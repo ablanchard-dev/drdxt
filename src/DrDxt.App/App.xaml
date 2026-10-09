@@ -1,0 +1,912 @@
+﻿<Application x:Class="DrDxt.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:effets="clr-namespace:DrDxt.App.Effets">
+    <!--
+        CHROME LIQUIDE SUR OBSIDIENNE.
+
+        Le fond est une pierre noire, froide, où l'on joue la nuit à côté d'un bureau éclairé.
+        La matière est le chrome : argent qui coule (shader Effets/ChromeLiquide.hlsl), liserés
+        métalliques qui accrochent la lumière du curseur. La couleur vient de l'irisation d'une
+        couche mince sur le métal (cyan, violet, magenta, ambre), jamais d'un aplat décoratif.
+        Trois couleurs d'état seulement, chacune doublée d'un mot : à corriger, à regarder, rien de
+        signalé ; « pas lu » reste acier.
+
+        Tout ce qui bouge obéit à Effets/MoteurDAnimation : la fenêtre doit être au premier plan.
+        Pendant une mesure en jeu, c'est le jeu qui l'est, et l'interface ne coûte rien.
+    -->
+    <Application.Resources>
+
+        <!-- ══ Couleurs ══ -->
+        <Color x:Key="ObsidienneColor">#FF06070A</Color>
+        <Color x:Key="ObsidienneHauteColor">#FF0C0E13</Color>
+        <Color x:Key="ObsidienneReleveeColor">#FF131720</Color>
+        <Color x:Key="FiletColor">#FF1D222C</Color>
+        <Color x:Key="FiletClairColor">#FF2C3240</Color>
+        <Color x:Key="TexteColor">#FFF2F4F8</Color>
+        <Color x:Key="TexteSecondaireColor">#FFA7B0BF</Color>
+        <Color x:Key="TexteDiscretColor">#FF7A8394</Color>
+        <Color x:Key="SurChromeColor">#FF07080B</Color>
+
+        <!-- 06/10/2026 (le mainteneur : « enlever le turquoise », DA noir et argent) : l'accent de DrDXT devient le platine.
+             Les noms « Cyan » restent pour ne pas toucher aux vues ; leurs valeurs sont de l'argent. -->
+        <Color x:Key="IrisCyanColor">#FFE6EAF0</Color>
+        <Color x:Key="IrisVioletColor">#FF8B5CFF</Color>
+        <Color x:Key="IrisMagentaColor">#FFFF4FD8</Color>
+        <Color x:Key="IrisAmbreColor">#FFFFB547</Color>
+        <!-- 03/10/2026 (D4.1) : le cyan est LA couleur de DrDXT dans l'interface (actions, progression, liseré, sélection).
+             Violet, magenta et ambre ne vivent plus que dans la matière : le chrome liquide et le réseau neuronal. -->
+        <Color x:Key="CyanGlaceColor">#FFFFFFFF</Color>
+        <Color x:Key="CyanProfondColor">#FF8D96A3</Color>
+
+        <Color x:Key="EtatCorrigerColor">#FFFF5C7A</Color>
+        <Color x:Key="EtatRegarderColor">#FFFFB547</Color>
+        <Color x:Key="EtatRienColor">#FF4DF0B0</Color>
+        <Color x:Key="EtatNonLuColor">#FF8A93A3</Color>
+
+        <!-- ══ Brosses ══ -->
+        <SolidColorBrush x:Key="ObsidienneBrush" Color="{StaticResource ObsidienneColor}"/>
+        <!-- 29/09/2026 : fondu en haut des pages qui défilent ; le contenu passait net sous la barre de titre,
+             un titre coupé à mi-hauteur (seconde critique de l'app). -->
+        <LinearGradientBrush x:Key="FonduHautBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FF06070A" Offset="0"/>
+            <GradientStop Color="#0006070A" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="ObsidienneHauteBrush" Color="{StaticResource ObsidienneHauteColor}"/>
+        <SolidColorBrush x:Key="ObsidienneReleveeBrush" Color="{StaticResource ObsidienneReleveeColor}"/>
+        <SolidColorBrush x:Key="FiletBrush" Color="{StaticResource FiletColor}"/>
+        <SolidColorBrush x:Key="FiletClairBrush" Color="{StaticResource FiletClairColor}"/>
+        <SolidColorBrush x:Key="TexteBrush" Color="{StaticResource TexteColor}"/>
+        <SolidColorBrush x:Key="TexteSecondaireBrush" Color="{StaticResource TexteSecondaireColor}"/>
+        <SolidColorBrush x:Key="TexteDiscretBrush" Color="{StaticResource TexteDiscretColor}"/>
+        <SolidColorBrush x:Key="SurChromeBrush" Color="{StaticResource SurChromeColor}"/>
+        <SolidColorBrush x:Key="IrisCyanBrush" Color="{StaticResource IrisCyanColor}"/>
+        <SolidColorBrush x:Key="IrisVioletBrush" Color="{StaticResource IrisVioletColor}"/>
+        <SolidColorBrush x:Key="IrisMagentaBrush" Color="{StaticResource IrisMagentaColor}"/>
+        <SolidColorBrush x:Key="IrisAmbreBrush" Color="{StaticResource IrisAmbreColor}"/>
+        <SolidColorBrush x:Key="EtatCorrigerBrush" Color="{StaticResource EtatCorrigerColor}"/>
+        <SolidColorBrush x:Key="EtatRegarderBrush" Color="{StaticResource EtatRegarderColor}"/>
+        <SolidColorBrush x:Key="EtatRienBrush" Color="{StaticResource EtatRienColor}"/>
+        <SolidColorBrush x:Key="EtatNonLuBrush" Color="{StaticResource EtatNonLuColor}"/>
+        <SolidColorBrush x:Key="VoileBrush" Color="#CC06070A"/>
+        <!-- 07/10/2026 : une ombre ronde, sans bord, sous un texte posé à nu sur le chrome clair du fond. -->
+        <RadialGradientBrush x:Key="HaloDeLectureBrush"><GradientStop Color="#C006070A" Offset="0"/><GradientStop Color="#8006070A" Offset="0.55"/><GradientStop Color="#0006070A" Offset="1"/></RadialGradientBrush>
+        <SolidColorBrush x:Key="IrisCyanDouxBrush" Color="#1FE6EAF0"/>
+        <SolidColorBrush x:Key="EtatCorrigerDouxBrush" Color="#24FF5C7A"/>
+        <SolidColorBrush x:Key="EtatRegarderDouxBrush" Color="#24FFB547"/>
+        <SolidColorBrush x:Key="EtatRienDouxBrush" Color="#1F4DF0B0"/>
+        <SolidColorBrush x:Key="EtatNonLuDouxBrush" Color="#1F8A93A3"/>
+
+        <!-- 23/09/2026 — LE FILET D'ÉTAT, pas la pastille pleine. Une pilule remplie d'une couleur
+             pastel est la signature d'un gabarit ; sur un fond obsidienne elle fait tache et le texte
+             y perd du contraste. L'état se dit désormais par un LISERÉ teinté et un POINT, le libellé
+             restant sur le blanc cassé du texte courant : la couleur devient un accent, pas le fond,
+             et l'information ne repose jamais sur elle seule (le mot est là, et le point a une forme). -->
+        <SolidColorBrush x:Key="EtatCorrigerFiletBrush" Color="#66FF5C7A"/>
+        <SolidColorBrush x:Key="EtatRegarderFiletBrush" Color="#5CFFB547"/>
+        <SolidColorBrush x:Key="EtatRienFiletBrush" Color="#4D4DF0B0"/>
+        <SolidColorBrush x:Key="EtatNonLuFiletBrush" Color="#4D8A93A3"/>
+
+        <!-- Clés lues par les convertisseurs (HeadlineKeyToBrushConverter). -->
+        <SolidColorBrush x:Key="GreenBrush" Color="{StaticResource EtatRienColor}"/>
+        <SolidColorBrush x:Key="BandPoorBrush" Color="{StaticResource EtatCorrigerColor}"/>
+        <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TexteSecondaireColor}"/>
+
+        <!-- Le chrome : bandes d'argent comme sur une surface miroir courbe. -->
+        <LinearGradientBrush x:Key="ChromeBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFFFFFFF" Offset="0"/>
+            <GradientStop Color="#FFD7DCE4" Offset="0.30"/>
+            <GradientStop Color="#FF8D96A4" Offset="0.49"/>
+            <GradientStop Color="#FF3E4450" Offset="0.52"/>
+            <GradientStop Color="#FFB9C0CB" Offset="0.78"/>
+            <GradientStop Color="#FFF4F6FA" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- Le chrome d'une capsule qui porte du texte : clair d'un bout à l'autre, aucune bande
+             sombre ne passe dans les lettres (contraste du texte sombre au-dessus de 4,5:1). -->
+        <LinearGradientBrush x:Key="ChromeCapsuleBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFFFFFFF" Offset="0"/>
+            <GradientStop Color="#FFE9ECF1" Offset="0.42"/>
+            <GradientStop Color="#FFCDD3DC" Offset="0.78"/>
+            <GradientStop Color="#FFB7BFCA" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- Le liseré de métal : sombre, un éclat, sombre. Tourné vers le curseur par Speculaire. -->
+        <LinearGradientBrush x:Key="LisereChromeBrush" StartPoint="0,0.5" EndPoint="1,0.5">
+            <GradientStop Color="#FF2A303B" Offset="0"/>
+            <GradientStop Color="#FF4A5260" Offset="0.36"/>
+            <GradientStop Color="#FFF6F8FB" Offset="0.5"/>
+            <GradientStop Color="#FF4A5260" Offset="0.64"/>
+            <GradientStop Color="#FF2A303B" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- 03/10/2026 (D2.7, revue) : le bord des actions secondaires. Gris chrome, elles passaient pour des boutons
+             désactivés ou ceux d'un autre produit ; irisé, elles restent sous la pilule chrome mais dans la DA. Même forme que le
+             liseré chrome, donc Speculaire le fait tourner vers le curseur de la même façon. -->
+        <LinearGradientBrush x:Key="LisereIrisBrush" StartPoint="0,0.5" EndPoint="1,0.5">
+            <GradientStop Color="#FF1C1F25" Offset="0"/>
+            <GradientStop Color="#FF5A626E" Offset="0.32"/>
+            <GradientStop Color="{StaticResource IrisCyanColor}" Offset="0.5"/>
+            <GradientStop Color="#FF5A626E" Offset="0.68"/>
+            <GradientStop Color="#FF1C1F25" Offset="1"/>
+        </LinearGradientBrush>
+
+        <!-- L'arête haute d'une dalle : l'éclat du métal au bord, fondu vers la pierre. -->
+        <LinearGradientBrush x:Key="AreteDalleBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FF3A414E" Offset="0"/>
+            <GradientStop Color="#FF1D222C" Offset="0.18"/>
+            <GradientStop Color="#FF151920" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="IrisBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="{StaticResource CyanGlaceColor}" Offset="0"/>
+            <GradientStop Color="{StaticResource IrisCyanColor}" Offset="0.45"/>
+            <GradientStop Color="{StaticResource CyanProfondColor}" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="FonduVersObsidienneBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#0006070A" Offset="0"/>
+            <GradientStop Color="#9906070A" Offset="0.55"/>
+            <GradientStop Color="#FF06070A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <LinearGradientBrush x:Key="VoileLectureBrush" StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#E606070A" Offset="0"/>
+            <GradientStop Color="#A006070A" Offset="0.42"/>
+            <GradientStop Color="#0006070A" Offset="1"/>
+        </LinearGradientBrush>
+
+        <RadialGradientBrush x:Key="HaloIrisBrush">
+            <GradientStop Color="#55FFFFFF" Offset="0"/>
+            <GradientStop Color="#228D96A3" Offset="0.45"/>
+            <GradientStop Color="#008D96A3" Offset="1"/>
+        </RadialGradientBrush>
+
+        <!-- 06/10/2026 (maquette « 20h32 ») : la lettre en chrome poli, ciel clair en haut, horizon sombre au milieu,
+             sol réfléchi en bas. Réservé à la marque et au mot fort du titre. -->
+        <LinearGradientBrush x:Key="ChromeTexteBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#FFFFFFFF" Offset="0"/>
+            <GradientStop Color="#FFE3E7EC" Offset="0.42"/>
+            <GradientStop Color="#FFA4ACB6" Offset="0.52"/>
+            <GradientStop Color="#FFB9C0C9" Offset="0.7"/>
+            <GradientStop Color="#FFF4F6F8" Offset="1"/>
+        </LinearGradientBrush>
+
+        <RadialGradientBrush x:Key="HaloArgentBrush">
+            <GradientStop Color="#40FFFFFF" Offset="0"/>
+            <GradientStop Color="#18E4F2FF" Offset="0.5"/>
+            <GradientStop Color="#00E4F2FF" Offset="1"/>
+        </RadialGradientBrush>
+
+        <RadialGradientBrush x:Key="VolumeSphereBrush" GradientOrigin="0.36,0.3" Center="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+            <GradientStop Color="#00000000" Offset="0"/>
+            <GradientStop Color="#00000000" Offset="0.55"/>
+            <GradientStop Color="#B3000000" Offset="1"/>
+        </RadialGradientBrush>
+
+        <!-- 03/10/2026 (D7.1) : la lumière du logo 3D portée sur le bouton central. L'anneau cyan en relief (clair en haut à
+             gauche, profond en bas à droite, comme la lumière du rendu) et le liseré de Fresnel cyan au bord de la sphère. -->
+        <!-- 03/10/2026 (D9.1) : l'anneau cyan fixe se prenait pour la jauge, à l'usage.
+             Il passe en acier poli ; le cyan autour du bouton est réservé à la jauge qui avance pendant l'analyse. -->
+        <LinearGradientBrush x:Key="AnneauAcier3DBrush" StartPoint="0.15,0.1" EndPoint="0.85,0.9">
+            <GradientStop Color="#FFF2F5F9" Offset="0"/>
+            <GradientStop Color="#FFB9C2CE" Offset="0.35"/>
+            <GradientStop Color="#FF6E7886" Offset="0.7"/>
+            <GradientStop Color="#FF2E343D" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="ArreteAnneauBrush" StartPoint="0.2,0" EndPoint="0.8,1">
+            <GradientStop Color="#CCFFFFFF" Offset="0"/>
+            <GradientStop Color="#00FFFFFF" Offset="0.55"/>
+        </LinearGradientBrush>
+        <RadialGradientBrush x:Key="FresnelSphereBrush">
+            <GradientStop Color="#00FFFFFF" Offset="0"/>
+            <GradientStop Color="#00FFFFFF" Offset="0.8"/>
+            <GradientStop Color="#55FFFFFF" Offset="0.97"/>
+            <GradientStop Color="#88FFFFFF" Offset="1"/>
+        </RadialGradientBrush>
+
+        <RadialGradientBrush x:Key="RefletSphereBrush" GradientOrigin="0.5,0.5">
+            <GradientStop Color="#E6FFFFFF" Offset="0"/>
+            <GradientStop Color="#00FFFFFF" Offset="1"/>
+        </RadialGradientBrush>
+
+        <!-- ══ Polices ══ -->
+        <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+        <FontFamily x:Key="UiDisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
+        <FontFamily x:Key="MarqueFont">pack://application:,,,/DrDxt.App;component/Assets/Fonts/#Unbounded ExtraBold</FontFamily>
+        <FontFamily x:Key="MarqueDemiFont">pack://application:,,,/DrDxt.App;component/Assets/Fonts/#Unbounded SemiBold</FontFamily>
+        <FontFamily x:Key="MarqueLegereFont">pack://application:,,,/DrDxt.App;component/Assets/Fonts/#Unbounded</FontFamily>
+        <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
+
+        <!-- ══ Icônes au trait ══ -->
+        <Style x:Key="GlyphIcon" TargetType="Path">
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="StrokeThickness" Value="1.6"/>
+            <Setter Property="StrokeStartLineCap" Value="Round"/>
+            <Setter Property="StrokeEndLineCap" Value="Round"/>
+            <Setter Property="StrokeLineJoin" Value="Round"/>
+        </Style>
+
+        <!-- ══ Texte ══ -->
+        <Style x:Key="TitreMarque" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MarqueFont}"/>
+            <Setter Property="FontSize" Value="34"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="LineHeight" Value="42"/>
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+        </Style>
+
+        <Style x:Key="TitreSection" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MarqueDemiFont}"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style x:Key="Corps" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="LineHeight" Value="21"/>
+        </Style>
+
+        <Style x:Key="Discret" TargetType="TextBlock" BasedOn="{StaticResource Corps}">
+            <Setter Property="Foreground" Value="{StaticResource TexteSecondaireBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="LineHeight" Value="19"/>
+        </Style>
+
+        <Style x:Key="Legende" TargetType="TextBlock" BasedOn="{StaticResource Corps}">
+            <Setter Property="Foreground" Value="{StaticResource TexteDiscretBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="LineHeight" Value="17"/>
+        </Style>
+
+        <Style x:Key="Mesure" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource UiDisplayFont}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="30"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+            <Setter Property="Typography.NumeralAlignment" Value="Tabular"/>
+        </Style>
+
+        <Style x:Key="Donnee" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteSecondaireBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <!-- ══ Surfaces ══ -->
+        <!-- 03/10/2026 (D4.4) : « rectangle dans rectangle dans rectangle ». La dalle se sépare de la pierre par sa lumière
+             et l'espace autour ; elle ne garde que l'éclat du métal sur son arête haute, plus de cadre complet. -->
+        <Style x:Key="Dalle" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource ObsidienneHauteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource AreteDalleBrush}"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="CornerRadius" Value="14"/>
+        </Style>
+
+        <Style x:Key="Filet" TargetType="Border">
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Background" Value="{StaticResource FiletBrush}"/>
+        </Style>
+
+        <!-- ══ Focus clavier : un anneau cyan, jamais l'anneau pointillé de Windows ══ -->
+        <Style x:Key="FocusIris">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Rectangle Margin="-3" RadiusX="16" RadiusY="16" StrokeThickness="1.5"
+                                   Stroke="{StaticResource IrisCyanBrush}" SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ══ Capsule de maintien : les actions « Agir » des domaines ══
+             29/09/2026 : réduit à 96 px, le noyau de chrome liquide se lisait comme une image cassée (« une espèce de
+             diamant », retour sur l'app). Même geste, même clavier ; une pilule chrome que le maintien remplit
+             d'irisé de gauche à droite, et qui pulse pendant le travail. -->
+        <Style x:Key="CapsuleDeMaintien" TargetType="effets:NoyauDeMaintien">
+            <Setter Property="MinWidth" Value="190"/>
+            <Setter Property="Background" Value="{StaticResource ChromeCapsuleBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource SurChromeBrush}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusIris}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="effets:NoyauDeMaintien">
+                        <Grid>
+                            <Border x:Name="Halo" CornerRadius="26" Margin="-5" Background="{StaticResource HaloIrisBrush}" Opacity="0"/>
+                            <!-- Son échelle est posée par NoyauDeMaintien.OnApplyTemplate (une transformation liée dans le
+                                 modèle n'a pas d'élément gouvernant). -->
+                            <Border x:Name="Onde" CornerRadius="22" BorderThickness="1.5" BorderBrush="{StaticResource IrisBrush}" RenderTransformOrigin="0.5,0.5"
+                                    Opacity="{Binding OndeOpacite, RelativeSource={RelativeSource TemplatedParent}}" IsHitTestVisible="False"/>
+                            <Border CornerRadius="22" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}" ClipToBounds="True">
+                                <Grid>
+                                    <Border x:Name="Iris" CornerRadius="22" Background="{StaticResource IrisBrush}" Opacity="0.14"/>
+                                    <!-- Échelle posée par NoyauDeMaintien.OnApplyTemplate, comme l'onde. -->
+                                    <Border x:Name="Remplissage" CornerRadius="22" Background="{StaticResource IrisBrush}" HorizontalAlignment="Stretch" RenderTransformOrigin="0,0.5"/>
+                                    <!-- 29/09/2026 : le verbe et la durée de l'action (Content) ; le symbole seul si
+                                         aucun libellé n'est donné. -->
+                                    <ContentPresenter x:Name="Libelle" Margin="18,0" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      TextElement.FontFamily="{StaticResource MarqueDemiFont}" TextElement.FontSize="12.5"
+                                                      TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                    <Path x:Name="Symbole" Data="M0,0 L11,7 L0,14 Z" Fill="{StaticResource SurChromeBrush}" Width="11" Height="14"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                                </Grid>
+                            </Border>
+                            <!-- 29/09/2026 (B5) : l'éclair de l'action qui part (NoyauDeMaintien.Eclairer). -->
+                            <Border x:Name="Eclair" CornerRadius="22" Margin="-3" Background="{StaticResource IrisBrush}" Opacity="0" IsHitTestVisible="False"/>
+                            <!-- Annexe de B5 : l'action finie, une coche sur la capsule (NoyauDeMaintien.SignalerFait). -->
+                            <Border x:Name="Fait" CornerRadius="22" Background="{StaticResource ChromeCapsuleBrush}" Opacity="0" IsHitTestVisible="False">
+                                <Path Data="M0,6 L5,11 L14,0" Stroke="{StaticResource IrisCyanBrush}" StrokeThickness="2.4"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Content" Value="{x:Null}">
+                                <Setter TargetName="Symbole" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Halo" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                            <Trigger Property="EnMaintien" Value="True">
+                                <Setter TargetName="Halo" Property="Opacity" Value="1"/>
+                            </Trigger>
+                            <!-- Au travail : la respiration vient du moteur d'animation (Pouls), jamais d'un storyboard
+                                 sans fin qui tournerait encore derrière le jeu. -->
+                            <Trigger Property="Occupe" Value="True">
+                                <Setter Property="Cursor" Value="Arrow"/>
+                                <Setter TargetName="Iris" Property="Opacity" Value="{Binding Pouls, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                <Setter TargetName="Halo" Property="Opacity" Value="{Binding Pouls, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsEnabled" Value="False"/>
+                                    <Condition Property="Occupe" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter Property="Opacity" Value="0.45"/>
+                            </MultiTrigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Halo" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 03/10/2026 (D11.5, revue n° 5) : mesurer ou tester ne doit pas peser comme corriger. Même geste (maintenir),
+             mais la capsule d'une mesure est sombre et cerclée de cyan, comme les boutons secondaires ; le chrome plein reste
+             aux gestes qui changent quelque chose sur la machine. -->
+        <!-- 06/10/2026 : le filet de chrome des cadres de composants. -->
+        <LinearGradientBrush x:Key="FiletChromeBrush" StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#B3FFFFFF" Offset="0"/>
+            <GradientStop Color="#33FFFFFF" Offset="0.45"/>
+            <GradientStop Color="#80FFFFFF" Offset="1"/>
+        </LinearGradientBrush>
+
+        <Style x:Key="CapsuleDeMesure" TargetType="effets:NoyauDeMaintien" BasedOn="{StaticResource CapsuleDeMaintien}">
+            <Setter Property="Background" Value="{StaticResource ObsidienneHauteBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource IrisCyanBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <!-- ══ Capsule chrome : l'action principale d'un écran ══ -->
+        <Style x:Key="CapsuleChrome" TargetType="Button">
+            <Setter Property="FontFamily" Value="{StaticResource MarqueDemiFont}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{StaticResource SurChromeBrush}"/>
+            <Setter Property="Padding" Value="26,13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusIris}"/>
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform/>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="Halo" CornerRadius="26" Margin="-6" Background="{StaticResource HaloIrisBrush}" Opacity="0"/>
+                            <Border x:Name="Corps" CornerRadius="24" Background="{StaticResource ChromeCapsuleBrush}" ClipToBounds="True"
+                                    BorderThickness="1" BorderBrush="Transparent">
+                                <Grid>
+                                    <Border x:Name="Iris" CornerRadius="24" Background="{StaticResource IrisBrush}" Opacity="0.12"/>
+                                    <!-- 29/09/2026 : l'éclat était une bande blanche qui passait une fois en 0,75 s (retour sur l'app :
+                                         « un effet blanc qui dure même pas une seconde »). Reflet irisé, plus lent, qui
+                                         repasse tant que la souris reste. -->
+                                    <Border x:Name="Eclat" Width="110" HorizontalAlignment="Left" Opacity="0">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                                <GradientStop Color="#003CE6FF" Offset="0"/>
+                                                <GradientStop Color="#803CE6FF" Offset="0.3"/>
+                                                <GradientStop Color="#999470FF" Offset="0.5"/>
+                                                <GradientStop Color="#80FF5CC7" Offset="0.7"/>
+                                                <GradientStop Color="#00FF5CC7" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <Border.RenderTransform>
+                                            <TranslateTransform X="-80"/>
+                                        </Border.RenderTransform>
+                                    </Border>
+                                    <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.22"/>
+                                            <DoubleAnimation Storyboard.TargetName="Iris" Storyboard.TargetProperty="Opacity" To="0.3" Duration="0:0:0.22"/>
+                                            <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.3"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                    <BeginStoryboard x:Name="Balayage">
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                             From="-120" To="420" Duration="0:0:1.6">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <SineEase EasingMode="EaseInOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <StopStoryboard BeginStoryboardName="Balayage"/>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.16"/>
+                                            <DoubleAnimation Storyboard.TargetName="Iris" Storyboard.TargetProperty="Opacity" To="0.12" Duration="0:0:0.16"/>
+                                            <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.97" ScaleY="0.97"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <!-- Désactivée, la capsule perd son métal : pierre, liseré acier, texte discret. -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Corps" Property="Background" Value="{StaticResource ObsidienneReleveeBrush}"/>
+                                <Setter TargetName="Corps" Property="BorderBrush" Value="{StaticResource FiletClairBrush}"/>
+                                <Setter TargetName="Iris" Property="Opacity" Value="0"/>
+                                <Setter Property="Foreground" Value="{StaticResource TexteDiscretBrush}"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ══ Bouton à reflet : obsidienne cerclée de métal, l'arête suit le curseur ══ -->
+        <Style x:Key="BoutonReflet" TargetType="Button">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+            <Setter Property="Background" Value="{StaticResource ObsidienneHauteBrush}"/>
+            <Setter Property="Padding" Value="20,11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusIris}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Cadre" CornerRadius="22" BorderThickness="1.5"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{StaticResource LisereIrisBrush}"
+                                effets:Speculaire.Suivre="True">
+                            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Cadre" Property="Background" Value="{StaticResource ObsidienneReleveeBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Cadre" Property="Background" Value="{StaticResource ObsidienneBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ══ Lien : le texte seul, cyan d'irisation ══ -->
+        <Style x:Key="Lien" TargetType="Button">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource IrisCyanBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusIris}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="Transparent" Padding="0,2">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 03/10/2026 (D8.5, revue n° 3) : un réglage secondaire posé près de l'action principale. Une pilule fine,
+             texte gris, qui ne prend le cyan qu'au survol : on le voit, il ne concurrence pas le bouton principal. -->
+        <Style x:Key="BoutonDiscret" TargetType="Button">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteSecondaireBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource FiletBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusIris}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Pilule" Background="Transparent" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                                CornerRadius="12" Padding="12,4">
+                            <ContentPresenter HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource IrisCyanBrush}"/>
+                                <Setter TargetName="Pilule" Property="BorderBrush" Value="{StaticResource IrisCyanBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ══ Boutons de la barre de titre ══ -->
+        <Style x:Key="BoutonFenetre" TargetType="Button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteSecondaireBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fond" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fond" Property="Background" Value="{StaticResource ObsidienneReleveeBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BoutonFenetreFermer" TargetType="Button" BasedOn="{StaticResource BoutonFenetre}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Fond" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fond" Property="Background" Value="{StaticResource EtatCorrigerBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource SurChromeBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ══ Sélecteur segmenté : une piste de métal, le choix devient une capsule chrome ══ -->
+        <Style x:Key="SelecteurSegmente" TargetType="ListBox">
+            <Setter Property="Background" Value="{StaticResource ObsidienneBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBox">
+                        <Border CornerRadius="22" Background="{TemplateBinding Background}" BorderThickness="1"
+                                BorderBrush="{StaticResource FiletClairBrush}" Padding="4">
+                            <ItemsPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Rows="1"/>
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Cursor" Value="Hand"/>
+                        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusIris}"/>
+                        <Setter Property="Foreground" Value="{StaticResource TexteSecondaireBrush}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Grid>
+                                        <Border x:Name="Capsule" CornerRadius="18" Background="{StaticResource ChromeCapsuleBrush}" Opacity="0">
+                                            <Border CornerRadius="18" Background="{StaticResource IrisBrush}" Opacity="0.12"/>
+                                        </Border>
+                                        <Border x:Name="Survol" CornerRadius="18" Background="{StaticResource ObsidienneReleveeBrush}" Opacity="0"/>
+                                        <ContentPresenter Margin="8,8" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                          TextElement.FontFamily="{StaticResource UiFont}" TextElement.FontSize="12.5"
+                                                          TextElement.FontWeight="SemiBold"/>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Survol" Property="Opacity" Value="1"/>
+                                            <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Trigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="Capsule" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.24"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.EnterActions>
+                                            <Trigger.ExitActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="Capsule" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.14"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.ExitActions>
+                                            <Setter Property="Foreground" Value="{StaticResource SurChromeBrush}"/>
+                                            <Setter TargetName="Survol" Property="Opacity" Value="0"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ══ En-tête repliable : le titre, puis un chevron qui tourne ══ -->
+        <Style x:Key="EnTeteRepliable" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusIris}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="Transparent" Padding="0,4">
+                            <StackPanel Orientation="Horizontal">
+                                <ContentPresenter VerticalAlignment="Center"/>
+                                <Path x:Name="Chevron" Data="M0 0 L5 5 L10 0" Stroke="{StaticResource IrisCyanBrush}" StrokeThickness="1.6"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="10" Height="6" Margin="12,0,0,0"
+                                      VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform>
+                                        <RotateTransform Angle="-90"/>
+                                    </Path.RenderTransform>
+                                </Path>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Chevron" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <RotateTransform Angle="0"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ══ Champ de saisie : une fente dans la pierre, soulignée de chrome au focus ══ -->
+        <Style TargetType="TextBox">
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+            <Setter Property="Background" Value="{StaticResource ObsidienneBrush}"/>
+            <Setter Property="CaretBrush" Value="{StaticResource IrisCyanBrush}"/>
+            <Setter Property="SelectionBrush" Value="{StaticResource IrisCyanBrush}"/>
+            <Setter Property="SelectionOpacity" Value="0.45"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Grid>
+                            <Border x:Name="Fente" CornerRadius="12" Background="{TemplateBinding Background}"
+                                    BorderThickness="1" BorderBrush="{StaticResource FiletClairBrush}">
+                                <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center" Focusable="False"/>
+                            </Border>
+                            <Border x:Name="Trait" Height="2" CornerRadius="1" Margin="12,0" VerticalAlignment="Bottom"
+                                    Background="{StaticResource IrisBrush}" Opacity="0"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fente" Property="BorderBrush" Value="{StaticResource TexteDiscretBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Trait" Property="Opacity" Value="1"/>
+                                <Setter TargetName="Fente" Property="BorderBrush" Value="{StaticResource LisereChromeBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsReadOnly" Value="True">
+                                <Setter TargetName="Fente" Property="BorderThickness" Value="0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ══ Barre de défilement : un fil de chrome ══ -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="MinWidth" Value="10"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True" Margin="0,6">
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border x:Name="Fil" CornerRadius="3" Width="4" Background="{StaticResource FiletClairBrush}"/>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Fil" Property="Width" Value="6"/>
+                                                    <Setter TargetName="Fil" Property="Background" Value="{StaticResource ChromeBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Height" Value="0"/>
+                    <Setter Property="MinHeight" Value="0"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ══ Info-bulle ══ -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border CornerRadius="10" Background="{StaticResource ObsidienneReleveeBrush}" BorderThickness="1"
+                                BorderBrush="{StaticResource FiletClairBrush}" Padding="12,8" MaxWidth="360">
+                            <!-- 24/09/2026 : une chaîne passée en contenu devient un TextBlock sans retour à la
+                                 ligne ; les explications longues (bridage, incidents) étaient coupées à 360. -->
+                            <ContentPresenter>
+                                <ContentPresenter.Resources>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                        <Setter Property="LineHeight" Value="18"/>
+                                    </Style>
+                                </ContentPresenter.Resources>
+                            </ContentPresenter>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ══ Le noyau de scan : une sphère de chrome liquide qu'on maintient ══ -->
+        <Style TargetType="effets:NoyauDeMaintien">
+            <Setter Property="Width" Value="210"/>
+            <Setter Property="Height" Value="210"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="effets:NoyauDeMaintien">
+                        <Grid>
+                            <Ellipse x:Name="Halo" Margin="-34" Fill="{StaticResource HaloArgentBrush}" Opacity="0.55"/>
+                            <!-- 29/09/2026 : au travail, une onde irisée part de la sphère (Pouls et onde viennent du moteur
+                                 d'animation, donc s'arrêtent quand le jeu passe devant). -->
+                            <Ellipse x:Name="Onde" Margin="16" StrokeThickness="2" Stroke="#CCFFFFFF" RenderTransformOrigin="0.5,0.5"
+                                     Opacity="{Binding OndeOpacite, RelativeSource={RelativeSource TemplatedParent}}" IsHitTestVisible="False"/>
+                            <!-- 06/10/2026 (le mainteneur, maquettes 20h15 / 20h41) : le bouton est la bille de DrDXT, un tourbillon de
+                                 chrome qui tourne dans une sphère de verre ; plus vite pendant le scan. Pas d'anneau fixe. -->
+                            <effets:BilleDeChrome Margin="6" Rapide="{TemplateBinding Occupe}"/>
+                            <Ellipse Margin="6" Fill="#01000000"/>
+                            <!-- 06/10/2026 (le mainteneur : « ça n'attend pas que la barre soit pleine ») : elle attendait, mais la bille la
+                                 cachait. La jauge du maintien passe au-dessus de la bille, autour d'elle, bien visible. -->
+                            <effets:ArcDeProgression Margin="-10" Epaisseur="5" Valeur="{TemplateBinding Progression}"
+                                                     Trait="{StaticResource IrisBrush}" Fond="#00FFFFFF" IsHitTestVisible="False"/>
+                            <!-- 06/10/2026 (le mainteneur : « le trait est trop épais autour, enlève-le, fais une vraie bille ») : plus
+                                 d'anneau fixe ; la bille de chrome 3D est le bouton. -->
+                            <Ellipse x:Name="AnneauFocus" Margin="6" StrokeThickness="1.5" Stroke="{StaticResource IrisCyanBrush}"
+                                     StrokeDashArray="2 3" Visibility="Collapsed"/>
+                            <!-- 29/09/2026 (B5) : l'éclair du scan qui part (NoyauDeMaintien.Eclairer). -->
+                            <Ellipse x:Name="Eclair" Margin="-20" Fill="{StaticResource HaloIrisBrush}" Opacity="0" IsHitTestVisible="False"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Halo" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="EnMaintien" Value="True">
+                                <Setter TargetName="Halo" Property="Opacity" Value="1"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="AnneauFocus" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <!-- Au travail : on reste allumé, le métal s'anime plus vite, le halo monte.
+                                 C'est la réponse au geste ; l'arc de progression la double. -->
+                            <Trigger Property="Occupe" Value="True">
+                                <Setter Property="Cursor" Value="Arrow"/>
+                                <Setter TargetName="Halo" Property="Opacity" Value="{Binding Pouls, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            </Trigger>
+                            <!-- Hors service SANS être au travail : là seulement, on grise. -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsEnabled" Value="False"/>
+                                    <Condition Property="Occupe" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter Property="Opacity" Value="0.5"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 03/10/2026 (D4.3) : la sphère de marque. La même matière que le bouton central (chrome liquide, volume, reflet,
+             liseré) et sa jauge cyan ; c'est le logo de DrDXT : l'icône Windows est photographiée sur elle, et elle remplace
+             le docteur dans le bilan. Dessinée sur 210, mise à l'échelle par la Viewbox. -->
+        <!-- 03/10/2026 (D6.3) : le logo retenu, rendu en vraie 3D (la matière chrome liquide de l'appli sur une
+             sphère éclairée, l'anneau cyan en volume, dans la même lumière). Le même rendu fait l'icône Windows. -->
+        <ControlTemplate x:Key="SphereDeMarque" TargetType="Control">
+            <Image Source="pack://application:,,,/DrDxt.App;component/Assets/logo-3d.png" Stretch="Uniform"
+                   RenderOptions.BitmapScalingMode="HighQuality"/>
+        </ControlTemplate>
+    </Application.Resources>
+</Application>

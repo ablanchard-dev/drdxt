@@ -1,0 +1,87 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\drdxt.ico</ApplicationIcon>
+    <!-- 18/09/2026 - Mesure du payload : 13 dossiers de langue, 8,88 Mo, alors que DrDXT ne
+         traduit que le francais (Strings.fr.resx) par-dessus le neutre anglais. Les douze
+         autres ne portaient QUE les satellites du framework WPF : les messages internes de
+         WPF en tcheque ou en coreen, pour une interface francaise. Sur une machine tcheque,
+         nos chaines tombent de toute facon sur le neutre.
+         La liste n'est pas un choix de gout : un test la compare aux .resx du depot, donc
+         ajouter Strings.de.resx sans l'ajouter ici fait rougir la suite. -->
+    <SatelliteResourceLanguages>en;fr</SatelliteResourceLanguages>
+    <!-- 04/10/2026 : aucun code injecte au lancement (DOTNET_STARTUP_HOOKS), voir AucunCrochetDeDemarrageTests. -->
+    <StartupHookSupport>false</StartupHookSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\drdxt.ico" />
+    <Resource Include="Assets\logo-3d.png" />
+    <Resource Include="Assets\docteur-portrait.png" />
+    <!-- 06/10/2026 : rendu Cycles (tools/rendus-3d) : la boucle de chrome des composants. -->
+    <Resource Include="Assets\boucle.png" />
+    <Resource Include="Assets\Fonts\*.ttf" />
+    <Resource Include="Effets\ChromeLiquide.ps" />
+    <Resource Include="Effets\BilleLiquide.ps" />
+    <Resource Include="Effets\ChromeSouple.ps" />
+    <Resource Include="Assets\studio-chrome.png" />
+    <None Include="Effets\BilleLiquide.hlsl" />
+    <None Include="Effets\ChromeLiquide.hlsl" />
+    <None Include="Assets\Fonts\OFL-Unbounded.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- 23/09/2026 : la GPL-3.0 (§4) accompagne chaque copie livrée. L'installeur copie publish\*. -->
+    <None Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test-only access to the internal fail-closed signer/verifier (M5 custody tests). -->
+    <InternalsVisibleTo Include="DrDxt.App.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <!-- 07/10/2026 (D11) : le QR du guide BIOS, lu au téléphone pendant que le PC est dans le BIOS. MIT. -->
+    <PackageReference Include="QRCoder" Version="1.8.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <!-- WMI: System Restore status + restore-point verification (WmiRestorePointService). -->
+    <PackageReference Include="System.Management" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DrDxt.Application\DrDxt.Application.csproj" />
+    <!-- M3 — the BIOS Doctor advisor (IBiosAdvisor) surfaced in the scan, guidance-only. -->
+    <ProjectReference Include="..\DrDxt.Bios\DrDxt.Bios.csproj" />
+    <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
+    <ProjectReference Include="..\DrDxt.Detection\DrDxt.Detection.csproj" />
+    <!-- T5 — the verified ADLX native boundary (IAdlxNative/AdlxNative). The App wires the
+         real AdlxGpuTuningReader over it; explicit (not just transitive via Detection) so the
+         dependency is declared where it is used. -->
+    <ProjectReference Include="..\DrDxt.GpuNative\DrDxt.GpuNative.csproj" />
+    <!-- Real signed-IPC IElevatedClient (talks to the elevated helper).
+         The App LAUNCHES this helper exe on demand (HelperLauncher), so the helper
+         apphost + its runtime files MUST land next to the App exe. The SDK copies
+         a referenced Exe project's apphost to the referencing output; the
+         CopyHelperHostToOutput target below makes that an ENFORCED invariant (build
+         fails if the helper exe is missing) rather than an implicit SDK default. -->
+    <ProjectReference Include="..\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
+    <ProjectReference Include="..\DrDxt.Infrastructure\DrDxt.Infrastructure.csproj" />
+    <ProjectReference Include="..\DrDxt.Measurement\DrDxt.Measurement.csproj" />
+    <!-- M6 — per-chip optimization profiles (IProfileMatcher + the sourced catalog). -->
+    <ProjectReference Include="..\DrDxt.Profiles\DrDxt.Profiles.csproj" />
+    <!-- M4 — the reconciler (status/control surface): pure contracts + prod probes. -->
+    <ProjectReference Include="..\DrDxt.Reconciler\DrDxt.Reconciler.csproj" />
+    <ProjectReference Include="..\DrDxt.Reconciler.Adapters\DrDxt.Reconciler.Adapters.csproj" />
+  </ItemGroup>
+
+  <!-- Enforce that the elevated helper apphost lands next to the App exe. The App
+       launches "$(OutDir)DrDxt.ElevatedHelper.exe" at runtime (ElevatedClientFactory
+       / HelperLauncher); if it is missing, fail the build loudly instead of shipping
+       an App that cannot elevate. -->
+  <Target Name="VerifyHelperHostInOutput" AfterTargets="Build;Publish">
+    <Error Condition="!Exists('$(OutDir)DrDxt.ElevatedHelper.exe')"
+           Text="DrDxt.ElevatedHelper.exe was not copied to the App output ($(OutDir)). The App cannot launch the elevated helper without it." />
+  </Target>
+
+</Project>

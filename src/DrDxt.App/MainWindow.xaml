@@ -1,0 +1,94 @@
+<Window x:Class="DrDxt.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:conv="clr-namespace:DrDxt.App.Converters"
+        mc:Ignorable="d"
+        Title="DrDXT"
+        Height="900"
+        Width="1320"
+        MinHeight="640"
+        MinWidth="1040"
+        Icon="Assets/drdxt.ico"
+        Background="{StaticResource ObsidienneBrush}"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <!-- Les boutons de la barre de titre ne sont que des tracés : leur nom parlé vient
+             du catalogue, comme le reste de ce que le client lit. -->
+        <conv:KeyToLocalizedStringConverter x:Key="Loc"/>
+    </Window.Resources>
+
+    <!-- La barre de titre de Windows est remplacée par la nôtre ; le système garde le
+         redimensionnement, l'ancrage et les raccourcis (WindowChrome). -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="38" ResizeBorderThickness="6" GlassFrameThickness="0"
+                      CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Template>
+        <ControlTemplate TargetType="Window">
+            <Border x:Name="Cadre" Background="{TemplateBinding Background}"
+                    BorderThickness="1" BorderBrush="{StaticResource FiletBrush}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="38"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
+                            <!-- 06/10/2026 (maquette « 20h32 ») : la marque en chrome poli, penchée vers l'avant. -->
+                            <TextBlock FontFamily="{StaticResource MarqueFont}" FontSize="20" VerticalAlignment="Center"
+                                       Foreground="{StaticResource ChromeTexteBrush}" Text="DrDXT">
+                                <TextBlock.RenderTransform><SkewTransform AngleX="-12"/></TextBlock.RenderTransform>
+                                <TextBlock.Effect><DropShadowEffect BlurRadius="8" ShadowDepth="1.5" Direction="270" Opacity="0.9" Color="#000000"/></TextBlock.Effect>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Style="{StaticResource BoutonFenetre}" Command="{x:Static SystemCommands.MinimizeWindowCommand}"
+                                    AutomationProperties.Name="{Binding Source=Window.Minimize, Converter={StaticResource Loc}}"
+                                    WindowChrome.IsHitTestVisibleInChrome="True">
+                                <Path Data="M0 0.5 H10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1" Width="10" Height="1"/>
+                            </Button>
+                            <Button x:Name="Agrandir" Style="{StaticResource BoutonFenetre}" Command="{x:Static SystemCommands.MaximizeWindowCommand}"
+                                    AutomationProperties.Name="{Binding Source=Window.Maximize, Converter={StaticResource Loc}}"
+                                    WindowChrome.IsHitTestVisibleInChrome="True">
+                                <Path Data="M0.5 0.5 H9.5 V9.5 H0.5 Z" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1" Width="10" Height="10"/>
+                            </Button>
+                            <Button x:Name="Restaurer" Style="{StaticResource BoutonFenetre}" Command="{x:Static SystemCommands.RestoreWindowCommand}"
+                                    AutomationProperties.Name="{Binding Source=Window.Restore, Converter={StaticResource Loc}}"
+                                    WindowChrome.IsHitTestVisibleInChrome="True" Visibility="Collapsed">
+                                <Path Data="M2.5 0.5 H9.5 V7.5 M0.5 2.5 H7.5 V9.5 H0.5 Z" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1" Width="10" Height="10"/>
+                            </Button>
+                            <Button Style="{StaticResource BoutonFenetreFermer}" Command="{x:Static SystemCommands.CloseWindowCommand}"
+                                    AutomationProperties.Name="{Binding Source=Window.Close, Converter={StaticResource Loc}}"
+                                    WindowChrome.IsHitTestVisibleInChrome="True">
+                                <Path Data="M0.5 0.5 L9.5 9.5 M9.5 0.5 L0.5 9.5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1" Width="10" Height="10"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <AdornerDecorator Grid.Row="1">
+                        <ContentPresenter/>
+                    </AdornerDecorator>
+                </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="WindowState" Value="Maximized">
+                    <!-- Une fenêtre maximisée déborde de quelques pixels de l'écran : on les rend. -->
+                    <Setter TargetName="Cadre" Property="BorderThickness" Value="0"/>
+                    <Setter TargetName="Cadre" Property="Padding" Value="7"/>
+                    <Setter TargetName="Agrandir" Property="Visibility" Value="Collapsed"/>
+                    <Setter TargetName="Restaurer" Property="Visibility" Value="Visible"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+    </Window.Template>
+</Window>
