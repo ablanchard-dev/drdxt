@@ -1,0 +1,105 @@
+# -*- coding: utf-8 -*-
+"""Les chemins cites par les documents de garde existent-ils vraiment ?
+
+18/09/2026. `GATES.md` est le fichier dont la fonction est de BLOQUER : il dit ce
+qui n'est pas fini et, surtout, ce que le mainteneur doit faire pour debloquer. Sa premiere
+instruction disait :
+
+    Double-cliquer `installer/Output/DrDXT-Setup.exe`
+
+Ce fichier n'existe pas, et ne PEUT pas exister : `build-installer.ps1` ne retire
+le suffixe `-NON-SIGNE` qu'avec `-Sign`, et rien n'est signe. La seule
+instruction actionnable du document envoyait ouvrir un dossier et n'y rien
+trouver -- le gate le plus ancien du projet, ouvert depuis le 27/08, tenait pour
+partie a une chaine de caracteres.
+
+Un document de garde qui cite un chemin mort ne bloque plus : il fait perdre son
+temps a celui qui le suit, et la fois d'apres il n'est plus suivi.
+
+Lecture seule. N'ecrit rien, ne construit rien, ne lance rien.
+
+    python tools/gates/liens.py            # 0 si tout resout, 1 sinon
+    python tools/gates/liens.py --autotest # se verifie lui-meme
+"""
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+RACINE = Path(__file__).resolve().parents[2]
+
+DOCUMENTS = ["GATES.md", "README.md"]
+
+# Un chemin du depot cite entre accents graves : au moins un dossier connu en
+# tete, pour ne pas confondre avec un identifiant de code (`Result`, `Ok(vide)`).
+DOSSIERS = ("docs", "tools", "installer", "server", "src", "tests")
+CHEMIN = re.compile(
+    r"`((?:" + "|".join(DOSSIERS) + r")/[A-Za-z0-9._/\\-]+)`"
+)
+
+# Ce qui est cite comme un MOTIF, pas comme un fichier : le verifier serait du
+# bruit, et un crible qui crie au loup finit desactive.
+# `...` est une ELISION (« tests/.../SourcesCiteesTests ») : le fichier existe, c'est
+# le chemin qui est abrege. Premier essai sans cette entree : une accusation, a tort.
+JOKERS = ("*", "{", "%", "...")
+
+
+def chemins_cites(texte: str) -> list[str]:
+    return [c.replace("\\", "/") for c in CHEMIN.findall(texte) if not any(j in c for j in JOKERS)]
+
+
+def manquants(racine: Path = RACINE) -> list[tuple[str, str]]:
+    """(document, chemin) pour chaque citation qui ne resout pas."""
+    trouves = []
+    for nom in DOCUMENTS:
+        fichier = racine / nom
+        if not fichier.exists():
+            trouves.append((nom, "<le document lui-meme est introuvable>"))
+            continue
+        texte = fichier.read_text(encoding="utf-8")
+        for chemin in chemins_cites(texte):
+            if not (racine / chemin).exists():
+                trouves.append((nom, chemin))
+    return trouves
+
+
+def autotest() -> int:
+    """Le crible doit voir, et ne pas crier a tort."""
+    assert chemins_cites("ouvrir `installer/Output/DrDXT-Setup.exe` puis") == [
+        "installer/Output/DrDXT-Setup.exe"
+    ]
+    assert chemins_cites("le type `Result` est neutre") == [], "un identifiant n'est pas un chemin"
+    assert chemins_cites("voir `tools/*` pour les smokes") == [], "un motif n'est pas un chemin"
+    assert chemins_cites("`%LOCALAPPDATA%/x`") == [], "une variable d'environnement n'est pas un chemin"
+    # Et il doit savoir accuser : un document temoin qui cite un fichier absent.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        faux = Path(d)
+        (faux / "GATES.md").write_text("voir `docs/INEXISTANT.md`", encoding="utf-8")
+        (faux / "README.md").write_text("rien", encoding="utf-8")
+        assert manquants(faux) == [("GATES.md", "docs/INEXISTANT.md")], manquants(faux)
+    print("autotest : ok")
+    return 0
+
+
+def main() -> int:
+    if "--autotest" in sys.argv:
+        return autotest()
+
+    morts = manquants()
+    if not morts:
+        print("Tous les chemins cites par les documents de garde existent.")
+        return 0
+
+    print("Chemins cites qui n'existent pas :")
+    for document, chemin in morts:
+        print(f"  {document} -> {chemin}")
+    print("\nUn document de garde qui cite un chemin mort ne bloque plus : il fait")
+    print("perdre son temps a celui qui le suit.")
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

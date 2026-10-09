@@ -1,0 +1,15 @@
+<!-- QUEL CANDIDAT CETTE MACHINE MERITE-T-ELLE, AUJOURD'HUI ? NE FAIT PAS partie de DrDXT.sln. -->
+<!-- Lit l'etat REEL avec les lecteurs du produit, puis passe le catalogue au selecteur. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <RootNamespace>DrDxt.Tools.CandidatProbe</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Detection\DrDxt.Detection.csproj" />
+  </ItemGroup>
+</Project>

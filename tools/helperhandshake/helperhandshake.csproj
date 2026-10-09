@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- M5 helper-launch + §9.13 HANDSHAKE smoke. Lives OUTSIDE the .sln (like
+       tools/m2smoke, tools/r2smoke). Launches DrDxt.ElevatedHelper.exe ELEVATED in
+       handshake mode (NO pre-shared key), performs the REAL session-key handshake,
+       and runs a harmless allowlisted op (Ping) end-to-end. Prints PASS/FAIL.
+       The launch triggers a UAC prompt (interactive). See Program.cs / README.md. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AssemblyName>helperhandshake</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Core\DrDxt.Core.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
+  </ItemGroup>
+
+</Project>

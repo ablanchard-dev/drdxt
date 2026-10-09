@@ -1,0 +1,18 @@
+# Local dev runner scripts + ad-hoc outputs. Kept untracked AND ignored so a stray
+# `git add -A` (e.g. by an automated agent) can NEVER sweep/commit them again.
+run-*.ps1
+**/run-*.ps1
+# UNE exception, decidee par le proprietaire le 11/09/2026 : ce script porte une correction de
+# chemin qui doit survivre au disque. Ancree a la racine de tools/ : elle ne rattrape aucun homonyme
+# plus bas, et tout autre run-*.ps1 reste ignore.
+!/run-bench-ab.ps1
+bench_ab.txt
+
+# r2apply = local ELEVATED NVAPI apply-and-hold smoke tool (source kept locally;
+# build artifacts live in bin/). Intentionally not tracked.
+r2apply/
+
+# Sorties de build et caches, jamais du contenu : `guet/` est la copie deployee des
+# assemblies pour le probe drsprobe, reconstruite a chaque fois.
+drsprobe/guet/
+**/__pycache__/

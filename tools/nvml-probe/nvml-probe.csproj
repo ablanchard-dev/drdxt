@@ -1,0 +1,16 @@
+<!-- Throwaway live dogfood for the NVML ReBAR boundary. NOT part of DrDXT.sln. -->
+<!-- Validates the real nvml.dll P/Invoke (NvmlNative) + the wired NvmlReBarProvider -->
+<!-- end-to-end on a real NVIDIA GPU — the one part unit tests can't cover. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Detection\DrDxt.Detection.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.GpuNative\DrDxt.GpuNative.csproj" />
+  </ItemGroup>
+</Project>

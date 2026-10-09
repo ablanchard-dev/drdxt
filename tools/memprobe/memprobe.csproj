@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Sonde memoire : debit, latence et escalier de cache. Vit HORS de la .sln, comme r2bench et
+       les autres sondes, pour ne jamais peser sur le build ni sur les tests du produit.
+       LECTURE PURE : aucune ecriture, aucune elevation.
+
+       Corrige le 06/09/2026 : cette sonde portait sa PROPRE copie de l'algorithme et disait
+       « aucune dependance au produit ». Elle validait donc un instrument que le produit n'embarque
+       pas : exactement le defaut « l'artefact vendu n'a jamais ete execute ». Elle appelle
+       desormais `MemoryBench`, le code reellement livre. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <ServerGarbageCollector>true</ServerGarbageCollector>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Measurement\DrDxt.Measurement.csproj" />
+  </ItemGroup>
+
+</Project>

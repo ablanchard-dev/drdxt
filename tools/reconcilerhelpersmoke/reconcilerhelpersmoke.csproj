@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- M5 reconciler-to-helper CHANNEL live smoke. Lives OUTSIDE DrDXT.sln (like
+       tools/helperhandshake, tools/m2smoke). Launches DrDxt.ElevatedHelper.exe
+       ELEVATED in service mode (the long-lived, multi-connection accept loop) with
+       BOTH a trusted App path AND a trusted reconciler path, then connects AS the
+       reconciler identity (connect-only, NO launch) and round-trips a harmless
+       allowlisted op (Ping) through the negotiated, signed, allowlisted typed IPC.
+       The launch triggers ONE UAC prompt (interactive). Prints PASS/FAIL. See
+       README.md. Do NOT run in CI (it elevates). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AssemblyName>reconcilerhelpersmoke</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Core\DrDxt.Core.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.ReconcilerHost\DrDxt.ReconcilerHost.csproj" />
+  </ItemGroup>
+
+</Project>

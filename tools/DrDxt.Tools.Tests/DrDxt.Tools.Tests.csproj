@@ -1,0 +1,33 @@
+<!-- LES SUITES DES OUTILS QUI EN ONT UNE. -->
+<!-- Cree le 11/09/2026 : `CoeursHomogenes` et `CpuBudgetJuge` ont quitte `src/DrDxt.Measurement`
+     pour les outils qui les appellent, et leurs tests ne pouvaient pas rester dans la suite d'un
+     projet produit qui ne les compile plus. Ce projet est DANS DrDXT.sln pour que `dotnet test`
+     continue de les lancer : une garde qu'il faut penser a lancer a la main est une garde morte.
+     Meme place que `tools/amd-harness/DrDxt.AmdHarness.Tests`, qui y est deja. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>DrDxt.Tools.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="FluentAssertions" Version="7.2.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\coeurs\coeurs.csproj" />
+    <ProjectReference Include="..\cpubench\cpubench.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

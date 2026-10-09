@@ -1,0 +1,18 @@
+<!-- Manual LIVE OC sweep harness (P2). NOT part of DrDXT.sln. Finds the best PROVEN
+     stable core offset on the deterministic perf-meter (OcSweep over GpuBenchSession),
+     writing offsets via the live-validated NVAPI boundary. Non-elevated. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AssemblyName>octune</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Application\DrDxt.Application.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.Detection\DrDxt.Detection.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.GpuNative\DrDxt.GpuNative.csproj" />
+  </ItemGroup>
+</Project>

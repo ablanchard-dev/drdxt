@@ -1,0 +1,26 @@
+DrDXT — validation complète de ton PC
+
+Ce test MODIFIE des réglages de Windows, un par un, et remet chacun d'origine aussitôt :
+mode Jeu, enregistrement en arrière-plan de la Game Bar, mode fenêtré optimisé, planification GPU
+accélérée, plan d'alimentation, mode boost du processeur, limite de puissance de la carte graphique, Anti-Lag, Vsync et plafond d'images FRTC (réglages du pilote AMD).
+Il ne touche jamais au BIOS, ni à la tension, à la fréquence ou au ventilateur de la carte.
+
+1. Ferme tous les jeux.
+2. Dézippe tout le dossier (clic droit sur le zip > Extraire tout), puis ouvre le dossier extrait.
+3. Double-clique sur VALIDER.cmd.
+   - Si Windows affiche « Windows a protégé votre ordinateur » : clique « Informations complémentaires »,
+     puis « Exécuter quand même ». Le programme n'est pas signé, c'est normal.
+   - Windows demande « Voulez-vous autoriser cette application à apporter des modifications » : clique « Oui ».
+4. Ne ferme pas la fenêtre noire. Compte une à deux minutes.
+5. À la fin, un fichier DrDXT-validation-....txt est dans ton dossier Téléchargements. Sa première ligne
+   dit « tout est remis d'origine », ou la liste de ce qu'il faut vérifier. Envoie-le à la personne qui
+   t'a donné ce test, et à personne d'autre : il contient le nom de ton PC.
+
+Si la fenêtre se ferme toute seule ou si le PC plante pendant le test : relance VALIDER.cmd, ou
+REMETTRE.cmd. Le programme remet d'abord d'origine ce qu'il avait laissé (il le note dans le fichier
+DrDXT-a-remettre.json de tes Téléchargements, qui disparaît une fois tout remis).
+
+Si la première ligne dit « À VÉRIFIER À LA MAIN » : le rapport donne, pour chaque réglage concerné, sa valeur
+d'origine. Lance d'abord REMETTRE.cmd. Si la ligne reste là, remets ce réglage toi-même (logiciel AMD Adrenalin
+pour Anti-Lag, le plafond d'images et la limite de puissance ; Paramètres de Windows pour le reste), puis supprime
+le fichier DrDXT-a-remettre.json de tes Téléchargements, et envoie quand même le rapport.
