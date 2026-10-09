@@ -54,7 +54,7 @@ public sealed class VrrVsyncCapAmdTests
         Received.InOrder(() =>
         {
             _elevated.ExecuteAsync(new ApplyAdlxTuningOp(0, AdlxTuningKind.VerticalRefresh, 3), Arg.Any<CancellationToken>());
-            _elevated.ExecuteAsync(new ApplyAdlxTuningOp(0, AdlxTuningKind.FrameRateTarget, 141), Arg.Any<CancellationToken>());
+            _elevated.ExecuteAsync(new ApplyAdlxTuningOp(0, AdlxTuningKind.FrameRateTarget, 138), Arg.Any<CancellationToken>());
         });
         CompositeSnapshotCodec.Decode(r.Value!.OriginalValueJson).Value.Should().Equal(
             new ApplyAdlxTuningOp(0, AdlxTuningKind.FrameRateTarget, -60),

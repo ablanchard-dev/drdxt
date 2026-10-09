@@ -94,14 +94,14 @@ public sealed class VrrVsyncCapConfigTweakTests
     [Fact]
     public async Task Apply_configures_vsync_and_cap_three_under_refresh()
     {
-        var t = Build(refresh: 144); // cap should be 141
+        var t = Build(refresh: 144); // cap should be 138 (PlafondVrr : Reflex, 09/10/2026)
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // Vsync ON via DRS and frame cap = refresh - 3 = 141 via DRS.
+        // Vsync ON via DRS and frame cap = PlafondVrr.Cible(144) = 138 via DRS.
         await _elevated.Received().ExecuteAsync(
-            Arg.Is<ApplyNvApiDrsSettingOp>(o => o.Value == 141),
+            Arg.Is<ApplyNvApiDrsSettingOp>(o => o.Value == 138),
             Arg.Any<CancellationToken>());
         // Two settings applied (vsync + cap).
         await _elevated.Received(2).ExecuteAsync(Arg.Any<ApplyNvApiDrsSettingOp>(), Arg.Any<CancellationToken>());
@@ -112,13 +112,13 @@ public sealed class VrrVsyncCapConfigTweakTests
     {
         // FRL_FPS is documented (NVIDIA NvApiDriverSettings.h) as a 0-1023 range. A bogus
         // refresh from EDID/driver must never push an out-of-range value to the driver.
-        var t = Build(refresh: 2000); // refresh - 3 = 1997 would be out of the FRL range
+        var t = Build(refresh: 2000); // a bogus refresh: the target must stay inside the FRL range (PlafondVrr gives 1000)
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
         await _elevated.Received().ExecuteAsync(
-            Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x10835002u && o.Value == 1023u),
+            Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x10835002u && o.Value == 1000u && o.Value <= 1023u),
             Arg.Any<CancellationToken>());
     }
 
@@ -193,18 +193,18 @@ public sealed class VrrVsyncCapConfigTweakTests
         // §6.2 "rien ne reste pendu": op (1) Vsync ON succeeds, op (2) frame cap
         // FAILS → the tweak must replay the inverse of op (1) (restore Vsync to the
         // captured original 0) and return Fail, leaving NO half-applied state.
-        var t = Build(refresh: 144); // cap target = 141
+        var t = Build(refresh: 144); // cap target = 138
         _nvApi.GetVsyncMode().Returns(Result<uint>.Ok(0));      // original vsync = 0
         _nvApi.GetFrameRateLimit().Returns(Result<uint>.Ok(0)); // original cap = 0
 
-        // Vsync ON (VSYNCMODE_FORCEON) succeeds; the frame cap (value 141) fails.
+        // Vsync ON (VSYNCMODE_FORCEON) succeeds; the frame cap (value 138) fails.
         // Corrected DRS ids: VSYNCMODE = 0x00A879CF, FRL_FPS = 0x10835002.
         _elevated.ExecuteAsync(
                 Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x00A879CFu && o.Value == 0x47814940u),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
         _elevated.ExecuteAsync(
-                Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x10835002u && o.Value == 141u),
+                Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x10835002u && o.Value == 138u),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Fail(ErrorCodes.HelperOpFailed, "cap write failed")));
         // The inverse rollback (Vsync back to 0) is allowed to succeed.

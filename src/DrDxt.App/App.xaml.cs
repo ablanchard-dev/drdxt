@@ -384,7 +384,7 @@ public partial class App : System.Windows.Application
         using var client = new System.Net.Http.HttpClient();
         var etat = await Task.Run(() => DrDxt.App.Updates.VerificationMiseAJour.VerifierAsync(
             () => DrDxt.App.Updates.VerificationMiseAJour.Monter(
-                Environment.GetEnvironmentVariable(DrDxt.App.Updates.VerificationMiseAJour.VariableUrl), client, version),
+                DrDxt.App.Updates.VerificationMiseAJour.UrlEffective(Environment.GetEnvironmentVariable(DrDxt.App.Updates.VerificationMiseAJour.VariableUrl)), client, version),
             DrDxt.App.Updates.VerificationMiseAJour.DelaiParDefaut, CancellationToken.None));
         scan.AfficherMiseAJour(etat);
     }

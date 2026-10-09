@@ -2,7 +2,7 @@
 <#
 .SYNOPSIS
     07/10/2026 : fabrique le zip du RAPPORT EN LECTURE SEULE pour un joueur (machine AMD ou autre).
-    Remplace package.ps1 (zip de juillet, session d'écriture retirée par la règle du 29/09).
+    (Le zip de juillet, session d'écriture retirée par la règle du 29/09, et son script sont supprimés.)
     Dossier publié, pas un exe en un seul fichier : un exe qui se décompresse dans %TEMP% au lancement
     est ce que les antivirus aiment le moins (revue n° 8).
 #>

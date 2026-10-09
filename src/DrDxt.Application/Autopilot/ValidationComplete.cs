@@ -65,6 +65,9 @@ public static class ValidationComplete
             try { ecrireBloc?.Invoke(t); }
             catch (Exception) { /* le texte reste dans le rapport final */ }
         }
+        // 09/10/2026 : un rapport reçu d'un inconnu doit dire de quelle machine il vient (processeur, carte, pilote),
+        // sinon il ne prouve rien pour un matériel précis.
+        Ecrire($"Matériel : {Materiel(materiel)}{Environment.NewLine}{Environment.NewLine}");
         foreach (var levier in leviers)
         {
             if (jeuOuvert?.Invoke() == true)
@@ -166,8 +169,10 @@ public static class ValidationComplete
     /// <param name="Propre">Vrai seulement quand rien ne restait, ou que ce qui restait est rendu. Faux = à vérifier à la main.</param>
     public sealed record Remise(string Texte, bool Propre);
 
-    /// <summary>Rend ce qu'un essai interrompu a laissé dans le journal. Ne lève jamais.</summary>
-    public static async Task<Remise> RemettreAsync(IRevertEnAttente journal, Func<string, ITweak?> trouver)
+    /// <summary>Rend ce qu'un essai interrompu a laissé dans le journal. Ne lève jamais.
+    /// 09/10/2026 (revue) : le journal est rejoué en administrateur ; comme au démarrage de l'App, seul un inverse que ce
+    /// levier écrit lui-même est rejoué (<paramref name="rejouable"/> = RevertAuDemarrage.InverseRejouable en production).</summary>
+    public static async Task<Remise> RemettreAsync(IRevertEnAttente journal, Func<string, ITweak?> trouver, Func<string, string?, bool> rejouable)
     {
         try
         {
@@ -182,6 +187,8 @@ public static class ValidationComplete
                 return new($"{entree.TweakId} : l'essai s'est arrêté pendant l'écriture, avant que l'origine soit gardée. À vérifier à la main.", false);
             }
             if (trouver(entree.TweakId) is not { } levier) return new($"{entree.TweakId} : levier inconnu de ce banc, journal gardé.", false);
+            if (!rejouable(entree.TweakId, s.OriginalValueJson))
+                return new($"{entree.TweakId} : le journal ne demande pas une remise en état de ce levier, rien n'est rejoué. À vérifier à la main.", false);
             var r = await levier.RevertAsync(s).ConfigureAwait(false);
             if (!r.IsOk) return new($"{entree.TweakId} : PAS REMIS ({r.Error?.Code} {r.Error?.Message}), journal gardé.", false);
             journal.Lever();
@@ -194,6 +201,22 @@ public static class ValidationComplete
     {
         try { return relire(s); }
         catch (Exception ex) { return new Lecture(null, $"relecture impossible : {ex.Message}"); }
+    }
+
+    /// <summary>La carte qui fait tourner les jeux : celle qui a le plus de mémoire vidéo dédiée (un iGPU n'en a presque
+    /// pas). <c>null</c> sans carte lue.</summary>
+    public static GpuInfo? CartePrincipale(HardwareInventory? materiel)
+        => materiel?.Gpus.OrderByDescending(g => g.VramBytes).FirstOrDefault();
+
+    /// <summary>« processeur | carte (pilote x) | autres cartes » : les modèles seulement, aucun numéro de série.</summary>
+    public static string Materiel(HardwareInventory? materiel)
+    {
+        if (materiel is null) return "non lu";
+        var principale = CartePrincipale(materiel);
+        var cartes = principale is null ? "carte non lue"
+            : $"{principale.Model} (pilote {(principale.DriverVersion.Length > 0 ? principale.DriverVersion : "non lu")})";
+        var autres = materiel.Gpus.Where(g => !ReferenceEquals(g, principale)).Select(g => g.Model).ToList();
+        return $"{materiel.Cpu.Model} | {cartes}{(autres.Count > 0 ? " | aussi : " + string.Join(", ", autres) : "")}";
     }
 
     private static string Mot(bool? v, string oui, string non) => v switch { true => oui, false => non, null => "non lu" };

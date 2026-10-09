@@ -61,7 +61,7 @@ public partial class ScanViewModel
         catch (Exception) { VerificationBilan = _localize("Verifier.EnvoiImpossible"); return; }
         var hw = _lastScan?.Hw;
         var lien = DrDxt.App.Platform.LienDeRapport.Construire(hw?.Cpu.Model ?? "?",
-            hw?.Gpus.FirstOrDefault()?.Model ?? "?", texte);
+            (hw is null ? null : DrDxt.Application.Autopilot.ValidationComplete.CartePrincipale(hw))?.Model ?? "?", texte);
         if (!OuvrirLien(lien)) VerificationBilan = _localize("Verifier.EnvoiImpossible");
     }
 

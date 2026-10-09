@@ -41,6 +41,19 @@ public sealed class VerificationMiseAJourTests : IDisposable
                 UpdateDevKeys.CreateUpdateVerifier().Value!), delai, CancellationToken.None)).Etat;
 
     [Fact]
+    public void Sans_variable_l_adresse_du_projet_est_lue_et_off_coupe_tout()
+    {
+        // 09/10/2026 (audit de pérennité) : sans adresse par défaut, aucune copie installée ne pouvait se mettre à jour.
+        VerificationMiseAJour.UrlEffective(null).Should().Be("https://ablanchard-dev.github.io/drdxt");
+        VerificationMiseAJour.UrlEffective("off").Should().BeNull("« off » coupe toute requête");
+        VerificationMiseAJour.UrlEffective(" OFF ").Should().BeNull();
+        // Sous Windows, une variable posée vide n'existe pas : elle ne peut pas servir à couper.
+        VerificationMiseAJour.UrlEffective("").Should().Be(VerificationMiseAJour.UrlParDefaut);
+        VerificationMiseAJour.UrlEffective("https://exemple.test").Should().Be("https://exemple.test");
+        VerificationMiseAJour.UrlParDefaut.Should().StartWith("https://");
+    }
+
+    [Fact]
     public void Seule_une_version_verifiee_et_complete_est_installable()
     {
         new ResultatMiseAJour(EtatMiseAJour.NouvelleVersionVerifiee, "p.pkg", "abc", "1.3.0").Installable.Should().BeTrue();

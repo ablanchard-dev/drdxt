@@ -2,9 +2,10 @@
 
 ## Ce que fait l'App
 
-1. Au démarrage, si une adresse de serveur est configurée (variable d'environnement `DRDXT_UPDATE_URL`, en HTTPS), l'App lit
-   deux petits fichiers : `<racine>/updates/profiles/manifest` et `<racine>/updates/app/manifest`. Sans adresse, aucun
-   réseau n'est touché et le pied de page le dit.
+1. Au démarrage, l'App lit deux petits fichiers : `<racine>/updates/profiles/manifest` et `<racine>/updates/app/manifest`.
+   La racine est `https://ablanchard-dev.github.io/drdxt` (le site GitHub Pages du dépôt public) ; la variable
+   d'environnement `DRDXT_UPDATE_URL` la remplace, et posée à `off` elle coupe toute vérification (aucun réseau touché, le
+   pied de page le dit). Un fichier absent (404) veut dire « rien à offrir », jamais une erreur.
 2. Chaque manifeste est signé (Ed25519) par la clé de release du projet. La clé publique est dans l'App
    (`UpdateTrust.ProductionPublicKey`) ; elle ne peut que vérifier. Un manifeste non signé, mal signé, ou qui propose une
    version plus ancienne est refusé, et le refus est affiché : jamais tu, jamais installé.
@@ -16,8 +17,7 @@
    dossier utilisateur, après la même vérification de signature et d'empreinte ; une nouvelle version de l'App, jamais sans
    toi. Les versions sont rares. Rien d'autre que ces deux manifestes, le pack de profils et, sur ton accord, l'installeur
    ne quitte ni n'entre.
-6. Tant que l'adresse n'est pas configurée chez toi (`DRDXT_UPDATE_URL`), aucune mise à jour n'arrive : l'adresse de
-   production sera posée par l'installeur le jour de la sortie publique, et dite ici.
+6. Tant que le mainteneur n'a publié aucun manifeste sur ce site, rien n'arrive et le pied de page dit « à jour ».
 
 ## Ce que fait le mainteneur (hors de l'App)
 
@@ -28,8 +28,8 @@
   `signer.cs -- manifeste App <version> <url du fichier> <installeur> <sortie>` écrit le manifeste signé, le relit avec la
   clé publique, et le manifeste est publié à `<racine>/updates/app/manifest` (GitHub Pages du dépôt, fichiers statiques).
 - La clé publique du code est celle du mainteneur, créée le 09/10/2026 (empreinte hex
-  `8fb9aa669956b185d6d64bd0fb2010365980962cd84b2fb77ad42ce10b2fe6eb`). La racine (`DRDXT_UPDATE_URL`) sera posée le jour
-  du déploiement.
+  `8fb9aa669956b185d6d64bd0fb2010365980962cd84b2fb77ad42ce10b2fe6eb`). La racine est écrite dans le code
+  (`VerificationMiseAJour.UrlParDefaut`).
   Si une clé devait être remplacée, l'ancienne App ne reconnaîtrait plus les manifestes : une nouvelle version s'installe
   alors à la main depuis la Release.
 - La graine privée est chiffrée pour le compte Windows du mainteneur ET par une phrase demandée à chaque signature : un

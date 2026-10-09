@@ -16,7 +16,7 @@ public sealed class ValidationDeLaMachine(
     IAdlxGpuTuning adlxCarte, IAdlx latenceAmd, INvApiGpuTuning nvCarte)
 {
     public Task<ValidationComplete.Remise> RemettreAsync(IRevertEnAttente journal)
-        => ValidationComplete.RemettreAsync(journal, id => catalogue.Get(id) is { IsOk: true, Value: { } t } ? t : null);
+        => ValidationComplete.RemettreAsync(journal, id => catalogue.Get(id) is { IsOk: true, Value: { } t } ? t : null, RevertAuDemarrage.InverseRejouable);
 
     public async Task<ValidationComplete.Resultat> ValiderAsync(IRevertEnAttente journal, Action<string>? ecrireBloc = null,
         Func<bool>? jeuOuvert = null)

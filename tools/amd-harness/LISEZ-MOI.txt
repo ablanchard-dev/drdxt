@@ -8,9 +8,10 @@ DrDXT — test de ton PC (lecture seule)
      clique « Oui ». Il a besoin des droits administrateur pour LIRE certains journaux de Windows ;
      il ne modifie rien.
 3. Une fenêtre noire affiche chaque étape. Ne la ferme pas. Compte 1 à 3 minutes.
-4. À la fin, un fichier DrDXT-rapport-....txt est dans ton dossier Téléchargements.
-   Envoie-le à la personne qui t'a donné ce test, et à personne d'autre : il contient le nom de ton PC,
-   la liste de ses programmes au démarrage et de ses services.
+4. À la fin, un fichier DrDXT-rapport-....txt est dans ton dossier Téléchargements. Il contient les modèles de ton
+   matériel, tes réglages, la liste des programmes au démarrage et des services. Le nom du PC et du compte, les numéros
+   de série et les adresses réseau en sont retirés. Relis-le, puis envoie-le à qui t'a donné ce test, ou au projet :
+   https://github.com/ablanchard-dev/drdxt/issues/new?template=rapport-de-verification.yml
 
 Rien n'est modifié sur ton PC : le programme ne fait que lire (carte graphique, processeur, réglages,
 journaux). Il n'installe rien, ne crée aucun service ni point de restauration, et n'écrit que le rapport.

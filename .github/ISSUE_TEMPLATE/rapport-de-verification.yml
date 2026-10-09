@@ -1,12 +1,13 @@
 name: Rapport de vérification
-description: Le rapport de « Vérifier DrDXT sur mon PC », pour prouver DrDXT sur ton matériel.
+description: Le rapport de « Vérifier DrDXT sur mon PC » ou du zip de validation, pour prouver DrDXT sur ton matériel.
 title: "Vérification : <processeur> + <carte graphique>"
 labels: ["preuve"]
 body:
   - type: markdown
     attributes:
       value: |
-        Merci ! Le rapport se trouve dans `Documents\verification-drdxt-<date>.txt`. Il ne contient rien qui te désigne ; relis-le avant de l'envoyer si tu veux.
+        Merci ! Le rapport est dans `Documents\verification-drdxt-<date>.txt` (bouton de l'App) ou dans `Téléchargements\DrDXT-validation-<date>.txt` (zip de validation).
+        Avant d'être écrit, il est passé par les mêmes règles que la machine exportée : le nom du PC et du compte, le dossier utilisateur, les numéros de série, les adresses MAC et IP, les identifiants de compte et de volume et les adresses de courriel en sont retirés. Il reste les modèles du matériel, la version du pilote et les réglages testés. Relis-le avant de l'envoyer.
   - type: textarea
     id: rapport
     attributes:
