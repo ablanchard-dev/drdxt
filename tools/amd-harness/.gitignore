@@ -2,7 +2,7 @@
 # Note: bin/, obj/, publish/ are already covered by the root .gitignore;
 # they are not repeated here.
 
-# Package output produced by package.ps1
+# Package output (paquet-rapport.ps1 writes to Downloads)
 dist/
 
 # Log files produced by run.ps1 on the test machine

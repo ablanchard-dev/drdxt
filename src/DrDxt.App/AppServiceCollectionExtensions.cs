@@ -695,6 +695,8 @@ public static class AppServiceCollectionExtensions
         var texte = bilan + Environment.NewLine + Environment.NewLine
             + $"DrDXT {typeof(AppServiceCollectionExtensions).Assembly.GetName().Version?.ToString(3)}, vérification du {maintenant:dd/MM/yyyy HH:mm}"
             + Environment.NewLine + Environment.NewLine + r.Texte;
+        // 09/10/2026 : ce texte part en public (ticket GitHub) : les règles de la machine exportée s'y appliquent aussi.
+        texte = DrDxt.Detection.Repair.MachineExportee.AnonymiserTexte(texte, DrDxt.Detection.Repair.MachineExportee.ValeursDeCePc());
         return EcrireDansDocuments($"verification-drdxt-{maintenant:yyyy-MM-dd-HHmmss}.txt", texte);
     }
 

@@ -21,7 +21,7 @@ public static class UpdateTrust
     /// Créée le 09/10/2026 par le mainteneur (<c>cle --creer</c>) : la graine privée est chiffrée pour son compte Windows ET
     /// par une phrase qu'il est seul à connaître ; elle n'entre jamais dans le dépôt. Changer ces octets, c'est changer de clé :
     /// les App déjà installées refuseraient alors toute mise à jour signée par la nouvelle.
-    /// La clef vit ici, l'URL de serveur dans la variable <c>DRDXT_UPDATE_URL</c> posée au déploiement : sans URL, rien n'est tenté.</summary>
+    /// La clef vit ici ; l'URL du serveur est VerificationMiseAJour.UrlParDefaut (la variable <c>DRDXT_UPDATE_URL</c> la remplace).</summary>
     public static byte[]? ProductionPublicKey =>
     [
         0x8F, 0xB9, 0xAA, 0x66, 0x99, 0x56, 0xB1, 0x85, 0xD6, 0xD6, 0x4B, 0xD0, 0xFB, 0x20, 0x10, 0x36,

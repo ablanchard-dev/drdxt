@@ -20,10 +20,6 @@ namespace DrDxt.Detection.Display;
 /// </summary>
 public static class FrameCapInferencer
 {
-    /// <summary>The driver's low-latency rule: cap 3 fps under the refresh so frames stay inside
-    /// the VRR window. Same constant the VRR tweak writes.</summary>
-    private const int CapBelowRefresh = 3;
-
     /// <param name="frameCapFps">FRL_FPS as read from the driver; 0 is the driver's "no limit",
     /// null means it could not be read.</param>
     /// <param name="displays">Attached displays. Empty or without a primary → Indeterminate.</param>
@@ -54,12 +50,13 @@ public static class FrameCapInferencer
                 $"The frame cap ({(cap == 0 ? "off" : cap + " fps")}) never binds on a " +
                 $"{primary.RefreshHz} Hz screen.");
 
-        if (cap == primary.RefreshHz - CapBelowRefresh)
+        // The low-latency rule (PlafondVrr, the same one the VRR tweak writes): between the Reflex value and refresh - 3.
+        if (PlafondVrr.EstBasseLatence(cap, primary.RefreshHz))
             return new(FrameCapVerdict.Coherent,
                 $"The cap ({cap} fps) is the low-latency value for your {primary.RefreshHz} Hz screen.", origin);
 
         var other = displays!.FirstOrDefault(d =>
-            !d.IsPrimaryGameDisplay && d.RefreshHz > 0 && cap == d.RefreshHz - CapBelowRefresh);
+            !d.IsPrimaryGameDisplay && d.RefreshHz > 0 && PlafondVrr.EstBasseLatence(cap, d.RefreshHz));
 
         if (other is not null)
             return new(FrameCapVerdict.ComputedOnAnotherDisplay,

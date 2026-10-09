@@ -102,17 +102,9 @@ public class TheProductMayNotBuildWhatItNeverCallsTests
         // apparaissait dans un commentaire de `src/`. Chacun est verifie : un seul `tools/*` l'appelle,
         // plus ses tests, et rien dans le code de `src/`.
         //
-        // `AdlxGpuTuningWriter` — c'est la plume d'ecriture ADLX du BANC, pas celle du produit :
-        // « harness-side ADLX write seam (Task 4) », appelee par `tools/amd-harness` seul. Le
-        // produit a la sienne, `ADLXTuningActions` (ElevatedHelper), et **elle ecrit reellement le
-        // GPU AMD** : l'App lance `DrDxt.ElevatedHelper.exe` a la premiere op privilegiee et lui
-        // envoie l'op. Seul le reconciliateur de BOOT (LocalSystem) la remplace par
-        // `DisabledAdlxActions` — un offset GPU est volatile, un service non surveille n'a pas a le
-        // rejouer au demarrage —, et c'est la meme restriction cote NVIDIA (`DisabledNvApiActions`).
-        // Corrige le 11/09 : ces lignes disaient « une seule plume est expediee », ce qui laissait
-        // croire que rien n'ecrit le GPU AMD en production. Deux plumes sont expediees ; celle du
-        // banc n'en fait pas partie, et c'est la seule raison de sa presence dans cette liste.
-        "AdlxGpuTuningWriter",
+        // 09/10/2026 : `AdlxGpuTuningWriter` (la plume d'écriture ADLX du banc de juillet, tension et fréquence) est supprimée
+        // avec la session qui l'appelait ; son interface et le vieux banc de juillet (HarnessRunner, nettoyage, rendu) suivent :
+        // le banc public n'écrit la carte que par le canal élevé du produit, filtré.
         "CalibrationVerdict",
         "CpuFrequencyState",
         // 06/10/2026 (chantier J2) : `GainCumule` quitte la liste : la carte des parties de l'App compose les gains prouvés sur les vraies parties.

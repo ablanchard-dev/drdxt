@@ -16,12 +16,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Runner + contracts -->
+    <!-- Validation, lecture seule et garde de la carte -->
     <ProjectReference Include="..\DrDxt.AmdHarness\DrDxt.AmdHarness.csproj" />
-    <!-- Explicit refs so fakes can implement DrDxt.Core + Application interfaces directly -->
+    <!-- Explicit refs for the Core and Application types the tests build -->
     <ProjectReference Include="..\..\..\src\DrDxt.Core\DrDxt.Core.csproj" />
     <ProjectReference Include="..\..\..\src\DrDxt.Application\DrDxt.Application.csproj" />
-    <!-- Task 4: fakes implement IAdlxGpuTuningWriter from Detection -->
+    <!-- Detection: the anonymiser and the read-only steps -->
     <ProjectReference Include="..\..\..\src\DrDxt.Detection\DrDxt.Detection.csproj" />
   </ItemGroup>
 

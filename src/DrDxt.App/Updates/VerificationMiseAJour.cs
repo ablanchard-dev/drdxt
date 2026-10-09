@@ -40,7 +40,7 @@ public sealed record ResultatMiseAJour(
 /// Personne dans l'App ; le pied de page affichait une constante. Ici : au demarrage, montage, canal
 /// profils puis canal App, sous un delai borne, et le pied de page dit ce qui a ete constate.
 ///
-/// L'URL du serveur vient de la variable d'environnement <see cref="VariableUrl"/> : aucun serveur
+/// L'URL du serveur : <see cref="UrlParDefaut"/>, ou la variable <see cref="VariableUrl"/> qui la remplace (« off » = coupée). Avant le 09/10/2026 : aucun serveur
 /// n'est deploye (geste du mainteneur), et une URL ecrite dans le code serait un chiffre publie a la main.
 /// Sans elle : aucun reseau touche, « aucun serveur configure ».
 ///
@@ -51,6 +51,18 @@ public sealed record ResultatMiseAJour(
 public static class VerificationMiseAJour
 {
     public const string VariableUrl = "DRDXT_UPDATE_URL";
+
+    /// <summary>09/10/2026 (audit de pérennité) : sans adresse écrite, aucune copie installée n'aurait jamais pu recevoir de
+    /// mise à jour, et l'installeur ne posait pas la variable. Les manifestes signés vivent sur le site GitHub Pages du dépôt
+    /// public. Tant qu'il n'est pas publié, GitHub répond 404 : « joignable, rien à offrir », jamais une erreur.</summary>
+    public const string UrlParDefaut = "https://ablanchard-dev.github.io/drdxt";
+
+    /// <summary>La variable gagne quand elle existe ; « off » coupe toute vérification (aucune requête ne part).
+    /// 09/10/2026 (revue) : pas « vide » : sous Windows, une variable posée vide n'existe pas pour le processus.</summary>
+    public const string Coupee = "off";
+
+    public static string? UrlEffective(string? variable) => string.IsNullOrWhiteSpace(variable) ? UrlParDefaut
+        : string.Equals(variable.Trim(), Coupee, StringComparison.OrdinalIgnoreCase) ? null : variable;
 
     /// <summary>Au-dela, « injoignable » : une verification ne doit jamais tenir le demarrage.</summary>
     public static readonly TimeSpan DelaiParDefaut = TimeSpan.FromSeconds(15);

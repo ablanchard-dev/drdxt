@@ -34,6 +34,7 @@ public class SourcesCiteesTests
         "www.noobfeed.com",
         "presentmon.com",
         "github.com",
+        "ablanchard-dev.github.io", // 09/10/2026 : le site GitHub Pages du projet, racine des manifestes de mise à jour signés
         "hwbusters.com",            // 08/10/2026 (A6) : mesure publique du parcage X3D (7950X3D, 1080p), graphique relu
         "www.msi.com",              // 07/10/2026 (D12) : la page d'assistance d'une carte MSI (manuel), ouverte sur clic ; relevée dans un vrai navigateur
     };

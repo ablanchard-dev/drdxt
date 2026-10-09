@@ -17,7 +17,7 @@ Le mot qui compte : **mesure**. Le marché de l'optimisation PC est un marché d
 qui distingue ce produit tient dans une discipline : il ne dit jamais un chiffre qu'il n'a pas
 mesuré, et il n'applique jamais un levier qu'il ne peut pas défaire.
 
-C# / .NET 10 (`net10.0-windows`). **6 728 tests, 0 échec**, mesuré le 09/10/2026 sur
+C# / .NET 10 (`net10.0-windows`). **6 666 tests, 0 échec**, mesuré le 09/10/2026 sur
 17 projets, hors tests marqués `Machine`. Un chiffre écrit à la main vieillit (celui-ci s'est
 trompé sept fois) : `tools/gates/compte_des_tests.py` compare cette ligne aux journaux `.trx` de la
 dernière exécution, et ne dit rien du tout s'il n'y en a pas. La commande qui redonne le chiffre :
@@ -117,8 +117,10 @@ réseau, et pourquoi. Ce que DrDXT lit et garde sur ta machine est dans [CONFIDE
   sur une carte GeForce).
 - **Des pings** (ICMP, sans contenu) vers ta box et vers `1.1.1.1`, pour mesurer la latence et savoir si elle vient de
   chez toi ou d'au-delà ; pendant une partie, aussi vers le serveur du jeu, pour suivre la route d'une partie à l'autre.
-- **La vérification de mise à jour**, seulement si une adresse HTTPS est configurée (« Mises à jour : aucun serveur
-  configuré » en bas de l'écran sinon).
+- **La vérification de mise à jour**, au démarrage : deux petits fichiers lus sur `https://ablanchard-dev.github.io/drdxt`
+  (le site GitHub Pages du projet ; GitHub voit donc ton adresse IP, comme pour toute page web). Rien de ton PC n'est
+  envoyé. Pour la couper : variable d'environnement `DRDXT_UPDATE_URL` posée à `off` (« aucun serveur configuré » en bas de
+  l'écran).
 - **La page support de ta carte mère MSI, seulement si tu cliques « Ouvrir la page de ta carte »** dans le guide du BIOS : ton
   navigateur ouvre `www.msi.com/Motherboard/<modèle>/support`. DrDXT ne télécharge rien lui-même.
 - **Ton rapport de vérification, seulement si tu cliques « Envoyer mon rapport »** : DrDXT n'envoie rien lui-même, il

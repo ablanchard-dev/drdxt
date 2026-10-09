@@ -33,7 +33,7 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
     // PASSIVE=0x60925292, FORCEON=0x47814940, FORCEOFF=0x08416747; a live RTX 4060 read the
     // default as PASSIVE=0x60925292). "Vsync ON" is FORCEON — writing 1 set an invalid value.
     private const uint VsyncOn = 0x47814940;                   // VSYNCMODE_FORCEON
-    private const int CapBelowRefresh = 3;                      // Blur-Busters: refresh − 3
+    // La cible : PlafondVrr (Core), la plus basse de « fréquence − 3 » et de la règle de Reflex (09/10/2026).
     // FRL_FPS documented range = 0-1023 fps (NvApiDriverSettings.h) — never write out of range.
     private const int FrlMaxFps = 1023;
 
@@ -82,7 +82,7 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
             && _adlx.GetEnhancedSyncActif() is { IsOk: true, Value: false }
             && _adlx.GetFrameRateTarget() is { IsOk: true } frtc
             && _adlx.GetVsyncMode() is { IsOk: true } vsync
-            && (frtc.Value != Cible(ecran.RefreshHz) || vsync.Value != VsyncAmdToujours);
+            && (!PlafondVrr.EstBasseLatence(frtc.Value, ecran.RefreshHz) || vsync.Value != VsyncAmdToujours);
     }
 
     /// <summary>ADLX_WAIT_FOR_VERTICAL_REFRESH_MODE.WFVR_ALWAYS_ON (ADLXDefines.h).</summary>
@@ -94,7 +94,7 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
            && (!_adlx.GetFrameRateTarget().IsOk || !_adlx.GetChillActif().IsOk
                || !_adlx.GetVsyncMode().IsOk || !_adlx.GetEnhancedSyncActif().IsOk);
 
-    private static int Cible(int rafraichissementHz) => Math.Clamp(rafraichissementHz - CapBelowRefresh, 1, FrlMaxFps);
+    private static int Cible(int rafraichissementHz) => Math.Min(PlafondVrr.Cible(rafraichissementHz), FrlMaxFps);
 
     /// <summary>A2b/A2c : Vsync du pilote « toujours activée » puis FRTC à la cible, chacun seulement s'il n'y est pas
     /// déjà ; l'inverse (composite) rend le mode et l'état FRTC d'origine. Une seconde écriture refusée rend la première.

@@ -75,6 +75,24 @@ public class ExportDeMachineTests
     }
 
     [Fact]
+    public void Un_rapport_en_texte_libre_perd_les_memes_valeurs_et_garde_le_materiel()
+    {
+        // 09/10/2026 : le rapport de vérification part en public (ticket GitHub) ; les règles de la machine exportée s'y appliquent.
+        // Le même texte que la fausse machine, mis à plat comme un rapport : chaque valeur semée dans son contexte réel.
+        var (hw, st, sante) = FausseMachine();
+        var texte = string.Join(Environment.NewLine, sante.SelectMany(f => new[] { f.Nom, f.ValeurCourante ?? "", f.Explication, f.Provenance ?? "" }))
+            + Environment.NewLine + hw.Board.Product + Environment.NewLine + string.Join(Environment.NewLine, (st.NetworkAdapters ?? []).Select(a => $"{a.Name} {a.Description}"))
+            + Environment.NewLine + "Matériel : AMD Ryzen 7 7800X3D | AMD Radeon RX 9070 XT (pilote 32.0.21013.1000)";
+
+        var propre = MachineExportee.AnonymiserTexte(texte, [Compte, Pc, Domaine, SerieBios, SerieDisque, Uuid, MacColle, CompteCourt]);
+
+        foreach (var (regle, valeurs) in Semees)
+            foreach (var v in valeurs)
+                propre.Should().NotContainEquivalentOf(v, $"« {regle} »");
+        propre.Should().Contain("AMD Radeon RX 9070 XT (pilote 32.0.21013.1000)", "un modèle et un pilote ne désignent personne");
+    }
+
+    [Fact]
     public void Aucune_valeur_qui_designe_le_joueur_ou_son_pc_ne_sort()
     {
         Semees.Keys.Should().BeEquivalentTo(MachineExportee.CeQuiEstRetire, "chaque règle écrite a sa valeur semée");

@@ -69,10 +69,30 @@ public static class MachineExportee
     public static string Json(string nom, string? note, bool? eleve, HardwareInventory inventaire, SettingsState reglages,
         IReadOnlyList<RepairFinding> sante, IEnumerable<string> valeursDeCePc)
     {
+        var anonymiser = Anonymiseur(valeursDeCePc);
+
+        var noeud = JsonSerializer.SerializeToNode(new { Nom = nom, Note = note, Eleve = eleve, Inventaire = inventaire,
+            Reglages = reglages, Sante = sante }, Options)!;
+        Nettoyer(noeud, null, anonymiser);
+        var json = noeud.ToJsonString(Options);
+        _ = JsonSerializer.Deserialize<Relue>(json, Options) ?? throw new InvalidDataException("la machine exportée ne se relit pas");
+        return json;
+    }
+
+    /// <summary>
+    /// 09/10/2026 : les mêmes règles (<see cref="CeQuiEstRetire"/>) sur un texte libre, pour les rapports de vérification
+    /// envoyés en public (bouton de l'App et zip de validation). Une suite de quatre nombres qui n'est pas une adresse IP
+    /// (rare dans ces rapports) part aussi : mieux vaut perdre une version que garder une adresse.
+    /// </summary>
+    public static string AnonymiserTexte(string texte, IEnumerable<string> valeursDeCePc)
+        => Anonymiseur(valeursDeCePc)(texte, null);
+
+    private static Func<string, string?, string> Anonymiseur(IEnumerable<string> valeursDeCePc)
+    {
         var propres = valeursDeCePc.Select(v => v?.Trim() ?? "").Where(v => v.Length >= 2).Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(v => v.Length)
             .Select(v => new Regex($"(?<![A-Za-z0-9]){Regex.Escape(v)}(?![A-Za-z0-9])", RegexOptions.IgnoreCase, Delai)).ToList();
-        string Anonymiser(string s, string? cle)
+        return (s, cle) =>
         {
             s = Profil.Replace(s, "${tete}joueur");
             s = OneDrive.Replace(s, "${tete}" + Retire);
@@ -83,14 +103,7 @@ public static class MachineExportee
             s = Sid.Replace(s, Retire);
             s = VolumeGuid.Replace(s, "Volume{" + Retire + "}");
             return Courriel.Replace(s, Retire);
-        }
-
-        var noeud = JsonSerializer.SerializeToNode(new { Nom = nom, Note = note, Eleve = eleve, Inventaire = inventaire,
-            Reglages = reglages, Sante = sante }, Options)!;
-        Nettoyer(noeud, null, Anonymiser);
-        var json = noeud.ToJsonString(Options);
-        _ = JsonSerializer.Deserialize<Relue>(json, Options) ?? throw new InvalidDataException("la machine exportée ne se relit pas");
-        return json;
+        };
     }
 
     // La clé suit le texte (un élément de liste garde celle de sa liste) : une version n'est pas une adresse.

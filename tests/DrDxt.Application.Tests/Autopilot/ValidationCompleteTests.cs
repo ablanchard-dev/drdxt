@@ -52,6 +52,22 @@ public sealed class ValidationCompleteTests : IDisposable
         => new(_machine.GetValueOrDefault(s.TweakId) == 1, $"lu {_machine.GetValueOrDefault(s.TweakId)}");
 
     [Fact]
+    public async Task Le_rapport_dit_le_materiel_et_prend_la_carte_dediee_pas_l_igpu()
+    {
+        // 09/10/2026 : un rapport reçu d'un inconnu doit dire de quelle machine il vient. Sur un APU + Radeon, la première
+        // carte listée est souvent l'iGPU : c'est la carte qui a de la mémoire vidéo qui fait tourner les jeux.
+        var hw = new HardwareInventory(new CpuInfo("AMD Ryzen 7 7800X3D", "AuthenticAMD", 8, 16, true, 1),
+            [new GpuInfo("AMD Radeon(TM) Graphics", "AMD", 512L << 20, "32.0.21013.1000", TriState.Unknown),
+             new GpuInfo("AMD Radeon RX 9070 XT", "AMD", 16L << 30, "32.0.21013.1000", TriState.On)],
+            [], new MotherboardInfo("ASUS", "B650"), new BiosInfo("1.0", null, true), ChassisType.Desktop);
+
+        ValidationComplete.CartePrincipale(hw)!.Model.Should().Be("AMD Radeon RX 9070 XT");
+        var r = await ValidationComplete.ValiderAsync([], hw, null!, new FichierRevertEnAttente(_chemin), Relire);
+        r.Texte.Should().StartWith("Matériel : AMD Ryzen 7 7800X3D | AMD Radeon RX 9070 XT (pilote 32.0.21013.1000) | aussi : AMD Radeon(TM) Graphics");
+        ValidationComplete.Materiel(null).Should().Be("non lu");
+    }
+
+    [Fact]
     public async Task Chaque_levier_est_pose_relu_rendu_et_la_machine_finit_comme_elle_a_commence()
     {
         var journal = new FichierRevertEnAttente(_chemin);
@@ -89,12 +105,28 @@ public sealed class ValidationCompleteTests : IDisposable
         var pose = await levier.ApplyAsync();
         journal.Poser("a", pose.Value);   // la fenêtre meurt ici
 
-        var texte = await ValidationComplete.RemettreAsync(new FichierRevertEnAttente(_chemin), id => id == "a" ? levier : null);
+        var texte = await ValidationComplete.RemettreAsync(new FichierRevertEnAttente(_chemin), id => id == "a" ? levier : null, (_, _) => true);
 
         texte.Propre.Should().BeTrue();
         texte.Texte.Should().Contain("remis d'origine");
         _machine["a"].Should().Be(0);
         journal.Lire().Value.Should().BeNull();
+    }
+
+    // 09/10/2026 (revue) : un journal piégé ne fait rien rejouer en administrateur.
+    [Fact]
+    public async Task Un_inverse_qui_n_est_pas_celui_du_levier_n_est_jamais_rejoue()
+    {
+        var journal = new FichierRevertEnAttente(_chemin);
+        var levier = new Levier("a", _machine);
+        _machine["a"] = 0;
+        journal.Poser("a", (await levier.ApplyAsync()).Value);
+
+        var remise = await ValidationComplete.RemettreAsync(journal, _ => levier, (_, _) => false);
+
+        remise.Propre.Should().BeFalse();
+        _machine["a"].Should().NotBe(0, "rien n'a été rejoué");
+        journal.Lire().Value!.TweakId.Should().Be("a");
     }
 
     // Revue n° 9 : le levier suivant écraserait l'essai au journal ; la validation s'arrête au premier non rendu.
@@ -118,7 +150,7 @@ public sealed class ValidationCompleteTests : IDisposable
         var journal = new FichierRevertEnAttente(_chemin);
         journal.Poser("a", null);
 
-        var remise = await ValidationComplete.RemettreAsync(journal, _ => null);
+        var remise = await ValidationComplete.RemettreAsync(journal, _ => null, (_, _) => true);
 
         remise.Propre.Should().BeFalse();
         remise.Texte.Should().Contain("À vérifier à la main");

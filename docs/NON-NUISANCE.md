@@ -271,7 +271,6 @@ src/DrDxt.Application/Tweaks/LeviersVerifies.cs 1
 src/DrDxt.Application/Tweaks/PreuveDuRepos.cs 2
 src/DrDxt.Core/Storage/FichierJsonAtomique.cs 1
 src/DrDxt.Detection/Display/Win32ModeEcran.cs 2
-src/DrDxt.Detection/Gpu/Adlx/AdlxGpuTuningWriter.cs 4
 src/DrDxt.Detection/Gpu/MagasinDePilotes.cs 1
 src/DrDxt.Detection/Repair/InventaireMachine.cs 1
 src/DrDxt.Detection/Repair/RepairAuditService.cs 2
