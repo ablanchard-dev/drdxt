@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>DrDxt.Server</RootNamespace>
+    <AssemblyName>DrDxt.Server</AssemblyName>
+    <!-- TreatWarningsAsErrors / Nullable / ImplicitUsings inherited from repo-root Directory.Build.props. -->
+    <!-- 23/09/2026 : DrDXT est gratuit. Ce serveur ne sert plus que le canal de mise a jour signe.
+         Aucun code d'ici n'est livre dans le binaire client. Il reste dans DrDXT.sln : un serveur
+         que personne ne compile est un serveur dont personne ne sait qu'il est casse. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Ed25519 manifest signing (server-side key custody). Same lib/version the client uses
+         to VERIFY (DrDxt.Reconciler), so a signature this server produces verifies under the
+         client's embedded PUBLIC key. The PRIVATE seed is read from env, never hardcoded. -->
+    <PackageReference Include="NSec.Cryptography" Version="24.4.0" />
+  </ItemGroup>
+
+</Project>
