@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test-only access to internal canonicalization helpers (TDD). -->
+    <InternalsVisibleTo Include="DrDxt.Reconciler.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Project-tranched Ed25519 (master plan §11). Used ONLY by the real
+         Ed25519SignatureScheme; all logic sits behind the ISignatureScheme seam so
+         unit tests use an in-memory fake and never touch the native libsodium. -->
+    <PackageReference Include="NSec.Cryptography" Version="24.4.0" />
+    <!-- 11/09/2026 : la cle de signature de la machine, protegee au repos par DPAPI portee machine. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+  </ItemGroup>
+
+</Project>

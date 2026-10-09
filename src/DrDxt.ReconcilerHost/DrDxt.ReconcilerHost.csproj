@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Generic host packaged as a Windows Service (UseWindowsService). All real
+         logic lives in tested classes; Program/Worker are a thin shell. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
+    <ProjectReference Include="..\DrDxt.Reconciler\DrDxt.Reconciler.csproj" />
+    <ProjectReference Include="..\DrDxt.Reconciler.Adapters\DrDxt.Reconciler.Adapters.csproj" />
+    <!-- Detection's IWmiQuery / ManagementWmiQuery — the bare WMI read seam the
+         reconciler's WmiGpuDriverProbe needs (not the full Detection scan graph). -->
+    <ProjectReference Include="..\DrDxt.Detection\DrDxt.Detection.csproj" />
+    <ProjectReference Include="..\DrDxt.Infrastructure\DrDxt.Infrastructure.csproj" />
+    <!-- Real signed-IPC IElevatedClient (talks to the elevated helper); the host
+         wires it behind a fail-clean factory until the service-context handshake lands. -->
+    <ProjectReference Include="..\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test-only access to the host's internal testable classes (TDD: the worker is
+         a thin shell; the logic is in these classes, exercised with fakes). -->
+    <InternalsVisibleTo Include="DrDxt.ReconcilerHost.Tests" />
+  </ItemGroup>
+
+</Project>
