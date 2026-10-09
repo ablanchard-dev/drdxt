@@ -336,6 +336,20 @@ public sealed class AutoUpdaterTests
         replacer.LastTargetDir.Should().Be(AppInstallDir);
     }
 
+    [Fact]
+    public async Task App_the_installed_version_is_up_to_date_not_a_new_version()
+    {
+        var payload = Encoding.UTF8.GetBytes("installeur deja en place");
+        var manifest = SignedManifest(UpdateChannel.App, Installed, "https://u/app.pkg", payload);
+        var replacer = new RecordingReplacer(new OkReplacer());
+
+        var result = await Build(new FakeFeed(manifest, payload), replacer: replacer).UpdateAppAsync(CancellationToken.None);
+
+        result.IsOk.Should().BeTrue();
+        result.Value.Should().Be(UpdateOutcome.UpToDate);
+        replacer.Calls.Should().Be(0);
+    }
+
     // ── Revue du 10/09/2026 : la charge stagee n'est pas retelechargee a chaque demarrage ──
 
     [Fact]

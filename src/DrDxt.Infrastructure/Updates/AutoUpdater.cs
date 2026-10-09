@@ -179,6 +179,12 @@ public sealed class AutoUpdater
         if (!sig.IsOk)
             return Result<(UpdateManifest, byte[])?>.Fail(sig.Error!.Value.Code, sig.Error.Value.Message);
 
+        // 09/10/2026 (revue) : le site sert toujours le dernier manifeste. La version déjà installée n'est pas une
+        // nouvelle version : sans ce test, elle était retéléchargée et « Installer » la reproposait à chaque démarrage.
+        if (channel == UpdateChannel.App && !UpdateVerifier.IsDowngrade(manifest.Version, _installedVersion)
+            && !UpdateVerifier.IsDowngrade(_installedVersion, manifest.Version))
+            return Result<(UpdateManifest, byte[])?>.Ok(null);
+
         // (2) Only now fetch the payload (the url came from a SIGNED manifest).
         // Revue du 10/09/2026 : tant que l'installation est manuelle, le canal App retelechargeait
         // la meme charge a chaque demarrage. Une charge deja stagee avec l'empreinte du manifeste signe

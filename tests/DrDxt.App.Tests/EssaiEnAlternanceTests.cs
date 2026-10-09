@@ -193,6 +193,26 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.MemoireParties!.Lire()[0].Essai.Should().BeNull();
         vm.EssaiEnCours.Should().BeFalse();
         vm.LigneEssai.Should().Be("Essai.Redemarrage");
+        (_poses - _rendus).Should().Be(0, "posé au moment du redémarrage, il est rendu : un plan d'alimentation survit au redémarrage");
+    }
+
+    // 09/10/2026 (revue) : sans helper joignable, rien ne s'efface : l'essai attend que le joueur clique « Arrêter ».
+    [Fact]
+    public async Task Apres_un_redemarrage_sans_helper_l_essai_attend_le_clic_qui_rend_l_origine()
+    {
+        var vm = Vm(helperJoignable: false);
+        await vm.DemarrerEssaiAsync(Id);
+        _demarrage = _maintenant.AddHours(2);
+
+        await Jouer(vm, 90);
+
+        vm.EssaiEnCours.Should().BeTrue();
+        vm.LigneEssai.Should().Be("Essai.RedemarrageARendre");
+        _rendus.Should().Be(0);
+
+        await vm.ArreterEssaiAsync();
+        _rendus.Should().Be(1);
+        vm.EssaiEnCours.Should().BeFalse();
     }
 
     // Revue F-33 : les parties d'un essai précédent du même levier ne tranchent pas le nouvel essai.

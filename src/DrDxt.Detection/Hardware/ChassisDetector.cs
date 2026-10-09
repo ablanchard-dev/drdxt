@@ -29,7 +29,17 @@ public sealed class ChassisDetector
                  : DesktopCodes.Contains(code) ? ChassisType.Desktop
                  : LaptopCodes.Contains(code) ? ChassisType.Laptop
                  : ChassisType.Unknown;
+        // 09/10/2026 (revue) : mini PC (35), tout-en-un (13) et beaucoup de cartes mères de PC montés (« Other » 1,
+        // « Unknown » 2) tombaient en « inconnu » et perdaient les leviers de bureau sans explication. Sans batterie,
+        // ce n'est pas un portable : il est traité en PC fixe. Une station d'accueil (12) a la batterie de son portable.
+        if (type == ChassisType.Unknown && SansBatterie()) type = ChassisType.Desktop;
         return Result<ChassisType>.Ok(type);
+    }
+
+    private bool SansBatterie()
+    {
+        var q = _wmi.Query("SELECT Name FROM Win32_Battery");
+        return q.IsOk && q.Value is { Count: 0 };
     }
 
     private string ReadModel()
