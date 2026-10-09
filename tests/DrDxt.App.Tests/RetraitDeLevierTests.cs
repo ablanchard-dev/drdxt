@@ -1,0 +1,45 @@
+using System.IO;
+using DrDxt.App.Platform;
+using DrDxt.Application.Tweaks;
+using DrDxt.Core;
+using FluentAssertions;
+using NSubstitute;
+
+namespace DrDxt.App.Tests;
+
+// 06/10/2026 (revue) — ce qui suit une annulation retire VRAIMENT le levier du manifeste signé. Avant, il
+// cherchait l'identifiant de l'App (« latency.hagsOn ») parmi ceux du service (« os.hags ») et ne trouvait rien,
+// et il renvoyait un manifeste privé du levier que le magasin FUSIONNAIT, sans jamais rien retirer. Le service
+// reposait donc au démarrage un levier annulé, et la désinstallation en gardait la première origine.
+public sealed class RetraitDeLevierTests
+{
+    private readonly string _journal = Path.Combine(Path.GetTempPath(), "drdxt-retrait-" + Guid.NewGuid().ToString("N") + ".json");
+
+    [Theory]
+    [InlineData("latency.hagsOn", "os.hags")]
+    [InlineData("latency.vrrFlipModelOn", null)]
+    public async Task L_annulation_retire_le_levier_sous_ses_deux_noms(string id, string? auService)
+    {
+        var manifeste = Substitute.For<IDesiredStateStore>();
+        manifeste.RetirerAsync(default!).ReturnsForAnyArgs(Result.Ok());
+
+        await RetraitDeLevier.ApresAnnulationAsync(manifeste, new JournalDesLeviersAppliques(_journal), id);
+
+        var attendus = auService is null ? new[] { id } : new[] { id, auService };
+        await manifeste.Received(1).RetirerAsync(Arg.Is<IReadOnlyList<string>>(l => l.SequenceEqual(attendus)));
+        await manifeste.DidNotReceive().CommitAsync(Arg.Any<DesiredState>());
+    }
+
+    [Fact]
+    public async Task Un_retrait_refuse_ou_qui_jette_rend_un_echec()
+    {
+        var refuse = Substitute.For<IDesiredStateStore>();
+        refuse.RetirerAsync(default!).ReturnsForAnyArgs(Result.Fail(ErrorCodes.ManifestUnreadable, "illisible"));
+        var jette = Substitute.For<IDesiredStateStore>();
+        jette.RetirerAsync(default!).ReturnsForAnyArgs<Task<Result>>(_ => throw new IOException("verrou"));
+
+        (await RetraitDeLevier.ApresAnnulationAsync(refuse, new JournalDesLeviersAppliques(_journal), "os.hags")).IsOk.Should().BeFalse();
+        (await RetraitDeLevier.ApresAnnulationAsync(jette, new JournalDesLeviersAppliques(_journal), "os.hags"))
+            .Error!.Value.Message.Should().Contain("verrou");
+    }
+}
