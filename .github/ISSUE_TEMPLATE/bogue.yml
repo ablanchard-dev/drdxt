@@ -1,0 +1,26 @@
+name: Bogue
+description: Quelque chose ne marche pas comme prévu.
+labels: ["bogue"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Une faille de sécurité ? Ne l'écris pas ici : voir SECURITY.md (signalement privé).
+  - type: input
+    id: version
+    attributes:
+      label: Version de DrDXT
+      description: En bas de l'écran, par exemple « Version 0.9.0 ».
+    validations:
+      required: true
+  - type: textarea
+    id: quoi
+    attributes:
+      label: Ce que tu as fait, ce que tu attendais, ce qui s'est passé
+    validations:
+      required: true
+  - type: textarea
+    id: rapport
+    attributes:
+      label: Rapport de diagnostic
+      description: « Voir le rapport » dans l'App, si elle en a produit un.

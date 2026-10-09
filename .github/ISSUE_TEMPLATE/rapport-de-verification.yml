@@ -1,0 +1,21 @@
+name: Rapport de vérification
+description: Le rapport de « Vérifier DrDXT sur mon PC », pour prouver DrDXT sur ton matériel.
+title: "Vérification : <processeur> + <carte graphique>"
+labels: ["preuve"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci ! Le rapport se trouve dans `Documents\verification-drdxt-<date>.txt`. Il ne contient rien qui te désigne ; relis-le avant de l'envoyer si tu veux.
+  - type: textarea
+    id: rapport
+    attributes:
+      label: Le rapport
+      description: Glisse le fichier ici, ou colle son contenu.
+    validations:
+      required: true
+  - type: textarea
+    id: remarques
+    attributes:
+      label: Ce que tu as remarqué
+      description: Un réglage qui ne s'est pas rendu, un écran étrange, une partie plus fluide ou moins fluide après.

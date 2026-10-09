@@ -1,0 +1,16 @@
+name: Machine
+description: La lecture de ta machine (« Exporter ma machine »), pour que DrDXT apprenne ton matériel.
+title: "Machine : <processeur> + <carte graphique> (<bureau/portable>)"
+labels: ["machine"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Le fichier se trouve dans `Documents\machine-exportee-<date>.json`. Ce qu'il contient : docs/TESTEUR-EXPORTER-MA-MACHINE.md.
+  - type: textarea
+    id: fichier
+    attributes:
+      label: Le fichier exporté
+      description: Glisse-le ici.
+    validations:
+      required: true
