@@ -1,0 +1,102 @@
+## .NET gitignore — standard Visual Studio / dotnet CLI
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/
+!**/[Pp]ackages/build/
+nuget.config
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]uild/
+[Pp]ublish/
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# Roslyn cache
+.roslyn/
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# MSBuild binary log
+*.binlog
+
+# dotnet CLI tools
+.config/dotnet-tools.json.local
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Crash dumps
+*.dmp
+
+# Local env / secrets
+*.env
+appsettings.Local.json
+appsettings.Development.json
+secrets.json
+
+# AMD harness run artefacts (generated on the test machine; never committed)
+tools/amd-harness/harness-run-*.txt
+tools/amd-harness/harness-report-*.txt
+tools/amd-harness/harness-report-*.html
+
+# Le plan, la recherche et le dossier sont DANS le dépôt depuis le 21/08/2026 : le projet se
+# développe à deux, et un collaborateur qui n'a que le code n'a pas le projet — chaque levier
+# vient de research/, avec sa source.
+#
+# AVANT DE PASSER CE DÉPÔT EN PUBLIC : relire docs/ et plans/. Le cahier des charges contient
+# la stratégie commerciale (prix, modèle de vente, analyse concurrence). Un fichier committé
+# reste dans l'HISTORIQUE même après suppression — le retirer plus tard exigerait une réécriture
+# d'historique, pas un simple `git rm`.
+
+# Working artifacts
+scratchpad/
+tasks/
+*.output
+*.bak
+*.orig
+_wf_*
+_apply_*
+
+# M5 installer build artifacts
+installer/publish/
+installer/Output/
+
+# captures de frames brutes : donnees locales de banc (optimize --rejeu, tailbench), jamais versionnees
+tools/p3/frames-*.txt
