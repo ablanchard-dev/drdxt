@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- H2: AddDrDxtApplication() registers the P2 layer (engine, tweaks, seams). -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
+    <!-- Reuse the single source of truth for the A/B significance rule (AbComparer).
+         Measurement only depends on Core, so this adds no dependency cycle. -->
+    <ProjectReference Include="..\DrDxt.Measurement\DrDxt.Measurement.csproj" />
+  </ItemGroup>
+
+</Project>
