@@ -1,0 +1,134 @@
+// DrDXT BIOS guide library. Every entry below is a best-known per-vendor / UI-generation
+// FALLBACK (isVerified=false): the menu paths are the best available, but NOT bench-
+// confirmed for a specific board. Per decision §9.1, "Verified for your exact board" is
+// reserved for entries carrying a board + biosVersion KB key (added only once a board is
+// validated on the Warzup bench). The validator REJECTS any isVerified=true entry that
+// lacks that board+biosVersion key.
+[
+  {
+    "vendor": "Asus",
+    "biosUiGeneration": "AI Tweaker UEFI",
+    "isVerified": false,
+    "enterKey": "Del",
+    "saveKey": "F10",
+    "paths": [
+      { "setting": "XmpExpo", "menuPath": "Advanced Mode (F7) > Ai Tweaker > Ai Overclock Tuner", "settingName": "Ai Overclock Tuner", "targetValue": "EXPO I (AMD) / XMP I (Intel)" },
+      { "setting": "Above4G", "menuPath": "Advanced Mode (F7) > Advanced > PCI Subsystem Settings > Above 4G Decoding", "settingName": "Above 4G Decoding", "targetValue": "Enabled" },
+      { "setting": "Csm", "menuPath": "Advanced Mode (F7) > Boot > CSM (Compatibility Support Module) > Launch CSM", "settingName": "Launch CSM", "targetValue": "Disabled" },
+      { "setting": "ReBar", "menuPath": "Advanced Mode (F7) > Advanced > PCI Subsystem Settings > Re-Size BAR Support", "settingName": "Re-Size BAR Support", "targetValue": "Enabled" },
+      { "setting": "X3dCppc", "menuPath": "Advanced Mode (F7) > Advanced > AMD CBS > CPU Common Options > CPPC Preferred Cores", "settingName": "CPPC Preferred Cores", "targetValue": "Auto / Enabled" }
+    ]
+  },
+  {
+    "vendor": "Msi",
+    "biosUiGeneration": "Click BIOS 5",
+    "isVerified": false,
+    "enterKey": "Del",
+    "saveKey": "F10",
+    "paths": [
+      { "setting": "XmpExpo", "menuPath": "Advanced (F7) > OC > Extreme Memory Profile (X.M.P.) / EXPO", "settingName": "EXPO (AMD) / XMP (Intel)", "targetValue": "Profile 1 / Enabled" },
+      { "setting": "Above4G", "menuPath": "Advanced (F7) > Settings > Advanced > PCI Subsystem Settings > Above 4G Memory / Crypto Currency mining", "settingName": "Above 4G memory", "targetValue": "Enabled" },
+      { "setting": "Csm", "menuPath": "Advanced (F7) > Settings > Advanced > Windows OS Configuration > BIOS CSM/UEFI Mode", "settingName": "BIOS UEFI/CSM Mode", "targetValue": "UEFI" },
+      { "setting": "ReBar", "menuPath": "Advanced (F7) > Settings > Advanced > PCI Subsystem Settings > Re-Size BAR Support", "settingName": "Re-Size BAR Support", "targetValue": "Enabled" },
+      { "setting": "X3dCppc", "menuPath": "Advanced (F7) > OC > Advanced CPU Configuration > AMD CBS > CPPC Preferred Cores", "settingName": "CPPC Preferred Cores", "targetValue": "Auto / Enabled" }
+    ]
+  },
+  {
+    "vendor": "Gigabyte",
+    "biosUiGeneration": "Aorus UEFI",
+    "isVerified": false,
+    "enterKey": "Del",
+    "saveKey": "F10",
+    "paths": [
+      { "setting": "XmpExpo", "menuPath": "Advanced Mode (F2) > Tweaker > Extreme Memory Profile (X.M.P.) / EXPO", "settingName": "Extreme Memory Profile (X.M.P.) / EXPO", "targetValue": "Profile1 / Enabled" },
+      { "setting": "Above4G", "menuPath": "Advanced Mode (F2) > Settings > Miscellaneous > Above 4G Decoding", "settingName": "Above 4G Decoding", "targetValue": "Enabled" },
+      { "setting": "Csm", "menuPath": "Advanced Mode (F2) > BIOS > CSM Support", "settingName": "CSM Support", "targetValue": "Disabled" },
+      { "setting": "ReBar", "menuPath": "Advanced Mode (F2) > Settings > Miscellaneous > Re-Size BAR Support", "settingName": "Re-Size BAR Support", "targetValue": "Enabled" },
+      { "setting": "X3dCppc", "menuPath": "Advanced Mode (F2) > Settings > AMD CBS > CPU Common Options > CPPC Preferred Cores", "settingName": "CPPC Preferred Cores", "targetValue": "Auto / Enabled" }
+    ]
+  },
+  {
+    "vendor": "Asrock",
+    "biosUiGeneration": "ASRock UEFI",
+    "isVerified": false,
+    "enterKey": "Del",
+    "saveKey": "F10",
+    "paths": [
+      { "setting": "XmpExpo", "menuPath": "Advanced Mode (F6) > OC Tweaker > DRAM Profile Configuration > Load XMP/EXPO Setting", "settingName": "Load XMP / EXPO Setting", "targetValue": "XMP/EXPO 1.0 / Enabled" },
+      { "setting": "Above4G", "menuPath": "Advanced Mode (F6) > Advanced > Chipset Configuration > Above 4G Decoding", "settingName": "Above 4G Decoding", "targetValue": "Enabled" },
+      { "setting": "Csm", "menuPath": "Advanced Mode (F6) > Boot > CSM (Compatibility Support Module)", "settingName": "CSM", "targetValue": "Disabled" },
+      { "setting": "ReBar", "menuPath": "Advanced Mode (F6) > Advanced > Chipset Configuration > Re-Size BAR Support", "settingName": "Re-Size BAR Support", "targetValue": "Enabled" },
+      { "setting": "X3dCppc", "menuPath": "Advanced Mode (F6) > Advanced > AMD CBS > CPU Common Options > CPPC Preferred Cores", "settingName": "CPPC Preferred Cores", "targetValue": "Auto / Enabled" }
+    ]
+  },
+  {
+    "vendor": "Asus",
+    "biosUiGeneration": "Generic",
+    "isVerified": false,
+    "enterKey": "Del",
+    "saveKey": "F10",
+    "paths": [
+      { "setting": "XmpExpo", "menuPath": "Ai Tweaker (look for the memory profile)", "settingName": "Ai Overclock Tuner / XMP / EXPO", "targetValue": "EXPO / XMP enabled" },
+      { "setting": "Above4G", "menuPath": "Advanced > PCI Subsystem Settings", "settingName": "Above 4G Decoding", "targetValue": "Enabled" },
+      { "setting": "Csm", "menuPath": "Boot > CSM (Compatibility Support Module)", "settingName": "Launch CSM", "targetValue": "Disabled" },
+      { "setting": "ReBar", "menuPath": "Advanced > PCI Subsystem Settings", "settingName": "Re-Size BAR Support", "targetValue": "Enabled" },
+      { "setting": "X3dCppc", "menuPath": "Advanced > AMD CBS > CPU Common Options", "settingName": "CPPC Preferred Cores", "targetValue": "Auto / Enabled" }
+    ]
+  },
+  {
+    "vendor": "Msi",
+    "biosUiGeneration": "Generic",
+    "isVerified": false,
+    "enterKey": "Del",
+    "saveKey": "F10",
+    "paths": [
+      { "setting": "XmpExpo", "menuPath": "OC (look for the memory profile)", "settingName": "EXPO / XMP / A-XMP", "targetValue": "Profile 1 / Enabled" },
+      { "setting": "Above4G", "menuPath": "Settings > Advanced > PCI Subsystem Settings", "settingName": "Above 4G memory", "targetValue": "Enabled" },
+      { "setting": "Csm", "menuPath": "Settings > Advanced > Windows OS Configuration", "settingName": "BIOS UEFI/CSM Mode", "targetValue": "UEFI" },
+      { "setting": "ReBar", "menuPath": "Settings > Advanced > PCI Subsystem Settings", "settingName": "Re-Size BAR Support", "targetValue": "Enabled" },
+      { "setting": "X3dCppc", "menuPath": "OC > Advanced CPU Configuration > AMD CBS", "settingName": "CPPC Preferred Cores", "targetValue": "Auto / Enabled" }
+    ]
+  },
+  {
+    "vendor": "Gigabyte",
+    "biosUiGeneration": "Generic",
+    "isVerified": false,
+    "enterKey": "Del",
+    "saveKey": "F10",
+    "paths": [
+      { "setting": "XmpExpo", "menuPath": "Tweaker (look for the memory profile)", "settingName": "Extreme Memory Profile (X.M.P.) / EXPO", "targetValue": "Profile1 / Enabled" },
+      { "setting": "Above4G", "menuPath": "Settings > Miscellaneous", "settingName": "Above 4G Decoding", "targetValue": "Enabled" },
+      { "setting": "Csm", "menuPath": "BIOS", "settingName": "CSM Support", "targetValue": "Disabled" },
+      { "setting": "ReBar", "menuPath": "Settings > Miscellaneous", "settingName": "Re-Size BAR Support", "targetValue": "Enabled" },
+      { "setting": "X3dCppc", "menuPath": "Settings > AMD CBS > CPU Common Options", "settingName": "CPPC Preferred Cores", "targetValue": "Auto / Enabled" }
+    ]
+  },
+  {
+    "vendor": "Asrock",
+    "biosUiGeneration": "Generic",
+    "isVerified": false,
+    "enterKey": "Del",
+    "saveKey": "F10",
+    "paths": [
+      { "setting": "XmpExpo", "menuPath": "OC Tweaker > DRAM Profile Configuration", "settingName": "Load XMP / EXPO Setting", "targetValue": "XMP/EXPO 1.0 / Enabled" },
+      { "setting": "Above4G", "menuPath": "Advanced > Chipset Configuration", "settingName": "Above 4G Decoding", "targetValue": "Enabled" },
+      { "setting": "Csm", "menuPath": "Boot", "settingName": "CSM", "targetValue": "Disabled" },
+      { "setting": "ReBar", "menuPath": "Advanced > Chipset Configuration", "settingName": "Re-Size BAR Support", "targetValue": "Enabled" },
+      { "setting": "X3dCppc", "menuPath": "Advanced > AMD CBS > CPU Common Options", "settingName": "CPPC Preferred Cores", "targetValue": "Auto / Enabled" }
+    ]
+  },
+  {
+    "vendor": "Unknown",
+    "biosUiGeneration": "Generic",
+    "isVerified": false,
+    "enterKey": "Del or F2 (watch the boot screen)",
+    "saveKey": "F10",
+    "paths": [
+      { "setting": "XmpExpo", "menuPath": "Overclocking / Tweaker / Ai Tweaker section of your BIOS", "settingName": "XMP / EXPO / DOCP / A-XMP (the memory profile)", "targetValue": "Profile 1 / Enabled" },
+      { "setting": "Above4G", "menuPath": "Advanced / PCI Subsystem / Chipset section", "settingName": "Above 4G Decoding (a.k.a. Above 4G Memory)", "targetValue": "Enabled" },
+      { "setting": "Csm", "menuPath": "Boot / Windows OS Configuration section", "settingName": "CSM (Compatibility Support Module)", "targetValue": "Disabled" },
+      { "setting": "ReBar", "menuPath": "Advanced / PCI Subsystem / Chipset section", "settingName": "Re-Size BAR Support (a.k.a. Smart Access Memory)", "targetValue": "Enabled" },
+      { "setting": "X3dCppc", "menuPath": "Advanced > AMD CBS > CPU Common Options", "settingName": "CPPC Preferred Cores", "targetValue": "Auto / Enabled" }
+    ]
+  }
+]
