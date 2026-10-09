@@ -1,0 +1,164 @@
+﻿namespace DrDxt.Core;
+
+/// <summary>
+/// Les raisons de bridage que NVIDIA publie, telles quelles.
+///
+/// Valeurs exactes de `nvmlClocksEventReasons` (docs.nvidia.com/deploy/nvml-api). Elles sont
+/// figees ici parce qu'un bitmask mal recopie ne leve rien : il rend juste une conclusion fausse
+/// avec l'assurance d'une lecture materielle.
+/// </summary>
+[Flags]
+public enum ClocksEventReason : ulong
+{
+    /// <summary>`nvmlClocksEventReasonNone`. Une vraie valeur : rien ne bride. A ne jamais
+    /// confondre avec « pas lisible ».</summary>
+    Aucune = 0x0,
+
+    /// <summary>`GpuIdle` — le GPU ne fait rien. En jeu, c'est le signe qu'on mesure autre chose
+    /// que du jeu.</summary>
+    GpuInactif = 0x1,
+
+    /// <summary>`ApplicationsClocksSetting` — horloges figees par une consigne applicative.</summary>
+    ConsigneApplicative = 0x2,
+
+    /// <summary>`SwPowerCap` — plafond de puissance logiciel atteint.</summary>
+    PlafondPuissanceLogiciel = 0x4,
+
+    /// <summary>`HwSlowdown` — ralentissement materiel (thermique ou alimentation).</summary>
+    RalentissementMateriel = 0x8,
+
+    /// <summary>`SyncBoost` — synchronisation multi-GPU.</summary>
+    SyncBoost = 0x10,
+
+    /// <summary>`SwThermalSlowdown` — ralentissement thermique logiciel.</summary>
+    ThermiqueLogiciel = 0x20,
+
+    /// <summary>`HwThermalSlowdown` — ralentissement thermique materiel.</summary>
+    ThermiqueMateriel = 0x40,
+
+    /// <summary>`HwPowerBrakeSlowdown` — frein d'alimentation materiel.</summary>
+    FreinAlimentation = 0x80,
+
+    /// <summary>`DisplayClockSetting` — horloge limitee par l'affichage.</summary>
+    ContrainteAffichage = 0x100,
+}
+
+/// <summary>Ce que la telemetrie a observe pendant la passe. Aucune de ces valeurs n'est une
+/// cause : ce sont des coincidences temporelles, nommees prudemment.</summary>
+public enum GpuLimiterObserved
+{
+    /// <summary>Rien de lisible : pas de sonde, ou le peripherique ne rend pas ces grandeurs.</summary>
+    Inconnu,
+
+    /// <summary>Lu, et rien ne bride. Le GPU tourne librement.</summary>
+    RienDeBridant,
+
+    /// <summary>Le GPU passe l'essentiel de la frame occupe. Il est le rythme de la scene — ce
+    /// qui ne dit pas qu'il est la cause d'un a-coup.</summary>
+    GpuSature,
+
+    /// <summary>Un plafond de PUISSANCE a ete observe pendant la passe.</summary>
+    PlafondPuissanceObserve,
+
+    /// <summary>Un ralentissement thermique a ete observe pendant la passe.</summary>
+    PlafondThermiqueObserve,
+
+    /// <summary>La frequence a chute nettement pendant la passe, sans qu'aucune raison publiee ne
+    /// l'explique. C'est un fait sans explication, et le dire ainsi vaut mieux que d'en inventer
+    /// une.</summary>
+    ChuteDeFrequenceObservee,
+}
+
+/// <summary>
+/// La lecture materielle minimale, sur la fenetre ou la decision est prise.
+///
+/// Six grandeurs : frametime (ailleurs), GPU busy, frequence, watts, temperature, raisons de
+/// bridage. Elles viennent toutes de la meme passe — c'est la seule facon qu'elles aient de
+/// parler du meme instant.
+///
+/// **Corrélation, jamais causalité.** Le produit a le droit de dire « pendant les fenetres
+/// mesurees, un plafond de puissance a ete observe et la frequence a chute de 12 % ». Il n'a pas
+/// le droit d'en deduire « c'est la puissance qui te coute des FPS » : il faudrait pour cela
+/// changer la limite et remesurer, ce qui est une experience, pas une lecture.
+///
+/// Et une gate a saute en ecrivant ceci. Le 07/09/2026, il etait ecrit que la frequence et la
+/// raison de bridage « demanderaient NVAPI et ses identifiants prives ». Verification dans la doc
+/// officielle le 08/09 : `nvmlDeviceGetClockInfo` et `nvmlDeviceGetCurrentClocksEventReasons` sont
+/// des exports NVML publics, nommes et documentes. La gate etait fausse et privait le root-cause
+/// de sa grandeur la plus directe. Une gate est une hypothese datee, pas un fait.
+/// </summary>
+public static class GpuLimiter
+{
+    /// <summary>Au-dela, le GPU passe l'essentiel de la frame occupe.
+    /// **NON CHIFFRÉ** : reprend le seuil du classifieur de goulot du produit (0,92), pour
+    /// qu'il n'existe pas deux definitions de « GPU-bound » qui divergeraient.</summary>
+    public const double SeuilGpuSature = 0.92;
+
+    /// <summary>Chute de frequence, en part de la frequence mediane, au-dela de laquelle on la
+    /// nomme. **NON CHIFFRÉ** : 10 % est assez grand pour ne pas se declencher sur le boost
+    /// opportuniste ordinaire d'une carte NVIDIA, assez petit pour attraper un decrochage.</summary>
+    public const double ChuteFrequenceNotable = 0.10;
+
+    /// <summary>Ce que ces lectures autorisent a dire, et rien de plus.</summary>
+    /// <param name="raisons">Le bitmask publie, ou <c>null</c> si non lisible. <c>0</c> est une
+    /// vraie valeur (rien ne bride) : ne pas la confondre avec l'absence de lecture.</param>
+    /// <param name="gpuBusyRatio">Occupation GPU dans [0, 1], ou <c>null</c>.</param>
+    /// <param name="frequenceMedianeMhz">Frequence mediane de la passe, ou <c>null</c>.</param>
+    /// <param name="frequenceMinimaleMhz">Frequence minimale de la passe, ou <c>null</c>.</param>
+    public static GpuLimiterObserved Classer(
+        ClocksEventReason? raisons,
+        double? gpuBusyRatio,
+        double? frequenceMedianeMhz,
+        double? frequenceMinimaleMhz)
+    {
+        // L'ordre compte : une raison PUBLIEE par le pilote bat toute inference de notre part.
+        if (raisons is { } r)
+        {
+            if (r.HasFlag(ClocksEventReason.ThermiqueMateriel)
+                || r.HasFlag(ClocksEventReason.ThermiqueLogiciel))
+                return GpuLimiterObserved.PlafondThermiqueObserve;
+
+            if (r.HasFlag(ClocksEventReason.PlafondPuissanceLogiciel)
+                || r.HasFlag(ClocksEventReason.FreinAlimentation))
+                return GpuLimiterObserved.PlafondPuissanceObserve;
+
+            // `RalentissementMateriel` seul ne dit pas LEQUEL des deux : le pilote le pose en
+            // meme temps que le bit precis quand il le connait. Seul, il reste un ralentissement
+            // materiel non attribue, et on ne choisit pas a sa place.
+            if (r.HasFlag(ClocksEventReason.RalentissementMateriel))
+                return GpuLimiterObserved.ChuteDeFrequenceObservee;
+        }
+
+        // Une chute de frequence sans raison publiee est un fait sans explication. Le dire ainsi
+        // vaut mieux que d'en inventer une.
+        if (frequenceMedianeMhz is > 0 && frequenceMinimaleMhz is { } min
+            && min < frequenceMedianeMhz.Value * (1 - ChuteFrequenceNotable))
+            return GpuLimiterObserved.ChuteDeFrequenceObservee;
+
+        if (gpuBusyRatio is { } busy && busy >= SeuilGpuSature)
+            return GpuLimiterObserved.GpuSature;
+
+        // On n'a rien lu du tout : ni raison, ni frequence, ni occupation.
+        if (raisons is null && gpuBusyRatio is null && frequenceMedianeMhz is null)
+            return GpuLimiterObserved.Inconnu;
+
+        return raisons is not null || gpuBusyRatio is not null
+            ? GpuLimiterObserved.RienDeBridant
+            : GpuLimiterObserved.Inconnu;
+    }
+
+    /// <summary>La phrase du produit. Prudente par construction : elle dit ce qui a ete observe
+    /// pendant les fenetres mesurees, jamais ce qui « cause » quoi que ce soit.</summary>
+    public static string Phrase(GpuLimiterObserved o) => o switch
+    {
+        GpuLimiterObserved.RienDeBridant => "rien ne bridait le GPU pendant les fenêtres mesurées",
+        GpuLimiterObserved.GpuSature => "le GPU était occupé l'essentiel de chaque frame",
+        GpuLimiterObserved.PlafondPuissanceObserve =>
+            "un plafond de puissance a été observé pendant les fenêtres mesurées",
+        GpuLimiterObserved.PlafondThermiqueObserve =>
+            "un ralentissement thermique a été observé pendant les fenêtres mesurées",
+        GpuLimiterObserved.ChuteDeFrequenceObservee =>
+            "la fréquence GPU a chuté pendant les fenêtres mesurées, sans raison publiée par le pilote",
+        _ => "le matériel n'a pas été lu pendant cette session",
+    };
+}
