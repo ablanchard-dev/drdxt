@@ -381,7 +381,9 @@ public partial class App : System.Windows.Application
     private static async Task VerifierMisesAJourAsync(ScanViewModel scan)
     {
         var version = typeof(App).Assembly.GetName().Version?.ToString() ?? "0.0.0";
-        using var client = new System.Net.Http.HttpClient();
+        // 09/10/2026 (revue) : derrière un proxy d'entreprise qui demande le compte Windows, sans ces identifiants le proxy
+        // répondait 407 et la mise à jour restait « injoignable » pour toujours.
+        using var client = new System.Net.Http.HttpClient(new System.Net.Http.HttpClientHandler { DefaultProxyCredentials = System.Net.CredentialCache.DefaultCredentials });
         var etat = await Task.Run(() => DrDxt.App.Updates.VerificationMiseAJour.VerifierAsync(
             () => DrDxt.App.Updates.VerificationMiseAJour.Monter(
                 DrDxt.App.Updates.VerificationMiseAJour.UrlEffective(Environment.GetEnvironmentVariable(DrDxt.App.Updates.VerificationMiseAJour.VariableUrl)), client, version),

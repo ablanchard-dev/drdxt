@@ -142,4 +142,11 @@ public sealed class TheUpdaterIsMountedOrSaysWhyNotTests
         UpdateComposition.ManifestPath(UpdateChannel.App).Should().Be("/updates/app/manifest");
         UpdateComposition.ManifestPath(UpdateChannel.Profiles).Should().Be("/updates/profiles/manifest");
     }
+
+    [Theory]
+    [InlineData("https://ablanchard-dev.github.io/drdxt", "https://ablanchard-dev.github.io/drdxt/updates/app/manifest")]
+    [InlineData("https://ablanchard-dev.github.io/drdxt/", "https://ablanchard-dev.github.io/drdxt/updates/app/manifest")]
+    [InlineData("https://updates.exemple.test", "https://updates.exemple.test/updates/app/manifest")]
+    public void La_racine_garde_son_chemin(string racine, string attendu)
+        => UpdateComposition.UrlDuManifeste(new Uri(racine), UpdateChannel.App).Should().Be(attendu);
 }

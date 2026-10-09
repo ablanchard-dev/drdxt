@@ -27,6 +27,12 @@ public static class UpdateComposition
     public static string ManifestPath(UpdateChannel channel)
         => "/updates/" + channel.ToString().ToLowerInvariant() + "/manifest";
 
+    /// <summary>09/10/2026 (revue) : la racine garde son chemin. <c>new Uri(racine, "/updates/…")</c> le remplaçait :
+    /// https://ablanchard-dev.github.io/drdxt devenait https://ablanchard-dev.github.io/updates/…, un 404 lu comme
+    /// « rien à offrir », et aucune copie installée n'aurait reçu de mise à jour.</summary>
+    public static string UrlDuManifeste(Uri racine, UpdateChannel channel)
+        => racine.GetLeftPart(UriPartial.Path).TrimEnd('/') + ManifestPath(channel);
+
     /// <summary>Monte l'updater, ou dit pourquoi il ne peut pas l'etre.</summary>
     /// <param name="manifestBaseUrl">Racine du serveur de mise a jour. Vide/absente ⇒ refus.</param>
     /// <param name="pinnedClient">Le client HTTP injecte. 19/09/2026 : ce texte disait « epingle » ;
@@ -76,7 +82,7 @@ public static class UpdateComposition
 
         var feed = new HttpUpdateFeed(
             pinnedClient,
-            channel => new Uri(baseUri, ManifestPath(channel)).ToString());
+            channel => UrlDuManifeste(baseUri, channel));
 
         return Result<AutoUpdater>.Ok(new AutoUpdater(
             feed,

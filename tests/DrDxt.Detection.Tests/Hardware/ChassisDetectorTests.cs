@@ -9,9 +9,13 @@ namespace DrDxt.Detection.Tests.Hardware;
 
 public class ChassisDetectorTests
 {
-    private static IWmiQuery Enclosure(int chassisType, string? model = null)
+    private static IWmiQuery Enclosure(int chassisType, string? model = null, bool batterie = true)
     {
         var q = Substitute.For<IWmiQuery>();
+        q.Query(Arg.Is<string>(s => s.Contains("Win32_Battery")))
+         .Returns(Result<IReadOnlyList<WmiRow>>.Ok(batterie
+             ? new List<WmiRow> { new(new Dictionary<string, object?> { ["Name"] = "Batterie" }) }
+             : new List<WmiRow>()));
         q.Query(Arg.Is<string>(s => s.Contains("Win32_SystemEnclosure")))
          .Returns(Result<IReadOnlyList<WmiRow>>.Ok(new List<WmiRow>
          { new(new Dictionary<string, object?> { ["ChassisTypes"] = new[] { (ushort)chassisType } }) }));
@@ -57,6 +61,15 @@ public class ChassisDetectorTests
     {
         new ChassisDetector(Enclosure(10, "Jupiter")).Detect().Value!.Should().Be(ChassisType.Handheld);
     }
+
+    // 09/10/2026 (revue) : mini PC, tout-en-un, carte mère qui dit « Other » : sans batterie, c'est un PC fixe.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(13)]
+    [InlineData(35)]
+    public void Un_code_inconnu_sans_batterie_est_un_pc_fixe(int code)
+        => new ChassisDetector(Enclosure(code, batterie: false)).Detect().Value!.Should().Be(ChassisType.Desktop);
 
     [Fact]
     public void Unknown_code_is_unknown()

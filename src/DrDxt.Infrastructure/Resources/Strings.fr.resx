@@ -342,7 +342,7 @@
     <value>Lance un scan complet pour évaluer ton PC.</value>
   </data>
   <data name="UI.Trust.Local" xml:space="preserve">
-    <value>Rien de ta machine n'est envoyé : seuls des pings et la lecture des dernières versions de pilote sortent</value>
+    <value>Rien de ta machine n'est envoyé : seuls sortent des pings, la lecture des dernières versions de pilote et la vérification de mise à jour</value>
   </data>
   <data name="UI.Trust.Data" xml:space="preserve">
     <value>Tes données restent sur ton PC : rien qui te désigne n'est envoyé.</value>
@@ -466,7 +466,7 @@
     <value>Mises à jour : jamais vérifiées</value>
   </data>
   <data name="UI.Footer.Updates.NotConfigured" xml:space="preserve">
-    <value>Réseau : seulement des pings, et le site du fabricant de ta carte graphique pour la version du pilote</value>
+    <value>Réseau : seulement des pings, le site du fabricant de ta carte graphique pour la version du pilote, et le site du projet pour la mise à jour</value>
   </data>
   <data name="UI.Footer.Updates.UpToDate" xml:space="preserve">
     <value>Mises à jour : à jour (vérifié au démarrage)</value>
@@ -1908,6 +1908,9 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
   </data>
   <data name="Essai.Incertain" xml:space="preserve">
     <value>Essai de « {0} » arrêté : une erreur pendant le changement d'état l'a rendu incertain. Regarde « Ce que DrDXT a posé » et annule-le si tu veux revenir à avant.</value>
+  </data>
+  <data name="Essai.RedemarrageARendre" xml:space="preserve">
+    <value>Le PC a redémarré pendant l'essai de « {0} » : clique « Arrêter l'essai » pour remettre ton réglage d'origine.</value>
   </data>
   <data name="Essai.Redemarrage" xml:space="preserve">
     <value>Essai de « {0} » arrêté par un redémarrage du PC : l'état du levier n'est plus sûr. Relance l'essai si tu veux.</value>

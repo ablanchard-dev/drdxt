@@ -130,6 +130,20 @@ public partial class ScanViewModel
         // Revue F-32 : après un redémarrage, l'état réel du levier n'est plus sûr ; l'essai s'arrête honnêtement.
         if (RedemarreDepuis(e))
         {
+            // 09/10/2026 (revue) : un plan d'alimentation ou un réglage du pilote survit au redémarrage. L'essai ne s'efface
+            // plus en laissant le levier posé (et un essai relancé l'aurait pris pour l'origine) : il rend d'abord l'origine,
+            // sans invite Windows ; sinon il attend, et « Arrêter l'essai » la rend.
+            if (e.PoseMaintenant != e.PoseALOrigine)
+            {
+                if (HelperJoignableSansUac is { } peut && levier.RequiresElevation && !await peut().ConfigureAwait(true))
+                {
+                    MemoireEssai.Ecrire(e with { EnPause = true });
+                    LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.RedemarrageARendre"), Titre(e.LevierId));
+                    return;
+                }
+                await ArreterEssaiSousVerrouAsync().ConfigureAwait(true);
+                if (MemoireEssai.Lire() is not null) return;   // rendu raté : « ArretRate » est dit, nouvel essai au passage suivant
+            }
             MemoireEssai.Ecrire(null);
             LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.Redemarrage"), Titre(e.LevierId));
             OnPropertyChanged(nameof(EssaiEnCours));

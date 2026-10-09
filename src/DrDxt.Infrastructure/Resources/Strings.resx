@@ -368,7 +368,7 @@
     <value>Run a full scan to assess your PC.</value>
   </data>
   <data name="UI.Trust.Local" xml:space="preserve">
-    <value>Nothing from your machine is sent: only pings and the latest driver version lookup go out</value>
+    <value>Nothing from your machine is sent: only pings, the latest driver version lookup and the update check go out</value>
   </data>
   <data name="UI.Trust.Data" xml:space="preserve">
     <value>Your data stays on your PC: nothing that identifies you is sent.</value>
@@ -492,7 +492,7 @@
     <value>Updates: never checked</value>
   </data>
   <data name="UI.Footer.Updates.NotConfigured" xml:space="preserve">
-    <value>Network: only pings, and your graphics card maker's site for the driver version</value>
+    <value>Network: only pings, your graphics card maker's site for the driver version, and the project site for updates</value>
   </data>
   <data name="UI.Footer.Updates.UpToDate" xml:space="preserve">
     <value>Updates: up to date (checked at startup)</value>
@@ -1935,6 +1935,9 @@ No setting on your machine was changed by this error.</value>
   </data>
   <data name="Essai.Incertain" xml:space="preserve">
     <value>Trial of “{0}” stopped: an error while switching left its state uncertain. Check “What DrDXT set” and undo it if you want to go back.</value>
+  </data>
+  <data name="Essai.RedemarrageARendre" xml:space="preserve">
+    <value>The PC restarted during the trial of “{0}”: click “Stop the trial” to put your original setting back.</value>
   </data>
   <data name="Essai.Redemarrage" xml:space="preserve">
     <value>Trial of “{0}” stopped by a PC restart: the setting's state is no longer certain. Start the trial again if you want.</value>
