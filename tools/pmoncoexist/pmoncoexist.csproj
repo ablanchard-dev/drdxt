@@ -1,0 +1,25 @@
+<!-- Smoke de COEXISTENCE PresentMon. NE FAIT PAS partie de DrDXT.sln. -->
+<!-- Repond a une seule question, sur une vraie machine : le service Intel etant actif, -->
+<!-- DrDXT peut-il quand meme ouvrir sa session de mesure ? Voir P1 du plan. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <RootNamespace>DrDxt.Tools.PmonCoexist</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Measurement\DrDxt.Measurement.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.Core\DrDxt.Core.csproj" />
+    <!-- L'option de reparation appelle le VRAI code d'installation du produit
+         (Win32ServiceActions), jamais un sc.exe ecrit a la main pour l'occasion : un smoke
+         qui contourne le code qu'il pretend valider ne valide rien. -->
+    <ProjectReference Include="..\..\src\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
+  </ItemGroup>
+</Project>

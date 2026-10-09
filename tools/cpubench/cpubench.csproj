@@ -1,0 +1,20 @@
+<!-- LE BANC CPU DETERMINISTE. -->
+<!-- 11/09/2026 : entre dans DrDXT.sln, tire par `tools/DrDxt.Tools.Tests`. La ligne precedente
+     disait « NE FAIT PAS partie de DrDXT.sln » ; elle a cesse d'etre vraie le jour ou
+     `CpuBudgetJuge` est venu vivre ici avec sa suite de tests. Rien de cet outil n'entre dans
+     l'App : aucun projet de `src/` ne le reference. -->
+<!-- LECTURE PURE : compteurs de performance, aucune ecriture. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <RootNamespace>DrDxt.Tools.CpuBench</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Detection\DrDxt.Detection.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.Measurement\DrDxt.Measurement.csproj" />
+  </ItemGroup>
+</Project>

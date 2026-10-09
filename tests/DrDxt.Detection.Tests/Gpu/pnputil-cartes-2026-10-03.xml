@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<PnpUtil Version="10.0.26200" Command="/enum-devices /class Display /format xml">
+    <Device InstanceId="PCI\VEN_10DE&amp;DEV_2882&amp;SUBSYS_51611462&amp;REV_A1\4&amp;22a14bb8&amp;0&amp;0008">
+        <DeviceDescription>NVIDIA GeForce RTX 4060</DeviceDescription>
+        <ClassName>Display</ClassName>
+        <ClassGuid>{4d36e968-e325-11ce-bfc1-08002be10318}</ClassGuid>
+        <ManufacturerName>NVIDIA</ManufacturerName>
+        <Status>Started</Status>
+        <DriverName>oem127.inf</DriverName>
+    </Device>
+</PnpUtil>

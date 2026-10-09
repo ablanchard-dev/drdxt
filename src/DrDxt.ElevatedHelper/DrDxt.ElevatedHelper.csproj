@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- 04/10/2026 : aucun code injecte au lancement (DOTNET_STARTUP_HOOKS), voir AucunCrochetDeDemarrageTests. -->
+    <StartupHookSupport>false</StartupHookSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- NamedPipeServerStreamAcl / PipeSecurity (restrictive pipe DACL). -->
+    <!-- ServiceController (start/stop/query the AMD3DVCache + PresentMon services). -->
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
+    <!-- WMI root\default:SystemRestore.Enable for the EnableSystemRestoreOp executor. -->
+    <PackageReference Include="System.Management" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
+    <!-- The SINGLE verified ADLX native boundary (AdlxNative + slots). Reused by the
+         elevated helper so the real ADLX write has ONE copy of the vtable slots, never a
+         divergent duplicate (master §9 leaf-minimal: GpuNative pulls only the BCL). -->
+    <ProjectReference Include="..\DrDxt.GpuNative\DrDxt.GpuNative.csproj" />
+    <!-- 11/09/2026 : le helper eleve est le SEUL ecrivain du manifeste signe (CommitManifestOp) :
+         cle de la machine, fusion, signature et racine admin vivent dans DrDxt.Reconciler, qui ne
+         depend que de DrDxt.Core (aucun cycle). -->
+    <ProjectReference Include="..\DrDxt.Reconciler\DrDxt.Reconciler.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Unit-test the internal NVAPI entry layer (MakeVersion golden rule + the
+         fail-clean EnumPhysicalGPUs path) without making it public surface. -->
+    <InternalsVisibleTo Include="DrDxt.ElevatedHelper.Tests" />
+    <!-- Le banc AMD (validation complète) passe au canal élevé la même instance ADLX que ses lecteurs. -->
+    <InternalsVisibleTo Include="DrDxt.AmdHarness" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Deploy the vendored PresentMon service binary next to the helper so the
+         bounded InstallPresentMonServiceOp can locate it at runtime (the locator
+         probes <basedir>\third_party\presentmon\PresentMonService.exe). -->
+    <None Include="..\..\third_party\presentmon\PresentMonService.exe"
+          Link="third_party\presentmon\PresentMonService.exe"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

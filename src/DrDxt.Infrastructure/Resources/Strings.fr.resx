@@ -1,0 +1,2500 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Common_Ok" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="Scan_Title" xml:space="preserve">
+    <value>Analyse ton PC</value>
+  </data>
+  <data name="Common_Apply" xml:space="preserve">
+    <value>Appliquer</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>Fermer</value>
+  </data>
+  <data name="Scan.Button.Start" xml:space="preserve">
+    <value>Lancer le scan</value>
+  </data>
+  <data name="Scan.State.Scanning" xml:space="preserve">
+    <value>Analyse en cours…</value>
+  </data>
+  <data name="Scan.Degraded.PresentMon" xml:space="preserve">
+    <value>Perf en jeu (latence, FPS, 1 % lows) pas encore mesurée : joue une partie, puis relance le scan.</value>
+  </data>
+  <data name="dashboard.resolution.unresolved" xml:space="preserve">
+    <value>Écart mesuré : {0:+0.0;-0.0} %. Cette session ne pouvait résoudre que ±{1:0.0} %. L'écart existe, mais il n'est pas démontrable ici.</value>
+  </data>
+  <data name="dashboard.resolution.unknown" xml:space="preserve">
+    <value>Écart mesuré : {0:+0.0;-0.0} %. Ce que cette session pouvait résoudre est inconnu (moins de 3 passes) : rien n'est démontré, ni dans un sens ni dans l'autre.</value>
+  </data>
+  <data name="Scan.Degraded.ServiceUnavailable" xml:space="preserve">
+    <value>Perf en jeu non mesurée : le service de mesure de DrDXT ne répond pas. Jouer n'y changera rien : relance DrDXT en administrateur pour qu'il le réinstalle.</value>
+  </data>
+  <data name="Scan.Error.Detection" xml:space="preserve">
+    <value>Détection matérielle échouée. Vérifie ton système et réessaie.</value>
+  </data>
+  <data name="Scan.Error.Analyse" xml:space="preserve">
+    <value>L'analyse de ce scan n'a pas pu aboutir. Réessaie.</value>
+  </data>
+  <data name="Scan.Error.Settings" xml:space="preserve">
+    <value>Lecture des paramètres échouée. Vérifie ton système et réessaie.</value>
+  </data>
+  <data name="Scan.Gating.Note" xml:space="preserve">
+    <value>Certains modules ne s'appliquent pas à ton type d'appareil.</value>
+  </data>
+  <data name="Scan.Findings.Header" xml:space="preserve">
+    <value>Résultats</value>
+  </data>
+  <data name="Scan.Recommendations.Header" xml:space="preserve">
+    <value>Optimisations recommandées</value>
+  </data>
+  <data name="Scan.Recommendation.Tease" xml:space="preserve">
+    <value>{0} : optimisation recommandée</value>
+  </data>
+  <data name="Finding.Cat.Gpu" xml:space="preserve">
+    <value>Carte graphique</value>
+  </data>
+  <data name="Finding.Cat.Latency" xml:space="preserve">
+    <value>Latence</value>
+  </data>
+  <data name="Finding.Cat.Generic" xml:space="preserve">
+    <value>Système</value>
+  </data>
+  <data name="Finding.Memory.XmpOff" xml:space="preserve">
+    <value>Profil XMP/EXPO probablement désactivé</value>
+  </data>
+  <data name="Finding.Memory.PagefileDisabled" xml:space="preserve">
+    <value>Fichier d'échange désactivé (risque de fiabilité, pas des FPS)</value>
+  </data>
+  <data name="Finding.Memory.SingleChannelOneModule" xml:space="preserve">
+    <value>Une seule barrette, donc un seul canal. En ajouter une identique est le plus gros gain mémoire qui existe (mesuré ailleurs, pas sur ta machine).</value>
+  </data>
+  <data name="Finding.Memory.SingleChannelPopulation" xml:space="preserve">
+    <value>Tes barrettes sont sur le même canal. En déplacer une vers l’autre canal (en général le second emplacement de l’autre paire) rétablit le double canal.</value>
+  </data>
+  <data name="Finding.Memory.SlotsNotA2B2" xml:space="preserve">
+    <value>Tes deux barrettes sont en double canal, mais pas dans les emplacements A2 et B2 que la plupart des cartes à quatre emplacements demandent (MSI, ASUS ; ta carte en déclare quatre). Ailleurs, la mémoire tient moins bien sa fréquence. Vérifie dans le manuel de ta carte avant de les déplacer.</value>
+  </data>
+  <data name="Finding.Memory.SlotPositionUnknown" xml:space="preserve">
+    <value>Tes deux barrettes sont en double canal, mais ta carte nomme ses emplacements d’une façon qui ne dit pas leur position. La plupart des cartes à quatre emplacements demandent A2 et B2 : vérifie dans le manuel de ta carte.</value>
+  </data>
+  <data name="Finding.Memory.ChannelTopologyUnknown" xml:space="preserve">
+    <value>Cette carte ne nomme pas ses emplacements d’une façon que DrDXT sache lire ; il ne peut pas dire si tu es en simple ou en double canal. Il le dit plutôt que de le deviner.</value>
+  </data>
+  <data name="Finding.Memory.XmpOnWithUncleanShutdowns" xml:space="preserve">
+    <value>Overclock actif et arrêts brutaux ces 90 derniers jours. Ta RAM tourne au-dessus de la vitesse standard JEDEC : c’est un overclock mémoire, par profil XMP/EXPO ou réglage à la main, et le domaine BIOS dit lequel quand il est lisible ; et Windows a redémarré sans arrêt propre (appuis longs sur le bouton exclus ; le détail, écrans bleus compris, est dans le bilan de stabilité). DrDXT n’a pas testé ce réglage et ne l’accuse pas. Pourquoi repasser en JEDEC : c’est la seule façon de savoir si cet overclock fait planter la machine. C’est un test de stabilité, pas de performance. Laisse tourner en JEDEC au moins trois fois l’écart habituel entre deux arrêts : par exemple, avec un arrêt tous les neuf jours, une semaine sans arrêt peut arriver par hasard. Si les arrêts cessent sur cette durée, l’overclock devient le suspect le plus probable. S’ils continuent, l’overclock n’y est pour rien, mais les barrettes ne sont pas innocentées pour autant. Un test mémoire les vérifie plus vite que des semaines d’attente : celui intégré à Windows (Windows + R, puis mdsched.exe ; il redémarre le PC et l’immobilise pendant le test), dont DrDXT affiche ensuite le résultat dans le bilan de stabilité, ou MemTest86, plus long. Sans redémarrer, le test de la section Agir ci-dessous vérifie un quart de ta mémoire en cinq minutes, mais il ne voit pas la mémoire que Windows occupe : aucune erreur ne vaut pas un test complet.</value>
+  </data>
+  <data name="Finding.Scheduling.X3dCcd" xml:space="preserve">
+    <value>Ordonnancement : CPU X3D multi-CCD à vérifier</value>
+  </data>
+  <data name="Finding.Display.RefreshBelowMax" xml:space="preserve">
+    <value>Affichage : ton écran tourne sous la fréquence qu'il supporte</value>
+  </data>
+  <data name="Finding.Display.RefreshUnknown" xml:space="preserve">
+    <value>Affichage : les fréquences disponibles n'ont pas pu être lues</value>
+  </data>
+  <data name="Finding.Memory.PagefileOff" xml:space="preserve">
+    <value>Fiabilité : le fichier d'échange de Windows est désactivé. À la limite de validation, les programmes gèlent ou plantent</value>
+  </data>
+  <data name="Finding.Latency.MmcssBroken" xml:space="preserve">
+    <value>L'ordonnanceur multimédia a été mis à 0 par un ancien « tweak ». Aucun gain prouvé, et l'audio peut en souffrir</value>
+  </data>
+  <data name="Finding.Memory.SysMainOff" xml:space="preserve">
+    <value>Un optimiseur précédent a désactivé SysMain : le remettre ne coûte rien, même si l'effet sur un SSD est négligeable</value>
+  </data>
+  <data name="Finding.Latency.HagsOff" xml:space="preserve">
+    <value>Planification GPU accélérée matériellement désactivée</value>
+  </data>
+  <data name="Finding.Gpu.ReBarOff" xml:space="preserve">
+    <value>Resizable BAR (ReBAR) désactivé</value>
+  </data>
+  <data name="Finding.Gpu.ReBarUnknown" xml:space="preserve">
+    <value>ReBAR : état non lisible sur ton GPU (non concluant)</value>
+  </data>
+  <data name="Finding.Gpu.DriverStale" xml:space="preserve">
+    <value>Pilote graphique qui semble dépassé. Le mettre à jour est le plus gros levier GPU</value>
+  </data>
+  <data name="Finding.Gpu.ReBarGuidance" xml:space="preserve">
+    <value>Vérifie que le Resizable BAR (ReBAR) est activé dans le BIOS. Il est illisible côté NVIDIA, mais c'est le 1er levier de config GPU</value>
+  </data>
+  <data name="Finding.Scheduling.X3dUnknown" xml:space="preserve">
+    <value>Ordonnancement : routage du cache X3D non confirmé (purement informatif)</value>
+  </data>
+  <data name="Finding.Latency.VrrOff" xml:space="preserve">
+    <value>Écran de jeu : le VRR (G-Sync, FreeSync) est inactif alors que l’écran le supporte. Il se règle dans le pilote : panneau NVIDIA, Configurer G-SYNC (AMD : FreeSync dans les réglages d’affichage). Le réglage VRR de Windows ne l’allume pas.</value>
+  </data>
+  <data name="Finding.Latency.VrrInactiveSupportUnknown" xml:space="preserve">
+    <value>Écran de jeu : le VRR (G-Sync, FreeSync) est inactif, et DrDXT n’a pas pu lire si ton écran le supporte. S’il le supporte, l’activer supprime les déchirures d’image quand le jeu tourne sous la fréquence de l’écran. À vérifier dans le panneau NVIDIA (Configurer G-SYNC) ou l’équivalent AMD.</value>
+  </data>
+  <data name="Finding.Latency.VrrUnknown" xml:space="preserve">
+    <value>État VRR non lisible (non concluant)</value>
+  </data>
+  <data name="UI.Header.Tagline" xml:space="preserve">
+    <value>DIAGNOSTIC PC HONNÊTE</value>
+  </data>
+  <data name="UI.Label.AvgFps" xml:space="preserve">
+    <value>FPS MOY</value>
+  </data>
+  <data name="UI.Label.P1Low" xml:space="preserve">
+    <value>1% BAS</value>
+  </data>
+  <data name="UI.Label.Margin" xml:space="preserve">
+    <value>MARGE</value>
+  </data>
+
+  <!-- ── Refonte du tableau de bord (M1) ── -->
+
+  <!-- App / en-tête -->
+  <data name="UI.App.Name" xml:space="preserve">
+    <value>DrDXT</value>
+  </data>
+
+  <!-- Verdict (titre) -->
+  <data name="UI.Verdict.Partial" xml:space="preserve">
+    <value>évalué en partie seulement</value>
+  </data>
+  <data name="UI.Register.Problem" xml:space="preserve">
+    <value>{0} à changer</value>
+  </data>
+  <data name="UI.Register.Problems" xml:space="preserve">
+    <value>{0} à changer</value>
+  </data>
+  <data name="UI.Register.LeversRead" xml:space="preserve">
+    <value>Réglages que DrDXT pose lui-même : {0} lus sur {1}</value>
+  </data>
+  <data name="UI.Register.Caption" xml:space="preserve">
+    <value>Ce que ce scan a réellement lu sur ta machine</value>
+  </data>
+  <data name="Coverage.Reason.Validated" xml:space="preserve">
+    <value>Tuning validé sur cette architecture : testé en vrai sur du matériel réel.</value>
+  </data>
+  <data name="Coverage.Reason.NeverWriteTested" xml:space="preserve">
+    <value>Aucune validation en écriture archivée pour cette architecture : DrDXT y essaie ses réglages en jeu et les rend sans gain, mais rien n'est encore prouvé sur ce matériel.</value>
+  </data>
+  <data name="Coverage.Reason.UnknownArchitecture" xml:space="preserve">
+    <value>Lecture seule : DrDXT ne reconnaît pas cette carte, et il ne règle pas un matériel sur lequel il n'a pas été validé.</value>
+  </data>
+  <data name="Coverage.Reason.VoltageLockedByVendor" xml:space="preserve">
+    <value>Tuning validé, sauf le voltage manuel : le constructeur a verrouillé ce chemin sur cette génération.</value>
+  </data>
+  <data name="Coverage.Reason.NotTunableHardware" xml:space="preserve">
+    <value>Rien à régler ici : carte intégrée ou mobile.</value>
+  </data>
+  <data name="Coverage.Reason.LaptopOrHandheld" xml:space="preserve">
+    <value>Les portables et consoles portables verrouillent leurs profils d'alimentation dans le firmware : le tuning GPU n'est pas proposé.</value>
+  </data>
+  <data name="Product.Promise" xml:space="preserve">
+    <value>Trouver les erreurs de configuration qui te coûtent des images, le prouver par la mesure, ne rien casser, et survivre aux mises à jour de Windows. Si ta machine est déjà bonne, DrDXT te le prouve aussi.</value>
+  </data>
+  <data name="Support.ReportWritten" xml:space="preserve">
+    <value>Rapport de diagnostic écrit dans :</value>
+  </data>
+  <data name="Support.ReportFailed" xml:space="preserve">
+    <value>Le rapport de diagnostic n'a pas pu être écrit (disque plein, ou dossier non accessible en écriture).</value>
+  </data>
+  <data name="Machine.ExportButton" xml:space="preserve">
+    <value>Exporter ma machine</value>
+  </data>
+  <data name="Machine.ExportWritten" xml:space="preserve">
+    <value>Ta machine (matériel, réglages, constats du docteur), sans ton nom, celui du PC, les numéros de série ni les adresses réseau, est écrite dans le fichier ci-dessous. Rien n'a été envoyé : c'est toi qui l'envoies, si tu veux.</value>
+  </data>
+  <data name="Machine.ExportFailed" xml:space="preserve">
+    <value>La machine n'a pas pu être exportée : lance d'abord une analyse, ou vérifie que le dossier Documents accepte l'écriture.</value>
+  </data>
+  <data name="Verifier.Bouton" xml:space="preserve">
+    <value>Vérifier DrDXT sur mon PC</value>
+  </data>
+  <data name="Verifier.Consentement" xml:space="preserve">
+    <value>DrDXT va poser, un par un, chaque réglage qu'il sait faire sur ce PC (mode Jeu, enregistrement de fond de la Game Bar, mode fenêtré optimisé, planification de la carte graphique, plan d'alimentation, boost du processeur, limite de puissance de la carte, réglages de latence du pilote ; sur une carte NVIDIA, ceux-là ne se vérifient qu'en jeu et restent non touchés ici), le relire, le remettre d'origine, puis le relire encore. Aucun réglage n'est gardé. Ferme ton jeu avant. Windows te demandera ton accord. Compte une à deux minutes.</value>
+  </data>
+  <data name="Verifier.Confirmer" xml:space="preserve">
+    <value>Lancer la vérification</value>
+  </data>
+  <data name="Verifier.Annuler" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="Verifier.EnCours" xml:space="preserve">
+    <value>Vérification en cours : {0}</value>
+  </data>
+  <data name="Verifier.Compte" xml:space="preserve">
+    <value>Vérification finie. {0} réglage(s) posé(s), relu(s) et remis d'origine ; {1} non touché(s) (déjà réglé(s), sans objet ou illisible(s) sur ce PC) ; {2} refusé(s), sans rien changer.</value>
+  </data>
+  <data name="Verifier.RefusWindows" xml:space="preserve">
+    <value>Vérification arrêtée : l'accord de Windows a été refusé. Les réglages suivants n'ont pas été essayés ; ceux d'avant ont été remis d'origine.</value>
+  </data>
+  <data name="Verifier.JeuOuvertEnCours" xml:space="preserve">
+    <value>Vérification arrêtée : un jeu s'est ouvert. Ce qui avait été posé a été remis d'origine ; relance-la jeu fermé.</value>
+  </data>
+  <data name="Verifier.AVerifier" xml:space="preserve">
+    <value>Vérification arrêtée. À vérifier à la main, la valeur d'origine est dans le rapport :
+{0}</value>
+  </data>
+  <data name="Verifier.Echec" xml:space="preserve">
+    <value>La vérification n'a pas pu se dérouler. Si un réglage a été posé, DrDXT le remettra d'origine au prochain lancement.</value>
+  </data>
+  <data name="Verifier.EssaiEnCours" xml:space="preserve">
+    <value>Un essai de DrDXT est déjà en cours : recommence quand il est fini.</value>
+  </data>
+  <data name="Verifier.JeuOuvert" xml:space="preserve">
+    <value>Ferme ton jeu d'abord : DrDXT ne touche à rien pendant une partie.</value>
+  </data>
+  <data name="Verifier.RapportEcrit" xml:space="preserve">
+    <value>Le rapport est écrit ici. Rien n'a été envoyé : c'est toi qui l'envoies, si tu veux aider à tester DrDXT.</value>
+  </data>
+  <data name="Bios.Guide.Recovery.RebarNeedsCsmOff" xml:space="preserve">
+    <value>Si le Resizable BAR refuse de s'activer : sur la plupart des cartes il a aussi besoin que le CSM (module de compatibilité) soit désactivé. DrDXT ne te guide pas sur celui-là : mal réglé, il peut empêcher la machine de démarrer. N'y touche donc que si tu es à l'aise, et un réglage à la fois.</value>
+  </data>
+  <data name="Bios.Optional.Note" xml:space="preserve">
+    <value>La partie BIOS est optionnelle. Pas à l'aise là-dedans ? Le reste fonctionne sans : rien de cette liste ne dépend de ton BIOS.</value>
+  </data>
+  <data name="UI.Coverage.Caption" xml:space="preserve">
+    <value>leviers lus</value>
+  </data>
+
+  <!-- Mot de bande (sous la jauge) -->
+
+  <!-- Libellés qualitatifs des sous-scores -->
+  <data name="UI.Qual.Excellent" xml:space="preserve">
+    <value>Excellente</value>
+  </data>
+  <data name="UI.Qual.Good" xml:space="preserve">
+    <value>Bonne</value>
+  </data>
+  <data name="UI.Qual.Fair" xml:space="preserve">
+    <value>Moyenne</value>
+  </data>
+  <data name="UI.Qual.Poor" xml:space="preserve">
+    <value>Faible</value>
+  </data>
+
+  <!-- Écran au repos -->
+  <data name="UI.Idle.HeadlineLead" xml:space="preserve">
+    <value>Ton PC, réglé</value>
+  </data>
+  <data name="UI.Idle.HeadlineAccent" xml:space="preserve">
+    <value>à l'image près.</value>
+  </data>
+  <data name="UI.Idle.HeroTitle" xml:space="preserve">
+    <value>Aucun scan effectué</value>
+  </data>
+  <data name="UI.Idle.HeroBody" xml:space="preserve">
+    <value>Lance un scan complet pour évaluer ton PC.</value>
+  </data>
+  <data name="UI.Trust.Local" xml:space="preserve">
+    <value>Rien de ta machine n'est envoyé : seuls des pings et la lecture des dernières versions de pilote sortent</value>
+  </data>
+  <data name="UI.Trust.Data" xml:space="preserve">
+    <value>Tes données restent sur ton PC : rien qui te désigne n'est envoyé.</value>
+  </data>
+
+  <!-- Écran de résultats -->
+  <data name="UI.Result.HeadlineLead" xml:space="preserve">
+    <value>Résultat :</value>
+  </data>
+  <data name="UI.Result.HeadlineLeadConfig" xml:space="preserve">
+    <value>Côté config :</value>
+  </data>
+  <data name="UI.Result.ScanDone" xml:space="preserve">
+    <value>Scan terminé</value>
+  </data>
+  <data name="UI.Result.Subtitle" xml:space="preserve">
+    <value>Voici ce que ta machine fait vraiment en jeu, et ce qui a été constaté sur sa configuration.</value>
+  </data>
+  <data name="UI.Result.NoCritical" xml:space="preserve">
+    <value>Aucun problème critique détecté</value>
+  </data>
+  <data name="UI.Result.ACorrigerSansCritique" xml:space="preserve">
+    <value>{0} points à corriger</value>
+  </data>
+  <data name="UI.Result.ACorrigerDontCritiques" xml:space="preserve">
+    <value>{0} points à corriger, dont {1} critiques</value>
+  </data>
+  <data name="UI.Result.ACorrigerDontCritiques.Seul" xml:space="preserve">
+    <value>{0} point à corriger, et il est critique</value>
+  </data>
+  <data name="UI.Result.ACorrigerDontCritiques.Un" xml:space="preserve">
+    <value>{0} points à corriger, dont {1} critique</value>
+  </data>
+  <data name="UI.Result.ACorrigerSansCritique.Un" xml:space="preserve">
+    <value>{0} point à corriger</value>
+  </data>
+
+  <!-- Héros (côté résultats) -->
+  <data name="UI.Cta.Optimize" xml:space="preserve">
+    <value>Optimiser</value>
+  </data>
+  <data name="UI.Cta.Rescan" xml:space="preserve">
+    <value>Relancer le scan</value>
+  </data>
+
+  <!-- Descriptions des sous-scores / notes honnêtes -->
+  <data name="UI.Profile.Unverified" xml:space="preserve">
+    <value>non vérifié</value>
+  </data>
+  <data name="Carte.Propose.NonValide" xml:space="preserve">
+    <value>pas encore prouvé sur ce matériel</value>
+  </data>
+
+  <!-- Panneau assistant -->
+  <data name="UI.Assistant.Title" xml:space="preserve">
+    <value>Ton assistant DrDXT</value>
+  </data>
+  <data name="UI.Assistant.Online" xml:space="preserve">
+    <value>Local</value>
+  </data>
+  <data name="UI.Assistant.IdleLead" xml:space="preserve">
+    <value>Prêt à analyser ton PC.</value>
+  </data>
+  <data name="UI.Assistant.WillExamine" xml:space="preserve">
+    <value>Le scan va examiner les composants clés :</value>
+  </data>
+  <data name="UI.Assistant.ViewReport" xml:space="preserve">
+    <value>Voir le rapport</value>
+  </data>
+
+  <!-- Lignes du résumé de diagnostic -->
+
+  <!-- Composants -->
+  <data name="UI.Component.Cpu" xml:space="preserve">
+    <value>Processeur</value>
+  </data>
+  <data name="UI.Component.Gpu" xml:space="preserve">
+    <value>Carte graphique</value>
+  </data>
+  <data name="UI.Component.Ram" xml:space="preserve">
+    <value>Mémoire</value>
+  </data>
+  <data name="UI.Component.Storage" xml:space="preserve">
+    <value>Stockage</value>
+  </data>
+  <data name="UI.Component.Windows" xml:space="preserve">
+    <value>Windows</value>
+  </data>
+
+  <!-- Cartes de fonctionnalités (au repos) -->
+  <data name="UI.Feature.Diagnostic.Title" xml:space="preserve">
+    <value>Diagnostic intelligent</value>
+  </data>
+  <data name="UI.Feature.Diagnostic.Body" xml:space="preserve">
+    <value>Une lecture mesurée de ta machine, et ce que DrDXT n'a pas su lire est dit.</value>
+  </data>
+  <data name="UI.Feature.Gaming.Title" xml:space="preserve">
+    <value>Optimisation gaming</value>
+  </data>
+  <data name="UI.Feature.Gaming.Body" xml:space="preserve">
+    <value>DrDXT corrige ce qui est prouvé, mesure avant et après, et annule tout seul si ça régresse.</value>
+  </data>
+  <data name="UI.Feature.Security.Title" xml:space="preserve">
+    <value>Sécurité système</value>
+  </data>
+  <data name="UI.Feature.Security.Body" xml:space="preserve">
+    <value>Aucun driver noyau. Rien qui te désigne ne quitte ton PC.</value>
+  </data>
+  <data name="UI.Feature.Report.Title" xml:space="preserve">
+    <value>Rapport détaillé</value>
+  </data>
+  <data name="UI.Feature.Report.Body" xml:space="preserve">
+    <value>Ce qui a été constaté, ce qui a été mesuré, et ce qu'il reste à faire.</value>
+  </data>
+
+  <!-- Pied de page -->
+  <data name="UI.Footer.Version" xml:space="preserve">
+    <value>Version {0} · Moteur DrDXT Core</value>
+  </data>
+  <data name="UI.Footer.Updates" xml:space="preserve">
+    <value>Mises à jour : jamais vérifiées</value>
+  </data>
+  <data name="UI.Footer.Updates.NotConfigured" xml:space="preserve">
+    <value>Réseau : seulement des pings, et le site du fabricant de ta carte graphique pour la version du pilote</value>
+  </data>
+  <data name="UI.Footer.Updates.UpToDate" xml:space="preserve">
+    <value>Mises à jour : à jour (vérifié au démarrage)</value>
+  </data>
+  <data name="UI.Footer.Updates.ProfilesInstalled" xml:space="preserve">
+    <value>Mises à jour : nouveaux profils signés installés</value>
+  </data>
+  <data name="UI.Footer.Updates.NewVersion" xml:space="preserve">
+    <value>Mises à jour : une nouvelle version signée est vérifiée ; l'installation automatique n'est pas encore disponible</value>
+  </data>
+  <data name="UI.Footer.Updates.NewVersionNamed" xml:space="preserve">
+    <value>Mises à jour : DrDXT {0} est prêt, signé et vérifié. Rien ne s&apos;installe sans toi : clique « Installer » quand tu veux.</value>
+  </data>
+  <data name="UI.Footer.Updates.Offline" xml:space="preserve">
+    <value>Mises à jour : serveur injoignable, on reste sur cette version</value>
+  </data>
+  <data name="UI.Footer.Updates.Rejected" xml:space="preserve">
+    <value>Mises à jour : un paquet a été refusé (signature, empreinte ou retour en arrière)</value>
+  </data>
+  <data name="UI.Footer.Updates.Failed" xml:space="preserve">
+    <value>Mises à jour : vérification en échec, on reste sur cette version</value>
+  </data>
+  <data name="UI.Footer.Install" xml:space="preserve">
+    <value>Installer la mise à jour</value>
+  </data>
+  <data name="UI.Footer.Updates.InstallerLaunched" xml:space="preserve">
+    <value>Mises à jour : installateur lancé. Accepte la demande de Windows pour installer</value>
+  </data>
+  <data name="UI.Footer.Updates.InstallerRefused" xml:space="preserve">
+    <value>Mises à jour : installateur refusé. Le fichier ne correspond plus à la version vérifiée</value>
+  </data>
+
+  <!-- ── Spine de mesure (M1.5) — états de mesure honnêtes ── -->
+  <data name="Measure.NoPresentingFrames" xml:space="preserve">
+    <value>Aucune image n'a été captée alors que le processus tourne. Soit il ne présente rien en ce moment (menu, fenêtre minimisée), ou l'anti-triche du jeu bloque la mesure : DrDXT ne peut pas trancher entre les deux.</value>
+  </data>
+
+  <!-- ── Statut honnête GPU AMD (§22.3) — GPU AMD détecté, SDK ADLX pas encore disponible ── -->
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       M2 — Appliquer + prouver le gain : tableau de bord avant/après (G1/G3).
+       Honnêteté (§4 P1 / §5) : la latence est « estimée », jamais vendue comme
+       exacte ; un gain n'est affiché que mesuré au-delà des marges ; les résumés
+       latence / efficacité / fix-it ne promettent JAMAIS de « +FPS ».
+       ════════════════════════════════════════════════════════════════════ -->
+
+  <!-- États d'en-tête / verdict du tableau de bord -->
+  <data name="dashboard.measurable_gain" xml:space="preserve">
+    <value>Gain mesuré : changements conservés</value>
+  </data>
+  <data name="dashboard.no_measurable_gain" xml:space="preserve">
+    <value>Aucun gain mesurable : changements conservés, rien à cacher</value>
+  </data>
+  <data name="dashboard.regression_reverted" xml:space="preserve">
+    <value>Régression mesurée : changements annulés automatiquement</value>
+  </data>
+
+  <!-- Métriques -->
+  <data name="metric.pc_latency_estimated" xml:space="preserve">
+    <value>Latence PC estimée</value>
+  </data>
+  <data name="metric.p1_low" xml:space="preserve">
+    <value>1% low</value>
+  </data>
+  <data name="metric.avg_fps" xml:space="preserve">
+    <value>FPS moyen</value>
+  </data>
+  <data name="metric.gpu_busy" xml:space="preserve">
+    <value>GPU occupé</value>
+  </data>
+
+  <!-- Actions -->
+  <data name="action.revert_all" xml:space="preserve">
+    <value>Tout annuler</value>
+  </data>
+  <data name="dashboard.revert.unavailable" xml:space="preserve">
+    <value>Rien à annuler pour le moment : aucun réglage n'a encore été appliqué sur cette machine.</value>
+  </data>
+  <data name="dashboard.revert.available" xml:space="preserve">
+    <value>Remet chaque réglage appliqué dans l'état où il était avant le passage de DrDXT.</value>
+  </data>
+  <data name="scan.apply.needs_scan" xml:space="preserve">
+    <value>Lance d'abord un scan : DrDXT n'applique rien sans avoir lu cette machine.</value>
+  </data>
+  <data name="scan.apply.ready" xml:space="preserve">
+    <value>Applique les réglages retenus, en gardant l'état d'origine de chacun pour pouvoir revenir.</value>
+  </data>
+  <data name="action.back_to_scan" xml:space="preserve">
+    <value>Retour au scan</value>
+  </data>
+
+  <!-- Parcours d'application (§15/§16) -->
+  <data name="Apply.RestoreRequired.Declined" xml:space="preserve">
+    <value>Application bloquée : tu as refusé d'activer la restauration système, et DrDXT n'écrit rien sans point de restauration. Rien n'a été modifié.</value>
+  </data>
+  <data name="Apply.RestoreRequired.Failed" xml:space="preserve">
+    <value>Application bloquée : Windows a refusé de créer le point de restauration, deux fois ({0}). Rien n'a été modifié. Réessaie dans quelques minutes.</value>
+  </data>
+  <data name="Apply.RestoreRequired.NotFound" xml:space="preserve">
+    <value>Application bloquée : Windows a accepté de créer le point de restauration, mais DrDXT ne le retrouve pas (pas créé, ou la liste des points ne se relit pas). Rien n'a été modifié. Réessaie dans une minute.</value>
+  </data>
+  <data name="Apply.EnCours" xml:space="preserve">
+    <value>Point de restauration puis réglages : en général moins d'une minute, quelques minutes au pire. Ne ferme pas DrDXT.</value>
+  </data>
+  <data name="Apply.RestoreRequired.Blocked" xml:space="preserve">
+    <value>Application bloquée : un point de restauration système est requis au préalable. La restauration système est désactivée et n'a pas pu être activée, donc rien n'a été modifié. Active la restauration système (Protection du système) puis réessaie.</value>
+  </data>
+  <data name="Apply.NothingApplicable" xml:space="preserve">
+    <value>Rien à appliquer : aucune optimisation sûre ne s'applique à cette machine dans cette version.</value>
+  </data>
+  <data name="Apply.SousGarde" xml:space="preserve">
+    <value>Ce PC s'est arrêté brutalement plusieurs fois ces dernières semaines. DrDXT optimise quand même, sous garde : un réglage suivi d'un nouvel arrêt dans la semaine est rendu seul. La cause de ces arrêts et sa réparation sont dans « Windows et stabilité ».</value>
+  </data>
+  <data name="Optimize.KeptOriginNotSigned" xml:space="preserve">
+    <value>Ce réglage a été conservé, mais sa valeur d'origine n'a pas pu être enregistrée dans le manifeste signé : désinstaller DrDXT ne la remettra pas. La valeur d'origine reste notée sur ce PC seulement.</value>
+  </data>
+  <data name="Apply.Failed" xml:space="preserve">
+    <value>L'optimisation n'a pas pu être appliquée. Rien n'a été conservé : ton système est inchangé.</value>
+  </data>
+  <data name="Apply.Result.Discarded" xml:space="preserve">
+    <value>écarté</value>
+  </data>
+  <data name="Apply.Result.ToMeasure" xml:space="preserve">
+    <value>à mesurer en jeu</value>
+  </data>
+  <data name="Apply.Result.AtReboot" xml:space="preserve">
+    <value>au redémarrage</value>
+  </data>
+  <data name="Apply.Result.NotThisRound" xml:space="preserve">
+    <value>retenu, pas à ce tour</value>
+  </data>
+  <data name="Apply.Result.Unknown" xml:space="preserve">
+    <value>inconnu : aucun descripteur, jamais tenté</value>
+  </data>
+  <data name="Apply.Result.RebootSet" xml:space="preserve">
+    <value>Posé(s), effectif(s) au prochain redémarrage :</value>
+  </data>
+  <data name="Apply.Result.RebootNoneHeld" xml:space="preserve">
+    <value>Aucune correction au redémarrage n'a tenu.</value>
+  </data>
+  <data name="Apply.Result.NotHeld" xml:space="preserve">
+    <value>Pas posé (refusé ou défait, rien n'est resté) :</value>
+  </data>
+  <data name="Apply.Result.SetNow" xml:space="preserve">
+    <value>posé tout de suite</value>
+  </data>
+  <data name="Apply.Result.SetNowDone" xml:space="preserve">
+    <value>Posé(s), effectif(s) tout de suite :</value>
+  </data>
+  <data name="Apply.Result.SetNowNoneHeld" xml:space="preserve">
+    <value>Aucun réglage posé tout de suite n'a tenu.</value>
+  </data>
+  <data name="tweak.fixit.mode_boost.title" xml:space="preserve">
+    <value>Boost du processeur rendu</value>
+  </data>
+  <data name="tweak.fixit.mode_boost.summary" xml:space="preserve">
+    <value>Le boost du processeur est coupé dans ton plan d'alimentation (sur secteur), alors que le réglage par défaut de ce plan l'autorise : il ne dépasse plus sa fréquence de base. DrDXT remet la valeur par défaut de ton plan, rien d'autre (la batterie n'est pas touchée). Le gain n'est pas connu d'avance : DrDXT le mesure en partie et rend l'ancien réglage s'il ne gagne rien. Réversible. Sur un Intel de 13e ou 14e génération, un boost coupé peut être un choix, contre la chaleur : coupé exprès ? laisse-le.</value>
+  </data>
+  <data name="tweak.fixit.heures_actives.title" xml:space="preserve">
+    <value>Heures d'activité de Windows Update sur tes heures de jeu</value>
+  </data>
+  <data name="tweak.fixit.heures_actives.summary" xml:space="preserve">
+    <value>Règle les heures d'activité de Windows Update pour couvrir les heures de tes parties relevées (18 h au plus, la limite de Windows) : Windows ne redémarre pas automatiquement le PC pendant ces heures. Windows Update reste allumé et installe tout comme avant. Effectif tout de suite, annulable. Ça n'ajoute pas d'images par seconde.</value>
+  </data>
+  <data name="Apply.Session.Unavailable" xml:space="preserve">
+    <value>n'est pas disponible dans cette version : il n'a pas été tenté.</value>
+  </data>
+  <data name="Apply.Session.BestState" xml:space="preserve">
+    <value>La machine est restée dans le meilleur état mesuré pendant cette session.</value>
+  </data>
+  <data name="Apply.Session.RevertFailed" xml:space="preserve">
+    <value>Attention : un retour à l'état de référence a échoué.</value>
+  </data>
+  <data name="Apply.Session.ReadBack" xml:space="preserve">
+    <value>Relecture :</value>
+  </data>
+  <data name="Apply.RestorePoint.DuringIssue" xml:space="preserve">
+    <value>Souci en cours ({0}) : le point de restauration de l'Optimiser le contiendra. Pour revenir à un état sain : {1}. Détail : « Windows et stabilité ».</value>
+  </data>
+  <data name="Apply.RestorePoint.DuringIssueNoPoint" xml:space="preserve">
+    <value>Souci en cours ({0}), sans point de restauration plus ancien : celui de l'Optimiser le contiendra et ne ramènera qu'à l'état d'aujourd'hui. Détail : « Windows et stabilité ».</value>
+  </data>
+  <data name="Apply.RestorePoint.DuringIssueUnread" xml:space="preserve">
+    <value>Souci en cours ({0}), liste des points de restauration illisible : celui de l'Optimiser contiendra le souci. Détail : « Windows et stabilité ».</value>
+  </data>
+  <data name="Apply.RestorePoint.Reused" xml:space="preserve">
+    <value>Un point de restauration du {0:g} existe déjà : il protège ce changement, DrDXT n'en crée donc pas un de plus. Le restaurer défait aussi tout ce qui a changé depuis cette heure-là.</value>
+  </data>
+  <data name="Autopilot.Outcome.Kept" xml:space="preserve">
+    <value>conservé : gain prouvé</value>
+  </data>
+  <data name="Autopilot.Outcome.RejectedRegression" xml:space="preserve">
+    <value>annulé : dégradation prouvée</value>
+  </data>
+  <data name="Autopilot.Outcome.RejectedUnresolved" xml:space="preserve">
+    <value>annulé : l'écart est resté sous ce que cette session sait résoudre</value>
+  </data>
+  <data name="Autopilot.Outcome.ApplyFailed" xml:space="preserve">
+    <value>non appliqué : l'écriture n'a pas pris</value>
+  </data>
+  <data name="Autopilot.Outcome.Unstable" xml:space="preserve">
+    <value>annulé : la machine est devenue instable</value>
+  </data>
+  <data name="Autopilot.Outcome.NotAttempted" xml:space="preserve">
+    <value>non tenté</value>
+  </data>
+  <data name="Autopilot.Evidence.ProvenGain" xml:space="preserve">
+    <value>gain prouvé</value>
+  </data>
+  <data name="Autopilot.Evidence.ProvenRegression" xml:space="preserve">
+    <value>dégradation prouvée</value>
+  </data>
+  <data name="Autopilot.Evidence.NoResolvedChange" xml:space="preserve">
+    <value>non résolu ici</value>
+  </data>
+  <data name="Autopilot.Evidence.Invalid" xml:space="preserve">
+    <value>mesure invalide</value>
+  </data>
+  <data name="Autopilot.ReadBack.Applied" xml:space="preserve">
+    <value>appliqué</value>
+  </data>
+  <data name="Autopilot.ReadBack.NotApplied" xml:space="preserve">
+    <value>non appliqué</value>
+  </data>
+  <data name="Autopilot.ReadBack.Drifted" xml:space="preserve">
+    <value>modifié par autre chose</value>
+  </data>
+  <data name="Autopilot.ReadBack.Unavailable" xml:space="preserve">
+    <value>relecture impossible</value>
+  </data>
+  <data name="Autopilot.ReadBack.Unknown" xml:space="preserve">
+    <value>inconnu</value>
+  </data>
+  <data name="Apply.MoatUnarmed" xml:space="preserve">
+    <value>Tes optimisations ont bien été appliquées, mais elles n'ont pas pu être enregistrées pour être réappliquées automatiquement après une mise à jour Windows ou un redémarrage. Elles restent actives maintenant ; la protection en arrière-plan sera armée la prochaine fois.</value>
+  </data>
+  <data name="Apply.ReferenceNotSeeded" xml:space="preserve">
+    <value>Tes optimisations sont appliquées et enregistrées pour être réappliquées automatiquement, mais le repère qui permet à DrDXT de reconnaître une mise à jour de Windows ou du pilote n'a pas pu être enregistré. Après la prochaine mise à jour de ce type, la protection en arrière-plan te signalera le réglage modifié au lieu de le rétablir.</value>
+  </data>
+  <data name="Apply.ManifestUnreadable" xml:space="preserve">
+    <value>Le registre signé que DrDXT tient de tes changements n'a pas pu être relu (il a été modifié, ou signé par une clé que ce PC ne possède plus). Rien n'a été écrit par-dessus, et rien de neuf n'a été enregistré. Tant qu'il reste illisible, désinstaller DrDXT ne remettra pas les valeurs d'origine qu'il contient.</value>
+  </data>
+  <data name="Apply.ManifestReset" xml:space="preserve">
+    <value>Commencer un nouveau registre signé</value>
+  </data>
+  <data name="Apply.ManifestResetDone" xml:space="preserve">
+    <value>Un nouveau registre signé a été commencé. L'ancien, illisible, a été mis de côté à côté de lui dans %ProgramData%\DrDxt, pas effacé. Les valeurs d'origine qu'il contenait ne seront pas remises par la désinstallation de DrDXT ; elles restent notées sur ce PC seulement.</value>
+  </data>
+  <data name="Apply.ManifestResetFailed" xml:space="preserve">
+    <value>Le nouveau registre signé n'a pas pu être commencé ; rien n'a changé.</value>
+  </data>
+  <data name="dashboard.revert.failed" xml:space="preserve">
+    <value>Certains changements n'ont pas pu être annulés automatiquement. Utilise le point de restauration système si nécessaire.</value>
+  </data>
+
+  <!-- SummaryKeys de verdict du moteur -->
+  <data name="verdict.measurable_gain" xml:space="preserve">
+    <value>Gain mesuré au-delà de la marge d'erreur.</value>
+  </data>
+  <data name="verdict.no_measurable_gain" xml:space="preserve">
+    <value>Aucun gain au-delà de la marge d'erreur. Changements conservés ; tu peux les annuler.</value>
+  </data>
+  <data name="verdict.regression_reverted" xml:space="preserve">
+    <value>Une régression a été mesurée, les changements ont été annulés automatiquement.</value>
+  </data>
+
+  <!-- Résumés de tweak (D/E/F) — honnêtes, jamais de « +FPS » sur latence/efficacité/fix-it -->
+  <data name="tweak.latency.reflex.driver_floor" xml:space="preserve">
+    <value>Limite la file de frames au niveau du pilote. Sans effet en DirectX 12 et Vulkan, où le moteur du jeu gère lui-même la file. Ce n'est pas NVIDIA Reflex, qui est une technologie différente, intégrée au jeu.</value>
+  </data>
+  <data name="tweak.latency.hags.enable" xml:space="preserve">
+    <value>Activer l'ordonnancement GPU accéléré par le matériel (effet après redémarrage).</value>
+  </data>
+  <data name="tweak.latency.mouse_acceleration_off.title" xml:space="preserve">
+    <value>Accélération du pointeur coupée</value>
+  </data>
+  <data name="tweak.latency.mouse_acceleration.off" xml:space="preserve">
+    <value>Couper « Améliorer la précision du pointeur » : le curseur suit le geste à l'identique, quelle que soit la vitesse (effet à la prochaine ouverture de session).</value>
+  </data>
+  <data name="tweak.latency.game_mode.enable" xml:space="preserve">
+    <value>Activer le mode Jeu de Windows (effet au prochain lancement de jeu).</value>
+  </data>
+  <data name="tweak.latency.game_dvr.background_off" xml:space="preserve">
+    <value>Désactiver l'enregistrement en arrière-plan du Game DVR : moins de charge de fond (effet au prochain lancement de jeu) ; la capture manuelle reste active.</value>
+  </data>
+  <data name="tweak.latency.vrr_flipmodel.enable" xml:space="preserve">
+    <value>Activer le taux de rafraîchissement variable et les optimisations pour jeux fenêtrés (effet au prochain lancement de jeu) ; l'Auto HDR est préservé.</value>
+  </data>
+  <data name="tweak.latency.render_queue_cap.floor" xml:space="preserve">
+    <value>Limite la file de rendu pour réduire la latence entrée→affichage.</value>
+  </data>
+  <data name="tweak.latency.vrr_vsync_cap.combo" xml:space="preserve">
+    <value>VRR + Vsync + cap juste sous le rafraîchissement : latence minimale, sans tearing.</value>
+  </data>
+  <data name="tweak.latency.prefer_max_perf.enable" xml:space="preserve">
+    <value>Régler le mode de gestion de l'alimentation NVIDIA sur « Performances maximales » : fréquences plus stables dans les jeux qui downclockent ; consomme plus au repos sur le bureau.</value>
+  </data>
+  <data name="tweak.gpu.undervolt.efficiency" xml:space="preserve">
+    <value>Décale l'horloge du cœur dans des bornes prudentes (de -200 à +100 MHz), sans écrire aucune tension. Au-dessus de zéro, un peu plus d'images et de chaleur ; en dessous, une carte plus fraîche. DrDXT teste sa stabilité et revient en arrière sinon.</value>
+  </data>
+  <data name="tweak.gpu.power_limit.efficiency" xml:space="preserve">
+    <value>Réduit la limite de puissance : plus froid et plus efficace. L'effet sur les images est mesuré sur ta machine.</value>
+  </data>
+  <data name="tweak.gpu.fan_curve.cooler" xml:space="preserve">
+    <value>Une courbe de ventilation plus fraîche : la carte chauffe moins en charge. Des images en plus seulement si elle baissait ses fréquences à cause de la chaleur.</value>
+  </data>
+  <data name="tweak.fixit.x3d_ccd.repair_routing" xml:space="preserve">
+    <value>Répare le routage CCD pour faire tourner les jeux sur les cœurs V-Cache (route supportée).</value>
+  </data>
+  <data name="tweak.cpu.power_policy.raise_perf_preference" xml:space="preserve">
+    <value>Monte la préférence performance du processeur. Utile seulement si le processeur limite ce jeu ; coûte de la consommation au repos.</value>
+  </data>
+
+  <!-- Clé de guide ouverte par le tweak F2 (pilote obsolète) -->
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       M2 G2 — habillage de la VUE tableau de bord avant/après (jumelle de
+       l'écran de scan). Libellés statiques liés par DashboardView (badge,
+       axes/séries, en-têtes de section). Les clés headline/verdict/metric/
+       action/résumé-de-tweak ci-dessus sont réutilisées telles quelles.
+       Honnêteté (§4 P1) : la latence reste « estimée ».
+       ════════════════════════════════════════════════════════════════════ -->
+
+  <!-- En-tête -->
+  <data name="dashboard.caveat.cpu_bound" xml:space="preserve">
+    <value>Cette session était limitée par ton processeur, pas par ta carte graphique : un réglage graphique ne pouvait donc pas ajouter d’images ici. Refais la mesure pendant une scène qui charge le GPU pour voir ce que ces réglages donnent vraiment.</value>
+  </data>
+  <data name="dashboard.subtitle" xml:space="preserve">
+    <value>Avant vs après, mesuré : rien de gonflé.</value>
+  </data>
+
+  <!-- Badges (couleur + icône + TEXTE, jamais la couleur seule — a11y) -->
+  <data name="dashboard.badge.gain" xml:space="preserve">
+    <value>Gain</value>
+  </data>
+  <data name="dashboard.badge.no_gain" xml:space="preserve">
+    <value>Aucun gain mesurable</value>
+  </data>
+  <data name="dashboard.badge.reverted" xml:space="preserve">
+    <value>Annulé</value>
+  </data>
+
+  <!-- Graphe frametime avant/après -->
+  <data name="dashboard.chart.frametime.title" xml:space="preserve">
+    <value>Temps par image (ms)</value>
+  </data>
+  <data name="dashboard.chart.frametime.caption" xml:space="preserve">
+    <value>Plus bas et plus plat, c'est mieux.</value>
+  </data>
+  <data name="dashboard.series.before" xml:space="preserve">
+    <value>Avant</value>
+  </data>
+  <data name="dashboard.series.after" xml:space="preserve">
+    <value>Après</value>
+  </data>
+
+  <!-- Barres groupées 1% / 0.1% lows -->
+  <data name="dashboard.lows.title" xml:space="preserve">
+    <value>1% &amp; 0.1% lows (FPS)</value>
+  </data>
+  <data name="metric.p01_low" xml:space="preserve">
+    <value>0.1% low</value>
+  </data>
+
+  <!-- Bullet latence -->
+  <data name="dashboard.latency.title" xml:space="preserve">
+    <value>Latence PC</value>
+  </data>
+  <data name="dashboard.unit.ms" xml:space="preserve">
+    <value>ms</value>
+  </data>
+  <data name="dashboard.unit.percent" xml:space="preserve">
+    <value>%</value>
+  </data>
+
+  <!-- Liste des changements -->
+  <data name="dashboard.changes.title" xml:space="preserve">
+    <value>Changements</value>
+  </data>
+  <data name="dashboard.changes.applied" xml:space="preserve">
+    <value>Appliqués &amp; conservés</value>
+  </data>
+  <data name="dashboard.changes.reverted" xml:space="preserve">
+    <value>Annulés automatiquement</value>
+  </data>
+  <data name="dashboard.changes.none" xml:space="preserve">
+    <value>Aucun changement dans cette catégorie.</value>
+  </data>
+
+  <!-- Titres d'affichage des tweaks (un par id que la liste peut montrer) -->
+  <data name="tweak.latency.reflex.title" xml:space="preserve">
+    <value>NVIDIA Ultra Low Latency (pilote) : DirectX 9 a 11 uniquement</value>
+  </data>
+  <data name="tweak.latency.render_queue_cap.title" xml:space="preserve">
+    <value>Limite de la file de rendu</value>
+  </data>
+  <data name="tweak.latency.vrr_vsync_cap.title" xml:space="preserve">
+    <value>VRR + Vsync + cap d'images</value>
+  </data>
+  <data name="tweak.gpu.undervolt.title" xml:space="preserve">
+    <value>Décalage d'horloge GPU testé</value>
+  </data>
+  <data name="tweak.gpu.power_limit.title" xml:space="preserve">
+    <value>Limite de puissance GPU</value>
+  </data>
+  <data name="tweak.gpu.fan_curve.title" xml:space="preserve">
+    <value>Courbe de ventilation GPU</value>
+  </data>
+  <data name="tweak.fixit.x3d_ccd.title" xml:space="preserve">
+    <value>Correctif de routage CCD X3D</value>
+  </data>
+  <data name="tweak.fixit.power_plan.title" xml:space="preserve">
+    <value>Mode d'alimentation sain</value>
+  </data>
+  <data name="tweak.latency.prefer_max_perf.title" xml:space="preserve">
+    <value>Performances GPU maximales (pilote)</value>
+  </data>
+  <data name="tweak.latency.hagsOn.title" xml:space="preserve">
+    <value>Planification GPU à accélération matérielle</value>
+  </data>
+  <data name="tweak.latency.gameModeOn.title" xml:space="preserve">
+    <value>Mode Jeu de Windows</value>
+  </data>
+  <data name="tweak.latency.gameDvrBackgroundOff.title" xml:space="preserve">
+    <value>Enregistrement Game DVR en arrière-plan désactivé</value>
+  </data>
+  <data name="tweak.latency.vrrFlipModelOn.title" xml:space="preserve">
+    <value>Optimisations pour les jeux en fenêtre (VRR)</value>
+  </data>
+  <data name="tweak.fixit.sane_pagefile.title" xml:space="preserve">
+    <value>Fichier d'échange sain</value>
+  </data>
+  <data name="tweak.gpu.core_offset.title" xml:space="preserve">
+    <value>Décalage d'horloge du cœur GPU</value>
+  </data>
+
+  <!-- M4 — notifications de l'hôte de réconciliation (I5 : on notifie, on n'écrase
+       jamais un choix utilisateur en silence). {0} = titre du réglage. -->
+  <data name="reconciler.notify.user_drift" xml:space="preserve">
+    <value>Un réglage optimisé par DrDXT a été modifié ({0}). Il a été laissé tel que tu l'as défini : ouvre DrDXT pour vérifier ou réappliquer.</value>
+  </data>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       M3 — BIOS Doctor (fondation). Findings firmware : lire + guider + prouver,
+       JAMAIS d'écriture BIOS. Honnêteté : un réglage non lisible le dit clairement
+       (« non lu »), jamais un faux état. Pas d'étapes de menu ici.
+       ════════════════════════════════════════════════════════════════════ -->
+
+  <!-- XMP / EXPO -->
+  <data name="Bios.Xmp.Off.Title" xml:space="preserve">
+    <value>Mémoire : le profil XMP/EXPO est désactivé</value>
+  </data>
+  <data name="Bios.Xmp.Off.Rationale" xml:space="preserve">
+    <value>Ta RAM tourne en dessous de sa vitesse nominale. Activer le profil XMP/EXPO dans le BIOS débloque la vitesse que tu as payée.</value>
+  </data>
+  <data name="Bios.Xmp.Action.Enable" xml:space="preserve">
+    <value>Active le profil mémoire XMP/EXPO dans le BIOS.</value>
+  </data>
+  <data name="Bios.Xmp.Unknown.Title" xml:space="preserve">
+    <value>Mémoire : état XMP/EXPO non lisible</value>
+  </data>
+  <data name="Bios.Xmp.Unknown.Rationale" xml:space="preserve">
+    <value>Impossible de déterminer si le profil mémoire est actif. On ne suppose pas : vérifie-le dans le BIOS.</value>
+  </data>
+  <data name="Bios.Action.VerifyInBios" xml:space="preserve">
+    <value>Vérifie ce réglage dans ton BIOS.</value>
+  </data>
+
+  <!-- ReBAR + prérequis -->
+  <data name="Bios.ReBar.Off.Title" xml:space="preserve">
+    <value>GPU : le Resizable BAR (ReBAR/SAM) est désactivé</value>
+  </data>
+  <data name="Bios.ReBar.Off.Rationale" xml:space="preserve">
+    <value>Le Resizable BAR permet au CPU d'adresser toute la mémoire du GPU d'un coup, ce qui peut aider dans certains jeux. Il exige d'abord les prérequis ci-dessous.</value>
+  </data>
+  <data name="Bios.ReBar.Action.Enable" xml:space="preserve">
+    <value>Active Re-Size BAR Support dans le BIOS (après les prérequis).</value>
+  </data>
+  <data name="Bios.ReBar.Unknown.Title" xml:space="preserve">
+    <value>GPU : état du Resizable BAR non lisible</value>
+  </data>
+  <data name="Bios.ReBar.Unknown.Rationale" xml:space="preserve">
+    <value>L'état du ReBAR n'est pas lisible sur ce GPU. Recommandé avec réserve : DrDXT ne le force pas ; vérifie après redémarrage.</value>
+  </data>
+  <data name="Bios.Above4G.Title" xml:space="preserve">
+    <value>Prérequis : Above 4G Decoding doit être activé</value>
+  </data>
+  <data name="Bios.Above4G.Rationale" xml:space="preserve">
+    <value>Le Resizable BAR exige que Above 4G Decoding soit activé en premier.</value>
+  </data>
+  <data name="Bios.Above4G.Action.Enable" xml:space="preserve">
+    <value>Active Above 4G Decoding dans le BIOS.</value>
+  </data>
+  <data name="Bios.Csm.Title" xml:space="preserve">
+    <value>Prérequis : CSM doit être désactivé</value>
+  </data>
+  <data name="Bios.Csm.Rationale" xml:space="preserve">
+    <value>Le Resizable BAR exige que le Compatibility Support Module (CSM) soit désactivé. Ton système démarre déjà en UEFI : Windows démarrera pareil. Seule une carte graphique très ancienne, sans firmware UEFI, n'afficherait plus l'écran du BIOS.</value>
+  </data>
+  <data name="Bios.Csm.Action.Disable" xml:space="preserve">
+    <value>Désactive le CSM (Compatibility Support Module) dans le BIOS.</value>
+  </data>
+
+  <!-- X3D / CPPC -->
+  <data name="Bios.X3dCppc.Title" xml:space="preserve">
+    <value>CPU : le routage X3D multi-CCD est à vérifier</value>
+  </data>
+  <data name="Bios.X3dCppc.Rationale" xml:space="preserve">
+    <value>Sur un CPU X3D multi-CCD, les jeux doivent tourner sur les cœurs à V-Cache. Vérifie d'abord le routage côté Windows : le service AMD 3D V-Cache et la Game Bar s'en chargent sur la plupart des machines et sont presque sûrement déjà corrects. Ce n'est que si les jeux tournent encore sur les mauvais cœurs après ça qu'il vaut la peine de toucher au réglage CPPC / Preferred Cores du BIOS.</value>
+  </data>
+  <data name="Bios.X3dCppc.Action.SetRoute" xml:space="preserve">
+    <value>Règle CPPC / Preferred Cores sur la route supportée pour le V-Cache.</value>
+  </data>
+
+  <!-- Estimations de gain honnêtes (plage sourcée + nuance, jamais un % promis brut) -->
+  <data name="Bios.Gain.Xmp.Source" xml:space="preserve">
+    <value>Profil certifié par le fabricant de la mémoire : AMD EXPO, Intel XMP.</value>
+  </data>
+  <data name="Bios.Gain.Xmp.Caveat" xml:space="preserve">
+    <value>L'écart dépend du jeu et du processeur : faible dans un jeu limité par la carte graphique, bien plus grand dans un jeu très sensible à la mémoire (tests publics TechSpot et XDA), et d'environ 1 % sur un processeur X3D selon AMD. Proche de zéro si ton kit tourne déjà à son profil. Ton vrai gain, c'est le test avant/après qui le prouve.</value>
+  </data>
+  <data name="Bios.Gain.ReBar.Source" xml:space="preserve">
+    <value>Resizable BAR, fonction de la norme PCI Express : son effet dépend du jeu.</value>
+  </data>
+  <data name="Bios.Gain.ReBar.Caveat" xml:space="preserve">
+    <value>Dépend du jeu et n'est pas un gain global : certains titres régressent avec le Resizable BAR. À vérifier par jeu ; le vrai gain est prouvé par le test avant/après.</value>
+  </data>
+  <data name="Bios.Gain.X3d.Source" xml:space="preserve">
+    <value>Processeurs AMD X3D à deux blocs de cœurs : seul l'un des deux porte le cache 3D V-Cache.</value>
+  </data>
+  <data name="Bios.Gain.X3d.Caveat" xml:space="preserve">
+    <value>Ne compte que si le routage des blocs de cœurs est mal réglé ; sur la plupart des machines il est déjà correct, et rien ne change. Vérifie d'abord le service 3D V-Cache et la Game Bar côté Windows.</value>
+  </data>
+
+  <!-- Lien PCIe -->
+  <data name="Bios.Pcie.NotRead.Title" xml:space="preserve">
+    <value>Vitesse du lien PCIe non lue dans cette version</value>
+  </data>
+  <data name="Bios.Pcie.NotRead.Rationale" xml:space="preserve">
+    <value>La largeur et la vitesse négociées du lien PCIe ne sont pas encore lues. On ne devine pas : vérifie la vitesse du slot GPU dans le BIOS si tu suspectes un souci.</value>
+  </data>
+
+  <!-- Version BIOS / AGESA -->
+  <data name="Bios.Version.Old.Title" xml:space="preserve">
+    <value>Le BIOS est peut-être obsolète</value>
+  </data>
+  <data name="Bios.Version.Old.Rationale" xml:space="preserve">
+    <value>Ta version de BIOS a plus de deux ans. Un BIOS plus récent peut améliorer la compatibilité mémoire et la stabilité : consulte la page du fabricant de ta carte mère.</value>
+  </data>
+  <data name="Bios.Version.Action.Update" xml:space="preserve">
+    <value>Vérifie si un BIOS plus récent est disponible chez ton fabricant.</value>
+  </data>
+
+  <!-- Section des réglages BIOS (affichée dans les résultats du scan, guidage seul) -->
+  <data name="Scan.Bios.Header" xml:space="preserve">
+    <value>Réglages BIOS à vérifier</value>
+  </data>
+  <data name="Scan.Repair.Header" xml:space="preserve">
+    <value>Ce que l'audit a lu</value>
+  </data>
+  <data name="Scan.Repair.BlindSpots" xml:space="preserve">
+    <value>Ce que DrDXT n'a pas pu lire</value>
+  </data>
+  <data name="Scan.Repair.Changes" xml:space="preserve">
+    <value>Ce qui a changé depuis la dernière fois</value>
+  </data>
+  <data name="Scan.Bios.GuidanceOnly" xml:space="preserve">
+    <value>Guidé : DrDXT ne modifie jamais ton BIOS</value>
+  </data>
+  <data name="Scan.Bios.GainRange" xml:space="preserve">
+    <value>≈ {0}–{1} %</value>
+  </data>
+
+  <!-- Guide BIOS personnalisé (le « comment », affiché dans les résultats du scan, guidage seul) -->
+  <data name="Scan.Bios.Guide.Header" xml:space="preserve">
+    <value>Comment l'appliquer sur ta carte</value>
+  </data>
+  <data name="Scan.Bios.Guide.Verified" xml:space="preserve">
+    <value>Vérifié pour ta carte exacte : les chemins de menu ci-dessous sont confirmés.</value>
+  </data>
+  <data name="Scan.Bios.Guide.Unverified" xml:space="preserve">
+    <value>Étapes les mieux connues : pas encore vérifiées pour ta carte exacte. Le nom exact du réglage à chercher est indiqué.</value>
+  </data>
+  <data name="Scan.Bios.Guide.CsmSuppressed" xml:space="preserve">
+    <value>Ton système démarre en mode Legacy, donc DrDXT n'a pas conseillé de désactiver le CSM : cela pourrait empêcher ton PC de démarrer. Laisse-le tel quel.</value>
+  </data>
+  <data name="Scan.Bios.Guide.EnterKey" xml:space="preserve">
+    <value>Appuie sur {0} au démarrage pour entrer dans le BIOS.</value>
+  </data>
+  <data name="Scan.Bios.Guide.SaveKey" xml:space="preserve">
+    <value>Appuie sur {0} pour enregistrer et quitter.</value>
+  </data>
+  <data name="Scan.Bios.Guide.RecoveryHeader" xml:space="preserve">
+    <value>En cas de souci</value>
+  </data>
+
+  <!-- Gating châssis -->
+  <data name="Bios.NotApplicable.Title" xml:space="preserve">
+    <value>Le réglage du BIOS ne s'applique pas à cet appareil</value>
+  </data>
+  <data name="Bios.NotApplicable.Rationale" xml:space="preserve">
+    <value>Les portables et consoles portables verrouillent généralement ces réglages firmware, donc le module BIOS ne s'applique pas à ta machine.</value>
+  </data>
+  <data name="Bios.Action.None" xml:space="preserve">
+    <value>Aucune action nécessaire.</value>
+  </data>
+
+  <!-- ════════════════════════════════════════════════════════════════════
+       M3 BIOS Doctor — GUIDE PERSONNALISÉ (contenu). Le chemin de menu /
+       nom du réglage / valeur cible exacts sont portés par l'étape ; ces
+       clés sont les phrases humaines autour (FR+EN). Jamais d'écriture BIOS.
+       ════════════════════════════════════════════════════════════════════ -->
+
+  <!-- Étapes par réglage -->
+  <data name="Bios.Guide.Step.Xmp" xml:space="preserve">
+    <value>Active ton profil mémoire (XMP/EXPO) ici :</value>
+  </data>
+  <data name="Bios.Guide.Step.Above4G" xml:space="preserve">
+    <value>D'abord, active Above 4G Decoding ici :</value>
+  </data>
+  <data name="Bios.Guide.Step.Csm" xml:space="preserve">
+    <value>Ensuite, désactive le CSM ici (ton système démarre déjà en UEFI, Windows démarrera pareil) :</value>
+  </data>
+  <data name="Bios.Guide.Step.ReBar" xml:space="preserve">
+    <value>Enfin, active Re-Size BAR Support ici :</value>
+  </data>
+  <data name="Bios.Guide.Step.X3dCppc" xml:space="preserve">
+    <value>Règle CPPC / Preferred Cores sur la route supportée ici :</value>
+  </data>
+  <data name="Bios.Guide.Step.Pcie" xml:space="preserve">
+    <value>Vérifie la vitesse de ton lien PCIe ici :</value>
+  </data>
+  <data name="Bios.Guide.Step.BiosVersion" xml:space="preserve">
+    <value>Vérifie s'il existe un BIOS plus récent ici :</value>
+  </data>
+  <data name="Bios.Guide.Step.Generic" xml:space="preserve">
+    <value>Modifie ce réglage ici :</value>
+  </data>
+
+  <!-- Étiquettes de confiance -->
+  <data name="Bios.Guide.Confidence.Verified" xml:space="preserve">
+    <value>Vérifié pour ta carte exacte : les chemins de menu ci-dessous sont confirmés.</value>
+  </data>
+  <data name="Bios.Guide.Confidence.Unverified" xml:space="preserve">
+    <value>Pas encore vérifié pour ta carte exacte : les chemins ci-dessous sont les meilleurs connus ; le nom exact du réglage à chercher est indiqué, tu n'as donc besoin de rien d'autre.</value>
+  </data>
+
+  <!-- CSM-off supprimé sur un démarrage Legacy/MBR (garde-fou no-boot) -->
+  <data name="Bios.Guide.Csm.SuppressedLegacy" xml:space="preserve">
+    <value>Ton système démarre en mode Legacy, donc DrDXT ne conseille pas de désactiver le CSM : cela pourrait empêcher ton PC de démarrer. Laisse le CSM tel quel.</value>
+  </data>
+
+  <!-- Échelle de récupération (haut ET bas) -->
+  <data name="Bios.Guide.Recovery.NoBootNormal" xml:space="preserve">
+    <value>Un écran noir ou l'absence d'affichage après le premier redémarrage est normal : rien n'est cassé.</value>
+  </data>
+  <data name="Bios.Guide.Recovery.MemoryTraining" xml:space="preserve">
+    <value>Attends 30 à 60 secondes que l'entraînement mémoire se termine. Ne coupe pas l'alimentation.</value>
+  </data>
+  <data name="Bios.Guide.Recovery.ClearCmos" xml:space="preserve">
+    <value>S'il ne démarre toujours pas, fais un Clear CMOS (le bouton ou le cavalier de ta carte mère, ou retire la pile une minute) pour réinitialiser le BIOS sans risque.</value>
+  </data>
+  <data name="Bios.Guide.Recovery.LoadDefaults" xml:space="preserve">
+    <value>De retour dans le BIOS, utilise Load Optimized Defaults pour revenir à un état sain connu.</value>
+  </data>
+  <data name="Bios.Guide.Recovery.OneChangeAtATime" xml:space="preserve">
+    <value>Puis réapplique un seul changement à la fois, en redémarrant entre chaque, pour savoir quel réglage a causé un éventuel souci.</value>
+  </data>
+
+  <!-- M3 boucle fermée : verdicts après redémarrage -->
+  <data name="Bios.Loop.Setting.XmpExpo" xml:space="preserve">
+    <value>Profil mémoire XMP / EXPO</value>
+  </data>
+  <data name="Bios.Loop.Setting.ReBar" xml:space="preserve">
+    <value>Resizable BAR</value>
+  </data>
+  <data name="Bios.Loop.Setting.Above4G" xml:space="preserve">
+    <value>Above 4G Decoding</value>
+  </data>
+  <data name="Bios.Loop.Setting.Csm" xml:space="preserve">
+    <value>CSM (module de compatibilité)</value>
+  </data>
+  <data name="Bios.Loop.Setting.X3dCppc" xml:space="preserve">
+    <value>Routage CPPC des cœurs préférés</value>
+  </data>
+  <data name="Bios.Loop.Setting.PcieGen" xml:space="preserve">
+    <value>Génération du lien PCIe</value>
+  </data>
+  <data name="Bios.Loop.Setting.BiosVersion" xml:space="preserve">
+    <value>Version du BIOS</value>
+  </data>
+  <data name="Bios.Loop.Verdict.Took" xml:space="preserve">
+    <value>Confirmé : ce réglage correspond maintenant à ce qu'on attendait. Le changement a bien été pris en compte.</value>
+  </data>
+  <data name="Bios.Loop.Verdict.DidNotTake" xml:space="preserve">
+    <value>Ce réglage n'est pas passé à la valeur attendue. Le changement n'a pas été pris en compte : voir les étapes de récupération ci-dessous.</value>
+  </data>
+  <data name="Bios.Loop.Verdict.Unreadable" xml:space="preserve">
+    <value>DrDXT n'a pas pu relire ce réglage depuis Windows, donc il ne peut pas confirmer qu'il a été pris. Vérifie-le toi-même dans le BIOS : voir les étapes de récupération ci-dessous.</value>
+  </data>
+  <data name="Bios.Loop.AllTook" xml:space="preserve">
+    <value>Tous tes changements BIOS ont été appliqués : vérifié après le redémarrage. Tout est bon.</value>
+  </data>
+
+  <!-- M3 boucle fermée : carte de récupération (affichée UNIQUEMENT si un réglage n'a pas pris ou n'a pas pu être vérifié) -->
+  <data name="Bios.Loop.Recovery.Header" xml:space="preserve">
+    <value>Un ou plusieurs changements n'ont pas été pris (ou n'ont pas pu être vérifiés). C'est réparable : suis ces étapes.</value>
+  </data>
+  <data name="Bios.Loop.Recovery.Reenter" xml:space="preserve">
+    <value>Redémarre dans le BIOS et revérifie le ou les réglages listés ci-dessus : assure-toi qu'ils sont bien enregistrés (n'oublie pas Sauvegarder et Quitter, en général F10).</value>
+  </data>
+  <data name="Bios.Loop.Recovery.OneChangeAtATime" xml:space="preserve">
+    <value>Si tu changeais plusieurs réglages, réapplique un seul changement à la fois, en redémarrant entre chaque, pour savoir lequel n'a pas tenu.</value>
+  </data>
+  <data name="Bios.Loop.Recovery.LoadDefaults" xml:space="preserve">
+    <value>Si ça ne tient toujours pas, utilise Load Optimized Defaults pour revenir à un état sain connu, puis réessaie le changement seul.</value>
+  </data>
+  <data name="Bios.Loop.Recovery.ClearCmos" xml:space="preserve">
+    <value>En dernier recours, fais un Clear CMOS (le bouton ou le cavalier de ta carte mère, ou retire la pile une minute) pour réinitialiser le BIOS sans risque, puis recommence.</value>
+  </data>
+  <data name="Finding.Gpu.IntelNoTuningPath" xml:space="preserve">
+    <value>Carte Intel Arc détectée : DrDXT n'a pas encore de chemin de réglage GPU pour Intel. Rien n'est appliqué sur cette carte ; les deux leviers ci-dessous sont ceux qui comptent sur Arc.</value>
+  </data>
+  <data name="Finding.Gpu.IntelRebarOff" xml:space="preserve">
+    <value>Le Resizable BAR est désactivé. Intel indique que ReBAR est requis pour une performance optimale sur Arc : la carte fonctionne sans, mais sous-performe. À activer dans le BIOS/UEFI (« Re-Size BAR » / « Smart Access Memory »), avec CSM désactivé et le démarrage UEFI actif.</value>
+  </data>
+  <data name="Finding.Gpu.IntelRebarUnknown" xml:space="preserve">
+    <value>L'état du Resizable BAR n'a pas pu être lu sur ce GPU Intel. Intel indique que ReBAR est requis pour une performance optimale sur Arc : vérifie-le dans le BIOS/UEFI plutôt que de le supposer. « Inconnu » ne veut pas dire « correct ».</value>
+  </data>
+  <data name="Finding.Gpu.IntelDriverIsTheLever" xml:space="preserve">
+    <value>Sur Arc, le pilote graphique est de loin le plus gros levier réel : Intel publie des pilotes « game ready » avec des optimisations par titre, et ce sont les jeux DX9/DX11 qui en profitent le plus. DrDXT ne sait pas dire de combien un pilote Arc est en retard, son plancher de fraîcheur est trop grossier pour la cadence d'Intel, donc vérifie-le toi-même.</value>
+  </data>
+  <data name="Finding.Network.RssOff" xml:space="preserve">
+    <value>Le Receive Side Scaling (RSS) est désactivé sur cette carte. Microsoft recommande de le laisser actif : il répartit le traitement réseau sur plusieurs cœurs au lieu de le concentrer sur un seul. À réactiver dans les propriétés avancées de la carte.</value>
+  </data>
+  <data name="Finding.Display.MixedRefreshIdlePower" xml:space="preserve">
+    <value>Tes écrans tournent à des fréquences différentes. Sur certaines cartes NVIDIA, ça peut empêcher la mémoire vidéo de descendre dans son état de repos : elle reste au palier haut, et la consommation avec, en permanence, pas seulement quand tu joues. Un support NVIDIA l'a déjà dit voulu pour plusieurs écrans à haute fréquence sur une ancienne carte, en conseillant de passer sous 144 Hz hors jeu ; rien ne confirme que ta carte réagit pareil : c'est à essayer. Ce que DrDXT ne te promet pas : un chiffre. Les économies rapportées viennent d'autres machines. À essayer sur le second écran uniquement : jamais sur l'écran de jeu, ça te coûterait des images. Autre cause possible : une application accélérée par la carte (navigateur, Discord, lanceurs) peut aussi la garder éveillée. Pour savoir laquelle joue chez toi, ferme-les puis compare.</value>
+  </data>
+  <data name="Finding.Network.LinkPowerSavingOn" xml:space="preserve">
+    <value>Une économie d'énergie du lien réseau est active sur cette carte (Ethernet vert, mode d'économie, ou 802.3az). Le lien s'endort quand il ne passe rien et se réveille à la demande : ce réveil se compte en microsecondes. Ce que DrDXT ne sait pas : ce que ça coûte en jeu, aucune mesure publiée ne le chiffre, et son propre instrument, qui compte en millisecondes, est au moins trente fois trop grossier pour le voir. Il le signale parce que c'est là, pas parce qu'il sait ce que ça vaut.</value>
+  </data>
+  <data name="Finding.Network.InterruptModerationTradeoff" xml:space="preserve">
+    <value>La modération d'interruption est active sur ta carte réseau. Microsoft conseille de la couper seulement quand on cherche la latence la plus basse possible, en prévenant que ça coûte plus de temps processeur ; sa documentation parle de serveurs, et aucune mesure publiée ne chiffre l'effet en jeu. C'est un arbitrage, pas une panne à réparer. Le scan mesure la stabilité de ton réseau, mais il ne compare pas ta carte avec et sans ce réglage : il ne peut donc pas te dire ce que tu y gagnerais.</value>
+  </data>
+  <data name="tweak.fixit.sane_pagefile.reliability" xml:space="preserve">
+    <value>Remet le fichier d'échange Windows en gestion automatique. Un fichier d'échange désactivé est un risque de fiabilité, pas un gain de vitesse : à la limite de mémoire validée, Windows tombe en manque de mémoire et la machine se fige ou plante. Effectif au redémarrage. Ça n'ajoute pas d'images par seconde.</value>
+  </data>
+  <data name="tweak.fixit.ecran_frequence.title" xml:space="preserve">
+    <value>Écran à sa vraie fréquence</value>
+  </data>
+  <data name="tweak.fixit.ecran_frequence.confort" xml:space="preserve">
+    <value>Règle ton écran de jeu sur la plus haute fréquence que Windows propose à ta résolution actuelle. Windows l'essaie d'abord ; DrDXT relit le mode, puis te demande de le garder : sans réponse en 15 secondes, l'ancien mode revient tout seul. C'est un réglage de fluidité : DrDXT ne le chiffre pas en images par seconde.</value>
+  </data>
+  <data name="Dialog.Ecran.Title" xml:space="preserve">
+    <value>DrDXT - Fréquence de l'écran</value>
+  </data>
+  <data name="Dialog.Ecran.Question" xml:space="preserve">
+    <value>Ton écran tourne maintenant à {0} Hz. Garder ce réglage ? Sans réponse, l'ancien revient.</value>
+  </data>
+  <data name="Dialog.Ecran.Garder" xml:space="preserve">
+    <value>Garder</value>
+  </data>
+  <data name="Dialog.Ecran.Revenir" xml:space="preserve">
+    <value>Revenir ({0} s)</value>
+  </data>
+  <data name="UI.Verdict.Clean" xml:space="preserve">
+    <value>tout lu, rien à corriger</value>
+  </data>
+  <data name="UI.Verdict.Problems" xml:space="preserve">
+    <value>réglages à corriger</value>
+  </data>
+  <data name="UI.Verdict.SanteACorriger" xml:space="preserve">
+    <value>des points à corriger</value>
+  </data>
+  <data name="UI.Register.NoCoverage" xml:space="preserve">
+    <value>lecture impossible : ce scan n'a pas pu mesurer ce qu'il a couvert</value>
+  </data>
+  <data name="NonNuisance.Never.Voltage" xml:space="preserve">
+    <value>DrDXT n'écrit jamais une tension. L'undervolt qu'il propose est un décalage d'horloge, pas une courbe tension/fréquence.</value>
+  </data>
+  <data name="NonNuisance.Never.Firmware" xml:space="preserve">
+    <value>DrDXT n'écrit jamais dans le firmware, ni dans le BIOS, ni dans le VBIOS de ta carte : il lit des réglages du BIOS depuis Windows, sans les modifier. Pour « Redémarrer vers le BIOS », il le demande à Windows, qui pose lui-même cette demande de démarrage.</value>
+  </data>
+  <data name="NonNuisance.Never.Security" xml:space="preserve">
+    <value>DrDXT ne touche jamais à Windows Defender, à Windows Update, à BITS ni au journal d'activité des applications. Ces zones du registre lui sont refusées quoi qu'il demande.</value>
+  </data>
+  <data name="NonNuisance.Never.KernelDriver" xml:space="preserve">
+    <value>DrDXT ne charge aucun pilote sur ta machine. Il passe par les API de Windows et par celles du fabricant de ta carte graphique.</value>
+  </data>
+  <data name="NonNuisance.Never.SilentFan" xml:space="preserve">
+    <value>DrDXT ne laisse jamais le ventilateur de la carte sous 40 % au-delà de 80 °C, même si tu lui demandes une courbe plus silencieuse.</value>
+  </data>
+  <data name="NonNuisance.Unknown.VendorEnvelope" xml:space="preserve">
+    <value>Ce que DrDXT ne sait pas : jusqu'où le pilote de ta carte accepte un décalage d'horloge. Il écrit dans une bande plus étroite que celle du pilote, sans savoir la nommer.</value>
+  </data>
+  <data name="NonNuisance.Unknown.Tdr" xml:space="preserve">
+    <value>Ce que DrDXT ne sait pas : si un décalage pourtant dans la bande fera planter le pilote graphique. Le cas reste possible ; il se répare en redémarrant, le décalage ne survit pas au reboot.</value>
+  </data>
+  <data name="NonNuisance.Unknown.UnknownFirmware" xml:space="preserve">
+    <value>Ce que DrDXT ne sait pas : comment ton firmware réagit au redémarrage vers le setup UEFI. Le code de sortie est lu et l'échec est dit, mais le comportement de ta carte mère n'est pas connu d'avance.</value>
+  </data>
+  <data name="NonNuisance.Unknown.NoBootRecovery" xml:space="preserve">
+    <value>Ce que DrDXT n'a pas mesuré : une machine rendue non démarrable puis récupérée. Aucun test de ce genre n'a été fait sur une machine réelle.</value>
+  </data>
+  <data name="NonNuisance.Unknown.WindowsFeatureUpdate" xml:space="preserve">
+    <value>Ce que DrDXT n'a pas mesuré : ce que deviennent ses réglages après une mise à jour de fonctionnalité de Windows.</value>
+  </data>
+  <!-- LM — la section « ton passage dans le BIOS », moitie memoire. Aucune de ces phrases ne dit
+       « leger gain » : un ecart sous le bruit est une ABSENCE de resultat, pas un petit resultat. -->
+  <data name="Scan.BiosReturn.Header" xml:space="preserve">
+    <value>Ton passage dans le BIOS</value>
+  </data>
+  <data name="Memory.Ab.Header" xml:space="preserve">
+    <value>Mémoire, mesurée avant puis après</value>
+  </data>
+  <data name="Memory.Ab.Bandwidth" xml:space="preserve">
+    <value>débit</value>
+  </data>
+  <data name="Memory.Ab.Latency" xml:space="preserve">
+    <value>latence</value>
+  </data>
+  <data name="Memory.Ab.Unit.GBs" xml:space="preserve">
+    <value>Go/s</value>
+  </data>
+  <data name="Memory.Ab.Unit.Ns" xml:space="preserve">
+    <value>ns</value>
+  </data>
+  <data name="Memory.Ab.Significant" xml:space="preserve">
+    <value>L'écart dépasse trois fois la dispersion de l'instrument : c'est un résultat, pas du hasard.</value>
+  </data>
+  <data name="Memory.Ab.NotSignificant" xml:space="preserve">
+    <value>L'écart tient sous le bruit de la mesure : aucune différence mesurable. Ce n'est pas un petit gain, c'est une absence de résultat. Ces deux mesures ne savaient pas distinguer moins de ±{0:0.#} % : un gain plus petit que ça existerait sans se voir ici.</value>
+  </data>
+  <data name="Memory.Ab.NoVerdict.Busy" xml:space="preserve">
+    <value>Pas de comparaison : la machine était trop occupée pendant la mesure ({0}). Relance-la au repos, sans jeu ni téléchargement en cours.</value>
+  </data>
+  <data name="Memory.Ab.NoVerdict.NoRoom" xml:space="preserve">
+    <value>Pas de comparaison : la mesure n'a pas pu démarrer ({0}). Elle a besoin de 384 Mo de mémoire libre d'un seul tenant : ferme ce qui en consomme, puis relance.</value>
+  </data>
+  <data name="Memory.Ab.NoVerdict.Stale" xml:space="preserve">
+    <value>Pas de comparaison : la mesure d'avant ne date pas de ton départ vers le BIOS ({0}). Comparée à une mesure d'un autre jour, la machine peut sembler plus rapide ou plus lente sans que ton changement y soit pour rien. Au prochain passage par le BIOS depuis DrDXT, la mesure d'avant sera prise juste avant de partir.</value>
+  </data>
+  <data name="Memory.Ab.NoVerdict.Failed" xml:space="preserve">
+    <value>Pas de comparaison : la mesure n'a pas pu être menée à bien ({0}). Ce n'est pas une question de programmes ouverts : fermer des applications n'y changerait rien.</value>
+  </data>
+  <data name="Scan.Drift.Regression" xml:space="preserve">
+    <value>Depuis ta mesure de référence du {0:d}, cette machine rend {1:0.#} % d'images en moins en jeu (résolution ±{2:0.#} %).</value>
+  </data>
+  <data name="Scan.Drift.Gain" xml:space="preserve">
+    <value>Depuis ta mesure de référence du {0:d}, cette machine rend {1:0.#} % d'images en plus en jeu (résolution ±{2:0.#} %).</value>
+  </data>
+  <data name="Scan.Drift.None" xml:space="preserve">
+    <value>Aucune baisse de performance détectable depuis ta mesure de référence du {0:d} : si une baisse existe, elle est plus petite que ±{1:0.#} %, la précision de ces mesures.</value>
+  </data>
+  <data name="Scan.Memory.Measured" xml:space="preserve">
+    <value>Ta mémoire, mesurée sur cette machine le {0:d} : {1:0.#} Go/s de débit (précision ±{2:0.#} %) et {3:0.#} ns de temps d'accès (±{4:0.#} %).</value>
+  </data>
+  <data name="Scan.Cadence.Measured" xml:space="preserve">
+    <value>Cadence : 5 % des trames dérivent d'au moins {0:0.#} ms de l'instant où elles auraient dû s'afficher, certaines dérivent plus. C'est l'irrégularité que l'on ressent en visant, et qu'une moyenne d'images ne montre jamais.</value>
+  </data>
+  <data name="Scan.Stutter.Measured" xml:space="preserve">
+    <value>Les 5 % de trames les plus lentes durent au moins {0:0.#} ms, certaines durent plus. C'est là que vit la saccade, et une moyenne d'images la cache. Plus petit est mieux.</value>
+  </data>
+  <data name="Scan.PresentStall.Measured" xml:space="preserve">
+    <value>Attente d'affichage : 5 % des trames patientent au moins {0:0.#} ms dans Present() une fois prêtes, certaines patientent plus. C'est la signature d'un cap d'images, d'un vsync, ou du compositeur qui retient la trame.</value>
+  </data>
+  <data name="Scan.Scene.Question" xml:space="preserve">
+    <value>Pendant la mesure en jeu, tu joues :</value>
+  </data>
+  <data name="Scan.Scene.Unknown" xml:space="preserve">
+    <value>Je ne sais pas</value>
+  </data>
+  <data name="Scan.Scene.Gameplay" xml:space="preserve">
+    <value>Partie réelle</value>
+  </data>
+  <data name="Scan.Scene.Training" xml:space="preserve">
+    <value>Stand de tir</value>
+  </data>
+  <data name="Scan.Scene.Menu" xml:space="preserve">
+    <value>Menu ou lobby</value>
+  </data>
+  <data name="Scan.Scene.HorsJeu" xml:space="preserve">
+    <value>PC au repos</value>
+  </data>
+  <data name="Scan.Scene.Description" xml:space="preserve">
+    <value>Précision (facultatif), par ex. « partie réelle, zone calme »</value>
+  </data>
+  <data name="Scan.Scene.Declared" xml:space="preserve">
+    <value>Scène déclarée :</value>
+  </data>
+  <data name="Scan.Scene.Consigne" xml:space="preserve">
+    <value>Pendant la mesure, joue une vraie partie ou le stand de tir : un menu ne mesure que le menu.
+Allume le compteur FPS du jeu pour comparer.</value>
+  </data>
+  <data name="Scan.Voisins.Header" xml:space="preserve">
+    <value>Des programmes tournaient à côté du jeu pendant la mesure.</value>
+  </data>
+  <data name="Scan.Voisins.Ligne" xml:space="preserve">
+    <value>{0}, {1:0.#} % de processeur (d'un cœur)</value>
+  </data>
+  <data name="Scan.Voisins.LigneGpu" xml:space="preserve">
+    <value>{0}, {1:0.#} % de processeur (d'un cœur), {2:0.#} % de carte graphique</value>
+  </data>
+  <data name="Scan.Voisins.Aucun" xml:space="preserve">
+    <value>Rien de notable n'a tourné à côté du jeu pendant la mesure.</value>
+  </data>
+  <data name="Scan.Elevation.Button" xml:space="preserve">
+    <value>Lire aussi ce qui demande l’administrateur</value>
+  </data>
+  <data name="Scan.Elevation.Hint" xml:space="preserve">
+    <value>DrDXT se relance avec les droits administrateur pour lire la latence des pilotes, le démarrage et les incidents noyau. Il ne modifie rien : le scan reste une lecture.</value>
+  </data>
+  <data name="Scan.Elevation.Refused" xml:space="preserve">
+    <value>Relance annulée : l’accord administrateur a été refusé. Le scan reste tel quel.</value>
+  </data>
+  <data name="Scan.Recommendations.None" xml:space="preserve">
+    <value>Aucun réglage logiciel à recommander sur cette machine : ceux que DrDXT connaît sont déjà en place, ne s’y appliquent pas, ou dépendent d’un jeu qui n’était pas lancé pendant le scan. Pour ceux-là, lance le jeu et reste dans le menu (le menu suffit), puis relance le scan : pas en pleine partie, le scan charge la machine.</value>
+  </data>
+  <data name="Carte.Titre" xml:space="preserve">
+    <value>Ta machine, domaine par domaine</value>
+  </data>
+  <data name="Carte.AFaire" xml:space="preserve">
+    <value>À faire d'abord</value>
+  </data>
+  <data name="Carte.Pourquoi" xml:space="preserve">
+    <value>Pourquoi ?</value>
+  </data>
+  <data name="Carte.Mesures" xml:space="preserve">
+    <value>Mesuré sur ta machine</value>
+  </data>
+  <data name="Carte.Constats" xml:space="preserve">
+    <value>Constaté</value>
+  </data>
+  <data name="Carte.Proposes" xml:space="preserve">
+    <value>Réglages proposés</value>
+  </data>
+  <data name="Carte.NonLus" xml:space="preserve">
+    <value>Pas pu lire</value>
+  </data>
+  <data name="Carte.Vide" xml:space="preserve">
+    <value>Ce scan n'a rien lu dans ce domaine.</value>
+  </data>
+  <data name="Carte.Domaine.processeur" xml:space="preserve">
+    <value>Processeur</value>
+  </data>
+  <data name="Carte.Domaine.graphique" xml:space="preserve">
+    <value>Carte graphique</value>
+  </data>
+  <data name="Carte.Domaine.memoire" xml:space="preserve">
+    <value>Mémoire</value>
+  </data>
+  <data name="Carte.Domaine.latence" xml:space="preserve">
+    <value>Latence et fluidité</value>
+  </data>
+  <data name="Carte.Domaine.reseau" xml:space="preserve">
+    <value>Réseau</value>
+  </data>
+  <data name="Carte.Domaine.stockage" xml:space="preserve">
+    <value>Stockage</value>
+  </data>
+  <data name="Carte.Domaine.windows" xml:space="preserve">
+    <value>Windows et stabilité</value>
+  </data>
+  <data name="Carte.Domaine.bios" xml:space="preserve">
+    <value>BIOS</value>
+  </data>
+  <data name="Carte.Etat.ACorriger" xml:space="preserve">
+    <value>À corriger</value>
+  </data>
+  <data name="Carte.Etat.ARegarder" xml:space="preserve">
+    <value>À regarder</value>
+  </data>
+  <data name="Carte.Etat.RienDeSignale" xml:space="preserve">
+    <value>Rien de signalé</value>
+  </data>
+  <data name="Carte.Etat.NonLu" xml:space="preserve">
+    <value>Pas lu</value>
+  </data>
+  <data name="Scan.Hold.Hint" xml:space="preserve">
+    <value>Maintiens pour lancer, ou Entrée</value>
+  </data>
+  <data name="Carte.Verifies.Un" xml:space="preserve">
+    <value>{0} état lu par l'audit, pour information</value>
+  </data>
+  <data name="Carte.Verifies.Plusieurs" xml:space="preserve">
+    <value>{0} états lus par l'audit, pour information</value>
+  </data>
+  <data name="UI.Register.NothingApplies" xml:space="preserve">
+    <value>Aucun réglage du catalogue ne s'applique à ta machine</value>
+  </data>
+  <data name="Scan.Voisins.HeaderSansJeu" xml:space="preserve">
+    <value>Aucun jeu lu pendant la mesure ; des programmes tournaient quand même.</value>
+  </data>
+  <data name="Scan.Voisins.AucunSansJeu" xml:space="preserve">
+    <value>Rien de notable n'a tourné pendant la mesure.</value>
+  </data>
+  <data name="Finding.Memory.SousLaVitesseDuKit" xml:space="preserve">
+    <value>Ta RAM tourne sous la vitesse prévue par son kit. Le profil XMP/EXPO du kit n'est donc pas appliqué tel quel : c'est un autre profil ou un réglage à la main. Quand ton BIOS est lisible, le domaine BIOS montre le profil actif. Ce n'est pas forcément une erreur : une vitesse abaissée sert souvent à stabiliser une machine. Si des arrêts brutaux sont relevés sur ce PC, fais d'abord le test mémoire avant de remonter à la vitesse du kit.</value>
+  </data>
+  <data name="Finding.Gpu.PerfMaxGlobal" xml:space="preserve">
+    <value>Le mode d'alimentation NVIDIA est sur « performances maximales » pour tout le PC, pas seulement pour tes jeux. La carte ne redescend donc jamais au repos : elle garde ses fréquences hautes et consomme plus qu'au repos, toute la journée. En jeu, ce réglage n'aide que si la carte baisse ses fréquences en pleine partie ; le levier de DrDXT, lui, ne le pose que sur le profil du jeu. Pour le retirer du bureau : panneau de configuration NVIDIA, Gérer les paramètres 3D, onglet Paramètres globaux, Mode de gestion de l'alimentation, « Normal ». Ton jeu hérite de ce réglage global : pour le garder en jeu, pose-le dans l'onglet Paramètres de programme, sur le jeu seul.</value>
+  </data>
+  <data name="Window.Minimize" xml:space="preserve">
+    <value>Réduire</value>
+  </data>
+  <data name="Window.Maximize" xml:space="preserve">
+    <value>Agrandir</value>
+  </data>
+  <data name="Window.Restore" xml:space="preserve">
+    <value>Restaurer</value>
+  </data>
+  <data name="Window.Close" xml:space="preserve">
+    <value>Fermer</value>
+  </data>
+  <data name="Scan.Error.Inattendu" xml:space="preserve">
+    <value>Le scan s'est arrêté sur une erreur imprévue. Rien n'a été modifié sur ta machine. Réessaie ; si ça se reproduit, le journal de panne en garde le détail.</value>
+  </data>
+  <data name="Scan.Ab.MeasurableGain" xml:space="preserve">
+    <value>Gain mesuré : la seconde passe est meilleure que la première, au-delà des deux marges d'erreur.</value>
+  </data>
+  <data name="Scan.Ab.NoMeasurableGain" xml:space="preserve">
+    <value>Pas de gain mesurable : l'écart entre les deux passes reste dans leurs marges d'erreur.</value>
+  </data>
+  <data name="Scan.Ab.Regression" xml:space="preserve">
+    <value>Régression : la seconde passe est moins bonne que la première, au-delà des deux marges d'erreur.</value>
+  </data>
+  <data name="Dialog.Crash.Title" xml:space="preserve">
+    <value>DrDXT</value>
+  </data>
+  <data name="Dialog.Crash.Message" xml:space="preserve">
+    <value>DrDXT a rencontré une erreur et doit s'arrêter.
+
+Le détail a été écrit dans :
+{0}
+
+Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
+  </data>
+  <data name="Dialog.Restore.Title" xml:space="preserve">
+    <value>DrDXT - Restauration du système</value>
+  </data>
+  <data name="Dialog.Restore.Question" xml:space="preserve">
+    <value>La restauration du système est désactivée. DrDXT ne change rien sans point de restauration. L'activer maintenant ?</value>
+  </data>
+  <data name="Dashboard.Marge.Fps" xml:space="preserve">
+    <value>± {0} FPS (marge d'erreur)</value>
+  </data>
+  <data name="Dashboard.Marge.Inconnue" xml:space="preserve">
+    <value>Marge d'erreur inconnue (moins de 3 passes)</value>
+  </data>
+  <data name="Dashboard.NonMesure" xml:space="preserve">
+    <value>Non mesuré pendant ces parties</value>
+  </data>
+  <data name="Carte.Agir" xml:space="preserve">
+    <value>Agir</value>
+  </data>
+  <data name="Memoire.Test.Titre" xml:space="preserve">
+    <value>Tester ta mémoire sans redémarrer</value>
+  </data>
+  <data name="Memoire.Test.Description" xml:space="preserve">
+    <value>Écrit puis relit un quart de ta mémoire sur tous les cœurs, pendant cinq minutes. Utilise le PC normalement, sans lancer de jeu.</value>
+  </data>
+  <data name="Memoire.Test.Maintenir" xml:space="preserve">
+    <value>Maintiens pour lancer, ou Entrée</value>
+  </data>
+  <data name="Memoire.Test.EnCours" xml:space="preserve">
+    <value>Test en cours</value>
+  </data>
+  <data name="Memoire.Test.Arreter" xml:space="preserve">
+    <value>Arrêter le test</value>
+  </data>
+  <data name="Memoire.Test.Relancer" xml:space="preserve">
+    <value>Relancer le test</value>
+  </data>
+  <data name="Memoire.Test.Restant" xml:space="preserve">
+    <value>restantes</value>
+  </data>
+  <data name="Ping.Protection.Titre" xml:space="preserve">
+    <value>Protéger ton ping pendant le jeu</value>
+  </data>
+  <data name="Ping.Protection.Description" xml:space="preserve">
+    <value>Plafonne l'envoi des autres programmes pendant que le jeu tourne, pour que la file d'attente de ta box ne se remplisse pas. Au repos, rien ne change. Se retire à la fermeture du jeu. Elle n'agit que pendant que DrDXT est ouvert. Tant que tu ne la désactives pas, DrDXT la rallume à chaque lancement, et Windows te demande alors l'autorisation.</value>
+  </data>
+  <data name="Ping.Protection.Description.Service" xml:space="preserve">
+    <value>Plafonne l'envoi des autres programmes pendant que le jeu tourne, pour que la file d'attente de ta box ne se remplisse pas. Au repos, rien ne change. Se retire à la fermeture du jeu. Le service de démarrage de DrDXT la porte : elle agit même DrDXT fermé, sans demande d'autorisation, jusqu'à ce que tu la désactives.</value>
+  </data>
+  <data name="Ping.Protection.Indisponible" xml:space="preserve">
+    <value>Protection du ping non proposée : rien n'a encore montré ton ping monter quand ton envoi sature. La surveillance ci-dessous le relève pendant tes parties ; si ça n'arrive jamais, il n'y a rien à protéger.</value>
+  </data>
+  <data name="Ping.Veille.Libelle" xml:space="preserve">
+    <value>Surveiller mon ping en partie</value>
+  </data>
+  <data name="Ping.Veille.Description" xml:space="preserve">
+    <value>DrDXT peut le mesurer pendant tes vraies parties, sans rien envoyer à part les pings. S'il voit ton ping monter quand ton envoi sature, il allume la protection et l'écrit dans le rapport. Sinon, il ne touche à rien. DrDXT doit rester ouvert pendant que tu joues.</value>
+  </data>
+  <data name="Ping.Veille.EnCours" xml:space="preserve">
+    <value>Surveillance en cours : rien n'est encore posé. DrDXT juge tes parties au fur et à mesure et allumera la protection seulement si ton ping monte quand ton envoi sature.</value>
+  </data>
+  <data name="Ping.Protection.Plafond" xml:space="preserve">
+    <value>Plafond mesuré pendant ta partie : {0:0.#} Mbit/s d'envoi pour les autres programmes. Le jeu ({1}), lui, n'est pas plafonné.</value>
+  </data>
+  <data name="Ping.Protection.Activer" xml:space="preserve">
+    <value>Activer la protection</value>
+  </data>
+  <data name="Ping.Protection.Desactiver" xml:space="preserve">
+    <value>Désactiver la protection</value>
+  </data>
+  <data name="Ping.Protection.Active" xml:space="preserve">
+    <value>active</value>
+  </data>
+  <data name="Ping.Protection.Inactive" xml:space="preserve">
+    <value>désactivée</value>
+  </data>
+  <data name="Ping.Protection.Echec" xml:space="preserve">
+    <value>La protection n'a pas pu démarrer</value>
+  </data>
+  <data name="Bcd.Rendre.Titre" xml:space="preserve">
+    <value>Rendre l'écran de récupération à Windows</value>
+  </data>
+  <data name="Bcd.Rendre.Description" xml:space="preserve">
+    <value>Un réglage demande à Windows de ne plus afficher l'écran de récupération après un démarrage raté. Le retirer rend la décision à Windows. Réversible, et relu après l'écriture.</value>
+  </data>
+  <data name="Bcd.Rendre.Maintenir" xml:space="preserve">
+    <value>Maintiens pour rendre, ou Entrée</value>
+  </data>
+  <data name="Bcd.Rendre.Fait" xml:space="preserve">
+    <value>rendu à Windows</value>
+  </data>
+  <data name="Bcd.Rendre.Annuler" xml:space="preserve">
+    <value>Annuler et reposer l'ancien réglage</value>
+  </data>
+  <data name="Bcd.Rendre.Echec" xml:space="preserve">
+    <value>Le réglage n'a pas pu être écrit</value>
+  </data>
+  <data name="Cpu.Remesure.Titre" xml:space="preserve">
+    <value>Remesurer ton processeur</value>
+  </data>
+  <data name="Cpu.Remesure.Description" xml:space="preserve">
+    <value>Une quarantaine de secondes à pleine charge sur ses cœurs rapides, pour savoir ce qu'il rend quand la charge dure. À lancer hors partie, les autres programmes lourds fermés : DrDXT ne sait pas les repérer, et ils faussent le résultat. Ta mesure actuelle n'est remplacée que si la nouvelle aboutit et permet de conclure.</value>
+  </data>
+  <data name="Cpu.Remesure.Maintenir" xml:space="preserve">
+    <value>Maintiens pour remesurer, ou Entrée</value>
+  </data>
+  <data name="Cpu.Remesure.EnCours" xml:space="preserve">
+    <value>mesure en cours</value>
+  </data>
+  <data name="Cpu.Remesure.Faite" xml:space="preserve">
+    <value>mesure refaite</value>
+  </data>
+  <data name="Cpu.Remesure.Echec" xml:space="preserve">
+    <value>La mesure n'a pas abouti : l'ancienne est gardée</value>
+  </data>
+  <data name="Reparation.Windows.Titre" xml:space="preserve">
+    <value>Réparer Windows avec l'outil de Microsoft</value>
+  </data>
+  <data name="Reparation.Windows.Description" xml:space="preserve">
+    <value>Des composants de Windows sont abîmés mais réparables. Une console s'ouvre et lance DISM puis sfc, les outils de réparation de Microsoft : ils téléchargent ce qu'il faut depuis Windows Update et affichent leur avancement, ce qui peut être long. La console reste ouverte à la fin pour que tu lises le résultat.</value>
+  </data>
+  <data name="Reparation.Windows.Maintenir" xml:space="preserve">
+    <value>Maintiens pour ouvrir la réparation, ou Entrée</value>
+  </data>
+  <data name="Reparation.Windows.Lancee" xml:space="preserve">
+    <value>réparation en cours dans la console de Microsoft. Pour l'arrêter, ferme la console.</value>
+  </data>
+  <data name="Reparation.Windows.Terminee.Sain" xml:space="preserve">
+    <value>réparation terminée : Windows relu, ses fichiers de réparation sont sains.</value>
+  </data>
+  <data name="Reparation.Windows.Terminee.Abime" xml:space="preserve">
+    <value>console fermée : Windows relu, ses fichiers de réparation sont encore abîmés.</value>
+  </data>
+  <data name="Reparation.Windows.Terminee.NonRelu" xml:space="preserve">
+    <value>console fermée : DrDXT n'a pas pu relire l'état de Windows. Relance un scan pour le savoir.</value>
+  </data>
+  <data name="Reparation.Windows.Terminee.Reinstaller" xml:space="preserve">
+    <value>console fermée : la réparation de Microsoft n'a pas trouvé de quoi réparer, et certains fichiers abîmés n'ont pas de version plus récente. La relancer ne changera rien : la sortie de Microsoft est de réinstaller Windows en gardant tes fichiers, ci-dessus.</value>
+  </data>
+  <data name="Reparation.Windows.Reinstallation.Titre" xml:space="preserve">
+    <value>Réinstaller Windows en gardant tes fichiers</value>
+  </data>
+  <data name="Reparation.Windows.Reinstallation.Description" xml:space="preserve">
+    <value>La réparation de Microsoft ne trouve pas de quoi remplacer ces fichiers abîmés, et certains servent encore. Microsoft propose de réinstaller la même version de Windows depuis Windows Update, en gardant tes fichiers, tes applications et tes réglages : la page Récupération s'ouvre, choisis « Réinstaller maintenant » sous « Résoudre les problèmes à l'aide de Windows Update ». Compte environ une heure et un redémarrage ; fais-le hors partie.</value>
+  </data>
+  <data name="Reparation.Windows.Reinstallation.Ouverte" xml:space="preserve">
+    <value>page Récupération de Windows ouverte : « Réinstaller maintenant » lance la réinstallation, Windows mène la suite.</value>
+  </data>
+  <data name="Reparation.Windows.Refusee" xml:space="preserve">
+    <value>Réparation non lancée : la fenêtre de Windows a été refusée.</value>
+  </data>
+  <data name="Reparation.Windows.Echec" xml:space="preserve">
+    <value>La réparation n'a pas pu s'ouvrir</value>
+  </data>
+  <data name="measure.network.icmp_caveat" xml:space="preserve">
+    <value>Ce sont des pings vers ta box et vers Internet, pas les paquets du jeu vers son serveur.</value>
+  </data>
+  <data name="measure.network.first_hop_caveat" xml:space="preserve">
+    <value>Une box répond au ping avec son propre processeur, en basse priorité : un premier saut instable est une piste à confirmer (câble, port), pas une preuve.</value>
+  </data>
+  <data name="Bios.Depart.Bouton" xml:space="preserve">
+    <value>Redémarrer vers le BIOS</value>
+  </data>
+  <data name="Bios.Depart.Confirmation" xml:space="preserve">
+    <value>Enregistre ce qui est ouvert. DrDXT mesure d'abord ta mémoire (une trentaine de secondes, pour comparer au retour), puis Windows redémarre directement dans le BIOS, {0} secondes après. Au retour, DrDXT vérifie ce qui a changé.</value>
+  </data>
+  <data name="Bios.Depart.Confirmer" xml:space="preserve">
+    <value>Confirmer et redémarrer</value>
+  </data>
+  <data name="Bios.Depart.Annuler" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="Bios.Depart.EnCours" xml:space="preserve">
+    <value>Mesure de la mémoire avant le départ, une trentaine de secondes…</value>
+  </data>
+  <data name="Bios.Depart.Lance" xml:space="preserve">
+    <value>Windows redémarre vers le BIOS dans {0} secondes.</value>
+  </data>
+  <data name="Bios.Depart.Echec" xml:space="preserve">
+    <value>Le redémarrage vers le BIOS n'a pas pu être demandé</value>
+  </data>
+  <data name="Bios.Depart.AnnulerRedemarrage" xml:space="preserve">
+    <value>Annuler le redémarrage</value>
+  </data>
+  <data name="Bios.Depart.AnnulationEchec" xml:space="preserve">
+    <value>Le redémarrage n'a peut-être pas été annulé</value>
+  </data>
+  <data name="Memoire.Remesure.Titre" xml:space="preserve">
+    <value>Remesurer la mémoire</value>
+  </data>
+  <data name="Memoire.Remesure.Description" xml:space="preserve">
+    <value>La mesure affichée est datée. En refaire une prend une trentaine de secondes : ferme ce qui tourne à côté pour qu'elle soit acceptée.</value>
+  </data>
+  <data name="Memoire.Remesure.EnCours" xml:space="preserve">
+    <value>Mesure en cours, une trentaine de secondes…</value>
+  </data>
+  <data name="Memoire.Remesure.Faite" xml:space="preserve">
+    <value>Mesure refaite</value>
+  </data>
+  <data name="Memoire.Remesure.Echec" xml:space="preserve">
+    <value>La nouvelle mesure n'a pas été acceptée : l'ancienne reste affichée</value>
+  </data>
+  <data name="Bios.Retour.Oublier" xml:space="preserve">
+    <value>Je renonce à ce changement : ne plus le vérifier</value>
+  </data>
+  <data name="Bios.Retour.OublierEchec" xml:space="preserve">
+    <value>Le changement n'a pas pu être oublié</value>
+  </data>
+  <data name="Memoire.Remesure.JeuEnCours" xml:space="preserve">
+    <value>Ferme le jeu d'abord : une mesure prise pendant qu'il tourne décrit le jeu, pas ta mémoire</value>
+  </data>
+  <data name="Cpu.Remesure.JeuEnCours" xml:space="preserve">
+    <value>Ferme le jeu d'abord : une mesure prise pendant qu'il tourne décrit le jeu, pas ton processeur</value>
+  </data>
+  <data name="Memory.Ab.NoVerdict.Game" xml:space="preserve">
+    <value>Pas de comparaison : un jeu tournait pendant la mesure d'après ({0}). Il prend une part de la bande passante mémoire, et l'écart lu aurait été le sien, pas celui de ton changement.</value>
+  </data>
+  <data name="Memoire.Remesure.SauteeJeu" xml:space="preserve">
+    <value>Pas mesurée à ce scan : un jeu tournait, et la mesure aurait décrit le jeu. Ferme-le, puis remesure.</value>
+  </data>
+  <data name="Cpu.Remesure.SauteJeu" xml:space="preserve">
+    <value>Pas mesuré à ce scan : un jeu tournait, et la mesure aurait décrit le jeu. Ferme-le, puis remesure.</value>
+  </data>
+  <data name="Scan.AttenteJeu" xml:space="preserve">
+    <value>Ton jeu est réduit : retourne dedans et restes-y {0} secondes, la mesure démarre dès qu'il est à l'écran.</value>
+  </data>
+  <data name="Scan.Degraded.JeuReduit" xml:space="preserve">
+    <value>Ton jeu est resté réduit : sans image à l'écran, il n'y a rien à mesurer. Relance le scan, puis retourne dans ton jeu sans attendre.</value>
+  </data>
+  <data name="Apply.Session.JeuReduit" xml:space="preserve">
+    <value>Ton jeu est resté réduit : la session n'a pas eu lieu, aucun levier n'a été essayé. Relance Optimiser, puis retourne dans ton jeu sans attendre.</value>
+  </data>
+  <data name="Apply.AttenteJeu" xml:space="preserve">
+    <value>Ton jeu est réduit : retourne dedans et joue jusqu'à la fin de la session, sans revenir sur DrDXT : chaque retour ici réduit le jeu et brouille la mesure.</value>
+  </data>
+  <data name="Scan.Degraded.JeuQuitteNomme" xml:space="preserve">
+    <value>Tu as quitté {1} pendant la mesure : les images d'un jeu réduit ne décrivent pas ta partie, ce scan ne donne donc pas de FPS. Relance-le et reste en jeu {0} secondes. Si {1} n'est pas ton jeu, DrDXT l'a pris pour un jeu parce que sa fenêtre couvrait un écran entier.</value>
+  </data>
+  <data name="Scan.Degraded.JeuQuitte" xml:space="preserve">
+    <value>Tu as quitté ton jeu pendant la mesure : les images d'un jeu réduit ne décrivent pas ta partie, ce scan ne donne donc pas de FPS. Relance-le et reste en jeu {0} secondes.</value>
+  </data>
+  <data name="Apply.Session.JeuQuitte" xml:space="preserve">
+    <value>Tu as quitté ton jeu pendant la session : ses mesures mêlent ta partie et un jeu réduit, ne te fie pas à ce verdict. Relance Optimiser et reste en jeu jusqu'à la fin.</value>
+  </data>
+  <data name="Scan.Memory.PriseEnJeu" xml:space="preserve">
+    <value> Prise dans le même scan qu'une capture de {0} ({1:HH:mm}) : un jeu tournait sans doute, et ces chiffres décrivent le partage avec lui. DrDXT la remesurera seul la prochaine fois que ton PC sera au repos (aucun jeu, 5 min sans toi) ; tu peux aussi le faire tout de suite, jeu fermé.</value>
+  </data>
+  <data name="Cpu.PriseEnJeu" xml:space="preserve">
+    <value> Une capture de {0} ({1:HH:mm}) date du même scan : un jeu tournait sans doute et prenait sa part des cœurs pendant cette mesure. DrDXT le remesurera seul la prochaine fois que ton PC sera au repos (aucun jeu, 5 min sans toi) ; tu peux aussi le faire tout de suite, jeu fermé.</value>
+  </data>
+  <data name="Dashboard.Lecture" xml:space="preserve">
+    <value>{0} : {1} avant, {2} après</value>
+  </data>
+  <data name="Dashboard.Lecture.Graphique" xml:space="preserve">
+    <value>Temps par image, médiane : {0:0.#} ms avant, {1:0.#} ms après</value>
+  </data>
+  <data name="Scan.Scene.Retenue" xml:space="preserve">
+    <value>Pendant la mesure en jeu, tu joues :</value>
+  </data>
+  <data name="Carte.Verdict.ACorriger" xml:space="preserve">
+    <value>Le plus urgent ici : {0}</value>
+  </data>
+  <data name="Carte.Verdict.ARegarder" xml:space="preserve">
+    <value>À regarder ici : {0}</value>
+  </data>
+  <data name="Carte.Verdict.AEssayer" xml:space="preserve">
+    <value>Rien de cassé ; un réglage à essayer : {0}</value>
+  </data>
+  <data name="Carte.Verdict.Mesure" xml:space="preserve">
+    <value>La mesure ci-dessous montre un écart : lis-la d'abord.</value>
+  </data>
+  <data name="Carte.Verdict.Rien" xml:space="preserve">
+    <value>Rien à faire ici : tout ce qui a été lu est normal.</value>
+  </data>
+  <data name="Carte.Verdict.NonLu" xml:space="preserve">
+    <value>Ce domaine n'a pas pu être lu sur cette machine.</value>
+  </data>
+  <data name="Parties.Titre" xml:space="preserve">
+    <value>Tes dernières parties</value>
+  </data>
+  <data name="Parties.Description" xml:space="preserve">
+    <value>Allumé par défaut, DrDXT prend une mesure de 20 secondes toutes les trois minutes pendant tes parties, puis garde une ligne par partie : tes images, et ce qui les limitait. C&apos;est ce qui permet de juger chaque réglage sur tes vraies parties. Tout reste sur ce PC, rien n&apos;est envoyé ; tu peux l&apos;arrêter ici. Il marche aussi DrDXT fermé : allumé, DrDXT se lance sans fenêtre à l&apos;ouverture de ta session, juste pour ce relevé ; l&apos;arrêter ici l&apos;enlève aussi du démarrage de Windows.</value>
+  </data>
+  <data name="Parties.Gains.Aucun" xml:space="preserve">
+    <value>aucun gain prouvé pour l&apos;instant</value>
+  </data>
+  <data name="Parties.Gains.Total" xml:space="preserve">
+    <value>{0:+0.0;-0.0} % sur le 1 % low (au moins {2:+0.0;-0.0} % en prenant le pire cas de chaque mesure ; {1} changement(s) prouvé(s), sur tes parties)</value>
+  </data>
+  <data name="Parties.Gains" xml:space="preserve">
+    <value>Ce que tes changements ont fait en jeu : {0} ; {1} sans effet mesurable ; {2} pas encore jugé(s) (il faut 3 parties du même jeu avant et après).</value>
+  </data>
+  <data name="Parties.Gains.AutreJeu" xml:space="preserve">
+    <value>Et {0} gain(s) prouvé(s) sur un autre jeu, comptés à part : des jeux différents ne s&apos;additionnent pas.</value>
+  </data>
+  <data name="Parties.CaptureRatee" xml:space="preserve">
+    <value>Relevé allumé, mais la dernière mesure a raté le {0} : aucune image de jeu captée. DrDXT réessaie à ta prochaine partie.</value>
+  </data>
+  <data name="Parties.Aucune" xml:space="preserve">
+    <value>Aucune partie relevée pour l'instant.</value>
+  </data>
+  <data name="Parties.Libelle" xml:space="preserve">
+    <value>Relever mes FPS en partie</value>
+  </data>
+  <data name="Parties.Goulot.Processeur" xml:space="preserve">
+    <value>limité par le processeur</value>
+  </data>
+  <data name="Parties.Goulot.Carte" xml:space="preserve">
+    <value>limité par la carte graphique</value>
+  </data>
+  <data name="Parties.Goulot.PlutotCarte" xml:space="preserve">
+    <value>plutôt limité par la carte graphique</value>
+  </data>
+  <data name="Parties.Processeur" xml:space="preserve">
+    <value>processeur {0} GHz, {1} W</value>
+  </data>
+  <data name="Changement.Reglage" xml:space="preserve">
+    <value>{0} passé de « {1} » à « {2} »</value>
+  </data>
+  <data name="Reglage.windows.game_mode" xml:space="preserve">
+    <value>le mode Jeu de Windows</value>
+  </data>
+  <data name="Reglage.windows.hags" xml:space="preserve">
+    <value>la planification GPU à accélération matérielle</value>
+  </data>
+  <data name="Reglage.memoire.frequence" xml:space="preserve">
+    <value>la fréquence de la mémoire</value>
+  </data>
+  <data name="Reglage.memoire.fichier_echange" xml:space="preserve">
+    <value>le fichier d'échange</value>
+  </data>
+  <data name="Reglage.memoire.tension" xml:space="preserve">
+    <value>la tension de la mémoire</value>
+  </data>
+  <data name="Reglage.nvidia.instant_replay" xml:space="preserve">
+    <value>l'Instant Replay de NVIDIA</value>
+  </data>
+  <data name="Reglage.Allume" xml:space="preserve">
+    <value>allumé</value>
+  </data>
+  <data name="Reglage.Eteint" xml:space="preserve">
+    <value>éteint</value>
+  </data>
+  <data name="Scan.Bios.Guide.Manuel" xml:space="preserve">
+    <value>Ces chemins ne sont pas vérifiés pour ta carte : le manuel de ta {0}, sur le site de son constructeur (page d'assistance, onglet Manuel), fait foi. Cherche-y le nom exact du réglage.</value>
+  </data>
+  <data name="Scan.Bios.Guide.Manuel.Ouvrir" xml:space="preserve">
+    <value>Ouvrir la page de ta carte</value>
+  </data>
+  <data name="Scan.Bios.Guide.Qr" xml:space="preserve">
+    <value>Scanne ce code avec ton téléphone : le guide entier y est écrit, il reste lisible quand le PC est dans le BIOS, sans réseau.</value>
+  </data>
+  <data name="Scan.Bios.Guide.Qr.Secours" xml:space="preserve">
+    <value>Si le PC ne démarre plus : Clear CMOS (bouton ou cavalier de la carte mère, ou pile retirée une minute).</value>
+  </data>
+  <data name="Scan.Bios.Guide.Qr.Manuel" xml:space="preserve">
+    <value>Manuel de ta carte : {0}</value>
+  </data>
+  <data name="Scan.Bios.Guide.Qr.Titre" xml:space="preserve">
+    <value>DrDXT, guide BIOS : {0}</value>
+  </data>
+  <data name="Leviers.Titre" xml:space="preserve">
+    <value>Ce que DrDXT a posé</value>
+  </data>
+  <data name="Leviers.Description" xml:space="preserve">
+    <value>Chaque réglage garde sa valeur d'avant DrDXT : « Annuler » la remet.</value>
+  </data>
+  <data name="Leviers.BoutonAnnuler" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="Leviers.AnnuleAuRedemarrage" xml:space="preserve">
+    <value>Annulé : {0}. La valeur d'avant DrDXT est remise ; elle prend effet au prochain redémarrage.</value>
+  </data>
+  <data name="Leviers.Introuvable" xml:space="preserve">
+    <value>{0} n'est plus noté comme posé par DrDXT : il n'y a rien à annuler.</value>
+  </data>
+  <data name="Leviers.Annule" xml:space="preserve">
+    <value>Annulé : {0}. La valeur d'avant DrDXT est remise.</value>
+  </data>
+  <data name="Leviers.PasAnnule" xml:space="preserve">
+    <value>{0} n'a pas été annulé ({1}). Rien n'a changé.</value>
+  </data>
+  <data name="Changement.PasSortiDuManifeste" xml:space="preserve">
+    <value>{0} : la valeur d'avant est remise sur ta machine, mais DrDXT n'a pas pu le sortir de sa liste signée ({1}). Après une mise à jour de Windows, le service pourrait le reposer, et la désinstallation pourrait remettre une valeur plus ancienne.</value>
+  </data>
+  <data name="Changement.ARetirer" xml:space="preserve">
+    <value>« {0} » est moins bien en jeu. DrDXT ne l'a pas retiré seul (il aurait fallu une autorisation Windows sans ton clic) : annule-le d'un clic dans « Ce que DrDXT a posé ».</value>
+  </data>
+  <data name="Essai.EnCours" xml:space="preserve">
+    <value>Essai en alternance : « {0} », un lancement du jeu sur deux quand DrDXT est ouvert (plusieurs parties dans le même lancement comptent d'un seul côté) ({1} avec, {2} sans ; la prochaine : {3}). DrDXT tranche à 3 contre 3 nets.</value>
+  </data>
+  <data name="Essai.Pause" xml:space="preserve">
+    <value>Essai de « {0} » en pause : il n'a pas pu changer d'état sans te demander une autorisation Windows. Ouvre DrDXT, il reprendra à la partie suivante.</value>
+  </data>
+  <data name="Essai.Fini.Mieux" xml:space="preserve">
+    <value>Essai de « {0} » terminé : mieux en jeu sur tes parties, il reste posé.</value>
+  </data>
+  <data name="Essai.Fini.Pire" xml:space="preserve">
+    <value>Essai de « {0} » terminé : moins bien en jeu sur tes parties, il est retiré.</value>
+  </data>
+  <data name="Essai.Fini.Pareil" xml:space="preserve">
+    <value>Essai de « {0} » terminé : pas de différence nette sur tes parties, l'état d'avant l'essai est revenu.</value>
+  </data>
+  <data name="Essai.Incertain" xml:space="preserve">
+    <value>Essai de « {0} » arrêté : une erreur pendant le changement d'état l'a rendu incertain. Regarde « Ce que DrDXT a posé » et annule-le si tu veux revenir à avant.</value>
+  </data>
+  <data name="Essai.Redemarrage" xml:space="preserve">
+    <value>Essai de « {0} » arrêté par un redémarrage du PC : l'état du levier n'est plus sûr. Relance l'essai si tu veux.</value>
+  </data>
+  <data name="Essai.Arrete" xml:space="preserve">
+    <value>Essai de « {0} » arrêté : l'état d'avant l'essai est revenu.</value>
+  </data>
+  <data name="Essai.ArretRate" xml:space="preserve">
+    <value>Essai de « {0} » : l'état d'avant n'a pas pu être rendu ; l'essai continue, réessaie.</value>
+  </data>
+  <data name="Essai.Bouton" xml:space="preserve">
+    <value>Essayer en alternance pendant mes parties</value>
+  </data>
+  <data name="Essai.Arreter" xml:space="preserve">
+    <value>Arrêter l'essai</value>
+  </data>
+  <data name="Changement.Retire" xml:space="preserve">
+    <value>Retiré par DrDXT : {0}, moins bien en jeu sur tes parties. La valeur d'avant est remise.</value>
+  </data>
+  <data name="Changement.RetireAuRedemarrage" xml:space="preserve">
+    <value>Retiré par DrDXT : {0}, moins bien en jeu sur tes parties. La valeur d'avant est remise ; elle prendra effet au prochain redémarrage.</value>
+  </data>
+  <data name="Historique.Titre" xml:space="preserve">
+    <value>Historique de ta machine</value>
+  </data>
+  <data name="Historique.Description" xml:space="preserve">
+    <value>Les 30 derniers jours sur une seule ligne du temps : ce qui a changé, tes parties, et les arrêts ou erreurs du PC. Le plus récent en haut.</value>
+  </data>
+  <data name="Historique.PartieFps" xml:space="preserve">
+    <value>{0} FPS · 1 % low {1}</value>
+  </data>
+  <data name="Historique.Arret" xml:space="preserve">
+    <value>arrêt brutal : le PC s'est coupé sans s'éteindre proprement</value>
+  </data>
+  <data name="Historique.Erreur" xml:space="preserve">
+    <value>erreur matérielle signalée par Windows</value>
+  </data>
+  <data name="PretAJouer.Bouton" xml:space="preserve">
+    <value>Prêt à jouer ?</value>
+  </data>
+  <data name="PretAJouer.EnCours" xml:space="preserve">
+    <value>Vérification en cours, quelques secondes…</value>
+  </data>
+  <data name="PretAJouer.Ok" xml:space="preserve">
+    <value>Prêt : rien ne gêne parmi ce qui a été mesuré.</value>
+  </data>
+  <data name="PretAJouer.AGenes" xml:space="preserve">
+    <value>Ce qui peut gêner ta partie maintenant :</value>
+  </data>
+  <data name="PretAJouer.Voisins" xml:space="preserve">
+    <value>des programmes chargent le processeur : {0}. Ferme-les, ou allume « passer les gourmands après le jeu ».</value>
+  </data>
+  <data name="PretAJouer.Pertes" xml:space="preserve">
+    <value>des pings se perdent ({0} % vers la box, {1} % vers internet) : regarde le câble ou le Wi-Fi avant de lancer.</value>
+  </data>
+  <data name="PretAJouer.Box" xml:space="preserve">
+    <value>la box répond en {0} ms : le lien local (Wi-Fi, courant porteur) coûte avant même internet ; le câble le règle.</value>
+  </data>
+  <data name="PretAJouer.Memoire" xml:space="preserve">
+    <value>il reste {0} Mo de mémoire libre : ferme ce qui en prend (navigateur, enregistrement) avant de lancer.</value>
+  </data>
+  <data name="PretAJouer.Chaleur" xml:space="preserve">
+    <value>le processeur est déjà à {0} °C avant la partie : vérifie le refroidissement.</value>
+  </data>
+  <data name="PretAJouer.Mesure" xml:space="preserve">
+    <value>Mesuré : box {0}, internet {1}, mémoire libre {2}, processeur {3}.</value>
+  </data>
+  <data name="PretAJouer.TemperatureNonLue" xml:space="preserve">
+    <value>non lu (HWiNFO fermé)</value>
+  </data>
+  <data name="PretAJouer.Echec" xml:space="preserve">
+    <value>La vérification n'a pas pu se faire. Relance-la.</value>
+  </data>
+  <data name="Historique.DepuisLeScan" xml:space="preserve">
+    <value>{0} Pour un pilote ou une mise à jour de Windows, les parties relevées avant et après diront ce que ça a coûté en jeu.</value>
+  </data>
+  <data name="Historique.Bilan" xml:space="preserve">
+    <value>Cette semaine : {0} partie(s) relevée(s), {1} changement(s), {2} arrêt(s) brutal(aux), {3} erreur(s) matérielle(s).</value>
+  </data>
+  <data name="Historique.BilanFps" xml:space="preserve">
+    <value>FPS médians du jeu le plus joué : {0} la semaine d'avant, {1} cette semaine.</value>
+  </data>
+  <data name="Changement.Bios" xml:space="preserve">
+    <value>le réglage du BIOS « {0} » passé à « {1} »</value>
+  </data>
+  <data name="Changement.SansAvant" xml:space="preserve">
+    <value>Depuis {0} ({1}) : aucune partie n'a été relevée avant ce changement, il ne pourra donc pas être jugé en jeu. Les parties relevées à partir de maintenant serviront à juger les prochains.</value>
+  </data>
+  <data name="Changement.PasEncore" xml:space="preserve">
+    <value>Depuis {0} ({1}) : pas encore jugé en jeu. {2} partie(s) relevée(s) après, {3} avant ; il en faut {4} de chaque côté, même jeu.</value>
+  </data>
+  <data name="Changement.Juge" xml:space="preserve">
+    <value>Depuis {0} ({1}) : {2} sur {3}. 1 % low {4} puis {5}, FPS {6} puis {7} (médianes de {8} parties avant, {9} après).</value>
+  </data>
+  <data name="Changement.Mieux" xml:space="preserve">
+    <value>mieux en jeu</value>
+  </data>
+  <data name="Changement.Pire" xml:space="preserve">
+    <value>moins bien en jeu</value>
+  </data>
+  <data name="Changement.Pareil" xml:space="preserve">
+    <value>pas de différence nette en jeu</value>
+  </data>
+  <data name="Parties.Chaleur" xml:space="preserve">
+    <value> (jusqu'à {0} °C, lu dans HWiNFO)</value>
+  </data>
+  <data name="Parties.Carte" xml:space="preserve">
+    <value>carte jusqu'à {0} °C</value>
+  </data>
+  <data name="Parties.RalentitChaleur" xml:space="preserve">
+    <value>ton processeur ralentit en partie ({0} GHz, contre {1} GHz tenus au banc de l'époque) et il a chauffé : probablement la chaleur, regarde le refroidissement</value>
+  </data>
+  <data name="Parties.Profil" xml:space="preserve">
+    <value>{0} en résumé : {1} parties, médiane {2} FPS (1 % low {3}), {4} le plus souvent, dernière le {5}</value>
+  </data>
+  <data name="Parties.Ralentit" xml:space="preserve">
+    <value>ton processeur tourne plus bas en partie ({0} GHz, contre {1} GHz tenus au banc de l'époque) : la chaleur ou la limite de puissance, la température n'a pas été lue assez haute pour trancher</value>
+  </data>
+  <data name="Parties.Goulot.Cadence" xml:space="preserve">
+    <value>cadence irrégulière : de bons FPS en moyenne, mais des à-coups (1 % low bas)</value>
+  </data>
+  <data name="Parties.Goulot.CarteBridee" xml:space="preserve">
+    <value>carte graphique freinée par la chaleur ou sa limite de puissance</value>
+  </data>
+  <data name="Parties.Goulot.Plafond" xml:space="preserve">
+    <value>images plafonnées (limite d'images ou synchro) : la mesure ne juge rien</value>
+  </data>
+  <data name="Parties.Goulot.Memoire" xml:space="preserve">
+    <value>mémoire presque pleine : risque de plantage plus que perte de FPS</value>
+  </data>
+  <data name="Parties.VramPleine" xml:space="preserve">
+    <value>mémoire vidéo pleine ({0} % au pic) : le jeu déborde en mémoire système et saccade ; baisse la qualité des textures</value>
+  </data>
+  <data name="Parties.Voisins" xml:space="preserve">
+    <value>à côté du jeu, en % d'un cœur au pic : {0} ; chaque cœur pris est un cœur en moins pour le jeu</value>
+  </data>
+  <data name="Parties.CarteIgnoree" xml:space="preserve">
+    <value>le jeu a tourné sur {0}, pas sur {1} : la puce intégrée rend bien moins d'images. Paramètres > Système > Affichage > Graphiques, ajoute {2}, Options, « Hautes performances », puis relance le jeu</value>
+  </data>
+  <data name="Parties.Ping" xml:space="preserve">
+    <value>ping {0} ms vers internet, {1} ms vers la box, {2} % de pertes au pic</value>
+  </data>
+  <data name="Parties.Route.Box" xml:space="preserve">
+    <value>Le ping vers internet monte d'une partie à l'autre : {0} ms puis {1} ms (médianes des {2} dernières parties contre les {2} d'avant). Celui vers la box monte aussi : c'est le lien jusqu'à elle (Wi-Fi, câble ou box). Un câble ou un redémarrage de la box se tente d'abord.</value>
+  </data>
+  <data name="Parties.Route.Loin" xml:space="preserve">
+    <value>Le ping vers internet monte d'une partie à l'autre : {0} ms puis {1} ms (médianes des {2} dernières parties contre les {2} d'avant). Celui vers la box ne bouge pas : c'est au-delà, chez ton fournisseur d'accès ou plus loin ; DrDXT n'y peut rien régler.</value>
+  </data>
+  <data name="Parties.Overlays" xml:space="preserve">
+    <value>overlays ouverts : {0}</value>
+  </data>
+  <data name="Parties.OverlayEcart.Pire" xml:space="preserve">
+    <value>Toutes ses parties avec ont un 1 % low plus bas que toutes celles sans : il coûte probablement ici, mais la carte et la soirée changent aussi. Le couper dans ses réglages le dira.</value>
+  </data>
+  <data name="Parties.OverlayEcart.Mieux" xml:space="preserve">
+    <value>Ses parties avec ont toutes un meilleur 1 % low : aucun coût visible ici.</value>
+  </data>
+  <data name="Parties.OverlayEcart.Pareil" xml:space="preserve">
+    <value>Pas de différence nette au 1 % low entre ses parties avec et sans : aucun coût prouvé.</value>
+  </data>
+  <data name="Parties.OverlayEcart" xml:space="preserve">
+    <value>Overlay {0} sur {1} : {2} FPS médian avec, {3} sans ({4} parties contre {5}). {6}</value>
+  </data>
+  <data name="Parties.OverlaySansComparaison" xml:space="preserve">
+    <value>Overlay {0} ouvert pendant {2} parties de {1} : son coût chez toi n'est pas mesuré tant que {3} parties sans lui n'ont pas été jouées.</value>
+  </data>
+  <data name="Parties.Vram" xml:space="preserve">
+    <value>mémoire vidéo à {0} % au pic</value>
+  </data>
+  <data name="Parties.Goulot.Latence" xml:space="preserve">
+    <value>des FPS corrects, mais une latence trop haute</value>
+  </data>
+  <data name="Parties.Goulot.Inconnu" xml:space="preserve">
+    <value>limite non mesurée</value>
+  </data>
+  <data name="Cpu.Limite.Titre" xml:space="preserve">
+    <value>Ce qui bride ton processeur en jeu</value>
+  </data>
+  <data name="Cpu.Limite.Mesure" xml:space="preserve">
+    <value>Sous une charge longue, ton processeur tient {0} W et perd {1} % de puissance : c'est sa limite de puissance réglée dans le BIOS qui le freine, pas la chaleur. En partie, c'est lui qui limite tes images.</value>
+  </data>
+  <data name="Cpu.Limite.DesLeDepart" xml:space="preserve">
+    <value>Sous une charge longue, ton processeur tient {0} W et ses cœurs tournent à {1} MHz contre {2} MHz quand un seul travaille ; à froid, il n'allait pas plus vite : sa limite de puissance réglée dans le BIOS le retient dès le début de la charge, pas la chaleur. Si ton jeu est limité par le processeur, c'est elle qui limite tes images.</value>
+  </data>
+  <data name="Cpu.Limite.MesureSansWatts" xml:space="preserve">
+    <value>Sous une charge longue, ton processeur perd {0} % de puissance, freiné par sa limite de puissance réglée dans le BIOS, pas par la chaleur.</value>
+  </data>
+  <data name="Cpu.Limite.Reglage" xml:space="preserve">
+    <value>Le réglage : « CPU Cooler Tuning » dans le BIOS de ta carte MSI, lu sur « {0} ». Les profils plus hauts laissent le processeur consommer plus longtemps ; le chemin exact dans le menu n'est pas vérifié sur ta carte.</value>
+  </data>
+  <data name="Cpu.Limite.ReglageInconnu" xml:space="preserve">
+    <value>Le réglage : la limite de puissance du processeur, dans le BIOS de ta carte. Son nom change selon le fabricant (« Long Duration Power Limit », « PL1 », « Package Power Limit », ou un profil de puissance du processeur) ; DrDXT ne sait pas lire le BIOS de ta carte, il ne peut donc pas te dire sa valeur.</value>
+  </data>
+  <data name="Cpu.Limite.RisqueGenerique" xml:space="preserve">
+    <value>Le risque : plus de puissance, c'est plus de chaleur, et ton refroidissement doit suivre. Sur les Core Intel de 13e et 14e génération, garde un BIOS à jour et le profil que recommande le fabricant de ta carte. Si ton PC s'éteint parfois sans raison, trouve d'abord pourquoi.</value>
+  </data>
+  <data name="Cpu.Limite.RetourGenerique" xml:space="preserve">
+    <value>Revenir en arrière : remettre le réglage d'origine (souvent « Auto » ou le profil par défaut). DrDXT ne touche pas au BIOS et ne te conseille pas de le changer ; si tu le changes, remesure ton processeur ici pour voir l'écart réel.</value>
+  </data>
+  <data name="Cpu.Limite.Risque" xml:space="preserve">
+    <value>Le risque : Intel et MSI recommandent « Intel Default Settings » pour la stabilité des Core de 13e et 14e génération. Plus de puissance, c'est plus de chaleur. Si ton PC s'éteint parfois sans raison, trouve d'abord pourquoi.</value>
+  </data>
+  <data name="Cpu.Limite.Retour" xml:space="preserve">
+    <value>Revenir en arrière : remettre « Intel Default Settings ». DrDXT ne touche pas au BIOS et ne te conseille pas de le changer ; si tu le changes, remesure ton processeur ici pour voir l'écart réel.</value>
+  </data>
+  <data name="Scan.Scene.PasChoisie" xml:space="preserve">
+    <value>Ce que tu joues pendant la mesure en jeu : pas encore choisi</value>
+  </data>
+  <data name="Scan.Scene.Preciser" xml:space="preserve">
+    <value>Ajouter une précision (facultatif)</value>
+  </data>
+  <data name="Carte.Reglage.Pourquoi" xml:space="preserve">
+    <value>Réglage de la carte : pourquoi</value>
+  </data>
+  <data name="Carte.Note.ReglageCarte" xml:space="preserve">
+    <value>Essayé en jeu par Optimiser, gardé seulement avec un gain mesuré.</value>
+  </data>
+  <data name="Carte.Note.NonLu" xml:space="preserve">
+    <value>État illisible sur cette machine : ignoré. Ce n'est pas un bon point, rien n'a été vérifié ici.</value>
+  </data>
+  <data name="Carte.Note.NonApplicable" xml:space="preserve">
+    <value>Ne s'applique pas à cette machine : ignoré.</value>
+  </data>
+  <data name="Carte.Note.Inconnu" xml:space="preserve">
+    <value>Réglage inconnu du catalogue : ignoré.</value>
+  </data>
+  <data name="Carte.Note.Borne.Coeur" xml:space="preserve">
+    <value>décalage du cœur ramené de {0} à {1} MHz (bornes de sécurité)</value>
+  </data>
+  <data name="Carte.Note.Borne.Memoire" xml:space="preserve">
+    <value>décalage de la mémoire ramené de {0} à {1} MHz (bornes de sécurité)</value>
+  </data>
+  <data name="Carte.Note.Borne.Puissance" xml:space="preserve">
+    <value>limite de puissance ramenée de {0} à {1} % (bornes de sécurité)</value>
+  </data>
+  <data name="Parties.Detail" xml:space="preserve">
+    <value>Détail des parties</value>
+  </data>
+  <data name="Parties.CommentCaMarche" xml:space="preserve">
+    <value>Comment ça marche</value>
+  </data>
+  <data name="Scan.Scene.Changer" xml:space="preserve">
+    <value>Changer</value>
+  </data>
+  <data name="Scan.Voisins.Voir" xml:space="preserve">
+    <value>Voir les programmes</value>
+  </data>
+  <data name="Carte.VoirLesAutres" xml:space="preserve">
+    <value>Voir la suite (</value>
+  </data>
+  <data name="Animations.MalgreWindows" xml:space="preserve">
+    <value>Animations coupées par Windows : les activer dans DrDXT</value>
+  </data>
+  <data name="Optimiser.Apercu" xml:space="preserve">
+    <value>DrDXT essaie lui-même, mesuré en jeu et annulable :</value>
+  </data>
+  <data name="Optimiser.Apercu.SansValidation" xml:space="preserve">
+    <value>Sans validation sur une vraie machine à ce jour :</value>
+  </data>
+  <data name="Optimiser.Apercu.AucuneValidation" xml:space="preserve">
+    <value>Pas encore validé sur une vraie machine.</value>
+  </data>
+  <data name="Dashboard.Gain.LowNonConclu" xml:space="preserve">
+    <value>Le gain vient du FPS moyen : le 1 % low n'a pas eu assez de passes pour conclure.</value>
+  </data>
+  <data name="Agir.Capsule.TestMemoire" xml:space="preserve">
+    <value>Tester · 5 min</value>
+  </data>
+  <data name="Agir.Capsule.RemesureCpu" xml:space="preserve">
+    <value>Remesurer · 45 s</value>
+  </data>
+  <data name="Agir.Capsule.RemesureMemoire" xml:space="preserve">
+    <value>Remesurer · 30 s</value>
+  </data>
+  <data name="Agir.Capsule.Bcd" xml:space="preserve">
+    <value>Rendre à Windows</value>
+  </data>
+  <data name="Agir.Capsule.Reparation" xml:space="preserve">
+    <value>Réparer · long</value>
+  </data>
+  <data name="Scan.Date" xml:space="preserve">
+    <value>scan du</value>
+  </data>
+  <data name="Carte.CopierCommande" xml:space="preserve">
+    <value>Copier dans le presse-papiers</value>
+  </data>
+  <data name="tweak.gpu.repos_global_normal" xml:space="preserve">
+    <value>Rend « Normal » au mode d'alimentation global de la carte graphique : elle redescend au repos sur le bureau. Un jeu qui a son propre réglage le garde. Retiré tout seul si la baisse de consommation au repos n'est pas mesurée.</value>
+  </data>
+  <data name="Carte.Repos.Prouve" xml:space="preserve">
+    <value>Repos de la carte prouvé : {0:0.0} W au repos au lieu de {1:0.0} W avant. Le mode « Normal » reste au global ; un jeu qui a son propre réglage le garde.</value>
+  </data>
+  <data name="Carte.Repos.NonMesure" xml:space="preserve">
+    <value>La consommation de la carte n'a pas pu être relue : le mode « Normal » a été retiré, sans preuve rien ne reste.</value>
+  </data>
+  <data name="Carte.Repos.PasDeGain" xml:space="preserve">
+    <value>Pas de baisse nette au repos ({0:0.0} W contre {1:0.0} W avant) : le mode « Normal » a été retiré, la carte est revenue comme avant.</value>
+  </data>
+  <data name="Carte.Repos.PireEnJeu" xml:space="preserve">
+    <value>Sur {0}, tes trois dernières parties sont toutes plus saccadées que les trois d'avant le mode « Normal » : il a été retiré, la carte est revenue comme avant.</value>
+  </data>
+  <data name="Carte.Repos.Titre" xml:space="preserve">
+    <value>Rendre le repos à ta carte, et le prouver</value>
+  </data>
+  <data name="Carte.Repos.Description" xml:space="preserve">
+    <value>Ton pilote garde « performances maximales » pour tout le PC : la carte ne redescend jamais sur le bureau. DrDXT mesure sa consommation au repos, pose « Normal » au réglage global (ton jeu garde le sien s'il en a un), puis remesure après ton prochain redémarrage : sans baisse nette, il retire le réglage tout seul, et une partie plus saccadée ensuite le retire aussi.</value>
+  </data>
+  <data name="Carte.Repos.Maintenir" xml:space="preserve">
+    <value>Maintiens pour mesurer et poser, ou Entrée</value>
+  </data>
+  <data name="Carte.Repos.EnCours" xml:space="preserve">
+    <value>Mesure du repos de la carte, une vingtaine de secondes…</value>
+  </data>
+  <data name="Carte.Repos.EnAttente" xml:space="preserve">
+    <value>Posé. Il prend effet au prochain redémarrage : au lancement suivant, DrDXT mesure la carte au repos et garde ou retire le réglage.</value>
+  </data>
+  <data name="Carte.Repos.Capsule" xml:space="preserve">
+    <value>Rendre le repos</value>
+  </data>
+  <data name="Carte.Repos.Refuse" xml:space="preserve">
+    <value>Rien n'a été posé : la consommation de la carte ne s'est pas lue, ou le réglage global n'est plus sur « performances maximales ».</value>
+  </data>
+  <data name="Scan.Etape.Format" xml:space="preserve">
+    <value>Étape {0} sur {1} · {2}</value>
+  </data>
+  <data name="Scan.Etape.Materiel" xml:space="preserve">
+    <value>lecture du matériel</value>
+  </data>
+  <data name="Scan.Etape.Reglages" xml:space="preserve">
+    <value>lecture des réglages de Windows</value>
+  </data>
+  <data name="Scan.Etape.Bios" xml:space="preserve">
+    <value>lecture du BIOS</value>
+  </data>
+  <data name="Scan.Etape.ReseauProcesseur" xml:space="preserve">
+    <value>mesure du réseau et du processeur</value>
+  </data>
+  <data name="Scan.Etape.Memoire" xml:space="preserve">
+    <value>mesure de la mémoire</value>
+  </data>
+  <data name="Scan.Etape.EnJeu" xml:space="preserve">
+    <value>mesure en jeu</value>
+  </data>
+  <data name="Scan.Etape.Analyse" xml:space="preserve">
+    <value>analyse des résultats</value>
+  </data>
+  <data name="Scan.Etape.Audit" xml:space="preserve">
+    <value>audit de santé du système</value>
+  </data>
+  <data name="Apply.RienAPoserSeul" xml:space="preserve">
+    <value>Rien à poser par « Optimiser » pour l'instant : ses réglages sont déjà en place, ou fermés sur ce PC (la raison est dans chaque domaine). Les autres gestes sont dans « Agir ».</value>
+  </data>
+  <data name="Apply.Carte.NonProposee" xml:space="preserve">
+    <value>Réglage de la carte : pas proposé sur cette machine (portable, carte non prise en charge ou rien à régler selon le profil).</value>
+  </data>
+  <data name="Rapport.Description" xml:space="preserve">
+    <value>Tout ce que cette analyse a lu, dans un fichier à garder ou à joindre à une demande d'aide.</value>
+  </data>
+  <data name="UI.Register.None" xml:space="preserve">
+    <value>aucun à changer</value>
+  </data>
+  <data name="Carte.AFaire.Total" xml:space="preserve">
+    <value>À faire d'abord · les {0} points, domaine par domaine, plus bas</value>
+  </data>
+  <data name="Scan.Voisins.Titre" xml:space="preserve">
+    <value>Ce qui tournait en même temps</value>
+  </data>
+  <data name="Scan.Voisins.NonLus" xml:space="preserve">
+    <value>Les programmes ouverts pendant la mesure n'ont pas pu être lus : le chiffre se lit sans savoir ce qui tournait à côté.</value>
+  </data>
+  <data name="Voisins.Calmer.Titre" xml:space="preserve">
+    <value>Faire passer les programmes gourmands après le jeu</value>
+  </data>
+  <data name="Voisins.Calmer.Description" xml:space="preserve">
+    <value>Pendant une partie, un programme d'arrière-plan qui prend plus d'un quart de cœur passe en priorité « en dessous de la normale » : il tourne toujours, il passe après le jeu. Jamais le jeu, la fenêtre au premier plan ni un processus de Windows ou de sécurité. Sa priorité lui est rendue à la fin de la partie. Coupé tant que tu ne l'allumes pas.</value>
+  </data>
+  <data name="Voisins.Calmer.Libelle" xml:space="preserve">
+    <value>Passer les gourmands après le jeu</value>
+  </data>
+  <data name="Voisins.Calmer.Fait" xml:space="preserve">
+    <value>Passés après le jeu pendant la partie : {0}</value>
+  </data>
+  <data name="Reglage.voisins.calmer" xml:space="preserve">
+    <value>les programmes gourmands passés après le jeu</value>
+  </data>
+  <data name="Voisins.Proposition.NonLu" xml:space="preserve">
+    <value>Ce qui tourne à côté du jeu pendant tes parties : non lu. Allume le relevé de tes FPS en partie pour que DrDXT le voie.</value>
+  </data>
+  <data name="Voisins.Proposition.Aucun" xml:space="preserve">
+    <value>Pendant tes parties relevées, aucun programme n'a tenu plus d'un quart de cœur à côté du jeu : rien à calmer.</value>
+  </data>
+  <data name="Voisins.Proposition" xml:space="preserve">
+    <value>Proposé : pendant tes parties, {0} ont tenu plus d'un quart de cœur à côté du jeu. Le bouton les fait passer après le jeu ; le bilan se lit ensuite sur tes parties, et « moins bien en jeu » l'arrête tout seul.</value>
+  </data>
+  <data name="Voisins.Proposition.Actif" xml:space="preserve">
+    <value>En place pour : {0}. Le bilan se lit sur tes parties ; « moins bien en jeu » l'arrête tout seul.</value>
+  </data>
+  <data name="Voisins.Exclus.Titre" xml:space="preserve">
+    <value>Ne jamais toucher à (noms séparés par des virgules) :</value>
+  </data>
+  <data name="Voisins.Exclus.Proteges" xml:space="preserve">
+    <value>Toujours protégés, sans rien écrire ici : le jeu, son lanceur et ce qu'ils font tourner, la fenêtre au premier plan, Windows, l'antivirus, DrDXT et les antitriches.</value>
+  </data>
+  <data name="Carte.AFaire.Total.Un" xml:space="preserve">
+    <value>À faire d'abord · ce point est détaillé dans son domaine, plus bas</value>
+  </data>
+  <data name="Carte.Expert.Titre" xml:space="preserve">
+    <value>Mode Expert : fréquence et ventilateur de la carte</value>
+  </data>
+  <data name="Carte.Expert.NonValideIci" xml:space="preserve">
+    <value>Cette carte n'a jamais été essayée en écriture par DrDXT : si elle décroche, le test de stabilité et le bail la rendent, et ton essai servira de preuve pour les autres.</value>
+  </data>
+  <data name="Carte.Expert.Accord" xml:space="preserve">
+    <value>Je sais que ce réglage peut rendre ma carte instable. DrDXT est gratuit et sans garantie : j'en suis responsable.</value>
+  </data>
+  <data name="Carte.Expert.Decalage" xml:space="preserve">
+    <value>Décalage du cœur : {0:+0;-0;0} MHz</value>
+  </data>
+  <data name="Carte.Expert.Appliquer" xml:space="preserve">
+    <value>Essayer</value>
+  </data>
+  <data name="Carte.Expert.Rendre" xml:space="preserve">
+    <value>Rendre l'origine</value>
+  </data>
+  <data name="Carte.Expert.AccordRequis" xml:space="preserve">
+    <value>Coche l'accord d'abord.</value>
+  </data>
+  <data name="Carte.Expert.JeuEnCours" xml:space="preserve">
+    <value>Ferme le jeu d'abord : rien ne s'écrit sur la carte pendant une partie.</value>
+  </data>
+  <data name="Carte.Expert.EnCours" xml:space="preserve">
+    <value>Test de stabilité…</value>
+  </data>
+  <data name="Carte.Expert.Garde" xml:space="preserve">
+    <value>Stable. Gardé tant que DrDXT est ouvert : à sa fermeture, la carte revient d'elle-même (deux minutes au plus).</value>
+  </data>
+  <data name="Carte.Expert.Instable" xml:space="preserve">
+    <value>Instable : la carte a été rendue à son origine.</value>
+  </data>
+  <data name="Carte.Expert.Refuse" xml:space="preserve">
+    <value>Rien n'a changé :</value>
+  </data>
+  <data name="Carte.Expert.Rendu" xml:space="preserve">
+    <value>Origine rendue.</value>
+  </data>
+  <data name="Carte.Expert.RenduRate" xml:space="preserve">
+    <value>L'origine n'a pas pu être rendue ; elle reviendra à la fermeture de DrDXT ou au redémarrage :</value>
+  </data>
+  <data name="Carte.Expert.RenduParLeHelper" xml:space="preserve">
+    <value>Le helper a rendu l'origine de lui-même (le bail a expiré).</value>
+  </data>
+  <data name="tweak.gpu.repos_global_normal.title" xml:space="preserve">
+    <value>Repos de la carte (réglage global)</value>
+  </data>
+  <data name="Carte.Guide" xml:space="preserve">
+    <value>Ce qui se fait à la main, étape par étape (BIOS, câbles, réglages du jeu) : ouvrir le guide</value>
+  </data>
+  <data name="Carte.Leviers.Titre" xml:space="preserve">
+    <value>Ce que DrDXT fait ici</value>
+  </data>
+  <data name="Levier.Statut.Pose" xml:space="preserve">
+    <value>posé</value>
+  </data>
+  <data name="Levier.Statut.APoser" xml:space="preserve">
+    <value>à poser</value>
+  </data>
+  <data name="Levier.Statut.DejaBon" xml:space="preserve">
+    <value>déjà bon</value>
+  </data>
+  <data name="Levier.Statut.NonLu" xml:space="preserve">
+    <value>pas lu</value>
+  </data>
+  <data name="Levier.Statut.PasIci" xml:space="preserve">
+    <value>pas sur ton matériel</value>
+  </data>
+  <data name="Levier.PasIci.Console" xml:space="preserve">
+    <value>Console portable : ses profils d'énergie et de carte sont verrouillés.</value>
+  </data>
+  <data name="Levier.PasIci.Batterie" xml:space="preserve">
+    <value>Portable : ce réglage touche aussi la batterie et la chauffe.</value>
+  </data>
+  <data name="Levier.PasIci.FrequencesVerrouillees" xml:space="preserve">
+    <value>Portable : les fréquences de la carte sont verrouillées par le pilote.</value>
+  </data>
+  <data name="Levier.PasIci.PasNvidia" xml:space="preserve">
+    <value>Réglage du pilote NVIDIA : pas de carte NVIDIA ici.</value>
+  </data>
+  <data name="Levier.PasIci.PasDeCarteDediee" xml:space="preserve">
+    <value>Pas de carte graphique dédiée ici.</value>
+  </data>
+  <data name="Levier.PasIci.X3dDeuxBlocs" xml:space="preserve">
+    <value>Pas sur un Ryzen X3D à deux blocs : d'après la communauté AMD et les testeurs (aucune note AMD trouvée), son pilote range le jeu sur le bloc à cache sous le plan Équilibré seulement.</value>
+  </data>
+  <data name="Levier.PasIci.PasX3d" xml:space="preserve">
+    <value>Seulement pour un Ryzen X3D à deux blocs de cœurs.</value>
+  </data>
+  <data name="Levier.PasIci.ReflexDuJeu" xml:space="preserve">
+    <value>Reflex s'active dans le jeu ; DrDXT ne fait que défaire ce qu'une ancienne version avait écrit.</value>
+  </data>
+  <data name="Levier.Statut.Expert" xml:space="preserve">
+    <value>mode Expert, sur ton accord (page Graphique)</value>
+  </data>
+  <data name="Service.Reaffirme" xml:space="preserve">
+    <value>Windows avait remis « {0} » : DrDXT l'a réaffirmé tout seul le {1}, comme tu l'avais gardé.</value>
+  </data>
+  <data name="Levier.Statut.SansObjet" xml:space="preserve">
+    <value>sans objet ici</value>
+  </data>
+  <data name="Carte.Repos.Description.Court" xml:space="preserve">
+    <value>Pose « Normal » au pilote, mesure la carte au repos ; sans baisse nette, retiré seul.</value>
+  </data>
+  <data name="Cpu.Remesure.Description.Court" xml:space="preserve">
+    <value>Une quarantaine de secondes à pleine charge, hors partie, gros programmes fermés.</value>
+  </data>
+  <data name="Carte.Expert.Ventilateur" xml:space="preserve">
+    <value>Ventilateur fixé à {0} % : une vitesse fixe, qui ne suit plus la température tant que tu ne la rends pas</value>
+  </data>
+  <data name="Carte.Expert.Ventilateur.Appliquer" xml:space="preserve">
+    <value>Fixer le ventilateur</value>
+  </data>
+  <data name="Levier.PasIci.VentilateurConstructeur" xml:space="preserve">
+    <value>Portable ou console : le ventilateur est piloté par le constructeur, DrDXT n'y touche pas.</value>
+  </data>
+  <data name="Finding.Memory.XmpOnSousLeKitAvecArrets" xml:space="preserve">
+    <value>Overclock actif, mais sous la vitesse du kit, et arrêts brutaux ces 90 derniers jours. Ta RAM tourne au-dessus de la vitesse standard JEDEC : c’est un overclock mémoire, par profil XMP/EXPO ou réglage à la main, et le domaine BIOS dit lequel quand il est lisible ; et Windows a redémarré sans arrêt propre (appuis longs sur le bouton exclus ; le détail, écrans bleus compris, est dans le bilan de stabilité). DrDXT n’a pas testé ce réglage et ne l’accuse pas. Pourquoi repasser en JEDEC : c’est la seule façon de savoir si cet overclock fait planter la machine. C’est un test de stabilité, pas de performance. Laisse tourner en JEDEC au moins trois fois l’écart habituel entre deux arrêts : par exemple, avec un arrêt tous les neuf jours, une semaine sans arrêt peut arriver par hasard. Si les arrêts cessent sur cette durée, l’overclock devient le suspect le plus probable. S’ils continuent, l’overclock n’y est pour rien, mais les barrettes ne sont pas innocentées pour autant. Un test mémoire les vérifie plus vite que des semaines d’attente : celui intégré à Windows (Windows + R, puis mdsched.exe ; il redémarre le PC et l’immobilise pendant le test), dont DrDXT affiche ensuite le résultat dans le bilan de stabilité, ou MemTest86, plus long. Sans redémarrer, le test de la section Agir ci-dessous vérifie un quart de ta mémoire en cinq minutes, mais il ne voit pas la mémoire que Windows occupe : aucune erreur ne vaut pas un test complet. Ta RAM tourne aussi sous la vitesse prévue par son kit : le profil du kit n'est pas appliqué tel quel, souvent pour stabiliser. Fais d'abord le test mémoire avant de remonter à la vitesse du kit.</value>
+  </data>
+  <data name="Levier.VerifieIci" xml:space="preserve">
+    <value>vérifié ici (posé, relu, rendu)</value>
+  </data>
+  <data name="Verifier.Envoyer" xml:space="preserve">
+    <value>Envoyer mon rapport (ouvre un ticket GitHub pré-rempli, que tu relis avant de l'envoyer)</value>
+  </data>
+  <data name="Verifier.EnvoiImpossible" xml:space="preserve">
+    <value>Le rapport n'a pas pu s'ouvrir dans le navigateur : il reste dans le fichier ci-dessus, à joindre toi-même.</value>
+  </data>
+  <data name="Bascule.Allume" xml:space="preserve">
+    <value>Allumé</value>
+  </data>
+  <data name="Bascule.Eteint" xml:space="preserve">
+    <value>Éteint</value>
+  </data>
+  <data name="Changement.Tableau.SansAvant" xml:space="preserve">
+    <value>pas jugé : aucune partie du même jeu avant</value>
+  </data>
+  <data name="Changement.Tableau.PeuAvant" xml:space="preserve">
+    <value>pas jugé : {0} sur {1} parties du même jeu avant</value>
+  </data>
+  <data name="Changement.Tableau.Attend" xml:space="preserve">
+    <value>attend {0} partie(s) après</value>
+  </data>
+  <data name="Changement.Tableau.Changement" xml:space="preserve">
+    <value>Changement</value>
+  </data>
+  <data name="Changement.Tableau.Date" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="Changement.Tableau.EnJeu" xml:space="preserve">
+    <value>En jeu</value>
+  </data>
+  <data name="Garde.RenduIncidentCarte" xml:space="preserve">
+    <value>Rendu seul : {0}. Le pilote graphique a décroché le {1} (vidage à chaud, code {2}), après que DrDXT l'a posé ; la valeur d'avant est remise. Si ça revient sans lui, ce n'était pas lui.</value>
+  </data>
+  <data name="Garde.RenduIncidentCarteAuRedemarrage" xml:space="preserve">
+    <value>Rendu seul : {0}. Le pilote graphique a décroché le {1} (vidage à chaud, code {2}), après que DrDXT l'a posé ; la valeur d'avant reprend au prochain redémarrage. Si ça revient ensuite sans lui, ce n'était pas lui.</value>
+  </data>
+  <data name="Garde.Rendu" xml:space="preserve">
+    <value>Rendu seul : {0}. Un arrêt brutal est survenu le {1}, après que DrDXT l'a posé ; la valeur d'avant est remise. Si l'arrêt revient sans lui, ce n'était pas lui.</value>
+  </data>
+  <data name="Garde.ARendre" xml:space="preserve">
+    <value>« {0} » est à rendre : un incident est survenu le {1} (arrêt brutal, ou décrochage du pilote graphique), après que DrDXT l'a posé. DrDXT ne l'a pas rendu seul (il aurait fallu une autorisation Windows sans ton clic) : annule-le d'un clic dans « Ce que DrDXT a posé ».</value>
+  </data>
+  <data name="Parties.Mecanisme.SansEffet" xml:space="preserve">
+    <value>Limite de puissance de la carte, lue par son pilote sur tes {0} dernière(s) partie(s) de {1} : bridée {2} % du temps en charge, environ {3} % de fréquence perdue. Sans effet mesurable sur tes images.</value>
+  </data>
+  <data name="Parties.Mecanisme.Coute" xml:space="preserve">
+    <value>Limite de puissance de la carte, lue par son pilote sur tes {0} dernière(s) partie(s) de {1} : bridée {2} % du temps en charge, environ {3} % de fréquence perdue pendant tes parties.</value>
+  </data>
+  <data name="Parties.Mecanisme.Toujours" xml:space="preserve">
+    <value>Limite de puissance de la carte, lue par son pilote sur tes {0} dernière(s) partie(s) de {1} : bridée {2} % du temps en charge, sans moment libre pour comparer ; l'écart ne se lit pas encore.</value>
+  </data>
+  <data name="Garde.PasRepose" xml:space="preserve">
+    <value>« {0} » a été rendu le {1} après un arrêt brutal : Optimiser ne le repose pas avant le {2}, pour voir si l'arrêt revient sans lui.</value>
+  </data>
+  <data name="Garde.RenduAuRedemarrage" xml:space="preserve">
+    <value>Rendu seul : {0}. Un arrêt brutal est survenu le {1}, après que DrDXT l'a posé ; la valeur d'avant reprend au prochain redémarrage. Si l'arrêt revient ensuite sans lui, ce n'était pas lui.</value>
+  </data>
+  <data name="Garde.Rate" xml:space="preserve">
+    <value>« {0} » est à rendre (incident le {1}, après sa pose), mais le rendu a échoué : {2} DrDXT réessaie au prochain affichage ; « Annuler » dans « Ce que DrDXT a posé » le tente tout de suite.</value>
+  </data>
+</root>

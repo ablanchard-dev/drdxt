@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+    <PackageReference Include="FluentAssertions" Version="7.2.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
+    <!-- Ed25519 (T12/T13): tests act as the "release pipeline", signing fixture update
+         manifests with the dev/test private seed against the embedded update public key.
+         Same pinned version as the production layer. -->
+    <PackageReference Include="NSec.Cryptography" Version="24.4.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Infrastructure\DrDxt.Infrastructure.csproj" />
+    <!-- LU : le seul projet ou les deux moities de la mise a jour se rencontrent. Le serveur cible
+         net8.0, ce projet net8.0-windows, donc c'est ICI que le manifeste signe par le serveur peut
+         etre verifie par la clef publique embarquee dans l'application. Reference de TEST : rien
+         dans le produit ne depend du serveur. -->
+    <ProjectReference Include="..\..\server\DrDxt.Server\DrDxt.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TEST-ONLY manifest dev/test PRIVATE seed (never in any shipping binary, C2) — the
+         T12 cross-key test signs a fixture with the MANIFEST seed to prove it does NOT
+         verify against the UPDATE key. -->
+    <Compile Include="..\Shared\ManifestDevTestKeys.cs" Link="Shared\ManifestDevTestKeys.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

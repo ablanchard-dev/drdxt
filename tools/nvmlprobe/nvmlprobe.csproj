@@ -1,0 +1,14 @@
+<!-- La sonde NVML lit-elle REELLEMENT cette carte ? Compiler ne prouve rien. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <RootNamespace>DrDxt.Tools.NvmlProbe</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Detection\DrDxt.Detection.csproj" />
+  </ItemGroup>
+</Project>

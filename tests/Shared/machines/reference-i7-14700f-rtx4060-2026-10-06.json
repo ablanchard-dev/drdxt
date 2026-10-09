@@ -1,0 +1,407 @@
+{
+  "Nom": "reference-i7-14700f-rtx4060-2026-10-06",
+  "Note": "version publique d'un export réel : santé nommée et datée retirée, carte mère et BIOS génériques (PRIV1, 09/10/2026)",
+  "Inventaire": {
+    "Cpu": {
+      "Model": "Intel(R) Core(TM) i7-14700F",
+      "Vendor": "GenuineIntel",
+      "Cores": 20,
+      "Threads": 28,
+      "IsX3D": false,
+      "CcdCount": 0
+    },
+    "Gpus": [
+      {
+        "Model": "NVIDIA GeForce RTX 4060",
+        "Vendor": "NVIDIA",
+        "VramBytes": 8342470656,
+        "DriverVersion": "32.0.15.0000",
+        "ReBar": "On"
+      }
+    ],
+    "Memory": [
+      {
+        "PartNumber": "F4-4000C18-32GTES",
+        "Manufacturer": "G Skill Intl",
+        "ConfiguredMhz": 3800,
+        "RatedMhz": 4000,
+        "SmbiosMemoryType": 26,
+        "Ranks": 2,
+        "ConfiguredVoltageMv": 1350,
+        "DeviceLocator": "Controller0-DIMMA2"
+      },
+      {
+        "PartNumber": "F4-4000C18-32GTES",
+        "Manufacturer": "G Skill Intl",
+        "ConfiguredMhz": 3800,
+        "RatedMhz": 4000,
+        "SmbiosMemoryType": 26,
+        "Ranks": 2,
+        "ConfiguredVoltageMv": 1350,
+        "DeviceLocator": "Controller1-DIMMB2"
+      }
+    ],
+    "Board": {
+      "Manufacturer": "Micro-Star International Co., Ltd.",
+      "Product": "PRO Z790-A WIFI"
+    },
+    "Bios": {
+      "Version": "1.00",
+      "ReleaseDate": "2025-01-01T00:00:00+00:00",
+      "IsUefi": true
+    },
+    "Chassis": "Desktop",
+    "MemorySlots": 4
+  },
+  "Reglages": {
+    "XmpExpo": "On",
+    "ReBar": "On",
+    "PowerPlanGuid": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+    "Hags": "Unknown",
+    "GameMode": "Unknown",
+    "ParkedCoreIndexes": [
+      0,
+      2,
+      4,
+      6,
+      12,
+      14,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27
+    ],
+    "Vrr": "Off",
+    "VrrCapableDisplay": "On",
+    "PagefileConfigured": "On",
+    "NetworkAdapters": [
+      {
+        "Name": "Ethernet",
+        "Description": "Intel(R) Ethernet Controller I226-V",
+        "IsWired": true,
+        "InterruptModeration": "Off",
+        "Rss": "On",
+        "EnergyEfficientEthernet": "Off",
+        "LinkPowerSaving": "Off"
+      }
+    ],
+    "MemoryConfiguredMhz": 3800,
+    "Csm": "Unknown",
+    "Restart": {
+      "Verdict": "Indeterminate",
+      "Reason": "File renames are queued for the next restart. On its own this is a weak signal (ordinary servicing queues them on healthy machines), so it does not establish that a restart is required."
+    },
+    "FrameCap": null,
+    "DisplayRefresh": {
+      "HasHeadroom": "Off",
+      "CurrentHz": 200,
+      "BestHz": 200
+    },
+    "SysMain": "On",
+    "MmcssIntact": "On",
+    "UncleanShutdowns": [
+      "2026-01-01T12:00:00+00:00",
+      "2026-01-02T12:00:00+00:00",
+      "2026-01-03T12:00:00+00:00",
+      "2026-01-04T12:00:00+00:00",
+      "2026-01-05T12:00:00+00:00",
+      "2026-01-06T12:00:00+00:00",
+      "2026-01-07T12:00:00+00:00",
+      "2026-01-08T12:00:00+00:00",
+      "2026-01-09T12:00:00+00:00",
+      "2026-01-10T12:00:00+00:00",
+      "2026-01-11T12:00:00+00:00"
+    ],
+    "MemoryProvenChannels": 0,
+    "AttachedRefreshHz": [
+      200,
+      144
+    ],
+    "NvidiaPreferMaxPerf": "Unknown",
+    "NvidiaPreferMaxPerfOrigin": null,
+    "NvidiaDrsScope": null,
+    "HagsEffective": "On",
+    "GoulotMesure": null,
+    "BiosLu": null
+  },
+  "Sante": [
+    {
+      "Domaine": "POWER",
+      "Nom": "plan d'alimentation actif",
+      "ValeurCourante": "Hautes performances",
+      "ValeurAttendue": "Equilibre",
+      "Statut": "UserChoiceProbable",
+      "Provenance": null,
+      "Explication": "un plan différent du défaut se change à la main : c'est probablement voulu",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "minimum processeur",
+      "ValeurCourante": "100 %",
+      "ValeurAttendue": "100 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "maximum processeur",
+      "ValeurCourante": "100 %",
+      "ValeurAttendue": "100 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "preference energie/perf",
+      "ValeurCourante": "5 (0 = performance, 100 = économie)",
+      "ValeurAttendue": "5 (0 = performance, 100 = économie)",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "mode de boost",
+      "ValeurCourante": "2 (activé, agressif si Windows choisit la fréquence)",
+      "ValeurAttendue": "2 (activé, agressif si Windows choisit la fréquence)",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "parking : coeurs min",
+      "ValeurCourante": "4 %",
+      "ValeurAttendue": "4 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "parking : coeurs max",
+      "ValeurCourante": "100 %",
+      "ValeurAttendue": "100 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "CPU",
+      "Nom": "frequence effective",
+      "ValeurCourante": "3721 MHz (base 2100 MHz x 177 %)",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "aucun cœur n'était chargé : c'est la moyenne de tous les processeurs logiques, et elle ne dit pas ce que la machine rend sous charge. La fréquence que Windows annonce (2100 MHz) est la fréquence de base, pas celle que le processeur tient en réalité.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "CPU",
+      "Nom": "bridage",
+      "ValeurCourante": "aucun indicateur",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "les indicateurs Windows de limite de performance valent 0. Ce compteur ne voit pas les limites de puissance du paquet (RAPL) : sur la machine de test, il valait 0 pendant que la fréquence tombait de 5292 à 3698 MHz sous charge soutenue. Aucun indicateur levé n'est donc pas « rien ne bride ».",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "CPU",
+      "Nom": "microcode du processeur",
+      "ValeurCourante": "0x133",
+      "ValeurAttendue": "0x12F ou plus récent",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "le microcode de ton processeur (0x133) contient le correctif d'Intel contre l'instabilité des Core de 13e et 14e génération (0x12F ou plus récent). Il protège pour la suite, il ne répare pas un processeur déjà abîmé.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "SystemResponsiveness",
+      "ValeurCourante": "20 %",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "20 % des ressources processeur sont réservées aux tâches de faible priorité  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "GPU Priority",
+      "ValeurCourante": "8",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "toute valeur de ce champ est sans effet : « This priority is not yet used. »  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "SFIO Priority",
+      "ValeurCourante": "Normal",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "toute valeur de ce champ est sans effet : « This value is not used. »  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "Clock Rate",
+      "ValeurCourante": "10000",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "toute valeur de ce champ est sans effet : la garantie de granularité existait sous Vista ; « Starting with Windows 7 and Windows Server 2008 R2, this guarantee was removed to reduce system power consumption ». Sur Windows 11, ce champ ne garantit plus rien.  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "Games\\Priority",
+      "ValeurCourante": "2 (de 1 à 8)",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "priorité 2 en catégorie Medium (plage documentée 1 à 8)  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "STABILITE",
+      "Nom": "type de vidage",
+      "ValeurCourante": "3 (petit vidage)",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "capture environ 256 Ko : de quoi nommer le code d'arrêt, pas d'attribuer la cause à un pilote. Aucune comparaison à un défaut : la documentation Microsoft décrit les types de vidage sans publier de valeur par défaut, donc rien ici ne dit que quelqu'un l'a changé.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "STABILITE",
+      "Nom": "arrets brutaux",
+      "ValeurCourante": "11 sur 90 jours",
+      "ValeurAttendue": "aucun",
+      "Statut": "Suspicious",
+      "Provenance": null,
+      "Explication": "11 redémarrages non propres : ce n'est plus un accident isolé. Ce que le journal en dit : 2 écrans bleus (0x000000EF CRITICAL_PROCESS_DIED le 04/09, 0x00000154 UNEXPECTED_STORE_EXCEPTION le 02/09), 1 arrêt sans aucun code (gel, coupure de courant ou alimentation ; le 18/08), 8 avec une mise en veille signalée en cours, sens que Microsoft ne documente pas (du 22/07 au 05/10), 1 appui long sur le bouton, non compté.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "STABILITE",
+      "Nom": "test memoire Windows",
+      "ValeurCourante": "jamais lancé",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "Avec 11 arrêts brutaux en 90 jours, c'est le test qui dit si la mémoire est en cause, et il n'a jamais été lancé sur cette machine (ou son résultat a été effacé). C'est l'outil intégré à Windows (Windows + R, puis mdsched.exe) : il redémarre le PC et le garde pour lui pendant le test, à lancer quand tu n'en as pas besoin. MemTest86 teste plus longuement.",
+      "Action": "Recommandation"
+    },
+    {
+      "Domaine": "STABILITE",
+      "Nom": "erreurs matérielles (WHEA)",
+      "ValeurCourante": "aucune en 90 jours",
+      "ValeurAttendue": "aucune",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "Windows n'a enregistré aucune erreur matérielle (processeur, mémoire, PCIe) en 90 jours (1 enregistrement(s) d'information, qui ne sont pas des erreurs). Après un changement de puissance ou de mémoire au BIOS, c'est ici qu'une instabilité se voit en premier.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "DISPLAY",
+      "Nom": "frequence",
+      "ValeurCourante": "200 Hz",
+      "ValeurAttendue": "200 Hz",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "le panneau tourne à son maximum",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "GPU DRIVER",
+      "Nom": "Valeur de registre NVTweak LowLatencyMode",
+      "ValeurCourante": "absent",
+      "ValeurAttendue": "absent",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "la valeur n'existe pas : c'est l'état par défaut d'une installation propre. Des scripts la posent pour le mode faible latence, mais aucune source ne montre que le pilote la lit ; le réglage du panneau NVIDIA vit dans le profil du pilote, pas ici.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "SECURITE",
+      "Nom": "intégrité de la mémoire (HVCI)",
+      "ValeurCourante": "coupée",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "l'intégrité de la mémoire est coupée : elle ne coûte rien en jeu. La contrepartie, à connaître : Windows ne vérifie plus que le code qui tourne dans le noyau est signé et intact, et certains anti-triches peuvent la demander.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "GPU DRIVER",
+      "Nom": "enregistrement continu NVIDIA",
+      "ValeurCourante": "Instant Replay allumé",
+      "ValeurAttendue": "éteint si tu ne t'en sers pas",
+      "Statut": "UserChoiceProbable",
+      "Provenance": null,
+      "Explication": "l'Instant Replay de NVIDIA enregistre en continu les dernières minutes de jeu pour pouvoir les sauvegarder après coup. Coût publié : environ 5 % d'images selon NVIDIA, 1 à 5 % dans les tests publiés, surtout quand la carte graphique limite. Si tu ne t'en sers pas : Alt+Z dans un jeu, puis Instant Replay, puis Désactiver. Pour savoir ce que ça change chez toi, relève tes parties avant et après : DrDXT les compare.",
+      "Action": "Recommandation"
+    },
+    {
+      "Domaine": "PAGEFILE",
+      "Nom": "gestion",
+      "ValeurCourante": "automatique (Windows)",
+      "ValeurAttendue": "automatique (Windows)",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "Windows dimensionne lui-même : rien à réparer",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "PAGEFILE",
+      "Nom": "taille / pic",
+      "ValeurCourante": "4096 Mo alloués, pic 128 Mo",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "le pic d'utilisation dit si la taille est réellement sollicitée",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "THERMIQUE",
+      "Nom": "temperature du GPU",
+      "ValeurCourante": "58 °C",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "lue par NVML, publiée par la carte elle-même ; elle consommait 55,7 W au moment de la lecture.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "GPU",
+      "Nom": "lien PCIe de NVIDIA GeForce RTX 4060",
+      "ValeurCourante": "x8, PCIe 4.0",
+      "ValeurAttendue": "x8",
+      "Statut": "ExpectedDefault",
+      "Explication": "la carte tourne à la largeur qu'elle sait faire. La génération PCIe peut baisser au repos pour économiser.",
+      "Action": "Aucune",
+      "Provenance": null
+    }
+  ]
+}

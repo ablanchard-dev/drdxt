@@ -1,0 +1,142 @@
+Sortie COMPLETE, non filtree, de :
+
+    dotnet list DrDXT.sln package --vulnerable --include-transitive
+
+Lancee le 06/09/2026. Conservee telle quelle : un extrait choisi se relit comme un tri deja fait,
+et c'est precisement le tri qui doit etre ecrit ailleurs (docs/SECURITE.md) et discutable.
+
+Un avis peut apparaitre ou disparaitre sans qu'une seule ligne du depot change : la base d'avis
+bouge, pas le code. Ce fichier est donc DATE, jamais mis a jour en place.
+
+--------------------------------------------------------------------------------------------
+
+  Identification des projets à restaurer...
+  Tous les projets sont à jour pour la restauration.
+
+Les sources suivantes ont été utilisées :
+   https://api.nuget.org/v3/index.json
+
+Le projet spécifié 'DrDxt.Core' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Infrastructure' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Detection' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Measurement' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Application' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Bios' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Reconciler' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Profiles' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Licensing' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.ElevatedHelper' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.App' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet 'DrDxt.Core.Tests' comporte les packages vulnérables suivants
+   [net8.0]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.Profiles.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.Bios.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.Infrastructure.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > SQLitePCLRaw.lib.e_sqlite3          2.1.10   High      https://github.com/advisories/GHSA-2m69-gcr7-jv3q
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.Detection.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.Measurement.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.Application.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.Reconciler.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.Licensing.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.ElevatedHelper.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.App.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.Integration.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet spécifié 'DrDxt.Reconciler.Adapters' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet 'DrDxt.Reconciler.Adapters.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet spécifié 'DrDxt.ReconcilerHost' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet 'DrDxt.ReconcilerHost.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet spécifié 'DrDxt.GpuNative' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet 'DrDxt.GpuNative.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet 'DrDxt.Server' comporte les packages vulnérables suivants
+   [net8.0]: 
+   Package transitif                 Résolu   Gravité   URL d'avertissement                              
+   > SQLitePCLRaw.lib.e_sqlite3      2.1.10   High      https://github.com/advisories/GHSA-2m69-gcr7-jv3q
+
+Le projet 'DrDxt.Server.Tests' comporte les packages vulnérables suivants
+   [net8.0]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > SQLitePCLRaw.lib.e_sqlite3          2.1.10   High      https://github.com/advisories/GHSA-2m69-gcr7-jv3q
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+
+Le projet spécifié 'DrDxt.AmdHarness' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet 'DrDxt.AmdHarness.Tests' comporte les packages vulnérables suivants
+   [net8.0-windows]: 
+   Package transitif                     Résolu   Gravité   URL d'avertissement                              
+   > System.Net.Http                     4.3.0    High      https://github.com/advisories/GHSA-7jgj-8wvc-jh57
+   > System.Text.RegularExpressions      4.3.0    High      https://github.com/advisories/GHSA-cmhx-cq75-c4mj
+

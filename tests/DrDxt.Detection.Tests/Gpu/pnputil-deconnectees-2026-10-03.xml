@@ -1,0 +1,4 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<PnpUtil Version="10.0.26200" Command="/enum-devices /class Display /disconnected /format xml">
+Aucun appareil n'a �t� trouv� sur le syst�me.
+</PnpUtil>

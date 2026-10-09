@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- TreatWarningsAsErrors inherited from Directory.Build.props -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="FluentAssertions" Version="7.2.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Runner + contracts -->
+    <ProjectReference Include="..\DrDxt.AmdHarness\DrDxt.AmdHarness.csproj" />
+    <!-- Explicit refs so fakes can implement DrDxt.Core + Application interfaces directly -->
+    <ProjectReference Include="..\..\..\src\DrDxt.Core\DrDxt.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\DrDxt.Application\DrDxt.Application.csproj" />
+    <!-- Task 4: fakes implement IAdlxGpuTuningWriter from Detection -->
+    <ProjectReference Include="..\..\..\src\DrDxt.Detection\DrDxt.Detection.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,23 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- La SEULE source de version (revue du 12/09, C4) : l'App, le helper et l'installeur la lisent ici. -->
+    <Version>0.9.0</Version>
+  </PropertyGroup>
+  <!-- 23/09/2026 (D-SEC-3) : le build livré portait C:\Users\<développeur> dans la DLL et dans chaque
+       pile de plantage (PDB livrés). Déterministe en Release : la racine locale devient « /_/ ». -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+  <!-- 06/10/2026 (plan 4.6) : le runtime .NET EMBARQUÉ dans l'installeur (publication self-contained). Une appli
+       self-contained ne suit pas les correctifs de sécurité installés sur la machine (Microsoft Learn, « .NET
+       application publishing ») : sans épingle, le runtime livré était celui du SDK de la machine de build (10.0.9,
+       trois correctifs de retard). À monter à chaque correctif mensuel de .NET 10, puis reconstruire et livrer.
+       Seulement en self-contained : les tests tournent sur le runtime installé. -->
+  <PropertyGroup Condition="'$(SelfContained)' == 'true'">
+    <RuntimeFrameworkVersion>10.0.12</RuntimeFrameworkVersion>
+  </PropertyGroup>
+</Project>

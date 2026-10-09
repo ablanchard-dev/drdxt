@@ -1,0 +1,9 @@
+Preuves sur vraies machines (T4, 08/10/2026).
+
+Un fichier par preuve : le rapport « Vérifier DrDXT sur mon PC » (verification-drdxt-*.txt, dans Documents)
+d'une vraie machine, renommé <architecture>-<carte>-<date>.txt, par exemple AdaOrOlder-rtx4060-2026-10-08.txt.
+L'architecture est celle de GpuArchitecture (AdaOrOlder, Rdna3, Rdna4, Blackwell).
+
+Une architecture n'est « validée en vie » dans GpuTuningCoverage.ValideesEnVie, et un profil n'est Tested, que si
+un rapport d'ici le prouve, avec une écriture rendue (« rendu : oui ») sans « PAS REMIS D'ORIGINE ».
+UnePreuveDebloqueSonMaterielTests le vérifie.

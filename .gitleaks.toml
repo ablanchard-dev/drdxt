@@ -1,0 +1,11 @@
+# Balayage des secrets (gitleaks), relancé à chaque copie publique et dans la CI du dépôt public.
+# Une seule exception : les clés de ressources WPF (x:Key="…") ne sont pas des clés d'API.
+title = "DrDXT"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Clés de ressources XAML"
+regexes = ['''x:Key="[A-Za-z0-9_.]+"''']
+paths = ['''\.xaml$''']

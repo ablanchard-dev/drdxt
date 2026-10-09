@@ -1,0 +1,17 @@
+<!-- SPIKE : une paire CLIENT + SERVICE PresentMon ASSORTIE cohabite-t-elle avec Intel ? -->
+<!-- NE FAIT PAS partie de DrDXT.sln. Charge une PresentMonAPI2.dll ARBITRAIRE, designee par -->
+<!-- argument, pour comparer plusieurs versions dans la meme execution. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>DrDxt.Tools.PmonPair</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
+  </ItemGroup>
+</Project>

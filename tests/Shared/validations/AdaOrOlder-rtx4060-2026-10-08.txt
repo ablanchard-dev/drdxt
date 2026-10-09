@@ -1,0 +1,34 @@
+BILAN : tout est remis d'origine.
+
+DrDXT 0.9.0, vérification du 08/10/2026 19:29
+
+=== latency.gameModeOn
+pas touché : son état n'a pas pu être lu.
+
+=== latency.gameDvrBackgroundOff
+pas touché : déjà réglé, ou ne concerne pas ce PC.
+
+=== latency.vrrFlipModelOn
+pas touché : déjà réglé, ou ne concerne pas ce PC.
+
+=== latency.hagsOn
+pas touché : déjà réglé, ou ne concerne pas ce PC.
+
+=== fixit.power_plan
+pas touché : déjà réglé, ou ne concerne pas ce PC.
+
+=== fixit.mode_boost
+pas touché : déjà réglé, ou ne concerne pas ce PC.
+
+=== gpu.power_limit
+posé, relu   : en place (limite de puissance (%) : origine 100, lu 90)
+rendu        : oui
+rendu, relu  : origine en place (limite de puissance (%) : origine 100, lu 100)
+verdict      : validé (écrit, relu, rendu, relu)
+
+=== latency.render_queue_cap
+pas touché : son état n'a pas pu être lu.
+
+=== latency.vrr_vsync_cap
+pas touché : déjà réglé, ou ne concerne pas ce PC.
+

@@ -1,0 +1,9 @@
+# Build output and distribution artifacts — never commit these.
+# Note: bin/, obj/, publish/ are already covered by the root .gitignore;
+# they are not repeated here.
+
+# Package output produced by package.ps1
+dist/
+
+# Log files produced by run.ps1 on the test machine
+harness-run-*.txt

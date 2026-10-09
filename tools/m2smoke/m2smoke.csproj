@@ -1,0 +1,20 @@
+<!-- Manual LIVE smoke harness for the M2 SAFE apply->revert pipeline. NOT part of DrDXT.sln. -->
+<!-- Talks to the RUNNING elevated helper over the signed, allowlisted typed IPC and -->
+<!-- performs a real power-plan switch + revert (the boundary unit tests can't cover). -->
+<!-- See README.md in this folder for the exact launch + run commands. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AssemblyName>m2smoke</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Core\DrDxt.Core.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.App\DrDxt.App.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.GpuNative\DrDxt.GpuNative.csproj" />
+  </ItemGroup>
+</Project>

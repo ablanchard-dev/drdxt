@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Leaf project: the SINGLE verified GPU native boundaries —
+         • AMD: AdlxNative + AdlxVtableSlots + IAdlxNative (DrDxt.Detection.Gpu.Adlx
+           namespace; ADLX-SLOTS.md carries the per-slot citation), and
+         • NVIDIA: NvApiNative + INvApiNative (+ NvApiEntry / structs / status /
+           NvApiConvert) in the DrDxt.GpuNative.NvApi namespace.
+       Both boundaries carry BOTH the reads (non-elevated) AND the writes, so the
+       verified vtable slots / reverse-engineered function IDs + write recipe have ONE
+       copy, never a divergent duplicate. Zero project references, zero NuGet — only
+       System.Runtime.InteropServices / System.Runtime.Versioning from the framework.
+       Referenced by DrDxt.Detection (the non-elevated readers) and DrDxt.ElevatedHelper
+       (the write orchestrators). The leaf must NEVER reference the helper. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The interop structs / entry / status / conversions are INTERNAL to the leaf;
+         the struct-size, finder, entry and conversion freeze-tests live in
+         DrDxt.GpuNative.Tests (the only consumer that needs the internals). -->
+    <InternalsVisibleTo Include="DrDxt.GpuNative.Tests" />
+  </ItemGroup>
+
+</Project>

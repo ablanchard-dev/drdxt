@@ -1,0 +1,36 @@
+DrDXT est distribué sous la GNU General Public License v3 (fichier LICENSE).
+Il contient ou utilise les composants suivants, chacun sous sa propre licence, compatible avec la GPL v3.
+
+Bibliothèques livrées avec l'application
+- .NET runtime, WPF, Microsoft.Extensions.DependencyInjection, Microsoft.Extensions.DependencyInjection.Abstractions,
+  Microsoft.Extensions.Hosting, Microsoft.Extensions.Hosting.WindowsServices, System.Diagnostics.EventLog,
+  System.Diagnostics.PerformanceCounter, System.Management, System.Security.Cryptography.ProtectedData,
+  System.ServiceProcess.ServiceController : MIT, © .NET Foundation and Contributors. https://github.com/dotnet/runtime
+- CommunityToolkit.Mvvm : MIT, © .NET Foundation and Contributors. https://github.com/CommunityToolkit/dotnet
+- NSec.Cryptography : MIT, © Klaus Hartke. https://github.com/ektrah/nsec
+- libsodium (livré avec NSec) : ISC, © Frank Denis. https://github.com/jedisct1/libsodium
+- QRCoder : MIT, © Raffael Herrmann et contributeurs (texte complet : QRCoder-LICENSE-MIT.txt). https://github.com/codebude/QRCoder
+- Serilog, Serilog.Sinks.File : Apache License 2.0, © Serilog Contributors. https://github.com/serilog/serilog
+- Vortice.DXGI, Vortice.Direct3D11 (et Vortice.DirectX, Vortice.Mathematics) : MIT, © Amer Koleci et contributeurs.
+  https://github.com/amerkoleci/Vortice.Windows
+- SharpGen.Runtime (livré avec Vortice) : MIT, © SharpGenTools contributors. https://github.com/SharpGenTools/SharpGenTools
+- PresentMon (PresentMonService.exe, PresentMonAPI2) : MIT, © Intel Corporation, avec les avis de ses propres
+  composants (texte complet : PresentMon-NOTICE-MIT.txt). https://github.com/GameTechDev/PresentMon
+
+Module embarqué pour PawnIO (rien n'installe PawnIO : DrDXT s'en sert seulement s'il est déjà là)
+- IntelMSR.bin (namazso/PawnIO.Modules) : LGPL-2.1 ou ultérieure, © namazso (texte complet : third_party/pawnio-modules/COPYING).
+  Lecture seule des registres de température du processeur Intel. https://github.com/namazso/PawnIO.Modules
+- PawnIO (pilote et PawnIOLib.dll) : non livré ; appelé s'il est installé par le joueur. https://pawnio.eu
+
+Police
+- Unbounded : SIL Open Font License 1.1 (texte complet : Assets/Fonts/OFL-Unbounded.txt). https://github.com/NDISCOVER/Unbounded
+
+Images
+- Assets/docteur-portrait.png (le médaillon du docteur) et les icônes de l'application : créées pour DrDXT (dessin du
+  28/09/2026, recoloré le 29/09/2026) ; aucune œuvre tierce connue n'y est reprise. GPL v3 comme le reste du dépôt.
+
+Interfaces des pilotes graphiques (rien n'est livré : DrDXT appelle les bibliothèques installées avec le pilote)
+- NVAPI (nvapi64.dll) : identifiants de fonctions et de réglages relevés dans les en-têtes publiés par NVIDIA sous MIT.
+  https://github.com/NVIDIA/nvapi
+- ADLX (amdadlx64.dll) : numéros d'entrées des interfaces relevés dans les en-têtes du SDK publiés par AMD sous MIT.
+  https://github.com/GPUOpen-LibrariesAndSDKs/ADLX

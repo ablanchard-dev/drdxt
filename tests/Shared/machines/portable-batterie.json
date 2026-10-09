@@ -1,0 +1,374 @@
+{
+  "Nom": "portable-batterie",
+  "Note": "machine synthétique : la machine de référence en portable à batterie, deux cartes (Intel intégrée, NVIDIA) ; santé générique depuis le 09/10/2026 (plus rien de la machine de référence)",
+  "Inventaire": {
+    "Cpu": {
+      "Model": "13th Gen Intel(R) Core(TM) i7-13700H",
+      "Vendor": "GenuineIntel",
+      "Cores": 14,
+      "Threads": 20,
+      "IsX3D": false,
+      "CcdCount": 0
+    },
+    "Gpus": [
+      {
+        "Model": "Intel(R) Iris(R) Xe Graphics",
+        "Vendor": "Intel",
+        "VramBytes": 134217728,
+        "DriverVersion": "31.0.101.5592",
+        "ReBar": "Unknown"
+      },
+      {
+        "Model": "NVIDIA GeForce RTX 4060 Laptop GPU",
+        "Vendor": "NVIDIA",
+        "VramBytes": 8585740288,
+        "DriverVersion": "617.14",
+        "ReBar": "On"
+      }
+    ],
+    "Memory": [
+      {
+        "PartNumber": "F4-4000C18-32GTES",
+        "Manufacturer": "G Skill Intl",
+        "ConfiguredMhz": 3800,
+        "RatedMhz": 4000,
+        "SmbiosMemoryType": 26,
+        "Ranks": 2,
+        "ConfiguredVoltageMv": 1350,
+        "DeviceLocator": "Controller0-DIMMA2"
+      },
+      {
+        "PartNumber": "F4-4000C18-32GTES",
+        "Manufacturer": "G Skill Intl",
+        "ConfiguredMhz": 3800,
+        "RatedMhz": 4000,
+        "SmbiosMemoryType": 26,
+        "Ranks": 2,
+        "ConfiguredVoltageMv": 1350,
+        "DeviceLocator": "Controller1-DIMMB2"
+      }
+    ],
+    "Board": {
+      "Manufacturer": "ASUSTeK COMPUTER INC.",
+      "Product": "G614JV"
+    },
+    "Bios": {
+      "Version": "1.H0",
+      "ReleaseDate": "2026-05-09T00:00:00+00:00",
+      "IsUefi": true
+    },
+    "Chassis": "Laptop",
+    "MemorySlots": 2
+  },
+  "Reglages": {
+    "XmpExpo": "On",
+    "ReBar": "On",
+    "PowerPlanGuid": "381b4222-f694-41f0-9685-ff5bb260df2e",
+    "Hags": "Unknown",
+    "GameMode": "Unknown",
+    "ParkedCoreIndexes": [
+      0,
+      2,
+      4,
+      6,
+      12,
+      14,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27
+    ],
+    "Vrr": "Off",
+    "VrrCapableDisplay": "On",
+    "PagefileConfigured": "On",
+    "NetworkAdapters": [
+      {
+        "Name": "Ethernet",
+        "Description": "Realtek Gaming 2.5GbE Family Controller",
+        "IsWired": true,
+        "InterruptModeration": "Off",
+        "Rss": "On",
+        "EnergyEfficientEthernet": "Off",
+        "LinkPowerSaving": "Off"
+      }
+    ],
+    "MemoryConfiguredMhz": 3800,
+    "Csm": "Unknown",
+    "Restart": {
+      "Verdict": "Indeterminate",
+      "Reason": "File renames are queued for the next restart. On its own this is a weak signal (ordinary servicing queues them on healthy machines), so it does not establish that a restart is required."
+    },
+    "FrameCap": null,
+    "DisplayRefresh": {
+      "HasHeadroom": "Off",
+      "CurrentHz": 200,
+      "BestHz": 200
+    },
+    "SysMain": "On",
+    "MmcssIntact": "On",
+    "UncleanShutdowns": [],
+    "MemoryProvenChannels": 0,
+    "AttachedRefreshHz": [
+      200,
+      144
+    ],
+    "NvidiaPreferMaxPerf": "Unknown",
+    "NvidiaPreferMaxPerfOrigin": null,
+    "NvidiaDrsScope": null,
+    "HagsEffective": "On",
+    "GoulotMesure": null,
+    "BiosLu": null
+  },
+  "Sante": [
+    {
+      "Domaine": "POWER",
+      "Nom": "plan d'alimentation actif",
+      "ValeurCourante": "Equilibre",
+      "ValeurAttendue": "Equilibre",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "NecessiteUneDecisionHumaine": false,
+      "Explication": "c'est le plan que Windows installe par défaut : rien à réparer ici",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "mode d'alimentation (secteur)",
+      "ValeurCourante": "Meilleure autonomie",
+      "ValeurAttendue": "Performances équilibrées",
+      "Statut": "NonDefault",
+      "Provenance": null,
+      "NecessiteUneDecisionHumaine": true,
+      "Explication": "branché sur secteur, Windows reste réglé pour économiser la batterie : il fait pencher le processeur vers l'économie. Pour jouer branché, choisis « Performances équilibrées » ou « Meilleures performances » dans Paramètres > Système > Alimentation et batterie. Le gain en images n'est pas mesuré.",
+      "Action": "Recommandation"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "minimum processeur",
+      "ValeurCourante": "100 %",
+      "ValeurAttendue": "100 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "maximum processeur",
+      "ValeurCourante": "100 %",
+      "ValeurAttendue": "100 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "preference energie/perf",
+      "ValeurCourante": "5 (0 = performance, 100 = économie)",
+      "ValeurAttendue": "5 (0 = performance, 100 = économie)",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "mode de boost",
+      "ValeurCourante": "2 (activé, agressif si Windows choisit la fréquence)",
+      "ValeurAttendue": "2 (activé, agressif si Windows choisit la fréquence)",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "parking : coeurs min",
+      "ValeurCourante": "4 %",
+      "ValeurAttendue": "4 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "parking : coeurs max",
+      "ValeurCourante": "100 %",
+      "ValeurAttendue": "100 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "CPU",
+      "Nom": "frequence effective",
+      "ValeurCourante": "3721 MHz (base 2100 MHz x 177 %)",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "aucun cœur n'était chargé : c'est la moyenne de tous les processeurs logiques, et elle ne dit pas ce que la machine rend sous charge. La fréquence que Windows annonce (2100 MHz) est la fréquence de base, pas celle que le processeur tient en réalité.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "CPU",
+      "Nom": "bridage",
+      "ValeurCourante": "aucun indicateur",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "les indicateurs Windows de limite de performance valent 0. Ce compteur ne voit pas les limites de puissance du paquet (RAPL) : sur la machine de test, il valait 0 pendant que la fréquence tombait de 5292 à 3698 MHz sous charge soutenue. Aucun indicateur levé n'est donc pas « rien ne bride ».",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "SystemResponsiveness",
+      "ValeurCourante": "20 %",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "20 % des ressources processeur sont réservées aux tâches de faible priorité  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "GPU Priority",
+      "ValeurCourante": "8",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "toute valeur de ce champ est sans effet : « This priority is not yet used. »  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "SFIO Priority",
+      "ValeurCourante": "Normal",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "toute valeur de ce champ est sans effet : « This value is not used. »  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "Clock Rate",
+      "ValeurCourante": "10000",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "toute valeur de ce champ est sans effet : la garantie de granularité existait sous Vista ; « Starting with Windows 7 and Windows Server 2008 R2, this guarantee was removed to reduce system power consumption ». Sur Windows 11, ce champ ne garantit plus rien.  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "Games\\Priority",
+      "ValeurCourante": "2 (de 1 à 8)",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "priorité 2 en catégorie Medium (plage documentée 1 à 8)  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "STABILITE",
+      "Nom": "erreurs matérielles (WHEA)",
+      "ValeurCourante": "aucune en 90 jours",
+      "ValeurAttendue": "aucune",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "Windows n'a enregistré aucune erreur matérielle (processeur, mémoire, PCIe) en 90 jours (1 enregistrement(s) d'information, qui ne sont pas des erreurs). Après un changement de puissance ou de mémoire au BIOS, c'est ici qu'une instabilité se voit en premier.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "DISPLAY",
+      "Nom": "frequence",
+      "ValeurCourante": "200 Hz",
+      "ValeurAttendue": "200 Hz",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "le panneau tourne à son maximum",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "SECURITE",
+      "Nom": "intégrité de la mémoire (HVCI)",
+      "ValeurCourante": "coupée",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "l'intégrité de la mémoire est coupée : elle ne coûte rien en jeu. La contrepartie, à connaître : Windows ne vérifie plus que le code qui tourne dans le noyau est signé et intact, et certains anti-triches peuvent la demander.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "PAGEFILE",
+      "Nom": "gestion",
+      "ValeurCourante": "automatique (Windows)",
+      "ValeurAttendue": "automatique (Windows)",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "Windows dimensionne lui-même : rien à réparer",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "PAGEFILE",
+      "Nom": "taille / pic",
+      "ValeurCourante": "4096 Mo alloués, pic 128 Mo",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "le pic d'utilisation dit si la taille est réellement sollicitée",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "THERMIQUE",
+      "Nom": "temperature du processeur",
+      "ValeurCourante": "56 °C",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "lue dans HWiNFO (capteur « CPU Package »), au moment du scan : 56 °C. Pour la juger, regarde-la pendant une partie : c'est là qu'elle monte.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "THERMIQUE",
+      "Nom": "temperature du GPU",
+      "ValeurCourante": "58 °C",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "lue par NVML, publiée par la carte elle-même ; elle consommait 55,7 W au moment de la lecture.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "BIOS",
+      "Nom": "temps du BIOS",
+      "ValeurCourante": "12,0 s",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "mesuré par le BIOS lui-même à l'allumage du 05/10/2026 (11,2 à 12,3 s sur les 10 derniers), avant que Windows ne démarre ; le chargeur de Windows a pris ensuite 1,8 s. C'est le « Dernier temps BIOS » du Gestionnaire des tâches. Aucun réglage de Windows ne le change.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "STABILITE",
+      "Nom": "arrets brutaux",
+      "ValeurCourante": "aucun sur 90 jours",
+      "ValeurAttendue": null,
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "aucun arrêt brutal relevé",
+      "Action": "Aucune"
+    }
+  ]
+}

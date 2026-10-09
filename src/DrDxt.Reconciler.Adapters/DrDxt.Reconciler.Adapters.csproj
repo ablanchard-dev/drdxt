@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- OS-coupled probe boundaries (confined to this project; the pure Reconciler
+         never references these). Registry reads via Microsoft.Win32.Registry; service
+         start/state via System.ServiceProcess.ServiceController; the active power plan
+         via a powrprof.dll P/Invoke. WMI is reused from DrDxt.Detection's IWmiQuery. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
+    <ProjectReference Include="..\DrDxt.Reconciler\DrDxt.Reconciler.csproj" />
+    <!-- Reuse the existing WMI read seam (IWmiQuery / ManagementWmiQuery). -->
+    <ProjectReference Include="..\DrDxt.Detection\DrDxt.Detection.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Test-only access to the internal raw-read seams (TDD: dispatch + serialization
+         are fully unit-tested with fakes; only the thin real readers are untested edges). -->
+    <InternalsVisibleTo Include="DrDxt.Reconciler.Adapters.Tests" />
+  </ItemGroup>
+
+</Project>

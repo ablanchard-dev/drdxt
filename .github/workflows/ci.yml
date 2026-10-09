@@ -1,0 +1,202 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, "feat/**" ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    # Windows required: the solution targets net10.0-windows and uses WPF.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        # 06/10/2026 : l'historique entier. Le test d'hygiene relit tous les messages de commit ; un clone a 1 commit
+        # lui en donnait 6 et il echouait (« plus de mille commits attendus »).
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore DrDXT.sln
+
+      # Warnings are treated as errors via Directory.Build.props, so a warning fails CI.
+      - name: Build (Release)
+        run: dotnet build DrDXT.sln --configuration Release --no-restore
+
+      # Les outils de tools/ restent hors solution (smokes lancés à la main), donc aucune étape ne les
+      # compilait : ils pouvaient casser sans bruit. Le 27/09/2026, compilés à la main, ils ont rendu
+      # 3 avertissements, dont une constante morte. Le dépôt en suit 33 : r2apply reste local, ignoré exprès. Compilés ici sans être lancés, avertissements en
+      # erreurs ; un outil ajouté demain est pris sans modifier ce fichier.
+      - name: Build tools hors solution
+        shell: pwsh
+        run: |
+          $dans = dotnet sln DrDXT.sln list | Where-Object { $_ -like '*.csproj' } | ForEach-Object { (Resolve-Path $_).Path }
+          $hors = @(Get-ChildItem tools -Recurse -Filter *.csproj | Where-Object { $_.FullName -notin $dans -and $_.FullName -notmatch '\\(bin|obj)\\' })
+          if ($hors.Count -eq 0) { throw 'temoin : aucun outil hors solution trouve' }
+          foreach ($c in $hors) {
+            dotnet build $c.FullName -c Release -v q --nologo -warnaserror
+            if ($LASTEXITCODE -ne 0) { throw "outil casse : $($c.Name)" }
+          }
+          "$($hors.Count) outils compiles"
+
+      # Category=Machine = tests qui lisent la VRAIE machine (journal Systeme, WMI du BIOS, table
+      # Perflib localisee) : un runner vierge ne peut pas les passer. Ils tournent sur le poste de dev ;
+      # les portes ci-dessous gardent leurs propres filtres et restent obligatoires.
+      - name: Test (Release)
+        run: dotnet test DrDXT.sln --configuration Release --no-build --verbosity normal --filter "Category!=Machine" --logger "trx" --results-directory TestResults
+
+      # HARD GATE (M2 §4/§18/§20): "the revert restores the state". The whole
+      # money-back guarantee rests on this — fail the build if a revert does not
+      # return the system byte-identical to baseline (incl. on a mid-batch failure).
+      - name: Gate — revert restores state
+        run: >-
+          dotnet test tests/DrDxt.Integration.Tests/DrDxt.Integration.Tests.csproj
+          --logger "trx;LogFileName=gate-revert.trx"
+          --configuration Release --no-build --verbosity normal
+          --filter "FullyQualifiedName~RevertRestoresStateTests" -- RunConfiguration.TreatNoTestsAsError=true
+
+      # HARD GATE (M4 §5/§9 — T36): the reconciler's IDEMPOTENCE (T13 all-in-desired
+      # no-op + run-twice second-pass no-op, host single-flight T29), manifest TAMPER
+      # (T3 tampered-load-fails + T20 fail-closed end-to-end), and PROTECTED-SURFACE
+      # refusal (T22: Defender/Update/BITS are never touched) tests MUST pass to merge —
+      # these are the "do no harm" invariants of the always-on reconcile loop.
+      # The trait selects them precisely (each gated method carries
+      # [Trait("Category","ReconcileGate")]); a 0-match filter would be a silent gate.
+      # ENFORCED, not assumed: every filtered step passes
+      # `-- RunConfiguration.TreatNoTestsAsError=true`. Measured 15/08/2026: without it a
+      # filter matching nothing exits 0 and the step goes green on an EMPTY guarantee;
+      # with it the same filter exits 1. The host gate matches a single test today, so
+      # one deleted [Trait] was all it took. Match counts: revert 5, reconciler 5,
+      # host 1, security 11.
+      - name: Gate — reconciler idempotence + tamper (Reconciler)
+        run: >-
+          dotnet test tests/DrDxt.Reconciler.Tests/DrDxt.Reconciler.Tests.csproj
+          --logger "trx;LogFileName=gate-reconciler.trx"
+          --configuration Release --no-build --verbosity normal
+          --filter "Category=ReconcileGate" -- RunConfiguration.TreatNoTestsAsError=true
+
+      - name: Gate — reconciler idempotence + tamper (Host)
+        run: >-
+          dotnet test tests/DrDxt.ReconcilerHost.Tests/DrDxt.ReconcilerHost.Tests.csproj
+          --logger "trx;LogFileName=gate-reconciler-host.trx"
+          --configuration Release --no-build --verbosity normal
+          --filter "Category=ReconcileGate" -- RunConfiguration.TreatNoTestsAsError=true
+
+      # HARD GATE (M5 §7/§9 — T21): the STATIC security net over everything M5 built
+      # (update T12-T13). These tests scan the source TREE and fail
+      # the build on a security regression: (1) ANTI-SECRET — no admin token /
+      # webhook HMAC secret / bearer token / secret-named blob may live in src/DrDxt.*
+      # (the server secret lives ONLY in server/ via env); (2) ANTI-FAIL-OPEN — no catch
+      # in the update trust layer may return success (a broken signature must
+      # NEVER become a pass); (3) PUBLIC-ONLY KEYS — EmbeddedKeys/UpdateDevKeys expose
+      # only public material, the dev/test seed stays banner-fenced and unused by prod.
+      # The trait selects them precisely (each carries [Trait("Category","SecurityGate")]);
+      # a 0-match filter can't silently pass: the step carries
+      # `-- RunConfiguration.TreatNoTestsAsError=true`. Mirrors the M4 ReconcileGate pattern.
+      - name: Gate — security (anti-secret / anti-fail-open / public-only keys)
+        run: >-
+          dotnet test tests/DrDxt.Integration.Tests/DrDxt.Integration.Tests.csproj
+          --logger "trx;LogFileName=gate-securite.trx"
+          --configuration Release --no-build --verbosity normal
+          --filter "Category=SecurityGate" -- RunConfiguration.TreatNoTestsAsError=true
+
+      # 06/10/2026 (chantier B8b, S6) : les 5 machines de tests/Shared/machines (référence, sans droits
+      # administrateur, AMD, Intel Arc, portable) rejouées par le scan et l'écran, sans matériel. Un seul PC réel existe :
+      # c'est la seule preuve qu'une autre machine n'obtient pas de phrase fausse. Un filtre vide rougit.
+      - name: Gate — machines-fixtures (5 machines rejouées sans matériel)
+        run: >-
+          dotnet test tests/DrDxt.App.Tests/DrDxt.App.Tests.csproj
+          --logger "trx;LogFileName=gate-machines.trx"
+          --configuration Release --no-build --verbosity normal
+          --filter "FullyQualifiedName~MachinesEnregistreesTests" -- RunConfiguration.TreatNoTestsAsError=true
+
+      # 18/09/2026 — un rouge doit rester NOMMABLE.
+      #
+      # `dotnet test DrDXT.sln` a rendu ce jour-la 1 rouge sur 4 366, dans
+      # DrDxt.Integration.Tests ; le meme projet lance seul repassait vert, et huit
+      # relances de la solution entiere n'ont pas su le reproduire. Impossible de
+      # dire QUEL test, parce que rien ne gardait la trace : la seule etait la sortie
+      # console du job, qui part avec le log.
+      #
+      # Un flake qui ne laisse rien derriere lui est un flake qu'on relance sans lire,
+      # puis une CI rouge qu'on ignore. Les rapports partent donc du runner meme --
+      # surtout -- quand le job est rouge.
+      - name: Rapports de tests (pour qu'un rouge reste nommable)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultats-tests
+          path: '**/TestResults/*.trx'
+          retention-days: 30
+          if-no-files-found: warn
+
+      # Reste ADVISORY, volontairement : au 06/09/2026 l'un des trois avis
+      # (GHSA-2m69-gcr7-jv3q, SQLite embarque) n'a AUCUNE version corrigee publiee. Un gate dur ici
+      # serait un gate qu'on ne peut pas passer, donc un gate qu'on desactive — et un gate desactive
+      # ment mieux qu'un gate absent. Ce qui est DUR, c'est le tri : voir l'etape suivante.
+      - name: Dependency vulnerability audit
+        run: dotnet list DrDXT.sln package --vulnerable --include-transitive
+        continue-on-error: true
+
+      # Gate DUR (LS) : un avis MESURE ICI, MAINTENANT, doit etre trie dans docs/SECURITE.md.
+      # C'est la seule etape ou une mesure fraiche rencontre le document — le test
+      # TheVulnerabilityTriageIsCompleteGateTests, lui, compare deux fichiers COMMITES et ne peut
+      # donc pas voir un avis apparu depuis. La base d'avis bouge sans qu'une ligne du depot change.
+      - name: Gate — every advisory measured NOW is triaged
+        shell: pwsh
+        run: |
+          $out = dotnet list DrDXT.sln package --vulnerable --include-transitive | Out-String
+          if ([string]::IsNullOrWhiteSpace($out)) { Write-Error "l'audit n'a rien produit : c'est l'outil, pas le depot"; exit 1 }
+          $rx = 'GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}'
+          $found = [regex]::Matches($out, $rx) | ForEach-Object { $_.Value } | Sort-Object -Unique
+          $triaged = [regex]::Matches((Get-Content docs/SECURITE.md -Raw), $rx) | ForEach-Object { $_.Value } | Sort-Object -Unique
+          $new = @($found | Where-Object { $triaged -notcontains $_ })
+          if ($new.Count -gt 0) { Write-Error ("Avis non tries dans docs/SECURITE.md : " + ($new -join ', ')); exit 1 }
+          Write-Host ("avis mesures : " + @($found).Count + ", tous tries")
+
+      # Gate DUR, pas advisory : docs/NON-NUISANCE.md dit ou le produit ecrit sur la machine du
+      # joueur. Ce script RECALCULE les sites et echoue si un fichier apparait, disparait ou change
+      # de compte. Un chiffre ecrit a la main est une dette tant qu'aucun outil ne le refait — et
+      # une table de non-nuisance perimee est pire qu'absente : elle rassure a tort.
+      - name: Gate — non-nuisance write-site table is current
+        run: python tools/nonuisance/count-write-sites.py
+
+      # Meme raison, autre dette : la table nomme, en face de chaque garde, le test qui la prouve.
+      # Un nom recopie a la main survit a un renommage, et le document continue alors d'affirmer une
+      # preuve qui n'existe plus. Ce script refait la verification (il ne juge pas ce que le test
+      # assure — c'est le travail des mutations —, il verifie qu'il existe).
+      - name: Gate — every guard named in the table has a real test
+        run: python tools/nonuisance/check-guard-tests.py docs/NON-NUISANCE.md docs/RAPPORT-VERIFICATION.md
+
+      # 18/09/2026 - Les quatre gates de `tools/gates/` existaient, avec leur `--autotest`, et
+      # AUCUN n'etait lance par quoi que ce soit : la CI ne connaissait que `tools/nonuisance/`,
+      # et GATES.md demandait au mainteneur de lancer les autres a la main. Un gate que personne ne
+      # lance ne garde rien. Celui qui BLOQUE tient, celui qui RAPPELLE meurt.
+      # Un test de la suite (`UnGardeQuePersonneNeLanceNeGardeRienTests`) tient desormais les
+      # deux sens : un gate ajoute et non branche fait rougir, une entree qui cite un script
+      # absent aussi.
+      - name: Gate — les dates de GATES.md sont lisibles (ages.py)
+        run: python tools/gates/ages.py
+
+      - name: Gate — aucun chemin mort dans les documents de garde (liens.py)
+        run: python tools/gates/liens.py
+
+      - name: Gate — l'inventaire des tests hors CI est exact (hors_ci.py)
+        run: python tools/gates/hors_ci.py
+
+      # Celui-ci lit les journaux .trx de l'etape « Test (Release) » ci-dessus : il doit donc
+      # venir apres elle, et elle ecrit maintenant dans UN dossier (`--results-directory`),
+      # sans `LogFileName` -- un journal par assembly, une execution par dossier.
+      - name: Gate — le nombre de tests annonce par le README est celui mesure
+        run: python tools/gates/compte_des_tests.py

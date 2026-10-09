@@ -1,0 +1,50 @@
+PresentMon 2.5.1 — paire ASSORTIE (client + service de la MEME release)
+
+Source     : https://github.com/GameTechDev/PresentMon/releases/tag/v2.5.1
+Artefact   : PresentMon-v2.5.1.msi
+             157 696 000 octets
+             SHA256 4DDE95A71DAA44BA9379C60C8686404DD4EDC8F567EFCCBB2A69BEA2CFB9A694
+Extraction : msiexec /a (installation administrative — rien n'a ete installe sur la machine)
+Licence    : MIT — NOTICE-MIT.txt et THIRD_PARTY.txt viennent du meme artefact
+Vendore le : 2026-09-07
+
+Fichiers, avec leur empreinte :
+  PresentMonAPI2.dll         1 998 688  sha256:0859E22071180AB9...
+  PresentMonService.exe      3 600 736  sha256:E802C7F8D50888CB...
+  PresentMonAPI2Loader.dll     570 208  sha256:D7164B554FF65F58...
+  PresentMonAPI.h               14 646  sha256:3766FA9AD32E4351...
+
+== POURQUOI CETTE MONTEE, ET CE QU'ELLE FERME ==
+
+La version precedente etait 2.4.1. Elle fonctionnait — SEULE. Des qu'Intel PresentMon
+2.5.1 tournait sur la machine (service `PresentMonSharedService`, demarrage AUTOMATIQUE),
+le client 2.4.1 de DrDXT recevait PM_STATUS_PIPE_ERROR, et le produit demandait a
+l'utilisateur d'arreter le service rival — un geste manuel a refaire apres CHAQUE
+demarrage.
+
+Mesures du 07/09/2026, service Intel ACTIF (`tools/pmonpair`) :
+
+  client 2.5.1  -> pmOpenSession SUCCES  +  pmStartTrackingProcess SUCCES
+  client 2.4.1  -> PM_STATUS_PIPE_ERROR (12)
+
+Le probleme n'etait donc ni le tube nomme, ni la cohabitation : c'etait la VERSION du
+client vendore. Une conclusion anterieure disait « la cohabitation est impossible » ; elle
+etait trop generale, et la machine l'a dementie le jour meme.
+
+== CE QUE LA MONTEE A COUTE : PRESQUE RIEN ==
+
+Headers compares avant de bouger quoi que ce soit :
+  * les 89 valeurs de PM_METRIC sont IDENTIQUES et DANS LE MEME ORDRE ; 2.5.1 en ajoute
+    trois a la fin (PM_METRIC_PROCESS_ID, PM_METRIC_SESSION_START_QPC, PM_METRIC_COUNT_) ;
+  * PM_QUERY_ELEMENT est INCHANGEE, champ pour champ.
+
+L'ABI que DrDXT utilise est donc compatible : aucun code client n'a eu a changer.
+
+⚠️ 2.5.1 a en revanche une autre LIGNE DE COMMANDE : il rejette `--intro-nsm`. Sans
+consequence ici, puisque le produit ne passe aucun argument au service (voir
+PresentMonNaming.ServiceArguments, vide et mesure comme tel).
+
+🔑 PM_METRIC_SESSION_START_QPC est le cadeau de cette version : c'est la base de temps
+commune dont la timeline root-cause a besoin pour fusionner les frametimes avec la
+telemetrie materielle. Non exploite a ce jour — a brancher quand il apportera vraiment
+quelque chose a la synchronisation, pas avant.

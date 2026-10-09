@@ -1,0 +1,8 @@
+NVAPI available : True
+  FRL_FPS   (0x10835002) = 1000
+  VSYNCMODE (0x00A879CF) = 0x08416747
+  \\.\DISPLAY1 primary=True 200 Hz (max 200) vrr=False
+  \\.\DISPLAY2 primary=False 144 Hz (max 144) vrr=False
+  boot            : 01/09 22:44:09
+  nvdrsdb0.bin    : ecrit 01/09 22:52:21  sha 1D9DB1A9169F7A26
+  lu le           : 02/09 00:14:21
