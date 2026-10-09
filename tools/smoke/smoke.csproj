@@ -1,0 +1,19 @@
+<!-- Manual in-game smoke harness for the PresentMon spine. NOT part of DrDXT.sln. -->
+<!-- Validates the real PresentMonAPI2 P/Invoke boundary end-to-end (the one part unit -->
+<!-- tests can't cover). See ../../third_party/presentmon/SMOKE-TEST.md. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DrDxt.Measurement\DrDxt.Measurement.csproj" />
+    <ProjectReference Include="..\..\src\DrDxt.Core\DrDxt.Core.csproj" />
+  </ItemGroup>
+</Project>
