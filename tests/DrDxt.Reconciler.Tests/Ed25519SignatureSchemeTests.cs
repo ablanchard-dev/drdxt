@@ -1,0 +1,113 @@
+using System.Text;
+using DrDxt.Core;
+using DrDxt.Reconciler;
+using DrDxt.Reconciler.Manifest;
+using FluentAssertions;
+using NSec.Cryptography;
+
+namespace DrDxt.Reconciler.Tests;
+
+// -----------------------------------------------------------------------
+// The real Ed25519 scheme behind the seams — proves the asymmetric security
+// property end-to-end (sign with private, verify with PUBLIC; tamper → false).
+//
+// This is the production crypto (NSec / libsodium). It is the only test that
+// touches the native lib; all reconciler-logic tests use the in-memory FakeKeyPair.
+// -----------------------------------------------------------------------
+public sealed class Ed25519SignatureSchemeTests
+{
+    private static (Ed25519ManifestSigner signer, Ed25519ManifestVerifier verifier) NewPair()
+    {
+        using var key = Key.Create(
+            SignatureAlgorithm.Ed25519,
+            new KeyCreationParameters { ExportPolicy = KeyExportPolicies.AllowPlaintextExport });
+        var seed = key.Export(KeyBlobFormat.RawPrivateKey);
+        var pub = key.PublicKey.Export(KeyBlobFormat.RawPublicKey);
+        return (Ed25519ManifestSigner.FromSeed(seed), new Ed25519ManifestVerifier(pub));
+    }
+
+    [Fact]
+    public void Sign_thenVerify_withMatchingPublicKey_succeeds()
+    {
+        var (signer, verifier) = NewPair();
+        var bytes = Encoding.UTF8.GetBytes("the canonical manifest content");
+
+        var sig = signer.Sign(bytes);
+        sig.IsOk.Should().BeTrue();
+
+        verifier.Verify(bytes, sig.Value!).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Verify_failsOnTamper_evenOneByte()
+    {
+        var (signer, verifier) = NewPair();
+        var bytes = Encoding.UTF8.GetBytes("the canonical manifest content");
+        var sig = signer.Sign(bytes).Value!;
+
+        var tampered = (byte[])bytes.Clone();
+        tampered[0] ^= 0x01;
+
+        verifier.Verify(tampered, sig).Should().BeFalse("a tampered payload must fail verification");
+    }
+
+    [Fact]
+    public void Verify_failsForForeignSignature_ownerCannotForge()
+    {
+        // Two independent keypairs: a forger who has their own private key cannot
+        // produce a signature that OUR public-key verifier accepts.
+        var (_, ourVerifier) = NewPair();
+        var (forgerSigner, _) = NewPair();
+        var bytes = Encoding.UTF8.GetBytes("attacker-chosen content");
+
+        var forged = forgerSigner.Sign(bytes).Value!;
+        ourVerifier.Verify(bytes, forged).Should().BeFalse("only the holder of OUR private key can produce a valid sig");
+    }
+
+    [Fact]
+    public void Verify_failsOnMalformedSignature_failClosed_neverThrows()
+    {
+        var (_, verifier) = NewPair();
+        var bytes = Encoding.UTF8.GetBytes("content");
+
+        verifier.Verify(bytes, new byte[] { 1, 2, 3 }).Should().BeFalse("wrong-length signature fails closed");
+        verifier.Verify(bytes, Array.Empty<byte>()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SignedDesiredStateStore_withRealEd25519_roundTripsAndRejectsTamper()
+    {
+        // The store driven by the real crypto, end to end.
+        using var key = Key.Create(
+            SignatureAlgorithm.Ed25519,
+            new KeyCreationParameters { ExportPolicy = KeyExportPolicies.AllowPlaintextExport });
+        var seed = key.Export(KeyBlobFormat.RawPrivateKey);
+        var pub = key.PublicKey.Export(KeyBlobFormat.RawPublicKey);
+
+        var storage = new InMemoryManifestStorage();
+        var policy = new FakePolicy().Map("reflex.lowlatency", ReconcileSurface.Registry);
+        var store = new SignedDesiredStateStore(
+            storage,
+            Ed25519ManifestSigner.FromSeed(seed),
+            new Ed25519ManifestVerifier(pub),
+            policy,
+            new FakeClock());
+
+        var desired = new DesiredState(new[]
+        {
+            new AppliedTweak("reflex.lowlatency", "{\"v\":2}", "{\"v\":0}", new DateTimeOffset(2026, 6, 23, 12, 0, 0, TimeSpan.Zero)),
+        });
+
+        (await store.CommitAsync(desired)).IsOk.Should().BeTrue();
+        (await store.LoadAsync()).Value!.Tweaks.Should().ContainSingle();
+
+        // Tamper → fail-closed under real Ed25519 (flip one byte of the signed content).
+        var slot = storage.Slot!;
+        var chars = slot.CanonicalJson.ToCharArray();
+        chars[chars.Length / 2] = chars[chars.Length / 2] == 'x' ? 'y' : 'x';
+        storage.Slot = slot with { CanonicalJson = new string(chars) };
+        var tampered = await store.LoadAsync();
+        tampered.IsOk.Should().BeFalse();
+        tampered.Error!.Value.Code.Should().Be(ErrorCodes.ManifestTampered);
+    }
+}

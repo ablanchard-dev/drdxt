@@ -1,0 +1,325 @@
+{
+  "Nom": "nvidia-gtx1650-i5-10400",
+  "Note": "machine synthétique (gamme NVIDIA/Intel, 09/10/2026) : le bas de gamme ancien : GTX 1650 (Turing), i5-10400F, DDR4 sous son profil",
+  "Inventaire": {
+    "Cpu": {
+      "Model": "Intel(R) Core(TM) i5-10400F CPU @ 2.90GHz",
+      "Vendor": "GenuineIntel",
+      "Cores": 6,
+      "Threads": 12,
+      "IsX3D": false,
+      "CcdCount": 1
+    },
+    "Gpus": [
+      {
+        "Model": "NVIDIA GeForce GTX 1650",
+        "Vendor": "NVIDIA",
+        "VramBytes": 4294967296,
+        "DriverVersion": "32.0.15.7283",
+        "ReBar": "Unknown"
+      }
+    ],
+    "Memory": [
+      {
+        "PartNumber": "CMK16GX4M2B3200C16",
+        "Manufacturer": "Corsair",
+        "ConfiguredMhz": 2666,
+        "RatedMhz": 3200,
+        "SmbiosMemoryType": 26,
+        "Ranks": 1,
+        "ConfiguredVoltageMv": 1200,
+        "DeviceLocator": "ChannelA-DIMM0"
+      },
+      {
+        "PartNumber": "CMK16GX4M2B3200C16",
+        "Manufacturer": "Corsair",
+        "ConfiguredMhz": 2666,
+        "RatedMhz": 3200,
+        "SmbiosMemoryType": 26,
+        "Ranks": 1,
+        "ConfiguredVoltageMv": 1200,
+        "DeviceLocator": "ChannelB-DIMM0"
+      }
+    ],
+    "Board": {
+      "Manufacturer": "Micro-Star International Co., Ltd.",
+      "Product": "B460M PRO-VDH WIFI"
+    },
+    "Bios": {
+      "Version": "1.A0",
+      "ReleaseDate": "2025-03-01T00:00:00+00:00",
+      "IsUefi": true
+    },
+    "Chassis": "Desktop",
+    "MemorySlots": 4
+  },
+  "Reglages": {
+    "XmpExpo": "Off",
+    "ReBar": "Unknown",
+    "PowerPlanGuid": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+    "Hags": "Unknown",
+    "GameMode": "Unknown",
+    "ParkedCoreIndexes": [],
+    "Vrr": "Off",
+    "VrrCapableDisplay": "On",
+    "PagefileConfigured": "On",
+    "NetworkAdapters": [
+      {
+        "Name": "Ethernet",
+        "Description": "Realtek Gaming 2.5GbE Family Controller",
+        "IsWired": true,
+        "InterruptModeration": "Off",
+        "Rss": "On",
+        "EnergyEfficientEthernet": "Off",
+        "LinkPowerSaving": "Off"
+      }
+    ],
+    "MemoryConfiguredMhz": 2666,
+    "Csm": "Unknown",
+    "Restart": {
+      "Verdict": "NoRestartPending",
+      "Reason": "Nothing pending."
+    },
+    "FrameCap": null,
+    "DisplayRefresh": {
+      "HasHeadroom": "Off",
+      "CurrentHz": 75,
+      "BestHz": 75
+    },
+    "SysMain": "On",
+    "MmcssIntact": "On",
+    "UncleanShutdowns": [],
+    "MemoryProvenChannels": 0,
+    "AttachedRefreshHz": [
+      75
+    ],
+    "NvidiaPreferMaxPerf": "Unknown",
+    "NvidiaPreferMaxPerfOrigin": null,
+    "NvidiaDrsScope": null,
+    "HagsEffective": "On",
+    "GoulotMesure": null,
+    "BiosLu": null
+  },
+  "Sante": [
+    {
+      "Domaine": "POWER",
+      "Nom": "plan d'alimentation actif",
+      "ValeurCourante": "Hautes performances",
+      "ValeurAttendue": "Equilibre",
+      "Statut": "UserChoiceProbable",
+      "Provenance": null,
+      "Explication": "un plan différent du défaut se change à la main : c'est probablement voulu",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "minimum processeur",
+      "ValeurCourante": "100 %",
+      "ValeurAttendue": "100 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "maximum processeur",
+      "ValeurCourante": "100 %",
+      "ValeurAttendue": "100 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "preference energie/perf",
+      "ValeurCourante": "5 (0 = performance, 100 = économie)",
+      "ValeurAttendue": "5 (0 = performance, 100 = économie)",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "mode de boost",
+      "ValeurCourante": "2 (activé, agressif si Windows choisit la fréquence)",
+      "ValeurAttendue": "2 (activé, agressif si Windows choisit la fréquence)",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "parking : coeurs min",
+      "ValeurCourante": "4 %",
+      "ValeurAttendue": "4 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "POWER",
+      "Nom": "parking : coeurs max",
+      "ValeurCourante": "100 %",
+      "ValeurAttendue": "100 %",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "identique au défaut de ce plan",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "CPU",
+      "Nom": "bridage",
+      "ValeurCourante": "aucun indicateur",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "les indicateurs Windows de limite de performance valent 0. Ce compteur ne voit pas les limites de puissance du paquet (RAPL) : sur la machine de test, il valait 0 pendant que la fréquence tombait de 5292 à 3698 MHz sous charge soutenue. Aucun indicateur levé n'est donc pas « rien ne bride ».",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "SystemResponsiveness",
+      "ValeurCourante": "20 %",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "20 % des ressources processeur sont réservées aux tâches de faible priorité  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "GPU Priority",
+      "ValeurCourante": "8",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "toute valeur de ce champ est sans effet : « This priority is not yet used. »  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "SFIO Priority",
+      "ValeurCourante": "Normal",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "toute valeur de ce champ est sans effet : « This value is not used. »  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "Clock Rate",
+      "ValeurCourante": "10000",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "toute valeur de ce champ est sans effet : la garantie de granularité existait sous Vista ; « Starting with Windows 7 and Windows Server 2008 R2, this guarantee was removed to reduce system power consumption ». Sur Windows 11, ce champ ne garantit plus rien.  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "MMCSS",
+      "Nom": "Games\\Priority",
+      "ValeurCourante": "2 (de 1 à 8)",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "priorité 2 en catégorie Medium (plage documentée 1 à 8)  [source : learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service]",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "STABILITE",
+      "Nom": "erreurs matérielles (WHEA)",
+      "ValeurCourante": "aucune en 90 jours",
+      "ValeurAttendue": "aucune",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "Windows n'a enregistré aucune erreur matérielle (processeur, mémoire, PCIe) en 90 jours (1 enregistrement(s) d'information, qui ne sont pas des erreurs). Après un changement de puissance ou de mémoire au BIOS, c'est ici qu'une instabilité se voit en premier.",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "DISPLAY",
+      "Nom": "frequence",
+      "ValeurCourante": "75 Hz",
+      "ValeurAttendue": "200 Hz",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "le panneau tourne à son maximum",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "PAGEFILE",
+      "Nom": "gestion",
+      "ValeurCourante": "automatique (Windows)",
+      "ValeurAttendue": "automatique (Windows)",
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "Windows dimensionne lui-même : rien à réparer",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "PAGEFILE",
+      "Nom": "taille / pic",
+      "ValeurCourante": "4096 Mo alloués, pic 128 Mo",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "le pic d'utilisation dit si la taille est réellement sollicitée",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "THERMIQUE",
+      "Nom": "temperature du GPU",
+      "ValeurCourante": null,
+      "ValeurAttendue": null,
+      "Statut": "Unknown",
+      "Explication": "DrDXT n'a pas pu lire la température de ta carte (AMD Radeon RX 7800 XT) par le pilote AMD. Le logiciel AMD ou HWiNFO la montre.",
+      "Action": "Aucune",
+      "Provenance": null
+    },
+    {
+      "Domaine": "THERMIQUE",
+      "Nom": "temperature du processeur",
+      "ValeurCourante": null,
+      "ValeurAttendue": null,
+      "Statut": "Unknown",
+      "Explication": "Windows ne publie pas la température du processeur sans outil tiers.",
+      "Action": "Aucune",
+      "Provenance": null
+    },
+    {
+      "Domaine": "LATENCE",
+      "Nom": "limite d'images de la carte",
+      "ValeurCourante": null,
+      "ValeurAttendue": null,
+      "Statut": "Unknown",
+      "Explication": "DrDXT n'a pas pu lire la limite d'images de ta carte (AMD Radeon RX 7800 XT) par le pilote AMD. Avec un écran à fréquence variable, une limite juste sous sa fréquence maximale garde le rafraîchissement variable actif ; elle se règle dans le logiciel AMD ou dans le jeu.",
+      "Action": "Aucune",
+      "Provenance": null
+    },
+    {
+      "Domaine": "STABILITE",
+      "Nom": "arrets brutaux",
+      "ValeurCourante": "aucun sur 90 jours",
+      "ValeurAttendue": null,
+      "Statut": "ExpectedDefault",
+      "Provenance": null,
+      "Explication": "aucun arrêt brutal relevé",
+      "Action": "Aucune"
+    },
+    {
+      "Domaine": "BIOS",
+      "Nom": "carte mere / firmware",
+      "ValeurCourante": "Micro-Star International Co., Ltd. B460M PRO-VDH WIFI",
+      "ValeurAttendue": null,
+      "Statut": "Observed",
+      "Provenance": null,
+      "Explication": "lu dans le firmware",
+      "Action": "Aucune"
+    }
+  ]
+}
