@@ -1,0 +1,227 @@
+using DrDxt.Core;
+using DrDxt.Detection.Wmi;
+
+namespace DrDxt.Detection.Network;
+
+public interface INetworkAdapterReader
+{
+    Result<IReadOnlyList<NetworkAdapterState>> Read();
+
+    /// <summary>Passerelle par defaut IPv4 de la carte physique donnee, ou null si elle n'en a
+    /// pas. On passe par la carte plutot que par « la premiere passerelle trouvee » parce qu'un
+    /// adaptateur VPN monte en a une aussi : mesurer la sienne repondrait sur le tunnel, pas sur
+    /// le lien local. Ok(null) = pas de passerelle ; Fail = lecture impossible.</summary>
+    Result<string?> ReadDefaultGateway(NetworkAdapterState adapter);
+
+    /// <summary>Toutes les passerelles IPv4 par defaut publiees par la machine, DISTINCTES et
+    /// cartes VIRTUELLES COMPRISES. Sert a une seule question : y a-t-il ambiguite sur le premier
+    /// saut ? Une seule passerelle = tout ce qui sort passe par elle. Plusieurs = rien ici ne dit
+    /// laquelle porte la route vers une destination donnee, et un premier saut mesure au hasard
+    /// n'est plus forcement sur le chemin auquel on le compare.</summary>
+    Result<IReadOnlyList<string>> ReadAllDefaultGateways();
+}
+
+/// <summary>
+/// Reads connected PHYSICAL adapters and their NDIS settings from root\StandardCimv2.
+///
+/// Two decisions worth keeping:
+///   * settings are matched on the STANDARDIZED NDIS keyword (*InterruptModeration, *RSS,
+///     *EEE), never on DisplayName. DisplayName is localized — on this very machine it reads
+///     "Modération interruption". A reader keyed on English display names would silently find
+///     nothing on a French Windows and report Unknown everywhere: a wrong answer that looks
+///     like a working feature.
+///   * virtual adapters are excluded (Virtual = TRUE): VPN tunnels, Hyper-V/VirtualBox
+///     host-only, Bluetooth PAN. Advising someone to tune a VirtualBox adapter is noise.
+///
+/// Non-admin, read-only, never throws (the WMI seam converts everything to Result).
+/// </summary>
+public sealed class NetworkAdapterReader : INetworkAdapterReader
+{
+    private const string Namespace = @"\\.\root\StandardCimv2";
+
+    // ndisPhysicalMedium: 14 = 802.3 (Ethernet). Everything else (9 = native 802.11, …) is
+    // not wired. Source: NDIS_PHYSICAL_MEDIUM enumeration.
+    private const int NdisPhysicalMedium8023 = 14;
+
+    // MediaConnectState: 1 = Connected. An adapter with no cable/association has no bearing
+    // on how the game plays right now.
+    private const int MediaConnected = 1;
+
+    private readonly IWmiQuery _wmi;
+
+    public NetworkAdapterReader(IWmiQuery wmi) => _wmi = wmi;
+
+    public Result<IReadOnlyList<NetworkAdapterState>> Read()
+    {
+        var adapters = _wmi.QueryInNamespace(Namespace,
+            "SELECT Name, InterfaceDescription, Virtual, MediaConnectState, ndisPhysicalMedium FROM MSFT_NetAdapter");
+        if (!adapters.IsOk)
+            return Result<IReadOnlyList<NetworkAdapterState>>.Fail(ErrorCodes.WmiFail, adapters.Error!.Value.Message);
+
+        // The advanced-property table is read once and indexed; a failure here is not fatal —
+        // we still know which adapters exist, and every setting simply stays Unknown. Saying
+        // "adapter present, settings unknown" is honest; dropping the adapter would hide it.
+        var settings = _wmi.QueryInNamespace(Namespace,
+            "SELECT Name, RegistryKeyword, RegistryValue FROM MSFT_NetAdapterAdvancedPropertySettingData");
+        var byAdapter = IndexSettings(settings);
+
+        var states = new List<NetworkAdapterState>();
+        foreach (var row in adapters.Value!)
+        {
+            if (IsTrue(row, "Virtual")) continue;
+            if (row.GetInt("MediaConnectState") != MediaConnected) continue;
+
+            string name = row.GetString("Name") ?? "Unknown";
+            var keywords = byAdapter.TryGetValue(name, out var k) ? k : EmptyKeywords;
+
+            states.Add(new NetworkAdapterState(
+                Name: name,
+                Description: row.GetString("InterfaceDescription") ?? "Unknown",
+                IsWired: row.GetInt("ndisPhysicalMedium") == NdisPhysicalMedium8023,
+                InterruptModeration: Flag(keywords, "*InterruptModeration"),
+                Rss: Flag(keywords, "*RSS"),
+                EnergyEfficientEthernet: Flag(keywords, "*EEE"),
+                // Les deux premiers sont des mots-cles PROPRIETAIRES (Realtek), sans etoile : non
+                // normalises, donc absents de bien des cartes -- et leur absence rend Unknown,
+                // jamais Off. `*SelectiveSuspend` est normalise, lui, donc present sur beaucoup
+                // plus de machines.
+                //
+                // Le ou est volontaire : les trois disent la meme chose au client -- le lien
+                // reduit sa puissance quand il est calme, et le reveil coute des microsecondes.
+                // Il n'a pas a lire trois fois la meme idee parce que sa carte l'expose sous trois
+                // noms.
+                //
+                // `*SelectiveSuspend` a ete ajoute le 08/09/2026 : il etait actif sur la
+                // machine de reference et lu par personne, alors qu'il est standard.
+                LinkPowerSaving: Either(
+                    Flag(keywords, "EnableGreenEthernet"),
+                    Flag(keywords, "PowerSavingMode"),
+                    Flag(keywords, "*SelectiveSuspend"))));
+        }
+
+        return Result<IReadOnlyList<NetworkAdapterState>>.Ok(states);
+    }
+
+    /// <summary>On = l'un au moins est actif · Off = au moins un a ete lu et aucun n'est actif ·
+    /// Unknown = aucun n'a pu etre lu. Un seul lu et actif suffit a dire On : l'economie d'energie
+    /// est bien la. L'asymetrie est le cœur : `Unknown` ne devient jamais `Off`, sinon une carte
+    /// qui n'expose aucun de ces mots-cles serait declaree sans economie d'energie.</summary>
+    private static TriState Either(params TriState[] etats)
+        => etats.Any(e => e == TriState.On) ? TriState.On
+         : etats.Any(e => e == TriState.Off) ? TriState.Off
+         : TriState.Unknown;
+
+    private static readonly Dictionary<string, string> EmptyKeywords = new(StringComparer.OrdinalIgnoreCase);
+
+    private static Dictionary<string, Dictionary<string, string>> IndexSettings(Result<IReadOnlyList<WmiRow>> settings)
+    {
+        var byAdapter = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+        if (!settings.IsOk) return byAdapter;
+
+        foreach (var row in settings.Value!)
+        {
+            string? adapter = row.GetString("Name");
+            string? keyword = row.GetString("RegistryKeyword");
+            string? value = FirstValue(row);
+            if (adapter is null || keyword is null || value is null) continue;
+
+            if (!byAdapter.TryGetValue(adapter, out var map))
+                byAdapter[adapter] = map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            map[keyword] = value;
+        }
+        return byAdapter;
+    }
+
+    /// <summary>RegistryValue is a string ARRAY in CIM (a single-element one in practice).
+    /// ToString() on it yields "System.String[]", so unwrap it explicitly — this is exactly
+    /// the kind of silent wrong-but-plausible reading that ends up shipped.</summary>
+    private static string? FirstValue(WmiRow row)
+    {
+        if (!row.Properties.TryGetValue("RegistryValue", out var raw) || raw is null) return null;
+        return raw switch
+        {
+            string s => s.Trim(),
+            string[] a => a.Length > 0 ? a[0]?.Trim() : null,
+            System.Collections.IEnumerable e => e.Cast<object?>().FirstOrDefault()?.ToString()?.Trim(),
+            _ => raw.ToString()?.Trim()
+        };
+    }
+
+    /// <summary>NDIS boolean-ish keyword → TriState. Absent keyword = Unknown (this NIC does
+    /// not expose the setting), not Off.</summary>
+    private static TriState Flag(Dictionary<string, string> keywords, string keyword)
+    {
+        if (!keywords.TryGetValue(keyword, out var v)) return TriState.Unknown;
+        return v switch
+        {
+            "0" => TriState.Off,
+            "1" => TriState.On,
+            // *InterruptModeration and *RSS are 0/1. Anything else (a vendor using a wider
+            // enum) is not something we understand → say Unknown instead of guessing.
+            _ => TriState.Unknown
+        };
+    }
+
+    private static bool IsTrue(WmiRow row, string key)
+        => row.Properties.TryGetValue(key, out var v) && v is bool b && b;
+
+    public Result<string?> ReadDefaultGateway(NetworkAdapterState adapter)
+    {
+        // Win32_NetworkAdapterConfiguration (cimv2) porte la passerelle ; MSFT_NetAdapter ne
+        // l'expose pas. Les deux se recoupent sur la description de l'interface.
+        var rows = _wmi.Query(
+            "SELECT Description, DefaultIPGateway FROM Win32_NetworkAdapterConfiguration WHERE IPEnabled = True");
+        if (!rows.IsOk)
+            return Result<string?>.Fail(ErrorCodes.WmiFail, rows.Error!.Value.Message);
+
+        foreach (var row in rows.Value!)
+        {
+            if (!string.Equals(row.GetString("Description"), adapter.Description, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!row.Properties.TryGetValue("DefaultIPGateway", out var raw) || raw is not string[] gws)
+                return Result<string?>.Ok(null);
+
+            // IPv4 uniquement : une adresse IPv6 lien-local (fe80::) est la passerelle du meme
+            // saut, mais la sonde ICMP du produit vise l'IPv4 — melanger les deux comparerait
+            // deux chemins differents sans le dire.
+            return Result<string?>.Ok(PremiereIPv4(gws));
+        }
+        return Result<string?>.Ok(null);
+    }
+
+    public Result<IReadOnlyList<string>> ReadAllDefaultGateways()
+    {
+        // Cartes virtuelles comprises, et c'est tout l'interet de cette lecture. Le reste de ce
+        // fichier ecarte les adaptateurs virtuels parce qu'on ne conseille pas de regler un tunnel
+        // VPN. Mais pour savoir SI le premier saut d'une carte physique est bien celui que le
+        // trafic emprunte, il faut au contraire voir toutes les passerelles : un tunnel monte, ou
+        // une seconde carte connectee, en publie une autre — et rien ici ne dit laquelle porte la
+        // route. Deux passerelles distinctes = ambiguite, et l'appelant doit se taire.
+        var rows = _wmi.Query(
+            "SELECT DefaultIPGateway FROM Win32_NetworkAdapterConfiguration WHERE IPEnabled = True");
+        if (!rows.IsOk)
+            return Result<IReadOnlyList<string>>.Fail(ErrorCodes.WmiFail, rows.Error!.Value.Message);
+
+        var passerelles = new List<string>();
+        foreach (var row in rows.Value!)
+        {
+            if (!row.Properties.TryGetValue("DefaultIPGateway", out var raw) || raw is not string[] gws)
+                continue;
+            var ipv4 = PremiereIPv4(gws);
+            if (ipv4 is not null && !passerelles.Contains(ipv4, StringComparer.OrdinalIgnoreCase))
+                passerelles.Add(ipv4);
+        }
+        return Result<IReadOnlyList<string>>.Ok(passerelles);
+    }
+
+    /// <summary>IPv4 uniquement : une adresse IPv6 lien-local (fe80::) est la passerelle du meme
+    /// saut, mais la sonde ICMP du produit vise l'IPv4 — melanger les deux comparerait deux
+    /// chemins differents sans le dire.</summary>
+    private static string? PremiereIPv4(string[] passerelles)
+    {
+        foreach (var gw in passerelles)
+            if (!string.IsNullOrWhiteSpace(gw) && gw.Contains('.') && !gw.Contains(':'))
+                return gw.Trim();
+        return null;
+    }
+}
