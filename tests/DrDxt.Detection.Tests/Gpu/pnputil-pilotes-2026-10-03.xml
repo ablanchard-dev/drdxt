@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<PnpUtil Version="10.0.26200" Command="/enum-drivers /class Display /format xml">
+    <Driver DriverName="oem127.inf">
+        <OriginalName>nvmdi.inf</OriginalName>
+        <ProviderName>NVIDIA</ProviderName>
+        <ClassName>Display</ClassName>
+        <ClassGuid>{4d36e968-e325-11ce-bfc1-08002be10318}</ClassGuid>
+        <DriverVersion>08/20/2026 32.0.16.1656</DriverVersion>
+        <SignerName>Microsoft Windows Hardware Compatibility Publisher</SignerName>
+        <CatalogAttributes>
+            <Attribute>Declarative</Attribute>
+        </CatalogAttributes>
+        <WhcpVersion>Unknown</WhcpVersion>
+    </Driver>
+</PnpUtil>
