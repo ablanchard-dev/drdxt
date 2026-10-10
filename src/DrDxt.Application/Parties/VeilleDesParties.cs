@@ -163,7 +163,7 @@ public sealed class VeilleDesParties
                 catch (Exception) { }
                 captures.Add(new CaptureEnPartie(_horloge(), mesure.AvgFps, mesure.P1LowFps, _classer(mesure), cpu.Mhz, cpu.Watts, cpu.Celsius, vram, voisins, carte, overlays,
                     reseau.Box, reseau.Internet, reseau.Pertes, carteDuJeu?.Carte, carteDuJeu?.DedieeIgnoree,
-                    MecanismeCarte.Depuis(echantillons)));
+                    MecanismeCarte.Depuis(echantillons), LatenceAffichageMs: mesure.DisplayLatencyMsMedian));
             }
             await Attendre(EntreDeuxCaptures, ct);
         }

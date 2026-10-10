@@ -143,6 +143,8 @@ public sealed class PresentMonSession : IPresentMonSession
                 new PM_QUERY_ELEMENT { metric = PM_METRIC.PM_METRIC_ANIMATION_ERROR, stat = PM_STAT.PM_STAT_NONE },
                 new PM_QUERY_ELEMENT { metric = PM_METRIC.PM_METRIC_PRESENT_MODE, stat = PM_STAT.PM_STAT_NONE },
                 new PM_QUERY_ELEMENT { metric = PM_METRIC.PM_METRIC_CPU_START_QPC, stat = PM_STAT.PM_STAT_NONE },
+                // B4 (10/10/2026) : la latence d'affichage (début de l'image → écran), pour juger les leviers de latence.
+                new PM_QUERY_ELEMENT { metric = PM_METRIC.PM_METRIC_DISPLAY_LATENCY, stat = PM_STAT.PM_STAT_NONE },
             };
 
             var regRc = _api.RegisterFrameQuery(session, elements, out query, out var blobSize);
@@ -168,6 +170,9 @@ public sealed class PresentMonSession : IPresentMonSession
             // L'instant de chaque image, sur l'horloge QPC (celle de Stopwatch). Taille autre que 8 : pas de filtre, comme avant.
             var debutImageOffset = (int)elements[8].dataOffset;
             var filtrerArriere = elements[8].dataSize == 8;
+            // Lue à la taille annoncée seulement : une taille autre que 8 = série absente, jamais un chiffre inventé.
+            var latenceAffichageOffset = (int)elements[9].dataOffset;
+            var latenceAffichageLue = elements[9].dataSize == 8;
             var buffer = new byte[checked((int)blobSize * (int)MaxFramesPerPoll)];
             var frames = new List<double>();
             var latencies = new List<double>();
@@ -177,6 +182,7 @@ public sealed class PresentMonSession : IPresentMonSession
             var presentApi = new List<double>();
             var animationError = new List<double>();
             var presentModes = new List<int>();
+            var latenceAffichage = new List<double>();
 
             // La durée se compte à partir de la PREMIÈRE image, pas du pmStartTrackingProcess.
             // Mesure du 06/10/2026 (scène D3D11, service Intel 2.5.1, `tools/scene`) : le service
@@ -233,6 +239,7 @@ public sealed class PresentMonSession : IPresentMonSession
                     cpuBusy.Add(BitConverter.ToDouble(buffer, frameBase + cpuBusyOffset));
                     presentApi.Add(BitConverter.ToDouble(buffer, frameBase + presentApiOffset));
                     animationError.Add(BitConverter.ToDouble(buffer, frameBase + animationErrorOffset));
+                    if (latenceAffichageLue) latenceAffichage.Add(BitConverter.ToDouble(buffer, frameBase + latenceAffichageOffset));
                     if (presentModeSize == 4) presentModes.Add(BitConverter.ToInt32(buffer, frameBase + presentModeOffset));
                     else if (presentModeSize == 8) presentModes.Add((int)BitConverter.ToInt64(buffer, frameBase + presentModeOffset));
                 }
@@ -245,7 +252,8 @@ public sealed class PresentMonSession : IPresentMonSession
                     : "Aucune frame capturée (jeu hors premier plan, anti-cheat, ou jeu non lancé ?).");
 
             return Result<FrameCapture>.Ok(
-                new FrameCapture(frames, latencies, gpuBusy, gpuWait, cpuBusy, presentApi, animationError, presentModes));
+                new FrameCapture(frames, latencies, gpuBusy, gpuWait, cpuBusy, presentApi, animationError, presentModes,
+                    DisplayLatencyMs: latenceAffichageLue ? latenceAffichage : null));
         }
         catch (OperationCanceledException)
         {

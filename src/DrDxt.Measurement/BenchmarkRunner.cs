@@ -77,6 +77,7 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
         var perRunP1Low = new List<double>();
         var perRunP01Low = new List<double>();
         var allLatencies = new List<double>();
+        var allDisplayLatencies = new List<double>();
         var allGpuBusy = new List<double>();
         // Le denominateur de l'occupation GPU : les memes trames que `allGpuBusy`, et elles seules.
         var tramesAvecGpu = new List<double>();
@@ -193,6 +194,9 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
 
             all.AddRange(frames);
             allLatencies.AddRange(Filtrer(cap.Value.RenderPresentLatencyMs, masque, brut.Count)!);
+            // B4 (10/10/2026) : la latence d'affichage, même masque, même frame.
+            if (cap.Value.DisplayLatencyMs is { } latenceAffichage)
+                allDisplayLatencies.AddRange(Filtrer(latenceAffichage, masque, brut.Count)!);
             // La serie GPU emporte son propre denominateur (10/09/2026, apres deux revues).
             //
             // Premier defaut : elle etait empilee sans appariement (`AddRange`), donc une capture
@@ -288,6 +292,8 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             // porter sur deux populations differentes.
             PresentStallSamples: FrametimeStatistics.EchantillonsExploitables(allPresentApi),
             RenderPresentLatencyMsP95: FrametimeStatistics.PercentileOrNull(allLatencies, 0.95),
+            // B4 : la médiane, pas le p95 : un levier de latence se juge sur ce que le joueur sent à chaque image.
+            DisplayLatencyMsMedian: FrametimeStatistics.PercentileOrNull(allDisplayLatencies, 0.5),
             // Valeur absolue : une frame affichee 5 ms trop TOT casse la cadence autant qu'une
             // frame 5 ms trop tard, et l'erreur d'animation est signee.
             AnimationErrorMsP95: FrametimeStatistics.AbsPercentileOrNull(allAnimationError, 0.95),

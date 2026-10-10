@@ -1999,6 +1999,9 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
   <data name="Historique.PartieFps" xml:space="preserve">
     <value>{0} FPS · 1 % low {1}</value>
   </data>
+  <data name="Historique.PartieFpsLatence" xml:space="preserve">
+    <value>{0} FPS · 1 % low {1} · {2} ms à l'écran</value>
+  </data>
   <data name="Historique.Arret" xml:space="preserve">
     <value>arrêt brutal : le PC s'est coupé sans s'éteindre proprement</value>
   </data>

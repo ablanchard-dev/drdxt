@@ -28,7 +28,8 @@ public class PresentMonSessionCaptureTests
     // first poll, then 0 frames thereafter. Frametime is at dataOffset 0, latency at offset 8.
     private static IPresentMonApi ApiYielding(double[] frametimes, uint blobSize = 24,
         ulong frametimeOffset = 0, ulong latencyOffset = 8, double[]? latencies = null,
-        ulong gpuBusyOffset = 16, double[]? gpuBusy = null, int[]? presentModes = null, ulong presentModeSize = 0)
+        ulong gpuBusyOffset = 16, double[]? gpuBusy = null, int[]? presentModes = null, ulong presentModeSize = 0,
+        double[]? displayLatencies = null, ulong displayLatencyOffset = 32)
     {
         var api = Substitute.For<IPresentMonApi>();
         api.OpenSession(out Arg.Any<nint>()).Returns(c => { c[0] = Session; return PM_STATUS.PM_STATUS_SUCCESS; });
@@ -42,6 +43,8 @@ public class PresentMonSessionCaptureTests
                 if (elements.Length > 1) elements[1].dataOffset = latencyOffset;
                 if (elements.Length > 2) elements[2].dataOffset = gpuBusyOffset;
                 if (elements.Length > 7) { elements[7].dataOffset = 24; elements[7].dataSize = presentModeSize; }
+                // B4 : la latence d'affichage n'est livrée (taille 8) que si le test la donne.
+                if (elements.Length > 9 && displayLatencies is not null) { elements[9].dataOffset = displayLatencyOffset; elements[9].dataSize = 8; }
                 c[2] = Query;
                 c[3] = blobSize;
                 return PM_STATUS.PM_STATUS_SUCCESS;
@@ -64,6 +67,8 @@ public class PresentMonSessionCaptureTests
                         BitConverter.GetBytes(gb).CopyTo(buf, i * (int)blobSize + (int)gpuBusyOffset);
                         if (presentModes is not null)
                             BitConverter.GetBytes(presentModes[i]).CopyTo(buf, i * (int)blobSize + 24);
+                        if (displayLatencies is not null)
+                            BitConverter.GetBytes(displayLatencies[i]).CopyTo(buf, i * (int)blobSize + (int)displayLatencyOffset);
                     }
                     c[4] = (uint)frametimes.Length;
                 }
@@ -113,6 +118,21 @@ public class PresentMonSessionCaptureTests
         r.IsOk.Should().BeTrue();
         r.Value!.FrameTimesMs.Should().BeEquivalentTo(new[] { 8.3, 8.4 });
         r.Value.RenderPresentLatencyMs.Should().BeEquivalentTo(new[] { 3.1, 3.5 });
+    }
+
+    // B4 (10/10/2026) : la latence d'affichage, lue à son décalage et à la taille annoncée ; non annoncée = null, jamais zéro.
+    [Fact]
+    public async Task Capture_decodes_display_latency_at_the_registered_offset_and_null_when_not_delivered()
+    {
+        var avec = await new PresentMonSession(ApiYielding(new[] { 8.0, 8.0 }, blobSize: 48, displayLatencies: new[] { 21.5, 23.5 }), new FakeClock())
+            .CaptureAsync(42, TimeSpan.FromMilliseconds(100), CancellationToken.None);
+        avec.IsOk.Should().BeTrue(avec.Error?.Message);
+        avec.Value!.DisplayLatencyMs.Should().Equal(21.5, 23.5);
+
+        var sans = await new PresentMonSession(ApiYielding(new[] { 8.0, 8.0 }, blobSize: 48), new FakeClock())
+            .CaptureAsync(42, TimeSpan.FromMilliseconds(100), CancellationToken.None);
+        sans.IsOk.Should().BeTrue(sans.Error?.Message);
+        sans.Value!.DisplayLatencyMs.Should().BeNull("série non annoncée par le service");
     }
 
     [Fact]

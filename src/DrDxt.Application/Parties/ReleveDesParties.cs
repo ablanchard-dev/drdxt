@@ -9,7 +9,9 @@ public sealed record CaptureEnPartie(DateTimeOffset Quand, double Fps, double Lo
     double? Mhz = null, double? Watts = null, double? Celsius = null, double? VramPourcent = null,
     IReadOnlyList<(string Nom, double Pourcent)>? Voisins = null, double? CarteCelsius = null,
     IReadOnlyList<string>? Overlays = null, double? PingBox = null, double? PingInternet = null, double? PertesInternet = null,
-    string? CarteDuJeu = null, string? CarteDedieeIgnoree = null, MecanismeCarte? MecanismeCarte = null);
+    string? CarteDuJeu = null, string? CarteDedieeIgnoree = null, MecanismeCarte? MecanismeCarte = null,
+    // B4 (10/10/2026) : la latence d'affichage médiane de la capture (PresentMon), en ms ; null = non livrée.
+    double? LatenceAffichageMs = null);
 
 /// <summary>04/10/2026 : un programme qui a chargé le processeur à côté du jeu : son pic (en % d'un cœur, tous ses
 /// processus additionnés) et le nombre de relevés où il dépassait le seuil.</summary>
@@ -21,7 +23,9 @@ public sealed record PartieRelevee(
     double? MhzMedian = null, double? WattsMedian = null, double? CelsiusMax = null, double? BancMhz = null, double? VramPourcentMax = null,
     IReadOnlyList<VoisinEnPartie>? Voisins = null, double? CarteCelsiusMax = null, string? Essai = null,
     IReadOnlyList<string>? Overlays = null, double? PingBoxMedian = null, double? PingInternetMedian = null, double? PertesInternetMax = null,
-    string? CarteDuJeu = null, string? CarteDedieeIgnoree = null, MecanismeCarte? MecanismeCarte = null);
+    string? CarteDuJeu = null, string? CarteDedieeIgnoree = null, MecanismeCarte? MecanismeCarte = null,
+    // B4 (10/10/2026) : la latence d'affichage médiane de la partie, en ms ; null quand aucune capture ne l'a.
+    double? LatenceAffichageMedianMs = null);
 
 /// <summary>
 /// 29/09/2026 (boucle « vivant et prouvé », A3) : aucune partie jouée ne laissait de trace dans DrDXT. La veille
@@ -51,6 +55,8 @@ public static class ReleveDesParties
         {
             // 04/10/2026 : la mémoire vidéo aussi, à son pic : une saturation fait des à-coups même brève.
             VramPourcentMax = captures.Select(c => c.VramPourcent).OfType<double>().DefaultIfEmpty().Max() is var v and > 0 ? v : null,
+            // B4 (10/10/2026) : la latence d'affichage, à sa médiane, comme les images.
+            LatenceAffichageMedianMs = MedianeLue(captures.Select(c => c.LatenceAffichageMs)),
             Voisins = VoisinsLourds(captures),
             // 07/10/2026 (A5) : la carte aussi, à son pic ; non lue sur toutes les captures, elle reste non lue.
             CarteCelsiusMax = captures.Select(c => c.CarteCelsius).OfType<double>().DefaultIfEmpty().Max() is var g and > 0 ? g : null,

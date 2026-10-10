@@ -13,6 +13,22 @@ public sealed class ReleveDesPartiesTests
     private static CaptureEnPartie C(int minute, double fps, double low, BottleneckState goulot)
         => new(T0.AddMinutes(minute), fps, low, goulot);
 
+    // B4 (10/10/2026) : la latence d'affichage à sa médiane ; aucune capture ne l'a = non livrée, jamais zéro.
+    [Fact]
+    public void La_latence_d_affichage_se_resume_a_sa_mediane_ou_reste_non_livree()
+    {
+        var avec = ReleveDesParties.Resumer("cod.exe",
+        [
+            C(1, 130, 95, BottleneckState.CpuBoundOrAppBound) with { LatenceAffichageMs = 24 },
+            C(4, 140, 100, BottleneckState.CpuBoundOrAppBound) with { LatenceAffichageMs = 20 },
+            C(7, 120, 80, BottleneckState.MixedGpuLeaning) with { LatenceAffichageMs = 30 },
+        ])!;
+        avec.LatenceAffichageMedianMs.Should().Be(24);
+
+        ReleveDesParties.Resumer("cod.exe", [C(1, 130, 95, BottleneckState.CpuBoundOrAppBound), C(4, 140, 100, BottleneckState.CpuBoundOrAppBound)])!
+            .LatenceAffichageMedianMs.Should().BeNull();
+    }
+
     [Fact]
     public void Une_partie_se_resume_en_medianes_et_en_goulot_le_plus_vu()
     {
