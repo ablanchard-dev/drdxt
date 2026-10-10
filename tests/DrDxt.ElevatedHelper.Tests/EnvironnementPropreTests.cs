@@ -23,6 +23,29 @@ public sealed class EnvironnementPropreTests
         env["SystemDrive"].Should().Be("C:");
     }
 
+    // Revue du 10/10/2026 : l'audit de santé lit « %ProgramFiles%\... » et « %ProgramData%\... » au registre ; sans ces
+    // variables, le scan élevé ignorait en silence des tâches et des services que le scan simple voyait.
+    [Fact]
+    public void Les_dossiers_du_systeme_que_l_audit_lit_sont_la()
+    {
+        var env = EnvironnementPropre.Construire(@"C:\Windows", @"C:\Users\joueur\AppData\Local\Temp", @"C:\Users\joueur",
+            @"C:\Users\joueur\AppData\Roaming", @"C:\Users\joueur\AppData\Local",
+            new EnvironnementPropre.DossiersDuSysteme(@"C:\Program Files", @"C:\Program Files (x86)", @"C:\Program Files\Common Files",
+                @"C:\Program Files (x86)\Common Files", @"C:\ProgramData", @"C:\Users\Public", "joueur", 20, "AMD64"));
+
+        env.Keys.Should().NotContain(k => EnvironnementPropre.EstUneVariableDuRuntime(k));
+        env["ProgramFiles"].Should().Be(@"C:\Program Files");
+        env["ProgramFiles(x86)"].Should().Be(@"C:\Program Files (x86)");
+        env["ProgramW6432"].Should().Be(@"C:\Program Files");
+        env["ProgramData"].Should().Be(@"C:\ProgramData");
+        env["ALLUSERSPROFILE"].Should().Be(@"C:\ProgramData");
+        env["PUBLIC"].Should().Be(@"C:\Users\Public");
+        env["USERNAME"].Should().Be("joueur");
+        env["NUMBER_OF_PROCESSORS"].Should().Be("20");
+        env["PROCESSOR_ARCHITECTURE"].Should().Be("AMD64");
+        env["PATH"].Split(';').Should().OnlyContain(p => p.StartsWith(@"C:\Windows", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Theory]
     [InlineData("CORECLR_ENABLE_PROFILING")]
     [InlineData("CORECLR_PROFILER_PATH")]

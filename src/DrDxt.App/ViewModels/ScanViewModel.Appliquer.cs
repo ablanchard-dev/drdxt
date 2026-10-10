@@ -22,38 +22,81 @@ public sealed partial class ScanViewModel
     // Le mode lot (tout le plan, re-bench global) n'est plus atteignable d'ici. Le tuning GPU
     // reste une action separee (ApplyGpuTuningCommand).
     // -----------------------------------------------------------------------
+    /// <summary>Les leviers posés depuis le dernier scan : le plan du scan ne les connaît pas encore comme posés, et
+    /// sans ça « Prochaine étape : Optimiser » restait affiché après la pose (revue du 10/10/2026). Vidé au scan.</summary>
+    private readonly HashSet<string> _posesDepuisLeScan = new(StringComparer.Ordinal);
+
     [RelayCommand(CanExecute = nameof(CanApply))]
     private async Task ApplyAsync()
     {
         ApplyBlockedMessage = null;
         MoatUnarmedMessage = null;
         ResultatOptimisation = null;
+        if (_consumption is null) return; // pas de scan : la garde CanExecute l'empêche déjà.
+
+        // (1) juger avant d'encaisser : pur et gratuit. Un clic qui n'a rien à poser ne crée pas de point de restauration.
+        var jugement = await JugerAsync(GrainesOptimiser()).ConfigureAwait(true);
+        // 10/10/2026 (« j'ai revoulu opti, je peux toujours pas ») : sans jeu ouvert, un réglage qui se mesure en jeu était
+        // « écarté, lance ton jeu, refais un scan ». L'essai en alternance sait attendre les parties : le clic vaut accord.
+        // Revue du 10/10 : il part aussi quand il y avait autre chose à poser, comme l'étape en tête le promet.
+        var essaiAFaire = _gamePid == 0 && LevierAEssayer is not null && EssaiProposable;
+        if (jugement.RienATenter && !essaiAFaire && !ReposCarteAOuvrir)
+        {
+            // 08/10/2026 : les arrêts ne bloquent plus ; rien à tenter veut dire rien à tenter. Et jamais sans suite (U5).
+            ApplyBlockedMessage = _localize(KeyNothingToApply);
+            ResultatOptimisation = string.Join(Environment.NewLine,
+                new[] { Resumer(jugement, null, null), Ordonnance(reposFait: ReposCarteEnAttente) }.Where(l => l.Length > 0));
+            return;
+        }
+
+        // (2) la porte §16 : un point de restauration vérifié avant tout ce qui écrit. Revue du 10/10/2026 : le geste du
+        // docteur et l'essai lancé d'ici passaient avant elle, alors que l'écran l'annonçait.
+        var gate = await _safety.EnsureRestorePointAsync().ConfigureAwait(true);
+        if (!gate.IsOk)
+        {
+            ApplyBlockedMessage = MessageDuPoint(gate);
+            return;
+        }
 
         // 10/10/2026 (le mainteneur : « c'est pas normal qu'Optimiser n'ait rien à poser chez moi ») : les gestes que le
         // docteur propose et que DrDXT sait faire seul étaient cachés dans « Agir ». Optimiser les fait d'abord, et le dit
         // en tête de son résultat, quelle que soit la suite.
-        var gestes = await GestesDuDocteurAsync().ConfigureAwait(true);
-        try { await OptimiserAsync().ConfigureAwait(true); }
+        IReadOnlyList<string> gestes = [];
+        string? essai = null;
+        try
+        {
+            gestes = await GestesDuDocteurAsync().ConfigureAwait(true);
+            if (!jugement.RienATenter) await PoserAsync(jugement).ConfigureAwait(true);
+            var pose = ResultatOptimisation;
+            if (essaiAFaire && await EssayerEnJeuSansJeuOuvertAsync().ConfigureAwait(true))
+            {
+                essai = ResultatOptimisation;
+                ResultatOptimisation = pose;
+            }
+        }
         finally
         {
-            if (gestes.Count > 0 && ApplyBlockedMessage == _localize(KeyNothingToApply)) ApplyBlockedMessage = null;
             // 10/10/2026 (le mainteneur : « ça manque de conclusion, de réelle aide ») : Optimiser finit toujours par une
             // ordonnance : ce qui est fait, ce qui reste à faire soi-même (les plus urgents), ce qui est déjà en place, et la suite.
             ResultatOptimisation = string.Join(Environment.NewLine,
-                gestes.Append(ResultatOptimisation ?? string.Empty).Append(Ordonnance(reposFait: ReposCarteEnAttente))
-                    .Where(l => l.Length > 0));
+                gestes.Append(ResultatOptimisation ?? string.Empty).Append(essai ?? string.Empty)
+                    .Append(Ordonnance(reposFait: ReposCarteEnAttente)).Where(l => l.Length > 0));
         }
+        // (6) Revue du 10/10/2026 : l'étape en tête suivait le scan, pas Optimiser. Rejugée sur ce qui reste.
+        await JugerCeQuiResteAPoserAsync().ConfigureAwait(true);
     }
+
+    /// <summary>Les points « à faire d'abord » encore vrais : le mode NVIDIA au global sort de la liste une fois le repos
+    /// rendu par DrDXT (reconnu par sa clé, jamais par son texte).</summary>
+    internal IEnumerable<PointAFaire> PointsAFaireRestants(bool reposFait) =>
+        PointsAFaire.Where(p => !(reposFait && p.Entree.Cle == "Finding.Gpu.PerfMaxGlobal"));
 
     /// <summary>10/10/2026 : la conclusion du docteur après Optimiser, construite sur ce que le scan a déjà dit (la liste
     /// « à faire d'abord » et le compte des réglages lus) : jamais une impasse.</summary>
     internal string Ordonnance(bool reposFait)
     {
         var lignes = new List<string> { _localize("Ordonnance.Titre") };
-        var titreRepos = _localize("Finding.Gpu.PerfMaxGlobal");
-        var aLaMain = PointsAFaire
-            .Where(p => !(reposFait && titreRepos.StartsWith(p.Entree.Titre.TrimEnd('.', ' '), StringComparison.Ordinal)))
-            .ToList();
+        var aLaMain = PointsAFaireRestants(reposFait).ToList();
         if (aLaMain.Count > 0)
         {
             lignes.Add(string.Format(CultureInfo.CurrentCulture, _localize("Ordonnance.ATaMain"), aLaMain.Count));
@@ -82,25 +125,9 @@ public sealed partial class ScanViewModel
         return lignes;
     }
 
-    private async Task OptimiserAsync()
+    /// <summary>Ce qu'Optimiser pose une fois le jugement rendu et la porte passée.</summary>
+    private async Task PoserAsync(JugementApply jugement)
     {
-
-        if (_consumption is not { } consumption)
-            return; // no scan results yet — the CanExecute guard normally prevents this.
-
-        // (1) juger avant d'encaisser. Pur et gratuit : un client a qui il n'y a rien a tenter ne
-        //     paie pas pour l'apprendre.
-        if (await JugerOuRefuserAsync(GrainesOptimiser()).ConfigureAwait(true) is not { } jugement)
-            return;
-
-        // (3) Restore-point gate (§16): a verified point must exist before any apply.
-        var gate = await _safety.EnsureRestorePointAsync().ConfigureAwait(true);
-        if (!gate.IsOk)
-        {
-            ApplyBlockedMessage = MessageDuPoint(gate);
-            return;
-        }
-
         // (4) ce qui ne se mesure pas : un A/B avant redemarrage mesurerait le neant. Le moteur
         //     applique, relit et revient sur echec ; baseline null = aucune pretention de gain.
         ApplyReport? auRedemarrage = null;
@@ -133,7 +160,9 @@ public sealed partial class ScanViewModel
             // s'ils ont ete defaits (le manifeste n'en porte que quatre).
             _journalLeviers?.Enregistrer(reussi);
             ChargerLeviersPoses();
-            NoterPoses(reussi.Outcomes.Where(o => o.Applied && !o.AutoReverted).Select(o => o.TweakId), Horloge());
+            var posees = reussi.Outcomes.Where(o => o.Applied && !o.AutoReverted).Select(o => o.TweakId).ToList();
+            NoterPoses(posees, Horloge());
+            _posesDepuisLeScan.UnionWith(posees);
             // 07/10/2026 (revue F-25) : le mode Jeu agit tout de suite. Relevé seulement à la prochaine ouverture ou au
             // prochain scan, sa bascule était datée là, et les parties jouées entre la pose et ce relevé ne comptaient d'aucun
             // côté. Seuls les réglages à effet immédiat se relèvent ici : un levier au redémarrage n'a pas encore basculé.
@@ -184,7 +213,7 @@ public sealed partial class ScanViewModel
     private IReadOnlyList<string> GrainesOptimiser() =>
         _consumption is { } c
             ? c.Plan.TweakIds.Concat(c.GpuPlan.TweakIds.Where(id => !CandidateSelector.ReglagesCarteInterdits.Contains(id)))
-                .Where(id => !RendusParLaGarde().ContainsKey(id)).ToList()
+                .Where(id => !RendusParLaGarde().ContainsKey(id) && !_posesDepuisLeScan.Contains(id)).ToList()
             : [];
 
     /// <summary>GARDE1 (09/10/2026) : les leviers que la garde d'incident a rendus il y a moins d'une semaine, avec la date
@@ -220,24 +249,12 @@ public sealed partial class ScanViewModel
         return true;
     }
 
-    /// <summary>Le jugement du scan sur ces graines, ou <c>null</c> quand il n'y a rien a tenter —
-    /// le motif est alors deja a l'ecran, et rien n'a ete encaisse ni ecrit.</summary>
-    private async Task<JugementApply?> JugerOuRefuserAsync(IReadOnlyList<string> graines)
+    /// <summary>Le jugement du scan sur ces graines : pur, rien n'est encaissé ni écrit.</summary>
+    private async Task<JugementApply> JugerAsync(IReadOnlyList<string> graines)
     {
         var (instabilite, arrets) = await Task.Run(LireStabiliteSure).ConfigureAwait(true);
         var diagnostic = DiagnosticDeScan.Construire(_goulotScan, _scannedBaseline, instabilite, arrets, _pressionThreads);
-        var jugement = JugementApply.Juger(diagnostic, graines, jeuEnCours: _gamePid > 0);
-        if (!jugement.RienATenter) return jugement;
-
-        // 10/10/2026 (le mainteneur : « j'ai revoulu opti, je peux toujours pas ») : sans jeu ouvert, un réglage qui se
-        // mesure en jeu était « écarté, lance ton jeu, refais un scan ». L'essai en alternance sait attendre les parties :
-        // le clic sur Optimiser vaut accord, l'essai démarre, et l'écran dit qu'il se jugera sur les prochaines parties.
-        if (await EssayerEnJeuSansJeuOuvertAsync().ConfigureAwait(true)) return null;
-
-        // 08/10/2026 : les arrêts ne bloquent plus ; rien à tenter veut dire rien à tenter.
-        ApplyBlockedMessage = _localize(KeyNothingToApply);
-        ResultatOptimisation = Resumer(jugement, null, null);
-        return null;
+        return JugementApply.Juger(diagnostic, graines, jeuEnCours: _gamePid > 0);
     }
 
     private (InstabiliteGpuObservee?, IReadOnlyList<ArretClasse>?) LireStabiliteSure()
@@ -443,8 +460,14 @@ public sealed partial class ScanViewModel
         // Revue du 12/09 (C3) : le meme jugement que l'Optimiser, avant l'achat. Ce bouton ecrivait
         // sur la carte sans demander au selecteur — ni la decision « rien sur la carte depuis l'App »
         // (TuningGpuAutorise), ni le veto des arrets brutaux, ni l'instabilite graphique.
-        if (await JugerOuRefuserAsync(consumption.GpuPlan.TweakIds).ConfigureAwait(true) is not { } jugement)
+        var jugement = await JugerAsync(consumption.GpuPlan.TweakIds).ConfigureAwait(true);
+        if (jugement.RienATenter)
+        {
+            if (await EssayerEnJeuSansJeuOuvertAsync().ConfigureAwait(true)) return;
+            ApplyBlockedMessage = _localize(KeyNothingToApply);
+            ResultatOptimisation = Resumer(jugement, null, null);
             return;
+        }
         // 06/10/2026 (L-GPU) : la carte se regle comme tout levier a chaud, en jeu, un a la fois, garde seulement
         // avec un gain mesure, sinon annule (regle du 29/09). L'ancienne etape par lot gardait un reglage sans gain.
         if (jugement.AChaud is not { } aChaud) return;

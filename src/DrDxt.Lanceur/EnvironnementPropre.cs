@@ -19,7 +19,7 @@ public static class EnvironnementPropre
 
     /// <summary>Le PATH ne contient que Windows : un programme élevé ne cherche pas ses DLL dans un dossier du compte.</summary>
     public static IReadOnlyDictionary<string, string> Construire(string dossierWindows, string dossierTemp,
-        string? profilUtilisateur, string? appData, string? localAppData)
+        string? profilUtilisateur, string? appData, string? localAppData, DossiersDuSysteme? systeme = null)
     {
         var w = dossierWindows.TrimEnd('\\');
         var lecteur = Path.GetPathRoot(w)?.TrimEnd('\\') ?? "C:";
@@ -41,8 +41,27 @@ public static class EnvironnementPropre
         if (!string.IsNullOrEmpty(profilUtilisateur)) env["USERPROFILE"] = profilUtilisateur;
         if (!string.IsNullOrEmpty(appData)) env["APPDATA"] = appData;
         if (!string.IsNullOrEmpty(localAppData)) env["LOCALAPPDATA"] = localAppData;
+        // Revue du 10/10/2026 : sans ProgramFiles ni ProgramData, l'audit de santé de l'App élevée laissait
+        // « %ProgramFiles%\... » tel quel dans les chemins lus au registre, donc des tâches et services passaient en
+        // silence : le scan élevé auditait MOINS que le scan simple. Tout vient des API (dossiers connus), rien de reçu.
+        if (systeme is { } s)
+        {
+            if (!string.IsNullOrEmpty(s.ProgramFiles)) { env["ProgramFiles"] = s.ProgramFiles; env["ProgramW6432"] = s.ProgramFiles; }
+            if (!string.IsNullOrEmpty(s.ProgramFilesX86)) env["ProgramFiles(x86)"] = s.ProgramFilesX86;
+            if (!string.IsNullOrEmpty(s.CommonProgramFiles)) { env["CommonProgramFiles"] = s.CommonProgramFiles; env["CommonProgramW6432"] = s.CommonProgramFiles; }
+            if (!string.IsNullOrEmpty(s.CommonProgramFilesX86)) env["CommonProgramFiles(x86)"] = s.CommonProgramFilesX86;
+            if (!string.IsNullOrEmpty(s.ProgramData)) { env["ProgramData"] = s.ProgramData; env["ALLUSERSPROFILE"] = s.ProgramData; }
+            if (!string.IsNullOrEmpty(s.Public)) env["PUBLIC"] = s.Public;
+            if (!string.IsNullOrEmpty(s.NomUtilisateur)) env["USERNAME"] = s.NomUtilisateur;
+            if (s.Processeurs > 0) env["NUMBER_OF_PROCESSORS"] = s.Processeurs.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (!string.IsNullOrEmpty(s.Architecture)) env["PROCESSOR_ARCHITECTURE"] = s.Architecture;
+        }
         return env;
     }
+
+    /// <summary>Les dossiers du système que l'audit de santé lit par leurs variables ; lus aux API par le lanceur.</summary>
+    public sealed record DossiersDuSysteme(string? ProgramFiles, string? ProgramFilesX86, string? CommonProgramFiles,
+        string? CommonProgramFilesX86, string? ProgramData, string? Public, string? NomUtilisateur, int Processeurs, string? Architecture);
 
     /// <summary>Le mot qui demande au lanceur la console de réparation de Windows (DISM puis sfc), au lieu d'un programme.</summary>
     public const string ReparerWindows = "reparer-windows";

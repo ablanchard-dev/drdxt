@@ -16,15 +16,17 @@ public partial class ScanViewModel
         !CanApply ? EtapeDuDocteur.Aucune
         : EssaiEnCours ? EtapeDuDocteur.EssaiEnCours
         : ReposCarteAOuvrir || !RienAPoserSeul || EssaiProposable ? EtapeDuDocteur.Optimiser
-        : PointsAFaire.Count > 0 ? EtapeDuDocteur.AFaire
+        : PointsAFaireRestants(ReposCarteEnAttente).Any() ? EtapeDuDocteur.AFaire
         : EtapeDuDocteur.Jouer;
+
+    private PointAFaire PremierPoint => PointsAFaireRestants(ReposCarteEnAttente).First();
 
     public string? ProchaineEtape => EtapeSuivante switch
     {
         EtapeDuDocteur.Optimiser => _localize("Etape.Optimiser"),
         EtapeDuDocteur.EssaiEnCours => _localize("Etape.EssaiEnCours"),
         EtapeDuDocteur.AFaire => string.Format(CultureInfo.CurrentCulture, _localize("Etape.AFaire"),
-            PointsAFaire[0].Entree.Titre.TrimEnd('.', ' '), PointsAFaire[0].Domaine.Nom),
+            PremierPoint.Entree.Titre.TrimEnd('.', ' '), PremierPoint.Domaine.Nom),
         EtapeDuDocteur.Jouer => _localize("Etape.Jouer"),
         _ => null,
     };
@@ -36,22 +38,24 @@ public partial class ScanViewModel
     [RelayCommand]
     private void SuivreLaProchaineEtape()
     {
-        if (EtapeSuivante == EtapeDuDocteur.AFaire) ChoisirDomaine(PointsAFaire[0].Domaine);
+        if (EtapeSuivante == EtapeDuDocteur.AFaire) ChoisirDomaine(PremierPoint.Domaine);
     }
 
     private static readonly HashSet<string> CeQuiChangeLEtape = new(StringComparer.Ordinal)
     {
         nameof(State), nameof(RienAPoserSeul), nameof(EssaiEnCours), nameof(EssaiProposable), nameof(ReposCarteAOuvrir),
+        nameof(ReposCarteEnAttente),
     };
 
-    // Un seul abonnement plutôt qu'une notification dans chaque setter qui touche l'étape.
+    // Un seul abonnement plutôt qu'une notification dans chaque setter qui touche l'étape. La liste « à faire » se
+    // reconstruit d'un bloc (AnnoncerSatellites) : une annonce par reconstruction, pas une par ligne (revue du 10/10/2026 :
+    // chaque évaluation de l'étape relit l'essai sur disque).
     private void AbonnerLaProchaineEtape()
     {
         PropertyChanged += (_, e) =>
         {
             if (e.PropertyName is { } nom && CeQuiChangeLEtape.Contains(nom)) AnnoncerEtape();
         };
-        PointsAFaire.CollectionChanged += (_, _) => AnnoncerEtape();
     }
 
     /// <summary>« Rien à poser par Optimiser » n'est vrai que si Optimiser n'a pas non plus de geste ni d'essai à lancer.</summary>

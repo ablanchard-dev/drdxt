@@ -123,7 +123,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-6,719 tests, 0 failures, measured on 10/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
+6,724 tests, 0 failures, measured on 10/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
 real hardware). The number is checked by `tools/gates/compte_des_tests.py` against the last run.
 
 The installer is built with `installer/build-installer.ps1`. It also needs **Inno Setup 6** and the Visual Studio C++

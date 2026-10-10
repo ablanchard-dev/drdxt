@@ -31,7 +31,10 @@ public sealed record EntreeCarte(
     string Valeur,
     string Action,
     bool NonLu,
-    bool Propose = false)
+    bool Propose = false,
+    // Revue du 10/10/2026 : la clé du constat (« Finding.Gpu.PerfMaxGlobal »), pour reconnaître un point sans comparer
+    // des textes traduits.
+    string? Cle = null)
 {
     /// <summary>29/09/2026 : la première phrase du détail reste à l'écran ; la suite s'ouvre sous « Pourquoi ? »
     /// (un constat mémoire faisait dix lignes d'un bloc).</summary>

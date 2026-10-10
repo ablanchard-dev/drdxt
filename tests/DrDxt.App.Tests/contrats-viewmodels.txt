@@ -183,6 +183,7 @@ EntreeCarte
   ARemede : Boolean
   Action : String
   ActionAAfficher : String
+  Cle : String
   CommandeACopier : String
   Detail : String
   DetailCourt : String

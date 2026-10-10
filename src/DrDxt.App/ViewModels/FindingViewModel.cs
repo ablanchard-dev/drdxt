@@ -4,11 +4,15 @@ namespace DrDxt.App.ViewModels;
 
 public sealed class FindingViewModel
 {
+    /// <summary>Revue du 10/10/2026 : la clé du constat, pour le reconnaître sans comparer des textes traduits.</summary>
+    internal string Cle { get; }
+
     public FindingViewModel(Finding f, Func<string, string> localize)
     {
         Category = f.Category;
         Severity = f.Severity;
         Title = localize(f.TitleKey);
+        Cle = f.TitleKey;
         Constat = DrDxt.Core.Constat.Depuis(f);
 
         // Le dernier reste du score, retire le 05/09/2026.
