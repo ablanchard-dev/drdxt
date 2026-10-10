@@ -2299,6 +2299,21 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
   <data name="Scan.Etape.Audit" xml:space="preserve">
     <value>audit de santé du système</value>
   </data>
+  <data name="Etape.Optimiser" xml:space="preserve">
+    <value>Prochaine étape : Optimiser. DrDXT pose ce qu'il sait régler seul sur ce PC, essaie en jeu ce qui se juge en jeu, et te donne ton ordonnance pour le reste.</value>
+  </data>
+  <data name="Etape.EssaiEnCours" xml:space="preserve">
+    <value>Prochaine étape : joue. Un essai tourne, une partie avec, une sans ; DrDXT ouvert, il tranche seul après trois parties de chaque côté.</value>
+  </data>
+  <data name="Etape.AFaire" xml:space="preserve">
+    <value>Prochaine étape : {0} ({1}). DrDXT ne peut pas le faire à ta place ; le pas à pas est dans son domaine.</value>
+  </data>
+  <data name="Etape.AFaire.Bouton" xml:space="preserve">
+    <value>Voir le pas à pas</value>
+  </data>
+  <data name="Etape.Jouer" xml:space="preserve">
+    <value>Prochaine étape : joue. Rien d'autre à faire sur ce PC pour l'instant ; DrDXT ouvert, il relève tes parties et te préviendra.</value>
+  </data>
   <data name="Apply.RienAPoserSeul" xml:space="preserve">
     <value>Rien à poser par « Optimiser » pour l'instant : ses réglages sont déjà en place, ou fermés sur ce PC (la raison est dans chaque domaine). Les autres gestes sont dans « Agir ».</value>
   </data>

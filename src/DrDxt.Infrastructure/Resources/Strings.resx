@@ -2326,6 +2326,21 @@ No setting on your machine was changed by this error.</value>
   <data name="Scan.Etape.Audit" xml:space="preserve">
     <value>system health audit</value>
   </data>
+  <data name="Etape.Optimiser" xml:space="preserve">
+    <value>Next step: Optimize. DrDXT sets what it can fix on its own on this PC, tries in game what is judged in game, and gives you your prescription for the rest.</value>
+  </data>
+  <data name="Etape.EssaiEnCours" xml:space="preserve">
+    <value>Next step: play. A trial is running, one game with, one without; keep DrDXT open, it decides on its own after three games on each side.</value>
+  </data>
+  <data name="Etape.AFaire" xml:space="preserve">
+    <value>Next step: {0} ({1}). DrDXT cannot do it for you; the step-by-step guide is in its domain.</value>
+  </data>
+  <data name="Etape.AFaire.Bouton" xml:space="preserve">
+    <value>See the guide</value>
+  </data>
+  <data name="Etape.Jouer" xml:space="preserve">
+    <value>Next step: play. Nothing else to do on this PC for now; keep DrDXT open, it records your games and will tell you.</value>
+  </data>
   <data name="Apply.RienAPoserSeul" xml:space="preserve">
     <value>Nothing for “Optimize” to apply for now: its settings are already in place, or closed on this PC (each area says why). Other actions are under “Act”.</value>
   </data>

@@ -435,6 +435,17 @@
                                 </TextBlock>
                                 <TextBlock Text="{Binding SubtitleText}" Style="{StaticResource Discret}" FontSize="15" LineHeight="23" Margin="0,12,0,0"/>
                                 <TextBlock Text="{Binding DateDuScan}" Style="{StaticResource Legende}" Margin="0,4,0,0" Typography.NumeralAlignment="Tabular"/>
+                                <!-- 10/10/2026 (« le côté Dr n'y est pas ») : le docteur dit d'abord ce qui vient ensuite, une phrase, un bouton. -->
+                                <Border x:Name="ProchaineEtape" BorderBrush="{StaticResource IrisCyanBrush}" BorderThickness="2,0,0,0" Padding="14,2,0,2"
+                                        Margin="0,18,0,0" HorizontalAlignment="Left" MaxWidth="560"
+                                        Visibility="{Binding ProchaineEtape, Converter={StaticResource StrVis}}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding ProchaineEtape}" Style="{StaticResource Corps}" Foreground="{StaticResource TexteBrush}" TextWrapping="Wrap"/>
+                                        <Button Style="{StaticResource Lien}" Content="{Binding ProchaineEtapeBouton}" Command="{Binding SuivreLaProchaineEtapeCommand}"
+                                                HorizontalAlignment="Left" Margin="0,8,0,0"
+                                                Visibility="{Binding ProchaineEtapeBouton, Converter={StaticResource StrVis}}"/>
+                                    </StackPanel>
+                                </Border>
                                 <!-- La légende du registre passe en info-bulle de sa ligne : une ligne de moins, rien de perdu. -->
                                 <TextBlock Text="{Binding RegisterText}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,14,0,0"
                                            Typography.NumeralAlignment="Tabular" ToolTip="{Binding LabelRegisterCaption}"/>
@@ -491,7 +502,7 @@
                                     <!-- 03/10/2026 (D5.1) : rien que DrDXT puisse poser seul : une phrase vraie à la place du bouton. -->
                                     <TextBlock Text="{Binding LabelRienAPoserSeul}" Style="{StaticResource Discret}" TextWrapping="Wrap" MaxWidth="540"
                                                HorizontalAlignment="Left" Margin="0,12,0,0"
-                                               Visibility="{Binding RienAPoserSeul, Converter={StaticResource BoolVis}}"/>
+                                               Visibility="{Binding RienAPoserDuTout, Converter={StaticResource BoolVis}}"/>
                                     <!-- 06/10/2026 (L-GPU) : pourquoi le réglage de la carte est ouvert ou fermé chez ce joueur. -->
                                     <!-- 08/10/2026 : le détail du réglage de la carte se replie derrière son lien. -->
                                     <StackPanel Visibility="{Binding PhraseReglageCarte, Converter={StaticResource StrVis}}" Margin="0,12,0,0">

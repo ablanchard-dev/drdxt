@@ -602,6 +602,8 @@ ScanViewModel
   PresentStallLabel : String
   PretAJouerEnCours : Boolean
   ProblemSummary : String
+  ProchaineEtape : String
+  ProchaineEtapeBouton : String
   ProgressionDuScan : Double
   ProgressionTestMemoire : Double
   PropositionCalmer : String
@@ -637,6 +639,7 @@ ScanViewModel
   ReposCarteVisible : Boolean
   ResultatOptimisation : String
   ResultatTestMemoire : String
+  RienAPoserDuTout : Boolean
   RienAPoserSeul : Boolean
   Satellites : IReadOnlyList<SatelliteDomaine>
   ScanCommand : IAsyncRelayCommand
@@ -645,6 +648,7 @@ ScanViewModel
   State : ScanState
   StutterLabel : String
   SubtitleText : String
+  SuivreLaProchaineEtapeCommand : IAsyncRelayCommand
   TempsRestantTestMemoire : String
   TestMemoireATermine : Boolean
   TestMemoireEnCours : Boolean

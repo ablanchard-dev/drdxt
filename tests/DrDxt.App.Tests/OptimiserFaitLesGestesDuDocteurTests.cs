@@ -78,6 +78,37 @@ public sealed class OptimiserFaitLesGestesDuDocteurTests
         else ordonnance.Should().Contain("Ordonnance.RienAMain");
     }
 
+    // 10/10/2026 (« le côté Dr n'y est pas ») : après le scan, une prochaine étape en tête, un seul bouton.
+    [Fact]
+    public async Task Apres_le_scan_le_docteur_dit_la_prochaine_etape_et_elle_suit_ce_qui_est_fait()
+    {
+        var vm = await ScanneAvec(new Finding("Gpu", Severity.Minor, "Finding.Gpu.PerfMaxGlobal", null));
+        Levier(vm);
+        vm.SignalerReposCarte();
+        vm.ProchaineEtape.Should().Be("Etape.Optimiser", "DrDXT a un geste à faire seul : c'est Optimiser d'abord");
+        vm.ProchaineEtapeBouton.Should().NotBeNull();
+        vm.RienAPoserSeul = true;
+        vm.RienAPoserDuTout.Should().BeFalse("plus de « rien à poser par Optimiser » quand Optimiser a un geste à faire");
+        vm.ApplyHintKey.Should().NotBe("Apply.RienAPoserSeul");
+        var annonces = 0;
+        vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(ScanViewModel.ProchaineEtape)) annonces++; };
+
+        await vm.SuivreLaProchaineEtapeCommand.ExecuteAsync(null);
+
+        vm.ReposCarteEnAttente.Should().BeTrue("le bouton de l'étape lance Optimiser");
+        annonces.Should().BeGreaterThan(0, "l'écran suit");
+        vm.ProchaineEtape.Should().BeOneOf("Etape.AFaire", "Etape.Jouer");
+    }
+
+    [Fact]
+    public void Avant_le_scan_pas_d_etape()
+    {
+        var vm = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
+            Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k);
+        vm.ProchaineEtape.Should().BeNull();
+        vm.ProchaineEtapeBouton.Should().BeNull();
+    }
+
     [Fact]
     public async Task Sans_le_constat_optimiser_ne_touche_pas_au_pilote()
     {
