@@ -1,0 +1,18 @@
+DrDXT - test of your PC (read only)
+
+1. Unzip the whole folder (right-click the zip > Extract All), then open the extracted folder.
+2. Double-click DrDXT-Test.exe.
+   - If Windows shows "Windows protected your PC": click "More info", then "Run anyway". The program is not
+     signed, this is expected.
+   - Windows then asks "Do you want to allow this app to make changes" for DrDxt.Lanceur: click "Yes". The test
+     needs administrator rights to READ some Windows logs; it changes nothing. This small native launcher receives
+     the rights and starts the test with a clean environment.
+3. A black window shows each step. Do not close it. It takes 1 to 3 minutes. Its messages are in French.
+4. At the end, a DrDXT-rapport-....txt file is in your Downloads folder. It contains the models of your hardware, your
+   settings, the list of startup programs and services. The PC name and account name, serial numbers and network
+   addresses are removed. Read it, then send it to whoever gave you this test, or to the project:
+   https://github.com/ablanchard-dev/drdxt/issues/new?template=rapport-de-verification.yml
+
+Nothing is changed on your PC: the program only reads (graphics card, processor, settings, logs). It installs
+nothing, creates no service and no restore point, and writes only the report. If a step crashes, it moves to the next
+one and notes it in the report.

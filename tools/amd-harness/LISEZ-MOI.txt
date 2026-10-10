@@ -4,9 +4,10 @@ DrDXT — test de ton PC (lecture seule)
 2. Double-clique sur DrDXT-Test.exe.
    - Si Windows affiche « Windows a protégé votre ordinateur » : clique « Informations complémentaires »,
      puis « Exécuter quand même ». Le programme n'est pas signé, c'est normal.
-   - Windows demande ensuite « Voulez-vous autoriser cette application à apporter des modifications » :
-     clique « Oui ». Il a besoin des droits administrateur pour LIRE certains journaux de Windows ;
-     il ne modifie rien.
+   - Windows demande ensuite « Voulez-vous autoriser cette application à apporter des modifications » pour
+     DrDxt.Lanceur : clique « Oui ». Le test a besoin des droits administrateur pour LIRE certains journaux de
+     Windows ; il ne modifie rien. Ce petit lanceur natif reçoit les droits et démarre le test dans un
+     environnement propre.
 3. Une fenêtre noire affiche chaque étape. Ne la ferme pas. Compte 1 à 3 minutes.
 4. À la fin, un fichier DrDXT-rapport-....txt est dans ton dossier Téléchargements. Il contient les modèles de ton
    matériel, tes réglages, la liste des programmes au démarrage et des services. Le nom du PC et du compte, les numéros

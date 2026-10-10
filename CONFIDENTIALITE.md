@@ -1,5 +1,7 @@
 # Confidentialité
 
+English version: [PRIVACY.md](PRIVACY.md).
+
 DrDXT n'a ni compte, ni télémétrie, ni serveur à lui. Ce qu'il lit sur ton PC y reste, sauf les deux fichiers que tu
 choisis d'envoyer toi-même, plus bas.
 

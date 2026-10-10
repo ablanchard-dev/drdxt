@@ -1,5 +1,7 @@
 # Contribuer à DrDXT
 
+English version: [CONTRIBUTING.en.md](CONTRIBUTING.en.md).
+
 DrDXT est gratuit et sous GPL v3. Trois façons d'aider, de la plus simple à la plus technique.
 
 ## 1. Prouver DrDXT sur ton matériel
@@ -8,6 +10,8 @@ C'est l'aide la plus utile : DrDXT est mis au point sur peu de machines, et rien
 
 - **Vérifier DrDXT sur mon PC** (dans l'App) pose chaque réglage, le relit, le rend et le relit encore, avec ton
   accord. Le rapport arrive dans `Documents`. Ouvre une issue « Rapport de vérification » et joins-le.
+- **Sans installer DrDXT** : les zips de la [Release](https://github.com/ablanchard-dev/drdxt/releases) lisent ton PC,
+  ou font la même vérification, et écrivent le même rapport dans `Téléchargements` (mode d'emploi : `LISEZ-MOI.txt`).
 - **Exporter ma machine** écrit ce que DrDXT lit sur ton PC, sans rien qui te désigne
   ([docs/TESTEUR-EXPORTER-MA-MACHINE.md](docs/TESTEUR-EXPORTER-MA-MACHINE.md)). Ouvre une issue « Machine » et
   joins le fichier.

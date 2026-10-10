@@ -28,8 +28,8 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish (lanceur) a échoué ($LASTEXIT
 Copy-Item (Join-Path $lanceur 'DrDxt.Lanceur.exe') $pub
 Remove-Item $lanceur -Recurse -Force
 Get-ChildItem $pub -Filter *.pdb | Remove-Item
-if ($Validation) { 'LISEZ-MOI-VALIDATION.txt', 'VALIDER.cmd', 'REMETTRE.cmd' | ForEach-Object { Copy-Item (Join-Path $ici $_) $pub } }
-else { Copy-Item (Join-Path $ici 'LISEZ-MOI.txt') $pub }
+if ($Validation) { 'LISEZ-MOI-VALIDATION.txt', 'READ-ME-VALIDATION.txt', 'VALIDER.cmd', 'REMETTRE.cmd' | ForEach-Object { Copy-Item (Join-Path $ici $_) $pub } }
+else { 'LISEZ-MOI.txt', 'READ-ME.txt' | ForEach-Object { Copy-Item (Join-Path $ici $_) $pub } }
 if (Test-Path $Sortie) { Remove-Item $Sortie -Force }
 Compress-Archive -Path (Join-Path $pub '*') -DestinationPath $Sortie
 Write-Host "Zip prêt : $Sortie ($([math]::Round((Get-Item $Sortie).Length / 1MB)) Mo)"

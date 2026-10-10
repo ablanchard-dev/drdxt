@@ -1,26 +1,28 @@
-name: Bogue
-description: Quelque chose ne marche pas comme prévu.
+name: Bogue / Bug
+description: Quelque chose ne marche pas comme prévu. / Something does not work as expected.
 labels: ["bogue"]
 body:
   - type: markdown
     attributes:
       value: |
         Une faille de sécurité ? Ne l'écris pas ici : voir SECURITY.md (signalement privé).
+        A security issue? Do not post it here: see SECURITY.md (private report).
+        Français ou anglais, les deux vont. / French or English, both are fine.
   - type: input
     id: version
     attributes:
-      label: Version de DrDXT
-      description: En bas de l'écran, par exemple « Version 0.9.0 ».
+      label: Version de DrDXT / DrDXT version
+      description: En bas de l'écran, par exemple « Version 0.9.0 ». / Bottom of the screen, for example "Version 0.9.0".
     validations:
       required: true
   - type: textarea
     id: quoi
     attributes:
-      label: Ce que tu as fait, ce que tu attendais, ce qui s'est passé
+      label: Ce que tu as fait, ce que tu attendais, ce qui s'est passé / What you did, what you expected, what happened
     validations:
       required: true
   - type: textarea
     id: rapport
     attributes:
-      label: Rapport de diagnostic
-      description: « Voir le rapport » dans l'App, si elle en a produit un.
+      label: Rapport de diagnostic / Diagnostic report
+      description: « Voir le rapport » dans l'App, si elle en a produit un. / "View report" in the app, if it produced one.

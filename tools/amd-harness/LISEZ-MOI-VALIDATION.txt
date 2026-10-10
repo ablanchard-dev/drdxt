@@ -18,7 +18,9 @@ lui-même ces écritures. Il ne crée ni service ni point de restauration, et n'
      puis « Exécuter quand même ». Le programme n'est pas signé (pas encore de certificat pour ce projet gratuit).
      Pour vérifier que le zip est bien celui du projet, compare son empreinte SHA-256 avec celle de la page
      de téléchargement (PowerShell : Get-FileHash DrDXT-Validation-....zip).
-   - Windows demande « Voulez-vous autoriser cette application à apporter des modifications » : clique « Oui ».
+   - Windows demande « Voulez-vous autoriser cette application à apporter des modifications » pour DrDxt.Lanceur :
+     clique « Oui ». Ce petit lanceur natif reçoit les droits administrateur et démarre le test dans un
+     environnement propre.
 4. Ne ferme pas la fenêtre noire. Compte une à deux minutes.
 5. À la fin, un fichier DrDXT-validation-....txt est dans ton dossier Téléchargements. Sa première ligne dit
    « tout est remis d'origine », ou la liste de ce qu'il faut vérifier.
