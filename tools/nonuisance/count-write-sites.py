@@ -36,6 +36,9 @@ PATTERNS = [
     # retire ce qui etait pose), et `TrySet\w+` ne la voyait pas. Meme reponse que le 05/09 : un
     # motif d'intention. La liste ne fait que grandir.
     r"TryDelete\w+",
+    # 10/10/2026, B1 : l'ecriture d'un registre du processeur passe par PawnIO (pawnio_execute "ioctl_write_msr"), un
+    # P/Invoke que rien ici ne voyait. Motif d'intention : le nom de l'ioctl d'ecriture, cite dans l'appel.
+    r"ioctl_write_\w+",
     # 07/10/2026, L-ECRAN : le mode de l'ecran se pose par un P/Invoke direct de user32, que rien ici ne voyait. Le
     # motif demande la parenthese : un appel ou une declaration, pas le nom cite dans une source ou une phrase.
     r"ChangeDisplaySettings\w*\(",

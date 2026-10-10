@@ -77,6 +77,7 @@ public static class ApplicationServiceCollectionExtensions
 
         // Fix-it seams.
         services.TryAddSingleton<IPowerPlanReader, StubPowerPlanReader>();
+        services.TryAddSingleton<ICpuPowerLimitReader, StubCpuPowerLimitReader>();
         services.TryAddSingleton<IServiceStateReader, StubServiceStateReader>();
         services.TryAddSingleton<IModeEcran, StubModeEcran>();
         services.TryAddSingleton<IConfirmationEcran, StubConfirmationEcran>();
@@ -131,6 +132,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ITweak, X3dCcdParkingFixTweak>();
         services.AddSingleton<ITweak, SanePowerPlanTweak>();
         services.AddSingleton<ITweak, ModeBoostTweak>();
+        services.AddSingleton<ITweak, LimitePuissanceCpuTweak>();
         services.AddSingleton<ITweak, SanePagefileTweak>();
         services.AddSingleton<ITweak, HeuresActivesTweak>();
         services.AddSingleton<ITweak, EcranFrequenceTweak>();

@@ -35,6 +35,7 @@ public class SourcesCiteesTests
         "presentmon.com",
         "github.com",
         "ablanchard-dev.github.io", // 09/10/2026 : le site GitHub Pages du projet, racine des manifestes de mise à jour signés
+        "www.techpowerup.com",      // 10/10/2026 (B1) : mesure publique des limites de puissance (i9-14900K, 35 a 253 W, jeux 720p a 4K)
         "hwbusters.com",            // 08/10/2026 (A6) : mesure publique du parcage X3D (7950X3D, 1080p), graphique relu
         "www.msi.com",              // 07/10/2026 (D12) : la page d'assistance d'une carte MSI (manuel), ouverte sur clic ; relevée dans un vrai navigateur
     };

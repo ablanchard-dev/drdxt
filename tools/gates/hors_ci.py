@@ -42,7 +42,7 @@ ATTENDU = {
     "DrDxt.App.Tests/DisplayInfoSurLeVraiSystemeTests.cs": (1, "lit les ecrans de la vraie session"),
     "DrDxt.GpuNative.Tests/VentilateurNvmlSurLaVraieCarteTests.cs": (1, "lit le ventilateur de la vraie carte NVIDIA"),
     "DrDxt.ElevatedHelper.Tests/SessionUtilisateurSurLaVraieRucheTests.cs": (1, "ecrit puis rend une valeur de la vraie session Windows"),
-    "DrDxt.Detection.Tests/TemperaturePawnIoTests.cs": (2, "lit la temperature et les limites de puissance du processeur par PawnIO quand il est installe"),
+    "DrDxt.Detection.Tests/TemperaturePawnIoTests.cs": (3, "lit la temperature, les limites de puissance et leur copie MMIO du processeur par PawnIO quand il est installe"),
     "DrDxt.ElevatedHelper.Tests/AccelerationSourisSurLaVraieSessionTests.cs": (1, "ecrit puis rend l'acceleration du pointeur de la vraie session Windows"),
     "DrDxt.Detection.Tests/Network/DiagnosticDeRouteSurLaVraiePartieTests.cs": (1, "suit une vraie partie de Call of Duty et le vrai reseau"),
     "DrDxt.App.Tests/GameLocatorOnThisMachineTests.cs": (2, "interroge les fenetres de la vraie session"),

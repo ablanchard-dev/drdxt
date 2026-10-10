@@ -27,9 +27,13 @@ public sealed class SettingsStateReader : ISettingsStateReader
     public SettingsStateReader(IPowerProvider power, IRegistryProvider registry,
         INetworkAdapterReader network, INvApi? nvApi = null, IDisplayInfo? display = null,
         IUnexpectedShutdownLog? shutdowns = null, IGameExecutable? game = null,
-        IHagsEffectiveReader? hags = null, IAdlx? adlx = null)
-        => (_power, _registry, _network, _nvApi, _display, _shutdowns, _game, _hags, _adlx)
-            = (power, registry, network, nvApi, display, shutdowns, game, hags, adlx);
+        IHagsEffectiveReader? hags = null, IAdlx? adlx = null,
+        // B1 (10/10/2026) : la limite de puissance du processeur (PawnIO). null = non lue : le levier ne s'arme pas.
+        DrDxt.Application.Tweaks.Hardware.ICpuPowerLimitReader? limitePuissance = null)
+        => (_power, _registry, _network, _nvApi, _display, _shutdowns, _game, _hags, _adlx, _limitePuissance)
+            = (power, registry, network, nvApi, display, shutdowns, game, hags, adlx, limitePuissance);
+
+    private readonly DrDxt.Application.Tweaks.Hardware.ICpuPowerLimitReader? _limitePuissance;
 
     /// <summary>Vrai quand la couture du jeu en cours est BRANCHEE : sans elle, les reglages du
     /// pilote se lisent au profil global, quel que soit le jeu. « Enregistre » n'est pas
@@ -207,7 +211,9 @@ public sealed class SettingsStateReader : ISettingsStateReader
             MmcssIntact: _registry.GetMmcssIntact(),
             HeuresActives: _registry.GetHeuresActives(),
             // 07/10/2026 (L-CPU) : sans droits ; non lu = null, le levier du boost ne s'arme pas.
-            ModeDeBoost: Guid.TryParse(power.Value, out var plan) ? _power.LireModeDeBoost(plan) : null);
+            ModeDeBoost: Guid.TryParse(power.Value, out var plan) ? _power.LireModeDeBoost(plan) : null,
+            // B1 (10/10/2026) : PL1/PL2 du processeur, copie MMIO comprise ; non lu = null.
+            LimitePuissance: _limitePuissance?.LireRegistres() is { IsOk: true, Value: { } limite } ? limite.Lue : null);
 
         return Result<SettingsState>.Ok(state);
     });

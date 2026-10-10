@@ -497,6 +497,8 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<IModeEcran, DrDxt.Detection.Display.Win32ModeEcran>();
         services.AddSingleton<IConfirmationEcran, FenetreConfirmationEcran>();
         services.AddSingleton<IPowerPlanReader, Win32PowerPlanReader>();
+        // B1 (10/10/2026) : la limite de puissance du processeur par PawnIO (lecture ; l'écriture passe par le helper).
+        services.AddSingleton<DrDxt.Application.Tweaks.Hardware.ICpuPowerLimitReader, DrDxt.Detection.Cpu.PawnIoCpuPowerLimitReader>();
         services.AddSingleton<IServiceStateReader, Win32ServiceStateReader>();
 
         // R2 — the real deterministic GPU bench. The Vortice D3D11 compute runner

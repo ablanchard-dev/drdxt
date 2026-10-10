@@ -68,6 +68,9 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
         "RenewLeaseOp",
         "RunServiceControlOp",
         "SetActivePowerPlanOp",
+        // 10/10/2026 (B1) : la limite de puissance du processeur (PL1 seulement, dans la PL2 de la carte), par PawnIO
+        // dans le helper ; documentee dans docs/NON-NUISANCE.md.
+        "SetCpuPackagePowerLimitOp",
         // 07/10/2026 (L-CPU) : le mode de boost secteur d'un plan, seul reglage du plan ecrit (docs/NON-NUISANCE.md).
         "SetProcessorBoostModeOp",
         "SetRegistryValueOp",

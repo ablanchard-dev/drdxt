@@ -6,7 +6,10 @@ namespace DrDxt.Core;
 /// limite » (contre-revue du 09/10 : seule la valeur brute décide, jamais le bit 15, dont la fiabilité n'est pas vérifiée,
 /// et jamais une conversion en watts qui dépend de l'unité).</summary>
 public sealed record LimiteDePuissanceLue(double Pl1W, double Pl2W, double NominaleW, bool Verrou, bool Pl1Active = true,
-    bool RegistreAuMaximum = false)
+    bool RegistreAuMaximum = false,
+    // B1 (10/10/2026) : la copie MMIO de la carte mère (null = non lue, 0 = inactive, sinon la PL1 qu'elle tient) et la
+    // puissance maximale que le processeur publie (0 = absente). La limite effective est la plus basse de MSR et MMIO.
+    double? CopieMmioPl1W = null, double MaximaleW = 0)
 {
     public bool SansLimite => RegistreAuMaximum;
 }
@@ -16,8 +19,9 @@ public sealed record LimiteDePuissanceLue(double Pl1W, double Pl2W, double Nomin
 /// puis redescend ; c'est un goulot que les compteurs Windows ne voient pas (RAPL « Performance Limit Flags » à 0 pendant
 /// que la fréquence tombe, mesuré). La PL1 du registre MSR ne se lit que par PawnIO, s'il est installé ; la carte mère
 /// peut tenir plus bas encore par sa copie MMIO, que DrDXT ne lit pas : ce constat dit « du registre », pas « effective ».
-/// Lecture seule : le réglage est au BIOS (guide 5.3), DrDXT ne l'écrit jamais. Sur un Intel non-K, PL1 = puissance de base
-/// est la valeur d'Intel ; sur un K, Intel documente aussi un profil Performance plus haut : un choix, pas une réparation.
+/// B1 (10/10/2026) : Optimiser sait monter la PL1 à chaud jusqu'à la PL2 que la carte autorise (PawnIO, jugé en jeu,
+/// rendu sans gain) ; au BIOS reste ce que DrDXT n'écrit pas : la PL2, un verrou. Sur un Intel non-K, PL1 = puissance de
+/// base est la valeur d'Intel ; sur un K, Intel documente aussi un profil Performance plus haut : un choix, pas une réparation.
 /// </summary>
 public static class LimiteDePuissance
 {
@@ -41,13 +45,18 @@ public static class LimiteDePuissance
         if (lu.Pl1W + 0.5 < lu.NominaleW)
             return new RepairFinding("CPU", Nom, courante, attendue, RepairStatus.Suspicious,
                 $"la carte mère tient le processeur à {W(lu.Pl1W)} en continu, sous sa puissance de base de {W(lu.NominaleW)} : "
-                + "il tient sa fréquence quelques secondes puis redescend. Le réglage est au BIOS (limite de puissance, profil "
-                + "constructeur) ; DrDXT ne l'écrit jamais." + (lu.Verrou ? " Le registre est verrouillé jusqu'au redémarrage : seul le BIOS le change." : ""),
+                + "il tient sa fréquence quelques secondes puis redescend. "
+                + (lu.Verrou
+                    ? "Le registre est verrouillé jusqu'au redémarrage : seul le BIOS le change (limite de puissance, profil constructeur)."
+                    : $"Optimiser peut la monter à chaud jusqu'à {W(lu.Pl2W)} (ce que la carte laisse déjà passer en pointe), jugée en jeu et rendue sans gain ; le BIOS reste le réglage durable."),
                 RepairAction.Recommandation);
         if (Math.Abs(lu.Pl1W - lu.NominaleW) < 0.5)
             return new RepairFinding("CPU", Nom, courante, attendue, RepairStatus.Observed,
                 $"PL1 à la puissance de base ({W(lu.NominaleW)}) : le profil de base d'Intel pour ce processeur. Sur un K, Intel "
-                + "documente aussi un profil Performance plus haut (guide 5.3) ; monter chauffe plus : un choix, pas une réparation.");
+                + "documente aussi un profil Performance plus haut (guide 5.3) ; monter chauffe plus : un choix, pas une réparation."
+                + (!lu.Verrou && lu.Pl2W > lu.Pl1W + 0.5
+                    ? $" Optimiser peut l'essayer à chaud jusqu'à {W(lu.Pl2W)}, jugée sur tes parties et rendue sans gain."
+                    : ""));
         return new RepairFinding("CPU", Nom, courante, attendue, RepairStatus.Observed,
             $"PL1 relevée par le BIOS au-dessus de la puissance de base ({W(lu.NominaleW)}) : le processeur n'est pas tenu en "
             + "puissance ; surveille sa température.");

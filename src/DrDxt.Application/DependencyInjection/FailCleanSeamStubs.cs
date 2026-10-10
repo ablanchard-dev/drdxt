@@ -147,6 +147,9 @@ internal sealed class StubPowerPlanReader : IPowerPlanReader
         Result<Guid>.Fail(ErrorCodes.TweakSdkUnavailable, "Power-plan read not available (stub).");
 }
 
+/// <summary>Fail-clean CPU power-limit read seam: not available (the App wires the PawnIO reader).</summary>
+internal sealed class StubCpuPowerLimitReader : ICpuPowerLimitReader { }
+
 /// <summary>Fail-clean service-state read seam: not available.</summary>
 internal sealed class StubServiceStateReader : IServiceStateReader
 {

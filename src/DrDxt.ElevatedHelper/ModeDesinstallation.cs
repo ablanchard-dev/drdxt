@@ -178,5 +178,7 @@ public static class ModeDesinstallation
             // La desinstallation doit pouvoir REPOSER un element BCD que DrDXT a retire.
             bcd: new Win32BcdActions(),
             // 08/10/2026 (GPU-OC) : rendre un ventilateur resté en vitesse fixe à l'automatique.
-            ventilateur: new NvmlVentilateurActions()));
+            ventilateur: new NvmlVentilateurActions(),
+            // 10/10/2026 (B1) : rendre une limite de puissance du processeur restée posée.
+            cpu: new PawnIoCpuPowerActions()));
 }

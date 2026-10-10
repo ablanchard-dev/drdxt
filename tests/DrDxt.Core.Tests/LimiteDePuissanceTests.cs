@@ -15,7 +15,15 @@ public sealed class LimiteDePuissanceTests
         f.Statut.Should().Be(RepairStatus.Suspicious);
         f.Action.Should().Be(RepairAction.Recommandation);
         f.ValeurCourante.Should().Be("PL1 45 W, PL2 125 W, verrouillée");
-        f.Explication.Should().Contain("BIOS").And.Contain("ne l'écrit jamais").And.Contain("verrouillé");
+        f.Explication.Should().Contain("BIOS").And.Contain("verrouillé").And.NotContain("Optimiser", "verrouillée : seul le BIOS la change");
+
+        var ouverte = LimiteDePuissance.Juger(new LimiteDePuissanceLue(45, 125, 65, Verrou: false));
+        ouverte.Statut.Should().Be(RepairStatus.Suspicious);
+        ouverte.Explication.Should().Contain("Optimiser").And.Contain("125 W").And.Contain("BIOS");
+
+        // B1 : à la base mais sous une PL2 plus haute, le docteur dit qu'Optimiser peut l'essayer.
+        LimiteDePuissance.Juger(new LimiteDePuissanceLue(65, 219, 65, Verrou: false)).Explication.Should().Contain("Optimiser");
+        LimiteDePuissance.Juger(new LimiteDePuissanceLue(65, 65, 65, Verrou: false)).Explication.Should().NotContain("Optimiser", "aucune marge");
     }
 
     [Fact]

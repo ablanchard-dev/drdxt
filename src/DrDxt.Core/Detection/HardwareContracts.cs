@@ -231,7 +231,10 @@ public record SettingsState(
     ModeDeBoostLu? ModeDeBoost = null,
     // MOUSE1 (09/10/2026) : « Améliorer la précision du pointeur » (HKCU Control Panel\Mouse, MouseSpeed). On = accélération
     // active, Off = coupée, Unknown = valeur absente ou d'un autre type, null = non lu (lecteur non branché).
-    TriState? AccelerationSouris = null);
+    TriState? AccelerationSouris = null,
+    // B1 (10/10/2026) : la limite de puissance du processeur Intel lue par PawnIO (PL1, PL2, verrou, copie MMIO, maximum
+    // publié). null = non lue (PawnIO absent, pas Intel, sans droits) : le levier ne s'arme pas, le docteur le dit.
+    LimiteDePuissanceLue? LimitePuissance = null);
 
 /// <summary>07/10/2026 (L-CPU) : PERFBOOSTMODE sur secteur, lu dans un plan, avec le défaut de la personnalité de ce plan
 /// (Microsoft Learn, « PERFBOOSTMODE » : 0 = désactivé quel que soit le mode du processeur, 1 à 4 = activé).</summary>

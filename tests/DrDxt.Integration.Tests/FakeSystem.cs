@@ -43,6 +43,8 @@ public sealed class FakeSystemState
 
     // L-CPU : le mode de boost secteur (PERFBOOSTMODE) du plan actif, et le défaut de sa personnalité.
     public uint ModeBoostSecteur { get; set; } = 2;
+    // B1 (10/10/2026) : le registre 0x610 du banc : PL1 65 W, PL2 219 W (huitièmes de watt), activées, sans verrou.
+    public ulong CpuPkgPowerLimit { get; set; } = (1752UL << 32) | (1UL << 47) | (1UL << 15) | 520UL;
     public uint ModeBoostDefaut { get; set; } = 2;
 
     // Service states.
@@ -141,7 +143,7 @@ public sealed class FakeSystemState
             sb.Append('[').Append(kv.Key).Append('=').Append(kv.Value.Kind).Append(':')
               .Append(kv.Value.Value).Append(']');
 
-        sb.Append(";power=").Append(ActivePowerPlan.ToString("D")).Append(",boost=").Append(ModeBoostSecteur);
+        sb.Append(";power=").Append(ActivePowerPlan.ToString("D")).Append(",boost=").Append(ModeBoostSecteur).Append(",pl=").Append(CpuPkgPowerLimit);
 
         sb.Append(";services:");
         foreach (var kv in _services.OrderBy(k => k.Key, StringComparer.Ordinal))
@@ -218,6 +220,11 @@ public sealed class FakeElevatedClient : IElevatedClient
             // Le banc ne modélise que le plan actif : une écriture visant un autre plan ne change rien ici.
             case SetProcessorBoostModeOp b when b.PlanGuid == _state.ActivePowerPlan:
                 _state.ModeBoostSecteur = b.AcValue;
+                break;
+
+            // B1 (10/10/2026) : le registre de limite de puissance du processeur, tel quel.
+            case SetCpuPackagePowerLimitOp c:
+                _state.CpuPkgPowerLimit = c.Valeur;
                 break;
 
             case ApplyNvApiClockOffsetOp c:
@@ -408,6 +415,22 @@ public sealed class FakePowerPlanReader : IPowerPlanReader
     public Result<ModeDeBoostLu> LireModeDeBoost(Guid plan) => plan == _state.ActivePowerPlan
         ? Result<ModeDeBoostLu>.Ok(new ModeDeBoostLu(plan, _state.ModeBoostSecteur, _state.ModeBoostDefaut))
         : Result<ModeDeBoostLu>.Fail(ErrorCodes.TweakSdkUnavailable, "plan non modélisé");
+}
+
+/// <summary>B1 (10/10/2026) : les registres de limite de puissance du banc (unité = huitièmes de watt, base 65 W).</summary>
+public sealed class FakeCpuPowerLimitReader : ICpuPowerLimitReader
+{
+    private readonly FakeSystemState _state;
+    public FakeCpuPowerLimitReader(FakeSystemState state) => _state = state;
+
+    public Result<LectureLimiteCpu> LireRegistres()
+    {
+        var registres = new RegistresCpuLus(0x3, _state.CpuPkgPowerLimit, 520UL);
+        var lu = RegistreDeLimiteCpu.Decoder(0x3, _state.CpuPkgPowerLimit, 520UL);
+        return lu is null
+            ? Result<LectureLimiteCpu>.Fail(ErrorCodes.TweakSdkUnavailable, "registres vides")
+            : Result<LectureLimiteCpu>.Ok(new LectureLimiteCpu(registres, lu with { CopieMmioPl1W = 0 }));
+    }
 }
 
 public sealed class FakeServiceStateReader : IServiceStateReader

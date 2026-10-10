@@ -43,8 +43,6 @@
          runner needs no runtime HLSL compiler. Regenerate from GpuBench.hlsl with:
          fxc /T cs_5_0 /E CSMain /O3 /Fo GpuBench.cso GpuBench.hlsl -->
     <EmbeddedResource Include="Gpu\Bench\GpuBench.cso" />
-    <!-- PAWN1 (09/10/2026) : module IntelMSR de namazso/PawnIO.Modules (LGPL-2.1+, third_party/pawnio-modules), fige par empreinte. -->
-    <EmbeddedResource Include="Cpu\PawnIO\IntelMSR.bin" />
     <!-- Ship the HLSL source alongside for auditability (not compiled by MSBuild). -->
     <None Include="Gpu\Bench\GpuBench.hlsl" />
   </ItemGroup>

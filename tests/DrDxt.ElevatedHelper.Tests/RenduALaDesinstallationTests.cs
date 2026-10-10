@@ -48,6 +48,7 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         DeleteRegistryValueOp d => $"{d.Hive}|{d.Path}|{d.Name}",
         SetActivePowerPlanOp => "plan",
         SetProcessorBoostModeOp b => "boost|" + b.PlanGuid,
+        SetCpuPackagePowerLimitOp => "pl1",
         RunServiceControlOp r => "service|" + r.ServiceName,
         ApplyNvApiDrsSettingOp a => "drs|" + a.SettingId,
         ApplyNvApiPowerLimitOp n => "nvpuissance|" + n.GpuIndex,

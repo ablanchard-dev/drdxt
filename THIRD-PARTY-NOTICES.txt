@@ -18,8 +18,9 @@ Bibliothèques livrées avec l'application
   composants (texte complet : PresentMon-NOTICE-MIT.txt). https://github.com/GameTechDev/PresentMon
 
 Module embarqué pour PawnIO (rien n'installe PawnIO : DrDXT s'en sert seulement s'il est déjà là)
-- IntelMSR.bin (namazso/PawnIO.Modules) : LGPL-2.1 ou ultérieure, © namazso (texte complet : third_party/pawnio-modules/COPYING).
-  Lecture seule des registres de température du processeur Intel. https://github.com/namazso/PawnIO.Modules
+- IntelMSR.bin et IntelMCHBAR.bin (namazso/PawnIO.Modules, publication 0.2.11) : LGPL-2.1 ou ultérieure, © namazso (texte
+  complet : third_party/pawnio-modules/COPYING). Lecture des registres de température et de limite de puissance du
+  processeur Intel, écriture de la seule limite continue (PL1) sur accord, par le helper. https://github.com/namazso/PawnIO.Modules
 - PawnIO (pilote et PawnIOLib.dll) : non livré ; appelé s'il est installé par le joueur. https://pawnio.eu
 
 Police

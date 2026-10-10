@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using DrDxt.Core;
 using DrDxt.Detection.Cpu;
 using FluentAssertions;
 
@@ -30,7 +31,7 @@ public sealed class TemperaturePawnIoTests
     [Fact]
     public void Le_module_embarque_est_celui_relu_et_fige()
     {
-        using var flux = typeof(TemperaturePawnIo).Assembly.GetManifestResourceStream("DrDxt.Detection.Cpu.PawnIO.IntelMSR.bin");
+        using var flux = typeof(DrDxt.GpuNative.PawnIo.PawnIoIntel).Assembly.GetManifestResourceStream("DrDxt.GpuNative.PawnIo.IntelMSR.bin");
         flux.Should().NotBeNull("le module IntelMSR.bin de namazso/PawnIO.Modules est embarqué");
         using var ms = new MemoryStream();
         flux!.CopyTo(ms);
@@ -44,6 +45,40 @@ public sealed class TemperaturePawnIoTests
         // Avec ou sans PawnIO, la source composite répond (null compris) sans exception.
         var act = () => TemperatureProcesseur.Lire();
         act.Should().NotThrow();
+    }
+
+    // B1 (10/10/2026) : composer une nouvelle PL1 ne touche à rien d'autre dans le registre.
+    [Fact]
+    public void Composer_PL1_ne_change_que_le_champ_PL1_et_l_active()
+    {
+        var origine = (1UL << 63) | (1UL << 47) | (1752UL << 32) | (0x1EUL << 17) | (1UL << 16) | 520UL; // verrou, PL2 219 W, fenêtre, bride, PL1 65 W
+        var compose = RegistreDeLimiteCpu.ComposerPl1(origine, 219, 0x3);
+        (compose & 0x7FFF).Should().Be(1752, "PL1 = 219 W en huitièmes de watt");
+        ((compose >> 15) & 1).Should().Be(1, "PL1 activée");
+        (compose & ~0xFFFFUL).Should().Be(origine & ~0xFFFFUL, "PL2, fenêtres, bride et verrou intouchés");
+        (RegistreDeLimiteCpu.ComposerPl1(origine, 100000, 0x3) & 0x7FFF).Should().Be(0x7FFF, "borné au maximum du champ");
+        (RegistreDeLimiteCpu.ComposerPl1(origine, 0, 0x3) & 0x7FFF).Should().Be(1, "jamais zéro");
+        RegistreDeLimiteCpu.Decoder(0x3, origine, (1752UL << 32) | 520UL)!.MaximaleW.Should().Be(219);
+        // La forme admise par le helper, sur un registre sans verrou (un verrou se refuse de toute façon).
+        var sansVerrou = origine & ~(1UL << 63); var composeSansVerrou = compose & ~(1UL << 63);
+        RegistreDeLimiteCpu.NeToucheQuePl1(composeSansVerrou, sansVerrou).Should().BeTrue();
+        RegistreDeLimiteCpu.NeToucheQuePl1(sansVerrou, composeSansVerrou).Should().BeTrue("le retour à l'origine est admissible aussi");
+        RegistreDeLimiteCpu.NeToucheQuePl1(compose, origine).Should().BeFalse("jamais de verrou posé");
+        RegistreDeLimiteCpu.NeToucheQuePl1(composeSansVerrou ^ (1UL << 40), sansVerrou).Should().BeFalse("PL2 intouchée");
+        RegistreDeLimiteCpu.NeToucheQuePl1((composeSansVerrou & ~0x7FFFUL) | 1753, sansVerrou).Should().BeFalse("PL1 jamais au-dessus de PL2");
+        TemperaturePawnIo.CopieMmioPl1W(0x10000UL, 0x3).Should().Be(0, "copie présente mais inactive (machine de référence)");
+        TemperaturePawnIo.CopieMmioPl1W((1UL << 15) | 520UL, 0x3).Should().Be(65, "copie active : 65 W");
+        TemperaturePawnIo.CopieMmioPl1W(null, 0x3).Should().BeNull();
+    }
+
+    [Fact]
+    public void Le_module_MCHBAR_embarque_est_celui_relu_et_fige()
+    {
+        using var flux = typeof(DrDxt.GpuNative.PawnIo.PawnIoIntel).Assembly.GetManifestResourceStream("DrDxt.GpuNative.PawnIo.IntelMCHBAR.bin");
+        flux.Should().NotBeNull();
+        using var ms = new MemoryStream();
+        flux!.CopyTo(ms);
+        Convert.ToHexStringLower(SHA256.HashData(ms.ToArray())).Should().Be(TemperaturePawnIo.EmpreinteMchbar);
     }
 
     [Fact]
@@ -75,6 +110,19 @@ public sealed class TemperaturePawnIoTests
 
         lu.Should().NotBeNull();
         lu!.Pl1W.Should().BeInRange(10, 1000); lu.Pl2W.Should().BeGreaterThanOrEqualTo(lu.Pl1W); lu.NominaleW.Should().BeInRange(10, 500);
+    }
+
+    // B1 (10/10/2026) : la copie MMIO de la limite, lue sur la vraie machine, et comparée au registre MSR (lecture seule).
+    [Fact]
+    [Trait("Category", "Machine")]
+    public void Sur_cette_machine_la_copie_MMIO_de_la_limite_se_lit_et_se_compare_au_registre()
+    {
+        if (!TemperaturePawnIo.Installe() || !TemperaturePawnIo.ProcesseurIntel()) return;
+        var lu = TemperaturePawnIo.LireLimites();
+        Console.WriteLine("MCHBAR : " + DrDxt.GpuNative.PawnIo.PawnIoIntel.DiagnostiquerMchbar());
+        Console.WriteLine($"MSR : {lu?.Pl1W} W / {lu?.Pl2W} W, verrou {lu?.Verrou} ; copie MMIO PL1 : {lu?.CopieMmioPl1W} W ; max 0x614 : {lu?.MaximaleW} W");
+        lu.Should().NotBeNull();
+        lu!.CopieMmioPl1W.Should().NotBeNull("la fenêtre MCHBAR se lit sur cette machine");
     }
 
     /// <summary>La preuve sur la machine : PawnIO installé ici (09/10/2026), un processeur Intel ⇒ une vraie température.</summary>

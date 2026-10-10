@@ -98,7 +98,8 @@
     "NvidiaDrsScope": null,
     "HagsEffective": "On",
     "GoulotMesure": null,
-    "BiosLu": null
+    "BiosLu": null,
+    "LimitePuissance": { "Pl1W": 65, "Pl2W": 117, "NominaleW": 65, "Verrou": false, "Pl1Active": true, "RegistreAuMaximum": false, "CopieMmioPl1W": 0, "MaximaleW": 0 }
   },
   "Sante": [
     {

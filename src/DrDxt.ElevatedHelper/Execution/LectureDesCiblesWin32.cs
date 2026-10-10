@@ -37,6 +37,10 @@ public sealed class LectureDesCiblesWin32 : ILectureDesCibles
                 SetRegistryValueOp s => LireRegistre(s),
                 SetActivePowerPlanOp => LirePlanActif(),
                 SetProcessorBoostModeOp b => LireModeDeBoost(b.PlanGuid),
+                // B1 (10/10/2026) : le registre entier, en décimal, comme l'op le pose.
+                SetCpuPackagePowerLimitOp => DrDxt.GpuNative.PawnIo.PawnIoIntel.LireRegistres() is { } r
+                    ? Result<string?>.Ok(r.PkgPowerLimit.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    : Result<string?>.Fail(ErrorCodes.HelperOpFailed, "CPU power limit register not readable."),
                 RunServiceControlOp r => LireService(r.ServiceName),
                 ApplyNvApiDrsSettingOp d when OpAllowlist.IsBaseProfileScope(d.ProfileName) => LireDrs(d.SettingId),
                 ApplyNvApiDrsSettingOp d when OpAllowlist.IsQualifiedExecutablePath(d.ProfileName)
@@ -101,6 +105,8 @@ public sealed class LectureDesCiblesWin32 : ILectureDesCibles
                 // (ou, pire, on ecrirait un GUID qui ne designe plus rien).
                 SetActivePowerPlanOp p => PlanExiste(p.PlanGuid),
                 SetProcessorBoostModeOp b => PlanExiste(b.PlanGuid),
+                // B1 : la cible existe tant que PawnIO est là et que le processeur est Intel.
+                SetCpuPackagePowerLimitOp => Result<bool>.Ok(DrDxt.GpuNative.PawnIo.PawnIoIntel.Installe() && DrDxt.GpuNative.PawnIo.PawnIoIntel.ProcesseurIntel()),
                 RunServiceControlOp r => ServiceExiste(r.ServiceName),
                 // NVAPI : le pilote doit repondre. Absent ⇒ la cible n'existe plus sur cette machine.
                 ApplyNvApiDrsSettingOp or DeleteNvApiDrsSettingOp => Result<bool>.Ok(_nvApi.Value.IsAvailable),

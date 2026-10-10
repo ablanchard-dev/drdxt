@@ -60,6 +60,7 @@ public static class CouvertureDesLeviers
         ["fixit.x3d_ccd"] = "processeur",
         ["fixit.power_plan"] = "processeur",
         ["fixit.mode_boost"] = "processeur",
+        ["fixit.cpu_power_limit"] = "processeur",
         ["fixit.sane_pagefile"] = "memoire",
         ["fixit.heures_actives"] = "windows",
     };
@@ -79,8 +80,13 @@ public static class CouvertureDesLeviers
         var portable = hw.Chassis == ChassisType.Laptop;
         var carteDediee = hw.Gpus.Any(g => !g.Vendor.Contains("Intel", StringComparison.OrdinalIgnoreCase) && g.VramBytes >= 1L << 30);
         var nvidia = hw.Gpus.Any(g => g.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase));
+        var intel = hw.Cpu.Vendor.Contains("Intel", StringComparison.OrdinalIgnoreCase);
         return id switch
         {
+            // B1 (10/10/2026) : la limite de puissance du processeur, registres Intel, PC fixe seulement.
+            "fixit.cpu_power_limit" when console => "Levier.PasIci.Console",
+            "fixit.cpu_power_limit" when portable => "Levier.PasIci.Batterie",
+            "fixit.cpu_power_limit" when !intel => "Levier.PasIci.PasIntel",
             // GPU-OC (08/10/2026) : le ventilateur NVIDIA (NVML) en mode Expert, sur un PC fixe seulement.
             "gpu.fan_curve" when console || portable => "Levier.PasIci.VentilateurConstructeur",
             "gpu.fan_curve" when !nvidia => "Levier.PasIci.PasNvidia",
