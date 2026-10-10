@@ -269,6 +269,7 @@ ScanState
 ScanViewModel
   ADesChangementsEnAttente : Boolean
   ADesDomaines : Boolean
+  ADesLignesVerification : Boolean
   ADesParties : Boolean
   ADuDetailDeParties : Boolean
   AHistorique : Boolean
@@ -569,6 +570,7 @@ ScanViewModel
   LignesPartiesDetail : IReadOnlyList<String>
   LignesPartiesResume : IReadOnlyList<String>
   LignesPretAJouer : ObservableCollection<String>
+  LignesVerification : IReadOnlyList<String>
   LimitePremiereLigne : String
   ManifesteIllisibleMessage : String
   MarginDisplay : String
@@ -689,3 +691,4 @@ VerificationRendue
   Refus : String
   Refuses : Int32
   Valides : Int32
+  ValidesIds : IReadOnlyList<String>

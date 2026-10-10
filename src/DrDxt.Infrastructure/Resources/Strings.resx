@@ -292,7 +292,7 @@
     <value>Check DrDXT on my PC</value>
   </data>
   <data name="Verifier.Consentement" xml:space="preserve">
-    <value>DrDXT will set, one by one, every setting it can change on this PC (Game Mode, Game Bar background recording, optimized windowed mode, graphics scheduling, power plan, processor boost, graphics card power limit, driver latency settings; on an NVIDIA card those are only checked in game and stay untouched here), read it back, restore it, then read it again. Nothing is kept. Close your game first. Windows will ask for your consent. Allow one to two minutes.</value>
+    <value>This test checks that DrDXT can set up your PC: it applies each setting one by one, reads it back, then puts it back as it was. Nothing is kept. It does not measure gains: to know whether a setting earns you frames, use "Try it every other game". Close your game, Windows will ask for your consent, allow one to two minutes. At the end you can send the report to the project: it moves DrDXT forward on your hardware.</value>
   </data>
   <data name="Verifier.Confirmer" xml:space="preserve">
     <value>Start the check</value>
@@ -303,8 +303,17 @@
   <data name="Verifier.EnCours" xml:space="preserve">
     <value>Checking: {0}</value>
   </data>
+  <data name="Verifier.Ligne.Valide" xml:space="preserve">
+    <value>{0}: checked, applied, read back, put back as it was</value>
+  </data>
+  <data name="Verifier.Ligne.NonTouche" xml:space="preserve">
+    <value>{0}: not touched, already set or not on this PC</value>
+  </data>
+  <data name="Verifier.Ligne.AVerifier" xml:space="preserve">
+    <value>{0}: check by hand, its original value is in the report</value>
+  </data>
   <data name="Verifier.Compte" xml:space="preserve">
-    <value>Check done. {0} setting(s) set, read back and restored; {1} untouched (already set, not relevant or unreadable on this PC); {2} refused, nothing changed.</value>
+    <value>Check done: {0} setting(s) tried and put back as they were, nothing was kept. Setting by setting:</value>
   </data>
   <data name="Verifier.RefusWindows" xml:space="preserve">
     <value>Check stopped: Windows consent was declined. The next settings were not tried; the earlier ones were restored.</value>

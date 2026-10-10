@@ -356,7 +356,7 @@ public sealed class ArcDeProgression : FrameworkElement
 }
 
 /// <summary>Place ses enfants sur une orbite, chacun centré sur la même position qu'un pôle du
-/// <see cref="ReseauNeuronal"/> (voir <see cref="Orbite"/>).</summary>
+/// cercle des composants (voir <see cref="Orbite"/>), là où le shader des tentacules pose leurs bouts.</summary>
 public sealed class PanneauOrbital : Panel
 {
     public static readonly DependencyProperty RayonXProperty = DependencyProperty.Register(

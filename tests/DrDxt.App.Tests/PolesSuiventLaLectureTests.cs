@@ -42,17 +42,4 @@ public sealed class PolesSuiventLaLectureTests
         // 10/10/2026 : huit satellites. Processeur (bit 0), mémoire (bit 3), carte (bit 1), puis le reste du cercle.
         vus.Should().Equal(0b00000001, 0b00001001, 0b00001011, 0b11111111);
     }
-
-    [Fact]
-    public void Pendant_le_scan_un_pole_lu_est_vif_et_un_pole_attendu_est_terne()
-    {
-        var lu = ReseauNeuronal.AspectDuPole(ModeReseau.Scan, allume: true);
-        var attendu = ReseauNeuronal.AspectDuPole(ModeReseau.Scan, allume: false);
-
-        lu.Vif.Should().BeTrue();
-        attendu.Vif.Should().BeFalse();
-        lu.Taille.Should().BeGreaterThan(attendu.Taille);
-        ReseauNeuronal.AspectDuPole(ModeReseau.Repos, allume: false).Should().Be(ReseauNeuronal.AspectDuPole(ModeReseau.Repos, allume: true),
-            "témoin : hors scan, rien ne dépend de la lecture");
-    }
 }
