@@ -57,18 +57,23 @@ public sealed class L_attente_des_compteurs_se_paie_avant_le_scan_Tests : IDispo
     }
 
     [Fact]
-    public async Task L_amorce_ne_tourne_pas_sur_le_fil_appelant()
+    public async Task L_amorce_ne_bloque_pas_le_fil_appelant()
     {
         // Second contrepoids : amorcer sur le fil d'interface deplacerait l'attente du scan
         // vers l'ouverture de la fenetre — la meme seconde perdue, montree plus tot.
-        var filAppelant = Environment.CurrentManagedThreadId;
-        var filDeLAmorce = 0;
-        AmorceDesCompteurs.Amorcer = () => filDeLAmorce = Environment.CurrentManagedThreadId;
+        //
+        // 10/10/2026 : ce test comparait des numeros de fil, et a rougi en CI (fil 55 des deux
+        // cotes) sans aucun defaut : apres un `await`, le pool peut reprendre le fil appelant
+        // pour y faire tourner la tache. Ce qui compte n'est pas le numero du fil, c'est que
+        // l'appelant reprend la main AVANT que l'amorce ait fini. On le prouve avec une barriere.
+        using var barriere = new ManualResetEventSlim(false);
+        AmorceDesCompteurs.Amorcer = () => barriere.Wait(TimeSpan.FromSeconds(10));
 
-        await AmorceDesCompteurs.AuLancementAsync();
+        var amorce = AmorceDesCompteurs.AuLancementAsync();
 
-        filDeLAmorce.Should().NotBe(0, "l'amorce doit avoir tourne");
-        filDeLAmorce.Should().NotBe(filAppelant, "une fenetre qui s'ouvre ne doit rien attendre");
+        amorce.IsCompleted.Should().BeFalse("une fenetre qui s'ouvre ne doit rien attendre : l'appelant a la main pendant que l'amorce tourne");
+        barriere.Set();
+        await amorce;
     }
 
     [Fact]
