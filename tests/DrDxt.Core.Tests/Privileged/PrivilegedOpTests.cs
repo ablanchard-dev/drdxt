@@ -63,6 +63,17 @@ public sealed class PrivilegedOpTests
     }
 
     [Fact]
+    public void SetWirelessPowerSavingOp_roundtrips_typed()
+    {
+        var op = new SetWirelessPowerSavingOp(KnownPowerPlans.Balanced, 2);
+
+        var back = PrivilegedOpCodec.Deserialize(PrivilegedOpCodec.Serialize(op).Value!);
+
+        back.Value.Should().BeOfType<SetWirelessPowerSavingOp>();
+        back.Value.Should().BeEquivalentTo(op);
+    }
+
+    [Fact]
     public void SetCpuPackagePowerLimitOp_roundtrips_typed()
     {
         var op = new SetCpuPackagePowerLimitOp((1752UL << 32) | (1UL << 15) | 1752UL, (1752UL << 32) | (1UL << 15) | 520UL);
@@ -324,6 +335,9 @@ public sealed class PrivilegedOpTests
             // Elargie deliberement le 10/10/2026 (B1) : la limite de puissance du processeur (PL1 seule, dans la PL2 de la
             // carte, sans verrou), ecrite par PawnIO dans le helper. Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.SetCpuPackagePowerLimit),
+            // Elargie deliberement le 10/10/2026 (B3) : l'economie d'energie de la carte sans fil (secteur) d'un plan,
+            // valeur 0 a 3. Documentee dans docs/NON-NUISANCE.md.
+            nameof(PrivilegedOpType.SetWirelessPowerSaving),
         });
     }
 

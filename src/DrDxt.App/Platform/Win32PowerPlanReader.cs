@@ -28,4 +28,9 @@ public sealed class Win32PowerPlanReader : IPowerPlanReader
         DrDxt.Detection.Settings.PowerSettingsReader.LireModeDeBoost(plan) is { } lu
             ? Result<ModeDeBoostLu>.Ok(lu)
             : Result<ModeDeBoostLu>.Fail(ErrorCodes.TweakSdkUnavailable, "Boost mode (PERFBOOSTMODE) unread.");
+
+    public Result<EconomieSansFilLue> LireEconomieSansFil(Guid plan) =>
+        DrDxt.Detection.Settings.PowerSettingsReader.LireEconomieSansFil(plan) is { } lu
+            ? Result<EconomieSansFilLue>.Ok(lu)
+            : Result<EconomieSansFilLue>.Fail(ErrorCodes.TweakSdkUnavailable, "Wireless power saving mode unread.");
 }

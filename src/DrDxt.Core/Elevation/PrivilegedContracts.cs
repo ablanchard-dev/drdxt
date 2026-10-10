@@ -81,6 +81,11 @@ public sealed record SetProcessorBoostModeOp(Guid PlanGuid, uint AcValue) : Priv
 /// valeurs échangées. Volatil : le BIOS remet sa valeur au redémarrage.</summary>
 public sealed record SetCpuPackagePowerLimitOp(ulong Valeur, ulong Origine) : PrivilegedOp;
 
+/// <summary>B3 (10/10/2026) : le mode d'économie d'énergie de la carte sans fil (secteur) dans un plan, et rien d'autre du
+/// plan. Le réglage est fixé par le type : l'appelant ne choisit que le plan et la valeur (0 à 3, bornée par le helper).
+/// Le helper réactive le plan s'il est actif. La valeur batterie n'est jamais touchée.</summary>
+public sealed record SetWirelessPowerSavingOp(Guid PlanGuid, uint AcValue) : PrivilegedOp;
+
 /// <summary>Creates a System Restore point before a batch is applied.</summary>
 public sealed record CreateRestorePointOp(string Description) : PrivilegedOp
 {

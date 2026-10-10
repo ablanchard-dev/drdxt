@@ -100,6 +100,12 @@ public static class CatalogueDeCandidats
             new("fixit.cpu_power_limit", CandidateKind.AutoHot, 1, false, new[] { "cpu.power" }, Family: CandidateFamily.Cpu,
                 Surface: SurfaceTouchee.Processeur),
 
+            // B3 (10/10/2026) : `SetWirelessPowerSavingOp`, la carte sans fil sortie de son economie d'energie (plan actif,
+            // secteur). Microsoft : l'economie coute de la latence de transfert ; aucun effet sur les images ⇒ pose au clic,
+            // relu ; la gigue vers la box se voit au scan suivant.
+            new("fixit.wifi_performances", CandidateKind.AutoReglage, 0, false, new[] { "latence" }, Family: CandidateFamily.Network,
+                Surface: SurfaceTouchee.PlanificationWindows),
+
             // L-ECRAN : le mode de l'ecran (user32, profil de l'utilisateur, sans droits). Confort : pose et relu, jamais mesure.
             new("fixit.ecran_frequence", CandidateKind.AutoReglage, 1, false, new[] { "display.refresh" },
                 Family: CandidateFamily.Repair, Surface: SurfaceTouchee.Affichage),

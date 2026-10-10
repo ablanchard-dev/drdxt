@@ -187,6 +187,12 @@ public sealed class OpAllowlist
                 ? Result.Ok()
                 : Deny("Boost mode value is not one Microsoft documents (0 to 4), or the plan is empty."),
 
+            // B3 (10/10/2026) : un seul reglage du plan, fixe par le type (economie d'energie de la carte sans fil, secteur) ;
+            // valeur documentee (0 a 3) seulement ; plan non vide.
+            SetWirelessPowerSavingOp w => w.PlanGuid != Guid.Empty && w.AcValue <= EconomieSansFilLue.MaxDocumente
+                ? Result.Ok()
+                : Deny("Wireless power saving value is not one Windows documents (0 to 3), or the plan is empty."),
+
             // B1 (10/10/2026) : la limite de puissance du processeur. La seule forme admise : une valeur qui ne diffère de
             // l'origine que par PL1 (bits 15:0), sans verrou, PL1 entre 1 et la PL2 que le registre porte déjà. Jamais de
             // PL2, de fenêtre, de courant ni de tension : le registre ne bouge que là où la carte mère laisse déjà monter.
@@ -705,7 +711,7 @@ public sealed class OpAllowlist
         // fréquence, tension ni ventilateur (règle du 29/09) : la sous-tension ADLX reste refusée.
         var estUnRetour = decodee.Value is SetRegistryValueOp or DeleteRegistryValueOp or SetActivePowerPlanOp
             or SetProcessorBoostModeOp
-            or SetCpuPackagePowerLimitOp
+            or SetCpuPackagePowerLimitOp or SetWirelessPowerSavingOp
             or ApplyNvApiDrsSettingOp or DeleteNvApiDrsSettingOp or RunServiceControlOp
             or ApplyNvApiPowerLimitOp
             or ApplyAdlxTuningOp { Kind: AdlxTuningKind.PowerLimit or AdlxTuningKind.AntiLag or AdlxTuningKind.FrameRateTarget or AdlxTuningKind.VerticalRefresh };

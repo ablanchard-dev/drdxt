@@ -118,6 +118,10 @@ public sealed class PowerSettingsReader
             ? new ModeDeBoostLu(plan, valeur, defaut)
             : null;
 
+    /// <summary>B3 (10/10/2026) : « Mode d'économie d'énergie » de la carte sans fil, sur secteur, dans ce plan. null = non lu.</summary>
+    public static EconomieSansFilLue? LireEconomieSansFil(Guid plan) =>
+        LireValeur(EconomieSansFilLue.Reglage, plan, EconomieSansFilLue.SousGroupe) is { } valeur ? new EconomieSansFilLue(plan, valeur) : null;
+
     /// <summary>07/10/2026 (L-USB) : la suspension sélective USB sur secteur dans ce plan, et le défaut de sa personnalité.
     /// Lecture seule : aucune source ne justifie de l'écrire pour le jeu (voir <see cref="Repair.SuspensionUsb"/>).</summary>
     public static PowerSettingValue LireSuspensionUsb(Guid plan) =>

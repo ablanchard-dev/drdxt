@@ -30,6 +30,10 @@ public interface IPowerPlanReader
     /// non lu (un lecteur qui ne sait pas le lire le dit, il ne rend jamais un zéro).</summary>
     Result<ModeDeBoostLu> LireModeDeBoost(Guid plan) =>
         Result<ModeDeBoostLu>.Fail(ErrorCodes.TweakSdkUnavailable, "Boost mode is not readable here.");
+
+    /// <summary>B3 (10/10/2026) : l'économie d'énergie de la carte sans fil (secteur) dans ce plan. Par défaut : non lu.</summary>
+    Result<EconomieSansFilLue> LireEconomieSansFil(Guid plan) =>
+        Result<EconomieSansFilLue>.Fail(ErrorCodes.TweakSdkUnavailable, "Wireless power saving mode is not readable here.");
 }
 
 /// <summary>B1 (10/10/2026) : la limite de puissance du processeur Intel (registres MSR par PawnIO), brute et décodée.

@@ -133,6 +133,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ITweak, SanePowerPlanTweak>();
         services.AddSingleton<ITweak, ModeBoostTweak>();
         services.AddSingleton<ITweak, LimitePuissanceCpuTweak>();
+        services.AddSingleton<ITweak, EconomieSansFilTweak>();
         services.AddSingleton<ITweak, SanePagefileTweak>();
         services.AddSingleton<ITweak, HeuresActivesTweak>();
         services.AddSingleton<ITweak, EcranFrequenceTweak>();

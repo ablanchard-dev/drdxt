@@ -62,28 +62,35 @@ public sealed class Win32PowerPlanActions : IPowerPlanActions
     // Microsoft Learn (PowerWriteACValueIndex) : la valeur du plan actif ne prend effet qu'apres PowerSetActiveScheme ;
     // un autre plan n'est jamais active ici.
     public Result SetBoostModeAc(Guid planGuid, uint acValue)
+        => EcrireValeurDePlanAc(planGuid, SousGroupeProcesseur, ModeDeBoostLu.Reglage, acValue, "Boost mode");
+
+    // B3 (10/10/2026) : meme chemin, autre reglage du plan : l'economie d'energie de la carte sans fil, secteur seulement.
+    public Result SetWirelessPowerSavingAc(Guid planGuid, uint acValue)
+        => EcrireValeurDePlanAc(planGuid, EconomieSansFilLue.SousGroupe, EconomieSansFilLue.Reglage, acValue, "Wireless power saving");
+
+    private Result EcrireValeurDePlanAc(Guid planGuid, Guid sousGroupe, Guid reglage, uint acValue, string libelle)
     {
         try
         {
             // Le plan actif est lu avant d'ecrire : non lu, on ne saurait pas s'il faut le reactiver, et une valeur ecrite
             // sans effet passerait pour posee.
-            if (_alimentation.PlanActif() is not { } actif) return Fail("Active power plan unread: boost mode not written.");
+            if (_alimentation.PlanActif() is not { } actif) return Fail($"Active power plan unread: {libelle} not written.");
             // Revue F-36 : la valeur d'avant, relue, pour la rendre si la suite échoue (une op « ratée » ne laisse rien).
-            if (_alimentation.LireValeurSecteur(planGuid, SousGroupeProcesseur, ModeDeBoostLu.Reglage) is not { } avant)
-                return Fail("Boost mode unread: not written.");
+            if (_alimentation.LireValeurSecteur(planGuid, sousGroupe, reglage) is not { } avant)
+                return Fail($"{libelle} unread: not written.");
             var mode = _alimentation.ModeSecteur();
-            var rc = _alimentation.EcrireValeurSecteur(planGuid, SousGroupeProcesseur, ModeDeBoostLu.Reglage, acValue);
+            var rc = _alimentation.EcrireValeurSecteur(planGuid, sousGroupe, reglage, acValue);
             if (rc != 0) return Fail($"PowerWriteACValueIndex failed (Win32 {rc}).");
             if (actif != planGuid) return Result.Ok();
             var r = ActiverEnGardantLeMode(planGuid);
             if (r.IsOk) return r;
-            _alimentation.EcrireValeurSecteur(planGuid, SousGroupeProcesseur, ModeDeBoostLu.Reglage, avant);
+            _alimentation.EcrireValeurSecteur(planGuid, sousGroupe, reglage, avant);
             _alimentation.Activer(planGuid);
-            return Fail($"{r.Error?.Message} Boost mode set back to {avant}. {RendreLeMode(mode)}");
+            return Fail($"{r.Error?.Message} {libelle} set back to {avant}. {RendreLeMode(mode)}");
         }
         catch (Exception ex)
         {
-            return Fail($"Boost mode write failed: {ex.GetType().Name}.");
+            return Fail($"{libelle} write failed: {ex.GetType().Name}.");
         }
     }
 

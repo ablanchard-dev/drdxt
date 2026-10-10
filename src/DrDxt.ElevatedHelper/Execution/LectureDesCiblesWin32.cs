@@ -37,6 +37,7 @@ public sealed class LectureDesCiblesWin32 : ILectureDesCibles
                 SetRegistryValueOp s => LireRegistre(s),
                 SetActivePowerPlanOp => LirePlanActif(),
                 SetProcessorBoostModeOp b => LireModeDeBoost(b.PlanGuid),
+                SetWirelessPowerSavingOp w => LireValeurDePlanAc(w.PlanGuid, EconomieSansFilLue.SousGroupe, EconomieSansFilLue.Reglage),
                 // B1 (10/10/2026) : le registre entier, en décimal, comme l'op le pose.
                 SetCpuPackagePowerLimitOp => DrDxt.GpuNative.PawnIo.PawnIoIntel.LireRegistres() is { } r
                     ? Result<string?>.Ok(r.PkgPowerLimit.ToString(System.Globalization.CultureInfo.InvariantCulture))
@@ -105,6 +106,7 @@ public sealed class LectureDesCiblesWin32 : ILectureDesCibles
                 // (ou, pire, on ecrirait un GUID qui ne designe plus rien).
                 SetActivePowerPlanOp p => PlanExiste(p.PlanGuid),
                 SetProcessorBoostModeOp b => PlanExiste(b.PlanGuid),
+                SetWirelessPowerSavingOp w => PlanExiste(w.PlanGuid),
                 // B1 : la cible existe tant que PawnIO est là et que le processeur est Intel.
                 SetCpuPackagePowerLimitOp => Result<bool>.Ok(DrDxt.GpuNative.PawnIo.PawnIoIntel.Installe() && DrDxt.GpuNative.PawnIo.PawnIoIntel.ProcesseurIntel()),
                 RunServiceControlOp r => ServiceExiste(r.ServiceName),
@@ -196,9 +198,11 @@ public sealed class LectureDesCiblesWin32 : ILectureDesCibles
 
     /// <summary>07/10/2026 (L-CPU) : PERFBOOSTMODE sur secteur dans ce plan (PowerReadACValueIndex, lecture seule).</summary>
     private static Result<string?> LireModeDeBoost(Guid plan)
+        => LireValeurDePlanAc(plan, new Guid("54533251-82be-4824-96c1-47b60b740d00"), ModeDeBoostLu.Reglage);
+
+    // B3 (10/10/2026) : la valeur secteur d'un reglage de plan, sous la forme que son op pose (un entier).
+    private static Result<string?> LireValeurDePlanAc(Guid plan, Guid sousGroupe, Guid reglage)
     {
-        var sousGroupe = new Guid("54533251-82be-4824-96c1-47b60b740d00");
-        var reglage = ModeDeBoostLu.Reglage;
         uint valeur = 0;
         var rc = PowerReadACValueIndex(IntPtr.Zero, ref plan, ref sousGroupe, ref reglage, ref valeur);
         return rc == 0

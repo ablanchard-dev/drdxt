@@ -711,6 +711,23 @@ public sealed class OpAllowlistTests
     public void Mode_de_boost_refuse_un_plan_vide() =>
         _allow.Validate(new SetProcessorBoostModeOp(Guid.Empty, 2)).IsOk.Should().BeFalse();
 
+    // B3 (10/10/2026) : l'economie d'energie de la carte sans fil, valeurs documentees seulement, plan non vide.
+    [Theory]
+    [InlineData(0u)]
+    [InlineData(3u)]
+    public void Economie_sans_fil_accepte_une_valeur_documentee(uint valeur) =>
+        _allow.Validate(new SetWirelessPowerSavingOp(KnownPowerPlans.Balanced, valeur)).IsOk.Should().BeTrue();
+
+    [Theory]
+    [InlineData(4u)]
+    [InlineData(uint.MaxValue)]
+    public void Economie_sans_fil_refuse_une_valeur_forgee(uint valeur) =>
+        _allow.Validate(new SetWirelessPowerSavingOp(KnownPowerPlans.Balanced, valeur)).Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
+
+    [Fact]
+    public void Economie_sans_fil_refuse_un_plan_vide() =>
+        _allow.Validate(new SetWirelessPowerSavingOp(Guid.Empty, 0)).IsOk.Should().BeFalse();
+
     // B1 (10/10/2026) : la limite de puissance du processeur ne bouge que par PL1, dans la PL2 de la carte, sans verrou.
     private const ulong Pl2_219W = 1752UL << 32;
     private const ulong Origine65W = Pl2_219W | (1UL << 47) | (1UL << 15) | 520UL;

@@ -213,7 +213,9 @@ public sealed class SettingsStateReader : ISettingsStateReader
             // 07/10/2026 (L-CPU) : sans droits ; non lu = null, le levier du boost ne s'arme pas.
             ModeDeBoost: Guid.TryParse(power.Value, out var plan) ? _power.LireModeDeBoost(plan) : null,
             // B1 (10/10/2026) : PL1/PL2 du processeur, copie MMIO comprise ; non lu = null.
-            LimitePuissance: _limitePuissance?.LireRegistres() is { IsOk: true, Value: { } limite } ? limite.Lue : null);
+            LimitePuissance: _limitePuissance?.LireRegistres() is { IsOk: true, Value: { } limite } ? limite.Lue : null,
+            // B3 (10/10/2026) : l'économie d'énergie de la carte sans fil (secteur) du plan actif ; non lu = null.
+            EconomieSansFil: Guid.TryParse(power.Value, out var planSansFil) ? _power.LireEconomieSansFil(planSansFil) : null);
 
         return Result<SettingsState>.Ok(state);
     });

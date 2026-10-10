@@ -49,6 +49,7 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         SetActivePowerPlanOp => "plan",
         SetProcessorBoostModeOp b => "boost|" + b.PlanGuid,
         SetCpuPackagePowerLimitOp => "pl1",
+        SetWirelessPowerSavingOp w => "wifi|" + w.PlanGuid,
         RunServiceControlOp r => "service|" + r.ServiceName,
         ApplyNvApiDrsSettingOp a => "drs|" + a.SettingId,
         ApplyNvApiPowerLimitOp n => "nvpuissance|" + n.GpuIndex,
