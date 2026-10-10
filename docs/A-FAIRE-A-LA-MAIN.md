@@ -244,6 +244,17 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    ne bannit pas) ; rien de connu côté Ricochet, Vanguard ou EAC, mais ce n'est pas mesuré : si tu joues en compétition,
    renseigne-toi avant. Retirer : `PawnIO_setup.exe -uninstall -silent`, ou Paramètres > Applications.
 
+### 5.19 Surcouche DLSS et mode faible latence « Ultra » (carte NVIDIA) : des choix, pas des réparations
+1. Surcouche DLSS : appli NVIDIA (pilotes 572 et plus), onglet Graphismes, un jeu, « Surcouche DLSS ». Le modèle DLSS 4
+   (transformer) affine l'image dans les jeux DLSS 2 et 3 ; la génération d'images (RTX 40 et 50) multiplie les images
+   comptées **en augmentant la latence** : à essayer jeu par jeu, et à juger à l'œil et à la main, pas au compteur
+   d'images. DrDXT ne la pose pas : l'essai en alternance la « gagnerait » à tort sur le compte d'images.
+   Source : NVIDIA, « DLSS 4 Multi Frame Generation » et « NVIDIA app global DLSS overrides » (nvidia.com/geforce/news).
+2. Mode faible latence « Ultra » (panneau NVIDIA, « Mode faible latence ») : seulement pour les vieux jeux DX9 à DX11
+   sans Reflex, quand la carte limite entre 60 et 100 images par seconde ; en DX12/Vulkan, seul Reflex dans le jeu compte ;
+   hors de sa fenêtre, « Ultra » peut baisser les images ou la régularité. DrDXT pose déjà « On » (une image en file) au
+   profil du jeu quand c'est utile. Source : Blur Busters, « NVIDIA Low Latency Mode - On or Off » (forums.blurbusters.com).
+
 ## 6. Ce que DrDXT dit sans geste à faire
 
 Certains constats sont des pistes, pas des gestes : les parties hors de tes heures d'activité, les logiciels installés

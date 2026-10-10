@@ -63,6 +63,7 @@ public sealed class ChaqueConseilDuDocteurASonEtapeTests
         ["Bufferbloat.cs"] = "SQM",
         ["JournalDesLeviersAppliques.cs"] = "relance l'optimisation",
         ["SanteWindows.cs"] = "Récupération > « Réinstaller maintenant »",
+        ["OptionsNvidiaDuJoueur.cs"] = "Surcouche DLSS et mode faible latence",
     };
 
     // Chaque reglage de firmware que DrDXT lit et guide (jamais ecrit) ⇒ son etape.
