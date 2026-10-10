@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace DrDxt.Lanceur;
 
 /// <summary>
@@ -41,6 +43,18 @@ public static class EnvironnementPropre
         if (!string.IsNullOrEmpty(localAppData)) env["LOCALAPPDATA"] = localAppData;
         return env;
     }
+
+    /// <summary>Le mot qui demande au lanceur la console de réparation de Windows (DISM puis sfc), au lieu d'un programme.</summary>
+    public const string ReparerWindows = "reparer-windows";
+
+    /// <summary>10/10/2026 (revue de sécurité) : la console de réparation est un PowerShell élevé, donc .NET Framework, qui
+    /// lit lui aussi de quoi charger une DLL dans l'environnement (COR_PROFILER). Elle passe par le lanceur, avec cette
+    /// commande FIXE : chemins absolus de System32, sans profil, rien qui vienne de l'appelant.</summary>
+    public static (string Fichier, string Arguments) ConsoleDeReparation(string system32) => (
+        Path.Combine(system32, @"WindowsPowerShell\v1.0\powershell.exe"),
+        $"-NoProfile -NoExit -Command \"& '{Path.Combine(system32, "Dism.exe")}' /Online /Cleanup-Image /RestoreHealth; "
+        + $"& '{Path.Combine(system32, "sfc.exe")}' /scannow; "
+        + $"& '{Path.Combine(system32, "Dism.exe")}' /Online /Cleanup-Image /CheckHealth\"");
 
     /// <summary>Vrai pour une variable que le runtime .NET lit au démarrage : aucune ne doit sortir de Construire.</summary>
     public static bool EstUneVariableDuRuntime(string nom)

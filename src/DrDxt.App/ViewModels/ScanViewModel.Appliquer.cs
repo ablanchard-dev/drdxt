@@ -101,7 +101,12 @@ public sealed partial class ScanViewModel
     // n'y a rien à tenter ne paie pas pour l'apprendre »). DrDXT est gratuit : il dit ce qu'il voit, le bouton reste.
     private bool _rienAPoserSeul;
     public string LabelRienAPoserSeul => _localize("Apply.RienAPoserSeul");
-    partial void OnRienAPoserSeulChanged(bool value) => OnPropertyChanged(nameof(ApercuOptimisation));
+    partial void OnRienAPoserSeulChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ApercuOptimisation));
+        OnPropertyChanged(nameof(ApplyHintKey));
+        OnPropertyChanged(nameof(ApplyHint));
+    }
 
     private async Task JugerCeQuiResteAPoserAsync()
     {

@@ -76,6 +76,17 @@ public sealed class PointDeRestaurationSainTests
             .Should().NotContain("au moins depuis");
     }
 
+    // 10/10/2026 (le mainteneur) : un seul arrêt pendant une mise en veille, cinq jours plus tôt, sans récidive : pas un souci en cours.
+    [Fact]
+    public void Un_incident_isole_de_plus_de_trois_jours_n_est_plus_un_souci_en_cours()
+    {
+        PointDeRestaurationSain.Juger([(T(10, 8), "Windows Update")], [Arret(T(10, 5, 20))], T(10, 10)).Should().BeEmpty();
+        PointDeRestaurationSain.Juger([(T(10, 8), "Windows Update")], [Arret(T(10, 8, 20))], T(10, 10)).Should().ContainSingle(
+            "deux jours plus tôt, il peut encore revenir");
+        PointDeRestaurationSain.Juger([(T(10, 8), "Windows Update")], [Arret(T(9, 28)), Arret(T(10, 5, 20))], T(10, 10)).Should()
+            .ContainSingle("deux arrêts à moins de deux semaines : une série, toujours en cours");
+    }
+
     [Fact]
     public void Une_liste_illisible_pendant_un_souci_est_inconnue()
         => PointDeRestaurationSain.Juger(null, [Arret(T(10, 5))], Maintenant).Single().Statut.Should().Be(RepairStatus.Unknown);

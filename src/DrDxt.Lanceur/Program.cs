@@ -21,10 +21,11 @@ internal static class Program
     {
         if (args.Length == 0) return 2;
         var nom = args[0];
-        if (!EnvironnementPropre.Executables.Contains(nom, StringComparer.OrdinalIgnoreCase)) return 2;
+        var reparer = args.Length == 1 && string.Equals(nom, EnvironnementPropre.ReparerWindows, StringComparison.Ordinal);
+        if (!reparer && !EnvironnementPropre.Executables.Contains(nom, StringComparer.OrdinalIgnoreCase)) return 2;
         var dossier = AppContext.BaseDirectory;
         var exe = Path.Combine(dossier, nom);
-        if (!File.Exists(exe)) return 3;
+        if (!reparer && !File.Exists(exe)) return 3;
 
         if (!EstEleve())
         {
@@ -37,15 +38,19 @@ internal static class Program
             catch (Exception) { return 1; }
         }
 
-        var psi = new ProcessStartInfo(exe)
+        var (fichier, arguments) = reparer
+            ? EnvironnementPropre.ConsoleDeReparation(Environment.SystemDirectory)
+            : (exe, "");
+        var psi = new ProcessStartInfo(fichier)
         {
             UseShellExecute = false,   // CreateProcess avec NOTRE bloc d'environnement, rien d'hérité.
             // Le helper est un programme console sans rien à montrer : sans fenêtre. Le banc du zip, lui, affiche ses
             // étapes et attend une touche à la fin : sa fenêtre reste.
-            CreateNoWindow = !string.Equals(nom, "DrDXT-Test.exe", StringComparison.OrdinalIgnoreCase),
+            CreateNoWindow = !reparer && !string.Equals(nom, "DrDXT-Test.exe", StringComparison.OrdinalIgnoreCase),
             WorkingDirectory = dossier,
         };
-        for (var i = 1; i < args.Length; i++) psi.ArgumentList.Add(args[i]);
+        if (reparer) psi.Arguments = arguments;
+        else for (var i = 1; i < args.Length; i++) psi.ArgumentList.Add(args[i]);
         psi.Environment.Clear();
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         var localAppData = Dossier(Environment.SpecialFolder.LocalApplicationData);
@@ -53,7 +58,14 @@ internal static class Program
         foreach (var (cle, valeur) in EnvironnementPropre.Construire(windows, temp,
                      Dossier(Environment.SpecialFolder.UserProfile), Dossier(Environment.SpecialFolder.ApplicationData), localAppData))
             psi.Environment[cle] = valeur;
-        try { return Process.Start(psi) is null ? 1 : 0; }
+        try
+        {
+            using var fils = Process.Start(psi);
+            if (fils is null) return 1;
+            // La console de réparation : l'App attend sa fermeture pour relire la santé de Windows.
+            if (reparer) fils.WaitForExit();
+            return 0;
+        }
         catch (Exception) { return 1; }
     }
 

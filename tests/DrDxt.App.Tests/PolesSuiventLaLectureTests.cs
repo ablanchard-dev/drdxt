@@ -39,8 +39,8 @@ public sealed class PolesSuiventLaLectureTests
 
         await vm.ScanCommand.ExecuteAsync(null);
 
-        // Processeur (bit 0), mémoire (bit 2), carte (bit 1), puis stockage (bit 3) et Windows (bit 4).
-        vus.Should().Equal(0b00001, 0b00101, 0b00111, 0b11111);
+        // 10/10/2026 : huit satellites. Processeur (bit 0), mémoire (bit 3), carte (bit 1), puis le reste du cercle.
+        vus.Should().Equal(0b00000001, 0b00001001, 0b00001011, 0b11111111);
     }
 
     [Fact]

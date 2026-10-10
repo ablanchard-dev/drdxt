@@ -385,6 +385,15 @@ public sealed class PanneauOrbital : Panel
 
     public bool PortVersCentre { get => (bool)GetValue(PortVersCentreProperty); set => SetValue(PortVersCentreProperty, value); }
 
+    /// <summary>10/10/2026 (le mainteneur : « des ronds chelous sous Réseau, Windows, pas alignés ») : centrée sur son pôle, une
+    /// carte voyait son icône bouger avec la hauteur de son texte (une ligne d'état de plus après le scan la remontait de
+    /// 10 px), loin de la douille fixe du shader. Posée par son icône, chaque carte met le centre de l'icône SUR son pôle.
+    /// La valeur est la distance du bord de la carte au centre de l'icône (marge + demi-icône). NaN : ancienne mise en page.</summary>
+    public static readonly DependencyProperty CentreIconeProperty = DependencyProperty.Register(
+        nameof(CentreIcone), typeof(double), typeof(PanneauOrbital), new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsArrange));
+
+    public double CentreIcone { get => (double)GetValue(CentreIconeProperty); set => SetValue(CentreIconeProperty, value); }
+
     /// <summary>Posé par le panneau sur le libellé du haut (hérité) : son gabarit met l'icône en bas, face à la bille.</summary>
     public static readonly DependencyProperty EnHautProperty = DependencyProperty.RegisterAttached(
         "EnHaut", typeof(bool), typeof(PanneauOrbital), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.Inherits));
@@ -407,6 +416,11 @@ public sealed class PanneauOrbital : Panel
             double.IsInfinity(disponible.Height) ? 400 : disponible.Height);
     }
 
+    /// <summary>Le haut de la carte. Posée par son icône : l'icône du haut est en bas de sa carte, les autres en haut.</summary>
+    internal double PositionVerticale(double pole, double hauteur, bool enHaut) => double.IsNaN(CentreIcone)
+        ? (enHaut ? pole - hauteur : pole - hauteur / 2 + DecalageY)
+        : (enHaut ? pole - hauteur + CentreIcone : pole - CentreIcone);
+
     protected override Size ArrangeOverride(Size finale)
     {
         var n = InternalChildren.Count;
@@ -417,7 +431,8 @@ public sealed class PanneauOrbital : Panel
             var d = enfant.DesiredSize;
             var x = Math.Clamp(p.X - d.Width / 2, 0, Math.Max(0, finale.Width - d.Width));
             var enHaut = EstEnHaut(i, n);
-            var y = Math.Clamp(enHaut ? p.Y - d.Height : p.Y - d.Height / 2 + DecalageY, 0, Math.Max(0, finale.Height - d.Height));
+            var y = PositionVerticale(p.Y, d.Height, enHaut);
+            y = Math.Clamp(y, 0, Math.Max(0, finale.Height - d.Height));
             enfant.Arrange(new Rect(new Point(x, y), d));
         }
         return finale;

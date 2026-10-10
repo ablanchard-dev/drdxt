@@ -14,6 +14,11 @@ public static class PointDeRestaurationSain
     private static readonly TimeSpan Serie = TimeSpan.FromDays(14);
     private static readonly TimeSpan EnCours = TimeSpan.FromDays(30);
 
+    /// <summary>10/10/2026 (le mainteneur : « me dit toujours souci en cours » pour un seul arrêt pendant une mise en veille, cinq
+    /// jours plus tôt, le PC stable depuis). Un incident SEUL n'est un souci en cours que s'il a moins de trois jours ;
+    /// au-delà, sans récidive, c'est un accident passé (le constat « Arrêts brutaux » le garde dans son bilan).</summary>
+    public static readonly TimeSpan IsoleEnCours = TimeSpan.FromDays(3);
+
     /// <param name="lusDepuis">Revue T3+T4 (F-28) : le début de la fenêtre de lecture des incidents. Une série qui
     /// commence à moins de deux semaines de cette borne a peut-être commencé avant : elle est dite « au moins depuis ».</param>
     public static IEnumerable<RepairFinding> Juger(IReadOnlyList<(DateTimeOffset Quand, string Nom)>? points,
@@ -36,6 +41,7 @@ public static class PointDeRestaurationSain
             if (debut.Quand - i.Quand > Serie) break;
             debut = i;
         }
+        if (ReferenceEquals(debut, tries[0]) && maintenant - debut.Quand > IsoleEnCours) yield break;
         var tronque = lusDepuis is { } borne && debut.Quand - borne <= Serie;
         // 06/10/2026 (capture d'écran du scan) : l'avertissement disait « un souci est en cours » sans dire lequel. Le souci,
         // daté, est la provenance du constat ; l'écran le nomme.

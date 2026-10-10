@@ -583,6 +583,9 @@ public static class CarteDeLaMachine
         "Gpu" => "graphique",
         "Ram" => "memoire",
         "Ssd" => "stockage",
+        "Latency" => "latence",
+        "Network" => "reseau",
+        "Firmware" => "bios",
         _ => "windows",
     };
 }

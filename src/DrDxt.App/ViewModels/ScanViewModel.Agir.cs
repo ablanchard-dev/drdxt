@@ -954,15 +954,19 @@ public sealed partial class ScanViewModel
     /// <summary>La commande de la console. Chemins ABSOLUS tires de l'API, jamais du PATH ni de
     /// $env:SystemRoot (tous deux reglables par l'utilisateur, et la console est elevee) ; -NoProfile
     /// pour ne pas executer en administrateur le profil PowerShell de l'utilisateur.</summary>
-    internal static System.Diagnostics.ProcessStartInfo ConsoleDeReparation(string system32) => new(
-        Path.Combine(system32, @"WindowsPowerShell\v1.0\powershell.exe"),
-        $"-NoProfile -NoExit -Command \"& '{Path.Combine(system32, "Dism.exe")}' /Online /Cleanup-Image /RestoreHealth; "
-              + $"& '{Path.Combine(system32, "sfc.exe")}' /scannow; "
-              + $"& '{Path.Combine(system32, "Dism.exe")}' /Online /Cleanup-Image /CheckHealth\"")
+    /// <para>10/10/2026 (revue de sécurité) : installée, la console passe par le lanceur natif (environnement reconstruit,
+    /// commande fixe écrite dans le lanceur) ; sans lanceur à côté de l'App (build de développement), elle s'ouvre seule.</para>
+    internal static System.Diagnostics.ProcessStartInfo ConsoleDeReparation(string system32, string? lanceur = null)
     {
-        UseShellExecute = true,
-        Verb = "runas",
-    };
+        if (lanceur is not null && File.Exists(lanceur))
+        {
+            var parLanceur = new System.Diagnostics.ProcessStartInfo(lanceur) { UseShellExecute = true, Verb = "runas" };
+            parLanceur.ArgumentList.Add(DrDxt.Lanceur.EnvironnementPropre.ReparerWindows);
+            return parLanceur;
+        }
+        var (fichier, arguments) = DrDxt.Lanceur.EnvironnementPropre.ConsoleDeReparation(system32);
+        return new System.Diagnostics.ProcessStartInfo(fichier, arguments) { UseShellExecute = true, Verb = "runas" };
+    }
 
     private void ArmerReparation(RepairTriage triage)
     {
@@ -989,7 +993,8 @@ public sealed partial class ScanViewModel
                 EtatReparation = _localize("Reparation.Windows.Reinstallation.Ouverte");
                 return;
             }
-            var console = LancerConsole(ConsoleDeReparation(Environment.GetFolderPath(Environment.SpecialFolder.System)));
+            var console = LancerConsole(ConsoleDeReparation(Environment.GetFolderPath(Environment.SpecialFolder.System),
+                Path.Combine(AppContext.BaseDirectory, DrDxt.App.Platform.RelanceElevee.Lanceur)));
             ReparationLancee = console is not null;
             if (console is null) return;
             EtatReparation = _localize("Reparation.Windows.Lancee");

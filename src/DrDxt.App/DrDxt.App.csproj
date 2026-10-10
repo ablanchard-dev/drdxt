@@ -19,7 +19,9 @@
 
   <ItemGroup>
     <Resource Include="Assets\drdxt.ico" />
-    <Resource Include="Assets\logo-3d.png" />
+    <!-- 10/10/2026 : la commande de la console de réparation, la même que celle du lanceur natif. -->
+    <Compile Include="..\DrDxt.Lanceur\EnvironnementPropre.cs" Link="Platform\EnvironnementPropre.cs" />
+    <Resource Include="Assets\logo-marque.png" />
     <Resource Include="Assets\docteur-portrait.png" />
     <!-- 06/10/2026 : rendu Cycles (tools/rendus-3d) : la boucle de chrome des composants. -->
     <Resource Include="Assets\boucle.png" />
