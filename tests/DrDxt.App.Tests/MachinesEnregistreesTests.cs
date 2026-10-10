@@ -40,7 +40,7 @@ public class MachinesEnregistreesTests
 
     [Fact]
     public void Les_machines_attendues_sont_la()
-        => Noms().Select(n => (string)n[0]).Should().Contain(["reference-i7-14700f-rtx4060-2026-10-06", "amd-radeon-synthetique",
+        => Noms().Cast<object[]>().Select(n => (string)n[0]).Should().Contain(["reference-i7-14700f-rtx4060-2026-10-06", "amd-radeon-synthetique",
             "intel-arc-synthetique", "sans-admin", "portable-batterie", "amd-rx6600-ryzen5-5600", "amd-rx6700xt-ryzen5-7600",
             "amd-rx7900xtx-ryzen9-7950x3d", "console-portable-rog-ally", "nvidia-gtx1650-i5-10400", "nvidia-rtx3060-i5-12400f",
             "nvidia-rtx5070-i5-13400f", "bureau-sans-jeu-i5-8go"]);

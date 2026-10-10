@@ -14,7 +14,7 @@
     <!-- Ed25519 manifest signing (server-side key custody). Same lib/version the client uses
          to VERIFY (DrDxt.Reconciler), so a signature this server produces verifies under the
          client's embedded PUBLIC key. The PRIVATE seed is read from env, never hardcoded. -->
-    <PackageReference Include="NSec.Cryptography" Version="24.4.0" />
+    <PackageReference Include="NSec.Cryptography" Version="26.4.0" />
   </ItemGroup>
 
 </Project>

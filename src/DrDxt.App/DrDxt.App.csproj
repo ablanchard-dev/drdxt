@@ -41,7 +41,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <!-- 07/10/2026 (D11) : le QR du guide BIOS, lu au téléphone pendant que le PC est dans le BIOS. MIT. -->
     <PackageReference Include="QRCoder" Version="1.8.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
