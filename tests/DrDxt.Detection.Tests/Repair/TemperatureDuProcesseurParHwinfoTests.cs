@@ -24,6 +24,21 @@ public sealed class TemperatureDuProcesseurParHwinfoTests
         c.Explication.Should().Contain("HWiNFO").And.Contain("CPU Package");
     }
 
+    // 10/10/2026 soir : lue par PawnIO (registres, Intel seulement), 100 °C en partie était dite « observée » et « lue dans
+    // HWiNFO ». Les registres se jugent comme le paquet, nomment leur source, et à la limite disent le freinage.
+    [Fact]
+    public void Lue_par_les_registres_la_limite_est_jugee_et_la_source_est_la_bonne()
+    {
+        var c = Constat(new TemperatureHwinfo.Lecture(100, TemperaturePawnIo.Libelle));
+        c.Statut.Should().Be(RepairStatus.Suspicious);
+        c.Explication.Should().Contain("registres du processeur").And.NotContain("HWiNFO")
+            .And.Contain("se freine lui-même").And.Contain("refroidissement");
+
+        var tiede = Constat(new TemperatureHwinfo.Lecture(72, TemperaturePawnIo.Libelle));
+        tiede.Statut.Should().Be(RepairStatus.Observed);
+        tiede.Explication.Should().NotContain("HWiNFO");
+    }
+
     // 06/10/2026 (plan 4.6) : chez moi, un HWiNFO de 2012 tournait sans rien publier, et la carte disait seulement « pas
     // pu lire ». Quand HWiNFO tourne sans publier, la carte nomme sa version et les deux causes connues.
     [Fact]

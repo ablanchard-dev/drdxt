@@ -2075,7 +2075,7 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
     <value>pas de différence nette en jeu</value>
   </data>
   <data name="Parties.Chaleur" xml:space="preserve">
-    <value> (jusqu'à {0} °C, lu dans HWiNFO)</value>
+    <value> (jusqu'à {0} °C)</value>
   </data>
   <data name="Parties.Carte" xml:space="preserve">
     <value>carte jusqu'à {0} °C</value>
