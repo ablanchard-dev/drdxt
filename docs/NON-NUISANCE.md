@@ -258,8 +258,9 @@ est une dette tant qu'aucun outil ne le refait.
 
 ```counts
 src/DrDxt.App/App.xaml.cs 10
-src/DrDxt.App/AppServiceCollectionExtensions.cs 4
+src/DrDxt.App/AppServiceCollectionExtensions.cs 2
 src/DrDxt.App/Platform/CalmeurDeVoisins.cs 1
+src/DrDxt.App/Platform/RelanceElevee.cs 1
 src/DrDxt.App/Updates/InstallationMiseAJour.cs 1
 src/DrDxt.App/ViewModels/BiosGuideViewModel.cs 1
 src/DrDxt.App/ViewModels/ScanViewModel.Agir.cs 2
@@ -287,6 +288,7 @@ src/DrDxt.ElevatedHelper/Execution/Win32PowerPlanActions.cs 6
 src/DrDxt.ElevatedHelper/Execution/Win32RegistryActions.cs 4
 src/DrDxt.ElevatedHelper/Execution/Win32RestorePointActions.cs 2
 src/DrDxt.ElevatedHelper/Execution/Win32ServiceActions.cs 4
+src/DrDxt.Lanceur/Program.cs 2
 src/DrDxt.ElevatedHelper/Ipc/HelperLauncher.cs 1
 src/DrDxt.ElevatedHelper/Leases/HelperDiagnosticsLog.cs 1
 src/DrDxt.ElevatedHelper/ModeDesinstallation.cs 1

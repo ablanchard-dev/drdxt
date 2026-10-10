@@ -17,7 +17,7 @@ Le mot qui compte : **mesure**. Le marché de l'optimisation PC est un marché d
 qui distingue ce produit tient dans une discipline : il ne dit jamais un chiffre qu'il n'a pas
 mesuré, et il n'applique jamais un levier qu'il ne peut pas défaire.
 
-C# / .NET 10 (`net10.0-windows`). **6 677 tests, 0 échec**, mesuré le 09/10/2026 sur
+C# / .NET 10 (`net10.0-windows`). **6 692 tests, 0 échec**, mesuré le 10/10/2026 sur
 17 projets, hors tests marqués `Machine`. Un chiffre écrit à la main vieillit (celui-ci s'est
 trompé sept fois) : `tools/gates/compte_des_tests.py` compare cette ligne aux journaux `.trx` de la
 dernière exécution, et ne dit rien du tout s'il n'y en a pas. La commande qui redonne le chiffre :
@@ -31,6 +31,23 @@ Le `sed` permissif n'est pas de la coquetterie : `dotnet test` sépare ses libel
 deux-points par une **espace insécable**, et un motif qui attend une espace ordinaire rend
 zéro sans rien dire. Et les deux options comptent : sans `-c Release`, 5 tests de plus (compilés en
 Debug seulement) ; sans le filtre, les tests `Machine` en plus.
+
+## Installer
+
+1. Télécharge `DrDXT-Setup-NON-SIGNE.exe` dans la dernière [Release](https://github.com/ablanchard-dev/drdxt/releases) ; son
+   empreinte SHA-256 est écrite dans la page de la Release (`Get-FileHash` dans PowerShell pour la comparer).
+2. L'installeur n'est pas encore signé : Windows affiche « Windows a protégé votre ordinateur ». Clique « Informations
+   complémentaires », puis « Exécuter quand même ». Il demande ensuite les droits administrateur : c'est l'installation
+   dans Program Files et le helper élevé qui les demandent, pas l'application.
+3. Deux cases à l'installation : un raccourci sur le Bureau, et le service `DrDxtReconciler` (décoché par défaut) qui
+   réapplique au démarrage de Windows les réglages que tu as gardés. Sans lui, rien n'est réappliqué.
+4. Au premier lancement, « Lancer le scan » lit la machine sans rien écrire. Rien n'est posé avant que tu cliques
+   « Optimiser » ou « Essayer en alternance », et chaque réglage se défait depuis « Ce que DrDXT a posé ».
+5. Désinstaller : Paramètres, Applications, DrDXT. Le désinstalleur rend d'abord les réglages qu'il connaît (ceux du
+   manifeste signé), puis retire les fichiers. Ce qui reste : `%LOCALAPPDATA%\DrDXT` (journaux, relevés de parties) et
+   `%ProgramData%\DrDxt` (rapports de désinstallation) ; supprime-les à la main si tu veux repartir de zéro.
+
+Windows 10 ou 11, 64 bits. Tout ce qu'il faut est dans l'installeur : aucun .NET à installer.
 
 ## Compiler
 

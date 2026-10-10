@@ -206,12 +206,29 @@ public sealed class HttpUpdateFeed : IUpdateFeed
         }
     }
 
+    public const long TailleMaxOctets = 400L * 1024 * 1024;
+
     public async Task<Result<byte[]>> DownloadAsync(string url, CancellationToken ct)
     {
         try
         {
-            var bytes = await _http.GetByteArrayAsync(url, ct).ConfigureAwait(false);
-            return Result<byte[]>.Ok(bytes);
+            // 10/10/2026 (revue de sécurité) : une réponse sans fin faisait allouer des Go en mémoire. Un installeur
+            // de DrDXT pèse moins de 200 Mo : au-delà, ce n'est pas une mise à jour.
+            using var reponse = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            reponse.EnsureSuccessStatusCode();
+            if (reponse.Content.Headers.ContentLength is > TailleMaxOctets)
+                return Result<byte[]>.Fail(UpdateErrorCodes.Offline, "Update payload refused: larger than the size limit.");
+            await using var flux = await reponse.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            using var memoire = new MemoryStream();
+            var tampon = new byte[81920];
+            int lu;
+            while ((lu = await flux.ReadAsync(tampon, ct).ConfigureAwait(false)) > 0)
+            {
+                if (memoire.Length + lu > TailleMaxOctets)
+                    return Result<byte[]>.Fail(UpdateErrorCodes.Offline, "Update payload refused: larger than the size limit.");
+                memoire.Write(tampon, 0, lu);
+            }
+            return Result<byte[]>.Ok(memoire.ToArray());
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
