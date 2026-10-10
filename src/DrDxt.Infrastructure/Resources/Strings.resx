@@ -2102,7 +2102,7 @@ No setting on your machine was changed by this error.</value>
     <value>no clear difference in game</value>
   </data>
   <data name="Parties.Chaleur" xml:space="preserve">
-    <value> (up to {0} °C, read from HWiNFO)</value>
+    <value> (up to {0} °C)</value>
   </data>
   <data name="Parties.Carte" xml:space="preserve">
     <value>card up to {0} °C</value>

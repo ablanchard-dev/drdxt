@@ -958,12 +958,21 @@ public sealed partial class RepairAuditService
             var c = hw.Celsius.ToString("0", CultureInfo.InvariantCulture) + " °C";
             // Revue du 04/10 (P1) : le seuil vient d'Intel (freinage à 100 °C). Un Ryzen 7000 (« CPU (Tctl/Tdie) »)
             // tourne à 95 °C par conception : pour lui, aucun jugement, la valeur seule.
-            var chaudIntel = hw.Libelle is "CPU Package" or "Core Max" && hw.Celsius >= SeuilChaleurProcesseurC;
+            // 10/10/2026 soir (le mainteneur, 100 °C en partie lus par PawnIO et dits « observé ») : la lecture par les
+            // registres est Intel seulement, elle se juge comme le paquet ; et elle ne vient pas de HWiNFO.
+            var parRegistres = hw.Libelle == DrDxt.Detection.Cpu.TemperaturePawnIo.Libelle;
+            var chaudIntel = (parRegistres || hw.Libelle is "CPU Package" or "Core Max") && hw.Celsius >= SeuilChaleurProcesseurC;
+            var aLaLimite = chaudIntel && hw.Celsius >= 100;
             yield return new RepairFinding("THERMIQUE", "temperature du processeur", c, null,
                 chaudIntel ? RepairStatus.Suspicious : RepairStatus.Observed,
-                $"lue dans HWiNFO (capteur « {hw.Libelle} »), au moment du scan : {c}."
-                + (chaudIntel
-                    ? $" C'est près de la limite où le processeur se freine lui-même (100 °C sur les Intel récents) : regarde le refroidissement."
+                (parRegistres ? "lue dans les registres du processeur (PawnIO)" : $"lue dans HWiNFO (capteur « {hw.Libelle} »)")
+                + $", au moment du scan : {c}."
+                + (aLaLimite
+                    ? " C'est la limite : le processeur se freine lui-même (il baisse sa fréquence) tant que ça dure, et tes 1 % low"
+                      + " en pâtissent. Regarde le refroidissement (montage, pâte, ventilateurs, poussière) ; sinon une limite de"
+                      + " puissance plus basse au BIOS le garde sous la limite."
+                    : chaudIntel
+                    ? " C'est près de la limite où le processeur se freine lui-même (100 °C sur les Intel récents) : regarde le refroidissement."
                     : " Pour la juger, regarde-la pendant une partie : c'est là qu'elle monte."));
             foreach (var r in ThermiqueCarte()) yield return r;
             yield break;
