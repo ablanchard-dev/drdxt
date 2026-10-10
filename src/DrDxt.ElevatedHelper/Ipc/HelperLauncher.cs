@@ -181,15 +181,26 @@ public sealed class HelperLauncher
 public sealed class RunAsProcessLauncher : IHelperProcessLauncher
 {
     private const int ErrorCancelled = 1223; // ERROR_CANCELLED — UAC "No".
+    public const string Lanceur = "DrDxt.Lanceur.exe";
+
+    /// <summary>10/10/2026 (revue de sécurité) : l'invite Windows porte le lanceur natif quand il est à côté du helper ;
+    /// il redémarre le helper avec un environnement reconstruit (un processus élevé hérite de HKCU\Environment, où tout
+    /// programme du compte peut poser CORECLR_PROFILER_PATH). Sans lanceur (build de développement) : le helper lui-même.</summary>
+    internal static (string Fichier, IReadOnlyList<string> Prefixe) Cible(string helperExePath)
+    {
+        var lanceur = Path.Combine(Path.GetDirectoryName(helperExePath) ?? "", Lanceur);
+        return File.Exists(lanceur) ? (lanceur, [Path.GetFileName(helperExePath)]) : (helperExePath, []);
+    }
 
     public Result Launch(HelperLaunchSpec spec)
     {
         if (string.IsNullOrWhiteSpace(spec.HelperExePath) || !File.Exists(spec.HelperExePath))
             return Result.Fail(ErrorCodes.IoFailure, "Elevated helper executable was not found.");
 
+        var (fichier, prefixe) = Cible(spec.HelperExePath);
         var psi = new ProcessStartInfo
         {
-            FileName = spec.HelperExePath,
+            FileName = fichier,
             UseShellExecute = true, // REQUIRED for Verb="runas" (UAC): no shell-out of a command string.
             Verb = "runas",
             WindowStyle = ProcessWindowStyle.Hidden,
@@ -198,6 +209,7 @@ public sealed class RunAsProcessLauncher : IHelperProcessLauncher
         // Pass identity/config as a typed argument LIST (never a concatenated
         // command string) — no injection surface. The session key is negotiated
         // over the pipe, not passed here.
+        foreach (var a in prefixe) psi.ArgumentList.Add(a);
         psi.ArgumentList.Add($"--app-path={spec.AppImagePath}");
         if (!string.IsNullOrWhiteSpace(spec.PipeName))
             psi.ArgumentList.Add($"--pipe={spec.PipeName}");

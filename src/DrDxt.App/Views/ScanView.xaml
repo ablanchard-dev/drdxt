@@ -434,11 +434,11 @@
                                              AutomationProperties.Name="{Binding LabelSceneDescription}"/>
                                 </StackPanel>
 
-                                <StackPanel Orientation="Horizontal" Margin="0,18,0,0">
+                                <DockPanel Margin="0,18,0,0" LastChildFill="True">
                                     <Path Style="{StaticResource GlyphIcon}" Data="{Binding Source=ShieldCheck, Converter={StaticResource Icon}}"
-                                          Stroke="{StaticResource IrisCyanBrush}" Width="15" Height="15" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding LabelTrustLocal}" Style="{StaticResource Legende}" Margin="8,0,0,0" VerticalAlignment="Center"/>
-                                </StackPanel>
+                                          Stroke="{StaticResource IrisCyanBrush}" Width="15" Height="15" VerticalAlignment="Top" Margin="0,1,0,0" DockPanel.Dock="Left"/>
+                                    <TextBlock Text="{Binding LabelTrustLocal}" Style="{StaticResource Legende}" Margin="8,0,0,0" TextWrapping="Wrap"/>
+                                </DockPanel>
                             </StackPanel>
 
                             <!-- Après le scan -->
@@ -2085,7 +2085,7 @@
                                 <!-- Le rapport que le client colle dans son ticket. -->
                                 <!-- 03/10/2026 (D8.7, revue n° 3) : étiré sur 300 px, il faisait un troisième gabarit de bouton. -->
                                 <Button Style="{StaticResource BoutonReflet}" HorizontalAlignment="Left"
-                                        Command="{Binding ExportReportCommand}"
+                                        Command="{Binding ExportReportCommand}" AutomationProperties.Name="{Binding LabelViewReport}"
                                         Visibility="{Binding CanExportReport, Converter={StaticResource BoolVis}}">
                                     <StackPanel Orientation="Horizontal">
                                         <Path Style="{StaticResource GlyphIcon}" Data="{Binding Source=Report, Converter={StaticResource Icon}}"
@@ -2103,7 +2103,7 @@
                                 </StackPanel>
                                 <!-- 07/10/2026 (T1) : la machine du joueur testeur, au format des fixtures, anonymisée. -->
                                 <Button Style="{StaticResource BoutonReflet}" HorizontalAlignment="Left" Margin="0,12,0,0"
-                                        Command="{Binding ExporterMaMachineCommand}"
+                                        Command="{Binding ExporterMaMachineCommand}" AutomationProperties.Name="{Binding LabelExportMachine}"
                                         Visibility="{Binding CanExportMachine, Converter={StaticResource BoolVis}}">
                                     <StackPanel Orientation="Horizontal">
                                         <Path Style="{StaticResource GlyphIcon}" Data="{Binding Source=Report, Converter={StaticResource Icon}}"
@@ -2121,7 +2121,7 @@
                                 <!-- 08/10/2026 (T1b) : vérifier DrDXT sur ce PC, chaque réglage posé, relu, remis d'origine, relu. -->
                                 <StackPanel Visibility="{Binding CanVerifierMachine, Converter={StaticResource BoolVis}}">
                                     <Button Style="{StaticResource BoutonReflet}" HorizontalAlignment="Left" Margin="0,12,0,0"
-                                            Command="{Binding DemanderVerificationCommand}">
+                                            Command="{Binding DemanderVerificationCommand}" AutomationProperties.Name="{Binding LabelVerifierMachine}">
                                         <StackPanel Orientation="Horizontal">
                                             <Path Style="{StaticResource GlyphIcon}" Data="{Binding Source=Report, Converter={StaticResource Icon}}"
                                                   Stroke="{StaticResource TexteBrush}" Width="15" Height="15" VerticalAlignment="Center"/>

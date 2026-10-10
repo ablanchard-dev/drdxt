@@ -134,3 +134,27 @@ Limites acceptées, dites :
 - Aucun compteur anti-rejeu dans le manifeste signé : rejouer un ancien manifeste demande d'écrire dans un dossier
   réservé aux administrateurs.
 - Un programme du compte peut squatter le nom du tube entre deux connexions : déni de service, l'App refuse le squatteur.
+
+## 4. Revue du 10/10/2026 — le programme qui reçoit l'élévation est natif
+
+Trouvé par une revue adverse indépendante : un processus élevé par l'UAC reçoit son environnement de
+`HKCU\Environment`, que n'importe quel programme du compte écrit sans droits. Le runtime .NET y lit, avant la première
+ligne du programme, de quoi charger une DLL de son choix (`CORECLR_ENABLE_PROFILING`, `CORECLR_PROFILER_PATH`,
+documentées par Microsoft ; `StartupHookSupport=false` ne coupe que `DOTNET_STARTUP_HOOKS`). Chaque « Oui » donné à
+DrDXT aurait fait tourner ce code en administrateur, dans l'image authentique du helper.
+
+Corrigé : le seul exécutable de DrDXT qui reçoit l'élévation est `DrDxt.Lanceur.exe`, compilé en natif (NativeAOT, sans
+CoreCLR : ces variables n'ont aucune prise). Il ne démarre que les programmes de DrDXT, à côté de lui, avec un environnement
+reconstruit depuis les API Windows (`EnvironnementPropre` : SystemRoot, PATH limité à Windows, dossiers du profil lus au
+jeton) : rien de l'environnement reçu ne passe. Le helper (`RunAsProcessLauncher.Cible`), l'App qui se relance élevée
+(`RelanceElevee`) et le zip de validation passent par lui ; l'installeur le livre (`LeLanceurNatifRecoitLElevationTests`).
+Mesuré le 10/10 : lancé par le lanceur avec `CORECLR_*` et `DOTNET_*` posés, le programme fils ne voit aucune de ces
+variables (13 variables, PATH = Windows seul).
+
+Aussi corrigé : `StartupHookSupport=false` sur le service ; le téléchargement d'une mise à jour est borné à 400 Mo.
+
+Limites redites par cette revue, acceptées :
+- Ce qu'un programme du compte obtient à travers l'allowlist, sans exécution de code : fichier d'échange vide
+  (plantages jusqu'à remise à la main), redémarrage dans le BIOS, options BCD, plafond d'envoi. Réversible, borné.
+- Le helper ne doit jamais être diffusé hors installeur : hors Program Files, il fait confiance à l'image passée en
+  `--app-path`, et le compte peut le remplacer avant l'élévation. Seul l'installeur est publié.

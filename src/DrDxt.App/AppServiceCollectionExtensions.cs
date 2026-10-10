@@ -344,19 +344,8 @@ public static class AppServiceCollectionExtensions
                 estEleve: eleve,
                 relancerEnAdministrateur: () =>
                 {
-                    if (Environment.ProcessPath is not { } exe) return false;
-                    try
-                    {
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe)
-                        {
-                            UseShellExecute = true,
-                            Verb = "runas",
-                        });
-                    }
-                    catch (System.ComponentModel.Win32Exception)
-                    {
-                        return false;
-                    }
+                    // 10/10/2026 (revue de sécurité) : par le lanceur natif, environnement reconstruit (RelanceElevee).
+                    if (!DrDxt.App.Platform.RelanceElevee.Demarrer()) return false;
                     System.Windows.Application.Current?.Shutdown();
                     return true;
                 },
@@ -442,19 +431,8 @@ public static class AppServiceCollectionExtensions
             // 03/10/2026 (D6.2) : l'analyse lancée sans droits se relance en administrateur et enchaîne, une seule fois.
             vm.RelancerEleveEtAnalyser = scene =>
             {
-                if (Environment.ProcessPath is not { } exe) return false;
-                try
-                {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, $"--analyser --scene={scene}")
-                    {
-                        UseShellExecute = true,
-                        Verb = "runas",
-                    });
-                }
-                catch (System.ComponentModel.Win32Exception)
-                {
-                    return false;
-                }
+                // 10/10/2026 (revue de sécurité) : par le lanceur natif, environnement reconstruit (RelanceElevee).
+                if (!DrDxt.App.Platform.RelanceElevee.Demarrer("--analyser", $"--scene={scene}")) return false;
                 System.Windows.Application.Current?.Shutdown();
                 return true;
             };

@@ -131,7 +131,20 @@ dotnet publish "$appProj" -c $Configuration -r win-x64 --self-contained -o "$pub
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed (exit $LASTEXITCODE)" }
 
 # --- 2. Verifier la charge utile ----------------------------------------------
-foreach ($f in @('DrDxt.App.exe', 'DrDxt.ElevatedHelper.exe', 'PresentMonAPI2.dll')) {
+# 10/10/2026 (revue de sécurité) : le lanceur natif (NativeAOT, un seul fichier) reçoit l'élévation et redémarre le
+# helper ou l'App avec un environnement reconstruit. Il faut les outils C++ de Visual Studio (link.exe).
+# NativeAOT cherche vswhere.exe sur le PATH (cible Microsoft.NETCore.Native) : le dossier de l'installeur Visual Studio y passe.
+$vsInstaller = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
+if (Test-Path $vsInstaller) { $env:PATH = "$vsInstaller;$env:PATH" }
+$lanceurProj = Join-Path $repoRoot 'src\DrDxt.Lanceur\DrDxt.Lanceur.csproj'
+$lanceurDir = Join-Path $scriptDir 'publish-lanceur'
+if (Test-Path $lanceurDir) { Remove-Item $lanceurDir -Recurse -Force }
+dotnet publish "$lanceurProj" -c $Configuration -r win-x64 -o "$lanceurDir" "-p:Version=$Version"
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish (lanceur) failed (exit $LASTEXITCODE)" }
+Copy-Item (Join-Path $lanceurDir 'DrDxt.Lanceur.exe') -Destination $publishDir -Force
+Remove-Item $lanceurDir -Recurse -Force
+
+foreach ($f in @('DrDxt.App.exe', 'DrDxt.ElevatedHelper.exe', 'DrDxt.Lanceur.exe', 'PresentMonAPI2.dll')) {
     if (Test-Path (Join-Path $publishDir $f)) { Write-Host "  [OK] $f" }
     else { throw "Payload incomplet : $f manquant dans $publishDir" }
 }
@@ -161,7 +174,7 @@ else { throw "Payload incomplet : DrDxt.ReconcilerHost.exe manquant dans $servic
 # cote, et un helper non signe derriere un installeur signe est le maillon que SmartScreen
 # et un antivirus regardent.
 if ($Sign) {
-    foreach ($exe in @('DrDxt.App.exe', 'DrDxt.ElevatedHelper.exe', 'service\DrDxt.ReconcilerHost.exe')) {
+    foreach ($exe in @('DrDxt.App.exe', 'DrDxt.ElevatedHelper.exe', 'DrDxt.Lanceur.exe', 'service\DrDxt.ReconcilerHost.exe')) {
         Invoke-Sign (Join-Path $publishDir $exe)
     }
 }

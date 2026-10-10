@@ -17,6 +17,16 @@ if (Test-Path $pub) { Remove-Item $pub -Recurse -Force }
 dotnet publish (Join-Path $ici 'DrDxt.AmdHarness\DrDxt.AmdHarness.csproj') -c Release -r win-x64 --self-contained -o $pub -nodeReuse:false -v q
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish a échoué ($LASTEXITCODE)" }
 Rename-Item (Join-Path $pub 'DrDxt.AmdHarness.exe') 'DrDXT-Test.exe'
+# 10/10/2026 (revue de sécurité) : le lanceur natif reçoit l'élévation et démarre le banc avec un environnement reconstruit.
+# NativeAOT cherche vswhere.exe sur le PATH (cible Microsoft.NETCore.Native) : le dossier de l'installeur Visual Studio y passe.
+$vsInstaller = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
+if (Test-Path $vsInstaller) { $env:PATH = "$vsInstaller;$env:PATH" }
+$lanceur = Join-Path $env:TEMP 'drdxt-lanceur-publie'
+if (Test-Path $lanceur) { Remove-Item $lanceur -Recurse -Force }
+dotnet publish (Join-Path $ici '..\..\src\DrDxt.Lanceur\DrDxt.Lanceur.csproj') -c Release -r win-x64 -o $lanceur -nodeReuse:false -v q
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish (lanceur) a échoué ($LASTEXITCODE)" }
+Copy-Item (Join-Path $lanceur 'DrDxt.Lanceur.exe') $pub
+Remove-Item $lanceur -Recurse -Force
 Get-ChildItem $pub -Filter *.pdb | Remove-Item
 if ($Validation) { 'LISEZ-MOI-VALIDATION.txt', 'VALIDER.cmd', 'REMETTRE.cmd' | ForEach-Object { Copy-Item (Join-Path $ici $_) $pub } }
 else { Copy-Item (Join-Path $ici 'LISEZ-MOI.txt') $pub }
