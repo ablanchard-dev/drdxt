@@ -1,6 +1,6 @@
-name: Bogue / Bug
+name: Bug
 description: Quelque chose ne marche pas comme prévu. / Something does not work as expected.
-labels: ["bogue"]
+labels: ["bug"]
 body:
   - type: markdown
     attributes:

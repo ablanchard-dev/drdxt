@@ -55,7 +55,7 @@ L'aide la plus utile ne demande pas de savoir coder :
 - **Vérifier DrDXT sur ton PC**, puis glisser le rapport dans un ticket « Rapport de vérification ».
 - **Sans installer DrDXT** : les zips de la [Release](https://github.com/ablanchard-dev/drdxt/releases) lisent ton PC,
   ou font la même vérification, et écrivent le même rapport.
-- **Signaler un bogue**, ou proposer du code : [CONTRIBUTING.md](CONTRIBUTING.md). Une faille de sécurité se signale
+- **Signaler un bug**, ou proposer du code : [CONTRIBUTING.md](CONTRIBUTING.md). Une faille de sécurité se signale
   en privé : [SECURITY.md](SECURITY.md).
 
 ## Ce que DrDXT écrit sur ta machine
