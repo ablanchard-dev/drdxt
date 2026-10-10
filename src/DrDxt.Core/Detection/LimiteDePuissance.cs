@@ -9,9 +9,13 @@ public sealed record LimiteDePuissanceLue(double Pl1W, double Pl2W, double Nomin
     bool RegistreAuMaximum = false,
     // B1 (10/10/2026) : la copie MMIO de la carte mère (null = non lue, 0 = inactive, sinon la PL1 qu'elle tient) et la
     // puissance maximale que le processeur publie (0 = absente). La limite effective est la plus basse de MSR et MMIO.
-    double? CopieMmioPl1W = null, double MaximaleW = 0)
+    double? CopieMmioPl1W = null, double MaximaleW = 0,
+    // 10/10/2026 soir : la température la plus haute relevée sur les dernières parties (null = aucune) ; un processeur
+    // qui touche déjà sa limite ne se voit pas monter sa PL1.
+    double? ChaleurEnPartieMaxC = null)
 {
     public bool SansLimite => RegistreAuMaximum;
+    public bool SeFreineEnPartie => ChaleurEnPartieMaxC is { } c && c >= 95;
 }
 
 /// <summary>

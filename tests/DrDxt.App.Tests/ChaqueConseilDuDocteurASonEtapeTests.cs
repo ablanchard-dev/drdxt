@@ -34,6 +34,7 @@ public sealed class ChaqueConseilDuDocteurASonEtapeTests
         ["FichierDEchangeSurDisqueDur.cs"] = "Fichier d'échange sur un disque dur",
         ["MemoireSaturee.cs"] = "Mémoire saturée (PC de bureau comme PC de jeu)",
         ["LimiteDePuissance.cs"] = "Limite de puissance du processeur (Intel)",
+        ["ChaleurEnPartie.cs"] = "Trop chaud en partie",
         ["HeuresActives.cs"] = "hors de tes heures d'activité",
         ["JeuxSurDisqueDur.cs"] = "Jeux sur un disque dur",
         ["MicrocodeRaptorLake.cs"] = "microcode antérieur au correctif",

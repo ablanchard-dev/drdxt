@@ -205,6 +205,9 @@ public sealed partial class RepairAuditService
         }));
         // J-MECA (09/10/2026) : la limite de puissance effective, lue dans les registres quand PawnIO est là ; jamais écrite.
         constats.AddRange(Isoler("CPU", () => [LimiteDePuissance.Juger(_limitesPuissance())]));
+        // 10/10/2026 soir : la chaleur relevée en partie, reliée à la limite de puissance lue (plafond conseillé).
+        constats.AddRange(Isoler("CPU", () => DrDxt.Detection.Cpu.ChaleurEnPartie.Juger(
+            DrDxt.Detection.Cpu.ChaleurEnPartie.Lire(DossierDonnees.Chemin("parties.json")), _limitesPuissance())));
         // D2 (10/10/2026) : les fils de rendu de Call of Duty, lus dans son fichier (jamais écrits), contre les cœurs performants.
         constats.AddRange(Isoler("CPU", FilsDeRenduCallOfDuty));
         // 07/10/2026 (A7) : Curve Optimizer sur un Ryzen de bureau, en guide ; jamais écrit.
