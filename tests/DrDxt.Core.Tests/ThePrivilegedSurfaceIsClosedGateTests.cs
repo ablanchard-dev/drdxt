@@ -74,6 +74,9 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
         // 07/10/2026 (L-CPU) : le mode de boost secteur d'un plan, seul reglage du plan ecrit (docs/NON-NUISANCE.md).
         "SetProcessorBoostModeOp",
         "SetRegistryValueOp",
+        // 10/10/2026 (B3) : l'economie d'energie de la carte sans fil (secteur) d'un plan, seul reglage du plan ecrit par
+        // cette op ; documentee dans docs/NON-NUISANCE.md.
+        "SetWirelessPowerSavingOp",
     ];
 
     /// <summary>

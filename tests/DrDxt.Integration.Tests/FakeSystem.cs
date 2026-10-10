@@ -46,6 +46,8 @@ public sealed class FakeSystemState
     // B1 (10/10/2026) : le registre 0x610 du banc : PL1 65 W, PL2 219 W (huitièmes de watt), activées, sans verrou.
     public ulong CpuPkgPowerLimit { get; set; } = (1752UL << 32) | (1UL << 47) | (1UL << 15) | 520UL;
     public uint ModeBoostDefaut { get; set; } = 2;
+    // B3 (10/10/2026) : l'économie d'énergie de la carte sans fil (secteur) du plan actif : « moyenne » au départ.
+    public uint EconomieSansFilSecteur { get; set; } = 2;
 
     // Service states.
     private readonly Dictionary<string, ServiceState> _services = new(StringComparer.Ordinal);
@@ -143,7 +145,7 @@ public sealed class FakeSystemState
             sb.Append('[').Append(kv.Key).Append('=').Append(kv.Value.Kind).Append(':')
               .Append(kv.Value.Value).Append(']');
 
-        sb.Append(";power=").Append(ActivePowerPlan.ToString("D")).Append(",boost=").Append(ModeBoostSecteur).Append(",pl=").Append(CpuPkgPowerLimit);
+        sb.Append(";power=").Append(ActivePowerPlan.ToString("D")).Append(",boost=").Append(ModeBoostSecteur).Append(",pl=").Append(CpuPkgPowerLimit).Append(",wifi=").Append(EconomieSansFilSecteur);
 
         sb.Append(";services:");
         foreach (var kv in _services.OrderBy(k => k.Key, StringComparer.Ordinal))
@@ -220,6 +222,10 @@ public sealed class FakeElevatedClient : IElevatedClient
             // Le banc ne modélise que le plan actif : une écriture visant un autre plan ne change rien ici.
             case SetProcessorBoostModeOp b when b.PlanGuid == _state.ActivePowerPlan:
                 _state.ModeBoostSecteur = b.AcValue;
+                break;
+
+            case SetWirelessPowerSavingOp w when w.PlanGuid == _state.ActivePowerPlan:
+                _state.EconomieSansFilSecteur = w.AcValue;
                 break;
 
             // B1 (10/10/2026) : le registre de limite de puissance du processeur, tel quel.
@@ -415,6 +421,10 @@ public sealed class FakePowerPlanReader : IPowerPlanReader
     public Result<ModeDeBoostLu> LireModeDeBoost(Guid plan) => plan == _state.ActivePowerPlan
         ? Result<ModeDeBoostLu>.Ok(new ModeDeBoostLu(plan, _state.ModeBoostSecteur, _state.ModeBoostDefaut))
         : Result<ModeDeBoostLu>.Fail(ErrorCodes.TweakSdkUnavailable, "plan non modélisé");
+
+    public Result<EconomieSansFilLue> LireEconomieSansFil(Guid plan) => plan == _state.ActivePowerPlan
+        ? Result<EconomieSansFilLue>.Ok(new EconomieSansFilLue(plan, _state.EconomieSansFilSecteur))
+        : Result<EconomieSansFilLue>.Fail(ErrorCodes.TweakSdkUnavailable, "plan non modélisé");
 }
 
 /// <summary>B1 (10/10/2026) : les registres de limite de puissance du banc (unité = huitièmes de watt, base 65 W).</summary>

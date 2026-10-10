@@ -120,7 +120,7 @@ public sealed class AppliedTweakManifestMapper
     private static bool OrigineRendable(string origine)
     {
         static bool Rendable(PrivilegedOp op) => op is SetRegistryValueOp or DeleteRegistryValueOp or SetActivePowerPlanOp
-            or SetProcessorBoostModeOp or SetCpuPackagePowerLimitOp
+            or SetProcessorBoostModeOp or SetCpuPackagePowerLimitOp or SetWirelessPowerSavingOp
             or ApplyNvApiDrsSettingOp or DeleteNvApiDrsSettingOp or RunServiceControlOp
             // 08/10/2026 : les réglages de la carte que la désinstallation sait relire et rendre (jamais la sous-tension).
             or ApplyNvApiPowerLimitOp

@@ -34,6 +34,11 @@ public interface IPowerPlanActions
     /// défaut : refusé, pour les exécutants qui ne savent pas l'écrire.</summary>
     Result SetBoostModeAc(Guid planGuid, uint acValue) =>
         Result.Fail(ErrorCodes.HelperOpFailed, "Boost mode write is not wired in this executor.");
+
+    /// <summary>B3 (10/10/2026) : l'économie d'énergie de la carte sans fil sur secteur dans ce plan, puis le plan réactivé
+    /// s'il est actif. Par défaut : refusé.</summary>
+    Result SetWirelessPowerSavingAc(Guid planGuid, uint acValue) =>
+        Result.Fail(ErrorCodes.HelperOpFailed, "Wireless power saving write is not wired in this executor.");
 }
 
 /// <summary>System Restore point creation (SRSetRestorePoint / WMI) and enabling

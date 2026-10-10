@@ -684,6 +684,12 @@
   <data name="Apply.Result.SetNowNoneHeld" xml:space="preserve">
     <value>No immediate setting held.</value>
   </data>
+  <data name="tweak.fixit.wifi_performances.title" xml:space="preserve">
+    <value>Wi-Fi card taken out of power saving</value>
+  </data>
+  <data name="tweak.fixit.wifi_performances.summary" xml:space="preserve">
+    <value>Your game goes through Wi-Fi and your power plan keeps the wireless card in power saving mode on AC: Microsoft says this mode "reduces power consumption at the cost of increased data transfer latency" (the card skips beacons and wakes up to send). DrDXT sets this single value to "Maximum Performance", on AC, in your active plan; the battery value is left alone. No extra frames: fewer ping spikes. The next scan shows the jitter to your router. Reversible. The real fix is still a cable.</value>
+  </data>
   <data name="tweak.fixit.cpu_power_limit.title" xml:space="preserve">
     <value>Processor power limit raised</value>
   </data>

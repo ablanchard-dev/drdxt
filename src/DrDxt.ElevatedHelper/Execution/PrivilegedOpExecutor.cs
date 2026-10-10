@@ -118,6 +118,8 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                     _power.SetActivePlan(p.PlanGuid),
                 SetProcessorBoostModeOp b =>
                     _power.SetBoostModeAc(b.PlanGuid, b.AcValue),
+                SetWirelessPowerSavingOp w =>
+                    _power.SetWirelessPowerSavingAc(w.PlanGuid, w.AcValue),
                 SetCpuPackagePowerLimitOp c => _cpu is not null
                     ? _cpu.SetPackagePowerLimit(c.Valeur, c.Origine)
                     : Fail("CPU power limit write is not wired in this executor."),

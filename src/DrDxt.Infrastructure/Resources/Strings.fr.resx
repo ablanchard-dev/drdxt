@@ -658,6 +658,12 @@
   <data name="Apply.Result.SetNowNoneHeld" xml:space="preserve">
     <value>Aucun réglage posé tout de suite n'a tenu.</value>
   </data>
+  <data name="tweak.fixit.wifi_performances.title" xml:space="preserve">
+    <value>Carte Wi-Fi sortie de son économie d'énergie</value>
+  </data>
+  <data name="tweak.fixit.wifi_performances.summary" xml:space="preserve">
+    <value>Ton jeu passe par le Wi-Fi et ton plan d'alimentation tient la carte sans fil en mode économie d'énergie sur secteur : Microsoft le dit, ce mode « réduit la consommation au prix d'une latence de transfert accrue » (la carte saute des balises et se réveille pour envoyer). DrDXT passe cette seule valeur à « performances maximales », sur secteur, dans ton plan actif ; la valeur sur batterie n'est pas touchée. Pas d'images en plus : moins de pics de ping. Le scan suivant montre la gigue vers ta box. Réversible. Le vrai remède reste le câble.</value>
+  </data>
   <data name="tweak.fixit.cpu_power_limit.title" xml:space="preserve">
     <value>Limite de puissance du processeur montée</value>
   </data>

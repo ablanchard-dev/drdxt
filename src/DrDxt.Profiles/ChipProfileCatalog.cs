@@ -35,6 +35,7 @@ public interface IChipProfileCatalog
 //     https://github.com/NVIDIA/nvapi, et Microsoft Learn sur le fichier d'échange)
 //     fixit.ecran_frequence (07/10/2026, L-ECRAN : Microsoft Learn, ChangeDisplaySettingsExW et CDS_TEST)
 //     fixit.mode_boost (07/10/2026, L-CPU : Microsoft Learn, PERFBOOSTMODE et PowerWriteACValueIndex)
+//     fixit.wifi_performances (10/10/2026, B3 : Microsoft Learn, Wi-Fi power management for modern standby platforms)
 //     fixit.cpu_power_limit (10/10/2026, B1 : TechPowerUp, i9-14900K aux limites de 35 à 253 W ; Intel SDM vol. 4, MSR 0x610)
 // -----------------------------------------------------------------------
 public sealed class ChipProfileCatalog : IChipProfileCatalog
@@ -122,6 +123,9 @@ public sealed class ChipProfileCatalog : IChipProfileCatalog
 
     // 07/10/2026 (L-CPU) : learn.microsoft.com, « Options for perf state engine PerfBoostMode ».
     private const string TweakModeBoost = "fixit.mode_boost";
+    private const string TweakWifiPerformances = "fixit.wifi_performances";
+    private const string SrcWifiPerformances =
+        "https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/wi-fi-power-management-for-modern-standby-platforms";
     private const string TweakCpuPowerLimit = "fixit.cpu_power_limit";
     private const string SrcCpuPowerLimit =
         "https://www.techpowerup.com/review/intel-core-i9-14900k-raptor-lake-tested-at-power-limits-down-to-35-w/";
@@ -168,6 +172,14 @@ public sealed class ChipProfileCatalog : IChipProfileCatalog
                     "cœurs du plan Équilibré. Proche de zéro sur un PC moderne bien réglé ; un vrai " +
                     "correctif seulement quand la machine est mal réglée. Sûr partout.",
                     SrcCahierPowerPlan, GainConfidence.Inferred, SafetyLevel.Safe)),
+            new ProfileTweakSelection(
+                TweakWifiPerformances, ProfileIntent.FixMisconfig,
+                Array.Empty<ProfileParameter>(),
+                new GainEvidence(
+                    "Carte sans fil sortie de son mode d'économie d'énergie (valeur secteur du plan actif) quand le jeu passe " +
+                    "par le Wi-Fi. Microsoft : l'économie « réduit la consommation au prix d'une latence de transfert accrue ». " +
+                    "Confort de latence, pas d'images en plus ; posé et relu ; la batterie n'est jamais touchée. Réversible.",
+                    SrcWifiPerformances, GainConfidence.Sourced, SafetyLevel.Safe)),
             new ProfileTweakSelection(
                 TweakCpuPowerLimit, ProfileIntent.FixMisconfig,
                 Array.Empty<ProfileParameter>(),

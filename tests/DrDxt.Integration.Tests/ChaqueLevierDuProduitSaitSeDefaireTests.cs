@@ -140,6 +140,7 @@ public sealed class ChaqueLevierDuProduitSaitSeDefaireTests
             new X3dCcdParkingFixTweak(svc, reg, client),
             new SanePowerPlanTweak(power, client),
             new ModeBoostTweak(power, client),
+            new EconomieSansFilTweak(power, client),
             new LimitePuissanceCpuTweak(new FakeCpuPowerLimitReader(etat), client),
             new SanePagefileTweak(reg, client),
             new HeuresActivesTweak(reg, client, PartieDu0410, Paris),

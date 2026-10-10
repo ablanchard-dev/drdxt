@@ -61,6 +61,7 @@ public static class CouvertureDesLeviers
         ["fixit.power_plan"] = "processeur",
         ["fixit.mode_boost"] = "processeur",
         ["fixit.cpu_power_limit"] = "processeur",
+        ["fixit.wifi_performances"] = "reseau",
         ["fixit.sane_pagefile"] = "memoire",
         ["fixit.heures_actives"] = "windows",
     };
@@ -85,6 +86,7 @@ public static class CouvertureDesLeviers
         {
             // B1 (10/10/2026) : la limite de puissance du processeur, registres Intel, PC fixe seulement.
             "fixit.cpu_power_limit" when console => "Levier.PasIci.Console",
+            "fixit.wifi_performances" when console => "Levier.PasIci.Console",
             "fixit.cpu_power_limit" when portable => "Levier.PasIci.Batterie",
             "fixit.cpu_power_limit" when !intel => "Levier.PasIci.PasIntel",
             // GPU-OC (08/10/2026) : le ventilateur NVIDIA (NVML) en mode Expert, sur un PC fixe seulement.

@@ -234,10 +234,23 @@ public record SettingsState(
     TriState? AccelerationSouris = null,
     // B1 (10/10/2026) : la limite de puissance du processeur Intel lue par PawnIO (PL1, PL2, verrou, copie MMIO, maximum
     // publié). null = non lue (PawnIO absent, pas Intel, sans droits) : le levier ne s'arme pas, le docteur le dit.
-    LimiteDePuissanceLue? LimitePuissance = null);
+    LimiteDePuissanceLue? LimitePuissance = null,
+    // B3 (10/10/2026) : le mode d'économie d'énergie de la carte sans fil (valeur secteur du plan actif). null = non lu.
+    EconomieSansFilLue? EconomieSansFil = null);
 
 /// <summary>07/10/2026 (L-CPU) : PERFBOOSTMODE sur secteur, lu dans un plan, avec le défaut de la personnalité de ce plan
 /// (Microsoft Learn, « PERFBOOSTMODE » : 0 = désactivé quel que soit le mode du processeur, 1 à 4 = activé).</summary>
+/// <summary>B3 (10/10/2026) : « Mode d'économie d'énergie » des « Paramètres de la carte sans fil » d'un plan, sur
+/// secteur. Microsoft Learn (Wi-Fi power management) : l'économie « réduit la consommation au prix d'une latence de
+/// transfert accrue ». 0 = performances maximales, 1 = économie faible, 2 = moyenne, 3 = maximale.</summary>
+public sealed record EconomieSansFilLue(Guid Plan, uint Valeur)
+{
+    public static readonly Guid SousGroupe = new("19cbb8fa-5279-450e-9fac-8a3d5fedd0c1");
+    public static readonly Guid Reglage = new("12bbebe6-58d6-4636-95bb-3217ef867c1a");
+    public const uint PerformancesMaximales = 0;
+    public const uint MaxDocumente = 3;
+}
+
 public sealed record ModeDeBoostLu(Guid Plan, uint Valeur, uint Defaut)
 {
     /// <summary>GUID du réglage (Learn) ; sous-groupe GUID_PROCESSOR_SETTINGS_SUBGROUP.</summary>

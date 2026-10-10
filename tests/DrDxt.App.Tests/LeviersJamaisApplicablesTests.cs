@@ -35,6 +35,11 @@ public sealed class LeviersJamaisApplicablesTests
         ["fixit.mode_boost"] = (hw, s) => (hw, s with { PowerPlanGuid = Equilibre, ModeDeBoost = new ModeDeBoostLu(Guid.Parse(Equilibre), 0, 2) }),
         ["latency.mouse_acceleration_off"] = (hw, s) => (hw, s with { AccelerationSouris = TriState.On }),
         ["fixit.cpu_power_limit"] = (hw, s) => (hw, s with { LimitePuissance = new LimiteDePuissanceLue(65, 219, 65, false) }),
+        ["fixit.wifi_performances"] = (hw, s) => (hw, s with
+        {
+            NetworkAdapters = [new NetworkAdapterState("Wi-Fi", "Intel Wi-Fi 6 AX200", false, TriState.Unknown, TriState.Unknown, TriState.Unknown)],
+            EconomieSansFil = new EconomieSansFilLue(Guid.Parse(s.PowerPlanGuid), 2),
+        }),
         ["fixit.x3d_ccd"] = (hw, s) => (hw with { Cpu = new CpuInfo("AMD Ryzen 9 7950X3D", "AuthenticAMD", 16, 32, true, 2) },
             s with { ParkedCoreIndexes = [] }),
     };
