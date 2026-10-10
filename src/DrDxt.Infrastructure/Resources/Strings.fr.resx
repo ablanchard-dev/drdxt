@@ -1960,6 +1960,9 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
   <data name="Essai.ArretRate" xml:space="preserve">
     <value>Essai de « {0} » : l'état d'avant n'a pas pu être rendu ; l'essai continue, réessaie.</value>
   </data>
+  <data name="Essai.Explication" xml:space="preserve">
+    <value>Pour un réglage qui se juge en jeu : DrDXT l'alterne d'une partie à l'autre, avec puis sans, et ne le garde que s'il te fait gagner. Optimiser le lance aussi tout seul.</value>
+  </data>
   <data name="Essai.Bouton" xml:space="preserve">
     <value>Essayer en alternance pendant mes parties</value>
   </data>
@@ -2300,7 +2303,7 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
     <value>audit de santé du système</value>
   </data>
   <data name="Etape.Optimiser" xml:space="preserve">
-    <value>Prochaine étape : Optimiser. DrDXT pose ce qu'il sait régler seul sur ce PC, essaie en jeu ce qui se juge en jeu, et te donne ton ordonnance pour le reste.</value>
+    <value>Prochaine étape : le bouton « Optimiser », juste en dessous. DrDXT pose ce qu'il sait régler seul sur ce PC, essaie en jeu ce qui se juge en jeu, et te donne ton ordonnance pour le reste.</value>
   </data>
   <data name="Etape.EssaiEnCours" xml:space="preserve">
     <value>Prochaine étape : joue. Un essai tourne, une partie avec, une sans ; DrDXT ouvert, il tranche seul après trois parties de chaque côté.</value>
@@ -2321,7 +2324,11 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
     <value>Réglage de la carte : pas proposé sur cette machine (portable, carte non prise en charge ou rien à régler selon le profil).</value>
   </data>
   <data name="Rapport.Description" xml:space="preserve">
-    <value>Tout ce que cette analyse a lu, dans un fichier à garder ou à joindre à une demande d'aide.</value>
+    <value>« Voir le rapport » : tout ce que cette analyse a lu, dans un fichier à garder ou à joindre à une demande d'aide.
+
+« Exporter ma machine » : ta machine sans rien qui t'identifie, dans un fichier ; rien ne part, c'est toi qui l'envoies au projet si tu veux.
+
+« Vérifier DrDXT sur mon PC » : pose chaque réglage un instant, le relit, puis le remet comme avant. Rien n'est gardé : ça prouve que DrDXT sait régler ce PC.</value>
   </data>
   <data name="UI.Register.None" xml:space="preserve">
     <value>aucun à changer</value>
