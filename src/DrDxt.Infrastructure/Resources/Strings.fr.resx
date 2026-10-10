@@ -593,7 +593,7 @@
     <value>Ton ordonnance :</value>
   </data>
   <data name="Ordonnance.ATaMain" xml:space="preserve">
-    <value>À faire toi-même ({0}), les plus urgents d'abord :</value>
+    <value>D'abord, à ta main ({0}), les plus urgents en tête :</value>
   </data>
   <data name="Ordonnance.Guide" xml:space="preserve">
     <value>Chaque point a son pas à pas dans son domaine, plus bas, et dans « Ce qui se fait à la main ».</value>
@@ -2328,6 +2328,9 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
   </data>
   <data name="Etape.AFaire" xml:space="preserve">
     <value>Prochaine étape : {0} ({1}). DrDXT ne peut pas le faire à ta place ; le pas à pas est dans son domaine.</value>
+  </data>
+  <data name="Etape.AFairePuisOptimiser" xml:space="preserve">
+    <value>D'abord : {0} ({1}). DrDXT ne peut pas le faire à ta place ; le pas à pas est dans son domaine. Puis « Optimiser », juste en dessous : il fait sa part dans tous les cas.</value>
   </data>
   <data name="Etape.AFaire.Bouton" xml:space="preserve">
     <value>Voir le pas à pas</value>

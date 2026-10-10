@@ -506,7 +506,7 @@ public sealed class ScanApplyCommandTests
         await ScanThenApply(h);
 
         h.CandidatsCrees.Should().Contain("fixit.power_plan");
-        h.Vm.ResultatOptimisation.Should().StartWith("Apply.SousGarde");
+        h.Vm.ResultatOptimisation.Should().StartWith("Ordonnance.Titre").And.Contain("Apply.SousGarde");
     }
 
     [Fact]
@@ -521,7 +521,7 @@ public sealed class ScanApplyCommandTests
             Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         // 09/10/2026 : HAGS et Reflex (pilote graphique) passent sous garde, comme le reste ; Reflex se tente à chaud.
         h.CandidatsCrees.Should().Equal("latency.reflex");
-        h.Vm.ResultatOptimisation.Should().StartWith("Apply.SousGarde")
+        h.Vm.ResultatOptimisation.Should().StartWith("Ordonnance.Titre").And.Contain("Apply.SousGarde")
             .And.Contain("Apply.Result.AtReboot · tweak.latency.hagsOn.title").And.NotContain("Apply.Result.Discarded · tweak.latency.hagsOn.title");
     }
 
@@ -534,7 +534,7 @@ public sealed class ScanApplyCommandTests
         await ScanThenApply(h);
 
         await h.Safety.Received().EnsureRestorePointAsync();
-        h.Vm.ResultatOptimisation.Should().StartWith("Apply.SousGarde");
+        h.Vm.ResultatOptimisation.Should().StartWith("Ordonnance.Titre").And.Contain("Apply.SousGarde");
     }
 
     // GARDE1 (09/10/2026) : un levier rendu par la garde d'incident n'est pas reposé avant une semaine, et l'écran le dit ;

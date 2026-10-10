@@ -77,10 +77,13 @@ public sealed partial class ScanViewModel
         finally
         {
             // 10/10/2026 (le mainteneur : « ça manque de conclusion, de réelle aide ») : Optimiser finit toujours par une
-            // ordonnance : ce qui est fait, ce qui reste à faire soi-même (les plus urgents), ce qui est déjà en place, et la suite.
+            // ordonnance. Le soir même (« c'est relou que DrDXT ne s'occupe pas plus des points à corriger avant opti ») :
+            // ce qui reste à ta main s'écrivait après « Posé » et « C'est parti », enterré. Le docteur le dit en tête,
+            // puis ce qu'il a fait, puis la suite.
+            var (tete, fin) = OrdonnanceEnDeux(reposFait: ReposCarteEnAttente);
             ResultatOptimisation = string.Join(Environment.NewLine,
-                gestes.Append(ResultatOptimisation ?? string.Empty).Append(essai ?? string.Empty)
-                    .Append(Ordonnance(reposFait: ReposCarteEnAttente)).Where(l => l.Length > 0));
+                new[] { tete }.Concat(gestes).Append(ResultatOptimisation ?? string.Empty).Append(essai ?? string.Empty)
+                    .Append(fin).Where(l => l.Length > 0));
         }
         // (6) Revue du 10/10/2026 : l'étape en tête suivait le scan, pas Optimiser. Rejugée sur ce qui reste.
         await JugerCeQuiResteAPoserAsync().ConfigureAwait(true);
@@ -91,23 +94,36 @@ public sealed partial class ScanViewModel
     internal IEnumerable<PointAFaire> PointsAFaireRestants(bool reposFait) =>
         PointsAFaire.Where(p => !(reposFait && p.Entree.Cle == "Finding.Gpu.PerfMaxGlobal"));
 
+    /// <summary>Ce qui reste vraiment à la main du joueur : les points à faire, moins celui qu'Optimiser va faire ou a fait
+    /// lui-même (le repos de la carte).</summary>
+    internal IEnumerable<PointAFaire> PointsALaMain => PointsAFaireRestants(ReposCarteEnAttente || ReposCarteAOuvrir);
+
     /// <summary>10/10/2026 : la conclusion du docteur après Optimiser, construite sur ce que le scan a déjà dit (la liste
     /// « à faire d'abord » et le compte des réglages lus) : jamais une impasse.</summary>
     internal string Ordonnance(bool reposFait)
     {
-        var lignes = new List<string> { _localize("Ordonnance.Titre") };
+        var (tete, fin) = OrdonnanceEnDeux(reposFait);
+        return tete + Environment.NewLine + fin;
+    }
+
+    /// <summary>L'ordonnance en deux morceaux : la tête (ce qui est à ta main, d'abord) s'écrit avant ce qu'Optimiser a
+    /// fait ; la fin (ce qui est déjà en place, la suite) après.</summary>
+    internal (string Tete, string Fin) OrdonnanceEnDeux(bool reposFait)
+    {
+        var tete = new List<string> { _localize("Ordonnance.Titre") };
         var aLaMain = PointsAFaireRestants(reposFait).ToList();
         if (aLaMain.Count > 0)
         {
-            lignes.Add(string.Format(CultureInfo.CurrentCulture, _localize("Ordonnance.ATaMain"), aLaMain.Count));
-            lignes.AddRange(aLaMain.Take(3).Select(p => $"• {p.Entree.Titre.TrimEnd('.', ' ')} ({p.Domaine.Nom})"));
-            lignes.Add(_localize("Ordonnance.Guide"));
+            tete.Add(string.Format(CultureInfo.CurrentCulture, _localize("Ordonnance.ATaMain"), aLaMain.Count));
+            tete.AddRange(aLaMain.Take(3).Select(p => $"• {p.Entree.Titre.TrimEnd('.', ' ')} ({p.Domaine.Nom})"));
+            tete.Add(_localize("Ordonnance.Guide"));
         }
-        else lignes.Add(_localize("Ordonnance.RienAMain"));
+        else tete.Add(_localize("Ordonnance.RienAMain"));
+        var fin = new List<string>();
         if (Coverage is { ApplicableLevers: > 0 } c)
-            lignes.Add(string.Format(CultureInfo.CurrentCulture, _localize("Ordonnance.DejaEnPlace"), c.KnownLevers, c.ApplicableLevers));
-        lignes.Add(_localize("Ordonnance.Suite"));
-        return string.Join(Environment.NewLine, lignes);
+            fin.Add(string.Format(CultureInfo.CurrentCulture, _localize("Ordonnance.DejaEnPlace"), c.KnownLevers, c.ApplicableLevers));
+        fin.Add(_localize("Ordonnance.Suite"));
+        return (string.Join(Environment.NewLine, tete), string.Join(Environment.NewLine, fin));
     }
 
     /// <summary>10/10/2026 : ce qu'Optimiser fait sans mesure en jeu, parce que le scan l'a constaté et que DrDXT a son
