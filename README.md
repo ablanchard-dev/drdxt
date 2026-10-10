@@ -1,21 +1,32 @@
 # DrDXT
 
-Optimisation PC gaming pour Windows. Le produit détecte le matériel, lit l'état des réglages,
-applique des leviers réversibles, **mesure** (PresentMon, ou les événements DXGI de Windows quand
-PresentMon ne voit rien), annule tout seul un levier immédiat qui régresse en session a-b-b-a, et
-sait réasserter au boot ce qui doit persister. Ce dernier point passe par le service
-`DrDxtReconciler`, que l'installeur propose (case « reconciler », décochée par défaut) : sans lui,
-rien n'est réappliqué au démarrage.
+Un optimiseur PC gaming pour Windows, gratuit et libre, qui ne promet rien qu'il n'ait mesuré.
 
-Ce que la mesure ne sait pas faire, et le produit le dit : en partie réelle, le bruit est de 5 à
-10 % (`docs/OU-VIT-LE-GAIN.md`), plus que le gain attendu de la plupart des leviers. Un levier
-qui ne dépasse pas ce bruit est dit « indistinguable », jamais « gagnant ». Les leviers qui
-prennent effet au redémarrage sont appliqués sans mesure immédiate : seule l'analyse suivante en
-jeu peut en juger.
+Il lit ton matériel et tes réglages, dit ce qui te coûte des images, pose des réglages qu'il sait défaire, et juge
+chacun sur tes vraies parties : gardé s'il apporte quelque chose, rendu sinon. Si ta machine est déjà bonne, il te le
+dit aussi. Le marché de l'optimisation PC vit de placebos ; tout ce qui distingue DrDXT tient dans une discipline : il
+n'affiche jamais un chiffre qu'il n'a pas mesuré, et il n'applique jamais un réglage qu'il ne peut pas rendre.
 
-Le mot qui compte : **mesure**. Le marché de l'optimisation PC est un marché de placebos. Tout ce
-qui distingue ce produit tient dans une discipline : il ne dit jamais un chiffre qu'il n'a pas
-mesuré, et il n'applique jamais un levier qu'il ne peut pas défaire.
+**Où en est le projet, sans enjoliver.** Version 0.9. Mis au point sur peu de machines (Intel + NVIDIA surtout). Aucun
+gain en jeu n'est encore prouvé : la mesure existe, la preuve attend des parties et d'autres PC. Les cartes AMD, les
+Intel Arc, les portables à deux cartes et les consoles portables sont pris en charge dans le code, sur des machines
+reconstituées, jamais encore sur une vraie. C'est exactement là que tu peux aider.
+
+## Participer
+
+Toute aide est bienvenue, et la plus utile ne demande pas de savoir coder :
+
+- **Vérifier DrDXT sur ton PC** (bouton en bas de l'écran après un scan) : chaque réglage est posé, relu, rendu, relu.
+  Le rapport ne contient ni ton nom, ni celui de ton PC, ni tes adresses. Tu le glisses dans un ticket
+  « Rapport de vérification » et ton matériel entre dans ce que DrDXT sait prouver.
+- **Sans installer DrDXT** : les zips de la [Release](https://github.com/ablanchard-dev/drdxt/releases) lisent ton PC
+  (ou font la même vérification) et écrivent le même rapport.
+- **Signaler ce qui cloche**, ou proposer du code : [CONTRIBUTING.md](CONTRIBUTING.md) dit comment, et
+  [docs/COUVERTURE.md](docs/COUVERTURE.md) ce qui est prouvé, à prouver, ou pas sur ton matériel.
+
+DrDXT est sous **GPL-3.0** : il reste gratuit et libre pour toujours. Quiconque le modifie et le diffuse doit publier
+son code sous la même licence, en citant d'où il vient. Personne ne peut en vendre une version fermée ; une version
+améliorée profite à tout le monde. Le détail est plus bas, dans « Licence ».
 
 C# / .NET 10 (`net10.0-windows`). **6 692 tests, 0 échec**, mesuré le 10/10/2026 sur
 17 projets, hors tests marqués `Machine`. Un chiffre écrit à la main vieillit (celui-ci s'est
@@ -47,7 +58,10 @@ Debug seulement) ; sans le filtre, les tests `Machine` en plus.
    manifeste signé), puis retire les fichiers. Ce qui reste : `%LOCALAPPDATA%\DrDXT` (journaux, relevés de parties) et
    `%ProgramData%\DrDxt` (rapports de désinstallation) ; supprime-les à la main si tu veux repartir de zéro.
 
-Windows 10 ou 11, 64 bits. Tout ce qu'il faut est dans l'installeur : aucun .NET à installer.
+Windows 10 ou 11, 64 bits, **sur un compte administrateur** : c'est lui qui donne son accord à chaque réglage, et c'est
+dans son profil que DrDXT range tes relevés. Sur un compte standard, l'invite Windows demande le mot de passe d'un
+administrateur et les réglages iraient dans le profil de ce compte-là : ce n'est pas prévu. Tout ce qu'il faut est dans
+l'installeur : aucun .NET à installer.
 
 ## Compiler
 
@@ -152,7 +166,10 @@ l'appel réseau.
 ## Licence
 
 DrDXT est un logiciel libre sous **GPL-3.0** : le texte complet est dans `LICENSE`, et il est livré
-avec chaque copie du programme. PresentMon (Intel) est sous licence MIT, sa notice est livrée à
+avec chaque copie du programme. Ce que ça veut dire : tu peux l'utiliser, le copier, le modifier et le redistribuer,
+même contre de l'argent, à condition de donner le code source de ta version sous la même licence. Une version fermée
+ou payante sans source n'est pas permise. Le nom « DrDXT » désigne ce projet : une version modifiée se présente sous
+son propre nom. PresentMon (Intel) est sous licence MIT, sa notice est livrée à
 côté (`PresentMon-NOTICE-MIT.txt`, depuis `third_party/presentmon/NOTICE-MIT.txt` dans ce dépôt). QRCoder,
 qui dessine le QR du guide BIOS, est sous licence MIT : sa notice est livrée à côté (`QRCoder-LICENSE-MIT.txt`,
 depuis `third_party/qrcoder/LICENSE-MIT.txt`).
