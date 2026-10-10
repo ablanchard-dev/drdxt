@@ -589,8 +589,32 @@
   <data name="Apply.RestoreRequired.Blocked" xml:space="preserve">
     <value>Application bloquée : un point de restauration système est requis au préalable. La restauration système est désactivée et n'a pas pu être activée, donc rien n'a été modifié. Active la restauration système (Protection du système) puis réessaie.</value>
   </data>
+  <data name="Ordonnance.Titre" xml:space="preserve">
+    <value>Ton ordonnance :</value>
+  </data>
+  <data name="Ordonnance.ATaMain" xml:space="preserve">
+    <value>À faire toi-même ({0}), les plus urgents d'abord :</value>
+  </data>
+  <data name="Ordonnance.Guide" xml:space="preserve">
+    <value>Chaque point a son pas à pas dans son domaine, plus bas, et dans « Ce qui se fait à la main ».</value>
+  </data>
+  <data name="Ordonnance.RienAMain" xml:space="preserve">
+    <value>Rien à faire à la main : le docteur n'a rien vu d'autre.</value>
+  </data>
+  <data name="Ordonnance.DejaEnPlace" xml:space="preserve">
+    <value>Déjà vérifié : DrDXT a lu {0} des {1} réglages qu'il sait poser ; ceux qui sont bons, il n'y touche pas.</value>
+  </data>
+  <data name="Ordonnance.Suite" xml:space="preserve">
+    <value>Ensuite : joue normalement, DrDXT ouvert. Chaque partie est relevée, et c'est sur elles qu'il juge ce qu'il a posé.</value>
+  </data>
+  <data name="Apply.GesteFait" xml:space="preserve">
+    <value>{0} : {1}</value>
+  </data>
+  <data name="Apply.EssaiLanceSansJeu" xml:space="preserve">
+    <value>C'est parti : « {0} » se juge en jeu, et aucun jeu n'est ouvert. DrDXT l'essaie donc pendant tes prochaines parties, une partie avec, une sans, et le garde seulement s'il te fait gagner. Joue normalement, DrDXT ouvert ; le verdict tombe après trois parties de chaque côté. « Arrêter l'essai » remet tout comme avant à tout moment.</value>
+  </data>
   <data name="Apply.NothingApplicable" xml:space="preserve">
-    <value>Rien à appliquer : aucune optimisation sûre ne s'applique à cette machine dans cette version.</value>
+    <value>Rien de plus à poser par DrDXT pour l'instant : ce qu'il sait régler seul est déjà en place sur ce PC. Ton ordonnance est juste en dessous.</value>
   </data>
   <data name="Apply.SousGarde" xml:space="preserve">
     <value>Ce PC s'est arrêté brutalement plusieurs fois ces dernières semaines. DrDXT optimise quand même, sous garde : un réglage suivi d'un nouvel arrêt dans la semaine est rendu seul. La cause de ces arrêts et sa réparation sont dans « Windows et stabilité ».</value>
