@@ -451,6 +451,12 @@
   <data name="UI.Component.Ram" xml:space="preserve">
     <value>Memory</value>
   </data>
+  <data name="UI.Component.Latency.Valeur" xml:space="preserve">
+    <value>mouse, display, game settings</value>
+  </data>
+  <data name="UI.Component.Network.Valeur" xml:space="preserve">
+    <value>router, internet, game server</value>
+  </data>
   <data name="UI.Component.Storage" xml:space="preserve">
     <value>Storage</value>
   </data>
@@ -1655,7 +1661,7 @@ No setting on your machine was changed by this error.</value>
     <value>Hold to open the repair, or press Enter</value>
   </data>
   <data name="Reparation.Windows.Lancee" xml:space="preserve">
-    <value>repair running in the Microsoft console. To stop it, close the console.</value>
+    <value>repair running in the Microsoft console. It often stays for several minutes around 62 or 63 %: that is the Windows tool downloading healthy files, not a hang. Let it finish, up to 30 minutes. To stop it, close the console.</value>
   </data>
   <data name="Reparation.Windows.Terminee.Sain" xml:space="preserve">
     <value>repair finished: Windows re-read, its repair files are healthy.</value>

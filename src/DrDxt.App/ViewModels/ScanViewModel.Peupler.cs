@@ -58,7 +58,22 @@ public sealed partial class ScanViewModel
 
         Components.Add(new ComponentItem("Windows", _localize("UI.Component.Windows"),
             DescribeWindows()));
+        // 10/10/2026 : latence, réseau et BIOS rejoignent le cercle. Le BIOS dit la carte mère et sa version, lues ici ;
+        // latence et réseau disent ce que DrDXT y mesure.
+        _composantsSansPiece =
+        [
+            new ComponentItem("Latency", _localize("Carte.Domaine.latence"), _localize("UI.Component.Latency.Valeur")),
+            new ComponentItem("Firmware", _localize("Carte.Domaine.bios"), DescribeBios(hw)),
+            new ComponentItem("Network", _localize("Carte.Domaine.reseau"), _localize("UI.Component.Network.Valeur")),
+        ];
         AnnoncerSatellites();
+    }
+
+    internal static string DescribeBios(HardwareInventory? hw)
+    {
+        var carte = hw?.Board.Product is { Length: > 0 } p ? p.Trim() : null;
+        var version = hw?.Bios.Version is { Length: > 0 } v ? "BIOS " + v.Trim() : null;
+        return Text(string.Join(" · ", new[] { carte, version }.Where(x => x is not null)) is { Length: > 0 } t ? t : null);
     }
 
     private static string DescribeMemory(HardwareInventory? hw)

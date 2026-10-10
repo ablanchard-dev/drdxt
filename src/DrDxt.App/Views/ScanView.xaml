@@ -588,9 +588,10 @@
                              l'échelle d'un bloc ; la boucle de chrome et les billes des composants sont un vrai rendu Cycles
                              (tools/rendus-3d/boucle.py) calé sur ces mêmes pôles. -->
                         <Viewbox Grid.Column="1" MinHeight="480" Stretch="Uniform">
-                        <Grid Width="660" Height="720">
+                        <!-- 10/10/2026 : 760 de large pour huit composants sans chevauchement (660 pour cinq). -->
+                        <Grid Width="760" Height="720">
                             <effets:BranchesDeChrome Panel.ZIndex="0" Rapide="{Binding IsScanning}"/>
-                            <effets:ReseauNeuronal Panel.ZIndex="1" Style="{StaticResource ReseauSelonEtat}" NombreDePoles="5" PolesAllumes="{Binding PolesLus}" RayonX="0.37" RayonY="0.37" AngleDepart="-90"/>
+                            <effets:ReseauNeuronal Panel.ZIndex="1" Style="{StaticResource ReseauSelonEtat}" NombreDePoles="8" PolesAllumes="{Binding PolesLus}" RayonX="0.37" RayonY="0.35" AngleDepart="-90"/>
                             
 
                             <!-- Tes composants, chacun sur son pôle. Les valeurs passent à la ligne, jamais coupées. -->
@@ -601,7 +602,7 @@
                             <ItemsControl Panel.ZIndex="4" ItemsSource="{Binding Satellites}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <effets:PanneauOrbital RayonX="0.37" RayonY="0.37" AngleDepart="-90" DecalageY="44" PortVersCentre="True"/>
+                                        <effets:PanneauOrbital RayonX="0.37" RayonY="0.35" AngleDepart="-90" CentreIcone="24.5" PortVersCentre="True"/>
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
@@ -647,40 +648,6 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <!-- Les domaines sans composant (latence, réseau, BIOS) : même point, même mot, même clic, sous l'orbite. -->
-                            <!-- Posée entre la bille (réduite après le scan) et les deux satellites du bas : en bas de la scène, elle
-                                 chevauchait Stockage et Mémoire (vu sur capture le 08/10). -->
-                            <ItemsControl Panel.ZIndex="4" ItemsSource="{Binding DomainesSansComposant}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,304,0,0"
-                                          Visibility="{Binding ADesDomainesSansComposant, Converter={StaticResource BoolVis}}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <!-- 08/10/2026 (vu sur la vraie fenêtre à 1318 px) : le halo s'estompe vers ses bords et les trois se
-                                             mangeaient (« atence et fluidité »). Une capsule nette, sombre, à sa taille, espacée. -->
-                                        <Button Cursor="Hand" Margin="5,0" FocusVisualStyle="{StaticResource FocusIris}" AutomationProperties.Name="{Binding Nom}"
-                                                Command="{Binding DataContext.ChoisirDomaineCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}">
-                                            <Button.Template>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border x:Name="Capsule" Padding="14,6" CornerRadius="12" Background="#E60A0B0F" BorderBrush="#2EFFFFFF" BorderThickness="1">
-                                                        <ContentPresenter/>
-                                                    </Border>
-                                                    <ControlTemplate.Triggers>
-                                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Capsule" Property="BorderBrush" Value="#73FFFFFF"/></Trigger>
-                                                    </ControlTemplate.Triggers>
-                                                </ControlTemplate>
-                                            </Button.Template>
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="{Binding Nom}" Style="{StaticResource Legende}" Foreground="#FFB4B4B4" HorizontalAlignment="Center"/>
-                                                <Border Style="{StaticResource PastilleEtat}" HorizontalAlignment="Center" Margin="0,3,0,0">
-                                                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource ContenuEtat}"/>
-                                                </Border>
-                                            </StackPanel>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
 
                             <!-- Le noyau -->
                             <!-- 06/10/2026 : le bouton est au centre exact du réseau et de son anneau de chrome ; le libellé est posé dessous

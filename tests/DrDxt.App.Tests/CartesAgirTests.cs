@@ -1627,6 +1627,26 @@ public sealed class CartesAgirTests
             .And.NotContain("$env:");
     }
 
+    // 10/10/2026 (revue de sécurité) : installée, la console passe par le lanceur natif, avec sa commande fixe.
+    [Fact]
+    public void Installee_la_console_passe_par_le_lanceur_natif_sans_argument_venu_de_l_app()
+    {
+        var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "drdxt-console-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dossier);
+        try
+        {
+            var lanceur = System.IO.Path.Combine(dossier, "DrDxt.Lanceur.exe");
+            System.IO.File.WriteAllText(lanceur, "");
+            var psi = ScanViewModel.ConsoleDeReparation(@"C:\Windows\system32", lanceur);
+            psi.FileName.Should().Be(lanceur);
+            psi.Verb.Should().Be("runas");
+            psi.ArgumentList.Should().Equal("reparer-windows");
+            ScanViewModel.ConsoleDeReparation(@"C:\Windows\system32", System.IO.Path.Combine(dossier, "absent.exe")).FileName
+                .Should().EndWith("powershell.exe", "sans lanceur à côté, la console s'ouvre seule");
+        }
+        finally { System.IO.Directory.Delete(dossier, true); }
+    }
+
     // ── 25/09/2026 : remesurer le processeur a la demande ─────────────────────────────────────
     private sealed class FichierCpu(string? contenu) : DrDxt.Measurement.Cpu.ICpuBaselineFile
     {

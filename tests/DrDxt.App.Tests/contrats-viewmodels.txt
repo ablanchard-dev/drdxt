@@ -269,7 +269,6 @@ ScanState
 ScanViewModel
   ADesChangementsEnAttente : Boolean
   ADesDomaines : Boolean
-  ADesDomainesSansComposant : Boolean
   ADesParties : Boolean
   ADuDetailDeParties : Boolean
   AHistorique : Boolean
@@ -336,7 +335,6 @@ ScanViewModel
   DescriptionScene : String
   DomaineSelectionne : DomaineMachine
   Domaines : ObservableCollection<DomaineMachine>
-  DomainesSansComposant : IReadOnlyList<DomaineMachine>
   EnvoyerRapportCommand : IRelayCommand
   ErreurBcd : String
   ErreurOubliBios : String

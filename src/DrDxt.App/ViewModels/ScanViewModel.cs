@@ -305,6 +305,8 @@ public sealed partial class ScanViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsScanning))]
     [NotifyPropertyChangedFor(nameof(CanScan))]
     [NotifyPropertyChangedFor(nameof(CanApply))]
+    [NotifyPropertyChangedFor(nameof(ApplyHintKey))]
+    [NotifyPropertyChangedFor(nameof(ApplyHint))]
     [NotifyPropertyChangedFor(nameof(CanApplyGpuTuning))]
     [NotifyCanExecuteChangedFor(nameof(ApplyCommand))]
     [NotifyCanExecuteChangedFor(nameof(ApplyGpuTuningCommand))]
@@ -492,7 +494,9 @@ public sealed partial class ScanViewModel : ObservableObject
     /// avant tout scan, elle laissait la personne devant un bouton mort, sans savoir
     /// s'il est casse ou s'il attend un geste d'elle.
     /// </para></summary>
-    public string ApplyHintKey => CanApply ? "scan.apply.ready" : "scan.apply.needs_scan";
+    // 10/10/2026 (le mainteneur : « au survol d'Optimiser, “lance d'abord un scan” alors que je viens de le faire ») : l'info-bulle
+    // n'était jamais recalculée après le scan. Elle suit l'état, et dit quand il n'y a rien à poser.
+    public string ApplyHintKey => !CanApply ? "scan.apply.needs_scan" : RienAPoserSeul ? "Apply.RienAPoserSeul" : "scan.apply.ready";
 
     /// <summary>Le texte deja traduit. `ScanView` ne declare pas le convertisseur `Loc`
     /// (il n'existe que dans `DashboardView`) : lier une CLE ici aurait leve au rendu, et
@@ -812,27 +816,26 @@ public sealed partial class ScanViewModel : ObservableObject
     /// <summary>08/10/2026 (critique UI, défaut 6) : l'orbite montrait cinq composants sans état ni clic, et taisait trois
     /// domaines. Chaque satellite porte maintenant l'état de son domaine et l'ouvre ; les domaines sans composant
     /// (latence, réseau, BIOS) sont listés sous l'orbite. Les cinq tentacules de chrome restent : l'effet en dessine cinq.</summary>
-    public IReadOnlyList<SatelliteDomaine> Satellites =>
-        Components.Select(c => new SatelliteDomaine(c,
-            Domaines.FirstOrDefault(d => d.Cle == CarteDeLaMachine.DomaineDuComposant(c.IconKey)))).ToList();
+    /// <para>10/10/2026 (le mainteneur : « latence, réseau, BIOS ne sont pas sur le même design que le reste, l'araignée ; faut
+    /// que ce soit identique ») : les huit domaines sont huit satellites, chacun branché par sa tentacule. Plus de rangée de
+    /// pastilles sous la bille.</para></summary>
+    public static readonly string[] OrdreDesSatellites = ["Cpu", "Gpu", "Latency", "Ram", "Ssd", "Firmware", "Windows", "Network"];
 
-    public IReadOnlyList<DomaineMachine> DomainesSansComposant
+    /// <summary>Les trois domaines sans pièce de matériel à eux (latence, réseau, BIOS) : posés au scan du matériel.</summary>
+    private IReadOnlyList<ComponentItem> _composantsSansPiece = [];
+
+    public IReadOnlyList<SatelliteDomaine> Satellites
     {
         get
         {
-            var portes = Components.Select(c => CarteDeLaMachine.DomaineDuComposant(c.IconKey)).ToHashSet(StringComparer.Ordinal);
-            return Domaines.Where(d => !portes.Contains(d.Cle)).ToList();
+            var tous = Components.Concat(_composantsSansPiece).ToDictionary(c => c.IconKey, StringComparer.Ordinal);
+            return OrdreDesSatellites.Where(tous.ContainsKey).Select(cle => tous[cle])
+                .Select(c => new SatelliteDomaine(c, Domaines.FirstOrDefault(d => d.Cle == CarteDeLaMachine.DomaineDuComposant(c.IconKey))))
+                .ToList();
         }
     }
 
-    public bool ADesDomainesSansComposant => DomainesSansComposant.Count > 0;
-
-    private void AnnoncerSatellites()
-    {
-        OnPropertyChanged(nameof(Satellites));
-        OnPropertyChanged(nameof(DomainesSansComposant));
-        OnPropertyChanged(nameof(ADesDomainesSansComposant));
-    }
+    private void AnnoncerSatellites() => OnPropertyChanged(nameof(Satellites));
 
     /// <summary>08/10/2026 (défaut 10) : le mot d'état d'un interrupteur, dans le gabarit « Bascule ».</summary>
     public string LabelBasculeAllume => _localize("Bascule.Allume");
@@ -1379,9 +1382,9 @@ public sealed partial class ScanViewModel : ObservableObject
     private void AllumerPole(params string[] cles)
     {
         var bits = PolesLus;
+        // 10/10/2026 : le bit d'un pôle est sa place sur le cercle des huit satellites.
         foreach (var cle in cles)
-            for (var i = 0; i < Components.Count; i++)
-                if (Components[i].IconKey == cle) bits |= 1 << i;
+            if (Array.IndexOf(OrdreDesSatellites, cle) is var i and >= 0) bits |= 1 << i;
         PolesLus = bits;
     }
 
@@ -1497,7 +1500,7 @@ public sealed partial class ScanViewModel : ObservableObject
         Etape(8, "Scan.Etape.Audit");
         await PopulateRepairAuditAsync();
         // L'audit de santé lit ensemble le stockage (usure, SMART) et Windows : leurs deux pôles s'allument ensemble.
-        AllumerPole("Ssd", "Windows");
+        AllumerPole("Ssd", "Windows", "Latency", "Network", "Firmware");
 
         ConstruireCarte();
         if (_etapeEnCours > 0) _dureesMesurees[_etapeEnCours - 1] = _chronoEtape.Elapsed.TotalSeconds;

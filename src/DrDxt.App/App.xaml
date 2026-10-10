@@ -420,7 +420,9 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Grid>
-                            <Border x:Name="Halo" CornerRadius="26" Margin="-6" Background="{StaticResource HaloIrisBrush}" Opacity="0"/>
+                            <!-- 10/10/2026 (« un effet arc-en-ciel qui dépasse le bouton ») : le halo reste DANS le bouton, et le reflet
+                                 est argent, comme le reste de l'appli (plus de cyan, violet ni rose). -->
+                            <Border x:Name="Halo" CornerRadius="24" Margin="0" Background="{StaticResource HaloIrisBrush}" Opacity="0"/>
                             <Border x:Name="Corps" CornerRadius="24" Background="{StaticResource ChromeCapsuleBrush}" ClipToBounds="True"
                                     BorderThickness="1" BorderBrush="Transparent">
                                 <Grid>
@@ -431,11 +433,11 @@
                                     <Border x:Name="Eclat" Width="110" HorizontalAlignment="Left" Opacity="0">
                                         <Border.Background>
                                             <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
-                                                <GradientStop Color="#003CE6FF" Offset="0"/>
-                                                <GradientStop Color="#803CE6FF" Offset="0.3"/>
-                                                <GradientStop Color="#999470FF" Offset="0.5"/>
-                                                <GradientStop Color="#80FF5CC7" Offset="0.7"/>
-                                                <GradientStop Color="#00FF5CC7" Offset="1"/>
+                                                <GradientStop Color="#00FFFFFF" Offset="0"/>
+                                                <GradientStop Color="#55FFFFFF" Offset="0.35"/>
+                                                <GradientStop Color="#99FFFFFF" Offset="0.5"/>
+                                                <GradientStop Color="#55FFFFFF" Offset="0.65"/>
+                                                <GradientStop Color="#00FFFFFF" Offset="1"/>
                                             </LinearGradientBrush>
                                         </Border.Background>
                                         <Border.RenderTransform>
@@ -456,12 +458,14 @@
                                             <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.3"/>
                                         </Storyboard>
                                     </BeginStoryboard>
+                                    <!-- 10/10/2026 (règles d'Emil Kowalski, animations.dev) : un survol revient des dizaines de fois
+                                         par jour ; le reflet passe UNE fois, vite, sans boucle. -->
                                     <BeginStoryboard x:Name="Balayage">
-                                        <Storyboard RepeatBehavior="Forever">
+                                        <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                             From="-120" To="420" Duration="0:0:1.6">
+                                                             From="-120" To="420" Duration="0:0:0.7">
                                                 <DoubleAnimation.EasingFunction>
-                                                    <SineEase EasingMode="EaseInOut"/>
+                                                    <CubicEase EasingMode="EaseOut"/>
                                                 </DoubleAnimation.EasingFunction>
                                             </DoubleAnimation>
                                         </Storyboard>
@@ -905,7 +909,10 @@
         <!-- 03/10/2026 (D6.3) : le logo retenu, rendu en vraie 3D (la matière chrome liquide de l'appli sur une
              sphère éclairée, l'anneau cyan en volume, dans la même lumière). Le même rendu fait l'icône Windows. -->
         <ControlTemplate x:Key="SphereDeMarque" TargetType="Control">
-            <Image Source="pack://application:,,,/DrDxt.App;component/Assets/logo-3d.png" Stretch="Uniform"
+            <!-- 10/10/2026 (le mainteneur : « toujours l'ancien logo, je l'ai demandé plein de fois ») : la sphère à anneau turquoise
+                 restait dans le bilan. Le logo est celui choisi le 08/10, la bille sur sa tuile noire : le même fichier que
+                 l'icône de l'appli (Assets/drdxt.ico, image 256), une seule marque partout. -->
+            <Image Source="pack://application:,,,/DrDxt.App;component/Assets/logo-marque.png" Stretch="Uniform"
                    RenderOptions.BitmapScalingMode="HighQuality"/>
         </ControlTemplate>
     </Application.Resources>

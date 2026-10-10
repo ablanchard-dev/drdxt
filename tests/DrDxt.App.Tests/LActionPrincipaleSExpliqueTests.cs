@@ -71,6 +71,23 @@ public sealed class LActionPrincipaleSExpliqueTests
         vm.ApplyHintKey.Should().Be("scan.apply.ready");
     }
 
+    // 10/10/2026 : l'info-bulle restait « lance d'abord un scan » après le scan, faute d'être recalculée.
+    [Fact]
+    public void L_info_bulle_suit_l_etat_du_scan_et_dit_quand_il_n_y_a_rien_a_poser()
+    {
+        var vm = Neuf();
+        var annonces = new List<string?>();
+        vm.PropertyChanged += (_, e) => annonces.Add(e.PropertyName);
+
+        vm.State = ScanState.Done;
+        annonces.Should().Contain(nameof(ScanViewModel.ApplyHint), "la vue relit l'info-bulle quand le scan finit");
+
+        annonces.Clear();
+        vm.RienAPoserSeul = true;
+        annonces.Should().Contain(nameof(ScanViewModel.ApplyHint));
+        vm.ApplyHintKey.Should().Be("Apply.RienAPoserSeul");
+    }
+
     [Theory]
     [InlineData("scan.apply.needs_scan")]
     [InlineData("scan.apply.ready")]

@@ -428,6 +428,12 @@
   <data name="UI.Component.Storage" xml:space="preserve">
     <value>Stockage</value>
   </data>
+  <data name="UI.Component.Latency.Valeur" xml:space="preserve">
+    <value>souris, écran, réglages du jeu</value>
+  </data>
+  <data name="UI.Component.Network.Valeur" xml:space="preserve">
+    <value>box, internet, serveur du jeu</value>
+  </data>
   <data name="UI.Component.Windows" xml:space="preserve">
     <value>Windows</value>
   </data>
@@ -1628,7 +1634,7 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
     <value>Maintiens pour ouvrir la réparation, ou Entrée</value>
   </data>
   <data name="Reparation.Windows.Lancee" xml:space="preserve">
-    <value>réparation en cours dans la console de Microsoft. Pour l'arrêter, ferme la console.</value>
+    <value>réparation en cours dans la console de Microsoft. Elle reste souvent plusieurs minutes vers 62 ou 63 % : c'est l'outil de Windows qui télécharge les fichiers sains, pas un blocage. Laisse-la finir, compte jusqu'à 30 minutes. Pour l'arrêter, ferme la console.</value>
   </data>
   <data name="Reparation.Windows.Terminee.Sain" xml:space="preserve">
     <value>réparation terminée : Windows relu, ses fichiers de réparation sont sains.</value>
