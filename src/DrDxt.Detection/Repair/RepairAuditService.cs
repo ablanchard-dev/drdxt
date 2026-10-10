@@ -275,6 +275,8 @@ public sealed partial class RepairAuditService
         }));
         // 04/10/2026 (plan 2.1) : un logiciel qui coûte des images, lu dans ses réglages.
         constats.AddRange(Isoler("GPU DRIVER", () => DrDxt.Detection.Gpu.EnregistrementNvidia.Juger(DrDxt.Detection.Gpu.EnregistrementNvidia.LireReglages())));
+        // D1 (10/10/2026) : la surcouche DLSS et « Ultra », des choix du joueur nommés sur carte NVIDIA, jamais posés.
+        constats.AddRange(Isoler("GPU DRIVER", () => DrDxt.Detection.Gpu.OptionsNvidiaDuJoueur.Juger(CartesLues())));
         // 03/10/2026 (tour G2) : les paquets de pilote d'affichage gardés par Windows et les cartes déconnectées restées déclarées.
         constats.AddRange(Isoler("GPU DRIVER", () => DrDxt.Detection.Gpu.MagasinDePilotes.Juger(
             DrDxt.Detection.Gpu.MagasinDePilotes.Pnputil("/enum-drivers /class Display"),
