@@ -1,5 +1,7 @@
 # DrDXT
 
+English version: [README.en.md](README.en.md).
+
 Un optimiseur PC gaming pour Windows. Gratuit, libre, et honnête : il ne promet rien qu'il n'ait mesuré.
 
 DrDXT lit ta machine, te dit ce qui te coûte des images, et pose seulement des réglages qu'il sait défaire. Chaque
