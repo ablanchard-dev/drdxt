@@ -615,8 +615,32 @@
   <data name="Apply.RestoreRequired.Blocked" xml:space="preserve">
     <value>Apply blocked: a System Restore point is required first. System Restore is disabled and could not be enabled, so nothing was changed. Enable System Restore (System Protection) and try again.</value>
   </data>
+  <data name="Ordonnance.Titre" xml:space="preserve">
+    <value>Your prescription:</value>
+  </data>
+  <data name="Ordonnance.ATaMain" xml:space="preserve">
+    <value>To do yourself ({0}), most urgent first:</value>
+  </data>
+  <data name="Ordonnance.Guide" xml:space="preserve">
+    <value>Each point has its step-by-step guide in its domain, below, and in "What is done by hand".</value>
+  </data>
+  <data name="Ordonnance.RienAMain" xml:space="preserve">
+    <value>Nothing to do by hand: the doctor saw nothing else.</value>
+  </data>
+  <data name="Ordonnance.DejaEnPlace" xml:space="preserve">
+    <value>Already checked: DrDXT read {0} of the {1} settings it can set; the ones that are fine, it leaves alone.</value>
+  </data>
+  <data name="Ordonnance.Suite" xml:space="preserve">
+    <value>Next: play normally with DrDXT open. Every game is recorded, and that is what DrDXT judges its settings on.</value>
+  </data>
+  <data name="Apply.GesteFait" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="Apply.EssaiLanceSansJeu" xml:space="preserve">
+    <value>Started: "{0}" is judged in game, and no game is open. DrDXT therefore tries it over your next games, one with, one without, and keeps it only if it gains you something. Play normally with DrDXT open; the verdict comes after three games on each side. "Stop the trial" puts everything back at any time.</value>
+  </data>
   <data name="Apply.NothingApplicable" xml:space="preserve">
-    <value>Nothing to apply: no safe optimization applies to this machine in this build.</value>
+    <value>Nothing more for DrDXT to set right now: what it can set on its own is already in place on this PC. Your prescription is just below.</value>
   </data>
   <data name="Apply.SousGarde" xml:space="preserve">
     <value>This PC has shut down abruptly several times in recent weeks. DrDXT optimizes anyway, under guard: a change followed by a new shutdown within a week is reverted on its own. The cause of these shutdowns and its repair are in “Windows and stability”.</value>

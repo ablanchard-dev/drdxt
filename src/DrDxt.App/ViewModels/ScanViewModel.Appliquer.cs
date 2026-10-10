@@ -29,6 +29,62 @@ public sealed partial class ScanViewModel
         MoatUnarmedMessage = null;
         ResultatOptimisation = null;
 
+        // 10/10/2026 (le mainteneur : « c'est pas normal qu'Optimiser n'ait rien à poser chez moi ») : les gestes que le
+        // docteur propose et que DrDXT sait faire seul étaient cachés dans « Agir ». Optimiser les fait d'abord, et le dit
+        // en tête de son résultat, quelle que soit la suite.
+        var gestes = await GestesDuDocteurAsync().ConfigureAwait(true);
+        try { await OptimiserAsync().ConfigureAwait(true); }
+        finally
+        {
+            if (gestes.Count > 0 && ApplyBlockedMessage == _localize(KeyNothingToApply)) ApplyBlockedMessage = null;
+            // 10/10/2026 (le mainteneur : « ça manque de conclusion, de réelle aide ») : Optimiser finit toujours par une
+            // ordonnance : ce qui est fait, ce qui reste à faire soi-même (les plus urgents), ce qui est déjà en place, et la suite.
+            ResultatOptimisation = string.Join(Environment.NewLine,
+                gestes.Append(ResultatOptimisation ?? string.Empty).Append(Ordonnance(reposFait: ReposCarteEnAttente))
+                    .Where(l => l.Length > 0));
+        }
+    }
+
+    /// <summary>10/10/2026 : la conclusion du docteur après Optimiser, construite sur ce que le scan a déjà dit (la liste
+    /// « à faire d'abord » et le compte des réglages lus) : jamais une impasse.</summary>
+    internal string Ordonnance(bool reposFait)
+    {
+        var lignes = new List<string> { _localize("Ordonnance.Titre") };
+        var titreRepos = _localize("Finding.Gpu.PerfMaxGlobal");
+        var aLaMain = PointsAFaire
+            .Where(p => !(reposFait && titreRepos.StartsWith(p.Entree.Titre.TrimEnd('.', ' '), StringComparison.Ordinal)))
+            .ToList();
+        if (aLaMain.Count > 0)
+        {
+            lignes.Add(string.Format(CultureInfo.CurrentCulture, _localize("Ordonnance.ATaMain"), aLaMain.Count));
+            lignes.AddRange(aLaMain.Take(3).Select(p => $"• {p.Entree.Titre.TrimEnd('.', ' ')} ({p.Domaine.Nom})"));
+            lignes.Add(_localize("Ordonnance.Guide"));
+        }
+        else lignes.Add(_localize("Ordonnance.RienAMain"));
+        if (Coverage is { ApplicableLevers: > 0 } c)
+            lignes.Add(string.Format(CultureInfo.CurrentCulture, _localize("Ordonnance.DejaEnPlace"), c.KnownLevers, c.ApplicableLevers));
+        lignes.Add(_localize("Ordonnance.Suite"));
+        return string.Join(Environment.NewLine, lignes);
+    }
+
+    /// <summary>10/10/2026 : ce qu'Optimiser fait sans mesure en jeu, parce que le scan l'a constaté et que DrDXT a son
+    /// geste : aujourd'hui, rendre le repos à la carte quand le pilote NVIDIA est sur « performances maximales » au global
+    /// (le geste prouve lui-même son effet au repos et se retire seul sans baisse nette). Une ligne par geste tenté.</summary>
+    internal async Task<IReadOnlyList<string>> GestesDuDocteurAsync()
+    {
+        var lignes = new List<string>();
+        if (ReposCarteAOuvrir)
+        {
+            await RendreLeReposALaCarteCommand.ExecuteAsync(null).ConfigureAwait(true);
+            lignes.Add(string.Format(CultureInfo.CurrentCulture, _localize("Apply.GesteFait"), _localize("Carte.Repos.Titre"),
+                ReposCarteEnAttente ? _localize("Carte.Repos.EnAttente") : ErreurReposCarte ?? _localize("Carte.Repos.Refuse")));
+        }
+        return lignes;
+    }
+
+    private async Task OptimiserAsync()
+    {
+
         if (_consumption is not { } consumption)
             return; // no scan results yet — the CanExecute guard normally prevents this.
 
@@ -153,6 +209,17 @@ public sealed partial class ScanViewModel
     [ObservableProperty]
     private string? _phraseReglageCarte;
 
+    /// <summary>10/10/2026 : Optimiser, aucun jeu ouvert, un réglage à chaud à essayer : l'essai en alternance démarre.
+    /// Faux quand il n'y a rien à essayer ainsi (jeu ouvert, aucun levier, essai déjà en cours) ou que la pose a échoué.</summary>
+    internal async Task<bool> EssayerEnJeuSansJeuOuvertAsync()
+    {
+        if (_gamePid > 0 || LevierAEssayer is not { } id || !EssaiProposable) return false;
+        if (!await DemarrerEssaiAsync(id).ConfigureAwait(true)) return false;
+        ApplyBlockedMessage = null;
+        ResultatOptimisation = string.Format(CultureInfo.CurrentCulture, _localize("Apply.EssaiLanceSansJeu"), Titre(id));
+        return true;
+    }
+
     /// <summary>Le jugement du scan sur ces graines, ou <c>null</c> quand il n'y a rien a tenter —
     /// le motif est alors deja a l'ecran, et rien n'a ete encaisse ni ecrit.</summary>
     private async Task<JugementApply?> JugerOuRefuserAsync(IReadOnlyList<string> graines)
@@ -161,6 +228,11 @@ public sealed partial class ScanViewModel
         var diagnostic = DiagnosticDeScan.Construire(_goulotScan, _scannedBaseline, instabilite, arrets, _pressionThreads);
         var jugement = JugementApply.Juger(diagnostic, graines, jeuEnCours: _gamePid > 0);
         if (!jugement.RienATenter) return jugement;
+
+        // 10/10/2026 (le mainteneur : « j'ai revoulu opti, je peux toujours pas ») : sans jeu ouvert, un réglage qui se
+        // mesure en jeu était « écarté, lance ton jeu, refais un scan ». L'essai en alternance sait attendre les parties :
+        // le clic sur Optimiser vaut accord, l'essai démarre, et l'écran dit qu'il se jugera sur les prochaines parties.
+        if (await EssayerEnJeuSansJeuOuvertAsync().ConfigureAwait(true)) return null;
 
         // 08/10/2026 : les arrêts ne bloquent plus ; rien à tenter veut dire rien à tenter.
         ApplyBlockedMessage = _localize(KeyNothingToApply);

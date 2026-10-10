@@ -180,6 +180,30 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.EssaiEnCours.Should().BeFalse();
     }
 
+    // 10/10/2026 (le mainteneur : « j'ai revoulu opti, je peux toujours pas ») : sans jeu ouvert, Optimiser lance l'essai.
+    [Fact]
+    public async Task Sans_jeu_ouvert_optimiser_lance_l_essai_du_reglage_qui_se_juge_en_jeu()
+    {
+        var vm = Vm();
+        vm.LevierAEssayer = Id;
+
+        (await vm.EssayerEnJeuSansJeuOuvertAsync()).Should().BeTrue();
+
+        vm.EssaiEnCours.Should().BeTrue();
+        _poses.Should().Be(1, "le clic pose le levier : la première partie l'a avec");
+        vm.ResultatOptimisation.Should().Be("Apply.EssaiLanceSansJeu", "l'écran dit ce qui se passe, et quoi faire");
+        (await vm.EssayerEnJeuSansJeuOuvertAsync()).Should().BeFalse("un seul essai à la fois");
+    }
+
+    [Fact]
+    public async Task Sans_reglage_a_essayer_optimiser_ne_lance_rien()
+    {
+        var vm = Vm();
+        vm.LevierAEssayer = null;
+        (await vm.EssayerEnJeuSansJeuOuvertAsync()).Should().BeFalse();
+        _poses.Should().Be(0);
+    }
+
     // Revue F-32 : un redémarrage efface un levier de carte ; l'état n'est plus sûr, l'essai s'arrête et le dit.
     [Fact]
     public async Task Un_redemarrage_pendant_l_essai_l_arrete_sans_marquer_la_partie()
