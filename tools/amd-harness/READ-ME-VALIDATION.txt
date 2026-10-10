@@ -1,0 +1,43 @@
+DrDXT - full check of your PC (to help the project)
+
+What it is for: DrDXT only claims a setting works on some hardware once someone has checked it there. This test
+checks, on YOUR PC, that each DrDXT setting can be applied, read back, and restored. Your report serves as proof for
+your processor and graphics card (AMD above all: that is what is missing most).
+
+This test CHANGES Windows settings, one at a time, and restores each one right away:
+Game Mode, Game Bar background recording, optimizations for windowed games, hardware-accelerated GPU scheduling,
+mouse acceleration, power plan, processor boost mode, graphics card power limit,
+Anti-Lag, Vsync and the FRTC frame cap (AMD driver settings).
+It never touches the BIOS, nor the voltage, clock or fan of the graphics card: the program itself refuses these
+writes. It creates no service and no restore point, and installs nothing.
+
+The program's messages and the report are in French; the report is easy to read for the project either way.
+
+1. Close all games. If a game opens during the test, the test stops before the next setting.
+2. Unzip the whole folder (right-click the zip > Extract All), then open the extracted folder.
+3. Double-click VALIDER.cmd.
+   - If Windows shows "Windows protected your PC": click "More info", then "Run anyway". The program is not
+     signed (no certificate yet for this free project). To check that the zip is the project's, compare its
+     SHA-256 with the one on the download page (PowerShell: Get-FileHash DrDXT-Validation-AMD.zip).
+   - Windows asks "Do you want to allow this app to make changes" for DrDxt.Lanceur: click "Yes". This small
+     native launcher receives the administrator rights and starts the test with a clean environment.
+4. Do not close the black window. It takes one to two minutes.
+5. At the end, a DrDXT-validation-....txt file is in your Downloads folder. Its first line says
+   "tout est remis d'origine" (everything restored), or lists what needs checking ("A VERIFIER A LA MAIN").
+6. Send it to the project: open
+   https://github.com/ablanchard-dev/drdxt/issues/new?template=rapport-de-verification.yml
+   (a free GitHub account is needed), drop the file into the issue, and write what you noticed if you like.
+
+Removed from the report before it is written: the PC name and Windows account name, your user folder, serial
+numbers (BIOS, motherboard, drives, memory), network addresses (MAC and IP), account and volume identifiers, email
+addresses. What remains: the models (processor, card, driver version) and the tested settings with their values.
+Read it before sending: you see exactly what leaves.
+
+If the window closes on its own or the PC crashes during the test: run VALIDER.cmd again, or REMETTRE.cmd. The
+program first restores what it had left (it notes it in C:\ProgramData\DrDXT-banc, a folder only administrators can
+change; the file disappears once everything is restored).
+
+If the first line says "A VERIFIER A LA MAIN" (check by hand): the report gives, for each setting concerned, its
+original value. Run REMETTRE.cmd first. If the line is still there, restore that setting yourself (AMD Adrenalin
+software for Anti-Lag, the frame cap and the power limit; Windows Settings for the rest), then send the report
+anyway: that is exactly the case the project needs to know about.

@@ -1,16 +1,17 @@
 name: Machine
-description: La lecture de ta machine (« Exporter ma machine »), pour que DrDXT apprenne ton matériel.
-title: "Machine : <processeur> + <carte graphique> (<bureau/portable>)"
+description: La lecture de ta machine (« Exporter ma machine »). / What DrDXT reads on your machine ("Export my machine").
+title: "Machine : <processeur / processor> + <carte graphique / graphics card> (<bureau, portable / desktop, laptop>)"
 labels: ["machine"]
 body:
   - type: markdown
     attributes:
       value: |
-        Le fichier se trouve dans `Documents\machine-exportee-<date>.json`. Ce qu'il contient : docs/TESTEUR-EXPORTER-MA-MACHINE.md.
+        Le fichier se trouve dans `Documents\machine-exportee-<date>.json`. Ce qui en est retiré : CONFIDENTIALITE.md.
+        The file is in `Documents\machine-exportee-<date>.json`. What is removed from it: PRIVACY.md.
   - type: textarea
     id: fichier
     attributes:
-      label: Le fichier exporté
-      description: Glisse-le ici.
+      label: Le fichier exporté / The exported file
+      description: Glisse-le ici. / Drop it here.
     validations:
       required: true

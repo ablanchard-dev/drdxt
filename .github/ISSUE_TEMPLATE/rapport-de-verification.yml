@@ -1,22 +1,25 @@
-name: Rapport de vérification
-description: Le rapport de « Vérifier DrDXT sur mon PC » ou du zip de validation, pour prouver DrDXT sur ton matériel.
-title: "Vérification : <processeur> + <carte graphique>"
+name: Rapport de vérification / Verification report
+description: Le rapport de « Vérifier DrDXT sur mon PC » ou d'un zip. / The report from "Check DrDXT on my PC" or a zip.
+title: "Vérification : <processeur / processor> + <carte graphique / graphics card>"
 labels: ["preuve"]
 body:
   - type: markdown
     attributes:
       value: |
-        Merci ! Le rapport est dans `Documents\verification-drdxt-<date>.txt` (bouton de l'App) ou dans `Téléchargements\DrDXT-validation-<date>.txt` (zip de validation).
-        Avant d'être écrit, il est passé par les mêmes règles que la machine exportée : le nom du PC et du compte, le dossier utilisateur, les numéros de série, les adresses MAC et IP, les identifiants de compte et de volume et les adresses de courriel en sont retirés. Il reste les modèles du matériel, la version du pilote et les réglages testés. Relis-le avant de l'envoyer.
+        Merci ! Le rapport est dans `Documents\verification-drdxt-<date>.txt` (bouton de l'App) ou dans `Téléchargements\DrDXT-validation-<date>.txt` / `DrDXT-rapport-<date>.txt` (zips).
+        Le nom du PC et du compte, le dossier utilisateur, les numéros de série, les adresses MAC et IP, les identifiants de compte et de volume et les adresses de courriel en sont retirés. Relis-le avant de l'envoyer.
+
+        Thank you! The report is in `Documents\verification-drdxt-<date>.txt` (app button) or in `Downloads\DrDXT-validation-<date>.txt` / `DrDXT-rapport-<date>.txt` (zips).
+        The PC and account names, the user folder, serial numbers, MAC and IP addresses, account and volume identifiers and email addresses are removed from it. Read it before sending.
   - type: textarea
     id: rapport
     attributes:
-      label: Le rapport
-      description: Glisse le fichier ici, ou colle son contenu.
+      label: Le rapport / The report
+      description: Glisse le fichier ici, ou colle son contenu. / Drop the file here, or paste its content.
     validations:
       required: true
   - type: textarea
     id: remarques
     attributes:
-      label: Ce que tu as remarqué
-      description: Un réglage qui ne s'est pas rendu, un écran étrange, une partie plus fluide ou moins fluide après.
+      label: Ce que tu as remarqué / What you noticed
+      description: Un réglage qui ne s'est pas rendu, un écran étrange, une partie plus ou moins fluide après. / A setting that was not restored, a strange screen, a smoother or rougher match afterwards.

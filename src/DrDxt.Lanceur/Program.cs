@@ -40,7 +40,9 @@ internal static class Program
         var psi = new ProcessStartInfo(exe)
         {
             UseShellExecute = false,   // CreateProcess avec NOTRE bloc d'environnement, rien d'hérité.
-            CreateNoWindow = true,
+            // Le helper est un programme console sans rien à montrer : sans fenêtre. Le banc du zip, lui, affiche ses
+            // étapes et attend une touche à la fin : sa fenêtre reste.
+            CreateNoWindow = !string.Equals(nom, "DrDXT-Test.exe", StringComparison.OrdinalIgnoreCase),
             WorkingDirectory = dossier,
         };
         for (var i = 1; i < args.Length; i++) psi.ArgumentList.Add(args[i]);

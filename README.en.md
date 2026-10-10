@@ -1,7 +1,8 @@
 # DrDXT
 
-Version française : [README.md](README.md). The app itself speaks English and French; the other documents in this
-repository are in French for now.
+Version française : [README.md](README.md). The app speaks English and French. For players and contributors,
+[CONTRIBUTING.en.md](CONTRIBUTING.en.md), [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md) are in English; the
+technical documents under `docs/` are in French.
 
 A PC gaming optimizer for Windows. Free, open source, and honest: it promises nothing it has not measured.
 
@@ -55,7 +56,7 @@ The most useful help does not require writing code:
 - **Check DrDXT on your PC**, then drop the report into a "Verification report" issue.
 - **Without installing DrDXT**: the zips in the [Release](https://github.com/ablanchard-dev/drdxt/releases) read your
   PC, or run the same verification, and write the same report.
-- **Report a bug**, or propose code: [CONTRIBUTING.md](CONTRIBUTING.md) (in French). A security issue is reported in
+- **Report a bug**, or propose code: [CONTRIBUTING.en.md](CONTRIBUTING.en.md). A security issue is reported in
   private: [SECURITY.md](SECURITY.md).
 
 ## What DrDXT writes on your machine
@@ -87,7 +88,7 @@ site, are in [docs/NON-NUISANCE.md](docs/NON-NUISANCE.md); the helper's security
 ## What leaves the machine
 
 No telemetry, no account. Here is everything DrDXT sends over the network. What it reads and keeps on your machine is
-in [CONFIDENTIALITE.md](CONFIDENTIALITE.md).
+in [PRIVACY.md](PRIVACY.md).
 
 - **The latest graphics driver version**, at each scan, to tell you whether yours is behind: AMD's public page
   (`www.amd.com`) and one fixed request to NVIDIA's public service (`gfwsl.geforce.com`, always the same, queried only
@@ -161,4 +162,4 @@ Five rules hold the code, and each comes from a real failure:
 
 Where to start: [docs/NON-NUISANCE.md](docs/NON-NUISANCE.md), [docs/SECURITE.md](docs/SECURITE.md), then
 [docs/INSTRUMENTS.md](docs/INSTRUMENTS.md) and [docs/OU-VIT-LE-GAIN.md](docs/OU-VIT-LE-GAIN.md) for what each
-measurement can prove. Working conventions are in [CONTRIBUTING.md](CONTRIBUTING.md).
+measurement can prove. Working conventions are in [CONTRIBUTING.en.md](CONTRIBUTING.en.md).

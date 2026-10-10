@@ -20,6 +20,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 const string LienTicket = "https://github.com/ablanchard-dev/drdxt/issues/new?template=rapport-de-verification.yml";
 
+// 10/10/2026 (revue de sécurité) : le banc ne demande plus l'élévation lui-même (manifeste asInvoker). Un programme .NET
+// élevé par l'UAC hérite de HKCU\Environment, où tout programme du compte peut poser de quoi charger sa DLL avant cette
+// ligne. Lancé sans droits (double-clic), il passe la main au lanceur natif à côté de lui, qui demande l'élévation et le
+// relance avec un environnement reconstruit ; puis il s'arrête. Sans lanceur, il le dit et s'arrête.
+if (!LanceurDuBanc.EstAdministrateur())
+{
+    var code = LanceurDuBanc.RelancerParLeLanceur(args);
+    if (code != 0) Console.WriteLine(LanceurDuBanc.Message(code));
+    if (code != 0 && !Console.IsInputRedirected) { Console.WriteLine("Appuie sur une touche pour fermer."); try { Console.ReadKey(true); } catch (InvalidOperationException) { } }
+    return;
+}
+
 // Revue n° 8 : « --etape N » = une seule étape, dans ce processus enfant ; sa sortie est relue par le parent.
 if (args.Length == 2 && args[0] == "--etape" && int.TryParse(args[1], out var numero))
 {
@@ -142,6 +154,37 @@ void Fin(string? chemin)
 }
 
 /// <summary>Un canal élevé qui refuse, et qui le dit : le rapport en lecture seule ne modifie rien.</summary>
+internal static class LanceurDuBanc
+{
+    public const string Lanceur = "DrDxt.Lanceur.exe";
+
+    public static bool EstAdministrateur()
+    {
+        using var identite = System.Security.Principal.WindowsIdentity.GetCurrent();
+        return new System.Security.Principal.WindowsPrincipal(identite).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+    }
+
+    /// <summary>0 relancé, 3 lanceur absent, 1223 élévation refusée, 1 autre échec.</summary>
+    public static int RelancerParLeLanceur(string[] args)
+    {
+        var lanceur = Path.Combine(AppContext.BaseDirectory, Lanceur);
+        if (!File.Exists(lanceur)) return 3;
+        var psi = new System.Diagnostics.ProcessStartInfo(lanceur) { UseShellExecute = true, Verb = "runas", WorkingDirectory = AppContext.BaseDirectory };
+        psi.ArgumentList.Add("DrDXT-Test.exe");
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        try { System.Diagnostics.Process.Start(psi); return 0; }
+        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) { return 1223; }
+        catch (Exception) { return 1; }
+    }
+
+    public static string Message(int code) => code switch
+    {
+        3 => $"{Lanceur} manque à côté de ce programme : extrais tout le zip, puis relance.",
+        1223 => "Windows n'a pas eu ton accord : rien n'a été lu ni modifié. Relance et clique « Oui » pour faire le test.",
+        _ => "Le test n'a pas pu demander les droits administrateur : rien n'a été lu ni modifié.",
+    };
+}
+
 internal sealed class RefusDElevation : IElevatedClient
 {
     public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)

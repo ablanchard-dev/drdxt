@@ -40,8 +40,11 @@ public sealed class LeLanceurNatifRecoitLElevationTests
         var build = Lire("installer", "build-installer.ps1");
         build.Should().Contain("DrDxt.Lanceur.csproj").And.Contain("'DrDxt.Lanceur.exe'");
         Lire("tools", "amd-harness", "paquet-rapport.ps1").Should().Contain("DrDxt.Lanceur.csproj");
-        Lire("tools", "amd-harness", "VALIDER.cmd").Should().Contain("DrDxt.Lanceur.exe\" DrDXT-Test.exe --valider");
-        Lire("tools", "amd-harness", "REMETTRE.cmd").Should().Contain("DrDxt.Lanceur.exe\" DrDXT-Test.exe --remettre");
+        // Le banc ne demande plus l'élévation lui-même : lancé sans droits, il passe par le lanceur.
+        Lire("tools", "amd-harness", "DrDxt.AmdHarness", "app.manifest").Should().Contain("level=\"asInvoker\"");
+        Lire("tools", "amd-harness", "DrDxt.AmdHarness", "Program.cs").Should().Contain("LanceurDuBanc.RelancerParLeLanceur(args)");
+        Lire("tools", "amd-harness", "VALIDER.cmd").Should().Contain("DrDXT-Test.exe\" --valider");
+        Lire("tools", "amd-harness", "REMETTRE.cmd").Should().Contain("DrDXT-Test.exe\" --remettre");
     }
 
     [Fact]
