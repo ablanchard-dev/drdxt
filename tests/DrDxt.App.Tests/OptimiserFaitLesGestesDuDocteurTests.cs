@@ -122,6 +122,31 @@ public sealed class OptimiserFaitLesGestesDuDocteurTests
         vm.ApplyBlockedMessage.Should().BeNull();
     }
 
+    // 10/10/2026 soir (« c'est relou que DrDXT ne s'occupe pas plus des points à corriger avant opti ») : ce qui reste à la
+    // main du joueur s'écrit en tête du résultat, avant ce qu'Optimiser a fait ; et l'étape le dit en premier, puis Optimiser.
+    [Fact]
+    public async Task Ce_qui_est_a_ta_main_vient_en_tete_et_l_etape_le_dit_avant_optimiser()
+    {
+        var vm = await ScanneAvec(new Finding("Gpu", Severity.Minor, "Finding.Gpu.PerfMaxGlobal", null),
+            new Finding("Latency", Severity.Minor, "Finding.Latency.VrrOff", null));
+        Levier(vm);
+        vm.SignalerReposCarte();
+        vm.PointsALaMain.Should().ContainSingle(p => p.Entree.Cle == "Finding.Latency.VrrOff",
+            "le repos de la carte, Optimiser le fait lui-même : il n'est pas à ta main");
+        vm.ProchaineEtape.Should().Be("Etape.AFairePuisOptimiser");
+        vm.ProchaineEtapeBouton.Should().Be("Etape.AFaire.Bouton");
+        vm.RienAPoserDuTout.Should().BeFalse("Optimiser a toujours sa part à faire");
+
+        await vm.ApplyCommand.ExecuteAsync(null);
+
+        var r = vm.ResultatOptimisation!;
+        r.Should().StartWith("Ordonnance.Titre");
+        r.IndexOf("Ordonnance.ATaMain", StringComparison.Ordinal).Should().BeLessThan(r.IndexOf("Carte.Repos.EnAttente", StringComparison.Ordinal),
+            "ce qui est à ta main s'écrit avant ce qu'Optimiser a fait");
+        r.Should().EndWith("Ordonnance.Suite");
+        vm.ProchaineEtape.Should().Be("Etape.AFaire", "le repos est fait par DrDXT ; reste le VRR, à ta main");
+    }
+
     [Fact]
     public async Task Un_clic_qui_n_a_rien_a_poser_ne_cree_pas_de_point_de_restauration()
     {

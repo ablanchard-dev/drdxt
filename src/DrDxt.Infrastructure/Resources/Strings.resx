@@ -619,7 +619,7 @@
     <value>Your prescription:</value>
   </data>
   <data name="Ordonnance.ATaMain" xml:space="preserve">
-    <value>To do yourself ({0}), most urgent first:</value>
+    <value>First, in your hands ({0}), most urgent on top:</value>
   </data>
   <data name="Ordonnance.Guide" xml:space="preserve">
     <value>Each point has its step-by-step guide in its domain, below, and in "What is done by hand".</value>
@@ -2355,6 +2355,9 @@ No setting on your machine was changed by this error.</value>
   </data>
   <data name="Etape.AFaire" xml:space="preserve">
     <value>Next step: {0} ({1}). DrDXT cannot do it for you; the step-by-step guide is in its domain.</value>
+  </data>
+  <data name="Etape.AFairePuisOptimiser" xml:space="preserve">
+    <value>First: {0} ({1}). DrDXT cannot do it for you; the step-by-step guide is in its domain. Then "Optimize", just below: it does its part either way.</value>
   </data>
   <data name="Etape.AFaire.Bouton" xml:space="preserve">
     <value>See the guide</value>
