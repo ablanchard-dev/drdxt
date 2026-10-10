@@ -22,7 +22,7 @@ architecture s'ajoute à `GpuTuningCoverage.ValideesEnVie` ; la garde refuse l'i
 
 ## 2. Signaler un problème
 
-Une issue « Bogue » : ce que tu as fait, ce que tu attendais, ce qui s'est passé, et ta version de DrDXT (en bas
+Une issue « Bug » : ce que tu as fait, ce que tu attendais, ce qui s'est passé, et ta version de DrDXT (en bas
 de l'écran). Joins le rapport de diagnostic (« Voir le rapport ») si l'App en a produit un. Une faille de sécurité
 se signale en privé : voir [SECURITY.md](SECURITY.md).
 
