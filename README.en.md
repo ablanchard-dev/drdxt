@@ -27,9 +27,17 @@ well set up, it tells you that too.
 
 ## Where the project stands
 
-Version 0.9. Developed on few machines, mostly Intel and NVIDIA. No in-game gain has been proven yet: the measurement
-is there, the proof is waiting for matches and other PCs. AMD cards, Intel Arc, dual-GPU laptops and handhelds are
-covered in the code, but tested only on reconstructed machines. [docs/COUVERTURE.md](docs/COUVERTURE.md) says, setting
+Version 0.9, usable today. The scan, the doctor, match recording, Optimize, the every-other-game trial and the rollback
+of every setting run on real PCs, and every setting was applied, read back and restored on a real machine before
+being offered.
+
+Players have already used a version derived from part of DrDXT, prepared by someone close to the project. Some report
+a latency steady around 10 ms, others 30 to 50 more frames per second. These figures come from them: DrDXT has not
+measured them itself yet, and what that version does on top is not known yet. That is exactly what the
+every-other-game trial and the verification reports are for, PC by PC.
+
+Still to prove: a gain measured by DrDXT over matches, and AMD cards, Intel Arc, dual-GPU laptops and handhelds,
+covered in the code but tested only on reconstructed machines. [docs/COUVERTURE.md](docs/COUVERTURE.md) says, setting
 by setting, what is proven, what is still to prove, and what is absent from your hardware.
 
 ## Install

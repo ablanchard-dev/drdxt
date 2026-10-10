@@ -25,9 +25,17 @@ réglée, il te le dit aussi.
 
 ## Où en est le projet
 
-Version 0.9. Mis au point sur peu de machines, surtout Intel et NVIDIA. Aucun gain en jeu n'est encore prouvé : la
-mesure est là, la preuve attend des parties et d'autres PC. Les cartes AMD, les Intel Arc, les portables à deux cartes
-et les consoles portables sont prévus dans le code, mais testés seulement sur des machines reconstituées.
+Version 0.9, utilisable aujourd'hui. Le scan, le docteur, le relevé de tes parties, Optimiser, l'essai en alternance et
+le retour arrière de chaque réglage tournent sur de vrais PC, et chaque réglage a été posé, relu et rendu sur une vraie
+machine avant d'être proposé.
+
+Des joueurs ont déjà utilisé une version dérivée d'une partie de DrDXT, préparée par un proche du projet. Certains
+rapportent une latence stable autour de 10 ms, d'autres 30 à 50 images par seconde de plus. Ces chiffres viennent d'eux :
+DrDXT ne les a pas encore mesurés lui-même, et on ne sait pas encore ce que cette version fait de plus. C'est exactement
+ce que l'essai en alternance et les rapports de vérification servent à établir, PC par PC.
+
+Ce qui reste à prouver : un gain mesuré par DrDXT sur des parties, et les cartes AMD, Intel Arc, les portables à deux
+cartes et les consoles portables, prévus dans le code mais testés seulement sur des machines reconstituées.
 [docs/COUVERTURE.md](docs/COUVERTURE.md) dit, réglage par réglage, ce qui est prouvé, à prouver, ou absent de ton matériel.
 
 ## Installer
