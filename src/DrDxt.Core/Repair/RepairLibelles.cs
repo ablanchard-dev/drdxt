@@ -68,6 +68,7 @@ public static class RepairLibelles
         "carte mere / firmware"   => "carte mère / firmware",
         "temperature du GPU"      => "température du GPU",
         "temperature du processeur" => "température du processeur",
+        "chaleur en partie"       => "chaleur du processeur en partie",
         "pertes a l'interface"    => "pertes à l'interface",
         "creation de vidage"      => "création de vidage",
         // 24/09/2026 : noms de registre et d'alimentation vus bruts sur la carte processeur.

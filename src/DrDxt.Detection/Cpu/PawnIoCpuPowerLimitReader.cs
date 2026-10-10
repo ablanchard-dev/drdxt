@@ -16,7 +16,11 @@ public sealed class PawnIoCpuPowerLimitReader : ICpuPowerLimitReader
         var lu = RegistreDeLimiteCpu.Decoder(registres.RaplPowerUnit, registres.PkgPowerLimit, registres.PkgPowerInfo);
         if (lu is null)
             return Result<LectureLimiteCpu>.Fail(ErrorCodes.TweakSdkUnavailable, "CPU power limit registers are empty.");
-        lu = lu with { CopieMmioPl1W = RegistreDeLimiteCpu.CopieMmioPl1W(PawnIoIntel.LireCopieMmioLimite(), registres.RaplPowerUnit) };
+        lu = lu with
+        {
+            CopieMmioPl1W = RegistreDeLimiteCpu.CopieMmioPl1W(PawnIoIntel.LireCopieMmioLimite(), registres.RaplPowerUnit),
+            ChaleurEnPartieMaxC = ChaleurEnPartie.MaxC(ChaleurEnPartie.Lire(DossierDonnees.Chemin("parties.json"))),
+        };
         return Result<LectureLimiteCpu>.Ok(new LectureLimiteCpu(
             new RegistresCpuLus(registres.RaplPowerUnit, registres.PkgPowerLimit, registres.PkgPowerInfo), lu));
     }

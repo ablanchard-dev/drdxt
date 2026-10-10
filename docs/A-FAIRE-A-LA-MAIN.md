@@ -115,6 +115,13 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    valeur à la main. Un PL1 plus haut chauffe plus : surveille la température dans DrDXT.
 4. Enregistre, redémarre, joue : le constat « bridage » de DrDXT doit baisser. Retour : le même menu, « Auto » ou le
    profil d'origine.
+5. Trop chaud en partie (le constat « chaleur en partie » : 95 °C ou plus) : c'est l'inverse. Une limite ouverte (PL1 = PL2
+   = 253 W) laisse passer des pics que le refroidisseur n'évacue pas ; à 100 °C le processeur se freine et les 1 % low
+   tombent. DrDXT donne le plafond qui garde le jeu tel quel (la puissance médiane de ta partie, plus un tiers, arrondie :
+   117 W en médiane ⇒ 160 W) : mets PL1 = PL2 à cette valeur, même menu (« Long Duration Power Limit » et « Short
+   Duration Power Limit » chez MSI). Sur MSI, « CPU Lite Load » un ou deux crans plus bas baisse encore la tension, à
+   perf égale ; si un jeu plante, remonte d'un cran. Encore 95 °C ou plus avec ce plafond : c'est le refroidissement
+   (montage du ventirad, pâte, second ventilateur, poussière).
 
 ### 5.4 Resizable BAR
 1. Vérifie d'abord que Windows démarre en UEFI : Windows + R, `msinfo32`, ligne « Mode BIOS » = UEFI. S'il dit
@@ -216,6 +223,8 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 ### 5.16 Windows et périphériques
 1. Windows Update : Paramètres > Windows Update > Rechercher des mises à jour, puis Microsoft Store > Bibliothèque > Obtenir
    les mises à jour (les deux chemins se relancent à la main quand DrDXT dit qu'ils n'ont rien fait depuis longtemps).
+   Une mise à jour qui échoue ou reste « en attente » : Paramètres > Système > Dépannage > Autres utilitaires de
+   résolution des problèmes > Windows Update > Exécuter, puis redémarre et relance la recherche.
 2. Un périphérique dont le pilote est en échec (DrDXT nomme le code) : Gestionnaire de périphériques, clic droit, Mettre à
    jour le pilote, sinon Désinstaller puis redémarrer.
 3. Vieux pilotes graphiques gardés dans le magasin de Windows : DrDXT les nomme, ne les retire pas ; `pnputil /delete-driver

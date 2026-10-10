@@ -42,7 +42,7 @@ public sealed class LimitePuissanceCpuTweak : FixItTweakBase
     /// faut qu'il dépasse la PL1 lue d'au moins un demi-watt, sans verrou ni registre « sans limite ».</summary>
     public static double? Cible(LimiteDePuissanceLue lu)
     {
-        if (lu.Verrou || lu.SansLimite || lu.Pl2W <= 0) return null;
+        if (lu.Verrou || lu.SansLimite || lu.Pl2W <= 0 || lu.SeFreineEnPartie) return null;
         var plafond = lu.Pl2W;
         if (lu.MaximaleW > 0) plafond = Math.Min(plafond, lu.MaximaleW);
         if (lu.CopieMmioPl1W is > 0 and var mmio) plafond = Math.Min(plafond, mmio);

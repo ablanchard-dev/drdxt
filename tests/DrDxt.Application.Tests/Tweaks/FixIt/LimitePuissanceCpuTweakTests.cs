@@ -50,6 +50,16 @@ public sealed class LimitePuissanceCpuTweakTests
     public void Jamais_hors_Intel() =>
         Build().AppliesTo(Hw(ChassisType.Desktop, "AuthenticAMD"), Etat(new LimiteDePuissanceLue(65, 219, 65, false))).Should().BeFalse();
 
+    // 10/10/2026 soir : un processeur qui touche déjà 95 °C en partie ne se voit pas monter sa PL1, quelle que soit la PL2.
+    [Fact]
+    public void Un_processeur_qui_se_freine_en_partie_n_est_pas_monte()
+    {
+        var chaud = new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 97);
+        LimitePuissanceCpuTweak.Cible(chaud).Should().BeNull();
+        Build().AppliesTo(Hw(ChassisType.Desktop), Etat(chaud)).Should().BeFalse();
+        LimitePuissanceCpuTweak.Cible(chaud with { ChaleurEnPartieMaxC = 88 }).Should().Be(219);
+    }
+
     [Fact]
     public void Non_lu_est_dit_non_lu_et_jamais_propose()
     {
