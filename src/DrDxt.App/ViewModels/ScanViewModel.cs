@@ -299,6 +299,7 @@ public sealed partial class ScanViewModel : ObservableObject
             new(SceneRepresentativity.HorsJeu, _localize("Scan.Scene.HorsJeu")),
         };
         _sceneDeclaree = ChoixDeScene[0];
+        SuivreLaProchaineEtape();
     }
 
     [ObservableProperty]
@@ -496,7 +497,7 @@ public sealed partial class ScanViewModel : ObservableObject
     /// </para></summary>
     // 10/10/2026 (le mainteneur : « au survol d'Optimiser, “lance d'abord un scan” alors que je viens de le faire ») : l'info-bulle
     // n'était jamais recalculée après le scan. Elle suit l'état, et dit quand il n'y a rien à poser.
-    public string ApplyHintKey => !CanApply ? "scan.apply.needs_scan" : RienAPoserSeul ? "Apply.RienAPoserSeul" : "scan.apply.ready";
+    public string ApplyHintKey => !CanApply ? "scan.apply.needs_scan" : RienAPoserDuTout ? "Apply.RienAPoserSeul" : "scan.apply.ready";
 
     /// <summary>Le texte deja traduit. `ScanView` ne declare pas le convertisseur `Loc`
     /// (il n'existe que dans `DashboardView`) : lier une CLE ici aurait leve au rendu, et
