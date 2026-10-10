@@ -143,6 +143,11 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    plafond du jeu agit avec moins de latence que celui du pilote ; les deux peuvent rester, le plus bas des deux agit.
 4. Mode d'affichage : plein écran ou fenêtre sans bordure, les deux se valent sur Windows 11 ; en sans bordure, G-SYNC
    doit être réglé « plein écran et fenêtré » dans le pilote.
+5. Fils de rendu (Call of Duty) : Paramètres > Graphismes > Avancé > « Fils de rendu » (RendererWorkerCount dans
+   `Documents\Call of Duty\players\s.1.0.codNN.txt0`, −1 = automatique). Les guides conseillent le nombre de cœurs
+   performants moins un (un i7-14700 a 8 cœurs performants : 7) ; ce n'est pas mesuré indépendamment, et le jeu réécrit
+   ce fichier à chaque sortie : règle-le dans le menu, jeu ouvert. DrDXT lit la valeur, ne l'écrit pas, et juge le
+   changement sur tes parties.
 
 ### 5.8 Réseau
 1. Câble Ethernet plutôt que Wi-Fi, chaque fois que c'est possible.
