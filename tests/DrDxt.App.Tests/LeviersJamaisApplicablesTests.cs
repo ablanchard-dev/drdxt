@@ -64,7 +64,7 @@ public sealed class LeviersJamaisApplicablesTests
 
     private static List<string> JamaisApplicables(IEnumerable<ITweak> leviers)
     {
-        var machines = MachinesEnregistreesTests.Noms().Select(n => MachinesEnregistreesTests.Charger((string)n[0])).ToList();
+        var machines = MachinesEnregistreesTests.Noms().Cast<object[]>().Select(n => MachinesEnregistreesTests.Charger((string)n[0])).ToList();
         var reference = MachinesEnregistreesTests.Charger("reference-i7-14700f-rtx4060-2026-10-06");
         return leviers.Where(t =>
                 !machines.Any(m => SApplique(t, m.Inventaire, m.Reglages) || SApplique(t, m.Inventaire, ToutAOff(m.Reglages)))

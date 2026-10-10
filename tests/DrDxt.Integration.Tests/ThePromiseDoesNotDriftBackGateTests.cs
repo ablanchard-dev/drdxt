@@ -81,7 +81,7 @@ public sealed class ThePromiseDoesNotDriftBackGateTests
     public void The_two_languages_both_carry_the_promise()
     {
         // Une promesse presente dans une seule langue n'engage que la moitie des clients.
-        foreach (var path in ResxFiles().Select(row => (string)row[0]!))
+        foreach (var path in ResxFiles().Cast<object[]>().Select(row => (string)row[0]!))
         {
             var keys = Entries(path).Select(e => e.Key).ToHashSet(StringComparer.Ordinal);
             keys.Should().Contain("Product.Promise", $"{Path.GetFileName(path)} doit porter la promesse");

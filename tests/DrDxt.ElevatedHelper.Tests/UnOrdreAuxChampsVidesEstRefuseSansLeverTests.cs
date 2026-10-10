@@ -33,7 +33,7 @@ public sealed class UnOrdreAuxChampsVidesEstRefuseSansLeverTests
     [Fact]
     public void Le_temoin_couvre_bien_chaque_type_et_des_ordres_atteignent_vraiment_l_allowlist()
     {
-        Types().Count().Should().Be(Enum.GetValues<PrivilegedOpType>().Length).And.BeGreaterThan(20);
+        Types().Cast<object[]>().Count().Should().Be(Enum.GetValues<PrivilegedOpType>().Length).And.BeGreaterThan(20);
         // Si tout etait refuse au decodage, la theorie ci-dessus ne toucherait jamais l'allowlist.
         Enum.GetValues<PrivilegedOpType>()
             .Count(t => PrivilegedOpCodec.Deserialize($"{{\"op\":{(int)t}}}").IsOk)
