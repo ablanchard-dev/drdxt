@@ -1987,6 +1987,9 @@ No setting on your machine was changed by this error.</value>
   <data name="Essai.ArretRate" xml:space="preserve">
     <value>Trial of “{0}”: the previous state could not be restored; the trial goes on, try again.</value>
   </data>
+  <data name="Essai.Explication" xml:space="preserve">
+    <value>For a setting that is judged in game: DrDXT alternates it from one game to the next, with then without, and keeps it only if it gains you something. Optimize also starts it on its own.</value>
+  </data>
   <data name="Essai.Bouton" xml:space="preserve">
     <value>Try it every other game</value>
   </data>
@@ -2327,7 +2330,7 @@ No setting on your machine was changed by this error.</value>
     <value>system health audit</value>
   </data>
   <data name="Etape.Optimiser" xml:space="preserve">
-    <value>Next step: Optimize. DrDXT sets what it can fix on its own on this PC, tries in game what is judged in game, and gives you your prescription for the rest.</value>
+    <value>Next step: the "Optimize" button, just below. DrDXT sets what it can fix on its own on this PC, tries in game what is judged in game, and gives you your prescription for the rest.</value>
   </data>
   <data name="Etape.EssaiEnCours" xml:space="preserve">
     <value>Next step: play. A trial is running, one game with, one without; keep DrDXT open, it decides on its own after three games on each side.</value>
@@ -2348,7 +2351,11 @@ No setting on your machine was changed by this error.</value>
     <value>Graphics card tuning: not offered on this machine (laptop, unsupported card or nothing to tune for this profile).</value>
   </data>
   <data name="Rapport.Description" xml:space="preserve">
-    <value>Everything this scan read, in a file to keep or attach to a support request.</value>
+    <value>"View report": everything this scan read, in a file to keep or attach to a support request.
+
+"Export my machine": your machine with nothing that identifies you, in a file; nothing is sent, you send it to the project if you want.
+
+"Check DrDXT on my PC": sets each setting for a moment, reads it back, then puts it back as it was. Nothing is kept: it proves DrDXT can tune this PC.</value>
   </data>
   <data name="UI.Register.None" xml:space="preserve">
     <value>none to change</value>

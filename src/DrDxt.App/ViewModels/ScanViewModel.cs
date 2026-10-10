@@ -299,7 +299,7 @@ public sealed partial class ScanViewModel : ObservableObject
             new(SceneRepresentativity.HorsJeu, _localize("Scan.Scene.HorsJeu")),
         };
         _sceneDeclaree = ChoixDeScene[0];
-        SuivreLaProchaineEtape();
+        AbonnerLaProchaineEtape();
     }
 
     [ObservableProperty]
@@ -732,6 +732,7 @@ public sealed partial class ScanViewModel : ObservableObject
     public string LabelRegisterCaption => _localize("UI.Register.Caption");
     public string LabelOptimize => _localize("UI.Cta.Optimize");
     public string LabelRapportDescription => _localize("Rapport.Description");
+    public string LabelEssaiExplication => _localize("Essai.Explication");
     public string LabelRescan => _localize("UI.Cta.Rescan");
 
     // Assistant panel.

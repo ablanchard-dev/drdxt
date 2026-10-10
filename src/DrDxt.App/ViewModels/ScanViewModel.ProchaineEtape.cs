@@ -29,19 +29,14 @@ public partial class ScanViewModel
         _ => null,
     };
 
-    /// <summary>Le libellé du bouton de l'étape ; <c>null</c> quand il n'y a rien à cliquer.</summary>
-    public string? ProchaineEtapeBouton => EtapeSuivante switch
-    {
-        EtapeDuDocteur.Optimiser => LabelOptimize,
-        EtapeDuDocteur.AFaire => _localize("Etape.AFaire.Bouton"),
-        _ => null,
-    };
+    /// <summary>Le libellé du bouton de l'étape ; <c>null</c> quand il n'y a rien à cliquer. Pas de second
+    /// « Optimiser » : le vrai est juste en dessous (un seul appel à l'action, critique du 29/09).</summary>
+    public string? ProchaineEtapeBouton => EtapeSuivante == EtapeDuDocteur.AFaire ? _localize("Etape.AFaire.Bouton") : null;
 
     [RelayCommand]
-    private async Task SuivreLaProchaineEtapeAsync()
+    private void SuivreLaProchaineEtape()
     {
-        if (EtapeSuivante == EtapeDuDocteur.Optimiser) await ApplyCommand.ExecuteAsync(null).ConfigureAwait(true);
-        else if (EtapeSuivante == EtapeDuDocteur.AFaire) ChoisirDomaine(PointsAFaire[0].Domaine);
+        if (EtapeSuivante == EtapeDuDocteur.AFaire) ChoisirDomaine(PointsAFaire[0].Domaine);
     }
 
     private static readonly HashSet<string> CeQuiChangeLEtape = new(StringComparer.Ordinal)
@@ -50,7 +45,7 @@ public partial class ScanViewModel
     };
 
     // Un seul abonnement plutôt qu'une notification dans chaque setter qui touche l'étape.
-    private void SuivreLaProchaineEtape()
+    private void AbonnerLaProchaineEtape()
     {
         PropertyChanged += (_, e) =>
         {

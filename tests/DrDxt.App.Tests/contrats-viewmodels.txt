@@ -443,6 +443,7 @@ ScanViewModel
   LabelEnvoyerRapport : String
   LabelEssaiArreter : String
   LabelEssaiBouton : String
+  LabelEssaiExplication : String
   LabelEtapeDuScan : String
   LabelExclusProteges : String
   LabelExclusTitre : String
@@ -648,7 +649,7 @@ ScanViewModel
   State : ScanState
   StutterLabel : String
   SubtitleText : String
-  SuivreLaProchaineEtapeCommand : IAsyncRelayCommand
+  SuivreLaProchaineEtapeCommand : IRelayCommand
   TempsRestantTestMemoire : String
   TestMemoireATermine : Boolean
   TestMemoireEnCours : Boolean

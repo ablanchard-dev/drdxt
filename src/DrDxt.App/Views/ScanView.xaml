@@ -539,8 +539,12 @@
                                         <TextBlock Text="{Binding ResultatOptimisation}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,0,0,8"
                                                    Visibility="{Binding ResultatOptimisation, Converter={StaticResource StrVis}}"/>
                                         <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelEssaiBouton}" HorizontalAlignment="Left"
-                                                Command="{Binding EssayerEnAlternanceCommand}" Margin="0,0,0,8"
+                                                Command="{Binding EssayerEnAlternanceCommand}" Margin="0,0,0,4"
                                                 Visibility="{Binding EssaiProposable, Converter={StaticResource BoolVis}}"/>
+                                        <!-- 10/10/2026 (U6) : chaque bouton dit ce qu'il fait en une ligne. -->
+                                        <TextBlock Text="{Binding LabelEssaiExplication}" Style="{StaticResource Legende}" TextWrapping="Wrap" MaxWidth="540"
+                                                   HorizontalAlignment="Left" Margin="0,0,0,8"
+                                                   Visibility="{Binding EssaiProposable, Converter={StaticResource BoolVis}}"/>
                                     </StackPanel>
                                     <!-- 29/09/2026, troisième critique : le choix de scène suit Optimiser ; le bloc du bas et son
                                          second Optimiser sont retirés (un seul appel à l'action). -->

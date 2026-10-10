@@ -86,16 +86,16 @@ public sealed class OptimiserFaitLesGestesDuDocteurTests
         Levier(vm);
         vm.SignalerReposCarte();
         vm.ProchaineEtape.Should().Be("Etape.Optimiser", "DrDXT a un geste à faire seul : c'est Optimiser d'abord");
-        vm.ProchaineEtapeBouton.Should().NotBeNull();
+        vm.ProchaineEtapeBouton.Should().BeNull("un seul « Optimiser » : le vrai bouton est juste en dessous");
         vm.RienAPoserSeul = true;
         vm.RienAPoserDuTout.Should().BeFalse("plus de « rien à poser par Optimiser » quand Optimiser a un geste à faire");
         vm.ApplyHintKey.Should().NotBe("Apply.RienAPoserSeul");
         var annonces = 0;
         vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(ScanViewModel.ProchaineEtape)) annonces++; };
 
-        await vm.SuivreLaProchaineEtapeCommand.ExecuteAsync(null);
+        await vm.GestesDuDocteurAsync();
 
-        vm.ReposCarteEnAttente.Should().BeTrue("le bouton de l'étape lance Optimiser");
+        vm.ReposCarteEnAttente.Should().BeTrue();
         annonces.Should().BeGreaterThan(0, "l'écran suit");
         vm.ProchaineEtape.Should().BeOneOf("Etape.AFaire", "Etape.Jouer");
     }
