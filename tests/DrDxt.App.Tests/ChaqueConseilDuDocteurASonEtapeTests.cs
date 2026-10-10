@@ -64,6 +64,7 @@ public sealed class ChaqueConseilDuDocteurASonEtapeTests
         ["JournalDesLeviersAppliques.cs"] = "relance l'optimisation",
         ["SanteWindows.cs"] = "Récupération > « Réinstaller maintenant »",
         ["OptionsNvidiaDuJoueur.cs"] = "Surcouche DLSS et mode faible latence",
+        ["ConfigurationCallOfDuty.cs"] = "Fils de rendu (Call of Duty)",
     };
 
     // Chaque reglage de firmware que DrDXT lit et guide (jamais ecrit) ⇒ son etape.

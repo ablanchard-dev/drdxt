@@ -205,6 +205,8 @@ public sealed partial class RepairAuditService
         }));
         // J-MECA (09/10/2026) : la limite de puissance effective, lue dans les registres quand PawnIO est là ; jamais écrite.
         constats.AddRange(Isoler("CPU", () => [LimiteDePuissance.Juger(_limitesPuissance())]));
+        // D2 (10/10/2026) : les fils de rendu de Call of Duty, lus dans son fichier (jamais écrits), contre les cœurs performants.
+        constats.AddRange(Isoler("CPU", FilsDeRenduCallOfDuty));
         // 07/10/2026 (A7) : Curve Optimizer sur un Ryzen de bureau, en guide ; jamais écrit.
         constats.AddRange(Isoler("CPU", () =>
         {
@@ -430,6 +432,19 @@ public sealed partial class RepairAuditService
 
     // Les cartes vues par Windows, avec la mémoire qu'il leur prête (AdapterRAM plafonne à 4 Go : assez pour séparer une
     // puce intégrée d'une carte dédiée).
+    private IEnumerable<RepairFinding> FilsDeRenduCallOfDuty()
+    {
+        var dossier = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Call of Duty", "players");
+        var lu = DrDxt.Detection.Jeu.ConfigurationCallOfDuty.Lire(dossier);
+        if (lu is null) return [];
+        var cpu = _wmi.Query("SELECT Manufacturer, NumberOfCores, NumberOfLogicalProcessors FROM Win32_Processor");
+        var ligne = cpu.IsOk ? cpu.Value!.FirstOrDefault() : null;
+        var performants = ligne is null ? 0
+            : DrDxt.Detection.Jeu.ConfigurationCallOfDuty.CoeursPerformants(ligne.GetString("Manufacturer") ?? "",
+                ligne.GetInt("NumberOfCores") ?? 0, ligne.GetInt("NumberOfLogicalProcessors") ?? 0);
+        return DrDxt.Detection.Jeu.ConfigurationCallOfDuty.Juger(lu, performants);
+    }
+
     private IReadOnlyList<GpuInfo> CartesLues()
     {
         var r = _wmi.Query("SELECT Name, AdapterRAM FROM Win32_VideoController");
