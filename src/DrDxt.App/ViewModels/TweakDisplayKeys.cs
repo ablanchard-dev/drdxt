@@ -30,6 +30,7 @@ public static class TweakDisplayKeys
             ["fixit.sane_pagefile"]     = ("tweak.fixit.sane_pagefile.title",     "tweak.fixit.sane_pagefile.reliability"),
             ["fixit.heures_actives"]    = ("tweak.fixit.heures_actives.title",    "tweak.fixit.heures_actives.summary"),
             ["fixit.mode_boost"]        = ("tweak.fixit.mode_boost.title",        "tweak.fixit.mode_boost.summary"),
+            ["fixit.cpu_power_limit"]         = ("tweak.fixit.cpu_power_limit.title",         "tweak.fixit.cpu_power_limit.summary"),
             ["fixit.ecran_frequence"]   = ("tweak.fixit.ecran_frequence.title",   "tweak.fixit.ecran_frequence.confort"),
             ["gpu.repos_global_normal"] = ("tweak.gpu.repos_global_normal.title", "tweak.gpu.repos_global_normal"),
             // Levier de l'outil, sans ITweak dans l'App : pas de resume a lui.

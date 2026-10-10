@@ -32,6 +32,14 @@ public interface IPowerPlanReader
         Result<ModeDeBoostLu>.Fail(ErrorCodes.TweakSdkUnavailable, "Boost mode is not readable here.");
 }
 
+/// <summary>B1 (10/10/2026) : la limite de puissance du processeur Intel (registres MSR par PawnIO), brute et décodée.
+/// Par défaut : non lue (un lecteur qui ne sait pas la lire le dit, il ne rend jamais un chiffre).</summary>
+public interface ICpuPowerLimitReader
+{
+    Result<LectureLimiteCpu> LireRegistres() =>
+        Result<LectureLimiteCpu>.Fail(ErrorCodes.TweakSdkUnavailable, "CPU power limit is not readable here.");
+}
+
 /// <summary>The current state of a Windows service, used by F1 to capture the real
 /// original state of the AMD 3D V-Cache Performance Optimizer service.</summary>
 public enum ServiceState

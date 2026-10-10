@@ -44,6 +44,7 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
     private readonly DrDxt.Reconciler.Reseau.PlafondEnvoiDuService? _plafondDuService;
     private readonly IBcdActions? _bcd;
     private readonly IVentilateurActions? _ventilateur;
+    private readonly ICpuPowerActions? _cpu;
     private const string BcdNotWiredMessage = "The BCD seam is not wired in this host: nothing was written.";
 
     private const string QosNotWiredMessage =
@@ -78,8 +79,11 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
         // le service le lit, il ne l'ecrit pas. Absent : les deux ops echouent honnetement.
         DrDxt.Reconciler.Reseau.PlafondEnvoiDuService? plafondDuService = null,
         // 08/10/2026 (GPU-OC) : le ventilateur en mode Expert. Absent : il reste refusé honnêtement.
-        IVentilateurActions? ventilateur = null)
+        IVentilateurActions? ventilateur = null,
+        // 10/10/2026 (B1) : la limite de puissance du processeur par PawnIO. Absente : refusée honnêtement.
+        ICpuPowerActions? cpu = null)
     {
+        _cpu = cpu;
         _ventilateur = ventilateur;
         _plafondDuService = plafondDuService;
         _qos = qos;
@@ -114,6 +118,9 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                     _power.SetActivePlan(p.PlanGuid),
                 SetProcessorBoostModeOp b =>
                     _power.SetBoostModeAc(b.PlanGuid, b.AcValue),
+                SetCpuPackagePowerLimitOp c => _cpu is not null
+                    ? _cpu.SetPackagePowerLimit(c.Valeur, c.Origine)
+                    : Fail("CPU power limit write is not wired in this executor."),
 
                 // M3 lot 2 — the trip and its undo. Both go through shutdown.exe; DrDXT writes
                 // no firmware variable itself. A missing seam is SAID, never silently ignored:

@@ -59,6 +59,8 @@ public enum PrivilegedOpType
     SetProcessorBoostMode = 27,
     // 08/10/2026 (GPU-OC) : les ventilateurs rendus à l'automatique. Appendue -- ne jamais renumeroter.
     RestoreGpuFanAuto = 28,
+    // 10/10/2026 (B1) : la limite de puissance du processeur par PawnIO. Appendue -- ne jamais renumeroter.
+    SetCpuPackagePowerLimit = 29,
 }
 
 // -----------------------------------------------------------------------
@@ -104,6 +106,7 @@ public static class PrivilegedOpCodec
             DeleteRegistryValueOp r => (PrivilegedOpType.DeleteRegistryValue, r),
             SetActivePowerPlanOp pp => (PrivilegedOpType.SetActivePowerPlan, pp),
             SetProcessorBoostModeOp bm => (PrivilegedOpType.SetProcessorBoostMode, bm),
+            SetCpuPackagePowerLimitOp cl => (PrivilegedOpType.SetCpuPackagePowerLimit, cl),
             RestoreGpuFanAutoOp rf => (PrivilegedOpType.RestoreGpuFanAuto, rf),
             CreateRestorePointOp rp => (PrivilegedOpType.CreateRestorePoint, rp),
             ApplyNvApiClockOffsetOp c => (PrivilegedOpType.ApplyNvApiClockOffset, c),
@@ -204,6 +207,7 @@ public static class PrivilegedOpCodec
                 PrivilegedOpType.DeleteRegistryValue => Read<DeleteRegistryValueOp>(rawJson),
                 PrivilegedOpType.SetActivePowerPlan => Read<SetActivePowerPlanOp>(rawJson),
                 PrivilegedOpType.SetProcessorBoostMode => Read<SetProcessorBoostModeOp>(rawJson),
+                PrivilegedOpType.SetCpuPackagePowerLimit => Read<SetCpuPackagePowerLimitOp>(rawJson),
                 PrivilegedOpType.RestoreGpuFanAuto => Read<RestoreGpuFanAutoOp>(rawJson),
                 PrivilegedOpType.CreateRestorePoint => Read<CreateRestorePointOp>(rawJson),
                 PrivilegedOpType.ApplyNvApiClockOffset => Read<ApplyNvApiClockOffsetOp>(rawJson),

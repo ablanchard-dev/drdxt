@@ -35,6 +35,7 @@ public interface IChipProfileCatalog
 //     https://github.com/NVIDIA/nvapi, et Microsoft Learn sur le fichier d'échange)
 //     fixit.ecran_frequence (07/10/2026, L-ECRAN : Microsoft Learn, ChangeDisplaySettingsExW et CDS_TEST)
 //     fixit.mode_boost (07/10/2026, L-CPU : Microsoft Learn, PERFBOOSTMODE et PowerWriteACValueIndex)
+//     fixit.cpu_power_limit (10/10/2026, B1 : TechPowerUp, i9-14900K aux limites de 35 à 253 W ; Intel SDM vol. 4, MSR 0x610)
 // -----------------------------------------------------------------------
 public sealed class ChipProfileCatalog : IChipProfileCatalog
 {
@@ -121,6 +122,9 @@ public sealed class ChipProfileCatalog : IChipProfileCatalog
 
     // 07/10/2026 (L-CPU) : learn.microsoft.com, « Options for perf state engine PerfBoostMode ».
     private const string TweakModeBoost = "fixit.mode_boost";
+    private const string TweakCpuPowerLimit = "fixit.cpu_power_limit";
+    private const string SrcCpuPowerLimit =
+        "https://www.techpowerup.com/review/intel-core-i9-14900k-raptor-lake-tested-at-power-limits-down-to-35-w/";
     private const string SrcModeBoost =
         "Microsoft (learn.microsoft.com, « PERFBOOSTMODE ») : la valeur 0 désactive le boost du processeur, quel que soit " +
         "son mode de pilotage. Son effet en jeu sur un processeur récent n'est pas publié : DrDXT le mesure chez toi.";
@@ -164,6 +168,15 @@ public sealed class ChipProfileCatalog : IChipProfileCatalog
                     "cœurs du plan Équilibré. Proche de zéro sur un PC moderne bien réglé ; un vrai " +
                     "correctif seulement quand la machine est mal réglée. Sûr partout.",
                     SrcCahierPowerPlan, GainConfidence.Inferred, SafetyLevel.Safe)),
+            new ProfileTweakSelection(
+                TweakCpuPowerLimit, ProfileIntent.FixMisconfig,
+                Array.Empty<ProfileParameter>(),
+                new GainEvidence(
+                    "Limite de puissance continue du processeur (PL1) montée à la pointe que la carte autorise (PL2). TechPowerUp " +
+                    "(i9-14900K, RTX 4090, PL1 = PL2 forcés) : 65 W coûte 15,5 % d'images en 720p et environ 16 % en 1080p, " +
+                    "125 W environ 2 %. Proposé sur un PC fixe Intel seulement, quand PL1 est lue sous PL2 sans verrou ; " +
+                    "mesuré en jeu, rendu sans gain.",
+                    SrcCpuPowerLimit, GainConfidence.Sourced, SafetyLevel.Safe)),
             new ProfileTweakSelection(
                 TweakModeBoost, ProfileIntent.FixMisconfig,
                 Array.Empty<ProfileParameter>(),

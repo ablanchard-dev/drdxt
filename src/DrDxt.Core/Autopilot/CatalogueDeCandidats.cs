@@ -95,6 +95,11 @@ public static class CatalogueDeCandidats
             new("fixit.mode_boost", CandidateKind.AutoHot, 1, false, new[] { "cpu.power" }, Family: CandidateFamily.Cpu,
                 Surface: SurfaceTouchee.Processeur),
 
+            // B1 (10/10/2026) : `SetCpuPackagePowerLimitOp`, la PL1 montée à la PL2 que la carte autorise. Elle change la
+            // fréquence tenue, donc les images (TechPowerUp : −15 % à 65 W, −2 % à 125 W) : mesuré en jeu, rendu sans gain.
+            new("fixit.cpu_power_limit", CandidateKind.AutoHot, 1, false, new[] { "cpu.power" }, Family: CandidateFamily.Cpu,
+                Surface: SurfaceTouchee.Processeur),
+
             // L-ECRAN : le mode de l'ecran (user32, profil de l'utilisateur, sans droits). Confort : pose et relu, jamais mesure.
             new("fixit.ecran_frequence", CandidateKind.AutoReglage, 1, false, new[] { "display.refresh" },
                 Family: CandidateFamily.Repair, Surface: SurfaceTouchee.Affichage),

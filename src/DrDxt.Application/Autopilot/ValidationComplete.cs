@@ -19,7 +19,7 @@ public static class ValidationComplete
     public static readonly IReadOnlyList<string> Leviers =
     [
         "latency.gameModeOn", "latency.gameDvrBackgroundOff", "latency.vrrFlipModelOn", "latency.hagsOn", "latency.mouse_acceleration_off",
-        "fixit.power_plan", "fixit.mode_boost", "gpu.power_limit", "latency.render_queue_cap", "latency.vrr_vsync_cap",
+        "fixit.power_plan", "fixit.mode_boost", "fixit.cpu_power_limit", "gpu.power_limit", "latency.render_queue_cap", "latency.vrr_vsync_cap",
     ];
 
     /// <summary>Ce que la relecture a vu. <paramref name="Pose"/> : vrai = la valeur du levier est en place, faux = la

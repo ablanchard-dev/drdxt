@@ -310,6 +310,7 @@ public static class RevertAuDemarrage
             ["fixit.heures_actives"] = [.. Registre],
             ["fixit.power_plan"] = [typeof(SetActivePowerPlanOp)],
             ["fixit.mode_boost"] = [typeof(SetProcessorBoostModeOp)],
+            ["fixit.cpu_power_limit"] = [typeof(SetCpuPackagePowerLimitOp)],
             ["fixit.x3d_ccd"] = [.. Registre, typeof(RunServiceControlOp)],
             ["gpu.undervolt"] = [typeof(ApplyNvApiClockOffsetOp), typeof(ApplyAdlxTuningOp)],
             ["gpu.power_limit"] = [typeof(ApplyNvApiPowerLimitOp), typeof(ApplyAdlxTuningOp)],

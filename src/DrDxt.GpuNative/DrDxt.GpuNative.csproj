@@ -16,6 +16,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- PAWN1 (09/10/2026) puis B1 (10/10/2026) : modules de namazso/PawnIO.Modules, publication 0.2.11 (LGPL-2.1+,
+         third_party/pawnio-modules), figes par empreinte dans PawnIoIntel. IntelMSR lit les registres et ecrit la limite
+         de puissance ; IntelMCHBAR lit la copie MMIO de cette limite. -->
+    <EmbeddedResource Include="PawnIo\IntelMSR.bin" LogicalName="DrDxt.GpuNative.PawnIo.IntelMSR.bin" />
+    <EmbeddedResource Include="PawnIo\IntelMCHBAR.bin" LogicalName="DrDxt.GpuNative.PawnIo.IntelMCHBAR.bin" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The interop structs / entry / status / conversions are INTERNAL to the leaf;
          the struct-size, finder, entry and conversion freeze-tests live in
          DrDxt.GpuNative.Tests (the only consumer that needs the internals). -->

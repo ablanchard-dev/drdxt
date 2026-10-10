@@ -169,6 +169,14 @@ public interface IBcdActions
     Result SetValue(string element, string value);
 }
 
+/// <summary>B1 (10/10/2026) : la limite de puissance du processeur Intel (MSR 0x610) par PawnIO. Par défaut : refusé,
+/// pour les exécutants qui ne savent pas l'écrire (le service de démarrage, le banc).</summary>
+public interface ICpuPowerActions
+{
+    Result SetPackagePowerLimit(ulong valeur, ulong origine) =>
+        Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit write is not wired in this executor.");
+}
+
 /// <summary>GPU-OC (08/10/2026) : le ventilateur d'une carte en mode Expert. Poser ne fait que monter, et se relit ;
 /// rendre se prouve par la politique relue (voir <see cref="NvmlVentilateurActions"/>).</summary>
 public interface IVentilateurActions

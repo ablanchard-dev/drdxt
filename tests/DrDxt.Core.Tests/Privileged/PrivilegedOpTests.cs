@@ -63,6 +63,17 @@ public sealed class PrivilegedOpTests
     }
 
     [Fact]
+    public void SetCpuPackagePowerLimitOp_roundtrips_typed()
+    {
+        var op = new SetCpuPackagePowerLimitOp((1752UL << 32) | (1UL << 15) | 1752UL, (1752UL << 32) | (1UL << 15) | 520UL);
+
+        var back = PrivilegedOpCodec.Deserialize(PrivilegedOpCodec.Serialize(op).Value!);
+
+        back.Value.Should().BeOfType<SetCpuPackagePowerLimitOp>();
+        back.Value.Should().BeEquivalentTo(op);
+    }
+
+    [Fact]
     public void SetProcessorBoostModeOp_roundtrips_typed()
     {
         var op = new SetProcessorBoostModeOp(KnownPowerPlans.Balanced, 2);
@@ -310,6 +321,9 @@ public sealed class PrivilegedOpTests
             // Elargie deliberement le 08/10/2026 (GPU-OC) : rendre les ventilateurs d'une carte a l'automatique, l'inverse
             // d'une vitesse fixe posee en mode Expert. Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.RestoreGpuFanAuto),
+            // Elargie deliberement le 10/10/2026 (B1) : la limite de puissance du processeur (PL1 seule, dans la PL2 de la
+            // carte, sans verrou), ecrite par PawnIO dans le helper. Documentee dans docs/NON-NUISANCE.md.
+            nameof(PrivilegedOpType.SetCpuPackagePowerLimit),
         });
     }
 

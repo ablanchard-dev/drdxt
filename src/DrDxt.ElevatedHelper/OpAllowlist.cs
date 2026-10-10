@@ -187,6 +187,13 @@ public sealed class OpAllowlist
                 ? Result.Ok()
                 : Deny("Boost mode value is not one Microsoft documents (0 to 4), or the plan is empty."),
 
+            // B1 (10/10/2026) : la limite de puissance du processeur. La seule forme admise : une valeur qui ne diffère de
+            // l'origine que par PL1 (bits 15:0), sans verrou, PL1 entre 1 et la PL2 que le registre porte déjà. Jamais de
+            // PL2, de fenêtre, de courant ni de tension : le registre ne bouge que là où la carte mère laisse déjà monter.
+            SetCpuPackagePowerLimitOp c => RegistreDeLimiteCpu.NeToucheQuePl1(c.Valeur, c.Origine)
+                ? Result.Ok()
+                : Deny("CPU power limit write may only change PL1, within the board's PL2, without a lock."),
+
             // M3 lot 2 — the firmware trip. The op carries only a delay (no command shape at
             // all), so the whole authorization is that bound. It is not cosmetic: an unbounded
             // delay lets a caller park a restart far in the future, which the user experiences
@@ -698,6 +705,7 @@ public sealed class OpAllowlist
         // fréquence, tension ni ventilateur (règle du 29/09) : la sous-tension ADLX reste refusée.
         var estUnRetour = decodee.Value is SetRegistryValueOp or DeleteRegistryValueOp or SetActivePowerPlanOp
             or SetProcessorBoostModeOp
+            or SetCpuPackagePowerLimitOp
             or ApplyNvApiDrsSettingOp or DeleteNvApiDrsSettingOp or RunServiceControlOp
             or ApplyNvApiPowerLimitOp
             or ApplyAdlxTuningOp { Kind: AdlxTuningKind.PowerLimit or AdlxTuningKind.AntiLag or AdlxTuningKind.FrameRateTarget or AdlxTuningKind.VerticalRefresh };

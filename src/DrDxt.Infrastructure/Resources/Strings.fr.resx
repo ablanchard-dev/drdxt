@@ -658,6 +658,15 @@
   <data name="Apply.Result.SetNowNoneHeld" xml:space="preserve">
     <value>Aucun réglage posé tout de suite n'a tenu.</value>
   </data>
+  <data name="tweak.fixit.cpu_power_limit.title" xml:space="preserve">
+    <value>Limite de puissance du processeur montée</value>
+  </data>
+  <data name="tweak.fixit.cpu_power_limit.summary" xml:space="preserve">
+    <value>Ta carte mère tient le processeur sous une limite de puissance continue (PL1) plus basse que la pointe qu'elle lui laisse (PL2) : en jeu, il tient sa fréquence quelques secondes puis redescend. DrDXT monte la limite continue jusqu'à cette pointe, rien au-delà de ce que la carte autorise déjà, et jamais la tension ni le courant. Mesuré (TechPowerUp, 14900K) : une limite à 65 W coûte environ 15 % d'images en 1080p ; 125 W, 2 %. DrDXT le juge sur tes parties, une avec, une sans, et rend l'ancienne limite s'il ne gagne rien. Le processeur chauffe plus quand il est tenu plus haut : il se bride lui-même à sa température maximale. Rien n'est gardé au redémarrage : le BIOS remet sa valeur.</value>
+  </data>
+  <data name="Levier.PasIci.PasIntel" xml:space="preserve">
+    <value>Registres du processeur Intel : pas de processeur Intel ici.</value>
+  </data>
   <data name="tweak.fixit.mode_boost.title" xml:space="preserve">
     <value>Boost du processeur rendu</value>
   </data>

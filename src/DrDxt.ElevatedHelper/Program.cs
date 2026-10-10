@@ -139,7 +139,9 @@ internal static class Program
             // 28/09/2026 : le seul ecrivain du reglage de protection du ping que porte le service de demarrage.
             plafondDuService: DrDxt.Reconciler.Reseau.PlafondEnvoiDuService.ParDefaut(),
             // 08/10/2026 (GPU-OC) : le ventilateur en mode Expert, vers le haut seulement, rendu sous bail.
-            ventilateur: new NvmlVentilateurActions());
+            ventilateur: new NvmlVentilateurActions(),
+            // 10/10/2026 (B1) : la limite de puissance du processeur, relue avant et après, par PawnIO s'il est là.
+            cpu: new PawnIoCpuPowerActions());
 
         // Dead-man's-switch: a held GPU offset / power limit registers a lease whose
         // recorded revert (an existing typed op) fires automatically if the controller

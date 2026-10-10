@@ -684,6 +684,15 @@
   <data name="Apply.Result.SetNowNoneHeld" xml:space="preserve">
     <value>No immediate setting held.</value>
   </data>
+  <data name="tweak.fixit.cpu_power_limit.title" xml:space="preserve">
+    <value>Processor power limit raised</value>
+  </data>
+  <data name="tweak.fixit.cpu_power_limit.summary" xml:space="preserve">
+    <value>Your motherboard holds the processor under a sustained power limit (PL1) lower than the peak it already allows (PL2): in game it holds its clocks for a few seconds, then drops. DrDXT raises the sustained limit up to that peak, nothing beyond what the board already allows, and never voltage or current. Measured (TechPowerUp, 14900K): a 65 W limit costs about 15% of frames at 1080p; 125 W, 2%. DrDXT judges it on your games, one with, one without, and puts the old limit back if it gains nothing. The processor runs hotter when held higher: it throttles itself at its maximum temperature. Nothing is kept across a reboot: the BIOS restores its value.</value>
+  </data>
+  <data name="Levier.PasIci.PasIntel" xml:space="preserve">
+    <value>Intel processor registers: no Intel processor here.</value>
+  </data>
   <data name="tweak.fixit.mode_boost.title" xml:space="preserve">
     <value>Processor boost restored</value>
   </data>

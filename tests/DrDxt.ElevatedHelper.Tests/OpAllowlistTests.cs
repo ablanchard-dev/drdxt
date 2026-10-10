@@ -710,4 +710,23 @@ public sealed class OpAllowlistTests
     [Fact]
     public void Mode_de_boost_refuse_un_plan_vide() =>
         _allow.Validate(new SetProcessorBoostModeOp(Guid.Empty, 2)).IsOk.Should().BeFalse();
+
+    // B1 (10/10/2026) : la limite de puissance du processeur ne bouge que par PL1, dans la PL2 de la carte, sans verrou.
+    private const ulong Pl2_219W = 1752UL << 32;
+    private const ulong Origine65W = Pl2_219W | (1UL << 47) | (1UL << 15) | 520UL;
+
+    [Fact]
+    public void La_limite_processeur_accepte_une_PL1_montee_jusqu_a_la_PL2_de_la_carte()
+    {
+        _allow.Validate(new SetCpuPackagePowerLimitOp((Origine65W & ~0x7FFFUL) | 1752UL, Origine65W)).IsOk.Should().BeTrue();
+        _allow.Validate(new SetCpuPackagePowerLimitOp(Origine65W, (Origine65W & ~0x7FFFUL) | 1752UL)).IsOk.Should().BeTrue("le retour à l'origine passe aussi");
+    }
+
+    [Theory]
+    [InlineData((Origine65W & ~0x7FFFUL) | 1753UL)]            // PL1 au-dessus de PL2
+    [InlineData(Origine65W | (1UL << 63))]                      // verrou posé
+    [InlineData((Origine65W & ~0x7FFFUL) | 1752UL ^ (1UL << 40))] // PL2 touchée
+    [InlineData(Origine65W & ~0x7FFFUL)]                        // PL1 à zéro
+    public void La_limite_processeur_refuse_tout_ce_qui_n_est_pas_PL1_dans_la_PL2(ulong valeur) =>
+        _allow.Validate(new SetCpuPackagePowerLimitOp(valeur, Origine65W)).Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
 }

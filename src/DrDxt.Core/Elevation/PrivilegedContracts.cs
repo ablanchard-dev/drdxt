@@ -74,6 +74,13 @@ public sealed record SetActivePowerPlanOp(Guid PlanGuid) : PrivilegedOp;
 /// valeur du plan actif ne prend pas effet).</summary>
 public sealed record SetProcessorBoostModeOp(Guid PlanGuid, uint AcValue) : PrivilegedOp;
 
+/// <summary>B1 (10/10/2026) : la limite de puissance du processeur Intel (registre MSR_PKG_POWER_LIMIT, 0x610) écrite
+/// par PawnIO. <paramref name="Valeur"/> est le registre entier à écrire, <paramref name="Origine"/> le registre tel qu'il
+/// a été lu avant : le helper n'écrit que si le registre porte encore l'origine, et seulement une valeur qui ne diffère
+/// de l'origine que par PL1 (bits 15:0), sans verrou, PL1 au plus égale à PL2. L'inverse est la même op, les deux
+/// valeurs échangées. Volatil : le BIOS remet sa valeur au redémarrage.</summary>
+public sealed record SetCpuPackagePowerLimitOp(ulong Valeur, ulong Origine) : PrivilegedOp;
+
 /// <summary>Creates a System Restore point before a batch is applied.</summary>
 public sealed record CreateRestorePointOp(string Description) : PrivilegedOp
 {

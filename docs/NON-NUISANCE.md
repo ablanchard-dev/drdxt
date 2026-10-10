@@ -236,6 +236,7 @@ page OEM « Disabled » aussi en mode autonome). La mesure en jeu le tranche. Ga
 | Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
 |---|---|---|
 | `GpuNative/Nvml/NvmlNative.cs` (0 → 2) et `GpuNative/Nvml/INvmlNative.cs` (0 → 2, les membres par defaut qui rendent `false`) | `nvmlDeviceSetFanSpeed_v2` (une vitesse fixe, la politique passe en manuel) et `nvmlDeviceSetDefaultFanSpeed_v2` (le retour a l'automatique), exports documentes de NVML (docs.nvidia.com/deploy/nvml-api, Maxwell et plus, droits administrateur) | **helper eleve** seulement, par `NvmlVentilateurActions` |
+| `GpuNative/PawnIo/PawnIoIntel.cs` (0 → 1) | `ioctl_write_msr` du module IntelMSR de PawnIO (namazso/PawnIO.Modules 0.2.11, qui n'accepte d'ecrire que ses registres de puissance et de tension) : la **limite de puissance du processeur Intel** (MSR 0x610, `SetCpuPackagePowerLimitOp`), B1 du 10/10/2026. PL1 seule (bits 15:0), jamais PL2, fenetre, courant, tension ni verrou ; relu avant (le registre porte encore l'origine, pas de verrou BIOS) et apres (le registre porte ce qui a ete ecrit, sinon echec dit). Volatil : le BIOS remet sa valeur au redemarrage | **helper eleve** seulement, par `PawnIoCpuPowerActions` ; borne par `OpAllowlist` (`PawnIoIntel.NeToucheQuePl1` : PL1 entre 1 et la PL2 que la carte porte deja) ; le service de demarrage ne la recoit pas ; PawnIO jamais installe par DrDXT |
 | `ElevatedHelper/Execution/NvmlVentilateurActions.cs` (0 → 2) | la pose d'une vitesse fixe (`ApplyGpuFanCurveOp` a un seul point) et le retour a l'automatique (`RestoreGpuFanAutoOp`) | **helper eleve**, mode Expert sur geste du joueur seulement. NVIDIA previent qu'une vitesse trop basse peut abimer la carte : DrDXT ne pose qu'en partant de l'automatique, jamais sous la vitesse que l'automatique vise a cet instant ni sous le minimum de la carte, et jamais sous 40 % (plancher a chaud de `OpAllowlist`). Tout est relu apres l'ecriture ; un echec rend l'automatique. Le retour se prouve par la politique relue (un retour rate a ete signale en 2022 sur le forum NVIDIA) : non confirme, l'echec le dit. Une courbe a plusieurs points reste refusee |
 
 ### 07/10/2026 — revue F-28, le mode d'alimentation de Windows 11 que l'activation d'un plan peut remettre
@@ -298,6 +299,7 @@ src/DrDxt.GpuNative/INvApiNative.cs 6
 src/DrDxt.GpuNative/NvApiNative.cs 6
 src/DrDxt.GpuNative/Nvml/INvmlNative.cs 2
 src/DrDxt.GpuNative/Nvml/NvmlNative.cs 2
+src/DrDxt.GpuNative/PawnIo/PawnIoIntel.cs 1
 src/DrDxt.Infrastructure/Diagnostics/DiagnosticsLog.cs 3
 src/DrDxt.Infrastructure/Updates/UpdateSeams.cs 1
 src/DrDxt.Measurement/Frames/CompteurPresentsDxgi.cs 1
