@@ -63,6 +63,8 @@ public sealed partial class ScanViewModel : ObservableObject
     private readonly Func<IReadOnlyList<RepairFinding>>? _repairAudit;
     private readonly IGuideGenerator _guideGenerator;
     private readonly ISafetyManager _safety;
+    /// <summary>Pour les tests : la porte du point de restauration, telle qu'Optimiser la franchit.</summary>
+    internal ISafetyManager Safety => _safety;
     private readonly ITweakEngine _engine;
     private readonly IScanProfileConsumer _profileConsumer;
     private readonly IGpuTuningApplyStep _gpuTuningApplyStep;
@@ -837,7 +839,7 @@ public sealed partial class ScanViewModel : ObservableObject
         }
     }
 
-    private void AnnoncerSatellites() => OnPropertyChanged(nameof(Satellites));
+    private void AnnoncerSatellites() { OnPropertyChanged(nameof(Satellites)); AnnoncerEtape(); }
 
     /// <summary>08/10/2026 (défaut 10) : le mot d'état d'un interrupteur, dans le gabarit « Bascule ».</summary>
     public string LabelBasculeAllume => _localize("Bascule.Allume");
@@ -909,7 +911,7 @@ public sealed partial class ScanViewModel : ObservableObject
         {
             var (titre, suite) = CarteDeLaMachine.TitreEtSuite(f.Title);
             entrees.Add(new EntreeCarte(CarteDeLaMachine.DomaineDuConstat(f.Category), f.Severity,
-                titre, suite, string.Empty, string.Empty, NonLu: false));
+                titre, suite, string.Empty, string.Empty, NonLu: false, Cle: f.Cle));
         }
 
         // UI1 (08/10/2026, vu sur capture) : un réglage défait depuis portait son identifiant (« Latency.vrrFlipModelOn »)
@@ -1519,6 +1521,7 @@ public sealed partial class ScanViewModel : ObservableObject
 
     private void ReinitialiserPourUnScan()
     {
+        _posesDepuisLeScan.Clear();
         State = ScanState.Scanning;
         Findings.Clear();
         ProvenProblemCount = 0;

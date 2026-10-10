@@ -100,6 +100,37 @@ public sealed class OptimiserFaitLesGestesDuDocteurTests
         vm.ProchaineEtape.Should().BeOneOf("Etape.AFaire", "Etape.Jouer");
     }
 
+    // Revue du 10/10/2026 : après Optimiser, l'étape en tête disait encore « Optimiser », ou « DrDXT ne peut pas le faire
+    // à ta place » pour le réglage qu'il venait de faire. Et le geste s'écrivait avant le point de restauration annoncé.
+    [Fact]
+    public async Task Apres_optimiser_l_etape_suit_ce_qui_a_ete_fait_et_le_point_de_restauration_vient_avant()
+    {
+        var vm = await ScanneAvec(new Finding("Gpu", Severity.Minor, "Finding.Gpu.PerfMaxGlobal", null));
+        var levier = Levier(vm);
+        var ordre = new List<string>();
+        vm.Safety.EnsureRestorePointAsync().Returns(_ => { ordre.Add("point"); return Result.Ok(); });
+        levier.ApplyAsync().Returns(_ => { ordre.Add("geste"); return Result<TweakSnapshot>.Ok(new TweakSnapshot("gpu.repos_global_normal", "inverse")); });
+        vm.SignalerReposCarte();
+        vm.ProchaineEtape.Should().Be("Etape.Optimiser");
+
+        await vm.ApplyCommand.ExecuteAsync(null);
+
+        ordre.Should().Equal(new[] { "point", "geste" }, "le point de restauration passe avant tout ce qui écrit");
+        vm.ReposCarteEnAttente.Should().BeTrue();
+        vm.ResultatOptimisation.Should().Contain("Carte.Repos.EnAttente").And.Contain("Ordonnance.Titre");
+        vm.ProchaineEtape.Should().Be("Etape.Jouer", "le seul point à faire vient d'être fait par DrDXT : plus rien à sa main ni à la tienne");
+        vm.ApplyBlockedMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Un_clic_qui_n_a_rien_a_poser_ne_cree_pas_de_point_de_restauration()
+    {
+        var vm = await ScanneAvec();
+        await vm.ApplyCommand.ExecuteAsync(null);
+        await vm.Safety.DidNotReceive().EnsureRestorePointAsync();
+        vm.ResultatOptimisation.Should().Contain("Ordonnance.Titre", "jamais d'impasse sans suite");
+    }
+
     [Fact]
     public void Avant_le_scan_pas_d_etape()
     {

@@ -16,6 +16,7 @@ using DrDxt.Lanceur;
 internal static class Program
 {
     private const int ElevationRefusee = 1223;
+    private const string Relance = "--relance-elevee";
 
     private static int Main(string[] args)
     {
@@ -29,10 +30,14 @@ internal static class Program
 
         if (!EstEleve())
         {
+            // Revue du 10/10/2026 : UAC désactivé (EnableLUA=0) sur un compte limité, « runas » lance sans élever, et le
+            // fils se relançait sans fin. Un seul essai : relancé et toujours pas élevé, on rend « élévation refusée ».
+            if (args.Contains(Relance, StringComparer.Ordinal)) return ElevationRefusee;
             var moi = Environment.ProcessPath;
             if (moi is null) return 1;
             var relance = new ProcessStartInfo(moi) { UseShellExecute = true, Verb = "runas", WorkingDirectory = dossier };
             foreach (var a in args) relance.ArgumentList.Add(a);
+            relance.ArgumentList.Add(Relance);
             try { Process.Start(relance); return 0; }
             catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == ElevationRefusee) { return ElevationRefusee; }
             catch (Exception) { return 1; }
@@ -50,13 +55,18 @@ internal static class Program
             WorkingDirectory = dossier,
         };
         if (reparer) psi.Arguments = arguments;
-        else for (var i = 1; i < args.Length; i++) psi.ArgumentList.Add(args[i]);
+        else for (var i = 1; i < args.Length; i++) if (args[i] != Relance) psi.ArgumentList.Add(args[i]);
         psi.Environment.Clear();
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         var localAppData = Dossier(Environment.SpecialFolder.LocalApplicationData);
         var temp = localAppData is null ? Path.Combine(windows, "Temp") : Path.Combine(localAppData, "Temp");
+        var systeme = new EnvironnementPropre.DossiersDuSysteme(
+            Dossier(Environment.SpecialFolder.ProgramFiles), Dossier(Environment.SpecialFolder.ProgramFilesX86),
+            Dossier(Environment.SpecialFolder.CommonProgramFiles), Dossier(Environment.SpecialFolder.CommonProgramFilesX86),
+            Dossier(Environment.SpecialFolder.CommonApplicationData), DossierPublic(),
+            Environment.UserName, Environment.ProcessorCount, Architecture());
         foreach (var (cle, valeur) in EnvironnementPropre.Construire(windows, temp,
-                     Dossier(Environment.SpecialFolder.UserProfile), Dossier(Environment.SpecialFolder.ApplicationData), localAppData))
+                     Dossier(Environment.SpecialFolder.UserProfile), Dossier(Environment.SpecialFolder.ApplicationData), localAppData, systeme))
             psi.Environment[cle] = valeur;
         try
         {
@@ -74,6 +84,17 @@ internal static class Program
         try { var d = Environment.GetFolderPath(dossier); return string.IsNullOrEmpty(d) ? null : d; }
         catch (Exception) { return null; }
     }
+
+    // Pas de dossier connu « Public » dans SpecialFolder : son bureau commun en est un sous-dossier.
+    private static string? DossierPublic() =>
+        Dossier(Environment.SpecialFolder.CommonDesktopDirectory) is { } bureau ? Path.GetDirectoryName(bureau) : null;
+
+    private static string Architecture() => System.Runtime.InteropServices.RuntimeInformation.OSArchitecture switch
+    {
+        System.Runtime.InteropServices.Architecture.Arm64 => "ARM64",
+        System.Runtime.InteropServices.Architecture.X86 => "x86",
+        _ => "AMD64",
+    };
 
     private static bool EstEleve()
     {

@@ -877,7 +877,10 @@ public sealed partial class ScanViewModel
     public bool ReposCarteVisible =>
         (LevierReposCarte is not null && _lastScan?.Findings.Any(f => f.TitleKey == "Finding.Gpu.PerfMaxGlobal") == true)
         || ReposCarteEnAttente || VerdictReposCarte is not null;
-    public bool ReposCarteAOuvrir => ReposCarteVisible && !ReposCarteEnAttente && !ReposCarteEnCours && VerdictReposCarte is null;
+    // Revue du 10/10/2026 : sans sonde ni attente, le geste rendait la main en silence et Optimiser écrivait « rien n'a été
+    // posé » pour une tentative qui n'avait pas eu lieu.
+    public bool ReposCarteAOuvrir => ReposCarteVisible && SondeCarte is not null && AttenteReposCarte is not null
+        && !ReposCarteEnAttente && !ReposCarteEnCours && VerdictReposCarte is null;
     partial void OnReposCarteEnAttenteChanged(bool value) { OnPropertyChanged(nameof(ReposCarteVisible)); OnPropertyChanged(nameof(ReposCarteAOuvrir)); }
     partial void OnReposCarteEnCoursChanged(bool value) => OnPropertyChanged(nameof(ReposCarteAOuvrir));
     partial void OnVerdictReposCarteChanged(string? value) { OnPropertyChanged(nameof(ReposCarteVisible)); OnPropertyChanged(nameof(ReposCarteAOuvrir)); }
