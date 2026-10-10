@@ -323,7 +323,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="effets:NoyauDeMaintien">
                         <Grid>
-                            <Border x:Name="Halo" CornerRadius="26" Margin="-5" Background="{StaticResource HaloIrisBrush}" Opacity="0"/>
+                            <Border x:Name="Halo" CornerRadius="24" Margin="0" Background="{StaticResource HaloIrisBrush}" Opacity="0"/>
                             <!-- Son échelle est posée par NoyauDeMaintien.OnApplyTemplate (une transformation liée dans le
                                  modèle n'a pas d'élément gouvernant). -->
                             <Border x:Name="Onde" CornerRadius="22" BorderThickness="1.5" BorderBrush="{StaticResource IrisBrush}" RenderTransformOrigin="0.5,0.5"
@@ -422,7 +422,6 @@
                         <Grid>
                             <!-- 10/10/2026 (« un effet arc-en-ciel qui dépasse le bouton ») : le halo reste DANS le bouton, et le reflet
                                  est argent, comme le reste de l'appli (plus de cyan, violet ni rose). -->
-                            <Border x:Name="Halo" CornerRadius="24" Margin="0" Background="{StaticResource HaloIrisBrush}" Opacity="0"/>
                             <Border x:Name="Corps" CornerRadius="24" Background="{StaticResource ChromeCapsuleBrush}" ClipToBounds="True"
                                     BorderThickness="1" BorderBrush="Transparent">
                                 <Grid>
@@ -453,7 +452,6 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.22"/>
                                             <DoubleAnimation Storyboard.TargetName="Iris" Storyboard.TargetProperty="Opacity" To="0.3" Duration="0:0:0.22"/>
                                             <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.3"/>
                                         </Storyboard>
@@ -475,9 +473,10 @@
                                     <StopStoryboard BeginStoryboardName="Balayage"/>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.16"/>
                                             <DoubleAnimation Storyboard.TargetName="Iris" Storyboard.TargetProperty="Opacity" To="0.12" Duration="0:0:0.16"/>
-                                            <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.1"/>
+                                            <!-- 10/10/2026 (« reste un effet une micro-seconde, blanc, après que la souris parte ») :
+                                                 la sortie est plus rapide que l'entrée (Emil Kowalski), et plus de halo blanc. -->
+                                            <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.08"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>

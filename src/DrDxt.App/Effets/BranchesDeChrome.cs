@@ -26,7 +26,9 @@ public sealed class ChromeSoupleEffect : ShaderEffect
     public double Survol { get => (double)GetValue(SurvolProperty); set => SetValue(SurvolProperty,value); }
     public static readonly DependencyProperty EclatProperty = DependencyProperty.Register(nameof(Eclat), typeof(double), typeof(ChromeSoupleEffect), new UIPropertyMetadata(0.0, PixelShaderConstantCallback(4)));
     public double Eclat { get => (double)GetValue(EclatProperty); set => SetValue(EclatProperty,value); }
-    public ChromeSoupleEffect(){PixelShader=Shader;UpdateShaderValue(InputProperty);UpdateShaderValue(TempsProperty);UpdateShaderValue(TeinteProperty);UpdateShaderValue(ActiviteProperty);UpdateShaderValue(SurvolProperty);UpdateShaderValue(EclatProperty);}
+    public static readonly DependencyProperty LusProperty = DependencyProperty.Register(nameof(Lus), typeof(double), typeof(ChromeSoupleEffect), new UIPropertyMetadata(0.0, PixelShaderConstantCallback(5)));
+    public double Lus { get => (double)GetValue(LusProperty); set => SetValue(LusProperty,value); }
+    public ChromeSoupleEffect(){PixelShader=Shader;UpdateShaderValue(InputProperty);UpdateShaderValue(TempsProperty);UpdateShaderValue(TeinteProperty);UpdateShaderValue(ActiviteProperty);UpdateShaderValue(SurvolProperty);UpdateShaderValue(EclatProperty);UpdateShaderValue(LusProperty);}
 }
 
 /// <summary>Huit rubans de chrome dans leur tuyau, un par composant, calculés en continu sur un fond transparent.</summary>
@@ -60,6 +62,10 @@ public sealed class BranchesDeChrome : Grid
         => vise ? eclat + (1 - eclat) * Math.Min(1, dt / .05) : eclat * Math.Max(0, 1 - dt / .08);
     public static readonly DependencyProperty RapideProperty = DependencyProperty.Register(nameof(Rapide), typeof(bool), typeof(BranchesDeChrome), new PropertyMetadata(false));
     public bool Rapide { get => (bool)GetValue(RapideProperty); set => SetValue(RapideProperty,value); }
+    /// <summary>10/10/2026 : les domaines lus par le scan (un bit par composant, dans l'ordre du cercle).</summary>
+    public static readonly DependencyProperty PolesLusProperty = DependencyProperty.Register(nameof(PolesLus), typeof(int), typeof(BranchesDeChrome),
+        new PropertyMetadata(0, (d, e) => ((BranchesDeChrome)d)._effet.Lus = (int)e.NewValue));
+    public int PolesLus { get => (int)GetValue(PolesLusProperty); set => SetValue(PolesLusProperty,value); }
     /// <summary>La couleur du métal des rubans ; l'ombre dessous reste noire.</summary>
     public static readonly DependencyProperty TeinteProperty = DependencyProperty.Register(nameof(Teinte), typeof(Color), typeof(BranchesDeChrome),
         new PropertyMetadata(Colors.White, (d, e) => ((BranchesDeChrome)d)._effet.Teinte = (Color)e.NewValue));

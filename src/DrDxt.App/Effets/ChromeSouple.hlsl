@@ -18,6 +18,8 @@ float Activite : register(c2); // 0 au repos, 1 pendant le scan : des influx de 
 // éclat (0 à 1, monté en ~150 ms, descendu en ~250 ms par BranchesDeChrome) : sa douille et le bord de son tuyau s'allument.
 float Survol : register(c3);
 float Eclat : register(c4);
+// Les domaines déjà lus par le scan, un bit par composant (0 à 255) : la lueur de chacun s'allume à sa lecture.
+float Lus : register(c5);
 
 // Le canevas fait 760 x 720 (10/10/2026) : p va de -1 à 1 en largeur, de -0,947 à 0,947 en hauteur.
 static const float Hauteur = 1.8947368;
@@ -32,7 +34,7 @@ static const float K = .868421;
 float4 main(float2 uv : TEXCOORD) : COLOR
 {
     float2 p = (uv - .5) * float2(2.0, Hauteur);
-    float ombre = 0.0, tuyau = 0.0, verre = 0.0, ruban = 0.0, metal = 0.0, douille = 0.0, acier = 0.0;
+    float ombre = 0.0, tuyau = 0.0, verre = 0.0, ruban = 0.0, metal = 0.0, lueur = 0.0;
     [loop] for (int i = 0; i < 8; i++)
     {
         float a = -1.5707963 + float(i) * .78539816;
@@ -40,12 +42,15 @@ float4 main(float2 uv : TEXCOORD) : COLOR
         float longueur = length(cible);
         float2 axe = cible / longueur;
         float u = dot(p, axe), v = dot(p, float2(-axe.y, axe.x));
-        float s = saturate((u - .105) / (longueur - .105));
+        // 10/10/2026 (le mainteneur : « ronds autour des symboles, pas ouf ») : plus de douille ; la tentacule s'arrête au
+        // bord de l'icône (à ~17 px de son centre) au lieu d'entrer dans un anneau.
+        float fin = longueur - .045;
+        float s = saturate((u - .105) / (fin - .105));
         float ouverture = sin(s * 3.14159265);
         float phase = float(i) * 1.73;
         float vise = Eclat * step(abs(float(i) - Survol), .5);
         // Né sous la bille, il court jusqu'au centre de la douille, qui le recouvre.
-        float effile = smoothstep(.105, .19, u) * (1.0 - smoothstep(longueur - .01, longueur, u));
+        float effile = smoothstep(.105, .19, u) * (1.0 - smoothstep(fin - .03, fin, u));
         float centre = ouverture * (.08 * sin(s * 4.2 - Temps * .38 + phase) + .04 * cos(s * 7.0 + Temps * .24 + phase));
         float ecart = v - centre;
 
@@ -73,15 +78,12 @@ float4 main(float2 uv : TEXCOORD) : COLOR
         float m = saturate(eclat + .35 * lisere + .6 * influx);
         if (corps > ruban) { ruban = corps; metal = m; }
 
-        // La douille : verre noir, un liseré net, un reflet en haut à gauche ; elle s'éclaire quand un influx en part.
-        float ds = length(p - cible), R = .050 * K;
-        float couvre = 1.0 - smoothstep(R - .003, R + .003, ds);
-        float bord = exp(-pow((ds - R + .006) / .006, 2));
-        float2 q = (p - cible) / R;
-        float reflet = exp(-pow((length(q - float2(-.35, -.45)) - .55) / .12, 2)) * saturate(-q.y - q.x);
-        float c = .02 + .08 * vise + (.55 + .45 * vise) * bord + .20 * reflet + .35 * Activite * (.5 + .5 * sin(Temps * 2.4 + phase)) * bord;
-        if (couvre > douille) { douille = couvre; acier = c; }
-        ombre = max(ombre, exp(-pow(ds / (R * 1.7), 2)));
+        // La lueur par le dessous : une lumière douce, sans contour, qui monte de sous l'icône quand la souris la vise
+        // (Eclat) ou quand le scan la lit (Activite). Au repos, rien.
+        float ds = length(p - cible + float2(0, -.012));
+        float halo = exp(-pow(ds / (.075 * K), 2));
+        float lu = fmod(floor(Lus / exp2(float(i)) + .001), 2.0);
+        lueur = max(lueur, halo * (.55 * vise + .40 * Activite * lu));
     }
 
     // L'ombre (noire), puis le tuyau plein, puis le ruban, chacun posé sur le précédent.
@@ -91,8 +93,9 @@ float4 main(float2 uv : TEXCOORD) : COLOR
     alpha = alpha * (1.0 - tuyau) + tuyau;
     couleur = couleur * (1.0 - ruban) + ruban * metal;
     alpha = alpha * (1.0 - ruban) + ruban;
-    couleur = couleur * (1.0 - douille) + douille * acier;
-    alpha = alpha * (1.0 - douille) + douille;
+    // La lueur s'ajoute par-dessus, en lumière (prémultipliée) : elle éclaire sans rien couvrir.
+    couleur += lueur;
+    alpha = saturate(alpha + lueur);
     // L'ombre reste noire ; seul ce qui brille prend la teinte.
     return float4(couleur * Teinte.rgb, alpha);
 }

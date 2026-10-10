@@ -21,6 +21,27 @@ public class VerifierLaMachineTests
             _ => k,
         });
 
+    // 10/10/2026 (le mainteneur : « je sais pas réellement ce que ça a fait ») : une ligne par réglage, avec son nom et son sort.
+    [Fact]
+    public async Task Le_bilan_nomme_chaque_reglage_et_ce_qui_lui_est_arrive()
+    {
+        var vm = Vm();
+        vm.VerifierLaMachine = _ => Task.FromResult(new VerificationRendue(null, ["gpu.power_limit : PAS remis d'origine"], "r.txt", Valides: 1)
+            { ValidesIds = ["latency.gameModeOn"] });
+
+        await vm.ConfirmerVerificationCommand.ExecuteAsync(null);
+
+        vm.LignesVerification.Should().HaveCount(DrDxt.Application.Autopilot.ValidationComplete.Leviers.Count);
+        vm.LignesVerification.Should().Contain(l => l.Contains("Verifier.Ligne.Valide"), "le mode Jeu a été posé, relu, rendu")
+            .And.Contain(l => l.Contains("Verifier.Ligne.AVerifier"), "la limite de puissance n'est pas revenue")
+            .And.Contain(l => l.Contains("Verifier.Ligne.NonTouche"));
+        vm.ADesLignesVerification.Should().BeTrue();
+
+        vm.VerifierLaMachine = _ => Task.FromResult(new VerificationRendue("Verifier.JeuOuvert", [], null));
+        await vm.ConfirmerVerificationCommand.ExecuteAsync(null);
+        vm.LignesVerification.Should().HaveCount(0, "refusée avant de commencer : aucun réglage n'a été essayé");
+    }
+
     [Fact]
     public void Sans_branchement_pas_de_bouton()
         => Vm().CanVerifierMachine.Should().BeFalse();

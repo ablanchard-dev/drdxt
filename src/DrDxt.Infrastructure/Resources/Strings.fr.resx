@@ -266,7 +266,7 @@
     <value>Vérifier DrDXT sur mon PC</value>
   </data>
   <data name="Verifier.Consentement" xml:space="preserve">
-    <value>DrDXT va poser, un par un, chaque réglage qu'il sait faire sur ce PC (mode Jeu, enregistrement de fond de la Game Bar, mode fenêtré optimisé, planification de la carte graphique, plan d'alimentation, boost du processeur, limite de puissance de la carte, réglages de latence du pilote ; sur une carte NVIDIA, ceux-là ne se vérifient qu'en jeu et restent non touchés ici), le relire, le remettre d'origine, puis le relire encore. Aucun réglage n'est gardé. Ferme ton jeu avant. Windows te demandera ton accord. Compte une à deux minutes.</value>
+    <value>Ce test vérifie que DrDXT sait régler ton PC : il pose chaque réglage un par un, le relit, puis le remet comme avant. Rien n'est gardé. Il ne mesure pas de gain : pour savoir si un réglage te fait gagner des images, c'est « Essayer en alternance pendant mes parties ». Ferme ton jeu, Windows te demandera ton accord, compte une à deux minutes. À la fin, tu peux envoyer le rapport au projet : il fait avancer DrDXT sur ton matériel.</value>
   </data>
   <data name="Verifier.Confirmer" xml:space="preserve">
     <value>Lancer la vérification</value>
@@ -278,7 +278,7 @@
     <value>Vérification en cours : {0}</value>
   </data>
   <data name="Verifier.Compte" xml:space="preserve">
-    <value>Vérification finie. {0} réglage(s) posé(s), relu(s) et remis d'origine ; {1} non touché(s) (déjà réglé(s), sans objet ou illisible(s) sur ce PC) ; {2} refusé(s), sans rien changer.</value>
+    <value>Vérification finie : {0} réglage(s) essayé(s) et remis comme avant, rien n'a été gardé. Réglage par réglage :</value>
   </data>
   <data name="Verifier.RefusWindows" xml:space="preserve">
     <value>Vérification arrêtée : l'accord de Windows a été refusé. Les réglages suivants n'ont pas été essayés ; ceux d'avant ont été remis d'origine.</value>
@@ -298,6 +298,15 @@
   </data>
   <data name="Verifier.JeuOuvert" xml:space="preserve">
     <value>Ferme ton jeu d'abord : DrDXT ne touche à rien pendant une partie.</value>
+  </data>
+  <data name="Verifier.Ligne.Valide" xml:space="preserve">
+    <value>{0} : vérifié, posé, relu, remis comme avant</value>
+  </data>
+  <data name="Verifier.Ligne.NonTouche" xml:space="preserve">
+    <value>{0} : pas touché, déjà réglé ou pas sur ce PC</value>
+  </data>
+  <data name="Verifier.Ligne.AVerifier" xml:space="preserve">
+    <value>{0} : à vérifier à la main, sa valeur d'origine est dans le rapport</value>
   </data>
   <data name="Verifier.RapportEcrit" xml:space="preserve">
     <value>Le rapport est écrit ici. Rien n'a été envoyé : c'est toi qui l'envoies, si tu veux aider à tester DrDXT.</value>

@@ -426,7 +426,7 @@ public static class AppServiceCollectionExtensions
                 // ROAD1 (08/10/2026) : la liste « ce que DrDXT fait ici » dit « vérifié ici » pour ces leviers.
                 try { DrDxt.Application.Tweaks.LeviersVerifies.Enregistrer(DrDxt.Core.DossierDonnees.Chemin("leviers-verifies.json"), r.Empreinte, r.EssayesIds, r.ValidesIds); }
                 catch (Exception) { /* la liste ne le dira pas ; le rapport, si */ }
-                return new VerificationRendue(null, r.NonRemis, chemin, r.Valides, r.NonTouches, r.Refuses, r.ArretPar);
+                return new VerificationRendue(null, r.NonRemis, chemin, r.Valides, r.NonTouches, r.Refuses, r.ArretPar) { ValidesIds = r.ValidesIds };
             };
             // 03/10/2026 (D6.2) : l'analyse lancée sans droits se relance en administrateur et enchaîne, une seule fois.
             vm.RelancerEleveEtAnalyser = scene =>

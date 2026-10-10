@@ -7,7 +7,11 @@ namespace DrDxt.App.ViewModels;
 /// (clé de ressource). <paramref name="AVerifier"/> : les réglages pas revenus, ou revenus sans relecture qui le confirme.</summary>
 public sealed record VerificationRendue(string? Refus, IReadOnlyList<string> AVerifier, string? Chemin, int Valides = 0,
     int NonTouches = 0, int Refuses = 0,
-    DrDxt.Application.Autopilot.ValidationComplete.Arret ArretPar = DrDxt.Application.Autopilot.ValidationComplete.Arret.Aucun);
+    DrDxt.Application.Autopilot.ValidationComplete.Arret ArretPar = DrDxt.Application.Autopilot.ValidationComplete.Arret.Aucun)
+{
+    /// <summary>10/10/2026 : les réglages posés, relus et rendus, par identifiant (le bilan les nomme un par un).</summary>
+    public IReadOnlyList<string> ValidesIds { get; init; } = [];
+}
 
 // 08/10/2026 (T1b, le mainteneur : « rajouter les tests pour valider certaines choses pour les users dans l'app ») : « Vérifier
 // DrDXT sur mon PC ». Chaque réglage que DrDXT sait poser est posé, relu, remis d'origine, relu encore, sur la machine du
@@ -26,6 +30,21 @@ public partial class ScanViewModel
     }
 
     public bool CanVerifierMachine => _verifierLaMachine is not null;
+
+    /// <summary>10/10/2026 (le mainteneur : « je sais pas réellement ce que ça a fait, écriture illisible ») : une ligne par
+    /// réglage essayé, avec son nom et ce qui lui est arrivé, au lieu d'un seul compte.</summary>
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ADesLignesVerification))] private IReadOnlyList<string> _lignesVerification = [];
+    public bool ADesLignesVerification => LignesVerification.Count > 0;
+
+    internal IReadOnlyList<string> Lignes(VerificationRendue r) =>
+        DrDxt.Application.Autopilot.ValidationComplete.Leviers.Select(id =>
+        {
+            var nom = _localize(TweakDisplayKeys.TitleKey(id));
+            var cle = r.AVerifier.Any(a => a.StartsWith(id, StringComparison.Ordinal)) ? "Verifier.Ligne.AVerifier"
+                : r.ValidesIds.Contains(id) ? "Verifier.Ligne.Valide"
+                : "Verifier.Ligne.NonTouche";
+            return string.Format(_localize(cle), nom);
+        }).ToList();
 
     [ObservableProperty] private bool _verificationAConfirmer;
     [ObservableProperty] private bool _verificationEnCours;
@@ -109,6 +128,7 @@ public partial class ScanViewModel
                 if (id is not null) VerificationProgres = string.Format(_localize("Verifier.EnCours"), _localize(TweakDisplayKeys.TitleKey(id)));
             }));
             VerificationChemin = r.Chemin ?? string.Empty;
+            LignesVerification = r.Refus is null ? Lignes(r) : [];
             // Revue n° 10 : le bilan compte ce qui a été vérifié, et dit pourquoi la vérification s'est arrêtée ;
             // « tout est remis » ne s'affiche plus quand rien n'a été posé.
             VerificationBilan = r.Refus is { } refus ? _localize(refus)

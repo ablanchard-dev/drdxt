@@ -229,27 +229,6 @@
             </Setter>
         </Style>
 
-        <!-- Le réseau change de régime avec le scan. -->
-        <Style x:Key="ReseauSelonEtat" TargetType="effets:ReseauNeuronal">
-            <Setter Property="Mode" Value="Repos"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding State}" Value="Scanning">
-                    <Setter Property="Mode" Value="Scan"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}" Value="Done">
-                    <Setter Property="Mode" Value="Resultat"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}" Value="AlreadyOptimal">
-                    <Setter Property="Mode" Value="Resultat"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}" Value="Degraded">
-                    <Setter Property="Mode" Value="Resultat"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding State}" Value="Failed">
-                    <Setter Property="Mode" Value="Resultat"/>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
 
         <!-- Un choix de scène passe à la ligne plutôt que d'être coupé. -->
         <DataTemplate x:Key="LibelleDeScene">
@@ -590,8 +569,10 @@
                         <Viewbox Grid.Column="1" MinHeight="480" Stretch="Uniform">
                         <!-- 10/10/2026 : 760 de large pour huit composants sans chevauchement (660 pour cinq). -->
                         <Grid Width="760" Height="720">
-                            <effets:BranchesDeChrome Panel.ZIndex="0" Rapide="{Binding IsScanning}"/>
-                            <effets:ReseauNeuronal Panel.ZIndex="1" Style="{StaticResource ReseauSelonEtat}" NombreDePoles="8" PolesAllumes="{Binding PolesLus}" RayonX="0.37" RayonY="0.35" AngleDepart="-90"/>
+                            <effets:BranchesDeChrome Panel.ZIndex="0" Rapide="{Binding IsScanning}" PolesLus="{Binding PolesLus}"/>
+                            <!-- 10/10/2026 (le mainteneur : « ronds autour des symboles, pas ouf ») : l'onde de balayage et les anneaux
+                                 de lecture (ReseauNeuronal) faisaient des cercles ; la lecture d'un domaine éclaire maintenant son icône par
+                                 en dessous, dans le shader des tentacules. -->
                             
 
                             <!-- Tes composants, chacun sur son pôle. Les valeurs passent à la ligne, jamais coupées. -->
@@ -2096,7 +2077,7 @@
                                         </StackPanel>
                                     </Button>
                                     <StackPanel Margin="0,12,0,0" Visibility="{Binding VerificationAConfirmer, Converter={StaticResource BoolVis}}">
-                                        <TextBlock Text="{Binding LabelVerifierConsentement}" Style="{StaticResource Legende}" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding LabelVerifierConsentement}" Style="{StaticResource Corps}" FontSize="13" LineHeight="19" TextWrapping="Wrap"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                             <Button Style="{StaticResource BoutonReflet}" Command="{Binding ConfirmerVerificationCommand}">
                                                 <TextBlock Text="{Binding LabelVerifierConfirmer}"/>
@@ -2108,8 +2089,17 @@
                                     </StackPanel>
                                     <TextBlock Text="{Binding VerificationProgres}" Style="{StaticResource Legende}" Margin="0,12,0,0" TextWrapping="Wrap"
                                                Visibility="{Binding VerificationEnCours, Converter={StaticResource BoolVis}}"/>
-                                    <TextBlock Text="{Binding VerificationBilan}" Margin="0,12,0,0" TextWrapping="Wrap"
+                                    <TextBlock Text="{Binding VerificationBilan}" Style="{StaticResource Corps}" FontSize="13" LineHeight="19" Margin="0,12,0,0" TextWrapping="Wrap"
                                                Visibility="{Binding HasVerificationBilan, Converter={StaticResource BoolVis}}"/>
+                                    <!-- 10/10/2026 : ce que la vérification a fait, réglage par réglage. -->
+                                    <ItemsControl ItemsSource="{Binding LignesVerification}" Margin="0,8,0,0"
+                                                  Visibility="{Binding ADesLignesVerification, Converter={StaticResource BoolVis}}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding}" Style="{StaticResource Corps}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                     <StackPanel Margin="0,8,0,0" Visibility="{Binding HasVerificationChemin, Converter={StaticResource BoolVis}}">
                                         <TextBlock Text="{Binding LabelVerifierRapport}" Style="{StaticResource Legende}" TextWrapping="Wrap"/>
                                         <TextBox Text="{Binding VerificationChemin, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
