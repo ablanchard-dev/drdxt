@@ -171,7 +171,10 @@ public record BenchmarkResult(
 
     /// <summary>28/09/2026 : la marge des 0,1 % lows, meme calcul. Le chiffre le plus fragile du rapport
     /// sortait seul sans marge. Informative, jamais decisionnelle (voir <c>GameObjective</c>).</summary>
-    double P01LowMarginOfError = double.PositiveInfinity)
+    double P01LowMarginOfError = double.PositiveInfinity,
+    /// <summary>B4 (10/10/2026) : médiane de la latence d'affichage de PresentMon (début de l'image → écran), en ms ;
+    /// null quand la série n'a pas été livrée. Le chiffre sur lequel l'essai en alternance juge un levier de latence.</summary>
+    double? DisplayLatencyMsMedian = null)
 {
     /// <summary>GPU-busy as a % of frame time: the CPU-bound (≪ 100) vs GPU-bound (≈ 100) signal.
     /// Null when GPU busy was not measured or the frame rate is unknown — never a fabricated 0.

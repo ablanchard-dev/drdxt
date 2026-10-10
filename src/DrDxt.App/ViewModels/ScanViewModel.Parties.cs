@@ -223,7 +223,9 @@ public partial class ScanViewModel
                 c => c.Libelle,
                 p => NomDuJeu(p.Jeu),
                 _localize("Historique.Arret"), _localize("Historique.Erreur"),
-                p => string.Format(fr, _localize("Historique.PartieFps"), p.FpsMedian.ToString("0", fr), p.Low1Median.ToString("0", fr)));
+                p => p.LatenceAffichageMedianMs is { } latence
+                    ? string.Format(fr, _localize("Historique.PartieFpsLatence"), p.FpsMedian.ToString("0", fr), p.Low1Median.ToString("0", fr), latence.ToString("0.#", fr))
+                    : string.Format(fr, _localize("Historique.PartieFps"), p.FpsMedian.ToString("0", fr), p.Low1Median.ToString("0", fr)));
             // 04/10/2026 (plan 3b.5) : le bilan de la semaine, en tête.
             if (frise.Count > 0)
                 LignesHistorique.Add(LigneBilan(BilanDeLaSemaine.Construire(parties, JournalChangements?.Lire() ?? [], arrets, erreurs, DateTimeOffset.Now), _localize));

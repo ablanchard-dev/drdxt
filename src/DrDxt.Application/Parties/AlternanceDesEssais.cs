@@ -1,3 +1,4 @@
+using DrDxt.Core;
 namespace DrDxt.Application.Parties;
 
 /// <summary>
@@ -23,12 +24,27 @@ public static class AlternanceDesEssais
             .OrderByDescending(j => parties.Count(p => string.Equals(p.Jeu, j, StringComparison.OrdinalIgnoreCase)))
             .FirstOrDefault();
         if (jeu is null) return VerdictEnJeu.PasEncoreJuge;
-        var a = avec.Where(p => string.Equals(p.Jeu, jeu, StringComparison.OrdinalIgnoreCase)).Select(p => p.Low1Median).ToList();
-        var s = sans.Where(p => string.Equals(p.Jeu, jeu, StringComparison.OrdinalIgnoreCase)).Select(p => p.Low1Median).ToList();
-        if (a.Count < ComparaisonDesParties.PartiesMinimum || s.Count < ComparaisonDesParties.PartiesMinimum)
+        var pAvec = avec.Where(p => string.Equals(p.Jeu, jeu, StringComparison.OrdinalIgnoreCase)).ToList();
+        var pSans = sans.Where(p => string.Equals(p.Jeu, jeu, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (pAvec.Count < ComparaisonDesParties.PartiesMinimum || pSans.Count < ComparaisonDesParties.PartiesMinimum)
             return VerdictEnJeu.PasEncoreJuge;
+        // B4 (10/10/2026) : un levier de latence se juge sur la latence d'affichage (plus bas = mieux) quand toutes les
+        // parties la portent ; sinon, comme les autres, sur les 1 % bas (plus haut = mieux).
+        if (JugeSurLaLatence(levierId) && pAvec.Concat(pSans).All(p => p.LatenceAffichageMedianMs is not null))
+        {
+            var la = pAvec.Select(p => p.LatenceAffichageMedianMs!.Value).ToList();
+            var ls = pSans.Select(p => p.LatenceAffichageMedianMs!.Value).ToList();
+            return la.Max() < ls.Min() ? VerdictEnJeu.Mieux : la.Min() > ls.Max() ? VerdictEnJeu.Pire : VerdictEnJeu.PasDeDifference;
+        }
+        var a = pAvec.Select(p => p.Low1Median).ToList();
+        var s = pSans.Select(p => p.Low1Median).ToList();
         return a.Min() > s.Max() ? VerdictEnJeu.Mieux : a.Max() < s.Min() ? VerdictEnJeu.Pire : VerdictEnJeu.PasDeDifference;
     }
+
+    /// <summary>B4 : les leviers de la famille « latence » du catalogue (file de rendu, VRR + Vsync + plafond) se jugent
+    /// sur la latence d'affichage, pas sur les images.</summary>
+    public static bool JugeSurLaLatence(string levierId) =>
+        CatalogueDeCandidats.Decrire(levierId) is { Family: CandidateFamily.Latency };
 
     /// <summary>Ce que la prochaine partie doit avoir : posé ou non, et si l'alternance est finie. Pas encore tranché :
     /// l'inverse de la dernière partie de l'essai (la première partie après l'allumage l'a avec). Tranché : « mieux »

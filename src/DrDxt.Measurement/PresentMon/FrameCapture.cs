@@ -50,7 +50,10 @@ public sealed record FrameCapture(
     IReadOnlyList<double>? CpuBusyMs = null,
     IReadOnlyList<double>? InPresentApiMs = null,
     IReadOnlyList<double>? AnimationErrorMs = null,
-    IReadOnlyList<int>? PresentModes = null)
+    IReadOnlyList<int>? PresentModes = null,
+    // B4 (10/10/2026) : DisplayLatency de PresentMon, « du début de l'image jusqu'à son affichage à l'écran », pour toute
+    // application sans instrumentation. null = non demandée ou non livrée (taille inconnue).
+    IReadOnlyList<double>? DisplayLatencyMs = null)
 {
     /// <summary>Part des images passées par le compositeur, parmi celles dont le mode est connu ;
     /// null quand aucune ne l'est. Composed = valeurs 4, 5 et 6 de `PM_PRESENT_MODE`.</summary>

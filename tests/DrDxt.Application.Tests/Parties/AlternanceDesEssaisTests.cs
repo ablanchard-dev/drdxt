@@ -14,6 +14,31 @@ public sealed class AlternanceDesEssaisTests
             4, 130, low1, BottleneckState.CpuBoundOrAppBound,
             Essai: pose is { } b ? AlternanceDesEssais.Marque(Levier, b) : null);
 
+    // B4 (10/10/2026) : un levier de latence (famille « latence » du catalogue) se juge sur la latence d'affichage,
+    // plus bas = mieux ; sans latence sur toutes les parties, il retombe sur les 1 % bas.
+    private const string LevierLatence = "latency.render_queue_cap";
+
+    private static PartieRelevee L(int jour, double latence, bool pose, double low1 = 90) =>
+        P(jour, low1, null) with { Essai = AlternanceDesEssais.Marque(LevierLatence, pose), LatenceAffichageMedianMs = latence };
+
+    [Fact]
+    public void Un_levier_de_latence_se_juge_sur_la_latence_d_affichage_plus_bas_est_mieux()
+    {
+        AlternanceDesEssais.JugeSurLaLatence(LevierLatence).Should().BeTrue();
+        AlternanceDesEssais.JugeSurLaLatence("gpu.power_limit").Should().BeFalse("la limite de puissance de la carte se juge sur les images");
+        AlternanceDesEssais.Juger([L(1, 20, true), L(2, 26, false), L(3, 21, true), L(4, 25, false), L(5, 19, true), L(6, 27, false)], LevierLatence)
+            .Should().Be(VerdictEnJeu.Mieux, "avec : 19-21 ms, sans : 25-27 ms");
+        AlternanceDesEssais.Juger([L(1, 30, true), L(2, 26, false), L(3, 31, true), L(4, 25, false), L(5, 29, true), L(6, 27, false)], LevierLatence)
+            .Should().Be(VerdictEnJeu.Pire);
+    }
+
+    [Fact]
+    public void Sans_latence_sur_toutes_les_parties_le_levier_de_latence_retombe_sur_les_images()
+    {
+        var parties = new[] { L(1, 20, true), L(2, 26, false), L(3, 21, true), L(4, 25, false), L(5, 19, true), L(6, 27, false) with { LatenceAffichageMedianMs = null } };
+        AlternanceDesEssais.Juger(parties, LevierLatence).Should().Be(VerdictEnJeu.PasDeDifference, "1 % bas identiques des deux côtés");
+    }
+
     [Fact]
     public void Trois_parties_avec_nettement_au_dessus_de_trois_sans_disent_mieux()
         => AlternanceDesEssais.Juger([P(1, 90, true), P(2, 80, false), P(3, 91, true), P(4, 81, false), P(5, 92, true), P(6, 79, false)], Levier)
