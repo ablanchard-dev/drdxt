@@ -314,6 +314,7 @@ src/DrDxt.Application/Tweaks/PreuveDuRepos.cs 2
 src/DrDxt.Core/Storage/FichierJsonAtomique.cs 1
 src/DrDxt.Detection/Display/Win32ModeEcran.cs 2
 src/DrDxt.Detection/Gpu/MagasinDePilotes.cs 1
+src/DrDxt.Detection/Hardware/MisesAJourEnAttente.cs 1
 src/DrDxt.Detection/Repair/InventaireMachine.cs 1
 src/DrDxt.Detection/Repair/RepairAuditService.cs 2
 src/DrDxt.ElevatedHelper/Execution/Adlx/ADLXTuningActions.cs 3
@@ -325,8 +326,9 @@ src/DrDxt.ElevatedHelper/Execution/SanteDesComposants.cs 1
 src/DrDxt.ElevatedHelper/Execution/Win32BcdActions.cs 2
 src/DrDxt.ElevatedHelper/Execution/Win32FirmwareBootActions.cs 4
 src/DrDxt.ElevatedHelper/Execution/Win32NetworkQosActions.cs 1
+src/DrDxt.ElevatedHelper/Execution/Win32PnpActions.cs 1
 src/DrDxt.ElevatedHelper/Execution/Win32PowerPlanActions.cs 6
-src/DrDxt.ElevatedHelper/Execution/Win32RegistryActions.cs 4
+src/DrDxt.ElevatedHelper/Execution/Win32RegistryActions.cs 5
 src/DrDxt.ElevatedHelper/Execution/Win32RestorePointActions.cs 2
 src/DrDxt.ElevatedHelper/Execution/Win32ServiceActions.cs 4
 src/DrDxt.Lanceur/Program.cs 2
@@ -377,7 +379,7 @@ dont seul l'ecretage est prouve laisserait le refus mourir sans bruit.
 | Grandeur | Bande | Constante | Ecretage prouve par | Refus prouve par |
 |---|---|---|---|---|
 | Offset d'horloge coeur | **-200 a +100 MHz** | `GpuSafeBounds.Min/MaxCoreOffsetMhz` | `ScanProfileConsumerTests.Out_of_bounds_core_offset_is_clamped_to_safe_bounds_before_reaching_the_target` (+3) | `OcSweepTests.Out_of_band_candidates_are_never_applied` (+1) |
-| Offset d'horloge memoire | **-500 a +500 MHz** | `GpuSafeBounds.Min/MaxMemoryOffsetMhz` | `GpuTuningApplyStepTests.Reclamps_out_of_bounds_live_targets_to_safe_bounds_before_applying` — **un seul test** | `GpuUndervoltTweakTests.Apply_rejects_memory_offset_outside_safe_bounds` |
+| Offset d'horloge memoire | **-500 a +500 MHz** | `GpuSafeBounds.Min/MaxMemoryOffsetMhz` | l'op d'horloge porte toujours 0 MHz de memoire : `GpuUndervoltTweakTests.L_op_ne_porte_aucune_memoire` | `GpuUndervoltTweakTests.Apply_rejects_memory_offset_outside_safe_bounds` |
 | Limite de puissance | **60 a 100 %** cote appli ; **50 a 100 %** cote eleve (allowlist 0-100, executeur 50-120, `NvApiTuningRailTests`) | `GpuSafeBounds.Min/MaxPowerLimitPct` | `GpuSafeBoundsTests.Power_limit_clamp_raises_below_floor_to_the_floor` (+5) | `GpuSafeBoundsTests.Is_power_limit_safe_rejects_values_below_the_floor` |
 | Ventilateur au-dela de **80 °C** | **>= 40 %** de vitesse | `HotTempThresholdC`, `MinFanDutyAtHotTempPct` | `GpuSafeBoundsTests.Fan_curve_clamp_only_raises_hot_points_below_the_floor` (+2) | `GpuSafeBoundsTests.Is_fan_curve_safe_flags_a_hot_silent_curve` |
 
