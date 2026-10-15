@@ -6,13 +6,13 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Adapters.Tests;
 
 // -----------------------------------------------------------------------
-// WmiGpuDriverProbe: queries Win32_VideoController and returns the DriverVersion of
-// the adapter matching a vendor (case-insensitive substring on AdapterCompatibility
-// or Name). No match → Ok(null) (absence ≠ error); query failure → Fail.
+// WmiGpuDriverProbe : interroge Win32_VideoController et rend la DriverVersion de l'adaptateur
+// qui correspond à un constructeur (sous-chaîne insensible à la casse sur AdapterCompatibility
+// ou Name). Aucune correspondance → Ok(null) (absence ≠ erreur) ; requête en échec → Fail.
 // -----------------------------------------------------------------------
 public sealed class WmiGpuDriverProbeTests
 {
-    // A fake IWmiQuery returning canned rows (or a failure).
+    // Un faux IWmiQuery qui rend des lignes toutes faites (ou un échec).
     private sealed class FakeWmi : IWmiQuery
     {
         private readonly Result<IReadOnlyList<WmiRow>> _result;
@@ -82,7 +82,7 @@ public sealed class WmiGpuDriverProbeTests
 
         var r = probe.ReadDriverVersion("AMD");
 
-        r.IsOk.Should().BeTrue();   // absence is not an error
+        r.IsOk.Should().BeTrue();   // l'absence n'est pas une erreur
         r.Value.Should().BeNull();
     }
 

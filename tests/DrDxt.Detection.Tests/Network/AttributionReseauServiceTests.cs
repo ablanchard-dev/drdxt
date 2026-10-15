@@ -113,8 +113,8 @@ public class AttributionReseauServiceTests
     [InlineData(1.20, 1.29)]
     public async Task La_phrase_ne_repete_pas_le_mot_reseau_et_commence_par_une_majuscule(double saut, double internet)
     {
-        // 25/09/2026 : vue sur photo, « Réseau : mesuré, … » sous le titre « Réseau » puis
-        // « Mesuré sur ta machine » ; dans le rapport, « réseau : mesuré » sous « Réseau mesuré ».
+        // Pas de « Réseau : mesuré, … » sous le titre « Réseau » puis « Mesuré sur ta machine », ni de
+        // « réseau : mesuré » sous « Réseau mesuré » dans le rapport : la ligne ne répète pas son titre.
         var ligne = await Service(new CompteurFictif(saut, internet)).LigneAsync();
 
         ligne.Should().NotBeNull();
@@ -223,7 +223,7 @@ public class AttributionReseauServiceTests
     [InlineData(1.20, 1.29)]  // rien a designer
     public async Task Chaque_verdict_dit_que_ce_sont_des_pings_pas_le_jeu(double saut, double internet)
     {
-        // 25/09/2026 : la cle d'avertissement ICMP n'avait de texte nulle part ; le joueur lisait une
+        // La cle d'avertissement ICMP n'avait de texte nulle part ; le joueur lisait une
         // gigue sans savoir qu'elle ne vient pas des paquets de son jeu.
         var ligne = await Service(new CompteurFictif(saut, internet)).LigneAsync();
 

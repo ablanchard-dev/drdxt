@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Core.Tests;
 
-// M2 Phase D — the per-tweak error codes (TWEAK.* namespace).
+// Les codes d'erreur par levier (espace TWEAK.*).
 public class M2TweakErrorCodesTests
 {
     [Fact] public void TweakNotApplicable_is_stable() => ErrorCodes.TweakNotApplicable.Should().Be("TWEAK.NOT_APPLICABLE");

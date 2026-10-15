@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Infrastructure.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Le journal des changements n'avait aucune borne.
+// Le journal des changements n'avait aucune borne.
 //
 // `DiagnosticsLog.Change` fait un `File.AppendAllText` et rien d'autre : pas de plafond,
 // pas de rotation. Le fichier vit sous `%LOCALAPPDATA%\DrDXT\diagnostics` et n'est jamais

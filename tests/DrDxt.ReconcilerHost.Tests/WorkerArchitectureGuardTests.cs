@@ -5,14 +5,14 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// T31 — architectural guard: the Worker has NO direct privileged-write path.
+// Garde d'architecture : le Worker n'a aucun chemin d'écriture privilégiée direct.
 //
-// The whole security posture relies on the host being a user-mode READER whose only
-// route to a privileged write is the elevated helper (via IElevatedReapplyClient,
-// constructed deep in the reconciler graph — never injected into the Worker). This
-// reflection guard pins that: it inspects the Worker's constructor dependency surface
-// and fails if a banned OS write-surface (Microsoft.Win32.Registry, ServiceController,
-// a power-plan P/Invoke type) ever leaks in as a direct dependency.
+// Toute la posture de sécurité repose sur un hôte lecteur en mode utilisateur dont la seule
+// voie vers une écriture privilégiée est le helper élevé (via IElevatedReapplyClient,
+// construit au fond du graphe du réconciliateur, jamais injecté dans le Worker). Cette
+// garde par réflexion le fige : elle inspecte la surface de dépendances du constructeur du
+// Worker et échoue si une surface d'écriture OS interdite (Microsoft.Win32.Registry,
+// ServiceController, un type P/Invoke de plan d'alimentation) s'y glisse en dépendance directe.
 // -----------------------------------------------------------------------
 public sealed class WorkerArchitectureGuardTests
 {
@@ -27,7 +27,7 @@ public sealed class WorkerArchitectureGuardTests
     [Fact]
     public void Worker_HasNoDirectPrivilegedWritePath()
     {
-        // No banned OS write-surface type is a direct Worker dependency.
+        // Aucun type de surface d'écriture OS interdite n'est une dépendance directe du Worker.
         foreach (var t in WorkerCtorParamTypes)
         {
             var full = t.FullName ?? t.Name;
@@ -41,8 +41,8 @@ public sealed class WorkerArchitectureGuardTests
             full.Should().NotContain("PowrProf",
                 "the Worker must never hold a direct power-plan P/Invoke dependency");
 
-            // The Worker must not even hold a generic elevated CLIENT directly: its write
-            // path is entirely INSIDE the reconciler graph. (Belt-and-suspenders.)
+            // Le Worker ne doit même pas tenir directement un client élevé générique : son chemin
+            // d'écriture est entièrement à l'intérieur du graphe du réconciliateur. (Ceinture et bretelles.)
             t.Should().NotBe(typeof(IElevatedClient),
                 "the elevated client is wired deep in the reconciler graph, not injected into the Worker");
         }
@@ -51,8 +51,8 @@ public sealed class WorkerArchitectureGuardTests
     [Fact]
     public void Worker_DependencySurface_IsTheExpectedReadCoordinateOnlySet()
     {
-        // Pin the surface so a future change that adds a write dependency trips this test
-        // (the set is deliberately small to keep T31 checkable).
+        // Figer la surface pour qu'un changement futur ajoutant une dépendance d'écriture fasse
+        // tomber ce test (l'ensemble est petit à dessein, pour rester vérifiable).
         WorkerCtorParamTypes.Should().BeEquivalentTo(new[]
         {
             typeof(SingleFlightReconcile),
@@ -67,7 +67,7 @@ public sealed class WorkerArchitectureGuardTests
     [Fact]
     public void Worker_ReferencesNoBannedWriteSurface_AcrossAllItsFields()
     {
-        // Deeper than the ctor: no Worker FIELD is a banned OS write-surface type either.
+        // Plus profond que le constructeur : aucun champ du Worker n'est non plus un type de surface d'écriture OS interdite.
         var fieldTypes = typeof(Worker)
             .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
             .Select(f => f.FieldType.FullName ?? f.FieldType.Name);

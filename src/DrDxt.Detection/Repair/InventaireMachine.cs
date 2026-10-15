@@ -8,7 +8,7 @@ namespace DrDxt.Detection.Repair;
 public sealed record ElementInstalle(string Famille, string Nom, string Version, string? Date = null);
 
 /// <summary>
-/// 03/10/2026 (tour H1, retour d'usage : « si je télécharge un truc qui casse tout, DrDXT doit le voir »). À chaque scan,
+/// À chaque scan,
 /// l'inventaire de ce qui peut casser une machine est relevé (logiciels, pilotes tiers, services tiers, programmes lancés au
 /// démarrage), gardé, et comparé au précédent : ce qui est apparu, a disparu ou a changé de version depuis le dernier scan
 /// est nommé, avec la date du scan de référence. Lecture seule.
@@ -18,7 +18,7 @@ public static class InventaireMachine
     public const string Domaine = "CHANGEMENTS";
     public const string Logiciels = "logiciels", Pilotes = "pilotes tiers", Services = "services tiers", Demarrage = "programmes au démarrage";
 
-    /// <param name="Lues">Les familles lues sans erreur. Revue R1 : une famille vide peut être lue (machine sans service
+    /// <param name="Lues">Les familles lues sans erreur. Une famille vide peut être lue (machine sans service
     /// tiers) ou illisible ; seule la lecture le sait. <c>null</c> dans un relevé d'avant ce champ.</param>
     public sealed record Releve(DateTimeOffset Quand, IReadOnlyList<ElementInstalle> Elements, IReadOnlyList<string>? Lues = null);
 
@@ -26,7 +26,7 @@ public static class InventaireMachine
     public static IReadOnlyList<(ElementInstalle? Avant, ElementInstalle? Apres)> Comparer(IReadOnlyList<ElementInstalle> avant, IReadOnlyList<ElementInstalle> apres)
     {
         static string Cle(ElementInstalle e) => e.Famille + "|" + e.Nom.ToLowerInvariant();
-        // Revue R1 : deux paquets du même nom (l'ancien pilote NVIDIA gardé à côté du nouveau) ne se réduisent plus au
+        // Deux paquets du même nom (l'ancien pilote NVIDIA gardé à côté du nouveau) ne se réduisent plus au
         // premier lu ; toutes leurs versions forment la version de l'entrée.
         static ElementInstalle Fusion(IGrouping<string, ElementInstalle> g) => g.First() with
         {
@@ -48,15 +48,14 @@ public static class InventaireMachine
     {
         if (precedent is null)
         {
-            var parFamille = string.Join(", ", actuel.Elements.GroupBy(e => e.Famille).Select(g => $"{g.Count()} {g.Key}"));
+            var parFamille = string.Join(", ", actuel.Elements.GroupBy(e => e.Famille).Select(g => $"{g.Count()} {Famille(g.Key)}"));
             yield return new RepairFinding(Domaine, "point de référence", null, null, RepairStatus.Observed,
-                $"premier relevé de ce qui est installé ({parFamille}) : à partir du prochain scan, DrDXT dira ce qui a été "
-                + "installé, retiré ou mis à jour entre les deux.");
+                Docteur.T("IM.Reference", parFamille));
             yield break;
         }
-        var depuis = $"depuis le scan du {precedent.Quand.ToLocalTime():dd/MM à HH:mm}";
-        // Revue C1 : une famille illisible d'un côté (pnputil absent ou trop lent, registre refusé) annoncerait « tout a
-        // disparu » ou « tout est apparu ». Seules les familles lues des deux côtés se comparent. Revue R1 : « lue » vient de
+        var depuis = Docteur.T("IM.Depuis", precedent.Quand.ToLocalTime());
+        // Une famille illisible d'un côté (pnputil absent ou trop lent, registre refusé) annoncerait « tout a
+        // disparu » ou « tout est apparu ». Seules les familles lues des deux côtés se comparent. « lue » vient de
         // la lecture, plus du nombre d'éléments ; un relevé ancien, sans ce champ, retombe sur « non vide ».
         static IEnumerable<string> LuesDe(Releve r) => r.Lues ?? r.Elements.Select(e => e.Famille).Distinct();
         var lues = LuesDe(precedent).Intersect(LuesDe(actuel)).ToHashSet();
@@ -68,17 +67,20 @@ public static class InventaireMachine
             var versions = famille.Where(e => e is { Avant: not null, Apres: not null })
                 .Select(e => $"{e.Apres!.Nom} {Ecart(e.Avant!.Version, e.Apres.Version)}").ToList();
             var parties = new List<string>();
-            if (ajouts.Count > 0) parties.Add("apparus : " + string.Join(", ", ajouts));
-            if (retraits.Count > 0) parties.Add("disparus : " + string.Join(", ", retraits));
-            if (versions.Count > 0) parties.Add("versions changées : " + string.Join(", ", versions));
-            yield return new RepairFinding(Domaine, $"{famille.Key} changés", $"{famille.Count()} changement(s)", null, RepairStatus.Observed,
-                $"{depuis} : {string.Join(" ; ", parties)}. Si un problème est apparu depuis, c'est une piste.");
+            if (ajouts.Count > 0) parties.Add(Docteur.T("IM.Apparus", string.Join(", ", ajouts)));
+            if (retraits.Count > 0) parties.Add(Docteur.T("IM.Disparus", string.Join(", ", retraits)));
+            if (versions.Count > 0) parties.Add(Docteur.T("IM.Versions", string.Join(", ", versions)));
+            yield return new RepairFinding(Domaine, Docteur.Nom("IM.NomChanges", Docteur.Nom("IM.Famille." + famille.Key)), Docteur.T("IM.Changements", famille.Count()),
+                null, RepairStatus.Observed, Docteur.T("IM.Explication", depuis, string.Join(Docteur.T("IM.Separateur"), parties)));
         }
     }
 
-    /// <summary>06/10/2026 : « A + B ⇒ A + B + C » se lisait comme un changement alors que C est ajoutée à côté (pilote gardé),
-    /// et un service mis à jour recopiait deux chemins entiers. Une version ajoutée ou retirée est dite comme telle ; un même
-    /// programme dans un autre dossier est dit sans les chemins.</summary>
+    /// <summary>Le nom affiché d'une famille ; la clé (« logiciels »…) reste celle du relevé enregistré.</summary>
+    private static string Famille(string cle) => Docteur.Chercher("IM.Famille." + cle) ?? cle;
+
+    /// <summary>Une version ajoutée ou retirée est dite comme telle : « A + B ⇒ A + B + C » passerait pour un changement
+    /// alors que C est ajoutée à côté (pilote gardé). Un même programme dans un autre dossier est dit sans les chemins,
+    /// qu'un service mis à jour recopierait en entier.</summary>
     internal static string Ecart(string avant, string apres)
     {
         static string[] Parts(string v) => v.Split(" + ", StringSplitOptions.RemoveEmptyEntries);
@@ -86,10 +88,10 @@ public static class InventaireMachine
         var b = Parts(apres);
         var ajoutees = b.Except(a, StringComparer.OrdinalIgnoreCase).ToList();
         var retirees = a.Except(b, StringComparer.OrdinalIgnoreCase).ToList();
-        if (retirees.Count == 0 && ajoutees.Count > 0) return $"+ {string.Join(" + ", ajoutees)} (à côté de {avant})";
-        if (ajoutees.Count == 0 && retirees.Count > 0) return $"− {string.Join(" − ", retirees)} (reste {apres})";
+        if (retirees.Count == 0 && ajoutees.Count > 0) return Docteur.T("IM.ACote", string.Join(" + ", ajoutees), avant);
+        if (ajoutees.Count == 0 && retirees.Count > 0) return Docteur.T("IM.Reste", string.Join(" − ", retirees), apres);
         if (Programme(avant) is { } pa && string.Equals(pa, Programme(apres), StringComparison.OrdinalIgnoreCase))
-            return $"mis à jour ({pa} a changé de dossier)";
+            return Docteur.T("IM.ChangeDossier", pa);
         return $"{avant} ⇒ {apres}";
     }
 
@@ -167,7 +169,7 @@ public static class InventaireMachine
             using var s = cle.OpenSubKey(nom);
             if (s?.GetValue("ImagePath") is not string image || string.IsNullOrWhiteSpace(image)) continue;
             var chemin = Environment.ExpandEnvironmentVariables(image.Trim().Trim('"'));
-            // Revue R1 : le dossier Windows lu, plus « C:\Windows » écrit en dur (Windows installé sur D:).
+            // Le dossier Windows lu, plus « C:\Windows » écrit en dur (Windows installé sur D:).
             if (chemin.StartsWith(windows, StringComparison.OrdinalIgnoreCase) || chemin.StartsWith(@"\SystemRoot", StringComparison.OrdinalIgnoreCase)
                 || chemin.StartsWith(@"System32\", StringComparison.OrdinalIgnoreCase) || chemin.StartsWith(@"\??\" + windows, StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -175,7 +177,7 @@ public static class InventaireMachine
         }
     }
 
-    // Revue F-10 : un seul lecteur des clés Run (celui du constat « programmes au démarrage »). Les clés Run seulement,
+    // Un seul lecteur des clés Run (celui du constat « programmes au démarrage »). Les clés Run seulement,
     // comme avant : y ajouter les dossiers Démarrage ferait voir de faux « nouveaux » au premier scan suivant.
     private static IEnumerable<ElementInstalle> ProgrammesAuDemarrage()
     {
@@ -184,7 +186,7 @@ public static class InventaireMachine
         return lu.Value!.Where(e => e.DansRun).Select(e => new ElementInstalle(Demarrage, e.Nom, e.Commande));
     }
 
-    /// <summary>04/10/2026 (plan 3b.1) : ce qui a changé depuis le dernier scan, relu sans garder l'actuel (le scan
+    /// <summary>Ce qui a changé depuis le dernier scan, relu sans garder l'actuel (le scan
     /// suivant le juge encore). Sans référence, rien : le point de référence est l'affaire du scan.</summary>
     public static IReadOnlyList<RepairFinding> Apercu(string fichier, Func<string, string> pnputil)
     {

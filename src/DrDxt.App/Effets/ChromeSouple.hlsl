@@ -1,12 +1,11 @@
-// Les huit liens de la bille vers les composants (cinq jusqu'au 10/10/2026 : latence, réseau et BIOS les ont rejoints). 08/10/2026 (le mainteneur) : « mi-ruban, mi ce qu'on a, et détaché du fond »,
-// puis « on voit le fond par-dessous le voile, faut pas » :
-//   - un tuyau de verre sombre et PLEIN : le fond ne passe jamais au travers ; bords clairs, un liseré de lumière ;
+// Les huit liens de la bille vers les composants, un ruban détaché du fond, sans que le fond se voie par-dessous :
+//   - un tuyau de verre sombre et plein : le fond ne passe jamais au travers ; bords clairs, un liseré de lumière ;
 //   - dedans, un ruban de chrome qui se vrille : sa largeur suit la torsion, des reflets nets coulent le long ;
 //   - dessous, une ombre douce qui le détache du chrome clair du fond.
 // Le tuyau et le ruban s'effilent vers leurs bouts au lieu de devenir transparents.
-// 08/10/2026 (critique) : corps presque noir, la lumière seulement sur le ruban et le liseré ; ils naissent sous la bille
+// Corps presque noir, la lumière seulement sur le ruban et le liseré ; ils naissent sous la bille
 // même réduite après le scan (0,12), et s'arrêtent avant le libellé du composant.
-// 08/10/2026 (le mainteneur : « processeur trop courte, GPU, Windows aussi, faut que ce soit cohérent ») : chaque tentacule vise
+// Chaque tentacule vise
 // l'icône de son composant (le pôle même, plus 0,25 plus bas) et s'y branche dans une douille de chrome : un disque de
 // verre noir à liseré clair, comme un câble dans son port. Le tuyau garde son épaisseur jusqu'à la douille.
 // Sortie en alpha prémultiplié. Compilé en ps_3_0 par Effets/compiler-shaders.ps1.
@@ -14,21 +13,21 @@ sampler2D Entree : register(s0);
 float Temps : register(c0);
 float4 Teinte : register(c1);  // la couleur du métal, pour le séparer du fond
 float Activite : register(c2); // 0 au repos, 1 pendant le scan : des influx de lumière remontent des composants vers la bille
-// 10/10/2026 (le mainteneur : « un effet par le dessous, mais maîtrisé ») : le composant sous la souris (-1 : aucun) et son
+// Le composant sous la souris (-1 : aucun) et son
 // éclat (0 à 1, monté en ~150 ms, descendu en ~250 ms par BranchesDeChrome) : sa douille et le bord de son tuyau s'allument.
 float Survol : register(c3);
 float Eclat : register(c4);
 // Les domaines déjà lus par le scan, un bit par composant (0 à 255) : la lueur de chacun s'allume à sa lecture.
 float Lus : register(c5);
 
-// Le canevas fait 760 x 720 (10/10/2026) : p va de -1 à 1 en largeur, de -0,947 à 0,947 en hauteur.
+// Le canevas fait 760 x 720 : p va de -1 à 1 en largeur, de -0,947 à 0,947 en hauteur.
 static const float Hauteur = 1.8947368;
 // Les pôles : RayonX et RayonY 0,37 de la vue, ramenés à p (aucune carte ne touche le bord, sinon elle se décale de sa douille).
 static const float2 Rayon = float2(.74, .66316);
 // Les tailles d'avant (canevas de 660) ramenées au nouveau : 660 / 760.
 static const float K = .868421;
 
-// 10/10/2026 : chaque carte est posée par son icône (PanneauOrbital.CentreIcone) : l'icône est SUR son pôle, avant comme
+// Chaque carte est posée par son icône (PanneauOrbital.CentreIcone) : l'icône est SUR son pôle, avant comme
 // après le scan. Plus de recalage mesuré à la main, qui se décalait dès que le texte d'une carte changeait de hauteur.
 
 float4 main(float2 uv : TEXCOORD) : COLOR
@@ -42,7 +41,7 @@ float4 main(float2 uv : TEXCOORD) : COLOR
         float longueur = length(cible);
         float2 axe = cible / longueur;
         float u = dot(p, axe), v = dot(p, float2(-axe.y, axe.x));
-        // 10/10/2026 (le mainteneur : « ronds autour des symboles, pas ouf ») : plus de douille ; la tentacule s'arrête au
+        // Plus de douille ; la tentacule s'arrête au
         // bord de l'icône (à ~17 px de son centre) au lieu d'entrer dans un anneau.
         float fin = longueur - .045;
         float s = saturate((u - .105) / (fin - .105));

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>Critique UI du 08/10 (25/40) : « 13 points à corriger » en haut, « 12 à corriger » en bas. Le titre compte tout,
+/// <summary>« 13 points à corriger » en haut, « 12 à corriger » en bas. Le titre compte tout,
 /// la phrase du bas l'audit de santé seul : elle le dit. La RAM ne renvoie plus « sous le titre « Mémoire » ».</summary>
 public sealed class PhraseDeLaSanteTests
 {

@@ -6,14 +6,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DrDxt.Profiles.Tests;
 
-// M6 — the HONESTY gate. Every profile must reference only real M2 catalog tweaks, must
-// cite a source for every claimed gain, and any numeric parameter must sit inside the M2
-// safety envelope. This is the permanent barrier against an invented/unsourced profile.
+// La porte d'honnêteté. Chaque profil ne doit référencer que de vrais leviers du catalogue, citer
+// une source pour chaque gain annoncé, et tout paramètre numérique doit tenir dans l'enveloppe
+// de sécurité. C'est la barrière permanente contre un profil inventé ou sans source.
 public sealed class ChipProfileCatalogProvenanceTests
 {
     private static readonly IChipProfileCatalog Catalog = new ChipProfileCatalog();
 
-    // The ids of the live M2 tweak catalog, resolved exactly as the app composes it.
+    // Les identifiants du catalogue de leviers vivant, résolus exactement comme l'application le compose.
     private static IReadOnlyCollection<string> RealCatalogTweakIds()
     {
         using var provider = new ServiceCollection().AddDrDxtApplication().BuildServiceProvider();
@@ -59,8 +59,8 @@ public sealed class ChipProfileCatalogProvenanceTests
     [Fact]
     public void Generic_profile_surfaces_the_ns1_os_tweaks()
     {
-        // NS-1: the cross-vendor OS/latency tweaks are recommended on every machine (their real
-        // effect is proven by the engine's A/B, never promised). They must ride the generic profile.
+        // Les leviers OS et latence communs aux constructeurs sont recommandés sur chaque machine (leur
+        // effet réel est prouvé par l'A/B du moteur, jamais promis). Ils doivent voyager avec le profil générique.
         Catalog.Generic.Selections.Select(s => s.TweakId).Should().Contain(new[]
         {
             "latency.hagsOn", "latency.gameModeOn",
@@ -79,7 +79,7 @@ public sealed class ChipProfileCatalogProvenanceTests
     [Fact]
     public void Foundation_profiles_are_untested_until_team_waves_validate_them()
     {
-        // Honest: grounded but not yet hardware-validated (cahier §10).
+        // Honnête : fondé mais pas encore validé sur le matériel.
         Catalog.All().Should().OnlyContain(p => p.Tested == false);
     }
 
@@ -91,12 +91,12 @@ public sealed class ChipProfileCatalogProvenanceTests
 
         var powerLimit = ParamValue(nvidia.Value!, "gpu.power_limit", "PowerLimitPct");
 
-        powerLimit.Should().Be(90);  // DECISION-undervolt Option A
-        // 08/10/2026 (V2) : plus de décalage d'horloge dans aucun profil (règle du 29/09).
+        powerLimit.Should().Be(90);
+        // Plus de décalage d'horloge dans aucun profil (règle de la carte).
         nvidia.Value!.Selections.Should().NotContain(s => s.TweakId == "gpu.undervolt");
 
-        // Cross-check against the real M2 safety envelope (no profile can request a value
-        // the apply layer would refuse).
+        // Recoupement avec la vraie enveloppe de sécurité (aucun profil ne peut demander une valeur
+        // que la couche d'application refuserait).
         GpuSafeBounds.IsPowerLimitSafe(powerLimit).Should().BeTrue();
     }
 

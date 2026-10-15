@@ -5,25 +5,25 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// HelperLauncher decision logic — unit-tested behind a process-launch seam and a
-// connect+handshake ATTEMPT seam (NO separate bare-connect liveness probe; FIX 1).
+// Logique de décision de HelperLauncher, testée derrière une couture de lancement de
+// processus et une couture de tentative connexion + négociation (pas de sonde de vie séparée).
 //
-// The real `runas` (UseShellExecute + Verb="runas") spawn is the untested live
-// edge (documented in HelperLauncher). These tests cover the branching:
-//   * already running (a handshake attempt succeeds first try)  -> REUSE, no launch
-//   * not running (connect fails)                               -> launch
-//   * launched then comes up within the deadline                -> Ok
-//   * launched but never comes up before the deadline           -> HELPER_UNREACHABLE
-//   * a live pipe that REJECTS the handshake (auth/protocol)     -> fail, no launch
-//   * UAC declined                                              -> ELEVATION_DECLINED
+// Le vrai lancement `runas` (UseShellExecute + Verb="runas") est le bord vivant non testé
+// (documenté dans HelperLauncher). Ces tests couvrent les branches :
+//   * déjà lancé (une tentative de négociation réussit du premier coup) → réutiliser, pas de lancement
+//   * pas lancé (la connexion échoue)                                  → lancer
+//   * lancé puis joignable avant l'échéance                            → Ok
+//   * lancé mais jamais joignable avant l'échéance                     → HELPER_UNREACHABLE
+//   * un tube vivant qui refuse la négociation (authentification/protocole) → échec, pas de lancement
+//   * UAC refusé                                                        → ELEVATION_DECLINED
 //
-// There is exactly ONE accept per attempt: the attempt seam does a COMPLETE
-// connect+handshake (no truncated, probe-consumed slot, no pipe re-creation race).
+// Il y a exactement un accept par tentative : la couture fait une connexion + négociation
+// complète (pas de créneau consommé par une sonde, pas de course à la recréation du tube).
 // -----------------------------------------------------------------------
 public sealed class HelperLauncherTests
 {
-    // Records launch attempts and lets a test script the outcome. Optionally flips
-    // the attempt seam to "connectable" on launch (the helper comes up after spawn).
+    // Enregistre les tentatives de lancement et laisse un test en scénariser l'issue. Peut
+    // rendre la couture de tentative « connectable » au lancement (le helper monte après le spawn).
     private sealed class FakeProcessLauncher : IHelperProcessLauncher
     {
         public int LaunchCount { get; private set; }
@@ -45,9 +45,9 @@ public sealed class HelperLauncherTests
         public HelperLaunchSpec? LastSpec { get; private set; }
     }
 
-    // A connect+handshake attempt whose outcome the test controls. It can flip from
-    // "connect fails" to a launched-state outcome after a launch, simulating the
-    // helper's pipe coming up.
+    // Tentative connexion + négociation dont le test contrôle l'issue. Elle peut passer de
+    // « la connexion échoue » à l'issue d'après lancement, pour simuler le tube du helper
+    // qui monte.
     private sealed class FakeAttempt : IHelperHandshakeAttempt
     {
         private HelperAttemptOutcome _current;
@@ -73,13 +73,13 @@ public sealed class HelperLauncherTests
             @"C:\Program Files\DrDXT\DrDxt.App.exe",
             "DrDXT.Elevated");
 
-    // --- not running (connect fails) -> launch happens, comes up -> Ok ---
+    // --- pas lancé (la connexion échoue) → le lancement a lieu, le helper monte → Ok ---
     [Fact]
     public async Task Launches_when_helper_not_running()
     {
         var attempt = new FakeAttempt(
             HelperAttemptOutcome.ConnectFailed, afterLaunch: HelperAttemptOutcome.Connected);
-        var launcher = new FakeProcessLauncher(markAlive: attempt); // helper comes up on launch
+        var launcher = new FakeProcessLauncher(markAlive: attempt); // le helper monte au lancement
         var sut = new HelperLauncher(launcher, attempt);
 
         var r = await sut.EnsureRunningAsync(Spec(), default, postLaunchWaitMs: 500, pollIntervalMs: 10);
@@ -89,7 +89,7 @@ public sealed class HelperLauncherTests
         launcher.LastSpec.Should().Be(Spec());
     }
 
-    // --- already running (handshake succeeds first try) -> reuse, NO launch ---
+    // --- déjà lancé (la négociation réussit du premier coup) → réutiliser, pas de lancement ---
     [Fact]
     public async Task Reuses_when_helper_already_running()
     {
@@ -100,11 +100,11 @@ public sealed class HelperLauncherTests
         var r = await sut.EnsureRunningAsync(Spec(), default);
 
         r.IsOk.Should().BeTrue();
-        launcher.LaunchCount.Should().Be(0); // reused, never spawned
+        launcher.LaunchCount.Should().Be(0); // réutilisé, jamais lancé
         attempt.Calls.Should().Be(1, "reuse is detected by ONE successful handshake, not a bare probe");
     }
 
-    // --- UAC declined -> clean Fail(ELEVATION_DECLINED), no throw ---
+    // --- UAC refusé → Fail(ELEVATION_DECLINED) propre, pas d'exception ---
     [Fact]
     public async Task Fails_clean_when_uac_declined()
     {
@@ -120,7 +120,7 @@ public sealed class HelperLauncherTests
         launcher.LaunchCount.Should().Be(1);
     }
 
-    // --- launch succeeds but the helper never comes up -> HELPER_UNREACHABLE ---
+    // --- le lancement réussit mais le helper ne monte jamais → HELPER_UNREACHABLE ---
     [Fact]
     public async Task Fails_unreachable_when_launch_ok_but_helper_never_comes_up()
     {
@@ -135,9 +135,9 @@ public sealed class HelperLauncherTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperUnreachable);
     }
 
-    // --- a live pipe that REJECTS the handshake (auth/protocol) -> fail, NO launch.
-    //     A hostile/mismatched helper is already up; we must not spawn a 2nd elevated
-    //     process onto it, and we must not spin retrying an auth denial. ---
+    // --- un tube vivant qui refuse la négociation (authentification/protocole) → échec, pas de lancement.
+    //     Un helper hostile ou dépareillé tourne déjà ; on ne lance pas un second processus
+    //     élevé par-dessus, et on ne boucle pas sur un refus d'authentification. ---
     [Fact]
     public async Task Live_pipe_that_rejects_handshake_fails_without_launching()
     {
@@ -152,7 +152,7 @@ public sealed class HelperLauncherTests
         launcher.LaunchCount.Should().Be(0, "a live but rejecting pipe must not trigger another elevation");
     }
 
-    // --- launch ok and the helper comes up shortly after -> Ok ---
+    // --- lancement ok et le helper monte peu après → Ok ---
     [Fact]
     public async Task Ok_when_helper_becomes_live_after_launch()
     {
@@ -177,7 +177,7 @@ public sealed class HelperLauncherTests
         }
     }
 
-    // --- a null/empty helper path is rejected fail-clean (no spawn) ---
+    // --- un chemin de helper nul ou vide est refusé proprement (pas de spawn) ---
     [Fact]
     public async Task Rejects_empty_helper_path()
     {
@@ -192,12 +192,12 @@ public sealed class HelperLauncherTests
         launcher.LaunchCount.Should().Be(0);
     }
 
-    // --- a post-launch handshake REJECTION fails immediately (no spin to deadline) ---
+    // --- un refus de négociation après lancement échoue aussitôt (pas de boucle jusqu'à l'échéance) ---
     [Fact]
     public async Task Post_launch_handshake_rejection_fails_fast()
     {
         var launcher = new FakeProcessLauncher(Result.Ok());
-        // Connect fails first (so we launch), then a server comes up that REJECTS us.
+        // La connexion échoue d'abord (donc on lance), puis un serveur monte et nous refuse.
         var attempt = new FakeAttempt(
             HelperAttemptOutcome.ConnectFailed, afterLaunch: HelperAttemptOutcome.HandshakeRejected);
         var launcherThatMarks = new MarkingLauncher2(attempt, launcher);
@@ -209,8 +209,8 @@ public sealed class HelperLauncherTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.ElevationDenied);
     }
 
-    // Marks the attempt as "launched" AND forwards the launch to a real fake launcher
-    // so LaunchCount is tracked.
+    // Marque la tentative « lancée » et transmet le lancement au faux lanceur réel,
+    // pour que LaunchCount soit suivi.
     private sealed class MarkingLauncher2 : IHelperProcessLauncher
     {
         private readonly FakeAttempt _attempt;

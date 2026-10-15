@@ -1,13 +1,13 @@
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// Anti-replay nonce tracker.
+// Suivi des nonces anti-rejeu.
 //
-// SECURITY: a valid (correctly-HMAC'd) request must not be replayable. Each
-// request carries a unique nonce; the server records seen nonces and rejects
-// any repeat fail-closed. Thread-safe so a future concurrent accept loop is
-// safe. M0 keeps an unbounded in-memory set (sessions are short-lived); M2
-// can bound it / window it by time when the helper becomes long-running.
+// Sécurité : une requête valide (au HMAC correct) ne doit pas pouvoir être rejouée. Chaque
+// requête porte un nonce unique ; le serveur enregistre les nonces vus et rejette toute
+// répétition (fail-closed). Thread-safe, pour qu'une future boucle d'acceptation concurrente
+// soit sûre. Il garde un ensemble en mémoire sans borne (les sessions sont courtes) ; une version
+// ultérieure pourra le borner ou le fenêtrer dans le temps quand le helper tournera longtemps.
 // -----------------------------------------------------------------------
 public sealed class NonceTracker
 {
@@ -15,10 +15,10 @@ public sealed class NonceTracker
     private readonly object _gate = new();
 
     /// <summary>
-    /// Atomically records the nonce. Returns true if it was fresh (accept),
-    /// false if it was already seen (replay → reject). An empty/whitespace
-    /// nonce is treated as a replay (never fresh) so a missing nonce can never
-    /// pass the anti-replay check.
+    /// Enregistre le nonce de façon atomique. Rend true s'il était neuf (accepter),
+    /// false s'il était déjà vu (rejeu → rejeter). Un nonce vide ou blanc est traité
+    /// comme un rejeu (jamais neuf) pour qu'un nonce absent ne passe jamais la
+    /// vérification anti-rejeu.
     /// </summary>
     public bool TryRegister(string nonce)
     {

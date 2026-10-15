@@ -6,8 +6,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// RAPPORT-FINAL (09/10/2026, le mainteneur : « si vraiment pas possible on sort un rapport final avec tout ce qui doit
-/// être fait à la main, étape par étape »). Le docteur dit des choses que DrDXT n'écrit pas (BIOS, câbles, réglages du
+/// Ce que DrDXT ne peut pas faire sort en rapport final, étape par étape. Le docteur dit des choses que DrDXT n'écrit pas (BIOS, câbles, réglages du
 /// jeu, disques) : chacune doit avoir son étape dans docs/A-FAIRE-A-LA-MAIN.md, sinon le joueur lit un constat sans
 /// geste. La garde relie chaque fichier qui émet une recommandation, et chaque réglage de firmware que DrDXT guide, à
 /// une phrase du guide. Un nouveau conseil sans étape fait échouer ce test : c'est voulu.
@@ -35,11 +34,16 @@ public sealed class ChaqueConseilDuDocteurASonEtapeTests
         ["MemoireSaturee.cs"] = "Mémoire saturée (PC de bureau comme PC de jeu)",
         ["LimiteDePuissance.cs"] = "Limite de puissance du processeur (Intel)",
         ["ChaleurEnPartie.cs"] = "Trop chaud en partie",
+        ["UsureBatterie.cs"] = "Batterie usée (portable)",
+        ["VentilateursEnPartie.cs"] = "Ventilateur qui s'arrête ou ne tourne plus",
+        ["CarteChaudeEnPartie.cs"] = "Carte graphique freinée par la chaleur",
+        ["TestDeRefroidissement.cs"] = "Le test de refroidissement de DrDXT",
         ["HeuresActives.cs"] = "hors de tes heures d'activité",
         ["JeuxSurDisqueDur.cs"] = "Jeux sur un disque dur",
         ["MicrocodeRaptorLake.cs"] = "microcode antérieur au correctif",
         ["EcranBride.cs"] = "écran bridé",
         ["ReglagesCod.cs"] = "Reflex : « Activé »",
+        ["ReglagesUnreal.cs"] = "Éclairage global et reflets (jeux Unreal Engine 5",
         ["BranchementDeLaCarte.cs"] = "Lien PCIe de la carte graphique",
         ["EnregistrementNvidia.cs"] = "Instant Replay",
         ["MagasinDePilotes.cs"] = "pnputil /delete-driver",

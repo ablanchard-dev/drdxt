@@ -4,12 +4,11 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// Les lignes du scan qui n'affichaient qu'un nombre ou un code, et ce qu'elles disent maintenant,
-/// chaque fois d'après une page Microsoft relue.
+/// Les lignes du scan disent en mots ce qu'un nombre ou un code ne dit pas, chaque fois d'après une
+/// page Microsoft relue.
 ///
-/// 24/09/2026 : « Mode de boost : 2 » ne disait rien. La table vient de learn.microsoft.com
-/// (PERFBOOSTMODE) : 3 = 1, 4 = 2, et 2 n'est « agressif » qu'en CPPC non autonome. Une première
-/// table écrite de mémoire disait « agressif » partout, et inventait 5 et 6.
+/// « Mode de boost : 2 » ne dit rien. La table vient de learn.microsoft.com (PERFBOOSTMODE) : 3 = 1,
+/// 4 = 2, et 2 n'est « agressif » qu'en CPPC non autonome ; pas de valeurs 5 ou 6.
 /// </summary>
 public sealed class LignesDuScanLisiblesTests
 {
@@ -27,7 +26,7 @@ public sealed class LignesDuScanLisiblesTests
     public void La_preference_energie_performance_dit_son_sens()
         => RepairAuditService.Lisible("preference energie/perf", 5, "").Should().Be("5 (0 = performance, 100 = économie)");
 
-    // 24/09/2026, Bug Check 0x144 (Microsoft) : 0x1009 = commande xHCI non aboutie après abandon.
+    // Bug Check 0x144 (Microsoft) : 0x1009 = commande xHCI non aboutie après abandon.
     [Fact]
     public void Un_incident_USB3_0x1009_dit_sa_cause_publiee()
         => RepairAuditService.CauseUsb3(0x144, "1009").Should()
@@ -55,7 +54,7 @@ public sealed class LignesDuScanLisiblesTests
     public void La_famille_USB3_entre_dans_la_valeur_affichee(uint code, string p, string attendu)
         => RepairAuditService.FamilleUsb3(code, p).Should().Be(attendu);
 
-    // 29/09/2026, photo (processeur) : « Minimum processeur : 100% ». En français l'unité se sépare du nombre ;
+    // Photo (processeur) : « Minimum processeur : 100% ». En français l'unité se sépare du nombre ;
     // le reste de l'écran écrit déjà « 0 % », « 30,0 % ».
     [Fact]
     public void Les_autres_reglages_gardent_leur_unite_separee_du_nombre()

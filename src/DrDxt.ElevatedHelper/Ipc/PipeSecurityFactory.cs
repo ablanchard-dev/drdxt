@@ -6,30 +6,30 @@ using System.Security.Principal;
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// Restrictive named-pipe ACL factory.
+// Fabrique d'ACL restrictive pour le pipe nommé.
 //
-// SECURITY (master plan §9.13):
-//   * The pipe is created with PipeOptions.FirstPipeInstance so a squatter
-//     cannot pre-create the name and impersonate the server. If the name is
-//     already taken, creation fails loudly rather than silently sharing.
-//   * The DACL grants pipe access only to: the creating user, the local
-//     Administrators group, and SYSTEM. Everyone else is implicitly denied
-//     (no Everyone/Authenticated-Users ACE). The ACL is *protected* so it
-//     does not inherit a looser parent ACL.
-// Windows-only by construction (net8.0-windows).
+// Sécurité :
+//   * Le pipe est créé avec PipeOptions.FirstPipeInstance pour qu'un squatteur ne puisse pas
+//     créer le nom à l'avance et se faire passer pour le serveur. Si le nom est déjà pris, la
+//     création échoue bruyamment au lieu de partager en silence.
+//   * La DACL n'accorde l'accès au pipe qu'à : l'utilisateur créateur, le groupe local
+//     Administrateurs et SYSTEM. Tous les autres sont refusés implicitement (aucune ACE
+//     Everyone/Authenticated-Users). L'ACL est *protégée* : elle n'hérite pas d'une ACL parente
+//     plus lâche.
+// Windows seulement par construction (net8.0-windows).
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class PipeSecurityFactory
 {
     public const string DefaultPipeName = "DrDXT.Elevated";
 
-    /// <summary>Builds a restrictive <see cref="PipeSecurity"/> granting full
-    /// control to the current user, Administrators and SYSTEM only.</summary>
+    /// <summary>Construit un <see cref="PipeSecurity"/> restrictif qui n'accorde le contrôle
+    /// total qu'à l'utilisateur courant, aux Administrateurs et à SYSTEM.</summary>
     public static PipeSecurity CreateRestrictiveSecurity()
     {
         var security = new PipeSecurity();
 
-        // Start from an empty, protected DACL (no inherited ACEs).
+        // Partir d'une DACL vide et protégée (aucune ACE héritée).
         security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
 
         var currentUser = WindowsIdentity.GetCurrent().User
@@ -44,9 +44,9 @@ public static class PipeSecurityFactory
         security.AddAccessRule(new PipeAccessRule(
             system, PipeAccessRights.FullControl, AccessControlType.Allow));
 
-        // 26/09/2026 : .NET ne pose pas PIPE_REJECT_REMOTE_CLIENTS (NamedPipeServerStream.Windows.cs,
+        // .NET ne pose pas PIPE_REJECT_REMOTE_CLIENTS (NamedPipeServerStream.Windows.cs,
         // dotnet/runtime), et PipeOptions ne l'expose pas. Une session reseau qui passe les regles
-        // ci-dessus (meme compte, ou un administrateur, par SMB) atteignait donc le tube. Le refus
+        // ci-dessus (meme compte, ou un administrateur, par SMB) atteindrait donc le tube. Le refus
         // NETWORK est l'equivalent documente ; un refus passe avant les autorisations. Le local n'en
         // porte pas le SID : la connexion de l'appli reste permise (LeTubeDuHelperRefuseLeReseauTests).
         security.AddAccessRule(new PipeAccessRule(
@@ -56,7 +56,7 @@ public static class PipeSecurityFactory
         return security;
     }
 
-    /// <summary>Creates the ACL'd, single-instance server pipe stream.</summary>
+    /// <summary>Crée le flux de pipe serveur à instance unique, protégé par ACL.</summary>
     public static NamedPipeServerStream CreateServerStream(string pipeName)
     {
         var security = CreateRestrictiveSecurity();

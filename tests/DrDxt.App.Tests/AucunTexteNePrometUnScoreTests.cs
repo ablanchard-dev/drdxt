@@ -8,37 +8,33 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Le score a quitte la vitrine le 05/09 : son plancher mathematique
-// etait 47, il ne pouvait donc pas dire « cette machine est mal reglee ». Ce que
-// le produit affirme depuis : N a corriger sur M lus, plus K non lus — trois
+// Le produit n'affiche pas de score : un score a plancher mathematique (47) ne peut pas dire
+// « cette machine est mal reglee ». Il affirme N a corriger sur M lus, plus K non lus : trois
 // entiers, tous des faits de lecture.
 //
-// Mesure du jour : deux chaines de score survivaient dans les ressources, et
-// **l'une d'elles etait encore affichee**. Quand l'analyse echouait, le client
-// lisait « Impossible de calculer ton score » — on lui refusait quelque chose que
-// le produit ne fait plus. Le contrat du depot le dit deja des mots : ce qui
-// ordonne encore un score le fait revenir a la premiere session distraite. Une
-// ressource le fait revenir aussi surement qu'un contrat.
+// Ce test garde les ressources : une chaine de score restee dans un resx finirait affichee
+// (« Impossible de calculer ton score » quand l'analyse echoue), et refuserait au client quelque
+// chose que le produit ne fait pas.
 // -----------------------------------------------------------------------
 public sealed class AucunTexteNePrometUnScoreTests
 {
     // -------------------------------------------------------------------
-    // 18/09/2026, deuxieme surface. Le contrat du depot previent : « un contrat qui
+    // Deuxieme surface. Le contrat du depot previent : « un contrat qui
     // ordonne encore un score le fait revenir a la premiere session distraite ».
     //
     // Le cahier des charges porte bien une note de revision qui enterre le score --
     // mais elle vise nommement « les points 3 et 4 ». Deux autres passages
-    // ordonnaient le meme score au client, §11 du cahier et le brief de recherche,
+    // ordonnaient le meme score au client, le cahier des charges et une note de recherche,
     // sans aucune marque. Un lecteur qui tombe dessus sans lire jusqu'a la note lit
     // une instruction vivante.
     //
-    // On ne REECRIT pas ces documents : le cahier le dit lui-meme, « ce qu'il disait
-    // a ete vrai, et savoir ce qu'on a cru compte autant que savoir ce qu'on sait ».
+    // On ne reecrit pas ces documents : le cahier le dit lui-meme, savoir ce qu'on a cru
+    // compte autant que savoir ce qu'on sait.
     // On exige seulement que chaque mention porte sa marque.
     // -------------------------------------------------------------------
-    // 27/09/2026 : le brief de recherche a quitte le depot (synthese de travail, pas de la doc) ; le
+    // La note de recherche a quitte le depot (synthese de travail, pas de la doc) ; le
     // cahier seul porte cinq mentions, le temoin ci-dessous reste au-dessus de son seuil.
-    // 08/10/2026 (PUB2) : le cahier reste dans le dépôt privé ; la copie publique (tools/copie_publique.py) ne l'a pas, et
+    // Le cahier reste dans le dépôt privé ; la copie publique (tools/copie_publique.py) ne l'a pas, et
     // ce garde n'y a rien à garder.
     private static readonly string[] DocumentsDeReference =
         new[] { @"docs\CAHIER-DES-CHARGES.md" }.Where(d => File.Exists(Path.Combine(Racine().FullName, d))).ToArray();

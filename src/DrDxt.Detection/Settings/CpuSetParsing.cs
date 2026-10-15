@@ -3,11 +3,11 @@ namespace DrDxt.Detection.Settings;
 /// <summary>
 /// Décodage du tampon rendu par <c>GetSystemCpuSetInformation</c> (kernel32, Windows 10+).
 ///
-/// Pourquoi ce fichier existe : le lecteur de cœurs parqués était un bouchon qui rendait
-/// <b>toujours</b> une liste vide, avec un TODO. Deux consommateurs en tiraient des conclusions
-/// opposées — le barème lisait « aucun parking, machine saine » et laissait deux leviers muets,
-/// pendant que l'heuristique X3D lisait « rien n'est parqué, donc l'optimiseur ne route pas » et
-/// faisait proposer une <b>écriture</b> sur toute machine X3D bi-CCD, saines comprises.
+/// Pourquoi ce fichier existe : un lecteur de cœurs parqués qui rendrait <b>toujours</b> une
+/// liste vide ferait tirer à deux consommateurs des conclusions opposées : le barème lirait
+/// « aucun parking, machine saine » et laisserait deux leviers muets, pendant que l'heuristique
+/// X3D lirait « rien n'est parqué, donc l'optimiseur ne route pas » et ferait proposer une
+/// <b>écriture</b> sur toute machine X3D bi-CCD, saines comprises.
 ///
 /// Choix du mécanisme : l'API CPU Sets est documentée, en espace utilisateur, sans élévation et
 /// <b>sans dépendance nouvelle</b>. Le compteur de performance « Parking Status » existe aussi
@@ -47,7 +47,7 @@ internal static class CpuSetParsing
     ///
     /// Windows parque des cœurs entiers : un seul jumeau SMT parqué n'est pas un cœur parqué, et
     /// l'annoncer ferait conclure à un symptôme qui n'existe pas. La liste vide est un résultat
-    /// — « lu, aucun cœur parqué » — et jamais un échec de lecture, que l'appelant exprime par
+    /// (« lu, aucun cœur parqué ») et jamais un échec de lecture, que l'appelant exprime par
     /// <c>null</c>.
     /// </summary>
     /// <param name="buffer">Le tampon natif copié.</param>

@@ -1,182 +1,230 @@
-# DrDXT
+<p align="center">
+  <img src="docs/images/banniere.png" alt="DrDXT, the honest PC optimizer for gamers" width="100%">
+</p>
 
-English version: [README.en.md](README.en.md).
+<p align="center">
+  <a href="https://github.com/ablanchard-dev/drdxt/releases"><img alt="Download the Windows installer" src="https://img.shields.io/badge/download-Windows%20installer-3DF5FF?style=flat-square&labelColor=06070A"></a>
+  <a href="LICENSE"><img alt="License GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-8B5CFF?style=flat-square&labelColor=06070A"></a>
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-FF4FD8?style=flat-square&labelColor=06070A">
+  <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-FFB547?style=flat-square&labelColor=06070A">
+</p>
 
-Un optimiseur PC gaming pour Windows. Gratuit, libre, et honnête : il ne promet rien qu'il n'ait mesuré.
+<p align="center">
+  <a href="https://github.com/ablanchard-dev/drdxt/releases"><b>Download</b></a> ·
+  <a href="#what-it-does">What it does</a> ·
+  <a href="#contributing">Contributing</a> ·
+  <a href="docs/COUVERTURE.md">What is proven</a> ·
+  <a href="README.fr.md">Français</a>
+</p>
 
-DrDXT lit ta machine, te dit ce qui te coûte des images, et pose seulement des réglages qu'il sait défaire. Chaque
-réglage est jugé sur tes vraies parties : gardé s'il apporte quelque chose, rendu sinon. Si ta machine est déjà bien
-réglée, il te le dit aussi.
+A PC gaming optimizer for Windows. Free, open source, and honest: it promises nothing it has not measured.
 
-## Ce qu'il fait
+DrDXT reads your machine, tells you what is costing you frames, and only applies settings it knows how to undo. Every
+setting is judged on your real matches: kept if it brings something, reverted otherwise. If your machine is already
+well set up, it tells you that too.
 
-- **Un scan** lit ton processeur, ta carte graphique, ta mémoire, ton stockage, Windows, le réseau et le BIOS. Rien n'est
-  écrit à ce stade.
-- **Un docteur par domaine** explique chaque point : ce qui a été lu, ce qui pose problème, ce que DrDXT peut faire, et
-  ce qui se fait à la main (BIOS, câbles, réglages du jeu), étape par étape.
-- **Optimiser** pose les réglages utiles, un par un, après un point de restauration. **Essayer en alternance** compare
-  un réglage sur tes parties, une sur deux, et tranche au bout de six.
-- **Tes parties** sont relevées en arrière-plan : images par seconde, 1 % les plus lentes, ce qui limitait, programmes
-  ouverts à côté. C'est la seule preuve que DrDXT accepte.
-- **Le mode Expert** ouvre la fréquence et le ventilateur de la carte graphique, sur ton accord, avec test de stabilité
-  et retour automatique.
-- **Vérifier DrDXT sur mon PC** pose chaque réglage, le relit, le rend et le relit encore, puis écrit un rapport sans
-  rien qui te désigne. C'est ainsi que ton matériel entre dans ce que DrDXT sait prouver.
+<p align="center">
+  <img src="docs/images/accueil-en.png" alt="DrDXT home screen: the machine read domain by domain around the chrome sphere" width="100%">
+</p>
+<p align="center">
+  <img src="docs/images/memoire-en.png" alt="The memory domain: what was measured, what was found, what DrDXT can do" width="49%">
+  <img src="docs/images/graphique-en.png" alt="The graphics card domain, with the expert mode folded" width="49%">
+</p>
 
-## Où en est le projet
+The app speaks English and French. [CONTRIBUTING.md](CONTRIBUTING.md), [PRIVACY.md](PRIVACY.md) and
+[SECURITY.md](SECURITY.md) are in English; the technical documents under `docs/` are in French.
 
-Version 0.9, utilisable aujourd'hui. Le scan, le docteur, le relevé de tes parties, Optimiser, l'essai en alternance et
-le retour arrière de chaque réglage tournent sur de vrais PC, et chaque réglage a été posé, relu et rendu sur une vraie
-machine avant d'être proposé.
+## What it does
 
-Des joueurs ont déjà utilisé une version dérivée d'une partie de DrDXT, préparée par un proche du projet. Certains
-rapportent une latence stable autour de 10 ms, d'autres 30 à 50 images par seconde de plus. Ces chiffres viennent d'eux :
-DrDXT ne les a pas encore mesurés lui-même, et on ne sait pas encore ce que cette version fait de plus. C'est exactement
-ce que l'essai en alternance et les rapports de vérification servent à établir, PC par PC.
+- **A scan** reads your processor, graphics card, memory, storage, Windows, network and BIOS. Nothing is written at
+  this point.
+- **A doctor per domain** explains each point: what was read, what is wrong, what DrDXT can do, and what has to be done
+  by hand (BIOS, cables, in-game settings). When a point has a fix, it reads apart under **How to fix**, in numbered
+  steps that name what was read on your machine: the app, the value, the path.
+- **Optimize** applies the useful settings one by one, after a restore point. **Try it every other game** compares one setting
+  across your matches, every other match, and decides after six.
+- **Your matches** are recorded in the background: frames per second, the slowest 1 %, what was the bottleneck, which
+  programs were open alongside. This is the only proof DrDXT accepts. The game is found on its own, full screen or
+  borderless, and the most played ones even windowed; launchers, Discord and maximized desktop apps are left aside.
+- **Your machine's history** puts matches, shutdowns or errors, and changes on one timeline, with each match's frames per second
+  under the game's name.
+- **Unreal Engine 5 games**: DrDXT reads the global illumination and reflections settings (Lumen) and, from what
+  slowed your last matches of that game, says whether lowering them is worth trying. It is advice: the setting is
+  changed in the game, by you.
+- **Expert mode** opens the graphics card's clock offset and fan speed, with your consent, with a stability test and
+  automatic rollback.
+- **Find my undervolt** (Intel) lowers the processor voltage step by step, with a load test at each step and an
+  automatic return to the original value. The stable value is then yours to write in the BIOS, guided step by step.
+- **Check DrDXT on my PC** applies each setting, reads it back, reverts it and reads it again, then writes a report
+  with nothing that identifies you. This is how your hardware enters what DrDXT can prove.
 
-Ce qui reste à prouver : un gain mesuré par DrDXT sur des parties, et les cartes AMD, Intel Arc, les portables à deux
-cartes et les consoles portables, prévus dans le code mais testés seulement sur des machines reconstituées.
-[docs/COUVERTURE.md](docs/COUVERTURE.md) dit, réglage par réglage, ce qui est prouvé, à prouver, ou absent de ton matériel.
+## The five invariants
 
-## Installer
+Five rules hold the code, and each comes from a real failure:
 
-1. Télécharge `DrDXT-Setup-NON-SIGNE.exe` dans la dernière [Release](https://github.com/ablanchard-dev/drdxt/releases).
-   Son empreinte SHA-256 est dans la page ; `Get-FileHash` dans PowerShell la recalcule.
-2. L'installeur n'est pas encore signé : Windows affiche « Windows a protégé votre ordinateur ». Clique « Informations
-   complémentaires », puis « Exécuter quand même ».
-3. Deux cases : un raccourci sur le Bureau, et le service `DrDxtReconciler`, décoché par défaut, qui réapplique au
-   démarrage de Windows les réglages que tu as gardés.
-4. Au premier lancement, « Lancer le scan » lit la machine sans rien écrire. Rien n'est posé avant que tu cliques
-   « Optimiser » ou « Essayer en alternance », et chaque réglage se défait depuis « Ce que DrDXT a posé ».
-5. Désinstaller : Paramètres, Applications, DrDXT. Le désinstalleur rend d'abord les réglages qu'il connaît, puis retire
-   les fichiers. Restent `%LOCALAPPDATA%\DrDXT` (tes relevés) et `%ProgramData%\DrDxt` (ses rapports), à supprimer à la
-   main si tu veux repartir de zéro.
+- **Proven, never claimed.** A gain is shown only above the noise of the measurement. "No measurable gain" is a valid
+  answer, and often the right one.
+- **Surgical.** No service disabled, no Windows debloat, no bolted-on script. What requires the BIOS stays a guide.
+- **Reversible.** Original value read before any write, rollback tested, restore point.
+- **Honest about unavailability.** A setting that does not apply says which one and why.
+- **Permanent blacklist.** The optimization myths (Nagle, `NetworkThrottlingIndex`, 8,000 Hz polling, realtime
+  priority, C-states disabled wholesale) are refused by a test that breaks if one of them enters the catalog.
 
-Windows 10 ou 11, 64 bits, sur un **compte administrateur** : c'est lui qui donne son accord à chaque réglage. Sur un
-compte standard, Windows demanderait le mot de passe d'un administrateur et les réglages iraient dans son profil : ce
-n'est pas prévu. Aucun .NET à installer, tout est dans l'installeur.
+## Where the project stands
 
-## Participer
+Version 0.9, usable today. The scan, the doctor, match recording, Optimize, the every-other-game trial and the rollback
+of every setting run on real PCs, and every setting was applied, read back and restored on a real machine before
+being offered.
 
-L'aide la plus utile ne demande pas de savoir coder :
+Players have already used a version derived from part of DrDXT, prepared by someone close to the project. Some report
+a latency steady around 10 ms, others 30 to 50 more frames per second. These figures come from them: DrDXT has not
+measured them itself yet, and what that version does on top is not known yet. That is exactly what the
+every-other-game trial and the verification reports are for, PC by PC.
 
-- **Vérifier DrDXT sur ton PC**, puis glisser le rapport dans un ticket « Rapport de vérification ».
-- **Sans installer DrDXT** : les zips de la [Release](https://github.com/ablanchard-dev/drdxt/releases) lisent ton PC,
-  ou font la même vérification, et écrivent le même rapport.
-- **Signaler un bug**, ou proposer du code : [CONTRIBUTING.md](CONTRIBUTING.md). Une faille de sécurité se signale
-  en privé : [SECURITY.md](SECURITY.md).
+Still to prove: a gain measured by DrDXT over matches, and AMD cards, Intel Arc, dual-GPU laptops and handhelds,
+covered in the code but tested only on reconstructed machines. [docs/COUVERTURE.md](docs/COUVERTURE.md) says, setting
+by setting, what is proven, what is still to prove, and what is absent from your hardware.
 
-## Ce que DrDXT écrit sur ta machine
+## Install
 
-Tout réglage passe par un programme élevé séparé, le helper, qui refuse ce qui n'est pas dans sa liste. Chaque écriture
-lit d'abord la valeur d'origine et sait la rendre. La liste, en entier :
+1. Download `DrDXT-Setup-NON-SIGNE.exe` from the latest [Release](https://github.com/ablanchard-dev/drdxt/releases).
+   Its SHA-256 is on the page; `Get-FileHash` in PowerShell recomputes it.
+2. The installer is not signed yet: Windows shows "Windows protected your PC". Click "More info", then "Run anyway".
+3. Two checkboxes: a Desktop shortcut, and the `DrDxtReconciler` service, unchecked by default, which reapplies at
+   Windows startup the settings you kept.
+4. On first launch, "Run scan" reads the machine without writing anything. Nothing is applied before you click
+   "Optimize" or "Try it every other game", and every setting can be undone from "What DrDXT set".
+5. Uninstall: Settings, Apps, DrDXT. The uninstaller first reverts the settings it knows about, then removes the files.
+   `%LOCALAPPDATA%\DrDXT` (your records) and `%ProgramData%\DrDxt` (its reports) remain; delete them by hand to start
+   from scratch.
 
-- **Registre, valeurs exactes**, jamais une branche entière : `HwSchMode` (planification GPU accélérée),
-  `PagingFiles` (fichier d'échange désactivé, remis), `AllowAutoGameMode` et `AutoGameModeEnabled` (mode Jeu),
-  `HistoricalCaptureEnabled` (enregistrement en arrière-plan de la Game Bar), `DirectXUserGlobalSettings` (VRR et
-  modèle d'affichage), `MouseSpeed`, `MouseThreshold1` et `MouseThreshold2` (accélération du pointeur). Deux valeurs
-  ne sont plus posées, seulement rendues si une ancienne version les a écrites : `LowLatencyMode` et `CppcEnable`.
-- **Pilote NVIDIA**, au profil du jeu seulement : file de rendu, synchronisation verticale, limiteur d'images, mode
-  d'alimentation.
-- **Plan d'alimentation** : un plan Windows connu, et le boost du processeur dans ce plan.
-- **Un point de restauration** avant d'appliquer ; la restauration système est activée sur le disque système si elle
-  ne l'était pas. Deux points DrDXT au plus, réutilisés sous 24 heures.
-- **Deux services** : PresentMon, qui mesure les images, et le service AMD 3D V-Cache.
-- **Carte graphique**, dans des bornes : la limite de puissance, essayée en jeu et gardée seulement avec un gain
-  mesuré ; en mode Expert, sur ton accord, le décalage d'horloge et une vitesse fixe du ventilateur, rendus seuls si
-  DrDXT s'arrête.
-- **Deux règles QoS** pendant une partie, sur ta demande, pour plafonner l'envoi ; retirées à la fin de la partie.
-- **Démarrage de Windows**, cinq éléments exacts, sur ta demande, pour retirer un réglage posé par un script.
-- **Redémarrer vers le BIOS**, sur ta demande. Le BIOS est lu, jamais écrit.
-- **Le manifeste signé** des réglages gardés, dans `%ProgramData%\DrDxt`, que la désinstallation relit pour les
-  rendre.
+Windows 10 or 11, 64-bit, on an **administrator account**: it is the one that consents to each setting. On a standard
+account, Windows would ask for an administrator's password and the settings would go into that account's profile:
+this is not supported. No .NET to install, everything is in the installer.
 
-Jamais écrit, quoi qu'on demande : Windows Defender, Windows Update, les services de Windows, le firmware. Le détail,
-site par site, est dans [docs/NON-NUISANCE.md](docs/NON-NUISANCE.md) ; la sécurité du helper et ce qui est accepté
-comme limite, dans [docs/SECURITE.md](docs/SECURITE.md).
+## Contributing
 
-## Ce qui quitte la machine
+DrDXT gets better one PC at a time, and most of what it still has to prove is on hardware it has never seen.
+The most useful help does not require writing code:
 
-Pas de télémétrie, pas de compte. Voici tout ce que DrDXT envoie sur le réseau. Ce qu'il lit et garde sur ta machine est
-dans [CONFIDENTIALITE.md](CONFIDENTIALITE.md).
+- **Check DrDXT on your PC**, then drop the report into a "Verification report" issue. Each report moves a setting
+  from "to prove" to "proven" on that hardware, in [docs/COUVERTURE.md](docs/COUVERTURE.md).
+- **Without installing DrDXT**: the zips in the [Release](https://github.com/ablanchard-dev/drdxt/releases) read your
+  PC, or run the same verification, and write the same report.
+- **Report a bug**, or a sentence in the app that is unclear or wrong in your language.
+- **Talk**: questions, bug reports and testers meet on [Discord](https://discord.gg/z6HJWDzfB3).
 
-- **La dernière version des pilotes graphiques**, à chaque scan, pour te dire si le tien a du retard : la page publique
-  d'AMD (`www.amd.com`) et une requête fixe au service public de NVIDIA (`gfwsl.geforce.com`, toujours la même,
-  interrogé seulement sur une carte GeForce). Rien ne te désigne.
-- **Des pings** vers ta box et vers `1.1.1.1`, pour mesurer la latence ; pendant une partie, aussi vers le serveur du
-  jeu, pour suivre la route d'une partie à l'autre.
-- **La vérification de mise à jour**, au démarrage : deux petits fichiers lus sur `https://ablanchard-dev.github.io/drdxt`.
-  GitHub voit ton adresse IP, comme pour toute page web. Pour la couper : la variable d'environnement `DRDXT_UPDATE_URL`
-  posée à `off`. Une mise à jour ne s'installe jamais sans ton clic ([docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)).
-- **La page support de ta carte mère MSI**, seulement si tu cliques « Ouvrir la page de ta carte » dans le guide du
-  BIOS : ton navigateur ouvre `www.msi.com/Motherboard/<modèle>/support`.
-- **Ton rapport de vérification**, seulement si tu cliques « Envoyer mon rapport » : DrDXT ouvre ton navigateur sur un
-  ticket GitHub déjà rempli. Rien ne part tant que tu ne le soumets pas.
+Writing code? [ARCHITECTURE.md](ARCHITECTURE.md) shows how the pieces fit and how to add a setting from end to end;
+[CONTRIBUTING.md](CONTRIBUTING.md) explains how to build, test and propose a change. Every pull
+request runs the full test suite in CI. A security issue is reported in private: [SECURITY.md](SECURITY.md).
 
-Un plantage est écrit dans `%LOCALAPPDATA%\DrDXT\crash.log`, sur ta machine seulement. Un test échoue si une adresse
-contactée par le code manque dans cette liste.
+## What DrDXT writes on your machine
 
-## Compiler
+Every setting goes through a separate elevated program, the helper, which refuses anything not on its list. Every
+write first reads the original value and knows how to restore it. The full list:
 
-Windows 10 ou 11 x64 et le SDK **.NET 10**. Rien d'autre pour l'application et les tests.
+- **Registry, exact values**, never a whole branch: `HwSchMode` (hardware-accelerated GPU scheduling), `PagingFiles`
+  (disabled page file restored, or moved to an SSD), `AllowAutoGameMode` and `AutoGameModeEnabled` (Game Mode), `HistoricalCaptureEnabled`
+  (Game Bar background recording), `DirectXUserGlobalSettings` (VRR and presentation model), `MouseSpeed`,
+  `MouseThreshold1` and `MouseThreshold2` (pointer acceleration). Two values are no longer applied, only reverted if an
+  older version wrote them: `LowLatencyMode` and `CppcEnable`.
+- **Startup apps**, on request: the Windows on/off switch (`StartupApproved`) of an entry you choose, as Task Manager
+  does.
+- **NVIDIA driver**, on the game's profile only: render queue, vertical sync, frame limiter, power mode, and on request
+  the DLSS override to the latest model.
+- **AMD driver**, through ADLX: power limit, Anti-Lag, frame rate target, vertical sync.
+- **Power plan**: a known Windows plan, processor boost within that plan, and the Wi-Fi adapter's power saving when the
+  game runs over Wi-Fi.
+- **Processor** (desktop Intel): the PL1 power limit in its register, raised to what the board allows or capped when the
+  processor runs too hot; the BIOS puts its own back at the next boot. On request, an undervolt search, step by step
+  under load, with the original voltage restored at the end; the result is yours to set in the BIOS.
+- **One restore point** before applying; System Restore is turned on for the system drive if it was off. At most two
+  DrDXT points, reused within 24 hours.
+- **Two services**: PresentMon, which measures frames, and the AMD 3D V-Cache service.
+- **Graphics card**, within bounds: the power limit, tried in-game and kept only with a measured gain; in Expert mode,
+  with your consent, the clock offset and a fixed fan speed, reverted on their own if DrDXT stops.
+- **Two QoS rules** during a match, on request, to cap upload; removed when the match ends.
+- **Windows boot settings**, five exact elements, on request, to remove a setting left by a script.
+- **Drivers**, on request: restart a device, remove an old driver package from the driver store and put it back.
+- **Windows Memory Diagnostic** at the next boot, on request, and its cancellation.
+- **Reboot to BIOS**, on request. The BIOS is read, never written.
+- **The signed manifest** of kept settings, in `%ProgramData%\DrDxt`, which the uninstaller reads to revert them.
+
+Never written, whatever is asked: Windows Defender, Windows Update, Windows services, firmware. The details, site by
+site, are in [docs/NON-NUISANCE.md](docs/NON-NUISANCE.md); the helper's security and the accepted limits are in
+[docs/SECURITE.md](docs/SECURITE.md).
+
+## What leaves the machine
+
+No telemetry, no account. Here is everything DrDXT sends over the network. What it reads and keeps on your machine is
+in [PRIVACY.md](PRIVACY.md).
+
+- **The latest graphics driver version**, at each scan, to tell you whether yours is behind: AMD's public page
+  (`www.amd.com`) and one fixed request to NVIDIA's public service (`gfwsl.geforce.com`, always the same, queried only
+  on a GeForce card). Nothing identifies you.
+- **Pings** to your router and to `1.1.1.1`, to measure latency; during a match, also to the game server, to follow the
+  route from one match to the next.
+- **The update check**, at startup: two small files read from `https://ablanchard-dev.github.io/drdxt`. GitHub sees
+  your IP address, as with any web page. To turn it off: the `DRDXT_UPDATE_URL` environment variable set to `off`. An
+  update never installs without your click ([docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)).
+- **Your MSI motherboard's support page**, only if you click "Open your board's page" in the BIOS guide: your browser
+  opens `www.msi.com/Motherboard/<model>/support`.
+- **A Windows Update search**, only if you click "Check now" under the Windows Update finding: Windows Update asks
+  Microsoft's servers what is waiting, as Settings > Windows Update does. Nothing is installed.
+- **Your verification report**, only if you click "Send my report": DrDXT opens your browser on a pre-filled GitHub
+  issue. Nothing leaves until you submit it.
+
+A crash is written to `%LOCALAPPDATA%\DrDXT\crash.log`, on your machine only. A test fails if an address contacted by
+the code is missing from this list.
+
+## Build
+
+Windows 10 or 11 x64 and the **.NET 10** SDK. Nothing else for the application and the tests.
 
 ```
 dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**6 802 tests, 0 échec**, mesuré le 10/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
-matériel). Ce chiffre est vérifié par `tools/gates/compte_des_tests.py` contre la dernière exécution. La commande qui
-le redonne :
+**7,164 tests, 0 failures**, measured on 15/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
+real hardware). The number is checked by `tools/gates/compte_des_tests.py` against the last run. The command that gives
+it back (an English .NET SDK; with a French one, see the French README):
 
 ```bash
-dotnet test DrDXT.sln -c Release --filter "Category!=Machine" --nologo -v q 2>&1 | grep "Réussi" \
-  | sed 's/.*total[^0-9]*\([0-9][0-9]*\).*/\1/' | awk '{s+=$1; n++} END {print n, "projets |", s, "tests"}'
+dotnet test DrDXT.sln -c Release --filter "Category!=Machine" --nologo -v q 2>&1 | grep "Passed!" \
+  | sed 's/.*Total[^0-9]*\([0-9][0-9]*\).*/\1/' | awk '{s+=$1; n++} END {print n, "projects |", s, "tests"}'
 ```
 
-L'installeur se construit avec `installer/build-installer.ps1`. Il demande **Inno Setup 6** et les outils C++ de
-Visual Studio, pour compiler en natif le lanceur qui reçoit l'élévation.
+The installer is built with `installer/build-installer.ps1`. It also needs **Inno Setup 6** and the Visual Studio C++
+tools, to compile natively the launcher that receives elevation.
 
-## Licence
+## Code map
 
-DrDXT est un logiciel libre sous **GPL-3.0**. Le texte complet est dans `LICENSE` et livré avec chaque copie. Tu peux
-l'utiliser, le copier, le modifier et le redistribuer, même contre de l'argent, à condition de publier le code source
-de ta version sous la même licence. Une version fermée, ou payante sans source, n'est pas permise. Le nom « DrDXT »
-désigne ce projet : une version modifiée se présente sous son propre nom.
-
-Livrés à côté : PresentMon (Intel, licence MIT, `PresentMon-NOTICE-MIT.txt`) et QRCoder (licence MIT,
-`QRCoder-LICENSE-MIT.txt`). NVAPI (NVIDIA) et ADLX (AMD) ne sont pas livrés : DrDXT appelle les bibliothèques que ton
-pilote a installées, d'après leurs en-têtes publics.
-
-## Les cinq invariants
-
-Cinq règles tiennent le code, et chacune vient d'un échec réel :
-
-- **Prouvé, jamais affirmé.** Un gain ne s'affiche qu'au-dessus du bruit de la mesure. « Aucun gain mesurable » est
-  une réponse valide, et souvent la bonne.
-- **Chirurgical.** Aucun service désactivé, aucun nettoyage de Windows, aucun script greffé. Ce qui exige le BIOS reste
-  un guide.
-- **Réversible.** Valeur d'origine lue avant toute écriture, retour testé, point de restauration.
-- **Honnête sur l'indisponibilité.** Un réglage qui ne s'applique pas dit lequel et pourquoi.
-- **Liste noire permanente.** Les mythes de l'optimisation (Nagle, `NetworkThrottlingIndex`, polling 8 000 Hz,
-  priorité temps réel, C-states coupés en bloc) sont refusés par un test qui casse si l'un d'eux entre au catalogue.
-
-## Carte du code
-
-| Projet | Rôle |
+| Project | Role |
 |---|---|
-| `DrDxt.Core` | contrats, résultats, codes d'erreur, opérations privilégiées |
-| `DrDxt.Detection` | matériel, état des réglages, réseau |
-| `DrDxt.Measurement` | PresentMon, repli DXGI, réseau, test mémoire |
-| `DrDxt.Application` | catalogue des réglages, moteur d'application, retour arrière, bornes GPU |
-| `DrDxt.ElevatedHelper` | le programme élevé qui écrit, derrière sa liste blanche |
-| `DrDxt.Lanceur` | l'exécutable natif qui reçoit l'élévation et relance les autres avec un environnement propre |
-| `DrDxt.Reconciler*` | manifeste signé, réapplication au démarrage |
-| `DrDxt.Bios` | lecture du BIOS et guide, jamais d'écriture |
+| `DrDxt.Core` | contracts, results, error codes, privileged operations |
+| `DrDxt.Detection` | hardware, settings state, network |
+| `DrDxt.Measurement` | PresentMon, DXGI fallback, network, memory test |
+| `DrDxt.Application` | settings catalog, apply engine, rollback, GPU bounds |
+| `DrDxt.ElevatedHelper` | the elevated program that writes, behind its allowlist |
+| `DrDxt.Lanceur` | the native executable that receives elevation and relaunches the others with a clean environment |
+| `DrDxt.Reconciler*` | signed manifest, reapplication at startup |
+| `DrDxt.Bios` | BIOS reading and guide, never a write |
 | `DrDxt.GpuNative` | NVAPI, ADLX, NVML |
-| `DrDxt.App` | l'interface (WPF) |
-| `tools/` | bancs et sondes hors solution, dont le zip de validation (`amd-harness`) |
+| `DrDxt.App` | the user interface (WPF) |
+| `tools/` | benches and probes outside the solution, including the validation zip (`amd-harness`) |
 
-Par où commencer : [docs/NON-NUISANCE.md](docs/NON-NUISANCE.md), [docs/SECURITE.md](docs/SECURITE.md), puis
-[docs/INSTRUMENTS.md](docs/INSTRUMENTS.md) et [docs/OU-VIT-LE-GAIN.md](docs/OU-VIT-LE-GAIN.md) pour ce que chaque
-mesure peut prouver. Les conventions de travail sont dans [CONTRIBUTING.md](CONTRIBUTING.md).
+Where to start: [ARCHITECTURE.md](ARCHITECTURE.md), then [docs/NON-NUISANCE.md](docs/NON-NUISANCE.md), [docs/SECURITE.md](docs/SECURITE.md), then
+[docs/INSTRUMENTS.md](docs/INSTRUMENTS.md) and [docs/OU-VIT-LE-GAIN.md](docs/OU-VIT-LE-GAIN.md) for what each
+measurement can prove. Working conventions are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+DrDXT is free software under **GPL-3.0**. The full text is in `LICENSE` and ships with every copy. You may use, copy,
+modify and redistribute it, even for money, provided you publish the source code of your version under the same
+license. A closed version, or a paid one without source, is not allowed. The name "DrDXT" refers to this project: a
+modified version goes by its own name.
+
+Shipped alongside: PresentMon (Intel, MIT license, `PresentMon-NOTICE-MIT.txt`) and QRCoder (MIT license,
+`QRCoder-LICENSE-MIT.txt`). NVAPI (NVIDIA) and ADLX (AMD) are not shipped: DrDXT calls the libraries your driver
+installed, from their public headers.

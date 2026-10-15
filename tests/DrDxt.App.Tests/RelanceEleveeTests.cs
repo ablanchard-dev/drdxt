@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 10/10/2026 (revue de sécurité) : l'App se relance élevée par le lanceur natif quand il est installé à côté d'elle.
+// L'App se relance élevée par le lanceur natif quand il est installé à côté d'elle.
 public sealed class RelanceEleveeTests : IDisposable
 {
     private readonly string _dossier = Path.Combine(Path.GetTempPath(), "drdxt-relance-" + Guid.NewGuid().ToString("N"));

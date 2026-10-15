@@ -33,7 +33,7 @@ public class ChassisDetectorTests
     [InlineData(9, ChassisType.Laptop)]    // Laptop
     [InlineData(10, ChassisType.Laptop)]   // Notebook
     [InlineData(14, ChassisType.Laptop)]   // Sub Notebook
-    [InlineData(11, ChassisType.Handheld)] // Hand Held (SMBIOS) → Handheld, jamais Laptop (gating §16)
+    [InlineData(11, ChassisType.Handheld)] // Hand Held (SMBIOS) → Handheld, jamais Laptop (gating)
     [InlineData(30, ChassisType.Handheld)] // Tablet → Handheld
     [InlineData(12, ChassisType.Unknown)]  // Docking Station → ni laptop ni desktop
     public void Maps_smbios_chassis_codes(int code, ChassisType expected)
@@ -41,7 +41,7 @@ public class ChassisDetectorTests
         new ChassisDetector(Enclosure(code)).Detect().Value!.Should().Be(expected);
     }
 
-    // Revue n° 13 : ces consoles se déclarent « Notebook » en SMBIOS.
+    // Ces consoles se déclarent « Notebook » en SMBIOS.
     [Theory]
     [InlineData("Claw A1M")]
     [InlineData("GPD WIN 4")]
@@ -62,7 +62,7 @@ public class ChassisDetectorTests
         new ChassisDetector(Enclosure(10, "Jupiter")).Detect().Value!.Should().Be(ChassisType.Handheld);
     }
 
-    // 09/10/2026 (revue) : mini PC, tout-en-un, carte mère qui dit « Other » : sans batterie, c'est un PC fixe.
+    // Mini PC, tout-en-un, carte mère qui dit « Other » : sans batterie, c'est un PC fixe.
     [Theory]
     [InlineData(1)]
     [InlineData(2)]

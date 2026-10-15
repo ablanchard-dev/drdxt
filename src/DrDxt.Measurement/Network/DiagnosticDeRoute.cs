@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Measurement.Network;
 
 /// <summary>
-/// 03/10/2026 (boucle 2D2P, P3.1) : ce que vendent ExitLag, GearUP, NoPing ou WTFast, c'est un réseau de relais qui
+/// Ce que vendent ExitLag, GearUP, NoPing ou WTFast, c'est un réseau de relais qui
 /// transporte la partie sur un chemin choisi pour la latence. Ils ne disent jamais quand ça ne sert à rien. Ce juge le dit,
 /// à partir de la route mesurée vers le serveur de la partie, sans rien écrire et sans contacter personne d'autre.
 ///
@@ -69,9 +69,9 @@ public static class DiagnosticDeRoute
 
     /// <summary>Le serveur n'a répondu à aucune sonde : beaucoup de serveurs de jeu ignorent le ping. Rien n'est affirmé.</summary>
     public static RepairFinding SansReponse(string serveur) => new(PertesInterface.Domaine, Nom, null, null, RepairStatus.Observed,
-        $"le serveur de la partie ({serveur}) ne répond pas aux sondes de ping : rien n'est affirmé sur la route.");
+        Docteur.T("DR.SansReponse", serveur));
 
-    /// <summary>03/10/2026 (P3.1d, test en vraie partie) : un serveur de Call of Duty ignore le ping. Les routeurs du chemin,
+    /// <summary>Un serveur de Call of Duty ignore le ping. Les routeurs du chemin,
     /// eux, répondent (TTL expiré) : on juge la route jusqu'au dernier qui répond, au plus près du serveur. La boîte (premier
     /// saut) ne compte pas : une route mesurée jusqu'à elle ne dit rien d'Internet.</summary>
     public static SautDeRoute? DernierSautQuiRepond(IReadOnlyList<SautDeRoute> sauts) =>
@@ -84,31 +84,26 @@ public static class DiagnosticDeRoute
         var c = ConstatBrut(m, serveur);
         return jusqua is null ? c : c with
         {
-            Explication = $"mesuré jusqu'au routeur n° {jusqua.Ttl} ({jusqua.Adresse}), le dernier qui répond sur le chemin : "
-                + $"le serveur de la partie ({serveur}) ignore le ping. "
-                + char.ToUpper(c.Explication[0], System.Globalization.CultureInfo.CurrentCulture) + c.Explication[1..],
+            Explication = Docteur.T("DR.JusquAuRouteur", jusqua.Ttl, jusqua.Adresse, serveur)
+                + char.ToUpper(c.Explication[0], Docteur.Langue) + c.Explication[1..],
         };
     }
 
     private static RepairFinding ConstatBrut(MesureDeRoute m, string serveur)
     {
-        var lu = $"{m.PingMedianMs:0} ms, {m.PertePourcent:0.#} % de pertes, gigue {m.GigueMs:0.#} ms";
+        var lu = Docteur.T("DR.Lu", m.PingMedianMs, m.PertePourcent, m.GigueMs);
         return Juger(m) switch
         {
             VerdictRoute.RouteDejaBonne => new(PertesInterface.Domaine, Nom, lu, null, RepairStatus.ExpectedDefault,
-                $"ta route vers le serveur de la partie ({serveur}) est déjà courte et stable : un relais payant (ExitLag, "
-                + "GearUP, NoPing…) n'a rien à gagner ici."),
+                Docteur.T("DR.DejaBonne", serveur)),
             VerdictRoute.ProblemeLocal => new(PertesInterface.Domaine, Nom, lu, null, RepairStatus.Suspicious,
-                "l'instabilité commence entre le PC et la box : un relais passe par ce même lien et n'y changera rien. "
-                + "Piste à vérifier : câble, port de la box, Wi-Fi."),
+                Docteur.T("DR.Local")),
             VerdictRoute.RelaisPeutAider => new(PertesInterface.Domaine, Nom, lu, null, RepairStatus.Suspicious,
-                $"pertes ou à-coups au-delà de ta box, sur la route vers le serveur ({serveur}) : c'est le cas où un relais "
-                + "(ExitLag, GearUP…) aide vraiment. Si tu en essaies un, compare avec cette mesure, même serveur."),
+                Docteur.T("DR.Relais", serveur)),
             VerdictRoute.EssaiAComparer => new(PertesInterface.Domaine, Nom, lu, null, RepairStatus.Observed,
-                $"route stable mais de {m.PingMedianMs:0} ms vers le serveur ({serveur}) : un chemin plus court existe peut-être, "
-                + "seul un essai comparé (un relais en essai gratuit, même serveur) le dira."),
+                Docteur.T("DR.Essai", m.PingMedianMs, serveur)),
             _ => new(PertesInterface.Domaine, Nom, null, null, RepairStatus.Observed,
-                $"trop peu de réponses du serveur de la partie ({m.Echantillons}) pour juger la route."),
+                Docteur.T("DR.TropPeu", m.Echantillons)),
         };
     }
 }

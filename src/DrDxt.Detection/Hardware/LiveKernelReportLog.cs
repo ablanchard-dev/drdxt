@@ -10,7 +10,7 @@ namespace DrDxt.Detection.Hardware;
 /// <param name="Quand">L'instant de l'incident, en UTC.</param>
 /// <param name="Code">Le code de verification de bogue, tel qu'ecrit par WER.</param>
 /// <param name="NomSdk">Le nom du code selon `bugcodes.h`. <c>null</c> quand le code n'est pas dans
-/// notre table — un code non repertorie reste un chiffre, jamais un nom invente.</param>
+/// notre table : un code non repertorie reste un chiffre, jamais un nom invente.</param>
 /// <param name="Bucket">Le classement de Windows, lu sur le nom du vidage (`WATCHDOG`,
 /// `USBXHCI`…). <c>null</c> quand aucun vidage n'est conserve.</param>
 /// <param name="Parametre1">Le premier parametre du code, en hexadecimal. C'est lui qui distingue
@@ -31,19 +31,22 @@ public sealed record LiveKernelReport(
     /// le noyau graphique (`VIDEO_*`, `*_DXGKRNL_*`).
     ///
     /// Un code que nous ne savons pas nommer rend <c>false</c> : il pourrait etre graphique, et
-    /// nous l'ignorons. Cette porte retient la main, elle ne la force pas — se tromper vers
+    /// nous l'ignorons. Cette porte retient la main, elle ne la force pas : se tromper vers
     /// « inconnu donc pas graphique » coute une experience potentiellement risquee, se tromper vers
     /// l'inverse gelerait la carte sur un incident sans rapport.
     /// </summary>
-    public bool EstGraphique => Code is 0x113 or 0x116 or 0x117 or 0x141 or 0x193;
+    public bool EstGraphique => CodeGraphique(Code);
+
+    /// <summary>La même liste, pour qui n'a que le code (l'écran le relit dans la valeur du constat).</summary>
+    public static bool CodeGraphique(uint code) => code is 0x113 or 0x116 or 0x117 or 0x141 or 0x193;
 
     public string Phrase => NomSdk is { } n
-        ? $"0x{Code:X} {n}" + (Parametre1 is { } p ? $", paramètre 1 : 0x{p}" : "")
-        : $"0x{Code:X} (code non repertorie)";
+        ? $"0x{Code:X} {n}" + (Parametre1 is { } p ? Docteur.T("LK.Parametre1", $"0x{p}") : "")
+        : Docteur.T("LK.CodeInconnu", $"0x{Code:X}");
 }
 
 /// <summary>
-/// Les incidents noyau que la machine a CONSERVES, meme quand elle n'a pas plante.
+/// Les incidents noyau que la machine a conserves, meme quand elle n'a pas plante.
 ///
 /// Un incident live n'est pas un plantage : le noyau a pris une photo et la machine a continue
 /// de tourner. Les additionner aux arrets brutaux de <see cref="IUnexpectedShutdownLog"/>
@@ -55,7 +58,7 @@ public interface ILiveKernelReportLog
     /// lecture est un `Fail`, jamais une liste vide.</summary>
     Result<IReadOnlyList<LiveKernelReport>> Lire();
 
-    /// <summary>Revue (F-31) : les rapports présents mais refusés à la dernière lecture, quand d'autres ont été lus.
+    /// <summary>Les rapports présents mais refusés à la dernière lecture, quand d'autres ont été lus.
     /// Ils sont dits à part ; les lus restent utilisés (point sain, rapprochement avec les installations).</summary>
     int Refuses => 0;
 }
@@ -74,8 +77,8 @@ public interface ILiveKernelReportLog
 ///
 /// Et ce n'est ni la faute du fichier d'echange (33 Go, gere par le systeme, sur le volume de
 /// demarrage, pic a 1,7 Go) ni de la place disque (291 Go libres). Consequence a retenir : le
-/// « reparage » evident — remettre `CrashDumpEnabled` a 7 au lieu de 3 — n'aurait rien repare,
-/// puisque c'est la CREATION du vidage qui echoue, pas son type.
+/// « reparage » evident (remettre `CrashDumpEnabled` a 7 au lieu de 3) n'aurait rien repare,
+/// puisque c'est la creation du vidage qui echoue, pas son type.
 ///
 /// Pourtant la machine avait garde quatre rapports, que rien ne lisait :
 ///
@@ -88,22 +91,21 @@ public interface ILiveKernelReportLog
 /// (`0x80e`). Ce n'est pas du bruit, et ca conditionne toute experimentation GPU.
 ///
 /// ══ pourquoi la lecture se fait par index ══
-/// `Report.wer` est LOCALISE : sur ce Windows francais les champs s'appellent
+/// `Report.wer` est localise : sur ce Windows francais les champs s'appellent
 /// `Sig[1].Name=Paramètre 1`. Chercher « Parameter 1 » ne trouve rien ici, et coder « Paramètre »
-/// ne trouverait rien ailleurs. On lit donc les `Sig[N].Value` par INDICE, apres avoir verifie
-/// `EventType=LiveKernelEvent` — c'est cet en-tete qui garantit le schema. Meme lecon que les
+/// ne trouverait rien ailleurs. On lit donc les `Sig[N].Value` par indice, apres avoir verifie
+/// `EventType=LiveKernelEvent` : c'est cet en-tete qui garantit le schema. Meme lecon que les
 /// compteurs de performance.
 ///
 /// Non couvert, et dit plutot que devine : `C:\Windows\LiveKernelReports` est l'autre
-/// emplacement de ces vidages. Il est vide sur cette machine, donc invérifiable ici — ecrire son
+/// emplacement de ces vidages. Il est vide sur cette machine, donc invérifiable ici : ecrire son
 /// analyse serait livrer du code que rien n'a prouve.
 /// </summary>
 public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
 {
     /// <summary>
-    /// Les codes que nous savons nommer, releves dans
-    /// `Windows Kits\10\Include\10.0.22621.0\shared\bugcodes.h` le 08/09/2026 — pas de memoire,
-    /// pas de blog. Une table courte et exacte vaut mieux qu'une longue et approximative : un code
+    /// Les codes que nous savons nommer, releves le 08/09/2026 dans
+    /// `Windows Kits\10\Include\10.0.22621.0\shared\bugcodes.h` (source : le SDK, ni memoire ni blog). Une table courte et exacte vaut mieux qu'une longue et approximative : un code
     /// absent d'ici ressort en chiffre, ce qui est vrai, plutot qu'en nom plausible, qui serait
     /// faux.
     /// </summary>
@@ -129,8 +131,8 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
         [0x000000EF] = "CRITICAL_PROCESS_DIED",
     };
 
-    /// <summary>Le nom SDK d'un code d'arret, ou <c>null</c> s'il n'est pas dans la table. 17/09/2026 :
-    /// la table servait aux incidents a chaud ; les ecrans bleus du bilan n'affichaient que le code.</summary>
+    /// <summary>Le nom SDK d'un code d'arret, ou <c>null</c> s'il n'est pas dans la table.
+    /// La table servait aux incidents a chaud ; les ecrans bleus du bilan n'affichaient que le code.</summary>
     public static string? NomSdk(int code) => NomsSdk.TryGetValue(unchecked((uint)code), out var n) ? n : null;
 
     private readonly string[] _racines;
@@ -173,20 +175,19 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
                 }
             }
 
-            // F-31 : un refus partiel garde ce qui a été lu ; seul « tout refusé » est un échec. F-36 : la cause (droits ou
+            // Un refus partiel garde ce qui a été lu ; seul « tout refusé » est un échec. La cause (droits ou
             // dossier durci) est dite par l'appelant, qui sait s'il tourne en administrateur.
             Refuses = refuses;
             if (refuses > 0 && rapports.Count == 0)
                 return Result<IReadOnlyList<LiveKernelReport>>.Fail(ErrorCodes.DetectionFailed,
-                    $"{refuses} rapport(s) d'incident noyau existent mais n'ont pas pu être lus (accès refusé). "
-                    + "« Non lu » n'est pas « aucun incident ».");
+                    Docteur.T("LK.Refuses", refuses));
 
             rapports.Sort((a, b) => b.Quand.CompareTo(a.Quand));
             return Result<IReadOnlyList<LiveKernelReport>>.Ok(rapports);
         }
         catch (Exception ex)
         {
-            // Acces refuse sur une machine durcie, dossier verrouille : on le DIT. Rendre une
+            // Acces refuse sur une machine durcie, dossier verrouille : on le dit. Rendre une
             // liste vide ferait passer « je n'ai pas pu lire » pour « aucun incident ».
             return Result<IReadOnlyList<LiveKernelReport>>.Fail(
                 ErrorCodes.DetectionFailed, "Rapports WER illisibles : " + ex.Message);
@@ -196,7 +197,7 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
     private static LiveKernelReport? Analyser(string dossier)
     {
         var wer = Path.Combine(dossier, "Report.wer");
-        // 06/10/2026 (chantier B8c) : pas de `File.Exists`. Sans droits administrateur, chaque dossier `Kernel_*`
+        // Pas de `File.Exists`. Sans droits administrateur, chaque dossier `Kernel_*`
         // est fermé et `File.Exists` y répond « absent » : un refus passait pour une absence. On ouvre ; un refus lève
         // UnauthorizedAccessException, compté par Lire().
         var champs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -220,7 +221,7 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
         if (!champs.TryGetValue("EventTime", out var brut)
             || !long.TryParse(brut, out var filetime)) return null;
 
-        // HEXADECIMAL, et ce n'est pas un pari. WER ecrit ces valeurs sans prefixe : `144`,
+        // Hexadecimal, et ce n'est pas un pari. WER ecrit ces valeurs sans prefixe : `144`,
         // `193`, mais aussi `80e` et `ffff920c4059c760`, qui ne peuvent etre que de l'hexadecimal.
         // Deux verifications independantes le confirment sur le code lui-meme : `144` accompagne un
         // vidage nomme `USBXHCI` (0x144 = BUGCODE_USB3_DRIVER) et `193` un vidage du noyau

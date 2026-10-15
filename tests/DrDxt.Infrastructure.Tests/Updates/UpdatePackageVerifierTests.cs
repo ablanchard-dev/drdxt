@@ -9,27 +9,27 @@ using NSec.Cryptography;
 namespace DrDxt.Infrastructure.Tests.Updates;
 
 // -----------------------------------------------------------------------
-// T12 — The update TRUST GATE. Fail-clean, never fail-open.
+// La porte de confiance des mises à jour. Échec propre, jamais ouverte.
 //
-// Proven matrix (verbatim from the plan):
-//   * manifest signed by the real (dedicated update) test key   → VerifyManifest Ok
-//   * manifest unsigned / signature invalid / tampered field    → Fail(UPDATE_SIG_INVALID)
-//                                                                  (download REFUSED)
-//   * payload SHA-256 ≠ signed manifest sha256                   → Fail(UPDATE_HASH_MISMATCH)
-//                                                                  (never executed)
-//   * downgrade (version < installed), non-beta                  → Fail(UPDATE_DOWNGRADE)
-//   * any uncertainty                                            → keep current version
-// Plus: imposed order (signature before payload), canonical form pinned, the update
-// key is DEDICATED (does not verify a manifest signed by the license/manifest key).
+// Matrice prouvée :
+//   * manifeste signé par la vraie clé de test (dédiée aux mises à jour) → VerifyManifest Ok
+//   * manifeste non signé / signature invalide / champ altéré         → Fail(UPDATE_SIG_INVALID)
+//                                                                        (téléchargement refusé)
+//   * SHA-256 de la charge ≠ sha256 du manifeste signé                 → Fail(UPDATE_HASH_MISMATCH)
+//                                                                        (jamais exécutée)
+//   * rétrogradation (version < installée), hors bêta                  → Fail(UPDATE_DOWNGRADE)
+//   * toute incertitude                                                → garder la version courante
+// Plus : ordre imposé (signature avant charge), forme canonique figée, la clé de mise à jour
+// est dédiée (elle ne vérifie pas un manifeste signé par la clé de licence ou de manifeste).
 // -----------------------------------------------------------------------
 public sealed class UpdatePackageVerifierTests
 {
     private const string InstalledVersion = "1.2.0";
 
     private static UpdateManifest UnsignedManifest(
-        UpdateChannel channel = UpdateChannel.Profiles,
+        UpdateChannel channel = UpdateChannel.App,
         string version = "1.3.0",
-        string url = "https://updates.drdxt.example/profiles/1.3.0.zip",
+        string url = "https://updates.drdxt.example/app/1.3.0.exe",
         string? sha256 = null,
         byte[]? payload = null)
     {
@@ -41,9 +41,9 @@ public sealed class UpdatePackageVerifierTests
     private static string Sha256Hex(byte[] bytes)
         => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
-    // Signs the canonical bytes of a manifest with a raw Ed25519 private seed (the test
-    // is the "release pipeline"). Uses the same canonicalization the verifier uses, and
-    // returns the manifest with the base64 signature attached.
+    // Signe les octets canoniques d'un manifeste avec une graine privée Ed25519 brute (le test
+    // joue le « pipeline de publication »). Même canonisation que le vérificateur, et
+    // rend le manifeste avec la signature base64 attachée.
     private static UpdateManifest Signed(UpdateManifest manifest, byte[] seed)
     {
         using var key = Key.Import(SignatureAlgorithm.Ed25519, seed, KeyBlobFormat.RawPrivateKey);
@@ -59,7 +59,7 @@ public sealed class UpdatePackageVerifierTests
         return created.Value!;
     }
 
-    // ── VerifyManifest: signature gate ────────────────────────────────────────────
+    // ── VerifyManifest : porte de signature ───────────────────────────────────────
 
     [Fact]
     public void VerifyManifest_RealKeySignature_IsOk()
@@ -72,7 +72,7 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void VerifyManifest_AbsentSignature_RefusesDownload_NotOkByDefault()
     {
-        // An unsigned manifest is never trusted — the download is refused on the spot.
+        // Un manifeste non signé n'est jamais cru : le téléchargement est refusé sur-le-champ.
         var result = EmbeddedVerifier().VerifyManifest(UnsignedManifest());
 
         result.IsOk.Should().BeFalse();
@@ -109,7 +109,7 @@ public sealed class UpdatePackageVerifierTests
     {
         var signed = Signed(UnsignedManifest(), UpdateDevKeys.DevPrivateSeed);
 
-        // Attacker swaps the download url but reuses the old signature.
+        // L'attaquant remplace l'URL de téléchargement mais réutilise l'ancienne signature.
         var tampered = signed with { Url = "https://evil.example/malware.zip" };
 
         var result = EmbeddedVerifier().VerifyManifest(tampered);
@@ -123,7 +123,7 @@ public sealed class UpdatePackageVerifierTests
     {
         var signed = Signed(UnsignedManifest(), UpdateDevKeys.DevPrivateSeed);
 
-        // Attacker swaps the expected hash (to match their payload) but reuses the sig.
+        // L'attaquant remplace l'empreinte attendue (pour coller à sa charge) mais réutilise la signature.
         var tampered = signed with { Sha256 = Sha256Hex(Encoding.UTF8.GetBytes("attacker-payload")) };
 
         EmbeddedVerifier().VerifyManifest(tampered).Error!.Value.Code
@@ -133,7 +133,7 @@ public sealed class UpdatePackageVerifierTests
     // Audit securite 26/08 : la signature couvre les 4 champs. Url + Sha256 sont deja
     // testes ci-dessus ; Version et Channel manquaient. Un Version non signe defeat le
     // no-downgrade (rejouer un vieux binaire signe en mentant sur la version) ; un Channel
-    // non signe croise les canaux App/Profiles. On tord chacun -> refus.
+    // non signe ferait passer un autre canal pour l'App. On tord chacun -> refus.
     [Fact]
     public void VerifyManifest_TamperedVersionAfterSigning_Fails()
     {
@@ -147,7 +147,7 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void VerifyManifest_TamperedChannelAfterSigning_Fails()
     {
-        var signed = Signed(UnsignedManifest(channel: UpdateChannel.Profiles), UpdateDevKeys.DevPrivateSeed);
+        var signed = Signed(UnsignedManifest(channel: (UpdateChannel)7), UpdateDevKeys.DevPrivateSeed);
         var tampered = signed with { Channel = UpdateChannel.App };
 
         EmbeddedVerifier().VerifyManifest(tampered).Error!.Value.Code
@@ -171,8 +171,8 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void VerifyManifest_SignedByManifestKey_Fails_UpdateKeyIsDedicated()
     {
-        // The machine-manifest signing key must not be able to vouch for an update
-        // manifest — the update channel is cloistered behind its own key (decision T12).
+        // La clé de signature du manifeste machine ne doit pas pouvoir cautionner un manifeste de
+        // mise à jour : le canal de mise à jour est cloîtré derrière sa propre clé.
         var manifest = Signed(UnsignedManifest(), ManifestDevTestKeys.DevPrivateSeed);
 
         EmbeddedVerifier().VerifyManifest(manifest).Error!.Value.Code
@@ -198,7 +198,7 @@ public sealed class UpdatePackageVerifierTests
         created.Value!.VerifyManifest(manifest).IsOk.Should().BeTrue();
     }
 
-    // ── VerifyPayload: hash + downgrade, after the signature passed ────────────────
+    // ── VerifyPayload : empreinte + rétrogradation, après que la signature a passé ─────────
 
     [Fact]
     public void VerifyPayload_MatchingHash_IsOk()
@@ -214,8 +214,8 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void VerifyPayload_HashMismatch_Fails_NeverExecuted()
     {
-        // Manifest is honestly signed for ONE payload; a DIFFERENT payload is downloaded
-        // (e.g. swapped at the CDN). The signed sha256 no longer matches → refuse.
+        // Le manifeste est honnêtement signé pour une charge ; une autre charge est téléchargée
+        // (remplacée sur le CDN, par exemple). Le sha256 signé ne correspond plus → refuser.
         var manifest = Signed(
             UnsignedManifest(payload: Encoding.UTF8.GetBytes("the-real-payload")),
             UpdateDevKeys.DevPrivateSeed);
@@ -269,14 +269,14 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void IsDowngrade_NumericComponents_NotLexical()
     {
-        // 1.2.10 is NEWER than 1.2.9 (numeric, not string compare).
+        // 1.2.10 est plus récent que 1.2.9 (comparaison numérique, pas de chaînes).
         UpdateVerifier.IsDowngrade("1.2.10", "1.2.9").Should().BeFalse();
         UpdateVerifier.IsDowngrade("1.2.9", "1.2.10").Should().BeTrue();
         UpdateVerifier.IsDowngrade("2.0.0", "1.9.9").Should().BeFalse();
         UpdateVerifier.IsDowngrade("1.0.0", "1.0.0").Should().BeFalse();
     }
 
-    // ── Canonical form — determinism & stability ──────────────────────────────────
+    // ── Forme canonique : déterminisme et stabilité ───────────────────────────────
 
     [Fact]
     public void Canonicalize_IsDeterministic_AcrossCalls()

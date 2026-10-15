@@ -5,7 +5,7 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (D1.1) : l'analyse dure plus de 10 s. Au-delà, un rond qui tourne sans fin fait croire à un plantage
+// L'analyse dure plus de 10 s. Au-delà, un rond qui tourne sans fin fait croire à un plantage
 // (NN/g, Progress Indicators) : elle avance par étapes nommées, sans jamais reculer, jusqu'à 100 %.
 public sealed class LAnalyseAvanceParEtapesTests
 {
@@ -28,8 +28,7 @@ public sealed class LAnalyseAvanceParEtapesTests
           .Returns(Result<BenchmarkResult>.Fail(ErrorCodes.PidInvalid, "aucun jeu"));
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(hw, st, new List<Finding>(), 68, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(hw, st, new List<Finding>(), null)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
         var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, sd, k => k == "Scan.Etape.Format" ? "{0}/{1} {2}" : k);

@@ -3,11 +3,11 @@ using DrDxt.Core;
 
 namespace DrDxt.Detection.Network;
 
-/// <summary>07/10/2026 (D6) : les cartes actives qui ont une passerelle IPv4 ou IPv6, sans les tunnels (VPN) ni la boucle
+/// <summary>Les cartes actives qui ont une passerelle IPv4 ou IPv6, sans les tunnels (VPN) ni la boucle
 /// locale, et si elles sont sans fil (NetworkInterfaceType.Wireless80211). Lecture seule, sans droits ; <c>null</c> = non lu.</summary>
 public static class CartesVersInternet
 {
-    /// <summary>Revue F-43 : les noms d'adaptateurs que Windows type « Ethernet » sans câble derrière (VPN, machines
+    /// <summary>Les noms d'adaptateurs que Windows type « Ethernet » sans câble derrière (VPN, machines
     /// virtuelles, partage de connexion USB d'un téléphone). Liste de motifs relevés, pas une source : un adaptateur absent
     /// d'ici compte comme un câble.</summary>
     private static readonly string[] MotifsVirtuels =

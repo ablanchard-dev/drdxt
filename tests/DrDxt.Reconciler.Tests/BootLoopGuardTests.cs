@@ -4,15 +4,15 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// T27b — the anti boot-loop guard threshold logic, in isolation.
+// La logique de seuil de la garde anti-boucle de démarrage, isolée.
 // -----------------------------------------------------------------------
 public sealed class BootLoopGuardTests
 {
     [Theory]
     [InlineData(0, 3, false)]
     [InlineData(2, 3, false)]
-    [InlineData(3, 3, true)]   // at threshold → suspend
-    [InlineData(5, 3, true)]   // over threshold → suspend
+    [InlineData(3, 3, true)]   // au seuil → suspendre
+    [InlineData(5, 3, true)]   // au-dessus du seuil → suspendre
     public async Task ShouldSuspend_IsTrue_AtOrOverThreshold(int streak, int threshold, bool expected)
     {
         var store = new FakeBootOutcomeStore { Streak = streak };
@@ -24,8 +24,8 @@ public sealed class BootLoopGuardTests
     [Fact]
     public async Task ShouldSuspend_FailsSafe_WhenStreakUnreadable()
     {
-        // If we cannot confirm boots are healthy, suspend GPU re-apply (do not
-        // re-impose a tweak that might be the cause of the loop) — fail-safe.
+        // Si on ne peut pas confirmer que les démarrages sont sains, suspendre la réapplication GPU
+        // (ne pas réimposer un levier qui pourrait causer la boucle) : sûreté intégrée.
         var store = new FakeBootOutcomeStore { Fail = true };
         var guard = new BootLoopGuard(store, threshold: 3);
 

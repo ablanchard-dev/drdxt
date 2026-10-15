@@ -6,7 +6,7 @@ using Xunit.Abstractions;
 namespace DrDxt.Detection.Tests.Cpu;
 
 // -----------------------------------------------------------------------
-// 19/09/2026. L'instrument du tour 122 accuse enfin quelqu'un.
+// Le chronometre accuse enfin quelqu'un.
 //
 // Le chronometre lecteur par lecteur, ecrit pour arreter de supposer, rend aujourd'hui :
 //
@@ -24,8 +24,8 @@ namespace DrDxt.Detection.Tests.Cpu;
 // Mon hypothese, et la mesure qui l'a rabotee. J'ai accuse `Localiser`, corrige, puis
 // remesure : le total tombe a 4 996 ms. **490 ms gagnes, pas 5 200.** Attribution en trois
 // phases dans un processus neuf : 427 ms pour resoudre cinq noms tables froides, 4 543 ms
-// pour le premier `Lire()` une fois les noms resolus, 11,6 ms a chaud. Le plateau ouvert
-// depuis le tour 116 est enfin nomme — c'est l'initialisation de perflib au premier
+// pour le premier `Lire()` une fois les noms resolus, 11,6 ms a chaud. Le plateau restant
+// est nomme — c'est l'initialisation de perflib au premier
 // `new PerformanceCounter` du processus, et elle n'est pas dans notre code.
 //
 // Ce que ce fichier garde reste vrai et utile : `Localiser` relisait tout, a chaque nom.
@@ -53,7 +53,7 @@ namespace DrDxt.Detection.Tests.Cpu;
 /// Quatorze classes de ce projet lisent les memes compteurs, et xunit fait tourner les
 /// collections en parallele : seuls, mes six tests passaient ; dans la suite complete, deux
 /// rougissaient — une autre classe relisait la table pendant que je comptais, ou lisait la
-/// mienne pendant que je l'avais rendue muette. Le meme piege qu'au tour 125 : un test vert
+/// mienne pendant que je l'avais rendue muette. Le piege connu : un test vert
 /// isole et rouge avec les autres ne prouve pas ce qu'il dit.
 /// </summary>
 [CollectionDefinition(LaTableDesCompteursNeSeRelitPasAChaqueNomTests.NomDeLaCollection,
@@ -194,7 +194,7 @@ public sealed class LaTableDesCompteursNeSeRelitPasAChaqueNomTests(ITestOutputHe
         sortie.WriteLine("(mesure indicative : la duree depend de la machine et de la charge)");
 
         // Ce test n'AFFIRMAIT rien : trois chronometres et pas une assertion. Le crible de
-        // non-vacuite du tour 113 l'a pris en suite complete — il a fait son travail sur moi.
+        // non-vacuite l'a pris en suite complete.
         // Ce qui se tient sans dependre d'un chronometre : les trois phases ont mesure quelque
         // chose de reel, donc les noms se sont resolus et le lecteur rend un etat.
         CpuFrequencyReader.Localiser("Processor Information").Should().NotBeNull();

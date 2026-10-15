@@ -4,7 +4,7 @@ using DrDxt.Core;
 namespace DrDxt.Application.Parties;
 
 /// <summary>
-/// 04/10/2026 (plan 3.2) : un changement (réglage du BIOS, levier, bascule) suivi d'un arrêt brutal ou d'une erreur
+/// Un changement (réglage du BIOS, levier, bascule) suivi d'un arrêt brutal ou d'une erreur
 /// matérielle dans la semaine est la première piste ; le docteur rapprochait déjà les incidents des pilotes installés,
 /// pas des réglages. Une semaine sans incident après un changement se dit aussi : c'est ce qui permet de le garder.
 /// Pur : le journal des changements, les dates d'arrêts et d'erreurs, et l'heure, viennent de l'appelant.
@@ -13,28 +13,31 @@ public static class StabiliteApresChangement
 {
     public static readonly TimeSpan Surveillance = TimeSpan.FromDays(7);
 
-    /// <summary>Revue adverse du 09/10/2026 (R7) : un journal d'arrêts ou d'erreurs illisible, et des changements récents à
+    /// <summary>Un journal d'arrêts ou d'erreurs illisible, et des changements récents à
     /// suivre : « non lu ». Sans changement récent, rien à rapprocher, rien à dire.</summary>
     public static IEnumerable<RepairFinding> NonLu(IReadOnlyList<Changement> changements, DateTimeOffset maintenant)
         => changements.Any(c => c.Cle?.StartsWith("pose:", StringComparison.Ordinal) != true && maintenant - c.Quand <= TimeSpan.FromDays(30))
             ? [new RepairFinding("STABILITE", "après un changement", null, null, RepairStatus.Unknown,
-                "le journal des arrêts ou celui des erreurs matérielles n'a pas pu être lu : DrDXT ne sait pas si tes changements "
-                + "récents ont été suivis d'un incident.")]
+                Docteur.T("SA.NonLu"))]
             : [];
 
     public static IEnumerable<RepairFinding> Juger(IReadOnlyList<Changement> changements, IReadOnlyList<DateTimeOffset> arrets,
         IReadOnlyList<DateTimeOffset> erreursMaterielles, DateTimeOffset maintenant)
     {
-        string D(DateTimeOffset d) => d.LocalDateTime.ToString("dd/MM HH:mm", CultureInfo.InvariantCulture);
-        // UI1 (08/10/2026) : « 1 arrêt(s) brutal(aux) » vu sur capture ; le nombre choisit sa forme (moins de 2 : singulier).
-        static string N(int n, string un, string plusieurs) => $"{n} {(n < 2 ? un : plusieurs)}";
+        var format = Docteur.T("SA.Date");
+        string D(DateTimeOffset d) => d.LocalDateTime.ToString(format, CultureInfo.InvariantCulture);
+        // Le nombre choisit sa forme, jamais « 1 arrêt(s) brutal(aux) » : en français le singulier va jusque sous 2 (« 1,5 jour »),
+        // en anglais il ne vaut que pour 1 (« 0.4 days », « 1.5 days »).
         static string Jours(double j)
         {
             var arrondi = Math.Round(j, 1);
-            return $"{arrondi.ToString("0.#", CultureInfo.GetCultureInfo("fr-FR"))} {(arrondi < 2 ? "jour" : "jours")}";
+            var singulier = Docteur.Langue.TwoLetterISOLanguageName == "fr" ? arrondi < 2 : arrondi == 1;
+            return Docteur.T(singulier ? "SA.Jour" : "SA.Jours", arrondi.ToString("0.#", Docteur.Langue));
         }
+        string Arrets(List<DateTimeOffset> a) => a.Count == 1 ? Docteur.T("SA.Arret1", D(a[0])) : Docteur.T("SA.Arrets", a.Count, D(a[0]));
+        string Erreurs(List<DateTimeOffset> w) => w.Count == 1 ? Docteur.T("SA.Erreur1", D(w[0])) : Docteur.T("SA.Erreurs", w.Count, D(w[0]));
 
-        // Chaque constat garde le rang de son changement : la sortie suit l'ordre des changements (revue n° 15).
+        // Chaque constat garde le rang de son changement : la sortie suit l'ordre des changements.
         var sortie = new List<(int Rang, RepairFinding F)>();
         var suspects = new List<(int Rang, Changement C, List<DateTimeOffset> A, List<DateTimeOffset> W)>();
         var rang = 0;
@@ -48,13 +51,12 @@ public static class StabiliteApresChangement
             if (a.Count + w.Count > 0)
                 suspects.Add((rang, c, a, w));
             else if (maintenant < fin)
-                sortie.Add((rang, new RepairFinding("STABILITE", "après un changement", "aucun incident pour l'instant", "aucun incident",
+                sortie.Add((rang, new RepairFinding("STABILITE", "après un changement", Docteur.T("SA.PourLInstant"), Docteur.T("SA.AucunIncident"),
                     RepairStatus.Observed,
-                    $"depuis {c.Libelle} ({D(c.Quand)}) : aucun arrêt brutal ni erreur matérielle, après {Jours((maintenant - c.Quand).TotalDays)} "
-                    + $"sur les {Surveillance.TotalDays:0} de surveillance.")));
+                    Docteur.T("SA.Depuis", c.Libelle, D(c.Quand), Jours((maintenant - c.Quand).TotalDays), Surveillance.TotalDays))));
         }
 
-        // UI1 (08/10/2026), revue n° 15 : les changements qui partagent AU MOINS un incident se disent ensemble, de proche en
+        // Les changements qui partagent au moins un incident se disent ensemble, de proche en
         // proche (A voit l'arrêt du jour 5, B ceux des jours 5 et 9 : un seul constat, qui n'accuse aucun des deux).
         var groupe = Enumerable.Range(0, suspects.Count).ToArray();
         int Racine(int i) { while (groupe[i] != i) i = groupe[i] = groupe[groupe[i]]; return i; }
@@ -70,28 +72,39 @@ public static class StabiliteApresChangement
                 var a = g.SelectMany(x => x.A).Distinct().Order().ToList();
                 var w = g.SelectMany(x => x.W).Distinct().Order().ToList();
                 var faitsCommuns = new List<string>();
-                if (a.Count > 0) faitsCommuns.Add($"{N(a.Count, "arrêt brutal", "arrêts brutaux")} (le {(a.Count == 1 ? "" : "premier le ")}{D(a[0])})");
-                if (w.Count > 0) faitsCommuns.Add($"{N(w.Count, "erreur matérielle", "erreurs matérielles")} (la première le {D(w[0])})");
-                var liste = string.Join(" ; ", g.Select(x => $"{x.C.Libelle} ({D(x.C.Quand)})"));
-                sortie.Add((g.Min(x => x.Rang), new RepairFinding("STABILITE", "après un changement", string.Join(", ", faitsCommuns), "aucun incident",
+                if (a.Count > 0) faitsCommuns.Add(Arrets(a));
+                if (w.Count > 0) faitsCommuns.Add(Erreurs(w));
+                var liste = string.Join(Docteur.T("SA.Separateur"), g.Select(x => $"{x.C.Libelle} ({D(x.C.Quand)})"));
+                sortie.Add((g.Min(x => x.Rang), new RepairFinding("STABILITE", "après un changement", string.Join(", ", faitsCommuns), Docteur.T("SA.AucunIncident"),
                     RepairStatus.Suspicious,
-                    $"dans la semaine qui a suivi {g.Count} changements ({liste}) : {string.Join(" et ", faitsCommuns)}. C'est un "
-                    + "rapprochement de dates, pas une preuve, et il ne désigne aucun d'eux en particulier : reviens sur eux un à la "
-                    + "fois, le plus récent d'abord, puis regarde si les incidents s'arrêtent.",
-                    RepairAction.Recommandation)));
+                    Docteur.T("SA.Groupe", g.Count, liste, string.Join(Docteur.T("SA.Et"), faitsCommuns)),
+                    RepairAction.Recommandation,
+                    Remede: Docteur.T("SA.Groupe.Remede", g.MaxBy(x => x.C.Quand).C.Libelle))));
                 continue;
             }
             var (r, c, aSeul, wSeul) = g[0];
             var faits = new List<string>();
-            if (aSeul.Count > 0) faits.Add($"{N(aSeul.Count, "arrêt brutal", "arrêts brutaux")} ({(aSeul.Count == 1 ? "le" : "le premier le")} {D(aSeul[0])}, {Jours((aSeul[0] - c.Quand).TotalDays)} après)");
-            if (wSeul.Count > 0) faits.Add($"{N(wSeul.Count, "erreur matérielle", "erreurs matérielles")} (la première le {D(wSeul[0])})");
-            sortie.Add((r, new RepairFinding("STABILITE", "après un changement", string.Join(", ", faits), "aucun incident",
+            if (aSeul.Count > 0)
+                faits.Add(aSeul.Count == 1
+                    ? Docteur.T("SA.Arret1Apres", D(aSeul[0]), Jours((aSeul[0] - c.Quand).TotalDays))
+                    : Docteur.T("SA.ArretsApres", aSeul.Count, D(aSeul[0]), Jours((aSeul[0] - c.Quand).TotalDays)));
+            if (wSeul.Count > 0) faits.Add(Erreurs(wSeul));
+            sortie.Add((r, new RepairFinding("STABILITE", "après un changement", string.Join(", ", faits), Docteur.T("SA.AucunIncident"),
                 RepairStatus.Suspicious,
-                $"dans la semaine qui a suivi {c.Libelle} ({D(c.Quand)}) : {string.Join(" et ", faits)}. C'est un rapprochement "
-                + "de dates, pas une preuve, mais c'est une piste : revenir au réglage d'avant, puis regarder si les "
-                + "incidents s'arrêtent.",
-                RepairAction.Recommandation)));
+                Docteur.T("SA.Seul", c.Libelle, D(c.Quand), string.Join(Docteur.T("SA.Et"), faits)),
+                RepairAction.Recommandation,
+                Remede: Docteur.T("SA.Seul.Remede", GesteDeRetour(c.Libelle)))));
         }
         return sortie.OrderBy(x => x.Rang).Select(x => x.F).ToList();
     }
+
+    // Le libellé d'un réglage du BIOS porte l'avant et l'après (Changement.Bios, dans les deux langues) : le geste dit la
+    // valeur à remettre. Tout autre changement se nomme tel quel.
+    private static readonly System.Text.RegularExpressions.Regex ReglageBios =
+        new("« (?<avant>.+) » passé à « (?<nouveau>.+) »|\"(?<avant>.+)\" changed to \"(?<nouveau>.+)\"");
+
+    internal static string GesteDeRetour(string libelle)
+        => ReglageBios.Match(libelle) is { Success: true } m
+            ? Docteur.T("SA.Retour.Bios", m.Groups["avant"].Value, m.Groups["nouveau"].Value)
+            : Docteur.T("SA.Retour.Autre", libelle);
 }

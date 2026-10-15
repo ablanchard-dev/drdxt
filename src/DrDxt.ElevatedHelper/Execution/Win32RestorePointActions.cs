@@ -6,10 +6,10 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Execution;
 
 // -----------------------------------------------------------------------
-// Win32RestorePointActions — the real System Restore point (m2smoke boundary).
+// Win32RestorePointActions : le vrai point de Restauration du système (frontière du m2smoke).
 //
-// 06/10/2026 (plans 4.5 et 4.5b) : le point se cree par l'outil de Windows, Checkpoint-Computer
-// (CreerParCheckpoint). SRSetRestorePoint n'a cree aucun point sur 4 essais sur ma machine ; l'appel WMI
+// Le point se cree par l'outil de Windows, Checkpoint-Computer
+// (CreerParCheckpoint). SRSetRestorePoint n'a cree aucun point sur 4 essais sur la machine de référence ; l'appel WMI
 // direct depuis ce helper, 0 sur 2 ; Checkpoint-Computer, 3 sur 3. Le helper ne cree que sous le nom fixe
 // de DrDXT, et retire ses plus anciens points, du plus ancien de la machine seulement (Volsnap efface dans
 // l'ordre). Sources : learn.microsoft.com, SRSetRestorePointA et « Calling SRSetRestorePoint ». Un code non nul est un
@@ -26,7 +26,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
     private readonly Func<IReadOnlyList<(uint Sequence, string Description)>> _lister;
     private readonly Func<uint, uint> _retirer;
 
-    /// <summary>06/10/2026 (plan 4.5b, le mainteneur : « DrDXT garde actif max 2 points »).</summary>
+    /// <summary>Points de restauration de DrDXT gardés au plus ; les plus anciens sont retirés.</summary>
     public const int PointsGardes = 2;
 
     public Win32RestorePointActions() : this(CreerParCheckpoint, ListerParWmi, SRRemoveRestorePoint) { }
@@ -47,7 +47,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
         try
         {
             var (code, erreur) = _creerParWmi(Truncate(description));
-            // Revue du 06/10 (P1) : powershell -Command sort 1 sur toute erreur ; la raison est la 1re ligne
+            // Powershell -Command sort 1 sur toute erreur ; la raison est la 1re ligne
             // de sa sortie d'erreur, et c'est elle que l'écran dit.
             var cree = code != 0 && PremiereLigne(erreur) is { } raison ? Fail(raison) : LireRetour(code, "Checkpoint-Computer");
             if (cree.IsOk) Elaguer();
@@ -59,9 +59,9 @@ public sealed class Win32RestorePointActions : IRestorePointActions
         }
     }
 
-    /// <summary>06/10/2026 (plan 4.5b) : le point est créé par l'outil de Windows lui-même. Décompilé
+    /// <summary>Le point est créé par l'outil de Windows lui-même. Décompilé
     /// (Microsoft.PowerShell.Commands.Management, CheckpointComputerCommand) : il appelle la même méthode WMI, puis son
-    /// processus relit la liste jusqu'à voir le point (90 s). Lancé ainsi, il a réussi 3 fois sur 3 sur ma machine,
+    /// processus relit la liste jusqu'à voir le point (90 s). Lancé ainsi, il a réussi 3 fois sur 3 sur la machine de référence,
     /// une fois 18 s après un échec ; appelé depuis le helper lancé par l'App, le même appel WMI a échoué 2 fois sur 2
     /// (VSS 8193). Code de sortie 0 = accepté ; le point est relu par SafetyManager.</summary>
     private static string? PremiereLigne(string? texte)
@@ -82,7 +82,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
             RedirectStandardError = true,
         };
         foreach (var a in ArgumentsCheckpoint(description)) psi.ArgumentList.Add(a);
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException("powershell.exe non lancé");
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("powershell.exe not started");
         var sortie = p.StandardOutput.ReadToEndAsync();
         var erreurs = p.StandardError.ReadToEndAsync();
         // Checkpoint-Computer attend lui-même le point jusqu'à 90 s (décompilé) : 120 s laissent la marge.
@@ -152,8 +152,8 @@ public sealed class Win32RestorePointActions : IRestorePointActions
     [System.Runtime.InteropServices.DllImport("srclient.dll")]
     private static extern uint SRRemoveRestorePoint(uint dwRPNum);
 
-    /// <summary>Revue du 06/10 (P1) : le code des méthodes WMI de SystemRestore est un uint32, et un échec réel est
-    /// un HRESULT (0x80070422 : service désactivé). Lu en int, il débordait (création) ou ne se lisait pas et passait
+    /// <summary>Le code des méthodes WMI de SystemRestore est un uint32, et un échec réel est
+    /// un HRESULT (0x80070422 : service désactivé). Lu en int, il déborderait (création) ou ne se lirait pas et passerait
     /// pour un succès (activation). Absent ou illisible : échec, jamais succès.</summary>
     internal static Result LireRetour(object? retour, string methode)
     {
@@ -164,21 +164,21 @@ public sealed class Win32RestorePointActions : IRestorePointActions
     }
 
     // -------------------------------------------------------------------
-    // EnableSystemRestore — the real "turn System Restore ON" (m2smoke boundary).
+    // EnableSystemRestore : le vrai « activer la Restauration du système » (frontière du m2smoke).
     //
-    // Mirrors the proven qa/enable_sr.ps1 sequence in C#:
+    // Reprend en C# la séquence éprouvée de qa/enable_sr.ps1 :
     //   1. Enable-ComputerRestore  → WMI root\default:SystemRestore.Enable(drive).
-    //   2. vssadmin resize shadowstorage … /maxsize=5%  → give SR room to keep a
-    //      point (a 0-byte allocation silently no-ops the create).
-    // The drive is already allowlist-validated (system drive only). A failed Enable
-    // is fatal (return Fail); the shadow-storage resize is best-effort (SR can still
-    // create a point on a default allocation) so a resize hiccup does not block.
-    // Never throws — every boundary is wrapped → Result.
+    //   2. vssadmin resize shadowstorage … /maxsize=5%  → laisser à la restauration la place de
+    //      garder un point (une allocation de 0 octet rend la création sans effet, en silence).
+    // Le lecteur est déjà validé par l'allowlist (lecteur système seulement). Un Enable raté est
+    // fatal (rend Fail) ; le redimensionnement du shadow storage est au mieux (la restauration peut
+    // créer un point sur l'allocation par défaut), un accroc de redimensionnement ne bloque donc pas.
+    // Ne lève jamais : chaque frontière est emballée → Result.
     // -------------------------------------------------------------------
-    // Drive-root form the WMI SystemRestore.Enable + vssadmin expect, e.g. "C:\".
-    // 25/09/2026 : meme normalisation que OpAllowlist.NormalizeDriveLetter. L'allowlist validait la
-    // lettre ROGNEE et l'executeur construisait la racine avec la valeur BRUTE : « C » donnait « C\ »,
-    // « C: » avec espace donnait « C: \ ». Le valide et l'execute doivent etre la meme chaine.
+    // La racine de lecteur qu'attendent SystemRestore.Enable (WMI) et vssadmin, par exemple « C:\ ».
+    // Meme normalisation que OpAllowlist.NormalizeDriveLetter. Si l'allowlist validait la
+    // lettre rognee et que l'executeur construisait la racine avec la valeur brute, « C » donnerait « C\ »,
+    // « C: » avec espace donnerait « C: \ ». Le valide et l'execute doivent etre la meme chaine.
     internal static string DriveRoot(string driveLetter) =>
         driveLetter.Trim().TrimEnd('\\', '/').TrimEnd(':').ToUpperInvariant() + ":\\";
 
@@ -195,10 +195,10 @@ public sealed class Win32RestorePointActions : IRestorePointActions
             if (!enabled.IsOk)
                 return enabled;
 
-            // Best-effort: size the shadow storage to ~5% so a point can be kept. A
-            // failure here is not fatal (SR may already have a usable allocation).
-            // 07/10/2026 (revue F-13) : seulement quand aucune reserve n'existe. Une reserve deja fixee
-            // (2 %, illimitee) est un choix de l'utilisateur ou de Windows : DrDXT ne l'ecrase plus, faute de pouvoir la rendre.
+            // Au mieux : dimensionner le shadow storage à ~5 % pour qu'un point puisse être gardé. Un
+            // échec ici n'est pas fatal (la restauration a peut-être déjà une allocation utilisable).
+            // Seulement quand aucune reserve n'existe. Une reserve deja fixee
+            // (2 %, illimitee) est un choix de l'utilisateur ou de Windows : DrDXT ne l'ecrase pas, faute de pouvoir la rendre.
             if (DoitRedimensionner(LireReserves()))
                 ResizeShadowStorage(root);
 
@@ -210,7 +210,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
         }
     }
 
-    // Enable-ComputerRestore equivalent: WMI root\default:SystemRestore.Enable(drive).
+    // Équivalent d'Enable-ComputerRestore : WMI root\default:SystemRestore.Enable(drive).
     private static Result EnableComputerRestore(string driveRoot)
     {
         try
@@ -220,7 +220,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
             inParams["Drive"] = driveRoot;
             using var outParams = cls.InvokeMethod("Enable", inParams, null);
 
-            // ReturnValue 0 = success; anything else (incl. unsupported SKU / GPO) → Fail.
+            // ReturnValue 0 = succès ; tout le reste (y compris SKU non pris en charge / GPO) → Fail.
             return LireRetour(outParams?["ReturnValue"], "SystemRestore.Enable");
         }
         catch (Exception ex)
@@ -229,7 +229,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
         }
     }
 
-    /// <summary>07/10/2026 (F-13) : redimensionner seulement quand aucune reserve n'a de place. Non lu (null) = ne pas toucher.
+    /// <summary>Redimensionner seulement quand aucune reserve n'a de place. Non lu (null) = ne pas toucher.
     /// Limite connue : toutes les reserves de la machine, pas celle du seul disque systeme ; la jointure Win32_Volume si un
     /// second disque protege fausse la decision.</summary>
     internal static bool DoitRedimensionner(IReadOnlyList<ulong>? reserves) => reserves is not null && reserves.All(r => r == 0);
@@ -248,8 +248,8 @@ public sealed class Win32RestorePointActions : IRestorePointActions
     }
 
     // vssadmin resize shadowstorage /for=<drive> /on=<drive> /maxsize=5%.
-    // Best-effort: a non-zero exit is swallowed (the caller treats Enable as the
-    // gate; the resize only improves retention).
+    // Au mieux : une sortie non nulle est avalée (l'appelant tient Enable pour la barrière ;
+    // le redimensionnement ne fait qu'améliorer la conservation).
     private static void ResizeShadowStorage(string driveRoot)
     {
         try
@@ -269,7 +269,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
         }
         catch
         {
-            // Best-effort only — SR can still create a point on its default allocation.
+            // Au mieux seulement : la restauration peut encore créer un point sur son allocation par défaut.
         }
     }
 

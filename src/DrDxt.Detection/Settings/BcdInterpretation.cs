@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Settings;
 
 /// <summary>
-/// Ce qu'une entree BCD veut dire — et l'argument qui se passe de valeur par defaut.
+/// Ce qu'une entree BCD veut dire, et l'argument qui se passe de valeur par defaut.
 ///
 /// `bcdedit /enum` ne liste que les elements presents dans le magasin. En lire un prouve donc
 /// que quelqu'un l'a ecrit : c'est une propriete de l'outil, pas une supposition sur un etat
@@ -11,11 +11,11 @@ namespace DrDxt.Detection.Settings;
 /// jugeable la ou le MMCSS ne l'etait pas.
 ///
 /// Ce que ce juge ne dit pas : qu'un de ces elements coute des performances. Il dit ce qu'ils
-/// FONT — imposer a Windows un choix qu'il fait seul — et que les retirer lui rend la decision.
+/// font (imposer a Windows un choix qu'il fait seul) et que les retirer lui rend la decision.
 /// Chiffrer un effet demanderait une mesure que personne n'a faite.
 ///
 /// Pourquoi cette logique vit ici et non dans l'outil. Elle etait un `switch` en ligne dans
-/// `tools/repairaudit`, donc intestable — et la machine de reference ne pose aucun element de la
+/// `tools/repairaudit`, donc intestable, et la machine de reference ne pose aucun element de la
 /// famille horloge, si bien que ce chemin n'etait jamais exercé. « Ca compile » n'est pas « ca
 /// marche » : c'est le meme motif que le regroupement des echecs de services, extrait le meme jour
 /// pour la meme raison.
@@ -38,41 +38,35 @@ public static class BcdInterpretation
             new RepairFinding("BCD", cle, valeur, "IgnoreShutdownFailures", RepairStatus.Suspicious,
                 Action: RepairAction.Recommandation,
                 Explication:
-                "Windows n'affichera plus l'écran de récupération après un démarrage raté. C'est "
-                + "une modification fréquente des scripts d'optimisation, et elle cache les "
-                // Revue adverse du 09/10/2026 : une recommandation porte son geste ; DrDXT a la carte qui le fait (et l'annule).
-                + "symptômes au lieu de les corriger. DrDXT te propose de remettre le réglage de Windows, et de l'annuler "
-                + "si tu changes d'avis."),
+                Docteur.T("BC.BootStatus"),
+                // Une recommandation porte son geste ; DrDXT a la carte qui le fait (et l'annule).
+                Remede: Docteur.T("BC.BootStatus.Remede")),
 
         "hypervisorlaunchtype" when valeur.Equals("Auto", StringComparison.OrdinalIgnoreCase) =>
             new RepairFinding("BCD", cle, valeur, "Auto", RepairStatus.ExpectedDefault,
-                // Revue adverse du 09/10/2026 (R12) : « coûte un peu en jeu » sans source ni lecture de l'état de la VBS ;
+                // « coûte un peu en jeu » sans source ni lecture de l'état de la VBS ;
                 // le coût mesuré connu est celui de l'intégrité de la mémoire, qui a son propre constat.
-                "L'hyperviseur démarre : c'est le réglage par défaut de Windows. Son coût en jeu, s'il y en a, se lit au "
-                + "constat de l'intégrité de la mémoire. DrDXT ne le désactive pas à ta place."),
+                Docteur.T("BC.Hyperviseur")),
 
         var k when FamilleHorloge.Contains(k) =>
-            new RepairFinding("BCD", cle, valeur, "élément absent", RepairStatus.NonDefault,
+            new RepairFinding("BCD", cle, valeur, Docteur.T("BC.Absent"), RepairStatus.NonDefault,
                 Action: RepairAction.Recommandation,
                 Explication:
-                // 17/09/2026, doc Microsoft « BCDEdit /set » (29/04/2024) : useplatformclock, useplatformtick,
+                // Doc Microsoft « BCDEdit /set » : useplatformclock, useplatformtick,
                 // tscsyncpolicy et disabledynamictick portent chacun la note « This option should only be
                 // used for debugging ». C'est ce que la phrase dit, et rien de plus.
-                "Windows ne pose pas ce réglage de lui-même : un programme ou un script l'a ajouté. "
-                + "Il force l'horloge que Windows utilise, alors que Windows la choisit seul selon "
-                + "ton matériel, et Microsoft réserve cette option au débogage. Le retirer rend la "
-                + "décision à Windows ; ce n'est pas un gain promis, et rien ici ne chiffre un effet."),
+                Docteur.T("BC.Horloge"),
+                // Pas de carte pour ces éléments : le geste est la commande, sur l'élément lu.
+                Remede: Docteur.T("BC.Horloge.Remede", k)),
 
         "increaseuserva" =>
-            new RepairFinding("BCD", cle, valeur, "élément absent", RepairStatus.NonDefault,
-                "Windows ne pose pas ce réglage de lui-même : quelqu'un l'a ajouté. Il donne plus "
-                + "de mémoire aux anciens programmes 32 bits, n'a aucun effet sur un jeu 64 bits, "
-                + "et réduit la mémoire réservée à Windows. C'est un constat, pas une panne."),
+            new RepairFinding("BCD", cle, valeur, Docteur.T("BC.Absent"), RepairStatus.NonDefault,
+                Docteur.T("BC.UserVa")),
 
         // Le repli est une vraie reponse : le produit lit l'entree et dit qu'il ne sait pas la
         // juger. La ranger en `Observed` plutot qu'en `NonDefault` evite de transformer chaque
-        // ligne de `bcdedit` en anomalie — la plupart sont posees par Windows lui-meme.
+        // ligne de `bcdedit` en anomalie : la plupart sont posees par Windows lui-meme.
         _ => new RepairFinding("BCD", cle, valeur, null, RepairStatus.Observed,
-            "Réglage lu, mais DrDXT ne sait pas encore dire ce qu'il change."),
+            Docteur.T("BC.Inconnu")),
     };
 }

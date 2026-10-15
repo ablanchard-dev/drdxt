@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Infrastructure.Tests;
 
 /// <summary>
-/// 16/09/2026 : deux constats affiches affirmaient ce que rien ne prouve. « Plus frequente
+/// Deux constats affiches affirmaient ce que rien ne prouve. « Plus frequente
 /// qu'on ne le croit » n'a aucune source. « DrDXT sait desormais le mesurer » etait faux : le scan
 /// mesure la stabilite du reseau (passerelle contre internet), il ne compare pas la carte avec et sans
 /// moderation d'interruption.

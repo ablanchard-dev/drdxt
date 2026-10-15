@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Reconciler.Tests;
 
-/// <summary>28/09/2026 : la protection du ping portée par le service, sans DrDXT ouvert. À chaque battement :
+/// <summary>La protection du ping portée par le service, sans DrDXT ouvert. À chaque battement :
 /// le réglage retenu est relu, le plafond posé si le jeu tourne, retiré sinon. Pas de bail dans le service
 /// (il n'y a pas de helper séparé qui pourrait mourir seul) : le filet, c'est le retrait au démarrage et à
 /// l'arrêt, et les politiques QoS disparaissent de toute façon au redémarrage.</summary>
@@ -117,7 +117,7 @@ public sealed class ProtectionDuPingParLeServiceTests
         public Task<Result<string>> ExportAsync() => Task.FromResult(Result<string>.Ok(""));
     }
 
-    // 28/09/2026 : une pose ou un retrait du service se voit après coup, comme ceux de l'App. Sans journal, la
+    // Une pose ou un retrait du service se voit après coup, comme ceux de l'App. Sans journal, la
     // protection portée par le service était invisible en vraie partie.
     [Fact]
     public async Task Chaque_pose_et_chaque_retrait_reussis_s_ecrivent_au_journal()

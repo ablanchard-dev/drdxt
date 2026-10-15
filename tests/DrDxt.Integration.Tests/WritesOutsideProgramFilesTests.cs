@@ -13,8 +13,7 @@ namespace DrDxt.Integration.Tests;
 /// avant, cote source : tout etat persistant (logs, config, marqueurs) doit se calculer depuis
 /// un dossier utilisateur, jamais depuis le repertoire de l'application.
 ///
-/// Verifie le 27/08/2026 : les cinq chemins d'ecriture connus passent tous par
-/// LocalApplicationData -- mais rien ne l'imposait. Ce fichier est ce qui l'impose.
+/// Les chemins d'ecriture connus passent tous par LocalApplicationData ; ce fichier l'impose.
 /// </summary>
 public sealed class WritesOutsideProgramFilesTests
 {
@@ -53,7 +52,7 @@ public sealed class WritesOutsideProgramFilesTests
         "SpecialFolder.ApplicationData",
         "SpecialFolder.CommonApplicationData", // %ProgramData% : admin-write, PAS Program Files
         "GetTempPath",
-        // 27/09/2026 : le dossier des donnees en un seul endroit, resolu sous LocalApplicationData
+        // Le dossier des donnees en un seul endroit, resolu sous LocalApplicationData
         // (DossierDonneesTests le prouve ; UnSeulDossierDeDonneesTests interdit qu'on le recalcule ailleurs).
         "DossierDonnees.",
     };
@@ -103,7 +102,7 @@ public sealed class WritesOutsideProgramFilesTests
     [Fact]
     public void TheKnownStateWriters_AllResolveFromAUserFolder()
     {
-        // Les ecrivains connus (le marqueur de siege de licence est parti le 23/09/2026). Si l'un d'eux change de racine, ce test le dit --
+        // Les ecrivains connus. Si l'un d'eux change de racine, ce test le dit,
         // et si un sixieme apparait ailleurs, le test precedent l'attrape.
         string[] writers =
         {

@@ -64,9 +64,9 @@ public class MemoryDetectorTests
     [Fact]
     public void Rated_speed_comes_from_part_number_when_wmi_speed_collapsed_to_configured()
     {
-        // Real post-BIOS-flash state on the reference machine: XMP reset, so WMI reports
-        // Speed == ConfiguredClockSpeed == 2667 (JEDEC). The 4000 rating only exists
-        // in the part number. RatedMhz must recover it so the regression is detectable.
+        // Vrai état après flash du BIOS sur la machine de référence : XMP remis à zéro, donc WMI annonce
+        // Speed == ConfiguredClockSpeed == 2667 (JEDEC). Le nominal 4000 n'existe que dans la
+        // référence. RatedMhz doit le retrouver pour que la régression soit détectable.
         var sut = new MemoryDetector(Wmi(("F4-4000C18-32GTES", "G Skill Intl", 2667, 2667)));
         sut.Detect().Value!.Single().RatedMhz.Should().Be(4000);
     }
@@ -74,8 +74,8 @@ public class MemoryDetectorTests
     [Fact]
     public void Detected_module_with_collapsed_wmi_speed_still_infers_xmp_off()
     {
-        // End-to-end guard: detect → infer. The whole point — DrDXT must catch
-        // "XMP got reset by a BIOS update" even when WMI hides the rated speed.
+        // Garde de bout en bout : détecter → inférer. Tout l'enjeu : DrDXT doit attraper
+        // « XMP remis à zéro par une mise à jour du BIOS » même quand WMI cache la vitesse nominale.
         var sut = new MemoryDetector(Wmi(("F4-4000C18-32GTES", "G Skill Intl", 2667, 2667)));
         var modules = sut.Detect().Value!;
         XmpInferencer.Infer(modules).Should().Be(TriState.Off);
@@ -84,8 +84,8 @@ public class MemoryDetectorTests
     [Fact]
     public void Wmi_speed_is_kept_when_it_already_reports_the_rated_speed()
     {
-        // Some boards report the rated speed in WMI Speed (here 6000 > the 6000 in the
-        // part number). max(wmi, parsed) must not regress that case.
+        // Certaines cartes mères annoncent la vitesse nominale dans WMI Speed (ici 6000 > le 6000 de
+        // la référence). max(wmi, analysé) ne doit pas régresser ce cas.
         var sut = new MemoryDetector(Wmi(("CMK32GX5M2B6000Z30", "Corsair", 4800, 6000)));
         sut.Detect().Value!.Single().RatedMhz.Should().Be(6000);
     }
@@ -93,8 +93,8 @@ public class MemoryDetectorTests
     [Fact]
     public void Unparseable_part_number_falls_back_to_wmi_speed()
     {
-        // Kingston Fury's compact encoding (KF4 32 = DDR4-3200) has no 4-digit run we
-        // parse → we must not invent a speed; keep the WMI value honestly.
+        // L'encodage compact de Kingston Fury (KF4 32 = DDR4-3200) n'a aucune suite de 4 chiffres à
+        // analyser → ne pas inventer une vitesse ; garder honnêtement la valeur WMI.
         var sut = new MemoryDetector(Wmi(("KF432C16BB1A", "Kingston", 3200, 3200)));
         sut.Detect().Value!.Single().RatedMhz.Should().Be(3200);
     }

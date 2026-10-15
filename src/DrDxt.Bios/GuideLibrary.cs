@@ -4,24 +4,24 @@ using DrDxt.Core;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// Data-driven guide library: the curated, validated <see cref="GuideTemplate"/>s.
-/// A genuine KB entry is keyed by <b>board + BIOS version</b> (decision §9.1) and is the
-/// Only thing that resolves as <see cref="GuideTemplate.IsVerified"/>; the per-vendor ×
-/// BIOS-UI generation and generic entries are best-known FALLBACKS only.
+/// Bibliothèque de guides pilotée par les données : les <see cref="GuideTemplate"/> curés et validés.
+/// Une vraie entrée de base de connaissance est indexée par <b>carte + version BIOS</b> et c'est la
+/// seule chose qui se résout en <see cref="GuideTemplate.IsVerified"/> ; les entrées par constructeur
+/// × génération d'interface BIOS et les entrées génériques ne sont que des meilleurs replis connus.
 ///
-/// PRECISION = the product (decision §9): a covered board + BIOS version → exact verified
-/// template; anything else → a labelled fallback (<see cref="GuideTemplate.IsVerified"/> =
-/// false) that still carries the exact setting names. <see cref="Resolve"/> never
-/// strands the user — it only fails on internally corrupt library data, which is
-/// rejected at construction by <see cref="GuideTemplateValidator"/>.
+/// La précision fait le produit : une carte + version BIOS couvertes → modèle exact vérifié ; tout
+/// le reste → un repli étiqueté (<see cref="GuideTemplate.IsVerified"/> = false) qui porte quand même
+/// les noms exacts des réglages. <see cref="Resolve"/> ne laisse jamais l'utilisateur en plan : il
+/// n'échoue que sur des données de bibliothèque corrompues en interne, rejetées à la construction
+/// par <see cref="GuideTemplateValidator"/>.
 /// </summary>
 public sealed class GuideLibrary : IGuideLibrary
 {
     private readonly IReadOnlyList<GuideTemplate> _templates;
 
     /// <summary>
-    /// Builds a library from already-validated templates. Use
-    /// <see cref="GuideLibraryFactory"/> to load the embedded data defensively.
+    /// Construit une bibliothèque à partir de modèles déjà validés. Utiliser
+    /// <see cref="GuideLibraryFactory"/> pour charger les données embarquées avec prudence.
     /// </summary>
     public GuideLibrary(IReadOnlyList<GuideTemplate> templates)
         => _templates = templates ?? throw new ArgumentNullException(nameof(templates));
@@ -34,11 +34,11 @@ public sealed class GuideLibrary : IGuideLibrary
             ? BiosUiGenerationDetector.Generic
             : biosUiGeneration.Trim();
 
-        // 0) The board + BIOS-version KB hit — the only match that can be Verified
-        //    (decision §9.1). A vendor/UI-generation entry never carries a board key,
-        //    so it can never be returned here, and so can never claim "verified for your
-        //    exact board". When the KB has no entry for this board (the current state),
-        //    we fall through to the honest best-known fallbacks below.
+        // 0) L'entrée carte + version BIOS de la base de connaissance : la seule correspondance qui puisse
+        //    être Verified. Une entrée constructeur / génération d'interface ne porte jamais de clé de
+        //    carte : elle ne peut donc jamais être rendue ici, ni annoncer « vérifié pour votre carte
+        //    exacte ». Quand la base n'a aucune entrée pour cette carte (l'état actuel), on passe aux
+        //    meilleurs replis connus et honnêtes ci-dessous.
         if (!string.IsNullOrWhiteSpace(board) && !string.IsNullOrWhiteSpace(biosVersion))
         {
             var b = board.Trim();
@@ -53,8 +53,8 @@ public sealed class GuideLibrary : IGuideLibrary
                 return Result<GuideTemplate>.Ok(boardExact);
         }
 
-        // 1) Best-known entry for this vendor × UI generation (a labelled fallback —
-        //    Never verified; the menu paths are the best available, not board-confirmed).
+        // 1) Meilleure entrée connue pour ce constructeur × génération d'interface (un repli étiqueté,
+        //    jamais vérifié ; les chemins de menu sont les meilleurs disponibles, pas confirmés pour la carte).
         var exact = _templates.FirstOrDefault(t =>
             t.Vendor == vendor &&
             string.IsNullOrWhiteSpace(t.Board) &&
@@ -78,25 +78,25 @@ public sealed class GuideLibrary : IGuideLibrary
         if (generic is not null)
             return Result<GuideTemplate>.Ok(generic);
 
-        // The embedded library always ships an Unknown×Generic entry, so reaching
-        // here means the data is internally incomplete → fail clean, never strand
-        // the caller with a null template.
+        // La bibliothèque embarquée livre toujours une entrée Unknown×Generic : arriver ici veut dire que
+        // les données sont incomplètes en interne → échec propre, ne jamais laisser l'appelant avec un
+        // modèle null.
         return Result<GuideTemplate>.Fail(
             ErrorCodes.BiosTemplateInvalid, "guide library is missing the generic fallback template");
     }
 }
 
 /// <summary>
-/// Loads the embedded guide data (<c>data/guides.json</c>) and builds a validated
-/// <see cref="GuideLibrary"/>. Defensive: a missing/corrupt embedded resource throws
-/// at startup wiring (a packaging bug we want loud), but the JSON content itself is
-/// validated via <see cref="GuideTemplateValidator"/> before use.
+/// Charge les données de guide embarquées (<c>data/guides.json</c>) et construit une
+/// <see cref="GuideLibrary"/> validée. Prudent : une ressource embarquée absente ou corrompue lève
+/// au branchement du démarrage (un bug d'empaquetage qu'on veut bruyant), mais le contenu JSON
+/// lui-même est validé par <see cref="GuideTemplateValidator"/> avant usage.
 /// </summary>
 public static class GuideLibraryFactory
 {
     private const string ResourceName = "DrDxt.Bios.data.guides.json";
 
-    /// <summary>Loads &amp; validates the embedded library; throws only on a packaging fault.</summary>
+    /// <summary>Charge et valide la bibliothèque embarquée ; ne lève que sur une faute d'empaquetage.</summary>
     public static GuideLibrary CreateDefault()
     {
         var json = ReadEmbedded();
@@ -107,7 +107,7 @@ public static class GuideLibraryFactory
         return new GuideLibrary(parsed.Value!);
     }
 
-    /// <summary>Loads the embedded library as a <see cref="Result"/> (no throw on bad data).</summary>
+    /// <summary>Charge la bibliothèque embarquée en <see cref="Result"/> (aucune exception sur de mauvaises données).</summary>
     public static Result<GuideLibrary> TryCreateDefault()
     {
         string json;

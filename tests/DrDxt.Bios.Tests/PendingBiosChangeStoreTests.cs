@@ -5,13 +5,13 @@ using FluentAssertions;
 namespace DrDxt.Bios.Tests;
 
 /// <summary>
-/// The pending-BIOS-change marker store: atomic write, fail-clean read (absent vs
-/// corrupt vs I/O), and round-trip fidelity. The marker is an OS file only — never a
-/// BIOS write. Timestamps come from an injected clock, never DateTime.Now.
+/// Le magasin de marqueur de changement BIOS en attente : écriture atomique, lecture à échec propre
+/// (absent, corrompu, E/S), et fidélité de l'aller-retour. Le marqueur est un fichier OS seulement,
+/// jamais une écriture BIOS. Les horodatages viennent d'une horloge injectée, jamais DateTime.Now.
 /// </summary>
 public class PendingBiosChangeStoreTests
 {
-    // ── A fixed clock so the persisted timestamp is asserted, not wall-clock. ──
+    // ── Une horloge fixe pour vérifier l'horodatage persisté, pas l'heure murale. ──
     private sealed class FixedBiosClock(DateTimeOffset now) : IBiosClock
     {
         public DateTimeOffset UtcNow { get; } = now;
@@ -31,8 +31,8 @@ public class PendingBiosChangeStoreTests
         CreatedUtc: clock.UtcNow,
         MachineId: "machine-abc");
 
-    // ── In-memory marker file: captures the bytes, supports a torn-write probe and a
-    //    forced I/O fault, so the store's logic is tested with no real disk. ──
+    // ── Fichier de marqueur en mémoire : capture les octets, permet une sonde d'écriture déchirée et
+    //    une faute d'E/S forcée, pour tester la logique du magasin sans vrai disque. ──
     private sealed class FakeMarkerFile : IBiosMarkerFile
     {
         public string? Content { get; set; }
@@ -42,7 +42,7 @@ public class PendingBiosChangeStoreTests
         public Result WriteAtomic(string json)
         {
             if (FailIo) return Result.Fail(ErrorCodes.BiosPendingChangeIo, "forced");
-            // Atomic by contract: the published content flips in one assignment.
+            // Atomique par contrat : le contenu publié bascule en une seule affectation.
             Content = json;
             Writes++;
             return Result.Ok();
@@ -121,7 +121,7 @@ public class PendingBiosChangeStoreTests
     [Fact]
     public void Load_marker_with_unknown_enum_is_corrupt()
     {
-        // String enums → an unknown setting name fails the read cleanly.
+        // Énumérations en chaîne → un nom de réglage inconnu fait échouer la lecture proprement.
         var file = new FakeMarkerFile
         {
             Content = """
@@ -177,11 +177,11 @@ public class PendingBiosChangeStoreTests
 
         store.Clear().IsOk.Should().BeTrue();
         store.Load().Value.Should().BeNull();
-        // Idempotent: clearing again when already absent is still Ok.
+        // Idempotent : effacer de nouveau quand c'est déjà absent reste Ok.
         store.Clear().IsOk.Should().BeTrue();
     }
 
-    // ── Real filesystem: atomicity + true round-trip through actual JSON on disk. ──
+    // ── Vrai système de fichiers : atomicité et vrai aller-retour par du JSON réel sur disque. ──
 
     [Fact]
     public void Real_filesystem_round_trip_and_atomic_publish()
@@ -195,7 +195,7 @@ public class PendingBiosChangeStoreTests
 
             store.Save(SampleChange(clock)).IsOk.Should().BeTrue();
 
-            // Atomic publish: the durable file exists, the temp sidecar does not linger.
+            // Publication atomique : le fichier durable existe, le fichier temporaire ne traîne pas.
             File.Exists(path).Should().BeTrue();
             File.Exists(path + ".tmp").Should().BeFalse();
 
@@ -243,7 +243,7 @@ public class PendingBiosChangeStoreTests
     [Fact]
     public void The_measured_baseline_SURVIVES_the_disk_round_trip()
     {
-        // Le test qui manquait, et son absence rendait le lot 1 INERTE en production.
+        // Le test qui manquait, et son absence rendait la boucle INERTE en production.
         // Le DTO disque n'avait pas ce champ : la grandeur mesuree etait jetee a l'ecriture et
         // reconstruite a null a la relecture. Comme BiosLoopVerifier ne voit les cibles que par
         // Load(), le juge par delta ne se declenchait jamais apres un redemarrage -- le seul
@@ -275,7 +275,7 @@ public class PendingBiosChangeStoreTests
         store.Load().Value!.Targets.Single().ObservedBefore.Should().BeNull();
     }
 
-    // 26/09/2026 : le marqueur vit sous %LOCALAPPDATA%, ecrivable par tout le compte, et il est relu au
+    // Le marqueur vit sous %LOCALAPPDATA%, ecrivable par tout le compte, et il est relu au
     // retour de Windows. Un contenu abime ne fait jamais lever, et ne se lit jamais comme un changement.
     public static TheoryData<string> Abimes() => new()
     {

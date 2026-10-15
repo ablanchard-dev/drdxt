@@ -5,13 +5,11 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Network;
 
 /// <summary>
-/// Trou trouve par l'audit du 07/09/2026. La carte de la machine de reference porte
-/// `Ethernet vert` = Active et `Power Saving Mode` = Active. `NetworkAdvisor` ne lisait ni l'un ni
-/// l'autre : il ne couvrait que la moderation d'interruption, RSS et EEE -- et EEE, lu, n'etait
-/// meme pas utilise. Le scanner disait donc « rien a signaler » sur des reglages bien presents.
+/// La carte de la machine de reference porte `Ethernet vert` = Active et `Power Saving Mode` = Active
+/// (releve). Sans ces lectures, le scanner dirait « rien a signaler » sur des reglages bien presents.
 ///
-/// Ce que ce constat n'a pas le droit de faire : promettre un gain. La recherche du 07/09
-/// (`docs/LEVIERS-REPOS-ET-RESEAU.md`, N-01 a N-03) ne trouve aucun chiffre pour le jeu -- le
+/// Ce que ce constat n'a pas le droit de faire : promettre un gain. La recherche documentee
+/// (`docs/LEVIERS-REPOS-ET-RESEAU.md`, N-01 a N-03) ne trouve aucun chiffre pour le jeu : le
 /// reveil du lien se compte en microsecondes, plusieurs ordres de grandeur sous notre plancher de
 /// bruit de 9,9 %. On signale, on ne chiffre pas.
 /// </summary>

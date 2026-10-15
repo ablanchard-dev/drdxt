@@ -23,7 +23,7 @@ public class CpuBudgetJugeTests
     [Fact]
     public void Un_epinglage_incomplet_sur_UNE_seule_mesure_suffit_a_tout_rendre_indetermine()
     {
-        // Le cas exact releve en revue : la passe intermediaire a rate son epinglage, donc ce debit
+        // Le cas exact releve : la passe intermediaire a rate son epinglage, donc ce debit
         // a ete mesure sur un cœur choisi par l'ordonnanceur, pas par nous.
         var verdict = CpuBudgetJuge.Juger(
             [Point(1, 1800), Point(8, 1600, epingles: 7), Point(1, 1798)],
@@ -77,7 +77,7 @@ public class CpuBudgetJugeTests
     [Fact]
     public void Une_HAUSSE_du_debit_n_est_jamais_un_bridage_etabli()
     {
-        // LE CAS RELEVE EN REVUE. `Math.Abs(ecart) > seuil` rendait « budget limitant etabli »
+        // LE CAS RELEVE. `Math.Abs(ecart) > seuil` rendait « budget limitant etabli »
         // pour une hausse de 10 %. L'outil d'origine ne le montrait pas — il n'imprimait la phrase
         // du budget que si l'ecart etait negatif — et l'extraction a perdu la distinction.
         var verdict = CpuBudgetJuge.Juger(

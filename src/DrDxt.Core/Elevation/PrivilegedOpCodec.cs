@@ -4,12 +4,12 @@ using System.Text.Json.Serialization;
 namespace DrDxt.Core;
 
 // -----------------------------------------------------------------------
-// PrivilegedOpType — the CLOSED discriminant for the wire form of a
-// PrivilegedOp. Each member maps 1:1 to exactly one sealed leaf. The codec
-// switches on this enum explicitly; it never resolves a type by name.
+// PrivilegedOpType : le discriminant fermé de la forme filaire d'un PrivilegedOp.
+// Chaque membre correspond à exactement une feuille scellée. Le codec fait un switch
+// explicite sur cette énumération ; il ne résout jamais un type par son nom.
 //
-// This is the on-wire mirror of the PrivilegedOp leaf allowlist. It grows only
-// by adding a member here AND a matching arm in the codec's two switches.
+// C'est le reflet sur le fil de l'allowlist des feuilles PrivilegedOp. Il ne grandit
+// qu'en ajoutant un membre ici et un bras correspondant dans les deux switch du codec.
 // -----------------------------------------------------------------------
 public enum PrivilegedOpType
 {
@@ -28,74 +28,85 @@ public enum PrivilegedOpType
     EnableSystemRestore = 12,
     EstablishLease = 13,
     RenewLease = 14,
-    // M3 lot 2. AJOUTES le 26/08 : sans eux, Serialize rendait le discriminant -1 et l'op ne
-    // pouvait pas traverser l'IPC -- donc le trajet vers le BIOS etait inerte des que le helper
-    // tourne hors du processus, c'est-a-dire en production. Les valeurs sont APPENDUES : ne
-    // jamais renumeroter, un ancien client et un nouveau serveur partagent ce fil.
+    // Sans ces entrees, Serialize rendrait le discriminant -1 et l'op ne traverserait pas l'IPC :
+    // le trajet vers le BIOS serait inerte des que le helper tourne hors du processus, c'est-a-dire
+    // en production. Les valeurs sont ajoutees en fin : ne jamais renumeroter, un ancien client et
+    // un nouveau serveur partagent ce fil.
     RebootToFirmwareSetup = 15,
     CancelPendingFirmwareBoot = 16,
     // Lecture seule. Il n'existe deliberement aucune op d'ecriture firmware dans cette
     // enumeration fermee : ecrire au mauvais offset d'un varstore peut rendre une carte non
     // demarrable, et l'offset depend du couple (modele x version de BIOS). Appendue, comme
-    // les precedentes -- ne jamais renumeroter.
+    // les precedentes : ne jamais renumeroter.
     ReadFirmwareVariable = 17,
-    // PHASE 18 F1 lot 3 (10/09/2026) : l'inverse d'une ecriture au profil d'un jeu. Appendue,
-    // comme les precedentes -- ne jamais renumeroter.
+    // L'inverse d'une ecriture au profil d'un jeu. Appendue,
+    // comme les precedentes : ne jamais renumeroter.
     DeleteNvApiDrsSetting = 18,
-    // 11/09/2026 : le manifeste signe, ecrit par le helper eleve. Appendue -- ne jamais renumeroter.
+    // Le manifeste signe, ecrit par le helper eleve. Appendue : ne jamais renumeroter.
     CommitManifest = 19,
-    // 24/09/2026 : le plafond d'envoi QoS et son inverse. Appendues -- ne jamais renumeroter.
+    // Le plafond d'envoi QoS et son inverse. Appendues : ne jamais renumeroter.
     ApplyUploadCap = 20,
     RemoveUploadCap = 21,
-    // 24/09/2026 : retirer / reposer un element BCD de l'ensemble ferme. Appendues -- ne jamais renumeroter.
+    // Retirer / reposer un element BCD de l'ensemble ferme. Appendues : ne jamais renumeroter.
     DeleteBcdValue = 22,
     SetBcdValue = 23,
-    // 25/09/2026 : lecture de l'etat du magasin de composants (DISM /CheckHealth). Appendue -- ne jamais renumeroter.
+    // Lecture de l'etat du magasin de composants (DISM /CheckHealth). Appendue : ne jamais renumeroter.
     ReadComponentStoreHealth = 24,
-    // 28/09/2026 : la protection du ping retenue pour le service, et son inverse. Appendues -- ne jamais renumeroter.
+    // La protection du ping retenue pour le service, et son inverse. Appendues : ne jamais renumeroter.
     RetainServiceUploadCap = 25,
     ForgetServiceUploadCap = 26,
-    // 07/10/2026 (L-CPU) : le mode de boost secteur d'un plan. Appendue -- ne jamais renumeroter.
+    // Le mode de boost secteur d'un plan. Appendue : ne jamais renumeroter.
     SetProcessorBoostMode = 27,
-    // 08/10/2026 (GPU-OC) : les ventilateurs rendus à l'automatique. Appendue -- ne jamais renumeroter.
+    // Les ventilateurs rendus à l'automatique. Appendue : ne jamais renumeroter.
     RestoreGpuFanAuto = 28,
-    // 10/10/2026 (B1) : la limite de puissance du processeur par PawnIO. Appendue -- ne jamais renumeroter.
+    // La limite de puissance du processeur par PawnIO. Appendue : ne jamais renumeroter.
     SetCpuPackagePowerLimit = 29,
-    // 10/10/2026 (B3) : l'economie d'energie de la carte sans fil (secteur) d'un plan. Appendue -- ne jamais renumeroter.
+    // L'economie d'energie de la carte sans fil (secteur) d'un plan. Appendue : ne jamais renumeroter.
     SetWirelessPowerSaving = 30,
+    // Le décalage de tension des cœurs et du cache. Appendue : ne jamais renumeroter.
+    SetCpuVoltageOffset = 31,
+    // Un programme au démarrage coupé ou réactivé (StartupApproved). Appendue : ne jamais renumeroter.
+    SetStartupApproval = 32,
+    // Le test memoire au prochain demarrage, et son annulation. Appendues : ne jamais renumeroter.
+    ScheduleMemoryDiagnostic = 40,
+    CancelMemoryDiagnostic = 41,
+    // Relancer un peripherique, retirer un vieux pilote d'affichage exporte, le remettre. Appendues : ne jamais renumeroter.
+    RestartDevice = 42,
+    RemoveDriverPackage = 43,
+    RestoreDriverPackage = 44,
 }
 
 // -----------------------------------------------------------------------
-// PrivilegedOpCodec — serialize/deserialize a PrivilegedOp to/from JSON via a
-// BOUNDED discriminant enum + EXPLICIT switch.
+// PrivilegedOpCodec : sérialise et désérialise un PrivilegedOp en JSON via une
+// énumération discriminante bornée + un switch explicite.
 //
-// SECURITY (master plan §9.2, §9.13; M2 risk #2 = polymorphic JSON = RCE):
-//   * NO Newtonsoft TypeNameHandling, NO System.Text.Json polymorphism by
-//     discriminator that maps to arbitrary types, NO Type.GetType. The wire
-//     carries a numeric "op" discriminant only; an unknown / out-of-range
-//     discriminant deserializes to nothing — it fails clean
+// Sécurité (risque : JSON polymorphe = RCE) :
+//   * pas de TypeNameHandling de Newtonsoft, pas de polymorphisme System.Text.Json par
+//     discriminant vers des types arbitraires, pas de Type.GetType. Le fil ne porte
+//     qu'un discriminant numérique « op » ; un discriminant inconnu ou hors plage ne
+//     donne rien, il échoue proprement
 //     (Result.Fail("HELPER.NOT_ALLOWLISTED", ...)).
-//   * Deserialization is total: every malformed / hostile payload returns a
-//     failed Result. It never throws and never instantiates an arbitrary type.
+//   * La désérialisation est totale : toute charge malformée ou hostile rend un Result
+//     en échec. Elle ne lève jamais et n'instancie jamais un type arbitraire.
 // -----------------------------------------------------------------------
 public static class PrivilegedOpCodec
 {
-    // The discriminant property name on the wire. Deliberately not "$type"
-    // (which evokes type-name handling) — it is a plain numeric enum field.
+    // Le nom de la propriété discriminante sur le fil. Volontairement pas « $type »
+    // (qui évoque le type-name handling) : c'est un simple champ d'énumération numérique.
     private const string Discriminator = "op";
 
     private static readonly JsonSerializerOptions Options = new()
     {
-        // Enums travel as their integer value (the closed discriminant), never by
-        // name. Unmapped members are tolerated on the payload (forward-compat) but
-        // can never select a type — only the explicit switch can.
+        // Les énumérations voyagent en valeur entière (le discriminant fermé), jamais par
+        // nom. Les membres inconnus sont tolérés dans la charge (compatibilité future) mais
+        // ne peuvent jamais choisir un type : seul le switch explicite le peut.
         PropertyNamingPolicy = null,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
     };
 
-    /// <summary>Serializes a known PrivilegedOp leaf to a discriminated JSON
-    /// object. Returns Fail(HELPER.NOT_ALLOWLISTED) if the leaf is somehow not
-    /// in the closed set (defensive; unreachable for the sealed hierarchy).</summary>
+    /// <summary>Sérialise une feuille PrivilegedOp connue en objet JSON discriminé.
+    /// Rend Fail(HELPER.NOT_ALLOWLISTED) si la feuille n'est pas dans l'ensemble
+    /// fermé (prudence ; inatteignable pour la hiérarchie scellée).</summary>
     public static Result<string> Serialize(PrivilegedOp op)
     {
         if (op is null)
@@ -109,7 +120,9 @@ public static class PrivilegedOpCodec
             SetActivePowerPlanOp pp => (PrivilegedOpType.SetActivePowerPlan, pp),
             SetProcessorBoostModeOp bm => (PrivilegedOpType.SetProcessorBoostMode, bm),
             SetCpuPackagePowerLimitOp cl => (PrivilegedOpType.SetCpuPackagePowerLimit, cl),
+            SetCpuVoltageOffsetOp cv => (PrivilegedOpType.SetCpuVoltageOffset, cv),
             SetWirelessPowerSavingOp ws => (PrivilegedOpType.SetWirelessPowerSaving, ws),
+            SetStartupApprovalOp sa => (PrivilegedOpType.SetStartupApproval, sa),
             RestoreGpuFanAutoOp rf => (PrivilegedOpType.RestoreGpuFanAuto, rf),
             CreateRestorePointOp rp => (PrivilegedOpType.CreateRestorePoint, rp),
             ApplyNvApiClockOffsetOp c => (PrivilegedOpType.ApplyNvApiClockOffset, c),
@@ -134,6 +147,11 @@ public static class PrivilegedOpCodec
             DeleteBcdValueOp db => (PrivilegedOpType.DeleteBcdValue, db),
             SetBcdValueOp sb => (PrivilegedOpType.SetBcdValue, sb),
             ReadComponentStoreHealthOp ch => (PrivilegedOpType.ReadComponentStoreHealth, ch),
+            ScheduleMemoryDiagnosticOp sm => (PrivilegedOpType.ScheduleMemoryDiagnostic, sm),
+            CancelMemoryDiagnosticOp am => (PrivilegedOpType.CancelMemoryDiagnostic, am),
+            RestartDeviceOp rd => (PrivilegedOpType.RestartDevice, rd),
+            RemoveDriverPackageOp rp2 => (PrivilegedOpType.RemoveDriverPackage, rp2),
+            RestoreDriverPackageOp rr => (PrivilegedOpType.RestoreDriverPackage, rr),
             _ =>((PrivilegedOpType)(-1), (object?)null),
         };
 
@@ -142,9 +160,9 @@ public static class PrivilegedOpCodec
 
         try
         {
-            // Emit the discriminant, then merge the leaf's own fields into the
-            // same object. We build a JSON node so the discriminant and the leaf
-            // payload share one flat object (no nested polymorphic envelope).
+            // Écrit le discriminant, puis fusionne les champs de la feuille dans le même
+            // objet. On construit un nœud JSON pour que le discriminant et la charge de la
+            // feuille partagent un objet plat (pas d'enveloppe polymorphe imbriquée).
             using var doc = JsonSerializer.SerializeToDocument(payload, payload.GetType(), Options);
             using var stream = new MemoryStream();
             using (var writer = new Utf8JsonWriter(stream))
@@ -163,9 +181,9 @@ public static class PrivilegedOpCodec
         }
     }
 
-    /// <summary>Deserializes a discriminated JSON object to its closed leaf via an
-    /// EXPLICIT switch on the bounded discriminant. Total: any malformed / unknown
-    /// / out-of-range payload fails clean (never throws, never resolves a type).</summary>
+    /// <summary>Désérialise un objet JSON discriminé en sa feuille fermée, par un switch
+    /// explicite sur le discriminant borné. Totale : toute charge malformée, inconnue ou
+    /// hors plage échoue proprement (jamais d'exception, jamais de type résolu).</summary>
     public static Result<PrivilegedOp> Deserialize(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -189,7 +207,7 @@ public static class PrivilegedOpCodec
             if (root.ValueKind != JsonValueKind.Object)
                 return Result<PrivilegedOp>.Fail(ErrorCodes.NotAllowlisted, "Privileged-op payload is not an object.");
 
-            // The discriminant must be a numeric member of the closed enum.
+            // Le discriminant doit être un membre numérique de l'énumération fermée.
             if (!root.TryGetProperty(Discriminator, out var disc)
                 || disc.ValueKind != JsonValueKind.Number
                 || !disc.TryGetInt32(out var rawType)
@@ -201,8 +219,8 @@ public static class PrivilegedOpCodec
 
             var rawJson = root.GetRawText();
 
-            // EXPLICIT switch — the only place a discriminant becomes a type. No
-            // reflection, no Type.GetType, no polymorphic by-name resolution.
+            // Switch explicite : le seul endroit où un discriminant devient un type. Pas de
+            // réflexion, pas de Type.GetType, pas de résolution polymorphe par nom.
             PrivilegedOp? op = (PrivilegedOpType)rawType switch
             {
                 PrivilegedOpType.Ping => new PingOp(),
@@ -211,7 +229,9 @@ public static class PrivilegedOpCodec
                 PrivilegedOpType.SetActivePowerPlan => Read<SetActivePowerPlanOp>(rawJson),
                 PrivilegedOpType.SetProcessorBoostMode => Read<SetProcessorBoostModeOp>(rawJson),
                 PrivilegedOpType.SetCpuPackagePowerLimit => Read<SetCpuPackagePowerLimitOp>(rawJson),
+                PrivilegedOpType.SetCpuVoltageOffset => Read<SetCpuVoltageOffsetOp>(rawJson),
                 PrivilegedOpType.SetWirelessPowerSaving => Read<SetWirelessPowerSavingOp>(rawJson),
+                PrivilegedOpType.SetStartupApproval => Read<SetStartupApprovalOp>(rawJson),
                 PrivilegedOpType.RestoreGpuFanAuto => Read<RestoreGpuFanAutoOp>(rawJson),
                 PrivilegedOpType.CreateRestorePoint => Read<CreateRestorePointOp>(rawJson),
                 PrivilegedOpType.ApplyNvApiClockOffset => Read<ApplyNvApiClockOffsetOp>(rawJson),
@@ -236,6 +256,11 @@ public static class PrivilegedOpCodec
                 PrivilegedOpType.DeleteBcdValue => Read<DeleteBcdValueOp>(rawJson),
                 PrivilegedOpType.SetBcdValue => Read<SetBcdValueOp>(rawJson),
                 PrivilegedOpType.ReadComponentStoreHealth => new ReadComponentStoreHealthOp(),
+                PrivilegedOpType.ScheduleMemoryDiagnostic => new ScheduleMemoryDiagnosticOp(),
+                PrivilegedOpType.CancelMemoryDiagnostic => new CancelMemoryDiagnosticOp(),
+                PrivilegedOpType.RestartDevice => Read<RestartDeviceOp>(rawJson),
+                PrivilegedOpType.RemoveDriverPackage => Read<RemoveDriverPackageOp>(rawJson),
+                PrivilegedOpType.RestoreDriverPackage => Read<RestoreDriverPackageOp>(rawJson),
                 _ => null,
             };
 
@@ -245,7 +270,7 @@ public static class PrivilegedOpCodec
         }
         catch (Exception)
         {
-            // Any binding error (e.g. wrong field types for the leaf) → fail clean.
+            // Toute erreur de liaison (par exemple mauvais types de champ pour la feuille) → échec propre.
             return Result<PrivilegedOp>.Fail(ErrorCodes.NotAllowlisted, "Privileged-op payload could not be bound.");
         }
         finally

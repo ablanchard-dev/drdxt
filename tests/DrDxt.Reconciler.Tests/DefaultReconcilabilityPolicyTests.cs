@@ -4,19 +4,19 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// The production closed reconcilability table: known OS surfaces are reconcilable,
-// protected surfaces are hard-refused, unknown tweaks are conservatively rejected.
+// La table fermée de réconciliabilité de production : les surfaces OS connues sont réconciliables,
+// les surfaces protégées sont refusées net, les leviers inconnus sont rejetés par prudence.
 // -----------------------------------------------------------------------
 public sealed class DefaultReconcilabilityPolicyTests
 {
-    // Referenced through the interface so the default IsReconcilable() DIM is in scope.
+    // Référencé par l'interface pour que l'implémentation par défaut d'IsReconcilable() soit visible.
     private readonly IReconcilabilityPolicy _policy = new DefaultReconcilabilityPolicy();
 
     [Theory]
     [InlineData("fixit.sanePowerPlan", ReconcileSurface.PowerPlan)]
     [InlineData("fixit.x3dVCacheService", ReconcileSurface.Service)]
     [InlineData("latency.reflex.lowLatencyMode", ReconcileSurface.Registry)]
-    [InlineData("os.hags", ReconcileSurface.Registry)]                 // NS-1 HAGS (HKLM DWORD)
+    [InlineData("os.hags", ReconcileSurface.Registry)]                 // HAGS (HKLM DWORD)
     public void KnownTweaks_MapToTheirSurface_AndAreReconcilable(string id, ReconcileSurface surface)
     {
         _policy.SurfaceFor(id).Should().Be(surface);

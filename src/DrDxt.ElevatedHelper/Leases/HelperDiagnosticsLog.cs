@@ -4,14 +4,14 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Leases;
 
 // -----------------------------------------------------------------------
-// HelperDiagnosticsLog — a minimal, self-contained IDiagnosticsLog for the elevated
-// helper's own use (the lease watchdog journals auto-revert events here).
+// HelperDiagnosticsLog : un IDiagnosticsLog minimal et autonome, pour l'usage propre du helper
+// élevé (le chien de garde des baux y journalise les retours automatiques).
 //
-// Deliberately not a reference to DrDxt.Infrastructure.DiagnosticsLog: the elevated
-// helper (the #1 risk surface) references only Core, so we keep the journal a tiny
-// best-effort file append rather than pulling Infrastructure into the elevated
-// process. A write failure (disk full, ACL) is swallowed — the journal is a
-// secondary audit trail and must never abort or crash the helper.
+// Exprès sans référence à DrDxt.Infrastructure.DiagnosticsLog : le helper élevé (la surface de
+// risque n°1) ne référence que Core ; le journal reste donc un petit ajout au fichier, au mieux,
+// au lieu de tirer Infrastructure dans le processus élevé. Un échec d'écriture (disque plein,
+// ACL) est avalé : le journal est une trace d'audit secondaire et ne doit jamais interrompre ni
+// faire planter le helper.
 // -----------------------------------------------------------------------
 public sealed class HelperDiagnosticsLog : IDiagnosticsLog
 {
@@ -25,7 +25,7 @@ public sealed class HelperDiagnosticsLog : IDiagnosticsLog
     {
         if (directory is null)
         {
-            // 25/09/2026 : le journal quitte le profil de l'utilisateur. Le controle de jonction
+            // Le journal quitte le profil de l'utilisateur. Le controle de jonction
             // ci-dessous laissait une course entre controle et ecriture ; dans %ProgramData%\DrDxt
             // durci (proprietaire Administrateurs, utilisateurs en lecture) personne d'autre qu'un
             // administrateur ne peut rien y poser. Racine non durcissable = pas de journal.

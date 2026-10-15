@@ -5,14 +5,14 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Scoring;
 
 /// <summary>
-/// Lot 1 « preuve du besoin » — le plan d'alimentation n'est plus un levier du registre.
+/// Le plan d'alimentation n'est plus un levier du registre.
 ///
-/// Le rapport genere sur la machine de reference le 10/09/2026 annoncait « 1 probleme prouve :
-/// power-plan » sur la foi de coeurs parques — alors que le parking est identique entre Equilibre et
-/// Haute performance. Le scanner prouvait au client un besoin que notre propre mesure disculpe.
+/// Annoncer « 1 probleme prouve : power-plan » sur la foi de coeurs parques serait faux : le parking est
+/// identique entre Equilibre et Haute performance (mesure). Le scanner prouverait au client un besoin que
+/// notre propre mesure disculpe.
 ///
 /// Un plan Equilibre n'est pas un defaut de CONFIGURATION ; il ne devient une piste que si la mesure
-/// dit que le processeur limite le jeu — et ce jugement appartient au candidat `fixit.power_plan`,
+/// dit que le processeur limite le jeu, et ce jugement appartient au candidat `fixit.power_plan`,
 /// pas au registre (la mesure ne bouge jamais le registre : `MeasurementDoesNotMoveTheScoreTests`).
 /// </summary>
 public class PowerPlanLeverTests

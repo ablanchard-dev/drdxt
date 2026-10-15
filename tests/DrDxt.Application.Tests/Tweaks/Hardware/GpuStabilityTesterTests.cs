@@ -5,15 +5,15 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// R2b — GpuStabilityTester orchestration (the safety-critical fail-safe logic),
-// unit-tested with a FAKE load probe (no GPU needed). The real D3D11 GPU-load probe
-// is injected and smoke-validated separately.
+// Orchestration de GpuStabilityTester (la logique de sûreté intégrée, critique pour la
+// sécurité), testée avec une fausse sonde de charge (aucune carte requise). La vraie sonde
+// de charge D3D11 est injectée et validée en fumée à part.
 //
-// INVARIANT: Never report Stable unless the brief GPU load completed with a healthy
-// device. Any probe failure / unknown result / thrown exception is treated
-// conservatively as Inconclusive — which the undervolt tweak treats as "revert".
-// This is the whole point: a stability test that can't be sure must never green-light
-// an unverified undervolt.
+// Invariant : ne jamais rapporter Stable sauf si la brève charge GPU s'est achevée sur un
+// périphérique sain. Toute panne de sonde, résultat inconnu ou exception est traité par
+// prudence comme Inconclusive, que le levier d'undervolt traite comme « retour arrière ».
+// C'est tout l'enjeu : un test de stabilité qui ne peut pas être sûr ne doit jamais
+// donner le feu vert à un undervolt non vérifié.
 // -----------------------------------------------------------------------
 public sealed class GpuStabilityTesterTests
 {
@@ -22,7 +22,7 @@ public sealed class GpuStabilityTesterTests
         private readonly Func<Result<GpuLoadResult>> _fn;
         public FakeProbe(Func<Result<GpuLoadResult>> fn) => _fn = fn;
         public Task<Result<GpuLoadResult>> RunBriefLoadAsync(int gpuIndex, TimeSpan duration, CancellationToken ct)
-            => Task.FromResult(_fn());   // _fn may throw to simulate a probe blowing up
+            => Task.FromResult(_fn());   // _fn peut lever pour simuler une sonde qui explose
     }
 
     private static GpuStabilityTester Build(Func<Result<GpuLoadResult>> probe) => new(new FakeProbe(probe));
@@ -66,7 +66,7 @@ public sealed class GpuStabilityTesterTests
     {
         var tester = Build(() => throw new InvalidOperationException("device blew up under load"));
 
-        var r = await tester.RunAsync(0, default);   // must not throw
+        var r = await tester.RunAsync(0, default);   // ne doit pas lever
 
         r.IsOk.Should().BeTrue();
         r.Value.Should().Be(StabilityOutcome.Inconclusive);

@@ -13,14 +13,13 @@ namespace DrDxt.Measurement.Tests;
 /// une machine saine la ou le joueur a vu son jeu se trainer — le defaut exactement inverse de
 /// celui que l'hygiene corrige.
 ///
-/// Pourquoi ces series sont synthetiques, et pourquoi c'est le bon choix. Les 8 captures reelles
-/// du 01/09 ont ete relues (07/09) : la coupe hors-focus y supprime **une seule seconde au total**,
+/// Pourquoi ces series sont synthetiques, et pourquoi c'est le bon choix.
+/// Mesure sur les 8 captures reelles du 01/09 : la coupe hors-focus y supprime **une seule seconde au total**,
 /// sur 2 171 secondes, et cette seconde ne contient **qu'une trame de 795 ms**. Le danger n'est donc
-/// pas observable dans ces donnees — la machine de reference tourne a ~140 fps et n'a jamais rame.
+/// pas observable dans ces donnees : la machine de reference tourne a ~140 fps et n'a jamais rame.
 /// L'absence de danger observe n'etant pas l'absence de danger, il faut le fabriquer pour le tester.
 ///
-/// (Au passage : la doc de `Clean` cite « une capture de reference de 39 minutes » qui n'existe pas
-/// dans le depot — la plus longue conservee fait 595 s. Ce chiffre publie n'est pas reproductible.)
+/// (La plus longue capture conservee dans le depot fait 595 s.)
 /// </summary>
 public class FrameSeriesHygieneKeepsRealStutterTests
 {

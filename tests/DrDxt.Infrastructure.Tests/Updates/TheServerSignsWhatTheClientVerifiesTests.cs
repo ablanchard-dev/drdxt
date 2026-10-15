@@ -60,19 +60,6 @@ public sealed class TheServerSignsWhatTheClientVerifiesTests
     }
 
     [Fact]
-    public void The_profiles_channel_travels_the_same_road()
-    {
-        // Le canal est un champ signe : il se canonise par le nom invariant de l'enum, pas par le
-        // segment d'url. Un canal traduit d'un cote et pas de l'autre casserait le seul canal qui
-        // se met a jour sans elevation.
-        var signature = SignLikeTheServer("Profiles", Version, Url, Sha256);
-
-        UpdateDevKeys.CreateUpdateVerifier().Value!
-            .VerifyManifest(new UpdateManifest(UpdateChannel.Profiles, Version, Url, Sha256, signature))
-            .IsOk.Should().BeTrue();
-    }
-
-    [Fact]
     public void One_field_changed_after_signing_is_refused()
     {
         // Controle POSITIF : sans lui, un verificateur qui dirait toujours oui (clef nulle, chemin
@@ -87,9 +74,9 @@ public sealed class TheServerSignsWhatTheClientVerifiesTests
     [Fact]
     public void The_channel_itself_is_covered_by_the_signature()
     {
-        // Un manifeste signe pour les profils ne doit pas pouvoir etre presente comme un manifeste
-        // d'application : ce serait faire installer un binaire la ou seul un pack devait aller.
-        var signature = SignLikeTheServer("Profiles", Version, Url, Sha256);
+        // Un manifeste signe pour un autre canal ne doit pas pouvoir etre presente comme un manifeste
+        // d'application.
+        var signature = SignLikeTheServer("Other", Version, Url, Sha256);
 
         UpdateDevKeys.CreateUpdateVerifier().Value!
             .VerifyManifest(new UpdateManifest(UpdateChannel.App, Version, Url, Sha256, signature))

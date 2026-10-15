@@ -1,116 +1,116 @@
 namespace DrDxt.Core;
 
 // ════════════════════════════════════════════════════════════════════════════
-// M3 — BIOS Doctor (foundation). Contracts for the detect→diff→Findings core.
+// Docteur BIOS (socle). Contrats du cœur détection→comparaison→Findings.
 //
-// Strategy lock (M3-BIOS-doctor-decision.md): V1 = BIOS Doctor = read + guide +
-// proof, never a BIOS write/script. The advisor here is pure read+diff: it takes
-// the HardwareInventory + SettingsState already produced by M1 (it never
-// re-detects them) and emits the firmware Findings that concern this machine.
+// Stratégie arrêtée : V1 = docteur BIOS = lire + guider +
+// prouver, jamais d'écriture ni de script BIOS. Le conseiller ici ne fait que lire et
+// comparer : il prend le HardwareInventory + SettingsState déjà produits par le scan (il ne
+// les redétecte jamais) et émet les Findings firmware qui concernent cette machine.
 //
-// Honesty (plan §0.7, decision §9 / §22.3): a setting we cannot read = an honest
-// "not read + why" Finding, never a fabricated state. "Nothing to tune in the
-// BIOS" is a valid, assumed result.
+// Honnêteté : un réglage illisible = un Finding honnête
+// « non lu + pourquoi », jamais un état inventé. « Rien à régler dans le
+// BIOS » est un résultat valide, assumé.
 //
-// Guide steps / QR / mobile page / verify loop / IBiosAutomationProvider are
-// LATER increments — deliberately not in these foundation contracts.
+// Étapes de guide / QR / page mobile / boucle de vérification / IBiosAutomationProvider
+// viennent plus tard, volontairement hors de ces contrats de socle.
 // ════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// The firmware setting a <see cref="BiosFinding"/> concerns.
+/// Le réglage firmware que concerne un <see cref="BiosFinding"/>.
 /// </summary>
 public enum FirmwareSettingKind
 {
-    /// <summary>Memory overclock profile (XMP on Intel / EXPO on AMD / DOCP/A-XMP legacy).</summary>
+    /// <summary>Profil d'overclocking mémoire (XMP chez Intel / EXPO chez AMD / anciens DOCP/A-XMP).</summary>
     XmpExpo,
 
     /// <summary>Resizable BAR (NVIDIA) / Smart Access Memory (AMD).</summary>
     ReBar,
 
-    /// <summary>Above 4G Decoding — a ReBAR prerequisite.</summary>
+    /// <summary>Above 4G Decoding, un prérequis de ReBAR.</summary>
     Above4G,
 
-    /// <summary>Compatibility Support Module — must be OFF (UEFI) for ReBAR; gated by boot mode.</summary>
+    /// <summary>Compatibility Support Module : doit être coupé (UEFI) pour ReBAR ; dépend du mode de démarrage.</summary>
     Csm,
 
-    /// <summary>CPPC / Preferred Cores routing for AMD multi-CCD X3D (the V-Cache route).</summary>
+    /// <summary>Routage CPPC / Preferred Cores des X3D AMD multi-CCD (la route V-Cache).</summary>
     X3dCppc,
 
-    /// <summary>PCIe link generation (Auto / Gen3 / Gen4 / Gen5) on the GPU slot.</summary>
+    /// <summary>Génération du lien PCIe (Auto / Gen3 / Gen4 / Gen5) sur le port du GPU.</summary>
     PcieGen,
 
-    /// <summary>BIOS / AGESA firmware version (old firmware recommended for update).</summary>
+    /// <summary>Version du firmware BIOS / AGESA (mise à jour conseillée si ancienne).</summary>
     BiosVersion,
 }
 
 /// <summary>
-/// Where a firmware setting sits in the decision-doc §2 action matrix.
-/// V1 emits <see cref="Guide"/> for everything that needs changing (read + guide +
-/// prove). <see cref="Read"/> is for informational, already-good or not-readable
-/// states. <see cref="AutoOfficial"/> / <see cref="LabWhitelist"/> / <see cref="Forbidden"/>
-/// describe the write pathway a future version MAY (or must never) use — they are
-/// carried on the Finding for honesty/UX, but the foundation never writes.
+/// La place d'un réglage firmware dans la matrice d'action.
+/// V1 émet <see cref="Guide"/> pour tout ce qui doit changer (lire + guider +
+/// prouver). <see cref="Read"/> sert aux états d'information, déjà bons ou illisibles.
+/// <see cref="AutoOfficial"/> / <see cref="LabWhitelist"/> / <see cref="Forbidden"/>
+/// décrivent la voie d'écriture qu'une future version pourrait (ou ne doit jamais) prendre :
+/// portés par le Finding pour l'honnêteté et l'UX, mais le socle n'écrit jamais.
 /// </summary>
 public enum BiosMatrixClass
 {
-    /// <summary>Read-only: state reported (good, or not readable). No change proposed.</summary>
+    /// <summary>Lecture seule : état rapporté (bon, ou illisible). Aucun changement proposé.</summary>
     Read,
 
-    /// <summary>Guide the user through the exact BIOS change (V1 default for fixes).</summary>
+    /// <summary>Guider l'utilisateur dans le changement BIOS exact (défaut V1 pour les corrections).</summary>
     Guide,
 
-    /// <summary>Auto via a documented official vendor API/CLI on a supported machine (V2 only).</summary>
+    /// <summary>Automatique via une API/CLI officielle et documentée du fabricant, sur machine prise en charge (V2 seulement).</summary>
     AutoOfficial,
 
-    /// <summary>Lab-whitelisted write: exact board + BIOS + setting + backup (V2/V3 only).</summary>
+    /// <summary>Écriture sur liste blanche du labo : carte + BIOS + réglage exacts + sauvegarde (V2/V3 seulement).</summary>
     LabWhitelist,
 
-    /// <summary>A write path that is forbidden (raw UEFI write, WinRing0, BIOS/VBIOS flash, …).</summary>
+    /// <summary>Une voie d'écriture interdite (écriture UEFI brute, WinRing0, flash BIOS/VBIOS, …).</summary>
     Forbidden,
 }
 
 /// <summary>
-/// The recommended direction for a firmware setting. Foundation findings carry an
-/// honest label key (<see cref="BiosFinding.RecommendedActionKey"/>) — not BIOS
-/// menu navigation steps (those are a later guide increment).
+/// Le sens conseillé pour un réglage firmware. Les constats du socle portent une clé
+/// de libellé honnête (<see cref="BiosFinding.RecommendedActionKey"/>), pas d'étapes de
+/// navigation dans le BIOS (elles viennent avec le guide).
 /// </summary>
 public enum BiosRecommendedAction
 {
-    /// <summary>Nothing to do — informational only (already good, or simply reported).</summary>
+    /// <summary>Rien à faire : information seule (déjà bon, ou simplement rapporté).</summary>
     None,
 
-    /// <summary>Turn the setting ON (e.g. enable XMP/EXPO, enable ReBAR, enable Above-4G).</summary>
+    /// <summary>Activer le réglage (par exemple XMP/EXPO, ReBAR, Above-4G).</summary>
     Enable,
 
-    /// <summary>Turn the setting OFF (e.g. disable CSM when booting in UEFI for ReBAR).</summary>
+    /// <summary>Couper le réglage (par exemple le CSM en démarrage UEFI, pour ReBAR).</summary>
     Disable,
 
-    /// <summary>Set the setting to its supported route (e.g. CPPC = Driver / Auto for X3D).</summary>
+    /// <summary>Mettre le réglage sur sa route prise en charge (par exemple CPPC = Driver / Auto pour X3D).</summary>
     SetSupportedRoute,
 
-    /// <summary>Update the firmware (BIOS / AGESA) to a newer recommended version.</summary>
+    /// <summary>Mettre à jour le firmware (BIOS / AGESA) vers une version plus récente conseillée.</summary>
     Update,
 
-    /// <summary>State could not be read — verify manually in the BIOS (honest unknown).</summary>
+    /// <summary>État illisible : vérifier à la main dans le BIOS (inconnu honnête).</summary>
     Verify,
 }
 
 /// <summary>
-/// An HONEST gain estimate for a mis-set firmware setting — a sourced RANGE with a
-/// caveat, never a bare promised point-%. Mirrors M6's <c>GainEvidence</c> discipline
-/// (decision §5: "on prouve, on ne promet pas"): a worst-case/typical range tied to a
-/// cited source, plus a caveat saying when it is ≈0 (already well-tuned) or conditional
-/// (e.g. only if mis-routed). Numbers are never fabricated — a setting with no sourced
-/// figure carries a null range and leans on the caveat (e.g. game-dependent).
+/// Une estimation honnête du gain d'un réglage firmware mal posé : une plage sourcée avec
+/// une réserve, jamais un % promis tout seul. Même discipline que la <c>GainEvidence</c> des
+/// profils (« on prouve, on ne promet pas ») : une plage pire cas/typique liée à une
+/// source citée, plus une réserve qui dit quand c'est ≈0 (déjà bien réglé) ou conditionnel
+/// (par exemple seulement si mal routé). Aucun chiffre inventé : un réglage sans chiffre
+/// sourcé porte une plage null et s'appuie sur la réserve (par exemple selon le jeu).
 /// </summary>
-/// <param name="MinPct">Low end of the honest range (e.g. ≈0 when already well-tuned); null = unquantified.</param>
-/// <param name="MaxPct">High end of the honest range (worst-case/best-case upside); null = unquantified.</param>
+/// <param name="MinPct">Bas de la plage honnête (par exemple ≈0 si déjà bien réglé) ; null = non chiffré.</param>
+/// <param name="MaxPct">Haut de la plage honnête (gain au mieux) ; null = non chiffré.</param>
 /// <param name="Conditional">
-/// True when the gain is realized only under a condition (e.g. the setting is actually
-/// mis-set / mis-routed) and is likely ≈0 otherwise — drives conditional UI framing.
+/// Vrai quand le gain n'existe que sous condition (par exemple le réglage est vraiment
+/// mal posé ou mal routé) et vaut sans doute ≈0 sinon : pilote une formulation conditionnelle dans l'UI.
 /// </param>
-/// <param name="SourceKey">Resx key citing the in-repo source (the decision doc). Never blank.</param>
-/// <param name="CaveatKey">Resx key for the honesty caveat ("≈0 if already correct" / game-dependent…). Never blank.</param>
+/// <param name="SourceKey">Clé resx qui cite la source du dépôt (le document de décision). Jamais vide.</param>
+/// <param name="CaveatKey">Clé resx de la réserve d'honnêteté (« ≈0 si déjà correct » / selon le jeu…). Jamais vide.</param>
 public record BiosGainEstimate(
     double? MinPct,
     double? MaxPct,
@@ -119,25 +119,25 @@ public record BiosGainEstimate(
     string CaveatKey);
 
 /// <summary>
-/// A firmware-level Finding that concerns this machine, produced by detect→diff
-/// over M1's <see cref="HardwareInventory"/> + <see cref="SettingsState"/>.
-/// Pure constat + rationale + recommended direction — no menu steps, no write.
+/// Un Finding firmware qui concerne cette machine, produit par détection→comparaison
+/// sur le <see cref="HardwareInventory"/> + <see cref="SettingsState"/> du scan.
+/// Constat + raison + sens conseillé, rien d'autre : pas d'étapes de menu, pas d'écriture.
 /// </summary>
-/// <param name="Kind">The firmware setting concerned.</param>
-/// <param name="Severity">How impactful it is when mis-set (Info / Minor / Major).</param>
-/// <param name="TitleKey">Resx key for the finding title (FR+EN). Never hard-coded text.</param>
-/// <param name="RationaleKey">Resx key for the "why" (honesty). Never hard-coded text.</param>
-/// <param name="MatrixClass">Decision-doc §2 class of the setting's write pathway.</param>
-/// <param name="CurrentState">Read state if available; <see cref="TriState.Unknown"/> when not readable.</param>
-/// <param name="RecommendedAction">The honest recommended direction (no menu steps here).</param>
-/// <param name="RecommendedActionKey">Resx key for the recommended-action label (FR+EN).</param>
+/// <param name="Kind">Le réglage firmware concerné.</param>
+/// <param name="Severity">Son poids quand il est mal posé (Info / Minor / Major).</param>
+/// <param name="TitleKey">Clé resx du titre du constat (FR+EN). Jamais de texte en dur.</param>
+/// <param name="RationaleKey">Clé resx du « pourquoi » (honnêteté). Jamais de texte en dur.</param>
+/// <param name="MatrixClass">Classe de la voie d'écriture du réglage.</param>
+/// <param name="CurrentState">État lu s'il existe ; <see cref="TriState.Unknown"/> s'il est illisible.</param>
+/// <param name="RecommendedAction">Le sens conseillé honnête (pas d'étapes de menu ici).</param>
+/// <param name="RecommendedActionKey">Clé resx du libellé de l'action conseillée (FR+EN).</param>
 /// <param name="Gain">
-/// An honest sourced gain RANGE with a caveat when this is mis-set (never a bare promised
-/// point-%); null when not quantified. See <see cref="BiosGainEstimate"/>.
+/// Une plage de gain honnête et sourcée, avec réserve, quand c'est mal posé (jamais un %
+/// promis tout seul) ; null si non chiffré. Voir <see cref="BiosGainEstimate"/>.
 /// </param>
 /// <param name="StateNotReadable">
-/// True when <see cref="CurrentState"/> could not be read (honest "not read + why").
-/// The Finding then states the unknown and never asserts a false state.
+/// Vrai quand <see cref="CurrentState"/> n'a pas pu être lu (« non lu + pourquoi », honnête).
+/// Le Finding dit alors l'inconnu et n'affirme jamais un état faux.
 /// </param>
 public record BiosFinding(
     FirmwareSettingKind Kind,
@@ -152,15 +152,15 @@ public record BiosFinding(
     bool StateNotReadable);
 
 /// <summary>
-/// Detect→diff over M1's already-produced inventory + settings, emitting the
-/// firmware Findings that concern this machine. Never re-detects, never writes.
+/// Détection→comparaison sur l'inventaire et les réglages déjà produits par le scan, qui émet
+/// les Findings firmware de cette machine. Ne redétecte jamais, n'écrit jamais.
 /// </summary>
 public interface IBiosAdvisor
 {
     /// <summary>
-    /// Produces the firmware Findings applicable to <paramref name="hw"/> given
-    /// <paramref name="state"/>. A well-tuned machine yields an empty list (valid,
-    /// assumed result). Incoherent input fails cleanly via <see cref="Result"/>.
+    /// Produit les Findings firmware qui s'appliquent à <paramref name="hw"/> selon
+    /// <paramref name="state"/>. Une machine bien réglée donne une liste vide (résultat
+    /// valide, assumé). Une entrée incohérente échoue proprement via <see cref="Result"/>.
     /// </summary>
     Result<IReadOnlyList<BiosFinding>> Advise(HardwareInventory hw, SettingsState state);
 }

@@ -5,7 +5,7 @@ using System.Windows.Data;
 namespace DrDxt.App.Converters;
 
 /// <summary>
-/// Converts bool to Visibility. Pass parameter "Invert" to flip the logic.
+/// Convertit un bool en Visibility. Le paramètre « Invert » inverse la logique.
 /// </summary>
 [ValueConversion(typeof(bool), typeof(Visibility))]
 public sealed class BoolToVisibilityConverter : IValueConverter

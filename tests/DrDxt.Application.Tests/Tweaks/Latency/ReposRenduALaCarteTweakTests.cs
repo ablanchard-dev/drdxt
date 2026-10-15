@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
-// 30/09/2026 (boucle « la carte, prouvée », G2) : le profil GLOBAL du pilote portait « performances maximales »
+// Le profil GLOBAL du pilote portait « performances maximales »
 // (lu le 24/09 : 55,6 W et 2 490 MHz au repos). Le levier le rend à « Normal » au global seulement ; l'original est
 // lu avant l'écriture et l'annulation le réécrit tel quel. La relecture passe par la cible gardée dans le snapshot.
 public sealed class ReposRenduALaCarteTweakTests

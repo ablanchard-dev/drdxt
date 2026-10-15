@@ -4,40 +4,40 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler.Manifest;
 
 // ───────────────────────────────────────────────────────────────────────────────
-//  EMBEDDED PUBLIC MATERIAL ONLY — NO SECRET MAY EVER LIVE HERE, IN ANY CONFIG.
+//  EMBEDDED PUBLIC MATERIAL ONLY : aucun secret ne doit jamais vivre ici, dans aucune configuration.
 // ───────────────────────────────────────────────────────────────────────────────
 //
-// This file is the client/service ROOT OF TRUST for the reconciler MANIFEST (the
-// persistence moat). It holds ONLY material that is safe to ship in a binary that
-// anyone can decompile:
-//   * the 32-byte raw Ed25519 manifest-verify PUBLIC key — it can ONLY VERIFY a
-//     signed desired-state manifest, never mint one. The App + reconciler host build
-//     their verifier from this so a self-contained team build VERIFIES real manifests.
+// Ce fichier est la racine de confiance client / service du manifeste du réconciliateur (le
+// moat de persistance). Il ne contient que du matériel sûr à livrer dans un binaire que
+// n'importe qui peut décompiler :
+//   * la clé publique Ed25519 brute de 32 octets qui vérifie le manifeste : elle ne peut que
+//     vérifier un manifeste d'état voulu signé, jamais en frapper un. L'App + l'hôte
+//     réconciliateur en construisent leur vérificateur pour qu'un build d'équipe autonome vérifie
+//     de vrais manifestes.
 //
-// NO PRIVATE KEY BYTES LIVE HERE (M5 review finding #3). A usable manifest-signing
-// PRIVATE key is FORBIDDEN in any shipping code path — and unlike a #if DEBUG fence,
-// this file carries NO seed bytes in EITHER Debug or Release. The dev/test PRIVATE seed
-// that the unit tests use to sign fixture manifests lives ONLY in the test assemblies
-// (DrDxt.TestSupport.ManifestDevTestKeys, tests/Shared) — so a shipping DrDxt.Reconciler.dll
-// contains zero usable private-key bytes.
+// Aucun octet de clé privée ici. Une clé privée de signature du manifeste utilisable est
+// interdite dans tout chemin de code livré ; et contrairement à une barrière #if DEBUG, ce
+// fichier ne porte aucun octet de graine, ni en Debug ni en Release. La graine privée de dev/test
+// avec laquelle les tests unitaires signent leurs manifestes d'essai ne vit que dans les
+// assemblages de test (DrDxt.TestSupport.ManifestDevTestKeys, tests/Shared) : un
+// DrDxt.Reconciler.dll livré ne contient aucun octet de clé privée utilisable.
 //
-// PRODUCTION (11/09/2026 — plus de signataire serveur, la regle est « rien hors du PC ») : la
-// vraie cle de signature est PROPRE A CHAQUE MACHINE (MachineManifestKey), creee par le helper
+// La
+// vraie cle de signature est propre a chaque machine (MachineManifestKey), creee par le helper
 // eleve au premier CommitManifestOp sous %ProgramData%\DrDxt (Administrateurs + SYSTEM
 // seulement), et `manifest-public.key` en est derivee. Cette cle de dev n'est jamais acceptee
 // ailleurs que dans le repli embarque sous #if DEBUG : un fichier provisionne qui la contient est
-// refuse (EstLaCleDeDev), et une cle de machine qui la deriverait aussi. A RELEASE build with no
-// provisioned key FAILS CLOSED (a dev-key-signed or unsigned manifest is rejected).
+// refuse (EstLaCleDeDev), et une cle de machine qui la deriverait aussi. Un build Release sans
+// cle fournie refuse (fail-closed) : un manifeste signe par la cle de dev ou non signe est rejete.
 // ───────────────────────────────────────────────────────────────────────────────
 public static class ManifestDevKeys
 {
-    /// <summary>The 32-byte raw Ed25519 PUBLIC key. SAFE to commit — it can only
-    /// verify, never sign. The App + reconciler host build their verifier from this so
-    /// they VERIFY real manifests in a self-contained DEBUG/team build. A RELEASE build
-    /// does NOT trust it — it requires a provisioned production public key (see the
-    /// header) and otherwise fails closed. Its matching dev/test PRIVATE seed is
-    /// TEST-ONLY and lives in DrDxt.TestSupport.ManifestDevTestKeys (tests/Shared),
-    /// NEVER in this shipping assembly.</summary>
+    /// <summary>La clé publique Ed25519 brute de 32 octets. Sûre à commiter : elle ne peut que
+    /// vérifier, jamais signer. L'App + l'hôte réconciliateur en construisent leur vérificateur pour
+    /// vérifier de vrais manifestes dans un build Debug / d'équipe autonome. Un build Release ne lui
+    /// fait pas confiance : il exige une clé publique de production fournie (voir l'en-tête) et sinon
+    /// refuse (fail-closed). La graine privée de dev/test assortie est réservée aux tests et vit dans
+    /// DrDxt.TestSupport.ManifestDevTestKeys (tests/Shared), jamais dans cet assemblage livré.</summary>
     public static byte[] PublicKey =>
     [
         0x97, 0xE0, 0xAC, 0x22, 0x73, 0xD9, 0xEF, 0xC2,
@@ -46,16 +46,16 @@ public static class ManifestDevKeys
         0xAE, 0x35, 0x81, 0x4C, 0xC4, 0xFE, 0xAE, 0x28,
     ];
 
-    /// <summary>11/09/2026 — cette cle publique est-elle la cle de DEV ? Une cle de machine, un fichier
+    /// <summary>Cette cle publique est-elle la cle de dev ? Une cle de machine, un fichier
     /// de cle publique provisionne ou une cle derivee par le helper ne doivent jamais l'etre : sa graine
     /// privee vit dans les tests, donc quiconque a le depot signerait un manifeste accepte.</summary>
     public static bool EstLaCleDeDev(ReadOnlySpan<byte> clePublique) => clePublique.SequenceEqual(PublicKey);
 
-    /// <summary>Builds the verify-only <see cref="IManifestVerifier"/> from the embedded
-    /// PUBLIC key. Never fails (the embedded key is well-formed by construction); wrapped
-    /// in a Result so a future provisioned-key swap keeps the same fail-clean contract.
-    /// DEBUG/test convenience only — a RELEASE build verifies with a PROVISIONED key and
-    /// never falls back to this (see HostServiceCollectionExtensions / AppManifestPublicKey).</summary>
+    /// <summary>Construit l'<see cref="IManifestVerifier"/> en vérification seule à partir de la clé
+    /// publique embarquée. N'échoue jamais (la clé embarquée est bien formée par construction) ;
+    /// emballé dans un Result pour qu'un futur échange par une clé fournie garde le même contrat
+    /// d'échec propre. Commodité Debug / test seulement : un build Release vérifie avec une clé
+    /// fournie et ne se rabat jamais sur celle-ci (voir HostServiceCollectionExtensions / AppManifestPublicKey).</summary>
     public static Result<IManifestVerifier> CreateVerifier()
     {
         try

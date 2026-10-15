@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.Core.Tests;
 
-/// <summary>08/10/2026 (J-MECA) : ce que la limite de puissance fait pendant une partie, lu par le pilote.</summary>
+/// <summary>Ce que la limite de puissance fait pendant une partie, lu par le pilote.</summary>
 public class MecanismeCarteTests
 {
     private static HardwareReading L(double mhz, ClocksEventReason raisons) => new(100, 60, mhz, raisons);
@@ -44,7 +44,7 @@ public class MecanismeCarteTests
         m.MhzLibre.Should().Be(2735);
     }
 
-    // MECA2 : un menu (puissance basse, non bridé) ne compte pas comme du temps « libre ».
+    // Un menu (puissance basse, non bridé) ne compte pas comme du temps « libre ».
     [Fact]
     public void Les_lectures_hors_charge_ne_comptent_pas()
     {

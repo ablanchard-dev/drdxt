@@ -1,11 +1,10 @@
 namespace DrDxt.App.ViewModels;
 
 /// <summary>
-/// Maps an engine tweak id to its display resx keys (title + honest summary) so the
-/// dashboard change rows read as friendly names, not raw ids. The summary keys are the
-/// Same ones the tweaks (D/E/F) declare via <c>ITweak.SummaryKey</c> — kept in sync by
-/// the localization parity test. An unknown id falls back to the id itself for the title
-/// and an empty summary, so nothing ever crashes and nothing is invented.
+/// Donne, pour l'identifiant d'un levier, les clés de son titre et de son résumé, pour que « Ce que DrDXT a posé » et
+/// la carte de la machine montrent un nom lisible plutôt qu'un identifiant. Les clés de résumé sont celles que chaque
+/// levier déclare par <c>ITweak.SummaryKey</c>. Un identifiant inconnu garde son nom brut et un résumé vide : rien ne
+/// plante, rien n'est inventé.
 /// </summary>
 public static class TweakDisplayKeys
 {
@@ -20,7 +19,7 @@ public static class TweakDisplayKeys
             ["gpu.fan_curve"]          = ("tweak.gpu.fan_curve.title",           "tweak.gpu.fan_curve.cooler"),
             ["fixit.x3d_ccd"]          = ("tweak.fixit.x3d_ccd.title",           "tweak.fixit.x3d_ccd.repair_routing"),
             ["fixit.power_plan"]       = ("tweak.fixit.power_plan.title",        "tweak.cpu.power_policy.raise_perf_preference"),
-            // 14/09/2026 (plan 2.4) : l'ecran de resultat nomme aussi ces leviers ; le resume = leur SummaryKey.
+            // L'ecran de resultat nomme aussi ces leviers ; le resume = leur SummaryKey.
             ["latency.prefer_max_perf"] = ("tweak.latency.prefer_max_perf.title", "tweak.latency.prefer_max_perf.enable"),
             ["latency.hagsOn"]          = ("tweak.latency.hagsOn.title",          "tweak.latency.hags.enable"),
             ["latency.gameModeOn"]      = ("tweak.latency.gameModeOn.title",      "tweak.latency.game_mode.enable"),
@@ -31,18 +30,21 @@ public static class TweakDisplayKeys
             ["fixit.heures_actives"]    = ("tweak.fixit.heures_actives.title",    "tweak.fixit.heures_actives.summary"),
             ["fixit.mode_boost"]        = ("tweak.fixit.mode_boost.title",        "tweak.fixit.mode_boost.summary"),
             ["fixit.cpu_power_limit"]         = ("tweak.fixit.cpu_power_limit.title",         "tweak.fixit.cpu_power_limit.summary"),
+            ["fixit.cpu_power_cap"]           = ("tweak.fixit.cpu_power_cap.title",           "tweak.fixit.cpu_power_cap.summary"),
             ["fixit.wifi_performances"] = ("tweak.fixit.wifi_performances.title", "tweak.fixit.wifi_performances.summary"),
+            ["fixit.pagefile_ssd"]      = ("tweak.fixit.pagefile_ssd.title",      "tweak.fixit.pagefile_ssd.summary"),
+            ["fixit.plan_economie"]     = ("tweak.fixit.plan_economie.title",     "tweak.fixit.plan_economie.summary"),
             ["fixit.ecran_frequence"]   = ("tweak.fixit.ecran_frequence.title",   "tweak.fixit.ecran_frequence.confort"),
             ["gpu.repos_global_normal"] = ("tweak.gpu.repos_global_normal.title", "tweak.gpu.repos_global_normal"),
             // Levier de l'outil, sans ITweak dans l'App : pas de resume a lui.
             ["gpu.core_offset"]         = ("tweak.gpu.core_offset.title",         ""),
         };
 
-    /// <summary>Title resx key for a tweak id, or the id itself when unknown.</summary>
+    /// <summary>Clé resx du titre d'un levier, ou l'id lui-même s'il est inconnu.</summary>
     public static string TitleKey(string tweakId) =>
         Map.TryGetValue(tweakId, out var keys) ? keys.TitleKey : tweakId;
 
-    /// <summary>Summary resx key for a tweak id, or empty when unknown.</summary>
+    /// <summary>Clé resx du résumé d'un levier, ou vide s'il est inconnu.</summary>
     public static string SummaryKey(string tweakId) =>
         Map.TryGetValue(tweakId, out var keys) ? keys.SummaryKey : string.Empty;
 }

@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 
 namespace DrDxt.Detection.Tests.Network;
 
-// 03/10/2026 (boucle 2D2P, P3.1d) : le diagnostic de route sur le vrai environnement, sans rien de simulé : le processus
+// Le diagnostic de route sur le vrai environnement, sans rien de simulé : le processus
 // Call of Duty en cours, son vrai serveur (écoute ETW), les vrais routeurs (TTL), la vraie box. Sans partie ouverte ou sans
 // droits d'administrateur, le test n'a rien à regarder et le dit. Avec, il exige un verdict et l'écrit dans la sortie.
 public sealed class DiagnosticDeRouteSurLaVraiePartieTests(ITestOutputHelper sortie)

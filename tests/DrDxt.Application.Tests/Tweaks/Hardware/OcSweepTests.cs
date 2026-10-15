@@ -5,18 +5,18 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// P2 — OcSweep: the pure ascending core-offset sweep decision logic. Measures stock,
-// then each candidate offset on the deterministic perf-meter (P1); keeps the best
-// PROVEN gain (GpuBenchAb: delta clears the combined margin AND stable); stops at the
-// first unstable/failed step; always ends by applying the best offset (0 = stock when
-// nothing proved better). Pure orchestration over two delegates — no GPU in tests.
+// OcSweep : la logique de décision pure du balayage ascendant de décalage cœur. Mesure
+// l'origine, puis chaque décalage candidat sur le perf-mètre déterministe ; garde le meilleur
+// gain prouvé (GpuBenchAb : le delta franchit la marge combinée et c'est stable) ; s'arrête
+// au premier pas instable ou raté ; finit toujours en appliquant le meilleur décalage (0 =
+// origine quand rien n'a prouvé mieux). Pure orchestration sur deux délégués, sans carte.
 // -----------------------------------------------------------------------
 public sealed class OcSweepTests
 {
     private static GpuBenchAggregate Agg(double mean, double margin = 1, bool stable = true)
         => new(mean, margin, 3, stable);
 
-    // measure delegate keyed by the offset last applied.
+    // délégué de mesure indexé par le dernier décalage appliqué.
     private static (Func<Result<GpuBenchAggregate>> Measure, Func<int, bool> Apply, List<int> Applied)
         Rig(Dictionary<int, Result<GpuBenchAggregate>> byOffset, Func<int, bool>? applyOverride = null)
     {
@@ -42,9 +42,9 @@ public sealed class OcSweepTests
         var (measure, apply, applied) = Rig(new()
         {
             [0] = Result<GpuBenchAggregate>.Ok(Agg(100)),
-            [30] = Result<GpuBenchAggregate>.Ok(Agg(104)),   // gain (margin 1+1=2)
-            [60] = Result<GpuBenchAggregate>.Ok(Agg(108)),   // bigger gain
-            [90] = Result<GpuBenchAggregate>.Ok(Agg(108.5)), // within noise vs stock? 8.5 > 2 → still gain, best score
+            [30] = Result<GpuBenchAggregate>.Ok(Agg(104)),   // gain (marge 1+1=2)
+            [60] = Result<GpuBenchAggregate>.Ok(Agg(108)),   // gain plus grand
+            [90] = Result<GpuBenchAggregate>.Ok(Agg(108.5)), // dans le bruit face à l'origine ? 8.5 > 2 → toujours un gain, meilleur score
         });
 
         var r = OcSweep.Run(measure, apply, new[] { 30, 60, 90 });
@@ -52,7 +52,7 @@ public sealed class OcSweepTests
         r.IsOk.Should().BeTrue();
         r.Value!.BestOffsetMhz.Should().Be(90);
         r.Value.GainPct.Should().BeApproximately(8.5, 0.01);
-        applied.Last().Should().Be(90); // ends applied at the best
+        applied.Last().Should().Be(90); // finit appliqué au meilleur
         r.Value.EndedAtBest.Should().BeTrue();
     }
 
@@ -63,15 +63,15 @@ public sealed class OcSweepTests
         {
             [0] = Result<GpuBenchAggregate>.Ok(Agg(100)),
             [30] = Result<GpuBenchAggregate>.Ok(Agg(105)),                  // gain
-            [60] = Result<GpuBenchAggregate>.Ok(Agg(120, stable: false)),  // TDR/checksum → stop
+            [60] = Result<GpuBenchAggregate>.Ok(Agg(120, stable: false)),  // TDR ou somme de contrôle → stop
         });
 
         var r = OcSweep.Run(measure, apply, new[] { 30, 60, 90 });
 
         r.IsOk.Should().BeTrue();
         r.Value!.BestOffsetMhz.Should().Be(30);
-        applied.Last().Should().Be(30);              // reverted to the proven best
-        applied.Should().NotContain(90);             // never went past the instability
+        applied.Last().Should().Be(30);              // revenu au meilleur prouvé
+        applied.Should().NotContain(90);             // n'a jamais dépassé l'instabilité
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class OcSweepTests
         var (measure, apply, applied) = Rig(new()
         {
             [0] = Result<GpuBenchAggregate>.Ok(Agg(100, margin: 5)),
-            [30] = Result<GpuBenchAggregate>.Ok(Agg(103, margin: 5)),  // within combined noise
+            [30] = Result<GpuBenchAggregate>.Ok(Agg(103, margin: 5)),  // dans le bruit combiné
         });
 
         var r = OcSweep.Run(measure, apply, new[] { 30 });
@@ -101,15 +101,15 @@ public sealed class OcSweepTests
         var r = OcSweep.Run(measure, apply, new[] { 150, 500 }); // > GpuSafeBounds.MaxCoreOffsetMhz (100)
 
         r.IsOk.Should().BeTrue();
-        applied.Should().OnlyContain(o => o == 0);   // just the initial stock + final restore
+        applied.Should().OnlyContain(o => o == 0);   // juste l'origine initiale et la restauration finale
         r.Value!.BestOffsetMhz.Should().Be(0);
     }
 
     [Fact]
     public void Memory_band_candidates_pass_when_the_memory_band_check_is_supplied()
     {
-        // +300 is outside the core band (+100 cap) but inside the memory band (±500):
-        // with the memory band check supplied it must be swept, not silently dropped.
+        // +300 est hors de la bande cœur (plafond +100) mais dans la bande mémoire (±500) :
+        // avec le contrôle de bande mémoire fourni, il doit être balayé, pas écarté en silence.
         var (measure, apply, applied) = Rig(new()
         {
             [0] = Result<GpuBenchAggregate>.Ok(Agg(100)),
@@ -145,7 +145,7 @@ public sealed class OcSweepTests
         {
             [0] = Result<GpuBenchAggregate>.Ok(Agg(100)),
             [30] = Result<GpuBenchAggregate>.Ok(Agg(105)),
-        }, applyOverride: mhz => mhz != 60); // +60 write fails
+        }, applyOverride: mhz => mhz != 60); // l'écriture +60 échoue
 
         var r = OcSweep.Run(measure, apply, new[] { 30, 60 });
 

@@ -10,7 +10,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 06/10/2026 (L-GPU, L4) : la phrase « réglage de la carte ouvert / fermé » rejouée sur les cinq machines enregistrées,
+/// La phrase « réglage de la carte ouvert / fermé » rejouée sur les cinq machines enregistrées,
 /// avec les VRAIS leviers de la carte et le vrai consommateur du scan. Les fixtures ne portent pas le détail des arrêts
 /// (dates seules) : la phrase ne doit donc nommer aucune famille d'arrêt, et le portable ne se voit rien proposer
 /// (`GpuGating`).

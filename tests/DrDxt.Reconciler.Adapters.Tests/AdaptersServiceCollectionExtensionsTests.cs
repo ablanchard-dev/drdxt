@@ -7,16 +7,16 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.Reconciler.Adapters.Tests;
 
 // -----------------------------------------------------------------------
-// AddDrDxtReconcilerAdapters registers the 3 production probes + the descriptor
-// catalog seam against their interfaces. The Host/App wire this later — here we only
-// assert the container resolves each interface to the right concrete adapter.
+// AddDrDxtReconcilerAdapters enregistre les 3 sondes de production et la couture du catalogue
+// de descripteurs sur leurs interfaces. L'hôte et l'App les câblent plus tard ; ici on vérifie
+// seulement que le conteneur résout chaque interface vers le bon adaptateur concret.
 // -----------------------------------------------------------------------
 public sealed class AdaptersServiceCollectionExtensionsTests
 {
     private static ServiceProvider BuildProvider()
     {
         var services = new ServiceCollection();
-        // WmiGpuDriverProbe needs IWmiQuery — supplied by Detection's registration.
+        // WmiGpuDriverProbe a besoin d'IWmiQuery, fourni par l'enregistrement de Detection.
         services.AddSingleton<IWmiQuery, ManagementWmiQuery>();
         services.AddDrDxtReconcilerAdapters();
         return services.BuildServiceProvider();
@@ -50,9 +50,9 @@ public sealed class AdaptersServiceCollectionExtensionsTests
     [Fact]
     public void RegistersElevatedReapplyClient_AsItsImplementation()
     {
-        // ElevatedReapplyClient also needs IElevatedClient (a Host/App prerequisite, like
-        // IWmiQuery), so we assert the REGISTRATION's implementation type rather than
-        // forcing construction here.
+        // ElevatedReapplyClient a aussi besoin d'IElevatedClient (un prérequis hôte/App, comme
+        // IWmiQuery), donc on vérifie le type d'implémentation de l'enregistrement plutôt que
+        // de forcer la construction ici.
         var services = new ServiceCollection();
         services.AddSingleton<IWmiQuery, ManagementWmiQuery>();
         services.AddDrDxtReconcilerAdapters();

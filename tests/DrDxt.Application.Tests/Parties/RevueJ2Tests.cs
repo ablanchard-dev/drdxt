@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 06/10/2026 (chantier J2, revue 5/10) : les gains affichés doivent tenir dans la vraie vie, pas seulement sur
+// Les gains affichés doivent tenir dans la vraie vie, pas seulement sur
 // l'exemple du test.
 public sealed class RevueJ2Tests : IDisposable
 {
@@ -15,7 +15,7 @@ public sealed class RevueJ2Tests : IDisposable
         new("cod.exe", new DateTimeOffset(2026, 10, jour, 20, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, jour, 20, 30, 0, TimeSpan.Zero),
             4, 130, low1, BottleneckState.CpuBoundOrAppBound);
 
-    // F-3 : l'écart des bornes (pire cas) accompagne un verdict tranché ; il est plus prudent que l'écart des médianes.
+    // L'écart des bornes (pire cas) accompagne un verdict tranché ; il est plus prudent que l'écart des médianes.
     [Fact]
     public void Un_verdict_tranche_porte_l_ecart_de_ses_bornes()
     {
@@ -28,7 +28,7 @@ public sealed class RevueJ2Tests : IDisposable
         b.EcartBornesPercent.Should().BeLessThan((b.Low1Apres!.Value / b.Low1Avant!.Value - 1) * 100);
     }
 
-    // F-2 : figer écrit le bilan tranché une fois ; un bilan déjà figé n'est jamais réécrit ; un « pas encore jugé » non plus.
+    // Figer écrit le bilan tranché une fois ; un bilan déjà figé n'est jamais réécrit ; un « pas encore jugé » non plus.
     [Fact]
     public void Figer_garde_le_premier_bilan_tranche()
     {
@@ -45,7 +45,7 @@ public sealed class RevueJ2Tests : IDisposable
         journal.Lire().Single().Fige.Should().Be(premier);
     }
 
-    // F-5 : une seule capture de 20 s (une vidéo plein écran de passage) n'est pas une partie.
+    // Une seule capture de 20 s (une vidéo plein écran de passage) n'est pas une partie.
     [Fact]
     public void Une_seule_capture_ne_fait_pas_une_partie()
     {

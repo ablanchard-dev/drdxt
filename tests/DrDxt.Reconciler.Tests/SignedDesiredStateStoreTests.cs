@@ -6,14 +6,14 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// T1-T7 — the SEALED, SIGNED DesiredState manifest store.
+// Le magasin de manifeste DesiredState scellé et signé.
 //
-// Security property under test (master §9.12 / B1, plan §2):
-//   * Integrity = ASYMMETRIC signature; the verifier holds only the PUBLIC key.
-//   * A TAMPERED manifest → LoadAsync fails clean → the reconciler refuses to
-//     apply anything (fail-CLOSED, never fail-open).
-//   * Defence-in-depth = an admin-write-only ProgramData ACL (storage seam).
-//   * The manifest carries only OS-side reconcilable tweaks (firmware rejected).
+// Propriété de sécurité testée :
+//   * Intégrité = signature asymétrique ; le vérificateur ne tient que la clé publique.
+//   * Un manifeste altéré → LoadAsync échoue proprement → le réconciliateur refuse
+//     d'appliquer quoi que ce soit (fermé, jamais ouvert).
+//   * Défense en profondeur = une ACL ProgramData inscriptible par les seuls admins (couture de stockage).
+//   * Le manifeste ne porte que des leviers réconciliables côté OS (firmware rejeté).
 // -----------------------------------------------------------------------
 public sealed class SignedDesiredStateStoreTests
 {
@@ -42,7 +42,7 @@ public sealed class SignedDesiredStateStoreTests
         return (store, storage, keys);
     }
 
-    // T1 — round-trip preserves every field.
+    // L'aller-retour préserve chaque champ.
     [Fact]
     public async Task SaveThenLoad_RoundTripsAllFields()
     {
@@ -56,8 +56,8 @@ public sealed class SignedDesiredStateStoreTests
         loaded.Value!.Tweaks.Should().BeEquivalentTo(desired.Tweaks, o => o.WithStrictOrdering());
     }
 
-    // T2 — the persisted file lives under an admin-write-only root (the storage seam
-    // is the ACL boundary; production path generator is asserted in StorageTests).
+    // Le fichier persisté vit sous une racine inscriptible par les seuls admins (la couture de
+    // stockage est la frontière ACL ; le générateur de chemin de production est vérifié dans StorageTests).
     [Fact]
     public async Task PersistedFile_GoesThroughAdminWriteStorageSeam()
     {
@@ -68,8 +68,8 @@ public sealed class SignedDesiredStateStoreTests
         storage.Slot.Should().NotBeNull("the manifest is persisted via the admin-write storage seam");
     }
 
-    // T3 — tampering with one byte of the canonical content → verification fails →
-    // load fails clean and returns no DesiredState (fail-CLOSED).
+    // Altérer un octet du contenu canonique → la vérification échoue →
+    // le chargement échoue proprement et ne rend aucun DesiredState (fermé).
     [Fact]
     [Trait("Category", "ReconcileGate")]
     public async Task TamperedFile_LoadFails_AndReturnsNothing()
@@ -77,7 +77,7 @@ public sealed class SignedDesiredStateStoreTests
         var (store, storage, _) = Build();
         (await store.CommitAsync(ThreeTweaks())).IsOk.Should().BeTrue();
 
-        // Corrupt one byte of the signed canonical content (attacker edits the file).
+        // Corrompre un octet du contenu canonique signé (l'attaquant édite le fichier).
         var original = storage.Slot!;
         var bytes = original.CanonicalJson.ToCharArray();
         bytes[bytes.Length / 2] = bytes[bytes.Length / 2] == 'x' ? 'y' : 'x';
@@ -89,7 +89,7 @@ public sealed class SignedDesiredStateStoreTests
         loaded.Value.Should().BeNull();
     }
 
-    // 26/09/2026 : une enveloppe aux champs nuls (fichier « {} » ou ecriture interrompue) faisait lever
+    // Une enveloppe aux champs nuls (fichier « {} » ou ecriture interrompue) faisait lever
     // Convert.FromBase64String(null) : le service tombait au lieu d'echouer proprement.
     [Theory]
     [InlineData(null, "c2ln")]
@@ -108,15 +108,15 @@ public sealed class SignedDesiredStateStoreTests
         loaded.Error!.Value.Code.Should().Be(ErrorCodes.ManifestTampered);
     }
 
-    // T3b — a forged signature (signed by a DIFFERENT key) is rejected: the verifier
-    // holds only OUR public key, so an owner-forged manifest fails-closed.
+    // Une signature forgée (par une autre clé) est rejetée : le vérificateur ne tient que
+    // notre clé publique, donc un manifeste forgé par le propriétaire se ferme.
     [Fact]
     public async Task ForeignSignature_LoadFails_FailClosed()
     {
         var (store, storage, _) = Build();
         (await store.CommitAsync(ThreeTweaks())).IsOk.Should().BeTrue();
 
-        // Re-sign the same content with an UNRELATED keypair (the "forger").
+        // Re-signer le même contenu avec une paire de clés sans rapport (le « faussaire »).
         var forger = new FakeKeyPair();
         var canonical = storage.Slot!.CanonicalJson;
         var forgedSig = forger.Signer().Sign(System.Text.Encoding.UTF8.GetBytes(canonical)).Value!;
@@ -128,7 +128,7 @@ public sealed class SignedDesiredStateStoreTests
         loaded.Value.Should().BeNull();
     }
 
-    // T4 — no file = clean empty state (first install), not a failure.
+    // Pas de fichier = état vide propre (première installation), pas un échec.
     [Fact]
     public async Task LoadAsync_WhenNoFile_ReturnsEmptyDesiredState()
     {
@@ -138,14 +138,14 @@ public sealed class SignedDesiredStateStoreTests
         loaded.Value!.Tweaks.Should().BeEmpty();
     }
 
-    // T5 — an unknown/future schema version fails clean (no guessing).
+    // Une version de schéma inconnue ou future échoue proprement (rien de deviné).
     [Fact]
     public async Task Load_UnknownSchemaVersion_FailsClean()
     {
         var (store, storage, keys) = Build();
         (await store.CommitAsync(ThreeTweaks())).IsOk.Should().BeTrue();
 
-        // Hand-craft a correctly-signed envelope whose body has a FUTURE schema.
+        // Fabriquer à la main une enveloppe correctement signée dont le corps porte un schéma futur.
         var futureBody = SignedDesiredStateStore.CanonicalizeForTest(
             new DesiredStateManifest(999, ThreeTweaks(), At));
         var sig = keys.Signer().Sign(System.Text.Encoding.UTF8.GetBytes(futureBody)).Value!;
@@ -157,7 +157,7 @@ public sealed class SignedDesiredStateStoreTests
         loaded.Value.Should().BeNull();
     }
 
-    // T6 — a write failure leaves the previous valid manifest intact (atomic).
+    // Un échec d'écriture laisse intact le manifeste valide précédent (atomique).
     [Fact]
     public async Task SaveAsync_IsAtomic_NoPartialFileOnFailure()
     {
@@ -174,14 +174,14 @@ public sealed class SignedDesiredStateStoreTests
         second.IsOk.Should().BeFalse();
         second.Error!.Value.Code.Should().Be(ErrorCodes.IoFailure);
 
-        // The old valid manifest must still be there, untouched.
+        // L'ancien manifeste valide doit toujours être là, intact.
         storage.Slot.Should().Be(afterFirst);
         var loaded = await store.LoadAsync();
         loaded.IsOk.Should().BeTrue();
         loaded.Value!.Tweaks.Should().ContainSingle().Which.TweakId.Should().Be("reflex.lowlatency");
     }
 
-    // T7 — a firmware-persistent tweak is refused at save (durability scope §4 P4).
+    // Un levier persistant en firmware est refusé à l'enregistrement (portée de durabilité).
     [Fact]
     public async Task SaveAsync_RejectsFirmwarePersistentTweaks()
     {
@@ -200,7 +200,7 @@ public sealed class SignedDesiredStateStoreTests
         storage.WriteCount.Should().Be(0, "nothing is persisted when the manifest is invalid");
     }
 
-    // T7b — an unknown tweakId (no surface) is also refused at save (conservative).
+    // Un tweakId inconnu (sans surface) est aussi refusé à l'enregistrement (prudence).
     [Fact]
     public async Task SaveAsync_RejectsUnknownTweak()
     {

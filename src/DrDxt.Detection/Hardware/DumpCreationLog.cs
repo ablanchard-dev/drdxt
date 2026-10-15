@@ -10,10 +10,9 @@ public sealed record EtatDesVidages(IReadOnlyList<DateTimeOffset> Echecs, int Pe
 /// <summary>
 /// Les echecs de creation de vidage (`volmgr` 161) et les vidages presents.
 ///
-/// 17/09/2026 : l'outil de developpement lisait cet evenement depuis des jours, le produit non. Sur
-/// la machine de reference : 10 arrets brutaux, 2 echecs de creation (02/09 et 04/09), aucun vidage
-/// garde. L'app disait comment les vidages sont configures, jamais qu'ils ne s'ecrivent pas.
-/// La difference entre « configure pour » et « capable de ».
+/// Releve sur la machine de reference : 10 arrets brutaux, 2 echecs de creation, aucun vidage garde.
+/// Dire comment les vidages sont configures ne dit pas qu'ils s'ecrivent : la difference entre
+/// « configure pour » et « capable de ».
 /// </summary>
 public interface IDumpCreationLog
 {

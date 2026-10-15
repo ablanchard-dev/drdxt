@@ -11,7 +11,7 @@ namespace DrDxt.Integration.Tests;
 /// s'appelle `UNKNOWN`.
 ///
 /// Et une regle propre a ce fichier : **toutes les lignes reseau doivent rester NON CHIFFRE.**
-/// La recherche du 07/09 n'a trouve aucun chiffre pour le JEU -- seulement « des microsecondes par
+/// La recherche documentee n'a trouve aucun chiffre pour le JEU, seulement « des microsecondes par
 /// reveil » et « negligeable sauf usages tres sensibles ». Notre plancher de bruit en jeu est de
 /// 9,9 % : nous ne pourrons jamais mesurer un effet pareil, donc jamais le promettre. Le jour ou
 /// quelqu'un remplit une de ces cases, il devra faire passer ce test.

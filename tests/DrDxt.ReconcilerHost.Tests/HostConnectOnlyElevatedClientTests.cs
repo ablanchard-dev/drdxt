@@ -5,19 +5,19 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// HostElevatedClientFactory.CreateConnectOnly — the reconciler→helper client.
+// HostElevatedClientFactory.CreateConnectOnly : le client réconciliateur → helper.
 //
-// The low-priv reconciler service does not launch the helper (no UAC at boot): it
-// only CONNECTS to the already-running helper service over the same §9.13 handshake
-// the App uses, with the reconciler-host exe as its caller identity. So the
-// reconciler-side client is "connect-only" — a HandshakingElevatedClient with NO
-// runas launch wrapper.
+// Le service réconciliateur peu privilégié ne lance pas le helper (pas d'UAC au démarrage) :
+// il se connecte seulement au service helper déjà en route par la même négociation de clé de
+// session que l'App, avec l'exécutable de l'hôte réconciliateur comme identité d'appelant. Le
+// client côté réconciliateur est donc « connexion seule » : un HandshakingElevatedClient sans
+// enveloppe de lancement runas.
 //
-//   * It returns the real handshaking client (connect-only), never the
-//     launch-on-demand wrapper.
-//   * When the helper service is absent, the client fails CLEAN (HELPER_UNREACHABLE)
-//     rather than crashing — the reconciler logs "elevation unavailable" and does not
-//     reapply. We assert this with a NON-existent pipe + a short connect timeout.
+//   * Il rend le vrai client négociant (connexion seule), jamais l'enveloppe de
+//     lancement à la demande.
+//   * Quand le service helper est absent, le client échoue proprement (HELPER_UNREACHABLE)
+//     plutôt que de planter : le réconciliateur journalise « élévation indisponible » et ne
+//     réapplique pas. Vérifié avec un tube inexistant et un délai de connexion court.
 // -----------------------------------------------------------------------
 public sealed class HostConnectOnlyElevatedClientTests
 {
@@ -27,16 +27,16 @@ public sealed class HostConnectOnlyElevatedClientTests
     public void CreateConnectOnly_returns_the_real_connect_only_handshaking_client()
     {
         var client = HostElevatedClientFactory.CreateConnectOnly();
-        // It is the connect-only handshaking client — not the launch-on-demand wrapper
-        // (the reconciler must never trigger a UAC at boot).
+        // C'est le client négociant en connexion seule, pas l'enveloppe de lancement à la demande
+        // (le réconciliateur ne doit jamais déclencher un UAC au démarrage).
         client.Should().BeOfType<HandshakingElevatedClient>();
     }
 
     [Fact]
     public async Task When_the_helper_is_absent_the_connect_only_client_fails_clean()
     {
-        // A unique, never-served pipe + a short connect deadline → the client cannot
-        // reach a helper and must fail clean (no crash), surfacing HELPER_UNREACHABLE.
+        // Un tube unique jamais servi et une échéance de connexion courte → le client ne peut pas
+        // atteindre un helper et doit échouer proprement (pas de plantage), en remontant HELPER_UNREACHABLE.
         var deadPipe = "DrDXT.ReconConnectOnly." + Guid.NewGuid().ToString("N");
         var client = HostElevatedClientFactory.CreateConnectOnly(
             pipeName: deadPipe, connectTimeoutMs: 250);

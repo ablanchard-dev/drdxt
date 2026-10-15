@@ -10,10 +10,10 @@ namespace DrDxt.Reconciler.Reseau;
 public sealed record PlafondRetenuDuService(string Exe, long PlafondBps);
 
 /// <summary>
-/// 28/09/2026 : la protection du ping, retenue pour le service de démarrage.
+/// La protection du ping, retenue pour le service de démarrage.
 ///
-/// L'App la gardait sous %LOCALAPPDATA% (<c>PlafondEnvoiMemorise</c>) : un fichier que tout programme du
-/// compte peut réécrire, et que le helper appliquait : un programme du compte pouvait y nommer un autre exe. Le service tourne en SYSTEM, sans
+/// Gardée par l'App sous %LOCALAPPDATA% (<c>PlafondEnvoiMemorise</c>), elle vivrait dans un fichier que tout programme du
+/// compte peut réécrire, et que le helper appliquerait : un programme du compte pourrait y nommer un autre exe. Le service tourne en SYSTEM, sans
 /// personne devant l'écran : il ne lit donc que %ProgramData%\DrDxt, écrit par le helper élevé, dont le
 /// propriétaire et les droits sont vérifiés à chaque lecture. Un fichier non fiable, abîmé ou incohérent
 /// n'allume rien.

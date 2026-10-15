@@ -7,9 +7,8 @@ namespace DrDxt.Core.Tests;
 /// <summary>
 /// Ce tri decide de ce qu'un joueur voit.
 ///
-/// L'audit rendait une quarantaine de constats sur onze domaines et terminait par un decompte de
-/// statuts — « 2 recommandations, 6 Unknown ». Exact, et illisible : rien n'y disait ce qu'il faut
-/// regarder. Un rapport que personne ne lit ne vaut pas mieux qu'un rapport faux.
+/// L'audit rend une quarantaine de constats sur onze domaines ; un decompte de statuts
+/// (« 2 recommandations, 6 Unknown ») serait exact et illisible, sans dire quoi regarder. Un rapport que personne ne lit ne vaut pas mieux qu'un rapport faux.
 ///
 /// La regression que ces tests empechent : qu'un constat porteur d'un GESTE se retrouve range
 /// parmi les angles morts et disparaisse de l'ecran.
@@ -48,8 +47,8 @@ public class RepairTriageTests
     [InlineData(RepairStatus.KnownHarmful)]
     public void UN_ETAT_SUSPECT_OU_NUISIBLE_REMONTE_MEME_SANS_GESTE_PROPOSE(RepairStatus s)
     {
-        // Le produit n'a pas toujours de remede a offrir — et il doit quand meme le dire. Les deux
-        // constats de stabilite du 08/09 sont exactement dans ce cas : signature repetee du noyau
+        // Le produit n'a pas toujours de remede a offrir, et il doit quand meme le dire. Deux
+        // constats de stabilite sont exactement dans ce cas : signature repetee du noyau
         // graphique et vidages qui echouent, sans aucune reparation possible.
         RepairTriage.Trier([C(s)]).Attention.Should().HaveCount(1);
     }
@@ -84,14 +83,14 @@ public class RepairTriageTests
     [Fact]
     public void LA_PHRASE_S_ACCORDE_AU_SINGULIER()
     {
-        // 17/09/2026 : « 1 état(s) méritent … 1 n'ont pas pu être lus » sur la machine de reference.
+        // « 1 état(s) méritent … 1 n'ont pas pu être lus » sur la machine de reference.
         var t = RepairTriage.Trier([C(RepairStatus.KnownHarmful), C(RepairStatus.Observed), C(RepairStatus.Unknown)]);
 
         t.Phrase.Should().Be("1 à corriger, 1 est vérifié, 1 n'a pas pu être lu");
     }
 
-    // UI1 (critique du 08/10, défaut 2) : le titre disait « 17 points à corriger » et cette phrase « 21 états méritent
-    // ton attention » : la pile compte aussi les gestes proposés sur un état sain. Elle parle maintenant avec les mots du
+    // Pas « 17 points à corriger » en titre et « 21 états méritent ton attention » dans la phrase : la pile
+    // compte aussi les gestes proposés sur un état sain. Elle parle avec les mots du
     // titre (« à corriger » = nuisible ou suspect, la même règle que GraviteDe) et nomme le reste « à regarder ».
     [Fact]
     public void LA_PHRASE_SEPARE_CE_QUI_EST_A_CORRIGER_DE_CE_QUI_EST_A_REGARDER()

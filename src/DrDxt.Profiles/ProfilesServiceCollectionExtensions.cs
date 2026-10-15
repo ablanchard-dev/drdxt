@@ -5,17 +5,17 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace DrDxt.Profiles;
 
 // -----------------------------------------------------------------------
-// M6 — DI wiring (mirrors AddDrDxtDetection / AddDrDxtApplication).
+// Câblage de l'injection (comme AddDrDxtDetection et AddDrDxtApplication).
 //
-// AddDrDxtProfiles() registers the per-chip profile layer:
-//   * IChipProfileCatalog  -> ChipProfileCatalog        (the sourced profiles)
-//   * IChipProfileMatcher  -> ChipProfileMatcher        (detected chip → profile(s))
-//   * IProfileMatcher      -> CoreProfileMatcherAdapter (Core contract, projects down)
+// AddDrDxtProfiles() enregistre la couche des profils par puce :
+//   * IChipProfileCatalog  -> ChipProfileCatalog        (les profils sourcés)
+//   * IChipProfileMatcher  -> ChipProfileMatcher        (puce détectée → profils)
+//   * IProfileMatcher      -> CoreProfileMatcherAdapter (contrat de Core, projection)
 //
-// TryAdd* so a host/test composition can replace any of them. Pure registration — no
-// scan/apply behaviour is rewired here; turning a profile's parameters into the M2
-// GpuTuningTarget / building a TweakPlan from IProfileMatcher.Match is the consumption
-// seam left to the App scan flow (documented, not forced).
+// TryAdd* pour qu'un hôte ou un test puisse remplacer chacun. Enregistrement pur : rien du
+// scan ni de la pose n'est recâblé ici ; transformer les paramètres d'un profil en
+// GpuTuningTarget ou bâtir un TweakPlan depuis IProfileMatcher.Match reste la couture de
+// consommation du flux de scan de l'App (documentée, pas imposée).
 // -----------------------------------------------------------------------
 public static class ProfilesServiceCollectionExtensions
 {

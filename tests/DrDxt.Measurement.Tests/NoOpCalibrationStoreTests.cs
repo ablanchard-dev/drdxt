@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Measurement.Tests;
 
 /// <summary>
-/// Le journal des controles n'efface plus ce qu'il n'a pas su lire (L2, plan du 10/09).
+/// Le journal des controles n'efface plus ce qu'il n'a pas su lire.
 ///
 /// Une lecture ratee ou un JSON illisible donnait une liste vide, puis `Ajouter` ecrasait le
 /// fichier avec les seules observations du jour. Des semaines de controles no-op — la seule base
@@ -76,7 +76,7 @@ public class NoOpCalibrationStoreTests
         new NoOpCalibrationStore(new Fichier { EchecLecture = true }).Lire().Should().BeEmpty();
     }
 
-    // 26/09/2026 : une resolution infinie (zero degre de liberte) faisait lever la serialisation, et le
+    // Une resolution infinie (zero degre de liberte) faisait lever la serialisation, et le
     // lot du jour etait perdu. Elle s'ecrit, se relit, et le juge l'ecarte deja (IsFinite).
     [Fact]
     public void Une_resolution_infinie_se_consigne_au_lieu_de_perdre_le_lot()

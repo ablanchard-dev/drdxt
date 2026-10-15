@@ -1,4 +1,4 @@
-using DrDxt.App.ViewModels;
+﻿using DrDxt.App.ViewModels;
 using System.Globalization;
 using DrDxt.Core;
 using DrDxt.Infrastructure.Localization;
@@ -50,24 +50,19 @@ public class ScanLocalizationTests
     [InlineData("Finding.Latency.VrrUnknown")]
     [InlineData("Finding.Gpu.ReBarOff")]
     [InlineData("Finding.Gpu.ReBarUnknown")]
-    // ── Dashboard rebuild (M1) ──
+    // ── Reconstruction du tableau de bord ──
     [InlineData("UI.App.Name")]
-    [InlineData("UI.Qual.Excellent")]
-    [InlineData("UI.Qual.Good")]
-    [InlineData("UI.Qual.Fair")]
-    [InlineData("UI.Qual.Poor")]
     [InlineData("UI.Idle.HeadlineLead")]
     [InlineData("UI.Idle.HeadlineAccent")]
     [InlineData("UI.Idle.HeroTitle")]
     [InlineData("UI.Idle.HeroBody")]
     [InlineData("UI.Trust.Local")]
     [InlineData("UI.Trust.Data")]
-    [InlineData("UI.Result.HeadlineLead")]
     [InlineData("UI.Result.ScanDone")]
     [InlineData("UI.Result.Subtitle")]
     [InlineData("UI.Result.NoCritical")]
     [InlineData("UI.Cta.Optimize")]
-    // 11/09/2026 — la scene declaree avant la mesure en jeu.
+    // La scene declaree avant la mesure en jeu.
     [InlineData("Scan.Scene.Question")]
     [InlineData("Scan.Scene.Unknown")]
     [InlineData("Scan.Scene.Gameplay")]
@@ -75,14 +70,14 @@ public class ScanLocalizationTests
     [InlineData("Scan.Scene.Menu")]
     [InlineData("Scan.Scene.Description")]
     [InlineData("Scan.Scene.Declared")]
-    // 08/10/2026 — des arrets recents ne bloquent plus : l'ecran dit la garde qui les remplace.
+    // Des arrets recents ne bloquent plus : l'ecran dit la garde qui les remplace.
     [InlineData("Apply.SousGarde")]
-    // 11/09/2026 — un keep dont l'origine n'a pas atteint le manifeste signe.
+    // Un keep dont l'origine n'a pas atteint le manifeste signe.
     [InlineData("Optimize.KeptOriginNotSigned")]
-    // 11/09/2026 — le manifeste signe illisible : refus nomme, bouton de reprise, et son issue.
+    // Le manifeste signe illisible : refus nomme, bouton de reprise, et son issue.
     [InlineData("Apply.MoatUnarmed")]
     [InlineData("Apply.ManifestUnreadable")]
-    // 11/09/2026 — manifeste ecrit, repere de derive non pose par le helper.
+    // Manifeste ecrit, repere de derive non pose par le helper.
     [InlineData("Apply.ReferenceNotSeeded")]
     [InlineData("Apply.ManifestReset")]
     [InlineData("Apply.ManifestResetDone")]
@@ -111,19 +106,19 @@ public class ScanLocalizationTests
     [InlineData("UI.Feature.Report.Body")]
     [InlineData("UI.Footer.Version")]
     [InlineData("UI.Footer.Updates")]
-    // ── Measurement spine (M1.5) ──
+    // ── Colonne de mesure ──
     [InlineData("Measure.NoPresentingFrames")]
-    // ── AMD GPU honest status (§22.3) ──
+    // ── Statut honnête GPU AMD ──
     public void Key_exists_in_fr_and_en(string key)
     {
         var en = Localizer.Get(key, new CultureInfo("en"));
         var fr = Localizer.Get(key, new CultureInfo("fr"));
-        // ResxLocalizer returns the key itself when missing — so a real value must differ from the key
+        // ResxLocalizer rend la clé elle-même quand elle manque, donc une vraie valeur doit différer de la clé
         en.Should().NotBeNullOrEmpty().And.NotBe(key, $"key '{key}' missing from EN resx");
         fr.Should().NotBeNullOrEmpty().And.NotBe(key, $"key '{key}' missing from FR resx");
     }
 
-    // 29/09/2026 : retour sur l'app, « l'app c'est bien plus que simplement la santé de ton PC ». L'accueil ne résume
+    // Retour sur l'app, « l'app c'est bien plus que simplement la santé de ton PC ». L'accueil ne résume
     // plus DrDXT à un bilan de santé : il règle, mesure et prouve.
     [Fact]
     public void L_accueil_ne_resume_pas_DrDXT_a_la_sante_du_PC()
@@ -132,13 +127,13 @@ public class ScanLocalizationTests
         var en = Localizer.Get("UI.Idle.HeadlineLead", new CultureInfo("en")) + " " + Localizer.Get("UI.Idle.HeadlineAccent", new CultureInfo("en"));
         fr.Should().NotContainEquivalentOf("santé");
         en.Should().NotContainEquivalentOf("health");
-        // 29/09/2026 : retour sur l'app, « réglé au neurone près, pas correct avec un PC ». Un PC n'a pas de neurones ;
+        // Retour sur l'app, « réglé au neurone près, pas correct avec un PC ». Un PC n'a pas de neurones ;
         // la précision se dit dans l'unité du joueur, l'image.
         fr.Should().NotContainEquivalentOf("neurone").And.Contain("image");
         en.Should().NotContainEquivalentOf("neuron").And.Contain("frame");
     }
 
-    // 29/09/2026, critiques 3 et 4 : dans le sélecteur de scène, « Je ne suis pas en jeu (PC au repos) » tenait sur
+    // Critiques 3 et 4 : dans le sélecteur de scène, « Je ne suis pas en jeu (PC au repos) » tenait sur
     // trois lignes et « Entraînement / stand de tir » sur deux ; les cellules n'avaient pas la même hauteur.
     [Theory]
     [InlineData("Scan.Scene.Unknown")]
@@ -149,7 +144,7 @@ public class ScanLocalizationTests
     public void Chaque_choix_de_scene_tient_sur_une_ligne(string key)
         => Localizer.Get(key, new CultureInfo("fr")).Length.Should().BeLessThanOrEqualTo(14);
 
-    // 29/09/2026, critiques : « modèle flip » est un terme de développeur. Le réglage porte le nom que Windows lui
+    // Critiques : « modèle flip » est un terme de développeur. Le réglage porte le nom que Windows lui
     // donne dans ses paramètres, celui que le joueur y retrouvera.
     [Fact]
     public void Le_reglage_VRR_porte_le_nom_que_Windows_lui_donne()
@@ -158,7 +153,7 @@ public class ScanLocalizationTests
             .Should().NotContainEquivalentOf("flip").And.Contain("jeux en fenêtre");
     }
 
-    // 29/09/2026, quatrième critique : la même pilule « ▶ » servait à un test de cinq minutes, à une réparation qui
+    // La même pilule « ▶ » servait à un test de cinq minutes, à une réparation qui
     // télécharge et à une remesure de trente secondes. Chaque capsule porte son verbe, et sa durée quand elle est connue.
     [Theory]
     [InlineData("Agir.Capsule.TestMemoire", "5 min")]
@@ -173,8 +168,8 @@ public class ScanLocalizationTests
         fr.Length.Should().BeLessThanOrEqualTo(18, "le libellé tient dans la capsule");
     }
 
-    // 29/09/2026, quatrième critique : « 12 points à corriger » au-dessus de « 0 réglages à revoir · 7 lus sur 7 »
-    // se lisaient comme deux comptes de la même chose. Le registre dit de quoi il parle : les réglages que DrDXT
+    // « 12 points à corriger » au-dessus de « 0 réglages à revoir · 7 lus sur 7 »
+    // passeraient pour deux comptes de la même chose. Le registre dit de quoi il parle : les réglages que DrDXT
     // sait poser lui-même.
     [Fact]
     public void Le_registre_dit_qu_il_compte_les_reglages_que_DrDXT_sait_poser()
@@ -183,7 +178,7 @@ public class ScanLocalizationTests
         Localizer.Get("UI.Register.Problems", new CultureInfo("fr")).Should().Be("{0} à changer");
     }
 
-    // 03/10/2026 (D8.4, revue n° 3) : l'en-tête de « À faire d'abord » rappelle le total et où sont les autres ;
+    // L'en-tête de « À faire d'abord » rappelle le total et où sont les autres ;
     // à zéro, le registre dit « aucun à changer » plutôt que « 0 à changer ».
     [Fact]
     public void L_en_tete_a_faire_rappelle_le_total_et_le_registre_dit_aucun()
@@ -196,7 +191,7 @@ public class ScanLocalizationTests
         Loc("UI.Register.None").Should().Be("aucun à changer");
     }
 
-    // 29/09/2026, quatrième critique : Optimiser, posé sous « À faire d'abord », laissait croire qu'il corrigeait la
+    // Optimiser, posé sous « À faire d'abord », laissait croire qu'il corrigeait la
     // liste ; il n'essaie que ses propres réglages. L'aperçu le dit et vient avant le bouton, séparé de la liste.
     [Fact]
     public void Optimiser_dit_qu_il_essaie_ses_propres_reglages_avant_le_bouton()
@@ -210,7 +205,7 @@ public class ScanLocalizationTests
             .Should().BeLessThan(xaml.IndexOf("Style=\"{StaticResource CapsuleChrome}\"", StringComparison.Ordinal));
     }
 
-    // 29/09/2026, troisième critique : « réglages bons, reste à revoir » au-dessus de « 12 points à corriger » se
+    // « réglages bons, reste à revoir » au-dessus de « 12 points à corriger » se
     // lisait encore comme une contradiction. Quand il reste des points, le verdict ne dit rien de bon.
     [Fact]
     public void Un_verdict_avec_des_points_a_reprendre_ne_dit_rien_de_bon()
@@ -219,8 +214,8 @@ public class ScanLocalizationTests
         Localizer.Get("UI.Verdict.SanteACorriger", new CultureInfo("en")).Should().NotContainEquivalentOf("fine");
     }
 
-    // 29/09/2026, seconde critique : « 12 points à corriger, aucun critique » à côté de dix arrêts brutaux
-    // se lisait comme un mensonge. « Critique » est une gravité du moteur, pas une promesse au joueur : le
+    // « 12 points à corriger, aucun critique » à côté de dix arrêts brutaux
+    // passerait pour un mensonge. « Critique » est une gravité du moteur, pas une promesse au joueur : le
     // résumé compte, il ne rassure pas.
     [Theory]
     [InlineData("UI.Result.ACorrigerSansCritique")]
@@ -231,7 +226,7 @@ public class ScanLocalizationTests
         Localizer.Get(key, new CultureInfo("en")).Should().NotContainEquivalentOf("critical");
     }
 
-    // 29/09/2026 : vu sur photo, le titre après scan tenait sur trois lignes en police de titre. Un verdict
+    // Un titre après scan sur trois lignes en police de titre ne se lit pas d'un coup d'œil. Un verdict
     // se lit d'un coup d'œil : 30 caractères au plus derrière « Côté config : », soit deux lignes de titre.
     [Theory]
     [InlineData("UI.Verdict.Partial")]
@@ -243,20 +238,20 @@ public class ScanLocalizationTests
         Localizer.Get(key, new CultureInfo("fr")).Length.Should().BeLessThanOrEqualTo(30);
     }
 
-    // 29/09/2026 : critique de l'app, « aucun serveur configuré » en pied de page est du vocabulaire de
+    // Critique de l'app, « aucun serveur configuré » en pied de page est du vocabulaire de
     // développeur ; le joueur doit lire ce que ça veut dire pour lui.
     [Fact]
     public void Le_pied_de_page_sans_serveur_parle_au_joueur()
     {
-        // 03/10/2026 (tour G) : décision produit, DrDXT interroge le fabricant de la carte pour la version du pilote. Le pied
+        // Décision produit, DrDXT interroge le fabricant de la carte pour la version du pilote. Le pied
         // de page ne promet plus « aucun serveur » ; il dit exactement ce qui part sur le réseau.
         var fr = Localizer.Get("UI.Footer.Updates.NotConfigured", new CultureInfo("fr"));
         fr.Should().NotContain("configuré").And.NotContain("aucun serveur");
         fr.Should().Contain("pings").And.Contain("fabricant de ta carte graphique");
     }
 
-    // 29/09/2026 : critique de l'app, « Maintiens pour lancer » ne disait pas qu'Entrée déclenche tout de suite :
-    // au clavier, le geste restait à deviner.
+    // « Maintiens pour lancer » dit aussi qu'Entrée déclenche tout de suite : sinon, au clavier, le geste
+    // resterait à deviner.
     [Theory]
     [InlineData("Scan.Hold.Hint")]
     [InlineData("Memoire.Test.Maintenir")]
@@ -269,8 +264,8 @@ public class ScanLocalizationTests
         Localizer.Get(key, new CultureInfo("en")).Should().Contain("Enter");
     }
 
-    // 29/09/2026 : critique de l'app, « réglages bons, santé à corriger » au-dessus de « 0 leviers mal réglés »
-    // et « 12 points à corriger » se lisait comme une contradiction. Le verdict dit où sont les points, et le
+    // « réglages bons, santé à corriger » au-dessus de « 0 leviers mal réglés » et « 12 points à
+    // corriger » passerait pour une contradiction. Le verdict dit où sont les points, et le
     // décompte parle de réglages, pas de « leviers ».
     [Theory]
     [InlineData("UI.Verdict.SanteACorriger")]
@@ -284,8 +279,7 @@ public class ScanLocalizationTests
         fr.Should().NotContainEquivalentOf("levier").And.NotContainEquivalentOf("santé");
     }
 
-    // 03/10/2026 (D11.6 reporté, revue n° 5) : le titre disait « des points à reprendre » au-dessus de « 13 points à
-    // corriger ». Un seul mot pour la même chose.
+    // Pas « des points à reprendre » au-dessus de « 13 points à corriger » : un seul mot pour la même chose.
     [Fact]
     public void Le_titre_et_le_compteur_disent_le_meme_mot()
     {

@@ -3,10 +3,10 @@ using DrDxt.Core;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// Derives the <see cref="BootMode"/> from the already-detected <see cref="BiosInfo"/>.
-/// Used to gate CSM-off advice: CSM may only be disabled when booting UEFI (§16 / B2).
-/// A non-UEFI boot is treated as <see cref="BootMode.Legacy"/> — the conservative,
-/// no-boot-safe assumption.
+/// Déduit le <see cref="BootMode"/> du <see cref="BiosInfo"/> déjà détecté.
+/// Sert à filtrer le conseil de désactiver le CSM : il ne peut l'être que sur un démarrage UEFI.
+/// Un démarrage non UEFI est traité comme <see cref="BootMode.Legacy"/> : l'hypothèse prudente,
+/// sans risque de non-démarrage.
 /// </summary>
 public static class BootModeResolver
 {

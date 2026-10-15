@@ -3,21 +3,21 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// ReconcilerStateBootOutcomeStore — the write path of the anti boot-loop counter
-// (plan T27b), persisting the streak in the runtime sidecar (§5). Pure: it depends
-// only on the IReconcilerStateStore + IClock seams (Core), no OS calls of its own.
+// ReconcilerStateBootOutcomeStore : le chemin d'écriture du compteur anti-boucle de démarrage
+// (plan T27b), qui enregistre la série dans le sidecar d'exécution. Pur : il ne dépend que des
+// coutures IReconcilerStateStore + IClock (Core), sans appel à l'OS de son côté.
 //
-// Dead-man pattern:
-//   • MarkBootStarted (host startup, before the reconcile pass) INCREMENTS the
-//     streak. A boot that never reaches a stable session leaves it elevated.
-//   • MarkSessionStable (after a stable up-interval) RESETS the streak to 0 and
-//     stamps LastStableSessionAt — the dead-man reset that clears the counter.
-//   • GetUncleanStreak just reads it (what BootLoopGuard consumes).
+// Motif « homme mort » :
+//   • MarkBootStarted (démarrage de l'hôte, avant la passe de réconciliation) incrémente la
+//     série. Un démarrage qui n'atteint jamais une session stable la laisse élevée.
+//   • MarkSessionStable (après un intervalle de marche stable) remet la série à 0 et horodate
+//     LastStableSessionAt : la remise à zéro « homme mort » qui efface le compteur.
+//   • GetUncleanStreak ne fait que la lire (ce que consomme BootLoopGuard).
 //
-// Each mutation is Load → record-with → Save, fail-CLEAN: if Load or Save fails the
-// op returns that Fail unchanged, with no partial mutation and no exception across
-// the seam. The sidecar is unsigned authority-wise — it can only make the reconciler
-// do LESS — so persisting it here never widens privilege.
+// Chaque modification est Load → record-with → Save, en échec propre : si Load ou Save échoue,
+// l'op rend ce Fail tel quel, sans modification partielle ni exception à travers la couture. Le
+// sidecar n'a aucune autorité signée (il ne peut qu'en faire moins au réconciliateur) : l'enregistrer
+// ici n'élargit jamais les privilèges.
 // -----------------------------------------------------------------------
 public sealed class ReconcilerStateBootOutcomeStore : IBootOutcomeStore
 {
@@ -47,8 +47,8 @@ public sealed class ReconcilerStateBootOutcomeStore : IBootOutcomeStore
             state => state with { UncleanBootStreak = 0, LastStableSessionAt = _clock.UtcNow },
             ct);
 
-    /// <summary>Load → mutate → Save, fail-clean. A failed Load short-circuits before
-    /// any mutation; a failed Save propagates without having partially mutated state.</summary>
+    /// <summary>Load → modifier → Save, en échec propre. Un Load raté court-circuite avant toute
+    /// modification ; un Save raté se propage sans avoir modifié l'état à moitié.</summary>
     private async Task<Result> MutateAsync(
         Func<ReconcilerState, ReconcilerState> mutate, CancellationToken ct)
     {

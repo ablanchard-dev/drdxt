@@ -7,7 +7,7 @@ namespace DrDxt.Application.Network;
 public sealed record PlafondEnvoiRetenu(string Exe, long PlafondBps, DateTimeOffset MesureLe);
 
 /// <summary>
-/// 25/09/2026 — le mode « proteger ton ping » survit a la fermeture de DrDXT.
+/// Le mode « proteger ton ping » survit a la fermeture de DrDXT.
 ///
 /// Il vivait dans la memoire de l'appli : la fermer l'eteignait, la rouvrir ne le rallumait pas. Le clic
 /// du joueur est le consentement ; ce fichier le garde jusqu'a ce qu'il eteigne le mode.
@@ -48,6 +48,6 @@ public sealed class PlafondEnvoiMemorise
         }
     }
 
-    // 28/09/2026 : la regle vit dans Core (NomExeDeJeu.EstUnJeuPossible), lue aussi par le helper et le service.
+    // La regle vit dans Core (NomExeDeJeu.EstUnJeuPossible), lue aussi par le helper et le service.
     public static bool EstUnJeuPossible(string exe) => NomExeDeJeu.EstUnJeuPossible(exe);
 }

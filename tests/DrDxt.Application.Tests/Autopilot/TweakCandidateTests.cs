@@ -7,7 +7,7 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Autopilot;
 
 /// <summary>
-/// PHASE 18 F6 (L8 a) — l'adaptateur levier → candidat. Le test qui compte est celui du protocole
+/// L'adaptateur levier → candidat. Le test qui compte est celui du protocole
 /// A-b-b-a : deux applications de suite ne doivent jamais faire recapturer la cible comme
 /// « original ».
 /// </summary>
@@ -156,7 +156,7 @@ public class TweakCandidateTests
         levier.Annules.Should().HaveCount(levier.Rendus.Count, "chaque application a ete rendue");
     }
 
-    // ══ L8 a — le filet d'une session tuee ═══════════════════════════════════════════════════
+    // ══ Le filet d'une session tuee ═══════════════════════════════════════════════════
 
     [Fact]
     public void Le_journal_est_pose_AVANT_la_premiere_ecriture_machine()
@@ -183,7 +183,7 @@ public class TweakCandidateTests
     [Fact]
     public void Un_journal_qu_on_ne_peut_pas_completer_fait_rendre_le_levier_aussitot()
     {
-        // Revue du 10/09 : le second Poser etait ignore — le levier restait pose avec un
+        // Le second Poser etait ignore — le levier restait pose avec un
         // journal sans inverse, et le demarrage suivant ne pouvait que dire « verifie ce reglage ».
         var levier = new LevierFaux();
         var journal = new JournalFaux { RefuseApresPremier = true };

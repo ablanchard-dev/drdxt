@@ -3,40 +3,40 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// Injectable hardware seams for the M2 Phase F "fix-it" tweaks (F1 X3D CCD
-// parking, F2 stale driver, F3 sane power plan).
+// Coutures matérielles injectables des leviers de réparation (parcage des CCD X3D,
+// plan d'alimentation sain).
 //
-// Like the latency / GPU seams, these are read + CAPABILITY seams only — they
-// Never perform the privileged write. The change is always applied through
-// IElevatedClient with a typed, allowlisted PrivilegedOp (Phase A). The seams let
-// each fix-it tweak capture the real original state before applying (for a
-// faithful revert) and decide gating.
+// Comme les coutures de latence et de GPU, elles ne font que lire et dire ce qui est
+// possible : elles n'écrivent jamais. Le changement passe toujours par IElevatedClient avec
+// un PrivilegedOp typé et sur liste blanche (Phase A). Elles permettent à chaque réparation
+// de relever le vrai état d'origine avant la pose (pour un retour arrière fidèle) et de
+// décider si elle s'applique.
 //
-// Every method returns a Result so an unavailable API fails CLEAN
-// (TWEAK.SDK_UNAVAILABLE) — it must never throw. Implementations live in
-// Detection / Infrastructure; unit tests use NSubstitute fakes.
+// Chaque méthode rend un Result : une API indisponible échoue proprement
+// (TWEAK.SDK_UNAVAILABLE), sans jamais lever. Les implémentations vivent dans
+// Detection / Infrastructure ; les tests unitaires utilisent des doublures NSubstitute.
 // -----------------------------------------------------------------------
 
-/// <summary>Read seam over the active Windows power plan (PowerGetActiveScheme).
-/// Apply is done via IElevatedClient (SetActivePowerPlanOp); this only reads the
-/// current plan so F3 can capture the real original GUID for a faithful revert.</summary>
+/// <summary>Couture de lecture du plan d'alimentation actif de Windows (PowerGetActiveScheme).
+/// La pose passe par IElevatedClient (SetActivePowerPlanOp) ; ceci ne lit que le plan courant,
+/// pour que la réparation du plan relève le vrai GUID d'origine et le rende fidèlement.</summary>
 public interface IPowerPlanReader
 {
-    /// <summary>Reads the currently active power-plan GUID. Unavailable path →
+    /// <summary>Lit le GUID du plan d'alimentation actif. Chemin indisponible →
     /// Fail(TWEAK.SDK_UNAVAILABLE).</summary>
     Result<Guid> GetActivePowerPlan();
 
-    /// <summary>07/10/2026 (L-CPU) : PERFBOOSTMODE sur secteur dans ce plan, et le défaut de sa personnalité. Par défaut :
+    /// <summary>PERFBOOSTMODE sur secteur dans ce plan, et le défaut de sa personnalité. Par défaut :
     /// non lu (un lecteur qui ne sait pas le lire le dit, il ne rend jamais un zéro).</summary>
     Result<ModeDeBoostLu> LireModeDeBoost(Guid plan) =>
         Result<ModeDeBoostLu>.Fail(ErrorCodes.TweakSdkUnavailable, "Boost mode is not readable here.");
 
-    /// <summary>B3 (10/10/2026) : l'économie d'énergie de la carte sans fil (secteur) dans ce plan. Par défaut : non lu.</summary>
+    /// <summary>L'économie d'énergie de la carte sans fil (secteur) dans ce plan. Par défaut : non lu.</summary>
     Result<EconomieSansFilLue> LireEconomieSansFil(Guid plan) =>
         Result<EconomieSansFilLue>.Fail(ErrorCodes.TweakSdkUnavailable, "Wireless power saving mode is not readable here.");
 }
 
-/// <summary>B1 (10/10/2026) : la limite de puissance du processeur Intel (registres MSR par PawnIO), brute et décodée.
+/// <summary>La limite de puissance du processeur Intel (registres MSR par PawnIO), brute et décodée.
 /// Par défaut : non lue (un lecteur qui ne sait pas la lire le dit, il ne rend jamais un chiffre).</summary>
 public interface ICpuPowerLimitReader
 {
@@ -44,35 +44,35 @@ public interface ICpuPowerLimitReader
         Result<LectureLimiteCpu>.Fail(ErrorCodes.TweakSdkUnavailable, "CPU power limit is not readable here.");
 }
 
-/// <summary>The current state of a Windows service, used by F1 to capture the real
-/// original state of the AMD 3D V-Cache Performance Optimizer service.</summary>
+/// <summary>L'état courant d'un service Windows, pour que la réparation X3D relève le vrai
+/// état d'origine du service AMD 3D V-Cache Performance Optimizer.</summary>
 public enum ServiceState
 {
-    /// <summary>The service is not installed / not present on the machine.</summary>
+    /// <summary>Le service n'est pas installé / absent de la machine.</summary>
     NotInstalled = 0,
-    /// <summary>The service is installed but stopped.</summary>
+    /// <summary>Le service est installé mais arrêté.</summary>
     Stopped = 1,
-    /// <summary>The service is installed and running.</summary>
+    /// <summary>Le service est installé et tourne.</summary>
     Running = 2,
 }
 
-/// <summary>Read seam over Windows services for the fix-it tweaks. Apply (start /
-/// stop) is done via IElevatedClient (RunServiceControlOp); this only reads state
-/// so F1 can capture whether the service was already running for a faithful revert.</summary>
+/// <summary>Couture de lecture des services Windows pour les réparations. La pose (démarrer /
+/// arrêter) passe par IElevatedClient (RunServiceControlOp) ; ceci ne lit que l'état, pour que
+/// la réparation X3D relève si le service tournait déjà et le rende fidèlement.</summary>
 public interface IServiceStateReader
 {
-    /// <summary>Reads the current state of a named service. A service that is not
-    /// installed returns Ok(ServiceState.NotInstalled). A genuine query error →
+    /// <summary>Lit l'état courant d'un service nommé. Un service non installé rend
+    /// Ok(ServiceState.NotInstalled). Une vraie erreur de requête →
     /// Fail(TWEAK.SDK_UNAVAILABLE).</summary>
     Result<ServiceState> GetServiceState(string serviceName);
 }
 
 
-/// <summary>L-ECRAN : un mode d'affichage, tel que Windows le décrit (EnumDisplaySettings).</summary>
+/// <summary>Un mode d'affichage, tel que Windows le décrit (EnumDisplaySettings).</summary>
 public sealed record ModeEcran(string Peripherique, int Largeur, int Hauteur, int Bpp, int Hz);
 
 /// <summary>
-/// L-ECRAN : lire et poser le mode d'un écran, côté utilisateur (user32, sans droits). Les retours entiers sont les codes
+/// Lire et poser le mode d'un écran, côté utilisateur (user32, sans droits). Les retours entiers sont les codes
 /// DISP_CHANGE de ChangeDisplaySettingsEx : 0 = réussi, tout autre = refusé.
 /// </summary>
 public interface IModeEcran
@@ -88,7 +88,7 @@ public interface IModeEcran
     int Ecrire(ModeEcran mode, bool enregistrer);
 }
 
-/// <summary>L-ECRAN : demander au joueur de garder le nouveau mode. Pas de réponse dans le délai = non : un écran qui
+/// <summary>Demander au joueur de garder le nouveau mode. Pas de réponse dans le délai = non : un écran qui
 /// n'affiche rien ne se confirme pas, et l'ancien mode revient (comme Windows après 15 s).</summary>
 public interface IConfirmationEcran
 {

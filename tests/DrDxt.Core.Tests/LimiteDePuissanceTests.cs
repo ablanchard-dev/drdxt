@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Core.Tests;
 
-/// <summary>J-MECA (09/10/2026) : PL1 sous la puissance de base = la carte mère bride, dit avec le geste BIOS ; PL1 à la base =
+/// <summary>PL1 sous la puissance de base = la carte mère bride, dit avec le geste BIOS ; PL1 à la base =
 /// la valeur d'Intel, pas un défaut ; au-dessus = relevé par le BIOS, observé ; non lu = non lu.</summary>
 public sealed class LimiteDePuissanceTests
 {
@@ -21,7 +21,7 @@ public sealed class LimiteDePuissanceTests
         ouverte.Statut.Should().Be(RepairStatus.Suspicious);
         ouverte.Explication.Should().Contain("Optimiser").And.Contain("125 W").And.Contain("BIOS");
 
-        // B1 : à la base mais sous une PL2 plus haute, le docteur dit qu'Optimiser peut l'essayer.
+        // À la base mais sous une PL2 plus haute, le docteur dit qu'Optimiser peut l'essayer.
         LimiteDePuissance.Juger(new LimiteDePuissanceLue(65, 219, 65, Verrou: false)).Explication.Should().Contain("Optimiser");
         LimiteDePuissance.Juger(new LimiteDePuissanceLue(65, 65, 65, Verrou: false)).Explication.Should().NotContain("Optimiser", "aucune marge");
     }
@@ -33,7 +33,11 @@ public sealed class LimiteDePuissanceTests
 
         f.Statut.Should().Be(RepairStatus.Observed);
         f.Action.Should().Be(RepairAction.Aucune);
-        f.Explication.Should().Contain("profil de base d'Intel").And.Contain("pas une réparation");
+        f.Explication.Should().Contain("profil de base d'Intel").And.Contain("hors de la spécification", "65 W de base : un non-K");
+
+        // Seul un K (125 W de base) a un profil Intel plus haut.
+        LimiteDePuissance.Juger(new LimiteDePuissanceLue(125, 253, 125, false)).Explication
+            .Should().Contain("profil Performance").And.Contain("pas une réparation").And.NotContain("hors de la spécification");
     }
 
     [Fact]
@@ -45,7 +49,7 @@ public sealed class LimiteDePuissanceTests
         f.Explication.Should().Contain("au-dessus de la puissance de base").And.Contain("température");
     }
 
-    /// <summary>Revue du 09/10 : une PL1 au maximum du registre (4 095,875 W) ou désactivée n'est pas une lecture ratée : la
+    /// <summary>Une PL1 au maximum du registre (4 095,875 W) ou désactivée n'est pas une lecture ratée : la
     /// carte ne tient pas le processeur en puissance, et c'est dit comme tel.</summary>
     [Theory]
     [InlineData(true)]
@@ -59,7 +63,7 @@ public sealed class LimiteDePuissanceTests
         f.Explication.Should().Contain("ne tient pas le processeur en puissance").And.Contain("température");
     }
 
-    /// <summary>Contre-revue du 09/10 : le bit 15 ne décide jamais seul. Une PL1 sous la base avec le bit à zéro reste un
+    /// <summary>Le bit 15 ne décide jamais seul. Une PL1 sous la base avec le bit à zéro reste un
     /// bridage à dire, pas une « limite désactivée » qui rassurerait à tort.</summary>
     [Fact]
     public void Le_bit_d_activation_a_zero_ne_masque_pas_un_bridage()
@@ -76,5 +80,17 @@ public sealed class LimiteDePuissanceTests
         var f = LimiteDePuissance.Juger(null);
         f.Statut.Should().Be(RepairStatus.Unknown);
         f.Explication.Should().Contain("PawnIO");
+    }
+
+    // La promesse « Optimiser peut la monter » suit la cible du levier, une seule source de vérité.
+    [Fact]
+    public void Optimiser_n_est_promis_que_si_le_levier_monterait_et_jusqu_a_sa_vraie_cible()
+    {
+        var sous = new LimiteDePuissanceLue(45, 219, 65, false);
+        LimiteDePuissance.Juger(sous).Explication.Should().Contain("jusqu'à 219 W");
+        LimiteDePuissance.Juger(sous with { MicrocodeVminPerime = true }).Explication.Should().NotContain("Optimiser");
+        LimiteDePuissance.Juger(sous with { ChaleurEnPartieMaxC = 97 }).Explication.Should().NotContain("Optimiser");
+        LimiteDePuissance.Juger(sous with { MaximaleW = 180 }).Explication.Should().Contain("jusqu'à 180 W", "bornée par la puissance maximale publiée");
+        LimiteDePuissance.CibleDeMontee(sous with { CopieMmioPl1W = 120 }).Should().Be(120);
     }
 }

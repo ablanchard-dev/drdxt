@@ -4,49 +4,49 @@ using NSec.Cryptography;
 namespace DrDxt.Reconciler.Manifest;
 
 // -----------------------------------------------------------------------
-// Ed25519 sign/verify behind the IManifestSigner / IManifestVerifier seams
-// (master plan §11: "Crypto Ed25519 = NSec"). Ed25519 is not in the .NET BCL, so
-// the project's tranched lib (NSec / libsodium) provides it.
+// Signature / vérification Ed25519 derrière les coutures IManifestSigner / IManifestVerifier
+// (Ed25519 par NSec). Ed25519 n'est pas dans la BCL .NET : la bibliothèque retenue par le projet
+// (NSec / libsodium) le fournit.
 //
-// ASYMMETRY is the whole point (master §9.12 / B1): a Verifier is constructed from
-// the PUBLIC key alone and can only verify; a Signer holds the PRIVATE key and can
-// Only sign. The reconciler/verify host is given a Verifier — it cannot forge,
-// because it does not have (and is never injected with) the private key. This is
-// exactly why a symmetric MAC / DPAPI is refused: the owner could re-derive the key.
+// Tout l'intérêt est l'asymétrie : un Verifier se construit à partir de la seule clé publique et
+// ne peut que vérifier ; un Signer tient la clé privée et ne peut que signer. L'hôte
+// réconciliateur / de vérification reçoit un Verifier : il ne peut pas falsifier, car il n'a pas
+// la clé privée (et ne la reçoit jamais par injection). C'est exactement pourquoi un MAC
+// symétrique / DPAPI est refusé : le propriétaire pourrait redériver la clé.
 // -----------------------------------------------------------------------
 
-/// <summary>Ed25519 verifier — holds the 32-byte PUBLIC key only. Verify is total:
-/// any malformed signature / wrong length returns false (fail-closed), never throws.</summary>
+/// <summary>Vérificateur Ed25519 : ne tient que la clé publique de 32 octets. Verify est total :
+/// toute signature malformée ou de mauvaise longueur rend false (fail-closed), jamais d'exception.</summary>
 public sealed class Ed25519ManifestVerifier : IManifestVerifier
 {
     private readonly PublicKey _publicKey;
 
-    /// <summary>Constructs a verifier from a 32-byte Ed25519 public key.</summary>
+    /// <summary>Construit un vérificateur à partir d'une clé publique Ed25519 de 32 octets.</summary>
     public Ed25519ManifestVerifier(ReadOnlySpan<byte> publicKey)
         => _publicKey = PublicKey.Import(SignatureAlgorithm.Ed25519, publicKey, KeyBlobFormat.RawPublicKey);
 
     public bool Verify(ReadOnlySpan<byte> canonicalBytes, ReadOnlySpan<byte> signature)
     {
-        // NSec's Verify already returns false on a bad/short signature; guard the
-        // obvious wrong length too so we never hand the lib something it might throw on.
+        // Le Verify de NSec rend déjà false sur une signature mauvaise ou courte ; garder aussi la
+        // mauvaise longueur évidente pour ne jamais passer à la bibliothèque de quoi lever.
         if (signature.Length != SignatureAlgorithm.Ed25519.SignatureSize)
             return false;
         return SignatureAlgorithm.Ed25519.Verify(_publicKey, canonicalBytes, signature);
     }
 }
 
-/// <summary>Ed25519 signer — holds the PRIVATE key. Lives only on the commit side;
-/// never injected into the reconcile/verify host (key-custody assumption — see
-/// SignedDesiredStateStore). Sign is fail-clean on any crypto error.</summary>
+/// <summary>Signataire Ed25519 : tient la clé privée. Ne vit que du côté du commit ; jamais
+/// injecté dans l'hôte de réconciliation / de vérification (hypothèse de garde de la clé : voir
+/// SignedDesiredStateStore). Sign échoue proprement sur toute erreur cryptographique.</summary>
 public sealed class Ed25519ManifestSigner : IManifestSigner
 {
     private readonly Key _key;
 
-    /// <summary>Wraps an already-imported NSec Ed25519 key (the caller owns its
-    /// lifetime / secure storage). Dispose is the caller's responsibility.</summary>
+    /// <summary>Emballe une clé Ed25519 NSec déjà importée (l'appelant possède sa durée de vie et
+    /// son stockage sûr). Dispose est à la charge de l'appelant.</summary>
     public Ed25519ManifestSigner(Key key) => _key = key;
 
-    /// <summary>Imports a signer from a 32-byte raw Ed25519 private-key seed.</summary>
+    /// <summary>Importe un signataire depuis une graine brute de clé privée Ed25519 de 32 octets.</summary>
     public static Ed25519ManifestSigner FromSeed(ReadOnlySpan<byte> seed)
     {
         var key = Key.Import(SignatureAlgorithm.Ed25519, seed, KeyBlobFormat.RawPrivateKey);
@@ -61,7 +61,7 @@ public sealed class Ed25519ManifestSigner : IManifestSigner
         }
         catch (Exception)
         {
-            // Crypto frontier wrapped — fail-clean, never cascade.
+            // Frontière cryptographique emballée : échec propre, jamais de cascade.
             return Result<byte[]>.Fail(ErrorCodes.SignatureInvalid, "Ed25519 signing failed.");
         }
     }

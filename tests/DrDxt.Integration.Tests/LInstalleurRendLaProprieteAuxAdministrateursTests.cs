@@ -3,7 +3,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 27/09/2026. Trouve par l'audit de DrDXT sur sa propre installation (rapport exporte d'un scan reel) :
+// Trouve par l'audit de DrDXT sur sa propre installation (rapport exporte d'un scan reel) :
 // « Service systeme remplacable : PresentMon Service » et « DrDXT - reglages au demarrage ». Lu ensuite :
 // les fichiers poses dans Program Files\DrDXT appartenaient au compte qui avait lance l'installeur, avec
 // le controle total (regle CREATEUR PROPRIETAIRE de Program Files). UAC active, ce compte non eleve
@@ -46,7 +46,7 @@ public sealed class LInstalleurRendLaProprieteAuxAdministrateursTests
         proteger.Should().BeLessThan(etape.IndexOf("InstallOrRemoveReconcilerService()", StringComparison.Ordinal));
     }
 
-    // 28/09/2026, relecture adverse : les codes de retour d'icacls allaient au journal et les services SYSTEM
+    // Relecture adverse : les codes de retour d'icacls allaient au journal et les services SYSTEM
     // demarraient quand meme, avec des fichiers qu'un compte ordinaire pouvait remplacer. Un echec les laisse
     // non installes, et le joueur le lit.
     [Fact]

@@ -5,16 +5,16 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// D1 / D3 — la promesse ne redérive pas.
+/// La promesse ne redérive pas.
 ///
-/// Le produit a changé de promesse le 24/08. Ce n'est plus « plus de FPS », c'est :
+/// La promesse du produit n'est pas « plus de FPS », c'est :
 ///
 ///   « On trouve les erreurs de configuration qui te coûtent vraiment des images, on le prouve
 ///     par la mesure, on ne casse rien, et ça survit aux mises à jour Windows. Si ta machine est
 ///     déjà bonne, on te le prouve aussi. »
 ///
-/// Pourquoi ça compte au point d'avoir un gate : le concurrent le plus radical du marché —
-/// Atlas OS, qui réinstalle un Windows entier — a été mesuré à **444 FPS contre 444**, 1 % low
+/// Pourquoi ça compte au point d'avoir un gate : le concurrent le plus radical du marché
+/// (Atlas OS, qui réinstalle un Windows entier) a été mesuré à **444 FPS contre 444**, 1 % low
 /// 403 contre 401,5, latence 11,4 ms contre 11,3. Aucune différence. Vendre du FPS sur ce marché,
 /// c'est se faire démentir par son propre instrument au moment exact où le client le lance.
 ///
@@ -22,10 +22,9 @@ namespace DrDxt.Integration.Tests;
 /// affiche. Et une chaîne se réécrit en dix secondes, six mois plus tard, par quelqu'un qui
 /// voulait juste « rendre ça plus vendeur ». D'où ce gate.
 ///
-/// Il interdit aussi la clause de remboursement conditionnelle (D3). L'ancienne — « remboursé
-/// si zéro gain mesurable » — remboursait systématiquement les clients les MIEUX équipés (une
-/// machine de joueur a souvent déjà XMP activé) et transformait chaque demande en discussion sur
-/// la marge d'erreur. Une garantie doit CLORE un litige, pas en ouvrir un.
+/// Il interdit aussi la clause de remboursement conditionnelle : « remboursé si zéro gain
+/// mesurable » rembourserait systématiquement les clients les MIEUX équipés (une machine de joueur
+/// a souvent déjà XMP activé) et transformerait chaque demande en discussion sur la marge d'erreur. Une garantie doit CLORE un litige, pas en ouvrir un.
 /// </summary>
 public sealed class ThePromiseDoesNotDriftBackGateTests
 {
@@ -110,7 +109,7 @@ public sealed class ThePromiseDoesNotDriftBackGateTests
         // profils sont surfacees par l'UI (ScanProfileConsumer.cs:25). Deux chiffres de gain
         // vivaient donc hors de portee du gate.
         //
-        // Ils sont legitimes : ils citent leur source (CAHIER §5, research/…md). C'est exactement
+        // Ils sont legitimes : ils citent leur source (le cahier des charges, research/…md). C'est exactement
         // la doctrine du produit — « jamais un point-% promis nu » (BiosContracts.cs:100). Ce qui
         // manquait, c'est le controle : rien n'empechait le PROCHAIN chiffre d'etre nu.
         //

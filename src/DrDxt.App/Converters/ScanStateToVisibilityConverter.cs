@@ -6,8 +6,8 @@ using DrDxt.App.ViewModels;
 namespace DrDxt.App.Converters;
 
 /// <summary>
-/// Returns Visible when the ScanState matches any of the comma-separated state names in ConverterParameter,
-/// Collapsed otherwise. Prefix the list with "!" to invert (show when not matching).
+/// Rend Visible quand le ScanState correspond à l'un des noms d'état de ConverterParameter (séparés par
+/// des virgules), sinon Collapsed. Un « ! » devant la liste inverse (afficher quand rien ne correspond).
 /// </summary>
 [ValueConversion(typeof(ScanState), typeof(Visibility))]
 public sealed class ScanStateToVisibilityConverter : IValueConverter

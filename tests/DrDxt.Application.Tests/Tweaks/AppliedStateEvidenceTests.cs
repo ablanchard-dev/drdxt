@@ -282,7 +282,7 @@ public class AppliedStateEvidenceTests
         preuve.Verdict.Should().Be(EtatApplique.Unknown);
     }
 
-    // ── PHASE 18 F1 : La relecture au meme scope que l'ecriture ────────────────────────────
+    // ── La relecture au meme scope que l'ecriture ────────────────────────────
     //
     // Le helper sait ecrire dans le profil d'UN jeu ; la relecture ne lisait que le profil de
     // base. Ces trois tests mettent la base et le jeu en DESACCORD : relire le mauvais scope les
@@ -331,7 +331,7 @@ public class AppliedStateEvidenceTests
     [Fact]
     public void Un_inverse_par_SUPPRESSION_porte_la_valeur_d_avant_et_donne_NotApplied()
     {
-        // F1 lot 3 : quand le jeu HERITAIT la valeur, l'inverse est une suppression. Elle porte
+        // Quand le jeu HERITAIT la valeur, l'inverse est une suppression. Elle porte
         // la valeur d'avant ; sans elle, un reglage reste a 0 serait lu `Drifted`.
         var snapshot = new TweakSnapshot("latency.prefer_max_perf",
             Serialise(new DeleteNvApiDrsSettingOp(PreferredPstateId, Jeu,
@@ -345,7 +345,7 @@ public class AppliedStateEvidenceTests
         preuve.OriginalState.Should().Be("0");
     }
 
-    // ── 14/09/2026 (plan complet 1.4) : Un levier composite se prouve feuille par feuille ──────
+    // ── Un levier composite se prouve feuille par feuille ──────
     //
     // Un snapshot composite (Vsync + plafond ; X3D = service + deux feuilles) ne se decodait pas
     // comme une op : verdict Unknown, jamais de banc, pour toujours.
@@ -413,7 +413,7 @@ public class AppliedStateEvidenceTests
         preuve.AutoriseLaMesure.Should().BeFalse();
     }
 
-    // ── 19/09/2026 : « UN TROU L'EMPORTE TOUJOURS » — la regle qui interdit d'affirmer ───────
+    // ── « UN TROU L'EMPORTE TOUJOURS » — la regle qui interdit d'affirmer ───────
     //
     // `Combiner` porte cette phrase dans son resume : « Un trou (Unknown, puis Unavailable)
     // l'emporte toujours : il interdit d'affirmer. » Elle decide ce que le produit a le droit

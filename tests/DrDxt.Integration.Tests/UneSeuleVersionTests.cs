@@ -4,13 +4,12 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// Revue du 12/09/2026 (C4) — une seule source de version.
+/// Une seule source de version.
 ///
-/// L'installeur se disait 0.9.0 (deux litteraux : `build-installer.ps1` et `DrDXT.iss`) pendant
-/// que l'App lisait la version de son assembly, jamais fixee : 1.0.0.0. Le client voyait deux
-/// numeros, et la regle de non-retrogradation des mises a jour comparait le mauvais.
-/// La version vit desormais dans `Directory.Build.props` ; le script la lit, la passe au publish
-/// Et a l'installeur, et l'installeur refuse de compiler sans elle.
+/// Deux sources (des litteraux dans `build-installer.ps1` et `DrDXT.iss`, et la version de l'assembly)
+/// montreraient deux numeros au client, et la regle de non-retrogradation des mises a jour comparerait
+/// le mauvais. La version vit dans `Directory.Build.props` ; le script la lit, la passe au publish
+/// et a l'installeur, et l'installeur refuse de compiler sans elle.
 /// </summary>
 public sealed class UneSeuleVersionTests
 {
@@ -57,8 +56,7 @@ public sealed class UneSeuleVersionTests
     [InlineData("Strings.fr.resx")]
     public void Le_pied_de_page_ne_porte_aucun_numero_en_dur(string fichier)
     {
-        // 14/09/2026 (C1 bis) : une 3e source avait survecu a C4 — « Version 1.0.0 » dans le texte
-        // du pied de page, affiche au client pendant que l'installeur disait 0.9.0.
+        // Une troisieme source possible : un « Version 1.0.0 » ecrit dans le texte du pied de page.
         var resx = Lire("src", "DrDxt.Infrastructure", "Resources", fichier);
         var valeur = Regex.Match(resx,
             @"<data name=""UI\.Footer\.Version""[^>]*>\s*<value>([^<]*)</value>").Groups[1].Value;

@@ -26,8 +26,8 @@ public class PresentMonInteropTests
         _ = PM_METRIC.PM_METRIC_RENDER_PRESENT_LATENCY; // compile = présents
     }
 
-    // Numeric values must match third_party/presentmon/PresentMonAPI.h ordering,
-    // otherwise the wrong metric is queried and the blob is parsed for the wrong column.
+    // Les valeurs numériques doivent suivre l'ordre de third_party/presentmon/PresentMonAPI.h,
+    // sinon la mauvaise métrique est demandée et le blob est analysé sur la mauvaise colonne.
     [Fact]
     public void Between_presents_metric_has_header_value_78()
         => ((int)PM_METRIC.PM_METRIC_BETWEEN_PRESENTS).Should().Be(78);

@@ -4,7 +4,7 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Gpu;
 
 /// <summary>
-/// 04/10/2026 (plan 2.1, logiciels qui coûtent des images) : l'Instant Replay de l'overlay NVIDIA enregistre en continu
+/// L'Instant Replay de l'overlay NVIDIA enregistre en continu
 /// les dernières minutes de jeu. Lu sur la machine de référence : allumé (<c>irEnabled</c> dans ShareSettings.json).
 /// Coût publié : « environ 5 %, jusqu'à 10 % » selon NVIDIA (repris par PCWorld), 1 à 5 % dans les tests publiés, porté
 /// surtout par la carte graphique (encodeur NVENC, copie des images). Sur un jeu limité par le processeur, le coût en
@@ -52,12 +52,10 @@ public static class EnregistrementNvidia
     {
         if (EtatInstantReplay(json) != true) yield break;
 
-        yield return new RepairFinding("GPU DRIVER", "enregistrement continu NVIDIA", "Instant Replay allumé : environ 5 % d'images en moins selon NVIDIA", "éteint si tu ne t'en sers pas",
+        yield return new RepairFinding("GPU DRIVER", "enregistrement continu NVIDIA", Docteur.T("EN.Valeur"), Docteur.T("EN.Attendu"),
             RepairStatus.UserChoiceProbable,
-            "l'Instant Replay de NVIDIA enregistre en continu les dernières minutes de jeu pour pouvoir les sauvegarder après coup. "
-            + "Coût publié : environ 5 % d'images selon NVIDIA, 1 à 5 % dans les tests publiés, surtout quand la carte graphique "
-            + "limite. Si tu ne t'en sers pas : Alt+Z dans un jeu, puis Instant Replay, puis Désactiver. Pour savoir ce que ça "
-            + "change chez toi, relève tes parties avant et après : DrDXT les compare.",
-            RepairAction.Recommandation);
+            Docteur.T("EN.Explication"),
+            RepairAction.Recommandation,
+            Remede: Docteur.T("EN.Remede"));
     }
 }

@@ -5,11 +5,11 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 06/10/2026 (chantier J2) : `GainCumule` n'était appelé que par un outil de développement ; l'App jugeait chaque
+/// `GainCumule` n'était appelé que par un outil de développement ; l'App jugeait chaque
 /// changement sur les parties sans jamais dire ce que l'ensemble avait rapporté. La carte des parties commence par cette
 /// ligne : les gains prouvés (séparation nette sur 3 parties de chaque côté), composés et non additionnés ; ce qui n'a
 /// rien changé ; ce qui attend encore des parties.
-/// Revue du 06/10 (5/10) : bruit des bornes (F-3), autre jeu dit (F-4), fenêtres bornées et bilans figés (F-1, F-2).
+/// Bruit des bornes, autre jeu dit, fenêtres bornées et bilans figés.
 /// </summary>
 public class GainsEnJeuTests
 {
@@ -52,7 +52,7 @@ public class GainsEnJeuTests
         => ScanViewModel.LigneDesGains([(C("BIOS"), PasJuge())], Loc)
             .Should().Be("aucun gain prouvé | 0 sans effet | 1 pas encore jugés");
 
-    // F-4 : un gain prouvé sur un autre jeu (autre instrument) ne s'additionne pas, mais il est dit.
+    // Un gain prouvé sur un autre jeu (autre instrument) ne s'additionne pas, mais il est dit.
     [Fact]
     public void Un_gain_sur_un_autre_jeu_est_compte_et_pas_tu()
         => ScanViewModel.LigneDesGains(
@@ -63,7 +63,7 @@ public class GainsEnJeuTests
         new("cod.exe", new DateTimeOffset(2026, 10, jour, 20, 0, 0, TimeSpan.Zero), new DateTimeOffset(2026, 10, jour, 20, 30, 0, TimeSpan.Zero),
             4, 130, low1, DrDxt.Core.BottleneckState.CpuBoundOrAppBound);
 
-    // F-1 : A (le 4) améliore (70-72 ⇒ 73-75), puis B (le 8) dégrade (⇒ 60-62). Sans borne, les parties d'après B entraient
+    // A (le 4) améliore (70-72 ⇒ 73-75), puis B (le 8) dégrade (⇒ 60-62). Sans borne, les parties d'après B entraient
     // dans l'après de A et le rendaient « pas de différence » : l'effet de B se mêlait à celui de A.
     [Fact]
     public void L_apres_d_un_changement_s_arrete_au_changement_suivant()
@@ -78,7 +78,7 @@ public class GainsEnJeuTests
         bilans.Single(x => x.C.Libelle == "B").B.Verdict.Should().Be(VerdictEnJeu.Pire);
     }
 
-    // F-2 : un bilan figé est repris tel quel, même quand les parties d'avant ont quitté l'anneau des 20.
+    // Un bilan figé est repris tel quel, même quand les parties d'avant ont quitté l'anneau des 20.
     [Fact]
     public void Un_bilan_fige_ne_se_rejuge_pas()
     {
@@ -88,7 +88,7 @@ public class GainsEnJeuTests
         ScanViewModel.BilansDesChangements([c], [], journal: null).Single().B.Should().Be(fige);
     }
 
-    // F-6 (revue du 07/10) : 70-72, A, 80-82, B, 84-86. Sans borne basse, l'avant de B mêlait l'ère d'avant A
+    // 70-72, A, 80-82, B, 84-86. Sans borne basse, l'avant de B mêlait l'ère d'avant A
     // (médiane 76, +11,8 %) et le total comptait le gain de A deux fois. Borné, l'avant de B est l'ère de A (médiane 81).
     [Fact]
     public void L_avant_d_un_changement_commence_au_changement_precedent()
@@ -103,7 +103,7 @@ public class GainsEnJeuTests
         bilanB.Avant.Should().Be(3);
     }
 
-    // F-8 (revue du 07/10) : 3 contre 3 arrive par hasard une fois sur dix. Tant que la fenêtre est ouverte et que
+    // 3 contre 3 arrive par hasard une fois sur dix. Tant que la fenêtre est ouverte et que
     // le relevé n'est pas plein, une 4e partie peut encore corriger : rien n'est figé. Fenêtre close : figé.
     [Fact]
     public void Un_bilan_ne_se_fige_que_quand_plus_rien_ne_peut_le_corriger()
@@ -125,7 +125,7 @@ public class GainsEnJeuTests
         }
         finally { System.IO.Directory.Delete(dossier, true); }
     }
-    // F-10 (revue du 07/10) : une capture ratée plus récente que la dernière partie se dit ; plus ancienne, elle
+    // Une capture ratée plus récente que la dernière partie se dit ; plus ancienne, elle
     // a été suivie d'une partie relevée et ne dit plus rien.
     [Fact]
     public void Une_capture_ratee_depuis_la_derniere_partie_se_dit()
@@ -137,7 +137,7 @@ public class GainsEnJeuTests
         ScanViewModel.LigneEchec(null, [], Loc).Should().BeNull();
     }
 
-    // UI1 (critique du 08/10, défaut 4) : le code d'erreur brut (« powershell.exe : 0 image(s) DXGI… MEAS.NO_FRAMES »)
+    // Le code d'erreur brut (« powershell.exe : 0 image(s) DXGI… MEAS.NO_FRAMES »)
     // ne s'affiche plus au joueur ; la phrase dit quoi faire. La raison reste dans le fichier de l'échec.
     [Theory]
     [InlineData("fr", "ta prochaine partie")]
@@ -158,7 +158,7 @@ public class GainsEnJeuTests
         }
         finally { System.Globalization.CultureInfo.CurrentUICulture = avant; }
     }
-    // F-19 (revue du 07/10) : relevé plein (20 parties), c'est l'état normal d'un joueur installé. A ne se fige que si
+    // Relevé plein (20 parties), c'est l'état normal d'un joueur installé. A ne se fige que si
     // la prochaine partie à sortir est une partie d'avant A ; sinon une 4e partie peut encore corriger son verdict.
     [Fact]
     public void Releve_plein_ne_fige_que_si_la_prochaine_partie_perdue_est_d_avant()
@@ -188,7 +188,7 @@ public class GainsEnJeuTests
         }
         finally { System.IO.Directory.Delete(dossier, true); }
     }
-    // F-22 (revue du 07/10) : « au démarrage du PC » se recalcule à chaque lecture ; deux changements du même
+    // « au démarrage du PC » se recalcule à chaque lecture ; deux changements du même
     // redémarrage tombent à quelques ms l'un de l'autre. Bornés l'un par l'autre, aucun n'avait de partie d'un côté.
     [Fact]
     public void Deux_changements_a_quelques_ms_sont_du_meme_instant_et_se_jugent()
@@ -202,7 +202,7 @@ public class GainsEnJeuTests
             .Should().HaveCount(2).And.OnlyContain(x => x.B.Verdict == VerdictEnJeu.Mieux);
     }
 
-    // F-24 (revue du 07/10) : un même clic, l'un retiré (bilan figé), l'autre gardé et rejugé ensuite avec d'autres
+    // Un même clic, l'un retiré (bilan figé), l'autre gardé et rejugé ensuite avec d'autres
     // parties : deux bilans pour une seule mesure. Le figé fait foi, la mesure ne compte qu'une fois.
     [Fact]
     public void Un_instant_au_bilan_fige_ne_compte_qu_une_mesure()
@@ -214,7 +214,7 @@ public class GainsEnJeuTests
         ScanViewModel.LigneDesGains([(retire, fige), (garde, Mieux(80, 92, 6))], Loc).Should().Contain("1 prouvés");
     }
 
-    // Revue F-40 : un pilote mis à jour le 8 borne l'après du levier du 4 ; son gain n'est pas celui du levier.
+    // Un pilote mis à jour le 8 borne l'après du levier du 4 ; son gain n'est pas celui du levier.
     [Fact]
     public void Une_mise_a_jour_de_la_machine_borne_l_apres_d_un_changement_de_DrDXT()
     {
@@ -227,7 +227,7 @@ public class GainsEnJeuTests
             .Single().B.Apres.Should().Be(3, "les parties du 9 au 11 sont celles du pilote");
     }
 
-    // Revue F-41 : les parties d'un essai en alternance ne jugent pas les autres changements.
+    // Les parties d'un essai en alternance ne jugent pas les autres changements.
     [Fact]
     public void Les_parties_d_un_essai_ne_comptent_pas_pour_les_autres_changements()
     {
@@ -237,5 +237,16 @@ public class GainsEnJeuTests
         ComparaisonDesParties.Bilan(parties, new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero)).Apres.Should().Be(0);
         ComparaisonDesParties.Juger(parties, new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero), "cod.exe")
             .Should().Be(VerdictEnJeu.PasEncoreJuge);
+    }
+
+    // Un gain et une perte prouvés qui s'annulent : le total (+0,6 %) est sous son bruit, et la ligne l'annonçait quand
+    // même avec « au moins -7,0 % ». Sous son bruit, un total ne s'annonce pas ; c'est la règle de GainCumule.Phrase.
+    [Fact]
+    public void Un_total_sous_son_bruit_ne_s_annonce_pas()
+    {
+        var pire = new BilanDuChangement(VerdictEnJeu.Pire, "cod.exe", 3, 3, 88, 80.5, 130, 125, -3);
+        var ligne = ScanViewModel.LigneDesGains([(C("HAGS"), Mieux(80, 88, 5)), (C("VRR"), pire)], Loc)!;
+
+        ligne.Should().NotContain("au moins -").And.Contain("Parties.Gains.SousLeBruit");
     }
 }

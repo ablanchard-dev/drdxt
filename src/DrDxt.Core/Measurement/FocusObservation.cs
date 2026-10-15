@@ -3,7 +3,7 @@ namespace DrDxt.Core;
 /// <summary>
 /// Qui est au premier plan, maintenant. Une lecture, pas une deduction.
 ///
-/// C'est la couture qui permet de tester toute la logique de focus sans fenetre — et de brancher
+/// C'est la couture qui permet de tester toute la logique de focus sans fenetre, et de brancher
 /// le vrai `GetForegroundWindow` en production.
 /// </summary>
 public interface IForegroundProbe
@@ -17,11 +17,11 @@ public interface IForegroundProbe
 }
 
 /// <summary>
-/// Ce que le focus a reellement fait pendant une passe — observe, pas infere.
+/// Ce que le focus a reellement fait pendant une passe : observe, pas infere.
 ///
-/// Jusqu'ici, DrDXT devinait l'alt-tab a partir de la REGULARITE des frametimes : une seconde
+/// Jusqu'ici, DrDXT devinait l'alt-tab a partir de la regularite des frametimes : une seconde
 /// lente et reguliere ressemble a un plafond hors focus. C'est une inference, et elle se trompe
-/// dans les deux sens — un jeu qui rame regulierement passe pour un alt-tab, un alt-tab irregulier
+/// dans les deux sens : un jeu qui rame regulierement passe pour un alt-tab, un alt-tab irregulier
 /// passe pour du jeu.
 ///
 /// Ici on regarde. La difference tient en une phrase : **une zone hors focus n'est jamais une
@@ -37,8 +37,8 @@ public sealed record FocusObservation(int Echantillons, int AuPremierPlan, int I
     /// <summary>Rien n'a ete observe. Distinct d'une observation qui aurait trouve zero focus.</summary>
     public static readonly FocusObservation Aucune = new(0, 0, 0);
 
-    /// <summary>Part du temps passe au premier plan, parmi les lectures CONCLUANTES.
-    /// <c>null</c> quand aucune lecture n'a conclu — et « je n'ai pas pu regarder » ne doit jamais
+    /// <summary>Part du temps passe au premier plan, parmi les lectures concluantes.
+    /// <c>null</c> quand aucune lecture n'a conclu, et « je n'ai pas pu regarder » ne doit jamais
     /// devenir « il n'etait pas la ».</summary>
     public double? FractionAuPremierPlan
     {
@@ -51,7 +51,7 @@ public sealed record FocusObservation(int Echantillons, int AuPremierPlan, int I
 
     /// <summary>Part minimale de temps au premier plan pour qu'une passe reste comparable.
     ///
-    /// **NON CHIFFRÉ.** 90 % laisse passer une notification ou un changement de fenetre d'une
+    /// **Non chiffré.** 90 % laisse passer une notification ou un changement de fenetre d'une
     /// seconde sur une passe d'une minute, et arrete un alt-tab qui dure. Ecrit ici pour etre
     /// discute, pas dilue dans une condition.</summary>
     public const double FractionMinimale = 0.90;

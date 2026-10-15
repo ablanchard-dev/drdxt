@@ -10,8 +10,8 @@ public class ScoringRulesTests
     private const string BalancedPlan = "381b4222-f694-41f0-9685-ff5bb260df2e";
     private const string HighPerfPlan = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
 
-    // NOTE driver version "24.10.1" → branch 24 ≥ floor 20 → FRESH (so the new GPU-driver lever
-    // does not spuriously fire in tests that aren't about it). A stale fixture lives in its own test.
+    // Version de pilote « 24.10.1 » → branche 24 ≥ plancher 20 → à jour (pour que le levier pilote
+    // graphique ne joue pas à tort dans les tests qui ne le concernent pas). Un gabarit périmé a son propre test.
     private static HardwareInventory Desktop(bool x3d = false, int ccd = 1, TriState rebar = TriState.Off,
         string driver = "24.10.1", string vendor = "AMD") => new(
         new CpuInfo("CPU", "AMD", 8, 16, x3d, ccd),
@@ -37,8 +37,34 @@ public class ScoringRulesTests
         var f = ScoringRules.Evaluate(Desktop(), State(xmp: TriState.Off)).ToList();
         var mem = f.Should().ContainSingle(x => x.Category == "Memory").Subject;
         mem.Severity.Should().Be(Severity.Major);
-        mem.EstimatedGainPct.Should().Be(15);    // == the penalty the score removes (audit C1 coupling)
+        mem.EstimatedGainPct.Should().Be(15);    // == la pénalité que le score retire (couplage)
         mem.TitleKey.Should().Be("Finding.Memory.XmpOff");
+    }
+
+    // « Unknown » est ce que GpuDetector rend quand WMI échoue ou que la ligne est ambiguë (puce Intel + carte AMD) :
+    // un pilote non lu, pas un pilote périmé. Il était annoncé en défaut majeur.
+    [Fact]
+    public void Un_pilote_non_lu_n_est_pas_un_pilote_perime()
+    {
+        ScoringRules.Evaluate(Desktop(driver: "Unknown", vendor: "NVIDIA"), State())
+            .Should().NotContain(x => x.TitleKey == "Finding.Gpu.DriverStale");
+        // WmiRow.GetString rend "" pour une propriété vide : même chose, non lu.
+        ScoringRules.Evaluate(Desktop(driver: "", vendor: "AMD"), State())
+            .Should().NotContain(x => x.TitleKey == "Finding.Gpu.DriverStale");
+        ScoringRules.Evaluate(Desktop(driver: "400.10", vendor: "NVIDIA"), State())
+            .Should().Contain(x => x.TitleKey == "Finding.Gpu.DriverStale", "un vrai vieux pilote reste signalé");
+    }
+
+    // Un portable : l'iGPU Intel non lu ne cache pas le vieux pilote lu de la carte NVIDIA.
+    [Fact]
+    public void Une_carte_non_lue_ne_cache_pas_le_vieux_pilote_d_une_autre()
+    {
+        var hw = Desktop(driver: "400.10", vendor: "NVIDIA") with
+        {
+            Gpus = [new GpuInfo("Intel UHD Graphics", "Intel", 1L << 30, "Unknown", TriState.Unknown),
+                    new GpuInfo("NVIDIA GeForce RTX 3060", "NVIDIA", 12L << 30, "400.10", TriState.On)],
+        };
+        ScoringRules.Evaluate(hw, State()).Should().Contain(x => x.TitleKey == "Finding.Gpu.DriverStale");
     }
 
     [Fact]
@@ -48,7 +74,7 @@ public class ScoringRulesTests
             .Should().NotContain(x => x.Category == "Memory");
     }
 
-    // --- NS-4 : a DISABLED page file is an honest reliability finding (unscored, not "+FPS"). -----
+    // --- Un fichier d'échange désactivé est un constat de fiabilité honnête (non noté, pas « +FPS »). -----
 
     [Fact]
     public void Pagefile_disabled_produces_minor_reliability_finding_no_fps_claim()
@@ -56,8 +82,8 @@ public class ScoringRulesTests
         var f = ScoringRules.Evaluate(Desktop(), State() with { PagefileConfigured = TriState.Off });
         var pf = f.Should().ContainSingle(x => x.TitleKey == "Finding.Memory.PagefileDisabled").Subject;
         pf.Category.Should().Be("Memory");
-        pf.Severity.Should().Be(Severity.Minor); // reliability advisory, not a Major perf deficit
-        pf.EstimatedGainPct.Should().Be(0);      // honest: reliability, never a claimed FPS gain
+        pf.Severity.Should().Be(Severity.Minor); // avis de fiabilité, pas un déficit majeur de performance
+        pf.EstimatedGainPct.Should().Be(0);      // honnête : fiabilité, jamais un gain de FPS annoncé
     }
 
     [Fact]
@@ -69,7 +95,7 @@ public class ScoringRulesTests
             .Should().NotContain(x => x.TitleKey == "Finding.Memory.PagefileDisabled");
     }
 
-    // --- L8 suite (10/09/2026) : un ecran que le pilote dit NON capable n'appelle aucun conseil VRR. --
+    // --- Un ecran que le pilote dit NON capable n'appelle aucun conseil VRR. --
 
     [Fact]
     public void Vrr_off_sur_un_ecran_LU_non_capable_n_est_pas_une_opportunite()
@@ -77,7 +103,7 @@ public class ScoringRulesTests
             .Should().NotContain(x => x.TitleKey == "Finding.Latency.VrrOff",
                 "conseiller d'activer le VRR sur un ecran qui ne sait pas en faire est un faux besoin");
 
-    // --- Lot 1 (10/09/2026) : le plan d'alimentation ne produit plus aucun constat. -------------
+    // --- Le plan d'alimentation ne produit plus aucun constat. -------------
     // Le constat « Equilibre + coeurs parques » etait un faux probleme prouve : le parking est
     // identique entre les plans. La piste CPU vit dans le candidat `fixit.power_plan`, arme par la mesure.
 
@@ -88,7 +114,7 @@ public class ScoringRulesTests
         => ScoringRules.Evaluate(Desktop(), State(power: plan, parked: new[] { 1, 2 }))
             .Should().NotContain(x => x.TitleKey.Contains("PowerPlan"));
 
-    // --- M12 : X3D is penalized only on a confirmed misconfig (parking symptom), else Unknown. ----
+    // --- X3D n'est pénalisé que sur mauvaise configuration confirmée (symptôme de parcage), sinon Unknown. ----
 
     [Fact]
     public void X3d_dual_ccd_with_symptom_produces_major_scheduling_finding()
@@ -102,7 +128,7 @@ public class ScoringRulesTests
     [Fact]
     public void X3d_dual_ccd_without_symptom_is_unknown_info_not_a_deficit()
     {
-        // audit M12 : routing not confirmable (parked-core reader stubbed) → Unknown info, 0 gain.
+        // Routage non confirmable (lecteur de cœurs parqués bouchonné) → information Unknown, 0 gain.
         var f = ScoringRules.Evaluate(Desktop(x3d: true, ccd: 2), State(power: HighPerfPlan));
         f.Should().NotContain(x => x.TitleKey == "Finding.Scheduling.X3dCcd");
         var info = f.Should().ContainSingle(x => x.TitleKey == "Finding.Scheduling.X3dUnknown").Subject;
@@ -110,8 +136,8 @@ public class ScoringRulesTests
         info.EstimatedGainPct.Should().BeNull();
     }
 
-    // AMD-TOUT (09/10/2026) : seul le CCD de fréquence parqué, c'est le routage sain (la règle du levier fixit.x3d_ccd).
-    // Le docteur le disait « à vérifier », gain 12 %, sur un 7950X3D qui marchait, pendant que le levier ne proposait rien.
+    // Seul le CCD de fréquence parqué, c'est le routage sain (la règle du levier fixit.x3d_ccd).
+    // Le docteur ne le dit pas « à vérifier » avec un gain de 12 % sur un 7950X3D qui marche, quand le levier ne propose rien.
     [Fact]
     public void X3d_dual_ccd_with_only_frequency_ccd_parked_is_healthy()
     {
@@ -128,23 +154,23 @@ public class ScoringRulesTests
         f.Should().NotContain(x => x.TitleKey == "Finding.Scheduling.X3dUnknown");
     }
 
-    // --- C2 : HAGS off is a NEUTRAL opportunity (Info), never a scored deficit. ------------------
+    // --- HAGS désactivé est une opportunité neutre (Info), jamais un déficit noté. ----------------
 
     [Fact]
     public void Hags_off_produces_neutral_info_latency_finding()
     {
         var f = ScoringRules.Evaluate(Desktop(), State(hags: TriState.Off));
         var hags = f.Should().ContainSingle(x => x.TitleKey == "Finding.Latency.HagsOff").Subject;
-        hags.Severity.Should().Be(Severity.Info);       // neutral opportunity, not a Minor deficit
+        hags.Severity.Should().Be(Severity.Info);       // opportunité neutre, pas un déficit mineur
         hags.EstimatedGainPct.Should().BeNull();        // no gain claimed on a "non garanti" lever
     }
 
-    // --- GPU driver freshness lever (was invisible to the score). -------------------------------
+    // --- Levier de fraîcheur du pilote graphique (invisible pour le score auparavant). -----------
 
     [Fact]
     public void Stale_gpu_driver_produces_major_gpu_finding()
     {
-        // AMD branch 9 < floor 20 → genuinely old driver.
+        // Branche AMD 9 < plancher 20 → pilote vraiment vieux.
         var f = ScoringRules.Evaluate(Desktop(driver: "9.1"), State());
         var drv = f.Should().ContainSingle(x => x.TitleKey == "Finding.Gpu.DriverStale").Subject;
         drv.Severity.Should().Be(Severity.Major);
@@ -170,7 +196,7 @@ public class ScoringRulesTests
     [Fact]
     public void Rebar_unknown_amd_produces_info_not_a_problem_claim()
     {
-        // §16 : ReBar Unknown (non-NVIDIA) → on informe, on n'affirme pas un défaut.
+        // ReBar Unknown (non-NVIDIA) → on informe, on n'affirme pas un défaut.
         var f = ScoringRules.Evaluate(Desktop(rebar: TriState.Unknown, vendor: "AMD"), State(rebar: TriState.Unknown));
         var reb = f.Should().ContainSingle(x => x.TitleKey == "Finding.Gpu.ReBarUnknown").Subject;
         reb.Severity.Should().Be(Severity.Info);
@@ -180,8 +206,8 @@ public class ScoringRulesTests
     [Fact]
     public void Rebar_unknown_nvidia_pushes_systematic_guidance_finding()
     {
-        // audit H3 : when NVIDIA ReBAR can't be read (NVML unavailable) → guidance fallback so the
-        // dominant lever is never invisible, without touching the /100 (Info, no gain).
+        // Quand le ReBAR NVIDIA ne peut pas être lu (NVML indisponible) → repli en conseil, pour que le
+        // levier dominant ne soit jamais invisible, sans toucher au /100 (Info, sans gain).
         var f = ScoringRules.Evaluate(Desktop(rebar: TriState.Unknown, vendor: "NVIDIA", driver: "560.94"), State(rebar: TriState.Unknown));
         var reb = f.Should().ContainSingle(x => x.TitleKey == "Finding.Gpu.ReBarGuidance").Subject;
         reb.Severity.Should().Be(Severity.Info);
@@ -191,7 +217,7 @@ public class ScoringRulesTests
     [Fact]
     public void Laptop_does_not_produce_xmp_finding_gating()
     {
-        // §16 : laptop BIOS verrouillé → pas de tweak XMP impossible.
+        // Laptop BIOS verrouillé → pas de tweak XMP impossible.
         var laptop = Desktop() with { Chassis = ChassisType.Laptop };
         ScoringRules.Evaluate(laptop, State(xmp: TriState.Off))
             .Should().NotContain(x => x.Category == "Memory");
@@ -216,7 +242,7 @@ public class ScoringRulesTests
         f.Should().OnlyContain(x => !x.TitleKey.Contains(".Fix.") && !x.TitleKey.Contains(".Step."));
     }
 
-    // --- H2 : VRR off penalizes only when a VRR-capable display is confirmed. --------------------
+    // --- VRR désactivé ne pénalise que si un écran capable de VRR est confirmé. ----------------
 
     [Fact]
     public void Vrr_off_with_capable_display_produces_minor_latency_finding()
@@ -230,8 +256,8 @@ public class ScoringRulesTests
     [Fact]
     public void Vrr_off_without_capable_display_is_neutral_opportunity()
     {
-        // audit H2 : no confirmed VRR display → cannot assert the gain → opportunity, 0 gain.
-        // 16/09/2026 : sur la machine de reference le pilote AUTORISE G-Sync (plein ecran) mais il est
+        // Aucun écran VRR confirmé → impossible d'affirmer le gain → opportunité, 0 gain.
+        // Sur la machine de reference le pilote AUTORISE G-Sync (plein ecran) mais il est
         // inactif sur les deux ecrans, capacite non lue. « VRR desactive » laissait croire a un
         // reglage a basculer ; le fait lu est « inactif, support inconnu ».
         var f = ScoringRules.Evaluate(Desktop(), State(vrr: TriState.Off, vrrCapable: TriState.Unknown));

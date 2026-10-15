@@ -6,30 +6,29 @@ using Microsoft.Win32;
 namespace DrDxt.Reconciler.Adapters;
 
 // -----------------------------------------------------------------------
-// RegistryOsBuildProbe — IOsBuildProbe over the registry.
+// RegistryOsBuildProbe : IOsBuildProbe sur le registre.
 //
-// Reads HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion → CurrentBuild (string) +
-// UBR (dword), returning "{CurrentBuild}.{UBR}" (e.g. "22631.3447"). A change since
-// the value captured at apply time is the PRIMARY WindowsReset signal (plan §4).
+// Lit HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion → CurrentBuild (chaîne) + UBR (dword)
+// et rend « {CurrentBuild}.{UBR} » (par exemple « 22631.3447 »). Un changement depuis la valeur
+// capturée à l'apply est le signal WindowsReset principal.
 //
-// The raw registry read sits behind IRawOsVersionReader so the formatting/fail logic
-// is fully unit-tested with a fake; the thin real reader (Win32OsVersionReader) is
-// the only untested edge — it just opens the key and reads two values, wrapping any
-// throw in a Result.Fail.
+// La lecture brute du registre est derrière IRawOsVersionReader : la logique de mise en forme et
+// d'échec est entièrement testée avec un faux ; le vrai lecteur mince (Win32OsVersionReader) est
+// le seul bord non testé : il ouvre la clé et lit deux valeurs, en emballant toute exception
+// dans un Result.Fail.
 // -----------------------------------------------------------------------
 
-/// <summary>Internal raw read of the two CurrentVersion values. Returns the values
-/// as-read (CurrentBuild may be null/missing, UBR may be null/missing); a genuine
-/// registry error → Fail. Not the place that formats or validates — that is the
-/// probe, so it stays testable without the registry.</summary>
+/// <summary>Lecture brute interne des deux valeurs de CurrentVersion. Rend les valeurs telles que
+/// lues (CurrentBuild peut être null/absent, UBR aussi) ; une vraie erreur de registre → Fail. Ce
+/// n'est pas ici qu'on met en forme ou valide : c'est la sonde, qui reste ainsi testable sans registre.</summary>
 internal interface IRawOsVersionReader
 {
     Result<(string? CurrentBuild, uint? Ubr)> Read();
 }
 
-/// <summary>The thin real registry reader (untested edge). Opens
-/// HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion read-only and pulls CurrentBuild
-/// + UBR. Any boundary exception → Fail(RegistryFail), never thrown.</summary>
+/// <summary>Le vrai lecteur mince du registre (bord non testé). Ouvre
+/// HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion en lecture seule et lit CurrentBuild
+/// + UBR. Toute exception à la frontière → Fail(RegistryFail), jamais levée.</summary>
 internal sealed class Win32OsVersionReader : IRawOsVersionReader
 {
     private const string CurrentVersionPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
@@ -62,7 +61,7 @@ internal sealed class Win32OsVersionReader : IRawOsVersionReader
     }
 }
 
-/// <summary>Reads the Windows feature-update token "{CurrentBuild}.{UBR}".</summary>
+/// <summary>Lit le jeton de mise à jour de fonctionnalité Windows « {CurrentBuild}.{UBR} ».</summary>
 public sealed class RegistryOsBuildProbe : IOsBuildProbe
 {
     private readonly IRawOsVersionReader _reader;

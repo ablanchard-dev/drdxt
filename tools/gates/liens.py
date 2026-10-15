@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Les chemins cites par les documents de garde existent-ils vraiment ?
 
-18/09/2026. `GATES.md` est le fichier dont la fonction est de BLOQUER : il dit ce
-qui n'est pas fini et, surtout, ce que le mainteneur doit faire pour debloquer. Sa premiere
-instruction disait :
+`GATES.md` est le fichier dont la fonction est de BLOQUER : il dit ce qui n'est
+pas fini et, surtout, ce qu'il faut faire pour debloquer. Exemple d'instruction
+morte :
 
     Double-cliquer `installer/Output/DrDXT-Setup.exe`
 
@@ -29,7 +29,7 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[2]
 
-DOCUMENTS = ["GATES.md", "README.md"]
+DOCUMENTS = ["GATES.md", "README.md", "README.fr.md", "CONTRIBUTING.md", "CONTRIBUTING.fr.md", "ARCHITECTURE.md"]
 
 # Un chemin du depot cite entre accents graves : au moins un dossier connu en
 # tete, pour ne pas confondre avec un identifiant de code (`Result`, `Ok(vide)`).
@@ -45,8 +45,19 @@ CHEMIN = re.compile(
 JOKERS = ("*", "{", "%", "...")
 
 
+# Un lien Markdown ou une image vers un fichier du depot. Une adresse web, une ancre ou un courriel ne sont pas
+# des fichiers ; l'ancre d'un lien vers un fichier (`docs/X.md#section`) tombe, le fichier reste.
+LIEN = re.compile(r"\]\(([^)\s]+)\)|<img[^>]*\ssrc=\"([^\"]+)\"")
+EXTERNE = ("http://", "https://", "mailto:", "#")
+
+
 def chemins_cites(texte: str) -> list[str]:
-    return [c.replace("\\", "/") for c in CHEMIN.findall(texte) if not any(j in c for j in JOKERS)]
+    cites = [c.replace("\\", "/") for c in CHEMIN.findall(texte) if not any(j in c for j in JOKERS)]
+    for lien, image in LIEN.findall(texte):
+        cible = (lien or image).split("#")[0]
+        if cible and not (lien or image).startswith(EXTERNE) and cible not in cites:
+            cites.append(cible)
+    return cites
 
 
 def manquants(racine: Path = RACINE) -> list[tuple[str, str]]:
@@ -77,9 +88,17 @@ def autotest() -> int:
 
     with tempfile.TemporaryDirectory() as d:
         faux = Path(d)
+        for nom in DOCUMENTS:
+            (faux / nom).write_text("rien", encoding="utf-8")
         (faux / "GATES.md").write_text("voir `docs/INEXISTANT.md`", encoding="utf-8")
-        (faux / "README.md").write_text("rien", encoding="utf-8")
         assert manquants(faux) == [("GATES.md", "docs/INEXISTANT.md")], manquants(faux)
+        # Les liens et les images du README comptent autant que les chemins entre accents graves.
+        (faux / "LICENSE").write_text("", encoding="utf-8")
+        (faux / "README.md").write_text(
+            "[licence](LICENSE) [plus bas](#build) [site](https://example.org/x.md)\n"
+            "[absent](docs/ABSENT.md#section) <img src=\"docs/images/absente.png\" alt=\"\">", encoding="utf-8")
+        assert manquants(faux) == [("GATES.md", "docs/INEXISTANT.md"), ("README.md", "docs/ABSENT.md"),
+                                   ("README.md", "docs/images/absente.png")], manquants(faux)
     print("autotest : ok")
     return 0
 

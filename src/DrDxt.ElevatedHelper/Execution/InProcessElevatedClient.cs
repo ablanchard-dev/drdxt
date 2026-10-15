@@ -3,24 +3,23 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Execution;
 
 // -----------------------------------------------------------------------
-// InProcessElevatedClient — the boot reconciler's IN-PROCESS privileged executor.
+// InProcessElevatedClient : l'exécuteur privilégié en processus du réconciliateur de démarrage.
 //
-// MOAT WIRING (decision M4/M5-MOAT-WIRING, Option B): the reconciler host runs as
-// LocalSystem and reapplies validated tweaks at boot without any IPC. There is no
-// elevated helper service to connect to and no open privileged endpoint — the only
-// input that can drive a write is the Ed25519-signature-verified, admin-write-ACL'd
-// manifest, loaded upstream by the SignedDesiredStateStore (signature checked before
-// parse, fail-closed).
+// Branchement du moat (option B) : l'hôte réconciliateur
+// tourne en LocalSystem et réapplique au démarrage des leviers validés, sans aucun IPC. Il n'y a
+// aucun service helper élevé où se connecter ni aucun point d'entrée privilégié ouvert : la seule
+// entrée qui puisse mener une écriture est le manifeste vérifié par signature Ed25519, dont l'ACL
+// réserve l'écriture aux administrateurs, chargé en amont par SignedDesiredStateStore (signature
+// vérifiée avant l'analyse, fail-closed).
 //
-// This client is the LAST gate. It runs the same leaf-exact OpAllowlist the remote
-// TypedPrivilegedServer applies as its final two steps (allowlist -> execute), then
-// dispatches to the same PrivilegedOpExecutor. The transport gates it omits (HMAC
-// integrity, anti-replay nonce, caller authorization) exist only to authenticate a
-// REMOTE caller over the pipe; in-process there is no remote caller, so they are not
-// applicable. The allowlist is the real authorization (master plan section 9.13), so
-// re-running it here means even a logic bug in the reconcile loop can never drive a
-// non-allowlisted op. The executor wraps every native fault -> Result, so a failing
-// action never throws out of here.
+// Ce client est la dernière barrière. Il fait tourner la même OpAllowlist à la feuille près que
+// le TypedPrivilegedServer distant applique en deux dernières étapes (allowlist -> exécution),
+// puis aiguille vers le même PrivilegedOpExecutor. Les barrières de transport qu'il omet (intégrité
+// HMAC, nonce anti-rejeu, autorisation de l'appelant) n'existent que pour authentifier un appelant
+// distant sur le pipe ; en processus il n'y a pas d'appelant distant, elles ne s'appliquent donc
+// pas. L'allowlist est la vraie autorisation : la repasser ici garantit que même un bug de logique
+// dans la boucle de réconciliation ne peut jamais mener une op hors allowlist. L'exécuteur emballe
+// chaque panne native -> Result : une action en échec ne lève jamais hors d'ici.
 // -----------------------------------------------------------------------
 public sealed class InProcessElevatedClient : IElevatedClient
 {
@@ -35,8 +34,8 @@ public sealed class InProcessElevatedClient : IElevatedClient
 
     public async Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
     {
-        // Defense n.1: leaf-exact allowlist before any action. A denied op never reaches
-        // the executor (no partial action, no OS touch).
+        // Défense n°1 : allowlist à la feuille près avant toute action. Une op refusée n'atteint
+        // jamais l'exécuteur (aucune action partielle, aucun contact avec l'OS).
         var allowed = _allowlist.Validate(op);
         if (!allowed.IsOk)
             return allowed;

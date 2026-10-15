@@ -5,7 +5,7 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Jeu;
 
 /// <summary>
-/// D2 (10/10/2026, boucle « allonger le bras », R10) : le nombre de fils de rendu de Call of Duty, lu dans son fichier de
+/// Le nombre de fils de rendu de Call of Duty, lu dans son fichier de
 /// réglages, comparé aux cœurs performants du processeur. Lecture seule : le jeu réécrit ce fichier à chaque sortie et à
 /// chaque mise à jour, et le réglage existe dans son menu ; DrDXT n'y écrit jamais. Les guides conseillent « cœurs
 /// performants moins un » ; aucune mesure indépendante publiée (les « +15 à 25 % » viennent d'optimiseurs commerciaux) :
@@ -45,11 +45,14 @@ public static partial class ConfigurationCallOfDuty
     }
 
     /// <summary>Pur : les cœurs performants estimés. Intel hybride (12e gén. et plus) : les cœurs performants ont deux fils,
-    /// les efficaces un ; donc fils − cœurs = cœurs performants quand c'est moins que les cœurs. Sinon tous les cœurs.</summary>
+    /// les efficaces un ; donc fils − cœurs = cœurs performants quand c'est moins que les cœurs. Intel sans hyperthreading
+    /// (Core Ultra 200S : 8 P + 16 E, 24 fils) : hybride ou non ne se lit pas aux comptes, donc 0 = inconnu. Secours seulement :
+    /// l'appelant lit d'abord les cœurs rapides par CpuTopology.</summary>
     public static int CoeursPerformants(string vendeur, int coeurs, int fils)
     {
         if (coeurs <= 0) return 0;
         var intel = vendeur.Contains("Intel", StringComparison.OrdinalIgnoreCase);
+        if (intel && fils == coeurs) return 0;
         var performants = fils - coeurs;
         return intel && performants > 0 && performants < coeurs ? performants : coeurs;
     }
@@ -60,22 +63,26 @@ public static partial class ConfigurationCallOfDuty
     {
         if (lu is not { } l) yield break;
         var p = coeursPerformants;
-        var guide = " Se règle dans le jeu (Paramètres > Graphismes > Avancé > Fils de rendu) ou dans son fichier, jeu fermé :"
-                    + " le guide 5.7 dit comment. DrDXT n'y écrit pas ; si tu le changes, il le juge sur tes parties, comme tout changement.";
+        var guide = Docteur.T("CF.Guide");
+        // Cœurs performants inconnus (0, Intel sans hyperthreading) : la valeur se dit, sans « 1 pour 0 estimés ».
+        if (p <= 0)
+        {
+            yield return new RepairFinding("CPU", Nom, l.Valeur == Automatique ? Docteur.T("CF.Auto") : Docteur.T("CF.Fils", l.Valeur.ToString(CultureInfo.InvariantCulture)),
+                null, RepairStatus.Observed, Docteur.T("CF.Inconnu", l.Fichier, l.Valeur) + guide);
+            yield break;
+        }
         if (l.Valeur == Automatique)
         {
-            yield return new RepairFinding("CPU", Nom, "automatique (le jeu décide)", null, RepairStatus.Observed,
-                $"« {l.Fichier} » : RendererWorkerCount = -1, le jeu choisit lui-même ses fils de rendu. Les guides conseillent un"
-                + $" nombre fixe, cœurs performants moins un (ici {Math.Max(1, p - 1)} pour {p} estimés), sans mesure indépendante"
-                + " publiée." + guide);
+            yield return new RepairFinding("CPU", Nom, Docteur.T("CF.Auto"), null, RepairStatus.Observed,
+                Docteur.T("CF.AutoExplication", l.Fichier, Math.Max(1, p - 1), p) + guide);
             yield break;
         }
         var loin = p > 0 && (l.Valeur < p - 2 || l.Valeur > p);
-        yield return new RepairFinding("CPU", Nom, l.Valeur.ToString(CultureInfo.InvariantCulture) + " fils",
-            p > 0 ? $"entre {Math.Max(1, p - 2)} et {p} (cœurs performants moins un conseillé)" : null,
+        yield return new RepairFinding("CPU", Nom, Docteur.T("CF.Fils", l.Valeur.ToString(CultureInfo.InvariantCulture)),
+            p > 0 ? Docteur.T("CF.Plage", Math.Max(1, p - 2), p) : null,
             loin ? RepairStatus.Suspicious : RepairStatus.Observed,
-            $"« {l.Fichier} » : RendererWorkerCount = {l.Valeur}, pour {p} cœurs performants estimés sur ce processeur."
-            + (loin ? " Loin de ce que les guides conseillent (cœurs performants moins un) : à regarder." : " Dans la plage que les guides conseillent.")
+            Docteur.T("CF.Valeur", l.Fichier, l.Valeur, p)
+            + Docteur.T(loin ? "CF.Loin" : "CF.DansPlage")
             + guide,
             loin ? RepairAction.Recommandation : RepairAction.Aucune);
     }

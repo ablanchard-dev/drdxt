@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Gpu;
 
 // -----------------------------------------------------------------------
-// NS-5 première tranche. Le test qui compte ici est le piège de nommage : Intel appelle
+// Le test qui compte ici est le piège de nommage : Intel appelle
 // « Arc » à la fois ses cartes discrètes (A770) et des iGPU soudés au CPU (« Arc Graphics »,
 // « Arc 140V »). Classer un iGPU comme une carte discrète ferait proposer de l'overclocker.
 // -----------------------------------------------------------------------
@@ -69,7 +69,7 @@ public class IntelGpuAdvisorTests
     [Fact]
     public void Says_out_loud_that_there_is_no_intel_tuning_path()
     {
-        // §22.3 : le refus de tuning doit être DIT. Aujourd'hui il est silencieux —
+        // Le refus de tuning doit être DIT. Aujourd'hui il est silencieux —
         // GpuGating.IsTunableDiscreteGpu n'autorise que NVIDIA/AMD et la carte disparaît.
         var advice = IntelGpuAdvisor.Advise(new[] { ArcA770(TriState.On) });
 

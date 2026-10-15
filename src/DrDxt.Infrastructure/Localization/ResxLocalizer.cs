@@ -5,12 +5,12 @@ using DrDxt.Core;
 namespace DrDxt.Infrastructure.Localization;
 
 /// <summary>
-/// <see cref="ILocalizer"/> backed by the embedded <c>Strings.resx</c> /
-/// <c>Strings.fr.resx</c> resource files in this assembly.
+/// <see cref="ILocalizer"/> adossé aux fichiers de ressources embarqués <c>Strings.resx</c> /
+/// <c>Strings.fr.resx</c> de cet assemblage.
 /// </summary>
 /// <remarks>
-/// Thread-safe: <see cref="ResourceManager"/> is thread-safe by design.
-/// Missing keys return the key itself — never null, never an exception.
+/// Thread-safe : <see cref="ResourceManager"/> est thread-safe par conception.
+/// Une clé manquante rend la clé elle-même : jamais null, jamais d'exception.
 /// </remarks>
 public sealed class ResxLocalizer : ILocalizer
 {

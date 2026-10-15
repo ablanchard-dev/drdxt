@@ -3,8 +3,8 @@ using DrDxt.Detection.Cpu;
 // ============================================================================================
 // LA FREQUENCE REELLE DU PROCESSEUR, ET CE QUI LA BRIDE — SUIVIE DANS LE TEMPS.
 //
-// Pourquoi un outil separe alors que `CpuFrequencyReader` existe depuis le 08/09 : il n'etait
-// lisible qu'a travers `repairaudit`, qui met des minutes et sort un audit entier. Une frequence
+// Pourquoi un outil separe de `CpuFrequencyReader` : lu a travers `repairaudit`, il met des minutes
+// et sort un audit entier. Une frequence
 // se juge SOUS CHARGE, pendant quelques secondes, au moment ou le jeu tourne — pas dans un
 // rapport qu'on lit apres coup.
 //

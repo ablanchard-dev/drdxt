@@ -10,7 +10,7 @@ using Xunit;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 06/10/2026 (plan 3.4) : quand un souci est en cours, le point que l'Optimiser va prendre le contiendra. L'écran le dit
+/// Quand un souci est en cours, le point que l'Optimiser va prendre le contiendra. L'écran le dit
 /// AVANT le clic, avec le point sain que le docteur a trouvé (ou l'absence d'un tel point).
 /// </summary>
 public class PointPendantUnSouciTests
@@ -38,8 +38,7 @@ public class PointPendantUnSouciTests
           .Returns(Result<BenchmarkResult>.Ok(bl));
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), st, new List<Finding>(), 90, bl,
-              new ScoreBreakdown(90, 90, 90), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), st, new List<Finding>(), bl)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
         return ScanViewModelTestSeams.Build(hd, sr, br, sc, sd, k => k.EndsWith(".DuringIssue") ? k + " {0} | {1}" : k + " {0}",
@@ -62,7 +61,7 @@ public class PointPendantUnSouciTests
             .And.Contain(Souci, "capture du 06/10 : « un souci est en cours » sans dire lequel");
     }
 
-    // Revue T3+T4 (F-29) : sans point d'avant le souci, « Pour revenir à un état sain : aucun point d'avant le souci »
+    // Sans point d'avant le souci, « Pour revenir à un état sain : aucun point d'avant le souci »
     // ne voulait rien dire ; une seconde phrase le dit.
     [Fact]
     public async Task Sans_point_d_avant_le_souci_l_avertissement_le_dit_sans_proposer_de_retour()
@@ -73,7 +72,7 @@ public class PointPendantUnSouciTests
         vm.AvertissementPoint.Should().StartWith("Apply.RestorePoint.DuringIssueNoPoint").And.NotContain("aucun point d'avant").And.Contain(Souci);
     }
 
-    // chantier B6 : le bilan santé se remplit des constats du scan, jusqu'au ViewModel.
+    // Le bilan santé se remplit des constats du scan, jusqu'au ViewModel.
     [Fact]
     public async Task Le_bilan_sante_prend_les_constats_du_scan()
     {
@@ -95,7 +94,7 @@ public class PointPendantUnSouciTests
         vm.AvertissementPoint.Should().BeNull();
     }
 
-    // Revue (F-37) : le docteur ne rend ce constat « non lu » qu'avec un souci en cours ; le point de l'Optimiser le
+    // Le docteur ne rend ce constat « non lu » qu'avec un souci en cours ; le point de l'Optimiser le
     // contiendra quand même : c'est dit, sans nommer de point.
     [Fact]
     public async Task Une_liste_de_points_illisible_pendant_un_souci_avertit_sans_nommer_de_point()
@@ -106,7 +105,7 @@ public class PointPendantUnSouciTests
         vm.AvertissementPoint.Should().Be("Apply.RestorePoint.DuringIssueUnread " + Souci);
     }
 
-    // UI1 (critique du 08/10, défaut 5) : l'avertissement s'écrivait en gris SOUS le bouton Optimiser, lu après le clic.
+    // L'avertissement s'écrivait en gris SOUS le bouton Optimiser, lu après le clic.
     // Il vient avant le bouton, en couleur « à regarder ».
     [Fact]
     public void L_avertissement_du_souci_precede_le_bouton_Optimiser()

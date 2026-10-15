@@ -5,19 +5,19 @@ using DrDxt.GpuNative.NvApi;
 namespace DrDxt.ElevatedHelper.Execution.NvApi;
 
 // -----------------------------------------------------------------------
-// NvApiDrsActions — the real DRS (driver settings) write (m2smoke boundary).
+// NvApiDrsActions : la vraie écriture DRS (réglages du pilote), frontière du m2smoke.
 //
-// The SAFE, public NVAPI surface: a single global driver setting (no voltage / no
-// clock). The session sequence (recipe §C: CreateSession → LoadSettings →
-// GetBaseProfile → SetSetting → SaveSettings → DestroySession, DestroySession always
-// runs) lives in the SINGLE verified native boundary — NvApiNative in DrDxt.GpuNative,
-// which shares the NVAPI entry with the clock/power writes. There is NO second copy of
-// the DRS function IDs or the NVDRS_SETTING_V1 struct here; this is a thin orchestrator,
-// exactly like ADLXTuningActions over IAdlxNative.
+// La surface NVAPI publique et sûre : un seul réglage global du pilote (ni tension ni
+// horloge). La séquence de session (recette §C : CreateSession → LoadSettings →
+// GetBaseProfile → SetSetting → SaveSettings → DestroySession, DestroySession tourne toujours)
+// vit dans l'unique frontière native vérifiée : NvApiNative dans DrDxt.GpuNative, qui partage
+// l'entrée NVAPI avec les écritures d'horloge et de puissance. Aucune seconde copie des ids de
+// fonction DRS ni de la struct NVDRS_SETTING_V1 ici ; c'est un orchestrateur mince, exactement
+// comme ADLXTuningActions sur IAdlxNative.
 //
-// The settingId handed here is already allowlist-validated (the closed corrected id
-// set: PRERENDERLIMIT / VSYNCMODE / FRL_FPS / PREFERRED_PSTATE — four since phase 18). On an AMD / no-NVIDIA box NVAPI is
-// unavailable → a clean Result.Fail("NVIDIA NVAPI unavailable"). Never throws.
+// Le settingId reçu est déjà validé par l'allowlist (l'ensemble fermé d'ids corrigés :
+// PRERENDERLIMIT / VSYNCMODE / FRL_FPS / PREFERRED_PSTATE, quatre). Sur une machine AMD / sans
+// NVIDIA, NVAPI est indisponible → un Result.Fail propre (« NVIDIA NVAPI unavailable »). Ne lève jamais.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class NvApiDrsActions : INvApiDrsActions
@@ -44,25 +44,25 @@ public sealed class NvApiDrsActions : INvApiDrsActions
         }
         catch (Exception ex)
         {
-            // The native boundary already swallows faults (returns false); last-resort guard
-            // so an exception never crosses the IPC boundary.
+            // La frontière native avale déjà les pannes (rend false) ; garde de dernier recours
+            // pour qu'aucune exception ne traverse la frontière IPC.
             return Fail($"DRS write failed: {ex.GetType().Name}.");
         }
     }
 
     /// <summary>
-    /// L2 — l'ecriture par JEU, et sa verification.
+    /// L'ecriture par jeu, et sa verification.
     ///
     /// La relecture n'est pas une precaution de style : c'est la meme regle que les ecritures de
     /// tuning (« une action relit avant d'affirmer »). Un `true` natif dit que le driver a
-    /// ACCEPTE L'APPEL, pas que la valeur a atterri. Ici deux choses peuvent la faire diverger :
+    /// accepte l'appel, pas que la valeur a atterri. Ici deux choses peuvent la faire diverger :
     /// NVIDIA documente qu'une sauvegarde de session ecrase ce qu'un autre processus a modifie
     /// entre-temps (PG-12072-001 p.11), et un profil predefini peut se comporter autrement que
     /// prevu.
     ///
-    /// La relecture passe par une SESSION neuve. Relire dans la session d'ecriture rendrait ce
-    /// qu'on vient d'y poser -- une verification qui se verifie elle-meme, verte quoi qu'il
-    /// arrive. C'est le cas ou un test peut NOMMER une garantie sans la prouver.
+    /// La relecture passe par une session neuve. Relire dans la session d'ecriture rendrait ce
+    /// qu'on vient d'y poser : une verification qui se verifie elle-meme, verte quoi qu'il
+    /// arrive. C'est le cas ou un test peut nommer une garantie sans la prouver.
     ///
     /// Une relecture qui echoue n'est pas un succes : « applique mais non confirme » est
     /// exactement l'affirmation que ce code existe pour empecher.
@@ -87,8 +87,8 @@ public sealed class NvApiDrsActions : INvApiDrsActions
                 return Fail("The DRS write was accepted but could not be read back, "
                           + "so it is NOT confirmed.");
 
-            // Comparaison EXACTE, comme pour les ecritures de tuning : un driver qui quantifierait
-            // une demande apparaitrait ici comme un ecart -- une information sur ce driver, pas un
+            // Comparaison exacte, comme pour les ecritures de tuning : un driver qui quantifierait
+            // une demande apparaitrait ici comme un ecart : une information sur ce driver, pas un
             // defaut a masquer avec une tolerance inventee.
             return readBack.Value == value
                 ? Result.Ok()
@@ -102,10 +102,10 @@ public sealed class NvApiDrsActions : INvApiDrsActions
     }
 
     /// <summary>
-    /// PHASE 18 F1 lot 3 — le revert d'une ecriture au profil d'un jeu qui ne possedait pas le
+    /// Le revert d'une ecriture au profil d'un jeu qui ne possedait pas le
     /// reglage.
     ///
-    /// La preuve est la PROVENANCE relue, en session neuve. Relire la valeur seule ne prouve
+    /// La preuve est la provenance relue, en session neuve. Relire la valeur seule ne prouve
     /// rien : une reecriture de la meme valeur la rendrait aussi, en laissant au jeu un reglage
     /// « pose par toi » qu'il n'avait pas.
     ///

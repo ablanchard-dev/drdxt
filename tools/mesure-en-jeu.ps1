@@ -1,10 +1,10 @@
 # =============================================================================
 # MESURE EN JEU : un avant/apres a un endroit fixe, en une commande.
 #
-# Nee le 25/09/2026 des tests faits a la main pendant une partie (COD, machine de reference) :
+# Les releves du 25/09/2026 faits a la main pendant une partie (COD, machine de reference) :
 # 131,8 / 133,0 / 134,5 FPS au meme endroit, processeur a 76-79 %, paquet a 66,5 W, coeurs P
-# plats a 4 000 MHz. Ce script refait exactement ces relevés, sans les pieges rencontres ce jour-la
-# (noms de compteurs traduits sur un Windows francais, virgules decoupees par PowerShell).
+# plats a 4 000 MHz. Ce script refait ces releves sans leurs pieges (noms de compteurs traduits
+# sur un Windows francais, virgules decoupees par PowerShell).
 #
 # UTILISATION (console ADMINISTRATEUR : la trace ETW l'exige), pendant la partie, immobile :
 #   powershell -NoProfile -File tools\mesure-en-jeu.ps1 -Processus cod -Etiquette AVANT

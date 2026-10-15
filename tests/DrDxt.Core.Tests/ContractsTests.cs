@@ -4,8 +4,8 @@ using FluentAssertions;
 namespace DrDxt.Core.Tests;
 
 // -----------------------------------------------------------------------
-// Contracts smoke tests — one value-equality test per record,
-// one enum-member test per enum. Interface presence = compilation is enough.
+// Tests de fumée des contrats : un test d'égalité de valeur par record,
+// un test de membre par énumération. La présence d'une interface = compiler suffit.
 // -----------------------------------------------------------------------
 
 public class EnumTests
@@ -55,7 +55,7 @@ public class EnumTests
         names.Should().HaveCount(3);
     }
 
-    // --- LeverState (scoring §2.3) ---
+    // --- LeverState ---
     [Fact]
     public void LeverState_HasExpectedMembers()
     {
@@ -153,7 +153,7 @@ public class RecordEqualityTests
         var mem = new MemoryModule("BLS16G4D32AESB", "Crucial", 3200, 3200);
         var board = new MotherboardInfo("MSI", "Z790 ACE");
         var bios = new BiosInfo("7D25vAA", null, true);
-        // Use shared list instances — IReadOnlyList<T> uses reference equality in record Equals
+        // Partager les instances de liste : IReadOnlyList<T> se compare par référence dans le Equals des records
         IReadOnlyList<GpuInfo> gpus = new[] { gpu };
         IReadOnlyList<MemoryModule> mems = new[] { mem };
 
@@ -215,24 +215,6 @@ public class RecordEqualityTests
         a.EstimatedGainPct.Should().BeNull();
     }
 
-    // --- ScoreBreakdown ---
-    [Fact]
-    public void ScoreBreakdown_EqualWhenFieldsMatch()
-    {
-        var a = new ScoreBreakdown(80, 75, 85);
-        var b = new ScoreBreakdown(80, 75, 85);
-        a.Should().Be(b);
-    }
-
-    // --- DimensionStatus ---
-    [Fact]
-    public void DimensionStatus_EqualWhenFieldsMatch()
-    {
-        var a = new DimensionStatus(false, false);
-        var b = new DimensionStatus(false, false);
-        a.Should().Be(b);
-    }
-
     // --- ScoreLedgerEntry ---
     [Fact]
     public void ScoreLedgerEntry_EqualWhenFieldsMatch()
@@ -270,11 +252,8 @@ public class RecordEqualityTests
         var state = new SettingsState(TriState.Off, TriState.Unknown, "plan-guid", TriState.Off, TriState.Off, Array.Empty<int>(), TriState.Unknown);
         var findings = Array.Empty<Finding>();
 
-        var result = new ScanResult(hw, state, findings, 42, null,
-            new ScoreBreakdown(80, 80, 85),
-            new DimensionStatus(false, false));
+        var result = new ScanResult(hw, state, findings, null);
         result.Baseline.Should().BeNull();
-        result.Score.Should().Be(42);
     }
 
     // --- TweakSnapshot ---
@@ -328,7 +307,7 @@ public class RecordEqualityTests
     public void Profile_EqualWhenFieldsMatch()
     {
         var match = new HardwareMatch(".*", null);
-        // Share same list instance — IReadOnlyList<T> uses reference equality in record Equals
+        // Partager la même instance de liste : IReadOnlyList<T> se compare par référence dans le Equals des records
         IReadOnlyList<string> tweakIds = new[] { "hags-on", "xmp" };
         var a = new Profile("amd-x3d-rtx", match, tweakIds, true);
         var b = new Profile("amd-x3d-rtx", match, tweakIds, true);
@@ -339,7 +318,7 @@ public class RecordEqualityTests
     [Fact]
     public void TweakPlan_EqualWhenFieldsMatch()
     {
-        // Share same list instance — IReadOnlyList<T> uses reference equality in record Equals
+        // Partager la même instance de liste : IReadOnlyList<T> se compare par référence dans le Equals des records
         IReadOnlyList<string> ids = new[] { "hags-on", "gamemode-on" };
         var a = new TweakPlan(ids);
         var b = new TweakPlan(ids);

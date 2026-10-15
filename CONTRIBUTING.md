@@ -1,54 +1,61 @@
-# Contribuer à DrDXT
+# Contributing to DrDXT
 
-English version: [CONTRIBUTING.en.md](CONTRIBUTING.en.md).
+Version française : [CONTRIBUTING.fr.md](CONTRIBUTING.fr.md).
 
-DrDXT est gratuit et sous GPL v3. Trois façons d'aider, de la plus simple à la plus technique.
+DrDXT is free and licensed under GPL v3. Three ways to help, from the simplest to the most technical.
 
-## 1. Prouver DrDXT sur ton matériel
+## 1. Prove DrDXT on your hardware
 
-C'est l'aide la plus utile : DrDXT est mis au point sur peu de machines, et rien ne se dit « validé » sans preuve.
+This is the most useful help: DrDXT is developed on few machines, and nothing is called "validated" without proof.
 
-- **Vérifier DrDXT sur mon PC** (dans l'App) pose chaque réglage, le relit, le rend et le relit encore, avec ton
-  accord. Le rapport arrive dans `Documents`. Ouvre une issue « Rapport de vérification » et joins-le.
-- **Sans installer DrDXT** : les zips de la [Release](https://github.com/ablanchard-dev/drdxt/releases) lisent ton PC,
-  ou font la même vérification, et écrivent le même rapport dans `Téléchargements` (mode d'emploi : `LISEZ-MOI.txt`).
-- **Exporter ma machine** écrit ce que DrDXT lit sur ton PC, sans rien qui te désigne
-  ([docs/TESTEUR-EXPORTER-MA-MACHINE.md](docs/TESTEUR-EXPORTER-MA-MACHINE.md)). Ouvre une issue « Machine » et
-  joins le fichier.
+- **Check DrDXT on my PC** (in the app) applies each setting, reads it back, reverts it and reads it again, with your
+  consent. The report lands in `Documents`. Open a "Verification report" issue and attach it.
+- **No install needed**: the zips in the [Release](https://github.com/ablanchard-dev/drdxt/releases) read your PC, or
+  run the same verification, and write the same report to your `Downloads` folder. Their instructions are in
+  `READ-ME.txt` and `READ-ME-VALIDATION.txt`.
+- **Export my machine** writes what DrDXT reads on your PC, with nothing that identifies you. Open a "Machine" issue
+  and attach the file.
 
-Un rapport validé entre dans `tests/Shared/validations` (nommé `<architecture>-<carte>-<date>.txt`), puis son
-architecture s'ajoute à `GpuTuningCoverage.ValideesEnVie` ; la garde refuse l'inverse
-([docs/COUVERTURE.md](docs/COUVERTURE.md) dit ce que DrDXT fait sur quel PC).
+Reports, the app and the zips are in French or English; you can write your issue in either language.
 
-## 2. Signaler un problème
+A validated report goes into `tests/Shared/validations` (named `<architecture>-<card>-<date>.txt`), then its
+architecture is added to `GpuTuningCoverage.ValideesEnVie`; a guard test refuses the opposite.
+[docs/COUVERTURE.md](docs/COUVERTURE.md) says what DrDXT does on which PC.
 
-Une issue « Bug » : ce que tu as fait, ce que tu attendais, ce qui s'est passé, et ta version de DrDXT (en bas
-de l'écran). Joins le rapport de diagnostic (« Voir le rapport ») si l'App en a produit un. Une faille de sécurité
-se signale en privé : voir [SECURITY.md](SECURITY.md).
+## 2. Report a problem
 
-## 3. Écrire du code
+A "Bug" issue: what you did, what you expected, what happened, and your DrDXT version (bottom of the screen). Attach
+the diagnostic report ("View report") if the app produced one. A security issue is reported in private: see
+[SECURITY.md](SECURITY.md).
 
-Prérequis : Windows 10 ou 11, le SDK .NET 10.
+## 3. Write code
+
+Start with [ARCHITECTURE.md](ARCHITECTURE.md): the projects, the rules the code keeps, and how to add a setting
+from end to end.
+
+Requirements: Windows 10 or 11, the .NET 10 SDK.
 
 ```
 dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-Les tests `Category=Machine` lisent le vrai matériel ; ils tournent à la main, pas en CI.
+`Category=Machine` tests read the real hardware; they run by hand, not in CI.
 
-Les règles que la suite fait respecter :
+The rules the test suite enforces:
 
-- **Un correctif commence par un test rouge**, puis le code le fait passer. Une garde qu'on ne peut pas faire
-  tomber ne prouve rien : chaque garde a son témoin.
-- **Les réglages de Windows et du matériel s'écrivent par le helper**, sous sa liste blanche ; les valeurs de la
-  session de l'utilisateur s'écrivent avec son jeton, après la même liste. Chaque écriture a son inverse, lu avant
-  d'écrire, et un test qui la rend. La table des sites d'écriture ([docs/NON-NUISANCE.md](docs/NON-NUISANCE.md)) est
-  recalculée par la CI.
-- **Aucun gain annoncé sans sa source** : un chiffre affiché porte une adresse, sinon il n'est pas affiché.
-- **Ce qui quitte la machine est dit dans le README** ; un test vérifie les adresses écrites dans le code qui fait
-  l'appel réseau.
-- **Les textes de l'App existent en français et en anglais.**
-- Le compte de tests du README suit la dernière exécution (`python tools/gates/compte_des_tests.py`).
+- **A fix starts with a failing test**, then the code makes it pass. A guard that cannot fail proves nothing: every
+  guard has its witness.
+- **Windows and hardware settings are written by the helper**, behind its allowlist; values from the user's session
+  are written with the user's token, after the same allowlist. Every write has its inverse, read before writing, and
+  a test that reverts it. The table of write sites ([docs/NON-NUISANCE.md](docs/NON-NUISANCE.md)) is recomputed by CI.
+- **No gain is shown without its source**: a displayed figure carries a URL, otherwise it is not displayed.
+- **What leaves the machine is stated in the README**; a test checks the addresses written in the code that makes
+  the network call.
+- **App texts exist in French and English.**
+- The test count in the README follows the last run (`python tools/gates/compte_des_tests.py`).
 
-Les commentaires et les textes sont en français. Un commit dit ce qui change pour le joueur, puis pourquoi.
+The code is written in French on purpose (identifiers, comments, test names), and new code follows that rule; each
+file opens with a short French summary of what it does and why. See "Language of the code" in
+[ARCHITECTURE.md](ARCHITECTURE.md). Pull requests and issues are welcome in English or French. A commit says what
+changes for the player, then why.

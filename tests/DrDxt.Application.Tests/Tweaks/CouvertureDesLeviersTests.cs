@@ -6,7 +6,7 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks;
 
 /// <summary>
-/// ROAD1 (08/10/2026) : « ce que DrDXT fait sur ton PC ». Chaque levier du catalogue a un statut sur la machine lue :
+/// « ce que DrDXT fait sur ton PC ». Chaque levier du catalogue a un statut sur la machine lue :
 /// posé, à poser, déjà bon, non lu, ou pas sur ce matériel avec sa raison. Fin de la navigation à l'aveugle.
 /// </summary>
 public sealed class CouvertureDesLeviersTests
@@ -80,7 +80,7 @@ public sealed class CouvertureDesLeviersTests
     public void Le_routage_X3D_ne_concerne_qu_un_X3D_a_deux_blocs()
     {
         Un(Levier("fixit.x3d_ccd"), Machine()).RaisonCle.Should().Be("Levier.PasIci.PasX3d");
-        // X3D-PLAN (09/10/2026) : la raison inverse, pour le plan d'alimentation.
+        // La raison inverse, pour le plan d'alimentation.
         var x3d = Machine(); x3d = x3d with { Cpu = x3d.Cpu with { IsX3D = true, CcdCount = 2 } };
         Un(Levier("fixit.power_plan"), x3d).RaisonCle.Should().Be("Levier.PasIci.X3dDeuxBlocs");
         Un(Levier("fixit.x3d_ccd"), Machine(x3d: true, ccd: 2)).Statut.Should().Be(StatutDuLevier.DejaBon);
@@ -93,7 +93,7 @@ public sealed class CouvertureDesLeviersTests
         Un(Levier("latency.reflex"), Machine()).Statut.Should().Be(StatutDuLevier.SansObjet, "ce n'est pas une question de matériel");
     }
 
-    // GPU-OC (08/10/2026) : le ventilateur NVIDIA est construit, en mode Expert sur un PC fixe ; ailleurs, la raison.
+    // Le ventilateur NVIDIA est construit, en mode Expert sur un PC fixe ; ailleurs, la raison.
     [Fact]
     public void Le_ventilateur_est_Expert_sur_un_fixe_NVIDIA_et_dit_pourquoi_ailleurs()
     {
@@ -109,7 +109,7 @@ public sealed class CouvertureDesLeviersTests
             CouvertureDesLeviers.Domaine(id).Should().NotBeNullOrEmpty();
     }
 
-    // ROAD1 (08/10/2026) : « vérifié ici » vient de « Vérifier DrDXT » sur cette machine ; jamais sur un levier qui n'est pas
+    // « vérifié ici » vient de « Vérifier DrDXT » sur cette machine ; jamais sur un levier qui n'est pas
     // pour ce matériel.
     [Fact]
     public void Un_levier_verifie_ici_le_dit_sauf_s_il_n_est_pas_pour_ce_materiel()

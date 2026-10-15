@@ -4,32 +4,30 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// F1 — X3dCcdParkingFixTweak (the killer fix-it feature).
+// X3dCcdParkingFixTweak.
 //
-// Repairs WRONG CCD parking on a dual-CCD AMD X3D CPU (7950X3D etc.) so games run
-// on the V-Cache CCD. 08/10/2026 (A6) : la seule mesure publique trouvée donne ~6 % en moyenne en 1080p
-// (Hardware Busters, 02/04/2023 : sans parcage, 94,12 % de la machine bien réglée) ; le « deux chiffres »
-// d'avant n'avait aucune source. L'écart réel est mesuré par le produit — but only
-// via the supported software route (cahier §4 P2.3):
-//   (1) start the AMD 3D V-Cache Performance Optimizer service (AMD3DVCacheSvc),
-//   (2) enable Game Bar auto game mode (the optimizer keys off Game Bar).
-// 24/09/2026 : l'ancienne étape « CppcEnable = 1 sous ...\Control\Processor » est retirée. Aucune
-// source trouvée ne montre que Windows lise cette valeur ; CPPC se règle au BIOS. Un instantané
-// ancien qui la porte s'annule toujours : la feuille reste dans l'allowlist pour ça.
-// NO kernel hack, NO BIOS write. The BIOS CPPC option is GUIDED in M3, never
-// scripted here.
+// Répare un mauvais parcage des blocs (CCD) sur un processeur AMD X3D à deux blocs (7950X3D, etc.), pour
+// que le jeu tourne sur le bloc à V-Cache. La seule mesure publique trouvée donne environ 6 % en moyenne en
+// 1080p (Hardware Busters, 02/04/2023 : sans parcage, 94,12 % de la machine bien réglée). L'écart réel est
+// mesuré par le produit, et seulement par la voie logicielle prise en charge :
+//   (1) démarrer le service AMD 3D V-Cache Performance Optimizer (AMD3DVCacheSvc) ;
+//   (2) activer le mode Jeu automatique de la Game Bar (l'optimiseur se règle sur la Game Bar).
+// CppcEnable sous ...\Control\Processor n'est pas écrit : aucune source trouvée ne montre que Windows
+// lise cette valeur ; CPPC se règle au BIOS. La feuille reste dans l'allowlist pour annuler un instantané
+// ancien qui la porte. Aucun bricolage du noyau, aucune écriture du BIOS : l'option CPPC du BIOS est
+// guidée par le guide BIOS, jamais scriptée ici.
 //
-// Capture the real original service + Game Bar state → a COMPOSITE
-// inverse snapshot; revert restores both. Every external boundary wrapped →
-// fail clean, never throws.
+// L'état d'origine du service et de la Game Bar est relu, rangé dans un snapshot composite inverse ;
+// l'annulation rend les deux. Chaque frontière externe est protégée : échec propre, jamais d'exception.
 //
-// HONESTY (§6): SummaryKey describes the repair, never "+FPS". The gain is PROVEN
-// by the engine's re-bench (Phase C2); if no measured gain, no gain is shown.
+// Le SummaryKey décrit la réparation, jamais « +FPS ». Le gain se prouve par la nouvelle mesure du
+// moteur ; sans gain mesuré, aucun gain n'est affiché.
 //
-// Detection false-positive risk: the heuristic is CONSERVATIVE (X3dParkingHeuristic)
-// and the route is fully supported + fully reverted, so a false positive costs
-// nothing measurable.
+// Risque de faux positif : l'heuristique est prudente (X3dParkingHeuristic), et la voie est prise en
+// charge et entièrement annulée : un faux positif ne coûte rien de mesurable.
 // -----------------------------------------------------------------------
+/// <summary>Démarre l'optimiseur 3D V-Cache d'AMD et le mode Jeu automatique pour que le jeu tourne sur le bloc à cache.
+/// Proposé sur un Ryzen X3D à deux blocs dont le parcage semble faux.</summary>
 public sealed class X3dCcdParkingFixTweak : FixItTweakBase
 {
     private const string ServiceName = "AMD3DVCacheSvc";
@@ -54,18 +52,18 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
     public override string SummaryKey => "tweak.fixit.x3d_ccd.repair_routing";
 
     public override bool AppliesTo(HardwareInventory hw, SettingsState state) =>
-        // Dual-CCD X3D (single-CCD 7800X3D/9800X3D, Intel, non-X3D are excluded by
-        // the heuristic) whose parking looks wrong.
+        // X3D à deux CCD (les 7800X3D/9800X3D à un CCD, Intel et les non-X3D sont écartés par
+        // l'heuristique) dont le parcage semble faux.
         X3dParkingHeuristic.LooksMisparked(hw.Cpu, state);
 
-    /// <summary>Revue n° 14 : le parking non lu n'est pas « rien n'est parqué ».</summary>
+    /// <summary>Le parking non lu n'est pas « rien n'est parqué ».</summary>
     public override bool EtatNonLu(SettingsState state) => state.ParkedCoreIndexes is null;
 
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
         try
         {
-            // (Capture) Read the real originals before writing, for a faithful revert.
+            // (Relevé) Lire les vraies origines avant d'écrire, pour un retour arrière fidèle.
             var serviceState = _service.GetServiceState(ServiceName);
             if (!serviceState.IsOk)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
@@ -76,13 +74,13 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     $"Could not read original Game Bar auto-mode: {gameBar.Error?.Code}.");
 
-            // Build the COMPOSITE inverse snapshot (restore both originals).
+            // Construire le snapshot inverse composite (rend les deux origines).
             var inverseOps = new List<PrivilegedOp>
             {
                 BuildRegistryInverse(RegistryHiveKind.CurrentUser, GameBarPath, GameBarName, gameBar.Value),
             };
-            // Only add a service inverse if the service was not already running — we
-            // must not stop a service the user already had on.
+            // N'ajouter l'inverse du service que s'il ne tournait pas déjà : on ne doit pas
+            // arrêter un service que l'utilisateur avait déjà allumé.
             if (serviceState.Value == ServiceState.Stopped)
                 inverseOps.Add(new RunServiceControlOp(ServiceName, ServiceAction.Stop));
 
@@ -91,19 +89,18 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "Could not serialize the revert ops.");
 
-            // (Apply — supported route only) service start + Game Bar.
-            // Each forward op is paired with the inverse that returns the system to
-            // This tweak's entry state. If any op fails mid-sequence, we replay the
-            // inverses of the ops already applied (LIFO) so nothing stays half-applied
-            // (§6.2 "rien ne reste pendu") before returning the original Fail.
+            // (Pose, voie prise en charge seulement) démarrage du service + Game Bar.
+            // Chaque op est appariée à l'inverse qui ramène le système à l'état d'entrée du
+            // levier. Si une op échoue en cours de route, on rejoue les inverses des ops déjà
+            // posées (LIFO) pour que rien ne reste à moitié posé, puis on rend le Fail d'origine.
             var enableValue = Enable.ToString(System.Globalization.CultureInfo.InvariantCulture);
             var steps = new (PrivilegedOp Forward, PrivilegedOp? Inverse)[]
             {
                 (
                     new RunServiceControlOp(ServiceName, ServiceAction.Start),
-                    // Only undo the start if the service was Stopped at entry; if it was
-                    // already running, there is nothing to undo (never stop a service the
-                    // user already had on) → null inverse, skipped on rollback.
+                    // N'annuler le démarrage que si le service était Stopped à l'entrée ; s'il tournait
+                    // déjà, rien à annuler (ne jamais arrêter un service que l'utilisateur avait allumé)
+                    // → inverse null, sauté au rollback.
                     serviceState.Value == ServiceState.Stopped
                         ? new RunServiceControlOp(ServiceName, ServiceAction.Stop)
                         : null
@@ -127,7 +124,7 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
                 appliedInverses.Add(inverse);
             }
 
-            // 11/09/2026 — les valeurs posees (service, Game Bar), pour que la desinstallation ne
+            // Les valeurs posees (service, Game Bar), pour que la desinstallation ne
             // rende une feuille que si elle porte encore ce que DrDXT y a mis.
             var posees = CompositeSnapshotCodec.Encode(steps.Select(s => s.Forward).ToList());
             return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, snapshotJson.Value, posees.IsOk ? posees.Value : null));
@@ -139,8 +136,8 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
         }
     }
 
-    /// <summary>Composite revert: replay each captured-original op. Malformed
-    /// snapshot → SAFETY.SNAPSHOT_INVALID; never throws, never runs an unknown op.</summary>
+    /// <summary>Retour composite : rejoue chaque op d'origine relevée. Snapshot malformé
+    /// → SAFETY.SNAPSHOT_INVALID ; ne lève jamais, ne lance jamais une op inconnue.</summary>
     public override async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
@@ -166,7 +163,7 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
             {
                 var res = await Elevated.ExecuteAsync(op, CancellationToken.None).ConfigureAwait(false);
                 if (!res.IsOk)
-                    return res; // surface the first revert failure verbatim
+                    return res; // rend tel quel le premier échec de retour
             }
             return Result.Ok();
         }
@@ -176,8 +173,8 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
         }
     }
 
-    // The serialized inverse op for a single DWORD registry leaf: if the value
-    // existed, restore it; if it was absent, the faithful inverse is a delete.
+    // L'op inverse sérialisée d'une feuille de registre DWORD : si la valeur existait,
+    // la remettre ; si elle était absente, l'inverse fidèle est une suppression.
     private static PrivilegedOp BuildRegistryInverse(
         RegistryHiveKind hive, string path, string name, uint? capturedOriginal) =>
         capturedOriginal is uint original

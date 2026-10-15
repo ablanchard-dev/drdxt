@@ -7,7 +7,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// L0.1 — le canal de retour de donnees.
+// Le canal de retour de donnees.
 //
 // Avant lui, une lecture firmware n'apprenait que « la variable est lisible » : les octets
 // etaient jetes dans PrivilegedOpExecutor. Le produit ne pouvait donc rien afficher de l'etat

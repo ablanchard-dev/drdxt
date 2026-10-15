@@ -9,12 +9,12 @@ public enum StatutDuLevier { Pose, APoser, DejaBon, NonLu, Expert, SansObjet, Pa
 /// ce matériel.</summary>
 public sealed record LevierSurCeMateriel(string Id, StatutDuLevier Statut, string? RaisonCle = null)
 {
-    /// <summary>ROAD1 : posé, relu, rendu et relu sur cette machine par « Vérifier DrDXT » (<see cref="LeviersVerifies"/>).</summary>
+    /// <summary>Posé, relu, rendu et relu sur cette machine par « Vérifier DrDXT » (<see cref="LeviersVerifies"/>).</summary>
     public bool VerifieIci { get; init; }
 }
 
 /// <summary>
-/// ROAD1 (08/10/2026) : « ce que DrDXT fait sur ton PC ». Chaque levier du catalogue a un statut sur la machine lue. Le
+/// « ce que DrDXT fait sur ton PC ». Chaque levier du catalogue a un statut sur la machine lue. Le
 /// matériel d'abord : un levier qui ne peut pas exister ici le dit, avec sa raison (le joueur ne lit plus « rien à faire »
 /// là où la vérité est « pas sur ton matériel »). Ensuite posé, à poser, non lu, déjà bon.
 /// </summary>
@@ -23,7 +23,7 @@ public static class CouvertureDesLeviers
     public static IReadOnlyList<LevierSurCeMateriel> Calculer(IEnumerable<ITweak> catalogue, HardwareInventory hw,
         SettingsState etat, IReadOnlySet<string> poses, IReadOnlySet<string>? verifies = null)
         => Statuts(catalogue, hw, etat, poses)
-            // Revue n° 15 : « vérifié ici » seulement pour un levier lu et proposé ici (posé, à poser, déjà bon).
+            // « vérifié ici » seulement pour un levier lu et proposé ici (posé, à poser, déjà bon).
             .Select(l => l.Statut is not (StatutDuLevier.Pose or StatutDuLevier.APoser or StatutDuLevier.DejaBon)
                          || verifies?.Contains(l.Id) != true
                 ? l : l with { VerifieIci = true })
@@ -59,10 +59,13 @@ public static class CouvertureDesLeviers
         ["fixit.ecran_frequence"] = "graphique",
         ["fixit.x3d_ccd"] = "processeur",
         ["fixit.power_plan"] = "processeur",
+        ["fixit.plan_economie"] = "processeur",
         ["fixit.mode_boost"] = "processeur",
         ["fixit.cpu_power_limit"] = "processeur",
+        ["fixit.cpu_power_cap"] = "processeur",
         ["fixit.wifi_performances"] = "reseau",
         ["fixit.sane_pagefile"] = "memoire",
+        ["fixit.pagefile_ssd"] = "memoire",
         ["fixit.heures_actives"] = "windows",
     };
 
@@ -72,7 +75,7 @@ public static class CouvertureDesLeviers
     /// <summary>Pour la garde : un levier du catalogue a une page choisie, pas la page par défaut.</summary>
     public static bool DomaineChoisi(string id) => Domaines.ContainsKey(id);
 
-    // Revue n° 14 : ces raisons ne tiennent pas au matériel ; « pas sur ton matériel » mentait sur un fixe RTX.
+    // Ces raisons ne tiennent pas au matériel ; « pas sur ton matériel » mentait sur un fixe RTX.
     private static readonly HashSet<string> SansObjet = ["Levier.PasIci.ReflexDuJeu"];
 
     private static string? RaisonMateriel(string id, HardwareInventory hw)
@@ -84,17 +87,22 @@ public static class CouvertureDesLeviers
         var intel = hw.Cpu.Vendor.Contains("Intel", StringComparison.OrdinalIgnoreCase);
         return id switch
         {
-            // B1 (10/10/2026) : la limite de puissance du processeur, registres Intel, PC fixe seulement.
+            // La limite de puissance du processeur, registres Intel, PC fixe seulement.
             "fixit.cpu_power_limit" when console => "Levier.PasIci.Console",
             "fixit.wifi_performances" when console => "Levier.PasIci.Console",
+            "fixit.plan_economie" when console => "Levier.PasIci.Console",
+            "fixit.plan_economie" when portable => "Levier.PasIci.Batterie",
             "fixit.cpu_power_limit" when portable => "Levier.PasIci.Batterie",
             "fixit.cpu_power_limit" when !intel => "Levier.PasIci.PasIntel",
-            // GPU-OC (08/10/2026) : le ventilateur NVIDIA (NVML) en mode Expert, sur un PC fixe seulement.
+            "fixit.cpu_power_cap" when console => "Levier.PasIci.Console",
+            "fixit.cpu_power_cap" when portable => "Levier.PasIci.Batterie",
+            "fixit.cpu_power_cap" when !intel => "Levier.PasIci.PasIntel",
+            // Le ventilateur NVIDIA (NVML) en mode Expert, sur un PC fixe seulement.
             "gpu.fan_curve" when console || portable => "Levier.PasIci.VentilateurConstructeur",
             "gpu.fan_curve" when !nvidia => "Levier.PasIci.PasNvidia",
             "latency.reflex" => "Levier.PasIci.ReflexDuJeu",
             "fixit.x3d_ccd" when !(hw.Cpu.IsX3D && hw.Cpu.CcdCount >= 2) => "Levier.PasIci.PasX3d",
-            // X3D-PLAN (09/10/2026) : le pilote AMD range le jeu sur le bloc à cache sous Équilibré seulement.
+            // Le pilote AMD range le jeu sur le bloc à cache sous Équilibré seulement.
             "fixit.power_plan" when hw.Cpu.IsX3D && hw.Cpu.CcdCount >= 2 => "Levier.PasIci.X3dDeuxBlocs",
             "fixit.power_plan" or "fixit.mode_boost" or "latency.render_queue_cap" or "latency.vrr_vsync_cap"
                 or "latency.prefer_max_perf" or "gpu.repos_global_normal" or "gpu.undervolt" or "gpu.power_limit"

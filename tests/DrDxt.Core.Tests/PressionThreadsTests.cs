@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Core.Tests;
 
-/// <summary>Phase 18 — la pression du thread de jeu, branchee dans le diagnostic de l'App.</summary>
+/// <summary>La pression du thread de jeu, branchee dans le diagnostic de l'App.</summary>
 public class PressionThreadsTests
 {
     [Theory]

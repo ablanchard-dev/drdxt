@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>J-MECA (09/10/2026) : la limite de puissance jugée par son mécanisme, sur les parties normales.</summary>
+/// <summary>La limite de puissance jugée par son mécanisme, sur les parties normales.</summary>
 public sealed class LigneMecanismeCarteTests
 {
     private static PartieRelevee P(MecanismeCarte? m) =>
@@ -26,7 +26,7 @@ public sealed class LigneMecanismeCarteTests
         ScanViewModel.LigneMecanismeCarte([P(null)], k => k).Should().BeNull();
     }
 
-    // MECA2 : seules les parties du même jeu et du même côté de l'essai que la dernière comptent.
+    // Seules les parties du même jeu et du même côté de l'essai que la dernière comptent.
     [Fact]
     public void Un_autre_jeu_ou_l_autre_cote_de_l_essai_ne_se_melent_pas()
     {

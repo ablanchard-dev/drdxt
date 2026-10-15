@@ -5,19 +5,16 @@ using Xunit;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// À temps de jeu égal, des passes plus courtes résolvent mieux — et le produit croyait
-/// l'inverse.
+/// À temps de jeu égal, des passes plus courtes résolvent mieux.
 ///
-/// `GameOptimizationSession.DureeParPasse` valait **60 s**, sur la foi d'une mesure du 01/09/2026 :
-/// « 3 × 10 s → seuil 22 % ; 3 × 60 s → seuil 1,6 % ». Cette mesure comparait trois passes courtes
-/// a trois passes longues — six fois moins de temps de jeu d'un cote. Elle confondait la duree
-/// d'une passe avec le temps total.
+/// Comparer trois passes courtes a trois passes longues (« 3 × 10 s → seuil 22 % ; 3 × 60 s → seuil
+/// 1,6 % ») confond la duree d'une passe avec le temps total : six fois moins de temps de jeu d'un cote.
 ///
 /// L'arithmetique tranche : la marge inter-passes vaut `t95(n-2) × σ / √n`. Passer de 3 a 17
 /// passes fait chuter t95 de 4,30 a 2,13 **et** multiplie √n par 2,4. Meme si σ grossit sur des
 /// passes plus courtes, le produit des deux facteurs gagne largement.
 ///
-/// Confirme le 07/09/2026 en rejouant les huit captures Warzone reelles : mediane ~3,4 % a 10 s
+/// Mesure le 07/09/2026 en rejouant les huit captures Warzone reelles : mediane ~3,4 % a 10 s
 /// contre ~4,8 % a 20 s et ~30 % a 45 s, sept captures sur huit meilleures a 10 s.
 /// Voir `docs/PROTOCOLES-DE-MESURE-IN-GAME.md`.
 ///
@@ -67,8 +64,8 @@ public class ShorterPassesResolveBetterTests
     public void La_duree_de_passe_du_produit_reste_celle_qui_a_ete_MESUREE()
     {
         // La garde qui empeche le retour a 60 s « parce qu'une passe longue parait plus serieuse ».
-        // Le changer demande de refaire la mesure, pas de changer d'avis — et la mesure a bien ete
-        // refaite le 07/09/2026 a temps de jeu EGAL, qui a fait descendre 15 s a 10 s.
+        // Le changer demande de refaire la mesure, pas de changer d'avis : la mesure du 07/09/2026,
+        // a temps de jeu egal, donne 10 s.
         DrDxt.Core.Tests.ProtocoleReference.DureeParPasseSecondes.Should().Be(10);
     }
 }

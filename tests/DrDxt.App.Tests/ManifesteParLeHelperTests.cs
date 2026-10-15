@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using DrDxt.App.Navigation;
 using DrDxt.App.ViewModels;
 using DrDxt.Core;
 using DrDxt.ElevatedHelper;
@@ -21,7 +20,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 11/09/2026 — l'app ne signe plus : elle envoie les entrees au HELPER eleve.
+// L'app ne signe plus : elle envoie les entrees au HELPER eleve.
 //
 // Avant ce lot, rien n'atteignait le manifeste dans l'App installee : pas de graine d'environnement,
 // pas d'elevation. Ces tests tiennent le nouveau chemin, de la composition jusqu'a l'ecran :
@@ -135,8 +134,7 @@ public sealed class ManifesteParLeHelperTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(hw, st,
-              new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) },
-              68, bl, new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) }, bl)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
             new List<StorageDevice> { new("Samsung 990 Pro", "NVMe", 1L << 40) }));
@@ -152,7 +150,6 @@ public sealed class ManifesteParLeHelperTests
         return new ScanViewModel(
             hd, sr, br, sc, sd, safety, moteur,
             ScanViewModelTestSeams.ProfileConsumer(ScanViewModelTestSeams.PlanConsumption(new[] { "latency.hagsOn" })),
-            ScanViewModelTestSeams.GpuTuningStep(), Substitute.For<INavigationService>(), () => new DashboardViewModel(),
             store, new AppliedTweakManifestMapper(), ScanViewModelTestSeams.BiosAdvisor(),
             ScanViewModelTestSeams.GuideGenerator(), key => key);
     }
@@ -189,7 +186,7 @@ public sealed class ManifesteParLeHelperTests
     [Fact]
     public void L_App_n_ecrit_plus_la_reference_de_derive_et_son_rafraichissement_ne_passe_par_aucun_decorateur()
     {
-        // 11/09/2026 — le decorateur ApplyReferenceSeedingStore vivait ici : l'App non elevee ecrivait la
+        // Le decorateur ApplyReferenceSeedingStore vivait ici : l'App non elevee ecrivait la
         // racine admin (echec avale), et son RafraichirAsync par defaut repassait par le client qui lance l'UAC.
         using var provider = new ServiceCollection().AddDrDxtApp().BuildServiceProvider();
 

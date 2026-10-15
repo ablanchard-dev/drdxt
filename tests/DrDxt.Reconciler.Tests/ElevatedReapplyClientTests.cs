@@ -5,14 +5,14 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// T32 — ElevatedReapplyClient maps a reconcilable tweakId to an existing typed op
-// and dispatches via IElevatedClient. An unknown tweakId fails before any IPC (I3).
+// ElevatedReapplyClient associe un tweakId réconciliable à une op typée existante
+// et l'envoie via IElevatedClient. Un tweakId inconnu échoue avant tout IPC.
 // -----------------------------------------------------------------------
 public sealed class ElevatedReapplyClientTests
 {
-    // A recording IElevatedClient — captures every op it is asked to execute, so we
-    // can prove (a) a known tweak dispatches the RIGHT typed op, and (b) an unknown
-    // tweak dispatches nothing.
+    // Un IElevatedClient enregistreur : capture chaque op qu'on lui demande d'exécuter, pour
+    // prouver (a) qu'un levier connu envoie la bonne op typée, et (b) qu'un levier inconnu
+    // n'envoie rien.
     private sealed class RecordingElevatedClient : IElevatedClient
     {
         public List<PrivilegedOp> Sent { get; } = new();
@@ -24,7 +24,7 @@ public sealed class ElevatedReapplyClientTests
         }
     }
 
-    // A mapper backed by an explicit table — the production shape, configurable.
+    // Un mappeur adossé à une table explicite : la forme de production, configurable.
     private sealed class TableMapper : IReapplyOpMapper
     {
         private readonly Dictionary<string, Func<string, PrivilegedOp>> _table = new(StringComparer.Ordinal);

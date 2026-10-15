@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Measurement.Tests.Cpu;
 
 /// <summary>
-/// 25/09/2026. En jeu, sur la machine de reference, le paquet tenait 66,5 W plats (63,2-69,5) et
+/// En jeu, sur la machine de reference, le paquet tenait 66,5 W plats (63,2-69,5) et
 /// les cœurs P restaient a 4,0 GHz : la limite longue du BIOS, que les indicateurs de Windows ne
 /// voient pas. Le banc soutenu releve maintenant la puissance, et le juge le dit quand elle est plate.
 /// </summary>
@@ -19,6 +19,17 @@ public class LimiteDePuissanceSoutenueTests
         => CpuBaselineService.Juger(Baisse(65.8, 9.5)).Lisible
             .Should().Contain("66 W").And.Contain("limite de puissance longue");
 
+    // Sur un Windows anglais, le verdict du banc se dit en anglais (point décimal, date mois/jour).
+    [Fact]
+    public void La_baisse_se_dit_en_anglais()
+    {
+        using var _ = DrDxt.Core.Docteur.Portee(System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+        var b = Baisse(65.8, 9.5) with { TakenUtc = new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero) };
+
+        CpuBaselineService.Juger(b).Lisible.Should().StartWith("Under a long load on 8 cores, your processor holds 30.0% less power")
+            .And.Contain("an average of 66 W").And.EndWith("Measured on 10/03/2026.");
+    }
+
     [Fact]
     public void Le_verdict_porte_le_drapeau_de_limite_de_puissance()
     {
@@ -27,7 +38,7 @@ public class LimiteDePuissanceSoutenueTests
         CpuBaselineService.Juger(Baisse(null, null)).LimiteDePuissance.Should().BeFalse();
     }
 
-    // 26/09/2026 : une mutation qui levait le drapeau sans baisse démontrée restait verte. Une puissance plate
+    // Une mutation qui levait le drapeau sans baisse démontrée restait verte. Une puissance plate
     // sur un processeur qui ne perd rien n'est pas une limite : l'écran désignerait le BIOS pour rien.
     [Fact]
     public void Une_puissance_plate_sans_baisse_ne_designe_pas_le_BIOS()
@@ -46,7 +57,7 @@ public class LimiteDePuissanceSoutenueTests
     [Fact]
     public void Une_puissance_qui_varie_est_dite_avec_son_chiffre_et_sans_conclusion()
     {
-        // 25/09/2026, mesure fraîche sur la machine de reference : 63 W à 12,8 % près ; la phrase ne disait plus rien de la puissance.
+        // Mesure fraîche sur la machine de reference : 63 W à 12,8 % près ; la phrase dit la puissance.
         var lisible = CpuBaselineService.Juger(Baisse(63.2, 12.8)).Lisible;
         lisible.Should().Contain("63 W en moyenne").And.Contain("±13 %").And.Contain("trop incertain");
         CpuBaselineService.Juger(Baisse(65.8, 9.5)).Lisible.Should().NotContain("trop incertain");
@@ -62,7 +73,7 @@ public class LimiteDePuissanceSoutenueTests
         // Témoin : une mesure précise sans baisse le dit toujours.
         CpuBaselineService.Juger(new CpuBaseline("m", DateTimeOffset.UtcNow, 8, 100, 99.9, 0.5)).Lisible
             .Should().Contain("garde sa puissance quand")
-            // Sous un autre programme lourd, ce verdict sortait à tort (25/09/2026) : sa condition est dite.
+            // Sous un autre programme lourd, ce verdict sortait à tort : sa condition est dite.
             .And.Contain("si aucun autre programme lourd ne tournait pendant la mesure");
     }
 
@@ -78,14 +89,14 @@ public class LimiteDePuissanceSoutenueTests
     [Fact]
     public void Une_reference_relue_sans_debit_soutenu_ne_fabrique_pas_cent_pour_cent_de_perte()
     {
-        // 25/09/2026 : la reference se relit depuis %LOCALAPPDATA%, que tout programme de l'utilisateur
+        // La reference se relit depuis %LOCALAPPDATA%, que tout programme de l'utilisateur
         // peut modifier. Un debit soutenu a 0 y rendait « 100 % de puissance en moins », demontrable.
         var j = CpuBaselineService.Juger(new CpuBaseline("m", DateTimeOffset.UtcNow, 8, 100, 0, 0.5));
         j.Demontrable.Should().BeFalse();
         j.Lisible.Should().NotContain("100");
     }
 
-    // 26/09/2026 : un fichier sans « BruitPercent » se relit avec 0. Le seuil (3 fois le bruit) tombait
+    // Un fichier sans « BruitPercent » se relit avec 0. Le seuil (3 fois le bruit) tombait
     // a 0 et 2 % d'ecart devenaient une baisse « demontrable », BIOS designe compris.
     [Theory]
     [InlineData(0)]
@@ -118,7 +129,7 @@ public class LimiteDePuissanceSoutenueTests
     [Fact]
     public void Les_quatre_mesures_de_la_machine_de_reference_donnent_le_meme_verdict()
     {
-        // 25/09/2026 : même machine, même état ; l'écart-type des relevés disait « tenue » 2 fois sur 4.
+        // Même machine, même état ; juger sur l'écart-type des relevés dirait « tenue » 2 fois sur 4.
         // Sur 17 relevés, ces écarts-types donnent une incertitude de la moyenne sous le seuil, les quatre fois.
         foreach (var ecartType in new[] { 7.0, 12.8, 10.4, 7.9 })
         {
@@ -143,8 +154,8 @@ public class LimiteDePuissanceSoutenueTests
     [Fact]
     public void Une_reference_sans_puissance_invite_a_remesurer()
     {
-        // 25/09/2026 : la reference du 11/09 n'avait pas de puissance ; une mesure fraiche disait
-        // « limite du BIOS ». La phrase le dit, sans rien remesurer a la place de l'utilisateur.
+        // Une reference ancienne sans puissance, quand une mesure fraiche dit « limite du BIOS » :
+        // la phrase le dit, sans rien remesurer a la place de l'utilisateur.
         CpuBaselineService.Juger(Baisse(null, null)).Lisible.Should().Contain("Remesurer ton processeur");
         CpuBaselineService.Juger(Baisse(65.8, 9.5)).Lisible.Should().NotContain("Remesurer ton processeur");
     }
@@ -154,8 +165,7 @@ public class LimiteDePuissanceSoutenueTests
     [InlineData(99.9)]  // pas de baisse
     public void La_phrase_porte_la_date_de_la_mesure(double soutenu)
     {
-        // 25/09/2026 : la reference de la machine de reference date du 11/09, et le rapport la
-        // presentait sans date, donc comme d'aujourd'hui.
+        // Une reference ancienne presentee sans date passerait pour d'aujourd'hui.
         var onzeSeptembre = new DateTimeOffset(2026, 9, 11, 17, 46, 0, TimeSpan.Zero);
         CpuBaselineService.Juger(new CpuBaseline("m", onzeSeptembre, 8, 100, soutenu, 0.5)).Lisible
             .Should().EndWith($"Mesuré le {onzeSeptembre.ToLocalTime():dd/MM/yyyy}.");

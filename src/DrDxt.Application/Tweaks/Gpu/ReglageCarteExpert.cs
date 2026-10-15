@@ -4,7 +4,7 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Gpu;
 
 /// <summary>
-/// GPU-OC (08/10/2026) : le décalage de fréquence de la carte, posé à la main par le joueur en mode Expert, sur son
+/// Le décalage de fréquence de la carte, posé à la main par le joueur en mode Expert, sur son
 /// accord. Jamais par l'autopilote (la règle de <c>CandidateSelector.ReglagesCarteInterdits</c> tient pour lui).
 ///
 /// L'ordre : le journal d'abord (le démarrage suivant rendrait la carte), puis le levier, qui sonde, arme le bail du
@@ -17,22 +17,25 @@ public sealed class ReglageCarteExpert(GpuUndervoltTweak levier, GpuTuningTarget
 
     /// <summary>Un PC fixe à carte dédiée. Sur un portable, les fréquences de la carte sont verrouillées par le pilote.</summary>
     public static bool Possible(HardwareInventory hw) => GpuGating.HasDesktopDiscreteGpu(hw);
-    // 08/10/2026 (revue n° 13) : 120 s. Le helper sert une opération à la fois ; une opération longue (un point de
+    // 120 s. Le helper sert une opération à la fois ; une opération longue (un point de
     // restauration) pouvait retenir les battements plus de 30 s et faire rendre la carte en silence.
     public const int BailSecondes = 120;
 
     public async Task<Result<EssaiCarte>> PoserAsync(int coeurMhz, int memoireMhz = 0)
     {
-        if (coeurMhz == 0 && memoireMhz == 0)
-            return Result<EssaiCarte>.Fail(ErrorCodes.TweakNotApplicable, "Décalage nul : rien à poser.");
-        if (!GpuSafeBounds.IsCoreOffsetSafe(coeurMhz) || !GpuSafeBounds.IsMemoryOffsetSafe(memoireMhz))
+        // Le helper n'écrit que le cœur : une mémoire demandée serait affichée sans jamais être posée.
+        if (memoireMhz != 0)
+            return Result<EssaiCarte>.Fail(ErrorCodes.TweakNotApplicable, Docteur.T("GX.MemoireNonEcrite"));
+        if (coeurMhz == 0)
+            return Result<EssaiCarte>.Fail(ErrorCodes.TweakNotApplicable, Docteur.T("GX.DecalageNul"));
+        if (!GpuSafeBounds.IsCoreOffsetSafe(coeurMhz))
             return Result<EssaiCarte>.Fail(ErrorCodes.TweakNotApplicable,
-                $"Décalage hors des bornes ({GpuSafeBounds.MinCoreOffsetMhz} à +{GpuSafeBounds.MaxCoreOffsetMhz} MHz) : rien n'est écrit.");
+                Docteur.T("GX.HorsBornes", GpuSafeBounds.MinCoreOffsetMhz, GpuSafeBounds.MaxCoreOffsetMhz));
 
         var pose = journal.Poser(levier.Id, null);
         if (!pose.IsOk)
             return Result<EssaiCarte>.Fail(pose.Error?.Code ?? FichierRevertEnAttente.CodeErreur,
-                "rien n'est posé sans filet : " + pose.Error?.Message);
+                Docteur.T("GX.SansFilet", pose.Error?.Message));
 
         // La cible passe au levier ; la source partagée (le profil, un scan) n'est jamais modifiée.
         var cible = cibles.Tuning with { CoreOffsetMhz = coeurMhz, MemoryOffsetMhz = memoireMhz };
@@ -49,14 +52,28 @@ public sealed class ReglageCarteExpert(GpuUndervoltTweak levier, GpuTuningTarget
         if (!journal.Poser(levier.Id, snapshot).IsOk)
         {
             var rendu = await levier.RevertAsync(snapshot).ConfigureAwait(false);
-            await bail.DisposeAsync().ConfigureAwait(false);
-            if (rendu.IsOk) journal.Lever();
+            if (rendu.IsOk)
+            {
+                await bail.LibererAsync().ConfigureAwait(false);
+                journal.Lever();
+            }
+            else await bail.DisposeAsync().ConfigureAwait(false);
             return Result<EssaiCarte>.Fail(FichierRevertEnAttente.CodeErreur,
-                rendu.IsOk ? "journal impossible à compléter : la carte a été rendue"
-                           : "journal impossible à compléter, et la carte n'a pas pu être rendue : le bail la rendra");
+                rendu.IsOk ? Docteur.T("GX.JournalCarteRendue") : Docteur.T("GX.JournalCarteNonRendue"));
         }
 
         return Result<EssaiCarte>.Ok(new EssaiCarte(levier, journal, snapshot, bail));
+    }
+}
+
+/// <summary>Le bail perdu, le helper a rendu l'origine : le journal n'a plus rien à rendre (sinon l'Expert et l'autopilote se
+/// croiraient « encore en essai » jusqu'au redémarrage de l'App).</summary>
+internal static class SuiviDuBail
+{
+    public static bool LeverAuBailPerdu(HeartbeatSender bail, IRevertEnAttente journal)
+    {
+        bail.Perdu += () => journal.Lever();
+        return true;
     }
 }
 
@@ -74,6 +91,8 @@ public interface IEssaiCarte : IAsyncDisposable
 public sealed class EssaiCarte(GpuUndervoltTweak levier, IRevertEnAttente journal, TweakSnapshot snapshot, HeartbeatSender bail)
     : IEssaiCarte
 {
+    private readonly bool _journalSuitLeBail = SuiviDuBail.LeverAuBailPerdu(bail, journal);
+
     public TweakSnapshot Snapshot { get; } = snapshot;
 
     public event Action? BailPerdu

@@ -5,16 +5,16 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// M1 — the ELEVATED helper enforces the GPU safety envelope itself.
+// Le helper élevé impose lui-même l'enveloppe de sécurité GPU.
 //
-// The helper cannot reference DrDxt.Application (it depends only on DrDxt.Core), so the
-// conservative band is MIRRORED in NvApiTuningMath. GpuSafeBounds is the single source of
-// TRUTH; these tests fail loudly if the mirror ever drifts, and pin the tightened executor
-// rail at the band edges (the rail the direct, non-IPC smoke-tool write path goes through).
+// Le helper ne peut pas référencer DrDxt.Application (il ne dépend que de DrDxt.Core), donc
+// la bande prudente est recopiée dans NvApiTuningMath. GpuSafeBounds reste la seule source ;
+// ces tests échouent bruyamment si la copie dérive, et figent le rail resserré de l'exécuteur
+// aux bords de la bande (le rail que traverse l'écriture directe, hors IPC, de l'outil de fumée).
 // -----------------------------------------------------------------------
 public sealed class NvApiTuningPolicyBoundSyncTests
 {
-    // --- The mirror must equal GpuSafeBounds, leaf by leaf. ---
+    // --- La copie doit égaler GpuSafeBounds, feuille par feuille. ---
 
     [Fact]
     public void Core_offset_band_mirrors_GpuSafeBounds()
@@ -30,17 +30,17 @@ public sealed class NvApiTuningPolicyBoundSyncTests
         NvApiTuningMath.MaxMemoryOffsetMhz.Should().Be(GpuSafeBounds.MaxMemoryOffsetMhz);
     }
 
-    // --- The tightened executor rail enforces the same band (this is the path a direct,
-    //     non-IPC smoke-tool call to NvApiTuningActions.SetCoreClockOffset goes through). ---
+    // --- Le rail resserré de l'exécuteur impose la même bande (c'est le chemin d'un appel direct,
+    //     hors IPC, à NvApiTuningActions.SetCoreClockOffset depuis l'outil de fumée). ---
 
     [Theory]
-    [InlineData(100, true)]      // upper bound — in band
-    [InlineData(-200, true)]     // lower bound — in band
+    [InlineData(100, true)]      // borne haute : dans la bande
+    [InlineData(-200, true)]     // borne basse : dans la bande
     [InlineData(0, true)]
-    [InlineData(101, false)]     // one past top
-    [InlineData(-201, false)]    // one past bottom
-    [InlineData(500, false)]     // the OLD ±500 rail — now rejected
-    [InlineData(int.MinValue, false)]  // no Math.Abs overflow
+    [InlineData(101, false)]     // un cran au-dessus
+    [InlineData(-201, false)]    // un cran en dessous
+    [InlineData(500, false)]     // l'ancien rail ±500, désormais refusé
+    [InlineData(int.MinValue, false)]  // pas de débordement Math.Abs
     [InlineData(int.MaxValue, false)]
     public void Core_offset_rail_enforces_the_policy_band(int mhz, bool inBand) =>
         NvApiTuningMath.IsCoreOffsetWithinHardRail(mhz).Should().Be(inBand);

@@ -35,7 +35,7 @@ public class NvApiLatencyReaderTests
     [Fact]
     public void Drs_getters_fail_clean_when_the_setting_is_not_readable()
     {
-        _native.DrsReadSuccess = false; // NVAPI unavailable or setting at default
+        _native.DrsReadSuccess = false; // NVAPI indisponible ou réglage par défaut
         Reader().GetVsyncMode().Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
         Reader().GetFrameRateLimit().IsOk.Should().BeFalse();
         Reader().GetMaxPreRenderedFrames().IsOk.Should().BeFalse();
@@ -51,7 +51,7 @@ public class NvApiLatencyReaderTests
         r.Value.Should().Be(2u);
     }
 
-    // Minimal settable IRegistryReader fake (the shared StubRegistryReader always fails).
+    // Faux IRegistryReader minimal et réglable (le StubRegistryReader partagé échoue toujours).
     private sealed class FakeReg : IRegistryReader
     {
         public uint? Value { get; set; }

@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Ligne « compresse image » de la checklist produit, appliquee cette
+// Ligne « compresse image » de la checklist produit, appliquee cette
 // fois a l'application. Sur Lumenia, la meme ligne avait sorti une icone de
 // 2,18 Mo servie pour dessiner 180 points. Ici, la mesure dit autre chose, et de
 // pire : Deux images sont embarquees dans l'executable et **referencees nulle
@@ -72,7 +72,7 @@ public sealed class RienNEstEmbarqueSansEtreUtiliseTests
 
     // Embarquees exprES, en attendant la decision. La raison n'est pas
     // decorative : c'est elle qu'on relira le jour ou l'installeur pesera trop.
-    // 27/09/2026 : la decision est tombee. mascot.png et logo.png ne sont plus embarques (2 Mo de moins
+    // La decision est tombee. mascot.png et logo.png ne sont plus embarques (2 Mo de moins
     // dans l'executable et l'installeur) ; les fichiers restent dans Assets pour un ecran a venir.
     private static readonly Dictionary<string, string> GardeesSciemment = new();
 

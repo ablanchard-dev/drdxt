@@ -5,15 +5,15 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Settings;
 
 /// <summary>
-/// The inferencer shipped with a full rationale and NO tests. These pin the two traps its own
-/// doc names — a rationale in a comment proves nothing until a test fails when it is broken.
+/// L'inférenceur était livré avec toute sa justification et aucun test. Ceux-ci figent les deux pièges
+/// que sa propre doc nomme : une justification en commentaire ne prouve rien tant qu'un test n'échoue pas quand elle casse.
 /// </summary>
 public class RestartStateInferencerTests
 {
     private static readonly string[] NoRenames = Array.Empty<string>();
     private static readonly string[] SomeRenames = { @"\??\C:\Windows\Temp\x.dll" };
 
-    // ---- cold diagnostic (no change to verify) --------------------------------------
+    // ---- diagnostic à froid (aucun changement à vérifier) ----------------------------
 
     [Fact]
     public void Servicing_key_alone_requires_a_restart()
@@ -23,7 +23,7 @@ public class RestartStateInferencerTests
     [Fact]
     public void Pending_file_renames_alone_never_claim_a_restart_is_required()
     {
-        // TRAP 1: off-the-shelf checks light up here on a perfectly healthy PC.
+        // Piège 1 : les contrôles tout faits s'allument ici sur une machine parfaitement saine.
         var s = RestartStateInferencer.Infer(false, SomeRenames, TriState.Off, TimeSpan.FromHours(1), null);
 
         s.Verdict.Should().Be(RestartVerdict.Indeterminate);
@@ -40,7 +40,7 @@ public class RestartStateInferencerTests
         => RestartStateInferencer.Infer(false, NoRenames, TriState.Off, TimeSpan.FromHours(1), null)
             .Verdict.Should().Be(RestartVerdict.NoRestartPending);
 
-    // ---- verifying a change ----------------------------------------------------------
+    // ---- vérifier un changement ------------------------------------------------------
 
     [Fact]
     public void A_kernel_session_older_than_the_change_means_the_change_is_not_in_effect()
@@ -51,14 +51,14 @@ public class RestartStateInferencerTests
     [Fact]
     public void Fast_startup_makes_a_restart_after_the_change_unprovable()
     {
-        // TRAP 2: uptime says the machine started after the change, but with Fast Startup that
-        // start may have restored the old kernel session. Claiming "applied" here would be the
-        // silent lie the whole class exists to prevent.
+        // Piège 2 : la durée de fonctionnement dit que la machine a démarré après le changement, mais avec
+        // le démarrage rapide ce démarrage a pu restaurer l'ancienne session noyau. Dire « appliqué » ici
+        // serait le mensonge silencieux que toute la classe existe pour empêcher.
         var s = RestartStateInferencer.Infer(false, NoRenames, TriState.On,
             uptime: TimeSpan.FromMinutes(10), sinceChange: TimeSpan.FromHours(2));
 
         s.Verdict.Should().Be(RestartVerdict.Indeterminate);
-        s.Reason.Should().Contain("Restart");   // tells the user which button, not just "unknown"
+        s.Reason.Should().Contain("Restart");   // dit au joueur quel bouton, pas seulement « inconnu »
     }
 
     [Fact]
@@ -89,14 +89,14 @@ public class RestartStateInferencerTests
                 uptime: null, sinceChange: TimeSpan.FromHours(2))
             .Verdict.Should().Be(RestartVerdict.Indeterminate);
 
-    // ---- the real machine, 2026-09-01 (i7-14700F, Windows 11) -----------------------
+    // ---- la machine de référence (i7-14700F, Windows 11) ------------------------------
 
     [Fact]
     public void The_real_healthy_machine_that_every_market_tool_calls_reboot_required()
     {
-        // Measured live: 86 PendingFileRenameOperations entries (Edge, EdgeUpdate,
-        // gamingservicesproxy) while both servicing keys read false. The machine is healthy.
-        // Any check that tests the mere presence of that value shouts "RESTART REQUIRED" here.
+        // Mesuré en direct : 86 entrées PendingFileRenameOperations (Edge, EdgeUpdate,
+        // gamingservicesproxy) alors que les deux clés de maintenance lisent false. La machine est saine.
+        // Tout contrôle qui teste la simple présence de cette valeur crierait « redémarrage requis » ici.
         var renames = Enumerable.Range(0, 86)
             .Select(i => $@"\??\C:\Program Files (x86)\Microsoft\EdgeUpdate.3.{i}")
             .ToArray();
@@ -111,9 +111,9 @@ public class RestartStateInferencerTests
     [Fact]
     public void Fast_startup_plus_an_eleven_day_uptime_cannot_confirm_a_change_took_effect()
     {
-        // Same machine: HiberbootEnabled=1 and LastBootUpTime 2026-08-21 — 11 days. A change
-        // written since then has not been through a real kernel init, and "Shut down" would not
-        // give it one either. Saying "applied" here is the failure this whole type exists to stop.
+        // Même machine : HiberbootEnabled=1 et LastBootUpTime vieux de 11 jours. Un changement écrit
+        // depuis n'est pas passé par une vraie initialisation du noyau, et « Arrêter » ne lui en
+        // donnerait pas non plus. Dire « appliqué » ici est l'échec que tout ce type existe pour arrêter.
         var r = RestartStateInferencer.Infer(
             false, NoRenames, TriState.On, TimeSpan.FromDays(11), TimeSpan.FromDays(3));
 

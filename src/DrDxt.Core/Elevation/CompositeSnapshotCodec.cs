@@ -3,19 +3,19 @@ using System.Text.Json;
 namespace DrDxt.Core;
 
 // -----------------------------------------------------------------------
-// CompositeSnapshotCodec — wraps MULTIPLE inverse PrivilegedOps in one snapshot.
+// CompositeSnapshotCodec : enveloppe plusieurs PrivilegedOp inverses dans un seul snapshot.
 //
-// A tweak that configures several things at once (e.g. D3: Vsync + frame cap;
-// F1: service + CppcEnable + Game Bar) must restore ALL of them on revert. Each
-// element is itself encoded by the leaf-exact PrivilegedOpCodec, so the security
-// model is unchanged — this only frames an ordered list of those wire forms inside
-// one snapshot string.
+// Un levier qui règle plusieurs choses à la fois (par exemple le plafond VRR : Vsync + plafond
+// d'images ; Service + CppcEnable + Game Bar) doit toutes les rendre au retour arrière. Chaque
+// élément est lui-même encodé par le PrivilegedOpCodec à la feuille près : le modèle de
+// sécurité ne change pas, ceci ne fait qu'encadrer une liste ordonnée de ces formes filaires
+// dans une seule chaîne de snapshot.
 //
-// Decode is TOTAL: a malformed / non-array / element-decode failure returns a
-// failed Result; it never throws and never binds an arbitrary type.
+// Le décodage est total : un format malformé, qui n'est pas un tableau, ou un élément
+// indécodable rend un Result en échec ; jamais d'exception, jamais de type arbitraire lié.
 //
-// Lives in Core (11/09/2026, moved from Application) so the tweaks AND the elevated helper's
-// uninstall mode read the same composite-snapshot format — the helper references Core, never
+// Vit dans Core pour que les leviers et le mode désinstallation du helper élevé lisent le
+// même format de snapshot composite : le helper référence Core, jamais
 // Application.
 // -----------------------------------------------------------------------
 public static class CompositeSnapshotCodec
@@ -42,7 +42,7 @@ public static class CompositeSnapshotCodec
                 writer.WriteStartArray(OpsProperty);
                 foreach (var wire in wires)
                 {
-                    // Each element is already a JSON object (a codec wire form): embed it verbatim.
+                    // Chaque élément est déjà un objet JSON (une forme filaire du codec) : on l'insère tel quel.
                     using var elem = JsonDocument.Parse(wire);
                     elem.RootElement.WriteTo(writer);
                 }

@@ -48,7 +48,7 @@ public class SceneResolutionTests
     [Fact]
     public void Une_scene_qui_DERIVE_est_signalee_comme_telle()
     {
-        // Le cas du 01/09 : 136 → 148 en dix minutes, machine inchangee. Monotone, faible
+        // Cas mesure le 01/09 : 136 → 148 en dix minutes, machine inchangee. Monotone, faible
         // dispersion autour de la pente : un A/B naif attribuerait douze FPS au tweak.
         var r = SceneResolution.Probe(new[] { 136.0, 139.0, 142.0, 145.0, 148.0 });
 

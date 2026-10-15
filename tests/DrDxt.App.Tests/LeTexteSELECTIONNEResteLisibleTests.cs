@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 19/09/2026. « IrisViolet ne sert que dans des degrades decoratifs » — sauf a un endroit.
+// « IrisViolet ne sert que dans des degrades decoratifs » — sauf a un endroit.
 //
 // `ContrasteDuChromeLiquideTests` connait deja la couleur qui echoue le seuil : IrisViolet
 // donne 4,33:1 sur ObsidienneRelevee. Son commentaire ajoute, en toute bonne foi, qu'elle

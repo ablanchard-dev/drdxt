@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 08/10/2026 (critique UI) : sous un constat, la pastille en police de code recopiait la phrase juste au-dessus, et un
+// Sous un constat, la pastille en police de code recopiait la phrase juste au-dessus, et un
 // point rouge (à corriger) portait l'étiquette « recommandation ». Les données d'origine ne changent pas (l'historique
 // compare Valeur et Titre) : seul l'affichage se tait quand il redit ou se contredit.
 public sealed class PastillesSansRedireTests
@@ -29,7 +29,7 @@ public sealed class PastillesSansRedireTests
             .Should().NotBeEmpty("le 5 % n'est pas dans la phrase");
     }
 
-    // Revue du 08/10 : « 60 » se retrouvait dans « 1600 », et une valeur courte dans n'importe quel mot du dessus.
+    // « 60 » se retrouvait dans « 1600 », et une valeur courte dans n'importe quel mot du dessus.
     [Fact]
     public void Un_nombre_ou_un_mot_court_dans_un_autre_ne_compte_pas_comme_deja_dit()
     {
@@ -37,7 +37,7 @@ public sealed class PastillesSansRedireTests
         E(Severity.Minor, "Mode jeu", "Le mode jeu de Windows est coupé.", "On").ValeurAAfficher.Should().Be("On");
     }
 
-    // Vu sur capture le 08/10 : la phrase disait déjà les deux versions.
+    // La phrase dit déjà les deux versions : la pastille n'apprendrait rien.
     [Fact]
     public void Des_nombres_tous_deja_dits_au_dessus_ne_se_repetent_pas() =>
         E(Severity.Major, "Version du pilote graphique", "Ton pilote NVIDIA 617.14 a une version de retard : la dernière publiée est la 617.42.",

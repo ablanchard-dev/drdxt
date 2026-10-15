@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Profiles.Tests;
 
-// M6 — the matcher: detected chip → recommended profile(s), conservative + fail-closed.
+// L'apparieur : puce détectée → profil(s) recommandé(s), prudent et fermé.
 public sealed class ChipProfileMatcherTests
 {
     private static ChipProfileMatcher NewMatcher() => new(new ChipProfileCatalog());

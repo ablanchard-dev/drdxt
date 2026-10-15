@@ -6,7 +6,7 @@ using DrDxt.Application.Parties;
 namespace DrDxt.App.Platform;
 
 /// <summary>
-/// 04/10/2026 (plan 3b.3) : les quelques secondes de mesure du bouton « prêt à jouer ». Rien n'est envoyé hors de la
+/// Les quelques secondes de mesure du bouton « prêt à jouer ». Rien n'est envoyé hors de la
 /// machine : dix pings vers la box et dix vers 1.1.1.1 (comme le reste du produit), les programmes voisins sur 600 ms,
 /// la mémoire libre, et la température si HWiNFO la publie. Toutes les lectures tournent en parallèle.
 /// </summary>
@@ -31,7 +31,7 @@ public static class MesureAvantPartie
             DrDxt.Measurement.CommitPressureReader.LibrePhysique());
     }
 
-    /// <summary>07/10/2026 (D6) : la même mesure pendant la partie, pour le relevé : box, internet, pertes vers internet.</summary>
+    /// <summary>La même mesure pendant la partie, pour le relevé : box, internet, pertes vers internet.</summary>
     public static async Task<(double? Box, double? Internet, double? Pertes)> ReseauAsync(CancellationToken ct)
     {
         var box = Passerelle();
@@ -62,7 +62,7 @@ public static class MesureAvantPartie
         catch (Exception) { return (null, null); }
     }
 
-    /// <summary>Revue du 04/10 (P1) : la passerelle de la carte par laquelle passe VRAIMENT la route vers internet.
+    /// <summary>La passerelle de la carte par laquelle passe vraiment la route vers internet.
     /// La première carte active avec une passerelle pouvait être un VPN ou un Wi-Fi secondaire. Une prise UDP « connectée »
     /// à 1.1.1.1 n'envoie rien, mais Windows y choisit l'adresse locale de la route : sa carte porte la bonne passerelle.</summary>
     internal static IPAddress? Passerelle()

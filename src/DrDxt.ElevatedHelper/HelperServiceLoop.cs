@@ -3,47 +3,46 @@ using System.Runtime.Versioning;
 namespace DrDxt.ElevatedHelper;
 
 // -----------------------------------------------------------------------
-// HelperServiceLoop — the long-lived, multi-connection accept loop the elevated
-// helper runs in --service mode (M5 reconciler↔helper channel).
+// HelperServiceLoop : la boucle d'acceptation durable, multi-connexion, que le helper élevé
+// fait tourner en mode --service (canal réconciliateur↔helper).
 //
-// The helper service must serve MANY sequential connections over its lifetime (the
-// App AND the reconciler host connect, repeatedly), without changing what one
-// connection does. So this loop drives the PROVEN per-connection pipeline — an
-// injected AcceptOneAsync delegate (HandshakeAcceptingServer.AcceptOneAsync) that
-// already does: (re)create the FIRST_PIPE_INSTANCE ACL'd pipe → accept ONE client →
-// handshake (auth → ephemeral key) → serve one typed op → close. This class adds
-// Only the outer "loop and re-arm + harden" concern; it touches nothing in the
-// per-connection protocol (HMAC, nonce, codec, allowlist, executor).
+// Le service helper doit servir de nombreuses connexions successives pendant sa vie (l'App et
+// l'hôte réconciliateur se connectent, à répétition), sans changer ce que fait une connexion.
+// Cette boucle mène donc le pipeline par connexion éprouvé : un délégué AcceptOneAsync injecté
+// (HandshakeAcceptingServer.AcceptOneAsync) qui fait déjà : (re)créer le pipe FIRST_PIPE_INSTANCE
+// protégé par ACL → accepter un client → handshake (auth → clé éphémère) → servir une op typée →
+// fermer. Cette classe n'ajoute que la boucle extérieure « boucler, réarmer, durcir » ; elle ne
+// touche rien au protocole par connexion (HMAC, nonce, codec, allowlist, exécuteur).
 //
-// Hardening (same shape as the R1 accept-loop in Program.cs, now reusable + tested):
-//   * a single bad/garbage connection (the accept delegate throws) is LOGGED and the
-//     loop CONTINUES — one bad client never kills the service;
-//   * a SUSTAINED burst of faults backs off between attempts and then FAILS CLOSED
-//     (returns a non-zero code) rather than spinning a CPU-burning tight loop;
-//   * a CLEAN accept resets the consecutive-fault counter (transient blips never
-//     accumulate to the threshold);
-//   * cancellation (the stop signal) unwinds cleanly — an OperationCanceledException
-//     from the accept is a shutdown, not a fault.
+// Durcissement (même forme que la boucle d'acceptation de Program.cs, réutilisable et testée) :
+//   * une seule connexion mauvaise ou déchet (le délégué lève) est journalisée et la boucle
+//     continue : un mauvais client ne tue jamais le service ;
+//   * une rafale de pannes soutenue recule entre les tentatives puis se ferme (fail-closed, rend
+//     un code non nul) au lieu de tourner dans une boucle serrée qui brûle le CPU ;
+//   * une acceptation propre remet à zéro le compteur de pannes consécutives (les accrocs passagers
+//     ne s'accumulent jamais jusqu'au seuil) ;
+//   * l'annulation (le signal d'arrêt) se déroule proprement : une OperationCanceledException
+//     venue de l'acceptation est un arrêt, pas une panne.
 //
-// The accept + backoff are seams so the loop is fully unit-tested with fakes (no
-// pipe, no elevation). Program.cs wires the real AcceptOneAsync + a Task.Delay backoff.
+// L'acceptation et le recul sont des coutures : la boucle est entièrement testée avec des faux
+// (sans pipe, sans élévation). Program.cs branche le vrai AcceptOneAsync + un recul Task.Delay.
 // -----------------------------------------------------------------------
 
-/// <summary>Diagnostics sink for the service accept loop. Kept tiny + injectable so
-/// the loop is testable; production writes to the helper's console/diagnostics.</summary>
+/// <summary>Récepteur des diagnostics de la boucle d'acceptation du service. Minuscule et
+/// injectable pour tester la boucle ; en production, il écrit sur la console / les diagnostics du helper.</summary>
 public interface IServiceLoopLog
 {
-    /// <summary>A single accept faulted (logged, the loop continues).</summary>
+    /// <summary>Une acceptation en panne (journalisée, la boucle continue).</summary>
     void Fault(int consecutive, int max, string detail);
 
-    /// <summary>The fault threshold was hit; the loop stops fail-closed.</summary>
+    /// <summary>Le seuil de pannes est atteint ; la boucle s'arrête en fail-closed.</summary>
     void FailedClosed();
 }
 
 [SupportedOSPlatform("windows")]
 public sealed class HelperServiceLoop
 {
-    /// <summary>Exit code when the loop fails closed after a sustained fault burst.</summary>
+    /// <summary>Code de sortie quand la boucle se ferme après une rafale de pannes soutenue.</summary>
     public const int FailClosedExitCode = 3;
 
     private readonly Func<CancellationToken, Task> _acceptOne;
@@ -51,13 +50,13 @@ public sealed class HelperServiceLoop
     private readonly Func<CancellationToken, Task> _backoff;
     private readonly int _maxConsecutiveFaults;
 
-    /// <param name="acceptOne">Serves exactly ONE connection (the proven per-connection
-    /// pipeline). Re-invoked each iteration to serve the next connection.</param>
-    /// <param name="log">Fault / fail-closed diagnostics sink.</param>
-    /// <param name="backoff">Awaited between consecutive faults to avoid a tight spin
-    /// (production = a short Task.Delay; tests pass a no-op or a counter).</param>
-    /// <param name="maxConsecutiveFaults">Fail-closed threshold: this many faults in a
-    /// row (no clean accept between) stops the loop.</param>
+    /// <param name="acceptOne">Sert exactement une connexion (le pipeline par connexion
+    /// éprouvé). Rappelé à chaque tour pour servir la connexion suivante.</param>
+    /// <param name="log">Récepteur des diagnostics de panne / de fermeture.</param>
+    /// <param name="backoff">Attendu entre deux pannes consécutives pour éviter une boucle serrée
+    /// (en production, un court Task.Delay ; les tests passent un no-op ou un compteur).</param>
+    /// <param name="maxConsecutiveFaults">Seuil de fermeture : ce nombre de pannes d'affilée
+    /// (sans acceptation propre entre elles) arrête la boucle.</param>
     public HelperServiceLoop(
         Func<CancellationToken, Task> acceptOne,
         IServiceLoopLog log,
@@ -72,9 +71,9 @@ public sealed class HelperServiceLoop
         _maxConsecutiveFaults = maxConsecutiveFaults;
     }
 
-    /// <summary>Runs the accept loop until cancellation or a fault burst. Returns 0 on
-    /// a clean (cancelled) shutdown, or <see cref="FailClosedExitCode"/> if it failed
-    /// closed. Never throws across the boundary for a connection-level fault.</summary>
+    /// <summary>Fait tourner la boucle d'acceptation jusqu'à l'annulation ou une rafale de pannes.
+    /// Rend 0 sur un arrêt propre (annulé), ou <see cref="FailClosedExitCode"/> si elle s'est
+    /// fermée. Ne lève jamais à travers la frontière pour une panne au niveau d'une connexion.</summary>
     public async Task<int> RunAsync(CancellationToken ct)
     {
         var consecutiveFaults = 0;
@@ -83,17 +82,17 @@ public sealed class HelperServiceLoop
             try
             {
                 await _acceptOne(ct).ConfigureAwait(false);
-                consecutiveFaults = 0; // a clean accept resets the fault counter
+                consecutiveFaults = 0; // une acceptation propre remet le compteur de pannes à zéro
             }
             catch (OperationCanceledException)
             {
-                break; // stop signal during the accept → clean shutdown, not a fault
+                break; // signal d'arrêt pendant l'acceptation → arrêt propre, pas une panne
             }
             catch (Exception ex)
             {
-                // A connection-level fault (garbage on the wire, a pipe squatter, …) must
-                // Not crash the service into a tight CPU-burning loop. Log, back off, and
-                // if it persists, stop fail-closed rather than spin.
+                // Une panne au niveau d'une connexion (déchet sur le fil, squatteur de pipe…) ne doit
+                // pas jeter le service dans une boucle serrée qui brûle le CPU. Journaliser, reculer et,
+                // si cela persiste, s'arrêter en fail-closed plutôt que tourner en boucle.
                 consecutiveFaults++;
                 _log.Fault(consecutiveFaults, _maxConsecutiveFaults, ex.GetType().Name);
 

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 04/10/2026 (plan 1.3 et 1.4) : chaque changement daté se juge sur les parties d'avant et d'après.
+// Chaque changement daté se juge sur les parties d'avant et d'après.
 public sealed class JournalDesChangementsTests : IDisposable
 {
     private readonly string _chemin = Path.Combine(Path.GetTempPath(), $"changements-{Guid.NewGuid():N}.json");
@@ -55,7 +55,7 @@ public sealed class JournalDesChangementsTests : IDisposable
         b.FpsApres.Should().Be(150);
     }
 
-    // Revue du 04/10 (P1) : les parties entre la dernière mesure et le démarrage ne comptent d'aucun côté.
+    // Les parties entre la dernière mesure et le démarrage ne comptent d'aucun côté.
     [Fact]
     public void Les_parties_de_la_fenetre_incertaine_ne_comptent_d_aucun_cote()
     {
@@ -103,7 +103,7 @@ public sealed class JournalDesChangementsTests : IDisposable
         ComparaisonDesParties.Bilan([], reglage).Jeu.Should().BeNull();
     }
 
-    // 07/10/2026 : deux écrivains en même temps (le relevé de fond et l'App) ne perdent plus l'écriture de l'autre.
+    // Deux écrivains en même temps (le relevé de fond et l'App) ne perdent plus l'écriture de l'autre.
     [Fact]
     public async Task Des_ecritures_simultanees_de_deux_journaux_sur_le_meme_fichier_ne_se_perdent_pas()
     {

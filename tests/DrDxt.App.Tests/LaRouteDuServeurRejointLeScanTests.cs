@@ -10,7 +10,7 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, P3.1c) : la route vers le serveur de la partie est mesurée pendant la même fenêtre que les
+// La route vers le serveur de la partie est mesurée pendant la même fenêtre que les
 // images, sur le jeu repéré, et sa phrase rejoint la santé de la machine (domaine Réseau). Sans jeu, rien n'est mesuré.
 public sealed class LaRouteDuServeurRejointLeScanTests
 {
@@ -41,8 +41,7 @@ public sealed class LaRouteDuServeurRejointLeScanTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(
-              Hw(), St, new List<Finding>(), 68, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              Hw(), St, new List<Finding>(), null)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
         return (hd, sr, br, sc, sd);
@@ -84,7 +83,7 @@ public sealed class LaRouteDuServeurRejointLeScanTests
         appels.Should().BeEmpty();
     }
 
-    // 03/10/2026 (P3.3) : la mémoire libre relevée pendant la même fenêtre, jugée avec les images de la même partie.
+    // La mémoire libre relevée pendant la même fenêtre, jugée avec les images de la même partie.
     [Fact]
     public async Task Memoire_basse_et_a_coups_en_partie_rejoignent_la_sante()
     {
@@ -100,7 +99,7 @@ public sealed class LaRouteDuServeurRejointLeScanTests
         vm.RepairFindings.Should().Contain(r => r.Explication.Contains("600 Mo"));
     }
 
-    // 03/10/2026 (D10.1, revue n° 4) : « les 1 points » sous « 13 points à corriger ». La santé arrive après le premier
+    // « les 1 points » sous « 13 points à corriger ». La santé arrive après le premier
     // calcul de l'en-tête ; il doit suivre le compte final, celui que la carte et le résumé affichent.
     [Fact]
     public async Task L_en_tete_a_faire_suit_le_compte_final_avec_la_sante()
@@ -122,7 +121,7 @@ public sealed class LaRouteDuServeurRejointLeScanTests
         vm.ProblemSummary.Should().Contain(attendu.ToString());
     }
 
-    // 03/10/2026 (tour G) : la version du pilote, vérifiée avec les cartes que le scan a détectées, rejoint la santé.
+    // La version du pilote, vérifiée avec les cartes que le scan a détectées, rejoint la santé.
     [Fact]
     public async Task La_verification_du_pilote_recoit_les_cartes_et_rejoint_la_sante()
     {

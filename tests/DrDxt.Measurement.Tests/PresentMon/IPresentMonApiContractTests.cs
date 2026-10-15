@@ -17,7 +17,7 @@ public class IPresentMonApiContractTests
         api.CloseSession(Arg.Any<nint>()).Returns(PM_STATUS.PM_STATUS_SUCCESS);
         api.FreeFrameQuery(Arg.Any<nint>()).Returns(PM_STATUS.PM_STATUS_SUCCESS);
 
-        // compile = the surface (Open/Close/Start/Stop/RegisterFrameQuery/ConsumeFrames/FreeFrameQuery) exists
+        // compiler = la surface (Open/Close/Start/Stop/RegisterFrameQuery/ConsumeFrames/FreeFrameQuery) existe
         api.Should().NotBeNull();
     }
 

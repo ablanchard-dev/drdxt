@@ -4,9 +4,9 @@ using DrDxt.Detection.Display;
 namespace DrDxt.Detection.Tests.Display;
 
 /// <summary>
-/// Written from a real machine: the reference PC runs 1920x1080 @ 143 Hz with a 200 Hz
-/// panel attached. DrDXT had no display probe at all, so its scan reported a healthy
-/// machine while the single largest free win sat unflagged.
+/// Écrit depuis une vraie machine : la machine de référence tourne en 1920x1080 à 143 Hz avec un
+/// écran 200 Hz branché. DrDXT n'avait aucune sonde d'affichage, donc son scan annonçait une
+/// machine saine alors que le plus gros gain gratuit restait non signalé.
 /// </summary>
 public class DisplayRefreshHeuristicTests
 {
@@ -32,8 +32,8 @@ public class DisplayRefreshHeuristicTests
     [Fact]
     public void A_one_hertz_gap_is_the_same_mode_not_an_opportunity()
     {
-        // Windows reports a 144 Hz mode as 143. Without the tolerance DrDXT would nag
-        // about a display that is already maxed out.
+        // Windows annonce un mode 144 Hz comme 143. Sans la tolérance, DrDXT harcèlerait
+        // sur un écran déjà au maximum.
         var r = DisplayRefreshHeuristic.Evaluate(143, new[] { 60, 144 });
 
         Assert.Equal(TriState.Off, r.HasHeadroom);
@@ -42,8 +42,8 @@ public class DisplayRefreshHeuristicTests
     [Fact]
     public void Two_hertz_is_a_real_gap()
     {
-        // Guards the boundary from the other side: the tolerance must not swallow
-        // a genuine difference just above it.
+        // Garde la frontière de l'autre côté : la tolérance ne doit pas avaler
+        // une vraie différence juste au-dessus d'elle.
         var r = DisplayRefreshHeuristic.Evaluate(143, new[] { 145 });
 
         Assert.Equal(TriState.On, r.HasHeadroom);
@@ -52,8 +52,8 @@ public class DisplayRefreshHeuristicTests
     [Fact]
     public void An_empty_mode_list_is_unknown_not_fine()
     {
-        // The failure that matters: enumeration produced nothing. Answering "Off"
-        // would turn "I could not look" into "there is nothing better".
+        // L'échec qui compte : l'énumération n'a rien produit. Répondre « désactivé »
+        // transformerait « je n'ai pas pu regarder » en « il n'y a rien de mieux ».
         var r = DisplayRefreshHeuristic.Evaluate(143, Array.Empty<int>());
 
         Assert.Equal(TriState.Unknown, r.HasHeadroom);
@@ -80,8 +80,8 @@ public class DisplayRefreshHeuristicTests
     [Fact]
     public void Never_reports_a_best_below_the_current_rate()
     {
-        // A truncated or stale mode list must not make DrDXT claim the machine is
-        // running ABOVE what the panel offers — that would read as a fault to fix.
+        // Une liste de modes tronquée ou périmée ne doit pas faire dire à DrDXT que la machine tourne
+        // au-dessus de ce que l'écran offre : ça se lirait comme une faute à corriger.
         var r = DisplayRefreshHeuristic.Evaluate(200, new[] { 60, 120 });
 
         Assert.Equal(TriState.Off, r.HasHeadroom);

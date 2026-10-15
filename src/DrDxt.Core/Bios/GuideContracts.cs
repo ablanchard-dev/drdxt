@@ -1,38 +1,38 @@
 namespace DrDxt.Core;
 
 // ════════════════════════════════════════════════════════════════════════════
-// M3 — BIOS Doctor: the GUIDE GENERATOR (content). Not the rendering.
+// Docteur BIOS : le générateur de guide (contenu). Pas le rendu.
 //
-// This round = the *content* of the personalized BIOS guide only:
-//   • the guide MODEL (records below),
-//   • the guide LIBRARY (IGuideLibrary): per vendor × BIOS-UI generation, the
-//     Exact menu paths per setting (data-driven JSON, validated defensively),
-//   • the GENERATOR (IGuideGenerator): from the actionable BiosFindings + the
-//     board/BIOS identity → the PersonalizedGuide.
+// Ici, seulement le *contenu* du guide BIOS personnalisé :
+//   • le modèle du guide (records ci-dessous),
+//   • la bibliothèque de guides (IGuideLibrary) : par fabricant × génération d'UI BIOS,
+//     les chemins de menu exacts par réglage (JSON, validé par prudence),
+//   • le générateur (IGuideGenerator) : des BiosFindings à faire + l'identité
+//     carte/BIOS → le PersonalizedGuide.
 //
-// PRECISION = the product (decision §9). A covered board → exact path + Verified.
-// An uncovered board → a labelled "unverified for your exact board" fallback that
-// Always carries the exact setting NAME to look for (the client never needs a
-// third-party tool) + a Clear-CMOS recovery net.
+// La précision est le produit. Carte couverte → chemin exact + Verified.
+// Carte non couverte → un repli étiqueté « non vérifié pour ta carte exacte » qui
+// porte toujours le nom exact du réglage à chercher (le client n'a jamais besoin d'un
+// outil tiers) + un filet de secours Clear-CMOS.
 //
-// SAFETY (§16):
-//   • Legacy/MBR boot → never a "CSM off" step (no-boot guard).
-//   • ReBAR ordered prerequisites → Above 4G → CSM OFF → Re-Size BAR, in order.
-//   • Recovery section is MANDATORY, at the TOP and the BOTTOM of every guide.
+// Sécurité :
+//   • démarrage Legacy/MBR → jamais d'étape « CSM off » (garde anti non-démarrage).
+//   • prérequis ReBAR ordonnés → Above 4G → CSM OFF → Re-Size BAR, dans l'ordre.
+//   • la section de secours est obligatoire, en haut et en bas de chaque guide.
 //
-// Never a BIOS write/script: a guide is human-readable text/steps only.
+// Jamais d'écriture ni de script BIOS : un guide n'est que du texte et des étapes lisibles.
 //
-// Rendering (HTML/mobile page), QR, PDF, signed URL/TTL, post-reboot verify loop,
-// IBiosAutomationProvider — deliberately not in this increment.
+// Rendu (page HTML/mobile), QR, PDF, URL signée/TTL, boucle de vérification après
+// redémarrage, IBiosAutomationProvider : volontairement hors de ce lot.
 // ════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// The motherboard BIOS vendor a guide is keyed on. Derived from
-/// <see cref="MotherboardInfo.Manufacturer"/> (case/space-insensitive mapping).
+/// Le fabricant du BIOS de la carte mère, clé du guide. Déduit de
+/// <see cref="MotherboardInfo.Manufacturer"/> (sans tenir compte de la casse ni des espaces).
 /// </summary>
 public enum BiosVendor
 {
-    /// <summary>Vendor not recognized → the most prudent generic fallback is used.</summary>
+    /// <summary>Fabricant inconnu → on prend le repli générique le plus prudent.</summary>
     Unknown,
 
     /// <summary>ASUS / ASUSTeK.</summary>
@@ -49,59 +49,59 @@ public enum BiosVendor
 }
 
 /// <summary>
-/// The system boot mode, derived from <see cref="BiosInfo.IsUefi"/>. Gates the
-/// CSM-off advice: CSM may only be disabled when booting in <see cref="Uefi"/>
-/// (disabling it on a Legacy/MBR install risks a no-boot — §16).
+/// Le mode de démarrage, déduit de <see cref="BiosInfo.IsUefi"/>. Conditionne le
+/// conseil CSM-off : on ne coupe le CSM qu'en démarrage <see cref="Uefi"/>
+/// (le couper sur une installation Legacy/MBR risque un PC qui ne démarre plus).
 /// </summary>
 public enum BootMode
 {
-    /// <summary>UEFI boot — CSM-off advice is safe to give.</summary>
+    /// <summary>Démarrage UEFI : le conseil CSM-off est sans risque.</summary>
     Uefi,
 
-    /// <summary>Legacy/CSM boot — CSM-off advice is SUPPRESSED (no-boot risk).</summary>
+    /// <summary>Démarrage Legacy/CSM : le conseil CSM-off est retiré (risque de non-démarrage).</summary>
     Legacy,
 
-    /// <summary>Boot mode could not be determined — treated as unsafe for CSM-off.</summary>
+    /// <summary>Mode de démarrage indéterminé : traité comme risqué pour CSM-off.</summary>
     Unknown,
 }
 
 /// <summary>
-/// How trustworthy the menu paths in a <see cref="PersonalizedGuide"/> are.
-/// Honesty: an unverified guide is clearly marked so the client knows the paths
-/// are a best-known fallback, not confirmed for their exact board.
+/// Le degré de confiance des chemins de menu d'un <see cref="PersonalizedGuide"/>.
+/// Honnêteté : un guide non vérifié est clairement marqué, le client sait que les chemins
+/// sont un repli connu, non confirmé pour sa carte exacte.
 /// </summary>
 public enum GuideConfidence
 {
     /// <summary>
-    /// The exact board + BIOS version is in the curated, bench-verified KB (decision
-    /// §9.1: the KB key is board + BIOS version, not the brand) → the menu paths are
-    /// Exact for this machine. A vendor / UI-generation match is never Verified — it is
-    /// only the labelled <see cref="UnverifiedFallback"/>.
+    /// La carte et la version de BIOS exactes sont dans la base soignée et vérifiée au banc
+    /// (la clé de la base est carte + version de BIOS, pas la marque) → les chemins de menu sont
+    /// exacts pour cette machine. Une correspondance fabricant / génération d'UI n'est jamais
+    /// Verified : ce n'est que le <see cref="UnverifiedFallback"/> étiqueté.
     /// </summary>
     Verified,
 
     /// <summary>
-    /// The exact board is not (yet) covered → the guide uses the best-known
-    /// per-vendor (or most-prudent generic) fallback, labelled "unverified for your
-    /// exact board". It still carries the exact setting NAME to look for + Clear-CMOS.
+    /// La carte exacte n'est pas (encore) couverte → le guide prend le repli connu par
+    /// fabricant (ou le générique le plus prudent), étiqueté « non vérifié pour ta carte
+    /// exacte ». Il porte toujours le nom exact du réglage à chercher + Clear-CMOS.
     /// </summary>
     UnverifiedFallback,
 }
 
 /// <summary>
-/// One ordered, human-readable step of a personalized BIOS guide. It is text for a
-/// human — never a write/script.
+/// Une étape lisible, dans l'ordre, d'un guide BIOS personnalisé. C'est du texte pour un
+/// humain, jamais une écriture ni un script.
 /// </summary>
-/// <param name="Order">1-based position within its section (steps are emitted in order).</param>
-/// <param name="InstructionKey">Resx key (FR+EN) for the step instruction. Never hard-coded text.</param>
+/// <param name="Order">Position dans sa section, à partir de 1 (les étapes sortent dans l'ordre).</param>
+/// <param name="InstructionKey">Clé resx (FR+EN) de la consigne. Jamais de texte en dur.</param>
 /// <param name="ExactValue">
-/// The exact navigation value for this step when known — e.g. the menu path
-/// ("Ai Tweaker &gt; Ai Overclock Tuner"), the toggle name ("EXPO I"), or a key
-/// ("F10"). For a fallback step this is the exact setting NAME to search for (so the
-/// client never needs a third party). Null only for pure narrative/recovery steps.
+/// La valeur de navigation exacte de l'étape quand elle est connue : le chemin de menu
+/// (« Ai Tweaker &gt; Ai Overclock Tuner »), le nom de l'option (« EXPO I ») ou une touche
+/// (« F10 »). Pour une étape de repli, c'est le nom exact du réglage à chercher (le client
+/// n'a jamais besoin d'un tiers). Null seulement pour une étape de récit ou de secours.
 /// </param>
-/// <param name="Setting">The firmware setting this step concerns (for grouping/ordering).</param>
-/// <param name="IsRecoveryRelated">True for safety/recovery steps (rendered with care).</param>
+/// <param name="Setting">Le réglage firmware visé par l'étape (pour grouper et ordonner).</param>
+/// <param name="IsRecoveryRelated">Vrai pour une étape de sécurité ou de secours (rendue avec soin).</param>
 public record GuideStep(
     int Order,
     string InstructionKey,
@@ -110,16 +110,16 @@ public record GuideStep(
     bool IsRecoveryRelated);
 
 /// <summary>
-/// The mandatory safety/recovery section. It is shown at the TOP (so the client is
-/// reassured before touching the BIOS) AND at the BOTTOM (so it is there when a
-/// reboot goes sideways). §16: includes the no-boot reassurance, the memory-training
-/// wait, Clear-CMOS, Load Optimized Defaults, and the "one change at a time" ladder.
+/// La section obligatoire de sécurité et de secours. Elle est en haut (le client est
+/// rassuré avant de toucher au BIOS) et en bas (elle est là quand un redémarrage
+/// tourne mal). Elle comprend le message rassurant sur le non-démarrage, l'attente de
+/// l'entraînement mémoire, Clear-CMOS, Load Optimized Defaults et l'échelle « un changement à la fois ».
 /// </summary>
-/// <param name="Top">Recovery steps placed at the top of the guide (non-empty).</param>
-/// <param name="Bottom">Recovery steps placed at the bottom of the guide (non-empty).</param>
+/// <param name="Top">Étapes de secours en haut du guide (jamais vide).</param>
+/// <param name="Bottom">Étapes de secours en bas du guide (jamais vide).</param>
 /// <param name="CsmAdviceSuppressed">
-/// True when a CSM-off step was suppressed because the system does not boot UEFI
-/// (a warning step replaces it). Drives the honest "we did not advise CSM-off" note.
+/// Vrai quand une étape CSM-off a été retirée parce que le système ne démarre pas en UEFI
+/// (une étape d'avertissement la remplace). Pilote la note honnête « on n'a pas conseillé CSM-off ».
 /// </param>
 public record RecoverySection(
     IReadOnlyList<GuideStep> Top,
@@ -127,21 +127,21 @@ public record RecoverySection(
     bool CsmAdviceSuppressed);
 
 /// <summary>
-/// The fully assembled, machine-targeted BIOS guide content (NO rendering). It shows
-/// Only what is mis-set on this machine, with exact menu paths (or a labelled
-/// fallback), the ReBAR dependency order, and the mandatory recovery section top+bottom.
+/// Le contenu complet du guide BIOS, ciblé sur la machine (sans rendu). Il ne montre que
+/// ce qui est mal réglé ici, avec les chemins de menu exacts (ou un repli étiqueté),
+/// l'ordre des dépendances ReBAR et la section de secours obligatoire en haut et en bas.
 /// </summary>
-/// <param name="Vendor">The resolved BIOS vendor (for the board label / fallback).</param>
-/// <param name="BiosUiGeneration">The resolved BIOS-UI generation token (e.g. "Click BIOS 5").</param>
-/// <param name="DetectedBoardLabel">Human label of the detected board (Manufacturer + Product).</param>
-/// <param name="Confidence">Verified (covered board) vs UnverifiedFallback (best-known).</param>
-/// <param name="BootMode">The resolved boot mode (gates CSM-off).</param>
-/// <param name="Findings">The actionable findings this guide addresses (Guide-class only).</param>
-/// <param name="Steps">The ordered per-finding instruction steps (recovery lives in <see cref="Recovery"/>).</param>
-/// <param name="Recovery">The mandatory top+bottom recovery section.</param>
-/// <param name="EnterKey">The key to enter the BIOS (e.g. "Del", "F2"), carried verbatim from the resolved template. May be blank when the template does not specify one.</param>
-/// <param name="SaveKey">The key to save &amp; exit the BIOS (e.g. "F10"), carried verbatim from the resolved template. May be blank when the template does not specify one.</param>
-/// <param name="BoardProduct">07/10/2026 (D12) : le modèle seul, tel que Windows le lit (Win32_BaseBoard.Product), pour
+/// <param name="Vendor">Le fabricant de BIOS trouvé (pour le nom de la carte et le repli).</param>
+/// <param name="BiosUiGeneration">La génération d'UI BIOS trouvée (par exemple « Click BIOS 5 »).</param>
+/// <param name="DetectedBoardLabel">Le nom lisible de la carte détectée (Manufacturer + Product).</param>
+/// <param name="Confidence">Verified (carte couverte) ou UnverifiedFallback (repli connu).</param>
+/// <param name="BootMode">Le mode de démarrage trouvé (conditionne CSM-off).</param>
+/// <param name="Findings">Les constats à faire que traite ce guide (classe Guide seulement).</param>
+/// <param name="Steps">Les étapes de consigne, dans l'ordre, par constat (le secours vit dans <see cref="Recovery"/>).</param>
+/// <param name="Recovery">La section de secours obligatoire, en haut et en bas.</param>
+/// <param name="EnterKey">La touche pour entrer dans le BIOS (par exemple « Del », « F2 »), reprise telle quelle du modèle trouvé. Peut être vide si le modèle n'en donne pas.</param>
+/// <param name="SaveKey">La touche pour sauvegarder et quitter (par exemple « F10 »), reprise telle quelle du modèle trouvé. Peut être vide si le modèle n'en donne pas.</param>
+/// <param name="BoardProduct">Le modèle seul, tel que Windows le lit (Win32_BaseBoard.Product), pour
 /// pointer le manuel du constructeur.</param>
 public record PersonalizedGuide(
     BiosVendor Vendor,
@@ -156,18 +156,18 @@ public record PersonalizedGuide(
     string SaveKey,
     string BoardProduct = "");
 
-// ── Library data model (deserialized from embedded JSON, validated defensively). ──
+// ── Modèle de données de la bibliothèque (lu depuis le JSON embarqué, validé par prudence). ──
 
 /// <summary>
-/// The per-setting menu navigation for one vendor × BIOS-UI generation, used to
-/// build <see cref="GuideStep.ExactValue"/>. Every setting carries both the exact
-/// menu path AND the exact setting name to search for (the fallback can always give
-/// the name even when the path is generic).
+/// La navigation de menu par réglage pour un fabricant × génération d'UI BIOS, qui sert à
+/// construire <see cref="GuideStep.ExactValue"/>. Chaque réglage porte le chemin de menu
+/// exact et le nom exact du réglage à chercher (le repli peut toujours donner le nom,
+/// même quand le chemin est générique).
 /// </summary>
-/// <param name="Setting">The firmware setting this entry navigates to.</param>
-/// <param name="MenuPath">The exact BIOS menu path (e.g. "Ai Tweaker &gt; Ai Overclock Tuner"). May be empty for a name-only fallback.</param>
-/// <param name="SettingName">The exact on-screen setting name to look for (e.g. "EXPO", "Re-Size BAR Support"). Never empty.</param>
-/// <param name="TargetValue">The exact value to set (e.g. "EXPO I", "Enabled", "Disabled").</param>
+/// <param name="Setting">Le réglage firmware vers lequel mène l'entrée.</param>
+/// <param name="MenuPath">Le chemin de menu BIOS exact (par exemple « Ai Tweaker &gt; Ai Overclock Tuner »). Peut être vide pour un repli qui n'a que le nom.</param>
+/// <param name="SettingName">Le nom exact du réglage à l'écran (par exemple « EXPO », « Re-Size BAR Support »). Jamais vide.</param>
+/// <param name="TargetValue">La valeur exacte à poser (par exemple « EXPO I », « Enabled », « Disabled »).</param>
 public record GuideSettingPath(
     FirmwareSettingKind Setting,
     string MenuPath,
@@ -175,33 +175,33 @@ public record GuideSettingPath(
     string TargetValue);
 
 /// <summary>
-/// A curated guide template. Most templates are per-vendor (× BIOS-UI generation)
-/// best-known FALLBACKS. A genuine KB entry additionally carries <see cref="Board"/> +
-/// <see cref="BiosVersion"/> — the only key (decision §9.1) that can be
-/// <see cref="IsVerified"/>. The validator REJECTS any <see cref="IsVerified"/> template
-/// that lacks that board + BIOS-version key, so a vendor/UI-generation entry can never
-/// claim to be "verified for your exact board". Loaded from embedded JSON, validated
-/// before use.
+/// Un modèle de guide soigné. La plupart des modèles sont des replis connus par fabricant
+/// (× génération d'UI BIOS). Une vraie entrée de la base porte en plus <see cref="Board"/> +
+/// <see cref="BiosVersion"/>, la seule clé qui peut être
+/// <see cref="IsVerified"/>. Le validateur rejette tout modèle <see cref="IsVerified"/>
+/// sans cette clé carte + version de BIOS : une entrée fabricant / génération d'UI ne peut
+/// jamais se dire « vérifiée pour ta carte exacte ». Lu depuis le JSON embarqué, validé
+/// avant usage.
 /// </summary>
-/// <param name="Vendor">The vendor this template targets.</param>
-/// <param name="BiosUiGeneration">The BIOS-UI generation token (e.g. "Click BIOS 5"), or "Generic".</param>
+/// <param name="Vendor">Le fabricant visé par ce modèle.</param>
+/// <param name="BiosUiGeneration">La génération d'UI BIOS (par exemple « Click BIOS 5 »), ou « Generic ».</param>
 /// <param name="IsVerified">
-/// True only for a bench-verified board + BIOS-version KB entry; false for every
-/// per-vendor / UI-generation / generic fallback. Enforced by the validator: a true
-/// value without a <see cref="Board"/> + <see cref="BiosVersion"/> is rejected as corrupt.
+/// Vrai seulement pour une entrée carte + version de BIOS vérifiée au banc ; faux pour tout
+/// repli par fabricant, génération d'UI ou générique. Imposé par le validateur : vrai sans
+/// <see cref="Board"/> + <see cref="BiosVersion"/> est rejeté comme corrompu.
 /// </param>
 /// <param name="Board">
-/// The exact board this entry was bench-verified on (e.g. "ROG STRIX B650-A GAMING WIFI"),
-/// matched against <see cref="MotherboardInfo.Product"/>. Empty for a vendor/generic fallback.
+/// La carte exacte sur laquelle l'entrée a été vérifiée au banc (par exemple « ROG STRIX B650-A GAMING WIFI »),
+/// comparée à <see cref="MotherboardInfo.Product"/>. Vide pour un repli fabricant ou générique.
 /// </param>
 /// <param name="BiosVersion">
-/// The exact BIOS version this entry was verified against (matched against
-/// <see cref="BiosInfo.Version"/>). Empty for a vendor/generic fallback. Together with
-/// <see cref="Board"/> it forms the board + BIOS-version KB key (decision §9.1).
+/// La version de BIOS exacte vérifiée pour cette entrée (comparée à
+/// <see cref="BiosInfo.Version"/>). Vide pour un repli fabricant ou générique. Avec
+/// <see cref="Board"/>, elle forme la clé carte + version de BIOS de la base.
 /// </param>
-/// <param name="EnterKey">The key to enter the BIOS (e.g. "Del", "F2").</param>
-/// <param name="SaveKey">The key to save &amp; exit (e.g. "F10").</param>
-/// <param name="Paths">The per-setting navigation entries.</param>
+/// <param name="EnterKey">La touche pour entrer dans le BIOS (par exemple « Del », « F2 »).</param>
+/// <param name="SaveKey">La touche pour sauvegarder et quitter (par exemple « F10 »).</param>
+/// <param name="Paths">Les entrées de navigation par réglage.</param>
 public record GuideTemplate(
     BiosVendor Vendor,
     string BiosUiGeneration,
@@ -213,49 +213,49 @@ public record GuideTemplate(
     IReadOnlyList<GuideSettingPath> Paths);
 
 /// <summary>
-/// Resolves the curated <see cref="GuideTemplate"/> for a machine. Always succeeds with
-/// a usable template. Resolution precedence (decision §9.1):
+/// Trouve le <see cref="GuideTemplate"/> soigné d'une machine. Réussit toujours avec un
+/// modèle utilisable. Ordre de priorité :
 /// <list type="number">
-///   <item>a bench-verified <b>board + BIOS-version</b> KB entry — the only match that
-///   can be <see cref="GuideTemplate.IsVerified"/> ("verified for your exact board");</item>
-///   <item>the per-vendor × BIOS-UI generation best-known fallback (never verified);</item>
-///   <item>the per-vendor generic fallback;</item>
-///   <item>the cross-vendor generic fallback.</item>
+///   <item>une entrée <b>carte + version de BIOS</b> vérifiée au banc, seule correspondance
+///   qui peut être <see cref="GuideTemplate.IsVerified"/> (« vérifiée pour ta carte exacte ») ;</item>
+///   <item>le repli connu par fabricant × génération d'UI BIOS (jamais vérifié) ;</item>
+///   <item>le repli générique du fabricant ;</item>
+///   <item>le repli générique commun à tous les fabricants.</item>
 /// </list>
-/// A labelled fallback (<see cref="GuideTemplate.IsVerified"/> = false) still carries the
-/// exact setting names, so the client is never stranded. A hard failure is reserved for
-/// internally corrupt library data (defensive validation), never for an uncovered board.
+/// Un repli étiqueté (<see cref="GuideTemplate.IsVerified"/> = false) porte toujours les
+/// noms exacts des réglages : le client n'est jamais laissé seul. L'échec franc est réservé
+/// aux données de bibliothèque corrompues (validation prudente), jamais à une carte non couverte.
 /// </summary>
 public interface IGuideLibrary
 {
     /// <summary>
-    /// Returns the best template for the machine. When <paramref name="board"/> +
-    /// <paramref name="biosVersion"/> match a verified KB entry, that exact (Verified)
-    /// entry is returned; otherwise the best-known per-vendor / generic fallback (never
-    /// verified). Fails only on corrupt library data.
+    /// Rend le meilleur modèle pour la machine. Quand <paramref name="board"/> +
+    /// <paramref name="biosVersion"/> correspondent à une entrée vérifiée, c'est elle (Verified)
+    /// qui est rendue ; sinon le repli connu par fabricant ou générique (jamais
+    /// vérifié). N'échoue que sur des données de bibliothèque corrompues.
     /// </summary>
-    /// <param name="vendor">The resolved BIOS vendor.</param>
-    /// <param name="biosUiGeneration">The BIOS-UI generation token (fallback key).</param>
-    /// <param name="board">The detected board product (the KB key, with <paramref name="biosVersion"/>); optional.</param>
-    /// <param name="biosVersion">The detected BIOS version (the KB key, with <paramref name="board"/>); optional.</param>
+    /// <param name="vendor">Le fabricant de BIOS trouvé.</param>
+    /// <param name="biosUiGeneration">La génération d'UI BIOS (clé de repli).</param>
+    /// <param name="board">Le modèle de carte détecté (la clé de la base, avec <paramref name="biosVersion"/>) ; facultatif.</param>
+    /// <param name="biosVersion">La version de BIOS détectée (la clé de la base, avec <paramref name="board"/>) ; facultatif.</param>
     Result<GuideTemplate> Resolve(
         BiosVendor vendor, string biosUiGeneration, string? board = null, string? biosVersion = null);
 }
 
 /// <summary>
-/// Assembles the <see cref="PersonalizedGuide"/> from the actionable
-/// (<see cref="BiosMatrixClass.Guide"/>) findings + the board/BIOS identity. Shows
-/// Only what is mis-set, with exact paths (or labelled fallback), the ReBAR
-/// dependency order, the mandatory recovery section top+bottom, and the §16 guards
-/// (Legacy → no CSM-off; uncovered board → Unverified; ReBAR NVIDIA Unknown findings
-/// are non-Guide and yield no write step). Never produces a write.
+/// Assemble le <see cref="PersonalizedGuide"/> à partir des constats à faire
+/// (<see cref="BiosMatrixClass.Guide"/>) + l'identité carte/BIOS. Ne montre que ce qui
+/// est mal réglé, avec les chemins exacts (ou un repli étiqueté), l'ordre des
+/// dépendances ReBAR, la section de secours obligatoire en haut et en bas, et les gardes
+/// (Legacy → pas de CSM-off ; carte non couverte → Unverified ; les constats ReBAR NVIDIA
+/// Unknown ne sont pas Guide et ne donnent aucune étape d'écriture). N'écrit jamais.
 /// </summary>
 public interface IGuideGenerator
 {
     /// <summary>
-    /// Builds the personalized guide for <paramref name="hw"/> given the
-    /// <paramref name="findings"/> (only Guide-class findings yield write steps).
-    /// Fails cleanly via <see cref="Result"/> on corrupt library data.
+    /// Construit le guide personnalisé de <paramref name="hw"/> à partir des
+    /// <paramref name="findings"/> (seuls les constats de classe Guide donnent des étapes).
+    /// Échoue proprement via <see cref="Result"/> sur des données de bibliothèque corrompues.
     /// </summary>
     Result<PersonalizedGuide> Generate(HardwareInventory hw, IReadOnlyList<BiosFinding> findings);
 }

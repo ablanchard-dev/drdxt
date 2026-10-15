@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Jeu;
 
-// D2 (10/10/2026) : les fils de rendu de Call of Duty, lus (jamais écrits) dans son fichier de réglages, comparés aux
+// Les fils de rendu de Call of Duty, lus (jamais écrits) dans son fichier de réglages, comparés aux
 // cœurs performants estimés. Forme relevée sur la machine de référence.
 public sealed class ConfigurationCallOfDutyTests
 {
@@ -27,6 +27,8 @@ public sealed class ConfigurationCallOfDutyTests
     [InlineData("GenuineIntel", 6, 12, 6)]    // i5-12400F : pas d'E-cores
     [InlineData("AuthenticAMD", 6, 12, 6)]    // Ryzen 5 5600
     [InlineData("GenuineIntel", 14, 20, 6)]   // i5-13600K : 6 P + 8 E
+    [InlineData("GenuineIntel", 24, 24, 0)]   // Core Ultra 9 285K : 8 P + 16 E sans hyperthreading, indiscernable : inconnu
+    [InlineData("GenuineIntel", 6, 6, 0)]     // sans hyperthreading, hybride ou non ne se lit pas aux comptes
     public void Les_coeurs_performants_s_estiment_sur_l_architecture(string vendeur, int coeurs, int fils, int attendu)
         => ConfigurationCallOfDuty.CoeursPerformants(vendeur, coeurs, fils).Should().Be(attendu);
 
@@ -66,5 +68,23 @@ public sealed class ConfigurationCallOfDutyTests
             ConfigurationCallOfDuty.Lire(Path.Combine(dossier, "absent")).Should().BeNull();
         }
         finally { Directory.Delete(dossier, true); }
+    }
+
+    // Sur un Core Ultra 9 285K, la vraie valeur (8, les cœurs P) était dite « loin » d'une plage 22-24 inventée.
+    [Fact]
+    public void Huit_fils_sur_un_Core_Ultra_ne_sont_pas_dits_loin()
+        => ConfigurationCallOfDuty.Juger((8, "s.1.0.cod24.txt0"), ConfigurationCallOfDuty.CoeursPerformants("GenuineIntel", 24, 24))
+            .Single().Statut.Should().NotBe(RepairStatus.Suspicious);
+
+    // Cœurs performants inconnus (Intel sans hyperthreading, topologie non lue) : la valeur se dit sans « pour 0 estimés ».
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(4)]
+    public void Des_coeurs_inconnus_ne_font_pas_de_conseil(int valeur)
+    {
+        var c = ConfigurationCallOfDuty.Juger((valeur, "s.1.0.cod24.txt0"), 0).Should().ContainSingle().Subject;
+        c.Statut.Should().Be(RepairStatus.Observed);
+        c.Action.Should().Be(RepairAction.Aucune);
+        c.Explication.Should().NotContain("pour 0").And.NotContain("for 0");
     }
 }

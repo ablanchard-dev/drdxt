@@ -50,7 +50,7 @@ Console.WriteLine($"   LowLatencyMode    : {(lowLatency is { } v ? v.ToString() 
                   + "   (valeur d'origine exigee pour un revert fidele)");
 
 
-// Les descripteurs viennent du catalogue du PRODUIT (`CatalogueDeCandidats`, L8) : l'outil et l'App
+// Les descripteurs viennent du catalogue du PRODUIT (`CatalogueDeCandidats`) : l'outil et l'App
 // jugent un levier de la meme facon. `BlocageConstate` porte ce que le `AppliesTo` du tweak exige et
 // que la machine vient de dementir — lu a l'instant, jamais suppose.
 var catalogue = new (CandidateDescriptor D, string Source)[]
@@ -65,20 +65,20 @@ var catalogue = new (CandidateDescriptor D, string Source)[]
               + "ne saurait pas annuler"
             : null),
         "ReflexLowLatencyTweak"),
-    // PHASE 18 F3 : ce levier est une politique d'alimentation CPU, plus un correctif de parking.
+    // Ce levier est une politique d'alimentation CPU, plus un correctif de parking.
     (Decrire("fixit.power_plan", BlocagePlan(planGuid)), "SanePowerPlanTweak"),
     (Decrire("latency.hagsOn"), "HagsOnTweak"),
     (Decrire("latency.gameModeOn"), "GameModeOnTweak"),
     (Decrire("fixit.sane_pagefile"), "SanePagefileTweak"),
 };
 
-// Ce que la session Warzone du 08/09/2026 a observe, injecte tel quel.
+// Ce qu'une session Warzone a mesure le 08/09/2026, injecte tel quel.
 var diagnostic = new DiagnosticMachine(
     Goulot: BottleneckState.MixedGpuLeaning,
     Bridage: GpuLimiterObserved.RienDeBridant,
     FrequenceMedianeMhz: 2715,
     FrequenceMinimaleMhz: 2715,
-    // 06/10/2026 (L-GPU) : plus de decision globale ; la carte se ferme par famille d'arret, lue ci-dessous.
+    // Plus de decision globale ; la carte se ferme par famille d'arret, lue ci-dessous.
     TuningGpuAutorise: true,
     // `PressionThread` reste volontairement `Unknown`, ET C'EST UNE DECISION, PAS UN OUBLI.
     // La session ETW du 08/09 a mesure la RESIDENCE du thread chaud de Warzone : `tid 97704` a
@@ -86,9 +86,9 @@ var diagnostic = new DiagnosticMachine(
     // COMBIEN il consomme — et `GameThreadPressure.Observee` parle de consommation. Les confondre
     // ferait remonter les familles CPU et Scheduler en tete du classement sur une grandeur qui ne
     // repond pas a la question.
-    // L8 b — lu par `StabiliteLue`, la meme lecture que l'App.
+    // Lu par `StabiliteLue`, la meme lecture que l'App.
     InstabiliteGpu: StabiliteLue.InstabiliteGpu(new WerLiveKernelReportLog()),
-    // PHASE 18 F4 — les arrets brutaux REELS de cette machine, sur la fenetre du veto. Echec de
+    // Les arrets brutaux REELS de cette machine, sur la fenetre du veto. Echec de
     // lecture ⇒ null ⇒ le veto ne ferme rien (et ne pretend pas « aucun arret »).
     ArretsBrutaux: StabiliteLue.ArretsBrutaux(new WindowsUnexpectedShutdownLog(), DateTimeOffset.UtcNow));
 
@@ -102,7 +102,7 @@ var diagnostic = new DiagnosticMachine(
 // Une famille peut donc arriver en tete sans qu'aucun levier n'existe encore pour elle. Ce
 // n'est pas un trou du classement : c'est son resultat le plus utile, puisqu'il dit QUOI
 // CONSTRUIRE. Le laisser invisible revenait a se priver de sa propre feuille de route.
-// 06/10/2026 (D1, L-GPU) : chaque arret lu avec sa famille, et ce que le joueur lit sur le reglage de sa carte.
+// Chaque arret lu avec sa famille, et ce que le joueur lit sur le reglage de sa carte.
 Console.WriteLine("== ARRETS BRUTAUX PAR FAMILLE (45 jours, hors bouton) ==");
 foreach (var a in diagnostic.ArretsBrutaux ?? [])
     Console.WriteLine($"   {a.Quand.ToLocalTime():dd/MM HH:mm}  {ClasseurDArrets.Nom(a.Famille)}"
@@ -163,7 +163,7 @@ if (retenus == 0)
 }
 return 0;
 
-/// <summary>Ce qui empeche `SanePowerPlanTweak` de s'appliquer, COTE PLAN. Depuis la phase 18 F3
+/// <summary>Ce qui empeche `SanePowerPlanTweak` de s'appliquer, COTE PLAN. Depuis
 /// l'autre condition de son `AppliesTo` est le GOULOT MESURE (processeur limitant ou mixte), que
 /// porte le diagnostic injecte ci-dessous ; le parking n'entre plus dans la decision (il est
 /// identique entre Equilibre et Haute performance, mesure du 10/09/2026).</summary>

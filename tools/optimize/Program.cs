@@ -30,7 +30,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-// 30/09/2026 (boucle « la carte, prouvée », G3) : `--repos-carte`, jeu fermé. Rend « Normal » au profil global
+// `--repos-carte`, jeu fermé. Rend « Normal » au profil global
 // du pilote, mesure la consommation de la carte avant et après, et retire le réglage sans baisse nette.
 if (args.Contains("--repos-carte"))
     return await ReposDeLaCarte(args.Contains("--suivi"));
@@ -70,7 +70,7 @@ var sp = new ServiceCollection()
     .BuildServiceProvider();
 var banc = sp.GetRequiredService<IBenchmarkRunner>();
 
-// 24/09/2026 — `--diag` : UNE passe, et ce que le banc rend tel quel. Une session qui rend « aucune
+// `--diag` : UNE passe, et ce que le banc rend tel quel. Une session qui rend « aucune
 // mesure exploitable » ne dit pas si c'est PresentMon, le focus ou zero image : ceci le dit.
 if (args.Contains("--diag"))
 {
@@ -104,7 +104,7 @@ AfficherLeLot(jugement);
 
 // -- MODE REJEU : la meme boucle, sur de VRAIES frames de jeu deja capturees -------------
 // Ce n'est pas un mode degrade, c'est un CONTROLE. Les captures de `tools/p3` viennent de
-// vraies parties de Warzone (01/09/2026) : elles portent la derive, le bruit et les morts
+// vraies parties de Warzone : elles portent la derive, le bruit et les morts
 // d'une session reelle. Exercer la boucle dessus prouve la chaine de DECISION sur des
 // donnees authentiques, sans demander a personne de rejouer neuf minutes.
 if (args.Contains("--rejeu"))
@@ -166,27 +166,22 @@ if (!offsetInitial.IsOk)
     return 2;
 }
 
-// LE LOT DE CANDIDATS — L'HISTORIQUE D'UNE DECISION, PUIS LA REGLE EN VIGUEUR.
+// LE LOT DE CANDIDATS.
 //
-// 07/09/2026 — UN SEUL CANDIDAT. L'offset coeur +100 MHz etait le seul AutoHot reellement ecrit et
-// reversible a chaud, et il etait pourtant ECARTE : la machine porte 13 arrets non propres
-// inexpliques (GATES.md), et la decision du 07/09 est « on reste a 0 MHz / 100 % » — on n'ajoute
-// pas une variable non necessaire a une machine qu'on debogue. Mieux vaut zero optimisation
-// qu'une optimisation risquee. `--controle` exercait donc toute la chaine avec un candidat qui
-// n'ecrit RIEN : le seul moyen honnete de verifier que la boucle ne fabrique pas de gain, puisqu'un
-// candidat inerte DOIT ressortir « non resolu ». Ce mode reste, inchange.
+// `--controle` exerce toute la chaine avec un candidat qui n'ecrit RIEN : le seul moyen honnete de
+// verifier que la boucle ne fabrique pas de gain, puisqu'un candidat inerte DOIT ressortir « non resolu ».
+// Sur une machine qu'on debogue (arrets non propres inexpliques), la decision est « on reste a 0 MHz /
+// 100 % » : mieux vaut zero optimisation qu'une optimisation risquee.
 //
-// 11/09/2026 — LE LOT EST ELARGI AU CATALOGUE (decision produit). La regle :
+// LE LOT COUVRE LE CATALOGUE (decision produit). La regle :
 //   1. le lot est `jugement.LotAChaud`, calcule plus haut par la MEME fonction que l'App. Le
-//      veto des arrets brutaux (L6), la decision « 0 MHz / 100 % » (`TuningGpuAutorise: false`
+//      veto des arrets brutaux, la decision « 0 MHz / 100 % » (`TuningGpuAutorise: false`
 //      dans `DiagnosticDeScan`) et l'instabilite graphique repetee y sont appliques AVANT : ils
 //      priment sur l'elargissement. Le veto des arrets ferme sur la SURFACE ecrite (materiel ET
-//      pilote graphique) : trouve en rejeu le 11/09, trois leviers du pilote passaient l'ancien veto
-//      L6, fonde sur la famille declaree. Il a d'abord ete ferme ICI par un second veto propre a la
-//      campagne ; corrige a la source le meme soir, ce second veto a ete retire ;
+//      pilote graphique), pas sur la famille declaree, que des leviers du pilote passeraient ;
 //   2. chaque candidat est mesure SEUL, en A-B-B-A, puis garde ou annule AVANT que le suivant ne
 //      soit pose (`AutopilotEngine`, une boucle par candidat) : jamais deux leviers non juges dans
-//      la machine en meme temps. Un candidat garde reste pose pendant les suivants — c'est l'etat
+//      la machine en meme temps. Un candidat garde reste pose pendant les suivants : c'est l'etat
 //      de depart qu'ils doivent battre ;
 //   3. le verdict final ne compose que les candidats GARDES (`GainCumule.DepuisLaCampagne`).
 // Pourquoi c'est sur : l'elargissement change le NOMBRE de candidats, pas un seul garde-fou. Un
@@ -242,7 +237,7 @@ chrono.Stop();
 
 Afficher(profil, chrono.Elapsed);
 
-// 11/09/2026 — cet outil n'a PAS de manifeste signe : un levier qu'il garde n'est rendu par aucune
+// Cet outil n'a PAS de manifeste signe : un levier qu'il garde n'est rendu par aucune
 // desinstallation. Son origine reste dans pending-revert.json (Gardes), que rien ne rejoue. On le dit.
 foreach (var c in candidats.OfType<TweakCandidate>())
     if (c.OrigineHorsManifeste is { } raison)
@@ -267,10 +262,9 @@ if (args.Contains("--controle"))
             resultatControle!.PassesAb,
             // LE MINIMUM DES PASSES RETENUES, PAS DE TOUTES LES OBSERVATIONS.
             //
-            // Trouve en session Warzone live le 08/09/2026 : le journal de focus contient AUSSI
-            // les passes ecartees et refaites (ici 64 %, 0 %, 41 %). En prendre le minimum brut
-            // donnait 0 %, et le juge de calibration ecartait alors une experience parfaitement
-            // saine — « 3 observations deposees », puis « 0 controles » pour les trois grandeurs.
+            // Le journal de focus contient AUSSI les passes ecartees et refaites
+            // (releve en session Warzone le 08/09/2026 : 64 %, 0 %, 41 %). En prendre le minimum brut donnerait 0 %, et
+            // le juge de calibration ecarterait une experience parfaitement saine.
             //
             // Une passe ecartee n'a contribue AUCUNE donnee a l'experience. L'exposition reelle
             // est celle des passes retenues, et c'est elle qui doit qualifier l'observation.
@@ -384,7 +378,7 @@ static void Afficher(GameOptimizationProfile profil, TimeSpan duree)
         // ne fait que recopier l'intervalle entre deux images. Afficher ces trois nombres sans
         // cette ligne, c'est laisser quelqu'un lire une saccade d'une seconde la ou il n'y a que
         // de l'arithmetique.
-        // 27/09/2026 : chaque p95 se juge sur le compte de SA serie, comme l'ecran et `tools/smoke` ; le
+        // Chaque p95 se juge sur le compte de SA serie, comme l'ecran et `tools/smoke` ; le
         // nombre de trames ne dit rien des series du blocage et de l'erreur d'animation. La latence
         // render-present ne publie pas de compte : elle reste jugee sur les trames exploitables.
         if (TailStatistic.PourquoiPasInterpretable(m.PresentStallSamples ?? 0) is { } pourquoiBlocage)
@@ -439,8 +433,8 @@ static void Afficher(GameOptimizationProfile profil, TimeSpan duree)
         // UNE LIGNE PAR GRANDEUR. C'est la sortie que le brief demande : chaque metrique avec
         // son ecart, SA resolution et SON verdict — au lieu d'un seul chiffre qui les melange.
         foreach (var m in r.Metriques ?? Array.Empty<MetricEvidence>())
-            // 24/09/2026 — une grandeur INVALIDE dit pourquoi : « NaN % invalide » seul se lisait comme
-            // un defaut de calcul, alors que PairedAb refusait d'extraire un effet qu'il n'avait pas.
+            // Une grandeur INVALIDE dit pourquoi : « NaN % invalide » seul passerait pour un defaut de
+            // calcul, alors que PairedAb refuse d'extraire un effet qu'il n'a pas.
             Console.WriteLine(m.Preuve.Outcome == EvidenceOutcome.Invalid
                 ? $"   {"",-6}{m.Libelle,-16}   aucun chiffre : {m.Preuve.InvalidReason ?? "experience invalide"}"
                 : $"   {"",-6}{m.Libelle,-16}{m.Preuve.DeltaPct,8:+0.0;-0.0} %"
@@ -695,7 +689,7 @@ internal struct DEVMODE
 }
 
 
-/// <summary>Un banc qui rejoue les captures REELLES du 01/09 : une par passe, dans l'ordre. Les
+/// <summary>Un banc qui rejoue les captures REELLES mesurees le 01/09 : une par passe, dans l'ordre. Les
 /// frametimes sont ceux d'une vraie partie, avec sa derive, son bruit et ses morts.</summary>
 internal sealed class BancDeRejeu : IBenchmarkRunner
 {

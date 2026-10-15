@@ -6,7 +6,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests;
 
-// 26/09/2026 : l'ordonnancement GPU matériel est lu par D3DKMT, sans test sur le vrai système. Relevé à la
+// L'ordonnancement GPU matériel est lu par D3DKMT, sans test sur le vrai système. Relevé à la
 // main le même jour : la clé HwSchMode est absente de la machine de référence, et dxdiag dit « Enabled:True »
 // comme le lecteur. Ce test refait la confrontation : le lecteur rend ce que dxdiag rapporte.
 public sealed class HagsReaderSurLeVraiSystemeTests

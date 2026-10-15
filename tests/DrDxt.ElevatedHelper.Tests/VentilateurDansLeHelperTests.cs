@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-/// <summary>GPU-OC (08/10/2026) : l'aiguillage du ventilateur dans le helper. Un seul point = une vitesse fixe ; une courbe à
+/// <summary>L'aiguillage du ventilateur dans le helper. Un seul point = une vitesse fixe ; une courbe à
 /// plusieurs points reste refusée ; le retour à l'automatique a son op, admise par la liste blanche.</summary>
 public sealed class VentilateurDansLeHelperTests
 {

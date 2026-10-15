@@ -6,7 +6,7 @@ using NSubstitute;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// REV6 (revue du 08/10/2026) : pendant que l'inverse d'un bail expiré part, un nouveau bail du même nom (même réglage,
+/// Pendant que l'inverse d'un bail expiré part, un nouveau bail du même nom (même réglage,
 /// même un autre client, une App relancée) est refusé ; sinon son écriture pouvait passer avant l'inverse, qui la défaisait.
 /// </summary>
 public sealed class InverseEnCoursTests
@@ -36,7 +36,7 @@ public sealed class InverseEnCoursTests
         w.Establish(new LeaseOwner(ProcessId: 2), "gpu-expert", Inverse, 120).IsOk.Should().BeTrue("l'inverse est fini");
     }
 
-    // REV6b : l'App plantée a laissé son bail ; l'App relancée (autre client) ne prend pas le même réglage avant qu'il soit rendu.
+    // L'App plantée a laissé son bail ; l'App relancée (autre client) ne prend pas le même réglage avant qu'il soit rendu.
     [Fact]
     public async Task Un_bail_tenu_par_un_autre_client_bloque_le_meme_nom_jusqu_a_son_rendu()
     {

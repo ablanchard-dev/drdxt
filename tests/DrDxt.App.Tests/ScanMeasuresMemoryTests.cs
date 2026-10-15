@@ -11,7 +11,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// LM — le cablage du banc memoire. Sans lui, MemoryBench serait un instrument que le produit
+// Le cablage du banc memoire. Sans lui, MemoryBench serait un instrument que le produit
 // n'appelle jamais : le defaut exact que ce lot vient reparer, et que ce depot a deja paye avec
 // AbComparer et avec le verifieur de boucle BIOS.
 //
@@ -132,8 +132,7 @@ public sealed class ScanMeasuresMemoryTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(
-              Hw(), St, new List<Finding>(), 68, bl,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              Hw(), St, new List<Finding>(), bl)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
@@ -150,9 +149,7 @@ public sealed class ScanMeasuresMemoryTests
         var vm = new ScanViewModel(
             hd, sr, br, sc, sd,
             ScanViewModelTestSeams.Safety(), ScanViewModelTestSeams.Engine(),
-            ScanViewModelTestSeams.ProfileConsumer(), ScanViewModelTestSeams.GpuTuningStep(),
-            ScanViewModelTestSeams.Navigation(), ScanViewModelTestSeams.DashboardFactory(),
-            store, new AppliedTweakManifestMapper(),
+            ScanViewModelTestSeams.ProfileConsumer(), store, new AppliedTweakManifestMapper(),
             conseiller ?? ScanViewModelTestSeams.BiosAdvisor(),
             guide ?? ScanViewModelTestSeams.GuideGenerator(), key => key,
             gameLocator: locator, firmwareTrip: voyage,
@@ -299,7 +296,7 @@ public sealed class ScanMeasuresMemoryTests
     {
         // Le verdict du voyage BIOS est calcule avant la mesure memoire. Une exception du cote
         // memoire ne doit pas emporter un verdict deja obtenu : le client perdrait la seule chose
-        // qui lui disait si son changement a pris.
+        // qui lui dit si son changement a pris.
         var (vm, _, _) = Build(voyage: VoyageReussi(),
                                machineId: () => throw new InvalidOperationException("identite illisible"));
 
@@ -412,9 +409,8 @@ public sealed class ScanMeasuresMemoryTests
         second.MemoryMeasuredLabel.Should().NotBeNull("relire suffit a afficher");
     }
 
-    // 26/09/2026 : sur la machine de reference, la reference memoire du 16/09 rendait 12,7 Go/s et
-    // 128,5 ns, la meme machine 33,4 Go/s et 74 ns dix jours plus tard. Comparee a elle, un passage
-    // au profil 4 000 aurait ete annonce a +160 %. Au retour, une mesure d'avant qui ne date pas du
+    // Mesure sur la machine de reference : 12,7 Go/s et 128,5 ns le 16/09, 33,4 Go/s et 74 ns
+    // dix jours plus tard. Comparee a la premiere, un passage au profil 4 000 serait annonce a +160 %. Au retour, une mesure d'avant qui ne date pas du
     // depart ne donne AUCUN chiffre.
     [Fact]
     public async Task Au_retour_une_mesure_d_avant_d_un_autre_jour_ne_donne_aucun_chiffre()
@@ -440,7 +436,7 @@ public sealed class ScanMeasuresMemoryTests
         vm.MemoryAb.Conclusion.Should().StartWith(MemoryAbStringKeys.NoVerdictStale);
     }
 
-    // 26/09/2026 : au retour, un jeu lance ferait lire son propre ecart comme celui du changement.
+    // Au retour, un jeu lance ferait lire son propre ecart comme celui du changement.
     [Fact]
     public async Task Au_retour_jeu_lance_l_A_B_ne_mesure_pas_et_le_dit()
     {
@@ -498,8 +494,8 @@ public sealed class ScanMeasuresMemoryTests
             .Which.Should().BeGreaterThan(avantLeClic, "la mesure d'avant est prise avant d'armer le voyage");
     }
 
-    // 26/09/2026 : a configuration inchangee, la reference ne se remesurait jamais. Sur la machine de
-    // reference, celle du 16/09 (12,7 Go/s) restait affichee quand la memoire rendait 33,4 Go/s.
+    // A configuration inchangee, la reference doit pouvoir se remesurer : sinon une reference de
+    // 12,7 Go/s resterait affichee quand la memoire rend 33,4 Go/s (mesure sur la machine de reference).
     [Fact]
     public async Task Remesurer_la_memoire_remplace_la_reference_affichee()
     {
@@ -519,8 +515,8 @@ public sealed class ScanMeasuresMemoryTests
         vm.ErreurRemesureMemoire.Should().BeNull();
     }
 
-    // 26/09/2026 : la reference du 16/09 a ete prise pendant que Warzone tournait (scan de 17:53,
-    // capture du jeu a 17:54). Ni le scan ni le bouton ne mesurent jeu lance.
+    // Une reference prise pendant que Warzone tourne est faussee. Ni le scan ni le bouton ne mesurent
+    // jeu lance.
     [Fact]
     public async Task Un_scan_jeu_lance_ne_lance_pas_le_banc_memoire()
     {
@@ -570,7 +566,7 @@ public sealed class ScanMeasuresMemoryTests
         vm.MemoireSauteeJeu.Should().BeFalse();
     }
 
-    // 26/09/2026 : une référence prise avant le garde « jeu lancé » (celle du 16/09 : capture de Warzone 1 min
+    // Une référence prise avant le garde « jeu lancé » (par exemple suivie d'une capture de Warzone 1 min
     // 40 plus tard, même scan) est relue telle quelle. La ligne le dit, sur la foi du journal, sans seuil inventé.
     private sealed class JournalFake : DrDxt.Measurement.IPerformanceJournalFile
     {
@@ -580,7 +576,7 @@ public sealed class ScanMeasuresMemoryTests
     }
 
     [Theory]
-    [InlineData(100, "MACHINE-A", true)]    // le cas du 16/09 : même scan
+    [InlineData(100, "MACHINE-A", true)]    // capture après la mesure, même scan
     [InlineData(-240, "MACHINE-A", true)]   // capture avant la mesure, même scan
     [InlineData(900, "MACHINE-A", false)]   // quinze minutes : un autre moment
     [InlineData(100, "MACHINE-B", false)]   // une autre machine ne dit rien de celle-ci
@@ -698,7 +694,7 @@ public sealed class ScanMeasuresMemoryTests
         vm.RemesureMemoireFaite.Should().BeFalse();
     }
 
-    // 26/09/2026 : la carte existe a l'ecran, dans le domaine memoire, et seulement quand une mesure est
+    // La carte existe a l'ecran, dans le domaine memoire, et seulement quand une mesure est
     // affichee. Rendue sur la vraie ScanView apres un vrai scan (le domaine est construit par le scan).
     [Fact]
     public async Task La_carte_de_remesure_s_affiche_dans_le_domaine_memoire()
@@ -714,7 +710,7 @@ public sealed class ScanMeasuresMemoryTests
         textes.Should().NotContain("Memoire.Remesure.SauteeJeu", "rien n'a été sauté : pas de motif");
     }
 
-    // 26/09/2026 : le scan capture le jeu, donc le parcours normal le lance avant de scanner. Sans mesure
+    // Le scan capture le jeu, donc le parcours normal le lance avant de scanner. Sans mesure
     // faute de jeu ferme, la carte doit quand meme etre la, dire pourquoi, et offrir le bouton.
     [Fact]
     public async Task Jeu_lance_sans_reference_la_carte_dit_pourquoi_et_offre_le_bouton()
@@ -772,7 +768,7 @@ public sealed class ScanMeasuresMemoryTests
             return vus;
         });
 
-    // 26/09/2026 : un changement qui n'a pas pris garde son marqueur, donc chaque scan suivant refait la
+    // Un changement qui n'a pas pris garde son marqueur, donc chaque scan suivant refait la
     // verification du retour. L'A/B memoire, lui, a deja eu lieu au premier retour et a remplace la
     // reference par la mesure d'apres : au scan suivant il ne doit ni remesurer, ni pretendre que la
     // mesure d'avant « ne date pas du depart ».
@@ -806,7 +802,7 @@ public sealed class ScanMeasuresMemoryTests
         (second.MemoryAb?.Conclusion ?? string.Empty).Should().NotStartWith(MemoryAbStringKeys.NoVerdictStale);
     }
 
-    // 26/09/2026 : renoncer a un changement qui n'a pas pris. Sans ceci, la section « n'a pas pris » et sa
+    // Renoncer a un changement qui n'a pas pris. Sans ceci, la section « n'a pas pris » et sa
     // carte de recuperation revenaient a chaque scan, pour toujours.
     private static BiosLoopResult PasPris() => new(
         HadPendingChange: true, AllTook: false,

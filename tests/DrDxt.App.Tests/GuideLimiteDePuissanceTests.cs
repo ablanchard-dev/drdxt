@@ -5,9 +5,9 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 (boucle « vivant et prouvé », case A1) : en partie, le jeu est limité par le processeur, bridé par sa
-// limite de puissance soutenue. La phrase qui le disait était cachée sous « Pourquoi ? ». La page Processeur dit
-// maintenant en clair ce qui bride, où est le réglage, le risque, et comment revenir ; DrDXT ne décide rien.
+// En partie, le jeu peut être limité par le processeur, bridé par sa limite de puissance soutenue. La page
+// Processeur dit en clair, hors de « Pourquoi ? », ce qui bride, où est le réglage, le risque, et comment
+// revenir ; DrDXT ne décide rien.
 public sealed class GuideLimiteDePuissanceTests
 {
     private static readonly CpuBaseline Mesure = new("m", DateTimeOffset.UtcNow, 8, 1807.7, 1265.4, 2.4,
@@ -31,7 +31,7 @@ public sealed class GuideLimiteDePuissanceTests
         guide[1].Should().Contain("Intel Default Settings");
     }
 
-    // A2 : ce qui est noté avec chaque mesure, pour reconnaître un réglage changé au scan suivant.
+    // Ce qui est noté avec chaque mesure, pour reconnaître un réglage changé au scan suivant.
     [Fact]
     public void Le_reglage_de_puissance_lu_se_note_en_une_chaine()
     {
@@ -45,7 +45,7 @@ public sealed class GuideLimiteDePuissanceTests
         ScanViewModel.ReglageDePuissanceLu(null).Should().BeNull();
     }
 
-    // 03/10/2026 (M2) : retenu dès la première seconde, sans baisse ; le guide s'ouvre sur la fréquence, pas sur un déficit.
+    // Retenu dès la première seconde, sans baisse ; le guide s'ouvre sur la fréquence, pas sur un déficit.
     [Fact]
     public void Retenu_des_le_depart_le_guide_s_ouvre_sur_la_frequence()
     {
@@ -60,7 +60,7 @@ public sealed class GuideLimiteDePuissanceTests
             .Should().BeNull("témoin : ni baisse démontrée, ni bride dès le départ");
     }
 
-    // 04/10/2026 (plan 2.2) : la bride se mesure partout ; sur une carte dont DrDXT ne lit pas le BIOS, le guide reste,
+    // La bride se mesure partout ; sur une carte dont DrDXT ne lit pas le BIOS, le guide reste,
     // avec le nom générique du réglage, au lieu de se taire.
     [Fact]
     public void Sans_BIOS_lu_la_bride_mesuree_donne_le_guide_generique()

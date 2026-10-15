@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 07/10/2026 (D7) : l'historique de Windows Update, sans les définitions de Defender ni les applications du Store.
+// L'historique de Windows Update, sans les définitions de Defender ni les applications du Store.
 public sealed class MisesAJourWindowsTests
 {
     [Theory]
@@ -15,7 +15,7 @@ public sealed class MisesAJourWindowsTests
     public void Seul_ce_qui_peut_changer_un_jeu_est_garde(string titre, bool garde)
         => MisesAJourWindows.Garder(titre).Should().Be(garde);
 
-    // Revue F-42 : la classification « pilotes » écarte aussi un pilote au titre inattendu.
+    // La classification « pilotes » écarte aussi un pilote au titre inattendu.
     [Fact]
     public void Un_pilote_classe_comme_tel_est_ecarte_quel_que_soit_son_titre()
         => MisesAJourWindows.Garder("Intel Corporation Extension", pilote: true).Should().BeFalse();
@@ -25,8 +25,8 @@ public sealed class MisesAJourWindowsTests
     {
         var faits = MisesAJourWindows.Lire();
 
-        faits.Should().NotBeEmpty();
-        faits.Should().OnlyContain(f => f.Libelle.StartsWith("Windows Update : ") && MisesAJourWindows.Garder(f.Libelle));
-        faits.Should().OnlyContain(f => f.Quand <= DateTimeOffset.Now);
+        // Une machine réinstallée la veille peut n'avoir encore aucune mise à jour : vide n'est pas une panne.
+        faits.Where(f => !(f.Libelle.StartsWith("Windows Update : ") && MisesAJourWindows.Garder(f.Libelle))).Should().BeEmpty();
+        faits.Where(f => f.Quand > DateTimeOffset.Now).Should().BeEmpty();
     }
 }

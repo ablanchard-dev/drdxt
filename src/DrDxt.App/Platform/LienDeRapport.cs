@@ -1,7 +1,7 @@
 namespace DrDxt.App.Platform;
 
 /// <summary>
-/// CONTRIB1 (08/10/2026, « faut que ce soit direct en lien ») : le rapport de « Vérifier DrDXT » part par un ticket GitHub
+/// Le rapport de « Vérifier DrDXT » part par un ticket GitHub
 /// pré-rempli (modèle .github/ISSUE_TEMPLATE/rapport-de-verification.yml, champ « rapport »). Aucun serveur : DrDXT ouvre
 /// le navigateur, le joueur relit et soumet lui-même. Une adresse trop longue est refusée par les navigateurs et par
 /// GitHub : au-delà de <see cref="LongueurMax"/>, le rapport est coupé et le dit (le fichier complet se joint au ticket).
@@ -11,12 +11,16 @@ public static class LienDeRapport
     /// <summary>Le dépôt qui reçoit les rapports. Il passe au dépôt public le jour de la sortie (PUB4).</summary>
     public const string Depot = "ablanchard-dev/drdxt";
 
-    /// <summary>RAPPORT-FINAL (09/10/2026) : le guide de ce qui se fait à la main, étape par étape, lu sur le dépôt.</summary>
+    /// <summary>Le guide de ce qui se fait à la main, étape par étape, lu sur le dépôt.</summary>
     public const string Guide = $"https://github.com/{Depot}/blob/main/docs/A-FAIRE-A-LA-MAIN.md";
+
+    /// <summary>L'étape 5.23 (sous-tension), par l'ancre posée dans le guide : celle que GitHub tire d'un titre accentué
+    /// n'est pas stable.</summary>
+    public const string GuideSousTension = Guide + "#sous-tension";
 
     public const int LongueurMax = 7000;
 
-    private const string Coupure = "\n\n[… rapport coupé : joins le fichier complet au ticket]";
+    private static string Coupure => "\n\n" + DrDxt.Core.Docteur.T("App.RapportCoupe");
 
     public static string Construire(string processeur, string carte, string rapport)
     {

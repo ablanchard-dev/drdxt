@@ -3,8 +3,8 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Hardware;
 
-// 08/10/2026 (D5) : les jeux de Battle.net, Riot, EA app et Ubisoft Connect, trouvés par l'éditeur inscrit dans la liste
-// des programmes de Windows. Valeurs relevées sur le PC du mainteneur pour Battle.net (Call of Duty, Overwatch).
+// Les jeux de Battle.net, Riot, EA app et Ubisoft Connect, trouvés par l'éditeur inscrit dans la liste
+// des programmes de Windows. Valeurs relevées sur la machine de référence pour Battle.net (Call of Duty, Overwatch).
 public sealed class JeuxDesLanceursTests
 {
     [Fact]

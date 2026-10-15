@@ -5,7 +5,7 @@ using Xunit;
 namespace DrDxt.AmdHarness.Tests;
 
 /// <summary>
-/// 09/10/2026 (diffusion publique du zip) : la règle du 29/09 (jamais tension, fréquence ni ventilateur) tenue par le code
+/// La règle de la carte (jamais tension, fréquence ni ventilateur) tenue par le code
 /// du banc, pas seulement par la liste de ses leviers : une écriture interdite n'atteint jamais le canal élevé.
 /// </summary>
 public sealed class SansFrequenceNiVentilateurTests

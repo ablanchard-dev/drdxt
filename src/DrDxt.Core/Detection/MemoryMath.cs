@@ -1,7 +1,7 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// L'arithmétique de la mémoire — fonctions pures, aucune I/O, aucune supposition matérielle.
+/// L'arithmétique de la mémoire : fonctions pures, aucune I/O, aucune supposition matérielle.
 ///
 /// Pourquoi ça existe : la fréquence seule ne dit rien de la latence. Un kit DDR5-6000 CL30 et
 /// un DDR4-3200 CL16 ont exactement la même latence vraie (10,00 ns) malgré 88 % d'écart de
@@ -9,7 +9,7 @@ namespace DrDxt.Core;
 /// acheter la mauvaise barrette.
 ///
 /// Ce que ces fonctions ne font pas : elles ne mesurent rien. Elles convertissent des
-/// grandeurs déjà obtenues ailleurs. La latence calculée vaut ce que vaut le tCL fourni — et
+/// grandeurs déjà obtenues ailleurs. La latence calculée vaut ce que vaut le tCL fourni, et
 /// le tCL vient de la référence du kit (part number), pas de la machine, parce qu'aucune API
 /// Windows documentée n'expose les timings effectifs. Si la carte a changé le tCL, le chiffre
 /// est faux, et l'appelant doit le présenter comme « la latence du kit à la fréquence mesurée »,

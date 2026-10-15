@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 25/09/2026. Les deux gardes d'écriture lisaient le fichier de textes français ; les chaînes écrites dans le
+/// Les deux gardes d'écriture lisaient le fichier de textes français ; les chaînes écrites dans le
 /// code leur échappaient. Relues à la main, elles portaient 3 « on » du produit et 16 phrases sans accents
 /// (message de démarrage, raisons de verdict, rapport de désinstallation). Ce crible lit les chaînes françaises
 /// de `src`, trous d'interpolation retirés (« {probleme} » est un nom de variable, pas un mot affiché).
@@ -40,9 +40,9 @@ public sealed class ChainesFrancaisesDuCodeTests
         // Témoins : les formes d'avant sont vues ; la forme juste et un nom de variable ne le sont pas.
         Faute("le GPU est deja sature : liberer du CPU ne rend rien").Should().NotBeNull();
         Faute("pour ne pas écraser un journal qu'on n'a pas su lire : ").Should().NotBeNull();
-        // 25/09/2026 : sans accent ni article entouré d'espaces, cette chaîne n'était pas vue comme française.
+        // Sans accent ni article entouré d'espaces, cette chaîne n'était pas vue comme française.
         Faute("la sequence ne contient qu'un seul etat").Should().NotBeNull();
-        // 26/09/2026 : deux phrases affichées sans accents passaient, faute de marqueur reconnu.
+        // Deux phrases affichées sans accents passaient, faute de marqueur reconnu.
         Faute("{a} : {b} alors que {c} etait ").Should().NotBeNull();
         Faute("L'installeur n'a pas pu etre lance.").Should().NotBeNull();
         Faute("le GPU est déjà saturé : libérer du CPU ne rend rien").Should().BeNull();
@@ -60,6 +60,11 @@ public sealed class ChainesFrancaisesDuCodeTests
             .SelectMany(x => Chaine.Matches(x.l).Select(m => (x.f, x.i, Texte: m.Groups[1].Value)))
             .Where(x => Francais.IsMatch(Trou.Replace(x.Texte, " ")))
             .ToList();
+        // Les phrases passées dans le fichier français du docteur restent sous la même garde.
+        var resx = Path.Combine(racine, "src", "DrDxt.Core", "Resources", "Docteur.fr.resx");
+        chaines.AddRange(System.Xml.Linq.XDocument.Load(resx).Root!.Elements("data")
+            .Select((d, i) => (resx, i, Texte: (string?)d.Element("value") ?? ""))
+            .Where(x => Francais.IsMatch(Trou.Replace(x.Texte, " "))));
         chaines.Should().HaveCountGreaterThan(500, "src portait 695 chaînes françaises le 25/09/2026");
 
         chaines.Where(x => Faute(x.Texte) is not null)

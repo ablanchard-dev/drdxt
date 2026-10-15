@@ -6,20 +6,20 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Execution;
 
 // -----------------------------------------------------------------------
-// Win32ServiceActions — the real service control + PresentMon install
-// (m2smoke boundary).
+// Win32ServiceActions : le vrai pilotage de services + l'installation de PresentMon
+// (frontière du m2smoke).
 //
-// * Control(start/stop/query) uses System.ServiceProcess.ServiceController on a
-//   service name the allowlist already restricted (AMD3DVCacheSvc + actions).
-// * InstallPresentMonService installs+starts the VENDORED PresentMonService.exe
-//   Only — bounded to the binary the helper ships next to itself; no free path.
+// * Control(start/stop/query) utilise System.ServiceProcess.ServiceController sur un
+//   nom de service déjà restreint par l'allowlist (AMD3DVCacheSvc + actions).
+// * InstallPresentMonService installe et démarre le PresentMonService.exe embarqué
+//   seulement : borné au binaire que le helper livre à côté de lui ; aucun chemin libre.
 //
-// Every failure is wrapped → HELPER.OP_FAILED; this never throws.
+// Tout échec est emballé → HELPER.OP_FAILED ; ne lève jamais.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class Win32ServiceActions : IServiceActions
 {
-    // The vendored PresentMon service (master plan §1b / 01b-presentmon-spine).
+    // Le service PresentMon embarqué (docs/PRESENTMON-COEXISTENCE.md).
     private const string PresentMonServiceName = "PresentMonService";
     private const string PresentMonBinaryFileName = "PresentMonService.exe";
 
@@ -44,8 +44,8 @@ public sealed class Win32ServiceActions : IServiceActions
                 ServiceAction.Query => Query(serviceName),
                 ServiceAction.Start => Start(serviceName),
                 ServiceAction.Stop => Stop(serviceName),
-                // Generic install for an arbitrary service is not supported here:
-                // the only install path is the bounded PresentMon op.
+                // L'installation générique d'un service quelconque n'est pas prise en charge ici :
+                // le seul chemin d'installation est l'op PresentMon bornée.
                 ServiceAction.Install => Fail("Generic service install is not supported."),
                 _ => Fail("Unsupported service action."),
             };
@@ -64,17 +64,17 @@ public sealed class Win32ServiceActions : IServiceActions
             if (string.IsNullOrWhiteSpace(binary) || !File.Exists(binary))
                 return Fail("Vendored PresentMon service binary not found.");
 
-            // 25/09/2026 : avant de créer, réparer ou démarrer — le démarrage seul suffisait à faire
+            // Avant de créer, réparer ou démarrer : le démarrage seul suffirait à faire
             // tourner en SYSTEM un binaire remplacé. Un build de dev sous le profil échoue ici : la mesure
             // passe au compteur DXGI de repli.
             if (_verifierChemin(binary) is { } nonProtege)
                 return Fail($"PresentMon service not started: its executable is not protected ({nonProtege}).");
 
-            // Trois cas, pas deux. Ce code faisait « le service existe ⇒ demarre-le », ce qui
-            // laisse passer celui qui produit le conflit : un service installe sans nos arguments,
-            // c'est-a-dire toute machine ou DrDXT a ete installe avant ce lot. Le demarrer ne
-            // suffit pas -- il republie le tube par defaut, que le service Intel possede deja
-            // (mesure du 07/09 : les deux services Running, une seule paire de tubes).
+            // Quatre cas, pas deux. « Le service existe ⇒ demarre-le » laisserait passer
+            // celui qui produit le conflit : un service d'une installation plus ancienne de DrDXT,
+            // ailleurs ou avec des arguments qu'on ne pose plus. Le demarrer ne suffit pas : il republie le
+            // tube par defaut, que le service Intel possede deja (mesure du 07/09 : les deux
+            // services Running, une seule paire de tubes).
             //
             // Et l'inverse : quand la configuration est deja la bonne, on n'ecrit rien. Un
             // produit qui recree son service a chaque mesure se bat contre le systeme.
@@ -102,6 +102,10 @@ public sealed class Win32ServiceActions : IServiceActions
 
                 case PresentMonServiceAction.StartOnly:
                     break;
+
+                case PresentMonServiceAction.PasANous:
+                    // Le service d'un autre produit (même nom que le PresentMon d'Intel) : ni repointé ni démarré.
+                    return Fail("PresentMon service belongs to another product: left untouched; measurement uses the DXGI fallback.");
             }
 
             return Start(PresentMonServiceName);
@@ -143,7 +147,7 @@ public sealed class Win32ServiceActions : IServiceActions
         if (!ServiceExists(serviceName))
             return Fail($"Service '{serviceName}' is not installed.");
         using var sc = new ServiceController(serviceName);
-        // Touch Status so a query genuinely reflects the SCM state.
+        // Toucher Status pour qu'une requête reflète vraiment l'état du SCM.
         _ = sc.Status;
         return Result.Ok();
     }
@@ -154,7 +158,7 @@ public sealed class Win32ServiceActions : IServiceActions
 
     /// <summary>La ligne de commande enregistree dans le SCM, ou <c>null</c> si elle n'a pas pu
     /// etre lue. Le registre est la source : `ServiceController` n'expose pas le `binPath`.
-    /// `null` ne veut pas dire « elle est correcte » -- <see cref="PresentMonServicePlan"/>
+    /// `null` ne veut pas dire « elle est correcte » : <see cref="PresentMonServicePlan"/>
     /// repare dans ce cas, par la meme doctrine que partout ailleurs : Unknown ne deduit rien.</summary>
     private static string? ReadBinPath(string serviceName)
     {
@@ -172,7 +176,7 @@ public sealed class Win32ServiceActions : IServiceActions
 
     private static Result RunSc(string arguments)
     {
-        // 25/09/2026 : resolu depuis System32, jamais par nom nu. Un nom nu part dans la recherche
+        // Resolu depuis System32, jamais par nom nu. Un nom nu part dans la recherche
         // de CreateProcess (dossier de l'appli, puis dossier courant, avant System32 : Microsoft Learn,
         // CreateProcessW, lpCommandLine). Meme regle que shutdown.exe et powershell.exe.
         var psi = new ProcessStartInfo(
@@ -192,8 +196,8 @@ public sealed class Win32ServiceActions : IServiceActions
             : Fail($"sc.exe failed (exit {(proc.HasExited ? proc.ExitCode : -1)}).");
     }
 
-    // The vendored binary deploys next to the helper exe (or under a sibling
-    // third_party\presentmon folder during dev).
+    // Le binaire embarqué se déploie à côté de l'exe du helper (ou, en dev, dans un dossier
+    // voisin third_party\presentmon).
     private static string? DefaultPresentMonBinaryLocator()
     {
         var baseDir = AppContext.BaseDirectory;

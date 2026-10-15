@@ -8,8 +8,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// BUREAU (09/10/2026, le mainteneur : « un PC de bureau sans jeu, capable quand même de gains de latence et de fluidité ;
-/// si les RAM sont saturées, trouver des possibilités ; qu'il s'adapte à toutes les situations ») : une machine de bureau
+/// Un PC de bureau sans jeu gagne aussi en latence et en fluidité : une machine de bureau
 /// synthétique (i5 à carte intégrée, une barrette de 8 Go, écran 60 Hz, aucun jeu) reçoit ses constats (mémoire saturée
 /// avec ses gestes, simple canal, programmes au démarrage) et ses leviers (accélération du pointeur, Mode Jeu, Game DVR),
 /// et aucun levier de carte graphique dédiée. Le plan d'alimentation reste fermé : il ne s'ouvre que sur une mesure en

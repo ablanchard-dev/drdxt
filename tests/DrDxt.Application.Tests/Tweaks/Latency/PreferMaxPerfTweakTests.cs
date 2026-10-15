@@ -7,15 +7,15 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// NS-2 — PreferMaxPerfTweak (NVIDIA "Power management mode" = Prefer maximum performance).
+// PreferMaxPerfTweak (NVIDIA « Power management mode » = Prefer maximum performance).
 //
-// Single DRS setting (PREFERRED_PSTATE_ID = 0x1057EB71) → PREFER_MAX = 1. Opt-in tradeoff
-// (forces max clocks; helps only if the GPU downclocks in-game, costs idle power) — gated on a
-// desktop NVIDIA render GPU, captured original for a faithful revert, applied via a typed DRS op.
+// Un seul réglage DRS (PREFERRED_PSTATE_ID = 0x1057EB71) → PREFER_MAX = 1. Compromis choisi
+// (force les horloges max ; n'aide que si la carte baisse ses horloges en jeu, coûte au repos) :
+// filtré sur un GPU de rendu NVIDIA de bureau, origine capturée pour un retour fidèle, appliqué via une op DRS typée.
 // -----------------------------------------------------------------------
 public sealed class PreferMaxPerfTweakTests
 {
-    // 30/09/2026 (G1) : « Normal » du panneau NVIDIA vaut PREFERRED_PSTATE_ADAPTIVE (0), pas DRIVER_CONTROLLED (2) ni
+    // « Normal » du panneau NVIDIA vaut PREFERRED_PSTATE_ADAPTIVE (0), pas DRIVER_CONTROLLED (2) ni
     // OPTIMAL_POWER (5), le défaut de l'en-tête (NvApiDriverSettings.h ; fiche NVIDIA 3130, « Normal » ex-« Adaptive »).
     [Fact]
     public void Normal_est_la_valeur_adaptive_du_pilote()
@@ -64,7 +64,7 @@ public sealed class PreferMaxPerfTweakTests
         t.SummaryKey.Should().NotContain("fps");
     }
 
-    // --- Gating: desktop NVIDIA render GPU only (no laptop/battery, no non-NVIDIA). ---
+    // --- Filtre : GPU de rendu NVIDIA de bureau seulement (ni portable/batterie, ni hors NVIDIA). ---
 
     [Fact]
     public void AppliesTo_true_on_desktop_nvidia() =>
@@ -79,10 +79,10 @@ public sealed class PreferMaxPerfTweakTests
         Build().AppliesTo(Desktop(chassis: ChassisType.Laptop), State).Should().BeFalse();
 
     /// <summary>
-    /// Le placebo que ce test ferme, trouve en LISANT la machine le 10/09/2026 :
-    /// `PREFERRED_PSTATE` y vaut deja 1. Le gate ne regardait que « bureau + NVIDIA », donc le
-    /// produit aurait propose ce levier, l'aurait applique sans rien changer, puis aurait mesure
-    /// le bruit d'une session. Un levier qui n'a rien a changer n'est pas un candidat.
+    /// Le placebo que ce test ferme : `PREFERRED_PSTATE` vaut deja 1
+    /// (releve sur la machine de reference le 10/09/2026). Un gate qui ne regarde que « bureau + NVIDIA » proposerait ce levier, l'appliquerait
+    /// sans rien changer, puis mesurerait le bruit d'une session. Un levier qui n'a rien a changer n'est
+    /// pas un candidat.
     /// </summary>
     [Fact]
     public void AppliesTo_false_quand_le_mode_maximum_est_DEJA_actif() =>
@@ -161,12 +161,12 @@ public sealed class PreferMaxPerfTweakTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
     }
 
-    // --- Revert restores the captured original pstate preference. ---
+    // --- Le retour arrière rend la préférence de pstate d'origine capturée. ---
 
     [Fact]
     public async Task Apply_then_revert_restores_the_original_pstate()
     {
-        var t = Build(originalPstate: 0); // adaptive originally
+        var t = Build(originalPstate: 0); // adaptatif à l'origine
 
         var apply = await t.ApplyAsync();
         apply.IsOk.Should().BeTrue();
@@ -192,7 +192,7 @@ public sealed class PreferMaxPerfTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // --- PHASE 18 F1 lot 3 : ecrire au profil du JEU, revenir selon la PROVENANCE. ---
+    // --- Ecrire au profil du JEU, revenir selon la PROVENANCE. ---
     //
     // Reecrire l'ancienne valeur dans un profil de jeu qui ne la possedait pas laisse une trace
     // que le jeu n'avait pas : la valeur revient, l'etat non, et le scan suivant dirait « pose par
@@ -205,7 +205,7 @@ public sealed class PreferMaxPerfTweakTests
         public string? RunningGameExecutablePath() => chemin;
     }
 
-    /// <summary>24/09/2026 : le produit cherche le jeu et ne le trouve pas (PC au repos, anti-triche
+    /// <summary>Le produit cherche le jeu et ne le trouve pas (PC au repos, anti-triche
     /// qui refuse l'ouverture du processus). Écrire au global mettait la carte au maximum hors jeu
     /// toute la journée : rien ne s'écrit.</summary>
     [Fact]

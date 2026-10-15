@@ -8,7 +8,7 @@ using Xunit;
 namespace DrDxt.Detection.Tests.Security;
 
 /// <summary>
-/// Garde §9.8 : la détection + scan doivent tourner sans élévation admin.
+/// Garde : la détection + scan doivent tourner sans élévation admin.
 /// Test d'intégration léger — opère sur la vraie machine (WMI/DXGI/registre),
 /// mode dégradé attendu (PresentMon absent = baseline null).
 /// </summary>
@@ -17,7 +17,7 @@ public class NonAdminScanTests
     [Fact]
     public async Task Full_detection_runs_without_administrator_rights()
     {
-        // Garde §9.8 : la détection ne doit pas exiger l'élévation.
+        // Garde : la détection ne doit pas exiger l'élévation.
         using var identity = WindowsIdentity.GetCurrent();
         var isAdmin = new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
 
@@ -55,7 +55,7 @@ public class NonAdminScanTests
         scored.IsOk.Should().BeTrue("le scorer ne lève jamais, même en mode dégradé");
 
         var result = scored.Value!;
-        result.Score.Should().BeInRange(0, 100, "score toujours borné §11");
+        result.Ledger!.Sum(e => e.Penalty).Should().BeInRange(0, 100, "score toujours borné §11");
         result.Findings.Should().NotBeNull("la liste peut être vide mais pas null");
         result.Baseline.Should().BeNull("mode dégradé : PresentMon absent → baseline null §4 P1");
         result.Hw.Should().BeSameAs(hw.Value);

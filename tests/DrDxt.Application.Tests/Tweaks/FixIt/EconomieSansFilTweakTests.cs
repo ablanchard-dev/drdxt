@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.Application.Tests.Tweaks.FixIt;
 
-// B3 (10/10/2026) : la carte sans fil sortie de son mode d'économie d'énergie (valeur secteur du plan actif) quand le jeu
+// La carte sans fil sortie de son mode d'économie d'énergie (valeur secteur du plan actif) quand le jeu
 // passe par le Wi-Fi. Doublures NSubstitute seulement : aucune lecture ni écriture de la vraie machine.
 public sealed class EconomieSansFilTweakTests
 {

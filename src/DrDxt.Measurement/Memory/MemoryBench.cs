@@ -8,14 +8,12 @@ namespace DrDxt.Measurement.Memory;
 /// Lecture pure. Il alloue de la memoire et la lit. Il n'ecrit rien, ne demande aucune elevation,
 /// ne touche ni au BIOS ni au registre.
 ///
-/// Ce code vient de `tools/memprobe`, qui l'a valide le 06/09/2026 sur la machine de reference :
+/// Mesure le 06/09/2026 sur la machine de reference (`tools/memprobe`, qui n'est plus qu'un appelant) :
 /// sigma/moyenne de 1,83 % sur le debit et 3,45 % sur la latence, contre un plancher de bruit
-/// in-game de 9,9 %. Il vit ici parce qu'un instrument que le produit n'appelle pas ne sert a
-/// personne -- l'outil en ligne de commande n'est plus qu'un appelant.
+/// in-game de 9,9 %.
 ///
-/// Le piege paye, ecrit ici pour qu'il ne se repaie pas : une premiere version chainait sur
-/// 16 Mo, ce qui TIENT dans le L3 de 33 Mo d'un i7-14700F. Elle rendait 25 ns -- la latence du
-/// CACHE, prise pour celle de la DRAM. C'est le controle Q-04 qui attrape ca aujourd'hui.
+/// Le piege : une chaine de 16 Mo tient dans le L3 de 33 Mo d'un i7-14700F et rend 25 ns, la
+/// latence du cache prise pour celle de la DRAM. Le controle Q-04 l'attrape.
 /// </summary>
 public static class MemoryBench
 {
@@ -38,7 +36,7 @@ public static class MemoryBench
     /// <summary>
     /// Mesure la memoire. <paramref name="passes"/> passes pour le debit et la latence, dont on
     /// tire la moyenne et la dispersion : sans la dispersion, aucun A/B ne peut distinguer un gain
-    /// du bruit. L'escalier, lui, se parcourt une fois -- c'est sa FORME qui compte, pas sa
+    /// du bruit. L'escalier, lui, se parcourt une fois : c'est sa forme qui compte, pas sa
     /// precision au pourcent.
     /// </summary>
     public static MemoryMeasurement Measure(int passes = 10)
@@ -94,7 +92,7 @@ public static class MemoryBench
 
     /// <summary>
     /// Latence d'un acces aleatoire dans une zone de <paramref name="elements"/> entiers. Chaine
-    /// de pointeurs : chaque acces DEPEND du precedent, donc le prefetcheur ne peut rien anticiper
+    /// de pointeurs : chaque acces depend du precedent, donc le prefetcheur ne peut rien anticiper
     /// et la latence ne peut pas etre masquee.
     /// </summary>
     private static double LatencyNs(int elements, int steps)
@@ -111,15 +109,15 @@ public static class MemoryBench
     }
 
     /// <summary>
-    /// Une permutation aleatoire, chainee en UN SEUL cycle qui passe par chaque element : partant de
+    /// Une permutation aleatoire, chainee en un seul cycle qui passe par chaque element : partant de
     /// 0, on parcourt toute la zone avant de revenir.
     ///
-    /// 26/09/2026 : la chaine se construisait depuis 0 en suivant la permutation. Arrivee sur la
-    /// valeur 0, elle revenait au depart et reecrivait le premier maillon : le cycle parcouru ne
-    /// couvrait plus qu'une fraction aleatoire de la zone (3,1 % des 128 Mo, 23,7 % des 2 Mo avec
-    /// la graine du banc). L'effet mesure est faible, parce que les elements visites restent
-    /// eparpilles sur toute la zone (au plus 6,5 %, sur la fenetre de 16 Mo), mais chaque fenetre
-    /// ne mesurait pas la zone qu'elle annonce.
+    /// Une chaine construite depuis 0 en suivant simplement la permutation reviendrait au depart en
+    /// arrivant sur la valeur 0 et reecrirait le premier maillon : le cycle parcouru ne couvrirait
+    /// qu'une fraction aleatoire de la zone (3,1 % des 128 Mo, 23,7 % des 2 Mo avec la graine du
+    /// banc). L'effet mesure est faible, parce que les elements visites restent eparpilles sur toute
+    /// la zone (au plus 6,5 %, sur la fenetre de 16 Mo), mais chaque fenetre ne mesurerait pas la
+    /// zone qu'elle annonce.
     /// </summary>
     internal static int[] ChaineUnique(int elements)
     {

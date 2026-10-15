@@ -10,7 +10,7 @@ using Xunit;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// L0.2 — le protocole en deux temps du voyage dans le BIOS.
+// Le protocole en deux temps du voyage dans le BIOS.
 //
 // Ce que ces tests verrouillent tient en une phrase : on n'envoie pas quelqu'un dans son BIOS
 // si on ne pourra rien lui prouver au retour. L'ordre (marqueur d'abord, redemarrage ensuite)
@@ -259,7 +259,7 @@ public sealed class FirmwareTripTests
         verifier.Seen.Should().BeSameAs(fresh);
     }
 
-    // 26/09/2026 : se retracter pendant le delai. Le voyage n'aura pas lieu, donc le marqueur part aussi ;
+    // Se retracter pendant le delai. Le voyage n'aura pas lieu, donc le marqueur part aussi ;
     // mais seulement si l'annulation a reussi, sinon le retour doit encore etre verifie.
     [Fact]
     public async Task Annuler_annule_le_redemarrage_PUIS_retire_le_marqueur()

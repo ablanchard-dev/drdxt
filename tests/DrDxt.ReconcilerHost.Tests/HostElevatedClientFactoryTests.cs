@@ -5,14 +5,14 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// HostElevatedClientFactory — builds the SERVICE-context IElevatedClient.
+// HostElevatedClientFactory : construit l'IElevatedClient du contexte service.
 //
-//   * a provisioned session key (>=32 bytes, base64) → the real
-//     TypedNamedPipeElevatedClient over the ACL'd pipe.
-//   * NO key (the service-context helper handshake is not yet established) → a
-//     fail-clean UNAVAILABLE client that refuses every op (Result.Fail), so a
-//     reconcile attempt logs "elevation unavailable" and fails clean, never crashes.
-//   * we never fake a successful elevation: the unavailable client always Fails.
+//   * une clé de session provisionnée (>= 32 octets, base64) → le vrai
+//     TypedNamedPipeElevatedClient sur le tube protégé par ACL.
+//   * pas de clé (la négociation du helper en contexte service n'est pas encore établie) → un
+//     client indisponible à échec propre qui refuse chaque op (Result.Fail), pour qu'une tentative
+//     de réconciliation journalise « élévation indisponible » et échoue proprement, sans planter.
+//   * jamais une élévation réussie inventée : le client indisponible échoue toujours.
 // -----------------------------------------------------------------------
 public sealed class HostElevatedClientFactoryTests
 {
@@ -44,12 +44,12 @@ public sealed class HostElevatedClientFactoryTests
     [Fact]
     public void ValidKey_ReturnsTheRealTypedPipeClient()
     {
-        var key = Convert.ToBase64String(new byte[32]); // 32 bytes minimum.
+        var key = Convert.ToBase64String(new byte[32]); // 32 octets minimum.
         var client = HostElevatedClientFactory.Create(keySource: () => key);
 
-        // We do not connect a pipe here (no helper in a unit test); we only assert the
-        // factory wires the real client type when a key is present — the actual IPC is
-        // smoke-tested separately (the service-context handshake is a deferred edge).
+        // Aucun tube connecté ici (pas de helper en test unitaire) ; on vérifie seulement que la
+        // fabrique câble le vrai type de client quand une clé est présente ; l'IPC réel est testé en
+        // fumée à part (la négociation en contexte service est un bord différé).
         client.Should().BeOfType<TypedNamedPipeElevatedClient>();
     }
 }

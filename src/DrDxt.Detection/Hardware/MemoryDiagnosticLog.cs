@@ -7,10 +7,10 @@ namespace DrDxt.Detection.Hardware;
 public sealed record ResultatTestMemoire(DateTimeOffset Quand, int EventId, string Message);
 
 /// <summary>
-/// Ce que le diagnostic de memoire WINDOWS a ecrit dans le journal.
+/// Ce que le diagnostic de memoire Windows a ecrit dans le journal.
 ///
-/// Le produit ne traduit pas le numero d'evenement en verdict : le 17/09/2026, deux familles de
-/// sources se contredisaient (1101/1102 contre 1201/1202 pour « rien trouve » / « erreurs »). Il rend
+/// Le produit ne traduit pas le numero d'evenement en verdict : deux familles de
+/// sources se contredisent (1101/1102 contre 1201/1202 pour « rien trouve » / « erreurs »). Il rend
 /// le message que Windows a lui-meme ecrit, localise, et laisse le joueur le lire.
 /// Une liste vide est une reponse (« jamais lance ») ; un journal illisible est un `Fail`.
 /// </summary>

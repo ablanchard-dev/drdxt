@@ -10,23 +10,18 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // =======================================================================
-// M6 — the isolation gate: "a GPU failure NEVER rolls back the safe batch".
+// La porte d'isolement : « un échec GPU n'annule jamais le lot sûr ».
 //
-// This is the WHOLE reason GPU tuning is a dedicated, SEPARATE engine batch (the
-// GpuTuningApplyStep runs `consumption.GpuPlan` as its own engine.ApplyAsync). With the
-// Real TweakEngine + real SafetyManager + real catalog of real tweaks (only the SDK boundary
-// faked by FakeSystemState + FakeElevatedClient + read-seams that report from that state) we
-// model exactly that flow: apply the SAFE batch (kept), then run the GPU plan as a SECOND,
-// independent engine batch, and assert:
-//   1. when the GPU batch FAILS mid-apply (a refused write), the engine LIFO-reverts only the
-//      GPU batch — the previously-applied safe batch is byte-identical to its kept state;
-//   2. when the GPU batch is kept-then-regresses, the engine auto-reverts only the GPU change
-//      (the R2 measured-regression revert net) — again the safe batch is untouched.
-//
-// (The step's "run GpuPlan as its own batch" + re-clamp + no-op are unit-tested in
-//  DrDxt.App.Tests/GpuTuningApplyStepTests; here we prove the engine-level isolation the step
-//  relies on, end-to-end against a real machine model.)
-// =======================================================================
+// Deux lots du moteur restent indépendants : un plan GPU joué par son propre engine.ApplyAsync
+// ne remonte jamais dans le lot appliqué avant lui. Avec le vrai TweakEngine, le vrai SafetyManager
+// et le vrai catalogue de vrais leviers (seule la frontière SDK est simulée par FakeSystemState +
+// FakeElevatedClient + des coutures de lecture qui rapportent cet état), on modélise exactement
+// ce flux : appliquer le lot sûr (gardé), puis jouer le plan GPU comme un second lot
+// indépendant, et vérifier :
+//   1. quand le lot GPU échoue en pleine application (écriture refusée), le moteur n'annule en
+//      LIFO que le lot GPU ; le lot sûr appliqué avant est identique à l'octet près à son état gardé ;
+//   2. quand le lot GPU est gardé puis régresse, le moteur n'annule que le changement GPU
+//      (le filet de retour sur régression mesurée) ; le lot sûr reste intact, là encore.
 public sealed class GpuTuningIsolationTests
 {
     private const int Pid = 4242;
@@ -34,7 +29,7 @@ public sealed class GpuTuningIsolationTests
     private static readonly BenchmarkResult Baseline =
         new(200, 150, 120, new[] { 5.0, 5.0 }, 15, MarginOfError: 1, Runs: 1);
 
-    // "after" == baseline → no regression, no gain → the batch is KEPT.
+    // « après » == départ → ni régression ni gain → le lot est gardé.
     private sealed class NeutralBenchmark : IBenchmarkRunner
     {
         public Task<Result<BenchmarkResult>> RunAsync(int targetPid, TimeSpan duration, int runs, CancellationToken ct) =>
@@ -42,7 +37,7 @@ public sealed class GpuTuningIsolationTests
                 new BenchmarkResult(200, 150, 120, new[] { 5.0, 5.0 }, 15, MarginOfError: 1, Runs: 1)));
     }
 
-    // "after" much worse than baseline → a MEASURED regression → the engine auto-reverts.
+    // « après » bien pire que le départ → régression mesurée → le moteur annule tout seul.
     private sealed class RegressionBenchmark : IBenchmarkRunner
     {
         public Task<Result<BenchmarkResult>> RunAsync(int targetPid, TimeSpan duration, int runs, CancellationToken ct) =>
@@ -68,9 +63,9 @@ public sealed class GpuTuningIsolationTests
         public Task<Result<string>> ExportAsync() => Task.FromResult(Result<string>.Ok(string.Empty));
     }
 
-    // A desktop NVIDIA baseline: stock GPU offsets/power, Balanced plan + a captured reflex
-    // registry seed, so the SAFE batch (power-plan + reflex) applies + is capturable, and the
-    // GPU batch (power-limit + undervolt) has stock originals to revert to.
+    // Un départ NVIDIA de bureau : décalages et puissance GPU d'origine, plan Équilibré et une
+    // graine de registre reflex capturée, pour que le lot sûr (plan + reflex) s'applique et se
+    // capture, et que le lot GPU (limite de puissance + undervolt) ait des origines où revenir.
     private static FakeSystemState NewBaseline()
     {
         var s = new FakeSystemState
@@ -87,8 +82,8 @@ public sealed class GpuTuningIsolationTests
         return s;
     }
 
-    // The SAFE (non-GPU) plan and the SEPARATE GPU plan, mirroring what ScanProfileConsumer
-    // produces (Plan vs GpuPlan).
+    // Le plan sûr (hors GPU) et le plan GPU séparé, miroir de ce que produit ScanProfileConsumer
+    // (Plan et GpuPlan).
     private static readonly TweakPlan SafePlan = new(new[] { "fixit.power_plan", "latency.reflex" });
     private static readonly TweakPlan GpuPlan = new(new[] { "gpu.power_limit", "gpu.undervolt" });
 
@@ -104,7 +99,7 @@ public sealed class GpuTuningIsolationTests
         var power = new FakePowerPlanReader(state);
         var nvTuning = new FakeNvApiGpuTuning(state);
         var adlxTuning = new FakeAdlxGpuTuning(state);
-        // The conservative in-bounds GPU targets (same as the App seeds).
+        // Les cibles GPU prudentes, dans les bornes (les mêmes que celles de l'App).
         var gpuTargets = new GpuTuningTargetSource(new GpuTuningTarget(0, -100, 0), new GpuPowerLimitTarget(0, 90));
 
         var tweaks = new ITweak[]
@@ -118,7 +113,7 @@ public sealed class GpuTuningIsolationTests
         return new TweakEngine(safety, bench, diag, catalog);
     }
 
-    // Applies the safe batch and asserts it was KEPT (not auto-reverted); returns its snapshot.
+    // Applique le lot sûr et vérifie qu'il a été gardé (pas annulé automatiquement) ; rend son instantané.
     private static async Task<string> ApplyKeptSafeBatchAsync(FakeSystemState state)
     {
         var engine = BuildEngine(state, new NeutralBenchmark(), refuse: null, out _);
@@ -126,12 +121,12 @@ public sealed class GpuTuningIsolationTests
 
         safe.IsOk.Should().BeTrue();
         safe.Value!.Outcomes.Should().OnlyContain(o => o.Applied && !o.AutoReverted);
-        // The safe batch really changed the machine (so the gate below isn't vacuous).
+        // Le lot sûr a vraiment changé la machine (pour que la porte ci-dessous ne soit pas creuse).
         state.ActivePowerPlan.Should().Be(KnownPowerPlans.HighPerformance);
         return state.Snapshot();
     }
 
-    // =================== GATE 1: GPU apply failure leaves the safe batch intact ===================
+    // =================== Porte 1 : un échec d'application GPU laisse le lot sûr intact ===================
 
     [Fact]
     public async Task Gpu_batch_apply_failure_does_not_roll_back_the_previously_applied_safe_batch()
@@ -140,11 +135,11 @@ public sealed class GpuTuningIsolationTests
         var before = state.Snapshot();
 
         var afterSafe = await ApplyKeptSafeBatchAsync(state);
-        afterSafe.Should().NotBe(before); // sanity: the safe batch is applied + kept.
+        afterSafe.Should().NotBe(before); // témoin : le lot sûr est appliqué et gardé.
 
-        // The GPU batch runs as a SEPARATE engine call. Refuse the undervolt clock-offset
-        // write so the GPU batch fails after the power-limit already wrote → the engine
-        // LIFO-reverts the GPU batch (power-limit back to stock).
+        // Le lot GPU tourne comme un appel séparé du moteur. Refuser l'écriture du décalage
+        // d'horloge de l'undervolt pour que le lot GPU échoue après l'écriture de la limite de
+        // puissance → le moteur annule le lot GPU en LIFO (limite de puissance rendue à l'origine).
         static bool RefuseUndervoltWrite(PrivilegedOp op) =>
             op is ApplyNvApiClockOffsetOp { CoreOffsetMhz: -100 };
 
@@ -153,18 +148,18 @@ public sealed class GpuTuningIsolationTests
 
         gpu.IsOk.Should().BeFalse();
         gpu.Error!.Value.Code.Should().Be(ErrorCodes.BatchReverted);
-        // The GPU batch DID write (power-limit) before being rolled back → gate isn't vacuous.
+        // Le lot GPU a bien écrit (limite de puissance) avant d'être annulé → la porte n'est pas creuse.
         gpuClient.Writes.Should().NotBeEmpty();
 
-        // THE GATE: the safe batch is byte-identical to its kept state — never rolled back.
+        // La porte : le lot sûr est identique à l'octet près à son état gardé, jamais annulé.
         state.Snapshot().Should().Be(afterSafe);
-        state.ActivePowerPlan.Should().Be(KnownPowerPlans.HighPerformance); // safe fix survives
-        // And the GPU change itself was fully reverted (only the GPU change).
+        state.ActivePowerPlan.Should().Be(KnownPowerPlans.HighPerformance); // le correctif sûr survit
+        // Et le changement GPU lui-même a été entièrement annulé (seulement lui).
         state.GpuPowerLimitPct.Should().Be(100);
         state.GpuCoreOffsetMhz.Should().Be(0);
     }
 
-    // =================== GATE 2: GPU measured-regression auto-reverts only the GPU change ===================
+    // =================== Porte 2 : une régression GPU mesurée n'annule que le changement GPU ===================
 
     [Fact]
     public async Task Gpu_batch_measured_regression_auto_reverts_only_the_gpu_change()
@@ -172,8 +167,8 @@ public sealed class GpuTuningIsolationTests
         var state = NewBaseline();
         var afterSafe = await ApplyKeptSafeBatchAsync(state);
 
-        // The GPU batch applies fully (stable), then a regression bench makes the engine
-        // auto-revert the WHOLE GPU batch — the R2 measured-regression revert net.
+        // Le lot GPU s'applique en entier (stable), puis un banc en régression fait annuler
+        // automatiquement tout le lot GPU par le moteur : le filet de retour sur régression mesurée.
         var gpuEngine = BuildEngine(state, new RegressionBenchmark(), refuse: null, out _);
         var gpu = await gpuEngine.ApplyAsync(GpuPlan, Baseline, Pid, default);
 
@@ -181,7 +176,7 @@ public sealed class GpuTuningIsolationTests
         gpu.Value!.Verdict!.SummaryKey.Should().Be("verdict.regression_reverted");
         gpu.Value.Outcomes.Should().OnlyContain(o => o.AutoReverted);
 
-        // THE GATE: the safe batch is byte-identical to its kept state; only the GPU reverted.
+        // La porte : le lot sûr est identique à l'octet près à son état gardé ; seul le GPU est revenu.
         state.Snapshot().Should().Be(afterSafe);
         state.ActivePowerPlan.Should().Be(KnownPowerPlans.HighPerformance);
         state.GpuPowerLimitPct.Should().Be(100);

@@ -6,7 +6,7 @@ using Microsoft.Win32.SafeHandles;
 namespace DrDxt.Detection.Hardware;
 
 /// <summary>
-/// 06/10/2026 (chantier B5 b) : la fréquence d'interrogation qu'une souris USB annonce. Lue sans pilote ni
+/// La fréquence d'interrogation qu'une souris USB annonce. Lue sans pilote ni
 /// mouvement de souris : le hub USB rend les tuyaux ouverts de l'appareil (IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX,
 /// usbioctl.h) et le point d'accès d'interruption entrant porte bInterval. USB 2.0 §9.6.6 : en basse et pleine vitesse,
 /// bInterval est en millisecondes (1 à 255) ; en haute vitesse et au-delà, l'intervalle vaut 2^(bInterval−1) × 125 µs
@@ -17,7 +17,7 @@ namespace DrDxt.Detection.Hardware;
 public static class FrequenceSouris
 {
     /// <param name="vitesse">USB_DEVICE_SPEED : 0 basse, 1 pleine, 2 haute, 3 super.</param>
-    // Revue T3+T4 (F-26) : en basse et pleine vitesse, le contrôleur arrondit l'intervalle à la puissance de 2
+    // En basse et pleine vitesse, le contrôleur arrondit l'intervalle à la puissance de 2
     // inférieure (xHCI 1.2 §6.2.3.6 ; EHCI pareil) : 9 ou 10 ms annoncées sont servies toutes les 8 ms.
     public static int? Hz(int vitesse, int intervalle) => vitesse switch
     {
@@ -29,7 +29,7 @@ public static class FrequenceSouris
     // USB_NODE_CONNECTION_INFORMATION_EX (empaqueté sur 1 octet) : vitesse à l'octet 23, nombre de tuyaux ouverts aux
     // octets 27-30, puis à 35 les USB_PIPE_INFO de 11 octets (descripteur de point d'accès de 7 octets + ScheduleOffset).
     /// <summary>La vitesse du bus et le plus petit intervalle des points d'accès d'interruption entrants ; null sans eux.
-    /// Revue T3+T4 (F-25) : sur un appareil composite (souris + clavier sur un récepteur), le plus petit peut être
+    /// Sur un appareil composite (souris + clavier sur un récepteur), le plus petit peut être
     /// celui du clavier ; des intervalles différents y rendent null (non lu).</summary>
     public static (int Vitesse, int Intervalle)? Lire(byte[] info, bool composite)
     {
@@ -52,15 +52,13 @@ public static class FrequenceSouris
 
     public static RepairFinding Juger(string nom, int? hz) => hz switch
     {
-        null => new RepairFinding("LATENCE", $"fréquence de la souris · {nom}", null, null, RepairStatus.Unknown,
-            "la fréquence de cette souris n'a pas pu être lue (souris Bluetooth, récepteur partagé, ou hub illisible)."),
-        <= 125 => new RepairFinding("LATENCE", $"fréquence de la souris · {nom}", $"{hz} Hz", "1000 Hz", RepairStatus.Suspicious,
-            $"ta souris n'envoie sa position que {hz} fois par seconde au mieux, soit jusqu'à {1000 / hz} ms entre ton geste "
-            + "et ce que le jeu en voit. Si elle le permet, règle 500 ou 1000 Hz dans son logiciel ou par son bouton ; sinon, "
-            + "une souris de jeu à 1000 Hz règle ce retard.",
+        null => new RepairFinding("LATENCE", Docteur.Nom("FS.Nom", nom), null, null, RepairStatus.Unknown,
+            Docteur.T("FS.NonLue")),
+        <= 125 => new RepairFinding("LATENCE", Docteur.Nom("FS.Nom", nom), Docteur.T("FS.Hz", hz), Docteur.T("FS.Hz", 1000), RepairStatus.Suspicious,
+            Docteur.T("FS.Lente", hz, 1000 / hz),
             RepairAction.Recommandation),
-        _ => new RepairFinding("LATENCE", $"fréquence de la souris · {nom}", $"jusqu'à {hz} Hz", null, RepairStatus.Observed,
-            $"c'est le maximum que la souris annonce ; son logiciel peut la régler plus bas. 1000 Hz suffit au jeu."),
+        _ => new RepairFinding("LATENCE", Docteur.Nom("FS.Nom", nom), Docteur.T("FS.JusquA", hz), null, RepairStatus.Observed,
+            Docteur.T("FS.Max")),
     };
 
     // ── Lecture ─────────────────────────────────────────────────────────────────────────
@@ -77,7 +75,7 @@ public static class FrequenceSouris
             if (l.GetString("PNPDeviceID") is not { } id
                 || !(id.StartsWith("HID\\", StringComparison.OrdinalIgnoreCase) || id.StartsWith("USB\\", StringComparison.OrdinalIgnoreCase))) continue;
             var usb = PremierParentUsb(id);
-            // Revue T3+T4 (F-25) : un pavé tactile (I2C, PS/2) n'est ni USB ni Bluetooth : rien n'est dit.
+            // Un pavé tactile (I2C, PS/2) n'est ni USB ni Bluetooth : rien n'est dit.
             if (usb is null && !EstBluetooth(id)) continue;
             if (usb is not null && !vus.Add(usb.Value.Instance)) continue;
             var nom = (usb is { } u ? Texte(u.Noeud, ProprieteNom) : null) ?? l.GetString("Name") ?? "souris";

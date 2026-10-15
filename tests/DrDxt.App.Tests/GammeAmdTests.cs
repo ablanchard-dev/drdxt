@@ -10,7 +10,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// AMD-TOUT (09/10/2026) : toute la gamme AMD, du bas au haut, reçoit les constats et les leviers de son matériel, pas
+/// Toute la gamme AMD, du bas au haut, reçoit les constats et les leviers de son matériel, pas
 /// seulement la grosse carte. Quatre machines synthétiques dans tests/Shared/machines (RX 6600 + Ryzen 5 5600 en DDR4,
 /// RX 6700 XT + Ryzen 5 7600, RX 7800 XT + 7800X3D, RX 7900 XTX + 7950X3D), rejouées ici sur le vrai catalogue.
 /// Les vraies Radeon le prouveront ensuite (rapports rangés par tools/ranger_rapport.py).
@@ -58,7 +58,7 @@ public sealed class GammeAmdTests
         ouverts.Should().NotContain(["latency.prefer_max_perf", "gpu.repos_global_normal", "latency.reflex"]);
         // Le routage X3D ne concerne que les X3D à deux CCD (7950X3D) ; un 7800X3D n'a qu'un CCD.
         (ouverts.Contains("fixit.x3d_ccd")).Should().Be(deuxCcdX3d);
-        // X3D-PLAN (09/10/2026) : même avec le processeur mesuré en goulot, un X3D à deux blocs garde Équilibré (le pilote AMD
+        // Même avec le processeur mesuré en goulot, un X3D à deux blocs garde Équilibré (le pilote AMD
         // y range le jeu sur le bloc à cache) ; les autres machines reçoivent le plan.
         var cpuLimite = m.Reglages with { GoulotMesure = DrDxt.Core.BottleneckState.CpuBoundStrong, PowerPlanGuid = KnownPowerPlans.Balanced.ToString() };
         VraisLeviers().Single(t => t.Id == "fixit.power_plan").AppliesTo(m.Inventaire, cpuLimite).Should().Be(!deuxCcdX3d);
@@ -84,7 +84,7 @@ public sealed class GammeAmdTests
 }
 
 /// <summary>
-/// AMD-TOUT (3, 09/10/2026) : le mode Expert de la carte reste ouvert sur une Radeon (le joueur décide, le bail et le test
+/// Le mode Expert de la carte reste ouvert sur une Radeon (le joueur décide, le bail et le test
 /// de stabilité rendent la carte), mais l'accord dit que l'écriture n'a jamais été essayée sur cette architecture.
 /// </summary>
 public sealed class ExpertSurCarteNonValideeTests
@@ -103,7 +103,7 @@ public sealed class ExpertSurCarteNonValideeTests
 }
 
 /// <summary>
-/// Consoles portables (demande relevée par l'audit du 09/10/2026) : une machine synthétique ROG Ally (Ryzen Z1 Extreme,
+/// Consoles portables : une machine synthétique ROG Ally (Ryzen Z1 Extreme,
 /// Radeon 780M intégrée, LPDDR5 soudée). DrDXT n'y règle ni la carte (intégrée, châssis verrouillé : dit avec son motif),
 /// ni la mémoire, ni le BIOS ; seuls les réglages de Windows sans risque s'ouvrent.
 /// </summary>
@@ -133,7 +133,7 @@ public sealed class ConsolePortableTests
 }
 
 /// <summary>
-/// La gamme NVIDIA et Intel au-delà de la machine de référence (09/10/2026) : GTX 1650 + i5-10400F (Turing, DDR4),
+/// La gamme NVIDIA et Intel au-delà de la machine de référence : GTX 1650 + i5-10400F (Turing, DDR4),
 /// RTX 3060 + i5-12400F (Ampere), RTX 5070 + i5-13400F (Blackwell). Chaque carte est reconnue ; aucune n'a de rapport
 /// de validation (seule une RTX 40 en a un) ; Blackwell garde la tension fermée par NVIDIA ; la limite de puissance se
 /// propose ; aucun levier AMD ni X3D ; la mémoire sous son profil est dite.

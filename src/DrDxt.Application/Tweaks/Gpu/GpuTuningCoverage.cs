@@ -4,15 +4,15 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Gpu;
 
 /// <summary>
-/// D5 / gate G4 — ce que cette machine recevra, dit avant le paiement.
+/// Ce que cette machine recevra, dit avant le paiement.
 ///
 /// Le problème que ça règle est commercial autant que technique : vendre du tuning GPU à
 /// quelqu'un dont la carte est en lecture seule, c'est un remboursement immédiat et un avis
-/// négatif. Le produit savait déjà refuser au moment d'appliquer — la sonde d'écriture-identité
+/// négatif. Le produit savait déjà refuser au moment d'appliquer : la sonde d'écriture-identité
 /// le fait honnêtement. Mais elle le fait après l'achat, et derrière une élévation.
 ///
 /// D'où cette classification : elle n'utilise que ce qui se lit sans élévation, sans driver et
-/// sans rien écrire — le châssis, le fournisseur, la VRAM, le nom commercial. Exactement ce
+/// sans rien écrire : le châssis, le fournisseur, la VRAM, le nom commercial. Exactement ce
 /// qu'on peut montrer à quelqu'un qui n'a pas encore payé.
 ///
 /// ══ ce qu'elle ne fait pas ══
@@ -24,14 +24,14 @@ namespace DrDxt.Application.Tweaks.Gpu;
 ///
 /// Et elle ne promet jamais par défaut. Une carte qu'on ne sait pas nommer ressort
 /// <see cref="GpuTuningSupport.ReadOnly"/>, pas « supporté » : c'est la moitié de la décision
-/// D5, l'autre étant qu'on le DISE.
+/// fail-closed, l'autre étant qu'on le dise.
 /// </summary>
 public enum GpuTuningSupport
 {
-    /// <summary>Architecture validée EN VIE (écriture, relecture, revert). Le tuning est vendu.</summary>
+    /// <summary>Architecture validée en vrai (écriture, relecture, revert). Le tuning est vendu.</summary>
     Validated,
 
-    /// <summary>Lue et comprise, mais jamais validée en écriture — ou validée seulement en
+    /// <summary>Lue et comprise, mais jamais validée en écriture, ou validée seulement en
     /// partie. « Supporté en lecture, tuning à venir » : on lit la carte, on ne la règle pas.</summary>
     ReadOnly,
 
@@ -44,7 +44,7 @@ public enum GpuTuningSupport
 /// <param name="Model">Le nom commercial lu, tel quel.</param>
 /// <param name="Support">Le verdict.</param>
 /// <param name="Architecture">L'architecture reconnue, ou Unknown.</param>
-/// <param name="ReasonKey">La clé resx du motif — jamais du texte codé en dur.</param>
+/// <param name="ReasonKey">La clé resx du motif, jamais du texte codé en dur.</param>
 /// <param name="VoltageTuning">Le voltage manuel est-il proposé sur cette carte ? Séparé du
 /// verdict global : une RDNA3 est réglable (limite de puissance, fréquences) sans que le voltage
 /// le soit, et confondre les deux ferait perdre des leviers réels ou en promettre un faux.</param>
@@ -67,16 +67,15 @@ public static class GpuTuningCoverage
 
     /// <summary>
     /// La matrice pour cette machine, une ligne par GPU. Vide seulement quand aucun GPU n'a été
-    /// détecté — et ça se dit aussi, plutôt que d'afficher une matrice vide qui ressemble à une
+    /// détecté, et ça se dit aussi, plutôt que d'afficher une matrice vide qui ressemble à une
     /// machine sans problème.
     /// </summary>
     /// <summary>
-    /// T4 (08/10/2026) : les architectures validées EN VIE (écriture, relecture, retour). Une architecture n'entre ici qu'avec
+    /// Les architectures validées en vie (écriture, relecture, retour). Une architecture n'entre ici qu'avec
     /// son rapport dans tests/Shared/validations ; la garde <c>UnePreuveDebloqueSonMaterielTests</c> refuse le reste.
-    /// Avant ce jour, Ada, RDNA4 et Blackwell se disaient validées sans qu'aucun rapport ne soit archivé : elles redeviennent
-    /// « lecture seule » jusqu'à leur preuve (Ada : l'essai Expert sur une RTX 4060 ; RDNA4 : la validation sur Radeon).
+    /// Sans rapport archivé, une architecture reste « lecture seule » jusqu'à sa preuve.
     /// </summary>
-    /// ADM1 (08/10/2026) : Ada validée par sa preuve, tests/Shared/validations/AdaOrOlder-rtx4060-2026-10-08.txt (limite de
+    /// Ada validée par sa preuve, tests/Shared/validations/AdaOrOlder-rtx4060-2026-10-08.txt (limite de
     /// puissance d'une RTX 4060 posée 100 ⇒ 90 %, relue, rendue, relue à 100 %, par « Vérifier DrDXT » sur la machine).
     private static readonly System.Text.RegularExpressions.Regex Rtx40 =
         new(@"\bRTX\s*40\d{2}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -114,7 +113,7 @@ public static class GpuTuningCoverage
 
         return architecture switch
         {
-            // T4 : validée seulement avec son rapport archivé (voir ValideesEnVie). Autocontrôle du 08/10/2026 : le rapport
+            // Validée seulement avec son rapport archivé (voir ValideesEnVie). Le rapport
             // archivé est celui d'une RTX 4060 ; la classe AdaOrOlder ne se dit validée que pour les RTX 40 (Ada), les RTX
             // 20/30 et GTX 10/16 attendent le leur.
             GpuArchitecture.AdaOrOlder when validees.Contains(architecture) && Rtx40.IsMatch(gpu.Model) =>
@@ -130,12 +129,12 @@ public static class GpuTuningCoverage
             GpuArchitecture.AdaOrOlder or GpuArchitecture.Rdna4 or GpuArchitecture.Blackwell =>
                 new(gpu.Model, GpuTuningSupport.ReadOnly, architecture, ReasonNeverWriteTested, voltage),
 
-            // RDNA3 : jamais testée en écriture. C'est le cas nommé par D5.
+            // RDNA3 : jamais testée en écriture. C'est le cas que la règle nomme.
             GpuArchitecture.Rdna3 or GpuArchitecture.Rdna2 =>
                 new(gpu.Model, GpuTuningSupport.ReadOnly, architecture, ReasonNeverWriteTested, voltage),
 
             // Une carte qu'on ne sait pas nommer n'est pas une carte validée. Lecture seule, et
-            // on l'écrit — c'est le fail-closed de D5 dans sa forme la plus littérale.
+            // on l'écrit : c'est le fail-closed dans sa forme la plus littérale.
             _ => new(gpu.Model, GpuTuningSupport.ReadOnly, architecture, ReasonUnknownArchitecture, voltage),
         };
     }

@@ -20,7 +20,7 @@ namespace DrDxt.Bios.Tests;
 ///
 /// Ce controle est cette ligne rouge. Quand il tombe : ce n'est pas le test qu'on corrige.
 ///
-/// ══ ce qu'il attrape exactement, mesure plutot qu'affirme (05/09/2026) ══
+/// ══ ce qu'il attrape exactement, mesure plutot qu'affirme ══
 ///
 /// `GetReferencedAssemblies` ne liste que les assemblies reellement UTILISEES : le compilateur
 /// retire du manifeste une reference a laquelle aucun type ne touche. Verifie dans les deux sens :

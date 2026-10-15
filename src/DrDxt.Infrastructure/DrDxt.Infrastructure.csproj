@@ -15,7 +15,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
     <PackageReference Include="Serilog" Version="4.4.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
-    <!-- Ed25519 (NOT in the .NET BCL) for the signed update-package verifier (T12).
+    <!-- Ed25519 (NOT in the .NET BCL) for the signed update-package verifier.
          Same tranched lib + version as DrDxt.Reconciler — verify
          path uses the PUBLIC key only; the dev/test PRIVATE seed (UpdateDevKeys) is
          used solely to sign fixtures in tests. -->

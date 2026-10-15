@@ -253,6 +253,47 @@ de reference le 07/10/2026, sans rien ecrire : plan actif Hautes performances, m
 (equilibre), `ActiveOverlayAcPowerScheme` vide. Le risque n'y est donc pas observe ; la garde vaut pour les machines en
 Equilibre avec un mode choisi. Preuves : `ModeDAlimentationGardeTests` (powrprof factice qui remet le mode a l'activation).
 
+### 12/10/2026 — la tension des cœurs du processeur vers le bas (décision du mainteneur : « undervolt OK si la faille est vraiment fermée »)
+
+| Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
+|---|---|---|
+| `GpuNative/PawnIo/PawnIoIntel.cs` (1 → 2) | `ioctl_write_msr` sur la **boite aux lettres OC** (MSR 0x150, `EchangerBoiteOc`) : la commande de lecture 0x10 et la commande d'ecriture 0x11 du **decalage de tension des cœurs et du cache** (`SetCpuVoltageOffsetOp`), **relatif a la tension que le BIOS avait mise a ce demarrage** (retenue dans HKLM au premier passage : 0 rend exactement l'origine, jamais au-dessus, jamais sous −125 mV au total ; relecture du 12/10 : en absolu, un undervolt deja en place etait remonte puis efface). Codage source : erpalma/throttled (`calc_undervolt_msr`) ; les bits 20:0 lus juste avant (ratio, tension cible, mode du BIOS) sont recopies, jamais remis a zero. Volatil : rendu au redemarrage | **helper eleve** seulement, par `PawnIoCpuPowerActions.SetVoltageOffset` ; borne par `OpAllowlist` (0 a −125 mV, jamais vers le haut) et par `TensionCpu.CommandeEcriture` (plans cœurs et cache seulement, lecture d'avant acceptee) ; **refuse si le processeur a SGX** (CPUID 7.EBX[2]) |
+| `Application/Tweaks/JournalDesLeviersAppliques.cs` (2 → 0) | plus rien en direct : ses deux ecritures passent par l'ecriture atomique commune (`FichierJsonAtomique`, audit du 12/10, `7f02a27d`) | donnees locales |
+| `ElevatedHelper/Execution/Adlx/ADLXTuningActions.cs` (2 → 3) | le **retour arriere** d'une ecriture de frequence de la carte AMD refusee qui a quand meme pris (meme API `TrySetGfx`, la valeur lue avant), ajoute le 12/10 (`0ea8dd65`) | **helper eleve**, dans la meme op ; n'ecrit que la valeur relue juste avant |
+
+Classe de nuisance : une tension trop basse fait **planter** (ecran bleu, jeu qui se ferme), elle n'abime pas le materiel ; seule
+une tension trop haute l'abime, et l'op ne monte jamais (refus par la liste blanche et par le codage, prouve par mutation :
+`TensionCpuTests`, montee admise ⇒ rouge). Plundervolt (CVE-2019-11157, INTEL-SA-00289) n'attaque que les enclaves SGX ; Intel
+l'a corrige en verrouillant la tension quand SGX est actif ; DrDXT refuse toute ecriture sur un processeur qui a SGX
+(`PawnIoTensionTests`, SGX ⇒ aucune ecriture). Undervolt Protection (12e-14e gen, reglage BIOS) ou la securite par
+virtualisation de Windows peuvent ignorer l'ecriture : chaque plan est relu, une valeur non retrouvee est un echec dit et un plan
+deja pose est rendu (`PawnIoTensionTests`). Residuel : un decalage trop fort peut faire planter avant d'etre juge ; la garde
+d'incident rend les leviers poses apres un arret, et le redemarrage le rend de toute facon. Lu sur le PC de reference le 12/10
+(lecture 0x10 seulement) : decalage 0 sur les cœurs et le cache, processeur sans SGX.
+
+### La frontiere reelle : chaque op doit rester inoffensive meme demandee par un programme hostile du compte
+
+Le tube du helper n'admet que le compte courant, les administrateurs et SYSTEM, et refuse le reseau ; le helper verifie que
+l'appelant est l'image de DrDxt.App. Mais l'App non elevee tourne au meme niveau d'integrite que n'importe quel programme du
+compte, qui peut s'y injecter et parler au helper : aucun intermediaire eleve qui sert le meme compte n'echappe a cela (Microsoft
+ne tient pas UAC pour une frontiere de securite). La seule frontiere qui tient est donc la forme fermee des ops et leurs bornes
+(`OpAllowlist`, et les gardes relues a l'execution) : **toute op, presente ou future, doit rester sans dommage durable meme
+appelee par un programme hostile du compte**. Exemples tenus : la tension seulement vers le bas et relative a l'origine du
+demarrage, jamais avec SGX ; la PL1 jamais sous le cinquieme de la PL2 ; aucune ecriture de variable firmware. Et ce qui
+contournerait toute borne (un programme eleve qui charge du code choisi par le compte) est traite a part : la tache planifiee
+elevee passe par le lanceur natif qui reconstruit l'environnement (12/10/2026).
+
+**Limite assumee, reglages DRS du pilote NVIDIA.** Une valeur DRS est bornee a l'enumeration que NVIDIA documente
+(`ValeursDrs`, NvApiDriverSettings.h), pas plus strictement : un inverse rejoue la valeur LUE chez le joueur (synchro
+« adaptative demi-frequence », plafond bas), et une borne plus stricte rendait cette origine irrejouable, le reglage de DrDXT
+pose pour toujours. Un programme hostile du compte peut donc poser une valeur documentee mais genante sur le profil de base
+(un plafond d'images tres bas) : nuisance reversible par le joueur dans le panneau NVIDIA, sans dommage durable. Le levier,
+lui, n'ecrit pas quand l'origine lue sort de l'enumeration.
+
+NvApiTuningActions passe de 2 a 4 sites : une ecriture que le pilote ramene a sa borne ou arrondit n'est plus laissee en
+place, l'origine lue avant est reposee (puissance, decalage du coeur) ; deux ecritures de RENDU, vers une valeur deja lue
+sur la carte.
+
 `python tools/nonuisance/count-write-sites.py` refait ce compte et **sort non-zero** si un fichier
 apparait, disparait, ou change de compte. Le script ne recopie rien : un chiffre ecrit a la main
 est une dette tant qu'aucun outil ne le refait.
@@ -268,7 +309,6 @@ src/DrDxt.App/ViewModels/ScanViewModel.Agir.cs 2
 src/DrDxt.App/ViewModels/ScanViewModel.Verifier.cs 1
 src/DrDxt.Application/Autopilot/JournalDesCandidats.cs 1
 src/DrDxt.Application/Parties/VerrouDuReleve.cs 1
-src/DrDxt.Application/Tweaks/JournalDesLeviersAppliques.cs 2
 src/DrDxt.Application/Tweaks/LeviersVerifies.cs 1
 src/DrDxt.Application/Tweaks/PreuveDuRepos.cs 2
 src/DrDxt.Core/Storage/FichierJsonAtomique.cs 1
@@ -276,9 +316,9 @@ src/DrDxt.Detection/Display/Win32ModeEcran.cs 2
 src/DrDxt.Detection/Gpu/MagasinDePilotes.cs 1
 src/DrDxt.Detection/Repair/InventaireMachine.cs 1
 src/DrDxt.Detection/Repair/RepairAuditService.cs 2
-src/DrDxt.ElevatedHelper/Execution/Adlx/ADLXTuningActions.cs 2
+src/DrDxt.ElevatedHelper/Execution/Adlx/ADLXTuningActions.cs 3
 src/DrDxt.ElevatedHelper/Execution/NvApi/NvApiDrsActions.cs 3
-src/DrDxt.ElevatedHelper/Execution/NvApi/NvApiTuningActions.cs 2
+src/DrDxt.ElevatedHelper/Execution/NvApi/NvApiTuningActions.cs 4
 src/DrDxt.ElevatedHelper/Execution/NvmlVentilateurActions.cs 2
 src/DrDxt.ElevatedHelper/Execution/PrivilegedOpExecutor.cs 1
 src/DrDxt.ElevatedHelper/Execution/SanteDesComposants.cs 1
@@ -299,7 +339,7 @@ src/DrDxt.GpuNative/INvApiNative.cs 6
 src/DrDxt.GpuNative/NvApiNative.cs 6
 src/DrDxt.GpuNative/Nvml/INvmlNative.cs 2
 src/DrDxt.GpuNative/Nvml/NvmlNative.cs 2
-src/DrDxt.GpuNative/PawnIo/PawnIoIntel.cs 1
+src/DrDxt.GpuNative/PawnIo/PawnIoIntel.cs 2
 src/DrDxt.Infrastructure/Diagnostics/DiagnosticsLog.cs 3
 src/DrDxt.Infrastructure/Updates/UpdateSeams.cs 1
 src/DrDxt.Measurement/Frames/CompteurPresentsDxgi.cs 1
@@ -524,6 +564,43 @@ Le service de demarrage (SYSTEM) recoit a cette date les actions QoS dans son ex
 pendant la partie, sans DrDXT ouvert. Il ne le demande que pour le jeu retenu, pendant qu'il tourne, par la meme
 allowlist ; il retire tout a son demarrage et a son arret. Il ne recoit ni l'ecriture du reglage (branchee dans le
 helper seul), ni le firmware, ni le manifeste, ni le BCD : `HostCompositionTests` le verifie sur la construction.
+
+### 15/10/2026 — `SetStartupApprovalOp`, la 28e operation : un programme au demarrage coupe ou reactive
+
+| Site | Ce qu'il fait | Garde | Prouve par |
+|---|---|---|---|
+| `Win32RegistryActions.SetStartupApproval` (helper eleve) | ecrit les 12 octets que le Gestionnaire des taches ecrit (02 = actif ; 03 + heure FILETIME = coupe) a la valeur du programme sous `Explorer\StartupApproved\{Run, Run32, StartupFolder}`. La commande du programme (cle Run, raccourci du dossier Demarrage) n'est jamais touchee. | liste fermee (`Run`, `Run32` en machine seulement, `StartupFolder`), ruche utilisateur ou machine, nom simple (ni `\`, ni `/`, ni caractere de controle, 260 au plus) ; `SecurityHealth` ne se coupe pas ; le programme doit etre liste la ou sa liste le dit, sinon rien n'est ecrit (un op forge ne cree pas de valeur pour un programme qui n'existe pas). | `StartupApprovalAllowlistTests` (11 cas), `SetStartupApprovalOpTests` (codec, octets), `StartupApprovalMachineTests` (une entree d'essai de la session coupee, relue, reactivee puis effacee sur la machine de reference) |
+
+Nuisance possible, dite : un programme coupe ne se lance plus a l'ouverture de session, ce que le joueur a demande ;
+il se reactive par le meme geste, dans DrDXT ou dans le Gestionnaire des taches. Le format n'est pas documente par
+Microsoft : il est releve sur la machine de reference et decrit pareil par la communaute.
+
+### 15/10/2026 — `ScheduleMemoryDiagnosticOp` / `CancelMemoryDiagnosticOp` : le test memoire au prochain demarrage
+
+| Site | Ce qu'il fait | Garde | Prouve par |
+|---|---|---|---|
+| `Win32BcdActions` (helper eleve) | `bcdedit /bootsequence {memdiag}` : le gestionnaire de demarrage lance le Diagnostic de memoire Windows au prochain demarrage, une seule fois, puis efface la sequence (Microsoft, « BCDEdit /bootsequence », ce que fait `mdsched.exe`) ; relu par `bcdedit /enum {bootmgr}`. L'annulation retire `bootsequence` de `{bootmgr}` et relit son absence | ops sans parametre : l'entree (`{memdiag}`) et l'objet (`{bootmgr}`) sont ecrits en dur, l'appelant ne choisit rien ; refus sans ecriture si l'entree `{memdiag}` n'existe pas, ou si une autre sequence unique est en attente (jamais ecrasee) ; l'annulation ne retire que `{memdiag}` ; `bcdedit.exe` resolu depuis le dossier systeme ; jamais le revert d'un bail (`LeaseWatchdog`) ; aucun redemarrage lance par DrDXT | `TestMemoireAuDemarrageTests` (pose relue, entree absente sans ecriture, pose non relue = echec, annulation, annulation sans rien en attente), `LeaseWatchdogTests`, codec |
+
+Nuisance possible, dite : au redemarrage suivant, le PC passe quelques minutes dans le test memoire avant Windows ;
+c'est l'effet demande. La sequence ne sert qu'une fois : l'ordre de demarrage habituel n'est pas touche.
+
+### 15/10/2026 — `RestartDeviceOp`, `RemoveDriverPackageOp` / `RestoreDriverPackageOp` : pnputil
+
+| Site | Ce qu'il fait | Garde | Prouve par |
+|---|---|---|---|
+| `Win32PnpActions` (helper eleve) | `pnputil /restart-device <id>` : relance un peripherique dont le pilote est en echec. `pnputil /export-driver oemNN.inf <dossier>` puis `/delete-driver oemNN.inf` : retire un vieux paquet d'affichage du magasin de Windows apres l'avoir sauvegarde ; `/add-driver <inf exporte> /install` le remet (Microsoft Learn, « PnPUtil command syntax ») | identifiant de peripherique par regex (enumerateur, barre, puis lettres, chiffres et `& _ . - # { } \ : + ,`, sans espace ni guillemet : jamais une option) ; relance refusee si Windows ne tient pas ce peripherique pour en panne (`CM_Get_DevNode_Status`, `DN_HAS_PROBLEM`) : la carte graphique, la carte reseau ou un disque qui marchent ne se relancent pas ; nom publie `oemN.inf` seulement ; le paquet est relu dans `%windir%\INF` et doit etre de la classe Display (`[Version]`, `Class=Display` ou son GUID) ; aucune suppression sans export relu ; jamais `/force` ni `/uninstall`, donc Windows refuse un paquet encore utilise, et la relecture du magasin le dit ; l'export vit sous `%ProgramData%\DrDxt\pilotes-retires`, durci (Administrateurs et SYSTEM), relu fiable avant toute reinstallation, un dossier horodate par retrait (un `oemNN.inf` reutilise par Windows n'efface pas la sauvegarde d'avant ; la remise prend le dernier), chemin derive du nom par le helper, jamais transmis ; un seul `.inf` d'affichage par export ; `pnputil.exe` resolu depuis le dossier systeme ; jamais le revert d'un bail | `GestesPnpTests` (relance et codes, export puis retrait, paquet non Display intouche, export rate = rien retire, paquet garde par Windows, paquet absent, remise, dossier non fiable jamais installe, allowlist des identifiants et des noms, codec), `LeaseWatchdogTests` |
+
+Nuisance possible, dite : relancer un peripherique le coupe un instant (une souris, une carte reseau). Retirer un vieux
+paquet empeche Windows d'y revenir apres une mise a jour ratee, ce qui est l'effet voulu ; la sauvegarde et « Annuler »
+le rendent. Le pilote en service n'est jamais propose (MagasinDePilotes), et Windows le refuserait de toute facon.
+
+### 15/10/2026 — deux reglages DRS de plus : la surcouche DLSS d'un jeu
+
+`ApplyNvApiDrsSettingOp` / `DeleteNvApiDrsSettingOp` admettent `NGX_DLSS_SR_OVERRIDE` (0x10E41E01, 0 ou 1) et
+`NGX_DLSS_SR_OVERRIDE_RENDER_PRESET_SELECTION` (0x10E41DF3, 0 a 15 ou Latest = 0x00FFFFFF), valeurs bornees par
+`ValeursDrs` d'apres NvApiDriverSettings.h. Meme portee que les autres : un chemin d'executable complet ou le profil de base,
+et le produit n'ecrit qu'au profil d'un jeu qui en a deja un. Nuisance possible, dite : une image plus nette pour un calcul
+un peu plus lourd ; la generation d'images (latence) n'est pas touchee. Prouve par `SurcoucheDlssTests`, `GesteDlssTests`.
 
 ## Ce que le produit a le DROIT de dire au client
 

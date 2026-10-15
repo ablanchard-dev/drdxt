@@ -15,7 +15,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 07/10/2026 (chantier J5, enquête #30) : le journal des changements et le retrait automatique étaient testés
+/// Le journal des changements et le retrait automatique étaient testés
 /// morceau par morceau, jamais tels qu'ils tournent chez un joueur. Ici, une histoire de deux semaines rejouée de bout en
 /// bout avec les vrais types : la machine de référence enregistrée est scannée, « Optimiser » pose trois réglages au
 /// redémarrage par les vrais leviers (registre et helper factices), les parties arrivent par la vraie veille (jeu,
@@ -28,7 +28,7 @@ namespace DrDxt.App.Tests;
 /// (2) les réglages posés par un même clic basculent au même instant, et chacun bornait l'autre à zéro partie : aucun
 /// n'était jugé, rien n'était retiré ; (3) jugés ensemble, leur mesure unique se composait une fois par réglage dans la
 /// ligne des gains (-38 % annoncés pour une perte de 15 %) ; (4) la veille datait ses captures sur l'horloge réelle.
-/// J5b : (5) les bascules ne se relevaient qu'au scan ; un joueur qui ne rescannait pas n'était jamais jugé ni protégé ;
+/// (5) les bascules ne se relevaient qu'au scan ; un joueur qui ne rescannait pas n'était jamais jugé ni protégé ;
 /// (6) la phrase « retiré par DrDXT » disparaissait au premier rafraîchissement de la carte.
 /// </summary>
 public sealed class HistoireDUnJoueurTests : IDisposable
@@ -59,7 +59,7 @@ public sealed class HistoireDUnJoueurTests : IDisposable
     {
         Directory.CreateDirectory(_dossier);
         _helper.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
-            // Revue F-29 : un vrai helper répond plus tard ; une tâche déjà finie cachait un retrait non attendu.
+            // Un vrai helper répond plus tard ; une tâche déjà finie cachait un retrait non attendu.
             .Returns(async ci => { await Task.Yield(); Ecrire(ci.Arg<PrivilegedOp>()); return Result.Ok(); });
         _registre.ReadDword(default, default!, default!).ReturnsForAnyArgs(Result<uint?>.Ok(0u));
         _registre.ReadDword(RegistryHiveKind.LocalMachine, Hw, "HwSchMode").Returns(Result<uint?>.Ok(1u));
@@ -75,7 +75,7 @@ public sealed class HistoireDUnJoueurTests : IDisposable
         _vm = Lancer();
     }
 
-    /// <summary>Revue F-25 : le registre factice garde ce qu'on y écrit, comme le vrai. Le mode Jeu et la valeur
+    /// <summary>Le registre factice garde ce qu'on y écrit, comme le vrai. Le mode Jeu et la valeur
     /// HwSchMode se relisent aussitôt ; le fichier d'échange aussi, dans le registre, alors qu'il ne prend effet qu'au
     /// redémarrage ; HAGS effectif, lui, attend le redémarrage (le test le bascule).</summary>
     private void Ecrire(PrivilegedOp op)
@@ -117,7 +117,6 @@ public sealed class HistoireDUnJoueurTests : IDisposable
             ScanViewModelTestSeams.PlanConsumption(["latency.hagsOn", "latency.gameModeOn", "fixit.sane_pagefile"]));
 
         var vm = new ScanViewModel(hd, sr, br, new ScanScorer(), sd, ScanViewModelTestSeams.Safety(), new MoteurQuiReussit(_leviers), plan,
-            ScanViewModelTestSeams.GpuTuningStep(), ScanViewModelTestSeams.Navigation(), ScanViewModelTestSeams.DashboardFactory(),
             ScanViewModelTestSeams.DesiredStateStore(), new AppliedTweakManifestMapper(), ScanViewModelTestSeams.BiosAdvisor(),
             ScanViewModelTestSeams.GuideGenerator(), Fr, repairAudit: () => _machine.Sante, lireStabilite: () => (null, Array.Empty<ArretClasse>()),
             journalLeviers: new JournalDesLeviersAppliques(Fichier("leviers.json")))
@@ -205,7 +204,7 @@ public sealed class HistoireDUnJoueurTests : IDisposable
 
     private IReadOnlyList<Changement> Journal() => new JournalDesChangements(Fichier("changements.json")).Lire();
 
-    /// <summary>Les bascules du clic d'Optimiser du jour 4 : parties de la pose (F-25), le retour à « éteint » exclu.</summary>
+    /// <summary>Les bascules du clic d'Optimiser du jour 4 : parties de la pose, le retour à « éteint » exclu.</summary>
     private static bool DuClic(Changement c) => c.Depuis == T(4, 12) && c.Cle?.EndsWith(":on", StringComparison.Ordinal) == true;
 
     private int EcritsSur(string nom) => _ecrits.OfType<SetRegistryValueOp>().Count(o => o.Name == nom);
@@ -248,7 +247,7 @@ public sealed class HistoireDUnJoueurTests : IDisposable
         await Jouer(T(6, 20), 81);
 
         // Jour 7 : un scan voit les deux bascules au redémarrage. Elles datent du redémarrage qui a suivi la pose, pas de ce
-        // scan ; le mode Jeu, qui agit tout de suite, s'est daté à la pose (F-25).
+        // scan ; le mode Jeu, qui agit tout de suite, s'est daté à la pose.
         await Scanner(T(7, 10));
         var bascules = Journal().Where(c => c.Cle?.EndsWith(":on", StringComparison.Ordinal) == true).ToList();
         bascules.Select(c => c.Cle).Should().BeEquivalentTo(["windows.hags:on", "windows.game_mode:on", "memoire.fichier_echange:on"]);
@@ -259,7 +258,7 @@ public sealed class HistoireDUnJoueurTests : IDisposable
         cartes.Should().Contain(Retire("windows.hags")).And.Contain(Retire("windows.game_mode"));
         cartes.Should().NotContain(Retire("memoire.fichier_echange"), "F-9 : le fichier d'échange ne se retire pas sur les images");
         cartes.Should().Contain(l => l.StartsWith("Ce que tes changements", StringComparison.Ordinal) && l.Contains("1 changement prouvé"));
-        // F-25 : le mode Jeu, jugé dès la pose, a été retiré pendant la partie du jour 6 ; le scan du jour 7 relève son retour
+        // Le mode Jeu, jugé dès la pose, a été retiré pendant la partie du jour 6 ; le scan du jour 7 relève son retour
         // à « éteint », et la carte (trois changements au plus) ne montre plus sa bascule de la pose. Son bilan reste le même.
         cartes.Count(l => l.Contains(Fr("Changement.Pire")) && l.Contains("95 puis 81")).Should().Be(2);
         ScanViewModel.BilansDesChangements(Journal(), _vm.MemoireParties!.Lire(), null).Where(x => DuClic(x.C))
@@ -272,16 +271,16 @@ public sealed class HistoireDUnJoueurTests : IDisposable
         new JournalDesLeviersAppliques(Fichier("leviers.json")).Lire().Select(s => s.TweakId).Should().Equal("fixit.sane_pagefile");
         _vm.LeviersPoses.Select(l => l.Id).Should().Equal("fixit.sane_pagefile");
         _sortisDuManifeste.Should().BeEquivalentTo(["latency.hagsOn", "latency.gameModeOn"]);
-        // F-8 : la fenêtre est encore ouverte et le relevé n'est pas plein : rien n'est figé, sauf ce qui vient d'être
+        // La fenêtre est encore ouverte et le relevé n'est pas plein : rien n'est figé, sauf ce qui vient d'être
         // retiré (J5, 07/10) : son verdict est figé au retrait, pour que les parties d'après ne le réécrivent pas.
         var basculees = Journal().Where(c => c.Cle?.StartsWith("pose:", StringComparison.Ordinal) != true).ToList();
         basculees.Where(c => c.Cle is "windows.hags:on" or "windows.game_mode:on")
             .Should().HaveCount(2).And.OnlyContain(c => c.Fige != null && c.Fige.Verdict == VerdictEnJeu.Pire);
-        // F-25 : le fichier d'échange, lui, a sa fenêtre close par le retour du mode Jeu à « éteint » relevé à ce scan.
+        // Le fichier d'échange, lui, a sa fenêtre close par le retour du mode Jeu à « éteint » relevé à ce scan.
         basculees.Single(c => c.Cle == "memoire.fichier_echange:on").Fige.Should().Match<BilanDuChangement>(b => b.Verdict == VerdictEnJeu.Pire);
         basculees.Where(c => !DuClic(c)).Should().OnlyContain(c => c.Fige == null);
 
-        // F-25 : le retour du mode Jeu à « éteint », relevé ce matin, est un changement ; trois parties et un scan le suivent
+        // Le retour du mode Jeu à « éteint », relevé ce matin, est un changement ; trois parties et un scan le suivent
         // avant le BIOS, pour que la mémoire ait un avant.
         await Jouer(T(7, 12), 81);
         await Jouer(T(7, 14), 80);
@@ -293,7 +292,7 @@ public sealed class HistoireDUnJoueurTests : IDisposable
         _reglages = _reglages with { HagsEffective = TriState.Off, Hags = TriState.Off, GameMode = TriState.Off };
         _inventaire = _inventaire with { Memory = _inventaire.Memory.Select(m => m with { ConfiguredMhz = 3600 }).ToList() };
         await Scanner(T(8, 10));
-        // F-8 : le changement suivant ferme la fenêtre du premier ; son bilan est figé, tranché.
+        // Le changement suivant ferme la fenêtre du premier ; son bilan est figé, tranché.
         Journal().Where(DuClic).Should().HaveCount(3).And.OnlyContain(c => c.Fige != null && c.Fige.Verdict == VerdictEnJeu.Pire);
 
         await Jouer(T(8, 20), 70);
@@ -335,7 +334,7 @@ public sealed class HistoireDUnJoueurTests : IDisposable
         _vm.LeviersPoses.Select(l => l.Id).Should().Equal("fixit.sane_pagefile");
     }
 
-    // J5b : le joueur optimise, redémarre et joue sans jamais rescanner. Le relevé de fond (ouverture de session) note les
+    // Le joueur optimise, redémarre et joue sans jamais rescanner. Le relevé de fond (ouverture de session) note les
     // bascules et juge les parties, sans rien retirer ; l'ouverture de DrDXT retire ce qui coûte, et la carte le dit, même
     // après la partie suivante.
     [Fact]
@@ -382,7 +381,7 @@ public sealed class HistoireDUnJoueurTests : IDisposable
         _vm.LignesParties.Should().Contain(l => l.Contains(Fr("Changement.Pire")) && l.Contains("95 puis 81"));
     }
 
-    // Revue F-25 : le mode Jeu agit tout de suite. Posé par Optimiser, il n'était relevé qu'à la prochaine ouverture
+    // Le mode Jeu agit tout de suite. Posé par Optimiser, il n'était relevé qu'à la prochaine ouverture
     // ou au prochain scan, et les parties jouées entre la pose et ce relevé ne comptaient d'aucun côté. Il se relève juste
     // après la pose ; le fichier d'échange, déjà écrit au registre mais actif seulement au redémarrage, attend.
     [Fact]
@@ -438,7 +437,7 @@ public sealed class HistoireDUnJoueurTests : IDisposable
         _ecrits.Should().HaveCount(ecrits, "les poses sont illisibles : DrDXT ne sait plus ce qu'il a posé, il ne retire rien");
         _vm.LignesParties.Should().Contain(l => l.Contains("Call of Duty") && l.Contains("FPS"), "les parties restent à l'écran");
         _vm.LignesParties.Should().NotContain(l => l.Contains(Fr("Changement.Pire")));
-        // 08/10/2026 : la carte se lit en résumé puis détail ; les deux ensemble redonnent tout, dans le même ordre.
+        // La carte se lit en résumé puis détail ; les deux ensemble redonnent tout, dans le même ordre.
         _vm.LignesPartiesResume.Concat(_vm.LignesPartiesDetail).Should().Equal(_vm.LignesParties);
         _vm.LignesPartiesDetail.Should().Contain(l => l.Contains("Call of Duty") && l.Contains("FPS"), "une partie est du détail, repliée");
 

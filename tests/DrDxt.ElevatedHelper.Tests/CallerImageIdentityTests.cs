@@ -5,24 +5,24 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// M5 caller-auth hardening: the dev-path check now verifies the connecting
-// image's IDENTITY (path + image hash), not just its path. A peer that sits at
-// the same path but is a DIFFERENT binary is rejected — closing the gap where
-// path equality alone would trust a swapped exe.
+// Durcissement de l'authentification de l'appelant : la vérification du chemin de
+// développement contrôle l'identité de l'image qui se connecte (chemin + empreinte), pas
+// seulement son chemin. Un pair au même chemin mais d'un binaire différent est refusé :
+// l'égalité de chemin seule ferait confiance à un exécutable substitué.
 //
-// The real Authenticode (WinVerifyTrust + publisher pin) check for SIGNED release
-// builds is still a documented TODO; this layer is the UNSIGNED dev-build identity
-// gate (exe-path + image-hash match). It never fails open: any doubt -> deny.
+// La vraie vérification Authenticode (WinVerifyTrust + éditeur épinglé) des versions
+// signées reste à faire ; cette couche est la porte d'identité des versions de
+// développement non signées (chemin + empreinte de l'image). Jamais ouverte : doute = refus.
 //
-// Identity resolution is behind a seam (ICallerImageIdentity) so this is unit-
-// tested with fakes; the real path+hash resolution is the live boundary.
+// La résolution d'identité est derrière une couture (ICallerImageIdentity), testée ici
+// avec des faux ; la vraie résolution chemin + empreinte est la frontière vivante.
 // -----------------------------------------------------------------------
 public sealed class CallerImageIdentityTests
 {
     private const string ExpectedExe = @"C:\Program Files\DrDXT\DrDxt.App.exe";
     private static readonly byte[] ExpectedHash = { 1, 2, 3, 4, 5 };
 
-    // A fake identity resolver: maps a PID to (path, hash) or returns null.
+    // Faux résolveur d'identité : associe un PID à (chemin, empreinte) ou rend null.
     private sealed class FakeIdentity : ICallerImageIdentity
     {
         private readonly (string path, byte[]? hash)? _result;
@@ -52,7 +52,7 @@ public sealed class CallerImageIdentityTests
     [Fact]
     public void Denies_when_path_matches_but_hash_differs()
     {
-        // Same path, DIFFERENT binary (swapped exe) -> deny (this is the gap closed).
+        // Même chemin, binaire différent (exécutable substitué) → refus : c'est la brèche fermée.
         var auth = Auth(new FakeIdentity((ExpectedExe, new byte[] { 9, 9, 9 })));
         var r = auth.Authorize(new CallerInfo(1234));
         r.IsOk.Should().BeFalse();
@@ -69,7 +69,7 @@ public sealed class CallerImageIdentityTests
     [Fact]
     public void Denies_when_hash_could_not_be_computed()
     {
-        // No hash resolved (file unreadable) -> cannot prove identity -> deny.
+        // Aucune empreinte résolue (fichier illisible) → identité improuvable → refus.
         var auth = Auth(new FakeIdentity((ExpectedExe, (byte[]?)null)));
         auth.Authorize(new CallerInfo(1234)).IsOk.Should().BeFalse();
     }
@@ -104,5 +104,19 @@ public sealed class CallerImageIdentityTests
         Action act = () => DrDxtAppCallerAuthenticator.WithImageIdentity(
             ExpectedExe, Array.Empty<byte>(), new FakeIdentity((ExpectedExe, ExpectedHash)));
         act.Should().Throw<ArgumentException>();
+    }
+
+    // MainModule lit la liste des modules dans la mémoire du processus appelant : une valeur qu'il contrôle. Le chemin
+    // vient du noyau (QueryFullProcessImageNameW, comme PipeServerIdentity), et le résolveur ne passe plus par MainModule.
+    [Fact]
+    public void Le_chemin_de_l_appelant_vient_du_noyau_pas_de_sa_memoire()
+    {
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
+        var source = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.ElevatedHelper", "Ipc", "CallerImageIdentity.cs"));
+        source.Should().NotContain(".MainModule");
+
+        var moi = new Win32CallerImageIdentity().Resolve(Environment.ProcessId);
+        moi!.Value.Path.Should().BeEquivalentTo(Environment.ProcessPath);
     }
 }

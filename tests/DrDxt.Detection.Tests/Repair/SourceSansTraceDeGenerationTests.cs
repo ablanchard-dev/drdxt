@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// Le 24/09/2026, 1 030 pictogrammes (dont une partie dans des textes affichés) et 17 marqueurs
+/// 1 030 pictogrammes (dont une partie dans des textes affichés) et 17 marqueurs
 /// « ponytail: » ont été retirés du code. Le dépôt est destiné à être public : ce sont des traces
 /// d'écriture générée, pas du code. Ce test fait échouer leur retour dans `src`.
 /// </summary>
@@ -14,11 +14,11 @@ public sealed class SourceSansTraceDeGenerationTests
     private static bool Pictogramme(string ligne) => ligne.EnumerateRunes().Any(r => r.Value is (>= 0x1F300 and <= 0x1FAFF) or (>= 0x2600 and <= 0x27BF) or 0x2B50 or 0x2B55);
     private static readonly Regex Marqueur = new(@"\bponytail\b", RegexOptions.IgnoreCase);
 
-    // PUB2 (08/10/2026) : le dépôt devient public ; les noms internes du travail (l'agent de revue, les fichiers de boucle) n'y
+    // Le dépôt devient public ; les noms internes du travail (l'agent de revue, les fichiers de boucle) n'y
     // ont pas leur place. Sensible à la casse : « fable » et « loop » sont aussi des mots courants.
-    // Audit du 09/10/2026 : le prénom du mainteneur était revenu dans 4 fichiers de src ; le prénom du mainteneur n'a rien à y faire.
+    // Un prénom de personne n'a rien à faire dans src.
     private static readonly Regex NomInterne = new(@"\bFable\b|LOOP-DRDXT|\bAlex\b");
-    // Les mots d'insistance les plus fréquents avant le 24/09/2026 (never 194, only 159...), en
+    // Les mots d'insistance les plus fréquents (relevé : never 194, only 159...), en
     // capitales dans un commentaire. Le bandeau de sécurité des clés garde les siennes : c'est un
     // contrat vérifié par SecurityGateTests, pas un cri.
     private static readonly HashSet<string> BandeauxDeSecurite = ["UpdateDevKeys.cs", "ManifestDevKeys.cs"];

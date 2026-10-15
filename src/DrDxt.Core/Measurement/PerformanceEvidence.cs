@@ -17,12 +17,12 @@ public enum EvidenceOutcome
     NoResolvedChange,
 
     /// <summary>L'experience elle-meme ne tient pas : perte de focus, capture defaillante, charge
-    /// concurrente. Aucun chiffre n'en sort — et surtout pas un « pas de changement ».</summary>
+    /// concurrente. Aucun chiffre n'en sort, et surtout pas un « pas de changement ».</summary>
     Invalid,
 }
 
 /// <summary>
-/// Un ecart, et ce que l'experience pouvait resoudre — les deux ensemble, toujours.
+/// Un ecart, et ce que l'experience pouvait resoudre : les deux ensemble, toujours.
 ///
 /// Ce type remplace un booleen, `AbVerdict.IsMeasurableGain`, et c'est lui qui forcait a mentir.
 /// Le banc deterministe resout **0,1 %** (mesure du 06/09 : sigma/moyenne 0,122 % sur 10 passes) ;
@@ -30,13 +30,13 @@ public enum EvidenceOutcome
 /// pas porter cette difference : il oblige a jeter un gain sous-systeme reel, ou a le survendre.
 ///
 /// Le cas qui a impose ce modele (07/09, RTX 4060) : l'offset `+100/100` rend **+2,7 % de calcul
-/// GPU a watts identiques**, reproductible, controle A/A' a 0,72 % — et c'est **3,6 fois sous le
+/// GPU a watts identiques**, reproductible, controle A/A' a 0,72 %, et c'est **3,6 fois sous le
 /// plancher in-game de 9,9 %**. Les deux affirmations sont vraies en meme temps.
 /// </summary>
 /// <param name="DeltaPct">L'ecart mesure, en pourcent, signe. Conserve meme quand rien n'est
 /// prouve : il faut bien l'afficher pour dire « +2,7 %, non resolu a +/-4,8 % ».</param>
 /// <param name="ResolutionPct">Ce que cette experience sait resoudre. <c>+∞</c> quand elle ne le
-/// sait pas — c'est la valeur que rend `InterRunMarginOfError` sous 3 passes.</param>
+/// sait pas : c'est la valeur que rend `InterRunMarginOfError` sous 3 passes.</param>
 /// <param name="InvalidReason">Renseigne uniquement pour <see cref="EvidenceOutcome.Invalid"/>.</param>
 public readonly record struct Evidence(
     double DeltaPct,
@@ -50,7 +50,7 @@ public readonly record struct Evidence(
 
     /// <summary>Juge un ecart contre la resolution de l'experience qui l'a produit.
     ///
-    /// La borne se resout du cote prudent : un ecart EGAL a la resolution ne prouve rien — un
+    /// La borne se resout du cote prudent : un ecart egal a la resolution ne prouve rien : un
     /// instrument qui conclut pile a son propre seuil prouve son seuil, pas un gain. Et une
     /// resolution non finie ne permet aucune conclusion : affirmer reviendrait a inventer une
     /// resolution que personne n'a mesuree.</summary>
@@ -67,7 +67,7 @@ public readonly record struct Evidence(
         return new Evidence(deltaPct, resolutionPct, issue, null);
     }
 
-    /// <summary>L'experience n'a pas tenu. Aucun chiffre n'en sort — le delta est mis a
+    /// <summary>L'experience n'a pas tenu. Aucun chiffre n'en sort : le delta est mis a
     /// <c>NaN</c> pour qu'aucun appelant ne puisse l'afficher par megarde.</summary>
     public static Evidence Invalide(string motif) =>
         new(double.NaN, double.NaN, EvidenceOutcome.Invalid, motif);
@@ -78,12 +78,12 @@ public readonly record struct Evidence(
 /// <param name="Nom">L'identifiant du sous-systeme mesure, ex. <c>gpu.debit</c>.</param>
 public sealed record SubsystemEvidence(string Nom, Evidence Preuve);
 
-/// <summary>Ce que le JEU a fait — la seule chose que le joueur ressent, et la moins resolue.</summary>
+/// <summary>Ce que le jeu a fait : la seule chose que le joueur ressent, et la moins resolue.</summary>
 /// <param name="Metrique">L'identifiant de la grandeur, ex. <c>fps.moyen</c>, <c>fps.p1low</c>.</param>
 public sealed record GameEvidence(string Metrique, Evidence Preuve);
 
 /// <summary>
-/// Les deux preuves coexistent — elles ne s'excluent pas.
+/// Les deux preuves coexistent, elles ne s'excluent pas.
 ///
 /// C'est la correction de fond apportee au modele a trois niveaux « A ou B ou C » : un changement
 /// produit une preuve sous-systeme et une preuve en jeu, chacune avec sa propre resolution, et il
@@ -103,7 +103,7 @@ public sealed record PerformanceEvidence(SubsystemEvidence? Subsystem, GameEvide
     public bool QuelqueChoseDeProuve =>
         (Subsystem?.Preuve.EstConcluante ?? false) || (Game?.Preuve.EstConcluante ?? false);
 
-    /// <summary>Un gain que le JOUEUR ressent, prouve au-dessus du bruit de sa session. C'est la
+    /// <summary>Un gain que le joueur ressent, prouve au-dessus du bruit de sa session. C'est la
     /// seule affirmation qui justifie de promettre des FPS.</summary>
     public bool GainEnJeuProuve => Game?.Preuve.Outcome == EvidenceOutcome.ProvenGain;
 

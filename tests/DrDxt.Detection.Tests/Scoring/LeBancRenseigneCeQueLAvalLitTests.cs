@@ -11,17 +11,10 @@ namespace DrDxt.Detection.Tests.Scoring;
 /// <summary>
 /// Le meme trou que le p95, sur les autres grandeurs optionnelles du banc.
 ///
-/// Le 11/09/2026 une mutation a montre que remplacer `P95FrametimeMs` par `null` dans
-/// <see cref="BenchmarkRunner"/> — le banc de production — laissait les 3 727 tests du depot
-/// verts. Le code etait juste, la garantie n'existait pas.
-///
-/// Le crible a ete repris le meme jour sur les **15** arguments optionnels que ce banc passe a
-/// `BenchmarkResult`, un par un, chacun force a `null`, suite complete relancee a chaque fois :
-/// **8 mutations sur 15 restaient VERTES**. Ce fichier ferme les 7 qui ont un consommateur. La
-/// 8e, `P99FrametimeMs`, n'en avait aucun — ni lecture dans `src/`, `tools/`, `tests/`, `server/`,
-/// le XAML ou les ressources, ni persistance (aucun enregistrement ecrit sur disque ne contient un
-/// `BenchmarkResult`), ni reflexion : elle a ete SUPPRIMEE le 11/09/2026 sur decision produit, avec
-/// ses deux producteurs.
+/// Chaque argument optionnel que <see cref="BenchmarkRunner"/> (le banc de production) passe a
+/// `BenchmarkResult` doit etre garde par un test : force a `null` par mutation, sans test qui le lit,
+/// la suite resterait verte (mesure : 8 mutations sur 15 vertes). Ce fichier ferme les grandeurs qui
+/// ont un consommateur.
 ///
 /// Ce que ces tests prouvent, et pas autre chose. Les etats du classifieur sont deja testes
 /// sur des `BenchmarkResult` construits a la main (`BottleneckClassifierTests`). Ce qui n'etait

@@ -5,7 +5,7 @@ namespace DrDxt.Integration.Tests;
 /// <summary>
 /// Le backend est dans la solution, et il doit y rester.
 ///
-/// Constate le 07/09/2026 : `server/DrDxt.Server/DrDxt.Server.csproj` affirmait en commentaire
+/// `server/DrDxt.Server/DrDxt.Server.csproj` affirmait en commentaire
 /// etre « **intentionally NOT part of DrDXT.sln** ». Il y est — lui et ses tests — et ses **51
 /// tests** tournent a chaque `dotnet test DrDXT.sln`.
 ///

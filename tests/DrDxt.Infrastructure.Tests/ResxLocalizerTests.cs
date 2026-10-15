@@ -9,7 +9,7 @@ namespace DrDxt.Infrastructure.Tests;
 public sealed class ResxLocalizerTests
 {
     // -----------------------------------------------------------------------
-    // Direct construction tests
+    // Tests de construction directe
     // -----------------------------------------------------------------------
 
     [Fact]
@@ -61,13 +61,8 @@ public sealed class ResxLocalizerTests
         localizer.Get("Common_Ok", new CultureInfo("fr")).Should().Be("OK");
     }
 
-    // Ce test exigeait « Score de santé » en francais. La cle a ete retiree du catalogue
-    // le 18/09/2026 avec le dernier score que le client pouvait lire : un plancher
-    // mathematique a 47 rendait ce chiffre incapable de dire qu'une machine est mal
-    // reglee. Le test etait reste, rouge, a reclamer la chaine supprimee.
-    //
-    // Il garde la meme place, mais tenu a l'endroit : le score ne doit pas revenir par
-    // le catalogue. La regle vaut pour les deux langues et pour les deux formes de cle.
+    // Le score ne doit pas revenir par le catalogue : un plancher mathematique a 47 le rend
+    // incapable de dire qu'une machine est mal reglee. La regle vaut pour les deux langues et pour les deux formes de cle.
     [Theory]
     [InlineData("Scan_Score_Label")]
     [InlineData("scan.score.label")]

@@ -4,11 +4,9 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D11.3, revue n° 5) : « Relever mes parties » et « Surveiller mes parties » se lisaient
-// comme une seule fonction (ce sont deux : les FPS, le ping) et aucune ne disait son état.
-// 08/10/2026 (critique UI, défaut 10) : l'état s'écrivait dans le texte d'un bouton pilule (« Éteint · surveiller mon
-// ping »). C'est maintenant un vrai interrupteur : la piste dit l'état, son mot (« Allumé » / « Éteint ») est à côté,
-// et le libellé ne dit plus que ce que ça fait. La règle reste : chaque bascule dit son état.
+// « Relever mes parties » (les FPS) et « Surveiller mes parties » (le ping) sont deux fonctions.
+// Chacune est un vrai interrupteur : la piste dit l'état, son mot (« Allumé » / « Éteint ») est à côté,
+// et le libellé ne dit que ce que ça fait. La règle : chaque bascule dit son état.
 public sealed class BasculesDisentLeurEtatTests
 {
     private static string L(string cle) => new DrDxt.Infrastructure.Localization.ResxLocalizer().Get(cle, new CultureInfo("fr"));

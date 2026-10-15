@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// 25/09/2026 : une tâche planifiée lancée en SYSTEM ou au plus haut niveau depuis un fichier que le compte
+/// Une tâche planifiée lancée en SYSTEM ou au plus haut niveau depuis un fichier que le compte
 /// peut modifier est la même élévation qu'un service remplaçable. Vue sur la machine de reference : une tâche « plus haut
 /// niveau » qui lance un pythonw.exe de ses Téléchargements.
 /// </summary>
@@ -51,18 +51,20 @@ public sealed class TachesRemplacablesTests : IDisposable
         constats[0].Statut.Should().Be(RepairStatus.Suspicious);
         // Une tâche n'est pas un service : sa propre famille, et son propre titre à l'écran et dans le rapport.
         RepairLibelles.Domaine(constats[0].Domaine).Should().Be("Tâches planifiées");
-        // 29/09/2026, photo de l'accueil : « Tâche planifiée \Agent de projet ». La barre du dossier racine
+        // Photo de l'accueil : « Tâche planifiée \Agent de projet ». La barre du dossier racine
         // du Planificateur n'a pas de sens pour un joueur : le titre porte le nom, le détail dit où la trouver.
         constats[0].Nom.Should().StartWith("tâche planifiée Agent :");
         constats[0].Explication.Should().Contain(@"Planificateur de tâches : \Agent");
         constats[0].Explication.Should().Contain("sans passer par la fenêtre de confirmation");
-        // 29/09/2026, seconde critique : « tâche planifiée remplaçable » est du jargon qui fait peur sans rien dire.
+        constats[0].Remede.Should().StartWith("1) ").And.Contain("Supprimer").And.Contain("Program Files");
+        constats[0].Explication.Should().NotContain("Déplacer le programme");
+        // « tâche planifiée remplaçable » est du jargon qui fait peur sans rien dire.
         // Le titre dit ce qui peut arriver, en mots de joueur.
         constats[0].Nom.Should().NotContain("remplaçable").And.Contain("peut être remplacé par un autre programme");
     }
 
-    // 25/09/2026, relu sur la machine : la tâche vue sur la machine de reference est désactivée, et le constat disait encore
-    // « cette tâche se lance ». Désactivée, elle ne se lance pas ; le chemin reste, réactivée elle élèverait.
+    // Une tâche désactivée ne se lance pas : le constat ne dit pas « cette tâche se lance ». Le chemin reste,
+    // réactivée elle élèverait.
     [Fact]
     public void Une_tache_desactivee_ne_dit_pas_qu_elle_se_lance()
     {
@@ -97,4 +99,17 @@ public sealed class TachesRemplacablesTests : IDisposable
     public void Une_liste_illisible_est_dite_non_lue()
         => RepairAuditService.TachesRemplacables(Result<IReadOnlyList<WmiRow>>.Fail(ErrorCodes.WmiFail, "refus"), _ => "x")
             .Single().Statut.Should().Be(RepairStatus.Unknown);
+
+    // Une ACL illisible n'est pas une preuve : en anglais, sa raison ne commence plus par « ACL illisible », et elle
+    // devenait « tâche remplaçable » sur tout Windows anglais.
+    [Fact]
+    public void Une_ACL_illisible_ne_fait_pas_de_constat_dans_aucune_langue()
+    {
+        foreach (var langue in new[] { "en-US", "fr-FR" })
+        {
+            using var _ = Docteur.Portee(System.Globalization.CultureInfo.GetCultureInfo(langue));
+            RepairAuditService.TachesRemplacables(Lues(Tache("Agent", "SYSTEM", 0, _exe)), _ => Docteur.T("CP.Illisible", "UnauthorizedAccessException"))
+                .Should().BeEmpty(langue);
+        }
+    }
 }

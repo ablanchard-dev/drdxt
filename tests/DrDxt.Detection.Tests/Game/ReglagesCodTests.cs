@@ -37,7 +37,7 @@ public class ReglagesCodTests
         var c = ReglagesCod.Constats(ReglagesCod.Lire("f", Extrait, Recent), Recent);
         c.Should().ContainSingle().Which.Statut.Should().Be(RepairStatus.Observed);
         c[0].Explication.Should().Contain("155");
-        // 25/09/2026 : la valeur du jeu est citée comme telle, avec sa source.
+        // La valeur du jeu est citée comme telle, avec sa source.
         c[0].ValeurCourante.Should().MatchRegex(@"^Reflex « .+ » \(fichier de réglages de Call of Duty\)$");
     }
 
@@ -74,7 +74,7 @@ public class ReglagesCodTests
         finally { Directory.Delete(d, true); }
     }
 
-    // 29/09/2026 : en partie, la carte de la machine de référence tourne à 97 % ; ses FPS se jouent dans la carte, pas
+    // En partie, la carte de la machine de référence tourne à 97 % ; ses FPS se jouent dans la carte, pas
     // dans Windows. Le levier logiciel qui reste est le mode DLSS du jeu. Extrait du fichier réel (s.1.0.cod25.txt1, 25/09).
     private const string ExtraitDlss = """
         NvidiaReflex@0;33761;11445 = Enabled + boost

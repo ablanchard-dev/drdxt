@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Un crible qui parcourt des fichiers et conclut « aucune faute »
+// Un crible qui parcourt des fichiers et conclut « aucune faute »
 // dit deux choses tres differentes selon ce qu'il a lu : « j'ai lu la suite, elle
 // est propre », ou « je n'ai lu aucun fichier ». La seconde est verte aussi.
 //

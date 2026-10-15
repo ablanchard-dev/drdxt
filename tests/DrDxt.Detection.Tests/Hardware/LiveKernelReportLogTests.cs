@@ -29,7 +29,7 @@ public class LiveKernelReportLogTests : IDisposable
         if (Directory.Exists(_racine)) Directory.Delete(_racine, recursive: true);
     }
 
-    /// <summary>Ecrit un `Report.wer` conforme a ceux du 08/09/2026 : UTF-16, champs localises.</summary>
+    /// <summary>Ecrit un `Report.wer` conforme a ceux releves le 08/09/2026 : UTF-16, champs localises.</summary>
     private string Rapport(string dossier, string type, string code, string parametre1,
         long filetime, string? vidage = null)
     {
@@ -49,7 +49,7 @@ public class LiveKernelReportLogTests : IDisposable
         return chemin;
     }
 
-    // 06/10/2026 (chantier B8c) : sans droits administrateur, chaque dossier `Kernel_*` est lisible par les seuls
+    // Sans droits administrateur, chaque dossier `Kernel_*` est lisible par les seuls
     // administrateurs (ACL relue sur la machine de référence) et `File.Exists` y répond « absent ». Le lecteur rendait
     // « aucun rapport » sur une machine qui en avait deux.
     [Fact]
@@ -76,7 +76,7 @@ public class LiveKernelReportLogTests : IDisposable
             r.IsOk.Should().BeFalse("un rapport refusé n'est pas une absence de rapport");
             r.Error!.Value.Message.Should().Contain("accès refusé");
 
-            // Revue (F-31) : un second rapport, lisible : il est rendu, le refusé est compté à part.
+            // Un second rapport, lisible : il est rendu, le refusé est compté à part.
             Rapport("Kernel_144_def", "LiveKernelEvent", "144", "3003", 134318324727177547);
             var partiel = new WerLiveKernelReportLog(_racine);
             var lus = partiel.Lire();
@@ -96,7 +96,7 @@ public class LiveKernelReportLogTests : IDisposable
     [Fact]
     public void LE_CODE_EST_LU_EN_HEXADECIMAL_SINON_UN_WATCHDOG_GPU_DEVIENT_UN_CODE_INCONNU()
     {
-        // Le rapport reel du 22/08/2026 sur la machine de reference.
+        // Le rapport reel releve le 22/08/2026 sur la machine de reference.
         Rapport("Kernel_193_abc", "LiveKernelEvent", "193", "80e",
             134318324727177547, "WATCHDOG-20260822-0234.dmp");
 
@@ -128,7 +128,7 @@ public class LiveKernelReportLogTests : IDisposable
         var rapport = new WerLiveKernelReportLog(_racine).Lire().Value.Should().ContainSingle().Subject;
         rapport.Code.Should().Be(0xABC);
         rapport.NomSdk.Should().BeNull();
-        rapport.Phrase.Should().Contain("non repertorie");
+        rapport.Phrase.Should().Contain("non répertorié");
     }
 
     [Fact]

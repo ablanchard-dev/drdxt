@@ -4,25 +4,25 @@ using System.Runtime.Versioning;
 namespace DrDxt.GpuNative.Nvml;
 
 // -----------------------------------------------------------------------
-// NvmlNative — the SINGLE real P/Invoke boundary into nvml.dll.
+// NvmlNative : l'unique vraie frontière P/Invoke vers nvml.dll.
 //
-// Unlike NvApiNative (nvapi_QueryInterface + reverse-engineered private ids), NVML exports
-// its functions by NAME, so we resolve them straight off the loaded module. We load the
-// module ourselves (NativeLibrary.TryLoad) rather than a static [DllImport] so a machine
-// with NO NVIDIA driver (nvml.dll absent) yields IsAvailable == false instead of a
-// DllNotFoundException — the fail-clean contract.
+// Contrairement à NvApiNative (nvapi_QueryInterface + ids privés rétro-ingéniés), NVML exporte ses
+// fonctions par leur nom : on les résout directement sur le module chargé. On charge le module
+// soi-même (NativeLibrary.TryLoad) plutôt que par un [DllImport] statique, pour qu'une machine sans
+// pilote NVIDIA (nvml.dll absente) donne IsAvailable == false au lieu d'une
+// DllNotFoundException : le contrat d'échec propre.
 //
-// SURFACE (read-only, non-elevated — NVML queries need no elevation):
+// Surface (lecture seule, non élevée ; les requêtes NVML ne demandent aucune élévation) :
 //   nvmlInit_v2 → nvmlDeviceGetHandleByIndex_v2 → nvmlDeviceGetMemoryInfo
 //                                               → nvmlDeviceGetBAR1MemoryInfo.
 //
-// Exact symbols/structs frozen against nvml.h (NVML_SUCCESS = 0; nvmlDevice_t = opaque
-// pointer; nvmlMemory_t { ull total, free, used }; nvmlBAR1Memory_t { ull bar1Total,
-// bar1Free, bar1Used }). On x64 there is a single native calling convention, so the
-// Cdecl attribute is moot but kept for parity with NvApiNative.
+// Symboles et structs exacts figés contre nvml.h (NVML_SUCCESS = 0 ; nvmlDevice_t = pointeur
+// opaque ; nvmlMemory_t { ull total, free, used } ; nvmlBAR1Memory_t { ull bar1Total, bar1Free,
+// bar1Used }). Sur x64 il n'y a qu'une convention d'appel native : l'attribut Cdecl ne change rien
+// mais est gardé par symétrie avec NvApiNative.
 //
-// nvmlInit is called once (lazy, thread-safe) and intentionally not shut down: NVML init is
-// ref-counted and our reads are short-lived; the OS reclaims the handle at process exit.
+// nvmlInit est appelé une fois (paresseux, thread-safe) et exprès jamais arrêté : l'init de NVML
+// est comptée par référence et nos lectures sont brèves ; l'OS récupère le handle à la sortie du processus.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class NvmlNative : INvmlNative
@@ -34,13 +34,17 @@ public sealed class NvmlNative : INvmlNative
     private const int NvmlClockGraphics = 0; // nvmlClockType_t NVML_CLOCK_GRAPHICS (nvml.h)
     private const int NvmlClockMem = 2;      // nvmlClockType_t NVML_CLOCK_MEM (nvml.h)
 
-    // Fallback location used by older driver packages (modern drivers put nvml.dll in System32,
-    // which the default search already covers).
-    private const string NvsmiFallback =
-        @"C:\Program Files\NVIDIA Corporation\NVSMI\nvml.dll";
+    // Emplacement de repli des anciens paquets de pilote (les pilotes récents mettent nvml.dll dans System32,
+    // déjà couvert par la recherche par défaut). Le vrai Program Files, jamais un C:\ codé en dur : avec Windows sur un autre
+    // disque, C:\ peut être un volume de données où n'importe quel compte crée des dossiers, et ce repli se charge aussi dans le helper élevé.
+    internal static readonly string NvsmiFallback =
+        CheminDeSecours(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles));
 
-    // 23/09/2026 : un drapeau « déjà tenté » posé avant la fin de nvmlInit laissait un second fil
-    // sortir tout de suite et lire « NVML absent » : le Resizable BAR sortait « non lu » un scan sur
+    internal static string CheminDeSecours(string programFiles) =>
+        Path.Combine(programFiles, "NVIDIA Corporation", "NVSMI", "nvml.dll");
+
+    // Un drapeau « déjà tenté » posé avant la fin de nvmlInit laisserait un second fil
+    // sortir tout de suite et lire « NVML absent » : le Resizable BAR sortirait « non lu » un scan sur
     // deux. Lazy (ExecutionAndPublication) fait attendre chaque appelant jusqu'à la vraie réponse.
     private readonly Lazy<bool> _init;
     private bool _available => _init.Value;
@@ -111,14 +115,14 @@ public sealed class NvmlNative : INvmlNative
             if (_getHandle((uint)deviceIndex, out var device) != NvmlSuccess || device == IntPtr.Zero)
                 return false;
 
-            // Instant read — works on datacenter/older GPUs. DEPRECATED and N/A on Ada consumer
-            // cards (RTX 40-series, verified on a 4060 / driver 610.62: returns NOT_SUPPORTED).
+            // Lecture instantanée : marche sur les GPU de datacenter / plus anciens. Dépréciée et N/A sur les
+            // cartes Ada grand public (RTX série 40, vérifié sur une 4060 / pilote 610.62 : rend NOT_SUPPORTED).
             if (_getPower is not null && _getPower(device, out milliwatts) == NvmlSuccess && milliwatts != 0)
                 return true;
 
-            // Fallback: the power-samples ring buffer, averaged over the window. 25/09/2026, RTX 4060 /
-            // driver 616.56: nvidia-smi shows N/A for both the instant and the averaged draw, while
-            // this buffer returns 119 fresh samples (oldest 2.6 s) at 55.7 W with the card held in P0.
+            // Repli : le tampon circulaire des relevés de puissance, moyenné sur la fenêtre.
+            // Relevé du 25/09/2026, RTX 4060 / pilote 616.56 : nvidia-smi affiche N/A pour la consommation instantanée
+            // et moyenne, alors que ce tampon rend 119 relevés frais (le plus ancien à 2,6 s) à 55,7 W, carte tenue en P0.
             return TryAveragePowerSamples(device, out milliwatts);
         }
         catch { milliwatts = 0; return false; }
@@ -128,14 +132,14 @@ public sealed class NvmlNative : INvmlNative
     {
         milliwatts = 0;
         if (_getSamples is null) return false;
-        var samples = new NvmlSample[120]; // the driver keeps ~119 samples; a fixed buffer avoids the 2-call size dance
+        var samples = new NvmlSample[120]; // le pilote garde ~119 relevés ; un tampon fixe évite la danse des 2 appels pour la taille
         uint count = (uint)samples.Length;
         if (_getSamples(device, NvmlTotalPowerSamples, 0UL, out _, ref count, samples) != NvmlSuccess || count == 0)
             return false;
         ulong sum = 0;
         uint n = Math.Min(count, (uint)samples.Length);
         for (uint i = 0; i < n; i++)
-            sum += (uint)samples[i].Value; // power samples are unsigned-int mW in the value union
+            sum += (uint)samples[i].Value; // les relevés de puissance sont des mW en entier non signé dans l'union de valeur
         milliwatts = (uint)(sum / n);
         return milliwatts != 0;
     }
@@ -155,7 +159,7 @@ public sealed class NvmlNative : INvmlNative
         catch { celsius = 0; return false; }
     }
 
-    /// <summary>Le lien PCIe : generation et largeur NEGOCIEES maintenant, et le maximum que la carte et
+    /// <summary>Le lien PCIe : generation et largeur negociees maintenant, et le maximum que la carte et
     /// le slot savent faire. Au repos une carte NVIDIA redescend souvent en generation 1 pour
     /// economiser : l'appelant doit lire sous charge avant de conclure a un lien bride.</summary>
     public bool TryGetPcieLink(int deviceIndex, out uint gen, out uint largeur, out uint genMax, out uint largeurMax)
@@ -264,7 +268,7 @@ public sealed class NvmlNative : INvmlNative
             if (_getDriverVersion(buffer, (uint)buffer.Length) != NvmlSuccess) return false;
 
             // Buffer C : la chaine s'arrete au premier NUL. Prendre tout le buffer donnerait
-            // "580.88\0\0\0..." — une chaine qui a l'air juste, qui compare faux, et dont
+            // "580.88\0\0\0..." : une chaine qui a l'air juste, qui compare faux, et dont
             // personne ne verrait le probleme avant qu'un test d'egalite echoue.
             int end = Array.IndexOf(buffer, (byte)0);
             if (end < 0) end = buffer.Length;
@@ -335,9 +339,9 @@ public sealed class NvmlNative : INvmlNative
                 _getHandle = Resolve<HandleByIndexDelegate>(lib, "nvmlDeviceGetHandleByIndex_v2");
                 _getMemory = Resolve<MemoryInfoDelegate>(lib, "nvmlDeviceGetMemoryInfo");
                 _getBar1 = Resolve<Bar1MemoryInfoDelegate>(lib, "nvmlDeviceGetBAR1MemoryInfo");
-                // Power/temp are an ADDITIVE capability (the undervolt-efficiency instrument);
-                // a driver too old to export them must not disable ReBAR detection, so they are
-                // resolved best-effort and each reader guards its own delegate for null.
+                // Puissance / température sont une capacité en plus (l'instrument d'efficacité de l'undervolt) ;
+                // un pilote trop ancien pour les exporter ne doit pas désactiver la détection du ReBAR : elles
+                // sont résolues au mieux et chaque lecteur vérifie que son délégué n'est pas null.
                 _getPower = Resolve<PowerUsageDelegate>(lib, "nvmlDeviceGetPowerUsage");
                 _getTemp = Resolve<TemperatureDelegate>(lib, "nvmlDeviceGetTemperature");
                 _pcieGen = Resolve<UintValueDelegate>(lib, "nvmlDeviceGetCurrPcieLinkGeneration");
@@ -349,7 +353,7 @@ public sealed class NvmlNative : INvmlNative
                 _pcieLargeurMax = Resolve<UintValueDelegate>(lib, "nvmlDeviceGetMaxPcieLinkWidth");
                 _getSamples = Resolve<SamplesDelegate>(lib, "nvmlDeviceGetSamples");
                 _getDriverVersion = Resolve<SystemDriverVersionDelegate>(lib, "nvmlSystemGetDriverVersion");
-                // GPU-OC (08/10/2026) : le ventilateur, exports documentés de NVML ; chacun garde son délégué.
+                // Le ventilateur, exports documentés de NVML ; chacun garde son délégué.
                 _nombreVentilateurs = Resolve<UintValueDelegate>(lib, "nvmlDeviceGetNumFans");
                 _vitesseVentilateur = Resolve<FanValueDelegate>(lib, "nvmlDeviceGetFanSpeed_v2");
                 _cibleVentilateur = Resolve<FanValueDelegate>(lib, "nvmlDeviceGetTargetFanSpeed");
@@ -358,9 +362,8 @@ public sealed class NvmlNative : INvmlNative
                 _poserVentilateur = Resolve<SetFanSpeedDelegate>(lib, "nvmlDeviceSetFanSpeed_v2");
                 _rendreVentilateur = Resolve<FanDefaultDelegate>(lib, "nvmlDeviceSetDefaultFanSpeed_v2");
 
-                // Frequence et raison de bridage : API PUBLIQUES et DOCUMENTEES de NVML.
-                // Le 07/09/2026, il etait ecrit qu'elles « demanderaient NVAPI et ses
-                // identifiants prives ». C'etait faux, verifie dans la doc officielle le 08/09 :
+                // Frequence et raison de bridage : API publiques et documentees de NVML, sans NVAPI ni
+                // identifiants prives (verifie dans la doc officielle le 08/09) :
                 // nvmlDeviceGetClockInfo et nvmlDeviceGetCurrentClocksEventReasons sont des
                 // exports nommes et stables, au meme titre que la puissance et la temperature.
                 // Source : docs.nvidia.com/deploy/nvml-api, groupes nvmlDeviceQueries et
@@ -408,7 +411,7 @@ public sealed class NvmlNative : INvmlNative
         }
     }
 
-    // --- delegates (Cdecl for parity; moot on x64) ---
+    // --- délégués (Cdecl par symétrie ; sans effet sur x64) ---
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int InitDelegate();
@@ -425,9 +428,9 @@ public sealed class NvmlNative : INvmlNative
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int PowerUsageDelegate(IntPtr device, out uint milliwatts);
 
-    // nvmlSystemGetDriverVersion(char* version, unsigned int length) — remplit un buffer ASCII
+    // nvmlSystemGetDriverVersion(char* version, unsigned int length) : remplit un buffer ASCII
     // avec la branche NVIDIA telle que l'utilisateur la connait ("580.88"), pas la quadruplette
-    // WDDM de WMI. C'est une fonction SYSTEME : aucun handle de device, aucune elevation.
+    // WDDM de WMI. C'est une fonction systeme : aucun handle de device, aucune elevation.
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int SystemDriverVersionDelegate(byte[] version, uint length);
 
@@ -460,7 +463,7 @@ public sealed class NvmlNative : INvmlNative
         IntPtr device, int samplingType, ulong lastSeenTimeStamp,
         out int sampleValType, ref uint sampleCount, [In, Out] NvmlSample[] samples);
 
-    // --- structs (exact field order/types from nvml.h) ---
+    // --- structs (ordre et types de champs exacts de nvml.h) ---
 
     // nvmlProcessInfo_t (v2/v3) : pid, memoire utilisee, instances GPU/calcul.
     [StructLayout(LayoutKind.Sequential)]
@@ -482,8 +485,8 @@ public sealed class NvmlNative : INvmlNative
         public ulong Bar1Used;
     }
 
-    // nvmlSample_t { ull timeStamp; nvmlValue_t sampleValue; } — the value union is 8 bytes;
-    // for power samples it holds an unsigned-int mW in its low 32 bits (little-endian x64).
+    // nvmlSample_t { ull timeStamp; nvmlValue_t sampleValue; } : l'union de valeur fait 8 octets ;
+    // pour les relevés de puissance, elle tient des mW en entier non signé dans ses 32 bits bas (x64 petit-boutiste).
     [StructLayout(LayoutKind.Sequential)]
     private struct NvmlSample
     {

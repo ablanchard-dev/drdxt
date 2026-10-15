@@ -5,11 +5,11 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Autopilot;
 
 /// <summary>
-/// Une resolution qui dit « +/-74 % » ne dit pas **qui** LA RUINE.
+/// Une resolution qui dit « +/-74 % » ne dit pas **qui** la ruine.
 ///
-/// Session Warzone reelle du 07/09/2026 : la partie resolvait +/-74,0 % sur le score
-/// Competitive, et un candidat qui n'ecrit rien y a rendu -0,2 %. Verdict correct — mais la
-/// session s'arretait la, sans dire si la moyenne, elle, restait decidable. Or les deux grandeurs
+/// Mesure sur une session Warzone reelle du 07/09/2026 : +/-74,0 % sur le score Competitive, et un
+/// candidat qui n'ecrit rien y rend -0,2 %. Le verdict est correct, mais il ne dit pas si la moyenne,
+/// elle, reste decidable. Or les deux grandeurs
 /// du score n'ont aucune raison d'etre aussi dispersees : a 15 s et 140 fps, la moyenne porte
 /// ~2 100 frames quand le 1 % low n'en porte que ~21. Un percentile sur 21 tirages disperse
 /// enormement, et il entre dans le score a 65 %.
@@ -71,7 +71,7 @@ public sealed class WhichMetricRuinsTheResolutionTests
         profil.ResolutionUnPourcentLow!.ResolutionPct.Should().BeGreaterThan(50,
             "un percentile sur ~21 frames disperse enormement");
 
-        // Corrige le 07/09/2026. Ce test verifiait que la resolution de la SCENE etait pire que
+        // Ce test verifiait que la resolution de la SCENE etait pire que
         // celle de la moyenne, parce que la scene etait alors probee sur le score composite. Elle
         // l'est desormais sur la moyenne : la derive est une propriete de la scene, et la moyenne
         // est la grandeur qui la lit le mieux. Ce qu'il reste a prouver — et qui est le vrai sujet

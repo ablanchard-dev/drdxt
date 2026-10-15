@@ -1,32 +1,29 @@
-﻿using static DrDxt.Core.TexteFrancais;
+﻿using DrDxt.Core;
+using static DrDxt.Core.TexteFrancais;
 using DrDxt.Measurement.Network;
 
 namespace DrDxt.Detection.Network;
 
 /// <summary>
-/// D'ou vient l'instabilite du reseau — la seule question que le produit ne posait pas.
+/// D'ou vient l'instabilite du reseau, mesuree et pas seulement lue sur la carte : un joueur
+/// competitif ressent le reseau avant tout le reste.
 ///
-/// Jusqu'ici il lisait la carte (moderation d'interruptions, RSS, economies d'energie) et ne
-/// Mesurait rien : ni `INetworkLatencyMeter`, ni `NetworkPathAnalyzer` n'etaient appeles ailleurs
-/// que par un outil de ligne de commande. Un joueur competitif ressent le reseau avant tout le
-/// reste, et l'ecran n'en disait pas un mot.
-///
-/// Ce service assemble ce qui existait deja : la passerelle de la carte physique (jamais « la
-/// premiere passerelle trouvee » — un VPN monte en a une aussi), deux fenetres de mesure, et
+/// Ce service assemble la passerelle de la carte physique (jamais « la
+/// premiere passerelle trouvee » : un VPN monte en a une aussi), deux fenetres de mesure, et
 /// l'analyseur qui les compare sans seuil invente.
 ///
 /// Ce qu'il rend quand il ne sait pas : `null`. Pas de carte, pas de passerelle, une mesure
 /// refusee, un verdict indecidable ⇒ la ligne n'apparait pas. « Non mesure » ne se remplace pas
 /// par « reseau sain » : c'est la meme regle que le regime soutenu du processeur.
 ///
-/// Ordre D'APPEL : cette mesure doit passer avant le banc CPU du scan. Un banc qui sature huit
-/// cœurs gonfle la gigue ICMP des deux fenetres — et c'est notre propre machine qui la fabrique.
+/// Ordre d'appel : cette mesure doit passer avant le banc CPU du scan. Un banc qui sature huit
+/// cœurs gonfle la gigue ICMP des deux fenetres, et c'est notre propre machine qui la fabrique.
 /// Mesurer apres, ce serait attribuer au reseau une instabilite qu'on vient de creer.
 /// </summary>
 public sealed class AttributionReseauService
 {
     /// <summary>Reference internet par defaut : un resolveur anycast qui repond a l'ICMP depuis
-    /// n'importe quel operateur. Ce n'est pas le serveur de jeu — le caveat le dit dans la
+    /// n'importe quel operateur. Ce n'est pas le serveur de jeu : le caveat le dit dans la
     /// phrase, et aucun verdict ne pretend le contraire.</summary>
     public const string ReferenceInternetParDefaut = "1.1.1.1";
 
@@ -59,7 +56,7 @@ public sealed class AttributionReseauService
         if (premier.Verdict is not (NetworkPathVerdict.StartsAtFirstHop or NetworkPathVerdict.AppearsBeyondGateway))
             return Phrase(premier, passerelle);
 
-        // 25/09/2026 : un verdict qui désigne (la box, l'opérateur) doit se reproduire. Mesuré sur la machine de reference avec
+        // Un verdict qui désigne (la box, l'opérateur) doit se reproduire. Mesuré sur la machine de reference avec
         // le chemin exact du produit : 30 sur 30 « rien à désigner » au repos, mais 3 sur 10 accusations sous
         // charge processeur (le PC occupé fabrique sa propre gigue). Une seconde comparaison doit dire la même
         // chose ; sinon la mesure n'accuse personne. Coût : quatre secondes, seulement quand il y a accusation.
@@ -78,11 +75,11 @@ public sealed class AttributionReseauService
     }
 
     /// <summary>
-    /// Le premier saut — et le refus qui fait tenir tout le raisonnement.
+    /// Le premier saut, et le refus qui fait tenir tout le raisonnement.
     ///
     /// L'analyseur n'a pas de seuil : il conclut parce que le premier saut est contenu dans le
-    /// chemin complet. Cette inclusion est une hypothese sur le ROUTAGE, pas une propriete de la
-    /// mesure — et elle tombe des que la machine a plusieurs sorties. Ethernet et Wi-Fi connectes
+    /// chemin complet. Cette inclusion est une hypothese sur le routage, pas une propriete de la
+    /// mesure, et elle tombe des que la machine a plusieurs sorties. Ethernet et Wi-Fi connectes
     /// ensemble, un tunnel VPN monte : la passerelle qu'on mesurerait peut appartenir a un chemin
     /// que la reference internet n'emprunte pas. On comparerait alors deux trajets differents et
     /// on accuserait un lien qui ne porte rien.
@@ -133,31 +130,23 @@ public sealed class AttributionReseauService
 
         // Le caveat voyage avec chaque phrase qui designe le premier saut, jamais en note de bas
         // de page : une box repond a l'ICMP avec son propre processeur, en basse priorite, donc un
-        // premier saut instable peut venir de SA REPONSE et non de son acheminement.
-        const string caveat = " Une box répond à l'ICMP avec son propre processeur, en basse "
-                            + "priorité : c'est une piste à confirmer (câble, port), pas une preuve.";
+        // premier saut instable peut venir de sa reponse et non de son acheminement.
+        var caveat = Docteur.T("AR.Caveat");
 
-        // 25/09/2026 : la cle `measure.network.icmp_caveat` n'avait de texte dans aucune langue et
-        // aucun ecran ne la lisait ; « ICMP n'est pas le trafic du jeu » n'atteignait jamais le joueur.
-        // Le fait est dit dans chaque verdict, a la suite de la mesure qu'il nuance.
-        const string pasLeJeu = " Ce sont des pings vers ta box et vers Internet, pas les paquets du jeu vers son serveur.";
+        // « ICMP n'est pas le trafic du jeu » doit atteindre le joueur : le fait est dit dans chaque
+        // verdict, a la suite de la mesure qu'il nuance.
+        var pasLeJeu = Docteur.T("AR.PasLeJeu");
 
         return rapport.Verdict switch
         {
             NetworkPathVerdict.StartsAtFirstHop =>
-                $"L'instabilité est déjà présente au premier saut ({passerelle}), "
-                + F($"gigue {saut:0.##} ms contre {net:0.##} ms sur le chemin complet, elle commence ")
-                + "avant de sortir de chez toi." + caveat + pasLeJeu,
+                Docteur.T("AR.PremierSaut", passerelle, saut, net) + caveat + pasLeJeu,
 
             NetworkPathVerdict.AppearsBeyondGateway =>
-                F($"Le premier saut ({passerelle}) est stable à {saut:0.##} ms de gigue, le ")
-                + F($"chemin complet monte à {net:0.##} ms, ce qui s'ajoute vient d'au-delà de la ")
-                + "passerelle (opérateur, transit). Rien à régler sur cette machine." + pasLeJeu,
+                Docteur.T("AR.AuDela", passerelle, saut, net) + pasLeJeu,
 
             NetworkPathVerdict.Indistinguishable =>
-                F($"Mesuré, et rien à désigner : {saut:0.##} ms de gigue au premier saut ")
-                + F($"({passerelle}) contre {net:0.##} ms sur le chemin complet, l'écart est sous ce ")
-                + "que la sonde sait distinguer. La mesure a eu lieu ; elle n'accuse personne." + pasLeJeu,
+                Docteur.T("AR.Indiscernable", saut, passerelle, net) + pasLeJeu,
 
             // Une fenetre sans gigue exploitable : la mesure a eu lieu, elle ne tranche pas. On ne
             // dit rien plutot que d'ecrire une phrase qui ressemblerait a un bilan de sante.

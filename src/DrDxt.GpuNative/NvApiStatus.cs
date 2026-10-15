@@ -1,12 +1,11 @@
 namespace DrDxt.GpuNative.NvApi;
 
 // -----------------------------------------------------------------------
-// NvApiStatus — the subset of NvAPI_Status codes we branch on.
+// NvApiStatus : le sous-ensemble des codes NvAPI_Status sur lesquels on aiguille.
 //
-// Golden safety rule #3 (recipe): 0 = Ok, anything < 0 = error. We never proceed
-// on a non-zero status. IncompatibleStructVersion (-7) is the SAFE rejection the
-// driver returns when our C# struct size ≠ NVIDIA's C struct — surfaced as a
-// clean failure, never a crash.
+// Règle d'or de sécurité n°3 (recette) : 0 = Ok, tout < 0 = erreur. On ne continue jamais sur un
+// statut non nul. IncompatibleStructVersion (-7) est le rejet sûr que rend le pilote quand la
+// taille de notre struct C# ≠ celle de la struct C de NVIDIA : remonté en échec propre, jamais en plantage.
 // -----------------------------------------------------------------------
 internal enum NvApiStatus
 {
@@ -16,7 +15,7 @@ internal enum NvApiStatus
     NvidiaDeviceNotFound = -6,
     IncompatibleStructVersion = -7,
     NotSupported = -104,
-    // 14/09/2026 — source : NVIDIA/nvapi, nvapi_lite_common.h
+    // Source : NVIDIA/nvapi, nvapi_lite_common.h
     // « NVAPI_EXECUTABLE_NOT_FOUND = -166, Application not found in the Profile. »
     ExecutableNotFound = -166,
 }

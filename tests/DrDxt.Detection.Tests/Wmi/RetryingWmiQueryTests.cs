@@ -7,9 +7,9 @@ using Xunit;
 namespace DrDxt.Detection.Tests.Wmi;
 
 /// <summary>
-/// Gate du 09/09 : une famille entiere de l'audit (RAM, reseau) disparait puis revient
-/// sans qu'une ligne change. La lecture WMI echoue par intermittence dans le produit.
-/// Ce que ce decorateur garantit — et ce qu'il s'interdit :
+/// La lecture WMI echoue par intermittence : sans rejeu, une famille entiere de l'audit (RAM,
+/// reseau) disparaitrait puis reviendrait sans qu'une ligne change.
+/// Ce que ce decorateur garantit, et ce qu'il s'interdit :
 ///  - il rejoue une lecture qui a LEVE (Result.Fail) ;
 ///  - il ne rejoue jamais une lecture reussie mais vide : zero ligne est une reponse,
 ///    pas une panne. La rejouer inventerait une difference entre deux passes identiques ;

@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.GpuNative.Tests;
 
-/// <summary>GPU-OC (08/10/2026) : la lecture des ventilateurs par NVML, sur la vraie carte NVIDIA de la machine. Lecture
+/// <summary>La lecture des ventilateurs par NVML, sur la vraie carte NVIDIA de la machine. Lecture
 /// seule : rien n'est posé. Relevé de référence (RTX 4060, sonde du 08/10) : 1 ventilateur, automatique, plage 30-100.</summary>
 public sealed class VentilateurNvmlSurLaVraieCarteTests
 {

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 30/09/2026 (boucle « la carte, prouvée », G4) : un réglage de la carte ne reste que s'il ne coûte rien en jeu. Les
+// Un réglage de la carte ne reste que s'il ne coûte rien en jeu. Les
 // parties relevées avant et après se comparent sur le même jeu, par séparation nette (toutes les parties d'après
 // sous toutes celles d'avant = pire), sans seuil inventé. Moins de trois parties d'un côté : pas encore jugé.
 public sealed class ComparaisonDesPartiesTests

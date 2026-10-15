@@ -4,9 +4,9 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks;
 
 /// <summary>
-/// ROAD1 (08/10/2026) : les leviers que « Vérifier DrDXT sur mon PC » a posés, relus, rendus et relus sur CETTE machine.
+/// Les leviers que « Vérifier DrDXT sur mon PC » a posés, relus, rendus et relus sur cette machine.
 /// La liste « ce que DrDXT fait ici » les dit « vérifié ici ».
-/// Revue n° 15 : réécrite à chaque vérification (un levier tenté et pas validé n'est plus « vérifié »), et liée à
+/// Réécrite à chaque vérification (un levier tenté et pas validé n'est plus « vérifié »), et liée à
 /// l'empreinte du matériel (un autre processeur, une autre carte ou un autre pilote : plus rien n'est « vérifié »).
 /// Illisible ou d'une autre machine : vide (rien n'est dit vérifié sans preuve).
 /// </summary>

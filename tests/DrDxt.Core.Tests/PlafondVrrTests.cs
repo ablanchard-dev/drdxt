@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.Core.Tests;
 
-/// <summary>09/10/2026 (audit des gains) : « fréquence − 3 » est un minimum ; aux hautes fréquences la cible suit Reflex.</summary>
+/// <summary>« fréquence − 3 » est un minimum ; aux hautes fréquences la cible suit Reflex.</summary>
 public sealed class PlafondVrrTests
 {
     [Theory]

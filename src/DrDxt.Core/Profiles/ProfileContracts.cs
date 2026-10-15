@@ -1,6 +1,6 @@
 namespace DrDxt.Core;
 
-// --- Profiles ---
+// --- Profils ---
 
 public record HardwareMatch(string? CpuPattern, string? GpuPattern);
 

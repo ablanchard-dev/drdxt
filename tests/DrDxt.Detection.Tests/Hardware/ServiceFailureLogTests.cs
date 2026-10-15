@@ -64,12 +64,11 @@ public class ServiceFailureLogTests
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════════
-    // Une rafale n'est pas une maladie — la correction du 08/09/2026.
+    // Une rafale n'est pas une maladie.
     //
-    // La premiere version de ce lecteur rendait « 21 echecs » pour `atvi-skuld` et le classait
-    // suspect des cinq occurrences. Le compte etait exact et la lecture fausse : les 21 tiennent
-    // entre 18:14 et 18:16 le meme jour, avec ERROR_ALREADY_EXISTS — un installeur qui reessaie,
-    // pour un service qui n'existe meme plus sur la machine.
+    // Releve sur la machine de reference : « 21 echecs » pour `atvi-skuld`, tous entre 18:14 et 18:16
+    // le meme jour, avec ERROR_ALREADY_EXISTS : un installeur qui reessaie, pour un service qui
+    // n'existe meme plus. Classer ce service suspect sur le compte seul serait exact et faux.
     //
     // Compter sans regarder la repartition transforme un accident en condition chronique. C'est
     // une facon nouvelle de mentir avec un chiffre juste, et c'est celle que ces tests ferment.

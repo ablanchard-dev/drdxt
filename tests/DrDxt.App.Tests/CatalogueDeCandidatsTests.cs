@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// L8 a — le catalogue des candidats et les leviers reellement enregistres ne peuvent pas diverger.
+/// Le catalogue des candidats et les leviers reellement enregistres ne peuvent pas diverger.
 /// Un levier ajoute sans descripteur ne serait jamais tente par l'App ; un levier dont la nature
 /// ment ferait mesurer un effet qui n'existe qu'apres redemarrage.
 /// </summary>

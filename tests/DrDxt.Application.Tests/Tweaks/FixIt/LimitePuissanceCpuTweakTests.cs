@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.Application.Tests.Tweaks.FixIt;
 
-// B1 (10/10/2026) : la limite de puissance du processeur Intel (PL1) montée à chaud jusqu'à la PL2 de la carte.
+// La limite de puissance du processeur Intel (PL1) montée à chaud jusqu'à la PL2 de la carte.
 // Doublures NSubstitute seulement : aucune lecture ni écriture de la vraie machine.
 public sealed class LimitePuissanceCpuTweakTests
 {
@@ -50,7 +50,7 @@ public sealed class LimitePuissanceCpuTweakTests
     public void Jamais_hors_Intel() =>
         Build().AppliesTo(Hw(ChassisType.Desktop, "AuthenticAMD"), Etat(new LimiteDePuissanceLue(65, 219, 65, false))).Should().BeFalse();
 
-    // 10/10/2026 soir : un processeur qui touche déjà 95 °C en partie ne se voit pas monter sa PL1, quelle que soit la PL2.
+    // Un processeur qui touche déjà 95 °C en partie ne se voit pas monter sa PL1, quelle que soit la PL2.
     [Fact]
     public void Un_processeur_qui_se_freine_en_partie_n_est_pas_monte()
     {
@@ -58,6 +58,28 @@ public sealed class LimitePuissanceCpuTweakTests
         LimitePuissanceCpuTweak.Cible(chaud).Should().BeNull();
         Build().AppliesTo(Hw(ChassisType.Desktop), Etat(chaud)).Should().BeFalse();
         LimitePuissanceCpuTweak.Cible(chaud with { ChaleurEnPartieMaxC = 88 }).Should().Be(219);
+    }
+
+    // Le guide 5.3 exige le microcode corrigé avant de monter un Core 13e/14e ; le levier ne le lisait pas.
+    // La garde vit dans la lecture des registres, que ApplyAsync refait à chaque pose (essai en cours compris).
+    [Fact]
+    public void Jamais_plus_de_puissance_sur_un_microcode_d_avant_le_correctif_Vmin()
+    {
+        var lu = new LimiteDePuissanceLue(65, 219, 65, false);
+        Build().AppliesTo(Hw(ChassisType.Desktop), Etat(lu with { MicrocodeVminPerime = true })).Should().BeFalse();
+        Build().AppliesTo(Hw(ChassisType.Desktop), Etat(lu)).Should().BeTrue();
+        LimitePuissanceCpuTweak.Cible(lu with { MicrocodeVminPerime = true }).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Une_pose_relue_sur_un_microcode_perime_n_ecrit_rien()
+    {
+        var lu = RegistreDeLimiteCpu.Decoder(Unite, Registre65W, Info65W)! with { CopieMmioPl1W = 0, MicrocodeVminPerime = true };
+        _lecteur.LireRegistres().Returns(Result<LectureLimiteCpu>.Ok(new LectureLimiteCpu(new RegistresCpuLus(Unite, Registre65W, Info65W), lu)));
+        var levier = new LimitePuissanceCpuTweak(_lecteur, _elevated);
+
+        (await levier.ApplyAsync()).IsOk.Should().BeFalse();
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

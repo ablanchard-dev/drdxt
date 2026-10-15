@@ -7,13 +7,13 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// M2 Phase E3 — GpuPowerLimitTweak.
+// GpuPowerLimitTweak.
 //
-// Same invariants as E2: desktop dGPU gating, clamp via GpuSafeBounds (the power
-// limit never goes below the safe floor — a starved GPU stutters, it doesn't gain),
-// capture the original → serialized inverse op snapshot, apply via the allowlisted
-// ApplyNvApiPowerLimitOp / ADLX, revert, fail-clean. HONESTY: efficiency / cooler,
-// never "+FPS".
+// Mêmes invariants que l'undervolt : filtre dGPU de bureau, bornage via GpuSafeBounds (la
+// limite de puissance ne descend jamais sous le plancher sûr : une carte affamée saccade, elle ne gagne pas),
+// capture de l'origine → instantané en op inverse sérialisée, application via
+// ApplyNvApiPowerLimitOp / ADLX en liste blanche, retour arrière, échec propre. Honnêteté :
+// efficacité, plus frais, jamais « +FPS ».
 // -----------------------------------------------------------------------
 public sealed class GpuPowerLimitTweakTests
 {
@@ -43,15 +43,15 @@ public sealed class GpuPowerLimitTweakTests
         _nvApi.IsAvailable.Returns(true);
         _nvApi.GetPowerLimitPct(0).Returns(Result<int>.Ok(100)); // stock = 100%
         _adlx.IsAvailable.Returns(false);
-        _adlx.ResolveTunableGpuIndex().Returns(Result<int>.Ok(0)); // default: single tunable GPU at 0
+        _adlx.ResolveTunableGpuIndex().Returns(Result<int>.Ok(0)); // par défaut : une seule carte réglable, en 0
         _adlx.GetPowerLimitPct(0).Returns(Result<int>.Ok(100));
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
-        // M6 — the tweak now reads its target from the live IGpuTuningTargetSource; seed it
-        // with the test's power-limit target (the tuning default is unused by this tweak).
+        // Le levier lit sa cible dans l'IGpuTuningTargetSource vivant ; on y pose
+        // la cible de limite de puissance du test (la cible de réglage par défaut n'est pas utilisée ici).
         var source = new GpuTuningTargetSource(new GpuTuningTarget(0, -100, 0), new GpuPowerLimitTarget(0, requestedPct));
-        // Presence is a real hardware fact computed by the source from the scanned inventory
-        // (never forced on a fake seam) — set it from real AMD hw when asked.
+        // La présence est un vrai fait matériel calculé par la source depuis l'inventaire scanné
+        // (jamais forcé sur une fausse couture) : posée depuis un vrai matériel AMD à la demande.
         if (amdPresenceHw is not null)
             source.SetAmdGpuPresenceFromHardware(amdPresenceHw);
         return new GpuPowerLimitTweak(_nvApi, _adlx, _elevated, source);
@@ -74,7 +74,7 @@ public sealed class GpuPowerLimitTweakTests
         Build().SummaryKey.Should().NotContain("fps");
     }
 
-    // --- Gating: desktop dGPU only. ---
+    // --- Filtre : dGPU de bureau seulement. ---
 
     [Fact]
     public void AppliesTo_true_on_desktop_dgpu() =>
@@ -88,17 +88,17 @@ public sealed class GpuPowerLimitTweakTests
     public void AppliesTo_false_on_handheld() =>
         Build().AppliesTo(HandheldDeck(), State).Should().BeFalse();
 
-    // --- Clamp: never below the floor. ---
+    // --- Bornage : jamais sous le plancher. ---
 
     [Fact]
     public async Task Apply_clamps_below_floor_request_up_to_the_floor()
     {
-        var t = Build(requestedPct: 30); // below MinPowerLimitPct
+        var t = Build(requestedPct: 30); // sous MinPowerLimitPct
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // The applied value is raised to the safe floor — never the dangerous 30%.
+        // La valeur appliquée est relevée au plancher sûr, jamais les 30 % dangereux.
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyNvApiPowerLimitOp>(o => o.PowerLimitPercent == GpuSafeBounds.MinPowerLimitPct),
             Arg.Any<CancellationToken>());
@@ -117,13 +117,13 @@ public sealed class GpuPowerLimitTweakTests
             Arg.Any<CancellationToken>());
     }
 
-    // --- Capture original → snapshot. ---
+    // --- Capture de l'origine → instantané. ---
 
     [Fact]
     public async Task Apply_captures_original_power_limit_in_snapshot()
     {
         var t = Build(requestedPct: 80);
-        _nvApi.GetPowerLimitPct(0).Returns(Result<int>.Ok(95)); // some prior limit
+        _nvApi.GetPowerLimitPct(0).Returns(Result<int>.Ok(95)); // une limite antérieure quelconque
 
         var r = await t.ApplyAsync();
 
@@ -134,7 +134,7 @@ public sealed class GpuPowerLimitTweakTests
             .Which.PowerLimitPercent.Should().Be(95);
     }
 
-    // --- AMD branch. ---
+    // --- Branche AMD. ---
 
     [Fact]
     public async Task Apply_uses_adlx_power_limit_on_amd()
@@ -155,13 +155,13 @@ public sealed class GpuPowerLimitTweakTests
             .Which.IntValue.Should().Be(100);
     }
 
-    // --- AMD discrete-GPU selection (T4): resolve the tunable dGPU, not the iGPU. ---
+    // --- Choix de la carte AMD dédiée : résoudre la dGPU réglable, pas l'iGPU. ---
 
     [Fact]
     public async Task Apply_amd_resolves_discrete_gpu_index_and_targets_it()
     {
-        // iGPU at index 0 (not tunable) + discrete AMD dGPU at index 1. The resolver picks 1,
-        // and the capture + apply both target index 1 — never the iGPU at 0.
+        // iGPU à l'index 0 (non réglable) + dGPU AMD dédiée à l'index 1. Le résolveur choisit 1,
+        // et la capture comme l'application visent l'index 1, jamais l'iGPU en 0.
         var t = Build(requestedPct: 80);
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(true);
@@ -171,12 +171,12 @@ public sealed class GpuPowerLimitTweakTests
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // The applied power-limit op targeted the discrete card at index 1.
+        // L'op de limite de puissance appliquée visait la carte dédiée à l'index 1.
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyAdlxTuningOp>(o =>
                 o.GpuIndex == 1 && o.Kind == AdlxTuningKind.PowerLimit && o.IntValue == 80),
             Arg.Any<CancellationToken>());
-        // The captured-original inverse op (for revert) carries index 1 and the read value.
+        // L'op inverse d'origine capturée (pour le retour arrière) porte l'index 1 et la valeur lue.
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         var op = inverse.Value.Should().BeOfType<ApplyAdlxTuningOp>().Subject;
         op.GpuIndex.Should().Be(1);
@@ -186,7 +186,7 @@ public sealed class GpuPowerLimitTweakTests
     [Fact]
     public async Task Apply_amd_fails_clean_when_no_tunable_gpu_resolved()
     {
-        // 0-tunable-GPU box: the resolver fails → fail-clean, NO apply op, never Ok.
+        // Machine sans GPU réglable : le résolveur échoue → échec propre, aucune op d'application, jamais Ok.
         var t = Build(requestedPct: 80);
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(true);
@@ -200,7 +200,7 @@ public sealed class GpuPowerLimitTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // --- Fail-clean. ---
+    // --- Échec propre. ---
 
     [Fact]
     public async Task Apply_fails_clean_when_no_sdk_available()
@@ -254,14 +254,14 @@ public sealed class GpuPowerLimitTweakTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
     }
 
-    // --- Honesty: AMD GPU present but ADLX unavailable → explicit honest status. ---
+    // --- Honnêteté : GPU AMD présent mais ADLX indisponible → statut honnête explicite. ---
 
     [Fact]
     public async Task Apply_returns_amd_tuning_unavailable_when_amd_gpu_present_and_adlx_unavailable()
     {
-        // §22.3: when tuning cannot be done for this setup, SAY SO — never silently skip.
-        // Presence comes from the real source computing it from real AMD hardware
-        // (GpuGating.IsAmd) — never forced on a fake seam.
+        // Quand le réglage est impossible sur cette configuration, le dire, jamais sauter en silence.
+        // La présence vient de la vraie source qui la calcule depuis un vrai matériel AMD
+        // (GpuGating.IsAmd), jamais forcée sur une fausse couture.
         var t = Build(amdPresenceHw: DesktopAmd());
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(false);
@@ -277,14 +277,14 @@ public sealed class GpuPowerLimitTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // --- CAPABILITY PROBE (hardware-coverage doctrine). ---
+    // --- Sonde de capacité (doctrine de couverture matérielle). ---
 
     [Fact]
     public async Task Apply_refuses_when_the_identity_probe_write_does_not_take()
     {
-        // Same doctrine as the undervolt: prove the power-limit write is live on this card
-        // (identity write + read-back) before capping anything. Driver says ok, nothing moved
-        // → refuse honestly, tune nothing.
+        // Même doctrine que l'undervolt : prouver que l'écriture de limite de puissance est vivante
+        // sur cette carte (écriture identité + relecture) avant de plafonner quoi que ce soit. Le pilote
+        // dit ok, rien n'a bougé → refuser honnêtement, ne rien régler.
         var t = Build(requestedPct: 80);
         _nvApi.GetPowerLimitPct(0).Returns(Result<int>.Ok(100), Result<int>.Ok(112));
 
@@ -324,7 +324,7 @@ public sealed class GpuPowerLimitTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // Revue n° 11 : la valeur inscrite pour la désinstallation est celle que la carte relit, pas celle demandée.
+    // La valeur inscrite pour la désinstallation est celle que la carte relit, pas celle demandée.
     [Fact]
     public async Task La_valeur_inscrite_est_celle_que_la_carte_relit()
     {

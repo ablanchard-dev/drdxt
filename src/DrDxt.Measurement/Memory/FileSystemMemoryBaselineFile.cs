@@ -3,14 +3,13 @@ using DrDxt.Core;
 namespace DrDxt.Measurement.Memory;
 
 /// <summary>
-/// Le fichier reel sous <see cref="MemoryBaselineStore"/>, ecrit ATOMIQUEMENT : fichier temporaire
+/// Le fichier reel sous <see cref="MemoryBaselineStore"/>, ecrit atomiquement : fichier temporaire
 /// a cote de la cible (meme volume, donc le deplacement est un vrai renommage) puis remplacement.
-/// Un lecteur ne voit jamais un fichier a moitie ecrit -- et une reference tronquee serait pire
+/// Un lecteur ne voit jamais un fichier a moitie ecrit, et une reference tronquee serait pire
 /// qu'absente, puisqu'elle se comparerait quand meme.
 ///
-/// L'ecriture elle-meme vit dans <see cref="FichierJsonAtomique"/> depuis le 09/09/2026 : la
-/// reference CPU en avait besoin a l'identique, et recopier ces vingt lignes aurait garanti
-/// qu'elles derivent un jour d'un seul cote.
+/// L'ecriture elle-meme vit dans <see cref="FichierJsonAtomique"/>, partagee avec la reference CPU :
+/// deux copies finiraient par deriver d'un seul cote.
 /// </summary>
 public sealed class FileSystemMemoryBaselineFile : IMemoryBaselineFile
 {

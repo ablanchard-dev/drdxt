@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Cpu;
 
-// 04/10/2026 (plan 4.1) : la liste des cœurs rapides, partagée par le banc processeur et le relevé des parties, sur
+// La liste des cœurs rapides, partagée par le banc processeur et le relevé des parties, sur
 // d'autres processeurs que celui de la machine de référence (i7-14700F, 8 cœurs P en hyperthreading + 12 cœurs E).
 public sealed class CoeursRapidesTests
 {

@@ -1,11 +1,11 @@
 namespace DrDxt.Measurement.Network;
 
 /// <summary>
-/// 25/09/2026 — le plafond d'envoi en boucle fermee, pendant la partie.
+/// Le plafond d'envoi en boucle fermee, pendant la partie.
 ///
-/// Le plafond fixe (50 % du plus fort envoi vu au scan) etait calibre sur une machine, et la consigne
+/// Un plafond fixe (50 % du plus fort envoi vu au scan) serait calibre sur une machine, et la consigne
 /// QoS de Windows est lache (200 demandes, ~340 obtenus). Ici on le juge la ou il agit : sur une
-/// fenetre glissante prise plafond EN PLACE, le meme juge que le scan (<see cref="Bufferbloat.Juger"/>)
+/// fenetre glissante prise plafond en place, le meme juge que le scan (<see cref="Bufferbloat.Juger"/>)
 /// dit si le ping monte encore quand l'envoi est a son maximum.
 ///
 ///   - il monte encore de <see cref="Bufferbloat.SeuilMs"/> ou plus : on descend de 20 % ;

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.GpuNative.Tests;
 
-/// <summary>L8 suite — le VRR lu au pilote. Un bit mal place confondrait « l'ecran sait » et
+/// <summary>Le VRR lu au pilote. Un bit mal place confondrait « l'ecran sait » et
 /// « G-Sync est actif », exactement la difference que le levier de cadence doit faire.</summary>
 public class VrrReadingTests
 {

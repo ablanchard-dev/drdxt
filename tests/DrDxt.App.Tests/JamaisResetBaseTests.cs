@@ -3,8 +3,8 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>DOC-WIN (09/10/2026) : le mainteneur a refusé DISM /ResetBase (irréversible, aucun gain). Aucune ligne du produit
-/// ne le lance ; le retour se voit ici.</summary>
+/// <summary>DISM /ResetBase est exclu (irréversible, aucun gain). Aucune ligne du produit
+/// ne le lance ; un retour se voit ici.</summary>
 public sealed class JamaisResetBaseTests
 {
     [Fact]

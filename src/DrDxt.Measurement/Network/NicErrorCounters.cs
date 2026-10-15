@@ -4,9 +4,9 @@ using DrDxt.Core;
 namespace DrDxt.Measurement.Network;
 
 /// <summary>
-/// Compteurs d'une carte reseau a un instant donne. Ce sont des TOTAUX depuis le demarrage de
+/// Compteurs d'une carte reseau a un instant donne. Ce sont des totaux depuis le demarrage de
 /// la machine : pris seuls ils ne disent rien de l'instant present (mesure sur une machine
-/// saine : 347 paquets ignores sur 57 789 905 depuis le boot -- inutilisable pour diagnostiquer
+/// saine : 347 paquets ignores sur 57 789 905 depuis le boot, inutilisable pour diagnostiquer
 /// une partie en cours). Ils ne servent que par difference entre deux instants, voir
 /// <see cref="NicErrorCounters.Diff"/>.
 /// </summary>
@@ -21,8 +21,8 @@ public sealed record NicCounterSnapshot(
 /// <summary>
 /// Ce qui s'est passe sur la carte pendant une fenetre de mesure.
 ///
-/// Complementaire du ping, pas redondant : <see cref="NetworkLatencyMeter"/> mesure la ROUTE
-/// (latence, perte, gigue), ces compteurs mesurent la CARTE -- cable abime, port en
+/// Complementaire du ping, pas redondant : <see cref="NetworkLatencyMeter"/> mesure la route
+/// (latence, perte, gigue), ces compteurs mesurent la carte : cable abime, port en
 /// derangement, pilote qui jette des trames. Un lien peut pinguer parfaitement tout en
 /// perdant des paquets a l'interface.
 /// </summary>
@@ -64,7 +64,7 @@ public static class NicErrorCounters
 {
     /// <summary>Difference entre deux releves. Si un compteur a recule, la carte a ete
     /// reinitialisee pendant la fenetre : on le declare (<see cref="NicErrorDelta.CounterReset"/>),
-    /// on ne rend jamais un nombre negatif, et on ne calcule aucun taux. UNKNOWN vaut mieux
+    /// on ne rend jamais un nombre negatif, et on ne calcule aucun taux. Unknown vaut mieux
     /// qu'un chiffre faux.</summary>
     public static NicErrorDelta Diff(NicCounterSnapshot before, NicCounterSnapshot after)
     {

@@ -1,9 +1,9 @@
 namespace DrDxt.Core;
 
-// --- Diagnostics / audit log ---
+// --- Diagnostic / journal d'audit ---
 
 public interface IDiagnosticsLog
 {
     void Change(string tweakId, string from, string to, string actor /*"DrDXT"|"Windows"*/);
-    Task<Result<string>> ExportAsync(); // support button
+    Task<Result<string>> ExportAsync(); // bouton du support
 }

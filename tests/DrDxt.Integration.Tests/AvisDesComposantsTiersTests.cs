@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// PUB1 (08/10/2026) : chaque bibliothèque livrée a son avis de licence. Un paquet ajouté à un projet du produit sans
+/// Chaque bibliothèque livrée a son avis de licence. Un paquet ajouté à un projet du produit sans
 /// entrer dans THIRD-PARTY-NOTICES.txt partirait chez les joueurs sans sa licence ; l'installeur affiche la GPL.
 /// </summary>
 public sealed class AvisDesComposantsTiersTests

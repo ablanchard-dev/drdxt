@@ -6,23 +6,24 @@ using Microsoft.Win32;
 namespace DrDxt.App.Platform;
 
 // -----------------------------------------------------------------------
-// WmiRestorePointService — the real IRestorePointService.
+// WmiRestorePointService : le vrai IRestorePointService.
 //
-// * IsEnabled(): System Restore is usable when the SR config reports a non-zero
-//   disk-space allocation for the system drive (queried via WMI
-//   root\default:SystemRestoreConfig, with a registry fallback). Read-only.
-// * TryEnable(): enabling System Restore IS a privileged write, so it is routed
-//   through the elevated helper via a typed EnableSystemRestoreOp (system drive
-//   only, allowlist leaf-exact). After the helper enables it we RE-CHECK
-//   IsEnabled() and return that — true only if restore is genuinely usable now.
-//   The SafetyManager already asks consent (IConsentPrompt.AskEnableRestore)
-//   before calling this; here we make the enable actually happen.
-// * VerifyPointExists(desc): queries recent points (root\default:SystemRestore)
-//   for a matching description — the guard against a silent no-op create.
+// * IsEnabled() : la Restauration du système est utilisable quand sa configuration annonce
+//   un espace disque non nul pour le lecteur système (lu via WMI
+//   root\default:SystemRestoreConfig, avec repli sur le registre). Lecture seule.
+// * TryEnable() : activer la Restauration du système est une écriture privilégiée, elle
+//   passe donc par le helper élevé via un EnableSystemRestoreOp typé (lecteur système
+//   seulement, liste blanche à la feuille près). Une fois le helper passé, on revérifie
+//   IsEnabled() et on rend ce résultat : vrai seulement si la restauration est vraiment
+//   utilisable. Le SafetyManager demande déjà le consentement
+//   (IConsentPrompt.AskEnableRestore) avant cet appel ; ici on fait vraiment l'activation.
+// * VerifyPointExists(desc) : cherche dans les points récents (root\default:SystemRestore)
+//   une description qui correspond ; c'est la garde contre une création qui ne fait rien
+//   en silence.
 //
-// The CREATE itself flows through the elevated helper (CreateRestorePointOp);
-// this service answers "is restore usable", drives the helper enable, and
-// verifies "did the point land". Every path is wrapped; nothing throws.
+// La création elle-même passe par le helper élevé (CreateRestorePointOp) ; ce service
+// répond à « la restauration est-elle utilisable », pilote l'activation par le helper, et
+// vérifie « le point a-t-il été créé ». Chaque chemin est protégé ; rien ne lève.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class WmiRestorePointService : IRestorePointService
@@ -38,7 +39,7 @@ public sealed class WmiRestorePointService : IRestorePointService
     {
         try
         {
-            // Primary: WMI SystemRestoreConfig (RPSessionInterval > 0 means SR is on).
+            // D'abord : WMI SystemRestoreConfig (RPSessionInterval > 0 veut dire restauration active).
             using var searcher = new ManagementObjectSearcher(
                 SystemRestoreScope, "SELECT RPSessionInterval FROM SystemRestoreConfig");
             foreach (var o in searcher.Get())
@@ -53,10 +54,10 @@ public sealed class WmiRestorePointService : IRestorePointService
         }
         catch
         {
-            // fall through to the registry probe
+            // on passe à la lecture du registre
         }
 
-        // Fallback: the SR config registry key (RPSessionInterval).
+        // Repli : la clé de registre de configuration de la restauration (RPSessionInterval).
         try
         {
             using var key = Registry.LocalMachine.OpenSubKey(
@@ -72,16 +73,16 @@ public sealed class WmiRestorePointService : IRestorePointService
 
     public bool TryEnable()
     {
-        // Already usable? Nothing to do.
+        // Déjà utilisable ? Rien à faire.
         if (IsEnabled())
             return true;
 
         try
         {
-            // Enabling System Restore is a privileged write — route it through the
-            // elevated helper with a typed, allowlisted EnableSystemRestoreOp on the
-            // system drive only. Then re-check: return true only if SR is genuinely
-            // usable now (GPO/SKU can still no-op the enable → we report not-usable).
+            // Activer la Restauration du système est une écriture privilégiée : elle passe par le helper
+            // élevé avec un EnableSystemRestoreOp typé, sur liste blanche, pour le lecteur système
+            // seulement. Puis on revérifie : vrai seulement si la restauration est vraiment utilisable
+            // (une GPO ou l'édition de Windows peut encore annuler l'activation → on dit « inutilisable »).
             var drive = SystemDrive();
             var result = _elevated
                 .ExecuteAsync(new EnableSystemRestoreOp(drive), CancellationToken.None)
@@ -93,13 +94,13 @@ public sealed class WmiRestorePointService : IRestorePointService
         }
         catch
         {
-            // Never throw across this boundary — a failed enable just reports off.
+            // Jamais d'exception à travers cette frontière : une activation ratée dit simplement « inactive ».
             return false;
         }
     }
 
-    // The system drive in "X:" form (e.g. "C:"). %SystemDrive% is already "C:"; we
-    // trim any trailing slash. Falls back to "C:" if the environment is unreadable.
+    // Le lecteur système sous la forme « X: » (par exemple « C: »). %SystemDrive% est déjà
+    // « C: » ; on retire une éventuelle barre finale. Repli sur « C: » si l'environnement est illisible.
     private static string SystemDrive()
     {
         try
@@ -110,7 +111,7 @@ public sealed class WmiRestorePointService : IRestorePointService
         }
         catch
         {
-            // fall through to the default
+            // on passe à la valeur par défaut
         }
         return "C:";
     }
@@ -135,8 +136,8 @@ public sealed class WmiRestorePointService : IRestorePointService
     }
 
     /// <summary>Le point le plus recent cree depuis <paramref name="depuisUtc"/>, en UTC, ou <c>null</c>.
-    /// Les dates sont celles de la classe WMI SystemRestore (ex. « 20260911222955.512634-000 », lue sur le
-    /// poste le 14/09/2026). Une date illisible est ignoree : un point dont on ne sait pas l'age ne
+    /// Les dates sont celles de la classe WMI SystemRestore (ex. « 20260911222955.512634-000 », relevée sur un
+    /// poste réel). Une date illisible est ignoree : un point dont on ne sait pas l'age ne
     /// prouve pas qu'il protege ce changement.</summary>
     internal static DateTime? PlusRecentDepuis(IEnumerable<string?> creationsDmtf, DateTime depuisUtc)
     {

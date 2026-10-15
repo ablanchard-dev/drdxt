@@ -3,8 +3,8 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Hardware;
 
-/// <summary>L-WU : seuls les redémarrages demandés par Windows Update (`MoUsoCoreWorker.exe`) comptent. Les champs sont ceux
-/// des événements 1074 relus sur la machine de référence le 06/10/2026.</summary>
+/// <summary>Seuls les redémarrages demandés par Windows Update (`MoUsoCoreWorker.exe`) comptent. Les champs sont ceux
+/// des événements 1074 relevés sur la machine de référence le 06/10/2026.</summary>
 public sealed class RedemarragesWindowsUpdateTests
 {
     [Theory]

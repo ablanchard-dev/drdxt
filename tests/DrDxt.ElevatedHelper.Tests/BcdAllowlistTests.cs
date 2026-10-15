@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-// 24/09/2026 — le BCD est le magasin de demarrage. L'allowlist ne laisse passer que les cinq
+// Le BCD est le magasin de demarrage. L'allowlist ne laisse passer que les cinq
 // elements que BcdInterpretation sait juger, et seulement leurs valeurs documentees.
 public sealed class BcdAllowlistTests
 {

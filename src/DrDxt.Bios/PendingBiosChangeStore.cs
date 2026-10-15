@@ -5,48 +5,48 @@ using DrDxt.Core;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// File-backed <see cref="IPendingBiosChangeStore"/>. The marker lives as a single JSON
-/// file (default: <c>%LOCALAPPDATA%\DrDXT\pending-bios-change.json</c>). All filesystem
-/// access goes through an injectable <see cref="IBiosMarkerFile"/> seam so tests fake
-/// I/O (atomicity, corruption, faults) without touching the real disk.
+/// <see cref="IPendingBiosChangeStore"/> sur fichier. Le marqueur est un seul fichier JSON
+/// (par défaut <c>%LOCALAPPDATA%\DrDXT\pending-bios-change.json</c>). Tout accès au disque
+/// passe par la couture <see cref="IBiosMarkerFile"/> : les tests simulent l'entrée-sortie
+/// (atomicité, corruption, pannes) sans toucher au vrai disque.
 ///
-/// Guarantees:
-///   • write is ATOMIC — serialize, write a temp file, then move-with-overwrite onto
-///     the target (the move is the atomic publish; a reader never sees a torn file).
-///   • read is FAIL-CLEAN — absent file → <c>Ok(null)</c> "nothing pending"; corrupt
-///     content (bad JSON, empty targets, an Unknown expectation, a blank machine id, a
-///     non-positive timestamp) → <see cref="ErrorCodes.BiosPendingChangeCorrupt"/>;
-///     an I/O fault → <see cref="ErrorCodes.BiosPendingChangeIo"/>. Never throws.
-///   • This never writes the BIOS — it persists/reads an OS file only.
+/// Garanties :
+///   • écriture atomique : sérialiser, écrire un fichier temporaire, puis le déplacer par
+///     dessus la cible (le déplacement publie ; un lecteur ne voit jamais un fichier tronqué) ;
+///   • lecture propre : fichier absent → <c>Ok(null)</c>, rien en attente ; contenu corrompu
+///     (JSON invalide, cibles vides, attente Unknown, identifiant machine vide, horodatage
+///     non positif) → <see cref="ErrorCodes.BiosPendingChangeCorrupt"/> ; panne d'entrée-sortie
+///     → <see cref="ErrorCodes.BiosPendingChangeIo"/>. Ne lève jamais ;
+///   • n'écrit jamais le BIOS : ne lit et n'écrit qu'un fichier du système.
 /// </summary>
 public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        // Enums as strings so an unknown future enum value fails the read cleanly
-        // (a corrupt marker) instead of silently mapping to the zero member.
+        // Énumérations en chaînes : une valeur future inconnue fait échouer la lecture
+        // proprement (marqueur corrompu) au lieu de retomber en silence sur le membre zéro.
         Converters = { new JsonStringEnumConverter() },
     };
 
     private readonly IBiosMarkerFile _file;
 
-    /// <summary>The default marker path under the per-user local app data root.</summary>
+    /// <summary>Le chemin du marqueur par défaut, sous les données locales de l'utilisateur.</summary>
     public static string DefaultPath()
         => DrDxt.Core.DossierDonnees.Chemin("pending-bios-change.json");
 
-    /// <summary>Production store writing under <c>%LOCALAPPDATA%\DrDXT\</c>.</summary>
+    /// <summary>Le magasin de production, qui écrit sous <c>%LOCALAPPDATA%\DrDXT\</c>.</summary>
     public PendingBiosChangeStore()
         : this(new FileSystemBiosMarkerFile(DefaultPath())) { }
 
-    /// <summary>Constructs the store over an explicit file seam (tests inject a fake).</summary>
+    /// <summary>Construit le magasin sur une couture de fichier explicite (les tests injectent un faux).</summary>
     public PendingBiosChangeStore(IBiosMarkerFile file)
         => _file = file ?? throw new ArgumentNullException(nameof(file));
 
     /// <inheritdoc />
     public Result Save(PendingBiosChange change)
     {
-        // Defensive: never persist a marker that would read back as corrupt.
+        // Défensif : ne jamais écrire un marqueur qui se relirait corrompu.
         var invalid = Validate(change);
         if (invalid is not null)
             return Result.Fail(ErrorCodes.BiosPendingChangeCorrupt, invalid);
@@ -58,8 +58,8 @@ public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
         }
         catch (Exception ex)
         {
-            // Serialization itself should not throw for a validated change, but we wrap
-            // the boundary regardless — no exception ever escapes the store.
+            // La sérialisation ne devrait pas lever pour un changement validé, mais la frontière
+            // est protégée quand même : aucune exception ne sort du magasin.
             return Result.Fail(ErrorCodes.BiosPendingChangeIo, $"Marker serialize failed: {ex.Message}");
         }
     }
@@ -71,7 +71,7 @@ public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
         if (!read.IsOk)
             return Result<PendingBiosChange?>.Fail(read.Error!.Value.Code, read.Error.Value.Message);
 
-        // Absent marker → clean "nothing pending".
+        // Marqueur absent : proprement « rien en attente ».
         if (read.Value is null)
             return Result<PendingBiosChange?>.Ok(null);
 
@@ -94,7 +94,7 @@ public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
         if (change is null)
             return Result<PendingBiosChange?>.Fail(ErrorCodes.BiosPendingChangeCorrupt, reason!);
 
-        // Re-validate the materialized change (defence in depth against a hand-edited file).
+        // Revalider le changement reconstruit (défense en profondeur contre un fichier édité à la main).
         var invalid = Validate(change);
         if (invalid is not null)
             return Result<PendingBiosChange?>.Fail(ErrorCodes.BiosPendingChangeCorrupt, invalid);
@@ -105,7 +105,7 @@ public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
     /// <inheritdoc />
     public Result Clear() => _file.Delete();
 
-    /// <summary>Returns a corruption reason, or null when the change is a valid marker.</summary>
+    /// <summary>Rend la raison de la corruption, ou null quand le changement est un marqueur valide.</summary>
     private static string? Validate(PendingBiosChange change)
     {
         if (change is null) return "Pending change is null.";
@@ -121,7 +121,7 @@ public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
             if (t is null) return "Pending change has a null target.";
             if (!Enum.IsDefined(typeof(FirmwareSettingKind), t.Setting))
                 return $"Pending change has an unknown setting '{(int)t.Setting}'.";
-            // An expectation must be concrete — Unknown is not a verifiable target.
+            // Une attente doit être concrète : Unknown n'est pas une cible vérifiable.
             if (t.ExpectedState == TriState.Unknown)
                 return $"Pending change target '{t.Setting}' has an Unknown expectation.";
             if (!Enum.IsDefined(typeof(TriState), t.ExpectedState))
@@ -131,9 +131,10 @@ public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
         return null;
     }
 
-    // ── On-disk DTO: an explicit shape we control (not the domain record), so a
-    //    malformed/hostile file deserializes into something we then validate, rather
-    //    than binding straight onto the domain. Enums are strings (see JsonOptions). ──
+    // ── DTO sur disque : une forme explicite que l'on contrôle (pas l'enregistrement du
+    //    domaine), pour qu'un fichier malformé ou hostile se désérialise dans quelque chose
+    //    que l'on valide ensuite, au lieu de se lier directement au domaine. Énumérations en
+    //    chaînes (voir JsonOptions). ──
     private sealed record MarkerDto(
         List<TargetDto> Targets,
         DateTimeOffset CreatedUtc,

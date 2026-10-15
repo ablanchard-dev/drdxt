@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DrDxt.Profiles.Tests;
 
-// M6 — DI wiring resolves the profile layer (mirrors AddDrDxtDetection/Application tests).
+// Le câblage DI résout la couche des profils (miroir des tests AddDrDxtDetection/Application).
 public sealed class ProfilesServiceCollectionExtensionsTests
 {
     private static ServiceProvider Build() =>

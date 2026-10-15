@@ -4,7 +4,7 @@ namespace DrDxt.Detection.Gpu;
 
 public interface INvReBarProvider
 {
-    /// <summary>NVIDIA Resizable BAR state, inferred from NVML BAR1 size vs framebuffer size.
-    /// NVML absent / no NVIDIA GPU / unreadable → Unknown (never throws, never claims Off blindly).</summary>
+    /// <summary>État du Resizable BAR NVIDIA, déduit de la taille BAR1 de NVML contre celle du framebuffer.
+    /// NVML absent / pas de GPU NVIDIA / illisible → Unknown (ne lève jamais, jamais Off à l'aveugle).</summary>
     TriState GetReBarState();
 }

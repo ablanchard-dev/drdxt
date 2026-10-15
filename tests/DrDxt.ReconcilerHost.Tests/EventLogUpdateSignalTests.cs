@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 /// <summary>
-/// 25/09/2026 — le signal « une mise à jour Windows vient de s'installer » lit le même journal que
+/// Le signal « une mise à jour Windows vient de s'installer » lit le même journal que
 /// l'audit de santé. Il n'était pas écrit : il rendait toujours « non ».
 /// </summary>
 public sealed class EventLogUpdateSignalTests

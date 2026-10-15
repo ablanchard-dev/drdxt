@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 23/09/2026. Le frere du crible des boutons (AucunBoutonSansTexteNEstAnonymeTests).
+// Le frere du crible des boutons (AucunBoutonSansTexteNEstAnonymeTests).
 //
 // Mesure par UI Automation sur l'application lancee : un champ de saisie visible s'annoncait
 // « modification », sans nom. Trois dans les vues, pas deux : la « Precision (facultatif) » de la

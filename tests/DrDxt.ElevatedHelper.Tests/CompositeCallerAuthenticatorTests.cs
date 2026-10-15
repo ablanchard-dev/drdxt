@@ -5,16 +5,16 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// Multi-caller authorization (M5 reconciler↔helper channel).
+// Autorisation multi-appelants (canal réconciliateur ↔ helper).
 //
-// The helper must authorize a SET of distinct caller images — the interactive
-// DrDxt.App AND the low-priv reconciler host — each by path + SHA-256. The
-// composite is OK if ANY member authorizes the peer (the peer is exactly one of
-// the trusted images); it DENIES when none do. It never fails open:
-//   * an EMPTY set denies everything (no trusted image provisioned),
-//   * an unknown image denies,
-//   * a member that throws does not crash the decision (treated as that member
-//     not authorizing) — defense in depth.
+// Le helper doit autoriser un ensemble d'images appelantes distinctes (DrDxt.App
+// interactive et l'hôte réconciliateur peu privilégié), chacune par chemin + SHA-256. Le
+// composite accepte si un membre autorise le pair (le pair est exactement l'une des images
+// de confiance) ; il refuse quand aucun ne le fait. Jamais ouvert :
+//   * un ensemble vide refuse tout (aucune image de confiance provisionnée),
+//   * une image inconnue est refusée,
+//   * un membre qui lève ne fait pas tomber la décision (compté comme n'autorisant pas) :
+//     défense en profondeur.
 // -----------------------------------------------------------------------
 public sealed class CompositeCallerAuthenticatorTests
 {
@@ -49,7 +49,7 @@ public sealed class CompositeCallerAuthenticatorTests
     [Fact]
     public void Authorizes_when_a_later_member_allows()
     {
-        // App authenticator denies pid 22, but the reconciler authenticator allows it.
+        // L'authentificateur App refuse le pid 22 ; celui du réconciliateur l'accepte.
         var auth = new CompositeCallerAuthenticator(new AllowOnePid(11), new AllowOnePid(22));
         auth.Authorize(new CallerInfo(22)).IsOk.Should().BeTrue();
     }

@@ -7,7 +7,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 11/09/2026 — la surface declaree est celle que le levier ecrit.
+/// La surface declaree est celle que le levier ecrit.
 ///
 /// Le veto des arrets brutaux laisse passer deux surfaces : l'OS utilisateur et « rien ». Ce sont
 /// donc les seules declarations qui doivent etre prouvees — une surface fermee declaree a tort ne

@@ -7,7 +7,7 @@ namespace DrDxt.Core.Tests;
 /// <summary>
 /// Le veto des arrets brutaux, sur la surface ecrite — et le lot qu'il laisse.
 ///
-/// 11/09/2026 : le veto L6 fermait sur les grandeurs DECLAREES (`gpu.`, `cpu.`, `ram.`) ; trois
+/// Le veto des arrêts fermait sur les grandeurs DECLAREES (`gpu.`, `cpu.`, `ram.`) ; trois
 /// leviers qui ecrivent l'etat du pilote NVIDIA se declaraient « latence » et passaient. Un second
 /// veto propre a la campagne les avait ecartes de `tools/optimize`, pas de l'App. Le veto ferme
 /// maintenant sur <see cref="SurfaceTouchee"/>, une seule definition, lue par l'App et la campagne.
@@ -29,7 +29,7 @@ public class JugementApplyLotTests
         SurfaceTouchee.CarteGraphique, SurfaceTouchee.PiloteGraphique, SurfaceTouchee.Affichage,
     };
 
-    // L-ECRAN : un reglage de confort se pose a part, sans banc et sans jeu ; l'autopilote ne le tente jamais.
+    // Un reglage de confort se pose a part, sans banc et sans jeu ; l'autopilote ne le tente jamais.
     [Fact]
     public void L_ecran_se_pose_sans_mesure_meme_sans_jeu_et_jamais_en_session()
     {
@@ -50,8 +50,7 @@ public class JugementApplyLotTests
     [Fact]
     public void Catalogue_entier_et_arrets_secs_repetes_rien_n_est_ferme_par_les_arrets()
     {
-        // 08/10/2026 : les arrêts ne ferment plus le processeur ni la mémoire ; 09/10/2026 (le mainteneur : « DrDXT n'est pas
-        // censé me dire non ») : ni la carte ni le pilote graphique. La garde d'incident rend ce qui précède un arrêt.
+        // Les arrêts ne ferment plus le processeur ni la mémoire, ni la carte ni le pilote graphique. La garde d'incident rend ce qui précède un arrêt.
         var ids = CatalogueDeCandidats.Ids.ToList();
         var j = JugementApply.Juger(Diagnostic(ArretsRecents(3)), ids, jeuEnCours: true);
 
@@ -64,7 +63,7 @@ public class JugementApplyLotTests
     [Fact]
     public void Les_trois_leviers_du_pilote_trouves_au_rejeu_du_11_09_passent_sous_garde()
     {
-        // 11/09/2026 : fermés par les arrêts (ils écrivent le pilote). 09/10/2026 : la garde d'incident les rend après un
+        // Fermés par les arrêts (ils écrivent le pilote). La garde d'incident les rend après un
         // arrêt ; les arrêts ne les ferment plus.
         var j = JugementApply.Juger(Diagnostic(ArretsRecents(7)),
             new[] { "latency.reflex", "latency.render_queue_cap", "latency.vrr_vsync_cap" }, jeuEnCours: true);
@@ -92,7 +91,7 @@ public class JugementApplyLotTests
             new[] { "latency.gameModeOn", "latency.gameDvrBackgroundOff", "latency.vrrFlipModelOn",
                     "latency.hagsOn", "fixit.sane_pagefile" }, jeuEnCours: true);
 
-        // 08/10/2026 : le fichier d'échange (mémoire) passe sous garde ; 09/10/2026 : HAGS (pilote graphique) aussi.
+        // Le fichier d'échange (mémoire) passe sous garde ; 09/10/2026 : HAGS (pilote graphique) aussi.
         j.AuRedemarrage.Should().BeEquivalentTo("latency.gameModeOn", "latency.gameDvrBackgroundOff", "latency.vrrFlipModelOn",
             "latency.hagsOn", "fixit.sane_pagefile");
     }
@@ -109,7 +108,7 @@ public class JugementApplyLotTests
         j.AChaud!.Id.Should().Be("fixit.power_plan", "l'Optimiser de l'App ne tente que le premier du lot");
     }
 
-    // ── 11/09/2026 — le veto d'instabilite GRAPHIQUE ferme sur la surface, lui aussi ────────────────
+    // ── Le veto d'instabilite GRAPHIQUE ferme sur la surface, lui aussi ────────────────
 
     private static readonly SurfaceTouchee[] FermeesParLeNoyauGraphique =
         { SurfaceTouchee.NonDeclaree, SurfaceTouchee.CarteGraphique, SurfaceTouchee.PiloteGraphique };
@@ -122,7 +121,7 @@ public class JugementApplyLotTests
             "0x193 VIDEO_DXGKRNL_LIVEDUMP (parametre 1 : 0x80e)"),
         arretsBrutaux: Array.Empty<ArretClasse>());
 
-    // GARDE2 (09/10/2026, le mainteneur : « DrDXT doit tout faire si possible ») : les incidents du pilote ne ferment plus
+    // Les incidents du pilote ne ferment plus
     // la carte ni le pilote ; la garde d'incident surveille les vidages à chaud dans la semaine après une pose et rend seule.
     [Fact]
     public void Catalogue_entier_incidents_graphiques_et_zero_arret_rien_n_est_ferme_sauf_une_surface_non_declaree()
@@ -166,7 +165,7 @@ public class JugementApplyLotTests
         j.LotAChaud.Select(d => d.Id).Should().Equal("fixit.power_plan", "latency.reflex");
         j.VetoDesArrets.Should().BeNull();
     }
-    // 07/10/2026 (revue F-16) : changer le mode d'écran sort un jeu plein écran exclusif et cache la question
+    // Changer le mode d'écran sort un jeu plein écran exclusif et cache la question
     // « garder ou revenir ». Jeu lancé : refusé, avec son motif ; jeu fermé : posé au clic.
     [Fact]
     public void L_ecran_se_regle_jeu_ferme_jamais_en_partie()

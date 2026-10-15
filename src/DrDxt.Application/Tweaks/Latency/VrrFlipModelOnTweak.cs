@@ -4,29 +4,30 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// NS-1 — VrrFlipModelOnTweak (OS, persistent).
+// VrrFlipModelOnTweak (système, persistant).
 //
-// Turns ON, in one shot, the two Windows graphics toggles that share a single REG_SZ:
-//   * VRROptimizeEnable     — "Variable refresh rate" (helps windowed/borderless VRR),
-//   * SwapEffectUpgradeEnable — "Optimizations for windowed games" (flip-model presentation).
-// Noms vérifiés le 24/09/2026 : ce sont ceux qu'écrivent les Paramètres de Windows eux-mêmes
-// (lus tels quels dans le registre de la machine de référence, `SwapEffectUpgradeEnable=1;`).
-// Both live in HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings, a
-// "key=value;..." string also holding AutoHDREnable / HighPerfAdapter. So we MERGE: read the
-// current string, set only our two keys, re-serialize, PRESERVING every other key (audit M2 —
-// never clobber AutoHDR). The snapshot stores the RAW original string for a faithful revert
-// (or a delete when the value was absent).
+// Active d'un coup les deux bascules graphiques de Windows qui partagent une seule REG_SZ :
+//   * VRROptimizeEnable : « Taux de rafraîchissement variable » (VRR en fenêtré et sans bordure) ;
+//   * SwapEffectUpgradeEnable : « Optimisations pour les jeux en fenêtré » (présentation flip-model).
+// Ce sont les noms qu'écrivent les Paramètres de Windows eux-mêmes (relevés tels quels dans le
+// registre de la machine de référence, `SwapEffectUpgradeEnable=1;`).
+// Les deux vivent dans HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings,
+// une chaîne « clé=valeur;... » qui porte aussi AutoHDREnable et HighPerfAdapter. D'où une fusion :
+// lire la chaîne, poser nos deux clés seulement, réécrire en gardant toutes les autres (jamais écraser
+// AutoHDR). Le snapshot garde la chaîne d'origine brute pour un retour fidèle (ou une suppression si
+// la valeur était absente).
 //
-// Takes effect after reboot / next game launch → engine skips the immediate A/B (proof deferred).
+// Effet au redémarrage ou au prochain lancement du jeu : le moteur saute l'A/B immédiat.
 //
-// HONESTY (§6): PROPOSED, not auto-silent; SummaryKey describes the change, no "+FPS". VRR is a
-// no-op on a non-VRR display (harmless); the flip-model half helps windowed games regardless.
+// Proposé, jamais posé en silence ; le SummaryKey décrit le changement, pas de « +FPS ». Le VRR ne fait
+// rien sur un écran sans VRR (sans danger) ; la moitié flip-model aide les jeux fenêtrés dans tous les cas.
 //
-// Gating: AppliesTo reads this DirectXUserGlobalSettings string itself (the scan's VRR reading comes
-// from the driver, a different source). Flip-model absent ⇒ applicable on any display; flip-model
-// already on ⇒ applicable only for the VRR half, and only on a display read as VRR-capable
-// (`VrrCapableDisplay`, « C1 bis » du 14/09/2026, voir AppliesTo).
+// Gating : AppliesTo lit lui-même cette chaîne (la lecture VRR du scan vient du pilote, une autre
+// source). Flip-model absent : proposé sur tout écran. Flip-model déjà actif : proposé seulement pour
+// la moitié VRR, et seulement sur un écran lu compatible VRR (`VrrCapableDisplay`, voir AppliesTo).
 // -----------------------------------------------------------------------
+/// <summary>Active le VRR fenêtré et le flip-model de Windows dans DirectXUserGlobalSettings, en gardant les autres
+/// clés. Proposé quand le flip-model manque, ou quand seul le VRR manque sur un écran compatible.</summary>
 public sealed class VrrFlipModelOnTweak : LatencyTweakBase
 {
     private const string PrefsPath = @"Software\Microsoft\DirectX\UserGpuPreferences";
@@ -47,11 +48,11 @@ public sealed class VrrFlipModelOnTweak : LatencyTweakBase
 
     public override bool TakesEffectAfterReboot => true;
 
-    // Revue du 12/09 (C1) : les deux interrupteurs deja a 1 ⇒ rien a faire, hors du plan (sinon
+    // Les deux interrupteurs deja a 1 ⇒ rien a faire, hors du plan (sinon
     // « rien a tenter » n'est jamais vrai et le client paie pour rien). Illisible ⇒ applicable :
-    // non lu n'est pas « deja regle ». La capacite VRR de l'ecran reste un suivi NS-8.
+    // non lu n'est pas « deja regle ». La capacite VRR de l'ecran reste a lire.
     //
-    // 14/09/2026 (C1 bis) : la moitie VRR ne vaut rien sur un ecran qui ne fait pas de VRR. Le
+    // La moitie VRR ne vaut rien sur un ecran qui ne fait pas de VRR. Le
     // poste de reference a deja le flip-model (`SwapEffectUpgradeEnable=1`) et pas `VRROptimizeEnable` :
     // le levier restait au plan pour la seule moitie VRR, que l'ecran soit capable ou non. Elle ne
     // compte plus que sur un ecran LU comme VRR (`VrrCapableDisplay`, deja lu par le scan).
@@ -74,15 +75,15 @@ public sealed class VrrFlipModelOnTweak : LatencyTweakBase
     {
         try
         {
-            // Capture the real original string before writing (faithful revert of the whole value).
+            // Relever la vraie chaîne d'origine avant d'écrire (retour fidèle de toute la valeur).
             var read = _registry.ReadString(RegistryHiveKind.CurrentUser, PrefsPath, ValueName);
             if (!read.IsOk)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     $"Could not read original DirectXUserGlobalSettings: {read.Error?.Code}.");
 
-            var original = read.Value; // null = the value was absent
+            var original = read.Value; // null = la valeur était absente
 
-            // Inverse: restore the exact original string, or delete the value if it was absent.
+            // Inverse : remettre exactement la chaîne d'origine, ou supprimer la valeur si elle était absente.
             PrivilegedOp inverse = original is null
                 ? new DeleteRegistryValueOp(RegistryHiveKind.CurrentUser, PrefsPath, ValueName)
                 : new SetRegistryValueOp(RegistryHiveKind.CurrentUser, PrefsPath, ValueName,
@@ -92,7 +93,7 @@ public sealed class VrrFlipModelOnTweak : LatencyTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "Could not serialize the revert op.");
 
-            // Merge our two keys into the existing string (AutoHDR et al. preserved), write it back.
+            // Fusionner nos deux clés dans la chaîne existante (AutoHDR et les autres gardés), puis la réécrire.
             var merged = DirectXUserGlobalSettings.Merge(original, TurnOn);
             var op = new SetRegistryValueOp(RegistryHiveKind.CurrentUser, PrefsPath, ValueName,
                 RegistryValueType.String, merged);
@@ -101,7 +102,7 @@ public sealed class VrrFlipModelOnTweak : LatencyTweakBase
             if (!applied.IsOk)
                 return Result<TweakSnapshot>.Fail(applied.Error!.Value.Code, applied.Error!.Value.Message);
 
-            // 06/10/2026 (plan 4.3) : la chaîne posée voyage avec l'inverse. Sans elle, la désinstallation ne
+            // La chaîne posée voyage avec l'inverse. Sans elle, la désinstallation ne
             // sait pas si la valeur est encore celle de DrDXT, et n'y touche pas.
             return Result<TweakSnapshot>.Ok(SnapshotAvec(Id, inverseWire.Value, op));
         }

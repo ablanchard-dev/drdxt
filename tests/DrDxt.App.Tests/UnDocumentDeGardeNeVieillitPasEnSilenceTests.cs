@@ -5,16 +5,12 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. `GATES.md` est le fichier dont la fonction est de BLOQUER : il dit
-// ce qui n'est pas fini, ce qui n'est pas pousse, ce qui reste a trancher. Il
-// porte lui-meme cette phrase, ecrite le 05/09 : « le fichier dont la fonction
-// est de bloquer etait en retard d'une journee de travail sur ce qu'il doit
-// bloquer ».
+// `GATES.md` est le fichier dont la fonction est de BLOQUER : il dit
+// ce qui n'est pas fini, ce qui n'est pas pousse, ce qui reste a trancher.
 //
-// Mesure du jour : il l'etait de nouveau, et bien plus. Il annoncait « main
-// local est 16 commits en avance sur origin/main ». Le compte reel :
-// **137**. Le chiffre etait date -- donc honnete au moment ou il a ete ecrit --
-// mais il decrit un etat qui bouge a chaque commit, et personne ne le relit.
+// Un compte comme « main local est 16 commits en avance sur origin/main » est
+// honnete le jour ou il est ecrit, mais il bouge a chaque commit et personne ne
+// le relit (mesure : 16 ecrit, 137 reels).
 //
 // Un compte qui bouge tout seul n'a pas sa place en dur dans un document : ce
 // qui a sa place, c'est la COMMANDE qui le donne. Le lecteur obtient alors le
@@ -30,15 +26,16 @@ public sealed class UnDocumentDeGardeNeVieillitPasEnSilenceTests
     }
 
     // Les documents qui decrivent l'etat du depot, par opposition aux comptes rendus
-    // dates : un compte rendu du 12/09 doit garder le chiffre du 12/09.
-    private static readonly string[] DocumentsVivants = { "GATES.md", "README.md" };
+    // dates : un compte rendu date garde le chiffre de sa date.
+    private static readonly string[] DocumentsVivants = { "GATES.md", "README.md", "README.fr.md" };
 
     private static string Texte(string nom) => File.ReadAllText(Path.Combine(Racine().FullName, nom));
 
     // Ce qui bouge a chaque commit : l'avance du local sur le distant.
     //
-    // Ce que le crible laisse passer, et pourquoi : « l'exe du 02/09 avait 47 commits de
-    // retard sur le code (mesure le 06/09) ». C'est un fait historique clos -- l'ecart
+    // Ce que le crible laisse passer, et pourquoi :
+    // « l'exe du 02/09 avait 47 commits de retard sur le code (mesure le 06/09) ».
+    // C'est un fait historique clos : l'ecart
     // entre un artefact date et le code a une date donnee, depuis reconstruit. Il ne
     // bougera plus, donc il ne peut pas se demoder. Un crible qui l'accuserait crierait
     // au loup, et un crible qui crie au loup finit desactive.
@@ -58,6 +55,7 @@ public sealed class UnDocumentDeGardeNeVieillitPasEnSilenceTests
     [Theory]
     [InlineData("GATES.md")]
     [InlineData("README.md")]
+    [InlineData("README.fr.md")]
     public void Un_document_vivant_n_affirme_pas_un_compte_de_commits_en_dur(string nom)
     {
         var trouves = CompteDeCommits.Matches(Texte(nom)).Select(m => m.Value.Trim()).ToList();
@@ -78,10 +76,12 @@ public sealed class UnDocumentDeGardeNeVieillitPasEnSilenceTests
             "sans la commande, le lecteur n'a plus ni le chiffre ni le moyen de l'obtenir");
     }
 
-    [Fact]
-    public void Le_compte_de_tests_du_readme_vient_avec_la_commande_qui_le_redonne()
+    [Theory]
+    [InlineData("README.fr.md", @"\*\*[\d\s ]+tests")]
+    [InlineData("README.md", @"\*\*[\d,]+ tests")]
+    public void Le_compte_de_tests_du_readme_vient_avec_la_commande_qui_le_redonne(string fichier, string motif)
     {
-        // 18/09/2026, meme regle que ci-dessus, sur l'autre document et l'autre chiffre.
+        // Meme regle que ci-dessus, sur l'autre document et l'autre chiffre.
         // Le README annonce un nombre de tests. Il a porte 2 957, puis 4 205, puis 4 325,
         // et s'est trompe a chaque fois du meme cote : vers le bas, parce qu'on ajoute des
         // tests. C'est une dette inevitable — mais elle ne coute rien tant que le lecteur
@@ -91,9 +91,9 @@ public sealed class UnDocumentDeGardeNeVieillitPasEnSilenceTests
         // deux-points par une espace INSECABLE : un motif qui attend une espace ordinaire
         // rend zero sans rien dire. Une commande approximative serait pire que pas de
         // commande, parce qu'elle a l'air de marcher.
-        var readme = Texte("README.md");
+        var readme = Texte(fichier);
 
-        readme.Should().MatchRegex(@"\*\*[\d\s ]+tests",
+        readme.Should().MatchRegex(motif,
             "temoin : le README annonce bien un compte de tests");
         readme.Should().Contain("dotnet test DrDXT.sln",
             "sans la commande, le lecteur n'a qu'un chiffre date et aucun moyen de le refaire");
@@ -103,20 +103,18 @@ public sealed class UnDocumentDeGardeNeVieillitPasEnSilenceTests
     }
 
     // -------------------------------------------------------------------
-    // 18/09/2026, meme regle sur les deux autres comptes ecrits a la main du
+    // Meme regle sur les deux autres comptes ecrits a la main du
     // README : le nombre d'invariants, et la liste des projets.
     //
-    // Mesure avant d'ecrire : les deux disent vrai aujourd'hui -- cinq annonces
-    // et cinq puces, dix projets nommes et dix qui existent. Ce n'est pas une
-    // raison de ne rien ecrire : c'est exactement l'etat dans lequel le compte
-    // des commits etait le 05/09, avant de deriver de 16 a 137 sans que personne
-    // ne le relise. Un compte juste que rien ne tient n'est pas garanti, il est
-    // seulement encore jeune.
+    // Qu'ils disent vrai aujourd'hui ne suffit pas : le compte des commits etait
+    // juste aussi, avant de deriver de 16 a 137 sans que personne ne le relise. Un
+    // compte juste que rien ne tient n'est pas garanti, il est seulement encore jeune.
     // -------------------------------------------------------------------
 
     private static readonly Dictionary<string, int> NombresEnLettres = new()
     {
         ["trois"] = 3, ["quatre"] = 4, ["cinq"] = 5, ["six"] = 6, ["sept"] = 7, ["huit"] = 8,
+        ["three"] = 3, ["four"] = 4, ["five"] = 5, ["seven"] = 7, ["eight"] = 8,
     };
 
     /// <summary>Le corps d'une section `## Titre`, jusqu'au titre suivant.</summary>
@@ -131,13 +129,15 @@ public sealed class UnDocumentDeGardeNeVieillitPasEnSilenceTests
         return string.Join('\n', lignes[(i + 1)..suivante]) + "\n" + lignes[i];
     }
 
-    [Fact]
-    public void Le_nombre_d_invariants_annonce_est_celui_qui_est_liste()
+    [Theory]
+    [InlineData("README.fr.md", @"##\s+Les\s+(\w+)\s+invariants")]
+    [InlineData("README.md", @"##\s+The\s+(\w+)\s+invariants")]
+    public void Le_nombre_d_invariants_annonce_est_celui_qui_est_liste(string fichier, string motif)
     {
-        var readme = Texte("README.md");
+        var readme = Texte(fichier);
         var section = Section(readme, "invariants");
 
-        var titre = Regex.Match(section, @"##\s+Les\s+(\w+)\s+invariants");
+        var titre = Regex.Match(section, motif);
         titre.Success.Should().BeTrue("le titre annonce un nombre en toutes lettres");
         NombresEnLettres.Should().ContainKey(titre.Groups[1].Value,
             "le titre annonce un nombre que le test sait lire");
@@ -151,10 +151,12 @@ public sealed class UnDocumentDeGardeNeVieillitPasEnSilenceTests
             "bouge, c'est une promesse qui compte faux sur ce que le produit garantit");
     }
 
-    [Fact]
-    public void Chaque_projet_nomme_par_la_carte_du_code_existe_vraiment()
+    [Theory]
+    [InlineData("README.fr.md", "Carte du code")]
+    [InlineData("README.md", "Code map")]
+    public void Chaque_projet_nomme_par_la_carte_du_code_existe_vraiment(string fichier, string titre)
     {
-        var carte = Section(Texte("README.md"), "Carte du code");
+        var carte = Section(Texte(fichier), titre);
 
         // `DrDxt.Reconciler*` est un joker assume : plusieurs projets, un seul role.
         var nommes = Regex.Matches(carte, @"`(DrDxt\.[A-Za-z]+)\*?`")

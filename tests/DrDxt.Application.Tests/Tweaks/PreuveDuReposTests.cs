@@ -5,7 +5,7 @@ using NSubstitute;
 
 namespace DrDxt.Application.Tests.Tweaks;
 
-// 30/09/2026 (boucle « la carte, prouvée », G3) : un réglage de la carte ne reste que prouvé. Au repos, la preuve est
+// Un réglage de la carte ne reste que prouvé. Au repos, la preuve est
 // la consommation lue avant puis après ; sans séparation nette (toutes les lectures d'après sous toutes celles
 // d'avant), le réglage est retiré. Aucun seuil inventé : c'est la dispersion mesurée qui décide.
 public sealed class PreuveDuReposTests
@@ -79,7 +79,7 @@ public sealed class PreuveDuReposTests
         await levier.DidNotReceive().ApplyAsync();
     }
 
-    // 30/09/2026, mesure réelle : le global écrit ne change la carte qu'au redémarrage (chaque programme lit le profil
+    // Mesure réelle : le global écrit ne change la carte qu'au redémarrage (chaque programme lit le profil
     // à son lancement). La preuve se fait en deux temps : l'avant et l'écriture sont gardés, le lancement suivant conclut.
     private static string Fichier() => Path.Combine(Path.GetTempPath(), $"preuve-{Guid.NewGuid():N}.json");
 

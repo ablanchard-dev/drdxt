@@ -82,9 +82,8 @@ public class GainCumuleTests
             new GainProuve("b", BancCpu, 5, 0.8),
         ]);
 
-        // Ce test disait 1,00 JUSQU'AU 11/09/2026, et il NOMMAIT une garantie qu'il n'avait pas :
-        // racine de (0,6^2 + 0,8^2) empile des POINTS de pourcentage alors que le total est un
-        // Produit. Le bruit d'un produit se propage en relatif — racine de ((0,6/1,05)^2 +
+        // Pas 1,00 : racine de (0,6^2 + 0,8^2) empile des POINTS de pourcentage alors que le total
+        // est un produit. Le bruit d'un produit se propage en relatif : racine de ((0,6/1,05)^2 +
         // (0,8/1,05)^2) = 0,952 % du total — puis se reporte a l'echelle du total : x 1,1025.
         total.BruitPercent.Should().BeApproximately(1.05, 0.01,
             "un total sans son bruit est un chiffre qu'on ne peut pas contester");
@@ -129,19 +128,19 @@ public class GainCumuleTests
         // ── Le bruit : quadrature, et voici pourquoi ──────────────────────────────────────────
         // Le code choisit le modele INDEPENDANT (racine de la somme des carres) et non le
         // modele CORRELE (somme directe). La raison n'est pas esthetique : chaque bruit est la
-        // resolution d'une experience A/B SEPAREE — la dispersion passe-a-passe de ce levier-la,
+        // resolution d'une experience A/B SEPAREE : la dispersion passe-a-passe de ce levier-la,
         // mesuree dans ses propres passes. Deux experiences distinctes ne tirent pas la meme
         // erreur, donc leurs ecarts ne se renforcent pas systematiquement : ils se composent en
         // quadrature. Additionner les bruits reviendrait a supposer que toutes les mesures se
         // trompent dans le meme sens au meme moment.
         //
         // Et c'est le choix optimiste, ecrit ici plutot que decouvert plus tard. Si une derive
-        // commune existe — temperature ambiante, etat du pilote, phase de partie — les erreurs
+        // commune existe (temperature ambiante, etat du pilote, phase de partie), les erreurs
         // sont correlees et le vrai bruit monte jusqu'a la SOMME. Les deux bornes sont calculees
         // ci-dessous, et le test les tient toutes les deux : la quadrature est ce que le code
         // rend, la somme est le plafond qu'il n'atteint jamais.
         //
-        // Le bruit se propage dans l'espace du produit — en relatif (sigma_i / f_i), puis reporte
+        // Le bruit se propage dans l'espace du produit : en relatif (sigma_i / f_i), puis reporte
         // a l'echelle du total (x F) :
         //     0,50 / 1,04 = 0,480769  ->  au carre 0,231139
         //     0,40 / 1,03 = 0,388350  ->  au carre 0,150815
@@ -155,8 +154,8 @@ public class GainCumuleTests
         //
         // Trois valeurs a ne pas confondre, et c'est tout l'interet de ce test :
         //     0,7478 %  <- ce que le code rend (quadrature dans l'espace du produit)
-        //     0,7071 %  <- sqrt(0,5^2 + 0,4^2 + 0,3^2), la quadrature en POINTS de pourcentage,
-        //                  l'ancienne formule corrigee le 11/09/2026 : elle sous-ESTIME
+        //     0,7071 %  <- sqrt(0,5^2 + 0,4^2 + 0,3^2), la quadrature en POINTS de pourcentage :
+        //                  elle sous-ESTIME
         //     1,2000 %  <- 0,5 + 0,4 + 0,3, le modele correle, plafond jamais atteint ici
         var total = GainCumule.Additionner(
         [
@@ -227,7 +226,7 @@ public class GainCumuleTests
         var vide = GainCumule.Additionner(null);
 
         vide.TotalPercent.Should().Be(0);
-        vide.Refus.Should().ContainSingle().Which.Should().Contain("aucun gain prouve");
+        vide.Refus.Should().ContainSingle().Which.Should().Contain("aucun gain prouvé");
         vide.Instrument.Should().BeNull("on ne nomme pas un instrument qu'on n'a pas utilise");
     }
 

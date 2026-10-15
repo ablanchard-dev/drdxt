@@ -4,26 +4,26 @@ using DrDxt.Reconciler;
 namespace DrDxt.ReconcilerHost;
 
 // -----------------------------------------------------------------------
-// LoggingReconcilerNotifier — the host IReconcilerNotifier.
+// LoggingReconcilerNotifier : l'IReconcilerNotifier de l'hôte.
 //
-// When a drift is classified UserIntentional/Unknown the reconciler does not overwrite
-// it (I5); it raises this notification instead. In the background service there is no
-// interactive toast surface, so the notification is journalled through IDiagnosticsLog
-// (the same audit trail the App reads) — the App can surface it on next launch.
+// Quand une dérive est classée UserIntentional/Unknown, le réconciliateur ne l'écrase pas (I5) ;
+// il lève cette notification à la place. Dans le service d'arrière-plan il n'y a pas de surface
+// de toast interactive : la notification est journalisée par IDiagnosticsLog (la même trace
+// d'audit que lit l'App), et l'App peut la montrer au lancement suivant.
 //
-// i18n: the human-readable text is resolved from a resx KEY via ILocalizer, never a
-// hardcoded string (the project HAS a localizer, §4). The localized message is built
-// for the audit/UI; the journal line itself records the structured facts (tweak id +
-// current user-set value) so a log scan stays language-independent.
+// i18n : le texte lisible vient d'une clé resx via ILocalizer, jamais d'une chaîne en dur (le
+// projet a un localiseur). Le message localisé est construit pour l'audit / l'interface ; la
+// ligne de journal elle-même enregistre les faits structurés (id du levier + valeur actuelle
+// posée par l'utilisateur) pour qu'un balayage du journal reste indépendant de la langue.
 // -----------------------------------------------------------------------
 public sealed class LoggingReconcilerNotifier : IReconcilerNotifier
 {
-    /// <summary>The resx key for the "a DrDXT-optimized setting was changed, left as
-    /// you set it" notification. {0} = the tweak title/id.</summary>
+    /// <summary>La clé resx de la notification « un réglage optimisé par DrDXT a été changé, laissé
+    /// tel que vous l'avez posé ». {0} = le titre / l'id du levier.</summary>
     public const string UserDriftKey = "reconciler.notify.user_drift";
 
-    /// <summary>Journal actor marking a "notified, not overwritten" outcome — mirrors
-    /// the reconciler's own "DrDXT/notified" change-log actor.</summary>
+    /// <summary>Acteur de journal qui marque une issue « notifié, pas écrasé » : reprend l'acteur
+    /// « DrDXT/notified » du journal des changements du réconciliateur.</summary>
     public const string NotifiedActor = "DrDXT/notified";
 
     private readonly IDiagnosticsLog _diagnostics;
@@ -38,15 +38,15 @@ public sealed class LoggingReconcilerNotifier : IReconcilerNotifier
     public Task NotifyUserIntentionalDriftAsync(
         AppliedTweak tweak, string currentValueJson, CancellationToken ct)
     {
-        // Resolve the localized message from a resx key (not hardcoded). Built for the
-        // audit/UI surface; the structured journal line below stays language-neutral.
+        // Résoudre le message localisé depuis une clé resx (pas en dur). Construit pour l'audit /
+        // l'interface ; la ligne de journal structurée ci-dessous reste neutre en langue.
         _ = string.Format(
             System.Globalization.CultureInfo.CurrentUICulture,
             _localizer.Get(UserDriftKey),
             tweak.TweakId);
 
-        // Journal the structured facts: the desired value drifted to the user-set value;
-        // it was NOTIFIED, not overwritten (I5).
+        // Journaliser les faits structurés : la valeur voulue a dérivé vers la valeur posée par
+        // l'utilisateur ; elle a été notifiée, pas écrasée (I5).
         _diagnostics.Change(
             tweakId: tweak.TweakId,
             from: tweak.DesiredValueJson,

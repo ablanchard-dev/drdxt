@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 19/09/2026. 4,5 secondes que le scan payait pour rien.
+// 4,5 secondes que le scan payait pour rien.
 //
 // Chronometre en trois phases, processus neuf :
 //
@@ -62,7 +62,7 @@ public sealed class L_attente_des_compteurs_se_paie_avant_le_scan_Tests : IDispo
         // Second contrepoids : amorcer sur le fil d'interface deplacerait l'attente du scan
         // vers l'ouverture de la fenetre — la meme seconde perdue, montree plus tot.
         //
-        // 10/10/2026 : ce test comparait des numeros de fil, et a rougi en CI (fil 55 des deux
+        // Ce test comparait des numeros de fil, et a rougi en CI (fil 55 des deux
         // cotes) sans aucun defaut : apres un `await`, le pool peut reprendre le fil appelant
         // pour y faire tourner la tache. Ce qui compte n'est pas le numero du fil, c'est que
         // l'appelant reprend la main AVANT que l'amorce ait fini. On le prouve avec une barriere.

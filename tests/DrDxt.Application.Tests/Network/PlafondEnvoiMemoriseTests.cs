@@ -55,7 +55,7 @@ public sealed class PlafondEnvoiMemoriseTests : IDisposable
         m.Lire().Should().BeNull("seul un nom d'exe nu qui n'est pas un binaire de Windows se rallume");
     }
 
-    // 27/09/2026 : la veille du ping prend le programme en plein ecran pour le jeu. Une video en plein ecran
+    // La veille du ping prend le programme en plein ecran pour le jeu. Une video en plein ecran
     // dans un navigateur ou un lecteur n'en est pas un : l'exempter briderait tout le reste pour rien.
     [Theory]
     [InlineData("chrome.exe")]
@@ -75,7 +75,7 @@ public sealed class PlafondEnvoiMemoriseTests : IDisposable
         m.Lire().Should().BeNull();
     }
 
-    // 27/09/2026 : un lanceur ou un programme de fond tourne toute la session. Retenu, il laisserait brider
+    // Un lanceur ou un programme de fond tourne toute la session. Retenu, il laisserait brider
     // l'envoi de tout le reste en permanence ; pris par la veille (Steam Big Picture est en plein ecran),
     // il se ferait passer pour la partie.
     [Theory]
@@ -98,7 +98,7 @@ public sealed class PlafondEnvoiMemoriseTests : IDisposable
     [InlineData("VALORANT-Win64-Shipping.exe")]
     public void Un_jeu_reste_un_jeu(string exe) => PlafondEnvoiMemorise.EstUnJeuPossible(exe).Should().BeTrue();
 
-    // 26/09/2026 : le fichier est ecrivable par tout le compte et relu a chaque lancement, sans clic.
+    // Le fichier est ecrivable par tout le compte et relu a chaque lancement, sans clic.
     // Un contenu abime ne fait ni tomber le lancement ni rallumer quoi que ce soit.
     public static TheoryData<string> Abimes() => new()
     {

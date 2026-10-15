@@ -71,10 +71,9 @@ public sealed class ContrasteDuChromeLiquideTests
     }
 
     // -------------------------------------------------------------------
-    // 18/09/2026. La liste ci-dessus disait « tout ce que les vues passent en
-    // Foreground », verifie a la main une fois. Mesure du jour : elle avait deja
-    // derive -- `SurChromeBrush`, l'encre de la capsule chrome (l'action
-    // principale de l'ecran) et du bouton fermer au survol, n'y figurait pas.
+    // Une liste « tout ce que les vues passent en Foreground » verifiee a la main derive :
+    // `SurChromeBrush`, l'encre de la capsule chrome (l'action principale de l'ecran) et du
+    // bouton fermer au survol, pourrait en manquer sans que rien ne rougisse.
     //
     // Le risque n'est pas theorique : le theme contient une couleur qui ECHOUE
     // le seuil, `IrisVioletBrush` (4,33:1 sur ObsidienneRelevee). Elle ne sert

@@ -3,7 +3,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// 25/09/2026. Le disque systeme borne la restauration systeme que le helper accepte d'activer.
+/// Le disque systeme borne la restauration systeme que le helper accepte d'activer.
 /// Il etait lu dans %SystemDrive%, que l'utilisateur peut redefinir dans ses propres variables et
 /// que le processus eleve herite. Il vient maintenant de l'API.
 /// </summary>

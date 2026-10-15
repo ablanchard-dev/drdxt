@@ -1,18 +1,19 @@
 namespace DrDxt.ReconcilerHost;
 
 // -----------------------------------------------------------------------
-// Stable, non-localized tokens the host writes into the IDiagnosticsLog change
-// journal. The journal is a machine-parseable audit trail (not UI), so these are
-// fixed identifiers — never user-facing strings. UI text the host shows a human
-// goes through ILocalizer (resx keys), kept separate from these.
+// Jetons stables, non localisés, que l'hôte écrit dans le journal des changements
+// d'IDiagnosticsLog. Le journal est une trace d'audit lisible par machine (pas l'interface) :
+// ce sont des identifiants fixes, jamais des chaînes montrées à l'utilisateur. Le texte
+// d'interface montré à un humain passe par ILocalizer (clés resx), à part de ces jetons.
 // -----------------------------------------------------------------------
 internal static class HostActors
 {
-    /// <summary>Journal actor for a security event (tampered/unverifiable manifest,
-    /// refused reconcile). Lets a log scan filter security entries deterministically.</summary>
+    /// <summary>Acteur de journal pour un événement de sécurité (manifeste altéré / invérifiable,
+    /// réconciliation refusée). Permet à un balayage du journal de filtrer les entrées de sécurité de
+    /// façon déterministe.</summary>
     public const string Security = "DrDXT/security";
 
-    /// <summary>The journal "tweak" slot used for manifest-level (not per-tweak)
-    /// security events — the bad-manifest gate is about the whole manifest.</summary>
+    /// <summary>Le champ « tweak » du journal utilisé pour les événements de sécurité au niveau du
+    /// manifeste (pas par levier) : la barrière du mauvais manifeste porte sur tout le manifeste.</summary>
     public const string ManifestTweakId = "manifest";
 }

@@ -3,26 +3,27 @@ using System.Text.RegularExpressions;
 namespace DrDxt.Detection.Hardware;
 
 /// <summary>
-/// Extracts the XMP/EXPO rated data-rate (MHz) encoded in a DRAM part number.
+/// Extrait le débit nominal XMP/EXPO (MHz) encodé dans le part number d'une barrette.
 ///
-/// WMI does not reliably expose a kit's rated speed. After a BIOS flash resets XMP,
-/// <c>Win32_PhysicalMemory.Speed</c> collapses to the JEDEC value (== ConfiguredClockSpeed),
-/// so the part number becomes the only honest source of the rating — which is exactly
-/// when we most need to flag "XMP got reset".
+/// WMI n'expose pas de façon fiable la vitesse nominale d'un kit. Après un flash du BIOS qui
+/// remet XMP à zéro, <c>Win32_PhysicalMemory.Speed</c> retombe sur la valeur JEDEC
+/// (== ConfiguredClockSpeed) : le part number devient la seule source honnête du nominal, et
+/// c'est justement là qu'il faut signaler « XMP a été remis à zéro ».
 ///
-/// Conservative by design (we must never invent a problem): we accept only a run of
-/// Exactly four digits whose value lands in a plausible DDR4/DDR5 data-rate range, and
-/// we take the highest such match — the headline speed, never a lower timing code
-/// (e.g. "6000" over the "3038" in F5-6000J3038...). When nothing plausible is found we
-/// return null and the caller keeps the WMI value; we never guess.
+/// Prudent par conception (on n'invente jamais un problème) : on n'accepte qu'une suite
+/// d'exactement quatre chiffres dont la valeur tombe dans une plage plausible de débit
+/// DDR4/DDR5, et on prend la plus haute : la vitesse affichée, jamais un code de timing plus bas
+/// (par exemple « 6000 » plutôt que le « 3038 » de F5-6000J3038...). Rien de plausible : on rend
+/// null et l'appelant garde la valeur WMI ; on ne devine jamais.
 ///
-/// Known gap: vendors that compress the speed (Kingston Fury "KF4 32" = DDR4-3200) have
-/// no 4-digit run; those return null and fall back to WMI honestly.
+/// Limite connue : les fabricants qui compressent la vitesse (Kingston Fury « KF4 32 » =
+/// DDR4-3200) n'ont pas de suite de 4 chiffres ; ils rendent null et retombent honnêtement sur WMI.
 /// </summary>
 public static partial class DramPartNumber
 {
-    // Plausible consumer DRAM data-rates: DDR4 ~2133 up to DDR5 ~8400+. Bounds kept wide
-    // but above 3-digit codes / below year-like numbers so a stray value isn't read as a speed.
+    // Débits plausibles de la mémoire grand public : DDR4 ~2133 jusqu'à DDR5 ~8400+. Bornes
+    // larges, mais au-dessus des codes à 3 chiffres et sous les nombres qui ressemblent à une
+    // année, pour qu'une valeur parasite ne passe pas pour une vitesse.
     private const int MinPlausibleMhz = 2000;
     private const int MaxPlausibleMhz = 9000;
 
@@ -36,8 +37,8 @@ public static partial class DramPartNumber
         int? best = null;
         foreach (Match m in FourDigitRun().Matches(partNumber))
         {
-            // Accept the match only if it is a standalone 4-digit run: a digit on either
-            // side means it belongs to a longer number (serial / die code), not a data-rate.
+            // N'accepter la correspondance que si c'est une suite isolée de 4 chiffres : un chiffre de
+            // part ou d'autre veut dire qu'elle appartient à un nombre plus long (série, code de puce).
             int start = m.Index;
             int end = m.Index + m.Length;
             if (start > 0 && char.IsDigit(partNumber[start - 1])) continue;
@@ -55,11 +56,11 @@ public static partial class DramPartNumber
     /// <c>F4-4000C18-32GTES</c>, le « J3038 » de <c>F5-6000J3038F16GX2</c> (CL30).
     ///
     /// Pourquoi c'est la seule source : aucune API Windows documentée n'expose les timings
-    /// effectifs — ni <c>Win32_PhysicalMemory</c>, ni le SMBIOS Type 17 (vérifié sur la table
+    /// effectifs : ni <c>Win32_PhysicalMemory</c>, ni le SMBIOS Type 17 (vérifié sur la table
     /// complète). Le SPD les porte, mais il faut le bus SMBus, donc un pilote noyau, donc la
     /// voie BYOVD que le produit refuse.
     ///
-    /// Conséquence à ne jamais perdre : ce tCL est celui du KIT, pas celui de la machine.
+    /// Conséquence à ne jamais perdre : ce tCL est celui du kit, pas celui de la machine.
     /// Si la carte a appliqué un autre timing, il est faux. Tout affichage qui l'utilise doit
     /// dire « la latence du kit à la fréquence mesurée », jamais « ta latence actuelle ».
     ///
@@ -81,7 +82,7 @@ public static partial class DramPartNumber
         return null;
 
         // Bande de plausibilité : CL14 (DDR4 haut de gamme) à CL46 (DDR5 JEDEC). Hors bande,
-        // on a matché autre chose qu'un timing — on préfère ne rien rendre.
+        // on a matché autre chose qu'un timing : on préfère ne rien rendre.
         static bool Plausible(string raw, out int value)
             => int.TryParse(raw, out value) && value >= 14 && value <= 46;
     }

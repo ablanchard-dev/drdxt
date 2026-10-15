@@ -4,7 +4,7 @@ namespace DrDxt.App.Platform;
 
 public static class VariablesFirmware
 {
-    // 24/09/2026 — lire une variable firmware pour le scan. Jamais d'UAC : le helper deja lance
+    // Lire une variable firmware pour le scan. Jamais d'UAC : le helper deja lance
     // (client sans lancement), sinon lecture directe si l'appli tourne deja en administrateur.
     // Aucun des deux : echec, et le scan garde son inference.
     public static async Task<Result<byte[]>> Lire(string nom, string guid, CancellationToken ct)

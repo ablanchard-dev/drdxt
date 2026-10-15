@@ -7,10 +7,10 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// NS-1 — HagsOnTweak. Enables Hardware-Accelerated GPU Scheduling via the
-// allowlisted ...\GraphicsDrivers\HwSchMode leaf (DWORD 2 = On). Captures the real
-// original first → serialized inverse snapshot; reboot-required (deferred A/B proof).
-// Pure unit tests with NSubstitute fakes — no real registry access.
+// HagsOnTweak. Active la planification GPU accélérée par le matériel via la feuille
+// ...\GraphicsDrivers\HwSchMode en liste blanche (DWORD 2 = activé). Capture d'abord la
+// vraie origine → instantané inverse sérialisé ; redémarrage requis (preuve A/B différée).
+// Tests unitaires purs avec des faux NSubstitute : aucun accès réel au registre.
 // -----------------------------------------------------------------------
 public sealed class HagsOnTweakTests
 {
@@ -20,14 +20,14 @@ public sealed class HagsOnTweakTests
     private readonly IRegistryReader _registry = Substitute.For<IRegistryReader>();
     private readonly IElevatedClient _elevated = Substitute.For<IElevatedClient>();
 
-    /// <param name="hags">L'etat EFFECTIF (D3DKMT) — c'est lui que le gate lit depuis la phase 18 F2.</param>
+    /// <param name="hags">L'etat EFFECTIF (D3DKMT) — c'est lui que le gate lit.</param>
     /// <param name="cle">La cle `HwSchMode` ; par defaut, la meme chose que l'effectif.</param>
     private static SettingsState State(TriState hags, TriState? cle = null) => new SettingsState(
         TriState.On, TriState.On, KnownPowerPlans.Balanced.ToString(), cle ?? hags,
         GameMode: TriState.On, ParkedCoreIndexes: Array.Empty<int>(), Vrr: TriState.On)
         with { HagsEffective = hags };
 
-    // --- PHASE 18 F2 : la CLE ne decide plus rien, l'etat EFFECTIF decide. ---
+    // --- La CLE ne decide plus rien, l'etat EFFECTIF decide. ---
 
     [Fact]
     public void Cle_ABSENTE_mais_effectif_Off_lu_est_un_candidat()
@@ -39,7 +39,7 @@ public sealed class HagsOnTweakTests
         // Le placebo : ecrire 2 dans une cle pour activer un ordonnancement deja actif.
         => Build().AppliesTo(Hw, State(TriState.On, cle: TriState.Off)).Should().BeFalse();
 
-    // HAGS is vendor-agnostic — AppliesTo keys off state.Hags, not the GPU.
+    // HAGS ne dépend pas du constructeur : AppliesTo se base sur state.Hags, pas sur la carte.
     private static readonly HardwareInventory Hw = new(
         new CpuInfo("Core i7-14700F", "Intel", 20, 28, IsX3D: false, CcdCount: 1),
         new[] { new GpuInfo("NVIDIA GeForce RTX 4060", "NVIDIA", 8L << 30, "560.94", TriState.On) },
@@ -51,7 +51,7 @@ public sealed class HagsOnTweakTests
     private HagsOnTweak Build()
     {
         _registry.ReadDword(RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName)
-            .Returns(Result<uint?>.Ok(1u)); // currently Off (1)
+            .Returns(Result<uint?>.Ok(1u)); // actuellement désactivé (1)
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
         return new HagsOnTweak(_registry, _elevated);
@@ -65,7 +65,7 @@ public sealed class HagsOnTweakTests
         t.Category.Should().Be(TweakCategory.Latency);
         t.RequiresElevation.Should().BeTrue();
         t.RequiresRestorePoint.Should().BeTrue();
-        t.TakesEffectAfterReboot.Should().BeTrue(); // HwSchMode applies only after a restart
+        t.TakesEffectAfterReboot.Should().BeTrue(); // HwSchMode ne s'applique qu'après redémarrage
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class HagsOnTweakTests
     }
 
     /// <summary>
-    /// Le defaut corrige le 10/09/2026. Ce test affirmait l'inverse : « HwSchMode absent =
+    /// Ce test affirmait l'inverse : « HwSchMode absent =
     /// HAGS eteint → candidat offrable ». La cle absente ne dit rien de l'etat effectif — elle
     /// dit que personne n'a ecrit ce reglage, et Windows applique alors son propre defaut, qui
     /// depend de la version, du GPU et du pilote.
@@ -106,12 +106,12 @@ public sealed class HagsOnTweakTests
     [Fact]
     public async Task Apply_captures_original_and_writes_hags_on_via_helper()
     {
-        var t = Build(); // original = 1 (Off)
+        var t = Build(); // origine = 1 (désactivé)
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // Writes HwSchMode = 2 (On) on the allowlisted leaf.
+        // Écrit HwSchMode = 2 (activé) sur la feuille en liste blanche.
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<SetRegistryValueOp>(o =>
                 o.Hive == RegistryHiveKind.LocalMachine
@@ -120,7 +120,7 @@ public sealed class HagsOnTweakTests
                 && o.Kind == RegistryValueType.DWord
                 && o.Value == "2"),
             Arg.Any<CancellationToken>());
-        // Snapshot carries the captured original (1) as a serialized inverse op.
+        // L'instantané porte l'origine capturée (1) en op inverse sérialisée.
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         inverse.IsOk.Should().BeTrue();
         inverse.Value.Should().BeOfType<SetRegistryValueOp>().Which.Value.Should().Be("1");

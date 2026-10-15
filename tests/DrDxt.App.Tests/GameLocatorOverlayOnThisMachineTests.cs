@@ -8,7 +8,7 @@ namespace DrDxt.App.Tests;
 [Collection(CollectionFenetres.Nom)]
 public sealed class GameLocatorOverlayOnThisMachineTests
 {
-    // 14/09/2026 (plan M5) — NVIDIA Overlay pose une fenetre visible de la taille de l'ecran, en
+    // NVIDIA Overlay pose une fenetre visible de la taille de l'ecran, en
     // WS_EX_NOACTIVATE. On la reproduit dans un processus ENFANT (le locator s'ignore lui-meme),
     // quasi transparente et sans voler le focus, et on interroge le vrai locator.
     // Le cas sans NOACTIVATE est le controle : s'il n'etait pas trouve, le test passerait a vide.
@@ -18,14 +18,14 @@ public sealed class GameLocatorOverlayOnThisMachineTests
     [InlineData(false)]
     public void A_window_that_can_never_be_activated_is_not_the_game(bool noActivate)
     {
-        using var enfant = Process.Start(new ProcessStartInfo("powershell.exe",
+        using var enfant = Process.Start(new ProcessStartInfo(SondeDeJeu.Exe,
             "-NoProfile -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(Script(noActivate))))
         {
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
         })!;
-        // Corrige le 18/09/2026. Le cas de CONTROLE exigeait que le PID localise soit
+        // Le cas de CONTROLE exigeait que le PID localise soit
         // Exactement celui de la fenetre-sonde. Il est devenu rouge des qu'on a lance une
         // partie : le locator a repondu `JeuBClient-Win64-Shipping`, c'est-a-dire le vrai
         // jeu, premier dans l'enumeration. **Le produit avait raison, le test avait tort** --

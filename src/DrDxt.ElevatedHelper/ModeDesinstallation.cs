@@ -13,7 +13,7 @@ using DrDxt.Reconciler.Manifest;
 namespace DrDxt.ElevatedHelper;
 
 // -----------------------------------------------------------------------
-// ModeDesinstallation — `DrDxt.ElevatedHelper.exe --uninstall-revert` (11/09/2026).
+// ModeDesinstallation : `DrDxt.ElevatedHelper.exe --uninstall-revert`.
 //
 // Lance par le desinstalleur Inno ([UninstallRun]), deja eleve : aucun tube, aucune UAC, aucun appelant a
 // authentifier. Pourquoi le helper et pas l'App : l'App est une application WPF dont le demarrage a des
@@ -22,9 +22,9 @@ namespace DrDxt.ElevatedHelper;
 // Core et Reconciler.
 //
 // Ce que le mode peut faire, et rien d'autre :
-//   * Lire le manifeste signe sous %ProgramData%\DrDxt, verifie par la cle PUBLIQUE de la machine (jamais
+//   * Lire le manifeste signe sous %ProgramData%\DrDxt, verifie par la cle publique de la machine (jamais
 //     cree de cle) ;
-//   * rendre les origines par l'executeur EN PROCESSUS, derriere l'allowlist feuille-exacte ; les ecritures
+//   * rendre les origines par l'executeur en processus, derriere l'allowlist feuille-exacte ; les ecritures
 //     GPU (horloge, puissance, ADLX), le redemarrage firmware et l'ecriture du manifeste n'y sont pas
 //     branches ;
 //   * ecrire son rapport `desinstallation-<heure UTC>.txt` dans la meme racine durcie (lisible apres coup).
@@ -44,7 +44,7 @@ public static class ModeDesinstallation
     {
         if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
         {
-            Console.Error.WriteLine($"DrDxt.ElevatedHelper {Argument} : processus non eleve, rien n'est lu ni rendu.");
+            Console.Error.WriteLine($"DrDxt.ElevatedHelper {Argument}: not elevated, nothing is read or put back.");
             return 2;
         }
 
@@ -54,25 +54,26 @@ public static class ModeDesinstallation
         try
         {
             using var delai = new CancellationTokenSource(Budget);
-            // 08/10/2026 : une seule instance ADLX pour relire et rendre les réglages AMD.
+            // Une seule instance ADLX pour relire et rendre les réglages AMD.
             var adlx = new DrDxt.Detection.Gpu.Adlx.AdlxNative();
-            var client = ClientEnProcessus(adlx);
-            var travail = Task.Run(async () => await ExecuterAsync(racine, appliquerAcl: true, new LectureDesCiblesWin32(adlx: adlx),
+            var memeCompte = MemeCompteQueLaSession();
+            var client = GarderLaRucheDuJoueur(ClientEnProcessus(adlx), memeCompte);
+            var lecture = GarderLaRucheDuJoueur(new LectureDesCiblesWin32(adlx: adlx), memeCompte);
+            var travail = Task.Run(async () => await ExecuterAsync(racine, appliquerAcl: true, lecture,
                 client, quand, delai.Token) + await RetirerPlafondEnvoiAsync(client, delai.Token));
             texte = travail.Wait(Budget + TimeSpan.FromSeconds(5))
                 ? travail.Result
-                : $"DrDXT - rendu des réglages à la désinstallation{Environment.NewLine}"
-                  + $"délai de {Budget.TotalSeconds:0} s dépassé : le rendu a été abandonné ; la désinstallation continue.";
+                : Docteur.T("RD.Titre") + Environment.NewLine + Docteur.T("MD.Delai", Budget.TotalSeconds);
         }
         catch (Exception ex)
         {
-            texte = $"DrDXT - rendu des réglages à la désinstallation{Environment.NewLine}exception {ex.GetType().Name} : {ex.Message}";
+            texte = Docteur.T("RD.Titre") + Environment.NewLine + $"exception {ex.GetType().Name}: {ex.Message}";
         }
 
         Console.Out.WriteLine(texte);
         var journal = EcrireJournal(racine, quand, texte, appliquerAcl: true);
         if (!journal.IsOk)
-            Console.Error.WriteLine("rapport non écrit : " + journal.Error?.Message);
+            Console.Error.WriteLine("report not written: " + journal.Error?.Message);
         return 0;
     }
 
@@ -101,27 +102,32 @@ public static class ModeDesinstallation
 
         var texte = rapport.EnTexte(quand);
 
-        // 11/09/2026 (lot 6e) — le manifeste est mis de cote une fois lu. Il restait en place apres la
-        // desinstallation : une REINSTALLATION y retrouvait des origines capturees avant, deja rendues, et
+        // Le manifeste est mis de cote une fois lu. S'il restait en place apres la
+        // desinstallation, une reinstallation y retrouverait des origines capturees avant, deja rendues, et
         // le jour ou un service les rejouerait il reecrirait un passe que l'utilisateur a quitte. Il est
         // renomme, jamais efface. Non lu ⇒ on n'y touche pas : il n'a pas ete rendu.
-        if (rapport.ManifesteNonLu is null)
+        // Une origine non rendue (écriture refusée, cible illisible) reste à rendre : le manifeste garde sa place, une
+        // réinstallation puis une désinstallation la retentent.
+        var nonRendues = rapport.Lignes.Count(l => l.OrigineEnSuspens);
+        if (rapport.ManifesteNonLu is null && nonRendues > 0)
+        {
+            texte += Docteur.T("MD.ManifesteGarde", nonRendues) + Environment.NewLine;
+        }
+        else if (rapport.ManifesteNonLu is null)
         {
             var deCote = stockage.MettreDeCoteApresRendu();
             texte += deCote.IsOk
-                ? "manifeste signé : mis de côté (renommé) ; une réinstallation repart d'un manifeste neuf."
-                  + Environment.NewLine
-                : "manifeste signé : pas mis de côté (" + deCote.Error?.Message + ") ; une réinstallation le "
-                  + "retrouverait." + Environment.NewLine;
+                ? Docteur.T("MD.ManifesteDeCote") + Environment.NewLine
+                : Docteur.T("MD.ManifesteNonDeCote", deCote.Error?.Message) + Environment.NewLine;
         }
 
         return texte;
     }
 
-    /// <summary>26/09/2026 : le plafond d'envoi ne passe pas par le manifeste (il n'est pose que pendant
+    /// <summary>Le plafond d'envoi ne passe pas par le manifeste (il n'est pose que pendant
     /// une partie, sous un bail du helper). Un helper tue en pleine partie laisse la politique jusqu'au
-    /// redemarrage ; desinstaller avant ce redemarrage laissait donc l'envoi de tous les autres programmes
-    /// plafonne sans plus aucun DrDXT pour le retirer. Retrait inconditionnel et idempotent de NOS deux
+    /// redemarrage ; desinstaller avant ce redemarrage laisserait donc l'envoi de tous les autres programmes
+    /// plafonne sans plus aucun DrDXT pour le retirer. Retrait inconditionnel et idempotent de nos deux
     /// politiques ; aucune entree ne choisit l'op.</summary>
     internal static async Task<string> RetirerPlafondEnvoiAsync(IElevatedClient ecriture, CancellationToken ct)
     {
@@ -129,12 +135,12 @@ public static class ModeDesinstallation
         {
             var r = await ecriture.ExecuteAsync(new RemoveUploadCapOp(), ct).ConfigureAwait(false);
             return r.IsOk
-                ? "plafond d'envoi : aucun ne reste actif." + Environment.NewLine
-                : "plafond d'envoi : pas retiré (" + r.Error?.Message + ") ; un redémarrage l'efface." + Environment.NewLine;
+                ? Docteur.T("MD.PlafondRetire") + Environment.NewLine
+                : Docteur.T("MD.PlafondReste", r.Error?.Message) + Environment.NewLine;
         }
         catch (Exception ex)
         {
-            return "plafond d'envoi : pas retiré (" + ex.GetType().Name + ") ; un redémarrage l'efface." + Environment.NewLine;
+            return Docteur.T("MD.PlafondReste", ex.GetType().Name) + Environment.NewLine;
         }
     }
 
@@ -161,9 +167,79 @@ public static class ModeDesinstallation
     }
 
     // Les seams GPU de reglage fin sont desactives, le firmware et l'ecrivain du manifeste absents : ce mode
-    // ne sait que RENDRE (registre, plan, service, DRS du profil de base).
-    // 08/10/2026 : la carte s'écrit aussi, pour RENDRE une limite de puissance, Anti-Lag, FRTC ou la Vsync AMD gardés ; seules
+    // ne sait que rendre (registre, plan, service, DRS du profil de base).
+    // La carte s'écrit aussi, pour rendre une limite de puissance, Anti-Lag, FRTC ou la Vsync AMD gardés ; seules
     // les origines admises par OpAllowlist.ValiderOrigine passent (jamais fréquence, tension ni ventilateur).
+    /// <summary>Élevé avec le compte d'un autre (UAC « par-dessus l'épaule »), HKCU est la ruche de cet autre : les origines
+    /// de la session du joueur n'y sont pas écrites. Refusées et dites, elles gardent le manifeste en place (une origine non
+    /// rendue ne le laisse pas mettre de côté).</summary>
+    internal static IElevatedClient GarderLaRucheDuJoueur(IElevatedClient client, bool memeCompte) =>
+        memeCompte ? client : new SansRucheEtrangere(client);
+
+    /// <summary>La lecture aussi : lue dans la ruche d'un autre compte, une origine du joueur passait pour « respectée » ou
+    /// « disparue », sans ligne non rendue, et le manifeste partait. Refusée, elle est illisible et le garde.</summary>
+    internal static ILectureDesCibles GarderLaRucheDuJoueur(ILectureDesCibles lecture, bool memeCompte) =>
+        memeCompte ? lecture : new LectureSansRucheEtrangere(lecture);
+
+    private static bool EstHkcu(PrivilegedOp op) =>
+        op is SetRegistryValueOp { Hive: RegistryHiveKind.CurrentUser } or DeleteRegistryValueOp { Hive: RegistryHiveKind.CurrentUser };
+
+    private sealed class LectureSansRucheEtrangere(ILectureDesCibles lecture) : ILectureDesCibles
+    {
+        private const string Pourquoi = "elevated with another account: its HKCU is not the player's.";
+
+        public Result<string?> Lire(PrivilegedOp ecriture) =>
+            EstHkcu(ecriture) ? Result<string?>.Fail(ErrorCodes.HelperOpFailed, Pourquoi) : lecture.Lire(ecriture);
+
+        public Result<bool> CibleExiste(PrivilegedOp ecriture) =>
+            EstHkcu(ecriture) ? Result<bool>.Fail(ErrorCodes.HelperOpFailed, Pourquoi) : lecture.CibleExiste(ecriture);
+    }
+
+    private sealed class SansRucheEtrangere(IElevatedClient client) : IElevatedClient
+    {
+        private static readonly Result Refus = Result.Fail(ErrorCodes.HelperOpFailed,
+            "elevated with another account: its HKCU is not the player's; the player's session values are left for "
+            + "the player to restore.");
+
+        public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct) =>
+            EstHkcu(op) ? Task.FromResult(Refus) : client.ExecuteAsync(op, ct);
+
+        public Task<Result<byte[]>> ReadAsync(PrivilegedOp op, CancellationToken ct) => client.ReadAsync(op, ct);
+    }
+
+    /// <summary>Le compte du jeton est-il celui de la session interactive ? Illisible = non (HKCU refusé, dit).</summary>
+    internal static bool MemeCompteQueLaSession()
+    {
+        try
+        {
+            var session = LireSession(WtsUserName);
+            var domaine = LireSession(WtsDomainName);
+            if (string.IsNullOrEmpty(session)) return false;
+            // Par SID, pas par nom : un compte Microsoft ou Azure AD peut s'afficher autrement des deux côtés.
+            var sidDeLaSession = new NTAccount(domaine ?? "", session).Translate(typeof(SecurityIdentifier));
+            return sidDeLaSession.Equals(WindowsIdentity.GetCurrent().User);
+        }
+        catch { return false; }
+    }
+
+    private const int WtsUserName = 5, WtsDomainName = 7;
+
+    private static string? LireSession(int classe)
+    {
+        if (!WTSQuerySessionInformationW(IntPtr.Zero, -1, classe, out var tampon, out _)) return null;
+        try { return System.Runtime.InteropServices.Marshal.PtrToStringUni(tampon); }
+        finally { WTSFreeMemory(tampon); }
+    }
+
+    [System.Runtime.InteropServices.DllImport("wtsapi32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool WTSQuerySessionInformationW(IntPtr serveur, int session, int classe, out IntPtr tampon, out int octets);
+
+    [System.Runtime.InteropServices.DllImport("wtsapi32.dll")]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern void WTSFreeMemory(IntPtr memoire);
+
     private static IElevatedClient ClientEnProcessus(DrDxt.Detection.Gpu.Adlx.IAdlxNative adlx) => new InProcessElevatedClient(new OpAllowlist(),
         new PrivilegedOpExecutor(
             new Win32RegistryActions(),
@@ -173,12 +249,12 @@ public static class ModeDesinstallation
             new NvApiDrsActions(),
             new NvApiTuningActions(),
             new ADLXTuningActions(adlx),
-            // 24/09/2026 — la desinstallation doit pouvoir RETIRER le plafond d'envoi.
+            // La desinstallation doit pouvoir retirer le plafond d'envoi.
             qos: new Win32NetworkQosActions(),
-            // La desinstallation doit pouvoir REPOSER un element BCD que DrDXT a retire.
+            // La desinstallation doit pouvoir reposer un element BCD que DrDXT a retire.
             bcd: new Win32BcdActions(),
-            // 08/10/2026 (GPU-OC) : rendre un ventilateur resté en vitesse fixe à l'automatique.
+            // Rendre un ventilateur resté en vitesse fixe à l'automatique.
             ventilateur: new NvmlVentilateurActions(),
-            // 10/10/2026 (B1) : rendre une limite de puissance du processeur restée posée.
+            // Rendre une limite de puissance du processeur restée posée.
             cpu: new PawnIoCpuPowerActions()));
 }

@@ -42,7 +42,7 @@ public sealed class BranchesDeChrome : Grid
     public const int Nombre = 8;
     public const double RayonX = .37, RayonY = .35;
 
-    /// <summary>10/10/2026 : la carte sous la souris, ou -1. La carte du haut pend au-dessus de son icône, les autres
+    /// <summary>La carte sous la souris, ou -1. La carte du haut pend au-dessus de son icône, les autres
     /// en dessous ; la boîte suit la carte (194 de large, ~110 de haut), l'icône étant sur le pôle.</summary>
     public static int CarteSous(Point souris, Size taille)
     {
@@ -62,7 +62,7 @@ public sealed class BranchesDeChrome : Grid
         => vise ? eclat + (1 - eclat) * Math.Min(1, dt / .05) : eclat * Math.Max(0, 1 - dt / .08);
     public static readonly DependencyProperty RapideProperty = DependencyProperty.Register(nameof(Rapide), typeof(bool), typeof(BranchesDeChrome), new PropertyMetadata(false));
     public bool Rapide { get => (bool)GetValue(RapideProperty); set => SetValue(RapideProperty,value); }
-    /// <summary>10/10/2026 : les domaines lus par le scan (un bit par composant, dans l'ordre du cercle).</summary>
+    /// <summary>Les domaines lus par le scan (un bit par composant, dans l'ordre du cercle).</summary>
     public static readonly DependencyProperty PolesLusProperty = DependencyProperty.Register(nameof(PolesLus), typeof(int), typeof(BranchesDeChrome),
         new PropertyMetadata(0, (d, e) => ((BranchesDeChrome)d)._effet.Lus = (int)e.NewValue));
     public int PolesLus { get => (int)GetValue(PolesLusProperty); set => SetValue(PolesLusProperty,value); }
@@ -79,7 +79,7 @@ public sealed class BranchesDeChrome : Grid
             var dt=MoteurDAnimation.Cadence.TotalSeconds;
             _temps+=dt*(Rapide?1.8:1);
             _effet.Temps=_temps;
-            // 08/10/2026 : les influx montent en une demi-seconde quand le scan part, s'éteignent en une seconde à la fin.
+            // Les influx montent en une demi-seconde quand le scan part, s'éteignent en une seconde à la fin.
             _activite=Rapide?Math.Min(1,_activite+dt*2):Math.Max(0,_activite-dt);
             _effet.Activite=_activite;
             var sous=IsVisible?CarteSous(System.Windows.Input.Mouse.GetPosition(this),new Size(ActualWidth,ActualHeight)):-1;

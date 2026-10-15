@@ -1,7 +1,7 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// La nature d'une action — parce que « tweak » ne dit pas assez pour decider quoi en faire.
+/// La nature d'une action, parce que « tweak » ne dit pas assez pour decider quoi en faire.
 ///
 /// Un moteur qui ne connait qu'un `ITweak` indistinct ne peut ni choisir l'ordre des essais, ni
 /// savoir ce qu'il a le droit de tenter tout seul. Ces cinq natures se traitent differemment, et
@@ -17,13 +17,13 @@ public enum CandidateKind
     /// mesurer dans la session. Un A/B lance dessus mesurerait le neant.</summary>
     AutoReboot,
 
-    /// <summary>06/10/2026 (L-WU) : applicable seul et tout de suite, mais sans effet sur les images (les heures
+    /// <summary>Applicable seul et tout de suite, mais sans effet sur les images (les heures
     /// d'activité de Windows Update) : un A/B en jeu mesurerait le néant. Posé au clic comme <see cref="AutoReboot"/>, il
     /// se juge ailleurs (les redémarrages tombés pendant une partie).</summary>
     AutoReglage,
 
     /// <summary>XMP/EXPO, ReBAR, et tout ce que DrDXT n'ecrit pas lui-meme. Le produit peut le
-    /// RECOMMANDER et guider, jamais l'appliquer.</summary>
+    /// recommander et guider, jamais l'appliquer.</summary>
     GuidedBios,
 
     /// <summary>Un pilote a reinstaller, une action lourde exterieure au produit.</summary>
@@ -33,12 +33,12 @@ public enum CandidateKind
     DiagnosticOnly,
 }
 
-/// <summary>La famille d'un levier. Le root-cause classe des FAMILLES avant de choisir un
+/// <summary>La famille d'un levier. Le root-cause classe des familles avant de choisir un
 /// identifiant : « le GPU n'est pas sature et un thread de jeu est sous pression » designe
 /// CPU/Scheduler, quel que soit le catalogue disponible ce jour-la.</summary>
 public enum CandidateFamily
 {
-    /// <summary>Inconnue — le defaut, et il ne se classe jamais en tete.</summary>
+    /// <summary>Inconnue : le defaut, et il ne se classe jamais en tete.</summary>
     Inconnue,
     Repair,
     Cpu,
@@ -53,7 +53,7 @@ public enum CandidateFamily
 /// <summary>
 /// Ce qu'un levier ecrit vraiment, independamment de sa famille d'affichage.
 ///
-/// 11/09/2026 : le veto des arrets brutaux (L6) fermait sur les grandeurs DECLAREES (`gpu.`,
+/// Le veto des arrets brutaux fermait sur les grandeurs declarees (`gpu.`,
 /// `cpu.`, `ram.`). `latency.reflex`, `latency.render_queue_cap` et `latency.vrr_vsync_cap`
 /// ecrivent l'etat du pilote NVIDIA (cle NVTweak, reglages DRS) et se declarent « latence » : ils
 /// passaient, et l'Optimiser de l'App tentait `latency.reflex` sur une machine a sept arrets secs.
@@ -82,7 +82,7 @@ public enum SurfaceTouchee
     /// <summary>N'ecrit rien lui-meme (un guide).</summary>
     Aucune,
 
-    /// <summary>06/10/2026 (L-WU) : quand Windows Update s'autorise a redemarrer (heures d'activite). Ni materiel, ni
+    /// <summary>Quand Windows Update s'autorise a redemarrer (heures d'activite). Ni materiel, ni
     /// pilote : un arret sec ne peut pas lui etre attribue.</summary>
     PlanificationWindows,
 
@@ -99,7 +99,7 @@ public enum SurfaceTouchee
 /// <param name="NeedsStability">Faut-il verifier la stabilite apres application ? Un overclock
 /// oui, un plan d'alimentation non.</param>
 /// <param name="AffectedMetrics">Ce que cette action peut **theoriquement** changer. Sert a ne pas
-/// la tenter quand le goulot est ailleurs — et a ne jamais lui attribuer un effet hors de son
+/// la tenter quand le goulot est ailleurs, et a ne jamais lui attribuer un effet hors de son
 /// domaine.</param>
 public sealed record CandidateDescriptor(
     string Id,
@@ -108,12 +108,12 @@ public sealed record CandidateDescriptor(
     bool NeedsStability,
     IReadOnlyList<string> AffectedMetrics,
 
-    /// <summary>Ce que l'APPELANT a constate sur la machine et qui empeche ce levier de
-    /// s'appliquer — <c>null</c> quand rien ne l'empeche.
+    /// <summary>Ce que l'appelant a constate sur la machine et qui empeche ce levier de
+    /// s'appliquer, <c>null</c> quand rien ne l'empeche.
     ///
-    /// Ajoute le 08/09/2026 apres que le probe de selection a annonce « 2 candidats retenus »
+    /// Ajoute apres que le probe de selection a annonce « 2 candidats retenus »
     /// alors que les deux etaient inapplicables. <c>latency.reflex</c> n'a pas de valeur d'origine
-    /// a restaurer sur cette machine — la cle <c>NVTweak\LowLatencyMode</c> n'existe pas, donc le
+    /// a restaurer sur cette machine : la cle <c>NVTweak\LowLatencyMode</c> n'existe pas, donc le
     /// tweak refuse d'ecrire plutot que d'ecrire sans pouvoir revenir en arriere. Et
     /// <c>fixit.power_plan</c> exige le symptome de parking de coeurs, lu comme absent.
     ///
@@ -125,7 +125,7 @@ public sealed record CandidateDescriptor(
     /// doit pas se retrouver en tete d'un classement par famille.</summary>
     CandidateFamily Family = CandidateFamily.Inconnue,
 
-    /// <summary>PHASE 18 F5 — l'effet attendu, en pourcent de la grandeur qui decide, SOURCE (jamais
+    /// <summary>L'effet attendu, en pourcent de la grandeur qui decide, source (jamais
     /// devine). <c>null</c> = inconnu : le moteur se comporte comme avant. Connu, il decide avant
     /// toute ecriture si la scene peut le voir, et fixe d'avance le nombre d'alternances
     /// (<see cref="Decidabilite"/>).</summary>
@@ -139,7 +139,7 @@ public sealed record CandidateDescriptor(
 /// Une action que l'autopilote peut reellement tenter.
 ///
 /// <see cref="ReadBack"/> n'est pas une formalite. Mesure du 01/09/2026 : `tools/r2apply`
-/// affichait « power limit applied: 110% » puis relisait **100 %** — la carte n'a pas la marge, le
+/// affichait « power limit applied: 110% » puis relisait **100 %** : la carte n'a pas la marge, le
 /// pilote clampe en silence, et l'ecriture rend Ok. Une action qui ne relit pas ce qu'elle a ecrit
 /// peut faire mesurer un etat qui n'existe pas.
 /// </summary>
@@ -161,9 +161,9 @@ public interface IAutopilotCandidate
     /// <summary>Le moteur a garde ce levier, et l'a relu en place : il reste pose au-dela de la
     /// session. Appele une fois, apres la decision et la relecture, jamais avant.
     ///
-    /// 11/09/2026 : sans ce signal, le filet d'une session tuee (`pending-revert.json`) restait
+    /// Sans ce signal, le filet d'une session tuee (`pending-revert.json`) restait
     /// arme apres un keep, et le demarrage suivant rendait le levier garde en annoncant « la derniere
-    /// session a ete interrompue » — le produit defaisait exactement le gain qu'il venait de prouver.
+    /// session a ete interrompue » : le produit defaisait exactement le gain qu'il venait de prouver.
     /// Un echec ici laisse le levier pose avec son filet arme : il sera rendu au prochain demarrage,
     /// le defaut sur. Par defaut, rien a faire (un candidat sans journal).</summary>
     Result Garder() => Result.Ok();

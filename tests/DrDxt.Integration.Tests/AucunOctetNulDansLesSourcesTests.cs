@@ -3,7 +3,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 17/09/2026 : deux fichiers sources portaient un octet nul littéral (un separateur de cle, un
+/// Deux fichiers sources portaient un octet nul littéral (un separateur de cle, un
 /// commentaire). Les outils de recherche de texte classent alors le fichier comme binaire et le
 /// sautent sans rien dire : une phrase affichee au joueur est restee introuvable pendant une soiree.
 /// Un octet nul s'ecrit par son echappement, jamais tel quel.
@@ -25,7 +25,7 @@ public sealed class AucunOctetNulDansLesSourcesTests
                 .Any(p => p is "bin" or "obj" or ".git" or "node_modules"))
             .ToList();
 
-        // 18/09/2026 — le temoin manquait : sans lui, un filtre trop strict ou une
+        // Le temoin manquait : sans lui, un filtre trop strict ou une
         // racine mal trouvee rendait ce test vert sur zero fichier lu.
         candidats.Should().HaveCountGreaterThan(100, "le crible doit voir les sources du depot");
 

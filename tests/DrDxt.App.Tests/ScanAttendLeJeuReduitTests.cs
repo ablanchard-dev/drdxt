@@ -10,9 +10,9 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 26/09/2026 : un plein écran exclusif sur un seul écran est réduit dès qu'on clique sur DrDXT. Le scan ne
-// trouvait jamais le jeu et disait « lance une partie » à un joueur en pleine partie. Il attend
-// maintenant que le jeu revienne à l'écran, puis le mesure ; s'il reste réduit, la note le dit.
+// Un plein écran exclusif sur un seul écran est réduit dès qu'on clique sur DrDXT. Sans attente, le scan ne
+// trouverait jamais le jeu et dirait « lance une partie » à un joueur en pleine partie. Il attend
+// que le jeu revienne à l'écran, puis le mesure ; s'il reste réduit, la note le dit.
 public sealed class ScanAttendLeJeuReduitTests
 {
     private static HardwareInventory Hw() => new(
@@ -42,13 +42,12 @@ public sealed class ScanAttendLeJeuReduitTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(
-              Hw(), St, new List<Finding>(), 68, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              Hw(), St, new List<Finding>(), null)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
 
         var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, sd, key => key, gameLocator: locator);
-        // Chaque pas d'attente note si l'écran disait d'attendre à ce moment-là.
+        // Chaque pas d'attente note si l'écran demande d'attendre à ce moment-là.
         var attentes = new List<bool>();
         vm.Patienter = _ => { attentes.Add(vm.AttenteDuJeu); return Task.CompletedTask; };
         return (vm, br, attentes);
@@ -162,8 +161,8 @@ public sealed class ScanAttendLeJeuReduitTests
     [Fact]
     public async Task Quitter_le_jeu_pendant_la_capture_ne_donne_aucun_chiffre()
     {
-        // 06/10/2026 : 4242 rendait ce test instable : la note nomme le programme dont c'est le numéro (NomExeDuProcessus lit le vrai
-        // Windows), et un processus 4242 existe parfois, surtout pendant une compilation. 07/10/2026 : 4243 aussi, car Windows
+        // 4242 rendait ce test instable : la note nomme le programme dont c'est le numéro (NomExeDuProcessus lit le vrai
+        // Windows), et un processus 4242 existe parfois, surtout pendant une compilation. 4243 aussi, car Windows
         // ignore les deux bits du bas d'un numéro de processus (4243 ouvre 4240). Un numéro hors de portée des vrais
         // processus ne nomme jamais rien.
         const int Absent = int.MaxValue - 3;
@@ -179,7 +178,7 @@ public sealed class ScanAttendLeJeuReduitTests
         vm.State.Should().Be(ScanState.Degraded, "un chiffre mêlé à un jeu réduit n'est pas affiché");
     }
 
-    // 04/10/2026 (plan 1.5) : la note nomme le programme pris pour le jeu ; un faux positif se lit tout de suite.
+    // La note nomme le programme pris pour le jeu ; un faux positif se lit tout de suite.
     [Fact]
     public async Task Quitter_le_jeu_nomme_le_programme_retenu()
     {

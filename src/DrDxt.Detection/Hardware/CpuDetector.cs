@@ -30,7 +30,7 @@ public sealed class CpuDetector
         return Result<CpuInfo>.Ok(new CpuInfo(model, vendor, cores, threads, isX3d, ccd));
     }
 
-    // Heuristique CCD (Ryzen Zen): un CCD = jusqu'à 8 cœurs. Détection par le VENDOR
+    // Heuristique CCD (Ryzen Zen) : un CCD = jusqu'à 8 cœurs. Détection par le fabricant
     // (Win32_Processor.Manufacturer = "AuthenticAMD"/"GenuineIntel"), jamais par le nom
     // de modèle (fragile, chaînes OEM variables). Tout non-AMD → non applicable (0).
     private static int EstimateCcdCount(string vendor, int cores)

@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>29/09/2026, troisième critique : en lisant un long domaine, le rail des domaines partait avec la page
+/// <summary>En lisant un long domaine, le rail des domaines partait avec la page
 /// et laissait une colonne vide avec un fil seul. Il suit la lecture sans jamais sortir de sa section.</summary>
 public sealed class RailCollantTests
 {

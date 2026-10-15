@@ -5,14 +5,14 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Adapters.Tests;
 
 // -----------------------------------------------------------------------
-// RegistryOsBuildProbe: reads HKLM\...\CurrentVersion → "{CurrentBuild}.{UBR}".
-// The raw registry read is behind an internal seam so the formatting/fail logic is
-// unit-tested without touching the real registry; the thin real reader is the only
-// untested edge.
+// RegistryOsBuildProbe : lit HKLM\...\CurrentVersion → « {CurrentBuild}.{UBR} ».
+// La lecture brute du registre est derrière une couture interne, pour tester la logique de
+// formatage et d'échec sans toucher au vrai registre ; le mince vrai lecteur est le seul
+// bord non testé.
 // -----------------------------------------------------------------------
 public sealed class RegistryOsBuildProbeTests
 {
-    // A fake raw reader returning canned CurrentBuild / UBR values.
+    // Un faux lecteur brut qui rend des valeurs CurrentBuild / UBR toutes faites.
     private sealed class FakeRawReader : IRawOsVersionReader
     {
         public string? CurrentBuild { get; init; }

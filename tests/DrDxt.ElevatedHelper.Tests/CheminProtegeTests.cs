@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-// 25/09/2026 (revue de sécurité) — sur de vrais chemins de la machine, pas des ACL fabriquées.
+// Sur de vrais chemins de la machine, pas des ACL fabriquées.
 public sealed class CheminProtegeTests : IDisposable
 {
     private readonly string _dossier = Path.Combine(Path.GetTempPath(), $"drdxt-chemin-{Guid.NewGuid():N}");

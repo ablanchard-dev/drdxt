@@ -6,7 +6,7 @@ using DrDxt.ElevatedHelper.Ipc;
 using DrDxt.ElevatedHelper.Leases;
 
 [assembly: SupportedOSPlatform("windows")]
-// 25/09/2026 : processus eleve. Une DLL cherchee par son seul nom passe par le dossier courant
+// Processus eleve. Une DLL cherchee par son seul nom passe par le dossier courant
 // et le PATH, dont plusieurs dossiers sont modifiables par l'utilisateur : une DLL posee la
 // s'executerait en administrateur. Tout ce que ce processus charge vit dans System32.
 [assembly: System.Runtime.InteropServices.DefaultDllImportSearchPaths(
@@ -15,35 +15,36 @@ using DrDxt.ElevatedHelper.Leases;
 namespace DrDxt.ElevatedHelper;
 
 // -----------------------------------------------------------------------
-// Elevated helper host (M5 — handshake-fronted typed gateway; R1 legacy mode kept).
+// Hôte du helper élevé (passerelle typée derrière un handshake ; le mode historique par variable
+// d'environnement est gardé).
 //
-// Runs the privileged typed gateway (real executor + OpAllowlist + a real
-// process-identity authenticator) on the ACL'd named pipe accept-loop, ELEVATED.
-// Fail-closed throughout.
+// Fait tourner la passerelle typée privilégiée (vrai exécuteur + OpAllowlist + un vrai
+// authentificateur par identité de processus) sur la boucle d'acceptation du pipe nommé protégé
+// par ACL, en élevé. Refus au moindre doute (fail-closed) partout.
 //
-// TWO MODES (both authenticate the caller; both deny-by-default):
-//   * HANDSHAKE mode (DEFAULT — M5, §9.13): NO pre-shared key. Each connection
-//     authenticates the caller and then NEGOTIATES an ephemeral per-session key
-//     over the ACL'd pipe (HandshakeAcceptingServer). This is what the App's
-//     ElevatedClientFactory + HandshakingElevatedClient use.
-//   * LEGACY env-var mode (R1 dev-grade, kept for the m2smoke/r2smoke tools): when
-//     --session-key=<b64> / env DRDXT_HELPER_SESSION_KEY is provisioned, runs the
-//     TypedPrivilegedServer accept loop keyed by that pre-shared HMAC key so the
-//     existing smoke tools keep working unchanged.
+// Deux modes (les deux authentifient l'appelant ; les deux refusent par défaut) :
+//   * mode handshake (par défaut) : aucune clé partagée d'avance. Chaque connexion authentifie
+//     l'appelant puis négocie une clé éphémère par session sur le pipe protégé par ACL
+//     (HandshakeAcceptingServer). C'est ce qu'utilisent ElevatedClientFactory +
+//     HandshakingElevatedClient côté App.
+//   * mode historique par variable d'environnement (niveau dev, gardé pour les outils de smoke
+//     test) : quand --session-key=<b64> / la variable DRDXT_HELPER_SESSION_KEY est fournie, lance la
+//     boucle d'acceptation de TypedPrivilegedServer avec cette clé HMAC partagée d'avance, pour que
+//     les outils de smoke test existants marchent sans changement.
 //
-// PROVISIONING:
-//   * Trusted caller image path: --app-path=<full path> or env
-//     DRDXT_HELPER_APP_PATH. The authenticator authorizes only this exe by PATH
-//     AND SHA-256 (the hash is computed from this path at startup — FIX 2; closes
-//     the swapped-exe-at-same-path gap, no code signing needed). No path / an
-//     unhashable path → DenyByDefault (every caller denied) so the helper never
-//     fails open.
-//   * Optional pipe name: --pipe=<name> (defaults to the standard name).
-//   * Optional --session-key=<b64> selects the LEGACY pre-shared mode.
+// Fourniture :
+//   * Chemin de l'image de l'appelant de confiance : --app-path=<chemin complet> ou la variable
+//     DRDXT_HELPER_APP_PATH. L'authentificateur n'autorise que cet exe, par chemin et par SHA-256
+//     (l'empreinte est calculée depuis ce chemin au démarrage ; cela ferme le trou de l'exe
+//     remplacé au même chemin, sans signature de code). Pas de chemin, ou un chemin dont
+//     l'empreinte est incalculable → DenyByDefault (tout appelant refusé) : le helper ne s'ouvre
+//     jamais par défaut.
+//   * Nom de pipe facultatif : --pipe=<nom> (le nom standard par défaut).
+//   * --session-key=<b64> facultatif : choisit le mode historique à clé partagée.
 //
-// NOTE (05-M5 §1 end-state): the on-demand UAC launch is the dev stepping-stone;
-// the installer later registers this same exe as a Windows service over the same
-// pipe + handshake (one UAC at install). The accept loop below does not change.
+// Note : le lancement UAC à la demande est la marche de dev ; l'installeur enregistre ensuite
+// ce même exe comme service Windows sur le même pipe + handshake (une UAC à l'installation).
+// La boucle d'acceptation ci-dessous ne change pas.
 // -----------------------------------------------------------------------
 internal static class Program
 {
@@ -58,32 +59,33 @@ internal static class Program
 
     private static async Task<int> Main(string[] args)
     {
-        // 11/09/2026 — la desinstallation : un mode court, sans tube, lance par l'installeur deja eleve
+        // La desinstallation : un mode court, sans tube, lance par l'installeur deja eleve
         // (voir ModeDesinstallation). Il passe avant tout le reste : aucun tube n'est ouvert.
+        // Ses rapports parlent la langue de Windows, comme l'App.
+        DrDxt.Core.Docteur.FixerLangue(System.Globalization.CultureInfo.CurrentUICulture);
         if (args.Any(a => string.Equals(a, ModeDesinstallation.Argument, StringComparison.Ordinal)))
             return ModeDesinstallation.Executer();
 
-        // A pre-shared key selects LEGACY mode; its absence selects HANDSHAKE mode.
+        // Une clé partagée d'avance choisit le mode historique ; son absence, le mode handshake.
         var sessionKey = ReadSessionKey(args);
         var handshakeMode = sessionKey is null;
 
-        // --service selects the long-lived, multi-connection accept loop (the installed
-        // Windows-service shape): the loop serves connection after connection over the
-        // helper's lifetime via the same per-connection pipeline. Without it the helper
-        // keeps the historical "serve until stopped" behaviour (functionally identical —
-        // both run the same accept loop — but the flag makes the service intent explicit
-        // and is the entry the installer registers).
+        // --service choisit la boucle d'acceptation durable, multi-connexion (la forme du service
+        // Windows installé) : elle sert connexion après connexion pendant toute la vie du helper, par le
+        // même pipeline par connexion. Sans ce drapeau, le helper garde le comportement « servir jusqu'à
+        // l'arrêt » (identique en pratique, les deux lancent la même boucle, mais le drapeau rend
+        // explicite l'intention de service et c'est l'entrée que l'installeur enregistre).
         var serviceMode = args.Any(a => string.Equals(a, ServiceArg, StringComparison.Ordinal));
 
         var pipeName = ReadArg(args, PipeArg) ?? PipeSecurityFactory.DefaultPipeName;
 
-        // Authenticator (FIX 2): authorize only the trusted caller images by PATH AND
-        // SHA-256 (computed at startup). MULTI-caller: --app-path (the interactive App)
-        // AND --reconciler-path (the low-priv reconciler host) are both allowed, each by
-        // its own path+hash; an unknown image is denied. HelperAuthenticatorFactory never
-        // fails open — no trusted, hashable path → deny-by-default (never allow-all, never
-        // silently path-only). Applies to the on-demand handshake flow AND the env-var
-        // legacy smoke tools (which pass --app-path).
+        // Authentificateur : n'autoriser que les images d'appelants de confiance, par chemin et par
+        // SHA-256 (calculé au démarrage). Plusieurs appelants : --app-path (l'App interactive) et
+        // --reconciler-path (l'hôte réconciliateur peu privilégié) sont tous deux admis, chacun par son
+        // chemin + empreinte ; une image inconnue est refusée. HelperAuthenticatorFactory ne s'ouvre
+        // jamais par défaut : pas de chemin de confiance à empreinte calculable → refus par défaut
+        // (jamais tout autoriser, jamais le chemin seul en silence). Vaut pour le handshake à la demande
+        // et pour les outils de smoke test historiques par variable d'environnement (qui passent --app-path).
         var appPath = ReadArg(args, AppPathArg) ?? Environment.GetEnvironmentVariable(AppPathEnv);
         var reconcilerPath = ReadArg(args, ReconcilerPathArg)
             ?? Environment.GetEnvironmentVariable(ReconcilerPathEnv);
@@ -105,57 +107,59 @@ internal static class Program
                 string.Join(", ", trustedPaths) + ".");
         }
 
-        // Real executor: SAFE non-GPU ops + the SAFE NVAPI DRS surface + the RISKY
-        // NVAPI clock-offset / power-limit writes + the RISKY ADLX (AMD) tuning write
-        // all perform real driver actions. Only the multi-point GPU fan-curve remains
-        // deferred (T6). The native calls are the smoke boundary; on an AMD / no-NVIDIA
-        // box every NVAPI action fails clean ("NVIDIA NVAPI unavailable"), and on a
-        // non-AMD box every ADLX action fails clean ("AMD ADLX unavailable").
+        // Vrai exécuteur : les ops sûres hors GPU + la surface DRS NVAPI sûre + les écritures risquées
+        // de décalage d'horloge / limite de puissance NVAPI + l'écriture de réglage ADLX (AMD) risquée font
+        // toutes de vraies actions pilote. Seule la courbe de ventilateur GPU multipoint reste reportée.
+        // Les appels natifs sont la frontière du smoke test ; sur une machine AMD / sans NVIDIA, toute
+        // action NVAPI échoue proprement (« NVIDIA NVAPI unavailable »), et sur une machine sans AMD,
+        // toute action ADLX échoue proprement (« AMD ADLX unavailable »).
         var executor = new PrivilegedOpExecutor(
             new Win32RegistryActions(),
             new Win32PowerPlanActions(),
             new Win32RestorePointActions(),
             new Win32ServiceActions(),
             new NvApiDrsActions(),
-            // RISKY private NVAPI clock-offset + power-limit writes (recipe §A/§B):
-            // GET-then-SET, version=sizeof, fail-clean. A struct-size mismatch is
-            // rejected by the driver (IncompatibleStructVersion) before any write.
+            // Écritures NVAPI privées risquées de décalage d'horloge + limite de puissance (recette §A/§B) :
+            // GET puis SET, version=sizeof, échec propre. Une taille de struct incorrecte est
+            // rejetée par le pilote (IncompatibleStructVersion) avant toute écriture.
             new NvApiTuningActions(),
-            // RISKY ADLX (AMD) tuning writes (T3, the AMD mirror): GET-then-SET over the
-            // single verified AdlxNative boundary, default-DENY band re-check, fail-clean.
+            // Écritures de réglage ADLX (AMD) risquées (le miroir AMD) : GET puis SET par l'unique
+            // frontière AdlxNative vérifiée, nouvelle vérification de plage en refus par défaut, échec propre.
             new ADLXTuningActions(),
-            // M3 lot 2 — the firmware trip (shutdown /r /fw) and its undo (/a /fw). Wired
-            // Here and nowhere else: this helper only ever acts on an op the user just
-            // triggered from the app, so a restart always has a visible cause. DrDXT writes
-            // no firmware variable of its own — Windows owns the OsIndications bit.
+            // Le voyage firmware (shutdown /r /fw) et son annulation (/a /fw). Branché ici et
+            // nulle part ailleurs : ce helper n'agit que sur une op que l'utilisateur vient de lancer
+            // depuis l'app, donc un redémarrage a toujours une cause visible. DrDXT n'écrit aucune
+            // variable firmware lui-même : Windows possède le bit OsIndications.
             new Win32FirmwareBootActions(),
-            // 11/09/2026 — le seul ecrivain du manifeste signe : la cle de la machine vit ici, jamais
+            // Le seul ecrivain du manifeste signe : la cle de la machine vit ici, jamais
             // dans l'App (integrite moyenne) ni dans le service (qui verifie).
             new ManifestCommitActions(),
-            // 24/09/2026 — le plafond d'envoi QoS (ActiveStore : efface au redemarrage).
+            // Le plafond d'envoi QoS (ActiveStore : efface au redemarrage).
             new Win32NetworkQosActions(),
-            // 24/09/2026 — retirer / reposer un element BCD de l'ensemble ferme, relu apres ecriture.
+            // Retirer / reposer un element BCD de l'ensemble ferme, relu apres ecriture.
             new Win32BcdActions(),
-            // 28/09/2026 : le seul ecrivain du reglage de protection du ping que porte le service de demarrage.
+            // Le seul ecrivain du reglage de protection du ping que porte le service de demarrage.
             plafondDuService: DrDxt.Reconciler.Reseau.PlafondEnvoiDuService.ParDefaut(),
-            // 08/10/2026 (GPU-OC) : le ventilateur en mode Expert, vers le haut seulement, rendu sous bail.
+            // Le ventilateur en mode Expert, vers le haut seulement, rendu sous bail.
             ventilateur: new NvmlVentilateurActions(),
-            // 10/10/2026 (B1) : la limite de puissance du processeur, relue avant et après, par PawnIO s'il est là.
-            cpu: new PawnIoCpuPowerActions());
+            // La limite de puissance du processeur, relue avant et après, par PawnIO s'il est là.
+            cpu: new PawnIoCpuPowerActions(),
+            // Relancer un peripherique en echec, retirer un vieux pilote d'affichage exporte, le remettre (pnputil).
+            pnp: new Win32PnpActions());
 
-        // Dead-man's-switch: a held GPU offset / power limit registers a lease whose
-        // recorded revert (an existing typed op) fires automatically if the controller
-        // stops sending heartbeats. State is in-memory only (no disk persistence). The
-        // same allowlisted executor runs the auto-revert.
+        // Homme mort (dead-man's switch) : un décalage GPU / une limite de puissance tenus enregistrent
+        // un bail dont le retour enregistré (une op typée existante) part tout seul si le contrôleur
+        // cesse d'envoyer ses battements de cœur. L'état vit en mémoire seulement (aucune persistance
+        // disque). Le même exécuteur sous allowlist fait le retour automatique.
         var watchdog = new LeaseWatchdog(
             new SystemClock(), new OpAllowlist(), executor, new HelperDiagnosticsLog());
 
-        // Select the accept strategy by mode. HANDSHAKE mode mints an ephemeral key
-        // per connection after caller-auth (§9.13); LEGACY mode keys the proven
-        // TypedPrivilegedServer with the pre-shared HMAC key (m2smoke/r2smoke compat).
-        // Both expose AcceptOneAsync and run the same validated, allowlisted pipeline.
-        // SEC1 (08/10/2026) : lancé à la demande, le helper s'arrête après 15 minutes sans connexion authentifiée et sans
-        // bail ; une connexion refusée ne compte pas (revue de sécurité du 08/10).
+        // Choisir la stratégie d'acceptation selon le mode. Le mode handshake frappe une clé éphémère
+        // par connexion après l'auth de l'appelant ; le mode historique donne au TypedPrivilegedServer
+        // éprouvé la clé HMAC partagée d'avance (compatibilité m2smoke/r2smoke).
+        // Les deux exposent AcceptOneAsync et font tourner le même pipeline validé sous allowlist.
+        // Lancé à la demande, le helper s'arrête après 15 minutes sans connexion authentifiée et sans
+        // bail ; une connexion refusée ne compte pas.
         var inactivite = serviceMode ? null : new ArretSurInactivite(TimeSpan.FromMinutes(15), () => DateTimeOffset.UtcNow);
 
         Func<CancellationToken, Task> acceptOne;
@@ -183,34 +187,34 @@ internal static class Program
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
 
-        // Background monitor: tick the watchdog on a fixed cadence so EXPIRED leases
-        // auto-revert. Runs alongside the accept loop; faults are swallowed so a single
-        // bad tick never crashes the host.
+        // Surveillance de fond : faire battre le chien de garde à cadence fixe pour que les baux
+        // expirés reviennent en arrière tout seuls. Tourne à côté de la boucle d'acceptation ; les
+        // pannes sont avalées pour qu'un mauvais tick ne fasse jamais planter l'hôte.
         var monitor = RunLeaseMonitorAsync(watchdog, TimeSpan.FromSeconds(5), cts.Token, () =>
         {
             if (inactivite?.DoitSArreter(watchdog.NombreDeBaux, ProcessusVivant) != true) return;
-            Console.Out.WriteLine("DrDxt.ElevatedHelper: App fermée ou 15 minutes sans connexion, et aucun bail : arrêt.");
+            Console.Out.WriteLine("DrDxt.ElevatedHelper: app closed or 15 minutes without a connection, and no lease: stopping.");
             cts.Cancel();
         });
 
         Console.Out.WriteLine(
             $"DrDxt.ElevatedHelper: listening on pipe '{pipeName}' (elevated{(serviceMode ? ", service mode" : string.Empty)}).");
 
-        // Long-lived, multi-connection accept loop (HelperServiceLoop): each iteration
-        // serves exactly ONE connection via the proven per-connection pipeline above
-        // (acceptOne) then re-creates the FirstPipeInstance pipe for the next caller. A
-        // single bad/garbage connection is logged + tolerated; a sustained fault burst
-        // backs off then fails closed. The per-connection protocol is UNTOUCHED — this
-        // is purely the outer loop/hardening. The --service flag does not change the loop
-        // (the installed service and the on-demand launch share this exact code path); it
-        // only labels the intent + is the entry the installer registers.
+        // Boucle d'acceptation durable, multi-connexion (HelperServiceLoop) : chaque tour sert
+        // exactement une connexion par le pipeline par connexion éprouvé ci-dessus (acceptOne), puis
+        // recrée le pipe FirstPipeInstance pour l'appelant suivant. Une seule connexion mauvaise ou
+        // déchet est journalisée et tolérée ; une rafale de pannes soutenue fait reculer puis se ferme
+        // (fail-closed). Le protocole par connexion reste intact : ce n'est que la boucle extérieure et
+        // son durcissement. Le drapeau --service ne change pas la boucle (le service installé et le
+        // lancement à la demande partagent ce même chemin de code) ; il nomme seulement l'intention et
+        // c'est l'entrée que l'installeur enregistre.
         var loop = new HelperServiceLoop(
             acceptOne,
             new ConsoleServiceLoopLog(),
             backoff: ct => Task.Delay(TimeSpan.FromMilliseconds(250), ct));
         var exitCode = await loop.RunAsync(cts.Token).ConfigureAwait(false);
 
-        // 26/09/2026 : arret normal ou rafale d'echecs (un squatteur du tube peut la provoquer), les baux actifs
+        // Arret normal ou rafale d'echecs (un squatteur du tube peut la provoquer), les baux actifs
         // meurent avec ce processus. Ils sont rendus avant de sortir, sous un delai propre (cts peut etre annule).
         try
         {
@@ -222,14 +226,14 @@ internal static class Program
             Console.Error.WriteLine($"DrDxt.ElevatedHelper: leases not all released on exit: {ex.GetType().Name}.");
         }
 
-        // Let the monitor unwind cleanly on shutdown.
+        // Laisser la surveillance se dérouler proprement à l'arrêt.
         try { await monitor.ConfigureAwait(false); }
         catch (OperationCanceledException) { /* expected on cancel */ }
 
         return exitCode;
     }
 
-    // Writes the accept-loop diagnostics to the console (the helper's stderr/stdout).
+    // Écrit les diagnostics de la boucle d'acceptation sur la console (stderr/stdout du helper).
     private sealed class ConsoleServiceLoopLog : IServiceLoopLog
     {
         public void Fault(int consecutive, int max, string detail) =>
@@ -241,9 +245,9 @@ internal static class Program
                 "DrDxt.ElevatedHelper: too many consecutive accept faults; stopping (fail-closed).");
     }
 
-    // Ticks the watchdog on a fixed cadence until cancelled. A tick never throws
-    // (the watchdog swallows revert failures), but the loop is still defensively
-    // guarded so a fault can never crash the elevated host.
+    // Fait battre le chien de garde à cadence fixe jusqu'à l'annulation. Un tick ne lève jamais
+    // (le chien de garde avale les échecs de retour), mais la boucle reste gardée par prudence
+    // pour qu'une panne ne fasse jamais planter l'hôte élevé.
     private static async Task RunLeaseMonitorAsync(LeaseWatchdog watchdog, TimeSpan period, CancellationToken ct,
         Action? apresChaqueTour = null)
     {
@@ -263,7 +267,7 @@ internal static class Program
                 }
                 catch
                 {
-                    // A bad tick must never crash the host; the next tick retries.
+                    // Un mauvais tick ne doit jamais faire planter l'hôte ; le tick suivant réessaie.
                 }
             }
         }
@@ -275,14 +279,14 @@ internal static class Program
 
     private static byte[]? ReadSessionKey(string[] args)
     {
-        // 26/09/2026 : installe, la variable d'environnement (HKCU\Environment, ecrivable par le compte) ne choisit
+        // Installe, la variable d'environnement (HKCU\Environment, ecrivable par le compte) ne choisit
         // plus le mode legacy ; seul un argument de lancement le peut encore.
         var installe = HelperAuthenticatorFactory.EstInstalle(AppContext.BaseDirectory,
             Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles));
 #if DEBUG
         var b64 = ReadArg(args, SessionKeyArg) ?? (installe ? null : Environment.GetEnvironmentVariable(SessionKeyEnv));
 #else
-        // Revue de sécurité du 08/10 : le mode legacy des outils de banc n'est pas une surface du produit livré.
+        // Le mode legacy des outils de banc n'est pas une surface du produit livré.
         string? b64 = null;
         _ = installe;
 #endif
@@ -291,7 +295,7 @@ internal static class Program
         try
         {
             var key = Convert.FromBase64String(b64);
-            // A too-short key is not a valid session key — refuse rather than weaken.
+            // Une clé trop courte n'est pas une clé de session valide : refuser plutôt qu'affaiblir.
             return key.Length >= 32 ? key : null;
         }
         catch (FormatException)
@@ -313,7 +317,7 @@ internal static class Program
         return null;
     }
 
-    // SEC1 (autocontrôle du 08/10/2026) : le client authentifié vit-il encore ? Un processus introuvable est parti.
+    // Le client authentifié vit-il encore ? Un processus introuvable est parti.
     private static bool ProcessusVivant(int pid)
     {
         try { using var p = System.Diagnostics.Process.GetProcessById(pid); return !p.HasExited; }

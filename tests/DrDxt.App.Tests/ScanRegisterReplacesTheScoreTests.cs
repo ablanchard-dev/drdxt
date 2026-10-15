@@ -10,7 +10,7 @@ using Xunit;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// D2 / lot L1 / gate G3 — LE SCORE /100 disparait, le registre le remplace.
+// LE SCORE /100 disparait, le registre le remplace.
 //
 // Pourquoi le score partait, et pourquoi ce n'est pas un gout d'interface : ses six leviers
 // portent des magnitudes qui sont, c'est ecrit dans le code, des « estimations d'expert
@@ -63,8 +63,7 @@ public sealed class ScanRegisterReplacesTheScoreTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(
-              Hw(), St, findings ?? Array.Empty<Finding>(), score, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(true, false),
+              Hw(), St, findings ?? Array.Empty<Finding>(), null,
               ledger, coverage)));
 
         var sd = Substitute.For<IStorageDetector>();
@@ -75,19 +74,15 @@ public sealed class ScanRegisterReplacesTheScoreTests
     }
 
     /// <summary>
-    /// L'INVARIANCE — le controle qui dit si une estimation atteint encore l'ecran.
+    /// L'invariance : le controle qui dit si une estimation atteint encore l'ecran.
     ///
     /// Le registre compte des faits de lecture : combien de leviers ont ete lus, combien sont a
-    /// corriger. Les penalites, elles, sont des estimations d'expert calibrees a la main ; c'est
-    /// pour ca que le score /100 a ete retire de la vitrine le 02/09 (plancher mathematique a 47,
-    /// donc incapable de dire « cette machine est mal reglee »).
+    /// corriger. Les penalites, elles, sont des estimations d'expert calibrees a la main (un score
+    /// qui les somme a un plancher mathematique a 47 et ne peut pas dire « cette machine est mal reglee »).
     ///
     /// Si doubler toutes les penalites change ne serait-ce qu'une chaine affichee, alors une
-    /// estimation decide encore de ce que le client lit — et le retrait du score n'etait qu'un
-    /// deplacement.
-    ///
-    /// Ce test est ROUGE tant que `ScoreNarrative` vit : `VerdictText` et `BandWord` derivent du
-    /// score, donc de la somme des penalites.
+    /// estimation decide encore de ce que le client lit. Ce test rougirait si `VerdictText` ou
+    /// `BandWord` derivaient du score, donc de la somme des penalites.
     /// </summary>
     [Fact]
     public async Task Doubling_every_penalty_changes_NOTHING_the_client_reads()
@@ -114,15 +109,13 @@ public sealed class ScanRegisterReplacesTheScoreTests
         doubled.VerdictText.Should().Be(normal.VerdictText,
             "le verdict decrit ce qui a ete LU, pas une somme de points estimes");
 
-        // PERIMETRE ELARGI le 05/09, apres coup. La premiere version de ce test ne regardait
-        // que les trois lignes ci-dessus, et elle est passee au vert alors que le resume de
-        // diagnostic disait encore « globalement en bonne sante » ou « demande attention » selon
-        // le SCORE. Une garde juste sur un echantillon trop etroit ne garde rien : c'est le motif
-        // trouve cinq fois dans la boucle de verification, et je venais de le reproduire.
+        // Le resume aussi : limite aux trois lignes ci-dessus, le test resterait vert pendant que le
+        // resume dirait « globalement en bonne sante » ou « demande attention » selon le score. Une
+        // garde juste sur un echantillon trop etroit ne garde rien.
         doubled.AssistantSummary.Should().Be(normal.AssistantSummary,
             "le resume parle, et il ne doit pas dire autre chose que l'ecran");
-        // La liste « Résumé du diagnostic » que ce test gardait aussi a été retirée le 23/09/2026 :
-        // elle redisait l'en-tête et avait fini par le contredire. La phrase ci-dessus reste.
+        // Il n'y a pas de liste « Résumé du diagnostic » : elle redirait l'en-tête et finirait par le
+        // contredire. La phrase ci-dessus suffit.
     }
 
     [Fact]
@@ -155,7 +148,7 @@ public sealed class ScanRegisterReplacesTheScoreTests
     {
         // Le piege du lot. « ReBAR non lisible sur NVIDIA » est un guidage : le produit n'a rien
         // prouve, il dit qu'il n'a pas pu lire. Le compter gonflerait le registre avec exactement
-        // ce que D2 lui interdit d'affirmer.
+        // ce que la règle lui interdit d'affirmer.
         var vm = Build(
             ledger: new[] { Entry("rebar", LeverState.Unknown) },
             coverage: new ScanCoverage(1, 0, 1),
@@ -175,7 +168,7 @@ public sealed class ScanRegisterReplacesTheScoreTests
     [Fact]
     public async Task A_clean_machine_says_zero_problems_and_still_says_what_it_read()
     {
-        // La moitie de la promesse D1 : « si ta machine est deja bonne, on te le prouve aussi ».
+        // La moitie de la promesse : « si ta machine est deja bonne, on te le prouve aussi ».
         // Un registre a zero probleme doit quand meme montrer la couverture, sinon « rien trouve »
         // ne se distingue pas de « rien regarde ».
         var vm = Build(
@@ -185,7 +178,7 @@ public sealed class ScanRegisterReplacesTheScoreTests
         await vm.ScanCommand.ExecuteAsync(null);
 
         vm.ProvenProblemCount.Should().Be(0);
-        // 03/10/2026 (D8.4, revue n° 3) : à zéro, « aucun à changer » ; « 0 à changer » se lisait comme un démenti.
+        // À zéro, « aucun à changer » ; « 0 à changer » passerait pour un démenti.
         vm.RegisterText.Should().Contain("UI.Register.None").And.NotContain("UI.Register.Problem");
         vm.RegisterText.Should().Contain("UI.Register.LeversRead");
     }
@@ -206,8 +199,7 @@ public sealed class ScanRegisterReplacesTheScoreTests
     [Fact]
     public async Task Without_coverage_the_register_says_only_what_it_can()
     {
-        // Premiere version (02/09) : on coupait la seconde moitie et on affichait le compte seul.
-        // Corrige le 05/09 : « 3 problemes prouves » sans savoir combien de leviers ont ete lus
+        // Pas de compte seul : « 3 problemes prouves » sans savoir combien de leviers ont ete lus
         // laisse croire que la machine a ete examinee. Un scan qui n'a pas pu mesurer sa propre
         // couverture n'a rien examine d'affirmable, et il doit le dire.
         var vm = Build(
@@ -224,7 +216,7 @@ public sealed class ScanRegisterReplacesTheScoreTests
     public async Task A_missing_ledger_counts_zero_instead_of_guessing_from_the_score()
     {
         // Un scan sans grand livre n'a rien prouve. Retomber sur le score pour en deduire un
-        // nombre de problemes ressusciterait exactement le chiffre que D2 retire.
+        // nombre de problemes ressusciterait exactement le chiffre que la règle retire.
         var vm = Build(ledger: null, coverage: new ScanCoverage(4, 4, 0), score: 47);
 
         await vm.ScanCommand.ExecuteAsync(null);

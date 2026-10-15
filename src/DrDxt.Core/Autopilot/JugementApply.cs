@@ -1,16 +1,16 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// PHASE 18 F6 (L8 b) — ce que la mesure du SCAN dit a l'Apply, reduit a ce dont le choix a besoin.
+/// Ce que la mesure du scan dit a l'Apply, reduit a ce dont le choix a besoin.
 /// Pur : les lectures (journal WER, arrets brutaux) sont faites par l'appelant.
 /// </summary>
 public static class DiagnosticDeScan
 {
-    // 06/10/2026 (L-GPU) : le drapeau global `TuningGpuAutorise = false` (decision du 07/09, prise pour la seule machine
-    // du mainteneur) est retire. La carte se ferme machine par machine, par famille d'arret
+    // Le drapeau global `TuningGpuAutorise = false` (pris pour une seule machine de
+    // reference) est retire. La carte se ferme machine par machine, par famille d'arret
     // (`CandidateSelector.CarteFermeeParLesArrets`), et un reglage n'est garde qu'avec un gain mesure en jeu.
 
-    /// <param name="pressionThread">Ce que les threads du jeu ont CONSOMME pendant la fenetre de mesure
+    /// <param name="pressionThread">Ce que les threads du jeu ont consomme pendant la fenetre de mesure
     /// du scan (<see cref="PressionThreads"/>). Unknown = pas observe, et « pas observe » ne ferme rien.</param>
     public static DiagnosticMachine Construire(
         BottleneckVerdict? goulot,
@@ -37,22 +37,22 @@ public static class DiagnosticDeScan
 }
 
 /// <summary>
-/// PHASE 18 (branchement, revue du 10/09/2026) — la CONSOMMATION du thread de jeu le plus chaud,
+/// La consommation du thread de jeu le plus chaud,
 /// reduite a ce que <see cref="CandidateSelector.ClasserFamilles"/> sait lire.
 ///
 /// `GameThreadPressure` existait, et l'App le laissait a Unknown : le diagnostic ne pouvait jamais
 /// faire remonter les familles CPU/Scheduler. La mesure vient de `ThreadCpuReader` (GetThreadTimes,
-/// espace utilisateur, sans elevation) pendant la fenetre de mesure du scan — la meme que les frames.
+/// espace utilisateur, sans elevation) pendant la fenetre de mesure du scan, la meme que les frames.
 ///
 /// Sur un CPU hybride, « proche d'un thread logique » ne dit rien du type de coeur (P ou E) : le
 /// thread a pu tourner sur un E-core ou migrer. C'est une observation, jamais une cause.
 /// </summary>
 public static class PressionThreads
 {
-    /// <summary>A partir de quelle part d'UN thread logique le thread le plus chaud est « proche
+    /// <summary>A partir de quelle part d'un seul thread logique le thread le plus chaud est « proche
     /// d'un thread ».
     ///
-    /// **NON CHIFFRÉ.** Aucune source ni aucun outil du depot ne fixe ce seuil (`tools/cpuprobe`
+    /// **Non chiffré.** Aucune source ni aucun outil du depot ne fixe ce seuil (`tools/cpuprobe`
     /// n'affiche que des parts). 0,90 laisse 10 % a l'ordonnanceur et au bruit de lecture ; il est
     /// ecrit ici pour etre discute, comme les seuils du selecteur.</summary>
     public const double SeuilProcheDUnThread = 0.90;
@@ -66,13 +66,13 @@ public static class PressionThreads
 }
 
 /// <summary>
-/// PHASE 18 F6 (L8 b) — juger avant d'encaisser. Ce que l'Optimiser fera sur cette machine, decide
+/// Juger avant d'encaisser. Ce que l'Optimiser fera sur cette machine, decide
 /// avant tout paiement : un client a qui il n'y a rien a tenter ne paie pas pour l'apprendre.
 /// </summary>
 /// <param name="Appreciations">Chaque graine, jugee, avec ses motifs.</param>
 /// <param name="LotAChaud">tous les leviers mesurables que le selecteur retient, dans l'ordre des
-/// familles que la mesure met en tete. Vide = aucun. La campagne P3 (`tools/optimize`) tente ce lot
-/// entier, un candidat a la fois, et l'App son premier ; un levier ECARTE (veto des arrets brutaux
+/// familles que la mesure met en tete. Vide = aucun. La campagne (`tools/optimize`) tente ce lot
+/// entier, un candidat a la fois, et l'App son premier ; un levier ecarte (veto des arrets brutaux
 /// compris) n'y entre jamais, parce que le lot est construit ici, sur les memes appreciations que
 /// l'ecran.</param>
 /// <param name="AuRedemarrage">Les corrections dont l'effet n'existe qu'apres redemarrage, retenues
@@ -80,14 +80,14 @@ public static class PressionThreads
 /// de lui-meme »).</param>
 /// <param name="SansDescripteur">Des graines que le catalogue ne connait pas : jamais tentees.</param>
 /// <param name="VetoDesArrets">Le motif quand les arrets brutaux forment une condition, sinon
-/// <c>null</c>. Il ne DECIDE rien : le selecteur a deja ferme chaque surface materielle ou pilote
-/// (<see cref="CandidateSelector.FermeeParLesArrets"/>). Il sert a le dire — l'ecran de l'App
+/// <c>null</c>. Il ne decide rien : le selecteur a deja ferme chaque surface materielle ou pilote
+/// (<see cref="CandidateSelector.FermeeParLesArrets"/>). Il sert a le dire : l'ecran de l'App
 /// (« un test memoire d'abord ») et l'outil de campagne.
 ///
-/// 11/09/2026 : il s'appelait `VetoDeCampagne` et VIDAIT le lot de la seule campagne, parce que
+/// Il s'appelait `VetoDeCampagne` et vidait le lot de la seule campagne, parce que
 /// trois leviers du pilote passaient le veto du selecteur (ils se declaraient « latence »).
 /// L'Optimiser de l'App, lui, tentait encore `latency.reflex`. Le defaut etait dans le veto, pas
-/// chez l'appelant : il ferme desormais sur la SURFACE ecrite, et ce second veto par appelant, devenu
+/// chez l'appelant : il ferme desormais sur la surface ecrite, et ce second veto par appelant, devenu
 /// redondant, est retire.</param>
 public sealed record JugementApply(
     IReadOnlyList<CandidateAppraisal> Appreciations,
@@ -100,7 +100,7 @@ public sealed record JugementApply(
     /// tente qu'un par clic ; `null` = aucun.</summary>
     public CandidateDescriptor? AChaud => LotAChaud.Count > 0 ? LotAChaud[0] : null;
 
-    /// <summary>06/10/2026 (L-WU) : les réglages posés au clic, effectifs tout de suite mais sans effet sur les images
+    /// <summary>Les réglages posés au clic, effectifs tout de suite mais sans effet sur les images
     /// (<see cref="CandidateKind.AutoReglage"/>) : appliqués avec ceux du redémarrage, sans mesure.</summary>
     public IReadOnlyList<string> PosesSansMesure { get; init; } = [];
 
@@ -108,8 +108,8 @@ public sealed record JugementApply(
 
     /// <param name="jeuEnCours">Un jeu tournait-il au scan ? Sans lui, un levier a chaud etait
     /// « a tenter » sans jeu : le client payait et creait un point de restauration pour lire ensuite
-    /// « lance ton jeu » (revue du 10/09). Un levier qui se mesure en jeu, sans jeu, n'est pas
-    /// a tenter — et ce refus est gratuit.</param>
+    /// « lance ton jeu ». Un levier qui se mesure en jeu, sans jeu, n'est pas
+    /// a tenter, et ce refus est gratuit.</param>
     public static JugementApply Juger(DiagnosticMachine diagnostic, IReadOnlyList<string> graines, bool jeuEnCours)
     {
         var sansDescripteur = new List<string>();
@@ -123,9 +123,9 @@ public sealed record JugementApply(
         var appreciations = CandidateSelector.Evaluer(diagnostic, descripteurs
             .Select(d => d.Kind is CandidateKind.AutoReboot or CandidateKind.AutoReglage ? d with { Kind = CandidateKind.AutoHot } : d)
             .ToList())
-            // L-WU : un réglage sans effet sur les images n'a rien à voir avec le goulot ; son motif le dit.
+            // Un réglage sans effet sur les images n'a rien à voir avec le goulot ; son motif le dit.
             .Select((a, i) => a.Retenu && descripteurs[i].Kind == CandidateKind.AutoReglage
-                ? new CandidateAppraisal(a.Id, true, ["posé au clic, sans effet sur les images : il ne se mesure pas en jeu"])
+                ? new CandidateAppraisal(a.Id, true, [Docteur.T("JA.SansEffetImages")])
                 : a)
             .ToList();
 
@@ -134,17 +134,17 @@ public sealed record JugementApply(
                 .Select((a, i) => a.Retenu && descripteurs[i].Kind == CandidateKind.AutoHot
                     ? new CandidateAppraisal(a.Id, false, new[]
                     {
-                        "se mesure en jeu, et aucun jeu n'était lancé au scan : lance ton jeu, refais un scan",
+                        Docteur.T("JA.AucunJeu"),
                     })
                     : a)
                 .ToList();
 
-        // 07/10/2026 (revue F-16) : changer le mode d'écran sort un jeu plein écran exclusif, et la question « garder ou
+        // Changer le mode d'écran sort un jeu plein écran exclusif, et la question « garder ou
         // revenir » reste derrière lui. L'affichage se règle hors partie.
         if (jeuEnCours)
             appreciations = appreciations
                 .Select((a, i) => a.Retenu && descripteurs[i].Surface == SurfaceTouchee.Affichage
-                    ? new CandidateAppraisal(a.Id, false, ["change l'affichage : à poser jeu fermé, pour que la question « garder ou revenir » se voie"])
+                    ? new CandidateAppraisal(a.Id, false, [Docteur.T("JA.Affichage")])
                     : a)
                 .ToList();
 

@@ -9,12 +9,11 @@ public sealed record VerificationRendue(string? Refus, IReadOnlyList<string> AVe
     int NonTouches = 0, int Refuses = 0,
     DrDxt.Application.Autopilot.ValidationComplete.Arret ArretPar = DrDxt.Application.Autopilot.ValidationComplete.Arret.Aucun)
 {
-    /// <summary>10/10/2026 : les réglages posés, relus et rendus, par identifiant (le bilan les nomme un par un).</summary>
+    /// <summary>Les réglages posés, relus et rendus, par identifiant (le bilan les nomme un par un).</summary>
     public IReadOnlyList<string> ValidesIds { get; init; } = [];
 }
 
-// 08/10/2026 (T1b, le mainteneur : « rajouter les tests pour valider certaines choses pour les users dans l'app ») : « Vérifier
-// DrDXT sur mon PC ». Chaque réglage que DrDXT sait poser est posé, relu, remis d'origine, relu encore, sur la machine du
+// « Vérifier DrDXT sur mon PC ». Chaque réglage que DrDXT sait poser est posé, relu, remis d'origine, relu encore, sur la machine du
 // joueur, après son accord. Le bilan dit ce qui marche ici ; le rapport va dans Documents et le joueur l'envoie
 // lui-même. Ça prouve que DrDXT sait écrire et rendre chaque réglage sur ce matériel, pas qu'il fait gagner des images :
 // ça, c'est le relevé des parties.
@@ -31,7 +30,7 @@ public partial class ScanViewModel
 
     public bool CanVerifierMachine => _verifierLaMachine is not null;
 
-    /// <summary>10/10/2026 (le mainteneur : « je sais pas réellement ce que ça a fait, écriture illisible ») : une ligne par
+    /// <summary>Une ligne par
     /// réglage essayé, avec son nom et ce qui lui est arrivé, au lieu d'un seul compte.</summary>
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(ADesLignesVerification))] private IReadOnlyList<string> _lignesVerification = [];
     public bool ADesLignesVerification => LignesVerification.Count > 0;
@@ -70,7 +69,7 @@ public partial class ScanViewModel
         catch (Exception) { return false; }
     };
 
-    /// <summary>CONTRIB1 (08/10/2026, « direct en lien ») : le rapport part par un ticket GitHub pré-rempli, sans serveur ; DrDXT
+    /// <summary>Le rapport part par un ticket GitHub pré-rempli, sans serveur ; DrDXT
     /// n'envoie rien, le joueur relit et soumet. Rapport illisible ou navigateur absent : dit, rien n'est inventé.</summary>
     [RelayCommand]
     private void EnvoyerRapport()
@@ -86,14 +85,20 @@ public partial class ScanViewModel
 
     public string LabelGuide => _localize("Carte.Guide");
 
-    /// <summary>RAPPORT-FINAL (09/10/2026) : ce que DrDXT ne peut pas écrire (BIOS, câbles, réglages du jeu) se lit étape par
-    /// étape sur le dépôt. Navigateur absent (revue du 09/10) : l'adresse est copiée dans le presse-papiers, pour la coller
+    /// <summary>Ce que DrDXT ne peut pas écrire (BIOS, câbles, réglages du jeu) se lit étape par
+    /// Étape sur le dépôt. Navigateur absent : l'adresse est copiée dans le presse-papiers, pour la coller
     /// ailleurs ; le presse-papiers lui-même peut refuser, et alors rien de plus n'est possible d'ici.</summary>
     [RelayCommand]
-    private void OuvrirGuide()
+    private void OuvrirGuide() => OuvrirOuCopier(DrDxt.App.Platform.LienDeRapport.Guide);
+
+    /// <summary>Le bouton « Ouvrir le guide (5.23) » arrive sur l'étape, pas en haut du document.</summary>
+    [RelayCommand]
+    private void OuvrirGuideSousTension() => OuvrirOuCopier(DrDxt.App.Platform.LienDeRapport.GuideSousTension);
+
+    private void OuvrirOuCopier(string lien)
     {
-        if (OuvrirLien(DrDxt.App.Platform.LienDeRapport.Guide)) return;
-        try { System.Windows.Clipboard.SetText(DrDxt.App.Platform.LienDeRapport.Guide); } catch (Exception) { }
+        if (OuvrirLien(lien)) return;
+        try { System.Windows.Clipboard.SetText(lien); } catch (Exception) { }
     }
 
     [RelayCommand]
@@ -129,7 +134,7 @@ public partial class ScanViewModel
             }));
             VerificationChemin = r.Chemin ?? string.Empty;
             LignesVerification = r.Refus is null ? Lignes(r) : [];
-            // Revue n° 10 : le bilan compte ce qui a été vérifié, et dit pourquoi la vérification s'est arrêtée ;
+            // Le bilan compte ce qui a été vérifié, et dit pourquoi la vérification s'est arrêtée ;
             // « tout est remis » ne s'affiche plus quand rien n'a été posé.
             VerificationBilan = r.Refus is { } refus ? _localize(refus)
                 : r.AVerifier.Count > 0 ? string.Format(_localize("Verifier.AVerifier"), string.Join(Environment.NewLine, r.AVerifier))

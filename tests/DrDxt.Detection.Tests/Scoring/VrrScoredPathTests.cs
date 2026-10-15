@@ -5,21 +5,21 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Scoring;
 
 /// <summary>
-/// Two gaps in an otherwise well-covered lever (19 tests already set <c>vrrCapable</c>).
+/// Deux trous dans un levier par ailleurs bien couvert (19 tests posent déjà <c>vrrCapable</c>).
 ///
-/// 1. Two guarantees were already pinned separately: <c>ScoringRulesTests</c> asserts the
-///    lever DECLARES a gain of 5, and <c>ScanScorerTests</c> asserts the total score gets
-///    LOWER. Neither links them — a lever could declare 5 and subtract 3, and both would
-///    still pass. This pins the link: the points actually removed from the /100 equal the
-///    magnitude the scoring model publishes.
+/// 1. Deux garanties étaient figées séparément : <c>ScoringRulesTests</c> vérifie que le levier
+///    déclare un gain de 5, et <c>ScanScorerTests</c> que le score total baisse. Aucune ne les
+///    relie : un levier pourrait déclarer 5 et retirer 3, et les deux passeraient encore. Ceci
+///    fige le lien : les points vraiment retirés du /100 égalent l'ampleur que le modèle de
+///    notation publie.
 ///
-/// 2. The combination "VRR unreadable ON a confirmed-capable display" was never exercised:
-///    existing cases pair an unreadable VRR state with an unconfirmed display. Knowing the
-///    panel is capable must not turn "I cannot read it" into a deficit.
+/// 2. La combinaison « VRR illisible sur un écran confirmé capable » n'était jamais exercée :
+///    les cas existants associent un état VRR illisible à un écran non confirmé. Savoir l'écran
+///    capable ne doit pas transformer « je ne peux pas le lire » en déficit.
 ///
-/// Context worth keeping: <c>SettingsState.VrrCapableDisplay</c> was written NOWHERE in src until
-/// 10/09/2026 (L8 suite) — it is now read from the NVIDIA driver (NvAPI_Disp_GetVRRInfo) on the
-/// game display, and stays Unknown when the driver cannot be read.
+/// Contexte utile : <c>SettingsState.VrrCapableDisplay</c> n'était écrit nulle part dans src ;
+/// il est lu depuis le pilote NVIDIA (NvAPI_Disp_GetVRRInfo) sur l'écran du jeu,
+/// et reste Unknown quand le pilote ne peut pas être lu.
 /// </summary>
 public class VrrScoredPathTests
 {
@@ -44,7 +44,7 @@ public class VrrScoredPathTests
         var withVrr = Score(TriState.On, TriState.On);
         var without = Score(TriState.Off, TriState.On);
 
-        (withVrr.Score - without.Score).Should().Be(5,
+        (without.Ledger!.Sum(e => e.Penalty) - withVrr.Ledger!.Sum(e => e.Penalty)).Should().Be(5,
             "the lever declares magnitude 5; asserting only 'lower' would pass at any magnitude");
     }
 
@@ -54,7 +54,7 @@ public class VrrScoredPathTests
         var unknown = Score(TriState.Unknown, TriState.On);
         var optimal = Score(TriState.On, TriState.On);
 
-        unknown.Score.Should().Be(optimal.Score,
+        unknown.Ledger!.Sum(e => e.Penalty).Should().Be(optimal.Ledger!.Sum(e => e.Penalty),
             "knowing the panel is capable must not turn 'I cannot read VRR' into a deficit");
     }
 }

@@ -4,7 +4,7 @@ using DrDxt.ElevatedHelper.Execution.NvApi;
 using DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// r2leasesmoke — LIVE proof of the R2 LEASE WATCHDOG (dead-man's-switch).
+// r2leasesmoke — LIVE proof of the LEASE WATCHDOG (dead-man's-switch).
 //
 // Validation "A": prove END-TO-END that a HELD GPU clock offset, applied THROUGH the
 // elevated helper, is AUTO-REVERTED by the helper's background watchdog when the

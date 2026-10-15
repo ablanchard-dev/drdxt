@@ -4,13 +4,13 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 07/10/2026 (D10) : les overlays ouverts en partie, et leur coût mesuré sur les parties du joueur.
+// Les overlays ouverts en partie, et leur coût mesuré sur les parties du joueur.
 public sealed class OverlaysEnPartieTests
 {
     private static PartieRelevee Partie(string jeu, double fps, IReadOnlyList<string>? overlays, string? essai = null)
         => new(jeu, DateTimeOffset.Now, DateTimeOffset.Now, 3, fps, fps * 0.6, BottleneckState.CpuBoundOrAppBound, Essai: essai, Overlays: overlays);
 
-    // NET2 (08/10/2026) : Discord compte, sous le nom de ce qui se voit vraiment : Discord ouvert (son overlay vit dans le jeu).
+    // Discord compte, sous le nom de ce qui se voit vraiment : Discord ouvert (son overlay vit dans le jeu).
     [Fact]
     public void Seuls_les_processus_d_overlay_connus_sont_reconnus()
         => OverlaysEnPartie.Reconnaitre(["steam", "GameOverlayUI", "rtss", "Discord", "NVIDIA Overlay", "GameOverlayUI"])
@@ -28,7 +28,7 @@ public sealed class OverlaysEnPartieTests
         autres.Should().BeEmpty();
     }
 
-    // Revue F-45 : un levier posé entre les parties avec et celles sans ; son écart n'est pas celui de l'overlay.
+    // Un levier posé entre les parties avec et celles sans ; son écart n'est pas celui de l'overlay.
     [Fact]
     public void Seules_les_parties_d_apres_le_dernier_changement_se_comparent()
     {

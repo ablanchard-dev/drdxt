@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler.Reseau;
 
 /// <summary>
-/// 28/09/2026 : la protection du ping portée par le service de démarrage, sans DrDXT ouvert et sans invite.
+/// La protection du ping portée par le service de démarrage, sans DrDXT ouvert et sans invite.
 ///
 /// À chaque battement, le réglage retenu (<see cref="PlafondEnvoiDuService"/>, écrit par le helper) est relu :
 /// le plafond est posé quand le jeu retenu tourne, retiré quand il se ferme ou quand le joueur éteint la
@@ -26,7 +26,7 @@ public sealed class ProtectionDuPingParLeService
     public const string IdJournal = "upload-cap-service";
 
     /// <param name="journal">Chaque pose et chaque retrait reussis s'y ecrivent : sans lui, la protection portee par le
-    /// service etait invisible apres coup.</param>
+    /// service serait invisible apres coup.</param>
     public ProtectionDuPingParLeService(IElevatedClient client, Func<PlafondRetenuDuService?> lireRetenu, Func<string, bool> jeuEnCours,
         IDiagnosticsLog? journal = null)
         => (_client, _lireRetenu, _jeuEnCours, _journal) = (client, lireRetenu, jeuEnCours, journal);
@@ -66,7 +66,7 @@ public sealed class ProtectionDuPingParLeService
             else if ((await _client.ExecuteAsync(new ApplyUploadCapOp(voulu.Exe, voulu.PlafondBps), ct).ConfigureAwait(false)).IsOk)
             {
                 _journal?.Change(IdJournal, _pose is null ? "retiré" : "posé",
-                    FormattableString.Invariant($"{voulu.PlafondBps / 1e6:0.#} Mbit/s pour {voulu.Exe}"), "DrDXT");
+                    FormattableString.Invariant($"{voulu.PlafondBps / 1e6:0.#} Mbit/s for {voulu.Exe}"), "DrDXT");
                 _pose = voulu;
             }
         }

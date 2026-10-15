@@ -2,14 +2,15 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DrDxt.Application.Parties;
+using DrDxt.Application.Tweaks;
 using DrDxt.Core;
 
 namespace DrDxt.App.ViewModels;
 
 /// <summary>
-/// 07/10/2026 (chantier J4) : un levier à chaud essayé une partie sur deux, sans geste à chaque partie. Le clic
+/// Un levier à chaud essayé une partie sur deux, sans geste à chaque partie. Le clic
 /// « Essayer en alternance » est le consentement (et porte l'invite Windows éventuelle) ; ensuite DrDXT pose ou rend le
-/// levier entre deux parties, SEULEMENT si son helper tourne déjà : jamais d'invite Windows pendant que tu joues. Helper
+/// levier entre deux parties, seulement si son helper tourne déjà : jamais d'invite Windows pendant que tu joues. Helper
 /// absent : l'essai se met en pause et la carte le dit. Tranché (<see cref="AlternanceDesEssais"/>), il s'arrête sur le
 /// meilleur état ; « Arrêter l'essai » rend l'état d'origine à tout moment.
 /// </summary>
@@ -67,13 +68,18 @@ public partial class ScanViewModel
     /// <summary>Le joueur arrête : l'état d'origine revient (le clic porte l'invite Windows éventuelle).</summary>
     internal async Task ArreterEssaiAsync()
     {
-        // Revue F-38 : une bascule de fin de partie en cours se termine avant l'arrêt, qui lit alors l'état réel.
+        // Une bascule de fin de partie en cours se termine avant l'arrêt, qui lit alors l'état réel.
         await _verrouEssai.WaitAsync().ConfigureAwait(true);
         try { await ArreterEssaiSousVerrouAsync().ConfigureAwait(true); }
         finally { _verrouEssai.Release(); }
     }
 
     private readonly SemaphoreSlim _verrouEssai = new(1, 1);
+
+    /// <summary>Le levier en essai, pour le relevé de fond élevé (le joueur ne garde pas l'App ouverte en jouant :
+    /// sans lui, l'essai ne bougeait jamais). Le seul levier en essai, pas l'accès général de <see cref="LevierParId"/>, qui
+    /// ouvrirait le retrait automatique sans fenêtre. <c>null</c> = l'App, qui passe par <see cref="LevierParId"/>.</summary>
+    internal Func<string, ITweak?>? LevierDeLEssai { get; set; }
 
     private async Task ArreterEssaiSousVerrouAsync()
     {
@@ -89,16 +95,23 @@ public partial class ScanViewModel
         OnPropertyChanged(nameof(EssaiProposable));
     }
 
-    /// <summary>La partie porte l'état de l'essai qui l'a vue jouer. Revue F-33 : seulement si elle a commencé après la
-    /// dernière bascule (une partie à cheval ne compte d'aucun côté). F-37 : en pause, l'état est connu (rien n'a été
-    /// touché), la partie compte. F-32 : un redémarrage depuis la dernière bascule rend l'état incertain (un levier de
+    /// <summary>La partie porte l'état de l'essai qui l'a vue jouer. Seulement si elle a commencé après la
+    /// dernière bascule (une partie à cheval ne compte d'aucun côté). En pause, l'état est connu (rien n'a été
+    /// touché), la partie compte. Un redémarrage depuis la dernière bascule rend l'état incertain (un levier de
     /// carte ne survit pas au redémarrage) : rien n'est marqué, l'essai s'arrête au prochain passage.</summary>
     internal PartieRelevee MarquerEssai(PartieRelevee p)
-        => MemoireEssai?.Lire() is { } e && p.Debut >= e.Depuis && !RedemarreDepuis(e)
+        => MemoireEssai?.Lire() is { } lu && Effectif(lu) is { } e && p.Debut >= e.Depuis && !RedemarreDepuis(e)
             ? p with { Essai = AlternanceDesEssais.Marque(e.LevierId, e.PoseMaintenant) }
             : p;
 
     private bool RedemarreDepuis(EssaiEnAlternance e) => DemarrageDuPc() > e.Depuis;
+
+    /// <summary>L'essai tel qu'il est vraiment. Après un redémarrage, un levier volatil (<see cref="LeviersVolatils"/>)
+    /// est « pas posé », depuis le démarrage : l'essai continue de ce côté, sans rien écrire. Sinon l'essai tel quel.</summary>
+    private EssaiEnAlternance Effectif(EssaiEnAlternance e)
+        => RedemarreDepuis(e) && LeviersVolatils.Contient(e.LevierId)
+            ? e with { PoseMaintenant = false, EnPause = false, DerniereBascule = DemarrageDuPc() }
+            : e;
 
     /// <summary>Après une partie : l'état de la suivante. Poser ou rendre se fait sans invite Windows, ou pas du tout.</summary>
     internal async Task AvancerEssaiAsync(IReadOnlyList<PartieRelevee> parties)
@@ -107,7 +120,7 @@ public partial class ScanViewModel
         try { await AvancerEssaiSansFauteAsync(parties).ConfigureAwait(true); }
         catch (Exception)
         {
-            // Revue F-30 : une faute ne se perd plus dans une tâche jamais observée. F-46 : elle a pu tomber après la
+            // Une faute ne se perd plus dans une tâche jamais observée. Elle a pu tomber après la
             // bascule, l'état réel n'est plus sûr ; l'essai s'arrête (en pause, ses parties seraient marquées d'un faux état).
             try
             {
@@ -126,11 +139,19 @@ public partial class ScanViewModel
 
     private async Task AvancerEssaiSansFauteAsync(IReadOnlyList<PartieRelevee> parties)
     {
-        if (MemoireEssai?.Lire() is not { } e || LevierParId?.Invoke(e.LevierId) is not { } levier) return;
-        // Revue F-32 : après un redémarrage, l'état réel du levier n'est plus sûr ; l'essai s'arrête honnêtement.
+        if (MemoireEssai?.Lire() is not { } lu) return;
+        // Le fichier de l'essai vit sous le profil du joueur, que tout programme du compte peut écrire : un levier qui n'a pas
+        // le droit d'alterner (AutoHot) n'est jamais posé, quel que soit ce que le fichier dit ; l'essai est effacé.
+        if (!PeutAlterner(lu.LevierId)) { MemoireEssai.Ecrire(null); return; }
+        // Un levier volatil effacé par le redémarrage se note tout de suite, même là où rien ne peut être posé
+        // (le relevé de fond) : l'essai dit l'état vrai au lieu de rester figé sur « posé ».
+        var e = Effectif(lu);
+        if (e != lu) MemoireEssai.Ecrire(e);
+        if ((LevierDeLEssai ?? LevierParId)?.Invoke(e.LevierId) is not { } levier) return;
+        // Après un redémarrage, l'état réel du levier n'est plus sûr ; l'essai s'arrête honnêtement.
         if (RedemarreDepuis(e))
         {
-            // 09/10/2026 (revue) : un plan d'alimentation ou un réglage du pilote survit au redémarrage. L'essai ne s'efface
+            // Un plan d'alimentation ou un réglage du pilote survit au redémarrage. L'essai ne s'efface
             // plus en laissant le levier posé (et un essai relancé l'aurait pris pour l'origine) : il rend d'abord l'origine,
             // sans invite Windows ; sinon il attend, et « Arrêter l'essai » la rend.
             if (e.PoseMaintenant != e.PoseALOrigine)
@@ -160,7 +181,7 @@ public partial class ScanViewModel
                 return;
             }
             var ok = pose ? await PoserPourLEssaiAsync(levier).ConfigureAwait(true) : await RendrePourLEssaiAsync(levier).ConfigureAwait(true);
-            // Revue F-38 : « Annuler » pendant la bascule a arrêté l'essai ; ce qui vient d'être posé repart, rien ne revit.
+            // « Annuler » pendant la bascule a arrêté l'essai ; ce qui vient d'être posé repart, rien ne revit.
             if (MemoireEssai.Lire() is null)
             {
                 if (ok && pose) await RendrePourLEssaiAsync(levier).ConfigureAwait(true);
@@ -190,7 +211,7 @@ public partial class ScanViewModel
         DireEssai(parties);
     }
 
-    /// <summary>Revue F-31 : le joueur annule le levier en essai depuis « Ce que DrDXT a posé » : l'essai s'arrête,
+    /// <summary>Le joueur annule le levier en essai depuis « Ce que DrDXT a posé » : l'essai s'arrête,
     /// rien ne le repose.</summary>
     internal void ArreterEssaiSurAnnulation(string id)
     {
@@ -216,26 +237,27 @@ public partial class ScanViewModel
         var r = await levier.ApplyAsync().ConfigureAwait(true);
         if (!r.IsOk || r.Value is null) return false;
         _journalLeviers?.Enregistrer(new ApplyReport([new ApplyOutcome(levier.Id, true, false, r.Value, null)], null));
-        // Revue F-39 : un journal qui n'a rien gardé laisserait un levier posé, invisible et jamais rendu ; il repart.
+        // Un journal qui n'a rien gardé laisserait un levier posé, invisible et jamais rendu ; il repart.
         if (_journalLeviers is not null && _journalLeviers.Lire().All(s => s.TweakId != levier.Id))
         {
             await levier.RevertAsync(r.Value).ConfigureAwait(true);
             return false;
         }
         ChargerLeviersPoses();
-        // GARDE1 (09/10/2026) : chaque pose de l'essai se date, comme celles d'Optimiser : la garde d'incident la couvre.
+        // Chaque pose de l'essai se date, comme celles d'Optimiser : la garde d'incident la couvre.
         NoterPoses([levier.Id], Horloge());
         return true;
     }
 
     private async Task<bool> RendrePourLEssaiAsync(ITweak levier)
     {
-        // Revue F-31 : plus de trace au journal = déjà rendu (bouton Annuler) ; rien à rendre, pas un échec.
-        // F-39 : seulement si le journal se lit ; illisible, rien ne dit que le levier est rendu.
+        // Plus de trace au journal = déjà rendu (bouton Annuler) ; rien à rendre, pas un échec.
+        // Seulement si le journal se lit ; illisible, rien ne dit que le levier est rendu.
         if (_journalLeviers?.Lire().FirstOrDefault(s => s.TweakId == levier.Id) is not { } snapshot) return _journalLeviers?.Lisible() ?? true;
         var r = await levier.RevertAsync(snapshot).ConfigureAwait(true);
         if (!r.IsOk) return false;
-        _journalLeviers.Retirer(levier.Id);
+        // Rendu sur la machine : l'essai continue ; un journal non réécrit se dit (sinon le scan suivant croirait à une régression).
+        if (!_journalLeviers.Retirer(levier.Id)) MessageLeviers = _localize("Leviers.JournalPasMisAJour");
         ChargerLeviersPoses();
         return true;
     }

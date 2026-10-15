@@ -1,24 +1,24 @@
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// DirectXUserGlobalSettings — parse/merge the Windows REG_SZ string at
+// DirectXUserGlobalSettings : lit et fusionne la chaîne REG_SZ de Windows sous
 // HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings.
 //
-// Format is a flat "key=value;key=value;..." list (e.g.
+// Le format est une liste plate « clé=valeur;clé=valeur;... » (par exemple
 // "HighPerfAdapter=10DE&2684&...;VRROptimizeEnable=1;AutoHDREnable=1;SwapEffectUpgradeEnable=1").
-// VRR (VRROptimizeEnable) and flip-model / optimizations-for-windowed-games
-// (SwapEffectUpgradeEnable) share this string with AutoHDREnable and others, so a tweak must
-// MERGE — set only the keys it owns and PRESERVE every other (audit M2: never clobber AutoHDR).
+// Le VRR (VRROptimizeEnable) et le flip-model / les optimisations pour les jeux en fenêtré
+// (SwapEffectUpgradeEnable) partagent cette chaîne avec AutoHDREnable et d'autres : un levier
+// doit fusionner, poser seulement ses clés et garder toutes les autres (jamais écraser AutoHDR).
 //
-// Pure, no I/O. The first '=' separates key from value (a value may itself contain '=' / '&').
+// Pur, sans E/S. Le premier '=' sépare la clé de la valeur (une valeur peut contenir '=' / '&').
 // -----------------------------------------------------------------------
 internal static class DirectXUserGlobalSettings
 {
-    /// <summary>Returns <paramref name="original"/> with each (key, value) in
-    /// <paramref name="overrides"/> applied: an existing key is updated in place (original casing
-    /// kept), a new key is appended. Every untouched key is preserved verbatim. A null/empty
-    /// original yields just the overrides. Output is "key=value;key=value" (no trailing ';';
-    /// Windows splits on ';' and ignores empty segments either way).</summary>
+    /// <summary>Rend <paramref name="original"/> avec chaque (clé, valeur) de
+    /// <paramref name="overrides"/> appliquée : une clé existante est mise à jour sur place (casse
+    /// d'origine gardée), une clé nouvelle est ajoutée à la fin. Chaque clé non touchée est gardée
+    /// telle quelle. Un original null ou vide donne seulement les remplacements. Sortie
+    /// « clé=valeur;clé=valeur » (pas de ';' final ; Windows coupe sur ';' et ignore les segments vides).</summary>
     public static string Merge(string? original, IReadOnlyList<(string Key, string Value)> overrides)
     {
         var pairs = Parse(original);
@@ -26,15 +26,15 @@ internal static class DirectXUserGlobalSettings
         {
             var idx = pairs.FindIndex(p => string.Equals(p.Key, key, StringComparison.OrdinalIgnoreCase));
             if (idx >= 0)
-                pairs[idx] = (pairs[idx].Key, value); // keep the original key casing
+                pairs[idx] = (pairs[idx].Key, value); // garde la casse d'origine de la clé
             else
                 pairs.Add((key, value));
         }
         return string.Join(";", pairs.Select(p => $"{p.Key}={p.Value}"));
     }
 
-    /// <summary>True when every (key, value) is already present in <paramref name="current"/>
-    /// (key compared case-insensitively, value exactly) — the merge would change nothing.</summary>
+    /// <summary>Vrai quand chaque (clé, valeur) est déjà présente dans <paramref name="current"/>
+    /// (clé comparée sans tenir compte de la casse, valeur exactement) : la fusion ne changerait rien.</summary>
     public static bool AlreadyHas(string? current, IReadOnlyList<(string Key, string Value)> wanted)
     {
         var pairs = Parse(current);
@@ -51,7 +51,7 @@ internal static class DirectXUserGlobalSettings
         {
             var eq = segment.IndexOf('=');
             if (eq <= 0)
-                continue; // skip a malformed segment (no key) rather than corrupt the result
+                continue; // sauter un segment malformé (sans clé) plutôt que d'abîmer le résultat
             result.Add((segment[..eq], segment[(eq + 1)..]));
         }
         return result;

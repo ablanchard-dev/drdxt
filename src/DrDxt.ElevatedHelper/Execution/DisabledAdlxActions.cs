@@ -4,27 +4,28 @@ using DrDxt.ElevatedHelper.Execution.Adlx;
 namespace DrDxt.ElevatedHelper.Execution;
 
 // -----------------------------------------------------------------------
-// DisabledAdlxActions — a fail-clean ADLX (AMD) seam for the BOOT reconciler, the
-// AMD mirror of DisabledNvApiActions.
+// DisabledAdlxActions : une couture ADLX (AMD) à échec propre pour le réconciliateur de
+// démarrage, le miroir AMD de DisabledNvApiActions.
 //
-// The boot reconciler (InProcessElevatedClient, running as LocalSystem) must be
-// STRUCTURALLY incapable of touching the GPU — on an AMD box just as on an NVIDIA one.
-// ONE upstream guard exists (the reconcilable catalog/mapper never emit a GPU op), so this
-// seam is the second and LAST line: even if a future change let an ADLX op through, the
-// boot service has no real ADLX implementation wired and the op fails clean rather than
-// writing a volatile offset at boot. Wiring this also keeps the SYSTEM boot service from
-// loading the native ADLX code path at all.
+// Le réconciliateur de démarrage (InProcessElevatedClient, qui tourne en LocalSystem) doit être
+// incapable par construction de toucher au GPU, sur une machine AMD comme sur une NVIDIA. Il
+// existe une seule garde en amont (le catalogue et le mappeur réconciliables n'émettent jamais
+// d'op GPU) : cette couture est donc la deuxième et dernière ligne. Même si un changement futur
+// laissait passer une op ADLX, le service de démarrage n'a aucune vraie implémentation ADLX
+// branchée et l'op échoue proprement au lieu d'écrire un décalage volatil au démarrage. La
+// brancher évite aussi que le service de démarrage SYSTEM charge le moindre chemin de code ADLX natif.
 //
-// 11/09 — this header used to claim a THIRD guard, "OpAllowlist would gate one". It does
-// Not: ValidateAdlx accepts any well-formed ApplyAdlxTuningOp (index >= 0, known Kind) and
-// returns Ok. It bounds the SHAPE of an op, never the CONTEXT it runs in — the same
-// allowlist serves the user-triggered helper, which must be allowed to write. The refusal
-// at boot rests entirely on the wiring below, and is pinned by a test, not by prose.
+// OpAllowlist n'est pas une troisième garde : ValidateAdlx accepte tout ApplyAdlxTuningOp bien
+// formé (index >= 0, Kind connu) et rend Ok. Elle borne la forme d'une op, jamais le contexte où
+// elle tourne : la même allowlist sert le helper déclenché par l'utilisateur, qui doit avoir le
+// droit d'écrire. Le refus au démarrage repose entièrement sur le branchement ci-dessous, et un
+// test l'épingle, pas de la prose.
 //
-// Rationale: GPU clock/power offsets are VOLATILE (wiped by a reboot) and a marginal one
-// could regress boot stability — the reconciler persists only VALIDATED, durable settings
-// (registry / power-plan / service), never GPU tuning. SetTuning always returns a clean
-// Result.Fail and never throws (the contract for every GPU seam).
+// Raison : les décalages d'horloge / de puissance GPU sont volatils (effacés au redémarrage) et un
+// décalage limite pourrait dégrader la stabilité du démarrage ; le réconciliateur ne fait persister
+// que des réglages validés et durables (registre / plan d'alimentation / service), jamais de
+// réglage GPU. SetTuning rend toujours un Result.Fail propre et ne lève jamais (le contrat de
+// toute couture GPU).
 // -----------------------------------------------------------------------
 public sealed class DisabledAdlxActions : IADLXTuningActions
 {

@@ -7,11 +7,11 @@ using Xunit.Abstractions;
 namespace DrDxt.Detection.Tests.Cpu;
 
 // -----------------------------------------------------------------------
-// 19/09/2026. Le coupable des dix secondes, trouve par chronometre.
+// Le coupable des dix secondes, trouve par chronometre.
 //
 // Trois tours que la boucle poursuit un plateau : cinq tests d'audit a 28,3 s **a 0,2 s
-// pres** en execution complete (tour 116), une premiere hypothese (WMI) **refutee par la
-// mesure** au tour 118, et cinq lecteurs cables nommes sans qu'aucun ne soit accuse.
+// pres** en execution complete, une premiere hypothese (WMI) **refutee par la
+// mesure**, et cinq lecteurs cables nommes sans qu'aucun ne soit accuse.
 //
 // Mesure du jour, un chronometre par lecteur :
 //

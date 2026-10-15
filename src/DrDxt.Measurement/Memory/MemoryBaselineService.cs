@@ -18,12 +18,12 @@ public sealed class RealMemoryBench : IMemoryBench
 /// <summary>
 /// Decide quand la memoire se mesure, et ce que le scan a le droit d'en conclure.
 ///
-/// La regle, tranchee le 06/09/2026 : **automatique au premier scan** (la machine est
-/// censee etre au repos a l'installation), **a la demande** ensuite. Un scan qui remesurerait a
+/// La regle : automatique au premier scan (la machine est
+/// censee etre au repos a l'installation), a la demande ensuite. Un scan qui remesurerait a
 /// chaque fois couterait vingt a trente secondes et 384 Mo pour un chiffre qui ne bouge pas.
 ///
 /// Trois refus qui comptent plus que le chemin nominal :
-///   • une mesure rejetee par <see cref="MemoryQuality"/> n'est pas enregistree -- une reference
+///   • une mesure rejetee par <see cref="MemoryQuality"/> n'est pas enregistree : une reference
 ///     prise sur une machine chargee resterait fausse pour toujours ;
 ///   • une reference portant une autre frequence est caduque : le plafond d'un canal a change,
 ///     donc le compte de canaux qu'elle portait ne vaut plus ;
@@ -48,24 +48,24 @@ public sealed class MemoryBaselineService
     /// aucune conclusion, pas un diagnostic de simple canal.
     /// </summary>
     /// <summary>
-    /// La mesure deja enregistree, telle quelle — et rien d'autre.
+    /// La mesure deja enregistree, telle quelle, et rien d'autre.
     ///
-    /// Le scan paie trente a quarante secondes de banc au premier lancement, enregistre le
-    /// resultat, et aucune couche que l'utilisateur rencontre ne lisait le debit ni la latence :
-    /// ils servaient seulement a deduire un nombre de canaux. Les deux chiffres qu'un joueur
-    /// reconnaitrait etaient mesures puis jetes.
+    /// Le scan paie trente a quarante secondes de banc au premier lancement et enregistre le
+    /// resultat ; sans cet accesseur, aucune couche que l'utilisateur rencontre ne lirait le debit
+    /// ni la latence, qui ne serviraient qu'a deduire un nombre de canaux : les deux chiffres qu'un
+    /// joueur reconnaitrait seraient mesures puis jetes.
     ///
     /// Cet accesseur ne mesure jamais. Afficher un chiffre ne doit pas declencher un banc :
     /// c'est le scan qui decide quand mesurer, et lui seul. Rien enregistre ⇒ <c>null</c>.
     ///
-    /// Et ce qui est enregistre a forcement ete ACCEPTE : le magasin ne stocke pas une mesure
+    /// Et ce qui est enregistre a forcement ete accepte : le magasin ne stocke pas une mesure
     /// que <see cref="MemoryQuality"/> a rejetee. Lire le magasin, c'est donc lire une mesure
-    /// valide — l'ecran n'a aucun tri a refaire, et ne peut pas publier un chiffre refuse.
+    /// valide : l'ecran n'a aucun tri a refaire, et ne peut pas publier un chiffre refuse.
     ///
     /// Mais valide ne veut pas dire actuelle, et c'est le piege propre a ce magasin. Il garde
-    /// DELIBEREMENT la mesure d'avant quand la configuration a change : c'est elle qui rend l'A/B
+    /// deliberement la mesure d'avant quand la configuration a change : c'est elle qui rend l'A/B
     /// possible apres un passage dans le BIOS. Si la remesure echoue ensuite (machine occupee,
-    /// rejet Q-03), la reference d'avant reste seule en place — et l'afficher telle quelle
+    /// rejet Q-03), la reference d'avant reste seule en place, et l'afficher telle quelle
     /// annoncerait comme « ce que ta memoire rend » un chiffre pris dans une configuration que la
     /// machine a quittee. Precisement le cas ou le produit doit le moins se tromper.
     ///
@@ -88,7 +88,7 @@ public sealed class MemoryBaselineService
 
         // Une panne de lecture n'est pas une reference absente. Une reference amputee se
         // remplace : elle est inutilisable. Mais un fichier qu'on n'a pas pu lire (antivirus,
-        // disque occupe) est peut-etre parfait -- et la suite de cette methode ecrit. Continuer
+        // disque occupe) est peut-etre parfait, et la suite de cette methode ecrit. Continuer
         // detruirait la seule mesure d'avant que le client possede, pour une panne passagere.
         if (!existing.IsOk && existing.Error?.Code == ErrorCodes.MemoryBaselineIo)
             return 0;
@@ -106,7 +106,7 @@ public sealed class MemoryBaselineService
         if (measurement is null) return 0;
 
         // L'ecriture peut echouer (disque plein, fichier verrouille). La mesure, elle, est valide,
-        // et ce qu'elle prouve reste vrai pour ce scan -- on le rend. Ce qu'on perd alors, c'est la
+        // et ce qu'elle prouve reste vrai pour ce scan : on le rend. Ce qu'on perd alors, c'est la
         // memoire du resultat : le scan suivant remesurera. C'est un cout, pas un mensonge.
         _store.Save(new MemoryBaseline(machineId, _now(), mts, measurement, JeuFermeVerifie: true));
         return MemoryInference.ProvenMinimumChannels(measurement.BandwidthGBs, modules);
@@ -114,10 +114,10 @@ public sealed class MemoryBaselineService
 
     /// <summary>
     /// L'A/B : mesure maintenant, compare a la reference, et rend le verdict a 3 sigma. Rend
-    /// <c>null</c> quand il n'y a rien a comparer -- se taire faute de reference n'est pas la
+    /// <c>null</c> quand il n'y a rien a comparer : se taire faute de reference n'est pas la
     /// meme chose que se taire faute d'ecart, et les deux ne s'affichent pas pareil.
     ///
-    /// Un verdict rendu REMPLACE la reference : sans ca, le scan suivant comparerait encore la
+    /// Un verdict rendu remplace la reference : sans ca, le scan suivant comparerait encore la
     /// machine a une configuration qu'elle a quittee.
     /// </summary>
     public MemoryAbVerdict? CompareAfterChange(string machineId, IReadOnlyList<MemoryModule> modules,
@@ -126,13 +126,13 @@ public sealed class MemoryBaselineService
         var stored = _store.Read(machineId);
         if (!stored.IsOk || stored.Value is not { } baseline) return null;
 
-        // 26/09/2026 : la mesure d'avant doit dater du depart vers le BIOS, pas d'un autre jour. Sur la
-        // machine de reference, la reference du 16/09 rendait 12,7 Go/s et 128,5 ns ; le meme banc, meme
-        // configuration, rend 33,4 Go/s et 74 ns dix jours plus tard. Comparee a elle, un passage de
+        // La mesure d'avant doit dater du depart vers le BIOS, pas d'un autre jour.
+        // Mesure sur la machine de reference : 12,7 Go/s et 128,5 ns le 16/09 ; le meme banc,
+        // meme configuration, 33,4 Go/s et 74 ns dix jours plus tard. Comparee a elle, un passage de
         // 3 800 a 4 000 MT/s (+5,3 % au plus en theorie) aurait ete annonce a +160 %.
         if (departUtc is { } depart)
         {
-            // Posee APRES le depart : l'A/B de ce voyage a deja eu lieu et l'a remplacee par sa mesure
+            // Posee apres le depart : l'A/B de ce voyage a deja eu lieu et l'a remplacee par sa mesure
             // d'apres (un changement qui n'a pas pris garde son marqueur, donc chaque scan refait la
             // verification du retour), ou une remesure a la demande a suivi. Rien a comparer : on se tait.
             if (baseline.TakenUtc > depart) return null;
@@ -141,7 +141,7 @@ public sealed class MemoryBaselineService
         }
 
         // Jeu lancé au retour : la mesure d'après décrirait le partage avec le jeu, et l'écart lu serait le
-        // sien, pas celui du changement (la référence du 16/09 a perdu ainsi 62 % de son débit).
+        // sien, pas celui du changement (mesuré sur la machine de référence : 62 % du débit perdu ainsi).
         if (jeuEnCours) return new MemoryAbVerdict(false, JeuLance, 0, 0, false, false);
 
         // Le plafond doit couvrir les deux configurations. Sur un retour en JEDEC, la frequence du
@@ -173,7 +173,7 @@ public sealed class MemoryBaselineService
     /// </summary>
     public const int MaxAttempts = 3;
 
-    /// <summary>Le seul refus qui parle de la MACHINE, donc le seul qu'on reessaie.</summary>
+    /// <summary>Le seul refus qui parle de la machine, donc le seul qu'on reessaie.</summary>
     private const string MachineBusy = "Q-03";
 
     /// <summary>
@@ -208,9 +208,9 @@ public sealed class MemoryBaselineService
     }
 
     /// <summary>
-    /// Une mesure ACCEPTEE, ou <c>null</c>. Reessaie uniquement sur <c>Q-03</c> : c'est le seul
-    /// refus qui parle de la MACHINE (elle est occupee) et qui peut donc changer d'avis a l'essai
-    /// suivant. Q-01, Q-02 et Q-04 accusent l'INSTRUMENT -- les relancer rendrait trois fois la
+    /// Une mesure acceptee, ou <c>null</c>. Reessaie uniquement sur <c>Q-03</c> : c'est le seul
+    /// refus qui parle de la machine (elle est occupee) et qui peut donc changer d'avis a l'essai
+    /// suivant. Q-01, Q-02 et Q-04 accusent l'instrument : les relancer rendrait trois fois la
     /// meme erreur et couterait une minute au client.
     /// </summary>
     private (MemoryMeasurement? Measurement, string Reason) MeasureAccepted(double peakGBs)
@@ -223,7 +223,7 @@ public sealed class MemoryBaselineService
             var quality = MemoryQuality.Check(measurement, peakGBs);
             if (quality.Accepted) return (measurement, string.Empty);
 
-            // Un refus d'INSTRUMENT ne changera pas d'avis : il sort avec son propre numero.
+            // Un refus d'instrument ne changera pas d'avis : il sort avec son propre numero.
             if (quality.RejectionId != MachineBusy) return (null, quality.RejectionId!);
         }
 
@@ -232,7 +232,7 @@ public sealed class MemoryBaselineService
 
     /// <summary>
     /// Le banc, ou <c>null</c> quand il n'a pas pu tourner. Il alloue 384 Mo : sur une machine qui
-    /// ne les a pas -- c'est-a-dire exactement celle dont on veut parler -- l'allocation echoue.
+    /// ne les a pas (c'est-a-dire exactement celle dont on veut parler), l'allocation echoue.
     /// Mesurer la memoire ne doit jamais etre la raison pour laquelle un scan s'arrete ; ne pas
     /// savoir est un resultat acceptable, un ecran d'echec ne l'est pas.
     /// </summary>

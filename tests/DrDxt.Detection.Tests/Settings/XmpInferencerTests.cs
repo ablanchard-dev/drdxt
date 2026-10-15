@@ -46,26 +46,26 @@ public class XmpInferencerTests
         XmpInferencer.Infer(new[] { Mod(6000, 6000), Mod(4800, 6000) }).Should().Be(TriState.Off);
     }
 
-    // --- JEDEC base-speed heuristic (inference, probably) ---
+    // --- Heuristique de vitesse de base JEDEC (inférence, probable) ---
 
     [Fact]
     public void Ddr5_configured_at_jedec_base_with_higher_rated_is_xmp_off()
     {
-        // DDR5 JEDEC base = 4800. Configured=4800, Rated=6000 → XMP probably Off.
+        // Base JEDEC DDR5 = 4800. Configuré=4800, nominal=6000 → XMP probablement désactivé.
         XmpInferencer.Infer(new[] { Mod(4800, 6000) }).Should().Be(TriState.Off);
     }
 
     [Fact]
     public void Ddr5_configured_and_rated_both_above_jedec_and_equal_is_xmp_on()
     {
-        // DDR5 both at 6000 → both above JEDEC base 4800 and equal → XMP probably On.
+        // DDR5 toutes deux à 6000 → toutes deux au-dessus de la base JEDEC 4800 et égales → XMP probablement actif.
         XmpInferencer.Infer(new[] { Mod(6000, 6000) }).Should().Be(TriState.On);
     }
 
     [Fact]
     public void Missing_configured_speed_returns_unknown_not_on()
     {
-        // ConfiguredMhz=0 → cannot compare → Unknown, never On.
+        // ConfiguredMhz=0 → impossible de comparer → Unknown, jamais On.
         XmpInferencer.Infer(new[] { Mod(0, 6000) }).Should().Be(TriState.Unknown);
     }
 
@@ -74,14 +74,14 @@ public class XmpInferencerTests
     {
         // DDR4 3200/3200 sans tension lue. Apres un reset XMP, Windows rabat souvent la vitesse
         // nominale sur la vitesse reglee : 3200/3200 peut etre un kit 4000 tombe au socle. Rien
-        // ne dit « profil charge » ; affirmer On serait le faux « XMP actif » du 29/06.
+        // ne dit « profil charge » ; affirmer On serait un faux « XMP actif ».
         XmpInferencer.Infer(new[] { Mod(3200, 3200) }).Should().Be(TriState.Unknown);
     }
 
     [Fact]
     public void Flash_bios_reset_on_a_kit_whose_part_number_hides_its_speed_is_never_on()
     {
-        // Le cas du 29/06 (flash BIOS -> 2667/2667), mais sur un kit dont la reference ne
+        // Un flash BIOS qui rabat a 2667/2667, sur un kit dont la reference ne
         // donne pas la vitesse (Kingston Fury compact) : le part number ne sauve plus rien.
         // Tension JEDEC : aucune preuve de profil. On ne sait pas ; on ne dit surtout pas On.
         XmpInferencer.Infer(new[] { Volt(2667, 2667, 1200) }).Should().Be(TriState.Unknown);
@@ -97,21 +97,21 @@ public class XmpInferencerTests
     [Fact]
     public void High_rated_ddr4_kit_run_below_its_max_but_above_jedec_is_xmp_on()
     {
-        // Real case (G.Skill F4-4000C18 stable at 3800): rated 4000, running 3800. 3800 is far
-        // above the DDR4 JEDEC base (3200), so XMP is ON — it just is not at the rated max.
-        // Comparing to the rated max used to flag this "off" = inventing a problem (banned §6/§11).
+        // Cas réel (G.Skill F4-4000C18 stable à 3800) : nominal 4000, tourne à 3800. 3800 est bien
+        // au-dessus de la base JEDEC DDR4 (3200), donc XMP est actif ; il n'est juste pas au nominal max.
+        // Comparer au nominal max signalait ceci « désactivé » = inventer un problème (interdit).
         XmpInferencer.Infer(new[] { Mod(3800, 4000) }).Should().Be(TriState.On);
     }
 
     [Fact]
     public void High_rated_ddr4_kit_dropped_to_jedec_is_xmp_off()
     {
-        // Same 4000-rated kit sitting at JEDEC 2400 (e.g. after a BIOS flash reset XMP) IS off.
+        // Le même kit nominal 4000 posé au JEDEC 2400 (après un flash du BIOS qui remet XMP à zéro) est bien désactivé.
         XmpInferencer.Infer(new[] { Mod(2400, 4000) }).Should().Be(TriState.Off);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    //  26/08 — la TENSION comme seconde source. Mesuré : DDR4 JEDEC = 1200 mV,
+    //  La TENSION comme seconde source. Mesuré : DDR4 JEDEC = 1200 mV,
     //  la machine de référence tourne à 1350 mV, ce qui prouve un profil chargé
     //  sans rien devoir à la fréquence.
     // ══════════════════════════════════════════════════════════════════════════
@@ -159,7 +159,7 @@ public class XmpInferencerTests
     {
         // Un DDR5 lu 4800/4800 à 1100 mV est au socle JEDEC du type LU : rien ne prouve un profil,
         // et un kit 6000 remis à zéro dont Windows rabat la nominale donnerait la même lecture.
-        // Donc Unknown, pas On (24/09 : l'ancien On était le faux « XMP actif » du 29/06).
+        // Donc Unknown, pas On : On serait un faux « XMP actif ».
         XmpInferencer.Infer(new[] { Volt(4800, 4800, 1100, Ddr5) }).Should().Be(TriState.Unknown);
 
         // Et un DDR5 à 1250 mV (JEDEC 1100) est prouvé chargé même sans vitesse nominale.

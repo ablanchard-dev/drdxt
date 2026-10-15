@@ -42,7 +42,7 @@ public class EtwInteropLayoutTests
             return;
         }
 
-        // 11/09/2026 : cette boucle lisait `ThreadResidencyTracer`, inacheve et appele par le seul
+        // Cette boucle lisait `ThreadResidencyTracer`, inacheve et appele par le seul
         // `tools/cpuprobe`. Elle lit desormais `DpcLatencyTracer`, le traceur que le SCAN appelle
         // reellement — memes decalages, mais la garde couvre enfin du code expedie.
         foreach (var (nom, attendu) in DpcLatencyTracer.DecalagesUtilises)

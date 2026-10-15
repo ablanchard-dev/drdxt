@@ -8,15 +8,15 @@ using NSubstitute;
 namespace DrDxt.Detection.Tests.Network;
 
 // -----------------------------------------------------------------------
-// NS-9 — network adapter read + guidance.
+// Lecture de la carte réseau et conseils.
 //
-// The bugs worth defending against here all LOOK like a working feature:
-//   * keying on a localized DisplayName finds nothing on a French Windows and reports
-//     "Unknown" everywhere,
-//   * RegistryValue is a string[] — ToString() gives "System.String[]", which parses as
-//     neither 0 nor 1 and silently becomes Unknown,
-//   * an absent keyword read as "Off" would produce advice about a setting the NIC does
-//     not even have.
+// Les défauts à contrer ici ressemblent tous à une fonction qui marche :
+//   * indexer sur un DisplayName localisé ne trouve rien sur un Windows français et annonce
+//     « Unknown » partout,
+//   * RegistryValue est un string[] : ToString() donne « System.String[] », qui ne s'analyse
+//     ni en 0 ni en 1 et devient Unknown en silence,
+//   * un mot-clé absent lu comme « Off » produirait un conseil sur un réglage que la carte
+//     n'a même pas.
 // -----------------------------------------------------------------------
 public class NetworkAdapterReaderTests
 {
@@ -32,7 +32,7 @@ public class NetworkAdapterReaderTests
             ["ndisPhysicalMedium"] = medium,
         });
 
-    // RegistryValue as CIM really returns it: a string ARRAY.
+    // RegistryValue tel que CIM le rend vraiment : un tableau de chaînes.
     private static WmiRow Setting(string adapter, string keyword, string value) =>
         new(new Dictionary<string, object?>
         {
@@ -78,7 +78,7 @@ public class NetworkAdapterReaderTests
     [Fact]
     public void An_absent_keyword_is_Unknown_never_Off()
     {
-        // A NIC that does not expose *RSS must not be advised about *RSS.
+        // Une carte qui n'expose pas *RSS ne doit pas recevoir de conseil sur *RSS.
         var wmi = Wmi(
             new[] { Adapter("Ethernet", "Some NIC", false, 1, 14) },
             new[] { Setting("Ethernet", "*InterruptModeration", "0") });
@@ -95,7 +95,7 @@ public class NetworkAdapterReaderTests
     {
         var wmi = Wmi(
             new[] { Adapter("Ethernet", "Some NIC", false, 1, 14) },
-            new[] { Setting("Ethernet", "*InterruptModeration", "3") }); // vendor-wide enum
+            new[] { Setting("Ethernet", "*InterruptModeration", "3") }); // énumération commune au constructeur
 
         new NetworkAdapterReader(wmi).Read().Value!.Single()
             .InterruptModeration.Should().Be(TriState.Unknown);
@@ -130,8 +130,8 @@ public class NetworkAdapterReaderTests
     [Fact]
     public void A_failed_settings_query_still_reports_the_adapter_with_unknown_settings()
     {
-        // Losing the settings table must not make an adapter disappear — "present, settings
-        // unknown" is honest; a silent drop hides hardware the user has.
+        // Perdre la table des réglages ne doit pas faire disparaître une carte : « présente, réglages
+        // inconnus » est honnête ; une disparition silencieuse cache du matériel que le joueur possède.
         var wmi = Substitute.For<IWmiQuery>();
         wmi.QueryInNamespace(Ns, Arg.Is<string>(q => q.EndsWith("FROM MSFT_NetAdapter")))
            .Returns(Result<IReadOnlyList<WmiRow>>.Ok(
@@ -160,7 +160,7 @@ public class NetworkAdapterReaderTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.WmiFail);
     }
     // ══════════════════════════════════════════════════════════════════════════════════════
-    // `*SelectiveSuspend` — ajoute le 08/09/2026 apres l'avoir trouve actif sur la machine de
+    // `*SelectiveSuspend` — ajoute apres l'avoir trouve actif sur la machine de
     // reference et lu par personne. C'est le seul des trois qui soit normalise (etoile), donc
     // celui qui couvrira le plus de machines.
     // ══════════════════════════════════════════════════════════════════════════════════════
@@ -233,8 +233,8 @@ public class NetworkAdvisorTests
         var advice = NetworkAdvisor.Advise(new[] { Nic(TriState.On, TriState.On) }).Single();
 
         advice.Id.Should().Be("net.interrupt_moderation_on");
-        // The wording key must not promise a fix — Microsoft NIC tuning guide: marginal, NIC-dependent,
-        // costs CPU. It is a trade-off to measure, which NS-9 can now do.
+        // La clé de formulation ne doit pas promettre un correctif : guide Microsoft de réglage des cartes
+        // réseau : marginal, dépend de la carte, coûte du processeur. C'est un compromis à mesurer, ce que l'instrument réseau sait faire.
         advice.MessageKey.Should().Be("Finding.Network.InterruptModerationTradeoff");
     }
 
@@ -244,8 +244,8 @@ public class NetworkAdvisorTests
         var advice = NetworkAdvisor.Advise(new[] { Nic(TriState.On, TriState.Off) });
 
         advice.Should().HaveCount(2);
-        // Microsoft NIC tuning guide: NIC settings are guidance, never auto-applied. There is no
-        // apply path in this namespace at all — this asserts the intent stays explicit.
+        // Guide Microsoft de réglage des cartes réseau : les réglages sont des conseils, jamais appliqués
+        // automatiquement. Il n'y a aucun chemin d'application dans cet espace de noms ; ceci garde l'intention explicite.
         advice.Should().OnlyContain(a => a.IsGuidanceOnly);
         advice.Should().OnlyContain(a => !string.IsNullOrWhiteSpace(a.SourceUrl));
     }

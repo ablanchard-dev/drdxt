@@ -7,7 +7,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// 26/09/2026 — la source de .NET (NamedPipeServerStream.Windows.cs, dotnet/runtime) ne pose pas
+/// La source de .NET (NamedPipeServerStream.Windows.cs, dotnet/runtime) ne pose pas
 /// PIPE_REJECT_REMOTE_CLIENTS : sans autre barriere, le tube du helper accepte une session reseau
 /// (SMB) qui passe son ACL. Une ACE de refus pour NETWORK (S-1-5-2) la ferme en amont ; un refus est
 /// evalue avant les autorisations. Le tour qui l'avait mesure a montre qu'elle ne gene pas le local.

@@ -5,10 +5,10 @@ using FluentAssertions;
 namespace DrDxt.Bios.Tests;
 
 /// <summary>
-/// Defensive validation of the guide library data (§9.6: validate all external data
-/// before use). A valid payload parses; a corrupt one (missing field, bad enum,
-/// empty setting name, HTML/template injection in a value) fails cleanly with
-/// <see cref="ErrorCodes.BiosTemplateInvalid"/> — never an exception.
+/// Validation défensive des données de la bibliothèque de guides (valider toute donnée externe
+/// avant usage). Une charge valide s'analyse ; une corrompue (champ manquant, mauvaise énumération,
+/// nom de réglage vide, injection HTML ou de gabarit dans une valeur) échoue proprement avec
+/// <see cref="ErrorCodes.BiosTemplateInvalid"/>, jamais une exception.
 /// </summary>
 public class GuideTemplateValidatorTests
 {
@@ -30,7 +30,7 @@ public class GuideTemplateValidatorTests
     ]
     """;
 
-    // A genuine board+BIOS KB entry — the only shape allowed to be verified (decision §9.1).
+    // Une vraie entrée carte + BIOS de la base : la seule forme autorisée à être vérifiée.
     private const string VerifiedBoardJson = """
     [
       {
@@ -87,7 +87,7 @@ public class GuideTemplateValidatorTests
     [Fact]
     public void Empty_setting_name_fails_clean()
     {
-        // The exact setting name is the safety net — it can never be blank.
+        // Le nom exact du réglage est le filet de sécurité : il ne peut jamais être vide.
         var json = ValidJson.Replace("\"EXPO / A-XMP\"", "\"\"");
         var r = Parse(json);
         r.IsOk.Should().BeFalse();
@@ -123,7 +123,7 @@ public class GuideTemplateValidatorTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.BiosTemplateInvalid);
     }
 
-    // ── HONESTY (decision §9.1): "Verified" is reserved for a board+BIOS KB entry. ──
+    // ── Honnêteté : « vérifié » est réservé à une entrée carte + BIOS de la base. ──
 
     [Fact]
     public void Verified_template_with_board_and_version_parses()
@@ -139,7 +139,7 @@ public class GuideTemplateValidatorTests
     [Fact]
     public void Verified_without_board_or_version_is_rejected()
     {
-        // A vendor/UI-generation entry that marks itself verified is a lie → reject.
+        // Une entrée constructeur/génération qui se dit vérifiée est un mensonge → rejet.
         var json = ValidJson.Replace("\"isVerified\": false", "\"isVerified\": true");
         var r = Parse(json);
         r.IsOk.Should().BeFalse("a verified template must carry a board+BIOS KB key");
@@ -149,19 +149,19 @@ public class GuideTemplateValidatorTests
     [Fact]
     public void Verified_with_board_but_no_version_is_rejected()
     {
-        // Board alone is not the KB key — board + BIOS version both required for verified.
+        // La carte seule n'est pas la clé de la base : carte + version de BIOS requises pour vérifié.
         var json = VerifiedBoardJson.Replace("\"biosVersion\": \"7D75v18\",", "");
         var r = Parse(json);
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.BiosTemplateInvalid);
     }
 
-    // ── SEMANTIC direction guard: a dangerous wrong-direction mis-author is rejected. ──
+    // ── Garde sémantique de direction : une erreur d'auteur dangereuse dans le mauvais sens est rejetée. ──
 
     [Fact]
     public void Wrong_direction_xmp_disabled_is_rejected()
     {
-        // XMP/EXPO must be enabled — a "Disabled" target is a mis-author.
+        // XMP/EXPO doit être activé : une cible « Disabled » est une erreur d'auteur.
         var json = ValidJson.Replace("\"targetValue\": \"Enabled\"", "\"targetValue\": \"Disabled\"");
         var r = Parse(json);
         r.IsOk.Should().BeFalse("XMP/EXPO must be enabled, not disabled");
@@ -171,7 +171,7 @@ public class GuideTemplateValidatorTests
     [Fact]
     public void Wrong_direction_csm_enabled_is_rejected()
     {
-        // CSM must be Disabled/UEFI — an "Enabled" target is a no-boot mis-author.
+        // Le CSM doit être Disabled/UEFI : une cible « Enabled » est une erreur d'auteur qui empêche le démarrage.
         const string json = """
         [
           {

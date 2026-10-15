@@ -1,6 +1,6 @@
 // DrDXT BIOS guide library. Every entry below is a best-known per-vendor / UI-generation
 // FALLBACK (isVerified=false): the menu paths are the best available, but NOT bench-
-// confirmed for a specific board. Per decision §9.1, "Verified for your exact board" is
+// confirmed for a specific board. "Verified for your exact board" is
 // reserved for entries carrying a board + biosVersion KB key (added only once a board is
 // validated on the Warzup bench). The validator REJECTS any isVerified=true entry that
 // lacks that board+biosVersion key.

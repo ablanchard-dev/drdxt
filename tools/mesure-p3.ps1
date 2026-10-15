@@ -48,7 +48,7 @@ if (-not (Test-Path $smoke)) {
 New-Item -ItemType Directory -Path $store -Force | Out-Null
 
 # --- Un seul PresentMon a la fois -------------------------------------------
-# Constate le 27/08/2026 : deux services PresentMon de versions differentes
+# Deux services PresentMon de versions differentes
 # (celui de DrDXT en 2.4.1, celui d'Intel en 2.5.1) publient le MEME tube nomme.
 # La capture echouait alors 3 fois sur 5, sans motif visible, avec
 # PM_STATUS_PIPE_ERROR. Une mesure avant/apres dont une moitie echoue au hasard

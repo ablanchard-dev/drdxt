@@ -3,33 +3,33 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// The structured outcome of a reconcile pass / a drift detection pass.
+// L'issue structurée d'une passe de réconciliation / de détection de dérive.
 //
-// Returned ALONGSIDE the Result so the host can log/telemeter exactly what drifted,
-// what was re-applied, what was notified, and what failed — without parsing strings.
+// Rendue à côté du Result pour que l'hôte journalise / mesure exactement ce qui a dérivé, ce qui
+// a été réappliqué, notifié ou a échoué, sans analyser de chaînes.
 // -----------------------------------------------------------------------
 
-/// <summary>What the reconciler did with a single manifest item this pass.</summary>
+/// <summary>Ce que le réconciliateur a fait d'un élément du manifeste pendant cette passe.</summary>
 public enum ItemOutcome
 {
-    /// <summary>Already at desired — no write (idempotence, I1).</summary>
+    /// <summary>Déjà à la valeur voulue : aucune écriture (idempotence, I1).</summary>
     NoOp = 0,
-    /// <summary>Drifted and successfully re-applied + confirmed.</summary>
+    /// <summary>A dérivé, puis a été réappliqué avec succès et confirmé.</summary>
     Reapplied = 1,
-    /// <summary>Drifted but classified UserIntentional/Unknown → notified, not overwritten (I5).</summary>
+    /// <summary>A dérivé mais classé UserIntentional/Unknown → notifié, pas écrasé (I5).</summary>
     Notified = 2,
-    /// <summary>Item is paused (kill-switch) → compared/logged but not re-applied (I7).</summary>
+    /// <summary>Élément en pause (coupe-circuit) → comparé / journalisé mais pas réappliqué (I7).</summary>
     Skipped = 3,
-    /// <summary>Re-apply (or its confirming read-back) failed → item KO (I2).</summary>
+    /// <summary>La réapplication (ou sa relecture de confirmation) a échoué → élément KO (I2).</summary>
     Failed = 4,
-    /// <summary>Refused: not allowlisted / protected surface (I3, security).</summary>
+    /// <summary>Refusé : hors allowlist / surface protégée (I3, sécurité).</summary>
     Refused = 5,
-    /// <summary>Suspended by the anti boot-loop guard (T27b) — a GPU-tuning item was
-    /// not re-applied because the machine is in a suspected boot-loop.</summary>
+    /// <summary>Suspendu par la garde anti-boucle de démarrage (T27b) : un réglage GPU n'a pas été
+    /// réappliqué parce que la machine est soupçonnée d'être dans une boucle de démarrage.</summary>
     Suspended = 6,
 }
 
-/// <summary>One line of the reconcile report.</summary>
+/// <summary>Une ligne du rapport de réconciliation.</summary>
 public sealed record ReconcileItemResult(
     string TweakId,
     ItemOutcome Outcome,
@@ -37,8 +37,8 @@ public sealed record ReconcileItemResult(
     string? CurrentValueJson,
     Error? Error);
 
-/// <summary>The whole pass. <see cref="GloballyPaused"/> is true when the global
-/// kill-switch short-circuited the pass (I7 / T24).</summary>
+/// <summary>Toute la passe. <see cref="GloballyPaused"/> vaut true quand le coupe-circuit global
+/// a court-circuité la passe.</summary>
 public sealed record ReconcileReport(
     bool GloballyPaused,
     IReadOnlyList<ReconcileItemResult> Items)
@@ -49,6 +49,3 @@ public sealed record ReconcileReport(
     public IEnumerable<ReconcileItemResult> Suspended => Items.Where(i => i.Outcome == ItemOutcome.Suspended);
 }
 
-/// <summary>A single item the detector found drifted (current != desired), with its
-/// classified cause.</summary>
-public sealed record DriftedItem(string TweakId, DriftCause Cause, string CurrentValueJson);

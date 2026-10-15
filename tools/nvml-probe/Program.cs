@@ -18,11 +18,10 @@ Console.WriteLine($"ReBAR (provider) : {provider.GetReBarState()}");
 Console.WriteLine($"Heuristic direct : {ReBarHeuristic.FromBar1AndFb(bar1, fb)}");
 
 // ── WATTS ET DEGRES ──────────────────────────────────────────────────────────────────────
-// `TryGetPowerUsageMilliwatts` et `TryGetTemperatureCelsius` existaient dans l'interface et
-// n'avaient AUCUN appelant (verifie le 07/09/2026). Sans eux, aucune phrase sur l'undervolt ne
+// Cet outil appelle `TryGetPowerUsageMilliwatts` et `TryGetTemperatureCelsius`. Sans eux, aucune phrase sur l'undervolt ne
 // peut etre prouvee : « plus froid, moins gourmand » sont des grandeurs, pas des opinions.
 //
-// Usage : nvml-probe [secondes]   (defaut 5) — LECTURE PURE, rien n'est ecrit.
+// Usage : nvml-probe [secondes]   (defaut 5). LECTURE PURE, rien n'est ecrit.
 int secondes = args.Length > 0 && int.TryParse(args[0], out var sArg) && sArg > 0 ? sArg : 5;
 
 Console.WriteLine();

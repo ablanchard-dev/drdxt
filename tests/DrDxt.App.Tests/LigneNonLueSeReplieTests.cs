@@ -8,7 +8,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026, photo (processeur) : sous « Pas pu lire », la température du processeur tenait quatre lignes de prose
+// Photo (processeur) : sous « Pas pu lire », la température du processeur tenait quatre lignes de prose
 // technique d'un bloc (zone ACPI, machine de test, pilote noyau), alors que chaque constat se lit déjà en une phrase
 // avec la suite sous « Pourquoi ? ». Une ligne non lue suit la même règle.
 public sealed class LigneNonLueSeReplieTests

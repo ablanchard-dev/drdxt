@@ -4,8 +4,8 @@ using FluentAssertions;
 namespace DrDxt.Measurement.Tests.Cpu;
 
 /// <summary>
-/// 03/10/2026 (M2). Référence de la machine du 30/09 : rafale 1 391, soutenu 1 533 Mops (aucune baisse), 66 W à ±3,9 %,
-/// « Intel Default Settings ». La page Processeur disait « rien à faire » : le processeur ne baissait pas parce qu'il était
+/// Référence mesurée le 30/09 : rafale 1 391, soutenu 1 533 Mops (aucune baisse), 66 W à ±3,9 %,
+/// « Intel Default Settings ». « Rien à faire » serait faux : le processeur ne baisse pas parce qu'il est
 /// retenu dès la première seconde. Avec la fréquence d'un seul cœur et celle de tous, le juge le voit.
 /// </summary>
 public class BrideDesLeDepartTests

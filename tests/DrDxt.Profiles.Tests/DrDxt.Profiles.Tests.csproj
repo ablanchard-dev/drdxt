@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DrDxt.Profiles\DrDxt.Profiles.csproj" />
-    <!-- M6 honesty gate: assert every profile selection id is a REAL M2 catalog tweak,
+    <!-- Honesty gate: assert every profile selection id is a REAL catalog tweak,
          resolved from the live TweakCatalog (DrDxt.Application). -->
     <ProjectReference Include="..\..\src\DrDxt.Application\DrDxt.Application.csproj" />
   </ItemGroup>

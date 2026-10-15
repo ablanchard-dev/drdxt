@@ -3,18 +3,19 @@
 namespace DrDxt.Application.Parties;
 
 /// <summary>
-/// 29/09/2026 (boucle « vivant et prouvé », A3) : la veille des parties. Tant qu'un jeu tourne, une capture courte à
-/// intervalle ; quand il se ferme (ou change), la partie est résumée et enregistrée. Hors partie, rien n'est mesuré.
+/// La veille des parties. Tant qu'un jeu tourne, des fenêtres de mesure
+/// bout à bout ; quand il se ferme (ou change), la partie est résumée et enregistrée. Hors partie, rien n'est mesuré.
 /// Toutes les coutures sont injectées : la veille se teste sans jeu, sans horloge et sans disque.
 /// </summary>
 public sealed class VeilleDesParties
 {
-    /// <summary>Une capture tient 20 s : la durée où l'A/B du produit résout le mieux par point (tailbench, 07/09).</summary>
-    public static readonly TimeSpan DureeCapture = TimeSpan.FromSeconds(20);
+    /// <summary>Une fenêtre d'une minute, et les fenêtres se suivent sans trou : toute la partie est mesurée,
+    /// image par image (avant : 20 s toutes les trois minutes, soit un dixième de la partie, et un pic de chaleur entre deux
+    /// captures passait inaperçu). La minute est le grain auquel un menu ou un lobby se met à part.</summary>
+    public static readonly TimeSpan DureeCapture = TimeSpan.FromMinutes(1);
 
-    /// <summary>Trois minutes entre deux captures : une partie de vingt minutes en donne six, sans peser sur le jeu.
-    /// Choix de cadence, pas une mesure.</summary>
-    public static readonly TimeSpan EntreDeuxCaptures = TimeSpan.FromMinutes(3);
+    /// <summary>Plus d'attente entre deux fenêtres : la suivante commence dès que la précédente est relevée.</summary>
+    public static readonly TimeSpan EntreDeuxCaptures = TimeSpan.Zero;
 
     /// <summary>Hors partie, on regarde toutes les trente secondes si un jeu a démarré.</summary>
     public static readonly TimeSpan HorsPartie = TimeSpan.FromSeconds(30);
@@ -35,6 +36,9 @@ public sealed class VeilleDesParties
     private readonly Func<int, (string Carte, string? DedieeIgnoree)?>? _carteDuJeu;
     private readonly Action<PartieInterrompue?>? _suivre;
     private readonly Func<HardwareReading?>? _lireCarte;
+    private readonly Func<double?>? _temperatureProcesseur;
+    private readonly Func<bool?>? _entrees;
+    private readonly Func<EtatCpu?>? _etatProcesseur;
 
     public VeilleDesParties(
         Func<(string Exe, int Pid)?> jeu,
@@ -46,22 +50,31 @@ public sealed class VeilleDesParties
         Func<double?>? memoireVideo = null,
         Func<int, IReadOnlyList<(string Nom, double Pourcent)>?>? voisins = null,
         Action<string>? signalerEchec = null,
-        // 07/10/2026 (J5) : l'heure de chaque capture. Lue sur l'horloge réelle, une partie rejouée en test tombait à
+        // L'heure de chaque capture. Lue sur l'horloge réelle, une partie rejouée en test tombait à
         // la date du test, du mauvais côté des changements qu'elle devait juger.
         Func<DateTimeOffset>? horloge = null,
-        // 07/10/2026 (A5) : la température de la carte, lue par la bibliothèque de son pilote (NVML, ADLX, IGCL).
+        // La température de la carte, lue par la bibliothèque de son pilote (NVML, ADLX, IGCL).
         Func<double?>? carte = null,
-        // 07/10/2026 (D10) : les overlays ouverts, lus par le nom des processus (OverlaysEnPartie).
+        // Les overlays ouverts, lus par le nom des processus (OverlaysEnPartie).
         Func<IReadOnlyList<string>?>? overlays = null,
-        // 07/10/2026 (D6) : dix pings vers la box et dix vers internet, juste après la capture.
+        // Dix pings vers la box et dix vers internet, juste après la capture.
         Func<CancellationToken, Task<(double? Box, double? Internet, double? Pertes)>>? reseau = null,
-        // 07/10/2026 (A4) : la carte qui porte le jeu, et la vraie carte laissée de côté s'il tourne sur une puce intégrée.
+        // La carte qui porte le jeu, et la vraie carte laissée de côté s'il tourne sur une puce intégrée.
         Func<int, (string Carte, string? DedieeIgnoree)?>? carteDuJeu = null,
-        // 08/10/2026 (D1) : la partie suivie, à chaque regard ; null à sa clôture (marque « en cours »).
+        // La partie suivie, à chaque regard ; null à sa clôture (marque « en cours »).
         Action<PartieInterrompue?>? suivre = null,
-        // 08/10/2026 (J-MECA) : la carte lue par son pilote (fréquence, raisons de bridage), une fois par seconde pendant la capture.
-        Func<HardwareReading?>? lireCarte = null)
+        // La carte lue par son pilote (fréquence, raisons de bridage), une fois par seconde pendant la capture.
+        Func<HardwareReading?>? lireCarte = null,
+        // La température du processeur chaque seconde pendant toute la fenêtre (son vrai pic, pas une lecture
+        // après coup), et « le joueur a-t-il touché quelque chose cette seconde ? » (null = pas lisible).
+        Func<double?>? temperatureProcesseur = null,
+        Func<bool?>? entrees = null,
+        // La seconde du processeur entière (cœur le plus chaud, cœur 0, raisons de freiner).
+        Func<EtatCpu?>? etatProcesseur = null)
     {
+        _etatProcesseur = etatProcesseur;
+        _temperatureProcesseur = temperatureProcesseur;
+        _entrees = entrees;
         _lireCarte = lireCarte;
         _suivre = suivre;
         _carteDuJeu = carteDuJeu;
@@ -83,7 +96,7 @@ public sealed class VeilleDesParties
     /// <summary>Veille jusqu'à l'annulation. Une partie en cours à l'annulation n'est pas enregistrée : elle n'est pas finie.</summary>
     public async Task VeillerAsync(CancellationToken ct)
     {
-        // Revue du 08/10/2026 (D1) : une sortie propre (annulation, relevé éteint) lève la marque ; seule une mort du
+        // Une sortie propre (annulation, relevé éteint) lève la marque ; seule une mort du
         // processus (arrêt du PC) la laisse ouverte.
         try { await VeillerJusquaLaFinAsync(ct); }
         finally { if (_marqueOuverte) Suivre(null); }
@@ -98,8 +111,13 @@ public sealed class VeilleDesParties
         var debutEnCours = DateTimeOffset.MinValue;
         var captures = new List<CaptureEnPartie>();
 
+        // Une partie sans aucune seconde du processeur lue se dit une fois, avec sa raison probable ;
+        // avant, elle s'enregistrait sans température ni freinage, sans un mot.
+        var processeurSignale = false;
+
         void Clore()
         {
+            processeurSignale = false;
             if (enCours is not null && ReleveDesParties.Resumer(enCours, captures) is { } partie) _enregistrer(partie);
             if (enCours is not null) Suivre(null);
             enCours = null;
@@ -109,7 +127,7 @@ public sealed class VeilleDesParties
         while (!ct.IsCancellationRequested)
         {
             var jeu = _jeu();
-            // 07/10/2026 (vu en vrai : Warzone fermé puis relancé entre deux regards, 17:37 puis 18:53) : le même nom d'exécutable
+            // Le même nom d'exécutable
             // ne suffit pas, un nouveau processus est une nouvelle partie ; sinon les deux sessions n'en faisaient qu'une.
             if (jeu is null || jeu.Value.Exe != enCours || jeu.Value.Pid != pidEnCours) Clore();
             if (jeu is null)
@@ -124,21 +142,29 @@ public sealed class VeilleDesParties
             Suivre(new PartieInterrompue(enCours, debutEnCours, _horloge()));
             BenchmarkResult? mesure = null;
             var echantillons = new List<HardwareReading>();
+            var celsius = new List<double>();
+            var entrees = new List<bool>();
+            var etats = new List<EtatCpu>();
             using var finEchantillons = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            var echantillonneur = Echantillonner(echantillons, finEchantillons.Token);
+            var echantillonneur = Echantillonner(echantillons, celsius, entrees, etats, finEchantillons.Token);
             try { mesure = await _capturer(jeu.Value.Pid, DureeCapture, ct); }
             catch (OperationCanceledException) { return; }
-            // Une capture ratée ne compte pas ; la veille continue. 07/10/2026 (revue F-10) : mais elle se dit.
+            // Une capture ratée ne compte pas ; la veille continue, mais elle se dit.
             catch (Exception ex) { Signaler($"{jeu.Value.Exe} : {ex.Message}"); }
             finally
             {
                 finEchantillons.Cancel();
                 await echantillonneur;
             }
-            if (mesure is not { AvgFps: > 0 } && mesure is not null) Signaler($"{jeu.Value.Exe} : aucune image lue");
+            if (mesure is not { AvgFps: > 0 } && mesure is not null) Signaler(Docteur.T("VP.AucuneImage", jeu.Value.Exe));
+            if (_etatProcesseur is not null && etats.Count == 0 && !processeurSignale)
+            {
+                processeurSignale = true;
+                Signaler(Docteur.T("VP.ProcesseurNonLu", jeu.Value.Exe));
+            }
             if (mesure is { AvgFps: > 0 })
             {
-                // 04/10/2026 (plan 1.1) : lu juste après la capture, le jeu tourne encore. Un relevé raté n'annule pas la capture.
+                // Lu juste après la capture, le jeu tourne encore. Un relevé raté n'annule pas la capture.
                 (double? Mhz, double? Watts, double? Celsius) cpu = (null, null, null);
                 try { if (_processeur is not null) cpu = _processeur(); }
                 catch (Exception) { }
@@ -161,22 +187,35 @@ public sealed class VeilleDesParties
                 (string Carte, string? DedieeIgnoree)? carteDuJeu = null;
                 try { carteDuJeu = _carteDuJeu?.Invoke(jeu.Value.Pid); }
                 catch (Exception) { }
-                captures.Add(new CaptureEnPartie(_horloge(), mesure.AvgFps, mesure.P1LowFps, _classer(mesure), cpu.Mhz, cpu.Watts, cpu.Celsius, vram, voisins, carte, overlays,
+                // Le pic lu seconde par seconde pendant la fenêtre ; sans échantillon, la lecture d'après la capture.
+                var celsiusMax = celsius.Count > 0 ? celsius.Max() : cpu.Celsius;
+                captures.Add(new CaptureEnPartie(_horloge(), mesure.AvgFps, mesure.P1LowFps, _classer(mesure), cpu.Mhz, cpu.Watts, celsiusMax, vram, voisins, carte, overlays,
                     reseau.Box, reseau.Internet, reseau.Pertes, carteDuJeu?.Carte, carteDuJeu?.DedieeIgnoree,
-                    MecanismeCarte.Depuis(echantillons), LatenceAffichageMs: mesure.DisplayLatencyMsMedian));
+                    MecanismeCarte.Depuis(echantillons), LatenceAffichageMs: mesure.DisplayLatencyMsMedian,
+                    ImagesMs: mesure.FrameTimesMs, PremierPlan: mesure.ForegroundFraction,
+                    Entrees: entrees.Count > 0 ? entrees.Count(e => e) / (double)entrees.Count : null,
+                    Freinage: FreinageCpu.Depuis(etats), Ventilateurs: VentilateursEnPartie.Depuis(etats.Select(e => e.Ventilateurs))));
             }
             await Attendre(EntreDeuxCaptures, ct);
         }
     }
 
     /// <summary>J-MECA : une lecture de la carte par seconde tant que la capture dure. Une vraie minuterie, pas la couture
-    /// d'attente de la veille (dans les tests elle avance l'horloge des parties). Une lecture ratée n'arrête rien.</summary>
-    private async Task Echantillonner(List<HardwareReading> echantillons, CancellationToken fin)
+    /// d'attente de la veille (dans les tests elle avance l'horloge des parties). Une lecture ratée n'arrête rien.
+    /// Au même tic, la température du processeur et l'activité du joueur.</summary>
+    private async Task Echantillonner(List<HardwareReading> echantillons, List<double> celsius, List<bool> entrees,
+        List<EtatCpu> etats, CancellationToken fin)
     {
-        if (_lireCarte is null) return;
+        if (_lireCarte is null && _temperatureProcesseur is null && _entrees is null && _etatProcesseur is null) return;
         while (!fin.IsCancellationRequested)
         {
-            try { if (_lireCarte() is { } r) echantillons.Add(r); }
+            try { if (_lireCarte?.Invoke() is { } r) echantillons.Add(r); }
+            catch (Exception) { }
+            try { if (_temperatureProcesseur?.Invoke() is { } t) celsius.Add(t); }
+            catch (Exception) { }
+            try { if (_entrees?.Invoke() is { } e) entrees.Add(e); }
+            catch (Exception) { }
+            try { if (_etatProcesseur?.Invoke() is { } s) etats.Add(s); }
             catch (Exception) { }
             try { await Task.Delay(TimeSpan.FromSeconds(1), fin).ConfigureAwait(false); }
             catch (OperationCanceledException) { return; }

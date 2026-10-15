@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DrDxt.Bios\DrDxt.Bios.csproj" />
-    <!-- Resx parity test: resolve the FR+EN values for every guide key added in M3. -->
+    <!-- Resx parity test: resolve the FR+EN values for every guide key. -->
     <ProjectReference Include="..\..\src\DrDxt.Infrastructure\DrDxt.Infrastructure.csproj" />
   </ItemGroup>
 

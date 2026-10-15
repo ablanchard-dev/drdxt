@@ -6,20 +6,19 @@ using DrDxt.Core;
 namespace DrDxt.App.Converters;
 
 /// <summary>
-/// Converts a Severity value to the left-bar brush on a finding card.
+/// Convertit une Severity en pinceau de la barre gauche d'une carte de constat.
 /// </summary>
 [ValueConversion(typeof(Severity), typeof(Brush))]
 public sealed class SeverityColorConverter : IValueConverter
 {
     // DESIGN.md : trois couleurs d'état, chacune liée à un mot (corail = à corriger, ambre = à regarder,
-    // menthe = rien de signalé). 25/09/2026, vu sur photo : un constat Minor avait une pastille ambre dans
-    // un domaine au badge corail « À corriger » ; l'ambre disait deux mots. Majeur et Mineur comptent tous
-    // deux comme « à corriger » (verdict, badge, rapport) : même corail. L'information n'est pas un état :
-    // platine (06/10/2026 : plus de turquoise dans DrDXT).
+    // menthe = rien de signalé). Majeur et Mineur comptent tous deux comme « à corriger » (verdict, badge,
+    // rapport) : même corail, sinon une pastille ambre dans un domaine au badge corail dirait deux mots.
+    // L'information n'est pas un état : platine, jamais de turquoise.
     private static readonly SolidColorBrush ACorrigerBrush = new(Color.FromRgb(0xFF, 0x5C, 0x7A));
     private static readonly SolidColorBrush InfoBrush = new(Color.FromRgb(0xE6, 0xEA, 0xF0));
-    // 03/10/2026 (D10.2, revue n° 4) : un constat d'information suffit à mettre son domaine « À regarder » (ambre),
-    // mais sa puce restait cyan, la couleur des actions. Une ligne de constat reçue entière prend l'ambre ; un réglage
+    // Un constat d'information suffit à mettre son domaine « À regarder » (ambre) : sa puce suit, au lieu du cyan
+    // réservé aux actions. Une ligne de constat reçue entière prend l'ambre ; un réglage
     // proposé garde le cyan (c'est une proposition, pas un état).
     private static readonly SolidColorBrush ARegarderBrush = new(Color.FromRgb(0xFF, 0xB5, 0x47));
 

@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Integration.Tests;
 
-// 27/09/2026 : douze fichiers recalculaient %LOCALAPPDATA%\DrDXT a la main ; ils passent par DossierDonnees.
+// Douze fichiers recalculaient %LOCALAPPDATA%\DrDXT a la main ; ils passent par DossierDonnees.
 // Un treizieme qui le refait echappe a la redirection de developpement : une photo en DEBUG ecrirait alors,
 // en silence, dans les donnees du joueur.
 public sealed class UnSeulDossierDeDonneesTests

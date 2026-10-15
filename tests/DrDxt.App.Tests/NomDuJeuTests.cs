@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>UI1 (critique du 08/10, défaut 8) : « JeuBClient-Win64-Shipping » et « cod » s'affichaient tels quels dans
+/// <summary>« JeuBClient-Win64-Shipping » et « cod » s'affichaient tels quels dans
 /// les parties. Un jeu se nomme comme le joueur le connaît ; un inconnu garde son exécutable plutôt qu'un nom inventé.</summary>
 public sealed class NomDuJeuTests
 {

@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 04/10/2026 (plan 2.1) : un réglage basculé entre deux scans devient un changement borné par les deux relevés.
+// Un réglage basculé entre deux scans devient un changement borné par les deux relevés.
 public sealed class SuiviDesReglagesTests : IDisposable
 {
     private readonly string _chemin = Path.Combine(Path.GetTempPath(), $"suivi-{Guid.NewGuid():N}.json");
@@ -36,6 +36,6 @@ public sealed class SuiviDesReglagesTests : IDisposable
         s.Relever(new Dictionary<string, string> { ["HAGS"] = "1" }, t.AddMinutes(1), Libelle).Should().BeEmpty();
         var c = s.Relever(new Dictionary<string, string> { ["IR"] = "éteint" }, t.AddMinutes(2), Libelle)
             .Should().ContainSingle(c => c.Libelle == "IR: allumé>éteint", "l'état d'avant a survécu au relevé qui ne l'a pas lu").Subject;
-        c.Depuis.Should().Be(t, "revue : borné par le dernier relevé qui a LU ce réglage, pas par le dernier relevé tout court");
+        c.Depuis.Should().Be(t, "borné par le dernier relevé qui a LU ce réglage, pas par le dernier relevé tout court");
     }
 }

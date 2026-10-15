@@ -5,12 +5,12 @@ using DrDxt.Reconciler.Manifest;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// In-memory test doubles for the reconciler HOST. None touch a real timer, the
-// real SCM/Task Scheduler, the registry, or perform elevation — every effect is
-// modelled in memory so `dotnet test` is hermetic and deterministic.
+// Doublures en mémoire de l'hôte du réconciliateur. Aucune ne touche un vrai minuteur, le vrai
+// SCM ou le Planificateur de tâches, ni le registre, ni n'élève : chaque effet est modélisé
+// en mémoire pour que `dotnet test` soit hermétique et déterministe.
 // -----------------------------------------------------------------------
 
-/// <summary>Records every change logged through IDiagnosticsLog for assertions.</summary>
+/// <summary>Enregistre chaque changement journalisé via IDiagnosticsLog pour les assertions.</summary>
 public sealed class RecordingDiagnostics : IDiagnosticsLog
 {
     public List<(string tweakId, string from, string to, string actor)> Entries { get; } = new();
@@ -21,34 +21,16 @@ public sealed class RecordingDiagnostics : IDiagnosticsLog
     public Task<Result<string>> ExportAsync() => Task.FromResult(Result<string>.Ok(string.Empty));
 }
 
-/// <summary>A deterministic, advanceable UTC clock (mirrors the Reconciler one).</summary>
+/// <summary>Horloge UTC déterministe et avançable (miroir de celle du Reconciler).</summary>
 public sealed class FakeClock : IClock
 {
     public DateTimeOffset UtcNow { get; set; } = new(2026, 6, 25, 12, 0, 0, TimeSpan.Zero);
     public void Advance(TimeSpan by) => UtcNow += by;
 }
 
-/// <summary>FINDING 1 — a controllable entitlement gate for the tick tests. Defaults to
-/// ENTITLED (Ok) so existing load→reconcile tests are unchanged; set <see cref="Entitled"/>
-/// false to exercise the fail-closed "lapsed entitlement → do not reapply" path. Records
-/// how many times it was consulted.</summary>
-public sealed class FakeEntitlementGate : IEntitlementGate
-{
-    public bool Entitled { get; set; } = true;
-    public int Calls { get; private set; }
-
-    public Task<Result> EnsureReapplyEntitledAsync(CancellationToken ct)
-    {
-        Calls++;
-        return Task.FromResult(Entitled
-            ? Result.Ok()
-            : Result.Fail(ErrorCodes.ManifestTampered, "manifest does not verify (test)"));
-    }
-}
-
-/// <summary>In-memory sidecar state store. <see cref="FailLoad"/> / <see cref="FailSave"/>
-/// independently force the corresponding op to Fail; <see cref="SaveCount"/> proves a
-/// failed Load never reached Save.</summary>
+/// <summary>Magasin d'état annexe en mémoire. <see cref="FailLoad"/> / <see cref="FailSave"/>
+/// forcent indépendamment l'op correspondante à échouer ; <see cref="SaveCount"/> prouve qu'un
+/// Load raté n'a jamais atteint Save.</summary>
 public sealed class InMemoryReconcilerStateStore : IReconcilerStateStore
 {
     private ReconcilerState? _state;
@@ -74,7 +56,7 @@ public sealed class InMemoryReconcilerStateStore : IReconcilerStateStore
     }
 }
 
-/// <summary>Fake OS-build probe.</summary>
+/// <summary>Fausse sonde de build de l'OS.</summary>
 public sealed class FakeOsBuildProbe : IOsBuildProbe
 {
     public string? Build { get; set; }
@@ -86,9 +68,9 @@ public sealed class FakeOsBuildProbe : IOsBuildProbe
             : Result<string>.Ok(Build ?? "22631.3447");
 }
 
-/// <summary>Fake boot-outcome store: reads a mutable streak; the write methods mutate
-/// it (increment on boot-started, reset on session-stable). <see cref="Fail"/> fails
-/// every operation. Counters let a test assert exact call counts.</summary>
+/// <summary>Faux magasin d'issue de démarrage : lit une série mutable ; les méthodes d'écriture
+/// la mutent (incrément au démarrage, remise à zéro à la session stable). <see cref="Fail"/> fait
+/// échouer chaque opération. Des compteurs laissent un test vérifier le nombre exact d'appels.</summary>
 public sealed class FakeBootOutcomeStore : IBootOutcomeStore
 {
     public int Streak { get; set; }

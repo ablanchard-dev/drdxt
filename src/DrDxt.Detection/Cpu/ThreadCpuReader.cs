@@ -6,7 +6,7 @@ namespace DrDxt.Detection.Cpu;
 
 /// <summary>Ce qu'un thread a consomme pendant la fenetre observee.</summary>
 /// <param name="ThreadId">L'identifiant systeme du thread.</param>
-/// <param name="PartDUnThreadLogique">Sa consommation, en part d'UN thread logique. 1,0 = il a
+/// <param name="PartDUnThreadLogique">Sa consommation, en part d'un seul thread logique. 1,0 = il a
 /// tourne sans interruption. Ce n'est pas un pourcentage de la machine.</param>
 /// <param name="Cycles">Les cycles consommes, quand `QueryThreadCycleTime` a repondu. Le cycle est
 /// insensible a la frequence, donc comparable entre deux fenetres ou l'horloge a bouge.</param>
@@ -34,16 +34,16 @@ public sealed record ProcessCpuSample(
 ///
 /// Celui-ci se contente de `OpenThread(THREAD_QUERY_LIMITED_INFORMATION)` + `GetThreadTimes` et
 /// `QueryThreadCycleTime` : des API documentees, en espace utilisateur, sans elevation.
-/// **Aucune injection, aucun hook, aucun scanner memoire** — la regle du depot, et la seule facon
+/// **Aucune injection, aucun hook, aucun scanner memoire** : la regle du depot, et la seule facon
 /// de rester compatible avec un anti-triche.
 ///
 /// ══ ce qu'il ne dit pas ══
-/// Le 14700F est HYBRIDE : huit P-cores et douze E-cores. « ce thread consomme 95 % d'un thread
-/// logique » ne dit pas « un P-core est sature » — le thread peut avoir tourne sur un E-core, ou
-/// avoir migre. Ce lecteur rend une part de thread LOGIQUE, jamais un verdict sur un type de coeur.
+/// Le 14700F est hybride : huit P-cores et douze E-cores. « ce thread consomme 95 % d'un thread
+/// logique » ne dit pas « un P-core est sature » : le thread peut avoir tourne sur un E-core, ou
+/// avoir migre. Ce lecteur rend une part de thread logique, jamais un verdict sur un type de coeur.
 ///
 /// Et une consommation elevee n'est pas une cause. Un thread a 100 % pendant que le GPU attend
-/// est une COINCIDENCE a verifier, pas une explication.
+/// est une coincidence a verifier, pas une explication.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class ThreadCpuReader
@@ -51,7 +51,7 @@ public sealed class ThreadCpuReader
     private const int ThreadQueryLimitedInformation = 0x0800;
 
     /// <summary>Observe un processus pendant <paramref name="fenetre"/>. Rend <c>null</c> si le
-    /// processus disparait ou n'est pas lisible — jamais des zeros.</summary>
+    /// processus disparait ou n'est pas lisible, jamais des zeros.</summary>
     public ProcessCpuSample? Observer(int pid, TimeSpan fenetre, int combienDeChauds = 6)
     {
         try
@@ -101,7 +101,7 @@ public sealed class ThreadCpuReader
                 if (!GetThreadTimes(poignee, out _, out _, out var noyau, out var utilisateur))
                     continue;
                 // Le cycle est insensible a la frequence : deux fenetres ou l'horloge a bouge
-                // restent comparables. Optionnel — une lecture ratee rend simplement null.
+                // restent comparables. Optionnel : une lecture ratee rend simplement null.
                 ulong? cycles = QueryThreadCycleTime(poignee, out var c) ? c : null;
                 sortie[t.Id] = (ToLong(noyau), ToLong(utilisateur), cycles);
             }

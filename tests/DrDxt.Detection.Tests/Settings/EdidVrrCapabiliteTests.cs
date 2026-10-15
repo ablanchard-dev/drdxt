@@ -5,14 +5,13 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Settings;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// La capacité VRR d'un écran — la seule lecture qui manquait, et qui ferme deux leviers.
+// La capacité VRR d'un écran, lue dans son EDID.
 //
-// `SettingsState.VrrCapableDisplay` valait `Unknown` depuis le début, et le contrat le disait :
-// « stays Unknown until display-capability detection is wired ». `latency.vrr_vsync_cap` et
-// `latency.vrrFlipModelOn` en dépendent, donc se taisaient — sur un écran de jeu à 200 Hz.
+// `latency.vrr_vsync_cap` et `latency.vrrFlipModelOn` dépendent de `SettingsState.VrrCapableDisplay` :
+// sans cette lecture, ils se tairaient sur un écran de jeu à 200 Hz.
 //
-// Les deux fixtures sont de vrais EDID, lus dans le registre de la machine de référence le
-// 18/09/2026. Pas des octets fabriqués pour faire passer un test : un écran qui déclare FreeSync
+// Les deux fixtures sont de vrais EDID, relevés dans le registre de la machine de référence,
+// pas des octets fabriqués pour faire passer un test : un écran qui déclare FreeSync
 // et un qui n'en déclare pas, avec la réponse que la machine donne vraiment.
 //
 // Sources : liste amd-gfx (AMD VSDB, regle HDMI Forum de drm/edid) et CTA-861, voir `EdidVrrCapabilite`.

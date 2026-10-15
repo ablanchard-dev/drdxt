@@ -3,7 +3,7 @@ using System.Security.Principal;
 using DrDxt.Lanceur;
 
 // -----------------------------------------------------------------------
-// DrDxt.Lanceur — l'exécutable natif qui reçoit l'élévation (10/10/2026, revue de sécurité).
+// DrDxt.Lanceur — l'exécutable natif qui reçoit l'élévation.
 //
 //   DrDxt.Lanceur.exe <DrDxt.ElevatedHelper.exe | DrDxt.App.exe | DrDXT-Test.exe> [arguments du programme]
 //
@@ -30,7 +30,7 @@ internal static class Program
 
         if (!EstEleve())
         {
-            // Revue du 10/10/2026 : UAC désactivé (EnableLUA=0) sur un compte limité, « runas » lance sans élever, et le
+            // UAC désactivé (EnableLUA=0) sur un compte limité, « runas » lance sans élever, et le
             // fils se relançait sans fin. Un seul essai : relancé et toujours pas élevé, on rend « élévation refusée ».
             if (args.Contains(Relance, StringComparer.Ordinal)) return ElevationRefusee;
             var moi = Environment.ProcessPath;

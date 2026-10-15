@@ -13,13 +13,13 @@
     <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
   </ItemGroup>
 
-  <!-- Expose internal interop seam (IPresentMonApi, enums, PM_QUERY_ELEMENT) to the test project. -->
+  <!-- Expose la couture d'interop interne (IPresentMonApi, enums, PM_QUERY_ELEMENT) au projet de test. -->
   <ItemGroup>
     <InternalsVisibleTo Include="DrDxt.Measurement.Tests" />
-    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" /> <!-- NSubstitute proxies internal interfaces -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" /> <!-- NSubstitute fait des proxys des interfaces internes -->
   </ItemGroup>
 
-  <!-- Vendored PresentMon 2.5.1 SDK (MIT) — copied next to the app for P/Invoke. -->
+  <!-- SDK PresentMon 2.5.1 embarqué (MIT) : copié à côté de l'app pour le P/Invoke. -->
   <ItemGroup>
     <None Include="..\..\third_party\presentmon\PresentMonAPI2.dll" Link="PresentMonAPI2.dll" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\third_party\presentmon\PresentMonAPI2Loader.dll" Link="PresentMonAPI2Loader.dll" CopyToOutputDirectory="PreserveNewest" />

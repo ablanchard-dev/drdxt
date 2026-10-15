@@ -4,7 +4,7 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// L-CPU (07/10/2026) : le boost du processeur coupé, rendu au défaut de son propre plan.
+// Le boost du processeur coupé, rendu au défaut de son propre plan.
 //
 // Microsoft Learn (OEM, « PERFBOOSTMODE ») : 0 = désactivé en P-states ACPI, en CPPC et en CPPC autonome ; 1 à 4 =
 // activé. Un plan dont la valeur secteur vaut 0 alors que le défaut de sa personnalité ne vaut pas 0 a été réglé par
@@ -17,10 +17,12 @@ namespace DrDxt.Application.Tweaks.FixIt;
 // Ce qui est écrit : la seule valeur secteur de PERFBOOSTMODE du plan actif, jamais la valeur batterie, jamais une
 // valeur hors 1 à 4, jamais un autre réglage du plan. L'original est relu juste avant d'écrire.
 //
-// LAP1 (08/10/2026) : ouvert sur portable, puisque seule la valeur secteur est écrite (la batterie n'est jamais
+// Ouvert sur portable, puisque seule la valeur secteur est écrite (la batterie n'est jamais
 // touchée) et que l'essai est mesuré en jeu puis rendu s'il ne gagne rien. Écarté : consoles portables, profils verrouillés. Intel et AMD : proposé aux deux (la table couvre les trois modes ;
 // pas de variante par classe de cœurs sur un Intel hybride).
 // -----------------------------------------------------------------------
+/// <summary>Rend au boost du processeur le défaut de son plan quand la valeur secteur du plan actif est lue coupée (0)
+/// contre un défaut documenté. Proposé sur PC de bureau et portable, jugé en jeu.</summary>
 public sealed class ModeBoostTweak : FixItTweakBase
 {
     private readonly IPowerPlanReader _power;

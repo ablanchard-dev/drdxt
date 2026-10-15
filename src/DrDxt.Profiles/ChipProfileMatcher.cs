@@ -2,40 +2,41 @@ using DrDxt.Core;
 
 namespace DrDxt.Profiles;
 
-/// <summary>The honest "why" behind a recommendation: which families were detected and a
-/// human-readable reason for each decision (for the UI/telemetry, never a guess).</summary>
+/// <summary>Le pourquoi d'une recommandation : les familles détectées et une raison lisible
+/// pour chaque décision (pour l'interface et le rapport, jamais une supposition).</summary>
 public sealed record ChipClassification(
     bool IsAmdX3dDualCcd,
     bool HasTunableNvidiaGpu,
     IReadOnlyList<string> Reasons);
 
-/// <summary>What the matcher recommends for a machine: the safe generic baseline plus any
-/// chip-specific profiles, and the classification that produced them.</summary>
+/// <summary>Ce que le matcher recommande pour une machine : la base générique sûre, les
+/// profils propres à la puce, et le classement qui les a produits.</summary>
 public sealed record ProfileRecommendation(
     IReadOnlyList<ChipProfile> Profiles,
     ChipClassification Classification);
 
-/// <summary>M6 profile matching service: detected chip (M1 inventory) → recommended
-/// profile(s). Conservative + fail-closed: only proposes what is safe/sourced for the
-/// detected family; an unknown/odd chip gets the generic safe baseline, never a guess.</summary>
+/// <summary>Service d'appariement : puce détectée (inventaire du scan) → profils recommandés.
+/// Prudent et fermé par défaut : ne propose que ce qui est sûr et sourcé pour la famille
+/// détectée ; une puce inconnue reçoit la base générique, jamais une supposition.</summary>
 public interface IChipProfileMatcher
 {
     Result<ProfileRecommendation> Recommend(HardwareInventory hw);
 }
 
 // -----------------------------------------------------------------------
-// M6 — ChipProfileMatcher.
+// ChipProfileMatcher.
 //
-// Conservative composition (cahier §10/§16, « jamais inventer »):
-//   * The generic safe baseline is always recommended (the floor).
-//   * The AMD dual-CCD X3D profile is added IFF the CPU is confidently that family.
-//   * The NVIDIA Option-A profile is added IFF a tunable discrete desktop GeForce GPU
-//     is present.
-// An unrecognized chip adds nothing chip-specific → generic only. A null/missing
-// inventory is fail-closed (PROFILE.INPUT_INVALID) — we never fabricate a profile.
-// Each tweak's own AppliesTo (current SettingsState gating) is the FINAL safety gate at
-// apply time; the matcher's job is conservative chip-level ELIGIBILITY, nothing more.
-// Pure over the catalog; never throws.
+// Composition prudente (« jamais inventer ») :
+//   * la base générique sûre est toujours recommandée (le plancher) ;
+//   * le profil AMD X3D à deux CCD s'ajoute si, et seulement si, le processeur est de cette
+//     famille avec certitude ;
+//   * le profil NVIDIA option A s'ajoute si, et seulement si, une GeForce de bureau réglable
+//     est présente.
+// Une puce inconnue n'ajoute rien de spécifique : générique seulement. Un inventaire absent
+// est refusé (PROFILE.INPUT_INVALID) : jamais de profil fabriqué.
+// L'AppliesTo de chaque levier (état courant des réglages) reste la dernière garde au moment
+// de poser ; le matcher ne juge que l'éligibilité au niveau de la puce, rien de plus.
+// Pur sur le catalogue ; ne lève jamais.
 // -----------------------------------------------------------------------
 public sealed class ChipProfileMatcher : IChipProfileMatcher
 {
@@ -45,7 +46,7 @@ public sealed class ChipProfileMatcher : IChipProfileMatcher
 
     public Result<ProfileRecommendation> Recommend(HardwareInventory hw)
     {
-        // Fail-closed: an unusable inventory never yields a guessed profile.
+        // Fermé par défaut : un inventaire inutilisable ne donne jamais un profil deviné.
         if (hw is null || hw.Cpu is null)
             return Result<ProfileRecommendation>.Fail(ErrorCodes.ProfileInputInvalid,
                 "HardwareInventory (and its Cpu) is required to recommend a profile.");
@@ -64,7 +65,7 @@ public sealed class ChipProfileMatcher : IChipProfileMatcher
             }
             else
             {
-                // Family detected but no curated profile yet: stay generic, say so honestly.
+                // Famille détectée mais aucun profil établi : rester générique et le dire.
                 reasons.Add("AMD dual-CCD X3D detected but no curated profile available → generic only.");
             }
         }

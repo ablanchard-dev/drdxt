@@ -30,9 +30,9 @@ public sealed class SondeDeSautWindows : ISondeDeSaut
 }
 
 /// <summary>
-/// 03/10/2026 (boucle 2D2P, P3.1c) : pendant la fenêtre de mesure en jeu, trouve le serveur de la partie (les envois UDP du
+/// Pendant la fenêtre de mesure en jeu, trouve le serveur de la partie (les envois UDP du
 /// jeu), le sonde, sonde la box en même temps, et rend la phrase du domaine Réseau (<see cref="DiagnosticDeRoute"/>).
-/// P3.1d (test en vraie partie, 03/10 17:49) : le serveur de Call of Duty ignore le ping. Dix sondes rapides le disent ;
+/// Le serveur de Call of Duty ignore le ping. Dix sondes rapides le disent ;
 /// alors le chemin est remonté routeur par routeur et la route est jugée jusqu'au dernier qui répond.
 /// Rien n'est écrit ; seuls des pings partent, vers le serveur que le jeu contacte déjà, les routeurs du chemin et la box.
 /// <c>null</c> = pas pu regarder (pas de droits, pas d'UDP vers une adresse publique) : rien n'est affirmé.

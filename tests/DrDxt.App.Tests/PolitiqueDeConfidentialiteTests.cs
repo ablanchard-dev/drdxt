@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// PUB3 (08/10/2026) : CONFIDENTIALITE.md promet ce que « Exporter ma machine » retire. La liste y est recopiée mot pour
+/// CONFIDENTIALITE.md promet ce que « Exporter ma machine » retire. La liste y est recopiée mot pour
 /// mot depuis <see cref="MachineExportee.CeQuiEstRetire"/> : une anonymisation qui change sans la politique fait échouer ici.
 /// </summary>
 public sealed class PolitiqueDeConfidentialiteTests

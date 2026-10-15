@@ -6,7 +6,7 @@ relisible, et verifiee EN LISANT LE ZIP PRODUIT -- pas en faisant confiance a l'
 
 Ce qui est exclu, et pourquoi chacun :
   .git/            l'historique complet, y compris ce qui n'a jamais ete pousse
-  .claude/         configuration locale d'outils, jamais suivie par git
+  .*/              les dossiers caches (configuration locale), sauf .github
   bin/ obj/        des artefacts de build, lourds et inutiles a relire
   installer/publish/  176 Mo de runtime .NET recopie
   installer/Output/   l'executable de 54 Mo -- il se reconstruit, il ne se relit pas
@@ -31,7 +31,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # `audits/` : non versionne, notes de revue internes. TROUVE en lisant le zip produit le 10/09/2026 :
 # trois fichiers y etaient partis — le script parcourt le DISQUE, pas git, donc tout ce qui est non
 # suivi part avec, sauf exclusion ecrite.
-EXCLUDED_DIRS = {".git", ".claude", ".vs", "bin", "obj", "node_modules", "__pycache__", "audits"}
+EXCLUDED_DIRS = {"bin", "obj", "node_modules", "__pycache__", "audits"}
+
+
+def exclu(nom):
+    return nom in EXCLUDED_DIRS or (nom.startswith(".") and nom != ".github")
 EXCLUDED_PATHS = {
     os.path.join("installer", "publish"),
     os.path.join("installer", "Output"),
@@ -57,7 +61,7 @@ SECRET_PATTERNS = [
     re.compile(rb"-----BEGIN (RSA |EC )?PRIVATE KEY-----"),
     re.compile(rb"ghp_[A-Za-z0-9]{20,}"),                     # jeton GitHub
     # Regle du projet « zero trace d'assistant » : un paquet qui sort ne nomme pas les outils de
-    # revue internes. Ajoute le 10/09/2026 apres en avoir trouve dans des commentaires de src/.
+    # revue internes. Ajoute apres en avoir trouve dans des commentaires de src/.
     # Ce qui BLOQUE tient ; une consigne qui RAPPELLE s'oublie.
     re.compile(rb"(?i)\bfable\b"),
     re.compile(rb"(?i)\bopus\s?5\b"),
@@ -84,7 +88,7 @@ def excluded(rel):
     if slash.lower().endswith(BUILD_ARTIFACT_SUFFIXES) and not slash.startswith(VENDORED_ROOT):
         return True
     parts = slash.split("/")
-    if any(p in EXCLUDED_DIRS for p in parts):
+    if any(exclu(p) for p in parts[:-1]):
         return True
     if any(rel.replace("\\", "/").startswith(p.replace("\\", "/")) for p in EXCLUDED_PATHS):
         return True
@@ -95,7 +99,7 @@ def excluded(rel):
 
 def collect():
     for root, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in EXCLUDED_DIRS]
+        dirs[:] = [d for d in dirs if not exclu(d)]
         for name in files:
             full = os.path.join(root, name)
             rel = os.path.relpath(full, ROOT)

@@ -3,8 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D9.1) : l'anneau cyan fixe du bouton central se lisait comme une jauge qui ne bouge pas.
-// 06/10/2026 (le mainteneur : « le trait est trop épais autour, enlève-le, fais une vraie bille ») : il n'y a plus d'anneau fixe ;
+// Un anneau fixe autour du bouton central passerait pour une jauge qui ne bouge pas :
 // autour de la bille, seule la vraie jauge dessine un cercle.
 public sealed class AnneauDuNoyauNEstPasUneJaugeTests
 {

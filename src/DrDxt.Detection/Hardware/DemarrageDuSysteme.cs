@@ -3,9 +3,9 @@ using System.Diagnostics.Eventing.Reader;
 namespace DrDxt.Detection.Hardware;
 
 /// <summary>
-/// 07/10/2026 (revue F-32, non vérifié jusque-là) : l'heure du dernier démarrage du PC. « Maintenant moins le temps
-/// depuis le démarrage » ne suffit pas : avec le démarrage rapide de Windows (HiberbootEnabled à 1, le cas chez le
-/// mainteneur), un arrêt puis un allumage reprennent le noyau, et ce compteur peut ne pas repartir de zéro. Windows note
+/// L'heure du dernier démarrage du PC. « Maintenant moins le temps
+/// depuis le démarrage » ne suffit pas : avec le démarrage rapide de Windows (HiberbootEnabled à 1, le cas sur la
+/// machine de référence), un arrêt puis un allumage reprennent le noyau, et ce compteur peut ne pas repartir de zéro. Windows note
 /// chaque démarrage, rapide ou complet, dans le journal Système (Microsoft-Windows-Kernel-Boot, événement 27, BootType 0
 /// complet, 1 rapide ; relevé le 07/10 : rapides les 22/09, 23/09 et 02/10, complets ensuite). Le plus récent des deux
 /// repères fait foi. Lu une fois par lancement : un démarrage ne change pas tant que le programme tourne.

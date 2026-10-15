@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Tweaks;
 
 /// <summary>
-/// 08/10/2026 (chantier V3) : la revue du 08/10 a trouvé des leviers enregistrés qui ne pouvaient jamais
+/// Des leviers enregistrés qui ne pouvaient jamais
 /// s'appliquer (AppliesTo toujours faux) et que l'App montrait quand même. Un levier dont AppliesTo est toujours faux n'a
 /// sa place que s'il sert à DÉFAIRE une écriture ancienne, ou s'il attend une ligne nommée du plan ; il est alors listé
 /// ici avec sa raison, et la liste ne garde que des leviers réellement morts.
@@ -14,7 +14,7 @@ public sealed class AucunLevierMortTests
     private static readonly Dictionary<string, string> Exceptions = new(StringComparer.Ordinal)
     {
         ["NvidiaUltraLowLatencyTweak.cs"] = "latency.reflex : défait seulement l'écriture d'une ancienne version (manifeste, retour au démarrage)",
-        // Autocontrôle du 08/10/2026 : la raison « pas encore construite » était périmée.
+        // La raison « pas encore construite » était périmée.
         ["GpuFanCurveTweak.cs"] = "gpu.fan_curve : jamais proposé par l'autopilote (ReglagesCarteInterdits) ; le ventilateur s'écrit en mode Expert seulement (VentilateurExpert), et ce levier garde son entrée au catalogue pour la couverture et le retour au démarrage",
     };
 

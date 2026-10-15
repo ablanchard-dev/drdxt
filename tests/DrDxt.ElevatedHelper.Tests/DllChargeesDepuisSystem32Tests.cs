@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// 25/09/2026. Le helper eleve charge les DLL des pilotes par leur nom (nvapi64, amdadlx64, nvml).
+/// Le helper eleve charge les DLL des pilotes par leur nom (nvapi64, amdadlx64, nvml).
 /// Sur une carte NVIDIA, amdadlx64.dll manque dans System32 : la recherche par defaut de Windows
 /// continuait dans le dossier courant puis le PATH. Sur la machine de reference, 15 dossiers du PATH
 /// sont modifiables par l'utilisateur (WinGet\Links, Python, .cargo...) : une DLL posee la
@@ -43,7 +43,7 @@ public class DllChargeesDepuisSystem32Tests
             .SelectMany(p => Directory.EnumerateFiles(Path.Combine(d!.FullName, "src", p), "*.cs", SearchOption.AllDirectories))
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
             .ToList();
-        // Temoin : le fichier qui portait le defaut du 25/09 est bien dans ce qui a ete lu.
+        // Temoin : un fichier qui charge une DLL native est bien dans ce qui a ete lu.
         lus.Where(f => Path.GetFileName(f) == "NvmlNative.cs").Should().NotBeEmpty();
         lus.Where(f => motif.IsMatch(File.ReadAllText(f))).Should().BeEmpty();
     }

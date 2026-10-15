@@ -6,20 +6,20 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.Application.Tests.DependencyInjection;
 
 // -----------------------------------------------------------------------
-// M2 H2 — DI wiring. AddDrDxtApplication() registers the P2 application layer:
-// ISafetyManager, ITweakEngine, every ITweak (D/E/F) as IEnumerable<ITweak>,
-// ITweakCatalog -> TweakCatalog, IStabilityTester, and the SDK seams (registered
-// as thin fail-clean stubs for now — concrete P/Invoke impls land later).
+// Câblage DI. AddDrDxtApplication() enregistre la couche application :
+// ISafetyManager, ITweakEngine, chaque ITweak (D/E/F) en IEnumerable<ITweak>,
+// ITweakCatalog → TweakCatalog, IStabilityTester, et les coutures SDK (enregistrées
+// comme bouchons minces à échec propre ; les vraies implémentations P/Invoke viennent à part).
 //
-// The container must resolve ITweakEngine and a NON-EMPTY IEnumerable<ITweak>.
+// Le conteneur doit résoudre ITweakEngine et un IEnumerable<ITweak> non vide.
 // -----------------------------------------------------------------------
 public sealed class ApplicationServiceCollectionExtensionsTests
 {
     private static ServiceProvider Build()
     {
         var services = new ServiceCollection();
-        // The engine logs through IDiagnosticsLog; register a no-op test double so the
-        // application registrations are self-contained (the App host wires the real one).
+        // Le moteur journalise via IDiagnosticsLog ; une doublure sans effet rend les
+        // enregistrements de l'application autonomes (l'hôte App branche le vrai).
         services.AddSingleton<IDiagnosticsLog>(new NoOpDiagnosticsLog());
         services.AddSingleton<IBenchmarkRunner>(new NoOpBenchmarkRunner());
         services.AddDrDxtApplication();
@@ -55,7 +55,7 @@ public sealed class ApplicationServiceCollectionExtensionsTests
         using var provider = Build();
         var catalog = provider.GetRequiredService<ITweakCatalog>();
         catalog.All().Should().NotBeEmpty();
-        // The D/E/F tweaks are all present and discoverable by id.
+        // Les leviers D/E/F sont tous présents et retrouvables par identifiant.
         catalog.All().Select(t => t.Id).Should()
             .Contain(new[] { "latency.reflex", "gpu.undervolt", "fixit.x3d_ccd" });
     }
@@ -63,14 +63,14 @@ public sealed class ApplicationServiceCollectionExtensionsTests
     [Fact]
     public void Tweaks_resolve_their_seams_without_throwing()
     {
-        // Every ITweak (incl. the GPU ones that need value-object targets) must be
-        // constructible by the container — a missing seam registration would throw here.
+        // Chaque ITweak (y compris ceux du GPU qui veulent des cibles en objets-valeurs) doit être
+        // constructible par le conteneur : une couture non enregistrée lèverait ici.
         using var provider = Build();
         var act = () => provider.GetServices<ITweak>().ToList();
         act.Should().NotThrow();
     }
 
-    // --- Minimal test doubles for the cross-cutting services the engine needs. ---
+    // --- Doublures minimales des services transverses dont le moteur a besoin. ---
 
     private sealed class NoOpDiagnosticsLog : IDiagnosticsLog
     {

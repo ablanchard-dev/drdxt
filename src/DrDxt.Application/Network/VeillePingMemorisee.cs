@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Application.Network;
 
 /// <summary>
-/// 27/09/2026 : « Surveiller mes parties » survit a la fermeture de DrDXT, comme la protection du ping
+/// « Surveiller mes parties » survit a la fermeture de DrDXT, comme la protection du ping
 /// (<see cref="PlafondEnvoiMemorise"/>). Le clic du joueur est le consentement ; ce fichier le garde jusqu'a
 /// ce qu'il arrete la veille, ou que la veille trouve un plafond (la memoire du plafond prend alors le relais).
 ///

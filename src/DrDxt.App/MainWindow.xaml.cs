@@ -11,9 +11,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        // 18/09/2026 - La taille du XAML est ce qu'on VEUT, pas ce qu'on a. WPF ouvre a la
+        // La taille du XAML est ce qu'on veut, pas ce qu'on a. WPF ouvre a la
         // taille demandee meme si elle depasse l'ecran : sur un portable 1366x768, ou sur un
-        // 1080p a 150 %, le bas de la fenetre -- l'action -- s'ouvrait hors de l'ecran.
+        // 1080p a 150 %, le bas de la fenetre (l'action) s'ouvrirait hors de l'ecran.
         // `WorkArea` retire deja la barre des taches. La regle, elle, est testee sans fenetre.
         var zone = SystemParameters.WorkArea;
         (Width, Height) = TailleDeDepart.Adaptee(Width, Height, zone.Width, zone.Height);

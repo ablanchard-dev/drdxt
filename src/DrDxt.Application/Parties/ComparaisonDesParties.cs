@@ -3,15 +3,15 @@
 public enum VerdictEnJeu { PasEncoreJuge, PasDeDifference, Mieux, Pire }
 
 /// <summary>
-/// 30/09/2026 (boucle « la carte, prouvée », G4). Un réglage de la carte ne reste que s'il ne coûte rien en jeu. Les
+/// Un réglage de la carte ne reste que s'il ne coûte rien en jeu. Les
 /// parties relevées du même jeu, avant et après le réglage, se comparent sur leur 1 % le plus lent (la médiane de la
 /// partie) : c'est lui qu'un réglage d'alimentation abîmerait d'abord.
 ///
 /// Même règle que la preuve du repos : séparation nette ou rien. Pire = toutes les parties d'après sous toutes celles
 /// d'avant ; mieux = toutes au-dessus. Moins de trois parties d'un côté : pas encore jugé. Un autre jeu ne compte pas.
 /// </summary>
-/// <summary>04/10/2026 (plan 1.3) : ce qu'un changement a fait en jeu, avec les chiffres qui fondent le verdict.</summary>
-/// <param name="EcartBornesPercent">06/10/2026 (revue F-3) : l'écart dans le pire cas des bornes (après le plus bas
+/// <summary>Ce qu'un changement a fait en jeu, avec les chiffres qui fondent le verdict.</summary>
+/// <param name="EcartBornesPercent">L'écart dans le pire cas des bornes (après le plus bas
 /// contre avant le plus haut pour « mieux », l'inverse pour « pire ») ; null hors verdict tranché. Un gain se dit « au moins »
 /// cela : 3 parties contre 3 tombent nettement séparées une fois sur 20 par hasard.</param>
 public sealed record BilanDuChangement(VerdictEnJeu Verdict, string? Jeu, int Avant, int Apres,
@@ -23,23 +23,23 @@ public static class ComparaisonDesParties
 
     /// <summary>Le bilan d'un changement sur le jeu le plus joué depuis (sinon avant) : même verdict que
     /// <see cref="Juger"/>, plus les médianes de chaque côté pour que l'écran les dise.</summary>
-    /// <param name="jusqua">06/10/2026 (revue F-1) : le changement suivant. Sans borne, l'après d'un changement
+    /// <param name="jusqua">Le changement suivant. Sans borne, l'après d'un changement
     /// contenait les parties d'après le suivant : son écart portait déjà le gain de l'autre, et le total les comptait deux
     /// fois. null = aucun changement depuis.</param>
-    /// <param name="apartirDe">07/10/2026 (revue F-6) : le changement précédent. Sans borne, l'avant remontait
+    /// <param name="apartirDe">Le changement précédent. Sans borne, l'avant remontait
     /// avant lui : la médiane d'avant mélangeait les deux époques et l'écart portait encore le gain du précédent.</param>
     public static BilanDuChangement Bilan(IReadOnlyList<PartieRelevee> parties, DateTimeOffset quand, DateTimeOffset? depuis = null,
         DateTimeOffset? jusqua = null, DateTimeOffset? apartirDe = null)
     {
-        // Revue F-41 : une partie jouée en essai en alternance a un levier dans un état qui n'est pas celui du jour.
+        // Une partie jouée en essai en alternance a un levier dans un état qui n'est pas celui du jour.
         parties = parties.Where(p => p.Essai is null).ToList();
         if (jusqua is { } fin) parties = parties.Where(p => p.Debut < quand || p.Fin <= fin).ToList();
         if (apartirDe is { } debut) parties = parties.Where(p => p.Debut >= quand || p.Debut >= debut).ToList();
         var finAvant = depuis is { } d && d < quand ? d : quand;
         string? Plus(IEnumerable<PartieRelevee> ps) => ps.GroupBy(p => p.Jeu, StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
-        // Revue du 04/10 (P1) : le jeu joué des DEUX côtés d'abord ; sinon un autre jeu joué après rendait
-        // « aucune partie avant » alors que le jeu habituel en avait.
+        // Le jeu joué des deux côtés d'abord ; sinon un autre jeu joué après rendrait
+        // « aucune partie avant » alors que le jeu habituel en a.
         var jeu = parties.Where(p => p.Fin <= finAvant).Select(p => p.Jeu)
                       .Intersect(parties.Where(p => p.Debut >= quand).Select(p => p.Jeu), StringComparer.OrdinalIgnoreCase)
                       .OrderByDescending(j => parties.Count(p => string.Equals(p.Jeu, j, StringComparison.OrdinalIgnoreCase)))

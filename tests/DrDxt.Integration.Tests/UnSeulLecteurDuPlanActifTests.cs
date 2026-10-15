@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Integration.Tests;
 
-// 27/09/2026 : trois classes (App, Detection, Reconciler.Adapters) declaraient chacune PowerGetActiveScheme
+// Trois classes (App, Detection, Reconciler.Adapters) declaraient chacune PowerGetActiveScheme
 // et liberaient le tampon a leur facon. Trois copies du meme appel natif, c'est trois endroits a corriger le
 // jour ou il le faut, et un seul qu'on corrige. Une seule declaration, les autres lui deleguent.
 public sealed class UnSeulLecteurDuPlanActifTests

@@ -6,22 +6,22 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Engine;
 
 // -----------------------------------------------------------------------
-// M2 Phase C — TweakEngine (ITweakEngine), the transactional heart of M2.
+// TweakEngine (ITweakEngine), le cœur transactionnel du chemin d'application.
 //
-// C1  Plan + transactional apply: Never a half-applied batch.
-//     - Plan(...) gates: keeps applicable tweaks, collects skipped ids.
-//     - ApplyBatch: (1) EnsureRestorePointAsync — fail ⇒ ABORT, apply nothing;
-//       (2) apply each tweak, pushing its snapshot on a LIFO stack; first failure
-//       ⇒ pop+RevertAsync each already-applied (LIFO) ⇒ ENGINE.BATCH_REVERTED;
-//       a revert that itself fails during rollback ⇒ log critical + still return
-//       BATCH_REVERTED listing the un-reverted ids (never throws).
-// C2  Auto-revert on MEASURED regression: re-bench → AbComparer significance:
-//       regression-beyond-margin ⇒ auto-revert whole batch (LIFO) +
-//       ENGINE.REGRESSION_REVERTED + SummaryKey verdict.regression_reverted;
-//       no-measurable-gain ⇒ KEPT (not a regression) + verdict.no_measurable_gain;
-//       measurable gain ⇒ KEPT + reported.
+// C1  Plan + application transactionnelle : jamais un lot à moitié appliqué.
+//     - Plan(...) filtre : garde les leviers applicables, collecte les identifiants sautés.
+//     - ApplyBatch : (1) EnsureRestorePointAsync ; échec ⇒ abandon, rien n'est appliqué ;
+//       (2) appliquer chaque levier en empilant son instantané (pile LIFO) ; premier échec
+//       ⇒ dépiler + RevertAsync chaque levier déjà appliqué (LIFO) ⇒ ENGINE.BATCH_REVERTED ;
+//       un retour arrière qui échoue lui-même pendant le rollback ⇒ journal critique + renvoyer
+//       quand même BATCH_REVERTED avec les identifiants non annulés (jamais d'exception).
+// C2  Retour arrière automatique sur régression mesurée : re-banc → significativité AbComparer :
+//       régression au-delà de la marge ⇒ retour arrière de tout le lot (LIFO) +
+//       ENGINE.REGRESSION_REVERTED + SummaryKey verdict.regression_reverted ;
+//       aucun gain mesurable ⇒ gardé (ce n'est pas une régression) + verdict.no_measurable_gain ;
+//       gain mesurable ⇒ gardé + rapporté.
 //
-// Pure unit tests with NSubstitute fakes — nothing elevated, no real system.
+// Tests unitaires purs avec des faux NSubstitute : rien d'élevé, aucun vrai système.
 // -----------------------------------------------------------------------
 public sealed class TweakEngineTests
 {
@@ -44,7 +44,7 @@ public sealed class TweakEngineTests
         TriState.On, TriState.On, KnownPowerPlans.Balanced.ToString(), TriState.On,
         GameMode: TriState.On, ParkedCoreIndexes: Array.Empty<int>(), Vrr: TriState.On);
 
-    // Baseline benchmark (the "before").
+    // Banc de départ (l'« avant »).
     private static readonly BenchmarkResult Baseline = Bench(avg: 200, p1: 150, p01: 120, margin: 2);
 
     /// <summary>La meme reference, mais qui declare son exposition : sans elle, aucune des deux
@@ -55,10 +55,10 @@ public sealed class TweakEngineTests
     private static BenchmarkResult Bench(double avg, double p1, double p01, double margin) =>
         new(avg, p1, p01, new[] { 5.0, 5.0, 5.0 }, EstimatedPcLatencyMs: 10, MarginOfError: margin, Runs: 3, P1LowMarginOfError: margin);
 
-    // --- A configurable fake tweak (so we can assert apply/revert ordering). ---
-    // The engine reverts via the TWEAK's own RevertAsync (so composite-snapshot tweaks
-    // are fully restored — golden rule §6), so every fake's RevertAsync returns Ok by
-    // default and we assert on IT (not _safety) for the rollback / auto-revert paths.
+    // --- Un faux levier configurable (pour vérifier l'ordre apply/revert). ---
+    // Le moteur annule via le RevertAsync du levier lui-même (pour que les leviers à instantané
+    // composite soient entièrement restaurés) ; chaque faux rend donc Ok par défaut sur
+    // RevertAsync et c'est lui (pas _safety) qu'on vérifie sur les chemins de rollback et de retour automatique.
     private static ITweak FakeTweak(
         string id,
         bool applies = true,
@@ -74,9 +74,8 @@ public sealed class TweakEngineTests
         t.RequiresRestorePoint.Returns(true);
         t.TakesEffectAfterReboot.Returns(takesEffectAfterReboot);
         t.AppliesTo(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>()).Returns(applies);
-        // Le snapshot porte une cible relisible depuis le 10/09 : sans elle, le moteur garde le
-        // levier mais refuse de mesurer, et ces tests portent justement sur la mesure. C'est
-        // l'invariant de la phase 18 — seul `Applied` ouvre le banc.
+        // Le snapshot porte une cible relisible : sans elle, le moteur garde le levier mais refuse
+        // de mesurer, et ces tests portent justement sur la mesure. Seul `Applied` ouvre le banc.
         t.ApplyAsync().Returns(applyOk
             ? Task.FromResult(Result<TweakSnapshot>.Ok(SnapshotRelisible(id)))
             : Task.FromResult(Result<TweakSnapshot>.Fail(ErrorCodes.HelperOpFailed, "apply failed")));
@@ -101,8 +100,8 @@ public sealed class TweakEngineTests
 
     private TweakEngine Build()
     {
-        // Defaults: restore point ok, all reverts ok, bench returns baseline-equal
-        // (no measurable gain) unless a test overrides it.
+        // Par défaut : point de restauration ok, tous les retours ok, le banc rend l'égal du
+        // départ (aucun gain mesurable) sauf si un test le redéfinit.
         _safety.EnsureRestorePointAsync().Returns(Task.FromResult(Result.Ok()));
         _safety.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Task.FromResult(Result.Ok()));
         _bench.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -137,7 +136,7 @@ public sealed class TweakEngineTests
         plan.SkippedIds.Should().Contain("gpu.undervolt");
     }
 
-    // ====================== C1 — transactional apply ======================
+    // ====================== C1 : application transactionnelle ======================
 
     [Fact]
     public async Task RestorePoint_failure_aborts_before_any_apply()
@@ -152,7 +151,7 @@ public sealed class TweakEngineTests
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.RestoreDisabled);
-        await t1.DidNotReceive().ApplyAsync();              // nothing applied without a point
+        await t1.DidNotReceive().ApplyAsync();              // rien n'est appliqué sans point
         await _bench.DidNotReceive().RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
@@ -160,7 +159,7 @@ public sealed class TweakEngineTests
     public async Task Batch_failure_reverts_everything_already_applied_lifo()
     {
         var t1 = FakeTweak("t1");
-        var t2 = FakeTweak("t2", applyOk: false);          // fails at apply
+        var t2 = FakeTweak("t2", applyOk: false);          // échoue à l'application
         var engine = Build();
         Register(t1, t2);
 
@@ -168,11 +167,11 @@ public sealed class TweakEngineTests
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.BatchReverted);
-        // t1 (the only one that applied) was reverted via ITS own RevertAsync; t2 never
-        // produced a snapshot. The engine no longer routes rollback through _safety.
+        // t1 (le seul appliqué) a été annulé via son propre RevertAsync ; t2 n'a jamais
+        // produit d'instantané. Le moteur ne fait plus passer le rollback par _safety.
         await t1.Received(1).RevertAsync(Arg.Is<TweakSnapshot>(s => s.TweakId == "t1"));
         await _safety.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
-        // No re-bench when the batch failed to apply cleanly.
+        // Pas de re-banc quand le lot n'a pas pu s'appliquer proprement.
         await _bench.DidNotReceive().RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
@@ -181,11 +180,11 @@ public sealed class TweakEngineTests
     {
         var t1 = FakeTweak("t1");
         var t2 = FakeTweak("t2");
-        var t3 = FakeTweak("t3", applyOk: false);          // third fails
+        var t3 = FakeTweak("t3", applyOk: false);          // le troisième échoue
         var engine = Build();
         Register(t1, t2, t3);
 
-        // Order is recorded from each TWEAK's own RevertAsync (the engine's revert path).
+        // L'ordre est relevé sur le RevertAsync de chaque levier (le chemin de retour du moteur).
         var reverted = new List<string>();
         t1.RevertAsync(Arg.Any<TweakSnapshot>())
             .Returns(_ => { reverted.Add("t1"); return Task.FromResult(Result.Ok()); });
@@ -195,7 +194,7 @@ public sealed class TweakEngineTests
         var r = await engine.ApplyAsync(Plan(t1, t2, t3), Baseline, Pid, default);
 
         r.Error!.Value.Code.Should().Be(ErrorCodes.BatchReverted);
-        reverted.Should().Equal("t2", "t1");               // LIFO: last applied reverted first
+        reverted.Should().Equal("t2", "t1");               // LIFO : le dernier appliqué est annulé en premier
         await _safety.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
     }
 
@@ -212,9 +211,9 @@ public sealed class TweakEngineTests
 
         var r = await engine.ApplyAsync(Plan(t1, tBoom), Baseline, Pid, default);
 
-        r.IsOk.Should().BeFalse();                          // exception never escapes
+        r.IsOk.Should().BeFalse();                          // l'exception ne s'échappe jamais
         r.Error!.Value.Code.Should().Be(ErrorCodes.BatchReverted);
-        // t1 reverted via its own RevertAsync; tBoom never produced a snapshot to revert.
+        // t1 annulé via son propre RevertAsync ; tBoom n'a jamais produit d'instantané à annuler.
         await t1.Received(1).RevertAsync(Arg.Is<TweakSnapshot>(s => s.TweakId == "t1"));
         await _safety.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
     }
@@ -222,8 +221,8 @@ public sealed class TweakEngineTests
     [Fact]
     public async Task Failed_revert_during_rollback_still_returns_batch_reverted_and_logs_unreverted()
     {
-        // The rollback revert of t1 itself fails — must not throw; must still report
-        // BATCH_REVERTED and surface that t1 was not reverted (ultimate net = restore point).
+        // Le retour arrière de rollback de t1 échoue lui-même : pas d'exception ; rapporter quand
+        // même BATCH_REVERTED et signaler que t1 n'a pas été annulé (filet ultime = point de restauration).
         var t1 = FakeTweak("t1", revertOk: false);
         var t2 = FakeTweak("t2", applyOk: false);
         var engine = Build();
@@ -234,7 +233,7 @@ public sealed class TweakEngineTests
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.BatchReverted);
         r.Error!.Value.Message.Should().Contain("t1");      // un-reverted id surfaced
-        // Logged critical (a change record for the failed rollback).
+        // Journal critique (une trace de changement pour le rollback raté).
         _diag.ReceivedWithAnyArgs().Change(default!, default!, default!, default!);
     }
 
@@ -244,7 +243,7 @@ public sealed class TweakEngineTests
         var t1 = FakeTweak("t1");
         var engine = Build();
         Register(t1);
-        // bench returns a clear gain so the batch is kept.
+        // le banc rend un gain net, donc le lot est gardé.
         _bench.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<BenchmarkResult>.Ok(Bench(avg: 230, p1: 180, p01: 150, margin: 2))));
 
@@ -282,7 +281,7 @@ public sealed class TweakEngineTests
         r.Value!.Outcomes.Select(o => o.TweakId).Should().Contain("t1").And.NotContain("ghost");
     }
 
-    // ====================== C2 — auto-revert on measured regression ======================
+    // ====================== C2 : retour automatique sur régression mesurée ======================
 
     [Fact]
     public async Task Measured_regression_beyond_margin_auto_reverts_that_batch()
@@ -291,17 +290,17 @@ public sealed class TweakEngineTests
         var t2 = FakeTweak("t2");
         var engine = Build();
         Register(t1, t2);
-        // after WORSE than baseline beyond combined margins (200 - 20 > 2+2).
+        // après pire que le départ au-delà des marges combinées (200 - 20 > 2+2).
         _bench.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<BenchmarkResult>.Ok(Bench(avg: 180, p1: 120, p01: 100, margin: 2))));
 
         var r = await engine.ApplyAsync(Plan(t1, t2), Baseline, Pid, default);
 
-        r.IsOk.Should().BeTrue();                            // a measured regression is a known, handled outcome
+        r.IsOk.Should().BeTrue();                            // une régression mesurée est une issue connue et traitée
         r.Value!.Verdict.Should().NotBeNull();
         r.Value.Verdict!.IsMeasurableGain.Should().BeFalse();
         r.Value.Verdict.SummaryKey.Should().Be("verdict.regression_reverted");
-        // Both applied tweaks auto-reverted (LIFO) via their own RevertAsync.
+        // Les deux leviers appliqués annulés automatiquement (LIFO) via leur propre RevertAsync.
         r.Value.Outcomes.Where(o => o.AutoReverted).Select(o => o.TweakId)
             .Should().BeEquivalentTo(new[] { "t1", "t2" });
         await t1.Received(1).RevertAsync(Arg.Is<TweakSnapshot>(s => s.TweakId == "t1"));
@@ -359,20 +358,20 @@ public sealed class TweakEngineTests
     [Fact]
     public async Task Composite_snapshot_tweak_is_auto_reverted_via_its_OWN_revert_not_safety()
     {
-        // The reversibility-gap regression test (golden rule §6): a composite-snapshot
-        // tweak (X3D CCD fix / VRR cap) stores a multi-op snapshot that only its own
-        // RevertAsync can decode. If the engine auto-reverted via _safety.RevertAsync
-        // (single typed-op decode), the composite would be only PARTIALLY restored. We
-        // model that here: _safety.RevertAsync FAILS for this snapshot (it can't decode
-        // it), but the tweak's own RevertAsync succeeds — and the engine must use the
-        // tweak's. On a faked regression the whole batch auto-reverts cleanly.
+        // Le test de régression sur le trou de réversibilité : un levier à instantané composite
+        // (correctif CCD X3D, plafond VRR) stocke un instantané multi-ops que seul son propre
+        // RevertAsync sait décoder. Si le moteur annulait via _safety.RevertAsync (décodage d'une
+        // seule op typée), le composite ne serait restauré qu'en partie. Modélisé ici :
+        // _safety.RevertAsync échoue sur cet instantané (il ne sait pas le décoder), mais le
+        // RevertAsync du levier réussit, et le moteur doit utiliser celui du levier. Sur une
+        // régression simulée, tout le lot revient en arrière proprement.
         var composite = FakeTweak("fixit.x3d_ccd");
         var engine = Build();
         Register(composite);
-        // The generic safety path cannot restore a composite snapshot.
+        // Le chemin de sécurité générique ne sait pas restaurer un instantané composite.
         _safety.RevertAsync(Arg.Any<TweakSnapshot>())
             .Returns(Task.FromResult(Result.Fail(ErrorCodes.SnapshotInvalid, "composite not decodable by safety")));
-        // after WORSE than baseline beyond combined margins → engine auto-reverts.
+        // après pire que le départ au-delà des marges combinées → le moteur annule tout seul.
         _bench.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<BenchmarkResult>.Ok(Bench(avg: 180, p1: 120, p01: 100, margin: 2))));
 
@@ -380,7 +379,7 @@ public sealed class TweakEngineTests
 
         r.IsOk.Should().BeTrue();
         r.Value!.Verdict!.SummaryKey.Should().Be("verdict.regression_reverted");
-        // The composite was FULLY auto-reverted — via its own RevertAsync, not _safety.
+        // Le composite a été entièrement annulé, via son propre RevertAsync, pas _safety.
         r.Value.Outcomes.Should().ContainSingle()
             .Which.Should().Match<ApplyOutcome>(o => o.TweakId == "fixit.x3d_ccd" && o.AutoReverted);
         await composite.Received(1).RevertAsync(Arg.Is<TweakSnapshot>(s => s.TweakId == "fixit.x3d_ccd"));
@@ -393,7 +392,7 @@ public sealed class TweakEngineTests
         var t1 = FakeTweak("t1");
         var engine = Build();
         Register(t1);
-        // after within combined margins of baseline → no measurable gain.
+        // après dans les marges combinées du départ → aucun gain mesurable.
         _bench.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<BenchmarkResult>.Ok(Bench(avg: 201, p1: 150, p01: 120, margin: 2))));
 
@@ -402,7 +401,7 @@ public sealed class TweakEngineTests
         r.IsOk.Should().BeTrue();
         r.Value!.Verdict!.IsMeasurableGain.Should().BeFalse();
         r.Value.Verdict.SummaryKey.Should().Be("verdict.no_measurable_gain");
-        r.Value.Outcomes.Where(o => o.AutoReverted).Should().BeEmpty();   // no gain ≠ regression: KEEP
+        r.Value.Outcomes.Where(o => o.AutoReverted).Should().BeEmpty();   // pas de gain ≠ régression : garder
         r.Value.Outcomes.Should().OnlyContain(o => o.Applied);
         await _safety.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
     }
@@ -413,7 +412,7 @@ public sealed class TweakEngineTests
         var t1 = FakeTweak("t1");
         var engine = Build();
         Register(t1);
-        // after clearly better than baseline beyond margins → measurable gain.
+        // après nettement meilleur que le départ au-delà des marges → gain mesurable.
         _bench.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<BenchmarkResult>.Ok(Bench(avg: 230, p1: 190, p01: 160, margin: 2))));
 
@@ -430,42 +429,62 @@ public sealed class TweakEngineTests
     [Fact]
     public async Task Efficiency_tweak_with_flat_avg_and_better_1pct_lows_is_kept_not_reverted()
     {
-        // The decisive efficiency-tweak case (GPU undervolt / power-limit / fan curve):
-        // avg FPS flat WITHIN the combined margin (an undervolt is ~0 on avg FPS by design)
-        // but 1% lows improved BEYOND the margin (steadier frames). The OLD avg-only rule
-        // would have called this "no measurable gain"; the frame-consistency criterion makes
-        // it a measurable GAIN. Either way it must not be auto-reverted.
+        // Le cas décisif des leviers d'efficacité (undervolt GPU, limite de puissance, courbe de ventilation) :
+        // FPS moyens plats dans la marge combinée (un undervolt vaut ~0 sur la moyenne par construction)
+        // mais 1 % bas améliorés au-delà de la marge (images plus régulières). Une règle sur la seule
+        // moyenne dirait « aucun gain mesurable » ; le critère de régularité des images en fait
+        // un gain mesurable. Dans les deux cas, pas de retour arrière automatique.
         var undervolt = FakeTweak("gpu.undervolt", category: TweakCategory.GpuTuning);
         var engine = Build();
         Register(undervolt);
-        // baseline avg 200 / p1 150 (margin 2); after avg 201 (flat, within margin) but
-        // p1 170 (up 20 ≫ combined margin 4) → frame consistency clearly improved.
+        // départ moy. 200 / p1 150 (marge 2) ; après moy. 201 (plat, dans la marge) mais
+        // p1 170 (+20 ≫ marge combinée 4) → régularité des images nettement meilleure.
         _bench.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<BenchmarkResult>.Ok(Bench(avg: 201, p1: 170, p01: 120, margin: 2))));
 
         var r = await engine.ApplyAsync(Plan(undervolt), Baseline, Pid, default);
 
         r.IsOk.Should().BeTrue();
-        // KEPT: never auto-reverted (this is a WIN, not a regression).
+        // Gardé : jamais annulé automatiquement (c'est un gain, pas une régression).
         r.Value!.Outcomes.Where(o => o.AutoReverted).Should().BeEmpty();
         r.Value.Outcomes.Should().OnlyContain(o => o.Applied);
         await undervolt.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
         await _safety.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
-        // Reported as a measurable gain (steadier 1% lows), not a regression-revert.
+        // Rapporté comme gain mesurable (1 % bas plus réguliers), pas comme régression annulée.
         r.Value.Verdict!.IsMeasurableGain.Should().BeTrue();
         r.Value.Verdict.SummaryKey.Should().Be("verdict.measurable_gain");
+    }
+
+    // Un retour automatique raté ne doit pas être tracé qu'au journal : l'écran dirait « changements annulés
+    // automatiquement » et rangerait le levier, toujours posé et qui dégrade, parmi les changements gardés.
+    [Fact]
+    public async Task A_failed_auto_revert_is_said_failed_not_reverted()
+    {
+        var t1 = FakeTweak("gpu.undervolt", category: TweakCategory.GpuTuning, revertOk: false);
+        var engine = Build();
+        Register(t1);
+        _bench.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(Result<BenchmarkResult>.Ok(Bench(avg: 200, p1: 120, p01: 100, margin: 2))));
+
+        var r = await engine.ApplyAsync(Plan(t1), Baseline, Pid, default);
+
+        r.IsOk.Should().BeTrue();
+        var o = r.Value!.Outcomes.Single();
+        o.AutoReverted.Should().BeFalse();
+        o.Error.Should().NotBeNull("le retour a échoué : le levier est toujours posé");
+        r.Value.Verdict!.SummaryKey.Should().Be("verdict.regression_revert_failed");
     }
 
     [Fact]
     public async Task Regression_on_1pct_lows_alone_auto_reverts_even_if_avg_flat()
     {
-        // The other side of the criterion: avg FPS flat within margin but 1% lows DROP
-        // beyond the margin (per-game ReBAR/undervolt frame-consistency regression). The
-        // avg-only rule missed this; the frame-consistency criterion auto-reverts it.
+        // L'autre face du critère : FPS moyens plats dans la marge mais 1 % bas qui chutent
+        // au-delà (régression de régularité par jeu, ReBAR ou undervolt). La règle sur la seule
+        // moyenne la manquait ; le critère de régularité des images l'annule automatiquement.
         var t1 = FakeTweak("gpu.undervolt", category: TweakCategory.GpuTuning);
         var engine = Build();
         Register(t1);
-        // baseline avg 200 / p1 150 (margin 2); after avg 200 (flat) but p1 120 (down 30).
+        // départ moy. 200 / p1 150 (marge 2) ; après moy. 200 (plat) mais p1 120 (-30).
         _bench.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<BenchmarkResult>.Ok(Bench(avg: 200, p1: 120, p01: 100, margin: 2))));
 
@@ -481,9 +500,9 @@ public sealed class TweakEngineTests
     [Fact]
     public async Task Rebench_failure_keeps_batch_and_reports_no_verdict_honestly()
     {
-        // If we cannot re-measure, we do not claim a gain and we do not auto-revert a
-        // change we have no measured reason to revert — the batch stays applied with a
-        // null verdict (honesty §5). The user can still revert manually / via restore.
+        // Si on ne peut pas remesurer, on n'annonce pas de gain et on n'annule pas un changement
+        // qu'aucune mesure ne justifie d'annuler : le lot reste appliqué avec un verdict nul.
+        // Le joueur peut toujours annuler à la main ou par la restauration.
         var t1 = FakeTweak("t1");
         var engine = Build();
         Register(t1);
@@ -501,22 +520,22 @@ public sealed class TweakEngineTests
     [Fact]
     public async Task Reboot_required_batch_is_kept_without_rebench_even_with_a_baseline()
     {
-        // HAGS / Game Mode etc. only take effect after a reboot / next game launch, so an
-        // immediate re-bench can't reflect them and must not auto-revert them on session
-        // noise. A batch made entirely of reboot-required tweaks is kept as-is, with NO
-        // re-bench (the gain is proven by the next in-game scan — honest deferred proof).
+        // HAGS, Mode Jeu, etc. ne prennent effet qu'après redémarrage ou au prochain lancement de jeu :
+        // un re-banc immédiat ne peut pas les refléter et ne doit pas les annuler sur le bruit de la
+        // session. Un lot fait uniquement de leviers à redémarrage est gardé tel quel, sans
+        // re-banc (le gain se prouve au prochain scan en jeu : preuve différée, honnête).
         var reboot1 = FakeTweak("latency.hagsOn", takesEffectAfterReboot: true);
         var reboot2 = FakeTweak("os.gameMode", takesEffectAfterReboot: true);
         var engine = Build();
         Register(reboot1, reboot2);
-        // Even if a re-bench would read a regression, the engine must not consult it here.
+        // Même si un re-banc lirait une régression, le moteur ne doit pas le consulter ici.
         _bench.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<BenchmarkResult>.Ok(Bench(avg: 100, p1: 60, p01: 40, margin: 2))));
 
         var r = await engine.ApplyAsync(Plan(reboot1, reboot2), Baseline, Pid, default);
 
         r.IsOk.Should().BeTrue();
-        r.Value!.Verdict.Should().BeNull();                       // no A/B done → no invented verdict
+        r.Value!.Verdict.Should().BeNull();                       // pas d'A/B → pas de verdict inventé
         r.Value.Outcomes.Should().OnlyContain(o => o.Applied && !o.AutoReverted);
         await _bench.DidNotReceive().RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await reboot1.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
@@ -526,9 +545,9 @@ public sealed class TweakEngineTests
     [Fact]
     public async Task Mixed_batch_with_one_immediate_tweak_still_rebenches()
     {
-        // Only an ALL-reboot batch skips the A/B. A mixed batch still re-benches — the
-        // immediate tweak can be measured (heuristic ceiling: a measured regression would
-        // revert the whole mixed batch; split the families if that ever bites).
+        // Seul un lot entièrement à redémarrage saute l'A/B. Un lot mixte re-bance : le levier
+        // immédiat se mesure (plafond de l'heuristique : une régression mesurée annulerait
+        // tout le lot mixte ; séparer les familles si ça mord un jour).
         var immediate = FakeTweak("gpu.undervolt", category: TweakCategory.GpuTuning);
         var reboot = FakeTweak("latency.hagsOn", takesEffectAfterReboot: true);
         var engine = Build();
@@ -542,8 +561,8 @@ public sealed class TweakEngineTests
     [Fact]
     public async Task No_baseline_skips_rebench_and_keeps_batch()
     {
-        // Degraded mode: no baseline (PresentMon unavailable at scan) → we cannot do an
-        // A/B verdict, so we keep the applied batch with no verdict (never invent a gain).
+        // Mode dégradé : pas de départ (PresentMon indisponible au scan) → pas de verdict A/B
+        // possible, donc on garde le lot appliqué sans verdict (jamais inventer un gain).
         var t1 = FakeTweak("t1");
         var engine = Build();
         Register(t1);
@@ -556,7 +575,7 @@ public sealed class TweakEngineTests
         await _bench.DidNotReceive().RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
-    // ====================== P4 — un banc exige une cible PROUVEE ======================
+    // ====================== Un banc exige une cible PROUVEE ======================
 
     /// <summary>Un levier de registre dont l'apply « reussit » et dont on choisit ce que la
     /// relecture verra.</summary>
@@ -641,13 +660,12 @@ public sealed class TweakEngineTests
     [Fact]
     public async Task Sans_lecteur_le_batch_est_GARDE_mais_AUCUN_GAIN_n_est_annonce()
     {
-        // La correction du 10/09 (phase 18, P0). Le moteur n'annulait que sur `NotApplied` et
-        // laissait `Unknown` / `Unavailable` continuer jusqu'au banc : DrDXT pouvait donc mesurer
-        // un candidat sans avoir prouve que la cible etait en place, et attribuer l'ecart d'une
-        // session a un changement non verifie.
+        // `Unknown` / `Unavailable` n'ouvrent pas le banc, pas seulement `NotApplied` : sinon DrDXT
+        // mesurerait un candidat sans avoir prouve que la cible est en place, et attribuerait l'ecart
+        // d'une session a un changement non verifie.
         //
-        // Sans lecteur, aucune cible n'est prouvable. Le levier n'est pas condamne pour autant —
-        // il est garde — mais rien ne sera mesure.
+        // Sans lecteur, aucune cible n'est prouvable. Le levier n'est pas condamne pour autant :
+        // il est garde, mais rien ne sera mesure.
         var t = LevierRegistre("latency.test", avant: "1", demande: "2");
         Register(t);
         _safety.EnsureRestorePointAsync().Returns(Task.FromResult(Result.Ok()));

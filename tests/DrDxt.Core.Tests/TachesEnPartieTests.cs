@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.Core.Tests;
 
-// 07/10/2026 (chantier D4) : les tâches planifiées dont la dernière exécution tombe pendant une partie relevée.
+// Les tâches planifiées dont la dernière exécution tombe pendant une partie relevée.
 public sealed class TachesEnPartieTests
 {
     private static readonly DateTimeOffset J = new(2026, 10, 7, 0, 0, 0, TimeSpan.Zero);

@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Les gardes de ce projet lisent les sources du depot. Elles le
+// Les gardes de ce projet lisent les sources du depot. Elles le
 // faisaient avec `SearchOption.AllDirectories`, en ecartant `bin`/`obj`/`.git`
 // Apres l'enumeration -- donc apres y etre descendues. Pendant une execution de
 // toute la solution, MSBuild cree et supprime des fichiers dans ces dossiers en
@@ -13,7 +13,7 @@ namespace DrDxt.Integration.Tests;
 // Ce test interdit desormais le parcours brut dans ce projet : tout passe par
 // `FichiersDuDepot.Sous`, qui elague avant de descendre.
 //
-// Ce que je n'affirme pas : que c'etait la cause du rouge du tour 100. Ce
+// Ce que je n'affirme pas : que c'etait la cause du rouge intermittent. Ce
 // rouge n'a jamais ete nomme (mon instrument l'a manque deux fois), et 25
 // executions du projet seul n'ont rien redonne. Ce qui est sur et mesurable :
 // ces gardes ouvraient un chantier en activite alors qu'elles cherchent des

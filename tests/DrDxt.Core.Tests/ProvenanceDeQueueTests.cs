@@ -5,19 +5,19 @@ using Xunit;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// La question posee le 11/09/2026, et l'instrument qui servira a la trancher.
+/// Une question ouverte, et l'instrument qui servira a la trancher.
 ///
 /// `DecideParMetrique` garde un reglage sur une grandeur de queue prouvee : le 1 % low **ou** le
 /// p95 frametime. Deux mesures se contredisent sur ce que « p95 seul » vaut vraiment (voir
-/// <see cref="PreuveDeQueue"/> : 08/09 les deux grandeurs se separent, 11/09 le p95 partage
-/// 95,5 % de sa variance avec la moyenne). Un cas de chaque cote ne tranche rien.
+/// <see cref="PreuveDeQueue"/> : dans une mesure les deux grandeurs se separent, dans l'autre le p95
+/// partage 95,5 % de sa variance avec la moyenne). Un cas de chaque cote ne tranche rien.
 ///
 /// D'ou un ENREGISTREMENT, pas un durcissement : chaque verdict nomme ce qui a valide sa
 /// queue. Au bout de vraies sessions, la question se tranchera sur un corpus au lieu de deux
 /// mesures isolees.
 ///
 /// Ce fichier existe autant pour prouver que rien n'a bouge. La moitie de ses tests verifie
-/// que la decision — garder ou rejeter, et pourquoi — est exactement celle d'avant.
+/// que la decision (garder ou rejeter, et pourquoi) ne depend pas de cet enregistrement.
 /// </summary>
 public class ProvenanceDeQueueTests
 {

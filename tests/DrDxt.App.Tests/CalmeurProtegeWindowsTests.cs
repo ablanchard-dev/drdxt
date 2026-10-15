@@ -3,9 +3,9 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>Vu sur capture (08/10/2026) : la proposition « faire passer après le jeu » listait WmiPrvSE, un processus de
-/// Windows, sous le texte « toujours protégés : … Windows ». Les hôtes de Windows qui travaillent en arrière-plan sont
-/// protégés comme le reste du système.</summary>
+/// <summary>Les hôtes de Windows qui travaillent en arrière-plan (WmiPrvSE…) sont protégés comme le reste du système :
+/// sans ce test, « faire passer après le jeu » pourrait lister un processus de Windows sous le texte « toujours
+/// protégés : … Windows ».</summary>
 public sealed class CalmeurProtegeWindowsTests
 {
     [Theory]

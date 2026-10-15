@@ -77,7 +77,7 @@ public class MemoryVerdictTests
     [Fact]
     public void Un_ecart_sous_le_bruit_rend_la_RESOLUTION_et_pas_seulement_un_non()
     {
-        // 17/09/2026 — mesure sur la machine de reference : la memoire tourne a 3 800 MT/s pour un kit
+        // Mesure sur la machine de reference : la memoire tourne a 3 800 MT/s pour un kit
         // annonce a 4 000, soit +5,3 % de debit theorique si le profil du kit etait applique.
         // L'instrument repond « pas significatif ». Sans sa resolution, le lecteur entend
         // « monter a 4 000 ne sert a rien » ; la phrase vraie est « je ne sais pas distinguer
@@ -95,7 +95,7 @@ public class MemoryVerdictTests
         verdict.LatencyResolutionPct.Should().BeApproximately(14.64, 0.02);
     }
 
-    // 26/09/2026 : une mutation qui ne comptait que les HAUSSES de debit restait verte. Le cas qu'elle
+    // Une mutation qui ne comptait que les HAUSSES de debit restait verte. Le cas qu'elle
     // cache est celui qu'on veut voir : une mise a jour du BIOS qui remet la memoire a 2133 MT/s.
     [Fact]
     public void Un_debit_qui_s_effondre_est_un_resultat_et_son_delta_est_negatif()

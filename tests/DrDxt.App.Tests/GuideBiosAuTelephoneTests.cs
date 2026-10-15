@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 07/10/2026 (chantier D11) : le guide BIOS se lit au téléphone pendant que le PC est dans le BIOS ; le QR porte
+// Le guide BIOS se lit au téléphone pendant que le PC est dans le BIOS ; le QR porte
 // le texte entier, sans réseau.
 public sealed class GuideBiosAuTelephoneTests
 {
@@ -31,8 +31,8 @@ public sealed class GuideBiosAuTelephoneTests
         }
     }
 
-    // 07/10/2026 (D12) : une carte jamais vue renvoie au manuel de son constructeur ; un lien seulement là où l'adresse est
-    // prouvée (MSI, page relevée le 07/10 pour la carte du mainteneur).
+    // Une carte jamais vue renvoie au manuel de son constructeur ; un lien seulement là où l'adresse est
+    // prouvée (MSI, page relevée le 07/10 pour la carte de la machine de référence).
     [Fact]
     public void Le_lien_du_manuel_n_existe_que_pour_un_motif_prouve()
     {
@@ -41,7 +41,7 @@ public sealed class GuideBiosAuTelephoneTests
         BiosGuideViewModel.LienDuManuel(BiosVendor.Asus, "ROG STRIX B650-A GAMING WIFI").Should().BeNull();
         BiosGuideViewModel.LienDuManuel(BiosVendor.Msi, "PRO B760/../x").Should().BeNull();
         BiosGuideViewModel.LienDuManuel(BiosVendor.Msi, "").Should().BeNull();
-        // Revue F-51 : une carte qui ne dit que son code interne n'a pas de page à ce nom.
+        // Une carte qui ne dit que son code interne n'a pas de page à ce nom.
         BiosGuideViewModel.LienDuManuel(BiosVendor.Msi, "MS-7C02").Should().BeNull();
     }
 
@@ -58,7 +58,7 @@ public sealed class GuideBiosAuTelephoneTests
         new BiosGuideViewModel(ScanViewModelTestSeams.Guide(steps: ScanViewModelTestSeams.Step()), Fr).ManuelDeLaCarte.Should().BeNull();
     }
 
-    // Revue F-48 : un guide réel (carte non vérifiée, quatre réglages, lien du manuel) tient dans un QR lisible : au
+    // Un guide réel (carte non vérifiée, quatre réglages, lien du manuel) tient dans un QR lisible : au
     // plus la version 25, affiché à sa taille, 4 pixels par module. Relu hors CI par OpenCV à cette taille même
     // (DRDXT_QR_REEL=chemin.png).
     [Fact]
@@ -85,7 +85,7 @@ public sealed class GuideBiosAuTelephoneTests
         }
     }
 
-    // Revue F-50 : la carte ne dit plus « tu n'as besoin de rien d'autre » à côté de « le manuel fait foi ».
+    // La carte ne dit plus « tu n'as besoin de rien d'autre » à côté de « le manuel fait foi ».
     [Fact]
     public void Une_carte_non_verifiee_ne_dit_pas_deux_choses_contraires()
         => new BiosGuideViewModel(ScanViewModelTestSeams.Guide(GuideConfidence.UnverifiedFallback, steps: ScanViewModelTestSeams.Step()), Fr)
@@ -99,7 +99,7 @@ public sealed class GuideBiosAuTelephoneTests
 
         g.QrVisible.Should().BeFalse();
         g.Steps.Should().HaveCount(400);
-        // F-48 : vingt réglages tiennent dans un QR, mais au-delà de la version 25 : trop dense pour un téléphone.
+        // Vingt réglages tiennent dans un QR, mais au-delà de la version 25 : trop dense pour un téléphone.
         new BiosGuideViewModel(ScanViewModelTestSeams.Guide(steps: etapes.Take(20).ToArray()), Fr).QrVisible.Should().BeFalse();
     }
 }

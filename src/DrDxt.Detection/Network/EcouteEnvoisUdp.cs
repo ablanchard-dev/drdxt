@@ -5,7 +5,7 @@ using System.Runtime.Versioning;
 namespace DrDxt.Detection.Network;
 
 /// <summary>
-/// 03/10/2026 (boucle 2D2P, P3.1b) : écoute, le temps d'une fenêtre, les envois UDP publiés par
+/// Écoute, le temps d'une fenêtre, les envois UDP publiés par
 /// Microsoft-Windows-Kernel-Network (événement 42, voir <see cref="EnvoisUdp"/>) et les cumule par programme et par
 /// destination. Lecture pure : rien n'est écrit, aucun paquet n'est envoyé. Session privée en temps réel, arrêtée dans
 /// tous les cas (même modèle que <c>DpcLatencyTracer</c>). Rend <c>null</c> quand l'écoute n'a pas pu se faire : « pas pu

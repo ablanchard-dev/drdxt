@@ -13,14 +13,14 @@ using Microsoft.Extensions.DependencyInjection;
 //   --remettre : rend seulement ce qu'un essai interrompu a laissé ;
 //   --lire : ce que l'ADLX lit sur la carte AMD dédiée ;
 //   --etape N : une étape du rapport, dans un processus enfant (usage interne).
-// 09/10/2026 (diffusion publique) : aucun rapport ne porte le nom du PC ni du compte ; tout le texte passe par les règles
+// Aucun rapport ne porte le nom du PC ni du compte ; tout le texte passe par les règles
 // de la machine exportée (MachineExportee.CeQuiEstRetire) avant d'être écrit. L'ancienne session d'écriture de
 // fréquence et de tension (juillet) est supprimée du code, pas seulement désactivée.
 // -----------------------------------------------------------------------
 
 const string LienTicket = "https://github.com/ablanchard-dev/drdxt/issues/new?template=rapport-de-verification.yml";
 
-// 10/10/2026 (revue de sécurité) : le banc ne demande plus l'élévation lui-même (manifeste asInvoker). Un programme .NET
+// Le banc ne demande plus l'élévation lui-même (manifeste asInvoker). Un programme .NET
 // élevé par l'UAC hérite de HKCU\Environment, où tout programme du compte peut poser de quoi charger sa DLL avant cette
 // ligne. Lancé sans droits (double-clic), il passe la main au lanceur natif à côté de lui, qui demande l'élévation et le
 // relance avec un environnement reconstruit ; puis il s'arrête. Sans lanceur, il le dit et s'arrête.
@@ -32,7 +32,7 @@ if (!LanceurDuBanc.EstAdministrateur())
     return;
 }
 
-// Revue n° 8 : « --etape N » = une seule étape, dans ce processus enfant ; sa sortie est relue par le parent.
+// « --etape N » = une seule étape, dans ce processus enfant ; sa sortie est relue par le parent.
 if (args.Length == 2 && args[0] == "--etape" && int.TryParse(args[1], out var numero))
 {
     Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -49,7 +49,7 @@ if (args.Length == 2 && args[0] == "--etape" && int.TryParse(args[1], out var nu
     return;
 }
 
-// A1 (06/10/2026) : « --lire » lit par ADLX, sur la carte AMD dédiée, ce que le produit affiche (SAM, Anti-Lag,
+// « --lire » lit par ADLX, sur la carte AMD dédiée, ce que le produit affiche (SAM, Anti-Lag,
 // FRTC / Chill, température), puis s'arrête. Lecture seule : aucune entrée Set* n'est appelée, aucun service lancé.
 if (args.Contains("--lire"))
 {
@@ -73,7 +73,7 @@ string Propre(string t) => MachineExportee.AnonymiserTexte(t, valeursDeCePc);
 var version = typeof(DrDxt.Application.Autopilot.ValidationComplete).Assembly.GetName().Version?.ToString(3);
 var horodatage = DateTime.Now;
 
-// 07/10/2026 (revue n° 8) : « --valider » pose chaque levier du produit, le relit, le rend, le relit encore.
+// « --valider » pose chaque levier du produit, le relit, le rend, le relit encore.
 // « --remettre » rend seulement ce qu'un essai interrompu a laissé. Les deux commencent par rendre ce qui reste.
 if (args.Contains("--valider") || args.Contains("--remettre"))
 {
@@ -110,7 +110,7 @@ if (args.Contains("--valider") || args.Contains("--remettre"))
     return;
 }
 
-// 07/10/2026 (T3) : par défaut, le rapport en LECTURE SEULE (Reporting/RapportLecture.cs), écrit dans Téléchargements,
+// Par défaut, le rapport en LECTURE SEULE (Reporting/RapportLecture.cs), écrit dans Téléchargements,
 // qui ne s'arrête jamais sur une erreur.
 {
     Console.WriteLine("DrDXT — rapport de test en LECTURE SEULE : rien n'est modifié sur ce PC. Compte 1 à 3 minutes. Ne ferme pas cette fenêtre.");
@@ -120,7 +120,7 @@ if (args.Contains("--valider") || args.Contains("--remettre"))
     var corps = new System.Text.StringBuilder(entete);
     try
     {
-        // Revue n° 8 : le parent n'appelle aucun code natif ; chaque étape tourne dans son processus.
+        // Le parent n'appelle aucun code natif ; chaque étape tourne dans son processus.
         var services = new ServiceCollection();
         services.AddSingleton<IElevatedClient>(new RefusDElevation());
         services.AddDrDxtDetection();

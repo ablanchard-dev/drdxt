@@ -4,7 +4,7 @@ namespace DrDxt.Application.Parties;
 public sealed record Bilan(int Parties, double? FpsMedian, double? FpsMedianSemainePrecedente, int Changements, int Arrets, int Erreurs);
 
 /// <summary>
-/// 04/10/2026 (plan 3b.5) : le bilan de la semaine, en une ligne en tête de l'historique. Les FPS ne se comparent qu'au
+/// Le bilan de la semaine, en une ligne en tête de l'historique. Les FPS ne se comparent qu'au
 /// même jeu (le plus joué de la semaine) et seulement s'il y a des parties des deux côtés ; sinon la comparaison est tue.
 /// Pur : tout vient de l'appelant.
 /// </summary>

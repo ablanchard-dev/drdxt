@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// T4 (08/10/2026) : une preuve débloque son matériel, et rien d'autre ne le fait. Une architecture « validée en vie » et un
+/// Une preuve débloque son matériel, et rien d'autre ne le fait. Une architecture « validée en vie » et un
 /// profil « Tested » exigent un rapport de vérification réel dans tests/Shared/validations, avec une écriture rendue.
 /// </summary>
 public sealed class UnePreuveDebloqueSonMaterielTests
@@ -33,6 +33,34 @@ public sealed class UnePreuveDebloqueSonMaterielTests
         Enum.GetValues<GpuArchitecture>().Should().NotBeEmpty();
         GpuTuningCoverage.ValideesEnVie.Where(a => !Prouvee(a.ToString())).Should().BeEmpty(
             "une architecture ne se dit validée qu'avec son rapport réel, écriture rendue");
+    }
+
+    // Les leviers de carte qu'un rapport archivé a validés (écrit, relu, rendu, relu), par architecture (le nom du rapport).
+    // L'écran les dit « vérifiés sur une carte de la même famille » : la table du code et les rapports ne divergent pas.
+    [Fact]
+    public void Les_leviers_valides_en_vie_sont_ceux_des_rapports_archives()
+    {
+        var valides = Directory.GetFiles(Validations(), "*-*.txt")
+            .GroupBy(f => Path.GetFileName(f).Split('-')[0])
+            .ToDictionary(g => g.Key, g => g
+                .SelectMany(f => File.ReadAllText(f).Split("=== ", StringSplitOptions.RemoveEmptyEntries).Skip(1))
+                .Where(bloc => bloc.Contains("verdict      : validé", StringComparison.Ordinal))
+                .Select(bloc => bloc.Split('\n')[0].Trim())
+                .Where(id => id.StartsWith("gpu.", StringComparison.Ordinal))
+                .ToHashSet())
+            .Where(kv => kv.Value.Count > 0)
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+        valides.Should().ContainKey("AdaOrOlder").WhoseValue.Should().Contain("gpu.power_limit", "témoin : le crible lit bien le rapport de la RTX 4060");
+        PreuvesArchivees.LeviersParArchitecture.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value.ToHashSet())
+            .Should().BeEquivalentTo(valides);
+    }
+
+    [Fact]
+    public void La_preuve_d_une_architecture_ne_vaut_pas_pour_une_autre()
+    {
+        PreuvesArchivees.Prouve(GpuArchitecture.AdaOrOlder, "gpu.power_limit").Should().BeTrue();
+        Enum.GetValues<GpuArchitecture>().Where(a => a != GpuArchitecture.AdaOrOlder)
+            .Should().OnlyContain(a => !PreuvesArchivees.Prouve(a, "gpu.power_limit"));
     }
 
     [Fact]

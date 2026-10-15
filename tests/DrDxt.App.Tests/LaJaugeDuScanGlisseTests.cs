@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D3.1) : « un arc de cercle bleu censé bouger en même temps que le scan, pas très fluide ».
+// « un arc de cercle bleu censé bouger en même temps que le scan, pas très fluide ».
 // La jauge sautait d'un huitième à chaque étape puis restait figée. Elle glisse, avance pendant l'étape, sans jamais
 // dépasser la fin de l'étape en cours.
 public sealed class LaJaugeDuScanGlisseTests

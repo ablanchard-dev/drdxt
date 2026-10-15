@@ -5,10 +5,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// DI wiring for the BIOS Doctor module: the read+diff advisor, the data-driven guide
-/// library (loaded + validated from embedded data at first resolution), and the guide
-/// generator. All singletons — the library is immutable validated data and the
-/// generator is stateless. Registered with TryAdd so a host can substitute a fake.
+/// Branchement DI du module BIOS Doctor : le conseiller lecture + écart, la bibliothèque de guides
+/// pilotée par les données (chargée et validée depuis les données embarquées à la première
+/// résolution) et le générateur de guides. Tous singletons : la bibliothèque est une donnée validée
+/// immuable et le générateur est sans état. Enregistrés avec TryAdd pour qu'un hôte y substitue un faux.
 /// </summary>
 public static class BiosServiceCollectionExtensions
 {
@@ -16,16 +16,16 @@ public static class BiosServiceCollectionExtensions
     {
         services.TryAddSingleton<IBiosAdvisor, BiosAdvisor>();
 
-        // The library validates the embedded data at construction; a packaging fault
-        // surfaces loudly here (a bug we want loud), not as a silent empty guide.
+        // La bibliothèque valide les données embarquées à la construction ; une faute d'empaquetage
+        // remonte bruyamment ici (un bug qu'on veut bruyant), pas en guide vide silencieux.
         services.TryAddSingleton<IGuideLibrary>(_ => GuideLibraryFactory.CreateDefault());
 
         services.TryAddSingleton<IGuideGenerator>(sp =>
             new GuideGenerator(sp.GetRequiredService<IGuideLibrary>()));
 
-        // ── Closed-loop verification (M3): the injectable clock, the file-backed
-        //    pending-change marker store, and the post-reboot verifier. The store
-        //    writes under %LOCALAPPDATA%\DrDXT\ via the real filesystem seam. ──
+        // ── Vérification en boucle fermée : l'horloge injectable, le store de marqueur de changement en
+        //    attente adossé à un fichier, et le vérificateur après redémarrage. Le store écrit sous
+        //    %LOCALAPPDATA%\DrDXT\ par la vraie couture de système de fichiers. ──
         services.TryAddSingleton<IBiosClock, SystemBiosClock>();
         services.TryAddSingleton<IBiosMachineId, SystemBiosMachineId>();
         services.TryAddSingleton<IPendingBiosChangeStore>(_ => new PendingBiosChangeStore());

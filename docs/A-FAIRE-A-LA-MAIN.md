@@ -74,9 +74,10 @@ relue le 09/10/2026.
   elles ont été posées.
 - **Couper l'intégrité de la mémoire ou l'hyperviseur** : réglages de sécurité ; DrDXT dit leur coût mesuré, ne les coupe pas.
 - **Nettoyer le magasin de composants de Windows (`/ResetBase`)** : irréversible, aucun gain en jeu (de la place disque seulement).
-- **Sous-tension du processeur** : verrouillée par défaut sur les Intel de 12e à 14e générations (« Undervolt Protection »,
-  un réglage BIOS sur beaucoup de cartes de bureau) et passe par une faille fermée sur les plus anciens : DrDXT ne
-  touche pas à ce verrou ; sur Ryzen, le Curve Optimizer est un réglage BIOS (étapes plus bas).
+- **Sous-tension du processeur au-delà de ce qui est prouvé** : DrDXT ne monte jamais la tension, ne descend jamais sous
+  −125 mV, n'écrit rien sur un processeur qui a SGX (la faille Plundervolt n'attaque que lui), et ne touche jamais au verrou
+  « Undervolt Protection » du BIOS : quand il bloque, c'est toi qui choisis de l'ouvrir (5.23). Sur Ryzen, le Curve
+  Optimizer est un réglage BIOS (étapes plus bas).
 
 ## 5. À la main, étape par étape
 
@@ -118,10 +119,24 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 5. Trop chaud en partie (le constat « chaleur en partie » : 95 °C ou plus) : c'est l'inverse. Une limite ouverte (PL1 = PL2
    = 253 W) laisse passer des pics que le refroidisseur n'évacue pas ; à 100 °C le processeur se freine et les 1 % low
    tombent. DrDXT donne le plafond qui garde le jeu tel quel (la puissance médiane de ta partie, plus un tiers, arrondie :
-   117 W en médiane ⇒ 160 W) : mets PL1 = PL2 à cette valeur, même menu (« Long Duration Power Limit » et « Short
+   117 W en médiane ⇒ 160 W). Optimiser peut poser ce plafond lui-même sur PL1, à chaud (levier « Plafond de puissance
+   contre la chaleur », relu sur tes parties suivantes par le docteur, rendu au redémarrage) ; pour le rendre durable et couper aussi les pointes,
+   mets PL1 = PL2 à cette valeur au BIOS, même menu (« Long Duration Power Limit » et « Short
    Duration Power Limit » chez MSI). Sur MSI, « CPU Lite Load » un ou deux crans plus bas baisse encore la tension, à
    perf égale ; si un jeu plante, remonte d'un cran. Encore 95 °C ou plus avec ce plafond : c'est le refroidissement
    (montage du ventirad, pâte, second ventilateur, poussière).
+6. « 100 °C » n'est pas tout le processeur : le chiffre que lisent DrDXT et la plupart des outils est celui du cœur le
+   plus chaud. Sur la machine de référence, à 98 °C lus, le cœur 0 était à 77 °C. Ce qui coûte, c'est le temps passé
+   freiné. DrDXT le relève seconde par seconde (par PawnIO) et
+   ne conseille rien quand le processeur ne s'est presque pas freiné par la chaleur.
+7. Bridé par le courant, pas par la chaleur (le constat le dit : « limite de courant » une bonne part du temps) : au BIOS,
+   « CPU Current Limit » (MSI, même menu) en Auto ; une valeur à la main (160 A sur la machine de référence) faisait
+   tomber le processeur de 4,9 à 3,9 GHz. Un « CPU Lite Load » très bas peut aussi l'y pousser : remonte d'un ou deux
+   crans. Rejoue au moins trois parties avant de juger : une seule ne départage pas un réglage du hasard d'une partie.
+8. Le test de refroidissement de DrDXT : deux minutes de charge pleine sur tous les cœurs, l'état du processeur lu chaque
+   seconde, arrêt tout seul si le cœur le plus chaud reste à 99 °C dix secondes. Une charge pleine est plus dure qu'un jeu :
+   s'il s'arrête, c'est la marge du refroidissement à cette limite de puissance, pas ta partie. Plafonne la puissance
+   (étape 5) ou change de refroidisseur ; rejoue-le après, il doit tenir plus longtemps.
 
 ### 5.4 Resizable BAR
 1. Vérifie d'abord que Windows démarre en UEFI : Windows + R, `msinfo32`, ligne « Mode BIOS » = UEFI. S'il dit
@@ -155,6 +170,11 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    performants moins un (un i7-14700 a 8 cœurs performants : 7) ; ce n'est pas mesuré indépendamment, et le jeu réécrit
    ce fichier à chaque sortie : règle-le dans le menu, jeu ouvert. DrDXT lit la valeur, ne l'écrit pas, et juge le
    changement sur tes parties.
+6. Éclairage global et reflets (jeux Unreal Engine 5, par exemple JeuB ou Fortnite) : en « épique » ou « cinématique »,
+   ces deux réglages font tourner Lumen, l'éclairage le plus lourd pour la carte graphique (guide de performance de
+   Lumen d'Epic). Passe-les en « élevé » dans les options graphiques du jeu, puis en « moyen » s'il en faut plus. Ça
+   n'aide que si la carte freine : si tes parties disent que c'est le processeur, DrDXT le dit et ne conseille rien.
+   DrDXT lit la valeur dans `GameUserSettings.ini`, ne l'écrit pas, et juge le changement sur tes parties.
 
 ### 5.8 Réseau
 1. Câble Ethernet plutôt que Wi-Fi, chaque fois que c'est possible.
@@ -164,8 +184,9 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 3. Pendant la partie, pas d'envoi lourd (cloud, mise en ligne de vidéos) sur le même réseau.
 
 ### 5.9 Programmes au démarrage et à côté du jeu
-1. Gestionnaire des tâches (Ctrl + Maj + Échap) > Applications de démarrage : désactive ce qui ne sert pas au jeu
-   (DrDXT te nomme la liste ; garde « SecurityHealth »).
+1. Programmes au démarrage : sous « Comment corriger » du constat, DrDXT coupe chaque programme sur ton clic, comme le
+   Gestionnaire des tâches, et « Annuler » le réactive (« SecurityHealth » reste). À la main : Gestionnaire des tâches
+   (Ctrl + Maj + Échap) > Applications de démarrage.
 2. Overlays : coupe ceux dont tu ne te sers pas (Discord : Paramètres > Overlay du jeu ; GeForce : Alt+Z, Paramètres).
 3. Instant Replay de NVIDIA (enregistre en continu, environ 5 % d'images selon NVIDIA) : Alt+Z > Instant Replay >
    Désactiver, si tu ne t'en sers pas.
@@ -212,7 +233,8 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 ### 5.15 Disques
 1. Jeux sur un disque dur : déplace-les sur un SSD (le lanceur sait déplacer un jeu installé : Steam > Propriétés >
    Fichiers installés > Déplacer ; Battle.net > roue > Déplacer).
-2. Fichier d'échange sur un disque dur alors qu'un SSD est là : Windows + R, `sysdm.cpl` > Paramètres système avancés >
+2. Fichier d'échange sur un disque dur alors qu'un SSD est là : quand Windows est sur ce SSD et que la taille est gérée par
+   le système, DrDXT rend sa gestion à Windows lui-même (Optimiser, effet au redémarrage, réversible). Sinon : Windows + R, `sysdm.cpl` > Paramètres système avancés >
    Performances > Paramètres > Avancé > Mémoire virtuelle > Modifier, décoche « Gérer automatiquement », puis « Taille
    gérée par le système » sur le SSD et « Aucun fichier d'échange » sur le disque dur ; redémarre.
 3. Place libre du disque système sous 5 % : les mises à jour et le fichier d'échange n'ont plus de marge. Libère d'abord
@@ -223,17 +245,23 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 ### 5.16 Windows et périphériques
 1. Windows Update : Paramètres > Windows Update > Rechercher des mises à jour, puis Microsoft Store > Bibliothèque > Obtenir
    les mises à jour (les deux chemins se relancent à la main quand DrDXT dit qu'ils n'ont rien fait depuis longtemps).
+   Pour Windows Update, DrDXT peut aussi relancer la recherche lui-même (« Chercher maintenant », sous le constat).
    Une mise à jour qui échoue ou reste « en attente » : Paramètres > Système > Dépannage > Autres utilitaires de
    résolution des problèmes > Windows Update > Exécuter, puis redémarre et relance la recherche.
 2. Un périphérique dont le pilote est en échec (DrDXT nomme le code) : Gestionnaire de périphériques, clic droit, Mettre à
-   jour le pilote, sinon Désinstaller puis redémarrer.
-3. Vieux pilotes graphiques gardés dans le magasin de Windows : DrDXT les nomme, ne les retire pas ; `pnputil /delete-driver
-   oemNN.inf` en administrateur retire ceux qu'il a listés, un à la fois (**sans retour** : le paquet est supprimé ; le
-   pilote en service n'est jamais dans la liste).
-4. Plan d'alimentation « Économie d'énergie » pour jouer : Paramètres > Système > Alimentation, repasse en Équilibré.
+   jour le pilote, sinon Désinstaller puis redémarrer. DrDXT peut d'abord le relancer lui-même (« Le relancer », sous le
+   constat), comme le Gestionnaire de périphériques.
+3. Vieux pilotes graphiques gardés dans le magasin de Windows : DrDXT les nomme, et peut les retirer lui-même, un par un
+   (« Retirer oemNN.inf », sous le constat) : il sauvegarde d'abord le paquet, et « Annuler » le remet. À la main,
+   `pnputil /delete-driver oemNN.inf` en administrateur retire ceux qu'il a listés, **sans retour** : le paquet est
+   supprimé. Le pilote en service n'est jamais dans la liste.
+4. Plan d'alimentation « Économie d'énergie » pour jouer : sur un PC de bureau, DrDXT repasse en Équilibré lui-même (Optimiser,
+   réversible). Sur un portable, où l'économie peut être voulue : Paramètres > Système > Alimentation, repasse en Équilibré.
 5. Un réglage posé par DrDXT et défait depuis (mise à jour, autre programme) : relance l'optimisation, DrDXT ne le repose
    pas tout seul.
-6. Doute sur la mémoire : Windows + R, `mdsched.exe`, le test tourne au redémarrage ; DrDXT lit le résultat.
+6. Doute sur la mémoire : Windows + R, `mdsched.exe`, le test tourne au redémarrage ; DrDXT lit le résultat. DrDXT
+   peut aussi le demander lui-même pour le prochain redémarrage (« Le lancer au prochain démarrage », sous le constat),
+   une seule fois, et l'annuler ; le redémarrage reste à toi.
 7. Un service Windows qui plante ou redémarre sans cesse (DrDXT le nomme) : mets à jour ou réinstalle le logiciel à qui
    il appartient, ou désinstalle-le s'il ne sert plus. DrDXT ne touche pas aux services.
 
@@ -248,11 +276,13 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    vrai remède.
 3. Relance le scan après : le constat « mémoire saturée » doit passer à « pas de pression visible ».
 
-### 5.18 PawnIO : la température et la limite de puissance du processeur, lues dans ses registres
+### 5.18 PawnIO : la température et la limite de puissance du processeur, dans ses registres
 1. Sans HWiNFO, Windows ne donne pas la température du processeur ni sa limite de puissance. PawnIO (pawnio.eu, pilote signé,
    code source public) les lit dans les registres du processeur. **DrDXT ne l'installe jamais** : c'est ton choix, c'est un
-   pilote noyau. Installé dans son dossier par défaut (`Program Files\PawnIO`), DrDXT s'en sert en lecture seule, si DrDXT
-   est lancé en administrateur ; sinon ces deux constats restent « non lus », et c'est dit.
+   pilote noyau. Installé dans son dossier par défaut (`Program Files\PawnIO`), DrDXT s'en sert pour LIRE la température, la
+   limite de puissance et les raisons de freinage, si DrDXT est lancé en administrateur ; sinon ces constats restent « non
+   lus », et c'est dit. Une seule ÉCRITURE passe par lui : la limite de puissance longue (PL1) quand tu acceptes ce levier,
+   par le helper de DrDXT seulement, relue après coup, défaite au redémarrage (le BIOS remet sa valeur) ou en un clic.
 2. Intel seulement pour l'instant ; sur un Ryzen, ces deux constats restent non lus.
 3. Anti-triche : un pilote de lecture de registres est connu des anti-triches ; FACEIT bloque PawnIO (il refuse de lancer, il
    ne bannit pas) ; rien de connu côté Ricochet, Vanguard ou EAC, mais ce n'est pas mesuré : si tu joues en compétition,
@@ -262,12 +292,56 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 1. Surcouche DLSS : appli NVIDIA (pilotes 572 et plus), onglet Graphismes, un jeu, « Surcouche DLSS ». Le modèle DLSS 4
    (transformer) affine l'image dans les jeux DLSS 2 et 3 ; la génération d'images (RTX 40 et 50) multiplie les images
    comptées **en augmentant la latence** : à essayer jeu par jeu, et à juger à l'œil et à la main, pas au compteur
-   d'images. DrDXT ne la pose pas : l'essai en alternance la « gagnerait » à tort sur le compte d'images.
+   d'images. DrDXT ne la met jamais en essai (le compteur d'images ne juge pas la netteté) : sous « Comment corriger » des
+   réglages d'un jeu en DLSS, un bouton pose le dernier modèle (mise à l'échelle seulement) au profil pilote de ce seul jeu, et
+   « Annuler » rend ce que le profil portait. Sans profil pilote pour le jeu, pas de bouton : DrDXT n'en crée pas.
    Source : NVIDIA, « DLSS 4 Multi Frame Generation » et « NVIDIA app global DLSS overrides » (nvidia.com/geforce/news).
 2. Mode faible latence « Ultra » (panneau NVIDIA, « Mode faible latence ») : seulement pour les vieux jeux DX9 à DX11
    sans Reflex, quand la carte limite entre 60 et 100 images par seconde ; en DX12/Vulkan, seul Reflex dans le jeu compte ;
    hors de sa fenêtre, « Ultra » peut baisser les images ou la régularité. DrDXT pose déjà « On » (une image en file) au
    profil du jeu quand c'est utile. Source : Blur Busters, « NVIDIA Low Latency Mode - On or Off » (forums.blurbusters.com).
+
+### 5.20 Batterie usée (portable)
+1. DrDXT compare ce que ta batterie tient à pleine charge à ce qu'elle tenait neuve (les mêmes compteurs que
+   `powercfg /batteryreport`). Sous 80 %, elle est usée : moins d'autonomie, et sur certains portables moins de puissance
+   sur batterie.
+2. En jeu, branche le chargeur. Pour la changer, vois le fabricant (garantie, pièce d'origine) : DrDXT n'y touche pas.
+
+### 5.21 Carte graphique freinée par la chaleur
+1. Pendant tes parties, le pilote NVIDIA dit à DrDXT quand la carte baisse sa fréquence pour se protéger de la chaleur.
+   Au-delà de 5 % du temps, le constat le dit, avec la température la plus haute relevée.
+2. Éteins le PC, débranche-le, et dépoussière les ventilateurs et le radiateur de la carte (bombe d'air, ventilateurs
+   tenus pour qu'ils ne tournent pas trop vite).
+3. Regarde le flux d'air du boîtier : de l'air frais qui entre devant ou dessous, de l'air chaud qui sort derrière ou
+   dessus, rien qui bouche les entrées.
+4. Rejoue : le constat doit baisser. Encore freinée : la courbe de ventilation de la carte (mode Expert de DrDXT, ou
+   l'outil du fabricant) ou la pâte thermique de la carte (geste de réparateur).
+
+### 5.22 Ventilateur qui s'arrête ou ne tourne plus
+1. Pendant tes parties, DrDXT lit chaque ventilateur branché sur la carte mère (cartes MSI pour l'instant). Un ventilateur
+   qui tournait et tombe à l'arrêt quelques secondes, ou qui tournait sur tes parties d'avant et ne tourne plus du tout,
+   est dit, avec son numéro d'en-tête.
+2. PC éteint et débranché : fais-le tourner à la main. Il doit tourner librement, sans frotter ; aucun câble ne doit
+   toucher ses pales. Après un nettoyage, c'est la cause la plus fréquente.
+3. Regarde son câble sur la carte mère : bien enfoncé, sur l'en-tête que DrDXT nomme (CPU_FAN pour celui du processeur).
+4. Il frotte ou cale encore, propre et bien branché : son roulement est usé, change-le (un ventilateur de 120 mm coûte peu).
+5. Celui du processeur tourne lentement pendant que le processeur se freine par la chaleur : sa courbe au BIOS est trop
+   douce. Fais-la monter à 100 % dès 80 °C (réglage du ventilateur CPU, « Smart Fan » chez MSI).
+
+<a id="sous-tension"></a>
+
+### 5.23 Sous-tension du processeur (Intel) : moins de chaleur à la même fréquence
+1. Page Processeur, « Trouver ma sous-tension » (jeu fermé, une dizaine de minutes) : DrDXT mesure la chaleur à la tension
+   d'origine, puis baisse la tension des cœurs par paliers de −30 à −90 mV, chacun sous deux minutes de charge, et garde le
+   dernier qui tient sans erreur matérielle. La tension d'origine est rendue à la fin ; un plantage la rend aussi (le
+   redémarrage), et DrDXT dit au retour quel palier a planté.
+2. « Ton BIOS refuse la sous-tension depuis Windows » : c'est « UnderVolt Protection », activée par défaut sur les Intel de 12e
+   à 14e générations. Au BIOS, menu OC (sur MSI, la recherche du BIOS trouve « UnderVolt Protection »), passe-la à Disabled,
+   enregistre et redémarre, puis relance la recherche. Elle sert à empêcher l'attaque Plundervolt contre SGX ; un
+   processeur sans SGX (DrDXT le lit, et refuse tout sur un processeur qui l'a) n'a rien à protéger.
+3. Pour garder la valeur trouvée : au BIOS, la tension des cœurs en mode adaptatif avec un décalage (offset) négatif de la
+   valeur que DrDXT a dite. Rejoue : le docteur relit tes parties et dit si le processeur se freine moins.
+4. Un écran bleu ou un jeu qui se ferme dans les jours qui suivent : remonte le décalage de 10 à 20 mV, ou remets-le à zéro.
 
 ## 6. Ce que DrDXT dit sans geste à faire
 

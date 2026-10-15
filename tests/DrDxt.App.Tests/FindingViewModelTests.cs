@@ -9,11 +9,9 @@ public class FindingViewModelTests
     [Fact]
     public void Maps_finding_to_localized_title_and_shows_NO_estimated_gain()
     {
-        // Ce test exigeait « GainLabel contient 12 » — c'est-a-dire qu'un constat affiche la
-        // penalite estimee du score en pourcentage. Remplace le 05/09/2026 par la garantie
-        // inverse : `EstimatedGainPct` Est la penalite (documentation de ScoringRules), donc une
-        // estimation calibree a la main, et le produit ne la vend plus. Le constat nomme ce qui
-        // est mal regle ; il ne chiffre pas ce que ca coute.
+        // Un constat n'affiche pas la penalite estimee en pourcentage : `EstimatedGainPct` est la
+        // penalite (documentation de ScoringRules), une estimation calibree a la main. Le constat
+        // nomme ce qui est mal regle ; il ne chiffre pas ce que ca coute.
         var f = new Finding("Memory", Severity.Major, "Finding.Memory.XmpOff", 12.0);
         var vm = new FindingViewModel(f, key => key == "Finding.Memory.XmpOff" ? "Mémoire : XMP off" : key);
 
@@ -32,7 +30,7 @@ public class FindingViewModelTests
     [Fact]
     public void Every_finding_names_what_it_found()
     {
-        // 23/09/2026 — DrDXT est gratuit. Avant, un constat au correctif « payant » ne montrait
+        // DrDXT est gratuit. Avant, un constat au correctif « payant » ne montrait
         // qu'une accroche (« Mémoire (RAM) — problème trouvé ») et cachait le reglage jusqu'a
         // l'achat. Il n'y a plus rien a acheter : le constat dit toujours ce qu'il a trouve.
         var f = new Finding("Memory", Severity.Major, "Finding.Memory.XmpOff", 12.0);

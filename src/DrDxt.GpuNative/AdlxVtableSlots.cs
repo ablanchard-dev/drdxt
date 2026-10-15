@@ -1,34 +1,34 @@
 namespace DrDxt.Detection.Gpu.Adlx;
 
 // -----------------------------------------------------------------------
-// AdlxVtableSlots — canonical ADLX COM vtable slot indices (0-based).
+// AdlxVtableSlots : les indices de référence des emplacements de vtable COM d'ADLX (à partir de 0).
 //
-// ADLX exposes a COM-like C ABI: each object's first word points to a vtable
-// (an array of function pointers). To call a method we index that array. These
-// indices are not arbitrary — they are fixed by the ADLX SDK interface
-// declarations. Indexing the wrong slot calls the WRONG native function.
+// ADLX expose une ABI C proche de COM : le premier mot de chaque objet pointe vers une vtable (un
+// tableau de pointeurs de fonction). Pour appeler une méthode, on indexe ce tableau. Ces indices
+// ne sont pas arbitraires : ils sont fixés par les déclarations d'interfaces du SDK ADLX. Indexer
+// le mauvais emplacement appelle la mauvaise fonction native.
 //
-// Every constant below was verified slot-by-slot on 2026-06-29 against the
-// canonical ADLX SDK headers:
+// Chaque constante ci-dessous a été vérifiée emplacement par emplacement le 2026-06-29 contre les
+// en-têtes de référence du SDK ADLX :
 //   https://github.com/GPUOpen-LibrariesAndSDKs/ADLX  (SDK/Include/*.h)
-// See ADLX-SLOTS.md (same folder) for the full per-slot citation table.
+// Voir ADLX-SLOTS.md (même dossier) pour le tableau complet des citations par emplacement.
 //
-// AdlxNative is the only consumer. AdlxSlotsTests freezes each value so an
-// accidental edit fails the build loudly instead of silently mis-calling the
-// driver — these cannot be unit-tested against real hardware in CI.
+// AdlxNative est le seul consommateur. AdlxSlotsTests fige chaque valeur pour qu'une modification
+// accidentelle fasse échouer le build bruyamment au lieu d'appeler le pilote de travers en silence :
+// on ne peut pas les tester sur du vrai matériel en CI.
 // -----------------------------------------------------------------------
 public static class AdlxVtableSlots
 {
-    // IADLXInterface — base of every interface EXCEPT IADLXSystem.
-    //   slot 0 = Acquire (never called here)
+    // IADLXInterface : base de toutes les interfaces sauf IADLXSystem.
+    //   emplacement 0 = Acquire (jamais appelé ici)
     public const int Release        = 1;
     public const int QueryInterface = 2;
 
-    // IADLXSystem (ISystem.h) — SPECIAL: no Acquire/Release; methods start at 0.
+    // IADLXSystem (ISystem.h), spécial : pas d'Acquire/Release ; les méthodes commencent à 0.
     public const int System_GetGPUs              = 1;
     public const int System_GetGPUTuningServices = 8;
 
-    // IADLXGPUList (ISystem.h) — IADLXInterface + IADLXList + GPU-list methods.
+    // IADLXGPUList (ISystem.h) : IADLXInterface + IADLXList + méthodes de liste de GPU.
     public const int GpuList_Size = 3;
     public const int GpuList_At   = 11; // At_GPUList
 
@@ -40,9 +40,9 @@ public static class AdlxVtableSlots
     public const int Tuning_GetManualFan           = 16;
     public const int Tuning_GetManualPower         = 17;
 
-    // IADLXManualGraphicsTuning2 (IGPUManualGFXTuning.h) — RDNA freq+voltage API.
-    // NOTE: IADLXManualGraphicsTuning1 is a DIFFERENT, states-based interface;
-    // we never call its own slots — only QueryInterface (slot 2) to upgrade to v2.
+    // IADLXManualGraphicsTuning2 (IGPUManualGFXTuning.h) : l'API fréquence + tension de RDNA.
+    // Note : IADLXManualGraphicsTuning1 est une autre interface, par états ; on n'appelle jamais ses
+    // propres emplacements, seulement QueryInterface (emplacement 2) pour passer à la v2.
     public const int Gfx2_GetMinFreqRange = 3;
     public const int Gfx2_GetMinFreq      = 4;
     public const int Gfx2_GetMaxFreqRange = 6;
@@ -57,7 +57,7 @@ public static class AdlxVtableSlots
     public const int Power_GetLimit      = 4;
     public const int Power_SetLimit      = 5;  // Write
 
-    // IADLXManualFanTuning (IGPUManualFanTuning.h) — read-only path here.
+    // IADLXManualFanTuning (IGPUManualFanTuning.h) : chemin en lecture seule ici.
     public const int Fan_GetTuningRanges = 3;
     public const int Fan_GetTuningStates = 4;
 
@@ -69,8 +69,8 @@ public static class AdlxVtableSlots
     public const int FanState_GetFanSpeed    = 3;
     public const int FanState_GetTemperature = 5;
 
-    // ── Lecture des réglages (A1, 06/10/2026). Relevées dans les blocs C `...Vtbl` des en-têtes du SDK
-    //    (branche main, téléchargés le 06/10/2026)  (https://github.com/GPUOpen-LibrariesAndSDKs/ADLX).
+    // ── Lecture des réglages. Relevées dans les blocs C `...Vtbl` des en-têtes du SDK
+    //    (source : branche main, version téléchargée le 06/10/2026, https://github.com/GPUOpen-LibrariesAndSDKs/ADLX).
 
     // IADLXSystem (ISystem.h)
     public const int System_Get3DSettingsServices            = 7;
@@ -87,14 +87,14 @@ public static class AdlxVtableSlots
     public const int Feature_IsSupported = 3;
     public const int Feature_IsEnabled   = 4;
 
-    // IADLX3DAntiLag (I3DSettings.h, ADLX d9f04a9b du 17/04/2026) : 3 IsSupported, 4 IsEnabled, 5 SetEnabled.
+    // IADLX3DAntiLag (I3DSettings.h, source ADLX d9f04a9b du 17/04/2026) : 3 IsSupported, 4 IsEnabled, 5 SetEnabled.
     public const int AntiLag_SetEnabled = 5;
 
     // IADLX3DSettingsServices (I3DSettings.h)
     public const int Settings3D_GetAntiLag                = 3;
     public const int Settings3D_GetChill                  = 4;
     public const int Settings3D_GetFrameRateTargetControl = 9;
-    // A2c (08/10/2026), relues dans ADLX d9f04a9b : Enhanced Sync 7, Vsync (WaitForVerticalRefresh) 8.
+    // A2c, relues dans ADLX d9f04a9b : Enhanced Sync 7, Vsync (WaitForVerticalRefresh) 8.
     public const int Settings3D_GetEnhancedSync = 7;
     public const int Settings3D_GetWaitForVerticalRefresh = 8;
 
@@ -112,7 +112,7 @@ public static class AdlxVtableSlots
     public const int Frtc_SetEnabled = 7;
     public const int Frtc_SetFps = 8;
 
-    // A-FS1 (08/10/2026) : FreeSync, relevé dans les blocs C `...Vtbl` d'ADLX 32b5a740 (ISystem.h, IDisplays.h,
+    // FreeSync, relevé dans les blocs C `...Vtbl` d'ADLX 32b5a740 (ISystem.h, IDisplays.h,
     // IDisplaySettings.h). Lecture seule : SetEnabled (5) n'est jamais appelé.
     public const int System_GetDisplaysServices      = 3;
     public const int DisplayServices_GetDisplays     = 4;

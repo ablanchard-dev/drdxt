@@ -33,7 +33,7 @@ ApplicationConfiguration.Initialize();
 using var fenetre = new Form { Text = "DrDXT - scene de mesure", ClientSize = new System.Drawing.Size(1280, 720) };
 fenetre.Show();
 fenetre.Activate();
-// 24/09/2026 : lancée depuis un terminal, la scène restait DERRIÈRE lui (Windows refuse le premier
+// Lancée depuis un terminal, la scène restait DERRIÈRE lui (Windows refuse le premier
 // plan à un processus qui ne l'a pas) et le repli DXGI, qui observe le focus, écartait toutes ses
 // passes. On s'attache un instant au fil de la fenêtre de devant pour pouvoir prendre sa place.
 PremierPlan.Prendre(fenetre.Handle);

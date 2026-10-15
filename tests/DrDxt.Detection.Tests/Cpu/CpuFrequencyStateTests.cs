@@ -19,6 +19,9 @@ namespace DrDxt.Detection.Tests.Cpu;
 /// Ces tests protegent exactement cette regression : une moitie de formule ne fait pas un
 /// resultat.
 /// </summary>
+// La résolution des noms passe par `CpuFrequencyReader.SourceDesTables`, statique, qu'une autre classe remplace
+// par une fausse table ; en parallèle, ce test lisait la fausse et rougissait sous la suite complète, vert seul.
+[Collection(LaTableDesCompteursNeSeRelitPasAChaqueNomTests.NomDeLaCollection)]
 public class CpuFrequencyStateTests
 {
     [Fact]

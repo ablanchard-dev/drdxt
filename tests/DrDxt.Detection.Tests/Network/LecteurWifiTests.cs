@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Network;
 
-/// <summary>NET1 (08/10/2026) : la qualité Wi-Fi lue par wlanapi, sans la localisation.</summary>
+/// <summary>La qualité Wi-Fi lue par wlanapi, sans la localisation.</summary>
 public sealed class LecteurWifiTests
 {
     // wlanapi.h (SDK 10.0.26100.0) : WLAN_REALTIME_CONNECTION_QUALITY = 6 champs de 4 octets puis les liens ;

@@ -3,27 +3,26 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// ElevatedReapplyClient (plan §9 / T32) — the bridge from "a reconcilable tweakId
-// drifted, restore it to desired" to the existing typed privileged op pipeline.
+// ElevatedReapplyClient : le pont entre « un tweakId réconciliable a dérivé, le remettre à la
+// valeur voulue » et le pipeline existant des ops privilégiées typées.
 //
-// SECURITY (I3, the WinRing0 lesson): re-apply never introduces a new privileged
-// primitive. It resolves the tweakId+desired value to one of the existing sealed
-// PrivilegedOp leaves (SetRegistryValueOp / SetActivePowerPlanOp /
-// RunServiceControlOp / ApplyNvApiDrsSettingOp / …) via the injected
-// IReapplyOpMapper, then dispatches it through the same IElevatedClient.ExecuteAsync
-// — inheriting its full signature → caller-authz → server-side allowlist path. A
-// tweakId the mapper does not know fails before any IPC (no op is ever sent).
+// Sécurité (I3, la leçon WinRing0) : la réapplication n'introduit jamais de nouvelle primitive
+// privilégiée. Elle traduit tweakId + valeur voulue en une des feuilles PrivilegedOp scellées
+// existantes (SetRegistryValueOp / SetActivePowerPlanOp / RunServiceControlOp /
+// ApplyNvApiDrsSettingOp / …) par l'IReapplyOpMapper injecté, puis l'envoie par le même
+// IElevatedClient.ExecuteAsync, dont elle hérite tout le chemin signature → autorisation de
+// l'appelant → allowlist côté serveur. Un tweakId inconnu du mappeur échoue avant tout IPC
+// (aucune op n'est jamais envoyée).
 //
-// The op MAPPINGS themselves (which tweakId builds which leaf with which bounded
-// value) mirror the Application-layer tweaks; wiring the production mapper to the
-// real catalog is the NEXT increment. Here the seam + dispatch + the fail-before-IPC
-// guarantee are built and tested.
+// Les traductions elles-mêmes (quel tweakId construit quelle feuille avec quelle valeur bornée)
+// reprennent les leviers de la couche Application. Ici sont construits et testés la couture,
+// l'envoi et la garantie d'échec avant IPC.
 // -----------------------------------------------------------------------
 
-/// <summary>Resolves a reconcilable tweakId + its desired serialized value to the
-/// Existing typed PrivilegedOp leaf that re-asserts it. An unknown tweakId, or a
-/// desired value that does not parse into the bounded op fields, → Fail (so the
-/// reapply client refuses before any IPC). Never returns a free/generic op.</summary>
+/// <summary>Traduit un tweakId réconciliable + sa valeur voulue sérialisée en la feuille
+/// PrivilegedOp typée existante qui le réaffirme. Un tweakId inconnu, ou une valeur voulue qui
+/// ne s'analyse pas dans les champs bornés de l'op → Fail (le client de réapplication refuse
+/// donc avant tout IPC). Ne rend jamais une op libre ou générique.</summary>
 public interface IReapplyOpMapper
 {
     Result<PrivilegedOp> Map(string tweakId, string desiredValueJson);
@@ -42,14 +41,14 @@ public sealed class ElevatedReapplyClient : IElevatedReapplyClient
 
     public async Task<Result> ReapplyAsync(string tweakId, string desiredValueJson, CancellationToken ct)
     {
-        // (1) Resolve to an existing typed op. Unknown / unbindable → fail before IPC.
+        // (1) Traduire en une op typée existante. Inconnu / non reliable → échec avant IPC.
         var op = _mapper.Map(tweakId, desiredValueJson);
         if (!op.IsOk)
             return Result.Fail(
                 op.Error!.Value.Code,
                 $"Cannot re-apply '{tweakId}': {op.Error.Value.Message}");
 
-        // (2) Dispatch through the same elevated pipeline (no new privileged primitive).
+        // (2) Envoyer par le même pipeline élevé (aucune nouvelle primitive privilégiée).
         return await _elevated.ExecuteAsync(op.Value!, ct);
     }
 }

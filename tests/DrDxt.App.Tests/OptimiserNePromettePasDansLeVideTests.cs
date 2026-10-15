@@ -6,10 +6,8 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D5.1, revue) : « Optimiser » s'affichait sous « 0 à changer » et ne disait « rien à
-// appliquer » qu'au clic. Le jugement est rendu dès la fin de l'analyse.
-// 06/10/2026 (le mainteneur : « j'ai toujours pas le bouton opti », « DrDXT n'a pas le droit de nous empêcher de toucher ») : la
-// phrase dit ce que DrDXT voit, et le bouton reste. Le cacher était une règle de l'époque payante.
+// Le jugement d'Optimiser est rendu dès la fin de l'analyse, pas au clic : sous « 0 à changer », la
+// phrase dit ce que DrDXT voit, et le bouton reste.
 public sealed class OptimiserNePromettePasDansLeVideTests
 {
     [Fact]
@@ -54,8 +52,7 @@ public sealed class OptimiserNePromettePasDansLeVideTests
           .Returns(Result<BenchmarkResult>.Fail(ErrorCodes.PidInvalid, "aucun jeu"));
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(hw, st, new List<Finding>(), 68, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(hw, st, new List<Finding>(), null)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
         return ScanViewModelTestSeams.Build(hd, sr, br, sc, sd, k => k);

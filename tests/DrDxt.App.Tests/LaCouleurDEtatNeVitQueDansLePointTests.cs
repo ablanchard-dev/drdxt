@@ -6,10 +6,9 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 23/09/2026. Remarque sur une capture (A4) : « ya des couleurs sur les indications qui font
-// grv vibe code ». Critique Impeccable sur un scan réel : la pastille d'état teintait son liseré en
-// rouge, orange ou vert, le feu tricolore par défaut de tout gabarit. Les références (Vercel : la
-// couleur d'état seulement à l'échelle d'un point ; Linear : étiquette neutre) disent la même chose.
+// Un liseré teinté en rouge, orange ou vert est le feu tricolore par défaut de tout gabarit. Les
+// références (Vercel : la couleur d'état seulement à l'échelle d'un point ; Linear : étiquette neutre)
+// disent la même chose.
 //
 // La règle : dans le style `PastilleEtat`, un état ne change que la teinte héritée par le POINT
 // (`TextElement.Foreground`). Ni liseré, ni fond : l'étiquette reste la même pour tous les états,

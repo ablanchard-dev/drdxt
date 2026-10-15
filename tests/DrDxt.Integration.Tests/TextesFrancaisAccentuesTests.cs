@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 25/09/2026. Trois textes affichés du fichier français étaient écrits sans accents (« aucun reglage n'a
+/// Trois textes affichés du fichier français étaient écrits sans accents (« aucun reglage n'a
 /// encore ete applique », « l'etat ou il etait »), dont l'infobulle du bouton principal « Optimiser ». Ce crible
 /// refuse les mots courants qui n'existent pas sans accent en français.
 /// </summary>

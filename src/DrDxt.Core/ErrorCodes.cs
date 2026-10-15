@@ -1,39 +1,47 @@
 namespace DrDxt.Core;
 
-// REQUIRED — literal codes must never be scattered elsewhere.
+// Obligatoire : les codes littéraux ne doivent jamais être éparpillés ailleurs.
 public static class ErrorCodes
 {
     public const string DetectionFailed = "DETECTION_FAILED";
     public const string BenchmarkFailed = "BENCHMARK_FAILED";
     public const string RestorePointBlocked = "RESTORE_POINT_BLOCKED";
     public const string ElevationDenied = "ELEVATION_DENIED";
-    // 08/10/2026 (revue n° 10) : le joueur a refusé l'invite Windows. Repris de HelperLauncher pour que
+    /// <summary>Le helper ne connaît pas ce bail pour cet appelant (expiré, inverse rejoué). Seul refus qui dise « bail
+    /// rendu » : les refus d'appelant passagers restent <see cref="ElevationDenied"/>.</summary>
+    public const string LeaseUnknown = "LEASE.UNKNOWN";
+    /// <summary>Le helper a rendu l'origine de ce bail lui-même (expiré, inverse réussi). Seul refus qui permette de lever
+    /// le journal : un bail simplement inconnu (helper relancé, registre vide) laisse le réglage peut-être posé.</summary>
+    public const string LeaseReverted = "LEASE.REVERTED";
+    /// <summary>Le bail vient d'expirer et son inverse tourne : ni rendu ni inconnu encore. Passager, le battement continue.</summary>
+    public const string LeaseReverting = "LEASE.REVERTING";
+    // Le joueur a refusé l'invite Windows. Repris de HelperLauncher pour que
     // l'Application le reconnaisse sans dépendre du helper.
     public const string ElevationDeclined = "ELEVATION_DECLINED";
-    // 08/10/2026 (revue n° 10) : une écriture d'un levier a été refusée, ET le retour arrière des écritures déjà
+    // Une écriture d'un levier a été refusée, et le retour arrière des écritures déjà
     // faites aussi : une partie du réglage est encore en place. L'appelant garde son journal (RetourArriere).
     public const string TweakPartiallyApplied = "TWEAK.PARTIALLY_APPLIED";
-    // §9.13 handshake: a peer connected but the handshake itself was malformed,
-    // truncated, garbage, or carried an unsupported protocol marker — i.e. a
-    // transport/protocol fault, not an authorization denial. Distinct from
-    // ElevationDenied (which is reserved for a well-formed peer that failed
-    // caller authorization). Both are fail-closed (no key minted).
+    // Handshake : un pair s'est connecté mais le handshake était malformé, tronqué,
+    // illisible ou portait un marqueur de protocole non pris en charge : une panne de
+    // transport ou de protocole, pas un refus d'autorisation. Distinct d'ElevationDenied
+    // (réservé à un pair bien formé qui a échoué à l'autorisation de l'appelant). Les deux
+    // refusent au moindre doute (aucune clé émise).
     public const string HandshakeProtocolError = "HANDSHAKE_PROTOCOL_ERROR";
-    // On-demand launch: the elevated helper was launched (or believed up) but its
-    // pipe never accepted a real connect+handshake within the startup deadline.
-    // Distinct from ELEVATION_DECLINED (user cancelled UAC) — this is a launched
-    // helper that did not come up in time. Clean, retryable on a later op.
+    // Lancement à la demande : le helper élevé a été lancé (ou cru lancé) mais son pipe
+    // n'a jamais accepté de vraie connexion + handshake dans le délai de démarrage.
+    // Distinct d'ELEVATION_DECLINED (UAC annulé par l'utilisateur) : ici un helper lancé
+    // n'est pas monté à temps. Propre, à retenter sur une op suivante.
     public const string HelperUnreachable = "HELPER_UNREACHABLE";
     public const string SignatureInvalid = "SIGNATURE_INVALID";
     public const string ManifestTampered = "MANIFEST_TAMPERED";
-    // 11/09/2026 — le manifeste existant ne se relit pas (altere, signe par une autre cle, illisible) :
+    // Le manifeste existant ne se relit pas (altere, signe par une autre cle, illisible) :
     // le commit est refuse, rien n'est ecrit, et l'App propose la reprise explicite. Jamais un
     // ecrasement silencieux : il effacerait les seules origines que la desinstallation sait rendre.
     public const string ManifestUnreadable = "MANIFEST_UNREADABLE";
-    // 11/09/2026 — la cle de signature de la machine existe mais est inutilisable (illisible, ACL non
+    // La cle de signature de la machine existe mais est inutilisable (illisible, ACL non
     // fiable, ou c'est la cle de dev). Refus nomme ; la meme reprise explicite la met de cote.
     public const string ManifestKeyUnusable = "MANIFEST_KEY_UNUSABLE";
-    // 11/09/2026 — le manifeste signe est ecrit, mais la reference de derive (build, pilote) n'a pas pu etre
+    // Le manifeste signe est ecrit, mais la reference de derive (build, pilote) n'a pas pu etre
     // posee dans le fichier du reconciliateur : la 1re passe notifiera au lieu de reappliquer. Dit, jamais tu.
     public const string ManifestReferenceNotSeeded = "MANIFEST_REFERENCE_NOT_SEEDED";
     public const string GuideLinkTampered = "GUIDE_LINK_TAMPERED";
@@ -41,7 +49,7 @@ public static class ErrorCodes
     public const string OpNotAllowed = "OP_NOT_ALLOWED";
     public const string IoFailure = "IO_FAILURE";
 
-    // M1 — Detection codes
+    // Codes de détection
     public const string WmiFail          = "DET.WMI_FAIL";
     public const string DxgiFail         = "DET.DXGI_FAIL";
     public const string NvapiUnavailable = "DET.NVAPI_UNAVAIL";
@@ -51,140 +59,145 @@ public static class ErrorCodes
     public const string RegistryFail     = "DET.REG_FAIL";
     public const string FirmwareFail     = "DET.FIRMWARE_FAIL";
 
-    // M1 — Measurement codes
+    // Codes de mesure
     public const string PmonUnavailable  = "MEAS.PMON_UNAVAIL";
     public const string CaptureFail      = "MEAS.CAPTURE_FAIL";
     public const string NoFrames         = "MEAS.NO_FRAMES";
     public const string PidInvalid       = "MEAS.PID_INVALID";
 
-    // M1.5 — PresentMon spine additions
-    // Live process but 0 frames captured = the game's anti-cheat blocks ETW (distinct from no service).
+    // Ajouts de la colonne PresentMon
+    // Processus vivant mais 0 trame captée = l'anti-triche du jeu bloque ETW (distinct d'un service absent).
     public const string NoPresentingFrames   = "MEAS.NO_PRESENTING_FRAMES";
-    // Service binary not installed (one-time elevated install needed) ≠ runtime PMON unavailable.
+    // Binaire du service non installé (une installation élevée unique requise) ≠ PMON indisponible à l'exécution.
     public const string ServiceNotInstalled = "MEAS.SERVICE_NOT_INSTALLED";
 
-    // NS-9 — Network latency instrument.
-    // The measurement request itself is unusable (no host, probe count <= 0, timeout <= 0)
-    // → refuse before sending anything, never guess a default target.
+    // Instrument de latence réseau.
+    // La demande de mesure est inutilisable (pas d'hôte, nombre de sondes <= 0, délai <= 0)
+    // → refus avant tout envoi, jamais de cible par défaut devinée.
     public const string MeasureInvalidInput = "MEAS.INVALID_INPUT";
-    // Not one probe was sent (cancelled before the first) → this is NO measurement, which is
-    // Not the same as 100% packet loss. Never publish a loss figure we did not observe.
+    // Aucune sonde envoyée (annulé avant la première) → aucune mesure, ce qui n'est
+    // pas 100 % de perte. Ne jamais publier un chiffre de perte qu'on n'a pas observé.
     public const string MeasureNoSamples = "MEAS.NO_SAMPLES";
-    // The network adapter's own counters could not be read (interface absent, or it vanished
-    // mid-read). This is NO reading, which is not the same as "zero errors" — an adapter we
-    // cannot interrogate must never be reported as healthy.
+    // Les compteurs de la carte réseau sont illisibles (interface absente, ou disparue en
+    // cours de lecture). C'est une absence de lecture, pas « zéro erreur » : une carte qu'on
+    // ne peut pas interroger n'est jamais déclarée saine.
     public const string MeasureNicUnreadable = "MEAS.NIC_UNREADABLE";
 
-    // M1 — Scan codes
+    // Codes du scan
     public const string NoBaseline       = "SCAN.NO_BASELINE";
 
-    // M1 — Storage detection
+    // Détection du stockage
     public const string StorageFail      = "DET.STORAGE_FAIL";
 
-    // M3 — BIOS Doctor (foundation). The HardwareInventory/SettingsState handed to
-    // the advisor is internally incoherent (e.g. empty Memory while inferring XMP)
-    // → refuse cleanly, never throw, never emit a fabricated firmware Finding.
+    // Docteur BIOS (socle). Le HardwareInventory/SettingsState passé au conseiller est
+    // incohérent (par exemple Memory vide alors qu'on infère XMP)
+    // → refus propre, jamais d'exception, jamais de Finding firmware inventé.
     public const string BiosInputInvalid = "BIOS_INPUT_INVALID";
 
-    // M3 — BIOS Doctor (guide content). The guide-library data is corrupt: malformed
-    // JSON, an unknown vendor/setting enum, a blank exact-setting-name (the safety
-    // net), or an injection marker in a value → refuse cleanly (defensive §9.6),
-    // never render unvalidated external data, never throw.
+    // Docteur BIOS (contenu du guide). Les données de la bibliothèque sont corrompues :
+    // JSON malformé, fabricant ou réglage inconnu, nom exact de réglage vide (le filet de
+    // sécurité), ou marqueur d'injection dans une valeur → refus propre (prudence), jamais
+    // de rendu de données externes non validées, jamais d'exception.
     public const string BiosTemplateInvalid = "BIOS_TEMPLATE_INVALID";
 
-    // M3 — BIOS Doctor (closed-loop verification). The pending-change marker on disk
-    // is corrupt: malformed JSON, missing/empty targets, an unknown setting enum, or
-    // an out-of-range timestamp → the loop refuses to read it as a real pending change
-    // (fail-clean, never throw). Distinct from "absent" (no marker = nothing pending,
-    // an Ok no-op). A corrupt marker is a fault we surface, never silently trust.
+    // Docteur BIOS (vérification en boucle). Le marqueur sur disque est corrompu : JSON
+    // malformé, cibles absentes ou vides, réglage inconnu, ou horodatage hors plage → la
+    // boucle refuse d'y voir un vrai changement en attente (échec propre, jamais
+    // d'exception). Distinct d'« absent » (pas de marqueur = rien en attente, un Ok qui ne
+    // fait rien). Un marqueur corrompu est une panne qu'on montre, jamais crue en silence.
     public const string BiosPendingChangeCorrupt = "BIOS_PENDING_CHANGE_CORRUPT";
 
-    // M3 — BIOS Doctor (closed-loop verification). Reading/writing the pending-change
-    // marker file hit a real I/O fault (the directory, the temp file, the move) →
-    // fail-clean via Result, the boundary wrapped, never an unhandled exception.
+    // Docteur BIOS (vérification en boucle). Lire ou écrire le fichier marqueur a
+    // rencontré une vraie panne d'E/S (le dossier, le fichier temporaire, le déplacement) →
+    // échec propre via Result, frontière protégée, jamais d'exception non gérée.
     public const string BiosPendingChangeIo = "BIOS_PENDING_CHANGE_IO";
 
-    // LM — Mesure memoire. La reference sur disque est illisible (JSON malforme, identifiant de
+    // Mesure memoire. La reference sur disque est illisible (JSON malforme, identifiant de
     // machine vide) : on refuse de s'en servir plutot que de comparer un apres a n'importe quoi.
     // Distinct de "absente", qui n'est pas une erreur : rien n'a encore ete mesure.
     public const string MemoryBaselineCorrupt = "MEMORY_BASELINE_CORRUPT";
 
-    // LM — Mesure memoire. Ecrire ou lire le fichier de reference a bute sur une vraie panne
+    // Mesure memoire. Ecrire ou lire le fichier de reference a bute sur une vraie panne
     // d'entree/sortie : echec propre par Result, jamais d'exception qui remonte.
     public const string MemoryBaselineIo = "MEMORY_BASELINE_IO";
 
-    // M2 Phase A — Elevated-helper allowlist / signed-IPC fail-clean codes.
-    // The op was not in the closed, leaf-exact allowlist (unknown type, blacklisted
-    // target, or out-of-range field) → refused before execution, never run.
+    // Codes d'échec propre de l'allowlist du helper élevé et de l'IPC signé.
+    // L'op n'était pas dans l'allowlist fermée, à la feuille près (type inconnu, cible
+    // interdite, ou champ hors plage) → refusée avant exécution, jamais lancée.
     public const string NotAllowlisted   = "HELPER.NOT_ALLOWLISTED";
-    // The typed privileged request failed its transport-integrity (HMAC) check →
-    // refused fail-clean, op never executed. (Distinct from the legacy
-    // SignatureInvalid="SIGNATURE_INVALID" used by the M0 envelope path.)
+    // La demande privilégiée typée a échoué au contrôle d'intégrité du transport (HMAC) →
+    // refus propre, op jamais exécutée. (Distinct de l'ancien
+    // SignatureInvalid="SIGNATURE_INVALID" du chemin par enveloppe.)
     public const string HelperSignatureInvalid = "HELPER.SIGNATURE_INVALID";
-    // An allowlisted, signed op was dispatched but the privileged action itself
-    // failed at execution time (e.g. the underlying SDK/registry write errored).
+    // Une op signée et sur l'allowlist a été transmise, mais l'action privilégiée a
+    // échoué à l'exécution (par exemple l'écriture SDK ou registre sous-jacente).
     public const string HelperOpFailed   = "HELPER.OP_FAILED";
+    /// <summary>Le décalage de tension écrit n'a pas été relu : le BIOS le refuse à l'exécution (Undervolt Protection, verrou).</summary>
+    public const string TensionRefusee   = "HELPER.CPU_VOLTAGE_REFUSED";
+    /// <summary>Après un refus, un plan déjà posé n'a pas pu être rendu (relu différent) : la tension reste changée jusqu'au
+    /// redémarrage, qui la rend.</summary>
+    public const string TensionNonRendue = "HELPER.CPU_VOLTAGE_NOT_RESTORED";
 
-    // M2 Phase B — Safety / rollback (ISafetyManager).
-    // System Restore is OFF and cannot be enabled (GPO/SKU/locked) → block, never
-    // proceed without a verified restore point.
+    // Sécurité / retour arrière (ISafetyManager).
+    // La Restauration du système est coupée et ne peut pas être activée (GPO/SKU/verrouillée)
+    // → blocage, jamais d'avance sans point de restauration vérifié.
     public const string RestoreDisabled  = "SAFETY.RESTORE_DISABLED";
-    // System Restore is OFF and the user explicitly declined enabling it → block.
+    // La Restauration du système est coupée et l'utilisateur a refusé de l'activer → blocage.
     public const string RestoreDeclined  = "SAFETY.RESTORE_DECLINED";
-    // Creating (or verifying) the restore point failed → block, nothing applied.
+    // La création (ou la vérification) du point de restauration a échoué → blocage, rien d'appliqué.
     public const string RestoreFailed     = "SAFETY.RESTORE_FAILED";
-    // 06/10/2026 : Windows a accepté la demande, mais aucun point n'a pu être relu ensuite (pas créé, ou liste illisible).
+    // Windows a accepté la demande, mais aucun point n'a pu être relu ensuite (pas créé, ou liste illisible).
     public const string RestoreNotVerified = "SAFETY.RESTORE_NOT_VERIFIED";
-    // The TweakSnapshot's OriginalValueJson is malformed / not a known typed op →
-    // refuse to revert fail-clean (never throw, never run an unknown op).
+    // L'OriginalValueJson du TweakSnapshot est malformé ou n'est pas une op typée connue →
+    // refus propre du retour arrière (jamais d'exception, jamais d'op inconnue lancée).
     public const string SnapshotInvalid   = "SAFETY.SNAPSHOT_INVALID";
 
-    // M2 Phase D — Tweak applicability / SDK availability (ITweak).
-    // The tweak is out of its hardware gating or its requested value is out of
-    // bounds → it does not apply to this machine (skip cleanly, never write).
+    // Applicabilité du levier / disponibilité du SDK (ITweak).
+    // Le levier sort de sa condition matérielle ou sa valeur demandée est hors bornes
+    // → il ne s'applique pas à cette machine (on passe proprement, jamais d'écriture).
     public const string TweakNotApplicable = "TWEAK.NOT_APPLICABLE";
-    // The vendor SDK / registry-read path needed to capture the original value or
-    // apply the change is unavailable → fail clean (never throw), nothing applied.
+    // Le SDK du fabricant ou la lecture du registre, nécessaire pour relever l'origine ou
+    // appliquer le changement, est indisponible → échec propre (jamais d'exception), rien d'appliqué.
     public const string TweakSdkUnavailable = "TWEAK.SDK_UNAVAILABLE";
-    // 14/09/2026 — l'executable n'a aucun profil pilote a lui (NVAPI_EXECUTABLE_NOT_FOUND) : le pilote
+    // L'executable n'a aucun profil pilote a lui (NVAPI_EXECUTABLE_NOT_FOUND) : le pilote
     // lui applique le global. Distinct d'un profil qui existe mais ne se lit pas (TweakSdkUnavailable) :
     // seul ce cas-ci autorise a se rabattre sur le profil global.
     public const string DrsNoGameProfile = "TWEAK.DRS_NO_GAME_PROFILE";
-    // An AMD GPU is present on this machine but the ADLX tuning SDK is not available
-    // in this build. Distinct from TweakSdkUnavailable (generic) and TweakNotApplicable
-    // (hardware gating) — this is an honest "coming soon" for AMD GPU tuning.
-    // §22.3: never silently skip, never fake success, always say why.
+    // Un GPU AMD est présent mais le SDK de réglage ADLX n'est pas disponible dans cette
+    // version. Distinct de TweakSdkUnavailable (générique) et de TweakNotApplicable
+    // (condition matérielle) : c'est un « à venir » honnête pour le réglage GPU AMD.
+    // Jamais de saut silencieux, jamais de faux succès, toujours dire pourquoi.
     public const string GpuAmdTuningUnavailable = "TWEAK.GPU_AMD_TUNING_UNAVAILABLE";
-    // The tweak needs elevation but is being applied without an elevated client.
+    // Le levier exige l'élévation mais on l'applique sans client élevé.
     public const string TweakElevationRequired = "TWEAK.ELEVATION_REQUIRED";
-    // A GPU-tuning tweak (undervolt / power-limit) was applied but its internal
-    // stability test detected a hang / artifact / crash → it reverted itself
-    // Immediately and returns this. We never return Ok while the GPU is unstable.
+    // Un levier de réglage GPU (sous-tension / limite de puissance) a été appliqué mais son
+    // test de stabilité a vu un blocage, un artefact ou un plantage → il s'est annulé
+    // aussitôt et rend ceci. On ne rend jamais Ok quand le GPU est instable.
     public const string TweakUnstable = "TWEAK.UNSTABLE";
-    // The GPU tuning path could not be PROVEN writable on this specific card+driver:
-    // the pre-apply capability probe (identity write of the captured original + read-back)
-    // either failed or read back a different value. Doctrine §6.0 of the north-star plan:
-    // we do not own 2015-2026 hardware, so support is proven per device by probe, never
-    // assumed from an architecture name. Fail-closed → the lever is refused honestly and
-    // Nothing is tuned. Distinct from TweakSdkUnavailable (no SDK at all) and from
-    // TweakNotApplicable (hardware gating / out-of-bounds value).
+    // Le chemin de réglage GPU n'a pas pu être prouvé inscriptible sur cette carte et ce pilote :
+    // la sonde de capacité avant application (réécriture de l'origine relevée + relecture)
+    // a échoué ou relu une autre valeur. La règle :
+    // on ne possède pas le matériel 2015-2026, donc la prise en charge se prouve par sonde,
+    // appareil par appareil, jamais d'après un nom d'architecture. Refus → le levier est refusé
+    // honnêtement et rien n'est réglé. Distinct de TweakSdkUnavailable (pas de SDK du tout) et
+    // de TweakNotApplicable (condition matérielle / valeur hors bornes).
     public const string TweakUnsupportedOnThisGpu = "TWEAK.UNSUPPORTED_ON_THIS_GPU";
 
-    // M6 — Per-chip optimization profiles.
-    // The HardwareInventory handed to the profile matcher is missing/incoherent
-    // (e.g. null) → refuse cleanly (fail-closed), never guess a profile, never throw.
-    // The matcher still returns the safe generic baseline for a recognized-but-
-    // unmatched chip; this code is reserved for an UNUSABLE input.
+    // Profils d'optimisation par puce.
+    // Le HardwareInventory passé au matcher est absent ou incohérent (par exemple null)
+    // → refus propre, jamais de profil deviné, jamais d'exception.
+    // Le matcher rend quand même la base générique sûre pour une puce reconnue mais sans
+    // profil ; ce code est réservé à une entrée inutilisable.
     public const string ProfileInputInvalid = "PROFILE.INPUT_INVALID";
 
-    // M2 Phase C — Transactional tweak engine (ITweakEngine).
-    // A step of the batch failed at apply time → the whole already-applied batch
-    // was rolled back (LIFO). Never a half-applied state.
+    // Moteur de leviers transactionnel (ITweakEngine).
+    // Une étape du lot a échoué à l'application → tout le lot déjà appliqué a été
+    // annulé (LIFO). Jamais d'état à moitié appliqué.
     public const string BatchReverted     = "ENGINE.BATCH_REVERTED";
-    // The re-benchmark measured a regression beyond the combined margins → the
-    // whole batch was auto-reverted (LIFO). We never keep a measured loss.
+    // La remesure a vu une régression au-delà des marges cumulées → tout le lot a été
+    // annulé automatiquement (LIFO). On ne garde jamais une perte mesurée.
     public const string RegressionReverted = "ENGINE.REGRESSION_REVERTED";
-    // The re-benchmark showed no measurable gain beyond the combined margins.
-    // This is a VALID, KEPT state (not a regression) — surfaced honestly, not reverted.
+    // La remesure ne montre aucun gain mesurable au-delà des marges cumulées.
+    // C'est un état valide et gardé (pas une régression) : dit honnêtement, pas annulé.
     public const string NoMeasurableGain  = "ENGINE.NO_MEASURABLE_GAIN";
 }

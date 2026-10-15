@@ -2,7 +2,7 @@ using FluentAssertions;
 
 namespace DrDxt.Integration.Tests;
 
-// 14/09/2026 (plan 2.7) — un bouton qui n'ouvre qu'une boite « bientot disponible » promet ce qui
+// Un bouton qui n'ouvre qu'une boite « bientot disponible » promet ce qui
 // n'existe pas. Reglages, Historique, « Plus » et « Voir le rapport » l'etaient ; retires. Ce gate
 // empeche le suivant de revenir : aucune vue de l'App ne branche plus un clic sur OnComingSoon.
 public sealed class NoComingSoonButtonGateTests

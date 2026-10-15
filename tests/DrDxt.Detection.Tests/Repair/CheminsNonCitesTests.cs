@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// 25/09/2026 : un chemin de service non cité et contenant des espaces fait essayer à Windows, dans
+/// Un chemin de service non cité et contenant des espaces fait essayer à Windows, dans
 /// l'ordre, chaque préfixe suivi de « .exe ». Ce n'est exploitable que si l'un de ces emplacements accepte
 /// un fichier : sur une machine saine (C:\ n'accorde que la création de dossiers), l'audit se tait.
 /// </summary>

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- M5 helper-launch + §9.13 HANDSHAKE smoke. Lives OUTSIDE the .sln (like
+  <!-- Helper-launch + HANDSHAKE smoke. Lives OUTSIDE the .sln (like
        tools/m2smoke, tools/r2smoke). Launches DrDxt.ElevatedHelper.exe ELEVATED in
        handshake mode (NO pre-shared key), performs the REAL session-key handshake,
        and runs a harmless allowlisted op (Ping) end-to-end. Prints PASS/FAIL.

@@ -3,7 +3,7 @@
 namespace DrDxt.Bios;
 
 /// <summary>
-/// 24/09/2026 — LIT les reglages BIOS dans la NVRAM, pour les cartes et versions de firmware que
+/// LIT les reglages BIOS dans la NVRAM, pour les cartes et versions de firmware que
 /// <see cref="BiosQualificationMatrix"/> decrit avec un emplacement releve dans l'IFR.
 ///
 /// Tout ou rien, et c'est voulu : si la variable n'a pas la taille que l'IFR declare, ou si UN

@@ -3,9 +3,9 @@ using System.Text.RegularExpressions;
 namespace DrDxt.Detection.Repair;
 
 /// <summary>
-/// 07/10/2026 (chantier D7, enquête n° 17) : ce que Windows Update a installé tout seul, avec son heure exacte,
-/// par l'historique de l'agent (Microsoft.Update.Session, QueryHistory), en lecture seule. Relevé le 07/10 sur le PC du
-/// mainteneur, 40 entrées en 20 jours : les définitions de Microsoft Defender (KB2267602) plusieurs fois par jour et les
+/// Ce que Windows Update a installé tout seul, avec son heure exacte,
+/// par l'historique de l'agent (Microsoft.Update.Session, QueryHistory), en lecture seule. Relevé sur la machine de
+/// référence, 40 entrées en 20 jours : les définitions de Microsoft Defender (KB2267602) plusieurs fois par jour et les
 /// applications du Store (« 9NRZT3Q9R3DL-… ») à côté d'une mise à jour de pilote Realtek. Les deux premières sont
 /// écartées : elles tomberaient entre toutes les parties et plus aucun changement ne se jugerait.
 /// </summary>
@@ -13,7 +13,7 @@ public static class MisesAJourWindows
 {
     private static readonly Regex ApplicationDuStore = new(@"^9[A-Z0-9]{11}-", RegexOptions.Compiled);
 
-    /// <summary>Revue F-42 : les pilotes livrés par Windows Update s'écrivent « Fournisseur - Classe - version » ou
+    /// <summary>Les pilotes livrés par Windows Update s'écrivent « Fournisseur - Classe - version » ou
     /// « … Driver Update (version) ».</summary>
     private static readonly Regex TitreDePilote = new(@"^.+ - .+ - [\d.]+$|Driver Update \([\d.]+\)$", RegexOptions.Compiled);
 
@@ -21,7 +21,7 @@ public static class MisesAJourWindows
     private const string ClassePilotes = "ebfc1fc5-71a4-4f7b-9aca-3b9a503104a0";
 
     /// <summary>Ce qui peut changer un jeu : ni une définition d'antivirus, ni une application du Store. Ni un pilote
-    /// (F-42) : setupapi le date déjà à la seconde, et deux heures différentes du même pilote se bornaient l'une l'autre,
+    /// : setupapi le date déjà à la seconde, et deux heures différentes du même pilote se bornaient l'une l'autre,
     /// la mise à jour ne se jugeait jamais.</summary>
     internal static bool Garder(string titre, bool pilote = false)
         => !pilote && !titre.Contains("2267602", StringComparison.Ordinal) && !ApplicationDuStore.IsMatch(titre) && !TitreDePilote.IsMatch(titre);

@@ -6,10 +6,10 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// crash.log du 18/09/2026 01:18 : « Le thread appelant ne peut pas accéder à cet objet parce qu'un
-/// autre thread en est propriétaire », levé par PixelShader.get_ShaderRenderMode. Le shader du chrome
-/// liquide est partagé (static) par toutes les instances ; non gelé, il appartenait au premier thread
-/// qui l'avait créé. Gelé, il se lit depuis n'importe quel thread.
+/// Le shader du chrome liquide est partagé (static) par toutes les instances. Non gelé, il appartiendrait
+/// au premier thread qui l'a créé, et PixelShader.get_ShaderRenderMode lèverait « Le thread appelant ne
+/// peut pas accéder à cet objet parce qu'un autre thread en est propriétaire ». Gelé, il se lit depuis
+/// n'importe quel thread.
 /// </summary>
 public sealed class LeShaderDeChromeSePartageEntreThreadsTests
 {

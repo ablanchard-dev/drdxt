@@ -59,8 +59,8 @@ public class AutopilotEngineTests
             return Result.Ok();
         }
 
-        // `RelectureMenteuse` reproduit un defaut reel : le 01/09, une limite de puissance
-        // « appliquee a 110 % » se relisait a 100 % — le pilote clampait en silence.
+        // `RelectureMenteuse` reproduit un defaut reel : une limite de puissance « appliquee a 110 % »
+        // peut se relire a 100 %, le pilote la bornant en silence.
         public Result<bool> ReadBack() => Result<bool>.Ok(Applique && !RelectureMenteuse);
     }
 
@@ -74,7 +74,7 @@ public class AutopilotEngineTests
     [Fact]
     public void Une_session_ANNULEE_rend_l_etat_de_reference_et_ne_tente_plus_rien()
     {
-        // L8 a — la passe avalait toute exception comme « passe a 0 » : une annulation serait
+        // La passe avalait toute exception comme « passe a 0 » : une annulation serait
         // passee inapercue, et la session aurait continue levier pose.
         var c = new CandidatFake(1.10);
         using var cts = new CancellationTokenSource();
@@ -106,7 +106,7 @@ public class AutopilotEngineTests
         profil.EndedInBestState.Should().BeTrue();
     }
 
-    // 26/09/2026 : ce chemin n'avait aucun test (une mutation qui le retirait restait verte). Une bascule
+    // Ce chemin n'avait aucun test (une mutation qui le retirait restait verte). Une bascule
     // qui echoue pendant l'alternance laisse un etat que le moteur n'a pas relu : il ne pretend pas
     // avoir fini dans le meilleur etat.
     [Fact]
@@ -121,7 +121,7 @@ public class AutopilotEngineTests
         profil.Results.Single().Outcome.Should().NotBe(CandidateOutcome.Kept);
     }
 
-    // 26/09/2026 : les cinq autres chemins de retour. Une mutation qui retirait le compte de l'echec
+    // Les cinq autres chemins de retour. Une mutation qui retirait le compte de l'echec
     // restait verte sur chacun : le moteur pouvait dire « meilleur etat » apres un retour refuse.
     // Les rangs (N-ieme annulation ou application) suivent le protocole par defaut, un bloc A-b-b-a.
 

@@ -4,22 +4,17 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// Une ressource XAML introuvable ne se voit qu'à l'affichage — et elle tue l'écran.
+/// Une ressource XAML introuvable ne se voit qu'à l'affichage, et elle tue l'écran.
 ///
-/// WPF résout une `{StaticResource}` par l'ARBRE VISUEL : un style déclaré dans `ScanView.xaml`
-/// n'existe pas pour `LicenseView.xaml`. Rien dans la compilation ne le dit, rien dans les tests
-/// unitaires non plus : le modèle de vue est parfaitement testable sans jamais construire la vue.
-/// Le défaut n'apparaît qu'au premier clic d'un utilisateur sur l'écran concerné.
-///
-/// Payé deux FOIS le 02/09/2026 en une heure :
-///   • l'écran de scan refait s'est arrêté au démarrage — `TextBrush` au lieu de `TextPrimaryBrush` ;
-///   • l'écran d'activation neuf s'est arrêté à l'affichage — `Muted` déclaré chez le voisin.
+/// WPF résout une `{StaticResource}` par l'ARBRE VISUEL : un style déclaré dans une vue n'existe pas
+/// pour sa voisine. Rien dans la compilation ne le dit, rien dans les tests unitaires non plus : le
+/// modèle de vue est testable sans jamais construire la vue. Le défaut n'apparaît qu'à l'affichage
+/// (par exemple `TextBrush` au lieu de `TextPrimaryBrush`, ou un style déclaré chez le voisin).
 ///
 /// Ce gate lit chaque vue et exige que chaque `{StaticResource}` soit déclarée SOIT au niveau
 /// application (`App.xaml`), SOIT dans la vue elle-même. C'est exactement la portée que WPF
-/// accorde à un `UserControl` monté seul, et c'est la premiere version de ce controle, écrite en
-/// groupant tous les fichiers, qui a laissé passer le second crash : elle trouvait `Muted`
-/// déclaré « quelque part » et déclarait tout bon.
+/// accorde à un `UserControl` monté seul : grouper tous les fichiers laisserait passer une ressource
+/// déclarée « quelque part » ailleurs.
 /// </summary>
 public sealed class EveryViewResourceResolvesGateTests
 {

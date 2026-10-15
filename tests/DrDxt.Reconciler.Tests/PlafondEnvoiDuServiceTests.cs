@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Reconciler.Tests;
 
-/// <summary>28/09/2026 : le réglage « protéger mon ping » que le service SYSTEM portera. Il vit sous
+/// <summary>Le réglage « protéger mon ping » que le service SYSTEM portera. Il vit sous
 /// %ProgramData%\DrDxt (écrit par le helper, jamais par le compte) : le service ne lit jamais
 /// %LOCALAPPDATA%, que tout programme du compte peut réécrire (un programme du compte pourrait y nommer un autre exe, en pire sous SYSTEM).</summary>
 public sealed class PlafondEnvoiDuServiceTests : IDisposable
@@ -27,7 +27,7 @@ public sealed class PlafondEnvoiDuServiceTests : IDisposable
         Magasin().Lire().Should().Be(new PlafondRetenuDuService("cod.exe", 20_000_000));
     }
 
-    // 28/09/2026 : le service ne porte pas un lanceur ou un binaire de Windows, même retenu par une version
+    // Le service ne porte pas un lanceur ou un binaire de Windows, même retenu par une version
     // antérieure du helper qui ne les refusait pas.
     [Theory]
     [InlineData("steam.exe")]

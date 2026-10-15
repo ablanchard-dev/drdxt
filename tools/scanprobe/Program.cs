@@ -48,7 +48,7 @@ if (!hw.IsOk)
 
 var st = await sp.GetRequiredService<ISettingsStateReader>().ReadAsync(hw.Value!);
 
-// LM 07/09 — CE QUE LE LECTEUR A REELLEMENT LU, avant tout jugement. Sans ces trois lignes, un
+// CE QUE LE LECTEUR A REELLEMENT LU, avant tout jugement. Sans ces trois lignes, un
 // constat absent se lit comme « rien a signaler » alors qu'il veut dire « je n'ai rien lu ».
 if (st.IsOk && st.Value is { } vu)
 {
@@ -56,9 +56,8 @@ if (st.IsOk && st.Value is { } vu)
     Console.WriteLine($"[lecture] coeurs parques : {(vu.ParkedCoreIndexes is null ? "JAMAIS LU" : vu.ParkedCoreIndexes.Count.ToString())}");
     Console.WriteLine($"[lecture] cartes reseau  : {(vu.NetworkAdapters is null ? "JAMAIS LU" : vu.NetworkAdapters.Count.ToString())}");
 
-    // 18/09/2026 — LES REGLAGES QUI DECIDENT DU PLAN. Sur la machine de reference, les DIX
-    // lignes du plan sortaient « ne s'applique pas », et rien ne disait pourquoi : impossible de
-    // distinguer « deja regle » de « je n'ai pas su lire ». Ce sont exactement ces TriState qui
+    // LES REGLAGES QUI DECIDENT DU PLAN. Sans eux, une ligne « ne s'applique pas » ne dirait pas
+    // pourquoi : impossible de distinguer « deja regle » de « je n'ai pas su lire ». Ce sont exactement ces TriState qui
     // ferment les leviers de latence, et `Unknown` n'y veut jamais dire « rien a faire ».
     Console.WriteLine($"[lecture] Game Mode      : {vu.GameMode}");
     Console.WriteLine($"[lecture] HAGS (effectif): {vu.HagsEffective}   (cle brute : {vu.Hags})");
@@ -76,7 +75,7 @@ if (!st.IsOk)
 var state = st.Value!;
 var inv = hw.Value!;
 
-// 24/09/2026 — le BIOS LU, par la meme fonction que l'application (helper deja lance, sinon
+// Le BIOS LU, par la meme fonction que l'application (helper deja lance, sinon
 // lecture directe si ce processus est administrateur ; jamais d'UAC).
 var biosLu = await new DrDxt.Bios.NvramBiosSettingsReader(DrDxt.App.Platform.VariablesFirmware.Lire)
     .ReadAsync(inv.Board.Product, inv.Bios.Version);
@@ -150,7 +149,7 @@ if (args.Contains("--rapport"))
     var scan = scorer.Score(inv, state, baseline: null);
     Console.WriteLine();
     Console.WriteLine("=== RAPPORT SAV, mot pour mot ===");
-    // Lot 1 : la preuve du besoin porte AUSSI la sante de la machine, lue par le meme audit que
+    // La preuve du besoin porte AUSSI la sante de la machine, lue par le meme audit que
     // l'ecran (lecture seule : `Lire()` n'ecrit rien, c'est l'outil `repairaudit` qui journalise).
     var sante = RepairTriage.Trier(new DrDxt.Detection.Repair.RepairAuditService().Lire());
     Console.WriteLine(DiagnosticReport.Build(
@@ -163,7 +162,7 @@ if (args.Contains("--rapport"))
 // section imprime CE QUI est recommande, pour pouvoir juger chaque ligne sur la machine.
 if (args.Contains("--plan"))
 {
-    // 16/09/2026 : la premiere version montait AddDrDxtApplication seul, donc les lecteurs de TEST
+    // La premiere version montait AddDrDxtApplication seul, donc les lecteurs de TEST
     // (registre, plan d'alimentation, services) qui echouent toujours : « non lu ⇒ applicable » faisait
     // sortir comme recommande ce qui etait deja regle. On monte ici le conteneur de l'APPLI elle-meme
     // et on appelle le meme consommateur de profil que l'ecran.
@@ -172,7 +171,7 @@ if (args.Contains("--plan"))
     var etat = await appli.GetRequiredService<ISettingsStateReader>().ReadAsync(inventaire.Value!);
     var plan = appli.GetRequiredService<DrDxt.App.Profiles.IScanProfileConsumer>().Consume(inventaire.Value!, etat.Value!);
     Console.WriteLine();
-    // 18/09/2026 — LES MEMES LECTURES, MAIS PAR LES LECTEURS DE L'APPLI. Le bloc `[lecture]` du
+    // LES MEMES LECTURES, MAIS PAR LES LECTEURS DE L'APPLI. Le bloc `[lecture]` du
     // haut monte `AddDrDxtDetection` seul : les seams NVIDIA et ecran y sont des bouchons, donc
     // le cap d'images y sort « JAMAIS LU » pour une raison qui tient a la SONDE, pas au produit.
     // Comparer les deux colonnes est le seul moyen de ne pas prendre un trou d'outillage pour un

@@ -6,7 +6,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 07/10/2026 (L-USB) : la suspension sélective USB se dit, sans geste. Sources : Microsoft Learn, « USB Selective
+// La suspension sélective USB se dit, sans geste. Sources : Microsoft Learn, « USB Selective
 // Suspend » (activée par défaut, ne pas la couper) et « Selective Suspend for HID Over USB Devices » (coupée par Windows
 // sur les périphériques d'entrée, pour éviter le délai de reprise).
 public sealed class SuspensionUsbTests

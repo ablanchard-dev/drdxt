@@ -8,47 +8,39 @@ namespace DrDxt.Integration.Tests;
 /// Ce qui est construit et que le produit n'appelle jamais.
 ///
 /// ══ pourquoi ce controle existe ══
-/// Ce defaut a ete paye deux FOIS dans la meme journee, le 09/09/2026. Le matin : dix types
-/// construits en deux jours, zero reference par `DrDxt.App` ou `DrDxt.Application` — des lecteurs
-/// orphelins branches dans un outil lui-meme orphelin. Le soir : sept familles de sante enfin
-/// branchees, dont l'ecart d'alimentation qui n'atteignait toujours pas l'ecran, parce qu'un
-/// constat sans geste est range parmi ceux qu'on ne montre jamais.
-///
-/// Le savoir n'a pas suffi la seconde fois. Il fallait que la faute devienne impossible a
-/// reintroduire sans que quelque chose casse.
+/// Des types construits et testes peuvent n'etre references par aucune couche du produit : des
+/// lecteurs orphelins branches dans un outil lui-meme orphelin. Le savoir ne suffit pas : la faute
+/// doit etre impossible a reintroduire sans que quelque chose casse.
 ///
 /// ══ ce qu'il mesure ══
 /// Un type declare dans `src/` dont le nom n'apparait dans aucun autre fichier de `src/`, mais
 /// apparait dans `tools/`. Autrement dit : du code que seule une ligne de commande atteint. Il
-/// peut etre excellent — le banc CPU l'est — et il ne sert personne tant qu'aucun chemin produit
+/// peut etre excellent, et il ne sert personne tant qu'aucun chemin produit
 /// ne l'appelle.
 ///
-/// ══ la prose ne compte plus comme un appel — corrige le 11/09/2026 ══
-/// Ce controle a ete AVEUGLE par ses propres explications pendant deux jours. Il cherchait le
-/// nom du type dans le texte BRUT des fichiers de `src/` : un type cite dans un COMMENTAIRE passait
-/// donc pour appele. Cinq orphelins reels en profitaient, et le plus retourne est celui dont le
-/// commentaire disait mot pour mot pourquoi il restait dans l'outil — `BiosQualificationMatrix`,
-/// « reste dans l'outil : elle vit dans `DrDxt.Bios`, que ce projet ne reference pas ». Mieux la
-/// raison etait ecrite, plus surement elle faisait taire le garde cense la reclamer.
+/// ══ la prose ne compte plus comme un appel ══
+/// Chercher le nom du type dans le texte BRUT des fichiers de `src/` ferait passer pour appele un
+/// type cite dans un COMMENTAIRE : mieux la raison d'un orphelin serait ecrite, plus surement elle
+/// ferait taire le garde cense la reclamer.
 /// ⇒ <see cref="CodeSeul"/> ampute commentaires, litteraux chaine et litteraux caractere avant de
 /// chercher. Une chaine INTERPOLEE est gardee entiere : ses accolades portent du vrai code
 /// (`$"...{GameObjective.Explication(but)}..."` est un appel), et garder sa prose ne peut rendre ce
-/// controle qu'INDULGENT, jamais accusateur — c'est le bon sens de l'erreur pour un garde.
+/// controle qu'INDULGENT, jamais accusateur : c'est le bon sens de l'erreur pour un garde.
 ///
 /// ══ ce qu'il ne mesure toujours pas, et c'est dit plutot que cache ══
 /// La recherche se fait par NOM, pas par le compilateur. Elle ignore donc les classes d'extension
 /// appelees par leur methode (`services.AddDetection()` ne cite jamais
 /// `DetectionServiceCollectionExtensions`), et surtout **tout type qui ne circule qu'a travers un
-/// `var`** : `new CpuTopology().Lire()` n'ecrit nulle part le nom du type rendu. Ce trou-la a
-/// produit deux fausses accusations le 11/09 — `LogicalProcessor` et `CpuBenchResult`, toutes deux
-/// corrigees en ECRIVANT le type au lieu de `var` au site d'appel. Le fermer demande un comptage
+/// `var`** : `new CpuTopology().Lire()` n'ecrit nulle part le nom du type rendu. Ce trou-la produit
+/// de fausses accusations (`LogicalProcessor`, `CpuBenchResult`), levees en ECRIVANT le type au lieu
+/// de `var` au site d'appel. Le fermer demande un comptage
 /// semantique (Roslyn, table de symboles), donc une dependance nouvelle dans ce projet de test :
 /// geste a part entiere, pas un bricolage en passant.
 /// **seuil de reouverture, chiffre plutot que laisse au jugement** : au TROISIEME faux positif
-/// reel du trou `var` — un type que `src/` construit vraiment mais que ce controle accuse — la
+/// reel du trou `var` (un type que `src/` construit vraiment mais que ce controle accuse), la
 /// reponse cesse d'etre « ecrire le type au site d'appel » et devient l'ajout de
 /// `Microsoft.CodeAnalysis.CSharp` a ce seul `.csproj` de test plus un `SemanticModel` par fichier
-/// de `src/`. Compteur au 11/09/2026 : **2 sur 3** (`LogicalProcessor`, `CpuBenchResult`). Elargir
+/// de `src/`. Compteur releve le 11/09/2026 : **2 sur 3** (`LogicalProcessor`, `CpuBenchResult`). Elargir
 /// encore <see cref="CodeSeul"/> ne compte pas comme reponse : le trou du `var` n'est pas une
 /// question de texte, aucune amputation de prose ne fera apparaitre un nom qui n'est pas ecrit.
 /// Un comptage voisin, « aucune reference hors tests », rend 78 types : il est MOINS fiable pour
@@ -63,51 +55,35 @@ namespace DrDxt.Integration.Tests;
 /// </summary>
 public class TheProductMayNotBuildWhatItNeverCallsTests
 {
-    /// <summary>Mesure du 09/09/2026. Chaque nom qui part d'ici est une victoire ; chaque nom qui
-    /// s'y ajoute est une dette, et il faut alors dire pourquoi, ici meme, a cote du nom.
+    /// <summary>Chaque nom qui part d'ici est une victoire ; chaque nom qui s'y ajoute est une dette,
+    /// et il faut alors dire pourquoi, ici meme, a cote du nom.
     ///
-    /// **Mouvements du 09/09 au soir, et le cliquet les a tous les deux exiges :**
-    /// • `CpuBench` et `ChargeCpu` SORTENT — `RealCpuSustainedBench` les appelle depuis `src`.
-    /// • `CoeursHomogenes` et `DebitParCoeur` ENTRENT : la comparaison cœur par cœur coute huit
-    ///   mesures successives, soit plusieurs minutes de charge, et n'a donc pas sa place dans un
-    ///   scan. Elle appartient a la famille « a la demande », comme la reference CPU l'etait avant
-    ///   d'etre cablee.
+    /// `CoeursHomogenes` et `DebitParCoeur` restent des outils : la comparaison cœur par cœur coute
+    /// huit mesures successives, soit plusieurs minutes de charge, et n'a pas sa place dans un scan.
+    /// Elle appartient a la famille « a la demande ».
     ///
-    /// **Mouvement du 10/09** : `ConditionsDeMesure`, `RepairChangement`, `RepairEtat` et
-    /// `RepairHistoryStore` SORTENT — le pilier maintenir est cable, le produit garde enfin une
-    /// photo et dit ce qui a change depuis la precedente. Puis `NetworkPathAnalyzer` (attribution
-    /// reseau) et `CacheStaircase` (controle Q-05 : un escalier plat n'est pas une hierarchie).
-    ///
-    /// Et le cliquet a mordu apres un commit, pas avant : la suite d'integration n'avait pas
-    /// ete relancee dans le tour qui a cable `CacheStaircase`. Verte ailleurs ne veut pas dire
-    /// verte ici — c'est precisement le test qui parle de ce que les autres ne regardent pas.</summary>
+    /// Une suite verte ailleurs ne veut pas dire verte ici : c'est le test qui parle de ce que les
+    /// autres ne regardent pas, il faut le relancer.</summary>
     private static readonly HashSet<string> VusSeulementParUnOutil =
     [
-        // 10/09/2026 (L8 a + b) : l'Optimiser de l'App appelle desormais CandidateSelector,
-        // CatalogueDeCandidats, DiagnosticMachine, GameOptimizationProfile, GameOptimizationSession,
-        // GameProfileIdentity et InstabiliteGpuObservee — 22 types geles, 16 restent.
-        // 11/09/2026, DECISION ecrite plutot que redecouverte : `CalibrationVerdict` et
+        // DECISION ecrite plutot que redecouverte : `CalibrationVerdict` et
         // `NoOpCalibrationStore` RESTENT des outils. Le seul ecrivain du journal de controle est
         // `tools/optimize --controle` ; le produit n'a aucun candidat no-op, donc sur une machine
         // qui n'a jamais vu l'outil le fichier n'existe pas et le verdict vaudrait
         // `PasAssezDObservations` pour toujours, la meme phrase pour tout le monde. Et la
         // calibration juge une FORMULE, pas une decision : le produit annonce sa resolution
         // session par session (elle varie d'un facteur ~8 d'une partie a l'autre, `GameMetricSet`),
-        // et le corpus no-op a deja atteint le produit — GELE en constantes le 08/09 par
-        // `tools/tailbench --loco`. Se rouvre le jour ou le produit sait DEPOSER ses propres
+        // et le corpus no-op a deja atteint le produit, gele en constantes (mesure par
+        // `tools/tailbench --loco`). Se rouvre le jour ou le produit sait DEPOSER ses propres
         // controles.
         //
-        // 11/09/2026, les cinq que la prose cachait. Ils ne sont pas neufs : ils etaient orphelins
-        // depuis toujours et le balayage du texte brut les comptait « vus » parce que leur nom
-        // apparaissait dans un commentaire de `src/`. Chacun est verifie : un seul `tools/*` l'appelle,
-        // plus ses tests, et rien dans le code de `src/`.
+        // Ceux dont le nom n'apparait que dans un commentaire de `src/`. Chacun est verifie : un seul
+        // `tools/*` l'appelle, plus ses tests, et rien dans le code de `src/`.
         //
-        // 09/10/2026 : `AdlxGpuTuningWriter` (la plume d'écriture ADLX du banc de juillet, tension et fréquence) est supprimée
-        // avec la session qui l'appelait ; son interface et le vieux banc de juillet (HarnessRunner, nettoyage, rendu) suivent :
-        // le banc public n'écrit la carte que par le canal élevé du produit, filtré.
+        // Le banc public n'écrit la carte que par le canal élevé du produit, filtré.
         "CalibrationVerdict",
         "CpuFrequencyState",
-        // 06/10/2026 (chantier J2) : `GainCumule` quitte la liste : la carte des parties de l'App compose les gains prouvés sur les vraies parties.
+        // `GainCumule` quitte la liste : la carte des parties de l'App compose les gains prouvés sur les vraies parties.
         // `GpuBenchSession` et `OcSweep` — le balayage d'offset GPU de `tools/octune`. `AutopilotEngine`
         // ecrit lui-meme la succession : « `OcSweep` avait deja cette philosophie et n'etait appele
         // que par `tools/octune` : il ne savait balayer qu'un offset GPU entier » — le moteur
@@ -119,11 +95,11 @@ public class TheProductMayNotBuildWhatItNeverCallsTests
         // utilise l'executeur en processus, sans aucun point d'entree privilegie ouvert. Un chemin
         // volontairement non pris n'est pas un branchement oublie.
         "HostElevatedClientFactory",
-        // 10/09/2026 (branchement B1) : GameThreadPressure et ThreadCpuReader retires — le scan de l'App
+        // GameThreadPressure et ThreadCpuReader retires — le scan de l'App
         // observe les threads du jeu et le diagnostic les lit. 16 ⇒ 14.
-        // 11/09/2026 : DpcLatencyTracer et DpcOutcome retires — le scan mesure les DPC/ISR en jeu. 13 ⇒ 11.
+        // DpcLatencyTracer et DpcOutcome retires — le scan mesure les DPC/ISR en jeu. 13 ⇒ 11.
         //
-        // 11/09/2026, DEPLACEMENTS et non branchements : `CoeursHomogenes`, `DebitParCoeur`,
+        // DEPLACEMENTS et non branchements : `CoeursHomogenes`, `DebitParCoeur`,
         // `CpuBudgetIssue` et `CpuBudgetJuge` ont quitte `src/DrDxt.Measurement` pour `tools/coeurs`
         // et `tools/cpubench`, avec leurs tests. La raison de leur absence du produit reste celle
         // ecrite le 09/09 et rappelee plus haut — huit mesures successives pour la
@@ -132,13 +108,13 @@ public class TheProductMayNotBuildWhatItNeverCallsTests
         // dans `DrDxt.Measurement.dll` expediee. Le perimetre de ce test etant `src/`, elles
         // disparaissent du comptage : les garder ici ferait reclamer des noms hors perimetre.
         // 10 ⇒ 6.
-        // 06/10/2026 (chantier B14) : `MachineDeTest.Machine` est construit par JsonSerializer, et seulement dans
+        // `MachineDeTest.Machine` est construit par JsonSerializer, et seulement dans
         // un build Debug (argument « machine=<nom> », pour dessiner les écrans d'une machine qu'on n'a pas). La version
         // livrée ne le compile pas : il n'a pas de chemin produit, par construction.
         "Machine",
         "NoOpCalibrationStore",
         "OcSweep",
-        // 11/09/2026, DECISION ecrite : `PerformanceTimeline` et `TimelineSample` ne
+        // DECISION ecrite : `PerformanceTimeline` et `TimelineSample` ne
         // sont pas de la famille « outil par nature » — la fusion sur base de temps commune est
         // ecrite pour la production. Elle n'est simplement pas branchable AUJOURD'HUI, et les deux
         // manques sont verifiables : (1) la capture de frames du produit demande 7 elements
@@ -150,38 +126,14 @@ public class TheProductMayNotBuildWhatItNeverCallsTests
         // A rouvrir des qu'une de ces deux series existe ; pas avant, sinon c'est une tranche
         // verticale deguisee en branchement.
         "PerformanceTimeline",
-        // 10/09/2026 : SceneRepresentativity retire — la regle de decidabilite du moteur l'appelle.
-        // 10/09/2026 (B3) : SystemNicCounterSource retire — le scan mesure les pertes a l'interface. 14 ⇒ 13.
-        //
-        // 11/09/2026, `SceneRole` RESTE, et le tour ou il aurait ete facile de le retirer est celui
-        // ou il fallait le laisser. `SceneContract` est desormais RELU par le produit : la session
-        // dit ce que la scene n'autorise pas (`CeQuiManque` dans `SceneExplanation`, a l'ecran par
-        // `ResultatOptimisation`). Mais l'App n'a toujours pas de scene DECLAREE — elle appelle
-        // `Run` sans contrat, donc `Inconnue`, et le role n'est jamais atteint. Ecrire
-        // `SceneRole.Decouverte` au site d'appel ferait taire ce test sans changer un seul
-        // comportement : ce serait decorer le cliquet, pas brancher un type. Le vrai geste est de
-        // DEMANDER au joueur ce qu'il jouait — une question d'interface, donc une decision produit.
-        //
-        // 11/09/2026 au soir : `SceneRole` RETIRE, et cette fois ce n'est pas decorer le cliquet.
-        // Tranche : le joueur declare sa scene dans l'App (`ScanViewModel.SceneDeclaree`). Une
-        // partie reelle declaree ATTEINT la branche du role, et l'ecran dit « trouve en scene de
-        // decouverte : a revalider ». Le role reste `Decouverte` au site d'appel, et la raison est
-        // ecrite la-bas (`ContratDeScene`) : le code ne sait pas prouver qu'une session REJOUE un
-        // profil deja trouve, et une validation fabriquee serait le seul chemin vers un keep durable.
-        // 12 ⇒ 11.
-        // 11/09/2026 : `TraceOutcome` retire, et ce n'est pas un branchement — c'est un
-        // DEPLACEMENT. `ThreadResidencyTracer` (inacheve, aucune donnee rendue depuis le 08/09) et
-        // son enum n'ont jamais eu d'appelant hors `tools/cpuprobe` ; le fichier vit desormais
-        // dans cet outil, donc le type ne se compile plus dans `DrDxt.Detection.dll` expediee.
-        // Le perimetre de ce test etant `src/`, il disparait du comptage : le laisser dans la
-        // liste gelee la ferait reclamer un nom qui n'existe plus. 11 ⇒ 10.
+        // Retirer un nom de cette liste demande un vrai appel du produit : ecrire un type au site
+        // d'appel sans changer de comportement decorerait le cliquet, pas un branchement.
         "TimelineSample",
     ];
 
-    /// <summary>`ref\s+` et `(?:record\s+)?` ajoutes le 11/09/2026 : sans eux, **21 types**
-    /// declares `record struct` / `readonly record struct` / `record class` etaient invisibles a ce
-    /// controle — jamais declares, donc jamais accusables. Aucun des 21 ne s'est revele orphelin,
-    /// mais un inventaire qui ne voit pas une forme de declaration ne peut pas le prouver.</summary>
+    /// <summary>`ref\s+` et `(?:record\s+)?` : sans eux, les types declares `record struct` /
+    /// `readonly record struct` / `record class` seraient invisibles a ce controle, donc jamais
+    /// accusables. Un inventaire qui ne voit pas une forme de declaration ne peut rien prouver.</summary>
     private static readonly Regex Declaration = new(
         @"^\s*(?:public|internal)\s+(?:sealed\s+|static\s+|abstract\s+|partial\s+|readonly\s+|ref\s+)*"
         + @"(?:record\s+)?(?:class|record|interface|enum|struct)\s+([A-Z][A-Za-z0-9_]*)",

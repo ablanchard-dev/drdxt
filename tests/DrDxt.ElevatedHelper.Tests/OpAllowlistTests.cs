@@ -6,11 +6,11 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// A2 — OpAllowlist: validate BY TYPE + by target, leaf-exact, default-DENY.
+// OpAllowlist : valider par type et par cible, feuille exacte, refus par défaut.
 //
-// This is the master plan's defense n°1 (§9.13): not the HMAC, but the closed,
-// leaf-exact allowlist. A blacklisted or unknown target is refused
-// (HELPER.NOT_ALLOWLISTED) before any privileged action.
+// C'est la défense n° 1 : pas le HMAC, mais la liste blanche fermée, feuille exacte.
+// Une cible interdite ou inconnue est refusée (HELPER.NOT_ALLOWLISTED)
+// avant toute action privilégiée.
 // -----------------------------------------------------------------------
 public sealed class OpAllowlistTests
 {
@@ -19,12 +19,12 @@ public sealed class OpAllowlistTests
     private static SetRegistryValueOp Reg(string path, string name = "x") =>
         new(RegistryHiveKind.LocalMachine, path, name, RegistryValueType.DWord, "1");
 
-    // --- Registry: allowed exact leaves pass ---
+    // --- Registre : les feuilles exactes autorisées passent ---
 
     [Theory]
     // NVIDIA Low Latency, gardée pour défaire une écriture passée.
     [InlineData(@"SOFTWARE\NVIDIA Corporation\Global\NVTweak", "LowLatencyMode")]
-    // HAGS (Hardware-Accelerated GPU Scheduling).
+    // HAGS (planification GPU accélérée par le matériel).
     [InlineData(@"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode")]
     public void Registry_allowed_exact_leaf_passes(string path, string name)
     {
@@ -32,7 +32,7 @@ public sealed class OpAllowlistTests
         _allow.Validate(op).IsOk.Should().BeTrue();
     }
 
-    // 04/10/2026 (revue sécurité 6.1) : les feuilles machine (HKLM) sans valeur bornée acceptaient tout nombre.
+    // Les feuilles machine (HKLM) sans valeur bornée acceptaient tout nombre.
     // Les valeurs du compte (HKCU) restent libres : l'utilisateur peut déjà les écrire sans droits.
     [Theory]
     [InlineData(@"SOFTWARE\NVIDIA Corporation\Global\NVTweak", "LowLatencyMode")]
@@ -57,8 +57,8 @@ public sealed class OpAllowlistTests
     [Fact]
     public void Registry_gamebar_autogamemode_enabled_under_currentuser_passes()
     {
-        // NS-1 Game Mode ON sets the modern Settings toggle (AutoGameModeEnabled) alongside
-        // AllowAutoGameMode — both are documented to be set together under GameBar.
+        // Le Mode Jeu activé pose la bascule moderne des Paramètres (AutoGameModeEnabled) à côté
+        // d'AllowAutoGameMode : la documentation les pose ensemble sous GameBar.
         var op = new SetRegistryValueOp(
             RegistryHiveKind.CurrentUser, @"Software\Microsoft\GameBar", "AutoGameModeEnabled",
             RegistryValueType.DWord, "1");
@@ -68,8 +68,8 @@ public sealed class OpAllowlistTests
     [Fact]
     public void Registry_gamedvr_historical_capture_under_currentuser_passes()
     {
-        // NS-1 Game DVR background-recording OFF flips the "Record what happened" toggle
-        // (HistoricalCaptureEnabled) under HKCU GameDVR — surgical (manual capture untouched).
+        // Le Game DVR en arrière-plan désactivé bascule « Enregistrer ce qui s'est passé »
+        // (HistoricalCaptureEnabled) sous HKCU GameDVR : chirurgical (la capture manuelle reste intacte).
         var op = new SetRegistryValueOp(
             RegistryHiveKind.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\GameDVR",
             "HistoricalCaptureEnabled", RegistryValueType.DWord, "0");
@@ -79,14 +79,14 @@ public sealed class OpAllowlistTests
     [Fact]
     public void Registry_directx_user_global_settings_string_under_currentuser_passes()
     {
-        // NS-1 VRR global + flip-model live in this REG_SZ string (merged, AutoHDR preserved).
+        // VRR global et modèle de retournement vivent dans cette chaîne REG_SZ (fusionnée, AutoHDR préservé).
         var op = new SetRegistryValueOp(
             RegistryHiveKind.CurrentUser, @"Software\Microsoft\DirectX\UserGpuPreferences",
             "DirectXUserGlobalSettings", RegistryValueType.String, "VRROptimizeEnable=1;SwapEffectUpgradeEnable=1");
         _allow.Validate(op).IsOk.Should().BeTrue();
     }
 
-    // 26/09/2026 : l'allowlist ne verifiait que la cible. Un op forge (le rejeu au demarrage en rejoue depuis
+    // L'allowlist ne verifiait que la cible. Un op forge (le rejeu au demarrage en rejoue depuis
     // un fichier du compte) pouvait ecrire n'importe quel type et n'importe quelle valeur dans une feuille
     // permise : par exemple un fichier d'echange de 16 Mo, ou place ailleurs que sur un disque.
     // Le levier n'ecrit que deux valeurs : la gestion automatique, et, pour Annuler, le vide qu'il a lu
@@ -100,6 +100,10 @@ public sealed class OpAllowlistTests
     [InlineData(@"?:\pagefile.sys")] // ce que le levier pose
     [InlineData("")]                 // ce que son Annuler remet : l'etat d'origine, desactive
     [InlineData(" \n ")]             // idem, lu avec des entrees blanches
+    // Ce que l'Annuler de fixit.pagefile_ssd remet : une taille geree par le systeme sur un lecteur nomme.
+    [InlineData(@"D:\pagefile.sys 0 0")]
+    [InlineData(@"D:\pagefile.sys")]
+    [InlineData("C:\\pagefile.sys 0 0\nD:\\pagefile.sys 0 0")]
     public void PagingFiles_accepte_les_deux_valeurs_que_le_levier_ecrit(string valeur) =>
         _allow.Validate(PagingFiles(valeur)).IsOk.Should().BeTrue();
 
@@ -108,6 +112,9 @@ public sealed class OpAllowlistTests
     [InlineData(@"C:\pagefile.sys 4096 8192")]
     [InlineData(@"C:\Windows\evil.sys 4096 4096")]
     [InlineData("?:\\pagefile.sys\nC:\\pagefile.sys 16 16")]
+    [InlineData(@"D:\pagefile.sys 0 16")]
+    [InlineData(@"DD:\pagefile.sys 0 0")]
+    [InlineData(@"D:\dossier\pagefile.sys 0 0")]
     public void PagingFiles_refuse_toute_autre_valeur(string valeur) =>
         _allow.Validate(PagingFiles(valeur)).IsOk.Should().BeFalse();
 
@@ -123,29 +130,29 @@ public sealed class OpAllowlistTests
             .IsOk.Should().BeFalse();
     }
 
-    // --- Registry: HARD BLACKLIST always denies (Defender/Update/BITS/bam/policies) ---
+    // --- Registre : la liste noire dure refuse toujours (Defender/Update/BITS/bam/stratégies) ---
 
     [Theory]
     [InlineData(@"SYSTEM\CurrentControlSet\Services\WinDefend")]            // Defender
     [InlineData(@"SOFTWARE\Microsoft\Windows Defender")]                   // Defender
     [InlineData(@"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate")]     // Windows Update
-    [InlineData(@"SYSTEM\CurrentControlSet\Services\wuauserv")]            // Windows Update service
+    [InlineData(@"SYSTEM\CurrentControlSet\Services\wuauserv")]            // service Windows Update
     [InlineData(@"SYSTEM\CurrentControlSet\Services\BITS")]               // BITS
     [InlineData(@"SYSTEM\CurrentControlSet\Services\bam")]                // bam
-    [InlineData(@"SYSTEM\CurrentControlSet\Services\bam\State")]          // bam subtree
-    [InlineData(@"SOFTWARE\Policies\Microsoft\Windows\Safer")]            // security policy
-    [InlineData(@"SECURITY\Policy")]                                       // security policy hive area
+    [InlineData(@"SYSTEM\CurrentControlSet\Services\bam\State")]          // sous-arbre bam
+    [InlineData(@"SOFTWARE\Policies\Microsoft\Windows\Safer")]            // stratégie de sécurité
+    [InlineData(@"SECURITY\Policy")]                                       // zone de ruche des stratégies de sécurité
     public void Registry_blacklisted_subtree_is_denied(string path)
     {
         _allow.Validate(Reg(path)).Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
-    // It is the BLACKLIST that denies these — not the leaf-exact default-DENY that would
-    // refuse them anyway. Both curtains return NotAllowlisted, so asserting the code alone
-    // cannot tell them apart: deleting the Defender entries from BlacklistedSubtrees left
-    // the whole suite green (verified by mutation 2026-09-01). The blacklist exists for the
-    // case the code comments out: "even if some future allow-rule overlaps it" — so the
-    // assertion has to name which rule fired, or the second curtain is decorative.
+    // C'est la liste noire qui refuse ceux-là, pas le refus par défaut feuille exacte qui les
+    // refuserait de toute façon. Les deux rideaux rendent NotAllowlisted : vérifier le code seul ne
+    // les distingue pas, et retirer les entrées Defender de BlacklistedSubtrees laissait toute la
+    // suite verte (vérifié par mutation). La liste noire existe pour le cas que le code nomme :
+    // « même si une règle d'autorisation future la recouvre ». L'assertion doit donc nommer la
+    // règle qui a joué, sinon le second rideau est décoratif.
     [Theory]
     [InlineData(@"SYSTEM\CurrentControlSet\Services\WinDefend")]
     [InlineData(@"SOFTWARE\Microsoft\Windows Defender")]
@@ -159,13 +166,12 @@ public sealed class OpAllowlistTests
                 "removing this subtree from BlacklistedSubtrees must fail a test, not pass silently");
     }
 
-    // La theorie ci-dessus liste les sous-arbres a la main, et elle en oubliait la moitie :
-    // wuauserv, bam, Safer, SECURITY, SAM et le WindowsUpdate de CurrentVersion n'y etaient pas.
-    // Elle n'exercait par ailleurs que la CLE EXACTE — jamais un enfant. Mutation du 06/09/2026 :
-    // remplacer la branche `StartsWith(subtree + separateur)` d'IsUnderSubtree par `false` laisse
-    // les 397 tests au vert. Autrement dit, la liste noire ne couvrait plus que 11 cles precises
-    // au lieu de 11 sous-ARBRES, et rien ne le disait — alors que c'est exactement le cas qu'elle
-    // existe pour couvrir : une regle d'autorisation future qui viserait une feuille sous Defender.
+    // La theorie ci-dessus liste les sous-arbres a la main : une liste ecrite a la main en oublie
+    // (wuauserv, bam, Safer, SECURITY, SAM, le WindowsUpdate de CurrentVersion), et elle n'exerce que la
+    // CLE EXACTE, jamais un enfant. Mesure par mutation : remplacer la branche
+    // `StartsWith(subtree + separateur)` d'IsUnderSubtree par `false` laisserait la theorie verte, la
+    // liste noire ne couvrant plus que des cles precises au lieu de sous-ARBRES. C'est pourtant le cas
+    // qu'elle existe pour couvrir : une regle d'autorisation future qui viserait une feuille sous Defender.
     //
     // Ce controle enumere donc le tableau reel par reflexion : il ne peut plus prendre du retard
     // sur lui. Et il exige le message, pas seulement le code : les deux rideaux rendent
@@ -192,24 +198,24 @@ public sealed class OpAllowlistTests
         }
     }
 
-    // --- Registry: anything not explicitly allowed is denied (default-DENY) ---
+    // --- Registre : tout ce qui n'est pas explicitement autorisé est refusé (refus par défaut) ---
 
     [Theory]
-    [InlineData(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run")]   // autostart — not ours
+    [InlineData(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run")]   // démarrage automatique : pas à nous
     [InlineData(@"SOFTWARE\Random\Vendor\Key")]
-    [InlineData(@"SYSTEM\CurrentControlSet\Control\GraphicsDrivers")] // allowed path, but wrong VALUE name
+    [InlineData(@"SYSTEM\CurrentControlSet\Control\GraphicsDrivers")] // chemin autorisé, mais mauvais nom de valeur
     public void Registry_unallowed_target_is_denied(string path)
     {
-        // For the third case the path is allowed but the value name "x" is not the
-        // exact allowed leaf — leaf-exact means (path, name) both matter.
+        // Dans le troisième cas le chemin est autorisé mais le nom de valeur « x » n'est pas la
+        // feuille autorisée exacte : feuille exacte veut dire que le couple (chemin, nom) compte.
         _allow.Validate(Reg(path)).Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
     [Fact]
     public void Registry_allowed_path_but_wrong_value_name_is_denied_leaf_exact()
     {
-        // GraphicsDrivers path is allowed for HwSchMode only; a different value
-        // name under the same path must be refused (leaf-exact, not subtree).
+        // Le chemin GraphicsDrivers n'est autorisé que pour HwSchMode ; un autre nom de valeur
+        // sous le même chemin doit être refusé (feuille exacte, pas sous-arbre).
         var op = new SetRegistryValueOp(
             RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers",
             "SomethingElse", RegistryValueType.DWord, "1");
@@ -219,7 +225,7 @@ public sealed class OpAllowlistTests
     [Fact]
     public void Registry_allowed_leaf_but_wrong_hive_is_denied()
     {
-        // HwSchMode is an HKLM leaf; the same (path,name) under HKCU is not allowed.
+        // HwSchMode est une feuille HKLM ; le même couple (chemin, nom) sous HKCU n'est pas autorisé.
         var op = new SetRegistryValueOp(
             RegistryHiveKind.CurrentUser, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers",
             "HwSchMode", RegistryValueType.DWord, "1");
@@ -233,7 +239,7 @@ public sealed class OpAllowlistTests
             RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode");
         _allow.Validate(allowed).IsOk.Should().BeTrue();
 
-        // 24/09/2026 : ReflexEnabled n'est plus autorisée, aucun levier ne l'écrivait.
+        // ReflexEnabled n'est plus autorisée, aucun levier ne l'écrivait.
         var retiree = new DeleteRegistryValueOp(
             RegistryHiveKind.LocalMachine, @"SOFTWARE\NVIDIA Corporation\Global\NVTweak", "ReflexEnabled");
         _allow.Validate(retiree).Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
@@ -243,7 +249,7 @@ public sealed class OpAllowlistTests
         _allow.Validate(denied).Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
-    // --- Power plan: only known Windows GUIDs ---
+    // --- Plan d'alimentation : seulement les GUID Windows connus ---
 
     [Fact]
     public void PowerPlan_known_guids_pass()
@@ -260,22 +266,32 @@ public sealed class OpAllowlistTests
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
-    // --- M3 lot 2: the firmware trip. The op carries only a delay, so that bound IS the
-    //     whole authorization — which makes testing it the whole point. ---
+    // --- Le passage au firmware. L'op ne porte qu'un délai : cette borne est toute
+    //     l'autorisation, et la tester est donc tout l'enjeu. ---
 
     [Fact]
     public void Firmware_reboot_inside_the_band_passes()
     {
-        _allow.Validate(new RebootToFirmwareSetupOp(0)).IsOk.Should().BeTrue();
         _allow.Validate(new RebootToFirmwareSetupOp(10)).IsOk.Should().BeTrue();
         _allow.Validate(new RebootToFirmwareSetupOp(300)).IsOk.Should().BeTrue();
+    }
+
+    // Un redémarrage immédiat, à la demande de n'importe quel programme du compte (ou d'un JSON où le délai manque, qui
+    // vaut 0), coupait la partie sans laisser le temps de l'annuler. L'App demande 10 s ; c'est le plancher.
+    [Fact]
+    public void Un_redemarrage_immediat_vers_le_firmware_est_refuse()
+    {
+        _allow.Validate(new RebootToFirmwareSetupOp(0)).IsOk.Should().BeFalse();
+        _allow.Validate(new RebootToFirmwareSetupOp(9)).IsOk.Should().BeFalse();
+        _allow.Validate(PrivilegedOpCodec.Deserialize(PrivilegedOpCodec.Serialize(new RebootToFirmwareSetupOp(0)).Value!).Value!)
+            .IsOk.Should().BeFalse();
     }
 
     [Fact]
     public void Firmware_reboot_outside_the_band_is_denied()
     {
-        // Past a few minutes the user has moved on and no longer connects the restart to
-        // anything they clicked — a reboot with no visible cause is what destroys trust.
+        // Passé quelques minutes, le joueur est passé à autre chose et ne relie plus le redémarrage
+        // à un clic : un redémarrage sans cause visible est ce qui détruit la confiance.
         _allow.Validate(new RebootToFirmwareSetupOp(301))
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
         _allow.Validate(new RebootToFirmwareSetupOp(86_400))
@@ -287,12 +303,12 @@ public sealed class OpAllowlistTests
     [Fact]
     public void Cancelling_a_pending_firmware_boot_is_always_allowed()
     {
-        // Refusing to CANCEL could only ever harm the user: it would leave a reboot armed
-        // that they asked to call off. There is nothing to validate and nothing to gate.
+        // Refuser d'annuler ne pourrait que nuire : cela laisserait armé un redémarrage que le
+        // joueur a demandé d'annuler. Il n'y a rien à valider ni à filtrer.
         _allow.Validate(new CancelPendingFirmwareBootOp()).IsOk.Should().BeTrue();
     }
 
-    // --- Service control: only AMD3DVCacheSvc with allowed actions ---
+    // --- Contrôle de service : seulement AMD3DVCacheSvc avec les actions autorisées ---
 
     [Theory]
     [InlineData(ServiceAction.Install)]
@@ -347,7 +363,7 @@ public sealed class OpAllowlistTests
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
-    // --- L3.1 : le varstore CONSTRUCTEUR, en lecture seule -------------------------------------
+    // --- Le varstore CONSTRUCTEUR, en lecture seule -------------------------------------
 
     [Fact]
     public void ReadFirmwareVariable_the_vendor_setup_varstore_is_readable()
@@ -405,7 +421,7 @@ public sealed class OpAllowlistTests
                                    || n.Contains("SetFirmwareVariable", StringComparison.Ordinal));
     }
 
-    // --- InstallPresentMonService is allowlisted (bounded to the vendored binary) ---
+    // --- InstallPresentMonService est en liste blanche (borné au binaire embarqué) ---
 
     [Fact]
     public void InstallPresentMonService_is_allowed()
@@ -413,7 +429,7 @@ public sealed class OpAllowlistTests
         _allow.Validate(new InstallPresentMonServiceOp()).IsOk.Should().BeTrue();
     }
 
-    // --- NVAPI / ADLX: structural validation (SafeBounds clamping is Phase E) ---
+    // --- NVAPI / ADLX : validation structurelle (le bornage SafeBounds vient à part) ---
 
     [Fact]
     public void NvApiClockOffset_structurally_valid_passes()
@@ -428,30 +444,30 @@ public sealed class OpAllowlistTests
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
-    // --- M1: the ELEVATED layer enforces the GpuSafeBounds CORE policy band itself
-    // (reject, don't clamp). It never defers value bounds to the client. Band = [-200, +100].
+    // --- La couche élevée impose elle-même la bande de politique GpuSafeBounds du cœur
+    // (refuser, pas borner). Elle ne délègue jamais les bornes de valeur au client. Bande = [-200, +100].
 
     [Theory]
-    [InlineData(100)]   // upper bound — accepted
-    [InlineData(-200)]  // lower bound — accepted
-    [InlineData(0)]     // stock — accepted
-    [InlineData(-120)]  // a normal undervolt — accepted
+    [InlineData(100)]   // borne haute : acceptée
+    [InlineData(-200)]  // borne basse : acceptée
+    [InlineData(0)]     // origine : acceptée
+    [InlineData(-120)]  // un undervolt ordinaire : accepté
     public void NvApiClockOffset_core_within_policy_band_is_accepted(int coreOffsetMhz) =>
         _allow.Validate(new ApplyNvApiClockOffsetOp(0, coreOffsetMhz, 0)).IsOk.Should().BeTrue();
 
     [Theory]
-    [InlineData(101)]   // one past the top of the band
-    [InlineData(500)]   // the old hard rail (±500) — now REJECTED at the boundary
-    [InlineData(-201)]  // one past the bottom of the band
+    [InlineData(101)]   // un cran au-dessus de la bande
+    [InlineData(500)]   // l'ancien rail dur (±500), désormais refusé à la frontière
+    [InlineData(-201)]  // un cran sous la bande
     [InlineData(int.MaxValue)]
-    [InlineData(int.MinValue)] // no Math.Abs overflow
+    [InlineData(int.MinValue)] // pas de débordement Math.Abs
     public void NvApiClockOffset_core_outside_policy_band_is_rejected(int coreOffsetMhz) =>
         _allow.Validate(new ApplyNvApiClockOffsetOp(0, coreOffsetMhz, 0))
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
 
     [Theory]
-    [InlineData(500)]   // upper memory bound — accepted
-    [InlineData(-500)]  // lower memory bound — accepted
+    [InlineData(500)]   // borne haute mémoire : acceptée
+    [InlineData(-500)]  // borne basse mémoire : acceptée
     public void NvApiClockOffset_memory_within_policy_band_is_accepted(int memOffsetMhz) =>
         _allow.Validate(new ApplyNvApiClockOffsetOp(0, 0, memOffsetMhz)).IsOk.Should().BeTrue();
 
@@ -481,19 +497,19 @@ public sealed class OpAllowlistTests
     [Fact]
     public void NvApiDrsSetting_valid_passes_and_blank_profile_denied()
     {
-        // 0x10835002 = the CORRECTED FRL_FPS id.
-        _allow.Validate(new ApplyNvApiDrsSettingOp(0x10835002u, 3u, "Base Profile")).IsOk.Should().BeTrue();
-        _allow.Validate(new ApplyNvApiDrsSettingOp(0x10835002u, 3u, ""))
+        // 0x10835002 = l'identifiant FRL_FPS corrigé.
+        _allow.Validate(new ApplyNvApiDrsSettingOp(0x10835002u, 141u, "Base Profile")).IsOk.Should().BeTrue();
+        _allow.Validate(new ApplyNvApiDrsSettingOp(0x10835002u, 141u, ""))
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
     [Theory]
-    // The CORRECTED leaf-exact DRS id set (recipe §C) all pass.
-    [InlineData(0x007BA09Eu)] // PRERENDERLIMIT (unchanged)
-    [InlineData(0x00A879CFu)] // VSYNCMODE (corrected, was 0x00fc00fa)
-    [InlineData(0x10835002u)] // FRL_FPS  (corrected, was 0x10835000)
+    // L'ensemble corrigé d'identifiants DRS feuille exacte (recette §C) passe en entier.
+    [InlineData(0x007BA09Eu)] // PRERENDERLIMIT (inchangé)
+    [InlineData(0x00A879CFu)] // VSYNCMODE (corrigé, l'ancien était 0x00fc00fa)
+    [InlineData(0x10835002u)] // FRL_FPS (corrigé, l'ancien était 0x10835000)
     public void NvApiDrsSetting_corrected_ids_pass(uint settingId) =>
-        _allow.Validate(new ApplyNvApiDrsSettingOp(settingId, 1u, "Base Profile")).IsOk.Should().BeTrue();
+        _allow.Validate(new ApplyNvApiDrsSettingOp(settingId, ValeurNormale(settingId), "Base Profile")).IsOk.Should().BeTrue();
 
     [Theory]
     // HISTORIQUE, parce qu'il explique la forme de la regle : le ProfileName porte par l'op etait
@@ -502,7 +518,7 @@ public sealed class OpAllowlistTests
     // portee silencieuse, ou un appelant demandant un changement par jeu en obtenait un pour toute
     // la machine sans qu'aucune couche ne le dise.
     //
-    // L'allowlist a d'abord refuse toute portee que l'executeur ne savait pas honorer. Depuis L2,
+    // L'allowlist a d'abord refuse toute portee que l'executeur ne savait pas honorer. Depuis,
     // il sait viser un profil d'application, et la regle ouvre cette portee -- mais seulement sous
     // la forme que NVIDIA accepte : un chemin d'executable complet. Tout ce qui suit reste refuse.
     [InlineData("cod.exe")]                 // nom nu : NVIDIA le rejette comme ambigu
@@ -515,16 +531,16 @@ public sealed class OpAllowlistTests
     [InlineData(@"C:\games\cod.dll")]      // pas un executable
     [InlineData(@"C:\games\cod.exe?")]     // caractere impossible dans un chemin
     public void NvApiDrsSetting_a_profile_the_executor_cannot_honour_is_denied(string profile)
-        => _allow.Validate(new ApplyNvApiDrsSettingOp(0x10835002u, 3u, profile))
+        => _allow.Validate(new ApplyNvApiDrsSettingOp(0x10835002u, 141u, profile))
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
 
     [Fact]
     public void NvApiDrsSetting_the_base_profile_is_the_machine_wide_scope()
-        => _allow.Validate(new ApplyNvApiDrsSettingOp(0x10835002u, 3u, "Base Profile"))
+        => _allow.Validate(new ApplyNvApiDrsSettingOp(0x10835002u, 141u, "Base Profile"))
               .IsOk.Should().BeTrue();
 
     [Theory]
-    // L2 — la portee par JEU, desormais honorable, donc desormais autorisee. Un chemin complet
+    // La portee par JEU, desormais honorable, donc desormais autorisee. Un chemin complet
     // est la seule forme que NVIDIA accepte : sur un nom nu le driver rend
     // NVAPI_EXECUTABLE_PATH_IS_AMBIGUOUS, et l'ecriture echouerait au bord natif apres avoir
     // laisse croire qu'elle etait permise.
@@ -532,7 +548,7 @@ public sealed class OpAllowlistTests
     [InlineData(@"D:\Games\game.EXE")]     // l'extension se compare sans la casse
     [InlineData("C:/Games/game.exe")]      // NVIDIA accepte les deux separateurs
     public void NvApiDrsSetting_a_full_executable_path_is_now_an_allowed_scope(string profile)
-        => _allow.Validate(new ApplyNvApiDrsSettingOp(0x10835002u, 3u, profile))
+        => _allow.Validate(new ApplyNvApiDrsSettingOp(0x10835002u, 141u, profile))
               .IsOk.Should().BeTrue();
 
     [Fact]
@@ -544,7 +560,7 @@ public sealed class OpAllowlistTests
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
-    // --- PHASE 18 F1 lot 3 : la SUPPRESSION au profil d'un jeu, plus etroite que l'ecriture ---
+    // --- La SUPPRESSION au profil d'un jeu, plus etroite que l'ecriture ---
 
     private const string GameExe = @"C:\Program Files\Call of Duty\cod.exe";
 
@@ -586,38 +602,39 @@ public sealed class OpAllowlistTests
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
 
     [Theory]
-    // The OLD (wrong) ids must now be DENIED — proves the correction landed in the
-    // closed allow-set, not just added alongside the old values.
-    [InlineData(0x00fc00fau)] // old VSYNC
-    [InlineData(0x10835000u)] // old FRL
+    // Les anciens identifiants erronés doivent être refusés : la correction a bien remplacé les
+    // valeurs dans l'ensemble fermé, elle ne s'est pas ajoutée à côté.
+    [InlineData(0x00fc00fau)] // ancien VSYNC
+    [InlineData(0x10835000u)] // ancien FRL
     [InlineData(0xDEADBEEFu)] // forged
     public void NvApiDrsSetting_wrong_or_forged_id_is_denied_leaf_exact(uint settingId) =>
-        // "Base Profile" on purpose: with any other name the denial would come from the SCOPE
-        // check and this test would pass without ever exercising the id set it exists to pin.
-        _allow.Validate(new ApplyNvApiDrsSettingOp(settingId, 1u, "Base Profile"))
+        // « Base Profile » à dessein : avec un autre nom, le refus viendrait du contrôle de portée
+        // et ce test passerait sans jamais exercer l'ensemble d'identifiants qu'il doit figer.
+        _allow.Validate(new ApplyNvApiDrsSettingOp(settingId, ValeurNormale(settingId), "Base Profile"))
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
 
-    // --- EnableSystemRestore: leaf-exact to the SYSTEM drive only ---
+    // --- EnableSystemRestore : feuille exacte, lecteur système seulement ---
 
     [Fact]
     public void EnableSystemRestore_system_drive_passes()
     {
-        // The system drive in canonical form (resolved from %SystemDrive%, ~"C:").
-        var sysDrive = (Environment.GetEnvironmentVariable("SystemDrive") ?? "C:").TrimEnd('\\');
+        // Le disque système tel que l'allowlist le lit (par l'API, pas par %SystemDrive%, qu'un autre test
+        // remplace un instant par un piège en parallèle).
+        var sysDrive = OpAllowlist.ResolveSystemDriveLetter().TrimEnd('\\');
         _allow.Validate(new EnableSystemRestoreOp(sysDrive)).IsOk.Should().BeTrue();
-        // Trailing-slash / bare-letter forms normalize to the same leaf.
+        // Les formes avec barre finale ou lettre nue se normalisent vers la même feuille.
         _allow.Validate(new EnableSystemRestoreOp(sysDrive + "\\")).IsOk.Should().BeTrue();
     }
 
     [Theory]
-    [InlineData("D:")]          // a data drive — never SR-enabled by DrDXT
+    [InlineData("D:")]          // un lecteur de données : DrDXT n'y active jamais la restauration système
     [InlineData("Z:")]
-    [InlineData(@"C:\Windows")] // a path, not a drive letter
+    [InlineData(@"C:\Windows")] // un chemin, pas une lettre de lecteur
     [InlineData("")]
     [InlineData("notadrive")]
     public void EnableSystemRestore_non_system_or_invalid_drive_is_denied(string drive)
     {
-        // (D:/Z: assume the system drive is C: in CI — true on the standard runners.)
+        // (D:/Z: supposent que le lecteur système est C: en CI, vrai sur les runners standard.)
         _allow.Validate(new EnableSystemRestoreOp(drive))
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
@@ -630,7 +647,7 @@ public sealed class OpAllowlistTests
               .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
-    // --- Restore point + Ping pass (no target to constrain) ---
+    // --- Point de restauration et Ping passent (aucune cible à contraindre) ---
 
     [Fact]
     public void CreateRestorePoint_passes()
@@ -644,7 +661,7 @@ public sealed class OpAllowlistTests
         _allow.Validate(new PingOp()).IsOk.Should().BeTrue();
     }
 
-    // --- Default-DENY: an unmodelled / null op is refused ---
+    // --- Refus par défaut : une op non modélisée ou nulle est refusée ---
 
     [Fact]
     public void Null_op_is_denied()
@@ -660,7 +677,7 @@ public sealed class OpAllowlistTests
         _allow.Validate(new RogueOp()).Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
-    // L-WU : les deux heures d'activité du réglage utilisateur, une heure de 0 à 23, rien d'autre de Windows Update.
+    // Les deux heures d'activité du réglage utilisateur, une heure de 0 à 23, rien d'autre de Windows Update.
     private static SetRegistryValueOp Heure(string nom, string valeur, string chemin = HeuresActives.Cle,
         RegistryValueType type = RegistryValueType.DWord) => new(RegistryHiveKind.LocalMachine, chemin, nom, type, valeur);
 
@@ -689,7 +706,7 @@ public sealed class OpAllowlistTests
         _allow.Validate(Heure(HeuresActives.NomDebut, "15", type: RegistryValueType.String)).IsOk.Should().BeFalse();
     }
 
-    // L-CPU : le mode de boost secteur (PERFBOOSTMODE). Microsoft Learn ne documente que 0 a 4 ; powercfg en enumere 7
+    // Le mode de boost secteur (PERFBOOSTMODE). Microsoft Learn ne documente que 0 a 4 ; powercfg en enumere 7
     // sur Windows 11 26200 (5 et 6 « a garanti »), jamais ecrits. Un plan vide ne designe rien.
     [Theory]
     [InlineData(0u)]
@@ -711,7 +728,7 @@ public sealed class OpAllowlistTests
     public void Mode_de_boost_refuse_un_plan_vide() =>
         _allow.Validate(new SetProcessorBoostModeOp(Guid.Empty, 2)).IsOk.Should().BeFalse();
 
-    // B3 (10/10/2026) : l'economie d'energie de la carte sans fil, valeurs documentees seulement, plan non vide.
+    // L'economie d'energie de la carte sans fil, valeurs documentees seulement, plan non vide.
     [Theory]
     [InlineData(0u)]
     [InlineData(3u)]
@@ -728,7 +745,7 @@ public sealed class OpAllowlistTests
     public void Economie_sans_fil_refuse_un_plan_vide() =>
         _allow.Validate(new SetWirelessPowerSavingOp(Guid.Empty, 0)).IsOk.Should().BeFalse();
 
-    // B1 (10/10/2026) : la limite de puissance du processeur ne bouge que par PL1, dans la PL2 de la carte, sans verrou.
+    // La limite de puissance du processeur ne bouge que par PL1, dans la PL2 de la carte, sans verrou.
     private const ulong Pl2_219W = 1752UL << 32;
     private const ulong Origine65W = Pl2_219W | (1UL << 47) | (1UL << 15) | 520UL;
 
@@ -746,4 +763,7 @@ public sealed class OpAllowlistTests
     [InlineData(Origine65W & ~0x7FFFUL)]                        // PL1 à zéro
     public void La_limite_processeur_refuse_tout_ce_qui_n_est_pas_PL1_dans_la_PL2(ulong valeur) =>
         _allow.Validate(new SetCpuPackagePowerLimitOp(valeur, Origine65W)).Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
+
+    // Une valeur qu'un réglage normal porte, par identifiant (la liste blanche borne aussi la valeur).
+    private static uint ValeurNormale(uint id) => id switch { 0x00A879CFu => 0x47814940u, 0x10835002u => 141u, _ => 1u };
 }

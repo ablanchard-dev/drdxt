@@ -7,7 +7,7 @@ using Xunit;
 namespace DrDxt.Application.Tests.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// D5 / gate G4 — fail-closed materiel, et la matrice avant le paiement.
+// Fail-closed materiel, et la matrice avant le paiement.
 //
 // Le probleme est commercial autant que technique : vendre du tuning GPU a quelqu'un dont la
 // carte est en lecture seule, c'est un remboursement immediat et un avis negatif. Le produit
@@ -32,7 +32,7 @@ public sealed class GpuTuningCoverageTests
             new BiosInfo("1.H0", DateTimeOffset.UtcNow, true),
             chassis);
 
-    // ====================== le if que D5 demande ======================
+    // ====================== le if que le fail-closed demande ======================
 
     [Fact]
     public void RDNA3_never_gets_manual_voltage_because_nobody_has_ever_write_tested_it()
@@ -58,7 +58,7 @@ public sealed class GpuTuningCoverageTests
     [InlineData("AMD Radeon RX 9070 XT", GpuArchitecture.Rdna4)]
     [InlineData("NVIDIA GeForce RTX 4060", GpuArchitecture.AdaOrOlder)]
     [InlineData("NVIDIA GeForce RTX 5080", GpuArchitecture.Blackwell)]
-    // AMD-TOUT (09/10/2026) : les RX 6000 (RDNA2) passaient « inconnues » ; elles sont reconnues.
+    // Les RX 6000 (RDNA2) passaient « inconnues » ; elles sont reconnues.
     [InlineData("AMD Radeon RX 6800 XT", GpuArchitecture.Rdna2)]
     [InlineData("AMD Radeon RX 6600", GpuArchitecture.Rdna2)]
     [InlineData("AMD Radeon RX 6700 XT", GpuArchitecture.Rdna2)]
@@ -84,8 +84,8 @@ public sealed class GpuTuningCoverageTests
 
     // ====================== la matrice ======================
 
-    // T4 (08/10/2026) : aucune architecture n'a encore son rapport archivé ; sans lui, lecture seule.
-    // ADM1 (08/10/2026) : la RTX 4060 (Ada) a son rapport ; RDNA4 et Blackwell n'en ont pas encore. Autocontrôle : la
+    // Aucune architecture n'a encore son rapport archivé ; sans lui, lecture seule.
+    // La RTX 4060 (Ada) a son rapport ; RDNA4 et Blackwell n'en ont pas encore. Autocontrôle : la
     // classe AdaOrOlder couvre aussi les RTX 20/30 et GTX 10/16, que ce rapport ne prouve pas.
     [Theory]
     [InlineData("NVIDIA GeForce RTX 3070")]

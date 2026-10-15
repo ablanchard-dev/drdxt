@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// Revue du 08/10/2026 (REV2) : un SSD en USB ne compte pas ; un disque au type non dit empêche d'affirmer « aucun SSD ».
+// Un SSD en USB ne compte pas ; un disque au type non dit empêche d'affirmer « aucun SSD ».
 public class SsdInterneTests
 {
     [Theory]

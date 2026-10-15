@@ -3,13 +3,13 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Gpu;
 
 /// <summary>
-/// Infers Resizable BAR state from the NVML BAR1 window size relative to the framebuffer.
+/// Déduit l'état du Resizable BAR de la taille de la fenêtre BAR1 de NVML rapportée au framebuffer.
 ///
-/// In practice the BAR1 window is one of two things: the legacy ~256 MiB aperture (ReBAR OFF)
-/// or (close to) the full VRAM size (ReBAR ON) — there is no meaningful in-between. So the
-/// midpoint of the framebuffer cleanly classifies the two: BAR1 ≥ FB/2 ⇒ On, else Off.
-/// Source: nvmlDeviceGetBAR1MemoryInfo semantics (docs.nvidia.com/deploy/nvml-api), the value
-/// nvidia-smi reports as "BAR1 Memory Usage / Total".
+/// En pratique, la fenêtre BAR1 est l'une de deux choses : l'ancienne ouverture de ~256 Mio
+/// (ReBAR OFF) ou (presque) toute la VRAM (ReBAR ON) ; il n'y a pas d'entre-deux qui ait un sens.
+/// Le milieu du framebuffer sépare donc proprement les deux : BAR1 ≥ FB/2 ⇒ On, sinon Off.
+/// Source : sémantique de nvmlDeviceGetBAR1MemoryInfo (docs.nvidia.com/deploy/nvml-api), la valeur
+/// que nvidia-smi affiche en « BAR1 Memory Usage / Total ».
 /// </summary>
 public static class ReBarHeuristic
 {

@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using DrDxt.Core;
 using DrDxt.ElevatedHelper.Ipc;
 using FluentAssertions;
@@ -6,18 +6,20 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// Focused unit tests for the security primitives.
+// Tests unitaires ciblés des primitives de sécurité.
 // -----------------------------------------------------------------------
-public sealed class RequestHmacTests
+public sealed class TypedRequestHmacTests
 {
+    private const string Op = "{\"Kind\":\"ping\"}";
+
     [Fact]
     public void Verify_MatchingKeyAndFields_IsTrue()
     {
         var key = RandomNumberGenerator.GetBytes(32);
         var nonce = Guid.NewGuid().ToString("N");
-        var mac = RequestHmac.Compute(key, OpKind.Ping, nonce);
+        var mac = TypedRequestHmac.Compute(key, Op, nonce);
 
-        RequestHmac.Verify(key, OpKind.Ping, nonce, mac).Should().BeTrue();
+        TypedRequestHmac.Verify(key, Op, nonce, mac).Should().BeTrue();
     }
 
     [Fact]
@@ -26,18 +28,18 @@ public sealed class RequestHmacTests
         var key = RandomNumberGenerator.GetBytes(32);
         var other = RandomNumberGenerator.GetBytes(32);
         var nonce = Guid.NewGuid().ToString("N");
-        var mac = RequestHmac.Compute(key, OpKind.Ping, nonce);
+        var mac = TypedRequestHmac.Compute(key, Op, nonce);
 
-        RequestHmac.Verify(other, OpKind.Ping, nonce, mac).Should().BeFalse();
+        TypedRequestHmac.Verify(other, Op, nonce, mac).Should().BeFalse();
     }
 
     [Fact]
     public void Verify_DifferentNonce_IsFalse()
     {
         var key = RandomNumberGenerator.GetBytes(32);
-        var mac = RequestHmac.Compute(key, OpKind.Ping, "nonce-a");
+        var mac = TypedRequestHmac.Compute(key, Op, "nonce-a");
 
-        RequestHmac.Verify(key, OpKind.Ping, "nonce-b", mac).Should().BeFalse();
+        TypedRequestHmac.Verify(key, Op, "nonce-b", mac).Should().BeFalse();
     }
 
     [Fact]
@@ -45,10 +47,10 @@ public sealed class RequestHmacTests
     {
         var key = RandomNumberGenerator.GetBytes(32);
 
-        var act = () => RequestHmac.Verify(key, OpKind.Ping, "n", "not-base64-@@@");
+        var act = () => TypedRequestHmac.Verify(key, Op, "n", "not-base64-@@@");
 
         act.Should().NotThrow();
-        RequestHmac.Verify(key, OpKind.Ping, "n", "not-base64-@@@").Should().BeFalse();
+        TypedRequestHmac.Verify(key, Op, "n", "not-base64-@@@").Should().BeFalse();
     }
 
     [Fact]
@@ -56,17 +58,17 @@ public sealed class RequestHmacTests
     {
         var key = RandomNumberGenerator.GetBytes(32);
 
-        var act = () => RequestHmac.Verify(key, OpKind.Ping, "n", null!);
+        var act = () => TypedRequestHmac.Verify(key, Op, "n", null!);
 
         act.Should().NotThrow("a null HMAC must fail-close, not throw ArgumentNullException");
-        RequestHmac.Verify(key, OpKind.Ping, "n", null!).Should().BeFalse();
+        TypedRequestHmac.Verify(key, Op, "n", null!).Should().BeFalse();
     }
 
     [Fact]
     public void Verify_EmptyHmac_IsFalse()
     {
         var key = RandomNumberGenerator.GetBytes(32);
-        RequestHmac.Verify(key, OpKind.Ping, "n", "").Should().BeFalse();
+        TypedRequestHmac.Verify(key, Op, "n", "").Should().BeFalse();
     }
 }
 
@@ -98,7 +100,7 @@ public sealed class NonceTrackerTests
 }
 
 // -----------------------------------------------------------------------
-// Wire framing / deserialization fail-closed behavior.
+// Cadrage du fil et désérialisation : fermés en cas d'échec.
 // -----------------------------------------------------------------------
 public sealed class WireCodecTests
 {
@@ -113,30 +115,30 @@ public sealed class WireCodecTests
     [Fact]
     public async Task ReadMessage_WellFormed_RoundTrips()
     {
-        var framed = Frame("{\"Kind\":0,\"Nonce\":\"n\",\"HmacBase64\":\"x\"}");
+        var framed = Frame("{\"Ok\":true,\"ErrorCode\":\"e\"}");
         using var ms = new MemoryStream(framed);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-        var msg = await WireCodec.ReadMessageAsync<PrivilegedRequest>(ms, cts.Token);
+        var msg = await WireCodec.ReadMessageAsync<PrivilegedResponse>(ms, cts.Token);
 
         msg.Should().NotBeNull();
-        msg!.Kind.Should().Be(OpKind.Ping);
-        msg.Nonce.Should().Be("n");
+        msg!.Ok.Should().BeTrue();
+        msg.ErrorCode.Should().Be("e");
     }
 
     [Fact]
     public async Task ReadMessage_UnknownMember_ReturnsNull_FailClosed()
     {
-        var framed = Frame("{\"Kind\":0,\"Nonce\":\"n\",\"HmacBase64\":\"x\",\"EVIL\":\"y\"}");
+        var framed = Frame("{\"Ok\":true,\"ErrorCode\":\"e\",\"EVIL\":\"y\"}");
         using var ms = new MemoryStream(framed);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-        var msg = await WireCodec.ReadMessageAsync<PrivilegedRequest>(ms, cts.Token);
+        var msg = await WireCodec.ReadMessageAsync<PrivilegedResponse>(ms, cts.Token);
 
         msg.Should().BeNull("an unexpected JSON member must be rejected fail-closed");
     }
 
-    // 26/09/2026 : le plafond de trame n'etait tenu par aucun test. Sans lui, un client du compte
+    // Le plafond de trame n'etait tenu par aucun test. Sans lui, un client du compte
     // annonce 2 Gio et le helper eleve tente de les allouer avant d'avoir lu un seul octet.
     [Theory]
     [InlineData(int.MaxValue)]
@@ -149,7 +151,7 @@ public sealed class WireCodecTests
         System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(prefix, longueur);
         using var ms = new MemoryStream(prefix);
 
-        var msg = await WireCodec.ReadMessageAsync<PrivilegedRequest>(ms, CancellationToken.None);
+        var msg = await WireCodec.ReadMessageAsync<PrivilegedResponse>(ms, CancellationToken.None);
 
         msg.Should().BeNull();
     }
@@ -157,10 +159,10 @@ public sealed class WireCodecTests
     [Fact]
     public async Task ReadMessage_ExactementLePlafond_EstLu()
     {
-        var json = "{\"Kind\":0,\"Nonce\":\"n\",\"HmacBase64\":\"x\"}";
+        var json = "{\"Ok\":true,\"ErrorCode\":\"e\"}";
         using var ms = new MemoryStream(Frame(json.PadRight(WireCodec.MaxMessageBytes)));
 
-        var msg = await WireCodec.ReadMessageAsync<PrivilegedRequest>(ms, CancellationToken.None);
+        var msg = await WireCodec.ReadMessageAsync<PrivilegedResponse>(ms, CancellationToken.None);
 
         msg.Should().NotBeNull();
     }

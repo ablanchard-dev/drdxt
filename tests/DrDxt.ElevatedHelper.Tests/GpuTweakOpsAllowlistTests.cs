@@ -4,18 +4,18 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// Guard: the M2 Phase E GPU-tuning tweaks may only apply ops the allowlist permits.
+// Garde : les leviers GPU ne peuvent appliquer que les ops que la liste blanche permet.
 //
-// These reconstruct the exact typed ops the E2/E3/E4 tweaks emit and assert
-// OpAllowlist accepts the in-bounds ones and DENIES the dangerous ones. If a tweak
-// ever drifts to a non-allowlisted op, the corresponding arm here is the canary —
-// change the allowlist intentionally (leaf-exact), never silently.
+// Ces tests reconstruisent les ops typées exactes qu'émettent les leviers GPU et vérifient
+// qu'OpAllowlist accepte celles dans les bornes et refuse les dangereuses. Si un levier
+// dérive vers une op hors liste, la branche correspondante est le canari : on change la
+// liste blanche à dessein (feuille exacte), jamais en silence.
 // -----------------------------------------------------------------------
 public sealed class GpuTweakOpsAllowlistTests
 {
     private readonly OpAllowlist _allow = new();
 
-    // --- E2 undervolt: clock offset (NVIDIA) / undervolt tuning (AMD). ---
+    // --- Undervolt : décalage d'horloge (NVIDIA) / réglage undervolt (AMD). ---
 
     [Fact]
     public void E2_nvapi_clock_offset_is_allowlisted() =>
@@ -32,7 +32,7 @@ public sealed class GpuTweakOpsAllowlistTests
         _allow.Validate(new ApplyNvApiClockOffsetOp(-1, 0, 0))
             .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
 
-    // --- E3 power limit: NVIDIA / AMD. ---
+    // --- Limite de puissance : NVIDIA / AMD. ---
 
     [Fact]
     public void E3_nvapi_power_limit_is_allowlisted() =>
@@ -49,7 +49,7 @@ public sealed class GpuTweakOpsAllowlistTests
         _allow.Validate(new ApplyNvApiPowerLimitOp(0, PowerLimitPercent: 150))
             .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
 
-    // --- E4 fan curve. ---
+    // --- Courbe de ventilation. ---
 
     [Fact]
     public void E4_safe_fan_curve_is_allowlisted() =>
@@ -60,7 +60,7 @@ public sealed class GpuTweakOpsAllowlistTests
             new FanCurvePointDto(85, 75),
         })).IsOk.Should().BeTrue();
 
-    /// <summary>24/09/2026 : seuls les points chauds étaient contrôlés. Ces deux courbes passaient
+    /// <summary>Seuls les points chauds étaient contrôlés. Ces deux courbes passaient
     /// et laissaient le ventilateur sous 40 % au-dessus de 80 °C, que le pilote tienne ou interpole.
     /// Règle prudente : le point qui gouverne 80 °C tient aussi le plancher (une courbe sûre en
     /// interpolation seule peut être refusée ; jamais l'inverse).</summary>
@@ -77,7 +77,7 @@ public sealed class GpuTweakOpsAllowlistTests
 
     [Fact]
     public void E4_hot_silent_fan_curve_is_denied() =>
-        // The helper re-checks anti-overheat leaf-exact: a hot, near-silent point is refused.
+        // Le helper revérifie l'anti-surchauffe feuille par feuille : un point chaud et presque silencieux est refusé.
         _allow.Validate(new ApplyGpuFanCurveOp(0, new[]
         {
             new FanCurvePointDto(85, 10),
@@ -93,7 +93,7 @@ public sealed class GpuTweakOpsAllowlistTests
         _allow.Validate(new ApplyGpuFanCurveOp(0, new[] { new FanCurvePointDto(60, 130) }))
             .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
 
-    // --- Codec round-trip of the new fan-curve leaf (bounded, no type-name handling). ---
+    // --- Aller-retour codec de la feuille courbe de ventilation (bornée, sans nom de type). ---
 
     [Fact]
     public void E4_fan_curve_op_roundtrips_through_the_bounded_codec()

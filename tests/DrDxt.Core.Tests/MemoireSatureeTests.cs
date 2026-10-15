@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Core.Tests;
 
-/// <summary>BUREAU (09/10/2026) : une mémoire pleine se dit avec ses gestes, une mémoire large se dit avec sa marge, une
+/// <summary>Une mémoire pleine se dit avec ses gestes, une mémoire large se dit avec sa marge, une
 /// mémoire non lue se dit non lue. Lecture seule : aucun geste automatique.</summary>
 public sealed class MemoireSatureeTests
 {
@@ -28,7 +28,7 @@ public sealed class MemoireSatureeTests
 
         f.Statut.Should().Be(RepairStatus.Suspicious, "95 % de la limite d'engagement : le prochain programme peut manquer de mémoire");
         f.ValeurCourante.Should().Contain("engagement 95 %");
-        // Revue du 09/10 : l'engagement est de la réservation, pas de la pagination ; le texte ne confond plus les deux.
+        // L'engagement est de la réservation, pas de la pagination ; le texte ne confond plus les deux.
         f.Explication.Should().Contain("mémoire virtuelle").And.NotContain("part sur le disque");
         f.ValeurAttendue.Should().Contain("seuils DrDXT");
     }

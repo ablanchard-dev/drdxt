@@ -8,7 +8,7 @@ namespace DrDxt.Measurement.Tests;
 /// <summary>
 /// L'occupation GPU est appariee, et le repli ne doit jamais se rallumer sur une capture neuve.
 ///
-/// Deux defauts, trouves l'un apres l'autre en revue de sortie :
+/// Deux defauts, trouves l'un apres l'autre :
 ///   1. la serie GPU etait la seule des sept a etre empilee sans appariement, donc une capture
 ///      desynchronisee alimentait quand meme l'occupation — celle qui porte le verdict de goulot ;
 ///   2. l'apparier run par run ne suffisait pas. Sur cinq passes dont une seule decalee, le

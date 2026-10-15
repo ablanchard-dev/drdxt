@@ -7,10 +7,9 @@ namespace DrDxt.Core.Tests;
 /// <summary>
 /// Un chiffre juste, plausible, et vide de sens.
 ///
-/// Le 08/09/2026, la premiere lecture live des grandeurs de cadence a rendu
-/// `animationError_p95 = 1186,95 ms` sur huit frames captees d'un terminal en dix secondes. Le
-/// calcul etait correct, l'unite juste, aucune exception levee — et le nombre ne disait rien :
-/// a 0,8 image par seconde il recopiait l'intervalle entre deux images.
+/// Mesure sur huit frames captees d'un terminal en dix secondes : `animationError_p95 = 1186,95 ms`.
+/// Calcul correct, unite juste, aucune exception levee, et pourtant le nombre ne dit rien : a 0,8 image
+/// par seconde il recopie l'intervalle entre deux images.
 ///
 /// Ces tests gravent la seule chose qui protege de ce defaut : un p95 ne merite son nom qu'a
 /// partir de vingt echantillons, faute de quoi il se confond avec le maximum.

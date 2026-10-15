@@ -1,4 +1,4 @@
-﻿<!-- Scene de mesure DrDXT (24/09/2026) : un « jeu » que DrDXT controle, pour mesurer sans joueur. Hors de DrDXT.sln. -->
+﻿<!-- Scene de mesure DrDXT : un « jeu » que DrDXT controle, pour mesurer sans joueur. Hors de DrDXT.sln. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

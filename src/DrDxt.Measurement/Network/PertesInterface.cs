@@ -5,13 +5,13 @@ using DrDxt.Core;
 namespace DrDxt.Measurement.Network;
 
 /// <summary>
-/// Les pertes a l'interface, pendant une fenetre — le constat reseau que le scan de l'App ne faisait pas.
+/// Les pertes a l'interface, pendant une fenetre : un constat reseau du scan de l'App.
 ///
-/// Remonte de `tools/repairaudit` (branchement du 10/09/2026, revue : « le reseau = 0 bras ») : l'outil
-/// et l'App classent la meme fenetre de la meme facon. Dans l'App, la fenetre est celle de la mesure EN
-/// JEU du scan : c'est la carte pendant une partie, pas une carte au repos.
+/// Remonte de `tools/repairaudit` : l'outil
+/// et l'App classent la meme fenetre de la meme facon. Dans l'App, la fenetre est celle de la mesure en
+/// jeu du scan : c'est la carte pendant une partie, pas une carte au repos.
 ///
-/// Ceci mesure la CARTE — cable, port, pilote qui jette des trames — et non la route : un lien peut
+/// Ceci mesure la carte (cable, port, pilote qui jette des trames) et non la route : un lien peut
 /// pinguer parfaitement en perdant des paquets a l'interface.
 /// </summary>
 public static class PertesInterface
@@ -35,12 +35,12 @@ public static class PertesInterface
         Action<TimeSpan>? attendre = null)
     {
         var avant = source.Read(interfaceId);
-        if (!avant.IsOk) return Inconnu(avant.Error?.Message ?? "compteurs illisibles");
+        if (!avant.IsOk) return Inconnu(avant.Error?.Message ?? Docteur.T("PI.Illisibles"));
 
         if (attendre is null) Thread.Sleep(fenetre); else attendre(fenetre);
 
         var apres = source.Read(interfaceId);
-        if (!apres.IsOk) return Inconnu(apres.Error?.Message ?? "compteurs illisibles");
+        if (!apres.IsOk) return Inconnu(apres.Error?.Message ?? Docteur.T("PI.Illisibles"));
 
         return Classer(NicErrorCounters.Diff(avant.Value!, apres.Value!), fenetre);
     }
@@ -52,22 +52,18 @@ public static class PertesInterface
         var secondes = Math.Round(fenetre.TotalSeconds);
 
         if (delta.CounterReset)
-            return Inconnu("un compteur a reculé pendant la fenêtre : la carte a été réinitialisée et "
-                           + "l'information est perdue. Répondre « rien à signaler » ici serait une bonne "
-                           + "nouvelle fabriquee");
+            return Inconnu(Docteur.T("PI.Recule"));
 
         var taux = delta.ReceivedDiscardPercent;
         return delta.IsClean
-            ? new RepairFinding(Domaine, Nom, "aucune", "aucune", RepairStatus.ExpectedDefault,
-                $"fenêtre de {secondes} s : {delta.ReceivedPackets} paquets reçus, {delta.SentPackets} émis, "
-                + "zéro ignoré et zéro erreur")
+            ? new RepairFinding(Domaine, Nom, Docteur.T("PI.Aucune"), Docteur.T("PI.Aucune"), RepairStatus.ExpectedDefault,
+                Docteur.T("PI.Propre", secondes, delta.ReceivedPackets, delta.SentPackets))
             : new RepairFinding(Domaine, Nom,
-                $"{delta.ReceivedDiscarded} ignorés / {delta.ReceivedErrors} erreurs en réception",
-                "aucune", RepairStatus.Suspicious,
-                $"sur {delta.ReceivedPackets} paquets reçus en {secondes} s"
-                + (taux is { } x ? F($" ({x:0.000} %)") : "")
-                + ". Ceci mesure la carte (câble, port, pilote) et non la route : un lien peut "
-                + "pinguer parfaitement en jetant des trames à l'interface");
+                Docteur.T("PI.Pertes", delta.ReceivedDiscarded, delta.ReceivedErrors),
+                Docteur.T("PI.Aucune"), RepairStatus.Suspicious,
+                Docteur.T("PI.Sur", delta.ReceivedPackets, secondes)
+                + (taux is { } x ? Docteur.T("PI.Taux", x) : "")
+                + Docteur.T("PI.Carte"));
     }
 
     private static RepairFinding Inconnu(string pourquoi)

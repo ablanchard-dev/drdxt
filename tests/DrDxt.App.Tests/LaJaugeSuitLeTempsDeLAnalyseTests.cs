@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D6.1) : « la jauge pas même synchro que le scanner, quand le scan est fini la jauge pas
+// « la jauge pas même synchro que le scanner, quand le scan est fini la jauge pas
 // pleine ». Chaque étape pèse son temps réel ; la jauge avance au rythme du temps ; à la fin elle est pleine et reste
 // visible assez longtemps pour finir de glisser.
 public sealed class LaJaugeSuitLeTempsDeLAnalyseTests
@@ -66,7 +66,7 @@ public sealed class LaJaugeSuitLeTempsDeLAnalyseTests
         gardees.Should().NotBeNull().And.HaveCount(ScanViewModel.EtapesDuScan);
         gardees!.Should().OnlyContain(d => d > 0);
 
-        // Le masquage part après 1,1 s ; un runner chargé peut le retarder (38 s pour ce test sur GitHub le 07/10), on attend jusqu'à 15 s.
+        // Le masquage part après 1,1 s ; un runner chargé peut le retarder (38 s mesurées sur GitHub), on attend jusqu'à 15 s.
         var limite = DateTime.UtcNow.AddSeconds(15);
         while (vm.JaugeVisible && DateTime.UtcNow < limite) await Task.Delay(50);
         vm.JaugeVisible.Should().BeFalse();
@@ -90,8 +90,7 @@ public sealed class LaJaugeSuitLeTempsDeLAnalyseTests
           .Returns(Result<BenchmarkResult>.Fail(ErrorCodes.PidInvalid, "aucun jeu"));
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(hw, st, new List<Finding>(), 68, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(hw, st, new List<Finding>(), null)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
         return ScanViewModelTestSeams.Build(hd, sr, br, sc, sd, k => k);

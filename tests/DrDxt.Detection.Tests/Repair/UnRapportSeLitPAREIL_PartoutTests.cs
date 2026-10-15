@@ -7,7 +7,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 // -----------------------------------------------------------------------
-// 19/09/2026. Un chiffre qui change de forme selon la machine qui le produit.
+// Un chiffre qui change de forme selon la machine qui le produit.
 //
 // `DiagnosticReport` — le rapport que le client colle dans son ticket — porte un test nomme
 // `Numbers_use_an_invariant_format_so_a_pasted_report_reads_the_same_everywhere`. La regle
@@ -49,8 +49,10 @@ public sealed class UnRapportSeLitPAREIL_PartoutTests
     {
         var service = new RepairAuditService(new ServicesMuets(), new NoyauMuet(), new ArretsMuets(),
             new MemoireMuette(), new VidagesMuets(), new ZoneThermique(valeurWmi),
-            // 06/10/2026 : sans doublure, le vrai HWiNFO de la machine de test répondait à la place de la zone ACPI.
-            temperatureHwinfo: () => null);
+            // Sans doublure, le vrai HWiNFO de la machine de test répondait à la place de la zone ACPI.
+            temperatureHwinfo: () => null,
+            // Sans doublure, une session sans droits passait par l'autre phrase (« sans droits administrateur »).
+            eleve: () => true);
 
         return service.Lire()
             .Single(c => c.Domaine == "THERMIQUE" && c.Nom == "temperature du processeur")
@@ -116,7 +118,7 @@ public sealed class UnRapportSeLitPAREIL_PartoutTests
     {
         // Contrepoids : rendre le format invariant ne doit pas fabriquer une mesure.
         var sansZone = new RepairAuditService(new ServicesMuets(), new NoyauMuet(), new ArretsMuets(),
-                new MemoireMuette(), new VidagesMuets(), new WmiMuet(), temperatureHwinfo: () => null)
+                new MemoireMuette(), new VidagesMuets(), new WmiMuet(), temperatureHwinfo: () => null, eleve: () => true)
             .Lire()
             .Single(c => c.Domaine == "THERMIQUE" && c.Nom == "temperature du processeur");
 

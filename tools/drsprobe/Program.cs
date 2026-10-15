@@ -29,7 +29,7 @@ using Microsoft.Win32;
     }
 }
 
-// --roundtrip <chemin complet> [--j-autorise-une-ecriture] : GATE G2 (phase 18 F1 lot 3).
+// --roundtrip <chemin complet> [--j-autorise-une-ecriture]
 // La SEULE preuve MACHINE du revert par suppression : lit, ecrit LA MEME valeur au profil de cet
 // executable, relit, supprime, relit, et imprime les trois provenances. Sans le second drapeau il
 // LIT et s'arrete. A lancer sur un profil sans enjeu (un exe dont NVIDIA livre le profil), jamais
@@ -74,7 +74,7 @@ using Microsoft.Win32;
     if (ai >= 0 && args.Length > ai + 1)
     {
         var reader = new NvApiLatencyReader(new NvApiNative(), new Reg());
-        // Les quatre reglages que le catalogue sait ecrire, lus au scope du JEU (phase 18 F1).
+        // Les quatre reglages que le catalogue sait ecrire, lus au scope du JEU.
         (uint Id, string Nom)[] reglages =
             [(0x1057EB71, "PREFERRED_PSTATE"), (0x10835002, "FRL_FPS"),
              (0x00A879CF, "VSYNCMODE"), (0x007BA09E, "PRERENDERLIMIT")];
@@ -121,7 +121,7 @@ if (args.Contains("--state"))
     Console.WriteLine(st.Value.Restart is { } rs
         ? $"  redemarrage  : {rs.Verdict}\n      {rs.Reason}"
         : "  redemarrage  : non calcule");
-    // PHASE 18 F2 — la cle et l'etat effectif, cote a cote : c'est leur ecart que le produit lisait mal.
+    // La cle et l'etat effectif, cote a cote : c'est leur ecart que le produit lisait mal.
     Console.WriteLine($"  HAGS         : cle HwSchMode = {st.Value.Hags}, effectif (D3DKMT) = {st.Value.HagsEffective}");
     return;
 }

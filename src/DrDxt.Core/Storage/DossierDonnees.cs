@@ -1,7 +1,7 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// 27/09/2026 : le dossier des donnees de DrDXT (%LOCALAPPDATA%\DrDXT), en un seul endroit.
+/// Le dossier des donnees de DrDXT (%LOCALAPPDATA%\DrDXT), en un seul endroit.
 ///
 /// Douze fichiers le recalculaient chacun a la main. Au-dela de la repetition, c'etait un obstacle a la
 /// preuve : photographier l'appli en build de developpement lancait un vrai scan qui ecrivait dans les

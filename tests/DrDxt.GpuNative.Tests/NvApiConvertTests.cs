@@ -4,11 +4,10 @@ using FluentAssertions;
 namespace DrDxt.GpuNative.Tests.NvApi;
 
 // -----------------------------------------------------------------------
-// NvApiConvert — the recipe's pure unit conversions (MHz↔kHz, %↔PCM, the driver
-// clamp), relocated here with the native boundary by the 02f/N1 extraction. The
-// conservative offset / power BANDS stay in the helper (NvApiTuningMath / policy);
-// these conversions are recipe-level and live in the leaf next to NvApiNative. The
-// assertions are unchanged from the original NvApiTuningMathTests.
+// NvApiConvert : les conversions d'unités pures de la recette (MHz ↔ kHz, % ↔ PCM, le
+// bornage pilote), placées ici avec la frontière native. Les bandes prudentes de décalage
+// et de puissance restent dans le helper (NvApiTuningMath / politique) ; ces conversions
+// relèvent de la recette et vivent dans la feuille à côté de NvApiNative.
 // -----------------------------------------------------------------------
 public sealed class NvApiConvertTests
 {
@@ -53,7 +52,7 @@ public sealed class NvApiConvertTests
     [Fact]
     public void Clamp_pcm_with_inverted_bounds_returns_value_unchanged()
     {
-        // Defensive: bad driver bounds (max < min) must not throw — caller fails clean.
+        // Défensif : des bornes pilote aberrantes (max < min) ne doivent pas lever ; l'appelant échoue proprement.
         NvApiConvert.ClampPcm(90_000u, 120_000u, 50_000u).Should().Be(90_000u);
     }
 }

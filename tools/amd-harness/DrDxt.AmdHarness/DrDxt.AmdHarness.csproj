@@ -23,7 +23,7 @@
     <ProjectReference Include="..\..\..\src\DrDxt.Measurement\DrDxt.Measurement.csproj" />
     <!-- Task 3: real AdlxGpuTuningReader lives in DrDxt.Detection -->
     <ProjectReference Include="..\..\..\src\DrDxt.Detection\DrDxt.Detection.csproj" />
-    <!-- 07/10/2026 : la validation complète écrit par les leviers du produit (App) et son canal élevé (ElevatedHelper). -->
+    <!-- La validation complète écrit par les leviers du produit (App) et son canal élevé (ElevatedHelper). -->
     <ProjectReference Include="..\..\..\src\DrDxt.App\DrDxt.App.csproj" />
     <ProjectReference Include="..\..\..\src\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
   </ItemGroup>

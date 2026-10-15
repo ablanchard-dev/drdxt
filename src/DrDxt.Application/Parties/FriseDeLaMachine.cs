@@ -3,14 +3,14 @@ namespace DrDxt.Application.Parties;
 /// <summary>Un fait daté de la frise : un changement, une partie, un arrêt brutal, une erreur matérielle.</summary>
 public sealed record EvenementDeFrise(DateTimeOffset Quand, GenreDEvenement Genre, string Texte)
 {
-    /// <summary>08/10/2026 (critique UI, défaut 12) : ce qui s'aligne à droite (les FPS d'une partie) ; vide sinon.</summary>
+    /// <summary>Ce qui s'aligne à droite (les FPS d'une partie) ; vide sinon.</summary>
     public string Detail { get; init; } = "";
 }
 
 public enum GenreDEvenement { Changement, Partie, ArretBrutal, ErreurMaterielle }
 
 /// <summary>
-/// 04/10/2026 (plan 3b.2) : l'historique de la machine sur une seule ligne du temps. Chaque fait existait déjà, éparpillé :
+/// L'historique de la machine sur une seule ligne du temps. Chaque fait existait déjà, éparpillé :
 /// les changements au journal, les parties à leur carte, les arrêts et les erreurs dans le docteur. Côte à côte, on lit
 /// d'un coup d'œil « j'ai changé ça, puis mes parties ont fait ça, puis le PC s'est coupé ». Pur : tout vient de l'appelant.
 /// </summary>

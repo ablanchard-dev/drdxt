@@ -28,9 +28,9 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
 {
     /// <summary>
     /// Les 20 operations privilegiees du produit. Figee volontairement : c'est le point de la garde.
-    /// 18 au 05/09/2026 ; la 19e (`DeleteNvApiDrsSettingOp`, 10/09/2026) est l'INVERSE d'une
+    /// `DeleteNvApiDrsSettingOp` est l'INVERSE d'une
     /// ecriture au profil d'un jeu, documentee dans docs/NON-NUISANCE.md avant d'entrer ici.
-    /// La 20e (`CommitManifestOp`, 11/09/2026) ecrit le manifeste signe sous %ProgramData%\DrDxt :
+    /// `CommitManifestOp` ecrit le manifeste signe sous %ProgramData%\DrDxt :
     /// aucun registre, aucun pilote, aucun firmware ; ses entrees ne passent que si ce qu'elles feront
     /// executer plus tard passe l'allowlist. Documentee dans docs/NON-NUISANCE.md (H-aucune).
     /// </summary>
@@ -44,15 +44,22 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
         "ApplyNvApiPowerLimitOp",
         "CancelPendingFirmwareBootOp",
         "CommitManifestOp",
-        // 24/09/2026 : le plafond d'envoi QoS et son inverse (docs/NON-NUISANCE.md, section du 24/09).
+        // Le plafond d'envoi QoS et son inverse (docs/NON-NUISANCE.md, section du 24/09).
         "ApplyUploadCapOp",
         "RemoveUploadCapOp",
-        // 28/09/2026 : la protection du ping retenue pour le service, et son inverse (docs/NON-NUISANCE.md, section du 28/09).
+        // La protection du ping retenue pour le service, et son inverse (docs/NON-NUISANCE.md, section du 28/09).
         "RetainServiceUploadCapOp",
         "ForgetServiceUploadCapOp",
-        // 24/09/2026 : retirer / reposer un element BCD de l'ensemble ferme (docs/NON-NUISANCE.md).
+        // Retirer / reposer un element BCD de l'ensemble ferme (docs/NON-NUISANCE.md).
         "DeleteBcdValueOp",
         "SetBcdValueOp",
+        // Le test memoire au prochain demarrage, une seule fois, et son annulation (docs/NON-NUISANCE.md).
+        "ScheduleMemoryDiagnosticOp",
+        "CancelMemoryDiagnosticOp",
+        // Relancer un peripherique, retirer un vieux pilote d'affichage exporte, le remettre (docs/NON-NUISANCE.md).
+        "RestartDeviceOp",
+        "RemoveDriverPackageOp",
+        "RestoreDriverPackageOp",
         "CreateRestorePointOp",
         "DeleteNvApiDrsSettingOp",
         "DeleteRegistryValueOp",
@@ -61,22 +68,27 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
         "InstallPresentMonServiceOp",
         "PingOp",
         "ReadFirmwareVariableOp",
-        // 25/09/2026 : lecture de l'etat du magasin de composants, sans parametre, rien ecrit
+        // Lecture de l'etat du magasin de composants, sans parametre, rien ecrit
         // (docs/NON-NUISANCE.md, section du 25/09).
         "ReadComponentStoreHealthOp",
         "RebootToFirmwareSetupOp",
         "RenewLeaseOp",
         "RunServiceControlOp",
         "SetActivePowerPlanOp",
-        // 10/10/2026 (B1) : la limite de puissance du processeur (PL1 seulement, dans la PL2 de la carte), par PawnIO
+        // La limite de puissance du processeur (PL1 seulement, dans la PL2 de la carte), par PawnIO
         // dans le helper ; documentee dans docs/NON-NUISANCE.md.
         "SetCpuPackagePowerLimitOp",
-        // 07/10/2026 (L-CPU) : le mode de boost secteur d'un plan, seul reglage du plan ecrit (docs/NON-NUISANCE.md).
+        // La tension des cœurs vers le bas (docs/NON-NUISANCE.md).
+        "SetCpuVoltageOffsetOp",
+        // Le mode de boost secteur d'un plan, seul reglage du plan ecrit (docs/NON-NUISANCE.md).
         "SetProcessorBoostModeOp",
         "SetRegistryValueOp",
-        // 10/10/2026 (B3) : l'economie d'energie de la carte sans fil (secteur) d'un plan, seul reglage du plan ecrit par
+        // L'economie d'energie de la carte sans fil (secteur) d'un plan, seul reglage du plan ecrit par
         // cette op ; documentee dans docs/NON-NUISANCE.md.
         "SetWirelessPowerSavingOp",
+        // Un programme au demarrage coupe ou reactive comme le fait le Gestionnaire des taches (StartupApproved seulement) ;
+        // documentee dans docs/NON-NUISANCE.md.
+        "SetStartupApprovalOp",
     ];
 
     /// <summary>
@@ -89,8 +101,15 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
     private static readonly string[] Forbidden =
         ["voltage", "undervolt", "vfcurve", "writefirmware", "setfirmware"];
 
+    /// <summary>La seule ecriture de
+    /// tension admise, nommee ici une par une, jamais par motif. Vers le bas seulement (une tension basse fait planter, elle
+    /// n'abime rien ; la haute abime, et elle reste interdite), refusee avec SGX (Plundervolt), relue ; chaque garde est
+    /// prouvee par mutation (TensionCpuTests, PawnIoTensionTests, OpTensionCpuTests) et documentee dans docs/NON-NUISANCE.md.
+    /// Une tension de carte graphique, ou toute autre op de tension, reste attrapee.</summary>
+    private static readonly HashSet<string> TensionAdmise = ["SetCpuVoltageOffsetOp"];
+
     private static List<string> Offenders(IEnumerable<string> names) =>
-        names.Where(n => Forbidden.Any(f => n.Contains(f, StringComparison.OrdinalIgnoreCase)))
+        names.Where(n => !TensionAdmise.Contains(n) && Forbidden.Any(f => n.Contains(f, StringComparison.OrdinalIgnoreCase)))
              .OrderBy(n => n, StringComparer.Ordinal)
              .ToList();
 

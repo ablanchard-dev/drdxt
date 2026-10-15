@@ -59,14 +59,14 @@ public class CpuBaselineServiceTests
             "la mesure charge tous les cœurs ; un jeu non, la phrase ne doit pas l'égaliser");
     }
 
-    // 29/09/2026 (boucle « vivant et prouvé », A2) : changer la limite de puissance au BIOS ne changeait rien à
+    // Changer la limite de puissance au BIOS ne changeait rien à
     // l'écran, la référence gardait l'ancienne mesure. Quand le réglage lu diffère de celui noté avec la référence,
     // le scan remesure seul (jeu fermé) et dit l'avant et l'après.
     private static CpuBaseline AvecPuissance(double rafale, double soutenu, double watts, string? reglage)
         => new("m1", DateTimeOffset.UtcNow.AddDays(-2), 8, rafale, soutenu, 0.5, watts, 1.5, true, reglage,
             FrequenceUnCoeurMhz: 5300, FrequenceSoutenueMhz: 5000);
 
-    // Revue R1 (03/10) : une référence d'avant le relevé des fréquences ne montrait jamais la limite atteinte dès le début,
+    // Une référence d'avant le relevé des fréquences ne montrait jamais la limite atteinte dès le début,
     // même sur la machine qui l'avait. Elle se remesure une fois, sans parler d'un réglage changé.
     [Fact]
     public void Une_reference_sans_frequences_d_avant_le_banc_qui_les_releve_se_remesure_une_fois()
@@ -279,8 +279,8 @@ public class CpuBaselineServiceTests
                                 + "un scan s'arrete");
     }
 
-    // 04/10/2026 : vu sur la machine de référence après « MSI Performance Settings » au BIOS. La remesure au repos a refait le banc
-    // (62 ⇒ 128 W) et l'écran disait seulement « garde sa puissance » : le gain du geste n'était écrit nulle part.
+    // Mesuré sur la machine de référence après « MSI Performance Settings » au BIOS : la remesure au repos passe de
+    // 62 à 128 W. « garde sa puissance » seul ne dirait pas le gain du geste.
     [Fact]
     public void Remesurer_apres_un_reglage_BIOS_change_dit_l_avant_et_l_apres()
     {
@@ -306,7 +306,7 @@ public class CpuBaselineServiceTests
         deficit!.Lisible.Should().NotContain("Réglage du BIOS changé");
     }
 
-    // ── 25/09/2026 : « a la demande ensuite » ────────────────────────────────────────────────
+    // ── « a la demande ensuite » ────────────────────────────────────────────────
     [Fact]
     public void Remesurer_mesure_meme_quand_une_reference_existe_et_la_remplace()
     {
@@ -344,7 +344,7 @@ public class CpuBaselineServiceTests
         deficit.Lisible.Should().EndWith($"Mesuré le {DateTimeOffset.UtcNow.ToLocalTime():dd/MM/yyyy}.");
     }
 
-    // 27/09/2026 : la référence de la machine de référence (11/09, ±7,4 %) a été prise pendant une partie. La garder
+    // La référence de la machine de référence (11/09, ±7,4 %) a été prise pendant une partie. La garder
     // contre une remesure bruitée mais faite jeu fermé garderait un chiffre qu'on sait faux.
     [Fact]
     public void Une_remesure_bruitee_remplace_une_reference_suspecte()

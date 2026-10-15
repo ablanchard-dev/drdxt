@@ -12,9 +12,9 @@ using Xunit;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// L0.2 — LE CABLAGE, pas la logique.
+// LE CABLAGE, pas la logique.
 //
-// La logique du verifieur et du marqueur etait deja testee depuis M3. Ce qui manquait n'etait
+// La logique du verifieur et du marqueur etait deja testee. Ce qui manquait n'etait
 // pas un test de plus sur elle : c'est que personne ne l'appelait. Ces tests-la echouent si le
 // scan cesse de prononcer le verdict, ou si le bouton « emmene-moi dans le BIOS » redevient
 // decoratif -- les deux facons exactes dont ce differenciateur est deja mort une fois.
@@ -80,8 +80,7 @@ public sealed class ScanBiosLoopWiringTests
 
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), 72, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(true, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), null)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(

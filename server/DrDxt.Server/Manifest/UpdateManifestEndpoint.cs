@@ -6,9 +6,9 @@ using DrDxt.Server.Common;
 namespace DrDxt.Server.Manifest;
 
 // -----------------------------------------------------------------------
-// LU — la route qui SERT le manifeste de mise a jour, signee.
+// La route qui SERT le manifeste de mise a jour, signee.
 //
-// Le client porte depuis M5 tout le moteur (AutoUpdater, IUpdateVerifier, la clef publique
+// Le client porte tout le moteur (AutoUpdater, IUpdateVerifier, la clef publique
 // embarquee) et n'avait aucune source a interroger : le serveur n'exposait que le webhook et
 // /health, et le signeur de manifeste, pourtant enregistre, n'etait appele par personne.
 //
@@ -24,7 +24,7 @@ public static class UpdateManifestEndpoint
     // Liste FERMEE des canaux, dans la casse exacte que le client canonise (le nom INVARIANT de son
     // enum UpdateChannel). Le segment d'url est libre de casse ; ce qui est signe ne l'est pas.
     private static readonly Dictionary<string, string> Channels =
-        new(StringComparer.OrdinalIgnoreCase) { ["app"] = "App", ["profiles"] = "Profiles" };
+        new(StringComparer.OrdinalIgnoreCase) { ["app"] = "App" };
 
     public static IResult Handle(string channel, IConfiguration config, IManifestSigningService signer)
     {

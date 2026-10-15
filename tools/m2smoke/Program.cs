@@ -4,7 +4,7 @@ using DrDxt.ElevatedHelper;
 using DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// m2smoke — LIVE proof of the M2 SAFE apply->revert pipeline.
+// m2smoke — LIVE proof of the SAFE apply->revert pipeline.
 //
 // Against the RUNNING elevated helper, over the signed + allowlisted typed IPC:
 //   1. read the current active power plan (Win32PowerPlanReader)
@@ -108,7 +108,7 @@ else
     allPass = false;
 }
 
-// --- HAGS registry phase (NS-1): first LIVE proof of an allowlisted HKLM registry
+// --- HAGS registry phase: first LIVE proof of an allowlisted HKLM registry
 //     apply->revert through the elevated IPC. We assert the VALUE write+revert only
 //     (net-zero); HAGS's actual effect needs a reboot, which is NOT required to prove
 //     the apply mechanism, so this leaves the machine exactly as it found it. ---
@@ -174,7 +174,7 @@ else
     }
 }
 
-// --- DRS phase (NS-2): first LIVE proof of an ApplyNvApiDrsSettingOp through the elevated
+// --- DRS phase: first LIVE proof of an ApplyNvApiDrsSettingOp through the elevated
 //     IPC — the EXACT path PreferMaxPerf / VrrVsyncCap use. Read the current PREFERRED_PSTATE
 //     via the native NVAPI boundary, apply PREFER_MAX(1) THROUGH THE HELPER (allowlisted typed
 //     op), read back, then revert to the captured original — machine left as found. On a

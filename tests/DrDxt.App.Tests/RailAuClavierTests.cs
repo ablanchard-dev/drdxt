@@ -6,7 +6,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026, critique B10 (passage 2, flexibilité 2/4) : « pas de navigation clavier visible dans le rail ».
+// Critique B10 (passage 2, flexibilité 2/4) : « pas de navigation clavier visible dans le rail ».
 // La flèche du bas passe au domaine suivant, et chaque ligne garde le cadre de focus de l'appli.
 public sealed class RailAuClavierTests
 {

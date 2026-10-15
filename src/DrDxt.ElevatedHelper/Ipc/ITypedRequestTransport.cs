@@ -1,12 +1,12 @@
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// ITypedRequestTransport — the wire seam for a signed typed request.
+// ITypedRequestTransport : la couture de fil pour une requête typée signée.
 //
-// Separates the client's serialize+sign logic (TypedNamedPipeElevatedClient)
-// from the actual transport (named pipe). Tests inject an in-memory loopback to
-// a real TypedPrivilegedServer, exercising the full fail-clean round-trip with
-// fakes — no real pipe, nothing elevated.
+// Sépare la logique client de sérialisation + signature (TypedNamedPipeElevatedClient) du
+// transport réel (pipe nommé). Les tests injectent une boucle en mémoire vers un vrai
+// TypedPrivilegedServer et exercent tout l'aller-retour à échec propre avec des faux : pas de
+// vrai pipe, rien d'élevé.
 // -----------------------------------------------------------------------
 public interface ITypedRequestTransport
 {

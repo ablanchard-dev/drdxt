@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 (A3, 3/3) : « Tes dernières parties » à l'écran, une ligne par partie, le goulot dit en mots.
+// « Tes dernières parties » à l'écran, une ligne par partie, le goulot dit en mots.
 public sealed class ReleveDesPartiesEcranTests
 {
     [Fact]
@@ -19,7 +19,7 @@ public sealed class ReleveDesPartiesEcranTests
         ligne.Should().Contain("Call of Duty").And.Contain("128").And.Contain("94").And.Contain("Parties.Goulot.Processeur");
     }
 
-    // 04/10/2026 (plan 1.1) : le processeur pendant la partie, et la phrase quand il ralentit sous ce que le banc tient.
+    // Le processeur pendant la partie, et la phrase quand il ralentit sous ce que le banc tient.
     [Fact]
     public void La_ligne_dit_le_processeur_en_partie_et_s_il_ralentit()
     {
@@ -44,20 +44,20 @@ public sealed class ReleveDesPartiesEcranTests
             .Should().Contain("(96 °C)");
     }
 
-    // 04/10/2026 : mémoire vidéo saturée pendant la partie, la ligne le dit avec son pic ; en dessous du seuil, rien.
+    // Mémoire vidéo saturée pendant la partie, la ligne le dit avec son pic ; en dessous du seuil, rien.
     [Fact]
     public void La_ligne_dit_la_memoire_video_pleine()
     {
         var p = new PartieRelevee("cod.exe", DateTimeOffset.Now, DateTimeOffset.Now, 6, 137, 77, BottleneckState.FramePacing);
         ScanViewModel.LignePartie(p with { VramPourcentMax = 97 }, k => k == "Parties.VramPleine" ? "vram {0} %" : k)
             .Should().Contain("vram 97 %");
-        // Revue du 04/10 (P1) : sous le seuil, le pic se dit quand même ; un silence se lirait « pas la cause ».
+        // Sous le seuil, le pic se dit quand même ; un silence se lirait « pas la cause ».
         ScanViewModel.LignePartie(p with { VramPourcentMax = 80 }, k => k == "Parties.Vram" ? "vram lue {0} %" : k)
             .Should().Contain("vram lue 80 %").And.NotContain("Parties.VramPleine");
         ScanViewModel.LignePartie(p, k => k).Should().NotContain("Parties.VramPleine", "non lue n'est pas pleine");
     }
 
-    // 04/10/2026 : les voisins lourds de la partie, nommés avec leur pic ; sans voisin, rien.
+    // Les voisins lourds de la partie, nommés avec leur pic ; sans voisin, rien.
     [Fact]
     public void La_ligne_nomme_les_voisins_lourds()
     {
@@ -69,8 +69,8 @@ public sealed class ReleveDesPartiesEcranTests
         ScanViewModel.LignePartie(p, k => k).Should().NotContain("Parties.Voisins");
     }
 
-    // 04/10/2026 (audit 5.2, photo) : trois changements sans partie d'avant faisaient trois paragraphes presque identiques.
-    // 08/10/2026 (critique UI, défaut 8) : regroupés, ils faisaient encore un paragraphe de quatre lignes. Les changements
+    // Trois changements sans partie d'avant faisaient trois paragraphes presque identiques.
+    // Regroupés, ils faisaient encore un paragraphe de quatre lignes. Les changements
     // pas encore jugés passent dans un tableau (changement · date · en jeu) ; les phrases ne gardent que les jugés.
     [Fact]
     public void Les_changements_pas_encore_juges_passent_en_tableau()
@@ -95,7 +95,7 @@ public sealed class ReleveDesPartiesEcranTests
             new LigneEnAttente("le BIOS", "04/10", "attend 2 parties"));
     }
 
-    // 04/10/2026 (plan 1.3) : un changement daté se dit jugé, avec ses médianes, ou avec ce qui manque pour le juger.
+    // Un changement daté se dit jugé, avec ses médianes, ou avec ce qui manque pour le juger.
     [Fact]
     public void Un_changement_juge_dit_son_verdict_et_ses_chiffres()
     {
@@ -114,8 +114,8 @@ public sealed class ReleveDesPartiesEcranTests
     [Theory]
     [InlineData(BottleneckState.GpuBound, "Parties.Goulot.Carte")]
     [InlineData(BottleneckState.UnknownPartial, "Parties.Goulot.Inconnu")]
-    // 04/10/2026 : la partie du jour sur la carte Halloween (137 FPS, 1 % low 77) était jugée « cadence irrégulière » ;
-    // l'écran disait « limite non mesurée ». Chaque verdict mesuré a ses mots.
+    // Une partie jugée « cadence irrégulière » (137 FPS, 1 % low 77 relevés sur la carte Halloween) ne doit pas
+    // s'afficher « limite non mesurée ». Chaque verdict mesuré a ses mots.
     [InlineData(BottleneckState.FramePacing, "Parties.Goulot.Cadence")]
     [InlineData(BottleneckState.CpuBoundStrong, "Parties.Goulot.Processeur")]
     [InlineData(BottleneckState.ThermalOrPowerThrottle, "Parties.Goulot.CarteBridee")]
@@ -126,7 +126,7 @@ public sealed class ReleveDesPartiesEcranTests
         => ScanViewModel.LignePartie(new PartieRelevee("cod.exe", DateTimeOffset.Now, DateTimeOffset.Now, 3, 100, 80, goulot), k => k)
             .Should().Contain(cle);
 
-    // 07/10/2026 (A5) : la carte à son pic, quand elle est lue ; non lue, rien n'est écrit (pas « 0 °C »).
+    // La carte à son pic, quand elle est lue ; non lue, rien n'est écrit (pas « 0 °C »).
     [Fact]
     public void La_ligne_dit_la_temperature_de_la_carte_seulement_lue()
     {
@@ -137,7 +137,7 @@ public sealed class ReleveDesPartiesEcranTests
             .Should().Contain("carte 72");
     }
 
-    // 07/10/2026 (A4) : le jeu sur une puce intégrée alors qu'une vraie carte est là, dit sur la ligne avec le geste.
+    // Le jeu sur une puce intégrée alors qu'une vraie carte est là, dit sur la ligne avec le geste.
     [Fact]
     public void Un_jeu_sur_la_puce_integree_se_dit_sur_sa_ligne()
     {
@@ -147,7 +147,7 @@ public sealed class ReleveDesPartiesEcranTests
         ScanViewModel.LignePartie(p with { CarteDedieeIgnoree = null }, k => k).Should().NotContain("Parties.CarteIgnoree");
     }
 
-    // 07/10/2026 (D6) : le ping sur la ligne de la partie, et la route qui se dégrade dite avec où elle se dégrade.
+    // Le ping sur la ligne de la partie, et la route qui se dégrade dite avec où elle se dégrade.
     [Fact]
     public void Le_ping_se_lit_sur_la_partie_et_la_route_qui_se_degrade_dit_ou()
     {
@@ -162,7 +162,7 @@ public sealed class ReleveDesPartiesEcranTests
         ScanViewModel.LigneRoute([P(1, 12, 2)], L).Should().BeNull();
     }
 
-    // 07/10/2026 (D10) : les overlays ouverts sur la ligne de la partie, et leur coût seulement quand il est mesuré.
+    // Les overlays ouverts sur la ligne de la partie, et leur coût seulement quand il est mesuré.
     [Fact]
     public void Les_overlays_se_lisent_sur_la_partie_et_leur_cout_n_apparait_qu_avec_deux_parties_de_chaque_cote()
     {

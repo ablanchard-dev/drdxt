@@ -8,11 +8,11 @@ using NSec.Cryptography;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// The real Ed25519 scheme behind the seams — proves the asymmetric security
-// property end-to-end (sign with private, verify with PUBLIC; tamper → false).
+// Le vrai schéma Ed25519 derrière les coutures : prouve la propriété de sécurité
+// asymétrique de bout en bout (signer avec la privée, vérifier avec la publique ; altérer → faux).
 //
-// This is the production crypto (NSec / libsodium). It is the only test that
-// touches the native lib; all reconciler-logic tests use the in-memory FakeKeyPair.
+// C'est la cryptographie de production (NSec / libsodium). Seul test qui touche la
+// bibliothèque native ; tous les tests de logique du réconciliateur utilisent le FakeKeyPair en mémoire.
 // -----------------------------------------------------------------------
 public sealed class Ed25519SignatureSchemeTests
 {
@@ -54,8 +54,8 @@ public sealed class Ed25519SignatureSchemeTests
     [Fact]
     public void Verify_failsForForeignSignature_ownerCannotForge()
     {
-        // Two independent keypairs: a forger who has their own private key cannot
-        // produce a signature that OUR public-key verifier accepts.
+        // Deux paires de clés indépendantes : un faussaire qui a sa propre clé privée ne peut pas
+        // produire une signature que notre vérificateur à clé publique accepte.
         var (_, ourVerifier) = NewPair();
         var (forgerSigner, _) = NewPair();
         var bytes = Encoding.UTF8.GetBytes("attacker-chosen content");
@@ -77,7 +77,7 @@ public sealed class Ed25519SignatureSchemeTests
     [Fact]
     public async Task SignedDesiredStateStore_withRealEd25519_roundTripsAndRejectsTamper()
     {
-        // The store driven by the real crypto, end to end.
+        // Le magasin piloté par la vraie cryptographie, de bout en bout.
         using var key = Key.Create(
             SignatureAlgorithm.Ed25519,
             new KeyCreationParameters { ExportPolicy = KeyExportPolicies.AllowPlaintextExport });
@@ -101,7 +101,7 @@ public sealed class Ed25519SignatureSchemeTests
         (await store.CommitAsync(desired)).IsOk.Should().BeTrue();
         (await store.LoadAsync()).Value!.Tweaks.Should().ContainSingle();
 
-        // Tamper → fail-closed under real Ed25519 (flip one byte of the signed content).
+        // Altérer → fermé sous le vrai Ed25519 (inverser un octet du contenu signé).
         var slot = storage.Slot!;
         var chars = slot.CanonicalJson.ToCharArray();
         chars[chars.Length / 2] = chars[chars.Length / 2] == 'x' ? 'y' : 'x';

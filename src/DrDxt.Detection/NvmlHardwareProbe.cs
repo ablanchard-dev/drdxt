@@ -4,16 +4,14 @@ using DrDxt.GpuNative.Nvml;
 namespace DrDxt.Detection;
 
 /// <summary>
-/// La telemetrie materielle du produit, lue par NVML — la meme bibliotheque que `nvidia-smi`.
+/// La telemetrie materielle du produit, lue par NVML, la meme bibliotheque que `nvidia-smi`.
 ///
-/// Quatre grandeurs, toutes par des exports NVML PUBLICS et documentes, sans elevation :
+/// Quatre grandeurs, toutes par des exports NVML publics et documentes, sans elevation :
 /// puissance, temperature, frequence graphique, raisons de bridage.
 ///
-/// Ce commentaire disait le 07/09/2026 : « la frequence coeur et la raison de bridage
-/// demanderaient NVAPI et ses identifiants prives ». C'etait faux. Verifie dans la doc officielle
-/// le 08/09 : `nvmlDeviceGetClockInfo` et `nvmlDeviceGetCurrentClocksEventReasons` sont des
-/// exports nommes, documentes et stables. La gate etait une hypothese que je n'avais pas
-/// verifiee, et elle privait le root-cause de sa grandeur la plus directe.
+/// La frequence coeur et la raison de bridage ne demandent pas NVAPI ni ses identifiants prives :
+/// `nvmlDeviceGetClockInfo` et `nvmlDeviceGetCurrentClocksEventReasons` sont des
+/// exports nommes, documentes et stables.
 /// Source : docs.nvidia.com/deploy/nvml-api, groupes nvmlDeviceQueries et nvmlClocksEventReasons.
 ///
 /// Sur les cartes Ada grand public (RTX 40), la lecture instantanee de puissance est N/A ;

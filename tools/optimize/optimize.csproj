@@ -18,7 +18,7 @@
     <ProjectReference Include="..\..\src\DrDxt.Measurement\DrDxt.Measurement.csproj" />
     <ProjectReference Include="..\..\src\DrDxt.Detection\DrDxt.Detection.csproj" />
     <ProjectReference Include="..\..\src\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
-    <!-- 11/09/2026 : les lecteurs reels du produit (registre, plan d'alimentation) vivent dans l'App.
+    <!-- Les lecteurs reels du produit (registre, plan d'alimentation) vivent dans l'App.
          Meme reference que tools/m2smoke : l'outil fabrique les candidats du lot avec les leviers
          du produit, pas avec une copie. -->
     <ProjectReference Include="..\..\src\DrDxt.App\DrDxt.App.csproj" />

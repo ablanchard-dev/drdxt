@@ -1,42 +1,42 @@
 namespace DrDxt.Core;
 
 // ════════════════════════════════════════════════════════════════════════════
-// M3 — BIOS Doctor: the CLOSED LOOP (post-reboot verification). Logic only.
+// Docteur BIOS : la boucle fermée (vérification après redémarrage). Logique seule.
 //
-// The loop has two halves, both pure OS-marker + re-read (never a BIOS write):
+// La boucle a deux moitiés, toutes deux marqueur OS + relecture (jamais d'écriture BIOS) :
 //
-//   1. Before the user reboots into the BIOS, we persist a PendingBiosChange marker
-//      (which firmware setting(s) they are about to change, the state we expect each
-//      to end in, when, and a light machine id). IPendingBiosChangeStore owns that
-//      marker — atomic write, fail-clean read (absent = nothing pending, corrupt =
-//      an honest Result.Fail, never a throw, never a fabricated "pending").
+//   1. Avant que l'utilisateur redémarre dans le BIOS, on enregistre un marqueur
+//      PendingBiosChange (quels réglages firmware il va changer, l'état attendu pour
+//      chacun, quand, et un id machine léger). IPendingBiosChangeStore possède ce
+//      marqueur : écriture atomique, lecture qui échoue proprement (absent = rien en
+//      attente, corrompu = un Result.Fail honnête, jamais d'exception ni de faux « en attente »).
 //
-//   2. At the next Windows return, IBiosLoopVerifier takes that marker + the FRESH
-//      SettingsState re-read by M1 and compares, per setting: Took / DidNotTake /
-//      Unreadable. Honesty (decision §9): a setting that did not take — or that we
-//      cannot read — is SAID so, with a recovery card (retry one change at a time,
-//      Clear-CMOS, Load Optimized Defaults). It is never reported as a false success.
-//      If everything took, the marker is cleaned up. No marker → an idempotent no-op.
+//   2. Au retour suivant de Windows, IBiosLoopVerifier prend ce marqueur + le SettingsState
+//      frais relu par le scan et compare, réglage par réglage : Took / DidNotTake /
+//      Unreadable. Honnêteté : un réglage qui n'a pas pris, ou qu'on ne peut pas lire,
+//      est dit tel, avec une carte de secours (réessayer un changement à la fois,
+//      Clear-CMOS, Load Optimized Defaults). Jamais présenté comme un faux succès.
+//      Si tout a pris, le marqueur est effacé. Pas de marqueur → rien à faire (idempotent).
 //
-// This file is contracts only (records + interfaces + the injectable clock seam).
-// Rendering (HTML/QR/PDF/signed URL), live inspectors and IBiosAutomationProvider
-// are deliberately not here.
+// Ce fichier ne contient que des contrats (records + interfaces + la couture d'horloge).
+// Le rendu (HTML/QR/PDF/URL signée), les inspecteurs en direct et IBiosAutomationProvider
+// n'y sont pas, exprès.
 // ════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// Injectable UTC clock for the BIOS closed loop — the marker timestamp is read only
-/// through this seam so a FakeClock yields a fixed, asserted value. DateTime.Now /
-/// DateTimeOffset.UtcNow are forbidden in this path. A module-local one-liner matches
-/// the rest of the codebase (the reconciler, the elevated helper and licensing each
-/// keep their own rather than coupling projects).
+/// Horloge UTC injectable de la boucle BIOS : l'horodatage du marqueur ne passe que par
+/// cette couture, pour qu'un FakeClock rende une valeur fixe et vérifiée. DateTime.Now /
+/// DateTimeOffset.UtcNow sont interdits ici. Une ligne locale au module, comme dans
+/// le reste du code (le reconciler, le helper élevé et la licence ont chacun la leur
+/// plutôt que de coupler les projets).
 /// </summary>
 public interface IBiosClock
 {
-    /// <summary>The current UTC instant.</summary>
+    /// <summary>L'instant UTC courant.</summary>
     DateTimeOffset UtcNow { get; }
 }
 
-/// <summary>Production clock — the real UTC wall-clock.</summary>
+/// <summary>Horloge de production : la vraie heure UTC.</summary>
 public sealed class SystemBiosClock : IBiosClock
 {
     /// <inheritdoc />
@@ -44,19 +44,19 @@ public sealed class SystemBiosClock : IBiosClock
 }
 
 /// <summary>
-/// Injectable, light, non-secret machine identity for the BIOS closed loop. The verifier
-/// reads the CURRENT machine id only through this seam and compares it to the pending
-/// marker's <see cref="PendingBiosChange.MachineId"/>: a marker copied from another PC
-/// must not be honored on this one. A module-local one-liner matches the rest of the
-/// codebase (see <see cref="IBiosClock"/>).
+/// Identité machine injectable, légère et non secrète, de la boucle BIOS. Le vérificateur
+/// ne lit l'id de la machine courante que par cette couture et le compare au
+/// <see cref="PendingBiosChange.MachineId"/> du marqueur : un marqueur copié d'un autre PC
+/// ne doit pas être honoré ici. Une ligne locale au module, comme dans le reste du
+/// code (voir <see cref="IBiosClock"/>).
 /// </summary>
 public interface IBiosMachineId
 {
-    /// <summary>The current machine's light, non-secret identity.</summary>
+    /// <summary>L'identité légère et non secrète de la machine courante.</summary>
     string Current { get; }
 }
 
-/// <summary>Production machine identity — the OS machine name (light, non-secret).</summary>
+/// <summary>Identité de production : le nom de machine de l'OS (léger, non secret).</summary>
 public sealed class SystemBiosMachineId : IBiosMachineId
 {
     /// <inheritdoc />
@@ -64,25 +64,25 @@ public sealed class SystemBiosMachineId : IBiosMachineId
 }
 
 /// <summary>
-/// One firmware setting the user is about to change, with the state we expect it to
-/// hold when we re-read it after the reboot. The closed loop compares the FRESH
-/// <see cref="SettingsState"/> against this expectation per setting.
+/// Un réglage firmware que l'utilisateur va changer, avec l'état attendu à la
+/// relecture après le redémarrage. La boucle compare le <see cref="SettingsState"/>
+/// frais à cette attente, réglage par réglage.
 /// </summary>
-/// <param name="Setting">The firmware setting being changed.</param>
+/// <param name="Setting">Le réglage firmware changé.</param>
 /// <param name="ExpectedState">
-/// The state we expect after the change (e.g. <see cref="TriState.On"/> for "enable
-/// XMP/ReBAR"). <see cref="TriState.Unknown"/> is not a valid expectation — a pending
-/// change must name a concrete target — and is rejected by the store as corrupt.
+/// L'état attendu après le changement (par exemple <see cref="TriState.On"/> pour « activer
+/// XMP/ReBAR »). <see cref="TriState.Unknown"/> n'est pas une attente valide (un changement
+/// en attente doit nommer une cible concrète) : le store le rejette comme corrompu.
 /// </param>
 /// <param name="ObservedBefore">
-/// The MEASURED quantity for this setting at the instant the marker was written (for
-/// <see cref="FirmwareSettingKind.XmpExpo"/>: the configured memory clock in MHz).
-/// <c>null</c> = no scalar was captured, and the loop falls back to the TriState compare.
+/// La grandeur mesurée pour ce réglage à l'écriture du marqueur (pour
+/// <see cref="FirmwareSettingKind.XmpExpo"/> : l'horloge mémoire configurée, en MHz).
+/// <c>null</c> = aucune valeur relevée, et la boucle se replie sur la comparaison TriState.
 ///
-/// Why it exists: the loop's question is not "is XMP on" but "what CHANGED across this
-/// reboot". 2133 -> 3800 is a fact; probably-On -> probably-Off is a bet on a bet, and on a
-/// kit whose JEDEC floor is exceeded in both states the inference does not move at all while
-/// the machine does. Optional/trailing so existing 2-arg constructions stay source-compatible.
+/// Pourquoi : la question de la boucle n'est pas « XMP est-il actif » mais « qu'est-ce qui a
+/// changé à ce redémarrage ». 2133 -> 3800 est un fait ; probablement-On -> probablement-Off est
+/// un pari sur un pari, et sur un kit qui dépasse le plancher JEDEC dans les deux états l'inférence
+/// ne bouge pas alors que la machine bouge. Facultatif et en dernier : les constructions à 2 arguments compilent toujours.
 /// </param>
 public record PendingSettingTarget(
     FirmwareSettingKind Setting,
@@ -90,21 +90,21 @@ public record PendingSettingTarget(
     long? ObservedBefore = null);
 
 /// <summary>
-/// The on-disk "a firmware change is pending a reboot" marker, written before the user
-/// goes into the BIOS and read once Windows comes back. Persisted atomically; read
-/// fail-clean (absent = nothing pending; corrupt = an honest failure, never trusted).
+/// Le marqueur sur disque « un changement firmware attend un redémarrage », écrit avant que
+/// l'utilisateur entre dans le BIOS et lu au retour de Windows. Écrit atomiquement ; lu sans
+/// risque (absent = rien en attente ; corrompu = un échec honnête, jamais cru).
 /// </summary>
 /// <param name="Targets">
-/// The one-or-more settings being changed with their expected post-change state. An
-/// empty list is not a real pending change and is rejected as corrupt.
+/// Le ou les réglages changés, avec leur état attendu après le changement. Une liste
+/// vide n'est pas un vrai changement en attente : elle est rejetée comme corrompue.
 /// </param>
-/// <param name="CreatedUtc">When the marker was written (from <see cref="IBiosClock"/>, never DateTime.Now).</param>
+/// <param name="CreatedUtc">Quand le marqueur a été écrit (par <see cref="IBiosClock"/>, jamais DateTime.Now).</param>
 /// <param name="MachineId">
-/// A light, non-secret machine identity (so a marker copied to another PC is not blindly
-/// applied to it). The verifier compares it against <see cref="IBiosMachineId.Current"/>;
-/// on a mismatch the foreign marker is never honored — it is treated as nothing-pending
-/// and left untouched (not cleared, not evaluated, never reported as a success/failure
-/// for this machine).
+/// Une identité machine légère et non secrète (un marqueur copié sur un autre PC n'y est pas
+/// appliqué à l'aveugle). Le vérificateur la compare à <see cref="IBiosMachineId.Current"/> ;
+/// si elles diffèrent, le marqueur étranger n'est jamais honoré : traité comme « rien en
+/// attente » et laissé intact (ni effacé, ni évalué, jamais compté comme succès ou échec
+/// pour cette machine).
 /// </param>
 public record PendingBiosChange(
     IReadOnlyList<PendingSettingTarget> Targets,
@@ -112,31 +112,31 @@ public record PendingBiosChange(
     string MachineId);
 
 /// <summary>
-/// Per-setting verdict of the closed loop — honest by construction.
+/// Verdict par réglage de la boucle fermée, honnête par construction.
 /// </summary>
 public enum BiosSettingVerdict
 {
-    /// <summary>The fresh re-read matches the expected state — the change took.</summary>
+    /// <summary>La relecture fraîche correspond à l'état attendu : le changement a pris.</summary>
     Took,
 
-    /// <summary>The setting is readable but does not match the expectation — it did not take.</summary>
+    /// <summary>Le réglage est lisible mais ne correspond pas à l'attente : il n'a pas pris.</summary>
     DidNotTake,
 
     /// <summary>
-    /// The setting cannot be read from <see cref="SettingsState"/> (not all firmware
-    /// settings are OS-readable). We say "could not verify" — never a false success.
+    /// Le réglage ne se lit pas dans <see cref="SettingsState"/> (tous les réglages firmware
+    /// ne sont pas lisibles depuis l'OS). On dit « pas pu vérifier », jamais un faux succès.
     /// </summary>
     Unreadable,
 }
 
 /// <summary>
-/// The outcome of one expected setting after the reboot: what we expected, what we
-/// observed (<see cref="TriState.Unknown"/> when not readable) and the honest verdict.
+/// Le résultat d'un réglage attendu après le redémarrage : ce qu'on attendait, ce qu'on a
+/// observé (<see cref="TriState.Unknown"/> si illisible) et le verdict honnête.
 /// </summary>
-/// <param name="Setting">The firmware setting evaluated.</param>
-/// <param name="ExpectedState">The state we expected (carried from the marker).</param>
-/// <param name="ObservedState">The freshly re-read state, or <see cref="TriState.Unknown"/> when not readable.</param>
-/// <param name="Verdict">Took / DidNotTake / Unreadable — never a fabricated success.</param>
+/// <param name="Setting">Le réglage firmware évalué.</param>
+/// <param name="ExpectedState">L'état attendu (repris du marqueur).</param>
+/// <param name="ObservedState">L'état fraîchement relu, ou <see cref="TriState.Unknown"/> s'il est illisible.</param>
+/// <param name="Verdict">Took / DidNotTake / Unreadable, jamais un succès inventé.</param>
 public record BiosSettingOutcome(
     FirmwareSettingKind Setting,
     TriState ExpectedState,
@@ -144,32 +144,32 @@ public record BiosSettingOutcome(
     BiosSettingVerdict Verdict);
 
 /// <summary>
-/// The closed-loop result returned at the next Windows return. Either every expected
-/// setting took (success, marker cleaned up) or at least one did not take / could not
-/// be verified — in which case the recovery card is shown and the marker is KEPT (so
-/// the loop can run again after the next attempt). Never a false "OK".
+/// Le résultat de la boucle, rendu au retour suivant de Windows. Soit chaque réglage
+/// attendu a pris (succès, marqueur effacé), soit au moins un n'a pas pris ou n'a pas pu
+/// être vérifié : la carte de secours s'affiche et le marqueur est gardé (la boucle
+/// pourra retourner après la prochaine tentative). Jamais un faux « OK ».
 /// </summary>
 /// <param name="HadPendingChange">
-/// False when there was no marker at all (idempotent "nothing was pending" no-op);
-/// true when a real pending change was evaluated.
+/// Faux quand il n'y avait aucun marqueur (« rien en attente », idempotent) ;
+/// vrai quand un vrai changement en attente a été évalué.
 /// </param>
 /// <param name="AllTook">
-/// True only when <see cref="HadPendingChange"/> and every outcome is
-/// <see cref="BiosSettingVerdict.Took"/>. A single DidNotTake or Unreadable makes this
-/// false (we do not claim success on an unverifiable setting).
+/// Vrai seulement si <see cref="HadPendingChange"/> et que chaque résultat est
+/// <see cref="BiosSettingVerdict.Took"/>. Un seul DidNotTake ou Unreadable le rend
+/// faux (on n'affirme pas un succès sur un réglage invérifiable).
 /// </param>
-/// <param name="Outcomes">The per-setting outcomes (empty when there was no pending change).</param>
+/// <param name="Outcomes">Les résultats par réglage (vide s'il n'y avait rien en attente).</param>
 /// <param name="ShowRecoveryCard">
-/// True when something did not take or could not be verified → the UI must show the
-/// recovery card (<see cref="RecoveryCardKeys"/>). Never true on a clean success.
+/// Vrai quand quelque chose n'a pas pris ou n'a pas pu être vérifié → l'UI doit montrer la
+/// carte de secours (<see cref="RecoveryCardKeys"/>). Jamais vrai sur un succès net.
 /// </param>
 /// <param name="RecoveryCardKeys">
-/// Ordered resx keys for the recovery card (retry one change at a time, Clear-CMOS,
-/// Load Optimized Defaults…). Empty on success.
+/// Clés resx ordonnées de la carte de secours (réessayer un changement à la fois, Clear-CMOS,
+/// Load Optimized Defaults…). Vide en cas de succès.
 /// </param>
 /// <param name="MarkerCleared">
-/// True when the marker was removed (clean success). False when it was KEPT (failure /
-/// unreadable, so the loop persists across the next attempt) or when nothing was pending.
+/// Vrai quand le marqueur a été retiré (succès net). Faux quand il a été gardé (échec ou
+/// illisible, la boucle continue à la tentative suivante) ou quand rien n'était en attente.
 /// </param>
 public record BiosLoopResult(
     bool HadPendingChange,
@@ -180,7 +180,7 @@ public record BiosLoopResult(
     bool MarkerCleared,
     DateTimeOffset? DepartUtc = null)
 {
-    /// <summary>The idempotent "no marker, nothing was pending" result.</summary>
+    /// <summary>Le résultat idempotent « pas de marqueur, rien en attente ».</summary>
     public static BiosLoopResult NothingPending { get; } = new(
         HadPendingChange: false,
         AllTook: false,
@@ -191,49 +191,49 @@ public record BiosLoopResult(
 }
 
 /// <summary>
-/// Owns the on-disk "firmware change pending a reboot" marker. Writes atomically
-/// (temp + move, never a torn file) and reads fail-clean: an absent marker is a clean
-/// <c>Ok(null)</c> "nothing pending"; a CORRUPT marker is a
-/// <see cref="ErrorCodes.BiosPendingChangeCorrupt"/> failure (never trusted, never a
-/// throw). Never writes the BIOS — this is an OS file only.
+/// Possède le marqueur sur disque « changement firmware en attente de redémarrage ». Écrit
+/// atomiquement (temporaire + déplacement, jamais un fichier à moitié écrit) et lit sans
+/// risque : un marqueur absent donne <c>Ok(null)</c> « rien en attente » ; un marqueur
+/// corrompu donne l'échec <see cref="ErrorCodes.BiosPendingChangeCorrupt"/> (jamais cru, jamais
+/// d'exception). N'écrit jamais le BIOS : c'est un simple fichier de l'OS.
 /// </summary>
 public interface IPendingBiosChangeStore
 {
     /// <summary>
-    /// Persists <paramref name="change"/> as the pending marker, atomically. The
-    /// timestamp must already come from <see cref="IBiosClock"/> (the store does not
-    /// read the clock). Fails clean via <see cref="Result"/> on an invalid change or an
-    /// I/O fault; never throws.
+    /// Enregistre <paramref name="change"/> comme marqueur en attente, atomiquement.
+    /// L'horodatage doit déjà venir de <see cref="IBiosClock"/> (le store ne lit pas
+    /// l'horloge). Échoue proprement via <see cref="Result"/> sur un changement invalide ou
+    /// une panne d'E/S ; ne lève jamais.
     /// </summary>
     Result Save(PendingBiosChange change);
 
     /// <summary>
-    /// Reads the pending marker. <c>Ok(null)</c> when there is none (clean no-op);
-    /// <c>Ok(change)</c> when a valid one is present; <c>Fail</c> on a corrupt marker or
-    /// an I/O fault. Never throws.
+    /// Lit le marqueur en attente. <c>Ok(null)</c> s'il n'y en a pas (rien à faire) ;
+    /// <c>Ok(change)</c> s'il y en a un valide ; <c>Fail</c> sur un marqueur corrompu ou
+    /// une panne d'E/S. Ne lève jamais.
     /// </summary>
     Result<PendingBiosChange?> Load();
 
     /// <summary>
-    /// Removes the pending marker if present (a clean success, or a user dismissal).
-    /// Absent marker → <c>Ok</c> (idempotent). Fails clean on an I/O fault; never throws.
+    /// Retire le marqueur s'il existe (succès net, ou renoncement de l'utilisateur).
+    /// Marqueur absent → <c>Ok</c> (idempotent). Échoue proprement sur une panne d'E/S ; ne lève jamais.
     /// </summary>
     Result Clear();
 }
 
 /// <summary>
-/// The post-reboot closed-loop verifier. Takes the pending marker (via the store) plus
-/// the FRESH <see cref="SettingsState"/> re-read by M1 and produces an honest
-/// <see cref="BiosLoopResult"/>: per setting Took / DidNotTake / Unreadable. On a clean
-/// success it clears the marker; on any DidNotTake / Unreadable it KEEPS the marker and
-/// emits the recovery card — never a false success. No marker → an idempotent
-/// "nothing pending". Never writes the BIOS.
+/// Le vérificateur de la boucle après redémarrage. Prend le marqueur (via le store) et le
+/// <see cref="SettingsState"/> frais relu par le scan, et produit un <see cref="BiosLoopResult"/>
+/// honnête : par réglage Took / DidNotTake / Unreadable. Sur un succès net il efface le
+/// marqueur ; sur tout DidNotTake / Unreadable il le garde et émet la carte de secours,
+/// jamais un faux succès. Pas de marqueur → « rien en attente », idempotent.
+/// N'écrit jamais le BIOS.
 /// </summary>
 public interface IBiosLoopVerifier
 {
     /// <summary>
-    /// Verifies the pending firmware change (if any) against <paramref name="freshState"/>.
-    /// Fails clean via <see cref="Result"/> on a corrupt marker or an I/O fault; never throws.
+    /// Vérifie le changement firmware en attente (s'il y en a un) contre <paramref name="freshState"/>.
+    /// Échoue proprement via <see cref="Result"/> sur un marqueur corrompu ou une panne d'E/S ; ne lève jamais.
     /// </summary>
     Result<BiosLoopResult> Verify(SettingsState freshState);
 }

@@ -1,11 +1,11 @@
 namespace DrDxt.Measurement.PresentMon;
 
 /// <summary>
-/// Thin, testable seam over the raw PresentMonAPI2.dll P/Invokes.
-/// <see cref="PresentMonSession"/> consumes this so its capture/parse logic can be
-/// unit-tested with a fake that returns canned blob bytes — the only un-unit-tested
-/// boundary is the real <see cref="PresentMonApi2"/> (confirmed by a manual game smoke).
-/// Every method returns the raw <see cref="PM_STATUS"/> from the native call.
+/// Couture mince et testable sur les P/Invoke bruts de PresentMonAPI2.dll.
+/// <see cref="PresentMonSession"/> la consomme pour que sa logique de capture / d'analyse se teste
+/// avec un faux qui rend des octets de blob préparés ; la seule frontière sans test unitaire est le
+/// vrai <see cref="PresentMonApi2"/> (confirmé par un smoke test manuel en jeu).
+/// Chaque méthode rend le <see cref="PM_STATUS"/> brut de l'appel natif.
 /// </summary>
 internal interface IPresentMonApi
 {
@@ -15,15 +15,15 @@ internal interface IPresentMonApi
     PM_STATUS StopTracking(nint session, uint pid);
 
     /// <summary>
-    /// Registers a frame query. On success, <paramref name="query"/> holds the query handle,
-    /// <paramref name="blobSize"/> the byte size of one frame's blob, and each entry of
-    /// <paramref name="elements"/> has its <c>dataOffset</c>/<c>dataSize</c> filled in.
+    /// Enregistre une requête d'images. En cas de succès, <paramref name="query"/> tient le handle de
+    /// la requête, <paramref name="blobSize"/> la taille en octets du blob d'une image, et chaque
+    /// entrée de <paramref name="elements"/> a ses <c>dataOffset</c>/<c>dataSize</c> remplis.
     /// </summary>
     PM_STATUS RegisterFrameQuery(nint session, PM_QUERY_ELEMENT[] elements, out nint query, out uint blobSize);
 
     /// <summary>
-    /// Consumes up to <paramref name="maxFrames"/> frames into <paramref name="blobs"/>;
-    /// <paramref name="framesRead"/> reports how many were actually written.
+    /// Consomme jusqu'à <paramref name="maxFrames"/> images dans <paramref name="blobs"/> ;
+    /// <paramref name="framesRead"/> dit combien ont vraiment été écrites.
     /// </summary>
     PM_STATUS ConsumeFrames(nint query, uint pid, byte[] blobs, uint maxFrames, out uint framesRead);
 

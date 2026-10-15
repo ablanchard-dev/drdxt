@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 07/10/2026 (D6, enquête n° 14) : le ping pendant chaque partie, et la route qui se dégrade d'une partie à l'autre.
+// Le ping pendant chaque partie, et la route qui se dégrade d'une partie à l'autre.
 public sealed class RouteEnPartieTests
 {
     private static readonly DateTimeOffset T = new(2026, 10, 1, 20, 0, 0, TimeSpan.Zero);

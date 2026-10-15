@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Autopilot;
 
 /// <summary>
-/// Une campagne a plusieurs candidats (11/09/2026), par la vraie session.
+/// Une campagne a plusieurs candidats, par la vraie session.
 ///
 /// Deux garanties, chacune exercee par <see cref="GameOptimizationSession"/> — moteur, protocole
 /// apparie, <see cref="KeepPolicy"/> — sur un banc dont l'effet de chaque levier est connu :

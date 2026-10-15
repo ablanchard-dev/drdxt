@@ -6,23 +6,16 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// Le dernier reste du score, et il etait en facade.
+/// Aucun pourcentage estime ne s'affiche comme un gain.
 ///
-/// Mesure du 05/09/2026. `Finding.EstimatedGainPct` n'est pas une mesure : la documentation de
-/// `ScoringRules` le dit mot pour mot — « a finding's EstimatedGainPct is exactly the penalty the
-/// score removed ». C'est donc une **estimation d'expert calibree a la main**, la meme grandeur
-/// que celle pour laquelle le score /100 a ete retire de la vitrine le 02/09.
+/// `Finding.EstimatedGainPct` n'est pas une mesure : la documentation de `ScoringRules` le dit,
+/// « a finding's EstimatedGainPct is exactly the penalty the score removed ». C'est une
+/// **estimation d'expert calibree a la main**. Rendue via le gabarit `Scan.Gain.UpTo` = « ~{0}% »,
+/// elle ferait revenir un chiffre estime a cote de chaque constat.
 ///
-/// Et `FindingViewModel` la rendait au client via le gabarit `Scan.Gain.UpTo` = « ~{0}% ».
-/// Autrement dit : le chiffre chasse de l'entete revenait, ligne par ligne, a cote de chaque
-/// constat.
-///
-/// Deux controles ne l'ont pas vu, et les deux pour une raison precise :
-///   • le balayage anti-promesse (60fdbd0) lit les chaines LITTERALES ; ici le nombre est
-///     interpole a l'execution, donc invisible dans le resx ;
-///   • le test d'invariance (a288ec3) compare deux scans dont le decor ne porte aucun constat
-///     avec gain estime — l'echantillon ne contenait pas le cas.
-/// C'est la troisieme fois de la soiree qu'une garde juste rate ce qu'elle ne regarde pas.
+/// Deux autres controles ne la voient pas : le balayage anti-promesse lit les chaines litterales
+/// (ici le nombre est interpole a l'execution), et le test d'invariance compare deux scans sans
+/// constat a gain estime.
 ///
 /// La doctrine du produit tranche : un probleme prouve dont l'ampleur ne l'est pas se dit sans
 /// nombre. Le constat nomme ce qui est mal regle ; il ne chiffre pas ce que ca coute.

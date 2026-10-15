@@ -6,11 +6,11 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Hardware;
 
 /// <summary>
-/// 07/10/2026 (chantier D5) : les dossiers de jeux et le type du disque qui les porte, sans droits. Steam : la clé
+/// Les dossiers de jeux et le type du disque qui les porte, sans droits. Steam : la clé
 /// HKCU\Software\Valve\Steam (SteamPath) puis les « path » de steamapps\libraryfolders.vdf ; Epic : les InstallLocation des
-/// manifestes de ProgramData\Epic\EpicGamesLauncher\Data\Manifests ; Battle.net, Riot, EA app et Ubisoft Connect (08/10) :
+/// manifestes de ProgramData\Epic\EpicGamesLauncher\Data\Manifests ; Battle.net, Riot, EA app et Ubisoft Connect :
 /// l'InstallLocation de leurs jeux dans la liste des programmes de Windows. Le disque : MSFT_Partition (lettre ⇒ numéro de disque)
-/// puis MSFT_PhysicalDisk.MediaType. Mesure du 07/10 sur le PC du mainteneur : Steam et Epic sur C:, un Samsung 990 PRO
+/// puis MSFT_PhysicalDisk.MediaType. Mesure du 07/10 sur la machine de référence : Steam et Epic sur C:, un Samsung 990 PRO
 /// en NVMe (MediaType 4). <c>null</c> = rien n'a pu être lu.
 /// </summary>
 public static class DossiersDeJeux
@@ -21,13 +21,13 @@ public static class DossiersDeJeux
     internal static IReadOnlyList<string> CheminsSteam(string vdf)
         => CheminVdf.Matches(vdf).Select(m => m.Groups[1].Value.Replace(@"\\", @"\")).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-    /// <summary>08/10/2026 (D5) : les jeux des autres lanceurs, par l'éditeur que leur programme d'installation inscrit dans
-    /// la liste des programmes de Windows. Relevé sur le PC du mainteneur : « Call of Duty » et « Overwatch », Publisher
+    /// <summary>Les jeux des autres lanceurs, par l'éditeur que leur programme d'installation inscrit dans
+    /// la liste des programmes de Windows. Relevé sur une vraie machine : « Call of Duty » et « Overwatch », Publisher
     /// « Blizzard Entertainment », InstallLocation sous Program Files (x86). Le lanceur lui-même n'est pas un jeu.</summary>
     private static readonly (string Editeur, string Lanceur, string[] Outils)[] Editeurs =
     [
         ("Blizzard Entertainment", "Battle.net", ["Battle.net"]),
-        // Revue n° 11 : l'antitriche de Riot et les anciens noms des lanceurs (Origin, Uplay) ne sont pas des jeux.
+        // L'antitriche de Riot et les anciens noms des lanceurs (Origin, Uplay) ne sont pas des jeux.
         ("Riot Games", "Riot", ["Riot Client", "Riot Vanguard"]),
         ("Electronic Arts", "EA app", ["EA app", "Origin"]),
         ("Ubisoft", "Ubisoft Connect", ["Ubisoft Connect", "Uplay", "Ubisoft Game Launcher"]),
@@ -91,6 +91,25 @@ public static class DossiersDeJeux
                 .ToList();
         }
         catch (Exception) { return null; }
+    }
+
+    /// <summary>Le chemin complet d'un exécutable de jeu, cherché par son nom dans les dossiers des lanceurs (bibliothèques
+    /// Steam par leur steamapps\common) ; null si introuvable. Profondeur bornée : un jeu Unreal range son exécutable
+    /// sous Projet\Binaries\Win64, quatre niveaux sous le dossier du jeu.</summary>
+    public static string? CheminDeLExecutable(string exe)
+    {
+        var options = new System.IO.EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 5, IgnoreInaccessible = true };
+        foreach (var d in Lire() ?? [])
+        {
+            var racine = d.Lanceur == "Steam" ? Path.Combine(d.Chemin, "steamapps", "common") : d.Chemin;
+            try
+            {
+                if (Directory.Exists(racine) && Directory.EnumerateFiles(racine, exe, options).FirstOrDefault() is { } trouve)
+                    return trouve;
+            }
+            catch (Exception) { /* un dossier illisible n'empêche pas les autres */ }
+        }
+        return null;
     }
 
     internal static Dictionary<char, int> TypesParLettre()

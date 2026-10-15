@@ -13,8 +13,8 @@ public interface INetworkAdapterReader
     /// le lien local. Ok(null) = pas de passerelle ; Fail = lecture impossible.</summary>
     Result<string?> ReadDefaultGateway(NetworkAdapterState adapter);
 
-    /// <summary>Toutes les passerelles IPv4 par defaut publiees par la machine, DISTINCTES et
-    /// cartes VIRTUELLES COMPRISES. Sert a une seule question : y a-t-il ambiguite sur le premier
+    /// <summary>Toutes les passerelles IPv4 par defaut publiees par la machine, distinctes et
+    /// cartes virtuelles comprises. Sert a une seule question : y a-t-il ambiguite sur le premier
     /// saut ? Une seule passerelle = tout ce qui sort passe par elle. Plusieurs = rien ici ne dit
     /// laquelle porte la route vers une destination donnee, et un premier saut mesure au hasard
     /// n'est plus forcement sur le chemin auquel on le compare.</summary>
@@ -22,29 +22,29 @@ public interface INetworkAdapterReader
 }
 
 /// <summary>
-/// Reads connected PHYSICAL adapters and their NDIS settings from root\StandardCimv2.
+/// Lit les cartes réseau physiques connectées et leurs réglages NDIS dans root\StandardCimv2.
 ///
-/// Two decisions worth keeping:
-///   * settings are matched on the STANDARDIZED NDIS keyword (*InterruptModeration, *RSS,
-///     *EEE), never on DisplayName. DisplayName is localized — on this very machine it reads
-///     "Modération interruption". A reader keyed on English display names would silently find
-///     nothing on a French Windows and report Unknown everywhere: a wrong answer that looks
-///     like a working feature.
-///   * virtual adapters are excluded (Virtual = TRUE): VPN tunnels, Hyper-V/VirtualBox
-///     host-only, Bluetooth PAN. Advising someone to tune a VirtualBox adapter is noise.
+/// Deux décisions à garder :
+///   * les réglages se reconnaissent au mot-clé NDIS normalisé (*InterruptModeration, *RSS,
+///     *EEE), jamais au DisplayName. Le DisplayName est traduit : sur cette machine il vaut
+///     « Modération interruption ». Un lecteur fondé sur les noms anglais ne trouverait rien sur
+///     un Windows français et dirait Unknown partout : une réponse fausse qui ressemble à une
+///     fonction qui marche.
+///   * les cartes virtuelles sont écartées (Virtual = TRUE) : tunnels VPN, Hyper-V/VirtualBox
+///     host-only, Bluetooth PAN. Conseiller de régler une carte VirtualBox est du bruit.
 ///
-/// Non-admin, read-only, never throws (the WMI seam converts everything to Result).
+/// Sans droits admin, lecture seule, ne lève jamais (la couture WMI convertit tout en Result).
 /// </summary>
 public sealed class NetworkAdapterReader : INetworkAdapterReader
 {
     private const string Namespace = @"\\.\root\StandardCimv2";
 
-    // ndisPhysicalMedium: 14 = 802.3 (Ethernet). Everything else (9 = native 802.11, …) is
-    // not wired. Source: NDIS_PHYSICAL_MEDIUM enumeration.
+    // ndisPhysicalMedium : 14 = 802.3 (Ethernet). Tout le reste (9 = 802.11 natif, …) n'est
+    // pas filaire. Source : énumération NDIS_PHYSICAL_MEDIUM.
     private const int NdisPhysicalMedium8023 = 14;
 
-    // MediaConnectState: 1 = Connected. An adapter with no cable/association has no bearing
-    // on how the game plays right now.
+    // MediaConnectState : 1 = Connected. Une carte sans câble ni association ne joue aucun rôle
+    // dans la partie en cours.
     private const int MediaConnected = 1;
 
     private readonly IWmiQuery _wmi;
@@ -58,9 +58,9 @@ public sealed class NetworkAdapterReader : INetworkAdapterReader
         if (!adapters.IsOk)
             return Result<IReadOnlyList<NetworkAdapterState>>.Fail(ErrorCodes.WmiFail, adapters.Error!.Value.Message);
 
-        // The advanced-property table is read once and indexed; a failure here is not fatal —
-        // we still know which adapters exist, and every setting simply stays Unknown. Saying
-        // "adapter present, settings unknown" is honest; dropping the adapter would hide it.
+        // La table des propriétés avancées est lue une fois et indexée ; un échec ici n'est pas
+        // fatal : on sait quelles cartes existent, et chaque réglage reste simplement Unknown. Dire
+        // « carte présente, réglages inconnus » est honnête ; retirer la carte la cacherait.
         var settings = _wmi.QueryInNamespace(Namespace,
             "SELECT Name, RegistryKeyword, RegistryValue FROM MSFT_NetAdapterAdvancedPropertySettingData");
         var byAdapter = IndexSettings(settings);
@@ -81,18 +81,17 @@ public sealed class NetworkAdapterReader : INetworkAdapterReader
                 InterruptModeration: Flag(keywords, "*InterruptModeration"),
                 Rss: Flag(keywords, "*RSS"),
                 EnergyEfficientEthernet: Flag(keywords, "*EEE"),
-                // Les deux premiers sont des mots-cles PROPRIETAIRES (Realtek), sans etoile : non
-                // normalises, donc absents de bien des cartes -- et leur absence rend Unknown,
+                // Les deux premiers sont des mots-cles proprietaires (Realtek), sans etoile : non
+                // normalises, donc absents de bien des cartes, et leur absence rend Unknown,
                 // jamais Off. `*SelectiveSuspend` est normalise, lui, donc present sur beaucoup
                 // plus de machines.
                 //
-                // Le ou est volontaire : les trois disent la meme chose au client -- le lien
+                // Le ou est volontaire : les trois disent la meme chose au client : le lien
                 // reduit sa puissance quand il est calme, et le reveil coute des microsecondes.
                 // Il n'a pas a lire trois fois la meme idee parce que sa carte l'expose sous trois
                 // noms.
                 //
-                // `*SelectiveSuspend` a ete ajoute le 08/09/2026 : il etait actif sur la
-                // machine de reference et lu par personne, alors qu'il est standard.
+                // `*SelectiveSuspend` est lu : il est actif sur la machine de reference, et standard.
                 LinkPowerSaving: Either(
                     Flag(keywords, "EnableGreenEthernet"),
                     Flag(keywords, "PowerSavingMode"),
@@ -132,9 +131,9 @@ public sealed class NetworkAdapterReader : INetworkAdapterReader
         return byAdapter;
     }
 
-    /// <summary>RegistryValue is a string ARRAY in CIM (a single-element one in practice).
-    /// ToString() on it yields "System.String[]", so unwrap it explicitly — this is exactly
-    /// the kind of silent wrong-but-plausible reading that ends up shipped.</summary>
+    /// <summary>RegistryValue est un tableau de chaînes en CIM (à un seul élément en pratique).
+    /// ToString() dessus rend « System.String[] » : on le déballe explicitement. C'est exactement
+    /// le genre de lecture fausse mais plausible, et silencieuse, qui finit livrée.</summary>
     private static string? FirstValue(WmiRow row)
     {
         if (!row.Properties.TryGetValue("RegistryValue", out var raw) || raw is null) return null;
@@ -147,8 +146,8 @@ public sealed class NetworkAdapterReader : INetworkAdapterReader
         };
     }
 
-    /// <summary>NDIS boolean-ish keyword → TriState. Absent keyword = Unknown (this NIC does
-    /// not expose the setting), not Off.</summary>
+    /// <summary>Mot-clé NDIS quasi booléen → TriState. Mot-clé absent = Unknown (cette carte
+    /// n'expose pas le réglage), pas Off.</summary>
     private static TriState Flag(Dictionary<string, string> keywords, string keyword)
     {
         if (!keywords.TryGetValue(keyword, out var v)) return TriState.Unknown;
@@ -156,8 +155,8 @@ public sealed class NetworkAdapterReader : INetworkAdapterReader
         {
             "0" => TriState.Off,
             "1" => TriState.On,
-            // *InterruptModeration and *RSS are 0/1. Anything else (a vendor using a wider
-            // enum) is not something we understand → say Unknown instead of guessing.
+            // *InterruptModeration et *RSS valent 0/1. Tout le reste (un fabricant avec une énumération
+            // plus large) nous échappe → on dit Unknown au lieu de deviner.
             _ => TriState.Unknown
         };
     }
@@ -182,7 +181,7 @@ public sealed class NetworkAdapterReader : INetworkAdapterReader
                 return Result<string?>.Ok(null);
 
             // IPv4 uniquement : une adresse IPv6 lien-local (fe80::) est la passerelle du meme
-            // saut, mais la sonde ICMP du produit vise l'IPv4 — melanger les deux comparerait
+            // saut, mais la sonde ICMP du produit vise l'IPv4 : melanger les deux comparerait
             // deux chemins differents sans le dire.
             return Result<string?>.Ok(PremiereIPv4(gws));
         }
@@ -193,9 +192,9 @@ public sealed class NetworkAdapterReader : INetworkAdapterReader
     {
         // Cartes virtuelles comprises, et c'est tout l'interet de cette lecture. Le reste de ce
         // fichier ecarte les adaptateurs virtuels parce qu'on ne conseille pas de regler un tunnel
-        // VPN. Mais pour savoir SI le premier saut d'une carte physique est bien celui que le
+        // VPN. Mais pour savoir si le premier saut d'une carte physique est bien celui que le
         // trafic emprunte, il faut au contraire voir toutes les passerelles : un tunnel monte, ou
-        // une seconde carte connectee, en publie une autre — et rien ici ne dit laquelle porte la
+        // une seconde carte connectee, en publie une autre, et rien ici ne dit laquelle porte la
         // route. Deux passerelles distinctes = ambiguite, et l'appelant doit se taire.
         var rows = _wmi.Query(
             "SELECT DefaultIPGateway FROM Win32_NetworkAdapterConfiguration WHERE IPEnabled = True");
@@ -215,7 +214,7 @@ public sealed class NetworkAdapterReader : INetworkAdapterReader
     }
 
     /// <summary>IPv4 uniquement : une adresse IPv6 lien-local (fe80::) est la passerelle du meme
-    /// saut, mais la sonde ICMP du produit vise l'IPv4 — melanger les deux comparerait deux
+    /// saut, mais la sonde ICMP du produit vise l'IPv4 : melanger les deux comparerait deux
     /// chemins differents sans le dire.</summary>
     private static string? PremiereIPv4(string[] passerelles)
     {

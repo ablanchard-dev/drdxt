@@ -3,7 +3,7 @@ using DrDxt.ElevatedHelper;
 using DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// helperhandshake — LIVE proof of M5 helper-launch + §9.13 session-key handshake.
+// helperhandshake — LIVE proof of the helper launch + session-key handshake.
 //
 // End to end, with NO pre-shared key:
 //   1. locate DrDxt.ElevatedHelper.exe next to this tool.
@@ -81,8 +81,8 @@ else
     allPass = false;
 }
 
-// --- Step 4: LE CANAL DE RETOUR DE DONNEES (L0.1), sur le chemin de PRODUCTION ---
-// Avant L0.1, cette lecture n'apprenait que « la variable est lisible » : les octets etaient
+// --- Step 4: LE CANAL DE RETOUR DE DONNEES, sur le chemin de PRODUCTION ---
+// Avant, cette lecture n'apprenait que « la variable est lisible » : les octets etaient
 // jetes cote helper. Ici on exige la VALEUR. SecureBoot est choisie parce qu'elle est dans
 // l'ensemble ferme de l'allowlist, sous le GUID EFI global, et qu'elle tient en un octet.
 var read = await client.ReadAsync(new ReadFirmwareVariableOp("SecureBoot", OpAllowlist.EfiGlobalVariableGuid), default);
@@ -95,7 +95,7 @@ if (read.IsOk && read.Value is { Length: > 0 })
 }
 else if (read.IsOk)
 {
-    // Un Ok vide serait exactement le defaut que L0.1 corrige : le dire, pas le compter PASS.
+    // Un Ok vide serait exactement le defaut corrige : le dire, pas le compter PASS.
     Fail("Step 4 lecture firmware: OK mais AUCUN octet — le canal de retour ne porte rien.");
     allPass = false;
 }
@@ -107,10 +107,10 @@ else
     allPass = false;
 }
 
-// --- Step 5: L3.1 — LIRE LE VARSTORE CONSTRUCTEUR ---------------------------------------
+// --- Step 5: LIRE LE VARSTORE CONSTRUCTEUR ---------------------------------------
 // Ce n'est pas un PASS/FAIL du produit, c'est une MESURE. Le GUID du varstore AMI est un
 // CANDIDAT : ce depot ne peut pas le citer depuis une specification, donc c'est la carte qui
-// tranche. Le 27/08, « Setup » rendait 203 sous le GUID EFI global -- il vit ailleurs, et cette
+// tranche. « Setup » rend 203 sous le GUID EFI global (releve le 27/08) : il vit ailleurs, et cette
 // etape demande ou.
 //
 // Les trois reponses possibles sont distinctes, et les confondre serait le defaut :

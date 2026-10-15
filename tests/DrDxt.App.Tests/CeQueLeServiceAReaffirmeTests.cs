@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// SEC3 (08/10/2026) : après une mise à jour de Windows, le service réaffirme seul ce que le joueur a gardé. Il ne faisait
+/// Après une mise à jour de Windows, le service réaffirme seul ce que le joueur a gardé. Il ne faisait
 /// que le journaliser ; la page Windows le dit maintenant, réglage par réglage, avec la date.
 /// </summary>
 public sealed class CeQueLeServiceAReaffirmeTests

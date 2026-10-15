@@ -76,7 +76,7 @@ public class GpuDetectorTests
     [Fact]
     public void Nvidia_driver_version_is_the_real_branch_from_nvml_not_the_wddm_quad()
     {
-        // WMI rend "31.0.15.4633" (quadruplette WDDM) : GpuDriverFreshness refuse de juger cette
+        // WMI rend "31.0.15.4633" (quadruplette WDDM) : le levier de fraîcheur refuse de juger cette
         // forme, donc le levier « pilote obsolète » ne pouvait jamais se déclencher. NVML rend la
         // vraie branche, celle que l'utilisateur reconnaît et qui porte le signal de fraîcheur.
         var (d, a, w, n, m) = Mocks(0x10DE, "NVIDIA GeForce RTX 4060", 8L << 30, nvmlBranch: "610.88");
@@ -136,7 +136,7 @@ public class GpuDetectorTests
     [Fact]
     public void Intel_igpu_rebar_unknown()
     {
-        // Intel iGPU: neither ADLX nor NVML applies → Unknown even if the NVML provider were to answer.
+        // iGPU Intel : ni ADLX ni NVML ne s'appliquent → Unknown même si le fournisseur NVML répondait.
         var (d, a, w, n, m) = Mocks(0x8086, "Intel UHD Graphics 770", 0, nvReBar: TriState.On);
         var gpu = new GpuDetector(d, a, w, n, m).Detect().Value!.Single();
         gpu.Vendor.Should().Be("Intel");

@@ -18,11 +18,11 @@ public sealed record MemoryAbVerdict(
     double BandwidthAfterGBs = 0,
     double LatencyBeforeNs = 0,
     double LatencyAfterNs = 0,
-    // La RESOLUTION : le plus petit ecart que ces deux mesures pouvaient distinguer, en pourcent.
+    // La resolution : le plus petit ecart que ces deux mesures pouvaient distinguer, en pourcent.
     // Sans elle, « pas significatif » se lit « ca ne sert a rien », ce qui est une conclusion que
     // l'instrument n'a pas produite. Mesure du 17/09/2026 : sur cette machine la resolution du
-    // debit vaut ~7,8 %, quand passer de 3 800 a 4 000 MT/s n'en promet que 5,3 -- le banc ne peut
-    // Pas trancher cette question-la, et c'est ce chiffre qui le dit. Le tableau de bord parle
+    // debit vaut ~7,8 %, quand passer de 3 800 a 4 000 MT/s n'en promet que 5,3 : le banc ne peut
+    // pas trancher cette question-la, et c'est ce chiffre qui le dit. L'ecran de scan parle
     // deja ainsi pour le GPU (Scan.Drift.None). NaN quand il n'y a pas de verdict.
     double BandwidthResolutionPct = double.NaN,
     double LatencyResolutionPct = double.NaN);
@@ -32,15 +32,15 @@ public sealed record MemoryAbVerdict(
 /// dire « ca a change quelque chose ».
 ///
 /// La regle : un ecart ne compte que s'il depasse 3 sigma de la difference des deux mesures. En
-/// dessous, la phrase est « aucune difference mesurable » -- jamais « leger gain ». C'est ce
+/// dessous, la phrase est « aucune difference mesurable », jamais « leger gain ». C'est ce
 /// garde-fou qui separe un instrument d'un generateur d'espoir.
 /// </summary>
 public static class MemoryVerdict
 {
     /// <summary>
-    /// Nombre d'ecarts-types exiges. **Choix produit** : a 3 sigma, la probabilite qu'un ecart de
-    /// cette taille soit du bruit est inferieure a 1 %. Deux sigma aurait laisse passer un ecart
-    /// sur vingt -- trop, pour une phrase que le client lit comme une preuve.
+    /// Nombre d'ecarts-types exiges. Choix produit : a 3 sigma, la probabilite qu'un ecart de
+    /// cette taille soit du bruit est inferieure a 1 %. Deux sigma laisserait passer un ecart
+    /// sur vingt : trop, pour une phrase que le client lit comme une preuve.
     /// </summary>
     public const double SigmaFactor = 3.0;
 
@@ -77,8 +77,8 @@ public static class MemoryVerdict
 
     /// <summary>
     /// Le seuil, en pourcent. Les deux mesures apportent chacune leur dispersion, et l'incertitude
-    /// d'une difference est la racine de la somme des carres -- pas la somme, qui surestimerait.
-    /// On garde les sigma des PASSES et non ceux de la moyenne : c'est plus severe, et sur une
+    /// d'une difference est la racine de la somme des carres, pas la somme, qui surestimerait.
+    /// On garde les sigma des passes et non ceux de la moyenne : c'est plus severe, et sur une
     /// phrase que le client lira comme une preuve, l'erreur a ne pas commettre est de crier un
     /// gain qui n'existe pas.
     /// </summary>

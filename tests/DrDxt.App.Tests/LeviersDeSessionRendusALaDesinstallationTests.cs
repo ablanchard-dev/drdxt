@@ -16,11 +16,11 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 06/10/2026 (plan 4.3) — les leviers de la session Windows (HKCU) posés par « Optimiser » sont rendus à la
+// Les leviers de la session Windows (HKCU) posés par « Optimiser » sont rendus à la
 // désinstallation.
 //
 // Lu sur ma machine avant la première vraie désinstallation : « Optimiser » avait posé
-// `VRROptimizeEnable=1` (30/09), et `%ProgramData%\DrDxt` ne contenait aucun manifeste. Le mapper n'inscrivait
+// `VRROptimizeEnable=1`, et `%ProgramData%\DrDxt` ne contenait aucun manifeste. Le mapper n'inscrivait
 // que les leviers que le service réaffirme au démarrage ; les leviers HKCU (VRR, mode Jeu, Game DVR) en sont
 // exclus à raison (le service SYSTEM écrirait la mauvaise ruche), et leur ORIGINE l'était avec eux. Or la
 // désinstallation ne relit que ce manifeste : elle aurait laissé le réglage en place, quand le README promet
@@ -139,7 +139,7 @@ public sealed class LeviersDeSessionRendusALaDesinstallationTests : IDisposable
             "aucune des trois valeurs n'existait avant DrDXT");
     }
 
-    // Revue du 06/10 (P1) : un levier annulé restait au manifeste (la fusion ne retire rien, et le retrait
+    // Un levier annulé restait au manifeste (la fusion ne retire rien, et le retrait
     // cherchait l'identifiant de l'App parmi ceux du service). Posé à nouveau plus tard, il gardait sa PREMIÈRE
     // origine : la désinstallation écrivait un passé que l'utilisateur avait déjà quitté.
     [Fact]
@@ -209,7 +209,7 @@ public sealed class LeviersDeSessionRendusALaDesinstallationTests : IDisposable
             Garde("fixit.sane_pagefile", pagefile),              // sans valeur posée : jamais rendable
             new("latency.vrrFlipModelOn", Applied: true, AutoReverted: false,
                 new TweakSnapshot("latency.vrrFlipModelOn", vrr, vrrPose), Error: null), // témoin : celui-là entre
-            // 08/10/2026 : une limite de puissance gardée, avec la valeur posée : rendue à la désinstallation.
+            // Une limite de puissance gardée, avec la valeur posée : rendue à la désinstallation.
             new("gpu.power_limit", Applied: true, AutoReverted: false, new TweakSnapshot("gpu.power_limit",
                 PrivilegedOpCodec.Serialize(new ApplyNvApiPowerLimitOp(0, 100)).Value!,
                 PrivilegedOpCodec.Serialize(new ApplyNvApiPowerLimitOp(0, 90)).Value!), Error: null),

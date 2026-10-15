@@ -42,7 +42,8 @@ Avant d'écrire le fichier, DrDXT retire de chaque texte :
 - les identifiants de compte Windows (SID) ;
 - les identifiants de volume (`Volume{…}`) ;
 - les adresses de courriel ;
-- le nom d'organisation des dossiers OneDrive (`OneDrive - <organisation>`).
+- le nom d'organisation des dossiers OneDrive (`OneDrive - <organisation>`) ;
+- les clés à tirets (licence : au moins quatre groupes de cinq lettres ou chiffres) et les empreintes (32 caractères hexadécimaux ou plus).
 
 Chaque valeur retirée devient `<retiré>`. Cette liste est celle du code (`MachineExportee.CeQuiEstRetire`), et un
 test vérifie qu'aucune de ces valeurs, semée dans une fausse machine, ne ressort.

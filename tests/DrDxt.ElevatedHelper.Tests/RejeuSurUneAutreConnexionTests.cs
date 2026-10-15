@@ -8,10 +8,10 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// Ce que la lecture du 17/09/2026 a etabli, et que rien ne prouvait encore.
+// Ce qui empeche le rejeu d'une requete sur une autre connexion.
 //
 // `HandshakeAcceptingServer` construit un `TypedPrivilegedServer` NEUF a chaque
-// connexion — donc un `NonceTracker` neuf — et ne sert qu'une requete typee.
+// connexion (donc un `NonceTracker` neuf) et ne sert qu'une requete typee.
 // Consequence : le tracker de nonces ne peut pas, a lui seul, empecher le rejeu
 // d'une requete capturee sur une NOUVELLE connexion, puisqu'il y est vide.
 //

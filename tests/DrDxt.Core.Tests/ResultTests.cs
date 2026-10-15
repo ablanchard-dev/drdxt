@@ -51,7 +51,7 @@ public class ResultTests
         result.Error!.Value.Message.Should().Be("something went wrong");
     }
 
-    // --- Result<T>.Ok() with reference type (string) ---
+    // --- Result<T>.Ok() avec un type référence (string) ---
 
     [Fact]
     public void ResultT_Ok_String_IsOk_IsTrue()
@@ -77,7 +77,7 @@ public class ResultTests
         result.Error.Should().BeNull();
     }
 
-    // --- Result<T>.Ok() with value type (int) ---
+    // --- Result<T>.Ok() avec un type valeur (int) ---
 
     [Fact]
     public void ResultT_Ok_Int_IsOk_IsTrue()
@@ -139,7 +139,7 @@ public class ResultTests
         result.Value.Should().Be(default(int));
     }
 
-    // --- Inheritance: Result<T> is assignable to Result ---
+    // --- Héritage : Result<T> est assignable à Result ---
 
     [Fact]
     public void ResultT_IsAssignableTo_Result()
@@ -164,7 +164,7 @@ public class ResultTests
         baseResult.Error!.Value.Code.Should().Be("CODE");
     }
 
-    // --- Result<T>.Fail returns Result<T> (static new hides base correctly) ---
+    // --- Result<T>.Fail rend Result<T> (le static new masque correctement la base) ---
 
     [Fact]
     public void ResultT_Fail_ReturnsResultT_NotBaseResult()

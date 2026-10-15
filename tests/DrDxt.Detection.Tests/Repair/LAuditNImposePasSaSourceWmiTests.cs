@@ -7,7 +7,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 // -----------------------------------------------------------------------
-// 19/09/2026. La question laissee ouverte au tour precedent, fermee.
+// La question laissee ouverte au tour precedent, fermee.
 //
 // Hier : les cinq tests d'audit les plus lents ont ete ramenes de 18,7 s a 10,3 s en
 // injectant des lecteurs de decor — et remontaient a 28,3 s en execution de toute la
@@ -69,17 +69,12 @@ public sealed class LAuditNImposePasSaSourceWmiTests
     [Fact]
     public void CE_QUI_RESTE_A_CABLER_EST_NOMME_ET_NE_GROSSIT_PAS()
     {
-        // 24/09/2026 : correction d'une affirmation ecrite ici meme le jour meme.
-        //
-        // Ce test disait : « avec tous ses lecteurs injectes, l'audit ne paie plus l'attente
-        // systeme », seuil a 5 s. Mesure apres la couture WMI : l'audit tout injecte prend
-        // encore 5,1 s, et les cinq tests lents passent de 10,3 s a 9,8 s. Autrement dit la
-        // couture WMI corrige une INCOHERENCE reelle (c'etait le seul lecteur sans couture)
-        // mais **n'est pas** la cause du plateau. L'hypothese du tour precedent est refutee
-        // par la mesure, et une assertion de duree qui affirme le contraire serait fausse.
+        // Pas d'assertion de duree : mesure, l'audit tout injecte prend encore 5,1 s, et les cinq
+        // tests lents passent de 10,3 s a 9,8 s avec la couture WMI. Elle corrige une incoherence
+        // reelle (c'etait le seul lecteur sans couture) mais n'est pas la cause du plateau.
         //
         // Ce qui reste vrai et verifiable : cinq lecteurs systeme sont encore cables dans
-        // `Lire()`. Les geler ici, c'est savoir ou chercher la prochaine fois — et empecher
+        // `Lire()`. Les geler ici, c'est savoir ou chercher la prochaine fois, et empecher
         // la liste de grossir en silence.
         var fichier = Chemin("src", "DrDxt.Detection", "Repair", "RepairAuditService.cs");
         var texte = File.ReadAllText(fichier);

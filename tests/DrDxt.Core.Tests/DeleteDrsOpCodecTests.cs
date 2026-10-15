@@ -4,9 +4,9 @@ using Xunit;
 
 namespace DrDxt.Core.Tests;
 
-/// <summary>PHASE 18 F1 lot 3 — l'inverse d'une ecriture au profil d'un jeu doit TRAVERSER le fil.
+/// <summary>L'inverse d'une ecriture au profil d'un jeu doit TRAVERSER le fil.
 /// Sans valeur d'enum et sans ses deux bras de codec, l'op serait refusee hors du processus :
-/// le revert marcherait en test et jamais en production (le defaut paye le 26/08 par le BIOS).</summary>
+/// le revert marcherait en test et jamais en production (meme defaut que celui du trajet BIOS).</summary>
 public class DeleteDrsOpCodecTests
 {
     [Fact]

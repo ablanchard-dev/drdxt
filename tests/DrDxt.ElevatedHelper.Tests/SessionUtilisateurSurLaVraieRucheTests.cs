@@ -6,10 +6,10 @@ using NSubstitute;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// SEC2 / ADM5 (08/10/2026) : la valeur HKCU part par le jeton de l'App, sur la vraie ruche de la session, sans jamais
+/// SEC2 / ADM5 : la valeur HKCU part par le jeton de l'App, sur la vraie ruche de la session, sans jamais
 /// toucher le helper. Valeur choisie : le mode Jeu automatique à 1, qui est le défaut de Windows. L'état d'origine est lu
 /// avant, et rendu à la fin (valeur absente ⇒ supprimée, présente ⇒ réécrite), relu.
-/// Revue du 08/10/2026 (REV5) : une origine déjà à 1 ne prouverait rien, une origine d'un autre type serait réécrite en
+/// Une origine déjà à 1 ne prouverait rien, une origine d'un autre type serait réécrite en
 /// DWORD : dans ces deux cas le test ne touche à rien et le dit ; et l'échec de l'écriture n'est plus masqué par le rendu.
 /// </summary>
 public sealed class SessionUtilisateurSurLaVraieRucheTests

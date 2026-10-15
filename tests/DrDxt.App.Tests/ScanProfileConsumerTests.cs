@@ -11,18 +11,18 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// M6 — ScanProfileConsumer: per-chip profile recommendation → executed plan + clamped GPU
-// target overrides + honest surfaced evidence.
+// ScanProfileConsumer : recommandation de profil par puce → plan exécuté + dérogations de
+// cibles GPU bornées + preuves honnêtes remontées.
 //
-// Covers: profile→TweakPlan mapping (fix-misconfig first, deduped, AppliesTo-gated, GPU
-// excluded from the executed batch); GPU parameter clamping to GpuSafeBounds at the front
-// door (incl. an out-of-bounds value clamped + noted); unknown-chip → generic-only no chip
-// guess; failed recommendation → safe no-op; Tested=false surfaced as not-verified; and an
-// end-to-end pass over the real foundation matcher + catalog.
+// Couvre : la correspondance profil → TweakPlan (mauvaise configuration d'abord, dédoublonné,
+// filtré par AppliesTo, GPU exclu du lot exécuté) ; le bornage des paramètres GPU par
+// GpuSafeBounds à l'entrée (y compris une valeur hors bornes bornée et notée) ; puce inconnue →
+// générique seulement, sans deviner la puce ; recommandation ratée → rien, sans risque ; Tested=false
+// remonté comme non vérifié ; et un passage de bout en bout sur le vrai apparieur de base et le catalogue.
 // -----------------------------------------------------------------------
 public sealed class ScanProfileConsumerTests
 {
-    // ---- fakes / builders ----
+    // ---- faux / constructeurs ----
 
     private static readonly GpuTuningTarget DefaultTuning = new(0, -100, 0);
     private static readonly GpuPowerLimitTarget DefaultPower = new(0, 90);
@@ -41,7 +41,7 @@ public sealed class ScanProfileConsumerTests
     private static ITweakCatalog Catalog(params ITweak[] tweaks)
     {
         var c = Substitute.For<ITweakCatalog>();
-        // Unknown ids fail-closed (sealed Result<T> would otherwise resolve to null).
+        // Les identifiants inconnus se ferment (un Result<T> scellé se résoudrait sinon en null).
         c.Get(Arg.Any<string>()).Returns(_ => Result<ITweak>.Fail("TWEAK.NOT_FOUND", "unknown"));
         foreach (var t in tweaks)
         {
@@ -87,7 +87,7 @@ public sealed class ScanProfileConsumerTests
     private static SettingsState AnySt() => new(
         TriState.On, TriState.On, "g", TriState.On, TriState.On, Array.Empty<int>(), TriState.On);
 
-    // ====================== profile → plan mapping ======================
+    // ====================== correspondance profil → plan ======================
 
     [Fact]
     public void Plan_is_profile_selections_fix_misconfig_first_and_excludes_gpu_tuning()
@@ -104,7 +104,7 @@ public sealed class ScanProfileConsumerTests
 
         var r = sut.Consume(AnyHw(), AnySt());
 
-        // fix-misconfig first, then latency; GPU tuning is not in the executed batch.
+        // mauvaise configuration d'abord, puis latence ; le réglage GPU n'est pas dans le lot exécuté.
         r.Plan.TweakIds.Should().Equal("fixit.power_plan", "latency.reflex");
         r.Items.Single(i => i.TweakId == "gpu.power_limit").InExecutedPlan.Should().BeFalse();
     }
@@ -138,7 +138,7 @@ public sealed class ScanProfileConsumerTests
         item.AdjustmentNote.Should().Contain("Not applicable");
     }
 
-    // ====================== GPU param clamping (front door) ======================
+    // ====================== bornage des paramètres GPU (à l'entrée) ======================
 
     [Fact]
     public void Out_of_bounds_power_limit_is_clamped_to_safe_bounds_before_reaching_the_target()
@@ -151,9 +151,9 @@ public sealed class ScanProfileConsumerTests
 
         var r = sut.Consume(AnyHw(), AnySt());
 
-        // 30% (below floor) is raised to the safe floor — never the dangerous value.
+        // 30 % (sous le plancher) est relevé au plancher sûr, jamais la valeur dangereuse.
         r.GpuPowerLimit.PowerLimitPct.Should().Be(GpuSafeBounds.MinPowerLimitPct);
-        source.PowerLimit.PowerLimitPct.Should().Be(GpuSafeBounds.MinPowerLimitPct); // override committed
+        source.PowerLimit.PowerLimitPct.Should().Be(GpuSafeBounds.MinPowerLimitPct); // dérogation retenue
         r.Items.Single(i => i.TweakId == "gpu.power_limit").AdjustmentNote.Should().Contain("clamped");
     }
 
@@ -168,7 +168,7 @@ public sealed class ScanProfileConsumerTests
 
         var r = sut.Consume(AnyHw(), AnySt());
 
-        // +500 MHz (over the band) is pulled down to the conservative max.
+        // +500 MHz (au-dessus de la bande) est ramené au maximum prudent.
         r.GpuTuning.CoreOffsetMhz.Should().Be(GpuSafeBounds.MaxCoreOffsetMhz);
         source.Tuning.CoreOffsetMhz.Should().Be(GpuSafeBounds.MaxCoreOffsetMhz);
         r.Items.Single(i => i.TweakId == "gpu.undervolt").AdjustmentNote.Should().Contain("clamped");
@@ -184,11 +184,11 @@ public sealed class ScanProfileConsumerTests
 
         var r = sut.Consume(AnyHw(), AnySt());
 
-        r.GpuTuning.CoreOffsetMhz.Should().Be(75); // overrode the -100 default, in bounds
+        r.GpuTuning.CoreOffsetMhz.Should().Be(75); // a remplacé le -100 par défaut, dans les bornes
         r.Items.Single(i => i.TweakId == "gpu.undervolt").AdjustmentNote.Should().NotContain("clamped");
     }
 
-    // ====================== separate GPU plan (dedicated step) ======================
+    // ====================== plan GPU séparé (étape dédiée) ======================
 
     [Fact]
     public void Applicable_gpu_selections_go_in_the_separate_gpu_plan_not_the_safe_plan()
@@ -205,9 +205,9 @@ public sealed class ScanProfileConsumerTests
 
         var r = sut.Consume(AnyHw(), AnySt());
 
-        // The safe batch carries the NON-GPU tweak only.
+        // Le lot sûr ne porte que le levier hors GPU.
         r.Plan.TweakIds.Should().Equal("fixit.power_plan");
-        // The GPU tweaks are their own plan — run by the dedicated, isolated step.
+        // Les leviers GPU forment leur propre plan, joué par l'étape dédiée et isolée.
         r.HasGpuPlan.Should().BeTrue();
         r.GpuPlan.TweakIds.Should().BeEquivalentTo("gpu.undervolt", "gpu.power_limit");
         r.GpuPlan.TweakIds.Should().NotContain("fixit.power_plan");
@@ -216,8 +216,8 @@ public sealed class ScanProfileConsumerTests
     [Fact]
     public void The_gpu_note_promises_no_dedicated_step_and_says_the_measured_gain_rule()
     {
-        // 14/09/2026 — la note disait « applied in a dedicated step » alors que la decision produit
-        // interdit d'ecrire sur la carte depuis l'App. 06/10/2026 (L-GPU) : ouverte machine par machine, la carte
+        // La note ne dit pas « applied in a dedicated step » : la decision produit interdit
+        // d'ecrire sur la carte depuis l'App. Ouverte machine par machine, la carte
         // passe par Optimiser et ne garde un reglage qu'avec un gain mesure.
         var catalog = Catalog(Tweak("gpu.undervolt", TweakCategory.GpuTuning));
         var profile = Profile("nv", ChipFamily.NvidiaOptionA, false,
@@ -232,8 +232,8 @@ public sealed class ScanProfileConsumerTests
     [Fact]
     public void Unsupported_gpu_drops_the_gpu_selection_so_there_is_no_gpu_plan()
     {
-        // The GPU tweak does not AppliesTo this machine (e.g. iGPU / laptop / handheld) → it is
-        // surfaced with a "not applicable" note but never placed in the GPU plan → no GPU batch.
+        // Le levier GPU ne s'applique pas à cette machine (iGPU, portable, console portable) → remonté
+        // avec une note « non applicable » mais jamais placé dans le plan GPU → pas de lot GPU.
         var catalog = Catalog(Tweak("gpu.undervolt", TweakCategory.GpuTuning, applies: false));
         var profile = Profile("nv", ChipFamily.NvidiaOptionA, false,
             Sel("gpu.undervolt", ProfileIntent.GpuTune, new[] { new ProfileParameter("CoreOffsetMhz", 50, "MHz") }));
@@ -263,7 +263,7 @@ public sealed class ScanProfileConsumerTests
         r.GpuPlan.TweakIds.Should().BeEmpty();
     }
 
-    // ====================== unknown chip / fail-closed ======================
+    // ====================== puce inconnue / fermé ======================
 
     [Fact]
     public void Unknown_chip_yields_only_the_generic_baseline_with_no_chip_specific_guess()
@@ -271,8 +271,8 @@ public sealed class ScanProfileConsumerTests
         var catalog = Catalog(
             Tweak("fixit.power_plan", TweakCategory.FixIt),
             Tweak("latency.vrr_vsync_cap", TweakCategory.Latency));
-        // The matcher returns only the generic profile (its conservative behaviour for an
-        // unrecognised chip) — no AMD/NVIDIA chip-specific profile, no GPU selection.
+        // L'apparieur ne rend que le profil générique (sa prudence pour une puce non
+        // reconnue) : aucun profil propre à une puce AMD/NVIDIA, aucun choix de carte.
         var generic = Profile("generic", ChipFamily.GenericSafe, false,
             Sel("fixit.power_plan", ProfileIntent.FixMisconfig),
             Sel("latency.vrr_vsync_cap", ProfileIntent.Latency));
@@ -282,7 +282,7 @@ public sealed class ScanProfileConsumerTests
 
         r.Plan.TweakIds.Should().Equal("fixit.power_plan", "latency.vrr_vsync_cap");
         r.Plan.TweakIds.Should().NotContain("fixit.x3d_ccd");
-        // No GPU selection → the targets stay at the conservative defaults (no guess).
+        // Aucun choix de carte → les cibles restent aux valeurs prudentes par défaut (rien de deviné).
         r.GpuTuning.Should().Be(DefaultTuning);
         r.GpuPowerLimit.Should().Be(DefaultPower);
     }
@@ -303,10 +303,10 @@ public sealed class ScanProfileConsumerTests
         r.Plan.TweakIds.Should().BeEmpty();
         r.Items.Should().BeEmpty();
         r.GpuTuning.Should().Be(DefaultTuning);
-        source.Tuning.Should().Be(DefaultTuning); // reset, never overridden on a no-op
+        source.Tuning.Should().Be(DefaultTuning); // remis à zéro, jamais dérogé sur un passage sans effet
     }
 
-    // ====================== honest surface (evidence + verified state) ======================
+    // ====================== surface honnête (preuves + état vérifié) ======================
 
     [Fact]
     public void Each_item_carries_its_gain_evidence()
@@ -343,12 +343,12 @@ public sealed class ScanProfileConsumerTests
         r.Items.Single(i => i.TweakId == "fixit.x3d_ccd").IsVerified.Should().BeTrue();
     }
 
-    // ====================== AMD-GPU presence fed from the scanned hardware ======================
-    // Regression guard for the honest "AMD GPU detected — tuning coming soon" status. Consume must
-    // feed the AMD-presence HARDWARE fact onto the source so the GPU tweaks can surface it under
-    // real prod wiring — the ADLX seam cannot (its prod impl reports unavailable on every machine),
-    // and that exact gap once made the silent false-green a false-positive in tests. These guard the
-    // Consume→source link itself, not just the source→tweak link covered by GpuAmdHonestStatusTests.
+    // ====================== présence d'un GPU AMD alimentée par le matériel scanné ======================
+    // Garde de régression du statut honnête « GPU AMD détecté, réglage à venir ». Consume doit
+    // poser le fait matériel « AMD présent » sur la source pour que les leviers GPU le montrent sous
+    // le vrai câblage de production ; la couture ADLX ne le peut pas (son implémentation de production
+    // se dit indisponible partout), et ce trou précis faisait d'un faux vert silencieux un faux positif
+    // en test. Ces tests gardent le lien Consume → source, pas seulement le lien source → levier couvert par GpuAmdHonestStatusTests.
 
     [Fact]
     public void Consume_sets_amd_gpu_presence_on_the_source_from_the_scanned_hardware()
@@ -367,7 +367,7 @@ public sealed class ScanProfileConsumerTests
         var source = Source();
         var sut = new ScanProfileConsumer(Matcher(), Catalog(), source);
 
-        sut.Consume(AnyHw(), AnySt()); // NVIDIA GPU only
+        sut.Consume(AnyHw(), AnySt()); // carte NVIDIA seulement
 
         source.IsAmdGpuPresent.Should().BeFalse();
     }
@@ -375,8 +375,8 @@ public sealed class ScanProfileConsumerTests
     [Fact]
     public void Consume_sets_amd_gpu_presence_even_when_the_recommendation_fails()
     {
-        // Presence is a fact of the hardware, not the profile match — it must be recorded even on
-        // the fail-closed no-op path, so the honest AMD status still fires for an unrecognised chip.
+        // La présence est un fait du matériel, pas de la correspondance de profil : elle doit être
+        // enregistrée même sur le chemin fermé sans effet, pour que le statut honnête AMD joue sur une puce non reconnue.
         var source = Source();
         var matcher = Substitute.For<IChipProfileMatcher>();
         matcher.Recommend(Arg.Any<HardwareInventory>())
@@ -388,7 +388,7 @@ public sealed class ScanProfileConsumerTests
         source.IsAmdGpuPresent.Should().BeTrue();
     }
 
-    // ====================== end-to-end over the real foundation ======================
+    // ====================== de bout en bout sur la vraie base ======================
 
     [Fact]
     public void Real_foundation_profiles_compose_for_an_amd_x3d_nvidia_desktop()
@@ -413,12 +413,12 @@ public sealed class ScanProfileConsumerTests
 
         var r = sut.Consume(hw, AnySt());
 
-        // executed batch = applicable NON-GPU selections from generic + AMD-X3D + NVIDIA.
+        // lot exécuté = sélections hors GPU applicables du générique + AMD-X3D + NVIDIA.
         r.Plan.TweakIds.Should().Contain(new[] { "fixit.power_plan", "fixit.x3d_ccd" });
         r.Plan.TweakIds.Should().NotContain("gpu.power_limit");
         r.Plan.TweakIds.Should().NotContain("gpu.undervolt");
         // GPU targets overridden from the NVIDIA Option-A profile (in-bounds: 90 %). 08/10/2026 (V2) : le décalage
-        // d'horloge n'est plus proposé par aucun profil (règle du 29/09, chiffre non reproductible).
+        // d'horloge n'est plus proposé par aucun profil (règle de la carte, chiffre non reproductible).
         r.GpuPowerLimit.PowerLimitPct.Should().Be(90);
         r.Items.Should().NotContain(i => i.TweakId == "gpu.undervolt");
         // all foundation profiles are Tested=false → every surfaced line is "non vérifié".
@@ -428,7 +428,7 @@ public sealed class ScanProfileConsumerTests
 
     // ====================== non lu n'est pas « rien a faire » ======================
 
-    /// 17/09/2026, mesure sur la machine de reference (`scanprobe --plan`) : les DIX leviers du plan
+    /// Mesure sur la machine de reference (`scanprobe --plan`) : les DIX leviers du plan
     /// sortent « Not applicable to this machine: skipped », et rien n'atteint l'ecran. Trois
     /// d'entre eux ne sont pas inapplicables : leurs valeurs n'existent tout simplement pas dans
     /// le registre (`AllowAutoGameMode`, `HwSchMode` : absentes), donc l'etat lu est `Unknown`.

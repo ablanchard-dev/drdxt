@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Display;
 
 /// <summary>
-/// 06/10/2026 (chantier B2) : les fréquences qu'un écran tient à une résolution, lues dans les timings détaillés
+/// Les fréquences qu'un écran tient à une résolution, lues dans les timings détaillés
 /// de son EDID (bloc de base et extensions CTA-861). Le descripteur « Range Limits » n'est pas lu : il couvre toutes les
 /// résolutions, et une fréquence qu'il annonce peut n'exister qu'en dessous de la résolution du joueur. Un écran qui ne
 /// détaille ses modes rapides qu'en DisplayID rend null ici : on se tait plutôt que de deviner.
@@ -59,11 +59,11 @@ public static class EdidFrequences
 }
 
 /// <summary>
-/// 06/10/2026 (chantier B2) : l'écran annonce plus que ce que Windows propose. La fréquence se règle dans Windows ;
+/// L'écran annonce plus que ce que Windows propose. La fréquence se règle dans Windows ;
 /// quand Windows ne la propose même pas, quelque chose bride : d'abord le menu de l'écran (version DisplayPort ou HDMI,
-/// overclock coupé), puis le câble, le port ou le pilote (revue F-16). La version du câble ne se lit pas : on dit
-/// comment Windows voit le branchement, pas le câble. Une dalle de portable n'a pas de câble (F-14) ; des écrans dupliqués
-/// n'offrent que les modes communs (F-15) ; un EDID illisible est un « non lu » compté (F-18).
+/// overclock coupé), puis le câble, le port ou le pilote. La version du câble ne se lit pas : on dit
+/// comment Windows voit le branchement, pas le câble. Une dalle de portable n'a pas de câble ; des écrans dupliqués
+/// n'offrent que les modes communs ; un EDID illisible est un « non lu » compté.
 /// </summary>
 public static class EcranBride
 {
@@ -78,10 +78,10 @@ public static class EcranBride
     {
         if (duplique) return null;
         if (edid is null || EdidFrequences.Natif(edid) is not { } natif)
-            return NonLu("l'EDID de l'écran n'a pas pu être lu : DrDXT ne sait pas ce qu'il annonce.");
+            return NonLu(Docteur.T("EB.EdidNonLu"));
         var (l, h) = natif;
         if (EdidFrequences.MaxA(edid, l, h) is not { } max)
-            return NonLu($"l'EDID ne détaille pas les fréquences de la résolution native ({l}×{h}) : DrDXT ne les devine pas.");
+            return NonLu(Docteur.T("EB.EdidSansFrequences", l, h));
         return Juger(maxWindowsA(l, h), max, sortie, $"{l}×{h}");
     }
 
@@ -92,19 +92,15 @@ public static class EcranBride
     public static RepairFinding? Juger(int maxWindows, int? maxEdid, uint? sortie, string? resolution = null)
     {
         if (maxWindows <= 0 || maxEdid is not { } edid || edid - maxWindows < Tolerance) return null;
-        var ou = resolution is null ? "à cette résolution" : $"en {resolution}";
+        var ou = resolution is null ? Docteur.T("EB.ACetteResolution") : Docteur.T("EB.EnResolution", resolution);
         var dalle = sortie is { } so && (so == 11 || (so & Interne) != 0);
-        return new RepairFinding("DISPLAY", "fréquence annoncée par l'écran", $"{edid} Hz annoncés, {maxWindows} Hz proposés",
+        return new RepairFinding("DISPLAY", "fréquence annoncée par l'écran", Docteur.T("EB.Valeur", edid, maxWindows),
             $"{edid} Hz", RepairStatus.Suspicious,
             dalle
-                ? $"Ta dalle annonce {edid} Hz {ou}, et Windows n'en propose que {maxWindows} : regarde le pilote graphique et, "
-                  + "sur un portable à deux puces, le réglage de la puce qui affiche (mode hybride ou dédié, dans le BIOS ou "
-                  + "le logiciel du constructeur)."
-                : $"Ton écran annonce {edid} Hz {ou}, et Windows n'en propose que {maxWindows} : quelque chose bride."
-                  + (Nom(sortie) is { } n ? $" Windows voit l'écran branché en {n}." : "")
-                  + " Regarde d'abord le menu de l'écran (version DisplayPort ou HDMI, overclock) : c'est le plus fréquent, "
-                  + "et gratuit. Sinon, essaie un autre câble ou un autre port de l'écran (DisplayPort s'il en a un), puis "
-                  + "regarde si le pilote de la carte est à jour.",
+                ? Docteur.T("EB.Dalle", edid, ou, maxWindows)
+                : Docteur.T("EB.Ecran", edid, ou, maxWindows)
+                  + (Nom(sortie) is { } n ? Docteur.T("EB.Branche", n) : "")
+                  + Docteur.T("EB.Conseil"),
             RepairAction.Recommandation);
     }
 

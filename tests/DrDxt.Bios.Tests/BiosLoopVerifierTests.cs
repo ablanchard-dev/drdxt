@@ -5,18 +5,18 @@ using FluentAssertions;
 namespace DrDxt.Bios.Tests;
 
 /// <summary>
-/// The post-reboot closed loop: a setting that took → success + marker cleaned up; a
-/// setting that did not take → DidNotTake + recovery card + marker KEPT; a setting that
-/// is not OS-readable → an HONEST Unreadable (never a false success); no marker → an
-/// idempotent no-op. The verifier never writes the BIOS.
+/// La boucle fermée après redémarrage : un réglage qui a pris → succès + marqueur nettoyé ; un
+/// réglage qui n'a pas pris → DidNotTake + carte de récupération + marqueur gardé ; un réglage
+/// illisible par l'OS → Unreadable honnête (jamais un faux succès) ; pas de marqueur → rien,
+/// idempotent. Le vérificateur n'écrit jamais le BIOS.
 /// </summary>
 public class BiosLoopVerifierTests
 {
     private static readonly DateTimeOffset Now =
         new(2026, 6, 25, 10, 30, 0, TimeSpan.Zero);
 
-    // ── A store double we drive directly (no disk): the verifier only cares about
-    //    Load() and that it Clear()s on success but not on failure. ──
+    // ── Une doublure de magasin pilotée directement (sans disque) : le vérificateur ne regarde que
+    //    Load() et le fait qu'il Clear() en cas de succès, pas en cas d'échec. ──
     private sealed class FakeStore : IPendingBiosChangeStore
     {
         private PendingBiosChange? _change;
@@ -43,14 +43,14 @@ public class BiosLoopVerifierTests
         }
     }
 
-    // ── A controllable machine identity so the verifier's id matches (or, for the
-    //    foreign-marker test, deliberately does not match) the marker's "machine-abc". ──
+    // ── Une identité de machine pilotable pour que l'identifiant du vérificateur corresponde (ou,
+    //    pour le test du marqueur étranger, ne corresponde volontairement pas) au « machine-abc » du marqueur. ──
     private sealed class FakeMachineId(string current) : IBiosMachineId
     {
         public string Current { get; } = current;
     }
 
-    /// <summary>Builds a verifier whose current machine id matches the marker by default.</summary>
+    /// <summary>Construit un vérificateur dont l'identifiant de machine courant correspond au marqueur par défaut.</summary>
     private static BiosLoopVerifier Verifier(IPendingBiosChangeStore store, string machineId = "machine-abc")
         => new(store, new FakeMachineId(machineId));
 
@@ -117,7 +117,7 @@ public class BiosLoopVerifierTests
             new PendingSettingTarget(FirmwareSettingKind.XmpExpo, TriState.On)));
         var verifier = Verifier(store);
 
-        // Expected On, but the fresh re-read still says Off → it did not take.
+        // Attendu actif, mais la relecture fraîche dit toujours désactivé → ça n'a pas pris.
         var r = verifier.Verify(State(xmp: TriState.Off));
 
         r.IsOk.Should().BeTrue();
@@ -127,7 +127,7 @@ public class BiosLoopVerifierTests
         r.Value.MarkerCleared.Should().BeFalse();
         r.Value.Outcomes.Should().ContainSingle()
             .Which.Verdict.Should().Be(BiosSettingVerdict.DidNotTake);
-        // Honesty: marker KEPT so the loop runs again next attempt.
+        // Honnêteté : marqueur gardé, pour que la boucle rejoue à la prochaine tentative.
         store.ClearCalled.Should().BeFalse();
         store.MarkerPresent.Should().BeTrue();
     }
@@ -135,7 +135,7 @@ public class BiosLoopVerifierTests
     [Fact]
     public void Setting_that_is_not_readable_is_honestly_unreadable_never_false_success()
     {
-        // CSM is not in SettingsState → it can never be confirmed by the OS read.
+        // CSM n'est pas dans SettingsState → la lecture OS ne peut jamais le confirmer.
         var store = new FakeStore(Pending(
             new PendingSettingTarget(FirmwareSettingKind.Csm, TriState.Off)));
         var verifier = Verifier(store);
@@ -155,7 +155,7 @@ public class BiosLoopVerifierTests
     [Fact]
     public void A_readable_unknown_read_is_unreadable_not_a_did_not_take()
     {
-        // XMP IS mappable, but the fresh read came back Unknown → honest Unreadable.
+        // XMP se traduit bien, mais la relecture fraîche est revenue Unknown → Unreadable honnête.
         var store = new FakeStore(Pending(
             new PendingSettingTarget(FirmwareSettingKind.XmpExpo, TriState.On)));
         var verifier = Verifier(store);
@@ -208,7 +208,7 @@ public class BiosLoopVerifierTests
 
         var r = verifier.Verify(State(xmp: TriState.On));
 
-        // Everything took, but we could not clean the marker → honest failure.
+        // Tout a pris, mais le marqueur n'a pas pu être nettoyé → échec honnête.
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.BiosPendingChangeIo);
     }
@@ -228,13 +228,13 @@ public class BiosLoopVerifierTests
     [Fact]
     public void Foreign_machine_marker_is_not_honored_and_left_untouched()
     {
-        // The marker says "machine-abc"; this machine reports a different id → a marker
-        // copied from another PC must never be honored here.
+        // Le marqueur dit « machine-abc » ; cette machine annonce un autre identifiant → un marqueur
+        // copié d'une autre machine ne doit jamais être honoré ici.
         var store = new FakeStore(Pending(
             new PendingSettingTarget(FirmwareSettingKind.XmpExpo, TriState.On)));
         var verifier = Verifier(store, machineId: "some-other-machine");
 
-        // Even though XMP reads On (would "take"), the foreign marker is not evaluated.
+        // Même si XMP se lit actif (ça « prendrait »), le marqueur étranger n'est pas évalué.
         var r = verifier.Verify(State(xmp: TriState.On));
 
         r.IsOk.Should().BeTrue();
@@ -243,7 +243,7 @@ public class BiosLoopVerifierTests
         r.Value.ShowRecoveryCard.Should().BeFalse();
         r.Value.Outcomes.Should().BeEmpty();
         r.Value.MarkerCleared.Should().BeFalse();
-        // The foreign marker is left untouched (not cleared) — it is not ours to remove.
+        // Le marqueur étranger est laissé intact (pas effacé) : ce n'est pas à nous de le retirer.
         store.ClearCalled.Should().BeFalse();
         store.MarkerPresent.Should().BeTrue();
     }
@@ -253,7 +253,7 @@ public class BiosLoopVerifierTests
     {
         var store = new FakeStore(Pending(
             new PendingSettingTarget(FirmwareSettingKind.XmpExpo, TriState.On)));
-        // Same machine, different casing/whitespace → still honored (the change took).
+        // Même machine, casse ou espaces différents → toujours honoré (le changement a pris).
         var verifier = Verifier(store, machineId: "  MACHINE-ABC ");
 
         var r = verifier.Verify(State(xmp: TriState.On));
@@ -263,10 +263,10 @@ public class BiosLoopVerifierTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  M3 lot 1 — the judge works on the MEASURED delta, not on two inferences.
+    //  Le juge travaille sur le delta mesuré, pas sur deux inférences.
     // ════════════════════════════════════════════════════════════════════════════
 
-    /// <summary>A state that also carries the hard memory clock and the CSM reading.</summary>
+    /// <summary>Un état qui porte aussi l'horloge mémoire dure et la lecture du CSM.</summary>
     private static SettingsState StateWith(
         TriState xmp = TriState.Unknown,
         TriState rebar = TriState.Unknown,
@@ -278,9 +278,9 @@ public class BiosLoopVerifierTests
     [Fact]
     public void Delta_kills_the_false_success_the_TriState_compare_would_report()
     {
-        // The defect this lot exists for: on a 4000 kit the JEDEC floor (3200) is exceeded at
-        // Both 3600 and 3600, so XmpInferencer answers On before AND after. The TriState compare
-        // sees observed(On) == expected(On) and declares Took — while nothing moved.
+        // Le défaut qui justifie ce lot : sur un kit 4000 le plancher JEDEC (3200) est dépassé à
+        // 3600 comme à 3600, donc XmpInferencer répond actif avant et après. La comparaison TriState
+        // voit observé(On) == attendu(On) et déclare Took, alors que rien n'a bougé.
         var store = new FakeStore(Pending(
             new PendingSettingTarget(FirmwareSettingKind.XmpExpo, TriState.On, ObservedBefore: 3600)));
         var verifier = Verifier(store);
@@ -290,14 +290,14 @@ public class BiosLoopVerifierTests
         r.Value!.Outcomes.Single().Verdict.Should().Be(BiosSettingVerdict.DidNotTake);
         r.Value.AllTook.Should().BeFalse();
         r.Value.ShowRecoveryCard.Should().BeTrue();
-        store.MarkerPresent.Should().BeTrue();   // marker KEPT — the loop can run again
+        store.MarkerPresent.Should().BeTrue();   // marqueur gardé : la boucle peut rejouer
     }
 
     [Fact]
     public void Delta_confirms_a_real_move_even_when_the_inference_is_unreadable()
     {
-        // The mirror case: the inference failed (Unknown → the TriState path would say
-        // Unreadable and withhold success), but the machine measurably went 2133 → 3800.
+        // Le cas miroir : l'inférence a échoué (Unknown → le chemin TriState dirait Unreadable et
+        // retiendrait le succès), mais la machine est mesurablement passée de 2133 à 3800.
         var store = new FakeStore(Pending(
             new PendingSettingTarget(FirmwareSettingKind.XmpExpo, TriState.On, ObservedBefore: 2133)));
         var verifier = Verifier(store);
@@ -322,8 +322,8 @@ public class BiosLoopVerifierTests
     [Fact]
     public void An_unread_quantity_is_never_treated_as_zero_MHz()
     {
-        // mhz = 0 means "never read", not "0 MHz". No delta may be judged from it — the loop
-        // falls back to the TriState compare instead of inventing a collapse from 3600 to 0.
+        // mhz = 0 veut dire « jamais lu », pas « 0 MHz ». Aucun delta ne peut en être jugé : la boucle
+        // retombe sur la comparaison TriState au lieu d'inventer une chute de 3600 à 0.
         var store = new FakeStore(Pending(
             new PendingSettingTarget(FirmwareSettingKind.XmpExpo, TriState.On, ObservedBefore: 3600)));
 
@@ -339,7 +339,7 @@ public class BiosLoopVerifierTests
         Verifier(took).Verify(StateWith(rebar: TriState.On))
             .Value!.Outcomes.Single().Verdict.Should().Be(BiosSettingVerdict.Took);
 
-        // ReBAR off proves nothing about Above4G (it can be on with ReBAR off) → honest Unreadable.
+        // ReBAR désactivé ne prouve rien sur Above4G (il peut être actif avec ReBAR désactivé) → Unreadable honnête.
         var unknown = new FakeStore(Pending(
             new PendingSettingTarget(FirmwareSettingKind.Above4G, TriState.On)));
         Verifier(unknown).Verify(StateWith(rebar: TriState.Off))
@@ -349,11 +349,9 @@ public class BiosLoopVerifierTests
     [Fact]
     public void Csm_is_passed_through_from_SettingsState_when_a_reader_provides_it()
     {
-        // Nom corrige le 26/08. L'ancien disait « lu depuis le mode de demarrage » alors
-        // que ce test INJECTE la valeur et verifie une simple retransmission -- il ne touchait
-        // ni SettingsStateReader ni IsUefi. Il donnait l'impression de couvrir la derivation,
-        // qui etait justement le seul endroit risque du lot (et qui etait fausse).
-        // Aujourd'hui plus aucune derivation n'existe : le lecteur rend Unknown, faute d'une
+        // Ce test injecte la valeur et verifie une simple retransmission : il ne touche ni
+        // SettingsStateReader ni IsUefi, et son nom ne pretend pas couvrir une derivation.
+        // Il n'y a d'ailleurs pas de derivation : le lecteur rend Unknown, faute d'une
         // source capable de distinguer « legacy » de « pas su ».
         var store = new FakeStore(Pending(
             new PendingSettingTarget(FirmwareSettingKind.Csm, TriState.On)));
@@ -377,7 +375,7 @@ public class BiosLoopVerifierTests
             .Value!.Outcomes.Single().Verdict.Should().Be(BiosSettingVerdict.Unreadable);
     }
 
-    // 26/09/2026 : l'A/B memoire du retour exige une mesure d'avant prise au depart. Le verdict
+    // L'A/B memoire du retour exige une mesure d'avant prise au depart. Le verdict
     // porte donc l'heure du marqueur, que le changement ait pris ou non.
     [Theory]
     [InlineData(TriState.On)]

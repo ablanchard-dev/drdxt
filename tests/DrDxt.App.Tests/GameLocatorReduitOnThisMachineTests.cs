@@ -8,7 +8,7 @@ namespace DrDxt.App.Tests;
 [Collection(CollectionFenetres.Nom)]
 public sealed class GameLocatorReduitOnThisMachineTests
 {
-    // 26/09/2026 : un plein écran exclusif est réduit par Alt+Tab, et le jeu continue de tourner. La
+    // Un plein écran exclusif est réduit par Alt+Tab, et le jeu continue de tourner. La
     // fenêtre réduite reste « visible » mais ne couvre plus l'écran : LocateRunningGamePid ne la voit
     // plus, et les bancs (mémoire, processeur) seraient repartis sous la charge du jeu. On reproduit la
     // fenêtre dans un processus ENFANT (le locator s'ignore lui-même), quasi transparente, puis réduite.
@@ -23,7 +23,7 @@ public sealed class GameLocatorReduitOnThisMachineTests
         var avant = locator.JeuOuvert();
         var pidAvant = locator.LocateRunningGamePid();
 
-        using var enfant = Process.Start(new ProcessStartInfo("powershell.exe",
+        using var enfant = Process.Start(new ProcessStartInfo(SondeDeJeu.Exe,
             "-NoProfile -STA -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(Script(pleinEcran))))
         {
             UseShellExecute = false,
@@ -66,7 +66,7 @@ public sealed class GameLocatorReduitOnThisMachineTests
     [Trait("Category", "Machine")] // ouvre une fenetre dans la vraie session : rien sur un runner CI
     public void Une_fenetre_plein_ecran_affichee_est_vue_comme_affichee()
     {
-        using var enfant = Process.Start(new ProcessStartInfo("powershell.exe",
+        using var enfant = Process.Start(new ProcessStartInfo(SondeDeJeu.Exe,
             "-NoProfile -STA -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(ScriptAffichee())))
         {
             UseShellExecute = false,

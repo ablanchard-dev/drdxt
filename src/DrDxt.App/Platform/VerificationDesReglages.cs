@@ -8,17 +8,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.App.Platform;
 
 /// <summary>
-/// 14/09/2026 — LA V1 verifie que les reglages tiennent (decision produit : « sinon a quoi sert notre app »).
+/// Verifie au lancement que les reglages poses par DrDXT tiennent. Un autre optimiseur, une mise a jour
+/// Windows ou l'utilisateur peuvent defaire un reglage ; le produit promet « persistant », il doit le remarquer.
 ///
-/// Avant : `App.OnStartup` affichait la fenetre et c'est tout (constat du 21/08 dans
-/// AppliedTweakManifestMapper). Un autre optimiseur, une mise a jour Windows ou l'utilisateur pouvaient
-/// defaire un reglage : Rien ne le remarquait, alors que le produit promet « persistant ».
-///
-/// Au lancement, chaque reglage du manifeste signe est RELU par le verificateur existant
+/// Au lancement, chaque reglage du manifeste signe est relu par le verificateur existant
 /// (<see cref="AppliedStateVerifier"/>) contre ce que DrDXT a pose (<see cref="RenduALaDesinstallation.PoseesDe"/>,
-/// la meme regle que la desinstallation). Ce qui a bouge est DIT ; rien n'est reecrit (regle I5 : on
+/// la meme regle que la desinstallation). Ce qui a bouge est dit ; rien n'est reecrit (regle I5 : on
 /// notifie, on n'ecrase pas). Lecture seule, aucun service, aucune elevation.
-/// Les reglages HKCU (Game Mode, Game DVR, modele flip) ne sont pas dans le manifeste : lot 2.
+/// Les reglages HKCU (Game Mode, Game DVR, modele flip) ne sont pas dans le manifeste.
 /// </summary>
 public static class VerificationDesReglages
 {
@@ -47,7 +44,7 @@ public static class VerificationDesReglages
         }).ToList();
     }
 
-    /// <summary>Une ligne par reglage qui a BOUGE (change par autre chose, ou revenu a l'origine), ou
+    /// <summary>Une ligne par reglage qui a bouge (change par autre chose, ou revenu a l'origine), ou
     /// <c>null</c> quand tout tient. « Inconnu » et « illisible » ne sont pas des derives : on ne les
     /// presente pas comme telles.</summary>
     public static string? Dire(IReadOnlyList<AppliedStateEvidence> preuves, Func<string, string> localiser)

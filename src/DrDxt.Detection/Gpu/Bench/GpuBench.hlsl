@@ -1,19 +1,19 @@
 // -----------------------------------------------------------------------
-// R2 GPU bench — DETERMINISTIC compute workload.
+// Banc GPU : charge de calcul déterministe.
 //
-// One thread per element. Each thread runs the same integer recurrence as the CPU
-// reference GpuBenchWorkload.ComputeElement / MixRound (xorshift32 + multiply-add),
-// for a fixed number of iterations, then writes its final 32-bit state to the output
-// buffer. The CPU reads the buffer back and folds it (GpuBenchWorkload.Fold) into the
-// 64-bit checksum, which is compared against the known answer. Bit-exact, no floats,
-// no RNG -> identical on every healthy device and every run.
+// Un thread par élément. Chaque thread applique la même récurrence entière que la référence
+// CPU GpuBenchWorkload.ComputeElement / MixRound (xorshift32 + multiplication-addition),
+// pendant un nombre fixe d'itérations, puis écrit son état final sur 32 bits dans le tampon
+// de sortie. Le CPU relit le tampon et le replie (GpuBenchWorkload.Fold) en somme de contrôle
+// de 64 bits, comparée à la réponse connue. Exact au bit près, sans flottants, sans aléa ->
+// identique sur tout périphérique sain, à chaque passe.
 //
-// Iterations is passed as a constant so the same compiled shader serves any spec.
+// Iterations est passé en constante : le même shader compilé sert toute spec.
 //
-// Regenerate the embedded bytecode after editing this file:
+// Régénérer le bytecode embarqué après toute modification de ce fichier :
 //   fxc /T cs_5_0 /E CSMain /O3 /Fo GpuBench.cso GpuBench.hlsl
-// (cs_5_0 = Shader Model 5.0, available on Feature Level 11 — RTX 4060 and most
-//  2015+ GPUs). The .cso is embedded as a resource; see VorticeGpuComputeRunner.
+// (cs_5_0 = Shader Model 5.0, disponible au Feature Level 11 : RTX 4060 et la plupart des
+//  GPU depuis 2015). Le .cso est embarqué comme ressource ; voir VorticeGpuComputeRunner.
 // -----------------------------------------------------------------------
 
 RWStructuredBuffer<uint> Output : register(u0);

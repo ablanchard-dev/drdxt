@@ -6,12 +6,12 @@ using DrDxt.Core;
 namespace DrDxt.App.Platform;
 
 // -----------------------------------------------------------------------
-// Win32ServiceStateReader — the real IServiceStateReader (read-only).
+// Win32ServiceStateReader : le vrai IServiceStateReader (lecture seule).
 //
-// Reads a service's state via System.ServiceProcess.ServiceController. A service
-// that is not installed → Ok(ServiceState.NotInstalled). A genuine query error →
-// Fail(TWEAK.SDK_UNAVAILABLE). Never throws. Start/stop are privileged and go
-// through the helper (RunServiceControlOp).
+// Lit l'état d'un service via System.ServiceProcess.ServiceController. Un service non
+// installé → Ok(ServiceState.NotInstalled). Une vraie erreur de requête →
+// Fail(TWEAK.SDK_UNAVAILABLE). Ne lève jamais. Démarrer et arrêter sont privilégiés et
+// passent par le helper (RunServiceControlOp).
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class Win32ServiceStateReader : IServiceStateReader

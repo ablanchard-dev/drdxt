@@ -3,21 +3,21 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Settings;
 
 /// <summary>
-/// NS-4 (RAM reliability; Microsoft, https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file). Classifies the Windows page file from the raw
-/// REG_MULTI_SZ HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PagingFiles:
-///   • empty / all-blank  → Off   (page file DISABLED — a real reliability hazard: at the
-///                                  commit limit Windows hits "out of memory" → freeze/crash),
-///   • any real entry      → On    (a page file IS configured — system-managed "C:\pagefile.sys
-///                                  0 0" OR a custom size; a present page file is a valid,
-///                                  possibly deliberate choice we never second-guess),
-///   • null (unreadable)   → Unknown (never claim Off when we cannot read — §16 honesty).
-/// This is DETECTION only: it feeds an honest reliability finding, not a "+FPS" claim, and never
-/// writes (restoring "system-managed" is a WMI operation, out of the current typed-op model).
-/// Verified PagingFiles encoding (so "empty = disabled" is not a false positive): a
-/// system-managed / "automatically managed" page file stores an ENTRY without sizes (e.g.
-/// "?:\pagefile.sys" or "C:\pagefile.sys 0 0") — non-empty; a custom one is "…sys min max";
-/// only DISABLING the page file leaves the value EMPTY. So any non-blank entry ⇒ present (On).
-/// Source: https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file
+/// Fiabilité de la RAM (Microsoft, https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file). Classe le fichier d'échange de Windows à partir du
+/// REG_MULTI_SZ brut HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PagingFiles :
+///   • vide / que des blancs → Off   (fichier d'échange désactivé : un vrai risque de fiabilité ; à
+///                                    la limite de validation, Windows manque de mémoire → gel / plantage),
+///   • une vraie entrée      → On    (un fichier d'échange est configuré : géré par le système
+///                                    « C:\pagefile.sys 0 0 » ou taille personnalisée ; un fichier présent est
+///                                    un choix valide, peut-être voulu, qu'on ne remet jamais en cause),
+///   • null (illisible)      → Unknown (jamais Off quand on ne peut pas lire).
+/// Détection seule : nourrit un constat honnête de fiabilité, pas une promesse de « +FPS », et
+/// n'écrit jamais (remettre « géré par le système » est une op WMI, hors du modèle d'ops typées).
+/// Encodage de PagingFiles vérifié (« vide = désactivé » n'est donc pas un faux positif) : un
+/// fichier « géré par le système » / « géré automatiquement » stocke une entrée sans tailles (par
+/// exemple « ?:\pagefile.sys » ou « C:\pagefile.sys 0 0 »), non vide ; un fichier personnalisé est
+/// « …sys min max » ; seule la désactivation laisse la valeur vide. Toute entrée non vide ⇒ présent (On).
+/// Source : https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file
 /// </summary>
 public static class PagefileInferencer
 {

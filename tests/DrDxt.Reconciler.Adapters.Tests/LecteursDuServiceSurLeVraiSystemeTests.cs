@@ -6,7 +6,7 @@ using FluentAssertions;
 
 namespace DrDxt.Reconciler.Adapters.Tests;
 
-// 27/09/2026 : le service de demarrage (case de l'installeur) decide ce qu'il reapplique en lisant le
+// Le service de demarrage (case de l'installeur) decide ce qu'il reapplique en lisant le
 // registre, le plan d'alimentation et l'etat des services. Ces trois lecteurs n'etaient exerces que sur
 // des doublures. Chacun est confronte ici a l'outil de Windows qui lit la meme chose (reg, powercfg, sc).
 // Lecture seule ; ces outils existent sur tout Windows, runner de CI compris.

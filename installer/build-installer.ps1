@@ -64,10 +64,10 @@ $outDir     = Join-Path $scriptDir 'Output'
 $pmDir      = Join-Path $repoRoot 'third_party\presentmon'
 $iss        = Join-Path $scriptDir 'DrDXT.iss'
 
-# Revue du 12/09 (C4) : l'installeur disait 0.9.0 et l'App 1.0.0.0. Une seule source, et le numero
+# Une seule source de version, sinon l'installeur et l'App diraient deux numeros differents. Le numero
 # choisi part au publish ET a l'installeur, jamais a un seul des deux.
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    # 06/10/2026 : plusieurs PropertyGroup dans le fichier ; « .PropertyGroup.Version » rendait un tableau aplati en
+    # Plusieurs PropertyGroup dans le fichier ; « .PropertyGroup.Version » rendait un tableau aplati en
     # « 0.9.0  » (espaces des groupes sans Version), et la ProductVersion livrée portait deux espaces.
     $Version = @(([xml](Get-Content -Raw (Join-Path $repoRoot 'Directory.Build.props'))).Project.PropertyGroup |
         ForEach-Object { $_.Version } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) | Select-Object -First 1
@@ -131,7 +131,7 @@ dotnet publish "$appProj" -c $Configuration -r win-x64 --self-contained -o "$pub
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed (exit $LASTEXITCODE)" }
 
 # --- 2. Verifier la charge utile ----------------------------------------------
-# 10/10/2026 (revue de sécurité) : le lanceur natif (NativeAOT, un seul fichier) reçoit l'élévation et redémarre le
+# Le lanceur natif (NativeAOT, un seul fichier) reçoit l'élévation et redémarre le
 # helper ou l'App avec un environnement reconstruit. Il faut les outils C++ de Visual Studio (link.exe).
 # NativeAOT cherche vswhere.exe sur le PATH (cible Microsoft.NETCore.Native) : le dossier de l'installeur Visual Studio y passe.
 $vsInstaller = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
@@ -153,13 +153,13 @@ foreach ($f in @('DrDxt.App.exe', 'DrDxt.ElevatedHelper.exe', 'DrDxt.Lanceur.exe
 Copy-Item (Join-Path $pmDir 'PresentMonService.exe') -Destination $publishDir -Force
 Copy-Item (Join-Path $pmDir 'NOTICE-MIT.txt') -Destination (Join-Path $publishDir 'PresentMon-NOTICE-MIT.txt') -Force
 Write-Host "  [OK] PresentMonService.exe + NOTICE"
-# 07/10/2026 (D11) : QRCoder (MIT), le QR du guide BIOS ; sa notice voyage avec la DLL.
+# QRCoder (MIT), le QR du guide BIOS ; sa notice voyage avec la DLL.
 Copy-Item (Join-Path $repoRoot 'third_party\qrcoder\LICENSE-MIT.txt') -Destination (Join-Path $publishDir 'QRCoder-LICENSE-MIT.txt') -Force
-# 08/10/2026 (PUB1) : l'avis de tous les composants tiers voyage avec l'application.
+# L'avis de tous les composants tiers voyage avec l'application.
 Copy-Item (Join-Path $repoRoot 'THIRD-PARTY-NOTICES.txt') -Destination $publishDir -Force
 
 # --- 3b. Le service de demarrage (case decochee de l'installeur) ------------------
-# 27/09/2026 : publie a part, dans publish\service : c'est un autre programme (hote generique en service
+# Publie a part, dans publish\service : c'est un autre programme (hote generique en service
 # Windows), avec ses propres dependances ; les melanger a celles de l'App risquerait qu'une version
 # ecrase l'autre. L'installeur ne l'enregistre que si la case est cochee.
 $hostProj   = Join-Path $repoRoot 'src\DrDxt.ReconcilerHost\DrDxt.ReconcilerHost.csproj'

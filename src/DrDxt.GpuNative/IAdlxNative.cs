@@ -1,19 +1,19 @@
 namespace DrDxt.Detection.Gpu.Adlx;
 
 // -----------------------------------------------------------------------
-// IAdlxNative — the thin managed boundary over the ADLX native surface.
+// IAdlxNative : la frontière managée mince sur la surface native d'ADLX.
 //
-// This is the only gateway to amdadlx64.dll from managed code. All vtable
-// navigation, DllImport, and native lifetime live in AdlxNative.
-// Unit tests replace this with FakeAdlxNative — no native calls in tests.
+// C'est le seul accès à amdadlx64.dll depuis le code managé. Tout le parcours de vtable, les
+// DllImport et la durée de vie native vivent dans AdlxNative. Les tests unitaires la remplacent
+// par FakeAdlxNative : aucun appel natif en test.
 //
-// Fail-clean contract:
-//   • IsAvailable == false  ⇒ DLL absent or init failed; every Try* returns false.
-//   • Every Try* method never throws; returns false on any fault.
-//   • out params are default-initialised on false return.
+// Contrat d'échec propre :
+//   • IsAvailable == false  ⇒ DLL absente ou init ratée ; chaque Try* rend false.
+//   • Aucune méthode Try* ne lève ; elle rend false sur toute panne.
+//   • Les paramètres out sont à leur valeur par défaut quand le retour est false.
 // -----------------------------------------------------------------------
 
-/// <summary>Mirrors ADLX_IntRange { minValue, maxValue, step }.</summary>
+/// <summary>Reflet d'ADLX_IntRange { minValue, maxValue, step }.</summary>
 public readonly struct AdlxIntRange
 {
     public int Min  { get; init; }
@@ -21,9 +21,8 @@ public readonly struct AdlxIntRange
     public int Step { get; init; }
 }
 
-/// <summary>Graphics-tuning reads from IADLXManualGraphicsTuning2:
-/// voltage offset (mV), max-frequency offset (MHz), min-frequency (MHz)
-/// and their supported ranges.</summary>
+/// <summary>Lectures de réglage graphique depuis IADLXManualGraphicsTuning2 : décalage de tension
+/// (mV), décalage de fréquence max (MHz), fréquence min (MHz) et leurs plages prises en charge.</summary>
 public readonly struct AdlxGfxReads
 {
     public int          VoltMv       { get; init; }
@@ -34,23 +33,23 @@ public readonly struct AdlxGfxReads
     public AdlxIntRange MinFreqRange { get; init; }
 }
 
-/// <summary>Power-limit reads from IADLXManualPowerTuning:
-/// current power-limit (%) and its supported range.</summary>
+/// <summary>Lectures de limite de puissance depuis IADLXManualPowerTuning : limite actuelle (%) et
+/// sa plage prise en charge.</summary>
 public readonly struct AdlxPowerReads
 {
     public int          PowerLimitPct { get; init; }
     public AdlxIntRange PowerRange    { get; init; }
 }
 
-/// <summary>One point on a GPU fan curve.</summary>
+/// <summary>Un point d'une courbe de ventilateur GPU.</summary>
 public readonly struct AdlxFanPoint
 {
     public int TempC    { get; init; }
     public int SpeedPct { get; init; }
 }
 
-/// <summary>Fan-tuning reads from IADLXManualFanTuning:
-/// current fan-curve states and the supported temperature/speed ranges.</summary>
+/// <summary>Lectures de réglage du ventilateur depuis IADLXManualFanTuning : états actuels de la
+/// courbe et plages de température / vitesse prises en charge.</summary>
 public readonly struct AdlxFanReads
 {
     public IReadOnlyList<AdlxFanPoint>? Points     { get; init; }
@@ -58,14 +57,14 @@ public readonly struct AdlxFanReads
     public AdlxIntRange                 SpeedRange { get; init; }
 }
 
-/// <summary>One step of the ADLX GFX read-path diagnostic walk (see
-/// <see cref="IAdlxNative.ProbeGfxPath"/>). <paramref name="Name"/> is the stage,
-/// <paramref name="Ok"/> whether it succeeded, <paramref name="Detail"/> a short
-/// human reason. Used so a skipped GPU gate on real AMD hardware reports exactly
-/// where ADLX stopped instead of a vague "not available".</summary>
+/// <summary>Une étape du parcours de diagnostic du chemin de lecture GFX d'ADLX (voir
+/// <see cref="IAdlxNative.ProbeGfxPath"/>). <paramref name="Name"/> est l'étape,
+/// <paramref name="Ok"/> sa réussite, <paramref name="Detail"/> une courte raison lisible. Sert à
+/// ce qu'une barrière GPU sautée sur du vrai matériel AMD dise exactement où ADLX s'est arrêté, au
+/// lieu d'un vague « non disponible ».</summary>
 public sealed record GpuProbeStep(string Name, bool Ok, string? Detail = null);
 
-/// <summary>A1 (06/10/2026) : les réglages AMD lus par ADLX sur la carte dédiée. Chaque champ à null = non lu
+/// <summary>Les réglages AMD lus par ADLX sur la carte dédiée. Chaque champ à null = non lu
 /// (DLL absente, carte sans la fonction, entrée qui rend une erreur ADLX) ; jamais une valeur par défaut.
 /// <paramref name="Raison"/> dit pourquoi rien n'a été lu quand c'est le cas.</summary>
 public sealed record AdlxReglagesLus(
@@ -78,15 +77,15 @@ public sealed record AdlxReglagesLus(
     int? ChillMinFps = null,
     int? ChillMaxFps = null,
     double? TemperatureC = null,
-    // A2b (07/10/2026) : la cible FRTC réglée, lue même quand FRTC est éteint (la rendre exacte après un essai).
+    // La cible FRTC réglée, lue même quand FRTC est éteint (la rendre exacte après un essai).
     int? FrtcFpsReglee = null,
-    // A2c (08/10/2026) : le mode Vsync du pilote (0 à 3) et Enhanced Sync, qu'allumer la Vsync éteint.
+    // Le mode Vsync du pilote (0 à 3) et Enhanced Sync, qu'allumer la Vsync éteint.
     int? VsyncMode = null,
     bool? EnhancedSyncActif = null)
 {
     public static AdlxReglagesLus RienLu(string raison) => new(Raison: raison);
 
-    /// <summary>A2b : l'état FRTC en un entier, celui de <c>AdlxTuningKind.FrameRateTarget</c> : allumé = sa cible
+    /// <summary>L'état FRTC en un entier, celui de <c>AdlxTuningKind.FrameRateTarget</c> : allumé = sa cible
     /// (positive), éteint = moins la cible réglée, null si l'un des deux n'est pas lu.</summary>
     public int? FrtcCode => FrtcActif switch
     {
@@ -112,82 +111,81 @@ public sealed record AdlxReglagesLus(
     }
 }
 
-/// <summary>A-FS1 (08/10/2026) : un écran vu par le pilote AMD, son nom (celui de l'EDID) et l'état de FreeSync.
+/// <summary>Un écran vu par le pilote AMD, son nom (celui de l'EDID) et l'état de FreeSync.
 /// null = non lu.</summary>
 public sealed record AdlxEcranFreeSync(string Nom, bool? Supporte, bool? Actif);
 
-/// <summary>Thin boundary over native ADLX. Never throws — returns false on any
-/// failure (absent DLL, bad vtable, unsupported interface, etc.).</summary>
+/// <summary>Frontière mince sur ADLX natif. Ne lève jamais : rend false sur tout échec (DLL
+/// absente, mauvaise vtable, interface non prise en charge, etc.).</summary>
 public interface IAdlxNative
 {
-    /// <summary>True when ADLXInitialize succeeded (AMD GPU + Adrenalin driver present).</summary>
+    /// <summary>Vrai quand ADLXInitialize a réussi (GPU AMD + pilote Adrenalin présents).</summary>
     bool IsAvailable { get; }
 
-    /// <summary>Reads GPU graphics tuning via IADLXManualGraphicsTuning2 (RDNA) or
-    /// IADLXManualGraphicsTuning1 (Vega/older) for the given GPU index.
-    /// Returns false if the index is out of range or the interface is not supported.</summary>
+    /// <summary>Lit le réglage graphique du GPU via IADLXManualGraphicsTuning2 (RDNA) ou
+    /// IADLXManualGraphicsTuning1 (Vega / plus ancien) pour l'index de GPU donné.
+    /// Rend false si l'index est hors plage ou l'interface non prise en charge.</summary>
     bool TryReadGfx(int gpuIndex, out AdlxGfxReads reads);
 
-    /// <summary>Reads power-limit tuning via IADLXManualPowerTuning.
-    /// Returns false if the index is out of range or not supported.</summary>
+    /// <summary>Lit le réglage de limite de puissance via IADLXManualPowerTuning.
+    /// Rend false si l'index est hors plage ou non pris en charge.</summary>
     bool TryReadPower(int gpuIndex, out AdlxPowerReads reads);
 
-    /// <summary>Reads fan-curve tuning via IADLXManualFanTuning.
-    /// Returns false if the index is out of range or not supported.</summary>
+    /// <summary>Lit le réglage de courbe du ventilateur via IADLXManualFanTuning.
+    /// Rend false si l'index est hors plage ou non pris en charge.</summary>
     bool TryReadFan(int gpuIndex, out AdlxFanReads reads);
 
-    // ── write methods (harness-only, never called during dotnet test) ─────────
+    // ── méthodes d'écriture (harnais seulement, jamais appelées pendant dotnet test) ─────────
 
     /// <summary>
-    /// Get-then-set: reads the current GFX state first (capturing it in
-    /// <paramref name="original"/> for revert), validates the proposed values against
-    /// the hardware's own GetGPUMaxFrequencyRange / GetGPUVoltageRange, then writes:
-    ///   SetGPUMaxFrequency  IADLXManualGraphicsTuning2 vtable slot 8  (verified vs ADLX SDK headers)
-    ///   SetGPUVoltage       IADLXManualGraphicsTuning2 vtable slot 11 (verified vs ADLX SDK headers)
-    /// If SetGPUVoltage fails after SetGPUMaxFrequency already succeeded, best-effort
-    /// rolls back MaxFreq to the original before returning false.
-    /// Returns false if unavailable, unsupported (non-RDNA), range-violation, or any fault.
-    /// Never throws.
+    /// GET puis SET : lit d'abord l'état GFX actuel (capturé dans <paramref name="original"/> pour le
+    /// retour), valide les valeurs proposées contre les GetGPUMaxFrequencyRange / GetGPUVoltageRange
+    /// du matériel, puis écrit :
+    ///   SetGPUMaxFrequency  emplacement de vtable 8 d'IADLXManualGraphicsTuning2  (vérifié contre les en-têtes du SDK ADLX)
+    ///   SetGPUVoltage       emplacement de vtable 11 d'IADLXManualGraphicsTuning2 (vérifié contre les en-têtes du SDK ADLX)
+    /// Si SetGPUVoltage échoue après un SetGPUMaxFrequency réussi, MaxFreq est remise au mieux à
+    /// l'original avant de rendre false.
+    /// Rend false si indisponible, non pris en charge (hors RDNA), hors plage, ou sur toute panne.
+    /// Ne lève jamais.
     /// </summary>
     bool TrySetGfx(int gpuIndex, int newMaxFreqMhz, int newVoltMv, out AdlxGfxReads original);
 
     /// <summary>
-    /// Get-then-set: reads the current power limit first (capturing it in
-    /// <paramref name="original"/>), validates the proposed value against
-    /// the hardware's GetPowerLimitRange, then writes:
-    ///   SetPowerLimit  IADLXManualPowerTuning vtable slot 5 (verified vs ADLX SDK headers)
-    /// Returns false if unavailable, unsupported, range-violation, or any fault.
-    /// Never throws.
+    /// GET puis SET : lit d'abord la limite de puissance actuelle (capturée dans
+    /// <paramref name="original"/>), valide la valeur proposée contre le GetPowerLimitRange du
+    /// matériel, puis écrit :
+    ///   SetPowerLimit  emplacement de vtable 5 d'IADLXManualPowerTuning (vérifié contre les en-têtes du SDK ADLX)
+    /// Rend false si indisponible, non pris en charge, hors plage, ou sur toute panne.
+    /// Ne lève jamais.
     /// </summary>
     bool TrySetPowerLimit(int gpuIndex, int newPowerLimitPct, out AdlxPowerReads original);
 
-    // ── DIAGNOSTICS (read-only; never writes, never throws) ──────────────────
+    // ── Diagnostics (lecture seule ; n'écrit jamais, ne lève jamais) ──────────────────
 
-    /// <summary>Walks the GFX read path step by step — DLL/init → GetGPUs → list
-    /// size/index → GetGPU → GetGPUTuningServices → IsSupportedManualGFXTuning →
-    /// GetManualGFXTuning → QueryInterface(Tuning2) → ReadGfxV2 — recording each
-    /// stage's outcome. Stops at the first failure with an honest reason. Lets a
-    /// skipped GPU gate report exactly where ADLX stopped on a given machine.
-    /// Read-only; performs no write; never throws.</summary>
+    /// <summary>Parcourt pas à pas le chemin de lecture GFX (DLL / init → GetGPUs → taille / index de
+    /// la liste → GetGPU → GetGPUTuningServices → IsSupportedManualGFXTuning → GetManualGFXTuning →
+    /// QueryInterface(Tuning2) → ReadGfxV2) en notant l'issue de chaque étape. S'arrête au premier
+    /// échec avec une raison honnête. Permet à une barrière GPU sautée de dire exactement où ADLX
+    /// s'est arrêté sur une machine donnée. Lecture seule ; aucune écriture ; ne lève jamais.</summary>
     IReadOnlyList<GpuProbeStep> ProbeGfxPath(int gpuIndex);
 
-    /// <summary>A1 : SAM, Anti-Lag, FRTC, Chill et température de la carte dédiée. Lecture seule ; ne lève
+    /// <summary>SAM, Anti-Lag, FRTC, Chill et température de la carte dédiée. Lecture seule ; ne lève
     /// jamais. Par défaut (doublures qui ne la portent pas) : rien lu.</summary>
-    AdlxReglagesLus LireReglages() => AdlxReglagesLus.RienLu("Cette couture ne lit pas les réglages ADLX.");
+    AdlxReglagesLus LireReglages() => AdlxReglagesLus.RienLu("This seam does not read ADLX settings.");
 
-    /// <summary>A2 (07/10/2026) : allume ou éteint Anti-Lag (le classique ; le niveau Anti-Lag Next n'est jamais
+    /// <summary>Allume ou éteint Anti-Lag (le classique ; le niveau Anti-Lag Next n'est jamais
     /// touché) sur la carte dédiée, celle que <see cref="LireReglages"/> lit. Rend <c>null</c> si écrit, sinon la
     /// raison ; ne lève jamais. Par défaut (doublures qui ne la portent pas) : refusé.</summary>
-    string? EcrireAntiLag(bool actif) => "Cette couture n'écrit pas Anti-Lag.";
+    string? EcrireAntiLag(bool actif) => "This seam does not write Anti-Lag.";
 
-    /// <summary>A2b (07/10/2026) : pose FRTC sur la carte dédiée. <paramref name="code"/> &gt; 0 = allumé à cette cible ;
+    /// <summary>Pose FRTC sur la carte dédiée. <paramref name="code"/> &gt; 0 = allumé à cette cible ;
     /// &lt; 0 = éteint, cible rendue à <c>-code</c> ; 0 refusé. La cible doit tenir dans GetFPSRange. Rend <c>null</c>
     /// si écrit, sinon la raison ; ne lève jamais.</summary>
-    string? EcrireFrtc(int code) => "Cette couture n'écrit pas FRTC.";
+    string? EcrireFrtc(int code) => "This seam does not write FRTC.";
 
-    /// <summary>A2c (08/10/2026) : pose le mode Vsync du pilote (0 à 3, ADLX_WAIT_FOR_VERTICAL_REFRESH_MODE) sur la
+    /// <summary>Pose le mode Vsync du pilote (0 à 3, ADLX_WAIT_FOR_VERTICAL_REFRESH_MODE) sur la
     /// carte dédiée. Rend <c>null</c> si écrit, sinon la raison ; ne lève jamais.</summary>
-    string? EcrireVsync(int mode) => "Cette couture n'écrit pas la Vsync.";
+    string? EcrireVsync(int mode) => "This seam does not write Vsync.";
 
     /// <summary>A-FS1 : FreeSync de chaque écran branché sur la carte AMD, lu au pilote. Vide = rien lu.</summary>
     IReadOnlyList<AdlxEcranFreeSync> LireFreeSync() => Array.Empty<AdlxEcranFreeSync>();

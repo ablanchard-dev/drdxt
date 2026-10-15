@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// Revue adverse du docteur (09/10/2026, R7) : trois familles se taisaient quand leur lecture échouait. Sans droits
+/// Trois familles se taisaient quand leur lecture échouait. Sans droits
 /// administrateur, bcdedit refuse, et l'écran de récupération coupé disparaissait ; une lecture WMI ratée faisait disparaître
 /// l'intégrité de la mémoire ; « après un changement » se taisait si un journal était illisible. Une famille muette est
 /// indistinguable d'une famille saine : chacune dit maintenant « non lu ».

@@ -4,9 +4,9 @@ using DrDxt.GpuNative.Nvml;
 namespace DrDxt.Detection.Gpu;
 
 /// <summary>
-/// Reads NVIDIA Resizable BAR state via NVML BAR1 size (the source nvidia-smi uses).
-/// Returns Unknown when NVML is absent, there is no NVIDIA GPU, or the read fails — never
-/// claims Off blindly (§16 honest labelling).
+/// Lit l'état du Resizable BAR NVIDIA par la taille BAR1 de NVML (la source de nvidia-smi).
+/// Rend Unknown si NVML manque, s'il n'y a pas de GPU NVIDIA ou si la lecture échoue : jamais
+/// Off à l'aveugle (étiquette honnête).
 /// </summary>
 public sealed class NvmlReBarProvider : INvReBarProvider
 {

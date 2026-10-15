@@ -5,21 +5,21 @@ using DrDxt.Reconciler.Manifest;
 namespace DrDxt.ReconcilerHost;
 
 // -----------------------------------------------------------------------
-// HostPublicKeyProvider — loads the verify-only PUBLIC key for the manifest.
+// HostPublicKeyProvider : charge la clé publique du manifeste, en vérification seule.
 //
-// The reconciler host VERIFIES manifests and never signs them: it is given the 32-byte raw
-// Ed25519 PUBLIC key only. The private key does live on this machine (11/09/2026), but only
-// the elevated helper reads it — never this service (see SignedDesiredStateStore, key custody).
-// This reads the public key from a file under the admin-write manifest root.
+// L'hôte réconciliateur vérifie les manifestes et ne les signe jamais : il ne reçoit que la clé
+// publique Ed25519 brute de 32 octets. La clé privée vit bien sur cette machine, mais seul le
+// helper élevé la lit, jamais ce service (voir SignedDesiredStateStore, garde de la clé). Ceci lit
+// la clé publique dans un fichier sous la racine du manifeste en écriture admin.
 //
-// FAIL-CLOSED: an absent or malformed key returns Fail. The host then has NO verifier,
-// so it cannot verify any manifest and (correctly) does not reconcile — it never falls
-// back to an unverified read. A missing/empty PRIVATE key is the norm and never wired
-// here (this provider only ever produces a verifier).
+// Fail-closed : une clé absente ou malformée rend Fail. L'hôte n'a alors aucun vérificateur : il
+// ne peut vérifier aucun manifeste et (à raison) ne réconcilie pas ; il ne se rabat jamais sur une
+// lecture non vérifiée. Une clé privée absente / vide est la norme et n'est jamais branchée ici
+// (ce fournisseur ne produit jamais qu'un vérificateur).
 //
-// 11/09/2026 — the key is the MACHINE's own: the elevated helper derives it from the
-// machine's signing key (MachineManifestKey) and writes it next to the manifest at the first
-// CommitManifestOp. This loader is the consumption side; it does not embed a key.
+// La clé est celle de la machine : le helper élevé la dérive de la clé de signature de la machine
+// (MachineManifestKey) et l'écrit à côté du manifeste au premier CommitManifestOp. Ce chargeur
+// est le côté consommation ; il n'embarque aucune clé.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class HostPublicKeyProvider
@@ -27,19 +27,19 @@ public static class HostPublicKeyProvider
     private const string FileName = "manifest-public.key";
     private const int Ed25519PublicKeyLength = 32;
 
-    /// <summary>The default public-key path under the admin-write manifest root
-    /// (sibling of the manifest + sidecar).</summary>
+    /// <summary>Le chemin par défaut de la clé publique sous la racine du manifeste en écriture admin
+    /// (voisin du manifeste + du sidecar).</summary>
     public static string DefaultPath()
         => Path.Combine(ProgramDataManifestStorage.DefaultRoot(), FileName);
 
-    /// <summary>Loads the 32-byte raw Ed25519 public key. Absent / wrong length /
-    /// not-admin-trusted-at-rest → Fail (fail-closed: no key ⇒ no verifier ⇒ the host
-    /// refuses to reconcile).</summary>
-    /// <param name="enforceTrust">When true (production), the file is trusted only if its
-    /// owner is Administrators/SYSTEM and the root is not non-admin-writable
-    /// (<see cref="TrustedManifestRoot.EnsureTrustedFile"/>) — a forged key dropped into a
-    /// user-owned root is rejected (BLOCKER #1a). Tests pass false to round-trip a temp
-    /// file whose owner is the (non-admin) test user.</param>
+    /// <summary>Charge la clé publique Ed25519 brute de 32 octets. Absente / mauvaise longueur / non
+    /// fiable au repos côté admin → Fail (fail-closed : pas de clé ⇒ pas de vérificateur ⇒ l'hôte
+    /// refuse de réconcilier).</summary>
+    /// <param name="enforceTrust">Si true (production), le fichier n'est tenu pour fiable que si son
+    /// propriétaire est Administrateurs/SYSTEM et que la racine n'est pas inscriptible par un non-admin
+    /// (<see cref="TrustedManifestRoot.EnsureTrustedFile"/>) : une clé falsifiée déposée dans une
+    /// racine possédée par l'utilisateur est rejetée (BLOCKER #1a). Les tests passent false pour faire
+    /// l'aller-retour d'un fichier temporaire possédé par l'utilisateur de test (non admin).</param>
     public static Result<byte[]> Load(string path, bool enforceTrust = true)
     {
         try
@@ -48,8 +48,8 @@ public static class HostPublicKeyProvider
                 return Result<byte[]>.Fail(ErrorCodes.SignatureInvalid,
                     $"Manifest public key not provisioned at '{path}'.");
 
-            // At-rest integrity: a PRESENT-but-untrusted key file (user-owned / in a
-            // user-writable root) is an attack, not a missing key — fail closed hard.
+            // Intégrité au repos : un fichier de clé présent mais non fiable (possédé par l'utilisateur / dans
+            // une racine inscriptible par l'utilisateur) est une attaque, pas une clé absente : refus ferme.
             if (enforceTrust)
             {
                 var trust = TrustedManifestRoot.EnsureTrustedFile(path);
@@ -63,7 +63,7 @@ public static class HostPublicKeyProvider
                 return Result<byte[]>.Fail(ErrorCodes.SignatureInvalid,
                     $"Manifest public key has wrong length ({key.Length}, expected {Ed25519PublicKeyLength}).");
 
-            // 11/09/2026 — un fichier de cle qui contient la cle de DEV est refuse, dans toutes les
+            // Un fichier de cle qui contient la cle de dev est refuse, dans toutes les
             // configurations : sa graine privee vit dans les tests du depot.
             if (ManifestDevKeys.EstLaCleDeDev(key))
                 return Result<byte[]>.Fail(ErrorCodes.SignatureInvalid,
@@ -78,9 +78,9 @@ public static class HostPublicKeyProvider
         }
     }
 
-    /// <summary>Builds a verify-only <see cref="IManifestVerifier"/> from the provisioned
-    /// public key, or Fail if no valid (and admin-trusted-at-rest) key is present. Never
-    /// produces a signer.</summary>
+    /// <summary>Construit un <see cref="IManifestVerifier"/> en vérification seule à partir de la clé
+    /// publique fournie, ou Fail si aucune clé valide (et fiable au repos côté admin) n'est présente.
+    /// Ne produit jamais de signataire.</summary>
     public static Result<IManifestVerifier> LoadVerifier(string path, bool enforceTrust = true)
     {
         var key = Load(path, enforceTrust);

@@ -2,23 +2,23 @@ using System.Globalization;
 
 namespace DrDxt.Core;
 
-// --- Localization ---
+// --- Traduction ---
 
 /// <summary>
-/// Resolves a resource key to a localized string for a given culture.
+/// Traduit une clé de ressource en chaîne pour une culture donnée.
 /// </summary>
 /// <remarks>
-/// Implementations must be thread-safe (singleton lifetime in DI).
-/// On a missing key the key itself is returned — never null, never an exception.
-/// This contract lives in Core so domain types can reference keys without
-/// taking an infrastructure dependency.
+/// Les implémentations doivent être thread-safe (durée de vie singleton dans la DI).
+/// Sur une clé manquante, la clé elle-même est rendue : jamais null, jamais d'exception.
+/// Ce contrat vit dans Core pour que les types du domaine citent des clés sans
+/// dépendre de l'infrastructure.
 /// </remarks>
 public interface ILocalizer
 {
     /// <summary>
-    /// Returns the localized string for <paramref name="key"/> in
+    /// Rend la chaîne traduite de <paramref name="key"/> dans
     /// <paramref name="culture"/> (null = <see cref="CultureInfo.CurrentUICulture"/>).
-    /// On a missing key, returns the key itself.
+    /// Sur une clé manquante, rend la clé elle-même.
     /// </summary>
     string Get(string key, CultureInfo? culture = null);
 }

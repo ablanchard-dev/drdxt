@@ -4,12 +4,12 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// "The panel is running below what it can do" — the first lever whose magnitude is
-// arithmetic instead of a calibrated estimate.
+// « L'écran tourne sous ce qu'il sait faire » : le premier levier dont l'ampleur est
+// une arithmétique et non une estimation calibrée.
 //
-// The case that produced it, on the author's own machine: a panel capable of 200 Hz driven
-// at 144. The NVIDIA low-latency rule caps 3 under the refresh, so the only visible trace
-// was a frame cap at 141. Fixing the cap would have fixed nothing.
+// Le cas qui l'a produit, sur la machine de référence : un écran capable de 200 Hz piloté
+// à 144. La règle de latence basse NVIDIA plafonne 3 sous le rafraîchissement, donc la seule
+// trace visible était un plafond d'images à 141. Corriger le plafond n'aurait rien corrigé.
 // -----------------------------------------------------------------------
 public sealed class DisplayCapabilityTests
 {
@@ -37,8 +37,8 @@ public sealed class DisplayCapabilityTests
     [Fact]
     public void An_unread_maximum_never_becomes_a_deficit()
     {
-        // 0 = "we did not read it". Treating that as a maximum of zero, or as equal to the
-        // current rate, would either invent a deficit or hide one. It must do neither.
+        // 0 = « non lu ». Le traiter comme un maximum de zéro, ou comme égal à la cadence
+        // courante, inventerait un déficit ou en cacherait un. Il ne doit faire ni l'un ni l'autre.
         var d = Display(current: 144, max: 0);
 
         d.IsBelowCapability.Should().BeFalse();
@@ -54,8 +54,8 @@ public sealed class DisplayCapabilityTests
     [Fact]
     public void A_maximum_below_the_current_rate_is_not_reported_as_headroom()
     {
-        // Should not happen, but a negative headroom announced as a gain would be worse than
-        // silence: the arithmetic must never produce a number the user can act on wrongly.
+        // Ne devrait pas arriver, mais une marge négative annoncée comme gain serait pire que le
+        // silence : l'arithmétique ne doit jamais produire un nombre sur lequel le joueur agirait à tort.
         var d = Display(current: 200, max: 144);
 
         d.IsBelowCapability.Should().BeFalse();
@@ -65,8 +65,8 @@ public sealed class DisplayCapabilityTests
     [Fact]
     public void The_default_construction_stays_source_compatible_and_reads_nothing()
     {
-        // Existing three-argument constructions must keep compiling AND must not start
-        // claiming a maximum they never read.
+        // Les constructions à trois arguments existantes doivent continuer de compiler et ne pas
+        // se mettre à annoncer un maximum qu'elles n'ont jamais lu.
         var legacy = new DisplayInfo(IsPrimaryGameDisplay: true, SupportsVrr: true, RefreshHz: 144);
 
         legacy.MaxRefreshHz.Should().Be(0);
@@ -76,8 +76,8 @@ public sealed class DisplayCapabilityTests
     [Fact]
     public void The_faster_screen_on_a_two_screen_desk_is_visible()
     {
-        // The whole reason GetAllDisplays exists: with one display in hand, nothing can tell
-        // the user the game is running on the slower panel.
+        // Toute la raison d'être de GetAllDisplays : avec un seul écran en main, rien ne peut
+        // dire au joueur que le jeu tourne sur l'écran le plus lent.
         var screens = new[]
         {
             new DisplayInfo(true, false, RefreshHz: 144, MaxRefreshHz: 200, DeviceName: @"\\.\DISPLAY1"),

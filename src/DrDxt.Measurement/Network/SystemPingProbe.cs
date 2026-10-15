@@ -3,26 +3,26 @@ using System.Net.NetworkInformation;
 namespace DrDxt.Measurement.Network;
 
 /// <summary>
-/// ICMP echo through the OS stack (<see cref="Ping"/>, .NET BCL — no dependency, no driver,
-/// no raw socket, nothing installed).
+/// ICMP echo par la pile de l'OS (<see cref="Ping"/>, BCL .NET : aucune dépendance, aucun pilote,
+/// aucun socket brut, rien d'installé).
 ///
-/// Precision, stated honestly: <c>Ping</c> reports whole milliseconds. On a LAN a real 0.3 ms
-/// round-trip reads as 0 ms, and jitter derived from these samples is quantised to 1 ms. We do
-/// Not wrap a Stopwatch around the call to fake sub-millisecond digits: that would measure .NET
-/// scheduling as much as the network — false precision is exactly what this product refuses.
-/// A 0 ms reply is a real reply (it counts as received, and as a sample of value ~0), so it is
-/// reported as the smallest measurable non-loss: 0.5 ms, the midpoint of the [0,1) bucket, and
-/// never as "no reply".
+/// Précision, dite honnêtement : <c>Ping</c> rend des millisecondes entières. Sur un réseau local,
+/// un vrai aller-retour de 0,3 ms se lit 0 ms, et la gigue tirée de ces relevés est quantifiée à
+/// 1 ms. On n'entoure pas l'appel d'un Stopwatch pour simuler des décimales sous la milliseconde :
+/// cela mesurerait l'ordonnancement .NET autant que le réseau, et une fausse précision est
+/// exactement ce que ce produit refuse. Une réponse à 0 ms est une vraie réponse (elle compte comme
+/// reçue, et comme un relevé de valeur ~0) : elle est rapportée comme la plus petite non-perte
+/// mesurable, 0,5 ms, le milieu de l'intervalle [0,1), et jamais comme « pas de réponse ».
 ///
-/// Anything that is not a Success reply — timeout, unreachable, TTL expired, ICMP filtered by a
-/// firewall — is a MISS. It is aggregated as loss, and the caveat carried by the report says
-/// plainly that ICMP loss is not game packet loss.
+/// Tout ce qui n'est pas une réponse Success (délai dépassé, injoignable, TTL expiré, ICMP filtré
+/// par un pare-feu) est un raté. Il est agrégé comme perte, et la réserve portée par le rapport dit
+/// clairement qu'une perte ICMP n'est pas une perte de paquets de jeu.
 /// </summary>
 public sealed class SystemPingProbe : INetworkProbe
 {
-    // Midpoint of the [0,1) ms bucket: a sub-millisecond reply is real, and reporting it as 0
-    // would make it indistinguishable from "no data" downstream (every latency field is
-    // nullable and 0 is filtered out as invalid).
+    // Milieu de l'intervalle [0,1) ms : une réponse sous la milliseconde est réelle, et la rapporter
+    // à 0 la rendrait impossible à distinguer de « pas de donnée » en aval (chaque champ de latence
+    // peut être null et 0 est filtré comme invalide).
     private const double SubMillisecondReplyMs = 0.5;
 
     public async Task<NetworkProbeSample> ProbeAsync(string host, TimeSpan timeout, CancellationToken ct)
@@ -39,11 +39,11 @@ public sealed class SystemPingProbe : INetworkProbe
         }
         catch (OperationCanceledException)
         {
-            throw; // cancellation is the caller's business, not a network verdict.
+            throw; // l'annulation regarde l'appelant, ce n'est pas un verdict réseau.
         }
         catch (Exception)
         {
-            // PingException (DNS failure, no route), socket errors, disposal races: a MISS.
+            // PingException (échec DNS, pas de route), erreurs de socket, courses de libération : un raté.
             return new NetworkProbeSample(null);
         }
     }

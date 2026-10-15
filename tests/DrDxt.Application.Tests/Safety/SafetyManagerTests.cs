@@ -6,18 +6,18 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Safety;
 
 // -----------------------------------------------------------------------
-// M2 Phase B — SafetyManager (ISafetyManager).
+// SafetyManager (ISafetyManager).
 //
-// B1 EnsureRestorePointAsync: Nothing is applied without a verified restore
-//    point. Restore OFF + declined → SAFETY.RESTORE_DECLINED; OFF + accepted but
-//    cannot enable → SAFETY.RESTORE_DISABLED; ON (or enabled) → create via the
-//    elevated client; create/verify failure → SAFETY.RESTORE_FAILED. Throttled to
-//    one point per session.
-// B2 RevertAsync(snapshot): reconstruct the inverse typed PrivilegedOp from the
-//    snapshot's typed OriginalValueJson and send it through IElevatedClient;
-//    malformed JSON → SAFETY.SNAPSHOT_INVALID (never throws).
+// B1 EnsureRestorePointAsync : rien ne s'applique sans point de restauration vérifié.
+//    Restauration désactivée + refusée → SAFETY.RESTORE_DECLINED ; désactivée + acceptée mais
+//    impossible à activer → SAFETY.RESTORE_DISABLED ; active (ou activée) → création via le
+//    client élevé ; échec de création ou de vérification → SAFETY.RESTORE_FAILED. Limité à
+//    un point par session.
+// B2 RevertAsync(instantané) : reconstruire la PrivilegedOp typée inverse depuis
+//    l'OriginalValueJson typé de l'instantané et l'envoyer par IElevatedClient ;
+//    JSON malformé → SAFETY.SNAPSHOT_INVALID (jamais d'exception).
 //
-// Pure unit tests with NSubstitute fakes — nothing elevated, no real system.
+// Tests unitaires purs avec des faux NSubstitute : rien d'élevé, aucun vrai système.
 // -----------------------------------------------------------------------
 public sealed class SafetyManagerTests
 {
@@ -27,8 +27,8 @@ public sealed class SafetyManagerTests
 
     private SafetyManager Build()
     {
-        // Default: elevated client succeeds; verification passes. Individual tests
-        // override what they care about.
+        // Par défaut : le client élevé réussit, la vérification passe. Chaque test
+        // redéfinit ce qui le concerne.
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
         // Par defaut, un point NEUF (cree maintenant, donc apres la demande).
@@ -42,8 +42,8 @@ public sealed class SafetyManagerTests
     public async Task Blocks_when_system_restore_disabled_and_cannot_enable()
     {
         _restore.IsEnabled().Returns(false);
-        _consent.AskEnableRestore().Returns(true);   // user agrees…
-        _restore.TryEnable().Returns(false);         // …but it cannot be enabled (GPO/SKU)
+        _consent.AskEnableRestore().Returns(true);   // le joueur accepte…
+        _restore.TryEnable().Returns(false);         // …mais impossible à activer (GPO/édition)
 
         var r = await Build().EnsureRestorePointAsync();
 
@@ -56,7 +56,7 @@ public sealed class SafetyManagerTests
     public async Task Blocks_when_user_declines_enabling_restore()
     {
         _restore.IsEnabled().Returns(false);
-        _consent.AskEnableRestore().Returns(false);  // explicit refusal
+        _consent.AskEnableRestore().Returns(false);  // refus explicite
 
         var r = await Build().EnsureRestorePointAsync();
 
@@ -89,7 +89,7 @@ public sealed class SafetyManagerTests
     [Fact]
     public async Task The_point_is_looked_for_in_the_24h_window_Windows_refuses_to_create_in()
     {
-        // 14/09/2026 : Windows saute la creation s'il existe un point de moins de 24 h (Microsoft Learn).
+        // Windows saute la creation s'il existe un point de moins de 24 h (Microsoft Learn).
         // La fenetre part donc 24 h avant la demande, pas de la demande elle-meme.
         _restore.IsEnabled().Returns(true);
         var manager = Build();
@@ -97,7 +97,7 @@ public sealed class SafetyManagerTests
 
         await manager.EnsureRestorePointAsync();
 
-        // 06/10/2026 (plan 4.5b) : cherché avant de créer (réutiliser), puis après (vérifier).
+        // Cherché avant de créer (réutiliser), puis après (vérifier).
         _restore.Received(2).DernierPointDepuis(Arg.Is<DateTime>(d =>
             d >= avant - SafetyManager.FenetreDuRefusDeWindows
             && d <= DateTime.UtcNow - SafetyManager.FenetreDuRefusDeWindows));
@@ -116,7 +116,7 @@ public sealed class SafetyManagerTests
 
         r.IsOk.Should().BeTrue("un point de moins de 24 h date d'avant nos changements : il protege");
         manager.PointReutiliseUtc.Should().Be(ceMatin, "l'ecran doit pouvoir dire de quand date le point");
-        // 06/10/2026 (plan 4.5b, le mainteneur) : pas un point par « Optimiser » ; celui de moins de 24 h suffit.
+        // Pas un point par « Optimiser » ; celui de moins de 24 h suffit.
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<CreateRestorePointOp>(), Arg.Any<CancellationToken>());
     }
 
@@ -159,7 +159,7 @@ public sealed class SafetyManagerTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.RestoreFailed);
     }
 
-    // 06/10/2026 (plan 4.5) : le retour de Windows ne prouve pas le point (recherche point-de-restauration.md) ; la
+    // Le retour de Windows ne prouve pas le point (recherche point-de-restauration.md) ; la
     // liste est relue plusieurs fois avant de conclure.
     [Fact]
     public async Task Un_point_qui_apparait_apres_quelques_lectures_suffit()
@@ -190,10 +190,10 @@ public sealed class SafetyManagerTests
         await _elevated.Received(2).ExecuteAsync(Arg.Any<CreateRestorePointOp>(), Arg.Any<CancellationToken>());
     }
 
-    // 06/10/2026 (plan 4.5b) : VSS échoue par intermittence sur ma machine (8193 après une autre opération de
+    // VSS échoue par intermittence sur ma machine (8193 après une autre opération de
     // clichés) et réussit à l'essai suivant (03:39 puis 03:41, 04:28 puis 04:30). Une création sans point relu est
     // retentée une fois.
-    // Revue du 06/10 (P1) : l'échec VSS intermittent remonte en REFUS (Checkpoint-Computer sort 1) ; c'est lui
+    // L'échec VSS intermittent remonte en REFUS (Checkpoint-Computer sort 1) ; c'est lui
     // que la retentative vise.
     [Fact]
     public async Task Un_refus_de_Windows_est_retente_une_fois_et_le_second_essai_suffit()
@@ -239,8 +239,8 @@ public sealed class SafetyManagerTests
     [Fact]
     public async Task Post_create_verification_failure_blocks()
     {
-        // The create call "succeeds" but the point never actually materialized
-        // (GPO/SKU silently no-op'd it). We must not return Ok.
+        // L'appel de création « réussit » mais le point ne s'est jamais matérialisé
+        // (GPO ou édition l'ont neutralisé en silence). On ne doit pas rendre Ok.
         _restore.IsEnabled().Returns(true);
         var mgr = Build();
         _restore.DernierPointDepuis(Arg.Any<DateTime>()).Returns((DateTime?)null);
@@ -262,7 +262,7 @@ public sealed class SafetyManagerTests
 
         r1.IsOk.Should().BeTrue();
         r2.IsOk.Should().BeTrue();
-        // Only one real restore point is created per session/batch (no spamming).
+        // Un seul vrai point de restauration par session ou lot (pas de spam).
         await _elevated.Received(1).ExecuteAsync(Arg.Any<CreateRestorePointOp>(), Arg.Any<CancellationToken>());
     }
 
@@ -272,8 +272,8 @@ public sealed class SafetyManagerTests
     public async Task Revert_restores_captured_original_registry_value()
     {
         var mgr = Build();
-        // OriginalValueJson is the typed PrivilegedOp wire form (the codec form),
-        // carrying the real original value captured at apply time.
+        // OriginalValueJson est la forme de fil de la PrivilegedOp typée (la forme codec),
+        // portant la vraie valeur d'origine capturée à l'application.
         var original = new SetRegistryValueOp(
             RegistryHiveKind.LocalMachine,
             @"SOFTWARE\NVIDIA Corporation\Global\NVTweak",

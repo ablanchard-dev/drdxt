@@ -3,7 +3,7 @@ using DrDxt.Application.Tweaks.Hardware;
 using DrDxt.Detection.Gpu.Bench;
 
 // -----------------------------------------------------------------------
-// R2 deterministic GPU bench — a CONTROLLED, repeatable GPU workload that replaces
+// Deterministic GPU bench — a CONTROLLED, repeatable GPU workload that replaces
 // noisy live-gameplay A/B. It runs the SAME deterministic compute workload every
 // time, so baseline-vs-offset comparison is clean (the only thing that moves the
 // score is GPU clock/throughput).

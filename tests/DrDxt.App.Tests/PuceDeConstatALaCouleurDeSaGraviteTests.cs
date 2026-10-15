@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D8.2, revue n° 3) : sur le bilan, la puce d'un constat « à faire » était cyan sous un état
+// Sur le bilan, la puce d'un constat « à faire » était cyan sous un état
 // orange. Elle prend la couleur de sa gravité, comme la ligne du même constat dans son domaine.
 public sealed class PuceDeConstatALaCouleurDeSaGraviteTests
 {
@@ -21,7 +21,7 @@ public sealed class PuceDeConstatALaCouleurDeSaGraviteTests
         puce.Should().Contain("Entree.Gravite").And.Contain("SeverityColor").And.NotContain("IrisCyanBrush");
     }
 
-    // 03/10/2026 (D10.2) : dans un domaine, la puce d'une ligne reçoit la ligne entière (gravité ET proposition), pour que
+    // Dans un domaine, la puce d'une ligne reçoit la ligne entière (gravité ET proposition), pour que
     // le convertisseur rende l'ambre d'un constat d'information et le cyan d'un réglage proposé.
     [Fact]
     public void La_puce_d_une_ligne_de_domaine_recoit_la_ligne_entiere()
@@ -35,7 +35,7 @@ public sealed class PuceDeConstatALaCouleurDeSaGraviteTests
             .Should().Contain("Fill=\"{Binding Converter={StaticResource SeverityColor}}\"");
     }
 
-    // 03/10/2026 (D11.6, revue n° 5) : deux Run séparés par un retour à la ligne ajoutent déjà une espace ; un format
+    // Deux Run séparés par un retour à la ligne ajoutent déjà une espace ; un format
     // qui commençait aussi par une espace donnait « texte  · Domaine ».
     [Fact]
     public void Le_domaine_d_un_point_a_faire_n_a_qu_une_espace_devant_lui()

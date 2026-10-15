@@ -30,7 +30,7 @@ public class MeasurementDiTests
         // Ce test attendait `BenchmarkRunner` nu. Le banc du produit est desormais enveloppe :
         // c'est le decorateur qui emet `InstallPresentMonServiceOp` quand le service ne repond
         // pas -- l'op ecrite, allowlistee, testee, et que personne n'envoyait.
-        // 24/09/2026 : et par-dessus, le repli DXGI (PresentMon ne voit plus rien sur la machine de
+        // Et par-dessus, le repli DXGI (PresentMon ne voit plus rien sur la machine de
         // reference). L'auto-reparation doit rester DEDANS, sinon le repli masquerait sa perte.
         runner.Should().BeOfType<DrDxt.Measurement.Frames.RepliDxgiBenchmarkRunner>()
             .Which.PresentMon.Should().BeOfType<SelfHealingBenchmarkRunner>();
@@ -43,7 +43,7 @@ public class MeasurementDiTests
             .AddDrDxtMeasurement()
             .BuildServiceProvider();
 
-        // The runner builds on the real session, which is wired to the real P/Invoke api.
+        // L'exécutant se construit sur la vraie session, câblée sur la vraie API P/Invoke.
         provider.GetRequiredService<IBenchmarkRunner>().Should().NotBeNull();
 
         var session = provider.GetRequiredService<IPresentMonSession>();

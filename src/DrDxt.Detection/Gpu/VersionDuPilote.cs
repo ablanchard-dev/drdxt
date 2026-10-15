@@ -8,7 +8,7 @@ namespace DrDxt.Detection.Gpu;
 public sealed record VersionPubliee(string Version, DateOnly? Sortie);
 
 /// <summary>
-/// 03/10/2026 (tour G, retour d'usage : « DrDXT ne m'a jamais dit que mes pilotes GPU n'étaient pas bons »). Hors ligne,
+/// Hors ligne,
 /// DrDXT ne savait pas qu'une version plus récente existait : la branche 616 passait le plancher « 500 » et le pilote,
 /// trois versions en retard, était déclaré à jour. DrDXT demande maintenant au fabricant de la carte ses dernières
 /// versions publiées, et compte le retard du pilote installé.
@@ -54,7 +54,7 @@ public static class VersionDuPilote
     public static async Task<RepairFinding?> VerifierAsync(IReadOnlyList<GpuInfo> cartes, SourceNvidia nvidia, CancellationToken ct = default)
         => await VerifierAsync(cartes, nvidia, null, null, ct).ConfigureAwait(false);
 
-    /// <param name="amd">03/10/2026 (G4) : la page de téléchargement d'AMD.</param>
+    /// <param name="amd">La page de téléchargement d'AMD.</param>
     /// <param name="versionRadeon">La version AMD installée de la carte nommée, au format d'AMD (« 26.8.1 »), lue dans le registre.</param>
     public static async Task<RepairFinding?> VerifierAsync(IReadOnlyList<GpuInfo> cartes, SourceNvidia nvidia, SourceAmd? amd,
         Func<string, string?>? versionRadeon, CancellationToken ct = default)
@@ -62,34 +62,31 @@ public static class VersionDuPilote
         if (cartes.FirstOrDefault(c => c.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase)) is { } nv)
             return !SuitLesPilotesGameReady(nv.Model)
                 ? SansSource("NVIDIA", VersionNvidia(nv.DriverVersion) ?? nv.DriverVersion,
-                    "nvidia.com/fr-fr/drivers en choisissant ta carte (DrDXT ne compare que les GeForce RTX 20 à 50, GTX 16 et "
-                    + "MX 400 et 500 : les GTX 900 et 10 ne reçoivent plus de nouvelle version depuis la branche 580, et les autres "
-                    + "cartes suivent leur propre suite de pilotes)")
+                    Docteur.T("VP.OuNvidiaAncienne"))
                 : VersionNvidia(nv.DriverVersion) is not { } version ? null
-                // Revue R2 : site muet (hors ligne, page changée) = l'endroit où vérifier, pas le silence.
+                // Site muet (hors ligne, page changée) = l'endroit où vérifier, pas le silence.
                 : await nvidia.DernieresAsync(ct).ConfigureAwait(false) is { } publiees ? Juger("NVIDIA", version, publiees)
-                : SansReponse("NVIDIA", version, "nvidia.com/fr-fr/drivers");
+                : SansReponse("NVIDIA", version, Docteur.T("VP.OuNvidia"));
         if (cartes.FirstOrDefault(c => c.Vendor.Contains("AMD", StringComparison.OrdinalIgnoreCase)) is { } radeon)
         {
             if (!SuitAdrenalin(radeon.Model))
-                // Revue R2 : « les cartes plus anciennes » était faux pour une puce intégrée récente (« AMD Radeon(TM) Graphics »).
-                return SansSource("AMD", radeon.DriverVersion, "amd.com/fr/support en choisissant ta carte (DrDXT ne compare que les "
-                    + "Radeon RX 5000 à 9000)");
+                // « les cartes plus anciennes » était faux pour une puce intégrée récente (« AMD Radeon(TM) Graphics »).
+                return SansSource("AMD", radeon.DriverVersion, Docteur.T("VP.OuAmdAncienne"));
             if (amd is null || versionRadeon?.Invoke(radeon.Model) is not { } installee)
-                return SansSource("AMD", radeon.DriverVersion, "amd.com/fr/support");
+                return SansSource("AMD", radeon.DriverVersion, Docteur.T("VP.OuAmd"));
             return await amd.DerniereAsync(ct).ConfigureAwait(false) is { } derniere
                 ? Juger("AMD", installee, [derniere], listeComplete: false)
-                : SansReponse("AMD", installee, "amd.com/fr/support");
+                : SansReponse("AMD", installee, Docteur.T("VP.OuAmd"));
         }
         if (cartes.FirstOrDefault(c => c.Vendor.Contains("Intel", StringComparison.OrdinalIgnoreCase)) is { } intel)
-            // G4, relevé le 03/10/2026 : la page de téléchargement d'Intel répond 403 à tout programme, même avec les en-têtes
+            // Relevé le 03/10/2026 : la page de téléchargement d'Intel répond 403 à tout programme, même avec les en-têtes
             // d'un navigateur. Pas de source lisible : l'endroit où vérifier est dit.
-            return SansSource("Intel", intel.DriverVersion, "intel.fr, page « Pilotes graphiques » (le site d'Intel refuse la lecture par un programme)");
+            return SansSource("Intel", intel.DriverVersion, Docteur.T("VP.OuIntel"));
         return null;
     }
 
     /// <summary>
-    /// Revue C1 (03/10, « tous les autres PC ? ») : la source lue est celle des GeForce récentes. NVIDIA a arrêté les nouvelles
+    /// La source lue est celle des GeForce récentes. NVIDIA a arrêté les nouvelles
     /// versions pour Maxwell, Pascal et Volta à la branche 580 (annonce de juillet 2025, reprise par Tom's Hardware et
     /// TechPowerUp) : une GTX 1060 se verrait dire « en retard » sur des versions qui ne la prennent pas en charge. Les
     /// cartes professionnelles (Quadro, RTX A) suivent une autre suite. Seules les GeForce qui reçoivent la même version
@@ -99,14 +96,14 @@ public static class VersionDuPilote
         System.Text.RegularExpressions.Regex.IsMatch(modele, @"GeForce\s+(RTX\s+[2-5]0\d0|GTX\s+16\d0|MX\s*[45]\d0)",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-    /// <summary>G4 : les Radeon qui reçoivent la version d'Adrenalin publiée en tête de la page d'AMD (RDNA, RX 5000 à 9000).</summary>
+    /// <summary>Les Radeon qui reçoivent la version d'Adrenalin publiée en tête de la page d'AMD (RDNA, RX 5000 à 9000).</summary>
     internal static bool SuitAdrenalin(string modele) =>
         System.Text.RegularExpressions.Regex.IsMatch(modele, @"Radeon\s+RX\s+[5-9]\d{3}",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     /// <summary>La version AMD installée au format d'AMD, que Windows garde dans la clé de la carte graphique
     /// (valeur « RadeonSoftwareVersion », relevée dans des exports de registre publiés sur le forum Guru3D) ; <c>null</c>
-    /// sans carte AMD ou sans cette valeur. Revue R2 : les clés des cartes retirées restent ; seule celle dont la description
+    /// sans carte AMD ou sans cette valeur. Les clés des cartes retirées restent ; seule celle dont la description
     /// (« DriverDesc ») est le nom de la carte présente est lue.</summary>
     public static string? RadeonSoftwareVersion(string modele)
     {
@@ -131,7 +128,7 @@ public static class VersionDuPilote
     }
 
     /// <summary>Le constat : à jour, ou le nombre de versions publiées plus récentes et la dernière.</summary>
-    /// <param name="listeComplete">G4 : faux quand la source ne donne que la dernière version (AMD) ; le retard n'est alors
+    /// <param name="listeComplete">Faux quand la source ne donne que la dernière version (AMD) ; le retard n'est alors
     /// pas compté, il est dit.</param>
     public static RepairFinding? Juger(string marque, string installee, IReadOnlyList<VersionPubliee> publiees, bool listeComplete = true)
     {
@@ -143,32 +140,30 @@ public static class VersionDuPilote
             .Select(x => x.p).ToList();
         if (plusRecentes.Count == 0)
             return new RepairFinding(Domaine, Nom, $"{marque} {installee}", null, RepairStatus.ExpectedDefault,
-                $"ton pilote {marque} {installee} est la dernière version publiée par {marque}.");
+                Docteur.T("VP.AJour", marque, installee));
         var derniere = plusRecentes[0];
-        var date = derniere.Sortie is { } d ? $" du {d:dd/MM/yyyy}" : "";
-        var retard = !listeComplete ? "n'est pas le dernier"
-            : plusRecentes.Count == 1 ? "a une version de retard" : $"a {plusRecentes.Count} versions de retard";
-        // Revue adverse du 09/10/2026 (R3) : être en retard n'est pas un défaut ; observé, avec son geste (Recommandation).
+        var date = derniere.Sortie is { } d ? Docteur.T("VP.Du", d) : "";
+        var retard = !listeComplete ? Docteur.T("VP.PasLeDernier")
+            : plusRecentes.Count == 1 ? Docteur.T("VP.UneVersion") : Docteur.T("VP.Versions", plusRecentes.Count);
+        // Être en retard n'est pas un défaut ; observé, avec son geste (Recommandation).
         return new RepairFinding(Domaine, Nom, $"{marque} {installee}", derniere.Version, RepairStatus.Observed,
-            $"ton pilote {marque} {installee} {retard} : la dernière publiée est la {derniere.Version}{date}. Mets-le à jour "
-            + $"depuis l'application {marque} ou le site de {marque} ; DrDXT ne l'installe pas lui-même.",
-            RepairAction.Recommandation);
+            Docteur.T("VP.Retard", marque, installee, retard, derniere.Version, date),
+            RepairAction.Recommandation, Remede: Docteur.T("VP.Remede", marque, derniere.Version));
     }
 
-    /// <summary>Revue R2 : la source existe mais n'a pas répondu cette fois.</summary>
+    /// <summary>La source existe mais n'a pas répondu cette fois.</summary>
     public static RepairFinding SansReponse(string marque, string installee, string ouRegarder) =>
         new(Domaine, Nom, $"{marque} {installee}", null, RepairStatus.Unknown,
-            $"le site de {marque} n'a pas répondu (hors ligne, ou page changée) : DrDXT n'a pas pu comparer ton pilote "
-            + $"{installee} à la dernière version. Vérifie sur {ouRegarder}.");
+            Docteur.T("VP.SansReponse", marque, installee, ouRegarder));
 
     /// <summary>Pas de source lisible pour cette marque (AMD, Intel) : le dire, et où regarder.</summary>
     public static RepairFinding SansSource(string marque, string installee, string ouRegarder) =>
         new(Domaine, Nom, $"{marque} {installee}", null, RepairStatus.Observed,
-            $"DrDXT ne sait pas encore lire la dernière version publiée par {marque} : vérifie sur {ouRegarder}.");
+            Docteur.T("VP.SansSource", marque, ouRegarder));
 }
 
 /// <summary>
-/// 03/10/2026 (G4) : la page de téléchargement d'AMD. Son bouton « Download Windows Drivers » pointe sur l'installeur de la
+/// La page de téléchargement d'AMD. Son bouton « Download Windows Drivers » pointe sur l'installeur de la
 /// dernière version, dont le nom porte la version et la date (relevé : « adrenalin-edition-26.8.1-minimalsetup-260818 »).
 /// Une seule version publiée est donc lisible, la dernière.
 /// </summary>

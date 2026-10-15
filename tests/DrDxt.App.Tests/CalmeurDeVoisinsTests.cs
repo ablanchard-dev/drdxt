@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, P3.2) : calmer un voisin gourmand pendant la partie, et lui rendre sa priorité ensuite.
+// Calmer un voisin gourmand pendant la partie, et lui rendre sa priorité ensuite.
 // Le système est simulé : rien n'est posé sur la machine qui lance les tests.
 public sealed class CalmeurDeVoisinsTests
 {
@@ -84,7 +84,7 @@ public sealed class CalmeurDeVoisinsTests
         s.Priorites[Obs].Should().Be(ProcessPriorityClass.AboveNormal, "le choix du joueur passe avant celui de DrDXT");
     }
 
-    // ── 07/10/2026 (L-VOISINS) : proposé d'après les parties, jamais sur un protégé ni sur ce que le joueur exclut ──────
+    // ── Proposé d'après les parties, jamais sur un protégé ni sur ce que le joueur exclut ──────
     private static DrDxt.Application.Parties.PartieRelevee Partie(params DrDxt.Application.Parties.VoisinEnPartie[]? voisins)
         => new("cod.exe", DateTimeOffset.Now.AddHours(-1), DateTimeOffset.Now, 6, 120, 90, DrDxt.Core.BottleneckState.CpuBoundOrAppBound,
             Voisins: voisins);

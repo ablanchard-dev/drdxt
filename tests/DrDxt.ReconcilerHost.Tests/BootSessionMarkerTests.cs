@@ -4,15 +4,15 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// Boot-outcome scheduling (dead-man pattern).
+// Planification de l'issue de démarrage (motif de l'homme mort).
 //
-// BootSessionMarker:
-//   * MarkBootOnceAsync calls IBootOutcomeStore.MarkBootStartedAsync exactly ONCE per
-//     process (guarded) — boot is an unconditional +1 to the unclean streak.
-//   * MarkStableAfterAsync(window, ct) waits the window via an injected IDelay seam
-//     (not a real Task.Delay) then calls MarkSessionStableAsync — the dead-man reset.
-//     Cancelled before the window elapses → not marked stable (a boot that crashes
-//     before the stable window stays counted, preserving the boot-loop guarantee).
+// BootSessionMarker :
+//   * MarkBootOnceAsync appelle IBootOutcomeStore.MarkBootStartedAsync exactement une fois par
+//     processus (gardé) : un démarrage est un +1 inconditionnel à la série non propre.
+//   * MarkStableAfterAsync(fenêtre, ct) attend la fenêtre via une couture IDelay injectée
+//     (pas un vrai Task.Delay) puis appelle MarkSessionStableAsync : la remise à zéro de l'homme mort.
+//     Annulé avant la fin de la fenêtre → pas marqué stable (un démarrage qui plante avant
+//     la fenêtre stable reste compté, ce qui préserve la garantie anti-boucle).
 // -----------------------------------------------------------------------
 public sealed class BootSessionMarkerTests
 {
@@ -42,7 +42,7 @@ public sealed class BootSessionMarkerTests
         var failed = await marker.MarkBootOnceAsync(default);
         failed.IsOk.Should().BeFalse();
 
-        // A failed mark must not "use up" the once-guard: a later retry can still mark.
+        // Un marquage raté ne doit pas « consommer » la garde unique : un nouvel essai peut encore marquer.
         store.Fail = false;
         (await marker.MarkBootOnceAsync(default)).IsOk.Should().BeTrue();
         store.MarkBootStartedCount.Should().Be(1);
@@ -57,11 +57,11 @@ public sealed class BootSessionMarkerTests
 
         var task = marker.MarkStableAfterAsync(TimeSpan.FromMinutes(5), default);
 
-        // Before the window elapses: Not yet marked stable.
+        // Avant la fin de la fenêtre : pas encore marqué stable.
         await delay.WaitUntilAwaited();
         store.MarkSessionStableCount.Should().Be(0, "must not mark stable before the window elapses");
 
-        // Elapse the window → stable is marked, streak reset.
+        // Écouler la fenêtre → stable est marqué, série remise à zéro.
         delay.Complete();
         (await task).IsOk.Should().BeTrue();
         store.MarkSessionStableCount.Should().Be(1);
@@ -81,7 +81,7 @@ public sealed class BootSessionMarkerTests
         var task = marker.MarkStableAfterAsync(TimeSpan.FromMinutes(5), cts.Token);
         await delay.WaitUntilAwaited();
 
-        // Cancel before the window completes (a crash/shutdown mid-window).
+        // Annuler avant la fin de la fenêtre (plantage ou arrêt en pleine fenêtre).
         cts.Cancel();
         delay.Cancel();
 
@@ -106,8 +106,8 @@ public sealed class BootSessionMarkerTests
     }
 }
 
-/// <summary>A controllable IDelay. Records the requested duration; completes only when
-/// the test says so (or immediately if <see cref="AutoComplete"/>). No real time.</summary>
+/// <summary>IDelay pilotable. Enregistre la durée demandée ; ne s'achève que quand le test
+/// le dit (ou aussitôt si <see cref="AutoComplete"/>). Pas de temps réel.</summary>
 public sealed class ManualDelay : IDelay
 {
     private TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -124,7 +124,7 @@ public sealed class ManualDelay : IDelay
         if (AutoComplete)
             return Task.CompletedTask;
 
-        // Honor cancellation through the same token the production delay would observe.
+        // Honorer l'annulation par le même jeton que le délai de production observerait.
         ct.Register(() => _tcs.TrySetCanceled(ct));
         return _tcs.Task;
     }

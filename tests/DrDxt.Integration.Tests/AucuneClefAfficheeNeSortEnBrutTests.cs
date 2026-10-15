@@ -5,17 +5,16 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Une traduction manquante ne leve rien — elle S'AFFICHE.
+// Une traduction manquante ne leve rien — elle S'AFFICHE.
 //
 // Contrat de `ResxLocalizer`, ecrit dans son propre resume : « Missing keys return the
 // key itself — never null, never an exception. » C'est un bon contrat pour un ecran
 // (rien ne plante), et c'est exactement ce qui rend le defaut invisible : la seule
 // personne qui voit la clef brute, c'est le client.
 //
-// Le cas mesure ce jour : les trois verdicts que `AbComparer` produit
-// (`Scan.Ab.MeasurableGain`, `Scan.Ab.NoMeasurableGain`, `Scan.Ab.Regression`)
-// n'existaient dans aucun des deux resx. `DashboardView` affiche cette clef via `Loc` :
-// la ligne qui dit au client ce que la mesure a trouve affichait son propre code.
+// Exemple : si les verdicts que `AbComparer` produit (`Scan.Ab.MeasurableGain`, `Scan.Ab.NoMeasurableGain`,
+// `Scan.Ab.Regression`) manquaient aux deux resx, la ligne qui dit au joueur ce que la mesure a trouve
+// afficherait son propre code.
 //
 // Ce crible ne regarde pas une liste : il lit toutes les chaines litterales du livre qui
 // ressemblent a une clef de ressource et dont le premier segment est un prefixe deja
@@ -48,7 +47,7 @@ public sealed class AucuneClefAfficheeNeSortEnBrutTests
     /// <summary>Une chaine litterale en deux segments ou plus : `Scan.Ab.Regression`.</summary>
     private static readonly Regex Litteral = new("\"([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)+)\"");
 
-    /// <summary>25/09/2026 : une valeur donnee a une propriete `…Key` est une clef, quel que soit son
+    /// <summary>Une valeur donnee a une propriete `…Key` est une clef, quel que soit son
     /// prefixe. Le filtre par prefixe connu laissait passer `measure.network.icmp_caveat` : aucune clef
     /// du resx ne commencait par `measure.`, et l'avertissement n'avait de texte nulle part.</summary>
     private static readonly Regex ProprieteClef = new("Key\\s*=>\\s*\"([^\"]+)\"");
@@ -104,9 +103,12 @@ public sealed class AucuneClefAfficheeNeSortEnBrutTests
     public void Aucune_clef_ecrite_dans_le_code_ne_manque_au_resx()
     {
         var neutre = ClefsDe("Strings.resx");
+        // Une phrase du docteur (Docteur.T) vit dans le resx de Core ; elle est traduite aussi.
+        var docteur = XDocument.Load(Path.Combine(Racine().FullName, "src", "DrDxt.Core", "Resources", "Docteur.resx")).Root!
+            .Elements("data").Select(d => (string?)d.Attribute("name") ?? "").ToHashSet(StringComparer.Ordinal);
 
         var manquantes = ClefsEcritesDansLeCode(neutre)
-            .Where(x => !neutre.Contains(x.Clef))
+            .Where(x => !neutre.Contains(x.Clef) && !docteur.Contains(x.Clef))
             .Select(x => $"{x.Clef} ({x.Fichier})")
             .Distinct()
             .ToList();

@@ -7,7 +7,7 @@ namespace DrDxt.Detection.Network;
 public sealed record EnvoiUdp(int Pid, int Octets, IPAddress Destination, int PortDestination);
 
 /// <summary>
-/// 03/10/2026 (boucle 2D2P, P3.1b) : les jeux parlent en UDP, et la table UDP de Windows ne donne pas l'adresse en face.
+/// Les jeux parlent en UDP, et la table UDP de Windows ne donne pas l'adresse en face.
 /// Le fournisseur Microsoft-Windows-Kernel-Network la publie à chaque envoi (événement 42, « Data sent over UDP
 /// protocol », mot-clé IPv4 0x10). Forme relevée sur la machine le 03/10 par logman + tracerpt : PID, size, daddr,
 /// saddr, dport, sport, seqnum, connid. Les adresses et les ports sont dans l'ordre du réseau (octet fort d'abord),

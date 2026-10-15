@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
-    <!-- 10/10/2026 : le lanceur natif (NativeAOT) n'est pas référençable ; sa logique d'environnement est compilée ici en lien. -->
+    <!-- Le lanceur natif (NativeAOT) n'est pas référençable ; sa logique d'environnement est compilée ici en lien. -->
     <Compile Include="..\..\src\DrDxt.Lanceur\EnvironnementPropre.cs" Link="Lanceur\EnvironnementPropre.cs" />
     <!-- Test-only: assert the helper's mirrored policy band (NvApiTuningMath) stays in sync
          with GpuSafeBounds, the single source of truth. The helper itself does NOT reference

@@ -12,7 +12,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 06/10/2026 (chantier L-PROF, enquête #8) : `fixit.sane_pagefile` et `latency.prefer_max_perf` étaient enregistrés,
+/// `fixit.sane_pagefile` et `latency.prefer_max_perf` étaient enregistrés,
 /// testés un par un, et absents de tout profil : « Optimiser » ne les proposait jamais. Ici, les VRAIS leviers passent par
 /// les vrais profils et le vrai consommateur du scan : proposés là où l'état lu le justifie, nulle part ailleurs.
 /// Sources et limites : research/north-star/leviers-injoignables.md.
@@ -83,7 +83,7 @@ public sealed class LeviersInjoignablesTests
         plan.Contains(Pagefile).Should().Be(m.Reglages.PagefileConfigured == TriState.Off);
         plan.Contains(PMax).Should().Be(m.Reglages.NvidiaPreferMaxPerf == TriState.Off
             && m.Inventaire.Chassis == ChassisType.Desktop && m.Inventaire.Gpus.Any(g => g.Vendor == "NVIDIA"));
-        // L-ECRAN : l'écran n'est proposé que s'il est LU sous sa fréquence max ; une fixture sans la lecture n'invente rien.
+        // L'écran n'est proposé que s'il est LU sous sa fréquence max ; une fixture sans la lecture n'invente rien.
         plan.Contains(Ecran).Should().Be(m.Reglages.DisplayRefresh?.HasHeadroom == TriState.On);
     }
 

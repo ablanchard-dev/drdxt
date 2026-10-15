@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 04/10/2026 (plan 3b.6) : ce qui ralentit le démarrage (mesuré par Windows) et la place libre du disque système.
+// Ce qui ralentit le démarrage (mesuré par Windows) et la place libre du disque système.
 public sealed class DemarrageEtDisqueTests
 {
     [Fact]
@@ -32,7 +32,7 @@ public sealed class DemarrageEtDisqueTests
         DemarrageEtDisque.JugerDisqueSysteme("C:", 1, 0).Should().BeEmpty();
     }
 
-    // 04/10/2026 : sur la machine de référence, le cache de shaders NVIDIA occupait 98,6 Go (832 fichiers, dont trois
+    // Sur la machine de référence, le cache de shaders NVIDIA occupait 98,6 Go (832 fichiers, dont trois
     // de 16 Go). Au-dessus de 10 Go la place est dite, avec le prix d'un vidage ; en dessous, rien.
     [Fact]
     public void Un_gros_cache_de_shaders_se_dit_avec_le_prix_d_un_vidage()

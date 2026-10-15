@@ -5,11 +5,11 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// R1 (#4) — DrDxtAppCallerAuthenticator: authorize only the trusted DrDxt.App
-// process, deny on any doubt (fail-closed).
+// DrDxtAppCallerAuthenticator : n'autoriser que le processus DrDxt.App de confiance,
+// refuser au moindre doute (fermé par défaut).
 //
-// The path-comparison decision is unit-tested with a fake PID→image-path
-// resolver; the real GetProcessById/MainModule resolution is the live boundary.
+// La décision par comparaison de chemins se teste avec un faux résolveur PID → chemin
+// d'image ; la vraie résolution GetProcessById/MainModule est la frontière vivante.
 // -----------------------------------------------------------------------
 public sealed class CallerAuthenticatorTests
 {

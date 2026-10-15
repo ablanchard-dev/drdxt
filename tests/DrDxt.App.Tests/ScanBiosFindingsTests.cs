@@ -10,17 +10,17 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// M3 — the scan surfaces the BIOS Doctor's firmware findings (the integration the M3
-/// audit flagged as missing: the advisor existed but was wired to nothing, so the user
-/// never saw their biggest real lever — XMP/EXPO off, which lives in the BIOS).
+/// Le scan fait remonter les constats firmware du docteur BIOS (l'intégration que l'audit du
+/// travail BIOS signalait manquante : le conseiller existait mais n'était câblé à rien, donc le
+/// joueur ne voyait jamais son plus gros vrai levier, XMP/EXPO désactivé, qui vit dans le BIOS).
 ///
-/// Invariants proven here:
-///   • findings are surfaced after a successful scan, ordered fix-misconfig-first
-///     (actionable GUIDE findings before informational/not-readable, highest severity first);
-///   • an XMP/EXPO-off finding carries its SOURCED gain range and is GUIDANCE-only;
-///   • a not-readable state is marked "to verify", never asserted;
-///   • a failing advisor leaves the section empty and never breaks the (free) scan;
-///   • a rescan clears the previous section.
+/// Invariants prouvés ici :
+///   • les constats remontent après un scan réussi, mauvaise configuration d'abord
+///     (constats guidés actionnables avant les informatifs/non lisibles, gravité la plus haute d'abord) ;
+///   • un constat XMP/EXPO désactivé porte sa fourchette de gain sourcée et n'est qu'un guide ;
+///   • un état non lisible est marqué « à vérifier », jamais affirmé ;
+///   • un conseiller en échec laisse la section vide et ne casse jamais le scan (gratuit) ;
+///   • un nouveau scan efface la section précédente.
 /// </summary>
 public class ScanBiosFindingsTests
 {
@@ -36,7 +36,7 @@ public class ScanBiosFindingsTests
         TriState.On, TriState.On, "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
         TriState.On, TriState.On, Array.Empty<int>(), TriState.Unknown);
 
-    // ── Finding builders ──────────────────────────────────────────────────
+    // ── Constructeurs de constats ─────────────────────────────────────────
     private static BiosFinding Guide(FirmwareSettingKind kind, Severity sev, BiosGainEstimate? gain = null) =>
         new(kind, sev, $"{kind}.Title", $"{kind}.Rationale", BiosMatrixClass.Guide,
             TriState.Off, BiosRecommendedAction.Enable, $"{kind}.Action", gain, StateNotReadable: false);
@@ -63,8 +63,7 @@ public class ScanBiosFindingsTests
 
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), 72, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(true, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), null)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
@@ -76,9 +75,9 @@ public class ScanBiosFindingsTests
     [Fact]
     public async Task Surfaced_bios_findings_are_ordered_fix_misconfig_first()
     {
-        // Supplied in a deliberately scrambled order: an informational Read finding, then the
-        // Major GUIDE (XMP off), then a Minor GUIDE (ReBAR). Expected surfaced order:
-        // GUIDE-before-Read, highest severity first → XMP (Major Guide), ReBAR (Minor Guide), PCIe (Info Read).
+        // Fournis dans un ordre volontairement mélangé : un constat lu informatif, puis le guide
+        // majeur (XMP désactivé), puis un guide mineur (ReBAR). Ordre attendu en sortie :
+        // guide avant lecture, gravité la plus haute d'abord → XMP (guide majeur), ReBAR (guide mineur), PCIe (lecture informative).
         var advisor = ScanViewModelTestSeams.BiosAdvisor(
             ReadInfo(FirmwareSettingKind.PcieGen),
             Guide(FirmwareSettingKind.XmpExpo, Severity.Major, XmpGain),
@@ -105,7 +104,7 @@ public class ScanBiosFindingsTests
         var xmp = vm.BiosFindings.Single();
         xmp.IsGuidanceOnly.Should().BeTrue("an actionable BIOS fix is guided, never written by DrDXT");
         xmp.GuidanceLabel.Should().NotBeNullOrEmpty();
-        // A sourced RANGE, never a bare promised point-%.
+        // Une fourchette sourcée, jamais un % ponctuel promis.
         xmp.GainLabel.Should().Contain("11").And.Contain("25");
         xmp.IsGainConditional.Should().BeFalse();
     }
@@ -134,7 +133,7 @@ public class ScanBiosFindingsTests
 
         vm.HasBiosFindings.Should().BeFalse();
         vm.BiosFindings.Should().BeEmpty();
-        // The BIOS section is additive: a fault must never break the free scan.
+        // La section BIOS est additive : une faute ne doit jamais casser le scan gratuit.
         vm.State.Should().Be(ScanState.Done);
     }
 

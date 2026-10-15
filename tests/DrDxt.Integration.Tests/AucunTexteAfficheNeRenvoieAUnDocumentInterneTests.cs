@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 23/09/2026 — une source que le lecteur ne peut pas ouvrir n'est pas une source.
+/// Une source que le lecteur ne peut pas ouvrir n'est pas une source.
 ///
 /// Vu sur un scan reel : « Plan north star §2.6 et cahier §3 » sous une recommandation, et
 /// « Decision DrDXT BIOS Doctor §2/§5 » sous chaque gain du guide BIOS. Ce sont les noms de nos

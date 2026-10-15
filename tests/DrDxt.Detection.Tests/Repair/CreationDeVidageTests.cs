@@ -6,9 +6,8 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// 17/09/2026 : l'outil de developpement lisait les echecs de creation de vidage (volmgr 161), le
-/// produit non. Machine de reference : 10 arrets brutaux, 2 echecs, aucun vidage garde, et l'app n'en
-/// disait rien. Le produit le dit maintenant, sans nommer de cause qu'il n'a pas etablie.
+/// Le produit dit les echecs de creation de vidage (volmgr 161), sans nommer de cause qu'il n'a pas
+/// etablie. Releve sur la machine de reference : 10 arrets brutaux, 2 echecs, aucun vidage garde.
 /// </summary>
 public class CreationDeVidageTests
 {

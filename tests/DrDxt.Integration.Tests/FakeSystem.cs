@@ -7,29 +7,29 @@ using DrDxt.Detection.Gpu.Nvapi;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// FakeSystemState — the in-memory model of "the machine" the H1 gate compares.
+// FakeSystemState : le modèle en mémoire de « la machine » que la porte de retour arrière compare.
 //
-// The fake IElevatedClient WRITES into it (every privileged op mutates this and
-// only this), and every read-seam reports the CURRENT value from it. So after an
-// apply+revert the gate can compare a Snapshot() of the state against the baseline
-// Snapshot() and assert they are byte-identical — the §20 money-back guarantee.
+// Le faux IElevatedClient écrit dedans (chaque op privilégiée mute ceci et rien d'autre),
+// et chaque couture de lecture rapporte la valeur courante qui s'y trouve. Après un
+// apply + revert, la porte peut donc comparer un Snapshot() de l'état au Snapshot() de
+// départ et vérifier qu'ils sont identiques à l'octet près : la promesse qu'un retour arrière rend la machine.
 //
-// It models exactly the surfaces the M2 tweaks touch:
-//   * registry DWORDs (hive|path|name -> value)   [reflex, x3d cppc/gamebar]
-//   * active power-plan GUID                        [sane power plan]
-//   * Windows service states                        [x3d 3D V-Cache optimizer]
-//   * NVIDIA DRS settings (id -> value)             [render queue cap, vrr/vsync]
-//   * NV low-latency / pre-render / vsync / fps     [reflex / cap read seams]
-//   * GPU clock offsets / power limit / fan curve   [undervolt / power / fan]
-//   * ADLX tuning values (anti-lag/undervolt/power) [AMD render queue / tuning]
+// Il modélise exactement les surfaces que les leviers touchent :
+//   * DWORD de registre (ruche|chemin|nom → valeur)   [reflex, x3d cppc/gamebar]
+//   * GUID du plan d'alimentation actif                 [plan d'alimentation sain]
+//   * états des services Windows                        [optimiseur 3D V-Cache x3d]
+//   * réglages DRS NVIDIA (id → valeur)                 [plafond de file de rendu, vrr/vsync]
+//   * latence basse NV / pré-rendu / vsync / fps        [coutures de lecture reflex / plafond]
+//   * décalages d'horloge GPU / limite de puissance / courbe [undervolt / puissance / ventilation]
+//   * valeurs de réglage ADLX (anti-lag/undervolt/puissance) [file de rendu AMD / réglage]
 //
-// Snapshot() is an ORDERED, deterministic string so a byte comparison is total.
+// Snapshot() est une chaîne ordonnée et déterministe, pour qu'une comparaison d'octets soit totale.
 // -----------------------------------------------------------------------
 public sealed class FakeSystemState
 {
-    // Registry: keyed by "hive|path|name" → (TYPE, raw text). Absent key = not present.
+    // Registre : indexé par « ruche|chemin|nom » → (type, texte brut). Clé absente = valeur absente.
     //
-    // 19/09/2026 — la valeur etait un `uint`, et le client elevatoire faisait passer toute
+    // La valeur etait un `uint`, et le client elevatoire faisait passer toute
     // ecriture par `ParseDword` : une chaine devenait le DWORD 0. En face, le lecteur rendait
     // `Ok(null)` pour toute chaine — « absente ». Un levier qui ecrit une chaine capturait donc
     // « absent » avant d'ecrire, fabriquait un inverse de SUPPRESSION, et la suppression rend
@@ -38,56 +38,56 @@ public sealed class FakeSystemState
     private readonly Dictionary<string, (RegistryValueType Kind, string Value)> _registry =
         new(StringComparer.Ordinal);
 
-    // Active power plan.
+    // Plan d'alimentation actif.
     public Guid ActivePowerPlan { get; set; } = KnownPowerPlans.Balanced;
 
-    // L-CPU : le mode de boost secteur (PERFBOOSTMODE) du plan actif, et le défaut de sa personnalité.
+    // Le mode de boost secteur (PERFBOOSTMODE) du plan actif, et le défaut de sa personnalité.
     public uint ModeBoostSecteur { get; set; } = 2;
-    // B1 (10/10/2026) : le registre 0x610 du banc : PL1 65 W, PL2 219 W (huitièmes de watt), activées, sans verrou.
+    // Le registre 0x610 du banc : PL1 65 W, PL2 219 W (huitièmes de watt), activées, sans verrou.
     public ulong CpuPkgPowerLimit { get; set; } = (1752UL << 32) | (1UL << 47) | (1UL << 15) | 520UL;
     public uint ModeBoostDefaut { get; set; } = 2;
-    // B3 (10/10/2026) : l'économie d'énergie de la carte sans fil (secteur) du plan actif : « moyenne » au départ.
+    // L'économie d'énergie de la carte sans fil (secteur) du plan actif : « moyenne » au départ.
     public uint EconomieSansFilSecteur { get; set; } = 2;
 
-    // Service states.
+    // États des services.
     private readonly Dictionary<string, ServiceState> _services = new(StringComparer.Ordinal);
 
-    // NVIDIA DRS settings (id → value).
+    // Réglages DRS NVIDIA (id → valeur).
     private readonly Dictionary<uint, uint> _drs = new();
 
-    // NV driver latency reads.
+    // Lectures de latence du pilote NV.
     public uint NvLowLatencyMode { get; set; }
     public uint NvMaxPreRenderedFrames { get; set; } = 3;
     public uint NvVsyncMode { get; set; }
     public uint NvFrameRateLimit { get; set; }
 
-    // Availability flags for the seams.
+    // Drapeaux de disponibilité des coutures.
     public bool NvApiAvailable { get; set; }
     public bool AdlxAvailable { get; set; }
 
-    // GPU tuning state.
+    // État de réglage GPU.
     public int GpuCoreOffsetMhz { get; set; }
     public int GpuMemoryOffsetMhz { get; set; }
     public int GpuPowerLimitPct { get; set; } = 100;
     public FanCurve GpuFanCurve { get; set; } =
         new(new[] { new FanCurvePoint(40, 30), new FanCurvePoint(80, 60), new FanCurvePoint(90, 80) });
 
-    // ADLX tuning state.
+    // État de réglage ADLX.
     public int AdlxAntiLag { get; set; }
-    // AdlxUndervolt = the VOLTAGE the GetUndervoltValue probe reports (used only as an
-    // .IsOk readability probe by ResolveTunableGpuIndex — its value never seeds a revert).
+    // AdlxUndervolt = la tension que rapporte la sonde GetUndervoltValue (utilisée seulement comme
+    // sonde de lisibilité .IsOk par ResolveTunableGpuIndex ; sa valeur n'alimente jamais un retour arrière).
     public int AdlxUndervolt { get; set; }
-    // AdlxMaxFreqMhz = the absolute GFX max clock the undervolt write actually moves. The
-    // undervolt apply writes an absolute target here and its inverse op restores the absolute
-    // original — so the T8 gate genuinely exercises absolute MaxFreq (a wrong-units / VoltMv
-    // inverse would leave this at the wrong value and FAIL the byte-identical gate).
+    // AdlxMaxFreqMhz = l'horloge max GFX absolue que l'écriture d'undervolt déplace vraiment.
+    // L'application de l'undervolt y écrit une cible absolue et son op inverse rend l'origine
+    // absolue : la porte AMD exerce donc vraiment la MaxFreq absolue (un inverse en mauvaises
+    // unités ou en VoltMv laisserait ici une mauvaise valeur et ferait échouer la porte à l'octet près).
     public int AdlxMaxFreqMhz { get; set; } = 2900;
     public int AdlxPowerLimitPct { get; set; } = 100;
 
-    // The display the VRR tweak targets.
+    // L'écran que vise le levier VRR.
     public DisplayInfo? PrimaryGameDisplay { get; set; }
 
-    // L-ECRAN : le mode de l'écran, courant et enregistré dans le profil (ChangeDisplaySettingsEx).
+    // Le mode de l'écran, courant et enregistré dans le profil (ChangeDisplaySettingsEx).
     public ModeEcran? ModeEcranCourant { get; set; }
     public ModeEcran? ModeEcranEnregistre { get; set; }
 
@@ -135,7 +135,7 @@ public sealed class FakeSystemState
     public void SetDrs(uint id, uint value) => _drs[id] = value;
 
     // -----------------------------------------------------------------------
-    // A deterministic, byte-comparable snapshot of the whole modeled state.
+    // Instantané déterministe et comparable à l'octet près de tout l'état modélisé.
     // -----------------------------------------------------------------------
     public string Snapshot()
     {
@@ -175,10 +175,10 @@ public sealed class FakeSystemState
 }
 
 // -----------------------------------------------------------------------
-// FakeElevatedClient — the only thing that mutates FakeSystemState. It applies each
-// typed PrivilegedOp to the fake state (so the read-seams then report the new
-// value) and records every write for assertions. It can be told to refuse a chosen
-// op so a mid-batch failure can be simulated deterministically.
+// FakeElevatedClient : la seule chose qui mute FakeSystemState. Il applique chaque
+// PrivilegedOp typée à l'état factice (les coutures de lecture rapportent alors la nouvelle
+// valeur) et enregistre chaque écriture pour les assertions. On peut lui dire de refuser une
+// op choisie, pour simuler de façon déterministe un échec en plein lot.
 // -----------------------------------------------------------------------
 public sealed class FakeElevatedClient : IElevatedClient
 {
@@ -203,7 +203,7 @@ public sealed class FakeElevatedClient : IElevatedClient
             case PingOp:
             case CreateRestorePointOp:
             case InstallPresentMonServiceOp:
-                break; // no state change to model
+                break; // aucun changement d'état à modéliser
 
             case SetRegistryValueOp r:
                 // Le TYPE et le TEXTE tels qu'ecrits. Aplatir en DWORD faisait d'une chaine
@@ -228,7 +228,7 @@ public sealed class FakeElevatedClient : IElevatedClient
                 _state.EconomieSansFilSecteur = w.AcValue;
                 break;
 
-            // B1 (10/10/2026) : le registre de limite de puissance du processeur, tel quel.
+            // Le registre de limite de puissance du processeur, tel quel.
             case SetCpuPackagePowerLimitOp c:
                 _state.CpuPkgPowerLimit = c.Valeur;
                 break;
@@ -272,8 +272,8 @@ public sealed class FakeElevatedClient : IElevatedClient
         switch (a.Kind)
         {
             case AdlxTuningKind.AntiLag: _state.AdlxAntiLag = a.IntValue; break;
-            // Undervolt carries an absolute MaxFreq (MHz) — write it to the MaxFreq state, the
-            // surface the inverse op must restore. (not AdlxUndervolt, which is the voltage probe.)
+            // Undervolt porte une MaxFreq absolue (MHz) : l'écrire dans l'état MaxFreq, la surface
+            // que l'op inverse doit rendre (pas AdlxUndervolt, qui est la sonde de tension).
             case AdlxTuningKind.Undervolt: _state.AdlxMaxFreqMhz = a.IntValue; break;
             case AdlxTuningKind.PowerLimit: _state.AdlxPowerLimitPct = a.IntValue; break;
         }
@@ -285,7 +285,7 @@ public sealed class FakeElevatedClient : IElevatedClient
         {
             case ServiceAction.Start: _state.SetService(s.ServiceName, ServiceState.Running); break;
             case ServiceAction.Stop: _state.SetService(s.ServiceName, ServiceState.Stopped); break;
-            // Install / Query don't change the modeled running/stopped flag.
+            // Install / Query ne changent pas le drapeau modélisé en route/arrêté.
         }
     }
 
@@ -294,9 +294,9 @@ public sealed class FakeElevatedClient : IElevatedClient
 }
 
 // -----------------------------------------------------------------------
-// Read-seam fakes — every one reports the CURRENT value from the fake state, so a
-// capture before an apply records the real "from" value and a faithful inverse op
-// is produced. This is what makes the round-trip lossless.
+// Faux des coutures de lecture : chacune rapporte la valeur courante de l'état factice, pour
+// qu'une capture avant application enregistre la vraie valeur de départ et qu'une op inverse
+// fidèle soit produite. C'est ce qui rend l'aller-retour sans perte.
 // -----------------------------------------------------------------------
 public sealed class FakeRegistryReader : IRegistryReader
 {
@@ -306,10 +306,9 @@ public sealed class FakeRegistryReader : IRegistryReader
     public Result<uint?> ReadDword(RegistryHiveKind hive, string path, string name) =>
         Result<uint?>.Ok(_state.ReadRegistry(hive, path, name));
 
-    // 19/09/2026 — ces deux-la rendaient toujours `Ok(null)`, « absente ». Le commentaire disait
-    // « ajouter un magasin de chaines le jour ou un levier en ecrit une » : deux en ecrivaient
-    // deja (latency.vrrFlipModelOn, fixit.sane_pagefile). Un lecteur qui repond « absent » a
-    // tout fabrique des inverses de SUPPRESSION, et une suppression restaure toujours.
+    // Un vrai magasin de chaines : des leviers en ecrivent (latency.vrrFlipModelOn, fixit.sane_pagefile).
+    // Un lecteur qui repond « absent » a tout fabriquerait des inverses de SUPPRESSION, et une
+    // suppression restaure toujours.
     public Result<string?> ReadString(RegistryHiveKind hive, string path, string name) =>
         Result<string?>.Ok(_state.ReadRegistryText(hive, path, name));
 
@@ -329,8 +328,8 @@ public sealed class FakeNvApi : INvApi
     public Result<uint> GetFrameRateLimit() => Result<uint>.Ok(_state.NvFrameRateLimit);
     public Result<DrsOriginState> GetFrameRateLimitOrigin() =>
         Result<DrsOriginState>.Ok(DrsSettingOrigin.Describe(0, 0, 0));
-    // heuristic: adaptive (0) default — no integration flow exercises Prefer-Max-Perf yet;
-    // add a FakeSystemState field the day one does.
+    // heuristique : adaptatif (0) par défaut ; aucun flux d'intégration n'exerce encore Prefer-Max-Perf ;
+    // ajouter un champ à FakeSystemState le jour où l'un le fait.
     public Result<uint> GetPreferredPstate() => Result<uint>.Ok(0);
 }
 
@@ -359,7 +358,7 @@ public sealed class FakeDisplayInfo : IDisplayInfo
             : Result<IReadOnlyList<DisplayInfo>>.Fail(ErrorCodes.TweakSdkUnavailable, "no display (fake)");
 }
 
-/// <summary>L-ECRAN : le mode de l'écran, posé dans l'état du banc. Un mode au-dessus de la fréquence max lue est refusé
+/// <summary>Le mode de l'écran, posé dans l'état du banc. Un mode au-dessus de la fréquence max lue est refusé
 /// à l'essai, comme Windows refuse un mode que l'écran n'énumère pas.</summary>
 public sealed class FakeModeEcran(FakeSystemState state) : IModeEcran
 {
@@ -400,7 +399,7 @@ public sealed class FakeAdlxGpuTuning : IAdlxGpuTuning
     public FakeAdlxGpuTuning(FakeSystemState state) => _state = state;
 
     public bool IsAvailable => _state.AdlxAvailable;
-    // The modeled machine has a single tunable GPU at index 0 when ADLX is available.
+    // La machine modélisée a une seule carte réglable à l'index 0 quand ADLX est disponible.
     public Result<int> ResolveTunableGpuIndex() =>
         _state.AdlxAvailable
             ? Result<int>.Ok(0)
@@ -427,11 +426,17 @@ public sealed class FakePowerPlanReader : IPowerPlanReader
         : Result<EconomieSansFilLue>.Fail(ErrorCodes.TweakSdkUnavailable, "plan non modélisé");
 }
 
-/// <summary>B1 (10/10/2026) : les registres de limite de puissance du banc (unité = huitièmes de watt, base 65 W).</summary>
+/// <summary>Les registres de limite de puissance du banc (unité = huitièmes de watt, base 65 W).</summary>
 public sealed class FakeCpuPowerLimitReader : ICpuPowerLimitReader
 {
     private readonly FakeSystemState _state;
-    public FakeCpuPowerLimitReader(FakeSystemState state) => _state = state;
+    private readonly double? _plafondThermique;
+    /// <param name="plafondThermique">Le plafond que la dernière partie demande (levier `fixit.cpu_power_cap`).</param>
+    public FakeCpuPowerLimitReader(FakeSystemState state, double? plafondThermique = null)
+    {
+        _state = state;
+        _plafondThermique = plafondThermique;
+    }
 
     public Result<LectureLimiteCpu> LireRegistres()
     {
@@ -439,7 +444,7 @@ public sealed class FakeCpuPowerLimitReader : ICpuPowerLimitReader
         var lu = RegistreDeLimiteCpu.Decoder(0x3, _state.CpuPkgPowerLimit, 520UL);
         return lu is null
             ? Result<LectureLimiteCpu>.Fail(ErrorCodes.TweakSdkUnavailable, "registres vides")
-            : Result<LectureLimiteCpu>.Ok(new LectureLimiteCpu(registres, lu with { CopieMmioPl1W = 0 }));
+            : Result<LectureLimiteCpu>.Ok(new LectureLimiteCpu(registres, lu with { CopieMmioPl1W = 0, PlafondThermiqueW = _plafondThermique }));
     }
 }
 
@@ -452,9 +457,9 @@ public sealed class FakeServiceStateReader : IServiceStateReader
         Result<ServiceState>.Ok(_state.GetService(serviceName));
 }
 
-// A stability tester that always reports stable — so a GPU undervolt is kept and
-// then auto-reverted by the engine (rather than self-reverting), exercising the
-// engine's revert path on a GPU op.
+// Un testeur de stabilité qui dit toujours stable : un undervolt GPU est donc gardé puis
+// annulé automatiquement par le moteur (au lieu de s'annuler lui-même), ce qui exerce
+// le chemin de retour arrière du moteur sur une op GPU.
 public sealed class StableStabilityTester : IStabilityTester
 {
     public Task<Result<StabilityOutcome>> RunAsync(int gpuIndex, CancellationToken ct) =>

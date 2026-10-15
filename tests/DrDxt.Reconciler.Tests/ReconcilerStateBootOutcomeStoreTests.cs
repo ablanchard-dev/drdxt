@@ -4,10 +4,10 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// T27b write path — ReconcilerStateBootOutcomeStore maintains the unclean-boot
-// streak in the runtime sidecar (dead-man pattern): MarkBootStarted increments,
-// MarkSessionStable resets to 0 and stamps the clock, GetUncleanStreak reads.
-// Pure (Core only); each op is Load → mutate → Save, fail-clean (no partial write).
+// Chemin d'écriture : ReconcilerStateBootOutcomeStore tient la série de démarrages
+// non propres dans l'annexe d'exécution (motif de l'homme mort) : MarkBootStarted incrémente,
+// MarkSessionStable remet à 0 et date avec l'horloge, GetUncleanStreak lit.
+// Pur (Core seulement) ; chaque op est Load → muter → Save, à échec propre (aucune écriture partielle).
 // -----------------------------------------------------------------------
 public sealed class ReconcilerStateBootOutcomeStoreTests
 {

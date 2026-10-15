@@ -4,7 +4,7 @@ using System.Windows.Media;
 namespace DrDxt.App.Effets;
 
 /// <summary>
-/// 03/10/2026 (boucle 2D2P, D4.6) : l'en-tête vivant d'un domaine. Le langage de l'écran d'analyse (un pôle relié à ce
+/// L'en-tête vivant d'un domaine. Le langage de l'écran d'analyse (un pôle relié à ce
 /// qu'il a lu) porté sur chaque page : un pôle à gauche, un fil fin vers un point par lecture, les constats plus vifs.
 /// Une impulsion parcourt les fils au rythme du <see cref="MoteurDAnimation"/> ; c'est une décoration, elle se fige quand
 /// le jeu est devant. Rien de cliquable.
@@ -47,7 +47,7 @@ public sealed class ConstellationDuDomaine : FrameworkElement
     /// former une ligne droite. Jamais plus de <see cref="MaximumDePoints"/> ; jamais hors du cadre.</summary>
     public static IReadOnlyList<Point> Points(int lectures, double largeur, double hauteur)
     {
-        // Revue : une ou deux lectures donnaient un trait isolé qui ressemblait à un bug ; sous trois, rien.
+        // Une ou deux lectures donnaient un trait isolé qui ressemblait à un bug ; sous trois, rien.
         var n = lectures < 3 ? 0 : Math.Clamp(lectures, 0, MaximumDePoints);
         var pole = Pole(hauteur);
         var points = new List<Point>(n);
@@ -72,7 +72,7 @@ public sealed class ConstellationDuDomaine : FrameworkElement
         if (w <= 0 || h <= 0) return;
         var pole = Pole(h);
         var points = Points(Lectures, w, h);
-        // 03/10/2026 (D8.1, revue n° 3) : un pôle seul, sans fil, se lisait comme un rendu raté ; rien du tout.
+        // Un pôle seul, sans fil, passerait pour un rendu raté : mieux vaut ne rien dessiner.
         if (points.Count == 0) return;
         var signales = Math.Min(Signales, points.Count);
         var plume = new Pen(Fil, 1);

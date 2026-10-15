@@ -7,20 +7,20 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// M2 Phase E2 — GpuUndervoltTweak.
+// GpuUndervoltTweak.
 //
-// Option A (master §11): a conservative NEGATIVE core-clock offset (+ power limit)
-// via NVAPI / ADLX — not a full V/F curve. Sequence:
-//   (1) AppliesTo HARD gating = desktop dGPU only (false on laptop / Optimus /
-//       iGPU / handheld),
-//   (2) clamp via GpuSafeBounds — out of bounds → TWEAK.NOT_APPLICABLE,
-//   (3) capture the original offset (read seam) → serialized inverse op in snapshot,
-//   (4) apply via IElevatedClient (ApplyNvApiClockOffsetOp / ApplyAdlxTuningOp),
-//   (5) stability test (IStabilityTester) → if unstable → revert immediately and
-//       return TWEAK.UNSTABLE (never Ok while unstable).
+// Un décalage négatif prudent de l'horloge cœur (+ limite de puissance)
+// via NVAPI / ADLX, pas une courbe V/F complète. Séquence :
+//   (1) filtre dur AppliesTo = dGPU de bureau seulement (faux sur portable, Optimus,
+//       iGPU, console portable),
+//   (2) bornage via GpuSafeBounds ; hors bornes → TWEAK.NOT_APPLICABLE,
+//   (3) capture du décalage d'origine (couture de lecture) → op inverse sérialisée dans l'instantané,
+//   (4) application via IElevatedClient (ApplyNvApiClockOffsetOp / ApplyAdlxTuningOp),
+//   (5) test de stabilité (IStabilityTester) → si instable → retour arrière immédiat et
+//       rendre TWEAK.UNSTABLE (jamais Ok tant que c'est instable).
 //
-// HONESTY (§5): SummaryKey = efficiency / cooler / steadier 1% lows — never "+FPS".
-// Pure unit tests with NSubstitute fakes — no real SDK / GPU access.
+// Honnêteté : SummaryKey = efficacité / plus frais / 1 % bas plus réguliers, jamais « +FPS ».
+// Tests unitaires purs avec des faux NSubstitute : aucun accès réel au SDK ni à la carte.
 // -----------------------------------------------------------------------
 public sealed class GpuUndervoltTweakTests
 {
@@ -54,30 +54,30 @@ public sealed class GpuUndervoltTweakTests
         new BiosInfo("1.0", null, true),
         ChassisType.Desktop);
 
-    // A conservative, in-bounds undervolt offset (within GpuSafeBounds).
+    // Un décalage d'undervolt prudent, dans les bornes (GpuSafeBounds).
     private static GpuTuningTarget SafeTarget(int coreOffsetMhz = -120) =>
         new(GpuIndex: 0, CoreOffsetMhz: coreOffsetMhz, MemoryOffsetMhz: 0);
 
     private GpuUndervoltTweak Build(GpuTuningTarget? target = null, HardwareInventory? amdPresenceHw = null)
     {
         _nvApi.IsAvailable.Returns(true);
-        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(0));      // stock = 0 offset
+        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(0));      // origine = décalage 0
         _nvApi.GetMemoryClockOffsetMhz(0).Returns(Result<int>.Ok(0));
         _adlx.IsAvailable.Returns(false);
-        _adlx.ResolveTunableGpuIndex().Returns(Result<int>.Ok(0)); // default: single tunable GPU at 0
+        _adlx.ResolveTunableGpuIndex().Returns(Result<int>.Ok(0)); // par défaut : une seule carte réglable, en 0
         _adlx.GetUndervoltValue(0).Returns(Result<int>.Ok(0));
-        // ADLX reads/writes an absolute MaxFreq; the AMD apply reads the current absolute max
-        // clock to build the target (current + offset) and to capture the absolute original.
-        _adlx.GetGfxMaxFreqMhz(Arg.Any<int>()).Returns(Result<int>.Ok(2900)); // stock max clock
+        // ADLX lit et écrit une MaxFreq absolue ; l'application AMD lit l'horloge max absolue
+        // courante pour construire la cible (courante + décalage) et capturer l'origine absolue.
+        _adlx.GetGfxMaxFreqMhz(Arg.Any<int>()).Returns(Result<int>.Ok(2900)); // horloge max d'origine
         _stability.RunAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<StabilityOutcome>.Ok(StabilityOutcome.Stable)));
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
-        // M6 — the tweak now reads its target from the live IGpuTuningTargetSource; seed it
-        // with the test's tuning target (the power-limit default is unused by this tweak).
+        // Le levier lit sa cible dans l'IGpuTuningTargetSource vivant ; on y pose
+        // la cible de réglage du test (la limite de puissance par défaut n'est pas utilisée ici).
         var source = new GpuTuningTargetSource(target ?? SafeTarget(), new GpuPowerLimitTarget(0, 90));
-        // The AMD-GPU-presence fact is a real hardware fact computed by the source from the
-        // scanned inventory (never forced on a fake seam) — set it from real AMD hw when asked.
+        // La présence d'un GPU AMD est un vrai fait matériel calculé par la source depuis
+        // l'inventaire scanné (jamais forcé sur une fausse couture) : posée depuis un vrai matériel AMD à la demande.
         if (amdPresenceHw is not null)
             source.SetAmdGpuPresenceFromHardware(amdPresenceHw);
         return new GpuUndervoltTweak(_nvApi, _adlx, _stability, _elevated, source);
@@ -96,12 +96,12 @@ public sealed class GpuUndervoltTweakTests
     [Fact]
     public void SummaryKey_is_honest_no_fps_claim()
     {
-        // §5: an undervolt on an already-cool desktop is ~0 on peak FPS.
+        // Un undervolt sur un bureau déjà frais vaut ~0 sur les FPS de pointe.
         Build().SummaryKey.Should().Be("tweak.gpu.undervolt.efficiency");
         Build().SummaryKey.Should().NotContain("fps");
     }
 
-    // --- HARD gating: desktop dGPU only. ---
+    // --- Filtre dur : dGPU de bureau seulement. ---
 
     [Fact]
     public void AppliesTo_true_on_desktop_nvidia_dgpu() =>
@@ -128,12 +128,12 @@ public sealed class GpuUndervoltTweakTests
     public void AppliesTo_false_on_handheld() =>
         Build().AppliesTo(HandheldDeck(), State).Should().BeFalse();
 
-    // --- Clamp: out-of-bounds offset → TWEAK.NOT_APPLICABLE, nothing written. ---
+    // --- Bornage : décalage hors bornes → TWEAK.NOT_APPLICABLE, rien d'écrit. ---
 
     [Fact]
     public async Task Apply_rejects_offset_outside_safe_bounds()
     {
-        var t = Build(SafeTarget(coreOffsetMhz: -500)); // far beyond MinCoreOffsetMhz
+        var t = Build(SafeTarget(coreOffsetMhz: -500)); // bien au-delà de MinCoreOffsetMhz
 
         var r = await t.ApplyAsync();
 
@@ -154,22 +154,38 @@ public sealed class GpuUndervoltTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // --- Apply: capture original → snapshot, apply via helper (NVAPI clock offset). ---
+    // La mémoire ne s'écrit pas : ni la cible (un profil à +200), ni celle de la carte (+1000 posé par un autre outil, hors
+    // des bornes de la liste blanche, qui refuserait alors le réglage cœur) ne partent dans l'op.
+    [Fact]
+    public async Task L_op_ne_porte_aucune_memoire()
+    {
+        var t = Build(new GpuTuningTarget(GpuIndex: 0, CoreOffsetMhz: -120, MemoryOffsetMhz: 200));
+        _nvApi.GetMemoryClockOffsetMhz(0).Returns(Result<int>.Ok(1000));
+
+        (await t.ApplyAsync()).IsOk.Should().BeTrue();
+
+        await _elevated.Received().ExecuteAsync(
+            Arg.Is<ApplyNvApiClockOffsetOp>(o => o.CoreOffsetMhz == -120 && o.MemoryOffsetMhz == 0), Arg.Any<CancellationToken>());
+        await _elevated.DidNotReceive().ExecuteAsync(
+            Arg.Is<ApplyNvApiClockOffsetOp>(o => o.MemoryOffsetMhz != 0), Arg.Any<CancellationToken>());
+    }
+
+    // --- Application : capture de l'origine → instantané, application via le helper (décalage d'horloge NVAPI). ---
 
     [Fact]
     public async Task Apply_captures_original_offset_and_applies_via_helper()
     {
         var t = Build(SafeTarget(coreOffsetMhz: -120));
-        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(15)); // some prior offset
+        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(15)); // un décalage antérieur quelconque
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // Applied the requested offset via the allowlisted typed op.
+        // Le décalage demandé a été appliqué via l'op typée en liste blanche.
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyNvApiClockOffsetOp>(o => o.GpuIndex == 0 && o.CoreOffsetMhz == -120),
             Arg.Any<CancellationToken>());
-        // Snapshot carries the captured original offset (15) as the inverse op.
+        // L'instantané porte le décalage d'origine capturé (15) en op inverse.
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         inverse.IsOk.Should().BeTrue();
         inverse.Value.Should().BeOfType<ApplyNvApiClockOffsetOp>()
@@ -187,7 +203,7 @@ public sealed class GpuUndervoltTweakTests
         await _stability.Received(1).RunAsync(0, Arg.Any<CancellationToken>());
     }
 
-    // --- Stability test fails → revert immediately, return TWEAK.UNSTABLE. ---
+    // --- Le test de stabilité échoue → retour immédiat, rendre TWEAK.UNSTABLE. ---
 
     [Fact]
     public async Task Apply_reverts_immediately_and_fails_unstable_when_stability_test_crashes()
@@ -199,11 +215,11 @@ public sealed class GpuUndervoltTweakTests
 
         var r = await t.ApplyAsync();
 
-        // Never Ok while unstable.
+        // Jamais Ok tant que c'est instable.
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakUnstable);
-        // Three helper calls now: (1) the capability probe's IDENTITY write of the captured
-        // original (§6.0), (2) the undervolt offset, (3) the revert replaying the original.
+        // Trois appels au helper : (1) l'écriture identité de l'origine capturée par la sonde de
+        // capacité, (2) le décalage d'undervolt, (3) le retour arrière qui rejoue l'origine.
         await _elevated.Received(3).ExecuteAsync(Arg.Any<ApplyNvApiClockOffsetOp>(), Arg.Any<CancellationToken>());
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyNvApiClockOffsetOp>(o => o.CoreOffsetMhz == 0), Arg.Any<CancellationToken>());
@@ -212,20 +228,20 @@ public sealed class GpuUndervoltTweakTests
     [Fact]
     public async Task Apply_reports_failed_revert_distinctly_when_unstable_and_revert_also_fails()
     {
-        // §11 safety/honesty: if the GPU is unstable AND the automatic revert itself
-        // FAILS, we must not claim it "was reverted immediately" — the message must
-        // honestly reflect that the revert failed (GPU still undervolted + unstable).
+        // Sécurité et honnêteté : si la carte est instable et que le retour arrière automatique
+        // échoue lui-même, on ne doit pas dire « annulé immédiatement » ; le message doit
+        // refléter honnêtement l'échec du retour (carte toujours sous-voltée et instable).
         var t = Build(SafeTarget(coreOffsetMhz: -120));
-        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(0)); // original offset = 0
+        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(0)); // décalage d'origine = 0
         _stability.RunAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<StabilityOutcome>.Ok(StabilityOutcome.Unstable)));
-        // The applied undervolt (offset -120) succeeds; the revert (offset back to 0) FAILS.
+        // L'undervolt appliqué (décalage -120) réussit ; le retour (décalage à 0) échoue.
         _elevated.ExecuteAsync(
                 Arg.Is<ApplyNvApiClockOffsetOp>(o => o.CoreOffsetMhz == -120), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
-        // The "write the original (0) back" op is used TWICE: once by the capability probe
-        // (identity write, must succeed or we never tune at all) and once by the revert. Same
-        // op by construction → sequence the fake: 1st call ok (probe), 2nd call FAILS (revert).
+        // L'op « réécrire l'origine (0) » sert deux fois : à la sonde de capacité (écriture
+        // identité, qui doit réussir sinon on ne règle rien) et au retour arrière. Même op par
+        // construction → séquencer le faux : 1er appel ok (sonde), 2e appel échoue (retour).
         _elevated.ExecuteAsync(
                 Arg.Is<ApplyNvApiClockOffsetOp>(o => o.CoreOffsetMhz == 0), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()),
@@ -234,9 +250,9 @@ public sealed class GpuUndervoltTweakTests
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeFalse();
-        // 08/10/2026 (revue n° 13) : un code a part, pour que le journal reste et que l'ecran ne dise pas « rendue ».
+        // Un code a part, pour que le journal reste et que l'ecran ne dise pas « rendue ».
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakPartiallyApplied);
-        // The message must reflect the FAILED revert, never the "reverted immediately" wording.
+        // Le message doit refléter le retour raté, jamais la formule « annulé immédiatement ».
         r.Error!.Value.Message.Should().NotContain("reverted immediately");
         r.Error!.Value.Message.Should().Contain("revert failed");
         r.Error!.Value.Message.Should().Contain("System Restore");
@@ -245,7 +261,7 @@ public sealed class GpuUndervoltTweakTests
     [Fact]
     public async Task Apply_treats_inconclusive_stability_as_unsafe_and_reverts()
     {
-        // If the stability harness cannot run, we do not keep an unverified undervolt.
+        // Si le banc de stabilité ne peut pas tourner, on ne garde pas un undervolt non vérifié.
         var t = Build();
         _stability.RunAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<StabilityOutcome>.Ok(StabilityOutcome.Inconclusive)));
@@ -254,7 +270,7 @@ public sealed class GpuUndervoltTweakTests
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakUnstable);
-        // probe identity write + apply + revert = 3.
+        // écriture identité de la sonde + application + retour = 3.
         await _elevated.Received(3).ExecuteAsync(Arg.Any<ApplyNvApiClockOffsetOp>(), Arg.Any<CancellationToken>());
     }
 
@@ -269,22 +285,22 @@ public sealed class GpuUndervoltTweakTests
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakUnstable);
-        // probe identity write + apply + revert = 3.
+        // écriture identité de la sonde + application + retour = 3.
         await _elevated.Received(3).ExecuteAsync(Arg.Any<ApplyNvApiClockOffsetOp>(), Arg.Any<CancellationToken>());
     }
 
-    // --- AMD branch (ADLX undervolt). ---
+    // --- Branche AMD (undervolt ADLX). ---
 
     [Fact]
     public async Task Apply_uses_adlx_undervolt_on_amd_with_an_absolute_target_and_absolute_inverse()
     {
-        // ADLX is absolute: the apply op carries current MaxFreq + offset (2900 + (-100) = 2800)
-        // and the INVERSE op carries the absolute original (2900) — not a voltage. This is the
-        // fixed unit symmetry with the power-limit path; the revert restores the exact stock clock.
+        // ADLX est absolu : l'op d'application porte MaxFreq courante + décalage (2900 + (-100) = 2800)
+        // et l'op inverse porte l'origine absolue (2900), pas une tension. C'est la symétrie d'unité
+        // corrigée avec le chemin de limite de puissance ; le retour rend l'horloge d'origine exacte.
         var t = Build(SafeTarget(coreOffsetMhz: -100));
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(true);
-        _adlx.GetGfxMaxFreqMhz(0).Returns(Result<int>.Ok(2900)); // current absolute max clock
+        _adlx.GetGfxMaxFreqMhz(0).Returns(Result<int>.Ok(2900)); // horloge max absolue courante
 
         var r = await t.ApplyAsync();
 
@@ -300,8 +316,8 @@ public sealed class GpuUndervoltTweakTests
     [Fact]
     public async Task Apply_amd_fails_clean_when_current_maxfreq_read_fails()
     {
-        // No absolute current MaxFreq → we cannot build a faithful absolute target/inverse, so
-        // we fail clean and never apply (never guess a current clock).
+        // Pas de MaxFreq absolue courante → impossible de construire une cible et un inverse absolus
+        // fidèles, donc échec propre et aucune application (jamais deviner une horloge courante).
         var t = Build(SafeTarget(coreOffsetMhz: -100));
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(true);
@@ -315,31 +331,31 @@ public sealed class GpuUndervoltTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // --- AMD discrete-GPU selection (T4): resolve the tunable dGPU, not the iGPU. ---
+    // --- Choix de la carte AMD dédiée : résoudre la dGPU réglable, pas l'iGPU. ---
 
     [Fact]
     public async Task Apply_amd_resolves_discrete_gpu_index_and_targets_it_throughout()
     {
-        // iGPU at index 0 (not tunable) + discrete AMD dGPU at index 1. The resolver picks 1,
-        // and the capture, apply AND stability test all target index 1 — never the iGPU at 0.
+        // iGPU à l'index 0 (non réglable) + dGPU AMD dédiée à l'index 1. Le résolveur choisit 1,
+        // et la capture, l'application et le test de stabilité visent tous l'index 1, jamais l'iGPU en 0.
         var t = Build(SafeTarget(coreOffsetMhz: -100));
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(true);
         _adlx.ResolveTunableGpuIndex().Returns(Result<int>.Ok(1));
-        _adlx.GetGfxMaxFreqMhz(1).Returns(Result<int>.Ok(2900)); // current absolute max clock on the dGPU
+        _adlx.GetGfxMaxFreqMhz(1).Returns(Result<int>.Ok(2900)); // horloge max absolue courante sur la dGPU
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // The applied undervolt op targeted the discrete card at index 1 (absolute 2900 + (-100)).
+        // L'op d'undervolt appliquée visait la carte dédiée à l'index 1 (absolu 2900 + (-100)).
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyAdlxTuningOp>(o =>
                 o.GpuIndex == 1 && o.Kind == AdlxTuningKind.Undervolt && o.IntValue == 2800),
             Arg.Any<CancellationToken>());
-        // The stability test ran on the same resolved index (1).
+        // Le test de stabilité a tourné sur le même index résolu (1).
         await _stability.Received().RunAsync(1, Arg.Any<CancellationToken>());
         await _stability.DidNotReceive().RunAsync(0, Arg.Any<CancellationToken>());
-        // The captured-original inverse op (for revert) carries index 1 and the absolute original.
+        // L'op inverse d'origine capturée (pour le retour arrière) porte l'index 1 et l'origine absolue.
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         var op = inverse.Value.Should().BeOfType<ApplyAdlxTuningOp>().Subject;
         op.GpuIndex.Should().Be(1);
@@ -349,13 +365,13 @@ public sealed class GpuUndervoltTweakTests
     [Fact]
     public async Task Apply_amd_reverts_on_resolved_index_when_unstable()
     {
-        // Unstable → the immediate revert must replay the inverse op on the same resolved
-        // physical GPU (index 1), restoring the absolute original MaxFreq (2900), not a voltage.
+        // Instable → le retour immédiat doit rejouer l'op inverse sur la même carte physique
+        // résolue (index 1), en rendant la MaxFreq absolue d'origine (2900), pas une tension.
         var t = Build(SafeTarget(coreOffsetMhz: -100));
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(true);
         _adlx.ResolveTunableGpuIndex().Returns(Result<int>.Ok(1));
-        _adlx.GetGfxMaxFreqMhz(1).Returns(Result<int>.Ok(2900)); // current absolute max clock; apply → 2800
+        _adlx.GetGfxMaxFreqMhz(1).Returns(Result<int>.Ok(2900)); // horloge max absolue courante ; application → 2800
         _stability.RunAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<StabilityOutcome>.Ok(StabilityOutcome.Unstable)));
 
@@ -363,7 +379,7 @@ public sealed class GpuUndervoltTweakTests
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakUnstable);
-        // Revert replayed the inverse op (back to the absolute original 2900) on index 1.
+        // Le retour a rejoué l'op inverse (retour à l'origine absolue 2900) sur l'index 1.
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyAdlxTuningOp>(o => o.GpuIndex == 1 && o.IntValue == 2900),
             Arg.Any<CancellationToken>());
@@ -373,8 +389,8 @@ public sealed class GpuUndervoltTweakTests
     [Fact]
     public async Task Apply_amd_fails_clean_when_no_tunable_gpu_resolved()
     {
-        // 0-tunable-GPU box (e.g. iGPU only on the ADLX side): the resolver fails → fail-clean,
-        // NO apply op is executed, and we never claim Ok.
+        // Machine sans GPU réglable (iGPU seule côté ADLX, par exemple) : le résolveur échoue →
+        // échec propre, aucune op d'application exécutée, et jamais Ok.
         var t = Build(SafeTarget(coreOffsetMhz: -100));
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(true);
@@ -388,7 +404,7 @@ public sealed class GpuUndervoltTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // --- Fail-clean. ---
+    // --- Échec propre. ---
 
     [Fact]
     public async Task Apply_fails_clean_when_no_sdk_available()
@@ -442,57 +458,57 @@ public sealed class GpuUndervoltTweakTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
     }
 
-    // --- Honesty: AMD GPU present but ADLX unavailable → explicit honest status. ---
+    // --- Honnêteté : GPU AMD présent mais ADLX indisponible → statut honnête explicite. ---
 
     [Fact]
     public async Task Apply_returns_amd_tuning_unavailable_when_amd_gpu_present_and_adlx_unavailable()
     {
-        // §22.3: when tuning cannot be done for this setup, SAY SO — never silently skip.
-        // Scenario: AMD desktop dGPU detected, NVAPI absent (expected on AMD), ADLX SDK not
-        // yet wired in this build. Must be a distinct honest code, not a silent skip and not
-        // a success. PRESENCE comes from the real source computing it from real AMD hardware
-        // (GpuGating.IsAmd) — never forced on a fake seam.
+        // Quand le réglage est impossible sur cette configuration, le dire, jamais sauter en silence.
+        // Scénario : dGPU AMD de bureau détectée, NVAPI absent (attendu sur AMD), SDK ADLX pas
+        // encore câblé dans cette version. Il faut un code honnête distinct, ni saut silencieux ni
+        // succès. La présence vient de la vraie source qui la calcule depuis un vrai matériel AMD
+        // (GpuGating.IsAmd), jamais forcée sur une fausse couture.
         var t = Build(amdPresenceHw: DesktopAmd());
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(false);
 
         var r = await t.ApplyAsync();
 
-        // Not applied — would be dishonest.
+        // Non appliqué : ce serait malhonnête.
         r.IsOk.Should().BeFalse();
-        // Explicit, distinct honest code.
+        // Code honnête explicite et distinct.
         r.Error!.Value.Code.Should().Be(ErrorCodes.GpuAmdTuningUnavailable);
-        // Distinct from the generic SDK error (which could mean anything).
+        // Distinct de l'erreur SDK générique (qui pourrait vouloir dire n'importe quoi).
         r.Error!.Value.Code.Should().NotBe(ErrorCodes.TweakSdkUnavailable,
             because: "must be distinct from a generic SDK unavailable");
-        // Distinct from hardware gating (non-AMD machines stay silent — this one DOES apply).
+        // Distinct du filtre matériel (les machines non AMD restent muettes ; celui-ci s'applique bien).
         r.Error!.Value.Code.Should().NotBe(ErrorCodes.TweakNotApplicable,
             because: "must not look like the tweak does not apply to this hardware");
-        // No privileged write attempted.
+        // Aucune écriture privilégiée tentée.
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // --- CAPABILITY PROBE (hardware-coverage doctrine): a driver that says "ok" and writes nothing. ---
-    // This is the whole point of the probe: we cannot own 2015-2026 hardware, so support is
-    // proven per device. A locked / OEM-capped / mobile-ish card whose driver reports success
-    // and changes nothing must be REFUSED, not credited with a fake undervolt.
+    // --- Sonde de capacité (doctrine de couverture matérielle) : un pilote qui dit « ok » et n'écrit rien. ---
+    // C'est tout l'enjeu de la sonde : on ne possède pas le matériel de 2015 à 2026, donc le
+    // support se prouve carte par carte. Une carte verrouillée, bridée par l'OEM ou quasi mobile
+    // dont le pilote annonce un succès sans rien changer doit être refusée, pas créditée d'un faux undervolt.
 
     [Fact]
     public async Task Apply_refuses_when_the_identity_probe_write_does_not_take_nvidia()
     {
         var t = Build(SafeTarget(coreOffsetMhz: -120));
-        // 1st read = capture (15). 2nd read = the probe's read-back, and the card did not
-        // take the identity write (still stock 0) → the write path is not live here.
+        // 1re lecture = capture (15). 2e lecture = relecture de la sonde, et la carte n'a pas
+        // pris l'écriture identité (toujours 0 d'origine) → le chemin d'écriture n'est pas vivant ici.
         _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(15), Result<int>.Ok(0));
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakUnsupportedOnThisGpu);
-        // Nothing was tuned: the requested offset never reached the helper.
+        // Rien n'a été réglé : le décalage demandé n'a jamais atteint le helper.
         await _elevated.DidNotReceive().ExecuteAsync(
             Arg.Is<ApplyNvApiClockOffsetOp>(o => o.CoreOffsetMhz == -120), Arg.Any<CancellationToken>());
-        // ...and no stability test was run on a GPU we never touched.
+        // …et aucun test de stabilité n'a tourné sur une carte jamais touchée.
         await _stability.DidNotReceive().RunAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
@@ -502,7 +518,7 @@ public sealed class GpuUndervoltTweakTests
         var t = Build(SafeTarget(coreOffsetMhz: -100));
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(true);
-        // 1st read = capture (2900). 2nd = probe read-back: the card ignored the write.
+        // 1re lecture = capture (2900). 2e = relecture de la sonde : la carte a ignoré l'écriture.
         _adlx.GetGfxMaxFreqMhz(0).Returns(Result<int>.Ok(2900), Result<int>.Ok(2500));
 
         var r = await t.ApplyAsync();
@@ -516,19 +532,19 @@ public sealed class GpuUndervoltTweakTests
     [Fact]
     public async Task Apply_probe_writes_the_captured_original_back_which_changes_nothing()
     {
-        // The probe must be a NO-OP for the hardware: it writes the value it just read.
+        // La sonde doit être sans effet pour le matériel : elle écrit la valeur qu'elle vient de lire.
         var t = Build(SafeTarget(coreOffsetMhz: -120));
-        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(15)); // constant → probe passes
+        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(15)); // constante → la sonde passe
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // The probe wrote 15 (the captured original), i.e. the current value onto itself.
+        // La sonde a écrit 15 (l'origine capturée), soit la valeur courante sur elle-même.
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyNvApiClockOffsetOp>(o => o.CoreOffsetMhz == 15), Arg.Any<CancellationToken>());
     }
 
-    // --- Revert restores the captured original. ---
+    // --- Le retour arrière rend l'origine capturée. ---
 
     [Fact]
     public async Task Revert_restores_the_captured_original_via_helper()

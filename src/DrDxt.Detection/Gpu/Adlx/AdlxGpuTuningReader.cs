@@ -5,11 +5,11 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Gpu.Adlx;
 
 // -----------------------------------------------------------------------
-// AdlxGpuTuningReader — implements IAdlxGpuTuning over IAdlxNative.
+// AdlxGpuTuningReader : implémente IAdlxGpuTuning sur IAdlxNative.
 //
-// Pure domain logic: maps the boundary's raw reads to domain types and
-// Result error codes. Contains NO native calls — fully testable against
-// FakeAdlxNative without AMD hardware.
+// Pure logique de domaine : traduit les lectures brutes de la frontière en types du domaine
+// et en codes d'erreur Result. Aucun appel natif ici : entièrement testable contre
+// FakeAdlxNative sans matériel AMD.
 // -----------------------------------------------------------------------
 public sealed class AdlxGpuTuningReader : IAdlxGpuTuning
 {
@@ -21,9 +21,9 @@ public sealed class AdlxGpuTuningReader : IAdlxGpuTuning
 
     public Result<int> ResolveTunableGpuIndex()
     {
-        // Ported from the AMD harness picker: on an iGPU + dGPU box ADLX index 0 is often
-        // the non-tunable iGPU, so probe a small range and pick the first GPU whose GFX
-        // tuning reads cleanly — the discrete AMD card. Fail-clean if none is tunable.
+        // Repris du sélecteur du banc AMD : sur une machine iGPU + dGPU, l'index ADLX 0 est souvent
+        // l'iGPU non réglable ; on sonde une petite plage et on prend le premier GPU dont le réglage
+        // GFX se lit proprement, la carte AMD dédiée. Échec propre si aucun n'est réglable.
         if (!_native.IsAvailable)
             return Fail("ADLX SDK not available (AMD driver / GPU absent).");
 
@@ -49,10 +49,10 @@ public sealed class AdlxGpuTuningReader : IAdlxGpuTuning
 
     public Result<int> GetGfxMaxFreqMhz(int gpuIndex)
     {
-        // The absolute current GFX max clock (MHz) — the value the undervolt write sets.
-        // The undervolt tweak reads this to build an absolute target (current + offset) and
-        // to capture the absolute original for a faithful revert (mirrors the power-limit %
-        // round-trip). Fail-clean on a bad index / unavailable SDK / read failure.
+        // L'horloge GFX max absolue courante (MHz), la valeur que pose l'écriture de sous-tension.
+        // Le levier la lit pour construire une cible absolue (courante + décalage) et relever
+        // l'origine absolue pour un retour fidèle (comme l'aller-retour du % de limite de puissance).
+        // Échec propre sur un mauvais index, un SDK indisponible ou une lecture ratée.
         if (gpuIndex < 0)
             return Fail($"Invalid GPU index {gpuIndex}.");
         if (!_native.IsAvailable)

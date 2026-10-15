@@ -5,7 +5,7 @@ namespace DrDxt.Detection.Hardware;
 
 public sealed class ChassisDetector
 {
-    // SMBIOS System Enclosure types (spec Table 3). Handheld = 11 (Hand Held), 30 (Tablet).
+    // Types SMBIOS System Enclosure (table 3 de la spec). Console portable = 11 (Hand Held), 30 (Tablet).
     private static readonly int[] HandheldCodes = { 11, 30 };
     private static readonly int[] DesktopCodes = { 3, 4, 5, 6, 7, 15, 16, 17, 23, 24 };
     private static readonly int[] LaptopCodes = { 8, 9, 10, 14, 18, 21, 31, 32 };
@@ -29,7 +29,7 @@ public sealed class ChassisDetector
                  : DesktopCodes.Contains(code) ? ChassisType.Desktop
                  : LaptopCodes.Contains(code) ? ChassisType.Laptop
                  : ChassisType.Unknown;
-        // 09/10/2026 (revue) : mini PC (35), tout-en-un (13) et beaucoup de cartes mères de PC montés (« Other » 1,
+        // Mini PC (35), tout-en-un (13) et beaucoup de cartes mères de PC montés (« Other » 1,
         // « Unknown » 2) tombaient en « inconnu » et perdaient les leviers de bureau sans explication. Sans batterie,
         // ce n'est pas un portable : il est traité en PC fixe. Une station d'accueil (12) a la batterie de son portable.
         if (type == ChassisType.Unknown && SansBatterie()) type = ChassisType.Desktop;

@@ -5,7 +5,7 @@ using Xunit;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// NET1 (08/10/2026) : la qualité du Wi-Fi, lue sans la localisation (wlan_intf_opcode_realtime_connection_quality et
+/// La qualité du Wi-Fi, lue sans la localisation (wlan_intf_opcode_realtime_connection_quality et
 /// wlan_intf_opcode_channel_number, absents de la liste que Microsoft soumet à l'accord de localisation). Lecture seule.
 /// </summary>
 public sealed class QualiteWifiTests

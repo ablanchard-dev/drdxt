@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// LM — la section « ton passage dans le BIOS », moitie memoire. Ce que ces tests tiennent :
+// La section « ton passage dans le BIOS », moitie memoire. Ce que ces tests tiennent :
 // une phrase que le client lit comme une preuve ne s'affiche que quand l'instrument l'a
 // prouvee, et le pourcentage voyage toujours avec les deux valeurs qui le fabriquent.
 // -----------------------------------------------------------------------
@@ -131,7 +131,7 @@ public sealed class MemoryAbViewModelTests
     [Fact]
     public void Aucune_difference_mesurable_dit_SOUS_QUEL_SEUIL_elle_est_restee()
     {
-        // 17/09/2026. « Aucune différence mesurable » sans son seuil se lit « ça ne sert à rien ».
+        // « Aucune différence mesurable » sans son seuil se lit « ça ne sert à rien ».
         // Sur cette machine, monter la mémoire de 3 800 à 4 000 MT/s promet +5,3 % quand le banc
         // ne distingue pas moins de 7,8 % : la phrase honnête est « je ne sais pas voir si petit »,
         // pas « il n'y a rien ». Le tableau de bord le dit déjà pour le GPU (Scan.Drift.None).
@@ -147,7 +147,7 @@ public sealed class MemoryAbViewModelTests
         vm.Conclusion.Should().Contain(7.76.ToString(System.Globalization.CultureInfo.CurrentCulture));
     }
 
-    // 26/09/2026 : une mesure d'avant qui ne date pas du depart n'est ni une machine occupee ni une
+    // Une mesure d'avant qui ne date pas du depart n'est ni une machine occupee ni une
     // faute d'instrument ; la phrase le dit, et dit que le prochain passage par DrDXT le reglera.
     [Fact]
     public void Une_mesure_d_avant_perimee_a_sa_propre_phrase()

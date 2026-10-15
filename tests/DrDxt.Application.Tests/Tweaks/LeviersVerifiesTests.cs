@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Tweaks;
 
-/// <summary>ROAD1 (08/10/2026) : les leviers vérifiés sur ce PC, cumulés ; illisible = rien de vérifié.</summary>
+/// <summary>Les leviers vérifiés sur ce PC, cumulés ; illisible = rien de vérifié.</summary>
 public sealed class LeviersVerifiesTests : IDisposable
 {
     private readonly string _dossier = Path.Combine(Path.GetTempPath(), "drdxt-verifies-" + Guid.NewGuid().ToString("N"));
@@ -17,7 +17,7 @@ public sealed class LeviersVerifiesTests : IDisposable
         LeviersVerifies.Enregistrer(Chemin, Ici, ["latency.hagsOn", "fixit.power_plan"], ["latency.hagsOn", "fixit.power_plan"]);
         LeviersVerifies.Enregistrer(Chemin, Ici, ["latency.hagsOn", "latency.gameModeOn"], ["latency.gameModeOn"]);
 
-        // Revue n° 15 : hags tenté et pas validé la seconde fois ⇒ plus « vérifié » ; power_plan, pas retenté, le reste.
+        // Hags tenté et pas validé la seconde fois ⇒ plus « vérifié » ; power_plan, pas retenté, le reste.
         LeviersVerifies.Lire(Chemin, Ici).Should().HaveCount(2).And.BeEquivalentTo(["fixit.power_plan", "latency.gameModeOn"]);
     }
 

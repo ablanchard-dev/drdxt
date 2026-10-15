@@ -1,6 +1,6 @@
 using DrDxt.ElevatedHelper.Execution.NvApi;
 
-// R2 WRITE smoke — REQUIRES ELEVATION (SetPstates20 / SetStatus need admin).
+// NVAPI WRITE smoke — REQUIRES ELEVATION (SetPstates20 / SetStatus need admin).
 //
 // Conservative, SELF-REVERTING proof that the real NVAPI WRITES apply on this GPU:
 // for each lever it reads the original, applies a small safe change, reads back to

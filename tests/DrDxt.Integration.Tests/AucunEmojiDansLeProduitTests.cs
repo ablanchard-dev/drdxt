@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Integration.Tests;
 
-// 27/09/2026 : un « ⚠️ » restait dans la description d'un levier (FR et EN), lu par le joueur. Les
+// Un « ⚠️ » restait dans la description d'un levier (FR et EN), lu par le joueur. Les
 // pictogrammes decoratifs sont la marque la plus reconnaissable d'un texte ecrit par un assistant ; le
 // produit parle en phrases. Le crible couvre le code, les vues et les textes.
 public sealed class AucunEmojiDansLeProduitTests
@@ -44,7 +44,7 @@ public sealed class AucunEmojiDansLeProduitTests
         fautes.Should().BeEmpty();
     }
 
-    // 28/09/2026 : le crible ne lisait que `src`. L'installeur (script et Inno Setup) et le serveur de mises à
+    // Le crible ne lisait que `src`. L'installeur (script et Inno Setup) et le serveur de mises à
     // jour en portaient encore, dont un commentaire au ton de journal ; ils partent avec le produit.
     [Fact]
     public void Ni_l_installeur_ni_le_serveur_ne_portent_de_pictogramme()

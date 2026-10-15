@@ -4,17 +4,18 @@ using DrDxt.Detection.Hardware;
 namespace DrDxt.ReconcilerHost;
 
 // -----------------------------------------------------------------------
-// EventLogUpdateSignal — the production IUpdateSignal.
+// EventLogUpdateSignal : l'IUpdateSignal de production.
 //
-// The corroborating value comes from a recent successful Windows Update installation in
-// the event log (WindowsUpdateClient, read by `WindowsUpdateEventLog`, the same reader the
-// health audit uses). The primary build detector stays authoritative; this signal only ever
-// ADDS an earlier fire, and a read failure is a `Fail`, which the trigger treats as "no extra
-// signal" (FeatureUpdateTrigger). It never throws.
+// La valeur de confirmation vient d'une installation Windows Update récente et réussie dans le
+// journal d'événements (WindowsUpdateClient, lu par `WindowsUpdateEventLog`, le même lecteur que
+// l'audit de santé). Le détecteur de build principal reste l'autorité ; ce signal ne fait
+// qu'ajouter un déclenchement plus tôt, et un échec de lecture est un `Fail`, que le déclencheur
+// traite comme « pas de signal en plus » (FeatureUpdateTrigger). Ne lève jamais.
 //
-// 25/09/2026 : Defender definition updates are excluded. Windows Update installs them several
-// times a day and they touch no setting DrDXT holds; counting them would make every day look
-// like an update. « Defender » is a brand name, identical in every Windows language.
+// Les mises à jour de définitions de Defender sont exclues. Windows Update les installe plusieurs
+// fois par jour et elles ne touchent aucun réglage que tient DrDXT ; les compter ferait passer
+// chaque jour pour une mise à jour. « Defender » est un nom de marque, identique dans toutes les
+// langues de Windows.
 // -----------------------------------------------------------------------
 public sealed class EventLogUpdateSignal : IUpdateSignal
 {

@@ -6,11 +6,11 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Adapters.Tests;
 
 // -----------------------------------------------------------------------
-// SurfaceSettingProbe: ISettingProbe that dispatches by the descriptor's surface
-// (Registry / PowerPlan / Service), serializing to the same canonical JSON the
-// manifest stores as DesiredValueJson. ScheduledTask → "not supported in V1".
-// Unknown id → CanProbe=false + Fail. The 3 raw OS reads are behind internal seams
-// so dispatch + serialization are fully unit-tested with fakes.
+// SurfaceSettingProbe : ISettingProbe qui dispatche selon la surface du descripteur
+// (Registry / PowerPlan / Service), en sérialisant vers le même JSON canonique que le
+// manifeste stocke en DesiredValueJson. ScheduledTask → « non supporté en V1 ».
+// Identifiant inconnu → CanProbe=false + Fail. Les 3 lectures OS brutes sont derrière des
+// coutures internes, donc dispatch et sérialisation se testent entièrement avec des faux.
 // -----------------------------------------------------------------------
 public sealed class SurfaceSettingProbeTests
 {
@@ -18,7 +18,7 @@ public sealed class SurfaceSettingProbeTests
     private const string PowerId = "fixit.sanePowerPlan";
     private const string ServiceId = "fixit.x3dVCacheService";
 
-    // --- fakes for the three raw OS read seams ---
+    // --- faux des trois coutures de lecture OS brute ---
 
     private sealed class FakeRegistry : IRawRegistryValueReader
     {
@@ -78,7 +78,7 @@ public sealed class SurfaceSettingProbeTests
         var (probe, _, _, _) = Build();
 
         probe.CanProbe("does.not.exist").Should().BeFalse();
-        probe.CanProbe("latency.renderQueueCap").Should().BeFalse(); // DRS-backed, no readable leaf
+        probe.CanProbe("latency.renderQueueCap").Should().BeFalse(); // porté par DRS, aucune feuille lisible
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class SurfaceSettingProbeTests
     [Fact]
     public async Task ScheduledTaskSurface_FailsAsNotSupportedInV1()
     {
-        // A catalog that maps an id to the ScheduledTask surface (no op leaf exists in V1).
+        // Un catalogue qui associe un identifiant à la surface ScheduledTask (aucune feuille d'op en V1).
         var catalog = new StubCatalog(new ReconcilableDescriptor(
             "some.scheduled", ReconcileSurface.ScheduledTask));
         var probe = new SurfaceSettingProbe(catalog, new FakeRegistry(), new FakePowerPlan(), new FakeService());
@@ -160,7 +160,7 @@ public sealed class SurfaceSettingProbeTests
     [Fact]
     public async Task RegistrySurfaceWithoutDescriptorLocation_FailsClean()
     {
-        // Defensive: a Registry-surface descriptor missing its Registry sub-location.
+        // Défensif : un descripteur de surface Registry sans sa sous-localisation Registry.
         var catalog = new StubCatalog(new ReconcilableDescriptor(
             "bad.reg", ReconcileSurface.Registry, Registry: null));
         var probe = new SurfaceSettingProbe(catalog, new FakeRegistry(), new FakePowerPlan(), new FakeService());

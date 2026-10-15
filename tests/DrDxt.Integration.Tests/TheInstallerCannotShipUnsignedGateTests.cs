@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// GATE G2 — les trois garanties de signature de l'installeur.
+/// Les trois garanties de signature de l'installeur.
 ///
 /// `installer/build-installer.ps1` les ecrit noir sur blanc dans son en-tete :
 ///   1. on ne peut pas expedier du non signe par accident (le nom du fichier le DIT) ;

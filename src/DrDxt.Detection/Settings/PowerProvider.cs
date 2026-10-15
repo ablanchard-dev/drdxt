@@ -6,10 +6,10 @@ public interface IPowerProvider
 {
     Result<string> GetActiveSchemeGuid();
 
-    /// <summary>07/10/2026 (L-CPU) : le mode de boost secteur de ce plan et le défaut de sa personnalité ; null = non lu.</summary>
+    /// <summary>Le mode de boost secteur de ce plan et le défaut de sa personnalité ; null = non lu.</summary>
     ModeDeBoostLu? LireModeDeBoost(Guid plan) => null;
 
-    /// <summary>B3 (10/10/2026) : l'économie d'énergie de la carte sans fil (secteur) de ce plan ; null = non lu.</summary>
+    /// <summary>L'économie d'énergie de la carte sans fil (secteur) de ce plan ; null = non lu.</summary>
     EconomieSansFilLue? LireEconomieSansFil(Guid plan) => null;
 }
 

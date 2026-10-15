@@ -7,27 +7,27 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// M2 Phase F3 — SanePowerPlanTweak.
+// SanePowerPlanTweak.
 //
-// If the active plan is Balanced AND there are core-parking micro-stutter
-// symptoms on a DESKTOP, propose High Performance via the allowlisted
-// SetActivePowerPlanOp (a known Windows plan GUID). Captures the real original
-// plan GUID first so revert restores it.
+// Si le plan actif est Équilibré et qu'un bureau montre les symptômes de micro-saccades
+// du parcage de cœurs, proposer Performances élevées via SetActivePowerPlanOp (en liste
+// blanche, GUID de plan Windows connu). Capture d'abord le vrai GUID du plan d'origine
+// pour que le retour arrière le restaure.
 //
-// HONESTY (§6): the real effect is "reduces micro-stutter", never "+FPS".
-// A test asserts the SummaryKey is not an fps key.
+// Honnêteté : l'effet réel est « réduit les micro-saccades », jamais « +FPS ».
+// Un test vérifie que la SummaryKey n'est pas une clé fps.
 //
-// Gating (§16): desktop only. On a laptop, Balanced may be wanted for battery
-// life → the tweak skips (does not apply).
+// Filtre : bureau seulement. Sur un portable, Équilibré peut être voulu pour la
+// batterie → le levier se retire (ne s'applique pas).
 //
-// Pure unit tests with NSubstitute fakes — no real power API access.
+// Tests unitaires purs avec des faux NSubstitute : aucun accès réel à l'API d'alimentation.
 // -----------------------------------------------------------------------
 public sealed class SanePowerPlanTweakTests
 {
     private readonly IPowerPlanReader _power = Substitute.For<IPowerPlanReader>();
     private readonly IElevatedClient _elevated = Substitute.For<IElevatedClient>();
 
-    // PHASE 18 F3 — Balanced sur un bureau, avec le GOULOT mesure par le scan.
+    // Balanced sur un bureau, avec le GOULOT mesure par le scan.
     private static SettingsState Balanced(BottleneckState? goulot, IReadOnlyList<int>? parques = null) =>
         new SettingsState(
             TriState.On, TriState.On, KnownPowerPlans.Balanced.ToString(), TriState.On,
@@ -55,7 +55,7 @@ public sealed class SanePowerPlanTweakTests
         return new SanePowerPlanTweak(_power, _elevated);
     }
 
-    /// <summary>X3D-PLAN (09/10/2026) : sur un Ryzen X3D à deux blocs, le pilote de chipset AMD range le jeu sur le bloc à cache
+    /// <summary>Sur un Ryzen X3D à deux blocs, le pilote de chipset AMD range le jeu sur le bloc à cache
     /// et parque l'autre, et il ne le fait que sous le plan Équilibré (constat convergent de la communauté AMD et des testeurs ;
     /// AMD n'en publie pas de note technique que nous ayons trouvée). Hautes performances casserait ce rangement : le levier
     /// reste fermé, même avec le processeur en goulot ; le routage est l'affaire de fixit.x3d_ccd.</summary>
@@ -82,7 +82,7 @@ public sealed class SanePowerPlanTweakTests
     [Fact]
     public void SummaryKey_dit_le_mecanisme_vrai_jamais_parking_stutter_ni_fps()
     {
-        // PHASE 18 F3 : le parking est identique entre les deux plans (mesure du 10/09) ; ce que
+        // Le parking est identique entre les deux plans (mesure du 10/09) ; ce que
         // le plan change, c'est la preference performance du processeur.
         var t = Build();
         t.SummaryKey.Should().Be("tweak.cpu.power_policy.raise_perf_preference");
@@ -115,7 +115,7 @@ public sealed class SanePowerPlanTweakTests
 
     [Fact]
     public void AppliesTo_false_on_laptop_balanced_may_be_wanted_for_battery() =>
-        // §16: on a laptop, Balanced may be the user's intent for battery life → skip.
+        // Sur un portable, Équilibré peut être le choix du joueur pour la batterie → retrait.
         Build().AppliesTo(Hw(ChassisType.Laptop), BalancedWithParking()).Should().BeFalse();
 
     [Fact]
@@ -131,11 +131,11 @@ public sealed class SanePowerPlanTweakTests
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // Switches the active plan to High Performance (a known allowlisted GUID).
+        // Bascule le plan actif sur Performances élevées (GUID connu, en liste blanche).
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<SetActivePowerPlanOp>(o => o.PlanGuid == KnownPowerPlans.HighPerformance),
             Arg.Any<CancellationToken>());
-        // The snapshot carries the captured original (Balanced) as a serialized inverse op.
+        // L'instantané porte l'origine capturée (Équilibré) en op inverse sérialisée.
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         inverse.IsOk.Should().BeTrue();
         inverse.Value.Should().BeOfType<SetActivePowerPlanOp>()

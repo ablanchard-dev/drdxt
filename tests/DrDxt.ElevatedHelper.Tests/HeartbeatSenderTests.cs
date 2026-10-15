@@ -8,18 +8,18 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// R2 (client side) — IElevatedClient.RenewLease + the reusable HeartbeatSender.
+// IElevatedClient.RenewLease et le HeartbeatSender réutilisable.
 //
-// RenewLease is a thin call that sends a RenewLeaseOp through the same ExecuteAsync
-// IPC pipeline (so it inherits the full signature→nonce→authz→bind→allowlist path
-// and the same caller identity). HeartbeatSender is a disposable that renews on a
-// cadence until disposed; the held-offset path uses it to keep its lease alive.
+// RenewLease est un appel mince qui envoie une RenewLeaseOp par le même pipeline IPC
+// ExecuteAsync (il hérite donc du chemin complet signature → nonce → autorisation → liaison →
+// liste blanche, et de la même identité d'appelant). HeartbeatSender est un jetable qui
+// renouvelle à cadence fixe jusqu'à sa libération ; le décalage tenu s'en sert pour garder son bail en vie.
 //
-// Tests drive the cadence deterministically (manual PulseAsync) — no real timers.
+// Les tests pilotent la cadence à la main (PulseAsync) : aucun vrai minuteur.
 // -----------------------------------------------------------------------
 public sealed class HeartbeatSenderTests
 {
-    // 08/10/2026 (revue n° 13) : un renouvellement refusé (le helper ne connaît plus le bail) se dit, une fois ; une
+    // Un renouvellement refusé (le helper ne connaît plus le bail) se dit, une fois ; une
     // erreur passagère du transport ne se dit pas.
     private sealed class Renouvellement(params Result[] reponses) : IElevatedClient
     {
@@ -33,7 +33,7 @@ public sealed class HeartbeatSenderTests
     {
         var hb = new HeartbeatSender(new Renouvellement(
             Result.Fail(ErrorCodes.HelperOpFailed, "tube occupé"),
-            Result.Fail(ErrorCodes.ElevationDenied, "No such lease for this caller.")), "gpu-expert", 120);
+            Result.Fail(ErrorCodes.LeaseReverted, "The helper reverted this lease.")), "gpu-expert", 120);
         var perdus = 0;
         hb.Perdu += () => perdus++;
 
@@ -45,7 +45,75 @@ public sealed class HeartbeatSenderTests
         await hb.DisposeAsync();
     }
 
-    // Autocontrôle du 08/10/2026 (SEC1) : un essai rendu laissait son bail vivre jusqu'à expiration (2 min), et le helper
+    // « Caller not authorized » et les refus de poignée de main sortent aussi en ElevationDenied, passagers : les prendre
+    // pour un bail perdu faisait dire « rendu par le helper » pendant que le battement continuait et gardait le décalage.
+    [Fact]
+    public async Task Un_refus_d_appelant_passager_ne_leve_pas_Perdu()
+    {
+        var hb = new HeartbeatSender(new Renouvellement(Result.Fail(ErrorCodes.ElevationDenied, "Caller not authorized.")), "gpu-expert", 120);
+        var perdus = 0;
+        hb.Perdu += () => perdus++;
+
+        await hb.PulseAsync(CancellationToken.None);
+
+        perdus.Should().Be(0);
+        await hb.DisposeAsync();
+    }
+
+    // Helper relancé (registre vide) : le bail est inconnu, pas rendu ; le réglage est peut-être encore posé. Pas de
+    // Perdu (le journal reste pour le démarrage suivant), mais plus de battement inutile.
+    [Fact]
+    public async Task Un_bail_inconnu_arrete_le_battement_sans_lever_Perdu()
+    {
+        var client = new CountingClient { NextResult = () => Result.Fail(ErrorCodes.LeaseUnknown, "No such lease for this caller.") };
+        var hb = new HeartbeatSender(client, "gpu-expert", 120);
+        var perdus = 0;
+        hb.Perdu += () => perdus++;
+
+        await hb.PulseAsync(CancellationToken.None);
+        await hb.PulseAsync(CancellationToken.None);
+
+        perdus.Should().Be(0);
+        client.RenewCount.Should().Be(1);
+        await hb.DisposeAsync();
+    }
+
+    // Le battement croise l'inverse du helper : passager. Le battement suivant lit « rendu » et lève Perdu.
+    [Fact]
+    public async Task Un_inverse_en_cours_ne_coupe_pas_le_battement()
+    {
+        var reponses = new Queue<Result>([
+            Result.Fail(ErrorCodes.LeaseReverting, "inverse running"),
+            Result.Fail(ErrorCodes.LeaseReverted, "The helper reverted this lease."),
+        ]);
+        var client = new CountingClient { NextResult = () => reponses.Dequeue() };
+        var hb = new HeartbeatSender(client, "gpu-expert", 120);
+        var perdus = 0;
+        hb.Perdu += () => perdus++;
+
+        await hb.PulseAsync(CancellationToken.None);
+        await hb.PulseAsync(CancellationToken.None);
+
+        perdus.Should().Be(1);
+        await hb.DisposeAsync();
+    }
+
+    // Le bail perdu, plus rien à garder : aucun renouvellement de plus (un battement orphelin envoyait un IPC refusé toutes
+    // les 40 s jusqu'à la fermeture).
+    [Fact]
+    public async Task Apres_Perdu_plus_aucun_renouvellement()
+    {
+        var client = new CountingClient { NextResult = () => Result.Fail(ErrorCodes.LeaseReverted, "The helper reverted this lease.") };
+        var hb = new HeartbeatSender(client, "gpu-expert", 120);
+
+        await hb.PulseAsync(CancellationToken.None);
+        await hb.PulseAsync(CancellationToken.None);
+
+        client.RenewCount.Should().Be(1);
+        await hb.DisposeAsync();
+    }
+
+    // Un essai rendu laissait son bail vivre jusqu'à expiration (2 min), et le helper
     // attendait avec lui au lieu de s'arrêter à la fermeture de l'App. Libérer = plus de battement, bail ramené à 1 s.
     private sealed class Enregistreur : IElevatedClient
     {
@@ -89,8 +157,8 @@ public sealed class HeartbeatSenderTests
         public Task<Result<string>> ExportAsync() => Task.FromResult(Result<string>.Ok(string.Empty));
     }
 
-    /// <summary>Counts RenewLeaseOps it is asked to send, and lets a test simulate a
-    /// transient failure.</summary>
+    /// <summary>Compte les RenewLeaseOp qu'on lui demande d'envoyer et laisse un test simuler
+    /// une panne passagère.</summary>
     private sealed class CountingClient : IElevatedClient
     {
         public int RenewCount { get; private set; }
@@ -107,13 +175,13 @@ public sealed class HeartbeatSenderTests
         }
     }
 
-    // --- RenewLease sends a RenewLeaseOp through ExecuteAsync (same pipeline) ---
+    // --- RenewLease envoie une RenewLeaseOp par ExecuteAsync (même pipeline) ---
 
     [Fact]
     public async Task RenewLease_sends_a_RenewLeaseOp_via_ExecuteAsync()
     {
         var counting = new CountingClient();
-        IElevatedClient client = counting; // RenewLease is the interface contract
+        IElevatedClient client = counting; // RenewLease fait partie du contrat de l'interface
 
         var r = await client.RenewLease("lease-1", leaseSeconds: 30, default);
 
@@ -125,9 +193,9 @@ public sealed class HeartbeatSenderTests
     [Fact]
     public async Task RenewLease_roundtrips_through_the_full_server_pipeline_for_the_owner()
     {
-        // End-to-end: a real client → loopback → real server+watchdog. Establish a
-        // lease first (owner identity), then renew via the client and confirm it
-        // extended the lease (the watchdog does not fire after the renewed expiry).
+        // De bout en bout : vrai client → boucle locale → vrai serveur + chien de garde. Établir
+        // d'abord un bail (identité du propriétaire), puis renouveler via le client et vérifier
+        // qu'il a prolongé le bail (le chien de garde ne se déclenche pas après l'échéance renouvelée).
         var key = NewKey();
         var clock = new FakeClock();
         var exec = new NoopExecutor();
@@ -141,12 +209,12 @@ public sealed class HeartbeatSenderTests
         clock.Advance(TimeSpan.FromSeconds(20));
         (await client.RenewLease("lease-1", 30, default)).IsOk.Should().BeTrue();
 
-        clock.Advance(TimeSpan.FromSeconds(20)); // t+40, renewed to t+50 → alive
+        clock.Advance(TimeSpan.FromSeconds(20)); // t+40, renouvelé à t+50 → vivant
         await wd.TickAsync(default);
         tracker.Fired.Should().Be(0, "the renewed lease must not have auto-reverted");
     }
 
-    // --- HeartbeatSender renews on each pulse until disposed ---
+    // --- HeartbeatSender renouvelle à chaque pulsation jusqu'à sa libération ---
 
     [Fact]
     public async Task HeartbeatSender_renews_on_each_pulse()
@@ -171,7 +239,7 @@ public sealed class HeartbeatSenderTests
         await hb.PulseAsync(default);
         await hb.DisposeAsync();
 
-        // A pulse after disposal is a no-op (does not renew).
+        // Une pulsation après libération ne fait rien (ne renouvelle pas).
         await hb.PulseAsync(default);
 
         client.RenewCount.Should().Be(1, "a disposed heartbeat must not keep renewing");
@@ -189,7 +257,7 @@ public sealed class HeartbeatSenderTests
         client.RenewCount.Should().Be(1);
     }
 
-    // --- background loop: a real (short) interval actually renews, then stops on dispose ---
+    // --- boucle de fond : un vrai intervalle (court) renouvelle bien, puis s'arrête à la libération ---
 
     [Fact]
     public async Task HeartbeatSender_background_loop_renews_then_stops_on_dispose()
@@ -199,10 +267,9 @@ public sealed class HeartbeatSenderTests
             interval: TimeSpan.FromMilliseconds(15));
 
         hb.Start();
-        // This waits on a condition, not on a duration: the poll exits on the first renew.
-        // The timeout is a failure bound, so raising it costs nothing on a healthy run.
-        // 2s was not enough on a contended CI runner (2026-07-01: this was the only red test
-        // out of 333 in this project). 15 ms interval, 10 s of headroom.
+        // On attend une condition, pas une durée : la scrutation sort au premier renouvellement.
+        // Le délai est une borne d'échec ; le monter ne coûte rien sur une exécution saine.
+        // 2 s ne suffisaient pas sur un runner CI saturé. Intervalle de 15 ms, 10 s de marge.
         var waited = System.Diagnostics.Stopwatch.StartNew();
         var timeout = TimeSpan.FromSeconds(10);
         while (client.RenewCount == 0 && waited.Elapsed < timeout)
@@ -214,7 +281,7 @@ public sealed class HeartbeatSenderTests
 
         await hb.DisposeAsync();
         var countAtDispose = client.RenewCount;
-        await Task.Delay(80); // longer than several intervals
+        await Task.Delay(80); // plus long que plusieurs intervalles
         client.RenewCount.Should().Be(countAtDispose, "the loop must stop after dispose");
     }
 
@@ -233,7 +300,7 @@ public sealed class HeartbeatSenderTests
             => _server.ProcessTypedRequestAsync(request, ct, _caller);
     }
 
-    /// <summary>An executor that just counts how many times it ran a revert.</summary>
+    /// <summary>Exécuteur qui compte seulement combien de fois il a joué un retour arrière.</summary>
     private sealed class RecordingTracker : IPrivilegedOpExecutor
     {
         private readonly Tracker _t;

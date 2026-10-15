@@ -6,10 +6,10 @@ using Xunit;
 namespace DrDxt.Measurement.Tests.PresentMon;
 
 /// <summary>
-/// Integration-flavored tests against the real <see cref="PresentMonApi2"/> P/Invoke layer.
-/// On a box without the PresentMon service these must degrade cleanly (never throw),
-/// which also exercises the real DllImport boundary at least for the no-service path.
-/// Behavioral capture/parse coverage lives in <see cref="PresentMonSessionCaptureTests"/> (fake api).
+/// Tests à saveur d'intégration contre la vraie couche P/Invoke <see cref="PresentMonApi2"/>.
+/// Sur une machine sans service PresentMon ils doivent se dégrader proprement (ne jamais lever),
+/// ce qui exerce aussi la vraie frontière DllImport, au moins pour le chemin sans service.
+/// La couverture de capture et d'analyse vit dans <see cref="PresentMonSessionCaptureTests"/> (fausse API).
 /// </summary>
 public class PresentMonSessionTests
 {
@@ -21,7 +21,7 @@ public class PresentMonSessionTests
         var sut = RealSession();
         var act = () => sut.IsServiceAvailable();
         var r = act.Should().NotThrow().Subject;
-        // CI / dev box without the PresentMon service → Ok(false), never a crash.
+        // Machine de CI ou de développement sans service PresentMon → Ok(false), jamais un plantage.
         r.IsOk.Should().BeTrue();
     }
 
@@ -29,7 +29,7 @@ public class PresentMonSessionTests
     public async Task Capture_without_service_fails_cleanly_not_throw()
     {
         var sut = RealSession();
-        // Nonexistent PID + (likely) no service → clean failure, never an exception.
+        // PID inexistant + (probablement) pas de service → échec propre, jamais une exception.
         var r = await sut.CaptureAsync(int.MaxValue, TimeSpan.FromMilliseconds(50), default);
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().BeOneOf(
@@ -43,6 +43,6 @@ public class PresentMonSessionTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
         var r = await sut.CaptureAsync(1234, TimeSpan.FromSeconds(10), cts.Token);
-        r.IsOk.Should().BeFalse(); // cancelled cleanly
+        r.IsOk.Should().BeFalse(); // annulé proprement
     }
 }

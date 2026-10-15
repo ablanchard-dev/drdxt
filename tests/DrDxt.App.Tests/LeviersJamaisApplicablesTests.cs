@@ -7,11 +7,11 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// V3, autocontrôle du 08/10/2026 : le crible d'<c>AucunLevierMortTests</c> lit le texte et ne voit qu'un « => false » écrit tel
+/// Le crible d'<c>AucunLevierMortTests</c> lit le texte et ne voit qu'un « => false » écrit tel
 /// quel. Ici, chaque levier du VRAI catalogue est interrogé : <c>AppliesTo</c> sur chaque machine enregistrée (réglages lus,
 /// puis tous les tri-états à « Off »), puis sur des scénarios nommés bâtis sur la machine de référence. Un levier qui ne
 /// s'ouvre nulle part n'a sa place qu'avec sa raison écrite ici.
-/// Limite (revue du 08/10/2026, REV5) : les états sont fabriqués (tri-états de premier niveau à « Off ») ; un levier dont
+/// Limite : les états sont fabriqués (tri-états de premier niveau à « Off ») ; un levier dont
 /// le VRAI lecteur ne rend jamais l'état qui l'ouvre reste vert ici. Ce qui le couvre : les machines enregistrées et le
 /// rejeu des vrais scans, pas cette garde.
 /// </summary>
@@ -32,9 +32,12 @@ public sealed class LeviersJamaisApplicablesTests
     {
         ["fixit.ecran_frequence"] = (hw, s) => (hw, s with { DisplayRefresh = new RefreshHeadroom(TriState.On, 60, 144) }),
         ["fixit.power_plan"] = (hw, s) => (hw, s with { PowerPlanGuid = Equilibre, GoulotMesure = BottleneckState.CpuBoundStrong }),
+        ["fixit.pagefile_ssd"] = (hw, s) => (hw, s with { FichierDEchangeADeplacer = TriState.On }),
+        ["fixit.plan_economie"] = (hw, s) => (hw, s with { PowerPlanGuid = KnownPowerPlans.PowerSaver.ToString() }),
         ["fixit.mode_boost"] = (hw, s) => (hw, s with { PowerPlanGuid = Equilibre, ModeDeBoost = new ModeDeBoostLu(Guid.Parse(Equilibre), 0, 2) }),
         ["latency.mouse_acceleration_off"] = (hw, s) => (hw, s with { AccelerationSouris = TriState.On }),
         ["fixit.cpu_power_limit"] = (hw, s) => (hw, s with { LimitePuissance = new LimiteDePuissanceLue(65, 219, 65, false) }),
+        ["fixit.cpu_power_cap"] = (hw, s) => (hw, s with { LimitePuissance = new LimiteDePuissanceLue(253, 253, 65, false, PlafondThermiqueW: 150) }),
         ["fixit.wifi_performances"] = (hw, s) => (hw, s with
         {
             NetworkAdapters = [new NetworkAdapterState("Wi-Fi", "Intel Wi-Fi 6 AX200", false, TriState.Unknown, TriState.Unknown, TriState.Unknown)],

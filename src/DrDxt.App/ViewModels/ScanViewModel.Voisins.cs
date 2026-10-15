@@ -5,7 +5,7 @@ using DrDxt.App.Platform;
 
 namespace DrDxt.App.ViewModels;
 
-// 03/10/2026 (boucle 2D2P, P3.2b) : « Faire passer les programmes gourmands après le jeu ». Coupé par défaut ; le clic du
+// « Faire passer les programmes gourmands après le jeu ». Coupé par défaut ; le clic du
 // joueur est le consentement, gardé entre deux lancements comme « Surveiller mes parties ». Pendant une partie, une lecture
 // des voisins toutes les 5 s (CalmeurDeVoisins) ; à la fin de la partie, à l'arrêt et à la fermeture de DrDXT, chaque
 // programme calmé retrouve sa priorité.
@@ -20,7 +20,7 @@ public partial class ScanViewModel
     public string LabelCalmerDescription => _localize("Voisins.Calmer.Description");
     public string LabelCalmerDescriptionCourte => CarteDeLaMachine.TitreEtSuite(LabelCalmerDescription).Titre;
     public string LabelCalmerDescriptionSuite => CarteDeLaMachine.TitreEtSuite(LabelCalmerDescription).Suite;
-    public string LabelCalmerBascule => _localize("Voisins.Calmer.Libelle");   // 08/10/2026 (défaut 10) : l'état est dans l'interrupteur
+    public string LabelCalmerBascule => _localize("Voisins.Calmer.Libelle");   // L'état est dans l'interrupteur
 
     /// <summary>Le choix du joueur, gardé entre deux lancements. <c>null</c> = rien n'est gardé (les tests).</summary>
     internal DrDxt.Application.Network.VeillePingMemorisee? MemoireCalmer { get; set; }
@@ -37,7 +37,7 @@ public partial class ScanViewModel
         OnPropertyChanged(nameof(CalmeurPropose));
     }
 
-    /// <summary>07/10/2026 (L-VOISINS) : le clic du joueur est daté au journal des changements (« voisins.calmer:on/off ») :
+    /// <summary>Le clic du joueur est daté au journal des changements (« voisins.calmer:on/off ») :
     /// la bascule se lit sur la carte des parties et se juge sur les parties d'avant et d'après, comme HAGS.
     /// La commande tourne tant que le calmeur est allumé : sans exécutions simultanées, le bouton « Arrêter » restait grisé
     /// pendant tout ce temps, et le calmeur ne s'arrêtait pas depuis l'écran.</summary>
@@ -55,7 +55,7 @@ public partial class ScanViewModel
             NoterCalmeur(true);
             await AllumerCalmeurAsync();
         }
-        // 08/10/2026 (revue) : l'interrupteur se coche tout seul au clic ; une erreur avant le changement d'état le laissait faux.
+        // L'interrupteur se coche tout seul au clic ; une erreur avant le changement d'état le laissait faux.
         finally { OnPropertyChanged(nameof(CalmerVoisinsActif)); }
     }
 
@@ -87,7 +87,7 @@ public partial class ScanViewModel
         Afficher(MemoireParties?.Lire() ?? []);
     }
 
-    /// <summary>07/10/2026 (L-VOISINS) : le calmeur est un levier de performance (il rend du processeur au jeu), pas de
+    /// <summary>Le calmeur est un levier de performance (il rend du processeur au jeu), pas de
     /// fiabilité : si sa dernière bascule est « allumé » et qu'elle est jugée « moins bien en jeu » sur les parties (le même
     /// bilan borné que l'écran), il s'éteint seul, et l'arrêt est daté à son tour.</summary>
     internal IReadOnlyList<string> RetirerLeCalmeurSIlCoute(IReadOnlyList<DrDxt.Application.Parties.Changement> journal,
@@ -111,7 +111,7 @@ public partial class ScanViewModel
             _ = AllumerCalmeurAsync();
     }
 
-    // ── 07/10/2026 (L-VOISINS) : proposé d'office, et la liste d'exclusion du joueur ─────────────────────────────
+    // ── Proposé d'office, et la liste d'exclusion du joueur ─────────────────────────────
     private IReadOnlyList<DrDxt.Application.Parties.PartieRelevee> _partiesPourProposition = [];
 
     /// <summary>Ce que les parties relevées disent des voisins : non lus, aucun, ou les programmes proposés.</summary>
@@ -170,7 +170,7 @@ public partial class ScanViewModel
     /// <summary>À la fermeture de DrDXT : rien ne reste abaissé derrière lui.</summary>
     public void RendreLesPriorites() => _calmeur?.Rendre();
 
-    /// <summary>Revue F-26 : ce processus est-il un jeu possible (ni navigateur, ni lecteur, ni Windows) ? Le filtre F-5
+    /// <summary>Ce processus est-il un jeu possible (ni navigateur, ni lecteur, ni Windows) ? Le filtre F-5
     /// de la veille des parties ; injectable pour les tests.</summary>
     internal Func<int, bool> EstUnJeu { get; set; } =
         pid => NomExeDuProcessus(pid) is { } exe && DrDxt.Core.NomExeDeJeu.EstUnJeuPossible(exe);
@@ -183,7 +183,7 @@ public partial class ScanViewModel
         {
             while (!ct.IsCancellationRequested)
             {
-                // Revue F-26 : le même filtre que la veille des parties (F-5) ; une vidéo en plein écran n'est pas une
+                // Le même filtre que la veille des parties ; une vidéo en plein écran n'est pas une
                 // partie, et les programmes à côté (un encodage, un téléchargement) n'ont pas à passer sous la normale.
                 var pid = _gameLocator.LocateRunningGamePid() is { } trouve && trouve > 0 && EstUnJeu(trouve) ? trouve : 0;
                 if (pid > 0)

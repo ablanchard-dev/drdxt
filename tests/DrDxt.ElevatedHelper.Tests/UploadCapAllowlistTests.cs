@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-// 24/09/2026 — le nom d'exe finit dans une commande PowerShell executee elevee. La regex de
+// Le nom d'exe finit dans une commande PowerShell executee elevee. La regex de
 // l'allowlist est la seule chose qui rend cette interpolation sure : ces cas la gravent.
 public sealed class UploadCapAllowlistTests
 {
@@ -13,7 +13,7 @@ public sealed class UploadCapAllowlistTests
     [InlineData("cod.exe")]
     [InlineData("cs2.exe")]
     [InlineData("VALORANT-Win64-Shipping.exe")]
-    // 24/09/2026 — trouve par la preuve bout-en-bout : « PING.EXE » etait refuse, la regex
+    // Trouve par la preuve bout-en-bout : « PING.EXE » etait refuse, la regex
     // n'acceptait l'extension qu'en minuscules. Windows ne fait pas la difference.
     [InlineData("COD.EXE")]
     public void Un_nom_d_exe_nu_et_un_plafond_borne_passent(string exe)
@@ -44,7 +44,7 @@ public sealed class UploadCapAllowlistTests
     public void Un_plafond_hors_bornes_est_refuse(long cap)
         => _allow.Validate(new ApplyUploadCapOp("cod.exe", cap)).IsOk.Should().BeFalse();
 
-    // 26/09/2026 : les deux bornes elles-memes sont permises. AjustementDuPlafond descend jusqu'a
+    // Les deux bornes elles-memes sont permises. AjustementDuPlafond descend jusqu'a
     // 1 Mbit/s pile : une borne devenue exclusive ferait refuser son plancher en pleine partie.
     [Theory]
     [InlineData(1_000_000L)]

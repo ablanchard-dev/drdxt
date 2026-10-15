@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 04/10/2026 (plan 2.5) : l'intégrité de la mémoire, dite dans les deux sens, jamais écrite.
+// L'intégrité de la mémoire, dite dans les deux sens, jamais écrite.
 public sealed class IntegriteMemoireTests
 {
     [Fact]
@@ -13,7 +13,7 @@ public sealed class IntegriteMemoireTests
         var c = IntegriteMemoire.Juger(2, [0]).Should().ContainSingle().Subject;   // relevé de la machine de référence
         c.ValeurCourante.Should().Be("coupée");
         c.Statut.Should().Be(RepairStatus.Observed);
-        c.Explication.Should().Contain("noyau").And.NotContain("liste de blocage", "revue : sur Windows 11 22H2+, la liste ne dépend plus d'elle");
+        c.Explication.Should().Contain("noyau").And.NotContain("liste de blocage", "sur Windows 11 22H2+, la liste ne dépend plus d'elle");
     }
 
     [Fact]
@@ -25,7 +25,7 @@ public sealed class IntegriteMemoireTests
     }
 
     [Fact]
-    // Revue adverse du docteur (09/10/2026, R7) : « rien n'est dit » faisait passer une famille non lue pour une saine.
+    // « rien n'est dit » faisait passer une famille non lue pour une saine.
     public void Non_lue_se_dit_non_lue()
     {
         IntegriteMemoire.Juger(null, [2]).Should().ContainSingle().Which.Statut.Should().Be(RepairStatus.Unknown);

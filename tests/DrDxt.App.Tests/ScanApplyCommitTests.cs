@@ -3,7 +3,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DrDxt.App;
-using DrDxt.App.Navigation;
 using DrDxt.App.Profiles;
 using DrDxt.App.ViewModels;
 using DrDxt.Core;
@@ -13,18 +12,18 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// M4/M5 — after a VALIDATED apply the App COMMITS a signed desired-state manifest so
-// the reconciler can re-assert it at boot (the persistence moat, §9.12).
+// Après une application validée, l'App committe un manifeste d'état voulu signé pour que
+// le réconciliateur le réaffirme au démarrage (la douve de persistance).
 //
-//   * the kept (Applied && !AutoReverted) tweaks are committed — exactly those, mapped
-//     to their reconciler ids + desired tokens;
-//   * an auto-reverted tweak is EXCLUDED;
-//   * a commit FAILURE never breaks the apply UX: apply still succeeds, navigates to the
-//     dashboard, and surfaces a non-fatal "moat unarmed" signal (localized resx key);
-//   * a non-reconcilable / unmapped tweak is filtered (the mapper + the store both drop
-//     it), so commit is not even attempted when nothing maps.
+//   * les leviers gardés (Applied && !AutoReverted) sont commités, exactement ceux-là, traduits
+//     en identifiants du réconciliateur + jetons voulus ;
+//   * un levier annulé automatiquement est exclu ;
+//   * un échec de commit ne casse jamais l'expérience d'application : elle réussit toujours,
+//     navigue vers le tableau de bord et affiche un signal non fatal « douve désarmée » (clé resx localisée) ;
+//   * un levier non réconciliable ou non mappé est filtré (le mappeur et le magasin le
+//     rejettent tous deux), donc le commit n'est même pas tenté quand rien ne se traduit.
 //
-// Every seam is a fake — NO real signing key, NO real registry, NO real reconciler.
+// Chaque couture est un faux : aucune vraie clé de signature, aucun vrai registre, aucun vrai réconciliateur.
 // -----------------------------------------------------------------------
 public sealed class ScanApplyCommitTests
 {
@@ -57,8 +56,6 @@ public sealed class ScanApplyCommitTests
     {
         public required ScanViewModel Vm { get; init; }
         public required IDesiredStateStore Store { get; init; }
-        public required INavigationService Nav { get; init; }
-        public required DashboardViewModel Dashboard { get; init; }
     }
 
     private static Harness Build(
@@ -79,9 +76,7 @@ public sealed class ScanApplyCommitTests
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(
               Hw(), St,
-              new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) },
-              Score, Bl,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) }, Bl)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
@@ -94,27 +89,24 @@ public sealed class ScanApplyCommitTests
         engine.ApplyAsync(Arg.Any<TweakPlan>(), Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
               .Returns(applyResult ?? Result<ApplyReport>.Ok(ReportOf(Kept("fixit.power_plan"))));
 
-        // M6 — a profile consumer with a non-empty plan so apply proceeds; the commit logic
-        // under test depends on the engine's ApplyReport (the kept tweaks), not the plan ids.
+        // Un consommateur de profil au plan non vide pour que l'application avance ; la logique de commit
+        // testée dépend de l'ApplyReport du moteur (les leviers gardés), pas des identifiants du plan.
         var consumer = ScanViewModelTestSeams.ProfileConsumer(
             ScanViewModelTestSeams.PlanConsumption(new[] { "latency.hagsOn" }));
 
         var store = Substitute.For<IDesiredStateStore>();
         store.CommitAsync(Arg.Any<DesiredState>()).Returns(commitResult ?? Result.Ok());
-        // Finding-1 moat-entitlement refresh (end of scan) is a clean no-op here: nothing is
-        // armed yet at scan time, so the only commit asserted below is the apply-time commit.
+        // Le rafraîchissement du droit à la douve en fin de scan est ici sans effet : rien n'est
+        // encore armé au moment du scan, donc le seul commit vérifié ci-dessous est celui de l'application.
         store.LoadAsync().Returns(Result<DesiredState>.Ok(new DesiredState(Array.Empty<AppliedTweak>())));
 
-        var nav = Substitute.For<INavigationService>();
-        var dashboard = new DashboardViewModel();
-
         var vm = new ScanViewModel(
-            hd, sr, br, sc, sd, safety, engine, consumer, ScanViewModelTestSeams.GpuTuningStep(),
-            nav, () => dashboard, store, new AppliedTweakManifestMapper(),
+            hd, sr, br, sc, sd, safety, engine, consumer,
+            store, new AppliedTweakManifestMapper(),
             ScanViewModelTestSeams.BiosAdvisor(),
             ScanViewModelTestSeams.GuideGenerator(), key => key);
 
-        return new Harness { Vm = vm, Store = store, Nav = nav, Dashboard = dashboard };
+        return new Harness { Vm = vm, Store = store };
     }
 
     private static async Task ScanThenApply(Harness h)
@@ -123,7 +115,7 @@ public sealed class ScanApplyCommitTests
         await h.Vm.ApplyCommand.ExecuteAsync(null);
     }
 
-    // A validated apply commits exactly the kept tweaks (mapped to reconciler ids).
+    // Une application validée committe exactement les leviers gardés (traduits en identifiants du réconciliateur).
     [Fact]
     public async Task Validated_apply_commits_exactly_the_kept_tweaks()
     {
@@ -139,7 +131,7 @@ public sealed class ScanApplyCommitTests
         h.Vm.MoatUnarmedMessage.Should().BeNullOrEmpty("the commit succeeded → moat armed");
     }
 
-    // An auto-reverted tweak is not committed (only the kept one is).
+    // Un levier annulé automatiquement n'est pas commité (seul le gardé l'est).
     [Fact]
     public async Task Auto_reverted_tweak_is_excluded_from_the_commit()
     {
@@ -153,7 +145,7 @@ public sealed class ScanApplyCommitTests
             d.Tweaks.Count == 1 && d.Tweaks[0].TweakId == "fixit.sanePowerPlan"));
     }
 
-    // A commit FAILURE never breaks apply: navigation still happens, no blocking message,
+    // Un échec de commit ne casse jamais l'application : la navigation a lieu, aucun message bloquant,
     // and a non-fatal "moat unarmed" signal is surfaced (localized key).
     [Fact]
     public async Task Commit_failure_leaves_apply_successful_but_flags_moat_unarmed()
@@ -173,12 +165,12 @@ public sealed class ScanApplyCommitTests
         await h.Store.Received(1).CommitAsync(Arg.Any<DesiredState>());
     }
 
-    // When nothing maps to a reconcilable surface, no manifest is committed (the moat has
-    // nothing to arm) — but apply still succeeds and navigates.
+    // Quand rien ne mène à une surface réconciliable, aucun manifeste n'est commité (la douve
+    // n'a rien à armer), mais l'application réussit et navigue quand même.
     [Fact]
     public async Task No_reconcilable_kept_tweaks_commits_nothing_but_apply_succeeds()
     {
-        // The engine kept only a GPU tweak (unmapped / not reconcilable).
+        // Le moteur n'a gardé qu'un levier GPU (non mappé / non réconciliable).
         var h = Build(applyResult: Result<ApplyReport>.Ok(ReportOf(Kept("gpu.undervolt"))));
 
         await ScanThenApply(h);
@@ -192,7 +184,7 @@ public sealed class ScanApplyCommitTests
         h.Vm.MoatUnarmedMessage.Should().BeNullOrEmpty("nothing was reconcilable — that is not a failure to arm");
     }
 
-    // 06/10/2026 (plan 4.3) : un levier de la session Windows (HKCU) gardé n'est pas réaffirmé par le service,
+    // Un levier de la session Windows (HKCU) gardé n'est pas réaffirmé par le service,
     // mais son origine entre au manifeste en RevertOnly, le seul que la désinstallation relit. Un seul envoi pour
     // toutes les origines (une invite UAC au plus) ; un refus est dit, levier par levier.
     private static string OrigineVrr => PrivilegedOpCodec.Serialize(new SetRegistryValueOp(RegistryHiveKind.CurrentUser,
@@ -231,7 +223,7 @@ public sealed class ScanApplyCommitTests
         h.Vm.MoatUnarmedMessage.Should().Contain("Optimize.KeptOriginNotSigned").And.Contain("disk full");
     }
 
-    // A failed apply never commits (nothing was validated).
+    // Une application ratée ne committe jamais (rien n'a été validé).
     [Fact]
     public async Task Failed_apply_never_commits()
     {

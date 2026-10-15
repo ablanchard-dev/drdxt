@@ -50,7 +50,7 @@ public class DetectionDiTests
     public void The_settings_reader_still_resolves_where_the_optional_seams_are_absent()
     {
         // L'injection .NET honore bien les parametres optionnels (verifie par mutation le
-        // 02/09 : ce test reste vert avec le cablage par convention comme avec une fabrique
+        // Ce test reste vert avec le cablage par convention comme avec une fabrique
         // explicite). Ce test existe pour que ca le reste : sans lui, ajouter un seam
         // obligatoire au lecteur casserait tout hote qui ne l'enregistre pas.
         var act = () => new ServiceCollection().AddDrDxtDetection().BuildServiceProvider()
@@ -87,7 +87,7 @@ public class DetectionDiTests
 }
 
 // -----------------------------------------------------------------------
-// LM 07/09 — le conteneur de detection doit lire les ecrans.
+// Le conteneur de detection doit lire les ecrans.
 //
 // Le constat de consommation au repos naissait mort partout sauf dans l'application WPF :
 // `IDisplayInfo` n'etait enregistre que par la couche App, donc tout ce qui monte

@@ -5,8 +5,8 @@ using Xunit;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// 06/10/2026 (D1, L-GPU) : les arrêts brutaux classés par famille, et le réglage de la carte fermé machine par machine
-/// et famille par famille. Décision du mainteneur : « mes arrêts ne doivent pas tout bloquer » ; une coupure en veille
+/// Les arrêts brutaux classés par famille, et le réglage de la carte fermé machine par machine
+/// et famille par famille. Les arrêts ne bloquent pas tout : une coupure en veille
 /// ne ferme rien, un écran bleu graphique récent ferme la carte.
 /// </summary>
 public class ArretsParFamilleTests
@@ -45,7 +45,7 @@ public class ArretsParFamilleTests
             .And.Contain("gain mesuré");
     }
 
-    // 09/10/2026 (le mainteneur : « DrDXT n'est pas censé me dire non ») : un écran bleu graphique récent ne ferme plus la
+    // Un écran bleu graphique récent ne ferme plus la
     // carte, il la met sous garde (un arrêt après la pose la rend seule) ; la phrase nomme toujours sa famille.
     [Fact]
     public void Un_ecran_bleu_graphique_recent_ouvre_la_carte_sous_garde_et_la_phrase_nomme_sa_famille()
@@ -70,7 +70,7 @@ public class ArretsParFamilleTests
     [Fact]
     public void Des_arrets_secs_sans_code_repetes_n_empechent_plus_la_carte()
     {
-        // 09/10/2026 : sous garde, comme le reste.
+        // Sous garde, comme le reste.
         Carte(Machine(Arret(FamilleDArret.SansCode, 1), Arret(FamilleDArret.SansCode, 5))).Retenu.Should().BeTrue();
         Carte(Machine(Arret(FamilleDArret.SansCode, 1))).Retenu.Should().BeTrue();
     }
@@ -78,7 +78,7 @@ public class ArretsParFamilleTests
     [Fact]
     public void Des_ecrans_bleus_d_un_autre_code_ne_ferment_plus_rien()
     {
-        // 08/10/2026 : le cas du PC de référence (0xEF le 04/09, 0x154 le 02/09) ; la garde d'incident remplace le refus.
+        // Le cas relevé sur le PC de référence (0xEF le 04/09, 0x154 le 02/09) ; la garde d'incident remplace le refus.
         var d = Machine(Arret(FamilleDArret.EcranBleu, 2, 0xEF), Arret(FamilleDArret.EcranBleu, 4, 0x154));
 
         Carte(d).Retenu.Should().BeTrue();

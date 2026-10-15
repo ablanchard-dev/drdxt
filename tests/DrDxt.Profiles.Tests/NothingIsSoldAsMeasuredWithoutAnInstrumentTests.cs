@@ -8,26 +8,24 @@ namespace DrDxt.Profiles.Tests;
 /// <summary>
 /// `GainConfidence.Measured` est la classe la plus forte du produit : elle dit au client que le
 /// chiffre affiche a ete mesure, pas cite. Elle n'a le droit d'exister que si un instrument peut
-/// la produire — et le prouver en echouant quand le gain n'est pas la.
+/// la produire, et le prouver en echouant quand le gain n'est pas la.
 ///
 /// ══ ce qui a ete mesure le 05/09/2026, et qui ferme cette classe ══
 ///
 /// Les deux instruments du produit ont ete testes contre des controles, et aucun ne peut certifier
-/// un gain aujourd'hui :
+/// un gain :
 ///   • le rejeu d'une capture en jeu : +10 % de FPS injectes sur une serie reelle ne font pas
-///     basculer le verdict — la marge combinee vaut ±30 fps pour un delta de +13,3 ;
+///     basculer le verdict (la marge combinee vaut ±30 fps pour un delta de +13,3) ;
 ///   • le banc deterministe : sigma/moyenne = 72,6 % sur dix passes identiques (14,8 % sur six),
 ///     alors que le checksum est identique 16/16. Le calcul est juste, c'est le debit qui varie.
 ///
 /// Les deux ont leur ligne dans `GATES.md`, avec leurs causes et ce qui les debloquerait.
 ///
-/// Une seule entree du catalogue se disait `Measured` : l'offset de +75 MHz, adosse au « +2,5 %
-/// mesure sur la RTX du projet » du 02/07. Ce chiffre vient du banc dont on vient d'etablir qu'il
-/// varie de 15 a 73 % entre passes identiques. Il est donc SOURCE — il cite d'ou il vient — mais
-/// il n'est pas mesurable ici et maintenant, et le dire « mesure » au client serait exactement ce
-/// que ce produit refuse depuis le 24/08.
+/// Un chiffre comme le « +2,5 % mesure sur la RTX du projet » de l'offset de +75 MHz vient de ce banc,
+/// qui varie de 15 a 73 % entre passes identiques. Il est SOURCE (il cite d'ou il vient), pas
+/// mesurable ici et maintenant : le dire « mesure » au client serait exactement ce que ce produit refuse.
 ///
-/// Quand ce test tombe : ce n'est pas lui qu'on corrige. Soit un instrument a ete retabli — alors
+/// Quand ce test tombe : ce n'est pas lui qu'on corrige. Soit un instrument a ete retabli, alors
 /// on retire ce controle DELIBEREMENT, en fermant d'abord les deux lignes GATES ; soit quelqu'un a
 /// remis un « mesure » sans instrument derriere, et c'est le catalogue qu'on corrige.
 /// </summary>
@@ -71,7 +69,7 @@ public sealed class NothingIsSoldAsMeasuredWithoutAnInstrumentTests
         }
     }
 
-    // 08/10/2026 (A6) : « sourcé » sans source publique, c'est la même promesse en plus discret. La fiche X3D était
+    // « sourcé » sans source publique, c'est la même promesse en plus discret. La fiche X3D était
     // marquée sourcée avec une note interne jamais publiée ; trois autres ne citaient rien. Une entrée Sourced doit
     // nommer d'où elle sait : une adresse, Microsoft Learn, TechPowerUp, ou l'interface officielle de NVIDIA.
     [Fact]
@@ -82,7 +80,7 @@ public sealed class NothingIsSoldAsMeasuredWithoutAnInstrumentTests
             .Select(e => $"{e.Profile} / {e.Tweak}")
             .Should().BeEmpty("une entrée sourcée cite une source qu'on peut ouvrir");
 
-    // 08/10/2026 (chantier V2) : un pourcentage affiché au joueur porte, dans sa source, une adresse qu'il peut
+    // Un pourcentage affiché au joueur porte, dans sa source, une adresse qu'il peut
     // ouvrir. La fiche X3D affichait « +17 à +21 %, +27 % Warzone » contre une source qui dit ~6 % ; Reflex « 30 à 57 % »
     // ne citait rien.
     [Fact]

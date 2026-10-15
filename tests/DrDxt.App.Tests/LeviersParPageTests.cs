@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// ROAD1 (08/10/2026) : « ce que DrDXT fait sur ton PC », page par page. Chaque levier du catalogue apparaît sur sa page,
+/// « ce que DrDXT fait sur ton PC », page par page. Chaque levier du catalogue apparaît sur sa page,
 /// avec son nom, son statut et, quand il n'est pas pour ce matériel, sa raison.
 /// </summary>
 public sealed class LeviersParPageTests
@@ -47,7 +47,7 @@ public sealed class LeviersParPageTests
         var sc = NSubstitute.Substitute.For<DrDxt.Core.IScanScorer>();
         NSubstitute.SubstituteExtensions.Returns(sc.Score(NSubstitute.Arg.Any<DrDxt.Core.HardwareInventory>(), NSubstitute.Arg.Any<DrDxt.Core.SettingsState>(),
             NSubstitute.Arg.Any<DrDxt.Core.BenchmarkResult?>()), DrDxt.Core.Result<DrDxt.Core.ScanResult>.Ok(new DrDxt.Core.ScanResult(hw, st,
-            new List<DrDxt.Core.Finding>(), 68, bl, new DrDxt.Core.ScoreBreakdown(80, 80, 85), new DrDxt.Core.DimensionStatus(false, false))));
+            new List<DrDxt.Core.Finding>(), bl)));
         var sd = NSubstitute.Substitute.For<DrDxt.Core.IStorageDetector>();
         NSubstitute.SubstituteExtensions.Returns(sd.Detect(), DrDxt.Core.Result<IReadOnlyList<DrDxt.Core.StorageDevice>>.Ok(new List<DrDxt.Core.StorageDevice>()));
         var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, sd, k => k);

@@ -4,9 +4,9 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 (boucle « vivant et prouvé », B8) : la pastille d'état était un point plat sur un halo. Elle devient une
+// La pastille d'état était un point plat sur un halo. Elle devient une
 // perle de chrome teintée de son état : volume (reflet et ombre) et liseré chrome ; le mot reste à côté.
-// 03/10/2026 (boucle 2D2P, D5.3, revue) : le reflet brillant et le halo flou faisaient daté (« aqua ») ; la
+// Le reflet brillant et le halo flou faisaient daté (« aqua ») ; la
 // pastille devient un point plat de l'état, cerclé d'un liseré chrome fin, sans reflet ni flou. Le mot reste.
 public sealed class PastilleEnPerleTests
 {

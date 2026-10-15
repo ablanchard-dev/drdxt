@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Cpu;
 
-// 26/09/2026 : ce lecteur (OpenThread + GetThreadTimes) n'était exercé par aucun test sur le vrai
+// Ce lecteur (OpenThread + GetThreadTimes) n'était exercé par aucun test sur le vrai
 // système. Un thread qui tourne à plein dans ce processus doit sortir le plus chaud, avec une large part
 // d'un thread logique ; un processus inexistant rend null, jamais des zéros.
 [Collection(ThreadCpuReaderSurLeVraiSystemeTests.Seul)]
@@ -40,7 +40,7 @@ public sealed class ThreadCpuReaderSurLeVraiSystemeTests
             lu!.ThreadsLogiques.Should().Be(Environment.ProcessorCount);
             lu.ThreadsChauds.Should().NotBeEmpty();
             lu.ThreadsChauds[0].ThreadId.Should().Be(idNatif, "le thread qui boucle est le plus chaud du processus");
-            // 08/10/2026 : « plus de 0,3 » mesurait la charge de la machine, pas le lecteur (CI 37738806287 : un serveur
+            // « plus de 0,3 » mesurait la charge de la machine, pas le lecteur (CI 37738806287 : un serveur
             // partagé ne lui a donné que 0,157). Ce qui se vérifie partout : une part non nulle, dans l'unité d'un thread
             // logique (une erreur d'unité, 100 ns contre ms, la ferait sortir de [0 ; 1,05]).
             lu.ThreadsChauds[0].PartDUnThreadLogique.Should().BeInRange(0.01, 1.05, "une part d'un thread logique, non nulle");

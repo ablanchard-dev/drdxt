@@ -6,14 +6,14 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// LaunchOnDemandElevatedClient — defers the UAC launch to the first privileged op
-// (so the App does not prompt at startup), then delegates to the real
-// handshaking client. Behind seams: an ensure-running delegate + an inner client.
+// LaunchOnDemandElevatedClient : repousse le lancement UAC à la première op privilégiée
+// (pour que l'App n'affiche pas d'invite au démarrage), puis délègue au vrai client
+// négociant. Derrière des coutures : un délégué « assurer le lancement » et un client interne.
 //
-//   * first op -> ensure the helper is running (ONE launch), then delegate.
-//   * launch fails (UAC declined / helper never comes up) -> surface that Fail,
-//     do not delegate (no channel).
-//   * subsequent ops after a successful launch -> ensure is not called again.
+//   * première op → s'assurer que le helper tourne (un seul lancement), puis déléguer.
+//   * lancement raté (UAC refusé, helper jamais joignable) → remonter ce Fail,
+//     ne pas déléguer (pas de canal).
+//   * ops suivantes après un lancement réussi → le délégué n'est plus appelé.
 // -----------------------------------------------------------------------
 public sealed class LaunchOnDemandElevatedClientTests
 {
@@ -83,8 +83,8 @@ public sealed class LaunchOnDemandElevatedClientTests
     [Fact]
     public async Task A_failed_launch_is_retried_on_the_next_op()
     {
-        // If the first ensure fails (e.g. user dismissed UAC), a later op should be
-        // allowed to try again rather than be permanently broken.
+        // Si le premier lancement échoue (UAC rejeté par exemple), une op ultérieure doit pouvoir
+        // réessayer plutôt que de rester cassée pour toujours.
         var attempts = 0;
         var inner = new FakeInner(Result.Ok());
         var sut = new LaunchOnDemandElevatedClient(
@@ -104,7 +104,7 @@ public sealed class LaunchOnDemandElevatedClientTests
         inner.Calls.Should().Be(1);
     }
 
-    // Revue n° 14 (08/10/2026) : le helper s'arrête seul après 15 min d'inactivité (SEC1). Le client gardait « déjà lancé »
+    // Le helper s'arrête seul après 15 min d'inactivité (SEC1). Le client gardait « déjà lancé »
     // et ne le relançait plus jamais : « Annuler » ou « Rendre » échouaient jusqu'au redémarrage de l'App.
     private sealed class HelperQuiSArrete : IElevatedClient
     {

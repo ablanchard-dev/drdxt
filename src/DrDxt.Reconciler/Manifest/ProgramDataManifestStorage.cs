@@ -7,22 +7,22 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler.Manifest;
 
 // -----------------------------------------------------------------------
-// ProgramDataManifestStorage — the production IManifestStorage (plan T2).
+// ProgramDataManifestStorage : l'IManifestStorage de production.
 //
-// Defence-in-depth (master §9.12 / B1): the manifest lives under
+// Défense en profondeur : le manifeste vit sous
 //   %ProgramData%\DrDxt\desired-state.manifest
-// with a DACL that grants write to Administrators + SYSTEM only and read to
-// authenticated users. A non-admin user can read it (the reconciler runs low-priv)
-// but cannot REWRITE it. This complements — never replaces — the asymmetric
-// signature: the signature is the integrity authority; the ACL just raises the bar
-// at rest.
+// avec une DACL qui n'accorde l'écriture qu'aux Administrateurs + SYSTEM et la lecture aux
+// utilisateurs authentifiés. Un utilisateur non admin peut le lire (le réconciliateur tourne
+// peu privilégié) mais pas le réécrire. Cela complète la signature asymétrique, sans jamais la
+// remplacer : la signature est l'autorité d'intégrité ; l'ACL ne fait que relever la barre au repos.
 //
-// Writes are ATOMIC (write to a sibling .tmp, then File.Move/replace) so a crash
-// mid-flush never leaves a half-written manifest (plan T6 / I2).
+// Les écritures sont atomiques (écriture dans un .tmp voisin, puis File.Move / remplacement) :
+// un plantage en pleine écriture ne laisse jamais un manifeste à moitié écrit.
 //
-// TESTABILITY: the path + the DACL descriptor are pure static helpers (asserted in
-// unit tests with no FS / no admin). The instance is constructed with an explicit
-// root so tests round-trip in a temp dir; `applyAcl` is opt-out for those tests.
+// Testabilité : le chemin et le descripteur de DACL sont des fonctions statiques pures
+// (vérifiées en test unitaire sans système de fichiers ni admin). L'instance se construit avec
+// une racine explicite pour que les tests fassent l'aller-retour dans un dossier temporaire ;
+// `applyAcl` se désactive pour ces tests.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class ProgramDataManifestStorage : IManifestStorage
@@ -34,9 +34,9 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
 
     public ProgramDataManifestStorage() : this(DefaultRoot(), applyAcl: true) { }
 
-    /// <param name="root">The directory the manifest lives in.</param>
-    /// <param name="applyAcl">Apply the admin-write DACL on create (false in unit
-    /// tests, which run without admin in a temp dir).</param>
+    /// <param name="root">Le dossier où vit le manifeste.</param>
+    /// <param name="applyAcl">Poser la DACL en écriture admin à la création (false dans les tests
+    /// unitaires, qui tournent sans admin dans un dossier temporaire).</param>
     public ProgramDataManifestStorage(string root, bool applyAcl)
     {
         _root = root;
@@ -45,17 +45,17 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
 
     private string FilePath => Path.Combine(_root, FileName);
 
-    /// <summary>%ProgramData%\DrDxt — the admin-write root.</summary>
+    /// <summary>%ProgramData%\DrDxt : la racine en écriture admin.</summary>
     public static string DefaultRoot()
         => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
             "DrDxt");
 
-    /// <summary>The hardened admin-write root security: owner pinned to Administrators,
-    /// Write for Administrators + SYSTEM, read for authenticated users; protected (does
-    /// not inherit a looser parent ACL). Pinning the owner closes the "creator keeps an
-    /// implicit WRITE_DAC and reopens the DACL" hole (BLOCKER #1b) — see
-    /// <see cref="TrustedManifestRoot.BuildHardenedSecurity"/>.</summary>
+    /// <summary>La sécurité durcie de la racine en écriture admin : propriétaire épinglé à
+    /// Administrateurs, écriture pour Administrateurs + SYSTEM, lecture pour les utilisateurs
+    /// authentifiés ; protégée (n'hérite pas d'une ACL parente plus lâche). Épingler le propriétaire
+    /// ferme le trou « le créateur garde un WRITE_DAC implicite et rouvre la DACL » (BLOCKER #1b) :
+    /// voir <see cref="TrustedManifestRoot.BuildHardenedSecurity"/>.</summary>
     public static DirectorySecurity BuildAdminWriteDacl()
         => TrustedManifestRoot.BuildHardenedSecurity();
 
@@ -67,22 +67,22 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
 
             if (_applyAcl)
             {
-                // Production: write HARDENED — ensure/repair the admin-owned root, write
-                // atomically, and PIN the manifest file's owner=Administrators + protected
-                // admin-only DACL (BLOCKER #1 / F3) so the SYSTEM reconciler trusts it at
-                // rest even when the writer is an admin USER (not SYSTEM). Fails LOUD if the
-                // owner cannot be set (caller not elevated) — never leaves a user-owned
-                // manifest the service would silently reject.
+                // Production : écriture durcie. S'assurer de la racine appartenant aux administrateurs (ou la
+                // réparer), écrire atomiquement, et épingler owner=Administrators + DACL protégée réservée aux
+                // admins sur le fichier du manifeste, pour que le réconciliateur SYSTEM lui fasse confiance au
+                // repos même quand l'écrivain est un utilisateur admin (pas SYSTEM). Échoue bruyamment si le
+                // propriétaire ne peut pas être posé (appelant non élevé) : jamais de manifeste appartenant à
+                // l'utilisateur, que le service rejetterait en silence.
                 return Task.FromResult(
                     TrustedManifestRoot.WriteTrustedFile(FilePath, Encoding.UTF8.GetBytes(json)));
             }
 
-            // Test/no-ACL mode (temp dir the test user owns): plain atomic write.
+            // Mode test / sans ACL (dossier temporaire possédé par l'utilisateur de test) : simple écriture atomique.
             if (!Directory.Exists(_root))
                 Directory.CreateDirectory(_root);
             var tmp = FilePath + ".tmp";
             File.WriteAllText(tmp, json);
-            // Atomic replace: File.Move(overwrite) is an atomic rename on NTFS.
+            // Remplacement atomique : File.Move(overwrite) est un renommage atomique sur NTFS.
             File.Move(tmp, FilePath, overwrite: true);
             return Task.FromResult(Result.Ok());
         }
@@ -92,15 +92,15 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
         }
     }
 
-    /// <summary>11/09/2026 — la reprise : le manifeste illisible est RENOMME a cote de lui, jamais efface
+    /// <summary>La reprise : le manifeste illisible est renomme a cote de lui, jamais efface
     /// (il reste la seule trace de ce qu'il contenait). Absent ⇒ rien a faire. Le renommage garde le
     /// descripteur de securite du fichier.</summary>
     public Result MettreDeCote() => MiseDeCote.Renommer(FilePath);
 
-    /// <summary>11/09/2026 (lot 6e) — apres un rendu a la desinstallation. Le manifeste restait en place :
-    /// une reinstallation y retrouvait des origines deja rendues, capturees avant la desinstallation
+    /// <summary>Apres un rendu a la desinstallation. Laisse en place, le manifeste ferait retrouver a
+    /// une reinstallation des origines deja rendues, capturees avant la desinstallation
     /// precedente, et le jour ou le service les rejouerait il reecrirait un passe que l'utilisateur a
-    /// quitte. Il est renomme `desired-state.manifest.rendu-<heure UTC>` — jamais efface : il reste la
+    /// quitte. Il est renomme `desired-state.manifest.rendu-<heure UTC>`, jamais efface : il reste la
     /// trace de ce que la desinstallation a lu.</summary>
     public Result MettreDeCoteApresRendu() => MiseDeCote.Renommer(FilePath, "rendu");
 
@@ -111,11 +111,11 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
             if (!File.Exists(FilePath))
                 return Task.FromResult(Result<SignedManifestEnvelope?>.Ok(null));
 
-            // At-rest integrity (BLOCKER #1a): before trusting a PRESENT manifest, assert
-            // its owner is Administrators/SYSTEM and the root is not non-admin-writable. A
-            // poisoned root (e.g. a user-created %ProgramData%\DrDxt) → fail-closed (treat
-            // as tampered), so nothing is reapplied. Defence-in-depth on top of the Ed25519
-            // signature (the integrity authority). Skipped only in the test/no-ACL mode.
+            // Intégrité au repos (BLOCKER #1a) : avant de faire confiance à un manifeste présent, vérifier
+            // que son propriétaire est Administrateurs/SYSTEM et que la racine n'est pas inscriptible par un
+            // non-admin. Une racine empoisonnée (par exemple un %ProgramData%\DrDxt créé par l'utilisateur)
+            // → fail-closed (traitée comme altérée) : rien n'est réappliqué. Défense en profondeur au-dessus
+            // de la signature Ed25519 (l'autorité d'intégrité). Sautée seulement en mode test / sans ACL.
             if (_applyAcl)
             {
                 var trust = TrustedManifestRoot.EnsureTrustedFile(FilePath);
@@ -127,7 +127,7 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
 
             var json = File.ReadAllText(FilePath);
             var env = JsonSerializer.Deserialize<SignedManifestEnvelope>(json);
-            // 26/09/2026 : un fichier present qui contient « null » n'est pas un fichier absent.
+            // Un fichier present qui contient « null » n'est pas un fichier absent.
             return Task.FromResult(env is null
                 ? Result<SignedManifestEnvelope?>.Fail(ErrorCodes.ManifestTampered, "Manifest file is present but empty.")
                 : Result<SignedManifestEnvelope?>.Ok(env));

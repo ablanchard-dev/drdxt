@@ -11,9 +11,9 @@ namespace DrDxt.Measurement.Memory;
 /// qu'il y a plusieurs canaux, quelle que soit la facon dont la carte nomme ses emplacements.
 ///
 /// ══ ce que ce raisonnement n'a pas le droit de faire : conclure a l'envers ══
-/// Un debit BAS ne prouve rien du tout. Un seul fil d'execution ne sature pas forcement deux
-/// canaux -- le facteur limitant est alors le nombre d'acces qu'un coeur garde en vol, pas la
-/// memoire. Le plancher rend donc `1` au sens de « au moins un », c'est-a-dire UNKNOWN, et jamais
+/// Un debit bas ne prouve rien du tout. Un seul fil d'execution ne sature pas forcement deux
+/// canaux : le facteur limitant est alors le nombre d'acces qu'un coeur garde en vol, pas la
+/// memoire. Le plancher rend donc `1` au sens de « au moins un », c'est-a-dire Unknown, et jamais
 /// « simple canal ».
 /// </summary>
 public static class MemoryInference
@@ -29,9 +29,9 @@ public static class MemoryInference
     private const double ProofMargin = 1.02;
 
     /// <summary>
-    /// Debit plafond d'UN canal, en Go/s, a la frequence configuree. Les barrettes d'une machine
+    /// Debit plafond d'un canal, en Go/s, a la frequence configuree. Les barrettes d'une machine
     /// tournent toutes a la vitesse de la plus lente : c'est elle qui fixe le plafond.
-    /// Rend 0 quand aucune frequence n'a ete lue -- 0 veut dire « je ne sais pas », et aucun
+    /// Rend 0 quand aucune frequence n'a ete lue : 0 veut dire « je ne sais pas », et aucun
     /// appelant n'a le droit d'en tirer une conclusion.
     /// </summary>
     public static double PerChannelPeakGBs(IReadOnlyList<MemoryModule> modules)
@@ -58,7 +58,7 @@ public static class MemoryInference
     /// les deux nombres qu'on mesure deja et ne demande aucun banc supplementaire.
     ///
     /// Ce qu'elle explique, et qui compte pour ce produit : un debit modeste avec une bonne
-    /// latence signifie que la machine ne garde pas assez d'acces en vol -- le facteur limitant
+    /// latence signifie que la machine ne garde pas assez d'acces en vol : le facteur limitant
     /// est le coeur, pas la memoire. C'est la raison pour laquelle
     /// <see cref="ProvenMinimumChannels"/> refuse de conclure vers le bas.
     /// </summary>
@@ -66,7 +66,7 @@ public static class MemoryInference
         => latencyNs <= 0 ? 0 : bandwidthGBs * latencyNs / 64.0;
 
     /// <summary>
-    /// Nombre de canaux que le debit mesure prouve. 1 signifie « rien de prouve au-dela d'un » --
+    /// Nombre de canaux que le debit mesure prouve. 1 signifie « rien de prouve au-dela d'un » :
     /// lire le commentaire de classe avant d'en faire un diagnostic de simple canal.
     /// </summary>
     public static int ProvenMinimumChannels(

@@ -5,17 +5,17 @@ using FluentAssertions;
 namespace DrDxt.Bios.Tests;
 
 /// <summary>
-/// Foundation tests for <see cref="BiosAdvisor"/>: detect→diff over M1's
-/// HardwareInventory + SettingsState (it never re-detects, never writes).
-/// Honesty is the spine: a setting we cannot read = an honest "not read" Finding,
-/// never a fabricated state; a well-tuned machine = an empty list (valid result).
-/// Every Finding carries its decision-doc §2 matrix class.
+/// Tests de base de <see cref="BiosAdvisor"/> : détecter → comparer sur le HardwareInventory
+/// et le SettingsState du scan (il ne redétecte jamais, n'écrit jamais).
+/// L'honnêteté est la colonne vertébrale : un réglage illisible = un constat « non lu » honnête,
+/// jamais un état fabriqué ; une machine bien réglée = une liste vide (résultat valide).
+/// Chaque constat porte sa classe de matrice.
 /// </summary>
 public class BiosAdvisorTests
 {
     private static readonly IBiosAdvisor Advisor = new BiosAdvisor();
 
-    // ── Builders: a deliberately mis-tuned desktop baseline we mutate per test. ──
+    // ── Constructeurs : un bureau volontairement mal réglé, muté par test. ──
 
     private static HardwareInventory Hw(
         bool isX3D = false,
@@ -67,7 +67,7 @@ public class BiosAdvisorTests
         f.CurrentState.Should().Be(TriState.Off);
         f.RecommendedAction.Should().Be(BiosRecommendedAction.Enable);
         f.StateNotReadable.Should().BeFalse();
-        // 23/09/2026 : plus de fourchette (voir No_bios_gain_shows_a_range_nothing_public_holds).
+        // Plus de fourchette (voir No_bios_gain_shows_a_range_nothing_public_holds).
         f.Gain.Should().NotBeNull();
         f.Gain!.MinPct.Should().BeNull();
         f.Gain.SourceKey.Should().NotBeNullOrWhiteSpace();
@@ -77,14 +77,14 @@ public class BiosAdvisorTests
         f.RecommendedActionKey.Should().NotBeNullOrWhiteSpace();
     }
 
-    [Fact] // A2 — honesty: already ON → no XMP finding (no fabricated need)
+    [Fact] // Honnêteté : déjà actif → aucun constat XMP (pas de besoin fabriqué)
     public void XmpOn_emits_no_XmpExpo_finding()
     {
         Advise(Hw(), State(xmp: TriState.On))
             .Should().NotContain(x => x.Kind == FirmwareSettingKind.XmpExpo);
     }
 
-    [Fact] // A3 — Unknown → honest Info "not read", never asserts a state
+    [Fact] // Unknown → Info « non lu » honnête, n'affirme jamais un état
     public void XmpUnknown_emits_Info_Read_NotReadable_finding()
     {
         var f = Advise(Hw(), State(xmp: TriState.Unknown))
@@ -98,9 +98,9 @@ public class BiosAdvisorTests
         f.Gain.Should().BeNull();
     }
 
-    // ════════════════ ReBAR + ordered prerequisites ════════════════
+    // ════════════════ ReBAR et prérequis ordonnés ════════════════
 
-    [Fact] // A4 — ReBar off (UEFI) → ordered prereqs Above-4G → CSM → ReBAR
+    [Fact] // ReBar désactivé (UEFI) → prérequis ordonnés Above-4G → CSM → ReBAR
     public void ReBarOff_uefi_emits_ordered_prerequisites()
     {
         var findings = Advise(Hw(gpuReBar: TriState.Off, isUefi: true), State(reBar: TriState.Off));
@@ -110,7 +110,7 @@ public class BiosAdvisorTests
         kinds.Should().Contain(FirmwareSettingKind.Csm);
         kinds.Should().Contain(FirmwareSettingKind.ReBar);
 
-        // Exact ordering of the chain: Above-4G ON → CSM OFF → Re-Size BAR ON.
+        // Ordre exact de la chaîne : Above-4G activé → CSM désactivé → Re-Size BAR activé.
         kinds.IndexOf(FirmwareSettingKind.Above4G)
             .Should().BeLessThan(kinds.IndexOf(FirmwareSettingKind.Csm));
         kinds.IndexOf(FirmwareSettingKind.Csm)
@@ -123,14 +123,14 @@ public class BiosAdvisorTests
         findings.Single(f => f.Kind == FirmwareSettingKind.ReBar)
             .RecommendedAction.Should().Be(BiosRecommendedAction.Enable);
 
-        // every prereq carries a matrix class (V1 = Guide)
+        // chaque prérequis porte une classe de matrice (V1 = Guide)
         findings.Where(f => f.Kind is FirmwareSettingKind.Above4G
                                  or FirmwareSettingKind.Csm
                                  or FirmwareSettingKind.ReBar)
             .Should().OnlyContain(f => f.MatrixClass == BiosMatrixClass.Guide);
     }
 
-    [Fact] // A5 — ReBar already ON → no ReBar/Above4G/CSM findings
+    [Fact] // ReBar déjà actif → aucun constat ReBar/Above4G/CSM
     public void ReBarOn_emits_no_rebar_chain()
     {
         var findings = Advise(Hw(gpuReBar: TriState.On), State(reBar: TriState.On));
@@ -138,7 +138,7 @@ public class BiosAdvisorTests
             .NotContain(new[] { FirmwareSettingKind.ReBar, FirmwareSettingKind.Above4G, FirmwareSettingKind.Csm });
     }
 
-    [Fact] // A6 — ReBar Unknown on NVIDIA → recommend-with-caveat, Info, never Major/force
+    [Fact] // ReBar inconnu sur NVIDIA → recommander avec réserve, Info, jamais majeur ni forcé
     public void ReBarUnknown_nvidia_emits_Info_caveat_finding()
     {
         var f = Advise(Hw(gpuVendor: "NVIDIA", gpuReBar: TriState.Unknown), State(reBar: TriState.Unknown))
@@ -149,13 +149,13 @@ public class BiosAdvisorTests
         f.CurrentState.Should().Be(TriState.Unknown);
         f.StateNotReadable.Should().BeTrue();
         f.RecommendedAction.Should().Be(BiosRecommendedAction.Verify);
-        // Unknown must not drag in CSM/Above-4G write steps.
+        // Unknown ne doit pas entraîner d'étapes d'écriture CSM/Above-4G.
         Advise(Hw(gpuVendor: "NVIDIA", gpuReBar: TriState.Unknown), State(reBar: TriState.Unknown))
             .Select(x => x.Kind).Should()
             .NotContain(new[] { FirmwareSettingKind.Above4G, FirmwareSettingKind.Csm });
     }
 
-    [Fact] // A7 — ReBar off, known (AMD) → normal Guide finding, no "unknown" caveat
+    [Fact] // ReBar désactivé, connu (AMD) → constat Guide normal, sans réserve « inconnu »
     public void ReBarOff_amd_emits_normal_finding_not_caveat()
     {
         var f = Advise(Hw(gpuVendor: "AMD", gpuReBar: TriState.Off), State(reBar: TriState.Off))
@@ -166,35 +166,35 @@ public class BiosAdvisorTests
         f.RecommendedAction.Should().Be(BiosRecommendedAction.Enable);
     }
 
-    // ════════════════ Boot mode / CSM guard (no-boot safety) ════════════════
+    // ════════════════ Mode de démarrage / garde CSM (sécurité de démarrage) ════════════════
 
-    [Fact] // B2 — Legacy boot + ReBar off → do not advise CSM-off (no-boot risk)
+    [Fact] // Démarrage Legacy + ReBar désactivé → ne pas conseiller de couper le CSM (risque de non-démarrage)
     public void Legacy_boot_suppresses_csm_off_recommendation()
     {
         var findings = Advise(Hw(gpuReBar: TriState.Off, isUefi: false), State(reBar: TriState.Off));
 
         findings.Should().NotContain(f => f.Kind == FirmwareSettingKind.Csm,
             "advising CSM-off on a Legacy/MBR system risks no-boot");
-        // The ReBar finding is still surfaced, just without the dangerous CSM step.
+        // Le constat ReBar remonte toujours, juste sans l'étape CSM dangereuse.
         findings.Should().Contain(f => f.Kind == FirmwareSettingKind.ReBar);
     }
 
     // ════════════════ X3D / CPPC ════════════════
 
-    [Fact] // A8 — multi-CCD X3D → a Verify finding (Windows-side first), not a Major BIOS write
+    [Fact] // X3D multi-CCD → un constat à vérifier (côté Windows d'abord), pas une écriture BIOS majeure
     public void MultiCcd_X3D_emits_verify_finding_not_a_bios_write()
     {
         var f = Advise(Hw(isX3D: true, ccdCount: 2), State())
             .Single(x => x.Kind == FirmwareSettingKind.X3dCppc);
 
-        // Softened (decision §2: primary fix is Windows-side, BIOS CPPC only "if mis-set").
+        // Adouci (le correctif principal est côté Windows, CPPC du BIOS seulement « si mal réglé »).
         f.Severity.Should().Be(Severity.Minor);
         f.MatrixClass.Should().Be(BiosMatrixClass.Read, "the primary routing fix is Windows-side, not a BIOS step");
         f.RecommendedAction.Should().Be(BiosRecommendedAction.Verify);
         f.StateNotReadable.Should().BeTrue();
     }
 
-    [Fact] // A8 — non-X3D or single CCD → no X3D finding
+    [Fact] // Hors X3D ou un seul CCD → aucun constat X3D
     public void NonX3D_emits_no_X3dCppc_finding()
     {
         Advise(Hw(isX3D: false, ccdCount: 1), State())
@@ -203,9 +203,9 @@ public class BiosAdvisorTests
             .Should().NotContain(x => x.Kind == FirmwareSettingKind.X3dCppc);
     }
 
-    // ════════════════ PCIe link — honest "not read" ════════════════
+    // ════════════════ Lien PCIe : « non lu » honnête ════════════════
 
-    [Fact] // PCIe link info is not in M1 inventory → honest not-read finding, never fabricated
+    [Fact] // L'info de lien PCIe n'est pas dans l'inventaire du scan → constat « non lu » honnête, jamais fabriqué
     public void PcieGen_emits_honest_not_read_finding()
     {
         var f = Advise(Hw(), State())
@@ -219,9 +219,9 @@ public class BiosAdvisorTests
         f.Gain.Should().BeNull();
     }
 
-    // ════════════════ BIOS version / AGESA ════════════════
+    // ════════════════ Version du BIOS / AGESA ════════════════
 
-    [Fact] // old BIOS date → informational update suggestion (no KB = no hard claim)
+    [Fact] // date de BIOS ancienne → suggestion informative de mise à jour (sans base = aucune affirmation dure)
     public void OldBios_emits_Info_update_suggestion()
     {
         var old = DateTimeOffset.UtcNow.AddYears(-4);
@@ -233,16 +233,16 @@ public class BiosAdvisorTests
         f.RecommendedAction.Should().Be(BiosRecommendedAction.Update);
     }
 
-    [Fact] // recent BIOS → no version finding
+    [Fact] // BIOS récent → aucun constat de version
     public void RecentBios_emits_no_version_finding()
     {
         Advise(Hw(biosDate: DateTimeOffset.UtcNow.AddMonths(-3)), State())
             .Should().NotContain(x => x.Kind == FirmwareSettingKind.BiosVersion);
     }
 
-    // ════════════════ Chassis gating (§16) ════════════════
+    // ════════════════ Filtre par châssis ════════════════
 
-    [Theory] // A9 — laptop/handheld BIOS is locked → no actionable firmware findings
+    [Theory] // Le BIOS d'un portable ou d'une console portable est verrouillé → aucun constat firmware actionnable
     [InlineData(ChassisType.Laptop)]
     [InlineData(ChassisType.Handheld)]
     public void LockedChassis_emits_no_actionable_findings(ChassisType chassis)
@@ -250,7 +250,7 @@ public class BiosAdvisorTests
         var findings = Advise(Hw(chassis: chassis, gpuReBar: TriState.Off, isX3D: true, ccdCount: 2),
                               State(xmp: TriState.Off, reBar: TriState.Off));
 
-        // No Guide/Forbidden write recommendations on a locked machine.
+        // Aucune recommandation d'écriture Guide/Forbidden sur une machine verrouillée.
         findings.Should().NotContain(f => f.MatrixClass == BiosMatrixClass.Guide);
         findings.Select(f => f.Kind).Should().NotContain(new[]
         {
@@ -264,9 +264,9 @@ public class BiosAdvisorTests
         findings.Single().Severity.Should().Be(Severity.Info);
     }
 
-    // ════════════════ Defensive boundary ════════════════
+    // ════════════════ Frontière défensive ════════════════
 
-    [Fact] // A10 — empty memory while inferring XMP → clean Result.Fail, no exception
+    [Fact] // Mémoire vide pendant l'inférence XMP → Result.Fail propre, pas d'exception
     public void EmptyMemory_fails_clean()
     {
         var hw = Hw() with { Memory = Array.Empty<MemoryModule>() };
@@ -276,7 +276,7 @@ public class BiosAdvisorTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.BiosInputInvalid);
     }
 
-    [Fact] // A10 — no GPU while diffing ReBar → clean Result.Fail
+    [Fact] // Aucune carte pendant la comparaison ReBar → Result.Fail propre
     public void NoGpu_fails_clean()
     {
         var hw = Hw() with { Gpus = Array.Empty<GpuInfo>() };
@@ -286,9 +286,9 @@ public class BiosAdvisorTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.BiosInputInvalid);
     }
 
-    // ════════════════ Integration: every finding is honest + classed ════════════════
+    // ════════════════ Intégration : chaque constat est honnête et classé ════════════════
 
-    [Fact] // A11 — fully mis-tuned desktop → exactly the expected actionable set
+    [Fact] // Bureau entièrement mal réglé → exactement l'ensemble actionnable attendu
     public void MisTunedDesktop_emits_expected_set()
     {
         var findings = Advise(
@@ -305,7 +305,7 @@ public class BiosAdvisorTests
         });
     }
 
-    [Fact] // A11 — well-tuned desktop → "nothing to tune in BIOS" (only honest not-read infos)
+    [Fact] // Bureau bien réglé → « rien à régler dans le BIOS » (seulement des infos « non lu » honnêtes)
     public void WellTunedDesktop_has_no_actionable_findings()
     {
         var findings = Advise(
@@ -314,9 +314,9 @@ public class BiosAdvisorTests
                biosDate: DateTimeOffset.UtcNow.AddMonths(-2)),
             State(xmp: TriState.On, reBar: TriState.On));
 
-        // No actionable (Guide) finding — a valid, assumed "already good" result.
+        // Aucun constat actionnable (Guide) : un résultat valide, supposé « déjà bon ».
         findings.Should().NotContain(f => f.MatrixClass == BiosMatrixClass.Guide);
-        // Any remaining finding is purely informational/honest-not-read.
+        // Tout constat restant est purement informatif ou « non lu » honnête.
         findings.Should().OnlyContain(f =>
             f.Severity == Severity.Info && f.MatrixClass == BiosMatrixClass.Read);
     }
@@ -333,14 +333,14 @@ public class BiosAdvisorTests
             !string.IsNullOrWhiteSpace(f.TitleKey) &&
             !string.IsNullOrWhiteSpace(f.RationaleKey) &&
             !string.IsNullOrWhiteSpace(f.RecommendedActionKey));
-        // No Finding may ever claim a write-class the foundation can't honour.
+        // Aucun constat ne peut annoncer une classe d'écriture que la base ne sait pas honorer.
         findings.Should().OnlyContain(f =>
             f.MatrixClass == BiosMatrixClass.Guide || f.MatrixClass == BiosMatrixClass.Read);
     }
 
-    // ════════════════ Honest gain framing (ranges/caveats, not bare %) ════════════════
+    // ════════════════ Gains présentés honnêtement (fourchettes et réserves, pas de % nu) ════════════════
 
-    [Fact] // ReBAR is game-dependent (can regress) → conditional, NO fabricated point-%
+    [Fact] // ReBAR dépend du jeu (peut régresser) → conditionnel, aucun % ponctuel fabriqué
     public void ReBar_gain_is_conditional_with_no_fabricated_percent()
     {
         var f = Advise(Hw(gpuVendor: "AMD", gpuReBar: TriState.Off, isUefi: true), State(reBar: TriState.Off))
@@ -354,7 +354,7 @@ public class BiosAdvisorTests
         f.Gain.CaveatKey.Should().NotBeNullOrWhiteSpace();
     }
 
-    [Fact] // X3D : only IF mis-routed → conditional, and no range on screen
+    [Fact] // X3D : seulement si mal routé → conditionnel, et aucune fourchette à l'écran
     public void X3d_gain_is_conditional_with_no_range()
     {
         var f = Advise(Hw(isX3D: true, ccdCount: 2), State())
@@ -368,13 +368,13 @@ public class BiosAdvisorTests
         f.Gain.CaveatKey.Should().NotBeNullOrWhiteSpace();
     }
 
-    // 23/09/2026 — une fourchette que rien de public ne tient ne s'affiche pas.
+    // Une fourchette que rien de public ne tient ne s'affiche pas.
     //
-    // L'ecran disait « XMP : ≈ 11–25 % » et « X3D : ≈ 0–10 % », source : nos notes de decision. Les
+    // Une plage comme « XMP : ≈ 11–25 % » ou « X3D : ≈ 0–10 % » tiree de nos notes ne tient pas. Les
     // mesures publiques disent autre chose : pour XMP/EXPO, de quelques % dans un jeu limite par la
     // carte graphique a ~42 % dans un jeu tres sensible a la memoire (TechSpot, XDA), et ~1 % sur un
-    // X3D (AMD). Une fourchette unique ne decrit la machine de personne ; la notre, recherche
-    // la note memoire du projet (non publiee) le dit elle-meme : « non chiffrable de facon canonique : on mesure ». Le chiffre
+    // X3D (AMD). Une fourchette unique ne decrit la machine de personne ; la note memoire du projet
+    // (non publiee) le dit elle-meme : « non chiffrable de facon canonique : on mesure ». Le chiffre
     // de la personne vient de l'A/B du produit, pas d'une plage imprimee d'avance.
     [Fact]
     public void No_bios_gain_shows_a_range_nothing_public_holds()

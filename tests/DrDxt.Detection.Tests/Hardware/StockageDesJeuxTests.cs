@@ -6,7 +6,7 @@ using Xunit;
 
 namespace DrDxt.Detection.Tests.Hardware;
 
-// 07/10/2026 (D5) : les bibliothèques Steam lues dans libraryfolders.vdf, et le lien PCIe d'un SSD NVMe jugé.
+// Les bibliothèques Steam lues dans libraryfolders.vdf, et le lien PCIe d'un SSD NVMe jugé.
 public sealed class StockageDesJeuxTests
 {
     [Fact]

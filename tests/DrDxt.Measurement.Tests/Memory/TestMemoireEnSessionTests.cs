@@ -31,7 +31,7 @@ public class TestMemoireEnSessionTests
     [Fact]
     public void Rien_d_alloue_ne_se_dit_jamais_aucune_erreur()
     {
-        // 25/09/2026 : si aucun bloc n'avait pu etre alloue, la boucle tournait a vide et rendait
+        // Si aucun bloc n'avait pu etre alloue, la boucle tournait a vide et rendait
         // « aucune erreur en N passe(s) sur 0,0 Go » : une memoire non testee presentee comme propre.
         var r = new DrDxt.Measurement.Memory.ResultatTestMemoire(0, 0, 0, TimeSpan.FromMinutes(5), 0);
         r.Phrase.Should().NotContain("aucune erreur").And.Contain("rien n'a pu être testé");

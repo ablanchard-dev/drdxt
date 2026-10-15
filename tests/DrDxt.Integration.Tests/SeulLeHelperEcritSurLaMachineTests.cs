@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Le README annonce le modele de securite du produit :
+// Le README annonce le modele de securite du produit :
 //
 //   « Tout ce qui ecrit passe par une op typee serialisee vers le helper eleve,
 //     validee par une allowlist default-DENY, feuille-exacte. »

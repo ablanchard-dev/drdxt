@@ -3,8 +3,8 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Gpu;
 
-// 04/10/2026 : la mémoire vidéo occupée, carte par carte. Le compteur Windows nomme chaque carte par son identifiant
-// (luid_…_phys_N) ; il est rattaché à la carte DXGI de même identifiant. Revue du 04/10 (P1) : une carte intégrée
+// La mémoire vidéo occupée, carte par carte. Le compteur Windows nomme chaque carte par son identifiant
+// (luid_…_phys_N) ; il est rattaché à la carte DXGI de même identifiant. une carte intégrée
 // (128 à 512 Mo « dédiés ») frôle toujours 100 % alors que le jeu vit en mémoire partagée, elle ne compte pas.
 public sealed class MemoireVideoOccupeeTests
 {

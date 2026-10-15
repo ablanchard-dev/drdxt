@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// 25/09/2026, machine de reference : 27 echecs pour 575 reussites sur 90 jours. KB5124008 a echoue
+/// Machine de reference : 27 echecs pour 575 reussites sur 90 jours. KB5124008 a echoue
 /// deux fois puis s'est installe ; trois applications du Store restent en echec (0x80073D02).
 /// Le compte seul ferait peur pour rien : seul ce qui reste en echec est accuse.
 /// </summary>
@@ -35,8 +35,8 @@ public class MisesAJourEnEchecTests
         constats[0].Explication.Should().StartWith("2 de ces échecs ont été rattrapés");
     }
 
-    /// <summary>27/09/2026, vu sur photo : « Échecs : 27 sur 90 jours » au-dessus de quatre lignes à un échec
-    /// chacune. Le rattrapage n'était dit qu'en info-bulle ; le compte visible doit porter sa part rattrapée.</summary>
+    /// <summary>« Échecs : 27 sur 90 jours » au-dessus de quatre lignes à un échec chacune tromperait si le
+    /// rattrapage n'était dit qu'en info-bulle : le compte visible porte sa part rattrapée.</summary>
     [Fact]
     public void Le_compte_visible_dit_combien_d_echecs_ont_ete_rattrapes()
     {
@@ -61,11 +61,11 @@ public class MisesAJourEnEchecTests
             Essai(15, false, "9NMPJ99VJBWV-Microsoft.YourPhone", "0x80073d02"),
         ], 90);
 
-        // 29/09/2026, troisième critique : le nom de paquet du Store (« 9NMPJ99VJBWV-… ») et le code en tête
+        // Le nom de paquet du Store (« 9NMPJ99VJBWV-… ») et le code en tête
         // étaient illisibles pour un joueur. Le titre dit l'application, la valeur dit les échecs, le code reste
         // dans l'explication, après sa première phrase (donc sous « Pourquoi ? »).
         var appli = constats.Single(c => c.Nom == "Mise à jour de l'application YourPhone");
-        // UI1 (critique du 08/10) : l'appli marche toujours ; en rouge, elle se rangeait avec un service exploitable.
+        // L'appli marche toujours ; en rouge, elle se rangeait avec un service exploitable.
         appli.Statut.Should().Be(RepairStatus.Observed, "à regarder, pas à corriger");
         appli.Action.Should().Be(RepairAction.Recommandation, "elle reste à l'écran avec son geste");
         appli.ValeurCourante.Should().StartWith("3 échecs").And.NotContain("0x");
@@ -78,7 +78,7 @@ public class MisesAJourEnEchecTests
         => MisesAJourEnEchec.Juger([Essai(1, false, "KB5050009", "0x800f0922"), Essai(8, false, "KB5050009", "0x800f0922")], 90)
             .Single(c => c.Nom == "KB5050009").Statut.Should().Be(RepairStatus.Suspicious);
 
-    // Revue n° 15 : Gaming Services ne se range pas avec AppliX : un jeu Game Pass peut ne plus se lancer.
+    // Gaming Services ne se range pas avec AppliX : un jeu Game Pass peut ne plus se lancer.
     [Fact]
     public void Gaming_Services_qui_echoue_reste_a_corriger()
         => MisesAJourEnEchec.Juger([Essai(1, false, "9MWPM2CQNLHN-Microsoft.GamingServices", "0x80073d02"),
@@ -90,7 +90,7 @@ public class MisesAJourEnEchecTests
         => MisesAJourEnEchec.Juger([Essai(3, false, "Defender", "0x8024001e")], 90)
             .Single(c => c.Nom == "Defender").Statut.Should().Be(RepairStatus.Observed);
 
-    // 04/10/2026 (plan 3.3) : relevé sur la machine de référence. AppliX 26.930 déposé le 02/10 à 18:48:08, échec noté à
+    // Relevé sur la machine de référence. AppliX 26.930 déposé le 02/10 à 18:48:08, échec noté à
     // 18:48:42 en 0x80073D02 : la version installée EST la mise à jour, elle n'est pas en échec.
     [Fact]
     public void Une_appli_du_Store_deposee_au_moment_de_l_echec_n_est_pas_en_echec()
@@ -107,7 +107,7 @@ public class MisesAJourEnEchecTests
         MisesAJourEnEchec.NomDePaquet("9PLM9XGG6VKS-Editeur.AppliX").Should().Be("Editeur.AppliX");
         MisesAJourEnEchec.NomDePaquet("Mise à jour de sécurité KB5124008").Should().BeNull();
     }
-    // DOC-QUALITE (09/10/2026) : « recommandation » sans geste sur la machine de référence (AppliX, Photos). Ce qui échoue à
+    // « recommandation » sans geste sur la machine de référence (AppliX, Photos). Ce qui échoue à
     // chaque essai dit comment le relancer : par le Store pour une appli, par Windows Update pour le reste.
     [Fact]
     public void Ce_qui_echoue_a_chaque_essai_dit_comment_le_relancer()
@@ -120,13 +120,15 @@ public class MisesAJourEnEchecTests
             Essai(9, false, "Correctif (KB5000001)", "0x8024001e"),
         ], 90);
 
-        constats.Single(c => c.Nom == "Mise à jour de l'application YourPhone").Explication
-            .Should().EndWith("Pour la relancer : ferme l'application, puis Microsoft Store > Bibliothèque > Obtenir les mises à jour.");
-        constats.Single(c => c.Nom == "Correctif (KB5000001)").Explication
-            .Should().EndWith("Pour la relancer : Paramètres > Windows Update > Rechercher des mises à jour.");
+        var appli = constats.Single(c => c.Nom == "Mise à jour de l'application YourPhone");
+        appli.Explication.Should().NotContain("Pour la relancer", "le geste a sa place à part");
+        appli.Remede.Should().Be("1) Ferme YourPhone, y compris près de l'horloge si elle y tourne. "
+                                 + "2) Microsoft Store > Bibliothèque > Obtenir les mises à jour.");
+        constats.Single(c => c.Nom == "Correctif (KB5000001)").Remede
+            .Should().Be("1) Paramètres > Windows Update > Rechercher des mises à jour. 2) Si elle échoue encore, redémarre le PC puis relance.");
     }
 
-    // Revue adverse du docteur (09/10/2026, R10) : les définitions de Defender et l'outil de suppression changent de titre
+    // Les définitions de Defender et l'outil de suppression changent de titre
     // à chaque version ; un échec n'était jamais rattrapé par la version suivante réussie et restait « en échec » 90 jours.
     [Fact]
     public void Une_version_suivante_reussie_rattrape_l_echec_d_une_mise_a_jour_versionnee()

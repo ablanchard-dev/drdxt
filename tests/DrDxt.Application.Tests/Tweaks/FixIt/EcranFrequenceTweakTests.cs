@@ -7,7 +7,7 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// L-ECRAN : l'écran réglé à sa vraie fréquence.
+// L'écran réglé à sa vraie fréquence.
 //
 // Ce que ces tests défendent, dans l'ordre d'importance :
 //   * rien n'est écrit si Windows refuse le mode à l'essai (CDS_TEST),

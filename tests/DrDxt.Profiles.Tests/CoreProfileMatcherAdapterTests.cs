@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DrDxt.Profiles.Tests;
 
-// M6 — the adapter projecting the rich recommendation onto Core's IProfileMatcher.
+// L'adaptateur qui projette la recommandation riche sur l'IProfileMatcher du cœur.
 public sealed class CoreProfileMatcherAdapterTests
 {
     private static IProfileMatcher NewAdapter() =>
@@ -28,11 +28,11 @@ public sealed class CoreProfileMatcherAdapterTests
         var ids = result.Value!.RecommendedTweakIds;
 
         ids.Should().OnlyHaveUniqueItems();
-        // fix-misconfig first: every fixit.* precedes every latency.* and gpu.*
+        // mauvaise configuration d'abord : chaque fixit.* précède chaque latency.* et gpu.*
         var lastFixit = ids.Select((id, i) => (id, i)).Where(x => x.id.StartsWith("fixit.")).Select(x => x.i).DefaultIfEmpty(-1).Max();
         var firstNonFixit = ids.Select((id, i) => (id, i)).Where(x => !x.id.StartsWith("fixit.")).Select(x => x.i).DefaultIfEmpty(int.MaxValue).Min();
         lastFixit.Should().BeLessThan(firstNonFixit);
-        // includes the headline fix + a GPU tune for this combo.
+        // inclut le correctif phare et un réglage GPU pour cette combinaison.
         ids.Should().Contain("fixit.x3d_ccd").And.Contain("gpu.power_limit");
     }
 

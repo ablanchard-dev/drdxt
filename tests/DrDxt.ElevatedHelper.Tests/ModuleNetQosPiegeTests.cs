@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// 25/09/2026. Le plafond d'envoi passe par powershell.exe lance par le helper eleve. PowerShell 5.1
+/// Le plafond d'envoi passe par powershell.exe lance par le helper eleve. PowerShell 5.1
 /// met `Documents\WindowsPowerShell\Modules` en tete de PSModulePath, et l'utilisateur y ecrit sans
 /// droits : un faux module NetQos pose la etait charge a la place de celui de Windows. Ce test pose
 /// un tel module dans un dossier temporaire, en tete du chemin, et lance un vrai PowerShell avec le

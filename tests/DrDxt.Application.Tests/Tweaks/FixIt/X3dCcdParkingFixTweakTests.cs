@@ -7,19 +7,19 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// M2 Phase F1 — X3dCcdParkingFixTweak (the killer feature, supported route only).
+// X3dCcdParkingFixTweak (la fonction phare, voie supportée seulement).
 //
-// AppliesTo = dual-CCD AMD X3D (IsX3D && CcdCount >= 2) AND parking looks wrong
-// (heuristic on SettingsState.ParkedCoreIndexes). False on single-CCD X3D
-// (7800X3D / 9800X3D), Intel, and non-X3D.
+// AppliesTo = AMD X3D à deux CCD (IsX3D && CcdCount >= 2) et parcage qui semble faux
+// (heuristique sur SettingsState.ParkedCoreIndexes). Faux sur X3D à un CCD
+// (7800X3D / 9800X3D), Intel, et hors X3D.
 //
-// Supported route only (cahier §4 P2.3): enable the AMD 3D V-Cache Performance
-// Optimizer service (RunServiceControlOp("AMD3DVCacheSvc", Start)) + Game Bar. NO kernel
-// hack, NO BIOS write. Captures the original service + Game Bar state → composite
-// inverse snapshot; revert restores them. CppcEnable n'est plus écrit (24/09/2026) ; un
+// Voie supportée seulement : activer le service AMD 3D V-Cache Performance
+// Optimizer (RunServiceControlOp("AMD3DVCacheSvc", Start)) + Game Bar. Aucun bidouillage
+// noyau, aucune écriture BIOS. Capture l'état d'origine du service et de la Game Bar →
+// instantané inverse composite ; le retour arrière les restaure. CppcEnable n'est plus écrit ; un
 // ancien instantané qui le porte s'annule toujours.
 //
-// Pure unit tests with NSubstitute fakes.
+// Tests unitaires purs avec des faux NSubstitute.
 // -----------------------------------------------------------------------
 public sealed class X3dCcdParkingFixTweakTests
 {
@@ -33,8 +33,8 @@ public sealed class X3dCcdParkingFixTweakTests
     private readonly IRegistryReader _registry = Substitute.For<IRegistryReader>();
     private readonly IElevatedClient _elevated = Substitute.For<IElevatedClient>();
 
-    // Dual-CCD X3D (7950X3D = 16 cores / 2 CCDs) with nothing parked = the broken
-    // state (the optimizer isn't routing games to the V-Cache CCD).
+    // X3D à deux CCD (7950X3D = 16 cœurs / 2 CCD) sans rien de parqué = l'état cassé
+    // (l'optimiseur n'envoie pas les jeux sur le CCD V-Cache).
     private static SettingsState DualCcdBadParking() => StateWith(Array.Empty<int>());
 
     // Dual-CCD X3D dont le parking n'a pas pu etre lu. Distinct de "rien n'est parque" :
@@ -43,8 +43,8 @@ public sealed class X3dCcdParkingFixTweakTests
     // (AMD3DVCacheSvc + CppcEnable). Ne jamais proposer une ecriture sur un signal non lu.
     private static SettingsState DualCcdUnreadableParking() => StateWith(null);
 
-    // Dual-CCD X3D with the frequency CCD (high indexes 8..15) parked = healthy:
-    // games run on the V-Cache CCD0 (0..7). Nothing to fix.
+    // X3D à deux CCD avec le CCD fréquence (index hauts 8..15) parqué = sain :
+    // les jeux tournent sur le CCD0 V-Cache (0..7). Rien à corriger.
     private static SettingsState DualCcdGoodParking() => StateWith(new[] { 8, 9, 10, 11, 12, 13, 14, 15 });
 
     private static SettingsState StateWith(IReadOnlyList<int>? parked) => new(
@@ -135,15 +135,15 @@ public sealed class X3dCcdParkingFixTweakTests
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // (1) Start the AMD 3D V-Cache Performance Optimizer service.
+        // (1) Démarrer le service AMD 3D V-Cache Performance Optimizer.
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<RunServiceControlOp>(o => o.ServiceName == Service && o.Action == ServiceAction.Start),
             Arg.Any<CancellationToken>());
-        // 24/09/2026 : plus jamais CppcEnable, aucune source ne montre que Windows le lise.
+        // Plus jamais CppcEnable, aucune source ne montre que Windows le lise.
         await _elevated.DidNotReceive().ExecuteAsync(
             Arg.Is<SetRegistryValueOp>(o => o.Path == CppcPath && o.Name == CppcName),
             Arg.Any<CancellationToken>());
-        // (2) Game Bar auto game mode = 1.
+        // (2) Mode jeu automatique de la Game Bar = 1.
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<SetRegistryValueOp>(o => o.Path == GameBarPath && o.Name == GameBarName && o.Value == "1"),
             Arg.Any<CancellationToken>());
@@ -156,11 +156,11 @@ public sealed class X3dCcdParkingFixTweakTests
 
         await t.ApplyAsync();
 
-        // The only op types F1 may ever send are the supported software route.
+        // Les seuls types d'op que le correctif X3D peut envoyer sont la voie logicielle supportée.
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<ApplyNvApiClockOffsetOp>(), Arg.Any<CancellationToken>());
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<ApplyNvApiPowerLimitOp>(), Arg.Any<CancellationToken>());
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<ApplyGpuFanCurveOp>(), Arg.Any<CancellationToken>());
-        // Every op sent is one of the three supported-route shapes.
+        // Chaque op envoyée a l'une des trois formes de la voie supportée.
         var calls = _elevated.ReceivedCalls()
             .Where(c => c.GetMethodInfo().Name == nameof(IElevatedClient.ExecuteAsync))
             .Select(c => c.GetArguments()[0])
@@ -180,16 +180,16 @@ public sealed class X3dCcdParkingFixTweakTests
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // The snapshot is a composite of the captured-original inverse ops.
+        // L'instantané est un composite des ops inverses d'origine capturées.
         var decoded = CompositeSnapshotCodec.Decode(r.Value!.OriginalValueJson);
         decoded.IsOk.Should().BeTrue();
         var ops = decoded.Value!;
-        // Service was Stopped originally → inverse = Stop it again.
+        // Le service était arrêté à l'origine → inverse = l'arrêter de nouveau.
         ops.OfType<RunServiceControlOp>()
             .Any(s => s.ServiceName == Service && s.Action == ServiceAction.Stop).Should().BeTrue();
         // Plus rien sur CppcEnable : ce n'est plus écrit, donc rien à rendre.
         ops.OfType<SetRegistryValueOp>().Any(o => o.Name == CppcName).Should().BeFalse();
-        // Game Bar value was absent originally → inverse = delete it.
+        // La valeur Game Bar était absente à l'origine → inverse = la supprimer.
         ops.OfType<DeleteRegistryValueOp>()
             .Any(d => d.Path == GameBarPath && d.Name == GameBarName).Should().BeTrue();
     }
@@ -203,7 +203,7 @@ public sealed class X3dCcdParkingFixTweakTests
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // Service was already Running → the captured inverse must not stop it on revert.
+        // Le service tournait déjà → l'inverse capturé ne doit pas l'arrêter au retour arrière.
         var decoded = CompositeSnapshotCodec.Decode(r.Value!.OriginalValueJson);
         decoded.IsOk.Should().BeTrue();
         decoded.Value!.OfType<RunServiceControlOp>()
@@ -237,7 +237,7 @@ public sealed class X3dCcdParkingFixTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    /// <summary>Un instantané pris avant le 24/09/2026 porte encore l'inverse de CppcEnable : il doit
+    /// <summary>Un instantané d'une ancienne version porte encore l'inverse de CppcEnable : il doit
     /// toujours s'annuler en entier, sinon une ancienne écriture resterait sur la machine.</summary>
     [Fact]
     public async Task Un_ancien_instantane_avec_CppcEnable_s_annule_toujours()
@@ -286,9 +286,9 @@ public sealed class X3dCcdParkingFixTweakTests
     [Fact]
     public async Task Apply_rolls_back_already_applied_ops_when_a_mid_apply_op_fails()
     {
-        // §6.2 "rien ne reste pendu": op (1) service Start succeeds, op (2) Game Bar
-        // FAILS → the tweak must replay the inverse of op (1) (service was Stopped
-        // originally → Stop it) and return Fail, leaving NO orphaned applied state.
+        // « rien ne reste pendu » : l'op (1) Start du service réussit, l'op (2) Game Bar
+        // échoue → le levier doit rejouer l'inverse de l'op (1) (le service était arrêté
+        // à l'origine → l'arrêter) et rendre Fail, sans laisser d'état appliqué orphelin.
         var t = Build();
         _service.GetServiceState(Service).Returns(Result<ServiceState>.Ok(ServiceState.Stopped));
 
@@ -300,17 +300,17 @@ public sealed class X3dCcdParkingFixTweakTests
         _elevated.ExecuteAsync(
                 Arg.Is<SetRegistryValueOp>(o => o.Path == GameBarPath && o.Name == GameBarName), Arg.Any<CancellationToken>())
             .Returns(gameBarFail);
-        // The inverse rollback (service Stop) is allowed to succeed.
+        // Le rollback inverse (Stop du service) a le droit de réussir.
         _elevated.ExecuteAsync(
                 Arg.Is<RunServiceControlOp>(o => o.Action == ServiceAction.Stop), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
 
         var r = await t.ApplyAsync();
 
-        // The method returns Fail (the original failure code), not Ok.
+        // La méthode rend Fail (le code d'échec d'origine), pas Ok.
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
-        // The already-applied op (1)'s inverse WAS replayed: the service was stopped.
+        // L'inverse de l'op (1) déjà appliquée a bien été rejoué : le service a été arrêté.
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<RunServiceControlOp>(o => o.ServiceName == Service && o.Action == ServiceAction.Stop),
             Arg.Any<CancellationToken>());
@@ -327,11 +327,11 @@ public sealed class X3dCcdParkingFixTweakTests
         var revert = await t.RevertAsync(r.Value!);
 
         revert.IsOk.Should().BeTrue();
-        // Service was Stopped originally → revert stops it.
+        // Le service était arrêté à l'origine → le retour arrière l'arrête.
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<RunServiceControlOp>(o => o.ServiceName == Service && o.Action == ServiceAction.Stop),
             Arg.Any<CancellationToken>());
-        // Game Bar restored to original 0.
+        // Game Bar rendue à l'origine 0.
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<SetRegistryValueOp>(o => o.Path == GameBarPath && o.Name == GameBarName && o.Value == "0"),
             Arg.Any<CancellationToken>());

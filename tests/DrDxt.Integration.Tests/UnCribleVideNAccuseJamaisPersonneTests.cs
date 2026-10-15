@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. « AUCUN FAUTIF » est aussi ce que rend un crible qui ne lit plus rien.
+// « AUCUN FAUTIF » est aussi ce que rend un crible qui ne lit plus rien.
 //
 // Ce depot tient une bonne part de ses promesses avec des cribles : on fabrique une liste
 // de fautifs en lisant le livre, et on conclut `fautifs.Should().BeEmpty()`. C'est solide

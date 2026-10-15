@@ -12,8 +12,10 @@
         Trois couleurs d'état seulement, chacune doublée d'un mot : à corriger, à regarder, rien de
         signalé ; « pas lu » reste acier.
 
-        Tout ce qui bouge obéit à Effets/MoteurDAnimation : la fenêtre doit être au premier plan.
-        Pendant une mesure en jeu, c'est le jeu qui l'est, et l'interface ne coûte rien.
+        Tout ce qui bouge sans geste du joueur obéit à Effets/MoteurDAnimation : la fenêtre doit être au premier plan,
+        et Windows ne doit pas avoir coupé ses effets. Pendant une mesure en jeu, c'est le jeu qui est au premier plan,
+        et l'interface ne coûte rien. Un retour à un geste (survol, appui) reste permis : court, discret, et il ne part
+        que sous la souris.
     -->
     <Application.Resources>
 
@@ -28,13 +30,13 @@
         <Color x:Key="TexteDiscretColor">#FF7A8394</Color>
         <Color x:Key="SurChromeColor">#FF07080B</Color>
 
-        <!-- 06/10/2026 (le mainteneur : « enlever le turquoise », DA noir et argent) : l'accent de DrDXT devient le platine.
+        <!-- L'accent de DrDXT devient le platine.
              Les noms « Cyan » restent pour ne pas toucher aux vues ; leurs valeurs sont de l'argent. -->
         <Color x:Key="IrisCyanColor">#FFE6EAF0</Color>
         <Color x:Key="IrisVioletColor">#FF8B5CFF</Color>
         <Color x:Key="IrisMagentaColor">#FFFF4FD8</Color>
         <Color x:Key="IrisAmbreColor">#FFFFB547</Color>
-        <!-- 03/10/2026 (D4.1) : le cyan est LA couleur de DrDXT dans l'interface (actions, progression, liseré, sélection).
+        <!-- Le cyan est LA couleur de DrDXT dans l'interface (actions, progression, liseré, sélection).
              Violet, magenta et ambre ne vivent plus que dans la matière : le chrome liquide et le réseau neuronal. -->
         <Color x:Key="CyanGlaceColor">#FFFFFFFF</Color>
         <Color x:Key="CyanProfondColor">#FF8D96A3</Color>
@@ -46,8 +48,8 @@
 
         <!-- ══ Brosses ══ -->
         <SolidColorBrush x:Key="ObsidienneBrush" Color="{StaticResource ObsidienneColor}"/>
-        <!-- 29/09/2026 : fondu en haut des pages qui défilent ; le contenu passait net sous la barre de titre,
-             un titre coupé à mi-hauteur (seconde critique de l'app). -->
+        <!-- Fondu en haut des pages qui défilent ; le contenu passait net sous la barre de titre,
+             un titre coupé à mi-hauteur. -->
         <LinearGradientBrush x:Key="FonduHautBrush" StartPoint="0,0" EndPoint="0,1">
             <GradientStop Color="#FF06070A" Offset="0"/>
             <GradientStop Color="#0006070A" Offset="1"/>
@@ -69,7 +71,7 @@
         <SolidColorBrush x:Key="EtatRienBrush" Color="{StaticResource EtatRienColor}"/>
         <SolidColorBrush x:Key="EtatNonLuBrush" Color="{StaticResource EtatNonLuColor}"/>
         <SolidColorBrush x:Key="VoileBrush" Color="#CC06070A"/>
-        <!-- 07/10/2026 : une ombre ronde, sans bord, sous un texte posé à nu sur le chrome clair du fond. -->
+        <!-- Une ombre ronde, sans bord, sous un texte posé à nu sur le chrome clair du fond. -->
         <RadialGradientBrush x:Key="HaloDeLectureBrush"><GradientStop Color="#C006070A" Offset="0"/><GradientStop Color="#8006070A" Offset="0.55"/><GradientStop Color="#0006070A" Offset="1"/></RadialGradientBrush>
         <SolidColorBrush x:Key="IrisCyanDouxBrush" Color="#1FE6EAF0"/>
         <SolidColorBrush x:Key="EtatCorrigerDouxBrush" Color="#24FF5C7A"/>
@@ -77,20 +79,15 @@
         <SolidColorBrush x:Key="EtatRienDouxBrush" Color="#1F4DF0B0"/>
         <SolidColorBrush x:Key="EtatNonLuDouxBrush" Color="#1F8A93A3"/>
 
-        <!-- 23/09/2026 — LE FILET D'ÉTAT, pas la pastille pleine. Une pilule remplie d'une couleur
+        <!-- Le filet d'état, pas la pastille pleine. Une pilule remplie d'une couleur
              pastel est la signature d'un gabarit ; sur un fond obsidienne elle fait tache et le texte
-             y perd du contraste. L'état se dit désormais par un LISERÉ teinté et un POINT, le libellé
+             y perd du contraste. L'état se dit par un liseré teinté et un point, le libellé
              restant sur le blanc cassé du texte courant : la couleur devient un accent, pas le fond,
              et l'information ne repose jamais sur elle seule (le mot est là, et le point a une forme). -->
         <SolidColorBrush x:Key="EtatCorrigerFiletBrush" Color="#66FF5C7A"/>
         <SolidColorBrush x:Key="EtatRegarderFiletBrush" Color="#5CFFB547"/>
         <SolidColorBrush x:Key="EtatRienFiletBrush" Color="#4D4DF0B0"/>
         <SolidColorBrush x:Key="EtatNonLuFiletBrush" Color="#4D8A93A3"/>
-
-        <!-- Clés lues par les convertisseurs (HeadlineKeyToBrushConverter). -->
-        <SolidColorBrush x:Key="GreenBrush" Color="{StaticResource EtatRienColor}"/>
-        <SolidColorBrush x:Key="BandPoorBrush" Color="{StaticResource EtatCorrigerColor}"/>
-        <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TexteSecondaireColor}"/>
 
         <!-- Le chrome : bandes d'argent comme sur une surface miroir courbe. -->
         <LinearGradientBrush x:Key="ChromeBrush" StartPoint="0,0" EndPoint="0,1">
@@ -120,7 +117,7 @@
             <GradientStop Color="#FF2A303B" Offset="1"/>
         </LinearGradientBrush>
 
-        <!-- 03/10/2026 (D2.7, revue) : le bord des actions secondaires. Gris chrome, elles passaient pour des boutons
+        <!-- Le bord des actions secondaires. Gris chrome, elles passaient pour des boutons
              désactivés ou ceux d'un autre produit ; irisé, elles restent sous la pilule chrome mais dans la DA. Même forme que le
              liseré chrome, donc Speculaire le fait tourner vers le curseur de la même façon. -->
         <LinearGradientBrush x:Key="LisereIrisBrush" StartPoint="0,0.5" EndPoint="1,0.5">
@@ -162,7 +159,7 @@
             <GradientStop Color="#008D96A3" Offset="1"/>
         </RadialGradientBrush>
 
-        <!-- 06/10/2026 (maquette « 20h32 ») : la lettre en chrome poli, ciel clair en haut, horizon sombre au milieu,
+        <!-- La lettre en chrome poli, ciel clair en haut, horizon sombre au milieu,
              sol réfléchi en bas. Réservé à la marque et au mot fort du titre. -->
         <LinearGradientBrush x:Key="ChromeTexteBrush" StartPoint="0,0" EndPoint="0,1">
             <GradientStop Color="#FFFFFFFF" Offset="0"/>
@@ -184,9 +181,9 @@
             <GradientStop Color="#B3000000" Offset="1"/>
         </RadialGradientBrush>
 
-        <!-- 03/10/2026 (D7.1) : la lumière du logo 3D portée sur le bouton central. L'anneau cyan en relief (clair en haut à
+        <!-- La lumière du logo 3D portée sur le bouton central. L'anneau cyan en relief (clair en haut à
              gauche, profond en bas à droite, comme la lumière du rendu) et le liseré de Fresnel cyan au bord de la sphère. -->
-        <!-- 03/10/2026 (D9.1) : l'anneau cyan fixe se prenait pour la jauge, à l'usage.
+        <!-- L'anneau cyan fixe se prenait pour la jauge, à l'usage.
              Il passe en acier poli ; le cyan autour du bouton est réservé à la jauge qui avance pendant l'analyse. -->
         <LinearGradientBrush x:Key="AnneauAcier3DBrush" StartPoint="0.15,0.1" EndPoint="0.85,0.9">
             <GradientStop Color="#FFF2F5F9" Offset="0"/>
@@ -280,7 +277,7 @@
         </Style>
 
         <!-- ══ Surfaces ══ -->
-        <!-- 03/10/2026 (D4.4) : « rectangle dans rectangle dans rectangle ». La dalle se sépare de la pierre par sa lumière
+        <!-- « rectangle dans rectangle dans rectangle ». La dalle se sépare de la pierre par sa lumière
              et l'espace autour ; elle ne garde que l'éclat du métal sur son arête haute, plus de cadre complet. -->
         <Style x:Key="Dalle" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource ObsidienneHauteBrush}"/>
@@ -334,7 +331,7 @@
                                     <Border x:Name="Iris" CornerRadius="22" Background="{StaticResource IrisBrush}" Opacity="0.14"/>
                                     <!-- Échelle posée par NoyauDeMaintien.OnApplyTemplate, comme l'onde. -->
                                     <Border x:Name="Remplissage" CornerRadius="22" Background="{StaticResource IrisBrush}" HorizontalAlignment="Stretch" RenderTransformOrigin="0,0.5"/>
-                                    <!-- 29/09/2026 : le verbe et la durée de l'action (Content) ; le symbole seul si
+                                    <!-- Le verbe et la durée de l'action (Content) ; le symbole seul si
                                          aucun libellé n'est donné. -->
                                     <ContentPresenter x:Name="Libelle" Margin="18,0" HorizontalAlignment="Center" VerticalAlignment="Center"
                                                       TextElement.FontFamily="{StaticResource MarqueDemiFont}" TextElement.FontSize="12.5"
@@ -343,7 +340,7 @@
                                           HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
                                 </Grid>
                             </Border>
-                            <!-- 29/09/2026 (B5) : l'éclair de l'action qui part (NoyauDeMaintien.Eclairer). -->
+                            <!-- L'éclair de l'action qui part (NoyauDeMaintien.Eclairer). -->
                             <Border x:Name="Eclair" CornerRadius="22" Margin="-3" Background="{StaticResource IrisBrush}" Opacity="0" IsHitTestVisible="False"/>
                             <!-- Annexe de B5 : l'action finie, une coche sur la capsule (NoyauDeMaintien.SignalerFait). -->
                             <Border x:Name="Fait" CornerRadius="22" Background="{StaticResource ChromeCapsuleBrush}" Opacity="0" IsHitTestVisible="False">
@@ -385,16 +382,15 @@
             </Setter>
         </Style>
 
-        <!-- 03/10/2026 (D11.5, revue n° 5) : mesurer ou tester ne doit pas peser comme corriger. Même geste (maintenir),
-             mais la capsule d'une mesure est sombre et cerclée de cyan, comme les boutons secondaires ; le chrome plein reste
-             aux gestes qui changent quelque chose sur la machine. -->
-        <!-- 06/10/2026 : le filet de chrome des cadres de composants. -->
+        <!-- Le filet de chrome des cadres de composants. -->
         <LinearGradientBrush x:Key="FiletChromeBrush" StartPoint="0,0" EndPoint="1,1">
             <GradientStop Color="#B3FFFFFF" Offset="0"/>
             <GradientStop Color="#33FFFFFF" Offset="0.45"/>
             <GradientStop Color="#80FFFFFF" Offset="1"/>
         </LinearGradientBrush>
 
+        <!-- Mesurer ou tester ne doit pas peser comme corriger. Même geste (maintenir), mais la capsule d'une mesure est
+             sombre et cerclée de cyan, comme les boutons secondaires ; le chrome plein reste à Optimiser. -->
         <Style x:Key="CapsuleDeMesure" TargetType="effets:NoyauDeMaintien" BasedOn="{StaticResource CapsuleDeMaintien}">
             <Setter Property="Background" Value="{StaticResource ObsidienneHauteBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource TexteBrush}"/>
@@ -402,8 +398,17 @@
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
 
+        <!-- Un geste qui change la machine (rendre le repos à la carte, retirer un réglage de démarrage, réparer
+             Windows) : sombre au liseré chrome. Il pèse plus qu'une mesure, sans prendre le chrome plein d'Optimiser. -->
+        <Style x:Key="CapsuleDeCorrection" TargetType="effets:NoyauDeMaintien" BasedOn="{StaticResource CapsuleDeMesure}">
+            <Setter Property="BorderBrush" Value="{StaticResource LisereChromeBrush}"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+        </Style>
+
         <!-- ══ Capsule chrome : l'action principale d'un écran ══ -->
         <Style x:Key="CapsuleChrome" TargetType="Button">
+            <!-- Le reflet à l'apparition passe par le moteur d'animation (Effets/RefletALApparition). -->
+            <Setter Property="effets:RefletALApparition.Actif" Value="True"/>
             <Setter Property="FontFamily" Value="{StaticResource MarqueDemiFont}"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Foreground" Value="{StaticResource SurChromeBrush}"/>
@@ -420,15 +425,13 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Grid>
-                            <!-- 10/10/2026 (« un effet arc-en-ciel qui dépasse le bouton ») : le halo reste DANS le bouton, et le reflet
+                            <!-- Le halo reste dans le bouton, et le reflet
                                  est argent, comme le reste de l'appli (plus de cyan, violet ni rose). -->
                             <Border x:Name="Corps" CornerRadius="24" Background="{StaticResource ChromeCapsuleBrush}" ClipToBounds="True"
                                     BorderThickness="1" BorderBrush="Transparent">
                                 <Grid>
                                     <Border x:Name="Iris" CornerRadius="24" Background="{StaticResource IrisBrush}" Opacity="0.12"/>
-                                    <!-- 29/09/2026 : l'éclat était une bande blanche qui passait une fois en 0,75 s (retour sur l'app :
-                                         « un effet blanc qui dure même pas une seconde »). Reflet irisé, plus lent, qui
-                                         repasse tant que la souris reste. -->
+                                    <!-- Le reflet passe une fois, quand le résultat apparaît ; le survol n'allume que le halo. -->
                                     <Border x:Name="Eclat" Width="110" HorizontalAlignment="Left" Opacity="0">
                                         <Border.Background>
                                             <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
@@ -453,30 +456,14 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="Iris" Storyboard.TargetProperty="Opacity" To="0.3" Duration="0:0:0.22"/>
-                                            <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.3"/>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                    <!-- 10/10/2026 (règles d'Emil Kowalski, animations.dev) : un survol revient des dizaines de fois
-                                         par jour ; le reflet passe UNE fois, vite, sans boucle. -->
-                                    <BeginStoryboard x:Name="Balayage">
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                             From="-120" To="420" Duration="0:0:0.7">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut"/>
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                                 <Trigger.ExitActions>
-                                    <StopStoryboard BeginStoryboardName="Balayage"/>
                                     <BeginStoryboard>
                                         <Storyboard>
+                                            <!-- La sortie est plus rapide que l'entrée. -->
                                             <DoubleAnimation Storyboard.TargetName="Iris" Storyboard.TargetProperty="Opacity" To="0.12" Duration="0:0:0.16"/>
-                                            <!-- 10/10/2026 (« reste un effet une micro-seconde, blanc, après que la souris parte ») :
-                                                 la sortie est plus rapide que l'entrée (Emil Kowalski), et plus de halo blanc. -->
-                                            <DoubleAnimation Storyboard.TargetName="Eclat" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.08"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -562,7 +549,7 @@
             </Setter>
         </Style>
 
-        <!-- 03/10/2026 (D8.5, revue n° 3) : un réglage secondaire posé près de l'action principale. Une pilule fine,
+        <!-- Un réglage secondaire posé près de l'action principale. Une pilule fine,
              texte gris, qui ne prend le cyan qu'au survol : on le voit, il ne concurrence pas le bouton principal. -->
         <Style x:Key="BoutonDiscret" TargetType="Button">
             <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
@@ -825,7 +812,7 @@
                     <ControlTemplate TargetType="ToolTip">
                         <Border CornerRadius="10" Background="{StaticResource ObsidienneReleveeBrush}" BorderThickness="1"
                                 BorderBrush="{StaticResource FiletClairBrush}" Padding="12,8" MaxWidth="360">
-                            <!-- 24/09/2026 : une chaîne passée en contenu devient un TextBlock sans retour à la
+                            <!-- Une chaîne passée en contenu devient un TextBlock sans retour à la
                                  ligne ; les explications longues (bridage, incidents) étaient coupées à 360. -->
                             <ContentPresenter>
                                 <ContentPresenter.Resources>
@@ -852,23 +839,23 @@
                     <ControlTemplate TargetType="effets:NoyauDeMaintien">
                         <Grid>
                             <Ellipse x:Name="Halo" Margin="-34" Fill="{StaticResource HaloArgentBrush}" Opacity="0.55"/>
-                            <!-- 29/09/2026 : au travail, une onde irisée part de la sphère (Pouls et onde viennent du moteur
+                            <!-- Au travail, une onde irisée part de la sphère (Pouls et onde viennent du moteur
                                  d'animation, donc s'arrêtent quand le jeu passe devant). -->
                             <Ellipse x:Name="Onde" Margin="16" StrokeThickness="2" Stroke="#CCFFFFFF" RenderTransformOrigin="0.5,0.5"
                                      Opacity="{Binding OndeOpacite, RelativeSource={RelativeSource TemplatedParent}}" IsHitTestVisible="False"/>
-                            <!-- 06/10/2026 (le mainteneur, maquettes 20h15 / 20h41) : le bouton est la bille de DrDXT, un tourbillon de
+                            <!-- Le bouton est la bille de DrDXT, un tourbillon de
                                  chrome qui tourne dans une sphère de verre ; plus vite pendant le scan. Pas d'anneau fixe. -->
                             <effets:BilleDeChrome Margin="6" Rapide="{TemplateBinding Occupe}"/>
                             <Ellipse Margin="6" Fill="#01000000"/>
-                            <!-- 06/10/2026 (le mainteneur : « ça n'attend pas que la barre soit pleine ») : elle attendait, mais la bille la
+                            <!-- Elle attendait, mais la bille la
                                  cachait. La jauge du maintien passe au-dessus de la bille, autour d'elle, bien visible. -->
                             <effets:ArcDeProgression Margin="-10" Epaisseur="5" Valeur="{TemplateBinding Progression}"
                                                      Trait="{StaticResource IrisBrush}" Fond="#00FFFFFF" IsHitTestVisible="False"/>
-                            <!-- 06/10/2026 (le mainteneur : « le trait est trop épais autour, enlève-le, fais une vraie bille ») : plus
+                            <!-- Plus
                                  d'anneau fixe ; la bille de chrome 3D est le bouton. -->
                             <Ellipse x:Name="AnneauFocus" Margin="6" StrokeThickness="1.5" Stroke="{StaticResource IrisCyanBrush}"
                                      StrokeDashArray="2 3" Visibility="Collapsed"/>
-                            <!-- 29/09/2026 (B5) : l'éclair du scan qui part (NoyauDeMaintien.Eclairer). -->
+                            <!-- L'éclair du scan qui part (NoyauDeMaintien.Eclairer). -->
                             <Ellipse x:Name="Eclair" Margin="-20" Fill="{StaticResource HaloIrisBrush}" Opacity="0" IsHitTestVisible="False"/>
                         </Grid>
                         <ControlTemplate.Triggers>
@@ -887,7 +874,7 @@
                                 <Setter Property="Cursor" Value="Arrow"/>
                                 <Setter TargetName="Halo" Property="Opacity" Value="{Binding Pouls, RelativeSource={RelativeSource TemplatedParent}}"/>
                             </Trigger>
-                            <!-- Hors service SANS être au travail : là seulement, on grise. -->
+                            <!-- Hors service sans être au travail : là seulement, on grise. -->
                             <MultiTrigger>
                                 <MultiTrigger.Conditions>
                                     <Condition Property="IsEnabled" Value="False"/>
@@ -902,13 +889,13 @@
             </Setter>
         </Style>
 
-        <!-- 03/10/2026 (D4.3) : la sphère de marque. La même matière que le bouton central (chrome liquide, volume, reflet,
+        <!-- La sphère de marque. La même matière que le bouton central (chrome liquide, volume, reflet,
              liseré) et sa jauge cyan ; c'est le logo de DrDXT : l'icône Windows est photographiée sur elle, et elle remplace
              le docteur dans le bilan. Dessinée sur 210, mise à l'échelle par la Viewbox. -->
-        <!-- 03/10/2026 (D6.3) : le logo retenu, rendu en vraie 3D (la matière chrome liquide de l'appli sur une
+        <!-- Le logo retenu, rendu en vraie 3D (la matière chrome liquide de l'appli sur une
              sphère éclairée, l'anneau cyan en volume, dans la même lumière). Le même rendu fait l'icône Windows. -->
         <ControlTemplate x:Key="SphereDeMarque" TargetType="Control">
-            <!-- 10/10/2026 (le mainteneur : « toujours l'ancien logo, je l'ai demandé plein de fois ») : la sphère à anneau turquoise
+            <!-- La sphère à anneau turquoise
                  restait dans le bilan. Le logo est celui choisi le 08/10, la bille sur sa tuile noire : le même fichier que
                  l'icône de l'appli (Assets/drdxt.ico, image 256), une seule marque partout. -->
             <Image Source="pack://application:,,,/DrDxt.App;component/Assets/logo-marque.png" Stretch="Uniform"

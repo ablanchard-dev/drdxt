@@ -5,14 +5,13 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// InProcessElevatedClient — the boot reconciler's in-process privileged executor.
+// InProcessElevatedClient : l'exécuteur privilégié en processus du réconciliateur au démarrage.
 //
-// The security contract under test: it runs the real OpAllowlist as the last gate
-// Before the executor, so a non-allowlisted op never reaches the executor (no OS
-// touch); an allowlisted op is forwarded and the executor's Result is surfaced
-// faithfully (including a failure — never swallowed, never a faked success). A fake
-// IPrivilegedOpExecutor stands in for the real Windows actions so these unit tests
-// never touch the OS.
+// Contrat de sécurité testé : il fait passer la vraie OpAllowlist en dernière porte avant
+// l'exécuteur, donc une op hors liste n'atteint jamais l'exécuteur (aucun contact avec
+// l'OS) ; une op de la liste est transmise et le Result de l'exécuteur remonte fidèlement
+// (échec compris : jamais avalé, jamais un succès inventé). Un faux IPrivilegedOpExecutor
+// remplace les vraies actions Windows pour que ces tests ne touchent jamais à l'OS.
 // -----------------------------------------------------------------------
 public sealed class InProcessElevatedClientTests
 {
@@ -35,7 +34,7 @@ public sealed class InProcessElevatedClientTests
     [Fact]
     public async Task A_non_allowlisted_op_is_denied_before_the_executor_runs()
     {
-        // An unknown power-plan GUID is structurally non-allowlisted.
+        // Un GUID de plan d'alimentation inconnu est structurellement hors liste blanche.
         var executor = new FakeExecutor();
         var client = new InProcessElevatedClient(new OpAllowlist(), executor);
 
@@ -61,7 +60,7 @@ public sealed class InProcessElevatedClientTests
     [Fact]
     public async Task An_allowlisted_op_reaches_the_executor_and_its_ok_result_is_returned()
     {
-        // PingOp is allowlisted by OpAllowlist and harmless.
+        // PingOp est dans la liste blanche d'OpAllowlist et sans effet.
         var executor = new FakeExecutor(Result.Ok());
         var client = new InProcessElevatedClient(new OpAllowlist(), executor);
 

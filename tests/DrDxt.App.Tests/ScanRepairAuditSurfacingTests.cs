@@ -14,10 +14,9 @@ namespace DrDxt.App.Tests;
 /// <summary>
 /// Ce que l'audit montre, et ce qu'il ne cache pas.
 ///
-/// Ces tests existent a cause du defaut du 09/09/2026 : `RepairAuditService` et les dix types
-/// qu'il collecte etaient prouves par leurs propres tests, et references par aucune couche que
-/// l'utilisateur rencontre. Des tests verts sur du code que personne n'atteint ne prouvent rien
-/// sur le produit — ceux-ci portent sur le VM de l'ecran, pas sur le lecteur.
+/// `RepairAuditService` et les types qu'il collecte ont leurs propres tests, mais des tests verts
+/// sur du code que personne n'atteint ne prouvent rien sur le produit : ceux-ci portent sur le VM
+/// de l'ecran, pas sur le lecteur.
 /// </summary>
 public sealed class ScanRepairAuditSurfacingTests
 {
@@ -29,21 +28,17 @@ public sealed class ScanRepairAuditSurfacingTests
         => new("POWER", nom, valeur, null, statut, "parce que.", action);
 
     /// <summary>
-    /// Le cas exact qui a ete manque. Le minimum du processeur a 100 % est decrit dans ce depot
-    /// comme la signature la plus courante des scripts d'optimisation. Il etait lu, il etait
-    /// compte, et il n'atteignait pas l'ecran : un `NonDefault` sans geste tombe dans « verifies »,
-    /// exactement au meme endroit qu'un reglage identique au defaut. Le brancher ne suffisait pas,
-    /// il fallait qu'il ARRIVE.
+    /// Le minimum du processeur a 100 % est la signature la plus courante des scripts
+    /// d'optimisation. Un `NonDefault` sans geste ne doit pas tomber dans « verifies », au meme
+    /// endroit qu'un reglage identique au defaut : il doit arriver a l'ecran.
     ///
     /// Et il arrive sans etre declare nuisible : la doctrine « different n'est pas endommage »
     /// interdit d'accuser un choix d'utilisateur, elle n'a jamais impose de le taire.
     /// </summary>
     /// <summary>
-    /// Ce que le produit ne sait pas lire doit se voir, pas se compter. Jusqu'au 09/09/2026 au
-    /// soir, un constat `Unknown` ne sortait que comme un nombre dans la phrase de resume, alors
-    /// que `tools/repairaudit` le nommait sous « MES ANGLES MORTS ». Le meme triage rendait donc
-    /// deux verites selon qu'on le regardait par l'outil ou par l'ecran — et c'est l'ecran, le seul
-    /// que le client ouvre, qui en disait le moins.
+    /// Ce que le produit ne sait pas lire doit se voir, pas se compter : un constat `Unknown` est
+    /// nomme a l'ecran comme `tools/repairaudit` le nomme sous « MES ANGLES MORTS », pas reduit a un
+    /// nombre dans la phrase de resume.
     /// </summary>
     [Fact]
     public void Un_etat_NON_LU_est_nomme_a_l_ecran_et_pas_seulement_compte()
@@ -154,11 +149,11 @@ public sealed class ScanRepairAuditSurfacingTests
     }
 
     // ── Le scan complet ───────────────────────────────────────────────────────────────────
-    // Les quatre tests ci-dessus portent sur des types isoles — exactement le genre de test
-    // qui etait deja vert le 09/09 pendant que rien n'atteignait l'ecran. Ceux qui suivent font
-    // tourner le vrai `ScanCommand` et regardent ce que l'ecran recoit.
+    // Les quatre tests ci-dessus portent sur des types isoles : ils peuvent etre verts pendant que
+    // rien n'atteint l'ecran. Ceux qui suivent font tourner le vrai `ScanCommand` et regardent ce
+    // que l'ecran recoit.
 
-    // 23/09/2026 — le journal de sante gelait l'ecran. Mesure par la sonde de gel (DEBUG) sur la
+    // Le journal de sante gelait l'ecran. Mesure par la sonde de gel (DEBUG) sur la
     // machine de reference, jalons a l'appui : apres le retour de l'audit, le triage prend 1 ms,
     // le remplissage des listes 2 ms, et l'ecriture + comparaison de la photo du jour 390 a 400 ms
     // -- sur le fil d'interface. C'etaient les ~350 ms ou le scanner s'arretait de bouger.
@@ -228,8 +223,7 @@ public sealed class ScanRepairAuditSurfacingTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), st,
-              new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) },
-              68, bl, new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) }, bl)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
             new List<StorageDevice> { new("Samsung 990 Pro", "NVMe", 1L << 40) }));
@@ -397,7 +391,7 @@ public sealed class ScanRepairAuditSurfacingTests
     [Fact]
     public async Task Un_changement_de_jugement_se_lit_en_mots_et_pas_en_noms_de_code()
     {
-        // 16/09/2026, capture d'écran : « POWER · plan d'alimentation actif : ExpectedDefault →
+        // Capture d'écran : « POWER · plan d'alimentation actif : ExpectedDefault →
         // UserChoiceProbable — le jugement du produit a change : ExpectedDefault → UserChoiceProbable ».
         var chemin = Path.Combine(Path.GetTempPath(), $"drdxt-journal-{Guid.NewGuid():N}.json");
         try

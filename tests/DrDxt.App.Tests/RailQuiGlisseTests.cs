@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 (boucle « vivant et prouvé », B4) : choisir un domaine éteignait une ligne et en allumait une autre. Une
+// Choisir un domaine éteignait une ligne et en allumait une autre. Une
 // seule capsule, sous les lignes, glisse jusqu'à la ligne choisie (posée d'un coup quand le gouverneur fige tout).
 public sealed class RailQuiGlisseTests
 {

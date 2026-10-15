@@ -1,45 +1,45 @@
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// DefaultReconcilabilityPolicy — the production CLOSED table.
+// DefaultReconcilabilityPolicy : la table fermée de production.
 //
-// It answers three questions for a tweakId: which OS surface it writes (or null if
-// not reconcilable), whether it targets a PROTECTED surface (hard refuse), and
-// which GPU vendor it is tied to (for the driver-drift signal). Everything is an
-// explicit table — an unknown tweakId is conservatively not reconcilable (so a bogus
-// id can never be silently re-applied).
+// Elle répond à trois questions pour un tweakId : quelle surface OS il écrit (ou null s'il
+// n'est pas réconciliable), s'il vise une surface protégée (refus strict), et à quel
+// constructeur GPU il est lié (pour le signal de dérive du pilote). Tout est une table
+// explicite : un tweakId inconnu n'est, par prudence, pas réconciliable (un id bidon ne peut
+// donc jamais être réappliqué en silence).
 //
-// The PROTECTED blacklist (cahier §6) is the defence-in-depth guard the reconcile
-// loop also enforces (T22): even if a future bug let one of these into the manifest,
-// it is hard-refused. Defender / Windows Update / BITS are never touched.
+// La liste noire des surfaces protégées est la garde de défense en profondeur que la boucle de
+// réconciliation impose aussi : même si un futur bug en laissait entrer une dans le manifeste,
+// elle serait refusée strictement. Defender / Windows Update / BITS ne sont jamais touchés.
 //
-// NOTE: this seeds the FOUNDATION's known surfaces. Wiring it to the full live
-// tweak catalog (so every shipped tweak is mapped) lands with the host increment;
-// new reconcilable tweaks are added here as an explicit, reviewed table entry.
+// Note : la table contient les surfaces connues de la fondation. Le branchement sur tout le
+// catalogue réel de leviers (pour que chaque levier livré soit traduit) arrive avec l'hôte ; un
+// nouveau levier réconciliable s'ajoute ici comme une entrée de table explicite et relue.
 // -----------------------------------------------------------------------
 public sealed class DefaultReconcilabilityPolicy : IReconcilabilityPolicy
 {
-    // tweakId → OS surface. Firmware-category tweaks are deliberately absent (they
-    // are not reconcilable; the store rejects them at save).
+    // tweakId → surface OS. Les leviers de catégorie Firmware sont absents exprès (ils ne sont
+    // pas réconciliables ; le store les rejette à l'enregistrement).
     private static readonly IReadOnlyDictionary<string, ReconcileSurface> Surfaces =
         new Dictionary<string, ReconcileSurface>(StringComparer.Ordinal)
         {
-            // Latency / driver registry settings (NVCP / DRS-backed).
+            // Réglages de latence / du pilote dans le registre (adossés au NVCP / DRS).
             ["latency.reflex.lowLatencyMode"] = ReconcileSurface.Registry,
             ["latency.renderQueueCap"] = ReconcileSurface.Registry,
             ["latency.vrrVsyncCap"] = ReconcileSurface.Registry,
-            // System power plan (a feature update resets this to Balanced).
+            // Plan d'alimentation système (une mise à jour de fonctionnalité le remet à Équilibré).
             ["fixit.sanePowerPlan"] = ReconcileSurface.PowerPlan,
-            // AMD 3D V-Cache optimizer service.
+            // Service d'optimisation AMD 3D V-Cache.
             ["fixit.x3dVCacheService"] = ReconcileSurface.Service,
-            // NS-1 HAGS — HKLM registry (a feature update can flip it back; LocalSystem can
-            // reapply HKLM correctly). HKCU NS-1 tweaks (Game DVR / Game Mode / VRR) are not
-            // listed: the boot reconciler is LocalSystem, where an HKCU write hits SYSTEM's
-            // hive, so they need a per-user reconcile path (see AppliedTweakManifestMapper).
+            // HAGS : registre HKLM (une mise à jour de fonctionnalité peut le rebasculer ; LocalSystem
+            // réapplique HKLM correctement). Les leviers HKCU (Game DVR / mode Jeu / VRR) ne sont pas
+            // listés : le réconciliateur de démarrage tourne en LocalSystem, où une écriture HKCU touche la
+            // ruche de SYSTEM ; ils demandent donc une réconciliation par utilisateur (voir AppliedTweakManifestMapper).
             ["os.hags"] = ReconcileSurface.Registry,
         };
 
-    // tweakId → GPU vendor (for the per-vendor DriverVersion drift signal, I8).
+    // tweakId → constructeur GPU (pour le signal de dérive DriverVersion par constructeur, I8).
     private static readonly IReadOnlyDictionary<string, string> Vendors =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -47,14 +47,14 @@ public sealed class DefaultReconcilabilityPolicy : IReconcilabilityPolicy
             ["latency.renderQueueCap"] = "NVIDIA",
         };
 
-    // Protected surfaces (cahier §6) — never reconciled, hard-refused.
+    // Surfaces protégées : jamais réconciliées, refusées strictement.
     private static readonly IReadOnlySet<string> Protected =
         new HashSet<string>(StringComparer.Ordinal)
         {
             "service.WinDefend",
             "service.wuauserv",   // Windows Update
             "service.BITS",
-            "service.WdNisSvc",   // Defender network inspection
+            "service.WdNisSvc",   // inspection réseau de Defender
             "service.SecurityHealthService",
         };
 

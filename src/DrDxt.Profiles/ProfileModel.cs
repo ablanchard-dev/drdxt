@@ -3,76 +3,73 @@ using DrDxt.Core;
 namespace DrDxt.Profiles;
 
 // -----------------------------------------------------------------------
-// M6 — Per-chip optimization profiles (cahier §3 transversal "Base de profils",
-// §10 "Base de profils = le vrai moat", §5 "fix-misconfig first", decision
-// interne undervolt NVIDIA option A contre B).
+// Profils d'optimisation par puce (« réparer d'abord » ; la carte se règle par sa limite de
+// puissance, jamais par sa tension).
 //
-// A PROFILE is a named, chip-targeted set of tweak SELECTIONS (+ parameters). It does
-// Not apply anything and holds no privileged primitive — it is the curated, AUDITABLE
-// recommendation layer that sits in front of the M2 catalog/engine. Each selection
-// references an existing M2 catalog tweak id and carries its own honest provenance:
-// every claimed effect cites a measurement or a sourced range, plus a confidence and a
-// safety level. There are NO invented numbers here (cahier §11 garde-fou anti-Outbyte:
-// "ne jamais inventer de problème"; §5 "on prouve, on ne promet pas" — the *real* delta
-// is still proven by the engine's A/B re-bench, never by this table).
+// Un profil est un ensemble nommé, visant une puce, de sélections de leviers (avec leurs
+// paramètres). Il ne pose rien et ne détient aucune primitive privilégiée : c'est la couche
+// de recommandation, établie et auditable, devant le catalogue et le moteur. Chaque
+// sélection renvoie à un levier existant du catalogue et porte sa provenance : tout effet
+// annoncé cite une mesure ou une fourchette sourcée, avec une confiance et un niveau de
+// sûreté. Aucun chiffre inventé (« ne jamais inventer de problème » ; « on prouve, on ne
+// promet pas » : le vrai écart est prouvé par le re-banc A/B du moteur, jamais par cette table).
 //
-// Pure data: no I/O, no DI, fully unit-testable. The values are conservative and stay
-// subject to GpuSafeBounds re-clamping/gating downstream — a profile is a REQUEST, not
-// an authorization (mirrors GpuTuningTarget's own contract).
+// Données pures : ni entrée-sortie, ni injection, testable unitairement. Les valeurs sont
+// prudentes et restent soumises au recadrage de GpuSafeBounds en aval : un profil est une
+// demande, pas une autorisation (même contrat que GpuTuningTarget).
 // -----------------------------------------------------------------------
 
-/// <summary>How strongly a claimed effect is grounded — honesty ladder (cahier §5/§11).
+/// <summary>À quel point un effet annoncé est fondé : l'échelle d'honnêteté.
 /// <list type="bullet">
-/// <item><b>Measured</b> — observed in an A/B run on real hardware (note the sample).</item>
-/// <item><b>Sourced</b> — a published benchmark / research range (cited in Source).</item>
-/// <item><b>Inferred</b> — a conservative heuristic, not a number (used sparingly).</item>
+/// <item><b>Measured</b> : observé dans un A/B sur du vrai matériel (noter l'échantillon).</item>
+/// <item><b>Sourced</b> : fourchette publiée (banc ou recherche), citée dans Source.</item>
+/// <item><b>Inferred</b> : heuristique prudente, pas un chiffre (rare).</item>
 /// </list></summary>
 public enum GainConfidence { Measured, Sourced, Inferred }
 
-/// <summary>How safe a selection is to apply (cahier §8: aggressive tuning = Expert/Lab).
-/// The foundation profiles are all <see cref="Safe"/> — in-bounds, supported routes,
-/// fully reversible.</summary>
+/// <summary>Sûreté d'une sélection à la pose (réglage agressif = Expert ou laboratoire).
+/// Les profils de base sont tous <see cref="Safe"/> : dans les bornes, voies prises en charge,
+/// entièrement réversibles.</summary>
 public enum SafetyLevel { Safe, Moderate, Expert }
 
-/// <summary>What a selection is FOR. Drives the "fix-misconfig first" ordering
-/// (cahier §5: repair before tuning) and the UI grouping. The enum order IS the apply
-/// priority: FixMisconfig → Latency → GpuTune.</summary>
+/// <summary>À quoi sert une sélection. Pilote l'ordre « réparer d'abord » (réparation avant
+/// réglage) et le regroupement dans l'interface. L'ordre de l'énumération est la priorité de
+/// pose : FixMisconfig → Latency → GpuTune.</summary>
 public enum ProfileIntent { FixMisconfig, Latency, GpuTune }
 
-/// <summary>One named parameter for a tweak (e.g. <c>CoreOffsetMhz = 75</c>). Maps onto
-/// the M2 tuning targets at the consumption seam (e.g. <c>GpuTuningTarget.CoreOffsetMhz</c>,
-/// <c>GpuPowerLimitTarget.PowerLimitPct</c>). Integer scalars only in the foundation;
-/// still re-clamped by GpuSafeBounds before any write.</summary>
+/// <summary>Un paramètre nommé d'un levier (par exemple <c>CoreOffsetMhz = 75</c>). Se reporte
+/// sur les cibles de réglage à la couture de consommation (<c>GpuTuningTarget.CoreOffsetMhz</c>,
+/// <c>GpuPowerLimitTarget.PowerLimitPct</c>). Entiers seulement pour l'instant ; toujours
+/// recadrés par GpuSafeBounds avant toute écriture.</summary>
 public sealed record ProfileParameter(string Key, int Value, string Unit);
 
-/// <summary>The honest provenance of ONE claimed effect: a conservative, non-promising
-/// description of the effect, the exact in-repo source it comes from, and its confidence
-/// + safety. <see cref="Claim"/> must never read as a guaranteed FPS promise (§6) and
-/// <see cref="Source"/> must never be blank (enforced by tests).</summary>
+/// <summary>La provenance d'un effet annoncé : une description prudente, sans promesse, la
+/// source exacte du dépôt dont il vient, sa confiance et sa sûreté. <see cref="Claim"/> ne doit
+/// jamais se lire comme une promesse de FPS et <see cref="Source"/> jamais être vide
+/// (vérifié par des tests).</summary>
 public sealed record GainEvidence(
     string Claim,
     string Source,
     GainConfidence Confidence,
     SafetyLevel Safety);
 
-/// <summary>A profile's selection of ONE M2 catalog tweak: the tweak id, what it is for,
-/// its parameters, and the provenance of its claimed gain.</summary>
+/// <summary>La sélection d'un levier du catalogue par un profil : son identifiant, son but,
+/// ses paramètres et la provenance du gain annoncé.</summary>
 public sealed record ProfileTweakSelection(
     string TweakId,
     ProfileIntent Intent,
     IReadOnlyList<ProfileParameter> Parameters,
     GainEvidence Evidence);
 
-/// <summary>The coarse chip family a profile targets. Conservative on purpose — an
-/// <see cref="GenericSafe"/> baseline is always available; per-chip families are added
-/// only when detection is confident (cahier §10: detection universal, profiles by waves).</summary>
+/// <summary>La famille de puce visée par un profil. Prudente à dessein : la base
+/// <see cref="GenericSafe"/> existe toujours ; les familles par puce ne s'ajoutent que quand
+/// la détection est certaine (détection universelle, profils par vagues).</summary>
 public enum ChipFamily { GenericSafe, AmdX3dDualCcd, NvidiaOptionA }
 
-/// <summary>A named, chip-targeted set of tweak selections. The product's moat layer
-/// (cahier §10). <see cref="Tested"/> reflects whether the team bench has VALIDATED this
-/// profile on real hardware (cahier §10 "profils testés déployés par vagues") — false
-/// foundation profiles are still recommendable but the UI labels them "non vérifié"
-/// (cahier §16).</summary>
+/// <summary>Un ensemble nommé de sélections de leviers visant une puce.
+/// <see cref="Tested"/> dit si ce profil a été validé sur du vrai matériel (« profils testés
+/// déployés par vagues ») ; un profil de base non validé reste recommandable, mais
+/// l'interface le marque « non vérifié ».</summary>
 public sealed record ChipProfile(
     string Id,
     string NameKey,
@@ -81,9 +78,8 @@ public sealed record ChipProfile(
     bool Tested,
     string Summary)
 {
-    /// <summary>The catalog tweak ids this profile references, in fix-misconfig-first
-    /// order (cahier §5). Used to compose a TweakPlan and audited against the real M2
-    /// catalog by tests.</summary>
+    /// <summary>Les identifiants de leviers du profil, réparations d'abord. Sert à composer un
+    /// TweakPlan ; vérifié contre le vrai catalogue par des tests.</summary>
     public IReadOnlyList<string> OrderedTweakIds =>
         Selections
             .OrderBy(s => (int)s.Intent)

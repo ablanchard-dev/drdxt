@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 04/10/2026 (plan 3b.2) : l'historique sur une seule ligne du temps, le plus récent d'abord.
+// L'historique sur une seule ligne du temps, le plus récent d'abord.
 public sealed class FriseDeLaMachineTests
 {
     [Fact]

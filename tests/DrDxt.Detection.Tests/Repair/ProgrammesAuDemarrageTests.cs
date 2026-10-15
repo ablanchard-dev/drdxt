@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 06/10/2026 (chantier B7) : ce qui se lance au démarrage, lu seulement. Les clés d'approbation gardent des restes de
+// Ce qui se lance au démarrage, lu seulement. Les clés d'approbation gardent des restes de
 // programmes désinstallés (relevé du 06/10 : Battle.net, Discord, Steam approuvés sans clé Run) : seul ce qui se lance
 // vraiment compte.
 public sealed class ProgrammesAuDemarrageTests
@@ -36,7 +36,8 @@ public sealed class ProgrammesAuDemarrageTests
         c.ValeurCourante.Should().Be("2 lancés, 1 désactivé");
         c.Explication.Should().Contain("OneDrive (Windows a mesuré jusqu'à 2,3 s de retard)")
             .And.Contain("MicrosoftEdgeAutoLaunch").And.NotContain("E5F5B93CF6EF")
-            .And.Contain("Gestionnaire des tâches");
+            .And.NotContain("Gestionnaire des tâches");
+        c.Remede.Should().StartWith("1) Ctrl + Maj + Échap").And.Contain("Applications de démarrage").And.Contain("Désactiver");
         c.Action.Should().Be(RepairAction.Recommandation);
     }
 
@@ -48,7 +49,7 @@ public sealed class ProgrammesAuDemarrageTests
     public void Rien_au_demarrage_rien_n_est_dit()
         => ProgrammesAuDemarrage.Juger(Ok(), [], Existe).Should().BeEmpty();
 
-    // Revue du 06/10 (F-8) : une lecture qui échoue n'est pas une liste courte.
+    // Une lecture qui échoue n'est pas une liste courte.
     [Fact]
     public void Une_lecture_ratee_se_dit_non_lue_sans_compte()
     {
@@ -58,7 +59,7 @@ public sealed class ProgrammesAuDemarrageTests
         c.ValeurCourante.Should().BeNull();
     }
 
-    // F-9 : une entrée vers un programme désinstallé ne se lance pas.
+    // Une entrée vers un programme désinstallé ne se lance pas.
     [Theory]
     [InlineData("\"C:\\Program Files\\X\\x.exe\" --tray", "C:\\Program Files\\X\\x.exe")]
     [InlineData("C:\\Program Files\\Y\\y.exe /background", "C:\\Program Files\\Y\\y.exe")]
@@ -87,7 +88,7 @@ public sealed class ProgrammesAuDemarrageTests
                 @"C:\absent\Start Menu\Programs\Startup\BureauDistant.lnk", DansRun: false)), [], Existe)
             .Single().ValeurCourante.Should().Be("1 lancé, 0 désactivé");
 
-    // F-11 : rien de lancé, rien à couper.
+    // Rien de lancé, rien à couper.
     [Fact]
     public void Sans_programme_lance_aucun_geste()
     {
@@ -95,5 +96,17 @@ public sealed class ProgrammesAuDemarrageTests
 
         c.Action.Should().Be(RepairAction.Aucune);
         c.Explication.Should().NotContain("Gestionnaire des tâches");
+        c.Remede.Should().BeNull();
+    }
+
+    // Le geste d'une entrée vise sa ruche, sa liste et le nom exact que StartupApproved porte (le fichier, extension
+    // comprise, pour le dossier Démarrage).
+    [Fact]
+    public void Le_geste_vise_la_valeur_que_le_gestionnaire_des_taches_ecrit()
+    {
+        new ProgrammesAuDemarrage.Entree("Steam", true, "x", Ruche: RegistryHiveKind.LocalMachine, Liste: SetStartupApprovalOp.Run32)
+            .Geste(false).Should().Be(new SetStartupApprovalOp(RegistryHiveKind.LocalMachine, SetStartupApprovalOp.Run32, "Steam", false));
+        new ProgrammesAuDemarrage.Entree("Spotify", false, @"C:\S\Spotify.lnk", DansRun: false, Liste: SetStartupApprovalOp.DossierDemarrage, Cle: "Spotify.lnk")
+            .Geste(true).Should().Be(new SetStartupApprovalOp(RegistryHiveKind.CurrentUser, SetStartupApprovalOp.DossierDemarrage, "Spotify.lnk", true));
     }
 }

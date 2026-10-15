@@ -1,37 +1,36 @@
 namespace DrDxt.ElevatedHelper.Execution.Adlx;
 
 // -----------------------------------------------------------------------
-// AdlxTuningMath — the pure, unit-testable POWER-LIMIT value-bounds policy enforced
-// AT/BELOW the privilege boundary for the ADLX (AMD) power-limit write.
+// AdlxTuningMath : la règle pure, testable, de bornes de la limite de puissance, imposée à la
+// frontière de privilège ou en dessous pour l'écriture de limite de puissance ADLX (AMD).
 //
-// The ELEVATED helper enforces the same conservative band as the App-layer
-// GpuSafeBounds — it never trusts the caller (or the client-side clamp) for value
-// bounds. A value OUTSIDE the band is REJECTED by ADLXTuningActions (default-DENY,
-// fail-clean), never silently clamped, so a raw IPC op (a future App build that wires
-// the tuning seams, or a compromised caller) can never push an out-of-policy value to
-// live hardware.
+// Le helper élevé impose la même plage prudente que GpuSafeBounds de la couche App : il ne fait
+// jamais confiance à l'appelant (ni au bornage côté client) pour les bornes. Une valeur hors
+// plage est rejetée par ADLXTuningActions (refus par défaut, échec propre), jamais bornée en
+// silence : une op IPC brute (une future version de l'App qui branche les coutures de réglage, ou
+// un appelant compromis) ne peut jamais pousser une valeur hors règle sur le vrai matériel.
 //
-// Why only the power-limit band lives here: a power limit is an absolute %, so a fixed
-// [60,100] policy band is meaningful at the helper and is mirrored from GpuSafeBounds.
-// The UNDERVOLT op, by contrast, carries an absolute MaxFreq (MHz) — the conservative
-// OFFSET band [-200,+100] is meaningless on an absolute value, so it stays at the App
-// layer (GpuSafeBounds) and the helper validates the absolute target against the
-// DRIVER's own reported hardware range instead (see ADLXTuningActions.SetUndervolt).
+// Pourquoi seule la plage de limite de puissance vit ici : une limite de puissance est un %
+// absolu, une plage fixe [60,100] a donc du sens dans le helper et reprend GpuSafeBounds. L'op
+// d'undervolt, elle, porte une MaxFreq absolue (MHz) : la plage prudente en décalage [-200,+100]
+// n'a pas de sens sur une valeur absolue ; elle reste dans la couche App (GpuSafeBounds) et le
+// helper valide plutôt la cible absolue contre la plage matérielle annoncée par le pilote (voir
+// ADLXTuningActions.SetUndervolt).
 //
-// GpuSafeBounds (DrDxt.Application) is the single source of truth for the % band. The
-// helper depends only on DrDxt.Core (+ the leaf DrDxt.GpuNative) and cannot reference
-// DrDxt.Application, so the constants are MIRRORED here; the cross-assembly test
-// AdlxTuningPolicyBoundSyncTests asserts they stay equal to GpuSafeBounds. Keep them in
-// lock-step. Pure + total: the check never throws.
+// GpuSafeBounds (DrDxt.Application) est la source unique de la plage en %. Le helper ne dépend
+// que de DrDxt.Core (+ la feuille DrDxt.GpuNative) et ne peut pas référencer DrDxt.Application :
+// les constantes sont donc reprises ici ; le test inter-assemblages AdlxTuningPolicyBoundSyncTests
+// vérifie qu'elles restent égales à GpuSafeBounds. Les garder synchronisées. Pur et total : la
+// vérification ne lève jamais.
 // -----------------------------------------------------------------------
 internal static class AdlxTuningMath
 {
-    // Mirror of GpuSafeBounds.MinPowerLimitPct / MaxPowerLimitPct (the conservative
-    // absolute power-limit band — never starve the GPU below the floor).
+    // Reprise de GpuSafeBounds.MinPowerLimitPct / MaxPowerLimitPct (la plage prudente de limite
+    // de puissance absolue : ne jamais affamer le GPU sous le plancher).
     internal const int MinPowerLimitPct = 60;
     internal const int MaxPowerLimitPct = 100;
 
-    /// <summary>True if an absolute power-limit percent is within the policy band
+    /// <summary>Vrai si un pourcentage absolu de limite de puissance est dans la plage de règle
     /// [<see cref="MinPowerLimitPct"/>, <see cref="MaxPowerLimitPct"/>].</summary>
     internal static bool IsPowerLimitWithinHardRail(int pct) =>
         pct >= MinPowerLimitPct && pct <= MaxPowerLimitPct;

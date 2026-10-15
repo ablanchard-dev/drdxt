@@ -13,7 +13,7 @@ public interface IPrioritesDeProcessus
 }
 
 /// <summary>
-/// 03/10/2026 (boucle 2D2P, P3.2) : l'idée de ProBalance (Process Lasso, doc Bitsum) sans le reste. Pendant une partie, un
+/// L'idée de ProBalance (Process Lasso, doc Bitsum) sans le reste. Pendant une partie, un
 /// programme d'arrière-plan qui accapare le processeur passe en priorité « en dessous de la normale » ; il garde du
 /// processeur, il passe seulement après le jeu. Sa priorité d'origine lui est rendue à la fin de la partie.
 ///
@@ -33,13 +33,13 @@ public sealed class CalmeurDeVoisins
         "System", "Idle", "Registry", "smss", "csrss", "wininit", "winlogon", "services", "lsass", "svchost", "dwm",
         "audiodg", "explorer", "MsMpEng", "MpDefenderCoreService", "SecurityHealthService", "fontdrvhost", "ctfmon",
         "DrDxt.App", "DrDxt.ElevatedHelper", "DrDxt.ReconcilerHost",
-        // 08/10/2026 (vu sur capture : WmiPrvSE proposé) : les hôtes de Windows qui travaillent en arrière-plan. Limite : la
+        // Les hôtes de Windows qui travaillent en arrière-plan. Limite : la
         // liste est par nom (les voisins relevés ne portent pas leur chemin) ; un hôte absent d'ici n'est pas reconnu.
         "WmiPrvSE", "WmiApSrv", "SearchIndexer", "SearchProtocolHost", "SearchFilterHost", "TiWorker", "TrustedInstaller",
         "MoUsoCoreWorker", "usocoreworker", "wuauclt", "msiexec", "spoolsv", "sppsvc", "RuntimeBroker", "conhost", "dllhost",
         "taskhostw", "sihost", "WUDFHost", "backgroundTaskHost", "CompPkgSrv", "SgrmBroker", "NisSrv", "LsaIso",
         "StartMenuExperienceHost", "ShellExperienceHost", "TextInputHost", "SearchHost",
-        // 07/10/2026 (L-VOISINS) : les antitriches connus. Toucher au processus d'un antitriche, même sa seule priorité, peut
+        // Les antitriches connus. Toucher au processus d'un antitriche, même sa seule priorité, peut
         // passer pour une manipulation ; un nom absent de cette liste reste protégé par le mot « anticheat » (Protege).
         "EasyAntiCheat", "EasyAntiCheat_EOS", "BEService", "BEService_x64", "vgc", "vgtray", "EAAntiCheat.GameService",
         "EAAntiCheat.GameServiceLauncher", "FACEIT", "FACEITService", "PnkBstrA", "PnkBstrB", "GameMon", "GameMon64",
@@ -49,7 +49,7 @@ public sealed class CalmeurDeVoisins
     public static bool Protege(string nom)
         => Intouchables.Contains(nom) || nom.Contains("anticheat", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>07/10/2026 (L-VOISINS) : les programmes à proposer au calmeur, lus dans les parties relevées : ceux qui y ont
+    /// <summary>Les programmes à proposer au calmeur, lus dans les parties relevées : ceux qui y ont
     /// tenu plus d'un quart de cœur sur deux relevés (<see cref="DrDxt.Application.Parties.VoisinEnPartie"/>, même seuil
     /// que le calmeur), hors protégés et hors ce que le joueur a exclu. <c>null</c> = aucune partie dont les voisins ont été
     /// lus : rien à dire, jamais une proposition inventée. Vide = lus, aucun à calmer.</summary>
@@ -67,7 +67,7 @@ public sealed class CalmeurDeVoisins
     private HashSet<int> _auDessusALaDerniereLecture = new();
     private readonly HashSet<string> _exclus;
 
-    /// <param name="exclus">07/10/2026 (L-VOISINS) : les programmes que le joueur a exclus ; jamais touchés.</param>
+    /// <param name="exclus">Les programmes que le joueur a exclus ; jamais touchés.</param>
     public CalmeurDeVoisins(IPrioritesDeProcessus systeme, IEnumerable<string>? exclus = null)
     {
         _systeme = systeme;

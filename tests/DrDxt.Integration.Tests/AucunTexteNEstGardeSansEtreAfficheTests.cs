@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 27/09/2026. Deux nettoyages le meme soir : 26 textes que plus rien n'affichait, dont une promesse fausse
+// Deux nettoyages le meme soir : 26 textes que plus rien n'affichait, dont une promesse fausse
 // (« GPU AMD : optimisation bientot disponible »), les bandes et verdicts de l'ancien score (« en excellente
 // sante ») et le gabarit « ~{0}% » des gains estimes. Un texte mort n'est pas inoffensif : c'est une phrase
 // prete a revenir au premier branchement distrait, sans que personne la relise.
@@ -20,6 +20,7 @@ public sealed class AucunTexteNEstGardeSansEtreAfficheTests
         ["Reglage.nvidia."] = "nom d'un reglage suivi, compose par son identifiant (ScanViewModel.Parties, ReleverReglagesSuivis)",
         ["Reglage.windows."] = "nom d'un reglage suivi, compose par son identifiant (ScanViewModel.Parties, ReleverReglagesSuivis)",
         ["Reglage.memoire."] = "nom d'un reglage suivi, compose par son identifiant (ScanViewModel.Parties, ReleverReglagesSuivis)",
+        ["Reglage.bios."] = "nom d'un reglage suivi, compose par son identifiant (ScanViewModel.Parties, ReleverReglagesSuivis)",
         ["Common_"] = "donnees des tests du traducteur (langue par defaut, repli)",
         ["Scan_Title"] = "donnee des tests du traducteur",
     };
@@ -42,7 +43,7 @@ public sealed class AucunTexteNEstGardeSansEtreAfficheTests
         var cles = XDocument.Load(Path.Combine(racine.FullName, "src", "DrDxt.Infrastructure", "Resources", "Strings.resx"))
             .Root!.Elements("data").Select(e => (string)e.Attribute("name")!).ToList();
         var src = Path.Combine(racine.FullName, "src");
-        // 28/09/2026, relecture adverse : un nom cite dans un commentaire comptait comme un usage, et deux verdicts
+        // Relecture adverse : un nom cite dans un commentaire comptait comme un usage, et deux verdicts
         // de l'ancien score (UI.Verdict.Good, UI.Verdict.Fair) survivaient ainsi. Les commentaires sont retires
         // avant la recherche ; un « // » precede de « : » est une adresse, pas un commentaire.
         var code = string.Join("\n", FichiersDuDepot.Sous(src, "*.cs").Concat(FichiersDuDepot.Sous(src, "*.xaml"))

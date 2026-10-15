@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.GpuNative.Tests;
 
-// A1 (06/10/2026) — AdlxNative.LireReglages marche sur des DOUBLURES de la table ADLX : de vrais objets en mémoire
+// AdlxNative.LireReglages marche sur des DOUBLURES de la table ADLX : de vrais objets en mémoire
 // non managée (premier mot = table de pointeurs de fonctions natives), aux entrées relevées dans les en-têtes du SDK.
 // Le chemin natif réel (Slot, Release, délégués de AdlxNative) est celui qui tourne ; seule la DLL est remplacée.
 // Les entrées sont des fonctions [UnmanagedCallersOnly] : un pointeur tiré d'un délégué managé serait reconnu par le
@@ -257,7 +257,7 @@ public sealed unsafe class AdlxLectureTests
         var (lus, d) = Lire(new Scenario { Types = [1, 1] });
         using (d)
         {
-            lus.Raison.Should().Contain("aucune dédiée");
+            lus.Raison.Should().Contain("none as discrete");
             lus.Sam.Should().BeNull();
             lus.TemperatureC.Should().BeNull();
         }
@@ -374,7 +374,7 @@ public sealed unsafe class AdlxLectureTests
         }
     }
 
-    // ── A-FS1 (08/10/2026) : FreeSync lu au pilote, écran par écran ───────────────────────────
+    // ── A-FS1 : FreeSync lu au pilote, écran par écran ───────────────────────────
     [Fact]
     public void Lit_FreeSync_de_chaque_ecran_avec_son_nom_et_rend_tout_ce_qu_il_prend()
     {

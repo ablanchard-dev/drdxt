@@ -4,26 +4,26 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Gpu.Adlx;
 
 // -----------------------------------------------------------------------
-// AdlxSlotsTests — frozen-value guard for the ADLX vtable slot indices.
+// AdlxSlotsTests : garde à valeurs figées des index de slots de la vtable ADLX.
 //
-// These indices are an ABI contract with amdadlx64.dll: a wrong value calls
-// the WRONG native function (crash / unintended write). They cannot be unit-
-// tested against real hardware in CI, so this test FREEZES each one to the
-// value verified on 2026-06-29 against the canonical ADLX SDK headers
-// (github.com/GPUOpen-LibrariesAndSDKs/ADLX, SDK/Include/*.h). If anyone edits a
-// constant, this fails and points back to the header that defines it.
-// Full citation table: src/DrDxt.Detection/Gpu/Adlx/ADLX-SLOTS.md
+// Ces index sont un contrat ABI avec amdadlx64.dll : une mauvaise valeur appelle la
+// mauvaise fonction native (plantage, écriture non voulue). Ils ne peuvent pas se tester en
+// CI contre du vrai matériel, donc ce test fige chacun à la valeur vérifiée contre les
+// en-têtes canoniques du SDK ADLX
+// (github.com/GPUOpen-LibrariesAndSDKs/ADLX, SDK/Include/*.h). Si quelqu'un édite une
+// constante, ceci échoue et renvoie à l'en-tête qui la définit.
+// Table complète des citations : src/DrDxt.Detection/Gpu/Adlx/ADLX-SLOTS.md
 // -----------------------------------------------------------------------
 public sealed class AdlxSlotsTests
 {
-    [Fact] // IADLXInterface base (all interfaces except IADLXSystem)
+    [Fact] // base IADLXInterface (toutes les interfaces sauf IADLXSystem)
     public void BaseInterface_Slots_AreCanonical()
     {
         AdlxVtableSlots.Release.Should().Be(1);
         AdlxVtableSlots.QueryInterface.Should().Be(2);
     }
 
-    [Fact] // ISystem.h — IADLXSystem (no Acquire/Release)
+    [Fact] // ISystem.h — IADLXSystem (sans Acquire/Release)
     public void System_Slots_AreCanonical()
     {
         AdlxVtableSlots.System_GetGPUs.Should().Be(1);
@@ -69,7 +69,7 @@ public sealed class AdlxSlotsTests
         AdlxVtableSlots.Power_SetLimit.Should().Be(5);    // Write
     }
 
-    [Fact] // IGPUManualFanTuning.h — fan tuning + state list + state
+    [Fact] // IGPUManualFanTuning.h — réglage de ventilation + liste d'états + état
     public void Fan_Slots_AreCanonical()
     {
         AdlxVtableSlots.Fan_GetTuningRanges.Should().Be(3);
@@ -80,7 +80,7 @@ public sealed class AdlxSlotsTests
         AdlxVtableSlots.FanState_GetTemperature.Should().Be(5);
     }
 
-    [Fact] // A1 (06/10/2026) — lecture : ISystem.h, IGPUTuning1.h, ISmartAccessMemory.h, I3DSettings.h, IPerformanceMonitoring.h
+    [Fact] // Lecture : ISystem.h, IGPUTuning1.h, ISmartAccessMemory.h, I3DSettings.h, IPerformanceMonitoring.h
     public void Lecture_Slots_AreCanonical()
     {
         AdlxVtableSlots.System_Get3DSettingsServices.Should().Be(7);
@@ -107,7 +107,7 @@ public sealed class AdlxSlotsTests
         AdlxVtableSlots.Metrics_GpuTemperature.Should().Be(7);
     }
 
-    [Fact] // A-FS1 (08/10/2026) — ADLX 32b5a740 : ISystem.h, IDisplays.h, IDisplaySettings.h
+    [Fact] // ADLX 32b5a740 : ISystem.h, IDisplays.h, IDisplaySettings.h
     public void FreeSync_Slots_AreCanonical()
     {
         AdlxVtableSlots.System_GetDisplaysServices.Should().Be(3);

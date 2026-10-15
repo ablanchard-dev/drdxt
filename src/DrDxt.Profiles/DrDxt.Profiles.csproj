@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- M6: AddDrDxtProfiles() registers the per-chip profile layer (catalog + matcher). -->
+    <!-- AddDrDxtProfiles() registers the per-chip profile layer (catalog + matcher). -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
   </ItemGroup>
 

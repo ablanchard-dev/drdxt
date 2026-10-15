@@ -7,7 +7,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// SEC2 (08/10/2026) : une valeur de la session de l'utilisateur (HKCU) s'écrit avec le jeton de l'App, jamais par le
+/// Une valeur de la session de l'utilisateur (HKCU) s'écrit avec le jeton de l'App, jamais par le
 /// helper administrateur. Élevé avec le compte d'un autre (UAC « par-dessus l'épaule »), le helper écrirait la ruche de cet
 /// autre compte : le joueur croirait le mode Jeu allumé chez lui, il le serait chez l'administrateur.
 /// </summary>
@@ -57,7 +57,7 @@ public sealed class ClientSessionUtilisateurTests
         _registre.DidNotReceiveWithAnyArgs().SetValue(default, default!, default!, default, default!);
     }
 
-    // Revue de sécurité du 08/10 : régression de SEC2, les lectures n'atteignaient plus le helper.
+    // Régression de SEC2, les lectures n'atteignaient plus le helper.
     [Fact]
     public async Task Les_lectures_passent_au_helper()
     {

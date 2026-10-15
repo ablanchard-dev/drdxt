@@ -30,7 +30,7 @@ public sealed class TheRamStateOfTheArtHasNoUnsourcedClaimTests
     private static readonly Regex ContainsDigit = new(@"\d");
     private static readonly Regex IsoDate = new(@"^\d{4}-\d{2}-\d{2}$");
 
-    // Le tableau en portait 6 le 06/09/2026. Il peut grandir, jamais retrecir sans qu'on le voie.
+    // Le compte releve a l'ecriture du gate. Le tableau peut grandir, jamais retrecir sans qu'on le voie.
     private const int ClaimsAtGateWriting = 6;
 
     private static string RepoRoot()
@@ -103,8 +103,8 @@ public sealed class TheRamStateOfTheArtHasNoUnsourcedClaimTests
     /// et c'est justement celle qui pourrit : un fichier deplace, un levier ajoute, et le document
     /// affirme « aucun code » sur une regle que le produit applique depuis des mois.
     ///
-    /// Trouve le 06/09/2026 en ecrivant ce test : la ligne SysMain disait « (aucun code) » alors
-    /// que `LeverCatalog.EvaluateSysMain` et `Finding.Memory.SysMainOff` existaient deja.
+    /// Exemple : une ligne SysMain qui dirait « (aucun code) » alors que `LeverCatalog.EvaluateSysMain`
+    /// et `Finding.Memory.SysMainOff` existent.
     ///
     /// La regle : tout ce qui est entre accents graves dans cette colonne doit **exister** --
     /// soit comme fichier, soit comme texte present sous `src/`. Le seul echappatoire est la

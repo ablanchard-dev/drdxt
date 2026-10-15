@@ -5,9 +5,9 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// R2 — the lease ops are leaf-exact allowlisted (structural validation only; the
-// REVERT op they carry is validated separately by the watchdog). Deny-by-default
-// still applies to malformed lease ops.
+// Les ops de bail sont en liste blanche feuille exacte (validation structurelle seulement ;
+// l'op de retour arrière qu'elles portent est validée à part par le chien de garde). Le refus
+// par défaut s'applique toujours aux ops de bail malformées.
 // -----------------------------------------------------------------------
 public sealed class LeaseOpsAllowlistTests
 {

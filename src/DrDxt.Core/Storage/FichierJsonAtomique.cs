@@ -3,18 +3,16 @@ namespace DrDxt.Core;
 /// <summary>
 /// Un fichier JSON ecrit sans jamais etre lu a moitie.
 ///
-/// Fichier temporaire a cote de la cible — meme volume, donc le deplacement est un vrai renommage —
+/// Fichier temporaire a cote de la cible (meme volume, donc le deplacement est un vrai renommage),
 /// puis remplacement. Un lecteur ne voit jamais un fichier a demi ecrit, et **une reference tronquee
 /// serait pire qu'absente** : elle se comparerait quand meme.
 ///
-/// Le piege que cette forme evite est reel et paye ailleurs : ouvrir la cible en ecriture la
-/// TRONQUE avant d'ecrire quoi que ce soit. Une panne a cet instant precis laisse un fichier vide
+/// Le piege que cette forme evite : ouvrir la cible en ecriture la
+/// tronque avant d'ecrire quoi que ce soit. Une panne a cet instant precis laisse un fichier vide
 /// la ou il y avait une mesure.
 ///
-/// Vit dans Core depuis le 10/09/2026 : cinq magasins en ont besoin (references memoire et CPU,
-/// journal de performance, journal des constats, marqueur BIOS), et trois d'entre eux, hors de
-/// l'assembly de mesure, en avaient recopie les vingt lignes. Une correction faite ici atteint
-/// maintenant les cinq. Toutes les frontieres sont enveloppees : aucune exception ne remonte.
+/// Vit dans Core parce que cinq magasins en ont besoin (references memoire et CPU, journal de
+/// performance, journal des constats, marqueur BIOS) : une correction faite ici les atteint tous. Toutes les frontieres sont enveloppees : aucune exception ne remonte.
 /// </summary>
 public sealed class FichierJsonAtomique
 {
@@ -27,7 +25,7 @@ public sealed class FichierJsonAtomique
     public FichierJsonAtomique(string chemin, string codeErreur)
     {
         _chemin = string.IsNullOrWhiteSpace(chemin)
-            ? throw new ArgumentException("Un chemin est requis.", nameof(chemin))
+            ? throw new ArgumentException("A path is required.", nameof(chemin))
             : chemin;
         _codeErreur = codeErreur;
     }

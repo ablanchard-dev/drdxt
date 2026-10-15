@@ -5,10 +5,9 @@ using Xunit;
 namespace DrDxt.Profiles.Tests;
 
 /// <summary>
-/// La vue payante de l'ecran de scan affiche, pour chaque levier recommande, `Claim` et `Source`
-/// tels quels (ScanView, bloc « UNLOCKED »). Le 17/09/2026, ces textes etaient en anglais, avec du
-/// jargon et des chemins de fichiers du depot en guise de source (« research/2026-06-22-… R3 »).
-/// Un client qui paie ne lit ni l'anglais du depot ni ses chemins : ce gate tient les deux champs
+/// L'ecran de scan affiche, pour chaque levier recommande, `Claim` et `Source` tels quels. Un joueur
+/// ne lit ni l'anglais du depot ni ses chemins de fichiers (« research/2026-06-22-… R3 ») : ce gate
+/// tient les deux champs
 /// en francais lisible, sans tiret cadratin (le tic du texte genere) et sans chemin interne.
 /// </summary>
 public class TextesDuCatalogueLisiblesParLeClientTests
@@ -34,7 +33,7 @@ public class TextesDuCatalogueLisiblesParLeClientTests
         fautes.Should().BeEmpty();
     }
 
-    // 23/09/2026 — le chemin etait parti, le document interne etait reste. Vu sur un scan reel :
+    // Le chemin etait parti, le document interne etait reste. Vu sur un scan reel :
     // « Plan north star §2.6 et cahier §3 ». Le crible du dessus attrapait `research/…md`, pas le NOM
     // d'un document que personne hors du projet ne peut ouvrir. Une source que le lecteur ne peut pas
     // verifier n'est pas une source, c'est une autorite qu'on lui demande de croire.

@@ -10,17 +10,13 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// « LANCE UNE PARTIE » est un mensonge quand le service est mort.
+// « Lance une partie » est un mensonge quand le service de mesure est mort.
 //
-// Le scan disait une seule phrase des que la mesure en jeu echouait, quelle qu'en soit la cause :
-// « Ta vraie perf en jeu n'est pas encore mesuree -- lance une partie, puis relance le scan. »
-// Sur la machine de reference, la cause reelle etait le conflit de tube avec le service Intel
-// (PM_STATUS_PIPE_ERROR, 3 fois sur 5, mesure du 02/09/2026). Le client lancait donc une partie,
-// relancait le scan, et obtenait le meme message -- indefiniment. Un diagnostic qui accuse
-// l'utilisateur de son propre defaut est pire qu'un silence.
-//
-// L'information EXISTAIT deja : `BenchmarkRunner` distingue `MEAS.PMON_UNAVAIL` (le service ne
-// repond pas) de `MEAS.PID_INVALID` (aucun jeu a mesurer). Elle mourait dans un `bool degraded`.
+// `BenchmarkRunner` distingue `MEAS.PMON_UNAVAIL` (le service ne repond pas) de `MEAS.PID_INVALID`
+// (aucun jeu a mesurer), et la phrase suit la cause. Une seule phrase pour les deux renverrait le
+// joueur lancer une partie indefiniment quand la cause est un conflit de tube avec le service Intel
+// (PM_STATUS_PIPE_ERROR, 3 fois sur 5, mesure du 02/09/2026 sur la machine de reference). Un
+// diagnostic qui accuse l'utilisateur de son propre defaut est pire qu'un silence.
 // -----------------------------------------------------------------------
 public sealed class ScanDegradedReasonTests
 {
@@ -51,8 +47,7 @@ public sealed class ScanDegradedReasonTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(
-              Hw(), St, new List<Finding>(), 68, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              Hw(), St, new List<Finding>(), null)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
@@ -66,9 +61,7 @@ public sealed class ScanDegradedReasonTests
         return new ScanViewModel(
             hd, sr, br, sc, sd,
             ScanViewModelTestSeams.Safety(), ScanViewModelTestSeams.Engine(),
-            ScanViewModelTestSeams.ProfileConsumer(), ScanViewModelTestSeams.GpuTuningStep(),
-            ScanViewModelTestSeams.Navigation(), ScanViewModelTestSeams.DashboardFactory(),
-            store, new AppliedTweakManifestMapper(),
+            ScanViewModelTestSeams.ProfileConsumer(), store, new AppliedTweakManifestMapper(),
             ScanViewModelTestSeams.BiosAdvisor(),
             ScanViewModelTestSeams.GuideGenerator(), key => key);
     }

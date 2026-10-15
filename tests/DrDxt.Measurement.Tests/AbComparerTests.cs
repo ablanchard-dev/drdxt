@@ -7,16 +7,16 @@ namespace DrDxt.Measurement.Tests;
 
 public class AbComparerTests
 {
-    // avg + 1% low move together (avg*0.7) — the simple "everything up/down" cases.
+    // moyenne et 1 % bas bougent ensemble (moy.*0,7) : les cas simples « tout monte / tout baisse ».
     private static BenchmarkResult Bench(double avg, double moe) =>
         new(avg, avg * 0.7, avg * 0.5, new List<double>(), null, moe, 5, P1LowMarginOfError: moe);
 
-    // Explicit avg / 1%-low / margin so we can vary frame-consistency INDEPENDENTLY
-    // of average FPS — the whole point of the efficiency-tweak (undervolt) criterion.
+    // Moyenne, 1 % bas et marge explicites pour faire varier la régularité des images indépendamment
+    // de la moyenne : tout l'enjeu du critère des leviers d'efficacité (undervolt).
     private static BenchmarkResult Bench(double avg, double p1Low, double moe) =>
         new(avg, p1Low, avg * 0.5, new List<double>(), null, moe, 5, P1LowMarginOfError: moe);
 
-    // 26/09/2026 : les lows se jugeaient avec la marge des FPS moyens. Ici ils bougent de 6 FPS, au-dela
+    // Les lows se jugeaient avec la marge des FPS moyens. Ici ils bougent de 6 FPS, au-dela
     // de la marge des moyennes (2 + 2) mais dans la leur (5 + 5) : ce n'est ni un gain ni une regression.
     [Fact]
     public void Les_lows_se_jugent_avec_leur_propre_marge_pas_celle_des_moyennes()
@@ -65,17 +65,17 @@ public class AbComparerTests
         v.After.Should().BeSameAs(after);
     }
 
-    // --- Frame-consistency (1% lows) is the PRIMARY criterion (plan C2 / cahier §4) ---
-    // An efficiency tweak (GPU undervolt / power-limit / fan curve) is ~0 on AVG FPS
-    // by design — its value is steadier 1% lows + thermals. So the verdict must not be
-    // average-FPS-only.
+    // --- La régularité des images (1 % bas) est le critère principal ---
+    // Un levier d'efficacité (undervolt GPU, limite de puissance, courbe de ventilation) vaut ~0 sur la
+    // moyenne par construction ; sa valeur est des 1 % bas plus réguliers et des températures. Le verdict
+    // ne doit donc pas reposer sur la seule moyenne.
 
     [Fact]
     public void Gain_when_one_percent_lows_improve_beyond_margin_even_if_avg_flat()
     {
-        // avg flat within margin, but 1% lows clearly up → the undervolt WIN: kept, gain.
+        // moyenne plate dans la marge, mais 1 % bas nettement en hausse → le gain de l'undervolt : gardé, gain.
         var before = Bench(avg: 100, p1Low: 70, moe: 1);
-        var after = Bench(avg: 100, p1Low: 80, moe: 1); // avg delta 0; 1%-low delta 10 > 2
+        var after = Bench(avg: 100, p1Low: 80, moe: 1); // delta moyenne 0 ; delta 1 % bas 10 > 2
         var v = AbComparer.Compare(before, after);
         v.IsMeasurableGain.Should().BeTrue();
         v.SummaryKey.Should().Be("Scan.Ab.MeasurableGain");
@@ -84,10 +84,10 @@ public class AbComparerTests
     [Fact]
     public void No_gain_when_avg_and_one_percent_lows_both_within_margin()
     {
-        // The expected good outcome of an efficiency tweak: avg held, 1% lows held.
-        // Not a regression → must be KEPT (no auto-revert).
+        // L'issue attendue d'un levier d'efficacité : moyenne tenue, 1 % bas tenus.
+        // Pas une régression → doit être gardé (pas de retour automatique).
         var before = Bench(avg: 100, p1Low: 70, moe: 2);
-        var after = Bench(avg: 101, p1Low: 71, moe: 2); // both deltas (1) < combined margin (4)
+        var after = Bench(avg: 101, p1Low: 71, moe: 2); // les deux deltas (1) < marge combinée (4)
         var v = AbComparer.Compare(before, after);
         v.IsMeasurableGain.Should().BeFalse();
         v.SummaryKey.Should().Be("Scan.Ab.NoMeasurableGain");
@@ -96,10 +96,10 @@ public class AbComparerTests
     [Fact]
     public void Regression_when_one_percent_lows_worse_beyond_margin_even_if_avg_flat()
     {
-        // avg flat, but frame consistency degraded beyond margin → REGRESSION (auto-revert).
-        // This is the per-game ReBAR/undervolt 1%-low regression the avg-only rule missed.
+        // moyenne plate, mais régularité dégradée au-delà de la marge → régression (retour automatique).
+        // C'est la régression des 1 % bas par jeu (ReBAR, undervolt) que la règle sur la seule moyenne manquait.
         var before = Bench(avg: 100, p1Low: 80, moe: 1);
-        var after = Bench(avg: 100, p1Low: 70, moe: 1); // avg delta 0; 1%-low delta -10
+        var after = Bench(avg: 100, p1Low: 70, moe: 1); // delta moyenne 0 ; delta 1 % bas -10
         var v = AbComparer.Compare(before, after);
         v.IsMeasurableGain.Should().BeFalse();
         v.SummaryKey.Should().Be("Scan.Ab.Regression");
@@ -108,9 +108,9 @@ public class AbComparerTests
     [Fact]
     public void Regression_when_avg_clearly_worse_beyond_margin()
     {
-        // avg FPS clearly worse (1% lows steady) → still a regression on the avg signal.
+        // moyenne nettement pire (1 % bas stables) → toujours une régression sur le signal moyen.
         var before = Bench(avg: 110, p1Low: 80, moe: 1);
-        var after = Bench(avg: 100, p1Low: 80, moe: 1); // avg delta -10; 1%-low flat
+        var after = Bench(avg: 100, p1Low: 80, moe: 1); // delta moyenne -10 ; 1 % bas plats
         var v = AbComparer.Compare(before, after);
         v.IsMeasurableGain.Should().BeFalse();
         v.SummaryKey.Should().Be("Scan.Ab.Regression");
@@ -119,22 +119,22 @@ public class AbComparerTests
     [Fact]
     public void Regression_takes_priority_when_lows_drop_even_if_avg_rises_within_margin()
     {
-        // avg nudges up within margin, but 1% lows collapse beyond margin → the frame
-        // consistency loss wins: REGRESSION, never sold as a gain.
+        // la moyenne monte un peu dans la marge, mais les 1 % bas s'effondrent au-delà → la perte de
+        // régularité l'emporte : régression, jamais vendue comme un gain.
         var before = Bench(avg: 100, p1Low: 80, moe: 1);
-        var after = Bench(avg: 101, p1Low: 70, moe: 1); // avg +1 (in margin); 1%-low -10
+        var after = Bench(avg: 101, p1Low: 70, moe: 1); // moyenne +1 (dans la marge) ; 1 % bas -10
         var v = AbComparer.Compare(before, after);
         v.IsMeasurableGain.Should().BeFalse();
         v.SummaryKey.Should().Be("Scan.Ab.Regression");
     }
 
-    // --- M8: the verdict carries the BASELINE limiter so the reco layer never sells a GPU tweak
-    // as an FPS win on a CPU/other-bound machine. Classified from Before (the unmodified machine).
+    // --- Le verdict porte le limiteur de départ pour que la couche de recommandation ne vende jamais
+    // un levier GPU comme gain de FPS sur une machine limitée par le processeur. Classé depuis Before (la machine non modifiée).
     [Fact]
     public void Verdict_reports_the_baseline_bottleneck()
     {
-        // Before was CPU/other-bound (70 % GPU busy); After being GPU-bound must not change the
-        // verdict's limiter — it's the machine's natural limiter that gates the claim.
+        // Before était limité par le processeur ou autre (70 % d'occupation GPU) ; qu'After soit limité par
+        // la carte ne doit pas changer le limiteur du verdict : c'est le limiteur naturel de la machine qui filtre l'affirmation.
         var before = new BenchmarkResult(100, 70, 50, new List<double>(), null, 1, 5, MeanGpuBusyMs: 7.0);
         var after = new BenchmarkResult(110, 77, 55, new List<double>(), null, 1, 5, MeanGpuBusyMs: 9.5);
         AbComparer.Compare(before, after).Bottleneck.Should().Be(Bottleneck.CpuOrOtherBound);

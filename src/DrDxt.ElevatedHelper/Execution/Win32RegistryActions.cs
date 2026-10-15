@@ -5,12 +5,11 @@ using Microsoft.Win32;
 namespace DrDxt.ElevatedHelper.Execution;
 
 // -----------------------------------------------------------------------
-// Win32RegistryActions — the real registry write/delete (m2smoke boundary).
+// Win32RegistryActions : la vraie écriture / suppression dans le registre (frontière du m2smoke).
 //
-// Maps the neutral Core enums (RegistryHiveKind / RegistryValueType) to the
-// Microsoft.Win32 enums and writes only the exact (hive, path, name) leaf it is
-// handed — which the server already validated leaf-exact. Every failure is
-// wrapped → HELPER.OP_FAILED; this never throws.
+// Relie les enums neutres de Core (RegistryHiveKind / RegistryValueType) aux enums
+// Microsoft.Win32 et n'écrit que la feuille exacte (ruche, chemin, nom) reçue, déjà validée à
+// la feuille près par le serveur. Tout échec est emballé → HELPER.OP_FAILED ; ne lève jamais.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class Win32RegistryActions : IRegistryActions
@@ -38,7 +37,7 @@ public sealed class Win32RegistryActions : IRegistryActions
                     break;
                 case RegistryValueType.MultiString:
                     // Une entree par ligne. Les lignes vides sont retirees : un REG_MULTI_SZ
-                    // avec une entree vide au milieu est traite comme une FIN de liste par
+                    // avec une entree vide au milieu est traite comme une fin de liste par
                     // certaines API Windows, et le reste serait silencieusement ignore.
                     key.SetValue(
                         name,
@@ -61,14 +60,51 @@ public sealed class Win32RegistryActions : IRegistryActions
         }
     }
 
+    private const string Approuve = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\";
+
+    // Le programme doit être listé là où sa liste le dit : sans ce contrôle, un op forgé créerait des valeurs pour des
+    // programmes qui n'existent pas. Le programme lui-même (sa commande, son raccourci) n'est jamais touché.
+    public Result SetStartupApproval(RegistryHiveKind hive, string liste, string nom, bool actif)
+    {
+        try
+        {
+            using var root = OpenRoot(hive);
+            var estListe = liste switch
+            {
+                SetStartupApprovalOp.Run => Liste(root, @"Software\Microsoft\Windows\CurrentVersion\Run", nom),
+                SetStartupApprovalOp.Run32 => Liste(root, @"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run", nom),
+                SetStartupApprovalOp.DossierDemarrage => File.Exists(Path.Combine(Environment.GetFolderPath(
+                    hive == RegistryHiveKind.CurrentUser ? Environment.SpecialFolder.Startup : Environment.SpecialFolder.CommonStartup), nom)),
+                _ => false,
+            };
+            if (!estListe)
+                return Fail("This program is not listed at startup.");
+            using var key = root.CreateSubKey(Approuve + liste, writable: true);
+            if (key is null)
+                return Fail("Could not open the StartupApproved key.");
+            key.SetValue(nom, SetStartupApprovalOp.Octets(actif, DateTime.UtcNow), RegistryValueKind.Binary);
+            return Result.Ok();
+        }
+        catch (Exception ex)
+        {
+            return Fail($"Startup approval write failed: {ex.GetType().Name}.");
+        }
+
+        static bool Liste(RegistryKey racine, string run, string nom)
+        {
+            using var k = racine.OpenSubKey(run);
+            return k?.GetValue(nom) is not null;
+        }
+    }
+
     public Result DeleteValue(RegistryHiveKind hive, string path, string name)
     {
         try
         {
             using var root = OpenRoot(hive);
             using var key = root.OpenSubKey(path, writable: true);
-            // A missing key/value means the value is already absent — a clean revert
-            // target (its "original" was absence). Treat as success.
+            // Une clé ou une valeur absente veut dire que la valeur est déjà absente : une cible de retour
+            // propre (son « original » était l'absence). Traiter comme un succès.
             if (key is null)
                 return Result.Ok();
             key.DeleteValue(name, throwOnMissingValue: false);
@@ -87,7 +123,7 @@ public sealed class Win32RegistryActions : IRegistryActions
         _ => throw new ArgumentOutOfRangeException(nameof(hive)),
     };
 
-    // Accept either decimal ("2") or the unsigned form a DWORD tweak may carry.
+    // Accepter le décimal (« 2 ») ou la forme non signée que peut porter un levier DWORD.
     private static bool TryParseInt(string value, out uint dword)
     {
         if (uint.TryParse(value, out dword))

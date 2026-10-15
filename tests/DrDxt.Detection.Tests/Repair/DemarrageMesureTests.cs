@@ -5,8 +5,8 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// 25/09/2026. Sur la machine de reference, la derniere mesure de demarrage de Windows date du
-/// 31/07/2025 (Defender +39,9 s, un Norton desinstalle depuis). L'annee ne s'affichait pas : ces
+/// Sur la machine de reference, la derniere mesure de demarrage de Windows date du
+/// L'annee ne s'affichait pas : ces
 /// chiffres passaient pour actuels. Au-dela de la fenetre, DrDXT le dit et ne cite rien.
 /// </summary>
 public class DemarrageMesureTests
@@ -84,7 +84,7 @@ public class DemarrageMesureTests
     {
         var lu = new WindowsBootPerformanceLog().LireTempsBios();
         lu.IsOk.Should().BeTrue(lu.Error?.Message);
-        // 27/09/2026 : un runner de CI n'a aucun demarrage journalise ; une liste vide est un etat valide,
+        // Un runner de CI n'a aucun demarrage journalise ; une liste vide est un etat valide,
         // et OnlyContain echoue sur le vide. On verifie qu'aucune valeur lue n'est hors plage.
         lu.Value!.Should().NotContain(a => a.BiosMs <= 0 || a.BiosMs >= 600_000, "des millisecondes d'allumage, pas des nanosecondes");
     }

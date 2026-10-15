@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 (boucle « vivant et prouvé », B11, critique B10 P1) : la page Processeur empilait cinq blocs, et ce qui
+// La page Processeur empilait cinq blocs, et ce qui
 // bride le processeur en jeu arrivait après toutes les listes. Il vient maintenant tout de suite après le verdict.
 public sealed class PageProcesseurAllegeeTests
 {
@@ -22,7 +22,7 @@ public sealed class PageProcesseurAllegeeTests
         bride.Should().BeGreaterThan(verdict).And.BeLessThan(mesures);
     }
 
-    // 29/09/2026 (B22, critique B10 passage 5, P2) : quatre paragraphes avant la première mesure. La première phrase
+    // Quatre paragraphes avant la première mesure. La première phrase
     // reste à l'écran ; le réglage, le risque et le retour arrière se déplient sous « Pourquoi ? ».
     [Fact]
     public void La_bride_se_dit_en_une_phrase_et_le_reste_se_deplie()

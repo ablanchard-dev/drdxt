@@ -42,7 +42,7 @@ public sealed record TraceResult(
 /// <summary>
 /// LA RESIDENCE REELLE D'UN THREAD, PAR ETW. **INACHEVE — NE REND AUCUNE DONNEE A CE JOUR.**
 ///
-/// ══ ETAT AU 08/09/2026, POUR QUE PERSONNE NE REPAYE CE CHEMIN ══
+/// ══ CE QUI A ETE ESSAYE (RELEVE LE 08/09/2026), POUR QUE PERSONNE NE REPAYE CE CHEMIN ══
 /// `StartTrace` REUSSIT desormais. `ProcessTrace` ne rend jamais la main, et aucune residence n'est
 /// produite. Quatre tentatives, quatre echecs DISTINCTS, chacun instructif :
 ///
@@ -229,9 +229,9 @@ public sealed class ThreadResidencyTracer
 
             if (journal.PerfFreq > 0) _frequenceQpc = journal.PerfFreq;
 
-            // `ProcessTrace` PEUT NE JAMAIS RENDRE LA MAIN, et ca s'est produit le 08/09/2026 :
-            // la session est restee ouverte sur la machine apres la mort du processus, et il a fallu
-            // la retrouver avec `logman query -ets` puis l'arreter a la main. Un outil de diagnostic
+            // `ProcessTrace` PEUT NE JAMAIS RENDRE LA MAIN : la session reste alors ouverte sur la
+            // machine apres la mort du processus, et il faut la retrouver avec `logman query -ets`
+            // puis l'arreter a la main. Un outil de diagnostic
             // qui laisse une trace noyau derriere lui est un outil qui abime la machine qu'il
             // examine.
             //
@@ -435,7 +435,7 @@ public sealed class ThreadResidencyTracer
 
     /// <summary>Les decalages que ce fichier utilise, exposes pour que le test les compare a la
     /// sortie de l'oracle natif. Un ecart d'un seul octet doit faire echouer la suite.</summary>
-    /// <summary>11/09/2026 : cette table N'EST PLUS COMPAREE au SDK. La garde
+    /// <summary>Cette table N'EST PLUS COMPAREE au SDK. La garde
     /// `EtwInteropLayoutTests` lit desormais celle de `DpcLatencyTracer`, le traceur que le produit
     /// expedie. Celle-ci reste ici parce que c'est l'interop de CE fichier ; ne pas la croire
     /// verifiee.</summary>

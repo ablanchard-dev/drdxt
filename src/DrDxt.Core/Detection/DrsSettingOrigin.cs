@@ -1,39 +1,39 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// Turns the two fields NVIDIA fills on every DRS read — settingLocation and isCurrentPredefined —
-/// into an answer to "who put this value here?".
+/// Transforme les deux champs que NVIDIA remplit à chaque lecture DRS (settingLocation et
+/// isCurrentPredefined) en réponse à « qui a mis cette valeur ici ? ».
 ///
-/// The product was discarding both and keeping only the DWORD. On a machine carrying 10218
-/// driver-shipped application profiles, that makes every value look equally like a user choice,
-/// and makes the question "which settings did I actually change?" unanswerable.
+/// Sans eux, on ne garde que le DWORD. Sur une machine qui porte 10218 profils d'application
+/// livrés par le pilote, chaque valeur ressemble alors à un choix de l'utilisateur, et la
+/// question « quels réglages ai-je vraiment changés ? » n'a plus de réponse.
 ///
-/// Semantics from NVIDIA's Driver Settings Programming Guide (PG-12072-001 v01): p.2 separates
-/// "predefined settings" (shipped with the driver) from "user settings" (edited after install);
-/// p.9-10 state that settings not from the current profile are inherited from the base or global
-/// profiles and must be skipped when asking what a profile owns.
+/// Sens tiré du Driver Settings Programming Guide de NVIDIA (PG-12072-001 v01) : la p. 2 sépare
+/// les « predefined settings » (livrés avec le pilote) des « user settings » (modifiés après
+/// installation) ; les p. 9-10 disent que les réglages hors du profil courant sont hérités du
+/// profil de base ou global, et à ignorer quand on demande ce qu'un profil possède.
 ///
-/// Lives in Core since 10/09/2026: the elevated helper needs the same reading to prove that a
-/// revert returned a game's profile to its original provenance, and it references only Core.
-/// Two copies of this mapping would be two definitions of "restored".
+/// Vit dans Core : le helper élevé a besoin de la même lecture pour prouver qu'un retour arrière
+/// a rendu au profil d'un jeu sa provenance d'origine, et il ne référence que Core.
+/// Deux copies de cette correspondance feraient deux définitions de « rendu ».
 ///
-/// Pure and total: no I/O. An unrecognised location degrades to <see cref="DrsValueOrigin.Unknown"/>.
+/// Pur et total : aucune E/S. Un emplacement inconnu donne <see cref="DrsValueOrigin.Unknown"/>.
 /// </summary>
 public static class DrsSettingOrigin
 {
     // NVDRS_SETTING_LOCATION (PG-12072-001).
     private const uint CurrentProfile = 0, GlobalProfile = 1, BaseProfile = 2, DefaultProfile = 3;
 
-    /// <param name="settingLocation">NVDRS_SETTING.settingLocation as returned by the driver.</param>
-    /// <param name="isCurrentPredefined">NVDRS_SETTING.isCurrentPredefined: non-zero = the current
-    /// value is the one NVIDIA shipped.</param>
-    /// <param name="isPredefinedValid">NVDRS_SETTING.isPredefinedValid: whether predefinedValue is
-    /// usable. Reported, never used to override the two fields above.</param>
+    /// <param name="settingLocation">NVDRS_SETTING.settingLocation tel que rendu par le pilote.</param>
+    /// <param name="isCurrentPredefined">NVDRS_SETTING.isCurrentPredefined : non nul = la valeur
+    /// courante est celle livrée par NVIDIA.</param>
+    /// <param name="isPredefinedValid">NVDRS_SETTING.isPredefinedValid : predefinedValue est-il
+    /// utilisable. Rapporté, jamais utilisé pour passer outre les deux champs ci-dessus.</param>
     public static DrsOriginState Describe(uint settingLocation, uint isCurrentPredefined, uint isPredefinedValid)
     {
-        // Inheritance is decided first. isCurrentPredefined == 0 on an inherited value would
-        // otherwise read as "the user set this here" — the user set it somewhere else, and
-        // sending someone to edit a profile that owns nothing is worse than saying nothing.
+        // L'héritage se décide d'abord. Sinon isCurrentPredefined == 0 sur une valeur héritée se
+        // lirait « l'utilisateur l'a posée ici » ; il l'a posée ailleurs, et envoyer quelqu'un
+        // modifier un profil qui ne possède rien est pire que ne rien dire.
         switch (settingLocation)
         {
             case GlobalProfile:

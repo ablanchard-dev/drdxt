@@ -21,20 +21,20 @@ public class RepairAuditServiceTests
     /// <summary>
     /// La frequence dite par le produit ne peut pas etre une moyenne muette.
     ///
-    /// Jusqu'au 09/09/2026 cette ligne rendait l'instance `_Total`, moyenne des 28 processeurs
-    /// logiques CŒURS INACTIFS COMPRIS : elle disait 3 622 MHz pendant qu'une partie chargeait huit
-    /// a dix cœurs a 3 861. Elle repondait a une question que personne ne pose.
+    /// L'instance `_Total` fait la moyenne des 28 processeurs logiques, cœurs inactifs compris : mesure,
+    /// 3 622 MHz pendant qu'une partie chargeait huit a dix cœurs a 3 861. Elle repond a une question que
+    /// personne ne pose.
     ///
     /// La branche prise depend de la charge de la machine au moment du scan, donc ce test ne force
     /// pas laquelle : il exige qu'il y en ait toujours une, et que la mesure ne soit jamais rendue
-    /// comme un etat sain — une frequence n'est ni bonne ni mauvaise, elle est observee.
+    /// comme un etat sain : une frequence n'est ni bonne ni mauvaise, elle est observee.
     /// </summary>
     [Fact]
     public void LA_FREQUENCE_EST_TOUJOURS_DITE_ET_JAMAIS_COMME_UN_ETAT_SAIN()
     {
         var cpu = new RepairAuditService().Lire().Where(c => c.Domaine == "CPU").ToList();
 
-        // 17/09/2026 : un seul nom, quelle que soit la charge de l'instant. Deux noms selon qu'un
+        // Un seul nom, quelle que soit la charge de l'instant. Deux noms selon qu'un
         // cœur etait charge ou non faisaient ecrire au journal « Apparu » + « Disparu » a chaque
         // scan pris dans un autre etat : un faux changement recurrent, vu en executant l'audit.
         var frequence = cpu.Should().ContainSingle(c => c.Nom == "frequence effective",
@@ -54,7 +54,7 @@ public class RepairAuditServiceTests
     [Fact]
     public void L_USURE_DISQUE_EST_OBSERVEE_ET_JAMAIS_RENDUE_COMME_CONFORME()
     {
-        // 07/10/2026 (D5) : le domaine porte aussi des constats conformes (jeux sur SSD, lien du SSD) ; ce test parle de l'usure.
+        // Le domaine porte aussi des constats conformes (jeux sur SSD, lien du SSD) ; ce test parle de l'usure.
         var stockage = new RepairAuditService().Lire().Where(c => c.Domaine == "STOCKAGE" && c.Nom.StartsWith("usure", StringComparison.Ordinal)).ToList();
 
         stockage.Should().NotBeEmpty("la famille doit etre collectee meme quand rien n'est usé");
@@ -94,13 +94,13 @@ public class RepairAuditServiceTests
         var c = new RepairAuditService().Lire()
             .Should().ContainSingle(x => x.Domaine == "CPU" && x.Nom == "bridage").Subject;
         c.Statut.Should().NotBe(RepairStatus.ExpectedDefault);
-        // 25/09/2026 : `% of Maximum Frequency` etait rendu « la limite est atteinte a 60 % ». Ce
+        // `% of Maximum Frequency` etait rendu « la limite est atteinte a 60 % ». Ce
         // compteur n'est pas une limite : au repos, sur cette machine, il passe de 56 a 99 % en deux
         // secondes. Une lecture instantanee ne dit rien ; le constat ne la cite plus.
         c.Explication.Should().NotContain("limite est atteinte");
     }
 
-    // 29/09/2026, seconde critique de l'app : « la machine où DrDXT a été mis au point » dans une explication
+    // « la machine où DrDXT a été mis au point » dans une explication
     // affichée au joueur est du texte de développeur. Le fait reste (une machine de test), la tournure part.
     [Fact]
     public void Aucune_explication_affichee_ne_parle_de_la_mise_au_point_de_DrDXT()

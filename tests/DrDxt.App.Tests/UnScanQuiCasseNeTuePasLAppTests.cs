@@ -6,7 +6,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Le scan traite proprement un detecteur qui refuse : `Result.Fail`
+// Le scan traite proprement un detecteur qui refuse : `Result.Fail`
 // devient `Scan.Error.Detection`, l'ecran le dit, la vie continue. Mais rien ne
 // couvrait le detecteur qui LEVE.
 //

@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 25/09/2026 : les explications des états lus passent en info-bulle. Le modèle d'info-bulle
+/// Les explications des états lus passent en info-bulle. Le modèle d'info-bulle
 /// limite la largeur à 360 et affichait la chaîne sans retour à la ligne : une explication longue
 /// (bridage, incident noyau) était coupée à droite. Le TextBlock que WPF génère doit revenir à la ligne.
 /// </summary>

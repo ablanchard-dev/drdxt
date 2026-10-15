@@ -7,14 +7,14 @@ namespace DrDxt.Detection.Tests.Bios;
 /// <summary>
 /// Trouver une interface BIOS ne la qualifie pas.
 ///
-/// Decouverte le 08/09/2026 sur la MSI PRO B760-P WIFI DDR4 : `root\wmi` expose `MSI_BiosSetting`
+/// Releve le 08/09/2026 sur la MSI PRO B760-P WIFI DDR4 : `root\wmi` expose `MSI_BiosSetting`
 /// avec `GetBiosSetting(Item)` et `SetBiosSetting(Item, Value)`, deux instances ACPI\PNP0C14
 /// actives. C'est une interface firmware de lecture et d'ecriture, sur la machine de reference.
 ///
 /// La tentation evidente est d'en faire un `VendorSupportedWrite` et d'appeler `GetBiosSetting`
 /// pour voir. **Trois raisons de ne pas le faire, et chacune suffit** :
 ///
-///   1. `Item` est un NOM de reglage que nous ne connaissons pas — l'appeler revient a tatonner
+///   1. `Item` est un NOM de reglage que nous ne connaissons pas : l'appeler revient a tatonner
 ///      le parseur d'un firmware ;
 ///   2. la North Star exige une interface **officiellement supportee par le constructeur**, et
 ///      une classe WMI ACPI peut n'exister que pour le logiciel maison de MSI ;
@@ -51,7 +51,7 @@ public class VendorBiosInterfaceProbeTests
         phrase.Should().Contain("Présente ne veut pas dire prise en charge");
         phrase.Should().NotContain("—").And.NotContain("ECRITURE", "pas de capitales d'insistance");
         phrase.Should().Contain("aucune méthode n'est appelée");
-        // 25/09/2026 : l'intention reste (une interface qui sait écrire le DIT), portée par les mots.
+        // L'intention reste (une interface qui sait écrire le DIT), portée par les mots.
         phrase.Should().Contain("lecture et écriture exposées", "une interface qui sait écrire doit le dire");
     }
 

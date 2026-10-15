@@ -7,20 +7,20 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.Application.Tests.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// The prod-wiring gate for the honest "AMD GPU detected — tuning coming soon" status.
+// La porte de câblage de production du statut honnête « GPU AMD détecté, réglage à venir ».
 //
-// Regression guard for a real defect: the honest status was once gated on a flag that
-// lived on the ADLX seam, whose PRODUCTION impl (StubAdlxGpuTuning) returns a constant
-// false — so on a real AMD machine the status was DEAD and a fake had to force the flag
-// for the unit tests to pass (a false-positive). The fix moves "AMD GPU present" onto the
-// hardware-fed IGpuTuningTargetSource (computed from hw via GpuGating.IsAmd), whose prod
-// impl reflects the TRUE hardware.
+// Garde de régression sur un vrai défaut : le statut honnête dépendait d'un drapeau porté par
+// la couture ADLX, dont l'implémentation de production (StubAdlxGpuTuning) rend une constante
+// fausse ; sur une vraie machine AMD le statut était mort, et un faux devait forcer le drapeau
+// pour que les tests unitaires passent (un faux positif). Le correctif place « GPU AMD présent »
+// sur l'IGpuTuningTargetSource alimenté par le matériel (calculé via GpuGating.IsAmd), dont
+// l'implémentation de production reflète le vrai matériel.
 //
-// This test composes the ACTUAL production application graph (AddDrDxtApplication → the
-// Real StubNvApiGpuTuning + StubAdlxGpuTuning, both IsAvailable == false, exactly as on a
-// real machine today) and a HardwareInventory that contains an AMD GPU. With nothing
-// forced on any fake, every GPU tweak must return the explicit honest code — proving the
-// status fires under real wiring.
+// Ce test compose le vrai graphe d'application de production (AddDrDxtApplication → les
+// vrais StubNvApiGpuTuning + StubAdlxGpuTuning, tous deux IsAvailable == false, exactement
+// comme sur une vraie machine) et un HardwareInventory qui contient un GPU AMD. Sans rien
+// forcer sur aucun faux, chaque levier GPU doit rendre le code honnête explicite : preuve que
+// le statut joue sous le vrai câblage.
 // -----------------------------------------------------------------------
 public sealed class GpuAmdHonestStatusTests
 {
@@ -40,8 +40,8 @@ public sealed class GpuAmdHonestStatusTests
         new BiosInfo("1.0", null, true),
         ChassisType.Desktop);
 
-    // The real production application graph: the actual fail-clean SDK stubs (NVAPI + ADLX
-    // both IsAvailable == false) and the real GpuTuningTargetSource singleton.
+    // Le vrai graphe d'application de production : les bouchons SDK à échec propre (NVAPI et ADLX
+    // tous deux IsAvailable == false) et le vrai singleton GpuTuningTargetSource.
     private static ServiceProvider BuildProductionGraph() =>
         new ServiceCollection().AddDrDxtApplication().BuildServiceProvider();
 
@@ -50,8 +50,8 @@ public sealed class GpuAmdHonestStatusTests
     {
         using var provider = BuildProductionGraph();
 
-        // The only "AMD-ness" injected: the real source learns the AMD GPU from the scanned
-        // hardware (exactly what ScanProfileConsumer does at scan time). No fake is forced.
+        // Seule « amdité » injectée : la vraie source apprend le GPU AMD du matériel scanné
+        // (exactement ce que fait ScanProfileConsumer au scan). Aucun faux n'est forcé.
         provider.GetRequiredService<IGpuTuningTargetSource>().SetAmdGpuPresenceFromHardware(AmdDesktop());
 
         var gpuTweaks = provider.GetServices<ITweak>()
@@ -66,7 +66,7 @@ public sealed class GpuAmdHonestStatusTests
             r.IsOk.Should().BeFalse($"{tweak.Id} must not claim success on an AMD machine with no ADLX");
             r.Error!.Value.Code.Should().Be(ErrorCodes.GpuAmdTuningUnavailable,
                 $"{tweak.Id} must surface the explicit honest AMD status, not a silent skip");
-            // Distinct from the generic SDK-unavailable that fires on non-AMD machines.
+            // Distinct du générique « SDK indisponible » qui joue sur les machines non AMD.
             r.Error!.Value.Code.Should().NotBe(ErrorCodes.TweakSdkUnavailable);
         }
     }
@@ -74,9 +74,9 @@ public sealed class GpuAmdHonestStatusTests
     [Fact]
     public async Task With_real_prod_stubs_and_non_amd_hardware_gpu_tweaks_do_not_show_the_amd_status()
     {
-        // Honesty boundary: a non-AMD machine must not see the AMD message. With no AMD GPU,
-        // the source's presence stays false → the tweaks fall back to the generic
-        // TWEAK.SDK_UNAVAILABLE (the SDK genuinely isn't wired), never the AMD line.
+        // Frontière d'honnêteté : une machine non AMD ne doit pas voir le message AMD. Sans GPU AMD,
+        // la présence côté source reste fausse → les leviers retombent sur le générique
+        // TWEAK.SDK_UNAVAILABLE (le SDK n'est vraiment pas câblé), jamais la ligne AMD.
         using var provider = BuildProductionGraph();
         provider.GetRequiredService<IGpuTuningTargetSource>().SetAmdGpuPresenceFromHardware(IntelNvidiaDesktop());
 

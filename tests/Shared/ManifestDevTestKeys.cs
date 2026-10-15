@@ -1,26 +1,26 @@
 namespace DrDxt.TestSupport;
 
 // -----------------------------------------------------------------------
-// TEST-only fixture: the dev/test PRIVATE seed paired with
+// Gabarit réservé aux tests : la graine privée de dev/test appariée à
 // DrDxt.Reconciler.Manifest.ManifestDevKeys.PublicKey.
 //
-// Why this lives in tests/ and not in src/ (M5 review finding #3):
-// a usable manifest-signing PRIVATE key must never ship in a production binary — anyone
-// who decompiles DrDxt.Reconciler.dll and gets this seed could forge a desired-state
-// manifest the boot reconciler reapplies. The 32-byte PUBLIC key stays in src/
-// (ManifestDevKeys.PublicKey — safe, it can only verify); its matching PRIVATE seed lives
-// Here, compiled only into the test assemblies (in every config, incl. Release), so the
-// hermetic tests can sign a fixture manifest the embedded public key then verifies, with
-// ZERO private-key bytes in any shipping DLL.
+// Pourquoi ceci vit dans tests/ et pas dans src/ :
+// une clé privée de signature de manifeste utilisable ne doit jamais partir dans un binaire de
+// production ; quiconque décompilerait DrDxt.Reconciler.dll et obtiendrait cette graine pourrait
+// forger un manifeste d'état voulu que le réconciliateur du démarrage réapplique. La clé publique
+// de 32 octets reste dans src/ (ManifestDevKeys.PublicKey : sûre, elle ne peut que vérifier) ; sa
+// graine privée appariée vit ici, compilée seulement dans les assemblys de test (dans toute
+// configuration, Release comprise), pour que les tests hermétiques signent un manifeste de gabarit
+// que la clé publique embarquée vérifie ensuite, avec zéro octet de clé privée dans toute DLL livrée.
 //
-// This file is LINKED into the reconciler / host / app test projects (a single source of
-// truth — no per-project copies of the seed to drift).
+// Ce fichier est lié dans les projets de test du réconciliateur, de l'hôte et de l'App (une seule
+// source : aucune copie de la graine par projet qui pourrait dériver).
 // -----------------------------------------------------------------------
 internal static class ManifestDevTestKeys
 {
-    /// <summary>The 32-byte raw Ed25519 PRIVATE seed matched to
-    /// <c>ManifestDevKeys.PublicKey</c>. TEST-only — used by tests to sign fixture
-    /// manifests the embedded public key verifies. Never present in a shipping binary.</summary>
+    /// <summary>La graine privée Ed25519 brute de 32 octets appariée à
+    /// <c>ManifestDevKeys.PublicKey</c>. Réservée aux tests : sert à signer les manifestes de gabarit
+    /// que la clé publique embarquée vérifie. Jamais présente dans un binaire livré.</summary>
     public static byte[] DevPrivateSeed =>
     [
         0x31, 0x5D, 0xED, 0x95, 0x60, 0xB6, 0xA4, 0x94,

@@ -6,25 +6,26 @@ using DrDxt.ElevatedHelper.Leases;
 namespace DrDxt.ElevatedHelper;
 
 // -----------------------------------------------------------------------
-// HandshakeAcceptingServer — the elevated host's per-connection lifecycle with the
-// §9.13 session-key handshake in front of the PROVEN typed protocol.
+// HandshakeAcceptingServer : le cycle de vie par connexion de l'hôte élevé, avec le handshake
+// de clé de session placé devant le protocole typé éprouvé.
 //
-// Per accepted connection (deny-by-default, fail-clean throughout):
-//   1. create the ACL'd, FIRST_PIPE_INSTANCE pipe (PipeSecurityFactory) and accept.
-//   2. resolve the peer PID from the pipe (GetNamedPipeClientProcessId) → CallerInfo.
-//   3. run HandshakeServerCore: AUTHENTICATE the caller, then mint+send an EPHEMERAL
-//      per-connection key. A denied/garbage/truncated peer gets NO key and the
-//      connection is dropped — the executor is never reached.
-//   4. with the negotiated key, serve ONE typed request via the existing
-//      TypedPrivilegedServer.ProcessTypedRequestAsync — the message protocol, HMAC,
-//      nonce anti-replay, codec, leaf-exact allowlist and executor are ALL unchanged.
-//      Only the key's provenance changed (negotiated, not env-var pre-shared).
+// Par connexion acceptée (refus par défaut, échec propre partout) :
+//   1. créer le pipe FIRST_PIPE_INSTANCE protégé par ACL (PipeSecurityFactory) et accepter.
+//   2. résoudre le PID du pair depuis le pipe (GetNamedPipeClientProcessId) → CallerInfo.
+//   3. lancer HandshakeServerCore : authentifier l'appelant, puis frapper et envoyer une clé
+//      éphémère propre à la connexion. Un pair refusé, déchet ou tronqué n'a aucune clé et la
+//      connexion est coupée : l'exécuteur n'est jamais atteint.
+//   4. avec la clé négociée, servir une requête typée via le
+//      TypedPrivilegedServer.ProcessTypedRequestAsync existant : protocole de messages, HMAC,
+//      anti-rejeu par nonce, codec, allowlist à la feuille près et exécuteur restent tous
+//      inchangés. Seule la provenance de la clé change (négociée, pas partagée d'avance par
+//      variable d'environnement).
 //
-// The session key is EPHEMERAL and per-connection (in memory only, never persisted).
-// The lease watchdog (if any) is shared across connections (it lives on the helper),
-// so it is injected and reused; everything else is rebuilt per connection with the
-// fresh key. The same caller-auth runs again inside the typed server (defense in
-// depth + lease ownership binding).
+// La clé de session est éphémère et propre à la connexion (en mémoire seulement, jamais
+// persistée). Le chien de garde des baux (s'il existe) est partagé entre connexions (il vit
+// dans le helper) : il est donc injecté et réutilisé ; tout le reste est reconstruit par
+// connexion avec la clé neuve. La même auth de l'appelant repasse dans le serveur typé
+// (défense en profondeur + liaison du bail à son propriétaire).
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class HandshakeAcceptingServer
@@ -37,12 +38,12 @@ public sealed class HandshakeAcceptingServer
     private readonly string _pipeName;
     private readonly TimeSpan _delaiDeLecture;
 
-    /// <summary>26/09/2026 — le temps laisse a un client pour parler (poignee de main, puis requete). Le tube n'a
-    /// qu'une instance : sans ce delai, un programme du compte connecte et muet tenait le helper indefiniment. Il ne
-    /// borne que les LECTURES, pas l'execution d'un op (un point de restauration peut etre long).</summary>
+    /// <summary>Le temps laisse a un client pour parler (poignee de main, puis requete). Le tube n'a
+    /// qu'une instance : sans ce delai, un programme du compte connecte et muet tiendrait le helper indefiniment. Il ne
+    /// borne que les lectures, pas l'execution d'un op (un point de restauration peut etre long).</summary>
     public static readonly TimeSpan DelaiDeLectureParDefaut = TimeSpan.FromSeconds(10);
 
-    /// <summary>Revue de sécurité du 08/10 : appelé après une poignée de main réussie seulement (SEC1 : une connexion
+    /// <summary>Appelé après une poignée de main réussie seulement (SEC1 : une connexion
     /// refusée ne garde plus le helper vivant).</summary>
     public Action<int?>? ApresAuthentification { get; init; }
 
@@ -64,23 +65,23 @@ public sealed class HandshakeAcceptingServer
         _pipeName = string.IsNullOrWhiteSpace(pipeName) ? PipeSecurityFactory.DefaultPipeName : pipeName;
     }
 
-    /// <summary>Accepts exactly one connection, runs the handshake, then serves one
-    /// typed request with the negotiated key. Never throws across the boundary for
-    /// request-level failures; cancellation propagates.</summary>
+    /// <summary>Accepte exactement une connexion, fait le handshake, puis sert une requête
+    /// typée avec la clé négociée. Ne lève jamais à travers la frontière pour un échec au
+    /// niveau de la requête ; l'annulation se propage.</summary>
     public async Task AcceptOneAsync(CancellationToken ct)
     {
         using var server = PipeSecurityFactory.CreateServerStream(_pipeName);
         await server.WaitForConnectionAsync(ct).ConfigureAwait(false);
 
-        // Attribute the connection to a process so the authenticator can verify the
-        // peer is the trusted DrDxt.App. A null pid → the authenticator denies.
+        // Attribuer la connexion à un processus pour que l'authentificateur vérifie que le
+        // pair est le DrDxt.App de confiance. Un pid null → l'authentificateur refuse.
         var caller = new CallerInfo(PipeClientIdentity.TryGetClientProcessId(server));
 
         // Les lectures de ce client ont un delai ; l'arret du service reste `ct`.
         using var lecture = CancellationTokenSource.CreateLinkedTokenSource(ct);
         lecture.CancelAfter(_delaiDeLecture);
 
-        // 3. Handshake: AUTH then mint the ephemeral key. Denied/garbage → no key.
+        // 3. Handshake : l'auth, puis la frappe de la clé éphémère. Refusé ou déchet → aucune clé.
         byte[] sessionKey;
         try
         {
@@ -88,7 +89,7 @@ public sealed class HandshakeAcceptingServer
                 .RunAsync(server, caller, lecture.Token)
                 .ConfigureAwait(false);
             if (!handshake.IsOk || handshake.Value is null)
-                return; // fail-closed: no channel, executor never reached
+                return; // fail-closed : aucun canal, exécuteur jamais atteint
             sessionKey = handshake.Value;
             ApresAuthentification?.Invoke(caller.ClientProcessId);
         }
@@ -102,11 +103,11 @@ public sealed class HandshakeAcceptingServer
         }
         catch
         {
-            return; // any handshake fault → drop the connection, fail-closed
+            return; // toute panne de handshake → couper la connexion, fail-closed
         }
 
-        // 4. Serve ONE typed request with the negotiated key over the same
-        //    connection, via the proven pipeline (unchanged).
+        // 4. Servir une requête typée avec la clé négociée sur la même
+        //    connexion, par le pipeline éprouvé (inchangé).
         var typed = new TypedPrivilegedServer(
             sessionKey, _authenticator, _allowlist, _executor, _pipeName, _leaseWatchdog);
 
@@ -141,7 +142,7 @@ public sealed class HandshakeAcceptingServer
         }
         finally
         {
-            // The ephemeral key dies with this connection — clear it from memory.
+            // La clé éphémère meurt avec cette connexion : l'effacer de la mémoire.
             Array.Clear(sessionKey);
         }
 
@@ -155,7 +156,7 @@ public sealed class HandshakeAcceptingServer
         }
         catch
         {
-            // Peer vanished mid-response; nothing actionable.
+            // Le pair a disparu en pleine réponse ; rien à faire.
         }
     }
 }

@@ -4,18 +4,17 @@ using Serilog.Core;
 namespace DrDxt.Infrastructure.Logging;
 
 /// <summary>
-/// Minimal Serilog bootstrap. No global static mutation — callers own the lifetime.
+/// Amorçage Serilog minimal. Aucune modification statique globale : les appelants possèdent la durée de vie.
 /// </summary>
 public static class AppLogging
 {
     /// <summary>
-    /// Creates a Serilog <see cref="ILogger"/> that writes rolling daily files to
-    /// <paramref name="logDirectory"/>. The caller is responsible for disposing the
-    /// returned logger when the application shuts down.
+    /// Crée un <see cref="ILogger"/> Serilog qui écrit des fichiers quotidiens tournants dans
+    /// <paramref name="logDirectory"/>. L'appelant libère le logger rendu à l'arrêt de l'application.
     /// </summary>
     /// <param name="logDirectory">
-    /// Directory for log files. Defaults to <c>%LOCALAPPDATA%\DrDXT\logs</c>.
-    /// Inject a temp directory in tests to avoid pollution.
+    /// Dossier des fichiers de journal. Par défaut <c>%LOCALAPPDATA%\DrDXT\logs</c>.
+    /// Injecter un dossier temporaire en test pour ne rien salir.
     /// </param>
     public static ILogger CreateLogger(string? logDirectory = null)
     {

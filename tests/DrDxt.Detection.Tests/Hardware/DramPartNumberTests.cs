@@ -4,17 +4,17 @@ using Xunit;
 
 namespace DrDxt.Detection.Tests.Hardware;
 
-// The XMP/EXPO rated speed lives in the DRAM part number, not reliably in WMI.
-// After a BIOS flash resets XMP, WMI Speed collapses to the JEDEC value
-// (== ConfiguredClockSpeed), so the part number is the only honest source of the
-// kit's rated speed. We parse it conservatively: a 4-digit data-rate in a plausible
-// DDR4/DDR5 range, taking the highest match (the headline speed, never a timing code).
+// La vitesse nominale XMP/EXPO vit dans la référence de la barrette, pas de façon fiable dans WMI.
+// Après un flash du BIOS qui remet XMP à zéro, WMI Speed retombe à la valeur JEDEC
+// (== ConfiguredClockSpeed), donc la référence est la seule source honnête de la vitesse
+// nominale du kit. On l'analyse avec prudence : un débit à 4 chiffres dans une plage DDR4/DDR5
+// plausible, en prenant la plus haute correspondance (la vitesse affichée, jamais un code de timing).
 public class DramPartNumberTests
 {
     [Fact]
     public void GSkill_ddr4_4000_kit_parses_to_4000()
     {
-        // The reference machine's exact kit (G.Skill F4-4000C18-32GTES) — the regression that motivated this.
+        // Le kit exact de la machine de référence (G.Skill F4-4000C18-32GTES) : la régression à l'origine de ceci.
         DramPartNumber.TryParseRatedMhz("F4-4000C18-32GTES").Should().Be(4000);
     }
 
@@ -33,8 +33,8 @@ public class DramPartNumberTests
     [Fact]
     public void GSkill_ddr5_part_picks_the_speed_not_the_timing_code()
     {
-        // "F5-6000J3038..." contains TWO 4-digit runs: 6000 (speed) and 3038 (J-timing).
-        // The headline speed is the higher one — proves we take the max, not the first.
+        // « F5-6000J3038... » contient deux suites de 4 chiffres : 6000 (vitesse) et 3038 (timing J).
+        // La vitesse affichée est la plus haute : prouve qu'on prend le max, pas la première.
         DramPartNumber.TryParseRatedMhz("F5-6000J3038F16GX2-TZ5RK").Should().Be(6000);
     }
 
@@ -55,7 +55,7 @@ public class DramPartNumberTests
     [Fact]
     public void Four_digit_numbers_outside_the_dram_range_are_ignored()
     {
-        // 1999 (below DDR4 floor) and 9500 (above ceiling) are not plausible data-rates.
+        // 1999 (sous le plancher DDR4) et 9500 (au-dessus du plafond) ne sont pas des débits plausibles.
         DramPartNumber.TryParseRatedMhz("ABCD1999EFGH").Should().BeNull();
         DramPartNumber.TryParseRatedMhz("XYZ9500QRS").Should().BeNull();
     }

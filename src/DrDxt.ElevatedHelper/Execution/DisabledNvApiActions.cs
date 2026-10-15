@@ -3,26 +3,28 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Execution;
 
 // -----------------------------------------------------------------------
-// DisabledNvApiActions — a fail-clean NVAPI seam for the BOOT reconciler.
+// DisabledNvApiActions : une couture NVAPI à échec propre pour le réconciliateur de démarrage.
 //
-// The boot reconciler (InProcessElevatedClient, running as LocalSystem) must be
-// STRUCTURALLY incapable of touching the GPU. ONE upstream guard exists (the reconcilable
-// catalog/mapper never emit a GPU op), so this seam is the second and LAST line: even if a
-// future change let a GPU op through, the boot service has no real NVAPI implementation
-// wired and the op fails clean rather than writing a volatile offset at boot. Wiring this
-// also keeps the SYSTEM boot service from loading the native NVAPI code path at all.
+// Le réconciliateur de démarrage (InProcessElevatedClient, qui tourne en LocalSystem) doit être
+// incapable par construction de toucher au GPU. Il existe une seule garde en amont (le catalogue
+// et le mappeur réconciliables n'émettent jamais d'op GPU) : cette couture est donc la deuxième et
+// dernière ligne. Même si un changement futur laissait passer une op GPU, le service de démarrage
+// n'a aucune vraie implémentation NVAPI branchée et l'op échoue proprement au lieu d'écrire un
+// décalage volatil au démarrage. La brancher évite aussi que le service de démarrage SYSTEM charge
+// le moindre chemin de code NVAPI natif.
 //
-// 11/09 — this header used to claim a THIRD guard, "OpAllowlist would gate one". It does
-// Not. Validate() receives only the OP: ValidateNvApiPowerLimit accepts any 0..100 percent
-// on a non-negative index, and the same allowlist serves the user-triggered helper, which
-// must be allowed to write. It bounds the SHAPE of an op, never the CONTEXT it runs in.
-// The refusal at boot therefore rests entirely on the wiring below — which is why it is now
-// pinned by a test (HostCompositionTests, the GPU twin of the firmware one), not by prose.
+// OpAllowlist n'est pas une troisième garde. Validate() ne reçoit que l'op :
+// ValidateNvApiPowerLimit accepte tout pourcentage 0..100 sur un index non négatif, et la même
+// allowlist sert le helper déclenché par l'utilisateur, qui doit avoir le droit d'écrire. Elle
+// borne la forme d'une op, jamais le contexte où elle tourne. Le refus au démarrage repose donc
+// entièrement sur le branchement ci-dessous : c'est pourquoi un test l'épingle
+// (HostCompositionTests, le jumeau GPU de celui du firmware), et pas de la prose.
 //
-// Rationale: GPU clock/power offsets are VOLATILE (wiped by a reboot) and a marginal
-// one could regress boot stability — the reconciler persists only VALIDATED, durable
-// settings (registry / power-plan / service), never GPU tuning. Every method returns a
-// clean Result.Fail and never throws (the contract for both NVAPI seams).
+// Raison : les décalages d'horloge / de puissance GPU sont volatils (effacés au redémarrage) et un
+// décalage limite pourrait dégrader la stabilité du démarrage ; le réconciliateur ne fait persister
+// que des réglages validés et durables (registre / plan d'alimentation / service), jamais de
+// réglage GPU. Chaque méthode rend un Result.Fail propre et ne lève jamais (le contrat des deux
+// coutures NVAPI).
 // -----------------------------------------------------------------------
 public sealed class DisabledNvApiActions : INvApiDrsActions, INvApiTuningActions
 {
@@ -32,11 +34,11 @@ public sealed class DisabledNvApiActions : INvApiDrsActions, INvApiTuningActions
 
     public Result SetGlobalSetting(uint settingId, uint value) => Fail();
 
-    // L2 : le reconciliateur de boot n'ecrit pas plus par jeu que globalement. Meme refus, meme
-    // motif -- un chemin qui refuse pour une raison differente serait un chemin de plus a auditer.
+    // Le reconciliateur de boot n'ecrit pas plus par jeu que globalement. Meme refus, meme
+    // motif : un chemin qui refuse pour une raison differente serait un chemin de plus a auditer.
     public Result SetSettingForApplication(string applicationPath, uint settingId, uint value) => Fail();
 
-    // F1 lot 3 : ni ecriture ni suppression par jeu au boot — meme refus, meme motif.
+    // Ni ecriture ni suppression par jeu au boot : meme refus, meme motif.
     public Result DeleteSettingForApplication(string applicationPath, uint settingId, DrsValueOrigin origineAttendue) => Fail();
 
     public Result<int> GetCoreClockOffsetMhz(int gpuIndex) => FailInt();

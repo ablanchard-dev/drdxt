@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 07/10/2026 (D8) : la date de la dernière installation de Windows, en secondes depuis 1970.
+// La date de la dernière installation de Windows, en secondes depuis 1970.
 public sealed class InstallationDeWindowsTests
 {
     [Fact]

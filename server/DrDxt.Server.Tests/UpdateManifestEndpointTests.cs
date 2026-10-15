@@ -8,7 +8,7 @@ using NSec.Cryptography;
 namespace DrDxt.Server.Tests;
 
 // -----------------------------------------------------------------------
-// LU — LE MANIFESTE DE MISE A JOUR, SERVI ET SIGNE.
+// LE MANIFESTE DE MISE A JOUR, SERVI ET SIGNE.
 //
 // Etat mesure le 05 et le 06/09/2026 : le moteur de mise a jour du client (AutoUpdater,
 // IUpdateFeed, UpdateVerifier) est ecrit et teste, et **il ne tourne pour personne**. Cote serveur,
@@ -18,7 +18,7 @@ namespace DrDxt.Server.Tests;
 // Ce fichier est le ROUGE de depart du lot LU : il decrit la route avant qu'elle existe.
 //
 // ══ LES QUATRE ETATS DE LA ROUTE, ET POURQUOI CHACUN ══
-//   • canal inconnu            -> 404. La liste des canaux est fermee (App, Profiles).
+//   • canal inconnu            -> 404. La liste des canaux est fermee (App).
 //   • canal sans version       -> 204. Le client lit « joignable, rien a offrir » (Ok(null)) et
 //                                 reste sur sa version. C'est l'etat REEL aujourd'hui : aucune
 //                                 version n'est publiee. Servir un 404 ferait croire a une panne.
@@ -72,7 +72,7 @@ public sealed class UpdateManifestEndpointTests : IClassFixture<WebApplicationFa
         var response = await Client().GetAsync("/updates/firmware/manifest");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound,
-            "la liste des canaux est fermee : App et Profiles, rien d'autre");
+            "la liste des canaux est fermee : App, rien d'autre");
     }
 
     [Fact]

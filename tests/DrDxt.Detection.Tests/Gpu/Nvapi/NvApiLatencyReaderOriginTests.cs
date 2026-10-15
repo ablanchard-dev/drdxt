@@ -5,10 +5,10 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Gpu.Nvapi;
 
 /// <summary>
-/// The reader returned a bare number and threw away the two fields the driver fills on every read.
-/// These pin that a caller can now ask where the frame cap came from — the difference between
-/// "you set this" and "NVIDIA ships this", which is the whole question on a machine carrying
-/// 10218 driver-shipped application profiles.
+/// Le lecteur rendait un simple nombre et jetait les deux champs que le pilote remplit à chaque lecture.
+/// Ces tests figent qu'un appelant peut demander d'où vient le plafond d'images : la différence
+/// entre « vous l'avez posé » et « NVIDIA le livre », qui est toute la question sur une machine
+/// portant 10218 profils d'application livrés par le pilote.
 /// </summary>
 public class NvApiLatencyReaderOriginTests
 {
@@ -25,8 +25,8 @@ public class NvApiLatencyReaderOriginTests
             IsAvailable = true,
             DrsReadSuccess = true,
             DrsSettingValue = 141,
-            DrsSettingLocation = 0,       // current profile
-            DrsIsCurrentPredefined = 0,   // not shipped by NVIDIA
+            DrsSettingLocation = 0,       // profil courant
+            DrsIsCurrentPredefined = 0,   // pas livré par NVIDIA
         };
 
         var r = Reader(native).GetFrameRateLimitWithOrigin();
@@ -46,7 +46,7 @@ public class NvApiLatencyReaderOriginTests
             DrsReadSuccess = true,
             DrsSettingValue = 141,
             DrsSettingLocation = 0,
-            DrsIsCurrentPredefined = 1,   // shipped with the driver
+            DrsIsCurrentPredefined = 1,   // livré avec le pilote
         };
 
         var r = Reader(native).GetFrameRateLimitWithOrigin();
@@ -125,7 +125,7 @@ public class NvApiLatencyReaderOriginTests
     [InlineData(false, ErrorCodes.TweakSdkUnavailable)]
     public void No_profile_and_unreadable_profile_are_two_different_answers(bool pasDeProfil, string code)
     {
-        // 14/09/2026 : seul « pas de profil » autorise l'appelant a se rabattre sur le global.
+        // Seul « pas de profil » autorise l'appelant a se rabattre sur le global.
         var native = new FakeNvApiNative { IsAvailable = true, AppDrsReadSuccess = false, AppDrsPasDeProfil = pasDeProfil };
 
         var r = Reader(native).GetDrsForApplication(0x1057EB71, GamePath);

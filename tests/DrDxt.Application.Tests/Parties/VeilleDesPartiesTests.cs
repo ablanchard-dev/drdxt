@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 29/09/2026 (A3, 2/3) : la veille. Pendant une partie, une capture courte à intervalle ; quand le jeu se ferme,
+// La veille. Pendant une partie, une capture courte à intervalle ; quand le jeu se ferme,
 // la partie est résumée et enregistrée. Hors partie, rien n'est mesuré.
 public sealed class VeilleDesPartiesTests
 {
@@ -35,7 +35,7 @@ public sealed class VeilleDesPartiesTests
         enregistrees[0].Goulot.Should().Be(BottleneckState.CpuBoundOrAppBound);
     }
 
-    // 07/10/2026 (vu en vrai) : le jeu fermé puis relancé entre deux regards garde son nom mais pas son processus ; ce sont
+    // Le jeu fermé puis relancé entre deux regards garde son nom mais pas son processus ; ce sont
     // deux parties.
     [Fact]
     public async Task Un_jeu_relance_entre_deux_regards_fait_deux_parties()
@@ -45,7 +45,7 @@ public sealed class VeilleDesPartiesTests
         using var fin = new CancellationTokenSource();
 
         // La suite épuisée arrête la veille : sans ce garde, un code qui ne ferait qu'une partie tournerait sans fin
-        // (une mutation l'a fait tourner 50 minutes sur un cœur le 07/10, pendant une vraie partie).
+        // (mesuré par mutation : 50 minutes sur un cœur, pendant une vraie partie).
         var veille = new VeilleDesParties(
             jeu: () => { if (etats.Count == 0) fin.Cancel(); return etats.Count > 0 ? etats.Dequeue() : null; },
             capturer: (_, _, _) => Task.FromResult<BenchmarkResult?>(Capture(120)),
@@ -59,7 +59,7 @@ public sealed class VeilleDesPartiesTests
         enregistrees.Should().OnlyContain(p => p.Captures == 2);
     }
 
-    // 04/10/2026 (plan 1.1) : la fréquence des cœurs rapides et les watts du paquet, relevés à chaque capture.
+    // La fréquence des cœurs rapides et les watts du paquet, relevés à chaque capture.
     [Fact]
     public async Task Chaque_capture_porte_la_frequence_et_les_watts_du_processeur()
     {
@@ -83,7 +83,7 @@ public sealed class VeilleDesPartiesTests
         enregistrees[0].CelsiusMax.Should().Be(96, "la chaleur se juge à son pic ; un relevé absent n'est pas un zéro");
     }
 
-    // 04/10/2026 : la mémoire vidéo occupée à chaque capture ; la partie garde son pic (une saturation fait des
+    // La mémoire vidéo occupée à chaque capture ; la partie garde son pic (une saturation fait des
     // à-coups même si elle ne dure pas).
     [Fact]
     public async Task La_partie_garde_le_pic_de_memoire_video()
@@ -106,7 +106,7 @@ public sealed class VeilleDesPartiesTests
         enregistrees[0].VramPourcentMax.Should().Be(97);
     }
 
-    // 04/10/2026 : les programmes qui chargent le processeur à côté du jeu. Un seul relevé au-dessus du seuil est un
+    // Les programmes qui chargent le processeur à côté du jeu. Un seul relevé au-dessus du seuil est un
     // pic (une mise à jour qui passe) ; au moins deux, c'est un voisin de la partie, gardé avec son pic.
     [Fact]
     public async Task La_partie_garde_les_voisins_lourds_vus_au_moins_deux_fois()
@@ -135,6 +135,81 @@ public sealed class VeilleDesPartiesTests
             .Which.Should().Be(new VoisinEnPartie("chrome", 55, 2));
     }
 
+    // La température du processeur se lit chaque seconde pendant la fenêtre ; la partie garde ce pic, pas la
+    // lecture d'après coup (relevé : « 100 °C » n'était qu'une des six lectures d'une partie de 17 minutes).
+    [Fact]
+    public async Task La_chaleur_du_processeur_est_le_pic_lu_pendant_la_fenetre()
+    {
+        var etats = new Queue<(string, int)?>([("cod.exe", 42), ("cod.exe", 42), ("cod.exe", 42), null]);
+        var enregistrees = new List<PartieRelevee>();
+        var actives = new Queue<bool?>([true, false, null]);
+        using var fin = new CancellationTokenSource();
+
+        var veille = new VeilleDesParties(
+            jeu: () => etats.Count > 0 ? etats.Dequeue() : null,
+            capturer: (_, _, _) => Task.FromResult<BenchmarkResult?>(Capture(120)),
+            classer: _ => BottleneckState.CpuBoundOrAppBound,
+            enregistrer: p => { enregistrees.Add(p); fin.Cancel(); },
+            patienter: (_, _) => Task.CompletedTask,
+            processeur: () => (4900.0, 110.0, 80.0),
+            temperatureProcesseur: () => 97.0,
+            entrees: () => actives.Count > 0 ? actives.Dequeue() : null);
+
+        await veille.VeillerAsync(fin.Token);
+
+        enregistrees[0].CelsiusMax.Should().Be(97, "le pic de la fenêtre, pas la lecture d'après la capture");
+        // Sans images (Capture() n'en porte pas), les minutes jouées ne s'affirment pas.
+        enregistrees[0].MinutesJouees.Should().BeNull();
+    }
+
+    // Chaque seconde porte aussi le cœur 0 et les raisons de freiner ; la partie les garde ensemble.
+    [Fact]
+    public async Task Le_freinage_du_processeur_se_releve_seconde_par_seconde()
+    {
+        var etats = new Queue<(string, int)?>([("cod.exe", 42), ("cod.exe", 42), ("cod.exe", 42), null]);
+        var enregistrees = new List<PartieRelevee>();
+        using var fin = new CancellationTokenSource();
+
+        var veille = new VeilleDesParties(
+            jeu: () => etats.Count > 0 ? etats.Dequeue() : null,
+            capturer: async (_, _, ct) => { await Task.Delay(1500, ct); return Capture(120); },
+            classer: _ => BottleneckState.CpuBoundOrAppBound,
+            enregistrer: p => { enregistrees.Add(p); fin.Cancel(); },
+            patienter: (_, _) => Task.CompletedTask,
+            etatProcesseur: () => new EtatCpu(98, 77, false, false, false, true));
+
+        await veille.VeillerAsync(fin.Token);
+
+        var f = enregistrees[0].Freinage!;
+        f.Secondes.Should().BeGreaterThan(0);
+        f.LimiteCourant.Should().Be(f.Secondes);
+        f.Chaleur.Should().Be(0);
+        f.ChaudMoyenC.Should().Be(98);
+        f.Coeur0MoyenC.Should().Be(77);
+    }
+
+    // Aucune seconde du processeur lue pendant une partie se dit, une seule fois par partie.
+    [Fact]
+    public async Task Un_processeur_illisible_en_partie_se_dit_une_fois()
+    {
+        var etats = new Queue<(string, int)?>([("cod.exe", 42), ("cod.exe", 42), ("cod.exe", 42), null]);
+        var signalees = new List<string>();
+        using var fin = new CancellationTokenSource();
+
+        var veille = new VeilleDesParties(
+            jeu: () => etats.Count > 0 ? etats.Dequeue() : null,
+            capturer: (_, _, _) => Task.FromResult<BenchmarkResult?>(Capture(120)),
+            classer: _ => BottleneckState.CpuBoundOrAppBound,
+            enregistrer: _ => fin.Cancel(),
+            patienter: (_, _) => Task.CompletedTask,
+            signalerEchec: signalees.Add,
+            etatProcesseur: () => null);
+
+        await veille.VeillerAsync(fin.Token);
+
+        signalees.Should().ContainSingle().Which.Should().Contain("état du processeur non lu");
+    }
+
     [Fact]
     public async Task Hors_partie_rien_n_est_mesure()
     {
@@ -157,7 +232,7 @@ public sealed class VeilleDesPartiesTests
     [Fact]
     public async Task Une_capture_ratee_ne_compte_pas_dans_la_partie()
     {
-        // Une ratée puis deux bonnes : une partie demande deux captures (revue F-5, 06/10). Avec une seule bonne, rien
+        // Une ratée puis deux bonnes : une partie demande deux captures. Avec une seule bonne, rien
         // n'était enregistré, la fin n'arrivait jamais et ce test tournait sans fin.
         var etats = new Queue<(string, int)?>([("cod.exe", 7), ("cod.exe", 7), ("cod.exe", 7), null]);
         var enregistrees = new List<PartieRelevee>();
@@ -175,7 +250,7 @@ public sealed class VeilleDesPartiesTests
 
         enregistrees.Single().Captures.Should().Be(2, "la capture ratée ne compte pas");
     }
-    // 07/10/2026 (revue F-10) : une capture ratée (service de mesure refusé, jeu introuvable) ne compte pas, mais
+    // Une capture ratée (service de mesure refusé, jeu introuvable) ne compte pas, mais
     // elle se dit : sa raison part au signalement, et un résultat sans image aussi.
     [Fact]
     public async Task Une_capture_ratee_se_signale_avec_sa_raison()
@@ -198,7 +273,7 @@ public sealed class VeilleDesPartiesTests
         signales.Should().Equal("cod.exe : service refusé", "cod.exe : aucune image lue");
     }
 
-    // 07/10/2026 (A5) : la température de la carte à chaque capture ; la partie garde son pic. Un relevé non lu ou qui
+    // La température de la carte à chaque capture ; la partie garde son pic. Un relevé non lu ou qui
     // lève n'est pas un zéro et n'annule pas la capture.
     [Fact]
     public async Task La_partie_garde_le_pic_de_temperature_de_la_carte()

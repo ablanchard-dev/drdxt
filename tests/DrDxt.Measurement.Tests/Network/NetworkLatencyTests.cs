@@ -5,10 +5,10 @@ using FluentAssertions;
 namespace DrDxt.Measurement.Tests.Network;
 
 // -----------------------------------------------------------------------
-// NS-9 instrument. The tests that matter here are the HONESTY ones: this class of bug
-// (a plausible number where there is no measurement) is the expensive one — a "0 ms, 0%
-// loss" report from a connection that never answered would read as a perfect link.
-// Pure + fake probe: no network access, deterministic.
+// Instrument réseau. Les tests qui comptent ici sont ceux d'honnêteté : cette classe de défaut
+// (un nombre plausible là où il n'y a pas de mesure) est la plus coûteuse ; un rapport « 0 ms, 0 %
+// de perte » d'une connexion qui n'a jamais répondu se lirait comme un lien parfait.
+// Pur + fausse sonde : aucun accès réseau, déterministe.
 // -----------------------------------------------------------------------
 public sealed class NetworkLatencyStatisticsTests
 {
@@ -24,7 +24,7 @@ public sealed class NetworkLatencyStatisticsTests
         r.Received.Should().Be(0);
         r.LossPercent.Should().Be(100);
         r.HasLatency.Should().BeFalse();
-        // The whole point: no fabricated 0 ms on a dead link.
+        // Tout l'enjeu : aucun 0 ms fabriqué sur un lien mort.
         r.AvgMs.Should().BeNull();
         r.MinMs.Should().BeNull();
         r.MaxMs.Should().BeNull();
@@ -46,7 +46,7 @@ public sealed class NetworkLatencyStatisticsTests
     [Fact]
     public void A_lost_probe_is_not_counted_as_a_huge_latency_sample()
     {
-        // A miss must never leak into min/max/avg as a timeout-sized reading.
+        // Un raté ne doit jamais fuir dans min/max/moy comme une lecture de la taille du délai.
         var r = NetworkLatencyStatistics.Summarize("host", new[] { Reply(18), Miss(), Reply(22) });
 
         r.MaxMs.Should().Be(22, "the only samples are the replies");
@@ -57,7 +57,7 @@ public sealed class NetworkLatencyStatisticsTests
     [Fact]
     public void Jitter_is_the_mean_absolute_delta_between_consecutive_replies()
     {
-        // 20 -> 26 -> 24 : deltas 6 and 2 -> mean 4.
+        // 20 → 26 → 24 : deltas 6 et 2 → moyenne 4.
         var r = NetworkLatencyStatistics.Summarize("host", new[] { Reply(20), Reply(26), Reply(24) });
 
         r.JitterMs.Should().BeApproximately(4, 1e-9);
@@ -66,8 +66,8 @@ public sealed class NetworkLatencyStatisticsTests
     [Fact]
     public void Jitter_skips_pairs_broken_by_a_lost_probe_instead_of_inventing_a_delta()
     {
-        // 20, MISS, 60, 62 : the only intact consecutive pair is 60->62 -> jitter 2.
-        // Counting the 20->60 gap across a hole would report a 40 ms swing nobody measured.
+        // 20, raté, 60, 62 : la seule paire consécutive intacte est 60 → 62 → gigue 2.
+        // Compter l'écart 20 → 60 par-dessus un trou annoncerait un saut de 40 ms que personne n'a mesuré.
         var r = NetworkLatencyStatistics.Summarize("host", new[] { Reply(20), Miss(), Reply(60), Reply(62) });
 
         r.JitterMs.Should().BeApproximately(2, 1e-9);
@@ -108,7 +108,7 @@ public sealed class NetworkLatencyStatisticsTests
         var r = NetworkLatencyStatistics.Summarize("1.1.1.1", new[] { Reply(12) });
 
         r.Target.Should().Be("1.1.1.1");
-        // §22.3: the numbers must never travel without "ICMP to one host, not the game server".
+        // Les nombres ne doivent jamais voyager sans « ICMP vers un hôte, pas le serveur du jeu ».
         r.CaveatKey.Should().Be("measure.network.icmp_caveat");
     }
 }
@@ -200,7 +200,7 @@ public sealed class NetworkLatencyMeterTests
 
         var r = await meter.MeasureAsync("host", 5, NoWait, OneSecond, cts.Token, warmupProbes: 0);
 
-        // Reporting "100% packet loss" for a window we never sent would be a fabricated verdict.
+        // Annoncer « 100 % de perte » pour une fenêtre jamais envoyée serait un verdict fabriqué.
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.MeasureNoSamples);
         probe.Calls.Should().Be(0);

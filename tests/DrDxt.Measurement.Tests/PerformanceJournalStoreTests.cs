@@ -55,7 +55,7 @@ public class PerformanceJournalStoreTests
         relu[0].KeptFraction.Should().Be(1.0);
     }
 
-    // 26/09/2026 : une mesure relue sans « MarginOfError » vaut 0. Elle passait pour la plus precise, devenait
+    // Une mesure relue sans « MarginOfError » vaut 0. Elle passait pour la plus precise, devenait
     // l'etalon, et la resolution de la derive retrecissait d'autant.
     [Theory]
     [InlineData(0.0)]
@@ -70,7 +70,7 @@ public class PerformanceJournalStoreTests
         magasin.Lire().Should().BeEmpty();
     }
 
-    // 26/09/2026 : la marge vaut +infini sous trois passes (voir PerformanceSample). Le JSON par defaut
+    // La marge vaut +infini sous trois passes (voir PerformanceSample). Le JSON par defaut
     // refuse d'ecrire l'infini : la mesure doit se journaliser, ou echouer en le disant, jamais lever.
     [Fact]
     public void Une_mesure_a_marge_infinie_ne_fait_pas_lever_le_journal()
@@ -114,7 +114,7 @@ public class PerformanceJournalStoreTests
     [Fact]
     public void Une_LECTURE_ratee_n_ecrase_pas_la_reference_de_derive()
     {
-        // L2 : l'echec de lecture donnait un journal vide, puis Ajouter ecrasait le fichier —
+        // L'echec de lecture donnait un journal vide, puis Ajouter ecrasait le fichier —
         // la plus ancienne mesure, la reference de toute derive, disparaissait en silence.
         var f = new FichierFake { Contenu = "[reference]", EchecLecture = true };
 

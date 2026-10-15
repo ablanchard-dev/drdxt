@@ -7,12 +7,12 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// 11/09/2026 — la reference de derive (build, pilote) ecrite au commit, et son echec.
+// La reference de derive (build, pilote) ecrite au commit, et son echec.
 //
-// Constat du lot precedent : l'App (integrite moyenne) ecrivait ce fichier dans %ProgramData%\DrDxt, dont
-// le DACL ne donne aux utilisateurs que la lecture. Le code : JsonReconcilerStateStore.SaveAsync rend Fail
-// (IoFailure) — et ApplyReferenceSeedingStore JETAIT ce resultat (`await _sidecar.SaveAsync(...)` sans le
-// lire) puis avalait toute exception. Le commit rendait Ok ; rien ne disait que la reference manquait.
+// L'App (integrite moyenne) ecrit ce fichier dans %ProgramData%\DrDxt, dont le DACL ne donne aux
+// utilisateurs que la lecture : JsonReconcilerStateStore.SaveAsync rend alors Fail (IoFailure). Si
+// ApplyReferenceSeedingStore jetait ce resultat, le commit rendrait Ok et rien ne dirait que la
+// reference manque.
 //
 // La preuve ici : un dossier dont l'ecriture est refusee a l'utilisateur courant (ACE de refus, qui tient
 // meme sous un jeton administrateur), la meme situation d'acces refuse que l'App face a la racine admin.

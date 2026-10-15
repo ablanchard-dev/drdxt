@@ -7,20 +7,20 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// AppliedTweakManifestMapper — turns the KEPT outcomes of a validated apply into the
-// reconciler's AppliedTweak desired-state entries.
+// AppliedTweakManifestMapper : transforme les issues gardées d'une application validée en
+// entrées AppliedTweak d'état voulu du réconciliateur.
 //
-// Two impedance mismatches it bridges (both real, both reviewed as an explicit table):
-//   * id NAMESPACE: the Application catalog keys tweaks by ids like "fixit.power_plan"
-//     / "latency.reflex"; the reconciler (policy + descriptor catalog) keys by
-//     "fixit.sanePowerPlan" / "latency.reflex.lowLatencyMode". The mapper translates.
-//   * DESIRED value: the ApplyReport snapshot carries only the original value (the
-//     inverse op); the canonical DESIRED token the reconciler re-applies is known per
-//     tweak and lives in this closed table.
+// Deux écarts qu'il comble (tous deux réels, tous deux en table explicite) :
+//   * l'espace de noms des identifiants : le catalogue Application indexe les leviers par
+//     « fixit.power_plan » / « latency.reflex » ; le réconciliateur (politique + catalogue de
+//     descripteurs) par « fixit.sanePowerPlan » / « latency.reflex.lowLatencyMode ». Le mappeur traduit.
+//   * la valeur voulue : l'instantané d'ApplyReport ne porte que la valeur d'origine (l'op
+//     inverse) ; le jeton voulu canonique que le réconciliateur réapplique est connu par
+//     levier et vit dans cette table fermée.
 //
-// Only KEPT (Applied && !AutoReverted) outcomes that map to a reconcilable surface are
-// emitted. Auto-reverted, unmapped (e.g. GPU-tuning), and non-reconcilable tweaks are
-// excluded — the manifest holds only validated, reconcilable tweaks.
+// Seules les issues gardées (Applied && !AutoReverted) qui mènent à une surface réconciliable
+// sont émises. Les leviers annulés, non mappés (réglage GPU par exemple) et non réconciliables
+// sont exclus : le manifeste ne porte que des leviers validés et réconciliables.
 // -----------------------------------------------------------------------
 public sealed class AppliedTweakManifestMapperTests
 {
@@ -85,10 +85,10 @@ public sealed class AppliedTweakManifestMapperTests
     [Fact]
     public void Excludes_hkcuTweaks_from_localSystem_reconcile()
     {
-        // The boot reconciler runs as LocalSystem (HKLM-only). The HKCU NS-1 tweaks — Game DVR
-        // (HKCU DWORD), Game Mode (composite HKCU), VRR/flip (merged HKCU REG_SZ) — are
-        // intentionally excluded: a LocalSystem HKCU write hits SYSTEM's hive. Only HAGS (HKLM)
-        // is committed to the manifest. They persist natively + the App re-applies them.
+        // Le réconciliateur du démarrage tourne en LocalSystem (HKLM seulement). Les leviers HKCU, Game DVR
+        // (DWORD HKCU), Mode Jeu (composite HKCU), VRR/flip (REG_SZ HKCU fusionnée), sont exclus à
+        // dessein : une écriture HKCU en LocalSystem touche la ruche de SYSTEM. Seul HAGS (HKLM)
+        // est commité au manifeste. Ils persistent nativement et l'App les réapplique.
         var tweaks = new AppliedTweakManifestMapper().ToDesiredTweaks(Report(
             Kept("latency.hagsOn"),
             Kept("latency.gameDvrBackgroundOff"),
@@ -105,7 +105,7 @@ public sealed class AppliedTweakManifestMapperTests
 
         var tweaks = mapper.ToDesiredTweaks(Report(
             Kept("fixit.power_plan"),
-            AutoReverted("latency.reflex"))); // measured regression → reverted → not committed
+            AutoReverted("latency.reflex"))); // régression mesurée → annulé → non commité
 
         tweaks.Select(t => t.TweakId).Should().BeEquivalentTo(new[] { "fixit.sanePowerPlan" });
     }
@@ -117,7 +117,7 @@ public sealed class AppliedTweakManifestMapperTests
 
         var tweaks = mapper.ToDesiredTweaks(Report(
             Kept("fixit.power_plan"),
-            Kept("gpu.undervolt"))); // not a reconcilable OS-side surface → not in the table
+            Kept("gpu.undervolt"))); // pas une surface OS réconciliable → pas dans la table
 
         tweaks.Select(t => t.TweakId).Should().BeEquivalentTo(new[] { "fixit.sanePowerPlan" });
     }
@@ -134,8 +134,8 @@ public sealed class AppliedTweakManifestMapperTests
             "without a snapshot we cannot record an honest original value → exclude");
     }
 
-    // Every desired token the mapper emits must be ACCEPTED by the production
-    // reconcilability policy (so a real CommitAsync never rejects what the mapper built).
+    // Chaque jeton voulu que le mappeur émet doit être accepté par la politique de
+    // réconciliabilité de production (pour qu'un vrai CommitAsync ne rejette jamais ce que le mappeur a construit).
     [Fact]
     public void EveryMappedId_isReconcilableUnderTheProductionPolicy()
     {

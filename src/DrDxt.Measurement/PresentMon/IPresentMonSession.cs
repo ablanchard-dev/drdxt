@@ -11,7 +11,7 @@ public interface IPresentMonSession
 {
     /// <summary>
     /// Vérifie si le service PresentMon est disponible sur cette machine.
-    /// Ne lève jamais d'exception — retourne Ok(false) si absent, Ok(true) si présent,
+    /// Ne lève jamais d'exception : retourne Ok(false) si absent, Ok(true) si présent,
     /// Fail(PmonUnavailable) uniquement si la vérification elle-même plante.
     /// </summary>
     Result<bool> IsServiceAvailable();

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Hardware;
 
-/// <summary>06/10/2026 (D1) : ce que le lecteur rend au sélecteur, famille comprise, à partir des champs de l'événement.</summary>
+/// <summary>Ce que le lecteur rend au sélecteur, famille comprise, à partir des champs de l'événement.</summary>
 public class ArretsClassesTests
 {
     private static string Xml(int code, int veille, long bouton) =>

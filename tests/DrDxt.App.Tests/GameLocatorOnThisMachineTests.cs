@@ -7,7 +7,7 @@ namespace DrDxt.App.Tests;
 [Collection(CollectionFenetres.Nom)]
 public sealed class GameLocatorOnThisMachineTests
 {
-    // 14/09/2026 — mesure sur le poste de dev, aucun jeu lance : la regle « fenetre visible de la
+    // Mesure sur le poste de dev, aucun jeu lance : la regle « fenetre visible de la
     // taille de l'ecran » retenait TextInputHost, une CoreWindow masquee par DWM. Le produit aurait
     // mesure l'hote du clavier tactile a la place du jeu. Le test appelle le vrai locator.
     [Fact]
@@ -20,7 +20,7 @@ public sealed class GameLocatorOnThisMachineTests
         nom.Should().NotBe("TextInputHost");
     }
 
-    // 26/09/2026 : mesuré sur le poste en usage normal : le localisateur désignait explorer, par intermittence
+    // Mesuré sur le poste en usage normal : le localisateur désignait explorer, par intermittence
     // (3 fois sur 3 en sondant 10 s, fenêtre XamlExplorerHostIslandWindow de la taille de l'écran principal).
     // Limite dite : ce test ne rougit que si une fenêtre passagère du shell est affichée pendant qu'il sonde.
     [Fact]

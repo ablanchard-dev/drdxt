@@ -3,18 +3,16 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// Shared base for the M2 Phase E GPU-tuning tweaks (E2 undervolt, E3 power-limit,
-// E4 fan-curve).
+// Base commune des leviers de réglage GPU (sous-tension, limite de puissance, courbe de ventilateur).
 //
-// Like LatencyTweakBase, every GPU tweak follows the same revert contract: the
-// snapshot's OriginalValueJson is the serialized INVERSE typed PrivilegedOp
-// carrying the real captured original; reverting = deserialize it and send it back
-// through IElevatedClient. Under Option A (master §11) the original offset / power
-// limit / fan curve IS expressible as a typed allowlisted op, so there is NO
-// special V/F-curve revert path — the generic snapshot-replay is enough.
+// Comme LatencyTweakBase, chaque levier GPU suit le même contrat de retour : l'OriginalValueJson
+// du snapshot est la PrivilegedOp typée inverse, sérialisée, qui porte la vraie origine
+// relevée ; annuler = la désérialiser et la renvoyer par IElevatedClient. Le décalage, la
+// limite de puissance ou la courbe d'origine s'expriment par une op typée sur liste blanche :
+// il n'y a pas de chemin spécial de retour de courbe V/F, le rejeu générique du snapshot suffit.
 //
-// A malformed / unknown-typed snapshot must never throw and never run an arbitrary
-// op → SAFETY.SNAPSHOT_INVALID (fail clean), mirroring ISafetyManager.RevertAsync.
+// Un snapshot malformé ou de type inconnu ne doit jamais lever ni lancer une op arbitraire
+// → SAFETY.SNAPSHOT_INVALID (échec propre), comme ISafetyManager.RevertAsync.
 // -----------------------------------------------------------------------
 public abstract class GpuTweakBase : ITweak
 {
@@ -27,9 +25,9 @@ public abstract class GpuTweakBase : ITweak
     public bool RequiresElevation => true;
     public bool RequiresRestorePoint => true;
 
-    /// <summary>The honest summary key surfaced to the UI. Never a "+FPS" claim:
-    /// GPU tuning on an already-cool desktop is ~0 on peak FPS — the win is
-    /// efficiency / cooler / steadier 1% lows (master §5).</summary>
+    /// <summary>La clé de résumé honnête affichée par l'UI. Jamais une promesse de « +FPS » :
+    /// le réglage GPU sur un PC de bureau déjà frais vaut ~0 en FPS de pointe ; le gain est
+    /// l'efficacité, la fraîcheur, des 1 % lows plus réguliers.</summary>
     public abstract string SummaryKey { get; }
 
     public abstract bool AppliesTo(HardwareInventory hw, SettingsState state);
@@ -37,22 +35,21 @@ public abstract class GpuTweakBase : ITweak
     public abstract Task<Result<TweakSnapshot>> ApplyAsync();
 
     /// <summary>
-    /// Arms the elevated helper's dead-man's-switch for a HELD GPU offset / power
-    /// limit: registers a lease whose recorded auto-revert is the same typed inverse
-    /// op this tweak already produces for <see cref="RevertAsync"/>, and — on success
-    /// — returns a STARTED <see cref="HeartbeatSender"/> the caller keeps alive for as
-    /// long as the offset is held.
+    /// Arme l'homme mort du helper élevé pour un décalage ou une limite de puissance GPU
+    /// tenus : inscrit un bail dont le retour automatique est la même op inverse typée que
+    /// ce levier produit déjà pour <see cref="RevertAsync"/> et, en cas de succès, rend un
+    /// <see cref="HeartbeatSender"/> démarré que l'appelant garde en vie tant que le décalage
+    /// est tenu.
     ///
-    /// If the controller dies (or disposes the heartbeat) the lease expires and the
-    /// helper reverts the held tweak automatically — so a held privileged offset is
-    /// never left applied with no safety net. Everything goes through IElevatedClient
-    /// (the same signed IPC pipeline + caller identity); the inverse is carried as
-    /// codec JSON so the helper re-binds + re-validates it leaf-exact at expiry.
+    /// Si le contrôleur meurt (ou libère le battement), le bail expire et le helper annule
+    /// le levier tout seul : un décalage privilégié tenu ne reste jamais posé sans filet. Tout
+    /// passe par IElevatedClient (même pipeline IPC signé, même identité d'appelant) ; l'inverse
+    /// voyage en JSON du codec, pour que le helper le relie et le revalide à la feuille près à l'échéance.
     ///
-    /// If the lease cannot be established (no helper, refused), this fails clean and
-    /// returns NO heartbeat (never throws).
+    /// Si le bail ne peut pas être ouvert (pas de helper, refus), ceci échoue proprement et
+    /// ne rend aucun battement (ne lève jamais).
     ///
-    /// 08/10/2026 (GPU-OC) : armé par <see cref="GpuUndervoltTweak.ApplyAvecBailAsync"/>, le chemin du mode Expert,
+    /// Armé par <see cref="GpuUndervoltTweak.ApplyAvecBailAsync"/>, le chemin du mode Expert,
     /// avant l'écriture. L'autopilote ne l'arme pas : il n'écrit ni fréquence ni tension.
     /// </summary>
     protected async Task<Result<HeartbeatSender>> EstablishAutoRevertLeaseAsync(
@@ -84,8 +81,8 @@ public abstract class GpuTweakBase : ITweak
         return Result<HeartbeatSender>.Ok(heartbeat);
     }
 
-    /// <summary>Reverts by replaying the serialized inverse op from the snapshot.
-    /// Defensive: malformed snapshot → SAFETY.SNAPSHOT_INVALID, never throws.</summary>
+    /// <summary>Annule en rejouant l'op inverse sérialisée du snapshot.
+    /// Prudent : snapshot malformé → SAFETY.SNAPSHOT_INVALID, ne lève jamais.</summary>
     public virtual async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))

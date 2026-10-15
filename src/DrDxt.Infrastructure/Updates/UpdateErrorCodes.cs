@@ -1,54 +1,53 @@
 namespace DrDxt.Infrastructure.Updates;
 
 // -----------------------------------------------------------------------
-// M5 / T12-T13 — update error codes. Module-local, namespaced so literals are
-// never scattered (master plan §10 convention, mirroring LicensingErrorCodes /
-// ReconcilerErrorCodes). These are CODES (machine-readable), never UI text.
+// Codes d'erreur de mise à jour. Locaux au module, dans un espace de noms pour que les littéraux
+// ne soient jamais éparpillés (même convention que LicensingErrorCodes / ReconcilerErrorCodes). Ce
+// sont des codes (lisibles par machine), jamais du texte d'interface.
 //
-// The cardinal rule for the whole update path: a package update is verified
-// (signature then hash) before anything is executed or any file is replaced.
-// Jamais fail-open — every uncertainty keeps the CURRENT installed version.
+// La règle cardinale de tout le chemin de mise à jour : un paquet est vérifié (signature puis
+// empreinte) avant que quoi que ce soit soit exécuté ou qu'un fichier soit remplacé.
+// Jamais fail-open : toute incertitude garde la version installée actuelle.
 // -----------------------------------------------------------------------
 public static class UpdateErrorCodes
 {
-    // T12 — The Ed25519 signature over the canonical update MANIFEST did not verify:
-    // tampered signature, tampered manifest fields (url/sha256/version), absent/empty
-    // signature, signed by the wrong key, or a corrupt embedded update public key.
-    // Fail-clean: the download is REFUSED — we do not even fetch the payload, because
-    // an untrusted manifest's url/sha256 are not worth acting on. Never "ok by default".
+    // La signature Ed25519 sur le manifeste canonique ne se vérifie pas : signature altérée, champs
+    // du manifeste altérés (url/sha256/version), signature absente ou vide, signée par la mauvaise
+    // clé, ou clé publique de mise à jour embarquée corrompue. Échec propre : le téléchargement est
+    // refusé ; on ne récupère même pas la charge, car l'url / le sha256 d'un manifeste non fiable ne
+    // valent pas qu'on agisse dessus. Jamais « ok par défaut ».
     public const string SignatureInvalid = "UPDATE_SIG_INVALID";
 
-    // T12 — The SHA-256 of the DOWNLOADED payload does not equal the sha256 carried in
-    // the (already signature-verified) manifest. The payload is never executed / staged
-    // / extracted. We only ever trust a hash that came from a SIGNED manifest — so this
-    // check runs strictly after SignatureInvalid passed.
+    // Le SHA-256 de la charge téléchargée n'égale pas le sha256 porté par le manifeste (déjà vérifié
+    // par signature). La charge n'est jamais exécutée / préparée / extraite. On ne se fie qu'à une
+    // empreinte venue d'un manifeste signé : ce contrôle tourne donc strictement après le passage de SignatureInvalid.
     public const string HashMismatch = "UPDATE_HASH_MISMATCH";
 
-    // T12 — The manifest's version is LOWER than the installed version, outside a beta
-    // channel. Refused: an update must never silently roll the user back (a downgrade is
-    // the classic vector to re-introduce a fixed vulnerability). Beta channels may opt in.
+    // La version du manifeste est inférieure à la version installée, hors canal bêta. Refusé : une
+    // mise à jour ne doit jamais ramener l'utilisateur en arrière en silence (une rétrogradation est
+    // le vecteur classique pour réintroduire une faille corrigée). Les canaux bêta peuvent l'autoriser.
     public const string Downgrade = "UPDATE_DOWNGRADE";
 
-    // T13 — The update feed could not be reached (no network / transport failure). This
-    // is NON-BLOCKING: the app keeps running on the CURRENT version. Deliberately distinct
-    // from SignatureInvalid — an unreachable feed never downgrades trust, it just defers.
+    // Le flux de mise à jour est injoignable (pas de réseau / panne de transport). Non bloquant :
+    // l'app continue sur la version actuelle. Distinct exprès de SignatureInvalid : un flux injoignable
+    // ne dégrade jamais la confiance, il ne fait que reporter.
     public const string Offline = "UPDATE_OFFLINE";
 
-    // T13 — The elevated binary-replacement seam is not wired live yet (deferred, like the
-    // M2 fail-clean stubs). The app/profiles channel never needs it; the app channel
-    // surfaces this instead of silently doing nothing or writing without elevation. The
-    // staged payload was verified and is intact — only the privileged swap is deferred.
+    // La couture élevée de remplacement de binaires n'est pas encore branchée en réel (reportée, comme
+    // les autres coutures à échec propre). Le canal de l'app remonte ce code au lieu de ne rien faire
+    // en silence ou d'écrire sans élévation. La charge préparée a été vérifiée et est intacte : seul
+    // l'échange privilégié est reporté.
     public const string ReplacerUnavailable = "UPDATE_REPLACER_UNAVAILABLE";
 
-    // LU — Aucun serveur de mise a jour n'est configure (ou son url n'est pas une url https
+    // Aucun serveur de mise a jour n'est configure (ou son url n'est pas une url https
     // absolue). L'updater n'est pas monte : le produit reste sur sa version installee et ne tente
     // rien. Deliberement distinct d'Offline — « pas configure » se corrige en configurant, tandis
     // qu'« hors ligne » envoie chercher une panne de reseau qui n'existe pas. C'est l'etat reel du
     // produit tant qu'aucune url de deploiement n'existe.
     public const string NotConfigured = "UPDATE_NOT_CONFIGURED";
 
-    // T13 — A verified payload could not be staged/extracted on disk (IO failure, disk
-    // full, permission). The PREVIOUS version/pack is left intact (clean transaction —
-    // never a half-applied state). Fail-clean, never throws across the boundary.
+    // Une charge vérifiée n'a pas pu être préparée / extraite sur le disque (échec d'E/S, disque plein,
+    // permission). La version précédente reste intacte (transaction propre, jamais un état à moitié
+    // appliqué). Échec propre, jamais d'exception à travers la frontière.
     public const string StageFailed = "UPDATE_STAGE_FAILED";
 }

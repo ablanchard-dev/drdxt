@@ -126,10 +126,8 @@ public sealed class GameOptimizationSessionTests
     [Fact]
     public void UNE_SESSION_SANS_SCENE_DECLAREE_DIT_CE_QU_ELLE_N_AUTORISE_PAS()
     {
-        // L'App n'a jamais demande ce qui etait joue : elle appelle `Run` sans contrat, donc la
-        // scene vaut `Inconnue`. Jusqu'au 11/09/2026 le produit gardait un reglage trouve la
-        // exactement comme un reglage valide en pleine partie, sans un mot. Le contrat etait porte
-        // de bout en bout et personne ne le relisait.
+        // Un appel a `Run` sans contrat laisse la scene `Inconnue` : un reglage trouve la ne doit pas
+        // etre garde comme un reglage valide en pleine partie, sans un mot.
         var profil = new GameOptimizationSession(new BancScripte(Repeter(new GameMetrics(137, 88), 12)),
                 () => Identite)
             .Run(1234, new IAutopilotCandidate[] { new CandidatFake() });

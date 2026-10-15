@@ -8,7 +8,7 @@ namespace DrDxt.Detection.Wmi;
 /// reseau ont disparu puis sont revenues sans qu'une ligne change. La panne est dans la
 /// lecture, pas dans la machine. Un client qui lance deux audits a une minute d'ecart ne
 /// doit pas voir une famille entiere apparaitre et disparaitre.
-/// Ce qu'il s'interdit : rejouer une lecture REUSSIE mais vide. Zero ligne est une reponse
+/// Ce qu'il s'interdit : rejouer une lecture reussie mais vide. Zero ligne est une reponse
 /// de la machine, pas une panne ; la rejouer fabriquerait une difference entre deux passes
 /// identiques, c'est-a-dire exactement le defaut qu'on repare.
 /// </summary>
@@ -37,6 +37,6 @@ public sealed class RetryingWmiQuery(IWmiQuery inner, int attempts = 2, TimeSpan
         // Le motif porte le nombre de tentatives : en aval, un Unknown doit rester lisible.
         var err = last.Error!.Value;
         return Result<IReadOnlyList<WmiRow>>.Fail(
-            err.Code, $"échec après {_attempts} tentatives : {err.Message}");
+            err.Code, Docteur.T("WMI.Echec", _attempts, err.Message));
     }
 }

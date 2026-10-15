@@ -21,7 +21,7 @@ string Lister() => Run("Get-NetQosPolicy -PolicyStore ActiveStore | Where-Object
                        "ForEach-Object { \"$($_.Name) | $($_.AppPathName) | $($_.ThrottleRateAction)\" }");
 bool Pose() => Lister().Contains("upload-cap-jeu");
 
-// 24/09/2026 — `--bcd` : retire bootstatuspolicy par la classe du produit, relit, puis repose la
+// `--bcd` : retire bootstatuspolicy par la classe du produit, relit, puis repose la
 // valeur d'origine par l'inverse et relit. La machine finit comme elle a commence.
 if (args.Contains("--bcd"))
 {

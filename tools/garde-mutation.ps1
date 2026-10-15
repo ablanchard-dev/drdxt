@@ -75,7 +75,7 @@ function Relatif([string]$f) {
 function Empreinte([string]$chemin) { (Get-FileHash -LiteralPath $chemin -Algorithm SHA256).Hash }
 
 # Les chemins NON SUIVIS toleres hors de tout lot : un par un, jamais un joker, avec l'empreinte
-# du contenu tolere. `audits/` est non suivi depuis le 10/09/2026 et n'appartient a aucun lot.
+# du contenu tolere. `audits/` est non suivi et n'appartient a aucun lot.
 # Le suivre ou le changer est une decision : l'empreinte l'impose, ce fichier doit bouger avec lui.
 $Toleres = @{
     'audits/FABLE-5-1-AUDIT-2026-09-10.md' = '537C24C305ABC9BF09679913FBC96F6D52BD167D2DD6D490C70C2D455CC1B8C2'

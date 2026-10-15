@@ -5,12 +5,12 @@ using Xunit;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// PHASE 18 F4 — les arrets brutaux ferment les familles materielles.
+/// Les arrets brutaux ferment les familles materielles.
 ///
 /// Un arret sec (Kernel-Power 41) ne laisse aucun dump. Ecrire sur le processeur, la memoire ou la
 /// carte d'une machine qui s'arrete deja sans prevenir rendrait le prochain incident
 /// inattribuable : il viendrait de notre reglage ou de la condition preexistante. La machine de
-/// reference en compte 11 sur 90 jours (audit du 10/09/2026).
+/// Reference en compte 11 sur 90 jours.
 /// </summary>
 public class CandidateSelectorStabilityTests
 {
@@ -45,14 +45,13 @@ public class CandidateSelectorStabilityTests
         a.Motifs.Should().Contain(m => m.Contains("arrêt") && m.Contains("inattribuable"));
     }
 
-    // 11/09/2026 — ce test disait « un levier de LATENCE ne touche pas le materiel et reste
-    // ouvert ». C'etait la faille : `latency.reflex` se dit « latence » et ecrit l'etat du pilote
-    // NVIDIA. Le veto ne lit plus la famille, il lit la SURFACE ecrite.
+    // Un levier de latence peut toucher le materiel : `latency.reflex` se dit « latence » et ecrit
+    // l'etat du pilote NVIDIA. Le veto ne lit pas la famille, il lit la SURFACE ecrite.
     [Fact]
     public void Un_levier_qui_n_ecrit_QUE_la_session_utilisateur_reste_ouvert()
         => Juger(IlYA(11, 1), "latency.x", "latence", SurfaceTouchee.OsUtilisateur).Retenu.Should().BeTrue();
 
-    // 09/10/2026 : le pilote graphique passe sous la garde d'incident comme le reste ; seul un levier qui ne déclare pas
+    // Le pilote graphique passe sous la garde d'incident comme le reste ; seul un levier qui ne déclare pas
     // ce qu'il écrit reste fermé par les arrêts (la garde ne saurait pas quoi rendre).
     [Fact]
     public void Un_levier_qui_ne_dit_pas_ce_qu_il_ecrit_reste_ferme()
@@ -62,12 +61,12 @@ public class CandidateSelectorStabilityTests
     public void Un_levier_qui_ecrit_le_pilote_passe_sous_garde()
         => Juger(IlYA(11, 1), "latency.x", "latence", SurfaceTouchee.PiloteGraphique).Retenu.Should().BeTrue();
 
-    // R-O (08/10/2026), décision restée ouverte depuis le 24/09 : un test mémoire sans erreur ne lève pas ce veto. Il
-    // n'attribue pas le prochain arrêt (l'alimentation, le processeur, le pilote restent possibles) et ne teste pas la
-    // mémoire du système. Le motif disait « un test mémoire vient avant toute campagne », comme si le test débloquait.
+    // Un test mémoire sans erreur ne lève pas ce veto. Il n'attribue pas le prochain arrêt (l'alimentation, le
+    // processeur, le pilote restent possibles) et ne teste pas la mémoire du système. Le motif ne dit donc pas
+    // « un test mémoire vient avant toute campagne », comme si le test débloquait.
     [Fact]
     public void Des_arrets_hors_veille_ne_refusent_plus_le_processeur()
-        // 08/10/2026 (le mainteneur : « DrDXT n'est pas censé me dire non ») : la garde d'incident remplace le refus.
+        // La garde d'incident remplace le refus.
         => Juger(IlYA(11, 1), "cpu.x", "cpu", SurfaceTouchee.Processeur).Retenu.Should().BeTrue();
 
     [Fact]
@@ -82,8 +81,8 @@ public class CandidateSelectorStabilityTests
     [Fact]
     public void Des_arrets_ANCIENS_sont_un_fait_d_archive_pas_un_veto()
         => Juger(IlYA(11, 100), "gpu.essai", "gpu.clock").Retenu.Should().BeTrue();
-    // 07/10/2026 : règle du mainteneur du 29/09, « jamais tension, fréquence ni ventilateur ». La carte rouverte par
-    // machine (L-GPU) ne rouvre que la limite de puissance : sur une machine sans aucun arrêt, le décalage d'horloge,
+    // Ni tension, ni fréquence, ni ventilateur de la carte. La carte rouverte par
+    // machine ne rouvre que la limite de puissance : sur une machine sans aucun arrêt, le décalage d'horloge,
     // l'undervolt (qui décale la fréquence) et la courbe du ventilateur restent refusés, avec leur motif.
     [Theory]
     [InlineData("gpu.core_offset", true)]
@@ -94,7 +93,7 @@ public class CandidateSelectorStabilityTests
     {
         var a = CandidateSelector.Evaluer(Machine([]), new[] { CatalogueDeCandidats.Decrire(id)! }).Single();
 
-        a.Motifs.Any(m => m.Contains("règle du 29/09")).Should().Be(interdit);
+        a.Motifs.Any(m => m.Contains("règle de la carte")).Should().Be(interdit);
         if (interdit) a.Retenu.Should().BeFalse();
     }
 

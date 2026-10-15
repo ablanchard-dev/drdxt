@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026, critique B10 (passage 2) : une fois « Réparer » lancé, rien ne disait comment l'interrompre.
+// Une fois « Réparer » lancé, l'écran dit comment l'interrompre.
 // La réparation tourne dans une console de Microsoft, élevée, hors de DrDXT : tuer DISM en pleine écriture
 // depuis l'appli n'est pas un geste sûr. L'état « en cours » donne donc la seule issue propre : fermer la console.
 public class ReparationDitCommentArreterTests
@@ -25,8 +25,8 @@ public class ReparationDitCommentArreterTests
         Valeur(fichier, "Reparation.Windows.Lancee").Should().Contain(issue);
     }
 
-    // 29/09/2026, critique B10 (passage 4, P1) : « sans geste proposé » coiffait les états lus d'une page rouge et
-    // se lisait comme « rien à faire ». Ces lignes informent ; les constats, plus bas, gardent leur remède.
+    // « sans geste proposé » en tête des états lus d'une page rouge passerait pour « rien à faire ».
+    // Ces lignes informent ; les constats, plus bas, gardent leur remède.
     [Theory]
     [InlineData("Strings.fr.resx", "pour information", "sans geste")]
     [InlineData("Strings.resx", "for information", "no action")]

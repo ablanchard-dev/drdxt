@@ -6,25 +6,25 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Adapters.Tests;
 
 // -----------------------------------------------------------------------
-// Canonical round-trip pin: a known registry DWORD read back through the probe's
-// serialization must equal the exact string the Application catalog would store as
-// the manifest's DesiredValueJson — otherwise the reconciler's ordinal desired-vs-
-// actual comparison (StringComparison.Ordinal) would see false drift.
+// Aller-retour canonique figé : un DWORD de registre connu relu par la sérialisation de la sonde
+// doit égaler la chaîne exacte que le catalogue Application stockerait en DesiredValueJson du
+// manifeste ; sinon la comparaison ordinale voulu/réel du réconciliateur
+// (StringComparison.Ordinal) verrait une fausse dérive.
 //
-// NvidiaUltraLowLatencyTweak writes Ultra = 2 via value.ToString(InvariantCulture) → "2".
-// The probe must read a DWORD 2 back as exactly "2".
+// NvidiaUltraLowLatencyTweak écrit Ultra = 2 via value.ToString(InvariantCulture) → « 2 ».
+// La sonde doit relire un DWORD 2 exactement comme « 2 ».
 // -----------------------------------------------------------------------
 public sealed class RegistryDesiredRoundTripTests
 {
-    // The desired value the Application's NvidiaUltraLowLatencyTweak applies (Ultra = 2),
-    // serialized the same way the tweak serializes it for the manifest.
+    // La valeur voulue qu'applique le NvidiaUltraLowLatencyTweak de l'Application (Ultra = 2),
+    // sérialisée comme le levier la sérialise pour le manifeste.
     private const uint UltraLowLatency = 2;
     private static readonly string DesiredJson =
         UltraLowLatency.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
-    // A fake raw registry reader that hands the probe a DWORD already canonicalized by
-    // the same canonicalizer the real Win32RegistryValueReader uses — proving the
-    // dispatch surfaces that exact string unchanged.
+    // Un faux lecteur de registre brut qui donne à la sonde un DWORD déjà canonisé par le même
+    // canoniseur que le vrai Win32RegistryValueReader : preuve que le dispatch fait remonter
+    // exactement cette chaîne, inchangée.
     private sealed class CanonicalizingFakeRegistry : IRawRegistryValueReader
     {
         private readonly uint _dword;
@@ -45,7 +45,7 @@ public sealed class RegistryDesiredRoundTripTests
         var r = await probe.ReadCurrentValueAsync("latency.reflex.lowLatencyMode", default);
 
         r.IsOk.Should().BeTrue();
-        r.Value.Should().Be(DesiredJson);   // exact byte-comparable equality
+        r.Value.Should().Be(DesiredJson);   // égalité exacte, comparable à l'octet près
         r.Value.Should().Be("2");
     }
 

@@ -7,7 +7,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// GPU-OC (08/10/2026) : le mode Expert de la carte, sur la page Graphique. Le décalage ne part qu'avec l'accord du
+/// Le mode Expert de la carte, sur la page Graphique. Le décalage ne part qu'avec l'accord du
 /// joueur, jamais pendant une partie ; gardé, il vit tant que DrDXT est ouvert ; « Rendre » remet l'origine.
 /// </summary>
 public sealed class CarteExpertTests
@@ -103,7 +103,6 @@ public sealed class CarteExpertTests
         vm.ExpertEtat.Should().Be("Carte.Expert.Instable");
     }
 
-    // Revue n° 13
     [Fact]
     public async Task Instable_et_retour_rate_n_est_jamais_dit_rendu()
     {
@@ -162,7 +161,7 @@ public sealed class CarteExpertTests
         vm.ExpertEtat.Should().Contain("Carte.Expert.Refuse").And.Contain("bail refusé");
     }
 
-    // GPU-OC (08/10/2026) : le ventilateur partage l'accord, la règle du jeu ouvert et « Rendre » de la fréquence ; un seul
+    // Le ventilateur partage l'accord, la règle du jeu ouvert et « Rendre » de la fréquence ; un seul
     // essai gardé à la fois.
     [Fact]
     public async Task Le_ventilateur_part_avec_l_accord_sa_vitesse_et_bloque_un_second_essai()

@@ -7,12 +7,12 @@ namespace DrDxt.Detection;
 /// <summary>
 /// Qui est au premier plan, lu a la source : <c>GetForegroundWindow</c> puis le PID de sa fenetre.
 ///
-/// Deux API, aucune elevation, aucun hook, aucune injection — c'est une lecture d'etat que Windows
+/// Deux API, aucune elevation, aucun hook, aucune injection : c'est une lecture d'etat que Windows
 /// expose a tout le monde. C'est precisement ce qui la rend utilisable dans un jeu protege.
 ///
 /// Rend <c>null</c> plutot que de deviner : pas de fenetre au premier plan (bureau verrouille,
 /// transition d'ecran, session distante en train de basculer) ou PID nul. Le contrat de
-/// <see cref="FocusObservation"/> compte ces lectures comme INCONNUES, ni pour ni contre — les
+/// <see cref="FocusObservation"/> compte ces lectures comme inconnues, ni pour ni contre : les
 /// traiter comme une perte de focus invaliderait des passes parfaitement bonnes.
 /// </summary>
 [SupportedOSPlatform("windows")]

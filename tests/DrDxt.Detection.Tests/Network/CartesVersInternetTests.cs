@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Network;
 
-// Revue F-43 : les adaptateurs que Windows type « Ethernet » sans câble derrière.
+// Les adaptateurs que Windows type « Ethernet » sans câble derrière.
 public sealed class CartesVersInternetTests
 {
     [Theory]

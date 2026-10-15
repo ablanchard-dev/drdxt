@@ -4,14 +4,14 @@ namespace DrDxt.Measurement.Tests;
 
 public class FrameSeriesHygieneTests
 {
-    // n frames of `ms` each — one second of gameplay at 1000/ms fps.
+    // n images de `ms` chacune : une seconde de jeu à 1000/ms fps.
     private static IEnumerable<double> Seconds(double seconds, double ms)
         => Enumerable.Repeat(ms, (int)Math.Round(seconds * 1000.0 / ms));
 
     [Fact]
     public void Drops_the_warmup_seconds()
     {
-        // 10 s of loading-speed frames then 100 s of gameplay, warm-up cut at 10 s.
+        // 10 s d'images au rythme d'un chargement puis 100 s de jeu, échauffement coupé à 10 s.
         var series = Seconds(10, 50).Concat(Seconds(100, 7)).ToList();
 
         var r = FrameSeriesHygiene.Clean(series, warmupSeconds: 10, outOfFocusMedianMs: 1000);
@@ -24,17 +24,17 @@ public class FrameSeriesHygieneTests
     [Fact]
     public void Drops_the_out_of_focus_seconds_by_their_median()
     {
-        // 60 s of gameplay, then 20 s alt-tabbed at the 30 fps out-of-focus cap, then 60 s more.
+        // 60 s de jeu, puis 20 s en alt-tab au plafond de 30 fps hors focus, puis 60 s de plus.
         var series = Seconds(60, 7).Concat(Seconds(20, 33.3)).Concat(Seconds(60, 7)).ToList();
 
         var r = FrameSeriesHygiene.Clean(series, warmupSeconds: 0);
 
         r.Applied.Should().BeTrue();
         r.OutOfFocusSecondsDropped.Should().BeInRange(19, 21);
-        // Only the two BOUNDARY seconds can survive: they hold a mix of gameplay and capped
-        // frames, so their median stays under the threshold. Everything inside the alt-tab is
-        // gone. Filtering by whole seconds cannot do better, and pretending otherwise would be
-        // the lie this filter exists to avoid.
+        // Seules les deux secondes de frontière peuvent survivre : elles mélangent images de jeu et images
+        // plafonnées, donc leur médiane reste sous le seuil. Tout l'intérieur de l'alt-tab disparaît.
+        // Filtrer par secondes entières ne peut pas faire mieux, et prétendre le contraire serait
+        // le mensonge que ce filtre existe pour éviter.
         r.FrameTimesMs.Count(x => x > 25).Should().BeLessThan(70);
         r.FrameTimesMs.Count(x => x == 7).Should().BeGreaterThan(16_000);
     }
@@ -42,8 +42,8 @@ public class FrameSeriesHygieneTests
     [Fact]
     public void A_single_stutter_does_not_delete_its_second()
     {
-        // One 200 ms hitch inside an otherwise good second: the MEDIAN is still 7 ms, so the
-        // second survives — the filter removes non-gameplay, never real stutters.
+        // Un accroc de 200 ms dans une seconde par ailleurs bonne : la médiane reste à 7 ms, donc la
+        // seconde survit ; le filtre retire le hors-jeu, jamais les vraies saccades.
         var oneBadSecond = Seconds(1, 7).Concat(new[] { 200.0 });
         var series = Seconds(30, 7).Concat(oneBadSecond).Concat(Seconds(30, 7)).ToList();
 
@@ -57,8 +57,8 @@ public class FrameSeriesHygieneTests
     [Fact]
     public void Refuses_rather_than_emptying_a_genuinely_slow_session()
     {
-        // A machine really running at 30 fps: every second is above the threshold. Deleting the
-        // whole capture would turn a real problem into an empty result.
+        // Une machine qui tourne vraiment à 30 fps : chaque seconde est au-dessus du seuil. Supprimer
+        // toute la capture transformerait un vrai problème en résultat vide.
         var series = Seconds(300, 33.3).ToList();
 
         var r = FrameSeriesHygiene.Clean(series, warmupSeconds: 0);
@@ -74,7 +74,7 @@ public class FrameSeriesHygieneTests
 
         var slices = FrameSeriesHygiene.Slice(series, sliceSeconds: 30);
 
-        slices.Should().HaveCount(3);                       // 90 s used, 10 s remainder dropped
+        slices.Should().HaveCount(3);                       // 90 s utilisées, reste de 10 s écarté
         slices.Should().OnlyContain(s => s.Count == 3000);  // 30 s / 10 ms
     }
 
@@ -85,9 +85,9 @@ public class FrameSeriesHygieneTests
     [Fact]
     public void Slices_feed_the_inter_run_margin_from_a_single_session()
     {
-        // The payoff: one long session yields the >=3 aggregates InterRunMarginOfError needs,
-        // instead of demanding three separate benchmark runs.
-        var series = Seconds(300, 10).ToList(); // 30 000 frames = exactly 5 x 60 s
+        // Le bénéfice : une seule longue session donne les >= 3 agrégats dont InterRunMarginOfError a
+        // besoin, au lieu d'exiger trois passes de banc séparées.
+        var series = Seconds(300, 10).ToList(); // 30 000 images = exactement 5 x 60 s
 
         var perSlice = FrameSeriesHygiene.Slice(series, 60)
             .Select(s => FrametimeStatistics.AvgFps(s))
@@ -97,13 +97,13 @@ public class FrameSeriesHygieneTests
         FrametimeStatistics.InterRunMarginOfError(perSlice).Should().NotBe(double.PositiveInfinity);
     }
 
-    // --- warm-up is MEASURED, not assumed (regression: 2026-09-01 real capture) ---
+    // --- l'échauffement est mesuré, pas supposé (régression vue sur une vraie capture) ---
 
     [Fact]
     public void Detects_no_warmup_when_the_capture_starts_in_gameplay()
     {
-        // The real 178 s capture: every second already at gameplay pace. Dropping a flat 90 s
-        // threw away half the frames for a 0.9 % change AND starved Slice of a single 120 s slice.
+        // La vraie capture de 178 s : chaque seconde déjà au rythme du jeu. Couper 90 s à plat
+        // jetait la moitié des images pour un écart de 0,9 % et privait Slice d'une seule tranche de 120 s.
         var series = Seconds(178, 7.0).ToList();
 
         var r = FrameSeriesHygiene.Clean(series);
@@ -118,7 +118,7 @@ public class FrameSeriesHygieneTests
     [Fact]
     public void Drops_a_real_loading_head_and_stops_at_the_first_playable_second()
     {
-        // 12 s of loading at 30 fps, then gameplay at ~143 fps.
+        // 12 s de chargement à 30 fps, puis du jeu à ~143 fps.
         var series = Seconds(12, 33.3).Concat(Seconds(100, 7.0)).ToList();
 
         var r = FrameSeriesHygiene.Clean(series);
@@ -131,7 +131,7 @@ public class FrameSeriesHygieneTests
     [Fact]
     public void A_stutter_after_the_start_is_never_swallowed_as_warmup()
     {
-        // A defect to report, not warm-up to hide: the scan stops at the first normal second.
+        // Un défaut à signaler, pas un échauffement à cacher : le balayage s'arrête à la première seconde normale.
         var series = Seconds(30, 7.0).Concat(Seconds(3, 40.0)).Concat(Seconds(30, 7.0)).ToList();
 
         var r = FrameSeriesHygiene.Clean(series);

@@ -9,7 +9,7 @@ namespace DrDxt.Infrastructure;
 
 public static class ServiceCollectionExtensions
 {
-    // Feature modules add AddDrDxt<Module>() alongside their implementations (M1+).
+    // Feature modules add AddDrDxt<Module>() alongside their implementations.
 
     public static IServiceCollection AddDrDxtCore(
         this IServiceCollection services,
@@ -19,12 +19,11 @@ public static class ServiceCollectionExtensions
         string diagDir = diagnosticsDirectory
             ?? DrDxt.Core.DossierDonnees.Chemin("diagnostics");
 
-        // The logger and its log directory are created lazily on first resolution.
-        // NOTE for the App host (M1+): dispose the ServiceProvider (or call
-        // Serilog Log.CloseAndFlush) on application exit so the file sink flushes
-        // its final buffered writes. The container disposes this factory-created
-        // singleton because the concrete Serilog.Core.Logger is IDisposable, but
-        // only if the provider itself is disposed at shutdown.
+        // Le logger et son dossier de journaux sont créés paresseusement à la première résolution.
+        // Note pour l'hôte App : libérer le ServiceProvider (ou appeler Serilog Log.CloseAndFlush) à la
+        // sortie de l'application pour que le récepteur fichier vide ses dernières écritures en tampon.
+        // Le conteneur libère ce singleton créé par fabrique parce que le Serilog.Core.Logger concret est
+        // IDisposable, mais seulement si le fournisseur lui-même est libéré à l'arrêt.
         services.TryAddSingleton<Serilog.ILogger>(_ => AppLogging.CreateLogger(logDirectory));
 
         services.TryAddSingleton<IDiagnosticsLog>(sp =>
@@ -33,7 +32,7 @@ public static class ServiceCollectionExtensions
             return new DiagnosticsLog(diagDir, logger);
         });
 
-        // Bilingual localization — en neutral (embedded) + FR satellite assembly.
+        // Localisation bilingue : anglais neutre (embarqué) + assemblage satellite FR.
         services.TryAddSingleton<ILocalizer, ResxLocalizer>();
 
         return services;

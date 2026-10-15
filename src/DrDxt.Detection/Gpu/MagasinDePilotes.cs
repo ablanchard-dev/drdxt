@@ -5,7 +5,7 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Gpu;
 
 /// <summary>
-/// 03/10/2026 (tour G2, retour d'usage : « trop de pilotes ») : les paquets de pilote d'affichage gardés par Windows et les
+/// Les paquets de pilote d'affichage gardés par Windows et les
 /// cartes graphiques déconnectées qui restent déclarées (une ancienne carte, un pilote mal désinstallé). Lu par
 /// <c>pnputil /format xml</c> (sortie relevée sur la machine le 03/10/2026, indépendante de la langue de Windows).
 /// Lecture seule : DrDXT ne retire rien, il nomme le paquet en service et ceux qui restent.
@@ -32,40 +32,51 @@ public static class MagasinDePilotes
         catch { return null; }
     }
 
+    private const string NomInstalles = "pilotes d'affichage installés";
+
     public static IEnumerable<RepairFinding> Juger(string pilotesXml, string cartesXml, string deconnecteesXml)
     {
         var paquets = Paquets(pilotesXml);
-        var enService = Cartes(cartesXml).Select(c => c.Pilote).Where(p => p is not null).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        // Revue R2 : la classe Affichage déconnectée contient aussi des cartes virtuelles (Bureau à distance « SWD\\ »,
+        var cartes = Cartes(cartesXml);
+        var enService = cartes.Select(c => c.Pilote).Where(p => p is not null).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // La classe Affichage déconnectée contient aussi des cartes virtuelles (Bureau à distance « SWD\\ »,
         // Parsec ou écrans virtuels « ROOT\\ ») ; seule une carte sur le bus PCI est une ancienne carte.
         var restes = Cartes(deconnecteesXml, seulementPci: true);
         if (paquets.Count == 0) yield break;
 
+        // Une carte branchée dont le pilote n'est pas lu (pnputil rend "" sur toute erreur, ou une ligne sans DriverName) :
+        // on ne sait pas lequel est en service, donc aucun n'est dit inutile. Sans cette garde, le paquet en service de la carte
+        // non lue sortait avec sa commande de suppression.
+        if (enService.Count == 0 || cartes.Any(c => c.Pilote is null))
+        {
+            yield return new RepairFinding("GPU DRIVER", NomInstalles,
+                string.Join(", ", paquets.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")), null, RepairStatus.Unknown,
+                Docteur.T("MP.CartesNonLues"));
+            yield break;
+        }
+
         var inutiles = paquets.Where(p => !enService.Contains(p.Nom)).ToList();
         var lu = string.Join(", ", paquets.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})"));
         if (inutiles.Count == 0)
-            yield return new RepairFinding("GPU DRIVER", "pilotes d'affichage installés", lu, null, RepairStatus.ExpectedDefault,
+            yield return new RepairFinding("GPU DRIVER", NomInstalles, lu, null, RepairStatus.ExpectedDefault,
                 paquets.Count == 1
-                    ? "un seul pilote d'affichage est gardé par Windows, et c'est celui en service : pas de doublon."
-                    : "chaque pilote d'affichage gardé sert une carte présente : pas de doublon.");
+                    ? Docteur.T("MP.UnSeul")
+                    : Docteur.T("MP.ChacunSert"));
         else
-            // Revue H3 (03/10) : la valeur listait aussi le paquet en service sous le titre « anciens pilotes ».
+            // La valeur listait aussi le paquet en service sous le titre « anciens pilotes ».
             yield return new RepairFinding("GPU DRIVER", "anciens pilotes d'affichage gardés",
                 string.Join(", ", inutiles.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")), null, RepairStatus.Suspicious,
-                $"{inutiles.Count} paquet(s) de pilote d'affichage ne servent aucune carte présente : "
-                + string.Join(", ", inutiles.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")) + ". "
-                + "Restes d'un ancien pilote : Windows peut y revenir après une mise à jour ratée. Les retirer, dans une console "
-                + "administrateur : " + string.Join(" puis ", inutiles.Select(p => $"pnputil /delete-driver {p.Nom}"))
-                + ". DrDXT ne les retire pas lui-même."
-                // Revue R1 : un paquet encore lié à une carte déconnectée refuse de partir ; l'ordre des gestes est dit.
-                + (restes.Count > 0 ? " Retire d'abord les cartes déconnectées (constat suivant), sinon Windows refuse." : ""),
-                RepairAction.Recommandation);
+                Docteur.T("MP.Inutiles", inutiles.Count, string.Join(", ", inutiles.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})"))),
+                RepairAction.Recommandation,
+                // Un paquet encore lié à une carte déconnectée refuse de partir ; l'ordre des gestes est dit.
+                Remede: Docteur.T(restes.Count > 0 ? "MP.DAbord" : "MP.Remede",
+                    string.Join(Docteur.T("MP.Puis"), inutiles.Select(p => $"pnputil /delete-driver {p.Nom}"))),
+                Cible: string.Join(" ", inutiles.Select(p => p.Nom)));
 
         if (restes.Count > 0)
             yield return new RepairFinding("GPU DRIVER", "cartes graphiques déconnectées", $"{restes.Count}", "0", RepairStatus.Suspicious,
-                $"{restes.Count} carte(s) graphique(s) absente(s) restent déclarées : "
-                + string.Join(", ", restes.Select(r => r.Description)) + ". Restes d'une ancienne carte ou d'un pilote mal "
-                + "désinstallé ; le Gestionnaire de périphériques (Affichage, « Afficher les périphériques cachés ») les retire.");
+                Docteur.T("MP.Deconnectees", restes.Count, string.Join(", ", restes.Select(r => r.Description))),
+                Remede: Docteur.T("MP.Deconnectees.Remede", string.Join(", ", restes.Select(r => r.Description))));
     }
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll")]
@@ -90,7 +101,7 @@ public static class MagasinDePilotes
                 arguments + " /format xml")
             {
                 RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true,
-                // Revue R1, relevé sur la machine : pnputil annonce « utf-8 » dans son XML mais écrit dans la page de code OEM
+                // Relevé sur la machine : pnputil annonce « utf-8 » dans son XML mais écrit dans la page de code OEM
                 // de la console (« carte m\uFFFDre » lu en UTF-8).
                 StandardOutputEncoding = EncodageOem(),
             };

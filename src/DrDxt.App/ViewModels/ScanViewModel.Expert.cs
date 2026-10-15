@@ -5,19 +5,19 @@ using DrDxt.Core;
 
 namespace DrDxt.App.ViewModels;
 
-// GPU-OC (08/10/2026) : le mode Expert de la carte, sur la page Graphique. Décision du mainteneur du 08/10 : fréquence et
+// Le mode Expert de la carte, sur la page Graphique. Fréquence et
 // tension deviennent des réglages Expert, sur l'accord explicite du joueur, jamais dans « Optimiser ». Le décalage part
 // seulement avec l'accord coché et aucun jeu ouvert ; gardé, il vit tant que DrDXT est ouvert (le bail du helper rend
 // l'origine à l'arrêt ou au plantage) ; « Rendre » remet l'origine tout de suite.
 public partial class ScanViewModel
 {
-    /// <summary>SEC3 : l'état que le service écrit à chaque passage (lecture seule), branché par l'App.</summary>
+    /// <summary>L'état que le service écrit à chaque passage (lecture seule), branché par l'App.</summary>
     internal Func<DrDxt.Reconciler.ReconcilerState?>? LireEtatDuService { get; set; }
 
-    /// <summary>ROAD1 : le catalogue des leviers, branché par l'App ; null = pas de liste « ce que DrDXT fait ici ».</summary>
+    /// <summary>Le catalogue des leviers, branché par l'App ; null = pas de liste « ce que DrDXT fait ici ».</summary>
     internal Func<IReadOnlyList<DrDxt.Core.ITweak>>? CatalogueDesLeviers { get; set; }
 
-    /// <summary>ROAD1 : les leviers vérifiés sur ce PC par « Vérifier DrDXT », branché par l'App.</summary>
+    /// <summary>Les leviers vérifiés sur ce PC par « Vérifier DrDXT », branché par l'App.</summary>
     internal Func<HardwareInventory, IReadOnlySet<string>>? LeviersVerifiesIci { get; set; }
     public string LabelCarteLeviers => _localize("Carte.Leviers.Titre");
 
@@ -31,7 +31,7 @@ public partial class ScanViewModel
 
     private IEssaiCarte? _essaiCarte;
 
-    /// <summary>GPU-OC (08/10/2026) : la vitesse fixe du ventilateur (VentilateurExpert), branchée par l'App ; null = absente.
+    /// <summary>La vitesse fixe du ventilateur (VentilateurExpert), branchée par l'App ; null = absente.
     /// Elle partage l'accord, l'état et « Rendre » de la fréquence : un seul essai gardé à la fois, comme le journal.</summary>
     internal Func<int, Task<Result<IEssaiCarte>>>? PoserVentilateurExpert
     {
@@ -64,7 +64,7 @@ public partial class ScanViewModel
     public int ExpertMaxMhz => GpuSafeBounds.MaxCoreOffsetMhz;
 
     public string LabelExpertTitre => _localize("Carte.Expert.Titre");
-    // AMD-TOUT (09/10/2026) : sur une carte sans validation archivée (toute Radeon à ce jour), l'Expert reste ouvert mais
+    // Sur une carte sans validation archivée (toute Radeon à ce jour), l'Expert reste ouvert mais
     // l'accord le dit : l'écriture n'a jamais été essayée sur cette architecture.
     public string LabelExpertAccord => _lastScan is { } s && GpuTuningCoverage.For(s.Hw).Any(r => r.Support == GpuTuningSupport.ReadOnly)
         ? $"{_localize("Carte.Expert.Accord")} {_localize("Carte.Expert.NonValideIci")}"
@@ -102,7 +102,7 @@ public partial class ScanViewModel
                 ExpertEtat = r.Error?.Code switch
                 {
                     ErrorCodes.TweakUnstable => _localize("Carte.Expert.Instable"),
-                    // Revue n° 13 : instable ET retour raté ; jamais « rendue ».
+                    // Instable et retour raté ; jamais « rendue ».
                     ErrorCodes.TweakPartiallyApplied => $"{_localize("Carte.Expert.RenduRate")} {r.Error?.Message}",
                     _ => $"{_localize("Carte.Expert.Refuse")} {r.Error?.Message}",
                 };
@@ -119,12 +119,23 @@ public partial class ScanViewModel
         ExpertEtat = _localize("Carte.Expert.RenduParLeHelper");
     }
 
+    /// <summary>Vrai tant qu'un réglage temporaire est posé : décalage expert gardé, ou recherche de sous-tension en cours.</summary>
+    internal bool QuelqueChoseARendre => _essaiCarte is not null || RechercheSousTensionEnCours;
+
+    /// <summary>Avant la fermeture de la fenêtre : le décalage expert rendu, la recherche arrêtée et la tension d'origine
+    /// rendue. Appelé sur le fil d'interface sans le bloquer : la recherche y reprend pour exécuter son finally.</summary>
+    internal async Task RendreAvantFermetureAsync()
+    {
+        await FermerCarteExpertAsync();
+        await InterrompreRechercheSousTensionAsync();
+    }
+
     /// <summary>À la fermeture de l'App : l'essai gardé est rendu tout de suite, et son journal levé.</summary>
     internal async Task FermerCarteExpertAsync()
     {
         if (_essaiCarte is not { } essai) return;
         _essaiCarte = null;
-        // Revue du 08/10 : le battement est libéré même si le rendu rate ; le bail expire alors et le helper rend seul.
+        // Le battement est libéré même si le rendu rate ; le bail expire alors et le helper rend seul.
         try { await essai.RendreAsync().ConfigureAwait(false); }
         finally { await essai.DisposeAsync().ConfigureAwait(false); }
     }

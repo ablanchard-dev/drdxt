@@ -1,4 +1,4 @@
-<!-- Manual LIVE OC sweep harness (P2). NOT part of DrDXT.sln. Finds the best PROVEN
+<!-- Manual LIVE OC sweep harness. NOT part of DrDXT.sln. Finds the best PROVEN
      stable core offset on the deterministic perf-meter (OcSweep over GpuBenchSession),
      writing offsets via the live-validated NVAPI boundary. Non-elevated. -->
 <Project Sdk="Microsoft.NET.Sdk">

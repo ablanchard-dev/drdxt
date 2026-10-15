@@ -10,12 +10,12 @@ namespace DrDxt.App.ViewModels;
 /// Le verdict du retour de BIOS, rendu lisible : « ton changement a-t-il pris ? », reglage par
 /// reglage, plus la carte de recuperation quand quelque chose n'a pas pris.
 ///
-/// C'est la MOITIE VISIBLE du differenciateur « on te dit quoi changer, et on prouve que ca a
-/// pris ». Le verifieur existait depuis M3 et n'etait resolu par personne : le produit ne
+/// C'est la moitie visible du differenciateur « on te dit quoi changer, et on prouve que ca a
+/// pris ». Le verifieur existait et n'etait resolu par personne : le produit ne
 /// prononcait donc ce verdict nulle part.
 ///
 /// Ce qu'il ne fait jamais :
-///   • annoncer un succes sur un reglage illisible — <c>Unreadable</c> reste « je n'ai pas pu
+///   • annoncer un succes sur un reglage illisible : <c>Unreadable</c> reste « je n'ai pas pu
 ///     verifier », qui n'est pas « ca n'a pas marche » et encore moins « c'est bon » ;
 ///   • cacher la carte de recuperation quand le verifieur la demande. Les cles viennent de
 ///     <see cref="BiosLoopResult.RecoveryCardKeys"/>, dans l'ordre qu'il a fixe.
@@ -33,7 +33,7 @@ public sealed class BiosLoopViewModel
     }
 
     /// <summary>
-    /// Rend le VM du resultat, ou <c>null</c> quand il n'y avait rien en attente — le cas
+    /// Rend le VM du resultat, ou <c>null</c> quand il n'y avait rien en attente, le cas
     /// courant. Une section vide ne doit pas s'afficher : la plupart des ouvertures de l'app
     /// ne suivent aucun voyage dans le BIOS.
     /// </summary>

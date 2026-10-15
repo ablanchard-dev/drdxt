@@ -4,7 +4,7 @@ using Microsoft.Extensions.Hosting;
 namespace DrDxt.ReconcilerHost;
 
 /// <summary>
-/// 28/09/2026 : la protection du ping, portée par le service de démarrage. Retire un plafond resté au démarrage,
+/// La protection du ping, portée par le service de démarrage. Retire un plafond resté au démarrage,
 /// bat à intervalle régulier (<see cref="ProtectionDuPingParLeService.TickAsync"/>), retire tout à l'arrêt.
 /// Ne fait rien tant que le joueur n'a rien retenu : la décision est dans la classe testée, ce fichier ne fait
 /// que la cadencer.

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 26/09/2026 : le depart vers le BIOS n'etait lie a aucune vue. Ce bouton redemarre la machine :
+// Le depart vers le BIOS n'etait lie a aucune vue. Ce bouton redemarre la machine :
 // deux clics (dire, puis faire), et rien ne part tant que le second n'a pas eu lieu.
 public sealed class BiosGuideDepartTests
 {

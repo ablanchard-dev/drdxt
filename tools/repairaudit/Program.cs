@@ -18,14 +18,12 @@ using DrDxt.Measurement.Network;
 // LECTURE PURE DE LA MACHINE : cet outil ne modifie aucun etat systeme, ne demande aucune
 // elevation, ne repare rien.
 //
-// CORRIGE LE 09/09/2026 : cette ligne disait « n'ecrit rien », et c'est devenu FAUX le jour ou
-// le journal des constats est arrive. Il ECRIT un fichier — `%LOCALAPPDATA%\DrDXT\
-// repair-history.json` — a cote de `memory-baseline.json`. C'est l'etat du produit, pas un
-// reglage de la machine, mais la nuance devait etre ecrite plutot que sous-entendue : une
-// affirmation d'innocuite qui vieillit mal est exactement ce que ce depot traque ailleurs.
+// Il ECRIT pourtant un fichier, le journal des constats (`%LOCALAPPDATA%\DrDXT\repair-history.json`,
+// a cote de `memory-baseline.json`). C'est l'etat du produit, pas un reglage de la machine, et la
+// nuance est ecrite plutot que sous-entendue.
 //
-// LA REGLE QUI GOUVERNE TOUT CE FICHIER : « different » n'est pas « endommage ». Sur cette
-// machine, quatre etats non-default ont ete lus le 08/09/2026 — plan Equilibre, aucun coeur
+// LA REGLE QUI GOUVERNE TOUT CE FICHIER : « different » n'est pas « endommage ».
+// Releve sur la machine de reference le 08/09/2026, quatre etats non-default : plan Equilibre, aucun coeur
 // parque, `LowLatencyMode` absent, 1728x1080 sur un ecran 1920x1080. **Aucun des quatre n'est un
 // defaut.** Un outil qui « repare » ca casse le PC de quelqu'un en croyant l'aider.
 //
@@ -97,7 +95,9 @@ else
 // garde ce qui exige une MESURE qui dure (parking, memoire, reseau) et ce qui depend de
 // `DrDxt.Bios` (la matrice de qualification) : les melanger imposerait ce cout a une interface
 // qui veut afficher un etat tout de suite.
+var dureeAudit = System.Diagnostics.Stopwatch.StartNew();
 constats.AddRange(new RepairAuditService().Lire());
+Console.Error.WriteLine($"audit de santé : {dureeAudit.ElapsedMilliseconds} ms");
 
 double? dispersionDebit = null;
 
@@ -112,7 +112,7 @@ if (!modules.IsOk || modules.Value is not { Count: > 0 } barrettes)
     // premiere est typiquement transitoire et se reessaie, la seconde dit que le fournisseur a
     // repondu et n'a rien a dire.
     //
-    // Constate le 09/09/2026 : la famille RAM entiere a disparu d'une passe d'audit puis est
+    // La famille RAM entiere a disparu d'une passe d'audit puis est
     // revenue a la suivante, sans qu'on puisse savoir laquelle des deux s'etait produite. Rendre
     // l'echec LISIBLE avant de le traiter — on ne repare pas ce qu'on ne sait pas nommer.
     constats.Add(new RepairFinding("RAM", "modules", null, null, RepairStatus.Unknown,
@@ -135,9 +135,8 @@ else
         $"{barrettes.Count} — " + string.Join(" · ", barrettes.Select(Decrire)),
         null, RepairStatus.Observed, "inventaire SMBIOS, sans jugement"));
 
-    // SUR-AFFIRMATION CORRIGEE LE 08/09/2026. Ce constat disait « deux controleurs distincts
-    // PROUVENT le double canal ». **C'est faux.** `DeviceLocator` est une chaine de TOPOLOGIE
-    // physique venue de SMBIOS — elle decrit ou les barrettes sont branchees, pas le mode dans
+    // « Deux controleurs distincts PROUVENT le double canal » serait faux. `DeviceLocator` est une
+    // chaine de TOPOLOGIE physique venue de SMBIOS : elle decrit ou les barrettes sont branchees, pas le mode dans
     // lequel le controleur memoire fonctionne actuellement. Un entrelacement peut etre desactive,
     // degrade, ou refuse par le firmware sans que le nom du slot change d'un caractere.
     //
@@ -145,17 +144,15 @@ else
     // reel reste Unknown tant que personne n'a lu l'entrelacement.
     // LA TOPOLOGIE NE PROUVE RIEN, MAIS LE DEBIT SI.
     //
-    // Hier ce constat rendait `Unknown` : `DeviceLocator` decrit ou les barrettes sont branchees,
-    // pas le mode du controleur. C'etait juste — et le produit avait DEJA la preuve ailleurs sans
-    // que l'audit la lise. Un canal a une vitesse PLAFOND (MT/s x 8 octets) ; un debit mesure
+    // La preuve vient d'ailleurs : un canal a une vitesse PLAFOND (MT/s x 8 octets) ; un debit mesure
     // au-dessus de ce plafond ne peut pas venir d'un seul canal, quelle que soit la facon dont la
     // carte nomme ses emplacements.
     //
     // Mesure du 08/09/2026, jeu ferme, 25 passes : 33,15 GB/s pour un plafond d'un canal de
-    // 30,4 GB/s a 3800 MT/s — soit 1,09 x. Multi-canal PROUVE par la mesure.
+    // 30,4 GB/s a 3800 MT/s, soit 1,09 x. Multi-canal PROUVE par la mesure.
     //
     // La borne est unilaterale : elle prouve « au moins N canaux », jamais « exactement N », et
-    // jamais « simple canal » — un debit bas peut venir du nombre d'acces qu'un coeur garde en vol.
+    // jamais « simple canal » : un debit bas peut venir du nombre d'acces qu'un coeur garde en vol.
     var bancMemoire = MemoryBench.Measure(passes: 12);
     // Retenue pour la PHOTO : c'est la condition qui qualifie vraiment les conclusions
     // memoire, la charge processeur ne les voit pas.
@@ -191,7 +188,7 @@ else
     {
         var configure = frequences.Max();
         var nominal = nominales.Max();
-        // DEUX SUR-AFFIRMATIONS CORRIGEES LE 08/09/2026.
+        // Deux sur-affirmations a eviter.
         //
         // « un profil est charge » : la tension et la frequence ne prouvent PAS l'identite du
         // profil BIOS. 1350 mV et 3800 MT/s sont compatibles avec XMP, avec un XMP modifie, avec
@@ -200,7 +197,7 @@ else
         //
         // « NonDefault + GuidedBios » : un ecart au nominal du kit n'est ni un defaut ni une
         // raison de proposer une modification. Un GuidedBios n'a de sens qu'avec un objectif, une
-        // stabilite etablie et une mesure avant/apres possible — nous n'avons aucun des trois.
+        // stabilite etablie et une mesure avant/apres possible : nous n'avons aucun des trois.
         constats.Add(configure >= nominal
             ? new RepairFinding("RAM", "vitesse memoire", $"{configure} MT/s", $"{nominal} MT/s",
                 RepairStatus.Observed,
@@ -233,7 +230,7 @@ else
 
 // ── BCD ─────────────────────────────────────────────────────────────────────────────────
 // Rendu par `RepairAuditService` : c'est une pure lecture, donc elle appartient au produit et non
-// a cet outil. Le jugement lui-meme vit dans `BcdInterpretation` depuis le 08/09.
+// a cet outil. Le jugement lui-meme vit dans `BcdInterpretation`.
 
 // ── BIOS : la matrice de qualification, seule lecture BIOS qui reste ici ────────────────
 // L'identite (carte, firmware) et l'interface constructeur sont rendues par `RepairAuditService`.
@@ -272,10 +269,9 @@ else
             + "Ecriture automatique refusee : " + (e.CeQuiManque ?? "—")));
 }
 
-// ── RESEAU : la famille dont l'audit ne disait RIEN ─────────────────────────────────────
+// ── RESEAU ────────────────────────────────────────────────────────────────────────────
 //
-// `NicErrorCounters` est ecrit, teste, et n'avait **aucun consommateur** — troisieme fois
-// aujourd'hui qu'une grandeur deja mesuree n'atteignait personne. Et son contrat compte : ces
+// `NicErrorCounters`, et son contrat compte : ces
 // compteurs sont des TOTAUX depuis le demarrage, inutilisables tels quels. On mesure donc une
 // FENETRE, comme l'API le demande.
 
@@ -328,8 +324,8 @@ else
 // Le TYPE de vidage est rendu par `RepairAuditService` (pure lecture de registre). Ce qui suit
 // est ce que cet outil apporte en plus : l'inventaire de ce qui a REELLEMENT ete produit.
 
-// Les vidages presents et les echecs de creation (volmgr 161) sont rendus par `RepairAuditService`
-// depuis le 17/09/2026 : le produit les montre aussi.
+// Les vidages presents et les echecs de creation (volmgr 161) sont rendus par `RepairAuditService` :
+// le produit les montre aussi.
 
 // Les incidents noyau LIVE sont rendus par `RepairAuditService` : pure lecture des rapports WER,
 // donc elle appartient au produit.
@@ -355,9 +351,9 @@ foreach (var domaine in constats.Select(c => c.Domaine).Distinct())
 
 // ── CE QU'IL FAUT EN RETENIR ────────────────────────────────────────────────────────────
 //
-// Cette section rendait un decompte de statuts — « 2 recommandations, 6 Unknown ». Exact, et
-// illisible : rien n'y disait CE QU'IL FAUT REGARDER parmi une cinquantaine de constats sur onze
-// domaines. Un rapport que personne ne lit ne vaut pas mieux qu'un rapport faux.
+// Pas un decompte de statuts (« 2 recommandations, 6 Unknown ») : exact et illisible, il ne dirait
+// pas CE QU'IL FAUT REGARDER parmi une cinquantaine de constats sur onze domaines. Un rapport que
+// personne ne lit ne vaut pas mieux qu'un rapport faux.
 var tri = RepairTriage.Trier(constats);
 
 Console.WriteLine("== CE QUI MERITE TON ATTENTION ==");
@@ -396,12 +392,12 @@ var photoActuelle = new RepairSnapshot(
     // multi-canal n'est plus prouve » alors que la machine n'avait rien perdu — c'est une
     // compilation qui tournait.
     new ConditionsDeMesure(ChargeProcesseur(), dispersionDebit),
-    // 16/09/2026 : le meme magasin que l'appli. Sans l'empreinte et les droits, une photo prise ici
+    // Le meme magasin que l'appli. Sans l'empreinte et les droits, une photo prise ici
     // en administrateur faisait dire a l'appli, non elevee, que des familles avaient « disparu ».
     typeof(DrDxt.Detection.Repair.RepairAuditService).Assembly.ManifestModule.ModuleVersionId.ToString("N")[..12],
     new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
         .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator),
-    // 17/09/2026 : l'outil lit des familles que l'appli ne lit pas ; chacun se compare à lui-même.
+    // L'outil lit des familles que l'appli ne lit pas ; chacun se compare à lui-même.
     Lecteur: "outil");
 
 Console.WriteLine();
@@ -503,7 +499,7 @@ static RepairFinding Reglage(string quoi, TriState etat, string explication) => 
 /// difference entre deux instants a un sens — c'est pour ca que l'API n'expose que `Diff`.
 /// </summary>
 static RepairFinding MesurerPertes(string interfaceId)
-    // 10/09/2026 : la regle vit dans le produit (`PertesInterface`) ; l'outil et l'App classent pareil.
+    // La regle vit dans le produit (`PertesInterface`) ; l'outil et l'App classent pareil.
     // Ici, une fenetre calme de 3 s ; l'App, elle, mesure pendant la partie.
     => PertesInterface.Mesurer(new SystemNicCounterSource(), interfaceId, TimeSpan.FromSeconds(3));
 

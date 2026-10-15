@@ -9,7 +9,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 17/09/2026, suite du « tout annuler » : le defaut n'etait pas un cas isole.
+// Suite du « tout annuler » : le defaut n'etait pas un cas isole.
 // Six commandes de l'application peuvent etre grisees (activer, transferer,
 // rafraichir, acheter, installer la mise a jour, APPLIQUER) et **aucune**
 // n'expliquait son inertie.
@@ -34,9 +34,6 @@ public sealed class LActionPrincipaleSExpliqueTests
         ScanViewModelTestSeams.Safety(),
         ScanViewModelTestSeams.Engine(),
         ScanViewModelTestSeams.ProfileConsumer(),
-        ScanViewModelTestSeams.GpuTuningStep(),
-        Substitute.For<DrDxt.App.Navigation.INavigationService>(),
-        () => new DashboardViewModel(),
         ScanViewModelTestSeams.DesiredStateStore(),
         new AppliedTweakManifestMapper(),
         ScanViewModelTestSeams.BiosAdvisor(),
@@ -71,7 +68,7 @@ public sealed class LActionPrincipaleSExpliqueTests
         vm.ApplyHintKey.Should().Be("scan.apply.ready");
     }
 
-    // 10/10/2026 : l'info-bulle restait « lance d'abord un scan » après le scan, faute d'être recalculée.
+    // L'info-bulle restait « lance d'abord un scan » après le scan, faute d'être recalculée.
     [Fact]
     public void L_info_bulle_suit_l_etat_du_scan_et_dit_quand_il_n_y_a_rien_a_poser()
     {
@@ -111,7 +108,7 @@ public sealed class LActionPrincipaleSExpliqueTests
         bloc.Should().Contain("ToolTipService.ShowOnDisabled=\"True\"");
         bloc.Should().Contain("ApplyHint");
 
-        // Le convertisseur "Loc" n'existe que dans DashboardView : lier une cle ici
+        // Le convertisseur "Loc" n'est pas une ressource de ScanView : lier une cle ici
         // leverait au rendu. Ce test l'interdit explicitement, parce qu'un grep de XAML
         // ne voit pas une ressource manquante — seul le crible de liaisons la voit.
         bloc.Should().NotContain("StaticResource Loc");

@@ -7,9 +7,9 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// NS-1 — GameDvrBackgroundOffTweak. Turns off Game DVR background recording via
-// HKCU\...\GameDVR\HistoricalCaptureEnabled = 0 (surgical: manual capture untouched).
-// Single-leaf, reboot-required (deferred A/B proof). NSubstitute fakes, no real registry.
+// GameDvrBackgroundOffTweak. Coupe l'enregistrement en arrière-plan du Game DVR via
+// HKCU\...\GameDVR\HistoricalCaptureEnabled = 0 (chirurgical : la capture manuelle reste intacte).
+// Une seule feuille, redémarrage requis (preuve A/B différée). Faux NSubstitute, aucun vrai registre.
 // -----------------------------------------------------------------------
 public sealed class GameDvrBackgroundOffTweakTests
 {
@@ -67,7 +67,7 @@ public sealed class GameDvrBackgroundOffTweakTests
     [Fact]
     public void AppliesTo_is_false_when_already_off()
     {
-        // Revue du 12/09 (C1) : une machine deja reglee ne doit plus porter ce levier au plan,
+        // Une machine deja reglee ne doit plus porter ce levier au plan,
         // sinon « rien a tenter » n'est jamais vrai et le client passe par l'achat pour rien.
         var t = Build();
         _registry.ReadDword(RegistryHiveKind.CurrentUser, GameDvrPath, HistoricalCaptureName)
@@ -79,7 +79,7 @@ public sealed class GameDvrBackgroundOffTweakTests
     [Fact]
     public void AppliesTo_is_false_when_absent_because_the_windows_default_is_OFF()
     {
-        // 14/09/2026 (C1 bis) : ce test affirmait « absent = defaut Windows (actif) ». Faux :
+        // Ce test affirmait « absent = defaut Windows (actif) ». Faux :
         // « Record what happened » est desactive par defaut (valeur absente = 0). C'est le cas du
         // poste de reference, et c'est lui qui tenait « rien a tenter » faux pour toujours.
         var t = Build();
@@ -108,7 +108,7 @@ public sealed class GameDvrBackgroundOffTweakTests
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // Disables background recording: writes HistoricalCaptureEnabled = 0 on the leaf.
+        // Désactive l'enregistrement en arrière-plan : écrit HistoricalCaptureEnabled = 0 sur la feuille.
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<SetRegistryValueOp>(o =>
                 o.Hive == RegistryHiveKind.CurrentUser
@@ -117,7 +117,7 @@ public sealed class GameDvrBackgroundOffTweakTests
                 && o.Kind == RegistryValueType.DWord
                 && o.Value == "0"),
             Arg.Any<CancellationToken>());
-        // Snapshot carries the captured original (1) as a serialized inverse op.
+        // L'instantané porte l'origine capturée (1) en op inverse sérialisée.
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         inverse.IsOk.Should().BeTrue();
         inverse.Value.Should().BeOfType<SetRegistryValueOp>().Which.Value.Should().Be("1");

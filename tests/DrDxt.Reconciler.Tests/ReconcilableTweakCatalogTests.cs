@@ -4,9 +4,9 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// The reconcilable DESCRIPTOR table (single source of truth) + the canonical
-// value serializer. Pure data — both the SettingProbe and the future op-mapper
-// consume it, so it lives (and is tested) in the pure DrDxt.Reconciler layer.
+// La table de descripteurs réconciliables (seule source) et le sérialiseur de valeur
+// canonique. Données pures : la SettingProbe et le mappeur d'ops la consomment tous deux,
+// donc elle vit (et se teste) dans la couche pure DrDxt.Reconciler.
 // -----------------------------------------------------------------------
 public sealed class ReconcilableTweakCatalogTests
 {
@@ -50,8 +50,8 @@ public sealed class ReconcilableTweakCatalogTests
     [Fact]
     public void DrsBackedLatencyIds_AreNotProbeable_UntilTheOpMapperResolvesTheirReadPath()
     {
-        // Policy maps these to Registry, but the Application tweaks apply them via
-        // NVAPI DRS / ADLX — there is NO plain readable leaf, so they are absent here.
+        // La politique les classe Registry, mais les leviers de l'Application les appliquent via
+        // DRS NVAPI / ADLX : il n'y a aucune feuille lisible simple, donc ils sont absents ici.
         _catalog.DescriptorFor("latency.renderQueueCap").Should().BeNull();
         _catalog.DescriptorFor("latency.vrrVsyncCap").Should().BeNull();
     }
@@ -72,8 +72,8 @@ public sealed class ReconcilableTweakCatalogTests
     [Fact]
     public void Hkcu_ns1_tweaks_have_no_descriptor_localsystem_reconcile_is_hklm_only()
     {
-        // The boot reconciler runs as LocalSystem; an HKCU reapply would hit SYSTEM's hive, so
-        // the HKCU NS-1 tweaks are intentionally absent (per-user reconcile is a future path).
+        // Le réconciliateur du démarrage tourne en LocalSystem ; une réapplication HKCU toucherait la
+        // ruche de SYSTEM, donc les leviers HKCU sont volontairement absents (la réconciliation par utilisateur reste à faire).
         _catalog.DescriptorFor("os.gameDvrBackground").Should().BeNull();
         _catalog.DescriptorFor("os.gameMode").Should().BeNull();
     }
@@ -85,7 +85,7 @@ public sealed class ReconcilableTweakCatalogTests
     [Fact]
     public void Canonicalizer_Dword_MatchesTheApplicationTweaksInvariantString()
     {
-        // NvidiaUltraLowLatencyTweak writes UltraLowLatency=2 via value.ToString(InvariantCulture).
+        // NvidiaUltraLowLatencyTweak écrit UltraLowLatency=2 via value.ToString(InvariantCulture).
         ReconcilableValueCanonicalizer.Dword(2u).Should().Be("2");
         ReconcilableValueCanonicalizer.Dword(0u).Should().Be("0");
         ReconcilableValueCanonicalizer.Dword(uint.MaxValue).Should().Be("4294967295");

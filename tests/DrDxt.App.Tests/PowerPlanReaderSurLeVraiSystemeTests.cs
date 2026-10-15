@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 26/09/2026 : le plan d'alimentation actif, sur lequel le levier du plan se décide, était lu par un
+// Le plan d'alimentation actif, sur lequel le levier du plan se décide, était lu par un
 // lecteur qu'aucun test n'exerçait sur le vrai système. Il doit rendre le même GUID que powercfg.
 public sealed class PowerPlanReaderSurLeVraiSystemeTests
 {

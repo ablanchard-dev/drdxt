@@ -3,7 +3,7 @@ using DrDxt.Detection.Wmi;
 namespace DrDxt.Detection.Cpu;
 
 /// <summary>
-/// 25/09/2026 — la puissance du paquet processeur, telle que Windows la publie (compteur
+/// La puissance du paquet processeur, telle que Windows la publie (compteur
 /// « Energy Meter », instance RAPL du paquet). Lue par la classe CIM et non par le nom du
 /// compteur : le nom est traduit (« Compteur Énergie » sur un Windows français), la classe non.
 ///

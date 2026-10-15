@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 10/10/2026 : au survol d'un composant, sa douille s'allume. La carte visée suit la mise en page (icône sur le pôle),
+// Au survol d'un composant, sa douille s'allume. La carte visée suit la mise en page (icône sur le pôle),
 // et l'éclat monte vite puis redescend, sans boucle.
 public sealed class SurvolDesComposantsTests
 {

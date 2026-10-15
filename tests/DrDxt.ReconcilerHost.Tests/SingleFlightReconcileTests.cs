@@ -4,10 +4,10 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// T29 — SingleFlightReconcile serializes concurrent trigger calls with a
-// SemaphoreSlim(1,1): only ONE reconcile pass runs at a time. Two triggers firing
-// together do not double-run overlapping passes — the second waits for the first to
-// release, then runs (no overlap, both complete).
+// SingleFlightReconcile sérialise les appels concurrents des déclencheurs avec un
+// SemaphoreSlim(1,1) : un seul passage de réconciliation à la fois. Deux déclencheurs qui
+// jouent ensemble ne doublent pas les passages : le second attend que le premier libère,
+// puis tourne (aucun chevauchement, les deux s'achèvent).
 // -----------------------------------------------------------------------
 public sealed class SingleFlightReconcileTests
 {
@@ -18,16 +18,16 @@ public sealed class SingleFlightReconcileTests
         var gate = new InstrumentedTick();
         var single = new SingleFlightReconcile(gate.RunAsync);
 
-        // Fire two passes concurrently.
+        // Lancer deux passages en parallèle.
         var a = single.RunTickAsync(CancellationToken.None);
         var b = single.RunTickAsync(CancellationToken.None);
 
-        // Wait until exactly ONE has entered the body. If single-flight is broken the
-        // second would also enter; we give it a beat and assert it did not.
+        // Attendre qu'exactement un soit entré dans le corps. Si le vol unique est cassé, le
+        // second entrerait aussi ; on lui laisse un instant et on vérifie qu'il ne l'a pas fait.
         await gate.WaitUntilEntered(1);
         gate.CurrentlyInside.Should().Be(1, "the second pass must be blocked outside while the first holds the slot");
 
-        // Release the first; the second now acquires the slot and runs.
+        // Libérer le premier ; le second prend maintenant le créneau et tourne.
         gate.ReleaseOne();
         await gate.WaitUntilEntered(2);
         gate.CurrentlyInside.Should().Be(1, "still only one inside — they are serialized, never overlapping");
@@ -67,10 +67,10 @@ public sealed class SingleFlightReconcileTests
         result.Error!.Value.Code.Should().Be(ErrorCodes.IoFailure);
     }
 
-    // An instrumented reconcile body that records overlap. Each call increments an
-    // "entered" counter and a "currently inside" gauge, then (unless autoRelease)
-    // blocks on a semaphore until the test releases exactly one waiter — letting the
-    // test hold a pass "inside" and prove the coordinator does not admit a second.
+    // Un corps de réconciliation instrumenté qui enregistre les chevauchements. Chaque appel
+    // incrémente un compteur « entrés » et une jauge « actuellement dedans », puis (sauf autoRelease)
+    // bloque sur un sémaphore jusqu'à ce que le test libère exactement un attendant : le test
+    // peut ainsi tenir un passage « dedans » et prouver que le coordinateur n'en admet pas un second.
     private sealed class InstrumentedTick
     {
         private readonly bool _autoRelease;
@@ -104,9 +104,9 @@ public sealed class SingleFlightReconcileTests
 
         public void ReleaseOne() => _release.Release();
 
-        /// <summary>Spins (briefly) until <paramref name="count"/> calls have entered
-        /// the body. Deterministic up to a generous timeout so a broken single-flight
-        /// (which would over-admit) is caught, not hung forever.</summary>
+        /// <summary>Tourne (brièvement) jusqu'à ce que <paramref name="count"/> appels soient entrés
+        /// dans le corps. Déterministe jusqu'à un délai généreux, pour qu'un vol unique cassé
+        /// (qui admettrait trop) soit attrapé, pas suspendu pour toujours.</summary>
         public async Task WaitUntilEntered(int count)
         {
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);

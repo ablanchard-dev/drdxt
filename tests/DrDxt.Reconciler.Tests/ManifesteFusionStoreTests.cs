@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 /// <summary>
-/// 11/09/2026 — le manifeste signe fusionne au lieu de remplacer. Par identifiant : ajouter, ou mettre a
+/// Le manifeste signe fusionne au lieu de remplacer. Par identifiant : ajouter, ou mettre a
 /// jour la valeur voulue en GARDANT la premiere origine. Rien n'est jamais retire, et un manifeste existant
 /// qu'on ne sait pas relire n'est jamais ecrase.
 /// </summary>

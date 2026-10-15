@@ -5,7 +5,7 @@ using System.Windows.Data;
 namespace DrDxt.App.Converters;
 
 /// <summary>
-/// Collapses when value is null or empty string.
+/// Rend Collapsed quand la valeur est null ou une chaîne vide.
 /// </summary>
 [ValueConversion(typeof(string), typeof(Visibility))]
 public sealed class StringNotEmptyToVisibilityConverter : IValueConverter

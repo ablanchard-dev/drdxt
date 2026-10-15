@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Hardware;
 
 /// <summary>
-/// « OPTIMAL » est un jugement de qualite sur un overclock qu'on n'a pas teste.
+/// « Optimal » est un jugement de qualite sur un overclock qu'on n'a pas teste.
 ///
 /// `LeverCatalog` rend `Optimal` des que XMP/EXPO est actif. C'est vrai en performance et muet sur
 /// la stabilite : un profil XMP est un overclock memoire, il peut ne pas tenir, et le produit n'a
@@ -12,17 +12,16 @@ namespace DrDxt.Detection.Hardware;
 ///
 /// ══ ce que ce conseil n'a pas le droit de faire : accuser ══
 /// `Kernel-Power 41` signifie « Windows a redemarre sans arret propre ». **Une extinction au bouton
-/// ou a la prise se logue exactement pareil.** Ce projet a deja fait cette erreur une fois, en juin,
-/// et l'a corrigee : ecrire « ta machine plante N fois » a partir de ce compte est une
-/// surinterpretation, pas une mesure.
+/// ou a la prise se logue exactement pareil.** Ecrire « ta machine plante N fois » a partir de
+/// ce compte est une surinterpretation, pas une mesure.
 ///
 /// Le conseil pose donc deux faits lus (un profil est actif, la machine a redemarre sans arret
-/// propre) et **un UNKNOWN nomme** (nous n'avons pas teste ce profil). Il propose la seule
-/// experience qui tranche : repasser en JEDEC quelques jours. Il ne chiffre rien -- classe `NON CHIFFRE`.
+/// propre) et **un Unknown nomme** (nous n'avons pas teste ce profil). Il propose la seule
+/// experience qui tranche : repasser en JEDEC quelques jours. Il ne chiffre rien : classe `NON CHIFFRE`.
 ///
-/// 16/09/2026 : il ecrivait « nous ne savons pas distinguer un gel d'une extinction au bouton ».
-/// Faux : `PowerButtonTimestamp` le dit. Les appuis longs sur le bouton sont desormais exclus A LA
-/// Lecture (<see cref="ArretBrutal.HorsBouton"/>), et le detail (ecrans bleus, codes) est dit par
+/// Distinguer un gel d'une extinction au bouton est possible : `PowerButtonTimestamp` le dit.
+/// Les appuis longs sur le bouton sont exclus a la lecture
+/// (<see cref="ArretBrutal.HorsBouton"/>), et le detail (ecrans bleus, codes) est dit par
 /// l'audit de stabilite.
 ///
 /// ══ pourquoi pas sur un profil sain ══
@@ -51,13 +50,13 @@ public static class MemoryStabilityAdvisor
         if (chassis != ChassisType.Desktop) return Array.Empty<MemoryTopologyGuidance>();
 
         // Off ou Unknown : il n'y a pas d'overclock a suspecter, ou on ne sait pas s'il y en a un.
-        // Dans les deux cas on se tait -- on n'accuse pas un profil dont on ignore l'existence.
+        // Dans les deux cas on se tait : on n'accuse pas un profil dont on ignore l'existence.
         if (xmpExpo != TriState.On) return Array.Empty<MemoryTopologyGuidance>();
 
-        // `null` = jamais lu, liste vide = lu et propre. Les deux se taisent ici, et une mutation
-        // du 06/09 l'a prouve : separer les deux cas dans ce conseiller donnait un mutant
-        // EQUIVALENT -- une garde qui a l'air de defendre quelque chose et ne defend rien. La
-        // distinction qui compte vit chez le LECTEUR (`SettingsStateReader`), ou traduire un
+        // `null` = jamais lu, liste vide = lu et propre. Les deux se taisent ici : separer les deux cas
+        // dans ce conseiller donnerait un mutant equivalent, une garde qui a l'air de defendre
+        // quelque chose et ne defend rien. La
+        // distinction qui compte vit chez le lecteur (`SettingsStateReader`), ou traduire un
         // journal illisible en liste vide fait bel et bien tomber un test.
         var earliest = now.AddDays(-WindowDays);
         if (uncleanShutdowns is null || !uncleanShutdowns.Any(d => d >= earliest))
