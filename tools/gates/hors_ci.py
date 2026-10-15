@@ -42,6 +42,7 @@ ATTENDU = {
     "DrDxt.App.Tests/DisplayInfoSurLeVraiSystemeTests.cs": (1, "lit les ecrans de la vraie session"),
     "DrDxt.GpuNative.Tests/VentilateurNvmlSurLaVraieCarteTests.cs": (1, "lit le ventilateur de la vraie carte NVIDIA"),
     "DrDxt.ElevatedHelper.Tests/SessionUtilisateurSurLaVraieRucheTests.cs": (1, "ecrit puis rend une valeur de la vraie session Windows"),
+    "DrDxt.ElevatedHelper.Tests/StartupApprovalMachineTests.cs": (1, "coupe, relit, retablit puis efface une entree de demarrage d'essai"),
     "DrDxt.Detection.Tests/TemperaturePawnIoTests.cs": (5, "lit la temperature, les limites de puissance, leur copie MMIO et l'etat du processeur par PawnIO quand il est installe, et un ventilateur CPU qui tourne pendant une seconde relevee"),
     "DrDxt.GpuNative.Tests/PawnIoSuperIoTests.cs": (1, "lit les ventilateurs de la vraie carte MSI (puce NCT6687) par PawnIO, session elevee"),
     "DrDxt.ElevatedHelper.Tests/AccelerationSourisSurLaVraieSessionTests.cs": (1, "ecrit puis rend l'acceleration du pointeur de la vraie session Windows"),
