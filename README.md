@@ -7,6 +7,7 @@
   <a href="LICENSE"><img alt="License GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-8B5CFF?style=flat-square&labelColor=06070A"></a>
   <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-FF4FD8?style=flat-square&labelColor=06070A">
   <img alt=".NET 10" src="https://img.shields.io/badge/.NET-10-FFB547?style=flat-square&labelColor=06070A">
+  <a href="https://discord.gg/z6HJWDzfB3"><img alt="Join the Discord" src="https://img.shields.io/badge/Discord-join-5865F2?style=flat-square&labelColor=06070A&logo=discord&logoColor=white"></a>
 </p>
 
 <p align="center">
@@ -14,6 +15,7 @@
   <a href="#what-it-does">What it does</a> ·
   <a href="#contributing">Contributing</a> ·
   <a href="docs/COUVERTURE.md">What is proven</a> ·
+  <a href="https://discord.gg/z6HJWDzfB3">Discord</a> ·
   <a href="README.fr.md">Français</a>
 </p>
 
