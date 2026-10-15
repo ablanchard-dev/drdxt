@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 (boucle « vivant et prouvé », B3) : « 12 points à corriger » apparaissait figé. Le chiffre monte jusqu'à sa
+// « 12 points à corriger » apparaissait figé. Le chiffre monte jusqu'à sa
 // valeur ; la fin est toujours la vraie phrase, et un lecteur d'écran la reçoit tout de suite.
 public sealed class CompteurTests
 {
@@ -43,5 +43,24 @@ public sealed class CompteurTests
 
         texte.Should().Be("0 points à corriger");
         nom.Should().Be("12 points à corriger");
+    }
+
+    // Un chiffre qui revient chaque scan se lit vite : 300 ms, pas 600.
+    [Fact]
+    public void La_montee_dure_300_ms() => Compteur.Duree.Should().Be(TimeSpan.FromMilliseconds(300));
+
+    // Le même résultat après un nouveau scan ne repart pas de zéro : rien n'a changé, rien ne bouge.
+    [Fact]
+    public void Une_valeur_inchangee_ne_rejoue_pas_la_montee()
+    {
+        var texte = StaApplication.Run(() =>
+        {
+            var t = new TextBlock();
+            Compteur.Poser(t, "12 points à corriger", animer: false);
+            Compteur.Poser(t, "12 points à corriger", animer: true);
+            return t.Text;
+        });
+
+        texte.Should().Be("12 points à corriger");
     }
 }

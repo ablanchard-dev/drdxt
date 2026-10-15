@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 26/09/2026 : la regle du nom d'exe vivait dans l'allowlist du helper seulement ; l'appli rallumait des
+/// La regle du nom d'exe vivait dans l'allowlist du helper seulement ; l'appli rallumait des
 /// noms que le helper refusait. Elle vit dans `NomExeDeJeu`, et son motif nulle part ailleurs dans `src/`.
 /// </summary>
 public sealed class UneSeuleRegleDeNomExeTests

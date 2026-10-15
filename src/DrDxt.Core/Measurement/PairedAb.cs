@@ -2,7 +2,7 @@
 namespace DrDxt.Core;
 
 /// <summary>Une passe d'un protocole apparie : dans quel etat elle a ete prise, et ce qu'elle a
-/// rendu. L'ordre de la liste est le protocole — le melanger detruit l'information qui compte.</summary>
+/// rendu. L'ordre de la liste est le protocole : le melanger detruit l'information qui compte.</summary>
 /// <param name="EtatB">Vrai pour l'etat modifie (B), faux pour l'etat de reference (A).</param>
 /// <param name="AvgFps">Ce que la passe a rendu. <c>0</c> ou non fini = passe inexploitable.</param>
 public readonly record struct AbPass(bool EtatB, double AvgFps);
@@ -12,20 +12,20 @@ public readonly record struct AbPass(bool EtatB, double AvgFps);
 ///
 /// Ce n'est pas une precaution theorique, c'est une reponse a une mesure. Le 07/09/2026, les
 /// trois captures reelles conservees ont ete passees a <see cref="SceneResolution"/> : **deux sur
-/// trois derivent plus qu'elles ne bruitent** — 22h07 derive de 4,93 % pour un bruit de 1,83 %,
+/// trois derivent plus qu'elles ne bruitent** : 22h07 derive de 4,93 % pour un bruit de 1,83 %,
 /// 23h37 de 18,68 % pour 2,36 %. Sur cette machine, en partie reelle, un A/B en AAA→BBB attribue
 /// **le plus souvent** au reglage ce qui n'est que le temps ecoule.
 ///
 /// ══ pourquoi pas un simple appairage successif ══
 /// Comparer chaque B au A qui le precede parait suffire, et ne suffit pas : si la machine derive de
 /// <c>d</c> par passe, chaque difference porte encore <c>effet + d</c>. L'appairage successif
-/// **reduit** la derive de <c>3d</c> a <c>d</c> — il ne l'annule pas. Essaye et mesure le
-/// 07/09/2026 : sur une derive pure de +10 fps par passe, l'appairage successif rendait encore
+/// **reduit** la derive de <c>3d</c> a <c>d</c>, il ne l'annule pas. Essaye et mesure :
+/// sur une derive pure de +10 fps par passe, l'appairage successif rendait encore
 /// +14,6 % d'« effet ».
 ///
 /// ══ ce que fait cette classe ══
 /// Un ajustement aux moindres carres de <c>fps ≈ a + b·t + c·estB</c>. Le coefficient <c>c</c> est
-/// l'effet du reglage **degage de la derive lineaire**, quel que soit l'ordre du protocole —
+/// l'effet du reglage **degage de la derive lineaire**, quel que soit l'ordre du protocole :
 /// A-b-a-b, a-b-b-a ou plus long. Sur une derive pure sans effet, il vaut **exactement zero**.
 ///
 /// Et la garde contre AABB en tombe toute seule : dans cette sequence l'etat est **colineaire au
@@ -48,7 +48,7 @@ public static class PairedAb
     /// Part maximale de la variance de l'etat expliquable par le temps (r² entre l'instant et
     /// l'indicatrice B). Au-dela, l'effet et la derive sont confondus.
     ///
-    /// Hypothese de depart : AABB donnerait un systeme SINGULIER et se refuserait tout seul.
+    /// Hypothese de depart : AABB donnerait un systeme singulier et se refuserait tout seul.
     /// **Faux, verifie au calcul** : sur quatre passes, AABB rend un determinant de 1, pas de 0.
     /// La colinearite parfaite demanderait deux points. Il faut donc une garde explicite, et voici
     /// ce que valent les protocoles :
@@ -73,22 +73,22 @@ public static class PairedAb
     ///
     /// Le symptome est visible : les residus valaient 8,3 % de la base quand la scene n'annoncait
     /// que 2 % de bruit. Un modele qui laisse quatre fois plus de residu que le bruit mesure ne
-    /// decrit pas ces donnees — et un effet extrait d'un modele faux est une precision fabriquee.
+    /// decrit pas ces donnees, et un effet extrait d'un modele faux est une precision fabriquee.
     ///
-    /// **NON CHIFFRÉ** : le facteur 2 laisse passer le desajustement ordinaire (une courbure
+    /// **Non chiffré** : le facteur 2 laisse passer le desajustement ordinaire (une courbure
     /// douce) et arrete un saut. Il est ecrit ici pour etre discute, pas dilue dans un calcul.
     /// </summary>
     public const double ResiduToleretouteFoisLaResolution = 2.0;
 
     /// <summary>Juge une sequence appariee.</summary>
-    /// <param name="passes">Les passes dans l'ordre CHRONOLOGIQUE du protocole.</param>
+    /// <param name="passes">Les passes dans l'ordre chronologique du protocole.</param>
     /// <param name="resolutionPct">Ce que la scene sait resoudre, mesure par
-    /// <see cref="SceneResolution"/> — l'appairage change le signal, pas le bruit de la scene.</param>
+    /// <see cref="SceneResolution"/> : l'appairage change le signal, pas le bruit de la scene.</param>
     public static PerformanceEvidence Analyse(IReadOnlyList<AbPass> passes, double resolutionPct)
     {
         var toutes = passes ?? Array.Empty<AbPass>();
 
-        // L'index de temps est celui de la sequence COMPLETE, pas de la liste filtree : une
+        // L'index de temps est celui de la sequence complete, pas de la liste filtree : une
         // passe perdue laisse un trou dans le temps, et le reboucher ferait mentir la pente.
         var points = toutes
             .Select((p, t) => (T: (double)t, Z: p.EtatB ? 1.0 : 0.0, Y: p.AvgFps))
@@ -96,14 +96,12 @@ public static class PairedAb
             .ToList();
 
         if (points.Count < PassesMinimum)
-            return Invalide($"il faut au moins {PassesMinimum} passes exploitables pour separer "
-                            + $"l'effet de la derive (trouve : {points.Count}): avec moins, une "
-                            + "seule paire ne vaut pas mieux que le protocole naif");
+            return Invalide(Docteur.T("PA.Minimum", PassesMinimum, points.Count));
 
         var refA = points.Where(p => p.Z == 0).ToList();
         var refB = points.Where(p => p.Z == 1).ToList();
         if (refA.Count == 0 || refB.Count == 0)
-            return Invalide("la séquence ne contient qu'un seul état : il n'y a rien à comparer");
+            return Invalide(Docteur.T("PA.UnSeulEtat"));
 
         var tMoyen = points.Average(p => p.T);
         var zMoyen = points.Average(p => p.Z);
@@ -124,29 +122,27 @@ public static class PairedAb
 
         var determinant = stt * szz - stz * stz;
         if (!(stt > 0) || !(szz > 0) || Math.Abs(determinant) < 1e-9)
-            return Invalide("les passes ne varient ni dans le temps ni dans l'état : rien à séparer");
+            return Invalide(Docteur.T("PA.RienASeparer"));
 
         // Le protocole est-il capable de distinguer l'etat du temps ? Voir CorrelationTempsEtatMax :
         // AABB echoue ici, et c'est le seul endroit ou il pouvait etre attrape.
         var r2 = stz * stz / (stt * szz);
         if (r2 > CorrelationTempsEtatMax)
-            return Invalide(F($"le protocole ne sépare pas l'état du temps (r² = {r2:0.00}) : avec ")
-                            + "tous les A avant tous les B, « être en B » veut surtout dire « plus "
-                            + "tard ». Alterner (A-B-A-B) ou symétriser (A-B-B-A)");
+            return Invalide(Docteur.T("PA.Confondu", r2));
 
         // c = l'effet, en unites de FPS, une fois la derive lineaire retiree.
         var effetFps = (stt * szy - stz * sty) / determinant;
 
-        // Rapporte a la reference : c'est un pourcentage de l'etat A, pas de la moyenne generale —
+        // Rapporte a la reference : c'est un pourcentage de l'etat A, pas de la moyenne generale,
         // sinon l'effet se diluerait dans sa propre presence.
         var baseA = refA.Average(p => p.Y);
         if (!(baseA > 0))
-            return Invalide("aucune passe de référence exploitable");
+            return Invalide(Docteur.T("PA.SansReference"));
 
         // ── Le modele decrit-il seulement ces donnees ? ─────────────────────────────────────
         // On reconstruit la droite ajustee et on regarde ce qu'elle laisse. Un residu bien plus
         // grand que le bruit annonce par la scene signifie que la forme de la derive n'est pas
-        // celle qu'on retire — et l'effet extrait n'est alors qu'un artefact du desajustement.
+        // celle qu'on retire, et l'effet extrait n'est alors qu'un artefact du desajustement.
         var pente = (szz * sty - stz * szy) / determinant;
         var constante = yMoyen - pente * tMoyen - effetFps * zMoyen;
         var sse = points.Sum(pt =>
@@ -158,10 +154,7 @@ public static class PairedAb
 
         if (double.IsFinite(resolutionPct) && resolutionPct > 0
             && residuPct > ResiduToleretouteFoisLaResolution * resolutionPct)
-            return Invalide(F($"le modèle ne décrit pas cette séquence : il laisse {residuPct:0.0} % de ")
-                            + F($"résidu quand la scène n'annonce que {resolutionPct:0.0} % de bruit. ")
-                            + "La dérive n'a pas la forme retirée (saut de phase, plateau, courbure) "
-                            + ": un effet extrait ici serait une précision fabriquée");
+            return Invalide(Docteur.T("PA.Modele", residuPct, resolutionPct));
 
         // ── La resolution du modele lui-meme ────────────────────────────────────────────────
         // Jusqu'ici l'effet etait juge contre la resolution d'une phase d'A/A a trois passes.
@@ -169,7 +162,7 @@ public static class PairedAb
         // asymptotique. Mesure du 07/09/2026 (`tools/tailbench`, 8 captures Warzone reelles,
         // 43 positions glissantes) : l'A/A annoncait **±14,3 %** quand le bruit vrai de la meme
         // experience, mesure sur sa distribution nulle, valait **±3,85 %**. Le produit etait
-        // Sous-confiant d'un facteur ~3,7 — il ne fabriquait pas de faux verdicts, il etait
+        // sous-confiant d'un facteur ~3,7 : il ne fabriquait pas de faux verdicts, il etait
         // simplement aveugle a tout ce qui vaut moins de 14 %.
         //
         // L'experience appariee sait mesurer son propre bruit : la variance du coefficient
@@ -186,7 +179,7 @@ public static class PairedAb
                 Evidence.From(effetFps / baseA * 100.0, resolutionDuModele)));
     }
 
-    // 26/09/2026 : une seule table dans le produit (Student). Celle-ci en etait une copie.
+    // Une seule table dans le produit (Student). Celle-ci en etait une copie.
     private static double TValue95(int ddl) => Student.T95(ddl);
 
     private static PerformanceEvidence Invalide(string motif) =>

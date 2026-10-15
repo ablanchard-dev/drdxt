@@ -3,14 +3,14 @@ using System.Runtime.InteropServices;
 namespace DrDxt.Measurement;
 
 /// <summary>
-/// La pression de VALIDATION (commit) de Windows : octets valides / limite de validation,
+/// La pression de validation (commit) de Windows : octets valides / limite de validation,
 /// dans [0, 1].
 ///
 /// C'est la seule grandeur du classifieur de goulot qui ne vient pas de PresentMon, et la seule
 /// qui parle de fiabilite plutot que de FPS. Microsoft documente le fait qui la rend utile :
 /// quand la validation atteint la limite, le systeme et les processus peuvent geler, planter ou
 /// mal fonctionner. Sur une machine dans cet etat, aucun reglage graphique ne repare quoi que
-/// ce soit — et lui vendre un overclock serait vendre la mauvaise chose.
+/// ce soit, et lui vendre un overclock serait vendre la mauvaise chose.
 /// Source : https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file
 ///
 /// Rend <c>null</c> quand la lecture echoue. Jamais 0 : « je n'ai pas pu lire » et « la machine
@@ -25,8 +25,8 @@ public static class CommitPressureReader
         public uint dwMemoryLoad;
         public ulong ullTotalPhys;
         public ulong ullAvailPhys;
-        // ullTotalPageFile / ullAvailPageFile sont MAL NOMMES : malgre leur nom, Windows y met
-        // la limite de validation et ce qu'il en reste — RAM + fichier d'echange, pas le seul
+        // ullTotalPageFile / ullAvailPageFile sont mal nommes : malgre leur nom, Windows y met
+        // la limite de validation et ce qu'il en reste (RAM + fichier d'echange), pas le seul
         // fichier d'echange. C'est exactement le couple dont on a besoin, et c'est le piege de
         // lecture le plus courant sur cette API.
         public ulong ullTotalPageFile;
@@ -40,7 +40,7 @@ public static class CommitPressureReader
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
 
-    /// <summary>03/10/2026 (P3.3) : la mémoire physique libre, en octets, ou null si elle n'est pas lisible.</summary>
+    /// <summary>La mémoire physique libre, en octets, ou null si elle n'est pas lisible.</summary>
     public static ulong? LibrePhysique()
     {
         try

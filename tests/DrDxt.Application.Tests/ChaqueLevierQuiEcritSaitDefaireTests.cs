@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Le README ouvre sur deux promesses : « il ne dit jamais un chiffre
+// Le README ouvre sur deux promesses : « il ne dit jamais un chiffre
 // qu'il n'a pas mesure, et il n'applique jamais un levier qu'il ne peut pas
 // defaire ». La seconde tenait a la FORME du contrat -- `ITweak` expose bien un
 // `RevertAsync` -- et rien de plus.

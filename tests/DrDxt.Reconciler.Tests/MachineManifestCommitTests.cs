@@ -10,7 +10,7 @@ using NSec.Cryptography;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// 11/09/2026 — la cle de la machine et l'ecrivain du manifeste (ce que fait le helper eleve).
+// La cle de la machine et l'ecrivain du manifeste (ce que fait le helper eleve).
 //
 // Tout se joue dans un dossier temporaire, ACL NON appliquee (appliquerAcl: false) : la decision d'ACL
 // d'un fichier prive est prouvee a part, en fonction pure (Evaluate), comme le reste de la racine de
@@ -219,6 +219,36 @@ public sealed class MachineManifestCommitTests : IDisposable
 
         r.Error!.Value.Code.Should().Be(ErrorCodes.ManifestKeyUnusable);
         File.Exists(Manifeste).Should().BeFalse();
+    }
+
+    // La clé privée perdue (corrompue), la publique et le manifeste intacts : la reprise mettait de côté un manifeste encore
+    // lisible, et ses origines étaient perdues pour la désinstallation. Il est relu avec la publique et re-signé.
+    [Fact]
+    public async Task La_reprise_garde_les_origines_d_un_manifeste_encore_verifiable()
+    {
+        (await Commit(Gardes(Garde("latency.reflex", "\"1\"")))).IsOk.Should().BeTrue();
+        await File.WriteAllBytesAsync(Privee, new byte[] { 1, 2, 3 });
+
+        (await Commit(Gardes(Garde("latency.render_queue_cap", "\"0\"")), repartir: true)).IsOk.Should().BeTrue();
+
+        var relu = await RelireAvecLaSeulePublique();
+        relu.Value!.RevertOnly!.Select(t => t.TweakId).Should().BeEquivalentTo(["latency.reflex", "latency.render_queue_cap"]);
+    }
+
+    // Une lecture empêchée un instant (un antivirus tient le fichier) n'est pas une clé inutilisable : rien n'est mis de
+    // côté, l'écriture est remise.
+    [Fact]
+    public async Task Une_cle_tenue_un_instant_n_est_pas_mise_de_cote()
+    {
+        (await Commit(Gardes(Garde("latency.reflex", "\"1\"")))).IsOk.Should().BeTrue();
+        Result r;
+        using (new FileStream(Privee, FileMode.Open, FileAccess.Read, FileShare.None))
+            r = await Commit(Gardes(Garde("latency.render_queue_cap", "\"0\"")), repartir: true);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().NotBe(ErrorCodes.ManifestKeyUnusable);
+        MisDeCote(MachineManifestKey.PrivateFileName).Should().BeEmpty();
+        MisDeCote("desired-state.manifest").Should().BeEmpty();
     }
 
     // ── l'ACL d'un fichier prive (fonction pure) ────────────────────────────────────────────

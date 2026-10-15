@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Network;
 
-// 03/10/2026 (boucle 2D2P, P3.1b) : l'écoute des envois UDP, sur le vrai noyau. Le test envoie lui-même cinq datagrammes
+// L'écoute des envois UDP, sur le vrai noyau. Le test envoie lui-même cinq datagrammes
 // d'un octet vers 192.0.2.1:9 (plage réservée à la documentation, RFC 5737 : rien ne la route) et doit les retrouver,
 // adresse, port et octets compris. Sans droits d'administrateur la session ne s'ouvre pas : l'écoute le dit (null).
 public sealed class EcouteEnvoisUdpSurLeVraiSystemeTests

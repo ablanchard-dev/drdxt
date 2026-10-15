@@ -5,9 +5,9 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// 17/09/2026 : « 7 pendant une mise en veille ou une extinction » se lisait comme un probleme en
-/// cours. Sur la machine de reference ils datent du 22/07 au 05/08, et plus rien depuis. Les dates
-/// font partie du fait.
+/// « 7 pendant une mise en veille ou une extinction » sans dates passerait pour un probleme en
+/// cours, alors qu'ils peuvent tous etre anciens. Les dates font partie du fait (releves sur la
+/// machine de reference : tous entre 22/07 et 05/08, plus rien ensuite).
 /// </summary>
 public class ArretsBrutauxDatesTests
 {
@@ -29,7 +29,7 @@ public class ArretsBrutauxDatesTests
             .And.Contain("1 arrêt sans aucun code (gel, coupure de courant ou alimentation ; le 18/08)");
     }
 
-    // 08/10/2026 (D1 « sous charge ») : un arrêt tombé juste après le dernier regard du relevé sur une partie restée ouverte.
+    // Un arrêt tombé juste après le dernier regard du relevé sur une partie restée ouverte.
     [Fact]
     public void Un_arret_tombe_en_pleine_partie_se_dit_avec_le_jeu()
     {

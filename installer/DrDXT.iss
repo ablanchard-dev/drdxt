@@ -52,7 +52,7 @@ AppVersion={#AppVer}
 AppPublisher={#AppPublisher}
 VersionInfoVersion={#AppVer}
 DefaultDirName={autopf}\DrDXT
-; 25/09/2026 (revue de sécurité) : le dossier ne se choisit pas. Hors de Program Files (C:\DrDXT hérite
+; Le dossier ne se choisit pas. Hors de Program Files (C:\DrDXT hérite
 ; des droits de C:\), un compte sans droits admin pouvait remplacer le helper, lancé élevé à la demande
 ; et par la désinstallation. UsePreviousAppDir=no : une mise à jour ne reprend pas un ancien dossier choisi.
 DisableDirPage=yes
@@ -105,15 +105,27 @@ Name: "reconciler"; Description: "Réappliquer mes réglages au démarrage de Wi
 ; 27/09/2026 : le raccourci « Desinstaller DrDXT » prend ses accents ; sans cette ligne, une mise a jour
 ; laisserait l'ancien a cote du nouveau dans le menu Demarrer.
 Type: files; Name: "{group}\Desinstaller DrDXT.lnk"
-; 27/09/2026 : les fichiers de symboles ne sont plus livres depuis le 18/09, mais une mise a jour
-; n'efface que ce qu'elle remplace. Chez le mainteneur, 12 .pdb du 14/09 restaient a cote des binaires du 27/09.
+; Les fichiers de symboles ne sont plus livres, mais une mise a jour n'efface que ce qu'elle remplace :
+; sans ce retrait, des .pdb d'une ancienne version resteraient a cote des nouveaux binaires.
 Type: files; Name: "{app}\*.pdb"
+; 11/10/2026 : jusqu'au 10/10, l'App posait ce raccourci dans le dossier Demarrage du joueur. Lance par lui, le releve
+; tournait sans droits administrateur et ne lisait jamais la temperature du processeur (PawnIO refuse). La tache
+; planifiee de [Run] le remplace ; le raccourci d'une installation precedente est retire.
+Type: files; Name: "{userstartup}\DrDXT releve.lnk"
 Type: files; Name: "{app}\service\*.pdb"
 
 [UninstallDelete]
-; 06/10/2026 (J1b) : le raccourci du releve des parties, pose par l'App dans le dossier Demarrage du joueur
-; (ReleveAuDemarrage.NomRaccourci). Sans ce retrait, Windows lancerait a chaque session un programme desinstalle.
+; Le raccourci d'une ancienne version (voir [InstallDelete]) : sans ce retrait, Windows lancerait a
+; chaque session un programme desinstalle.
 Type: files; Name: "{userstartup}\DrDXT releve.lnk"
+
+[Registry]
+; Le helper y retient la limite de puissance du firmware a ce demarrage (garde Vmin) : partie avec DrDXT.
+Root: HKLM; Subkey: "Software\DrDXT"; Flags: uninsdeletekey dontcreatekey
+
+[Run]
+; La tache planifiee du releve (« DrDXT releve ») est posee par CurStepChanged, dans la branche ou le dossier est
+; protege : une tache au niveau le plus eleve qui lancerait un exe remplacable par le compte serait une elevation sans invite.
 
 [Files]
 ; Payload complet (App + helper + runtime + DLLs PresentMon + PresentMonService.exe + NOTICE)
@@ -153,7 +165,6 @@ Name: "{autodesktop}\DrDXT";      Filename: "{app}\{#AppExe}"; WorkingDir: "{app
 ; %ProgramData%\DrDxt\desinstallation-<heure UTC>.txt. skipifdoesntexist : un helper absent n'ajoute
 ; pas d'avertissement. Un test d'integration relit cette ligne.
 Filename: "{app}\DrDxt.ElevatedHelper.exe"; Parameters: "--uninstall-revert"; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "DrDxtRendreLesReglages"
-
 [Code]
 { --- 25/09/2026 : les outils Windows se lancent par la constante sys d'Inno (System32 64 bits, installeur en
       mode 64 bits), jamais par leur nom seul. Il tourne en administrateur ; un nom seul laisse
@@ -166,6 +177,30 @@ Filename: "{app}\DrDxt.ElevatedHelper.exe"; Parameters: "--uninstall-revert"; Fl
       sc renvoie une erreur inoffensive (loguee, ignoree).
       Le service de demarrage (reglages reappliques au boot) est a part, sur choix :
       voir InstallOrRemoveReconcilerService, plus bas. --- }
+{ Le nom PresentMonService est aussi celui du PresentMon d'Intel et d'autres outils : seul un service dont la ligne
+  commence par un PresentMonService.exe entre guillemets, sous un dossier DrDXT, est a nous. Une enveloppe qui le cite
+  plus loin ne l'est pas. Meme regle que PresentMonServicePlan dans Core. }
+function ImagePathPresentMon(): String;
+begin
+  Result := '';
+  RegQueryStringValue(HKLM, 'SYSTEM\CurrentControlSet\Services\{#PmService}', 'ImagePath', Result);
+end;
+
+function PresentMonEstANous(): Boolean;
+var
+  Chemin: String;
+  Fin: Integer;
+begin
+  Result := False;
+  Chemin := Uppercase(Trim(ImagePathPresentMon()));
+  if (Length(Chemin) < 2) or (Chemin[1] <> '"') then Exit;
+  Chemin := Copy(Chemin, 2, Length(Chemin));
+  Fin := Pos('"', Chemin);
+  if Fin < 23 then Exit;
+  Chemin := Copy(Chemin, 1, Fin - 1);
+  Result := (Pos('\DRDXT\', Chemin) > 0) and (Copy(Chemin, Length(Chemin) - 21, 22) = '\PRESENTMONSERVICE.EXE');
+end;
+
 procedure InstallPresentMonService();
 var
   ResultCode: Integer;
@@ -189,7 +224,9 @@ begin
         existant pointait vers un ancien dossier supprime ; create echouait (1073, ERROR_SERVICE_EXISTS)
         et l'installation laissait la mesure cassee. Meme cas chez un joueur qui reinstalle ou met a jour.
         On repointe donc le service existant sur CE binaire, sans le supprimer. --- }
-  if ResultCode = 1073 then
+  if (ResultCode = 1073) and not PresentMonEstANous() then
+    Log('service {#PmService} d''un autre produit : laisse tel quel (' + ImagePathPresentMon() + ')')
+  else if ResultCode = 1073 then
   begin
     Exec(ExpandConstant('{sys}\sc.exe'),
          'config {#PmService} binPath= "\"' + ExpandConstant('{app}\PresentMonService.exe') +
@@ -242,6 +279,9 @@ var
   ResultCode: Integer;
 begin
   Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#RcService}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  { 11/10/2026 : le releve de fond tourne sans fenetre a chaque session ; sans ceci, une mise a jour butait sur
+    DrDxt.App.exe en cours d'utilisation. }
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#AppExe} /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Result := '';
 end;
 
@@ -267,6 +307,8 @@ begin
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -274,11 +316,22 @@ begin
     begin
       InstallPresentMonService();
       InstallOrRemoveReconcilerService();
+      { Le releve des parties, a l'ouverture de session du joueur, au niveau le plus eleve (/RL HIGHEST : la temperature du
+        processeur se lit dans ses registres par PawnIO). Par le lanceur natif, jamais l'App directement : une tache HIGHEST
+        herite de HKCU\Environment, que tout programme du compte ecrit sans droits (CORECLR_PROFILER... chargerait une DLL
+        dans un programme .NET eleve) ; le lanceur reconstruit l'environnement. Sans /RU, la tache est celle du joueur qui
+        installe. Lancee tout de suite, pour que la prochaine partie soit relevee sans attendre une nouvelle session. }
+      Exec(ExpandConstant('{sys}\schtasks.exe'), '/Create /F /TN "DrDXT releve" /SC ONLOGON /RL HIGHEST /TR "\"' + ExpandConstant('{app}') + '\DrDxt.Lanceur.exe\" DrDxt.App.exe --releve"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      Exec(ExpandConstant('{sys}\schtasks.exe'), '/Run /TN "DrDXT releve"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end
     else
-      SuppressibleMsgBox('La protection du dossier de DrDXT a échoué : les services de démarrage ne sont pas installés, '
+    begin
+      { Dossier non protege : aucune tache elevee, et celle d'une installation precedente est retiree. }
+      Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /F /TN "DrDXT releve"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      SuppressibleMsgBox('La protection du dossier de DrDXT a échoué : les services de démarrage et le relevé des parties ne sont pas installés, '
         + 'pour qu''aucun programme de ton compte ne puisse remplacer leurs fichiers. DrDXT fonctionne sans eux ; '
         + 'relance l''installation pour réessayer.', mbError, MB_OK, IDOK);
+    end;
   end;
 end;
 
@@ -293,12 +346,20 @@ begin
   begin
     Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#AppExe} /F',                '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM DrDxt.ElevatedHelper.exe /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    { 11/10/2026 : la tache planifiee du releve (voir [Run]) part avec le programme. }
+    Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /F /TN "DrDXT releve"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     { Le service de demarrage d'abord : plus rien ne doit reappliquer pendant le rendu des reglages. }
     Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#RcService}',   '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec(ExpandConstant('{sys}\sc.exe'), 'delete {#RcService}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Log('Uninstall: service {#RcService} arrete + supprime (rc=' + IntToStr(ResultCode) + ').');
-    Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#PmService}',   '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec(ExpandConstant('{sys}\sc.exe'), 'delete {#PmService}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Log('Uninstall: service {#PmService} arrete + supprime.');
+    { Seulement le notre : celui d'un autre produit (meme nom) reste. }
+    if CompareText(ImagePathPresentMon(), '"' + ExpandConstant('{app}\PresentMonService.exe') + '"') = 0 then
+    begin
+      Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#PmService}',   '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      Exec(ExpandConstant('{sys}\sc.exe'), 'delete {#PmService}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      Log('Uninstall: service {#PmService} arrete + supprime.');
+    end
+    else
+      Log('Uninstall: service {#PmService} d''un autre produit, laisse tel quel.');
   end;
 end;

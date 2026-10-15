@@ -136,7 +136,7 @@ public class BenchmarkRunnerHygieneTests
     [Fact]
     public async Task Une_serie_SANS_rien_a_retirer_traverse_l_hygiene_intacte()
     {
-        // Le cas des 8 captures reelles du 01/09 : rejouees a travers l'hygiene corrigee, elles
+        // Le cas des 8 captures reelles mesurees le 01/09 : rejouees a travers l'hygiene, elles
         // gardent toutes leurs trames. Le branchement ne doit rien changer pour elles.
         var serie = Jeu(120, 5).ToList();
 

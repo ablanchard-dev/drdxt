@@ -7,7 +7,7 @@ using NSubstitute;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-/// <summary>28/09/2026 : retenir la protection du ping pour le service de démarrage. Le helper élevé est le
+/// <summary>Retenir la protection du ping pour le service de démarrage. Le helper élevé est le
 /// seul à écrire ce réglage sous %ProgramData%\DrDxt, derrière la même borne que le plafond lui-même.</summary>
 public sealed class PlafondRetenuPourLeServiceTests : IDisposable
 {
@@ -36,7 +36,7 @@ public sealed class PlafondRetenuPourLeServiceTests : IDisposable
         liste.Validate(new ForgetServiceUploadCapOp()).IsOk.Should().BeTrue();
     }
 
-    // 28/09/2026 : retenu pour le service, un lanceur ou un binaire de Windows serait exempté à chaque session,
+    // Retenu pour le service, un lanceur ou un binaire de Windows serait exempté à chaque session,
     // redémarrages compris, pendant que tout le reste est bridé. Même liste que le rallumage de l'App.
     [Theory]
     [InlineData("steam.exe")]

@@ -5,10 +5,10 @@ using FluentAssertions;
 namespace DrDxt.Bios.Tests;
 
 /// <summary>
-/// 24/09/2026 — lire le BIOS au lieu de le deviner, et ne rien dire des qu'un doute existe.
+/// Lire le BIOS au lieu de le deviner, et ne rien dire des qu'un doute existe.
 ///
 /// Les emplacements viennent de l'IFR du BIOS officiel MSI 1.H0 ; les valeurs « machine de
-/// reference » sont celles lues sur la carte de reference le 24/09 (XMP Profile 1, ReBAR et Above 4G
+/// reference » sont celles relevees sur la carte de reference le 24/09 (XMP Profile 1, ReBAR et Above 4G
 /// actifs, mode UEFI). La variable ici est synthetique, a la taille exacte de la vraie.
 /// </summary>
 public class NvramBiosSettingsReaderTests
@@ -32,7 +32,7 @@ public class NvramBiosSettingsReaderTests
 
     private const int TailleCpuSetup = 0x3C1;
 
-    // Le bloc processeur de la machine de reference le 24/09 : tout a l'usine (C-State Auto, limite C Auto, EIST et Turbo
+    // Le bloc processeur de la machine de reference, releve le 24/09 : tout a l'usine (C-State Auto, limite C Auto, EIST et Turbo
     // actifs, PL1/PL2 a 0 = Auto).
     private static byte[] CpuSetupDeReference(uint pl1 = 0)
     {
@@ -136,8 +136,8 @@ public class NvramBiosSettingsReaderTests
     [Fact]
     public void Le_cas_de_la_machine_de_reference_du_17_09_profil_desactive_et_RAM_reglee_a_la_main_se_dit_Off()
     {
-        // L'inference voyait 3800 MT/s au-dessus du standard et concluait « XMP actif ». Le BIOS
-        // disait « Disabled » : c'est lui qui a raison.
+        // L'inference voit 3800 MT/s au-dessus du standard et conclurait « XMP actif ». Le BIOS
+        // lu dit « Disabled » : c'est lui qui a raison.
         var lus = new[] { new BiosSettingReading("XMP", 0, "Disabled", IsDefault: true) };
         var st = NvramBiosSettingsReader.Appliquer(Etat(TriState.On, TriState.Unknown), lus);
         st.XmpExpo.Should().Be(TriState.Off);
@@ -180,6 +180,46 @@ public class NvramBiosSettingsReaderTests
         BiosQualificationMatrix.Pour(Carte, Firmware)
             .Should().OnlyContain(e => e.Nvram != null && !e.EcritureAutomatiqueAutorisee
                                        && e.Capability == BiosCapabilityLevel.Guided);
+    }
+
+    // Les réglages qui brident le processeur (NVRAM relevée le 11/10 : Current Limit 160 A puis Auto,
+    // Lite Load Mode 9, IA CEP Disabled) se lisent avec le reste.
+    [Fact]
+    public async Task Limite_de_courant_Lite_Load_et_CEP_se_lisent_comme_le_menu_les_affiche()
+    {
+        var setup = SetupDeReference();
+        BitConverter.GetBytes((ushort)160).CopyTo(setup, 0xF29);
+        setup[0xF63] = 80;
+        setup[0xFBC] = 1;
+
+        var lus = await Lecteur(setup).ReadAsync("MS-7D98", "1.H0");
+
+        lus.Should().ContainEquivalentOf(new BiosSettingReading("CPU Current Limit", 160, "160 A", IsDefault: false));
+        lus.Should().ContainEquivalentOf(new BiosSettingReading("CPU Lite Load", 80, "Mode 9", IsDefault: false));
+        lus.Should().ContainEquivalentOf(new BiosSettingReading("IA CEP Support", 1, "Disabled", IsDefault: false));
+        lus.Should().ContainEquivalentOf(new BiosSettingReading("CPU Lite Load Control", 0, "Normal", IsDefault: true));
+
+        BitConverter.GetBytes((ushort)0).CopyTo(setup, 0xF29);
+        (await Lecteur(setup).ReadAsync("MS-7D98", "1.H0")).Should()
+            .ContainEquivalentOf(new BiosSettingReading("CPU Current Limit", 0, "Auto", IsDefault: true));
+    }
+
+    // La courbe du ventilateur processeur relevée le 11/10 sur la machine de référence : 40/62/80/92 °C pour 35/55/70/100 %,
+    // après qu'un ventilateur unique n'a pas tenu 160 W. Un octet par palier (IFR : Min 0, Max 100).
+    [Fact]
+    public async Task La_courbe_du_ventilateur_processeur_se_lit_palier_par_palier()
+    {
+        var setup = SetupDeReference();
+        setup[0x1284] = 1;
+        new byte[] { 40, 62, 80, 92 }.CopyTo(setup, 0x128A);
+        new byte[] { 35, 55, 70, 100 }.CopyTo(setup, 0x128E);
+
+        var lus = await Lecteur(setup).ReadAsync("MS-7D98", "1.H0");
+
+        lus.Should().ContainEquivalentOf(new BiosSettingReading("CPU Fan1 Smart Fan Control", 1, "Enabled", IsDefault: true));
+        lus.Should().ContainEquivalentOf(new BiosSettingReading("CPU Fan1 level 2 Temperature", 62, "62 °C", IsDefault: false));
+        lus.Should().ContainEquivalentOf(new BiosSettingReading("CPU Fan1 level 1 Fan Speed", 35, "35 %", IsDefault: false));
+        lus.Should().ContainEquivalentOf(new BiosSettingReading("CPU Fan1 level 4 Fan Speed", 100, "100 %", IsDefault: true));
     }
 
     [Fact]

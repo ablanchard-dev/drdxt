@@ -26,9 +26,9 @@ public sealed class MemoryDetector
             int configured = r.GetInt("ConfiguredClockSpeed") ?? 0;
             int wmiSpeed = r.GetInt("Speed") ?? 0;
 
-            // WMI Speed alone is unreliable for the rated speed: after a BIOS flash resets
-            // XMP it collapses to the JEDEC value. Recover the kit's rating from the part
-            // number and keep whichever is higher, so an XMP reset stays detectable.
+            // Le Speed de WMI seul n'est pas fiable pour la vitesse nominale : après un flash du BIOS
+            // qui remet XMP à zéro, il retombe sur la valeur JEDEC. On retrouve le nominal du kit dans
+            // le part number et on garde le plus haut, pour qu'une remise à zéro d'XMP reste visible.
             int rated = Math.Max(wmiSpeed, DramPartNumber.TryParseRatedMhz(partNumber) ?? 0);
 
             return new MemoryModule(
@@ -46,7 +46,7 @@ public sealed class MemoryDetector
         return Result<IReadOnlyList<MemoryModule>>.Ok(modules);
     }
 
-    /// <summary>06/10/2026 (chantier B1) : les emplacements de la carte, somme des tableaux de mémoire système
+    /// <summary>Les emplacements de la carte, somme des tableaux de mémoire système
     /// (Use = 3). 0 = non lu : jamais un nombre deviné.</summary>
     public int Emplacements()
     {

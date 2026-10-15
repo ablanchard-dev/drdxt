@@ -6,7 +6,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 08/10/2026 (T1b) : « Vérifier DrDXT sur mon PC ». Rien ne part sans l'accord du joueur, le bilan dit ce qui reste à
+/// « Vérifier DrDXT sur mon PC ». Rien ne part sans l'accord du joueur, le bilan dit ce qui reste à
 /// vérifier, et une vérification ratée ne bloque pas la suivante.
 /// </summary>
 public class VerifierLaMachineTests
@@ -21,7 +21,7 @@ public class VerifierLaMachineTests
             _ => k,
         });
 
-    // 10/10/2026 (le mainteneur : « je sais pas réellement ce que ça a fait ») : une ligne par réglage, avec son nom et son sort.
+    // Une ligne par réglage, avec son nom et son sort.
     [Fact]
     public async Task Le_bilan_nomme_chaque_reglage_et_ce_qui_lui_est_arrive()
     {
@@ -101,7 +101,7 @@ public class VerifierLaMachineTests
         vm.HasVerificationChemin.Should().BeFalse();
     }
 
-    // Revue n° 10 : quand rien n'a été posé (accord de Windows refusé, jeu ouvert en cours), le bilan le dit au
+    // Quand rien n'a été posé (accord de Windows refusé, jeu ouvert en cours), le bilan le dit au
     // lieu d'annoncer une vérification réussie.
     [Fact]
     public async Task Un_arret_est_dit_tel_quel_jamais_comme_une_reussite()

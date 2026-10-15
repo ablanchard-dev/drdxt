@@ -8,11 +8,11 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>Phase 18 — la mise a jour branchee dans l'App : ce que le pied de page a le droit de
+/// <summary>La mise a jour branchee dans l'App : ce que le pied de page a le droit de
 /// dire, et le demarrage qu'elle n'a pas le droit de tenir.</summary>
 public sealed class VerificationMiseAJourTests : IDisposable
 {
-    // 24/09/2026 : chaque cas laissait son dossier « drdxt-maj-<id> » dans %TEMP% ; 1 977 trouvés sur
+    // Chaque cas laissait son dossier « drdxt-maj-<id> » dans %TEMP% ; 1 977 trouvés sur
     // le poste de développement, 738 rien que ce jour-là. Ce test range ce qu'il crée.
     private readonly List<string> _dossiers = new();
 
@@ -43,7 +43,7 @@ public sealed class VerificationMiseAJourTests : IDisposable
     [Fact]
     public void Sans_variable_l_adresse_du_projet_est_lue_et_off_coupe_tout()
     {
-        // 09/10/2026 (audit de pérennité) : sans adresse par défaut, aucune copie installée ne pouvait se mettre à jour.
+        // Sans adresse par défaut, aucune copie installée ne pouvait se mettre à jour.
         VerificationMiseAJour.UrlEffective(null).Should().Be("https://ablanchard-dev.github.io/drdxt");
         VerificationMiseAJour.UrlEffective("off").Should().BeNull("« off » coupe toute requête");
         VerificationMiseAJour.UrlEffective(" OFF ").Should().BeNull();
@@ -96,7 +96,7 @@ public sealed class VerificationMiseAJourTests : IDisposable
         lances.Should().BeEmpty();
     }
 
-    // Revue de securite du 11/09/2026. La relecture de l'empreinte ne suffisait pas : entre elle et
+    // La relecture de l'empreinte ne suffisait pas : entre elle et
     // Process.Start, le dossier de staging est sous %LOCALAPPDATA%, donc ecrivable par n'importe quel
     // code tournant sous le compte de l'utilisateur. Ce qui partait ensuite sous UAC n'etait plus ce
     // qui avait ete verifie. Le lanceur est appele a l'instant exact du lancement : c'est la que
@@ -130,10 +130,10 @@ public sealed class VerificationMiseAJourTests : IDisposable
         => InstallationMiseAJour.Lancer(Path.Combine(Path.GetTempPath(), $"absent-{Guid.NewGuid():N}.pkg"), "abc", "1.3.0", _ => true)
             .IsOk.Should().BeFalse();
 
-    /// <summary>SEC5 (09/10/2026) : la clef de release est embarquée ; avec une URL https, la vérification lit les deux
-    /// manifestes (profils, App) avec cette clef et rien d'autre ne part. Un serveur qui n'offre rien ⇒ « à jour ».</summary>
+    /// <summary>La clef de release est embarquée ; avec une URL https, la vérification lit le
+    /// manifeste de l'App avec cette clef et rien d'autre ne part. Un serveur qui n'offre rien ⇒ « à jour ».</summary>
     [Fact]
-    public async Task Avec_la_clef_de_production_une_URL_https_lit_les_deux_manifestes_et_rien_de_plus()
+    public async Task Avec_la_clef_de_production_une_URL_https_lit_le_manifeste_et_rien_de_plus()
     {
         var serveur = new Serveur(TimeSpan.Zero);
 
@@ -141,7 +141,7 @@ public sealed class VerificationMiseAJourTests : IDisposable
                 () => VerificationMiseAJour.Monter("https://updates.example.invalid", new HttpClient(serveur), "1.0.0"),
                 TimeSpan.FromSeconds(5), CancellationToken.None)).Etat
             .Should().Be(EtatMiseAJour.AJour);
-        serveur.Requetes.Should().Be(2, "un manifeste par canal, pas un octet de plus");
+        serveur.Requetes.Should().Be(1, "le manifeste de l'App, pas un octet de plus");
     }
 
     [Fact]
@@ -160,13 +160,13 @@ public sealed class VerificationMiseAJourTests : IDisposable
 
         (await Verifier("https://updates.example.invalid", serveur, TimeSpan.FromSeconds(5)))
             .Should().Be(EtatMiseAJour.AJour);
-        serveur.Requetes.Should().Be(2, "les deux canaux sont interroges");
+        serveur.Requetes.Should().Be(1, "le canal de l'App est interroge");
     }
 
     [Fact]
     public async Task Un_serveur_trop_lent_ne_tient_pas_le_demarrage()
     {
-        // 28/09/2026 : chronometre, ce test a encore echoue en CI (7 s pour une borne de 200 ms) : sur un runner
+        // Chronometre, ce test a encore echoue en CI (7 s pour une borne de 200 ms) : sur un runner
         // charge, le minuteur de la borne attend lui aussi un thread. Meme remede que pour le montage : un serveur
         // qui ne repondrait que dans dix minutes. Rendre la main avant la minute prouve la borne sans mesurer le temps.
         (await Verifier("https://updates.example.invalid", new Serveur(TimeSpan.FromMinutes(10)), TimeSpan.FromMilliseconds(200))
@@ -177,7 +177,7 @@ public sealed class VerificationMiseAJourTests : IDisposable
     [Fact]
     public async Task Un_montage_trop_lent_ne_tient_pas_le_demarrage_non_plus()
     {
-        // 27/09/2026 : le montage tournait avant la borne ; la CI l'a vu durer 3 a 7 s. Pas de chronometre
+        // Le montage tournait avant la borne ; la CI l'a vu durer 3 a 7 s. Pas de chronometre
         // ici : sur un runner charge, le minuteur de la borne attend lui aussi un thread (5 s mesurees pour
         // 200 ms). Un montage qui ne finit QUE si la verification a rendu la main prouve la borne sans
         // mesurer le temps : sans elle, la verification l'attend pour toujours.
@@ -203,15 +203,15 @@ public sealed class VerificationMiseAJourTests : IDisposable
     [Fact]
     public void Classer_une_version_verifiee_passe_d_abord_un_refus_avant_le_hors_ligne()
     {
-        VerificationMiseAJour.Classer(Ok(UpdateOutcome.UpToDate), Ko(UpdateErrorCodes.ReplacerUnavailable))
+        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.ReplacerUnavailable))
             .Should().Be(EtatMiseAJour.NouvelleVersionVerifiee);
-        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.SignatureInvalid), Ko(UpdateErrorCodes.Offline))
+        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.SignatureInvalid))
             .Should().Be(EtatMiseAJour.Refusee, "un paquet rejete est une information de securite");
-        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.Offline), Ok(UpdateOutcome.UpToDate))
+        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.Offline))
             .Should().Be(EtatMiseAJour.Injoignable);
-        VerificationMiseAJour.Classer(Ok(UpdateOutcome.ProfilesInstalled), Ok(UpdateOutcome.UpToDate))
-            .Should().Be(EtatMiseAJour.ProfilsInstalles);
-        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.StageFailed), Ok(UpdateOutcome.UpToDate))
+        VerificationMiseAJour.Classer(Ok(UpdateOutcome.UpToDate))
+            .Should().Be(EtatMiseAJour.AJour);
+        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.StageFailed))
             .Should().Be(EtatMiseAJour.Echec);
     }
 

@@ -3,33 +3,33 @@ using DrDxt.Core;
 namespace DrDxt.Infrastructure.Updates;
 
 // ───────────────────────────────────────────────────────────────────────────────
-//  EMBEDDED PUBLIC MATERIAL ONLY — NO SECRET MAY EVER LIVE HERE IN A RELEASE.
+//  EMBEDDED PUBLIC MATERIAL ONLY : aucun secret ne doit jamais vivre ici dans une version publiée.
 // ───────────────────────────────────────────────────────────────────────────────
 //
-// This is the client's ROOT OF TRUST for the AUTO-UPDATE layer (T12). It is a
-// DEDICATED update-signing keypair, deliberately SEPARATE from the licensing keys
-// (DrDxt.Licensing.EmbeddedKeys.LicensePublicKey) and the manifest/reconciler keys
-// (DrDxt.Reconciler.Manifest.ManifestDevKeys.PublicKey). Decision T12: cloister the
-// update channel so a compromise of one signing key never reaches the others.
+// C'est la racine de confiance du client pour la couche de mise à jour automatique. C'est une
+// paire de clés de signature dédiée aux mises à jour, séparée exprès des clés de licence
+// (DrDxt.Licensing.EmbeddedKeys.LicensePublicKey) et des clés du manifeste / réconciliateur
+// (DrDxt.Reconciler.Manifest.ManifestDevKeys.PublicKey). Décision : cloisonner le canal de mise à
+// jour pour que la compromission d'une clé de signature n'atteigne jamais les autres.
 //
-// The PUBLIC key here is safe to ship in a decompilable binary: it can ONLY verify
-// an update manifest, never mint one. The release-signing PRIVATE key lives OFF the
-// client (build/CI/HSM, out-of-band) — exactly like ManifestDevKeys.
+// La clé publique d'ici est sûre à livrer dans un binaire décompilable : elle ne peut que vérifier
+// un manifeste de mise à jour, jamais en frapper un. La clé privée de signature des versions vit
+// hors du client (build / CI / HSM, hors bande), exactement comme pour ManifestDevKeys.
 //
-// PRODUCTION (release hardening — MUST DO at release time, mirrors ManifestDevKeys /
-// EmbeddedKeys): replace UpdatePublicKey with the REAL update-release verify key and
-// never ship DevPrivateSeed. The dev seed below is the single clearly-fenced
-// exception (own banner) and exists ONLY so unit tests can sign a fixture manifest
-// against the embedded public key without a provisioning step — NO production code
-// path ever reads it.
+// Production (durcissement de version, à faire obligatoirement au moment de publier, comme
+// ManifestDevKeys / EmbeddedKeys) : remplacer UpdatePublicKey par la vraie clé de vérification des
+// versions et ne jamais livrer DevPrivateSeed. La graine de dev ci-dessous est l'unique exception
+// clairement balisée (avec sa propre bannière) et n'existe que pour que les tests unitaires signent
+// un manifeste d'essai contre la clé publique embarquée sans étape de fourniture : aucun chemin de
+// code de production ne la lit jamais.
 // ───────────────────────────────────────────────────────────────────────────────
 public static class UpdateDevKeys
 {
-    /// <summary>The 32-byte raw Ed25519 PUBLIC key the update-release pipeline signs
-    /// update manifests with. SAFE to ship — it can only VERIFY an
-    /// <see cref="UpdateManifest"/>, never sign one. A release overrides this with the
-    /// real update verify key (out-of-band). DEV/TEST value paired with
-    /// <see cref="DevPrivateSeed"/>. DEDICATED to updates — NOT the license/manifest key.</summary>
+    /// <summary>La clé publique Ed25519 brute de 32 octets associée aux manifestes que signe la chaîne
+    /// de publication. Sûre à livrer : elle ne peut que vérifier un <see cref="UpdateManifest"/>,
+    /// jamais en signer un. Une version publiée la remplace par la vraie clé de vérification (hors
+    /// bande). Valeur DEV/TEST associée à <see cref="DevPrivateSeed"/>. Dédiée aux mises à jour : ce
+    /// n'est pas la clé de licence ni celle du manifeste.</summary>
     public static byte[] UpdatePublicKey =>
     [
         0xF0, 0x73, 0x64, 0x29, 0x03, 0x42, 0x90, 0x58,
@@ -39,19 +39,19 @@ public static class UpdateDevKeys
     ];
 
     // ───────────────────────────────────────────────────────────────────────────
-    //   DEV / TEST PRIVATE SEED — NOT FOR PRODUCTION, NEVER READ AT RUNTIME 
+    //   DEV / TEST PRIVATE SEED : pas pour la production, NEVER READ AT RUNTIME (jamais lue à l'exécution)
     // ───────────────────────────────────────────────────────────────────────────
-    //  The 32-byte raw Ed25519 PRIVATE seed paired with UpdatePublicKey above. Committed
-    //  ONLY so the unit tests can sign a fixture UpdateManifest that the embedded public
-    //  key then verifies, keeping the test suite hermetic. NO production code path
-    //  references this seed. In production, update manifests are signed by the RELEASE
-    //  pipeline which holds the real private key out-of-band; a release ships only
-    //  UpdatePublicKey. Anyone with THIS dev seed can forge a manifest that ONLY the dev
-    //  public key would accept — which is exactly why the public key is swapped at release.
+    //  La graine privée Ed25519 brute de 32 octets associée à UpdatePublicKey ci-dessus. Commitée
+    //  seulement pour que les tests unitaires signent un UpdateManifest d'essai que la clé publique
+    //  embarquée vérifie ensuite, ce qui garde la suite de tests hermétique. Aucun chemin de code de
+    //  production ne référence cette graine. En production, les manifestes sont signés par la chaîne
+    //  de publication, qui tient la vraie clé privée hors bande ; une version publiée ne livre que
+    //  UpdatePublicKey. Quiconque détient cette graine de dev peut forger un manifeste que seule la clé
+    //  publique de dev accepterait : c'est exactement pourquoi la clé publique est changée à la publication.
     // ───────────────────────────────────────────────────────────────────────────
 
-    /// <summary>DEV/TEST ONLY — the seed paired with <see cref="UpdatePublicKey"/>,
-    /// for signing fixtures in tests. Never used by production code.</summary>
+    /// <summary>DEV/TEST seulement : la graine associée à <see cref="UpdatePublicKey"/>, pour signer
+    /// des données d'essai en test. Jamais utilisée par le code de production.</summary>
     public static byte[] DevPrivateSeed =>
     [
         0xFF, 0x93, 0x74, 0xA3, 0xC1, 0x27, 0x90, 0x0A,
@@ -60,10 +60,10 @@ public static class UpdateDevKeys
         0xE5, 0x27, 0xFD, 0x25, 0x23, 0x31, 0xC5, 0x73,
     ];
 
-    /// <summary>Builds the verify-only <see cref="IUpdateVerifier"/> from the embedded
-    /// PUBLIC key. Fail-clean: a corrupt/wrong-length embedded key returns
-    /// Fail(UPDATE_SIG_INVALID) rather than throwing (defends against a future bad key
-    /// swap). Mirrors <c>ManifestDevKeys.CreateVerifier</c> / <c>EmbeddedKeys.CreateLicenseVerifier</c>.</summary>
+    /// <summary>Construit l'<see cref="IUpdateVerifier"/> en vérification seule à partir de la clé
+    /// publique embarquée. Échec propre : une clé embarquée corrompue ou de mauvaise longueur rend
+    /// Fail(UPDATE_SIG_INVALID) au lieu de lever (protège d'un futur mauvais échange de clé). Reprend
+    /// <c>ManifestDevKeys.CreateVerifier</c> / <c>EmbeddedKeys.CreateLicenseVerifier</c>.</summary>
     public static Result<IUpdateVerifier> CreateUpdateVerifier()
         => UpdateVerifier.Create(UpdatePublicKey);
 }

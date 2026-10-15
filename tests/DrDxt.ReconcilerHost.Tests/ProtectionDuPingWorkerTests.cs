@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.ReconcilerHost.Tests;
 
-/// <summary>28/09/2026 : la tâche de fond du service qui porte la protection du ping. Elle retire un plafond resté
+/// <summary>La tâche de fond du service qui porte la protection du ping. Elle retire un plafond resté
 /// au démarrage, bat à intervalle régulier, et retire tout à l'arrêt du service.</summary>
 public sealed class ProtectionDuPingWorkerTests
 {

@@ -4,17 +4,17 @@ using FluentAssertions;
 namespace DrDxt.Core.Tests.Privileged;
 
 // -----------------------------------------------------------------------
-// A1 — typed privileged-op contract + codec.
+// Contrat et codec des ops privilégiées typées.
 //
-// SECURITY: the codec (de)serializes via a CLOSED discriminant enum + explicit
-// switch. There is NO Newtonsoft TypeNameHandling, NO Type.GetType, NO free
-// type-name resolution. An unknown discriminant / malformed JSON must fail
-// CLEAN (Result.Fail("HELPER.NOT_ALLOWLISTED", ...)) and never throw, never
-// instantiate an arbitrary type, never execute.
+// Sécurité : le codec (dé)sérialise par une énumération de discriminant fermée et un switch
+// explicite. Aucun TypeNameHandling Newtonsoft, aucun Type.GetType, aucune résolution libre
+// de nom de type. Un discriminant inconnu ou un JSON malformé doit échouer proprement
+// (Result.Fail("HELPER.NOT_ALLOWLISTED", ...)) sans jamais lever, jamais instancier un type
+// arbitraire, jamais exécuter.
 // -----------------------------------------------------------------------
 public sealed class PrivilegedOpTests
 {
-    // --- A leaf for every closed subtype round-trips through the codec ---
+    // --- Une feuille pour chaque sous-type fermé fait l'aller-retour par le codec ---
 
     [Fact]
     public void SetRegistryValueOp_roundtrips_typed()
@@ -177,7 +177,7 @@ public sealed class PrivilegedOpTests
         var json = PrivilegedOpCodec.Serialize(op);
         var back = PrivilegedOpCodec.Deserialize(json.Value!);
 
-        // Field-less record: BeOfType is the meaningful round-trip assertion.
+        // Record sans champ : BeOfType est l'assertion d'aller-retour qui a du sens.
         back.Value.Should().BeOfType<InstallPresentMonServiceOp>();
     }
 
@@ -204,13 +204,13 @@ public sealed class PrivilegedOpTests
         back.Value.Should().BeOfType<PingOp>();
     }
 
-    // --- SECURITY: hostile / unknown payloads fail CLEAN, never execute ---
+    // --- Sécurité : les charges hostiles ou inconnues échouent proprement, jamais exécutées ---
 
     [Fact]
     public void Deserialize_unknown_type_name_fails_clean_not_allowlisted()
     {
-        // The classic RCE shape: a Newtonsoft-style "$type" with an arbitrary
-        // type name. The codec must not resolve it; it must refuse.
+        // La forme classique d'exécution de code à distance : un « $type » façon Newtonsoft avec un nom
+        // de type arbitraire. Le codec ne doit pas le résoudre ; il doit refuser.
         var act = () => PrivilegedOpCodec.Deserialize(
             """{"$type":"System.Diagnostics.Process, System","cmd":"calc"}""");
 
@@ -233,7 +233,7 @@ public sealed class PrivilegedOpTests
     [Fact]
     public void Deserialize_out_of_range_discriminant_fails_clean()
     {
-        // A numeric discriminant outside the closed enum.
+        // Un discriminant numérique hors de l'énumération fermée.
         var act = () => PrivilegedOpCodec.Deserialize("""{"op":99999}""");
 
         var result = act.Should().NotThrow().Subject;
@@ -267,7 +267,7 @@ public sealed class PrivilegedOpTests
         result.IsOk.Should().BeFalse();
     }
 
-    // --- The closed leaf set is exactly what we expect (guard against drift) ---
+    // --- L'ensemble fermé de feuilles est exactement celui attendu (garde contre la dérive) ---
 
     [Fact]
     public void PrivilegedOpType_has_exactly_the_closed_leaf_set()
@@ -289,55 +289,70 @@ public sealed class PrivilegedOpTests
             nameof(PrivilegedOpType.EnableSystemRestore),
             nameof(PrivilegedOpType.EstablishLease),
             nameof(PrivilegedOpType.RenewLease),
-            // M3 lot 2, elargi DELIBEREMENT le 26/08. Ce test existe pour qu'on ne puisse pas
-            // ajouter une op privilegiee sans le decider : il a fait son travail, il a rougi.
+            // Elargi deliberement. Ce test existe pour qu'on ne puisse pas
+            // ajouter une op privilegiee sans le decider.
             // Les deux ops ci-dessous passent par shutdown.exe et n'ecrivent aucune variable
             // firmware ; elles sont bornees par l'allowlist (delai 0..300 s) et refusees comme
             // revert de bail (LeaseWatchdog), pour qu'un dead-man's switch ne puisse jamais
             // redemarrer une machine sans personne devant.
             nameof(PrivilegedOpType.RebootToFirmwareSetup),
             nameof(PrivilegedOpType.CancelPendingFirmwareBoot),
-            // Elargie DELIBEREMENT le 27/08 : Lecture seule. Aucune op d'ecriture firmware
-            // n'a ete ajoutee ; Setup et CpuSetup se lisent, noms fermes dans l'allowlist.
+            // Elargie deliberement : lecture seule. Aucune op d'ecriture firmware
+            // n'existe ; Setup et CpuSetup se lisent, noms fermes dans l'allowlist.
             nameof(PrivilegedOpType.ReadFirmwareVariable),
-            // Elargie DELIBEREMENT le 10/09/2026 (phase 18 F1 lot 3) : l'INVERSE d'une ecriture au
+            // Elargie DELIBEREMENT : l'INVERSE d'une ecriture au
             // profil d'un jeu. Portee = chemin d'executable uniquement, jamais le profil de base ;
             // documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.DeleteNvApiDrsSetting),
-            // Elargie DELIBEREMENT le 11/09/2026 : le manifeste signe, ecrit par le helper eleve avec
+            // Elargie DELIBEREMENT : le manifeste signe, ecrit par le helper eleve avec
             // la cle de la machine. Elle n'ecrit ni registre, ni pilote, ni firmware : un fichier sous
             // %ProgramData%\DrDxt, et ses entrees passent l'allowlist de ce qu'elles feront executer.
             // Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.CommitManifest),
-            // Elargie DELIBEREMENT le 24/09/2026 : le plafond d'envoi QoS et son inverse. Deux
+            // Elargie DELIBEREMENT : le plafond d'envoi QoS et son inverse. Deux
             // politiques Windows en MEMOIRE (ActiveStore : un redemarrage les efface), nom d'exe nu
             // et plafond bornes par l'allowlist. Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.ApplyUploadCap),
             nameof(PrivilegedOpType.RemoveUploadCap),
-            // Elargie DELIBEREMENT le 24/09/2026 : retirer / reposer un element BCD de `{current}`, parmi
+            // Elargie DELIBEREMENT : retirer / reposer un element BCD de `{current}`, parmi
             // les cinq que BcdInterpretation sait juger, valeurs documentees seulement. Aucun ne peut
             // empecher le demarrage. Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.DeleteBcdValue),
             nameof(PrivilegedOpType.SetBcdValue),
-            // Elargie DELIBEREMENT le 25/09/2026 : lecture de l'etat du magasin de composants
+            // Elargie DELIBEREMENT : lecture de l'etat du magasin de composants
             // (DISM /CheckHealth), sans parametre, rien n'est ecrit. Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.ReadComponentStoreHealth),
-            // Elargie DELIBEREMENT le 28/09/2026 : la protection du ping retenue pour le service de demarrage
+            // Elargie DELIBEREMENT : la protection du ping retenue pour le service de demarrage
             // (un fichier sous %ProgramData%\DrDxt, meme borne que le plafond). Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.RetainServiceUploadCap),
             nameof(PrivilegedOpType.ForgetServiceUploadCap),
-            // Elargie deliberement le 07/10/2026 (L-CPU) : le mode de boost secteur d'un plan, et rien d'autre du plan
+            // Elargie deliberement : le mode de boost secteur d'un plan, et rien d'autre du plan
             // (PERFBOOSTMODE, valeur 0 a 4 documentee par Microsoft). Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.SetProcessorBoostMode),
-            // Elargie deliberement le 08/10/2026 (GPU-OC) : rendre les ventilateurs d'une carte a l'automatique, l'inverse
+            // Elargie deliberement : rendre les ventilateurs d'une carte a l'automatique, l'inverse
             // d'une vitesse fixe posee en mode Expert. Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.RestoreGpuFanAuto),
-            // Elargie deliberement le 10/10/2026 (B1) : la limite de puissance du processeur (PL1 seule, dans la PL2 de la
+            // Elargie deliberement : la limite de puissance du processeur (PL1 seule, dans la PL2 de la
             // carte, sans verrou), ecrite par PawnIO dans le helper. Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.SetCpuPackagePowerLimit),
-            // Elargie deliberement le 10/10/2026 (B3) : l'economie d'energie de la carte sans fil (secteur) d'un plan,
+            // Elargie deliberement : l'economie d'energie de la carte sans fil (secteur) d'un plan,
             // valeur 0 a 3. Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.SetWirelessPowerSaving),
+            // Elargie DELIBEREMENT :
+            // la tension des cœurs du processeur vers le bas seulement, refusee avec SGX, documentee dans docs/NON-NUISANCE.md.
+            nameof(PrivilegedOpType.SetCpuVoltageOffset),
+            // Elargie deliberement : un programme au demarrage coupe ou reactive (StartupApproved seulement, la commande du
+            // programme jamais touchee). Documentee dans docs/NON-NUISANCE.md.
+            nameof(PrivilegedOpType.SetStartupApproval),
+            // Elargie deliberement : le test memoire de Windows au prochain demarrage, une seule fois, et son
+            // annulation (`bcdedit /bootsequence {memdiag}`). Documentee dans docs/NON-NUISANCE.md.
+            nameof(PrivilegedOpType.ScheduleMemoryDiagnostic),
+            nameof(PrivilegedOpType.CancelMemoryDiagnostic),
+            // Elargie deliberement : relancer un peripherique en echec, retirer un vieux paquet de pilote d'affichage
+            // apres l'avoir exporte, et le remettre depuis cet export (pnputil). Documentee dans docs/NON-NUISANCE.md.
+            nameof(PrivilegedOpType.RestartDevice),
+            nameof(PrivilegedOpType.RemoveDriverPackage),
+            nameof(PrivilegedOpType.RestoreDriverPackage),
         });
     }
 

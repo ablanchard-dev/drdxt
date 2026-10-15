@@ -3,7 +3,7 @@ using DrDxt.Core;
 
 namespace DrDxt.Detection.Hardware;
 
-/// <summary>BUREAU (09/10/2026) : la mémoire telle que Windows la voit à l'instant (GlobalMemoryStatusEx, kernel32).
+/// <summary>La mémoire telle que Windows la voit à l'instant (GlobalMemoryStatusEx, kernel32).
 /// Lecture seule, sans droits particuliers. Un échec rend null : le constat se dit non lu, jamais sain.</summary>
 public static class PressionMemoire
 {

@@ -11,7 +11,7 @@ public sealed class RepairLibellesTests
         => RepairLibelles.Nom("Valeur de registre NVTweak LowLatencyMode")
             .Should().Be("Faible latence NVIDIA posée dans le registre (sans effet prouvé)");
 
-    // 25/09/2026 : DrDXT lit l'écran PRINCIPAL. L'appeler « écran de jeu » supposait que le jeu y tourne,
+    // DrDXT lit l'écran PRINCIPAL. L'appeler « écran de jeu » supposait que le jeu y tourne,
     // ce qu'il ne sait pas sur une machine à deux écrans (celle de la mise au point en a deux, 200 et 144 Hz).
     [Fact]
     public void La_frequence_lue_est_celle_de_l_ecran_principal_pas_d_un_ecran_de_jeu_suppose()

@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.Core.Tests;
 
-// 08/10/2026 (chantier D5) : le fichier d'échange sur un disque dur alors qu'un SSD est là.
+// Le fichier d'échange sur un disque dur alors qu'un SSD est là.
 public sealed class FichierDEchangeSurDisqueDurTests
 {
     private const int Hdd = JeuxSurDisqueDur.DisqueDur, Ssd = JeuxSurDisqueDur.Ssd;
@@ -40,7 +40,7 @@ public sealed class FichierDEchangeSurDisqueDurTests
         => FichierDEchangeSurDisqueDur.Juger([(@"C:\pagefile.sys", Ssd), (@"D:\pagefile.sys", Hdd)], ssdPresent: true)
             .Statut.Should().Be(RepairStatus.Suspicious);
 
-    // Revue du 08/10/2026 (REV2) : lecture incomplète, cas mixte.
+    // Lecture incomplète, cas mixte.
     [Fact]
     public void Un_disque_au_type_non_dit_n_affirme_pas_qu_il_n_y_a_pas_de_ssd()
         => FichierDEchangeSurDisqueDur.Juger([(@"D:\pagefile.sys", Hdd)], ssdPresent: null).Statut.Should().Be(RepairStatus.Unknown);

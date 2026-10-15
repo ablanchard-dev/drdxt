@@ -4,27 +4,24 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// NS-1 — HagsOnTweak (OS/latency, persistent).
+// HagsOnTweak (système et latence, persistant).
 //
-// Enables Hardware-Accelerated GPU Scheduling (HAGS) via the allowlisted
-// ...\GraphicsDrivers\HwSchMode registry leaf (DWORD 2 = On, 1 = Off — mirrors
-// RegistryProvider.GetHags ; valeurs vérifiées le 24/09/2026 : learn.microsoft.com/answers
-// question 4137979 et howtogeek.com/756935 ; sans support du pilote, Windows l'ignore), written through the elevated helper. Capture the real
-// original first → store the inverse PrivilegedOp in the snapshot → write 2. Persists
-// natively across reboot (registry), and is reconcilable.
+// Active la planification GPU accélérée par le matériel (HAGS) par la feuille autorisée
+// ...\GraphicsDrivers\HwSchMode (DWORD 2 = activé, 1 = désactivé, comme RegistryProvider.GetHags ;
+// sources : learn.microsoft.com/answers question 4137979 et howtogeek.com/756935 ; sans support du
+// pilote, Windows l'ignore), écrite par le helper élevé. L'original est relu d'abord, l'op inverse
+// rangée dans le snapshot, puis 2 est écrit. Persiste au redémarrage (registre), réconciliable.
 //
-// Takes effect after reboot: HwSchMode only applies after a restart, so the engine
-// skips the immediate A/B for it (TakesEffectAfterReboot = true) — the gain is proven
-// by the next in-game scan, never claimed for the current session.
+// Effet au redémarrage seulement : le moteur saute l'A/B immédiat (TakesEffectAfterReboot = true) ;
+// le gain se prouve au prochain scan en jeu, jamais dans la session en cours.
 //
-// HONESTY (§6): HAGS is PROPOSED, never auto-applied silently; its real-world impact
-// varies by GPU/driver/title, so the SummaryKey describes the change (never "+FPS")
-// and the proof is the measured next-session A/B.
+// Proposé, jamais posé en silence : l'effet varie selon la carte, le pilote et le jeu, donc le
+// SummaryKey décrit le changement (jamais « +FPS ») et la preuve est l'A/B mesuré de la session suivante.
 //
-// Gating: only when HAGS is readable AND OFF — a present HwSchMode means the driver
-// supports HAGS; Unknown (key absent) → not offered (can't confirm support). Vendor-
-// agnostic (AMD / Intel / NVIDIA, WDDM 2.7+).
+// Gating : seulement quand l'état effectif (lu par D3DKMT) est désactivé ; inconnu, rien n'est proposé.
+// Tous fabricants (AMD, Intel, NVIDIA, WDDM 2.7+).
 // -----------------------------------------------------------------------
+/// <summary>Active HAGS (HwSchMode = 2) quand Windows le lit désactivé ; effet au redémarrage.</summary>
 public sealed class HagsOnTweak : LatencyTweakBase
 {
     private const uint HagsOn = 2; // 2 = On, 1 = Off (HwSchMode).
@@ -39,35 +36,30 @@ public sealed class HagsOnTweak : LatencyTweakBase
     public override string Id => "latency.hagsOn";
     public override string SummaryKey => "tweak.latency.hags.enable";
 
-    // Corrige LE 10/09/2026 (phase 18, P0.3). Ce gate disait `state.Hags != TriState.On`,
-    // c'est-a-dire qu'il proposait aussi sur **Unknown**, en assumant qu'un `HwSchMode` Absent
-    // vaut « HAGS eteint ». C'est faux : la cle absente veut dire que personne n'a ecrit ce
-    // reglage, pas que l'ordonnancement materiel est inactif — Windows choisit alors son propre
-    // defaut, qui depend de la version, du GPU et du pilote. Sur la machine de reference, la cle
-    // est absente et l'etat effectif est INCONNU.
+    // Une cle `HwSchMode` absente ne veut pas dire « HAGS eteint » : personne n'a ecrit ce reglage,
+    // et Windows choisit alors son propre defaut, selon la version, le GPU et le pilote.
     //
     // Un candidat fonde sur une absence de cle est un candidat fonde sur rien : il ecrirait un
     // reglage pour « corriger » un etat que personne n'a lu, et l'A/B qui suit mesurerait un
     // changement dont on ne connait meme pas le point de depart.
     //
-    // PHASE 18 F2 (10/09/2026) : cette lecture existe. Le gate lit l'etat effectif par D3DKMT
-    // (`SettingsState.HagsEffective`), et la cle ne sert plus qu'a l'ecriture et au revert. Sur la
-    // machine de reference, effectif = On ⇒ aucun candidat : c'est « deja bien regle », pas un trou.
-    // Unknown (non lu, non supporte) ne se corrige toujours pas.
+    // Le gate lit donc l'etat effectif par D3DKMT (`SettingsState.HagsEffective`) ; la cle ne sert
+    // qu'a l'ecriture et au revert. Effectif = On : « deja bien regle », pas un trou.
+    // Unknown (non lu, non supporte) ne se corrige pas.
     public override bool AppliesTo(HardwareInventory hw, SettingsState state) =>
         state.HagsEffective == TriState.Off;
 
     // `HwSchMode` absent du registre => Unknown. Ne rien ecrire, mais le dire.
     public override bool EtatNonLu(SettingsState state) => state.HagsEffective == TriState.Unknown;
 
-    // HwSchMode applies only after a restart → engine skips the immediate A/B (proof = next scan).
+    // HwSchMode n'agit qu'après un redémarrage → le moteur saute l'A/B immédiat (preuve = scan suivant).
     public override bool TakesEffectAfterReboot => true;
 
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
         try
         {
-            // Capture the real original before writing (faithful revert).
+            // Relever la vraie origine avant d'écrire (retour arrière fidèle).
             var read = _registry.ReadDword(RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName);
             if (!read.IsOk)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
@@ -79,7 +71,7 @@ public sealed class HagsOnTweak : LatencyTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "Could not serialize the revert op.");
 
-            // Apply HAGS On (=2) through the allowlisted typed op.
+            // Activer HAGS (=2) par l'op typée sur liste blanche.
             var op = new SetRegistryValueOp(
                 RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName,
                 RegistryValueType.DWord,
@@ -93,7 +85,7 @@ public sealed class HagsOnTweak : LatencyTweakBase
         }
         catch (Exception ex)
         {
-            // Every external boundary wrapped → fail clean, never throw.
+            // Chaque frontière externe protégée → échec propre, jamais d'exception.
             return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                 $"HAGS enable apply boundary error: {ex.Message}");
         }

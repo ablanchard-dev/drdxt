@@ -5,26 +5,24 @@ using DrDxt.Core;
 namespace DrDxt.Application.DependencyInjection;
 
 // -----------------------------------------------------------------------
-// M2 H2 — fail-clean stub implementations of the SDK seams.
+// Stubs des coutures SDK qui échouent proprement.
 //
-// The real P/Invoke implementations (NVAPI / ADLX / registry / power / restore
-// point / display) live in Detection / Infrastructure and arrive incrementally.
-// Until then the DI container needs SOMETHING to inject so the application graph
-// resolves — and the golden rule (master §1.2, §9.2) is fail-clean, never
-// fail-open: every seam here reports "unavailable" so a tweak skips cleanly
-// (TWEAK.SDK_UNAVAILABLE) and nothing privileged ever happens by accident.
+// Les vraies implémentations P/Invoke (NVAPI / ADLX / registre / alimentation / point de
+// restauration / affichage) vivent dans Detection / Infrastructure. Sans elles, le conteneur
+// DI a besoin de quelque chose à injecter pour résoudre le graphe, et la règle d'or est
+// d'échouer fermé, jamais ouvert : chaque couture ici dit « indisponible », un levier passe
+// proprement (TWEAK.SDK_UNAVAILABLE) et rien de privilégié n'arrive par accident.
 //
-// In particular StubElevatedClient REFUSES every op (it performs no privileged
-// write at all), and StubRestorePointService reports restore DISABLED so the
-// engine BLOCKS before applying anything. This is the safe default: a half-wired
-// build can read and plan, but cannot apply.
+// En particulier, StubElevatedClient refuse chaque op (il n'écrit rien de privilégié), et
+// StubRestorePointService dit la restauration désactivée : le moteur bloque avant toute
+// pose. C'est le défaut sûr : une version à moitié câblée peut lire et planifier, pas poser.
 //
-// These are registered with TryAdd* so the App composition root can replace any
-// of them with the real implementation without touching this file.
+// Ils sont enregistrés par TryAdd* : la racine de composition de l'App peut remplacer
+// chacun par la vraie implémentation sans toucher ce fichier.
 // -----------------------------------------------------------------------
 
-/// <summary>Fail-clean IElevatedClient: refuses every op (no privileged write).
-/// The real signed-IPC client is wired in the App host.</summary>
+/// <summary>IElevatedClient qui échoue proprement : refuse chaque op (aucune écriture privilégiée).
+/// Le vrai client en IPC signé est branché dans l'hôte App.</summary>
 internal sealed class StubElevatedClient : IElevatedClient
 {
     public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct) =>
@@ -32,8 +30,8 @@ internal sealed class StubElevatedClient : IElevatedClient
             "Elevated helper is not wired in this build (fail-clean stub)."));
 }
 
-/// <summary>Fail-clean restore-point seam: reports restore DISABLED so the safety
-/// manager / engine BLOCK before any apply (never proceed without a real point).</summary>
+/// <summary>Couture de point de restauration qui échoue proprement : dit la restauration
+/// désactivée, pour que le SafetyManager et le moteur bloquent avant toute pose (jamais sans vrai point).</summary>
 internal sealed class StubRestorePointService : IRestorePointService
 {
     public bool IsEnabled() => false;
@@ -41,14 +39,14 @@ internal sealed class StubRestorePointService : IRestorePointService
     public DateTime? DernierPointDepuis(DateTime depuisUtc) => null;
 }
 
-/// <summary>Fail-clean consent prompt: declines (no UI in a headless graph). The
-/// App host replaces this with a real dialog-backed prompt.</summary>
+/// <summary>Demande de consentement qui échoue proprement : refuse (pas d'UI dans un graphe
+/// sans écran). L'hôte App la remplace par une vraie boîte de dialogue.</summary>
 internal sealed class StubConsentPrompt : IConsentPrompt
 {
     public bool AskEnableRestore() => false;
 }
 
-/// <summary>Fail-clean NVAPI latency seam: not available.</summary>
+/// <summary>Couture de latence NVAPI qui échoue proprement : indisponible.</summary>
 internal sealed class StubNvApi : INvApi
 {
     public bool IsAvailable => false;
@@ -63,7 +61,7 @@ internal sealed class StubNvApi : INvApi
         Result<T>.Fail(ErrorCodes.TweakSdkUnavailable, "NVAPI not available (stub).");
 }
 
-/// <summary>Fail-clean ADLX latency seam: not available.</summary>
+/// <summary>Couture de latence ADLX qui échoue proprement : indisponible.</summary>
 internal sealed class StubAdlx : IAdlx
 {
     public bool IsAvailable => false;
@@ -71,7 +69,7 @@ internal sealed class StubAdlx : IAdlx
         Result<int>.Fail(ErrorCodes.TweakSdkUnavailable, "ADLX not available (stub).");
 }
 
-/// <summary>Fail-clean display seam: cannot determine the game display.</summary>
+/// <summary>Couture d'affichage qui échoue proprement : ne sait pas trouver l'écran du jeu.</summary>
 internal sealed class StubDisplayInfo : IDisplayInfo
 {
     public Result<DisplayInfo> GetPrimaryGameDisplay() =>
@@ -82,8 +80,8 @@ internal sealed class StubDisplayInfo : IDisplayInfo
             "Display info not available (stub).");
 }
 
-/// <summary>Fail-clean registry-read seam: read error (never "absent", which would
-/// be a real captured value).</summary>
+/// <summary>Couture de lecture du registre qui échoue proprement : erreur de lecture (jamais
+/// « absent », qui serait une vraie valeur relevée).</summary>
 internal sealed class StubRegistryReader : IRegistryReader
 {
     public Result<uint?> ReadDword(RegistryHiveKind hive, string path, string name) =>
@@ -96,15 +94,7 @@ internal sealed class StubRegistryReader : IRegistryReader
         Result<string?>.Fail(ErrorCodes.TweakSdkUnavailable, "Registry read not available (stub).");
 }
 
-/// <summary>Fail-clean NVAPI GPU-identity seam: no NVIDIA GPU / not available.</summary>
-internal sealed class StubNvApiInfo : INvApiInfo
-{
-    public bool IsAvailable => false;
-    public Result<NvGpuIdentity> GetGpuIdentity(int gpuIndex) =>
-        Result<NvGpuIdentity>.Fail(ErrorCodes.TweakSdkUnavailable, "NVAPI GPU info not available (stub).");
-}
-
-/// <summary>Fail-clean NVAPI GPU-tuning seam: not available.</summary>
+/// <summary>Couture de réglage GPU NVAPI qui échoue proprement : indisponible.</summary>
 internal sealed class StubNvApiGpuTuning : INvApiGpuTuning
 {
     public bool IsAvailable => false;
@@ -117,7 +107,7 @@ internal sealed class StubNvApiGpuTuning : INvApiGpuTuning
         Result<T>.Fail(ErrorCodes.TweakSdkUnavailable, "NVAPI GPU tuning not available (stub).");
 }
 
-/// <summary>Fail-clean ADLX GPU-tuning seam: not available.</summary>
+/// <summary>Couture de réglage GPU ADLX qui échoue proprement : indisponible.</summary>
 internal sealed class StubAdlxGpuTuning : IAdlxGpuTuning
 {
     public bool IsAvailable => false;
@@ -131,26 +121,26 @@ internal sealed class StubAdlxGpuTuning : IAdlxGpuTuning
         Result<T>.Fail(ErrorCodes.TweakSdkUnavailable, "ADLX GPU tuning not available (stub).");
 }
 
-/// <summary>Fail-clean GPU load probe: the real D3D11 stress load isn't wired in this
-/// build, so it reports CouldNotRun → GpuStabilityTester returns Inconclusive → an
-/// undervolt can never be kept (it reverts itself). Replaced by the real D3D11 probe.</summary>
+/// <summary>Sonde de charge GPU qui échoue proprement : la vraie charge D3D11 n'est pas
+/// branchée ici, elle rend CouldNotRun → GpuStabilityTester rend Inconclusive → une
+/// sous-tension n'est jamais gardée (elle s'annule). Remplacée par la vraie sonde D3D11.</summary>
 internal sealed class StubGpuLoadProbe : IGpuLoadProbe
 {
     public Task<Result<GpuLoadResult>> RunBriefLoadAsync(int gpuIndex, TimeSpan duration, CancellationToken ct) =>
         Task.FromResult(Result<GpuLoadResult>.Ok(GpuLoadResult.CouldNotRun));
 }
 
-/// <summary>Fail-clean power-plan read seam: not available.</summary>
+/// <summary>Couture de lecture du plan d'alimentation qui échoue proprement : indisponible.</summary>
 internal sealed class StubPowerPlanReader : IPowerPlanReader
 {
     public Result<Guid> GetActivePowerPlan() =>
         Result<Guid>.Fail(ErrorCodes.TweakSdkUnavailable, "Power-plan read not available (stub).");
 }
 
-/// <summary>Fail-clean CPU power-limit read seam: not available (the App wires the PawnIO reader).</summary>
+/// <summary>Couture de lecture de la limite de puissance CPU qui échoue proprement : indisponible (l'App branche le lecteur PawnIO).</summary>
 internal sealed class StubCpuPowerLimitReader : ICpuPowerLimitReader { }
 
-/// <summary>Fail-clean service-state read seam: not available.</summary>
+/// <summary>Couture de lecture de l'état d'un service qui échoue proprement : indisponible.</summary>
 internal sealed class StubServiceStateReader : IServiceStateReader
 {
     public Result<ServiceState> GetServiceState(string serviceName) =>

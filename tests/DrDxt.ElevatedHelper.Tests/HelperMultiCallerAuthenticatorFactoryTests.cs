@@ -5,19 +5,19 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// HelperAuthenticatorFactory.BuildMulti — binds the helper's authenticator from a
-// SET of trusted caller images (the interactive App + the reconciler host), each by
-// path + SHA-256 (FIX 2 hardening, applied per image).
+// HelperAuthenticatorFactory.BuildMulti : construit l'authentificateur du helper à partir
+// d'un ensemble d'images appelantes de confiance (l'App interactive et l'hôte
+// réconciliateur), chacune par chemin + SHA-256 (le durcissement appliqué image par image).
 //
-// Selection / fail-closed rules (mirrors the single-image Build, per member):
-//   * each provisioned path whose image hashes at startup → a path+hash member;
-//   * the composite authorizes a peer iff it matches ONE of those members;
-//   * a peer that is none of them (third-party OR a swapped binary at a trusted
-//     path) → DENY;
-//   * if NO path resolves/hashes (all null/empty/unhashable) → deny-by-default
-//     (never fail open, never path-only, never allow-all).
+// Règles de sélection et de fermeture (miroir du Build à une image, par membre) :
+//   * chaque chemin provisionné dont l'image se hache au démarrage → un membre chemin + empreinte ;
+//   * le composite autorise un pair s'il correspond à un de ces membres ;
+//   * un pair qui n'en est aucun (tiers, ou binaire substitué à un chemin de confiance)
+//     → refus ;
+//   * si aucun chemin ne se résout ni ne se hache (tous nuls, vides ou illisibles) → refus
+//     par défaut (jamais ouvert, jamais chemin seul, jamais tout accepter).
 //
-// File-hash + the connecting-peer image resolution are behind seams (no real exe).
+// Le hachage de fichier et la résolution de l'image du pair sont derrière des coutures (sans vrai exécutable).
 // -----------------------------------------------------------------------
 public sealed class HelperMultiCallerAuthenticatorFactoryTests
 {
@@ -28,8 +28,8 @@ public sealed class HelperMultiCallerAuthenticatorFactoryTests
     private static readonly byte[] AppHash = { 1, 1, 1, 1 };
     private static readonly byte[] ReconHash = { 2, 2, 2, 2 };
 
-    // Resolves the CONNECTING peer's (path, hash) by pid. Each trusted pid maps to its
-    // real image; an unknown pid resolves to a third-party image.
+    // Résout le couple (chemin, empreinte) du pair qui se connecte par pid. Chaque pid de
+    // confiance renvoie sa vraie image ; un pid inconnu renvoie une image tierce.
     private sealed class FakeIdentity : ICallerImageIdentity
     {
         public CallerImage? Resolve(int pid) => pid switch
@@ -37,13 +37,13 @@ public sealed class HelperMultiCallerAuthenticatorFactoryTests
             1 => new CallerImage(AppPath, AppHash),
             2 => new CallerImage(ReconPath, ReconHash),
             3 => new CallerImage(ThirdPartyPath, new byte[] { 9, 9, 9 }),
-            // a binary SWAPPED at the trusted App path (right path, wrong hash):
+            // un binaire substitué au chemin de confiance de l'App (bon chemin, mauvaise empreinte) :
             4 => new CallerImage(AppPath, new byte[] { 8, 8, 8 }),
             _ => null,
         };
     }
 
-    // The startup hasher: hashes each TRUSTED path to its expected hash.
+    // Le hacheur de démarrage : hache chaque chemin de confiance vers son empreinte attendue.
     private static byte[]? HashFile(string path) => path switch
     {
         AppPath => AppHash,
@@ -84,7 +84,7 @@ public sealed class HelperMultiCallerAuthenticatorFactoryTests
     [Fact]
     public void Unhashable_paths_are_skipped_but_resolvable_ones_still_authorize()
     {
-        // ReconPath cannot be hashed at startup → it is skipped, but App still works.
+        // ReconPath ne se hache pas au démarrage → il est sauté, mais l'App marche toujours.
         var auth = HelperAuthenticatorFactory.BuildMulti(
             new[] { AppPath, ReconPath },
             hashFile: p => p == AppPath ? AppHash : null,

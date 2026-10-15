@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // =======================================================================
-// 19/09/2026. Un banc qui aplatit ce qu'il mesure rend un vert qui ne prouve rien.
+// Un banc qui aplatit ce qu'il mesure rend un vert qui ne prouve rien.
 //
 // La premiere phrase du README promet : « il n'applique jamais un levier qu'il ne
 // peut pas defaire ». Le gate qui la tient est `RevertRestoresStateTests` : appliquer,

@@ -7,24 +7,24 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// A3 — signed IPC wiring for TYPED PrivilegedOps, fail-clean.
+// Câblage IPC signé des PrivilegedOp typées, échec propre.
 //
-// The server pipeline for a typed op is, IN ORDER:
-//   (a) HMAC verify ............ else HELPER.SIGNATURE_INVALID (not executed)
-//   (b) nonce not replayed ..... else HELPER.NOT_ALLOWLISTED   (not executed)
-//   (c) caller authorized ...... else ELEVATION_DENIED         (not executed)
-//   (d) codec deserialize ...... else HELPER.NOT_ALLOWLISTED   (not executed)
-//   (e) OpAllowlist.Validate ... else HELPER.NOT_ALLOWLISTED   (not executed)
-//   (f) execute the allowlisted op
+// Le pipeline du serveur pour une op typée, dans l'ordre :
+//   (a) vérification HMAC ............ sinon HELPER.SIGNATURE_INVALID (non exécutée)
+//   (b) nonce non rejoué ............. sinon HELPER.NOT_ALLOWLISTED   (non exécutée)
+//   (c) appelant autorisé ............ sinon ELEVATION_DENIED         (non exécutée)
+//   (d) désérialisation codec ........ sinon HELPER.NOT_ALLOWLISTED   (non exécutée)
+//   (e) OpAllowlist.Validate ......... sinon HELPER.NOT_ALLOWLISTED   (non exécutée)
+//   (f) exécution de l'op autorisée
 //
-// Deny-by-default, fail-clean — never fail-open. Any failure before (f) means
-// the executor is never invoked.
+// Refus par défaut, échec propre, jamais ouvert. Tout échec avant (f) signifie que
+// l'exécuteur n'est jamais appelé.
 // -----------------------------------------------------------------------
 public sealed class TypedPrivilegedServerTests
 {
     private static byte[] NewKey() => RandomNumberGenerator.GetBytes(32);
 
-    /// <summary>Records whether (and what) the server actually executed.</summary>
+    /// <summary>Enregistre si (et ce que) le serveur a réellement exécuté.</summary>
     private sealed class RecordingExecutor : IPrivilegedOpExecutor
     {
         public PrivilegedOp? Executed { get; private set; }
@@ -56,7 +56,7 @@ public sealed class TypedPrivilegedServerTests
         return new TypedPrivilegedRequest { OpJson = json, Nonce = nonce, HmacBase64 = hmac };
     }
 
-    // --- (acceptance) allowlisted + signed op round-trips OK and IS executed ---
+    // --- (acceptation) une op autorisée et signée fait l'aller-retour Ok et est exécutée ---
 
     [Fact]
     public async Task Allowlisted_signed_op_succeeds_and_is_executed()
@@ -73,7 +73,7 @@ public sealed class TypedPrivilegedServerTests
         exec.Executed.Should().BeOfType<SetActivePowerPlanOp>();
     }
 
-    // --- tampered HMAC → HELPER.SIGNATURE_INVALID, not executed ---
+    // --- HMAC altéré → HELPER.SIGNATURE_INVALID, non exécutée ---
 
     [Fact]
     public async Task Tampered_signature_is_rejected_signature_invalid_not_executed()
@@ -83,7 +83,7 @@ public sealed class TypedPrivilegedServerTests
         var server = Server(key, exec);
 
         var req = SignedRequest(key, new SetActivePowerPlanOp(KnownPowerPlans.HighPerformance));
-        // Flip one byte of the MAC.
+        // Inverser un octet du MAC.
         var bytes = Convert.FromBase64String(req.HmacBase64);
         bytes[0] ^= 0xFF;
         var tampered = req with { HmacBase64 = Convert.ToBase64String(bytes) };
@@ -103,7 +103,7 @@ public sealed class TypedPrivilegedServerTests
         var exec = new RecordingExecutor();
         var server = Server(serverKey, exec);
 
-        // Sign with the wrong key.
+        // Signer avec la mauvaise clé.
         var req = SignedRequest(clientKey, new CreateRestorePointOp("x"));
         var response = await server.ProcessTypedRequestAsync(req, default);
 
@@ -111,7 +111,7 @@ public sealed class TypedPrivilegedServerTests
         exec.WasInvoked.Should().BeFalse();
     }
 
-    // --- non-allowlisted op (validly signed) → HELPER.NOT_ALLOWLISTED, not executed ---
+    // --- op hors liste blanche (bien signée) → HELPER.NOT_ALLOWLISTED, non exécutée ---
 
     [Fact]
     public async Task NonAllowlisted_signed_op_is_rejected_before_execution()
@@ -120,8 +120,8 @@ public sealed class TypedPrivilegedServerTests
         var exec = new RecordingExecutor();
         var server = Server(key, exec);
 
-        // A perfectly-signed op that targets Defender — must be refused at the
-        // allowlist gate, after signature passes, before execution.
+        // Une op parfaitement signée qui vise Defender : refusée à la porte de la liste blanche,
+        // après la signature, avant l'exécution.
         var evil = new SetRegistryValueOp(
             RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Services\WinDefend",
             "Start", RegistryValueType.DWord, "4");
@@ -132,7 +132,7 @@ public sealed class TypedPrivilegedServerTests
         exec.WasInvoked.Should().BeFalse("a non-allowlisted op must never execute");
     }
 
-    // --- unknown discriminant in the signed payload → HELPER.NOT_ALLOWLISTED ---
+    // --- discriminant inconnu dans la charge signée → HELPER.NOT_ALLOWLISTED ---
 
     [Fact]
     public async Task Unknown_op_payload_is_rejected_not_allowlisted_not_executed()
@@ -141,8 +141,8 @@ public sealed class TypedPrivilegedServerTests
         var exec = new RecordingExecutor();
         var server = Server(key, exec);
 
-        // Sign an arbitrary JSON blob (no valid discriminant). Signature passes;
-        // the codec refuses to bind it → NOT_ALLOWLISTED.
+        // Signer un JSON arbitraire (sans discriminant valide). La signature passe ;
+        // le codec refuse de le lier → NOT_ALLOWLISTED.
         var json = """{"op":99999,"cmd":"calc"}""";
         var nonce = Guid.NewGuid().ToString("N");
         var hmac = TypedRequestHmac.Compute(key, json, nonce);
@@ -154,7 +154,7 @@ public sealed class TypedPrivilegedServerTests
         exec.WasInvoked.Should().BeFalse();
     }
 
-    // --- caller not authorized → ELEVATION_DENIED, not executed (fail-closed) ---
+    // --- appelant non autorisé → ELEVATION_DENIED, non exécutée (fermé) ---
 
     [Fact]
     public async Task Default_authenticator_denies_before_execution()
@@ -172,7 +172,7 @@ public sealed class TypedPrivilegedServerTests
         exec.WasInvoked.Should().BeFalse();
     }
 
-    // --- replayed nonce → rejected, not executed twice ---
+    // --- nonce rejoué → refusé, pas exécuté deux fois ---
 
     [Fact]
     public async Task Replayed_nonce_second_is_rejected_not_executed_again()
@@ -189,7 +189,7 @@ public sealed class TypedPrivilegedServerTests
         second.Ok.Should().BeFalse("replaying a nonce must be refused");
     }
 
-    // --- an execution failure surfaces as HELPER.OP_FAILED (not a throw) ---
+    // --- un échec d'exécution remonte en HELPER.OP_FAILED (pas une exception) ---
 
     [Fact]
     public async Task Executor_failure_surfaces_as_op_failed()
@@ -225,7 +225,7 @@ public sealed class TypedPrivilegedServerTests
             throw new InvalidOperationException("boom");
     }
 
-    // --- malformed / null request → fail-clean, never throws, never executes ---
+    // --- requête malformée ou nulle → échec propre, jamais d'exception, jamais exécutée ---
 
     [Fact]
     public async Task Null_request_fails_clean_no_throw()
@@ -261,17 +261,17 @@ public sealed class TypedPrivilegedServerTests
 }
 
 // -----------------------------------------------------------------------
-// GUARD: the server has NO generic registry/exec path. The only way to make it
-// execute is to go through a closed PrivilegedOp leaf that passes the allowlist.
-// This pins the master-plan §9.13 invariant against future drift.
+// Garde : le serveur n'a aucun chemin générique registre/exécution. La seule façon de le
+// faire exécuter est de passer par une feuille PrivilegedOp fermée qui franchit la liste blanche.
+// Ceci fige l'invariant de feuille exacte contre toute dérive.
 // -----------------------------------------------------------------------
 public sealed class TypedServerHasNoGenericPathTests
 {
     [Fact]
     public void Executor_contract_only_accepts_typed_PrivilegedOp()
     {
-        // The executor seam takes a PrivilegedOp — the SEALED, closed hierarchy.
-        // There is no string/command/path overload anywhere on the contract.
+        // La couture d'exécuteur prend une PrivilegedOp : la hiérarchie scellée, fermée.
+        // Aucune surcharge chaîne/commande/chemin nulle part sur le contrat.
         var method = typeof(IPrivilegedOpExecutor).GetMethod(nameof(IPrivilegedOpExecutor.ExecuteAsync))!;
         var paramTypes = method.GetParameters().Select(p => p.ParameterType).ToArray();
         paramTypes.Should().Contain(typeof(PrivilegedOp));
@@ -281,9 +281,9 @@ public sealed class TypedServerHasNoGenericPathTests
     [Fact]
     public void TypedServer_exposes_no_method_taking_a_raw_string_command()
     {
-        // No public method on the server accepts a bare string (a command/path)
-        // as its sole privileged input — the only entry point is the typed,
-        // signed, allowlisted request.
+        // Aucune méthode publique du serveur n'accepte une simple chaîne (commande ou chemin)
+        // comme seule entrée privilégiée : le seul point d'entrée est la requête typée,
+        // signée, passée par la liste blanche.
         var stringEntryPoints = typeof(TypedPrivilegedServer)
             .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
             .Where(m => m.DeclaringType == typeof(TypedPrivilegedServer))

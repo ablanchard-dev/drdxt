@@ -1,7 +1,7 @@
 namespace DrDxt.Core;
 
 /// <summary>Pourquoi un candidat n'a pas ete garde. Chaque valeur est une phrase differente pour
-/// le joueur — « pas teste » et « teste et rejete » ne se confondent jamais.</summary>
+/// le joueur : « pas teste » et « teste et rejete » ne se confondent jamais.</summary>
 public enum CandidateOutcome
 {
     /// <summary>Gain prouve au-dessus de la resolution de la session. Conserve.</summary>
@@ -10,7 +10,7 @@ public enum CandidateOutcome
     /// <summary>Degradation prouvee. Annule.</summary>
     RejectedRegression,
 
-    /// <summary>Mesure, mais l'ecart reste sous ce que la session sait resoudre. Annule — on ne
+    /// <summary>Mesure, mais l'ecart reste sous ce que la session sait resoudre. Annule : on ne
     /// garde pas un changement qu'on ne sait pas justifier.</summary>
     RejectedUnresolved,
 
@@ -25,14 +25,14 @@ public enum CandidateOutcome
 }
 
 /// <summary>Ce qu'un candidat a donne. <paramref name="Evidence"/> est nul quand rien n'a ete
-/// mesure — et c'est une information, pas un trou.</summary>
+/// mesure, et c'est une information, pas un trou.</summary>
 public sealed record CandidateResult(
     string Id,
     CandidateOutcome Outcome,
     Evidence? Evidence,
     string? Detail,
     string? RaisonCle = null,
-    /// <summary>Une preuve par GRANDEUR : moyenne, 1 % low, p95 frametime — chacune avec son
+    /// <summary>Une preuve par grandeur : moyenne, 1 % low, p95 frametime, chacune avec son
     /// ecart et sa resolution. Vide quand rien n'a ete mesure. <see cref="Evidence"/> reste la
     /// preuve de la moyenne, pour les appelants qui n'en veulent qu'une.</summary>
     IReadOnlyList<MetricEvidence>? Metriques = null,
@@ -40,7 +40,7 @@ public sealed record CandidateResult(
     /// sequentiel fait varier ce nombre : c'est le temps de jeu que le candidat a coute.</summary>
     int PassesAb = 0,
     /// <summary>La grandeur de queue qui a valide le keep, recopiee telle quelle de
-    /// <see cref="KeepDecision.Queue"/> — jamais recalculee ici. <see cref="PreuveDeQueue.Aucune"/>
+    /// <see cref="KeepDecision.Queue"/>, jamais recalculee ici. <see cref="PreuveDeQueue.Aucune"/>
     /// pour tout ce qui n'a pas ete garde. Pur enregistrement : c'est ce que le journal des
     /// candidats accumule pour trancher un jour si le p95 seul merite de garder un reglage.</summary>
     PreuveDeQueue Queue = PreuveDeQueue.Aucune);
@@ -55,11 +55,11 @@ public sealed record AutopilotProfile(
 }
 
 /// <summary>
-/// La boucle : observer → mesurer ce qu'on peut voir → TENTER → prouver → garder ou annuler.
+/// La boucle : observer → mesurer ce qu'on peut voir → tenter → prouver → garder ou annuler.
 ///
 /// `OcSweep` avait deja cette philosophie et n'etait appele que par `tools/octune` : il ne savait
 /// balayer qu'un offset GPU entier, contre un banc GPU precis. Ce moteur-ci est la meme idee rendue
-/// generique — il ne sait rien du GPU, rien des FPS, rien du materiel. Il sait juste tenter des
+/// generique : il ne sait rien du GPU, rien des FPS, rien du materiel. Il sait juste tenter des
 /// actions et refuser de garder ce qu'il ne peut pas prouver.
 ///
 /// ══ ce qui le rend different d'un catalogue de tweaks ══
@@ -99,17 +99,17 @@ public static class AutopilotEngine
                () => { var v = mesurer(); return v > 0 && double.IsFinite(v) ? new GameMetrics(v, v) : null; },
                passesAa, stable, but, alternancesMax);
 
-    /// <summary>La meme boucle, sur un JEU : chaque passe rend toutes ses grandeurs, et chacune
+    /// <summary>La meme boucle, sur un jeu : chaque passe rend toutes ses grandeurs, et chacune
     /// est jugee separement.</summary>
-    /// <param name="alternancesMax">Le nombre de passes d'alternance du protocole. **FIXE** : le
+    /// <param name="alternancesMax">Le nombre de passes d'alternance du protocole. **Fixe** : le
     /// moteur va au bout et ne prend qu'une decision statistique, sur l'experience complete.
     ///
     /// Ce parametre s'appelait un « plafond » et l'experience s'arretait des qu'un gain
-    /// devenait significatif. C'etait de l'optional stopping — chaque regard est une occasion
+    /// devenait significatif. C'etait de l'optional stopping : chaque regard est une occasion
     /// supplementaire de franchir le seuil par hasard, et s'arreter uniquement sur les succes est
-    /// exactement ce qui cree le biais. Seuls des arrets PHYSIQUES pre-declares interrompent le
+    /// exactement ce qui cree le biais. Seuls des arrets physiques pre-declares interrompent le
     /// protocole, parce qu'ils ne dependent pas du resultat mesure.</param>
-    /// <param name="representativite">PHASE 18 F5 — ce que la scene represente (partie reelle,
+    /// <param name="representativite">Ce que la scene represente (partie reelle,
     /// entrainement…). Sert a la regle de decidabilite ; <c>Unknown</c> par defaut.</param>
     public static AutopilotProfile Run(
         IReadOnlyList<IAutopilotCandidate> candidats,
@@ -135,13 +135,14 @@ public static class AutopilotEngine
 
         // ── 1. L'A/A : de quoi cette scene est-elle capable ? ────────────────────────────────
         // L'A/A se mesure sur la moyenne, pas sur le score composite. La derive est une
-        // propriete de la SCENE, et la moyenne est la grandeur qui la lit le mieux : mesuree le
-        // 07/09/2026, elle resout a +/-4,6 % la ou le score composite annonce +/-72 %. Probe le
+        // propriete de la scene, et la moyenne est la grandeur qui la lit le mieux : mesuree sur une
+        // session Warzone le 07/09/2026 (docs/PROTOCOLES-DE-MESURE-IN-GAME.md), elle resout a +/-4,6 % la ou
+        // le score composite annonce +/-72 %. Prendre le
         // score reviendrait a declarer inutilisable une scene parfaitement stable.
         //
-        // Et depuis le 07/09 l'A/A ne fixe plus le seuil de decision : l'experience appariee
-        // annonce sa propre resolution, mesuree sur ses residus. Il reste a l'A/A deux roles —
-        // dire si la scene derive, et dire d'avance ce qu'elle permettra d'esperer.
+        // L'A/A ne fixe pas le seuil de decision : l'experience appariee annonce sa propre
+        // resolution, mesuree sur ses residus. Il reste a l'A/A deux roles : dire si la scene
+        // derive, et dire d'avance ce qu'elle permettra d'esperer.
         var aa = new List<double>();
         for (var i = 0; i < Math.Max(0, passesAa); i++) aa.Add(MesureJeu(Mesurer).AvgFps);
         var scene = SceneResolution.Probe(aa);
@@ -153,8 +154,8 @@ public static class AutopilotEngine
             foreach (var c in candidats)
                 resultats.Add(new CandidateResult(c.Descriptor.Id, CandidateOutcome.NotAttempted, null,
                     scene.Verdict == SceneVerdict.DriftDominant
-                        ? "la scène dérive plus qu'elle ne bruite : un A/B y créditerait le temps écoulé"
-                        : "pas assez de passes exploitables pour connaître la résolution de la scène"));
+                        ? Docteur.T("AE.SceneDerive")
+                        : Docteur.T("AE.PassesInsuffisantes")));
             return new AutopilotProfile(scene, resultats, EndedInBestState: true);
         }
 
@@ -168,13 +169,13 @@ public static class AutopilotEngine
             if (d.Kind != CandidateKind.AutoHot)
             {
                 resultats.Add(new CandidateResult(d.Id, CandidateOutcome.NotAttempted, null,
-                    $"nature {d.Kind} : l'autopilote ne l'applique pas de lui-même"));
+                    Docteur.T("AE.Nature", d.Kind)));
                 continue;
             }
 
-            // ── 2 bis. La scene peut-elle voir son effet ? (PHASE 18 F5) ────────────────────
+            // ── 2 bis. La scene peut-elle voir son effet ? ────────────────────
             // Decide avant la moindre ecriture, sur la resolution que l'A/A vient de mesurer. Et le
-            // nombre d'alternances se fixe ici, par l'effet DECLARE — jamais par ce que la mesure
+            // nombre d'alternances se fixe ici, par l'effet declare, jamais par ce que la mesure
             // montrera : c'est un protocole pre-enregistre, pas un arret optionnel.
             // Effet inconnu : comportement inchange (parametre de l'appelant).
             var alternances = alternancesMax;
@@ -198,7 +199,7 @@ public static class AutopilotEngine
                     toutRemis &= Annuler(candidat);
                     resultats.Add(new CandidateResult(d.Id, CandidateOutcome.ApplyFailed, null,
                         applique.IsOk
-                            ? "l'écriture n'a pas pris à la relecture : mesurer serait mesurer autre chose"
+                            ? Docteur.T("AE.EcritureNonRelue")
                             : applique.Error?.Message));
                     continue;
                 }
@@ -208,18 +209,16 @@ public static class AutopilotEngine
                 {
                     toutRemis &= Annuler(candidat);
                     resultats.Add(new CandidateResult(d.Id, CandidateOutcome.Unstable, null,
-                        "instabilité détectée après application"));
+                        Docteur.T("AE.Instable")));
                     continue;
                 }
 
                 // ── 5. A-b-b-a, repete jusqu'a savoir : l'effet du reglage, pas celui du temps ─
-                // Le protocole etait a-b-a-b, quatre passes, point final. Quatre passes ne
-                // laissent qu'UN degre de liberte au modele (trois parametres a ajuster) : la
-                // resolution qui en sort est enorme, et l'experience s'arretait la. Mesure du
-                // 07/09/2026 sur le corpus des 8 captures Warzone : l'ecart p95 observe sous no-op
-                // tombe de 13,7 % a 3,9 % entre 4 et 12 alternances, sans allonger aucune passe.
-                // Ce chiffre vient de fenetres GLISSANTES, donc exploratoire. Refait en
-                // fenetres disjointes le 08/09, seules 8 alternances sont validees hors corpus
+                // Quatre passes ne laissent qu'un degre de liberte au modele (trois parametres a
+                // ajuster) : la resolution qui en sort est enorme. Mesure du 07/09/2026 sur le corpus
+                // des 8 captures Warzone : l'ecart p95 observe sous no-op tombe de 13,7 % a 3,9 % entre
+                // 4 et 12 alternances, sans allonger aucune passe (fenetres glissantes, donc exploratoire).
+                // Mesure en fenetres disjointes le 08/09 : seules 8 alternances sont validees hors corpus
                 // d'entrainement (`tools/tailbench --loco`).
                 //
                 // A-b-b-a plutot qu'a-b-a-b : les deux sont valides, mais a-b-b-a est exactement
@@ -258,13 +257,12 @@ public static class AutopilotEngine
                     var remis = candidat.Apply();
                     var reluApresKeep = remis.IsOk ? candidat.ReadBack() : Result<bool>.Ok(false);
                     if (!remis.IsOk || !reluApresKeep.IsOk || !reluApresKeep.Value) toutRemis = false;
-                    // Seulement une fois le levier RELU en place : un keep qui n'a pas repris garde
+                    // Seulement une fois le levier relu en place : un keep qui n'a pas repris garde
                     // son filet arme, et le demarrage suivant le rendra.
                     else if (!candidat.Garder().IsOk)
                         decision = decision with
                         {
-                            Detail = decision.Detail + " ; journal de retour non mis à jour : ce réglage "
-                                     + "sera remis comme avant au prochain démarrage",
+                            Detail = decision.Detail + Docteur.T("AE.JournalRetourNonMisAJour"),
                         };
                 }
                 else
@@ -284,11 +282,11 @@ public static class AutopilotEngine
                 {
                     // Le joueur a arrete : l'etat de reference est rendu, et on ne tente rien d'autre.
                     resultats.Add(new CandidateResult(d.Id, CandidateOutcome.NotAttempted, null,
-                        "session annulée, état de référence restauré"));
+                        Docteur.T("AE.SessionAnnulee")));
                     break;
                 }
                 resultats.Add(new CandidateResult(d.Id, CandidateOutcome.ApplyFailed, null,
-                    $"{ex.GetType().Name} pendant l'essai, état de référence restauré"));
+                    Docteur.T("AE.ExceptionPendantEssai", ex.GetType().Name)));
             }
         }
 
@@ -318,7 +316,7 @@ public static class AutopilotEngine
             }
             if (interrompu) break;
 
-            // Aucune decision statistique ici. Le protocole est FIXE.
+            // Aucune decision statistique ici. Le protocole est fixe.
             //
             // Ce code s'arretait des qu'un gain devenait significatif, avec pour
             // justification : « un Unresolved ne stoppe jamais, donc les regards repetes
@@ -334,7 +332,7 @@ public static class AutopilotEngine
             // qu'il n'y en a pas. Tant que ce n'est pas implemente et calibre, le
             // protocole va au bout : une decision, sur l'experience complete.
             //
-            // Les seules interruptions permises sont PHYSIQUES et pre-declarees
+            // Les seules interruptions permises sont physiques et pre-declarees
             // (voir `ArretPhysique`) : elles ne dependent pas du resultat mesure, donc
             // elles ne biaisent pas le verdict.
         }
@@ -350,7 +348,7 @@ public static class AutopilotEngine
         catch { return new GameMetrics(0, 0); }
     }
 
-    /// <summary>Une preuve par grandeur, toutes issues des MEMES passes. C'est ce qui permet de
+    /// <summary>Une preuve par grandeur, toutes issues des memes passes. C'est ce qui permet de
     /// dire « debit prouve, fluidite non resolue » au lieu d'un seul chiffre qui melange les
     /// deux.</summary>
     private static IReadOnlyList<MetricEvidence> Juger(

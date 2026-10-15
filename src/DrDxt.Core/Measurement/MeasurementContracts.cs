@@ -1,12 +1,12 @@
 namespace DrDxt.Core;
 
-// --- P1 Measurement ---
+// --- Mesure ---
 
-/// <summary>Which component paced a session, read from GPU-busy vs frame time. Intel PresentMon's
-/// GPU-Busy methodology: GPU-bound ⟺ GPU busy tracks frame time closely; CPU/other-bound ⟺ a large
-/// gap (the GPU finished and waited on the CPU, engine or presentation path). Indeterminate when GPU
-/// busy wasn't measured or the machine sits between the two — never a guessed limiter.
-/// Source (concept): Intel PresentMon GPU-Busy — https://presentmon.com/ .</summary>
+/// <summary>Quel composant a cadencé une session, lu par GPU-busy contre temps de trame. Méthode
+/// GPU-Busy d'Intel PresentMon : GPU-bound ⟺ le GPU busy suit de près le temps de trame ; limité par
+/// le CPU ou autre ⟺ un grand écart (le GPU a fini et attendu le CPU, le moteur ou la présentation).
+/// Indeterminate si le GPU busy n'est pas mesuré ou si la machine est entre les deux : jamais deviné.
+/// Source (concept) : Intel PresentMon GPU-Busy, https://presentmon.com/ .</summary>
 public enum Bottleneck { Indeterminate, GpuBound, CpuOrOtherBound }
 
 public record BenchmarkResult(
@@ -18,14 +18,14 @@ public record BenchmarkResult(
     double MarginOfError,
     int Runs,
     double? MeanGpuBusyMs = null,
-    // ── L1.1 — les grandeurs que le classifieur demande ────────────────────────────────────
+    // ── Les grandeurs que le classifieur demande ────────────────────────────────────
     // La note de conception du classifieur (voir `BottleneckClassifier`) en exige 8 ; ce contrat
     // n'en portait qu'une (MeanGpuBusyMs). Le produit ne pouvait donc distinguer que
     // « GPU-bound / pas GPU-bound » et vendait les memes leviers a tout le monde. Toutes
-    // optionnelles et en queue : null = pas mesuree, jamais zero -- la distinction porte tout
+    // optionnelles et en queue : null = pas mesuree, jamais zero ; la distinction porte tout
     // l'etat UNKNOWN_PARTIAL, qui interdit au produit de reclamer un gain.
     //
-    // Ce sont des AGREGATS et pas des series : les ratios se calculent frame par frame la ou
+    // Ce sont des agregats et pas des series : les ratios se calculent frame par frame la ou
     // les series sont paralleles (BenchmarkRunner), puis on garde la mediane. Les recalculer
     // ici sur des moyennes de moyennes donnerait un autre chiffre, et un plus faux.
 
@@ -34,7 +34,7 @@ public record BenchmarkResult(
     /// « CPU-bound » de « simplement pas GPU-bound ».</summary>
     double? GpuWaitRatio = null,
 
-    /// <summary>Mediane par frame de CpuBusy / frametime. Travail CPU de l'APPLICATION sur la
+    /// <summary>Mediane par frame de CpuBusy / frametime. Travail CPU de l'application sur la
     /// frame, pas la charge CPU de la machine (PresentMon le dit explicitement) : les confondre
     /// ferait accuser le CPU d'un systeme charge par autre chose.</summary>
     double? CpuBusyRatio = null,
@@ -59,11 +59,11 @@ public record BenchmarkResult(
     double? CommitPressure = null,
 
     /// <summary>
-    /// La part de trames que l'hygiene a gardees, dans [0, 1] — l'exposition reelle de la mesure.
+    /// La part de trames que l'hygiene a gardees, dans [0, 1] : l'exposition reelle de la mesure.
     ///
     /// Sans elle, deux passes A/B peuvent avoir vecu des choses completement differentes sans
     /// que rien ne le dise. Mesure du 06/09/2026 : une charge GPU concurrente decale le niveau de
-    /// **−23,9 %** sans faire exploser la variance — un A/B dont les deux moities n'ont pas la
+    /// **−23,9 %** sans faire exploser la variance : un A/B dont les deux moities n'ont pas la
     /// meme charge de fond compare deux machines, et le verdict sort sans le moindre signe
     /// d'erreur. Le meme piege vaut pour un alt-tab : l'hygiene retire les secondes hors focus, et
     /// une passe amputee de moitie n'est pas comparable a une passe intacte.
@@ -78,15 +78,15 @@ public record BenchmarkResult(
     double? HygieneKeptFraction = null,
 
     /// <summary>
-    /// La part du temps ou le jeu etait reellement au premier plan, dans [0, 1] — OBSERVEE.
+    /// La part du temps ou le jeu etait reellement au premier plan, dans [0, 1], observee.
     ///
-    /// Jusqu'ici l'alt-tab etait DEVINE a partir de la regularite des frametimes : une seconde
+    /// Jusqu'ici l'alt-tab etait devine a partir de la regularite des frametimes : une seconde
     /// lente et reguliere ressemble a un plafond hors focus. L'inference se trompe dans les deux
-    /// sens — un jeu qui rame regulierement passe pour un alt-tab, un alt-tab irregulier passe
+    /// sens : un jeu qui rame regulierement passe pour un alt-tab, un alt-tab irregulier passe
     /// pour du jeu. Ici on a regarde.
     ///
     /// Le focus ne dit rien de la performance : il dit si la mesure porte sur le jeu. Une passe
-    /// entierement jouee reste comparable, que le PC y ait ete brillant ou catastrophique — c'est
+    /// entierement jouee reste comparable, que le PC y ait ete brillant ou catastrophique : c'est
     /// justement ce qu'on veut mesurer. **On ne nettoie jamais les mauvaises performances du
     /// joueur.**
     ///
@@ -96,14 +96,14 @@ public record BenchmarkResult(
     double? ForegroundFraction = null,
 
     /// <summary>
-    /// Le p95 des frametimes, en millisecondes — la grandeur de queue qui sait decider.
+    /// Le p95 des frametimes, en millisecondes : la grandeur de queue qui sait decider.
     ///
     /// Le produit n'avait que le 1 % low pour parler de fluidite, et le 1 % low resout mal :
     /// en session live il annoncait +/-132 %. Sur le corpus des 8 captures Warzone, en fenetres
-    /// NON chevauchantes, son ecart maximal sous no-op va jusqu'a 43,7 % sur la partie la plus
+    /// non chevauchantes, son ecart maximal sous no-op va jusqu'a 43,7 % sur la partie la plus
     /// agitee, contre 15,0 % pour la moyenne.
     ///
-    /// Le p95 frametime est la meme famille — la queue lente — mais il repose sur 5 % des frames
+    /// Le p95 frametime est la meme famille (la queue lente), mais il repose sur 5 % des frames
     /// au lieu de 1 %, donc il ne se fait pas dicter sa valeur par une poignee d'a-coups. En
     /// leave-one-capture-out, il est choisi sur 7 holdouts sur 8 sans jamais voir la partie sur
     /// laquelle il est evalue.
@@ -112,21 +112,21 @@ public record BenchmarkResult(
     /// centile. Sur une deformation qui ajoute un a-coup toutes les 60 frames, il rend +1,6 %
     /// pendant que le 1 % low prouve une regression de -65,6 %. Les deux sont necessaires.
     ///
-    /// Il se lit A L'ENVERS : plus PETIT = mieux. Voir <see cref="GameMetricSet.Valeur"/>, qui
+    /// Il se lit a l'envers : plus petit = mieux. Voir <see cref="GameMetricSet.Valeur"/>, qui
     /// le convertit en FPS equivalents avant toute comparaison.
     ///
-    /// Le p99 a ete essaye et REJETE au meme banc : systematiquement surconfiant (il annonce
+    /// Le p99 a ete essaye et rejete au meme banc : systematiquement surconfiant (il annonce
     /// 9,2 % pour un ecart p95 observe de 15,3 %), il fabriquerait des verdicts.
     /// </summary>
     double? P95FrametimeMs = null,
 
     /// <summary>Ce que le materiel a fait pendant la passe : puissance mediane, temperature max.
-    /// <c>null</c> = aucune sonde branchee. C'est une OBSERVATION, jamais une cause : le
+    /// <c>null</c> = aucune sonde branchee. C'est une observation, jamais une cause : le
     /// produit a le droit de dire « le GPU etait a 68 °C pendant les fenetres mesurees », pas
     /// d'en deduire que la temperature coute des FPS.</summary>
     HardwareObservation? Materiel = null,
 
-    /// <summary>La part du temps ECOULE pendant laquelle le GPU a travaille, dans [0, 1], APPARIEE
+    /// <summary>La part du temps ecoule pendant laquelle le GPU a travaille, dans [0, 1], appariee
     /// trame par trame : somme des GPU-busy sur somme des temps de trame, sur les seules trames ou
     /// les deux existent.
     ///
@@ -135,10 +135,10 @@ public record BenchmarkResult(
     /// retombe alors sur l'ancienne approximation, et la nomme.</summary>
     double? GpuBusyShare = null,
 
-    /// <summary>Combien D'ECHANTILLONS portent <see cref="AnimationErrorMsP95"/>.
+    /// <summary>Combien d'echantillons portent <see cref="AnimationErrorMsP95"/>.
     ///
     /// Sans lui, la seule facon de juger si ce p95 merite son nom etait de compter les
-    /// FRAMETIMES — une autre serie. Une passe dont l'erreur d'animation est absente ou
+    /// frametimes, une autre serie. Une passe dont l'erreur d'animation est absente ou
     /// desynchronisee ne contribue pas au percentile, et le compte des trames ne le dit pas : on
     /// validait un p95 tire de huit points en en lisant mille. Meme faute que deux moyennes prises
     /// sur des trames differentes.
@@ -147,53 +147,52 @@ public record BenchmarkResult(
     /// « assez » : l'affichage se tait.</summary>
     int? AnimationErrorSamples = null,
 
-    /// <summary>Combien D'ECHANTILLONS portent <see cref="PresentStallMsP95"/>.
+    /// <summary>Combien d'echantillons portent <see cref="PresentStallMsP95"/>.
     ///
-    /// Meme raison que <see cref="AnimationErrorSamples"/>, appliquee d'entree cette fois : ce
+    /// Meme raison que <see cref="AnimationErrorSamples"/> : ce
     /// p95 vient de la serie `InPresentApi`, pas des trames. Juger son interpretabilite au nombre
-    /// de trames reviendrait a valider un percentile sur une population qui n'est pas la sienne —
-    /// la faute payee deux fois dans cette boucle. <c>null</c> = compte inconnu : on se tait.</summary>
+    /// de trames reviendrait a valider un percentile sur une population qui n'est pas la sienne.
+    /// <c>null</c> = compte inconnu : on se tait.</summary>
     int? PresentStallSamples = null,
-    /// <summary>24/09/2026 — qui a compte les images. <c>null</c> = PresentMon (le banc historique) ;
+    /// <summary>Qui a compte les images. <c>null</c> = PresentMon (le banc historique) ;
     /// « DXGI » = le compteur de repli, qui ne voit ni la latence ni le focus.</summary>
     string? Instrument = null,
-    /// <summary>25/09/2026 — quel processus a ete mesure. Un rapport lu le 25/09 donnait 99 FPS sur un
+    /// <summary>Quel processus a ete mesure. Un rapport lu le 25/09 donnait 99 FPS sur un
     /// scan que l'on croyait sans jeu : c'etait JeuB, au premier plan. Sans le nom, le chiffre ne
     /// se verifie pas. <c>null</c> = inconnu.</summary>
     string? ProcessusMesure = null,
 
-    /// <summary>26/09/2026 : la marge des 1 % lows, tiree de leur dispersion ENTRE passes. L'A/B
+    /// <summary>La marge des 1 % lows, tiree de leur dispersion entre passes. L'A/B
     /// jugeait les lows avec la marge des FPS moyens, alors que les lows varient bien plus d'une
     /// passe a l'autre : un « gain » ou une « regression » des lows pouvait etre du bruit, et une
     /// regression annule le reglage. +inf par defaut : un resultat qui ne l'a pas calculee ne
     /// conclut jamais sur les lows.</summary>
     double P1LowMarginOfError = double.PositiveInfinity,
 
-    /// <summary>28/09/2026 : la marge des 0,1 % lows, meme calcul. Le chiffre le plus fragile du rapport
+    /// <summary>La marge des 0,1 % lows, meme calcul. Le chiffre le plus fragile du rapport
     /// sortait seul sans marge. Informative, jamais decisionnelle (voir <c>GameObjective</c>).</summary>
     double P01LowMarginOfError = double.PositiveInfinity,
-    /// <summary>B4 (10/10/2026) : médiane de la latence d'affichage de PresentMon (début de l'image → écran), en ms ;
+    /// <summary>Médiane de la latence d'affichage de PresentMon (début de l'image → écran), en ms ;
     /// null quand la série n'a pas été livrée. Le chiffre sur lequel l'essai en alternance juge un levier de latence.</summary>
     double? DisplayLatencyMsMedian = null)
 {
-    /// <summary>GPU-busy as a % of frame time: the CPU-bound (≪ 100) vs GPU-bound (≈ 100) signal.
-    /// Null when GPU busy was not measured or the frame rate is unknown — never a fabricated 0.
+    /// <summary>GPU-busy en % du temps de trame : le signal CPU-bound (≪ 100) contre GPU-bound (≈ 100).
+    /// Null si le GPU busy n'est pas mesuré ou si la cadence est inconnue, jamais un 0 inventé.
     ///
-    /// Corrige LE 10/09/2026. Cette valeur se calculait « moyenne des GPU-busy ÷ moyenne des
-    /// temps de trame », et les deux moyennes ne portaient pas forcement sur les MEMES trames :
-    /// une serie GPU desynchronisee etait quand meme moyennee, et un GPU-busy a zero — mesure
-    /// valide : le GPU n'a rien fait sur cette trame — etait ecarte du haut sans l'etre du bas.
-    /// Le verdict de goulot du produit et le tableau de bord en dependaient deja.
+    /// « Moyenne des GPU-busy ÷ moyenne des temps de trame » melangerait des trames differentes :
+    /// une serie GPU desynchronisee serait quand meme moyennee, et un GPU-busy a zero (mesure
+    /// valide : le GPU n'a rien fait sur cette trame) serait ecarte du haut sans l'etre du bas.
+    /// Le verdict de goulot en depend.
     ///
-    /// <see cref="GpuBusyShare"/> est desormais la source : une part APPARIEE, somme sur somme,
-    /// des seules trames ou les deux grandeurs existent. L'ancienne derivation reste en REPLI
-    /// nomme, pour les mesures enregistrees avant que l'appariement existe (rejeu de journal) —
-    /// c'est une approximation, et elle est ecrite comme telle plutot que supprimee en silence.
+    /// <see cref="GpuBusyShare"/> est donc la source : une part appariee, somme sur somme, des
+    /// seules trames ou les deux grandeurs existent. Le rapport des moyennes reste en repli nomme,
+    /// pour les mesures enregistrees sans appariement (rejeu de journal) : c'est une approximation,
+    /// et elle est ecrite comme telle.
     ///
     /// Et le repli ne doit jamais se rallumer sur une capture neuve. L'invariant qui le garantit
     /// vit dans `BenchmarkRunner` : une passe n'entre au numerateur que si ses trames entrent au
     /// denominateur, donc une mesure qui a lu du GPU publie toujours sa part appariee. Sans cet
-    /// invariant, cinq passes dont une seule desynchronisee suffisaient a rendre la part
+    /// invariant, cinq passes dont une seule desynchronisee suffiraient a rendre la part
     /// incalculable et a rebrancher le melange de populations sur une mesure du jour.
     /// Verrouille par BenchmarkRunnerGpuOccupancyTests.</summary>
     public double? GpuBusyPercent =>
@@ -201,38 +200,38 @@ public record BenchmarkResult(
         : MeanGpuBusyMs is { } busy && AvgFps > 0 ? busy * AvgFps / 10.0
         : null;
 
-    /// <summary>GPU-busy % at/above which the GPU paced nearly the whole frame → GPU-bound. Intel
-    /// PresentMon defines the CONCEPT (a small GPU-busy↔frame-time gap = GPU-bound) but publishes NO
-    /// numeric cutoff; 90 % (≤10 % off-GPU) is DrDXT's conservative default, not a sourced constant.
-    /// calibration knob: raise toward 95 to be stricter before claiming GPU-bound.</summary>
+    /// <summary>GPU-busy % à partir duquel le GPU a cadencé presque toute la trame → GPU-bound. Intel
+    /// PresentMon définit le concept (un petit écart GPU-busy↔temps de trame = GPU-bound) sans publier
+    /// de seuil ; 90 % (≤10 % hors GPU) est le défaut prudent de DrDXT, pas une constante sourcée.
+    /// réglage d'étalonnage : monter vers 95 pour être plus strict avant d'affirmer GPU-bound.</summary>
     public const double GpuBoundBusyPercent = 90.0;
 
-    /// <summary>GPU-busy % at/below which a meaningful share of the frame ran off-GPU → the CPU or
-    /// another subsystem paced it. DrDXT default (≥25 % off-GPU). The 75–90 band stays Indeterminate
-    /// on purpose so we never over-claim either limiter. calibration knob.</summary>
+    /// <summary>GPU-busy % jusqu'auquel une part notable de la trame s'est passée hors GPU → le CPU
+    /// ou un autre sous-système l'a cadencée. Défaut DrDXT (≥25 % hors GPU). La bande 75–90 reste
+    /// Indeterminate exprès, pour n'affirmer à tort aucune limite. réglage d'étalonnage.</summary>
     public const double CpuBoundBusyPercent = 75.0;
 
-    /// <summary>The session's limiter (<see cref="Core.Bottleneck"/>), from <see cref="GpuBusyPercent"/>.
-    /// Indeterminate when GPU busy is unmeasured — the honest degraded state, never a fabricated
-    /// GpuBound. Lets the reco layer avoid selling a GPU tweak as an FPS win on a CPU-bound machine.</summary>
+    /// <summary>Ce qui a limité la session (<see cref="Core.Bottleneck"/>), d'après <see cref="GpuBusyPercent"/>.
+    /// Indeterminate si le GPU busy n'est pas mesuré : l'état dégradé honnête, jamais un GpuBound
+    /// inventé. La reco évite ainsi de vendre un levier GPU comme gain de FPS sur une machine CPU-bound.</summary>
     public Bottleneck Bottleneck =>
         GpuBusyPercent is not { } pct ? Bottleneck.Indeterminate
         : pct >= GpuBoundBusyPercent ? Bottleneck.GpuBound
         : pct <= CpuBoundBusyPercent ? Bottleneck.CpuOrOtherBound
         : Bottleneck.Indeterminate;
 
-    /// <summary>CapFrameX default "stuttering factor": a frame counts as a stutter when its frame
-    /// time exceeds 2.5× the average. Source: CapFrameX (reference frametime-analysis tool).</summary>
+    /// <summary>« Stuttering factor » par défaut de CapFrameX : une trame est un à-coup quand son
+    /// temps dépasse 2,5× la moyenne. Source : CapFrameX (outil de référence d'analyse des frametimes).</summary>
     public const double StutterFactor = 2.5;
 
-    /// <summary>Share of play-TIME (0–100 %) spent in stutter frames — frames whose frame time
-    /// exceeds <see cref="StutterFactor"/>× the mean. Mirrors CapFrameX's stuttering %, and is the
-    /// honest MEASURED-stability signal (100 − this = % of time that was smooth). Null when no valid
-    /// frame was captured — never a fabricated 0. Invalid frames (≤ 0 / NaN / ∞) are filtered like
-    /// the rest of the frametime maths.
-    /// heuristic: thresholds against the global mean, not CapFrameX's moving average — defensible for
-    /// the fixed-scene A/B protocol (the project's measurement-proof note, unpublished, §6); switch to a windowed mean if scene
-    /// variance within a capture starts to matter.</summary>
+    /// <summary>Part du temps de jeu (0–100 %) passée dans des trames à-coups, dont le temps dépasse
+    /// <see cref="StutterFactor"/>× la moyenne. Calqué sur le stuttering % de CapFrameX : c'est le
+    /// signal honnête de stabilité mesurée (100 − ceci = % du temps fluide). Null si aucune trame
+    /// valide n'a été captée, jamais un 0 inventé. Les trames invalides (≤ 0 / NaN / ∞) sont filtrées
+    /// comme dans le reste des calculs de frametimes.
+    /// heuristique : seuil sur la moyenne globale, pas la moyenne glissante de CapFrameX ; défendable pour
+    /// le protocole A/B à scène fixe (note de preuve de mesure du projet, non publiée) ; passer à une
+    /// moyenne par fenêtre si la variance de scène dans une capture devient gênante.</summary>
     public double? StutterTimePercent
     {
         get
@@ -246,8 +245,8 @@ public record BenchmarkResult(
     }
 
     /// <summary>
-    /// Coefficient de variation des frametimes (ecart-type / moyenne) — le proxy de cadence
-    /// Normalise : il met une machine a 60 FPS et une a 240 FPS sur la meme echelle, ce qu'un
+    /// Coefficient de variation des frametimes (ecart-type / moyenne) : le proxy de cadence
+    /// normalise. Il met une machine a 60 FPS et une a 240 FPS sur la meme echelle, ce qu'un
     /// ecart-type brut ne fait pas. Derive des frametimes deja portees ici, donc pas de
     /// parametre de plus. Null avec moins de deux frames valides : une seule frame n'a pas de
     /// dispersion, et rendre 0 dirait « parfaitement regulier » sur une absence de mesure.
@@ -266,7 +265,7 @@ public record BenchmarkResult(
     }
 
     /// <summary>
-    /// Rapport p99 / p50 des frametimes — l'autre lecture de la cadence, celle des a-coups
+    /// Rapport p99 / p50 des frametimes : l'autre lecture de la cadence, celle des a-coups
     /// rares : le CV peut rester sage pendant que 1 % des frames partent au double. Null quand
     /// il n'y a aucune frame valide.
     /// </summary>
@@ -281,9 +280,9 @@ public record BenchmarkResult(
     }
 
     /// <summary>
-    /// Frametime median (ms). La mesure D'ECHELLE de la machine : « 14 ms de latence », c'est
+    /// Frametime median (ms). La mesure d'echelle de la machine : « 14 ms de latence », c'est
     /// beaucoup a 143 FPS et normal a 60. Tout seuil de latence exprime en millisecondes fixes
-    /// serait juste sur une machine et faux sur toutes les autres — c'est contre ca qu'il existe.
+    /// serait juste sur une machine et faux sur toutes les autres : c'est contre ca qu'il existe.
     /// </summary>
     public double? FrameMsP50 => FramePercentileMs(0.50);
 
@@ -295,7 +294,7 @@ public record BenchmarkResult(
     }
 
     /// <summary>
-    /// Le ratio GPU-busy en [0, 1], derive de <see cref="GpuBusyPercent"/> — la forme que la
+    /// Le ratio GPU-busy en [0, 1], derive de <see cref="GpuBusyPercent"/> : la forme que la
     /// table de decision du classifieur utilise (0,92 / 0,80 / 0,75 / 0,60). Une seule source :
     /// changer le calcul du pourcentage change le ratio, ils ne peuvent pas diverger.
     /// </summary>
@@ -309,8 +308,8 @@ public interface IBenchmarkRunner
 
 public record AbVerdict(BenchmarkResult Before, BenchmarkResult After, bool IsMeasurableGain, string SummaryKey)
 {
-    /// <summary>The baseline session's limiter (M8). Classified from <see cref="Before"/> — the
-    /// unmodified machine's natural limiter — so the reco layer can caveat a GPU-lever gain that
-    /// landed on a CPU/other-bound machine instead of selling it as game FPS.</summary>
+    /// <summary>Ce qui limitait la session de base. Classé d'après <see cref="Before"/> (la limite
+    /// naturelle de la machine non modifiée), pour que la reco nuance un gain de levier GPU obtenu
+    /// sur une machine limitée par le CPU ou autre, au lieu de le vendre comme FPS en jeu.</summary>
     public Bottleneck Bottleneck => Before.Bottleneck;
 }

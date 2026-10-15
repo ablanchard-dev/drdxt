@@ -2,7 +2,8 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks;
 
-public enum EtatDeLaPreuve { Prouve, PasDeGain, NonMesure }
+/// <summary><see cref="RetraitRate"/> : pas de preuve, mais le retrait a été refusé ; le réglage est toujours posé.</summary>
+public enum EtatDeLaPreuve { Prouve, PasDeGain, NonMesure, RetraitRate }
 
 /// <summary>Ce que la mesure du repos a établi : les médianes avant et après, en watts.</summary>
 public sealed record VerdictDuRepos(EtatDeLaPreuve Etat, double? AvantW, double? ApresW)
@@ -39,7 +40,7 @@ public sealed class PreuvesEnAttente(string chemin)
     }
 }
 
-/// <summary>G4 : un réglage gardé au repos, et depuis quand. Il reste sous surveillance en jeu : le retirer demande
+/// <summary>Un réglage gardé au repos, et depuis quand. Il reste sous surveillance en jeu : le retirer demande
 /// l'annulation gardée ici.</summary>
 public sealed record ReglageRetenu(string TweakId, string OriginalValueJson, string? AppliedValueJson, DateTimeOffset Le);
 
@@ -67,7 +68,7 @@ public sealed class ReglagesRetenus(string chemin)
 }
 
 /// <summary>
-/// 30/09/2026 (boucle « la carte, prouvée », G3). Un réglage de la carte ne reste que prouvé. Au repos, la
+/// Un réglage de la carte ne reste que prouvé. Au repos, la
 /// preuve est la consommation de la carte lue avant, puis après le réglage.
 ///
 /// Prouvé = séparation nette : toutes les lectures d'après sous toutes celles d'avant. Pas de seuil en watts
@@ -95,7 +96,7 @@ public static class PreuveDuRepos
         return await JugerAsync(levier, ecrit.Value, avant, apres).ConfigureAwait(false);
     }
 
-    /// <summary>30/09/2026, mesure réelle : le global écrit ne change la carte qu'au redémarrage (chaque programme lit
+    /// <summary>Mesure réelle : le global écrit ne change la carte qu'au redémarrage (chaque programme lit
     /// le profil à son lancement, le pilote suit le plus exigeant). Premier temps : l'avant et l'écriture sont gardés.
     /// Rend <c>false</c> si rien n'a été écrit (watts illisibles, levier refusé).</summary>
     public static async Task<bool> EcrireAsync(ITweak levier, IHardwareProbe sonde, int echantillons,
@@ -110,7 +111,8 @@ public static class PreuveDuRepos
     }
 
     /// <summary>Second temps, au lancement suivant : mesure le repos, garde le réglage seulement sur séparation nette,
-    /// sinon le retire. La preuve en attente est effacée dans tous les cas. <c>null</c> = rien n'attendait.</summary>
+    /// sinon le retire. La preuve en attente est effacée, sauf si le retrait a raté (RetraitRate) : elle reste pour retenter le
+    /// retrait au lancement suivant. <c>null</c> = rien n'attendait.</summary>
     public static async Task<VerdictDuRepos?> ConclureAsync(ITweak levier, IHardwareProbe sonde, int echantillons,
         Func<TimeSpan, Task> attendre, PreuvesEnAttente attente)
     {
@@ -118,7 +120,8 @@ public static class PreuveDuRepos
         var apres = await LireAsync(sonde, echantillons, attendre).ConfigureAwait(false);
         var verdict = await JugerAsync(levier, new TweakSnapshot(p.TweakId, p.OriginalValueJson, p.AppliedValueJson),
             p.AvantW, apres).ConfigureAwait(false);
-        attente.Effacer();
+        // Un retrait refusé laisse le réglage posé : la preuve reste, pour que le retrait se retente au prochain lancement.
+        if (verdict.Etat != EtatDeLaPreuve.RetraitRate) attente.Effacer();
         return verdict;
     }
 
@@ -127,8 +130,8 @@ public static class PreuveDuRepos
         var etat = apres.Count == 0 ? EtatDeLaPreuve.NonMesure
             : apres.Max() < avant.Min() ? EtatDeLaPreuve.Prouve
             : EtatDeLaPreuve.PasDeGain;
-        if (etat != EtatDeLaPreuve.Prouve)
-            await levier.RevertAsync(ecrit).ConfigureAwait(false);
+        if (etat != EtatDeLaPreuve.Prouve && !(await levier.RevertAsync(ecrit).ConfigureAwait(false)).IsOk)
+            etat = EtatDeLaPreuve.RetraitRate;
         return new(etat, Mediane(avant), apres.Count == 0 ? null : Mediane(apres));
     }
 

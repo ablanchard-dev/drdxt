@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 namespace DrDxt.Detection.Tests.Repair;
 
 // -----------------------------------------------------------------------
-// 19/09/2026. Ce qui coute dans un audit — la question laissee ouverte deux tours.
+// Ce qui coute dans un audit — la question laissee ouverte deux tours.
 //
 // Rappel des faits mesures :
 //   * tour 116 : cinq tests d'audit tiennent un plateau de 28,3 s **a 0,2 s pres** en
@@ -41,7 +41,7 @@ public sealed class CeQuiCouteDansUnAuditTests(ITestOutputHelper sortie)
     [Fact]
     public void Chaque_lecteur_cable_rend_une_reponse_et_dit_ce_qu_il_coute()
     {
-        // Les cinq nommes au tour 118. L'ordre est celui de `Lire()`.
+        // Les cinq lecteurs les plus lents. L'ordre est celui de `Lire()`.
         var mesures = new Dictionary<string, double>
         {
             ["PowerSettingsReader"] = Chronometrer("PowerSettingsReader",

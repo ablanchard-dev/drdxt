@@ -4,8 +4,8 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// Les explications de l'audit sont affichees telles quelles au joueur. Retour du 16/09/2026 : les
-/// pictogrammes d'alerte et les mots en capitales pour insister font lire le texte comme genere.
+/// Les explications de l'audit sont affichees telles quelles au joueur : les pictogrammes d'alerte
+/// et les mots en capitales pour insister font lire le texte comme genere.
 /// Ce gate lit les litteraux de chaine des fichiers qui ecrivent ces explications ; les sigles et
 /// les cles de domaine du journal sont declares.
 /// </summary>
@@ -29,11 +29,11 @@ public sealed class AuditSansTicDEcritureTests
         "src/DrDxt.Application/Autopilot/RevertEnAttente.cs",
         "src/DrDxt.Core/Autopilot/SceneContract.cs",
         "src/DrDxt.Application/Support/DiagnosticReport.cs",
-        // 24/09/2026 : la nature des pannes de service s'affiche dans la carte « windows » (vue sans accents).
+        // La nature des pannes de service s'affiche dans la carte « windows » (vue sans accents).
         "src/DrDxt.Detection/Hardware/ServiceFailureLog.cs",
     ];
 
-    // 17/09/2026 : trois tours de suite ont trouve des phrases affichees sans accents, une par une.
+    // Trois tours de suite ont trouve des phrases affichees sans accents, une par une.
     // Les cles du journal (« test memoire Windows », « frequence effective ») restent sans accents
     // exprès : aucun des mots ci-dessous n'en fait partie.
     private static readonly string[] MotsSansAccent =
@@ -49,9 +49,9 @@ public sealed class AuditSansTicDEcritureTests
         "ACPI", "ADLX", "IGCL", "BIOS", "NVIDIA", "NVML", "RAPL", "MMCSS", "SELECT", "FROM", "WHERE","SOFTWARE", "SYSTEM",
         "STABILITE", "POWER", "SERVICES", "STOCKAGE", "DISPLAY", "DRIVER", "PAGEFILE", "THERMIQUE",
         "LATENCE", "RESEAU", "KMDF", "PERIPHERIQUES", "TACHES", "WINDOWS", "UPDATE", "DEMARRAGE",
-        // 04/10/2026 (plan 2.5) : la clé de domaine de l'intégrité de la mémoire, comme STABILITE.
+        // La clé de domaine de l'intégrité de la mémoire, comme STABILITE.
         "SECURITE",
-        // 24/09/2026 : l'API Microsoft par laquelle le compteur de repli lit les images. Un nom propre
+        // L'API Microsoft par laquelle le compteur de repli lit les images. Un nom propre
         // technique, comme NVIDIA ou MMCSS, pas un mot crie.
         "DXGI",
     };

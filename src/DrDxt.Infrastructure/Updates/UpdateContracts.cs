@@ -3,45 +3,39 @@ using DrDxt.Core;
 namespace DrDxt.Infrastructure.Updates;
 
 // -----------------------------------------------------------------------
-// M5 / T12-T13 — the signed update manifest + the seams the updater runs on.
+// Le manifeste de mise à jour signé + les coutures sur lesquelles tourne l'updater.
 //
-// SECURITY MODEL (master plan §9 / plan 05 §1):
-//   * A manifest is the only thing the client trusts to learn where a payload is
-//     (url), what it must hash to (sha256) and what version it is. It is signed with
-//     a DEDICATED update Ed25519 key (UpdateDevKeys) — verified before we act on any
-//     of its fields. We only ever trust a hash that came from a SIGNED manifest.
-//   * Order is IMPOSED: verify the manifest SIGNATURE first; only if Ok do we fetch
-//     the payload and check its SHA-256 against the (now-trusted) manifest hash.
-//   * jamais fail-open: any uncertainty keeps the CURRENT installed version.
+// Modèle de sécurité :
+//   * Un manifeste est la seule chose à laquelle le client se fie pour savoir où est une charge
+//     (url), quelle empreinte elle doit avoir (sha256) et quelle version elle est. Il est signé
+//     avec une clé Ed25519 dédiée aux mises à jour (UpdateDevKeys), vérifiée avant d'agir sur le
+//     moindre de ses champs. On ne se fie jamais qu'à une empreinte venue d'un manifeste signé.
+//   * L'ordre est imposé : vérifier d'abord la signature du manifeste ; seulement si Ok, récupérer
+//     la charge et vérifier son SHA-256 contre l'empreinte du manifeste (désormais fiable).
+//   * Jamais fail-open : toute incertitude garde la version installée actuelle.
 //
-// Every seam returns a Result so an unavailable network / FS / crypto path fails
-// CLEAN (never throws across the boundary).
+// Chaque couture rend un Result pour qu'un réseau / disque / chemin crypto indisponible échoue
+// proprement (jamais d'exception à travers la frontière).
 // -----------------------------------------------------------------------
 
-/// <summary>The two independent update channels. They are verified by the same gate
-/// (T12) but applied differently (T13): <see cref="App"/> needs an elevated binary
-/// swap; <see cref="Profiles"/> writes under %LOCALAPPDATA% with no admin.</summary>
+/// <summary>Le canal de mise à jour. Seule l'app existe : le nom voyage dans les octets signés, un manifeste signé pour
+/// un autre canal ne peut donc pas passer pour une mise à jour de l'app.</summary>
 public enum UpdateChannel
 {
-    /// <summary>The app binary in Program Files. Replacing it needs elevation, so the
-    /// swap is delegated to the typed <see cref="IElevatedFileReplacer"/> seam.</summary>
+    /// <summary>Le binaire de l'app dans Program Files. Le remplacer exige l'élévation : l'échange est
+    /// délégué à la couture typée <see cref="IElevatedFileReplacer"/>.</summary>
     App,
-
-    /// <summary>The profile packs under %LOCALAPPDATA%\DrDXT\profiles. Extracted with
-    /// NO admin — the recurring value without a reinstall (§18).</summary>
-    Profiles,
 }
 
-/// <summary>The signed update manifest. The signature (Ed25519, base64) is over the
-/// CANONICAL bytes of the four trusted fields (channel, version, url, sha256). The
-/// client verifies it with the embedded update PUBLIC key (T12) before touching the
-/// url or trusting the sha256.</summary>
-/// <param name="Channel">Which channel this manifest describes.</param>
-/// <param name="Version">The offered version (semantic; compared against installed).</param>
-/// <param name="Url">Where the payload lives. Never acted on until the signature verifies.</param>
-/// <param name="Sha256">The expected lowercase-hex SHA-256 of the payload. Only trusted
-/// after the signature verifies (we never trust a hash from an unsigned manifest).</param>
-/// <param name="Signature">Detached Ed25519 signature (base64) over the canonical bytes.</param>
+/// <summary>Le manifeste de mise à jour signé. La signature (Ed25519, base64) porte sur les octets
+/// canoniques des quatre champs de confiance (channel, version, url, sha256). Le client la vérifie
+/// avec la clé publique de mise à jour embarquée avant de toucher à l'url ou de se fier au sha256.</summary>
+/// <param name="Channel">Le canal que décrit ce manifeste.</param>
+/// <param name="Version">La version offerte (sémantique ; comparée à l'installée).</param>
+/// <param name="Url">Où vit la charge. Jamais utilisée avant que la signature soit vérifiée.</param>
+/// <param name="Sha256">Le SHA-256 attendu de la charge, en hexadécimal minuscule. Fiable seulement
+/// après vérification de la signature (jamais une empreinte d'un manifeste non signé).</param>
+/// <param name="Signature">Signature Ed25519 détachée (base64) sur les octets canoniques.</param>
 public sealed record UpdateManifest(
     UpdateChannel Channel,
     string Version,
@@ -49,88 +43,80 @@ public sealed record UpdateManifest(
     string Sha256,
     string Signature);
 
-/// <summary>The update TRUST GATE (T12). Verifies the manifest signature first, then
-/// (separately, only when the caller has the bytes) the payload hash. Result-based and
-/// total: any tamper / wrong key / absent signature / hash mismatch / downgrade →
-/// Fail(UPDATE_*), never Ok. Jamais fail-open.</summary>
+/// <summary>La barrière de confiance des mises à jour. Vérifie d'abord la signature du manifeste,
+/// puis (à part, seulement quand l'appelant a les octets) l'empreinte de la charge. À base de
+/// Result et totale : toute altération / mauvaise clé / signature absente / empreinte en désaccord
+/// / rétrogradation → Fail(UPDATE_*), jamais Ok. Jamais fail-open.</summary>
 public interface IUpdateVerifier
 {
-    /// <summary>Step 1 — verify the manifest's Ed25519 signature under the embedded
-    /// update public key. Ok iff the signature is valid over the canonical manifest
-    /// bytes. A null/empty/tampered signature, a tampered field, a foreign key, or any
-    /// crypto fault → Fail(UPDATE_SIG_INVALID). Never throws, never Ok by default. The
-    /// caller must not download the payload unless this returns Ok.</summary>
+    /// <summary>Étape 1 : vérifier la signature Ed25519 du manifeste sous la clé publique de mise à
+    /// jour embarquée. Ok si et seulement si la signature est valide sur les octets canoniques du
+    /// manifeste. Une signature null / vide / altérée, un champ altéré, une clé étrangère ou toute
+    /// panne crypto → Fail(UPDATE_SIG_INVALID). Ne lève jamais, jamais Ok par défaut. L'appelant ne
+    /// doit pas télécharger la charge tant que ceci ne rend pas Ok.</summary>
     Result VerifyManifest(UpdateManifest manifest);
 
-    /// <summary>Step 2 — verify the DOWNLOADED payload against the (already
-    /// signature-verified) manifest. Computes SHA-256 of <paramref name="payload"/> and
-    /// compares to <paramref name="manifest"/>.Sha256. Also enforces the no-downgrade
-    /// rule against <paramref name="installedVersion"/> (skipped only when
-    /// <paramref name="allowDowngrade"/> is true, e.g. a beta channel). Hash mismatch →
-    /// Fail(UPDATE_HASH_MISMATCH) (payload never executed); lower version →
-    /// Fail(UPDATE_DOWNGRADE). Never throws.</summary>
+    /// <summary>Étape 2 : vérifier la charge téléchargée contre le manifeste (déjà vérifié par
+    /// signature). Calcule le SHA-256 de <paramref name="payload"/> et le compare à
+    /// <paramref name="manifest"/>.Sha256. Impose aussi la règle de non-rétrogradation contre
+    /// <paramref name="installedVersion"/> (sautée seulement si <paramref name="allowDowngrade"/> vaut
+    /// true, par exemple un canal bêta). Empreinte en désaccord → Fail(UPDATE_HASH_MISMATCH) (charge
+    /// jamais exécutée) ; version inférieure → Fail(UPDATE_DOWNGRADE). Ne lève jamais.</summary>
     Result VerifyPayload(
         UpdateManifest manifest, byte[] payload, string installedVersion, bool allowDowngrade);
 }
 
-/// <summary>The update feed seam — fetches the signed manifest and the payload bytes
-/// for a channel over the INJECTED transport. (19/09/2026 : ce texte disait « PINNED » ;
-/// l'epinglage du serveur de mise a jour n'existe pas encore.) A fake stands in for tests. No
-/// network → Fail(UPDATE_OFFLINE); the app keeps running on the current version
-/// (updates are never blocking).</summary>
+/// <summary>La couture du flux de mise à jour : récupère le manifeste signé et les octets de la
+/// charge d'un canal par le transport injecté (non epingle : le serveur de mise a jour n'a
+/// pas encore d'empreintes). Un faux le remplace en test. Pas de réseau → Fail(UPDATE_OFFLINE) ;
+/// l'app continue sur la version actuelle (les mises à jour ne bloquent jamais).</summary>
 public interface IUpdateFeed
 {
-    /// <summary>Fetches the latest signed manifest for <paramref name="channel"/>.
-    /// Offline / transport failure → Fail(UPDATE_OFFLINE). Ok(null) when the feed is
-    /// reachable but offers no manifest (already current).</summary>
+    /// <summary>Récupère le dernier manifeste signé de <paramref name="channel"/>.
+    /// Hors ligne / panne de transport → Fail(UPDATE_OFFLINE). Ok(null) quand le flux est joignable
+    /// mais n'offre aucun manifeste (déjà à jour).</summary>
     Task<Result<UpdateManifest?>> GetManifestAsync(UpdateChannel channel, CancellationToken ct);
 
-    /// <summary>Downloads the payload at <paramref name="url"/> (the url comes only from
-    /// an already signature-verified manifest). Offline / transport failure →
-    /// Fail(UPDATE_OFFLINE).</summary>
+    /// <summary>Télécharge la charge à <paramref name="url"/> (l'url ne vient que d'un manifeste
+    /// déjà vérifié par signature). Hors ligne / panne de transport → Fail(UPDATE_OFFLINE).</summary>
     Task<Result<byte[]>> DownloadAsync(string url, CancellationToken ct);
 }
 
-/// <summary>Minimal filesystem seam so the profiles channel's atomic extraction is
-/// fully testable with an in-memory fake (no real disk, no admin). Every member is
-/// Result-wrapped — IO failure never throws across the boundary.</summary>
+/// <summary>Couture de système de fichiers minimale pour que la préparation soit entièrement
+/// testable avec un faux en mémoire (sans vrai disque ni admin). Chaque membre est emballé dans un
+/// Result : un échec d'E/S ne lève jamais à travers la frontière.</summary>
 public interface IUpdateFileSystem
 {
-    /// <summary>True iff the directory exists.</summary>
+    /// <summary>Vrai si et seulement si le dossier existe.</summary>
     bool DirectoryExists(string path);
 
     /// <summary>Les octets d'un fichier, ou <c>null</c> s'il est absent ou illisible. Sert a ne pas
-    /// retelecharger une charge deja stagee (elle est de toute facon RE-VERIFIEE). Par defaut : null.</summary>
+    /// retelecharger une charge deja stagee (elle est de toute facon reverifiee). Par defaut : null.</summary>
     byte[]? TryReadFile(string path) => null;
 
-    /// <summary>Creates the directory (and parents). IO failure → Fail.</summary>
+    /// <summary>Crée le dossier (et ses parents). Échec d'E/S → Fail.</summary>
     Result CreateDirectory(string path);
 
-    /// <summary>Writes bytes to a file, overwriting. IO failure → Fail.</summary>
+    /// <summary>Écrit des octets dans un fichier, en l'écrasant. Échec d'E/S → Fail.</summary>
     Result WriteFile(string path, byte[] bytes);
 
-    /// <summary>Atomically swaps <paramref name="stagingDir"/> into
-    /// <paramref name="targetDir"/> (the live pack), keeping the OLD pack intact if the
-    /// swap can't complete (clean transaction — never a half-applied state). IO failure
-    /// → Fail; on failure the previous target is left untouched.</summary>
-    Result ReplaceDirectory(string stagingDir, string targetDir);
-
-    /// <summary>Best-effort delete of a staging dir (cleanup). Never throws; a failure
-    /// to clean leftover staging is non-fatal and returns Fail for the caller to log.</summary>
+    /// <summary>Suppression au mieux d'un dossier de préparation (nettoyage). Ne lève jamais ; ne pas
+    /// réussir à nettoyer un reste n'est pas fatal et rend Fail pour que l'appelant le journalise.</summary>
     Result DeleteDirectory(string path);
 }
 
-/// <summary>The TYPED, allow-listed elevated seam that replaces signed binaries in
-/// Program Files (T13 / §9.1). It is not an arbitrary write primitive: the only
-/// operation it exposes is "replace these already-verified, staged files". For M5 the
-/// live elevation + helper wiring is DEFERRED (needs UAC) — the default impl is
-/// fail-clean (UPDATE_REPLACER_UNAVAILABLE), exactly like the M2 deferred seams. A
-/// verification failure at ANY earlier step means this is never even called.</summary>
+/// <summary>La couture élevée, typée et admise, qui remplace des binaires signés dans Program
+/// Files. Ce n'est pas une primitive d'écriture quelconque : sa seule opération est « remplacer ces
+/// fichiers déjà vérifiés et préparés ». Pour l'instant, l'élévation réelle et le branchement au
+/// helper sont reportés (il faut l'UAC) : l'implémentation par défaut échoue proprement
+/// (UPDATE_REPLACER_UNAVAILABLE), exactement comme les autres coutures reportées. Un échec de
+/// vérification à n'importe quelle étape antérieure veut dire qu'elle n'est même pas appelée.</summary>
 public interface IElevatedFileReplacer
 {
-    /// <summary>Replaces the live app files from a verified staged payload. Only invoked
-    /// after the manifest signature AND the payload hash AND the no-downgrade rule all
-    /// passed and the payload was staged atomically. Deferred impl → Fail(
-    /// UPDATE_REPLACER_UNAVAILABLE) (nothing replaced); live impl performs the typed swap.</summary>
+    /// <summary>Remplace les fichiers de l'app en service à partir d'une charge vérifiée et préparée.
+    /// Appelée seulement après que la signature du manifeste, l'empreinte de la charge et la règle de
+    /// non-rétrogradation sont toutes passées et que la charge a été préparée atomiquement.
+    /// Implémentation reportée → Fail(UPDATE_REPLACER_UNAVAILABLE) (rien de remplacé) ; l'implémentation
+    /// réelle fait l'échange typé.</summary>
     Task<Result> ReplaceAppFilesAsync(string stagedPayloadPath, string targetInstallDir, CancellationToken ct);
 }

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Gpu;
 
-// 06/10/2026 (chantier B3) : la carte graphique est-elle branchée comme elle le peut ? (a) le lien PCIe, lu par
+// La carte graphique est-elle branchée comme elle le peut ? (a) le lien PCIe, lu par
 // Windows sans pilote (DEVPKEY_PciDevice_*, relevé : RTX 4060 en Gen4 x8, son maximum) ; (b) l'écran branché sur la sortie
 // de la carte mère alors qu'une carte dédiée est là.
 public sealed class BranchementDeLaCarteTests
@@ -34,7 +34,7 @@ public sealed class BranchementDeLaCarteTests
         c.Action.Should().Be(RepairAction.Recommandation);
     }
 
-    // Revue T3+T4 (F-20) : sur un portable, la puce est soudée et câblée par le constructeur (RTX 4080 Laptop en x8) :
+    // Sur un portable, la puce est soudée et câblée par le constructeur (RTX 4080 Laptop en x8) :
     // « mal enfoncée, rallonge » serait faux. La largeur est dite, pas jugée ; batterie non lue ⇒ rien.
     [Fact]
     public void Sur_un_portable_une_largeur_plus_basse_est_dite_sans_accuser_l_emplacement()
@@ -44,14 +44,14 @@ public sealed class BranchementDeLaCarteTests
         c.Statut.Should().Be(RepairStatus.Observed);
         c.Action.Should().Be(RepairAction.Aucune);
         c.Explication.Should().NotContain("enfoncée").And.NotContain("rallonge");
-        // Revue (F-35) : batterie non lue ⇒ le lien est dit, non jugé ; à son maximum, la phrase habituelle.
+        // Batterie non lue ⇒ le lien est dit, non jugé ; à son maximum, la phrase habituelle.
         var nonLu = BranchementDeLaCarte.JugerLien(L(16, 8), batterie: null).Single();
         nonLu.Statut.Should().Be(RepairStatus.Unknown);
         nonLu.ValeurCourante.Should().Be("x8, PCIe 4.0");
         BranchementDeLaCarte.JugerLien(L(8, 8), batterie: null).Single().Statut.Should().Be(RepairStatus.ExpectedDefault);
     }
 
-    // F-21 : une carte dédiée de 1 Go (GT 710, Quadro) à côté d'une RTX n'est pas la carte mère.
+    // Une carte dédiée de 1 Go (GT 710, Quadro) à côté d'une RTX n'est pas la carte mère.
     [Fact]
     public void Une_petite_carte_dediee_n_est_pas_prise_pour_la_carte_mere()
         => BranchementDeLaCarte.JugerEcrans(["NVIDIA GeForce GT 710"],
@@ -59,7 +59,7 @@ public sealed class BranchementDeLaCarteTests
                  new GpuInfo("NVIDIA GeForce GT 710", "", 1L << 30, "", TriState.Unknown)], batterie: false)
             .Should().BeEmpty();
 
-    // F-22 : un 2e écran sur la carte mère ne dit rien du jeu sur l'écran principal : la phrase parle de « cet écran ».
+    // Un 2e écran sur la carte mère ne dit rien du jeu sur l'écran principal : la phrase parle de « cet écran ».
     [Fact]
     public void L_ecran_sur_la_carte_mere_est_nomme_sans_dire_que_le_jeu_y_passe()
         => BranchementDeLaCarte.JugerEcrans(["Intel(R) UHD Graphics 770"],

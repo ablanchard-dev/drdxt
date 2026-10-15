@@ -8,8 +8,8 @@ using FluentAssertions;
 namespace DrDxt.Infrastructure.Tests;
 
 /// <summary>
-/// Le produit tutoie le joueur. Le 16/09/2026, 68 textes francais le vouvoyaient encore (licence, BIOS,
-/// application des reglages) : deux voix dans la meme appli, au milieu d'un meme ecran.
+/// Le produit tutoie le joueur : un texte au vous ferait deux voix dans la meme appli, au milieu d'un
+/// meme ecran.
 /// </summary>
 public sealed class ResxTutoiementTests
 {
@@ -20,7 +20,7 @@ public sealed class ResxTutoiementTests
         var jeu = manager.GetResourceSet(new CultureInfo("fr"), createIfNotExists: true, tryParents: false)
                   ?? throw new InvalidOperationException("jeu de ressources francais introuvable");
 
-        // Temoin de lecture (18/09/2026) : « aucun fautif » est aussi ce que rend un jeu de
+        // Temoin de lecture : « aucun fautif » est aussi ce que rend un jeu de
         // ressources vide. Sans cette ligne, un resx qui ne se charge plus laisserait tout passer.
         jeu.Cast<DictionaryEntry>().Count(e => e.Value is string).Should().BeGreaterThan(100,
             "le crible doit avoir de vrais textes a lire");

@@ -4,8 +4,8 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Gpu;
 
-// 04/10/2026 (plan 2.1) : l'Instant Replay de NVIDIA, lu dans les réglages de l'overlay (forme relevée sur la machine
-// de référence, ShareSettings.json du 07/07/2026).
+// L'Instant Replay de NVIDIA, lu dans les réglages de l'overlay
+// (forme relevée sur la machine de référence, ShareSettings.json du 07/07/2026).
 public sealed class EnregistrementNvidiaTests
 {
     private const string Allume = """{"settings":{"globalhighlights":{"enabled":true},"video":{"irEnabled":true}}}""";
@@ -16,7 +16,8 @@ public sealed class EnregistrementNvidiaTests
         var c = EnregistrementNvidia.Juger(Allume).Should().ContainSingle().Subject;
         c.Domaine.Should().Be("GPU DRIVER");
         c.Statut.Should().Be(RepairStatus.UserChoiceProbable, "c'est un choix du joueur, pas une panne");
-        c.Explication.Should().Contain("5 %").And.Contain("Alt+Z").And.Contain("parties");
+        c.Explication.Should().Contain("5 %").And.NotContain("Alt+Z", "le geste a sa place à part");
+        c.Remede.Should().Contain("1) Dans un jeu, Alt+Z").And.Contain("parties");
     }
 
     [Theory]
@@ -36,8 +37,8 @@ public sealed class EnregistrementNvidiaTests
         act.Should().NotThrow();
     }
 
-    // UI1 (critique du 08/10, défaut 11) : la ligne visible disait « Instant Replay allumé » ; le coût, qui justifie le point
-    // orange, n'était que derrière le « ? ». La valeur le porte, avec sa source.
+    // Le coût, qui justifie le point orange, ne reste pas derrière le « ? » sous « Instant Replay allumé » :
+    // la valeur le porte, avec sa source.
     [Fact]
     public void La_valeur_visible_dit_le_cout_publie()
         => EnregistrementNvidia.Juger(Allume).Single().ValeurCourante.Should().Contain("5 %").And.Contain("NVIDIA");

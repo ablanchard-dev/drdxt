@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 07/10/2026 (D6) : la vraie mesure du relevé, dix pings vers la box et dix vers 1.1.1.1.
+// La vraie mesure du relevé, dix pings vers la box et dix vers 1.1.1.1.
 public sealed class ReseauEnPartieSurLaMachineTests
 {
     [Fact, Trait("Category", "Machine")] // pingue la vraie box et internet depuis cette machine

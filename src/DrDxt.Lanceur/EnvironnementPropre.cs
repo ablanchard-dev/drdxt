@@ -3,7 +3,7 @@ using System.IO;
 namespace DrDxt.Lanceur;
 
 /// <summary>
-/// 10/10/2026 (revue de sécurité) : un processus élevé par l'UAC reçoit l'environnement de HKCU\Environment, que
+/// Un processus élevé par l'UAC reçoit l'environnement de HKCU\Environment, que
 /// n'importe quel programme du compte écrit sans droits. Le runtime .NET y lit, avant la première ligne du programme,
 /// de quoi charger une DLL de son choix (CORECLR_ENABLE_PROFILING, CORECLR_PROFILER_PATH, documentées par Microsoft)
 /// : chaque « Oui » donné à DrDXT aurait fait tourner ce code en administrateur. Le lanceur ne transmet RIEN de
@@ -41,7 +41,7 @@ public static class EnvironnementPropre
         if (!string.IsNullOrEmpty(profilUtilisateur)) env["USERPROFILE"] = profilUtilisateur;
         if (!string.IsNullOrEmpty(appData)) env["APPDATA"] = appData;
         if (!string.IsNullOrEmpty(localAppData)) env["LOCALAPPDATA"] = localAppData;
-        // Revue du 10/10/2026 : sans ProgramFiles ni ProgramData, l'audit de santé de l'App élevée laissait
+        // Sans ProgramFiles ni ProgramData, l'audit de santé de l'App élevée laissait
         // « %ProgramFiles%\... » tel quel dans les chemins lus au registre, donc des tâches et services passaient en
         // silence : le scan élevé auditait MOINS que le scan simple. Tout vient des API (dossiers connus), rien de reçu.
         if (systeme is { } s)
@@ -66,7 +66,7 @@ public static class EnvironnementPropre
     /// <summary>Le mot qui demande au lanceur la console de réparation de Windows (DISM puis sfc), au lieu d'un programme.</summary>
     public const string ReparerWindows = "reparer-windows";
 
-    /// <summary>10/10/2026 (revue de sécurité) : la console de réparation est un PowerShell élevé, donc .NET Framework, qui
+    /// <summary>La console de réparation est un PowerShell élevé, donc .NET Framework, qui
     /// lit lui aussi de quoi charger une DLL dans l'environnement (COR_PROFILER). Elle passe par le lanceur, avec cette
     /// commande FIXE : chemins absolus de System32, sans profil, rien qui vienne de l'appelant.</summary>
     public static (string Fichier, string Arguments) ConsoleDeReparation(string system32) => (

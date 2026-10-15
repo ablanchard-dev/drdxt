@@ -3,13 +3,13 @@ using DrDxt.Detection.Network;
 using DrDxt.Detection.Wmi;
 using DrDxt.Measurement.Network;
 
-// NS-9 live smoke: runs the REAL instrument (SystemPingProbe + NetworkLatencyMeter) against
+// Live smoke: runs the REAL instrument (SystemPingProbe + NetworkLatencyMeter) against
 // a real host and prints the report. A pure unit test proves the arithmetic; only this proves
 // the ICMP path actually answers on this machine.
 //
 //   dotnet run --project tools/netprobe [host] [probeCount] [intervalMs]
 
-// 24/09/2026 — `--envoi <secondes>` : le bufferbloat MONTANT, juge sur le trafic reel (rien envoye
+// `--envoi <secondes>` : le bufferbloat MONTANT, juge sur le trafic reel (rien envoye
 // hors ping). Lance ton envoi (stream, sauvegarde) pendant la fenetre.
 if (args.Length > 0 && args[0] == "--envoi")
 {

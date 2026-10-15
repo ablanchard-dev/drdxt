@@ -107,7 +107,7 @@ public class BiosQualificationMatrixTests
     [Fact]
     public void LA_MATRICE_DIT_OU_LIRE_MAIS_NE_FIGE_JAMAIS_LA_VALEUR_COURANTE()
     {
-        // 24/09/2026 — la valeur courante se LIT a l'execution (NvramBiosSettingsReader). La
+        // La valeur courante se LIT a l'execution (NvramBiosSettingsReader). La
         // figer ici ferait croire a une lecture qui n'a pas eu lieu sur cette machine. Un
         // mecanisme de lecture ne se declare qu'avec l'emplacement releve dans l'IFR.
         BiosQualificationMatrix.Pour("MSI PRO B760-P WIFI DDR4 (MS-7D98)", "1.H0")

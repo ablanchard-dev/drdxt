@@ -48,7 +48,7 @@ public class CpuBenchTests
         r.EcartTypePourcent.Should().BeGreaterThanOrEqualTo(0);
     }
 
-    // 27/09/2026 : sorti de la CI. Un runner partage a rendu 63 % de dispersion sur trois passes : il
+    // Sorti de la CI. Un runner partage a rendu 63 % de dispersion sur trois passes : il
     // mesurait ses voisins, pas le code. Le seuil garde son sens sur une machine au repos.
     [Fact]
     [Trait("Category", "Machine")]

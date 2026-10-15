@@ -6,34 +6,33 @@ using NSec.Cryptography;
 namespace DrDxt.Infrastructure.Updates;
 
 // -----------------------------------------------------------------------
-// T12 — The update TRUST GATE. Verifies the Ed25519 signature over the CANONICAL
-// update manifest using the embedded, DEDICATED update PUBLIC key
-// (UpdateDevKeys.UpdatePublicKey), then — and only then — the payload hash.
+// La barrière de confiance des mises à jour. Vérifie la signature Ed25519 sur le manifeste
+// canonique avec la clé publique de mise à jour embarquée et dédiée (UpdateDevKeys.UpdatePublicKey),
+// puis, et seulement alors, l'empreinte de la charge.
 //
-// The cardinal rule: fail-clean, never fail-open. Every uncertainty — a corrupt
-// embedded key, a wrong-length signature, an NSec exception, an unparseable hash,
-// a lower version — collapses to a Fail(UPDATE_*). There is no path that proceeds on
-// doubt; the caller keeps the CURRENT installed version.
+// La règle cardinale : échec propre, jamais fail-open. Toute incertitude (clé embarquée corrompue,
+// signature de mauvaise longueur, exception NSec, empreinte illisible, version inférieure) se
+// réduit à un Fail(UPDATE_*). Aucun chemin ne continue dans le doute ; l'appelant garde la version
+// installée actuelle.
 //
-// IMPOSED ORDER (mirrors Ed25519LicenseVerifier / the §1 invariant): VerifyManifest
-// (signature) first; the caller fetches the payload only on Ok; VerifyPayload checks
-// the SHA-256 against the manifest hash SECOND. We only ever trust a hash that came
-// from a manifest we already proved signed.
+// Ordre imposé (la signature avant tout le reste) : VerifyManifest (signature) d'abord ;
+// l'appelant ne récupère la charge que sur Ok ; VerifyPayload vérifie ensuite le SHA-256 contre
+// l'empreinte du manifeste. On ne se fie qu'à une empreinte venue d'un manifeste déjà prouvé signé.
 //
-// ASYMMETRY (same as Ed25519ManifestVerifier): built from the PUBLIC key alone; can
-// only verify, never forge a manifest. The release pipeline signs out-of-band.
+// Asymétrie (comme Ed25519ManifestVerifier) : construit à partir de la seule clé publique ; ne
+// peut que vérifier, jamais forger un manifeste. La chaîne de publication signe hors bande.
 // -----------------------------------------------------------------------
 
-/// <summary>Ed25519 update verifier — holds the 32-byte PUBLIC key only.</summary>
+/// <summary>Vérificateur Ed25519 des mises à jour : ne tient que la clé publique de 32 octets.</summary>
 public sealed class UpdateVerifier : IUpdateVerifier
 {
     private readonly PublicKey _publicKey;
 
     private UpdateVerifier(PublicKey publicKey) => _publicKey = publicKey;
 
-    /// <summary>Builds a verifier from a 32-byte raw Ed25519 public key. Fail-clean:
-    /// a corrupt / wrong-length key returns Fail(UPDATE_SIG_INVALID) instead of throwing,
-    /// so a future bad key swap can never crash the gate (mirrors
+    /// <summary>Construit un vérificateur à partir d'une clé publique Ed25519 brute de 32 octets.
+    /// Échec propre : une clé corrompue ou de mauvaise longueur rend Fail(UPDATE_SIG_INVALID) au lieu
+    /// de lever, pour qu'un futur mauvais échange de clé ne fasse jamais planter la barrière (comme
     /// Ed25519LicenseVerifier.Create).</summary>
     public static Result<IUpdateVerifier> Create(ReadOnlySpan<byte> publicKey)
     {
@@ -56,8 +55,8 @@ public sealed class UpdateVerifier : IUpdateVerifier
         if (manifest is null)
             return Result.Fail(UpdateErrorCodes.SignatureInvalid, "Update manifest is absent.");
 
-        // Decode the detached signature. Absent / empty / non-base64 / wrong-length →
-        // Refuse. Never "ok by default".
+        // Décoder la signature détachée. Absente / vide / non base64 / mauvaise longueur →
+        // refus. Jamais « ok par défaut ».
         byte[] signature;
         try
         {
@@ -79,7 +78,7 @@ public sealed class UpdateVerifier : IUpdateVerifier
         try
         {
             var canonical = CanonicalBytes(manifest);
-            // NSec.Verify returns false on any bad/forged signature → fail-clean Result.
+            // NSec.Verify rend false sur toute signature mauvaise ou forgée → Result en échec propre.
             return SignatureAlgorithm.Ed25519.Verify(_publicKey, canonical, signature)
                 ? Result.Ok()
                 : Result.Fail(
@@ -87,7 +86,7 @@ public sealed class UpdateVerifier : IUpdateVerifier
         }
         catch (Exception)
         {
-            // Crypto frontier wrapped — any unexpected fault is a REFUSAL, never a pass.
+            // Frontière crypto emballée : toute panne inattendue est un refus, jamais un passage.
             return Result.Fail(
                 UpdateErrorCodes.SignatureInvalid, "Update manifest signature verification faulted.");
         }
@@ -101,16 +100,16 @@ public sealed class UpdateVerifier : IUpdateVerifier
         if (payload is null)
             return Result.Fail(UpdateErrorCodes.HashMismatch, "Update payload is absent.");
 
-        // No-downgrade rule, enforced before we bless a payload. A lower version (outside
-        // an opted-in beta channel) is refused — never silently roll the user back.
+        // Règle de non-rétrogradation, imposée avant de valider une charge. Une version inférieure (hors
+        // canal bêta qui l'autorise) est refusée : jamais de retour en arrière silencieux.
         if (!allowDowngrade && IsDowngrade(manifest.Version, installedVersion))
             return Result.Fail(
                 UpdateErrorCodes.Downgrade,
                 $"Update version {manifest.Version} is older than installed {installedVersion}.");
 
-        // The hash we compare against came from a manifest the caller already proved
-        // signed (VerifyManifest must run first). Compute SHA-256 of the bytes and
-        // compare to the trusted manifest hash. Mismatch → payload never executed.
+        // L'empreinte de comparaison vient d'un manifeste que l'appelant a déjà prouvé signé
+        // (VerifyManifest doit tourner d'abord). Calculer le SHA-256 des octets et le comparer à
+        // l'empreinte fiable du manifeste. Désaccord → charge jamais exécutée.
         string actual;
         try
         {
@@ -122,8 +121,8 @@ public sealed class UpdateVerifier : IUpdateVerifier
         }
 
         var expected = (manifest.Sha256 ?? string.Empty).Trim().ToLowerInvariant();
-        // Length-checked, case-normalized ordinal compare. (These are PUBLIC hex digests,
-        // not a secret — no constant-time requirement, mirroring SpkiPinValidator.)
+        // Comparaison ordinale, longueur vérifiée, casse normalisée. (Ce sont des empreintes hexadécimales
+        // publiques, pas un secret : pas d'exigence de temps constant, comme SpkiPinValidator.)
         if (expected.Length == 0 || !string.Equals(actual, expected, StringComparison.Ordinal))
             return Result.Fail(
                 UpdateErrorCodes.HashMismatch,
@@ -133,12 +132,13 @@ public sealed class UpdateVerifier : IUpdateVerifier
     }
 
     // -------------------------------------------------------------------
-    // Version comparison — true iff `candidate` is STRICTLY older than `installed`.
-    // Dotted numeric compare (1.2.10 > 1.2.9). Any unparseable component is treated as
-    // 0 so a malformed version never silently passes as "newer"; an equal version is
-    // Not a downgrade (re-offering the same version is a no-op upstream, not a rollback).
-    // Fail-clean: a parse fault is swallowed and treated as "not a downgrade" only when
-    // both parse cleanly — a thrown path returns false (the hash/sig gate still stands).
+    // Comparaison de versions : vrai si et seulement si `candidate` est strictement plus ancienne que
+    // `installed`. Comparaison numérique par points (1.2.10 > 1.2.9). Tout composant illisible vaut 0,
+    // pour qu'une version malformée ne passe jamais en silence pour « plus récente » ; une version
+    // égale n'est pas une rétrogradation (reproposer la même version est sans effet en amont, pas un
+    // retour en arrière). Échec propre : une panne d'analyse est avalée et traitée comme « pas une
+    // rétrogradation » seulement si les deux s'analysent proprement ; un chemin qui lève rend false
+    // (la barrière empreinte / signature tient toujours).
     // -------------------------------------------------------------------
     internal static bool IsDowngrade(string candidate, string installed)
     {
@@ -149,10 +149,10 @@ public sealed class UpdateVerifier : IUpdateVerifier
         {
             var ai = i < a.Length ? a[i] : 0;
             var bi = i < b.Length ? b[i] : 0;
-            if (ai < bi) return true;   // strictly older → downgrade
-            if (ai > bi) return false;  // strictly newer → not a downgrade
+            if (ai < bi) return true;   // strictement plus ancienne → rétrogradation
+            if (ai > bi) return false;  // strictement plus récente → pas une rétrogradation
         }
-        return false; // equal → not a downgrade
+        return false; // égale → pas une rétrogradation
     }
 
     private static int[] ParseVersion(string? version)
@@ -167,23 +167,23 @@ public sealed class UpdateVerifier : IUpdateVerifier
     }
 
     // -------------------------------------------------------------------
-    // Canonical serialization of the manifest's TRUSTED fields — a DETERMINISTIC byte
-    // form so the signature is computed/verified over the exact same bytes on both
-    // sides. The signature field itself is not part of the signed bytes (it is the
-    // signature). Mirrors Ed25519LicenseVerifier.Canonicalize:
-    //   * fixed field order (channel, version, url, sha256) written explicitly;
-    //   * channel as its INVARIANT enum name (stable across runtimes/cultures);
-    //   * no indentation / culture-sensitive formatting; relaxed (non-over-escaping)
-    //     encoder, since these bytes are only ever signed/verified, never embedded in HTML.
+    // Sérialisation canonique des champs de confiance du manifeste : une forme d'octets déterministe
+    // pour que la signature soit calculée et vérifiée sur exactement les mêmes octets des deux côtés.
+    // Le champ de signature lui-même ne fait pas partie des octets signés (c'est la signature). Comme
+    // Ed25519LicenseVerifier.Canonicalize :
+    //   * ordre des champs fixe (channel, version, url, sha256), écrit explicitement ;
+    //   * le canal par son nom d'enum invariant (stable d'un runtime / d'une culture à l'autre) ;
+    //   * aucune indentation ni mise en forme dépendant de la culture ; encodeur détendu (sans
+    //     échappement en trop), puisque ces octets ne sont que signés / vérifiés, jamais insérés en HTML.
     // -------------------------------------------------------------------
-    // SEC5 (09/10/2026) : public, pour que l'outil de release (tools/publication/signer.cs) signe EXACTEMENT les octets que
+    // Public, pour que l'outil de release (tools/publication/signer.cs) signe exactement les octets que
     // l'App vérifie, sans recopier la forme canonique.
     public static byte[] CanonicalBytes(UpdateManifest manifest)
         => Encoding.UTF8.GetBytes(Canonicalize(manifest));
 
-    /// <summary>The deterministic canonical JSON string the signature is computed over.
-    /// Exposed to tests (InternalsVisibleTo) so a fixture can sign the exact bytes and so
-    /// the canonical form itself is pinned for stability.</summary>
+    /// <summary>La chaîne JSON canonique et déterministe sur laquelle la signature est calculée.
+    /// Exposée aux tests (InternalsVisibleTo) pour qu'une donnée d'essai signe les octets exacts et que
+    /// la forme canonique elle-même soit figée.</summary>
     internal static string Canonicalize(UpdateManifest manifest)
     {
         var buffer = new System.Buffers.ArrayBufferWriter<byte>();

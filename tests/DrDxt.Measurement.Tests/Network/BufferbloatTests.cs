@@ -12,7 +12,7 @@ public class BufferbloatTests
     [Fact]
     public void Le_profil_mesure_sur_la_machine_de_reference_est_detecte_et_le_plafond_vaut_la_moitie_de_l_envoi_vu()
     {
-        // 24/09 : repos 8-9 ms, envoi sature ~720 Mbit/s -> p90 26 ms.
+        // Repos 8-9 ms, envoi sature ~720 Mbit/s -> p90 26 ms.
         var e = N(40, 2, 8).Concat(N(40, 720, 24)).ToList();
         var v = Bufferbloat.Juger(e);
         v.Detecte.Should().BeTrue();
@@ -20,11 +20,11 @@ public class BufferbloatTests
         v.PlafondConseilleBps.Should().Be(360_000_000);
     }
 
-    // 26/09/2026 : deux regles que des mutations laissaient vertes.
+    // Deux regles que des mutations laissaient vertes.
     private static IEnumerable<EchantillonEnvoi> Fixe(int n, double mbps, double ping)
         => Enumerable.Repeat(new EchantillonEnvoi(mbps, ping), n);
 
-    // 26/09/2026 : le p90 prenait l'indice floor(0,9·n), soit le 19e sur 20 (un p95), quand le reste du
+    // Le p90 prenait l'indice floor(0,9·n), soit le 19e sur 20 (un p95), quand le reste du
     // produit (FrametimeStatistics.PercentileOrNull) prend le rang le plus proche, ceil(0,9·n) − 1.
     [Fact]
     public void Le_p90_est_le_rang_le_plus_proche_comme_ailleurs_dans_le_produit()
@@ -101,10 +101,24 @@ public class BufferbloatTests
         detecte.Statut.Should().Be(RepairStatus.Suspicious);
         detecte.Action.Should().Be(RepairAction.Recommandation, "jamais une reparation automatique");
         detecte.Explication.Should().Contain("360 Mbit/s");
-        detecte.Explication.Should().Contain("routeur").And.Contain("SQM", "le plafond ne règle que ce PC ; la maison entière passe par le routeur (plan 2.6)");
+        detecte.Explication.Should().Contain("routeur").And.NotContain("SQM");
+        detecte.Remede.Should().StartWith("1) ").And.Contain("Protéger ton ping pendant le jeu").And.Contain("360 Mbit/s")
+            .And.Contain("SQM", "le plafond ne règle que ce PC ; la maison entière passe par le routeur (plan 2.6)");
 
         Bufferbloat.Constat(Bufferbloat.Juger(N(40, 2, 8).ToList()), f).Action.Should().Be(RepairAction.Aucune);
         Bufferbloat.Constat(Bufferbloat.Juger(N(40, 2, 8).Concat(N(5, 720, 60)).ToList()), f)
             .Statut.Should().Be(RepairStatus.Observed, "pas assez vu n'est ni sain ni malade");
+    }
+
+    // Sur un Windows anglais, le constat du ping sous envoi se dit en anglais.
+    [Fact]
+    public void Le_bufferbloat_se_dit_en_anglais()
+    {
+        using var _ = DrDxt.Core.Docteur.Portee(System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+        var v = new VerdictBufferbloat(true, 50, 20, 80, 30, 30, 40_000_000, "x");
+
+        var c = Bufferbloat.Constat(v, TimeSpan.FromSeconds(60));
+        c.ValeurCourante.Should().Be("+60 ms (p90 20 → 80 ms)");
+        c.Explication.Should().StartWith("during 60 s of play, your upload saturated at ~50 Mbit/s");
     }
 }

@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 17/09/2026 : les ressources et l'audit sont gardes, mais deux phrases affichees vivaient en dur dans
+/// Les ressources et l'audit sont gardes, mais deux phrases affichees vivaient en dur dans
 /// les ViewModels (« est INCONNU, pas vide », « categorie — accroche »). Cette garde lit les litteraux
 /// des ViewModels : ni pictogramme, ni tiret cadratin, ni mot en capitales hors sigles.
 /// </summary>
@@ -13,12 +13,12 @@ public sealed class TextesEnDurSansTicTests
 {
     private static readonly HashSet<string> Sigles = new(StringComparer.Ordinal)
     {
-        // DRAM (24/09/2026) : le nom du réglage « DRAM Frequency » tel que le menu du BIOS l'écrit.
+        // Le nom du réglage « DRAM Frequency » tel que le menu du BIOS l'écrit.
         "DRAM",
-        "BIOS", "NVIDIA", "JEDEC", "EXPO", "DWORD", "SELECT", "FROM", "SOFTWARE", "MMCSS", "NVML", "SMART", "UEFI",
+        "BIOS", "NVIDIA", "JEDEC", "ASUS", "EXPO", "DWORD", "SELECT", "FROM", "SOFTWARE", "MMCSS", "NVML", "SMART", "UEFI",
         // cles internes du journal, traduites a l'affichage par RepairFindingViewModel.LibelleDomaine
         "STABILITE", "POWER", "SERVICES", "STOCKAGE", "DISPLAY", "DRIVER", "PAGEFILE", "THERMIQUE", "LATENCE", "RESEAU",
-        // 25/09/2026 : l'ordre des familles sur la carte (ScanViewModel.OrdreDesFamilles), memes cles.
+        // L'ordre des familles sur la carte (ScanViewModel.OrdreDesFamilles), memes cles.
         "WINDOWS", "UPDATE", "PERIPHERIQUES", "USB", "DEFENDER", "TACHES", "DEMARRAGE", "BCD",
     };
 
@@ -39,7 +39,7 @@ public sealed class TextesEnDurSansTicTests
 
         var fautes = new List<string>();
         var lus = 0;
-        // 17/09/2026 — cette ligne ne lisait que le premier niveau de `ViewModels`.
+        // Cette ligne ne lisait que le premier niveau de `ViewModels`.
         // Experience : un fichier `ViewModels/Sous/Fautif.cs` portant « categorie — accroche »
         // est passe VERT. La garde ne dormait pas par erreur de motif, mais par erreur de
         // PORTEE : elle couvrait tout tant que le dossier restait plat, et se serait tue
@@ -65,7 +65,7 @@ public sealed class TextesEnDurSansTicTests
             }
         }
 
-        // 18/09/2026 — le temoin manquait : ce test concluait « aucune faute » sans jamais
+        // Le temoin manquait : ce test concluait « aucune faute » sans jamais
         // affirmer avoir lu un fichier. Un chemin qui change, et il restait vert sur zero.
         lus.Should().BeGreaterThan(5, "le crible doit avoir lu de vrais ViewModels");
         fautes.Should().BeEmpty();

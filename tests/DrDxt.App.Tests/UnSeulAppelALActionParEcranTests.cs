@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Le style `CapsuleChrome` porte sa propre definition dans App.xaml :
+// Le style `CapsuleChrome` porte sa propre definition dans App.xaml :
 // « l'action principale d'UN ecran ». Au singulier. C'est le seul bouton du
 // theme qui recoit un fond clair et un halo : deux capsules cote a cote, ce sont
 // deux actions qui se disputent le meme regard, et plus aucune qui se detache.

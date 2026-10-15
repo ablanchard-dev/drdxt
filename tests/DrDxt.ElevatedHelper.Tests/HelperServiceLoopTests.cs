@@ -4,24 +4,24 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// HelperServiceLoop — the long-lived, multi-connection accept loop the helper runs
-// in --service mode. It drives the existing per-connection pipeline (an injected
-// AcceptOneAsync delegate) over and over for the service lifetime, without changing
-// what one connection does (handshake → typed op → close).
+// HelperServiceLoop : la boucle d'accept longue durée, multi-connexions, que le helper
+// tient en mode --service. Elle rejoue le pipeline par connexion existant (un délégué
+// AcceptOneAsync injecté) pendant toute la vie du service, sans changer ce que fait une
+// connexion (négociation → op typée → fermeture).
 //
-// Invariants under test (with a fake accept delegate — no pipe, no elevation):
-//   * many SEQUENTIAL connections are served until cancellation (the loop re-arms);
-//   * one BAD/garbage connection (the delegate throws) is logged + tolerated — the
-//     loop continues to the next accept (a single bad client never kills the service);
-//   * a SUSTAINED burst of faults backs off and then fails closed (stops) rather
-//     than spinning a CPU-burning tight loop;
-//   * a clean accept RESETS the consecutive-fault counter (transient blips never
-//     accumulate to the fail-closed threshold);
-//   * cancellation unwinds cleanly (no throw across the boundary).
+// Invariants testés (avec un faux délégué d'accept : pas de tube, pas d'élévation) :
+//   * de nombreuses connexions successives sont servies jusqu'à l'annulation (la boucle se réarme) ;
+//   * une connexion corrompue (le délégué lève) est journalisée et tolérée : la boucle
+//     passe à l'accept suivant (un seul mauvais client ne tue jamais le service) ;
+//   * une rafale soutenue de fautes recule puis se ferme (s'arrête) plutôt que de
+//     tourner en boucle serrée et brûler le processeur ;
+//   * un accept propre remet à zéro le compteur de fautes consécutives (des ratés
+//     passagers ne s'accumulent jamais jusqu'au seuil de fermeture) ;
+//   * l'annulation se déroule proprement (aucune exception ne traverse la frontière).
 // -----------------------------------------------------------------------
 public sealed class HelperServiceLoopTests
 {
-    // A no-op diagnostics sink that counts logged faults.
+    // Puits de diagnostics qui ne fait que compter les fautes journalisées.
     private sealed class CountingLog : IServiceLoopLog
     {
         public int Faults { get; private set; }
@@ -41,7 +41,7 @@ public sealed class HelperServiceLoopTests
             acceptOne: _ =>
             {
                 if (Interlocked.Increment(ref served) >= 5)
-                    cts.Cancel(); // stop after the 5th clean accept
+                    cts.Cancel(); // s'arrêter après le 5e accept propre
                 return Task.CompletedTask;
             },
             log: log,
@@ -67,8 +67,8 @@ public sealed class HelperServiceLoopTests
             {
                 attempt++;
                 if (attempt == 1)
-                    throw new IOException("garbage on the wire"); // one bad client
-                // subsequent accepts are clean; stop after we've proven we continued
+                    throw new IOException("garbage on the wire"); // un seul mauvais client
+                // les accepts suivants sont propres ; on s'arrête une fois prouvé qu'on a continué
                 if (Interlocked.Increment(ref goodAfterBad) >= 2)
                     cts.Cancel();
                 return Task.CompletedTask;
@@ -107,8 +107,8 @@ public sealed class HelperServiceLoopTests
     [Fact]
     public async Task A_clean_accept_resets_the_consecutive_fault_counter()
     {
-        // Pattern: fault, fault, CLEAN, fault, fault, ... — with a threshold of 3 the
-        // clean accept must reset the counter so we never reach fail-closed by blips.
+        // Motif : faute, faute, propre, faute, faute… Avec un seuil de 3, l'accept propre doit
+        // remettre le compteur à zéro pour qu'on n'atteigne jamais la fermeture par ratés passagers.
         var step = 0;
         var cleanCount = 0;
         using var cts = new CancellationTokenSource();
@@ -118,7 +118,7 @@ public sealed class HelperServiceLoopTests
             acceptOne: _ =>
             {
                 var s = step++;
-                // 2 faults, 1 clean, 2 faults, 1 clean, ... never 3 faults in a row.
+                // 2 fautes, 1 propre, 2 fautes, 1 propre… jamais 3 fautes de suite.
                 if (s % 3 == 2)
                 {
                     if (Interlocked.Increment(ref cleanCount) >= 4)

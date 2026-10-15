@@ -1,6 +1,6 @@
 <!-- Smoke de COEXISTENCE PresentMon. NE FAIT PAS partie de DrDXT.sln. -->
 <!-- Repond a une seule question, sur une vraie machine : le service Intel etant actif, -->
-<!-- DrDXT peut-il quand meme ouvrir sa session de mesure ? Voir P1 du plan. -->
+<!-- DrDXT peut-il quand meme ouvrir sa session de mesure ? -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

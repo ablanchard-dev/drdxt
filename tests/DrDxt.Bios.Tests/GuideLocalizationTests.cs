@@ -7,9 +7,9 @@ using FluentAssertions;
 namespace DrDxt.Bios.Tests;
 
 /// <summary>
-/// Every guide resx key the generator can emit must resolve in both FR and EN (zero
-/// hard-coded UI text — §19 i18n). ResxLocalizer returns the key itself when missing,
-/// so a real value must differ from the key.
+/// Chaque clé resx de guide que le générateur peut émettre doit se résoudre en FR et en EN (zéro
+/// texte d'interface en dur). ResxLocalizer rend la clé elle-même quand elle manque,
+/// donc une vraie valeur doit différer de la clé.
 /// </summary>
 public class GuideLocalizationTests
 {
@@ -19,23 +19,23 @@ public class GuideLocalizationTests
     {
         var keys = new[]
         {
-            // Step instruction keys
+            // Clés d'instruction des étapes
             BiosGuideStringKeys.StepXmp, BiosGuideStringKeys.StepAbove4G,
             BiosGuideStringKeys.StepCsm, BiosGuideStringKeys.StepRebar,
             BiosGuideStringKeys.StepX3dCppc, BiosGuideStringKeys.StepPcie,
             BiosGuideStringKeys.StepBiosVersion, BiosGuideStringKeys.StepGeneric,
-            // Confidence labels
+            // Étiquettes de confiance
             BiosGuideStringKeys.Verified, BiosGuideStringKeys.UnverifiedFallback,
-            // CSM suppression warning
+            // Avertissement de retrait du CSM
             BiosGuideStringKeys.CsmSuppressedLegacy,
-            // Recovery ladder
+            // Échelle de récupération
             BiosGuideStringKeys.RecoveryNoBootNormal, BiosGuideStringKeys.RecoveryMemoryTraining,
             BiosGuideStringKeys.RecoveryClearCmos, BiosGuideStringKeys.RecoveryLoadDefaults,
             BiosGuideStringKeys.RecoveryOneChangeAtATime,
-            // M3 closed loop: post-reboot verdicts
+            // Boucle fermée : verdicts après redémarrage
             BiosLoopStringKeys.VerdictTook, BiosLoopStringKeys.VerdictDidNotTake,
             BiosLoopStringKeys.VerdictUnreadable, BiosLoopStringKeys.AllTook,
-            // M3 closed loop: recovery card
+            // Boucle fermée : carte de récupération
             BiosLoopStringKeys.RecoveryHeader, BiosLoopStringKeys.RecoveryReenter,
             BiosLoopStringKeys.RecoveryOneChangeAtATime, BiosLoopStringKeys.RecoveryLoadDefaults,
             BiosLoopStringKeys.RecoveryClearCmos,

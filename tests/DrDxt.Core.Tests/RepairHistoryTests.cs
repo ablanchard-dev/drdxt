@@ -9,11 +9,10 @@ namespace DrDxt.Core.Tests;
 ///
 /// Un journal des constats est la seule chose qui puisse repondre a « est-ce que quelque chose a
 /// change depuis hier ? ». Mal fait, il repond faux avec autorite, ce qui est pire que de ne pas
-/// repondre — et ces deux erreurs sont exactement celles que cette journee a rendues concretes :
+/// repondre. Deux erreurs a eviter :
 ///
-///   · le 08/09/2026, l'audit a gagne quatre familles (MMCSS, services, reseau, thermique) en une
-///     journee. Un diff naif aurait annonce des dizaines de constats APPARUS, comme si la machine
-///     s'etait degradee du jour au lendemain ;
+///   · quand l'audit gagne des familles (MMCSS, services, reseau, thermique), un diff naif
+///     annoncerait des dizaines de constats apparus, comme si la machine s'etait degradee ;
 ///   · et un constat qui n'est plus produit ressemble a une reparation autant qu'a un lecteur qui
 ///     a echoue. Les deux sont indistinguables, et le produit ne doit pas choisir.
 /// </summary>
@@ -28,8 +27,8 @@ public class RepairHistoryTests
     [Fact]
     public void UNE_FAMILLE_NOUVELLE_N_EST_PAS_UNE_DEGRADATION_DE_LA_MACHINE()
     {
-        // Le cas reel du 08/09. Sans ce garde-fou, le produit annonce une catastrophe le jour
-        // ou il apprend a lire quelque chose de nouveau — et perd toute credibilite au moment
+        // Sans ce garde-fou, le produit annoncerait une catastrophe le jour ou il apprend a lire
+        // quelque chose de nouveau, et perdrait toute credibilite au moment
         // exact ou il devient plus capable.
         var hier = Photo(["POWER"], E("POWER", "plan", "Equilibre"));
         var aujourdhui = Photo(["POWER", "MMCSS"],
@@ -136,12 +135,10 @@ public class RepairHistoryTests
     [Fact]
     public void DEUX_CONSTATS_DE_MEME_NOM_NE_FONT_PAS_LEVER_LA_COMPARAISON()
     {
-        // Le defaut trouve en executant, le 09/09/2026. Le couple (domaine, nom) n'est pas
-        // unique : l'audit rend deux « BIOS / interface constructeur », une par interface WMI
-        // trouvee. `ToDictionary` levait « An item with the same key has already been added ».
-        //
-        // Le code compilait et ses sept tests passaient — aucun ne contenait de doublon. Une
-        // bibliotheque qui leve sur une donnee legitime est un defaut, quelle que soit la donnee.
+        // Le couple (domaine, nom) n'est pas unique : l'audit rend deux « BIOS / interface
+        // constructeur », une par interface WMI trouvee. `ToDictionary` leverait « An item with the
+        // same key has already been added ». Une bibliotheque qui leve sur une donnee legitime est un
+        // defaut, quelle que soit la donnee.
         var hier = Photo(["BIOS"],
             E("BIOS", "interface constructeur", "MSI_BiosSetting"),
             E("BIOS", "interface constructeur", "MSI_BootOption"));
@@ -185,18 +182,17 @@ public class RepairHistoryTests
     // ══════════════════════════════════════════════════════════════════════════════════════
     // La troisieme facon de mentir : accuser la machine pour un changement de conditions.
     //
-    // Vu en vrai le 09/09/2026. Le journal a annonce « RAM / mode memoire : ExpectedDefault →
-    // Unknown », ce qui se lit comme « la machine a perdu son double canal ». Elle n'avait rien
-    // perdu : le debit etait tombe a 18,7 GB/s parce que des compilations tournaient, donc la
-    // borne qui prouve le multi-canal ne tenait plus. Constat juste, lecture fausse.
+    // « RAM / mode memoire : ExpectedDefault → Unknown » se lirait « la machine a perdu son double
+    // canal » alors que le debit est tombe a 18,7 GB/s (mesure) parce que des compilations tournaient,
+    // et que la borne qui prouve le multi-canal ne tient plus. Constat juste, lecture fausse.
     // ══════════════════════════════════════════════════════════════════════════════════════
 
     // ══════════════════════════════════════════════════════════════════════════════════════
     // La quatrieme : accuser la machine pour un changement du produit.
     //
-    // Vu en vrai le 16/09/2026. Entre deux photos, le lecteur d'arrets a appris a exclure les
-    // appuis longs sur le bouton : « arrets brutaux 11 → 10 ». Le journal le lisait comme une
-    // machine qui s'arrange. C'est le produit qui avait change sa facon de lire.
+    // Entre deux photos, un lecteur d'arrets qui apprend a exclure les appuis longs sur le bouton
+    // ferait lire « arrets brutaux 11 → 10 » comme une machine qui s'arrange. C'est le produit qui a
+    // change sa facon de lire.
     // ══════════════════════════════════════════════════════════════════════════════════════
 
     private static RepairSnapshot PhotoDuLecteur(string? empreinte) =>
@@ -218,9 +214,9 @@ public class RepairHistoryTests
     public void UNE_EMPREINTE_ABSENTE_NE_DECLENCHE_RIEN(string? avant, string? apres)
         => RepairHistory.AvertissementDeLecteur(PhotoDuLecteur(avant), PhotoDuLecteur(apres)).Should().BeNull();
 
-    // La cinquieme : accuser la machine pour une difference de droits (vu le 16/09/2026).
+    // La cinquieme : accuser la machine pour une difference de droits.
     // Photo d'avant prise en administrateur, photo d'apres sans : « toute la famille BCD a cesse de
-    // repondre », « DPC/ISR Suspicious → Unknown ». La machine n'avait rien fait.
+    // repondre », « DPC/ISR Suspicious → Unknown », alors que la machine n'a rien fait.
 
     private static RepairSnapshot PhotoDroits(bool? eleve) =>
         new(DateTimeOffset.Now, ["BCD"], [E("BCD", "bootstatuspolicy", "IgnoreAllFailures")], null, null, eleve);
@@ -230,7 +226,7 @@ public class RepairHistoryTests
         => RepairHistory.AvertissementDeDroits(PhotoDroits(true), PhotoDroits(false))
             .Should().NotBeNull().And.Subject.ToString()!.Should().Contain("administrateur");
 
-    // 29/09/2026, photo de la section Santé : « DrDXT a été mis à jour entre les deux photos ». « Photo » est le
+    // Photo de la section Santé : « DrDXT a été mis à jour entre les deux photos ». « Photo » est le
     // mot du code pour un relevé ; le joueur, lui, a lancé deux scans. Les trois avertissements qu'il lit le disent.
     [Fact]
     public void LES_AVERTISSEMENTS_PARLENT_DE_SCANS_PAS_DE_PHOTOS()
@@ -316,7 +312,7 @@ public class RepairHistoryTests
         // Unknown a ExpectedDefault. Le banc memoire est limite par la BANDE PASSANTE : un autre
         // programme peut saturer la memoire sans faire monter la charge CPU. Sa dispersion, elle,
         // le voit.
-        // 17/09/2026 : 12,6 % est une vraie photo agitee du journal ; 8,2 % (l'ancien exemple) est dans
+        // 12,6 % est une vraie photo agitee du journal ; 8,2 % (l'ancien exemple) est dans
         // la plage d'une machine calme (max mesure 8,7 %) et n'avertit plus.
         RepairHistory.AvertissementDeConditions(PhotoBanc(1.4), PhotoBanc(12.6))
             .Should().NotBeNull().And.Subject.ToString()!.Should().Contain("12,6").And.Contain("agité");
@@ -333,7 +329,7 @@ public class RepairHistoryTests
     [Fact]
     public void LA_PHRASE_RESTE_EN_FRANCAIS_SUR_UN_WINDOWS_ANGLAIS()
     {
-        // 12/09/2026 : la CI (runner en-US) rendait « 8.2 % » dans une phrase francaise. Meme
+        // La CI (runner en-US) rendait « 8.2 % » dans une phrase francaise. Meme
         // defaut que KeepPolicy et PlafondGpu (`ad1e8b8`) : la culture du poste fuyait dans le texte.
         var avant = System.Globalization.CultureInfo.CurrentCulture;
         try
@@ -370,7 +366,7 @@ public class RepairHistoryTests
         RepairHistory.AvertissementDeConditions(PhotoBanc(null), PhotoBanc(null)).Should().BeNull();
     }
 
-    // ── 17/09/2026 (D21) : la photo de l'outil et celle de l'appli ne se comparent pas ──
+    // ── La photo de l'outil et celle de l'appli ne se comparent pas ──
     // Vu sur la machine de reference : l'appli se comparait à une photo prise par l'outil de
     // développement, qui lit aussi la RAM, le réseau et le BIOS. L'écran annonçait seize lignes
     // « toute cette famille a cessé de répondre » alors que rien n'avait bougé.

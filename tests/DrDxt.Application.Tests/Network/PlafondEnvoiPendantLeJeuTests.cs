@@ -50,6 +50,43 @@ public class PlafondEnvoiPendantLeJeuTests
         mode.PlafondPose.Should().BeFalse();
     }
 
+    // Une pose ratée a pu laisser la politique générale (créée avant l'exemption du jeu, puis relecture ratée ou délai
+    // dépassé) : l'envoi de tout le PC restait bridé, et l'App, croyant n'avoir rien posé, ne retirait rien à la fermeture.
+    [Fact]
+    public async Task Une_pose_ratee_puis_le_jeu_ferme_retire_quand_meme()
+    {
+        var (mode, h, tick) = Monter();
+        await mode.DemarrerAsync(CancellationToken.None);
+        h.RefusePour = op => op is ApplyUploadCapOp;
+        await tick(true);
+        mode.PlafondPose.Should().BeFalse();
+
+        var avant = h.Ops.OfType<RemoveUploadCapOp>().Count();
+        await tick(false);
+        h.Ops.OfType<RemoveUploadCapOp>().Should().HaveCount(avant + 1, "une pose ratée laisse un état inconnu");
+        await tick(false);
+        h.Ops.OfType<RemoveUploadCapOp>().Should().HaveCount(avant + 1, "retiré une fois, l'état est de nouveau connu");
+    }
+
+    // Un changement de plafond raté en pleine partie : le helper a tout retiré (sa pose ratée ne laisse rien). L'écran
+    // ne doit pas dire « posé » ; le battement suivant repose l'ancien plafond.
+    [Fact]
+    public async Task Un_changement_rate_n_est_plus_dit_pose_et_l_ancien_se_repose()
+    {
+        var (mode, h, tick) = Monter();
+        await mode.DemarrerAsync(CancellationToken.None);
+        await tick(true);
+        h.RefusePour = op => op is ApplyUploadCapOp;
+
+        (await mode.ChangerPlafondAsync(400_000_000, CancellationToken.None)).IsOk.Should().BeFalse();
+        mode.PlafondPose.Should().BeFalse();
+
+        h.RefusePour = null;
+        await tick(true);
+        h.Ops.OfType<ApplyUploadCapOp>().Last().Should().Be(new ApplyUploadCapOp("cod.exe", 503_000_000));
+        mode.PlafondPose.Should().BeTrue();
+    }
+
     [Fact]
     public async Task Le_filet_est_un_bail_unique_dont_l_inverse_retire_le_plafond()
     {
@@ -74,7 +111,7 @@ public class PlafondEnvoiPendantLeJeuTests
         h.Ops.OfType<ApplyUploadCapOp>().Should().BeEmpty("un plafond sans filet survivrait a un plantage");
     }
 
-    // 26/09/2026 : helper tue net en pleine partie (fin de tache, plantage) : ses baux meurent avec lui,
+    // Helper tue net en pleine partie (fin de tache, plantage) : ses baux meurent avec lui,
     // la politique reste en memoire et bride l'envoi de tout le PC jusqu'au redemarrage. A la relance,
     // le nouveau bail est accepte, rien n'est « pose » a sa connaissance, jeu ferme : personne ne
     // retirait l'orpheline.
@@ -106,7 +143,7 @@ public class PlafondEnvoiPendantLeJeuTests
         mode.PlafondPose.Should().BeTrue();
     }
 
-    // 26/09/2026 : deux chemins de retrait que des mutations laissaient verts. Point de depart commun :
+    // Deux chemins de retrait que des mutations laissaient verts. Point de depart commun :
     // une pose qui repond « echec » (delai depasse) alors que le helper l'a peut-etre executee. `_pose`
     // est faux, et l'etat reel inconnu : le retrait doit partir quand meme.
 
@@ -150,7 +187,7 @@ public class PlafondEnvoiPendantLeJeuTests
     [Fact]
     public async Task Un_battement_qui_leve_ne_casse_pas_le_mode_le_suivant_pose_le_plafond()
     {
-        // 25/09/2026 : la boucle de l'appli n'attrape que l'annulation ; une exception la tuait.
+        // La boucle de l'appli n'attrape que l'annulation ; une exception la tuait.
         var (mode, h, tick) = Monter();
         await mode.DemarrerAsync(CancellationToken.None);
         h.LeveAuProchain = 1;
@@ -185,7 +222,7 @@ public class PlafondEnvoiPendantLeJeuTests
     [Fact]
     public async Task Un_ajustement_en_vol_quand_le_jeu_se_ferme_ne_laisse_pas_de_plafond()
     {
-        // 25/09/2026 : l'ajustement lisait « pose » et envoyait une pose ; pendant ce temps le battement
+        // L'ajustement lisait « pose » et envoyait une pose ; pendant ce temps le battement
         // voyait le jeu ferme et retirait. La pose arrivait apres le retrait : plafond en place, mode
         // persuade du contraire, aucun battement ne le retirait plus.
         var h = new PoseLente();
@@ -239,8 +276,8 @@ public class PlafondEnvoiPendantLeJeuTests
     [Fact]
     public async Task Un_bail_expire_en_partie_repose_le_plafond_que_le_helper_a_retire()
     {
-        // 25/09/2026 : a l'expiration, le helper retire le plafond (l'inverse du bail). Le mode rouvrait
-        // le bail mais gardait « pose » : plus rien ne protegeait la partie, l'ecran disait « actif ».
+        // A l'expiration, le helper retire le plafond (l'inverse du bail). Rouvrir le bail en gardant
+        // « pose » laisserait la partie sans protection pendant que l'ecran dit « actif ».
         var h = new BailQuiExpire();
         var mode = new PlafondEnvoiPendantLeJeu(h, _ => true, "cod.exe", 503_000_000);
         await mode.DemarrerAsync(CancellationToken.None);
@@ -257,7 +294,7 @@ public class PlafondEnvoiPendantLeJeuTests
     [Fact]
     public async Task Un_bail_perdu_se_rouvre_et_sans_filet_aucun_plafond_ne_reste()
     {
-        // 25/09/2026 : le resultat du renouvellement etait ignore.
+        // Le resultat du renouvellement etait ignore.
         var h = new BailPerdu();
         var mode = new PlafondEnvoiPendantLeJeu(h, _ => true, "cod.exe", 503_000_000);
         await mode.DemarrerAsync(CancellationToken.None);
@@ -320,7 +357,7 @@ public class PlafondEnvoiPendantLeJeuTests
         mode.PlafondPose.Should().BeFalse();
     }
 
-    // 26/09/2026 : le plafond ne se pose que si le jeu est vu vivant, et ce test tournait jusqu'ici sur une
+    // Le plafond ne se pose que si le jeu est vu vivant, et ce test tournait jusqu'ici sur une
     // doublure. Sur les vrais processus : le nom que le scan fournit (nom du processus + « .exe ») comme un
     // chemin complet retrouvent un processus qui tourne ; un nom inventé ne retrouve rien.
     [Fact]

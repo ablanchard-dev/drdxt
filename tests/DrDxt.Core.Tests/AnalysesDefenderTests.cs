@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.Core.Tests;
 
-// 07/10/2026 (chantier D3) : les analyses de Microsoft Defender contre les parties relevées, en lecture seule.
+// Les analyses de Microsoft Defender contre les parties relevées, en lecture seule.
 public sealed class AnalysesDefenderTests
 {
     private static readonly DateTimeOffset J = new(2026, 10, 6, 0, 0, 0, TimeSpan.Zero);
@@ -45,4 +45,12 @@ public sealed class AnalysesDefenderTests
     [Fact]
     public void Sans_partie_relevee_rien_n_est_compare()
         => AnalysesDefender.Juger([Analyse(3)], [], true, 30).Statut.Should().Be(RepairStatus.Observed);
+
+    // Une seule analyse pendant une partie : « dont 1 tombée », jamais « tombée(s) ».
+    [Fact]
+    public void Une_seule_analyse_pendant_une_partie_s_accorde_au_singulier()
+    {
+        var c = AnalysesDefender.Juger([Analyse(3), Analyse(20.5)], [Partie(20)], true, 30);
+        c.Explication.Should().NotContain("(s)");
+    }
 }

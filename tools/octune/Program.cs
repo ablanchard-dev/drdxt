@@ -4,7 +4,7 @@ using DrDxt.Detection.Gpu.Bench;
 using DrDxt.GpuNative.NvApi;
 
 // -----------------------------------------------------------------------
-// octune — LIVE ascending core-offset sweep on the deterministic perf-meter (P2).
+// octune — LIVE ascending core-offset sweep on the deterministic perf-meter.
 //
 // stock → +30 → +60 → +90 → +100 (the GpuSafeBounds band caps at +100): each point is
 // N deterministic bench runs (score mean + inter-run margin, checksum-verified); a gain

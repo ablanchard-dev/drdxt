@@ -6,7 +6,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Settings;
 
-// 27/09/2026 : les reglages processeur du plan actif (minimum, maximum, boost, parking...) sont ceux que
+// Les reglages processeur du plan actif (minimum, maximum, boost, parking...) sont ceux que
 // l'audit montre au joueur et compare au defaut. Le lecteur n'etait exerce que sur des doublures. Il doit
 // rendre, pour chaque reglage, l'« index actuel en courant alternatif » que powercfg affiche.
 // Lecture seule ; powercfg existe sur tout Windows, runner de CI compris.

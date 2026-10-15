@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-// 10/10/2026 (revue de sécurité) : un processus élevé hérite de HKCU\Environment, écrivable sans droits ; le runtime
+// Un processus élevé hérite de HKCU\Environment, écrivable sans droits ; le runtime
 // .NET y lit de quoi charger une DLL avant la première ligne du programme (CORECLR_PROFILER_PATH). Le lanceur natif
 // reconstruit l'environnement : rien de ce qu'il reçoit ne passe.
 public sealed class EnvironnementPropreTests
@@ -23,7 +23,7 @@ public sealed class EnvironnementPropreTests
         env["SystemDrive"].Should().Be("C:");
     }
 
-    // Revue du 10/10/2026 : l'audit de santé lit « %ProgramFiles%\... » et « %ProgramData%\... » au registre ; sans ces
+    // L'audit de santé lit « %ProgramFiles%\... » et « %ProgramData%\... » au registre ; sans ces
     // variables, le scan élevé ignorait en silence des tâches et des services que le scan simple voyait.
     [Fact]
     public void Les_dossiers_du_systeme_que_l_audit_lit_sont_la()

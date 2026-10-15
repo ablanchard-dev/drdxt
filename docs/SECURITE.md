@@ -71,7 +71,7 @@ empeche, et voici le test qui le prouve.*
 | Le materiel | une **ecriture de tension** ajoutee plus tard | elle **n'existe pas**, et le filtre de noms sait attraper un coupable fabrique | → test: `NoVoltageWriteOpExistsGateTests` |
 | Le BIOS | le composant qui **guide** dans le BIOS, s'il ecrivait | `DrDxt.Bios` ne reference que `DrDxt.Core` : structurellement incapable | → test: `TheGuideNeverWritesTheBiosGateTests` |
 | L'etat desire du reconciliateur | un fichier **altere** sur le disque | signature verifiee, chargement **fail-closed** | → test: `SignedDesiredStateStoreTests` |
-| Le rapport SAV | ce que le client **colle** dans un ticket public | masquage des chemins utilisateur et des secrets | → test: `TextScrubberTests` |
+| Le rapport SAV | ce que le client **colle** dans un ticket public | profil, nom du PC, adresses, numéros de série et courriels retirés | → test: `ExportDeMachineTests`, `CartesAgirTests` |
 | L'installeur | livrer un binaire **non signe** | gate de publication | → test: `TheInstallerCannotShipUnsignedGateTests` |
 | L'installeur stage | il est **remplace** entre l'empreinte et le clic, dans un dossier ecrivable par l'utilisateur, puis lance **sous UAC** | le binaire est **verrouille** (partage lecture seule) de l'empreinte jusqu'apres le lancement | → test: `VerificationMiseAJourTests` |
 | Le tube nomme privilegie, cote App | un processus du meme compte qui **prend le nom du tube** avant le helper et repond « applique » | l'App compare l'image du serveur au helper pose a cote d'elle, avant le handshake (garde du 11/09/2026) | → test: `TubeUsurpeTests` |

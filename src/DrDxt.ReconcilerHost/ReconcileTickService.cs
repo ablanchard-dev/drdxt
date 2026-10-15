@@ -4,75 +4,49 @@ using DrDxt.Reconciler.Manifest;
 namespace DrDxt.ReconcilerHost;
 
 // -----------------------------------------------------------------------
-// ReconcileTickService (plan T26) — one reconcile pass, fail-clean on a bad manifest.
+// ReconcileTickService : une passe de réconciliation, en échec propre sur un mauvais manifeste.
 //
-// A "tick" is: Check the license entitlement, load the SIGNED desired-state manifest,
-// then reconcile. The store's LoadAsync VERIFIES the signature before returning, so a
-// tamper / schema / IO error surfaces here as a Fail. The security-critical rule (I4): a
-// failed load never reaches the reconciler — we do not enter a write loop on a manifest we
-// cannot trust. Instead we journal a SECURITY diagnostic and return the Fail verbatim.
+// Un « tour » : charger le manifeste d'état voulu signé, une seule fois, puis réconcilier. Le
+// LoadAsync du store vérifie la signature avant de rendre la main : une
+// altération, une erreur de schéma ou d'E/S remonte donc ici en Fail. La règle critique de
+// sécurité (I4) : un chargement raté n'atteint jamais le réconciliateur ; on n'entre pas dans une
+// boucle d'écriture sur un manifeste auquel on ne peut pas se fier. On journalise à la place un
+// diagnostic de sécurité et on rend le Fail tel quel.
 //
-// FINDING 1 — ENTITLEMENT GATE (the moat blocker fix): Before we would load/reconcile, the
-// IEntitlementGate confirms the signed manifest still carries a live, bounded-validity
-// license entitlement (DesiredStateManifest.ExpiresAt). The LocalSystem reconciler runs
-// offline and cannot read the user's license cache, so this is the moat's fail-closed
-// license signal: when the license lapses/is revoked the App stops refreshing the manifest
-// → the entitlement expires within EntitlementTtl → we refuse to reapply (the paid moat
-// stops). We do not auto-revert already-applied tweaks (owner's call). Any ambiguity
-// (missing/expired entitlement, unverifiable manifest) fails CLOSED.
+// Aucune licence : le manifeste s'applique tel quel après vérification de sa signature. Aucun manifeste
+// → état vide (rien d'armé). Un refus ne défait pas automatiquement les leviers déjà appliqués.
 //
-// All the privileged work lives in the injected IReconciler; this class only sequences
-// entitlement → load → reconcile and enforces the fail-clean gates, so it is fully
-// unit-testable with a fake gate, a fake store (Ok / Fail) and a substitute reconciler.
+// Tout le travail privilégié vit dans l'IReconciler injecté ; cette classe ne fait que séquencer
+// chargement → réconciliation et imposer l'échec propre : elle se teste entièrement avec un store
+// simulé (Ok / Fail) et un réconciliateur de substitution.
 // -----------------------------------------------------------------------
 public sealed class ReconcileTickService
 {
     private readonly IDesiredStateStore _store;
     private readonly IReconciler _reconciler;
     private readonly IDiagnosticsLog _diagnostics;
-    private readonly IEntitlementGate _entitlement;
 
     public ReconcileTickService(
         IDesiredStateStore store,
         IReconciler reconciler,
-        IDiagnosticsLog diagnostics,
-        IEntitlementGate entitlement)
+        IDiagnosticsLog diagnostics)
     {
         _store = store;
         _reconciler = reconciler;
         _diagnostics = diagnostics;
-        _entitlement = entitlement;
     }
 
-    /// <summary>FINDING 1 + I4 — checks the live license entitlement, then loads the verified
-    /// manifest and reconciles it. An absent/expired entitlement OR a load failure
-    /// (tamper/schema/IO) is logged as a security event and returned without reconciling —
-    /// never a write loop on an unentitled or untrusted manifest (fail-closed).</summary>
+    /// <summary>Charge le manifeste vérifié et le réconcilie. Un chargement raté (altération / schéma / E/S)
+    /// est journalisé comme événement de sécurité et rendu sans réconcilier : jamais de boucle d'écriture sur
+    /// un manifeste non fiable (fail-closed, I4).</summary>
     public async Task<Result> RunTickAsync(CancellationToken ct)
     {
-        // FINDING 1 — entitlement gate first (fail-closed). If the manifest's bounded-validity
-        // entitlement is absent/expired (license lapsed/revoked → App stopped refreshing) or
-        // the manifest is unverifiable, refuse to reapply: journal a SECURITY diagnostic and
-        // return the Fail without touching the reconciler. The already-applied tweaks are left
-        // as-is (no auto-revert — owner's call).
-        var entitled = await _entitlement.EnsureReapplyEntitledAsync(ct);
-        if (!entitled.IsOk)
-        {
-            var entErr = entitled.Error!.Value;
-            _diagnostics.Change(
-                tweakId: HostActors.ManifestTweakId,
-                from: entErr.Code,
-                to: "reconcile-skipped-entitlement",
-                actor: HostActors.Security);
-            return entitled;
-        }
-
         var loaded = await _store.LoadAsync();
         if (!loaded.IsOk)
         {
             var error = loaded.Error!.Value;
-            // SECURITY log: the actor flags this as a security event for the audit
-            // journal. We deliberately do not call the reconciler (fail-clean, I4).
+            // Journal de sécurité : l'acteur marque ceci comme événement de sécurité pour le journal
+            // d'audit. On n'appelle exprès pas le réconciliateur (échec propre, I4).
             _diagnostics.Change(
                 tweakId: HostActors.ManifestTweakId,
                 from: error.Code,

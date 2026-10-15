@@ -3,21 +3,21 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// GpuStabilityTester (R2b) — turns a brief GPU load probe into a stability verdict for
-// the undervolt tweak (E2). SAFETY-CRITICAL, fail-safe by construction:
-//   * Stable      only when the load completed with a healthy device,
-//   * Unstable    when the device was lost (TDR) during the load,
-//   * Inconclusive for everything else — a probe failure, an unknown result, or a
-//                 thrown exception. The undervolt tweak treats Inconclusive as "revert",
-//                 so a stability test that can't be sure never green-lights an undervolt.
+// GpuStabilityTester : transforme une brève sonde de charge GPU en verdict de stabilité pour
+// le levier de sous-tension. Critique pour la sécurité, sûr par construction :
+//   * Stable      seulement si la charge s'est terminée avec un périphérique sain,
+//   * Unstable    si le périphérique a été perdu (TDR) pendant la charge,
+//   * Inconclusive pour tout le reste : panne de la sonde, résultat inconnu ou exception.
+//                 Le levier de sous-tension traite Inconclusive comme « retour » : un test
+//                 de stabilité qui n'est pas sûr ne valide jamais une sous-tension.
 //
-// It never throws. The actual GPU load is the injected IGpuLoadProbe (real D3D11
-// implementation in Detection, smoke-validated); this orchestration is pure + unit-tested.
+// Ne lève jamais. La vraie charge GPU est l'IGpuLoadProbe injecté (vraie implémentation D3D11
+// dans Detection, validée par smoke test) ; cette orchestration est pure et testée.
 // -----------------------------------------------------------------------
 public sealed class GpuStabilityTester : IStabilityTester
 {
-    // A few seconds is enough for an unstable, freshly-applied offset to TDR, while
-    // keeping the apply flow responsive.
+    // Quelques secondes suffisent pour qu'un décalage instable tout juste posé provoque un TDR,
+    // sans rendre la pose lente.
     private static readonly TimeSpan LoadDuration = TimeSpan.FromSeconds(3);
 
     private readonly IGpuLoadProbe _probe;
@@ -41,8 +41,8 @@ public sealed class GpuStabilityTester : IStabilityTester
         }
         catch (Exception)
         {
-            // Fail-safe: a probe that blows up (or a cancellation) must never read as
-            // Stable. Inconclusive → the tweak reverts.
+            // Sécurité : une sonde qui explose (ou une annulation) ne doit jamais se lire comme
+            // Stable. Inconclusive → le levier s'annule.
             return Result<StabilityOutcome>.Ok(StabilityOutcome.Inconclusive);
         }
     }

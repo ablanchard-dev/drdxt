@@ -6,12 +6,12 @@ namespace DrDxt.Detection.Display;
 /// Retrouve l'EDID d'un moniteur à partir du nom d'interface que rend <c>EnumDisplayDevices</c>.
 ///
 /// Pourquoi ce fichier existe : <see cref="EdidVrrCapabilite"/> sait lire une capacité VRR dans
-/// des octets, mais personne ne lui donnait les octets du BON écran. Le registre en conserve
-/// plusieurs — mesure du 18/09/2026 sur la machine de référence : <b>quatre</b> entrées portent
+/// des octets, mais encore faut-il lui donner les octets du bon écran. Le registre en conserve
+/// plusieurs : mesure du 18/09/2026 sur la machine de référence, <b>quatre</b> entrées portent
 /// un EDID pour <b>deux</b> écrans réellement branchés, les autres étant des branchements
 /// mémorisés. Prendre « le premier trouvé » aurait lu un écran débranché.
 ///
-/// Le pont est donc le nom d'interface de l'écran que Windows pilote MAINTENANT :
+/// Le pont est donc le nom d'interface de l'écran que Windows pilote maintenant :
 /// <c>\\?\DISPLAY#AUS2413#5&amp;3ac6cfcf&amp;0&amp;UID4354#{guid}</c>, dont les deux premiers
 /// champs sont exactement les deux niveaux de clé sous <c>Enum\DISPLAY</c>.
 ///
@@ -50,7 +50,7 @@ internal static class EdidDuMoniteur
         return $@"{RacineEnum}\{pnp}\{instance}\Device Parameters";
     }
 
-    /// <summary>06/10/2026 (chantier B2) : « DISPLAY\pnp\instance », le début du nom d'instance WMI du moniteur
+    /// <summary>« DISPLAY\pnp\instance », le début du nom d'instance WMI du moniteur
     /// (WmiMonitorConnectionParams), ou null.</summary>
     internal static string? Instance(string? nomInterface)
     {

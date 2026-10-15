@@ -5,11 +5,11 @@ using Xunit;
 
 namespace DrDxt.Detection.Tests.Settings;
 
-// NS-4 (RAM reliability). A DISABLED pagefile is a real reliability hazard (commit-limit
-// OOM → freeze/crash — Microsoft, « Introduction to the page file »). We infer it from the raw REG_MULTI_SZ
-// HKLM\...\Memory Management\PagingFiles: an empty value = pagefile OFF. A pagefile that IS
-// present (system-managed "C:\pagefile.sys 0 0" OR a custom size) is a valid, possibly
-// deliberate choice → On, never second-guessed. Unreadable/null → Unknown (never a lie).
+// Fiabilité de la RAM. Un fichier d'échange désactivé est un vrai risque de fiabilité (limite de
+// commit → gel ou plantage ; Microsoft, « Introduction to the page file »). On l'infère de la REG_MULTI_SZ brute
+// HKLM\...\Memory Management\PagingFiles : valeur vide = fichier d'échange désactivé. Un fichier présent
+// (géré par le système « C:\pagefile.sys 0 0 » ou taille personnalisée) est un choix valide, peut-être
+// délibéré → On, jamais remis en cause. Illisible ou null → Unknown (jamais un mensonge).
 public class PagefileInferencerTests
 {
     [Fact]
@@ -33,17 +33,17 @@ public class PagefileInferencerTests
     [Fact]
     public void Custom_fixed_size_is_on_not_second_guessed()
     {
-        // A present custom pagefile is a valid/deliberate choice — we only flag DISABLED.
+        // Un fichier d'échange personnalisé présent est un choix valide et délibéré : on ne signale que désactivé.
         PagefileInferencer.Infer(new[] { @"C:\pagefile.sys 4096 8192" }).Should().Be(TriState.On);
     }
 
     [Fact]
     public void Automatically_managed_wildcard_form_is_on_not_a_false_disabled()
     {
-        // The DEFAULT "automatically manage" state stores an entry without sizes (often the
-        // wildcard "?:\pagefile.sys"). It is a present, healthy page file → On, never a false
-        // "disabled" on a fine machine (audit C2: never invent a problem). Verified encoding:
-        // auto = entry-without-sizes, disabled = empty value.
+        // L'état par défaut « géré automatiquement » stocke une entrée sans tailles (souvent le
+        // joker « ?:\pagefile.sys »). C'est un fichier d'échange présent et sain → On, jamais un faux
+        // « désactivé » sur une machine saine (ne jamais inventer un problème). Encodage vérifié :
+        // auto = entrée sans tailles, désactivé = valeur vide.
         PagefileInferencer.Infer(new[] { @"?:\pagefile.sys" }).Should().Be(TriState.On);
     }
 

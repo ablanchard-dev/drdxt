@@ -4,17 +4,17 @@ using DrDxt.Reconciler;
 namespace DrDxt.ReconcilerHost;
 
 // -----------------------------------------------------------------------
-// FeatureUpdateDetector (plan T27) — the PRIMARY feature-update trigger signal.
+// FeatureUpdateDetector : le signal principal de déclenchement sur mise à jour de fonctionnalité.
 //
-// A Windows feature update bumps CurrentBuild.UBR and frequently resets OS-side
-// settings to defaults. This detector compares the current build (IOsBuildProbe)
-// against the last build the host acted on (ReconcilerState.LastFeatureUpdateBuild)
-// and reports whether a feature update has landed SINCE the last record.
+// Une mise à jour de fonctionnalité Windows fait monter CurrentBuild.UBR et remet souvent les
+// réglages côté OS à leurs valeurs par défaut. Ce détecteur compare le build actuel
+// (IOsBuildProbe) au dernier build traité par l'hôte (ReconcilerState.LastFeatureUpdateBuild) et
+// dit si une mise à jour de fonctionnalité est arrivée depuis le dernier relevé.
 //
-// EDGE-TRIGGERED, not level: on a genuine change it persists the new build so the
-// Same build is a no-op on the next tick — the reconcile is driven once per update,
-// not on every poll. A read or persist failure is surfaced as Fail (no guess): the
-// host then does not treat "unknown" as "updated".
+// Déclenché sur front, pas sur niveau : sur un vrai changement, il enregistre le nouveau build
+// pour que le même build soit sans effet au tour suivant ; la réconciliation est menée une fois
+// par mise à jour, pas à chaque interrogation. Un échec de lecture ou d'enregistrement remonte en
+// Fail (aucune supposition) : l'hôte ne traite alors pas « inconnu » comme « mis à jour ».
 // -----------------------------------------------------------------------
 public sealed class FeatureUpdateDetector
 {
@@ -27,9 +27,9 @@ public sealed class FeatureUpdateDetector
         _stateStore = stateStore;
     }
 
-    /// <summary>True iff the current OS build differs from the last recorded one (a
-    /// feature update landed since the host last acted). On true it persists the new
-    /// build (edge-trigger). Probe/store failure → Fail.</summary>
+    /// <summary>Vrai si et seulement si le build actuel de l'OS diffère du dernier enregistré (une
+    /// mise à jour de fonctionnalité est arrivée depuis la dernière action de l'hôte). Sur true, il
+    /// enregistre le nouveau build (déclenchement sur front). Échec de sonde / de store → Fail.</summary>
     public async Task<Result<bool>> WasFeatureUpdateInstalledAsync(CancellationToken ct)
     {
         var build = _buildProbe.ReadCurrentBuild();
@@ -43,12 +43,12 @@ public sealed class FeatureUpdateDetector
         var current = build.Value!;
         var last = loaded.Value!.LastFeatureUpdateBuild;
 
-        // Same build (including: same as a previously-recorded build) → no update, no write.
+        // Même build (y compris identique à un build déjà enregistré) → pas de mise à jour, pas d'écriture.
         if (string.Equals(current, last, StringComparison.OrdinalIgnoreCase))
             return Result<bool>.Ok(false);
 
-        // Changed (or first run with an empty record) → record the new build so the next
-        // tick with this build is a no-op, then report the update.
+        // Changé (ou premier lancement avec un relevé vide) → enregistrer le nouveau build pour que le
+        // tour suivant avec ce build soit sans effet, puis signaler la mise à jour.
         var saved = await _stateStore.SaveAsync(
             loaded.Value! with { LastFeatureUpdateBuild = current }, ct);
         if (!saved.IsOk)

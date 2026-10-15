@@ -7,14 +7,14 @@ using DrDxt.Core;
 namespace DrDxt.App.Platform;
 
 /// <summary>
-/// 06/10/2026 (chantier B14, S8) : rejouer une machine enregistrée (tests/Shared/machines) dans l'App, sans son
+/// Rejouer une machine enregistrée (tests/Shared/machines) dans l'App, sans son
 /// matériel, pour dessiner les écrans sur une carte AMD, un portable ou un compte sans droits. DEBUG seulement : l'argument
 /// « machine=&lt;nom ou chemin&gt; » remplace l'inventaire, les réglages, la santé, les disques et la mesure en jeu par ceux
 /// du fichier ; le reste (parties, historique, mises à jour) lit encore ce PC.
 /// </summary>
 internal static class MachineDeTest
 {
-    /// <param name="Eleve">Lu avec les droits administrateur ; null (fichiers anciens) = oui. Revue (P0-2) : sans ce
+    /// <param name="Eleve">Lu avec les droits administrateur ; null (fichiers anciens) = oui. Sans ce
     /// champ, la machine « sans-admin » rejouée gardait les droits de ce PC et le bouton « relancer en administrateur »
     /// ne se dessinait jamais.</param>
     internal sealed record Machine(string Nom, HardwareInventory Inventaire, SettingsState Reglages, List<RepairFinding> Sante,
@@ -23,7 +23,7 @@ internal static class MachineDeTest
     public static Machine? Active { get; set; }
 
     /// <summary>
-    /// 06/10/2026 : le premier rejeu (19:23) a écrit la machine AMD dans les vraies données du joueur : deux faux
+    /// Le premier rejeu (19:23) a écrit la machine AMD dans les vraies données du joueur : deux faux
     /// changements de mémoire dans changements.json, un faux scan dans repair-history.json. Activer une machine redirige
     /// donc d'office les données vers un dossier jetable (<see cref="DossierDonnees.VariableDeDeveloppement"/>), sauf si un
     /// dossier est déjà choisi.

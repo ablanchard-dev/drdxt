@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests;
 
-/// <summary>PAWN1 (09/10/2026) : la température lue dans les registres Intel par PawnIO, quand PawnIO est déjà installé.
+/// <summary>La température lue dans les registres Intel par PawnIO, quand PawnIO est déjà installé.
 /// Le décodage est pur et testé ici ; le module embarqué est figé par son empreinte ; la lecture réelle est un test
 /// Machine (il faut PawnIO sur la machine qui lance la suite).</summary>
 public sealed class TemperaturePawnIoTests
@@ -47,7 +47,7 @@ public sealed class TemperaturePawnIoTests
         act.Should().NotThrow();
     }
 
-    // B1 (10/10/2026) : composer une nouvelle PL1 ne touche à rien d'autre dans le registre.
+    // Composer une nouvelle PL1 ne touche à rien d'autre dans le registre.
     [Fact]
     public void Composer_PL1_ne_change_que_le_champ_PL1_et_l_active()
     {
@@ -91,20 +91,47 @@ public sealed class TemperaturePawnIoTests
         lu!.Pl1W.Should().Be(65); lu.Pl2W.Should().Be(219); lu.NominaleW.Should().Be(65); lu.Verrou.Should().BeTrue();
         lu.Pl1Active.Should().BeFalse("bit 15 à zéro dans ce registre d'essai");
         TemperaturePawnIo.DecoderLimites(0x3, 0UL, 520UL).Should().BeNull("PL1 nul = registre vide");
-        // Revue du 09/10 : le registre au maximum (0x7FFF) n'est pas une panne, c'est « sans limite » ; le bit 15 dit « activée ».
+        // Le registre au maximum (0x7FFF) n'est pas une panne, c'est « sans limite » ; le bit 15 dit « activée ».
         var max = TemperaturePawnIo.DecoderLimites(0x3, (1UL << 15) | 0x7FFFUL, 520UL);
         max.Should().NotBeNull();
         max!.Pl1W.Should().Be(4095.875); max.Pl1Active.Should().BeTrue(); max.SansLimite.Should().BeTrue();
-        // Contre-revue : « sans limite » vient du champ brut, pas des watts : avec une unité d'un seizième, 0x7FFF vaut 2 047 W et reste « sans limite ».
+        // « sans limite » vient du champ brut, pas des watts : avec une unité d'un seizième, 0x7FFF vaut 2 047 W et reste « sans limite ».
         TemperaturePawnIo.DecoderLimites(0x4, 0x7FFFUL, 520UL)!.SansLimite.Should().BeTrue();
         TemperaturePawnIo.DecoderLimites(0x3, 280UL, 520UL)!.SansLimite.Should().BeFalse("35 W avec le bit 15 à zéro : une limite, pas « sans limite »");
     }
 
+
+    // La seconde du processeur, lue sur la vraie machine.
+    // La seconde du processeur porte le ventilateur CPU (en-tête 0, CPU_FAN sur les cartes lues), en admin comme
+    // par le service ; sans ventilateurs lus, la seconde reste entière, sans ventilateur.
     [Fact]
+    public void La_seconde_du_processeur_porte_le_ventilateur_CPU_quand_il_est_lu()
+    {
+        var e = new EtatCpu(98, 77, true, false, false, false);
+        TemperaturePawnIo.AvecVentilo(e, [new VentilateurLu(5, 1210, 21), new VentilateurLu(0, 1265, 55)])!.VentiloCpu
+            .Should().Be(new VentilateurLu(0, 1265, 55));
+        TemperaturePawnIo.AvecVentilo(e, null).Should().Be(e);
+        TemperaturePawnIo.AvecVentilo(null, [new VentilateurLu(0, 1265, 55)]).Should().BeNull("pas d'état : pas de seconde");
+        // Des ventilateurs HWiNFO (sans cycle) : gardés pour les arrêts, jamais pris pour celui du processeur.
+        var hw = TemperaturePawnIo.AvecVentilo(e, [new VentilateurLu(100, 1180, null, "CPU")])!;
+        hw.VentiloCpu.Should().BeNull();
+        hw.Ventilateurs.Should().ContainSingle();
+    }
+
+    [FactSiPawnIoLisible]
+    [Trait("Category", "Machine")]
+    public void Sur_cette_machine_l_etat_du_processeur_se_lit_avec_le_coeur_0()
+    {
+        var e = TemperaturePawnIo.LireEtat();
+        e.Should().NotBeNull();
+        e!.ChaudC.Should().BeInRange(15, 105);
+        e.Coeur0C.Should().NotBeNull().And.BeLessThanOrEqualTo(e.ChaudC + 1);
+    }
+
+    [FactSiPawnIoLisible]
     [Trait("Category", "Machine")]
     public void Sur_cette_machine_PawnIO_donne_des_limites_plausibles()
     {
-        if (!TemperaturePawnIo.Installe() || !TemperaturePawnIo.ProcesseurIntel()) return;
 
         var lu = TemperaturePawnIo.LireLimites();
 
@@ -112,12 +139,11 @@ public sealed class TemperaturePawnIoTests
         lu!.Pl1W.Should().BeInRange(10, 1000); lu.Pl2W.Should().BeGreaterThanOrEqualTo(lu.Pl1W); lu.NominaleW.Should().BeInRange(10, 500);
     }
 
-    // B1 (10/10/2026) : la copie MMIO de la limite, lue sur la vraie machine, et comparée au registre MSR (lecture seule).
-    [Fact]
+    // La copie MMIO de la limite, lue sur la vraie machine, et comparée au registre MSR (lecture seule).
+    [FactSiPawnIoLisible]
     [Trait("Category", "Machine")]
     public void Sur_cette_machine_la_copie_MMIO_de_la_limite_se_lit_et_se_compare_au_registre()
     {
-        if (!TemperaturePawnIo.Installe() || !TemperaturePawnIo.ProcesseurIntel()) return;
         var lu = TemperaturePawnIo.LireLimites();
         Console.WriteLine("MCHBAR : " + DrDxt.GpuNative.PawnIo.PawnIoIntel.DiagnostiquerMchbar());
         Console.WriteLine($"MSR : {lu?.Pl1W} W / {lu?.Pl2W} W, verrou {lu?.Verrou} ; copie MMIO PL1 : {lu?.CopieMmioPl1W} W ; max 0x614 : {lu?.MaximaleW} W");
@@ -125,17 +151,58 @@ public sealed class TemperaturePawnIoTests
         lu!.CopieMmioPl1W.Should().NotBeNull("la fenêtre MCHBAR se lit sur cette machine");
     }
 
-    /// <summary>La preuve sur la machine : PawnIO installé ici (09/10/2026), un processeur Intel ⇒ une vraie température.</summary>
-    [Fact]
+    /// <summary>La preuve sur la machine : PawnIO installé ici, un processeur Intel ⇒ une vraie température.</summary>
+    [FactSiPawnIoLisible]
     [Trait("Category", "Machine")]
     public void Sur_cette_machine_PawnIO_donne_une_temperature_plausible()
     {
-        if (!TemperaturePawnIo.Installe() || !TemperaturePawnIo.ProcesseurIntel()) return;
 
         var lu = TemperaturePawnIo.Lire();
 
         lu.Should().NotBeNull("PawnIO est installé et le processeur est Intel : les registres se lisent");
         lu!.Celsius.Should().BeInRange(15, 105);
         lu.Libelle.Should().Be(TemperaturePawnIo.Libelle);
+    }
+}
+
+/// <summary>Un test de la vraie machine qui ne peut rien lire ici (pas de PawnIO, pas Intel,
+/// pas administrateur) se dit IGNORÉ avec sa raison, au lieu de passer au vert sans rien avoir vérifié. xUnit 2 : la
+/// condition se lit à la découverte, sans paquet de plus.</summary>
+public sealed class FactSiPawnIoLisibleAttribute : FactAttribute
+{
+    public FactSiPawnIoLisibleAttribute()
+    {
+        var admin = new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
+            .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+        if (!TemperaturePawnIo.Installe()) Skip = "PawnIO n'est pas installé sur cette machine";
+        else if (!TemperaturePawnIo.ProcesseurIntel()) Skip = "processeur non Intel : les registres lus sont ceux d'Intel";
+        else if (!admin) Skip = "session sans droits administrateur : PawnIO ne répond qu'à un processus élevé";
+    }
+}
+
+/// <summary>La seconde du processeur lue sur la vraie machine porte le ventilateur CPU (carte MSI à puce NCT6687).</summary>
+public sealed class SecondeAvecVentiloSurLaVraieCarteTests
+{
+    [FactSiCarteMsiEtPawnIo]
+    [Trait("Category", "Machine")]
+    public void La_seconde_lue_porte_un_ventilateur_CPU_qui_tourne()
+    {
+        var e = TemperaturePawnIo.LireEtat();
+        e.Should().NotBeNull();
+        e!.VentiloCpu.Should().NotBeNull();
+        e.VentiloCpu!.TrMin.Should().BeGreaterThan(200);
+    }
+}
+
+public sealed class FactSiCarteMsiEtPawnIoAttribute : FactAttribute
+{
+    public FactSiCarteMsiEtPawnIoAttribute()
+    {
+        Skip = new FactSiPawnIoLisibleAttribute().Skip;
+        if (Skip is not null) return;
+        using var bios = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
+        var fabricant = bios?.GetValue("BaseBoardManufacturer") as string ?? "";
+        if (!fabricant.Contains("Micro-Star", StringComparison.OrdinalIgnoreCase))
+            Skip = $"carte « {fabricant} » : la puce NCT6687 est celle des cartes MSI";
     }
 }

@@ -4,36 +4,33 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// NS-4 — réparer un fichier d'échange désactivé.
+// Réparer un fichier d'échange désactivé.
 //
 // « Couper le pagefile pour gagner des FPS » est un mythe répandu, classé comme tel par la
-// recherche du projet (non publiée). Le problème est qu'un mythe écarté côté catalogue
-// laisse quand même la machine cassée quand l'utilisateur l'a appliqué avant d'installer
-// DrDXT : à la limite de commit, Windows tombe en manque de mémoire — freeze, crash, et
-// l'utilisateur accuse le jeu.
+// recherche du projet (non publiée). Écarté du catalogue, il laisse quand même la machine cassée
+// quand l'utilisateur l'a appliqué avant d'installer DrDXT : à la limite de commit, Windows tombe
+// en manque de mémoire (gel, plantage), et l'utilisateur accuse le jeu.
 //
-// Le scan le DIAGNOSTIQUE depuis longtemps (`Finding.Memory.PagefileDisabled`) sans jamais
-// le réparer. Le commentaire du code disait que restaurer « géré par le système » exigeait
-// une op WMI hors du modèle d'op typée : c'était faux — la configuration vit dans une simple
-// valeur de registre, `PagingFiles`, que le lecteur du produit lit déjà. Le vrai obstacle
-// était que l'op typée ne savait pas écrire de REG_MULTI_SZ ; c'est réglé, et la feuille
-// reste unique (allowlist feuille-exacte).
+// Le scan le signale (`Finding.Memory.PagefileDisabled`). La configuration vit dans une simple
+// valeur de registre, `PagingFiles` (REG_MULTI_SZ), que le lecteur du produit lit déjà ; pas besoin
+// d'op WMI. La feuille reste unique (allowlist à la feuille exacte).
 //
-// Honnêteté : c'est un levier de FIABILITÉ, jamais un gain d'images. Sa phrase ne parle pas
-// de FPS, et il ne prend effet qu'au redémarrage.
+// C'est un levier de fiabilité, jamais un gain d'images. Sa phrase ne parle pas de FPS, et il ne
+// prend effet qu'au redémarrage.
 // -----------------------------------------------------------------------
+/// <summary>Rend à Windows la gestion du fichier d'échange (`PagingFiles`) quand il est lu désactivé ; effet au redémarrage.</summary>
 public sealed class SanePagefileTweak : ITweak
 {
     private const string MemoryManagementPath =
         @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
     private const string PagingFilesName = "PagingFiles";
 
-    // La valeur EXACTE que Windows lui-même écrit quand « Gestion automatique du fichier
+    // La valeur exacte que Windows lui-même écrit quand « Gestion automatique du fichier
     // d'échange pour tous les lecteurs » est cochée. Relevée sur une machine réelle
     // (Windows 11 26200, gestion automatique active) : `?:\pagefile.sys`, sans taille.
     //
-    // Une première version écrivait `?:\pagefile.sys 0 0` : la forme « 0 0 » existe, mais elle décrit
-    // une taille gérée par le système sur un lecteur NOMMÉ (`C:\pagefile.sys 0 0`), pas la
+    // La forme `?:\pagefile.sys 0 0` n'est pas la bonne : « 0 0 » existe, mais décrit
+    // une taille gérée par le système sur un lecteur nommé (`C:\pagefile.sys 0 0`), pas la
     // gestion automatique. Écrire une forme voisine mais non canonique laisserait la machine
     // dans un état que l'interface de Windows ne produit jamais. Le `?:` est le marqueur de
     // l'automatique : c'est Windows qui choisit le lecteur et la taille.
@@ -62,7 +59,7 @@ public sealed class SanePagefileTweak : ITweak
     public bool AppliesTo(HardwareInventory hw, SettingsState state) =>
         state.PagefileConfigured == TriState.Off;
 
-    /// <summary>Revue n° 14 : illisible n'est pas « déjà bon ».</summary>
+    /// <summary>Illisible n'est pas « déjà bon ».</summary>
     public bool EtatNonLu(SettingsState state) => state.PagefileConfigured == TriState.Unknown;
 
     public async Task<Result<TweakSnapshot>> ApplyAsync()

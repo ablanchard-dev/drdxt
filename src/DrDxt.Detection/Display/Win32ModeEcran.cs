@@ -4,7 +4,7 @@ using DrDxt.Application.Tweaks.Hardware;
 namespace DrDxt.Detection.Display;
 
 /// <summary>
-/// L-ECRAN : le mode d'un écran, lu par EnumDisplaySettings et posé par ChangeDisplaySettingsEx (user32). Sans droits :
+/// Le mode d'un écran, lu par EnumDisplaySettings et posé par ChangeDisplaySettingsEx (user32). Sans droits :
 /// sans CDS_GLOBAL, CDS_UPDATEREGISTRY range le mode dans le profil de l'utilisateur (Microsoft Learn). Le mode posé
 /// part du mode courant, dont seule la fréquence change ; résolution et profondeur sont redites pour que le pilote ne
 /// choisisse pas à notre place.

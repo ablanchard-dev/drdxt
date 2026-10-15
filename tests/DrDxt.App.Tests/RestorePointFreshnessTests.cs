@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 14/09/2026 — le point de restauration qui protege un changement : le plus recent cree depuis le debut
+// Le point de restauration qui protege un changement : le plus recent cree depuis le debut
 // de la fenetre (24 h avant la demande, la ou Windows refuse d'en creer un nouveau). Format de date lu sur
 // le poste : « 20260911222955.512634-000 ».
 public sealed class RestorePointFreshnessTests

@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. `installer/README-testeur.txt` est le seul texte qu'un testeur lit
+// `installer/README-testeur.txt` est le seul texte qu'un testeur lit
 // avant de lancer DrDXT. Quarante lignes, six affirmations verifiables sur le
 // produit, et aucun test : elles n'etaient tenues que par la memoire de celui
 // qui les a ecrites.
@@ -81,7 +81,7 @@ public sealed class LeReadmeDuTesteurDitVraiTests
     {
         Readme().Should().Contain("mode manuel", "c'est ce que le testeur lit avant d'installer");
 
-        // 27/09/2026 : le script cree aussi, sur choix, le service de demarrage. La promesse du README
+        // Le script cree aussi, sur choix, le service de demarrage. La promesse du README
         // porte sur le service de MESURE : on lit donc les modes des seuls appels sc qui le visent.
         var modes = Regex.Matches(IssExecutable(), @"'(?:create|config) \{#PmService\}[^;]*?start=\s*([a-z]+)", RegexOptions.Singleline)
             .Select(m => m.Groups[1].Value)

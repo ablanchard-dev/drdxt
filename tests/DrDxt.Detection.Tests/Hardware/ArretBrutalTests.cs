@@ -7,8 +7,8 @@ namespace DrDxt.Detection.Tests.Hardware;
 /// Un `Kernel-Power 41` n'est pas muet : ses donnees disent s'il y a eu un ecran bleu (code d'arret),
 /// un appui long sur le bouton (horodatage du bouton), ou une transition d'alimentation en cours.
 /// Doc Microsoft « Event ID 41 The system has rebooted without cleanly shutting down first »,
-/// mise a jour du 12/02/2026. Les XML ci-dessous reprennent la forme des evenements reels lus le
-/// 16/09/2026 sur la machine de reference.
+/// version du 12/02/2026. Les XML ci-dessous reprennent la forme des evenements reels
+/// releves le 16/09/2026 sur la machine de reference.
 /// </summary>
 public sealed class ArretBrutalTests
 {

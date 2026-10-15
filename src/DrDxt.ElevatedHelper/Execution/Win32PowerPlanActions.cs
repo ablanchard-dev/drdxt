@@ -5,13 +5,13 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Execution;
 
 // -----------------------------------------------------------------------
-// Win32PowerPlanActions — the real active power-plan switch (m2smoke boundary).
+// Win32PowerPlanActions : le vrai changement de plan d'alimentation actif (frontière du m2smoke).
 //
-// PowerSetActiveScheme(powrprof.dll) with the requested GUID. The GUID was
-// already validated by the allowlist against the known Windows plan set. Any
-// non-zero Win32 result → HELPER.OP_FAILED; this never throws.
+// PowerSetActiveScheme(powrprof.dll) avec le GUID demandé. Le GUID est déjà validé par
+// l'allowlist contre l'ensemble connu des plans Windows. Tout résultat Win32 non nul →
+// HELPER.OP_FAILED ; ne lève jamais.
 //
-// 07/10/2026 (revue F-28) : activer un plan peut remettre le « mode d'alimentation » de Windows 11 (Meilleure
+// Activer un plan peut remettre le « mode d'alimentation » de Windows 11 (Meilleure
 // autonomie, Équilibré, Meilleures performances ; autrefois « overlay ») à son défaut. Microsoft Learn documente sa lecture
 // et son écriture : PowerGetUserConfiguredACPowerMode / PowerSetUserConfiguredACPowerMode (powrprof.dll, Windows 11).
 // Le mode sur secteur est lu avant chaque activation ; s'il a bougé, il est reposé, puis relu. Avant Windows 11 (fonction
@@ -43,8 +43,8 @@ public sealed class Win32PowerPlanActions : IPowerPlanActions
     {
         try
         {
-            // Revue F-36 : plan activé mais mode d'alimentation pas reposé = l'op est dite ratée ; le plan d'avant
-            // revient, et le mode d'avant est retenté (revue du 07/10 : seul le plan revenait).
+            // Plan activé mais mode d'alimentation pas reposé = l'op est dite ratée ; le plan d'avant
+            // Revient, et le mode d'avant est retenté.
             var avant = _alimentation.PlanActif();
             var mode = _alimentation.ModeSecteur();
             var r = ActiverEnGardantLeMode(planGuid);
@@ -58,13 +58,13 @@ public sealed class Win32PowerPlanActions : IPowerPlanActions
         }
     }
 
-    // 07/10/2026 (L-CPU) : la valeur secteur de PERFBOOSTMODE dans ce plan (valeur deja bornee par l'allowlist).
+    // La valeur secteur de PERFBOOSTMODE dans ce plan (valeur deja bornee par l'allowlist).
     // Microsoft Learn (PowerWriteACValueIndex) : la valeur du plan actif ne prend effet qu'apres PowerSetActiveScheme ;
     // un autre plan n'est jamais active ici.
     public Result SetBoostModeAc(Guid planGuid, uint acValue)
         => EcrireValeurDePlanAc(planGuid, SousGroupeProcesseur, ModeDeBoostLu.Reglage, acValue, "Boost mode");
 
-    // B3 (10/10/2026) : meme chemin, autre reglage du plan : l'economie d'energie de la carte sans fil, secteur seulement.
+    // Meme chemin, autre reglage du plan : l'economie d'energie de la carte sans fil, secteur seulement.
     public Result SetWirelessPowerSavingAc(Guid planGuid, uint acValue)
         => EcrireValeurDePlanAc(planGuid, EconomieSansFilLue.SousGroupe, EconomieSansFilLue.Reglage, acValue, "Wireless power saving");
 
@@ -75,7 +75,7 @@ public sealed class Win32PowerPlanActions : IPowerPlanActions
             // Le plan actif est lu avant d'ecrire : non lu, on ne saurait pas s'il faut le reactiver, et une valeur ecrite
             // sans effet passerait pour posee.
             if (_alimentation.PlanActif() is not { } actif) return Fail($"Active power plan unread: {libelle} not written.");
-            // Revue F-36 : la valeur d'avant, relue, pour la rendre si la suite échoue (une op « ratée » ne laisse rien).
+            // La valeur d'avant, relue, pour la rendre si la suite échoue (une op « ratée » ne laisse rien).
             if (_alimentation.LireValeurSecteur(planGuid, sousGroupe, reglage) is not { } avant)
                 return Fail($"{libelle} unread: not written.");
             var mode = _alimentation.ModeSecteur();
@@ -152,7 +152,7 @@ public sealed class Win32PowerPlanActions : IPowerPlanActions
         private static extern uint PowerWriteACValueIndex(IntPtr rootPowerKey, ref Guid schemeGuid,
             ref Guid subGroupOfPowerSettingsGuid, ref Guid powerSettingGuid, uint acValueIndex);
 
-        // ERROR_SUCCESS (0) on success; a Win32 error code otherwise.
+        // ERROR_SUCCESS (0) en cas de succès ; un code d'erreur Win32 sinon.
         [DllImport("powrprof.dll", SetLastError = false)]
         private static extern uint PowerSetActiveScheme(IntPtr userRootPowerKey, ref Guid schemeGuid);
 

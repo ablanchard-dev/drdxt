@@ -16,7 +16,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 11/09/2026 (lot 6e) — l'apply inscrit l'origine complete des composites.
+// L'apply inscrit l'origine complete des composites.
 //
 // Le chemin Apply n'inscrivait qu'une valeur posee par levier : celle que le reconciliateur reaffirme au
 // demarrage (pour X3D, le service). Les deux autres feuilles du levier (CppcEnable, Game Bar) avaient une
@@ -94,7 +94,7 @@ public sealed class OrigineCompleteDesCompositesTests : IDisposable
         verificateur.IsOk.Should().BeTrue();
 
         // La machine porte encore ce que DrDXT y a pose : service demarre, Game Bar = 1. CppcEnable
-        // n'est plus ecrit depuis le 24/09/2026.
+        // n'est plus ecrit.
         var lecture = new LectureFactice
         {
             ["service|AMD3DVCacheSvc"] = "running",

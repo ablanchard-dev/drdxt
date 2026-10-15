@@ -27,8 +27,8 @@ public class RepairJournalServiceTests : IDisposable
     private static RepairFinding Constat(string domaine, string nom, string? valeur, RepairStatus statut)
         => new(domaine, nom, valeur, null, statut, "parce que.");
 
-    // 26/09/2026 : cette phrase est affichee. Sa jumelle du ViewModel avait ete corrigee le 17/09
-    // (accents, pas de capitales d'insistance) ; celle-ci, hors de la garde des ViewModels, non.
+    // Cette phrase est affichee, comme sa jumelle du ViewModel (accents, pas de capitales d'insistance) ;
+    // celle-ci est hors de la garde des ViewModels, d'ou ce test.
     [Fact]
     public void Un_historique_illisible_se_dit_inconnu_en_francais_correct()
     {
@@ -40,7 +40,7 @@ public class RepairJournalServiceTests : IDisposable
         journal!.Avertissement.Should().Contain("Ce qui a changé depuis la dernière fois est inconnu, pas vide.");
     }
 
-    // 26/09/2026 : l'historique se relit sans controle par entree. Un fichier ampute (entree nulle, photo
+    // L'historique se relit sans controle par entree. Un fichier ampute (entree nulle, photo
     // sans ses listes) ne doit jamais faire tomber le scan : il se dit illisible, comme un JSON casse.
     [Theory]
     [InlineData("[null]")]
@@ -172,7 +172,7 @@ public class RepairJournalServiceTests : IDisposable
     [Fact]
     public void Une_mise_a_jour_du_lecteur_entre_deux_photos_est_dite_et_survit_au_disque()
     {
-        // 16/09/2026 : « arrets brutaux 11 → 10 » venait du produit, pas de la machine. L'empreinte
+        // « arrets brutaux 11 → 10 » venait du produit, pas de la machine. L'empreinte
         // du lecteur est ecrite avec la photo et RELUE du disque au passage suivant.
         new RepairJournalService(new RepairHistoryStore(_chemin), () => null, empreinteLecteur: "ancien")
             .EnregistrerEtComparer([Constat("STABILITE", "arrets brutaux", "11 sur 90 jours", RepairStatus.Suspicious)]);
@@ -186,7 +186,7 @@ public class RepairJournalServiceTests : IDisposable
     [Fact]
     public void Sans_rien_de_change_il_n_y_a_rien_a_nuancer()
     {
-        // 23/09/2026, scan réel : « Ce qui a changé depuis la dernière fois » s'affichait avec un
+        // Scan réel : « Ce qui a changé depuis la dernière fois » s'affichait avec un
         // compteur à 0, un chevron qui n'ouvrait rien, et en orange « DrDXT a été mis à jour entre
         // les deux photos. Un changement de valeur ou de jugement peut venir de sa nouvelle façon de
         // lire ». Une mise en garde sur des changements qui n'existent pas. La mise à jour du lecteur
@@ -206,7 +206,7 @@ public class RepairJournalServiceTests : IDisposable
     [Fact]
     public void Ce_qu_une_photo_sans_droits_n_a_pas_pu_lire_ne_passe_pas_pour_un_changement()
     {
-        // 16/09/2026, capture d'écran : la photo d'avant venait d'un outil lance en administrateur,
+        // Capture d'écran : la photo d'avant venait d'un outil lance en administrateur,
         // celle d'apres de l'appli sans droits. La famille BCD « disparue » et la latence DPC
         // « Suspicious → Unknown » n'etaient que des lectures impossibles.
         new RepairJournalService(new RepairHistoryStore(_chemin), () => null, eleve: true)

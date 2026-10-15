@@ -5,22 +5,19 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// R2 (RISKY half) — NvApiTuningActions: what we CAN prove without a GPU.
+// NvApiTuningActions : ce qui se prouve sans carte graphique.
 //
-// The native NVAPI boundary (the reverse-engineered SetPstates20 /
-// ClientPowerPoliciesSetStatus recipe, the interop struct sizes, the P0-clock finder,
-// and the MHz/% unit conversions) now lives in DrDxt.GpuNative (NvApiNative) and is
-// pinned by DrDxt.GpuNative.Tests. What remains testable here is the helper-side
-// orchestrator + policy:
-//
-//   1. Fail-clean contract — the read-only Get* methods never throw and return a
-//      Result; on a box without NVAPI they fail clean (HELPER.OP_FAILED). Safe to run
-//      on a real NVIDIA box (read-only).
-//   2. POLICY RAILS — the conservative offset / power bands (NvApiTuningMath) the
-//      elevated write re-checks before it ever reaches the native boundary.
-//
-// We deliberately DO not call SetCoreClockOffset / SetPowerLimitPercent here — a unit
-// test must never write a clock/power delta to a real GPU.
+// La frontière native NVAPI (la recette SetPstates20 / ClientPowerPoliciesSetStatus issue
+// de la rétro-ingénierie, les tailles de structures interop, la recherche de l'horloge P0
+// et les conversions MHz/%) vit dans DrDxt.GpuNative (NvApiNative) et est figée par
+// DrDxt.GpuNative.Tests. Reste testable ici l'orchestrateur et la politique côté helper :
+//   1. Contrat d'échec propre : les Get* en lecture seule ne lèvent jamais et renvoient un
+//      Result ; sur une machine sans NVAPI ils échouent proprement (HELPER.OP_FAILED). Sûr
+//      sur une vraie machine NVIDIA (lecture seule).
+//   2. Rails de politique : les bandes prudentes de décalage et de puissance (NvApiTuningMath)
+//      que l'écriture élevée revérifie avant d'atteindre la frontière native.
+// SetCoreClockOffset et SetPowerLimitPercent ne sont pas appelés ici : un test unitaire
+// n'écrit jamais un delta d'horloge ou de puissance sur une vraie carte.
 // -----------------------------------------------------------------------
 public sealed class NvApiTuningActionsContractTests
 {
@@ -50,10 +47,9 @@ public sealed class NvApiTuningActionsContractTests
     [Fact]
     public void GetCoreClockOffsetMhz_on_a_box_without_nvapi_fails_clean()
     {
-        // CI/dev runners (no NVIDIA): expected path is a clean HELPER.OP_FAILED, never
-        // a throw. Guarded so it stays correct on a machine that DOES have an NVIDIA
-        // driver (there the read may legitimately succeed — we only pin the no-NVIDIA
-        // fail-clean shape).
+        // Runners CI et postes sans NVIDIA : le chemin attendu est un HELPER.OP_FAILED propre, jamais
+        // une exception. Gardé pour rester juste sur une machine qui a bien un pilote NVIDIA (là, la
+        // lecture peut légitimement réussir ; seul le profil d'échec propre sans NVIDIA est figé).
         var result = new NvApiTuningActions().GetCoreClockOffsetMhz(0);
 
         if (!result.IsOk)
@@ -75,8 +71,8 @@ public sealed class NvApiTuningActionsContractTests
 
 public sealed class NvApiTuningRailTests
 {
-    // The hard safety rails are pure and must never throw — int.MinValue (no Math.Abs!)
-    // and NaN (all NaN comparisons are false) are the traps the red-team flagged.
+    // Les rails durs sont purs et ne doivent jamais lever : int.MinValue (pas de Math.Abs !)
+    // et NaN (toute comparaison avec NaN est fausse) sont les deux pièges.
     [Fact]
     public void Core_offset_rail_accepts_a_normal_undervolt_offset() =>
         NvApiTuningMath.IsCoreOffsetWithinHardRail(-120).Should().BeTrue();
@@ -110,7 +106,7 @@ public sealed class NvApiTuningRailTests
     public void Power_rail_rejects_an_absurd_percent() =>
         NvApiTuningMath.IsPowerPercentWithinHardRail(500).Should().BeFalse();
 
-    // 26/09/2026 : la borne BASSE n'etait tenue par aucun test. C'est elle qui borne ce qu'un op eleve peut
+    // La borne BASSE n'etait tenue par aucun test. C'est elle qui borne ce qu'un op eleve peut
     // faire de la limite de puissance (l'allowlist accepte 0 a 100 %) : ramenee a 0, rien ne l'aurait vu.
     [Theory]
     [InlineData(49.9, false)]

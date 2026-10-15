@@ -3,7 +3,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// 24/09/2026 — quatre dépendances de `PrivilegedOpExecutor` sont optionnelles : absentes, leurs
+// Quatre dépendances de `PrivilegedOpExecutor` sont optionnelles : absentes, leurs
 // ops échouent honnêtement (« not wired »). Le produit ne tient donc que si le helper réel les
 // branche. `Program.cs` est un programme de haut niveau, pas instanciable ici : ce test lit la
 // construction de l'exécuteur et exige les quatre. Un oubli rendait « Redémarrer vers le BIOS »,
@@ -25,7 +25,8 @@ public class LeHelperBrancheSesQuatrePortesTests
     [InlineData("new ManifestCommitActions()")]
     [InlineData("new Win32NetworkQosActions()")]
     [InlineData("new Win32BcdActions()")]
-    // 28/09/2026 : la cinquieme, le reglage que porte le service de demarrage.
+    [InlineData("new Win32PnpActions()")]
+    // La cinquieme, le reglage que porte le service de demarrage.
     [InlineData("PlafondEnvoiDuService.ParDefaut()")]
     public void Le_helper_reel_branche_la_porte(string porte)
     {

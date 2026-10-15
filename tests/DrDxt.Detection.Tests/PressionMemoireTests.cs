@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests;
 
-/// <summary>BUREAU (09/10/2026) : la mémoire se lit sur la vraie machine qui lance la suite, sans droits et sans écriture.
+/// <summary>La mémoire se lit sur la vraie machine qui lance la suite, sans droits et sans écriture.
 /// C'est la preuve « lue sur un vrai PC » demandée par la ligne.</summary>
 public sealed class PressionMemoireTests
 {

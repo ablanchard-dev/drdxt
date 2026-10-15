@@ -7,9 +7,9 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// NS-1 — GameModeOnTweak. Enables Windows Game Mode by writing both GameBar leaves
-// (AllowAutoGameMode + AutoGameModeEnabled) = 1 via a composite snapshot; reboot-
-// required (deferred A/B proof). Pure unit tests with NSubstitute fakes.
+// GameModeOnTweak. Active le Mode Jeu de Windows en écrivant les deux feuilles GameBar
+// (AllowAutoGameMode + AutoGameModeEnabled) = 1 via un instantané composite ; redémarrage
+// requis (preuve A/B différée). Tests unitaires purs avec des faux NSubstitute.
 // -----------------------------------------------------------------------
 public sealed class GameModeOnTweakTests
 {
@@ -34,7 +34,7 @@ public sealed class GameModeOnTweakTests
 
     private GameModeOnTweak Build()
     {
-        // Originals: AllowAutoGameMode = 0 (off), AutoGameModeEnabled absent.
+        // Origines : AllowAutoGameMode = 0 (désactivé), AutoGameModeEnabled absent.
         _registry.ReadDword(RegistryHiveKind.CurrentUser, GameBarPath, AllowName)
             .Returns(Result<uint?>.Ok(0u));
         _registry.ReadDword(RegistryHiveKind.CurrentUser, GameBarPath, EnabledName)
@@ -112,10 +112,10 @@ public sealed class GameModeOnTweakTests
         var ops = CompositeSnapshotCodec.Decode(r.Value!.OriginalValueJson);
         ops.IsOk.Should().BeTrue();
         ops.Value.Should().HaveCount(2);
-        // AllowAutoGameMode original 0 → restore to "0".
+        // AllowAutoGameMode d'origine 0 → rendu à « 0 ».
         ops.Value.OfType<SetRegistryValueOp>()
             .Should().ContainSingle(s => s.Name == AllowName && s.Value == "0");
-        // AutoGameModeEnabled was absent → faithful revert deletes it.
+        // AutoGameModeEnabled était absent → le retour fidèle le supprime.
         ops.Value.OfType<DeleteRegistryValueOp>()
             .Should().ContainSingle(d => d.Name == EnabledName);
     }
@@ -138,7 +138,7 @@ public sealed class GameModeOnTweakTests
     public async Task Apply_rolls_back_the_first_leaf_when_the_second_write_fails()
     {
         var t = Build();
-        // First write (Allow) succeeds; second (Enabled) fails → the Allow leaf must be rolled back.
+        // La première écriture (Allow) réussit ; la seconde (Enabled) échoue → la feuille Allow doit être annulée.
         _elevated.ExecuteAsync(
                 Arg.Is<SetRegistryValueOp>(o => o.Name == EnabledName && o.Value == "1"),
                 Arg.Any<CancellationToken>())
@@ -148,7 +148,7 @@ public sealed class GameModeOnTweakTests
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
-        // Rollback restored AllowAutoGameMode to its original "0".
+        // Le rollback a rendu AllowAutoGameMode à son « 0 » d'origine.
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<SetRegistryValueOp>(o => o.Name == AllowName && o.Value == "0"),
             Arg.Any<CancellationToken>());

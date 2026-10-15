@@ -5,19 +5,19 @@ using DrDxt.Tools.CpuBench;
 // ============================================================================================
 // LE BANC CPU DETERMINISTE — et la courbe qui dit si la puissance bride ce processeur.
 //
-// POURQUOI CE BANC EXISTE. Le 09/09/2026, une heure de mesure EN PARTIE EN LIGNE a produit un
-// faux gain : deux A/B/A identiques ont rendu « +42 % » puis « -70 % » sur le 1 % low, et les
-// temoins seuls variaient de 32 a 84 images. La meme question, posee a une charge DETERMINISTE,
-// a ete tranchee en trois minutes a 450 fois le bruit. Ce banc est la traduction de cette lecon.
+// POURQUOI CE BANC EXISTE. Une mesure EN PARTIE EN LIGNE produit de faux gains (mesure le 09/09/2026 :
+// deux A/B/A identiques rendent « +42 % » puis « -70 % » sur le 1 % low, les temoins seuls varient
+// de 32 a 84 images). La meme question, posee a une charge DETERMINISTE, se tranche en trois minutes
+// a 450 fois le bruit.
 //
 // ══ LA COURBE, ET CE QU'ELLE SEPARE — AVEC UNE CONDITION ══
 // On charge 1, 2, 4, 8 puis 12 cœurs, et on regarde le debit PAR THREAD. S'il s'effondre quand on
 // ajoute des cœurs, un BUDGET (puissance ou thermique) bride ; s'il reste plat, il n'y en a pas.
 //
-// MAIS CETTE LECTURE N'EST VALABLE QU'AVEC `--lourd`, ET CA A ETE PAYE LE 09/09/2026. Avec la
-// charge legere, huit cœurs charges tournent a 5 297 MHz et le debit par thread ne bouge pas de
-// 0,4 % — le banc conclurait « rien ne bride ». Les memes huit cœurs, charges par des processus
-// PowerShell, tombaient a 3 698 MHz. Les deux mesures etaient justes : **ce n'est pas le NOMBRE de
+// MAIS CETTE LECTURE N'EST VALABLE QU'AVEC `--lourd`. Mesure le 09/09/2026 : avec la charge legere,
+// huit cœurs charges tournent a 5 297 MHz et le debit par thread ne bouge pas de 0,4 % (le banc
+// conclurait « rien ne bride ») ; les memes huit cœurs, charges par des processus PowerShell,
+// tombent a 3 698 MHz. Les deux mesures sont justes : **ce n'est pas le NOMBRE de
 // cœurs qui fait tomber la frequence, c'est la PUISSANCE que la charge appelle.** Un banc qui ne
 // consomme rien mesure le plafond de boost et se tait sur le budget.
 //

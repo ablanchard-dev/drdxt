@@ -6,11 +6,11 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// I4 fail-CLOSED end to end (plan T20 second leg, T26 host behaviour pre-figured):
-// the only way the reconciler gets a manifest is via IDesiredStateStore.LoadAsync,
-// which VERIFIES integrity. A tampered manifest makes LoadAsync fail → the host must
-// Not reconcile → ZERO privileged writes. This stitches the signed store to the
-// reconcile loop and proves "tamper ⇒ nothing applied".
+// Fermeture de bout en bout :
+// la seule façon pour le réconciliateur d'obtenir un manifeste est IDesiredStateStore.LoadAsync,
+// qui vérifie l'intégrité. Un manifeste altéré fait échouer LoadAsync → l'hôte ne doit pas
+// réconcilier → zéro écriture privilégiée. Ceci coud le magasin signé à la boucle de
+// réconciliation et prouve « altéré ⇒ rien d'appliqué ».
 // -----------------------------------------------------------------------
 public sealed class FailClosedEndToEndTests
 {
@@ -26,29 +26,29 @@ public sealed class FailClosedEndToEndTests
         var store = new SignedDesiredStateStore(
             storage, keys.Signer(), keys.Verifier(), policy, new FakeClock());
 
-        // Commit a valid manifest with a drifted-to-stock item.
+        // Committer un manifeste valide avec un élément dérivé vers l'origine.
         var desired = new DesiredState(new[] { new AppliedTweak("a", "1", "0", At) });
         (await store.CommitAsync(desired)).IsOk.Should().BeTrue();
 
-        // Tamper the persisted content.
+        // Altérer le contenu persisté.
         var slot = storage.Slot!;
         var chars = slot.CanonicalJson.ToCharArray();
         chars[chars.Length / 2] = chars[chars.Length / 2] == 'x' ? 'y' : 'x';
         storage.Slot = slot with { CanonicalJson = new string(chars) };
 
-        // The host's load: it must fail-closed.
+        // Le chargement de l'hôte : il doit se fermer.
         var loaded = await store.LoadAsync();
         loaded.IsOk.Should().BeFalse();
         loaded.Error!.Value.Code.Should().Be(ErrorCodes.ManifestTampered);
 
-        // Because load failed, the host never calls ReconcileAsync. Prove that the
-        // reconciler — had it been (wrongly) handed the *attacker's* DesiredState —
-        // is never reached: we simply assert the host gate. The reconcile client is
-        // an in-memory recorder that must have ZERO writes.
+        // Comme le chargement a échoué, l'hôte n'appelle jamais ReconcileAsync. Prouver que le
+        // réconciliateur, s'il avait reçu (à tort) le DesiredState de l'attaquant, n'est jamais
+        // atteint : on vérifie simplement la porte de l'hôte. Le client de réconciliation est
+        // un enregistreur en mémoire qui doit avoir zéro écriture.
         var h = new ReconcilerHarness();
         h.Policy.Map("a", ReconcileSurface.Registry);
 
-        // Simulate the host's correct control flow: only reconcile on a verified load.
+        // Simuler le bon flux de contrôle de l'hôte : ne réconcilier que sur un chargement vérifié.
         if (loaded.IsOk)
             await h.Build().ReconcileAsync(loaded.Value!, default);
 
@@ -58,7 +58,7 @@ public sealed class FailClosedEndToEndTests
     [Fact]
     public async Task ValidManifest_LoadSucceeds_ReconcilerRepairsDrift()
     {
-        // The positive control: a VALID manifest loads and a drifted item is repaired.
+        // Le témoin positif : un manifeste valide se charge et un élément dérivé est réparé.
         var keys = new FakeKeyPair();
         var storage = new InMemoryManifestStorage();
         var policy = new FakePolicy().Map("a", ReconcileSurface.Registry);
@@ -76,8 +76,8 @@ public sealed class FailClosedEndToEndTests
             Items = new[] { new ReconcilerItemState("a", false, "22631.3447", "555.99", At, "OK") },
         });
         h.Policy.Map("a", ReconcileSurface.Registry);
-        h.BuildProbe.Build = "22635.5000"; // build changed
-        h.Probe.Set("a", "0");             // drifted to stock
+        h.BuildProbe.Build = "22635.5000"; // build changé
+        h.Probe.Set("a", "0");             // dérivé vers l'origine
 
         var result = await h.Build().ReconcileAsync(loaded.Value!, default);
 
@@ -85,7 +85,7 @@ public sealed class FailClosedEndToEndTests
         h.Reapply.Reapplies.Should().ContainSingle().Which.tweakId.Should().Be("a");
     }
 
-    // 26/09/2026 : un etat illisible etait remplace par l'etat par defaut (non suspendu), la passe
+    // Un etat illisible etait remplace par l'etat par defaut (non suspendu), la passe
     // reappliquait, puis ecrivait cet etat par defaut par-dessus : une pause demandee par le joueur
     // disparaissait sur une simple panne de lecture. Etat inconnu = rien d'ecrit, ni sur la machine
     // ni dans l'etat.

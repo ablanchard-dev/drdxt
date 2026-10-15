@@ -6,12 +6,12 @@ using Microsoft.Win32;
 namespace DrDxt.App.Platform;
 
 // -----------------------------------------------------------------------
-// Win32RegistryReader — the real IRegistryReader (read-only).
+// Win32RegistryReader : le vrai IRegistryReader (lecture seule).
 //
-// Reads a DWORD via Microsoft.Win32.Registry. A missing key/value is the clean
-// "absent" result (Ok(null)) the tweaks already handle (its "original" is
-// absence). A genuine read error → Fail(TWEAK.SDK_UNAVAILABLE). Never throws.
-// No write path lives here — writes go through the elevated helper.
+// Lit un DWORD via Microsoft.Win32.Registry. Une clé ou une valeur manquante donne le
+// résultat propre « absent » (Ok(null)), que les leviers savent déjà traiter (leur
+// « origine » est alors l'absence). Une vraie erreur de lecture → Fail(TWEAK.SDK_UNAVAILABLE).
+// Ne lève jamais. Aucune écriture ici : les écritures passent par le helper élevé.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class Win32RegistryReader : IRegistryReader
@@ -34,7 +34,7 @@ public sealed class Win32RegistryReader : IRegistryReader
             if (raw is null)
                 return Result<uint?>.Ok(null); // absent
 
-            // DWORD comes back as a boxed int; normalize to uint.
+            // Un DWORD revient en int boxé ; on le ramène en uint.
             return raw switch
             {
                 int i => Result<uint?>.Ok(unchecked((uint)i)),
@@ -65,7 +65,7 @@ public sealed class Win32RegistryReader : IRegistryReader
                 return Result<string?>.Ok(null); // absent
 
             var raw = key.GetValue(name, defaultValue: null);
-            // Absent → Ok(null). Present → its string form (REG_SZ comes back as a string).
+            // Absent → Ok(null). Présent → sa forme texte (un REG_SZ revient en chaîne).
             return Result<string?>.Ok(raw?.ToString());
         }
         catch (Exception)

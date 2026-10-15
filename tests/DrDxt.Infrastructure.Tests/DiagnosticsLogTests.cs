@@ -21,7 +21,7 @@ public sealed class DiagnosticsLogTests : IDisposable
             Directory.Delete(_tempDir, recursive: true);
     }
 
-    // --- core acceptance: a logged change is re-readable ---
+    // --- acceptation de base : un changement journalisé se relit ---
     [Fact]
     public async Task Change_ThenExport_FileExistsAndContainsAllFields()
     {
@@ -44,7 +44,7 @@ public sealed class DiagnosticsLogTests : IDisposable
         content.Should().Contain("DrDXT",            "actor must appear in the export");
     }
 
-    // --- actor "Windows" is recorded and distinguishable from "DrDXT" ---
+    // --- l'acteur « Windows » est enregistré et se distingue de « DrDXT » ---
     [Fact]
     public async Task Change_WithWindowsActor_RecordedInExport()
     {
@@ -58,11 +58,11 @@ public sealed class DiagnosticsLogTests : IDisposable
         var content = await File.ReadAllTextAsync(result.Value!);
         content.Should().Contain("Windows");
         content.Should().Contain("PowerPlan");
-        // ensure actor field is distinct — "Windows" and "DrDXT" are different strings
+        // le champ acteur est distinct : « Windows » et « DrDXT » sont deux chaînes différentes
         content.Should().NotContain("DrDXT");
     }
 
-    // --- multiple Change calls → all entries present, in order ---
+    // --- plusieurs appels Change → toutes les entrées présentes, dans l'ordre ---
     [Fact]
     public async Task MultipleChanges_AllEntriesPresentInOrder()
     {
@@ -86,7 +86,7 @@ public sealed class DiagnosticsLogTests : IDisposable
         idxC.Should().BeGreaterThan(idxB, "TweakC must appear after TweakB");
     }
 
-    // --- each entry has a UTC timestamp ---
+    // --- chaque entrée porte un horodatage UTC ---
     [Fact]
     public async Task Change_EntryContainsUtcTimestamp()
     {
@@ -100,16 +100,16 @@ public sealed class DiagnosticsLogTests : IDisposable
         result.IsOk.Should().BeTrue();
         var content = await File.ReadAllTextAsync(result.Value!);
 
-        // Format is ISO-8601 date portion: at minimum the year is present
-        // We search for the UTC date (e.g. "2026-06-") as a reliable marker
+        // Le format est la partie date d'ISO 8601 : au minimum l'année est présente.
+        // On cherche la date UTC (par exemple « 2026-06- ») comme repère fiable.
         var datePrefix = before.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         content.Should().Contain(datePrefix, "entry must contain a UTC date stamp");
 
-        // Also verify the 'Z' suffix indicating UTC
+        // Vérifier aussi le suffixe « Z » qui marque l'UTC.
         content.Should().Contain("Z", "timestamp must be UTC (ends with Z)");
     }
 
-    // --- concurrent Change calls are serialized by the lock → no lost/duplicated entries ---
+    // --- des appels Change concurrents sont sérialisés par le verrou → aucune entrée perdue ni doublée ---
     [Fact]
     public async Task ConcurrentChanges_AllEntriesPresent()
     {
@@ -127,7 +127,7 @@ public sealed class DiagnosticsLogTests : IDisposable
         lines.Should().HaveCount(count, "every concurrent Change must produce exactly one journal line");
     }
 
-    // --- ExportAsync with no prior changes → still IsOk, valid file ---
+    // --- ExportAsync sans changement préalable → toujours IsOk, fichier valide ---
     [Fact]
     public async Task ExportAsync_NoPriorChanges_IsOkWithValidFile()
     {
@@ -140,7 +140,7 @@ public sealed class DiagnosticsLogTests : IDisposable
         File.Exists(result.Value!).Should().BeTrue("export file must exist even for an empty journal");
     }
 
-    // --- export path is an absolute path ---
+    // --- le chemin d'export est un chemin absolu ---
     [Fact]
     public async Task ExportAsync_ReturnsAbsolutePath()
     {

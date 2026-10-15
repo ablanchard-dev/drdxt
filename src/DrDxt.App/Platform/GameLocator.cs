@@ -4,28 +4,29 @@ using System.Runtime.Versioning;
 namespace DrDxt.App.Platform;
 
 // -----------------------------------------------------------------------
-// Generic game detection — NO per-game list (project rule: never maintain a list of every competitive
-// title). A "game" is simply the visible, monitor-sized (fullscreen or borderless) top-level
-// window that is not the shell / desktop / DrDXT itself. We measure that process with PresentMon,
-// so it works for Warzone, Valorant, CS2, Apex, Fortnite — any title — with zero maintenance,
-// and stays HONEST (we measure the real game; a synthetic benchmark would not represent it and
-// the doctrine bans it). No game found → null → the scan stays in honest config-only mode, never
-// a fabricated number.
+// Détection du jeu par sa fenêtre, sans viser une liste de tous les titres. Un « jeu » est la fenêtre
+// de premier niveau visible, de la taille de l'écran (plein écran ou sans bordure), qui n'est ni le
+// shell, ni le bureau, ni DrDXT, ni un programme qu'on sait ne pas être un jeu (NomExeDeJeu : navigateurs,
+// Discord, lanceurs), ni une appli agrandie. Une liste courte des jeux les plus joués passe avant
+// (NomExeDeJeu.EstUnJeuConnu) : ceux-là sont reconnus même en fenêtré ou réduits. On mesure ce processus avec PresentMon : ça marche pour Warzone, Valorant,
+// CS2, Apex, Fortnite, n'importe quel titre, sans entretien, et ça reste honnête (on mesure le
+// vrai jeu ; un benchmark synthétique ne le représenterait pas et la doctrine l'interdit). Pas
+// de jeu trouvé → null → le scan reste honnêtement en mode config seule, jamais un chiffre inventé.
 //
-// Detection is the canonical Windows fullscreen heuristic (Microsoft Learn GetForegroundWindow +
-// GetWindowRect vs the monitor bounds; Richard Banks 2007): a window whose rect covers a whole
-// monitor and which is not the shell is a fullscreen app.
+// La détection suit l'heuristique classique du plein écran sous Windows (Microsoft Learn
+// GetForegroundWindow + GetWindowRect comparé aux bornes de l'écran ; Richard Banks 2007) : une
+// fenêtre dont le rectangle couvre tout un écran et qui n'est pas le shell est une appli plein écran.
 // -----------------------------------------------------------------------
 public interface IGameLocator
 {
-    /// <summary>The PID of the game currently running (fullscreen/borderless), or null when none.</summary>
+    /// <summary>Le PID du jeu lancé (plein écran ou sans bordure), ou null s'il n'y en a pas.</summary>
     int? LocateRunningGamePid();
 
     /// <summary>
     /// Un jeu est-il ouvert, même réduit ? Pour les gardes qui refusent de mesurer sous charge, pas pour
     /// la capture : un jeu réduit n'affiche aucune image à mesurer.
     ///
-    /// 26/09/2026, mesuré sur le poste : une fenêtre plein écran réduite reste « visible », mais sa
+    /// Mesuré sur le poste : une fenêtre plein écran réduite reste « visible », mais sa
     /// position tombe à (0,1004)-(160,1032) et <see cref="LocateRunningGamePid"/> ne la voit plus, alors
     /// que le jeu tourne toujours (Alt+Tab sur un plein écran exclusif le réduit).
     /// </summary>
@@ -33,20 +34,20 @@ public interface IGameLocator
 
     /// <summary>
     /// La fenêtre de CE jeu couvre-t-elle encore un écran, quelle que soit la fenêtre au premier plan ?
-    /// 26/09/2026 : sur deux écrans, cliquer un stream en plein écran pendant la capture le fait passer
+    /// Sur deux écrans, cliquer un stream en plein écran pendant la capture le fait passer
     /// au premier plan ; comparer au seul jeu localisé aurait écarté une capture valide.
     /// </summary>
     bool EstAffiche(int pid) => LocateRunningGamePid() == pid;
 
     /// <summary>
-    /// Comment s'appelle ce jeu — la seule chose qui rend deux mesures comparables dans le temps.
+    /// Comment s'appelle ce jeu : la seule chose qui rend deux mesures comparables dans le temps.
     ///
     /// Le journal de performance comparait deux mesures sur la seule foi de l'identifiant
-    /// MACHINE. Or le produit mesure le jeu qui tourne, quel qu'il soit : scanner pendant Warzone
+    /// machine. Or le produit mesure le jeu qui tourne, quel qu'il soit : scanner pendant Warzone
     /// puis pendant un autre titre remplissait le journal de deux echelles de FPS sans rapport, et
     /// la comparaison annonçait une « degradation » qui n'etait qu'un changement de jeu.
     ///
-    /// Le nom du processus suffit — il ne quitte pas la machine, il n'identifie personne, et il est
+    /// Le nom du processus suffit : il ne quitte pas la machine, il n'identifie personne, et il est
     /// stable d'une session a l'autre. <c>null</c> quand le PID est inconnu ou deja mort : « pas
     /// identifie » n'est pas « le meme jeu », et le journal se taira.
     /// </summary>
@@ -70,7 +71,7 @@ public interface IGameLocator
 }
 
 /// <summary>
-/// PHASE 18 F1 — le chemin de l'executable du jeu en cours, pour lire les reglages du pilote au
+/// Le chemin de l'executable du jeu en cours, pour lire les reglages du pilote au
 /// profil que le pilote applique a ce jeu.
 /// Droit demande : <c>PROCESS_QUERY_LIMITED_INFORMATION</c>, le plus faible qui rende le chemin
 /// (celui du Gestionnaire des taches). Aucune lecture de memoire, aucune injection. Refus (processus
@@ -79,22 +80,11 @@ public interface IGameLocator
 [SupportedOSPlatform("windows")]
 public sealed class RunningGameExecutable(IGameLocator locator) : DrDxt.Application.Tweaks.Hardware.IGameExecutable
 {
-    private const uint ProcessQueryLimitedInformation = 0x1000;
-
     public string? RunningGameExecutablePath()
     {
         try
         {
-            if (locator.LocateRunningGamePid() is not { } pid || pid <= 0) return null;
-            var h = OpenProcess(ProcessQueryLimitedInformation, false, (uint)pid);
-            if (h == IntPtr.Zero) return null;
-            try
-            {
-                var buffer = new System.Text.StringBuilder(1024);
-                var taille = (uint)buffer.Capacity;
-                return QueryFullProcessImageName(h, 0, buffer, ref taille) ? buffer.ToString(0, (int)taille) : null;
-            }
-            finally { CloseHandle(h); }
+            return locator.LocateRunningGamePid() is { } pid && pid > 0 ? Win32GameLocator.CheminDe((uint)pid) : null;
         }
         catch
         {
@@ -102,16 +92,10 @@ public sealed class RunningGameExecutable(IGameLocator locator) : DrDxt.Applicat
         }
     }
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "QueryFullProcessImageNameW")]
-    private static extern bool QueryFullProcessImageName(IntPtr process, uint flags, System.Text.StringBuilder name, ref uint size);
-    [DllImport("kernel32.dll")]
-    private static extern bool CloseHandle(IntPtr handle);
 }
 
-/// <summary>Fail-clean default: never locates a game (non-Windows / headless / tests). The scan
-/// runs config-only, honestly.</summary>
+/// <summary>Valeur par défaut qui échoue proprement : ne trouve jamais de jeu (hors Windows,
+/// sans écran, tests). Le scan porte honnêtement sur la config seule.</summary>
 public sealed class NullGameLocator : IGameLocator
 {
     public int? LocateRunningGamePid() => null;
@@ -128,19 +112,28 @@ public sealed class Win32GameLocator : IGameLocator
             var shell = GetShellWindow();
             var desktop = GetDesktopWindow();
 
-            // 1) Prefer the FOREGROUND window (exclusive-fullscreen game the user is playing now).
-            if (IsFullscreenGameWindow(GetForegroundWindow(), self, shell, desktop, out var fgPid))
+            // 1) D'abord la fenêtre au premier plan : un jeu connu (fenêtré compris), ou un plein écran auquel le joueur joue.
+            //    Un jeu connu laissé ouvert sur l'autre écran ne passe pas devant le jeu joué.
+            var premierPlan = GetForegroundWindow();
+            GetWindowThreadProcessId(premierPlan, out var pidPremierPlan);
+            if (pidPremierPlan != 0 && pidPremierPlan != self && EstUnJeuConnu(pidPremierPlan))
+                return (int)pidPremierPlan;
+            if (IsFullscreenGameWindow(premierPlan, self, shell, desktop, out var fgPid))
                 return (int)fgPid;
 
-            // 2) Otherwise enumerate for a monitor-sized visible window — a borderless game stays
-            //    sized even when DrDXT is on top (the common competitive case).
+            // 2) Un jeu connu affiché ailleurs (fenêtré, DrDXT au premier plan) : il ne se rate pas.
+            if (JeuConnuAffiche(self) is { } connu)
+                return (int)connu;
+
+            // 3) Sinon, chercher une fenêtre visible de la taille de l'écran : un jeu sans bordure garde
+            //    sa taille même quand DrDXT est au-dessus (le cas courant en compétitif).
             uint found = 0;
             EnumWindows((h, _) =>
             {
                 if (IsFullscreenGameWindow(h, self, shell, desktop, out var pid))
                 {
                     found = pid;
-                    return false; // stop at the first match
+                    return false; // on s'arrête à la première correspondance
                 }
                 return true;
             }, IntPtr.Zero);
@@ -148,7 +141,7 @@ public sealed class Win32GameLocator : IGameLocator
         }
         catch
         {
-            return null; // never throw — no game located → honest degraded scan
+            return null; // jamais d'exception : pas de jeu trouvé → scan dégradé honnête
         }
     }
 
@@ -176,7 +169,7 @@ public sealed class Win32GameLocator : IGameLocator
 
     public bool JeuOuvert()
     {
-        if (LocateRunningGamePid() is not null) return true;
+        if (LocateRunningGamePid() is not null || JeuConnuLance()) return true;
         try
         {
             // Une fenêtre réduite garde la taille qu'elle retrouvera (rcNormalPosition) : si elle couvre
@@ -200,6 +193,7 @@ public sealed class Win32GameLocator : IGameLocator
         if ((GetWindowLong(h, GwlExStyle) & WsExNoActivate) != 0) return false;
         GetWindowThreadProcessId(h, out var pid);
         if (pid == 0 || pid == self || pid == PidDuShell()) return false;
+        if (PasUnJeu(pid)) return false;
         var p = new WindowPlacement { length = Marshal.SizeOf<WindowPlacement>() };
         if (!GetWindowPlacement(h, ref p)) return false;
         var mi = new MonitorInfo { cbSize = Marshal.SizeOf<MonitorInfo>() };
@@ -217,7 +211,7 @@ public sealed class Win32GameLocator : IGameLocator
     [StructLayout(LayoutKind.Sequential)]
     private struct WindowPlacement { public int length, flags, showCmd; public int minX, minY, maxX, maxY; public Rect rcNormalPosition; }
 
-    // 26/09/2026, mesuré sur le poste en usage normal : le localisateur désignait explorer comme le jeu, par
+    // Mesuré sur le poste en usage normal : le localisateur désignait explorer comme le jeu, par
     // intermittence. Le shell possède, en plus du bureau (déjà exclu), des fenêtres passagères qui couvrent
     // l'écran (sélecteur Alt+Tab, menu Démarrer, notifications : hôte XAML d'explorer). Toute fenêtre du
     // processus du shell est écartée : règle générique, pas une liste de noms.
@@ -235,16 +229,19 @@ public sealed class Win32GameLocator : IGameLocator
         if (hwnd == IntPtr.Zero || hwnd == shell || hwnd == desktop || !IsWindowVisible(hwnd))
             return false;
 
-        // 14/09/2026 (mesure sur le poste, aucun jeu lance) : TextInputHost garde une CoreWindow
+        // TextInputHost garde une CoreWindow
         // « visible » de la taille de l'ecran mais masquee par DWM, et passait pour le jeu. Une fenetre
         // masquee n'est pas affichee (Microsoft Learn, DWMWINDOWATTRIBUTE, DWMWA_CLOAKED).
         if (DwmGetWindowAttribute(hwnd, DwmwaCloaked, out var cloaked, sizeof(int)) == 0 && cloaked != 0)
             return false;
 
-        // 14/09/2026 (plan M5, mesure sur le poste) : la fenetre visible de NVIDIA Overlay est
-        // WS_EX_NOACTIVATE — elle ne peut jamais passer au premier plan, donc ce n'est pas le jeu
+        // La fenetre visible de NVIDIA Overlay est
+        // WS_EX_NOACTIVATE : elle ne peut jamais passer au premier plan, donc ce n'est pas le jeu
         // auquel on joue. Regle generique, pas une liste de noms : vaut pour tout overlay.
         if ((GetWindowLong(hwnd, GwlExStyle) & WsExNoActivate) != 0)
+            return false;
+
+        if (EstUneAppliAgrandie(GetWindowLong(hwnd, GwlStyle)))
             return false;
 
         GetWindowThreadProcessId(hwnd, out pid);
@@ -259,16 +256,86 @@ public sealed class Win32GameLocator : IGameLocator
         if (!GetMonitorInfo(mon, ref mi))
             return false;
 
-        // Covers (≈) the whole monitor → fullscreen / borderless game.
+        // Couvre (≈) tout l'écran → jeu en plein écran ou sans bordure, sauf un programme qu'on sait ne pas être un jeu
+        // (navigateur, Discord, lanceur), lu après la géométrie pour n'ouvrir que les processus plein écran.
         return r.Left <= mi.rcMonitor.Left && r.Top <= mi.rcMonitor.Top
-            && r.Right >= mi.rcMonitor.Right && r.Bottom >= mi.rcMonitor.Bottom;
+            && r.Right >= mi.rcMonitor.Right && r.Bottom >= mi.rcMonitor.Bottom
+            && !PasUnJeu(pid);
     }
+
+    private static bool PasUnJeu(uint pid)
+    {
+        var chemin = CheminDe(pid);
+        return DrDxt.Core.NomExeDeJeu.EstSurementPasUnJeu(chemin is null ? null : System.IO.Path.GetFileName(chemin), chemin);
+    }
+
+    /// <summary>Le premier jeu connu dont une fenêtre est affichée (visible, non réduite, non masquée), ou null.</summary>
+    private static uint? JeuConnuAffiche(uint self)
+    {
+        uint trouve = 0;
+        EnumWindows((h, _) =>
+        {
+            if (!IsWindowVisible(h) || IsIconic(h)) return true;
+            if (DwmGetWindowAttribute(h, DwmwaCloaked, out var cloaked, sizeof(int)) == 0 && cloaked != 0) return true;
+            GetWindowThreadProcessId(h, out var pid);
+            if (pid == 0 || pid == self || !EstUnJeuConnu(pid))
+                return true;
+            trouve = pid;
+            return false;
+        }, IntPtr.Zero);
+        return trouve != 0 ? trouve : null;
+    }
+
+    /// <summary>Un jeu connu lancé, même réduit ou derrière une autre fenêtre.</summary>
+    private static bool JeuConnuLance()
+    {
+        foreach (var p in System.Diagnostics.Process.GetProcesses())
+            using (p)
+                if (DrDxt.Core.NomExeDeJeu.EstUnJeuConnu(p.ProcessName + ".exe")) return true;
+        return false;
+    }
+
+    private const uint ProcessQueryLimitedInformation = 0x1000;
+
+    private static bool EstUnJeuConnu(uint pid) => DrDxt.Core.NomExeDeJeu.EstUnJeuConnu(CheminDe(pid) is { } c ? System.IO.Path.GetFileName(c) : null);
+
+    // Relu à chaque appel, sans cache : Windows réutilise vite un PID, un cache par PID donnerait au nouveau
+    // processus le chemin de l'ancien. La lecture aux droits limités coûte quelques microsecondes.
+    /// <summary>Le chemin de l'exécutable, avec le droit le plus faible qui le rende ; null si refusé (anti-triche).</summary>
+    internal static string? CheminDe(uint pid)
+    {
+        var h = OpenProcess(ProcessQueryLimitedInformation, false, pid);
+        if (h == IntPtr.Zero) return null;
+        try
+        {
+            var buffer = new System.Text.StringBuilder(1024);
+            var taille = (uint)buffer.Capacity;
+            return QueryFullProcessImageName(h, 0, buffer, ref taille) ? buffer.ToString(0, (int)taille) : null;
+        }
+        finally { CloseHandle(h); }
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "QueryFullProcessImageNameW")]
+    private static extern bool QueryFullProcessImageName(IntPtr process, uint flags, System.Text.StringBuilder name, ref uint size);
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr handle);
 
     private const uint MonitorDefaultToNearest = 2;
     private const int DwmwaCloaked = 14; // DWMWINDOWATTRIBUTE.DWMWA_CLOAKED (dwmapi.h)
 
     [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
     private const int GwlExStyle = -20;           // GWL_EXSTYLE (winuser.h)
+    private const int GwlStyle = -16;             // GWL_STYLE (winuser.h)
+    private const int WsMaximize = 0x01000000;    // WS_MAXIMIZE (winuser.h)
+    private const int WsMaximizeBox = 0x00010000; // WS_MAXIMIZEBOX (winuser.h)
+
+    /// <summary>Une appli agrandie sur un écran sans barre des tâches (Discord sur le second écran) en couvre toute la
+    /// surface, comme un jeu sans bordure. Agrandie par Windows et munie du bouton « Agrandir » : c'est une appli de bureau.
+    /// Un jeu plein écran ou sans bordure est une popup sans ce bouton. Règle générique, pas une liste de noms ; un jeu
+    /// qui garderait ce bouton en plein écran ne serait plus vu.</summary>
+    internal static bool EstUneAppliAgrandie(int style) => (style & WsMaximize) != 0 && (style & WsMaximizeBox) != 0;
     private const int WsExNoActivate = 0x08000000; // WS_EX_NOACTIVATE (winuser.h)
     [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hwnd, int index);
     private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);

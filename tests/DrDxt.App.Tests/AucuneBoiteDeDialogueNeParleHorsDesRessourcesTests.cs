@@ -5,11 +5,11 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 19/09/2026. Les deux seules boites de dialogue du produit parlaient hors des ressources.
+// Les deux seules boites de dialogue du produit parlaient hors des ressources.
 //
 // La regle est ecrite, et depuis longtemps. `AppReconcilerSeams.cs` la cite en tete de
 // fichier : « human-readable text resolves from a resx KEY via ILocalizer, never hardcoded
-// — §4 ». Tout l'affichage la suit : les ViewModels, les convertisseurs, les vues XAML —
+// ». Tout l'affichage la suit : les ViewModels, les convertisseurs, les vues XAML —
 // balayees, une seule chaine en dur, la marque « DXT ».
 //
 // Deux surfaces ne la suivaient pas, et ce sont les deux moments ou le produit PARLE :

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 06/10/2026 (plan 3.4) : un point pris pendant un souci le contient. Le docteur propose le plus récent d'avant le début
+// Un point pris pendant un souci le contient. Le docteur propose le plus récent d'avant le début
 // du souci, et ne restaure jamais seul.
 public sealed class PointDeRestaurationSainTests
 {
@@ -21,7 +21,7 @@ public sealed class PointDeRestaurationSainTests
     [Fact]
     public void Le_point_propose_est_le_plus_recent_d_avant_le_debut_de_la_serie()
     {
-        // Série : 20/09, 28/09, 05/10 (écarts ≤ 14 jours) ; un incident isolé le 01/08 n'en fait pas partie.
+        // Série : 20/09, 28/09, 05/10 (écarts ≤ 14 jours) ; un incident isolé plus ancien (01/08) n'en fait pas partie.
         var incidents = new[] { Arret(T(8, 1)), Arret(T(9, 20)), Arret(T(9, 28)), Arret(T(10, 5)) };
         var points = new[] { (T(9, 10), "Installation pilote"), (T(9, 18), "Windows Update"), (T(10, 1), "DrDXT : avant optimisation") };
 
@@ -42,12 +42,12 @@ public sealed class PointDeRestaurationSainTests
         c.ValeurCourante.Should().Be("aucun point d'avant le souci");
         c.Explication.Should().Contain("garderait le souci");
         c.Action.Should().Be(RepairAction.Aucune);
-        // Capture du 06/10 : le souci daté voyage avec le constat, l'écran le nomme.
-        // La série commence le 25/09 (le 05/10 est à moins de deux semaines).
+        // Le souci daté voyage avec le constat, l'écran le nomme.
+        // Début de la série : 25/09 ; 05/10 est à moins de deux semaines.
         c.Provenance.Should().Be($"arrêt brutal sans code, le {T(9, 25).ToLocalTime():dd/MM/yyyy à HH:mm}");
     }
 
-    // Revue T3+T4 (F-30) : la comparaison se fait en instants. Un point à 00:30 à Paris (22:30 UTC la veille) est
+    // La comparaison se fait en instants. Un point à 00:30 à Paris (22:30 UTC la veille) est
     // d'avant un arrêt à 01:00 à Paris ; une comparaison au jour, ou locale contre UTC, se tromperait.
     [Fact]
     public void Le_point_et_l_incident_se_comparent_en_instants_meme_a_cheval_sur_minuit()
@@ -59,7 +59,7 @@ public sealed class PointDeRestaurationSainTests
             .Single().ValeurCourante.Should().Be("aucun point d'avant le souci");
     }
 
-    // F-28 : les incidents ne sont lus que sur 90 jours. Une série qui touche cette borne a peut-être commencé avant :
+    // Les incidents ne sont lus que sur 90 jours. Une série qui touche cette borne a peut-être commencé avant :
     // « au moins depuis », et le point proposé n'est pas dit sain sans réserve.
     [Fact]
     public void Une_serie_qui_touche_la_borne_de_lecture_est_dite_au_moins_depuis()
@@ -76,7 +76,7 @@ public sealed class PointDeRestaurationSainTests
             .Should().NotContain("au moins depuis");
     }
 
-    // 10/10/2026 (le mainteneur) : un seul arrêt pendant une mise en veille, cinq jours plus tôt, sans récidive : pas un souci en cours.
+    // Un seul arrêt pendant une mise en veille, cinq jours plus tôt, sans récidive : pas un souci en cours.
     [Fact]
     public void Un_incident_isole_de_plus_de_trois_jours_n_est_plus_un_souci_en_cours()
     {
@@ -91,7 +91,7 @@ public sealed class PointDeRestaurationSainTests
     public void Une_liste_illisible_pendant_un_souci_est_inconnue()
         => PointDeRestaurationSain.Juger(null, [Arret(T(10, 5))], Maintenant).Single().Statut.Should().Be(RepairStatus.Unknown);
 
-    // Revue adverse du docteur (09/10/2026, P1) : journaux d'incidents illisibles, le bilan disait « aucun souci en cours ».
+    // Journaux d'incidents illisibles : le bilan ne doit pas dire « aucun souci en cours ».
     [Fact]
     public void Des_incidents_non_lus_se_disent_non_lus()
     {

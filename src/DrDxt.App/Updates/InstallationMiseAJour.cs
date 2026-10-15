@@ -7,17 +7,17 @@ using DrDxt.Core;
 namespace DrDxt.App.Updates;
 
 /// <summary>
-/// « INSTALLER » (revue du 10/09/2026) : lancer l'installeur signe deja verifie, pas un remplacement
+/// « Installer » : lancer l'installeur signe deja verifie, pas un remplacement
 /// maison des binaires. L'installeur (Inno Setup, PrivilegesRequired=admin) demande lui-meme l'UAC et
 /// ferme l'App en cours.
 ///
-/// L'empreinte est RE-VERIFIEE juste avant le lancement : entre la verification au demarrage et le
+/// L'empreinte est reverifiee juste avant le lancement : entre la verification au demarrage et le
 /// clic, le fichier stage a pu etre remplace sur le disque. Un installeur lance sans cette relecture
 /// executerait ce qui se trouve la, pas ce qui a ete verifie.
 ///
-/// Revue de securite du 11/09/2026 : relire ne suffisait pas. Le binaire est VERROUILLE (ouvert en
+/// Relire ne suffit pas. Le binaire est verrouille (ouvert en
 /// partage lecture seule) de l'empreinte jusqu'apres le lancement, sinon il restait une fenetre ou il
-/// pouvait etre remplace dans un dossier ecrivable par l'utilisateur — et ce qui part sous UAC serait
+/// pouvait etre remplace dans un dossier ecrivable par l'utilisateur, et ce qui part sous UAC serait
 /// alors le code de l'attaquant.
 /// </summary>
 public static class InstallationMiseAJour
@@ -33,12 +33,12 @@ public static class InstallationMiseAJour
         try
         {
             if (!File.Exists(cheminStage))
-                return Result.Fail(CodeRefus, "L'installeur vérifié n'est plus sur le disque.");
+                return Result.Fail(CodeRefus, Docteur.T("MAJ.InstalleurAbsent"));
 
             var exe = Path.Combine(Path.GetDirectoryName(cheminStage)!, $"DrDXT-Setup-{Nettoyer(version)}.exe");
             File.Copy(cheminStage, exe, overwrite: true);
 
-            // Le fichier reste OUVERT en partage lecture seule de la relecture jusqu'apres le
+            // Le fichier reste ouvert en partage lecture seule de la relecture jusqu'apres le
             // lancement. Sans ce verrou il restait une fenetre entre l'empreinte et Process.Start :
             // le staging vit sous %LOCALAPPDATA%, donc tout code tournant sous le compte de
             // l'utilisateur pouvait y ecrire, et ce qui partait sous UAC n'etait plus ce qui avait
@@ -53,12 +53,12 @@ public static class InstallationMiseAJour
                 {
                     verrou.Dispose();
                     File.Delete(exe);
-                    return Result.Fail(CodeRefus, "L'installeur ne correspond plus à la version vérifiée : il n'est pas lancé.");
+                    return Result.Fail(CodeRefus, Docteur.T("MAJ.InstalleurChange"));
                 }
 
                 return (lancer ?? LancerParLeShell)(exe)
                     ? Result.Ok()
-                    : Result.Fail(CodeRefus, "L'installeur n'a pas pu être lancé.");
+                    : Result.Fail(CodeRefus, Docteur.T("MAJ.InstalleurNonLance"));
             }
             finally
             {

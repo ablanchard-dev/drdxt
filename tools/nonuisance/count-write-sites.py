@@ -17,7 +17,7 @@ DOC = os.path.join(ROOT, "docs", "NON-NUISANCE.md")
 # WMI Put, SetupApi, DeviceIoControl, P/Invoke direct. Le trou est nomme, pas masque.
 PATTERNS = [
     r"SetFirmwareEnvironmentVariable", r"NvAPI_GPU_Set\w*", r"Registry\.SetValue",
-    # 19/09/2026, QUATRIEME TROU, et cette fois l'instrument SUR-comptait -- la faute que
+    # QUATRIEME TROU, et cette fois l'instrument SUR-comptait -- la faute que
     # l'en-tete de ce fichier nomme deja : un motif qui fait relire du vide finit par etre
     # ignore. `\.SetValue\(` attrapait `DependencyObject.SetValue`, le setter WPF de
     # `Effets/Controles.cs` : deux << sites d'ecriture >> qui ne touchent RIEN sur la
@@ -25,42 +25,42 @@ PATTERNS = [
     # `_registry.SetValue(` -- et le motif le demande desormais.
     r"\w*(?:[Kk]ey|[Rr]egistry)\.SetValue\(", r"bcdedit\.exe", r"shutdown\.exe", r"sc\.exe",
     r"File\.Write\w*", r"File\.AppendAll\w*", r"Process\.Start",
-    # 05/09, deuxieme trou trouve dans cet instrument : les ecritures GPU ne portent AUCUN des
+    # Deuxieme trou trouve dans cet instrument : les ecritures GPU ne portent AUCUN des
     # motifs ci-dessus. Elles s'appellent TrySetCoreClockOffset, TrySetPowerLimitPercent,
     # TrySetDrsGlobalSetting, TrySetFanCurve — c'est-a-dire la seule surface qui touche au
     # MATERIEL, et elle etait invisible. Un motif d'INTENTION vaut mieux qu'un motif d'API quand
     # l'API est enveloppee.
     r"TrySet\w+",
-    # 10/09/2026, troisieme trou, ouvert par le produit lui-meme : la suppression d'un reglage DRS
+    # Troisieme trou, ouvert par le produit lui-meme : la suppression d'un reglage DRS
     # au profil d'un jeu s'appelle TryDeleteDrsSettingForApplication. C'est une ECRITURE (elle
-    # retire ce qui etait pose), et `TrySet\w+` ne la voyait pas. Meme reponse que le 05/09 : un
+    # retire ce qui etait pose), et `TrySet\w+` ne la voit pas. Meme reponse : un
     # motif d'intention. La liste ne fait que grandir.
     r"TryDelete\w+",
-    # 10/10/2026, B1 : l'ecriture d'un registre du processeur passe par PawnIO (pawnio_execute "ioctl_write_msr"), un
+    # L'ecriture d'un registre du processeur passe par PawnIO (pawnio_execute "ioctl_write_msr"), un
     # P/Invoke que rien ici ne voyait. Motif d'intention : le nom de l'ioctl d'ecriture, cite dans l'appel.
     r"ioctl_write_\w+",
-    # 07/10/2026, L-ECRAN : le mode de l'ecran se pose par un P/Invoke direct de user32, que rien ici ne voyait. Le
+    # L-ECRAN : le mode de l'ecran se pose par un P/Invoke direct de user32, que rien ici ne voyait. Le
     # motif demande la parenthese : un appel ou une declaration, pas le nom cite dans une source ou une phrase.
     r"ChangeDisplaySettings\w*\(",
-    # 07/10/2026, L-VOISINS : la priorite d'un AUTRE processus (le calmeur de voisins) se pose par une propriete .NET,
+    # L-VOISINS : la priorite d'un AUTRE processus (le calmeur de voisins) se pose par une propriete .NET,
     # qu'aucun motif ne voyait. Le `=` seul, pas `==` : une lecture ou une comparaison n'ecrit rien.
     r"\.PriorityClass\s*=(?!=)",
-    # 07/10/2026, L-CPU : une valeur a l'interieur d'un plan d'alimentation (PowerWriteACValueIndex) et la reactivation du
+    # L-CPU : une valeur a l'interieur d'un plan d'alimentation (PowerWriteACValueIndex) et la reactivation du
     # plan (PowerSetActiveScheme), deux P/Invoke directs de powrprof que rien ne voyait, le changement de plan compris.
     r"Power(?:Write\w+|SetActiveScheme)\(",
-    # 07/10/2026, revue F-28 : le mode d'alimentation de Windows 11, repose quand l'activation d'un plan l'a remis a
+    # Le mode d'alimentation de Windows 11, repose quand l'activation d'un plan l'a remis a
     # son defaut (PowerSetUserConfiguredACPowerMode), un troisieme P/Invoke de powrprof.
     r"PowerSetUserConfigured\w+\(",
-    # 08/10/2026, revue de securite : un fichier ecrit par un FileStream (creation exclusive, ajout) ne portait aucun motif ;
+    # Un fichier ecrit par un FileStream (creation exclusive, ajout) ne portait aucun motif ;
     # passer de File.WriteAllText a FileMode.CreateNew faisait disparaitre un site d'ecriture de la table.
     r"FileMode\.(?:Create\w*|Append|OpenOrCreate)",
-    # 08/10/2026 (GPU-OC) : le ventilateur NVIDIA (NVML) s'ecrit par TryPoserVentilateur / TryRendreVentilateur, des noms
-    # francais qu'aucun motif ne voyait : meme le cas que le 05/09, un motif d'INTENTION.
+    # Le ventilateur NVIDIA (NVML) s'ecrit par TryPoserVentilateur / TryRendreVentilateur, des noms
+    # francais qu'aucun autre motif ne voit : meme reponse, un motif d'INTENTION.
     r"TryPoser\w+\(", r"TryRendre\w+\(",
 ]
 RX = re.compile("|".join(PATTERNS))
 
-# Premiere version (05/09) : le motif etait `shutdown` tout court, et il comptait le MOT — donc
+# Premiere version : le motif etait `shutdown` tout court, et il comptait le MOT — donc
 # des commentaires expliquant `shutdown /r /fw`, une phrase sur le demarrage rapide, un « unwind
 # cleanly on shutdown ». La table annoncait des sites d'ecriture qui n'en etaient pas.
 # Un instrument qui SUR-compte trompe autant qu'un qui sous-compte : il fait relire du vide, puis

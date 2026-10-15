@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. `dotnet test DrDXT.sln` a rendu un rouge sur 4 366, dans ce
+// `dotnet test DrDXT.sln` a rendu un rouge sur 4 366, dans ce
 // projet-ci. Le meme projet lance seul : 111 verts. Huit relances de la
 // solution entiere, dont une avec un build en parallele pour charger la
 // machine : vertes. Le defaut existe, il est rare, et il est lie a la charge.

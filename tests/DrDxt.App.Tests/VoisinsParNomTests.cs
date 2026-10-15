@@ -3,9 +3,9 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 04/10/2026, revue (P1) : le relevé des parties additionne les processus d'un même programme. Filtrés un par un à
-// 5 % puis coupés à 5 avant l'addition, douze onglets de navigateur à 6 % (72 % d'un cœur) se lisaient « 30 % », et à
-// 4 % chacun le navigateur disparaissait. L'addition passe donc avant le seuil, et rien n'est coupé.
+// Le relevé des parties additionne les processus d'un même programme avant le seuil, et rien n'est coupé.
+// Filtrés un par un à 5 % puis coupés à 5, douze onglets de navigateur à 6 % (72 % d'un cœur) donneraient
+// « 30 % », et à 4 % chacun le navigateur disparaîtrait.
 public sealed class VoisinsParNomTests
 {
     [Fact]

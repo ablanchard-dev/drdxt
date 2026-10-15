@@ -1,30 +1,29 @@
 namespace DrDxt.Measurement.Network;
 
 // -----------------------------------------------------------------------
-// NS-9 — the network measurement INSTRUMENT.
+// L'instrument de mesure du réseau.
 //
-// DrDXT measured frames and never measured the network. Without an instrument no
-// network lever can be proven, and half the network folklore (TcpAckFrequency,
-// Nagle, "gamer DNS") is myth — so NS-9 starts here, with measurement, and not
-// with a tweak. Same doctrine as the rest: a gain is shown only when it is measured.
+// Sans instrument, aucun levier réseau ne peut être prouvé, et la moitié du folklore réseau
+// (TcpAckFrequency, Nagle, « DNS gamer ») est un mythe : le travail réseau commence donc ici, par
+// la mesure, pas par un levier. Même doctrine que le reste : un gain ne s'affiche que mesuré.
 //
-// What this measures, said plainly (the label matters as much as the number):
-//   * ICMP echo round-trip to ONE named host, from this PC, right now.
-//   * It is not the latency to the game server (routing and server load differ).
-//   * It is not click-to-photon: nothing here includes input, render or display.
-//   * ICMP loss is not game packet loss: routers routinely deprioritise or drop
-//     ICMP under load while forwarding UDP game traffic untouched.
-// A high reading is a lead to investigate, never a verdict — and never a "fix" to sell.
+// Ce que cela mesure, dit clairement (l'étiquette compte autant que le nombre) :
+//   * l'aller-retour ICMP echo vers un seul hôte nommé, depuis ce PC, maintenant.
+//   * Ce n'est pas la latence vers le serveur de jeu (routage et charge du serveur diffèrent).
+//   * Ce n'est pas du clic-à-photon : rien ici n'inclut l'entrée, le rendu ou l'affichage.
+//   * Une perte ICMP n'est pas une perte de paquets de jeu : les routeurs dépriorisent ou jettent
+//     souvent l'ICMP sous charge tout en faisant passer intact le trafic UDP du jeu.
+// Une valeur haute est une piste à creuser, jamais un verdict, et jamais une « correction » à vendre.
 // -----------------------------------------------------------------------
 
-/// <summary>One round-trip attempt. <see cref="RoundTripMs"/> is null when the probe did
-/// not come back (timeout / unreachable / blocked) — a miss is a MISS, never a 0 ms sample
-/// and never a max-latency sample.</summary>
+/// <summary>Une tentative d'aller-retour. <see cref="RoundTripMs"/> est null quand la sonde n'est
+/// pas revenue (délai dépassé / injoignable / bloquée) : un raté est un raté, jamais un relevé à
+/// 0 ms ni un relevé à latence maximale.</summary>
 public readonly record struct NetworkProbeSample(double? RoundTripMs);
 
-/// <summary>Aggregate of one measurement window. Every latency field is nullable and is
-/// null when nothing came back: with zero replies we report loss and say the latency is
-/// UNKNOWN, we never print 0 ms.</summary>
+/// <summary>Agrégat d'une fenêtre de mesure. Chaque champ de latence peut être null et l'est quand
+/// rien n'est revenu : avec zéro réponse, on rapporte la perte et on dit la latence inconnue,
+/// jamais 0 ms.</summary>
 public sealed record NetworkLatencyReport(
     string Target,
     int Sent,
@@ -36,25 +35,25 @@ public sealed record NetworkLatencyReport(
     double? P95Ms,
     double? JitterMs)
 {
-    /// <summary>True when at least one reply came back, i.e. the latency fields carry a
-    /// real measurement. False = loss-only report, latency UNKNOWN.</summary>
+    /// <summary>Vrai quand au moins une réponse est revenue, c'est-à-dire que les champs de latence
+    /// portent une vraie mesure. False = rapport de perte seule, latence inconnue.</summary>
     public bool HasLatency => Received > 0;
 
-    /// <summary>Localisation key for the caveat that must travel with these numbers
-    /// (§22.3 honesty): ICMP to one host, not the game server, not click-to-photon.</summary>
+    /// <summary>Clé de localisation de la réserve qui doit accompagner ces nombres (honnêteté) :
+    /// ICMP vers un seul hôte, pas le serveur de jeu, pas du clic-à-photon.</summary>
     public string CaveatKey => "measure.network.icmp_caveat";
 }
 
-/// <summary>Pure aggregation — no I/O, fully unit-testable.</summary>
+/// <summary>Agrégation pure : aucune E/S, entièrement testable.</summary>
 public static class NetworkLatencyStatistics
 {
-    /// <summary>Builds the report from the raw attempts, in order (order matters: jitter is
-    /// defined on CONSECUTIVE samples).</summary>
+    /// <summary>Construit le rapport à partir des tentatives brutes, dans l'ordre (l'ordre compte :
+    /// la gigue se définit sur des relevés consécutifs).</summary>
     public static NetworkLatencyReport Summarize(string target, IReadOnlyList<NetworkProbeSample> samples)
     {
         int sent = samples.Count;
-        // Only strictly-positive finite round-trips are real replies. A negative/NaN reading
-        // from a misbehaving stack is treated as a miss, not as data.
+        // Seuls les allers-retours finis strictement positifs sont de vraies réponses. Une valeur
+        // négative / NaN d'une pile réseau défaillante compte comme un raté, pas comme une donnée.
         var rtts = samples
             .Select(s => s.RoundTripMs)
             .Where(ms => ms is > 0 && double.IsFinite(ms.Value))
@@ -76,20 +75,20 @@ public static class NetworkLatencyStatistics
             JitterMs: Jitter(samples));
     }
 
-    /// <summary>Nearest-rank p95 on the ascending list. With few samples this is simply the
-    /// worst-but-one — honest for a short window, and it never interpolates a value that was
-    /// never measured.</summary>
+    /// <summary>p95 au rang le plus proche sur la liste croissante. Avec peu de relevés, c'est
+    /// simplement l'avant-dernier pire : honnête pour une fenêtre courte, et n'interpole jamais une
+    /// valeur jamais mesurée.</summary>
     private static double Percentile(IReadOnlyList<double> ascending, double fraction)
     {
         int rank = (int)Math.Ceiling(fraction * ascending.Count);
         return ascending[Math.Clamp(rank - 1, 0, ascending.Count - 1)];
     }
 
-    /// <summary>Jitter = mean absolute difference between CONSECUTIVE replies (the IPDV
-    /// definition used by RTP/RFC 3550, and the one that matters in a shooter: a steady 40 ms
-    /// beats a 20-60 ms sawtooth). Computed only across pairs where both probes replied — a
-    /// lost probe breaks the chain instead of inventing a huge delta. Null with fewer than
-    /// two consecutive replies.</summary>
+    /// <summary>Gigue = écart absolu moyen entre réponses consécutives (la définition IPDV de
+    /// RTP/RFC 3550, celle qui compte dans un jeu de tir : 40 ms stables valent mieux qu'une dent de
+    /// scie de 20 à 60 ms). Calculée seulement sur les paires où les deux sondes ont répondu : une
+    /// sonde perdue coupe la chaîne au lieu d'inventer un énorme écart. Null avec moins de deux
+    /// réponses consécutives.</summary>
     private static double? Jitter(IReadOnlyList<NetworkProbeSample> samples)
     {
         var deltas = new List<double>();

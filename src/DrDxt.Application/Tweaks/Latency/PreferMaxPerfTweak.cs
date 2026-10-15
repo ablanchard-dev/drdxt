@@ -4,30 +4,32 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// NS-2 — PreferMaxPerfTweak (NVIDIA "Power management mode" = Prefer maximum performance).
+// PreferMaxPerfTweak (NVIDIA « Mode de gestion de l'alimentation » = Performances maximales).
 //
-// Sets the driver DRS setting PREFERRED_PSTATE (0x1057EB71) to PREFER_MAX (1), so the GPU holds
-// its top P-state instead of downclocking. Verified verbatim against NVIDIA's official
-// NvApiDriverSettings.h (github.com/NVIDIA/nvapi): PREFERRED_PSTATE_ID = 0x1057EB71,
-// PREFERRED_PSTATE_PREFER_MAX = 1 (ADAPTIVE = 0). Applied via the same typed, allowlisted
-// ApplyNvApiDrsSettingOp path as the other DRS latency tweaks; the base RevertAsync restores the
-// captured original from the single-op snapshot.
+// Pose le réglage DRS du pilote PREFERRED_PSTATE (0x1057EB71) sur PREFER_MAX (1) : la carte garde
+// son état de performance le plus haut au lieu de baisser sa fréquence. Valeurs vérifiées dans
+// l'en-tête officiel NvApiDriverSettings.h (github.com/NVIDIA/nvapi) : PREFERRED_PSTATE_ID = 0x1057EB71,
+// PREFERRED_PSTATE_PREFER_MAX = 1 (ADAPTIVE = 0). Écrit par le même chemin typé et autorisé
+// (ApplyNvApiDrsSettingOp) que les autres leviers DRS ; le RevertAsync de la base rend l'original
+// relu, depuis le snapshot à une seule op.
 //
-// Opt-in TRADEOFF (honest, §6): forcing max clocks only helps when the GPU actually downclocks
-// in-game (fewer clock-ramp stutters); it costs idle power at the desktop and gives nothing on a
-// GPU already pinned at max under load. That tradeoff is not software-detectable, so it is stated
-// in the summary text (no "+FPS" claim) and the measured A/B governs whether it is kept.
+// Compromis, sur accord : forcer les fréquences maximales n'aide que si la carte baisse vraiment sa
+// fréquence en jeu (moins d'à-coups de montée) ; ça coûte de la consommation au bureau et n'apporte
+// rien à une carte déjà au maximum en charge. Ce compromis ne se détecte pas par logiciel : le texte le
+// dit (pas de « +FPS ») et l'A/B mesuré décide s'il est gardé.
 //
-// Gating: desktop NVIDIA render GPU only — never a laptop (battery / Optimus MUX manages power)
-// and never a non-NVIDIA GPU. Persists natively in the driver profile (nvdrssel.bin), like the
-// other DRS settings, so no reconciler entry is needed (mirrors VrrVsyncCap).
+// Gating : carte de rendu NVIDIA sur un PC de bureau seulement, jamais un portable (la batterie et le
+// MUX Optimus gèrent l'alimentation), jamais une carte non NVIDIA. Persiste dans le profil du pilote
+// (nvdrssel.bin), comme les autres réglages DRS : pas d'entrée au réconciliateur (comme VrrVsyncCap).
 // -----------------------------------------------------------------------
+/// <summary>Garde la carte NVIDIA à son état de performance maximal (PREFERRED_PSTATE = PREFER_MAX), au profil du jeu en cours quand il est connu.
+/// Proposé sur un PC de bureau à carte NVIDIA quand le réglage est lu sur « adaptatif ».</summary>
 public sealed class PreferMaxPerfTweak : LatencyTweakBase
 {
     public const uint PreferredPstateSettingId = 0x1057EB71; // PREFERRED_PSTATE_ID
     public const uint PreferMax = 1;                          // PREFERRED_PSTATE_PREFER_MAX
 
-    /// <summary>30/09/2026 (G1) : « Normal » du panneau NVIDIA = PREFERRED_PSTATE_ADAPTIVE (0) de NvApiDriverSettings.h
+    /// <summary>« Normal » du panneau NVIDIA = PREFERRED_PSTATE_ADAPTIVE (0) de NvApiDriverSettings.h
     /// (github.com/NVIDIA/nvapi). Depuis les pilotes 460, le panneau a renommé « Adaptive » en « Normal » : la fiche
     /// d'aide NVIDIA 3130 s'intitule « Setting Power management mode from Normal to Maximum Performance » et son
     /// adresse garde « adaptive » (nvidia.custhelp.com/app/answers/detail/a_id/3130).</summary>
@@ -36,7 +38,7 @@ public sealed class PreferMaxPerfTweak : LatencyTweakBase
     private readonly INvApi _nvApi;
     private readonly IGameExecutable? _game;
 
-    /// <param name="game">PHASE 18 F1 lot 3 — le jeu en cours. Absent (outils, tests) ou jeu sans
+    /// <param name="game">Le jeu en cours. Absent (outils, tests) ou jeu sans
     /// profil propre : ecriture globale, comme avant.</param>
     public PreferMaxPerfTweak(INvApi nvApi, IElevatedClient elevated, IGameExecutable? game = null) : base(elevated)
         => (_nvApi, _game) = (nvApi, game);
@@ -44,11 +46,9 @@ public sealed class PreferMaxPerfTweak : LatencyTweakBase
     public override string Id => "latency.prefer_max_perf";
     public override string SummaryKey => "tweak.latency.prefer_max_perf.enable";
 
-    // Corrige LE 10/09/2026 (phase 18). Ce gate ne regardait que « bureau + GPU NVIDIA » : il
-    // ne demandait pas si la valeur cible etait deja en place. Lecture reelle du 10/09 sur la
-    // machine de reference : `PREFERRED_PSTATE = 1`, donc **deja au maximum**. Le produit aurait
-    // propose un levier sans effet, l'aurait « applique » sans rien changer, puis aurait mesure le
-    // bruit d'une session — exactement le placebo qu'il existe pour ne pas vendre.
+    // Le gate demande aussi si la valeur cible est deja en place : sinon, sur une carte deja au
+    // maximum (`PREFERRED_PSTATE = 1`, relevé sur la machine de reference), le produit proposerait un
+    // levier sans effet puis mesurerait le bruit d'une session, le placebo qu'il refuse de vendre.
     //
     // `Unknown` ne devient pas un candidat : sans lecture de l'etat courant, il n'y a rien a
     // corriger. Seul un `Off` LU ouvre le levier.
@@ -69,7 +69,7 @@ public sealed class PreferMaxPerfTweak : LatencyTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "NVIDIA driver / NVAPI is not available to set the power management mode.");
 
-            // Capture the real original before writing (faithful revert), at the scope written.
+            // Relever la vraie origine avant d'écrire (retour fidèle), au scope écrit.
             var plan = PlanifierDrs(_nvApi, _game is not null, _game?.RunningGameExecutablePath(), PreferredPstateSettingId,
                 PreferMax, _nvApi.GetPreferredPstate, "power management mode");
             if (!plan.IsOk)

@@ -4,8 +4,8 @@ using DrDxt.Reconciler;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// Shared builder for the Reconciler under test, wiring all in-memory fakes. Each
-// test mutates the pieces it cares about. Nothing here touches the real machine.
+// Constructeur partagé du Reconciler sous test, qui câble tous les faux en mémoire. Chaque
+// test mute les pièces qui le concernent. Rien ici ne touche la vraie machine.
 // -----------------------------------------------------------------------
 public sealed class ReconcilerHarness
 {

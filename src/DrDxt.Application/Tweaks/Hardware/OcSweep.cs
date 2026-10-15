@@ -4,31 +4,31 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// P2 — OcSweep: ascending core-offset sweep on the deterministic perf-meter (P1).
+// OcSweep : balayage croissant du décalage cœur sur le compteur de performance déterministe.
 //
-// Protocol (surgical, honest):
-//   1. apply 0 (stock) and measure the stock aggregate — an UNSTABLE stock fails the
-//      whole sweep (the machine is not measurable; nothing is ever applied),
-//   2. for each candidate (ascending, in-band per GpuSafeBounds, out-of-band silently
-//      skipped so the sweep can never write past the policy): apply → measure →
-//      GpuBenchAb verdict vs stock,
-//   3. keep the best PROVEN gain (delta clears the combined inter-run margin AND every
-//      run stable); the first unstable / failed step STOPS the sweep,
-//   4. Always finish by re-applying the best offset (0 = stock when nothing proved
-//      better) — never leaves an unproven offset on the GPU, even on early exit.
+// Protocole (chirurgical, honnête) :
+//   1. poser 0 (origine) et mesurer l'agrégat d'origine ; une origine instable fait échouer
+//      tout le balayage (la machine n'est pas mesurable, rien n'est jamais posé),
+//   2. pour chaque candidat (croissant, dans la plage de GpuSafeBounds ; ceux hors plage sont
+//      écartés sans bruit, le balayage ne peut jamais écrire au-delà de la règle) : pose →
+//      mesure → verdict GpuBenchAb contre l'origine,
+//   3. garder le meilleur gain prouvé (l'écart dépasse la marge cumulée entre passes et chaque
+//      passe est stable) ; la première étape instable ou ratée arrête le balayage,
+//   4. toujours finir en reposant le meilleur décalage (0 = origine si rien n'a prouvé mieux) :
+//      jamais de décalage non prouvé laissé sur le GPU, même en sortie anticipée.
 //
-// Pure orchestration over two delegates (measure / apply) so the decision logic is
-// fully unit-tested with no GPU; the octune harness closes them over GpuBenchSession
-// and the live NVAPI write.
+// Pure orchestration sur deux délégués (mesurer / poser), pour que la logique de décision soit
+// testée en entier sans GPU ; le banc octune les branche sur GpuBenchSession et la vraie
+// écriture NVAPI.
 // -----------------------------------------------------------------------
 
-/// <summary>One sweep step: the offset tried, whether the write took, the measured
-/// aggregate (null when the apply or the measure failed) and its verdict vs stock.</summary>
+/// <summary>Une étape du balayage : le décalage essayé, si l'écriture a pris, l'agrégat mesuré
+/// (null si la pose ou la mesure a échoué) et son verdict contre l'origine.</summary>
 public sealed record OcSweepStep(int OffsetMhz, bool ApplyOk, GpuBenchAggregate? Aggregate, GpuBenchAbVerdict? Verdict);
 
-/// <summary>Sweep outcome: the best proven offset (0 = stock), its gain % vs stock
-/// (0 when stock), the stock aggregate, every step, and whether the final restore-to-best
-/// write succeeded (false = the GPU may not be at BestOffsetMhz — surface loudly).</summary>
+/// <summary>Résultat du balayage : le meilleur décalage prouvé (0 = origine), son gain en %
+/// contre l'origine (0 si origine), l'agrégat d'origine, chaque étape, et si l'écriture finale du
+/// meilleur a réussi (faux = le GPU n'est peut-être pas à BestOffsetMhz : le dire fort).</summary>
 public sealed record OcSweepOutcome(
     int BestOffsetMhz,
     double GainPct,
@@ -42,14 +42,14 @@ public static class OcSweep
         Func<Result<GpuBenchAggregate>> measure,
         Func<int, bool> applyOffset,
         IReadOnlyList<int> candidateOffsetsMhz,
-        // The clock domain decides the safe band: core by default; pass
-        // GpuSafeBounds.IsMemoryOffsetSafe for a memory-offset sweep (±500).
+        // Le domaine d'horloge décide de la plage sûre : le cœur par défaut ; passer
+        // GpuSafeBounds.IsMemoryOffsetSafe pour un balayage du décalage mémoire (±500).
         Func<int, bool>? isInBand = null)
     {
         isInBand ??= GpuSafeBounds.IsCoreOffsetSafe;
 
-        // In-band, non-stock, ascending, deduped. Out-of-band candidates are dropped
-        // here so a caller mistake can never reach the GPU (defense before the write).
+        // Dans la plage, hors origine, croissant, sans doublon. Les candidats hors plage sont
+        // écartés ici : une erreur d'appelant n'atteint jamais le GPU (défense avant l'écriture).
         var candidates = candidateOffsetsMhz
             .Where(o => o != 0 && isInBand(o))
             .Distinct()
@@ -77,7 +77,7 @@ public static class OcSweep
             if (!applyOffset(offset))
             {
                 steps.Add(new OcSweepStep(offset, ApplyOk: false, null, null));
-                break; // a refused write ends the sweep — restore below
+                break; // une écriture refusée arrête le balayage ; remise plus bas
             }
 
             var read = measure();
@@ -91,7 +91,7 @@ public static class OcSweep
             steps.Add(new OcSweepStep(offset, ApplyOk: true, read.Value, verdict));
 
             if (verdict == GpuBenchAbVerdict.Unstable)
-                break; // never push past the first instability
+                break; // jamais au-delà de la première instabilité
 
             if (verdict == GpuBenchAbVerdict.Gain && read.Value.MeanScore > bestScore)
             {
@@ -100,7 +100,7 @@ public static class OcSweep
             }
         }
 
-        // Surgical exit: the GPU always ends at the best PROVEN offset (stock if none).
+        // Sortie chirurgicale : le GPU finit toujours au meilleur décalage prouvé (l'origine sinon).
         var endedAtBest = applyOffset(bestOffset);
         var gainPct = bestOffset == 0 ? 0 : (bestScore - stock.MeanScore) / stock.MeanScore * 100.0;
 

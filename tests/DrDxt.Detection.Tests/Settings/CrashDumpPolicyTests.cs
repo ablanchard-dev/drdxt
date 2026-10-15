@@ -62,6 +62,8 @@ public class CrashDumpPolicyTests
         f.Statut.Should().Be(RepairStatus.Suspicious);
         f.Action.Should().Be(RepairAction.Recommandation);
         f.Explication.Should().Contain("aucune trace exploitable");
+        // Le réglage se pose là où Windows le range, en étapes ; l'explication reste le pourquoi.
+        f.Remede.Should().StartWith("1) ").And.Contain("sysdm.cpl").And.Contain("Vidage mémoire automatique");
     }
 
     [Fact]

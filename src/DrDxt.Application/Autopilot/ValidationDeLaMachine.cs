@@ -5,7 +5,7 @@ using DrDxt.Core;
 namespace DrDxt.Application.Autopilot;
 
 /// <summary>
-/// 08/10/2026 (T1b, le mainteneur : « rajouter les tests pour valider certaines choses pour les users dans l'app ») : la validation
+/// La validation
 /// complète sur la vraie machine, branchée sur les leviers et les lecteurs du produit. Le banc AMD et l'App l'appellent
 /// tous les deux. Chaque levier est relu par ce qui le lit vraiment : la carte pour la limite de puissance et les réglages
 /// du pilote AMD, le registre, le plan d'alimentation ou le pilote NVIDIA pour le reste (<see cref="AppliedStateVerifier"/>).
@@ -22,9 +22,9 @@ public sealed class ValidationDeLaMachine(
         Func<bool>? jeuOuvert = null)
     {
         var materiel = await detecteur.DetectAsync().ConfigureAwait(false);
-        if (!materiel.IsOk) return new($"détection impossible : {materiel.Error?.Message}", ["détection impossible : rien n'a été écrit"]);
+        if (!materiel.IsOk) return new(Docteur.T("VM.Detection", materiel.Error?.Message), [Docteur.T("VM.Detection.RienEcrit")]);
         var lu = await etat.ReadAsync(materiel.Value!).ConfigureAwait(false);
-        if (!lu.IsOk) return new($"état illisible : {lu.Error?.Message}", ["état illisible : rien n'a été écrit"]);
+        if (!lu.IsOk) return new(Docteur.T("VM.Etat", lu.Error?.Message), [Docteur.T("VM.Etat.RienEcrit")]);
 
         var leviers = ValidationComplete.Leviers
             .Select(id => catalogue.Get(id) is { IsOk: true, Value: { } t } ? t : null)
@@ -41,18 +41,18 @@ public sealed class ValidationDeLaMachine(
         {
             var (nom, origine, valeur) = op switch
             {
-                ApplyAdlxTuningOp { Kind: AdlxTuningKind.PowerLimit } a => ("limite de puissance (%)", a.IntValue, adlxCarte.GetPowerLimitPct(a.GpuIndex)),
+                ApplyAdlxTuningOp { Kind: AdlxTuningKind.PowerLimit } a => (Docteur.T("VM.LimitePuissance"), a.IntValue, adlxCarte.GetPowerLimitPct(a.GpuIndex)),
                 ApplyAdlxTuningOp { Kind: AdlxTuningKind.AntiLag } a => ("Anti-Lag (0/1)", a.IntValue, latenceAmd.GetAntiLagState()),
-                ApplyAdlxTuningOp { Kind: AdlxTuningKind.FrameRateTarget } a => ("FRTC (cible, négatif = éteint)", a.IntValue, latenceAmd.GetFrameRateTarget()),
-                ApplyNvApiPowerLimitOp n => ("limite de puissance (%)", n.PowerLimitPercent, nvCarte.GetPowerLimitPct(n.GpuIndex)),
+                ApplyAdlxTuningOp { Kind: AdlxTuningKind.FrameRateTarget } a => (Docteur.T("VM.Frtc"), a.IntValue, latenceAmd.GetFrameRateTarget()),
+                ApplyNvApiPowerLimitOp n => (Docteur.T("VM.LimitePuissance"), n.PowerLimitPercent, nvCarte.GetPowerLimitPct(n.GpuIndex)),
                 _ => ("", 0, (Result<int>?)null),
             };
             if (valeur is not null)
                 return valeur.IsOk
-                    ? new(valeur.Value != origine, $"{nom} : origine {origine}, lu {valeur.Value}")
-                    : new(null, $"{nom} illisible : {valeur.Error?.Message}");
+                    ? new(valeur.Value != origine, Docteur.T("VM.OrigineLu", nom, origine, valeur.Value))
+                    : new(null, Docteur.T("VM.Illisible", nom, valeur.Error?.Message));
         }
-        // A2c : un composite de réglages AMD (Vsync du pilote + FRTC) : chaque feuille relue par la carte, comparée à son
+        // Un composite de réglages AMD (Vsync du pilote + FRTC) : chaque feuille relue par la carte, comparée à son
         // origine. Posé = toutes ont bougé ; rendu = toutes sont à l'origine ; sinon, non conclu.
         if (CompositeSnapshotCodec.Decode(s.OriginalValueJson) is { IsOk: true, Value: { Count: > 0 } feuilles }
             && feuilles.All(f => f is ApplyAdlxTuningOp))
@@ -61,16 +61,16 @@ public sealed class ValidationDeLaMachine(
             {
                 AdlxTuningKind.VerticalRefresh => latenceAmd.GetVsyncMode(),
                 AdlxTuningKind.FrameRateTarget => latenceAmd.GetFrameRateTarget(),
-                _ => Result<int>.Fail(ErrorCodes.TweakSdkUnavailable, "genre non relu"),
+                _ => Result<int>.Fail(ErrorCodes.TweakSdkUnavailable, Docteur.T("VM.GenreNonRelu")),
             })).ToList();
-            var texte = string.Join(" ; ", lues.Select(l => $"{l.Kind} : origine {l.Origine}, lu {(l.Lu.IsOk ? l.Lu.Value.ToString() : "illisible")}"));
+            var texte = string.Join(" ; ", lues.Select(l => Docteur.T("VM.OrigineLu", l.Kind, l.Origine, l.Lu.IsOk ? l.Lu.Value.ToString() : Docteur.T("VM.IllisibleMot"))));
             if (lues.Any(l => !l.Lu.IsOk)) return new(null, texte);
             if (lues.All(l => l.Lu.Value != l.Origine)) return new(true, texte);
             if (lues.All(l => l.Lu.Value == l.Origine)) return new(false, texte);
-            return new(null, texte + " (en partie seulement)");
+            return new(null, texte + Docteur.T("VM.EnPartie"));
         }
         var preuve = AppliedStateVerifier.Verifier(s, registre, nvApi, alimentation);
         bool? pose = preuve.Verdict switch { EtatApplique.Applied => true, EtatApplique.NotApplied => false, _ => null };
-        return new(pose, $"{preuve.Verdict} : origine {preuve.OriginalState ?? "absente"}, demandé {preuve.RequestedState ?? "?"}, lu {preuve.ObservedState ?? "absent"}");
+        return new(pose, Docteur.T("VM.Preuve", preuve.Verdict, preuve.OriginalState ?? Docteur.T("TE.Absente"), preuve.RequestedState ?? "?", preuve.ObservedState ?? Docteur.T("TE.Absente")));
     }
 }

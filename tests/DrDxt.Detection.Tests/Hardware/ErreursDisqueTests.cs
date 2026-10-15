@@ -6,17 +6,17 @@ using NSubstitute;
 
 namespace DrDxt.Detection.Tests.Hardware;
 
-// 06/10/2026 (chantier B6 a) : les erreurs que le disque n'a pas pu corriger (MSFT_StorageReliabilityCounter,
+// Les erreurs que le disque n'a pas pu corriger (MSFT_StorageReliabilityCounter,
 // ReadErrorsUncorrected et WriteErrorsUncorrected). Dit seulement quand il y en a ; un compteur absent n'est pas zéro.
 public sealed class ErreursDisqueTests
 {
-    private static IWmiQuery Wmi(Dictionary<string, object?> compteurs)
+    private static IWmiQuery Wmi(Dictionary<string, object?> compteurs, object? sante = null)
     {
         var wmi = Substitute.For<IWmiQuery>();
         wmi.QueryInNamespace(Arg.Any<string>(), Arg.Is<string>(q => q.StartsWith("SELECT")))
             .Returns(Result<IReadOnlyList<WmiRow>>.Ok(new List<WmiRow>
             {
-                new(new Dictionary<string, object?> { ["FriendlyName"] = "Disque A", ["ObjectId"] = "{1}\\X" }),
+                new(new Dictionary<string, object?> { ["FriendlyName"] = "Disque A", ["ObjectId"] = "{1}\\X", ["HealthStatus"] = sante }),
             }));
         wmi.QueryInNamespace(Arg.Any<string>(), Arg.Is<string>(q => q.StartsWith("ASSOCIATORS")))
             .Returns(Result<IReadOnlyList<WmiRow>>.Ok(new List<WmiRow> { new(compteurs) }));
@@ -40,7 +40,8 @@ public sealed class ErreursDisqueTests
         c.Nom.Should().Be("erreurs non corrigées · Samsung SSD 990 PRO 2TB");
         c.ValeurCourante.Should().Be("3");
         c.Statut.Should().Be(RepairStatus.Suspicious);
-        c.Explication.Should().Contain("copie");
+        c.Explication.Should().Contain("abîmée").And.NotContain("chkdsk");
+        c.Remede.Should().StartWith("1) Copie").And.Contain("chkdsk");
         c.Action.Should().Be(RepairAction.Recommandation);
     }
 
@@ -49,5 +50,21 @@ public sealed class ErreursDisqueTests
     {
         StorageWearReader.JugerErreurs(new UsureDisque("A", 0, 40, ErreursNonCorrigees: 0)).Should().BeNull();
         StorageWearReader.JugerErreurs(new UsureDisque("A", 0, 40)).Should().BeNull();
+    }
+
+    // Ce que Windows dit de la santé du disque (MSFT_PhysicalDisk.HealthStatus, un UInt16).
+    [Fact]
+    public void La_sante_dite_par_Windows_se_lit_et_se_juge()
+    {
+        new StorageWearReader(Wmi(new() { ["Wear"] = "0" }, sante: (ushort)2)).Lire().Value!.Single().SanteWindows.Should().Be(2);
+        new StorageWearReader(Wmi(new() { ["Wear"] = "0" })).Lire().Value!.Single().SanteWindows.Should().BeNull();
+
+        StorageWearReader.JugerSante(new UsureDisque("A", 0, 40, SanteWindows: 2))!.ValeurCourante.Should().Be("en mauvaise santé");
+        StorageWearReader.JugerSante(new UsureDisque("A", 0, 40, SanteWindows: 1))!.Explication.Should().Contain("avertissement");
+        StorageWearReader.JugerSante(new UsureDisque("A", 0, 40, SanteWindows: 1))!.Remede.Should().StartWith("1) Copie");
+        StorageWearReader.JugerSante(new UsureDisque("A", 0, 40, SanteWindows: 2))!.Remede.Should().StartWith("1) Copie").And.Contain("remplacer");
+        StorageWearReader.JugerSante(new UsureDisque("A", 0, 40, SanteWindows: 0)).Should().BeNull();
+        StorageWearReader.JugerSante(new UsureDisque("A", 0, 40, SanteWindows: 5)).Should().BeNull("inconnu : rien d'inventé");
+        StorageWearReader.JugerSante(new UsureDisque("A", 0, 40)).Should().BeNull();
     }
 }

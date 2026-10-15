@@ -6,20 +6,20 @@ using System.Text;
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// PipeServerIdentity — la moitie SYMETRIQUE de PipeClientIdentity.
+// PipeServerIdentity : la moitie symetrique de PipeClientIdentity.
 //
-// Le serveur resout depuis longtemps qui l'appelle (GetNamedPipeClientProcessId →
-// chemin + SHA-256, DrDxtAppCallerAuthenticator). Ce fichier donne au CLIENT la
+// Le serveur resout qui l'appelle (GetNamedPipeClientProcessId →
+// chemin + SHA-256, DrDxtAppCallerAuthenticator). Ce fichier donne au client la
 // meme capacite : resoudre qui lui repond sur le tube, pour qu'un processus non
 // privilegie qui a pris le nom du tube avant le helper ne puisse plus se faire
-// passer pour lui (defaut D.3 de la revue du 11/09/2026).
+// passer pour lui.
 //
 // Pourquoi OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION) + QueryFullProcessImageNameW
 // et pas Process.MainModule comme cote serveur : le sens de la traversee est inverse.
-// Le serveur (eleve) lit une App a integrite moyenne — MainModule passe. Le client
-// (integrite moyenne) doit lire un helper ELEVE : MainModule y echoue, la lecture du
+// Le serveur (eleve) lit une App a integrite moyenne : MainModule passe. Le client
+// (integrite moyenne) doit lire un helper eleve : MainModule y echoue, la lecture du
 // module exigeant PROCESS_VM_READ. PROCESS_QUERY_LIMITED_INFORMATION existe exactement
-// pour ce cas — il ne donne que le nom de l'image, jamais la memoire. Meme motif que
+// pour ce cas : il ne donne que le nom de l'image, jamais la memoire. Meme motif que
 // DrDxt.App/Platform/GameLocator.cs, qui lit deja des processus qu'il ne peut pas ouvrir.
 //
 // Tout echec rend null → le client refuse (fail-closed, jamais fail-open).
@@ -32,9 +32,9 @@ public static class PipeServerIdentity
     /// client doit retrouver en face de lui sur le tube.</summary>
     public const string HelperExeName = "DrDxt.ElevatedHelper.exe";
 
-    /// <summary>Le chemin ATTENDU du helper : l'exe pose a cote du binaire courant
+    /// <summary>Le chemin attendu du helper : l'exe pose a cote du binaire courant
     /// (l'App et le service de reconciliation sont tous deux installes a cote de lui).
-    /// Rend null si le fichier n'est pas la — auquel cas le client refuse la session
+    /// Rend null si le fichier n'est pas la : le client refuse alors la session
     /// plutot que de faire confiance a n'importe qui.</summary>
     public static string? TryResolveExpectedHelperPath()
     {
@@ -52,7 +52,7 @@ public static class PipeServerIdentity
         }
     }
 
-    /// <summary>Le chemin complet de l'image du processus qui SERT ce tube, ou null si
+    /// <summary>Le chemin complet de l'image du processus qui sert ce tube, ou null si
     /// le pid ne se resout pas, si le processus a disparu, ou si le systeme refuse la
     /// requete. Un null vaut un refus cote appelant.</summary>
     public static string? TryGetServerImagePath(NamedPipeClientStream client)

@@ -1,36 +1,36 @@
 namespace DrDxt.GpuNative.NvApi;
 
 // -----------------------------------------------------------------------
-// NvApiConvert — the pure, unit-testable arithmetic the RISKY NVAPI tuning RECIPE
-// uses to express values in the DRIVER's units. It lives in the leaf next to the
-// single P/Invoke boundary (NvApiNative) because it is part of the recipe, not the
-// safety POLICY: the conservative offset / power bands stay in the helper's
-// NvApiTuningMath (mirrored from GpuSafeBounds), this file is conversion-only.
+// NvApiConvert : l'arithmétique pure et testable dont se sert la recette de réglage NVAPI risquée
+// pour exprimer les valeurs dans les unités du pilote. Elle vit dans la feuille, à côté de l'unique
+// frontière P/Invoke (NvApiNative), parce qu'elle fait partie de la recette, pas de la règle de
+// sécurité : les plages prudentes de décalage / de puissance restent dans le NvApiTuningMath du
+// helper (repris de GpuSafeBounds) ; ce fichier ne fait que convertir.
 //
-//  * Core-clock offset is expressed to the driver in kHz (recipe §A): +100 MHz =
-//    100_000 kHz; the sign is preserved for a negative undervolt offset.
-//  * Power limit is expressed in per-cent-mille (PCM, recipe §B): 100% = 100_000.
-//  * ClampPcm bounds a requested PCM target to the driver's reported [min, max];
-//    inverted/garbage bounds return the value unchanged (the caller then fails
-//    clean) rather than throwing.
+//  * Le décalage d'horloge cœur s'exprime au pilote en kHz (recette §A) : +100 MHz = 100_000 kHz ;
+//    le signe est gardé pour un décalage d'undervolt négatif.
+//  * La limite de puissance s'exprime en pour cent mille (PCM, recette §B) : 100 % = 100_000.
+//  * ClampPcm borne une cible PCM demandée au [min, max] annoncé par le pilote ; des bornes
+//    inversées ou déchet rendent la valeur inchangée (l'appelant échoue alors proprement) plutôt
+//    que de lever.
 // -----------------------------------------------------------------------
 internal static class NvApiConvert
 {
-    /// <summary>Core-clock offset MHz → kHz (the unit SetPstates20 expects). Sign kept.</summary>
+    /// <summary>Décalage d'horloge cœur MHz → kHz (l'unité qu'attend SetPstates20). Signe gardé.</summary>
     internal static int MhzToKhz(int mhz) => mhz * 1000;
 
-    /// <summary>Core-clock offset kHz → MHz (truncating toward zero).</summary>
+    /// <summary>Décalage d'horloge cœur kHz → MHz (troncature vers zéro).</summary>
     internal static int KhzToMhz(int khz) => khz / 1000;
 
-    /// <summary>Power-limit percent → per-cent-mille (90% → 90_000).</summary>
+    /// <summary>Limite de puissance en pour cent → pour cent mille (90 % → 90_000).</summary>
     internal static uint PercentToPcm(double percent) => (uint)Math.Round(percent * 1000.0);
 
-    /// <summary>Power-limit per-cent-mille → percent (90_000 → 90).</summary>
+    /// <summary>Limite de puissance en pour cent mille → pour cent (90_000 → 90).</summary>
     internal static int PcmToPercent(uint pcm) => (int)Math.Round(pcm / 1000.0);
 
-    /// <summary>Clamps a PCM power target to the driver's [min, max]. Inverted bounds
-    /// (max &lt; min) are treated as invalid and the value is returned unchanged so the
-    /// caller can refuse the write — never throws.</summary>
+    /// <summary>Borne une cible de puissance PCM au [min, max] du pilote. Des bornes inversées
+    /// (max &lt; min) sont traitées comme invalides et la valeur est rendue inchangée pour que
+    /// l'appelant puisse refuser l'écriture : ne lève jamais.</summary>
     internal static uint ClampPcm(uint value, uint min, uint max)
     {
         if (max < min) return value;

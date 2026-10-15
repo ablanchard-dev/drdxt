@@ -7,7 +7,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// 25/09/2026. Sur la machine de reference, les trois peripheriques « en erreur » sont des profils
+/// Sur la machine de reference, les trois peripheriques « en erreur » sont des profils
 /// Bluetooth mains libres DESACTIVES (code 22). Le code decide du statut : un choix n'est pas une panne.
 /// </summary>
 public class PeripheriquesEnErreurTests
@@ -29,6 +29,10 @@ public class PeripheriquesEnErreurTests
         var c = PeripheriquesEnErreur.Juger("Contrôleur", code)!;
         c.Statut.Should().Be(RepairStatus.Suspicious);
         c.Action.Should().Be(RepairAction.Recommandation);
+        // Le geste nomme le périphérique lu, celui à chercher dans le Gestionnaire de périphériques.
+        c.Remede.Should().StartWith("1) ").And.Contain("Gestionnaire de périphériques").And.Contain("« Contrôleur »");
+        // L'identifiant lu suit le constat : c'est lui que le geste « relancer » vise, jamais un nom affiché.
+        PeripheriquesEnErreur.Juger("Contrôleur", code, @"PCI\VEN_1\3")!.Cible.Should().Be(@"PCI\VEN_1\3");
     }
 
     [Theory]

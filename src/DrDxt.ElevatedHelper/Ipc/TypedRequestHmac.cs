@@ -4,22 +4,22 @@ using System.Text;
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// HMAC-SHA256 over the canonical bytes of a TYPED privileged request.
+// HMAC-SHA256 sur les octets canoniques d'une requête privilégiée typée.
 //
-// SECURITY (master plan §9.14): Transport integrity only — it proves the op
-// JSON + nonce were not altered in flight and that the peer holds the session
-// key. It is not authorization (that is ICallerAuthenticator) and not the
-// allowlist (that is OpAllowlist). Verification is constant-time
-// (FixedTimeEquals) and never throws on malformed input (fail-closed).
-// The key is INJECTED; M2 may keep an ephemeral per-session HMAC key (the
-// crypto hardening to asymmetric is M5), but the fail-clean path is tested now.
+// Sécurité : intégrité du transport seulement. Il prouve que le JSON de l'op + le nonce n'ont
+// pas été modifiés en route et que le pair détient la clé de session. Ce n'est pas
+// l'autorisation (c'est ICallerAuthenticator) ni l'allowlist (c'est OpAllowlist). La
+// vérification est en temps constant (FixedTimeEquals) et ne lève jamais sur une entrée
+// malformée (fail-closed). La clé est injectée : une clé HMAC éphémère par session, et le
+// chemin d'échec propre est testé.
 // -----------------------------------------------------------------------
 public static class TypedRequestHmac
 {
-    // ASCII unit separator (0x1F) — unambiguous field delimiter so distinct
-    // (opJson, nonce) pairs can never canonicalize to the same bytes. Explicit
-    //  escape so it survives copy/paste and editor cleanups.
-    private const string FieldSeparator = "";
+    // Séparateur d'unité ASCII (0x1F) entre les champs. La forme reste sans ambiguïté parce que le séparateur ne peut
+    // jamais apparaître brut dans un champ : l'op sort du codec, dont le JSON échappe les caractères de contrôle, et le
+    // nonce est un GUID en hexadécimal (LaFormeSigneeResteSansAmbiguiteTests). Écrit en échappement, pour qu'aucun
+    // copier-coller ni éditeur ne l'efface.
+    private const string FieldSeparator = "\u001F";
 
     public static byte[] CanonicalBytes(string opJson, string nonce)
     {
@@ -37,7 +37,7 @@ public static class TypedRequestHmac
 
     public static bool Verify(ReadOnlySpan<byte> key, string opJson, string nonce, string? hmacBase64)
     {
-        // Guard before decoding: a null/empty HMAC must fail-close, never throw.
+        // Garde avant le décodage : un HMAC null ou vide doit refuser (fail-closed), jamais lever.
         if (string.IsNullOrEmpty(hmacBase64))
             return false;
         if (opJson is null || nonce is null)
@@ -50,7 +50,7 @@ public static class TypedRequestHmac
         }
         catch (FormatException)
         {
-            return false; // malformed base64 → fail-closed
+            return false; // base64 malformé → fail-closed
         }
 
         Span<byte> expected = stackalloc byte[HMACSHA256.HashSizeInBytes];

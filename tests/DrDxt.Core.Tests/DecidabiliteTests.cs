@@ -5,7 +5,7 @@ using Xunit;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// PHASE 18 F5 — un candidat ne se tente que si la scene peut voir son effet, et le nombre
+/// Un candidat ne se tente que si la scene peut voir son effet, et le nombre
 /// d'alternances est fixe avant la mesure, par l'effet declare.
 /// </summary>
 public class DecidabiliteTests
@@ -13,7 +13,7 @@ public class DecidabiliteTests
     private static SceneResolution Scene(double resolutionPct) =>
         new(resolutionPct, 0, 24, SceneVerdict.Usable);
 
-    // 26/09/2026 : moins de trois passes, la resolution vaut +inf ; le motif ecrivait « (∞ %) ».
+    // Moins de trois passes, la resolution vaut +inf ; le motif ecrivait « (∞ %) ».
     [Fact]
     public void Une_scene_sans_resolution_le_dit_sans_symbole_infini()
     {

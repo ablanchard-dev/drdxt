@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 07/10/2026 (revue n° 8) : le rapport lit tout en administrateur (journaux, démarrage, BCD) ; un seul « Oui » au lancement. -->
+<!-- Le rapport lit tout en administrateur (journaux, démarrage, BCD) ; un seul « Oui » au lancement. -->
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>

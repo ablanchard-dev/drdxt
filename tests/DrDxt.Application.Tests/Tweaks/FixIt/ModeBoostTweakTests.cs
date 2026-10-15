@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.Application.Tests.Tweaks.FixIt;
 
-// L-CPU (07/10/2026) : le boost du processeur coupé (PERFBOOSTMODE secteur = 0) rendu au défaut de son propre plan.
+// Le boost du processeur coupé (PERFBOOSTMODE secteur = 0) rendu au défaut de son propre plan.
 // Doublures NSubstitute seulement : aucune lecture ni écriture de la vraie machine.
 public sealed class ModeBoostTweakTests
 {
@@ -40,7 +40,7 @@ public sealed class ModeBoostTweakTests
     public void Boost_coupe_sur_un_fixe_Intel_ou_AMD_est_propose(string vendeur) =>
         Build().AppliesTo(Hw(ChassisType.Desktop, vendeur), Etat(new ModeDeBoostLu(Plan, 0, 2))).Should().BeTrue();
 
-    // LAP1 (08/10/2026) : le levier n'écrit que la valeur « sur secteur » ; la batterie n'est jamais touchée.
+    // Le levier n'écrit que la valeur « sur secteur » ; la batterie n'est jamais touchée.
     [Fact]
     public void Sur_un_portable_le_boost_secteur_est_propose() =>
         Build().AppliesTo(Hw(ChassisType.Laptop), Etat(new ModeDeBoostLu(Plan, 0, 2))).Should().BeTrue();

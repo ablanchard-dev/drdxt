@@ -21,7 +21,7 @@ from pathlib import Path
 RACINE = Path(__file__).resolve().parent.parent
 ARCHITECTURES = {"AdaOrOlder", "Rdna3", "Rdna4", "Blackwell"}
 NOM_SUR = re.compile(r"^[a-z0-9][a-z0-9-]{2,60}$")
-# Revue du 08/10/2026 (REV1) : la liste suit MachineExportee.CeQuiEstRetire ; un export d'une ancienne version qui en
+# La liste suit MachineExportee.CeQuiEstRetire ; un export d'une ancienne version qui en
 # garde un se refuse. Ce qui ressemble sans l'être (C:\Users\Public, nvlddmkm@4.0, une version 1.459.153.0) passe.
 OCTET = r"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"
 IDENTIFIANTS = [
@@ -106,7 +106,7 @@ def autotest():
         (json.dumps({"Inventaire": {}, "Reglages": {"Mac": "AA-BB-CC-DD-EE-FF"}}), {"nom": "amd-pote"}),
         (json.dumps({"Inventaire": {}}), {"nom": "amd-pote"}),
         ("pas un rapport", {"nom": "amd-pote"}),
-        # REV1 : ce que l'ancienne liste laissait passer.
+        # Ce que l'ancienne liste laissait passer.
         (machine.replace("Documents", "Documents 192.168.1.20"), {"nom": "amd-pote"}),
         (machine.replace("Documents", "Documents fe80::1c2d:3e4f"), {"nom": "amd-pote"}),
         (machine.replace("Documents", "Documents DESKTOP-4KQ7ZPA"), {"nom": "amd-pote"}),
@@ -115,7 +115,7 @@ def autotest():
         (machine.replace("Documents", "OneDrive - Contoso"), {"nom": "amd-pote"}),
         (machine.replace("C:\\\\Users\\\\joueur", "C:/Users/bob"), {"nom": "amd-pote"}),
     ]
-    # REV1 : ce qui ressemble sans l'être passe.
+    # Ce qui ressemble sans l'être passe.
     for propre in ["C:\\Users\\Public\\Documents", "nvlddmkm@4.0", "version 1.459.153.0", "il est 20:00:00",
                    "plan 381b4222-f694-41f0-9685-ff5bb260df2e"]:
         assert identifiant_reste(propre) is None, propre

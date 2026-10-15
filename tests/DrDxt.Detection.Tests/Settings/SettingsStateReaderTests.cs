@@ -72,7 +72,7 @@ public class SettingsStateReaderTests
         return n;
     }
 
-    // ---- L8 suite : le VRR lu au pilote sur l'ecran du jeu ----------------------------
+    // ---- Le VRR lu au pilote sur l'ecran du jeu ----------------------------
 
     private static IDisplayInfo EcranVrr(TriState possible, TriState actif)
     {
@@ -106,7 +106,7 @@ public class SettingsStateReaderTests
     [InlineData(0u, TriState.Off)]
     public async Task Le_reglage_G_SYNC_du_pilote_fait_foi_sur_l_etat_instantane(uint mode, TriState attendu)
     {
-        // Machine de reference le 25/09/2026 : VRR_MODE = 1, et NVAPI « actif = Off » au bureau.
+        // Releve sur la machine de reference le 25/09/2026 : VRR_MODE = 1, et NVAPI « actif = Off » au bureau.
         var (p, r) = Providers();
         var pilote = Driver(null);
         pilote.GetGsyncMode().Returns(Result<uint>.Ok(mode));
@@ -130,11 +130,10 @@ public class SettingsStateReaderTests
     [Fact]
     public async Task Les_frequences_de_TOUS_les_ecrans_arrivent_dans_l_etat()
     {
-        // Le defaut que ce test ferme, et il etait a moi : le lecteur calculait la liste des
-        // frequences puis ne la passait pas au constructeur de l'etat. Calcule, puis jete. Le
-        // diagnostic de consommation au repos naissait donc mort -- l'advisor teste, le bareme
-        // cable, la chaine complete, et un `null` au milieu. Verifie sur la machine reelle : le
-        // lecteur d'ecrans rendait bien 200 et 144 Hz, et l'etat disait « jamais lu ».
+        // Le defaut que ce test ferme : une liste des frequences calculee puis jamais passee au
+        // constructeur de l'etat. Le diagnostic de consommation au repos serait mort, avec l'advisor
+        // teste, le bareme cable, et un `null` au milieu : le lecteur d'ecrans rendrait 200 et 144 Hz
+        // et l'etat dirait « jamais lu ».
         var (p, r) = Providers();
         var sut = new SettingsStateReader(p, r, NoNetwork(), Driver(null), Screens((200, true), (144, false)));
 
@@ -212,7 +211,7 @@ public class SettingsStateReaderTests
     [Fact]
     public async Task Power_plan_guid_propagated()
     {
-        var (p, r) = Providers(powerGuid: "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"); // High Performance
+        var (p, r) = Providers(powerGuid: "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"); // Performances élevées
         var state = await new SettingsStateReader(p, r, NoNetwork()).ReadAsync(Hw(TriState.Unknown));
         state.Value!.PowerPlanGuid.Should().Be("8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c");
     }
@@ -303,7 +302,7 @@ public class SettingsStateReaderTests
         state.Value!.UncleanShutdowns.Should().BeNull("null veut dire jamais lu");
     }
 
-    // L-WU : les heures d'activité lues atteignent l'état ; non lues, elles restent null (jamais « 8 h à 17 h » par défaut).
+    // Les heures d'activité lues atteignent l'état ; non lues, elles restent null (jamais « 8 h à 17 h » par défaut).
     [Fact]
     public async Task Les_heures_d_activite_lues_atteignent_l_etat()
     {

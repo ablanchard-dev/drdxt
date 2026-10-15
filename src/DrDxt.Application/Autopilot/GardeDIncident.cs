@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Application.Autopilot;
 
 /// <summary>
-/// 08/10/2026 (le mainteneur : « DrDXT n'est pas censé me dire non, il est censé trouver, réparer et faire ») : des arrêts brutaux
+/// Des arrêts brutaux
 /// passés ne refusent plus Optimiser. Le filet les remplace : un réglage posé par DrDXT et suivi d'un arrêt brutal hors
 /// veille dans la semaine est rendu seul, au lancement suivant. L'incident n'est plus « inattribuable » : ce qui a été
 /// posé juste avant est retiré, et la suite dit si l'incident revient sans lui.
@@ -12,7 +12,7 @@ public static class GardeDIncident
 {
     public static readonly TimeSpan Surveillance = TimeSpan.FromDays(7);
 
-    /// <summary>GARDE1 (09/10/2026) : un réglage qui n'écrit que la session (mode Jeu, préférences HKCU) ou le moment où
+    /// <summary>Un réglage qui n'écrit que la session (mode Jeu, préférences HKCU) ou le moment où
     /// Windows Update redémarre ne peut pas causer un arrêt brutal ; une coupure de courant ne le rend pas. Un levier qui ne
     /// déclare pas sa surface reste sous garde.</summary>
     public static bool PeutCauserUnArret(string id) =>
@@ -21,7 +21,7 @@ public static class GardeDIncident
 
     /// <summary>Les réglages à rendre, avec l'arrêt qui les fait rendre (le premier après la pose). Une coupure pendant la
     /// veille ne dit rien de la stabilité en charge : elle ne rend rien.</summary>
-    /// <param name="vidagesCarte">GARDE2 (09/10/2026) : les vidages à chaud du noyau graphique (WER, codes 0x113/0x116/0x117/
+    /// <param name="vidagesCarte">Les vidages à chaud du noyau graphique (WER, codes 0x113/0x116/0x117/
     /// 0x141/0x193), datés. Un vidage dans la semaine après la pose d'un réglage de la carte ou du pilote le rend : la machine
     /// a continué de tourner, mais le pilote a décroché après notre écriture, et l'attribution appartient au joueur, pas à un refus.</param>
     public static IReadOnlyList<(string Id, ArretClasse Arret, bool VidageAChaud)> ARendre(

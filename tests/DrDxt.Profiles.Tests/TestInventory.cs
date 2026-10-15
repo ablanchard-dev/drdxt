@@ -2,8 +2,8 @@ using DrDxt.Core;
 
 namespace DrDxt.Profiles.Tests;
 
-// Builders for M1 HardwareInventory fixtures — keep the chip-relevant fields explicit
-// and fill the rest with innocuous defaults so each test reads as "this chip → this".
+// Constructeurs de gabarits HardwareInventory : garder explicites les champs qui comptent pour la
+// puce et remplir le reste de valeurs anodines, pour que chaque test se lise « cette puce → ceci ».
 internal static class TestInventory
 {
     public const long EightGiB = 8L << 30;

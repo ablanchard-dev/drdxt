@@ -1,5 +1,5 @@
 <!-- CHAQUE COEUR REND-IL LA MEME CHOSE. -->
-<!-- 11/09/2026 : entre dans DrDXT.sln, tire par `tools/DrDxt.Tools.Tests`. La ligne precedente
+<!-- Entre dans DrDXT.sln, tire par `tools/DrDxt.Tools.Tests`. La ligne precedente
      disait « NE FAIT PAS partie de DrDXT.sln » ; elle a cesse d'etre vraie le jour ou
      `CoeursHomogenes` est venu vivre ici avec sa suite de tests. Rien de cet outil n'entre dans
      l'App : aucun projet de `src/` ne le reference. -->

@@ -6,11 +6,11 @@ using DrDxt.Infrastructure.Localization;
 namespace DrDxt.App.Converters;
 
 /// <summary>
-/// Resolves a resx KEY (the form the DashboardViewModel exposes — e.g.
-/// <c>dashboard.measurable_gain</c>) to its localized string via the same
-/// <see cref="ResxLocalizer"/> the rest of the app uses. This keeps the View free of
-/// hardcoded copy while the VM stays a pure, testable key bag. A null/empty key yields
-/// an empty string; a missing key yields the key itself (ResxLocalizer's contract).
+/// Traduit une clé resx (la forme qu'expose un view-model, par exemple
+/// <c>Scan.Ab.MeasurableGain</c>) en sa chaîne, via le même <see cref="ResxLocalizer"/> que
+/// le reste de l'app. La vue n'a ainsi aucun texte écrit en dur, et le VM reste un simple sac
+/// de clés, pur et testable. Une clé null ou vide donne une chaîne vide ; une clé manquante
+/// donne la clé elle-même (le contrat de ResxLocalizer).
 /// </summary>
 [ValueConversion(typeof(string), typeof(string))]
 public sealed class KeyToLocalizedStringConverter : IValueConverter

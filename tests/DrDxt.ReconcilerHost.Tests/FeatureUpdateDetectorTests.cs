@@ -5,12 +5,12 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// T27 — FeatureUpdateDetector.WasFeatureUpdateInstalledAsync:
-//   read current build (IOsBuildProbe) vs ReconcilerState.LastFeatureUpdateBuild.
-//   different → Ok(true) AND persist the new LastFeatureUpdateBuild (so the trigger
-//   fires once per feature update, not every tick).
-//   same → Ok(false), no write.
-//   probe/store Fail → Fail (no guess).
+// FeatureUpdateDetector.WasFeatureUpdateInstalledAsync :
+//   lire le build courant (IOsBuildProbe) et le comparer à ReconcilerState.LastFeatureUpdateBuild.
+//   différent → Ok(true) et persister le nouveau LastFeatureUpdateBuild (pour que le déclencheur
+//   joue une fois par mise à jour de fonctionnalité, pas à chaque tic).
+//   identique → Ok(false), aucune écriture.
+//   sonde ou magasin en Fail → Fail (rien de deviné).
 // -----------------------------------------------------------------------
 public sealed class FeatureUpdateDetectorTests
 {
@@ -36,8 +36,8 @@ public sealed class FeatureUpdateDetectorTests
     [Fact]
     public async Task WhenFirstRun_EmptyLastBuild_TreatsAsChanged_AndPersists()
     {
-        // First install: LastFeatureUpdateBuild is empty. A non-empty current build is
-        // "new" — record it so the NEXT tick with the same build is a no-op.
+        // Première installation : LastFeatureUpdateBuild est vide. Un build courant non vide est
+        // « nouveau » : l'enregistrer pour que le tic suivant avec le même build ne fasse rien.
         var probe = new FakeOsBuildProbe { Build = "22631.3447" };
         var store = new InMemoryReconcilerStateStore();
         var detector = Make(probe, store);

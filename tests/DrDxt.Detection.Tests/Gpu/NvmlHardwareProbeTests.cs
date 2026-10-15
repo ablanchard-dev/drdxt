@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Gpu;
 
 /// <summary>
-/// La garde que le code nommait et que rien ne prouvait (L2, plan du 10/09).
+/// La garde que le code nommait et que rien ne prouvait.
 ///
 /// `nvmlClocksEventReasonNone` vaut 0x0 : un masque nul lu avec succes veut dire « rien ne bride »,
 /// l'information la plus rassurante qu'une mesure GPU puisse rendre. Le commentaire de

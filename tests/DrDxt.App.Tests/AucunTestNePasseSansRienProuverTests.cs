@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. La journee a montre cinq fois la meme chose : **un test peut nommer
+// La journee a montre cinq fois la meme chose : **un test peut nommer
 // une garantie sans la tenir**. Le cas extreme est detectable mecaniquement — un
 // test qui n'affirme rien passe toujours, quel que soit le produit.
 //

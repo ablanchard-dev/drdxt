@@ -5,7 +5,7 @@ using Xunit;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// 08/10/2026 (D1 « sous charge ») : l'événement 41 ne dit pas si un jeu tournait, et il est daté du redémarrage. Une partie
+/// L'événement 41 ne dit pas si un jeu tournait, et il est daté du redémarrage. Une partie
 /// restée ouverte a été coupée entre son dernier regard et le relevé suivant : le premier arrêt de cet intervalle est le
 /// sien, et un seul.
 /// </summary>
@@ -26,7 +26,7 @@ public class ArretsSousChargeTests
         => ClasseurDArrets.MarquerSousCharge([new ArretClasse(T.AddMinutes(minutes), FamilleDArret.SansCode)], [Cod])
             .Single().PendantLaPartieDe.Should().BeNull();
 
-    // Revue du 08/10/2026 (P1) : des redémarrages en boucle comptaient la même partie pour chaque arrêt.
+    // Des redémarrages en boucle comptaient la même partie pour chaque arrêt.
     [Fact]
     public void Une_partie_ne_marque_qu_un_arret_le_premier()
     {

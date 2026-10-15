@@ -6,7 +6,7 @@ using static DrDxt.Detection.Repair.PlantagesDeJeu;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 07/10/2026 (D2) : les plantages et blocages des jeux, jugés sur des événements construits ; aucun test ne lit le vrai journal.
+// Les plantages et blocages des jeux, jugés sur des événements construits ; aucun test ne lit le vrai journal.
 public sealed class PlantagesDeJeuTests
 {
     private static readonly DateTimeOffset Maintenant = new(2026, 10, 7, 12, 0, 0, TimeSpan.FromHours(2));
@@ -20,7 +20,7 @@ public sealed class PlantagesDeJeuTests
     private static RepairFinding Un(IReadOnlyList<Evenement>? lus, IReadOnlyList<Changement>? changements = null, IReadOnlySet<string>? jeux = null)
         => Juger(lus, jeux ?? Cod, Nvidia, changements ?? [], Maintenant).Should().ContainSingle().Subject;
 
-    // 08/10/2026 (D2) : un jeu jamais relevé en partie (« cod26-cod.exe ») compte quand son programme vit dans un dossier de
+    // Un jeu jamais relevé en partie (« cod26-cod.exe ») compte quand son programme vit dans un dossier de
     // jeux installé ; un programme hors de ces dossiers, non.
     [Fact]
     public void Un_jeu_jamais_releve_compte_s_il_vit_dans_un_dossier_de_jeux()
@@ -86,7 +86,7 @@ public sealed class PlantagesDeJeuTests
         Designation(Plantage(1, "EasyAntiCheat_EOS.dll"), Nvidia).Should().Contain("ne classe pas");
     }
 
-    // Revue F-35 : les pilotes des cartes non lus, rien n'est affirmé sur la carte, ni oui ni non.
+    // Les pilotes des cartes non lus, rien n'est affirmé sur la carte, ni oui ni non.
     [Fact]
     public void Sans_pilotes_de_carte_lus_rien_n_est_affirme_sur_la_carte()
         => Designation(Plantage(1, "x.dll", paquet: "u0412345.inf_amd64_aa"), []).Should().Contain("pas vérifiée")
@@ -113,7 +113,7 @@ public sealed class PlantagesDeJeuTests
         c.Explication.Should().NotContain("\\").And.NotContain("FileRepository");
     }
 
-    // Revue n° 11 : la racine Steam contient Steam lui-même ; son navigateur intégré qui plante n'est pas un jeu.
+    // La racine Steam contient Steam lui-même ; son navigateur intégré qui plante n'est pas un jeu.
     [Fact]
     public void Steam_qui_plante_sous_sa_propre_racine_n_est_pas_un_plantage_de_jeu()
     {

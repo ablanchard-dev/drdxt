@@ -4,28 +4,27 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Display;
 
 /// <summary>
-/// Answers "is my frame cap the right one for the screen I actually play on?".
+/// Répond à « mon plafond d'images est-il le bon pour l'écran sur lequel je joue ? ».
 ///
-/// Found on the author's machine on 02/09/2026: the driver cap sat at 141 while the primary
-/// display ran at 200 Hz. 141 is 144 - 3 and 144 is the SECOND screen — the low-latency rule had
-/// been computed on the wrong panel, costing frames every session, and the product had been
-/// READING that 141 for months as a revert value without ever saying a word about it.
+/// Relevé sur la machine de référence le 02/09/2026 : le plafond du pilote était à 141 alors que
+/// l'écran principal tournait à 200 Hz. 141 = 144 - 3, et 144 est le second écran : la règle
+/// basse latence avait été calculée sur le mauvais écran, et coûtait des images à chaque session.
 ///
-/// The rule is a RELATION, never a magic number: on a machine whose primary is 144 Hz the same
-/// 141 is correct. So the verdict is derived from the primary's refresh and, only when that fails
-/// to explain the value, from the other attached displays.
+/// La règle est une relation, jamais un nombre magique : sur une machine dont l'écran principal
+/// est à 144 Hz, le même 141 est juste. Le verdict se déduit donc de la fréquence de l'écran
+/// principal et, seulement si elle n'explique pas la valeur, des autres écrans branchés.
 ///
-/// Pure and total: no I/O, no clock. A null cap or an unusable display list degrades to
-/// <see cref="FrameCapVerdict.Indeterminate"/> — it never invents a clean bill of health.
+/// Pur et total : ni E/S, ni horloge. Un plafond null ou une liste d'écrans inutilisable donne
+/// <see cref="FrameCapVerdict.Indeterminate"/> : jamais un certificat de bonne santé inventé.
 /// </summary>
 public static class FrameCapInferencer
 {
-    /// <param name="frameCapFps">FRL_FPS as read from the driver; 0 is the driver's "no limit",
-    /// null means it could not be read.</param>
-    /// <param name="displays">Attached displays. Empty or without a primary → Indeterminate.</param>
-    /// <param name="origin">Optional: who set the value, as the driver reports it. Carried
-    /// through untouched — it tells the reader what to DO about the cap (correct it yourself vs
-    /// a value NVIDIA ships for this game), and it must never influence the verdict.</param>
+    /// <param name="frameCapFps">FRL_FPS tel que lu au pilote ; 0 est le « pas de limite » du pilote,
+    /// null veut dire qu'il n'a pas pu être lu.</param>
+    /// <param name="displays">Écrans branchés. Vide ou sans écran principal → Indeterminate.</param>
+    /// <param name="origin">Facultatif : qui a posé la valeur, selon le pilote. Transmis tel quel :
+    /// il dit au lecteur quoi faire du plafond (le corriger soi-même, ou une valeur livrée par NVIDIA
+    /// pour ce jeu), et il ne doit jamais influer sur le verdict.</param>
     public static FrameCapState Infer(int? frameCapFps, IReadOnlyList<DisplayInfo>? displays,
         DrsOriginState? origin = null)
     {
@@ -38,8 +37,8 @@ public static class FrameCapInferencer
             return new(FrameCapVerdict.Indeterminate,
                 "No primary display was enumerated, so there is nothing to compare the cap against.", origin);
 
-        // A refresh of 0 means "not read" (see DisplayInfo): comparing against it would manufacture
-        // a verdict out of a missing reading.
+        // Une fréquence de 0 veut dire « non lu » (voir DisplayInfo) : comparer avec elle fabriquerait
+        // un verdict à partir d'une lecture manquante.
         if (primary.RefreshHz <= 0)
             return new(FrameCapVerdict.Indeterminate,
                 "The primary display did not report a refresh rate, so the cap cannot be judged.", origin);
@@ -50,7 +49,7 @@ public static class FrameCapInferencer
                 $"The frame cap ({(cap == 0 ? "off" : cap + " fps")}) never binds on a " +
                 $"{primary.RefreshHz} Hz screen.");
 
-        // The low-latency rule (PlafondVrr, the same one the VRR tweak writes): between the Reflex value and refresh - 3.
+        // La règle basse latence (PlafondVrr, celle qu'écrit le levier VRR) : entre la valeur Reflex et fréquence - 3.
         if (PlafondVrr.EstBasseLatence(cap, primary.RefreshHz))
             return new(FrameCapVerdict.Coherent,
                 $"The cap ({cap} fps) is the low-latency value for your {primary.RefreshHz} Hz screen.", origin);

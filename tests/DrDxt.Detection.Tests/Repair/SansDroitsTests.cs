@@ -5,8 +5,8 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 06/10/2026 (chantier B8c) : sur un compte sans droits administrateur, un refus d'accès se disait avec une fausse
-// cause (« aucune zone ACPI ne répond ») ou un message d'exception anglais. La cause dite est le manque de droits.
+// Sur un compte sans droits administrateur, un refus d'accès se dit par le manque de droits, jamais par une fausse
+// cause (« aucune zone ACPI ne répond ») ni par un message d'exception anglais.
 public sealed class SansDroitsTests
 {
     private sealed class DemarrageRefuse : IBootPerformanceLog
@@ -27,7 +27,7 @@ public sealed class SansDroitsTests
         => Lire(eleve: false).Single(c => c.Nom == "mesure de Windows").Explication
             .Should().Be(RepairAuditService.SansDroits);
 
-    // Revue (F-32) : pas de promesse « pour la voir » ; la thermique dit ce qui n'a pas été lu, et qu'il retentera.
+    // Pas de promesse « pour la voir » ; la thermique dit ce qui n'a pas été lu, et qu'il retentera.
     [Fact]
     public void Sans_droits_la_temperature_ne_blame_pas_l_ACPI()
         => Lire(eleve: false).Single(c => c.Nom == "temperature du processeur").Explication
@@ -40,7 +40,7 @@ public sealed class SansDroitsTests
             => Result<IReadOnlyList<LiveKernelReport>>.Fail(ErrorCodes.DetectionFailed, "2 rapport(s) … (accès refusé).");
     }
 
-    // F-36 : la cause d'un refus dépend des droits : sans eux, les relancer ; avec, un dossier verrouillé.
+    // La cause d'un refus dépend des droits : sans eux, les relancer ; avec, un dossier verrouillé.
     [Theory]
     [InlineData(false, "lance-le en administrateur")]
     [InlineData(true, "dossier des rapports est verrouillé")]

@@ -4,15 +4,17 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// 30/09/2026 (boucle « la carte, prouvée », G2). Le profil GLOBAL du pilote en « performances maximales »
-// garde la carte au maximum hors jeu : lu le 24/09 sur la machine de référence, 55,6 W et 2 490 MHz au
-// repos. Ce levier rend « Normal » (PREFERRED_PSTATE_ADAPTIVE, voir PreferMaxPerfTweak.Normal) au GLOBAL
+// Le profil global du pilote en « performances maximales » garde la carte au maximum hors jeu :
+// mesuré le 24/09 sur la machine de référence, 55,6 W et 2 490 MHz au repos. Ce levier rend
+// « Normal » (PREFERRED_PSTATE_ADAPTIVE, voir PreferMaxPerfTweak.Normal) au profil global
 // seulement : un maximum posé sur le profil d'un jeu reste le choix de ce jeu.
 //
 // L'original est relu au moment d'écrire (le scan peut dater) : s'il n'est plus au maximum, rien n'est
 // écrit. L'annulation réécrit la valeur lue ; la cible voyage dans le snapshot pour la relecture. Ce
-// levier ne reste que prouvé : la mesure du repos (G3) le retire sans baisse au-delà du bruit.
+// levier ne reste que prouvé : la mesure du repos le retire sans baisse au-delà du bruit.
 // -----------------------------------------------------------------------
+/// <summary>Rend « Normal » au profil global NVIDIA, pour que la carte redescende au repos. Proposé sur un PC de
+/// bureau à carte NVIDIA quand le global est lu en « performances maximales ».</summary>
 public sealed class ReposRenduALaCarteTweak : LatencyTweakBase
 {
     private readonly INvApi _nvApi;

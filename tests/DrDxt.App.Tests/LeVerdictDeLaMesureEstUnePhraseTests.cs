@@ -8,11 +8,9 @@ using Xunit;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. La ligne qui dit le resultat de la mesure affichait son propre code.
+// La ligne qui dit le resultat de la mesure affichait son propre code.
 //
-// `DashboardView.xaml` ligne 79 :
-//     <TextBlock Text="{Binding VerdictKey, Converter={StaticResource Loc}}" .../>
-// et `DashboardViewModel` : `VerdictKey = verdict?.SummaryKey`, c'est-a-dire l'une des
+// L'ecran de resultat liait `VerdictKey = verdict?.SummaryKey`, c'est-a-dire l'une des
 // trois chaines que `AbComparer.Compare` produit -- `Scan.Ab.MeasurableGain`,
 // `Scan.Ab.NoMeasurableGain`, `Scan.Ab.Regression`.
 //

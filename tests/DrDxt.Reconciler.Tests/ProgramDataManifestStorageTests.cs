@@ -7,13 +7,13 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// T2 — the real ProgramData admin-write-only storage.
+// Le vrai stockage ProgramData inscriptible par les seuls administrateurs.
 //
-// The PATH + the DACL descriptor are pure, testable values (no FS / no admin
-// needed) so unit tests assert the security shape: the root is under ProgramData,
-// the DACL grants write to Administrators + SYSTEM only and read to everyone, and
-// it is not user-writable. A real temp-dir atomic round-trip is exercised opt-in
-// (no admin required) to prove the write/read/atomic logic.
+// Le chemin et le descripteur DACL sont des valeurs pures et testables (ni système de
+// fichiers ni admin), donc les tests unitaires vérifient la forme de sécurité : la racine
+// est sous ProgramData, la DACL n'accorde l'écriture qu'aux Administrateurs et à SYSTEM et la
+// lecture à tous, et elle n'est pas inscriptible par l'utilisateur. Un vrai aller-retour
+// atomique en dossier temporaire s'exerce en option (sans admin) pour prouver la logique écriture/lecture/atomicité.
 // -----------------------------------------------------------------------
 public sealed class ProgramDataManifestStorageTests
 {
@@ -31,17 +31,17 @@ public sealed class ProgramDataManifestStorageTests
     public void AdminWriteDacl_GrantsWriteOnlyToAdminsAndSystem_notUsers()
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return; // the ACL model is Windows-only; logic is asserted on Windows runners.
+            return; // le modèle d'ACL est propre à Windows ; la logique se vérifie sur les runners Windows.
 
         var dacl = ProgramDataManifestStorage.BuildAdminWriteDacl();
         var sddl = dacl.GetSecurityDescriptorSddlForm(System.Security.AccessControl.AccessControlSections.Access);
 
-        // Admins (BA) and SYSTEM (SY) get full control; the broad world (WD/AU/BU)
-        // must not appear with a write/modify grant. Read for everyone is fine.
+        // Les administrateurs (BA) et SYSTEM (SY) ont le contrôle total ; le monde large (WD/AU/BU)
+        // ne doit pas apparaître avec un droit d'écriture ou de modification. La lecture pour tous convient.
         sddl.Should().Contain("BA", "Administrators must be in the DACL");
         sddl.Should().Contain("SY", "SYSTEM must be in the DACL");
 
-        // No allow-ACE granting write (FA/FW/0x...2/0x...6) to Users/Authenticated/World.
+        // Aucune ACE d'autorisation accordant l'écriture (FA/FW/0x...2/0x...6) à Users/Authenticated/World.
         dacl.GetAccessRules(true, false, typeof(System.Security.Principal.SecurityIdentifier))
             .Cast<System.Security.AccessControl.FileSystemAccessRule>()
             .Where(r => r.AccessControlType == System.Security.AccessControl.AccessControlType.Allow
@@ -58,15 +58,15 @@ public sealed class ProgramDataManifestStorageTests
     [Fact]
     public async Task RealRoundTrip_InTempDir_WritesAtomicallyAndReadsBack()
     {
-        // A real filesystem round-trip in an isolated temp dir (no admin, no
-        // ProgramData) — proves WriteAsync (temp+replace) + ReadAsync + absent-file.
+        // Un vrai aller-retour sur disque dans un dossier temporaire isolé (sans admin, sans
+        // ProgramData) : prouve WriteAsync (temporaire + remplacement), ReadAsync et le fichier absent.
         var tempRoot = Path.Combine(
             Path.GetTempPath(), "DrDxtReconcilerTest_" + Guid.NewGuid().ToString("N"));
         try
         {
             var storage = new ProgramDataManifestStorage(tempRoot, applyAcl: false);
 
-            // Absent file → Ok(null).
+            // Fichier absent → Ok(null).
             (await storage.ReadAsync(CancellationToken.None)).Value.Should().BeNull();
 
             var env = new SignedManifestEnvelope("{\"hello\":1}", "c2ln");
@@ -76,7 +76,7 @@ public sealed class ProgramDataManifestStorageTests
             read.IsOk.Should().BeTrue();
             read.Value.Should().Be(env);
 
-            // Overwrite is atomic (no leftover .tmp).
+            // L'écrasement est atomique (aucun .tmp qui traîne).
             var env2 = env with { CanonicalJson = "{\"hello\":2}" };
             (await storage.WriteAsync(env2, CancellationToken.None)).IsOk.Should().BeTrue();
             (await storage.ReadAsync(CancellationToken.None)).Value.Should().Be(env2);
@@ -88,7 +88,7 @@ public sealed class ProgramDataManifestStorageTests
         }
     }
 
-    // 26/09/2026 : un fichier PRESENT qui contient « null » se lisait comme « aucun manifeste » (premiere
+    // Un fichier PRESENT qui contient « null » ne se lit pas comme « aucun manifeste » (premiere
     // installation). Un fichier abime n'est pas un fichier absent.
     [Fact]
     public async Task Un_fichier_present_qui_contient_null_n_est_pas_un_fichier_absent()
@@ -111,10 +111,10 @@ public sealed class ProgramDataManifestStorageTests
         }
     }
 
-    // F3 — the PRODUCTION write path (applyAcl:true) pins the manifest file owner. When
-    // elevated the manifest ends up admin-owned (so the SYSTEM reconciler trusts it at
-    // rest); when not elevated it FAILS LOUD with no user-owned manifest left behind
-    // (never a root the service would silently reject). Deterministic on either runner.
+    // Le chemin d'écriture de production (applyAcl:true) fige le propriétaire du fichier
+    // manifeste. Élevé, le manifeste finit possédé par un admin (le réconciliateur SYSTEM lui
+    // fait confiance au repos) ; non élevé, il échoue bruyamment sans laisser de manifeste
+    // possédé par l'utilisateur (jamais une racine que le service rejetterait en silence). Déterministe sur les deux runners.
     [Fact]
     public async Task WriteAsync_WithAcl_PinsManifestOwnerToAdmins_OrFailsLoudly()
     {

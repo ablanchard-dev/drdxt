@@ -3,13 +3,13 @@ using System.Runtime.InteropServices;
 namespace DrDxt.Measurement.PresentMon;
 
 // ============================================================
-// Marshaling layer for PresentMonAPI2.dll (v2.5.1, MIT).
+// Couche de marshaling pour PresentMonAPI2.dll (v2.5.1, MIT).
 //
-// Enums are copied VERBATIM (full, ordered) from
+// Les enums sont copiés mot pour mot (complets, dans l'ordre) depuis
 //   third_party/presentmon/PresentMonAPI.h
-// so the numeric values match the native ABI exactly. Querying the
-// wrong metric value would parse the blob for the wrong column and
-// silently return garbage — the header is the single source of truth.
+// pour que les valeurs numériques correspondent exactement à l'ABI native. Demander la mauvaise
+// valeur de grandeur ferait lire le blob dans la mauvaise colonne et rendrait du déchet en
+// silence : l'en-tête est la source unique.
 // ============================================================
 
 internal enum PM_STATUS
@@ -37,9 +37,9 @@ internal enum PM_STATUS
     PM_STATUS_MIDDLEWARE_SERVICE_MISMATCH,
 }
 
-// Full ordered metric enum from the header. We only consume two of these
-// (BETWEEN_PRESENTS, RENDER_PRESENT_LATENCY) but the whole list is kept so
-// the numeric values are guaranteed correct against the native side.
+// L'enum complet et ordonné des grandeurs, tiré de l'en-tête. On n'en consomme que deux
+// (BETWEEN_PRESENTS, RENDER_PRESENT_LATENCY), mais toute la liste est gardée pour garantir des
+// valeurs numériques justes face au côté natif.
 internal enum PM_METRIC
 {
     PM_METRIC_APPLICATION,
@@ -120,11 +120,11 @@ internal enum PM_METRIC
     PM_METRIC_GPU_CARD_POWER,
     PM_METRIC_PRESENT_START_TIME,
     PM_METRIC_PRESENT_START_QPC,
-    PM_METRIC_BETWEEN_PRESENTS,        // 78 — frametime (ms, double) aggregated into Avg/P1/P0.1
+    PM_METRIC_BETWEEN_PRESENTS,        // 78 : frametime (ms, double) agrégé en Avg/P1/P0.1
     PM_METRIC_IN_PRESENT_API,
     PM_METRIC_BETWEEN_DISPLAY_CHANGE,
     PM_METRIC_UNTIL_DISPLAYED,
-    PM_METRIC_RENDER_PRESENT_LATENCY,  // 82 — estimated PC latency (ms, double)
+    PM_METRIC_RENDER_PRESENT_LATENCY,  // 82 : latence PC estimée (ms, double)
     PM_METRIC_BETWEEN_SIMULATION_START,
     PM_METRIC_PC_LATENCY,
     PM_METRIC_DISPLAYED_FRAME_TIME,
@@ -135,7 +135,7 @@ internal enum PM_METRIC
 
 internal enum PM_STAT
 {
-    PM_STAT_NONE = 0, // raw per-frame (no aggregation done by the service)
+    PM_STAT_NONE = 0, // brut par image (aucune agrégation par le service)
     PM_STAT_AVG,
     PM_STAT_PERCENTILE_99,
     PM_STAT_PERCENTILE_95,
@@ -154,7 +154,7 @@ internal enum PM_STAT
 }
 
 // struct PM_QUERY_ELEMENT { PM_METRIC; PM_STAT; uint32 deviceId; uint32 arrayIndex;
-//                           uint64 dataOffset; uint64 dataSize; }  // 32 bytes (4+4+4+4+8+8)
+//                           uint64 dataOffset; uint64 dataSize; }  // 32 octets (4+4+4+4+8+8)
 [StructLayout(LayoutKind.Sequential)]
 internal struct PM_QUERY_ELEMENT
 {
@@ -162,6 +162,6 @@ internal struct PM_QUERY_ELEMENT
     public PM_STAT stat;         // uint32
     public uint deviceId;
     public uint arrayIndex;
-    public ulong dataOffset;     // written back by pmRegisterFrameQuery
-    public ulong dataSize;       // written back by pmRegisterFrameQuery
+    public ulong dataOffset;     // réécrit par pmRegisterFrameQuery
+    public ulong dataSize;       // réécrit par pmRegisterFrameQuery
 }

@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>29/09/2026 : « pendant le scan il n'y a rien, pas d'animation » (retour sur l'app). Le noyau au
+/// <summary>« pendant le scan il n'y a rien, pas d'animation » (retour sur l'app). Le noyau au
 /// travail respire et lance une onde ; la pulsation passe par le moteur d'animation, pas par un storyboard sans
 /// fin qui tournerait encore derrière le jeu.</summary>
 public sealed class PulsationDuNoyauTests

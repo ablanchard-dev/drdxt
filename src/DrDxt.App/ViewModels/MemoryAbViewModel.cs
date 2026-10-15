@@ -11,7 +11,7 @@ namespace DrDxt.App.ViewModels;
 ///
 /// ══ ce que cette section n'a pas le droit de faire ══
 /// Dire « leger gain ». Un ecart plus petit que 3 sigma du bruit de l'instrument n'est pas un
-/// petit resultat, c'est une absence de resultat -- et c'est la phrase que tous les optimiseurs
+/// petit resultat, c'est une absence de resultat, et c'est la phrase que tous les optimiseurs
 /// du marche se permettent. La conclusion n'a donc que trois etats : c'est un resultat, ce n'en
 /// est pas un, ou on ne se prononce pas (mesure refusee).
 ///
@@ -53,7 +53,7 @@ public sealed class MemoryAbViewModel
 
                 // Le banc n'a pas pu demarrer, et c'est le plus souvent un manque de memoire
                 // libre : il en demande 384 Mo d'un coup. Le ranger avec les fautes d'instrument
-                // lui collerait « ce n'est pas une question de programmes ouverts » -- alors que
+                // lui collerait « ce n'est pas une question de programmes ouverts », alors que
                 // fermer des programmes est exactement ce qui repare ce cas.
                 _ when motif.StartsWith(
                     DrDxt.Measurement.Memory.MemoryBaselineService.BenchUnavailable,
@@ -96,11 +96,11 @@ public sealed class MemoryAbViewModel
                 header, lines, localize(MemoryAbStringKeys.Significant));
 
         // « Aucune difference mesurable » sans son seuil se lit « ca ne sert a rien ». La phrase
-        // porte donc la RESOLUTION : le plus petit ecart que ces deux mesures pouvaient
+        // porte donc la resolution : le plus petit ecart que ces deux mesures pouvaient
         // distinguer. Mesure du 17/09/2026 sur la machine de reference : 7,8 % sur le debit,
-        // quand passer de 3 800 a 4 000 MT/s n'en promet que 5,3 -- le banc ne peut pas trancher
+        // quand passer de 3 800 a 4 000 MT/s n'en promet que 5,3 : le banc ne peut pas trancher
         // cette question, et c'est ce chiffre qui le dit. Le GPU parle deja ainsi
-        // (Scan.Drift.None). On annonce la plus FINE des deux resolutions : c'est celle qui
+        // (Scan.Drift.None). On annonce la plus fine des deux resolutions : c'est celle qui
         // decrit ce que l'instrument savait voir de mieux.
         var resolution = Math.Min(
             verdict.BandwidthResolutionPct, verdict.LatencyResolutionPct);
@@ -168,10 +168,10 @@ public static class MemoryAbStringKeys
     public const string NoVerdictBusy = "Memory.Ab.NoVerdict.Busy";
 
     /// <summary>Le banc n'a pas pu demarrer : il demande 384 Mo libres d'un coup. Ici, fermer
-    /// des programmes est le geste qui repare -- l'inverse de la phrase suivante.</summary>
+    /// des programmes est le geste qui repare, l'inverse de la phrase suivante.</summary>
     public const string NoVerdictNoRoom = "Memory.Ab.NoVerdict.NoRoom";
 
-    /// <summary>Faute d'INSTRUMENT (Q-01, Q-02, Q-04) : la seule ou l'on peut ecarter les
+    /// <summary>Faute d'instrument (Q-01, Q-02, Q-04) : la seule ou l'on peut ecarter les
     /// programmes ouverts, parce que l'instrument mesure la mauvaise chose.</summary>
     public const string NoVerdictFailed = "Memory.Ab.NoVerdict.Failed";
 

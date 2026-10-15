@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-/// <summary>GPU-OC (08/10/2026) : le ventilateur NVIDIA en mode Expert. Un faux NVML : aucune vraie carte n'est touchée.
+/// <summary>Le ventilateur NVIDIA en mode Expert. Un faux NVML : aucune vraie carte n'est touchée.
 /// Le relevé de référence (RTX 4060) : 1 ventilateur, automatique, cible 30 %, plage 30-100.</summary>
 public sealed class NvmlVentilateurActionsTests
 {

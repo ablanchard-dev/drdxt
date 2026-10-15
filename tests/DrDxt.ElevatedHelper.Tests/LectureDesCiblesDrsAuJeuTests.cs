@@ -7,14 +7,14 @@ using NSubstitute;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// 14/09/2026 — la desinstallation relit un reglage DRS au profil du jeu.
+/// La desinstallation relit un reglage DRS au profil du jeu.
 ///
-/// `LectureDesCiblesWin32` ne relisait le DRS qu'au profil de base. Un reglage pose au profil d'un
-/// jeu (PreferMaxPerf depuis le 10/09, RenderQueueCap et VrrVsyncCap depuis `5619aa8`) etait donc
-/// « illisible » : la desinstallation ne le rendait jamais, et il restait dans le pilote apres DrDXT.
+/// Un reglage pose au profil d'un jeu (PreferMaxPerf, RenderQueueCap, VrrVsyncCap) relu seulement au
+/// profil de base serait « illisible » : la desinstallation ne le rendrait jamais, et il resterait dans
+/// le pilote apres DrDXT.
 ///
 /// Le piege : relu au profil d'un jeu qui ne le possede plus, le pilote rend la valeur HERITEE du
-/// global. Elle peut valoir exactement ce que DrDXT avait pose — et la desinstallation rendrait alors
+/// global. Elle peut valoir exactement ce que DrDXT avait pose, et la desinstallation rendrait alors
 /// un reglage que le jeu n'a plus. Seul un reglage POSSEDE par le profil du jeu est une valeur lue.
 /// </summary>
 public sealed class LectureDesCiblesDrsAuJeuTests

@@ -5,7 +5,7 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Execution;
 
 /// <summary>
-/// 25/09/2026 — `DISM /Online /Cleanup-Image /CheckHealth`, en lecture : il dit si le magasin de
+/// `DISM /Online /Cleanup-Image /CheckHealth`, en lecture : il dit si le magasin de
 /// composants est sain, reparable ou non reparable, sans rien reparer (Microsoft, « Repair a Windows
 /// Image »). Mesure sur la machine de reference : 0,2 s, « The component store is repairable ».
 ///

@@ -7,12 +7,11 @@ namespace DrDxt.Core.Tests;
 /// <summary>
 /// Un profil doit savoir ou il est ne.
 ///
-/// La session Warzone du 07/09/2026 a ete jouee en « partie reelle, zone calme » — une vraie
-/// scene de gameplay. Le profil ne le portait nulle part : C'etait dit a l'oral, le code n'en
-/// savait rien, et rien n'aurait distingue la session suivante prise dans un lobby.
+/// Une « partie reelle, zone calme » est une vraie scene de gameplay ; sans contrat, rien ne la
+/// distinguerait d'une session prise dans un lobby.
 ///
 /// Le silence ne vaut jamais « gameplay ». Le defaut est `Unknown` et il interdit le keep
-/// durable — inconfortable exprès : c'est ce qui force a declarer.
+/// durable, inconfortable exprès : c'est ce qui force a declarer.
 /// </summary>
 public class SceneContractTests
 {
@@ -37,8 +36,8 @@ public class SceneContractTests
     [Fact]
     public void Une_zone_calme_DECOUVRE_un_candidat_mais_ne_conclut_pas_pour_tout_le_jeu()
     {
-        // Le piege exact du 07/09 : une scene stable est le BON endroit pour trouver un
-        // candidat — elle bruite peu, donc elle resout mieux — et le MAUVAIS pour affirmer que le
+        // Le piege : une scene stable est le BON endroit pour trouver un candidat (elle bruite peu,
+        // donc elle resout mieux) et le MAUVAIS pour affirmer que le
         // profil vaut pour toute la carte.
         var decouverte = new SceneContract(
             SceneRepresentativity.Gameplay, SceneRole.Decouverte, "partie reelle, zone calme");
@@ -67,7 +66,7 @@ public class SceneContractTests
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 23/09/2026 — le premier scan ne se fait pas en jeu, et rien ne permettait de le dire.
+    // Le premier scan ne se fait pas en jeu, et rien ne permettait de le dire.
     //
     // Les quatre reponses proposees decrivaient toutes une session de JEU (partie, entrainement,
     // menu) ou l'absence de reponse. Quelqu'un qui lance son premier scan sans avoir ouvert le

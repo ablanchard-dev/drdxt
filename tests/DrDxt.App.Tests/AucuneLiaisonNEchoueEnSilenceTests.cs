@@ -63,33 +63,12 @@ public sealed class AucuneLiaisonNEchoueEnSilenceTests
             }
         });
 
-#if DEBUG // DashboardSample n'existe qu'en Debug : le reste du fichier tourne en Release
-    private static DashboardView Tableau()
-    {
-        var vm = new DashboardViewModel();
-        vm.Load(DashboardSample.MeasurableGain());
-        return new DashboardView { DataContext = vm };
-    }
-
-    [Theory]
-    // Les trois tailles qui comptent : la fenetre par defaut, un portable 1366,
-    // et une fenetre reduite — une liaison peut n'echouer que dans un gabarit.
-    [InlineData(1240, 900)]
-    [InlineData(1366, 768)]
-    [InlineData(900, 640)]
-    public void Le_tableau_de_bord_ne_laisse_aucune_liaison_en_erreur(double largeur, double hauteur)
-    {
-        ErreursEnRealisant(Tableau, largeur, hauteur).Should().BeEmpty();
-    }
-#endif
-
     [Fact]
     public void La_promesse_du_produit_se_lit_avant_le_premier_scan()
     {
-        // 23/09/2026 : « Ce que DrDXT promet » (trouver, prouver, ne rien casser, survivre aux mises à
-        // jour, dire aussi quand la machine est déjà bonne) existait dans les deux langues, gardé par
-        // un test, et n'était affiché nulle part. Le sous-titre de l'accueil en disait la moitié. La
-        // promesse prend sa place : elle le contient déjà, sans rien répéter.
+        // « Ce que DrDXT promet » (trouver, prouver, ne rien casser, survivre aux mises à
+        // jour, dire aussi quand la machine est déjà bonne) doit être affiché, pas seulement traduit.
+        // Elle tient lieu de sous-titre de l'accueil : elle le contient déjà, sans rien répéter.
         var textes = StaApplication.Run(() =>
         {
             var vm = ScanCharge();
@@ -118,37 +97,6 @@ public sealed class AucuneLiaisonNEchoueEnSilenceTests
         textes.Should().NotContain("UI.Idle.Subtitle", "le sous-titre redisait la moitié de la promesse");
     }
 
-#if DEBUG // GPU_occupe lit DashboardSample, compile hors Release
-    [Fact]
-    public void GPU_occupe_ne_se_peint_pas_comme_un_gain()
-    {
-        // 23/09/2026, aperçu de l'écran d'après « Optimiser » : « GPU occupé 83,2 → 94,7 % » portait
-        // le même cyan que FPS, 1 % low et latence. Plus de GPU occupé n'est pas un gain en soi :
-        // cela dit où la machine est limitée. Le cyan reste aux trois grandeurs dont le sens est connu.
-        var (couleurGpu, couleurFps) = StaApplication.Run(() =>
-        {
-            var vue = Tableau();
-            vue.Measure(new Size(1240, 900));
-            vue.Arrange(new Rect(0, 0, 1240, 900));
-            vue.UpdateLayout();
-            Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.SystemIdle);
-            var textes = new List<TextBlock>();
-            void Parcourir(DependencyObject d)
-            {
-                if (d is TextBlock t) textes.Add(t);
-                for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(d); i++)
-                    Parcourir(System.Windows.Media.VisualTreeHelper.GetChild(d, i));
-            }
-            Parcourir(vue);
-            string Couleur(params string[] valeurs) =>
-                ((System.Windows.Media.SolidColorBrush)textes.First(t => valeurs.Contains(t.Text)).Foreground).Color.ToString();
-            return (Couleur("94,7", "94.7"), Couleur("231"));
-        });
-
-        couleurGpu.Should().NotBe(couleurFps);
-    }
-#endif
-
     // ---- L'ecran de scan : celui que le client regarde le plus longtemps ----
     [Theory]
     [InlineData(1240, 900)]
@@ -169,9 +117,6 @@ public sealed class AucuneLiaisonNEchoueEnSilenceTests
                 ScanViewModelTestSeams.Safety(),
                 ScanViewModelTestSeams.Engine(),
                 ScanViewModelTestSeams.ProfileConsumer(),
-                ScanViewModelTestSeams.GpuTuningStep(),
-                NSubstitute.Substitute.For<DrDxt.App.Navigation.INavigationService>(),
-                () => new DashboardViewModel(),
                 ScanViewModelTestSeams.DesiredStateStore(),
                 new AppliedTweakManifestMapper(),
                 ScanViewModelTestSeams.BiosAdvisor(),
@@ -184,7 +129,7 @@ public sealed class AucuneLiaisonNEchoueEnSilenceTests
 
     // ---- L'ecran de scan CHARGE : tout ce que le repos ne montre jamais ----
     //
-    // 18/09/2026. Au repos, les listes sont vides : les DataTemplate des resultats,
+    // Au repos, les listes sont vides : les DataTemplate des resultats,
     // des composants et des ecrans BIOS ne sont jamais realises, donc jamais cribles.
     // C'est exactement la zone ou l'icone du badge du tableau de bord echouait en
     // silence : une liaison ne casse qu'une fois l'element construit.
@@ -199,9 +144,6 @@ public sealed class AucuneLiaisonNEchoueEnSilenceTests
             ScanViewModelTestSeams.Safety(),
             ScanViewModelTestSeams.Engine(),
             ScanViewModelTestSeams.ProfileConsumer(),
-            ScanViewModelTestSeams.GpuTuningStep(),
-            NSubstitute.Substitute.For<DrDxt.App.Navigation.INavigationService>(),
-            () => new DashboardViewModel(),
             ScanViewModelTestSeams.DesiredStateStore(),
             new AppliedTweakManifestMapper(),
             ScanViewModelTestSeams.BiosAdvisor(),
@@ -242,7 +184,7 @@ public sealed class AucuneLiaisonNEchoueEnSilenceTests
     [Fact]
     public void Le_bloc_du_rapport_ne_redit_pas_le_resume_en_liste()
     {
-        // 23/09/2026, scan réel : sous « 6 point(s) à corriger, dont 1 critique(s) », une liste
+        // Scan réel : sous « 6 point(s) à corriger, dont 1 critique(s) », une liste
         // « Résumé du diagnostic » redisait la même chose en trois lignes vagues (« Problèmes
         // critiques détectés », « Configuration à surveiller », « Quelques optimisations
         // possibles »), alors que l'en-tête l'avait déjà dit. Deux endroits qui disent la même
@@ -270,7 +212,7 @@ public sealed class AucuneLiaisonNEchoueEnSilenceTests
         textes.Should().NotContain("UI.Assistant.SummaryTitle");
     }
 
-    // 26/09/2026 : le bouton de depart vers le BIOS, lie pour la premiere fois. Ses liaisons passent par
+    // Le bouton de depart vers le BIOS, lie pour la premiere fois. Ses liaisons passent par
     // BiosGuide : une faute de nom laisserait le bouton invisible sans rien dire.
     [Theory]
     [InlineData(false)]
@@ -320,7 +262,7 @@ public sealed class AucuneLiaisonNEchoueEnSilenceTests
     [Fact]
     public void La_note_du_guide_BIOS_passe_a_la_ligne_au_lieu_d_etre_coupee()
     {
-        // 23/09/2026, scan réel avec XMP coupé : la note « Étapes les mieux connues : pas encore
+        // Scan réel avec XMP coupé : la note « Étapes les mieux connues : pas encore
         // vérifiées pour ta carte exacte… » était posée dans une pastille, à côté du nom de la carte,
         // dans une pile horizontale. Elle recevait une largeur infinie et sortait de la dalle,
         // coupée net (« tu n'as donc be »).
@@ -372,7 +314,7 @@ public sealed class AucuneLiaisonNEchoueEnSilenceTests
         // n'ecoute. On casse volontairement une liaison et on exige de la voir.
         var erreurs = ErreursEnRealisant(() =>
         {
-            var bloc = new TextBlock { DataContext = new DashboardViewModel() };
+            var bloc = new TextBlock { DataContext = new object() };
             bloc.SetBinding(TextBlock.TextProperty, new Binding("ProprieteQuiNExistePas"));
             return bloc;
         }, 200, 40);

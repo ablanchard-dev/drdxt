@@ -3,20 +3,19 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// R2 GPU bench — the real IGpuLoadProbe: Pure orchestration over the thin
-// IGpuComputeRunner D3D11 seam. It runs a bounded, deterministic GPU compute
-// workload and maps the outcome to GpuLoadResult, fail-safe by construction:
+// Banc GPU : le vrai IGpuLoadProbe, pure orchestration sur la fine couture D3D11
+// IGpuComputeRunner. Il lance une charge de calcul GPU bornée et déterministe et traduit le
+// résultat en GpuLoadResult, sûr par construction :
 //
-//   * Healthy device + checksum == known answer → CompletedDeviceHealthy
-//   * DeviceLost (TDR)                           → DeviceLost
-//   * Healthy device but checksum MISMATCH        → DeviceLost  (silent corruption;
-//                                                    per the research "no TDR ≠ stable")
-//   * runner Error / Fail / throws               → CouldNotRun (→ Inconclusive → revert)
+//   * périphérique sain + somme de contrôle == réponse connue → CompletedDeviceHealthy
+//   * DeviceLost (TDR)                                       → DeviceLost
+//   * périphérique sain mais somme de contrôle fausse         → DeviceLost  (corruption
+//                                                                silencieuse ; selon la recherche « pas de TDR ≠ stable »)
+//   * Error / Fail / exception du runner                     → CouldNotRun (→ Inconclusive → retour)
 //
-// It never throws across the IGpuLoadProbe boundary. The known-answer is computed
-// from the same workload spec the runner is asked to execute, so the checksum check
-// is a true known-answer test. The only un-unit-testable surface is the real D3D11
-// IGpuComputeRunner (live smoke).
+// Ne lève jamais à travers la frontière IGpuLoadProbe. La réponse connue se calcule à partir
+// de la même spec que celle donnée au runner : le contrôle est un vrai test à réponse connue.
+// La seule surface non testable unitairement est le vrai IGpuComputeRunner D3D11 (smoke test réel).
 // -----------------------------------------------------------------------
 public sealed class DeterministicGpuLoadProbe : IGpuLoadProbe
 {
@@ -44,15 +43,15 @@ public sealed class DeterministicGpuLoadProbe : IGpuLoadProbe
                 GpuDeviceStatus.Healthy =>
                     outcome.Checksum == GpuBenchWorkload.ComputeKnownChecksum(_spec)
                         ? GpuLoadResult.CompletedDeviceHealthy
-                        : GpuLoadResult.DeviceLost,   // silent corruption ⇒ unstable
+                        : GpuLoadResult.DeviceLost,   // corruption silencieuse ⇒ instable
                 _ => GpuLoadResult.CouldNotRun,
             };
             return Task.FromResult(Result<GpuLoadResult>.Ok(result));
         }
         catch (Exception)
         {
-            // Fail-safe: a runner that blows up (or cancellation) must never read as a
-            // healthy completion. CouldNotRun → Inconclusive → the tweak reverts.
+            // Sécurité : un runner qui explose (ou une annulation) ne doit jamais se lire comme une
+            // passe saine. CouldNotRun → Inconclusive → le levier s'annule.
             return Task.FromResult(Result<GpuLoadResult>.Ok(GpuLoadResult.CouldNotRun));
         }
     }

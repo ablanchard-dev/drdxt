@@ -7,7 +7,7 @@ using Xunit;
 namespace DrDxt.Detection.Tests.Scoring;
 
 // -----------------------------------------------------------------------
-// L1.5 — les degats deja infliges par un « optimiseur » precedent.
+// Les degats deja infliges par un « optimiseur » precedent.
 //
 // Trois regressions, trois traitements, et la difference est le sujet de ces tests : on ne
 // penalise que ce que la recherche du depot source comme un vrai risque.
@@ -56,7 +56,7 @@ public sealed class PreviousOptimiserDamageTests
     public void A_healthy_machine_still_scores_100()
     {
         // Le controle de base : ces trois leviers ne doivent rien retirer a une machine intacte.
-        Score(State()).Score.Should().Be(100);
+        Score(State()).Ledger!.Sum(e => e.Penalty).Should().Be(0);
     }
 
     // ====================== penalise ======================
@@ -66,12 +66,12 @@ public sealed class PreviousOptimiserDamageTests
     {
         var r = Score(State(pagefile: TriState.Off));
 
-        r.Score.Should().BeLessThan(100);
+        r.Ledger!.Sum(e => e.Penalty).Should().BeGreaterThan(0);
         r.Findings.Should().Contain(f => f.TitleKey == "Finding.Memory.PagefileOff");
         // Desactiver le pagefile ne coute pas des images, ca coute des plantages. Le ranger en
         // Performance le vendrait comme un gain de FPS.
-        r.Breakdown.Stability.Should().BeLessThan(100);
-        r.Breakdown.Performance.Should().Be(100);
+        r.Ledger!.Where(e => e.Group == "Stability").Sum(e => e.Penalty).Should().BeGreaterThan(0);
+        r.Ledger!.Where(e => e.Group == "Performance").Sum(e => e.Penalty).Should().Be(0);
     }
 
     [Fact]
@@ -79,9 +79,9 @@ public sealed class PreviousOptimiserDamageTests
     {
         var r = Score(State(mmcss: TriState.Off));
 
-        r.Score.Should().BeLessThan(100);
+        r.Ledger!.Sum(e => e.Penalty).Should().BeGreaterThan(0);
         r.Findings.Should().Contain(f => f.TitleKey == "Finding.Latency.MmcssBroken");
-        r.Breakdown.Latency.Should().BeLessThan(100);
+        r.Ledger!.Where(e => e.Group == "Latency").Sum(e => e.Penalty).Should().BeGreaterThan(0);
     }
 
     // ====================== signale, jamais penalise ======================
@@ -94,7 +94,7 @@ public sealed class PreviousOptimiserDamageTests
         // recherche dit non : gain non prouve, effet negligeable sur SSD.
         var r = Score(State(sysMain: TriState.Off));
 
-        r.Score.Should().Be(100, "on ne fabrique pas un deficit sur un reglage a l'impact nul");
+        r.Ledger!.Sum(e => e.Penalty).Should().Be(0, "on ne fabrique pas un deficit sur un reglage a l'impact nul");
         r.Findings.Should().Contain(f => f.TitleKey == "Finding.Memory.SysMainOff",
             "mais l'utilisateur apprend que sa machine a ete « optimisee » par quelqu'un d'autre");
         r.Ledger!.Should().NotContain(e => e.LeverId == "sysmain",
@@ -117,7 +117,7 @@ public sealed class PreviousOptimiserDamageTests
     {
         var r = Score(State(pagefile: TriState.Unknown, mmcss: TriState.Unknown));
 
-        r.Score.Should().Be(100);
+        r.Ledger!.Sum(e => e.Penalty).Should().Be(0);
         r.Coverage!.UnknownLevers.Should().BeGreaterThanOrEqualTo(2,
             "« pas lu » doit se voir, sinon un scan aveugle passe pour un scan propre");
     }
@@ -158,12 +158,12 @@ public sealed class PreviousOptimiserDamageTests
     }
 
     [Fact]
-    public void Only_a_literal_zero_counts_as_the_sabotaged_scheduler()
+    public void Only_100_disables_the_scheduler_and_values_below_10_are_clamped_to_20()
     {
-        WindowsDefaultsInferencer.InferMmcss(0, keyReadable: true).Should().Be(TriState.Off);
+        // learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service : « Values below 10 and
+        // above 100 are clamped to 20. A value of 100 disables MMCSS. » Même règle que le docteur (MmcssReader).
+        WindowsDefaultsInferencer.InferMmcss(100, keyReadable: true).Should().Be(TriState.Off);
+        WindowsDefaultsInferencer.InferMmcss(0, keyReadable: true).Should().Be(TriState.On, "0 est ramené à 20 : sans effet");
         WindowsDefaultsInferencer.InferMmcss(20, keyReadable: true).Should().Be(TriState.On);
-        // 100 desactive MMCSS, mais ce n'est pas la valeur que le mythe recopie et le depot ne
-        // source que le cas 0. On ne condamne pas ce qu'on n'a pas etabli.
-        WindowsDefaultsInferencer.InferMmcss(100, keyReadable: true).Should().Be(TriState.On);
     }
 }

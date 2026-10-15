@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.Detection.Tests.Hardware;
 
-// 06/10/2026 (chantier B1) : deux barrettes en double canal, mais pas dans la paire que les manuels MSI et ASUS
+// Deux barrettes en double canal, mais pas dans la paire que les manuels MSI et ASUS
 // demandent sur une carte à quatre emplacements (A2 et B2, au bout de la piste). Le risque est la tenue en fréquence, pas
 // un chiffre d'images : aucun gain n'est dit, et la carte reste juge (« vérifie le manuel »).
 public sealed class EmplacementsMemoireTests

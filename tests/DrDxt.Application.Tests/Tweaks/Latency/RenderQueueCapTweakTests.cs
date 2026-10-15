@@ -7,16 +7,16 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// M2 Phase D2 — RenderQueueCapTweak.
+// RenderQueueCapTweak.
 //
-// The universal low-latency floor when the NVIDIA Reflex / Low Latency Mode path (D1) isn't the
-// route: AMD via ADLX Anti-Lag, NVIDIA via the DRS Max-Pre-Rendered-Frames = 1
-// setting. Gating is COMPLEMENTARY to D1 (which owns NVIDIA-on-desktop) — D2 owns
-// the AMD desktop render GPU. Captures the real original → serialized inverse op;
-// applies via IElevatedClient; fails clean when the SDK is unavailable.
+// Le plancher universel de latence basse quand le chemin NVIDIA Reflex / Low Latency Mode
+// n'est pas la voie : AMD via Anti-Lag ADLX, NVIDIA via le réglage DRS
+// Max-Pre-Rendered-Frames = 1. Le filtre est complémentaire du plancher Reflex (qui possède
+// NVIDIA sur bureau) : ce levier possède le GPU de rendu AMD de bureau. Capture la vraie
+// origine → op inverse sérialisée ; applique via IElevatedClient ; échoue proprement sans SDK.
 //
-// NO unsupported registry hack (blacklist §6): AMD → ApplyAdlxTuningOp, NVIDIA →
-// ApplyNvApiDrsSettingOp, never a raw registry write of an unsupported key.
+// Aucun bidouillage de registre non supporté (liste noire) : AMD → ApplyAdlxTuningOp, NVIDIA →
+// ApplyNvApiDrsSettingOp, jamais une écriture brute d'une clé de registre non supportée.
 // -----------------------------------------------------------------------
 public sealed class RenderQueueCapTweakTests
 {
@@ -52,10 +52,10 @@ public sealed class RenderQueueCapTweakTests
     private RenderQueueCapTweak Build()
     {
         _adlx.IsAvailable.Returns(true);
-        _adlx.GetAntiLagState().Returns(Result<int>.Ok(0)); // off originally
+        _adlx.GetAntiLagState().Returns(Result<int>.Ok(0)); // désactivé à l'origine
         _adlx.GetChillActif().Returns(Result<bool>.Ok(false));
         _nvApi.IsAvailable.Returns(true);
-        _nvApi.GetMaxPreRenderedFrames().Returns(Result<uint>.Ok(3)); // default queue depth
+        _nvApi.GetMaxPreRenderedFrames().Returns(Result<uint>.Ok(3)); // profondeur de file par défaut
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
         return new RenderQueueCapTweak(_nvApi, _adlx, _elevated);
@@ -72,11 +72,11 @@ public sealed class RenderQueueCapTweakTests
         t.SummaryKey.Should().NotContain("fps");
     }
 
-    // --- Gating: complementary to D1 (D1 owns NVIDIA-on-desktop). ---
+    // --- Filtre : complémentaire du plancher Reflex (qui possède NVIDIA sur bureau). ---
 
-    // 07/10/2026 (revue n° 8) : l'écriture d'Anti-Lag n'existe pas encore dans le helper ; proposé, le levier ne
+    // L'écriture d'Anti-Lag n'existe pas encore dans le helper ; proposé, le levier ne
     // pouvait qu'échouer. Il revient quand elle est écrite et prouvée sur une vraie carte AMD.
-    // A2 (07/10/2026) : l'écriture d'Anti-Lag existe ; proposé sur AMD quand Anti-Lag ET Chill sont lus éteints.
+    // L'écriture d'Anti-Lag existe ; proposé sur AMD quand Anti-Lag ET Chill sont lus éteints.
     [Fact]
     public void AppliesTo_true_on_desktop_amd_when_anti_lag_and_chill_read_off() =>
         Build().AppliesTo(DesktopAmd(), State).Should().BeTrue();
@@ -119,7 +119,7 @@ public sealed class RenderQueueCapTweakTests
     public void AppliesTo_false_on_desktop_nvidia_without_a_known_game() =>
         Build().AppliesTo(DesktopNvidia(), State).Should().BeFalse();
 
-    // ── V-NV1 (08/10/2026) : « Low Latency Mode : On » sur NVIDIA, au profil du jeu, jamais pour un jeu à Reflex. ──
+    // ── V-NV1 : « Low Latency Mode : On » sur NVIDIA, au profil du jeu, jamais pour un jeu à Reflex. ──
     private const string JeuSansReflex = @"C:\Games\Hades II\Hades2.exe";
 
     private RenderQueueCapTweak SurNvidia(string? jeu, Result<(uint Value, DrsOriginState Origin)> lu)
@@ -141,7 +141,7 @@ public sealed class RenderQueueCapTweakTests
         t.EtatNonLu(State).Should().BeFalse();
     }
 
-    // Revue n° 13 : scanné sans jeu ouvert, la file NVIDIA n'est pas lue, et c'est dit.
+    // Scanné sans jeu ouvert, la file NVIDIA n'est pas lue, et c'est dit.
     [Fact]
     public void Sur_NVIDIA_sans_jeu_ouvert_la_file_est_dite_non_lue()
     {
@@ -199,13 +199,13 @@ public sealed class RenderQueueCapTweakTests
     public void AppliesTo_false_on_igpu_only() =>
         Build().AppliesTo(IgpuOnly(), State).Should().BeFalse();
 
-    // --- Apply (AMD Anti-Lag path). ---
+    // --- Application (chemin Anti-Lag AMD). ---
 
     [Fact]
     public async Task Apply_enables_antilag_via_helper_and_captures_original()
     {
         var t = Build();
-        _adlx.GetAntiLagState().Returns(Result<int>.Ok(0)); // off → we turn on
+        _adlx.GetAntiLagState().Returns(Result<int>.Ok(0)); // désactivé → on active
 
         var r = await t.ApplyAsync();
 
@@ -213,19 +213,32 @@ public sealed class RenderQueueCapTweakTests
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<ApplyAdlxTuningOp>(o => o.Kind == AdlxTuningKind.AntiLag && o.IntValue == 1),
             Arg.Any<CancellationToken>());
-        // Snapshot carries the captured original (0) as an inverse ADLX op.
+        // L'instantané porte l'origine capturée (0) en op ADLX inverse.
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         inverse.Value.Should().BeOfType<ApplyAdlxTuningOp>()
             .Which.IntValue.Should().Be(0);
-        // 08/10/2026 : la valeur posée, sans laquelle la désinstallation ne rendrait jamais Anti-Lag.
+        // La valeur posée, sans laquelle la désinstallation ne rendrait jamais Anti-Lag.
         PrivilegedOpCodec.Deserialize(r.Value!.AppliedValueJson).Value.Should()
             .Be(new ApplyAdlxTuningOp(0, AdlxTuningKind.AntiLag, 1));
+    }
+
+    // Une origine hors de l'énumération documentée ne se rejouerait pas (le helper la refuse) : rien n'est écrit, sinon le
+    // réglage de DrDXT resterait posé pour toujours.
+    [Fact]
+    public async Task Une_origine_irrejouable_n_est_pas_ecrasee()
+    {
+        var t = Build();
+        _adlx.IsAvailable.Returns(false);
+        _nvApi.GetMaxPreRenderedFrames().Returns(Result<uint>.Ok(0x100));
+
+        (await t.ApplyAsync()).IsOk.Should().BeFalse();
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<ApplyNvApiDrsSettingOp>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Apply_falls_back_to_nvidia_drs_when_only_nvapi_available()
     {
-        // The universal NVIDIA branch: render queue cap via DRS Max-Pre-Rendered-Frames = 1.
+        // La branche NVIDIA universelle : plafond de file de rendu via DRS Max-Pre-Rendered-Frames = 1.
         var t = Build();
         _adlx.IsAvailable.Returns(false);
         _nvApi.IsAvailable.Returns(true);

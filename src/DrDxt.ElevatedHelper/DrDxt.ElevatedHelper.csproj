@@ -3,42 +3,42 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <!-- 04/10/2026 : aucun code injecte au lancement (DOTNET_STARTUP_HOOKS), voir AucunCrochetDeDemarrageTests. -->
+    <!-- Aucun code injecte au lancement (DOTNET_STARTUP_HOOKS), voir AucunCrochetDeDemarrageTests. -->
     <StartupHookSupport>false</StartupHookSupport>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- NamedPipeServerStreamAcl / PipeSecurity (restrictive pipe DACL). -->
-    <!-- ServiceController (start/stop/query the AMD3DVCache + PresentMon services). -->
+    <!-- NamedPipeServerStreamAcl / PipeSecurity (DACL restrictive du pipe). -->
+    <!-- ServiceController (démarrer / arrêter / interroger les services AMD3DVCache + PresentMon). -->
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
-    <!-- WMI root\default:SystemRestore.Enable for the EnableSystemRestoreOp executor. -->
+    <!-- WMI root\default:SystemRestore.Enable pour l'exécuteur d'EnableSystemRestoreOp. -->
     <PackageReference Include="System.Management" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
-    <!-- The SINGLE verified ADLX native boundary (AdlxNative + slots). Reused by the
-         elevated helper so the real ADLX write has ONE copy of the vtable slots, never a
-         divergent duplicate (master §9 leaf-minimal: GpuNative pulls only the BCL). -->
+    <!-- L'unique frontière ADLX native vérifiée (AdlxNative + emplacements). Reprise par le
+         helper élevé pour que la vraie écriture ADLX n'ait qu'une copie des emplacements de
+         vtable, jamais un doublon divergent (master §9 feuille minimale : GpuNative ne tire que la BCL). -->
     <ProjectReference Include="..\DrDxt.GpuNative\DrDxt.GpuNative.csproj" />
-    <!-- 11/09/2026 : le helper eleve est le SEUL ecrivain du manifeste signe (CommitManifestOp) :
+    <!-- Le helper eleve est le seul ecrivain du manifeste signe (CommitManifestOp) :
          cle de la machine, fusion, signature et racine admin vivent dans DrDxt.Reconciler, qui ne
          depend que de DrDxt.Core (aucun cycle). -->
     <ProjectReference Include="..\DrDxt.Reconciler\DrDxt.Reconciler.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Unit-test the internal NVAPI entry layer (MakeVersion golden rule + the
-         fail-clean EnumPhysicalGPUs path) without making it public surface. -->
+    <!-- Tester la couche d'entrée NVAPI interne (règle d'or MakeVersion + le chemin
+         EnumPhysicalGPUs à échec propre) sans en faire une surface publique. -->
     <InternalsVisibleTo Include="DrDxt.ElevatedHelper.Tests" />
     <!-- Le banc AMD (validation complète) passe au canal élevé la même instance ADLX que ses lecteurs. -->
     <InternalsVisibleTo Include="DrDxt.AmdHarness" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Deploy the vendored PresentMon service binary next to the helper so the
-         bounded InstallPresentMonServiceOp can locate it at runtime (the locator
-         probes <basedir>\third_party\presentmon\PresentMonService.exe). -->
+    <!-- Déployer le binaire du service PresentMon embarqué à côté du helper pour que
+         l'InstallPresentMonServiceOp borné le trouve à l'exécution (le localisateur
+         sonde <basedir>\third_party\presentmon\PresentMonService.exe). -->
     <None Include="..\..\third_party\presentmon\PresentMonService.exe"
           Link="third_party\presentmon\PresentMonService.exe"
           CopyToOutputDirectory="PreserveNewest" />

@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
-/// <summary>MOUSE1 (09/10/2026) : « Améliorer la précision du pointeur » coupée, trois valeurs REG_SZ de la session lues
+/// <summary>« Améliorer la précision du pointeur » coupée, trois valeurs REG_SZ de la session lues
 /// avant, rendues à l'identique (absentes ⇒ supprimées), effet à la prochaine ouverture de session.</summary>
 public sealed class AccelerationSourisOffTweakTests
 {

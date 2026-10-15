@@ -13,9 +13,8 @@ namespace DrDxt.Core.Tests;
 ///
 /// Les deux erreurs sont graves et ne se ressemblent pas :
 ///   * SURCONFIANT — le produit garde un reglage inerte ;
-///   * sous-CONFIANT — le produit ne voit jamais rien. C'etait l'etat de DrDXT jusqu'au 07/09/2026
-///     (annonce 14,3 %, bruit vrai 3,9 %) et personne ne s'en plaignait, parce qu'un produit
-///     aveugle ne fait pas d'erreur visible.
+///   * sous-CONFIANT : le produit ne voit jamais rien (mesure : annonce 14,3 % pour un bruit vrai de
+///     3,9 %), et personne ne s'en plaint, parce qu'un produit aveugle ne fait pas d'erreur visible.
 /// </summary>
 public class NoOpCalibrationTests
 {
@@ -57,7 +56,7 @@ public class NoOpCalibrationTests
     [Fact]
     public void Un_intervalle_TROIS_FOIS_TROP_LARGE_est_denonce_comme_de_l_aveuglement()
     {
-        // Le defaut reel de DrDXT avant le 07/09 : jamais faux, jamais utile.
+        // Le defaut sous-confiant : jamais faux, jamais utile.
         var rapport = NoOpCalibration.Juger(Serie(30, ecartMax: 3.9, resolution: 14.3), GameMetricKind.Moyenne);
 
         rapport.Verdict.Should().Be(CalibrationVerdict.SousConfiant);
@@ -100,7 +99,7 @@ public class NoOpCalibrationTests
         rapport.Verdict.Should().NotBe(CalibrationVerdict.Surconfiant);
     }
 
-    // 26/09/2026 : une observation relue sans « ResolutionPct » vaut 0, et tout ecart non nul devenait un
+    // Une observation relue sans « ResolutionPct » vaut 0, et tout ecart non nul devenait un
     // depassement. Vingt-cinq lignes amputees suffisaient a declarer le modele surconfiant.
     [Theory]
     [InlineData(0.0)]

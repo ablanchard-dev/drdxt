@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>UI1 (critique du 08/10, défaut 12) : « 1 partie(s) relevée(s), 2 arrêt(s) brutal(aux) » : l'interface n'avait
+/// <summary>« 1 partie(s) relevée(s), 2 arrêt(s) brutal(aux) » : l'interface n'avait
 /// pas compté. Chaque mot marqué s'accorde au nombre qui le précède dans la même proposition.</summary>
 public sealed class AccordDesPlurielsTests
 {
@@ -18,7 +18,7 @@ public sealed class AccordDesPlurielsTests
     public void Chaque_mot_marque_s_accorde_au_nombre_qui_le_precede(string brut, string accorde)
         => Pluriels.Accorder(brut, new System.Globalization.CultureInfo("fr")).Should().Be(accorde);
 
-    // Revue n° 15 : un nombre trop long ne fait plus planter l'écran ; l'anglais met 0 au pluriel.
+    // Un nombre trop long ne fait plus planter l'écran ; l'anglais met 0 au pluriel.
     [Fact]
     public void Un_nombre_trop_long_ne_plante_pas_et_l_anglais_a_sa_regle()
     {

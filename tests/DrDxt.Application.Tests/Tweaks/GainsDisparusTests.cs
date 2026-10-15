@@ -101,8 +101,8 @@ public class GainsDisparusTests
         GainsDisparus.Detecter([], new LecteurParFeuille(new())).Should().BeEmpty();
     }
 
-    // Vu sur capture (08/10/2026) : le VRR s'affichait « revenu à la valeur d'avant » ET « posé, Annuler ». Son journal
-    // gardait une origine égale à la valeur posée : DrDXT n'avait rien changé, il n'y a rien de « défait ».
+    // Une origine égale à la valeur posée : DrDXT n'a rien changé, il n'y a rien de « défait ». Sinon le VRR
+    // s'afficherait à la fois « revenu à la valeur d'avant » et « posé, Annuler ».
     [Fact]
     public void Une_origine_egale_a_la_valeur_posee_n_est_pas_un_gain_perdu()
     {

@@ -7,7 +7,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// L2 — l'ecriture des reglages 3D par JEU.
+// L'ecriture des reglages 3D par JEU.
 //
 // La hierarchie du driver est Application > Global courant > Base (PG-12072-001 p.2). Une
 // ecriture globale peut donc ne jamais atteindre un jeu qui possede son propre profil, pendant

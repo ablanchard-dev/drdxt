@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
-// A2b (07/10/2026) : sur une carte AMD (sans NVAPI), le plafond VRR passe par FRTC. Avant, le levier était proposé
+// Sur une carte AMD (sans NVAPI), le plafond VRR passe par FRTC. Avant, le levier était proposé
 // puis ne pouvait qu'échouer.
 public sealed class VrrVsyncCapAmdTests
 {
@@ -41,7 +41,7 @@ public sealed class VrrVsyncCapAmdTests
         return new VrrVsyncCapConfigTweak(_nvApi, _display, _elevated, adlx: _adlx);
     }
 
-    // A2c : le combo entier, Vsync du pilote « toujours activée » puis FRTC ; l'inverse rend les deux, à l'envers.
+    // Le combo entier, Vsync du pilote « toujours activée » puis FRTC ; l'inverse rend les deux, à l'envers.
     [Fact]
     public async Task Sur_AMD_le_combo_passe_par_la_Vsync_et_FRTC_et_l_inverse_rend_les_deux_a_l_envers()
     {
@@ -86,7 +86,7 @@ public sealed class VrrVsyncCapAmdTests
         await _elevated.Received(1).ExecuteAsync(new ApplyAdlxTuningOp(0, AdlxTuningKind.VerticalRefresh, 1), Arg.Any<CancellationToken>());
     }
 
-    // Revue n° 10 : la seconde écriture refusée ET le retour arrière de la première refusé : la Vsync reste posée.
+    // La seconde écriture refusée ET le retour arrière de la première refusé : la Vsync reste posée.
     // Le levier le dit par son code, pour que l'appelant garde le journal au lieu de croire que rien n'a changé.
     [Fact]
     public async Task Retour_arriere_rate_le_levier_dit_pose_en_partie()
@@ -116,7 +116,7 @@ public sealed class VrrVsyncCapAmdTests
         t.EtatNonLu(State).Should().BeTrue();
     }
 
-    // Revue n° 9 : l'aller-retour entier. Le snapshot que rend ApplyAsync doit se rendre par RevertAsync.
+    // L'aller-retour entier. Le snapshot que rend ApplyAsync doit se rendre par RevertAsync.
     [Fact]
     public async Task Le_snapshot_rendu_par_la_pose_se_rend_par_le_levier_lui_meme()
     {

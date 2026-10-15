@@ -8,14 +8,14 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// R2 — the lease ops flow through the FULL TypedPrivilegedServer pipeline
-//   (a) HMAC verify → (b) nonce → (c) caller authz → (d) codec bind →
-//   (e) OpAllowlist.Validate → (f) route to the LeaseWatchdog (not the privileged
-//   executor — establishing/renewing a lease is not itself a privileged write).
+// Les ops de bail traversent tout le pipeline TypedPrivilegedServer :
+//   (a) vérification HMAC → (b) nonce → (c) autorisation de l'appelant → (d) liaison codec →
+//   (e) OpAllowlist.Validate → (f) routage vers le LeaseWatchdog (pas l'exécuteur privilégié :
+//   établir ou renouveler un bail n'est pas en soi une écriture privilégiée).
 //
-// The lease is tied to the AUTHENTICATED caller identity (CallerInfo): a forged /
-// unauthorized caller is rejected before the watchdog is touched, and a DIFFERENT
-// authenticated caller cannot renew or hijack another caller's lease.
+// Le bail est lié à l'identité authentifiée de l'appelant (CallerInfo) : un appelant forgé
+// ou non autorisé est refusé avant même de toucher le chien de garde, et un autre appelant
+// authentifié ne peut ni renouveler ni détourner le bail d'un tiers.
 // -----------------------------------------------------------------------
 public sealed class LeaseIpcPipelineTests
 {
@@ -68,7 +68,7 @@ public sealed class LeaseIpcPipelineTests
     private static string RevertJson() =>
         PrivilegedOpCodec.Serialize(new ApplyNvApiClockOffsetOp(0, 0, 0)).Value!;
 
-    // --- a signed EstablishLeaseOp registers a lease that later auto-reverts ---
+    // --- une EstablishLeaseOp signée enregistre un bail qui revient en arrière tout seul plus tard ---
 
     [Fact]
     public async Task EstablishLease_via_pipeline_registers_lease_that_auto_reverts_at_expiry()
@@ -83,13 +83,13 @@ public sealed class LeaseIpcPipelineTests
         resp.Ok.Should().BeTrue();
         exec.WasInvoked.Should().BeFalse("establishing a lease is not itself a privileged write");
 
-        // Expire it → the watchdog runs the recorded revert through the executor.
+        // Le faire expirer → le chien de garde joue le retour arrière enregistré via l'exécuteur.
         clock.Advance(TimeSpan.FromSeconds(31));
         await wd.TickAsync(default);
         exec.WasInvoked.Should().BeTrue("the watchdog must fire the recorded revert at expiry");
     }
 
-    // --- a signed RenewLeaseOp by the same caller extends the lease ---
+    // --- une RenewLeaseOp signée par le même appelant prolonge le bail ---
 
     [Fact]
     public async Task RenewLease_via_pipeline_by_owner_extends_expiry()
@@ -107,13 +107,13 @@ public sealed class LeaseIpcPipelineTests
             SignedRequest(key, new RenewLeaseOp("lease-1", 30)), default, owner))
             .Ok.Should().BeTrue();
 
-        // t+40 would have expired the original (t+30) lease; renewed to t+50 → alive.
+        // t+40 aurait fait expirer le bail d'origine (t+30) ; renouvelé à t+50 → vivant.
         clock.Advance(TimeSpan.FromSeconds(20));
         await wd.TickAsync(default);
         exec.WasInvoked.Should().BeFalse("the renewed lease must not have fired");
     }
 
-    // --- SECURITY: a DIFFERENT authenticated caller cannot renew/hijack a lease ---
+    // --- Sécurité : un autre appelant authentifié ne peut ni renouveler ni détourner un bail ---
 
     [Fact]
     public async Task RenewLease_via_pipeline_by_a_different_caller_is_denied()
@@ -127,21 +127,21 @@ public sealed class LeaseIpcPipelineTests
             SignedRequest(key, new EstablishLeaseOp("lease-1", RevertJson(), 30)), default, owner))
             .Ok.Should().BeTrue();
 
-        // The attacker is a fully authorized peer (AllowAllAuth) and signs correctly,
-        // but it is not the lease owner → the renew must be denied.
+        // L'attaquant est un pair pleinement autorisé (AllowAllAuth) qui signe correctement,
+        // mais il n'est pas le propriétaire du bail → le renouvellement doit être refusé.
         var hijack = await server.ProcessTypedRequestAsync(
             SignedRequest(key, new RenewLeaseOp("lease-1", 99999)), default, attacker);
 
         hijack.Ok.Should().BeFalse("a different caller must not renew another caller's lease");
-        hijack.ErrorCode.Should().Be(ErrorCodes.ElevationDenied);
+        hijack.ErrorCode.Should().Be(ErrorCodes.LeaseUnknown);
 
-        // And the original owner's lease still expires on its real schedule.
+        // Et le bail du vrai propriétaire expire toujours à son échéance réelle.
         clock.Advance(TimeSpan.FromSeconds(31));
         await wd.TickAsync(default);
         exec.WasInvoked.Should().BeTrue("the hijack must not have kept the owner's lease alive");
     }
 
-    // --- SECURITY: a forged (unauthorized) caller is rejected before the watchdog ---
+    // --- Sécurité : un appelant forgé (non autorisé) est refusé avant le chien de garde ---
 
     [Fact]
     public async Task EstablishLease_with_unauthorized_caller_is_denied_before_watchdog()
@@ -150,7 +150,7 @@ public sealed class LeaseIpcPipelineTests
         var clock = new FakeClock();
         var exec = new NoopExecutor();
         var wd = new LeaseWatchdog(clock, new OpAllowlist(), exec, new RecordingDiagnostics());
-        // Deny-by-default authenticator: the caller authz step (c) fails.
+        // Authentificateur fermé par défaut : l'étape (c) d'autorisation échoue.
         var server = new TypedPrivilegedServer(
             key, new DenyByDefaultCallerAuthenticator(), new OpAllowlist(), exec, leaseWatchdog: wd);
 
@@ -160,13 +160,13 @@ public sealed class LeaseIpcPipelineTests
         resp.Ok.Should().BeFalse();
         resp.ErrorCode.Should().Be(ErrorCodes.ElevationDenied);
 
-        // Nothing was registered: even after the would-be expiry, nothing fires.
+        // Rien n'a été enregistré : même après l'échéance supposée, rien ne se déclenche.
         clock.Advance(TimeSpan.FromSeconds(120));
         await wd.TickAsync(default);
         exec.WasInvoked.Should().BeFalse("an unauthorized caller must never register a lease");
     }
 
-    // --- SECURITY: a tampered EstablishLease signature is rejected ---
+    // --- Sécurité : une signature EstablishLease altérée est refusée ---
 
     [Fact]
     public async Task EstablishLease_with_tampered_signature_is_rejected()
@@ -189,14 +189,14 @@ public sealed class LeaseIpcPipelineTests
         exec.WasInvoked.Should().BeFalse();
     }
 
-    // --- a lease op against a server without a watchdog fails clean (no crash) ---
+    // --- une op de bail contre un serveur sans chien de garde échoue proprement (pas de plantage) ---
 
     [Fact]
     public async Task Lease_op_without_a_configured_watchdog_fails_clean()
     {
         var key = NewKey();
         var exec = new NoopExecutor();
-        // No watchdog wired (e.g. a minimal host): the lease op must fail clean.
+        // Aucun chien de garde branché (hôte minimal) : l'op de bail doit échouer proprement.
         var server = new TypedPrivilegedServer(key, new AllowAllAuth(), new OpAllowlist(), exec);
 
         var resp = await server.ProcessTypedRequestAsync(
@@ -205,7 +205,7 @@ public sealed class LeaseIpcPipelineTests
         resp.Ok.Should().BeFalse("a lease op needs a watchdog; without one it must fail clean, not crash");
     }
 
-    // --- Deny-by-default still holds: a non-allowlisted op is still refused ---
+    // --- Le refus par défaut tient toujours : une op hors liste blanche reste refusée ---
 
     [Fact]
     public async Task Non_allowlisted_op_still_refused_with_watchdog_present()

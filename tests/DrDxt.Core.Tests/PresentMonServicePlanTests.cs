@@ -35,22 +35,43 @@ public class PresentMonServicePlanTests
             .Should().Be(PresentMonServiceAction.StartOnly);
     }
 
-    [Fact]
-    public void Pointant_vers_un_binaire_INCONNU_il_faut_le_REPARER()
+    // Le nom « PresentMonService » est aussi celui du PresentMon d'Intel et d'autres outils. Un service qui pointe ailleurs
+    // que dans un dossier de DrDXT est celui d'un autre produit : il était repointé sur notre binaire puis supprimé à la
+    // désinstallation. Il n'est plus touché ; la mesure passe par le repli DXGI.
+    [Theory]
+    [InlineData(@"""C:\Program Files\Other\PresentMonService.exe""")]
+    [InlineData(@"""C:\ailleurs\PresentMonService.exe""")]
+    [InlineData(@"wrap.exe ""C:\Program Files\DrDXT\PresentMonService.exe""")] // une enveloppe : pas notre ligne
+    public void Le_service_d_un_autre_produit_n_est_pas_touche(string binPath)
     {
-        // Le cas qui compte : le service existe, mais rien ne dit quelle version il execute —
-        // et c'est la version qui decide si le client peut lui parler.
-        PresentMonServicePlan.Decide(true, "\"C:\\ailleurs\\PresentMonService.exe\"", @"C:\app\PresentMonService.exe")
+        PresentMonServicePlan.Decide(true, binPath, @"C:\app\PresentMonService.exe")
+            .Should().Be(PresentMonServiceAction.PasANous);
+    }
+
+    [Fact]
+    public void Un_ancien_emplacement_de_DrDXT_se_repare()
+    {
+        PresentMonServicePlan.Decide(true, @"""C:\Users\x\AppData\Local\Programs\DrDXT\PresentMonService.exe""",
+                @"C:\Program Files\DrDXT\PresentMonService.exe")
             .Should().Be(PresentMonServiceAction.Repair);
     }
 
     [Fact]
-    public void Une_configuration_ILLISIBLE_se_repare_au_lieu_de_se_croire_bonne()
+    public void Un_ancien_service_de_DrDXT_avec_des_arguments_se_repare_aussi()
     {
-        // Ne pas avoir pu lire le binPath n'est pas « il est correct ». Meme doctrine que partout
-        // ailleurs dans ce depot : Unknown ne deduit rien de favorable.
-        PresentMonServicePlan.Decide(true, null, @"C:\app\PresentMonService.exe")
+        // Une installation plus ancienne posait des arguments après l'exécutable : c'est le service que la réparation
+        // existe pour rattraper, celui qui republie le tube par défaut.
+        PresentMonServicePlan.Decide(true, @"""C:\Program Files\DrDXT\PresentMonService.exe"" --session_name DrDXT",
+                @"C:\Program Files\DrDXT\PresentMonService.exe")
             .Should().Be(PresentMonServiceAction.Repair);
+    }
+
+    [Fact]
+    public void Une_configuration_ILLISIBLE_n_est_ni_crue_bonne_ni_reecrite()
+    {
+        // Ne pas avoir pu lire le binPath n'est pas « il est correct » ; ce n'est pas non plus « il est à nous ».
+        PresentMonServicePlan.Decide(true, null, @"C:\app\PresentMonService.exe")
+            .Should().Be(PresentMonServiceAction.PasANous);
     }
 
     [Fact]

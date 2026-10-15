@@ -55,8 +55,7 @@ public sealed class ScanShowsCadenceTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(
-              Hw(), St, new List<Finding>(), 68, bl,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              Hw(), St, new List<Finding>(), bl)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
@@ -69,9 +68,7 @@ public sealed class ScanShowsCadenceTests
         return new ScanViewModel(
             hd, sr, br, sc, sd,
             ScanViewModelTestSeams.Safety(), ScanViewModelTestSeams.Engine(),
-            ScanViewModelTestSeams.ProfileConsumer(), ScanViewModelTestSeams.GpuTuningStep(),
-            ScanViewModelTestSeams.Navigation(), ScanViewModelTestSeams.DashboardFactory(),
-            store, new AppliedTweakManifestMapper(),
+            ScanViewModelTestSeams.ProfileConsumer(), store, new AppliedTweakManifestMapper(),
             ScanViewModelTestSeams.BiosAdvisor(),
             ScanViewModelTestSeams.GuideGenerator(), key => key);
     }

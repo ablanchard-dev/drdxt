@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 : un test de vue échouait au hasard sous charge (« chemin 'Opacity' non résolu »). Cause : xUnit
+// Un test de vue échouait au hasard sous charge (« chemin 'Opacity' non résolu »). Cause : xUnit
 // construit des vues sur plusieurs fils STA à la fois et le lecteur XAML de WPF ne le supporte pas. Seize
 // fils, dix vues chacun : rouge trois fois sur trois avant que le banc ne rende une vue à la fois.
 public sealed class VuesEnParalleleTests

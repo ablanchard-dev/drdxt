@@ -9,7 +9,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// B0 (10/10/2026, boucle « allonger le bras ») : le critère d'adoption d'un levier, écrit dans le code. Chaque levier que
+/// Le critère d'adoption d'un levier, écrit dans le code. Chaque levier que
 /// le bras propose porte (1) une source, dans un profil (`GainEvidence.Source`) ; (2) un retour que la désinstallation et
 /// le revert en attente savent rejouer (`RevertAuDemarrage.LeviersRejouables`) ; (3) un mode de mesure déclaré au catalogue
 /// des candidats (à chaud = jugé en jeu, au redémarrage = posé sans mesure, réglage = posé et relu). Un levier sans l'un des
@@ -21,10 +21,10 @@ public sealed class ChaqueLevierPorteSourceRetourEtMesureTests
     // le reflex défait seulement une ancienne écriture ; fréquence et ventilateur de la carte ne vivent qu'en mode Expert.
     private static readonly HashSet<string> HorsBras = ["latency.reflex", "gpu.undervolt", "gpu.fan_curve"];
 
-    // Un retour qui n'est pas une op du helper, avec sa raison : la garde l'a trouvé le 10/10/2026 et c'est voulu.
+    // Un retour qui n'est pas une op du helper, avec sa raison : c'est voulu, la garde le sait.
     private static readonly Dictionary<string, string> RetourHorsHelper = new(StringComparer.Ordinal)
     {
-        // L-ECRAN : écrit sans droits par l'App (user32, profil de l'utilisateur) ; un mode non gardé dans les 15 s revient
+        // Écrit sans droits par l'App (user32, profil de l'utilisateur) ; un mode non gardé dans les 15 s revient
         // seul (Windows), un mode non enregistré repart à l'ancien à la session suivante ; son propre RevertAsync rend
         // l'original. Rien n'est à rejouer au démarrage ni à la désinstallation.
         ["fixit.ecran_frequence"] = "mode d'écran, sans helper : revient seul si non confirmé, rendu par son propre levier",

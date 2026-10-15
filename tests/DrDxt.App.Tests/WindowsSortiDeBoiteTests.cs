@@ -8,7 +8,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 10/10/2026 (le mainteneur : « si mon PC là il n'optimise pas, il optimisera certainement pas les autres ») : sa machine
+/// Sa machine
 /// a déjà tout ce que DrDXT sait poser (7 lus sur 7). Ici, un Windows 11 sorti de boîte, bureau Intel + NVIDIA, avec les
 /// défauts de Windows et du pilote : Mode Jeu allumé, accélération du pointeur allumée, enregistrement en arrière-plan
 /// éteint, « optimisations pour les jeux en fenêtre » jamais réglées, plan Équilibré, boost par défaut, mode NVIDIA
@@ -44,7 +44,7 @@ public sealed class WindowsSortiDeBoiteTests
             MemoryConfiguredMhz: 2133, DisplayRefresh: new RefreshHeadroom(TriState.Off, 144, 144),
             NvidiaPreferMaxPerf: TriState.Off, HagsEffective: TriState.On,
             ModeDeBoost: new ModeDeBoostLu(Guid.Parse(Equilibre), 2, 2), AccelerationSouris: TriState.On,
-            // B1 : un i5-12400F livré à sa puissance de base (65 W) sous une pointe de 117 W (Intel), sans verrou.
+            // Un i5-12400F livré à sa puissance de base (65 W) sous une pointe de 117 W (Intel), sans verrou.
             LimitePuissance: new LimiteDePuissanceLue(65, 117, 65, false, CopieMmioPl1W: 0));
         return (hw, etat);
     }

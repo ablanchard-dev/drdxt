@@ -4,17 +4,17 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// DefaultReapplyOpMapper — the SECURITY BOUNDARY of the reconciler (the WinRing0
-// lesson, I3). It resolves a reconcilable tweakId + desired serialized value to ONE
-// of the existing sealed PrivilegedOp leaves with BOUNDED fields, always sourcing the
-// op's TARGET (hive/path/name/serviceName) from the descriptor catalog — never from
-// the caller-supplied desired value. An unknown tweakId, an unparseable / out-of-type
-// value, or an unsupported surface → Fail before any op is produced.
+// DefaultReapplyOpMapper : la frontière de sécurité du réconciliateur (la leçon
+// WinRing0). Il résout un tweakId réconciliable + une valeur voulue sérialisée vers une
+// des feuilles PrivilegedOp scellées existantes, aux champs bornés, en prenant toujours la
+// cible de l'op (ruche/chemin/nom/serviceName) dans le catalogue de descripteurs, jamais
+// dans la valeur fournie par l'appelant. Un tweakId inconnu, une valeur inanalysable ou
+// d'un mauvais type, ou une surface non supportée → Fail avant toute production d'op.
 //
-// These tests prove: each surface's happy path (op fields == descriptor + canonical
-// value), the parse rejections, the service-token → action mapping (incl. refusing
-// install / notinstalled), and the hard guarantee that a HOSTILE desired value cannot
-// move the op's target — only its bounded value field.
+// Ces tests prouvent : le chemin nominal de chaque surface (champs de l'op == descripteur +
+// valeur canonique), les rejets d'analyse, la correspondance jeton de service → action (y
+// compris le refus d'install / notinstalled), et la garantie dure qu'une valeur voulue
+// hostile ne peut pas déplacer la cible de l'op, seulement son champ de valeur borné.
 // -----------------------------------------------------------------------
 public sealed class DefaultReapplyOpMapperTests
 {
@@ -24,7 +24,7 @@ public sealed class DefaultReapplyOpMapperTests
     public DefaultReapplyOpMapperTests()
         => _mapper = new DefaultReapplyOpMapper(_catalog);
 
-    // ---- Registry surface ----------------------------------------------------
+    // ---- Surface registre ----------------------------------------------------
 
     [Fact]
     public void Registry_Dword_MapsToSetRegistryValueOp_WithDescriptorTargetAndCanonicalValue()
@@ -33,12 +33,12 @@ public sealed class DefaultReapplyOpMapperTests
 
         result.IsOk.Should().BeTrue();
         var op = result.Value.Should().BeOfType<SetRegistryValueOp>().Subject;
-        // Target comes entirely from the descriptor (not the desired value).
+        // La cible vient entièrement du descripteur (pas de la valeur voulue).
         op.Hive.Should().Be(RegistryHiveKind.LocalMachine);
         op.Path.Should().Be(@"SOFTWARE\NVIDIA Corporation\Global\NVTweak");
         op.Name.Should().Be("LowLatencyMode");
         op.Kind.Should().Be(RegistryValueType.DWord);
-        // Value is the canonical DWord form (byte-identical to what the probe reads).
+        // La valeur est la forme DWord canonique (identique à l'octet près à ce que la sonde lit).
         op.Value.Should().Be("2");
     }
 
@@ -59,15 +59,15 @@ public sealed class DefaultReapplyOpMapperTests
     [Fact]
     public void HkcuNs1Tweak_HasNoDescriptor_SoTheMapperRefusesIt()
     {
-        // os.gameDvrBackground is HKCU and intentionally not reconcilable by the LocalSystem
-        // boot reconciler → no descriptor → the mapper fails before producing any op.
+        // os.gameDvrBackground est HKCU et volontairement non réconciliable par le réconciliateur
+        // LocalSystem du démarrage → pas de descripteur → le mappeur échoue avant toute op.
         _mapper.Map("os.gameDvrBackground", "0").IsOk.Should().BeFalse();
     }
 
     [Fact]
     public void Registry_Dword_ReSerializesThroughCanonicalizer_SoLeadingZerosAreNormalized()
     {
-        // "007" parses as the uint 7 → the op carries the canonical "7", matching probe.
+        // « 007 » s'analyse comme le uint 7 → l'op porte le « 7 » canonique, celui que lit la sonde.
         var result = _mapper.Map("latency.reflex.lowLatencyMode", "007");
 
         result.IsOk.Should().BeTrue();
@@ -88,12 +88,12 @@ public sealed class DefaultReapplyOpMapperTests
     [Fact]
     public void Registry_Dword_RejectsNegativeAndOverflow_NoOp()
     {
-        // -1 is not a valid uint; 4294967296 overflows uint.
+        // -1 n'est pas un uint valide ; 4294967296 déborde du uint.
         _mapper.Map("latency.reflex.lowLatencyMode", "-1").IsOk.Should().BeFalse();
         _mapper.Map("latency.reflex.lowLatencyMode", "4294967296").IsOk.Should().BeFalse();
     }
 
-    // ---- PowerPlan surface ---------------------------------------------------
+    // ---- Surface plan d'alimentation -----------------------------------------
 
     [Fact]
     public void PowerPlan_ValidGuid_MapsToSetActivePowerPlanOp()
@@ -117,7 +117,7 @@ public sealed class DefaultReapplyOpMapperTests
         result.Error!.Value.Message.Should().Contain("GUID");
     }
 
-    // ---- Service surface -----------------------------------------------------
+    // ---- Surface service -----------------------------------------------------
 
     [Fact]
     public void Service_RunningToken_MapsToStartActionOnDescriptorService()
@@ -146,8 +146,8 @@ public sealed class DefaultReapplyOpMapperTests
     [Fact]
     public void Service_NotInstalledToken_Rejects_NeverInstalls()
     {
-        // The reconciler does not install/uninstall as drift-repair (install is an
-        // apply-time concern); ServiceAction.Install must never come from the mapper.
+        // Le réconciliateur n'installe ni ne désinstalle en réparation de dérive (l'installation
+        // relève de l'application) ; ServiceAction.Install ne doit jamais sortir du mappeur.
         var result = _mapper.Map("fixit.x3dVCacheService",
             ReconcilableValueCanonicalizer.Service(ServiceRunState.NotInstalled));
 
@@ -159,7 +159,7 @@ public sealed class DefaultReapplyOpMapperTests
     public void Service_UnknownToken_Rejects()
         => _mapper.Map("fixit.x3dVCacheService", "garbage").IsOk.Should().BeFalse();
 
-    // ---- Unknown id / unsupported surfaces -----------------------------------
+    // ---- Identifiant inconnu / surfaces non supportées -----------------------
 
     [Fact]
     public void UnknownTweakId_Rejects_BeforeAnythingElse()
@@ -174,25 +174,25 @@ public sealed class DefaultReapplyOpMapperTests
     [Fact]
     public void DrsBackedLatencyId_Rejects_NoOpLeafInV1()
     {
-        // latency.renderQueueCap is policy-mapped to Registry but applied via NVAPI DRS;
-        // it is absent from the catalog, so the mapper treats it as unknown.
+        // latency.renderQueueCap est classé Registry par la politique mais appliqué via DRS NVAPI ;
+        // absent du catalogue, le mappeur le traite comme inconnu.
         _mapper.Map("latency.renderQueueCap", "1").IsOk.Should().BeFalse();
         _mapper.Map("latency.vrrVsyncCap", "1").IsOk.Should().BeFalse();
     }
 
-    // ---- Defense in depth: hostile value cannot move the target --------------
+    // ---- Défense en profondeur : une valeur hostile ne peut pas déplacer la cible --------
 
     [Fact]
     public void HostileDesiredValue_CannotChangeRegistryTarget_OnlyTheBoundedValue()
     {
-        // A desired value that TRIES to smuggle a different hive/path/name (as JSON or
-        // delimited text) must not influence the op's target. For a DWord leaf it simply
-        // fails to parse → no op at all; the target can never be attacker-chosen.
+        // Une valeur voulue qui tente de glisser une autre ruche, un autre chemin ou un autre nom
+        // (en JSON ou en texte délimité) ne doit pas influencer la cible de l'op. Pour une feuille
+        // DWord elle échoue simplement à l'analyse → aucune op ; la cible n'est jamais au choix de l'attaquant.
         var hostile = "{\"Hive\":1,\"Path\":\"SYSTEM\\\\EVIL\",\"Name\":\"Pwned\",\"Value\":\"2\"}";
 
         var result = _mapper.Map("latency.reflex.lowLatencyMode", hostile);
 
-        // Not a valid DWord → rejected outright (no op produced).
+        // Pas un DWord valide → rejeté net (aucune op produite).
         result.IsOk.Should().BeFalse();
         result.Value.Should().BeNull();
     }
@@ -200,8 +200,8 @@ public sealed class DefaultReapplyOpMapperTests
     [Fact]
     public void EvenWithAParseableValue_TheTargetIsAlwaysTheDescriptors_NotTheInput()
     {
-        // The desired value is a perfectly valid DWord ("2") — so an op IS produced — but
-        // every target field still comes from the descriptor, never from the caller.
+        // La valeur voulue est un DWord parfaitement valide (« 2 »), donc une op est produite, mais
+        // chaque champ de cible vient toujours du descripteur, jamais de l'appelant.
         var result = _mapper.Map("latency.reflex.lowLatencyMode", "2");
 
         var op = result.Value.Should().BeOfType<SetRegistryValueOp>().Subject;

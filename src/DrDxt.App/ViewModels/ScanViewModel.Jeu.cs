@@ -3,7 +3,7 @@
 namespace DrDxt.App.ViewModels;
 
 // Le jeu pendant la mesure : l'attendre quand il est réduit, et vérifier qu'il reste à l'écran tant
-// qu'on le mesure (26/09/2026).
+// qu'on le mesure.
 public sealed partial class ScanViewModel
 {
     // La durée est dite au joueur : revenir sur DrDXT avant la fin réduit le jeu en pleine capture, et les
@@ -13,9 +13,9 @@ public sealed partial class ScanViewModel
     public string LabelAttenteDuJeuSession => _localize("Apply.AttenteJeu");
     internal static readonly TimeSpan DureeCaptureEnJeu = TimeSpan.FromSeconds(20);
 
-    // 26/09/2026 : un plein écran exclusif sur un seul écran est réduit dès qu'on clique sur DrDXT. Le scan
-    // ne trouvait alors jamais le jeu et disait « lance une partie » à un joueur en pleine partie. Il
-    // attend maintenant que le jeu revienne à l'écran, et le dit.
+    // Un plein écran exclusif sur un seul écran est réduit dès qu'on clique sur DrDXT. Sans attente, le scan
+    // ne trouverait jamais le jeu et dirait « lance une partie » à un joueur en pleine partie. Il
+    // attend que le jeu revienne à l'écran, et le dit.
     [ObservableProperty] private bool _attenteDuJeu;
     [ObservableProperty] private bool _attenteDuJeuSession;
     internal static readonly TimeSpan DelaiAttenteDuJeu = TimeSpan.FromSeconds(45);

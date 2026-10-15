@@ -5,17 +5,17 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// R2 GPU bench — DeterministicGpuLoadProbe (the pure decision logic over the thin
-// IGpuComputeRunner D3D11 seam), unit-tested with a FAKE runner (no GPU needed).
+// Banc GPU : DeterministicGpuLoadProbe (la logique de décision pure au-dessus de la mince
+// couture D3D11 IGpuComputeRunner), testée avec un faux exécutant (aucune carte requise).
 //
-// Decision contract (fail-safe — never falsely Stable):
-//   * Healthy device + checksum == known answer        → CompletedDeviceHealthy
-//   * DeviceLost (TDR)                                  → DeviceLost
-//   * Healthy device but checksum != known answer       → DeviceLost  (silent corruption;
-//                                                          "no TDR ≠ stable")
-//   * runner reports Error / fails / throws            → CouldNotRun  (probe never throws)
+// Contrat de décision (à sûreté intégrée, jamais faussement Stable) :
+//   * périphérique sain + somme de contrôle == réponse connue  → CompletedDeviceHealthy
+//   * DeviceLost (TDR)                                          → DeviceLost
+//   * périphérique sain mais somme de contrôle != réponse connue → DeviceLost (corruption
+//                                                                  silencieuse ; « pas de TDR ≠ stable »)
+//   * l'exécutant rapporte Error / échoue / lève                → CouldNotRun (la sonde ne lève jamais)
 //
-// The real D3D11 IGpuComputeRunner is the only uncovered boundary (live smoke).
+// Le vrai IGpuComputeRunner D3D11 est la seule frontière non couverte (fumée sur banc).
 // -----------------------------------------------------------------------
 public sealed class DeterministicGpuLoadProbeTests
 {
@@ -27,7 +27,7 @@ public sealed class DeterministicGpuLoadProbeTests
         private readonly Func<GpuWorkloadSpec, Result<GpuComputeOutcome>> _fn;
         public FakeRunner(Func<GpuWorkloadSpec, Result<GpuComputeOutcome>> fn) => _fn = fn;
         public Result<GpuComputeOutcome> Run(GpuWorkloadSpec spec, TimeSpan duration, CancellationToken ct)
-            => _fn(spec);   // _fn may throw to simulate the device blowing up
+            => _fn(spec);   // _fn peut lever pour simuler l'explosion du périphérique
     }
 
     private static DeterministicGpuLoadProbe Build(Func<GpuWorkloadSpec, Result<GpuComputeOutcome>> runner)
@@ -62,13 +62,13 @@ public sealed class DeterministicGpuLoadProbeTests
     [Fact]
     public async Task Healthy_but_wrong_checksum_reports_device_lost_silent_corruption()
     {
-        // No TDR, device "healthy", but the output is wrong → silent instability.
+        // Pas de TDR, périphérique « sain », mais la sortie est fausse → instabilité silencieuse.
         var probe = Build(_ => Result<GpuComputeOutcome>.Ok(Healthy(KnownChecksum ^ 0xDEAD)));
 
         var r = await probe.RunBriefLoadAsync(0, TimeSpan.FromSeconds(3), default);
 
         r.IsOk.Should().BeTrue();
-        r.Value.Should().Be(GpuLoadResult.DeviceLost);   // "no TDR ≠ stable"
+        r.Value.Should().Be(GpuLoadResult.DeviceLost);   // « pas de TDR ≠ stable »
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public sealed class DeterministicGpuLoadProbeTests
     {
         var probe = Build(_ => throw new InvalidOperationException("device removed mid-dispatch"));
 
-        var r = await probe.RunBriefLoadAsync(0, TimeSpan.FromSeconds(3), default);   // must not throw
+        var r = await probe.RunBriefLoadAsync(0, TimeSpan.FromSeconds(3), default);   // ne doit pas lever
 
         r.IsOk.Should().BeTrue();
         r.Value.Should().Be(GpuLoadResult.CouldNotRun);

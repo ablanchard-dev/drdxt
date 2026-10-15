@@ -1,4 +1,4 @@
-<!-- Smoke manuel du plafond d'envoi QoS (24/09/2026). Hors de DrDXT.sln. Session administrateur. -->
+<!-- Smoke manuel du plafond d'envoi QoS. Hors de DrDXT.sln. Session administrateur. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>

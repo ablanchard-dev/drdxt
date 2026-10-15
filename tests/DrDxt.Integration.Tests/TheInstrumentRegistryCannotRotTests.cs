@@ -33,7 +33,7 @@ public sealed class TheInstrumentRegistryCannotRotTests
     private static readonly string[] Verdicts =
         { "UTILISABLE", "HORS SERVICE", "HERITE", "PERIME" };
 
-    // Le registre en portait 5 le 06/09/2026. Le vider ne doit pas etre une facon de passer.
+    // Le compte releve a l'ecriture du gate. Vider le registre ne doit pas etre une facon de passer.
     private const int RowsAtGateWriting = 5;
 
     private static string RepoRoot()

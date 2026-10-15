@@ -3,81 +3,80 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// The reconciler's own behavioural seams (plan §4/§6/§9). The public IReconciler
-// / IDesiredStateStore contracts live in DrDxt.Core; these are the module-local
-// collaborators those implementations depend on.
+// Les coutures de comportement propres au réconciliateur. Les contrats publics IReconciler /
+// IDesiredStateStore vivent dans DrDxt.Core ; voici les collaborateurs locaux au module dont
+// dépendent leurs implémentations.
 // -----------------------------------------------------------------------
 
-/// <summary>Non-blocking user notification raised when a drift is classified
-/// UserIntentional/Unknown and the conservative policy is "notify, don't overwrite"
-/// (I5 / §16). Carries resx KEYS, never hard-coded UI text (i18n, §4). In the host
-/// this maps to a toast / event-log entry; here it's an injected seam.</summary>
+/// <summary>Notification non bloquante levée quand une dérive est classée UserIntentional/Unknown
+/// et que la politique prudente est « notifier, ne pas écraser ». Porte des clés resx, jamais de
+/// texte d'interface en dur (i18n). Dans l'hôte, cela devient un toast / une entrée du journal
+/// d'événements ; ici, c'est une couture injectée.</summary>
 public interface IReconcilerNotifier
 {
     Task NotifyUserIntentionalDriftAsync(AppliedTweak tweak, string currentValueJson, CancellationToken ct);
 }
 
-/// <summary>Maps a reconcilable tweakId + its desired serialized value to the
-/// Existing typed, allowlisted PrivilegedOp and dispatches it through the same
-/// IElevatedClient pipeline (plan §9 / T32). There is NO new privileged primitive:
-/// re-apply reuses the exact leaves the Application layer already uses. An unknown
-/// tweakId fails before any IPC (I3).</summary>
+/// <summary>Traduit un tweakId réconciliable + sa valeur voulue sérialisée en la PrivilegedOp
+/// typée et admise existante, et l'envoie par le même pipeline IElevatedClient. Aucune nouvelle
+/// primitive privilégiée : la réapplication reprend exactement les feuilles qu'utilise déjà la
+/// couche Application. Un tweakId inconnu échoue avant tout IPC (I3).</summary>
 public interface IElevatedReapplyClient
 {
     Task<Result> ReapplyAsync(string tweakId, string desiredValueJson, CancellationToken ct);
 
-    /// <summary>Re-asserts a reconcilable tweak to its original (pre-DrDXT) value for a
-    /// clean uninstall — the inverse of <see cref="ReapplyAsync"/>. It carries the same
-    /// security properties (I3, the WinRing0 lesson): the value flows only into the
-    /// bounded value field of the existing typed op leaf the tweakId maps to, the op's
-    /// TARGET is descriptor-only (never steered by the value), and an unknown / unbindable
-    /// tweakId fails before any IPC. The default routes through the same map → bounded-op
-    /// → elevated-dispatch path as re-apply with the original value in place of desired —
-    /// no new privileged primitive, no off-manifest target.</summary>
+    /// <summary>Remet un levier réconciliable à sa valeur d'origine (d'avant DrDXT) pour une
+    /// désinstallation propre : l'inverse de <see cref="ReapplyAsync"/>. Mêmes propriétés de sécurité
+    /// (I3, la leçon WinRing0) : la valeur ne va que dans le champ de valeur borné de la feuille d'op
+    /// typée existante associée au tweakId, la cible de l'op vient du seul descripteur (jamais guidée
+    /// par la valeur), et un tweakId inconnu ou non reliable échoue avant tout IPC. Par défaut, passe
+    /// par le même chemin traduction → op bornée → envoi élevé que la réapplication, avec la valeur
+    /// d'origine à la place de la voulue : aucune nouvelle primitive privilégiée, aucune cible hors manifeste.</summary>
     Task<Result> RevertToOriginalAsync(string tweakId, string originalValueJson, CancellationToken ct)
         => ReapplyAsync(tweakId, originalValueJson, ct);
 }
 
-/// <summary>The clean-uninstall mechanic (plan T37). On uninstall the host must leave
-/// NO orphan: it STOPS the reconcile loop, DISARMS any pending dead-man boot-stable
-/// scheduling / armed auto-revert lease, OPTIONALLY reverts every manifest item to its
-/// recorded original value (through the same bounded typed-op path — I3 preserved), and
-/// REMOVES the host's own service/task registration. The interface is pure (only Result);
-/// the concrete implementation lives in the host, where stop/remove are host concerns.
-/// M5 wires the UI/SCM; here the mechanic is built + tested with fakes (no real SCM).</summary>
+/// <summary>La mécanique de désinstallation propre. À la désinstallation, l'hôte ne doit laisser
+/// aucun orphelin : il arrête la boucle de réconciliation, désarme toute planification « homme
+/// mort » de démarrage stable en attente / tout bail de retour automatique armé, remet en option
+/// chaque élément du manifeste à sa valeur d'origine enregistrée (par le même chemin d'op typée
+/// bornée : I3 préservé), et retire son propre enregistrement de service / tâche. L'interface est
+/// pure (Result seulement) ; l'implémentation concrète vit dans l'hôte, à qui reviennent arrêt et
+/// retrait. L'hôte branche l'interface et le SCM ; ici la mécanique est construite et testée avec
+/// des faux (sans vrai SCM).</summary>
 public interface IReconcilerLifecycle
 {
-    /// <summary>Stops + disarms the reconciler and removes its host registration. When
-    /// <paramref name="revertToOriginal"/> is true, each manifest item is first reverted
-    /// to its OriginalValueJson (read-back confirmed) via the existing reapply path. The
-    /// returned Result aggregates any per-item revert failure, but the loop is always
-    /// stopped, the lease always disarmed, and the host always removed — a partial revert
-    /// failure never leaves an orphaned, still-reconciling install.</summary>
+    /// <summary>Arrête et désarme le réconciliateur et retire l'enregistrement de son hôte. Si
+    /// <paramref name="revertToOriginal"/> vaut true, chaque élément du manifeste est d'abord remis à
+    /// son OriginalValueJson (confirmé par relecture) par le chemin de réapplication existant. Le
+    /// Result rendu regroupe chaque échec de retour par élément, mais la boucle est toujours arrêtée,
+    /// le bail toujours désarmé et l'hôte toujours retiré : un échec de retour partiel ne laisse
+    /// jamais une installation orpheline qui réconcilie encore.</summary>
     Task<Result> StopAndDisarmAsync(bool revertToOriginal, CancellationToken ct);
 }
 
-/// <summary>The persisted boot-outcome counter behind a seam (plan T27b). The host
-/// marks a boot as "started" early and "stable" after a clean session window; the
-/// guard reads the streak to decide whether GPU-tuning re-apply must be suspended.
-/// Abstracted so unit tests drive the streak with a fake.
+/// <summary>Le compteur persisté d'issue des démarrages, derrière une couture (plan T27b). L'hôte
+/// marque tôt un démarrage « commencé » et « stable » après une fenêtre de session propre ; la
+/// garde lit la série pour décider si la réapplication des réglages GPU doit être suspendue.
+/// Abstrait pour que les tests unitaires mènent la série avec un faux.
 ///
-/// Dead-man pattern: MarkBootStarted INCREMENTS the streak before the reconcile pass,
-/// MarkSessionStable RESETS it to 0 once the host has been up a stable interval. A
-/// boot that never reaches a stable session leaves the streak elevated; consecutive
-/// such boots accumulate into a detectable boot-loop.</summary>
+/// Motif « homme mort » : MarkBootStarted incrémente la série avant la passe de réconciliation,
+/// MarkSessionStable la remet à 0 une fois l'hôte resté en marche un intervalle stable. Un
+/// démarrage qui n'atteint jamais une session stable laisse la série élevée ; ces démarrages
+/// consécutifs s'accumulent en une boucle de démarrage détectable.</summary>
 public interface IBootOutcomeStore
 {
-    /// <summary>The current consecutive unclean-boot streak.</summary>
+    /// <summary>La série actuelle de démarrages non propres consécutifs.</summary>
     Task<Result<int>> GetUncleanStreakAsync(CancellationToken ct);
 
-    /// <summary>Called at host startup before the reconcile pass: increments the
-    /// unclean-boot streak by 1 and persists it. If this boot later reaches a stable
-    /// session the streak is reset; if it does not, the elevated streak is what the
-    /// next boot's guard sees.</summary>
+    /// <summary>Appelé au démarrage de l'hôte avant la passe de réconciliation : incrémente de 1 la
+    /// série de démarrages non propres et l'enregistre. Si ce démarrage atteint ensuite une session
+    /// stable, la série est remise à zéro ; sinon, c'est la série élevée que voit la garde du
+    /// démarrage suivant.</summary>
     Task<Result> MarkBootStartedAsync(CancellationToken ct);
 
-    /// <summary>Called once the host has been up a stable interval: resets the
-    /// unclean-boot streak to 0, stamps the last-stable-session timestamp, and
-    /// persists. This is the "dead-man reset" that clears the boot-loop counter.</summary>
+    /// <summary>Appelé une fois l'hôte resté en marche un intervalle stable : remet à 0 la série de
+    /// démarrages non propres, horodate la dernière session stable et enregistre. C'est la remise à
+    /// zéro « homme mort » qui efface le compteur de boucle de démarrage.</summary>
     Task<Result> MarkSessionStableAsync(CancellationToken ct);
 }

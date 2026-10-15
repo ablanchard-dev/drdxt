@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// 26/09/2026. Le helper tourne en administrateur. Un outil lance par son nom seul (« sc.exe ») est cherche
+/// Le helper tourne en administrateur. Un outil lance par son nom seul (« sc.exe ») est cherche
 /// par CreateProcess dans le dossier de l'appli puis dans le dossier courant, avant System32 (Microsoft Learn,
 /// CreateProcessW, lpCommandLine) : un executable du meme nom pose la tournerait eleve. Tous les lancements du
 /// helper passent aujourd'hui par un chemin absolu vers System32 ; l'installeur a deja sa garde

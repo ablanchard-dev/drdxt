@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Core.Tests;
 
-// M2 Phase A — the elevated-helper error codes (HELPER.* namespace).
+// Les codes d'erreur du helper élevé (espace HELPER.*).
 public class M2HelperErrorCodesTests
 {
     [Fact] public void NotAllowlisted_is_stable()  => ErrorCodes.NotAllowlisted.Should().Be("HELPER.NOT_ALLOWLISTED");

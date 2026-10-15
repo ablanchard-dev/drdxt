@@ -4,7 +4,7 @@ using DrDxt.Infrastructure.Diagnostics;
 namespace DrDxt.Infrastructure.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. `DiagnosticsLog` est le journal d'audit de DrDXT : ce qu'un
+// `DiagnosticsLog` est le journal d'audit de DrDXT : ce qu'un
 // utilisateur exporte et envoie au support quand quelque chose a bouge sur sa
 // machine. Sa documentation annonce une garantie, en tete de classe :
 //

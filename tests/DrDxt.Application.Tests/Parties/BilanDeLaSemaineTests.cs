@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 04/10/2026 (plan 3b.5) : la semaine comptée ; les FPS comparés au même jeu, seulement si les deux semaines en ont.
+// La semaine comptée ; les FPS comparés au même jeu, seulement si les deux semaines en ont.
 public sealed class BilanDeLaSemaineTests
 {
     private static readonly DateTimeOffset Maintenant = new(2026, 10, 4, 8, 0, 0, TimeSpan.Zero);

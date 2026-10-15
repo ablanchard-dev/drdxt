@@ -6,8 +6,8 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 25/09/2026 — DESIGN.md : une couleur d'état = un mot. Majeur et Mineur se lisent « à corriger »
-// partout (verdict, badge, rapport) : une pastille ambre sur un Mineur disait « à regarder ».
+// DESIGN.md : une couleur d'état = un mot. Majeur et Mineur se lisent « à corriger »
+// partout (verdict, badge, rapport) : une pastille ambre sur un Mineur dirait « à regarder ».
 public class SeverityColorConverterTests
 {
     private static Color Teinte(Severity s) =>
@@ -23,10 +23,10 @@ public class SeverityColorConverterTests
 
     [Fact]
     public void L_information_n_emprunte_aucune_couleur_d_etat()
-        // 06/10/2026 (le mainteneur : « enlever le turquoise ») : l'accent de DrDXT est le platine.
+        // L'accent de DrDXT est le platine.
         => Teinte(Severity.Info).Should().Be(Color.FromRgb(0xE6, 0xEA, 0xF0));
 
-    // 03/10/2026 (D10.2, revue n° 4) : un constat d'information met son domaine « À regarder » ; sa puce prend
+    // Un constat d'information met son domaine « À regarder » ; sa puce prend
     // l'ambre de ce mot. Un réglage proposé reste cyan. Les gravités à corriger restent corail.
     private static Color Teinte(DrDxt.App.ViewModels.EntreeCarte e) =>
         ((SolidColorBrush)new SeverityColorConverter().Convert(e, typeof(Brush), null!, CultureInfo.InvariantCulture)).Color;

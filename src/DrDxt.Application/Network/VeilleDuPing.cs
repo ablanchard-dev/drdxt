@@ -3,13 +3,13 @@ using DrDxt.Measurement.Network;
 namespace DrDxt.Application.Network;
 
 /// <summary>
-/// 27/09/2026 : « Protéger mon ping » sans scan pendant une partie saturée.
+/// « Protéger mon ping » sans scan pendant une partie saturée.
 ///
 /// Avant, la protection ne s'allumait qu'apres un scan lance pendant une partie ou l'envoi avait
 /// sature : chez un joueur normal, quasiment jamais. Allumer la veille ne pose rien. Elle regarde les
 /// vraies parties (le jeu repere par le produit), accumule les echantillons d'envoi et de ping partie
 /// apres partie, et les juge avec le meme juge que le scan (<see cref="Bufferbloat.Juger"/>). Le
-/// plafond ne nait que d'un verdict « detecte » sur SES parties : jamais d'une valeur par defaut.
+/// plafond ne nait que d'un verdict « detecte » sur ses parties : jamais d'une valeur par defaut.
 /// Tant que l'envoi ne sature pas, elle ne trouve rien et ne touche a rien.
 ///
 /// Les echantillons ne se melangent pas d'un jeu a l'autre : le plafond vise un exe precis.

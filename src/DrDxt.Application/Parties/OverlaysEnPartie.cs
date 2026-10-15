@@ -1,12 +1,12 @@
 namespace DrDxt.Application.Parties;
 
 /// <summary>
-/// 07/10/2026 (chantier D10, demande du 19/08) : les overlays ouverts pendant une partie, et ce qu'ils coûtent chez
+/// Les overlays ouverts pendant une partie, et ce qu'ils coûtent chez
 /// le joueur. Source : le support de Riot Games (« Disabling overlays », League of Legends, Performance) les range parmi ce
 /// qui peut prendre de la bande passante ou poser des problèmes de compatibilité, sans chiffre. Un chiffre général n'existe
 /// donc pas ; le seul qui vaille est celui du joueur : ses parties d'un même jeu avec l'overlay, contre celles sans.
 /// Lu par le nom des processus, sans jamais ouvrir le jeu (un anti-triche n'aime pas qu'on lise sa mémoire). Ce qui ne
-/// se voit pas ainsi reste inconnu : l'overlay de Discord vit dans le processus du jeu. NET2 (08/10/2026) : Discord compte
+/// se voit pas ainsi reste inconnu : l'overlay de Discord vit dans le processus du jeu. NET2 : Discord compte
 /// donc sous le nom de ce que le processus prouve, « Discord (ouvert) », et l'écart se lit ainsi (Discord ouvert contre
 /// fermé). L'overlay d'AMD attend le nom de son processus, relevé sur une vraie Radeon.
 /// </summary>
@@ -27,8 +27,8 @@ public static class OverlaysEnPartie
     public static IReadOnlyList<string> Reconnaitre(IEnumerable<string> processus)
         => processus.Where(Connus.ContainsKey).Select(n => Connus[n]).Distinct().Order(StringComparer.Ordinal).ToList();
 
-    /// <summary>Un écart entre les parties d'un jeu avec l'overlay et celles sans, en FPS médian. 07/10/2026 (suite de la
-    /// revue n° 6) : le verdict suit la règle des autres juges, séparation nette du 1 % low ou rien : « pire » si
+    /// <summary>Un écart entre les parties d'un jeu avec l'overlay et celles sans, en FPS médian.
+    /// Le verdict suit la règle des autres juges, séparation nette du 1 % low ou rien : « pire » si
     /// toutes les parties avec sont sous toutes celles sans, « mieux » à l'inverse, sinon pas de différence nette.</summary>
     public sealed record Ecart(string Jeu, string Overlay, double FpsAvec, double FpsSans, int PartiesAvec, int PartiesSans,
         VerdictEnJeu Verdict = VerdictEnJeu.PasDeDifference);
@@ -42,7 +42,7 @@ public static class OverlaysEnPartie
     /// <summary>Par jeu et par overlay vu. Une partie sans relevé d'overlays ne compte d'aucun côté ; une partie jouée en
     /// essai d'un réglage non plus, l'essai changerait l'écart. Une partie où l'overlay n'a été vu qu'un moment compte
     /// « avec » : on surestime son coût plutôt que de le cacher.</summary>
-    /// <param name="changements">Revue F-45 : les changements de DrDXT et les mises à jour de la machine. Seules les
+    /// <param name="changements">Les changements de DrDXT et les mises à jour de la machine. Seules les
     /// parties d'après le dernier se comparent ; sinon l'écart d'un levier ou d'un pilote passait pour celui de l'overlay.</param>
     public static (IReadOnlyList<Ecart> Ecarts, IReadOnlyList<SansComparaison> Autres) Comparer(IEnumerable<PartieRelevee> parties,
         IEnumerable<DateTimeOffset>? changements = null)

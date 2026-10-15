@@ -9,7 +9,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 07/10/2026 (chantier J4) : un levier à chaud essayé une partie sur deux, sans geste à chaque partie. Le vrai
+/// Un levier à chaud essayé une partie sur deux, sans geste à chaque partie. Le vrai
 /// ViewModel, un levier factice, de vrais fichiers temporaires : rien ne touche la machine.
 /// </summary>
 public sealed class EssaiEnAlternanceTests : IDisposable
@@ -23,18 +23,18 @@ public sealed class EssaiEnAlternanceTests : IDisposable
     private DateTimeOffset _maintenant = new(2026, 10, 7, 20, 0, 0, TimeSpan.Zero);
     private DateTimeOffset _demarrage = new(2026, 10, 7, 8, 0, 0, TimeSpan.Zero);
 
-    private ScanViewModel Vm(bool helperJoignable = true)
+    private ScanViewModel Vm(bool helperJoignable = true, string id = Id)
     {
-        _levier.Id.Returns(Id);
+        _levier.Id.Returns(id);
         _levier.RequiresElevation.Returns(true);
-        _levier.ApplyAsync().Returns(_ => { _poses++; return Task.FromResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, "100", "90"))); });
+        _levier.ApplyAsync().Returns(_ => { _poses++; return Task.FromResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(id, "100", "90"))); });
         _levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(_ => { _rendus++; return Task.FromResult(Result.Ok()); });
         var vm = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
             Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k,
             journalLeviers: new JournalDesLeviersAppliques(Path.Combine(_dossier, "leviers.json")));
         vm.MemoireParties = new PartiesMemorisees(Path.Combine(_dossier, "choix.json"), Path.Combine(_dossier, "parties.json"));
         vm.MemoireEssai = new MemoireDeLEssai(Path.Combine(_dossier, "essai.json"));
-        vm.LevierParId = id => id == Id ? _levier : null;
+        vm.LevierParId = demande => demande == id ? _levier : null;
         vm.HelperJoignableSansUac = () => Task.FromResult(helperJoignable);
         vm.Horloge = () => _maintenant;
         vm.DemarrageDuPc = () => _demarrage;
@@ -72,7 +72,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         (_poses - _rendus).Should().Be(1, "mieux en jeu : il reste posé");
     }
 
-    // GARDE1 (09/10/2026) : la pose de l'essai se date, comme celles d'Optimiser : la garde d'incident la couvre.
+    // La pose de l'essai se date, comme celles d'Optimiser : la garde d'incident la couvre.
     [Fact]
     public async Task La_pose_de_l_essai_se_date_pour_la_garde()
     {
@@ -82,8 +82,8 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.JournalChangements.Lire().Should().Contain(c => c.Cle == "pose:" + Id && c.Quand == _maintenant);
     }
 
-    // 09/10/2026 : DrDXT relancé pendant un essai : sans scan ni fin de partie, l'essai ne se disait pas et son bouton
-    // d'arrêt restait dans la zone de résultats, invisible.
+    // DrDXT relancé pendant un essai : sans scan ni fin de partie, l'essai doit quand même se dire, et son
+    // bouton d'arrêt ne doit pas rester caché dans la zone de résultats.
     [Fact]
     public async Task Un_essai_en_cours_se_dit_des_le_lancement_et_s_arrete_sans_scan()
     {
@@ -115,7 +115,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.LigneEssai.Should().Be("Essai.Pause");
         vm.MemoireEssai!.Lire()!.EnPause.Should().BeTrue();
         await Jouer(vm, 80);
-        // Revue F-37 : en pause, rien n'a été touché : l'état (posé) est connu, la partie compte avec lui.
+        // En pause, rien n'a été touché : l'état (posé) est connu, la partie compte avec lui.
         vm.MemoireParties!.Lire()[0].Essai.Should().Be(AlternanceDesEssais.Marque(Id, true));
     }
 
@@ -139,7 +139,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         ScanViewModel.PeutAlterner("latency.hagsOn").Should().BeFalse("HAGS demande un redémarrage");
         ScanViewModel.PeutAlterner("inconnu").Should().BeFalse();
     }
-    // Revue F-30 : la veille enregistre la partie hors du fil de l'écran ; l'avancée de l'essai (qui rafraîchit des
+    // La veille enregistre la partie hors du fil de l'écran ; l'avancée de l'essai (qui rafraîchit des
     // listes liées à l'écran) doit y être postée, comme l'affichage.
     private sealed class FilDeLEcran : SynchronizationContext
     {
@@ -165,7 +165,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         _rendus.Should().Be(1);
     }
 
-    // Revue F-31 : « Annuler » sur le levier en essai arrête l'essai ; rien ne le repose ensuite.
+    // « Annuler » sur le levier en essai arrête l'essai ; rien ne le repose ensuite.
     [Fact]
     public async Task Annuler_le_levier_en_essai_arrete_l_essai_et_rien_ne_le_repose()
     {
@@ -180,7 +180,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.EssaiEnCours.Should().BeFalse();
     }
 
-    // 10/10/2026 (le mainteneur : « j'ai revoulu opti, je peux toujours pas ») : sans jeu ouvert, Optimiser lance l'essai.
+    // Sans jeu ouvert, Optimiser lance l'essai.
     [Fact]
     public async Task Sans_jeu_ouvert_optimiser_lance_l_essai_du_reglage_qui_se_juge_en_jeu()
     {
@@ -204,12 +204,14 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         _poses.Should().Be(0);
     }
 
-    // Revue F-32 : un redémarrage efface un levier de carte ; l'état n'est plus sûr, l'essai s'arrête et le dit.
+    // Un réglage qui survit au redémarrage (plan d'alimentation) : l'état n'est plus sûr, l'essai s'arrête et le dit.
+    private const string Durable = "fixit.power_plan";
+
     [Fact]
     public async Task Un_redemarrage_pendant_l_essai_l_arrete_sans_marquer_la_partie()
     {
-        var vm = Vm();
-        await vm.DemarrerEssaiAsync(Id);
+        var vm = Vm(id: Durable);
+        await vm.DemarrerEssaiAsync(Durable);
         _demarrage = _maintenant.AddHours(2);
 
         await Jouer(vm, 90);
@@ -220,12 +222,12 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         (_poses - _rendus).Should().Be(0, "posé au moment du redémarrage, il est rendu : un plan d'alimentation survit au redémarrage");
     }
 
-    // 09/10/2026 (revue) : sans helper joignable, rien ne s'efface : l'essai attend que le joueur clique « Arrêter ».
+    // Sans helper joignable, rien ne s'efface : l'essai attend que le joueur clique « Arrêter ».
     [Fact]
     public async Task Apres_un_redemarrage_sans_helper_l_essai_attend_le_clic_qui_rend_l_origine()
     {
-        var vm = Vm(helperJoignable: false);
-        await vm.DemarrerEssaiAsync(Id);
+        var vm = Vm(helperJoignable: false, id: Durable);
+        await vm.DemarrerEssaiAsync(Durable);
         _demarrage = _maintenant.AddHours(2);
 
         await Jouer(vm, 90);
@@ -239,7 +241,77 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.EssaiEnCours.Should().BeFalse();
     }
 
-    // Revue F-33 : les parties d'un essai précédent du même levier ne tranchent pas le nouvel essai.
+    // Un réglage
+    // VOLATIL (limite de la carte, PL1) s'efface au redémarrage ; son état est alors connu sans rien écrire : « sans ». L'essai
+    // continue, les parties d'après le démarrage comptent côté « sans » ; sinon un joueur qui éteint le soir ne finit jamais.
+    [Fact]
+    public async Task Un_redemarrage_rend_un_reglage_volatil_a_l_origine_et_l_essai_continue()
+    {
+        var vm = Vm();
+        await vm.DemarrerEssaiAsync(Id);
+        _poses.Should().Be(1);
+        _demarrage = _maintenant.AddHours(2);
+
+        await Jouer(vm, 90);
+
+        vm.EssaiEnCours.Should().BeTrue("le redémarrage n'arrête plus l'essai d'un réglage volatil");
+        vm.MemoireParties!.Lire()[0].Essai.Should().Be(AlternanceDesEssais.Marque(Id, false), "jouée après le démarrage : sans le réglage");
+        _rendus.Should().Be(0, "rien à rendre : le redémarrage l'a déjà fait");
+        _poses.Should().Be(2, "après une partie sans, la suivante est avec");
+    }
+
+    // Le cas réel : le relevé de fond (aucun levier accessible) enregistre la partie. Il ne pose rien, mais il note l'état vrai.
+    [Fact]
+    public async Task Le_releve_de_fond_note_un_reglage_volatil_efface_sans_rien_poser()
+    {
+        var vm = Vm();
+        await vm.DemarrerEssaiAsync(Id);
+        vm.LevierParId = null; // le relevé de fond
+        _demarrage = _maintenant.AddHours(2);
+
+        await Jouer(vm, 90);
+
+        vm.MemoireEssai!.Lire()!.PoseMaintenant.Should().BeFalse("le redémarrage l'a effacé : l'essai ne reste plus figé sur « posé »");
+        vm.MemoireParties!.Lire()[0].Essai.Should().Be(AlternanceDesEssais.Marque(Id, false));
+        (_poses, _rendus).Should().Be((1, 0), "le relevé de fond ne touche à aucun levier");
+    }
+
+    // Le relevé de fond élevé fait AVANCER l'essai (le joueur ne garde pas l'App ouverte en jouant), avec le seul
+    // levier en essai : jamais l'accès général aux leviers, qui ouvrirait le retrait automatique sans fenêtre.
+    [Fact]
+    public async Task Le_releve_de_fond_eleve_fait_avancer_l_essai_avec_le_seul_levier_en_essai()
+    {
+        var vm = Vm();
+        await vm.DemarrerEssaiAsync(Id);
+        var demandes = new List<string>();
+        vm.LevierParId = null;
+        vm.LevierDeLEssai = id => { demandes.Add(id); return id == Id ? _levier : null; };
+
+        await Jouer(vm, 90);
+
+        _rendus.Should().Be(1, "après une partie avec, la suivante est sans : rendu en fond");
+        vm.MemoireEssai!.Lire()!.PoseMaintenant.Should().BeFalse();
+        demandes.Should().OnlyContain(id => id == Id);
+    }
+
+    // Essai-alternance.json vit sous le profil du joueur, que tout programme du compte peut écrire. Le
+    // relevé de fond élevé ne pose jamais un levier qui n'a pas le droit d'alterner (AutoHot), même écrit dans ce fichier.
+    [Fact]
+    public async Task Un_essai_ecrit_sur_un_levier_qui_n_alterne_pas_ne_pose_rien_et_s_efface()
+    {
+        const string horsEssai = "fixit.cpu_power_cap"; // posé au clic, jamais en alternance
+        var vm = Vm(id: horsEssai);
+        vm.MemoireEssai!.Ecrire(new EssaiEnAlternance(horsEssai, false, false, _maintenant, DerniereBascule: _maintenant));
+        vm.LevierParId = null;
+        vm.LevierDeLEssai = _ => _levier;
+
+        await Jouer(vm, 90);
+
+        (_poses, _rendus).Should().Be((0, 0), "aucun levier hors alternance n'est posé en fond");
+        vm.MemoireEssai.Lire().Should().BeNull("l'essai trafiqué est effacé");
+    }
+
+    // Les parties d'un essai précédent du même levier ne tranchent pas le nouvel essai.
     [Fact]
     public async Task Les_parties_d_un_essai_precedent_ne_comptent_pas()
     {
@@ -257,7 +329,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.EssaiEnCours.Should().BeTrue("un seul jeu de parties de CET essai : rien de tranché");
     }
 
-    // Revue F-38 : « Annuler » pendant que la fin de partie repose le levier ; l'essai ne revit pas et le levier repart.
+    // « Annuler » pendant que la fin de partie repose le levier ; l'essai ne revit pas et le levier repart.
     [Fact]
     public async Task Annuler_pendant_la_bascule_n_est_pas_defait_par_elle()
     {
@@ -277,7 +349,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         _rendus.Should().Be(2, "ce que la fin de partie a posé après l'annulation est rendu");
     }
 
-    // Revue F-38 : « Arrêter l'essai » attend la bascule en cours, puis rend l'état d'origine depuis l'état réel.
+    // « Arrêter l'essai » attend la bascule en cours, puis rend l'état d'origine depuis l'état réel.
     [Fact]
     public async Task Arreter_pendant_la_bascule_rend_l_etat_d_origine()
     {
@@ -299,7 +371,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.LigneEssai.Should().Be("Essai.Arrete");
     }
 
-    // Revue F-38 : levier déjà posé avant l'essai ; « Arrêter » pendant que la fin de partie le repose ne le retire pas.
+    // Levier déjà posé avant l'essai ; « Arrêter » pendant que la fin de partie le repose ne le retire pas.
     [Fact]
     public async Task Arreter_pendant_la_bascule_garde_un_levier_pose_avant_l_essai()
     {
@@ -325,7 +397,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         new JournalDesLeviersAppliques(Path.Combine(_dossier, "leviers.json")).Lire().Should().Contain(s => s.TweakId == Id);
     }
 
-    // Revue F-39 : un journal qui ne garde rien ne laisse pas un levier posé et invisible.
+    // Un journal qui ne garde rien ne laisse pas un levier posé et invisible.
     [Fact]
     public async Task Un_journal_qui_ne_garde_rien_fait_repartir_le_levier()
     {
@@ -337,7 +409,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.MemoireEssai!.Lire().Should().BeNull();
     }
 
-    // Revue F-39 : un journal illisible ne vaut pas « déjà rendu ».
+    // Un journal illisible ne vaut pas « déjà rendu ».
     [Fact]
     public async Task Un_journal_illisible_ne_dit_pas_l_etat_d_avant_revenu()
     {
@@ -351,7 +423,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.MemoireEssai!.Lire().Should().NotBeNull();
     }
 
-    // Revue F-46 : une faute pendant l'avancée arrête l'essai au lieu de le mettre en pause sur un état peut-être faux.
+    // Une faute pendant l'avancée arrête l'essai au lieu de le mettre en pause sur un état peut-être faux.
     [Fact]
     public async Task Une_faute_pendant_l_avancee_arrete_l_essai()
     {

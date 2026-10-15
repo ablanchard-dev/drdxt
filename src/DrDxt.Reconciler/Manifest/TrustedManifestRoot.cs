@@ -6,60 +6,62 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler.Manifest;
 
 // -----------------------------------------------------------------------
-// TrustedManifestRoot — AT-REST integrity of the SYSTEM-trusted manifest root
-// (BLOCKER #1 of the M5 adversarial review).
+// TrustedManifestRoot : intégrité au repos de la racine du manifeste à laquelle SYSTEM fait
+// confiance (trou trouvé par une revue adverse).
 //
-// The boot reconciler (LocalSystem, moat Option B) trusts two files under
+// Le réconciliateur de démarrage (LocalSystem, moat option B) fait confiance à deux fichiers sous
 //   %ProgramData%\DrDxt
-//   * manifest-public.key   — the verify-only root of trust (forge the key → forge the
-//     manifest the boot reconciler reapplies), and
-//   * desired-state.manifest — the signed desired state.
-// The asymmetric signature is the integrity AUTHORITY, but the public key file is the
-// root that authority hangs from: if a non-admin can replace manifest-public.key (because
-// the directory was created user-owned/user-writable), they can sign a forged manifest
-// with their own key and the host would accept it. So we also enforce the at-rest ACL
-// posture before trusting either file.
+//   * manifest-public.key   : la racine de confiance en vérification seule (falsifier la clé →
+//     falsifier le manifeste que le réconciliateur de démarrage réapplique), et
+//   * desired-state.manifest : l'état voulu signé.
+// La signature asymétrique est l'autorité d'intégrité, mais le fichier de clé publique est la
+// racine à laquelle cette autorité est accrochée : si un non-admin peut remplacer
+// manifest-public.key (parce que le dossier a été créé possédé ou inscriptible par l'utilisateur),
+// il peut signer un manifeste falsifié avec sa propre clé et l'hôte l'accepterait. On impose donc
+// aussi la protection ACL au repos avant de faire confiance à l'un ou l'autre fichier.
 //
-// Two complementary guarantees:
-//   (CREATE) BuildHardenedSecurity / EnsureCreatedHardened pin the root's OWNER to
-//     Administrators (not the creating user). An object's owner holds an implicit
-//     WRITE_DAC, so a user-owned root could rewrite its own DACL back to user-writable;
-//     pinning the owner to Administrators closes that. Setting owner=Administrators
-//     requires an elevated/SYSTEM token, so the hardened root is STRUCTURALLY creatable
-//     only by elevated code — a non-elevated writer fails clean and never leaves a
-//     user-owned trust root behind. When the root already exists, EnsureCreatedHardened
-//     does not no-op: it asserts the at-rest posture and, if a non-admin pre-squatted the
-//     root, REPAIRS it (RepairToTrusted: take ownership → re-pin admin-only DACL) from an
-//     elevated/SYSTEM context, or FAILS LOUD if it cannot — it never returns Ok on an
-//     untrusted existing root (F1). WriteTrustedFile / BuildHardenedFileSecurity extend the
-//     same owner-pin to the FILES (manifest-public.key, the signed manifest): a file an
-//     admin USER (not SYSTEM) writes would otherwise be owned by that user's S-1-5-21 SID
-//     and rejected on a LEGITIMATE root (F3).
-//   (VERIFY) EnsureTrustedDirectory / EnsureTrustedFile assert, before trusting a file,
-//     that it is not a reparse point (junction/symlink — the OS would follow it to
-//     attacker-controlled storage, F2), that its owner is Administrators/SYSTEM, and that
-//     no non-admin principal holds a write/control grant. FAIL-CLOSED: any doubt (missing,
-//     reparse, unreadable ACL, foreign owner, a user-writable ACE) → Fail, and the caller
-//     treats it as no provisioned key / a tampered manifest and reapplies nothing.
+// Deux garanties complémentaires :
+//   (création) BuildHardenedSecurity / EnsureCreatedHardened épinglent le propriétaire de la
+//     racine à Administrateurs (pas l'utilisateur créateur). Le propriétaire d'un objet détient un
+//     WRITE_DAC implicite : une racine possédée par l'utilisateur pourrait réécrire sa propre DACL
+//     pour redevenir inscriptible ; épingler le propriétaire à Administrateurs ferme ce trou. Poser
+//     owner=Administrators exige un jeton élevé / SYSTEM : la racine durcie ne peut donc, par
+//     construction, être créée que par du code élevé ; un écrivain non élevé échoue proprement et
+//     ne laisse jamais de racine de confiance possédée par l'utilisateur. Si la racine existe déjà,
+//     EnsureCreatedHardened ne passe pas son tour : il vérifie la protection au repos et, si un
+//     non-admin a squatté la racine d'avance, la répare (RepairToTrusted : prise de possession →
+//     réépinglage de la DACL réservée aux admins) depuis un contexte élevé / SYSTEM, ou échoue
+//     bruyamment s'il ne le peut pas ; il ne rend jamais Ok sur une racine existante non fiable.
+//     WriteTrustedFile / BuildHardenedFileSecurity étendent le même épinglage du propriétaire aux
+//     fichiers (manifest-public.key, le manifeste signé) : sinon un fichier écrit par un
+//     utilisateur admin (pas SYSTEM) appartiendrait au SID S-1-5-21 de cet utilisateur et serait
+//     rejeté sur une racine légitime.
+//   (vérification) EnsureTrustedDirectory / EnsureTrustedFile vérifient, avant de faire confiance
+//     à un fichier, qu'il n'est pas un point de reparse (jonction / lien symbolique : l'OS le
+//     suivrait vers un stockage contrôlé par l'attaquant), que son propriétaire est
+//     Administrateurs/SYSTEM, et qu'aucun principal non admin ne détient de droit d'écriture ou de
+//     contrôle. Fail-closed : au moindre doute (absent, reparse, ACL illisible, propriétaire
+//     étranger, ACE inscriptible par l'utilisateur) → Fail, et l'appelant le traite comme une clé
+//     non fournie / un manifeste altéré et ne réapplique rien.
 //
-// TESTABILITY: the trust decision is a pure function (Evaluate over an owner SID + a list
-// of ACEs) so the logic is asserted with synthetic inputs — no admin, no real FS — while
-// the FS-reading wrappers are exercised against a temp dir whose owner is forced to the
-// current (non-admin) user.
+// Testabilité : la décision de confiance est une fonction pure (Evaluate sur un SID de
+// propriétaire + une liste d'ACE), vérifiée avec des entrées synthétiques (sans admin, sans vrai
+// système de fichiers) ; les enveloppes qui lisent le disque sont exercées sur un dossier
+// temporaire dont le propriétaire est forcé à l'utilisateur courant (non admin).
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class TrustedManifestRoot
 {
-    // The principals allowed to own the root and to hold a write/control grant on it.
-    // Deliberately just Administrators + SYSTEM — the root is created by elevated code
-    // with owner=Administrators, so nothing else legitimately writes it.
+    // Les principaux admis à posséder la racine et à y détenir un droit d'écriture ou de contrôle.
+    // Exprès seulement Administrateurs + SYSTEM : la racine est créée par du code élevé avec
+    // owner=Administrators, rien d'autre ne l'écrit légitimement.
     private static bool IsTrustedPrincipal(SecurityIdentifier sid)
         => sid.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid)
         || sid.IsWellKnown(WellKnownSidType.LocalSystemSid);
 
-    // The rights that constitute a "write / control" grant over the object. Any of these
-    // held by a non-admin principal makes the root untrusted (a non-admin could replace
-    // the key / manifest, or rewrite the DACL/owner).
+    // Les droits qui forment un droit « d'écriture / de contrôle » sur l'objet. L'un d'eux détenu
+    // par un principal non admin rend la racine non fiable (un non-admin pourrait remplacer la clé /
+    // le manifeste, ou réécrire la DACL / le propriétaire).
     private const FileSystemRights WriteishRights =
         FileSystemRights.WriteData                     // CreateFiles
         | FileSystemRights.AppendData                  // CreateDirectories
@@ -69,33 +71,33 @@ public static class TrustedManifestRoot
         | FileSystemRights.DeleteSubdirectoriesAndFiles
         | FileSystemRights.ChangePermissions           // WRITE_DAC
         | FileSystemRights.TakeOwnership               // WRITE_OWNER
-        // GENERIC rights: an ACE can carry the raw generic mask (GENERIC_WRITE / GENERIC_ALL)
-        // instead of the mapped specific bits — those bits do not overlap the specific rights
-        // above, so a non-admin ACE granting GENERIC_WRITE/GENERIC_ALL would slip through as
-        // "no write grant", the exact grant this guard exists to refuse. Measured 26/08/2026
-        // (red team): Evaluate trusted a non-admin holding 0x40000000 / 0x10000000.
-        // GENERIC_READ (0x80000000) / GENERIC_EXECUTE (0x20000000) are read-only ⇒ not flagged.
+        // Droits génériques : une ACE peut porter le masque générique brut (GENERIC_WRITE / GENERIC_ALL)
+        // au lieu des bits spécifiques correspondants ; ces bits ne recoupent pas les droits spécifiques
+        // ci-dessus, et une ACE non admin accordant GENERIC_WRITE/GENERIC_ALL passerait pour « aucun droit
+        // d'écriture », exactement le droit que cette garde doit refuser. Mesuré le 26/08/2026 (red team) :
+        // sans ces bits, Evaluate faisait confiance à un non-admin détenant 0x40000000 / 0x10000000.
+        // GENERIC_READ (0x80000000) / GENERIC_EXECUTE (0x20000000) sont en lecture seule ⇒ non signalés.
         | (FileSystemRights)0x40000000                 // GENERIC_WRITE
         | (FileSystemRights)0x10000000;                // GENERIC_ALL
 
-    /// <summary>The hardened directory security for the manifest root: owner pinned to
-    /// Administrators, a PROTECTED admin-write DACL (FullControl for Administrators +
-    /// SYSTEM, ReadAndExecute for authenticated users, no inheritance from a looser
-    /// parent). Setting owner=Administrators requires an elevated/SYSTEM token, so this
-    /// descriptor is creatable only by elevated code (a standard user token cannot apply
-    /// it — the create fails clean instead of leaving a user-owned root).</summary>
+    /// <summary>La sécurité durcie du dossier racine du manifeste : propriétaire épinglé à
+    /// Administrateurs, DACL protégée en écriture admin (FullControl pour Administrateurs + SYSTEM,
+    /// ReadAndExecute pour les utilisateurs authentifiés, aucun héritage d'un parent plus lâche).
+    /// Poser owner=Administrators exige un jeton élevé / SYSTEM : ce descripteur ne se crée que par
+    /// du code élevé (un jeton d'utilisateur standard ne peut pas l'appliquer : la création échoue
+    /// proprement au lieu de laisser une racine possédée par l'utilisateur).</summary>
     public static DirectorySecurity BuildHardenedSecurity()
     {
         var security = new DirectorySecurity();
-        // Stop inheriting a (potentially user-writable) parent ACL.
+        // Cesser d'hériter d'une ACL parente (peut-être inscriptible par l'utilisateur).
         security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
 
         var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
         var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
         var authUsers = new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null);
 
-        // Owner = Administrators (not the creating user) so the creator cannot later use
-        // the owner's implicit WRITE_DAC to reopen the DACL.
+        // Propriétaire = Administrateurs (pas l'utilisateur créateur) pour que le créateur ne puisse
+        // pas ensuite se servir du WRITE_DAC implicite du propriétaire pour rouvrir la DACL.
         security.SetOwner(admins);
 
         const InheritanceFlags inherit = InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit;
@@ -103,36 +105,36 @@ public static class TrustedManifestRoot
             admins, FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
         security.AddAccessRule(new FileSystemAccessRule(
             system, FileSystemRights.FullControl, inherit, PropagationFlags.None, AccessControlType.Allow));
-        // Read-only for everyone else — the App / a low-priv reader can read while non-admin.
+        // Lecture seule pour tous les autres : l'App / un lecteur peu privilégié lit sans être admin.
         security.AddAccessRule(new FileSystemAccessRule(
             authUsers, FileSystemRights.ReadAndExecute, inherit, PropagationFlags.None, AccessControlType.Allow));
 
         return security;
     }
 
-    /// <summary>The hardened FILE security for a trusted file (manifest-public.key / the
-    /// signed manifest): owner pinned to Administrators, a PROTECTED admin-only DACL
-    /// (FullControl for Administrators + SYSTEM, ReadAndExecute for authenticated users so a
-    /// low-priv reader can still read, no inheritance). Pinning the FILE owner closes
-    /// BLOCKER #1 / F3: a file written by an admin USER (typical installer) would otherwise
-    /// be owned by that user's S-1-5-21 SID and the SYSTEM reconciler would reject the
-    /// LEGITIMATE root. Setting owner=Administrators needs an elevated/SYSTEM token, so this
-    /// descriptor is applicable only by elevated code.</summary>
+    /// <summary>La sécurité durcie d'un fichier de confiance (manifest-public.key / le manifeste
+    /// signé) : propriétaire épinglé à Administrateurs, DACL protégée réservée aux admins
+    /// (FullControl pour Administrateurs + SYSTEM, ReadAndExecute pour les utilisateurs authentifiés
+    /// afin qu'un lecteur peu privilégié puisse lire, aucun héritage). Sans épinglage du propriétaire
+    /// du fichier, un fichier écrit par un utilisateur admin (installeur typique) appartiendrait au SID
+    /// S-1-5-21 de cet utilisateur et le réconciliateur SYSTEM rejetterait la racine légitime. Poser
+    /// owner=Administrators exige un jeton élevé / SYSTEM : ce descripteur ne s'applique que par du
+    /// code élevé.</summary>
     public static FileSecurity BuildHardenedFileSecurity()
     {
         var security = new FileSecurity();
-        // Stop inheriting a (potentially user-writable) parent ACL.
+        // Cesser d'hériter d'une ACL parente (peut-être inscriptible par l'utilisateur).
         security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
 
         var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
         var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
         var authUsers = new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null);
 
-        // Owner = Administrators (not the writing user) so a non-SYSTEM admin installer
-        // cannot leave a user-owned file the SYSTEM reconciler would silently reject.
+        // Propriétaire = Administrateurs (pas l'utilisateur qui écrit) pour qu'un installeur admin non
+        // SYSTEM ne laisse pas un fichier possédé par l'utilisateur, que le réconciliateur SYSTEM rejetterait en silence.
         security.SetOwner(admins);
 
-        // Files carry no inheritance flags (a file is a leaf — applying them throws).
+        // Les fichiers ne portent aucun drapeau d'héritage (un fichier est une feuille : les appliquer lève).
         security.AddAccessRule(new FileSystemAccessRule(
             admins, FileSystemRights.FullControl, AccessControlType.Allow));
         security.AddAccessRule(new FileSystemAccessRule(
@@ -143,7 +145,7 @@ public static class TrustedManifestRoot
         return security;
     }
 
-    /// <summary>11/09/2026 — la securite d'un fichier prive (la cle de signature de la machine) :
+    /// <summary>La securite d'un fichier prive (la cle de signature de la machine) :
     /// proprietaire Administrateurs, DACL protegee, Administrateurs + SYSTEM seulement. Aucune lecture
     /// pour les utilisateurs authentifies, contrairement aux fichiers publics : la protection DPAPI
     /// « machine » de la cle se dechiffre depuis n'importe quel compte local, c'est donc cette ACL qui
@@ -160,47 +162,47 @@ public static class TrustedManifestRoot
         return security;
     }
 
-    /// <summary>Creates the hardened root if missing; if it already exists, asserts it is
-    /// trusted at rest and REPAIRS it (take ownership → pin owner=Administrators → apply the
-    /// protected, inheritance-stripped admin-only DACL) when it is not. Fail-CLEAN (never
-    /// throws). Never returns Ok on an untrusted existing root (BLOCKER #1 / F1): a
-    /// pre-squatted user-owned <c>%ProgramData%\DrDxt</c> is repaired from an elevated/SYSTEM
-    /// context, or — when the caller is not elevated and cannot take ownership / set
-    /// owner=Administrators — this returns Fail. A reparse point (junction/symlink) is never
-    /// created over, repaired, or trusted (F2). By construction no user-owned trust root is
-    /// ever created or left behind (BLOCKER #1c).</summary>
+    /// <summary>Crée la racine durcie si elle manque ; si elle existe déjà, vérifie qu'elle est
+    /// fiable au repos et la répare sinon (prise de possession → owner=Administrators épinglé →
+    /// DACL protégée, sans héritage, réservée aux admins). Échec propre (ne lève jamais). Ne rend
+    /// jamais Ok sur une racine existante non fiable : un <c>%ProgramData%\DrDxt</c> squatté d'avance
+    /// par l'utilisateur est réparé depuis un contexte élevé / SYSTEM ou, si l'appelant n'est pas
+    /// élevé et ne peut ni prendre possession ni poser owner=Administrators, la méthode rend Fail.
+    /// Un point de reparse (jonction / lien symbolique) n'est jamais recouvert, réparé ni tenu pour
+    /// fiable. Par construction, aucune racine de confiance possédée par l'utilisateur n'est jamais
+    /// créée ni laissée (BLOCKER #1c).</summary>
     public static Result EnsureCreatedHardened(string dir)
     {
         try
         {
             if (Directory.Exists(dir))
             {
-                // A reparse point could redirect the root to attacker-controlled storage —
-                // never repair/trust one; reject outright (F2).
+                // Un point de reparse pourrait rediriger la racine vers un stockage contrôlé par l'attaquant :
+                // ne jamais le réparer ni lui faire confiance ; rejet immédiat.
                 if (IsReparsePoint(dir))
                     return Result.Fail(ErrorCodes.SignatureInvalid,
                         $"Manifest root '{dir}' is a reparse point (junction/symlink): refusing to trust or repair.");
 
-                // Already trusted at rest → nothing to do.
+                // Déjà fiable au repos → rien à faire.
                 var trust = EnsureTrustedDirectory(dir);
                 if (trust.IsOk)
                     return Result.Ok();
 
-                // Untrusted existing root → REPAIR it. Requires elevation/SYSTEM (take
-                // ownership + re-pin owner=Administrators); a non-elevated caller cannot and
-                // this fails loudly — it never returns Ok on an untrusted root.
+                // Racine existante non fiable → la réparer. Exige l'élévation / SYSTEM (prise de possession +
+                // réépinglage owner=Administrators) ; un appelant non élevé ne le peut pas et la méthode échoue
+                // bruyamment : elle ne rend jamais Ok sur une racine non fiable.
                 var repaired = RepairToTrusted(dir);
                 if (!repaired.IsOk)
                     return repaired;
 
-                // Re-verify: the repair must have produced a trusted posture, else fail.
+                // Revérifier : la réparation doit avoir produit une protection fiable, sinon échec.
                 return EnsureTrustedDirectory(dir);
             }
 
             new DirectoryInfo(dir).Create(BuildHardenedSecurity());
-            // Verify the create actually produced an admin-owned root (a non-elevated token
-            // cannot set owner=Administrators, so Create throws above; this re-asserts the
-            // posture for defence-in-depth and never returns Ok on an untrusted result).
+            // Vérifier que la création a bien produit une racine possédée par les admins (un jeton non
+            // élevé ne peut pas poser owner=Administrators, Create lève donc plus haut ; ceci revérifie la
+            // protection en défense en profondeur et ne rend jamais Ok sur un résultat non fiable).
             return EnsureTrustedDirectory(dir);
         }
         catch (Exception ex)
@@ -210,12 +212,12 @@ public static class TrustedManifestRoot
         }
     }
 
-    /// <summary>Repairs an existing directory to the trusted posture: takes ownership
-    /// (owner=Administrators) then applies the protected, inheritance-stripped admin-only
-    /// DACL. Setting owner=Administrators succeeds only for an elevated/SYSTEM token (whose
-    /// Administrators SID carries SE_GROUP_OWNER); a non-elevated token (Administrators
-    /// deny-only) cannot and this returns Fail — fail-closed, never silently succeeding on
-    /// an untrusted root. Fail-CLEAN (never throws).</summary>
+    /// <summary>Remet un dossier existant dans la protection fiable : prend possession
+    /// (owner=Administrators) puis applique la DACL protégée, sans héritage, réservée aux admins.
+    /// Poser owner=Administrators ne réussit qu'avec un jeton élevé / SYSTEM (dont le SID
+    /// Administrateurs porte SE_GROUP_OWNER) ; un jeton non élevé (Administrateurs en deny-only) ne le
+    /// peut pas et la méthode rend Fail : fail-closed, jamais de réussite silencieuse sur une racine
+    /// non fiable. Échec propre (ne lève jamais).</summary>
     public static Result RepairToTrusted(string dir)
     {
         try
@@ -226,15 +228,15 @@ public static class TrustedManifestRoot
 
             var di = new DirectoryInfo(dir);
 
-            // Phase 1: TAKE OWNERSHIP — owner = Administrators. Only an elevated/SYSTEM token
-            // can; a non-elevated one throws here (→ Fail), so the moat is never enabled on a
-            // root a non-admin still controls.
+            // Étape 1 : prise de possession, owner = Administrators. Seul un jeton élevé / SYSTEM le peut ;
+            // un jeton non élevé lève ici (→ Fail) : le moat n'est jamais activé sur une racine qu'un
+            // non-admin contrôle encore.
             var takeOwner = new DirectorySecurity();
             takeOwner.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
             di.SetAccessControl(takeOwner);
 
-            // Phase 2: now the owner (⇒ implicit WRITE_DAC) — strip inheritance and pin the
-            // protected admin-only DACL, evicting any non-admin write/control grant.
+            // Étape 2 : désormais propriétaire (⇒ WRITE_DAC implicite), retirer l'héritage et épingler la
+            // DACL protégée réservée aux admins, en chassant tout droit d'écriture / de contrôle non admin.
             di.SetAccessControl(BuildHardenedSecurity());
             return Result.Ok();
         }
@@ -245,16 +247,16 @@ public static class TrustedManifestRoot
         }
     }
 
-    /// <summary>Atomically writes a TRUSTED file (the signed manifest / manifest-public.key)
-    /// and PINS its owner=Administrators + a protected admin-only DACL, so the SYSTEM
-    /// reconciler trusts it at rest (BLOCKER #1 / F3). Ensures/repairs the parent root first.
-    /// FAIL-LOUD: if the owner cannot be set (caller not elevated) the partial write is
-    /// removed and this returns Fail — it never leaves a user-owned file the SYSTEM service
-    /// would silently reject. Fail-CLEAN (never throws).</summary>
-    /// <param name="prive">11/09/2026 — un fichier prive (la cle de signature de la machine) : cree
-    /// DIRECTEMENT avec <see cref="BuildPrivateFileSecurity"/>, sans jamais heriter de la lecture des
+    /// <summary>Écrit atomiquement un fichier de confiance (le manifeste signé / manifest-public.key)
+    /// et épingle owner=Administrators + une DACL protégée réservée aux admins, pour que le
+    /// réconciliateur SYSTEM lui fasse confiance au repos. S'assure d'abord de la racine parente (ou
+    /// la répare). Échec bruyant : si le propriétaire ne peut pas être posé (appelant non élevé),
+    /// l'écriture partielle est retirée et la méthode rend Fail ; elle ne laisse jamais un fichier
+    /// possédé par l'utilisateur, que le service SYSTEM rejetterait en silence. Échec propre (ne lève jamais).</summary>
+    /// <param name="prive">Un fichier prive (la cle de signature de la machine) : cree
+    /// directement avec <see cref="BuildPrivateFileSecurity"/>, sans jamais heriter de la lecture des
     /// utilisateurs du dossier, puis verifie par <see cref="EnsurePrivateFile"/>. Sans cela, entre la
-    /// creation du temporaire et la pose de son ACL, un processus local aurait pu l'ouvrir en lecture —
+    /// creation du temporaire et la pose de son ACL, un processus local pourrait l'ouvrir en lecture,
     /// et le blob DPAPI « machine » se dechiffre depuis n'importe quel compte local.</param>
     public static Result WriteTrustedFile(string path, byte[] bytes, bool prive = false)
     {
@@ -266,7 +268,7 @@ public static class TrustedManifestRoot
                 return Result.Fail(ErrorCodes.IoFailure,
                     $"Trusted file '{path}' has no parent directory.");
 
-            // The root must be admin-owned before we drop a trusted file into it.
+            // La racine doit appartenir aux admins avant qu'on y dépose un fichier de confiance.
             var ensured = EnsureCreatedHardened(dir);
             if (!ensured.IsOk)
                 return ensured;
@@ -281,14 +283,14 @@ public static class TrustedManifestRoot
             else
             {
                 File.WriteAllBytes(tmp, bytes);
-                // Pin owner + protected DACL on the temp file before publishing it under the real
-                // name, so the trusted file is never momentarily user-owned.
+                // Épingler propriétaire + DACL protégée sur le fichier temporaire avant de le publier sous son
+                // vrai nom : le fichier de confiance n'appartient jamais, même un instant, à l'utilisateur.
                 new FileInfo(tmp).SetAccessControl(BuildHardenedFileSecurity());
             }
-            // File.Move is a rename that preserves the security descriptor.
+            // File.Move est un renommage qui garde le descripteur de sécurité.
             File.Move(tmp, path, overwrite: true);
 
-            // Defence-in-depth: the published file must be admin-trusted at rest, else fail.
+            // Défense en profondeur : le fichier publié doit être fiable au repos (côté admin), sinon échec.
             var trust = prive ? EnsurePrivateFile(path) : EnsureTrustedFile(path);
             if (!trust.IsOk)
                 return Result.Fail(ErrorCodes.IoFailure,
@@ -310,14 +312,15 @@ public static class TrustedManifestRoot
         catch { /* best-effort cleanup; the caller already returns Fail. */ }
     }
 
-    /// <summary>True iff the path is a reparse point (junction/symlink). Throws if the
-    /// attributes are unreadable — callers run this inside a fail-closed try/catch.</summary>
+    /// <summary>Vrai si et seulement si le chemin est un point de reparse (jonction / lien
+    /// symbolique). Lève si les attributs sont illisibles : les appelants l'appellent dans un
+    /// try/catch fail-closed.</summary>
     internal static bool IsReparsePoint(string path)
         => (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
 
-    /// <summary>Asserts a directory is trusted at rest: it exists, its OWNER is
-    /// Administrators/SYSTEM, and NO non-admin principal holds a write/control grant.
-    /// FAIL-CLOSED on any doubt.</summary>
+    /// <summary>Vérifie qu'un dossier est fiable au repos : il existe, son propriétaire est
+    /// Administrateurs/SYSTEM, et aucun principal non admin ne détient de droit d'écriture ou de
+    /// contrôle. Fail-closed au moindre doute.</summary>
     public static Result EnsureTrustedDirectory(string dir)
     {
         try
@@ -326,8 +329,8 @@ public static class TrustedManifestRoot
                 return Result.Fail(ErrorCodes.SignatureInvalid,
                     $"Trusted manifest root '{dir}' does not exist.");
 
-            // A reparse point (junction/symlink) is followed silently by the OS, so the SD we
-            // would read is the TARGET's, not the root's — reject it before trusting (F2).
+            // Un point de reparse (jonction / lien symbolique) est suivi en silence par l'OS : le SD lu
+            // serait celui de la cible, pas de la racine ; le rejeter avant de faire confiance.
             if (IsReparsePoint(dir))
                 return Result.Fail(ErrorCodes.SignatureInvalid,
                     $"Trusted manifest root '{dir}' is a reparse point (junction/symlink): not trusted.");
@@ -343,10 +346,10 @@ public static class TrustedManifestRoot
         }
     }
 
-    /// <summary>Asserts a file is trusted at rest: its OWNER is Administrators/SYSTEM AND
-    /// the directory that holds it is itself trusted (so a non-admin can neither rewrite
-    /// the file in place nor swap it by recreating it in a writable directory).
-    /// FAIL-CLOSED on any doubt.</summary>
+    /// <summary>Vérifie qu'un fichier est fiable au repos : son propriétaire est
+    /// Administrateurs/SYSTEM et le dossier qui le contient est lui-même fiable (un non-admin ne peut
+    /// ni réécrire le fichier sur place ni l'échanger en le recréant dans un dossier inscriptible).
+    /// Fail-closed au moindre doute.</summary>
     public static Result EnsureTrustedFile(string path)
     {
         try
@@ -355,8 +358,8 @@ public static class TrustedManifestRoot
                 return Result.Fail(ErrorCodes.SignatureInvalid,
                     $"Trusted file '{path}' does not exist.");
 
-            // Reject a reparse-point FILE (symlink) before trusting it — the OS would follow
-            // it to a target whose SD/bytes the attacker controls (F2).
+            // Rejeter un fichier point de reparse (lien symbolique) avant de lui faire confiance : l'OS le
+            // suivrait vers une cible dont l'attaquant contrôle le SD et les octets.
             if (IsReparsePoint(path))
                 return Result.Fail(ErrorCodes.SignatureInvalid,
                     $"Trusted file '{path}' is a reparse point (junction/symlink): not trusted.");
@@ -381,9 +384,9 @@ public static class TrustedManifestRoot
         }
     }
 
-    /// <summary>11/09/2026 — un fichier prive est fiable au repos : tout ce qu'exige
+    /// <summary>Un fichier prive est fiable au repos : tout ce qu'exige
     /// <see cref="EnsureTrustedFile"/>, et aucun principal non-admin ne detient de droit de lecture.
-    /// FAIL-CLOSED.</summary>
+    /// Fail-closed.</summary>
     public static Result EnsurePrivateFile(string path)
     {
         var trusted = EnsureTrustedFile(path);
@@ -409,13 +412,13 @@ public static class TrustedManifestRoot
         | (FileSystemRights)unchecked((int)0x80000000)    // GENERIC_READ
         | (FileSystemRights)0x10000000;                   // GENERIC_ALL
 
-    // ── pure, FS-free trust decision (unit-tested with synthetic inputs) ──────────────
+    // ── décision de confiance pure, sans disque (testée avec des entrées synthétiques) ──────────────
 
-    /// <summary>A flattened access-control entry for the pure evaluator.</summary>
+    /// <summary>Une entrée de contrôle d'accès aplatie pour l'évaluateur pur.</summary>
     internal readonly record struct AceView(
         SecurityIdentifier Sid, FileSystemRights Rights, AccessControlType Type);
 
-    /// <summary>Reads owner + ACEs off a real security descriptor and evaluates trust.</summary>
+    /// <summary>Lit propriétaire + ACE sur un vrai descripteur de sécurité et évalue la confiance.</summary>
     internal static Result Evaluate(string label, FileSystemSecurity security, bool refuserLectureNonAdmin = false)
     {
         var owner = security.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier;
@@ -430,9 +433,9 @@ public static class TrustedManifestRoot
         return Evaluate(label, owner, aces, refuserLectureNonAdmin);
     }
 
-    /// <summary>The pure decision: trusted iff the owner is Administrators/SYSTEM and no
-    /// Allow ACE grants a write/control right to a non-admin principal. With
-    /// <paramref name="refuserLectureNonAdmin"/> (a PRIVATE file), a non-admin read grant is refused too.</summary>
+    /// <summary>La décision pure : fiable si et seulement si le propriétaire est Administrateurs/SYSTEM
+    /// et qu'aucune ACE Allow n'accorde de droit d'écriture ou de contrôle à un principal non admin. Avec
+    /// <paramref name="refuserLectureNonAdmin"/> (un fichier privé), un droit de lecture non admin est refusé aussi.</summary>
     internal static Result Evaluate(string label, SecurityIdentifier? owner, IReadOnlyList<AceView> aces,
         bool refuserLectureNonAdmin = false)
     {

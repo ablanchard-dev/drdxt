@@ -10,7 +10,7 @@ using DrDxt.Detection.Wmi;
 namespace DrDxt.Detection.Repair;
 
 /// <summary>
-/// 07/10/2026 (T1, kit testeur) : une machine au format de tests/Shared/machines (Nom, Note, Eleve, Inventaire, Reglages,
+/// Une machine au format de tests/Shared/machines (Nom, Note, Eleve, Inventaire, Reglages,
 /// Sante), anonymisée, pour qu'un fichier reçu d'un joueur devienne une fixture tel quel. Un seul format, partagé par le
 /// bouton « Exporter ma machine » de l'App et par tools/enregistreur. Rien ne part sur le réseau : c'est le joueur qui
 /// envoie le fichier.
@@ -32,6 +32,8 @@ public static class MachineExportee
         "les identifiants de volume (Volume{…})",
         "les adresses de courriel",
         "le nom d'organisation des dossiers OneDrive (« OneDrive - <organisation> »)",
+        // En français comme les autres lignes et CONFIDENTIALITE.md, quelle que soit la langue de Windows.
+        Docteur.Nom("ME.Cles"),
     ];
 
     private const string Retire = "<retiré>";
@@ -51,8 +53,21 @@ public static class MachineExportee
         RegexOptions.None, Delai);
     private static readonly Regex Sid = new(@"\bS-1-5-21(?:-\d+){1,4}\b", RegexOptions.None, Delai);
     private static readonly Regex VolumeGuid = new(@"Volume\{[0-9A-Fa-f-]{36}\}", RegexOptions.IgnoreCase, Delai);
-    // 07/10/2026 (revue F-21) : « OneDrive - Nom de l'entreprise » nomme l'employeur du joueur.
+    // « OneDrive - Nom de l'entreprise » nomme l'employeur du joueur.
     private static readonly Regex OneDrive = new(@"(?<tete>OneDrive - )[^\\/\r\n""]+", RegexOptions.IgnoreCase, Delai);
+    // Une clé de licence (Windows, Keygen) : des groupes majuscules d'au moins cinq caractères. Un GUID (groupes de quatre,
+    // minuscules) n'en est pas une : le plan d'alimentation d'un rapport reste lisible.
+    private static readonly Regex CleDeLicence = new(@"(?<![A-Za-z0-9-])[A-Z0-9]{5,}(?:-[A-Z0-9]{5,}){3,}(?![A-Za-z0-9-])", RegexOptions.None, Delai);
+    private static readonly Regex Empreinte = new(@"(?<![0-9A-Fa-f])[0-9A-Fa-f]{32,}(?![0-9A-Fa-f])", RegexOptions.None, Delai);
+
+    // Ce que WMI rend à la place d'un numéro de série que le constructeur n'a pas rempli : ça ne désigne aucun PC, et
+    // retiré partout (« unknown » est un mot du rapport), il rendait le texte illisible.
+    private static readonly HashSet<string> ValeursGeneriques = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Unknown", "None", "Default", "Default string", "To be filled by O.E.M.", "To Be Filled By O.E.M.", "System Serial Number",
+        "Not Specified", "Not Applicable", "N/A", "0", "00000000", "0000000000000000", "Base Board Serial Number", "Chassis Serial Number",
+    };
+
     private static readonly Regex Courriel = new(@"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", RegexOptions.None, Delai);
 
     private static readonly JsonSerializerOptions Options = new()
@@ -75,12 +90,12 @@ public static class MachineExportee
             Reglages = reglages, Sante = sante }, Options)!;
         Nettoyer(noeud, null, anonymiser);
         var json = noeud.ToJsonString(Options);
-        _ = JsonSerializer.Deserialize<Relue>(json, Options) ?? throw new InvalidDataException("la machine exportée ne se relit pas");
+        _ = JsonSerializer.Deserialize<Relue>(json, Options) ?? throw new InvalidDataException("the exported machine does not read back");
         return json;
     }
 
     /// <summary>
-    /// 09/10/2026 : les mêmes règles (<see cref="CeQuiEstRetire"/>) sur un texte libre, pour les rapports de vérification
+    /// Les mêmes règles (<see cref="CeQuiEstRetire"/>) sur un texte libre, pour les rapports de vérification
     /// envoyés en public (bouton de l'App et zip de validation). Une suite de quatre nombres qui n'est pas une adresse IP
     /// (rare dans ces rapports) part aussi : mieux vaut perdre une version que garder une adresse.
     /// </summary>
@@ -89,7 +104,7 @@ public static class MachineExportee
 
     private static Func<string, string?, string> Anonymiseur(IEnumerable<string> valeursDeCePc)
     {
-        var propres = valeursDeCePc.Select(v => v?.Trim() ?? "").Where(v => v.Length >= 2).Distinct(StringComparer.OrdinalIgnoreCase)
+        var propres = valeursDeCePc.Select(v => v?.Trim() ?? "").Where(v => v.Length >= 2 && !ValeursGeneriques.Contains(v)).Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(v => v.Length)
             .Select(v => new Regex($"(?<![A-Za-z0-9]){Regex.Escape(v)}(?![A-Za-z0-9])", RegexOptions.IgnoreCase, Delai)).ToList();
         return (s, cle) =>
@@ -102,6 +117,8 @@ public static class MachineExportee
             s = Ipv6.Replace(s, Retire);
             s = Sid.Replace(s, Retire);
             s = VolumeGuid.Replace(s, "Volume{" + Retire + "}");
+            s = CleDeLicence.Replace(s, Retire);
+            s = Empreinte.Replace(s, Retire);
             return Courriel.Replace(s, Retire);
         };
     }

@@ -5,9 +5,9 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// T14 — the runtime sidecar state store (kill-switches, last-seen build, boot
-// streak). Round-trips all fields; an absent file is a SANE default (not a fail).
-// Real temp-dir IO (no admin); kept separate from the signed manifest.
+// Le magasin d'état annexe d'exécution (coupe-circuits, dernier build vu, série de
+// démarrages). Aller-retour de tous les champs ; un fichier absent est un défaut sain (pas un échec).
+// Vraies E/S dans un dossier temporaire (sans admin) ; tenu à part du manifeste signé.
 // -----------------------------------------------------------------------
 public sealed class JsonReconcilerStateStoreTests
 {
@@ -58,7 +58,7 @@ public sealed class JsonReconcilerStateStoreTests
         }
     }
 
-    // 26/09/2026 : le deserialiseur remplit un etat ampute sans se plaindre (Items nul, build nul), et le
+    // Le deserialiseur remplit un etat ampute sans se plaindre (Items nul, build nul), et le
     // service SYSTEM le parcourait au demarrage. Ampute = illisible ; le reconciliateur n'ecrit alors rien
     // (voir FailClosedEndToEndTests).
     [Theory]

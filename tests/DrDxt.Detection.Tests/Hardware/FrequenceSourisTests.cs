@@ -4,14 +4,14 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Hardware;
 
-// 06/10/2026 (chantier B5 b) : la fréquence d'interrogation qu'une souris USB annonce (bInterval de son point d'accès
+// La fréquence d'interrogation qu'une souris USB annonce (bInterval de son point d'accès
 // d'interruption, USB 2.0 §9.6.6). C'est un maximum : au-dessous de 125 Hz le défaut est certain, au-dessus on dit « jusqu'à ».
 public sealed class FrequenceSourisTests
 {
     [Theory]
     [InlineData(1, 1, 1000)]   // pleine vitesse, 1 ms
     [InlineData(1, 8, 125)]    // pleine vitesse, 8 ms
-    // Revue T3+T4 (F-26) : le contrôleur (xHCI 6.2.3.6, EHCI pareil) arrondit l'intervalle en basse et pleine vitesse
+    // Le contrôleur (xHCI 6.2.3.6, EHCI pareil) arrondit l'intervalle en basse et pleine vitesse
     // à la puissance de 2 inférieure : 10 ms annoncées = 8 ms servies.
     [InlineData(0, 10, 125)]   // basse vitesse, 10 ms ⇒ 8 ms
     [InlineData(1, 9, 125)]    // pleine vitesse, 9 ms ⇒ 8 ms (et non 111 Hz)
@@ -44,7 +44,7 @@ public sealed class FrequenceSourisTests
         FrequenceSouris.Lire(info, composite: false).Should().Be((1, 2));
     }
 
-    // F-25 : un appareil composite (souris + clavier sur un récepteur) a plusieurs points d'accès d'interruption ; le plus
+    // Un appareil composite (souris + clavier sur un récepteur) a plusieurs points d'accès d'interruption ; le plus
     // petit intervalle peut être celui du clavier. Plusieurs intervalles différents ⇒ non lu.
     [Fact]
     public void Un_appareil_composite_aux_intervalles_differents_n_est_pas_lu()
@@ -59,7 +59,7 @@ public sealed class FrequenceSourisTests
         FrequenceSouris.Lire(info, composite: false).Should().Be((1, 1));
     }
 
-    // F-25 : un pavé tactile (I2C, PS/2) n'est ni USB ni Bluetooth : rien n'est dit, pas « souris non lue ».
+    // Un pavé tactile (I2C, PS/2) n'est ni USB ni Bluetooth : rien n'est dit, pas « souris non lue ».
     [Theory]
     [InlineData(@"ACPI\SYN1234\4&ABC", false)]
     [InlineData(@"HID\VEN_ELAN&DEV_0001&Col02\5&1", false)]

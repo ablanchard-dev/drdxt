@@ -8,7 +8,7 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Autopilot;
 
 /// <summary>
-/// 11/09/2026 — un levier garde est-il defait au demarrage suivant ?
+/// Un levier garde est-il defait au demarrage suivant ?
 ///
 /// Le vrai chemin, de bout en bout : une <see cref="GameOptimizationSession"/> (moteur, protocole
 /// apparie, <see cref="KeepPolicy"/>) sur un <see cref="TweakCandidate"/> du produit, avec le journal
@@ -270,7 +270,7 @@ public sealed class LevierGardeAuDemarrageTests : IDisposable
         new FichierRevertEnAttente(Fichier).Lire().Value.Should().BeNull();
     }
 
-    // ── 11/09/2026 — l'origine d'un keep entre au manifeste signe, le seul que la desinstallation lit ──
+    // ── L'origine d'un keep entre au manifeste signe, le seul que la desinstallation lit ──
 
     private sealed class Manifeste(Result reponse) : IDesiredStateStore
     {
@@ -286,7 +286,7 @@ public sealed class LevierGardeAuDemarrageTests : IDisposable
             => Task.FromResult(Result<DesiredState>.Ok(new DesiredState(Array.Empty<AppliedTweak>())));
     }
 
-    // GARDE1 (09/10/2026) : un levier gardé par la session garde son instantané (l'App l'inscrit au journal et date sa
+    // Un levier gardé par la session garde son instantané (l'App l'inscrit au journal et date sa
     // pose : « Annuler » et la garde d'incident le voient) ; un levier rejeté n'en laisse aucun.
     [Fact]
     public void Garde_par_la_session_le_levier_rend_son_instantane_rejete_aucun()

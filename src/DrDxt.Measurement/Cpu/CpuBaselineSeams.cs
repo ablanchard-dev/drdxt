@@ -20,15 +20,15 @@ public sealed class FileSystemCpuBaselineFile : ICpuBaselineFile
 }
 
 /// <summary>
-/// Le banc reel : la meme charge, deux fois, et c'est la DUREE qui change.
+/// Le banc reel : la meme charge, deux fois, et c'est la duree qui change.
 ///
-/// D'abord en rafale — quelques secondes, la machine ne quitte pas son turbo. Puis en soutenu,
+/// D'abord en rafale : quelques secondes, la machine ne quitte pas son turbo. Puis en soutenu,
 /// apres une chauffe continue qui franchit la marche observee vers la quinzieme seconde. Le meme
 /// nombre de cœurs dans les deux cas : le deficit ne veut rien dire a nombre different.
 ///
-/// La liste des processeurs vient de l'APPELANT. Ce projet ne lit pas la topologie — c'est
-/// `DrDxt.Detection` qui la publie — et la deviner par une formule est exactement la faute deja
-/// payee le 09/09 sur l'epinglage du banc.
+/// La liste des processeurs vient de l'appelant. Ce projet ne lit pas la topologie (c'est
+/// `DrDxt.Detection` qui la publie), et la deviner par une formule epinglerait le banc sur les
+/// mauvais cœurs.
 /// </summary>
 public sealed class RealCpuSustainedBench : ICpuSustainedBench
 {
@@ -39,7 +39,7 @@ public sealed class RealCpuSustainedBench : ICpuSustainedBench
     private const int Passes = 4;
 
     /// <summary>Premier releve de puissance, en secondes depuis le debut de la charge soutenue.
-    /// **NON CHIFFRÉ** au-dela de ceci : la marche est observee vers la 15e seconde. Si la puissance
+    /// Non chiffré au-dela de ceci : la marche est observee vers la 15e seconde. Si la puissance
     /// descend encore apres, l'ecart des releves grandit et le juge ne conclut pas : l'erreur possible
     /// est un silence, pas une affirmation.</summary>
     private const double DebutRelevesSecondes = 20;
@@ -48,9 +48,9 @@ public sealed class RealCpuSustainedBench : ICpuSustainedBench
     private readonly Func<double?>? _puissancePaquetW;
     private readonly Func<IReadOnlyList<int>, double?>? _frequenceMhz;
 
-    /// <param name="puissancePaquetW">25/09/2026 — la puissance du paquet en watts, lue pendant la
+    /// <param name="puissancePaquetW">La puissance du paquet en watts, lue pendant la
     /// mesure soutenue. <c>null</c> = pas de relevé (le banc reste le meme).</param>
-    /// <param name="frequenceMhz">03/10/2026 (M2) — la fréquence effective moyenne des processeurs logiques donnés.
+    /// <param name="frequenceMhz">La fréquence effective moyenne des processeurs logiques donnés.
     /// <c>null</c> = pas de relevé.</param>
     public RealCpuSustainedBench(Func<IReadOnlyList<int>> processeursRapides, Func<double?>? puissancePaquetW = null,
         Func<IReadOnlyList<int>, double?>? frequenceMhz = null)
@@ -96,7 +96,7 @@ public sealed class RealCpuSustainedBench : ICpuSustainedBench
         var moyenne = releves.Average();
         if (moyenne <= 0) return null;
         var ecartType = Math.Sqrt(releves.Average(r => (r - moyenne) * (r - moyenne)));
-        // 25/09/2026 : l'incertitude de la moyenne, pas la dispersion des relevés. Intel : le PL1 limite une
+        // L'incertitude de la moyenne, pas la dispersion des relevés. Intel : le PL1 limite une
         // puissance moyennée (« Shown limit is a time averaged power », moyenne glissante sur Tau, datasheet
         // Core 10e génération vol. 1, p. 53 et 56) ; sous un PL1 tenu, les relevés d'une seconde varient.
         // Juger leur dispersion faisait basculer le verdict 2 fois sur 4 sur la machine de reference (7 à 12,8 % d'écart-type
@@ -111,12 +111,11 @@ public sealed class RealCpuSustainedBench : ICpuSustainedBench
         if (processeurs is null || processeurs.Count == 0) return null;
 
         // Types ecrits plutot que `var` : ce que la reference CPU lit ici s'appelle
-        // `CpuBenchResult`, et le cliquet « construit mais jamais appele » compte par NOM. Le
-        // 11/09/2026, quand le juge de budget a quitte `src/` pour `tools/cpubench`, ces deux `var`
-        // ont fait passer `CpuBenchResult` pour orphelin alors que les quatre lignes suivantes le
-        // lisent — le faux positif que l'en-tete de ce test annonce. Le nommer dit la verite.
+        // `CpuBenchResult`, et le cliquet « construit mais jamais appele » compte par nom. Avec deux
+        // `var`, `CpuBenchResult` passerait pour orphelin alors que les quatre lignes suivantes le
+        // lisent : le faux positif qu'annonce l'en-tete de ce test. Le nommer dit la verite.
         CpuBenchResult rafale = CpuBench.Measure(processeurs.Count, Passes, ChargeCpu.Lourde, 0, processeurs);
-        // 03/10/2026 (M2) : un seul cœur chargé, la limite de puissance du paquet ne le retient pas ; c'est la fréquence
+        // Un seul cœur chargé, la limite de puissance du paquet ne le retient pas ; c'est la fréquence
         // de référence. Relevé sur la machine le 03/10 : avec 2 s de chauffe, la charge finissait avant que la première
         // lecture (près d'une seconde) n'aboutisse, et le « cœur seul » sortait à 3 792 MHz, sous les 4 270 MHz des huit.
         // Six secondes de chauffe : 5 292 MHz tenus de la 1re à la 7e seconde.
@@ -147,7 +146,7 @@ public sealed class RealCpuSustainedBench : ICpuSustainedBench
         lock (releves) puissance = Resumer(releves);
 
         // Un epinglage incomplet rend la comparaison sans objet : les cœurs charges ne sont pas
-        // ceux qu'on croit. Meme refus que dans le juge de budget — on ne rend pas un chiffre.
+        // ceux qu'on croit. Meme refus que dans le juge de budget : on ne rend pas un chiffre.
         if (rafale.EpinglesReussis != rafale.Threads || soutenu.EpinglesReussis != soutenu.Threads)
             return null;
 

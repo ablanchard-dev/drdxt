@@ -7,7 +7,7 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.FixIt;
 
 /// <summary>
-/// chantier L-WU : le levier des heures d'activité. Il n'écrit que les deux heures du réglage utilisateur, par le
+/// Le levier des heures d'activité. Il n'écrit que les deux heures du réglage utilisateur, par le
 /// helper, capture l'original avant, et l'annulation le rend (absent ⇒ supprimé). Proposé seulement sur des parties lues
 /// qui sortent des heures lues, jamais en mode automatique, jamais sur du non lu. Aucun faux helper n'écrit sur la machine.
 /// </summary>
@@ -100,7 +100,7 @@ public sealed class HeuresActivesTweakTests
         _ecrits.Should().EndWith(Pose(HeuresActives.NomDebut, "15"), "la première heure écrite est rendue");
     }
 
-    // 07/10/2026 (revue F-20) : le cas précédent garde le même début (15), un retour qui réécrirait la CIBLE au lieu
+    // Le cas précédent garde le même début (15), un retour qui réécrirait la CIBLE au lieu
     // de l'original passait encore. Ici le début change : seul l'original (8) peut revenir.
     [Fact]
     public async Task Un_echec_a_mi_chemin_rend_l_original_quand_le_debut_change()

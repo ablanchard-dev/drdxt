@@ -1,19 +1,19 @@
 namespace DrDxt.Application.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// GpuTuningTarget — the desired GPU tuning values a tweak should apply.
+// GpuTuningTarget : les valeurs de réglage GPU qu'un levier doit poser.
 //
-// Under Option A (master §11) an undervolt is a small NEGATIVE core-clock offset
-// (MHz). These values are still subject to GpuSafeBounds clamping/gating before
-// anything reaches the helper — the target is a request, not an authorization.
+// Ici, une « sous-tension » est un petit décalage négatif de l'horloge cœur (MHz). Ces
+// valeurs restent soumises au bornage et au filtrage de GpuSafeBounds avant d'atteindre le
+// helper : la cible est une demande, pas une autorisation.
 //
-// In production these come from a per-chip profile (M6); for M2 they are injected
-// so the tweak stays pure and unit-testable.
+// En production, elles viennent d'un profil de puce ; dans les tests, elles sont injectées
+// pour que le levier reste pur et testable.
 // -----------------------------------------------------------------------
 public sealed record GpuTuningTarget(int GpuIndex, int CoreOffsetMhz, int MemoryOffsetMhz);
 
-/// <summary>The desired power-limit (% of TDP) a power-limit tweak should apply.</summary>
+/// <summary>La limite de puissance voulue (% du TDP) que doit poser le levier de limite de puissance.</summary>
 public sealed record GpuPowerLimitTarget(int GpuIndex, int PowerLimitPct);
 
-/// <summary>The desired fan curve a fan-curve tweak should apply.</summary>
+/// <summary>La courbe de ventilateur voulue que doit poser le levier de courbe de ventilateur.</summary>
 public sealed record GpuFanCurveTarget(int GpuIndex, FanCurve Curve);

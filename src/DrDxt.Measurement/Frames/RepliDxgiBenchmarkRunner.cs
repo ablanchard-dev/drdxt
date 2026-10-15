@@ -3,9 +3,9 @@ using DrDxt.Core;
 namespace DrDxt.Measurement.Frames;
 
 /// <summary>
-/// 24/09/2026 — le banc PresentMon d'abord ; s'il ne capture rien, le compteur DXGI de DrDXT.
+/// Le banc PresentMon d'abord ; s'il ne capture rien, le compteur DXGI de DrDXT.
 ///
-/// Un succes de PresentMon passe tel quel. Seuls les echecs de CAPTURE basculent (service absent,
+/// Un succes de PresentMon passe tel quel. Seuls les echecs de capture basculent (service absent,
 /// suivi refuse, zero image) : un pid invalide ou une annulation restent ce qu'ils sont. Le
 /// resultat de repli porte <c>Instrument = "DXGI"</c>. Le premier plan y est observe comme sur le
 /// chemin PresentMon (une lecture toutes les 250 ms pendant la passe) ; sans sonde, il reste inconnu.
@@ -38,7 +38,7 @@ public sealed class RepliDxgiBenchmarkRunner : IBenchmarkRunner
         var lows01ParPasse = new List<double>();
         for (var i = 0; i < Math.Max(1, runs); i++)
         {
-            // Echantillonne PENDANT la passe : lu apres, le focus decrit le retour au jeu, pas l'alt-tab.
+            // Echantillonne pendant la passe : lu apres, le focus decrit le retour au jeu, pas l'alt-tab.
             using var arret = new CancellationTokenSource();
             var suivi = _foreground is null ? Task.CompletedTask : Task.Run(async () =>
             {
@@ -60,7 +60,7 @@ public sealed class RepliDxgiBenchmarkRunner : IBenchmarkRunner
             lows01ParPasse.Add(r.Value.P01LowFps);
         }
 
-        // 26/09/2026 : une seule passe rendait une marge de 0, et l'A/B prenait le moindre ecart pour un
+        // Une seule passe rendait une marge de 0, et l'A/B prenait le moindre ecart pour un
         // gain. Meme regle que le chemin PresentMon : +inf sous trois passes.
         var marge = FrametimeStatistics.InterRunMarginOfError(parPasse);
         return Result<BenchmarkResult>.Ok(

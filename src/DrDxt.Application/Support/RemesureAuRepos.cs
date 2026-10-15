@@ -18,11 +18,11 @@ public enum DecisionRemesure
 }
 
 /// <summary>
-/// 27/09/2026 : remesurer la memoire et le processeur sans demander au joueur.
+/// Remesurer la memoire et le processeur sans demander au joueur.
 ///
 /// Les deux references de la machine de reference ont ete prises pendant une partie (memoire 16/09,
 /// processeur 11/09) ; l'ecran le dit depuis le 26/09, et la seule issue etait un geste : « remesure, jeu
-/// ferme ». La regle rend ce geste inutile sans rien imposer : on ne remesure QUE une reference deja
+/// ferme ». La regle rend ce geste inutile sans rien imposer : on ne remesure qu'une reference deja
 /// signalee comme suspecte, et seulement quand le poste est vraiment au repos (aucun jeu, meme reduit ;
 /// personne au clavier depuis 5 min ; processeur sous 10 %), au plus une fois par heure. Une mesure
 /// trop bruitee garde l'ancienne reference, comme a la main.

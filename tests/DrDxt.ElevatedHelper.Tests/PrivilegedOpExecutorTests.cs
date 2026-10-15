@@ -6,15 +6,15 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// R1 — the real IPrivilegedOpExecutor dispatch logic, with fake action seams.
+// La vraie logique de dispatch d'IPrivilegedOpExecutor, avec de fausses coutures d'action.
 //
-// What is unit-tested here is the DISPATCH: which typed (already-allowlisted) op
-// maps to which Windows action, with the right arguments. The SAFE non-GPU ops, the
-// SAFE NVAPI DRS surface, the RISKY NVAPI clock-offset / power-limit writes AND the
-// RISKY ADLX (AMD) tuning write are all routed to their seam (T3). The GPU fan-curve
-// remains the only DEFERRED leaf (T6) — refused with an HONEST HELPER.OP_FAILED message
-// (names the fan-curve, "no fan write"), NO partial action; E4 fan-write lands later.
-// The native calls themselves are the m2smoke boundary, never run here.
+// Ce qui se teste ici est le dispatch : quelle op typée (déjà passée par la liste blanche)
+// mène à quelle action Windows, avec les bons arguments. Les ops sûres hors GPU, la surface
+// DRS NVAPI sûre, les écritures NVAPI de décalage d'horloge et de limite de puissance et
+// l'écriture de réglage ADLX (AMD) sont toutes routées vers leur couture. La courbe de
+// ventilation GPU reste la seule feuille différée : refusée avec un HELPER.OP_FAILED honnête
+// (nomme la courbe, « aucune écriture ventilateur »), sans action partielle.
+// Les appels natifs eux-mêmes sont la frontière du banc, jamais joués ici.
 // -----------------------------------------------------------------------
 public sealed class PrivilegedOpExecutorTests
 {
@@ -75,7 +75,7 @@ public sealed class PrivilegedOpExecutorTests
     private sealed class RecordingDrs : INvApiDrsActions
     {
         public (uint settingId, uint value)? Applied;
-        // L2 : la PORTEE reellement honoree. Un test qui ne regarde que `Applied` ne verrait pas
+        // La PORTEE reellement honoree. Un test qui ne regarde que `Applied` ne verrait pas
         // la difference entre une ecriture par jeu et une ecriture machine entiere.
         public (string path, uint settingId, uint value)? AppliedToApplication;
         private readonly Result _result;
@@ -83,7 +83,7 @@ public sealed class PrivilegedOpExecutorTests
         public Result SetGlobalSetting(uint settingId, uint value) { Applied = (settingId, value); return _result; }
         public Result SetSettingForApplication(string applicationPath, uint settingId, uint value)
         { AppliedToApplication = (applicationPath, settingId, value); return _result; }
-        // F1 lot 3 : la suppression est une methode A part — un routage vers SetSetting* ne doit
+        // La suppression est une methode A part — un routage vers SetSetting* ne doit
         // pas pouvoir passer pour elle.
         public (string path, uint settingId, DrsValueOrigin origine)? Deleted;
         public Result DeleteSettingForApplication(string applicationPath, uint settingId, DrsValueOrigin origineAttendue)
@@ -149,7 +149,7 @@ public sealed class PrivilegedOpExecutorTests
             drs ?? new RecordingDrs(), tuning ?? new RecordingTuning(),
             adlx ?? new RecordingAdlx(), firmware);
 
-    // --- M3 lot 2 : le trajet vers le BIOS, et l'hote qui n'a pas le droit de le faire ---
+    // --- Le trajet vers le BIOS, et l'hote qui n'a pas le droit de le faire ---
 
     [Fact]
     public async Task Firmware_reboot_passes_the_delay_to_the_seam()
@@ -256,7 +256,7 @@ public sealed class PrivilegedOpExecutorTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
     }
 
-    // --- Power plan ---
+    // --- Plan d'alimentation ---
 
     [Fact]
     public async Task SetActivePowerPlan_calls_power_action_with_guid()
@@ -270,7 +270,7 @@ public sealed class PrivilegedOpExecutorTests
         power.Applied.Should().Be(KnownPowerPlans.HighPerformance);
     }
 
-    // --- Restore point ---
+    // --- Point de restauration ---
 
     [Fact]
     public async Task CreateRestorePoint_calls_restore_action_with_description()
@@ -308,7 +308,7 @@ public sealed class PrivilegedOpExecutorTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
     }
 
-    // --- Service control + PresentMon install ---
+    // --- Contrôle de service et installation de PresentMon ---
 
     [Fact]
     public async Task RunServiceControl_calls_service_action()
@@ -341,7 +341,7 @@ public sealed class PrivilegedOpExecutorTests
         r.IsOk.Should().BeTrue();
     }
 
-    // --- DRS driver setting: Real now (SAFE NVAPI surface, no voltage/clock) ---
+    // --- Réglage pilote DRS : réel (surface NVAPI sûre, ni tension ni horloge) ---
 
     [Fact]
     public async Task ApplyNvApiDrsSetting_calls_drs_action_with_id_and_value()
@@ -349,7 +349,7 @@ public sealed class PrivilegedOpExecutorTests
         var drs = new RecordingDrs();
         var exec = Build(drs: drs);
 
-        // The corrected FRL_FPS id.
+        // L'identifiant FRL_FPS corrigé.
         var r = await exec.ExecuteAsync(new ApplyNvApiDrsSettingOp(0x10835002u, 141u, "Base Profile"), default);
 
         r.IsOk.Should().BeTrue();
@@ -357,7 +357,7 @@ public sealed class PrivilegedOpExecutorTests
         drs.AppliedToApplication.Should().BeNull("« Base Profile » est la portee MACHINE ENTIERE");
     }
 
-    // --- L2 : la PORTEE decide de la methode appelee -------------------------------------------
+    // --- La PORTEE decide de la methode appelee -------------------------------------------
 
     [Fact]
     public async Task ApplyNvApiDrsSetting_with_a_game_path_writes_the_GAME_profile_not_the_machine()
@@ -380,7 +380,7 @@ public sealed class PrivilegedOpExecutorTests
     [Fact]
     public async Task DeleteNvApiDrsSetting_routes_to_the_DELETE_action_with_the_expected_origin()
     {
-        // F1 lot 3 : la suppression est l'inverse d'une ecriture au jeu. Routee vers une
+        // La suppression est l'inverse d'une ecriture au jeu. Routee vers une
         // ecriture, le revert « reussirait » en laissant au jeu un reglage qu'il ne possedait pas.
         var drs = new RecordingDrs();
         var exec = Build(drs: drs);
@@ -398,7 +398,7 @@ public sealed class PrivilegedOpExecutorTests
     [Fact]
     public async Task ApplyNvApiDrsSetting_surfaces_unavailable_drs_as_op_failed()
     {
-        // AMD / no-NVIDIA box: the DRS action fails clean; the executor surfaces it.
+        // Machine AMD ou sans NVIDIA : l'action DRS échoue proprement ; l'exécuteur le remonte.
         var drs = new RecordingDrs(Result.Fail(ErrorCodes.HelperOpFailed, "NVIDIA NVAPI unavailable"));
         var exec = Build(drs: drs);
 
@@ -408,7 +408,7 @@ public sealed class PrivilegedOpExecutorTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
     }
 
-    // --- RISKY NVAPI clock-offset + power-limit: Real now (R2), routed to the tuning seam ---
+    // --- Décalage d'horloge et limite de puissance NVAPI : réels, routés vers la couture de réglage ---
 
     [Fact]
     public async Task ApplyNvApiClockOffset_calls_tuning_set_core_offset()
@@ -425,7 +425,7 @@ public sealed class PrivilegedOpExecutorTests
     [Fact]
     public async Task ApplyNvApiClockOffset_surfaces_tuning_failure_as_op_failed()
     {
-        // AMD / no-NVIDIA box, or missing private SetPstates20 id: fail-clean.
+        // Machine AMD ou sans NVIDIA, ou identifiant privé SetPstates20 absent : échec propre.
         var tuning = new RecordingTuning(Result.Fail(ErrorCodes.HelperOpFailed, "SetPstates20 unavailable"));
         var exec = Build(tuning: tuning);
 
@@ -433,6 +433,19 @@ public sealed class PrivilegedOpExecutorTests
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
+    }
+
+    // Seul le cœur s'écrit : un champ mémoire non nul (un ancien inverse en portait un) ne doit pas empêcher le cœur d'être
+    // rendu, sinon le bail se rejouait sans fin, le cœur jamais rendu.
+    [Fact]
+    public async Task L_inverse_du_coeur_passe_quel_que_soit_le_champ_memoire()
+    {
+        var tuning = new RecordingTuning();
+
+        var r = await Build(tuning: tuning).ExecuteAsync(new ApplyNvApiClockOffsetOp(0, 0, 300), default);
+
+        r.IsOk.Should().BeTrue();
+        tuning.AppliedOffset.Should().Be((0, 0));
     }
 
     [Fact]
@@ -459,7 +472,7 @@ public sealed class PrivilegedOpExecutorTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
     }
 
-    // --- RISKY ADLX (AMD) tuning: Real now (T3), routed to the tuning seam ---
+    // --- Réglage ADLX (AMD) : réel, routé vers la couture de réglage ---
 
     [Fact]
     public async Task ApplyAdlxTuning_routes_to_adlx_actions_with_exact_args()
@@ -470,7 +483,7 @@ public sealed class PrivilegedOpExecutorTests
         var r = await exec.ExecuteAsync(new ApplyAdlxTuningOp(0, AdlxTuningKind.Undervolt, -90), default);
 
         r.IsOk.Should().BeTrue();
-        // It is NO LONGER GpuDeferred — the op reached the real write seam verbatim.
+        // Ce n'est plus GpuDeferred : l'op a atteint la vraie couture d'écriture telle quelle.
         adlx.Applied.Should().Be((0, AdlxTuningKind.Undervolt, -90));
     }
 
@@ -489,8 +502,8 @@ public sealed class PrivilegedOpExecutorTests
     [Fact]
     public async Task ApplyAdlxTuning_surfaces_adlx_failure_as_op_failed()
     {
-        // Non-AMD box / unavailable ADLX / driver fault: the action fails clean; the
-        // executor surfaces it (no false Ok, no swallow).
+        // Machine sans AMD, ADLX absent ou pilote en faute : l'action échoue proprement ;
+        // l'exécuteur le remonte (pas de faux Ok, rien d'avalé).
         var adlx = new RecordingAdlx(Result.Fail(ErrorCodes.HelperOpFailed, "AMD ADLX unavailable"));
         var exec = Build(adlx: adlx);
 
@@ -500,11 +513,11 @@ public sealed class PrivilegedOpExecutorTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
     }
 
-    // --- Still-deferred GPU op: the fan-curve is cleanly REFUSED (R2), no action ---
+    // --- Op GPU encore différée : la courbe de ventilation est refusée proprement, sans action ---
 
     public static IEnumerable<object[]> DeferredGpuOps()
     {
-        // ADLX tuning is NO LONGER deferred (T3) — only the fan-curve remains (T6).
+        // Le réglage ADLX n'est plus différé : seule la courbe de ventilation le reste.
         yield return new object[] { new ApplyGpuFanCurveOp(0, new[] { new FanCurvePointDto(80, 65) }) };
     }
 
@@ -525,12 +538,12 @@ public sealed class PrivilegedOpExecutorTests
 
         r.IsOk.Should().BeFalse("the fan-curve remains deferred and must be refused");
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
-        // §22.3 honest unavailability: the message names the fan-curve and states plainly
-        // that NO fan write happens — not a vague "(R2)" placeholder.
+        // Indisponibilité honnête : le message nomme la courbe de ventilation et dit clairement
+        // qu'aucune écriture ventilateur n'a lieu, pas une formule vague.
         r.Error.Value.Message.Should().Contain("fan-curve");
         r.Error.Value.Message.Should().Contain("no fan write");
 
-        // No partial action anywhere — including no DRS / NVAPI / ADLX write.
+        // Aucune action partielle nulle part, et aucune écriture DRS / NVAPI / ADLX.
         reg.Set.Should().BeNull();
         reg.Deleted.Should().BeNull();
         power.Applied.Should().BeNull();

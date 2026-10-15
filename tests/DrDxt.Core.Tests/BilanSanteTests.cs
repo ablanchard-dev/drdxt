@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.Core.Tests;
 
-// 06/10/2026 (chantier B6 c) : le bilan santé, huit lignes fixes, chacune un constat. Une ligne sans constat se dit
+// Le bilan santé, huit lignes fixes, chacune un constat. Une ligne sans constat se dit
 // non lue, jamais « bonne ».
 public sealed class BilanSanteTests
 {
@@ -61,7 +61,7 @@ public sealed class BilanSanteTests
         bilan[2].Constat.Valeur.Should().Be("3");
     }
 
-    // Revue adverse du docteur (09/10/2026, P1) : à gravité égale, un constat lu passait devant un non lu ; un second disque
+    // À gravité égale, un constat lu passait devant un non lu ; un second disque
     // illisible disparaissait derrière « usure 0 % », une liste de Windows Update non lue derrière « aucun échec ».
     [Fact]
     public void A_gravite_egale_le_non_lu_passe_devant_le_lu()
@@ -77,7 +77,7 @@ public sealed class BilanSanteTests
         bilan[5].Constat.Etat.Should().Be(EtatConstat.NonLu);
     }
 
-    // Revue adverse (P2) : la ligne « Pilote graphique » ne lisait pas la version du pilote (« version du pilote graphique »).
+    // La ligne « Pilote graphique » ne lisait pas la version du pilote (« version du pilote graphique »).
     [Fact]
     public void La_ligne_du_pilote_lit_aussi_sa_version()
     {

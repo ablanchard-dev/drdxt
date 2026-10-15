@@ -6,13 +6,13 @@ namespace DrDxt.Detection.Settings;
 /// Un écran déclare-t-il un rafraîchissement variable ? Lu dans son EDID, jamais déduit.
 ///
 /// Pourquoi ce fichier existe : <c>SettingsState.VrrCapableDisplay</c> valait <c>Unknown</c>
-/// depuis le début, avec le contrat écrit dans <c>HardwareContracts</c> — « stays Unknown until
-/// display-capability detection is wired ». Deux leviers de latence en dépendent
-/// (<c>latency.vrr_vsync_cap</c>, <c>latency.vrrFlipModelOn</c>) et se taisaient donc, y compris
+/// au départ, avec le contrat écrit dans <c>HardwareContracts</c> : « reste Unknown tant que la
+/// détection des capacités d'écran n'est pas branchée ». Deux leviers de latence en dépendent
+/// (<c>latency.vrr_vsync_cap</c>, <c>latency.vrrFlipModelOn</c>) et se tairaient donc, y compris
 /// sur un écran de jeu à 200 Hz qui déclare FreeSync.
 ///
 /// Mécanisme : l'EDID que Windows conserve pour chaque écran. Lecture seule, <b>sans élévation
-/// et sans NVAPI</b> — donc valable NVIDIA, AMD et Intel. Ça élargit la couverture matérielle au
+/// et sans NVAPI</b>, donc valable NVIDIA, AMD et Intel. Ça élargit la couverture matérielle au
 /// lieu de la restreindre, contrairement à une voie pilote.
 ///
 /// <b>Le descripteur « Monitor Range Limits » (0xFD) ne prouve rien.</b> Tous les écrans en
@@ -20,8 +20,8 @@ namespace DrDxt.Detection.Settings;
 /// machine de référence en a un (50-144 Hz) et n'est pas VRR. S'en servir ferait dire « capable »
 /// à n'importe quel écran rapide.
 ///
-/// Ce qui fait foi, et rien d'autre — sources : la liste amd-gfx (AMD VSDB, versions et tailles :
-/// ratatoskr.run/amd-gfx/2026/07/17291713 ; règle de validité HDMI Forum, drm/edid) et CTA-861 :
+/// Ce qui fait foi, et rien d'autre (sources : la liste amd-gfx, AMD VSDB, versions et tailles :
+/// ratatoskr.run/amd-gfx/2026/07/17291713 ; règle de validité HDMI Forum, drm/edid ; et CTA-861) :
 /// <list type="bullet">
 ///   <item>AMD VSDB, OUI <c>0x00001A</c> : FreeSync ;</item>
 ///   <item>HDMI Forum VSDB, OUI <c>0xC45DD8</c> : VRR HDMI 2.1, avec sa règle de validité.</item>
@@ -40,9 +40,9 @@ public static class EdidVrrCapabilite
     /// aucun. <c>Unknown</c> = l'EDID est absent, tronqué ou n'en est pas un.
     ///
     /// La distinction Off / Unknown porte tout le sens. « Cet écran n'est pas VRR » est une
-    /// Réponse, qui autorise le produit à se taire pour une bonne raison. « Je n'ai pas su lire »
+    /// réponse, qui autorise le produit à se taire pour une bonne raison. « Je n'ai pas su lire »
     /// n'en est pas une, et rendre <c>Off</c> dans ce cas fermerait un levier sur une lecture
-    /// ratée — le défaut que ce dépôt traque partout ailleurs.
+    /// ratée, le défaut que ce dépôt traque partout ailleurs.
     /// </summary>
     public static TriState Lire(ReadOnlySpan<byte> edid)
     {
@@ -92,7 +92,7 @@ public static class EdidVrrCapabilite
             // L'OUI est petit-boutiste dans l'EDID.
             var oui = charge[2] << 16 | charge[1] << 8 | charge[0];
             if (oui == 0x00001A)
-                return true; // AMD VSDB : la presence du bloc EST la declaration FreeSync
+                return true; // AMD VSDB : la presence du bloc est la declaration FreeSync
             if (oui == 0xC45DD8 && VrrHdmiValide(charge))
                 return true;
         }

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Gpu;
 
-// 03/10/2026 (G4) : « il doit regarder la marque et savoir où chercher ». AMD comparé comme NVIDIA, depuis sa page de
+// « il doit regarder la marque et savoir où chercher ». AMD comparé comme NVIDIA, depuis sa page de
 // téléchargement ; la version installée au format d'AMD vient du registre.
 public sealed class SourceAmdTests
 {
@@ -28,7 +28,7 @@ public sealed class SourceAmdTests
     {
         var c = await VersionDuPilote.VerifierAsync([Radeon("AMD Radeon RX 7800 XT")], NvidiaMuette, Source(), _ => "26.5.1");
 
-        // Revue adverse du docteur (09/10/2026, R3) : en retard = observé, avec son geste.
+        // En retard = observé, avec son geste.
         c!.Statut.Should().Be(RepairStatus.Observed);
         c.Action.Should().Be(RepairAction.Recommandation);
         c.Explication.Should().Contain("ton pilote AMD 26.5.1 n'est pas le dernier : la dernière publiée est la 26.8.1 du 18/08/2026")
@@ -61,7 +61,7 @@ public sealed class SourceAmdTests
         c.Explication.Should().Contain("ne sait pas encore lire");
     }
 
-    // Revue R2 : site muet = l'endroit où vérifier, jamais le silence (avant G4, l'utilisateur AMD avait au moins cela).
+    // Site muet = l'endroit où vérifier, jamais le silence (avant, l'utilisateur AMD avait au moins cela).
     [Fact]
     public async Task Un_site_muet_dit_ou_verifier()
     {

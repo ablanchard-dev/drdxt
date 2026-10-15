@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- R2 deterministic GPU bench. Lives OUTSIDE the .sln (like tools/smoke,
+  <!-- Deterministic GPU bench. Lives OUTSIDE the .sln (like tools/smoke,
        tools/m2smoke, tools/r2probe, tools/r2smoke) so it never affects the product
        build/test. It runs the REAL D3D11 deterministic compute workload on the local
        GPU and prints a repeatable throughput score + stable/unstable + checksum-ok.

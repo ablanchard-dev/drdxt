@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Parties;
 
 /// <summary>
-/// 08/10/2026 (D1 « sous charge ») : la veille marque la partie qu'elle suit et lève la marque à sa clôture ; une marque
+/// La veille marque la partie qu'elle suit et lève la marque à sa clôture ; une marque
 /// restée ouverte au démarrage suivant devient une partie interrompue.
 /// </summary>
 public sealed class PartieEnCoursTests : IDisposable
@@ -62,7 +62,7 @@ public sealed class PartieEnCoursTests : IDisposable
         suivis[2].Should().BeNull("la partie close lève la marque");
     }
 
-    // Revue du 08/10/2026 : une veille annulée en pleine partie (relevé éteint, App fermée) n'est pas un arrêt du PC.
+    // Une veille annulée en pleine partie (relevé éteint, App fermée) n'est pas un arrêt du PC.
     [Fact]
     public async Task Une_veille_annulee_en_pleine_partie_leve_la_marque()
     {

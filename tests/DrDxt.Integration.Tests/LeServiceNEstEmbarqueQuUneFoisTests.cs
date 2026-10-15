@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Mesure sur le payload reellement construit (installer\publish) :
+// Mesure sur le payload reellement construit (installer\publish) :
 // **PresentMonService.exe y est deux fois, 3,6 Mo chacun, empreinte identique**
 // (md5 5041ba385fcc56db5cd2d673e2f3288f) :
 //

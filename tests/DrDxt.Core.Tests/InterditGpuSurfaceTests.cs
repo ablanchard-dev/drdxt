@@ -5,7 +5,7 @@ using Xunit;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// 11/09/2026 — la decision « 0 MHz / 100 % » lit la SURFACE ecrite, comme les vetos de stabilite. Le
+/// La decision « 0 MHz / 100 % » lit la SURFACE ecrite, comme les vetos de stabilite. Le
 /// catalogue entier est juge : la machine est choisie pour que rien d'autre ne refuse sur la famille
 /// (frequence qui chute vraiment, bridage publie, aucun incident, aucun arret lu).
 /// </summary>

@@ -39,8 +39,7 @@ public class ScanViewModelTests
           .Returns(Result<BenchmarkResult>.Ok(Bl));
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) }, score, Bl,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) }, Bl)));
         return (hd, sr, br, sc);
     }
 
@@ -53,13 +52,11 @@ public class ScanViewModelTests
         var vm = Build(Happy(68));
         await vm.ScanCommand.ExecuteAsync(null);
         vm.State.Should().Be(ScanState.Done);
-        vm.Score.Should().Be(68);
         vm.Findings.Should().NotBeEmpty();
     }
 
-    // ── « Deja bien reglee » (revue du 12/09, M1) ──
-    // Cet etat se decidait sur le score /100 (>= 90), retire de tout ce que le client lit le 05/09.
-    // Il se decide maintenant sur les faits de lecture : rien a corriger et tout a ete lu.
+    // ── « Deja bien reglee » ──
+    // Cet etat se decide sur les faits de lecture, jamais sur un score : rien a corriger et tout a ete lu.
 
     private static RepairFinding Constat(string nom, RepairStatus statut) =>
         new("POWER", nom, statut == RepairStatus.Unknown ? null : "lue", null, statut, "parce que.", RepairAction.Aucune);
@@ -70,8 +67,7 @@ public class ScanViewModelTests
         var (hd, sr, br, _) = Happy();
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), score, Bl,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false),
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), Bl,
               Coverage: couverture ?? new ScanCoverage(ApplicableLevers: 6, KnownLevers: 6, UnknownLevers: 0))));
         return ScanViewModelTestSeams.Build(hd, sr, br, sc, Storage(), k => k, repairAudit: audit,
             profileConsumer: ScanViewModelTestSeams.ProfileConsumer(consommation));
@@ -83,7 +79,7 @@ public class ScanViewModelTests
     [Fact]
     public async Task Avec_le_VRAI_scorer_une_machine_reglee_et_toute_lue_peut_etre_deja_reglee()
     {
-        // 14/09/2026 (relecture 12/20) : le vrai ScanScorer ajoute toujours
+        // Le vrai ScanScorer ajoute toujours
         // « Finding.Latency.Available » (Info, gain 0). DejaReglee comptait tous les constats : avec le
         // vrai scorer, « deja bien reglee » etait inatteignable, et les tests de cette section ne le
         // voyaient pas parce qu'ils SUBSTITUENT le scorer. Celui-ci ne substitue rien.
@@ -122,10 +118,19 @@ public class ScanViewModelTests
             $"couverture {vu.Coverage} ; constats : {string.Join(" | ", vu.Findings)}");
     }
 
+    // Un audit de santé qui lève vidait la section en silence, et le titre devenait « tout lu, rien à corriger ».
+    [Fact]
+    public async Task Une_sante_non_lue_n_est_jamais_dite_saine()
+    {
+        var vm = SansConstatDuScanner(() => throw new System.Runtime.InteropServices.COMException("WMI"));
+        await vm.ScanCommand.ExecuteAsync(null);
+        vm.VerdictText.Should().NotBe("UI.Verdict.Clean");
+    }
+
     [Fact]
     public async Task Un_reglage_encore_au_plan_n_est_jamais_deja_regle()
     {
-        // Revue du 14/09 : cette clause de DejaReglee etait NOMMEE, jamais prouvee.
+        // Cette clause de DejaReglee etait NOMMEE, jamais prouvee.
         var vm = SansConstatDuScanner(Sain,
             consommation: ScanViewModelTestSeams.PlanConsumption(new[] { "fixit.power_plan" }));
         await vm.ScanCommand.ExecuteAsync(null);
@@ -135,7 +140,7 @@ public class ScanViewModelTests
     [Fact]
     public async Task Des_leviers_GPU_fermes_par_decision_n_empechent_pas_deja_regle()
     {
-        // 14/09/2026 : DejaReglee exigeait HasGpuPlan == false. Or sur toute machine NVIDIA de bureau
+        // DejaReglee exigeait HasGpuPlan == false. Or sur toute machine NVIDIA de bureau
         // les leviers GPU s'appliquent, et la decision produit interdit d'y ecrire : « deja bien reglee »
         // n'etait atteignable sur aucune d'elles, pour des leviers que le produit ne proposera pas.
         var vm = SansConstatDuScanner(Sain,
@@ -147,7 +152,7 @@ public class ScanViewModelTests
     [Fact]
     public async Task Un_levier_que_le_scanner_n_a_pas_pu_lire_n_est_jamais_deja_regle()
     {
-        // 14/09/2026 (C1 bis) : le scanner rend Unknown sans constat (XMP, rafraichissement,
+        // Le scanner rend Unknown sans constat (XMP, rafraichissement,
         // pagefile, MMCSS). « Aucun constat » ne dit pas « tout lu » : la couverture, si.
         var vm = SansConstatDuScanner(() => new[] { Constat("sain", RepairStatus.ExpectedDefault) },
             couverture: new ScanCoverage(ApplicableLevers: 6, KnownLevers: 5, UnknownLevers: 1));
@@ -189,8 +194,7 @@ public class ScanViewModelTests
         var (hd, sr, br, _) = Happy();
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), 99, Bl,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), Bl)));
         var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, Storage(), k => k,
             biosAdvisor: ScanViewModelTestSeams.BiosAdvisorFailing(),
             repairAudit: () => new[] { Constat("sain", RepairStatus.ExpectedDefault) });
@@ -214,8 +218,7 @@ public class ScanViewModelTests
         br.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
           .Returns(Result<BenchmarkResult>.Fail(ErrorCodes.PmonUnavailable, "x"));
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) }, 68, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) }, null)));
         var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, Storage(), k => k);
         await vm.ScanCommand.ExecuteAsync(null);
         vm.State.Should().Be(ScanState.Degraded);
@@ -255,10 +258,10 @@ public class ScanViewModelTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Fail(ErrorCodes.NoBaseline, "x"));
-        var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, Storage(), k => k);   // localize is identity in tests
+        var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, Storage(), k => k);   // la localisation est l'identité dans les tests
         await vm.ScanCommand.ExecuteAsync(null);
         vm.State.Should().Be(ScanState.Failed);
-        vm.ErrorMessage.Should().Be("Scan.Error.Analyse"); // not the detection key (review must-fix)
+        vm.ErrorMessage.Should().Be("Scan.Error.Analyse"); // pas la clé de détection
     }
 
     [Fact]
@@ -281,7 +284,7 @@ public class ScanViewModelTests
         vm.GatingNote.Should().NotBeNullOrEmpty();
     }
 
-    // ── 17/09/2026 : l'écran de résultat se contredisait (défaut D22) ──
+    // ── L'écran de résultat se contredisait (défaut D22) ──
     // Vu sur la machine de reference après la refonte : titre « rien à corriger dans ce qui a été lu » et
     // résumé « configuration globalement saine » pendant que l'audit de santé trouvait des états à
     // regarder (Windows : à corriger), et « lecture impossible » alors que tout avait été lu et que
@@ -293,12 +296,12 @@ public class ScanViewModelTests
         var vm = SansConstatDuScanner(() => new[] { Constat("suspect", RepairStatus.Suspicious) });
         await vm.ScanCommand.ExecuteAsync(null);
 
-        // 25/09/2026 : aucun réglage n'est en cause, le titre ne dit plus « réglages à corriger ».
+        // Aucun réglage n'est en cause, le titre ne dit plus « réglages à corriger ».
         vm.VerdictText.Should().Be("UI.Verdict.SanteACorriger").And.NotBe("UI.Verdict.Clean");
     }
 
-    // 29/09/2026, photo du bas de page : « Des points à reprendre. 12 points à corriger », la même idée deux
-    // fois, sous le titre qui la disait déjà. Le compte suffit ; le titre reste au-dessus.
+    // « Des points à reprendre. 12 points à corriger » dirait la même idée deux fois, sous le titre
+    // qui la dit déjà. Le compte suffit ; le titre reste au-dessus.
     [Fact]
     public async Task Le_resume_du_rapport_ne_redit_pas_le_titre_quand_il_compte_deja_les_points()
     {
@@ -342,8 +345,7 @@ public class ScanViewModelTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St,
-              new List<Finding> { new("Network", Severity.Info, "Finding.Network.LinkPowerSavingOn", null) }, 40, Bl,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false),
+              new List<Finding> { new("Network", Severity.Info, "Finding.Network.LinkPowerSavingOn", null) }, Bl,
               Coverage: new ScanCoverage(ApplicableLevers: 6, KnownLevers: 6, UnknownLevers: 0))));
         var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, Storage(), k => k, repairAudit: Sain);
 
@@ -355,7 +357,7 @@ public class ScanViewModelTests
     [Fact]
     public async Task Le_registre_se_redit_quand_la_couverture_arrive()
     {
-        // 17/09/2026 : l'écran gardait « lecture impossible » (texte calculé avant la couverture)
+        // L'écran gardait « lecture impossible » (texte calculé avant la couverture)
         // sous un titre qui, lui, avait été recalculé. Une phrase affichée doit prévenir quand elle change.
         var vm = SansConstatDuScanner(Sain);
         var notifie = false;
@@ -367,7 +369,7 @@ public class ScanViewModelTests
         vm.RegisterText.Should().NotBe("UI.Register.NoCoverage");
     }
 
-    // 23/09/2026 — DrDXT est gratuit : aucune ligne de la carte n'est plus « reservee ». Le
+    // DrDXT est gratuit : aucune ligne de la carte n'est plus « reservee ». Le
     // constat s'affiche entier, avec son titre, sans accroche ni « Debloquer ».
     [Fact]
     public async Task Sur_la_carte_chaque_constat_se_dit_en_entier()
@@ -376,8 +378,7 @@ public class ScanViewModelTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St,
-              new List<Finding> { new("Network", Severity.Info, "Finding.Network.LinkPowerSavingOn", null) }, 40, Bl,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false),
+              new List<Finding> { new("Network", Severity.Info, "Finding.Network.LinkPowerSavingOn", null) }, Bl,
               Coverage: new ScanCoverage(ApplicableLevers: 6, KnownLevers: 6, UnknownLevers: 0))));
         var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, Storage(), k => k, repairAudit: Sain);
 

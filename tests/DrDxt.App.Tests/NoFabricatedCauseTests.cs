@@ -8,10 +8,9 @@ namespace DrDxt.App.Tests;
 /// <summary>
 /// Loi anti-scareware : le produit ne nomme jamais une cause qu'il n'a pas prouvée.
 ///
-/// Reproduit le 27/08/2026 : une capture lancée sur <c>explorer.exe</c> — qui n'a aucun
-/// anti-triche — renvoyait MEAS.NO_PRESENTING_FRAMES, et l'utilisateur lisait « La mesure est
-/// bloquée par l'anti-cheat de ce jeu ». La seule preuve détenue était « processus vivant,
-/// zéro image », ce qui arrive aussi devant un menu ou une fenêtre minimisée.
+/// Une capture lancée sur <c>explorer.exe</c> (aucun anti-triche) renvoie MEAS.NO_PRESENTING_FRAMES ;
+/// la phrase ne doit pas dire « La mesure est bloquée par l'anti-cheat de ce jeu ». La seule preuve
+/// détenue est « processus vivant, zéro image », ce qui arrive aussi devant un menu ou une fenêtre minimisée.
 ///
 /// Le code d'erreur reste stable (il sert d'identifiant dans les logs) ; c'est la PHRASE
 /// montrée à l'utilisateur qui doit cesser d'affirmer. Elle doit énoncer le fait constaté

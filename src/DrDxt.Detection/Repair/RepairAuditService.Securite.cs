@@ -2,9 +2,10 @@ using DrDxt.Core;
 
 namespace DrDxt.Detection.Repair;
 
+/// <summary>Sécurité : les services dont le fichier pourrait être remplacé par un autre programme, et les chemins non cités.</summary>
 public sealed partial class RepairAuditService
 {
-    // 25/09/2026 : un service qui tourne en SYSTEM depuis un dossier que le compte peut modifier est une
+    // Un service qui tourne en SYSTEM depuis un dossier que le compte peut modifier est une
     // élévation de privilèges classique : n'importe quel programme lancé sans droits remplace le binaire,
     // et il s'exécute en SYSTEM au démarrage suivant du service. Vue sur la machine de reference (PresentMonService, laissé
     // dans un dossier de son profil). Même règle que celle du helper (`CheminProtege`) : le fichier et son
@@ -16,7 +17,7 @@ public sealed partial class RepairAuditService
         if (!services.IsOk)
         {
             yield return new RepairFinding("SERVICES", "services système remplaçables", null, null, RepairStatus.Unknown,
-                $"la liste des services n'a pas pu être lue ({services.Error?.Message}).");
+                Docteur.T("SE.Services.NonLu", services.Error?.Message));
             yield break;
         }
 
@@ -27,49 +28,42 @@ public sealed partial class RepairAuditService
             // Un binaire absent n'est pas une faille ; une ACL illisible n'est pas une preuve : on se tait.
             if (exe is null || !File.Exists(exe)) continue;
             var raison = CheminProtege.Verifier(exe);
-            if (raison is null || raison.StartsWith("ACL illisible", StringComparison.Ordinal)) continue;
+            if (raison is null || CheminProtege.EstIllisible(raison)) continue;
 
             var nom = s.GetString("DisplayName") ?? s.GetString("Name") ?? exe;
-            // 25/09/2026 : un service désactivé ne démarre pas ; le chemin reste, réactivé il s'ouvrirait.
+            // Un service désactivé ne démarre pas ; le chemin reste, réactivé il s'ouvrirait.
             var debut = string.Equals(s.GetString("StartMode"), "Disabled", StringComparison.OrdinalIgnoreCase)
-                ? "ce service est désactivé, il ne démarre pas aujourd'hui ; réactivé, il tournerait avec les droits du système (SYSTEM)"
-                : "ce service tourne avec les droits du système (SYSTEM)";
-            // 29/09/2026 : « remplaçable » faisait peur sans rien dire ; le titre dit ce qui peut arriver.
-            yield return new RepairFinding("SERVICES", $"service {nom} : son fichier peut être remplacé par un autre programme", exe, null,
+                ? Docteur.T("SE.Desactive")
+                : Docteur.T("SE.Tourne");
+            // « remplaçable » faisait peur sans rien dire ; le titre dit ce qui peut arriver.
+            yield return new RepairFinding("SERVICES", Docteur.Nom("SE.Remplacable.Nom", nom), exe, null,
                 RepairStatus.Suspicious,
-                $"{debut}, mais {SansLeChemin(raison, exe)}. Un programme lancé sans "
-                + "droits administrateur pourrait remplacer ce fichier, et il s'exécuterait en SYSTEM au prochain "
-                + "démarrage du service. "
-                + Remede(exe, "Réinstaller le logiciel dans Program Files, ou retirer ce droit d'écriture, ferme ce chemin.")
-                + " DrDXT ne touche pas à ce service.");
+                Docteur.T("SE.Remplacable", debut, SansLeChemin(raison, exe)) + Docteur.T("SE.PasTouche"),
+                Remede: Remede(exe, Docteur.T("SE.Reinstaller")));
         }
     }
 
-    // 25/09/2026, vu dans le rapport réel : Epic Games Updater vit déjà sous C:\Program Files, et le conseil lui
-    // disait d'y réinstaller le logiciel. Là, c'est le droit d'écriture posé sur le fichier qui ouvre le chemin.
+    // Un service déjà sous C:\Program Files (Epic Games Updater, par exemple) ne gagne rien à y être réinstallé :
+    // là, c'est le droit d'écriture posé sur le fichier qui ouvre le chemin.
     internal static string Remede(string exe, string horsProgramFiles)
     {
         var sousProgramFiles = new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86 }
             .Select(Environment.GetFolderPath)
             .Any(d => d.Length > 0 && exe.StartsWith(Path.TrimEndingDirectorySeparator(d) + Path.DirectorySeparatorChar,
                 StringComparison.OrdinalIgnoreCase));
-        // 27/09/2026 : « le retirer » ne disait pas comment. Sous Program Files, rendu aux Administrateurs, le fichier
+        // « le retirer » ne dit pas comment. Sous Program Files, rendu aux Administrateurs, le fichier
         // reprend les droits de son dossier (Utilisateurs en lecture) : la commande de l'installeur de DrDXT, vérifiée
         // sur ses propres fichiers. Hors Program Files, le dossier lui-même peut donner l'écriture : pas de commande.
-        // DOC-QUALITE (09/10/2026) : sous ProgramData, le dossier est celui que l'installeur de l'éditeur a choisi.
+        // Sous ProgramData, le dossier est celui que l'installeur de l'éditeur a choisi.
         var pd = Path.TrimEndingDirectorySeparator(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData));
         if (pd.Length > 0 && exe.StartsWith(pd + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            return "Ce dossier est choisi par l'éditeur du logiciel, pas par toi : le lui signaler est ce qui ferme ce chemin "
-                   + "pour de bon. Retirer toi-même ce droit d'écriture peut empêcher ses mises à jour.";
+            return Docteur.T("SE.Editeur");
         return sousProgramFiles
-            ? "Le fichier est déjà sous Program Files : c'est ce droit d'écriture qui ouvre le chemin. Pour le retirer, "
-              + $"dans une console administrateur : icacls \"{exe}\" /setowner *S-1-5-32-544 puis icacls \"{exe}\" /reset "
-              + "(le fichier revient aux Administrateurs et reprend les droits de son dossier). Le signaler à l'éditeur "
-              + "du logiciel évite qu'une mise à jour le rouvre."
+            ? Docteur.T("SE.ProgramFiles", exe)
             : horsProgramFiles;
     }
 
-    // 25/09/2026 : le chemin non cité. « C:\Program Files\App\svc.exe » sans guillemets fait essayer à
+    // Le chemin non cité. « C:\Program Files\App\svc.exe » sans guillemets fait essayer à
     // Windows C:\Program.exe, puis C:\Program Files\App.exe… avant le vrai binaire. Ce n'est une faille que
     // si l'un de ces emplacements accepte un fichier : sur un Windows sain, C:\ n'accorde aux utilisateurs
     // que la création de dossiers (mesuré sur la machine de reference, deux services non cités, aucun exploitable). On se tait
@@ -84,16 +78,15 @@ public sealed partial class RepairAuditService
                 .FirstOrDefault(c => Path.GetDirectoryName(c) is { } d && DossierAccepteUnFichier(d));
             if (posable is null) continue;
             var nom = s.GetString("DisplayName") ?? s.GetString("Name") ?? posable;
-            yield return new RepairFinding("SERVICES", $"chemin de service non cité : {nom}", posable, null,
+            yield return new RepairFinding("SERVICES", Docteur.Nom("SE.NonCite.Nom", nom), posable, null,
                 RepairStatus.Suspicious,
-                $"le chemin de ce service n'est pas entre guillemets et contient des espaces : Windows essaie d'abord "
-                + $"« {posable} », et ton compte peut poser un fichier à cet endroit. Un programme sans droits "
-                + "administrateur pourrait s'y installer et s'exécuter en SYSTEM au démarrage du service"
+                Docteur.T("SE.NonCite", posable)
                 + (string.Equals(s.GetString("StartMode"), "Disabled", StringComparison.OrdinalIgnoreCase)
-                    ? " (ce service est désactivé : il ne démarre pas aujourd'hui, le chemin s'ouvrirait s'il était réactivé)"
+                    ? Docteur.T("SE.NonCite.Desactive")
                     : "")
-                + ". Mettre le "
-                + "chemin du service entre guillemets ferme ce chemin. DrDXT ne touche pas à ce service.");
+                + Docteur.T("SE.NonCite.Fin"),
+                // La clé lue sous son nom de service, pas son nom affiché : c'est là que Windows lit le chemin.
+                Remede: Docteur.T("SE.NonCite.Remede", s.GetString("Name") ?? nom));
         }
     }
 
@@ -144,14 +137,13 @@ public sealed partial class RepairAuditService
     }
 
     /// <summary>La raison de `CheminProtege` commence par le chemin jugé (le fichier ou son dossier), que
-    /// le constat affiche déjà comme valeur : le dire deux fois allongeait l'explication (vu sur la photo
-    /// du 25/09). Le fichier devient « ce fichier », son dossier « son dossier » ; autre chose reste tel quel.</summary>
+    /// le constat affiche déjà comme valeur : le dire deux fois allongerait l'explication. Le fichier devient « ce fichier », son dossier « son dossier » ; autre chose reste tel quel.</summary>
     internal static string SansLeChemin(string raison, string exe)
     {
-        if (raison.StartsWith(exe + " ", StringComparison.OrdinalIgnoreCase)) return "ce fichier" + raison[exe.Length..];
+        if (raison.StartsWith(exe + " ", StringComparison.OrdinalIgnoreCase)) return Docteur.T("CP.CeFichier") + raison[exe.Length..];
         var dossier = Path.GetDirectoryName(exe);
         if (dossier is not null && raison.StartsWith(dossier + " ", StringComparison.OrdinalIgnoreCase))
-            return $"son dossier ({dossier})" + raison[dossier.Length..];
+            return Docteur.T("CP.SonDossier", dossier) + raison[dossier.Length..];
         return raison;
     }
 

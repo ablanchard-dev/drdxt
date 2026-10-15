@@ -8,8 +8,8 @@ namespace DrDxt.Core.Tests;
 /// « DIFFERENT » N'EST pas « ENDOMMAGE », et le produit doit etre incapable de les confondre.
 ///
 /// La tentation d'un outil de reparation est de traiter tout etat non-default comme un degat. Elle
-/// est fausse et elle est dangereuse : sur cette machine, le 08/09/2026, quatre etats non-default
-/// ont ete lus — plan Equilibre, aucun coeur parque, `LowLatencyMode` absent, 1728x1080 sur un
+/// est fausse et elle est dangereuse. Releve sur la machine de reference le 08/09/2026, quatre etats
+/// non-default : plan Equilibre, aucun coeur parque, `LowLatencyMode` absent, 1728x1080 sur un
 /// ecran 1920x1080. **Aucun des quatre n'est un defaut.** Trois sont probablement des choix, et le
 /// quatrieme est le comportement par defaut de Windows.
 ///
@@ -17,7 +17,7 @@ namespace DrDxt.Core.Tests;
 ///
 /// La regle gravee ici : **une reparation AUTOMATIQUE exige une justification bien plus forte
 /// qu'un simple ecart au default.** Seul un etat connu comme NUISIBLE l'autorise. Un etat inconnu
-/// ne se repare jamais tout seul — il se signale.
+/// ne se repare jamais tout seul : il se signale.
 /// </summary>
 public class RepairFindingTests
 {

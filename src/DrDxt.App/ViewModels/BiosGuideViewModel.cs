@@ -7,20 +7,21 @@ using DrDxt.Core;
 namespace DrDxt.App.ViewModels;
 
 /// <summary>
-/// A localized, renderer-agnostic view of the PERSONALIZED BIOS guide (M3) — the "HOW"
-/// behind the findings: the exact menu path → setting → value to set for this machine,
-/// plus the mandatory recovery section, an HONEST confidence label, and the §16 CSM note.
+/// Une vue traduite du guide BIOS personnalisé, indépendante du rendu : le « comment »
+/// derrière les constats, c'est-à-dire le chemin exact menu → réglage → valeur pour cette
+/// machine, plus la section de secours obligatoire, une étiquette de confiance honnête et la
+/// note sur le CSM.
 ///
-/// HONESTY invariants this VM upholds:
-///   • a guide is GUIDANCE-only text — it is never a BIOS write and never enters the apply
-///     batch (the user changes the setting themselves);
-///   • <see cref="IsVerified"/> is true only when the generator resolved the exact board
-///     (<see cref="GuideConfidence.Verified"/>); a best-known fallback is always labelled
-///     "not yet verified for your exact board" — a fallback is never shown as verified;
-///   • the recovery section (<see cref="RecoveryTop"/> / <see cref="RecoveryBottom"/>) is
-///     mandatory and surfaced both before and after the steps;
-///   • when the CSM-off step was suppressed because the system boots Legacy
-///     (<see cref="CsmSuppressed"/>), an honest note says we did not advise disabling it.
+/// Règles d'honnêteté que ce VM tient :
+///   • un guide n'est que du texte de guidage : jamais une écriture dans le BIOS, jamais dans
+///     le lot appliqué (le joueur change le réglage lui-même) ;
+///   • <see cref="IsVerified"/> n'est vrai que si le générateur a trouvé la carte exacte
+///     (<see cref="GuideConfidence.Verified"/>) ; un repli connu porte toujours l'étiquette
+///     « pas encore vérifié pour ta carte exacte », et n'est jamais montré comme vérifié ;
+///   • la section de secours (<see cref="RecoveryTop"/> / <see cref="RecoveryBottom"/>) est
+///     obligatoire et affichée avant et après les étapes ;
+///   • quand l'étape CSM coupé a été retirée parce que le système démarre en Legacy
+///     (<see cref="CsmSuppressed"/>), une note honnête dit qu'on n'a pas conseillé de le couper.
 /// </summary>
 public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
 {
@@ -29,7 +30,7 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
 
     private readonly Func<string, string> _localize;
     private readonly Func<Task<Result>>? _annulerDepart;
-    // M3 lot 2 — la couture « emmene-moi dans le BIOS ». Un DELEGUE, pas IElevatedClient :
+    // La couture « emmene-moi dans le BIOS ». Un delegue, pas IElevatedClient :
     // meme idiome que `localize`, et le VM reste ignorant de l'IPC. Optionnel/en queue pour
     // que toutes les constructions existantes restent valides.
     private readonly Func<int, Task<Result>>? _requestFirmwareReboot;
@@ -43,8 +44,8 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
         _requestFirmwareReboot = requestFirmwareReboot;
         _annulerDepart = annulerDepart;
         _localize = localize;
-        // Confidence: Verified only for the exact board; otherwise the labelled fallback.
-        // Never label a fallback as verified (decision §9 honesty).
+        // Confiance : Verified seulement pour la carte exacte ; sinon le repli étiqueté.
+        // Jamais un repli étiqueté comme vérifié.
         IsVerified = guide.Confidence == GuideConfidence.Verified;
         ConfidenceLabel = localize(IsVerified
             ? "Scan.Bios.Guide.Verified"
@@ -52,13 +53,13 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
 
         BoardLabel = guide.DetectedBoardLabel ?? string.Empty;
 
-        // Each step: the localized human instruction + the RAW exact value (menu path →
-        // setting → = value), shown verbatim. ExactValue may be null for a name-only fallback.
+        // Chaque étape : la consigne traduite et la valeur exacte brute (chemin menu → réglage →
+        // = valeur), affichée telle quelle. ExactValue peut être null pour un repli qui n'a que le nom.
         Steps = guide.Steps
             .Select(s => new BiosGuideStepViewModel(localize(s.InstructionKey), s.ExactValue))
             .ToList();
 
-        // Recovery is mandatory: localize the top + bottom ladders (text-only, no exact value).
+        // Le secours est obligatoire : traduire les échelles du haut et du bas (texte seul, sans valeur exacte).
         RecoveryTop = guide.Recovery.Top
             .Select(s => localize(s.InstructionKey))
             .ToList();
@@ -66,19 +67,20 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
             .Select(s => localize(s.InstructionKey))
             .ToList();
 
-        // §16: when we suppressed CSM-off (Legacy boot), say so honestly.
+        // Quand on a retiré l'étape CSM coupé (démarrage Legacy), le dire honnêtement.
         CsmSuppressed = guide.Recovery.CsmAdviceSuppressed;
         CsmSuppressedNote = CsmSuppressed ? localize("Scan.Bios.Guide.CsmSuppressed") : string.Empty;
 
-        // The enter/save keys (carried verbatim from the resolved template). Surface the RAW
-        // key plus a localized, honest instruction. A blank key yields an empty instruction —
-        // we never print "Press  to enter" when the template did not specify a key.
+        // Les touches d'entrée et de sauvegarde (reprises telles quelles du modèle trouvé). On
+        // affiche la touche brute et une consigne traduite et honnête. Une touche vide donne une
+        // consigne vide : on n'écrit jamais « Appuie sur  pour entrer » quand le modèle ne donne
+        // pas de touche.
         EnterKey = guide.EnterKey ?? string.Empty;
         SaveKey = guide.SaveKey ?? string.Empty;
         EnterInstruction = FormatKey(localize("Scan.Bios.Guide.EnterKey"), EnterKey);
         SaveInstruction = FormatKey(localize("Scan.Bios.Guide.SaveKey"), SaveKey);
 
-        // 07/10/2026 (D12) : une carte jamais vue n'a que des chemins « les mieux connus ». Le manuel de son constructeur
+        // Une carte jamais vue n'a que des chemins « les mieux connus ». Le manuel de son constructeur
         // fait foi ; DrDXT ne l'invente pas, il y renvoie (un lien direct seulement là où l'adresse est prouvée).
         if (!IsVerified)
         {
@@ -88,7 +90,7 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
         }
 
         TexteTelephone = Telephone(this, localize);
-        // Revue F-48 : un QR montré à 180 points avec 93 à 165 modules tombait sous 2 pixels par module, illisible
+        // Un QR montré à 180 points avec 93 à 165 modules tombait sous 2 pixels par module, illisible
         // par un téléphone. Il s'affiche maintenant à sa taille (4 pixels par module) et ne dépasse pas la version 25 ;
         // au-delà, pas d'image plutôt qu'une image qu'aucun téléphone ne lit.
         try
@@ -100,7 +102,7 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
         catch (Exception) { QrTelephone = null; /* trop long pour un QR : le texte reste à l'écran */ }
     }
 
-    /// <summary>07/10/2026 (D12) : la phrase qui renvoie au manuel du constructeur ; <c>null</c> pour une carte vérifiée.</summary>
+    /// <summary>La phrase qui renvoie au manuel du constructeur ; <c>null</c> pour une carte vérifiée.</summary>
     public string? ManuelDeLaCarte { get; }
 
     /// <summary>La page d'assistance de la carte, seulement quand son adresse suit un motif relevé sur le site du
@@ -126,14 +128,14 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
     {
         // « PRO B760-P WIFI DDR4 (MS-7D98) » : le code interne entre parenthèses ne fait pas partie du nom de page.
         var nom = System.Text.RegularExpressions.Regex.Replace(produit, @"\s*\(MS-[0-9A-Z]+\)\s*$", "").Trim();
-        // Revue F-51 : beaucoup de cartes MSI ne disent que leur code (« MS-7C02 ») : ce n'est pas un nom de page.
+        // Beaucoup de cartes MSI ne disent que leur code (« MS-7C02 ») : ce n'est pas un nom de page.
         if (vendeur != BiosVendor.Msi || nom.Length == 0 || !System.Text.RegularExpressions.Regex.IsMatch(nom, @"^[A-Za-z0-9 \-+]+$")
             || System.Text.RegularExpressions.Regex.IsMatch(nom, @"^MS-[0-9A-Z]+$"))
             return null;
         return "https://www.msi.com/Motherboard/" + nom.Replace(' ', '-') + "/support";
     }
 
-    /// <summary>07/10/2026 (chantier D11, demande du 21/06) : le guide se lit pendant que le PC est dans le BIOS,
+    /// <summary>Le guide se lit pendant que le PC est dans le BIOS,
     /// donc ailleurs que sur son écran. Le texte entier tient dans le QR : le téléphone le lit sans réseau ni serveur.</summary>
     public string TexteTelephone { get; }
 
@@ -156,60 +158,61 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
     {
         var lignes = new List<string> { string.Format(CultureInfo.CurrentCulture, localize("Scan.Bios.Guide.Qr.Titre"), g.BoardLabel) };
         if (g.EnterInstruction.Length > 0) lignes.Add(g.EnterInstruction);
-        lignes.AddRange(g.Steps.Select((s, i) => s.ExactValue is { Length: > 0 } v ? $"{i + 1}. {s.Instruction.TrimEnd(' ', ':')} : {v}" : $"{i + 1}. {s.Instruction}"));
+        lignes.AddRange(g.Steps.Select((s, i) => s.ExactValue is { Length: > 0 } v ? $"{i + 1}. {s.Instruction.TrimEnd(' ', ':')}{Docteur.DeuxPoints}{v}" : $"{i + 1}. {s.Instruction}"));
         if (g.SaveInstruction.Length > 0) lignes.Add(g.SaveInstruction);
-        // F-48 : le QR porte ce qui se fait dans le BIOS ; les phrases longues (confiance, renvoi au manuel, échelle de
+        // Le QR porte ce qui se fait dans le BIOS ; les phrases longues (confiance, renvoi au manuel, échelle de
         // secours complète) restent à l'écran, une ligne de secours suffit au téléphone.
         if (g.LienManuel is { } lien) lignes.Add(string.Format(CultureInfo.CurrentCulture, localize("Scan.Bios.Guide.Qr.Manuel"), lien));
         lignes.Add(localize("Scan.Bios.Guide.Qr.Secours"));
         return string.Join("\n", lignes.Where(l => l.Length > 0));
     }
 
-    /// <summary>True only when the menu paths are verified for the exact board. A fallback is
-    /// never verified — its paths are best-known and labelled as such.</summary>
+    /// <summary>Vrai seulement si les chemins de menu sont vérifiés pour la carte exacte. Un
+    /// repli n'est jamais vérifié : ses chemins sont les plus connus, et étiquetés comme tels.</summary>
     public bool IsVerified { get; }
 
-    /// <summary>The localized confidence statement — verified-for-your-board vs the honest
-    /// "not yet verified for your exact board" fallback label. Never empty.</summary>
+    /// <summary>La phrase de confiance traduite : vérifié pour ta carte, ou l'étiquette honnête
+    /// de repli « pas encore vérifié pour ta carte exacte ». Jamais vide.</summary>
     public string ConfidenceLabel { get; }
 
-    /// <summary>Human label of the detected board (Manufacturer + Product).</summary>
+    /// <summary>Le nom lisible de la carte détectée (Manufacturer + Product).</summary>
     public string BoardLabel { get; }
 
-    /// <summary>The ordered per-finding instruction steps (the "HOW").</summary>
+    /// <summary>Les étapes de consigne, dans l'ordre, une par constat (le « comment »).</summary>
     public IReadOnlyList<BiosGuideStepViewModel> Steps { get; }
 
-    /// <summary>The mandatory recovery ladder shown at the TOP of the guide (non-empty).</summary>
+    /// <summary>L'échelle de secours obligatoire, affichée en haut du guide (jamais vide).</summary>
     public IReadOnlyList<string> RecoveryTop { get; }
 
-    /// <summary>The mandatory recovery ladder shown at the BOTTOM of the guide (non-empty).</summary>
+    /// <summary>L'échelle de secours obligatoire, affichée en bas du guide (jamais vide).</summary>
     public IReadOnlyList<string> RecoveryBottom { get; }
 
-    /// <summary>True when a CSM-off step was suppressed because the system boots Legacy (no-boot
-    /// guard, §16). Drives the honest "we did NOT advise disabling CSM" note.</summary>
+    /// <summary>Vrai quand une étape CSM coupé a été retirée parce que le système démarre en
+    /// Legacy (garde contre un PC qui ne démarre plus). Pilote la note honnête « on n'a pas
+    /// conseillé de couper le CSM ».</summary>
     public bool CsmSuppressed { get; }
 
-    /// <summary>The honest CSM-suppressed note; empty when CSM-off was not suppressed.</summary>
+    /// <summary>La note honnête sur le CSM retiré ; vide si l'étape CSM coupé n'a pas été retirée.</summary>
     public string CsmSuppressedNote { get; }
 
-    /// <summary>The RAW key to enter the BIOS (e.g. "Del", "F2"), verbatim from the resolved
-    /// template; empty when the template did not specify one.</summary>
+    /// <summary>La touche brute pour entrer dans le BIOS (par exemple « Del », « F2 »), reprise
+    /// telle quelle du modèle trouvé ; vide si le modèle n'en donne pas.</summary>
     public string EnterKey { get; }
 
-    /// <summary>The RAW key to save &amp; exit the BIOS (e.g. "F10"), verbatim from the resolved
-    /// template; empty when the template did not specify one.</summary>
+    /// <summary>La touche brute pour sauvegarder et quitter le BIOS (par exemple « F10 »), reprise
+    /// telle quelle du modèle trouvé ; vide si le modèle n'en donne pas.</summary>
     public string SaveKey { get; }
 
-    /// <summary>The localized "press {key} to enter the BIOS" instruction; empty when no enter
-    /// key was specified (we never print "Press  to enter").</summary>
+    /// <summary>La consigne traduite « appuie sur {touche} pour entrer dans le BIOS » ; vide si
+    /// aucune touche d'entrée n'est donnée (on n'écrit jamais « Appuie sur  pour entrer »).</summary>
     public string EnterInstruction { get; }
 
-    /// <summary>The localized "press {key} to save and exit" instruction; empty when no save
-    /// key was specified.</summary>
+    /// <summary>La consigne traduite « appuie sur {touche} pour sauvegarder et quitter » ; vide
+    /// si aucune touche de sauvegarde n'est donnée.</summary>
     public string SaveInstruction { get; }
 
     /// <summary>
-    /// M3 lot 2 — true quand DrDXT peut emmener l'utilisateur dans le setup firmware lui-meme
+    /// True quand DrDXT peut emmener l'utilisateur dans le setup firmware lui-meme
     /// (<c>shutdown /r /fw</c>), au lieu de lui demander de marteler une touche au demarrage.
     /// </summary>
     public bool CanOpenFirmwareDirectly => _requestFirmwareReboot is not null;
@@ -222,12 +225,12 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
     public const int DefaultFirmwareRebootDelaySeconds = 10;
 
     /// <summary>
-    /// Demande a Windows d'envoyer le PROCHAIN demarrage dans le setup firmware, puis de
+    /// Demande a Windows d'envoyer le prochain demarrage dans le setup firmware, puis de
     /// redemarrer. DrDXT n'ecrit aucune variable firmware : c'est Windows qui detient le bit
     /// <c>OsIndications</c>.
     ///
     /// <see cref="EnterInstruction"/> reste affiche quoi qu'il arrive. Le bouton est un
-    /// CONFORT, pas un remplacement : si le firmware refuse le boot-to-setup, ou si la couture
+    /// confort, pas un remplacement : si le firmware refuse le boot-to-setup, ou si la couture
     /// n'est pas la, l'utilisateur doit toujours avoir sous les yeux la touche a presser. Un
     /// produit qui cache le chemin manuel parce qu'il croit avoir mieux laisse le client sans
     /// rien le jour ou le mieux ne marche pas.
@@ -239,7 +242,7 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
                 "Opening the firmware setup directly is not available on this host."))
             : _requestFirmwareReboot(delaySeconds);
 
-    // ── Le bouton de la carte (26/09/2026) ────────────────────────────────────────────────────
+    // ── Le bouton de la carte ────────────────────────────────────────────────────
     // `OpenFirmwareSetupAsync` n'etait lie a aucune vue depuis sa creation : le marqueur n'etait jamais
     // ecrit depuis l'interface, donc la verification au retour ne tournait jamais. Deux clics, parce
     // qu'il redemarre la machine : le premier dit ce qui va se passer, le second le fait. La touche a
@@ -270,7 +273,7 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
         try { r = await _annulerDepart(); }
         catch (Exception ex) { r = Result.Fail(ErrorCodes.BiosInputInvalid, ex.Message); }
         if (r.IsOk) { ErreurDepart = null; Depart = EtatDepart.Repos; return; }
-        ErreurDepart = $"{_localize("Bios.Depart.AnnulationEchec")} : {r.Error?.Message}";
+        ErreurDepart = $"{_localize("Bios.Depart.AnnulationEchec")}{Docteur.DeuxPoints}{r.Error?.Message}";
     }
 
     public string LabelDepart => _localize("Bios.Depart.Bouton");
@@ -305,14 +308,14 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
         try { r = await OpenFirmwareSetupAsync(); }
         catch (Exception ex) { r = Result.Fail(ErrorCodes.BiosInputInvalid, ex.Message); }
         if (r.IsOk) { Depart = EtatDepart.Lance; return; }
-        ErreurDepart = $"{_localize("Bios.Depart.Echec")} : {r.Error?.Message}";
+        ErreurDepart = $"{_localize("Bios.Depart.Echec")}{Docteur.DeuxPoints}{r.Error?.Message}";
         Depart = EtatDepart.Repos;
     }
 
-    // Builds the localized key instruction with the same format-with-fallback idiom used
-    // elsewhere (FindingViewModel / BiosFindingViewModel): if the template has a "{0}" slot,
-    // format the key into it; otherwise append "<template> <key>". A blank key → no
-    // instruction at all (honest: never "Press  to enter").
+    // Construit la consigne de touche avec le même idiome « format avec repli » qu'ailleurs
+    // (FindingViewModel / BiosFindingViewModel) : si le modèle a un emplacement « {0} », on y
+    // met la touche ; sinon on ajoute « <modèle> <touche> ». Touche vide → aucune consigne
+    // (honnête : jamais « Appuie sur  pour entrer »).
     private static string FormatKey(string template, string key)
     {
         if (string.IsNullOrWhiteSpace(key))
@@ -324,8 +327,8 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
 }
 
 /// <summary>
-/// One ordered step of a personalized BIOS guide: the localized human instruction plus the
-/// RAW exact navigation value (the "menu path → setting → = value" string), shown verbatim.
+/// Une étape, dans l'ordre, d'un guide BIOS personnalisé : la consigne traduite et la valeur
+/// de navigation exacte brute (la chaîne « chemin menu → réglage → = valeur »), affichée telle quelle.
 /// </summary>
 public sealed class BiosGuideStepViewModel
 {
@@ -335,10 +338,10 @@ public sealed class BiosGuideStepViewModel
         ExactValue = exactValue;
     }
 
-    /// <summary>The localized human sentence around the exact value.</summary>
+    /// <summary>La phrase traduite autour de la valeur exacte.</summary>
     public string Instruction { get; }
 
-    /// <summary>The exact "menu path → setting → = value" string; null for a pure narrative step
-    /// or a name-only fallback with no path.</summary>
+    /// <summary>La chaîne exacte « chemin menu → réglage → = valeur » ; null pour une étape
+    /// purement descriptive ou un repli qui n'a que le nom, sans chemin.</summary>
     public string? ExactValue { get; }
 }

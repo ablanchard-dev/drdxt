@@ -6,7 +6,7 @@ using Xunit;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 16/09/2026 : le panneau de sante affichait les cles internes (« STABILITE », « GPU DRIVER »,
+/// Le panneau de sante affichait les cles internes (« STABILITE », « GPU DRIVER »,
 /// « POWER »). La cle reste celle du journal, sinon deux photos ne se comparent plus ; seul
 /// l'affichage change.
 /// </summary>
@@ -26,7 +26,7 @@ public sealed class RepairDomaineLibelleTests
         vm.Domaine.Should().Be(attendu);
     }
 
-    // 17/09/2026 : meme regle pour le NOM du constat, cle du journal ecrite sans accents.
+    // Meme regle pour le NOM du constat, cle du journal ecrite sans accents.
     [Theory]
     [InlineData("arrets brutaux", "Arrêts brutaux")]
     [InlineData("incident noyau conserve", "Incident noyau conservé")]

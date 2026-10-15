@@ -9,12 +9,10 @@ namespace DrDxt.Infrastructure.Tests;
 /// <summary>
 /// Ce que le client lit ne porte pas de tiret cadratin.
 ///
-/// Retour du 16/09/2026 : les textes sont justes, mais les « — » a chaque phrase les font lire comme
-/// generes. On ponctue comme on ecrit : deux-points, virgule, point. Ce gate lit les deux langues
+/// Les « — » a chaque phrase font lire un texte juste comme genere. On ponctue comme on ecrit : deux-points, virgule, point. Ce gate lit les deux langues
 /// dans le jeu de ressources lui-meme, il grandit tout seul avec la prochaine cle.
 ///
 /// Seule exception possible, declaree : une valeur qui n'est que le tiret, placeholder de cellule vide.
-/// 27/09/2026 : la derniere (dashboard.value.unavailable) etait un texte que plus rien n'affichait, retiree.
 /// </summary>
 public sealed class ResxSansTiretCadratinTests
 {
@@ -29,7 +27,7 @@ public sealed class ResxSansTiretCadratinTests
         var jeu = manager.GetResourceSet(new CultureInfo(langue), createIfNotExists: true, tryParents: false)
                   ?? throw new InvalidOperationException("jeu de ressources introuvable : " + langue);
 
-        // Temoin de lecture (18/09/2026) : « aucun fautif » est aussi ce que rend un jeu de
+        // Temoin de lecture : « aucun fautif » est aussi ce que rend un jeu de
         // ressources vide. Sans cette ligne, un resx qui ne se charge plus laisserait tout passer.
         jeu.Cast<DictionaryEntry>().Count(e => e.Value is string).Should().BeGreaterThan(100,
             "le crible doit avoir de vrais textes a lire");

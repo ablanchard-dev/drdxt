@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// Revue F-53 : un fichier de réglages illisible (le jeu l'écrit pendant le scan) se dit « non lu » pour ce jeu seul.
+// Un fichier de réglages illisible (le jeu l'écrit pendant le scan) se dit « non lu » pour ce jeu seul.
 public sealed class ReglagesDesJeuxUnrealTests : IDisposable
 {
     private readonly string _fichier = Path.Combine(Path.GetTempPath(), $"drdxt-gus-{Guid.NewGuid():N}.ini");

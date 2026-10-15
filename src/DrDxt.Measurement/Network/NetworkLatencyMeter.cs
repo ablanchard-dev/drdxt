@@ -2,19 +2,19 @@ using DrDxt.Core;
 
 namespace DrDxt.Measurement.Network;
 
-/// <summary>One round-trip attempt against a host. The seam exists so the meter is testable
-/// with zero network access — and so a future probe (UDP to a real game server, TCP connect)
-/// can replace ICMP without touching the aggregation.</summary>
+/// <summary>Une tentative d'aller-retour vers un hôte. La couture existe pour tester le mesureur
+/// sans aucun accès réseau, et pour qu'une future sonde (UDP vers un vrai serveur de jeu,
+/// connexion TCP) remplace l'ICMP sans toucher à l'agrégation.</summary>
 public interface INetworkProbe
 {
-    /// <summary>Sends one probe. Returns a sample whose RoundTripMs is null when nothing came
-    /// back. Never throws: a probe failure is a miss, not an exception.</summary>
+    /// <summary>Envoie une sonde. Rend un relevé dont RoundTripMs est null quand rien n'est revenu.
+    /// Ne lève jamais : un échec de sonde est un raté, pas une exception.</summary>
     Task<NetworkProbeSample> ProbeAsync(string host, TimeSpan timeout, CancellationToken ct);
 }
 
 public interface INetworkLatencyMeter
 {
-    /// <param name="warmupProbes">Sondes envoyees et JETEES avant la fenetre mesuree.
+    /// <param name="warmupProbes">Sondes envoyees et jetees avant la fenetre mesuree.
     /// Voir NetworkLatencyMeter pour pourquoi ce n'est pas une coquetterie.</param>
     Task<Result<NetworkLatencyReport>> MeasureAsync(
         string host, int probeCount, TimeSpan interval, TimeSpan timeout, CancellationToken ct,
@@ -22,30 +22,30 @@ public interface INetworkLatencyMeter
 }
 
 /// <summary>
-/// NS-9 instrument: sends N probes spaced by <c>interval</c> and aggregates them.
+/// Instrument réseau : envoie N sondes espacées de <c>interval</c> et les agrège.
 ///
-/// Spacing is deliberate — back-to-back probes measure a burst, not the connection a game
-/// actually sees, and they can trip ICMP rate limiting (which would then be reported as
-/// "packet loss" that does not exist). One probe per interval, in order, so jitter is
-/// computed on consecutive samples (see NetworkLatencyStatistics).
+/// L'espacement est voulu : des sondes collées mesurent une rafale, pas la connexion que voit
+/// vraiment un jeu, et elles peuvent déclencher la limitation de débit ICMP (rapportée ensuite
+/// comme une « perte de paquets » qui n'existe pas). Une sonde par intervalle, dans l'ordre, pour
+/// que la gigue se calcule sur des relevés consécutifs (voir NetworkLatencyStatistics).
 ///
-/// heuristique : sequential and single-target on purpose. Multi-target (gateway vs ISP vs game
-/// server) is what tells apart "my wifi" from "my ISP" — add it when a lever needs that
-/// distinction, not before; the report shape already carries the target.
+/// heuristique : séquentiel et à cible unique exprès. Plusieurs cibles (passerelle / FAI /
+/// serveur de jeu) distinguent « mon Wi-Fi » de « mon FAI » : à ajouter quand un levier a besoin
+/// de cette distinction, pas avant ; la forme du rapport porte déjà la cible.
 /// </summary>
 public sealed class NetworkLatencyMeter : INetworkLatencyMeter
 {
     /// <summary>
-    /// Sondes de CHAUFFE, envoyees puis jetees. Mesure sur machine reelle (21/08/2026), meme
+    /// Sondes de chauffe, envoyees puis jetees. Mesure sur machine reelle, meme
     /// cible, meme processus, trois fenetres consecutives : la premiere donnait avg 1,45 ms avec
     /// une pointe a 11 ms et jitter 0,95 ; les suivantes, avg 0,6 et jitter 0,21. Meme reseau,
     /// meme seconde. Le surcout venait du demarrage du processus (JIT, resolution DNS, premiere
     /// ouverture du socket ICMP), pas du lien.
     ///
-    /// Sans chauffe, l'instrument attribue au reseau une lenteur qui lui appartient — et c'est
-    /// exactement le genre de chiffre credible et faux que ce produit existe pour ne pas dire.
-    /// (C'est arrive : deux conclusions « le premier saut est plus instable que tout
-    /// l'internet » sur une mesure prise a froid.)
+    /// Sans chauffe, l'instrument attribue au reseau une lenteur qui lui appartient, et c'est
+    /// exactement le genre de chiffre credible et faux que ce produit existe pour ne pas dire
+    /// (par exemple « le premier saut est plus instable que tout l'internet » sur une mesure prise
+    /// a froid).
     /// </summary>
     public const int DefaultWarmupProbes = 3;
 
@@ -64,7 +64,7 @@ public sealed class NetworkLatencyMeter : INetworkLatencyMeter
         if (timeout <= TimeSpan.Zero)
             return Result<NetworkLatencyReport>.Fail(ErrorCodes.MeasureInvalidInput, "Probe timeout must be > 0.");
 
-        // Chauffe : on envoie, on ne garde rien. Un echec ici ne fait pas echouer la mesure —
+        // Chauffe : on envoie, on ne garde rien. Un echec ici ne fait pas echouer la mesure :
         // c'est une preparation, pas une observation.
         for (int w = 0; w < Math.Max(0, warmupProbes) && !ct.IsCancellationRequested; w++)
         {
@@ -85,11 +85,11 @@ public sealed class NetworkLatencyMeter : INetworkLatencyMeter
             }
             catch (OperationCanceledException)
             {
-                break; // cancelled mid-window: keep what we have, report on it honestly.
+                break; // annulé en pleine fenêtre : garder ce qu'on a, en rendre compte honnêtement.
             }
             catch (Exception)
             {
-                // A throwing probe is a MISS, never a crash and never a fabricated reading.
+                // Une sonde qui lève est un raté, jamais un plantage ni un relevé fabriqué.
                 sample = new NetworkProbeSample(null);
             }
             samples.Add(sample);
@@ -101,8 +101,8 @@ public sealed class NetworkLatencyMeter : INetworkLatencyMeter
             }
         }
 
-        // A window where nothing was sent is not a 100%-loss result — it is no measurement at
-        // all. Say so rather than publishing a loss figure we did not observe.
+        // Une fenêtre où rien n'a été envoyé n'est pas une perte de 100 % : ce n'est pas une mesure du
+        // tout. Le dire plutôt que publier un chiffre de perte non observé.
         if (samples.Count == 0)
             return Result<NetworkLatencyReport>.Fail(ErrorCodes.MeasureNoSamples,
                 "No network probe was sent (cancelled before the first probe): nothing measured.");

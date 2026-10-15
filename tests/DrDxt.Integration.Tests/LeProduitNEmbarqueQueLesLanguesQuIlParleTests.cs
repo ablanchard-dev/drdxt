@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Troisieme mesure d'affilee sur le payload construit, apres les
+// Troisieme mesure d'affilee sur le payload construit, apres les
 // `.pdb` et le service livre deux fois. Celle-ci est la plus lourde :
 //
 //   installer\publish\  ->  13 dossiers de langue, **8,88 Mo**

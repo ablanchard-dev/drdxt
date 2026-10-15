@@ -10,7 +10,7 @@ using NSubstitute;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// 11/09/2026 — `DrDxt.ElevatedHelper.exe --uninstall-revert` : Ce que la desinstallation rend.
+// `DrDxt.ElevatedHelper.exe --uninstall-revert` : Ce que la desinstallation rend.
 //
 // Tout en doublure : un manifeste signe par une cle de machine creee dans un dossier temporaire (ACL non
 // appliquee), relu par le vrai chemin verify-only du mode ; le registre, le plan, les services et le pilote
@@ -68,7 +68,7 @@ public sealed class RenduALaDesinstallationTests : IDisposable
     private Task<string> Rendre(ILectureDesCibles lecture, EcritureFactice ecriture)
         => ModeDesinstallation.ExecuterAsync(_racine, appliquerAcl: false, lecture, ecriture, Quand, CancellationToken.None);
 
-    // ── 08/10/2026 : les réglages de la carte gardés par le joueur ──────────────────────────────
+    // ── Les réglages de la carte gardés par le joueur ──────────────────────────────
 
     [Fact]
     public async Task Anti_Lag_AMD_garde_et_encore_pose_est_rendu_change_depuis_il_est_respecte()
@@ -103,7 +103,7 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         ecriture.Recues.Should().Equal(frtcOrigine, vsyncOrigine);
     }
 
-    // Revue n° 11 : même si un manifeste porte une origine de fréquence, la désinstallation ne l'écrit jamais.
+    // Même si un manifeste porte une origine de fréquence, la désinstallation ne l'écrit jamais.
     [Fact]
     public async Task Une_origine_de_frequence_n_est_jamais_ecrite_au_rendu()
     {
@@ -145,7 +145,7 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         rapport.Should().Contain("[Rendu] latency.reflex").And.Contain("lu et vérifié");
     }
 
-    // L-CPU (07/10/2026) : le boost rendu (2) puis gardé en jeu revient coupé (0) à la désinstallation, seulement s'il vaut
+    // Le boost rendu (2) puis gardé en jeu revient coupé (0) à la désinstallation, seulement s'il vaut
     // encore ce que DrDXT a posé.
     [Theory]
     [InlineData("2", true)]
@@ -191,7 +191,7 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         rapport.Should().Contain("[Rendu] latency.reflex.lowLatencyMode").And.Contain("[DejaRendu] latency.reflex");
     }
 
-    // ── les composites : Tout-ou-rien (revue, 11/09/2026) ────────────────────────────────
+    // ── les composites : Tout-ou-rien ────────────────────────────────
     //
     // Un levier composite n'a de sens qu'entier. Si une seule de ses feuilles a ete changee a la main,
     // rendre les autres laisserait la machine dans un melange que personne n'a choisi. On ne touche
@@ -244,13 +244,11 @@ public sealed class RenduALaDesinstallationTests : IDisposable
     [Fact]
     public async Task Un_composite_X3D_inscrit_AVANT_l_origine_complete_n_est_pas_rendu_a_moitie()
     {
-        // La forme d'avant le lot 6e : l'Apply n'inscrivait que la valeur voulue du SERVICE ; CppcEnable et
-        // Game Bar avaient une origine mais aucune valeur posee (`PoseesJson` absent). Un tel manifeste
-        // existe encore sur les machines deja equipees : il ne doit rien rendre a moitie.
-        // Ce test a change de verdict le 11/09/2026. Avant, le service seul etait rendu : on arretait le
-        // service et on laissait CppcEnable et Game Bar tels que DrDXT les avait mis — la moitie d'un levier.
-        // Le tout-ou-rien refuse desormais l'entier, et le dit. Depuis le lot 6e, l'Apply inscrit l'origine
-        // COMPLETE et le composite redevient rendable : `OrigineCompleteDesCompositesTests`.
+        // Un manifeste d'une ancienne version : seule la valeur voulue du SERVICE est inscrite ; CppcEnable et
+        // Game Bar ont une origine mais aucune valeur posee (`PoseesJson` absent). Il en existe encore sur des
+        // machines deja equipees : il ne doit rien rendre a moitie. Rendre le service seul laisserait CppcEnable
+        // et Game Bar tels que DrDXT les a mis, la moitie d'un levier : le tout-ou-rien refuse l'entier, et le
+        // dit. Un manifeste recent inscrit l'origine COMPLETE : `OrigineCompleteDesCompositesTests`.
         await Signer(new DesiredState(new[]
         {
             new AppliedTweak("fixit.x3dVCacheService", "running", Composite(
@@ -300,6 +298,22 @@ public sealed class RenduALaDesinstallationTests : IDisposable
             .And.Contain("CibleDisparue");
     }
 
+    // Une feuille illisible bloque tout le composite (laissé intact, à juste titre) : ce n'est pas « rendu ». Le manifeste
+    // était mis de côté quand même et l'origine perdue ; il reste en place.
+    [Fact]
+    public async Task Un_composite_avec_une_feuille_illisible_garde_le_manifeste()
+    {
+        await Signer(Gardes(new AppliedTweak("latency.vrr_vsync_cap",
+            Composite(Drs(Vsync, VsyncForceOn), Drs(Frl, 141)),
+            Composite(Drs(Frl, 0), Drs(Vsync, VsyncPassive)), Quand)));
+        var lecture = new LectureFactice { ["drs|" + Vsync] = Dec(VsyncForceOn) }; // le plafond ne se relit pas
+
+        var rapport = await Rendre(lecture, new EcritureFactice());
+
+        rapport.Should().Contain("[CompositePartiellementModifie] latency.vrr_vsync_cap").And.Contain("pas mis de côté");
+        Directory.GetFiles(_racine, "desired-state.manifest").Should().ContainSingle();
+    }
+
     // ── le manifeste est mis de cote une fois rendu (lot 6e, 11/09/2026) ──────────────────────
     //
     // Il restait en place : une REINSTALLATION y retrouvait des origines capturees avant la
@@ -324,7 +338,39 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         second.Should().Contain("aucune origine à rendre.");
     }
 
-    // ── la cible doit exister encore (revue, 11/09/2026) ────────────────────────────────
+    // Une origine qui n'a pas pu être rendue (écriture refusée) se perdait : le manifeste était mis de côté quand même, et
+    // une réinstallation ne la retrouvait plus. Il reste en place tant qu'une origine n'est pas rendue.
+    [Fact]
+    public async Task Une_origine_non_rendue_garde_le_manifeste_en_place()
+    {
+        await Signer(Gardes(new AppliedTweak("latency.reflex", Op(Reflex(2)), Op(Reflex(1)), Quand)));
+
+        var rapport = await Rendre(new LectureFactice { [Cle(Reflex(2))] = "2" }, new EcritureFactice { Echoue = _ => true });
+
+        rapport.Should().Contain("pas mis de côté");
+        Directory.GetFiles(_racine, "desired-state.manifest").Should().ContainSingle("l'origine non rendue reste à rendre");
+    }
+
+    // Autre compte élevé : sa ruche HKCU n'est pas celle du joueur. Lue, elle concluait « respecté » ou « disparu » sans
+    // jamais écrire : aucune ligne non rendue, manifeste mis de côté, origine du joueur perdue. Lecture et écriture HKCU
+    // sont refusées ensemble ; la ligne est illisible, le manifeste reste.
+    [Fact]
+    public async Task Un_autre_compte_garde_le_manifeste_meme_si_sa_ruche_differe()
+    {
+        var pose = new SetRegistryValueOp(RegistryHiveKind.CurrentUser, GameBar, "AutoGameModeEnabled", RegistryValueType.DWord, "1");
+        var origine = new SetRegistryValueOp(RegistryHiveKind.CurrentUser, GameBar, "AutoGameModeEnabled", RegistryValueType.DWord, "0");
+        await Signer(Gardes(new AppliedTweak("latency.game_mode", Op(pose), Op(origine), Quand)));
+        var ruicheDeLAdmin = new LectureFactice { [Cle(pose)] = "0" };
+
+        var rapport = await ModeDesinstallation.ExecuterAsync(_racine, appliquerAcl: false,
+            ModeDesinstallation.GarderLaRucheDuJoueur(ruicheDeLAdmin, memeCompte: false),
+            ModeDesinstallation.GarderLaRucheDuJoueur(new EcritureFactice(), memeCompte: false), Quand, CancellationToken.None);
+
+        rapport.Should().Contain("pas mis de côté");
+        Directory.GetFiles(_racine, "desired-state.manifest").Should().ContainSingle();
+    }
+
+    // ── la cible doit exister encore ────────────────────────────────
 
     [Fact]
     public async Task Une_cible_disparue_n_est_pas_reecrite_et_le_rapport_le_nomme()
@@ -357,7 +403,7 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         rapport.Should().Contain("[Illisible] latency.reflex").And.Contain("existence de la cible inconnue");
     }
 
-    // 26/09/2026 : une mutation qui ecrivait quand meme sur une valeur courante illisible restait verte.
+    // Une mutation qui ecrivait quand meme sur une valeur courante illisible restait verte.
     // Ne pas savoir ce qu'il y a, c'est ne pas savoir si quelqu'un l'a change depuis : on n'ecrit pas.
     [Fact]
     public async Task Une_valeur_courante_illisible_ne_fait_rien_ecrire()
@@ -467,7 +513,7 @@ public sealed class RenduALaDesinstallationTests : IDisposable
 
     private sealed class LectureFactice : Dictionary<string, string?>, ILectureDesCibles
     {
-        /// <summary>Les cibles DISPARUES (revue, 11/09/2026) : la cle supprimee, le service
+        /// <summary>Les cibles DISPARUES : la cle supprimee, le service
         /// desinstalle, le plan efface. Par defaut une cible existe — c'est le cas courant.</summary>
         public HashSet<string> Disparues { get; } = new();
 

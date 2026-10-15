@@ -4,24 +4,24 @@ using DrDxt.Reconciler;
 namespace DrDxt.Reconciler.Adapters;
 
 // -----------------------------------------------------------------------
-// SurfaceSettingProbe — ISettingProbe over the descriptor catalog.
+// SurfaceSettingProbe : ISettingProbe sur le catalogue de descripteurs.
 //
-// CanProbe(tweakId) = the catalog has a reconcilable descriptor for the id AND its
-// surface is one this probe can actually read (Registry with a concrete leaf,
-// PowerPlan, or Service). ScheduledTask / Firmware / unmapped → false.
+// CanProbe(tweakId) = le catalogue a un descripteur réconciliable pour l'id et sa surface est
+// lisible par cette sonde (Registry avec une feuille concrète, PowerPlan ou Service).
+// ScheduledTask / Firmware / non associé → false.
 //
-// ReadCurrentValueAsync dispatches by surface and returns the value already
-// CANONICALIZED by the raw reader (same JSON shape the manifest stores as
-// DesiredValueJson), so the reconciler's ordinal desired-vs-actual comparison holds:
-//   * Registry      → read the leaf, serialize per its kind,
-//   * PowerPlan      → the active scheme GUID,
-//   * Service        → the run-state token,
-//   * ScheduledTask  → Fail "not supported in V1" (no scheduled-task op leaf yet),
-//   * unknown / Registry-without-leaf → Fail(ProbeFailed).
+// ReadCurrentValueAsync aiguille selon la surface et rend la valeur déjà canonicalisée par le
+// lecteur brut (même forme JSON que le DesiredValueJson du manifeste), pour que la comparaison
+// ordinale voulu / réel du réconciliateur tienne :
+//   * Registry      → lire la feuille, sérialiser selon son type,
+//   * PowerPlan      → le GUID du plan actif,
+//   * Service        → le jeton d'état de marche,
+//   * ScheduledTask  → Fail « not supported in V1 » (pas encore de feuille d'op de tâche planifiée),
+//   * inconnu / Registry sans feuille → Fail(ProbeFailed).
 //
-// The three raw OS reads sit behind internal seams (IRawRegistryValueReader /
-// IRawPowerPlanReader / IRawServiceStateReader) so this dispatch + the descriptor
-// resolution are fully unit-tested with fakes; the real readers are the untested edge.
+// Les trois lectures OS brutes sont derrière des coutures internes (IRawRegistryValueReader /
+// IRawPowerPlanReader / IRawServiceStateReader) : cet aiguillage et la résolution du descripteur
+// sont entièrement testés avec des faux ; les vrais lecteurs sont le bord non testé.
 // -----------------------------------------------------------------------
 public sealed class SurfaceSettingProbe : ISettingProbe
 {
@@ -30,7 +30,7 @@ public sealed class SurfaceSettingProbe : ISettingProbe
     private readonly IRawPowerPlanReader _power;
     private readonly IRawServiceStateReader _service;
 
-    /// <summary>Production constructor — the real OS readers behind each surface.</summary>
+    /// <summary>Constructeur de production : les vrais lecteurs OS derrière chaque surface.</summary>
     public SurfaceSettingProbe(IReconcilableTweakCatalog catalog)
         : this(catalog,
                new Win32RegistryValueReader(),
@@ -62,7 +62,7 @@ public sealed class SurfaceSettingProbe : ISettingProbe
             ReconcileSurface.Registry => d.Registry is not null,
             ReconcileSurface.PowerPlan => true,
             ReconcileSurface.Service => !string.IsNullOrEmpty(d.ServiceName),
-            _ => false, // ScheduledTask / Firmware — not readable in V1.
+            _ => false, // ScheduledTask / Firmware : non lisibles en V1.
         };
     }
 

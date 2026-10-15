@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 27/09/2026. Vu dans le rapport d'un scan reel : le service de DrDXT s'appelait « DrDXT - reglages au
+// Vu dans le rapport d'un scan reel : le service de DrDXT s'appelait « DrDXT - reglages au
 // demarrage » dans la liste des services de Windows. Relu ensuite dans l'installeur : la case
 // « Reappliquer mes reglages au demarrage de Windows », son groupe « Demarrage : », « Creer un raccourci »
 // et le raccourci « Desinstaller DrDXT » du menu Demarrer. Tout ce que le joueur lit pendant et apres

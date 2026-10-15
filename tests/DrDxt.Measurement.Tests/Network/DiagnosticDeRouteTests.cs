@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Measurement.Tests.Network;
 
-// 03/10/2026 (boucle 2D2P, P3.1) : dire quand un relais payant (ExitLag, GearUP…) peut servir, et surtout quand il ne sert à rien.
+// Dire quand un relais payant (ExitLag, GearUP…) peut servir, et surtout quand il ne sert à rien.
 public sealed class DiagnosticDeRouteTests
 {
     private static MesureDeRoute M(double ping, double perte = 0, double gigue = 1, int n = 120,
@@ -35,7 +35,7 @@ public sealed class DiagnosticDeRouteTests
     public void Une_route_longue_mais_stable_se_juge_par_un_essai_compare() =>
         DiagnosticDeRoute.Juger(M(31)).Should().Be(VerdictRoute.EssaiAComparer);
 
-    // 03/10/2026 (P3.1d) : la box ne compte pas comme dernier routeur ; une route mesurée jusqu'à elle ne dit rien d'Internet.
+    // La box ne compte pas comme dernier routeur ; une route mesurée jusqu'à elle ne dit rien d'Internet.
     [Fact]
     public void La_box_seule_n_est_pas_un_dernier_routeur()
     {

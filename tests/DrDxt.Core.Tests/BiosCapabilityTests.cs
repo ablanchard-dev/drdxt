@@ -13,7 +13,7 @@ namespace DrDxt.Core.Tests;
 ///
 /// Il n'existe volontairement aucun niveau `GenericBiosWrite`. Son absence est le garde-fou :
 /// une future decision ne pourra pas s'y glisser sans ajouter explicitement une valeur a l'enum,
-/// ce qui se verra en revue.
+/// ce qui se verra.
 /// </summary>
 public class BiosCapabilityTests
 {
@@ -24,7 +24,7 @@ public class BiosCapabilityTests
         string? valeurCourante = "3800") =>
         new("MSI B760", "7D91v1C", "memory.profile", valeurCourante, "4000",
             "provider.qualifie", capacite, recuperation, RequiresReboot: true, Validated: validee,
-            // Ajoute le 08/09/2026 : cette fixture construisait des entrees VALIDEES sans
+            // Cette fixture construisait des entrees VALIDEES sans
             // SOURCE, un etat que le type interdit desormais a la construction. Les cinq tests qui
             // sont tombes decrivaient donc une entree impossible — c'est la garde qui a raison, et
             // corriger la fixture est le seul remede acceptable. L'affaiblir aurait rouvert le

@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Application.Parties;
 
 /// <summary>
-/// 06/10/2026 (chantier J1b) : le relevé tourne aussi DrDXT fermé (lancé à l'ouverture de session, sans fenêtre).
+/// Le relevé tourne aussi DrDXT fermé (lancé à l'ouverture de session, sans fenêtre).
 /// L'App ouverte en même temps relèverait la même partie une seconde fois : un seul relevé à la fois, celui qui tient ce
 /// verrou. Un fichier ouvert sans partage, pas un mutex : il se tient à travers les <c>await</c> et Windows le rend à la
 /// mort du processus.

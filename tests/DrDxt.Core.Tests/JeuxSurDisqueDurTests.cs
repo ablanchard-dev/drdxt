@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.Core.Tests;
 
-// 07/10/2026 (chantier D5) : des jeux posés sur un disque dur se chargent bien plus lentement.
+// Des jeux posés sur un disque dur se chargent bien plus lentement.
 public sealed class JeuxSurDisqueDurTests
 {
     [Fact]
@@ -24,7 +24,7 @@ public sealed class JeuxSurDisqueDurTests
         JeuxSurDisqueDur.Juger([]).Statut.Should().Be(RepairStatus.Observed);
     }
 
-    // Revue F-44 : un type non lu ne s'affiche pas « aucun », et seuls les dossiers lus sont dits sur un SSD.
+    // Un type non lu ne s'affiche pas « aucun », et seuls les dossiers lus sont dits sur un SSD.
     [Fact]
     public void Rien_de_lu_ne_s_affiche_pas_aucun_et_le_compte_des_ssd_est_juste()
     {

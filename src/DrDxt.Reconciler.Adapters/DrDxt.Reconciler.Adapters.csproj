@@ -5,10 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- OS-coupled probe boundaries (confined to this project; the pure Reconciler
-         never references these). Registry reads via Microsoft.Win32.Registry; service
-         start/state via System.ServiceProcess.ServiceController; the active power plan
-         via a powrprof.dll P/Invoke. WMI is reused from DrDxt.Detection's IWmiQuery. -->
+    <!-- Frontières des sondes liées à l'OS (confinées à ce projet ; le Reconciler pur
+         ne les référence jamais). Lectures du registre via Microsoft.Win32.Registry ; démarrage /
+         état des services via System.ServiceProcess.ServiceController ; le plan d'alimentation actif
+         via un P/Invoke de powrprof.dll. WMI est repris de l'IWmiQuery de DrDxt.Detection. -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
   </ItemGroup>
@@ -16,13 +16,13 @@
   <ItemGroup>
     <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
     <ProjectReference Include="..\DrDxt.Reconciler\DrDxt.Reconciler.csproj" />
-    <!-- Reuse the existing WMI read seam (IWmiQuery / ManagementWmiQuery). -->
+    <!-- Reprendre la couture de lecture WMI existante (IWmiQuery / ManagementWmiQuery). -->
     <ProjectReference Include="..\DrDxt.Detection\DrDxt.Detection.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Test-only access to the internal raw-read seams (TDD: dispatch + serialization
-         are fully unit-tested with fakes; only the thin real readers are untested edges). -->
+    <!-- Accès réservé aux tests aux coutures internes de lecture brute (TDD : aiguillage + sérialisation
+         entièrement testés avec des faux ; seuls les vrais lecteurs minces sont des bords non testés). -->
     <InternalsVisibleTo Include="DrDxt.Reconciler.Adapters.Tests" />
   </ItemGroup>
 

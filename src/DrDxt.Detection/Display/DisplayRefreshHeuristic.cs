@@ -2,29 +2,28 @@ using DrDxt.Core;
 
 namespace DrDxt.Detection.Display;
 
-// RefreshHeadroom a DEMENAGE dans DrDxt.Core (DetectionContracts) le 02/09/2026 : SettingsState
-// le porte desormais, et un type de l'assembly de detection ne peut pas etre reference depuis
-// Core sans inverser la dependance. Le type est identique, seul son foyer a change.
+// RefreshHeadroom vit dans DrDxt.Core (DetectionContracts) : SettingsState le porte, et un type
+// de l'assembly de detection ne peut pas etre reference depuis Core sans inverser la dependance.
 
 /// <summary>
-/// Decides whether the machine is running a display below the refresh rate its panel
-/// supports — the cheapest free win on a gaming PC, and one no other lever compensates:
-/// a 200 Hz panel driven at 143 Hz throws away 28% of the frames the GPU already renders.
+/// Décide si la machine pilote un écran sous la fréquence que sa dalle supporte : le gain
+/// gratuit le moins cher d'un PC de jeu, qu'aucun autre levier ne compense. Une dalle 200 Hz
+/// pilotée à 143 Hz jette 28 % des images que le GPU rend déjà.
 ///
-/// Two rules make this honest rather than merely plausible:
+/// Deux règles le rendent honnête et pas seulement plausible :
 ///
-/// 1. <b>Same resolution only.</b> The caller must pass the modes available AT the active
-///    resolution. A panel that offers 200 Hz at 1280x1024 and 144 Hz at 1920x1080 is
-///    correctly configured at 144; recommending 200 there would silently trade resolution
-///    for frequency, which is a user decision, not an optimisation.
+/// 1. <b>Même résolution seulement.</b> L'appelant doit passer les modes offerts à la résolution
+///    active. Une dalle qui offre 200 Hz en 1280x1024 et 144 Hz en 1920x1080 est bien réglée à
+///    144 ; conseiller 200 là échangerait en silence de la résolution contre de la fréquence,
+///    une décision de l'utilisateur, pas une optimisation.
 ///
-/// 2. <b>A 1 Hz gap is not an opportunity.</b> Windows reports a 144 Hz mode as 143
-///    (the real timing is ~143.98 and the API truncates). Treating that as headroom would
-///    make DrDXT nag about a display that is already maxed out.
+/// 2. <b>Un écart de 1 Hz n'est pas une occasion.</b> Windows annonce un mode 144 Hz comme 143
+///    (le vrai timing est ~143,98 et l'API tronque). Y voir une marge ferait harceler DrDXT sur
+///    un écran déjà au maximum.
 /// </summary>
 public static class DisplayRefreshHeuristic
 {
-    /// <summary>Gap below which two modes are the same mode. See rule 2 above.</summary>
+    /// <summary>Écart sous lequel deux modes sont le même mode. Voir la règle 2 ci-dessus.</summary>
     public const int ToleranceHz = 1;
 
     public static RefreshHeadroom Evaluate(int currentHz, IReadOnlyList<int>? availableHzAtSameResolution)

@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Display;
 
 /// <summary>
-/// Trou trouve par l'audit du 07/09/2026. La machine de reference tire **55,9 W au repos** pour
+/// La machine de reference tire **55,9 W au repos** pour
 /// une carte qui plafonne a 115 W, avec deux ecrans a **200 et 144 Hz**. Aucun levier du produit ne
 /// regardait la consommation au repos -- alors que c'est le seul effet qui joue 24 h sur 24 au lieu
 /// des heures de jeu.

@@ -9,10 +9,9 @@ namespace DrDxt.Measurement.Tests.PresentMon;
 
 /// <summary>
 /// « Service PresentMon indisponible » ne dit rien de ce qu'il faut réparer.
-/// Constaté sur la machine de dev le 27/08/2026 : le service tournait, le tube était
-/// joignable, et la capture échouait quand même — le vrai code (PM_STATUS_PIPE_ERROR)
-/// était écrasé par un booléen. Deux causes très différentes (DLL absente / service
-/// concurrent d'une autre version) rendaient exactement le même message.
+/// Le service peut tourner, le tube être joignable, et la capture échouer quand même : le vrai
+/// code (PM_STATUS_PIPE_ERROR) ne doit pas être écrasé par un booléen. Deux causes très différentes
+/// (DLL absente / service concurrent d'une autre version) rendraient sinon le même message.
 /// Ces tests exigent que la cause survive jusqu'à l'utilisateur.
 /// </summary>
 public class PmonUnavailableDetailTests

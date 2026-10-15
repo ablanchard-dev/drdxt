@@ -3,18 +3,18 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// HandshakeClientCore — the App (unelevated) end of the §9.13 handshake.
+// HandshakeClientCore : le bout App (non élevé) du handshake de clé de session.
 //
-// Operates on a raw duplex Stream so it is unit-testable with an in-memory pair.
-// One round trip:
-//   1. send HandshakeHello (protocol marker; no secret)
-//   2. read HandshakeResult
-//   3. accept only a well-formed Ok=true result carrying a 32-byte key; anything
-//      else (Ok=false, missing/short/garbage key, truncated reply) -> fail-clean,
-//      NO key.
+// Travaille sur un Stream duplex brut : il se teste avec une paire de flux en mémoire.
+// Un aller-retour :
+//   1. envoyer HandshakeHello (marqueur de protocole ; aucun secret)
+//   2. lire HandshakeResult
+//   3. n'accepter qu'un résultat Ok=true bien formé qui porte une clé de 32 octets ; tout le
+//      reste (Ok=false, clé absente, courte ou déchet, réponse tronquée) -> échec propre,
+//      aucune clé.
 //
-// The returned key seeds the existing TypedNamedPipeElevatedClient — the proven
-// typed/HMAC message protocol is unchanged; only the key's provenance is.
+// La clé rendue alimente le TypedNamedPipeElevatedClient existant : le protocole de messages
+// typé / HMAC éprouvé ne change pas ; seule la provenance de la clé change.
 // -----------------------------------------------------------------------
 public static class HandshakeClientCore
 {
@@ -23,15 +23,15 @@ public static class HandshakeClientCore
         ArgumentNullException.ThrowIfNull(stream);
         try
         {
-            // 1. Greet the server with the protocol marker only.
+            // 1. Saluer le serveur avec le seul marqueur de protocole.
             await WireCodec.WriteMessageAsync(stream, new HandshakeHello(), ct).ConfigureAwait(false);
 
-            // 2. Read the outcome (bounded; null on EOF/garbage/oversize).
+            // 2. Lire l'issue (borné ; null sur EOF, déchet ou taille démesurée).
             var result = await WireCodec.ReadMessageAsync<HandshakeResult>(stream, ct).ConfigureAwait(false);
             if (result is null)
                 return Fail("No handshake response from the elevated helper.");
 
-            // 3. Fail-closed unless the server explicitly authorized us with a key.
+            // 3. Fail-closed sauf si le serveur nous a explicitement autorisés avec une clé.
             if (!result.Ok)
                 return Fail("Elevated helper refused the handshake (caller not authorized).");
             if (string.IsNullOrEmpty(result.SessionKeyBase64))

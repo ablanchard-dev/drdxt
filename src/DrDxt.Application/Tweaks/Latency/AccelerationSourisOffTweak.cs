@@ -4,8 +4,9 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 /// <summary>
-/// MOUSE1 (09/10/2026, le mainteneur : « gain de latence, de fluidité, d'input lag, la totale ») : « Améliorer la précision
-/// du pointeur » de Windows est une accélération : le curseur parcourt plus de pixels quand la souris va vite. En jeu, la
+/// Coupe l'accélération du pointeur de Windows, proposé quand elle est lue active.
+///
+/// « Améliorer la précision du pointeur » de Windows est une accélération : le curseur parcourt plus de pixels quand la souris va vite. En jeu, la
 /// visée n'a plus la même échelle d'un geste à l'autre. Coupée, le déplacement redevient proportionnel au geste. Ce n'est
 /// pas un gain de latence ni d'images : de la justesse, et le texte le dit.
 ///

@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 (boucle « vivant et prouvé », B1) : pendant le scan, le réseau tournait en boucle, décoratif. Chaque pôle
+// Pendant le scan, le réseau tournait en boucle, décoratif. Chaque pôle
 // s'allume maintenant quand son domaine a réellement été lu : processeur, mémoire, carte, puis stockage et Windows.
 public sealed class PolesSuiventLaLectureTests
 {
@@ -29,8 +29,7 @@ public sealed class PolesSuiventLaLectureTests
           .Returns(Result<BenchmarkResult>.Fail(ErrorCodes.PidInvalid, "aucun jeu"));
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(hw, st, new List<Finding>(), 68, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(hw, st, new List<Finding>(), null)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
         var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, sd, k => k);
@@ -39,7 +38,7 @@ public sealed class PolesSuiventLaLectureTests
 
         await vm.ScanCommand.ExecuteAsync(null);
 
-        // 10/10/2026 : huit satellites. Processeur (bit 0), mémoire (bit 3), carte (bit 1), puis le reste du cercle.
+        // Huit satellites. Processeur (bit 0), mémoire (bit 3), carte (bit 1), puis le reste du cercle.
         vus.Should().Equal(0b00000001, 0b00001001, 0b00001011, 0b11111111);
     }
 }

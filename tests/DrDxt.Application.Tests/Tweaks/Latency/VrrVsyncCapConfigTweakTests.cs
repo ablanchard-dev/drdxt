@@ -7,13 +7,13 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// M2 Phase D3 — VrrVsyncCapConfigTweak.
+// VrrVsyncCapConfigTweak.
 //
-// Configures the Blur-Busters low-latency combo at the DRIVER level: Vsync ON +
-// a frame cap ~3 fps under the refresh, for a VRR/G-Sync/FreeSync display. NO
-// blind cap — AppliesTo is false when no VRR display is detected (IDisplayInfo).
-// Captures the original Vsync + frame-limit as a composite inverse snapshot;
-// applies via IElevatedClient typed DRS ops; fails clean if the SDK is missing.
+// Configure le combo de latence basse Blur Busters au niveau du pilote : Vsync activée +
+// un plafond d'images ~3 fps sous le rafraîchissement, pour un écran VRR/G-Sync/FreeSync.
+// Pas de plafond aveugle : AppliesTo est faux sans écran VRR détecté (IDisplayInfo).
+// Capture Vsync et limite d'images d'origine en instantané inverse composite ;
+// applique via des ops DRS typées d'IElevatedClient ; échoue proprement sans SDK.
 // -----------------------------------------------------------------------
 public sealed class VrrVsyncCapConfigTweakTests
 {
@@ -38,8 +38,8 @@ public sealed class VrrVsyncCapConfigTweakTests
         _display.GetPrimaryGameDisplay()
             .Returns(Result<DisplayInfo>.Ok(new DisplayInfo(IsPrimaryGameDisplay: true, SupportsVrr: vrr, RefreshHz: refresh)));
         _nvApi.IsAvailable.Returns(true);
-        _nvApi.GetVsyncMode().Returns(Result<uint>.Ok(0));      // vsync off originally
-        _nvApi.GetFrameRateLimit().Returns(Result<uint>.Ok(0)); // no cap originally
+        _nvApi.GetVsyncMode().Returns(Result<uint>.Ok(0x60925292u));      // vsync désactivée à l'origine
+        _nvApi.GetFrameRateLimit().Returns(Result<uint>.Ok(0)); // pas de plafond à l'origine
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
         return new VrrVsyncCapConfigTweak(_nvApi, _display, _elevated);
@@ -56,9 +56,9 @@ public sealed class VrrVsyncCapConfigTweakTests
         t.SummaryKey.Should().NotContain("fps");
     }
 
-    // --- Gating: VRR display required, else skip (no blind cap). ---
+    // --- Filtre : écran VRR requis, sinon retrait (pas de plafond aveugle). ---
 
-    // LAP1 (08/10/2026) : réglages du pilote, réversibles ; ils marchent aussi sur une carte de portable.
+    // Réglages du pilote, réversibles ; ils marchent aussi sur une carte de portable.
     [Fact]
     public void LAP1_propose_sur_un_portable_NVIDIA_avec_ecran_VRR() =>
         Build(vrr: true).AppliesTo(DesktopNvidia() with
@@ -94,25 +94,25 @@ public sealed class VrrVsyncCapConfigTweakTests
     [Fact]
     public async Task Apply_configures_vsync_and_cap_three_under_refresh()
     {
-        var t = Build(refresh: 144); // cap should be 138 (PlafondVrr : Reflex, 09/10/2026)
+        var t = Build(refresh: 144); // le plafond doit valoir 138 (PlafondVrr : Reflex)
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // Vsync ON via DRS and frame cap = PlafondVrr.Cible(144) = 138 via DRS.
+        // Vsync activée via DRS et plafond = PlafondVrr.Cible(144) = 138 via DRS.
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyNvApiDrsSettingOp>(o => o.Value == 138),
             Arg.Any<CancellationToken>());
-        // Two settings applied (vsync + cap).
+        // Deux réglages appliqués (vsync + plafond).
         await _elevated.Received(2).ExecuteAsync(Arg.Any<ApplyNvApiDrsSettingOp>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Apply_clamps_cap_to_frl_documented_max_1023()
     {
-        // FRL_FPS is documented (NVIDIA NvApiDriverSettings.h) as a 0-1023 range. A bogus
-        // refresh from EDID/driver must never push an out-of-range value to the driver.
-        var t = Build(refresh: 2000); // a bogus refresh: the target must stay inside the FRL range (PlafondVrr gives 1000)
+        // FRL_FPS est documenté (NvApiDriverSettings.h de NVIDIA) sur la plage 0-1023. Un
+        // rafraîchissement bidon venu de l'EDID ou du pilote ne doit jamais pousser une valeur hors plage.
+        var t = Build(refresh: 2000); // rafraîchissement bidon : la cible doit rester dans la plage FRL (PlafondVrr donne 1000)
 
         var r = await t.ApplyAsync();
 
@@ -139,7 +139,7 @@ public sealed class VrrVsyncCapConfigTweakTests
     [Fact]
     public async Task Apply_skips_not_applicable_when_no_vrr_at_apply()
     {
-        // Defensive: never apply a blind cap on a non-VRR panel even if called directly.
+        // Défensif : jamais de plafond aveugle sur un écran sans VRR, même appelé directement.
         var t = Build(vrr: false);
 
         var r = await t.ApplyAsync();
@@ -190,15 +190,15 @@ public sealed class VrrVsyncCapConfigTweakTests
     [Fact]
     public async Task Apply_rolls_back_vsync_when_the_frame_cap_op_fails()
     {
-        // §6.2 "rien ne reste pendu": op (1) Vsync ON succeeds, op (2) frame cap
-        // FAILS → the tweak must replay the inverse of op (1) (restore Vsync to the
-        // captured original 0) and return Fail, leaving NO half-applied state.
-        var t = Build(refresh: 144); // cap target = 138
-        _nvApi.GetVsyncMode().Returns(Result<uint>.Ok(0));      // original vsync = 0
-        _nvApi.GetFrameRateLimit().Returns(Result<uint>.Ok(0)); // original cap = 0
+        // « rien ne reste pendu » : l'op (1) Vsync activée réussit, l'op (2) plafond d'images
+        // échoue → le levier doit rejouer l'inverse de l'op (1) (rendre Vsync à l'origine
+        // capturée 0) et rendre Fail, sans laisser d'état à moitié appliqué.
+        var t = Build(refresh: 144); // plafond cible = 138
+        _nvApi.GetVsyncMode().Returns(Result<uint>.Ok(0x60925292u));      // vsync d'origine = 0
+        _nvApi.GetFrameRateLimit().Returns(Result<uint>.Ok(0)); // plafond d'origine = 0
 
-        // Vsync ON (VSYNCMODE_FORCEON) succeeds; the frame cap (value 138) fails.
-        // Corrected DRS ids: VSYNCMODE = 0x00A879CF, FRL_FPS = 0x10835002.
+        // Vsync activée (VSYNCMODE_FORCEON) réussit ; le plafond d'images (valeur 138) échoue.
+        // Identifiants DRS corrigés : VSYNCMODE = 0x00A879CF, FRL_FPS = 0x10835002.
         _elevated.ExecuteAsync(
                 Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x00A879CFu && o.Value == 0x47814940u),
                 Arg.Any<CancellationToken>())
@@ -207,30 +207,30 @@ public sealed class VrrVsyncCapConfigTweakTests
                 Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x10835002u && o.Value == 138u),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Fail(ErrorCodes.HelperOpFailed, "cap write failed")));
-        // The inverse rollback (Vsync back to 0) is allowed to succeed.
+        // Le rollback inverse (Vsync à 0) a le droit de réussir.
         _elevated.ExecuteAsync(
-                Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x00A879CFu && o.Value == 0u),
+                Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x00A879CFu && o.Value == 0x60925292u),
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
 
         var r = await t.ApplyAsync();
 
-        // Returns Fail (the original failure code), not Ok.
+        // Rend Fail (le code d'échec d'origine), pas Ok.
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
-        // The already-applied op (1)'s inverse WAS replayed: Vsync restored to 0.
+        // L'inverse de l'op (1) déjà appliquée a bien été rejoué : Vsync rendue à 0.
         await _elevated.Received(1).ExecuteAsync(
-            Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x00A879CFu && o.Value == 0u),
+            Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == 0x00A879CFu && o.Value == 0x60925292u),
             Arg.Any<CancellationToken>());
     }
 
-    // --- Revert: composite snapshot restores both original settings. ---
+    // --- Retour arrière : l'instantané composite rend les deux réglages d'origine. ---
 
     [Fact]
     public async Task Apply_then_revert_restores_both_original_settings()
     {
         var t = Build(refresh: 144);
-        _nvApi.GetVsyncMode().Returns(Result<uint>.Ok(0));
+        _nvApi.GetVsyncMode().Returns(Result<uint>.Ok(0x60925292u));
         _nvApi.GetFrameRateLimit().Returns(Result<uint>.Ok(0));
 
         var apply = await t.ApplyAsync();
@@ -240,7 +240,7 @@ public sealed class VrrVsyncCapConfigTweakTests
         var revert = await t.RevertAsync(apply.Value!);
 
         revert.IsOk.Should().BeTrue();
-        // Both original values (0 vsync, 0 cap) replayed via the helper.
+        // Les deux valeurs d'origine (vsync 0, plafond 0) rejouées via le helper.
         await _elevated.Received(2).ExecuteAsync(Arg.Any<ApplyNvApiDrsSettingOp>(), Arg.Any<CancellationToken>());
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyNvApiDrsSettingOp>(o => o.Value == 0), Arg.Any<CancellationToken>());
@@ -264,6 +264,7 @@ public sealed class VrrVsyncCapConfigTweakTests
     // le bureau, pour une mesure faite sur un seul. PreferMaxPerf ecrivait deja par jeu ; ce levier non.
 
     private const uint VsyncId = 0x00A879CFu;
+    private const uint VsyncPassive = 0x60925292u; // le défaut du pilote (NvApiDriverSettings.h)
     private const uint FrlId = 0x10835002u;
     private const string Jeu = @"C:\Games\Call of Duty\cod.exe";
 
@@ -282,12 +283,12 @@ public sealed class VrrVsyncCapConfigTweakTests
         public Result<(uint Value, DrsOriginState Origin)> GetDrsForApplication(uint settingId, string applicationPath)
             => lisibleAuJeu
                 ? Result<(uint, DrsOriginState)>.Ok(
-                    (7u, new DrsOriginState(origine, origine == DrsValueOrigin.SetByUser, "")))
+                    (settingId == VsyncId ? VsyncPassive : 7u, new DrsOriginState(origine, origine == DrsValueOrigin.SetByUser, "")))
                 : Result<(uint, DrsOriginState)>.Fail(echec, "pas lu au jeu");
         public Result<uint> GetPreferredPstate() => Result<uint>.Ok(9);
         public Result<uint> GetLowLatencyMode() => Result<uint>.Ok(9);
         public Result<uint> GetMaxPreRenderedFrames() => Result<uint>.Ok(9);
-        public Result<uint> GetVsyncMode() => Result<uint>.Ok(9);
+        public Result<uint> GetVsyncMode() => Result<uint>.Ok(0x60925292u);
         public Result<uint> GetFrameRateLimit() => Result<uint>.Ok(9);
         public Result<DrsOriginState> GetFrameRateLimitOrigin()
             => Result<DrsOriginState>.Fail(ErrorCodes.TweakSdkUnavailable, "non lu");
@@ -329,7 +330,7 @@ public sealed class VrrVsyncCapConfigTweakTests
 
         inverses.Should().Equal(
             new DeleteNvApiDrsSettingOp(FrlId, Jeu, origine, 7u),
-            new DeleteNvApiDrsSettingOp(VsyncId, Jeu, origine, 7u));
+            new DeleteNvApiDrsSettingOp(VsyncId, Jeu, origine, VsyncPassive));
     }
 
     [Fact]
@@ -339,7 +340,7 @@ public sealed class VrrVsyncCapConfigTweakTests
 
         inverses.Should().Equal(
             new ApplyNvApiDrsSettingOp(FrlId, 7u, Jeu),
-            new ApplyNvApiDrsSettingOp(VsyncId, 7u, Jeu));
+            new ApplyNvApiDrsSettingOp(VsyncId, VsyncPassive, Jeu));
     }
 
     [Fact]
@@ -363,7 +364,7 @@ public sealed class VrrVsyncCapConfigTweakTests
         public Result<uint> GetPreferredPstate() => Result<uint>.Ok(9);
         public Result<uint> GetLowLatencyMode() => Result<uint>.Ok(9);
         public Result<uint> GetMaxPreRenderedFrames() => Result<uint>.Ok(9);
-        public Result<uint> GetVsyncMode() => Result<uint>.Ok(9);
+        public Result<uint> GetVsyncMode() => Result<uint>.Ok(0x60925292u);
         public Result<uint> GetFrameRateLimit() => Result<uint>.Ok(9);
         public Result<DrsOriginState> GetFrameRateLimitOrigin()
             => Result<DrsOriginState>.Fail(ErrorCodes.TweakSdkUnavailable, "non lu");
@@ -384,7 +385,7 @@ public sealed class VrrVsyncCapConfigTweakTests
     [Fact]
     public async Task Un_jeu_connu_sans_profil_pilote_n_ecrit_RIEN_meme_au_global()
     {
-        // 24/09/2026 : ce test figeait l'inverse (repli global). Un gain mesuré sur un jeu ne
+        // Ce test figeait l'inverse (repli global). Un gain mesuré sur un jeu ne
         // s'écrit plus pour tout le PC : sur la machine de référence, le global portait déjà
         // « performances maximales », carte au maximum hors jeu toute la journée.
         var (r, _) = await AppliquerAuJeu(DrsValueOrigin.SetByUser, lisibleAuJeu: false);

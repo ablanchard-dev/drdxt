@@ -5,14 +5,14 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Gpu.Nvapi;
 
 /// <summary>
-/// The driver already answers "who put this value here?" on every read — NVDRS_SETTING carries
-/// settingLocation and isCurrentPredefined — and the product was throwing both away, keeping only
-/// the DWORD. That is how a machine with 10218 driver-shipped profiles becomes unreadable: every
-/// value looks equally like a user choice.
+/// Le pilote répond déjà « qui a posé cette valeur ? » à chaque lecture (NVDRS_SETTING porte
+/// settingLocation et isCurrentPredefined) et le produit jetait les deux, ne gardant que le
+/// DWORD. C'est ainsi qu'une machine à 10218 profils livrés par le pilote devient illisible : chaque
+/// valeur ressemble autant à un choix du joueur.
 ///
-/// Semantics pinned here come from NVIDIA's Driver Settings Programming Guide (PG-12072-001 v01):
-/// p.2 "predefined settings" (shipped with the driver) vs "user settings" (edited after install),
-/// and p.9-10 "settings that are not from the Current Profile are inherited from the Base or
+/// La sémantique figée ici vient du Driver Settings Programming Guide de NVIDIA (PG-12072-001 v01) :
+/// p.2 "predefined settings" (livrés avec le pilote) et "user settings" (édités après installation),
+/// et p.9-10 "settings that are not from the Current Profile are inherited from the Base or
 /// Global profiles. Skip them."
 /// </summary>
 public class DrsSettingOriginTests
@@ -47,9 +47,9 @@ public class DrsSettingOriginTests
     [Fact]
     public void Inheritance_wins_over_the_predefined_flag()
     {
-        // TRAP: isCurrentPredefined==0 alone reads as "the user set this". It does not when the
-        // value is inherited — the user set it SOMEWHERE ELSE, not on this profile. Reporting
-        // "set by user here" would send someone editing a profile that owns nothing.
+        // Piège : isCurrentPredefined==0 seul se lit « le joueur l'a posé ». Faux quand la valeur
+        // est héritée : le joueur l'a posée ailleurs, pas sur ce profil. Annoncer « posé par le joueur
+        // ici » enverrait quelqu'un éditer un profil qui ne possède rien.
         var s = DrsSettingOrigin.Describe(GlobalProfile, isCurrentPredefined: 0, isPredefinedValid: 0);
 
         s.Origin.Should().NotBe(DrsValueOrigin.SetByUser);

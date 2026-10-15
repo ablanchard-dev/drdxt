@@ -2,7 +2,7 @@ using FluentAssertions;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-/// <summary>SEC1 (08/10/2026) : un helper élevé lancé à la demande ne vit pas pour toujours. Il s'arrête après un délai sans
+/// <summary>Un helper élevé lancé à la demande ne vit pas pour toujours. Il s'arrête après un délai sans
 /// connexion, jamais tant qu'un bail est actif (il rendrait une valeur que l'App garde).</summary>
 public sealed class ArretSurInactiviteTests
 {
@@ -30,7 +30,7 @@ public sealed class ArretSurInactiviteTests
         g.DoitSArreter(bauxActifs: 0).Should().BeFalse();
     }
 
-    // SEC1, autocontrôle du 08/10 : « à la fermeture de l'App » n'était pas tenu (le helper attendait 15 minutes). Le dernier
+    // « à la fermeture de l'App » n'était pas tenu (le helper attendait 15 minutes). Le dernier
     // client authentifié parti, et aucun bail, il s'arrête tout de suite.
     [Fact]
     public void L_App_fermee_il_s_arrete_sans_attendre()

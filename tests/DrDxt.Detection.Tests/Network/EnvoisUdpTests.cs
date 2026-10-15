@@ -4,8 +4,8 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Network;
 
-// 03/10/2026 (boucle 2D2P, P3.1b) : trouver le serveur d'une partie en UDP. La charge de test reprend l'envoi relevé sur
-// la machine le 03/10 : PID 3208, 30 octets, 192.168.1.112:55088 vers 192.168.1.254:53.
+// Trouver le serveur d'une partie en UDP. La charge de test reprend un envoi
+// relevé sur la machine de référence le 03/10 : PID 3208, 30 octets, 192.168.1.112:55088 vers 192.168.1.254:53.
 public sealed class EnvoisUdpTests
 {
     private static byte[] Charge(int pid, int octets, byte[] daddr, ushort dport) =>

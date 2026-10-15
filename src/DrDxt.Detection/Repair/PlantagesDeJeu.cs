@@ -7,7 +7,7 @@ using Microsoft.Win32;
 namespace DrDxt.Detection.Repair;
 
 /// <summary>
-/// 07/10/2026 (D2, enquête #21) : les plantages et blocages des jeux, lus dans le journal Application, sans droits.
+/// Les plantages et blocages des jeux, lus dans le journal Application, sans droits.
 ///
 /// Sources : Microsoft Learn, « The application or service crashing behavior troubleshooting guidance » (maj 12/02/2026) :
 /// l'événement 1000 « Application Error » est le plantage lui-même, avec le module fautif et le code d'exception ; ntdll,
@@ -27,8 +27,8 @@ public static class PlantagesDeJeu
 {
     /// <summary>Un plantage (1000) ou un blocage (1002). <paramref name="Paquet"/> : le dossier du module fautif quand il
     /// est dans le magasin des pilotes, son nom seul.</summary>
-    /// <param name="Chemin">08/10/2026 : le chemin complet du programme (1000 : propriété 10 ; 1002 : propriété 5, relevés sur
-    /// le PC du mainteneur).</param>
+    /// <param name="Chemin">Le chemin complet du programme (1000 : propriété 10 ; 1002 : propriété 5, relevés sur
+    /// la machine de référence).</param>
     public sealed record Evenement(DateTimeOffset Quand, string Exe, bool Blocage, string? Module = null, string? Code = null,
         string? Paquet = null, string? Chemin = null);
 
@@ -48,13 +48,7 @@ public static class PlantagesDeJeu
         { "d3d9.dll", "d3d11.dll", "d3d12.dll", "d3d12core.dll", "dxgi.dll" };
 
     // [MS-ERREF] 2.3.1 (valeurs NTSTATUS) et la page de Microsoft Learn citée plus haut.
-    private static readonly Dictionary<string, string> Codes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["c0000005"] = "accès mémoire interdit (STATUS_ACCESS_VIOLATION)",
-        ["c0000022"] = "accès refusé (STATUS_ACCESS_DENIED)",
-        ["c0000374"] = "tas mémoire corrompu (STATUS_HEAP_CORRUPTION)",
-        ["c0000409"] = "dépassement de tampon détecté (STATUS_STACK_BUFFER_OVERRUN)",
-    };
+    private static readonly HashSet<string> Codes = new(StringComparer.OrdinalIgnoreCase) { "c0000005", "c0000022", "c0000374", "c0000409" };
 
     /// <summary>Le vrai, en lecture seule : le journal, les parties relevées et le jeu retenu pour le ping, la carte.</summary>
     public static IEnumerable<RepairFinding> DuPc()
@@ -63,7 +57,7 @@ public static class PlantagesDeJeu
         var jeux = PartiesMemorisees.ParDefaut().Lire().Select(p => p.Jeu)
             .Append(DrDxt.Application.Network.PlafondEnvoiMemorise.ParDefaut().Lire()?.Exe)
             .Where(NomExeDeJeu.EstUnJeuPossible).Select(e => e!).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        // 08/10/2026 (D2) : un jeu jamais relevé compte aussi quand son programme est dans un dossier de jeux installé
+        // Un jeu jamais relevé compte aussi quand son programme est dans un dossier de jeux installé
         // (Steam, Epic, Battle.net, Riot, EA app, Ubisoft Connect).
         var dossiers = DrDxt.Detection.Hardware.DossiersDeJeux.Lire()?.Select(d => d.Chemin).ToList();
         return Juger(Lire(maintenant - Fenetre), jeux, LirePaquetsGraphiques(),
@@ -139,28 +133,26 @@ public static class PlantagesDeJeu
     internal static string Designation(Evenement e, IReadOnlyList<PaquetGraphique> paquets)
     {
         if (e.Module is not { Length: > 0 } m || m.Equals("unknown", StringComparison.OrdinalIgnoreCase))
-            return "Windows n'a pas nommé le module fautif";
+            return Docteur.T("PJ.ModuleNonNomme");
         if (m.Equals(e.Exe, StringComparison.OrdinalIgnoreCase))
-            return "le jeu lui-même : l'erreur est dans son propre code, c'est à son éditeur de la corriger";
+            return Docteur.T("PJ.LeJeu");
         if (e.Paquet is { } paquet)
         {
             var carte = paquets.FirstOrDefault(p => Prefixe(paquet) is { } x && x.Equals(p.Prefixe, StringComparison.OrdinalIgnoreCase));
             return carte is not null
-                ? $"le pilote graphique{(carte.Fabricant.Length > 0 ? " " + carte.Fabricant : "")} (un fichier du paquet de pilote de la carte, "
-                  + "dans la version installée à ce moment-là)"
-                // Revue F-35 : sans liste des cartes lue, « pas une carte graphique » serait un négatif affirmé sur rien.
+                ? Docteur.T("PJ.PiloteGraphique", carte.Fabricant.Length > 0 ? " " + carte.Fabricant : "")
+                // Sans liste des cartes lue, « pas une carte graphique » serait un négatif affirmé sur rien.
                 : paquets.Count == 0
-                    ? "un fichier de pilote du magasin de Windows ; les pilotes des cartes graphiques n'ont pas pu être lus, la carte n'est donc pas vérifiée"
-                    : "un fichier de pilote du magasin de Windows, qui n'est pas celui d'une carte graphique déclarée";
+                    ? Docteur.T("PJ.MagasinNonVerifie")
+                    : Docteur.T("PJ.MagasinAutre");
         }
-        if (DirectX.Contains(m)) return "DirectX, le moteur graphique de Windows";
-        if (Victimes.Contains(m))
-            return "un module de Windows que Microsoft dit souvent victime d'une corruption faite par un autre module, rarement la cause";
-        return "un module que DrDXT ne classe pas : rien n'est affirmé sur ce qu'il est";
+        if (DirectX.Contains(m)) return Docteur.T("PJ.DirectX");
+        if (Victimes.Contains(m)) return Docteur.T("PJ.Victime");
+        return Docteur.T("PJ.NonClasse");
     }
 
     /// <summary>Pur : les événements lus, les jeux connus, les paquets graphiques, les changements datés et l'heure.</summary>
-    /// <param name="dossiersDeJeux">08/10/2026 : les dossiers des jeux installés ; un programme qui y vit est un jeu, même
+    /// <param name="dossiersDeJeux">Les dossiers des jeux installés ; un programme qui y vit est un jeu, même
     /// jamais relevé en partie.</param>
     public static IEnumerable<RepairFinding> Juger(IReadOnlyList<Evenement>? lus, IReadOnlySet<string> jeux,
         IReadOnlyList<PaquetGraphique> paquets, IReadOnlyList<Changement> changements, DateTimeOffset maintenant,
@@ -168,7 +160,7 @@ public static class PlantagesDeJeu
     {
         var dossiers = (dossiersDeJeux ?? []).Where(d => d.Length > 3)
             .Select(d => d.TrimEnd('\\') + "\\").ToList();
-        // Revue n° 11 : une racine de bibliothèque Steam contient Steam lui-même (steamwebhelper.exe plante souvent) :
+        // Une racine de bibliothèque Steam contient Steam lui-même (steamwebhelper.exe plante souvent) :
         // le programme doit aussi pouvoir être un jeu (NomExeDeJeu écarte lanceurs, navigateurs intégrés, outils).
         bool DansUnDossierDeJeux(Evenement e) => e.Chemin is { } c
             && NomExeDeJeu.EstUnJeuPossible(e.Exe)
@@ -178,14 +170,13 @@ public static class PlantagesDeJeu
         if (lus is null)
         {
             yield return new RepairFinding("STABILITE", Nom, null, null, RepairStatus.Unknown,
-                "le journal Application n'a pas pu être lu : « non lu » n'est pas « aucun plantage ».");
+                Docteur.T("PJ.NonLu"));
             yield break;
         }
         if (jeux.Count == 0 && dossiers.Count == 0)
         {
-            yield return new RepairFinding("STABILITE", Nom, "aucun jeu connu", null, RepairStatus.Observed,
-                "aucune partie relevée : DrDXT ne sait pas encore quels programmes sont tes jeux, il ne compte donc aucun "
-                + "plantage de jeu. Ce n'est pas « aucun plantage ».");
+            yield return new RepairFinding("STABILITE", Nom, Docteur.T("PJ.AucunJeuConnu"), null, RepairStatus.Observed,
+                Docteur.T("PJ.AucunJeuExplication"));
             yield break;
         }
 
@@ -194,35 +185,34 @@ public static class PlantagesDeJeu
             .OrderByDescending(e => e.Quand).ToList();
         var noms = jeux.Count > 0
             ? string.Join(", ", jeux.Order(StringComparer.OrdinalIgnoreCase))
-                + (dossiers.Count > 0 ? $" et des {dossiers.Count} dossier(s) de jeux installés" : "")
-            : $"des programmes des {dossiers.Count} dossier(s) de jeux installés";
+                + (dossiers.Count > 0 ? Docteur.T("PJ.EtDossiers", dossiers.Count) : "")
+            : Docteur.T("PJ.DesDossiers", dossiers.Count);
         if (miens.Count == 0)
         {
-            yield return new RepairFinding("STABILITE", Nom, $"aucun en {jours} jours", "aucun", RepairStatus.ExpectedDefault,
-                $"le journal Application ne note aucun plantage ni blocage de {noms} sur {jours} jours.");
+            yield return new RepairFinding("STABILITE", Nom, Docteur.T("PJ.AucunEn", jours), Docteur.T("PJ.Aucun"), RepairStatus.ExpectedDefault,
+                Docteur.T("PJ.AucunExplication", noms, jours));
             yield break;
         }
 
-        static string D(DateTimeOffset d) => d.ToLocalTime().ToString("dd/MM", CultureInfo.InvariantCulture);
+        static string D(DateTimeOffset d) => d.ToLocalTime().ToString(Docteur.T("PJ.FormatJour"), CultureInfo.InvariantCulture);
         var plantages = miens.Where(e => !e.Blocage).ToList();
         var blocages = miens.Count - plantages.Count;
         var morceaux = new List<string>
         {
-            string.Join(" ; ", miens.GroupBy(e => e.Exe, StringComparer.OrdinalIgnoreCase).Select(g =>
-                $"{g.Key} : {g.Count(e => !e.Blocage)} plantage(s), {g.Count(e => e.Blocage)} blocage(s), le dernier le {D(g.First().Quand)}")) + ".",
+            string.Join(Docteur.T("PJ.Separateur"), miens.GroupBy(e => e.Exe, StringComparer.OrdinalIgnoreCase).Select(g =>
+                Docteur.T("PJ.ParJeu", g.Key, g.Count(e => !e.Blocage), g.Count(e => e.Blocage), D(g.First().Quand)))) + ".",
         };
 
         if (plantages.Count > 0)
         {
             var module = plantages.GroupBy(e => e.Module ?? "unknown", StringComparer.OrdinalIgnoreCase)
                 .OrderByDescending(g => g.Count()).ThenByDescending(g => g.First().Quand).First();
-            morceaux.Add($"Module fautif le plus fréquent : {module.Key} ({module.Count()} sur {plantages.Count}), "
-                         + Designation(module.First(), paquets) + ".");
+            morceaux.Add(Docteur.T("PJ.Module", module.Key, module.Count(), plantages.Count, Designation(module.First(), paquets)));
             var code = plantages.Where(e => e.Code is not null).GroupBy(e => e.Code!, StringComparer.OrdinalIgnoreCase)
                 .OrderByDescending(g => g.Count()).FirstOrDefault();
             if (code is not null)
-                morceaux.Add($"Code d'exception le plus fréquent : 0x{code.Key.ToLowerInvariant()}"
-                             + (Codes.TryGetValue(code.Key, out var sens) ? $", {sens}" : "") + ".");
+                morceaux.Add(Docteur.T("PJ.Code", code.Key.ToLowerInvariant(),
+                    Codes.Contains(code.Key) ? ", " + Docteur.T("PJ.Code." + code.Key.ToLowerInvariant()) : ""));
         }
 
         // Le changement daté le plus récent suivi d'au moins un incident : une corrélation de dates, dite comme telle.
@@ -231,11 +221,10 @@ public static class PlantagesDeJeu
             .Select(c => (c, apres: miens.Count(e => e.Quand > c.Quand), avant: miens.Count(e => e.Quand <= c.Quand)))
             .FirstOrDefault(x => x.apres > 0);
         if (lien.c is not null)
-            morceaux.Add($"{lien.apres} de ces incidents depuis {lien.c.Libelle} ({D(lien.c.Quand)}), {lien.avant} avant dans la "
-                         + "fenêtre : c'est une corrélation de dates, pas une cause prouvée.");
+            morceaux.Add(Docteur.T("PJ.Correlation", lien.apres, lien.c.Libelle, D(lien.c.Quand), lien.avant));
 
         var repete = miens.Count >= Seuil;
-        yield return new RepairFinding("STABILITE", Nom, $"{plantages.Count} plantage(s), {blocages} blocage(s) en {jours} jours", "aucun",
+        yield return new RepairFinding("STABILITE", Nom, Docteur.T("PJ.Valeur", plantages.Count, blocages, jours), Docteur.T("PJ.Aucun"),
             repete ? RepairStatus.Suspicious : RepairStatus.Observed,
             string.Join(" ", morceaux),
             repete ? RepairAction.Recommandation : RepairAction.Aucune);

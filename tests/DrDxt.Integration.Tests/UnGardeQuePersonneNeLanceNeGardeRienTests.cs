@@ -3,7 +3,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Le depot porte quatre gates en Python sous `tools/gates/` :
+// Le depot porte quatre gates en Python sous `tools/gates/` :
 //
 //   ages.py             recalcule l'age de chaque ligne de GATES.md
 //   liens.py            verifie que les chemins cites existent vraiment
@@ -11,8 +11,8 @@ namespace DrDxt.Integration.Tests;
 //   compte_des_tests.py tient le nombre de tests annonce par le README
 //
 // Aucun n'est lance par quoi que ce soit. La CI lance `tools/nonuisance/*.py`
-// (deux gates DURS, et ils le disent), pas ceux-la. `GATES.md`, lui, demande a
-// le mainteneur de les lancer a la main -- « `python tools/gates/liens.py` ».
+// (deux gates DURS, et ils le disent), pas ceux-la. `GATES.md`, lui, demande de
+// les lancer a la main (`python tools/gates/liens.py`).
 //
 // C'est la difference entre un gate et un pense-bete. Celui qui BLOQUE tient ;
 // celui qui RAPPELLE meurt, parce qu'il depend de quelqu'un qui pense a le
@@ -64,7 +64,7 @@ public sealed class UnGardeQuePersonneNeLanceNeGardeRienTests
 
     /// <summary>Les outils qui VERIFIENT quelque chose, hors du dossier `gates`.
     ///
-    /// 19/09/2026 : cette regle ne regarde que `tools/gates/`. Les deux verificateurs de
+    /// Cette regle ne regarde que `tools/gates/`. Les deux verificateurs de
     /// `tools/nonuisance/` sont bien dans la CI -- je croyais le contraire en ecrivant ce
     /// bloc, mon crible excluait les tirets de leurs noms de fichier -- mais rien ne tenait
     /// qu'ils y restent. Ce test le tient maintenant, dans les deux sens.

@@ -9,7 +9,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 06/10/2026 (chantier B0, sortie S1-S3) : le back est livré prêt pour l'UI. Chaque constat porte ses données
+/// Le back est livré prêt pour l'UI. Chaque constat porte ses données
 /// (S1), aucun texte métier ne vit dans les vues (S2), et la surface des ViewModels est gelée dans un fichier que l'UI
 /// lit (S3). Changer ce fichier = un commit nommé « Contrat UI : … ».
 /// </summary>
@@ -92,7 +92,7 @@ public class ContratUiTests
         Constat.Depuis(new Finding("Gpu", Severity.Minor, "Finding.Gpu.ReBarOff", 3)).Etat.Should().Be(EtatConstat.Lu);
     }
 
-    // Revue du 06/10 (F-6) : « non lu » se reconnaît au suffixe « Unknown » de la clé ; la convention est gardée par la
+    // « non lu » se reconnaît au suffixe « Unknown » de la clé ; la convention est gardée par la
     // liste des clés qui disent elles-mêmes ne pas savoir, et par une clé hors liste qui reste « lu ».
     [Theory]
     [InlineData("Finding.Display.RefreshUnknown")]
@@ -131,7 +131,7 @@ public class ContratUiTests
         var xaml = Directory.EnumerateFiles(Path.Combine(Racine(), "src", "DrDxt.App"), "*.xaml", SearchOption.AllDirectories)
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")).ToList();
 
-        xaml.Should().HaveCountGreaterThan(3, "le crible doit avoir lu les vraies vues");
+        xaml.Should().HaveCountGreaterThanOrEqualTo(3, "le crible doit avoir lu les vraies vues");
         xaml.SelectMany(f => TexteEnDur.Matches(File.ReadAllText(f)).Select(m => $"{Path.GetFileName(f)} : {m.Groups[1].Value}"))
             .Should().BeEmpty("un texte affiché vit dans les resx, pas dans la vue");
     }
@@ -152,7 +152,7 @@ public class ContratUiTests
     {
         var sb = new StringBuilder();
         var types = typeof(ViewModels.ScanViewModel).Assembly.GetTypes()
-            // Revue du 06/10 (F-5) : les types imbriqués publics, et les valeurs d'une énumération (les états que l'UI
+            // Les types imbriqués publics, et les valeurs d'une énumération (les états que l'UI
             // aura à montrer).
             .Where(t => (t.IsPublic || t.IsNestedPublic) && t.Namespace == "DrDxt.App.ViewModels")
             .OrderBy(t => t.FullName, StringComparer.Ordinal);
@@ -182,7 +182,7 @@ public class ContratUiTests
         if (Environment.GetEnvironmentVariable("DRDXT_CONTRAT_UI") == "ecrire")
         {
             File.WriteAllText(fichier, Surface());
-            // Revue du 06/10 (F-7) : écrire puis comparer serait vert à coup sûr.
+            // Écrire puis comparer serait vert à coup sûr.
             Assert.Fail("contrat régénéré : relancer sans DRDXT_CONTRAT_UI");
         }
 

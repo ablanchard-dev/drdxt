@@ -1,6 +1,6 @@
 // Chrome liquide : champ de métal qui coule, irisé.
 //
-// 08/10/2026 (PUB1) : réécrit. La version précédente reprenait la formule du fond « Liquid Chrome » de React Bits, publié
+// Réécrit. La version précédente reprenait la formule du fond « Liquid Chrome » de React Bits, publié
 // sous MIT avec la Commons Clause, incompatible avec la GPL de DrDXT. Celle-ci est propre au projet : huit tours, chacun
 // décale le plan par une onde sinus de fréquence croissante puis le tourne ; le chrome est lu sur les crêtes d'un cosinus
 // du plan déformé. Comparé à l'ancien rendu image par image avant de le remplacer (même métal plissé et turbulent).

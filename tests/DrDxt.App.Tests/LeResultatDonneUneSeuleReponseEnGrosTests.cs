@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 23/09/2026. Critique Impeccable sur un scan réel, défaut n°2 : sous le titre du résultat, deux
+// Critique Impeccable sur un scan réel, défaut n°2 : sous le titre du résultat, deux
 // compteurs au même poids, « 1 problème prouvé · 7 leviers lus sur 7 » puis « 5 point(s) à
 // corriger ». Le joueur ne sait pas lequel lire, ni pourquoi 1 et 5 diffèrent.
 //
@@ -24,7 +24,7 @@ public sealed class LeResultatDonneUneSeuleReponseEnGrosTests
             && Texte(e) is "{Binding ProblemSummary}" or "{Binding RegisterText}").ToList();
     }
 
-    // 29/09/2026 (B3) : le résumé compte jusqu'à sa valeur ; sa liaison passe par effets:Compteur.Texte.
+    // Le résumé compte jusqu'à sa valeur ; sa liaison passe par effets:Compteur.Texte.
     private static string? Texte(XElement e)
         => (string?)e.Attribute("Text") ?? (string?)e.Attributes().FirstOrDefault(a => a.Name.LocalName == "Compteur.Texte");
 

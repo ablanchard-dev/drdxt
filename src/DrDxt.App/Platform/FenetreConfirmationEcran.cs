@@ -8,7 +8,7 @@ using DrDxt.Core;
 namespace DrDxt.App.Platform;
 
 /// <summary>
-/// L-ECRAN : la question que Windows pose lui-même après un changement d'affichage, « garder ou revenir », avec un compte
+/// La question que Windows pose lui-même après un changement d'affichage, « garder ou revenir », avec un compte
 /// à rebours. Pas de réponse dans le délai, fenêtre fermée, pas de fenêtre possible : non. Un écran qui n'affiche rien ne
 /// se confirme pas, et l'ancien mode revient tout seul.
 /// </summary>
@@ -41,7 +41,7 @@ public sealed class FenetreConfirmationEcran(ILocalizer localizer) : IConfirmati
             WindowStartupLocation = WindowStartupLocation.CenterScreen,
             Topmost = true,
         };
-        // 07/10/2026 (revue F-15) : sur un écran noir, Entrée ou Espace tapés à l'aveugle doivent REVENIR, comme
+        // Sur un écran noir, Entrée ou Espace tapés à l'aveugle doivent revenir, comme
         // Windows. « Revenir » est donc le bouton par défaut et le premier focus ; la fenêtre principale reste bloquée.
         var principale = System.Windows.Application.Current?.MainWindow;
         if (principale is { IsVisible: true }) fenetre.Owner = principale;

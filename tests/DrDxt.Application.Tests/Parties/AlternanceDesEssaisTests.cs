@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 07/10/2026 (chantier J4) : un levier jugé sur des parties A/B posées une sur deux, sans geste à chaque partie.
+// Un levier jugé sur des parties A/B posées une sur deux, sans geste à chaque partie.
 public sealed class AlternanceDesEssaisTests
 {
     private const string Levier = "latency.hagsOn";
@@ -14,7 +14,7 @@ public sealed class AlternanceDesEssaisTests
             4, 130, low1, BottleneckState.CpuBoundOrAppBound,
             Essai: pose is { } b ? AlternanceDesEssais.Marque(Levier, b) : null);
 
-    // B4 (10/10/2026) : un levier de latence (famille « latence » du catalogue) se juge sur la latence d'affichage,
+    // Un levier de latence (famille « latence » du catalogue) se juge sur la latence d'affichage,
     // plus bas = mieux ; sans latence sur toutes les parties, il retombe sur les 1 % bas.
     private const string LevierLatence = "latency.render_queue_cap";
 

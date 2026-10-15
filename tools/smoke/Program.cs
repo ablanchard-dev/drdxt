@@ -140,7 +140,7 @@ if (r.IsOk)
     // couverts par la meme garde.
     if (TailStatistic.PourquoiPasInterpretable(b.AnimationErrorSamples ?? 0) is { } raisonCadence)
         Console.WriteLine($"   l'erreur d'animation n'est PAS interpretable — {raisonCadence}");
-    // 27/09/2026 : les trames EXPLOITABLES, la liste meme sur laquelle les p95 sont calcules.
+    // Les trames EXPLOITABLES, la liste meme sur laquelle les p95 sont calcules.
     if (TailStatistic.PourquoiPasInterpretable(FrametimeStatistics.EchantillonsExploitables(b.FrameTimesMs)) is { } raison)
         Console.WriteLine($"   les trois p95 ci-dessus ne sont PAS interpretables — {raison}");
 

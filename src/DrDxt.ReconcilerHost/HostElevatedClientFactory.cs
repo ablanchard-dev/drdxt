@@ -6,33 +6,33 @@ using DrDxt.ElevatedHelper.Ipc;
 namespace DrDxt.ReconcilerHost;
 
 // -----------------------------------------------------------------------
-// HostElevatedClientFactory — builds the SERVICE-context IElevatedClient.
+// HostElevatedClientFactory : construit l'IElevatedClient du contexte service.
 //
-// Mirrors the App's ElevatedClientFactory but for the background service: when a
-// per-session HMAC key is provisioned (base64, >=32 bytes), the real
-// TypedNamedPipeElevatedClient over the ACL'd named pipe is returned; otherwise a
-// fail-clean UNAVAILABLE client is returned that refuses every op (Result.Fail) so a
-// reconcile attempt logs "elevation unavailable" and fails clean — never crashes, and
-// Never fakes a successful elevation.
+// Reprend l'ElevatedClientFactory de l'App, mais pour le service d'arrière-plan : quand une clé
+// HMAC par session est fournie (base64, >= 32 octets), il rend le vrai
+// TypedNamedPipeElevatedClient sur le pipe nommé protégé par ACL ; sinon un client
+// « indisponible » à échec propre qui refuse chaque op (Result.Fail), pour qu'une tentative de
+// réconciliation journalise « élévation indisponible » et échoue proprement : jamais de
+// plantage, jamais de fausse élévation réussie.
 //
-// Deferred integration point (flagged in the report): how a BACKGROUND SERVICE
-// launches/authenticates to the elevated helper without an interactive UAC prompt is a
-// known, not-yet-established handshake. Until it lands, no key is provisioned in the
-// service context and the factory returns the unavailable client by design — exactly
-// like the App path was wired then smoke-tested separately. We wire the real client
-// behind the seam; we do not fabricate a session.
+// État réel : ni Create ni CreateConnectOnly ne sont branchés en production. L'hôte utilise
+// l'exécuteur en processus (InProcessElevatedClient, option B, voir
+// HostServiceCollectionExtensions). CreateConnectOnly (handshake en connexion seule vers un
+// service helper déjà en marche, sans UAC) existe et est testé : c'est le durcissement V2 gardé.
+// Create, par clé fournie dans l'environnement, reste le mode historique : sans clé, il rend le
+// client indisponible. Aucune session n'est fabriquée.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class HostElevatedClientFactory
 {
-    /// <summary>The env var carrying the base64 per-session HMAC key (same contract as
-    /// the App side). In the service context this is set by whatever establishes the
-    /// helper handshake; until that exists it is unset → unavailable client.</summary>
+    /// <summary>La variable d'environnement qui porte la clé HMAC par session en base64 (même
+    /// contrat que le mode historique côté App). Rien ne la pose dans le contexte service : vide →
+    /// client indisponible.</summary>
     public const string SessionKeyEnv = "DRDXT_HELPER_SESSION_KEY";
 
-    /// <summary>Builds the client. <paramref name="keySource"/> reads the raw base64
-    /// session key (injected so the fail-clean path is unit-tested without touching the
-    /// real environment); production passes the env reader.</summary>
+    /// <summary>Construit le client. <paramref name="keySource"/> lit la clé de session brute en
+    /// base64 (injectée pour tester le chemin d'échec propre sans toucher au vrai environnement) ; la
+    /// production passe le lecteur de variable d'environnement.</summary>
     public static IElevatedClient Create(Func<string?> keySource)
     {
         var key = ParseKey(keySource());
@@ -43,32 +43,31 @@ public static class HostElevatedClientFactory
         return new TypedNamedPipeElevatedClient(key, transport);
     }
 
-    /// <summary>Production overload: reads the session key from the environment.</summary>
+    /// <summary>Surcharge de production : lit la clé de session dans l'environnement.</summary>
     public static IElevatedClient Create()
         => Create(() => Environment.GetEnvironmentVariable(SessionKeyEnv));
 
-    /// <summary>Builds the reconciler→helper CONNECT-only client (M5 channel).
+    /// <summary>Construit le client réconciliateur→helper en connexion seule.
     ///
-    /// The low-priv reconciler service does not launch the helper (no UAC at boot): it
-    /// only CONNECTS to the already-running helper SERVICE over the same §9.13 handshake
-    /// the App uses, negotiating an ephemeral per-session key on connect. So this is the
-    /// bare <see cref="HandshakingElevatedClient"/> — not the App's launch-on-demand
-    /// wrapper (which would raise a UAC). It is connect-only by construction (it never
-    /// spawns anything).
+    /// Le service réconciliateur peu privilégié ne lance pas le helper (pas d'UAC au démarrage) : il
+    /// ne fait que se connecter au service helper déjà en marche, par le même handshake de clé de
+    /// session que l'App, en négociant une clé éphémère par session à la connexion. C'est donc le
+    /// <see cref="HandshakingElevatedClient"/> nu, pas l'enveloppe de lancement à la demande de l'App
+    /// (qui ouvrirait une UAC). Il est en connexion seule par construction (il ne lance jamais rien).
     ///
-    /// FAIL-CLEAN when the helper is absent: <see cref="HandshakingElevatedClient"/>
-    /// already wraps every transport fault → a clean Result. When no helper service is
-    /// listening, its bounded connect-retry deadline elapses and it returns
-    /// HELPER_UNREACHABLE (no crash) — the reconciler then logs "elevation unavailable"
-    /// and does not reapply. The handshake also re-checks caller-auth server-side, so an
-    /// un-trusted reconciler image is denied there (defense in depth).</summary>
-    /// <param name="pipeName">Override for tests; defaults to the standard ACL'd pipe.</param>
-    /// <param name="connectTimeoutMs">Connect-retry deadline; the unit test uses a short
-    /// value so the absent-helper fail-clean path returns promptly.</param>
+    /// Échec propre quand le helper est absent : <see cref="HandshakingElevatedClient"/> emballe déjà
+    /// toute panne de transport → un Result propre. Quand aucun service helper n'écoute, son échéance
+    /// bornée de reprise de connexion passe et il rend HELPER_UNREACHABLE (sans plantage) : le
+    /// réconciliateur journalise alors « élévation indisponible » et ne réapplique pas. Le handshake
+    /// revérifie aussi l'auth de l'appelant côté serveur : une image de réconciliateur non fiable y
+    /// est refusée (défense en profondeur).</summary>
+    /// <param name="pipeName">Surcharge pour les tests ; par défaut le pipe standard protégé par ACL.</param>
+    /// <param name="connectTimeoutMs">Échéance de reprise de connexion ; le test unitaire prend une
+    /// valeur courte pour que le chemin d'échec propre sans helper rende vite la main.</param>
     /// <param name="expectedHelperImagePath">Le chemin du helper que ce client accepte
     /// d'ecouter. Par defaut celui pose a cote du service (meme source de verite que l'App).
     /// S'il est introuvable, la resolution rend null et le client refuse toute session plutot
-    /// que de faire confiance a un tube quelconque — c'est le sens fail-closed de la garde.</param>
+    /// que de faire confiance a un tube quelconque : c'est le sens fail-closed de la garde.</param>
     public static IElevatedClient CreateConnectOnly(
         string? pipeName = null, int connectTimeoutMs = 5000, string? expectedHelperImagePath = null)
         => new HandshakingElevatedClient(
@@ -91,9 +90,9 @@ public static class HostElevatedClientFactory
         }
     }
 
-    /// <summary>Fail-clean client used when no helper session is provisioned (the
-    /// service-context handshake is not yet established): refuses every op so a
-    /// reconcile fails clean rather than crashing. Never reports a faked success.</summary>
+    /// <summary>Client à échec propre rendu par Create quand aucune clé de session n'est fournie :
+    /// refuse chaque op pour qu'une réconciliation échoue proprement au lieu de planter. Ne rapporte
+    /// jamais un faux succès.</summary>
     private sealed class UnavailableElevatedClient : IElevatedClient
     {
         public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct) =>

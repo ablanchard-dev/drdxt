@@ -1,24 +1,24 @@
 namespace DrDxt.Core;
 
 // -----------------------------------------------------------------------
-// HeartbeatSender — a small REUSABLE disposable that keeps a held tweak's lease
-// alive by renewing it on a cadence, until disposed.
+// HeartbeatSender : un petit objet jetable et réutilisable qui maintient en vie le bail
+// d'un levier tenu en le renouvelant à intervalle régulier, jusqu'à sa libération.
 //
-// CONTRACT (the held-offset apply path is DESIGNED to wire one of these): for the
-// duration that a held GPU offset / power limit is applied, while the controller is
-// alive the heartbeat renews the lease so the helper's dead-man's-switch never fires.
-// When the apply flow completes (or the controlling process dies / disposes it), the
-// heartbeat stops; the lease then expires and the watchdog auto-reverts the held tweak.
+// Contrat (le chemin d'application à décalage tenu est conçu pour en brancher un) :
+// tant qu'un décalage GPU ou une limite de puissance tenus sont posés et que le contrôleur
+// vit, le battement renouvelle le bail pour que l'homme mort du helper ne parte jamais.
+// Quand l'application finit (ou que le processus qui pilote meurt ou le libère), le
+// battement s'arrête ; le bail expire et le chien de garde annule le levier tenu.
 //
-// STATUS: this is not yet wired into the live apply path — the GPU tweaks do not arm a
-// lease today (see the lease note in GpuUndervoltTweak); this sender + the
-// LeaseWatchdog are exercised by tests only. Once wired, the above contract holds.
+// État : pas encore branché sur le vrai chemin d'application. Les leviers GPU n'arment
+// pas de bail (voir la note sur le bail dans GpuUndervoltTweak) ; ce sender et le
+// LeaseWatchdog ne servent qu'aux tests. Une fois branché, le contrat ci-dessus tient.
 //
-// Renew goes through IElevatedClient.RenewLease → the same signed IPC pipeline +
-// the same caller identity as every other op (the helper only lets the lease OWNER
-// renew). A transient renew failure (pipe busy, helper momentarily down) is
-// swallowed — a single missed beat must not crash the controller; the lease simply
-// has fewer beats before its next genuine expiry.
+// Le renouvellement passe par IElevatedClient.RenewLease → le même pipeline IPC signé et
+// la même identité d'appelant que toute autre op (le helper ne laisse que le détenteur du
+// bail le renouveler). Un échec passager (pipe occupé, helper absent un instant) est
+// avalé : un battement manqué ne doit pas faire planter le contrôleur ; le bail a
+// simplement moins de battements avant sa vraie échéance.
 // -----------------------------------------------------------------------
 public sealed class HeartbeatSender : IAsyncDisposable
 {
@@ -32,15 +32,15 @@ public sealed class HeartbeatSender : IAsyncDisposable
     private volatile bool _disposed;
     private int _perdu;
 
-    /// <summary>08/10/2026 (revue n° 13) : le helper a refusé un renouvellement (il ne connaît plus ce bail : il a
+    /// <summary>Le helper a refusé un renouvellement (il ne connaît plus ce bail : il a
     /// expiré et l'origine a été rendue). Levé une fois. Une erreur passagère du transport ne le lève pas.</summary>
     public event Action? Perdu;
 
-    /// <param name="client">The elevated client used to send the renew.</param>
-    /// <param name="leaseId">The lease to keep alive (matches the EstablishLeaseOp id).</param>
-    /// <param name="leaseSeconds">The expiry extension each renew requests.</param>
-    /// <param name="interval">Optional background cadence. Defaults to ~1/3 of the
-    /// lease so a couple of misses are tolerated before a genuine expiry.</param>
+    /// <param name="client">Le client élevé qui envoie le renouvellement.</param>
+    /// <param name="leaseId">Le bail à maintenir (l'id de l'EstablishLeaseOp).</param>
+    /// <param name="leaseSeconds">La prolongation demandée à chaque renouvellement.</param>
+    /// <param name="interval">Cadence de fond, facultative. Par défaut ~1/3 du bail, pour
+    /// tolérer quelques ratés avant une vraie échéance.</param>
     public HeartbeatSender(IElevatedClient client, string leaseId, int leaseSeconds, TimeSpan? interval = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
@@ -54,30 +54,37 @@ public sealed class HeartbeatSender : IAsyncDisposable
         _interval = interval ?? TimeSpan.FromSeconds(Math.Max(1, leaseSeconds / 3));
     }
 
-    /// <summary>Sends exactly one renew now. No-op after disposal. Never throws — a
-    /// transient failure is swallowed (the next beat retries).</summary>
+    /// <summary>Envoie un seul renouvellement, maintenant. Ne fait rien après libération. Ne
+    /// lève jamais : un échec passager est avalé (le battement suivant réessaie).</summary>
     public async Task PulseAsync(CancellationToken ct)
     {
-        if (_disposed)
+        if (_disposed || Volatile.Read(ref _perdu) == 1)
             return;
         try
         {
             var r = await _client.RenewLease(_leaseId, _leaseSeconds, ct).ConfigureAwait(false);
-            if (r is { IsOk: false, Error.Code: ErrorCodes.ElevationDenied } && Interlocked.Exchange(ref _perdu, 1) == 0)
-                Perdu?.Invoke();
+            // « Rendu par le helper » : Perdu (le journal peut être levé). « Inconnu » (helper relancé, registre vide) : le
+            // réglage est peut-être encore posé, pas de Perdu, mais plus rien à renouveler. Conséquence assumée : jusqu'à la
+            // fin de la session, ce réglage n'a plus de bail ; seul le journal le rend, au démarrage suivant de l'App.
+            // Un refus d'appelant (ElevationDenied) est passager : le battement continue.
+            if (r is { IsOk: false, Error.Code: ErrorCodes.LeaseReverted or ErrorCodes.LeaseUnknown } && Interlocked.Exchange(ref _perdu, 1) == 0)
+            {
+                try { _cts.Cancel(); } catch { /* déjà libéré */ }
+                if (r.Error?.Code == ErrorCodes.LeaseReverted) Perdu?.Invoke();
+            }
         }
         catch (OperationCanceledException)
         {
-            // Shutdown / caller cancellation — not a heartbeat error.
+            // Arrêt ou annulation par l'appelant : pas une erreur de battement.
         }
         catch
         {
-            // A transient transport error must not crash the controller.
+            // Une erreur de transport passagère ne doit pas faire planter le contrôleur.
         }
     }
 
-    /// <summary>Starts the background renew loop on the configured interval. Idempotent.
-    /// Each tick sends a pulse until the sender is disposed.</summary>
+    /// <summary>Lance la boucle de renouvellement en fond, à l'intervalle choisi. Idempotent.
+    /// Chaque tic envoie un battement jusqu'à la libération du sender.</summary>
     public void Start()
     {
         if (_disposed || _loop is not null)
@@ -95,11 +102,11 @@ public sealed class HeartbeatSender : IAsyncDisposable
         }
         catch (OperationCanceledException)
         {
-            // Normal stop on dispose.
+            // Arrêt normal à la libération.
         }
     }
 
-    /// <summary>Autocontrôle du 08/10/2026 (SEC1) : l'essai est rendu, le bail n'a plus rien à garder. Le battement s'arrête
+    /// <summary>L'essai est rendu, le bail n'a plus rien à garder. Le battement s'arrête
     /// et le bail est ramené à une seconde : il expire aussitôt (son retour rejoue un état déjà rendu) et le helper peut
     /// s'arrêter avec l'App au lieu d'attendre l'expiration.</summary>
     public async Task LibererAsync()

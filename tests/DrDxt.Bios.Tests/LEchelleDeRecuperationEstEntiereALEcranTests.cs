@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Bios.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. L'echelle de recuperation est la page qu'on lit quand la machine
+// L'echelle de recuperation est la page qu'on lit quand la machine
 // ne demarre plus apres un reglage BIOS : ecran noir normal, entrainement
 // memoire, Clear CMOS, Load Optimized Defaults, un seul changement a la fois.
 // Le generateur la rend en deux exemplaires -- `Recovery.Top` et

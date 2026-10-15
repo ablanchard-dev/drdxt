@@ -4,7 +4,7 @@ using System.Runtime.Versioning;
 namespace DrDxt.Core;
 
 /// <summary>
-/// 27/09/2026 : le plan d'alimentation actif, lu en un seul endroit (PowerGetActiveScheme, powrprof.dll,
+/// Le plan d'alimentation actif, lu en un seul endroit (PowerGetActiveScheme, powrprof.dll,
 /// sans elevation). L'appli, l'audit, le helper et le service de demarrage lui deleguent et gardent chacun leurs codes
 /// d'erreur. Le tampon rendu par Windows est libere par LocalFree dans tous les cas. Ne leve jamais.
 /// </summary>

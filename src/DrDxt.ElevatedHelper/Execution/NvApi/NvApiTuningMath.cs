@@ -1,55 +1,55 @@
 namespace DrDxt.ElevatedHelper.Execution.NvApi;
 
 // -----------------------------------------------------------------------
-// NvApiTuningMath — the GPU value-bounds POLICY enforced AT/BELOW the privilege
-// boundary (defense n°1). Kept in the helper (not the native leaf) because it MIRRORS
-// the App-layer GpuSafeBounds — the recipe's unit conversions (MHz↔kHz, %↔PCM, the
-// driver clamp) live with the native boundary in DrDxt.GpuNative (NvApiConvert), this
-// file is policy only. Pure + unit-testable without a GPU.
+// NvApiTuningMath : la règle de bornes des valeurs GPU imposée à la frontière de privilège ou
+// en dessous (défense n°1). Gardée dans le helper (pas dans la feuille native) parce qu'elle
+// reprend GpuSafeBounds de la couche App ; les conversions d'unités de la recette (MHz↔kHz,
+// %↔PCM, le bornage du pilote) vivent avec la frontière native dans DrDxt.GpuNative
+// (NvApiConvert), ce fichier n'est que la règle. Pur, testable sans GPU.
 //
-// The ELEVATED helper enforces the same conservative band as GpuSafeBounds — it never
-// trusts the caller (or the client-side clamp) for value bounds. An offset OUTSIDE the
-// band is REJECTED (by OpAllowlist AND by the executor write in NvApiTuningActions),
-// never silently clamped, so a raw IPC op (a tools/r2* smoke, or a future App build that
-// wires the tuning seams) can never push an out-of-policy offset to live hardware.
+// Le helper élevé impose la même plage prudente que GpuSafeBounds : il ne fait jamais confiance
+// à l'appelant (ni au bornage côté client) pour les bornes. Un décalage hors plage est rejeté
+// (par OpAllowlist et par l'écriture de l'exécuteur dans NvApiTuningActions), jamais borné en
+// silence : une op IPC brute (un smoke test tools/r2*, ou une future version de l'App qui branche
+// les coutures de réglage) ne peut jamais pousser un décalage hors règle sur le vrai matériel.
 //
-// GpuSafeBounds (DrDxt.Application) is the single source of truth for the band. The helper
-// depends only on DrDxt.Core and cannot reference it, so the constants are MIRRORED here;
-// the cross-assembly test NvApiTuningPolicyBoundSyncTests asserts they stay equal to
-// GpuSafeBounds.{Min,Max}{Core,Memory}OffsetMhz. Keep them in lock-step.
+// GpuSafeBounds (DrDxt.Application) est la source unique de la plage. Le helper ne dépend que de
+// DrDxt.Core et ne peut pas la référencer : les constantes sont donc reprises ici ; le test
+// inter-assemblages NvApiTuningPolicyBoundSyncTests vérifie qu'elles restent égales à
+// GpuSafeBounds.{Min,Max}{Core,Memory}OffsetMhz. Les garder synchronisées.
 //
-// Pure + total: the checks never throw — no Math.Abs (int.MinValue is safe) and NaN /
-// Infinity are rejected by the power rail.
+// Pur et total : les vérifications ne lèvent jamais ; pas de Math.Abs (int.MinValue est sûr) et
+// NaN / Infinity sont rejetés par le garde-fou de puissance.
 // -----------------------------------------------------------------------
 internal static class NvApiTuningMath
 {
-    // Mirror of GpuSafeBounds.MinCoreOffsetMhz / MaxCoreOffsetMhz (the conservative band).
+    // Reprise de GpuSafeBounds.MinCoreOffsetMhz / MaxCoreOffsetMhz (la plage prudente).
     internal const int MinCoreOffsetMhz = -200;
     internal const int MaxCoreOffsetMhz = 100;
 
-    // Mirror of GpuSafeBounds.MinMemoryOffsetMhz / MaxMemoryOffsetMhz.
+    // Reprise de GpuSafeBounds.MinMemoryOffsetMhz / MaxMemoryOffsetMhz.
     internal const int MinMemoryOffsetMhz = -500;
     internal const int MaxMemoryOffsetMhz = 500;
 
-    // Power-limit % rail. INTENTIONALLY wider than GpuSafeBounds (60..100%): the power target
-    // is also bounded 0..100 by OpAllowlist and driver-clamped to the GPU's reported
-    // [min,max] in NvApiConvert.ClampPcm, so this stays the last-resort finite/NaN guard only.
+    // Garde-fou en % de la limite de puissance. Plus large exprès que GpuSafeBounds (60..100 %) : la
+    // cible de puissance est aussi bornée 0..100 par OpAllowlist et ramenée par le pilote au [min,max]
+    // annoncé du GPU dans NvApiConvert.ClampPcm ; ceci reste donc la seule garde de dernier recours fini/NaN.
     internal const double MinPowerPercent = 50.0;
     internal const double MaxPowerPercent = 120.0;
 
-    /// <summary>True if a core-clock offset (MHz) is within the policy band
-    /// [<see cref="MinCoreOffsetMhz"/>, <see cref="MaxCoreOffsetMhz"/>]. Uses NO Math.Abs,
-    /// so int.MinValue can never overflow across the IPC.</summary>
+    /// <summary>Vrai si un décalage d'horloge cœur (MHz) est dans la plage de règle
+    /// [<see cref="MinCoreOffsetMhz"/>, <see cref="MaxCoreOffsetMhz"/>]. Sans Math.Abs :
+    /// int.MinValue ne peut jamais déborder à travers l'IPC.</summary>
     internal static bool IsCoreOffsetWithinHardRail(int mhz) =>
         mhz >= MinCoreOffsetMhz && mhz <= MaxCoreOffsetMhz;
 
-    /// <summary>True if a memory-clock offset (MHz) is within the policy band
+    /// <summary>Vrai si un décalage d'horloge mémoire (MHz) est dans la plage de règle
     /// [<see cref="MinMemoryOffsetMhz"/>, <see cref="MaxMemoryOffsetMhz"/>].</summary>
     internal static bool IsMemoryOffsetWithinHardRail(int mhz) =>
         mhz >= MinMemoryOffsetMhz && mhz <= MaxMemoryOffsetMhz;
 
-    /// <summary>True if a power-limit percent is FINITE and within the helper's hard rail.
-    /// NaN / Infinity are rejected (they would slip past naive &lt;/&gt; comparisons).</summary>
+    /// <summary>Vrai si un pourcentage de limite de puissance est fini et dans le garde-fou strict du helper.
+    /// NaN / Infinity sont rejetés (ils passeraient à travers des comparaisons naïves &lt;/&gt;).</summary>
     internal static bool IsPowerPercentWithinHardRail(double percent) =>
         double.IsFinite(percent) && percent >= MinPowerPercent && percent <= MaxPowerPercent;
 }

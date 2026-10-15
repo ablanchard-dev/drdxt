@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 25/09/2026 : une regex `\r?\n` écrite par un script shell est arrivée dans un test avec
+/// Une regex `\r?\n` écrite par un script shell est arrivée dans un test avec
 /// un vrai retour chariot à la place de `\r`. Le test passait quand même, par accident. Un retour chariot
 /// qui n'est pas suivi d'un saut de ligne n'a aucune raison d'être dans un fichier texte du dépôt : c'est
 /// la trace d'un échappement mangé en route.
@@ -24,7 +24,7 @@ public sealed class AucunRetourChariotIsoleTests
     [Fact]
     public void Aucun_fichier_texte_ne_contient_un_retour_chariot_isole()
     {
-        // Témoin : la forme exacte de la faute du 25/09, et une fin de ligne Windows qui doit passer.
+        // Témoin : la forme exacte de la faute, et une fin de ligne Windows qui doit passer.
         CrIsole.IsMatch("MatchRegex(@\"x\\s*: 1\r?\n\");").Should().BeTrue();
         CrIsole.IsMatch("ligne\r\nligne\r\n").Should().BeFalse();
 

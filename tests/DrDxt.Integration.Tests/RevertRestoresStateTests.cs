@@ -13,78 +13,78 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.Integration.Tests;
 
 // =======================================================================
-// M2 H1 — THE GATE: "the revert restores the state".
+// La porte : « le retour arrière rend l'état ».
 //
-// The §20 money-back guarantee rests on this. With the real TweakEngine + real
-// SafetyManager + real TweakCatalog of real tweaks (only the SDK boundary is faked
-// by FakeSystemState + FakeElevatedClient + read-seams that report from that
-// state), we assert:
-//   1. After apply-then-revert, the fake system state is BYTE-IDENTICAL to the
-//      baseline snapshot (engine auto-revert on a faked regression).
-//   2. A tweak failing mid-batch leaves the state BYTE-IDENTICAL to baseline
-//      (transactional: never a half-applied state).
-//   3. (broader coverage) A composite-snapshot tweak's own RevertAsync also
-//      restores the state byte-identically (explicit revert path).
+// La promesse qu'un retour arrière rend la machine repose là-dessus. Avec le vrai TweakEngine,
+// le vrai SafetyManager et le vrai TweakCatalog de vrais leviers (seule la frontière SDK est
+// simulée par FakeSystemState + FakeElevatedClient + des coutures de lecture qui rapportent
+// cet état), on vérifie :
+//   1. Après apply puis revert, l'état factice est identique à l'octet près à l'instantané
+//      de départ (retour automatique du moteur sur une régression simulée).
+//   2. Un levier qui échoue en plein lot laisse l'état identique à l'octet près au départ
+//      (transactionnel : jamais d'état à moitié appliqué).
+//   3. (couverture élargie) Le RevertAsync propre d'un levier à instantané composite rend
+//      aussi l'état à l'octet près (chemin de retour explicite).
 //
-// Deterministic, no real machine: the CI runs this as the hard gate.
+// Déterministe, sans vraie machine : la CI joue ceci comme porte dure.
 // =======================================================================
 public sealed class RevertRestoresStateTests
 {
     private const int Pid = 4242;
     private static readonly TimeSpan Dur = TimeSpan.FromSeconds(10);
 
-    // --- A baseline that makes the single-op AND composite tweaks applicable and
-    // capturable. The composite tweaks (fixit.x3d_ccd, latency.vrr_vsync_cap) store a
-    // MULTI-OP snapshot only their own RevertAsync can decode, so wiring them through
-    // the engine proves the engine auto-revert path restores a composite byte-identically.
+    // --- Un départ qui rend applicables et capturables les leviers à une op et les composites.
+    // Les composites (fixit.x3d_ccd, latency.vrr_vsync_cap) stockent un instantané
+    // multi-ops que seul leur propre RevertAsync sait décoder ; les passer par le moteur
+    // prouve que le chemin de retour automatique du moteur rend un composite à l'octet près.
     private static FakeSystemState NewBaseline()
     {
         var s = new FakeSystemState
         {
-            NvApiAvailable = true,           // NVIDIA path for reflex + GPU tuning + VRR cap
+            NvApiAvailable = true,           // chemin NVIDIA pour reflex + réglage GPU + plafond VRR
             ActivePowerPlan = KnownPowerPlans.Balanced,
-            NvLowLatencyMode = 0,            // captured original = Off
+            NvLowLatencyMode = 0,            // origine capturée = désactivé
             GpuCoreOffsetMhz = 0,
             GpuMemoryOffsetMhz = 0,
             GpuPowerLimitPct = 100,
-            // Captured DRS originals for the VRR/Vsync composite (Vsync off, no cap).
-            NvVsyncMode = 0,
+            // Origines DRS capturées pour le composite VRR/Vsync (Vsync désactivée, pas de plafond).
+            NvVsyncMode = 0x60925292, // PASSIVE, le défaut du pilote
             NvFrameRateLimit = 0,
-            // A detected VRR display so latency.vrr_vsync_cap's ApplyAsync captures + writes.
+            // Un écran VRR détecté, pour que l'ApplyAsync de latency.vrr_vsync_cap capture et écrive.
             PrimaryGameDisplay = new DisplayInfo(IsPrimaryGameDisplay: true, SupportsVrr: true, RefreshHz: 144),
         };
-        // A pre-existing NVTweak LowLatencyMode value so reflex's revert restores it.
+        // Une valeur NVTweak LowLatencyMode préexistante, pour que le retour de reflex la rende.
         s.SetRegistry(RegistryHiveKind.LocalMachine,
             @"SOFTWARE\NVIDIA Corporation\Global\NVTweak", "LowLatencyMode", 0);
-        // Pre-seed the DRS leaves the VRR/Vsync composite touches with their captured
-        // originals (Vsync = 0, frame limit = 0) so a faithful composite revert returns
-        // those exact keys to baseline (the keys exist before AND after — byte-identical).
-        s.SetDrs(0x00A879CF, 0);  // VSYNCMODE_ID original = off (corrected id)
-        s.SetDrs(0x10835002, 0);  // FRL_FPS_ID original = no cap (corrected id)
-        // X3D-CCD composite captures: the optimizer service is initially stopped, and a
-        // pre-existing CppcEnable leaf — so its composite revert must restore both.
+        // Pré-amorcer les feuilles DRS que le composite VRR/Vsync touche avec leurs origines
+        // capturées (Vsync = 0, limite d'images = 0), pour qu'un retour composite fidèle ramène
+        // ces clés exactes au départ (les clés existent avant et après : identiques à l'octet près).
+        s.SetDrs(0x00A879CF, 0x60925292);  // VSYNCMODE_ID original = PASSIVE, le défaut du pilote
+        s.SetDrs(0x10835002, 0);  // FRL_FPS_ID d'origine = pas de plafond (identifiant corrigé)
+        // Captures du composite X3D-CCD : le service optimiseur est arrêté au départ, et une
+        // feuille CppcEnable préexiste ; son retour composite doit donc rendre les deux.
         s.SetService("AMD3DVCacheSvc", ServiceState.Stopped);
         s.SetRegistry(RegistryHiveKind.LocalMachine,
             @"SYSTEM\CurrentControlSet\Control\Processor", "CppcEnable", 0);
-        // Game Bar value initially absent → its faithful inverse is a delete.
+        // Valeur Game Bar absente au départ → son inverse fidèle est une suppression.
         return s;
     }
 
-    // --- T8 — an AMD baseline: NVAPI absent + ADLX PRESENT, so the GPU tuning tweaks take
-    // the ADLX branch. The captured ADLX originals are what a faithful inverse ApplyAdlxTuningOp
-    // must restore after the engine auto-reverts. The undervolt path round-trips an absolute
-    // MaxFreq (stock 2900 → apply 2800 → revert restores 2900): this gives the gate TEETH — a
-    // wrong-units / VoltMv-based inverse would leave AdlxMaxFreqMhz != 2900 and FAIL the gate. ---
+    // --- Un départ AMD : NVAPI absent + ADLX présent, pour que les leviers de réglage GPU
+    // prennent la branche ADLX. Les origines ADLX capturées sont ce qu'une ApplyAdlxTuningOp inverse
+    // fidèle doit rendre après le retour automatique du moteur. Le chemin d'undervolt fait
+    // l'aller-retour d'une MaxFreq absolue (origine 2900 → application 2800 → retour 2900) : c'est
+    // ce qui donne des dents à la porte ; un inverse en mauvaises unités ou en VoltMv laisserait AdlxMaxFreqMhz != 2900 et la ferait échouer. ---
     private static FakeSystemState NewAmdBaseline() => new()
     {
-        NvApiAvailable = false,           // no NVIDIA → GPU tuning resolves the ADLX path
-        AdlxAvailable = true,             // AMD ADLX present (single tunable dGPU at index 0)
+        NvApiAvailable = false,           // pas de NVIDIA → le réglage GPU résout le chemin ADLX
+        AdlxAvailable = true,             // ADLX AMD présent (une seule dGPU réglable à l'index 0)
         ActivePowerPlan = KnownPowerPlans.Balanced,
-        AdlxMaxFreqMhz = 2900,            // captured original absolute GFX max clock (the undervolt surface)
-        AdlxPowerLimitPct = 100,          // captured original power limit
+        AdlxMaxFreqMhz = 2900,            // horloge max GFX absolue d'origine capturée (la surface de l'undervolt)
+        AdlxPowerLimitPct = 100,          // limite de puissance d'origine capturée
     };
 
-    // --- The cross-cutting safety seams: restore enabled + point verified. ---
+    // --- Les coutures de sécurité transverses : restauration active + point vérifié. ---
     private sealed class EnabledRestore : IRestorePointService
     {
         public bool IsEnabled() => true;
@@ -103,11 +103,11 @@ public sealed class RevertRestoresStateTests
         public Task<Result<string>> ExportAsync() => Task.FromResult(Result<string>.Ok(string.Empty));
     }
 
-    // --- A benchmark runner that returns a regression so the engine auto-reverts. ---
+    // --- Un exécutant de banc qui rend une régression, pour que le moteur annule tout seul. ---
     private sealed class RegressionBenchmark : IBenchmarkRunner
     {
         public Task<Result<BenchmarkResult>> RunAsync(int targetPid, TimeSpan duration, int runs, CancellationToken ct) =>
-            // "after" much worse than the baseline (set in the test) → regression beyond margin.
+            // « après » bien pire que le départ (posé dans le test) → régression au-delà de la marge.
             Task.FromResult(Result<BenchmarkResult>.Ok(
                 new BenchmarkResult(120, 80, 60, new[] { 8.0, 8.1 }, 25, MarginOfError: 1, Runs: 1)));
     }
@@ -115,7 +115,7 @@ public sealed class RevertRestoresStateTests
     private static readonly BenchmarkResult Baseline =
         new(200, 150, 120, new[] { 5.0, 5.0 }, 15, MarginOfError: 1, Runs: 1);
 
-    // --- Wire the real engine + safety + catalog against the fake state. ---
+    // --- Câbler le vrai moteur, la vraie sécurité et le vrai catalogue sur l'état factice. ---
     private static (TweakEngine Engine, SafetyManager Safety, TweakCatalog Catalog, FakeElevatedClient Client)
         BuildReal(FakeSystemState state, IBenchmarkRunner bench, Func<PrivilegedOp, bool>? refuse = null)
     {
@@ -129,8 +129,8 @@ public sealed class RevertRestoresStateTests
         return (engine, safety, catalog, client);
     }
 
-    // The real tweaks, constructed against the fake seams (NVIDIA single-op set so the
-    // engine's generic SafetyManager revert path can restore every one).
+    // Les vrais leviers, construits sur les fausses coutures (jeu NVIDIA à une op, pour que
+    // le chemin de retour générique du SafetyManager du moteur puisse tous les rendre).
     private static IReadOnlyList<ITweak> BuildRealTweaks(FakeSystemState state, FakeElevatedClient client)
     {
         var nv = new FakeNvApi(state);
@@ -142,9 +142,8 @@ public sealed class RevertRestoresStateTests
         var svc = new FakeServiceStateReader(state);
         var display = new FakeDisplayInfo(state);
         var stability = new StableStabilityTester();
-        // M6 — the GPU tweaks now read their targets from the live IGpuTuningTargetSource,
-        // seeded here with the same conservative values they used before (byte-identical
-        // gate behaviour).
+        // Les leviers GPU lisent leurs cibles dans l'IGpuTuningTargetSource vivant, amorcé ici
+        // avec les mêmes valeurs prudentes qu'avant (comportement de la porte à l'octet près inchangé).
         var gpuTargets = new GpuTuningTargetSource(new GpuTuningTarget(0, -100, 0), new GpuPowerLimitTarget(0, 90));
 
         return new ITweak[]
@@ -161,7 +160,7 @@ public sealed class RevertRestoresStateTests
         };
     }
 
-    // =================== GATE 1: apply → auto-revert → identical ===================
+    // =================== Porte 1 : application → retour automatique → identique ===================
 
     [Fact]
     public async Task After_apply_then_revert_state_is_identical_to_baseline()
@@ -171,12 +170,12 @@ public sealed class RevertRestoresStateTests
 
         var before = state.Snapshot();
 
-        // A rich batch touching registry + power-plan + 3 GPU surfaces AND TWO
-        // composite-snapshot tweaks (fixit.x3d_ccd = service + 2 reg leaves;
-        // latency.vrr_vsync_cap = 2 DRS leaves). The composites store a multi-op
-        // snapshot that only their own RevertAsync can decode, so this proves the
-        // ENGINE auto-revert path (tweak.RevertAsync, not _safety) restores a composite
-        // byte-identically — the reversibility-gap fix, exercised end-to-end.
+        // Un lot riche qui touche registre + plan d'alimentation + 3 surfaces GPU et deux
+        // leviers à instantané composite (fixit.x3d_ccd = service + 2 feuilles de registre ;
+        // latency.vrr_vsync_cap = 2 feuilles DRS). Les composites stockent un instantané
+        // multi-ops que seul leur propre RevertAsync sait décoder : ceci prouve que le chemin
+        // de retour automatique du moteur (tweak.RevertAsync, pas _safety) rend un composite à
+        // l'octet près, le correctif du trou de réversibilité exercé de bout en bout.
         var plan = new TweakPlan(new[]
         {
             "latency.reflex", "fixit.power_plan", "gpu.undervolt", "gpu.power_limit", "gpu.fan_curve",
@@ -185,35 +184,35 @@ public sealed class RevertRestoresStateTests
 
         var result = await engine.ApplyAsync(plan, Baseline, Pid, default);
 
-        // The faked regression makes the engine auto-revert the WHOLE batch.
+        // La régression simulée fait annuler automatiquement tout le lot par le moteur.
         result.IsOk.Should().BeTrue();
         result.Value!.Verdict!.SummaryKey.Should().Be("verdict.regression_reverted");
         result.Value.Outcomes.Should().OnlyContain(o => o.AutoReverted);
-        // The composite tweaks WERE part of the auto-reverted batch (gate isn't vacuous).
+        // Les composites faisaient bien partie du lot annulé (la porte n'est pas creuse).
         result.Value.Outcomes.Select(o => o.TweakId)
             .Should().Contain(new[] { "fixit.x3d_ccd", "latency.vrr_vsync_cap" });
 
-        // Sanity: the batch DID write before reverting (so the gate isn't vacuous).
+        // Témoin : le lot a bien écrit avant de revenir (la porte n'est pas creuse).
         client.Writes.Should().NotBeEmpty();
-        // N6 teeth on the NVIDIA path: gpu.undervolt on NvApiAvailable=true issues a real NVAPI
-        // clock-offset write (GpuCoreOffsetMhz 0 → target), so the byte-identical restore below
-        // genuinely exercises the NVAPI offset capture→apply→revert round-trip — not just the
-        // composites. A wrong inverse would leave GpuCoreOffsetMhz != 0 and FAIL the gate.
+        // Dents sur le chemin NVIDIA : gpu.undervolt avec NvApiAvailable=true émet une vraie écriture
+        // NVAPI de décalage d'horloge (GpuCoreOffsetMhz 0 → cible), donc la restauration à l'octet
+        // près ci-dessous exerce vraiment l'aller-retour capture → application → retour du décalage
+        // NVAPI, pas seulement les composites. Un mauvais inverse laisserait GpuCoreOffsetMhz != 0 et ferait échouer la porte.
         client.Writes.Should().Contain(op => op is ApplyNvApiClockOffsetOp);
 
-        // THE GATE: byte-identical return to stock — including the composite surfaces.
+        // La porte : retour à l'origine identique à l'octet près, surfaces composites comprises.
         state.Snapshot().Should().Be(before);
     }
 
-    // =================== GATE 1b (AMD/ADLX): apply ADLX offset → auto-revert → identical ===================
+    // =================== Porte 1b (AMD/ADLX) : application du décalage ADLX → retour automatique → identique ===================
 
     [Fact]
     public async Task After_apply_then_revert_state_is_identical_on_the_amd_adlx_path()
     {
-        // T8 — the §20 "revert restores the state" gate, on the AMD path. With NVAPI absent
-        // and ADLX present, gpu.undervolt / gpu.power_limit resolve the tunable discrete GPU
-        // (T4) and write through ApplyAdlxTuningOp (T2/T3); the faked regression makes the
-        // engine auto-revert by replaying the inverse ADLX ops captured from the originals.
+        // La porte « le retour arrière rend l'état », sur le chemin AMD. Avec NVAPI absent
+        // et ADLX présent, gpu.undervolt / gpu.power_limit résolvent la carte dédiée réglable
+        // et écrivent par ApplyAdlxTuningOp ; la régression simulée fait annuler le moteur en
+        // rejouant les ops ADLX inverses capturées depuis les origines.
         var state = NewAmdBaseline();
         var (engine, _, _, client) = BuildReal(state, new RegressionBenchmark());
 
@@ -223,29 +222,29 @@ public sealed class RevertRestoresStateTests
 
         var result = await engine.ApplyAsync(plan, Baseline, Pid, default);
 
-        // The faked regression makes the engine auto-revert the whole GPU batch.
+        // La régression simulée fait annuler automatiquement tout le lot GPU par le moteur.
         result.IsOk.Should().BeTrue();
         result.Value!.Verdict!.SummaryKey.Should().Be("verdict.regression_reverted");
         result.Value.Outcomes.Should().OnlyContain(o => o.AutoReverted);
 
-        // Not vacuous AND genuinely the ADLX path: the batch issued ADLX writes and never an
-        // NVAPI clock-offset (proving it took the AMD branch, not NVIDIA).
+        // Pas creux, et vraiment le chemin ADLX : le lot a émis des écritures ADLX et jamais un
+        // décalage d'horloge NVAPI (preuve qu'il a pris la branche AMD, pas NVIDIA).
         client.Writes.Should().Contain(op => op is ApplyAdlxTuningOp);
         client.Writes.Should().NotContain(op => op is ApplyNvApiClockOffsetOp);
 
-        // THE GATE: byte-identical return to stock — the ADLX undervolt + power-limit restored.
+        // La porte : retour à l'origine identique à l'octet près, undervolt et limite de puissance ADLX rendus.
         state.Snapshot().Should().Be(before);
     }
 
-    // =================== GATE 2: partial failure → identical ===================
+    // =================== Porte 2 : échec partiel → identique ===================
 
     [Fact]
     public async Task Batch_partial_failure_leaves_state_identical_to_baseline()
     {
         var state = NewBaseline();
 
-        // Refuse reflex's registry write so the SECOND tweak fails mid-batch, after the
-        // first (power-plan) has applied. The engine must roll the first one back.
+        // Refuser l'écriture de registre de reflex pour que le second levier échoue en plein lot,
+        // après l'application du premier (plan d'alimentation). Le moteur doit annuler le premier.
         static bool RefuseReflexWrite(PrivilegedOp op) =>
             op is SetRegistryValueOp { Name: "LowLatencyMode" };
 
@@ -260,23 +259,23 @@ public sealed class RevertRestoresStateTests
         result.IsOk.Should().BeFalse();
         result.Error!.Value.Code.Should().Be(ErrorCodes.BatchReverted);
 
-        // THE GATE: no half-applied state — the power-plan change was rolled back.
+        // La porte : pas d'état à moitié appliqué ; le changement de plan a été annulé.
         state.Snapshot().Should().Be(before);
     }
 
-    // =================== broader coverage: composite explicit revert ===================
+    // =================== couverture élargie : retour explicite d'un composite ===================
 
     [Fact]
     public async Task Composite_tweak_explicit_revert_restores_state_identically()
     {
-        // F1 (x3d_ccd) writes a composite (service + 2 registry leaves); its own
-        // RevertAsync replays the composite to restore all three. This proves the
-        // composite-snapshot path is also byte-lossless.
+        // Le correctif X3D (x3d_ccd) écrit un composite (service + 2 feuilles de registre) ; son propre
+        // RevertAsync rejoue le composite pour rendre les trois. Ceci prouve que le chemin
+        // d'instantané composite est lui aussi sans perte à l'octet près.
         var state = NewBaseline();
         state.SetService("AMD3DVCacheSvc", ServiceState.Stopped);
         state.SetRegistry(RegistryHiveKind.LocalMachine,
             @"SYSTEM\CurrentControlSet\Control\Processor", "CppcEnable", 1);
-        // Game Bar value initially absent → its faithful inverse is a delete.
+        // Valeur Game Bar absente au départ → son inverse fidèle est une suppression.
 
         var client = new FakeElevatedClient(state);
         var tweak = new X3dCcdParkingFixTweak(
@@ -286,23 +285,23 @@ public sealed class RevertRestoresStateTests
 
         var apply = await tweak.ApplyAsync();
         apply.IsOk.Should().BeTrue();
-        // The apply actually changed the state (otherwise the gate would be vacuous).
+        // L'application a vraiment changé l'état (sinon la porte serait creuse).
         state.Snapshot().Should().NotBe(before);
 
         var revert = await tweak.RevertAsync(apply.Value!);
         revert.IsOk.Should().BeTrue();
 
-        // THE GATE: composite revert returns byte-identical.
+        // La porte : le retour du composite rend l'état identique à l'octet près.
         state.Snapshot().Should().Be(before);
     }
 
-    // =================== the catalog used is the real one (DI-resolvable) ===================
+    // =================== le catalogue utilisé est le vrai (résoluble par DI) ===================
 
     [Fact]
     public void Real_application_catalog_resolves_via_DI_and_is_non_empty()
     {
-        // The same registrations the App host uses: a smoke check that the integration
-        // gate exercises the real catalog, not a hand-rolled subset.
+        // Les mêmes enregistrements que l'hôte App : un contrôle de fumée que la porte
+        // d'intégration exerce le vrai catalogue, pas un sous-ensemble fait main.
         var services = new ServiceCollection();
         services.AddSingleton<IDiagnosticsLog>(new NoOpDiagnostics());
         services.AddSingleton<IBenchmarkRunner>(new RegressionBenchmark());

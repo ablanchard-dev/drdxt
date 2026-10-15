@@ -7,7 +7,7 @@ using NSubstitute;
 
 namespace DrDxt.Application.Tests.Tweaks.Gpu;
 
-// GPU-OC (08/10/2026) : le décalage de fréquence de la carte, posé à la main en mode Expert, jamais par l'autopilote.
+// Le décalage de fréquence de la carte, posé à la main en mode Expert, jamais par l'autopilote.
 // Ordre attendu : journal (filet au démarrage), sonde, BAIL du helper, écriture, test de stabilité. Le bail est armé
 // avant l'écriture : si DrDXT plante pendant le test, le helper rend la carte seul.
 public sealed class ReglageCarteExpertTests : IDisposable
@@ -45,6 +45,14 @@ public sealed class ReglageCarteExpertTests : IDisposable
 
     private ReglageCarteExpert Expert() =>
         new(new GpuUndervoltTweak(_nvApi, _adlx, _stabilite, _helper, _cibles), _cibles, _journal);
+
+    // Le helper n'écrit que le cœur : une mémoire demandée serait affichée sans jamais être posée. Refusée avant tout.
+    [Fact]
+    public async Task Un_decalage_memoire_est_refuse_sans_rien_ecrire()
+    {
+        (await Expert().PoserAsync(-50, 300)).IsOk.Should().BeFalse();
+        _envoyees.Should().BeEmpty();
+    }
 
     [Fact]
     public async Task Le_bail_est_arme_avant_l_ecriture_et_le_journal_porte_de_quoi_revenir()
@@ -101,7 +109,6 @@ public sealed class ReglageCarteExpertTests : IDisposable
         _journal.Lire().Value.Should().BeNull();
     }
 
-    // ── Revue n° 13 ──────────────────────────────────────────────────────────────────
     [Fact]
     public async Task Instable_et_retour_rate_le_journal_reste()
     {

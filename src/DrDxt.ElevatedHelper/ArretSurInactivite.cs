@@ -1,7 +1,7 @@
 namespace DrDxt.ElevatedHelper;
 
 /// <summary>
-/// SEC1 (08/10/2026) : un helper élevé lancé à la demande ne vit plus pour toujours. Après <c>delai</c> sans aucune
+/// Un helper élevé lancé à la demande ne vit plus pour toujours. Après <c>delai</c> sans aucune
 /// connexion, et sans bail actif, il s'arrête : un processus administrateur oublié n'est plus là pour personne. L'App ne le
 /// relance que sur un geste du joueur (les tâches de fond passent par un client qui ne lance jamais le helper).
 /// </summary>
@@ -13,7 +13,7 @@ public sealed class ArretSurInactivite(TimeSpan delai, Func<DateTimeOffset> main
 
     public void Activite() => Interlocked.Exchange(ref _derniere, maintenant().UtcTicks);
 
-    /// <summary>Autocontrôle du 08/10/2026 : le processus du dernier client authentifié (l'App). Inconnu = 0.</summary>
+    /// <summary>Le processus du dernier client authentifié (l'App). Inconnu = 0.</summary>
     public void ClientAuthentifie(int? pid)
     {
         Activite();

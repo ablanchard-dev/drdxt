@@ -25,9 +25,9 @@ public class CarteDeLaMachineTests
     [Fact]
     public void Un_reglage_propose_ne_se_range_pas_sous_ce_qui_a_ete_constate()
     {
-        // 23/09/2026, scan réel, carte Latence : sous « Constaté », juste après « VRR inactif »,
-        // la ligne « VRR + modèle flip activés : moins de latence… » se lisait comme un état de la
-        // machine. C'était le réglage que DrDXT propose, rangé avec ce qu'il a lu.
+        // Carte Latence : sous « Constaté », juste après « VRR inactif », la ligne « VRR + modèle flip
+        // activés : moins de latence… » passerait pour un état de la machine. C'est un réglage que DrDXT
+        // propose : il ne se range pas avec ce qu'il a lu.
         var vrrInactif = Ligne("latence", Severity.Minor, "VRR inactif");
         var propose = new EntreeCarte("latence", Severity.Info, "VRR + modèle flip activés",
             string.Empty, string.Empty, string.Empty, NonLu: false, Propose: true);
@@ -50,7 +50,7 @@ public class CarteDeLaMachineTests
             .Single(d => d.Cle == "latence").Etat.Should().Be(EtatDomaine.ARegarder);
     }
 
-    // 29/09/2026, critique de l'app : « 12 points à corriger » n'avait aucune liste, il fallait ouvrir les huit
+    // Critique de l'app : « 12 points à corriger » n'avait aucune liste, il fallait ouvrir les huit
     // domaines un par un avant d'atteindre Optimiser. Sous le verdict : ce qui est à corriger, le plus grave
     // d'abord, cinq au plus ; ni information, ni angle mort, ni réglage proposé.
     [Fact]
@@ -72,7 +72,7 @@ public class CarteDeLaMachineTests
         aFaire[0].Domaine.Cle.Should().Be("memoire", "un clic ouvre le domaine du point");
     }
 
-    // 29/09/2026, critique de l'app : un constat mémoire faisait dix lignes d'un bloc. La première phrase reste
+    // Critique de l'app : un constat mémoire faisait dix lignes d'un bloc. La première phrase reste
     // à l'écran, le reste s'ouvre sous « Pourquoi ? ».
     [Fact]
     public void Un_detail_long_montre_sa_premiere_phrase_et_garde_la_suite_a_deplier()
@@ -98,7 +98,7 @@ public class CarteDeLaMachineTests
         new LigneMesure("Fichier d'échange : 21504 Mo", null).ASuite.Should().BeFalse();
     }
 
-    // 29/09/2026, critique (joueur qui ne connaît rien au BIOS) : dix-neuf lignes brutes, et aucune phrase
+    // Critique (joueur qui ne connaît rien au BIOS) : dix-neuf lignes brutes, et aucune phrase
     // pour dire qu'il n'y a rien à toucher. Une longue liste mesurée montre six lignes, le reste se déplie.
     [Fact]
     public void Une_longue_liste_mesuree_montre_six_lignes_et_replie_le_reste()
@@ -115,7 +115,7 @@ public class CarteDeLaMachineTests
         court.MesuresRepliees.Should().BeEmpty("huit lignes se lisent d'un coup, replier deux lignes ne sert à rien");
     }
 
-    // 29/09/2026 (boucle « vivant et prouvé », B9) : un domaine s'ouvrait sur des listes. Il s'ouvre sur une phrase qui
+    // Un domaine s'ouvrait sur des listes. Il s'ouvre sur une phrase qui
     // dit quoi faire : le plus grave d'abord, sinon le réglage à essayer, sinon rien à faire.
     [Fact]
     public void Chaque_domaine_s_ouvre_sur_une_phrase_qui_dit_quoi_faire()
@@ -134,7 +134,7 @@ public class CarteDeLaMachineTests
         d["stockage"].Verdict.Should().Be("Carte.Verdict.Rien|{0}");
     }
 
-    // 29/09/2026, photo (latence) : « Mode DLSS du jeu : Balanced », et l'explication (ce que le mode Performance
+    // Photo (latence) : « Mode DLSS du jeu : Balanced », et l'explication (ce que le mode Performance
     // retire, gain non mesuré) seulement en info-bulle, que personne ne découvre. Elle passe sous « Pourquoi ? ».
     [Fact]
     public void L_explication_d_une_ligne_lue_s_ouvre_sous_pourquoi()
@@ -147,7 +147,7 @@ public class CarteDeLaMachineTests
         new LigneMesure("Fréquence : 200 Hz", null).ASuite.Should().BeFalse("témoin : rien à déplier");
     }
 
-    // 29/09/2026, photo (latence) : « pas encore validé sur une vraie machine » dans la pastille en police de code
+    // Photo (latence) : « pas encore validé sur une vraie machine » dans la pastille en police de code
     // des valeurs lues, comme un chiffre mesuré. Une réserve se lit comme une phrase ; une valeur lue garde sa pastille.
     [Fact]
     public void La_reserve_d_un_reglage_propose_n_est_pas_une_valeur_lue()
@@ -161,7 +161,7 @@ public class CarteDeLaMachineTests
         lu.ReserveDeValidation.Should().BeEmpty();
     }
 
-    // 29/09/2026, critique B10 (passage 6, P1) : « gigue », « premier saut », un code d'arrêt brut, lus sans aucune
+    // « gigue », « premier saut », un code d'arrêt brut, lus sans aucune
     // reformulation avant « Pourquoi ? ». Une glose courte, une fois par ligne, comme les réglages BIOS.
     [Theory]
     [InlineData("Mesuré : 0 ms de gigue au premier saut, 3 ms de gigue au-delà.",
@@ -175,7 +175,7 @@ public class CarteDeLaMachineTests
         new LigneMesure(texte, null).TexteCourt.Should().Be(attendu);
     }
 
-    // 29/09/2026, critique B10 (passage 5, P1, vu sur photo) : le BIOS était le seul domaine sans « Pourquoi ? ». Un
+    // Le BIOS a son « Pourquoi ? » comme les autres domaines. Un
     // réglage connu porte ce qu'il change ; un inconnu reste sans explication plutôt qu'avec une explication devinée.
     [Fact]
     public void Un_reglage_bios_connu_a_son_pourquoi_un_inconnu_non()
@@ -198,17 +198,11 @@ public class CarteDeLaMachineTests
             "une glose sans explication redonnerait une ligne BIOS sans « Pourquoi ? »");
     }
 
-    // 29/09/2026, critique B10 (passage 4, P0) : la Carte graphique « à corriger » sans aucun geste. Le remède était
+    // Critique B10 (passage 4, P0) : la Carte graphique « à corriger » sans aucun geste. Le remède était
     // écrit, mais derrière « Pourquoi ? ». Il sort de l'explication et se lit sans clic.
     [Theory]
     [InlineData("Le mode d'alimentation NVIDIA est au maximum. La carte ne redescend jamais. Pour le retirer du bureau : panneau NVIDIA, « Normal ».",
         "Pour le retirer du bureau : panneau NVIDIA, « Normal ».", "La carte ne redescend jamais.")]
-    [InlineData("Ce service tourne en SYSTEM. Un programme pourrait remplacer ce fichier. Réinstaller le logiciel dans Program Files ferme ce chemin. DrDXT ne touche pas à ce service.",
-        "Réinstaller le logiciel dans Program Files ferme ce chemin. DrDXT ne touche pas à ce service.", "Un programme pourrait remplacer ce fichier.")]
-    [InlineData("Ce service tourne en SYSTEM. Le fichier est déjà sous Program Files : c'est ce droit d'écriture qui ouvre le chemin.",
-        "Le fichier est déjà sous Program Files : c'est ce droit d'écriture qui ouvre le chemin.", "")]
-    [InlineData("Une tâche réécrivable. Elle se lancerait en administrateur. Déplacer le programme dans Program Files ferme ce chemin.",
-        "Déplacer le programme dans Program Files ferme ce chemin.", "Elle se lancerait en administrateur.")]
     public void Le_remede_d_un_constat_se_lit_sans_clic(string detail, string remede, string pourquoi)
     {
         var e = new EntreeCarte("gpu", Severity.Minor, "Titre", detail, "", "", false);
@@ -216,7 +210,7 @@ public class CarteDeLaMachineTests
         e.DetailSuite.Should().Be(pourquoi, "le remède ne se répète pas derrière « Pourquoi ? »");
     }
 
-    // 29/09/2026, critique B10 (passage 5, P1) : deux commandes icacls à retaper à la main. Le bouton copie les deux,
+    // Deux commandes icacls à retaper à la main. Le bouton copie les deux,
     // une par ligne : collées dans une console administrateur (cmd ou PowerShell), elles s'exécutent l'une après l'autre.
     [Fact]
     public void La_commande_du_remede_se_copie_telle_quelle()
@@ -233,7 +227,7 @@ public class CarteDeLaMachineTests
             .CommandeACopier.Should().BeEmpty("témoin : un remède sans commande n'a pas de bouton");
     }
 
-    // 03/10/2026 (D10.5, revue n° 4) : la prose du remède annonce les commandes, elle ne les recopie pas.
+    // La prose du remède annonce les commandes, elle ne les recopie pas.
     [Fact]
     public void La_prose_du_remede_annonce_les_commandes_sans_les_recopier()
     {
@@ -249,6 +243,17 @@ public class CarteDeLaMachineTests
             .RemedeLisible.Should().Be("Pour le retirer : « Normal ».", "sans commande, la prose ne change pas");
     }
 
+    // Le remède porté par le constat lui-même passe avant celui repéré dans la prose, et l'explication reste entière.
+    [Fact]
+    public void Le_remede_porte_par_le_constat_se_lit_sans_clic()
+    {
+        var e = new EntreeCarte("windows", Severity.Minor, "Titre", "Arrêts brutaux. Dix redémarrages non propres.", "", "", false,
+            RemedeDuConstat: "1) Lance le test mémoire.");
+        e.Remede.Should().Be("1) Lance le test mémoire.");
+        e.ARemede.Should().BeTrue();
+        e.DetailSuite.Should().Be("Dix redémarrages non propres.");
+    }
+
     [Fact]
     public void Un_constat_sans_remede_ecrit_n_en_invente_pas()
     {
@@ -257,8 +262,8 @@ public class CarteDeLaMachineTests
         e.DetailSuite.Should().Be("Dix redémarrages non propres.", "témoin : l'explication reste entière");
     }
 
-    // 29/09/2026, critique B10 (passage 2) : la page Windows empilait douze constats d'un bloc ; jusqu'à quatre, tout se
-    // lit d'un coup. UI1 (critique du 08/10, défaut 3) : « Voir la suite (16, dont 12 à corriger) » cachait douze rouges
+    // Critique B10 (passage 2) : la page Windows empilait douze constats d'un bloc ; jusqu'à quatre, tout se
+    // lit d'un coup. « Voir la suite (16, dont 12 à corriger) » cachait douze rouges
     // derrière trois lignes. Tout ce qui est à corriger reste à l'écran ; seul ce qui est pour information se replie.
     [Fact]
     public void Une_longue_liste_garde_a_l_ecran_tout_ce_qui_est_a_corriger_et_replie_l_information()
@@ -280,7 +285,7 @@ public class CarteDeLaMachineTests
         court.ADesLignesRepliees.Should().BeFalse();
     }
 
-    // 29/09/2026, photo (processeur) : « 14 états lus », trois affichés, « Voir les autres lignes : 13 ». Le compte
+    // Photo (processeur) : « 14 états lus », trois affichés, « Voir les autres lignes : 13 ». Le compte
     // prenait les sous-titres de famille pour des états. Il ne compte que ce qui se lit comme une donnée.
     [Fact]
     public void Le_compte_des_lignes_repliees_ne_compte_pas_les_sous_titres()
@@ -294,12 +299,13 @@ public class CarteDeLaMachineTests
     }
 
     [Fact]
-    public void A_faire_d_abord_s_arrete_a_cinq()
+    public void A_faire_d_abord_s_arrete_a_trois()
     {
+        // Trois points, puis Optimiser : au-delà, la liste repousse le bouton sous le pli. Le reste est dans les domaines.
         var carte = CarteDeLaMachine.Construire(
             Enumerable.Range(0, 8).Select(i => Ligne("windows", Severity.Minor, $"p{i}")).ToList(), Aucune, [], Loc);
 
-        CarteDeLaMachine.AFaire(carte).Should().HaveCount(5);
+        CarteDeLaMachine.AFaire(carte).Should().HaveCount(3);
     }
 
     [Fact]
@@ -364,7 +370,7 @@ public class CarteDeLaMachineTests
     [Fact]
     public void Une_mesure_qui_demontre_un_ecart_ne_dit_pas_rien_de_signale()
     {
-        // Vu sur la photo du 25/09 : « Rien de signalé » au-dessus de « ton processeur tient 30 % de moins ».
+        // Sans cette règle, « Rien de signalé » s'afficherait au-dessus de « ton processeur tient 30 % de moins ».
         var mesures = new Dictionary<string, IReadOnlyList<string>> { ["processeur"] = ["tient 30,0 % de moins"] };
 
         CarteDeLaMachine.Construire([], mesures, [], Loc, mesureDemontree: new HashSet<string> { "processeur" })
@@ -440,6 +446,8 @@ public class CarteDeLaMachineTests
     [Theory]
     [InlineData("temperature du GPU", "graphique")]
     [InlineData("temperature du processeur", "processeur")]
+    [InlineData("ventilateur qui s'arrête", "processeur")]
+    [InlineData("ventilateur qui ne tourne plus", "processeur")]
     [InlineData("autre", "windows")]
     public void La_temperature_se_range_avec_son_composant(string nom, string domaine) =>
         CarteDeLaMachine.DomaineDeLAudit("THERMIQUE", nom).Should().Be(domaine);
@@ -463,7 +471,7 @@ public class CarteDeLaMachineTests
     [Fact]
     public void A_etat_egal_le_domaine_le_plus_grave_s_ouvre_en_premier()
     {
-        // 23/09/2026, scan réel avec XMP coupé : « Latence » (VRR, Mineur) s'ouvrait avant
+        // Scan réel avec XMP coupé : « Latence » (VRR, Mineur) s'ouvrait avant
         // « BIOS » (XMP, Majeur, le plus gros gain réel) parce que les deux étaient « À corriger ».
         var carte = CarteDeLaMachine.Construire(
             [Ligne("latence", Severity.Minor), Ligne("bios", Severity.Major)], Aucune, [], Loc);
@@ -474,8 +482,8 @@ public class CarteDeLaMachineTests
     [Fact]
     public void Un_domaine_dont_l_audit_a_verifie_des_etats_n_est_jamais_pas_lu()
     {
-        // Vu le 17/09/2026 sur la machine de reference : « Stockage : Pas lu » alors que l'audit avait lu
-        // l'usure et la température du SSD. La carte ne recevait que les états à regarder.
+        // Si la carte ne recevait que les états à regarder, elle dirait « Stockage : Pas lu » alors que
+        // l'audit a lu l'usure et la température du SSD.
         var verifies = new Dictionary<string, IReadOnlyList<string>> { ["stockage"] = ["Cache d'écriture", "Trim"] };
 
         var stockage = CarteDeLaMachine.Construire([], Aucune, [], Loc, verifies).Single(d => d.Cle == "stockage");
@@ -485,8 +493,8 @@ public class CarteDeLaMachineTests
             "on dit LESQUELS, un par ligne, pas seulement combien");
     }
 
-    /// <summary>27/09/2026, vu sur photo (carte graphique) : « 3 états lus par l'audit, sans geste
-    /// proposé : » portait une puce, au même rang que les trois états qu'il annonce. Un en-tête n'est
+    /// <summary>« 3 états lus par l'audit, sans geste proposé : » ne porte pas de puce : avec une, il passerait
+    /// au même rang que les états qu'il annonce. Un en-tête n'est
     /// ni une donnée ni un titre de famille : il a son propre rang, les états gardent leur puce.</summary>
     [Fact]
     public void L_en_tete_des_etats_lus_n_est_ni_une_donnee_ni_un_titre_de_famille()
@@ -500,7 +508,7 @@ public class CarteDeLaMachineTests
         affichees.Should().OnlyContain(l => !l.EstTitre, "aucun titre de famille ici");
     }
 
-    /// <summary>24/09/2026 : l'explication sourcée d'un état lu n'était visible nulle part à l'écran.
+    /// <summary>L'explication sourcée d'un état lu n'était visible nulle part à l'écran.
     /// Elle voyage avec sa ligne, pour l'info-bulle ; une ligne sans explication n'en porte pas.</summary>
     [Fact]
     public void L_explication_d_un_etat_lu_voyage_avec_sa_ligne()
@@ -545,15 +553,15 @@ public class CarteDeLaMachineTests
 
         var bios = CarteDeLaMachine.Construire([], mesures, [], Loc).Single(d => d.Cle == "bios");
 
-        // 25/09/2026 : vu sur photo, les réglages d'usine étaient marqués et les réglages changés
-        // ne l'étaient pas ; l'écran se taisait sur les deux lignes qui comptent. Même mot que le rapport.
+        // Les réglages changés sont marqués, pas seulement les réglages d'usine : sinon l'écran se tairait
+        // sur les lignes qui comptent. Même mot que le rapport.
         bios.Mesures.Should().Equal(
             "Extreme Memory Profile(X.M.P) (profil de vitesse de la RAM) : Profile 1 (modifié)",
             "Intel Turbo Boost (montée en fréquence automatique du processeur) : Enabled (réglage d'usine)");
         CarteDeLaMachine.LignesBios(null).Should().BeEmpty("rien de lu : aucune ligne inventée");
     }
 
-    // 29/09/2026 (boucle « vivant et prouvé », B12, critique B10 P1) : les sigles du BIOS n'étaient pas expliqués. Le
+    // Les sigles du BIOS n'étaient pas expliqués. Le
     // nom exact reste (on le retrouve dans le menu du BIOS), une glose courte le suit ; un réglage inconnu reste nu.
     [Theory]
     [InlineData("XMP", "XMP (profil de vitesse de la RAM) : Profile 1 (modifié)")]
@@ -571,12 +579,35 @@ public class CarteDeLaMachineTests
     public void Un_constat_long_se_coupe_en_titre_et_explication(string texte, string titre, string suite)
         => CarteDeLaMachine.TitreEtSuite(texte).Should().Be((titre, suite));
 
+    // Les huit octets de la courbe du ventilateur processeur tiennent en une ligne, pas huit ; un palier manquant, pas de
+    // courbe inventée, et les paliers lus gardent chacun leur ligne.
+    [Fact]
+    public void La_courbe_du_ventilateur_processeur_tient_en_une_ligne()
+    {
+        var lus = new List<BiosSettingReading> { new("CPU Fan1 Smart Fan Control", 1, "Enabled", IsDefault: true) };
+        long[] t = [40, 62, 80, 92], v = [35, 55, 70, 100];
+        for (var i = 0; i < 4; i++)
+        {
+            lus.Add(new($"CPU Fan1 level {i + 1} Temperature", t[i], $"{t[i]} °C", IsDefault: false));
+            lus.Add(new($"CPU Fan1 level {i + 1} Fan Speed", v[i], $"{v[i]} %", IsDefault: i == 3));
+        }
+
+        CarteDeLaMachine.LignesBios(lus).Should().Equal(
+            "CPU Fan1 Smart Fan Control : Enabled (réglage d'usine)",
+            "Courbe du ventilateur processeur (quatre paliers, température puis vitesse) : 40-62-80-92 °C, 35-55-70-100 % (modifié)");
+
+        lus.RemoveAt(lus.Count - 1);
+        var partielles = CarteDeLaMachine.LignesBios(lus);
+        partielles.Should().HaveCount(8, "la ligne du mode, puis les sept paliers lus")
+            .And.NotContain(l => l.StartsWith("Courbe du ventilateur"), "un palier manquant : rien n'est inventé");
+    }
+
     [Fact]
     public void Une_frequence_memoire_lue_qui_ne_concorde_pas_avec_Windows_le_dit()
     {
         var lu = new[] { new BiosSettingReading("DRAM Frequency", 84, "3800 G1 (38x1.00x100.00)", IsDefault: false) };
 
-        CarteDeLaMachine.LignesBios(lu, 3800).Single().Should().Be("DRAM Frequency (vitesse de la RAM) : 3800 G1 (38x1.00x100.00) (modifié)");
+        CarteDeLaMachine.LignesBios(lu, 3800).Single().Should().Be("DRAM Frequency (vitesse de la RAM) : 3800 MT/s, Gear 1 (modifié)");
         CarteDeLaMachine.LignesBios(lu, 3200).Single().Should().Contain("lecture non concordante");
         CarteDeLaMachine.LignesBios(lu).Single().Should().NotContain("concordante", "sans mesure Windows, rien à comparer");
     }
@@ -594,7 +625,7 @@ public class CarteDeLaMachineTests
     [Fact]
     public void Les_sous_titres_de_famille_ne_comptent_pas_comme_des_etats_lus()
     {
-        // 25/09/2026, photo de la page Windows : 20 lignes à plat. Rangées par famille, les
+        // Photo de la page Windows : 20 lignes à plat. Rangées par famille, les
         // sous-titres s'intercalent ; le compte « N états lus » doit rester celui des états.
         var verifies = new Dictionary<string, IReadOnlyList<string>>
         {
@@ -611,7 +642,7 @@ public class CarteDeLaMachineTests
         windows.MesuresAffichees.Count(l => !l.EstTitre && !l.EstEntete).Should().Be(3, "les trois états");
     }
 
-    // 03/10/2026 (D12.1, revue n° 6) : un terme déjà suivi de sa parenthèse reçoit la glose dedans, pas une seconde
+    // Un terme déjà suivi de sa parenthèse reçoit la glose dedans, pas une seconde
     // parenthèse collée ; le nom du processeur perd ses marques déposées.
     [Fact]
     public void La_glose_entre_dans_la_parenthese_existante()
@@ -628,9 +659,9 @@ public class CarteDeLaMachineTests
     public void Le_nom_du_processeur_perd_ses_marques_deposees(string brut, string lisible) =>
         ScanViewModel.NomLisible(brut).Should().Be(lisible);
 
-    // Vu sur capture (08/10/2026, après le lot UI) : la pastille « Instant Replay allumé : environ 5 % d'images en moins »
-    // disparaissait parce que « 5 » figurait dans la partie de l'explication repliée derrière le « ? ». Ne redit rien que ce
-    // qui est AFFICHÉ (titre et première phrase).
+    // La pastille « Instant Replay allumé : environ 5 % d'images en moins » ne doit pas disparaître parce que
+    // « 5 » figure dans la partie de l'explication repliée derrière le « ? ». Seul compte ce
+    // qui est affiché (titre et première phrase).
     [Fact]
     public void Une_valeur_dite_seulement_dans_la_partie_repliee_reste_affichee()
     {

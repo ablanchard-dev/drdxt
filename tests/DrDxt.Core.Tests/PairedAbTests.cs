@@ -9,7 +9,7 @@ namespace DrDxt.Core.Tests;
 /// Minutes se sont ecoulees ».
 ///
 /// Ce n'est pas une precaution theorique. Mesure du 07/09/2026 sur les captures reelles du
-/// 01/09 : **deux des trois** ont une derive qui depasse leur propre bruit — 22h07 derive de 4,93 %
+/// **deux des trois** ont une derive qui depasse leur propre bruit — 22h07 derive de 4,93 %
 /// pour un bruit de 1,83 %, 23h37 de 18,68 % pour 2,36 %. Sur cette machine, en partie reelle, un
 /// A/B en AAA→BBB attribue le plus souvent au reglage ce qui n'est que le temps ecoule.
 ///
@@ -25,7 +25,7 @@ public class PairedAbTests
     private static IReadOnlyList<AbPass> Suite(params (char Etat, double Fps)[] passes) =>
         passes.Select(p => new AbPass(p.Etat == 'B', p.Fps)).ToList();
 
-    // 26/09/2026 : deux gardes que des mutations laissaient vertes.
+    // Deux gardes que des mutations laissaient vertes.
 
     [Fact]
     public void Trois_passes_sont_invalides_et_non_un_simple_changement_non_resolu()
@@ -79,7 +79,7 @@ public class PairedAbTests
 
         r.Game!.Preuve.DeltaPct.Should().BeApproximately(5.0, 1.0, "le vrai effet, degage de la derive");
 
-        // Corrige le 07/09/2026. Ce test exigeait `ProvenGain` et l'obtenait parce que le seuil
+        // Ce test exigeait `ProvenGain` et l'obtenait parce que le seuil
         // venait d'un `resolutionPct: 1.0` passe a la main — un chiffre choisi par le test, pas
         // mesure par l'experience. Depuis, l'experience annonce sa resolution, et quatre passes
         // n'ont qu'UN degre de liberte (trois parametres ajustes sur quatre points, t95 = 12,706).

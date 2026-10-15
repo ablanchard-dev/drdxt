@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-/// <summary>25/09/2026 — DISM /CheckHealth, lecture. La phrase « repairable » est celle relevee sur la
+/// <summary>DISM /CheckHealth, lecture. La phrase « repairable » est celle relevee sur la
 /// machine de reference le jour meme ; une sortie inconnue n'est jamais devinee.</summary>
 public class SanteDesComposantsTests
 {

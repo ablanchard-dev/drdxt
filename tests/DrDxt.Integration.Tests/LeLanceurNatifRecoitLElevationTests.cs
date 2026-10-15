@@ -4,7 +4,7 @@ using Xunit;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 10/10/2026 (revue de sécurité) : un processus élevé par l'UAC hérite de HKCU\Environment, écrivable par tout
+/// Un processus élevé par l'UAC hérite de HKCU\Environment, écrivable par tout
 /// programme du compte ; le runtime .NET y lit de quoi charger une DLL avant la première ligne (CORECLR_PROFILER_PATH,
 /// documenté par Microsoft). Le seul programme de DrDXT qui reçoit l'élévation est donc natif (NativeAOT, sans CoreCLR),
 /// et il redémarre le vrai programme avec un environnement reconstruit. Ce test fige : le lanceur est bien natif, et

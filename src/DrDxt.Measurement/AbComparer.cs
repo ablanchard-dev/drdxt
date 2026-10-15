@@ -4,27 +4,27 @@ using DrDxt.Core;
 namespace DrDxt.Measurement;
 
 /// <summary>
-/// Verdict A/B (§4 P1 + plan 02-M2 C2). The regression criterion is PRIMARILY
-/// frame consistency (1% lows), not average FPS alone:
-///   • Regression (→ auto-revert) when 1% lows are worse beyond the combined margin
-///     (frame consistency degraded) OR avg FPS is worse beyond the combined margin.
-///     Frame consistency is the primary trigger, so it takes priority over an avg-FPS
-///     nudge that stays within the margin.
-///   • Measurable gain when 1% lows OR avg FPS are BETTER beyond the combined margin
-///     (and there is no regression).
-///   • No measurable gain otherwise — including the key efficiency-tweak outcome:
-///     avg FPS within margin AND 1% lows held or improved (an undervolt is ~0 on avg
-///     FPS by design). That is a VALID kept state, never auto-reverted.
-/// Latency (EstimatedPcLatencyMs) stays informative — not a trigger for auto-revert.
+/// Verdict A/B. Le critère de régression est d'abord la régularité des images (1 % lows), pas
+/// les seuls FPS moyens :
+///   • Régression (→ retour automatique) quand les 1 % lows empirent au-delà de la marge
+///     combinée (régularité dégradée) ou que les FPS moyens empirent au-delà de la marge combinée.
+///     La régularité est le déclencheur principal : elle passe avant un léger mouvement des FPS
+///     moyens qui reste dans la marge.
+///   • Gain mesurable quand les 1 % lows ou les FPS moyens s'améliorent au-delà de la marge
+///     combinée (et sans régression).
+///   • Sinon, aucun gain mesurable, y compris l'issue clé d'un levier d'efficacité : FPS moyens
+///     dans la marge et 1 % lows tenus ou améliorés (un undervolt est à ~0 sur les FPS moyens par
+///     nature). C'est un état gardé valide, jamais défait automatiquement.
+/// La latence (EstimatedPcLatencyMs) reste informative : ce n'est pas un déclencheur de retour automatique.
 /// </summary>
 public static class AbComparer
 {
     /// <summary>Ecart maximal d'exposition entre deux passes A/B avant que la comparaison ne soit
     /// declaree invalide : dix points de trames gardees.
     ///
-    /// **NON CHIFFRÉ** — ce seuil n'est pas mesure, et il est ecrit ici pour etre trouve et
-    /// discute plutot que dilue dans une condition. Ce qui est mesure l'encadre : sur les 2 170
-    /// secondes de jeu reel du 07/09/2026, l'hygiene retire **0 %**, donc deux passes propres
+    /// **Non chiffré** : ce seuil n'est pas mesure, et il est ecrit ici pour etre trouve et
+    /// discute plutot que dilue dans une condition. Ce qui est mesure l'encadre :
+    /// mesure le 07/09/2026 sur 2 170 secondes de jeu reel, l'hygiene retire **0 %**, donc deux passes propres
     /// valent toutes deux 1,0 et sont a zero d'ecart. Dix points laissent passer une seconde de
     /// chargement d'un cote et pas de l'autre, et arretent un alt-tab. La direction du doute est
     /// choisie : mieux vaut refuser une comparaison douteuse que publier un gain fabrique par une
@@ -33,20 +33,24 @@ public static class AbComparer
 
     public static AbVerdict Compare(BenchmarkResult before, BenchmarkResult after)
     {
+        // Deux instruments différents : l'écart dirait l'instrument (voir Evidence), ni gain ni régression.
+        if (!string.Equals(before.Instrument ?? "PresentMon", after.Instrument ?? "PresentMon", StringComparison.OrdinalIgnoreCase))
+            return new AbVerdict(before, after, false, "Scan.Ab.NoMeasurableGain");
+
         var combinedMargin = before.MarginOfError + after.MarginOfError;
-        // 26/09/2026 : les lows se jugent avec LEUR marge, pas celle des FPS moyens (plus etroite).
+        // Les lows se jugent avec leur marge, pas celle des FPS moyens (plus etroite).
         var combinedLowMargin = before.P1LowMarginOfError + after.P1LowMarginOfError;
 
         var avgDelta = after.AvgFps - before.AvgFps;
         var lowDelta = after.P1LowFps - before.P1LowFps;
 
-        // Frame consistency (1% lows) is the PRIMARY signal; a 1%-low regression beyond
-        // the margin wins even if avg FPS edged up within the margin. An avg-FPS loss
-        // beyond the margin is also a regression.
+        // La régularité (1 % lows) est le signal principal ; une régression des 1 % lows au-delà de la
+        // marge l'emporte même si les FPS moyens ont un peu monté dans la marge. Une perte de FPS moyens
+        // au-delà de la marge est aussi une régression.
         var lowsRegressed = lowDelta < -combinedLowMargin;
         var avgRegressed = avgDelta < -combinedMargin;
 
-        // A gain on EITHER 1% lows or avg FPS, beyond the margin.
+        // Un gain sur les 1 % lows ou sur les FPS moyens, au-delà de la marge.
         var lowsGained = lowDelta > combinedLowMargin;
         var avgGained = avgDelta > combinedMargin;
 
@@ -74,17 +78,16 @@ public static class AbComparer
     /// <summary>
     /// Le meme a/b, mais qui garde sa resolution.
     ///
-    /// <see cref="Compare"/> calcule `combinedMargin`, s'en sert, et **la jette** : elle vit
+    /// <see cref="Compare"/> calcule `combinedMargin`, s'en sert, et la jette : elle vit
     /// dans une variable locale et meurt avec la methode. C'est pourtant elle qui distingue
-    /// « aucun gain » de « gain non resolu par cette session » — et le produit ne savait pas le
-    /// dire. Sur la machine de reference, cette confusion a fait passer un +2,7 % reel pour un
-    /// zero, alors que la session ne resolvait que +/-4,8 %.
+    /// « aucun gain » de « gain non resolu par cette session ». Sur la machine de reference, cette
+    /// confusion fait passer un +2,7 % reel pour un zero, alors que la session ne resout que +/-4,8 %.
     ///
     /// Rend une <see cref="GameEvidence"/> sur les FPS moyens : l'ecart en pourcent et ce que
-    /// l'experience savait resoudre, cote a cote. Le sous-systeme reste null — c'est au banc
+    /// l'experience savait resoudre, cote a cote. Le sous-systeme reste null : c'est au banc
     /// deterministe de le remplir, avec sa resolution a lui, bien plus fine.
     ///
-    /// La resolution est la SOMME des deux marges, comme dans <see cref="Compare"/>. La chaine
+    /// La resolution est la somme des deux marges, comme dans <see cref="Compare"/>. La chaine
     /// memoire, elle, utilise la racine de la somme des carres. La somme est plus large, donc plus
     /// prudente ; les aligner serait changer un seuil, et un seuil ne se change pas sans mesure.
     /// </summary>
@@ -97,19 +100,26 @@ public static class AbComparer
             return new PerformanceEvidence(
                 null,
                 new GameEvidence("fps.moyen",
-                    Core.Evidence.Invalide("aucune référence exploitable dans la passe d'avant")));
+                    Core.Evidence.Invalide(Docteur.T("AB.SansReference"))));
+
+        // Deux instruments ne comptent pas la meme chose : le repli DXGI ne passe ni par l'hygiene ni par
+        // l'exposition. Un ecart entre PresentMon et DXGI dirait l'instrument, pas le reglage.
+        if (!string.Equals(before.Instrument ?? "PresentMon", after.Instrument ?? "PresentMon", StringComparison.OrdinalIgnoreCase))
+            return new PerformanceEvidence(
+                null,
+                new GameEvidence("fps.moyen", Core.Evidence.Invalide(
+                    Docteur.T("AB.Instruments", before.Instrument ?? "PresentMon", after.Instrument ?? "PresentMon"))));
 
         // Les deux passes ont-elles vecu la meme chose ? Sans cette question, un A/B compare
         // deux sessions differentes et rend un verdict sans broncher. Le cas concret : l'hygiene
         // retire 2 % de la passe avant et 45 % de la passe apres parce que le joueur a alt-tabbe.
-        // C'est observe, pas infere -- l'exposition vient du masque d'hygiene, pas d'une heuristique.
+        // C'est observe, pas infere : l'exposition vient du masque d'hygiene, pas d'une heuristique.
         if (before.HygieneKeptFraction is { } avant && after.HygieneKeptFraction is { } apres
             && Math.Abs(avant - apres) > ExpositionComparableMax)
             return new PerformanceEvidence(
                 null,
                 new GameEvidence("fps.moyen", Core.Evidence.Invalide(
-                    F($"exposition trop différente entre les deux passes ({avant:P0} contre {apres:P0}) : ")
-                    + "elles n'ont pas mesuré la même session")));
+                    Docteur.T("AB.Exposition", avant, apres))));
 
         var deltaPct = (after.AvgFps - before.AvgFps) / before.AvgFps * 100.0;
         var resolutionPct = (before.MarginOfError + after.MarginOfError) / before.AvgFps * 100.0;

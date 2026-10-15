@@ -1,56 +1,55 @@
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// Bootstrap handshake wire contracts (§9.13 — ephemeral session-key negotiation).
+// Contrats de fil du handshake d'amorçage (négociation d'une clé de session éphémère).
 //
-// This is the CONNECT-time handshake that runs before the existing typed,
-// HMAC-keyed protocol. Its only job is to establish the per-session HMAC key
-// that the proven TypedPrivilegedServer / TypedNamedPipeElevatedClient layer
-// then uses unchanged.
+// C'est le handshake au moment de la connexion, qui tourne avant le protocole typé signé en
+// HMAC existant. Son seul rôle est d'établir la clé HMAC par session qu'utilise ensuite, sans
+// changement, la couche éprouvée TypedPrivilegedServer / TypedNamedPipeElevatedClient.
 //
-// Order on the wire (one round trip, framed by WireCodec like every other
-// message — length-prefixed JSON, bounded, unknown members rejected):
-//   1. client -> server : HandshakeHello (protocol marker only; no secret)
-//   2. server authenticates the caller (PID -> image identity) before replying
-//   3a. caller OK  -> server -> client : HandshakeResult{ Ok=true,  SessionKeyBase64 }
-//   3b. caller BAD -> server -> client : HandshakeResult{ Ok=false } (NO key) then close
+// Ordre sur le fil (un aller-retour, tramé par WireCodec comme tout autre message : JSON
+// préfixé par sa longueur, borné, membres inconnus rejetés) :
+//   1. client -> serveur : HandshakeHello (marqueur de protocole seulement ; aucun secret)
+//   2. le serveur authentifie l'appelant (PID -> identité d'image) avant de répondre
+//   3a. appelant bon     -> serveur -> client : HandshakeResult{ Ok=true,  SessionKeyBase64 }
+//   3b. appelant mauvais -> serveur -> client : HandshakeResult{ Ok=false } (aucune clé) puis fermeture
 //
-// SECURITY:
-//   * The key is generated SERVER-SIDE (the elevated, trusted end) with a CSPRNG
-//     and is EPHEMERAL (per connection, in memory only — never persisted).
-//   * The key is only ever sent over the LOCAL, DACL-protected, FIRST_PIPE_INSTANCE
-//     pipe AND only after the caller has been authenticated. A non-DrDxt.App peer
-//     never receives a key (it is denied before 3a).
-//   * The Hello carries NO secret; it cannot be replayed to extract a key because
-//     a key is only minted after caller-auth, which an attacker process cannot pass.
+// Sécurité :
+//   * La clé est générée côté serveur (le bout élevé, de confiance) par un CSPRNG et elle est
+//     éphémère (par connexion, en mémoire seulement, jamais persistée).
+//   * La clé ne passe que par le pipe local FIRST_PIPE_INSTANCE protégé par DACL, et seulement
+//     après l'authentification de l'appelant. Un pair qui n'est pas DrDxt.App ne reçoit jamais
+//     de clé (il est refusé avant 3a).
+//   * Le Hello ne porte aucun secret ; le rejouer ne peut pas extraire de clé, car une clé n'est
+//     frappée qu'après l'auth de l'appelant, qu'un processus attaquant ne peut pas passer.
 // -----------------------------------------------------------------------
 
-/// <summary>Client -> server connect greeting. Carries only a protocol-version
-/// marker so the server can reject an incompatible/garbage peer fail-clean. No
-/// secret travels here.</summary>
+/// <summary>Salut de connexion client -> serveur. Ne porte qu'un marqueur de version de
+/// protocole pour que le serveur rejette proprement un pair incompatible ou déchet. Aucun
+/// secret ne passe ici.</summary>
 public sealed record HandshakeHello
 {
-    /// <summary>Closed protocol marker. Bumped if the handshake shape ever changes.</summary>
+    /// <summary>Marqueur de protocole fermé. Incrémenté si la forme du handshake change un jour.</summary>
     public string Protocol { get; init; } = HandshakeProtocol.Version;
 }
 
-/// <summary>Server -> client handshake outcome. On success it carries the freshly
-/// minted ephemeral session key (base64, 32 bytes). On failure it carries NO key
-/// (the client must fail-closed and obtain no channel).</summary>
+/// <summary>Issue du handshake serveur -> client. En cas de succès, porte la clé de session
+/// éphémère tout juste frappée (base64, 32 octets). En cas d'échec, ne porte aucune clé
+/// (le client doit se fermer, fail-closed, et n'obtient aucun canal).</summary>
 public sealed record HandshakeResult
 {
     public bool Ok { get; init; }
-    /// <summary>Base64 of the 32-byte ephemeral session key. Present only when
-    /// <see cref="Ok"/> is true and the caller was authenticated.</summary>
+    /// <summary>Base64 de la clé de session éphémère de 32 octets. Présente seulement quand
+    /// <see cref="Ok"/> vaut true et que l'appelant a été authentifié.</summary>
     public string? SessionKeyBase64 { get; init; }
 }
 
-/// <summary>Handshake protocol constants (single source of truth for the marker
-/// the client sends and the server checks).</summary>
+/// <summary>Constantes du protocole de handshake (source unique du marqueur
+/// qu'envoie le client et que vérifie le serveur).</summary>
 public static class HandshakeProtocol
 {
     public const string Version = "drdxt-handshake-v1";
 
-    /// <summary>Ephemeral session-key length in bytes (seeds HMAC-SHA256).</summary>
+    /// <summary>Longueur en octets de la clé de session éphémère (clé du HMAC-SHA256).</summary>
     public const int SessionKeyBytes = 32;
 }

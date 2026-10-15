@@ -5,10 +5,10 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// After a reconcile pass the runtime sidecar is updated (bookkeeping for the next
-// pass / the UI in M6): per-item LastReconciledAt (from the injected clock),
-// LastResultCode, and the build/driver seen now. This is not the manifest — it is
-// the mutable sidecar (§5). The pass timestamps against IClock, never UtcNow.
+// Après un passage de réconciliation, l'état annexe d'exécution est mis à jour (tenue
+// de livre pour le passage suivant et l'interface) : LastReconciledAt par élément (depuis
+// l'horloge injectée), LastResultCode, et le build/pilote vus maintenant. Ce n'est pas le
+// manifeste, c'est l'annexe mutable. Le passage se date sur IClock, jamais UtcNow.
 // -----------------------------------------------------------------------
 public sealed class ReconcileStateUpdateTests
 {
@@ -23,7 +23,7 @@ public sealed class ReconcileStateUpdateTests
         });
         h.Policy.Map("a", ReconcileSurface.Registry);
         h.BuildProbe.Build = "22635.5000";
-        h.Probe.Set("a", "0"); // drifted to stock → re-applied
+        h.Probe.Set("a", "0"); // dérivé vers l'origine → réappliqué
         h.Clock.UtcNow = new DateTimeOffset(2026, 6, 23, 14, 30, 0, TimeSpan.Zero);
 
         var desired = new DesiredState(new[] { new AppliedTweak("a", "1", "0", At) });
@@ -106,21 +106,20 @@ public sealed class ReconcileStateUpdateTests
     }
 
     // -------------------------------------------------------------------
-    // Le trou de la toute premiere passe — 11/09/2026.
+    // Le trou de la toute premiere passe.
     //
-    // Le test a deux passes ci-dessus prouve le signal a partir de la SECONDE passe. Il
-    // laissait ouvert ce que la note « UNKNOWN » du plan disait honnetement : sur un item
+    // Le test a deux passes ci-dessus prouve le signal a partir de la SECONDE passe. Sur un item
     // que le reconciliateur n'a jamais vu, `item is null`, les deux gardes de `Classify`
-    // (`LastSeenBuild` et `LastSeenDriverVersion` non vides) sont mortes — la premiere
-    // passe ne pouvait que NOTIFIER, puis enregistrer l'etat deja change comme reference.
+    // (`LastSeenBuild` et `LastSeenDriverVersion` non vides) seraient mortes : la premiere passe
+    // ne pourrait que NOTIFIER, puis enregistrer l'etat deja change comme reference.
     //
     // La fenetre est reelle : l'App commite pendant la session de bureau, le service
     // reconcilie au demarrage et une fois par jour. Un pilote mis a jour entre les deux
-    // tombait exactement dedans.
+    // tomberait exactement dedans.
     //
     // Ici, rien n'est pose a la main : c'est le produit (`ApplyReferenceSeedingStore`, le
     // chemin de commit reel) qui ecrit la reference au moment de l'apply, et la toute
-    // Premiere passe qui doit la lire. Le build est FIXE de bout en bout : seul le pilote
+    // premiere passe qui doit la lire. Le build est FIXE de bout en bout : seul le pilote
     // bouge, donc seul le signal pilote peut expliquer la reapplication.
     // -------------------------------------------------------------------
     [Fact]
@@ -229,7 +228,7 @@ public sealed class ReconcileStateUpdateTests
         var desired = new DesiredState(new[] { new AppliedTweak("a", "1", "0", At) });
         await h.Build().ReconcileAsync(desired, default);
 
-        // Globally paused short-circuits: no writes, sidecar untouched.
+        // La pause globale court-circuite : aucune écriture, annexe intacte.
         h.StateStore.Saved.Should().Be(initial);
     }
 }

@@ -16,7 +16,7 @@ ecart, vers le bas.
 Ce gate ne reecrit rien. Il lit les journaux `.trx` de la derniere execution
 complete et compare leur somme a ce que le README annonce. Il ne sait donc rien
 dire sans une execution recente, et il le dit plutot que de rendre vert. En Release, comme la
-CI : des tests n'existent qu'en Debug (`#if DEBUG`), et compter en Debug ajoutait 14 le 08/10/2026 :
+CI : des tests n'existent qu'en Debug (`#if DEBUG`), et compter en Debug en ajouterait 14 (mesure) :
 
     dotnet test DrDXT.sln -c Release --filter "Category!=Machine" \\
         --logger "trx" --results-directory TestResults
@@ -36,6 +36,7 @@ correcte : 18 fichiers, 18 chemins. Ce gate cherche les deux dispositions.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -45,7 +46,7 @@ RACINE = Path(__file__).resolve().parents[2]
 # empiles sous les `bin/` des projets depuis des jours. Une somme qui melange deux executions
 # n'est pas une mesure. Le gate lit donc un seul dossier, celui qu'on vide avant de lancer.
 #
-# 19/09/2026 — et c'etait encore trop etroit. `dotnet test DrDXT.sln --logger "trx"`, la
+# Et c'etait encore trop etroit. `dotnet test DrDXT.sln --logger "trx"`, la
 # commande ecrite ci-dessus, n'ecrit PAS a la racine : chaque projet ecrit dans SON
 # `TestResults/`. Le gate ne lisait donc que la racine, restee figee sur une execution
 # d'une session precedente -- et il presentait ce vieux total comme la mesure du jour.
@@ -67,7 +68,7 @@ JOURNAUX = (
 # executions differentes. La suite complete prend environ deux minutes ; cette fenetre est
 # large pour ne pas ecarter un projet lent, et bien plus courte qu'une session.
 FENETRE_D_UNE_EXECUTION_S = 900
-README = "README.md"
+README = "README.fr.md"
 
 # <Counters total="703" executed="703" passed="703" failed="0" .../>
 STOCKAGE = re.compile(r'storage="([^"]+)"')
@@ -75,6 +76,9 @@ COMPTEURS = re.compile(r'total="(\d+)"\s+executed="\d+"\s+passed="(\d+)"\s+faile
 
 # **4 374 tests, 0 echec** : l'espace peut etre une espace fine insecable.
 ANNONCE = re.compile(r"\*\*([\d   ]+) tests, (\d+) échec")
+# Le README anglais, celui que GitHub montre : **7,168 tests, 0 failures**. Sans lui, son chiffre ne tenait a rien.
+ANNONCE_EN = re.compile(r"\*\*([\d,]+) tests, (\d+) failures?")
+READMES = ((README, ANNONCE), ("README.md", ANNONCE_EN))
 
 
 def journaux_de_la_derniere_execution(racine: Path = RACINE) -> list[Path]:
@@ -84,7 +88,7 @@ def journaux_de_la_derniere_execution(racine: Path = RACINE) -> list[Path]:
     un dossier qui accumule les journaux (on n'en garde que le dernier), et deux
     dossiers remplis a des heures differentes (la fenetre les separe).
     """
-    # 24/09/2026 — la cle n'est plus le dossier mais le PROJET teste. Avec
+    # La cle n'est plus le dossier mais le PROJET teste. Avec
     # `--results-directory TestResults` (la commande documentee plus haut), les 17 projets
     # ecrivent dans le MEME dossier : garder un journal par dossier en gardait un seul, et le
     # gate annoncait 736 tests pour 4 330 reels. Chaque journal nomme la dll qu'il a testee
@@ -96,7 +100,7 @@ def journaux_de_la_derniere_execution(racine: Path = RACINE) -> list[Path]:
             # d'une execution : le compter melangerait deux mesures.
             if "bin" in journal.parts or "obj" in journal.parts:
                 continue
-            # 27/09/2026 : la CI rejoue ensuite des SOUS-ENSEMBLES des memes dll (etapes
+            # La CI rejoue ensuite des SOUS-ENSEMBLES des memes dll (etapes
             # gate-revert, gate-reconciler, gate-securite : 5, 5, 1 et 11 tests) dans des
             # journaux `gate-*.trx`, plus recents. Gardes « le plus recent par dll », ils
             # remplacaient le compte complet de ces projets : 4 545 annonces pour 4 977
@@ -124,13 +128,37 @@ def mesure(racine: Path = RACINE) -> tuple[int, int, int]:
     # Dedoublonne par CHEMIN, jamais par nom : sur la CI les 18 journaux s'appellent tous
     # `suite-complete.trx` et ne different que par leur dossier. Dedoublonner par nom n'en
     # aurait compte qu'un seul -- et le gate aurait accuse le README d'un ecart invente.
+    locales = classes_hors_depot(racine)
     for journal in journaux_de_la_derniere_execution(racine):
-        trouve = COMPTEURS.search(journal.read_text(encoding="utf-8", errors="replace"))
+        texte = journal.read_text(encoding="utf-8", errors="replace")
+        trouve = COMPTEURS.search(texte)
         if trouve:
             projets += 1
             tests += int(trouve.group(1))
             echecs += int(trouve.group(3))
+            # Le README annonce ce qu'un clone execute : les tests d'un fichier que git ne suit pas n'y sont pas.
+            for nom, issue in RESULTAT.findall(texte):
+                if nom.split(".")[-2:-1] and nom.split(".")[-2] in locales:
+                    tests -= 1
+                    echecs -= issue == "Failed"
     return projets, tests, echecs
+
+
+# Le nom complet d'un test, jusqu'a ses arguments : l'avant-dernier segment est la classe.
+RESULTAT = re.compile(r'<UnitTestResult [^>]*testName="([\w.]+)[^"]*"[^>]*outcome="(\w+)"')
+
+
+def classes_hors_depot(racine: Path) -> set[str]:
+    """Les classes de test dont le fichier existe ici sans etre suivi par git (vide hors d'un depot)."""
+    try:
+        suivis = subprocess.run(["git", "-C", str(racine), "ls-files", "tests"], capture_output=True, text=True,
+                                encoding="utf-8", check=True).stdout.split("\n")
+    except (OSError, subprocess.CalledProcessError):
+        return set()
+    suivis = {Path(f).as_posix() for f in suivis if f}
+    return {f.stem for f in racine.glob("tests/**/*.cs")
+            if "bin" not in f.parts and "obj" not in f.parts
+            and f.relative_to(racine).as_posix() not in suivis}
 
 
 def perime(racine: Path = RACINE) -> str | None:
@@ -170,9 +198,12 @@ def perime(racine: Path = RACINE) -> str | None:
     return None
 
 
-def annonce(racine: Path = RACINE) -> tuple[int, int] | None:
-    """(tests, echecs) tels que le README les annonce, ou None s'il n'annonce rien."""
-    trouve = ANNONCE.search((racine / README).read_text(encoding="utf-8"))
+def annonce(racine: Path = RACINE, fichier: str = README, motif: re.Pattern = ANNONCE) -> tuple[int, int] | None:
+    """(tests, echecs) tels que le README les annonce, ou None s'il n'annonce rien (ou n'existe pas)."""
+    chemin = racine / fichier
+    if not chemin.exists():
+        return None
+    trouve = motif.search(chemin.read_text(encoding="utf-8"))
     if not trouve:
         return None
     chiffre = re.sub(r"[^\d]", "", trouve.group(1))
@@ -195,7 +226,7 @@ def autotest() -> int:
         assert mesure(faux) == (2, 15, 1), mesure(faux)
 
         # Un dossier qui ACCUMULE : seul le journal le plus recent compte. Sans ca, deux
-        # executions d'affilee se sommeraient -- c'est arrive la nuit du 19/09.
+        # executions d'affilee se sommeraient.
         import os as _os
         import time as _time
         vieux_meme_dossier = faux / "tests" / "Projet.Tests" / "TestResults" / "a-avant.trx"
@@ -227,7 +258,7 @@ def autotest() -> int:
         _os.utime(ancien, (_time.time() - 60, _time.time() - 60))
         assert mesure(commun) == (2, 10, 0), mesure(commun)
 
-        # 27/09/2026 : un journal de gate, PLUS RECENT, sur la meme dll, ne remplace pas le compte complet.
+        # Un journal de gate, PLUS RECENT, sur la meme dll, ne remplace pas le compte complet.
         gate = commun / "TestResults" / "gate-securite.trx"
         gate.write_text('<UnitTest storage="c:/p/x.trx.dll" /><Counters total="2" executed="2" '
                         'passed="2" failed="0" />', encoding="utf-8")
@@ -240,6 +271,11 @@ def autotest() -> int:
         # L'espace fine insecable du README reel ne doit pas casser la lecture.
         (faux / README).write_text("**4 396 tests, 0 échec**", encoding="utf-8")
         assert annonce(faux) == (4396, 0), annonce(faux)
+
+        # Le README anglais : sa virgule de milliers se lit, et son chiffre est tenu lui aussi.
+        (faux / "README.md").write_text("**7,168 tests, 0 failures**", encoding="utf-8")
+        assert annonce(faux, "README.md", ANNONCE_EN) == (7168, 0), annonce(faux, "README.md", ANNONCE_EN)
+        (faux / "README.md").unlink()
 
         # LA FRAICHEUR. Un journal ne peut pas decrire un fichier ecrit apres lui.
         import os
@@ -282,6 +318,13 @@ def autotest() -> int:
         code, lignes = verdict(faux)
         assert code == 1 and any("vers le haut" in l for l in lignes), lignes
 
+        # Un README dont l'annonce ne se lit plus, l'autre juste : le gate ne se tait pas sur le premier.
+        (faux / README).write_text("**15 tests, 1 échec**", encoding="utf-8")
+        (faux / "README.md").write_text("15 tests passing", encoding="utf-8")
+        code, lignes = verdict(faux)
+        assert code == 1 and "README.md" in lignes[0], (code, lignes)
+        (faux / "README.md").unlink()
+
         # Aucun chiffre annonce : le gate doit le voir, pas l'inventer.
         (faux / README).write_text("le depot est teste", encoding="utf-8")
         assert annonce(faux) is None
@@ -308,21 +351,32 @@ def verdict(racine: Path = RACINE) -> tuple[int, list[str]]:
         return 1, ["Aucun journal .trx : lancer la suite avec --logger \"trx\" avant ce gate.",
                    "Sans mesure, ce gate ne dit RIEN -- il ne rend pas vert par defaut."]
 
-    dit = annonce(racine)
-    if dit is None:
+    lignes: list[str] = []
+    code = 0
+    dits = {fichier: annonce(racine, fichier, motif) for fichier, motif in READMES}
+    # Un README present dont l'annonce a change de forme ne se lit plus : le taire laisserait son chiffre sans garde.
+    muets = [f for f, d in dits.items() if d is None and (racine / f).exists()]
+    if muets and any(d is not None for d in dits.values()):
+        return 1, [f"{', '.join(muets)} : annonce du nombre de tests introuvable, alors que l'autre README en porte une."]
+    for fichier, dit in dits.items():
+        if dit is None:
+            continue
+        if dit == (tests, echecs):
+            continue
+        code = 1
+        sens = "vers le bas" if dit[0] < tests else "vers le haut"
+        lignes += [
+            f"{fichier} annonce {dit[0]} tests / {dit[1]} echec(s).",
+            f"La derniere execution en a compte {tests} / {echecs}, sur {projets} projets.",
+            f"\n{fichier} est {sens} de {abs(dit[0] - tests)} test(s).",
+            "Le paragraphe du README qui explique ce piege est lui-meme un chiffre",
+            "ecrit a la main.",
+        ]
+    if code:
+        return 1, lignes
+    if all(d is None for d in dits.values()):
         return 0, ["Le README n'annonce plus de nombre de tests : rien a tenir."]
-
-    if dit == (tests, echecs):
-        return 0, [f"Le README dit vrai : {tests} tests, {echecs} echec(s), sur {projets} projets."]
-
-    sens = "vers le bas" if dit[0] < tests else "vers le haut"
-    return 1, [
-        f"Le README annonce {dit[0]} tests / {dit[1]} echec(s).",
-        f"La derniere execution en a compte {tests} / {echecs}, sur {projets} projets.",
-        f"\nLe README est {sens} de {abs(dit[0] - tests)} test(s).",
-        "Le paragraphe du README qui explique ce piege est lui-meme un chiffre",
-        "ecrit a la main.",
-    ]
+    return 0, [f"Le README dit vrai : {tests} tests, {echecs} echec(s), sur {projets} projets."]
 
 
 def main() -> int:

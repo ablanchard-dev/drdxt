@@ -32,13 +32,12 @@ public sealed class GpuDetector
         // system-wide : un seul pilote sert toutes les cartes NVIDIA de la machine.
         //
         // Pourquoi ça compte, et pas qu'esthétiquement : WMI rend la quadruplette WDDM
-        // ("32.0.16.1088"), dont le premier groupe est la version WDDM/DirectX. GpuDriverFreshness
-        // Refuse de juger cette forme (à raison — la juger contre le plancher NVIDIA marquait
-        // toutes les machines obsolètes), donc le levier « pilote obsolète » ne pouvait pas se
-        // déclencher sur une machine NVIDIA. Il était inerte, et rien ne le disait.
-        // Seulement s'il Y A une carte NVIDIA : sinon on forcerait le chargement de nvml.dll sur
-        // une machine AMD ou Intel pure, pour un résultat dont personne ne se sert. (Rattrapé par
-        // la revue d'ensemble : la tâche était « lire la branche », pas « décider QUAND la lire ».)
+        // ("32.0.16.1088"), dont le premier groupe est la version WDDM/DirectX. Le levier de fraîcheur
+        // refuse de juger cette forme (à raison : la juger contre le plancher NVIDIA marquerait
+        // toutes les machines obsolètes) ; sans la branche NVML, le levier « pilote obsolète » ne se
+        // déclencherait jamais sur une machine NVIDIA.
+        // Seulement s'il y a une carte NVIDIA : sinon on forcerait le chargement de nvml.dll sur
+        // une machine AMD ou Intel pure, pour un résultat dont personne ne se sert.
         string? nvidiaBranch = adapters.Value!.Any(a => a.VendorId == VendorNvidia)
                                && _nvml.TryGetDriverVersion(out var branch) ? branch : null;
 
@@ -54,7 +53,7 @@ public sealed class GpuDetector
             {
                 VendorAmd    => _adlx.GetSmartAccessMemoryState(),       // SAM via ADLX
                 VendorNvidia => uneSeuleNvidia ? _nvReBar.GetReBarState() : TriState.Unknown, // NVML BAR1, device 0
-                _            => TriState.Unknown                         // Intel: pas d'API → Unknown (§16)
+                _            => TriState.Unknown                         // Intel: pas d'API → Unknown
             };
             // NVML seulement pour NVIDIA, et seulement si la lecture a marché : sinon on garde
             // la valeur WMI. Jamais de version fabriquée, jamais la branche NVIDIA collée sur une
@@ -69,9 +68,9 @@ public sealed class GpuDetector
     }
 
     // Une ligne Win32_VideoController par controleur. Sur une machine iGPU + carte dediee, prendre
-    // la premiere collait le pilote de l'iGPU sur la carte. La ligne se retrouve par son nom (WMI
-    // Name et DXGI Description viennent tous deux du DriverDesc du pilote : identiques ici, RTX 4060
-    // le 25/09/2026), sinon par le fabricant dans PNPDeviceID (« PCI\VEN_10DE&... ») s'il n'y en a
+    // la premiere collerait le pilote de l'iGPU sur la carte. La ligne se retrouve par son nom (WMI
+    // Name et DXGI Description viennent tous deux du DriverDesc du pilote : identiques, relevé sur une RTX 4060),
+    // sinon par le fabricant dans PNPDeviceID (« PCI\VEN_10DE&... ») s'il n'y en a
     // qu'une. Seule ligne de la machine : c'est la sienne. Sinon « Unknown », jamais le pilote d'un
     // autre controleur.
     private IReadOnlyList<WmiRow> ReadControllers()

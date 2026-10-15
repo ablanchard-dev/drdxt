@@ -3,10 +3,10 @@ using DrDxt.Detection;
 using DrDxt.Detection.Repair;
 using Microsoft.Extensions.DependencyInjection;
 
-// Enregistre CETTE machine pour tests/Shared/machines (chantier B8a, B8b) : inventaire, réglages et constats du
+// Enregistre CETTE machine pour tests/Shared/machines : inventaire, réglages et constats du
 // docteur, en lecture seule. Usage : enregistreur <fichier.json> <nom> [note]. Lancé sans élévation, il enregistre ce
 // qu'un compte sans droits administrateur voit.
-// 07/10/2026 (T1) : même format et même anonymisation que « Exporter ma machine » de l'App (MachineExportee) ; le
+// Même format et même anonymisation que « Exporter ma machine » de l'App (MachineExportee) ; le
 // dossier du compte devient « joueur », les numéros de série et adresses de ce PC sont retirés.
 if (args.Length < 2)
 {

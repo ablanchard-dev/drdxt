@@ -5,30 +5,27 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. L'installateur CREE le service de mesure, le helper le CHERCHE.
+// L'installateur CREE le service de mesure, le helper le CHERCHE.
 // Deux litteraux, dans deux langages, tenus alignes a la main :
 //
 //   installer/DrDXT.iss                       #define PmService "PresentMonService"
 //   ElevatedHelper/Win32ServiceActions.cs     PresentMonServiceName = "PresentMonService"
 //
-// Le .iss dit meme, au-dessus des arguments : « Les arguments viennent de
-// PresentMonNaming (DrDxt.Core), et ils sont VIDES ». La phrase decrit un lien
-// qui n'existe pas -- rien ne les relie, et `PresentMonNaming` peut changer sans
-// que l'installateur bouge.
+// Rien ne relie ces deux litteraux : `PresentMonNaming` peut changer sans que
+// l'installateur bouge.
 //
 // Ce que couterait une divergence : l'installateur enregistre un service, le
 // helper en cherche un autre, et **la mesure ne demarre pas**. C'est la fonction
-// centrale du produit payant -- « Mesure tes perfs en jeu (FPS, 1% lows) via
-// PresentMon », promis dans le README du testeur. La desinstallation, elle,
+// centrale du produit : « Mesure tes perfs en jeu (FPS, 1% lows) via
+// PresentMon ». La desinstallation, elle,
 // laisserait derriere elle le service qu'elle vient de creer.
 //
 // Rien ne leverait : les deux moities marchent, elles ne parlent simplement pas
-// du meme service. Mesure du jour : elles sont d'accord, et personne ne le
-// garantissait.
+// du meme service. Ce test garantit qu'elles sont d'accord.
 //
-// Le test du 18/09 sur le README du testeur ne couvre pas ce cas : il verifie
-// que le .iss est coherent avec lui-meme (`{#PmService}` arrete puis supprime),
-// pas qu'il designe le service que le code connait.
+// Le test sur le README du testeur ne couvre pas ce cas : il verifie que le .iss
+// est coherent avec lui-meme (`{#PmService}` arrete puis supprime), pas qu'il
+// designe le service que le code connait.
 // -----------------------------------------------------------------------
 public sealed class LInstalleurEtLeCodeParlentDuMemeServiceTests
 {

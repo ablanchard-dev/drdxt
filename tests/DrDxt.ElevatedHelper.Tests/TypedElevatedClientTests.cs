@@ -7,13 +7,13 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// A3 (client side) — TypedNamedPipeElevatedClient serializes+signs a typed op
-// via the codec and surfaces the server's fail-clean codes.
+// TypedNamedPipeElevatedClient sérialise et signe une op typée
+// via le codec et remonte les codes d'échec propre du serveur.
 //
-// We drive the client over an in-memory transport seam (ITypedRequestTransport)
-// looped straight into a real TypedPrivilegedServer. This exercises the
-// client→codec→sign→server→allowlist→execute round-trip deterministically with
-// fakes — no real pipe, nothing elevated, nothing touches the system.
+// Le client est piloté par une couture de transport en mémoire (ITypedRequestTransport)
+// bouclée directement sur un vrai TypedPrivilegedServer. L'aller-retour
+// client → codec → signature → serveur → liste blanche → exécution se joue de façon
+// déterministe avec des faux : pas de vrai tube, rien d'élevé, rien ne touche au système.
 // -----------------------------------------------------------------------
 public sealed class TypedElevatedClientTests
 {
@@ -35,7 +35,7 @@ public sealed class TypedElevatedClientTests
         public Result Authorize(CallerInfo caller) => Result.Ok();
     }
 
-    /// <summary>Loops the client's request straight into a real server (same key).</summary>
+    /// <summary>Boucle la requête du client directement sur un vrai serveur (même clé).</summary>
     private sealed class LoopbackTransport : ITypedRequestTransport
     {
         private readonly TypedPrivilegedServer _server;
@@ -97,7 +97,7 @@ public sealed class TypedElevatedClientTests
     [Fact]
     public async Task Unsigned_op_payload_tampered_yields_signature_invalid()
     {
-        // Tamper the op JSON after signing → the HMAC no longer matches the body.
+        // Altérer le JSON de l'op après signature → le HMAC ne correspond plus au corps.
         var key = NewKey();
         var (client, exec) = BuildPair(key, tamper: req =>
             req with { OpJson = req.OpJson.Replace("batch", "tampered-description") });

@@ -6,14 +6,14 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Gpu.Adlx;
 
 // -----------------------------------------------------------------------
-// AdlxGpuTuningReaderTests — fake-based unit tests for AdlxGpuTuningReader.
+// AdlxGpuTuningReaderTests : tests unitaires sur faux d'AdlxGpuTuningReader.
 //
-// ALL tests use FakeAdlxNative — no native ADLX calls, no AMD GPU needed.
-// The test suite pins:
-//   1. FAIL-CLEAN: when native is unavailable, every read returns Fail.
-//   2. PASS-THROUGH: when native succeeds, reader maps raw reads to Result.Ok.
-//   3. ERROR CODES: all failures carry ErrorCodes.TweakSdkUnavailable.
-//   4. INPUT GUARD: negative GPU index → Fail before any native call.
+// Tous les tests utilisent FakeAdlxNative : aucun appel ADLX natif, aucune carte AMD requise.
+// La suite fige :
+//   1. Échec propre : natif indisponible → chaque lecture rend Fail.
+//   2. Transmission : natif réussi → le lecteur traduit les lectures brutes en Result.Ok.
+//   3. Codes d'erreur : chaque échec porte ErrorCodes.TweakSdkUnavailable.
+//   4. Garde d'entrée : index GPU négatif → Fail avant tout appel natif.
 // -----------------------------------------------------------------------
 public sealed class AdlxGpuTuningReaderTests
 {
@@ -76,7 +76,7 @@ public sealed class AdlxGpuTuningReaderTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
     }
 
-    // ── ResolveTunableGpuIndex (T4 — discrete-GPU selection) ──────────────
+    // ── ResolveTunableGpuIndex (choix de la carte dédiée) ────────────────
 
     [Fact]
     public void ResolveTunableGpuIndex_returns_fail_when_native_unavailable()
@@ -99,8 +99,8 @@ public sealed class AdlxGpuTuningReaderTests
     [Fact]
     public void ResolveTunableGpuIndex_skips_unsupported_igpu_and_picks_discrete_card()
     {
-        // 2-GPU box: iGPU at index 0 is not tunable (read fails); the discrete AMD card
-        // at index 1 reads OK → the resolver must select index 1, not the iGPU at 0.
+        // Machine à 2 cartes : l'iGPU à l'index 0 n'est pas réglable (lecture en échec) ; la carte AMD
+        // dédiée à l'index 1 se lit → le résolveur doit choisir l'index 1, pas l'iGPU en 0.
         var fake = new FakeAdlxNative
         {
             IsAvailable        = true,
@@ -114,7 +114,7 @@ public sealed class AdlxGpuTuningReaderTests
     [Fact]
     public void ResolveTunableGpuIndex_fails_clean_when_no_index_reads()
     {
-        // 0-tunable-GPU box: no index's GFX tuning reads → fail-clean, never an index.
+        // Machine sans GPU réglable : aucun index ne lit son réglage GFX → échec propre, jamais un index.
         var fake = new FakeAdlxNative { IsAvailable = true, GfxSuccess = false };
         var r    = new AdlxGpuTuningReader(fake).ResolveTunableGpuIndex();
         r.IsOk.Should().BeFalse();
@@ -238,7 +238,7 @@ public sealed class AdlxGpuTuningReaderTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
     }
 
-    // ── Native unavailable never throws ───────────────────────────────────
+    // ── Natif indisponible : ne lève jamais ──────────────────────────────────
 
     [Fact]
     public void All_reads_on_unavailable_native_never_throw()
@@ -254,33 +254,33 @@ public sealed class AdlxGpuTuningReaderTests
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// FakeAdlxNative — in-process substitute for unit tests.
-// Never calls amdadlx64.dll; fully configurable per test.
+// FakeAdlxNative : substitut en processus pour les tests unitaires.
+// N'appelle jamais amdadlx64.dll ; entièrement configurable par test.
 //
-// Write safety guarantee: the Set* properties and LastSet* fields are the
-// Only way write calls are observed. The real SetGPUMaxFrequency / SetPowerLimit
-// P/Invokes are never reached — amdadlx64.dll is not loaded in test processes.
+// Garantie d'écriture : les propriétés Set* et les champs LastSet* sont la seule
+// façon d'observer les appels d'écriture. Les vrais P/Invoke SetGPUMaxFrequency / SetPowerLimit
+// ne sont jamais atteints : amdadlx64.dll n'est pas chargée dans les processus de test.
 // ────────────────────────────────────────────────────────────────────────
 internal sealed class FakeAdlxNative : IAdlxNative
 {
     public bool IsAvailable { get; set; }
 
-    // ── read state ────────────────────────────────────────────────────────
+    // ── état de lecture ───────────────────────────────────────────────────
 
-    // Graphics tuning
+    // Réglage graphique
     public bool         GfxSuccess { get; set; } = true;
     public AdlxGfxReads GfxReads   { get; set; }
 
-    /// <summary>Optional per-index override for GFX read success — models an iGPU + dGPU
-    /// box where only the discrete card's index reads. When null, falls back to
-    /// <see cref="GfxSuccess"/> for every index.</summary>
+    /// <summary>Dérogation optionnelle par index du succès de lecture GFX : modélise une machine
+    /// iGPU + dGPU où seul l'index de la carte dédiée se lit. Null → repli sur
+    /// <see cref="GfxSuccess"/> pour chaque index.</summary>
     public Func<int, bool>? GfxSuccessForIndex { get; set; }
 
-    // Power tuning
+    // Réglage de puissance
     public bool           PowerSuccess { get; set; } = true;
     public AdlxPowerReads PowerReads   { get; set; }
 
-    // Fan tuning
+    // Réglage de ventilation
     public bool         FanSuccess { get; set; } = true;
     public AdlxFanReads FanReads   { get; set; }
 
@@ -302,33 +302,33 @@ internal sealed class FakeAdlxNative : IAdlxNative
         return FanSuccess;
     }
 
-    // ── write state ───────────────────────────────────────────────────────
-    // These fields record and control write behaviour without touching any driver.
+    // ── état d'écriture ───────────────────────────────────────────────────────
+    // Ces champs enregistrent et contrôlent le comportement d'écriture sans toucher aucun pilote.
 
-    /// <summary>Controls whether TrySetGfx returns true (default) or false.</summary>
+    /// <summary>Contrôle si TrySetGfx rend true (défaut) ou false.</summary>
     public bool SetGfxSuccess { get; set; } = true;
 
-    /// <summary>What TrySetGfx returns in 'original' — defaults to GfxReads so tests
-    /// can configure a single source of truth for current GFX state.</summary>
+    /// <summary>Ce que TrySetGfx rend dans 'original' ; par défaut GfxReads, pour que les tests
+    /// configurent une seule source de l'état GFX courant.</summary>
     public AdlxGfxReads SetGfxOriginal { get; set; }
 
-    /// <summary>The (MaxFreqMhz, VoltMv) tuple last passed to TrySetGfx, or null if
-    /// TrySetGfx was never called. Use in tests to assert what was written.</summary>
+    /// <summary>Le couple (MaxFreqMhz, VoltMv) passé en dernier à TrySetGfx, ou null si
+    /// TrySetGfx n'a jamais été appelé. Sert à vérifier ce qui a été écrit.</summary>
     public (int MaxFreqMhz, int VoltMv)? LastSetGfx { get; private set; }
 
-    /// <summary>Total number of TrySetGfx calls (use to assert write was not called).</summary>
+    /// <summary>Nombre total d'appels à TrySetGfx (pour vérifier que l'écriture n'a pas eu lieu).</summary>
     public int SetGfxCallCount { get; private set; }
 
-    /// <summary>Controls whether TrySetPowerLimit returns true (default) or false.</summary>
+    /// <summary>Contrôle si TrySetPowerLimit rend true (défaut) ou false.</summary>
     public bool SetPowerSuccess { get; set; } = true;
 
-    /// <summary>What TrySetPowerLimit returns in 'original'.</summary>
+    /// <summary>Ce que TrySetPowerLimit rend dans 'original'.</summary>
     public AdlxPowerReads SetPowerOriginal { get; set; }
 
-    /// <summary>The power-limit percent last passed to TrySetPowerLimit, or null.</summary>
+    /// <summary>Le pourcentage de limite de puissance passé en dernier à TrySetPowerLimit, ou null.</summary>
     public int? LastSetPower { get; private set; }
 
-    /// <summary>Total number of TrySetPowerLimit calls.</summary>
+    /// <summary>Nombre total d'appels à TrySetPowerLimit.</summary>
     public int SetPowerCallCount { get; private set; }
 
     public bool TrySetGfx(int gpuIndex, int newMaxFreqMhz, int newVoltMv, out AdlxGfxReads original)
@@ -349,9 +349,9 @@ internal sealed class FakeAdlxNative : IAdlxNative
         return true;
     }
 
-    // ── Diagnostics ───────────────────────────────────────────────────────
-    // Synthesises a probe from the fake's flags so tests can exercise the
-    // diagnostic surface without amdadlx64.dll.
+    // ── Diagnostics ───────────────────────────────────────────────────────────
+    // Synthétise une sonde depuis les drapeaux du faux pour que les tests exercent la
+    // surface de diagnostic sans amdadlx64.dll.
     public IReadOnlyList<GpuProbeStep> ProbeGfxPath(int gpuIndex)
     {
         if (!IsAvailable)

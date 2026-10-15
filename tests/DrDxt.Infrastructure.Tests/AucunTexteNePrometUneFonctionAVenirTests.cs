@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Infrastructure.Tests;
 
 // -----------------------------------------------------------------------
-// 27/09/2026. Relu dans les textes : « GPU AMD détecté : optimisation bientôt disponible ». Aucune ligne du
+// Relu dans les textes : « GPU AMD détecté : optimisation bientôt disponible ». Aucune ligne du
 // produit ne l'affichait plus, et DrDXT n'écrit sur aucune carte graphique dans cette version : c'était une
 // promesse fausse en réserve, prête à revenir au premier branchement distrait. Un texte dit ce que le produit
 // fait aujourd'hui ; ce qui viendra se dit le jour où il vient.

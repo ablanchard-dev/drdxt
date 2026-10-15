@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>CONTRIB1 (08/10/2026, « faut que ce soit direct en lien ») : le rapport part par un ticket GitHub pré-rempli,
+/// <summary>Le rapport part par un ticket GitHub pré-rempli,
 /// sans serveur ; DrDXT n'envoie rien lui-même, le joueur relit et soumet.</summary>
 public sealed class LienDeRapportTests
 {
@@ -48,7 +48,7 @@ public sealed class LienDeRapportTests
         finally { File.Delete(chemin); }
     }
 
-    /// <summary>RAPPORT-FINAL (09/10/2026) : ce qui se fait à la main se lit sur le dépôt, depuis la liste des leviers.</summary>
+    /// <summary>Ce qui se fait à la main se lit sur le dépôt, depuis la liste des leviers.</summary>
     [Fact]
     public void Le_guide_de_ce_qui_se_fait_a_la_main_s_ouvre_depuis_l_App()
     {

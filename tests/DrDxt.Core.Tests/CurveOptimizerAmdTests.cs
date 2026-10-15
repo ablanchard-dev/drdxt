@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.Core.Tests;
 
-// 07/10/2026 (A7) : Curve Optimizer, guide BIOS pour un Ryzen de bureau 5000 et plus ; jamais écrit.
+// Curve Optimizer, guide BIOS pour un Ryzen de bureau 5000 et plus ; jamais écrit.
 public sealed class CurveOptimizerAmdTests
 {
     [Theory]

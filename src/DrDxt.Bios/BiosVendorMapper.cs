@@ -3,10 +3,10 @@ using DrDxt.Core;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// Maps a raw <see cref="MotherboardInfo.Manufacturer"/> string (as WMI reports it,
-/// e.g. "ASUSTeK COMPUTER INC.", "Micro-Star International Co., Ltd.") to a
-/// <see cref="BiosVendor"/>. Case/space-insensitive; an unrecognized vendor maps to
-/// <see cref="BiosVendor.Unknown"/> (which still gets a prudent generic guide).
+/// Relie une chaîne brute <see cref="MotherboardInfo.Manufacturer"/> (telle que WMI la rapporte,
+/// par exemple « ASUSTeK COMPUTER INC. », « Micro-Star International Co., Ltd. ») à un
+/// <see cref="BiosVendor"/>. Sans tenir compte de la casse ni des espaces ; un constructeur non
+/// reconnu donne <see cref="BiosVendor.Unknown"/> (qui reçoit quand même un guide générique prudent).
 /// </summary>
 public static class BiosVendorMapper
 {

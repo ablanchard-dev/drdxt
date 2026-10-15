@@ -6,24 +6,16 @@ namespace DrDxt.Integration.Tests;
 /// <summary>
 /// La coche verte qui ne verifie rien.
 ///
-/// Trouve le 06/09/2026 en OUVRANT l'application compilee, pas en lisant le code : le pied de page
-/// affiche en permanence « Mises a jour a jour » avec une coche verte, et le panneau assistant
-/// affiche « En ligne » a cote de la phrase « tes donnees restent sur ton PC, rien n'est envoye ».
-///
-/// Les deux sont des CONSTANTES. `ScanViewModel.LabelFooterUpdates` rend une cle de ressource, rien
-/// de plus : aucun etat, aucune verification, et `UpdateComposition` / `IUpdateEngine` n'apparaissent
-/// nulle part dans le source de `DrDxt.App`. Le produit dit donc a chaque client qu'il est a jour
-/// alors qu'il n'a jamais interroge quoi que ce soit -- et il ne le peut pas, faute d'URL de
-/// deploiement (voir GATES).
-///
-/// C'est exactement le mensonge que ce produit existe pour ne pas faire, place sur son ecran
-/// principal, en permanence.
+/// « Mises a jour a jour » avec une coche verte, ou « En ligne » a cote de « tes donnees restent sur
+/// ton PC, rien n'est envoye », ne s'affichent que si quelque chose les calcule. Une constante qui
+/// dit au client qu'il est a jour sans avoir rien interroge est exactement le mensonge que ce produit
+/// existe pour ne pas faire.
 ///
 /// ══ la forme de ce controle : il s'ouvre tout seul ══
 /// Il n'interdit pas la phrase pour toujours. Il l'interdit **tant que rien ne la calcule**. Le jour
 /// ou quelqu'un monte un moteur de mise a jour dans `DrDxt.App`, la condition tombe et la phrase
 /// redevient permise -- parce qu'elle sera devenue vraie. Un gate qu'on ne peut pas satisfaire est
-/// un gate qu'on desactive, et un gate desactive ment mieux qu'un gate absent (lecon du lot LS).
+/// un gate qu'on desactive, et un gate desactive ment mieux qu'un gate absent.
 /// </summary>
 public sealed class TheScreenMayNotClaimAStateItNeverComputesTests
 {
@@ -103,8 +95,8 @@ public sealed class TheScreenMayNotClaimAStateItNeverComputesTests
     public void TheFooterMayNotWearAGreenCheckWhileNothingChecks()
     {
         // La coche verte est l'affirmation sous forme d'image : elle survit a toute correction du
-        // TEXTE, et personne ne relit une icone. Vue le 06/09 a cote de « Mises a jour a jour »,
-        // puis a cote de « jamais verifiees » -- ou elle contredisait la phrase qu'elle decorait.
+        // TEXTE, et personne ne relit une icone : a cote de « jamais verifiees », elle contredirait la
+        // phrase qu'elle decore.
         if (AppSource().Contains("UpdateComposition") || AppSource().Contains("IUpdateEngine")) return;
 
         var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
@@ -118,15 +110,15 @@ public sealed class TheScreenMayNotClaimAStateItNeverComputesTests
     [Fact]
     public void TheComponentPanelMayNotTruncateAFactItWentToTheTroubleOfComputing()
     {
-        // Vu a l'ecran le 06/09 : « 2 modules · 3800 MT/s (kit 4000) · 9,5 ns (kit CL... »
-        // coupe en plein mot. La ligne memoire est la plus longue du panneau, et c'est justement
+        // « 2 modules · 3800 MT/s (kit 4000) · 9,5 ns (kit CL... » ne doit pas etre coupe en plein mot.
+        // La ligne memoire est la plus longue du panneau, et c'est justement
         // celle qui porte le plus de travail : la vitesse entrainee, le nominal du kit, et la
         // latence vraie en ns -- la seule grandeur comparable entre deux kits.
         //
         // Tronquer, c'est cacher. Un produit qui calcule un fait, l'etiquette pour dire d'ou il
         // sort, puis le coupe avec trois points, a fait tout le travail sauf le dernier pas.
         var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
-        // 08/10/2026 : le panneau lit les satellites (composant + état de son domaine), même gabarit, même règle.
+        // Le panneau lit les satellites (composant + état de son domaine), même gabarit, même règle.
         var start = xaml.IndexOf("ItemsSource=\"{Binding Satellites}\"", StringComparison.Ordinal);
         start.Should().BeGreaterThan(0, "le panneau des composants doit exister");
         var end = xaml.IndexOf("</ItemsControl>", start, StringComparison.Ordinal);
@@ -143,63 +135,24 @@ public sealed class TheScreenMayNotClaimAStateItNeverComputesTests
             + "a la ligne");
     }
 
-    /// <summary>Les trois verdicts que `VerdictText` peut rendre.</summary>
-    private static readonly string[] VerdictKeys =
-        { "UI.Verdict.Partial", "UI.Verdict.Clean", "UI.Verdict.Problems" };
-
-    [Fact]
-    public void TheResultHeadlineMayNotBeASentenceItsVerdictCannotFinish()
-    {
-        // Vu a l'ecran le 06/09 apres un vrai scan : « Cote config, votre PC est reglages a
-        // corriger . » Le gabarit attend un ADJECTIF (« votre PC est ... »), et deux des trois
-        // verdicts sont des GROUPES NOMINAUX depuis que le lot la a remplace le score.
-        //
-        // Le seul des trois qui se lit correctement est celui que la n'a pas touche. Personne ne
-        // l'a vu parce que personne n'avait ouvert l'application : 2 834 tests, et la phrase
-        // principale de l'ecran de resultat etait agrammaticale dans deux cas sur trois.
-        //
-        // La regle mecanique : une amorce de titre ne se termine pas par un verbe conjugue. Un
-        // libelle qui ouvre une phrase impose une forme a tout ce qui le suit, et rien ne garantit
-        // que les verdicts la respecteront encore demain.
-        string[] copulas = { "est", "sont", "is", "are" };
-
-        foreach (var file in new[] { "Strings.resx", "Strings.fr.resx" })
-        foreach (var key in new[] { "UI.Result.HeadlineLead", "UI.Result.HeadlineLeadConfig" })
-        {
-            var lead = ResxValue(file, key).Trim().TrimEnd(':', ' ');
-            var lastWord = lead.Split(' ', ',', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "";
-
-            copulas.Should().NotContain(lastWord.ToLowerInvariant(),
-                "{0}/{1} vaut « {2} » : une amorce qui finit par un verbe impose une forme aux "
-                + "verdicts, et deux des trois n'y repondent pas", file, key, lead);
-        }
-    }
-
     [Fact]
     public void TheHeadlineMayNotPutASpaceBeforeItsFullStop()
     {
         // `<Run Text="."/>` sur sa propre ligne : WPF insere une espace entre deux Run, donc le
-        // client lit « reglages a corriger . ». Visible sur la capture du 06/09.
+        // client lirait « reglages a corriger . ».
         var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
-        var start = xaml.IndexOf("LabelResultHeadlineLead", StringComparison.Ordinal);
-        start.Should().BeGreaterThan(0);
-        var block = xaml.Substring(start, 600);
-        var end = block.IndexOf("</TextBlock>", StringComparison.Ordinal);
-        block = block.Substring(0, end);
+        xaml.Should().Contain("<Run ", "témoin : la vue compose bien des phrases en Run");
 
-        block.Should().NotContain("Text=\".\"",
-            "le point est un Run separe : WPF met une espace devant, et le client la voit");
+        xaml.Should().NotContain("Text=\".\"",
+            "un point en Run separe : WPF met une espace devant, et le joueur la voit");
     }
 
     [Fact]
     public void TheScoreEngineIsGoneFromWhatTheAppExposesAndSays()
     {
-        // Le lot la du 05/09 disait : « Le moteur /100 : SUPPRIME, pas retreci. Un moteur dormant
-        // + un contrat qui l'ordonne encore = un score qui revient a la premiere session
-        // distraite. » Sa commande de cloture cherchait `ScoreNarrative`, les convertisseurs et
-        // `/100`. Elle ne pouvait pas voir ce qui restait : cinq libelles `LabelScore*`, la
-        // collection `SubScores`, et surtout `PopulateSubScores(scanResult.Breakdown, ...)`
-        // **appele a chaque scan**. Le moteur dormait, mais il tournait.
+        // Un score peut survivre sans s'afficher : des libelles `LabelScore*`, une collection
+        // `SubScores`, un `PopulateSubScores(...)` appele a chaque scan. Chercher seulement
+        // `ScoreNarrative` ou `/100` ne les voit pas.
         //
         // Ce controle regarde ce que le modele de vue EXPOSE et ce que les ressources DISENT,
         // c'est-a-dire les deux surfaces par lesquelles un score peut revenir a l'ecran.

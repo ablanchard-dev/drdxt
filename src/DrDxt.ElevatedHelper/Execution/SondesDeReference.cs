@@ -8,7 +8,7 @@ using Microsoft.Win32;
 namespace DrDxt.ElevatedHelper.Execution;
 
 // -----------------------------------------------------------------------
-// 11/09/2026 — les deux sondes de la reference de derive, lues par le helper eleve au moment du
+// Les deux sondes de la reference de derive, lues par le helper eleve au moment du
 // CommitManifestOp (MachineManifestCommit → ApplyReferenceSeedingStore). Lecture seule.
 // Simplification voulue : memes lectures que RegistryOsBuildProbe / WmiGpuDriverProbe (DrDxt.Reconciler.Adapters), qui
 // tirent Detection ; le helper eleve reste sans Detection. Meme jeton, meme regle d'absence.

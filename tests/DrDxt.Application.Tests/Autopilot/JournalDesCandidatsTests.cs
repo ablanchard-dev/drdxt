@@ -140,8 +140,8 @@ public sealed class JournalDesCandidatsTests : IDisposable
     [Fact]
     public void Une_ligne_ecrite_AVANT_la_scene_se_relit_scene_non_consignee()
     {
-        // Une vraie ligne du produit, amputee des trois champs : la forme exacte de ce qu'ecrivait
-        // le journal jusqu'au 11/09/2026.
+        // Une vraie ligne du produit, amputee des trois champs : la forme qu'ecrit une ancienne version
+        // du journal.
         SessionP95Seul(Journal());
         var noeud = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllLines(Chemin).Single())!.AsObject();
         noeud.Remove("Scene");
@@ -156,7 +156,7 @@ public sealed class JournalDesCandidatsTests : IDisposable
         ancienne.DescriptionScene.Should().BeNull();
     }
 
-    // 26/09/2026 : une preuve invalide porte NaN (Evidence.Invalide), et le JSON par defaut refuse d'ecrire
+    // Une preuve invalide porte NaN (Evidence.Invalide), et le JSON par defaut refuse d'ecrire
     // NaN. Un seul candidat non decidable faisait perdre toutes les lignes de la session.
     [Fact]
     public void Une_preuve_invalide_se_consigne_au_lieu_de_faire_perdre_la_session()

@@ -7,13 +7,13 @@ public enum EtatConstat { Lu, NonLu, SansObjet }
 public enum Annulation { SansObjet, Oui, AuRedemarrage, Non }
 
 /// <summary>
-/// 06/10/2026 (chantier B0) : la forme commune des constats que l'écran affiche, quelle que soit leur famille
+/// La forme commune des constats que l'écran affiche, quelle que soit leur famille
 /// (santé, scan, BIOS). L'UI n'a plus qu'à afficher ces champs ; elle ne calcule rien.
 /// </summary>
 /// <param name="Id">Stable d'un scan à l'autre : la clé du texte (scan, BIOS) ou « sante/domaine/nom ».</param>
 /// <param name="Titre">Clé de ressource (scan, BIOS) ; libellé déjà en français (santé, dont les textes vivent dans Core).</param>
 /// <param name="Valeur">Ce qui est lu, tel quel. null = non lu, ou une famille qui ne porte pas de valeur (scan).</param>
-/// <param name="Pourquoi">Clé (BIOS) ou explication (santé). null = la famille n'en porte pas (scan, voir §9 F-1).</param>
+/// <param name="Pourquoi">Clé (BIOS) ou explication (santé). null = la famille n'en porte pas (scan).</param>
 /// <param name="Source">Ce qui a posé la valeur, ou la source du gain, quand elle est réellement connue.</param>
 /// <param name="Geste">Ce que DrDXT propose : clé (BIOS) ou action (santé). null = rien à faire.</param>
 public sealed record Constat(
@@ -42,7 +42,7 @@ public sealed record Constat(
     public static Constat Depuis(RepairFinding f) => new(
         $"sante/{f.Domaine}/{f.Nom}", "sante", f.Domaine, GraviteDe(f.Statut),
         f.Statut == RepairStatus.Unknown || f.ValeurCourante is null ? EtatConstat.NonLu : EtatConstat.Lu,
-        RepairLibelles.Nom(f.Nom), f.ValeurCourante, f.ValeurAttendue, f.Explication, f.Provenance,
+        RepairLibelles.Nom(f.Domaine, f.Nom), f.ValeurCourante, f.ValeurAttendue, f.Explication, f.Provenance,
         f.Action == RepairAction.Aucune ? null : f.Action.ToString(), Annulation.SansObjet);
 
     // Les clés du scan qui disent elles-mêmes « non lisible » finissent par « Unknown » (Finding.Gpu.ReBarUnknown…).

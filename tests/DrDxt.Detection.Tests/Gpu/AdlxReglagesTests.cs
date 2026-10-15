@@ -10,7 +10,7 @@ using NSubstitute;
 
 namespace DrDxt.Detection.Tests.Gpu;
 
-// A1 (06/10/2026) : les réglages AMD lus par ADLX arrivent là où le produit lit déjà ceux de NVIDIA (ReBAR, couture
+// Les réglages AMD lus par ADLX arrivent là où le produit lit déjà ceux de NVIDIA (ReBAR, couture
 // de latence, limite d'images, constats de santé). Non lus, ils restent « non lu » nommé.
 public sealed class AdlxReglagesTests
 {
@@ -123,7 +123,7 @@ public sealed class AdlxReglagesTests
         => RepairAuditService.TemperatureCarteNonLue([G("AMD Radeon RX 7800 XT")], RienLu)
             .Should().Contain("AMD Radeon RX 7800 XT").And.Contain("amdadlx64.dll absente").And.Contain("HWiNFO");
 
-    // Revue T3+T4 (F-23) : APU + Radeon dédiée, l'ordre de Windows met la puce intégrée d'abord ; la phrase nomme la
+    // APU + Radeon dédiée, l'ordre de Windows met la puce intégrée d'abord ; la phrase nomme la
     // carte dédiée (la plus grosse mémoire).
     [Fact]
     public void Avec_une_puce_integree_en_premier_la_carte_dediee_est_nommee()
@@ -160,13 +160,13 @@ public sealed class AdlxReglagesTests
         RepairAuditService.TemperatureAdlx([G("NVIDIA GeForce RTX 4060")], new(TemperatureC: 61.4)).Should().BeNull();
     }
 
-    // F-24 : une Intel Arc sans NVIDIA reçoit un « non lu », avec le logiciel Intel.
+    // Une Intel Arc sans NVIDIA reçoit un « non lu », avec le logiciel Intel.
     [Fact]
     public void La_limite_d_images_d_une_Intel_Arc_se_dit_non_lue()
         => RepairAuditService.LimiteImagesHorsNvidia([G("Intel(R) Arc(TM) B580 Graphics")], RienLu)
             .Single().Explication.Should().Contain("Intel(R) Arc(TM) B580 Graphics").And.Contain("logiciel Intel");
 
-    // chantier B5 a : la limite d'images d'une carte AMD non lue est un « non lu » dit, pas un silence.
+    // La limite d'images d'une carte AMD non lue est un « non lu » dit, pas un silence.
     [Fact]
     public void La_limite_d_images_d_une_carte_AMD_non_lue_se_dit_non_lue_avec_la_raison()
     {

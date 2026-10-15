@@ -5,16 +5,16 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// T8-T12 — ClassifyDriftAsync (WindowsReset / UserIntentional / Unknown).
+// ClassifyDriftAsync (WindowsReset / UserIntentional / Unknown).
 //
-// Heuristic (plan §4), not magic:
-//   * build CHANGED since apply + current == original (stock)        → WindowsReset
-//   * per-vendor DriverVersion CHANGED + GPU tweak drifted           → WindowsReset (T8b/T8c)
-//   * build UNCHANGED + current is a THIRD value (≠desired ≠original) → UserIntentional
-//   * build UNCHANGED + current == original                          → Unknown (ambiguous)
-//   * current == desired                                             → no drift (Unknown, no effect)
-//   * probe fails                                                    → Fail (no guess, no write)
-// ClassifyDriftAsync never writes.
+// Une heuristique, pas de la magie :
+//   * build changé depuis l'application + courant == origine (stock)     → WindowsReset
+//   * DriverVersion du constructeur changé + levier GPU dérivé            → WindowsReset
+//   * build inchangé + courant est une troisième valeur (≠voulu ≠origine) → UserIntentional
+//   * build inchangé + courant == origine                                 → Unknown (ambigu)
+//   * courant == voulu                                                    → pas de dérive (Unknown, sans effet)
+//   * la sonde échoue                                                     → Fail (ni supposition ni écriture)
+// ClassifyDriftAsync n'écrit jamais.
 // -----------------------------------------------------------------------
 public sealed class DriftClassificationTests
 {
@@ -33,14 +33,14 @@ public sealed class DriftClassificationTests
             },
         };
 
-    // T8 — build changed + value is back to original (stock reset pattern).
+    // Build changé + valeur revenue à l'origine (motif de remise à zéro).
     [Fact]
     public async Task ClassifyDriftAsync_BuildChanged_ValueIsOriginal_ReturnsWindowsReset()
     {
         var h = new ReconcilerHarness(StateWithItem(lastBuild: "22631.3447"));
         h.Policy.Map("reflex.lowlatency", ReconcileSurface.Registry);
-        h.BuildProbe.Build = "22635.5000";                 // build CHANGED
-        h.Probe.Set("reflex.lowlatency", "{\"v\":0}");      // current == original
+        h.BuildProbe.Build = "22635.5000";                 // build changé
+        h.Probe.Set("reflex.lowlatency", "{\"v\":0}");      // courant == origine
 
         var cause = await h.Build().ClassifyDriftAsync(Reg(desired: "{\"v\":2}", original: "{\"v\":0}"));
 
@@ -48,15 +48,15 @@ public sealed class DriftClassificationTests
         cause.Value.Should().Be(DriftCause.WindowsReset);
     }
 
-    // T8b — NVIDIA DriverVersion changed → WindowsReset-class (non-user) cause.
+    // NVIDIA DriverVersion changed → WindowsReset-class (non-user) cause.
     [Fact]
     public async Task ClassifyDriftAsync_NvidiaDriverVersionChanged_ReturnsWindowsReset()
     {
         var h = new ReconcilerHarness(StateWithItem(lastBuild: "22631.3447", lastDriver: "555.99"));
         h.Policy.Map("gpu.drs", ReconcileSurface.Registry).Vendor("gpu.drs", "NVIDIA");
-        h.BuildProbe.Build = "22631.3447";                 // build UNCHANGED
-        h.DriverProbe.Set("NVIDIA", "560.00");             // driver CHANGED
-        h.Probe.Set("gpu.drs", "0");                        // drifted (≠ desired)
+        h.BuildProbe.Build = "22631.3447";                 // build inchangé
+        h.DriverProbe.Set("NVIDIA", "560.00");             // pilote changé
+        h.Probe.Set("gpu.drs", "0");                        // dérivé (≠ voulu)
 
         var cause = await h.Build().ClassifyDriftAsync(
             new AppliedTweak("gpu.drs", "1", "0", At));
@@ -65,14 +65,14 @@ public sealed class DriftClassificationTests
         cause.Value.Should().Be(DriftCause.WindowsReset);
     }
 
-    // T8c — AMD driver change drives the same non-user cause.
+    // Un changement de pilote AMD mène à la même cause non utilisateur.
     [Fact]
     public async Task ClassifyDriftAsync_AmdDriverVersionChanged_ReturnsWindowsReset()
     {
         var h = new ReconcilerHarness(StateWithItem(lastBuild: "22631.3447", lastDriver: "24.5.1"));
         h.Policy.Map("gpu.drs", ReconcileSurface.Registry).Vendor("gpu.drs", "AMD");
         h.BuildProbe.Build = "22631.3447";
-        h.DriverProbe.Set("AMD", "24.8.1");                // AMD driver changed
+        h.DriverProbe.Set("AMD", "24.8.1");                // pilote AMD changé
         h.Probe.Set("gpu.drs", "0");
 
         var cause = await h.Build().ClassifyDriftAsync(new AppliedTweak("gpu.drs", "1", "0", At));
@@ -81,14 +81,30 @@ public sealed class DriftClassificationTests
         cause.Value.Should().Be(DriftCause.WindowsReset);
     }
 
-    // T9 — no build change + a foreign (third) value → user did something.
+    // Un nouveau pilote et une TROISIÈME valeur (ni celle de DrDXT ni l'origine) : c'est le joueur, ou un défaut du pilote
+    // qu'on ne sait pas distinguer ; dans le doute, sa valeur est respectée (elle était écrasée comme une remise à zéro).
+    [Fact]
+    public async Task ClassifyDriftAsync_DriverChanged_ValueIsForeign_ReturnsUserIntentional()
+    {
+        var h = new ReconcilerHarness(StateWithItem(lastBuild: "22631.3447", lastDriver: "555.99"));
+        h.Policy.Map("gpu.drs", ReconcileSurface.Registry).Vendor("gpu.drs", "NVIDIA");
+        h.BuildProbe.Build = "22631.3447";
+        h.DriverProbe.Set("NVIDIA", "560.00");
+        h.Probe.Set("gpu.drs", "3");                        // ni désirée (1) ni origine (0)
+
+        var cause = await h.Build().ClassifyDriftAsync(new AppliedTweak("gpu.drs", "1", "0", At));
+
+        cause.Value.Should().Be(DriftCause.UserIntentional);
+    }
+
+    // Pas de changement de build + une valeur étrangère (troisième) → le joueur a fait quelque chose.
     [Fact]
     public async Task ClassifyDriftAsync_NoBuildChange_ValueIsForeign_ReturnsUserIntentional()
     {
         var h = new ReconcilerHarness(StateWithItem(lastBuild: "22631.3447"));
         h.Policy.Map("reflex.lowlatency", ReconcileSurface.Registry);
-        h.BuildProbe.Build = "22631.3447";                 // build UNCHANGED
-        h.Probe.Set("reflex.lowlatency", "{\"v\":1}");      // ≠ desired AND ≠ original
+        h.BuildProbe.Build = "22631.3447";                 // build inchangé
+        h.Probe.Set("reflex.lowlatency", "{\"v\":1}");      // ≠ voulu et ≠ origine
 
         var cause = await h.Build().ClassifyDriftAsync(Reg(desired: "{\"v\":2}", original: "{\"v\":0}"));
 
@@ -96,14 +112,14 @@ public sealed class DriftClassificationTests
         cause.Value.Should().Be(DriftCause.UserIntentional);
     }
 
-    // T10 — no build change + value is exactly original → ambiguous (Unknown).
+    // Pas de changement de build + valeur exactement à l'origine → ambigu (Unknown).
     [Fact]
     public async Task ClassifyDriftAsync_NoBuildChange_ValueIsOriginal_ReturnsUnknown()
     {
         var h = new ReconcilerHarness(StateWithItem(lastBuild: "22631.3447"));
         h.Policy.Map("reflex.lowlatency", ReconcileSurface.Registry);
         h.BuildProbe.Build = "22631.3447";
-        h.Probe.Set("reflex.lowlatency", "{\"v\":0}");      // == original, no build change
+        h.Probe.Set("reflex.lowlatency", "{\"v\":0}");      // == origine, pas de changement de build
 
         var cause = await h.Build().ClassifyDriftAsync(Reg(desired: "{\"v\":2}", original: "{\"v\":0}"));
 
@@ -111,7 +127,7 @@ public sealed class DriftClassificationTests
         cause.Value.Should().Be(DriftCause.Unknown);
     }
 
-    // T11 — value == desired → no drift; returns a neutral cause, NO side effect.
+    // Valeur == voulu → pas de dérive ; rend une cause neutre, sans effet de bord.
     [Fact]
     public async Task ClassifyDriftAsync_ValueMatchesDesired_ReturnsNoDrift_NoSideEffect()
     {
@@ -128,7 +144,7 @@ public sealed class DriftClassificationTests
         h.Diagnostics.Entries.Should().BeEmpty();
     }
 
-    // T12 — probe failure → fail-clean, no guess, no write.
+    // Échec de la sonde → échec propre, ni supposition ni écriture.
     [Fact]
     public async Task ClassifyDriftAsync_WhenProbeFails_ReturnsFail()
     {

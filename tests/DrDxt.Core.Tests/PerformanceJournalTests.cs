@@ -172,7 +172,7 @@ public class PerformanceJournalTests
     [Fact]
     public void L_elagage_garde_une_REFERENCE_PAR_JEU()
     {
-        // Le defaut trouve en revue : la comparaison se fait par (machine, jeu), et l'elagage
+        // Le defaut trouve : la comparaison se fait par (machine, jeu), et l'elagage
         // ne gardait que la plus ancienne mesure du fichier. L'etalon de tous les autres jeux
         // disparaissait, et leur derive se serait ensuite calculee contre un passe deja degrade —
         // sans que rien ne le signale.
@@ -212,10 +212,10 @@ public class PerformanceJournalTests
     [Fact]
     public void Une_premiere_mesure_TROP_BRUITEE_ne_sert_pas_d_etalon()
     {
-        // Journal reel du 17/09/2026 : 164 ± 28 (17 %) le 11/09, pendant des compilations en fond ;
-        // 136 ± 5 en jeu le 16/09 ; puis, ici, une vraie baisse a 110 ± 4. Avec la premiere mesure
-        // comme etalon, la resolution vaudrait (28 + 4) / 164 = 19,5 % et la baisse de 33 % serait
-        // « non resolue ». Contre l'etalon du 16/09 : -19 % pour 6,6 % de resolution.
+        // Mesures reelles du journal : 164 ± 28 (17 %), pendant des compilations en fond ; 136 ± 5 en jeu ;
+        // puis, ici, une vraie baisse a 110 ± 4. Avec la premiere mesure comme etalon, la resolution
+        // vaudrait (28 + 4) / 164 = 19,5 % et la baisse de 33 % serait « non resolue ». Contre la
+        // deuxieme : -19 % pour 6,6 % de resolution.
         var journal = new[] { Mesure(0, 164, 28), Mesure(5, 136, 5), Mesure(30, 110, 4) };
 
         var etalon = PerformanceJournal.Etalon(journal);

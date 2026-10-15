@@ -4,7 +4,7 @@ using System.Windows.Media;
 namespace DrDxt.App.Effets;
 
 /// <summary>
-/// 03/10/2026 (boucle 2D2P, D5.6, revue) : « Maintiens pour …, ou Entrée » était écrit sous chaque action, six fois
+/// « Maintiens pour …, ou Entrée » était écrit sous chaque action, six fois
 /// par écran. Le geste s'apprend sur le rond de l'accueil ; dans les cartes « Agir », la consigne ne paraît qu'au survol
 /// ou au focus clavier de sa ligne. Elle garde sa place (opacité, pas de repli) : rien ne saute quand la souris passe.
 /// </summary>

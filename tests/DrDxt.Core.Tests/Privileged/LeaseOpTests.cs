@@ -4,23 +4,23 @@ using FluentAssertions;
 namespace DrDxt.Core.Tests.Privileged;
 
 // -----------------------------------------------------------------------
-// R2 (lease watchdog) — the two NEW closed PrivilegedOp leaves that drive the
-// helper-side dead-man's-switch:
-//   * EstablishLeaseOp — registers a held/reversible tweak's REVERT op + an
-//     expiry. The revert is carried as the codec-JSON of an existing typed op
-//     (RevertOpJson) so the watchdog re-binds it through the same bounded codec
-//     + allowlist at expiry — never a new generic privileged primitive.
-//   * RenewLeaseOp — heartbeat that extends a lease's expiry.
+// Les deux feuilles PrivilegedOp fermées qui pilotent
+// l'homme mort côté helper :
+//   * EstablishLeaseOp : enregistre l'op de retour arrière d'un levier tenu et réversible + une
+//     échéance. Le retour arrière est porté en JSON codec d'une op typée existante
+//     (RevertOpJson) pour que le chien de garde le relie par le même codec borné
+//     et la même liste blanche à l'échéance ; jamais une nouvelle primitive privilégiée générique.
+//   * RenewLeaseOp : battement qui prolonge l'échéance d'un bail.
 //
-// Both must round-trip through the bounded discriminant codec exactly like the
-// other leaves; the closed leaf set grows by exactly these two members.
+// Les deux doivent faire l'aller-retour par le codec à discriminant borné exactement comme les
+// autres feuilles ; l'ensemble fermé de feuilles grandit d'exactement ces deux membres.
 // -----------------------------------------------------------------------
 public sealed class LeaseOpTests
 {
     [Fact]
     public void EstablishLeaseOp_roundtrips_typed()
     {
-        // The revert op is the existing typed inverse, carried as codec JSON.
+        // L'op de retour arrière est l'inverse typé existant, porté en JSON codec.
         var revert = PrivilegedOpCodec.Serialize(
             new ApplyNvApiClockOffsetOp(GpuIndex: 0, CoreOffsetMhz: 0, MemoryOffsetMhz: 0)).Value!;
         var op = new EstablishLeaseOp("lease-1", revert, LeaseSeconds: 30);

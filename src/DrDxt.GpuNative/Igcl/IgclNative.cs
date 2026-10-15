@@ -4,10 +4,10 @@ using System.Runtime.Versioning;
 namespace DrDxt.GpuNative.Igcl;
 
 // -----------------------------------------------------------------------
-// 07/10/2026 (A5) : la température d'une carte Intel par IGCL (Intel Graphics Control Library), en lecture seule.
+// La température d'une carte Intel par IGCL (Intel Graphics Control Library), en lecture seule.
 //
-// Source : intel/drivers.gpu.control-library, include/igcl_api.h et Source/cApiWrapper.cpp (licence MIT), lus le
-// 07/10/2026. ControlLib.dll est livrée par le pilote Intel ; le chargeur officiel la cherche dans System32 seulement
+// Source : intel/drivers.gpu.control-library, include/igcl_api.h et Source/cApiWrapper.cpp (licence MIT), lus le 07/10/2026.
+// ControlLib.dll est livrée par le pilote Intel ; le chargeur officiel la cherche dans System32 seulement
 // (LoadLibraryExW + LOAD_LIBRARY_SEARCH_SYSTEM32), comme ici. Les fonctions sont exportées par leur nom (GetProcAddress).
 //
 //   ctlInit(ctl_init_args_t*, ctl_api_handle_t*)          AppVersion = CTL_MAKE_VERSION(1, 1), drapeau USE_LEVEL_ZERO
@@ -24,7 +24,7 @@ namespace DrDxt.GpuNative.Igcl;
 public sealed class IgclNative
 {
     public const string Dll = "ControlLib.dll";
-    public const string DllAbsente = "ControlLib.dll absente de System32 : pas de pilote graphique Intel récent sur ce PC.";
+    public const string DllAbsente = "ControlLib.dll missing from System32: no recent Intel graphics driver on this PC.";
 
     private const int Succes = 0;              // CTL_RESULT_SUCCESS
     private const uint DrapeauLevelZero = 1;   // CTL_INIT_FLAG_USE_LEVEL_ZERO : « requis pour la télémétrie »
@@ -60,7 +60,7 @@ public sealed class IgclNative
                     if (_proprietes!(sonde, ref p) != Succes || _etat!(sonde, out var c) != Succes) continue;
                     lues.Add((p.Type, c));
                 }
-            return Choisir(lues) is { } t ? (t, null) : (null, "le pilote Intel n'a rendu aucune température de puce graphique");
+            return Choisir(lues) is { } t ? (t, null) : (null, "the Intel driver returned no graphics chip temperature");
         }
         catch (Exception ex) { return (null, $"lecture IGCL interrompue : {ex.GetType().Name}"); }
     }
@@ -88,17 +88,17 @@ public sealed class IgclNative
     {
         if (!DllPresente()) return (IntPtr.Zero, DllAbsente);
         if (!NativeLibrary.TryLoad(Dll, typeof(IgclNative).Assembly, DllImportSearchPath.System32, out var lib))
-            return (IntPtr.Zero, "ControlLib.dll présente mais non chargée");
+            return (IntPtr.Zero, "ControlLib.dll present but not loaded");
         var init = Resoudre<InitDelegate>(lib, "ctlInit");
         _cartes = Resoudre<EnumDelegate>(lib, "ctlEnumerateDevices");
         _sondes = Resoudre<EnumDelegate>(lib, "ctlEnumTemperatureSensors");
         _proprietes = Resoudre<ProprietesDelegate>(lib, "ctlTemperatureGetProperties");
         _etat = Resoudre<EtatDelegate>(lib, "ctlTemperatureGetState");
         if (init is null || _cartes is null || _sondes is null || _proprietes is null || _etat is null)
-            return (IntPtr.Zero, "ControlLib.dll n'expose pas les fonctions de température");
+            return (IntPtr.Zero, "ControlLib.dll does not expose the temperature functions");
         var args = new CtlInitArgs { Size = (uint)Marshal.SizeOf<CtlInitArgs>(), AppVersion = Version11, Flags = DrapeauLevelZero };
         var r = init(ref args, out var api);
-        return r == Succes && api != IntPtr.Zero ? (api, null) : (IntPtr.Zero, $"ctlInit a échoué (0x{r:X8})");
+        return r == Succes && api != IntPtr.Zero ? (api, null) : (IntPtr.Zero, $"ctlInit failed (0x{r:X8})");
     }
 
     private static T? Resoudre<T>(IntPtr lib, string nom) where T : Delegate

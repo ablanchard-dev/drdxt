@@ -3,17 +3,18 @@ using DrDxt.Core;
 namespace DrDxt.ReconcilerHost;
 
 // -----------------------------------------------------------------------
-// SingleFlightReconcile (plan T29) — serializes reconcile passes.
+// SingleFlightReconcile : met les passes de réconciliation en file.
 //
-// Multiple triggers can fire near-simultaneously (boot + logon + a feature-update
-// event + the daily timer all landing together). Running overlapping passes would
-// race the read-modify-write of the sidecar state and could double-apply. A
-// SemaphoreSlim(1,1) guarantees ONE pass at a time: a second trigger arriving while a
-// pass runs WAITS for the slot, then runs once — never an overlapping double-run.
+// Plusieurs déclencheurs peuvent partir presque en même temps (démarrage + ouverture de session +
+// un événement de mise à jour de fonctionnalité + le minuteur quotidien, tous ensemble). Des
+// passes qui se chevauchent entreraient en course sur la lecture-modification-écriture de l'état
+// du sidecar et pourraient appliquer deux fois. Un SemaphoreSlim(1,1) garantit une seule passe à
+// la fois : un second déclencheur arrivé pendant une passe attend le créneau, puis tourne une
+// fois ; jamais deux passes qui se chevauchent.
 //
-// The actual pass is injected as a delegate (the host passes ReconcileTickService
-// .RunTickAsync), so this coordinator is a tiny, fully-unit-testable wrapper with no
-// dependency on the reconcile internals. Disposable: the semaphore is owned here.
+// La passe elle-même est injectée comme délégué (l'hôte passe ReconcileTickService
+// .RunTickAsync) : ce coordinateur est une petite enveloppe, entièrement testable, sans
+// dépendance aux rouages de la réconciliation. Disposable : le sémaphore est possédé ici.
 // -----------------------------------------------------------------------
 public sealed class SingleFlightReconcile : IDisposable
 {
@@ -23,8 +24,8 @@ public sealed class SingleFlightReconcile : IDisposable
     public SingleFlightReconcile(Func<CancellationToken, Task<Result>> runTick)
         => _runTick = runTick;
 
-    /// <summary>Runs one reconcile pass under the single-flight slot. Concurrent calls
-    /// serialize: at most one pass executes at a time; the others wait then run.</summary>
+    /// <summary>Lance une passe de réconciliation dans le créneau unique. Les appels concurrents se
+    /// mettent en file : une passe au plus tourne à la fois ; les autres attendent puis tournent.</summary>
     public async Task<Result> RunTickAsync(CancellationToken ct)
     {
         await _slot.WaitAsync(ct).ConfigureAwait(false);

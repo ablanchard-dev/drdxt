@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// ROAD2 (08/10/2026) : docs/COUVERTURE.md, la liste « ce que DrDXT fait sur quel PC », générée depuis le code et jamais
+/// Docs/COUVERTURE.md, la liste « ce que DrDXT fait sur quel PC », générée depuis le code et jamais
 /// écrite à la main. Ce test la recalcule ; si le fichier diverge, il échoue. Régénérer exprès : DRDXT_COUVERTURE=ecrire.
 /// </summary>
 public sealed class CouvertureDocTests

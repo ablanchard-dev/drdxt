@@ -1,28 +1,28 @@
 namespace DrDxt.Core;
 
-// --- P2 Safety / rollback seams (M2 Phase B) ---
+// --- Coutures de sécurité et de retour arrière ---
 //
-// These are the testable boundaries the SafetyManager depends on so that the
-// whole "never apply without a verified restore point" / "revert restores the
-// captured original" logic can be unit-tested with fakes — nothing here touches
-// the real System Restore or runs anything elevated. The actual privileged work
-// (creating the restore point) still flows through IElevatedClient + a typed
-// CreateRestorePointOp; this seam only models "is restore usable" + verification.
+// Les frontières testables dont dépend le SafetyManager, pour que toute la logique
+// « jamais d'application sans point de restauration vérifié » / « le retour arrière rend
+// l'origine relevée » se teste avec des doublures : rien ici ne touche la vraie
+// Restauration du système ni ne lance quoi que ce soit en élevé. Le vrai travail privilégié
+// (créer le point) passe toujours par IElevatedClient + un CreateRestorePointOp typé ;
+// cette couture ne modélise que « la restauration est-elle utilisable » + la vérification.
 
-/// <summary>Abstraction over Windows System Restore, kept testable. Implementations
-/// answer whether restore is usable, try to enable it, and verify that a freshly
-/// created point actually exists (GPO/SKU can silently no-op the create).</summary>
+/// <summary>Abstraction de la Restauration du système, testable. Les implémentations disent
+/// si la restauration est utilisable, tentent de l'activer, et vérifient qu'un point tout
+/// juste créé existe vraiment (une GPO ou l'édition peut annuler la création en silence).</summary>
 public interface IRestorePointService
 {
-    /// <summary>True when System Restore is enabled and a point can be created.</summary>
+    /// <summary>Vrai quand la Restauration du système est active et qu'un point peut être créé.</summary>
     bool IsEnabled();
 
-    /// <summary>Best-effort attempt to enable System Restore (may silently fail on
-    /// GPO-locked / unsupported SKUs). Returns true only if restore is usable after.</summary>
+    /// <summary>Tentative, au mieux, d'activer la Restauration du système (peut échouer en silence
+    /// sous GPO ou sur une édition non prise en charge). Vrai seulement si elle est utilisable ensuite.</summary>
     bool TryEnable();
 
-    /// <summary>14/09/2026 — la date (UTC) du point de restauration le plus recent cree depuis
-    /// <paramref name="depuisUtc"/>, quel que soit son nom, ou <c>null</c> s'il n'y en a aucun — la
+    /// <summary>La date (UTC) du point de restauration le plus recent cree depuis
+    /// <paramref name="depuisUtc"/>, quel que soit son nom, ou <c>null</c> s'il n'y en a aucun : la
     /// garde contre une creation silencieusement ignoree (GPO/SKU).
     /// Pourquoi « quel que soit son nom » : par defaut Windows saute la creation s'il existe un point de
     /// moins de 24 h et repond quand meme « reussi » (Microsoft Learn, SRSetRestorePointW). Ce point-la,
@@ -30,9 +30,9 @@ public interface IRestorePointService
     DateTime? DernierPointDepuis(DateTime depuisUtc);
 }
 
-/// <summary>UI-facing consent boundary: ask the user whether to enable System
-/// Restore when it is off. Abstracted so the SafetyManager logic is testable
-/// without any real prompt.</summary>
+/// <summary>Frontière de consentement côté UI : demande à l'utilisateur s'il faut activer la
+/// Restauration du système quand elle est coupée. Abstraite pour tester la logique du
+/// SafetyManager sans vraie invite.</summary>
 public interface IConsentPrompt
 {
     bool AskEnableRestore();

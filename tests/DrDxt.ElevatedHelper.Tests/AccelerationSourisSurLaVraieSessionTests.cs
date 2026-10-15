@@ -6,7 +6,7 @@ using NSubstitute;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// MOUSE1 (09/10/2026) : les trois valeurs REG_SZ de l'accélération du pointeur (HKCU\Control Panel\Mouse) partent par le
+/// Les trois valeurs REG_SZ de l'accélération du pointeur (HKCU\Control Panel\Mouse) partent par le
 /// jeton de l'App, sur la vraie ruche de la session, sans le helper ; chacune est lue avant, puis rendue à l'identique
 /// (absente ⇒ supprimée), relue. Même preuve que SessionUtilisateurSurLaVraieRucheTests, sur le type REG_SZ.
 /// </summary>

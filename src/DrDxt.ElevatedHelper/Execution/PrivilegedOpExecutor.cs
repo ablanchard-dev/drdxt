@@ -4,24 +4,24 @@ using DrDxt.ElevatedHelper.Execution.Adlx;
 namespace DrDxt.ElevatedHelper.Execution;
 
 // -----------------------------------------------------------------------
-// PrivilegedOpExecutor — the real R1 executor for the SAFE (non-GPU) ops.
+// PrivilegedOpExecutor : le vrai exécuteur des ops sûres (hors GPU).
 //
-// Reached only after TypedPrivilegedServer has run, in order: HMAC integrity →
-// anti-replay → caller authorization → bounded codec bind → OpAllowlist.Validate.
-// So the op handed here is a typed, closed, ALREADY-ALLOWLISTED leaf. The
-// dispatch maps each leaf to a concrete Windows action behind a thin seam (the
-// native call is the m2smoke boundary); every action is wrapped → Result so an
-// exception never crosses the IPC.
+// Atteint seulement après que TypedPrivilegedServer a passé, dans l'ordre : intégrité HMAC →
+// anti-rejeu → autorisation de l'appelant → liaison par le codec borné → OpAllowlist.Validate.
+// L'op reçue ici est donc une feuille typée, fermée, déjà passée par l'allowlist. L'aiguillage
+// relie chaque feuille à une action Windows concrète derrière une couture mince (l'appel natif
+// est la frontière du m2smoke) ; chaque action est emballée → Result, pour qu'aucune exception
+// ne traverse l'IPC.
 //
-// R2 (RISKY half): the RISKY NVAPI clock-offset + power-limit writes ARE now wired
-// (recipe §A/§B) via INvApiTuningActions (GET-then-SET, fail-clean). The DRS
-// driver-settings surface (recipe §C) is wired too. ADLX (AMD) tuning is now wired
-// (T3) via IADLXTuningActions (the AMD mirror, GET-then-SET, default-DENY band,
-// fail-clean). The multi-point GPU fan-curve remains DEFERRED here (T6) with an
-// HONEST HELPER.OP_FAILED message and NO partial action — fan-write (E4) is a
-// dedicated future task, deferred for both vendors (ADLX + NVAPI) until the
-// verified fan-write recipe lands. The read seam being live (T5) does not imply a
-// fan write exists; AdlxGpuTuningWriter is read-only by design.
+// Moitié risquée : les écritures NVAPI risquées de décalage d'horloge + limite de puissance sont
+// branchées (recette §A/§B) via INvApiTuningActions (GET puis SET, échec propre). La surface DRS
+// des réglages du pilote (recette §C) l'est aussi. Le réglage ADLX (AMD) est branché via
+// IADLXTuningActions (le miroir AMD, GET puis SET, plage en refus par défaut, échec propre). La
+// courbe de ventilateur GPU multipoint reste reportée ici, avec un message HELPER.OP_FAILED
+// honnête et aucune action partielle : l'écriture ventilateur est une tâche future à part,
+// reportée pour les deux constructeurs (ADLX + NVAPI) jusqu'à une recette d'écriture vérifiée. Une
+// couture de lecture active n'implique pas qu'une écriture ventilateur existe ;
+// AdlxGpuTuningWriter est en lecture seule par conception.
 // -----------------------------------------------------------------------
 public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
 {
@@ -43,6 +43,8 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
     private readonly INetworkQosActions? _qos;
     private readonly DrDxt.Reconciler.Reseau.PlafondEnvoiDuService? _plafondDuService;
     private readonly IBcdActions? _bcd;
+    private readonly IPnpActions? _pnp;
+    private const string PnpNotWiredMessage = "The pnputil seam is not wired in this host: nothing was done.";
     private readonly IVentilateurActions? _ventilateur;
     private readonly ICpuPowerActions? _cpu;
     private const string BcdNotWiredMessage = "The BCD seam is not wired in this host: nothing was written.";
@@ -64,25 +66,28 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
         INvApiDrsActions drs,
         INvApiTuningActions tuning,
         IADLXTuningActions adlx,
-        // M3 lot 2 — optional/trailing so every existing construction stays source-compatible.
-        // When it is absent the two firmware-boot ops fail HONESTLY (see FirmwareBootNotWired)
-        // rather than silently doing nothing, which is the same contract as the fan curve above.
+        // Facultatif et en dernier, pour que chaque construction existante reste compatible à la source.
+        // Absent, les deux ops de démarrage firmware échouent honnêtement (voir FirmwareBootNotWired)
+        // au lieu de ne rien faire en silence : même contrat que la courbe de ventilateur plus haut.
         IFirmwareBootActions? firmwareBoot = null,
-        // 11/09/2026 — l'ecriture du manifeste signe. Passee par le helper eleve seulement : le service
-        // SYSTEM (InProcessElevatedClient) ne la recoit pas, donc il ne peut pas signer — il verifie.
+        // L'ecriture du manifeste signe. Passee par le helper eleve seulement : le service
+        // SYSTEM (InProcessElevatedClient) ne la recoit pas, donc il ne peut pas signer : il verifie.
         IManifestCommitActions? manifeste = null,
-        // 24/09/2026 — le plafond d'envoi QoS. Absent : les deux ops echouent HONNETEMENT.
+        // Le plafond d'envoi QoS. Absent : les deux ops echouent honnetement.
         INetworkQosActions? qos = null,
-        // 24/09/2026 — l'ecriture BCD (ensemble ferme). Absente : les deux ops echouent honnetement.
+        // L'ecriture BCD (ensemble ferme). Absente : les deux ops echouent honnetement.
         IBcdActions? bcd = null,
-        // 28/09/2026 : le reglage de protection du ping que portera le service. Branche dans le helper seul :
+        // Le reglage de protection du ping que portera le service. Branche dans le helper seul :
         // le service le lit, il ne l'ecrit pas. Absent : les deux ops echouent honnetement.
         DrDxt.Reconciler.Reseau.PlafondEnvoiDuService? plafondDuService = null,
-        // 08/10/2026 (GPU-OC) : le ventilateur en mode Expert. Absent : il reste refusé honnêtement.
+        // Le ventilateur en mode Expert. Absent : il reste refusé honnêtement.
         IVentilateurActions? ventilateur = null,
-        // 10/10/2026 (B1) : la limite de puissance du processeur par PawnIO. Absente : refusée honnêtement.
-        ICpuPowerActions? cpu = null)
+        // La limite de puissance du processeur par PawnIO. Absente : refusée honnêtement.
+        ICpuPowerActions? cpu = null,
+        // Les gestes pnputil (peripherique, vieux pilotes d'affichage). Absents : refuses honnetement.
+        IPnpActions? pnp = null)
     {
+        _pnp = pnp;
         _cpu = cpu;
         _ventilateur = ventilateur;
         _plafondDuService = plafondDuService;
@@ -113,6 +118,8 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                     _registry.SetValue(r.Hive, r.Path, r.Name, r.Kind, r.Value),
                 DeleteRegistryValueOp r =>
                     _registry.DeleteValue(r.Hive, r.Path, r.Name),
+                SetStartupApprovalOp s =>
+                    _registry.SetStartupApproval(s.Hive, s.Liste, s.Nom, s.Actif),
 
                 SetActivePowerPlanOp p =>
                     _power.SetActivePlan(p.PlanGuid),
@@ -123,10 +130,13 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                 SetCpuPackagePowerLimitOp c => _cpu is not null
                     ? _cpu.SetPackagePowerLimit(c.Valeur, c.Origine)
                     : Fail("CPU power limit write is not wired in this executor."),
+                SetCpuVoltageOffsetOp v => _cpu is not null
+                    ? _cpu.SetVoltageOffset(v.DecalageMv)
+                    : Fail("CPU voltage offset write is not wired in this executor."),
 
-                // M3 lot 2 — the trip and its undo. Both go through shutdown.exe; DrDXT writes
-                // no firmware variable itself. A missing seam is SAID, never silently ignored:
-                // a user who clicked "take me to the BIOS" and got nothing must be told why.
+                // Le voyage et son annulation. Les deux passent par shutdown.exe ; DrDXT n'écrit
+                // aucune variable firmware lui-même. Une couture absente est dite, jamais ignorée en silence :
+                // un utilisateur qui a cliqué « emmène-moi dans le BIOS » sans résultat doit savoir pourquoi.
                 RebootToFirmwareSetupOp r =>
                     _firmwareBoot is null
                         ? Fail(FirmwareBootNotWiredMessage)
@@ -144,9 +154,9 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                 RunServiceControlOp s =>
                     _service.Control(s.ServiceName, s.Action),
 
-                // Lecture firmware par le chemin d'ACTION. Ce chemin-la ne rend toujours que
+                // Lecture firmware par le chemin d'action. Ce chemin-la ne rend que
                 // « lisible / pas lisible », parce que ExecuteAsync n'a pas de retour de donnees.
-                // La valeur passe desormais par ReadAsync ci-dessous. Garde ici : un appelant qui
+                // La valeur passe par ReadAsync ci-dessous. Garde ici : un appelant qui
                 // se trompe de methode apprend un fait vrai, il ne recoit pas un succes vide qui
                 // ressemblerait a une lecture reussie.
                 ApplyUploadCapOp uc =>
@@ -162,6 +172,16 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                     _bcd is null ? Fail(BcdNotWiredMessage) : _bcd.DeleteValue(db.Element),
                 SetBcdValueOp sb =>
                     _bcd is null ? Fail(BcdNotWiredMessage) : _bcd.SetValue(sb.Element, sb.Value),
+                ScheduleMemoryDiagnosticOp =>
+                    _bcd is null ? Fail(BcdNotWiredMessage) : _bcd.ScheduleMemoryDiagnostic(),
+                CancelMemoryDiagnosticOp =>
+                    _bcd is null ? Fail(BcdNotWiredMessage) : _bcd.CancelMemoryDiagnostic(),
+                RestartDeviceOp rd =>
+                    _pnp is null ? Fail(PnpNotWiredMessage) : _pnp.RestartDevice(rd.InstanceId),
+                RemoveDriverPackageOp rp =>
+                    _pnp is null ? Fail(PnpNotWiredMessage) : _pnp.RemoveDriverPackage(rp.PublishedName),
+                RestoreDriverPackageOp rr =>
+                    _pnp is null ? Fail(PnpNotWiredMessage) : _pnp.RestoreDriverPackage(rr.PublishedName),
 
                 ReadFirmwareVariableOp fv =>
                     _firmwareBoot is null
@@ -172,15 +192,13 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                 InstallPresentMonServiceOp =>
                     _service.InstallPresentMonService(),
 
-                // --- DRS driver setting: Real now (SAFE, no voltage/clock). ---
+                // --- Réglage pilote DRS : réel (sûr, ni tension ni horloge). ---
                 //
-                // L2 — la portee est enfin transportee. Cette ligne ne passait que
-                // (SettingId, Value) : `ProfileName` etait decoratif, et « cod.exe » produisait
-                // la meme ecriture machine entiere que « Base Profile ». L'allowlist refusait
-                // donc honnetement toute portee autre que le profil de base plutot que de
-                // laisser l'op mentir sur ce qu'elle faisait.
+                // La portee est transportee. Si cette ligne ne passait que (SettingId, Value),
+                // `ProfileName` serait decoratif, et « cod.exe » produirait la meme ecriture machine
+                // entiere que « Base Profile ».
                 //
-                // Desormais la portee decide de la methode appelee. L'allowlist garantit que
+                // La portee decide de la methode appelee. L'allowlist garantit que
                 // ProfileName est soit le profil de base, soit un chemin d'executable complet :
                 // il n'existe pas de troisieme cas qui atteindrait ce switch.
                 ApplyNvApiDrsSettingOp d =>
@@ -188,41 +206,42 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                         ? _drs.SetGlobalSetting(d.SettingId, d.Value)
                         : _drs.SetSettingForApplication(d.ProfileName, d.SettingId, d.Value),
 
-                // F1 lot 3 : la suppression n'a qu'une portee (l'allowlist refuse le profil de
+                // La suppression n'a qu'une portee (l'allowlist refuse le profil de
                 // base) ; la preuve du retour est la provenance relue par l'action.
                 DeleteNvApiDrsSettingOp dd =>
                     _drs.DeleteSettingForApplication(dd.ProfileName, dd.SettingId, dd.OrigineAttendue),
 
-                // --- RISKY NVAPI tuning: Real now (R2). GET-then-SET, fail-clean.
-                //     The CoreOffset op carries a memory offset too, but the verified
-                //     recipe only covers the P0 GRAPHICS clock; we apply only the core
-                //     offset (the memory-offset write is not in the verified §A path). ---
+                // --- Réglage NVAPI risqué : réel. GET puis SET, échec propre.
+                //     L'op CoreOffset porte aussi un décalage mémoire, mais la recette vérifiée
+                //     ne couvre que l'horloge graphique P0 ; on n'applique que le décalage cœur ;
+                //     le champ mémoire est ignoré. L'App l'envoie à 0 (ReglageCarteExpert refuse
+                //     toute mémoire demandée). ---
                 ApplyNvApiClockOffsetOp c =>
                     _tuning.SetCoreClockOffset(c.GpuIndex, c.CoreOffsetMhz),
                 ApplyNvApiPowerLimitOp pl =>
                     _tuning.SetPowerLimitPercent(pl.GpuIndex, pl.PowerLimitPercent),
 
-                // --- RISKY ADLX (AMD) tuning: Real now (T3). GET-then-SET, default-DENY
-                //     band re-check, fail-clean — the AMD mirror of the NVAPI tuning path. ---
+                // --- Réglage ADLX (AMD) risqué : réel. GET puis SET, nouvelle vérification de plage
+                //     en refus par défaut, échec propre : le miroir AMD du chemin NVAPI. ---
                 ApplyAdlxTuningOp a =>
                     _adlx.SetTuning(a.GpuIndex, a.Kind, a.IntValue),
 
-                // --- Still-DEFERRED GPU op: the multi-point fan-curve (T6 — E4 fan-write is a
-                //     dedicated future task). Cleanly REFUSED with an honest message, no partial
-                //     action; deferred for both vendors, consistent with the read-only writer. ---
-                // 08/10/2026 (GPU-OC) : un seul point = une vitesse fixe, qui ne fait que monter ; une vraie courbe
+                // --- Op GPU encore reportée : la courbe de ventilateur multipoint (l'écriture
+                //     ventilateur est une tâche future à part). Refusée proprement, message honnête, aucune
+                //     action partielle ; reportée pour les deux constructeurs, comme le writer en lecture seule. ---
+                // Un seul point = une vitesse fixe, qui ne fait que monter ; une vraie courbe
                 // (plusieurs points, suivie en température) reste à écrire.
                 ApplyGpuFanCurveOp { Points.Count: 1 } f when _ventilateur is not null =>
                     _ventilateur.Poser(f.GpuIndex, f.Points[0].DutyPct),
                 ApplyGpuFanCurveOp => FanCurveDeferred(),
                 RestoreGpuFanAutoOp rf => _ventilateur is null ? FanCurveDeferred() : _ventilateur.Rendre(rf.GpuIndex),
 
-                // Le manifeste signe : son echec garde son CODE (MANIFEST_UNREADABLE, MANIFEST_KEY_UNUSABLE),
+                // Le manifeste signe : son echec garde son code (MANIFEST_UNREADABLE, MANIFEST_KEY_UNUSABLE),
                 // parce que l'App en tire la reprise explicite.
                 CommitManifestOp cm =>
                     _manifeste is null ? Fail(ManifestCommitNotWiredMessage) : _manifeste.Commit(cm),
 
-                // Defensive default — should be unreachable (allowlist gated upstream).
+                // Défaut par prudence : ne devrait pas être atteint (l'allowlist filtre en amont).
                 _ => Fail("Unsupported privileged op."),
             };
 
@@ -234,14 +253,14 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
         }
         catch
         {
-            // Any unexpected error from a native action → fail-clean, no detail leak.
+            // Toute erreur inattendue d'une action native → échec propre, sans fuite de détail.
             return Task.FromResult(Fail("Privileged operation failed."));
         }
     }
 
     // ── Le chemin des ops qui repondent ────────────────────────────────────────────────
     // Ensemble ferme, comme partout ailleurs ici : une op absente de ce switch echoue au lieu
-    // de rendre un succes vide. Rien n'y ecrit -- il n'existe aucune op d'ecriture firmware
+    // de rendre un succes vide. Rien n'y ecrit : il n'existe aucune op d'ecriture firmware
     // dans l'enumeration, et ce switch ne peut donc pas en atteindre une.
     public Task<Result<byte[]>> ReadAsync(PrivilegedOp op, CancellationToken ct)
     {
@@ -255,7 +274,7 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                         : _firmwareBoot.ReadFirmwareVariable(fv.Name, fv.VendorGuid),
                 ReadComponentStoreHealthOp => SanteDesComposants.Lire(),
 
-                // Une op d'ACTION passee ici est un defaut d'appel, pas une lecture vide.
+                // Une op d'action passee ici est un defaut d'appel, pas une lecture vide.
                 _ => Result<byte[]>.Fail(ErrorCodes.NotAllowlisted, "This op does not return data."),
             };
 
@@ -277,10 +296,11 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
     private static Result Fail(string message) => Result.Fail(ErrorCodes.HelperOpFailed, message);
 
     // Reduit une lecture (Result<byte[]>) au Result sans donnees que ce canal sait porter.
-    // On garde le succes ou l'echec avec son motif -- notamment « privilege absent », qui est
-    // un NON CONCLUANT et surtout pas la preuve que le firmware a refuse. Les octets lus sont
+    // On garde le succes ou l'echec avec son motif, notamment « privilege absent », qui est
+    // un non concluant et surtout pas la preuve que le firmware a refuse. Les octets lus sont
     // volontairement abandonnes ici : ce canal execute des actions, il ne repond pas a des
     // requetes, et pretendre le contraire demanderait un canal de retour de donnees.
     private static Result ReadOnlyOutcome(Result<byte[]> read)
         => read.IsOk ? Result.Ok() : Result.Fail(read.Error!.Value.Code, read.Error.Value.Message);
+
 }

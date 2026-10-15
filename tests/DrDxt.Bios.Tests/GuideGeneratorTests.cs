@@ -5,17 +5,17 @@ using FluentAssertions;
 namespace DrDxt.Bios.Tests;
 
 /// <summary>
-/// Tests for the guide GENERATOR (content assembly, not rendering). The guide shows
-/// Only what is mis-set on this machine, with exact paths (or a labelled fallback +
-/// exact setting name), the ReBAR dependency order, and the mandatory recovery
-/// section top+bottom. §16 guards: Legacy → no CSM-off; uncovered board → Unverified;
-/// non-Guide findings → no write step. Never a write.
+/// Tests du générateur de guide (assemblage du contenu, pas rendu). Le guide ne montre que
+/// ce qui est mal réglé sur cette machine, avec des chemins exacts (ou un repli étiqueté +
+/// le nom exact du réglage), l'ordre de dépendance ReBAR, et la section de récupération
+/// obligatoire en haut et en bas. Gardes : Legacy → pas de coupure du CSM ; carte mère non
+/// couverte → non vérifié ; constats hors Guide → pas d'étape d'écriture. Jamais une écriture.
 /// </summary>
 public class GuideGeneratorTests
 {
     private static IGuideGenerator Gen() => new GuideGenerator(GuideLibraryFactory.CreateDefault());
 
-    // A desktop UEFI ASUS B650 (covered board) we mutate per test.
+    // Un bureau UEFI ASUS B650 (carte mère couverte), muté par test.
     private static HardwareInventory Hw(
         string manufacturer = "ASUSTeK COMPUTER INC.",
         string product = "ROG STRIX B650-A GAMING WIFI",
@@ -44,7 +44,7 @@ public class GuideGeneratorTests
         return r.Value!;
     }
 
-    // ── D1: only what is mis-set is in the guide; board label is injected. ──
+    // ── Seul ce qui est mal réglé est dans le guide ; l'étiquette de la carte mère est injectée. ──
 
     [Fact]
     public void Only_misset_settings_get_steps()
@@ -57,26 +57,26 @@ public class GuideGeneratorTests
         g.DetectedBoardLabel.Should().Contain("ASUSTeK").And.Contain("ROG STRIX B650-A");
     }
 
-    // ── HONESTY (decision §9.1): a recognized vendor on a board not in the board+BIOS
-    //    KB gives the best-known ASUS path but is never labelled Verified. ──
+    // ── Honnêteté : un constructeur reconnu sur une carte mère absente de la base carte + BIOS
+    //    reçoit le meilleur chemin ASUS connu mais n'est jamais étiqueté vérifié. ──
 
     [Fact]
     public void Recognized_vendor_uncovered_board_is_not_verified_but_keeps_best_known_path()
     {
         var g = Generate(Hw(), Finding(FirmwareSettingKind.XmpExpo));
 
-        // No board+BIOS KB entry ships → must be the honest "not confirmed" label,
-        // never "Verified for your exact board".
+        // Aucune entrée carte + BIOS n'est livrée → ce doit être l'étiquette honnête « non confirmé »,
+        // jamais « vérifié pour votre carte exacte ».
         g.Confidence.Should().Be(GuideConfidence.UnverifiedFallback);
         g.Vendor.Should().Be(BiosVendor.Asus);
-        // The best-known ASUS content is still there (only the CONFIDENCE label changed).
+        // Le meilleur contenu ASUS connu est toujours là (seule l'étiquette de confiance a changé).
         var step = g.Steps.Single(s => s.Setting == FirmwareSettingKind.XmpExpo);
         step.ExactValue.Should().NotBeNullOrWhiteSpace();
-        step.ExactValue.Should().Contain("Ai Overclock Tuner"); // exact ASUS path/name
+        step.ExactValue.Should().Contain("Ai Overclock Tuner"); // chemin et nom ASUS exacts
         step.InstructionKey.Should().NotBeNullOrWhiteSpace();
     }
 
-    [Fact] // §9.1 invariant: NO shipped board renders as Verified (the KB has no board entries yet)
+    [Fact] // Invariant : aucune carte mère livrée ne se rend vérifiée (la base n'a encore aucune entrée de carte)
     public void No_shipped_board_renders_as_verified()
     {
         foreach (var (mfr, product) in new[]
@@ -95,7 +95,7 @@ public class GuideGeneratorTests
         }
     }
 
-    // ── D5 / §16: uncovered board → fallback labelled Unverified + exact name + Clear-CMOS. ──
+    // ── Carte non couverte → repli étiqueté non vérifié + nom exact + effacement du CMOS. ──
 
     [Fact]
     public void Uncovered_board_is_unverified_with_setting_name_and_clear_cmos()
@@ -104,22 +104,22 @@ public class GuideGeneratorTests
                          Finding(FirmwareSettingKind.XmpExpo));
 
         g.Confidence.Should().Be(GuideConfidence.UnverifiedFallback);
-        // Even unverified, the exact setting NAME must be present (no third-party needed).
+        // Même non vérifié, le nom exact du réglage doit être présent (aucun tiers nécessaire).
         var step = g.Steps.Single(s => s.Setting == FirmwareSettingKind.XmpExpo);
         step.ExactValue.Should().NotBeNullOrWhiteSpace();
-        step.ExactValue.Should().Contain("XMP"); // generic fallback names the setting
+        step.ExactValue.Should().Contain("XMP"); // le repli générique nomme le réglage
 
-        // Clear-CMOS recovery must be present (the anti-panic net).
+        // La récupération par effacement du CMOS doit être présente (le filet anti-panique).
         AllRecoverySteps(g).Should().Contain(s => s.ExactValue == null || true);
         AllRecoveryInstructionKeys(g).Should().Contain(BiosGuideStringKeys.RecoveryClearCmos);
     }
 
-    // ── D4 / ReBAR: ordered dependencies Above-4G → CSM → Re-Size BAR (UEFI). ──
+    // ── ReBAR : dépendances ordonnées Above-4G → CSM → Re-Size BAR (UEFI). ──
 
     [Fact]
     public void Rebar_chain_is_ordered_above4g_then_rebar()
     {
-        // D4 (lot L5) : le CSM ne fait plus partie du pas a pas. Ce test verifiait l'ordre
+        // Le CSM ne fait plus partie du pas a pas. Ce test verifiait l'ordre
         // Above4G -> CSM -> ReBAR ; il verifie desormais celui qui reste, et surtout que le CSM
         // en est bien absent. Above4G reste : ce n'est pas une etape de plus, c'est la moitie
         // mecanique de ReBAR — sans elle, ReBAR ne s'active pas sur la plupart des cartes.
@@ -140,7 +140,7 @@ public class GuideGeneratorTests
                 "le prerequis se lit avant ce qu'il debloque");
     }
 
-    // ── D4 / B2 / §16: Legacy boot → never a CSM-off step; warning + flag instead. ──
+    // ── Démarrage Legacy → jamais d'étape de coupure du CSM ; avertissement et drapeau à la place. ──
 
     [Fact]
     public void Legacy_boot_never_emits_csm_off_step()
@@ -161,15 +161,15 @@ public class GuideGeneratorTests
         // elle enverrait quelqu'un couper un CSM dont sa machine a besoin pour demarrer.
         g.Recovery.Top.Should().NotContain(
             s => s.InstructionKey == "Bios.Guide.Recovery.RebarNeedsCsmOff");
-        // The rest of the chain still appears.
+        // Le reste de la chaîne apparaît toujours.
         g.Steps.Should().Contain(s => s.Setting == FirmwareSettingKind.Above4G);
         g.Steps.Should().Contain(s => s.Setting == FirmwareSettingKind.ReBar);
     }
 
-    [Fact] // §16 invariant: a guide can never contain a CSM-off step unless boot is UEFI
+    [Fact] // Invariant : un guide ne peut jamais contenir une étape de coupure du CSM sauf en démarrage UEFI
     public void NonUefi_never_yields_a_csm_step_invariant()
     {
-        foreach (var uefi in new[] { false }) // Legacy; Unknown is not expressible via BiosInfo.IsUefi
+        foreach (var uefi in new[] { false }) // Legacy ; Unknown n'est pas exprimable via BiosInfo.IsUefi
         {
             var g = Generate(Hw(isUefi: uefi),
                 Finding(FirmwareSettingKind.Csm, action: BiosRecommendedAction.Disable));
@@ -182,7 +182,7 @@ public class GuideGeneratorTests
     [Fact]
     public void Uefi_boot_names_csm_in_the_recovery_ladder_instead_of_walking_you_through_it()
     {
-        // D4 : ce test exigeait une ETAPE CSM dans le pas a pas. Elle n'existe plus — c'etait
+        // Ce test exigeait une ETAPE CSM dans le pas a pas. Elle n'existe plus — c'etait
         // l'etape la plus dangereuse du guide, et on la conseillait a l'aveugle (SettingsState.Csm
         // vaut Unknown en permanence). Ce qui reste, sur un demarrage UEFI ou c'est sans risque de
         // le dire : le CSM est nomme dans le filet de recuperation, pour que quelqu'un dont ReBAR
@@ -198,7 +198,7 @@ public class GuideGeneratorTests
             "on ne fait pas faire, mais on ne laisse pas en plan non plus");
     }
 
-    // ── D2: recovery section mandatory TOP and BOTTOM with the full ladder. ──
+    // ── Section de récupération obligatoire en haut et en bas, avec toute l'échelle. ──
 
     [Fact]
     public void Recovery_section_present_top_and_bottom_with_full_ladder()
@@ -221,7 +221,7 @@ public class GuideGeneratorTests
         }
     }
 
-    // ── Non-Guide findings (read/auto/lab/forbidden) → NO write step. ──
+    // ── Constats hors Guide (lecture/auto/labo/interdit) → aucune étape d'écriture. ──
 
     [Theory]
     [InlineData(BiosMatrixClass.Read)]
@@ -245,7 +245,7 @@ public class GuideGeneratorTests
         g.Steps.Select(s => s.Setting).Should().Equal(FirmwareSettingKind.XmpExpo);
     }
 
-    // ── No findings → an empty-steps guide that still has the recovery section. ──
+    // ── Aucun constat → un guide sans étape qui garde quand même la section de récupération. ──
 
     [Fact]
     public void No_findings_yields_steps_empty_but_recovery_present()
@@ -256,7 +256,7 @@ public class GuideGeneratorTests
         g.Recovery.Bottom.Should().NotBeEmpty();
     }
 
-    // ── Every step carries a resx instruction key (zero hard-coded UI text). ──
+    // ── Chaque étape porte une clé d'instruction resx (zéro texte d'interface en dur). ──
 
     [Fact]
     public void Every_step_carries_a_resx_key()
@@ -271,15 +271,15 @@ public class GuideGeneratorTests
         AllRecoverySteps(g).Should().OnlyContain(s => !string.IsNullOrWhiteSpace(s.InstructionKey));
     }
 
-    // ── The guide carries the enter/save keys from the resolved template. ──
+    // ── Le guide porte les touches entrer/enregistrer du gabarit résolu. ──
 
     [Fact]
     public void Guide_carries_enter_and_save_keys_from_the_template()
     {
         var g = Generate(Hw(), Finding(FirmwareSettingKind.XmpExpo));
 
-        // The resolved template's keys pass through verbatim so the guide tells the user
-        // how to enter the BIOS and save & exit.
+        // Les touches du gabarit résolu passent telles quelles, pour que le guide dise au joueur
+        // comment entrer dans le BIOS et enregistrer puis quitter.
         g.EnterKey.Should().NotBeNullOrWhiteSpace();
         g.SaveKey.Should().NotBeNullOrWhiteSpace();
     }

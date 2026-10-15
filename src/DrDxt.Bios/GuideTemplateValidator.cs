@@ -5,31 +5,32 @@ using DrDxt.Core;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// Parses + defensively validates the guide-library JSON (§9.6: validate ALL external
-/// data before it is ever used). Library data is a moat asset; a corrupt or tampered
-/// file must fail cleanly (<see cref="ErrorCodes.BiosTemplateInvalid"/>) — never crash,
-/// never feed an unvalidated value into a guide.
+/// Analyse et valide avec prudence le JSON de la bibliothèque de guides (valider toute donnée
+/// externe avant de s'en servir). Les données de la bibliothèque sont un atout du moat ; un fichier
+/// corrompu ou altéré doit échouer proprement (<see cref="ErrorCodes.BiosTemplateInvalid"/>) : jamais
+/// de plantage, jamais de valeur non validée dans un guide.
 ///
-/// Validated invariants:
-///   • well-formed JSON array, at least one template;
-///   • vendor + every setting parse to a KNOWN enum (no fallback to enum 0);
-///   • a template may only be <c>isVerified</c> when it carries a board + BIOS-version
-///     KB key (decision §9.1 — a vendor/UI-generation entry can never be "verified");
-///   • enter/save keys are present;
-///   • every path's exact <c>settingName</c> is non-blank (it is the safety net — the
-///     client must always get a name to search for, even on a fallback);
-///   • each path's <c>targetValue</c> points the SAFE/intended direction for its setting
-///     (CSM off/UEFI; XMP/EXPO, ReBAR, Above-4G enabled; X3D CPPC Auto/Enabled) — a
-///     wrong-direction mis-author (e.g. <c>Csm="Enabled"</c>) is rejected;
-///   • no value carries an HTML/template injection marker (defence-in-depth for the
-///     later rendering increment).
+/// Invariants validés :
+///   • tableau JSON bien formé, au moins un modèle ;
+///   • constructeur et chaque réglage s'analysent en un enum connu (aucun repli sur l'enum 0) ;
+///   • un modèle ne peut être <c>isVerified</c> que s'il porte une clé de base de connaissance
+///     carte + version BIOS (une entrée constructeur / génération d'interface ne peut jamais être « vérifiée ») ;
+///   • les touches d'entrée / d'enregistrement sont présentes ;
+///   • le <c>settingName</c> exact de chaque chemin est non vide (c'est le filet : le client doit
+///     toujours avoir un nom à chercher, même sur un repli) ;
+///   • le <c>targetValue</c> de chaque chemin va dans le sens sûr / voulu pour son réglage (CSM
+///     désactivé / UEFI ; XMP/EXPO, ReBAR, Above-4G activés ; X3D CPPC Auto/Enabled) : une erreur
+///     d'écriture dans le mauvais sens (par exemple <c>Csm="Enabled"</c>) est rejetée ;
+///   • aucune valeur ne porte de marqueur d'injection HTML / de modèle (défense en profondeur pour
+///     l'étape de rendu suivante).
 /// </summary>
 public static class GuideTemplateValidator
 {
-    // Markers that must never appear in library data. The values are plain BIOS menu
-    // labels/keys; '>' is deliberately not here because it is the legitimate menu-path
-    // separator ("Advanced > PCI Subsystem"). The markers below catch HTML tags and
-    // template-engine syntax — i.e. tampering or mis-authoring, not normal labels.
+    // Marqueurs qui ne doivent jamais apparaître dans les données de la bibliothèque. Les valeurs sont
+    // de simples libellés / touches de menu BIOS ; '>' n'est exprès pas ici, c'est le séparateur
+    // légitime de chemin de menu (« Advanced > PCI Subsystem »). Les marqueurs ci-dessous attrapent
+    // les balises HTML et la syntaxe de moteurs de modèles : altération ou erreur d'écriture, pas des
+    // libellés normaux.
     private static readonly string[] InjectionMarkers =
         { "<", "{{", "}}", "&lt;", "&gt;", "${" };
 
@@ -42,7 +43,7 @@ public static class GuideTemplateValidator
     };
 
     /// <summary>
-    /// Parses <paramref name="json"/> into validated templates, or fails clean.
+    /// Analyse <paramref name="json"/> en modèles validés, ou échoue proprement.
     /// </summary>
     public static Result<IReadOnlyList<GuideTemplate>> ParseAndValidate(string json)
     {
@@ -87,8 +88,8 @@ public static class GuideTemplateValidator
         if (dto.Paths is null || dto.Paths.Count == 0)
             return FailT("template has no setting paths");
 
-        // Board + BIOS version are OPTIONAL (a vendor/UI-generation fallback omits them),
-        // but if present they must be clean. Together they form the board+BIOS KB key.
+        // Carte + version BIOS sont facultatives (un repli constructeur / génération d'interface les
+        // omet), mais présentes, elles doivent être propres. Ensemble, elles forment la clé carte + BIOS.
         var board = dto.Board ?? string.Empty;
         if (ContainsInjection(board))
             return FailT("injection in board");
@@ -96,9 +97,9 @@ public static class GuideTemplateValidator
         if (ContainsInjection(biosVersion))
             return FailT("injection in biosVersion");
 
-        // HONESTY (decision §9.1): "Verified for your exact board" may only be claimed by
-        // a real board + BIOS-version KB entry. A vendor / UI-generation entry that marks
-        // itself verified is a lie (and a tamper/mis-author vector) → reject it.
+        // Honnêteté : « vérifié pour votre carte exacte » ne peut être annoncé que par une vraie entrée
+        // carte + version BIOS. Une entrée constructeur / génération d'interface qui se dit vérifiée ment
+        // (et c'est un vecteur d'altération / d'erreur) → la rejeter.
         if (dto.IsVerified && (string.IsNullOrWhiteSpace(board) || string.IsNullOrWhiteSpace(biosVersion)))
             return FailT("a verified template must carry both a board and a biosVersion "
                 + "(the board+BIOS KB key); vendor/UI-generation entries cannot be verified");
@@ -112,20 +113,20 @@ public static class GuideTemplateValidator
             if (!seen.Add(setting))
                 return FailT($"duplicate setting '{setting}' in template");
 
-            // MenuPath MAY be empty (a name-only fallback); but if present it must be clean.
+            // MenuPath peut être vide (repli sur le seul nom) ; mais présent, il doit être propre.
             var menuPath = p.MenuPath ?? string.Empty;
             if (ContainsInjection(menuPath))
                 return FailT($"injection in menuPath for '{setting}'");
 
-            // SettingName is the safety net — it can never be blank, and must be clean.
+            // SettingName est le filet : il ne peut jamais être vide, et doit être propre.
             if (IsBlankOrInjected(p.SettingName))
                 return FailT($"missing/invalid settingName for '{setting}'");
             if (IsBlankOrInjected(p.TargetValue))
                 return FailT($"missing/invalid targetValue for '{setting}'");
 
-            // SEMANTIC direction guard: a structurally valid template could still be
-            // mis-authored in a DANGEROUS direction (e.g. Csm="Enabled" → no-boot risk,
-            // or XmpExpo="Disabled"). Assert the target points the safe/intended way.
+            // Garde sémantique de sens : un modèle valide en structure pourrait encore être écrit dans un sens
+            // dangereux (par exemple Csm="Enabled" → risque de non-démarrage, ou XmpExpo="Disabled").
+            // Vérifier que la cible va dans le sens sûr / voulu.
             var targetValue = p.TargetValue!.Trim();
             if (!IsExpectedDirection(setting, targetValue))
                 return FailT($"targetValue '{targetValue}' for '{setting}' points the wrong direction "
@@ -141,26 +142,26 @@ public static class GuideTemplateValidator
             dto.EnterKey!.Trim(), dto.SaveKey!.Trim(), paths));
     }
 
-    // Per-setting expected target DIRECTION. Catches a dangerous mis-author that passes
-    // every structural check (e.g. a CSM target of "Enabled", or an XMP target of
-    // "Disabled"). Tokens are matched case-insensitively against the target value.
+    // Sens attendu de la cible par réglage. Attrape une erreur d'écriture dangereuse qui passe tous
+    // les contrôles de structure (par exemple une cible CSM « Enabled », ou une cible XMP « Disabled »).
+    // Les jetons se comparent à la valeur cible sans tenir compte de la casse.
     private static bool IsExpectedDirection(FirmwareSettingKind setting, string targetValue)
     {
         var v = targetValue.ToLowerInvariant();
         bool Any(params string[] tokens) => tokens.Any(t => v.Contains(t, StringComparison.Ordinal));
         return setting switch
         {
-            // The memory profile must be turned ON (enable / a profile / EXPO / XMP / DOCP).
+            // Le profil mémoire doit être activé (enable / un profil / EXPO / XMP / DOCP).
             FirmwareSettingKind.XmpExpo => Any("enable", "profile", "expo", "xmp", "docp"),
-            // ReBAR and its Above-4G prerequisite must be ENABLED.
+            // ReBAR et son prérequis Above 4G doivent être activés.
             FirmwareSettingKind.ReBar => Any("enable"),
             FirmwareSettingKind.Above4G => Any("enable"),
-            // CSM must be turned OFF (Disabled) or the boot mode set to UEFI — never
-            // enabled (keeping CSM defeats ReBAR and is on the no-boot path).
+            // Le CSM doit être désactivé ou le mode de démarrage en UEFI, jamais activé
+            // (garder le CSM annule ReBAR et mène à une machine qui ne démarre plus).
             FirmwareSettingKind.Csm => Any("disable", "uefi"),
-            // The X3D CPPC route must be the supported one (Auto / Enabled / Driver).
+            // La voie CPPC des X3D doit être une voie prise en charge (Auto, Enabled, Driver).
             FirmwareSettingKind.X3dCppc => Any("auto", "enable", "driver"),
-            // Other settings carry no enforced direction in the foundation.
+            // Les autres réglages n'ont pas de sens imposé pour l'instant.
             _ => true,
         };
     }
@@ -177,8 +178,8 @@ public static class GuideTemplateValidator
     private static Result<GuideTemplate> FailT(string why)
         => Result<GuideTemplate>.Fail(ErrorCodes.BiosTemplateInvalid, why);
 
-    // DTOs are deliberately nullable so a missing field is caught by validation, not
-    // by a deserialization default that silently produces an enum-0 / empty string.
+    // Les DTO sont nullables à dessein : un champ manquant est attrapé par la validation, pas
+    // par une valeur par défaut de désérialisation qui produirait en silence un enum 0 ou une chaîne vide.
     private sealed class TemplateDto
     {
         public string? Vendor { get; init; }

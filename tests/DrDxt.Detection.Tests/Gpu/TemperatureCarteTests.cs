@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Gpu;
 
-// A5 (07/10/2026) : une seule lecture de la température de carte pour NVIDIA, AMD et Intel, par la bibliothèque du
+// Une seule lecture de la température de carte pour NVIDIA, AMD et Intel, par la bibliothèque du
 // pilote ; rien n'est lu sur la vraie machine ici (chaque lecteur est une doublure).
 public sealed class TemperatureCarteTests
 {
@@ -32,7 +32,7 @@ public sealed class TemperatureCarteTests
         lu.Raison.Should().Be("NVML n'a pas rendu de température");
     }
 
-    // Revue F-37 : une Radeon muette à côté d'une puce Intel : ADLX répond, IGCL ne parle pas à sa place.
+    // Une Radeon muette à côté d'une puce Intel : ADLX répond, IGCL ne parle pas à sa place.
     [Fact]
     public void Une_carte_amd_muette_ne_laisse_pas_parler_la_puce_intel()
     {
@@ -42,7 +42,7 @@ public sealed class TemperatureCarteTests
         lu.Celsius.Should().BeNull();
     }
 
-    // Revue F-37 : au-delà de 150 °C, ce n'est pas une température (valeur hors unité, champ mal lu).
+    // Au-delà de 150 °C, ce n'est pas une température (valeur hors unité, champ mal lu).
     [Fact]
     public void Une_valeur_de_150_ou_plus_n_est_pas_une_temperature()
     {
@@ -92,7 +92,7 @@ public sealed class TemperatureCarteTests
         => RepairAuditService.TemperatureCarteNonLue([G("Intel(R) Arc(TM) B580 Graphics")], new()).Should().Be(
             "DrDXT n'a pas pu lire la température de ta carte (Intel(R) Arc(TM) B580 Graphics) par le pilote Intel. "
             + "Le logiciel Intel Graphics ou HWiNFO la montre.");
-    // 07/10/2026 : IGCL n'a jamais tourné sur une vraie carte Intel ; toute puce Intel installe ControlLib.dll. Rouvrir ce
+    // IGCL n'a jamais tourné sur une vraie carte Intel ; toute puce Intel installe ControlLib.dll. Rouvrir ce
     // lecteur est une décision, après un essai sur du vrai matériel : ce test doit changer avec elle.
     [Fact]
     public void Le_lecteur_Intel_reste_ferme_tant_qu_il_n_a_pas_ete_vu_sur_une_vraie_carte()

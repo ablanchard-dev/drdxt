@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 08/10/2026 (le mainteneur : « DrDXT n'est pas censé me dire non, il est censé trouver, réparer et faire ») : des arrêts récents ne
+/// Des arrêts récents ne
 /// bloquent plus Optimiser. Le texte au joueur dit la garde qui remplace le refus, et où sont la cause et la réparation.
 /// </summary>
 public sealed class LaGardeRemplaceLeRefusTests

@@ -3,8 +3,8 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// Revue adverse du docteur (09/10/2026, R5) : l'arrêt du 05/10 sur la machine de référence recevait quatre constats, dont
-/// trois se disaient chacun « la première piste » (pilote installé avant, changement noté avant, réglage BIOS, inventaire).
+/// Un même arrêt peut recevoir quatre constats (pilote installé avant, changement noté avant, réglage BIOS,
+/// inventaire).
 /// Quatre « premières » ne font aucune première : aucun texte montré au joueur ne s'attribue ce rang. Chacun est une piste.
 /// </summary>
 public class UneSeulePremierePisteTests

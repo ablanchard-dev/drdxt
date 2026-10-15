@@ -7,12 +7,12 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// M2 Phase E4 — GpuFanCurveTweak.
+// GpuFanCurveTweak.
 //
-// Same invariants as E2/E3: desktop dGPU gating, clamp via GpuSafeBounds (the fan
-// curve never runs below the minimum duty at high temp — anti-overheat), capture
-// the original curve → serialized inverse op snapshot, apply via the allowlisted
-// ApplyGpuFanCurveOp, revert, fail-clean. HONESTY: cooler, never "+FPS".
+// Mêmes invariants que l'undervolt et la limite de puissance : filtre dGPU de bureau, bornage
+// via GpuSafeBounds (la courbe ne descend jamais sous le régime minimal à haute température :
+// anti-surchauffe), capture de la courbe d'origine → instantané en op inverse sérialisée,
+// application via ApplyGpuFanCurveOp en liste blanche, retour arrière, échec propre. Honnêteté : plus frais, jamais « +FPS ».
 // -----------------------------------------------------------------------
 public sealed class GpuFanCurveTweakTests
 {
@@ -43,14 +43,14 @@ public sealed class GpuFanCurveTweakTests
         new FanCurvePoint(85, 70),
     });
 
-    // A safe, in-bounds requested curve.
+    // Une courbe demandée sûre, dans les bornes.
     private static FanCurve SafeRequest() => new(new[]
     {
         new FanCurvePoint(40, 35),
         new FanCurvePoint(85, 75),
     });
 
-    // A request that runs silent when hot — must be clamped up by GpuSafeBounds.
+    // Une demande qui tourne en silence à chaud : GpuSafeBounds doit la relever.
     private static FanCurve HotSilentRequest() => new(new[]
     {
         new FanCurvePoint(40, 20),
@@ -65,9 +65,9 @@ public sealed class GpuFanCurveTweakTests
         _adlx.GetFanCurve(0).Returns(Result<FanCurve>.Ok(StockCurve()));
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
-        // M6 — the fan-curve tweak now also reads the live IGpuTuningTargetSource for the
-        // AMD-GPU-presence hardware fact. Presence is computed by the source from real hardware
-        // (GpuGating.IsAmd) — never forced on a fake seam — and set from real AMD hw when asked.
+        // Le levier de courbe lit aussi l'IGpuTuningTargetSource vivant pour le fait matériel
+        // « GPU AMD présent ». La présence est calculée par la source depuis le vrai matériel
+        // (GpuGating.IsAmd), jamais forcée sur une fausse couture, et posée depuis un vrai matériel AMD à la demande.
         var source = new GpuTuningTargetSource(new GpuTuningTarget(0, -100, 0), new GpuPowerLimitTarget(0, 90));
         if (amdPresenceHw is not null)
             source.SetAmdGpuPresenceFromHardware(amdPresenceHw);
@@ -91,9 +91,9 @@ public sealed class GpuFanCurveTweakTests
         Build().SummaryKey.Should().NotContain("fps");
     }
 
-    // --- Gating: desktop dGPU only. ---
+    // --- Filtre : dGPU de bureau seulement. ---
 
-    // 24/09/2026 : le helper n'écrit aucune courbe (FanCurveDeferred). Même le cas le plus
+    // Le helper n'écrit aucune courbe (FanCurveDeferred). Même le cas le plus
     // favorable ne propose plus ce levier.
     [Fact]
     public void Jamais_propose_tant_que_le_helper_n_ecrit_pas_de_courbe() =>
@@ -107,7 +107,7 @@ public sealed class GpuFanCurveTweakTests
     public void AppliesTo_false_on_handheld() =>
         Build().AppliesTo(HandheldDeck(), State).Should().BeFalse();
 
-    // --- Clamp: a hot-silent curve is raised to the anti-overheat floor. ---
+    // --- Bornage : une courbe silencieuse à chaud est relevée au plancher anti-surchauffe. ---
 
     [Fact]
     public async Task Apply_clamps_hot_silent_curve_to_the_overheat_floor()
@@ -117,7 +117,7 @@ public sealed class GpuFanCurveTweakTests
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // The applied curve's hot point (85°C) is raised to at least the min safe duty.
+        // Le point chaud (85 °C) de la courbe appliquée est relevé au moins au régime sûr minimal.
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyGpuFanCurveOp>(o =>
                 o.GpuIndex == 0
@@ -139,7 +139,7 @@ public sealed class GpuFanCurveTweakTests
             Arg.Any<CancellationToken>());
     }
 
-    // --- Capture original → snapshot. ---
+    // --- Capture de l'origine → instantané. ---
 
     [Fact]
     public async Task Apply_captures_original_curve_in_snapshot()
@@ -161,7 +161,7 @@ public sealed class GpuFanCurveTweakTests
         op.Points.Should().Contain(p => p.TempC == 85 && p.DutyPct == 65);
     }
 
-    // --- Fail-clean. ---
+    // --- Échec propre. ---
 
     [Fact]
     public async Task Apply_fails_clean_when_no_sdk_available()
@@ -215,14 +215,14 @@ public sealed class GpuFanCurveTweakTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
     }
 
-    // --- Honesty: AMD GPU present but ADLX unavailable → explicit honest status. ---
+    // --- Honnêteté : GPU AMD présent mais ADLX indisponible → statut honnête explicite. ---
 
     [Fact]
     public async Task Apply_returns_amd_tuning_unavailable_when_amd_gpu_present_and_adlx_unavailable()
     {
-        // §22.3: when tuning cannot be done for this setup, SAY SO — never silently skip.
-        // Presence comes from the real source computing it from real AMD hardware
-        // (GpuGating.IsAmd) — never forced on a fake seam.
+        // Quand le réglage est impossible sur cette configuration, le dire, jamais sauter en silence.
+        // La présence vient de la vraie source qui la calcule depuis un vrai matériel AMD
+        // (GpuGating.IsAmd), jamais forcée sur une fausse couture.
         var t = Build(amdPresenceHw: DesktopAmd());
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(false);
@@ -238,7 +238,7 @@ public sealed class GpuFanCurveTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // --- AMD branch. ---
+    // --- Branche AMD. ---
 
     [Fact]
     public async Task Apply_uses_adlx_curve_read_on_amd()

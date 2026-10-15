@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// 26/09/2026 — un ordre dont les champs manquent se lie quand meme : le desérialiseur y met des
+/// Un ordre dont les champs manquent se lie quand meme : le desérialiseur y met des
 /// <c>null</c>. Le decodeur est total, mais c'est l'allowlist qui recoit ces <c>null</c> ensuite. Une
 /// exception a cet endroit ferait tomber la connexion au lieu de refuser l'ordre. Chaque type, avec son
 /// seul discriminant : refuse ou accepte proprement, jamais une exception.

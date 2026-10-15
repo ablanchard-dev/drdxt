@@ -4,16 +4,16 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 06/10/2026 (plan 3b.7) : « Windows me propose une mise à jour, DrDXT ne le dit même pas ». Le docteur lisait les
-// échecs passés de Windows Update, jamais ce qui attend. Lu sur ma machine (API officielle, hors ligne, 2,4 s) :
-// une définition Defender et trois pilotes en attente, dernière vérification par Windows le 05/10 à 19:02.
+// Le docteur dit ce que Windows Update a en attente, pas seulement ses échecs passés. Relevé sur la machine
+// de référence (API officielle, hors ligne, 2,4 s) :
+// une définition Defender et trois pilotes en attente, dernière vérification relevée le 05/10 à 19:02.
 public sealed class MisesAJourEnAttenteTests
 {
     private static readonly DateTimeOffset Maintenant = new(2026, 10, 6, 6, 0, 0, TimeSpan.FromHours(2));
 
     private static MiseAJourEnAttente Pilote(string titre) => new(titre, GenreDeMiseAJour.Pilote);
 
-    // 06/10/2026 (chantier B12) : ma capture de Paramètres « Windows 11, version 26H2 est disponible · Télécharger et
+    // Ma capture de Paramètres « Windows 11, version 26H2 est disponible · Télécharger et
     // installer ». L'API la rend en DeploymentAction='OptionalInstallation' (mesuré : catégorie Upgrades) ; la recherche
     // de 3b.7 ne la voyait pas.
     [Fact]
@@ -29,7 +29,7 @@ public sealed class MisesAJourEnAttenteTests
         c.Explication.Should().Contain("Télécharger et installer").And.Contain("hors partie").And.Contain("rien ne presse");
     }
 
-    // Revue (F-34) : la seconde recherche en panne est « non lu », pas « rien de proposé ».
+    // La seconde recherche en panne est « non lu », pas « rien de proposé ».
     [Fact]
     public void Une_recherche_des_propositions_ratee_se_dit_non_lue()
         => MisesAJourEnAttente.JugerProposees(null, "25H2").Single().Statut.Should().Be(RepairStatus.Unknown);
@@ -51,14 +51,40 @@ public sealed class MisesAJourEnAttenteTests
             Pilote("Realtek SoftwareComponent Driver Update (11.0.6000.398)"),
         ], Maintenant.AddHours(-11));
 
-        // Revue du 06/10 (P1) : le fuseau est donné, pas celui de la machine de test.
+        // Le fuseau est donné, pas celui de la machine de test.
         var c = MisesAJourEnAttente.Juger(etat, Maintenant, fuseau: TimeZoneInfo.Utc);
 
         c.Statut.Should().Be(RepairStatus.Observed, "des pilotes et une définition n'ont rien d'urgent");
         c.Explication.Should().Contain("4 mises à jour attendent").And.Contain("3 pilotes").And.Contain("1 définition")
             .And.Contain("STMicroelectronics").And.Contain("et 1 autre").And.Contain("05/10 à 17:00")
-            .And.Contain("Paramètres > Windows Update");
+            .And.Contain("DrDXT n'installe rien").And.NotContain("Paramètres > Windows Update");
+        c.Remede.Should().StartWith("1) Paramètres > Windows Update").And.Contain("2) ");
         c.Explication.Should().NotContain("Realtek SoftwareComponent Driver Update (11.0.6000.398)", "3 titres au plus");
+    }
+
+    [Fact]
+    public void Rien_en_attente_mais_pas_verifie_depuis_longtemps_donne_le_geste_a_part()
+    {
+        var c = MisesAJourEnAttente.Juger(new EtatWindowsUpdate([], Maintenant.AddDays(-30)), Maintenant);
+
+        c.Explication.Should().Contain("rien en attente").And.NotContain("Rechercher des mises à jour");
+        c.Remede.Should().StartWith("1) Paramètres > Windows Update > Rechercher des mises à jour");
+        // Le geste « chercher maintenant » ne s'attache qu'à une vérification ancienne.
+        c.Cible.Should().Be(MisesAJourEnAttente.CibleRecherche);
+        MisesAJourEnAttente.Juger(new EtatWindowsUpdate([], Maintenant.AddHours(-3)), Maintenant).Cible.Should().BeNull();
+    }
+
+    // Windows ne compte que ses propres recherches (Microsoft Learn, LastSearchSuccessDate : « Only the AutomaticUpdates
+    // object will update this property »). Celle que DrDXT a lancée compte aussi : la plus récente des deux.
+    [Fact]
+    public void La_derniere_recherche_est_la_plus_recente_de_Windows_et_de_DrDXT()
+    {
+        var windows = Maintenant.AddDays(-30);
+        LecteurWindowsUpdate.LaPlusRecente(windows, Maintenant.AddHours(-1).ToString("O")).Should().Be(Maintenant.AddHours(-1));
+        LecteurWindowsUpdate.LaPlusRecente(windows, Maintenant.AddDays(-60).ToString("O")).Should().Be(windows);
+        LecteurWindowsUpdate.LaPlusRecente(windows, "pas une date").Should().Be(windows, "une marque illisible ne vaut rien");
+        LecteurWindowsUpdate.LaPlusRecente(null, null).Should().BeNull();
+        LecteurWindowsUpdate.LaPlusRecente(null, Maintenant.ToString("O")).Should().Be(Maintenant);
     }
 
     [Fact]
@@ -87,7 +113,7 @@ public sealed class MisesAJourEnAttenteTests
         c.Explication.Should().Contain("12 jours");
     }
 
-    // Revue du 06/10 (P2) : jamais vérifié n'est pas « depuis 0 jours ».
+    // Jamais vérifié n'est pas « depuis 0 jours ».
     [Fact]
     public void Jamais_verifie_le_dit()
     {
@@ -97,7 +123,7 @@ public sealed class MisesAJourEnAttenteTests
         c.Explication.Should().Contain("jamais réussi à vérifier").And.NotContain("0 jours");
     }
 
-    // Revue du 06/10 (P2) : le nom d'une catégorie est traduit selon la langue de Windows ; son identifiant non.
+    // Le nom d'une catégorie est traduit selon la langue de Windows ; son identifiant non.
     [Theory]
     [InlineData(1, "0fa1201d-4330-4fa8-8ae9-b877473b6441", GenreDeMiseAJour.Securite)]
     [InlineData(1, "e6cf1350-c01b-414d-a61f-263d14d133b4", GenreDeMiseAJour.Securite)]

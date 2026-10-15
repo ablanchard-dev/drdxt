@@ -4,18 +4,20 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// E4 — GpuFanCurveTweak.
+// GpuFanCurveTweak.
 //
-// Applies a GPU fan curve (NVAPI / ADLX) via the allowlisted ApplyGpuFanCurveOp.
-// A more aggressive curve keeps the GPU cooler under load → steadier 1% lows for
-// ~0 peak-FPS cost (§5). The curve is always clamped by GpuSafeBounds so no point
-// at a high temperature can ever run below the minimum safe duty (anti-overheat) —
-// the helper re-checks this leaf-exact as defense-in-depth.
+// Pose une courbe de ventilation de la carte (NVAPI ou ADLX) par l'op autorisée ApplyGpuFanCurveOp.
+// Une courbe plus vive garde la carte plus fraîche en charge : des 1 % low plus stables pour un coût
+// quasi nul en images de pointe. La courbe est toujours bornée par GpuSafeBounds : aucun point à haute
+// température ne descend sous la vitesse minimale sûre (anti-surchauffe), et le helper revérifie la
+// feuille exacte, en seconde défense.
 //
-// Same invariants as E2/E3: desktop dGPU gating, clamp via GpuSafeBounds, capture
-// the real original curve → serialized inverse op snapshot, apply via the typed op,
-// revert via the base, fail-clean.
+// Mêmes invariants que les leviers de décalage et de limite de puissance : carte dédiée de PC de
+// bureau, bornes GpuSafeBounds, courbe d'origine relue puis rangée en op inverse dans le snapshot,
+// application par l'op typée, retour par la base, échec propre.
 // -----------------------------------------------------------------------
+/// <summary>Pose une courbe de ventilation plus vive sur la carte graphique. Jamais proposé tant que le helper ne
+/// sait pas écrire de courbe.</summary>
 public sealed class GpuFanCurveTweak : GpuTweakBase
 {
     private readonly INvApiGpuTuning _nvApi;
@@ -40,16 +42,16 @@ public sealed class GpuFanCurveTweak : GpuTweakBase
     public override string Id => "gpu.fan_curve";
     public override string SummaryKey => "tweak.gpu.fan_curve.cooler";
 
-    // 24/09/2026 : jamais proposé tant que le helper n'écrit pas de courbe. Son exécuteur rend
-    // toujours « not yet available » (`PrivilegedOpExecutor.FanCurveDeferred`) : proposer ce levier,
-    // c'était promettre un réglage qui échoue à chaque essai.
+    // Jamais proposé tant que le helper n'écrit pas de courbe. Son exécuteur rend
+    // toujours « not yet available » (`PrivilegedOpExecutor.FanCurveDeferred`) : proposer ce levier
+    // promettrait un réglage qui échoue à chaque essai.
     public override bool AppliesTo(HardwareInventory hw, SettingsState state) => false;
 
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
         try
         {
-            // Read the original curve from whichever SDK is present (for a faithful revert).
+            // Lire la courbe d'origine par le SDK présent (pour un retour arrière fidèle).
             Result<FanCurve> capture;
             if (_nvApi.IsAvailable)
                 capture = _nvApi.GetFanCurve(_target.GpuIndex);
@@ -57,9 +59,9 @@ public sealed class GpuFanCurveTweak : GpuTweakBase
                 capture = _adlx.GetFanCurve(_target.GpuIndex);
             else
             {
-                // §22.3: never silently skip. If an AMD GPU is present (a hardware fact from
-                // the scanned inventory, independent of the ADLX SDK) but no tuning SDK is
-                // wired, surface an explicit honest status.
+                // Jamais de saut silencieux. Si un GPU AMD est présent (fait matériel tiré de l'inventaire,
+                // indépendant du SDK ADLX) mais qu'aucun SDK de réglage n'est branché, on affiche un état
+                // explicite et honnête.
                 if (_targets.IsAmdGpuPresent)
                     return Result<TweakSnapshot>.Fail(ErrorCodes.GpuAmdTuningUnavailable,
                         "AMD GPU detected: ADLX tuning SDK not available in this build.");
@@ -72,7 +74,7 @@ public sealed class GpuFanCurveTweak : GpuTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     $"Could not read original fan curve: {capture.Error?.Code}.");
 
-            // Clamp the requested curve so no hot point is ever silent (anti-overheat).
+            // Borner la courbe demandée pour qu'aucun point chaud ne soit silencieux (anti-surchauffe).
             var safeCurve = GpuSafeBounds.ClampFanCurve(_target.Curve);
 
             var inverse = ToOp(_target.GpuIndex, capture.Value);

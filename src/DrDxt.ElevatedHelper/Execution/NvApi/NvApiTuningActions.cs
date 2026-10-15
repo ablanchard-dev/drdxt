@@ -5,31 +5,31 @@ using DrDxt.GpuNative.NvApi;
 namespace DrDxt.ElevatedHelper.Execution.NvApi;
 
 // -----------------------------------------------------------------------
-// NvApiTuningActions — the real risky NVAPI tuning writes (the m2smoke boundary).
+// NvApiTuningActions : les vraies écritures de réglage NVAPI risquées (la frontière du m2smoke).
 //
-// It reuses the SINGLE verified native NVAPI boundary — NvApiNative in DrDxt.GpuNative
-// (the reverse-engineered private SetPstates20 / ClientPowerPoliciesSetStatus recipe,
-// live-validated on an RTX 4060). There is NO second copy of the function IDs or the
-// GET-then-SET recipe in the helper (the divergence trap we swore off): the helper just
-// orchestrates over INvApiNative, exactly like ADLXTuningActions over IAdlxNative.
+// Reprend l'unique frontière NVAPI native vérifiée : NvApiNative dans DrDxt.GpuNative (la recette
+// privée rétro-ingéniée SetPstates20 / ClientPowerPoliciesSetStatus, validée en réel sur une
+// RTX 4060). Le helper n'a aucune seconde copie des ids de fonction ni de la recette GET puis SET
+// (le piège de divergence écarté) : il orchestre seulement sur INvApiNative, exactement comme
+// ADLXTuningActions sur IAdlxNative.
 //
-// GOLDEN rules (enforced inside NvApiNative):
-//   #1 version word = Marshal.SizeOf(struct) | (1 << 16) at runtime — a size mismatch
-//      becomes the driver's SAFE IncompatibleStructVersion, never a write.
-//   #2 GET-then-SET: read the FULL current struct, mutate only the one field IN PLACE,
-//      write it back — never a zero-built write struct.
-//   #3 status 0 = Ok; any non-zero → the boundary returns false → Result.Fail here.
+// Règles d'or (imposées dans NvApiNative) :
+//   #1 mot de version = Marshal.SizeOf(struct) | (1 << 16) à l'exécution : une taille incorrecte
+//      devient l'IncompatibleStructVersion sûr du pilote, jamais une écriture.
+//   #2 GET puis SET : lire toute la struct actuelle, ne modifier que le seul champ visé sur place,
+//      la réécrire ; jamais une struct d'écriture construite à zéro.
+//   #3 statut 0 = Ok ; tout non nul → la frontière rend false → Result.Fail ici.
 //
-// Defense-in-depth (this layer): out-of-policy write values are REFUSED here by
-// NvApiTuningMath's policy-band rails (which MIRROR the App's GpuSafeBounds and also reject
-// int.MinValue and NaN) before the value ever reaches the native boundary — the elevated GPU
-// write enforces the safety band itself and never trusts its caller for value bounds, even on
-// a DIRECT (non-IPC) call from a smoke tool that bypasses OpAllowlist. Out of band is
-// REJECTED, not clamped.
+// Défense en profondeur (cette couche) : les valeurs d'écriture hors règle sont refusées ici par
+// les garde-fous de plage de NvApiTuningMath (qui reprennent GpuSafeBounds de l'App et rejettent
+// aussi int.MinValue et NaN) avant d'atteindre la frontière native : l'écriture GPU élevée impose
+// elle-même la plage de sécurité et ne fait jamais confiance à son appelant pour les bornes, même
+// sur un appel direct (hors IPC) d'un outil de smoke test qui contourne OpAllowlist. Hors plage :
+// rejeté, pas borné.
 //
-// Every method returns a Result and never throws across the IPC. On an AMD / no-NVIDIA box,
-// or when a PRIVATE function id is not exported by the installed driver, the boundary returns
-// false and the call fails clean (HELPER.OP_FAILED).
+// Chaque méthode rend un Result et ne lève jamais à travers l'IPC. Sur une machine AMD / sans
+// NVIDIA, ou si un id de fonction privée n'est pas exporté par le pilote installé, la frontière
+// rend false et l'appel échoue proprement (HELPER.OP_FAILED).
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class NvApiTuningActions : INvApiTuningActions
@@ -43,7 +43,7 @@ public sealed class NvApiTuningActions : INvApiTuningActions
     internal NvApiTuningActions(INvApiNative native) =>
         _native = native ?? throw new ArgumentNullException(nameof(native));
 
-    // --- reads (capture-original for a faithful revert) ---
+    // --- lectures (capture de l'original pour un retour fidèle) ---
 
     public Result<int> GetCoreClockOffsetMhz(int gpuIndex)
     {
@@ -60,8 +60,8 @@ public sealed class NvApiTuningActions : INvApiTuningActions
         }
         catch (Exception ex)
         {
-            // The native boundary already swallows faults (returns false); last-resort guard
-            // so an exception never crosses the IPC.
+            // La frontière native avale déjà les pannes (rend false) ; garde de dernier recours
+            // pour qu'aucune exception ne traverse l'IPC.
             return Result<int>.Fail(ErrorCodes.HelperOpFailed, $"NVAPI read failed: {ex.GetType().Name}.");
         }
     }
@@ -85,13 +85,13 @@ public sealed class NvApiTuningActions : INvApiTuningActions
         }
     }
 
-    // --- writes (GET-then-SET via the leaf; policy band re-checked here) ---
+    // --- écritures (GET puis SET via la feuille ; plage de règle revérifiée ici) ---
 
     public Result SetCoreClockOffset(int gpuIndex, int offsetMHz)
     {
-        // Policy band enforced at the executor too (no Math.Abs → int.MinValue is safe): the
-        // elevated write never trusts its caller for value bounds, even on a DIRECT (non-IPC)
-        // call from a smoke tool that bypasses OpAllowlist. Out of band is REJECTED, not clamped.
+        // Plage de règle imposée aussi dans l'exécuteur (sans Math.Abs → int.MinValue est sûr) :
+        // l'écriture élevée ne fait jamais confiance à son appelant pour les bornes, même sur un appel
+        // direct (hors IPC) d'un outil de smoke test qui contourne OpAllowlist. Hors plage : rejeté, pas borné.
         if (!NvApiTuningMath.IsCoreOffsetWithinHardRail(offsetMHz))
             return Result.Fail(ErrorCodes.HelperOpFailed,
                 $"Refused: core-clock offset {offsetMHz} MHz is outside the GPU safe-bounds policy band " +
@@ -102,12 +102,17 @@ public sealed class NvApiTuningActions : INvApiTuningActions
             return Result.Fail(ErrorCodes.HelperOpFailed, Unavailable);
         try
         {
+            if (!_native.TryReadCoreOffsetMhz(gpuIndex, out var origine))
+                return Result.Fail(ErrorCodes.HelperOpFailed, "NVAPI core-clock offset could not be read before the write; nothing written.");
             if (!_native.TrySetCoreClockOffset(gpuIndex, offsetMHz))
                 return Result.Fail(ErrorCodes.HelperOpFailed,
                     "NVAPI core-clock write failed (clock not editable, private id absent, or driver fault).");
 
-            return Confirm(offsetMHz, _native.TryReadCoreOffsetMhz(gpuIndex, out var actualMhz),
+            var confirme = Confirm(offsetMHz, _native.TryReadCoreOffsetMhz(gpuIndex, out var actualMhz),
                 actualMhz, "core-clock offset", "MHz");
+            return confirme.IsOk ? confirme : RendreOrigine(confirme, origine, "core-clock offset", "MHz",
+                () => _native.TrySetCoreClockOffset(gpuIndex, origine),
+                () => (_native.TryReadCoreOffsetMhz(gpuIndex, out var v), v));
         }
         catch (Exception ex)
         {
@@ -117,7 +122,7 @@ public sealed class NvApiTuningActions : INvApiTuningActions
 
     public Result SetPowerLimitPercent(int gpuIndex, float pct)
     {
-        // Hard safety rail (rejects NaN / Infinity, which slip past naive comparisons).
+        // Garde-fou strict (rejette NaN / Infinity, qui passent à travers des comparaisons naïves).
         if (!NvApiTuningMath.IsPowerPercentWithinHardRail(pct))
             return Result.Fail(ErrorCodes.HelperOpFailed,
                 $"Refused: power-limit {pct}% is outside the hard [{NvApiTuningMath.MinPowerPercent}, {NvApiTuningMath.MaxPowerPercent}]% rail.");
@@ -127,12 +132,17 @@ public sealed class NvApiTuningActions : INvApiTuningActions
             return Result.Fail(ErrorCodes.HelperOpFailed, Unavailable);
         try
         {
+            if (!_native.TryReadPowerLimitPct(gpuIndex, out var origine))
+                return Result.Fail(ErrorCodes.HelperOpFailed, "NVAPI power limit could not be read before the write; nothing written.");
             if (!_native.TrySetPowerLimitPercent(gpuIndex, pct))
                 return Result.Fail(ErrorCodes.HelperOpFailed,
                     "NVAPI power-limit write failed (invalid driver bounds or driver fault).");
 
-            return Confirm((int)MathF.Round(pct), _native.TryReadPowerLimitPct(gpuIndex, out var actualPct),
+            var confirme = Confirm((int)MathF.Round(pct), _native.TryReadPowerLimitPct(gpuIndex, out var actualPct),
                 actualPct, "power limit", "%");
+            return confirme.IsOk ? confirme : RendreOrigine(confirme, origine, "power limit", "%",
+                () => _native.TrySetPowerLimitPercent(gpuIndex, origine),
+                () => (_native.TryReadPowerLimitPct(gpuIndex, out var v), v));
         }
         catch (Exception ex)
         {
@@ -141,18 +151,36 @@ public sealed class NvApiTuningActions : INvApiTuningActions
     }
 
     /// <summary>
-    /// A native write returning true means the driver accepted the call, not that the value
-    /// LANDED. Observed on a real RTX 4060: a 110% power-limit request returned true and the
-    /// card kept 100% — it has no headroom and the driver clamped in silence. Reporting that as
-    /// applied would tell a customer we raised their power limit while nothing moved, and would
-    /// record a revert value the GPU never held.
+    /// Une écriture non confirmée a pu laisser autre chose que l'origine : le pilote ramène une demande hors de ses bornes
+    /// à sa borne et l'écrit (100 % demandé 60, minimum 70 : 70 posé). L'App ne garde rien d'un échec, donc l'origine est
+    /// reposée et relue ici ; si elle ne revient pas, c'est dit avec la valeur laissée.
+    /// </summary>
+    private static Result RendreOrigine(Result echec, int origine, string what, string unit,
+        Func<bool> reposer, Func<(bool Ok, int Valeur)> relire)
+    {
+        var avant = relire();
+        if (avant.Ok && avant.Valeur == origine) return echec;
+        reposer();
+        var apres = relire();
+        if (apres.Ok && apres.Valeur == origine) return echec;
+        return Result.Fail(ErrorCodes.TweakPartiallyApplied,
+            $"NVAPI {what} was not applied and could not be restored: the driver holds " +
+            $"{(apres.Ok ? apres.Valeur + unit : "an unreadable value")} (was {origine}{unit}); reset it in the NVIDIA app or reboot.");
+    }
+
+    /// <summary>
+    /// Une écriture native qui rend true veut dire que le pilote a accepté l'appel, pas que la valeur
+    /// est en place. Relevé sur une vraie RTX 4060 : une demande de limite de puissance à 110 % a rendu
+    /// true et la carte est restée à 100 % ; elle n'a pas de marge et le pilote a borné en silence.
+    /// L'annoncer comme appliqué dirait à un client qu'on a relevé sa limite alors que rien n'a bougé,
+    /// et enregistrerait une valeur de retour que le GPU n'a jamais tenue.
     ///
-    /// So every write reads back and compares. The comparison is exact on purpose: a driver that
-    /// quantises a request would surface here as a mismatch, which is information about that
-    /// driver, not a defect to paper over with an invented tolerance.
+    /// Chaque écriture relit donc et compare. La comparaison est exacte exprès : un pilote qui
+    /// arrondit une demande apparaîtrait ici comme un désaccord, ce qui renseigne sur ce pilote,
+    /// pas un défaut à masquer par une tolérance inventée.
     ///
-    /// A readback that fails is not a success either — "applied but unconfirmed" is exactly the
-    /// claim this method exists to stop.
+    /// Une relecture qui échoue n'est pas un succès non plus : « appliqué mais non confirmé » est
+    /// exactement l'affirmation que cette méthode existe pour empêcher.
     /// </summary>
     private static Result Confirm(int requested, bool readOk, int actual, string what, string unit)
     {

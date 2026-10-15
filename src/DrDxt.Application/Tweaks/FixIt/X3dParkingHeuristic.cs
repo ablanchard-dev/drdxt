@@ -3,29 +3,28 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// X3dParkingHeuristic — conservative detection of "wrong CCD parking" on a
-// dual-CCD AMD X3D CPU, from SettingsState.ParkedCoreIndexes (read in M1/P0).
+// X3dParkingHeuristic : détection prudente d'un « mauvais parcage des CCD » sur un processeur
+// AMD X3D à deux CCD, d'après SettingsState.ParkedCoreIndexes (lu par le scan).
 //
-// Background: on a dual-CCD X3D (7950X3D / 7900X3D / 9950X3D), one CCD has the
-// stacked 3D V-Cache (the gaming CCD) and the other is the high-frequency CCD. The
-// AMD 3D V-Cache Performance Optimizer service + Game Bar route games to the
-// V-Cache CCD by PARKING the frequency CCD's cores during gaming. By convention the
-// V-Cache CCD is CCD0 (the LOW core indexes); the frequency CCD is CCD1 (the HIGH
-// indexes).
+// Contexte : sur un X3D à deux CCD (7950X3D / 7900X3D / 9950X3D), un CCD porte la 3D V-Cache
+// empilée (le CCD de jeu) et l'autre est le CCD haute fréquence. Le service AMD 3D V-Cache
+// Performance Optimizer + la Game Bar envoient les jeux sur le CCD à V-Cache en parquant les
+// cœurs du CCD fréquence pendant le jeu. Par convention, le CCD à V-Cache est CCD0 (les index
+// de cœur bas) ; le CCD fréquence est CCD1 (les index hauts).
 //
-// Broken states this flags (CONSERVATIVE — a false positive only enables a
-// supported, fully-reverted software route, and the real gain is PROVEN by the
-// engine re-bench, so we still err toward not flagging healthy machines):
-//   * nothing parked → the optimizer isn't routing at all (the classic broken
-//     state: both CCDs active, the scheduler bounces the game off the cache CCD).
-//   * A V-Cache-CCD core (a LOW index, < cores-per-CCD) is parked → the WRONG CCD
-//     is parked (games would be pushed onto the frequency CCD = the regression).
+// États cassés signalés (prudemment : un faux positif ne fait qu'activer une voie logicielle
+// prise en charge et entièrement annulable, et le vrai gain est prouvé par la remesure du
+// moteur ; on préfère quand même ne pas signaler une machine saine) :
+//   * rien de parqué → l'optimiseur ne route rien (le cas cassé classique : les deux CCD
+//     actifs, l'ordonnanceur éjecte le jeu du CCD à cache).
+//   * un cœur du CCD à V-Cache (index bas, < cœurs par CCD) est parqué → le mauvais CCD est
+//     parqué (les jeux seraient poussés sur le CCD fréquence = la régression).
 //
-// Healthy (not flagged): only frequency-CCD cores (HIGH indexes) are parked.
+// Sain (non signalé) : seuls des cœurs du CCD fréquence (index hauts) sont parqués.
 // -----------------------------------------------------------------------
 public static class X3dParkingHeuristic
 {
-    /// <summary>True only on a dual-CCD X3D whose core parking looks wrong.</summary>
+    /// <summary>Vrai seulement sur un X3D à deux CCD dont le parcage des cœurs semble faux.</summary>
     public static bool LooksMisparked(CpuInfo cpu, SettingsState state)
     {
         if (!cpu.IsX3D || cpu.CcdCount < 2)
@@ -33,28 +32,28 @@ public static class X3dParkingHeuristic
 
         var parked = state.ParkedCoreIndexes;
 
-        // Parking NON LU (null) n'est pas "rien n'est parque". Ce tweak ecrit
+        // Parcage non lu (null) n'est pas « rien n'est parque ». Ce levier ecrit
         // (AMD3DVCacheSvc + CppcEnable) : proposer une ecriture sur un signal non lu
-        // est exactement ce qu'un lecteur bouchonne rendant toujours une liste vide a
-        // fait faire ici, sur toute machine X3D bi-CCD, saines comprises.
+        // est exactement ce qu'un lecteur bouchonne rendant toujours une liste vide
+        // ferait faire ici, sur toute machine X3D bi-CCD, saines comprises.
         if (parked is null)
             return false;
 
-        // Broken state #1: nothing parked → the optimizer isn't routing.
+        // État cassé n° 1 : rien de parqué → l'optimiseur ne route rien.
         if (parked.Count == 0)
             return true;
 
-        // Broken state #2: a V-Cache-CCD (low-index) core is parked = wrong CCD.
-        // Cores-per-CCD split evenly across the detected CCDs; the V-Cache CCD0 owns
-        // the lowest block of indexes [0 .. coresPerCcd-1].
+        // État cassé n° 2 : un cœur du CCD à V-Cache (index bas) est parqué = mauvais CCD.
+        // Les cœurs sont répartis également entre les CCD détectés ; le CCD0 à V-Cache possède
+        // le bloc d'index le plus bas [0 .. coresPerCcd-1].
         var coresPerCcd = Math.Max(1, cpu.Cores / cpu.CcdCount);
         foreach (var index in parked)
         {
             if (index >= 0 && index < coresPerCcd)
-                return true; // a cache-CCD core is parked → misparked.
+                return true; // un cœur du CCD à cache est parqué → mauvais parcage.
         }
 
-        // Otherwise only frequency-CCD cores are parked → healthy.
+        // Sinon, seuls des cœurs du CCD fréquence sont parqués → sain.
         return false;
     }
 }

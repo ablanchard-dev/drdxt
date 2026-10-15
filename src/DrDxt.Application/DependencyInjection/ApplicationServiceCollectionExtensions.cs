@@ -12,28 +12,28 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace DrDxt.Application.DependencyInjection;
 
 // -----------------------------------------------------------------------
-// M2 H2 — application-layer DI wiring.
+// Câblage DI de la couche Application.
 //
-// AddDrDxtApplication() registers the P2 application layer:
+// AddDrDxtApplication() enregistre la couche Application :
 //   * ISafetyManager           -> SafetyManager
 //   * ITweakEngine             -> TweakEngine
-//   * every ITweak (D/E/F)     -> registered so IEnumerable<ITweak> is non-empty
-//   * ITweakCatalog            -> TweakCatalog (consumes IEnumerable<ITweak>)
-//   * IStabilityTester         -> fail-clean stub (real harness later)
-//   * the SDK seams            -> fail-clean stubs (real P/Invoke later)
+//   * chaque ITweak (D/E/F)    -> enregistré pour que IEnumerable<ITweak> ne soit pas vide
+//   * ITweakCatalog            -> TweakCatalog (consomme IEnumerable<ITweak>)
+//   * IStabilityTester         -> stub qui échoue proprement (vrai banc plus tard)
+//   * les coutures SDK         -> stubs qui échouent proprement (vrai P/Invoke plus tard)
 //
-// The seams are registered with TryAdd* so the App composition root can REPLACE
-// any of them with the real implementation (NVAPI/ADLX/registry/power/etc.)
-// without editing this file. The engine's own dependencies that belong to other
-// modules (IDiagnosticsLog from Infrastructure, IBenchmarkRunner from Measurement)
-// are expected to be registered by the host before this is called — this method
-// does not register them so it stays a single-responsibility application module.
+// Les coutures sont enregistrées par TryAdd* : la racine de composition de l'App peut
+// remplacer chacune par la vraie implémentation (NVAPI/ADLX/registre/alimentation/etc.)
+// sans toucher ce fichier. Les dépendances du moteur qui appartiennent à d'autres modules
+// (IDiagnosticsLog d'Infrastructure, IBenchmarkRunner de Measurement) doivent être
+// enregistrées par l'hôte avant cet appel ; cette méthode ne les enregistre pas, pour rester
+// un module d'application à une seule responsabilité.
 //
-// SEAM STATUS (real vs stub): in M2 ALL SDK seams + IElevatedClient are fail-clean
-// STUBS (see FailCleanSeamStubs). They report "unavailable" / refuse, so a tweak
-// skips cleanly and nothing privileged happens by accident. The real signed-IPC
-// IElevatedClient (DrDxt.ElevatedHelper) and the P/Invoke seams are wired in the
-// App host, replacing these stubs.
+// État des coutures (vraies ou stubs) : au départ toutes les coutures SDK + IElevatedClient
+// sont des stubs qui échouent proprement (voir FailCleanSeamStubs). Ils disent « indisponible »
+// ou refusent : un levier passe proprement et rien de privilégié n'arrive par accident. Le
+// vrai IElevatedClient en IPC signé (DrDxt.ElevatedHelper) et les coutures P/Invoke sont
+// branchés dans l'hôte App, à la place de ces stubs.
 // -----------------------------------------------------------------------
 public static class ApplicationServiceCollectionExtensions
 {
@@ -50,32 +50,31 @@ public static class ApplicationServiceCollectionExtensions
         return services;
     }
 
-    // --- Fail-clean SDK seam stubs (TryAdd: the App host overrides with real impls). ---
+    // --- Stubs des coutures SDK qui échouent proprement (TryAdd : l'hôte App les remplace par les vraies). ---
     private static void RegisterSeamStubs(IServiceCollection services)
     {
-        // Privileged frontier: a refusing stub by default (no privileged write).
+        // Frontière privilégiée : par défaut un stub qui refuse (aucune écriture privilégiée).
         services.TryAddSingleton<IElevatedClient, StubElevatedClient>();
 
-        // Safety seams.
+        // Coutures de sécurité.
         services.TryAddSingleton<IRestorePointService, StubRestorePointService>();
         services.TryAddSingleton<IConsentPrompt, StubConsentPrompt>();
 
-        // Latency seams.
+        // Coutures de latence.
         services.TryAddSingleton<INvApi, StubNvApi>();
         services.TryAddSingleton<IAdlx, StubAdlx>();
         services.TryAddSingleton<IDisplayInfo, StubDisplayInfo>();
         services.TryAddSingleton<IRegistryReader, StubRegistryReader>();
 
-        // GPU-tuning seams.
-        services.TryAddSingleton<INvApiInfo, StubNvApiInfo>();
+        // Coutures de réglage GPU.
         services.TryAddSingleton<INvApiGpuTuning, StubNvApiGpuTuning>();
         services.TryAddSingleton<IAdlxGpuTuning, StubAdlxGpuTuning>();
-        // Real orchestration over an injected GPU-load probe (D3D11 probe lands next);
-        // until the probe is real it reports CouldNotRun → Inconclusive → safe revert.
+        // Vraie orchestration sur une sonde de charge GPU injectée (la sonde D3D11 vient de l'App) ;
+        // tant que la sonde n'est pas réelle, elle rend CouldNotRun → Inconclusive → retour sûr.
         services.TryAddSingleton<IGpuLoadProbe, StubGpuLoadProbe>();
         services.TryAddSingleton<IStabilityTester, GpuStabilityTester>();
 
-        // Fix-it seams.
+        // Coutures des réparations.
         services.TryAddSingleton<IPowerPlanReader, StubPowerPlanReader>();
         services.TryAddSingleton<ICpuPowerLimitReader, StubCpuPowerLimitReader>();
         services.TryAddSingleton<IServiceStateReader, StubServiceStateReader>();
@@ -83,23 +82,23 @@ public static class ApplicationServiceCollectionExtensions
         services.TryAddSingleton<IConfirmationEcran, StubConfirmationEcran>();
     }
 
-    // --- Default GPU tuning targets (value objects, not services). ---
-    // Conservative, in-bounds defaults; in production these come from a per-chip
-    // profile (M6). They are still re-clamped/gated by GpuSafeBounds before anything
-    // reaches the helper — the target is a request, not an authorization.
+    // --- Cibles de réglage GPU par défaut (objets valeur, pas des services). ---
+    // Défauts prudents, dans les bornes ; en production, ils viennent d'un profil de puce.
+    // Ils sont quand même rebornés et filtrés par GpuSafeBounds avant d'atteindre le helper :
+    // la cible est une demande, pas une autorisation.
     private static void RegisterTweakTargets(IServiceCollection services)
     {
-        // A modest undervolt-direction offset, well inside GpuSafeBounds [-200, 100].
+        // Un décalage modeste dans le sens de la sous-tension, bien dans GpuSafeBounds [-200, 100].
         services.TryAddSingleton(new GpuTuningTarget(GpuIndex: 0, CoreOffsetMhz: -100, MemoryOffsetMhz: 0));
-        // A gentle power trim, inside [60, 100].
+        // Une légère baisse de puissance, dans [60, 100].
         services.TryAddSingleton(new GpuPowerLimitTarget(GpuIndex: 0, PowerLimitPct: 90));
-        // M6 — the live, overridable target holder the GPU tweaks read at apply time,
-        // seeded with the conservative defaults above. A per-chip profile Set()s it (after
-        // clamping) at scan time; with no override it returns those defaults unchanged.
+        // Le porteur de cible en cours, remplaçable, que les leviers GPU lisent à la pose,
+        // amorcé avec les défauts prudents ci-dessus. Un profil de puce le Set() (après bornage)
+        // au scan ; sans remplacement, il rend ces défauts tels quels.
         services.TryAddSingleton<IGpuTuningTargetSource>(sp => new GpuTuningTargetSource(
             sp.GetRequiredService<GpuTuningTarget>(),
             sp.GetRequiredService<GpuPowerLimitTarget>()));
-        // A sane cooling curve (every hot point >= the safe duty floor).
+        // Une courbe de refroidissement saine (chaque point chaud >= le plancher de cycle sûr).
         services.TryAddSingleton(new GpuFanCurveTarget(GpuIndex: 0, new FanCurve(new[]
         {
             new FanCurvePoint(40, 30),
@@ -109,10 +108,10 @@ public static class ApplicationServiceCollectionExtensions
         })));
     }
 
-    // --- Every ITweak (D/E/F), so IEnumerable<ITweak> flows into the catalog. ---
+    // --- Chaque ITweak (D/E/F), pour que IEnumerable<ITweak> alimente le catalogue. ---
     private static void RegisterTweaks(IServiceCollection services)
     {
-        // D — Latency / OS-persistent (NS-1)
+        // D : latence / persistant côté OS
         services.AddSingleton<ITweak, NvidiaUltraLowLatencyTweak>();
         services.AddSingleton<ITweak, RenderQueueCapTweak>();
         services.AddSingleton<ITweak, VrrVsyncCapConfigTweak>();
@@ -123,18 +122,21 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ITweak, VrrFlipModelOnTweak>();
         services.AddSingleton<ITweak, PreferMaxPerfTweak>();
 
-        // E — GPU tuning
+        // E : réglage GPU
         services.AddSingleton<ITweak, GpuUndervoltTweak>();
         services.AddSingleton<ITweak, GpuPowerLimitTweak>();
         services.AddSingleton<ITweak, GpuFanCurveTweak>();
 
-        // F — Fix-it
+        // F : réparations
         services.AddSingleton<ITweak, X3dCcdParkingFixTweak>();
         services.AddSingleton<ITweak, SanePowerPlanTweak>();
         services.AddSingleton<ITweak, ModeBoostTweak>();
         services.AddSingleton<ITweak, LimitePuissanceCpuTweak>();
+        services.AddSingleton<ITweak, PlafondThermiqueCpuTweak>();
         services.AddSingleton<ITweak, EconomieSansFilTweak>();
+        services.AddSingleton<ITweak, PlanEconomieTweak>();
         services.AddSingleton<ITweak, SanePagefileTweak>();
+        services.AddSingleton<ITweak, PagefileSurSsdTweak>();
         services.AddSingleton<ITweak, HeuresActivesTweak>();
         services.AddSingleton<ITweak, EcranFrequenceTweak>();
     }

@@ -6,19 +6,19 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// R2 — the HELD-OFFSET path can arm the helper's dead-man's-switch.
+// Le chemin du décalage tenu peut armer l'homme mort du helper.
 //
-// After a held GPU offset is applied, the tweak can establish a lease whose
-// recorded revert is the same inverse op it already computes for RevertAsync, and
-// get back a started HeartbeatSender it keeps alive for the held duration. If the
-// controller dies, the heartbeat stops and the helper auto-reverts.
+// Une fois un décalage GPU tenu appliqué, le levier peut établir un bail dont le retour
+// arrière enregistré est la même op inverse qu'il calcule déjà pour RevertAsync, et recevoir
+// un HeartbeatSender démarré qu'il garde en vie pendant la tenue. Si le contrôleur meurt,
+// le battement s'arrête et le helper revient en arrière tout seul.
 //
-// All through Core abstractions (IElevatedClient) — the tweak never references the
-// helper. A recording client captures exactly what crosses the boundary.
+// Tout passe par les abstractions du cœur (IElevatedClient) : le levier ne référence jamais
+// le helper. Un client enregistreur capture exactement ce qui traverse la frontière.
 // -----------------------------------------------------------------------
 public sealed class GpuHeldOffsetLeaseTests
 {
-    /// <summary>Captures every op the tweak sends through the elevated boundary.</summary>
+    /// <summary>Capture chaque op que le levier envoie à travers la frontière élevée.</summary>
     private sealed class RecordingClient : IElevatedClient
     {
         public List<PrivilegedOp> Sent { get; } = new();
@@ -29,7 +29,7 @@ public sealed class GpuHeldOffsetLeaseTests
         }
     }
 
-    // A concrete GpuTweakBase just to reach the protected lease helper.
+    // Un GpuTweakBase concret, juste pour atteindre l'aide protégée au bail.
     private sealed class ProbeTweak : GpuTweakBase
     {
         public ProbeTweak(IElevatedClient elevated) : base(elevated) { }
@@ -39,7 +39,7 @@ public sealed class GpuHeldOffsetLeaseTests
         public override Task<Result<TweakSnapshot>> ApplyAsync() =>
             Task.FromResult(Result<TweakSnapshot>.Fail(ErrorCodes.TweakNotApplicable, "probe"));
 
-        // Expose the protected helper for the test.
+        // Expose l'aide protégée pour le test.
         public Task<Result<HeartbeatSender>> EstablishLeaseForTest(PrivilegedOp inverse, string leaseId, int seconds)
             => EstablishAutoRevertLeaseAsync(inverse, leaseId, seconds);
     }
@@ -50,7 +50,7 @@ public sealed class GpuHeldOffsetLeaseTests
         var client = new RecordingClient();
         var tweak = new ProbeTweak(client);
 
-        // The inverse the held-offset path already computes (restore stock clocks).
+        // L'inverse que le chemin du décalage tenu calcule déjà (rendre les horloges d'origine).
         var inverse = new ApplyNvApiClockOffsetOp(0, 0, 0);
 
         var result = await tweak.EstablishLeaseForTest(inverse, "gpu.undervolt:0", seconds: 30);
@@ -58,8 +58,8 @@ public sealed class GpuHeldOffsetLeaseTests
         result.IsOk.Should().BeTrue();
         await using var hb = result.Value!;
 
-        // Exactly one EstablishLeaseOp crossed the boundary, carrying the inverse as
-        // codec JSON (re-bindable through the same bounded codec on the helper side).
+        // Exactement une EstablishLeaseOp a traversé la frontière, portant l'inverse en JSON
+        // codec (reliable par le même codec borné côté helper).
         client.Sent.Should().ContainSingle().Which.Should().BeOfType<EstablishLeaseOp>();
         var est = (EstablishLeaseOp)client.Sent[0];
         est.LeaseId.Should().Be("gpu.undervolt:0");
@@ -89,7 +89,7 @@ public sealed class GpuHeldOffsetLeaseTests
     [Fact]
     public async Task A_failed_establish_returns_fail_and_no_heartbeat()
     {
-        // A client that refuses the establish (e.g. no helper running).
+        // Un client qui refuse l'établissement (aucun helper en route, par exemple).
         var client = new FailingClient();
         var tweak = new ProbeTweak(client);
 

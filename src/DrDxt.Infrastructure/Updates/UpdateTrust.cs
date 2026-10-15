@@ -5,11 +5,10 @@ namespace DrDxt.Infrastructure.Updates;
 /// <summary>
 /// Le paquet de confiance de production des mises a jour.
 ///
-/// Trouve le 10/09/2026 (revue) : l'App venait d'etre branchee sur le moteur de mise a jour, et le
-/// moteur verifiait avec <see cref="UpdateDevKeys.UpdatePublicKey"/> — une clef dont la graine PRIVEE
-/// est dans le depot. Le jour ou une URL de serveur aurait existe, quiconque a lu le depot aurait pu
-/// signer un manifeste que l'App aurait accepte. Le commentaire « la clef publique est remplacee a la
-/// release » n'etait qu'un RAPPEL ; ceci BLOQUE.
+/// Verifier avec <see cref="UpdateDevKeys.UpdatePublicKey"/>, une clef dont la graine privee est
+/// dans le depot, permettrait a quiconque a lu le depot de signer un manifeste que l'App
+/// accepterait, des qu'une URL de serveur existe. Un commentaire « la clef publique est remplacee a
+/// la release » ne serait qu'un rappel ; ceci bloque.
 ///
 /// Regle : sans clef de production, aucun montage ; et la clef de dev est refusee meme si elle est
 /// posee ici par erreur. L'URL du serveur, cette clef et les empreintes SPKI changent ensemble, dans un
@@ -18,8 +17,8 @@ namespace DrDxt.Infrastructure.Updates;
 public static class UpdateTrust
 {
     /// <summary>La clef publique Ed25519 de release (SEC5, tools/publication/signer.cs). Elle ne peut que vérifier.
-    /// Créée le 09/10/2026 par le mainteneur (<c>cle --creer</c>) : la graine privée est chiffrée pour son compte Windows ET
-    /// par une phrase qu'il est seul à connaître ; elle n'entre jamais dans le dépôt. Changer ces octets, c'est changer de clé :
+    /// Créée par <c>cle --creer</c> : la graine privée est chiffrée pour le compte Windows de qui publie ET
+    /// par une phrase que lui seul connaît ; elle n'entre jamais dans le dépôt. Changer ces octets, c'est changer de clé :
     /// les App déjà installées refuseraient alors toute mise à jour signée par la nouvelle.
     /// La clef vit ici ; l'URL du serveur est VerificationMiseAJour.UrlParDefaut (la variable <c>DRDXT_UPDATE_URL</c> la remplace).</summary>
     public static byte[]? ProductionPublicKey =>
@@ -30,7 +29,7 @@ public static class UpdateTrust
 
     public static Result<IUpdateVerifier> CreateProductionVerifier() => CreateVerifier(ProductionPublicKey);
 
-    /// <summary>Le verificateur pour une clef donnee — refuse l'absence et la clef de dev.</summary>
+    /// <summary>Le verificateur pour une clef donnee : refuse l'absence et la clef de dev.</summary>
     public static Result<IUpdateVerifier> CreateVerifier(byte[]? clePublique)
     {
         if (clePublique is null || clePublique.Length == 0)

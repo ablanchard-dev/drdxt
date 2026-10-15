@@ -4,8 +4,8 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D2.6) : sous chaque ligne lue « pour information », « Pourquoi ? » prenait une ligne entière ;
-// un « ? » en fin de ligne ouvre la même suite. D5.5 (revue) : deux mécanismes pour la même chose, le « ? » rond
+// Sous chaque ligne lue « pour information », « Pourquoi ? » prenait une ligne entière ;
+// un « ? » en fin de ligne ouvre la même suite. Deux mécanismes pour la même chose, le « ? » rond
 // devient le seul signe partout (mesures, constats, lectures impossibles, processeur bridé), nom complet gardé.
 public sealed class PourquoiDesMesuresEnFinDeLigneTests
 {
@@ -42,7 +42,7 @@ public sealed class PourquoiDesMesuresEnFinDeLigneTests
         m.Value.Should().Contain("Style=\"{StaticResource BoutonPourquoi}\"");
     }
 
-    // 03/10/2026 (D8.7, revue n° 3) : le « ? » était au bout de la ligne pour les mesures, en dessous ailleurs.
+    // Le « ? » était au bout de la ligne pour les mesures, en dessous ailleurs.
     // Il est au bout de la ligne qu'il explique, partout.
     [Theory]
     [InlineData("Pourquoi")]
@@ -78,7 +78,7 @@ public sealed class PourquoiDesMesuresEnFinDeLigneTests
         style.Should().Contain("AutomationProperties.Name").And.Contain("Text=\"?\"");
     }
 
-    // 03/10/2026 (D10.4, revue n° 4) : protection du ping indisponible = un seul « ? » dans le bloc (celui de la
+    // Protection du ping indisponible = un seul « ? » dans le bloc (celui de la
     // veille) ; la description de la protection et son « ? » sont dans un conteneur qui ne s'affiche que si elle est disponible.
     [Fact]
     public void La_description_de_la_protection_se_tait_tant_qu_elle_est_indisponible()

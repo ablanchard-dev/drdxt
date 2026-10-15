@@ -12,12 +12,11 @@ import pathlib
 import re
 import sys
 
-# 19/09/2026 — UNE LIGNE FERMEE N'ATTEND PLUS PERSONNE.
+# UNE LIGNE FERMEE N'ATTEND PLUS PERSONNE.
 #
-# Ce gate comptait TOUTES les lignes datees, barrees comprises. Mesure du jour : 56 lignes,
-# dont 8 explicitement fermees, et le resume annoncait << 40 au-dela de 7 jours >>. Sur le
-# seul fichier qui sert a dire au mainteneur ce qui l'attend, un chiffre qui melange les decisions
-# en attente et les faits clos est un chiffre qu'on cesse de regarder.
+# Compter TOUTES les lignes datees, barrees comprises, melangerait les decisions en attente et
+# les faits clos (mesure : 56 lignes dont 8 fermees). Sur le seul fichier qui dit ce qui attend,
+# un tel chiffre est un chiffre qu'on cesse de regarder.
 #
 # La convention est celle du fichier lui-meme : une ligne fermee est barree, ou porte ✅,
 # ou dit CLOSE/FERMEE. Aucune liste tenue a la main.
@@ -42,7 +41,7 @@ def autotest() -> int:
     assert close("~~ une ligne barree ~~"), "la barre est la convention du fichier"
     assert close(" ✅ faite le 12/09"), "la coche aussi"
     assert close("**FERMEE** le 18/09"), "et le mot, en toutes lettres"
-    assert close("REQUALIFIEE en autre chose"), "requalifiee n'attend plus le mainteneur non plus"
+    assert close("REQUALIFIEE en autre chose"), "requalifiee n'attend plus de geste humain non plus"
 
     assert not close("Verifier que l'installeur s'installe"), "un geste a faire reste ouvert"
     assert not close("La fenetre ne tenait pas dans les ecrans"), (

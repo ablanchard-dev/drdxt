@@ -7,12 +7,9 @@ namespace DrDxt.Core.Tests;
 /// <summary>
 /// Ce qui a ete observe, et rien de plus.
 ///
-/// Une gate a saute pour ecrire ce fichier. Le produit affirmait le 07/09/2026 que la frequence
-/// GPU et la raison de bridage « demanderaient NVAPI et ses identifiants prives ». Verification
-/// dans la doc officielle le 08/09 : `nvmlDeviceGetClockInfo` et
-/// `nvmlDeviceGetCurrentClocksEventReasons` sont des exports NVML publics et documentes. Lus en
-/// vrai sur la RTX 4060 le meme jour : 2490 MHz, 55,8 W, 58 °C, masque 0x1.
-/// **Une gate est une hypothese datee, pas un fait.**
+/// La frequence GPU et la raison de bridage ne demandent pas NVAPI : `nvmlDeviceGetClockInfo` et
+/// `nvmlDeviceGetCurrentClocksEventReasons` sont des exports NVML publics et documentes (source :
+/// documentation officielle). Releve sur une RTX 4060 le 08/09/2026 : 2490 MHz, 55,8 W, 58 °C, masque 0x1.
 ///
 /// Ce classifieur ne rend jamais une cause. « un plafond de puissance a ete observe pendant les
 /// fenetres mesurees » est une coincidence temporelle ; l'attribuer a une perte de FPS demanderait

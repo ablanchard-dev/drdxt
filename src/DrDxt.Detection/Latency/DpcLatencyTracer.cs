@@ -10,9 +10,9 @@ namespace DrDxt.Detection.Latency;
 /// <param name="Evenements">Nombre de DPC/ISR attribues a ce module.</param>
 /// <param name="TotalMs">Temps cumule, en millisecondes.</param>
 /// <param name="MaxMs">La plus longue occurrence, en millisecondes. C'est elle qui fait la
-/// MICRO-SACCADE : un pilote qui prend 8 ms d'un coup rate une image entiere a 144 Hz, meme si son
+/// micro-saccade : un pilote qui prend 8 ms d'un coup rate une image entiere a 144 Hz, meme si son
 /// total sur 10 s est ridicule.</param>
-/// <param name="AuDelaDeUneMs">Occurrences au-dela de 1 ms — le seuil au-dela duquel une trame de
+/// <param name="AuDelaDeUneMs">Occurrences au-dela de 1 ms : le seuil au-dela duquel une trame de
 /// jeu est en danger.</param>
 public sealed record DpcCost(
     string Module, int Evenements, double TotalMs, double MaxMs, int AuDelaDeUneMs);
@@ -36,13 +36,13 @@ public sealed record DpcTraceResult(
     int RejetesTropCourts,
     int RejetesDeltaInvalide)
 {
-    /// <summary>Temps cumule en DPC/ISR rapporte a la duree observee, en pourcentage d'UN cœur.
+    /// <summary>Temps cumule en DPC/ISR rapporte a la duree observee, en pourcentage d'un seul cœur.
     ///
     /// Ce n'est pas une part de machine, et la difference est un facteur 28 sur ce PC. Les DPC
     /// tombent sur tous les processeurs a la fois : leur somme peut depasser 100 % sans que la
-    /// machine soit saturee. Une premiere version affichait ce nombre sous le nom « part CPU » —
-    /// 8,62 % y devenait lisible comme « 8,6 % de la machine » alors que la vraie part etait
-    /// 0,31 %. Le nom portait l'erreur, pas le calcul.</summary>
+    /// machine soit saturee. Affiche sous le nom « part CPU », ce nombre se lirait mal : 8,62 %
+    /// deviendrait « 8,6 % de la machine » alors que la vraie part est 0,31 %. Le nom porterait
+    /// l'erreur, pas le calcul.</summary>
     public double EquivalentCoeurPercent =>
         DureeObserveeSecondes > 0 ? Couts.Sum(c => c.TotalMs) / (DureeObserveeSecondes * 1000.0) * 100.0 : 0;
 
@@ -51,20 +51,18 @@ public sealed record DpcTraceResult(
 }
 
 /// <summary>
-/// La latence DPC/ISR, par ETW — « quel pilote de CETTE machine coute des micro-saccades ».
+/// La latence DPC/ISR, par ETW : « quel pilote de cette machine coute des micro-saccades ».
 ///
 /// ══ pourquoi cette grandeur plutot qu'une liste de reglages ══
 /// Un pic DPC ne coute pas des FPS moyens : il coute une trame ratee. C'est la difference entre
-/// une moyenne qui ne bouge pas et un 1 % low qui s'effondre — exactement ce qu'un joueur ressent
-/// sans savoir le nommer. Et c'est SPECIFIQUE au materiel : la mesure nomme le pilote fautif au
+/// une moyenne qui ne bouge pas et un 1 % low qui s'effondre, exactement ce qu'un joueur ressent
+/// sans savoir le nommer. Et c'est specifique au materiel : la mesure nomme le pilote fautif au
 /// lieu de reciter des reglages copies d'un site a l'autre.
 ///
 /// ══ ce qui est reutilise ══
 /// La plomberie (session privee en mode `SYSTEM_LOGGER`, activation par `EnableTraceEx2`, boucle
 /// `ProcessTrace` bornee sur un thread de fond, arret garanti par `finally`) est celle du traceur
-/// de residence des threads, dont l'en-tete raconte les quatre echecs qui l'ont produite — il vit
-/// depuis le 11/09/2026 dans `tools/cpuprobe`, le seul appelant qu'il ait jamais eu. Rien de tout
-/// cela n'est redecouvert ici.
+/// de residence des threads (`tools/cpuprobe`), dont l'en-tete detaille les pieges evites.
 ///
 /// Une session noyau ne cohabite pas avec n'importe quoi : si `xperf`, WPR ou un antivirus en
 /// tient une, cette methode rend un echec plutot que de casser l'existante.
@@ -82,12 +80,12 @@ public sealed class DpcLatencyTracer
     /// `SYSTEM_INTERRUPT_KW_DPC` ↔ `PERF_DPC` / `EVENT_TRACE_FLAG_DPC`.</summary>
     private static readonly Guid SystemInterruptProviderGuid = new("d4bbee17-b545-4888-858b-744169015b25");
 
-    /// <summary>`PerfInfoGuid` — c'est sous ce GUID que les evenements sortent, pas sous celui du
+    /// <summary>`PerfInfoGuid` : c'est sous ce GUID que les evenements sortent, pas sous celui du
     /// System Provider. La doc le dit : « the outputted events are not marked as being emitted from
     /// the individual system providers ».</summary>
     private static readonly Guid PerfInfoGuid = new("ce1dbfb4-137e-4da6-87b0-3f59aa102cbc");
 
-    // Opcodes PerfInfo. Un DPC arrive a la FIN de son execution, son `InitialTime` porte le debut.
+    // Opcodes PerfInfo. Un DPC arrive a la fin de son execution, son `InitialTime` porte le debut.
     private const byte OpcodeThreadedDpc = 66;
     private const byte OpcodeIsr = 67;
     private const byte OpcodeDpc = 68;
@@ -110,12 +108,8 @@ public sealed class DpcLatencyTracer
     /// <summary>Les decalages d'interop ETW que ce traceur utilise, publies pour etre compares aux
     /// en-tetes du SDK par `EtwInteropLayoutTests`.
     ///
-    /// Deplace ici le 11/09/2026. Avant, la garde lisait la copie de `ThreadResidencyTracer`, un
-    /// traceur INACHEVE qui ne rend aucune donnee et que seul `tools/cpuprobe` appelait. Le jour ou
-    /// ce traceur a quitte `src/` pour son outil, la garde serait partie avec lui et le seul code
-    /// d'interop ETW reellement EXPEDIE — celui-ci, appele par le scan — se serait retrouve non
-    /// verifie, sans qu'aucun test ne rougisse. C'est exactement le mode d'echec que le test
-    /// existe pour empecher : seize octets d'ecart rendent zero evenement, et rien ne leve.</summary>
+    /// La garde porte sur ce code-ci, le seul d'interop ETW reellement expedie (appele par le scan) :
+    /// seize octets d'ecart rendent zero evenement, et rien ne leve.</summary>
     public static IReadOnlyDictionary<string, int> DecalagesUtilises => new Dictionary<string, int>
     {
         ["EVENT_TRACE_LOGFILEW.size"] = 448,
@@ -180,11 +174,11 @@ public sealed class DpcLatencyTracer
 
             // `EnableFlags` seul ne livre rien a une session privee (mesure du 08/09/2026) : depuis
             // Windows 10 build 20348 le fournisseur systeme s'active par `EnableTraceEx2`.
-            // Simplification voulue : mot-cle a ulong.MaxValue — les valeurs numeriques des `SYSTEM_INTERRUPT_KW_*`
+            // Simplification voulue : mot-cle a ulong.MaxValue ; les valeurs numeriques des `SYSTEM_INTERRUPT_KW_*`
             // ne sont pas publiees dans la table, et un masque faux ne leve rien : il rend une trace
             // vide, le pire mode d'echec. On prend tout le fournisseur et on trie sur l'opcode.
-            // 25/09/2026 : le code rendu etait ignore. Un refus ici donnait une trace vide, rangee en
-            // « aucun evenement » avec le code de ProcessTrace : la vraie cause etait perdue. Le
+            // Le code rendu est lu : ignore, un refus ici donnerait une trace vide, rangee en
+            // « aucun evenement » avec le code de ProcessTrace, et la vraie cause serait perdue. Le
             // `finally` arrete la session.
             var activation = EnableTraceEx2(session, ref Unsafe(SystemInterruptProviderGuid),
                 EVENT_CONTROL_CODE_ENABLE_PROVIDER, TRACE_LEVEL_VERBOSE, ulong.MaxValue, 0, 0, IntPtr.Zero);
@@ -270,9 +264,9 @@ public sealed class DpcLatencyTracer
                 Guid = GuidSessionPrivee,
                 Flags = WNODE_FLAG_TRACED_GUID,
                 // 2 = temps systeme, et ce chiffre est le coeur de la mesure.
-                // Avec `ClientContext = 1` (QPC) — la valeur qu'utilise le tracer de commutations,
-                // ou elle est juste — la trace LIVRE ses evenements, les routines sont bonnes, et
-                // Aucune duree ne sort : `InitialTime` arrive en ticks QPC depuis le demarrage
+                // Avec `ClientContext = 1` (QPC), la valeur qu'utilise le tracer de commutations,
+                // ou elle est juste, la trace livre ses evenements, les routines sont bonnes, et
+                // aucune duree ne sort : `InitialTime` arrive en ticks QPC depuis le demarrage
                 // (~1,5e10) pendant que l'en-tete de l'evenement, lui, est converti en FILETIME
                 // (~1,34e17). La soustraction est alors toujours negative, la garde jette tout, et
                 // l'outil affiche un tableau vide qui ressemble trait pour trait a « cette machine
@@ -331,7 +325,7 @@ public sealed class DpcLatencyTracer
     /// <summary>L'adresse d'une routine → le fichier du pilote qui la contient.
     ///
     /// Simplification voulue : recherche du plus grand base ≤ adresse. `EnumDeviceDrivers` ne donne pas la taille
-    /// des modules — une adresse au-dela du dernier module serait donc attribuee a tort. Garde-fou :
+    /// des modules : une adresse au-dela du dernier module serait donc attribuee a tort. Garde-fou :
     /// au-dela de 64 Mo du base, on rend `?` plutot qu'un nom faux. Passer aux evenements
     /// `Image/Load` (qui portent ImageSize) le jour ou un `?` devient genant.</summary>
     private string Attribuer(ulong routine) => Attribuer(routine, _basesTriees, _nomsTries);
@@ -424,7 +418,7 @@ public sealed class DpcLatencyTracer
         public IntPtr ExtendedData; public IntPtr UserData; public IntPtr UserContext;
     }
 
-    /// <summary>Disposition VERIFIEE contre le SDK par <c>tools/etwlayout</c>, pas deduite — deux
+    /// <summary>Disposition verifiee contre le SDK par <c>tools/etwlayout</c>, pas deduite : deux
     /// versions fausses ont compile sans un mot, l'une bloquant `ProcessTrace`, l'autre rendant
     /// zero evenement. Les decalages sont publies par <see cref="DecalagesUtilises"/> et compares
     /// au SDK par `EtwInteropLayoutTests`.</summary>

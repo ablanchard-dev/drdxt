@@ -117,7 +117,7 @@ if __name__ == "__main__":
         print(en_csharp(q))
     # Deux declarations sur le meme octet ecrivent la meme variable : la table doit connaitre
     # l'union de leurs valeurs, sinon une valeur de l'autre fait jeter la lecture (Package C
-    # State Limit, 254 « Cpu Default », trouve le 25/09/2026).
+    # State Limit, 254 « Cpu Default », releve le 25/09/2026).
     par_octet = {}
     for q in trouvees:
         par_octet.setdefault((q["store"], q["offset"]), set()).update(v for v, _ in q["options"])

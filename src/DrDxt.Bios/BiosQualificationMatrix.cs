@@ -3,34 +3,29 @@
 namespace DrDxt.Bios;
 
 /// <summary>
-/// La connaissance BIOS reutilisable — pas le parcours de clics.
-///
-/// `BiosQualification` existait depuis des semaines et n'etait construite par personne : seuls
-/// ses propres tests l'appelaient. Cinquieme grandeur du produit calculee ou modelisee sans
-/// lecteur, apres les rapports noyau WER, `NicErrorCounters`, la frequence CPU effective et
-/// `ClasserFamilles`.
+/// La connaissance BIOS reutilisable, pas le parcours de clics : ici se construit `BiosQualification`.
 ///
 /// ══ pourquoi ce fichier n'est pas `guides.json` ══
-/// `data/guides.json` repond a « ou le joueur doit-il cliquer ? ». C'est un FRONTEND, indexe par
+/// `data/guides.json` repond a « ou le joueur doit-il cliquer ? ». C'est un frontend, indexe par
 /// constructeur x generation d'interface, et il ne porte ni defaut, ni risque, ni recuperation, ni
 /// mecanisme de lecture. Cette matrice-ci repond a « que sait-on de ce reglage, sur cette carte,
-/// avec ce firmware, et a-t-on le droit d'y toucher ? » — la connaissance qui alimentera un jour
+/// avec ce firmware, et a-t-on le droit d'y toucher ? » : la connaissance qui alimentera un jour
 /// une ecriture qualifiee. Le PDF et le QR sont un affichage de cette connaissance, pas l'inverse.
 ///
 /// ══ ce qui est mesure, et ce qui ne l'est pas ══
 /// Mesure sur la machine de reference le 08/09/2026 :
-///   `Win32_BaseBoard`  Micro-Star International Co., Ltd. — PRO B760-P WIFI DDR4 (MS-7D98), rev 1.0
-///   `Win32_BIOS`       American Megatrends International — 1.H0, publie le 09/05/2026, SMBIOS 3.6
+///   `Win32_BaseBoard`  Micro-Star International Co., Ltd. : PRO B760-P WIFI DDR4 (MS-7D98), rev 1.0
+///   `Win32_BIOS`       American Megatrends International : 1.H0, publie le 09/05/2026, SMBIOS 3.6
 ///
-/// NON ETABLI, et donc laisse a `null` ou a `Unknown` plutot que devine :
-///   · la voie de RECUPERATION de cette carte. Quatre tentatives pour obtenir son manuel exact ont
+/// Non etabli, et donc laisse a `null` ou a `Unknown` plutot que devine :
+///   · la voie de recuperation de cette carte. Quatre tentatives pour obtenir son manuel exact ont
 ///     echoue (404 sur l'URL deduite, 403 sur la page de support, la recherche ne rend que les
-///     manuels de cartes VOISINES, et la fiche technique est un PDF non extractible ici).
+///     manuels de cartes voisines, et la fiche technique est un PDF non extractible ici).
 ///     « JBAT1 en position 2-3, comme sur les autres cartes MSI B760 » est exactement
 ///     l'inference que ce produit s'interdit : une carte voisine n'est pas cette carte.
-///   · ~~les VALEURS possibles et le defaut~~ : RELEVES le 24/09/2026 dans l'IFR du BIOS officiel,
-///     avec l'emplacement NVRAM de chaque reglage (voir `SourceIfr`).
-///   · la valeur courante ne vit pas ici : elle se LIT a l'execution (`NvramBiosSettingsReader`),
+///   · (etablis, eux : les valeurs possibles et le defaut, releves le 24/09/2026 dans l'IFR du BIOS
+///     officiel, avec l'emplacement NVRAM de chaque reglage ; voir `SourceIfr`.)
+///   · la valeur courante ne vit pas ici : elle se lit a l'execution (`NvramBiosSettingsReader`),
 ///     jamais figee dans une table. `MSI_BiosSetting` reste inutilise : on n'appelle pas au hasard
 ///     une methode ACPI non documentee.
 ///
@@ -52,7 +47,7 @@ public static class BiosQualificationMatrix
     /// n'est pas dans la matrice — jamais une entree generique de repli.
     ///
     /// C'est le point de tout le type : une entree valable sur « MSI carte A / BIOS X » ne
-    /// devient pas valable sur « MSI carte A / BIOS Y ». Retourner quelque chose « d'approchant »
+    /// devient pas valable sur « MSI carte A / BIOS Y ». Rendre quelque chose « d'approchant »
     /// serait la faute que la matrice existe pour empecher.
     /// </summary>
     public static IReadOnlyList<BiosQualification> Pour(string? carte, string? firmware)
@@ -72,10 +67,10 @@ public static class BiosQualificationMatrix
             cible: "Profil 1",
             cheminMenu: "Advanced Mode (F7) > OC > Extreme Memory Profile (XMP)",
             // XMP touche l'entrainement memoire : un echec se voit par un ecran noir, et c'est
-            // un resultat NORMAL de la manœuvre, pas une panne. Le joueur doit le savoir avant.
+            // un resultat normal de la manœuvre, pas une panne. Le joueur doit le savoir avant.
             noPost: NoPostRisk.CanPreventPost,
-            // 25/09/2026 : les six valeurs de l'IFR (tools/ifr/ifr2matrice.py). La table n'en avait
-            // que trois : un joueur en « User Profile 1 » faisait jeter toute la lecture du BIOS.
+            // Les six valeurs de l'IFR (tools/ifr/ifr2matrice.py). Avec trois seulement, un joueur en
+            // « User Profile 1 » ferait jeter toute la lecture du BIOS.
             nvram: Setup(0xE65, Defaut: 0, (0, "Disabled"), (1, "Profile 1"), (2, "Profile 2"),
                 (3, "Profile 3"), (4, "User Profile 1"), (5, "User Profile 2"))),
 
@@ -105,7 +100,7 @@ public static class BiosQualificationMatrix
             noPost: NoPostRisk.CanPreventPost,
             nvram: Setup(0x10C6, Defaut: 1, (0, "CSM"), (1, "UEFI"))),
 
-        // 24/09/2026 — la frequence de la memoire, en lecture. Question "DRAM Frequency" (QuestionId
+        // La frequence de la memoire, en lecture. Question "DRAM Frequency" (QuestionId
         // 0x2967, VarOffset 0xD39, 230 valeurs, defaut Auto) de l'IFR 1.H0. Le BIOS en declare quatre
         // autres (0xD38, 0xD3A-0xD3C) que des conditions masquent selon le processeur et la memoire ;
         // 0xD39 est celle qui a rendu 84 = "3800 G1" sur la machine de reference, recoupe avec Windows (3800 MT/s).
@@ -188,21 +183,21 @@ public static class BiosQualificationMatrix
             (228, "10000 G2 (100x1.00x100.00)"), (229, "10000 G4 (100x1.00x100.00)"),
             (230, "10133 G2 (76x1.33x100.00)"), (231, "10133 G4 (76x1.33x100.00)"))),
 
-        // 24/09/2026 — le bloc processeur, en lecture. Aucune cible : ce sont des constats, pas des
+        // Le bloc processeur, en lecture. Aucune cible : ce sont des constats, pas des
         // recommandations (ce que « Auto » applique sur cette carte n'est pas dans l'IFR).
         Lecture("Intel C-State", Cpu(0x14, Defaut: 2, (0, "Disabled"), (1, "Enabled"), (2, "Auto"))),
         Lecture("Package C State Limit", Cpu(0x4B, Defaut: 255, (0, "C0"), (1, "C2"), (2, "C3"), (3, "C6"),
-            // 25/09/2026 : l'IFR declare cette question deux fois sur le meme octet ; la seconde
-            // ajoute 254 « Cpu Default ». Sans elle, cette valeur jetait toute la lecture du BIOS.
+            // L'IFR declare cette question deux fois sur le meme octet ; la seconde
+            // ajoute 254 « Cpu Default ». Sans elle, cette valeur jetterait toute la lecture du BIOS.
             (4, "C7"), (5, "C7s"), (6, "C8"), (7, "C9"), (8, "C10"), (254, "Cpu Default"), (255, "Auto"))),
         Lecture("EIST", Cpu(0x9, Defaut: 1, (0, "Disabled"), (1, "Enabled"))),
-        // 25/09/2026 — le reglage MSI qui decide des limites de puissance quand PL1/PL2 sont sur Auto.
+        // Le reglage MSI qui decide des limites de puissance quand PL1/PL2 sont sur Auto.
         // Lu sur la machine de reference : 1 « Intel Default Settings », et le paquet tient 66,5 W en jeu (Base Power du
         // 14700F : 65 W). Une declaration unique dans l'IFR 1.H0 (tools/ifr/ifr2matrice.py). Lecture
         // seule, aucune cible : Intel et MSI recommandent de rester sur Intel Default Settings.
         Lecture("CPU Cooler Tuning", Setup(0xF88, Defaut: 1,
             (1, "Intel Default Settings"), (2, "MSI Performance Settings"), (3, "MSI Unlimited Settings"))),
-        // 25/09/2026 — ce qui gouverne le temps du BIOS a l'allumage (Kernel-Boot 30, lu par l'audit
+        // Ce qui gouverne le temps du BIOS a l'allumage (Kernel-Boot 30, lu par l'audit
         // DEMARRAGE). Une declaration chacun dans l'IFR 1.H0. Sur la machine de reference : 0 et 0, et 11,2 a 11,8 s de BIOS
         // sauf l'allumage qui a suivi son reglage memoire (33,5 s, entrainement unique). Lecture seule :
         // aucune source ne chiffre ce que « MSI Fast Boot » ferait gagner, et il coupe la detection USB.
@@ -212,6 +207,31 @@ public static class BiosQualificationMatrix
         Lecture("Intel Turbo Boost", Cpu(0x16, Defaut: 1, (0, "Disabled"), (1, "Enabled"))),
         Lecture("Long Duration Power Limit (PL1)", CpuWatts(0x17)),
         Lecture("Short Duration Power Limit (PL2)", CpuWatts(0x1E)),
+        // Trois réglages qui brident le processeur, relevés sur la machine de référence (IFR 1.H0, une
+        // déclaration chacun) : la limite de courant (160 A mesurés : le processeur tombe de 4,9 à 3,9 GHz),
+        // le Lite Load (tension ; Mode 9 = 80, relevé le 11/10) et la protection contre les excursions de courant (CEP).
+        Lecture("CPU Current Limit", new NvramLocation("Setup", "{ec87d643-eba4-4bb5-a1e5-3f3e36b20da9}", VarSize: 0x13D9, 0xF29,
+            new Dictionary<byte, string>(), Default: 0, Taille: 2, Min: 0, Max: 512, Unite: "A", ZeroVautAuto: true)),
+        Lecture("CPU Lite Load Control", Setup(0xF62, Defaut: 0, (0, "Normal"), (1, "Advanced"), (2, "Intel Default"))),
+        Lecture("CPU Lite Load", Setup(0xF63, Defaut: 0, (0, "Auto"), (1, "Mode 1"), (10, "Mode 2"), (20, "Mode 3"),
+            (30, "Mode 4"), (40, "Mode 5"), (50, "Mode 6"), (60, "Mode 7"), (70, "Mode 8"), (80, "Mode 9"), (90, "Mode 10"),
+            (100, "Mode 11"), (110, "Mode 12"), (120, "Mode 13"), (130, "Mode 14"), (140, "Mode 15"), (150, "Mode 16"),
+            (160, "Mode 17"), (170, "Mode 18"), (180, "Mode 19"), (190, "Mode 20"), (200, "Mode 21"), (210, "Mode 22"),
+            (220, "Mode 23"))),
+        Lecture("IA CEP Support", Setup(0xFBC, Defaut: 0, (0, "Auto"), (1, "Disabled"), (2, "Enabled"))),
+        // La courbe du ventilateur processeur (IFR 1.H0, Hardware Monitor : « CPU Fan1 Smart Fan Control », puis
+        // « CPU Fan1 level N Temperature » et « CPU Fan1 level N Fan Speed », un octet chacun, Min 0, Max 100).
+        // Relevée sur la machine de référence le 11/10 (40/62/80/92 °C pour 35/55/70/100 %) après qu'un ventilateur
+        // unique n'a pas tenu 160 W : lue pour dater un changement de courbe et le juger sur les parties.
+        Lecture("CPU Fan1 Smart Fan Control", Setup(0x1284, Defaut: 1, (0, "Disabled"), (1, "Enabled"))),
+        Lecture("CPU Fan1 level 1 Temperature", SetupNombre(0x128A, Defaut: 0, Unite: "°C")),
+        Lecture("CPU Fan1 level 2 Temperature", SetupNombre(0x128B, Defaut: 45, Unite: "°C")),
+        Lecture("CPU Fan1 level 3 Temperature", SetupNombre(0x128C, Defaut: 65, Unite: "°C")),
+        Lecture("CPU Fan1 level 4 Temperature", SetupNombre(0x128D, Defaut: 80, Unite: "°C")),
+        Lecture("CPU Fan1 level 1 Fan Speed", SetupNombre(0x128E, Defaut: 20, Unite: "%")),
+        Lecture("CPU Fan1 level 2 Fan Speed", SetupNombre(0x128F, Defaut: 35, Unite: "%")),
+        Lecture("CPU Fan1 level 3 Fan Speed", SetupNombre(0x1290, Defaut: 70, Unite: "%")),
+        Lecture("CPU Fan1 level 4 Fan Speed", SetupNombre(0x1291, Defaut: 100, Unite: "%")),
     ];
 
     private static NvramLocation Cpu(int offset, byte Defaut, params (byte Valeur, string Libelle)[] valeurs) =>
@@ -224,10 +244,10 @@ public static class BiosQualificationMatrix
             new Dictionary<byte, string>(), Default: 0, Taille: 4, Min: 0, Max: 4096, Unite: "W", ZeroVautAuto: true);
 
     private static BiosQualification Lecture(string reglage, NvramLocation nvram) =>
-        Entree(reglage, cible: "lecture seule", cheminMenu: "non releve (lu dans l'IFR, pas dans le menu)",
+        Entree(reglage, cible: Docteur.T("BQ.LectureSeule"), cheminMenu: Docteur.T("BQ.NonReleve"),
             noPost: NoPostRisk.NoPostRiskUnknown, nvram);
 
-    // 24/09/2026 — releve dans l'IFR du BIOS officiel 1.H0 (download.msi.com/bos_exe/mb/7D98v1H.zip,
+    // Releve dans l'IFR du BIOS officiel 1.H0 (download.msi.com/bos_exe/mb/7D98v1H.zip,
     // E7D98IMS.1H0), module Setup 899407D7-99FE-43D8-9A21-79EC328CAC21, par IFRExtractor-RS 1.6.1.
     // VarStore « Setup », GUID ec87d643-eba4-4bb5-a1e5-3f3e36b20da9, taille 0x13D9. Les defauts
     // sont ceux du magasin StdDefaults de la meme image. Lu sur la machine de reference le meme
@@ -237,6 +257,11 @@ public static class BiosQualificationMatrix
     private static NvramLocation Setup(int offset, byte Defaut, params (byte Valeur, string Libelle)[] valeurs) =>
         new("Setup", "{ec87d643-eba4-4bb5-a1e5-3f3e36b20da9}", VarSize: 0x13D9, offset,
             valeurs.ToDictionary(v => v.Valeur, v => v.Libelle), Defaut);
+
+    // Un réglage numérique d'un octet de la variable Setup (IFR : Min 0, Max 100, Step 1), avec son unité.
+    private static NvramLocation SetupNombre(int offset, byte Defaut, string Unite) =>
+        new("Setup", "{ec87d643-eba4-4bb5-a1e5-3f3e36b20da9}", VarSize: 0x13D9, offset,
+            new Dictionary<byte, string>(), Defaut, Taille: 1, Min: 0, Max: 100, Unite: Unite);
 
     /// <summary>Toutes les entrees de cette carte partagent le meme etat de connaissance : chemin
     /// connu mais non verifie, valeurs et defaut jamais releves, valeur courante illisible,

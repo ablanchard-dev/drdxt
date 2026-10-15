@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.GpuNative.Tests.Nvml;
 
 // -----------------------------------------------------------------------
-// 23/09/2026. Trois scans de suite sur la RTX 4060 de la machine de reference : Resizable BAR lu, puis « non lu »,
+// Trois scans de suite sur la RTX 4060 de la machine de reference : Resizable BAR lu, puis « non lu »,
 // puis lu. Tracé : deux détections GPU tournent en même temps à chaque scan. `EnsureInit` posait
 // son drapeau « déjà tenté » avant que nvmlInit ait répondu ; le second fil voyait le drapeau,
 // sortait tout de suite et lisait `IsAvailable == false`. Le scan retenait tantôt l'une, tantôt

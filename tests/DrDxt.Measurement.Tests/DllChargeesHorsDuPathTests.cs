@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Measurement.Tests;
 
 /// <summary>
-/// 25/09/2026. L'App peut tourner en administrateur ; Measurement charge PresentMonAPI2.dll par son nom.
+/// L'App peut tourner en administrateur ; Measurement charge PresentMonAPI2.dll par son nom.
 /// Sans restriction, une DLL absente a cote de l'App serait cherchee dans le PATH (dossiers modifiables
 /// par l'utilisateur). La recherche est limitee au dossier de l'assembly et a System32.
 /// </summary>

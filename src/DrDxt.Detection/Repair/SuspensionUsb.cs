@@ -4,11 +4,11 @@ using DrDxt.Detection.Settings;
 namespace DrDxt.Detection.Repair;
 
 /// <summary>
-/// 07/10/2026 (L-USB) : la suspension sélective USB, en constat seul. Aucun levier, et c'est une décision sourcée.
+/// La suspension sélective USB, en constat seul. Aucun levier, et c'est une décision sourcée.
 ///
-/// Microsoft Learn, « USB Selective Suspend » (07/05/2025) : la suspension coupe un port seulement quand le pilote du
+/// Microsoft Learn, « USB Selective Suspend » : la suspension coupe un port seulement quand le pilote du
 /// périphérique dit qu'il est inactif ; « Selective suspend is enabled by default. Microsoft strongly recommends not
-/// disabling selective suspend. » Microsoft Learn, « Selective Suspend for HID Over USB Devices » (11/01/2024) : pour les
+/// disabling selective suspend. » Microsoft Learn, « Selective Suspend for HID Over USB Devices » : pour les
 /// souris, claviers et manettes USB, « USB selective suspend is disabled by Windows in order to provide a consistent user
 /// experience and to avoid resume latency » ; seul le constructeur l'active (descripteur Microsoft OS ou INF qui pose
 /// <c>SelectiveSuspendEnabled</c> sous <c>Device Parameters</c>), et le périphérique doit alors garder la première frappe ou
@@ -25,15 +25,12 @@ public static class SuspensionUsb
     public const string Domaine = "USB";
     public const string NomEntrees = "suspension sélective des périphériques d'entrée USB";
 
-    private const string CeQueFaitLePlan =
-        "ce réglage ne suspend un périphérique USB que lorsqu'il est inactif et que son pilote le demande ; Microsoft "
-        + "recommande de ne pas le couper. Les souris, claviers et manettes en sont exclus par défaut (ligne des "
-        + "périphériques d'entrée).";
+    private static string CeQueFaitLePlan => Docteur.T("SU.CeQueFait");
 
     public static string Lisible(uint valeur) => valeur switch
     {
-        0 => "désactivée",
-        1 => "activée",
+        0 => Docteur.T("SU.Desactivee"),
+        1 => Docteur.T("SU.Activee"),
         _ => valeur.ToString(System.Globalization.CultureInfo.InvariantCulture),
     };
 
@@ -41,14 +38,13 @@ public static class SuspensionUsb
     public static RepairFinding JugerPlan(PowerSettingValue lu) => lu switch
     {
         { ValeurAc: null } => new RepairFinding(Domaine, lu.Nom, null, null, RepairStatus.Unknown,
-            "le réglage du plan actif n'a pas pu être lu"),
+            Docteur.T("SU.PlanNonLu")),
         { EcarteDuDefaut: false } => new RepairFinding(Domaine, lu.Nom, Lisible(lu.ValeurAc.Value), Lisible(lu.DefautAc!.Value),
-            RepairStatus.ExpectedDefault, "c'est la valeur que Windows met dans ce plan : " + CeQueFaitLePlan),
+            RepairStatus.ExpectedDefault, Docteur.T("SU.Defaut", CeQueFaitLePlan)),
         { EcarteDuDefaut: true } => new RepairFinding(Domaine, lu.Nom, Lisible(lu.ValeurAc.Value), Lisible(lu.DefautAc!.Value),
-            RepairStatus.NonDefault, "ce plan ne porte plus la valeur que Windows y met. Aucune source ne chiffre un gain en "
-            + "jeu dans un sens ou dans l'autre : DrDXT ne propose rien. " + CeQueFaitLePlan),
+            RepairStatus.NonDefault, Docteur.T("SU.Ecart", CeQueFaitLePlan)),
         _ => new RepairFinding(Domaine, lu.Nom, Lisible(lu.ValeurAc.Value), null, RepairStatus.Observed,
-            "le défaut de ce plan n'a pas pu être lu. " + CeQueFaitLePlan),
+            Docteur.T("SU.DefautNonLu", CeQueFaitLePlan)),
     };
 
     /// <param name="branches">Les périphériques d'entrée USB (pilote HidUsb) branchés ; null = liste non lue.</param>
@@ -57,17 +53,13 @@ public static class SuspensionUsb
     public static RepairFinding JugerEntrees(int? branches, int suspendus) => branches switch
     {
         null => new RepairFinding(Domaine, NomEntrees, null, null, RepairStatus.Unknown,
-            "la liste des périphériques d'entrée USB n'a pas pu être lue"),
-        0 => new RepairFinding(Domaine, NomEntrees, "aucun périphérique d'entrée USB branché", null, RepairStatus.Observed,
-            "aucune souris, aucun clavier, aucune manette USB n'a été vu branché : rien à dire ici"),
-        _ when suspendus == 0 => new RepairFinding(Domaine, NomEntrees, $"activée sur 0 des {branches}", "activée sur aucun",
-            RepairStatus.ExpectedDefault,
-            "Windows laisse la suspension coupée sur les souris, claviers et manettes USB, pour éviter le délai de reprise "
-            + "(Microsoft Learn) : le réglage du plan ne les met donc pas en pause."),
-        _ => new RepairFinding(Domaine, NomEntrees, $"activée sur {suspendus} des {branches}", "activée sur aucun",
-            RepairStatus.Observed,
-            "le constructeur de ces périphériques a activé leur suspension. Microsoft exige alors qu'ils gardent la "
-            + "première frappe ou le premier mouvement et reprennent sans délai perçu ; aucun délai n'est mesuré ici."),
+            Docteur.T("SU.EntreesNonLues")),
+        0 => new RepairFinding(Domaine, NomEntrees, Docteur.T("SU.AucunBranche"), null, RepairStatus.Observed,
+            Docteur.T("SU.AucunBrancheExplication")),
+        _ when suspendus == 0 => new RepairFinding(Domaine, NomEntrees, Docteur.T("SU.ActiveeSur", 0, branches), Docteur.T("SU.ActiveeSurAucun"),
+            RepairStatus.ExpectedDefault, Docteur.T("SU.WindowsCoupe")),
+        _ => new RepairFinding(Domaine, NomEntrees, Docteur.T("SU.ActiveeSur", suspendus, branches), Docteur.T("SU.ActiveeSurAucun"),
+            RepairStatus.Observed, Docteur.T("SU.Constructeur")),
     };
 
     /// <summary>La valeur de registre <c>SelectiveSuspendEnabled</c> : binaire (un octet) ou DWORD selon l'INF.</summary>

@@ -4,30 +4,29 @@ using DrDxt.Reconciler;
 namespace DrDxt.ReconcilerHost;
 
 // -----------------------------------------------------------------------
-// BootSessionMarker (boot-outcome scheduling) — drives the dead-man boot-loop
-// counter from the host lifecycle (plan T27b).
+// BootSessionMarker (planification de l'issue des démarrages) : mène le compteur « homme mort »
+// de boucle de démarrage depuis le cycle de vie de l'hôte (plan T27b).
 //
-// THE INVARIANT: MarkBootStarted is an UNCONDITIONAL +1 per boot; only a genuine
-// stable up-window clears it. So:
-//   * MarkBootOnceAsync increments the unclean streak exactly ONCE per process (a
-//     guard prevents a double-count if the host calls it again). A boot that crashes
-//     before the stable window stays counted — consecutive such boots accumulate into
-//     a boot-loop the BootLoopGuard then detects.
-//   * MarkStableAfterAsync waits a stable up-window (via the injected IDelay) and only
-//     Then resets the streak (MarkSessionStable). If the host dies / is cancelled
-//     before the window elapses, stable is never marked — preserving the dead-man
-//     guarantee.
+// L'invariant : MarkBootStarted est un +1 sans condition par démarrage ; seule une vraie fenêtre
+// de marche stable l'efface. Donc :
+//   * MarkBootOnceAsync incrémente la série de démarrages non propres exactement une fois par
+//     processus (une garde empêche un double compte si l'hôte le rappelle). Un démarrage qui
+//     plante avant la fenêtre stable reste compté : ces démarrages consécutifs s'accumulent en
+//     une boucle de démarrage que BootLoopGuard détecte ensuite.
+//   * MarkStableAfterAsync attend une fenêtre de marche stable (via l'IDelay injecté) et ne remet
+//     la série à zéro (MarkSessionStable) qu'ensuite. Si l'hôte meurt ou est annulé avant la fin
+//     de la fenêtre, la stabilité n'est jamais marquée : la garantie « homme mort » tient.
 //
-// All time is injected (IDelay) so this is unit-tested with no real timer; the boot
-// store is the same IBootOutcomeStore the guard reads.
+// Tout le temps est injecté (IDelay) : la classe se teste sans vrai minuteur ; le store des
+// démarrages est le même IBootOutcomeStore que lit la garde.
 // -----------------------------------------------------------------------
 public sealed class BootSessionMarker
 {
     private readonly IBootOutcomeStore _bootStore;
     private readonly IDelay _delay;
 
-    // Guards MarkBootStarted to exactly-once per process. A FAILED mark does not trip
-    // the guard (so a transient store failure can be retried).
+    // Limite MarkBootStarted à une seule fois par processus. Un marquage raté ne déclenche pas
+    // la garde (un échec passager du store peut donc être repris).
     private int _bootMarked;
 
     public BootSessionMarker(IBootOutcomeStore bootStore, IDelay delay)
@@ -36,20 +35,20 @@ public sealed class BootSessionMarker
         _delay = delay;
     }
 
-    /// <summary>Marks this boot as started (unclean streak +1) exactly once per process.
-    /// A second call is a no-op Ok. A store failure returns Fail without consuming the
-    /// once-guard (the next call may retry).</summary>
+    /// <summary>Marque ce démarrage comme commencé (série de démarrages non propres +1) exactement
+    /// une fois par processus. Un second appel est un Ok sans effet. Un échec du store rend Fail sans
+    /// consommer la garde (l'appel suivant peut réessayer).</summary>
     public async Task<Result> MarkBootOnceAsync(CancellationToken ct)
     {
-        // Claim the once-slot. CompareExchange returns the PRIOR value: non-zero means
-        // already marked → no-op.
+        // Prendre le créneau unique. CompareExchange rend la valeur précédente : non nulle veut dire
+        // déjà marqué → sans effet.
         if (Interlocked.CompareExchange(ref _bootMarked, 1, 0) != 0)
             return Result.Ok();
 
         var marked = await _bootStore.MarkBootStartedAsync(ct);
         if (!marked.IsOk)
         {
-            // Release the once-slot so a transient failure can be retried.
+            // Libérer le créneau unique pour qu'un échec passager puisse être repris.
             Interlocked.Exchange(ref _bootMarked, 0);
             return marked;
         }
@@ -57,13 +56,13 @@ public sealed class BootSessionMarker
         return Result.Ok();
     }
 
-    /// <summary>Waits a stable up-window then marks the session stable (resets the
-    /// unclean streak). The wait uses the injected IDelay; cancellation before the
-    /// window elapses propagates and the session is not marked stable (dead-man).</summary>
+    /// <summary>Attend une fenêtre de marche stable puis marque la session stable (remet à zéro la
+    /// série de démarrages non propres). L'attente passe par l'IDelay injecté ; une annulation avant
+    /// la fin de la fenêtre se propage et la session n'est pas marquée stable (homme mort).</summary>
     public async Task<Result> MarkStableAfterAsync(TimeSpan window, CancellationToken ct)
     {
-        // Cancellation here throws OperationCanceledException, which is the correct
-        // "did not survive the window" signal — we deliberately do not mark stable.
+        // Une annulation lève ici une OperationCanceledException, le bon signal « n'a pas tenu la
+        // fenêtre » : on ne marque exprès pas la stabilité.
         await _delay.DelayAsync(window, ct).ConfigureAwait(false);
         return await _bootStore.MarkSessionStableAsync(ct).ConfigureAwait(false);
     }

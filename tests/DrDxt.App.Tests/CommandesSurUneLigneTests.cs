@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D11.1, revue n° 5) : une commande icacls coupée au milieu de son SID ressemblait à deux
+// Une commande icacls coupée au milieu de son SID ressemblait à deux
 // commandes cassées, et « Copier la commande » était au singulier pour deux. Chaque commande tient sur sa ligne (défilement
 // si elle déborde) et le lien dit ce qu'il fait, quel que soit le nombre.
 public sealed class CommandesSurUneLigneTests

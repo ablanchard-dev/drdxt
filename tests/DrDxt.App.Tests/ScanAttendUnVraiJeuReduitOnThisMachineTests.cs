@@ -7,7 +7,7 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 26/09/2026 : l'attente d'un jeu réduit, de bout en bout sur le vrai Windows : le vrai localisateur, une
+// L'attente d'un jeu réduit, de bout en bout sur le vrai Windows : le vrai localisateur, une
 // vraie fenêtre plein écran réduite dans un processus enfant, qui revient à l'écran au bout de 3 s comme
 // un joueur qui retourne dans sa partie. Le scan doit l'attendre, puis mesurer CE processus.
 [Collection(CollectionFenetres.Nom)]
@@ -33,7 +33,7 @@ public sealed class ScanAttendUnVraiJeuReduitOnThisMachineTests
         // Affirmée, pas sautée : un test qui se saute ne rougit jamais. garde-jeu refuse toute suite jeu lancé.
         locator.JeuOuvert().Should().BeFalse("précondition : aucun jeu ouvert, sinon il serait attendu à la place de la sonde");
 
-        using var enfant = Process.Start(new ProcessStartInfo("powershell.exe",
+        using var enfant = Process.Start(new ProcessStartInfo(SondeDeJeu.Exe,
             "-NoProfile -STA -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(Script)))
         {
             UseShellExecute = false,
@@ -55,8 +55,7 @@ public sealed class ScanAttendUnVraiJeuReduitOnThisMachineTests
               .Returns(Result<BenchmarkResult>.Fail(ErrorCodes.PidInvalid, "capture non simulée"));
             var sc = Substitute.For<IScanScorer>();
             sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-              .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), 68, null,
-                  new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), null)));
             var sd = Substitute.For<IStorageDetector>();
             sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
             var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, sd, k => k, gameLocator: locator);
@@ -83,7 +82,7 @@ public sealed class ScanAttendUnVraiJeuReduitOnThisMachineTests
         var locator = new Win32GameLocator();
         locator.JeuOuvert().Should().BeFalse("précondition : aucun jeu ouvert, sinon il serait mesuré à la place de la sonde");
 
-        using var enfant = Process.Start(new ProcessStartInfo("powershell.exe",
+        using var enfant = Process.Start(new ProcessStartInfo(SondeDeJeu.Exe,
             "-NoProfile -STA -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(ScriptCapture(reduiteEnCours))))
         {
             UseShellExecute = false,
@@ -106,8 +105,7 @@ public sealed class ScanAttendUnVraiJeuReduitOnThisMachineTests
               .Returns(async _ => { await Task.Delay(4000); return Result<BenchmarkResult>.Ok(bl); });
             var sc = Substitute.For<IScanScorer>();
             sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-              .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), 68, bl,
-                  new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), bl)));
             var sd = Substitute.For<IStorageDetector>();
             sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
             var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, sd, k => k, gameLocator: locator);
@@ -115,7 +113,7 @@ public sealed class ScanAttendUnVraiJeuReduitOnThisMachineTests
             await vm.ScanCommand.ExecuteAsync(null);
 
             await br.Received().RunAsync(enfant.Id, Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
-            // 04/10/2026 (plan 1.5) : un vrai processus a un nom, la note le dit.
+            // Un vrai processus a un nom, la note le dit.
             if (reduiteEnCours) vm.DegradedNote.Should().Be("Scan.Degraded.JeuQuitteNomme");
             else (vm.DegradedNote ?? "").Should().NotStartWith("Scan.Degraded.JeuQuitte");
         }

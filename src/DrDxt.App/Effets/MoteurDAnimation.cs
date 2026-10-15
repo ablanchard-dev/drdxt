@@ -30,13 +30,13 @@ public static class MoteurDAnimation
     /// <summary>Vrai quand les effets peuvent tourner.</summary>
     public static bool Actif { get; private set; }
 
-    /// <summary>La règle, pure : se teste sans fenêtre. 29/09/2026 : le joueur peut animer DrDXT même quand
+    /// <summary>La règle, pure : se teste sans fenêtre. Le joueur peut animer DrDXT même quand
     /// Windows a coupé ses animations (réglage d'optimisation courant, vu sur ma machine : tout était figé) ; le
     /// premier plan et la fenêtre réduite restent fermés, ce sont eux qui protègent la mesure en jeu.</summary>
     public static bool Decider(bool fenetreAuPremierPlan, bool fenetreReduite, bool animationsDeWindows, bool animerMalgreWindows = false) =>
         fenetreAuPremierPlan && !fenetreReduite && (animationsDeWindows || animerMalgreWindows);
 
-    /// <summary>Vrai quand un indicateur de travail en cours peut bouger. 02/10/2026 : Windows avait coupé ses
+    /// <summary>Vrai quand un indicateur de travail en cours peut bouger. Windows avait coupé ses
     /// animations sur ma machine, l'anneau du scan restait figé et l'analyse « faisait buguée ». Un indicateur n'est pas
     /// une décoration : il dit que le produit travaille. Il ignore donc le réglage de Windows, mais garde les deux
     /// portes qui protègent la mesure en jeu (premier plan, fenêtre non réduite).</summary>

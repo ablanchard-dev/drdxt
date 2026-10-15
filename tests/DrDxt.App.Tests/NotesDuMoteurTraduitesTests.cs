@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 08/10/2026 : « GPU tuning: tried in game by Optimize… » s'affichait en anglais dans l'App en français (vu sur une
+/// « GPU tuning: tried in game by Optimize… » s'affichait en anglais dans l'App en français (vu sur une
 /// capture de la carte graphique). Les notes du moteur restent en anglais ; la vue les traduit phrase par phrase.
 /// </summary>
 public sealed class NotesDuMoteurTraduitesTests

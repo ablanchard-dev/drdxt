@@ -1,7 +1,7 @@
 namespace DrDxt.Core;
 
-/// <summary>Une experience de CONTROLE : un candidat qui n'ecrit rien, passe dans toute la chaine
-/// de decision. L'effet vrai y vaut zero par construction — tout ecart trouve est une erreur, et
+/// <summary>Une experience de controle : un candidat qui n'ecrit rien, passe dans toute la chaine
+/// de decision. L'effet vrai y vaut zero par construction : tout ecart trouve est une erreur, et
 /// la resolution annoncee est censee le couvrir.</summary>
 /// <param name="QuandUtc">Quand. Ce qui vieillit doit pouvoir etre date.</param>
 /// <param name="Scene">Ce qui etait joue. Une « zone calme » et une fin de partie ne se
@@ -34,7 +34,7 @@ public sealed record NoOpObservation(
 public enum CalibrationVerdict
 {
     /// <summary>Pas assez d'observations pour dire quoi que ce soit. Ce n'est pas
-    /// « calibre » — c'est « on ne sait pas encore ».</summary>
+    /// « calibre », c'est « on ne sait pas encore ».</summary>
     PasAssezDObservations,
 
     /// <summary>Le taux de depassement est compatible avec les 5 % attendus.</summary>
@@ -45,7 +45,7 @@ public enum CalibrationVerdict
     Surconfiant,
 
     /// <summary>L'intervalle est beaucoup plus large que le bruit reellement observe. Aucun faux
-    /// verdict n'en sortira — mais le produit est AVEUGLE a des gains reels.</summary>
+    /// verdict n'en sortira, mais le produit est aveugle a des gains reels.</summary>
     SousConfiant,
 }
 
@@ -69,15 +69,15 @@ public sealed record CalibrationRapport(
 ///   * l'ecart trouve mesure directement l'erreur de la chaine complete ;
 ///   * un intervalle a 95 % doit exclure zero **environ une fois sur vingt**, pas plus.
 ///
-/// C'est la seule facon de detecter la surconfiance avant qu'elle ne coute un faux KEEP. Une
-/// formule mathematiquement correcte peut etre surconfiante en pratique — il suffit que les
+/// C'est la seule facon de detecter la surconfiance avant qu'elle ne coute un faux keep. Une
+/// formule mathematiquement correcte peut etre surconfiante en pratique : il suffit que les
 /// passes ne soient pas aussi independantes qu'elle le suppose, ce qui est le cas normal en jeu.
 /// Mesure du 07/09/2026 sur le corpus des 8 captures Warzone : le p99 frametime annoncait 9,2 %
 /// pour un ecart p95 observe de 15,3 %, exactement ce piege.
 ///
 /// Le verdict inverse compte tout autant. Un produit dont les intervalles sont trois fois trop
-/// larges ne se trompera jamais **et ne verra jamais rien** — c'etait l'etat de DrDXT jusqu'au
-/// 07/09 : il annoncait 14,3 % pour un ecart p95 observe de 3,9 % sur le corpus.
+/// larges ne se trompera jamais **et ne verra jamais rien** : c'etait l'etat de DrDXT, qui
+/// annoncait 14,3 % pour un ecart p95 observe de 3,9 % sur le corpus.
 ///
 /// Pur, aucune I/O : la persistance vit ailleurs, cette logique se teste sans disque.
 /// </summary>
@@ -89,8 +89,8 @@ public static class NoOpCalibration
     /// <summary>En dessous, la binomiale est trop plate pour separer 5 % de 15 % : le produit doit
     /// dire « pas encore » plutot que de trancher sur trois tirages.
     ///
-    /// **NON CHIFFRÉ.** A 20 observations, le test exact ci-dessous ne detecte une surconfiance
-    /// qu'a partir d'environ 3 depassements — il faut donc que le modele soit franchement mauvais
+    /// **Non chiffré.** A 20 observations, le test exact ci-dessous ne detecte une surconfiance
+    /// qu'a partir d'environ 3 depassements : il faut donc que le modele soit franchement mauvais
     /// pour etre attrape ici. C'est assume : mieux vaut manquer une petite surconfiance que la
     /// declarer sur du bruit.</summary>
     public const int ObservationsMinimum = 20;
@@ -134,7 +134,7 @@ public static class NoOpCalibration
     }
 
     /// <summary>P(X ≥ k) pour X ~ Binomiale(n, p). La question exacte : « en observant k
-    /// depassements sur n controles, quelle chance avait un modele HONNETE de faire au moins aussi
+    /// depassements sur n controles, quelle chance avait un modele honnete de faire au moins aussi
     /// mal ? » Une reponse sous 5 % accuse le modele, pas le hasard.</summary>
     private static double ProbaAuMoins(int k, int n, double p)
     {

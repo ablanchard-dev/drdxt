@@ -6,8 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.Bios.Tests;
 
 /// <summary>
-/// AddDrDxtBios() resolves the whole BIOS Doctor surface (advisor + library +
-/// generator), and the generator is wired against the real embedded library.
+/// AddDrDxtBios() résout toute la surface du docteur BIOS (conseiller + bibliothèque +
+/// générateur), et le générateur est câblé sur la vraie bibliothèque embarquée.
 /// </summary>
 public class BiosServiceCollectionExtensionsTests
 {

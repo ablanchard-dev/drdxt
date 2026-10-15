@@ -5,7 +5,7 @@ namespace DrDxt.GpuNative.PawnIo;
 
 /// <summary>
 /// La frontière PawnIO pour les registres Intel (MSR) et la fenêtre MCHBAR, dans le projet natif commun : lue par la
-/// détection (température, limites de puissance) et écrite par le helper élevé (B1, 10/10/2026 : la limite de puissance
+/// détection (température, limites de puissance) et écrite par le helper élevé (B1 : la limite de puissance
 /// PL1 montée à chaud). Une seule copie des modules, des empreintes et des appels, jamais un double qui diverge.
 ///
 /// PawnIO n'est jamais installé par DrDXT (un pilote noyau : le choix du joueur) ; sans lui rien n'est lu ni écrit. Les
@@ -20,6 +20,7 @@ public static class PawnIoIntel
 
     public const uint MsrTemperatureTarget = 0x1A2;
     public const uint MsrPackageThermStatus = 0x1B1;
+    public const uint MsrThermStatus = 0x19C;
     public const uint MsrRaplPowerUnit = 0x606;
     public const uint MsrPkgPowerLimit = 0x610;
     public const uint MsrPkgPowerInfo = 0x614;
@@ -55,6 +56,17 @@ public static class PawnIoIntel
     {
         if (!Installe() || !ProcesseurIntel()) return null;
         return AvecMsr(h => (object?)LireMsr(h, msr)) is ulong v ? v : null;
+    }
+
+    /// <summary>Un registre par cœur (0x19C) n'a de sens que lu sur un cœur connu. Le fil est posé sur le
+    /// premier cœur le temps de la lecture, puis rendu à son affinité d'avant ; s'il ne s'y trouve pas, rien n'est lu.</summary>
+    public static ulong? LireMsrPremierCoeur(uint msr)
+    {
+        if (!Installe() || !ProcesseurIntel()) return null;
+        var avant = SetThreadAffinityMask(GetCurrentThread(), 1);
+        if (avant == 0) return null;
+        try { return GetCurrentProcessorNumber() == 0 ? LireMsr(msr) : null; }
+        finally { SetThreadAffinityMask(GetCurrentThread(), avant); }
     }
 
     /// <summary>Les trois registres bruts de la limite de puissance : unités (0x606), limite (0x610), puissances (0x614).</summary>
@@ -96,6 +108,27 @@ public static class PawnIoIntel
     }
 
 
+    public const uint MsrBoiteOc = 0x150;
+
+    /// <summary>Un échange avec la boîte aux lettres OC (MSR 0x150) : la commande écrite, puis la réponse relue dès
+    /// que le bit 63 (occupé) retombe, 50 ms au plus ; null sur toute panne. Appelé par le seul helper élevé, qui borne les
+    /// commandes (lecture 0x10, écriture 0x11 du décalage de tension).</summary>
+    public static ulong? EchangerBoiteOc(ulong commande)
+    {
+        if (!Installe() || !ProcesseurIntel()) return null;
+        return AvecMsr(h =>
+        {
+            if (pawnio_execute(h, "ioctl_write_msr", [MsrBoiteOc, commande], 2, [], 0, out _) != 0) return null;
+            for (var i = 0; i < 50; i++)
+            {
+                if (LireMsr(h, MsrBoiteOc) is not { } v) return null;
+                if ((v >> 63) == 0) return (object?)v;
+                Thread.Sleep(1);
+            }
+            return null;
+        }) is ulong r ? r : null;
+    }
+
     /// <summary>Diagnostic (tests Machine) : chaque étape de l'accès MCHBAR avec son code de retour, en une ligne.</summary>
     public static string DiagnostiquerMchbar()
     {
@@ -105,7 +138,7 @@ public static class PawnIoIntel
             {
                 AssurerResolveur();
                 var module = Module("IntelMCHBAR", EmpreinteMchbar);
-                if (module is null) return "module absent ou empreinte différente";
+                if (module is null) return "module missing or hash mismatch";
                 var ouvert = pawnio_open(out var h);
                 if (ouvert != 0) return $"pawnio_open={ouvert}";
                 try
@@ -131,7 +164,7 @@ public static class PawnIoIntel
     /// <summary>La bibliothèque n'est pas à côté de l'App : elle se résout vers l'installation de PawnIO, et nulle part
     /// ailleurs (jamais de repli sur la recherche par défaut, dossier de l'App ou PATH). Posé au premier usage, sous le try
     /// de l'appelant : un second résolveur sur l'assembly ne ferait pas tomber l'App.</summary>
-    private static void AssurerResolveur()
+    internal static void AssurerResolveur()
     {
         lock (Verrou)
         {
@@ -168,6 +201,24 @@ public static class PawnIoIntel
         }
     }
 
+    /// <summary>Ferme les deux poignées. Le service ne garde pas PawnIO ouvert sans demande (un pilote de
+    /// lecture de registres chargé pendant toutes les parties est ce que des anti-triches refusent) ; le prochain appel
+    /// rouvre.</summary>
+    public static void FermerTout()
+    {
+        lock (Verrou)
+        {
+            Fermer(ref _poigneeMsr);
+            Fermer(ref _poigneeMchbar);
+        }
+    }
+
+    /// <summary>Une poignée est-elle ouverte ? (pour la fermeture sur inactivité du service).</summary>
+    public static bool Ouvert()
+    {
+        lock (Verrou) return _poigneeMsr != 0 || _poigneeMchbar != 0;
+    }
+
     private static void Fermer(ref nint poignee)
     {
         if (poignee == 0) return;
@@ -192,9 +243,12 @@ public static class PawnIoIntel
         return pawnio_execute(h, "ioctl_read_msr", [msr], 1, sortie, 1, out _) == 0 ? sortie[0] : null;
     }
 
-    [DllImport("PawnIOLib.dll")] private static extern int pawnio_open(out nint h);
-    [DllImport("PawnIOLib.dll")] private static extern int pawnio_load(nint h, byte[] blob, nuint size);
+    [DllImport("PawnIOLib.dll")] internal static extern int pawnio_open(out nint h);
+    [DllImport("PawnIOLib.dll")] internal static extern int pawnio_load(nint h, byte[] blob, nuint size);
     [DllImport("PawnIOLib.dll", CharSet = CharSet.Ansi)]
-    private static extern int pawnio_execute(nint h, string name, ulong[] inb, nuint inSize, ulong[] outb, nuint outSize, out nuint ret);
-    [DllImport("PawnIOLib.dll")] private static extern int pawnio_close(nint h);
+    internal static extern int pawnio_execute(nint h, string name, ulong[] inb, nuint inSize, ulong[] outb, nuint outSize, out nuint ret);
+    [DllImport("PawnIOLib.dll")] internal static extern int pawnio_close(nint h);
+    [DllImport("kernel32.dll")] private static extern nuint SetThreadAffinityMask(nint thread, nuint mask);
+    [DllImport("kernel32.dll")] private static extern nint GetCurrentThread();
+    [DllImport("kernel32.dll")] private static extern uint GetCurrentProcessorNumber();
 }

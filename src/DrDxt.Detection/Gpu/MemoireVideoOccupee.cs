@@ -3,7 +3,7 @@ using System.Diagnostics;
 namespace DrDxt.Detection.Gpu;
 
 /// <summary>
-/// 04/10/2026 : la mémoire vidéo occupée pendant une partie, en pourcentage de la carte. Une partie jugée « cadence
+/// La mémoire vidéo occupée pendant une partie, en pourcentage de la carte. Une partie jugée « cadence
 /// irrégulière » (137 FPS, 1 % low 77, RTX 4060 de 8 Go) n'avait aucune piste : quand un jeu dépasse la mémoire que
 /// Windows lui accorde, ses données passent en mémoire système et l'image saccade (Microsoft, documentation de
 /// <c>IDXGIAdapter3::QueryVideoMemoryInfo</c>, « budget »). Lu par le compteur Windows « GPU Adapter Memory », sans
@@ -12,7 +12,7 @@ namespace DrDxt.Detection.Gpu;
 /// </summary>
 public static class MemoireVideoOccupee
 {
-    /// <summary>Revue du 04/10 (P1) : sous 1 Go dédié, c'est une carte intégrée ; elle frôle toujours 100 % et
+    /// <summary>Sous 1 Go dédié, c'est une carte intégrée ; elle frôle toujours 100 % et
     /// le jeu y vit en mémoire partagée.</summary>
     public const long CarteDedieeMin = 1L << 30;
 
@@ -31,7 +31,7 @@ public static class MemoireVideoOccupee
         return plusPleine;
     }
 
-    // Revue du 04/10 (P2) : lus une fois par session, et seulement quand la lecture réussit (un échec, pilote qui
+    // Lus une fois par session, et seulement quand la lecture réussit (un échec, pilote qui
     // redémarre en pleine partie, n'est plus gardé jusqu'au redémarrage de l'appli).
     private static IReadOnlyList<DxgiAdapter>? _cartes;
     private static bool? _compteurPresent;

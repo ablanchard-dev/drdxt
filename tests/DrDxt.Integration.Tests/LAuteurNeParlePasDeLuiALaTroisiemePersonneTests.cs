@@ -4,10 +4,9 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 26/09/2026 : le code, les tests et les outils parlaient du mainteneur à la troisième personne
-/// (« demande d'Untel », « la machine d'Untel », « chez Untel ») : la voix d'un rapport, pas celle de
-/// l'auteur. Environ 150 lignes ont été réécrites. Ce garde empêche qu'elles reviennent. Il cherche les
-/// tournures, pas le prénom seul, et ne se lit pas lui-même.
+/// Le code, les tests et les outils ne parlent pas de l'auteur à la troisième personne
+/// (« demande d'Untel », « la machine d'Untel », « chez Untel ») : c'est la voix d'un rapport, pas celle
+/// de l'auteur. Ce garde cherche les tournures, pas le prénom seul, et ne se lit pas lui-même.
 /// </summary>
 public sealed class LAuteurNeParlePasDeLuiALaTroisiemePersonneTests
 {
@@ -15,7 +14,7 @@ public sealed class LAuteurNeParlePasDeLuiALaTroisiemePersonneTests
     private const string Prenom = "Al" + "ex";
     private static readonly Regex Tournure = new(
         @"\b(d'|qu'|chez |a |à |de |par |pour )" + Prenom + @"\b|\b" + Prenom + @"('s| a | doit| tranche| regard| lanc| jou)"
-        // 26/09/2026 : les noms de tests collent les mots par un tiret bas (« chez_Untel_est »), que `\b` ne voit pas.
+        // Les noms de tests collent les mots par un tiret bas (« chez_Untel_est »), que `\b` ne voit pas.
         + @"|(^|[^A-Za-z])(d|qu|chez|de|par|pour)_" + Prenom + @"(_|[^A-Za-z]|$)",
         RegexOptions.Compiled);
 
@@ -31,7 +30,7 @@ public sealed class LAuteurNeParlePasDeLuiALaTroisiemePersonneTests
     public void Le_code_les_tests_et_les_outils_ne_parlent_pas_du_mainteneur_a_la_troisieme_personne()
     {
         // Témoin : les tournures d'avant sont bien attrapées.
-        Tournure.IsMatch("// 11/09/2026, demande d'" + Prenom + ".").Should().BeTrue();
+        Tournure.IsMatch("// Demande d'" + Prenom + ".").Should().BeTrue();
         Tournure.IsMatch("mesure chez " + Prenom + " le 24/09").Should().BeTrue();
         Tournure.IsMatch("public void Le_profil_mesure_chez_" + Prenom + "_est_detecte()").Should().BeTrue();
         Tournure.IsMatch("var alexandre = Alexandrie;").Should().BeFalse();

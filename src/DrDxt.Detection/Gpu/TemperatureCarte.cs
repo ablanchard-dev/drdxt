@@ -1,3 +1,4 @@
+using DrDxt.Core;
 using DrDxt.Detection.Gpu.Adlx;
 using DrDxt.GpuNative.Igcl;
 using DrDxt.GpuNative.Nvml;
@@ -8,7 +9,7 @@ namespace DrDxt.Detection.Gpu;
 public sealed record TemperatureCarteLue(double? Celsius, string? Source, string? Raison);
 
 /// <summary>
-/// 07/10/2026 (A5) : la température de la carte graphique, quelle que soit la marque, par la bibliothèque que le pilote
+/// La température de la carte graphique, quelle que soit la marque, par la bibliothèque que le pilote
 /// installe lui-même : NVML (NVIDIA), ADLX (AMD), IGCL (Intel). Ni HWiNFO ni pilote noyau ; lecture seule.
 /// Un seul fabricant répond : le premier dont la bibliothèque est là (NVIDIA, puis AMD, puis Intel). Sans cet ordre
 /// exclusif, une carte NVIDIA muette laisserait parler la puce intégrée d'à côté sous le nom de « la carte ».
@@ -31,21 +32,21 @@ public static class TemperatureCarte
             if (lu is not { } l) continue;
             return l.Celsius is > 0 and < 150 and { } c
                 ? new TemperatureCarteLue(c, source, null)
-                : new TemperatureCarteLue(null, source, l.Raison ?? "aucune valeur rendue");
+                : new TemperatureCarteLue(null, source, l.Raison ?? Docteur.T("TC2.AucuneValeur"));
         }
-        return new TemperatureCarteLue(null, null, "aucune bibliothèque de pilote graphique (NVML, ADLX, IGCL) sur ce PC");
+        return new TemperatureCarteLue(null, null, Docteur.T("TC.AucuneBibliotheque"));
     }
 
     private static readonly Lazy<NvmlNative> _nvml = new(() => new NvmlNative());
     private static readonly Lazy<IgclNative> _igcl = new(() => new IgclNative());
 
-    /// <summary>07/10/2026 : le lecteur IGCL n'a jamais tourné sur une vraie carte Intel. Le pilote de toute carte Intel,
+    /// <summary>Le lecteur IGCL n'a jamais tourné sur une vraie carte Intel. Le pilote de toute carte Intel,
     /// puce intégrée comprise, installe `ControlLib.dll` : l'ouvrir partout ferait tourner chez beaucoup de joueurs un appel
     /// natif jamais vu, qu'une exception .NET ne rattrape pas s'il est mal formé. Fermé jusqu'à une vraie carte (machine
     /// exportée ou essai) ; la carte Intel reste « non lu », avec cette raison.</summary>
     public const bool IgclOuvert = false;
 
-    public const string IgclFerme = "lecteur Intel (IGCL) pas encore vérifié sur une vraie carte Intel : non lu";
+    public static string IgclFerme => Docteur.T("TC.IgclFerme");
 
     private static (double? Celsius, string? Raison)? IntelSiOuvert()
         => !IgclNative.DllPresente() ? null : IgclOuvert ? _igcl.Value.LireTemperature() : (null, IgclFerme);
@@ -53,7 +54,7 @@ public static class TemperatureCarte
     /// <summary>La vraie lecture, sur ce PC. Ne lève jamais.</summary>
     public static TemperatureCarteLue Lire() => Choisir(
         () => _nvml.Value.IsAvailable
-            ? (_nvml.Value.TryGetTemperatureCelsius(0, out var c) ? (double?)c : null, "NVML n'a pas rendu de température")
+            ? (_nvml.Value.TryGetTemperatureCelsius(0, out var c) ? (double?)c : null, Docteur.T("TC.NvmlMuet"))
             : null,
         () =>
         {

@@ -7,7 +7,7 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// NS-4 — réparation du fichier d'échange désactivé.
+// Réparation du fichier d'échange désactivé.
 //
 // Ce que ces tests défendent, dans l'ordre d'importance :
 //   * on ne répare que ce qu'on a lu (Unknown ne déclenche rien),
@@ -60,7 +60,7 @@ public sealed class SanePagefileTweakTests
     [Fact]
     public void The_sentence_never_promises_frames()
     {
-        // §5 : c'est de la FIABILITÉ. Vendre ça comme du FPS serait exactement le mensonge
+        // C'est de la FIABILITÉ. Vendre ça comme du FPS serait exactement le mensonge
         // que le produit existe pour ne pas faire.
         Build().SummaryKey.Should().Be("tweak.fixit.sane_pagefile.reliability");
         Build().SummaryKey.Should().NotContain("fps");

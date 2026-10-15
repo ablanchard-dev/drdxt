@@ -19,7 +19,7 @@
     <!-- The gate runs the REAL engine + REAL safety manager + REAL catalog of REAL
          tweaks against an in-memory fake system state. Only Application + Core. -->
     <ProjectReference Include="..\..\src\DrDxt.Application\DrDxt.Application.csproj" />
-    <!-- T35 end-to-end reconcile: the REAL reconciler + REAL probe/mapper (Adapters)
+    <!-- End-to-end reconcile: the REAL reconciler + REAL probe/mapper (Adapters)
          + the REAL R1 registry write leaf (Win32RegistryActions, ElevatedHelper),
          exercised against a real, isolated HKCU test key (no elevation, self-cleaning). -->
     <ProjectReference Include="..\..\src\DrDxt.Reconciler\DrDxt.Reconciler.csproj" />

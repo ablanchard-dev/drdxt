@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Display;
 
-/// <summary>L8 suite — ce qu'une lecture VRR du pilote autorise a dire, et surtout ce qu'elle
+/// <summary>Ce qu'une lecture VRR du pilote autorise a dire, et surtout ce qu'elle
 /// n'autorise pas : avec G-Sync coupe, « possible = 0 » n'est pas « ecran incapable ».</summary>
 public class Win32DisplayInfoVrrTests
 {
@@ -18,7 +18,7 @@ public class Win32DisplayInfoVrrTests
         => Win32DisplayInfo.Traduire(new VrrReading(possible, actif, false, false))
             .Should().Be((attenduPossible, attenduActif));
 
-    // ── A-FS1 (08/10/2026) : FreeSync lu par ADLX, l'écran retrouvé par le nom de modèle de son EDID ──────────
+    // ── A-FS1 : FreeSync lu par ADLX, l'écran retrouvé par le nom de modèle de son EDID ──────────
     private static readonly DrDxt.Detection.Gpu.Adlx.AdlxEcranFreeSync[] DeuxEcrans =
     [
         new("VG27AQ", true, true),

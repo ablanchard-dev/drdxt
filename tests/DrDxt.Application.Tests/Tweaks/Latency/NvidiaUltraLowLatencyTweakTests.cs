@@ -7,19 +7,19 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// M2 Phase D1 — NvidiaUltraLowLatencyTweak.
+// NvidiaUltraLowLatencyTweak.
 //
-// Sets the NVIDIA driver "Low Latency Mode = Ultra" floor via the allowlisted
-// ...\NVTweak\LowLatencyMode registry leaf (through IElevatedClient). Captures
-// the real original value first (registry-read seam) and stores it as a
-// serialized inverse PrivilegedOp so revert is faithful.
+// Pose le plancher pilote NVIDIA « Low Latency Mode = Ultra » via la feuille de registre
+// ...\NVTweak\LowLatencyMode en liste blanche (par IElevatedClient). Capture d'abord
+// la vraie valeur d'origine (couture de lecture du registre) et la stocke en
+// PrivilegedOp inverse sérialisée pour un retour arrière fidèle.
 //
-//  - AppliesTo: NVIDIA render GPU on a desktop. False on AMD-only / iGPU / handheld.
-//  - Apply captures original → snapshot, applies via helper, fails clean if the
-//    SDK / registry-read path is unavailable.
-//  - Revert restores the captured original.
+//  - AppliesTo : GPU de rendu NVIDIA sur un bureau. Faux sur AMD seul, iGPU, console portable.
+//  - L'application capture l'origine → instantané, applique via le helper, échoue proprement
+//    si le chemin SDK ou de lecture du registre est indisponible.
+//  - Le retour arrière rend l'origine capturée.
 //
-// Pure unit tests with NSubstitute fakes — no real registry / SDK access.
+// Tests unitaires purs avec des faux NSubstitute : aucun accès réel au registre ni au SDK.
 // -----------------------------------------------------------------------
 public sealed class NvidiaUltraLowLatencyTweakTests
 {
@@ -59,7 +59,7 @@ public sealed class NvidiaUltraLowLatencyTweakTests
     private NvidiaUltraLowLatencyTweak Build()
     {
         _nvApi.IsAvailable.Returns(true);
-        _nvApi.GetLowLatencyMode().Returns(Result<uint>.Ok(0)); // Off originally
+        _nvApi.GetLowLatencyMode().Returns(Result<uint>.Ok(0)); // désactivé à l'origine
         _registry.ReadDword(RegistryHiveKind.LocalMachine, NvTweakPath, LowLatencyName)
             .Returns(Result<uint?>.Ok(0u));
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
@@ -80,12 +80,12 @@ public sealed class NvidiaUltraLowLatencyTweakTests
     [Fact]
     public void SummaryKey_is_the_honest_driver_floor_key()
     {
-        // Honesty §5: the real per-game Reflex is in-game; this is only the driver floor.
+        // Honnêteté : le vrai Reflex par jeu est dans le jeu ; ceci n'est que le plancher pilote.
         Build().SummaryKey.Should().Be("tweak.latency.reflex.driver_floor");
         Build().SummaryKey.Should().NotContain("fps");
     }
 
-    // 24/09/2026 : la valeur écrite n'est lue par aucun pilote connu (absente de NvApiDriverSettings.h
+    // La valeur écrite n'est lue par aucun pilote connu (absente de NvApiDriverSettings.h
     // et du registre de la machine de référence). Le cas le plus favorable ne la propose plus.
     [Fact]
     public void Jamais_propose_meme_sur_un_bureau_nvidia() =>
@@ -107,7 +107,7 @@ public sealed class NvidiaUltraLowLatencyTweakTests
     public void AppliesTo_false_on_laptop_locked_nvidia() =>
         Build().AppliesTo(LaptopNvidia(), State).Should().BeFalse();
 
-    // 14/09/2026 (plan 1.2, H5) — NVIDIA 436.02 : sans effet en DX12. L'exe du jeu est un vrai fichier
+    // NVIDIA 436.02 : sans effet en DX12. L'exe du jeu est un vrai fichier
     // Windows dont la table d'import a ete relevee : Taskmgr.exe = d3d12 seul, GamePanel.exe = d3d11.
     private NvidiaUltraLowLatencyTweak AvecJeu(string? exe)
     {
@@ -130,7 +130,7 @@ public sealed class NvidiaUltraLowLatencyTweakTests
     public void Jamais_propose_meme_avec_un_jeu_DirectX11() =>
         AvecJeu(Sys("GamePanel.exe")).AppliesTo(DesktopRtx4070(), State).Should().BeFalse();
 
-    // 16/09/2026 : la regle etait « jeu inconnu : on ne retire rien ». Sur la machine de reference, un
+    // La regle etait « jeu inconnu : on ne retire rien ». Sur la machine de reference, un
     // scan fait jeu ferme recommandait donc ce levier alors que le jeu joue (cod.exe) est DX12 seul, ou
     // il ne peut rien. Son effet depend ENTIEREMENT de l'API du jeu : sans jeu lu, il n'y a rien a
     // affirmer, donc rien a recommander.
@@ -143,12 +143,12 @@ public sealed class NvidiaUltraLowLatencyTweakTests
     {
         var t = Build();
         _registry.ReadDword(RegistryHiveKind.LocalMachine, NvTweakPath, LowLatencyName)
-            .Returns(Result<uint?>.Ok(1u)); // currently "On" (1), not Ultra
+            .Returns(Result<uint?>.Ok(1u)); // actuellement « On » (1), pas Ultra
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // The driver floor: writes LowLatencyMode = 2 (Ultra) on the allowlisted leaf.
+        // Le plancher pilote : écrit LowLatencyMode = 2 (Ultra) sur la feuille en liste blanche.
         await _elevated.Received(1).ExecuteAsync(
             Arg.Is<SetRegistryValueOp>(o =>
                 o.Hive == RegistryHiveKind.LocalMachine
@@ -157,7 +157,7 @@ public sealed class NvidiaUltraLowLatencyTweakTests
                 && o.Kind == RegistryValueType.DWord
                 && o.Value == "2"),
             Arg.Any<CancellationToken>());
-        // The snapshot carries the captured original (1) as a serialized inverse op.
+        // L'instantané porte l'origine capturée (1) en op inverse sérialisée.
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         inverse.IsOk.Should().BeTrue();
         inverse.Value.Should().BeOfType<SetRegistryValueOp>()
@@ -169,12 +169,12 @@ public sealed class NvidiaUltraLowLatencyTweakTests
     {
         var t = Build();
         _registry.ReadDword(RegistryHiveKind.LocalMachine, NvTweakPath, LowLatencyName)
-            .Returns(Result<uint?>.Ok((uint?)null)); // value not present originally
+            .Returns(Result<uint?>.Ok((uint?)null)); // valeur absente à l'origine
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // Faithful revert of an added value = delete it.
+        // Retour fidèle d'une valeur ajoutée = la supprimer.
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         inverse.Value.Should().BeOfType<DeleteRegistryValueOp>();
     }

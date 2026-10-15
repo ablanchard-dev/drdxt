@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Read-only R2 layout probe. Lives OUTSIDE the .sln (like tools/smoke,
+  <!-- Read-only NVAPI layout probe. Lives OUTSIDE the .sln (like tools/smoke,
        tools/m2smoke) so it never affects the product build/test. It only calls the
        READ-ONLY Get* methods of NvApiTuningActions on the local GPU to validate the
        reverse-engineered struct layout live — no writes, no elevation needed. -->

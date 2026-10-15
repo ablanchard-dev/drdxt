@@ -3,34 +3,38 @@ using System.Globalization;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DrDxt.App.Navigation;
 using DrDxt.App.Profiles;
 using DrDxt.Core;
 using DrDxt.Detection.Hardware;
 
 namespace DrDxt.App.ViewModels;
 
+/// <summary>
+/// L'écran principal de DrDXT. Il lance le scan (matériel, réglages, BIOS, réseau, processeur, mémoire, mesure
+/// en jeu, audit de santé), range ce qui a été lu sur la carte de la machine et porte les gestes du joueur
+/// (Optimiser, rapport, mise à jour). Une étape en panne ne fait pas échouer le scan : elle dit ce qu'elle n'a pas lu.
+/// Chaque fichier ScanViewModel.*.cs en porte une partie.
+/// </summary>
 public sealed partial class ScanViewModel : ObservableObject
 {
     private const string Dash = "—";
 
-    // Restore-point gate (§16): a blocked apply surfaces an explicit, localized message —
-    // never a silent skip. The key chosen depends on WHY apply is blocked.
+    // Garde du point de restauration : une application bloquée affiche un message explicite et
+    // traduit, jamais un saut silencieux. La clé choisie dépend de la raison du blocage.
     private const string KeyRestoreBlocked = "Apply.RestoreRequired.Blocked";
     private const string KeyApplyFailed = "Apply.Failed";
     private const string KeyNothingToApply = "Apply.NothingApplicable";
     private const string KeySousGarde = "Apply.SousGarde";
     private const string KeyKeptOriginNotSigned = "Optimize.KeptOriginNotSigned";
 
-    // 23/09/2026 : DrDXT est gratuit (GPL-3.0). L'ancien gate payant de l'application prouvée a été retiré ;
-    // rien ne mène plus à un achat.
+    // DrDXT est gratuit (GPL-3.0) : rien ne mène à un achat.
 
-    // The persistence moat (§9.12): after a validated apply the App commits a signed
-    // desired-state manifest so the reconciler can re-assert it at boot. A commit failure
-    // is NON-FATAL (the tweaks are already applied + measured) — it surfaces this signal,
-    // not a blocking error.
+    // La persistance : après une application validée, l'App enregistre un manifeste signé de
+    // l'état voulu, pour que le reconciler le réimpose au démarrage. Un échec d'écriture n'est
+    // pas fatal (les leviers sont déjà appliqués et mesurés) : il remonte ce signal, pas une
+    // erreur bloquante.
     private const string KeyMoatUnarmed = "Apply.MoatUnarmed";
-    // 11/09/2026 — le manifeste signe illisible : refus nomme, puis reprise explicite.
+    // Le manifeste signe illisible : refus nomme, puis reprise explicite.
     private const string KeyManifestUnreadable = "Apply.ManifestUnreadable";
     private const string KeyReferenceNotSeeded = "Apply.ReferenceNotSeeded";
     private const string KeyManifestReset = "Apply.ManifestReset";
@@ -51,12 +55,12 @@ public sealed partial class ScanViewModel : ObservableObject
     ///
     /// Sans journal, aucune derive n'est detectable entre sessions : le produit
     /// redecouvre la machine a chaque lancement, et une degradation lente est exactement ce qu'un
-    /// scan isole ne voit pas -- chaque mesure prise seule parait normale.</summary>
+    /// scan isole ne voit pas : chaque mesure prise seule parait normale.</summary>
     private readonly DrDxt.Measurement.PerformanceJournalStore? _performanceJournal;
     private readonly IScanScorer _scorer;
     private readonly IStorageDetector _storage;
     private readonly IBiosAdvisor _biosAdvisor;
-    // L'audit de sante (pure lecture). Une COUTURE, pas le service concret : `RepairAuditService`
+    // L'audit de sante (pure lecture). Une couture, pas le service concret : `RepairAuditService`
     // lit le registre, le journal d'evenements et `bcdedit` en dur, donc l'injecter tel quel
     // rendrait tout test de cet ecran dependant de la machine qui l'execute. Meme idiome que
     // `_machineId` / `_writeReport`. null => pas de section, et le scan ne perd rien.
@@ -67,52 +71,49 @@ public sealed partial class ScanViewModel : ObservableObject
     internal ISafetyManager Safety => _safety;
     private readonly ITweakEngine _engine;
     private readonly IScanProfileConsumer _profileConsumer;
-    private readonly IGpuTuningApplyStep _gpuTuningApplyStep;
-    private readonly INavigationService _navigation;
-    private readonly Func<DashboardViewModel> _dashboardFactory;
     private readonly IDesiredStateStore _desiredStateStore;
     private readonly AppliedTweakManifestMapper _manifestMapper;
     private readonly Func<string, string> _localize;
-    // Generic game detection (no per-game list): finds the running game to measure in-game.
+    // Détection générique du jeu (aucune liste par jeu) : trouve le jeu lancé pour le mesurer en partie.
     private readonly DrDxt.App.Platform.IGameLocator _gameLocator;
-    // L0.2 — la boucle fermee du BIOS : poser le marqueur avant le voyage, relire au retour.
+    // La boucle fermee du BIOS : poser le marqueur avant le voyage, relire au retour.
     // Optionnelle : null = la couture n'est pas la, le bouton « ouvrir le BIOS » ne s'affiche
     // pas (CanOpenFirmwareDirectly reste faux) et aucun verdict n'est prononce. C'est un
-    // manque VISIBLE, pas un succes silencieux.
+    // manque visible, pas un succes silencieux.
     private readonly DrDxt.App.Platform.IFirmwareTrip? _firmwareTrip;
-    // D7 / gate G6 — de quoi fabriquer le rapport que la personne colle dans son ticket : la
+    // De quoi fabriquer le rapport que la personne colle dans son ticket : la
     // version du produit et l'ecriture du fichier. Optionnelles : sans elles le bouton disparait
     // plutot que de ne rien faire.
     private readonly Func<string, string, string>? _writeReport;
     private readonly string _appVersion;
 
-    // Captured from the last successful scan so Apply runs the profile-driven plan + passes
-    // the measured baseline to the engine for the re-bench / auto-revert verdict.
+    // Pris au dernier scan réussi : Apply exécute le plan issu du profil et passe la base mesurée
+    // au moteur, pour le verdict de remesure et de retour arrière automatique.
     private ScanProfileConsumption? _consumption;
     private BenchmarkResult? _scannedBaseline;
-    // The game PID measured this scan (0 = no game running → config-only). Reused by Apply's re-bench.
+    // Le PID du jeu mesuré à ce scan (0 = aucun jeu lancé, donc config seule). Repris par la remesure d'Apply.
     private int _gamePid;
     private readonly DrDxt.App.Platform.ILecteurDeVoisins _voisins;
-    // Lot 1 « preuve du besoin » : le dernier tri de sante, le meme que l'ecran, pour que le rapport
+    // Le dernier tri de sante, le meme que l'ecran, pour que le rapport
     // exporte ce que le client a vu. null = audit non lance.
     private RepairTriage? _derniereSante;
-    // Le conseiller BIOS a-t-il REPONDU a ce scan ? PopulateBiosFindings rend null pour « rien a
+    // Le conseiller BIOS a-t-il repondu a ce scan ? PopulateBiosFindings rend null pour « rien a
     // conseiller » comme pour une panne : seul ce drapeau les separe (DejaReglee le lit).
     private bool _biosLu;
-    // L8 b — le goulot mesure par le scan : le diagnostic de l'Optimiser part de lui.
+    // Le goulot mesure par le scan : le diagnostic de l'Optimiser part de lui.
     private BottleneckVerdict? _goulotScan;
-    // L8 b — un descripteur devient un candidat mesurable (journalise avant d'ecrire), et ce que la
+    // Un descripteur devient un candidat mesurable (journalise avant d'ecrire), et ce que la
     // stabilite interdit. null => aucun levier a chaud ne part en session / stabilite non lue.
     private readonly Func<CandidateDescriptor, IAutopilotCandidate?>? _creerCandidat;
     private readonly Func<(InstabiliteGpuObservee? Gpu, IReadOnlyList<ArretClasse>? Arrets)>? _lireStabilite;
     private readonly Func<string, bool>? _lancerInstalleur;
-    // Phase 18 — ce que les threads du jeu ont consomme pendant la mesure du scan. null = pas observe.
+    // Ce que les threads du jeu ont consomme pendant la mesure du scan. null = pas observe.
     private readonly Func<int, TimeSpan, DrDxt.Detection.Cpu.ProcessCpuSample?>? _observerThreads;
     private GameThreadPressure _pressionThreads = GameThreadPressure.Unknown;
-    // Phase 18 — les pertes a l'interface reseau pendant la meme fenetre de jeu. null = pas mesure.
+    // Les pertes a l'interface reseau pendant la meme fenetre de jeu. null = pas mesure.
     private readonly Func<TimeSpan, RepairFinding?>? _mesurerPertesReseau;
     private RepairFinding? _constatPertesReseau;
-    // 24/09/2026 — le ping quand la machine envoie, pendant la meme fenetre de jeu. null = pas mesure.
+    // Le ping quand la machine envoie, pendant la meme fenetre de jeu. null = pas mesure.
     private readonly Func<TimeSpan, DrDxt.Measurement.Network.VerdictBufferbloat?>? _mesurerBufferbloat;
     private RepairFinding? _constatBufferbloat;
     private readonly Func<int, TimeSpan, Task<RepairFinding?>>? _mesurerRoute;
@@ -137,15 +138,17 @@ public sealed partial class ScanViewModel : ObservableObject
     private DrDxt.Application.Network.PlafondEnvoiPendantLeJeu? _modePlafond;
     private CancellationTokenSource? _battementPlafond;
 
-    // Phase 18 — les DPC/ISR des pilotes pendant la meme fenetre de jeu. null = pas mesure.
+    // Les DPC/ISR des pilotes pendant la meme fenetre de jeu. null = pas mesure.
     private readonly Func<TimeSpan, RepairFinding?>? _mesurerDpc;
     private RepairFinding? _constatDpc;
     // Chaque candidat juge laisse une ligne : le corpus qui tranchera un jour « le p95 seul suffit-il ».
     private readonly DrDxt.Application.Autopilot.JournalDesCandidats? _journalCandidats;
 
     private readonly DrDxt.Bios.NvramBiosSettingsReader? _biosNvram;
-    // 24/09/2026 — ce que le scan a LU dans le BIOS, affiché dans son domaine (vu absent sur la photo).
+    // Ce que le scan a LU dans le BIOS, affiché dans son domaine (vu absent sur la photo).
     private IReadOnlyList<BiosSettingReading>? _reglagesBiosLus;
+    /// <summary>Où écrire le BIOS lu pour le docteur. L'appli le pose ; null = rien n'est écrit (les tests).</summary>
+    internal FichierJsonAtomique? FichierBiosLu { get; set; }
 
     public ScanViewModel(
         IHardwareDetector detector,
@@ -156,16 +159,14 @@ public sealed partial class ScanViewModel : ObservableObject
         ISafetyManager safety,
         ITweakEngine engine,
         IScanProfileConsumer profileConsumer,
-        IGpuTuningApplyStep gpuTuningApplyStep,
-        INavigationService navigation,
-        Func<DashboardViewModel> dashboardFactory,
         IDesiredStateStore desiredStateStore,
         AppliedTweakManifestMapper manifestMapper,
         IBiosAdvisor biosAdvisor,
         IGuideGenerator guideGenerator,
         Func<string, string> localize,
-        // Optional/defaulted so existing (test) constructions stay source-compatible; DI passes the
-        // real Win32 locator. Null → NullGameLocator → no game found → honest config-only scan.
+        // Optionnel avec valeur par défaut, pour que les constructions existantes (tests) compilent
+        // toujours ; la DI passe le vrai localisateur Win32. Null → NullGameLocator → aucun jeu
+        // trouvé → scan honnête de la config seule.
         DrDxt.App.Platform.IGameLocator? gameLocator = null,
         // Optionnel/en queue, comme gameLocator, pour que toutes les constructions existantes
         // (tests compris) restent valides. La DI passe la vraie couture.
@@ -174,7 +175,7 @@ public sealed partial class ScanViewModel : ObservableObject
         // le disque, et le VM ne connait pas l'arborescence de Windows.
         Func<string, string, string>? writeReport = null,
         string? appVersion = null,
-        // LM — le banc memoire. Optionnels/en queue comme les precedents, pour que toutes les
+        // Le banc memoire. Optionnels/en queue comme les precedents, pour que toutes les
         // constructions existantes restent valides. null => le scan ne mesure pas et n'affirme
         // rien de mesure sur la memoire ; la DI passe le vrai service.
         DrDxt.Measurement.Memory.MemoryBaselineService? memoryBaseline = null,
@@ -182,54 +183,54 @@ public sealed partial class ScanViewModel : ObservableObject
         DrDxt.Measurement.PerformanceJournalStore? performanceJournal = null,
         // L'audit de sante. Optionnel/en queue comme les precedents : toutes les constructions
         // existantes restent valides. null => aucune section d'audit, et surtout aucune phrase
-        // affirmant que la machine va bien — un audit absent ne se raconte pas comme un audit vide.
+        // affirmant que la machine va bien : un audit absent ne se raconte pas comme un audit vide.
         Func<IReadOnlyList<RepairFinding>>? repairAudit = null,
         DrDxt.Measurement.Cpu.CpuBaselineService? cpuBaseline = null,
         Func<IReadOnlyList<RepairFinding>, DrDxt.Infrastructure.Repair.JournalDeSante?>? journalSante = null,
-        // L'ATTRIBUTION reseau. Optionnelle/en queue comme les precedentes : toutes les
+        // L'attribution reseau. Optionnelle/en queue comme les precedentes : toutes les
         // constructions existantes restent valides. null => le scan ne dit rien du reseau, ce qui
         // est exactement ce qu'il faisait avant. Un faux compteur suffit a la tester d'ici.
         Func<CancellationToken, Task<string?>>? attributionReseau = null,
-        // L8 b — le cerveau de l'Optimiser. Optionnels/en queue comme les precedents.
+        // Le cerveau de l'Optimiser. Optionnels/en queue comme les precedents.
         Func<CandidateDescriptor, IAutopilotCandidate?>? creerCandidat = null,
         Func<(InstabiliteGpuObservee? Gpu, IReadOnlyList<ArretClasse>? Arrets)>? lireStabilite = null,
-        // Phase 18 — lance l'installeur de mise a jour. null = ShellExecute (UAC par l'installeur).
+        // Lance l'installeur de mise a jour. null = ShellExecute (UAC par l'installeur).
         Func<string, bool>? lancerInstalleur = null,
-        // Phase 18 — observe les threads du jeu (GetThreadTimes, sans elevation). null = pas observe.
+        // Observe les threads du jeu (GetThreadTimes, sans elevation). null = pas observe.
         Func<int, TimeSpan, DrDxt.Detection.Cpu.ProcessCpuSample?>? observerThreads = null,
-        // Phase 18 — mesure les pertes a l'interface pendant une fenetre. null = pas mesure.
+        // Mesure les pertes a l'interface pendant une fenetre. null = pas mesure.
         Func<TimeSpan, RepairFinding?>? mesurerPertesReseau = null,
-        // Phase 18 — mesure les DPC/ISR des pilotes pendant une fenetre. null = pas mesure.
+        // Mesure les DPC/ISR des pilotes pendant une fenetre. null = pas mesure.
         Func<TimeSpan, RepairFinding?>? mesurerDpc = null,
         // Le reservoir des candidats juges par l'Optimiser. null = rien n'est consigne.
         DrDxt.Application.Autopilot.JournalDesCandidats? journalCandidats = null,
-        // 11/09/2026 — ce qui tourne A cote du jeu pendant la mesure (demande produit : un scan a
+        // Ce qui tourne a cote du jeu pendant la mesure (demande produit : un scan a
         // affiche 164 FPS pendant qu'il regardait DrDXT, jeu en arriere-plan). null = on ne regarde
-        // pas, et la liste reste vide — jamais « rien ne tournait ».
+        // pas, et la liste reste vide, jamais « rien ne tournait ».
         DrDxt.App.Platform.ILecteurDeVoisins? voisins = null,
-        // 16/09/2026 — demande produit : relancer l'appli elevee pour lire ce qui exige
+        // Demande produit : relancer l'appli elevee pour lire ce qui exige
         // l'administrateur. null = droits inconnus ou relance indisponible : aucun bouton.
         bool? estEleve = null,
         Func<bool>? relancerEnAdministrateur = null,
-        // 24/09/2026 — lit les reglages BIOS dans la NVRAM (cartes de la matrice). null = on garde
+        // Lit les reglages BIOS dans la NVRAM (cartes de la matrice). null = on garde
         // l'inference, rien n'est affirme comme « lu dans le BIOS ».
         DrDxt.Bios.NvramBiosSettingsReader? biosNvram = null,
         Func<TimeSpan, DrDxt.Measurement.Network.VerdictBufferbloat?>? mesurerBufferbloat = null,
         // Le helper eleve qui posera le plafond. null = mode indisponible.
         IElevatedClient? helper = null,
-        // 24/09/2026 — le journal des leviers gardes et le lecteur qui les relit. null = on ne remarque rien.
+        // Le journal des leviers gardes et le lecteur qui les relit. null = on ne remarque rien.
         DrDxt.Application.Tweaks.JournalDesLeviersAppliques? journalLeviers = null,
         DrDxt.Application.Tweaks.Hardware.IRegistryReader? registreGains = null,
         Func<IReadOnlyList<RepairFinding>>? lireReglagesJeu = null,
-        // 24/09/2026 — le lien PCIe de la carte graphique (NVML). null ou lecture ratée = « non lu », comme avant.
+        // Le lien PCIe de la carte graphique (NVML). null ou lecture ratée = « non lu », comme avant.
         Func<CarteDeLaMachine.LienPcie?>? lirePcie = null,
-        // 03/10/2026 (P3.1c) — la route vers le serveur de la partie, pendant la même fenêtre. null = on ne regarde pas.
+        // La route vers le serveur de la partie, pendant la même fenêtre. null = on ne regarde pas.
         Func<int, TimeSpan, Task<RepairFinding?>>? mesurerRoute = null,
-        // 03/10/2026 (P3.3) — le plus bas de la mémoire libre pendant la fenêtre. null = on ne regarde pas.
+        // Le plus bas de la mémoire libre pendant la fenêtre. null = on ne regarde pas.
         Func<TimeSpan, Task<ulong?>>? mesurerMemoireLibre = null,
-        // 03/10/2026 (tour G) — la dernière version publiée du pilote, comparée à celle installée. null = on ne regarde pas.
+        // La dernière version publiée du pilote, comparée à celle installée. null = on ne regarde pas.
         Func<IReadOnlyList<GpuInfo>, Task<RepairFinding?>>? verifierPilote = null,
-        // 07/10/2026 (T1) — écrit la machine lue (inventaire, réglages, santé) au format des fixtures, anonymisée, et rend
+        // Écrit la machine lue (inventaire, réglages, santé) au format des fixtures, anonymisée, et rend
         // le chemin. null = pas de bouton.
         Func<HardwareInventory, SettingsState, IReadOnlyList<RepairFinding>, string>? exporterMachine = null)
     {
@@ -271,9 +272,6 @@ public sealed partial class ScanViewModel : ObservableObject
         _safety = safety;
         _engine = engine;
         _profileConsumer = profileConsumer;
-        _gpuTuningApplyStep = gpuTuningApplyStep;
-        _navigation = navigation;
-        _dashboardFactory = dashboardFactory;
         _desiredStateStore = desiredStateStore;
         _manifestMapper = manifestMapper;
         _localize = localize;
@@ -296,7 +294,7 @@ public sealed partial class ScanViewModel : ObservableObject
             new(SceneRepresentativity.Gameplay, _localize("Scan.Scene.Gameplay")),
             new(SceneRepresentativity.Entrainement, _localize("Scan.Scene.Training")),
             new(SceneRepresentativity.MenuLobby, _localize("Scan.Scene.Menu")),
-            // 23/09/2026 — le premier scan ne se fait pas en jeu. Sans cette case, la seule reponse
+            // Le premier scan ne se fait pas en jeu. Sans cette case, la seule reponse
             // honnete disponible etait « je ne sais pas », alors que la personne sait tres bien.
             new(SceneRepresentativity.HorsJeu, _localize("Scan.Scene.HorsJeu")),
         };
@@ -315,38 +313,38 @@ public sealed partial class ScanViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ApplyGpuTuningCommand))]
     private ScanState _state = ScanState.Idle;
 
-    /// <summary>Set when an apply is BLOCKED (restore-point gate, nothing applicable,
-    /// engine failure). A localized, explicit message — never a silent skip (§16).</summary>
+    /// <summary>Rempli quand une application est bloquée (garde du point de restauration, rien
+    /// d'applicable, panne du moteur). Un message traduit et explicite, jamais un saut silencieux.</summary>
     [ObservableProperty]
     private string? _applyBlockedMessage;
 
-    /// <summary>L8 b — ce que l'Optimiser a juge, pose et mesure, en clair. null = rien lance.</summary>
+    /// <summary>Ce que l'Optimiser a juge, pose et mesure, en clair. null = rien lance.</summary>
     [ObservableProperty]
     private string? _resultatOptimisation;
 
-    /// <summary>06/10/2026 (plan 3.4) : un souci est en cours, le point que l'Optimiser prendra le contiendra ; dit avant
+    /// <summary>Un souci est en cours, le point que l'Optimiser prendra le contiendra ; dit avant
     /// le clic, avec le point sain que le docteur a trouvé. null = pas de souci en cours, ou points illisibles.</summary>
     [ObservableProperty]
     private string? _avertissementPoint;
 
-    /// <summary>06/10/2026 (chantier B6) : le bilan santé, huit lignes fixes ; avant le scan, toutes non lues.</summary>
+    /// <summary>Le bilan santé, huit lignes fixes ; avant le scan, toutes non lues.</summary>
     [ObservableProperty]
     private IReadOnlyList<LigneBilan> _bilan = BilanSante.Construire([]);
 
     /// <summary>Une reponse a « pendant la mesure, tu joues : », et son libelle localise.</summary>
     public sealed record ChoixScene(SceneRepresentativity Valeur, string Libelle);
 
-    /// <summary>11/09/2026 — ce que le joueur dit jouer pendant la mesure en jeu. Par defaut « je ne
+    /// <summary>Ce que le joueur dit jouer pendant la mesure en jeu. Par defaut « je ne
     /// sais pas » (`Unknown`), jamais un defaut rassurant : DrDXT ne sait pas reconnaitre un lobby, et
     /// le silence ne vaut jamais « partie reelle ».
-    /// NON memorise par jeu, expres : une scene se declare pour cette mesure. Reprendre la reponse
-    /// d'hier ferait passer une ancienne partie pour celle d'aujourd'hui — le defaut rassurant refuse
+    /// Pas memorise par jeu, expres : une scene se declare pour cette mesure. Reprendre la reponse
+    /// d'hier ferait passer une ancienne partie pour celle d'aujourd'hui : c'est le defaut rassurant refuse
     /// ci-dessus, venu par un autre chemin.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LabelSceneRetenue))]
     private ChoixScene _sceneDeclaree;
 
-    /// <summary>29/09/2026 : avant Optimiser, le choix déjà fait avant le scan se dit en une ligne ; le
+    /// <summary>Avant Optimiser, le choix déjà fait avant le scan se dit en une ligne ; le
     /// sélecteur ne revient que sur « Changer ».</summary>
     public string LabelSceneRetenue => SceneDeclaree.Valeur == SceneRepresentativity.Unknown
         ? _localize("Scan.Scene.PasChoisie")
@@ -356,7 +354,7 @@ public sealed partial class ScanViewModel : ObservableObject
     private static readonly System.Text.RegularExpressions.Regex Borne = new(
         @"(core offset|memory offset|power limit) clamped (-?\d+)→(-?\d+)(?:%| MHz) \(GpuSafeBounds\)");
 
-    /// <summary>08/10/2026 : la note d'un réglage proposé vient du moteur, en anglais (ScanProfileConsumer) ; elle est
+    /// <summary>La note d'un réglage proposé vient du moteur, en anglais (ScanProfileConsumer) ; elle est
     /// traduite ici, phrase connue par phrase connue. Une phrase inconnue passe telle quelle plutôt que d'être tue.</summary>
     internal static string TraduireNote(string? note, Func<string, string> localiser)
     {
@@ -375,17 +373,20 @@ public sealed partial class ScanViewModel : ObservableObject
     }
     public string LabelAjouterPrecision => _localize("Scan.Scene.Preciser");
     public string LabelReglageCartePourquoi => _localize("Carte.Reglage.Pourquoi");
+    public string LabelPlusDOptions => _localize("Resultat.PlusDOptions");
+    public string LabelCadreReversible => _localize("Cadre.Reversible");
+    public string LabelCadreALaMain => _localize("Cadre.ALaMain");
     public string LabelVoirVoisins => _localize("Scan.Voisins.Voir");
     public string LabelVoirLesAutres => _localize("Carte.VoirLesAutres");
 
-    // 29/09/2026, quatrième critique : le verbe et la durée sur chaque capsule Agir.
+    // Le verbe et la durée sur chaque capsule Agir.
     public string LabelCapsuleTestMemoire => _localize("Agir.Capsule.TestMemoire");
     public string LabelCapsuleRemesureCpu => _localize("Agir.Capsule.RemesureCpu");
     public string LabelCapsuleRemesureMemoire => _localize("Agir.Capsule.RemesureMemoire");
     public string LabelCapsuleBcd => _localize("Agir.Capsule.Bcd");
     public string LabelCapsuleReparation => _localize("Agir.Capsule.Reparation");
 
-    /// <summary>29/09/2026 : Windows a coupé ses animations (réglage d'optimisation courant) et DrDXT, qui le
+    /// <summary>Windows a coupé ses animations (réglage d'optimisation courant) et DrDXT, qui le
     /// respecte, restait figé. Le joueur peut l'animer quand même ; le choix est gardé.</summary>
     public bool AnimationsFigeesParWindows => Effets.MoteurDAnimation.FigeParWindows;
     public string LabelAnimerMalgreWindows => _localize("Animations.MalgreWindows");
@@ -408,19 +409,18 @@ public sealed partial class ScanViewModel : ObservableObject
     public string LabelSceneQuestion => _localize("Scan.Scene.Question");
     public string LabelSceneDescription => _localize("Scan.Scene.Description");
 
-    /// <summary>L8 a — ce que le revert au demarrage a fait d'une session interrompue. Sa propre
+    /// <summary>Ce que le revert au demarrage a fait d'une session interrompue. Sa propre
     /// propriete : un clic sur Optimiser ou Scanner ne doit pas l'effacer avant qu'il soit lu.</summary>
     [ObservableProperty]
     private string? _messageDemarrage;
 
-    /// <summary>Set (non-fatally) when the apply SUCCEEDED but committing the signed
-    /// desired-state manifest failed — the optimizations are applied + measured, but the
-    /// reconciler cannot re-assert them at boot yet ("moat not armed", §9.12). A localized
-    /// diagnostic, not a blocking error: apply still succeeded and the dashboard shows.</summary>
+    /// <summary>Posé quand Optimiser a réussi mais que l'écriture du manifeste signé a échoué : les réglages sont
+    /// posés et mesurés, mais le service ne pourra pas les reposer au démarrage. Un message traduit, pas une erreur
+    /// bloquante : le résultat s'affiche quand même.</summary>
     [ObservableProperty]
     private string? _moatUnarmedMessage;
 
-    /// <summary>11/09/2026 — un commit du manifeste a ete refuse parce que le manifeste signe existant ne se
+    /// <summary>Un commit du manifeste a ete refuse parce que le manifeste signe existant ne se
     /// relit pas (ou que la cle de la machine est inutilisable) : rien n'a ete ecrit par-dessus. Le message
     /// le dit, avec la raison du helper, et <see cref="PeutRepartirDuManifeste"/> ouvre la reprise.</summary>
     [ObservableProperty]
@@ -431,22 +431,18 @@ public sealed partial class ScanViewModel : ObservableObject
 
     public string LabelManifestReset => _localize(KeyManifestReset);
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(VerdictText))]
-    private int _score;
-
     /// <summary>
-    /// How many scored levers were actually READABLE on this machine. The scorer has always
-    /// computed it (an Unknown lever deducts nothing, by doctrine — penalising something we did
-    /// not read would fabricate a deficit), but nothing ever displayed it, so a machine we could
-    /// barely read still announced a confident "100 — in excellent health". Null = the scorer
-    /// reported none, which is treated as INCOMPLETE, never as "everything was read".
+    /// Combien de leviers notés étaient vraiment lisibles sur cette machine. Le scorer le calcule
+    /// (un levier Unknown ne retire rien, par principe : pénaliser ce qu'on n'a pas lu inventerait
+    /// un déficit), mais rien ne l'affichait, et une machine à peine lue annonçait avec assurance
+    /// « 100, en excellente santé ». Null = le scorer n'a rien rendu : c'est traité comme
+    /// incomplet, jamais comme « tout a été lu ».
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(VerdictText))]
     [NotifyPropertyChangedFor(nameof(CoverageText))]
     [NotifyPropertyChangedFor(nameof(IsCoverageComplete))]
-    // 17/09/2026 : sans cette ligne, « lecture impossible » calculé avant la couverture restait à l'écran.
+    // Sans cette ligne, « lecture impossible » calculé avant la couverture restait à l'écran.
     [NotifyPropertyChangedFor(nameof(RegisterText))]
     private ScanCoverage? _coverage;
 
@@ -457,7 +453,6 @@ public sealed partial class ScanViewModel : ObservableObject
     private string? _gatingNote;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LabelResultHeadlineLead))]
     private string? _degradedNote;
 
     [ObservableProperty]
@@ -469,11 +464,11 @@ public sealed partial class ScanViewModel : ObservableObject
     [ObservableProperty]
     private string _marginDisplay = Dash;
 
-    // Derived narrative — set during scan, all already localized.
+    // Récit dérivé : rempli pendant le scan, déjà traduit.
     [ObservableProperty]
     private string _subtitleText = string.Empty;
 
-    // 03/10/2026 (D10.1, revue n° 4) : l'en-tête « À faire d'abord » reprend ce compte ; calculé une seule fois, avant
+    // L'en-tête « À faire d'abord » reprend ce compte ; calculé une seule fois, avant
     // que la santé soit chargée, il affichait « les 1 points » sous « 13 points à corriger ». Il suit maintenant le résumé.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LabelAFaire))]
@@ -486,98 +481,90 @@ public sealed partial class ScanViewModel : ObservableObject
     public bool CanScan => State != ScanState.Scanning;
 
     /// <summary>Optimiser est offert des qu'un scan a produit des resultats (Done / AlreadyOptimal /
-    /// Degraded). L8 b : il juge d'abord ce qu'il y a a tenter, et le dit quand il n'y a rien.</summary>
+    /// Degraded). Il juge d'abord ce qu'il y a a tenter, et le dit quand il n'y a rien.</summary>
     public bool CanApply =>
         State is ScanState.Done or ScanState.AlreadyOptimal or ScanState.Degraded;
 
     /// <summary>Ce que l'infobulle du bouton « Appliquer » dit, selon qu'il peut agir ou non.
     /// <para>
-    /// 17/09/2026 — SIX commandes de l'application peuvent etre grisees et aucune
+    /// Six commandes de l'application peuvent etre grisees et aucune
     /// n'expliquait son inertie. Celle-ci est l'action principale du produit : grisee
     /// avant tout scan, elle laissait la personne devant un bouton mort, sans savoir
     /// s'il est casse ou s'il attend un geste d'elle.
     /// </para></summary>
-    // 10/10/2026 (le mainteneur : « au survol d'Optimiser, “lance d'abord un scan” alors que je viens de le faire ») : l'info-bulle
+    // L'info-bulle
     // n'était jamais recalculée après le scan. Elle suit l'état, et dit quand il n'y a rien à poser.
     public string ApplyHintKey => !CanApply ? "scan.apply.needs_scan" : RienAPoserDuTout ? "Apply.RienAPoserSeul" : "scan.apply.ready";
 
     /// <summary>Le texte deja traduit. `ScanView` ne declare pas le convertisseur `Loc`
-    /// (il n'existe que dans `DashboardView`) : lier une CLE ici aurait leve au rendu, et
+    /// (il n'est declare que dans `MainWindow.xaml`) : lier une cle ici aurait leve au rendu, et
     /// un test qui se contente de relire le XAML ne l'aurait jamais vu. Cette vue localise
     /// par ses proprietes, comme `LabelOptimize` juste a cote.</summary>
     public string ApplyHint => _localize(ApplyHintKey);
 
-    /// <summary>M6 — the dedicated GPU-tuning apply is opt-in/explicit: offered only once a
-    /// scan produced results AND the per-chip profile recommended an APPLICABLE GPU step for
-    /// this machine. An unsupported GPU (unknown / iGPU / laptop / handheld) → no GPU plan →
-    /// the action stays disabled (never silently applies an OC on scan).</summary>
+    /// <summary>L'application du réglage GPU est explicite, sur demande : proposée seulement quand
+    /// un scan a rendu des résultats et que le profil de la puce recommande une étape GPU applicable
+    /// à cette machine. Un GPU non pris en charge (inconnu, iGPU, portable, console portable) → pas
+    /// de plan GPU → l'action reste désactivée (jamais d'OC posé en silence au scan).</summary>
     public bool CanApplyGpuTuning => CanApply && _consumption is { HasGpuPlan: true };
 
-    /// <summary>True when the scanned machine has an applicable GPU-tuning recommendation
-    /// (drives the opt-in GPU action's visibility — UI binding pending).</summary>
+    /// <summary>Vrai quand la machine scannée a une recommandation de réglage GPU applicable
+    /// (pilote la visibilité de l'action GPU sur demande ; binding de l'UI à venir).</summary>
     public bool HasGpuTuningRecommendation => _consumption is { HasGpuPlan: true };
 
-    /// <summary>cahier §16 — false when the recommended GPU-tuning lines are not yet
-    /// hardware-validated (Tested=false): the UI marks the opt-in GPU action "non vérifié".</summary>
+    /// <summary>Faux quand les lignes de réglage GPU recommandées ne sont pas encore validées
+    /// sur du vrai matériel (Tested=false) : l'UI marque l'action GPU « non vérifié ».</summary>
     public bool GpuTuningVerified =>
         _consumption is { HasGpuPlan: true } c
         && c.Items.Where(i => c.GpuPlan.TweakIds.Contains(i.TweakId)).All(i => i.IsVerified);
 
     /// <summary>
-    /// Le verdict en une expression — trois ETATS, fonction de deux ENTIERS, jamais d'une somme.
+    /// Le verdict en une expression : trois états, fonction de deux entiers, jamais d'une somme.
     ///
-    /// Mesure du 05/09/2026 : ce verdict derivait du score /100. Doubler toutes les penalites
-    /// du grand livre — sans changer un seul levier, un seul etat, un seul constat — faisait
-    /// passer la ligne que le client lit de « UI.Verdict.Good » a « UI.Verdict.Fair ». Le score
-    /// avait ete retire de la vitrine le 02/09 ; il continuait de decider ce que le client lisait.
-    /// Le retirer d'ici est ce qui rend le test d'invariance vert.
+    /// Il ne dépend d'aucune somme de pénalités : doubler toutes les pénalités du registre sans changer un levier ne
+    /// change pas ce que le client lit (test d'invariance).
     ///
     /// Les trois etats, dans l'ordre de priorite :
     ///   K > 0            -> la lecture est incomplete. Aucun verdict de sante n'est permis :
     ///                       ce qu'on n'a pas lu peut etre exactement le probleme.
     ///   K = 0 et N = 0   -> rien a corriger dans ce qui a ete lu. La nuance est la promesse.
     ///   K = 0 et N > 0   -> N reglages a corriger. Aucun plancher : douze mauvais leviers
-    ///                       affichent douze, ce que le /100 (plancher 47) ne pouvait pas dire.
+    ///                       affichent douze.
     /// </summary>
     public string VerdictText =>
-        !IsCoverageComplete ? _localize("UI.Verdict.Partial")
+        !IsCoverageComplete || _santeNonLue ? _localize("UI.Verdict.Partial")
         : ProvenProblemCount == 0 && !SanteACorriger ? _localize("UI.Verdict.Clean")
-        // 25/09/2026 : vu sur la photo, « réglages à corriger » au-dessus de « 0 leviers mal réglés » : les
+        // Vu sur la photo, « réglages à corriger » au-dessus de « 0 leviers mal réglés » : les
         // points venaient de la santé (mises à jour, incidents, failles), pas des réglages. Le titre le dit.
         : ProvenProblemCount == 0 ? _localize("UI.Verdict.SanteACorriger")
         : _localize("UI.Verdict.Problems");
 
     /// <summary>
-    /// 17/09/2026 (D22) : l'audit de santé a trouvé au moins un état suspect ou nuisible. Le titre et
+    /// L'audit de santé a trouvé au moins un état suspect ou nuisible. Le titre et
     /// le résumé ne regardaient que le scanner : « rien à corriger » s'affichait au-dessus de
     /// « Windows et stabilité : à corriger ». Un état seulement à surveiller (information) ne compte pas.
     /// </summary>
     private bool SanteACorriger => RepairFindings.Any(r => r.Severity > Severity.Info);
 
-    /// <summary>True only when every applicable lever was read. Absent coverage counts as false.</summary>
+    /// <summary>Vrai seulement si chaque levier applicable a été lu. Une couverture absente compte comme faux.</summary>
     public bool IsCoverageComplete => Coverage is { UnknownLevers: 0, ApplicableLevers: > 0 };
 
-    /// <summary>"known/applicable" — the read count behind the score. Em dash when unavailable.</summary>
+    /// <summary>« lus/applicables » : le compte de lecture derrière le score. Un tiret cadratin quand il manque.</summary>
     public string CoverageText => Coverage is { } c
         ? $"{c.KnownLevers}/{c.ApplicableLevers}"
         : "—";
 
-    // ═══ LE REGISTRE — ce qui remplace le score /100 (D2, lot L1, gate G3) ═══════════════════
+    // ═══ Le registre ═════════════════════════════════════════════════════════════════════════════
     //
-    // Pourquoi le score partait : ses six leviers portent des magnitudes qui sont, c'est ecrit
-    // dans le code, des « estimations d'expert calibrees ». Penalite maximale 53, donc
-    // **plancher mathematique a 47/100** : le chiffre ne pouvait litteralement pas dire « cette
-    // machine est mal reglee ». Et il contredisait la liste de mythes du produit, qui refuse
-    // tout levier non mesurable.
-    //
-    // Ce qui le remplace ne promet rien et ne note rien : il compte. « 3 problemes prouves ·
-    // 12 leviers lus sur 14 ». Les deux nombres sont des faits de lecture, pas des jugements.
+    // Il ne promet rien et ne note rien : il compte. « 3 problèmes prouvés · 12 leviers lus sur 14 ». Les deux nombres
+    // sont des faits de lecture, pas des jugements ; aucune note sur 100 (ses magnitudes sont des estimations d'expert,
+    // et son plancher l'empêchait de dire « cette machine est mal réglée »).
 
     /// <summary>
-    /// Le nombre de problemes de configuration CONSTATES — les leviers lus et trouves
+    /// Le nombre de problemes de configuration constates : les leviers lus et trouves
     /// sous-optimaux, comptes dans le grand livre.
     ///
-    /// « Prouve » porte sur l'EXISTENCE du probleme, jamais sur son ampleur : on a lu que XMP est
+    /// « Prouve » porte sur l'existence du probleme, jamais sur son ampleur : on a lu que XMP est
     /// desactive, c'est un fait ; combien d'images ca coute reste une estimation, et c'est
     /// precisement pour ca qu'aucun chiffre de gain n'entre dans ce compteur.
     ///
@@ -588,7 +575,7 @@ public sealed partial class ScanViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RegisterText))]
     [NotifyPropertyChangedFor(nameof(HasProvenProblems))]
-    // Le verdict depend desormais du compte, plus du score : sans cette ligne il resterait fige
+    // Le verdict dépend du compte : sans cette ligne il resterait figé
     // sur l'ecran apres un second scan.
     [NotifyPropertyChangedFor(nameof(VerdictText))]
     private int _provenProblemCount;
@@ -609,7 +596,7 @@ public sealed partial class ScanViewModel : ObservableObject
         {
             var problems = string.Format(
                 CultureInfo.CurrentCulture,
-                // 03/10/2026 (D8.4, revue n° 3) : « 0 à changer » sous « 13 points à corriger » se lisait comme un
+                // « 0 à changer » sous « 13 points à corriger » passerait pour un
                 // démenti ; à zéro, la phrase le dit en mots, et la ligne précise qu'elle parle de ce que DrDXT pose lui-même.
                 _localize(ProvenProblemCount == 0 ? "UI.Register.None" : ProvenProblemCount == 1 ? "UI.Register.Problem" : "UI.Register.Problems"),
                 ProvenProblemCount);
@@ -621,7 +608,7 @@ public sealed partial class ScanViewModel : ObservableObject
             if (Coverage is not { } c)
                 return _localize("UI.Register.NoCoverage");
 
-            // 17/09/2026 : tout a été lu et rien du catalogue ne s'applique à cette machine. Ce n'est
+            // Tout a été lu et rien du catalogue ne s'applique à cette machine. Ce n'est
             // pas « lecture impossible » : c'est une lecture complète au résultat vide.
             if (c.ApplicableLevers == 0)
                 return _localize("UI.Register.NothingApplies");
@@ -630,20 +617,20 @@ public sealed partial class ScanViewModel : ObservableObject
                 CultureInfo.CurrentCulture,
                 _localize("UI.Register.LeversRead"), c.KnownLevers, c.ApplicableLevers);
 
-            // 29/09/2026, quatrième critique : d'abord de quoi on parle (les réglages que DrDXT sait poser), puis
+            // D'abord de quoi on parle (les réglages que DrDXT sait poser), puis
             // combien sont à changer ; lu dans l'autre sens, il contredisait « 12 points à corriger » au-dessus.
             return $"{read}, {problems}";
         }
     }
 
-    // UI label properties — bound via localize so zero hardcoded strings in XAML.
+    // Libellés de l'UI : liés via la traduction, pour qu'aucune chaîne ne soit écrite en dur dans le XAML.
     public string LabelHeaderTagline => _localize("UI.Header.Tagline");
     public string LabelAppName => _localize("UI.App.Name");
-    // ── 11/09/2026 — ce qui tournait a cote, et la marge ──────────────────────────────────────
+    // ── Ce qui tournait a cote, et la marge ──────────────────────────────────────
     //
     // Un scan a affiche « 164 FPS » pendant qu'on regardait l'ecran de DrDXT, le jeu en
     // arriere-plan. Le meme soir, en partie reelle avec nos compilations sur son processeur : 79,5.
-    // Un FPS moyen seul est trompeur. L'ecran montre donc, a cote du chiffre, sa MARGE D'ERREUR (que
+    // Un FPS moyen seul est trompeur. L'ecran montre donc, a cote du chiffre, sa marge d'erreur (que
     // BenchmarkResult calcule deja) et la liste courte de ce qui consommait en meme temps.
 
     /// <summary>Ce qui tournait a cote du jeu pendant la mesure, une ligne lisible par voisin. Liste
@@ -664,19 +651,19 @@ public sealed partial class ScanViewModel : ObservableObject
     public string LabelConsigneScene => _localize("Scan.Scene.Consigne");
 
     /// <summary>Le FPS moyen avec sa marge, dans le meme champ : « 148 ± 3,2 ». Jamais un chiffre
-    /// seul — c'est la demande produit, et c'est la seule forme honnete d'une mesure.</summary>
+    /// seul : c'est la demande produit, et c'est la seule forme honnete d'une mesure.</summary>
     [ObservableProperty]
     private string _avgFpsAvecMarge = Dash;
 
-    /// <summary>27/09/2026 : le 1 % low s'affichait seul, alors qu'il varie plus d'une passe à l'autre que la
-    /// moyenne et qu'il a sa propre marge depuis le 26/09 (`P1LowMarginOfError`). Même règle que le FPS moyen.</summary>
+    /// <summary>Le 1 % low avec sa marge (`P1LowMarginOfError`) : il varie plus d'une passe à l'autre que la
+    /// moyenne, un chiffre seul tromperait. Même règle que le FPS moyen.</summary>
     [ObservableProperty]
     private string _p1LowAvecMarge = Dash;
 
     private void PeuplerLesVoisins(IReadOnlyList<DrDxt.App.Platform.VoisinDuJeu>? vus)
     {
         VoisinsDuJeu.Clear();
-        // 03/10/2026 (D8.6, revue n° 3) : « pas pu lire » a sa propre phrase, au lieu d'une parenthèse sous « rien vu ».
+        // « pas pu lire » a sa propre phrase, au lieu d'une parenthèse sous « rien vu ».
         if (vus is null)
         {
             VoisinsConnus = false;
@@ -691,7 +678,7 @@ public sealed partial class ScanViewModel : ObservableObject
                     v.ProcesseurPourcent));
 
         VoisinsConnus = VoisinsDuJeu.Count > 0;
-        // 17/09/2026 : sans jeu lu, la liste ne dit pas « à côté du jeu ».
+        // Sans jeu lu, la liste ne dit pas « à côté du jeu ».
         var avecJeu = _gamePid != 0;
         VoisinsResume = VoisinsConnus
             ? _localize(avecJeu ? "Scan.Voisins.Header" : "Scan.Voisins.HeaderSansJeu")
@@ -705,13 +692,13 @@ public sealed partial class ScanViewModel : ObservableObject
     public string LabelFindings => _localize("Scan.Findings.Header");
     public string LabelRecommendationsHeader => _localize("Scan.Recommendations.Header");
 
-    /// <summary>16/09/2026 : zero levier recommande se DIT, au lieu d'un compteur a 0 et d'une liste vide.</summary>
+    /// <summary>Zero levier recommande se dit, au lieu d'un compteur a 0 et d'une liste vide.</summary>
     public bool AucuneRecommandation => Recommendations.Count == 0;
     private void NotifierAucuneRecommandation(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         => OnPropertyChanged(nameof(AucuneRecommandation));
     public string LabelAucuneRecommandation => _localize("Scan.Recommendations.None");
     public string LabelScanning => _localize("Scan.State.Scanning");
-    // Idle headline + hero copy.
+    // Titre et texte du bandeau principal, à l'attente.
     public string LabelIdleHeadlineLead => _localize("UI.Idle.HeadlineLead");
     public string LabelIdleHeadlineAccent => _localize("UI.Idle.HeadlineAccent");
     public string LabelProductPromise => _localize("Product.Promise");
@@ -720,33 +707,28 @@ public sealed partial class ScanViewModel : ObservableObject
     public string LabelTrustLocal => _localize("UI.Trust.Local");
     public string LabelTrustData => _localize("UI.Trust.Data");
 
-    // Results headline ("Votre PC est <verdict>."). When the in-game perf was not measured
-    // (degraded — no game running), the lead scopes the verdict to config ("Côté config, votre
-    // PC est …") so the green "en bonne santé" never overclaims a measured in-game result — same
-    // honesty rule as the config-only sub-scores. The subtitle then sells the unmeasured gap.
-    public string LabelResultHeadlineLead =>
-        _localize(DegradedNote is not null ? "UI.Result.HeadlineLeadConfig" : "UI.Result.HeadlineLead");
     public string LabelScanDone => _localize("UI.Result.ScanDone");
 
-    // Hero — results side.
+    // Bandeau principal, côté résultats.
     public string LabelCoverageCaption => _localize("UI.Coverage.Caption");
-    /// <summary>Sous-titre du registre — dit ce que les deux nombres SONT : des lectures.</summary>
+    /// <summary>Sous-titre du registre : dit ce que les deux nombres sont, des lectures.</summary>
     public string LabelRegisterCaption => _localize("UI.Register.Caption");
     public string LabelOptimize => _localize("UI.Cta.Optimize");
     public string LabelRapportDescription => _localize("Rapport.Description");
     public string LabelEssaiExplication => _localize("Essai.Explication");
     public string LabelRescan => _localize("UI.Cta.Rescan");
 
-    // Assistant panel.
+    // Panneau d'aide.
     public string LabelAssistantTitle => _localize("UI.Assistant.Title");
     public string LabelAssistantOnline => _localize("UI.Assistant.Online");
     public string LabelAssistantIdleLead => _localize("UI.Assistant.IdleLead");
     public string LabelAssistantWillExamine => _localize("UI.Assistant.WillExamine");
     public string LabelViewReport => _localize("UI.Assistant.ViewReport");
 
-    // Footer.
-    public string LabelFooterVersion => DashboardViewModel.FooterVersion(_localize);
-    // Phase 18 — ce que la verification de mise a jour a CONSTATE au demarrage. Tant qu'elle n'a pas
+    // Pied de page.
+    public string LabelFooterVersion => string.Format(System.Globalization.CultureInfo.InvariantCulture, _localize("UI.Footer.Version"),
+        typeof(ScanViewModel).Assembly.GetName().Version?.ToString(3) ?? "?");
+    // Ce que la verification de mise a jour a constate au demarrage. Tant qu'elle n'a pas
     // rendu : « jamais verifiees », jamais une coche.
     private string? _etatMisesAJour;
     public string LabelFooterUpdates => _etatMisesAJour ?? _localize("UI.Footer.Updates");
@@ -755,17 +737,17 @@ public sealed partial class ScanViewModel : ObservableObject
 
     public string LabelInstallUpdate => _localize("UI.Footer.Install");
 
-    /// <summary>Le bouton n'existe que pour une version App VERIFIEE dont on connait chemin,
+    /// <summary>Le bouton n'existe que pour une version App verifiee dont on connait chemin,
     /// empreinte et version.</summary>
     public bool CanInstallUpdate => _miseAJour?.Installable == true;
 
-    /// <summary>06/10/2026 (chantier B10) : la version signée et vérifiée qui attend le clic ; null sinon.</summary>
+    /// <summary>La version signée et vérifiée qui attend le clic ; null sinon.</summary>
     public string? VersionProposee => _miseAJour is { Installable: true } m ? m.Version : null;
 
     public void AfficherMiseAJour(DrDxt.App.Updates.ResultatMiseAJour resultat)
     {
         _miseAJour = resultat;
-        // B10 : une version vérifiée est nommée ; l'ancienne phrase disait « une nouvelle version » sans dire laquelle.
+        // Une version vérifiée est nommée : « une nouvelle version » ne dirait pas laquelle.
         _etatMisesAJour = VersionProposee is { } v
             ? string.Format(System.Globalization.CultureInfo.CurrentUICulture, _localize("UI.Footer.Updates.NewVersionNamed"), v)
             : _localize(DrDxt.App.Updates.VerificationMiseAJour.CleResx(resultat.Etat));
@@ -775,7 +757,7 @@ public sealed partial class ScanViewModel : ObservableObject
         InstallUpdateCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>Lance l'installeur signe verifie (empreinte RE-VERIFIEE avant lancement). L'UAC et la
+    /// <summary>Lance l'installeur signe verifie (empreinte reverifiee avant lancement). L'UAC et la
     /// fermeture de l'App appartiennent a l'installeur.</summary>
     [RelayCommand(CanExecute = nameof(CanInstallUpdate))]
     private void InstallUpdate()
@@ -784,7 +766,7 @@ public sealed partial class ScanViewModel : ObservableObject
         var lance = DrDxt.App.Updates.InstallationMiseAJour.Lancer(
             m.CheminInstalleur!, m.Sha256!, m.Version!, _lancerInstalleur);
         _etatMisesAJour = _localize(lance.IsOk ? "UI.Footer.Updates.InstallerLaunched" : "UI.Footer.Updates.InstallerRefused");
-        // Revue (F-33) : un installeur refusé (fichier changé depuis la vérification) n'est plus proposé.
+        // Un installeur refusé (fichier changé depuis la vérification) n'est plus proposé.
         if (!lance.IsOk)
         {
             _miseAJour = m with { Etat = DrDxt.App.Updates.EtatMiseAJour.Refusee };
@@ -799,14 +781,14 @@ public sealed partial class ScanViewModel : ObservableObject
     public ObservableCollection<ComponentItem> Components { get; } = new();
     public ObservableCollection<FeatureItem> Features { get; }
 
-    /// <summary>M6 — the per-chip profile's surfaced recommendations for the scanned
-    /// machine: each carries its honest GainEvidence (claim + source) and an
-    /// <see cref="ProfileRecommendationItem.IsVerified"/> flag. Filled on a successful
-    /// scan; a not-yet-validated (Tested=false) line is marked "non vérifié" (§16).</summary>
+    /// <summary>Les recommandations du profil de la puce pour la machine scannée : chacune porte
+    /// sa GainEvidence honnête (affirmation et source) et un drapeau
+    /// <see cref="ProfileRecommendationItem.IsVerified"/>. Rempli à chaque scan réussi ; une ligne
+    /// pas encore validée (Tested=false) est marquée « non vérifié ».</summary>
     public ObservableCollection<ProfileRecommendationItem> Recommendations { get; } = new();
 
     /// <summary>
-    /// 17/09/2026 — la carte de la machine : les mêmes constats, mesures et recommandations que les
+    /// La carte de la machine : les mêmes constats, mesures et recommandations que les
     /// listes ci-dessous, rangés par domaine (processeur, carte graphique, mémoire, latence, réseau,
     /// stockage, Windows, BIOS). Rien n'y est ajouté ; un domaine où rien n'a été lu le dit.
     /// </summary>
@@ -817,11 +799,10 @@ public sealed partial class ScanViewModel : ObservableObject
 
     public bool ADesDomaines => Domaines.Count > 0;
 
-    /// <summary>08/10/2026 (critique UI, défaut 6) : l'orbite montrait cinq composants sans état ni clic, et taisait trois
+    /// <summary>L'orbite montrait cinq composants sans état ni clic, et taisait trois
     /// domaines. Chaque satellite porte maintenant l'état de son domaine et l'ouvre ; les domaines sans composant
     /// (latence, réseau, BIOS) sont listés sous l'orbite. Les cinq tentacules de chrome restent : l'effet en dessine cinq.</summary>
-    /// <para>10/10/2026 (le mainteneur : « latence, réseau, BIOS ne sont pas sur le même design que le reste, l'araignée ; faut
-    /// que ce soit identique ») : les huit domaines sont huit satellites, chacun branché par sa tentacule. Plus de rangée de
+    /// <para>Les huit domaines sont huit satellites, chacun branché par sa tentacule. Plus de rangée de
     /// pastilles sous la bille.</para></summary>
     public static readonly string[] OrdreDesSatellites = ["Cpu", "Gpu", "Latency", "Ram", "Ssd", "Firmware", "Windows", "Network"];
 
@@ -841,7 +822,7 @@ public sealed partial class ScanViewModel : ObservableObject
 
     private void AnnoncerSatellites() { OnPropertyChanged(nameof(Satellites)); AnnoncerEtape(); }
 
-    /// <summary>08/10/2026 (défaut 10) : le mot d'état d'un interrupteur, dans le gabarit « Bascule ».</summary>
+    /// <summary>Le mot d'état d'un interrupteur, dans le gabarit « Bascule ».</summary>
     public string LabelBasculeAllume => _localize("Bascule.Allume");
     public string LabelBasculeEteint => _localize("Bascule.Eteint");
 
@@ -859,12 +840,12 @@ public sealed partial class ScanViewModel : ObservableObject
         if (domaine is not null) DomaineSelectionne = domaine;
     }
 
-    /// <summary>29/09/2026 : sous le verdict, ce qui est à corriger, le plus grave d'abord ; un clic ouvre son domaine.</summary>
+    /// <summary>Sous le verdict, ce qui est à corriger, le plus grave d'abord ; un clic ouvre son domaine.</summary>
     public ObservableCollection<PointAFaire> PointsAFaire { get; } = new();
 
     public string LabelAFaire => EnTeteAFaire(_localize, CompteCommeLaCarte().ACorriger);
 
-    /// <summary>03/10/2026 (D8.4, revue n° 3) : le grand nombre de points à corriger ne disait pas où les trouver ; la
+    /// <summary>Le grand nombre de points à corriger ne dit pas où les trouver, et la
     /// liste n'en montre que les premiers. Son en-tête rappelle le total et où sont les autres.</summary>
     internal static string EnTeteAFaire(Func<string, string> localiser, int total) => total switch
     {
@@ -873,9 +854,10 @@ public sealed partial class ScanViewModel : ObservableObject
         _ => string.Format(CultureInfo.CurrentCulture, localiser("Carte.AFaire.Total"), total),
     };
     public string LabelPourquoi => _localize("Carte.Pourquoi");
+    public string LabelCommentCorriger => _localize("Carte.CommentCorriger");
     public string LabelCopierCommande => _localize("Carte.CopierCommande");
 
-    /// <summary>29/09/2026 (B21) : le presse-papiers de Windows ; une couture pour les tests.</summary>
+    /// <summary>Le presse-papiers de Windows ; une couture pour les tests.</summary>
     internal Action<string> VersPressePapiers { get; set; } = texte => System.Windows.Clipboard.SetText(texte);
 
     [CommunityToolkit.Mvvm.Input.RelayCommand]
@@ -891,14 +873,19 @@ public sealed partial class ScanViewModel : ObservableObject
     internal static string TitreDuConstat(RepairFindingViewModel r, Func<string, string> localiser)
         => string.Equals(r.DomaineCle, "persistance", StringComparison.OrdinalIgnoreCase) && TweakDisplayKeys.TitleKey(r.NomCle) is var cle && cle != r.NomCle ? localiser(cle) : r.Nom;
 
-    // UI1 (08/10/2026, vu sur capture) : la liste « Mesuré » prend le même titre et le même accord que les constats.
+    // La liste « Mesuré » prend le même titre et le même accord que les constats.
     internal static string LigneVerifiee(RepairFinding v) =>
         !string.IsNullOrWhiteSpace(v.ValeurCourante)
-            ? $"{RepairFindingViewModel.TitreAffiche(v)} : {RepairFindingViewModel.ValeurAffichee(v)}"
+            ? $"{RepairFindingViewModel.TitreAffiche(v)}{Docteur.DeuxPoints}{RepairFindingViewModel.ValeurAffichee(v)}"
             : RepairFindingViewModel.TitreAffiche(v);
 
-    internal static string MentionDePreuve(bool profilTeste, bool verifieIci, Func<string, string> localiser)
-        => profilTeste ? string.Empty : verifieIci ? localiser("Levier.VerifieIci") : localiser("Carte.Propose.NonValide");
+    /// <summary>D'où vient la preuve d'un réglage proposé : ce PC d'abord, puis un rapport archivé sur une carte de la
+    /// même famille, sinon « pas encore prouvé ».</summary>
+    internal static string MentionDePreuve(bool profilTeste, bool verifieIci, bool familleValidee, Func<string, string> localiser)
+        => profilTeste ? string.Empty
+         : verifieIci ? localiser("Levier.VerifieIci")
+         : familleValidee ? localiser("Levier.VerifieFamille")
+         : localiser("Carte.Propose.NonValide");
 
     private static string Majuscule(string phrase) =>
         phrase.Length == 0 ? phrase : char.ToUpper(phrase[0], CultureInfo.CurrentCulture) + phrase[1..];
@@ -914,12 +901,13 @@ public sealed partial class ScanViewModel : ObservableObject
                 titre, suite, string.Empty, string.Empty, NonLu: false, Cle: f.Cle));
         }
 
-        // UI1 (08/10/2026, vu sur capture) : un réglage défait depuis portait son identifiant (« Latency.vrrFlipModelOn »)
+        // Un réglage défait depuis portait son identifiant (« Latency.vrrFlipModelOn »)
         // pour titre ; il porte le nom que DrDXT lui donne partout ailleurs.
         foreach (var r in RepairFindings)
             entrees.Add(new EntreeCarte(CarteDeLaMachine.DomaineDeLAudit(r.DomaineCle, r.NomCle), r.Severity,
                 TitreDuConstat(r, _localize),
-                Majuscule(r.Explication), r.ValeurCourante, r.ActionLabel, NonLu: false));
+                Majuscule(r.Explication), r.ValeurCourante, r.ActionLabel, NonLu: false, RemedeDuConstat: r.Remede,
+                Gestes: GestesDuConstat(r)));
 
         foreach (var r in RepairBlindSpots)
             entrees.Add(new EntreeCarte(CarteDeLaMachine.DomaineDeLAudit(r.DomaineCle, r.NomCle), r.Severity,
@@ -929,21 +917,27 @@ public sealed partial class ScanViewModel : ObservableObject
             entrees.Add(new EntreeCarte("bios", b.Severity, b.Title,
                 b.Rationale, b.GainLabel, b.ActionLabel, NonLu: false));
 
-        // 29/09/2026, photo (latence) : le titre en gras était tout l'argumentaire, sur trois lignes. Le titre est
-        // le nom du réglage, celui qu'annonce Optimiser ; l'argumentaire passe dessous. Un id sans nom garde l'ancien.
-        // Vu sur capture (08/10/2026, après ADM1) : un réglage que « Vérifier DrDXT » a posé, relu et rendu sur CE PC le dit,
+        // Le titre est le nom du réglage, celui qu'annonce Optimiser ; l'argumentaire passe dessous (en titre, il
+        // ferait trois lignes en gras). Un identifiant sans nom à l'écran garde l'argumentaire en titre.
+        // Un réglage que « Vérifier DrDXT » a posé, relu et rendu sur ce PC le dit,
         // au lieu de « pas encore prouvé sur ce matériel ». Le profil entier, lui, reste non testé (une seule preuve).
         var verifiesIci = _lastScan is { } scanVerifie ? LeviersVerifiesIci?.Invoke(scanVerifie.Hw) : null;
+        // La preuve doit venir de l'architecture d'une carte validée de ce PC : celle d'une autre architecture ne vaut pas ici.
+        var architecturesValidees = _lastScan is { } scanCarte
+            ? DrDxt.Application.Tweaks.Gpu.GpuTuningCoverage.For(scanCarte.Hw)
+                .Where(c => c.Support == DrDxt.Application.Tweaks.Gpu.GpuTuningSupport.Validated).Select(c => c.Architecture).ToList()
+            : [];
         foreach (var r in Recommendations)
             entrees.Add(new EntreeCarte(CarteDeLaMachine.DomaineDeLaRecommandation(r.Intent), Severity.Info,
                 TweakDisplayKeys.TitleKey(r.TweakId) is var cle && cle != r.TweakId ? _localize(cle) : r.Claim,
                 cle != r.TweakId ? $"{r.Claim} {r.Source}" : r.Source,
-                MentionDePreuve(r.IsVerified, verifiesIci?.Contains(r.TweakId) == true, _localize),
+                MentionDePreuve(r.IsVerified, verifiesIci?.Contains(r.TweakId) == true,
+                    architecturesValidees.Any(a => DrDxt.Application.Tweaks.Gpu.PreuvesArchivees.Prouve(a, r.TweakId)), _localize),
                 TraduireNote(r.AdjustmentNote, _localize), NonLu: false, Propose: true));
 
         var latence = new List<string>();
-        if (AvgFpsDisplay != Dash) latence.Add($"{LabelAvgFps} : {AvgFpsAvecMarge}");
-        if (P1LowDisplay != Dash) latence.Add($"{LabelP1Low} : {P1LowAvecMarge}");
+        if (AvgFpsDisplay != Dash) latence.Add($"{LabelAvgFps}{Docteur.DeuxPoints}{AvgFpsAvecMarge}");
+        if (P1LowDisplay != Dash) latence.Add($"{LabelP1Low}{Docteur.DeuxPoints}{P1LowAvecMarge}");
         // Les processus voisins ne sont pas une mesure du domaine : ils ont leur propre bloc.
         latence.AddRange(new[] { CadenceLabel, StutterLabel, PresentStallLabel, PerformanceDriftLabel }
             .Where(x => !string.IsNullOrWhiteSpace(x))!);
@@ -955,7 +949,7 @@ public sealed partial class ScanViewModel : ObservableObject
             ["memoire"] = new[] { MemoryMeasuredLabel ?? string.Empty },
             ["latence"] = latence,
             ["reseau"] = new[] { NetworkPathLabel ?? string.Empty },
-            // SEC3 (08/10/2026) : ce que le service a réaffirmé seul après que Windows l'a remis.
+            // Ce que le service a réaffirmé seul après que Windows l'a remis.
             ["windows"] = CarteDeLaMachine.LignesDuService(LireEtatDuService?.Invoke(), _localize),
             ["bios"] = CarteDeLaMachine.LignesBios(_reglagesBiosLus, _lastScan?.Hw.Memory.FirstOrDefault()?.ConfiguredMhz ?? 0)
                 .Concat(_lienPcie is { } lien ? [CarteDeLaMachine.LignePcie(lien)] : Array.Empty<string>()).ToList(),
@@ -970,9 +964,9 @@ public sealed partial class ScanViewModel : ObservableObject
 
         Domaines.Clear();
         // Une observation (« Observed ») n'est pas un état conforme : elle porte sa valeur, qui la
-        // distingue d'un constat du même nom (vu le 24/09 : un incident noyau isolé listé « conforme »
+        // distingue d'un constat du même nom (sinon un incident noyau isolé serait listé « conforme »
         // à côté du même incident répété, affiché à regarder).
-        // 25/09/2026 : rangés par famille d'audit, avec son libellé en sous-titre quand un domaine en
+        // Rangés par famille d'audit, avec son libellé en sous-titre quand un domaine en
         // mêle plusieurs ; ce qui peut faire planter la machine d'abord.
         var titres = new HashSet<string>();
         var verifies = (_derniereSante?.Verifies ?? [])
@@ -984,9 +978,8 @@ public sealed partial class ScanViewModel : ObservableObject
                     .ThenBy(f => RepairLibelles.Domaine(f.Key), StringComparer.CurrentCulture)
                     .ToList();
                 var lignes = new List<string>();
-                // Un sous-titre par ligne n'est que du bruit (vu sur photo, page Carte graphique :
-                // 3 sous-titres pour 3 états). Le rangement ne sert qu'une liste longue.
-                // Le seuil de 6 vient des photos du 25/09, pas d'une source.
+                // Un sous-titre par ligne n'est que du bruit (3 sous-titres pour 3 états).
+                // Le rangement ne sert qu'une liste longue. Le seuil de 6 est un choix d'affichage, pas une source.
                 var sousTitrer = familles.Count > 1 && g.Count() >= 6;
                 foreach (var f in familles)
                 {
@@ -1001,13 +994,16 @@ public sealed partial class ScanViewModel : ObservableObject
                 return (IReadOnlyList<string>)lignes;
             });
 
-        // 24/09/2026 : l'explication sourcée de chaque état lu, en info-bulle sur sa ligne.
+        // L'explication sourcée de chaque état lu, en info-bulle sur sa ligne.
+        // Un état lu qui porte ses étapes (le test mémoire jamais lancé) les garde ici : sans elles, elles n'apparaissaient nulle part.
         var explications = (_derniereSante?.Verifies ?? [])
-            .Where(v => !string.IsNullOrWhiteSpace(v.Explication))
+            .Where(v => !string.IsNullOrWhiteSpace(v.Explication) || !string.IsNullOrWhiteSpace(v.Remede))
             .GroupBy(LigneVerifiee)
-            .ToDictionary(g => g.Key, g => Majuscule(g.First().Explication!));
+            .ToDictionary(g => g.Key, g => Majuscule(g.First().Explication ?? "")
+                + (string.IsNullOrWhiteSpace(g.First().Remede) ? ""
+                    : $"{Environment.NewLine}{_localize("Carte.CommentCorriger")}{Docteur.DeuxPoints}{g.First().Remede}"));
 
-        // ROAD1 (08/10/2026) : ce que DrDXT fait sur chaque page, levier par levier, sur la machine lue.
+        // Ce que DrDXT fait sur chaque page, levier par levier, sur la machine lue.
         var leviersParPage = CatalogueDesLeviers?.Invoke() is { } catalogue && _lastScan is { } scanLu
             ? CarteDeLaMachine.LeviersParPage(DrDxt.Application.Tweaks.CouvertureDesLeviers.Calculer(catalogue, scanLu.Hw, scanLu.State,
                 LeviersPoses.Select(l => l.Id).ToHashSet(StringComparer.Ordinal), LeviersVerifiesIci?.Invoke(scanLu.Hw)), _localize)
@@ -1022,17 +1018,18 @@ public sealed partial class ScanViewModel : ObservableObject
         AnnoncerSatellites();
     }
 
-    /// <summary>cahier §16 — the localized "non vérifié" tag for a not-yet-validated
-    /// profile recommendation (an item whose <see cref="ProfileRecommendationItem.IsVerified"/>
-    /// is false). The view shows it next to those lines.</summary>
+    /// <summary>L'étiquette traduite « non vérifié » d'une recommandation de profil pas encore
+    /// validée (un élément dont <see cref="ProfileRecommendationItem.IsVerified"/> est faux).
+    /// La vue l'affiche à côté de ces lignes.</summary>
     public string LabelUnverified => _localize("UI.Profile.Unverified");
 
-    /// <summary>M3 — the BIOS Doctor's firmware findings for the scanned machine, surfaced in
-    /// the scan results. GUIDANCE-only (never in the apply batch — we never write the firmware),
-    /// ordered fix-misconfig-first: actionable GUIDE findings (highest severity first, so
-    /// XMP/EXPO off — the single biggest real gain — leads) ahead of informational/not-readable
-    /// ones. Filled on a successful scan; empty when the machine is well-tuned, the BIOS is
-    /// locked (laptop/handheld), or the advisor faults (best-effort, never breaks the scan).</summary>
+    /// <summary>Les constats firmware du docteur BIOS pour la machine scannée, affichés dans les
+    /// résultats. Uniquement du guidage (jamais dans le lot appliqué : on n'écrit jamais le
+    /// firmware), les erreurs de réglage d'abord : les constats à guider (sévérité la plus haute en
+    /// tête, donc XMP/EXPO coupé, le plus gros gain réel, passe premier) avant ceux d'information ou
+    /// illisibles. Rempli à chaque scan réussi ; vide si la machine est bien réglée, si le BIOS est
+    /// verrouillé (portable, console portable) ou si le conseiller tombe en panne (au mieux, sans
+    /// jamais casser le scan).</summary>
     public ObservableCollection<BiosFindingViewModel> BiosFindings { get; } = new();
 
 #if DEBUG
@@ -1040,36 +1037,36 @@ public sealed partial class ScanViewModel : ObservableObject
     internal static bool SimulerXmpOffPourLeBios;
 #endif
 
-    /// <summary>True when the scan surfaced at least one BIOS finding (drives the section's
-    /// visibility in ScanView.xaml).</summary>
+    /// <summary>Vrai quand le scan a rendu au moins un constat BIOS (pilote la visibilité de la
+    /// section dans ScanView.xaml).</summary>
     public bool HasBiosFindings => BiosFindings.Count > 0;
 
-    /// <summary>Localized header for the guidance-only BIOS findings section.</summary>
+    /// <summary>Titre traduit de la section des constats BIOS (guidage seul).</summary>
     public string LabelBiosHeader => _localize("Scan.Bios.Header");
 
-    /// <summary>M3 — the PERSONALIZED BIOS guide for the scanned machine: the "HOW" behind the
-    /// findings (the exact menu path → setting → value to set, plus the mandatory recovery
-    /// section and an HONEST confidence label — Verified only for the exact board, otherwise a
-    /// clearly-labelled best-known fallback). GUIDANCE-only text: never a write, never in the
-    /// apply batch. Built only when the generator produced at least one actionable step; null
-    /// when the machine is well-tuned, the guide is recovery-only, or the generator faults
-    /// (best-effort, never breaks the scan).</summary>
+    /// <summary>Le guide BIOS personnalisé de la machine scannée : le « comment » derrière les
+    /// constats (le chemin exact menu → réglage → valeur, plus la section de secours obligatoire et
+    /// une étiquette de confiance honnête : Verified seulement pour la carte exacte, sinon un repli
+    /// connu, clairement étiqueté). Du texte de guidage seul : jamais une écriture, jamais dans le
+    /// lot appliqué. Construit seulement si le générateur a produit au moins une étape à faire ;
+    /// null si la machine est bien réglée, si le guide n'a que le secours, ou si le générateur tombe
+    /// en panne (au mieux, sans jamais casser le scan).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasBiosGuide))]
     private BiosGuideViewModel? _biosGuide;
 
-    /// <summary>True when the scan produced an actionable BIOS guide (drives the section's
-    /// visibility in ScanView.xaml).</summary>
+    /// <summary>Vrai quand le scan a produit un guide BIOS à suivre (pilote la visibilité de la
+    /// section dans ScanView.xaml).</summary>
     public bool HasBiosGuide => BiosGuide is not null;
 
     /// <summary>Le verdict du retour de BIOS : « ton changement a-t-il pris ? », reglage par
-    /// reglage. Null quand rien n'etait en attente — c'est le cas de presque toutes les
+    /// reglage. Null quand rien n'etait en attente : c'est le cas de presque toutes les
     /// ouvertures de l'app, et une section vide ne doit pas s'afficher.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasBiosLoopResult))]
     private BiosLoopViewModel? _biosLoop;
 
-    // LM — la moitie memoire de la meme section : ce que la machine mesurait avant le voyage
+    // La moitie memoire de la meme section : ce que la machine mesurait avant le voyage
     // BIOS, ce qu'elle mesure apres, et si l'ecart est un resultat. null = rien a montrer.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasMemoryAb))]
@@ -1082,7 +1079,7 @@ public sealed partial class ScanViewModel : ObservableObject
 
     [ObservableProperty] private string? _erreurOubliBios;
 
-    /// <summary>26/09/2026 : renoncer a un changement qui n'a pas pris. Le marqueur est retire, la section
+    /// <summary>Renoncer a un changement qui n'a pas pris. Le marqueur est retire, la section
     /// disparait ; au prochain passage par le bouton du guide, un nouveau voyage repart de zero.</summary>
     [RelayCommand]
     private void OublierChangementBios()
@@ -1090,7 +1087,7 @@ public sealed partial class ScanViewModel : ObservableObject
         if (_firmwareTrip is null || BiosLoop is null) return;
         var r = _firmwareTrip.Oublier();
         if (r.IsOk) { ErreurOubliBios = null; BiosLoop = null; MemoryAb = null; }
-        else ErreurOubliBios = $"{_localize("Bios.Retour.OublierEchec")} : {r.Error?.Message}";
+        else ErreurOubliBios = $"{_localize("Bios.Retour.OublierEchec")}{Docteur.DeuxPoints}{r.Error?.Message}";
     }
 
     public bool HasMemoryAb => MemoryAb is not null;
@@ -1102,24 +1099,24 @@ public sealed partial class ScanViewModel : ObservableObject
     /// cablee : le bouton « emmene-moi dans le BIOS » ne s'affiche pas et aucun verdict n'est
     /// prononce.
     ///
-    /// Expose parce que le contraire est INVISIBLE. Une couture optionnelle non passee donne un
-    /// ScanViewModel parfaitement construit et parfaitement muet -- c'est la forme exacte du
-    /// defaut L0.2, ou tout etait enregistre et rien n'etait resolu. Un test de composition peut
+    /// Expose parce que le contraire est invisible. Une couture optionnelle non passee donne un
+    /// ScanViewModel parfaitement construit et parfaitement muet : c'est la forme exacte du
+    /// defaut ou tout etait enregistre et rien n'etait resolu. Un test de composition peut
     /// desormais le constater au lieu de lire le fichier de cablage.
     /// </summary>
     public bool CanProveBiosChanges => _firmwareTrip is not null;
 
-    // ── D7 / gate G6 — le rapport de diagnostic ─────────────────────────────────────────────
+    // ── Le rapport de diagnostic ─────────────────────────────────────────────
     //
     // « Jamais de debogage a l'aveugle par mail. » Sans ce bouton, le premier client difficile
     // consomme une semaine : une question a la fois, avec quelqu'un qui ne sait pas ou regarder.
     //
-    // Le bouton appelait `OnComingSoon` — la meme impasse que le bouton « debloquer ».
+    // Le bouton appelait `OnComingSoon`, la meme impasse que le bouton « debloquer ».
 
     private ScanResult? _lastScan;
 
     /// <summary>« Ce que ta memoire rend », relu dans le magasin (jamais remesure ici) ; null sans
-    /// reference, ou si elle date d'une autre configuration. La DATE voyage avec les chiffres : une
+    /// reference, ou si elle date d'une autre configuration. La date voyage avec les chiffres : une
     /// mesure enregistree se lit autrement qu'une mesure du jour.</summary>
     private string? LigneMemoire(IReadOnlyList<MemoryModule> modules)
     {
@@ -1131,8 +1128,8 @@ public sealed partial class ScanViewModel : ObservableObject
             reference.Measurement.BandwidthGBs, reference.Measurement.BandwidthSigmaPct,
             reference.Measurement.LatencyNs, reference.Measurement.LatencySigmaPct);
 
-        // 26/09/2026 : une référence prise avant le garde « jeu lancé » peut décrire le partage avec un jeu
-        // (celle du 16/09 : 12,7 Go/s au lieu de 33,4, capture de Warzone 1 min 40 plus tard).
+        // Une référence prise avant le garde « jeu lancé » peut décrire le partage avec un jeu
+        // (mesurée le 16/09 sur la machine de référence : 12,7 Go/s au lieu de 33,4, une capture de Warzone 1 min 40 plus tard).
         var mention = MentionPriseEnJeu("Scan.Memory.PriseEnJeu", reference.TakenUtc, reference.JeuFermeVerifie);
         _memoireSuspecte = mention.Length > 0;
         return ligne + mention;
@@ -1153,7 +1150,7 @@ public sealed partial class ScanViewModel : ObservableObject
             : "";
     }
 
-    /// <summary>Une capture de jeu à moins de cette durée de la référence appartient au même scan. **NON CHIFFRÉ**
+    /// <summary>Une capture de jeu à moins de cette durée de la référence appartient au même scan. Non chiffré
     /// au-delà des deux cas de la machine de référence : 1 min 40 (mémoire, 16/09) et 5 min (processeur, 11/09).
     /// Le soupçon ne vise que les références d'avant le garde : le prix d'un faux positif est une remesure.</summary>
     internal static readonly TimeSpan FenetreDuMemeScan = TimeSpan.FromMinutes(10);
@@ -1174,7 +1171,7 @@ public sealed partial class ScanViewModel : ObservableObject
     /// <summary>Vrai quand un rapport vient d'etre ecrit.</summary>
     public bool HasExportedReport => LastReportPath.Length > 0;
 
-    /// <summary>Vrai quand l'export est possible — sinon le bouton disparait au lieu de ne
+    /// <summary>Vrai quand l'export est possible ; sinon le bouton disparait au lieu de ne
     /// rien faire.</summary>
     public bool CanExportReport => _writeReport is not null;
 
@@ -1182,9 +1179,8 @@ public sealed partial class ScanViewModel : ObservableObject
     public string LabelReportFailed => _localize("Support.ReportFailed");
 
     /// <summary>
-    /// Ecrit le rapport et dit ou. L'empreinte machine y figure — c'est ce que le support demande
-    /// pour retrouver une licence — mais jamais la cle : ce fichier est fait pour etre colle dans
-    /// un salon public, et une cle qui s'y trouverait serait publiee par le client lui-meme.
+    /// Ecrit le rapport et dit ou. Ce fichier est fait pour etre colle dans un salon public : rien de ce qui
+    /// designe ce PC ou son joueur n'y reste.
     /// </summary>
     [RelayCommand]
     private async Task ExportReportAsync()
@@ -1194,23 +1190,25 @@ public sealed partial class ScanViewModel : ObservableObject
         try
         {
             var now = DateTimeOffset.Now;
-            // Ce fichier est fait pour être envoyé : il passe par le même anonymiseur que les autres
-            // sorties (chemin du profil, courriels, empreintes), même si aucune ligne n'en porte
-            // aujourd'hui. Une ligne ajoutée demain ne pourra pas y glisser le nom du joueur.
-            var text = new DrDxt.Infrastructure.Ops.TextScrubber().Scrub(
-                DrDxt.Application.Support.DiagnosticReport.Build(_lastScan, _appVersion, now, _derniereSante, _localize,
-                    processeur: _dernierDeficitCpu,
-                    reseau: NetworkPathLabel is { } ligne ? new DrDxt.Measurement.Network.LigneReseau(ligne) : null,
-                    memoire: MemoryMeasuredLabel is { } memoire ? new DrDxt.Measurement.Memory.LigneMemoireMesuree(memoire) : null,
-                    derive: PerformanceDriftLabel is { } derive ? new DrDxt.Measurement.LigneDerive(derive) : null));
+            // Ce fichier est fait pour être envoyé : il passe par l'anonymiseur de la machine exportée, celui de
+            // toutes les sorties publiques (profil, nom du PC, adresses, numéros de série, courriels).
+            // Le rapport se compose ici (il lit l'écran) ; la lecture WMI des valeurs de ce PC et l'anonymisation partent hors
+            // du fil de l'interface : une dizaine de requêtes WMI figeaient la fenêtre au clic.
+            var brut = DrDxt.Application.Support.DiagnosticReport.Build(_lastScan, _appVersion, now, _derniereSante, _localize,
+                processeur: _dernierDeficitCpu,
+                reseau: NetworkPathLabel is { } ligne ? new DrDxt.Measurement.Network.LigneReseau(ligne) : null,
+                memoire: MemoryMeasuredLabel is { } memoire ? new DrDxt.Measurement.Memory.LigneMemoireMesuree(memoire) : null,
+                derive: PerformanceDriftLabel is { } derive ? new DrDxt.Measurement.LigneDerive(derive) : null);
+            var text = await Task.Run(() => DrDxt.Detection.Repair.MachineExportee.AnonymiserTexte(brut,
+                DrDxt.Detection.Repair.MachineExportee.ValeursDeCePc()));
 
             LastReportPath = _writeReport(
                 DrDxt.Application.Support.DiagnosticReport.FileNameFor(now), text);
         }
         catch
         {
-            // Disque plein, droits refuses : on le DIT. Un bouton d'export qui ne fait rien
-            // visiblement est pire que pas de bouton -- le client croit avoir un fichier.
+            // Disque plein, droits refuses : on le dit. Un bouton d'export qui ne fait rien
+            // visiblement est pire que pas de bouton : le client croit avoir un fichier.
             LastReportPath = string.Empty;
             ApplyBlockedMessage = _localize("Support.ReportFailed");
         }
@@ -1230,7 +1228,7 @@ public sealed partial class ScanViewModel : ObservableObject
     public string LabelMachineExportWritten => _localize("Machine.ExportWritten");
 
     /// <summary>
-    /// 07/10/2026 (T1, kit testeur) : écrit ce que le scan a lu, anonymisé, dans un fichier que le joueur envoie lui-même.
+    /// Écrit ce que le scan a lu, anonymisé, dans un fichier que le joueur envoie lui-même.
     /// Rien ne part sur le réseau. Sans scan, ou si l'écriture échoue, on le dit : pas de chemin vers un fichier absent.
     /// </summary>
     [RelayCommand]
@@ -1240,7 +1238,7 @@ public sealed partial class ScanViewModel : ObservableObject
         LastMachineExportPath = string.Empty;
         try
         {
-            if (_materielLu is not { } hw || _reglagesLus is not { } st) throw new InvalidOperationException("aucun scan lu");
+            if (_materielLu is not { } hw || _reglagesLus is not { } st) throw new InvalidOperationException("no scan read");
             var sante = _constatsLus ?? [];
             var exporter = _exporterMachine;
             // Hors du thread UI : l'export relit les numéros de série par WMI pour les retirer.
@@ -1252,28 +1250,29 @@ public sealed partial class ScanViewModel : ObservableObject
         }
     }
 
-    /// <summary>Localized header for the personalized BIOS guide section.</summary>
+    /// <summary>Titre traduit de la section du guide BIOS personnalisé.</summary>
     /// <summary>
-    /// D4 / gate G7 — « la partie BIOS est OPTIONNELLE ».
+    /// « la partie BIOS est optionnelle ».
     ///
     /// Sans cette phrase, un joueur qui n'ose pas entrer dans son BIOS croit qu'il rate la moitie
     /// du produit, et un joueur qui ose mais s'y perd ouvre un ticket. Un dev solo qui vend a des
     /// joueurs un produit qui les envoie dans leur BIOS ne peut pas se permettre ni l'un ni
-    /// l'autre : le differenciateur mis en vitrine n'est pas le guide, c'est la PREUVE qu'un
+    /// l'autre : le differenciateur mis en vitrine n'est pas le guide, c'est la preuve qu'un
     /// changement a pris.
     /// </summary>
     public string LabelBiosOptional => _localize("Bios.Optional.Note");
 
     public string LabelBiosGuideHeader => _localize("Scan.Bios.Guide.Header");
 
-    /// <summary>Localized, reassuring header for the guide's mandatory recovery/safety ladder
-    /// ("if something goes wrong") — surfaced in a calm, non-alarming panel.</summary>
+    /// <summary>Titre traduit et rassurant de l'échelle de secours obligatoire du guide (« si
+    /// quelque chose tourne mal »), affiché dans un panneau calme, sans alarme.</summary>
     public string LabelBiosRecoveryHeader => _localize("Scan.Bios.Guide.RecoveryHeader");
 
     /// <summary>
-    /// Fills the idle "Le scan va examiner…" list. Shows localized labels immediately with "—"
-    /// placeholders, then detects hardware off the UI thread and fills real models when ready.
-    /// Safe to fire-and-forget from the view after the window is shown.
+    /// Remplit la liste d'attente « Le scan va examiner… ». Affiche tout de suite les libellés
+    /// traduits avec un tiret en attente, puis détecte le matériel hors du thread UI et met les
+    /// vrais modèles quand ils sont prêts. La vue peut l'appeler sans l'attendre, une fois la
+    /// fenêtre affichée.
     /// </summary>
     public async Task LoadIdleComponentsAsync()
     {
@@ -1287,10 +1286,10 @@ public sealed partial class ScanViewModel : ObservableObject
     [RelayCommand]
     private async Task ScanAsync()
     {
-        // 18/09/2026. Les sondes du scan parlent a WMI, au registre, a des pilotes et a des
-        // services : du code qui LEVE au lieu de refuser -- un service arrete, une cle
-        // absente, un pilote qui rend n'importe quoi. Sans cette garde, l'exception remontait
-        // jusqu'au filet fatal de App.xaml.cs et l'application se fermait AU MILIEU du scan,
+        // Les sondes du scan parlent a WMI, au registre, a des pilotes et a des
+        // services : du code qui leve au lieu de refuser (un service arrete, une cle
+        // absente, un pilote qui rend n'importe quoi). Sans cette garde, l'exception remonterait
+        // jusqu'au filet fatal de App.xaml.cs et l'application se fermerait au milieu du scan,
         // c'est-a-dire au seul moment ou la personne attend quelque chose de nous.
         //
         // Un refus propre (`Result.Fail`) garde son message precis ; ceci ne rattrape que
@@ -1303,24 +1302,24 @@ public sealed partial class ScanViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Trace.TraceError("Scan interrompu par une exception : {0}", ex);
+            System.Diagnostics.Trace.TraceError("Scan interrupted by an exception: {0}", ex);
             ErrorMessage = _localize("Scan.Error.Inattendu");
             State = ScanState.Failed;
         }
         finally
         {
             _etapeEnCours = 0;
-            // D6.1 : finie, la jauge reste pleine un instant ; interrompue, elle part tout de suite.
+            // Finie, la jauge reste pleine un instant ; interrompue, elle part tout de suite.
             if (State is ScanState.Failed) JaugeVisible = false;
             else _ = MasquerLaJaugeAsync(numero);
         }
     }
 
-    /// <summary>29/09/2026 (B1) : les pôles du réseau déjà lus par CE scan, un bit par composant, dans l'ordre de
+    /// <summary>Les pôles du réseau déjà lus par CE scan, un bit par composant, dans l'ordre de
     /// <see cref="Components"/> (processeur, carte, mémoire, stockage, Windows), le même que celui des pôles.</summary>
     [ObservableProperty] private int _polesLus;
 
-    /// <summary>03/10/2026 (D1.1) : l'analyse dure plus de 10 s ; un rond qui tourne sans fin fait croire à un plantage
+    /// <summary>L'analyse dure plus de 10 s ; un rond qui tourne sans fin fait croire à un plantage
     /// (NN/g, Progress Indicators). Elle avance par étapes nommées, dans l'ordre réel de <see cref="ScanCoeurAsync"/>.</summary>
     public const int EtapesDuScan = 8;
 
@@ -1330,11 +1329,11 @@ public sealed partial class ScanViewModel : ObservableObject
     /// <summary>« Étape k sur 8 · nom » : ce qui tourne en ce moment, écrit sous le rond.</summary>
     [ObservableProperty] private string? _labelEtapeDuScan;
 
-    /// <summary>03/10/2026 (D3.1) : la fin de l'étape en cours, un peu en deçà : la jauge peut y avancer seule pendant
+    /// <summary>La fin de l'étape en cours, un peu en deçà : la jauge peut y avancer seule pendant
     /// l'étape, jamais au-delà.</summary>
     [ObservableProperty] private double _plafondDuScan;
 
-    /// <summary>03/10/2026 (D6.1) : « la jauge pas même synchro que le scanner ». Les huit étapes ne durent pas pareil
+    /// <summary>« la jauge pas même synchro que le scanner ». Les huit étapes ne durent pas pareil
     /// (le réseau et le processeur prennent l'essentiel) ; chacune pèse son temps réel. Durées par défaut tirées d'une
     /// analyse réelle au repos de la machine de référence (03/10 : réseau et processeur 8,0 s, audit 3,2 s, réglages 2,7 s,
     /// le reste sous la seconde), remplacées par celles de la dernière analyse de cette machine.</summary>
@@ -1386,7 +1385,7 @@ public sealed partial class ScanViewModel : ObservableObject
     private void AllumerPole(params string[] cles)
     {
         var bits = PolesLus;
-        // 10/10/2026 : le bit d'un pôle est sa place sur le cercle des huit satellites.
+        // Le bit d'un pôle est sa place sur le cercle des huit satellites.
         foreach (var cle in cles)
             if (Array.IndexOf(OrdreDesSatellites, cle) is var i and >= 0) bits |= 1 << i;
         PolesLus = bits;
@@ -1415,7 +1414,7 @@ public sealed partial class ScanViewModel : ObservableObject
         var hw = hwResult.Value!;
         _materielLu = hw;
         PopulateComponents(hw);
-        // 03/10/2026 (tour G) : la version du pilote graphique, demandée au fabricant pendant le reste de l'analyse.
+        // La version du pilote graphique, demandée au fabricant pendant le reste de l'analyse.
         _verificationPilote = _verifierPilote is { } verifier ? verifier(hw.Gpus) : null;
 
         Etape(2, "Scan.Etape.Reglages");
@@ -1429,19 +1428,25 @@ public sealed partial class ScanViewModel : ObservableObject
 
         var st = stResult.Value!;
 
-        // 24/09/2026 — le BIOS LU remplace l'inference quand il est lisible et que Windows ne le
+        // Le BIOS LU remplace l'inference quand il est lisible et que Windows ne le
         // contredit pas. Sinon `st` reste tel quel : l'inference, avec ses reserves.
         if (_biosNvram is not null)
             st = DrDxt.Bios.NvramBiosSettingsReader.Appliquer(
                 st, await _biosNvram.ReadAsync(hw.Board.Product, hw.Bios.Version));
         _reglagesBiosLus = st.BiosLu;
         _reglagesLus = st;
+        try { RetirerLeviersVolatilsRendus(); }
+        catch (Exception) { /* un journal non nettoyé ne fait pas échouer le scan */ }
+        // Le docteur n'a pas de helper pour lire le BIOS ; il relit ce que le scan vient d'en lire. Réécrit à
+        // Chaque scan, vide quand rien n'est lu : un relevé d'avant une mise à jour du BIOS ne survit pas.
+        FichierBiosLu?.WriteAtomic(System.Text.Json.JsonSerializer.Serialize(
+            new DrDxt.Detection.Cpu.ChaleurEnPartie.BiosLu(Horloge(), st.BiosLu ?? [])));
 
         // L'ordre des etapes ci-dessous est une contrainte, pas un hasard, et il a ete paye.
         // Le verdict de retour BIOS lit la reference d'avant le voyage. Le rafraichissement, lui,
-        // juge une reference caduque des que la frequence a change -- ce qui est exactement ce
-        // qu'un passage XMP off -> on provoque -- et la remplace. Rafraichir d'abord effacait donc
-        // la reference d'avant, et l'A/B comparait l'apres a l'apres : « aucune difference
+        // juge une reference caduque des que la frequence a change (ce qui est exactement ce
+        // qu'un passage XMP off -> on provoque) et la remplace. Rafraichir d'abord effacerait donc
+        // la reference d'avant, et l'A/B comparerait l'apres a l'apres : « aucune difference
         // mesurable » annonce sur un vrai +79 %. Le verdict passe devant, et consomme la reference
         // avant que quoi que ce soit la remplace.
         // Verrouille par ScanMeasuresMemoryTests.La_reference_d_AVANT_le_BIOS_survit_au_scan_qui_la_relit.
@@ -1453,8 +1458,8 @@ public sealed partial class ScanViewModel : ObservableObject
         // le produit vient lui-meme de fabriquer.
         Etape(4, "Scan.Etape.ReseauProcesseur");
         await MesurerReseauEtProcesseurAsync();
-        // Revue du 04/10 (P2) : hors du bloc processeur, une panne du banc ne saute plus le relevé.
-        try { ReleverReglagesSuivis(EtatsSuivis(_reglagesLus, _materielLu, LireInstantReplay?.Invoke()), Horloge()); }
+        // Hors du bloc processeur, une panne du banc ne saute plus le relevé.
+        try { ReleverReglagesSuivis(EtatsSuivis(_reglagesLus, _materielLu, LireInstantReplay?.Invoke(), _reglagesBiosLus), Horloge()); }
         catch (Exception) { /* un suivi raté ne fait pas échouer le scan */ }
         AllumerPole("Cpu");
 
@@ -1487,10 +1492,10 @@ public sealed partial class ScanViewModel : ObservableObject
         // Le goulot mesure entre dans `st` ici, et ce `st`-la sert aussi au conseiller BIOS, plus bas.
         st = PeuplerLesRecommandations(hw, st, baseline, scanResult);
 
-        // M3 — surface the BIOS Doctor's firmware findings (XMP/EXPO off is the single biggest
-        // real gain and lives in the BIOS, not in any software tweak). GUIDANCE-only: never
-        // added to the apply batch — the user changes them in the BIOS themselves. Then build
-        // the personalized guide (the exact "HOW") from the same raw findings.
+        // Affiche les constats firmware du docteur BIOS (XMP/EXPO coupé est le plus gros gain réel,
+        // et il vit dans le BIOS, pas dans un levier logiciel). Guidage seul : jamais ajouté au lot
+        // appliqué, le joueur les change lui-même dans le BIOS. Puis construit le guide personnalisé
+        // (le « comment » exact) à partir des mêmes constats bruts.
 #if DEBUG
         var biosFindings = PopulateBiosFindings(hw, SimulerXmpOffPourLeBios ? st with { XmpExpo = TriState.Off } : st);
 #else
@@ -1498,7 +1503,7 @@ public sealed partial class ScanViewModel : ObservableObject
 #endif
         PopulateBiosGuide(hw, biosFindings, st);
 
-        // L'audit de sante — pure lecture (registre, journal d'evenements, bcdedit, WMI). Il vit
+        // L'audit de sante, pure lecture (registre, journal d'evenements, bcdedit, WMI). Il vit
         // ici et pas dans le banc de mesure parce que la frontiere est le cout : ces familles ne
         // demandent qu'une lecture, la memoire et le reseau exigent une mesure qui dure.
         Etape(8, "Scan.Etape.Audit");
@@ -1560,12 +1565,12 @@ public sealed partial class ScanViewModel : ObservableObject
     // Le reseau, puis le processeur : une panne de l'un ou de l'autre ne fait jamais echouer le scan.
     private async Task MesurerReseauEtProcesseurAsync()
     {
-        // NS-9 — D'OU vient l'instabilite du reseau.
+        // D'ou vient l'instabilite du reseau.
         //
         // Ce bloc doit rester avant le banc CPU, juste en dessous. Le banc sature tous les
         // cœurs rapides pendant plus de quarante secondes : mesurer la gigue ICMP apres lui, ce
         // serait attribuer au reseau une instabilite que le produit vient lui-meme de fabriquer.
-        // Meme garde que partout ailleurs — une panne de ce cote ne fait pas echouer le scan.
+        // Meme garde que partout ailleurs : une panne de ce cote ne fait pas echouer le scan.
         if (_attributionReseau is not null)
         {
             try
@@ -1583,16 +1588,16 @@ public sealed partial class ScanViewModel : ObservableObject
             try
             {
                 // Hors du thread UI : la premiere mesure charge tous les cœurs rapides pendant plus
-                // de quarante secondes. Meme motif que le compte de canaux memoire, et meme garde —
-                // une panne de ce cote ne doit jamais faire echouer le SCAN.
+                // de quarante secondes. Meme motif que le compte de canaux memoire, et meme garde :
+                // une panne de ce cote ne doit jamais faire echouer le scan.
                 var jeuEnCours = _gameLocator.JeuOuvert();
-                // 29/09/2026 (A2) : le réglage de puissance lu voyage avec la mesure ; changé depuis, on remesure.
+                // Le réglage de puissance lu voyage avec la mesure ; changé depuis, on remesure.
                 var reglage = ReglageDePuissanceLu(_reglagesBiosLus);
                 var refAvant = _cpuBaseline.Reference(_machineId());
                 var deficit = await Task.Run(() => _cpuBaseline.DeficitPourScan(_machineId(), jeuEnCours, reglage));
                 NoterChangementBios(refAvant?.ReglageBios, _cpuBaseline.Reference(_machineId())?.ReglageBios, refAvant?.TakenUtc);
 
-                // 26/09/2026 : la référence processeur de la machine de référence (11/09 17:46, ±7,4 %) précède de
+                // La référence processeur de la machine de référence (11/09 17:46, ±7,4 %) précède de
                 // cinq minutes une capture de Warzone : prise pendant la partie, comme celle de la mémoire. La
                 // réserve voyage avec le verdict : le rapport envoyé au support la porte comme l'écran.
                 if (deficit?.Reference is { } prise)
@@ -1609,9 +1614,9 @@ public sealed partial class ScanViewModel : ObservableObject
         }
     }
 
-    // LM — la mesure memoire. Sans elle, MemoryBench serait un instrument que le produit n'appelle
-    // jamais. Elle ne tourne qu'au premier scan (decision produit) -- le service relit ensuite la
-    // reference enregistree -- et sur un fil de travail, parce que parcourir 384 Mo bloquerait
+    // La mesure memoire. Sans elle, MemoryBench serait un instrument que le produit n'appelle
+    // jamais. Elle ne tourne qu'au premier scan (decision produit ; le service relit ensuite la
+    // reference enregistree) et sur un fil de travail, parce que parcourir 384 Mo bloquerait
     // l'interface. Une mesure rejetee rend 0 : le scan continue sans rien affirmer.
     // Elle ne tourne pas apres un A/B refuse : l'ecran vient de dire au client « relance au repos »,
     // et le marqueur BIOS est deja consomme, donc la seule chose qui rend ce conseil applicable est
@@ -1631,7 +1636,7 @@ public sealed partial class ScanViewModel : ObservableObject
                 // ne remesure pas. Rien d'enregistre (mesure rejetee, banc indisponible) => la
                 // ligne n'existe pas, plutot qu'un chiffre sorti de nulle part.
                 //
-                // Et une reference PERIMEE ne s'affiche pas non plus : le magasin garde
+                // Et une reference perimee ne s'affiche pas non plus : le magasin garde
                 // volontairement la mesure d'avant quand la configuration memoire a change, pour
                 // que l'A/B reste possible. La publier comme « ce que ta memoire rend » decrirait
                 // une machine qui n'existe plus.
@@ -1642,9 +1647,9 @@ public sealed partial class ScanViewModel : ObservableObject
             catch
             {
                 // Ce bloc n'avait aucune garde : une panne du cote memoire faisait echouer le
-                // SCAN entier, et le client voyait « echec du scan » pour une mesure de confort.
-                // Ne pas savoir combien de canaux sont prouves laisse simplement le compte a zero
-                // -- c'est-a-dire rien d'affirme, ce que le reste du produit sait deja traiter.
+                // scan entier, et le client voyait « echec du scan » pour une mesure de confort.
+                // Ne pas savoir combien de canaux sont prouves laisse simplement le compte a zero,
+                // c'est-a-dire rien d'affirme, ce que le reste du produit sait deja traiter.
             }
         }
         return st;
@@ -1652,13 +1657,14 @@ public sealed partial class ScanViewModel : ObservableObject
 
     private async Task<(BenchmarkResult? Baseline, bool Degraded)> MesurerEnJeuAsync()
     {
-        // Generic in-game measurement: find the game currently running (any title, no list) and
-        // measure IT. No game → PID 0 → the runner fails clean → honest config-only (degraded) scan,
-        // never a fabricated number. Captured for Apply's re-bench so before/after use the same game.
+        // Mesure générique en jeu : trouve le jeu lancé (n'importe quel titre, sans liste) et mesure
+        // celui-là. Pas de jeu → PID 0 → le runner échoue proprement → scan honnête de la config seule
+        // (mode dégradé), jamais un chiffre inventé. Gardé pour la remesure d'Apply, pour que l'avant et
+        // l'après portent sur le même jeu.
         _gamePid = _gameLocator.LocateRunningGamePid() ?? 0;
         var jeuReduit = _gamePid == 0 && _gameLocator.JeuOuvert();
         if (jeuReduit) _gamePid = await AttendreLeJeuAsync() ?? 0;
-        // Phase 18 — les threads du jeu, observes pendant la meme fenetre que les frames (jamais avant :
+        // Les threads du jeu, observes pendant la meme fenetre que les frames (jamais avant :
         // une consommation prise a un autre moment decrirait un autre moment du jeu).
         var pidObserve = _gamePid;
         var observation = pidObserve > 0 && _observerThreads is { } observer
@@ -1673,7 +1679,7 @@ public sealed partial class ScanViewModel : ObservableObject
             ? Task.Run(() => mesurerBloat(DureeCaptureEnJeu))
             : Task.FromResult<DrDxt.Measurement.Network.VerdictBufferbloat?>(null);
         var exeObserve = pidObserve > 0 ? NomExeDuProcessus(pidObserve) : null;
-        // 03/10/2026 (P3.1c) : la route vers le serveur que le jeu contacte, pour dire si un relais payant servirait.
+        // La route vers le serveur que le jeu contacte, pour dire si un relais payant servirait.
         var route = pidObserve > 0 && _mesurerRoute is { } mesurerRoute
             ? mesurerRoute(pidObserve, DureeCaptureEnJeu)
             : Task.FromResult<RepairFinding?>(null);
@@ -1683,11 +1689,11 @@ public sealed partial class ScanViewModel : ObservableObject
         var dpc = pidObserve > 0 && _mesurerDpc is { } mesurerDpc
             ? Task.Run(() => mesurerDpc(DureeCaptureEnJeu))
             : Task.FromResult<RepairFinding?>(null);
-        // 11/09/2026 — ce qui tourne a cote, pendant la meme fenetre. Un scan a deja affiche 164 FPS
+        // Ce qui tourne a cote, pendant la meme fenetre. Un scan a deja affiche 164 FPS
         // pendant qu'on regardait l'ecran de DrDXT ; le meme soir, en partie avec nos compilations,
         // 79,5. Le chiffre seul ne veut rien dire : l'ecran dira ce qu'il y avait autour.
         var voisins = Task.Run(() => _voisins.Lire(pidObserve > 0 ? pidObserve : null, CancellationToken.None));
-        // 26/09/2026 : un joueur qui revient sur DrDXT avant la fin réduit le jeu en pleine capture. Les images
+        // Un joueur qui revient sur DrDXT avant la fin réduit le jeu en pleine capture. Les images
         // d'un jeu réduit ne décrivent pas sa partie : le jeu est vérifié chaque seconde, et s'il a quitté
         // l'écran, aucun chiffre n'est donné.
         var surveillance = _gamePid > 0 ? new SurveillanceDuJeu() : null;
@@ -1725,9 +1731,8 @@ public sealed partial class ScanViewModel : ObservableObject
         try { PeuplerLesVoisins(await voisins.ConfigureAwait(true)); }
         catch { PeuplerLesVoisins(null); }
         var degraded = !benchResult.IsOk || jeuQuitte;
-        // 04/10/2026 (plan 1.5) : « tu as quitté ton jeu » est apparu sans aucun jeu ouvert (scan du 04/10 04:50), et rien
-        // ne permettait de savoir quelle fenêtre avait été prise pour un jeu. La phrase nomme maintenant le programme
-        // retenu : un faux positif se voit tout de suite, pour le joueur comme pour le support.
+        // « tu as quitté ton jeu » peut s'afficher sans aucun jeu ouvert, quand une autre fenêtre a été prise pour le
+        // jeu. La phrase nomme le programme retenu : un faux positif se voit tout de suite, pour le joueur comme pour le support.
         if (jeuQuitte)
             DegradedNote = exeObserve is { } retenu
                 ? string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize("Scan.Degraded.JeuQuitteNomme"),
@@ -1745,9 +1750,9 @@ public sealed partial class ScanViewModel : ObservableObject
 
     private void PublierLesLibellesDeMesure(BenchmarkResult? baseline)
     {
-        // LA CADENCE. Mesuree a chaque scan et lue par le seul classifieur de goulot jusqu'ici.
+        // La cadence. Mesuree a chaque scan et lue par le seul classifieur de goulot jusqu'ici.
         //
-        // La garde se REUTILISE : sous vingt echantillons un p95 se confond avec le maximum —
+        // La garde se reutilise : sous vingt echantillons un p95 se confond avec le maximum ;
         // ce n'est pas de la prudence, c'est de l'arithmetique (1/20 = 5 %). Sans elle, une capture
         // courte publierait un « ecart de 1 187 ms », chiffre juste et vide de sens.
         //
@@ -1760,15 +1765,14 @@ public sealed partial class ScanViewModel : ObservableObject
             : null;
 
         // L'attente d'affichage. Le compte vient de sa serie a elle, publiee par le banc avec le
-        // meme filtre que le percentile — la lecon appliquee d'entree cette fois, et non apres
-        // qu'une revue l'ait signalee. Compte inconnu ⇒ silence.
+        // meme filtre que le percentile, des le depart. Compte inconnu ⇒ silence.
         PresentStallLabel = DrDxt.Measurement.FrametimeStatistics.AttenteP95(baseline) is { } attente
             ? string.Format(CultureInfo.CurrentCulture, _localize("Scan.PresentStall.Measured"), attente)
             : null;
 
-        // LA SACCADE. Le p95 des frametimes vient de la meme liste que le compte ci-dessous, avec
+        // La saccade. Le p95 des frametimes vient de la meme liste que le compte ci-dessous, avec
         // le meme filtre (`Clean`) : la valeur et la garde ne peuvent pas porter sur deux
-        // populations differentes — la faute payee deux fois dans cette boucle.
+        // populations differentes.
         StutterLabel = DrDxt.Measurement.FrametimeStatistics.SaccadeP95(baseline) is { } lentes
             ? string.Format(CultureInfo.CurrentCulture, _localize("Scan.Stutter.Measured"), lentes)
             : null;
@@ -1786,14 +1790,14 @@ public sealed partial class ScanViewModel : ObservableObject
 
     private void PublierLeResultat(ScanResult scanResult, bool degraded)
     {
-        Score = scanResult.Score;
         Coverage = scanResult.Coverage;
-        // D7 : le rapport de diagnostic decrit le dernier scan. Le garder ici evite de le
-        // recalculer au moment de l'export -- un rapport qui relance un scan decrirait une autre
+        // Le rapport de diagnostic decrit le dernier scan. Le garder ici evite de le
+        // recalculer au moment de l'export : un rapport qui relance un scan decrirait une autre
         // machine que celle dont le client parle.
         _lastScan = scanResult;
-        // Le registre (D2) : on compte les leviers lus et trouves sous-optimaux. Le grand livre
-        // est la source, parce qu'il ne contient que les leviers reellement notes -- pas les
+        OnPropertyChanged(nameof(SousTensionPrerequisVisible));
+        // Le registre : on compte les leviers lus et trouves sous-optimaux. Le grand livre
+        // est la source, parce qu'il ne contient que les leviers reellement notes, pas les
         // lignes d'information ni les guidages.
         ProvenProblemCount = scanResult.Ledger?.Count(e => e.State == LeverState.Suboptimal) ?? 0;
 
@@ -1805,19 +1809,18 @@ public sealed partial class ScanViewModel : ObservableObject
 
     private SettingsState PeuplerLesRecommandations(HardwareInventory hw, SettingsState st, BenchmarkResult? baseline, ScanResult scanResult)
     {
-        // M6 — consume the per-chip profile recommendation: compose the profile-driven
-        // plan, override + clamp the GPU targets (IGpuTuningTargetSource), and surface each
-        // selection's honest evidence. Captured so Apply runs this plan and re-benches
-        // against the same measured baseline.
+        // Consomme la recommandation du profil de la puce : compose le plan issu du profil, remplace
+        // et borne les cibles GPU (IGpuTuningTargetSource), et affiche la preuve honnête de chaque
+        // choix. Gardé pour qu'Apply exécute ce plan et remesure contre la même base mesurée.
         _scannedBaseline = baseline;
         _goulotScan = scanResult.Bottleneck;
-        // PHASE 18 F3 — le goulot mesure entre dans l'etat avant la selection : un levier CPU ne
+        // Le goulot mesure entre dans l'etat avant la selection : un levier CPU ne
         // s'arme que si le processeur limite ce jeu. Un verdict provisoire (confiance basse)
         // n'arme rien : trop peu de mesure pour justifier une ecriture sur la machine.
         st = st with
         {
             GoulotMesure = scanResult.Bottleneck is { Provisional: false } goulot ? goulot.State : null,
-            // 06/10/2026 (L-WU) : les heures des parties relevées, pour les heures d'activité de Windows Update. Sans relevé
+            // Les heures des parties relevées, pour les heures d'activité de Windows Update. Sans relevé
             // branché : null (non lu), jamais « aucune partie ».
             HeuresDeJeu = MemoireParties?.Lire().Select(p => new PlageDeJeu(p.Debut, p.Fin)).ToList(),
         };
@@ -1826,13 +1829,14 @@ public sealed partial class ScanViewModel : ObservableObject
         Recommendations.Clear();
         Recommendations.CollectionChanged -= NotifierAucuneRecommandation;
         Recommendations.CollectionChanged += NotifierAucuneRecommandation;
-        // 16/09/2026 : n'est recommande que ce qui sera reellement applique. Scan reel de la machine
+        // N'est recommande que ce qui sera reellement applique. Scan reel de la machine
         // de reference : 10 lignes « optimisation recommandee », dont 5 inapplicables selon le
         // catalogue et 2 reglages GPU fermes par decision, qui ne seront jamais ecrits.
         foreach (var item in _consumption.Items.Where(i => i.InExecutedPlan
                      || (i.Applicable && i.Intent == DrDxt.Profiles.ProfileIntent.GpuTune)))
-            // Stamp the non-technical category tease for the LOCKED (free) view here, where the
-            // localizer lives (the consumer is pure, no i18n). Free reveals the category, never how.
+            // Pose ici l'aperçu non technique de la catégorie pour la vue verrouillée (gratuite), là où
+            // vit la traduction (le consumer est pur, sans i18n). La version gratuite montre la catégorie,
+            // jamais le comment.
             Recommendations.Add(item with
             {
                 CategoryLabel = string.Format(
@@ -1842,23 +1846,21 @@ public sealed partial class ScanViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Revue du 12/09 (M1) — « deja bien reglee » se decidait sur le score /100 (>= 90), retire de
-    /// tout ce que le client lit le 05/09. Il se decide sur les faits de lecture : rien a corriger
+    /// « Deja bien reglee » se decide sur les faits de lecture : rien a corriger
     /// (scanner, plan, GPU, BIOS, sante) et rien de non lu. Un audit absent ou un conseiller BIOS en
     /// panne n'ont rien lu : jamais « deja reglee » sur ce qu'on n'a pas vu.
     /// </summary>
-    // 14/09/2026 (C1 bis) : le scanner rend `Unknown` sans constat pour ce qu'il n'a pas pu lire
+    // Le scanner rend `Unknown` sans constat pour ce qu'il n'a pas pu lire
     // (XMP, rafraichissement, pagefile, MMCSS) : « aucun constat » n'est pas « tout lu ». Sa
     // couverture le dit ; une couverture absente n'a rien affirme.
-    // 14/09/2026 (relecture 12/20) : `Findings.Count == 0` n'etait jamais vrai en production —
-    // le vrai scorer ajoutait toujours « Finding.Latency.Available » (retire le 16/09 : il ne lisait rien). Rien a
-    // corriger = aucun constat au-dessus d'Info. Ce qui n'a pas ete lu reste la clause de couverture.
-    // Simplification voulue : pas de clause « aucun levier sous-optimal au registre » — chaque Suboptimal de
+    // Rien à corriger = aucun constat au-dessus d'Info, et non `Findings.Count == 0` : un constat Info
+    // ne demande rien. Ce qui n'a pas ete lu reste la clause de couverture.
+    // Simplification voulue : pas de clause « aucun levier sous-optimal au registre ». Chaque Suboptimal de
     // LeverCatalog porte un constat Minor/Major, la mutation l'a montree redondante (verte, 589/589).
     private bool DejaReglee(ScanResult scan) =>
         scan.Findings.All(f => f.Severity == Severity.Info)
         && scan.Coverage is { UnknownLevers: 0, ApplicableLevers: > 0 }
-        // 14/09/2026 — un plan GPU ne compte pas : sinon toute machine NVIDIA de bureau (leviers GPU applicables) ne
+        // Un plan GPU ne compte pas : sinon toute machine NVIDIA de bureau (leviers GPU applicables) ne
         // pouvait jamais etre « deja bien reglee ». Un reglage de la carte n'est pas une correction, c'est un essai mesure.
         && _consumption is { Plan.TweakIds.Count: 0 }
         && _biosLu && BiosFindings.Count == 0

@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D2.2) : Microsoft, « Typography in Windows » : sous 12 px Regular, un texte est illisible
+// Microsoft, « Typography in Windows » : sous 12 px Regular, un texte est illisible
 // dans certaines langues. Quatre tailles en dessous ont été trouvées à l'audit (dont le mot d'état des perles, 11,5 px).
 public sealed class AucunTexteSousDouzePixelsTests
 {

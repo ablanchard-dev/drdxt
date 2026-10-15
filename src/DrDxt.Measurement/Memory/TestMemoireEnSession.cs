@@ -10,28 +10,24 @@ public sealed record ResultatTestMemoire(long OctetsTestes, int Passes, long Err
 {
     /// <summary>Ce que le resultat autorise a dire, limites comprises.</summary>
     public string Phrase => OctetsTestes == 0
-        ? "rien n'a pu être testé : Windows n'a pas accordé la mémoire demandée. Ce n'est pas un résultat ; "
-          + "relance le test avec moins de programmes ouverts."
+        ? Docteur.T("TM.RienTeste")
         : Erreurs > 0
-        ? F($"{Erreurs} erreur(s) mémoire en {Passes} passe(s) sur {Go:0.0} Go : la mémoire a rendu autre chose ")
-          + "que ce qui y avait été écrit. C'est un défaut, à ce réglage de RAM."
-        : F($"aucune erreur en {Passes} passe(s) sur {Go:0.0} Go ({Duree.TotalMinutes:0} min, {Fils} fils). ")
-          + "Ce test tourne sous Windows : il ne voit pas la mémoire que le système occupe, et quelques minutes "
-          + "ne valent pas une nuit de test. Il peut trouver un défaut ; il ne prouve pas qu'il n'y en a aucun.";
+        ? Docteur.T("TM.Erreurs", Erreurs, Passes, Go)
+        : Docteur.T("TM.Aucune", Passes, Go, Duree.TotalMinutes, Fils);
 
     private double Go => OctetsTestes / (double)(1L << 30);
 }
 
 /// <summary>
-/// 24/09/2026 — tester la RAM sans redemarrer, parce que le test de Windows exige un redemarrage que
+/// Tester la RAM sans redemarrer, parce que le test de Windows exige un redemarrage que
 /// le joueur n'a pas toujours le temps de faire.
 ///
 /// Methode des testeurs en session reconnus (TestMem5, HCI MemTest, Karhu) : ecrire un motif connu
 /// dans de gros blocs, puis tout relire et comparer, sur tous les coeurs a la fois pour charger le
-/// controleur memoire. Motif par mot de 64 bits derive de son ADRESSE (un bit colle ou une adresse
-/// qui en recouvre une autre rendent une valeur differente), puis son COMPLEMENT (chaque bit passe
-/// par 0 et par 1). Ce que ces outils revendiquent — trouver des erreurs que MemTest86 manque parce
-/// qu'elles n'apparaissent que sous charge et a chaud — vaut ici aussi ; leur limite aussi : la
+/// controleur memoire. Motif par mot de 64 bits derive de son adresse (un bit colle ou une adresse
+/// qui en recouvre une autre rendent une valeur differente), puis son complement (chaque bit passe
+/// par 0 et par 1). Ce que ces outils revendiquent (trouver des erreurs que MemTest86 manque parce
+/// qu'elles n'apparaissent que sous charge et a chaud) vaut ici aussi ; leur limite aussi : la
 /// memoire du systeme n'est pas testee.
 /// </summary>
 public static class TestMemoireEnSession
@@ -65,7 +61,7 @@ public static class TestMemoireEnSession
             catch (OutOfMemoryException) { break; }
         }
 
-        // 25/09/2026 : rien d'alloue, rien a tester. Sans ce retour, la boucle tournait a vide toute la
+        // Rien d'alloue, rien a tester. Sans ce retour, la boucle tournait a vide toute la
         // duree ; et le resultat rapporte les fils qui ont vraiment tourne, pas ceux demandes.
         if (blocs.Count == 0) return new ResultatTestMemoire(0, 0, 0, TimeSpan.Zero, 0);
         fils = blocs.Count;
@@ -94,14 +90,14 @@ public static class TestMemoireEnSession
     public const string Domaine = "MEMOIRE";
 
     /// <summary>Le resultat, tel que la sante l'affiche. Des erreurs : un defaut prouve. Zero erreur :
-    /// « observe », jamais « sain » — ce test peut trouver un defaut, il ne prouve pas l'absence.</summary>
+    /// « observe », jamais « sain » : ce test peut trouver un defaut, il ne prouve pas l'absence.</summary>
     public static RepairFinding Constat(ResultatTestMemoire r) => r.OctetsTestes == 0
-        ? new RepairFinding(Domaine, "test mémoire en session", "non testé", null, RepairStatus.Unknown, r.Phrase)
+        ? new RepairFinding(Domaine, "test mémoire en session", Docteur.T("TM.NonTeste"), null, RepairStatus.Unknown, r.Phrase)
         : r.Erreurs > 0
-        ? new RepairFinding(Domaine, "test mémoire en session", $"{r.Erreurs} erreur(s)", "aucune erreur",
-            RepairStatus.KnownHarmful, r.Phrase + " Baisser la fréquence de la RAM dans le BIOS, puis retester.",
+        ? new RepairFinding(Domaine, "test mémoire en session", Docteur.T("TM.NErreurs", r.Erreurs), Docteur.T("TM.AucuneErreur"),
+            RepairStatus.KnownHarmful, r.Phrase + Docteur.T("TM.Baisser"),
             RepairAction.Recommandation)
-        : new RepairFinding(Domaine, "test mémoire en session", "aucune erreur", null, RepairStatus.Observed, r.Phrase);
+        : new RepairFinding(Domaine, "test mémoire en session", Docteur.T("TM.AucuneErreur"), null, RepairStatus.Observed, r.Phrase);
 
     private static ulong Motif(ulong graine, ulong index)
     {

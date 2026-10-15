@@ -3,11 +3,11 @@ using DrDxt.Core;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// Resx keys for the post-reboot closed-loop result: the honest "it took" /
-/// "it did not take" / "could not verify" labels and the recovery card shown when a
-/// firmware change did not take or could not be verified. FR+en live in the shared
-/// Infrastructure resx; the verifier emits only these keys, never hard-coded UI text
-/// (mirrors <c>BiosStringKeys</c> / <c>BiosGuideStringKeys</c> / <c>ErrorCodes</c>).
+/// Clés resx du résultat de la boucle fermée après redémarrage : les libellés honnêtes « c'est
+/// pris » / « ce n'est pas pris » / « impossible à vérifier » et la carte de récupération montrée
+/// quand un changement firmware n'a pas pris ou n'a pas pu être vérifié. FR et EN vivent dans la
+/// resx partagée d'Infrastructure ; le vérificateur n'émet que ces clés, jamais de texte
+/// d'interface en dur (comme <c>BiosStringKeys</c> / <c>BiosGuideStringKeys</c> / <c>ErrorCodes</c>).
 /// </summary>
 public static class BiosLoopStringKeys
 {
@@ -29,15 +29,15 @@ public static class BiosLoopStringKeys
     /// suite a l'ecran au lieu de tomber silencieusement sur un libelle generique.</summary>
     public static string SettingName(FirmwareSettingKind kind) => SettingNamePrefix + kind;
 
-    // ── Recovery card (shown only when something did not take or is unreadable). The
-    //    order below is the order the card is rendered in — D2. ──
+    // ── Carte de récupération (montrée seulement quand quelque chose n'a pas pris ou est illisible).
+    //    L'ordre ci-dessous est l'ordre d'affichage de la carte. ──
     public const string RecoveryHeader = "Bios.Loop.Recovery.Header";
     public const string RecoveryReenter = "Bios.Loop.Recovery.Reenter";
     public const string RecoveryOneChangeAtATime = "Bios.Loop.Recovery.OneChangeAtATime";
     public const string RecoveryLoadDefaults = "Bios.Loop.Recovery.LoadDefaults";
     public const string RecoveryClearCmos = "Bios.Loop.Recovery.ClearCmos";
 
-    /// <summary>The recovery-card keys, in render order (header first). Single source of truth.</summary>
+    /// <summary>Les clés de la carte de récupération, dans l'ordre d'affichage (en-tête d'abord). Source unique.</summary>
     public static readonly IReadOnlyList<string> RecoveryCard = new[]
     {
         RecoveryHeader,

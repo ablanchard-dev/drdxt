@@ -8,7 +8,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 06/10/2026 (chantier B14, S8) : l'argument DEBUG « machine=&lt;nom&gt; » rejoue une machine enregistrée dans
+/// L'argument DEBUG « machine=&lt;nom&gt; » rejoue une machine enregistrée dans
 /// l'App. Chaque fichier de tests/Shared/machines doit se charger par son nom et nourrir le scan à la place de ce PC.
 /// </summary>
 public class MachineDeTestDansLAppTests
@@ -53,7 +53,7 @@ public class MachineDeTestDansLAppTests
         finally { MachineDeTest.Active = null; }
     }
 
-    // 06/10/2026 : le rejeu de 19:23 a écrit la machine AMD dans les vraies données (changements.json, repair-history.json).
+    // Le rejeu de 19:23 a écrit la machine AMD dans les vraies données (changements.json, repair-history.json).
     // Activer une machine sans dossier choisi redirige les données vers un dossier jetable ; un dossier déjà choisi est gardé.
     [Fact]
     public void Activer_une_machine_redirige_les_donnees_hors_de_celles_du_joueur()

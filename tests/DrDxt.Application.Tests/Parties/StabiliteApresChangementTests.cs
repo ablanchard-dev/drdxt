@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 04/10/2026 (plan 3.2) : un arrêt ou une erreur matérielle dans la semaine d'un changement le désigne ; une semaine
+// Un arrêt ou une erreur matérielle dans la semaine d'un changement le désigne ; une semaine
 // propre se dit aussi.
 public sealed class StabiliteApresChangementTests
 {
@@ -17,7 +17,17 @@ public sealed class StabiliteApresChangementTests
         var c = StabiliteApresChangement.Juger([Bios], [Changement.AddDays(2)], [], Changement.AddDays(3)).Should().ContainSingle().Subject;
         c.Statut.Should().Be(RepairStatus.Suspicious);
         c.ValeurCourante.Should().Contain("1 arrêt");
-        c.Explication.Should().Contain("« A »").And.Contain("revenir au réglage d'avant");
+        c.Explication.Should().Contain("« A »").And.NotContain("1)", "le geste a sa place à part");
+        c.Remede.Should().Contain("1) Au BIOS, remets « A » (il est à « B »)").And.Contain("2)").And.Contain("3)");
+    }
+
+    // Un changement qui n'est pas un réglage du BIOS lu : le geste le nomme tel quel.
+    [Fact]
+    public void Un_autre_changement_se_nomme_tel_quel_dans_le_geste()
+    {
+        var jeu = new Changement(Changement, "les réglages graphiques du jeu", null, null);
+        StabiliteApresChangement.Juger([jeu], [Changement.AddDays(1)], [], Changement.AddDays(2)).Single()
+            .Remede.Should().Contain("1) Remets comme avant : les réglages graphiques du jeu");
     }
 
     [Fact]
@@ -43,7 +53,7 @@ public sealed class StabiliteApresChangementTests
         StabiliteApresChangement.Juger([Bios], [Changement.AddDays(1)], [], Changement.AddDays(40)).Should().BeEmpty();
     }
 
-    // UI1 (08/10/2026, vu sur capture) : « 1 arrêt(s) brutal(aux) (… 1,5 jour(s) après) ». Les mots s'accordent au nombre.
+    // « 1 arrêt(s) brutal(aux) (… 1,5 jour(s) après) ». Les mots s'accordent au nombre.
     [Fact]
     public void Les_mots_s_accordent_au_nombre()
     {
@@ -56,7 +66,7 @@ public sealed class StabiliteApresChangementTests
         StabiliteApresChangement.Juger([Bios], [], [], Changement.AddDays(3)).Single().Explication.Should().Contain("3 jours sur les 7");
     }
 
-    // UI1 (critique du 08/10) : trois constats « Après un changement » accusaient chacun un changement différent du même
+    // Trois constats « Après un changement » accusaient chacun un changement différent du même
     // et unique arrêt. Les changements qui désignent les mêmes incidents se disent ensemble, sans en accuser un.
     [Fact]
     public void Plusieurs_changements_avant_le_meme_arret_font_un_seul_constat()
@@ -70,10 +80,11 @@ public sealed class StabiliteApresChangementTests
 
         c.ValeurCourante.Should().Be("1 arrêt brutal (le " + arret.LocalDateTime.ToString("dd/MM HH:mm", System.Globalization.CultureInfo.InvariantCulture) + ")");
         c.Explication.Should().Contain("3 changements").And.Contain("« A »").And.Contain("réglages graphiques").And.Contain("événement")
-            .And.Contain("un à la fois");
+            .And.NotContain("un à la fois", "le geste a sa place à part");
+        c.Remede.Should().Contain("1) Défais le plus récent : la carte de l'événement").And.Contain("un seul à la fois");
     }
 
-    // Revue n° 15 : A voit l'arrêt du jour 5, B ceux des jours 5 et 9. Regrouper sur l'ensemble exact laissait deux constats
+    // A voit l'arrêt du jour 5, B ceux des jours 5 et 9. Regrouper sur l'ensemble exact laissait deux constats
     // qui accusaient chacun le même arrêt ; ils partagent un incident, ils se disent ensemble.
     [Fact]
     public void Deux_changements_qui_partagent_un_seul_arret_font_un_seul_constat()

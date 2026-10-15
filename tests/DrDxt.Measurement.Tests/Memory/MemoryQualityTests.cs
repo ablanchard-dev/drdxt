@@ -48,9 +48,9 @@ public class MemoryQualityTests
     [Fact]
     public void Une_latence_de_25_ns_est_rejetee_car_c_est_du_cache_et_non_de_la_DRAM()
     {
-        // Le bug reellement paye le 06/09/2026 : une chaine de pointeurs de 16 Mo tenait dans un
-        // L3 de 33 Mo et rendait 25 ns. Aucune DRAM ne repond en 25 ns -- c'est ce chiffre trop
-        // beau qui avait trahi l'erreur. Le controle doit le refaire tout seul.
+        // Une chaine de pointeurs de 16 Mo tient dans un L3 de 33 Mo et rend 25 ns (mesure). Aucune
+        // DRAM ne repond en 25 ns : c'est ce chiffre trop beau qui trahit l'erreur, et le controle
+        // doit la voir tout seul.
         var duCache = Saine() with { LatencyNs = 25.0 };
 
         var verdict = MemoryQuality.Check(duCache, theoreticalPeakGBs: 60.8);
@@ -105,9 +105,8 @@ public class MemoryQualityTests
     [Fact]
     public void Un_creux_de_quelques_DIXIEMES_de_nanoseconde_sur_les_petites_fenetres_est_du_bruit()
     {
-        // Trouve par le controle positif du 07/09/2026, et c'etait le pire genre de defaut :
-        // l'instrument voyait une chute de debit de 89 % et REFUSAIT de la dire, en Q-02, pour un
-        // creux de 0,2 ns entre 32 et 48 Ko. A cette echelle, la resolution du chronometre et le
+        // Le pire genre de defaut : l'instrument verrait une chute de debit de 89 % et REFUSERAIT de la
+        // dire, en Q-02, pour un creux de 0,2 ns entre 32 et 48 Ko. A cette echelle, la resolution du chronometre et le
         // cout de la boucle pesent plus que la memoire : un ecart relatif y est enorme et ne veut
         // rien dire. Un refus doit etre grand dans les deux sens -- en pourcentage et en valeur.
         var vraieCourbe = Saine() with

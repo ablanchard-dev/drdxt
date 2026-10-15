@@ -1,12 +1,11 @@
 using System.Globalization;
-using CommunityToolkit.Mvvm.Input;
 
 namespace DrDxt.App.ViewModels;
 
 /// <summary>
-/// 10/10/2026 (le mainteneur : « le côté Dr n'y est pas », « faut que ça sorte de lui ») : après le scan, le docteur dit
-/// en une phrase ce qui vient ensuite, avec un seul bouton, avant la liste des constats. L'ordre, revu le soir même
-/// (« faut régler et ensuite pouvoir opti ») : un essai qui tourne, sinon le premier point à faire soi-même (et « puis
+/// Après le scan, le docteur dit
+/// en une phrase ce qui vient ensuite, avec un seul bouton, avant la liste des constats. L'ordre (régler d'abord,
+/// optimiser ensuite) : un essai qui tourne, sinon le premier point à faire soi-même (et « puis
 /// Optimiser » s'il a du travail), sinon ce que DrDXT fait seul (Optimiser), sinon « joue ». Optimiser reste cliquable
 /// dans tous les cas : il ne dit jamais non, il fait sa part.
 /// </summary>
@@ -39,15 +38,15 @@ public partial class ScanViewModel
         _ => null,
     };
 
-    /// <summary>Le libellé du bouton de l'étape ; <c>null</c> quand il n'y a rien à cliquer. Pas de second
-    /// « Optimiser » : le vrai est juste en dessous (un seul appel à l'action, critique du 29/09).</summary>
-    public string? ProchaineEtapeBouton => EtapeALaMain ? _localize("Etape.AFaire.Bouton") : null;
-
-    [RelayCommand]
-    private void SuivreLaProchaineEtape()
+    /// <summary>L'étape quand la liste ne la dit pas déjà : un point à faire soi-même est le premier de la liste,
+    /// cliquable vers son domaine, et ne se redit pas dans un encadré au-dessus. Quand Optimiser a aussi du travail, la
+    /// seconde moitié de la consigne (« puis Optimise ») reste dite.</summary>
+    public string? EtapeHorsListe => EtapeSuivante switch
     {
-        if (EtapeALaMain) ChoisirDomaine(PremierPoint.Domaine);
-    }
+        EtapeDuDocteur.AFaire => null,
+        EtapeDuDocteur.AFairePuisOptimiser => _localize("Etape.PuisOptimiser"),
+        _ => ProchaineEtape,
+    };
 
     private static readonly HashSet<string> CeQuiChangeLEtape = new(StringComparer.Ordinal)
     {
@@ -56,7 +55,7 @@ public partial class ScanViewModel
     };
 
     // Un seul abonnement plutôt qu'une notification dans chaque setter qui touche l'étape. La liste « à faire » se
-    // reconstruit d'un bloc (AnnoncerSatellites) : une annonce par reconstruction, pas une par ligne (revue du 10/10/2026 :
+    // reconstruit d'un bloc (AnnoncerSatellites) : une annonce par reconstruction, pas une par ligne (
     // chaque évaluation de l'étape relit l'essai sur disque).
     private void AbonnerLaProchaineEtape()
     {
@@ -72,7 +71,7 @@ public partial class ScanViewModel
     private void AnnoncerEtape()
     {
         OnPropertyChanged(nameof(ProchaineEtape));
-        OnPropertyChanged(nameof(ProchaineEtapeBouton));
+        OnPropertyChanged(nameof(EtapeHorsListe));
         OnPropertyChanged(nameof(RienAPoserDuTout));
         OnPropertyChanged(nameof(ApplyHintKey));
         OnPropertyChanged(nameof(ApplyHint));

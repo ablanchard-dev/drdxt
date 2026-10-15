@@ -5,11 +5,11 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Hardware;
 
 /// <summary>
-/// 07/10/2026 (chantier D3) : les analyses de Microsoft Defender, lues sans droits dans
+/// Les analyses de Microsoft Defender, lues sans droits dans
 /// « Microsoft-Windows-Windows Defender/Operational » (1000 début, 1001 fin, 1002 arrêtée avant la fin), reliées par
 /// l'identifiant d'analyse (troisième champ de l'événement). Et le réglage ScanOnlyIfIdleEnabled de MSFT_MpPreference.
 /// Lecture seule ; <c>null</c> = non lu, jamais « aucune ».
-/// Mesure du 07/10 sur le PC du mainteneur : 62 événements en 30 jours, analyses rapides de 1 à 2 minutes, plusieurs
+/// Mesure du 07/10 sur la machine de référence : 62 événements en 30 jours, analyses rapides de 1 à 2 minutes, plusieurs
 /// arrêtées avant la fin, ScanOnlyIfIdleEnabled = vrai.
 /// </summary>
 public static class JournalDefender

@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Tweaks;
 
-/// <summary>24/09/2026 — le journal qui permet enfin a GainsDisparus d'etre appele par le produit.</summary>
+/// <summary>Le journal qui permet enfin a GainsDisparus d'etre appele par le produit.</summary>
 public class JournalDesLeviersAppliquesTests : IDisposable
 {
     private readonly string _chemin = Path.Combine(Path.GetTempPath(), $"drdxt-journal-{Guid.NewGuid():N}.json");
@@ -62,8 +62,8 @@ public class JournalDesLeviersAppliquesTests : IDisposable
         new JournalDesLeviersAppliques(_chemin).Constats(new Registre(1)).Should().BeEmpty();
     }
 
-    // 26/09/2026 : un journal illisible se lisait comme vide, puis Enregistrer le reecrivait avec les seuls
-    // leviers du jour : l'historique des gains disparaissait en silence. Sans lecture sure, on n'ecrit pas.
+    // Un journal illisible lu comme vide serait reecrit par Enregistrer avec les seuls leviers du
+    // jour : l'historique des gains disparaitrait en silence. Sans lecture sure, on n'ecrit pas.
     [Fact]
     public void Un_journal_illisible_n_est_pas_ecrase_par_le_suivant()
     {
@@ -75,7 +75,7 @@ public class JournalDesLeviersAppliquesTests : IDisposable
         File.ReadAllText(_chemin).Should().Be("{ pas du json");
     }
 
-    // 26/09/2026 : une entree nulle ou sans identifiant faisait lever Constats, appele pendant le scan.
+    // Une entree nulle ou sans identifiant faisait lever Constats, appele pendant le scan.
     [Theory]
     [InlineData("[null]")]
     [InlineData("[{\"OriginalValueJson\":\"x\"}]")]

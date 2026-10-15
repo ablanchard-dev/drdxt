@@ -67,7 +67,7 @@ public sealed class TheSolutionStaysOnOnePileTests
     [Fact]
     public void Aucun_projet_ne_reste_sur_une_pile_hors_support()
     {
-        // .NET 8 sort de support le 10/11/2026 (dotnet.microsoft.com/platform/support/policy,
+        // .NET 8 sort de support le 10/11/2026 (source : dotnet.microsoft.com/platform/support/policy,
         // lu le 06/09/2026). Un seul csproj oublie suffit a ramener la pile entiere.
         var fautifs = new List<string>();
         foreach (var p in Csproj())

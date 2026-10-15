@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-// 10/10/2026 (revue de sécurité) : l'invite Windows porte le lanceur natif quand il est installé à côté du helper.
+// L'invite Windows porte le lanceur natif quand il est installé à côté du helper.
 public sealed class LanceurCibleTests : IDisposable
 {
     private readonly string _dossier = Path.Combine(Path.GetTempPath(), "drdxt-lanceur-" + Guid.NewGuid().ToString("N"));

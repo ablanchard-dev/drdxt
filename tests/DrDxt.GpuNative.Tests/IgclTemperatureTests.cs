@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.GpuNative.Tests;
 
-// A5 (07/10/2026) : la température Intel par IGCL. Pas de carte Intel sur ce PC (RTX 4060) : la disposition des structures
+// La température Intel par IGCL. Pas de carte Intel sur ce PC (RTX 4060) : la disposition des structures
 // est figée contre igcl_api.h, et le choix de la sonde se teste sans DLL. La valeur réelle attend une machine Arc.
 public sealed class IgclTemperatureTests
 {

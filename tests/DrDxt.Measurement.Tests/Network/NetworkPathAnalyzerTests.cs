@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Measurement.Tests.Network;
 
 // -----------------------------------------------------------------------
-// NS-9 — attribution de l'instabilité.
+// Attribution de l'instabilité.
 //
 // Le verdict ne repose sur aucune constante : seulement sur le fait que le premier saut est
 // contenu dans le chemin complet. Ces tests défendent surtout le refus de trancher : sans
@@ -29,7 +29,7 @@ public sealed class NetworkPathAnalyzerTests
         r.Verdict.Should().Be(NetworkPathVerdict.StartsAtFirstHop);
     }
 
-    // 26/09/2026 : une mutation qui rendait « indiscernable » un écart d'exactement une milliseconde restait
+    // Une mutation qui rendait « indiscernable » un écart d'exactement une milliseconde restait
     // verte. La sonde résout la milliseconde : un écart de 1 ms se départage, un écart de 0,9 ms non.
     [Fact]
     public void Un_ecart_d_exactement_la_resolution_de_la_sonde_se_departage()

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- 10/10/2026 (revue de sécurité) : le SEUL exécutable de DrDXT qui reçoit l'élévation (UAC). Compilé en natif
+  <!-- Le SEUL exécutable de DrDXT qui reçoit l'élévation (UAC). Compilé en natif
        (NativeAOT) : sans CoreCLR, les variables CORECLR_PROFILER* / DOTNET_* que n'importe quel programme du compte
        pose dans HKCU\Environment, et qu'un processus élevé hérite, n'ont aucune prise. Il relance ensuite le vrai
        programme (helper ou App) avec un environnement reconstruit depuis les API Windows. Voir Program.cs. -->
@@ -10,7 +10,7 @@
     <AssemblyName>DrDxt.Lanceur</AssemblyName>
     <RootNamespace>DrDxt.Lanceur</RootNamespace>
     <PublishAot>true</PublishAot>
-    <!-- 10/10/2026 : le compilateur natif suit le runtime épinglé (Directory.Build.props), pas celui du SDK de la
+    <!-- Le compilateur natif suit le runtime épinglé (Directory.Build.props), pas celui du SDK de la
          machine de build : sans cette ligne, il prenait 10.0.9, trois correctifs de sécurité de retard. -->
     <RuntimeFrameworkVersion>10.0.12</RuntimeFrameworkVersion>
     <IsAotCompatible>true</IsAotCompatible>

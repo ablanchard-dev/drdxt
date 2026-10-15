@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-// 06/10/2026 (plan 4.5) : le point se crée par WMI SystemRestore.CreateRestorePoint, comme Checkpoint-Computer.
+// Le point se crée par WMI SystemRestore.CreateRestorePoint, comme Checkpoint-Computer.
 // SRSetRestorePoint n'a créé aucun point sur 4 essais sur ma machine (VSS 8193/8194), WMI 7 sur 8
 // (research/north-star/point-de-restauration.md). Le code de retour non nul est un échec nommé ; zéro ne prouve pas
 // le point, que SafetyManager relit.
@@ -29,7 +29,7 @@ public sealed class RestorePointEndFailureTests
         r.Error!.Value.Message.Should().Contain("0x80070422", "revue 06/10 : un HRESULT dépassait int et finissait en OverflowException");
     }
 
-    // Revue du 06/10 (P1) : l'activation lisait le code par int.TryParse ; un HRESULT ne s'y lit pas, et
+    // L'activation lisait le code par int.TryParse ; un HRESULT ne s'y lit pas, et
     // l'échec était pris pour un succès. Même lecture pour les deux méthodes WMI.
     [Theory]
     [InlineData(0u, true)]
@@ -44,7 +44,7 @@ public sealed class RestorePointEndFailureTests
     public void Un_code_absent_ou_illisible_n_est_pas_un_succes(object? code)
         => Win32RestorePointActions.LireRetour(code, "SystemRestore.Enable").IsOk.Should().BeFalse();
 
-    // 06/10/2026 (plan 4.5b, le mainteneur : « DrDXT garde actif max 2 points ») : après une création, les points de DrDXT
+    // Après une création, les points de DrDXT
     // au-delà des 2 plus récents sont retirés ; seulement le nom fixe exact et l'ancien nom, jamais un autre point.
     [Fact]
     public void Seuls_les_plus_anciens_points_DrDXT_sont_retires_jusqu_a_en_garder_deux()
@@ -95,7 +95,7 @@ public sealed class RestorePointEndFailureTests
         retires.Should().BeEmpty("aucun point neuf : on ne retire rien");
     }
 
-    // 06/10/2026 (plan 4.5b) : le point est créé par l'outil de Windows (Checkpoint-Computer, 3 réussites sur 3 sur ma
+    // Le point est créé par l'outil de Windows (Checkpoint-Computer, 3 réussites sur 3 sur ma
     // machine, quand le helper en appel direct échouait 2 fois sur 2). Arguments fixes : aucun nom ne s'y injecte.
     [Fact]
     public void Checkpoint_Computer_recoit_des_arguments_fixes_et_le_nom_echappe()
@@ -106,7 +106,7 @@ public sealed class RestorePointEndFailureTests
         args[^1].Should().Be("Checkpoint-Computer -Description 'DrDXT : l''essai' -RestorePointType APPLICATION_INSTALL -ErrorAction Stop");
     }
 
-    // Revue du 06/10 (P1) : powershell -Command sort 1 sur toute erreur ; la raison est dans sa sortie d'erreur,
+    // Powershell -Command sort 1 sur toute erreur ; la raison est dans sa sortie d'erreur,
     // et c'est elle que l'écran doit dire.
     [Fact]
     public void La_phrase_d_erreur_de_Windows_remonte()

@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Settings;
 
 /// <summary>
-/// PHASE 18 F2 — la decision sur HAGS, testee sans carte. Les bits viennent de
+/// La decision sur HAGS, testee sans carte. Les bits viennent de
 /// `D3DKMT_WDDM_2_7_CAPS` : 1 supporte, 2 active, 4 active par defaut.
 /// </summary>
 public class HagsEffectiveReaderTests
@@ -14,7 +14,7 @@ public class HagsEffectiveReaderTests
 
     [Fact]
     public void La_valeur_MESUREE_sur_la_machine_de_reference_rend_On()
-        // 10/09/2026 : 0x0B sur l'adaptateur qui affiche (supporte + active + active par defaut).
+        // 0x0B sur l'adaptateur qui affiche (supporte + active + active par defaut).
         => Decider(new AdaptateurHags(Sources: 2, Lu: true, Caps: 0x0B)).Should().Be(TriState.On);
 
     [Fact]

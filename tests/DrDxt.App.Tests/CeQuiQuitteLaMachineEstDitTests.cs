@@ -7,9 +7,8 @@ namespace DrDxt.App.Tests;
 // -----------------------------------------------------------------------
 // Ce qui quitte la machine.
 //
-// Jusqu'au 23/09/2026, DrDXT envoyait deux choses a un tiers : la cle de licence et une
-// empreinte materielle, vers api.keygen.sh. DrDXT est devenu gratuit et Keygen est parti avec
-// la licence. Ce qui sort encore (README, « Ce qui quitte la machine », tenu par le test du bas) :
+// DrDXT est gratuit : aucune licence ni empreinte materielle ne part chez un tiers. Ce qui sort
+// (README, « Ce qui quitte la machine », tenu par le test du bas) :
 //   * la lecture des dernieres versions de pilotes (pages publiques d'AMD et de NVIDIA, rien sur la machine) ;
 //   * des pings sans contenu (box, 1.1.1.1, serveur du jeu pendant une partie) ;
 //   * le flux de mise a jour, et seulement si une adresse HTTPS est configuree.
@@ -70,25 +69,28 @@ public sealed class CeQuiQuitteLaMachineEstDitTests
             "les adresses que DrDXT contacte vivent dans des constantes nommees, jamais en ligne dans l'appel");
     }
 
-    // 08/10/2026 (chantier V1) : le crible ci-dessus ne voyait pas `GetStringAsync(Url)` avec l'adresse dans une
-    // constante, et le README disait « aucune donnee » alors que chaque scan lit les pages de pilotes de NVIDIA et d'AMD.
+    // Le crible ci-dessus ne voit pas `GetStringAsync(Url)` avec l'adresse dans une
+    // constante : le README pourrait dire « aucune donnee » alors que chaque scan lit les pages de pilotes de NVIDIA et d'AMD.
     // Tout fichier du produit qui fait une requete HTTP : chaque hote qu'il ecrit doit etre nomme dans la section
     // « Ce qui quitte la machine » du README. Les adresses IP pinguees en dur aussi.
     private static readonly Regex AppelHttp = new(@"HttpClient|GetStringAsync|GetAsync|PostAsync|SendAsync", RegexOptions.Compiled);
     private static readonly Regex Hote = new(@"""https?://([^/""?]+)", RegexOptions.Compiled);
     private static readonly Regex IpPinguee = new(@"(?:IPAddress\.Parse\(|ReferenceInternetParDefaut\s*=\s*)""(\d{1,3}(?:\.\d{1,3}){3})""", RegexOptions.Compiled);
 
-    private static string SectionDuReadme()
+    private static string SectionDuReadme(string fichier, string titre)
     {
-        var readme = File.ReadAllText(Path.Combine(Racine().FullName, "README.md"));
-        var debut = readme.IndexOf("## Ce qui quitte la machine", StringComparison.Ordinal);
+        var readme = File.ReadAllText(Path.Combine(Racine().FullName, fichier));
+        var debut = readme.IndexOf(titre, StringComparison.Ordinal);
         debut.Should().BeGreaterThan(-1, "le README garde sa section « Ce qui quitte la machine »");
         var fin = readme.IndexOf("\n## ", debut + 5, StringComparison.Ordinal);
         return fin < 0 ? readme[debut..] : readme[debut..fin];
     }
 
-    [Fact]
-    public void Chaque_hote_et_chaque_adresse_pinguee_du_produit_est_dit_dans_le_README()
+    // Les deux README : l'anglais est celui que GitHub montre.
+    [Theory]
+    [InlineData("README.fr.md", "## Ce qui quitte la machine")]
+    [InlineData("README.md", "## What leaves the machine")]
+    public void Chaque_hote_et_chaque_adresse_pinguee_du_produit_est_dit_dans_le_README(string readme, string titre)
     {
         var src = new DirectoryInfo(Path.Combine(Racine().FullName, "src"));
         var contactes = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -102,7 +104,7 @@ public sealed class CeQuiQuitteLaMachineEstDitTests
         }
         contactes.Should().Contain("www.amd.com", "temoin : le crible voit bien la page de pilotes d'AMD");
 
-        var section = SectionDuReadme();
+        var section = SectionDuReadme(readme, titre);
         contactes.Where(h => !section.Contains(h, StringComparison.OrdinalIgnoreCase)).Should().BeEmpty(
             "tout ce que DrDXT contacte est dit au joueur, dans le README");
     }

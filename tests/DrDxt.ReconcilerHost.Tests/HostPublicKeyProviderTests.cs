@@ -6,15 +6,15 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// HostPublicKeyProvider — loads the verify-only PUBLIC key from a known location.
+// HostPublicKeyProvider : charge la clé publique de vérification seule depuis un emplacement connu.
 //
-// The host VERIFIES manifests; it never signs (no private key, ever). This loads the
-// 32-byte raw Ed25519 public key from a file under the admin-write manifest root.
-//   * present + 32 bytes → Ok(key)
-//   * absent              → Fail (no key provisioned yet — the host then has no
-//                           verifier and refuses to reconcile, fail-closed)
-//   * wrong length        → Fail (a malformed key never silently "works")
-// No filesystem in the happy path is touched except a temp file we create here.
+// L'hôte vérifie les manifestes ; il ne signe jamais (aucune clé privée, jamais). Ceci charge la
+// clé publique Ed25519 brute de 32 octets depuis un fichier sous la racine de manifeste réservée aux admins.
+//   * présente + 32 octets → Ok(clé)
+//   * absente            → Fail (aucune clé provisionnée encore : l'hôte n'a alors pas de
+//                          vérificateur et refuse de réconcilier, fermé)
+//   * mauvaise longueur  → Fail (une clé malformée ne « marche » jamais en silence)
+// Aucun système de fichiers touché sur le chemin nominal, hormis un fichier temporaire créé ici.
 // -----------------------------------------------------------------------
 public sealed class HostPublicKeyProviderTests
 {
@@ -30,9 +30,9 @@ public sealed class HostPublicKeyProviderTests
             new Random(7).NextBytes(key);
             File.WriteAllBytes(path, key);
 
-            // enforceTrust:false — this test exercises the byte-length logic in a temp dir
-            // the (non-admin) test user owns; the at-rest ACL enforcement is covered by
-            // Load_WhenPresentButRootNotAdminTrusted_FailsClosed below.
+            // enforceTrust:false : ce test exerce la logique de longueur dans un dossier temporaire
+            // possédé par l'utilisateur de test (non admin) ; l'ACL au repos est couverte par
+            // Load_WhenPresentButRootNotAdminTrusted_FailsClosed ci-dessous.
             var result = HostPublicKeyProvider.Load(path, enforceTrust: false);
 
             result.IsOk.Should().BeTrue();
@@ -63,7 +63,7 @@ public sealed class HostPublicKeyProviderTests
         try
         {
             var path = Path.Combine(dir, "manifest-public.key");
-            File.WriteAllBytes(path, new byte[16]); // not 32
+            File.WriteAllBytes(path, new byte[16]); // pas 32
 
             var result = HostPublicKeyProvider.Load(path, enforceTrust: false);
 
@@ -76,7 +76,7 @@ public sealed class HostPublicKeyProviderTests
         }
     }
 
-    // 11/09/2026 — un fichier provisionne qui contient la cle de DEV est refuse par le service, dans
+    // Un fichier provisionne qui contient la cle de DEV est refuse par le service, dans
     // toutes les configurations : sa graine privee vit dans les tests du depot. Le temoin est
     // Load_WhenA32BytePublicKeyFileExists_ReturnsTheKey ci-dessus (meme longueur, autre cle).
     [Fact]
@@ -106,12 +106,12 @@ public sealed class HostPublicKeyProviderTests
         HostPublicKeyProvider.DefaultPath().Should().EndWith("manifest-public.key");
     }
 
-    // At-rest integrity (BLOCKER #1a): a 32-byte key that is well-formed but sits in a
-    // root the (non-admin) user OWNS / can write is an attack (a forged key the user can
-    // swap), not a provisioned key. With enforceTrust:true it FAILS CLOSED — so the host
-    // never builds a verifier from a user-controlled key. Deterministic regardless of the
-    // runner's elevation: the dir owner is explicitly forced to the current user SID, which
-    // is never BUILTIN\Administrators.
+    // Intégrité au repos : une clé de 32 octets bien formée mais placée dans une racine que
+    // l'utilisateur (non admin) possède ou peut écrire est une attaque (une clé forgée que
+    // l'utilisateur peut substituer), pas une clé provisionnée. Avec enforceTrust:true elle se ferme :
+    // l'hôte ne construit jamais un vérificateur depuis une clé contrôlée par l'utilisateur.
+    // Déterministe quelle que soit l'élévation du runner : le propriétaire du dossier est forcé au
+    // SID de l'utilisateur courant, qui n'est jamais BUILTIN\Administrators.
     [Fact]
     public void Load_WhenPresentButRootNotAdminTrusted_FailsClosed()
     {
@@ -125,7 +125,7 @@ public sealed class HostPublicKeyProviderTests
             var me = WindowsIdentity.GetCurrent().User!;
             var di = new DirectoryInfo(dir);
             var sec = di.GetAccessControl();
-            sec.SetOwner(me); // force owner = the current (non-admin) user, never Administrators
+            sec.SetOwner(me); // forcer propriétaire = l'utilisateur courant (non admin), jamais Administrators
             sec.AddAccessRule(new FileSystemAccessRule(
                 me, FileSystemRights.Modify,
                 InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,

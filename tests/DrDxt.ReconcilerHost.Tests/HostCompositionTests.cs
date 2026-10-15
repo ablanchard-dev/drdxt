@@ -11,8 +11,8 @@ using Microsoft.Extensions.Hosting;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// Composition smoke: the production DI graph resolves end-to-end, and the manifest
-// store is VERIFY-only (it can never sign on the host).
+// Fumée de composition : le graphe DI de production se résout de bout en bout, et le magasin
+// de manifeste est en vérification seule (il ne peut jamais signer sur l'hôte).
 // -----------------------------------------------------------------------
 public sealed class HostCompositionTests
 {
@@ -23,13 +23,13 @@ public sealed class HostCompositionTests
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = false });
     }
 
-    // A provider whose manifest storage is an injected IN-MEMORY seam (pre-registered so
-    // the host's TryAddSingleton does not override it). This lets the manifest verify
-    // tests round-trip without touching the real %ProgramData% / admin ACL.
+    // Un fournisseur dont le stockage de manifeste est une couture en mémoire injectée (préenregistrée
+    // pour que le TryAddSingleton de l'hôte ne l'écrase pas). Les tests de vérification du manifeste
+    // font ainsi l'aller-retour sans toucher au vrai %ProgramData% ni à l'ACL admin.
     [Fact]
     public async Task The_boot_reconciler_can_NEVER_reboot_the_machine_into_the_BIOS()
     {
-        // M3 lot 2. Cet hote tourne sans SURVEILLANCE. Un redemarrage qu'il aurait declenche
+        // Cet hote tourne sans SURVEILLANCE. Un redemarrage qu'il aurait declenche
         // arriverait chez le client comme une machine qui repart dans le BIOS toute seule,
         // sans rien a l'ecran pour l'expliquer -- et un reboot sans cause visible detruit la
         // confiance plus surement que n'importe quel bug. La couture firmware n'est donc
@@ -40,7 +40,7 @@ public sealed class HostCompositionTests
         using var sp = BuildProvider();
         var client = sp.GetRequiredService<IElevatedClient>();
 
-        var r = await client.ExecuteAsync(new RebootToFirmwareSetupOp(0), default);
+        var r = await client.ExecuteAsync(new RebootToFirmwareSetupOp(10), default);
 
         r.IsOk.Should().BeFalse();
         // Et l'echec est DIT : cabler la couture ici ferait passer ce test au vert, donc
@@ -48,22 +48,18 @@ public sealed class HostCompositionTests
         r.Error!.Value.Message.Should().Contain("not wired");
     }
 
-    // 11/09 — le jumeau GPU du test CI-dessus, et il manquait.
+    // Le jumeau GPU du test ci-dessus.
     //
-    // Rien ne prouvait que l'hote de boot refuse d'ecrire le GPU : la composition cable bien
-    // `DisabledNvApiActions` / `DisabledAdlxActions`, mais aucun test ne le tenait, et le
-    // commentaire de ces deux coutures ANNONCAIT une seconde barriere qui n'existe pas —
-    // `OpAllowlist.ValidateAdlx` accepte un `ApplyAdlxTuningOp` bien forme (index >= 0, `Kind`
-    // connu), il ne « gate » rien (commentaires corriges le 11/09). Le refus au boot repose donc
-    // ENTIEREMENT sur la couture cablee ici, ce qui en fait exactement le genre de decision qu'un
-    // test doit epingler.
+    // L'hote de boot refuse d'ecrire le GPU : la composition cable `DisabledNvApiActions` /
+    // `DisabledAdlxActions`. Il n'y a pas de seconde barriere : `OpAllowlist.ValidateAdlx` accepte
+    // un `ApplyAdlxTuningOp` bien forme (index >= 0, `Kind` connu). Le refus au boot repose donc
+    // ENTIEREMENT sur la couture cablee ici, exactement le genre de decision qu'un test doit epingler.
     //
     // Ce n'est pas la meme restriction que « les leviers GPU se mesurent au banc, jamais en
-    // appliquant » (close par la mesure du 09/09 : a `gpuWait` 0 %, un overclock ne rend
-    // rien). Celle-ci porte sur le CONTEXTE : un offset GPU est VOLATILE, un reboot l'efface, et un
+    // appliquant » (mesure du 09/09 : a `gpuWait` 0 %, un overclock ne rend rien). Celle-ci porte sur le CONTEXTE : un offset GPU est VOLATILE, un reboot l'efface, et un
     // service LocalSystem qui le reecrirait sans surveillance pourrait degrader le demarrage.
-    // Le vrai chemin produit — `DrDxt.ElevatedHelper.Program`, declenche par un geste de
-    // l'utilisateur — cable les deux vraies plumes (`NvApiTuningActions`, `ADLXTuningActions`) et
+    // Le vrai chemin produit (`DrDxt.ElevatedHelper.Program`, declenche par un geste de
+    // l'utilisateur) cable les deux vraies plumes (`NvApiTuningActions`, `ADLXTuningActions`) et
     // ecrit reellement. Confondre les deux ferait croire a un oubli cote AMD.
     [Fact]
     public async Task Le_reconciliateur_de_boot_n_ecrit_le_GPU_chez_AUCUN_des_deux_fabricants()
@@ -93,16 +89,16 @@ public sealed class HostCompositionTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(storage);
-        // 06/10/2026 : jamais la vraie clé de %ProgramData% (présente sur une machine où DrDXT a déjà signé).
+        // Jamais la vraie clé de %ProgramData% (présente sur une machine où DrDXT a déjà signé).
         services.AddSingleton(HostServiceCollectionExtensions.Verificateur(
             Path.Combine(Path.GetTempPath(), "drdxt-sans-cle-" + Guid.NewGuid().ToString("N"), "manifest-public.key")));
         services.AddDrDxtReconcilerHost();
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = false });
     }
 
-    // A provider whose IElevatedClient is the given (real) connect-only client, injected so
-    // the host's TryAddSingleton does not win — lets the absent-helper test use a short
-    // connect deadline instead of the production 5s wait.
+    // Un fournisseur dont l'IElevatedClient est le (vrai) client en connexion seule donné, injecté
+    // pour que le TryAddSingleton de l'hôte ne gagne pas : le test du helper absent peut utiliser une
+    // échéance de connexion courte au lieu des 5 s de production.
     private static ServiceProvider BuildProviderWithElevatedClient(IElevatedClient client)
     {
         var services = new ServiceCollection();
@@ -128,8 +124,8 @@ public sealed class HostCompositionTests
     [Fact]
     public void DefaultElevatedClient_IsTheInProcessExecutor_NotABrokerChannel()
     {
-        // Moat wiring Option B (M4-M5-moat-wiring-decision.md): the host's default
-        // IElevatedClient is the IN-PROCESS executor — no open privileged IPC endpoint.
+        // Câblage de la douve retenu : l'IElevatedClient par
+        // défaut de l'hôte est l'exécuteur en processus, sans point d'entrée IPC privilégié ouvert.
         using var sp = BuildProvider();
 
         sp.GetRequiredService<IElevatedClient>().Should().BeOfType<InProcessElevatedClient>(
@@ -141,9 +137,10 @@ public sealed class HostCompositionTests
     {
         using var sp = BuildProvider();
 
-        // 28/09/2026 : une seconde tache de fond, la protection du ping portee par le service.
+        // Une seconde tache de fond, la protection du ping portee par le service.
         var hosted = sp.GetServices<IHostedService>().Select(h => h.GetType()).ToList();
-        hosted.Should().BeEquivalentTo(new[] { typeof(Worker), typeof(ProtectionDuPingWorker) });
+        // Une troisième, le tube de l'état du processeur, en lecture seule.
+        hosted.Should().BeEquivalentTo(new[] { typeof(Worker), typeof(ProtectionDuPingWorker), typeof(ServeurDuProcesseur) });
     }
 
     [Fact]
@@ -169,17 +166,17 @@ public sealed class HostCompositionTests
 
         store.Should().BeOfType<SignedDesiredStateStore>();
 
-        // A verify-only store refuses to commit (no signing key) — fail-clean, not a throw.
+        // Un magasin en vérification seule refuse de committer (pas de clé de signature) : échec propre, pas une exception.
         var commit = await store.CommitAsync(new DesiredState(Array.Empty<AppliedTweak>()));
         commit.IsOk.Should().BeFalse("the host can verify but NEVER sign");
         commit.Error!.Value.Code.Should().Be(ErrorCodes.OpNotAllowed);
     }
 
 #if DEBUG
-    // DEBUG/test build: no manifest-public.key file is provisioned in this test env, so the
-    // host falls back to the EMBEDDED public key (DEBUG-only). A manifest produced by the
-    // embedded dev signer VERIFIES and LOADS through the host's wired verify-only store. A
-    // RELEASE build does not trust the embedded key — see the !DEBUG counterpart below.
+    // Version Debug/test : aucun fichier manifest-public.key n'est provisionné dans cet environnement,
+    // donc l'hôte se replie sur la clé publique embarquée (Debug seulement). Un manifeste produit par
+    // le signataire de dev embarqué se vérifie et se charge par le magasin câblé de l'hôte. Une
+    // version Release ne fait pas confiance à la clé embarquée : voir le pendant !DEBUG ci-dessous.
     [Fact]
     public async Task Host_VerifiesAndLoads_AManifestSignedByTheEmbeddedKey()
     {
@@ -187,8 +184,8 @@ public sealed class HostCompositionTests
         using var sp = BuildProviderWithStorage(storage);
         var policy = sp.GetRequiredService<IReconcilabilityPolicy>();
 
-        // The App side: commit a real, signed manifest with the embedded dev signer into
-        // the same storage the host reads.
+        // Côté App : committer un vrai manifeste signé avec le signataire de dev embarqué dans
+        // le même stockage que l'hôte lit.
         var committing = new SignedDesiredStateStore(
             storage, Ed25519ManifestSigner.FromSeed(ManifestDevTestKeys.DevPrivateSeed),
             ManifestDevKeys.CreateVerifier().Value!, policy, new SystemClock());
@@ -198,17 +195,17 @@ public sealed class HostCompositionTests
         });
         (await committing.CommitAsync(desired)).IsOk.Should().BeTrue();
 
-        // The host's wired verify-only store loads it (verifies under the embedded key).
+        // Le magasin câblé de l'hôte, vérification seule, le charge (vérifie sous la clé embarquée).
         var hostStore = sp.GetRequiredService<IDesiredStateStore>();
         var loaded = await hostStore.LoadAsync();
         loaded.IsOk.Should().BeTrue("the host verifies real manifests with the embedded public key");
         loaded.Value!.Tweaks.Should().ContainSingle().Which.TweakId.Should().Be("fixit.sanePowerPlan");
     }
 #else
-    // RELEASE build (key custody / T21): the host never trusts the embedded dev key. With no
-    // provisioned manifest-public.key, the host verifier is fail-closed, so even a manifest
-    // correctly signed by the embedded DEV seed is REJECTED — the moat refuses to reapply
-    // anything it cannot verify against a PROVISIONED production public key.
+    // Version Release (garde des clés) : l'hôte ne fait jamais confiance à la clé de dev embarquée.
+    // Sans manifest-public.key provisionné, le vérificateur de l'hôte est fermé, donc même un manifeste
+    // correctement signé par la graine de dev embarquée est rejeté : la douve refuse de réappliquer
+    // quoi que ce soit qu'elle ne peut vérifier contre une clé publique de production provisionnée.
     [Fact]
     public async Task Host_InRelease_FailsClosed_EvenOnAnEmbeddedDevKeySignedManifest()
     {
@@ -231,8 +228,8 @@ public sealed class HostCompositionTests
     }
 #endif
 
-    // A manifest signed by a DIFFERENT key still fails closed in the host: the embedded
-    // verifier holds only OUR public key, so a foreign-signed manifest applies nothing.
+    // Un manifeste signé par une autre clé se ferme toujours dans l'hôte : le vérificateur
+    // embarqué ne tient que notre clé publique, donc un manifeste signé ailleurs n'applique rien.
     [Fact]
     public async Task Host_FailsClosed_OnAForeignSignedManifest()
     {
@@ -265,16 +262,16 @@ public sealed class HostCompositionTests
     [Fact]
     public async Task ElevatedClient_FailsClean_WhenNoHelperServiceIsReachable_NeverFakesSuccess()
     {
-        // The CONNECT-only handshake client is the RETAINED V2 broker path (the V1 default is
-        // the in-process executor). Injected here so this test exercises the V2 client's
-        // fail-clean behaviour directly: with no helper service listening, the reapply fails
-        // CLEAN (HELPER_UNREACHABLE) — never a faked elevation success, never a crash.
+        // Le client de négociation en connexion seule est le chemin de courtier V2 conservé (le défaut
+        // V1 est l'exécuteur en processus). Injecté ici pour que ce test exerce directement l'échec
+        // propre du client V2 : sans service helper à l'écoute, la réapplication échoue proprement
+        // (HELPER_UNREACHABLE), jamais une élévation réussie inventée, jamais un plantage.
         //
-        // Test-hygiene: inject the same real connect-only client but with a DEAD pipe +
-        // short connect deadline so the absent-helper fail-clean path returns in ~ms
-        // instead of waiting the production 5s connect-retry budget. The client under test
-        // is still the genuine HandshakingElevatedClient (it really tries to connect and
-        // really fails clean) — only the timeout/pipe are tightened, never faked.
+        // Hygiène de test : injecter le même vrai client en connexion seule mais avec un tube mort et
+        // une échéance de connexion courte, pour que le chemin d'échec propre du helper absent rende en
+        // quelques ms au lieu d'attendre les 5 s de reconnexion de production. Le client testé reste
+        // le vrai HandshakingElevatedClient (il tente vraiment de se connecter et échoue vraiment
+        // proprement) ; seuls le délai et le tube sont resserrés, jamais simulés.
         var deadPipe = "DrDXT.HostComp." + Guid.NewGuid().ToString("N");
         using var sp = BuildProviderWithElevatedClient(
             HostElevatedClientFactory.CreateConnectOnly(pipeName: deadPipe, connectTimeoutMs: 50));
@@ -287,8 +284,8 @@ public sealed class HostCompositionTests
             "the real connect-only client surfaces HELPER_UNREACHABLE, never a faked success");
     }
 
-    // Defence-in-depth: even a SINGLE flipped byte of the signed canonical content fails
-    // closed in the host (the embedded verifier rejects it).
+    // Défense en profondeur : même un seul octet inversé du contenu canonique signé se ferme
+    // dans l'hôte (le vérificateur embarqué le rejette).
     [Fact]
     public async Task Host_FailsClosed_OnATamperedManifestByte()
     {
@@ -304,7 +301,7 @@ public sealed class HostCompositionTests
             new AppliedTweak("fixit.sanePowerPlan", "high", "balanced", DateTimeOffset.UtcNow),
         }))).IsOk.Should().BeTrue();
 
-        // Flip one byte of the signed canonical content (attacker edits the file at rest).
+        // Inverser un octet du contenu canonique signé (l'attaquant édite le fichier au repos).
         var original = storage.Slot!;
         var chars = original.CanonicalJson.ToCharArray();
         chars[chars.Length / 2] = chars[chars.Length / 2] == 'x' ? 'y' : 'x';
@@ -316,9 +313,9 @@ public sealed class HostCompositionTests
         loaded.Error!.Value.Code.Should().Be(ErrorCodes.ManifestTampered);
     }
 
-    // Local in-memory IManifestStorage seam (no real %ProgramData% / admin ACL). Mirrors
-    // the Reconciler.Tests double; kept local since this project does not reference that
-    // test assembly.
+    // Couture IManifestStorage locale en mémoire (ni vrai %ProgramData% ni ACL admin). Miroir de
+    // la doublure de Reconciler.Tests ; gardée locale parce que ce projet ne référence pas cet
+    // assembly de test.
     private sealed class InMemoryManifestStorage : IManifestStorage
     {
         public SignedManifestEnvelope? Slot { get; set; }

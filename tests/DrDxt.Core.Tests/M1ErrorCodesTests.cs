@@ -5,7 +5,7 @@ namespace DrDxt.Core.Tests;
 
 public class M1ErrorCodesTests
 {
-    // DET codes
+    // codes DET
     [Fact] public void WmiFail_is_stable()          => ErrorCodes.WmiFail.Should().Be("DET.WMI_FAIL");
     [Fact] public void DxgiFail_is_stable()         => ErrorCodes.DxgiFail.Should().Be("DET.DXGI_FAIL");
     [Fact] public void NvapiUnavailable_is_stable() => ErrorCodes.NvapiUnavailable.Should().Be("DET.NVAPI_UNAVAIL");
@@ -15,13 +15,13 @@ public class M1ErrorCodesTests
     [Fact] public void RegistryFail_is_stable()     => ErrorCodes.RegistryFail.Should().Be("DET.REG_FAIL");
     [Fact] public void FirmwareFail_is_stable()     => ErrorCodes.FirmwareFail.Should().Be("DET.FIRMWARE_FAIL");
 
-    // MEAS codes
+    // codes MEAS
     [Fact] public void PmonUnavailable_is_stable()  => ErrorCodes.PmonUnavailable.Should().Be("MEAS.PMON_UNAVAIL");
     [Fact] public void CaptureFail_is_stable()      => ErrorCodes.CaptureFail.Should().Be("MEAS.CAPTURE_FAIL");
     [Fact] public void NoFrames_is_stable()         => ErrorCodes.NoFrames.Should().Be("MEAS.NO_FRAMES");
     [Fact] public void PidInvalid_is_stable()       => ErrorCodes.PidInvalid.Should().Be("MEAS.PID_INVALID");
 
-    // MEAS codes — spine additions (M1.5)
+    // codes MEAS : ajouts de la colonne de mesure
     [Fact] public void NoPresentingFrames_is_stable() => ErrorCodes.NoPresentingFrames.Should().Be("MEAS.NO_PRESENTING_FRAMES");
     [Fact] public void ServiceNotInstalled_is_stable() => ErrorCodes.ServiceNotInstalled.Should().Be("MEAS.SERVICE_NOT_INSTALLED");
 
@@ -34,10 +34,10 @@ public class M1ErrorCodesTests
         ErrorCodes.NoPresentingFrames.Should().NotBe(ErrorCodes.NoFrames);
     }
 
-    // SCAN codes
+    // codes SCAN
     [Fact] public void NoBaseline_is_stable()       => ErrorCodes.NoBaseline.Should().Be("SCAN.NO_BASELINE");
 
-    // M0 constants must still be present
+    // Les premières constantes doivent rester présentes
     [Fact] public void M0_DetectionFailed_unchanged()       => ErrorCodes.DetectionFailed.Should().Be("DETECTION_FAILED");
     [Fact] public void M0_BenchmarkFailed_unchanged()       => ErrorCodes.BenchmarkFailed.Should().Be("BENCHMARK_FAILED");
     [Fact] public void M0_RestorePointBlocked_unchanged()   => ErrorCodes.RestorePointBlocked.Should().Be("RESTORE_POINT_BLOCKED");

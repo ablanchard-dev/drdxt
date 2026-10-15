@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.Detection.Tests.Hardware;
 
-// 07/10/2026 (D3) : les événements 1000 / 1001 / 1002 du journal de Defender reliés en analyses par leur identifiant.
+// Les événements 1000 / 1001 / 1002 du journal de Defender reliés en analyses par leur identifiant.
 public sealed class JournalDefenderTests
 {
     private static readonly DateTimeOffset T = new(2026, 10, 7, 3, 0, 0, TimeSpan.Zero);

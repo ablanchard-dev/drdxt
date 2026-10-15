@@ -7,7 +7,7 @@ using Xunit;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// T1.31 — Pipeline complet (fakes déterministes) → ScanResult cohérent.
+/// Pipeline complet (fakes déterministes) → ScanResult cohérent.
 /// Prouve que les briques se composent correctement : scorer reflète les findings,
 /// les catégories attendues sont présentes, baseline est transportée, pénalités appliquées.
 /// </summary>
@@ -46,7 +46,7 @@ public class ScanEndToEndTests
         var result = new ScanScorer().Score(hw, state, baseline);
 
         result.IsOk.Should().BeTrue();
-        result.Value!.Score.Should().BeInRange(1, 89,
+        result.Value!.Ledger!.Sum(e => e.Penalty).Should().BeInRange(11, 99,
             "machine mal réglée : Memory(12) + Scheduling×2(12+4) + Latency(4) + Gpu(4) = -36pts → score 64");
 
         result.Value.Findings
@@ -76,7 +76,7 @@ public class ScanEndToEndTests
 
         var state = new SettingsState(
             TriState.On, TriState.Unknown,
-            "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", // High Performance
+            "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", // Performances élevées
             TriState.On, TriState.On, Array.Empty<int>(), TriState.Unknown);
 
         var baseline = new BenchmarkResult(165, 140, 110, new List<double> { 6.0, 6.1 }, null, 0.8, 5);
@@ -103,7 +103,7 @@ public class ScanEndToEndTests
         var state = new SettingsState(
             XmpExpo: TriState.On,
             ReBar: TriState.On,
-            PowerPlanGuid: "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", // High Performance
+            PowerPlanGuid: "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", // Performances élevées
             Hags: TriState.On,
             GameMode: TriState.On,
             ParkedCoreIndexes: Array.Empty<int>(),
@@ -112,7 +112,7 @@ public class ScanEndToEndTests
         var baseline = new BenchmarkResult(120, 90, 70, new List<double> { 8.0 }, null, 1.0, 5);
 
         var r = new ScanScorer().Score(hw, state, baseline).Value!;
-        r.Score.Should().BeGreaterThanOrEqualTo(90, "machine déjà bien réglée → pas de penalité majeure");
+        r.Ledger!.Sum(e => e.Penalty).Should().BeLessThanOrEqualTo(10, "machine déjà bien réglée → pas de penalité majeure");
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public class ScanEndToEndTests
 
         result.IsOk.Should().BeTrue();
         result.Value!.Baseline.Should().BeNull("mode dégradé = pas de baseline");
-        result.Value.Score.Should().BeInRange(0, 100);
+        result.Value.Ledger!.Sum(e => e.Penalty).Should().BeInRange(0, 100);
         result.Value.Findings.Should().NotBeNull();
     }
 
@@ -154,9 +154,9 @@ public class ScanEndToEndTests
     {
         // Modèle "ledger de déductions" (plan 11, corrigé par l'audit) : le global est le REGISTRE
         // PLAT = clamp(100 - Σ pénalités des leviers applicables/connus/sous-optimaux), pas une
-        // moyenne pondérée 50/30/20 (§5 point 7).
+        // moyenne pondérée 50/30/20.
         // Config : XMP off (Major 15) = seul levier réel ici. Balanced sans symptôme core-parking
-        // → neutre (M5). ReBar On → Optimal. Pilote NVIDIA "531" ≥ floor 500 → frais. VRR Unknown → 0.
+        // → neutre. ReBar On → Optimal. Pilote NVIDIA "531" ≥ floor 500 → frais. VRR Unknown → 0.
         var hw = new HardwareInventory(
             new CpuInfo("Intel Core i7-13700K", "GenuineIntel", 16, 24, false, 0),
             new[] { new GpuInfo("NVIDIA RTX 3080", "NVIDIA", 10L << 30, "531", TriState.On) },
@@ -166,7 +166,7 @@ public class ScanEndToEndTests
             ChassisType.Desktop);
 
         var state = new SettingsState(
-            XmpExpo: TriState.Off,     // Major penalty 15 (desktop)
+            XmpExpo: TriState.Off,     // pénalité majeure 15 (bureau)
             ReBar: TriState.On,
             PowerPlanGuid: "381b4222-f694-41f0-9685-ff5bb260df2e",  // Balanced, sans symptôme → neutre
             Hags: TriState.On,
@@ -177,7 +177,7 @@ public class ScanEndToEndTests
         var r = new ScanScorer().Score(hw, state, baseline: null).Value!;
 
         // Registre plat : 100 - 15 (XMP off) = 85. Les neutres (Balanced sans symptôme, HAGS, VRR)
-        // ne fabriquent plus de déficit (audit C2/M5).
-        r.Score.Should().Be(85, "registre plat 100 - Σ pénalités, neutres non pénalisés (audit C2/M5)");
+        // ne fabriquent plus de déficit.
+        r.Ledger!.Sum(e => e.Penalty).Should().Be(15, "registre plat 100 - Σ pénalités, neutres non pénalisés (audit C2/M5)");
     }
 }

@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 23/09/2026 (D-SEC-3). Octets du build livré lus un par un : la DLL portait
+// Octets du build livré lus un par un : la DLL portait
 // « C:\Users\alicejoueuse\DrDXT\src\...\DrDxt.App.pdb », et les PDB livrés à côté mettaient les chemins
 // sources de la machine du développeur dans chaque pile de plantage (crash.log). Un utilisateur qui
 // envoie son crash.log envoyait le nom du compte Windows.

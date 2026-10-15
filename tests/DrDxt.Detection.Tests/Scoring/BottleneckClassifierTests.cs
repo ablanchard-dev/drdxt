@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Scoring;
 
 // -----------------------------------------------------------------------
-// L1.2 — le classifieur de goulot.
+// Le classifieur de goulot.
 //
 // Un test par etat, plus les gardes qui font que l'ordre des tests est la politique. Ce qui se
 // casse silencieusement ici, si on n'y prend pas garde :
@@ -52,7 +52,10 @@ public sealed class BottleneckClassifierTests
             PresentStallMsP95: presentStallMsP95,
             RenderPresentLatencyMsP95: renderPresentLatencyMsP95,
             AnimationErrorMsP95: animationErrorMsP95,
-            CommitPressure: commitPressure);
+            CommitPressure: commitPressure,
+            // Le banc compte chaque série ; un p95 sans compte ne décide rien (règle de l'écran).
+            AnimationErrorSamples: (frames ?? Frames(spread: spread)).Count,
+            PresentStallSamples: (frames ?? Frames(spread: spread)).Count);
 
     // ====================== l'aveu d'ignorance ======================
 
@@ -176,8 +179,8 @@ public sealed class BottleneckClassifierTests
     [Fact]
     public void A_cap_beats_the_pacing_and_the_limiter_questions()
     {
-        // Sous un cap, la moyenne FPS ne bouge pas quoi qu'on regle : c'est l'illusion mesuree
-        // le 01/09, ou ne rien faire « gagnait » plus que l'overclock.
+        // Sous un cap, la moyenne FPS ne bouge pas quoi qu'on regle : illusion mesuree le 01/09,
+        // ou ne rien faire « gagnait » plus que l'overclock.
         var cap = new FrameCapState(FrameCapVerdict.ComputedOnAnotherDisplay,
             "The cap (141 fps) was computed on your 144 Hz screen while you play on the 200 Hz one.");
 

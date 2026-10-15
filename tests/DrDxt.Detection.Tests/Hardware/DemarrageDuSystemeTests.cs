@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Hardware;
 
-// 07/10/2026 (F-32) : le dernier démarrage, rapide ou complet.
+// Le dernier démarrage, rapide ou complet.
 public sealed class DemarrageDuSystemeTests
 {
     private static readonly DateTimeOffset Compteur = new(2026, 10, 1, 8, 0, 0, TimeSpan.Zero);

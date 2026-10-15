@@ -5,7 +5,7 @@ using DrDxt.ElevatedHelper.Ipc;
 using DrDxt.ReconcilerHost;
 
 // -----------------------------------------------------------------------
-// reconcilerhelpersmoke — LIVE proof of the M5 reconciler↔helper CHANNEL.
+// reconcilerhelpersmoke — LIVE proof of the reconciler↔helper CHANNEL.
 //
 // Proves the three pieces of this increment end to end, with NO pre-shared key:
 //   1. SERVICE-MODE accept loop: the helper is launched ELEVATED in --service mode

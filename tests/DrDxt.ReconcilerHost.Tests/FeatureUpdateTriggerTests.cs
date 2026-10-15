@@ -5,16 +5,16 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// T28 — the composed feature-update TRIGGER.
+// Le déclencheur composé de mise à jour de fonctionnalité.
 //
-// The build detector (T27) is the PRIMARY, reliable signal. The IUpdateSignal event
-// read (Windows Update / Setup completion in the event log) is a CORROBORATING
-// signal that can fire EARLIER than the build flips (e.g. setup finished, build will
-// flip on next boot). The trigger fires when EITHER says "update": primary OR
-// corroborating. A primary FAIL is not masked by the corroborating signal — an
-// unreadable build is surfaced as Fail (the host must not silently treat unknown as
-// "updated"); the corroborating read is best-effort and never turns a primary Fail
-// into Ok.
+// Le détecteur de build est le signal principal, fiable. La lecture d'événement IUpdateSignal
+// (fin de Windows Update ou de Setup dans le journal d'événements) est un signal de
+// corroboration qui peut jouer plus tôt que le basculement du build (setup fini, le build
+// basculera au prochain démarrage). Le déclencheur joue quand l'un des deux dit « mise à jour » :
+// principal ou corroboration. Un Fail du principal n'est pas masqué par la corroboration : un
+// build illisible remonte en Fail (l'hôte ne doit pas traiter l'inconnu comme « mis à jour » en
+// silence) ; la lecture de corroboration est au mieux et ne transforme jamais un Fail principal
+// en Ok.
 // -----------------------------------------------------------------------
 public sealed class FeatureUpdateTriggerTests
 {
@@ -86,8 +86,8 @@ public sealed class FeatureUpdateTriggerTests
     [Fact]
     public async Task WhenCorroboratingSignalFails_ButPrimarySaysChanged_StillFires()
     {
-        // Primary already proves an update; the corroborating read being unavailable
-        // must not demote a proven update. (Corroborating is additive, best-effort.)
+        // Le principal prouve déjà une mise à jour ; l'indisponibilité de la lecture de corroboration
+        // ne doit pas rétrograder une mise à jour prouvée. (La corroboration est additive, au mieux.)
         var probe = new FakeOsBuildProbe { Build = "22631.4000" };
         var store = new InMemoryReconcilerStateStore(
             ReconcilerState.Default with { LastFeatureUpdateBuild = "22631.3447" });
@@ -101,8 +101,8 @@ public sealed class FeatureUpdateTriggerTests
     }
 }
 
-/// <summary>Fake corroborating update signal. <see cref="Recent"/> is what it reports;
-/// <see cref="Fail"/> makes the read fail (best-effort path).</summary>
+/// <summary>Faux signal de corroboration de mise à jour. <see cref="Recent"/> est ce qu'il rapporte ;
+/// <see cref="Fail"/> fait échouer la lecture (chemin au mieux).</summary>
 public sealed class FakeUpdateSignal : IUpdateSignal
 {
     public bool Recent { get; set; }

@@ -2,13 +2,15 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <!-- R2 GPU bench: the thin Vortice D3D11 runner pins bytecode + maps a readback
-         buffer (unsafe pointer span). Confined to that one boundary file. -->
+    <!-- Banc GPU : le fin runner Vortice D3D11 épingle le bytecode et mappe un tampon de
+         relecture (span de pointeur unsafe). Confiné à ce seul fichier frontière. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="DrDxt.Detection.Tests" />
+    <!-- L'aller-retour du tube du processeur se prouve avec le serveur du service. -->
+    <InternalsVisibleTo Include="DrDxt.ReconcilerHost.Tests" />
   </ItemGroup>
 
   <ItemGroup>
@@ -16,34 +18,34 @@
     <!-- Lecture du journal System (arrets brutaux). Mesure du 06/09/2026 : le meme resultat
          coute 16 701 ms par WMI Win32_NTLogEvent et 79 ms par ce lecteur. -->
     <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.12" />
-    <!-- Voie OFFICIELLE de lecture des compteurs de performance. Les deux autres sources de
-         frequence CPU (Win32_Processor, CallNtPowerInformation) rendent le NOMINAL sur cette
+    <!-- Voie officielle de lecture des compteurs de performance. Les deux autres sources de
+         frequence CPU (Win32_Processor, CallNtPowerInformation) rendent le nominal sur cette
          plateforme : ce paquet Microsoft est le seul chemin vers la frequence effective. -->
     <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="10.0.12" />
     <PackageReference Include="System.Management" Version="10.0.12" />
     <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
-    <!-- R2 GPU bench: the thin real-D3D11 compute runner (deterministic stability
-         workload). Same Vortice version as the existing DXGI detection package. -->
+    <!-- Banc GPU : le fin runner de calcul D3D11 réel (charge de stabilité déterministe).
+         Même version de Vortice que le paquet de détection DXGI existant. -->
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
-    <!-- R2: implements DrDxt.Application's IGpuComputeRunner seam with real D3D11.
-         Acyclic — Application references Core + Measurement, never Detection. -->
+    <!-- Implémente la couture IGpuComputeRunner de DrDxt.Application avec du vrai D3D11.
+         Sans cycle : Application référence Core + Measurement, jamais Detection. -->
     <ProjectReference Include="..\DrDxt.Application\DrDxt.Application.csproj" />
-    <!-- ADLX native boundary extracted to a leaf project so the elevated helper can
-         reuse the verified vtable slots without duplicating them. AdlxGpuTuningReader/
-         Writer here keep their DrDxt.Detection.Gpu.Adlx using via this reference. -->
+    <!-- La frontière native ADLX est sortie dans un projet feuille pour que le helper élevé
+         réutilise les emplacements de vtable vérifiés sans les dupliquer. AdlxGpuTuningReader/
+         Writer gardent ici leur using DrDxt.Detection.Gpu.Adlx par cette référence. -->
     <ProjectReference Include="..\DrDxt.GpuNative\DrDxt.GpuNative.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- R2 GPU bench: precompiled compute-shader bytecode (cs_5_0, FL11) embedded so the
-         runner needs no runtime HLSL compiler. Regenerate from GpuBench.hlsl with:
+    <!-- Banc GPU : bytecode du compute shader précompilé (cs_5_0, FL11), embarqué pour que le
+         runner n'ait pas besoin de compilateur HLSL à l'exécution. À régénérer depuis GpuBench.hlsl avec :
          fxc /T cs_5_0 /E CSMain /O3 /Fo GpuBench.cso GpuBench.hlsl -->
     <EmbeddedResource Include="Gpu\Bench\GpuBench.cso" />
-    <!-- Ship the HLSL source alongside for auditability (not compiled by MSBuild). -->
+    <!-- Livre la source HLSL à côté, pour l'audit (non compilée par MSBuild). -->
     <None Include="Gpu\Bench\GpuBench.hlsl" />
   </ItemGroup>
 

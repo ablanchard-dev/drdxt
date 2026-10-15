@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Gpu;
 
-// 03/10/2026 (tour G) : DrDXT ne disait jamais qu'un pilote NVIDIA avait du retard. La réponse réelle de la source NVIDIA,
+// DrDXT dit quand un pilote NVIDIA a du retard. La réponse réelle de la source NVIDIA,
 // relevée le 03/10/2026 (617.14, 616.92, 616.64), et le pilote réellement installé sur la machine (616.56).
 public sealed class VersionDuPiloteTests
 {
@@ -28,10 +28,12 @@ public sealed class VersionDuPiloteTests
     public void Le_pilote_installe_a_trois_versions_de_retard()
     {
         var c = VersionDuPilote.Juger("NVIDIA", "616.56", SourceNvidia.Lire(Reponse())!)!;
-        // Revue adverse du docteur (09/10/2026, R3) : être en retard n'est pas un défaut ; observé, avec son geste.
+        // Être en retard n'est pas un défaut ; observé, avec son geste.
         c.Statut.Should().Be(RepairStatus.Observed);
         c.Action.Should().Be(RepairAction.Recommandation);
-        c.Explication.Should().Contain("3 versions de retard").And.Contain("617.14 du 22/09/2026").And.Contain("ne l'installe pas");
+        c.Explication.Should().Contain("3 versions de retard").And.Contain("617.14 du 22/09/2026").And.Contain("ne l'installe pas")
+            .And.NotContain("Mets-le à jour");
+        c.Remede.Should().StartWith("1) Ouvre l'application NVIDIA").And.Contain("2) Installe la 617.14");
         c.ValeurCourante.Should().Be("NVIDIA 616.56");
     }
 

@@ -5,16 +5,16 @@ using DrDxt.Core;
 namespace DrDxt.App.ViewModels;
 
 /// <summary>
-/// A localized, display-ready BIOS Doctor finding (M3) surfaced in the scan results.
+/// Un constat du docteur BIOS, traduit et prêt à afficher dans les résultats du scan.
 ///
-/// BIOS findings are GUIDANCE-only: DrDXT never writes the firmware (decision §2, V1 =
-/// read + guide + prove). The user changes the setting themselves in the BIOS — these
-/// findings are never added to the apply batch. This VM carries the honest title,
-/// rationale, recommended direction, a SOURCED gain RANGE with its caveat (never a bare
-/// promised %), and honest flags:
-///   • <see cref="IsGuidanceOnly"/> — an actionable change the user makes in the BIOS;
-///   • <see cref="StateNotReadable"/> — the state could not be read, so we say "to verify"
-///     rather than assert a false state (honesty, decision §9 / §22.3).
+/// Les constats BIOS ne sont que du guidage : DrDXT n'écrit jamais le firmware (V1 = lire,
+/// guider, prouver). Le joueur change lui-même le réglage dans le BIOS ; ces constats ne sont
+/// jamais ajoutés au lot appliqué. Ce VM porte le titre honnête, la raison, le sens conseillé,
+/// une plage de gain sourcée avec sa réserve (jamais un % promis tout seul), et des drapeaux
+/// honnêtes :
+///   • <see cref="IsGuidanceOnly"/> : un changement à faire par le joueur dans le BIOS ;
+///   • <see cref="StateNotReadable"/> : l'état n'a pas pu être lu, on dit donc « à vérifier »
+///     au lieu d'affirmer un état faux (honnêteté).
 /// </summary>
 public sealed class BiosFindingViewModel
 {
@@ -27,18 +27,18 @@ public sealed class BiosFindingViewModel
         Rationale = localize(f.RationaleKey);
         ActionLabel = localize(f.RecommendedActionKey);
 
-        // Guidance-only: every actionable BIOS fix is a GUIDE — we never write the firmware.
+        // Guidage seul : chaque correction BIOS à faire est un guide, on n'écrit jamais le firmware.
         IsGuidanceOnly = f.MatrixClass == BiosMatrixClass.Guide;
         GuidanceLabel = IsGuidanceOnly ? localize("Scan.Bios.GuidanceOnly") : string.Empty;
 
-        // Honest "not read": surface "to verify" instead of asserting a state we don't have.
+        // « Non lu » honnête : on affiche « à vérifier » au lieu d'affirmer un état qu'on n'a pas.
         StateNotReadable = f.StateNotReadable;
         UnverifiedLabel = f.StateNotReadable ? localize("UI.Profile.Unverified") : string.Empty;
 
         if (f.Gain is { } g)
         {
-            // A SOURCED range + caveat (never a bare promised point-%). An unquantified gain
-            // (e.g. game-dependent ReBAR: null/null) leans entirely on the caveat — no number.
+            // Une plage sourcée et sa réserve (jamais un % ponctuel promis tout seul). Un gain non chiffré
+            // (par exemple ReBAR, qui dépend du jeu : null/null) repose entièrement sur la réserve, sans chiffre.
             GainLabel = (g.MinPct is { } min && g.MaxPct is { } max)
                 ? FormatRange(localize("Scan.Bios.GainRange"), min, max)
                 : string.Empty;
@@ -54,7 +54,7 @@ public sealed class BiosFindingViewModel
         }
     }
 
-    /// <summary>chantier B0 : la forme commune, ce que l'écran affiche.</summary>
+    /// <summary>La forme commune, ce que l'écran affiche.</summary>
     public DrDxt.Core.Constat Constat { get; }
 
     public string Kind { get; }
@@ -64,20 +64,20 @@ public sealed class BiosFindingViewModel
     public string ActionLabel { get; }
 
 
-    /// <summary>A SOURCED gain range (e.g. "≈ 11–25%"); empty when unquantified.</summary>
+    /// <summary>Une plage de gain sourcée (par exemple « ≈ 11–25% ») ; vide si non chiffrée.</summary>
     public string GainLabel { get; }
     public string GainSource { get; }
     public string GainCaveat { get; }
 
-    /// <summary>True when the gain is realized only if the setting is actually mis-set/mis-routed
-    /// (likely ≈0 otherwise) — drives conditional UI framing so we never over-promise.</summary>
+    /// <summary>Vrai quand le gain n'existe que si le réglage est vraiment mal posé ou mal routé
+    /// (sinon probablement ≈0) : pilote une formulation conditionnelle dans l'UI, pour ne jamais trop promettre.</summary>
     public bool IsGainConditional { get; }
 
-    /// <summary>True for an actionable change the user makes in the BIOS (DrDXT never writes it).</summary>
+    /// <summary>Vrai pour un changement à faire par le joueur dans le BIOS (DrDXT ne l'écrit jamais).</summary>
     public bool IsGuidanceOnly { get; }
     public string GuidanceLabel { get; }
 
-    /// <summary>True when the current state could not be read (honest unknown → "to verify").</summary>
+    /// <summary>Vrai quand l'état actuel n'a pas pu être lu (inconnu honnête → « à vérifier »).</summary>
     public bool StateNotReadable { get; }
     public string UnverifiedLabel { get; }
 

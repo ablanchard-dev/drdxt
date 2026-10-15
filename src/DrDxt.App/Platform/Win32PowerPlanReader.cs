@@ -5,12 +5,12 @@ using DrDxt.Core;
 namespace DrDxt.App.Platform;
 
 // -----------------------------------------------------------------------
-// Win32PowerPlanReader — the real IPowerPlanReader (read-only).
+// Win32PowerPlanReader : le vrai IPowerPlanReader (lecture seule).
 //
-// Reads the active power-plan GUID through PlanActif (Core), the one place that
-// calls PowerGetActiveScheme. Any failure →
-// Fail(TWEAK.SDK_UNAVAILABLE). Never throws. The plan SWITCH is privileged and
-// goes through the helper (SetActivePowerPlanOp) — this only reads.
+// Lit le GUID du plan d'alimentation actif via PlanActif (Core), le seul endroit qui
+// appelle PowerGetActiveScheme. Tout échec → Fail(TWEAK.SDK_UNAVAILABLE). Ne lève jamais.
+// Changer de plan est privilégié et passe par le helper (SetActivePowerPlanOp) ; ici, on
+// ne fait que lire.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class Win32PowerPlanReader : IPowerPlanReader

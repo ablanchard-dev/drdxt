@@ -1,18 +1,18 @@
 ﻿namespace DrDxt.App.ViewModels;
 
 /// <summary>
-/// A single hardware/system component shown in the assistant panel
-/// ("Le scan va examiner..." / detected inventory). Value is "—" when unavailable.
+/// Un composant matériel ou système affiché dans le panneau d'aide (« Le scan va examiner... »
+/// ou l'inventaire détecté). Value vaut un tiret cadratin quand il manque.
 /// </summary>
-/// <param name="IconKey">Stable key identifying the glyph to render (Cpu/Gpu/Ram/Ssd/Windows).</param>
-/// <param name="Label">Localized component label (e.g. "Processeur").</param>
-/// <param name="Value">Detected model/value, or "—" when unavailable.</param>
+/// <param name="IconKey">Clé stable du glyphe à dessiner (Cpu/Gpu/Ram/Ssd/Windows).</param>
+/// <param name="Label">Libellé traduit du composant (par exemple « Processeur »).</param>
+/// <param name="Value">Modèle ou valeur détecté, ou un tiret cadratin quand il manque.</param>
 public sealed record ComponentItem(string IconKey, string Label, string Value);
 
-/// <summary>08/10/2026 (critique UI, défaut 8) : une ligne du tableau des changements pas encore jugés en jeu.</summary>
+/// <summary>Une ligne du tableau des changements pas encore jugés en jeu.</summary>
 public sealed record LigneEnAttente(string Changement, string Date, string EnJeu);
 
-/// <summary>08/10/2026 (critique UI, défaut 6) : un satellite de l'orbite, son composant et le domaine qu'il ouvre.
+/// <summary>Un satellite de l'orbite, son composant et le domaine qu'il ouvre.
 /// Avant le scan, <see cref="Domaine"/> est nul : pas d'état à dire, pas de clic.</summary>
 public sealed record SatelliteDomaine(ComponentItem Composant, DomaineMachine? Domaine)
 {

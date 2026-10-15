@@ -5,32 +5,32 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T21 — CI security gate (M5).  A STATIC safety net over everything M5 built
-// (licence T1-T9/T18, update T12-T13).  These are not behaviour tests — they scan
-// the source TREE and FAIL the build if a security regression is introduced:
+// Porte de sécurité CI. Un filet statique sur le code de licence et de mise à jour
+// (signature, garde, confiance). Ce ne sont pas des tests de comportement : ils balaient
+// l'arbre source et font échouer la génération si une régression de sécurité entre :
 //
-//   (1) ANTI-SECRET     no Keygen admin token / webhook HMAC secret / bearer token /
-//                       long secret-shaped blob may live in src/DrDxt.*  (the server
-//                       secret lives only in server/, via env, never committed).
-//   (2) anti-fail-open  no `catch` in the licence/update trust layer may return a
-//                       SUCCESS (Result.Ok / true / LicenseStatus.Licensed).  A broken
-//                       signature must never become a pass (§1, §9 of 07-SECURITY).
-//   (3) public-only keys  EmbeddedKeys / UpdateDevKeys expose only public material;
-//                       the dev/test PRIVATE seed must stay banner-fenced and is never
-//                       referenced by PRODUCTION code (only by tests).
+//   (1) anti-secret       aucun jeton admin Keygen, secret HMAC de webhook, jeton bearer ou
+//                         long blob en forme de secret ne peut vivre dans src/DrDxt.* (le secret
+//                         serveur ne vit que dans server/, par l'environnement, jamais commité).
+//   (2) anti-ouverture    aucun `catch` de la couche de confiance licence/mise à jour ne peut
+//                         rendre un succès (Result.Ok / true / LicenseStatus.Licensed). Une
+//                         signature cassée ne doit jamais devenir un laissez-passer.
+//   (3) clés publiques seules  EmbeddedKeys / UpdateDevKeys n'exposent que du matériel public ;
+//                         la graine privée de dev/test doit rester encadrée par sa bannière et
+//                         n'est jamais référencée par du code de production (seulement par des tests).
 //
-// These tests carry [Trait("Category","SecurityGate")] so CI can select them exactly
-// (mirrors the M4 ReconcileGate pattern in .github/workflows/ci.yml).  A 0-match
-// filter would be a silent gate, so the trait is applied to real, present tests here.
+// Ces tests portent [Trait("Category","SecurityGate")] pour que la CI les sélectionne exactement
+// (même motif que ReconcileGate dans .github/workflows/ci.yml). Un filtre à 0 correspondance
+// serait une porte muette, donc le trait est posé sur de vrais tests présents ici.
 //
-// Repo-root resolution: every test resolves the repo root by walking UP from the test
-// assembly's location (AppContext.BaseDirectory) until it finds the directory that
-// contains DrDXT.sln.  This is robust to the bin/Debug|Release/net8.0-windows nesting
-// and to being run from any CWD (CI, IDE, dotnet test).
+// Résolution de la racine du dépôt : chaque test remonte depuis l'emplacement de l'assembly
+// de test (AppContext.BaseDirectory) jusqu'au dossier qui contient DrDXT.sln. Robuste à
+// l'imbrication bin/Debug|Release/net8.0-windows et à tout répertoire courant
+// (CI, IDE, dotnet test).
 // ─────────────────────────────────────────────────────────────────────────────
 public sealed class SecurityGateTests
 {
-    // ── repo-root resolution (walk up to the folder holding DrDXT.sln) ───────────
+    // ── résolution de la racine du dépôt (remonter jusqu'au dossier qui tient DrDXT.sln) ────
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -53,7 +53,7 @@ public sealed class SecurityGateTests
         return src;
     }
 
-    // Every production .cs under src/DrDxt.* (skip generated obj/bin).
+    // Chaque .cs de production sous src/DrDxt.* (obj/bin générés exclus).
     private static IReadOnlyList<string> ProductionCsFiles()
         => FichiersDuDepot.Sous(SrcRoot(), "*.cs")
             .Where(p => !IsGenerated(p))
@@ -70,24 +70,24 @@ public sealed class SecurityGateTests
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  (1) ANTI-SECRET  — no server-only credential may appear in the client tree.
+    //  (1) anti-secret : aucun identifiant réservé au serveur ne peut apparaître dans l'arbre client.
     //
-    //  Method: scan every production .cs line.  Line comments (// …) and the bodies
-    //  of // banners are STRIPPED first, because the codebase legitimately *documents*
-    //  these forbidden tokens in prose ("the admin TOKEN and the webhook HMAC secret
-    //  are SERVER-only").  We only flag tokens that survive comment-stripping, i.e.
-    //  tokens in actual CODE / string literals.  Zero false positives on the current
-    //  tree (verified: the only matches today are in comments).
+    //  Méthode : balayer chaque ligne .cs de production. Les commentaires de ligne (// …) et le
+    //  corps des bannières // sont retirés d'abord, parce que le dépôt documente légitimement ces
+    //  jetons interdits en prose (« le jeton admin et le secret HMAC du webhook sont serveur
+    //  seulement »). Seuls les jetons qui survivent au retrait des commentaires sont signalés,
+    //  c'est-à-dire ceux dans du vrai code ou des littéraux. Zéro faux positif sur l'arbre
+    //  courant (vérifié : les seules correspondances sont dans des commentaires).
     // ─────────────────────────────────────────────────────────────────────────
     [Fact]
     [Trait("Category", "SecurityGate")]
     public void NoServerSecretIsCommittedInTheClientTree()
     {
-        // Forbidden code-token substrings (case-insensitive), the shape a leaked
-        // server credential would take.  Not matched in comments.
+        // Sous-chaînes de jetons de code interdites (insensibles à la casse), la forme que
+        // prendrait un identifiant serveur fuité. Non cherchées dans les commentaires.
         var forbidden = new[]
         {
-            "Authorization: Bearer", // a bearer/admin header would mean the client holds a server token
+            "Authorization: Bearer", // un en-tête bearer/admin voudrait dire que le client tient un jeton serveur
             "admin-token",
             "admin_token",
             "keygen_admin",
@@ -111,11 +111,10 @@ public sealed class SecurityGateTests
                         offenders.Add($"{Rel(file)}:{i + 1}  [{token}]  {lines[i].Trim()}");
                 }
 
-                // A long secret-shaped blob assigned to a *secret*/*token*/*apiKey*/
-                // *password*/*hmac* member is a leaked secret.  Ed25519 PUBLIC keys
-                // (byte arrays 0x..) and the public SPKI pins are not caught: they are
-                // neither named like a secret nor a contiguous base64/hex literal of a
-                // secret field.
+                // Un long blob en forme de secret affecté à un membre *secret*/*token*/*apiKey*/
+                // *password*/*hmac* est un secret fuité. Les clés publiques Ed25519 (tableaux
+                // d'octets 0x..) et les épingles SPKI publiques ne sont pas attrapées : ni nommées
+                // comme un secret, ni littéral base64/hex contigu d'un champ secret.
                 if (SecretNamedLongLiteral.IsMatch(code))
                     offenders.Add($"{Rel(file)}:{i + 1}  [secret-named long literal]  {lines[i].Trim()}");
             }
@@ -127,45 +126,45 @@ public sealed class SecurityGateTests
             Environment.NewLine + string.Join(Environment.NewLine, offenders));
     }
 
-    // An identifier that CONTAINS a secret word (secret / token / admin / bearer /
-    // credential / apiKey / password / passwd / hmac - anywhere in the name, e.g.
-    // WebhookHmacSecret, AdminKey, ServerToken) assigned (= or :) a >=20-char base64/hex
-    // STRING LITERAL.  This is the "long blob in a *secret*/*token*/*apiKey* field" case
-    // from the plan.
+    // Un identifiant qui contient un mot secret (secret / token / admin / bearer /
+    // credential / apiKey / password / passwd / hmac, n'importe où dans le nom, par exemple
+    // WebhookHmacSecret, AdminKey, ServerToken) affecté (= ou :) d'un littéral chaîne
+    // base64/hex de 20 caractères ou plus. C'est le cas « long blob dans un champ
+    // *secret*/*token*/*apiKey* ».
     //
-    // Measured 26/08/2026 by planting the same 28-char base64 blob in EmbeddedKeys.cs:
-    //   WebhookHmacSecret  = "..."   -> caught      AdminKey         = "..." -> MISSED
-    //   "Authorization: Bearer ..."  -> caught      ServerToken      = "..." -> MISSED
-    //   KeygenAdminKey     = "..."   -> caught      BearerCredential = "..." -> MISSED
-    // The word list carried secret/api_key/password/passwd/hmac while the PLAN said
-    // "*secret*/*token*/*apiKey*": token/admin/bearer/credential were never added, so a
-    // pasted Keygen admin token in a field named AdminKey shipped SILENTLY.  Added now.
+    // Mesuré en plantant le même blob base64 de 28 caractères dans EmbeddedKeys.cs :
+    //   WebhookHmacSecret  = "..."   → attrapé      AdminKey         = "..." → manqué
+    //   "Authorization: Bearer ..."  → attrapé      ServerToken      = "..." → manqué
+    //   KeygenAdminKey     = "..."   → attrapé      BearerCredential = "..." → manqué
+    // La liste de mots portait secret/api_key/password/passwd/hmac alors que l'intention
+    // visait « *secret*/*token*/*apiKey* » : token/admin/bearer/credential manquaient, donc un
+    // jeton admin Keygen collé dans un champ nommé AdminKey partait en silence. Ils y sont.
     //
-    // CEILING, stated on purpose: the same blob SPLIT across two literals
-    // ("aGVsbG8" + "d29ybGQ") still passes, and always will - that is deliberate evasion,
-    // not the accidental paste this gate exists to stop.  No text scan closes it.
+    // Plafond, dit exprès : le même blob coupé en deux littéraux
+    // ("aGVsbG8" + "d29ybGQ") passe toujours, et passera toujours ; c'est une évasion délibérée,
+    // pas le collage accidentel que cette porte existe pour arrêter. Aucun balayage de texte ne le ferme.
     //
-    //   * the identifier is [A-Za-z0-9_]* containing one of the words (case-insensitive);
-    //   * "key" alone is intentionally not a trigger (too broad - "publicKey", "KeyBlob"),
-    //     only the compound "apikey"/"api_key" is.  The SPKI pins sit in an array
-    //     initializer with no `identifier =` before them, so they stay unflagged.
+    //   * l'identifiant est [A-Za-z0-9_]* contenant l'un des mots (insensible à la casse) ;
+    //   * « key » seul n'est pas un déclencheur à dessein (trop large : « publicKey », « KeyBlob »),
+    //     seul le composé « apikey »/« api_key » l'est. Les épingles SPKI sont dans un initialiseur
+    //     de tableau sans `identifiant =` devant, donc elles restent non signalées.
     private static readonly Regex SecretNamedLongLiteral = new(
         @"\b[A-Za-z0-9_]*(secret|token|admin|bearer|credential|api_?key|password|passwd|hmac)[A-Za-z0-9_]*""?\s*[=:]\s*""[A-Za-z0-9+/]{20,}={0,2}""",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  (2) anti-fail-open — no catch in the trust layer returns success.
+    //  (2) anti-ouverture : aucun catch de la couche de confiance ne rend un succès.
     //
-    //  Files guarded: the four that decide trust (signature/licence/update/gate).
-    //  Method: for each `catch` keyword we extract its BLOCK BODY by brace-balancing
-    //  ( `catch (...) { … }` ), then STRIP comments from the body, then assert the body
-    //  contains NO success-return pattern.  Because we only look INSIDE catch bodies,
-    //  the many *legitimate* `return LicenseStatus.Licensed` / `return Result.Ok()` that
-    //  live OUTSIDE catch (the happy path) are never flagged — that is the false-positive
-    //  the plan warns about, and the brace-balancing precisely avoids it.
+    //  Fichiers gardés : les quatre qui décident la confiance (signature/licence/mise à jour/porte).
+    //  Méthode : pour chaque mot-clé `catch`, extraire le corps de son bloc par équilibrage
+    //  d'accolades ( `catch (...) { … }` ), puis retirer les commentaires du corps, puis vérifier
+    //  que le corps ne contient aucun motif de retour de succès. Comme on ne regarde qu'à
+    //  l'intérieur des corps de catch, les nombreux `return LicenseStatus.Licensed` /
+    //  `return Result.Ok()` légitimes hors catch (le chemin heureux) ne sont jamais signalés :
+    //  c'est le faux positif à éviter, et l'équilibrage d'accolades l'évite précisément.
     //
-    //  Proven zero-false-positive on today's code (already fail-clean): every catch in
-    //  these files returns Result.Fail / Result<…>.Fail / null.
+    //  Zéro faux positif prouvé sur le code courant (déjà à échec propre) : chaque catch de
+    //  ces fichiers rend Result.Fail / Result<…>.Fail / null.
     // ─────────────────────────────────────────────────────────────────────────
     [Theory]
     [Trait("Category", "SecurityGate")]
@@ -182,8 +181,8 @@ public sealed class SecurityGateTests
         {
             var code = StripComments(body.Body);
 
-            // Any of these inside a catch body is a fail-OPEN: a thrown/faulted path that
-            // ends up GRANTING trust instead of refusing it.
+            // N'importe lequel de ces motifs dans un corps de catch est une ouverture : un chemin
+            // levé ou en faute qui finit par accorder la confiance au lieu de la refuser.
             if (SuccessReturnInCatch.IsMatch(code))
             {
                 offenders.Add(
@@ -198,21 +197,21 @@ public sealed class SecurityGateTests
             Environment.NewLine + string.Join(Environment.NewLine, offenders));
     }
 
-    // Success MENTIONED anywhere in a catch body — not just `return <success>`.
+    // Succès mentionné n'importe où dans un corps de catch, pas seulement `return <succès>`.
     //
-    // Measured 26/08/2026 by mutating the catch of Ed25519LicenseVerifier.Verify:
-    //   `return Result.Ok();`                                   -> caught (red)
-    //   `var passe = Result.Ok(); return passe;`                -> not caught (green)
-    //   `return signature.Length > 0 ? Result.Ok() : Fail(...);` -> not caught (green)
-    // The old pattern anchored on `return\s+`, so two ordinary ways of writing the same
-    // fail-open walked straight through a gate whose name promises it cannot happen.
-    // Dropping the anchor catches all three. Verified zero false positives: none of the
-    // 7 catch bodies in the guarded files mentions Ok / Licensed / true today.
+    // Mesuré en mutant le catch de Ed25519LicenseVerifier.Verify :
+    //   `return Result.Ok();`                                   → attrapé (rouge)
+    //   `var passe = Result.Ok(); return passe;`                → non attrapé (vert)
+    //   `return signature.Length > 0 ? Result.Ok() : Fail(...);` → non attrapé (vert)
+    // L'ancien motif s'ancrait sur `return\s+`, donc deux façons ordinaires d'écrire la même
+    // ouverture traversaient une porte dont le nom promet que c'est impossible.
+    // Retirer l'ancre attrape les trois. Zéro faux positif vérifié : aucun des
+    // 7 corps de catch des fichiers gardés ne mentionne Ok / Licensed / true.
     //
-    // CEILING, stated on purpose - this is a text scan, not a compiler. It still cannot
-    // see a success routed through a helper (`return Grant();`), a field set in the catch
-    // and returned after it, or a swallowing `catch { }` that falls through to the happy
-    // path. Those need a BEHAVIOURAL test (fault-inject, assert Fail), not a wider regex.
+    // Plafond, dit exprès : c'est un balayage de texte, pas un compilateur. Il ne voit toujours
+    // pas un succès routé par une aide (`return Grant();`), un champ posé dans le catch et rendu
+    // après, ni un `catch { }` qui avale et retombe sur le chemin heureux. Ceux-là demandent
+    // un test de comportement (injecter la faute, vérifier Fail), pas une regex plus large.
     private static readonly Regex SuccessReturnInCatch = new(
         @"(Result(<[^>]+>)?\s*\.\s*Ok)\b" +
         @"|(LicenseStatus\s*\.\s*Licensed)\b" +
@@ -221,24 +220,24 @@ public sealed class SecurityGateTests
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  (3) public-only key files — UpdateDevKeys (banner-fenced in-file seed).
+    //  (3) fichiers de clés publiques seules : UpdateDevKeys (graine en fichier encadrée par bannière).
     //
-    //  Invariant: the client root-of-trust files expose only public material in a way
-    //  PROD code may consume.  For UpdateDevKeys, a dev/test PRIVATE seed is tolerated only if:
-    //    (a) it is clearly banner-fenced as DEV/TEST, AND
-    //    (b) it is never referenced by production code (only by tests).
-    //  The gate fails if a private seed loses its dev/test banner, or if any production
-    //  file references the seed member.  EmbeddedKeys (license) and ManifestDevKeys are held
-    //  to the STRICTER "no seed in any config" bar instead (see (4a) / (4a-bis)).
+    //  Invariant : les fichiers de racine de confiance du client n'exposent que du matériel public
+    //  consommable par le code de production. Pour UpdateDevKeys, une graine privée de dev/test n'est tolérée que si :
+    //    (a) elle est clairement encadrée par une bannière dev/test, et
+    //    (b) elle n'est jamais référencée par du code de production (seulement par des tests).
+    //  La porte échoue si une graine privée perd sa bannière dev/test, ou si un fichier de
+    //  production référence le membre graine. EmbeddedKeys (licence) et ManifestDevKeys sont
+    //  tenus à la barre plus stricte « aucune graine dans aucune configuration » (voir (4a) / (4a-bis)).
     // ─────────────────────────────────────────────────────────────────────────
     [Theory]
     [Trait("Category", "SecurityGate")]
     [InlineData("src/DrDxt.Infrastructure/Updates/UpdateDevKeys.cs", "UpdateDevKeys", "DevPrivateSeed")]
-    // NB: the MANIFEST key (ManifestDevKeys) is not in this list — it is held to a STRICTER
-    // bar than an in-file banner-fenced seed: its private seed ships NOWHERE in src/ (Debug
-    // or Release), it lives only in the test assemblies. See
-    // ManifestDevKeys_ShipsNoUsablePrivateSeedInAnyConfig below. Only UpdateDevKeys still
-    // keeps a banner-fenced in-file dev seed.
+    // La clé du manifeste (ManifestDevKeys) n'est pas dans cette liste : elle est tenue à une
+    // barre plus stricte qu'une graine en fichier encadrée : sa graine privée n'est livrée nulle
+    // part dans src/ (Debug ou Release), elle ne vit que dans les assemblys de test. Voir
+    // ManifestDevKeys_ShipsNoUsablePrivateSeedInAnyConfig ci-dessous. Seul UpdateDevKeys
+    // garde encore une graine de dev en fichier encadrée par bannière.
     public void DevPrivateSeedIsBannerFencedAndNeverUsedByProductionCode(
         string relativePath, string className, string seedMember)
     {
@@ -246,9 +245,9 @@ public sealed class SecurityGateTests
         File.Exists(full).Should().BeTrue();
         var source = File.ReadAllText(full);
 
-        // (a) The seed member is present and BANNER-FENCED as DEV/TEST.  We require the
-        // explicit dev/test marker near the file (the loud "DEV / TEST PRIVATE SEED"
-        // banner) — its absence means someone stripped the warning.
+        // (a) Le membre graine est présent et encadré par une bannière dev/test. On exige le
+        // marqueur dev/test explicite près du fichier (la bannière bien visible « DEV / TEST PRIVATE
+        // SEED ») : son absence veut dire que quelqu'un a retiré l'avertissement.
         source.Should().Contain(seedMember, $"{relativePath} declares the dev/test seed");
         source.Should().MatchRegex(
             @"DEV\s*/\s*TEST",
@@ -256,11 +255,11 @@ public sealed class SecurityGateTests
         source.Should().Contain("NEVER READ AT RUNTIME",
             $"{relativePath}: the private-seed banner must state it is never read by production code");
 
-        // (b1) INSIDE the declaring file, the seed appears only as its declaration
-        // (`… byte[] DevPrivateSeed =>`) — it is never consumed by a sibling production
-        // method (the thing that would turn the client into a forger, e.g. a
-        // `CreateDevSigner() => …FromSeed(DevPrivateSeed)`).  Comments / XML-docs that
-        // merely NAME the seed are stripped first, so only real code counts.
+        // (b1) Dans le fichier déclarant, la graine n'apparaît que comme sa déclaration
+        // (`… byte[] DevPrivateSeed =>`) ; elle n'est jamais consommée par une méthode de
+        // production voisine (ce qui ferait du client un faussaire, par exemple un
+        // `CreateDevSigner() => …FromSeed(DevPrivateSeed)`). Les commentaires et docs XML qui
+        // ne font que nommer la graine sont retirés d'abord, donc seul le vrai code compte.
         var selfUses = CodeLinesReferencing(full, seedMember)
             .Where(l => !IsSeedDeclaration(l, seedMember))
             .ToList();
@@ -269,10 +268,10 @@ public sealed class SecurityGateTests
             "in its own file (a sibling signer would let the client forge, not just verify):" +
             Environment.NewLine + string.Join(Environment.NewLine, selfUses));
 
-        // (b2) NO OTHER production file may reference the seed via its QUALIFIED name
-        // (`ClassName.DevPrivateSeed`) in code.  Qualified, so an identically-named seed
-        // in a different class is not mis-attributed.  Tests legitimately use it (to sign
-        // fixtures) and live OUTSIDE src/, so they are not scanned here.
+        // (b2) Aucun autre fichier de production ne peut référencer la graine par son nom
+        // qualifié (`ClassName.DevPrivateSeed`) dans du code. Qualifié, pour qu'une graine de même
+        // nom dans une autre classe ne soit pas mal attribuée. Les tests s'en servent légitimement
+        // (pour signer des fixtures) et vivent hors de src/, donc ils ne sont pas balayés ici.
         var qualified = $"{className}.{seedMember}";
         var prodReferers = ProductionCsFiles()
             .Where(p => !PathEquals(p, full))
@@ -289,9 +288,9 @@ public sealed class SecurityGateTests
     [Trait("Category", "SecurityGate")]
     public void EmbeddedKeyFilesExposePublicMaterialBanner()
     {
-        // Every client/service root-of-trust file must carry the loud "EMBEDDED PUBLIC
-        // MATERIAL only" banner — its presence is the human-readable contract the other
-        // checks enforce. This includes the MANIFEST key (the moat's integrity root).
+        // Chaque fichier de racine de confiance du client ou du service doit porter la bannière
+        // bien visible « EMBEDDED PUBLIC MATERIAL only » : sa présence est le contrat lisible que
+        // les autres contrôles imposent. Clé du manifeste comprise (la racine d'intégrité de la douve).
         foreach (var rel in new[]
         {
             "src/DrDxt.Infrastructure/Updates/UpdateDevKeys.cs",
@@ -307,14 +306,14 @@ public sealed class SecurityGateTests
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  (4a) MANIFEST KEY — no usable private seed in any config (M5 review #3/#4).
+    //  (4a) Clé du manifeste : aucune graine privée utilisable dans aucune configuration.
     //
-    //  The manifest-signing key is the moat's integrity root. Unlike the licence/update
-    //  dev seeds (which legitimately keep a banner-fenced in-file seed), the manifest dev
-    //  seed must not ship in DrDxt.Reconciler.dll in EITHER Debug or Release — it lives
-    //  only in the test assemblies (DrDxt.TestSupport.ManifestDevTestKeys, tests/Shared).
-    //  So: ManifestDevKeys.cs declares NO private seed member, and the known dev seed byte
-    //  pattern appears NOWHERE under src/.
+    //  La clé de signature du manifeste est la racine d'intégrité de la douve. Contrairement aux
+    //  graines de dev de licence et de mise à jour (qui gardent légitimement une graine en fichier
+    //  encadrée), la graine de dev du manifeste ne doit être livrée dans DrDxt.Reconciler.dll ni
+    //  en Debug ni en Release ; elle ne vit que dans les assemblys de test
+    //  (DrDxt.TestSupport.ManifestDevTestKeys, tests/Shared). Donc : ManifestDevKeys.cs ne déclare
+    //  aucun membre graine privée, et le motif d'octets de la graine de dev connue n'apparaît nulle part sous src/.
     // ─────────────────────────────────────────────────────────────────────────
     [Fact]
     [Trait("Category", "SecurityGate")]
@@ -325,14 +324,14 @@ public sealed class SecurityGateTests
         File.Exists(manifestKeys).Should().BeTrue();
         var source = File.ReadAllText(manifestKeys);
 
-        // No private-seed MEMBER is declared (a `byte[] …Seed =>/=` would be a shipped key).
+        // Aucun membre graine privée n'est déclaré (un `byte[] …Seed =>/=` serait une clé livrée).
         Regex.IsMatch(source, @"\bbyte\s*\[\s*\]\s*\w*Seed\b")
             .Should().BeFalse(
                 "ManifestDevKeys.cs (the moat's root of trust) must declare NO private seed " +
                 "member — the dev/test seed lives only in the test assemblies");
 
-        // The known dev seed byte pattern must not appear ANYWHERE in the shipping tree
-        // (a #if DEBUG fence would still embed the bytes in a Debug binary; this is stricter).
+        // Le motif d'octets de la graine de dev connue ne doit apparaître nulle part dans l'arbre livré
+        // (une barrière #if DEBUG embarquerait encore les octets dans un binaire Debug ; ceci est plus strict).
         var offenders = ProductionCsFiles()
             .Where(p => NormalizeForByteScan(File.ReadAllText(p)).Contains(KnownManifestDevSeedPattern))
             .Select(Rel)
@@ -344,14 +343,14 @@ public sealed class SecurityGateTests
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  (4b) embedded-dev-key fallback is #if DEBUG-fenced in both wirings (review #4).
+    //  (4b) le repli sur la clé de dev embarquée est sous #if DEBUG dans les deux câblages.
     //
-    //  The host (HostServiceCollectionExtensions) and the App (AppReconcilerSeams) both
-    //  fall back to the embedded dev PUBLIC key (ManifestDevKeys.CreateVerifier()) when no
-    //  production key is provisioned. That fallback must compile only under #if DEBUG, so a
-    //  RELEASE build fails closed and never trusts the dev key. This gate fails if the
-    //  fallback is moved OUTSIDE a #if DEBUG region in either wiring (the empirical
-    //  fail-open the reviewer reproduced).
+    //  L'hôte (HostServiceCollectionExtensions) et l'App (AppReconcilerSeams) se replient tous
+    //  deux sur la clé publique de dev embarquée (ManifestDevKeys.CreateVerifier()) quand aucune
+    //  clé de production n'est provisionnée. Ce repli ne doit compiler que sous #if DEBUG, pour
+    //  qu'une version Release se ferme et ne fasse jamais confiance à la clé de dev. Cette porte
+    //  échoue si le repli sort d'une région #if DEBUG dans l'un ou l'autre câblage (l'ouverture
+    //  empirique reproduite sur banc).
     //
     // ─────────────────────────────────────────────────────────────────────────
     [Theory]
@@ -368,7 +367,7 @@ public sealed class SecurityGateTests
         var unfenced = new List<string>();
         for (var i = 0; i < lines.Length; i++)
         {
-            // Only CODE uses count (a comment naming the method is not a fallback).
+            // Seules les utilisations dans le code comptent (un commentaire qui nomme la méthode n'est pas un repli).
             if (!StripLineComment(lines[i]).Contains(fallbackToken))
                 continue;
             uses.Add(i + 1);
@@ -415,19 +414,19 @@ public sealed class SecurityGateTests
             Environment.NewLine + string.Join(Environment.NewLine, offenders));
     }
 
-    // The first 8 bytes of the manifest dev/test PRIVATE seed (distinctive), normalized for
-    // a whitespace-insensitive scan. Kept here (in a TEST that is never shipped) purely to
-    // detect a re-introduction of the seed into src/.
+    // Les 8 premiers octets de la graine privée de dev/test du manifeste (distinctifs), normalisés
+    // pour un balayage insensible aux espaces. Gardés ici (dans un test jamais livré) uniquement
+    // pour détecter une réintroduction de la graine dans src/.
     private const string KnownManifestDevSeedPattern =
         "0x31,0x5d,0xed,0x95,0x60,0xb6,0xa4,0x94";
 
     private static string NormalizeForByteScan(string s)
         => new string(s.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToLowerInvariant();
 
-    // True iff the given (0-based) line sits inside an ACTIVE `#if DEBUG` true-branch. A
-    // small preprocessor walk: tracks #if/#elif/#else/#endif nesting and whether the
-    // current frame is the DEBUG guard's compiled branch. Handles the simple, un-nested
-    // `#if DEBUG … #else … #endif` shape the two wirings use.
+    // Vrai si la ligne donnée (base 0) est dans la branche vraie active d'un `#if DEBUG`. Une
+    // petite marche de préprocesseur : suit l'imbrication #if/#elif/#else/#endif et si le
+    // cadre courant est la branche compilée de la garde DEBUG. Gère la forme simple, non
+    // imbriquée, `#if DEBUG … #else … #endif` que les deux câblages utilisent.
     private static bool IsInDebugOnlyRegion(IReadOnlyList<string> lines, int index)
     {
         var stack = new Stack<(bool IsDebug, bool Active)>();
@@ -467,9 +466,9 @@ public sealed class SecurityGateTests
         => string.Equals(
             Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
 
-    // The CODE lines (comments / XML-docs stripped) of a file that reference the given
-    // token as a whole word.  Comment-stripping is what makes the `<see cref="…"/>` doc
-    // mentions and the prose banners — which legitimately NAME the seed — not count.
+    // Les lignes de code (commentaires et docs XML retirés) d'un fichier qui référencent le
+    // jeton donné comme mot entier. Le retrait des commentaires fait que les mentions
+    // `<see cref="…"/>` et les bannières en prose, qui nomment légitimement la graine, ne comptent pas.
     private static IReadOnlyList<string> CodeLinesReferencing(string file, string token)
     {
         var word = new Regex($@"(?<![A-Za-z0-9_]){Regex.Escape(token)}(?![A-Za-z0-9_])",
@@ -481,15 +480,15 @@ public sealed class SecurityGateTests
             .ToList();
     }
 
-    // True iff a (comment-stripped) line is the seed's DECLARATION, e.g.
-    // `public static byte[] DevPrivateSeed =>` — the definition, not a forging use.
+    // Vrai si une ligne (sans commentaires) est la déclaration de la graine, par exemple
+    // `public static byte[] DevPrivateSeed =>` : la définition, pas une utilisation pour forger.
     private static bool IsSeedDeclaration(string codeLine, string seedMember)
         => Regex.IsMatch(
             codeLine,
             $@"\bbyte\s*\[\s*\]\s*{Regex.Escape(seedMember)}\b",
             RegexOptions.CultureInvariant);
 
-    // Remove a trailing // line comment, but not a // that sits inside a string literal.
+    // Retire un commentaire de ligne // final, mais pas un // qui se trouve dans un littéral chaîne.
     private static string StripLineComment(string line)
     {
         var inString = false;
@@ -521,9 +520,9 @@ public sealed class SecurityGateTests
         return line;
     }
 
-    // Strip both // line comments and /* … */ block comments from a code fragment, while
-    // preserving string/char literals (so a "//" inside a string survives).  Used to make
-    // the catch-body success scan blind to prose like "// never a pass".
+    // Retire les commentaires de ligne // et de bloc /* … */ d'un fragment de code, en
+    // préservant les littéraux chaîne et caractère (un « // » dans une chaîne survit). Sert à
+    // rendre le balayage des corps de catch aveugle à la prose comme « // jamais un laissez-passer ».
     private static string StripComments(string code)
     {
         var sb = new StringBuilder(code.Length);
@@ -573,20 +572,20 @@ public sealed class SecurityGateTests
 
     private readonly record struct CatchBody(int Offset, string Body);
 
-    // Find each `catch` keyword and extract the brace-balanced body of its block.
-    // Skips the word "catch" if it appears inside a string/comment (defensive — none do
-    // today).  The exception filter `catch (T) when (…)` is handled: we start brace
-    // counting at the first '{' after the catch keyword.
+    // Trouve chaque mot-clé `catch` et extrait le corps équilibré en accolades de son bloc.
+    // Saute le mot « catch » s'il apparaît dans une chaîne ou un commentaire (défensif ; aucun
+    // ne le fait). Le filtre d'exception `catch (T) when (…)` est géré : le comptage d'accolades
+    // commence à la première '{' après le mot-clé catch.
     private static IEnumerable<CatchBody> EnumerateCatchBodies(string source)
     {
         foreach (Match m in Regex.Matches(
             source, @"\bcatch\b", RegexOptions.CultureInvariant))
         {
-            // Find the opening brace of this catch's block.
+            // Trouver l'accolade ouvrante du bloc de ce catch.
             var open = source.IndexOf('{', m.Index);
             if (open < 0) continue;
 
-            // Brace-balance to the matching close, skipping braces inside strings/chars/comments.
+            // Équilibrer jusqu'à l'accolade fermante correspondante, en sautant celles des chaînes, caractères et commentaires.
             var depth = 0;
             var inString = false;
             var inChar = false;

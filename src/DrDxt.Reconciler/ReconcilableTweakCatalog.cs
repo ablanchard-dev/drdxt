@@ -4,89 +4,89 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// The reconcilable DESCRIPTOR seam (plan §1 / §9).
+// La couture des descripteurs réconciliables.
 //
-// IReconcilabilityPolicy answers "which surface does this tweakId write?".
-// IReconcilableTweakCatalog answers the NEXT question: "where on that surface does
-// its current value live, and what canonical JSON does that value serialize to?" —
-// the concrete read location (registry hive/path/name/kind, service name, or power
-// plan identity) for each reconcilable tweakId.
+// IReconcilabilityPolicy répond à « quelle surface ce tweakId écrit-il ? ».
+// IReconcilableTweakCatalog répond à la question suivante : « où, sur cette surface, vit sa
+// valeur actuelle, et en quel JSON canonique se sérialise-t-elle ? » : l'emplacement de lecture
+// concret (ruche/chemin/nom/type du registre, nom de service, ou identité du plan
+// d'alimentation) de chaque tweakId réconciliable.
 //
-// Single source of truth. This table is pure DATA (no OS dependency) so it lives in
-// the pure DrDxt.Reconciler layer, not the OS-coupled adapters. Both consumers read
-// from here:
-//   * the SettingProbe (this bundle) — to know what to read and how to serialize it,
-//   * the future op-mapper — to know which typed PrivilegedOp leaf to re-apply.
+// Source unique. Cette table n'est que des données (aucune dépendance à l'OS) : elle vit dans la
+// couche pure DrDxt.Reconciler, pas dans les adaptateurs liés à l'OS. Les deux consommateurs y
+// lisent :
+//   * la SettingProbe : pour savoir quoi lire et comment le sérialiser,
+//   * le mappeur d'ops : pour savoir quelle feuille PrivilegedOp typée réappliquer.
 //
-// It deliberately does not depend on DrDxt.Application: the Application catalog keys
-// tweaks by a DIFFERENT id ("latency.reflex", "fixit.power_plan") and hides its
-// concrete targets in private consts, so there is no clean id-keyed derivation, and
-// referencing Application would pull NVAPI/ADLX/D3D11 into the verify-only host. The
-// descriptors below mirror those Application consts exactly (the canonical reconciler
-// id maps to the same hive/path/name the tweak writes), reviewed as an explicit table.
+// Elle ne dépend pas exprès de DrDxt.Application : le catalogue Application indexe les leviers
+// par un autre id (« latency.reflex », « fixit.power_plan ») et cache ses cibles concrètes dans
+// des constantes privées ; il n'y a donc pas de dérivation propre par id, et référencer
+// Application tirerait NVAPI/ADLX/D3D11 dans l'hôte en vérification seule. Les descripteurs
+// ci-dessous reprennent exactement ces constantes Application (l'id canonique du réconciliateur
+// correspond aux mêmes ruche/chemin/nom qu'écrit le levier), relus comme une table explicite.
 // -----------------------------------------------------------------------
 
-/// <summary>A registry read location for a reconcilable tweak. <see cref="Kind"/>
-/// is the value type written by the corresponding Application tweak; it drives both
-/// the read and the canonical serialization.</summary>
+/// <summary>Un emplacement de lecture dans le registre pour un levier réconciliable.
+/// <see cref="Kind"/> est le type de valeur qu'écrit le levier Application correspondant ; il
+/// guide la lecture et la sérialisation canonique.</summary>
 public sealed record RegistryDescriptor(
     RegistryHiveKind Hive,
     string Path,
     string Name,
     RegistryValueType Kind);
 
-/// <summary>The concrete read location for ONE reconcilable tweakId. Exactly one of
-/// the surface-specific members is populated, matching <see cref="Surface"/>:
+/// <summary>L'emplacement de lecture concret d'un seul tweakId réconciliable. Exactement un des
+/// membres propres à une surface est rempli, selon <see cref="Surface"/> :
 ///   * Registry      → <see cref="Registry"/>,
 ///   * Service       → <see cref="ServiceName"/>,
-///   * PowerPlan     → none (the active scheme GUID is read from the OS directly),
-///   * ScheduledTask → none (no scheduled-task op leaf exists in V1).</summary>
+///   * PowerPlan     → aucun (le GUID du plan actif se lit directement dans l'OS),
+///   * ScheduledTask → aucun (aucune feuille d'op de tâche planifiée n'existe en V1).</summary>
 public sealed record ReconcilableDescriptor(
     string TweakId,
     ReconcileSurface Surface,
     RegistryDescriptor? Registry = null,
     string? ServiceName = null);
 
-/// <summary>The closed descriptor table: per reconcilable tweakId, its surface and
-/// concrete read location. Mirrors the OS-write targets of the Application tweaks so
-/// the probe reads exactly what the tweak wrote. Both the probe and the op-mapper
-/// consume this — keeping the "where" in ONE place.</summary>
+/// <summary>La table fermée des descripteurs : par tweakId réconciliable, sa surface et son
+/// emplacement de lecture concret. Reprend les cibles d'écriture OS des leviers Application pour
+/// que la sonde lise exactement ce que le levier a écrit. La sonde et le mappeur d'ops la
+/// consomment : le « où » reste en un seul endroit.</summary>
 public interface IReconcilableTweakCatalog
 {
-    /// <summary>The descriptor for a reconcilable tweakId, or null when the id is not
-    /// reconcilable / not in the closed table.</summary>
+    /// <summary>Le descripteur d'un tweakId réconciliable, ou null quand l'id n'est pas
+    /// réconciliable / pas dans la table fermée.</summary>
     ReconcilableDescriptor? DescriptorFor(string tweakId);
 }
 
-/// <summary>Canonical serialization for a reconcilable setting's CURRENT value, so a
-/// probe read byte-matches the manifest's DesiredValueJson under ordinal equality
-/// (the reconciler compares with StringComparison.Ordinal). The shape mirrors how the
-/// Application tweaks serialize their values today: a DWORD/QWORD is its invariant
-/// decimal string ("2"), a string value is itself, a power-plan/service value is the
-/// stable token defined here. No JSON wrapping is added: the value IS the token, which
-/// is exactly what the existing manifest carries (e.g. "1"/"0"/"2").</summary>
+/// <summary>Sérialisation canonique de la valeur actuelle d'un réglage réconciliable, pour
+/// qu'une lecture de sonde corresponde à l'octet près au DesiredValueJson du manifeste en égalité
+/// ordinale (le réconciliateur compare avec StringComparison.Ordinal). La forme reprend celle des
+/// leviers Application : un DWORD/QWORD est sa chaîne décimale invariante (« 2 »), une valeur
+/// chaîne est elle-même, une valeur de plan / de service est le jeton stable défini ici. Aucun
+/// emballage JSON : la valeur est le jeton, exactement ce que porte le manifeste existant (par
+/// exemple « 1 »/« 0 »/« 2 »).</summary>
 public static class ReconcilableValueCanonicalizer
 {
-    /// <summary>A DWORD/QWORD registry value → its invariant decimal string. Mirrors
-    /// the Application tweaks' <c>value.ToString(CultureInfo.InvariantCulture)</c>.</summary>
+    /// <summary>Une valeur de registre DWORD/QWORD → sa chaîne décimale invariante. Reprend le
+    /// <c>value.ToString(CultureInfo.InvariantCulture)</c> des leviers Application.</summary>
     public static string Dword(uint value)
         => value.ToString(CultureInfo.InvariantCulture);
 
-    /// <summary>A QWORD registry value → its invariant decimal string.</summary>
+    /// <summary>Une valeur de registre QWORD → sa chaîne décimale invariante.</summary>
     public static string Qword(ulong value)
         => value.ToString(CultureInfo.InvariantCulture);
 
-    /// <summary>A string registry value → itself (no extra quoting; the manifest
-    /// carries the raw value).</summary>
+    /// <summary>Une valeur de registre chaîne → elle-même (pas de guillemets en plus ; le manifeste
+    /// porte la valeur brute).</summary>
     public static string String(string value) => value;
 
-    /// <summary>The active power-plan GUID → its canonical 'D' form (lower-case,
-    /// hyphenated, no braces) — the stable token the manifest stores.</summary>
+    /// <summary>Le GUID du plan d'alimentation actif → sa forme canonique « D » (minuscules, tirets,
+    /// sans accolades) : le jeton stable que stocke le manifeste.</summary>
     public static string PowerPlan(Guid activeScheme)
         => activeScheme.ToString("D", CultureInfo.InvariantCulture);
 
-    /// <summary>A service start/run state → a stable lower-case token
-    /// ("notinstalled" / "stopped" / "running").</summary>
+    /// <summary>Un état de démarrage / de marche de service → un jeton stable en minuscules
+    /// (« notinstalled » / « stopped » / « running »).</summary>
     public static string Service(ServiceRunState state) => state switch
     {
         ServiceRunState.NotInstalled => "notinstalled",
@@ -96,9 +96,9 @@ public static class ReconcilableValueCanonicalizer
     };
 }
 
-/// <summary>The service run-state the probe reports for a Service-surface tweak. A
-/// neutral mirror (no ServiceController coupling in the pure layer) so the canonical
-/// token is defined here, next to the catalog the value belongs to.</summary>
+/// <summary>L'état de marche du service que rapporte la sonde pour un levier de surface
+/// Service. Un reflet neutre (aucun lien à ServiceController dans la couche pure) pour que le
+/// jeton canonique soit défini ici, à côté du catalogue auquel appartient la valeur.</summary>
 public enum ServiceRunState
 {
     NotInstalled = 0,
@@ -106,18 +106,17 @@ public enum ServiceRunState
     Running = 2,
 }
 
-/// <summary>The production closed descriptor table. Keyed by the canonical reconciler
-/// tweakId (the same ids <see cref="DefaultReconcilabilityPolicy"/> uses). Only ids
-/// with a concrete, READABLE OS location are present — the policy may map an id to a
-/// surface that has no plain readable leaf (e.g. an NVAPI/ADLX-backed "Registry" id),
-/// and such ids are deliberately absent here so the probe reports CanProbe=false
-/// rather than reading the wrong location.</summary>
+/// <summary>La table fermée des descripteurs de production. Indexée par le tweakId canonique du
+/// réconciliateur (les mêmes ids que <see cref="DefaultReconcilabilityPolicy"/>). Seuls les ids
+/// à emplacement OS concret et lisible y sont : la politique peut associer un id à une surface
+/// sans feuille lisible simple (par exemple un id « Registry » adossé à NVAPI/ADLX), et ces ids
+/// sont absents exprès pour que la sonde rapporte CanProbe=false au lieu de lire le mauvais emplacement.</summary>
 public sealed class DefaultReconcilableTweakCatalog : IReconcilableTweakCatalog
 {
     private static readonly IReadOnlyDictionary<string, ReconcilableDescriptor> Descriptors =
         new Dictionary<string, ReconcilableDescriptor>(StringComparer.Ordinal)
         {
-            // NVIDIA driver "Low Latency Mode" — a real, readable DWORD leaf
+            // « Low Latency Mode » du pilote NVIDIA : une vraie feuille DWORD lisible
             // (NvidiaUltraLowLatencyTweak: SOFTWARE\NVIDIA Corporation\Global\NVTweak\LowLatencyMode).
             ["latency.reflex.lowLatencyMode"] = new(
                 "latency.reflex.lowLatencyMode",
@@ -128,19 +127,19 @@ public sealed class DefaultReconcilableTweakCatalog : IReconcilableTweakCatalog
                     "LowLatencyMode",
                     RegistryValueType.DWord)),
 
-            // System active power plan — read via PowerGetActiveScheme (SanePowerPlanTweak).
+            // Plan d'alimentation actif du système : lu via PowerGetActiveScheme (SanePowerPlanTweak).
             ["fixit.sanePowerPlan"] = new(
                 "fixit.sanePowerPlan",
                 ReconcileSurface.PowerPlan),
 
-            // AMD 3D V-Cache Performance Optimizer service (X3dCcdParkingFixTweak).
+            // Service AMD 3D V-Cache Performance Optimizer (X3dCcdParkingFixTweak).
             ["fixit.x3dVCacheService"] = new(
                 "fixit.x3dVCacheService",
                 ReconcileSurface.Service,
                 ServiceName: "AMD3DVCacheSvc"),
 
-            // NS-1 HAGS — HwSchMode = 2 (On) on the HKLM GraphicsDrivers leaf (HagsOnTweak).
-            // HKLM is the one surface the LocalSystem boot reconciler reapplies correctly.
+            // HAGS : HwSchMode = 2 (activé) sur la feuille HKLM GraphicsDrivers (HagsOnTweak).
+            // HKLM est la surface que le réconciliateur de démarrage LocalSystem réapplique correctement.
             ["os.hags"] = new(
                 "os.hags",
                 ReconcileSurface.Registry,
@@ -150,25 +149,21 @@ public sealed class DefaultReconcilableTweakCatalog : IReconcilableTweakCatalog
                     "HwSchMode",
                     RegistryValueType.DWord)),
 
-            // NOTE — the NS-1 HKCU tweaks (Game DVR / Game Mode / VRR) are deliberately absent:
-            // the boot reconciler is LocalSystem, where Registry.CurrentUser is SYSTEM's hive,
-            // so an HKCU reapply would target the wrong hive. They persist natively across
-            // reboot and the App re-applies them on next launch; reconciling them needs a
-            // per-user reconcile path (see AppliedTweakManifestMapper / DefaultReconcilabilityPolicy).
+            // Note : les leviers HKCU (Game DVR / mode Jeu / VRR) sont absents exprès : le réconciliateur
+            // de démarrage tourne en LocalSystem, où Registry.CurrentUser est la ruche de SYSTEM ; une
+            // réapplication HKCU viserait donc la mauvaise ruche. Ils persistent d'eux-mêmes au redémarrage
+            // et l'App les réapplique au lancement suivant ; les réconcilier demande une réconciliation par
+            // utilisateur (voir AppliedTweakManifestMapper / DefaultReconcilabilityPolicy).
 
-            // NOTE — latency.renderQueueCap / latency.vrrVsyncCap restent OMIS, mais la raison
-            // ecrite ici etait a moitie fausse et a ete corrigee le 21/08/2026.
+            // latency.renderQueueCap / latency.vrrVsyncCap restent omis. Ils n'ont pas de feuille de
+            // registre lisible : les sonder comme une feuille lirait un emplacement bidon. Leur lecture
+            // existe pourtant : `NvApiLatencyReader` (Detection/Gpu/Nvapi) les lit via
+            // `TryGetDrsGlobalSetting`, en NVAPI non eleve (GetMaxPreRenderedFrames, GetVsyncMode,
+            // GetFrameRateLimit, GetPreferredPstate).
             //
-            // Ce qui reste vrai : ils n'ont pas de feuille de registre lisible, donc les sonder
-            // comme une feuille lirait un emplacement bidon.
-            // Ce qui etait faux : « le chemin de lecture DRS reste a resoudre ». Il existe et il
-            // est reel — `NvApiLatencyReader` (Detection/Gpu/Nvapi) lit ces reglages via
-            // `TryGetDrsGlobalSetting`, en NVAPI NON eleve : GetMaxPreRenderedFrames,
-            // GetVsyncMode, GetFrameRateLimit, GetPreferredPstate.
-            //
-            // La vraie raison de l'omission, et elle est structurelle : le reconciliateur de boot
-            // tourne en LocalSystem avec `DisabledNvApiActions` / `DisabledAdlxActions` — il est
-            // VOLONTAIREMENT incapable d'ecrire le GPU (posture de securite). Les sonder
+            // La raison de l'omission est structurelle : le reconciliateur de boot
+            // tourne en LocalSystem avec `DisabledNvApiActions` / `DisabledAdlxActions` : il est
+            // volontairement incapable d'ecrire le GPU (posture de securite). Les sonder
             // produirait donc une derive qu'il ne peut pas corriger. Le jour ou on les veut
             // reconciliables, la question n'est pas « comment les lire » (c'est fait) mais
             // « qui a le droit de les reecrire », et la reponse ne doit pas etre le service SYSTEM.

@@ -18,7 +18,7 @@ public class BenchmarkRunnerTests
         return s;
     }
 
-    // Returns a DIFFERENT capture per run (run 1, run 2, …) so per-run aggregates differ.
+    // Rend une capture différente par passe (passe 1, passe 2, …) pour que les agrégats par passe diffèrent.
     private static IPresentMonSession SessionReturningSequence(params IReadOnlyList<double>[] runs)
     {
         var s = Substitute.For<IPresentMonSession>();
@@ -32,7 +32,7 @@ public class BenchmarkRunnerTests
     [Fact]
     public async Task Computes_avg_and_lows_from_frametimes()
     {
-        var ft = Enumerable.Repeat(10.0, 100).ToArray(); // 100 fps constant
+        var ft = Enumerable.Repeat(10.0, 100).ToArray(); // 100 fps constants
         var runner = new BenchmarkRunner(SessionReturning(ft));
         var r = await runner.RunAsync(1234, TimeSpan.FromMilliseconds(50), 1, default);
         r.IsOk.Should().BeTrue();
@@ -52,8 +52,8 @@ public class BenchmarkRunnerTests
     [Fact]
     public async Task Margin_is_unreliable_infinite_below_three_runs()
     {
-        // 2 runs → run-to-run variance can't be bounded → margin is "unreliable" (∞), so the
-        // A/B verdict can never claim a measurable gain on too few runs (NS-6 §6).
+        // 2 passes → la variance entre passes ne peut pas être bornée → marge « non fiable » (∞), donc le
+        // verdict A/B ne peut jamais annoncer un gain mesurable sur trop peu de passes.
         var runner = new BenchmarkRunner(SessionReturning(Enumerable.Repeat(10.0, 50).ToArray()));
         var r = await runner.RunAsync(1, TimeSpan.FromMilliseconds(10), 2, default);
         r.IsOk.Should().BeTrue();
@@ -63,8 +63,8 @@ public class BenchmarkRunnerTests
     [Fact]
     public async Task Margin_comes_from_inter_run_variance_not_frame_count()
     {
-        // 3 runs with DIFFERENT per-run avg FPS (100 / 50 / 66.7) → a finite, positive margin
-        // driven by run-to-run spread, no matter how many frames each run has.
+        // 3 passes à moyennes différentes (100 / 50 / 66,7) → une marge finie et positive
+        // pilotée par l'écart entre passes, quel que soit le nombre d'images par passe.
         var run1 = Enumerable.Repeat(10.0, 300).ToList(); // 100 fps
         var run2 = Enumerable.Repeat(20.0, 300).ToList(); // 50 fps
         var run3 = Enumerable.Repeat(15.0, 300).ToList(); // ~66.7 fps
@@ -113,7 +113,7 @@ public class BenchmarkRunnerTests
     [Fact]
     public async Task Estimated_latency_is_null_when_no_latency_samples()
     {
-        // Frametimes but no latency series → "not measured" (null), never a fabricated 0.
+        // Temps d'image mais pas de série de latence → « non mesuré » (null), jamais un 0 fabriqué.
         var runner = new BenchmarkRunner(SessionReturning(Enumerable.Repeat(10.0, 50).ToArray()));
         var r = await runner.RunAsync(1, TimeSpan.FromMilliseconds(10), 1, default);
         r.Value!.EstimatedPcLatencyMs.Should().BeNull();
@@ -134,7 +134,7 @@ public class BenchmarkRunnerTests
     [Fact]
     public async Task Mean_gpu_busy_is_null_when_no_samples()
     {
-        // Frametimes but no GPU-busy series → "not measured" (null), never a fabricated 0.
+        // Temps d'image mais pas de série d'occupation GPU → « non mesuré » (null), jamais un 0 fabriqué.
         var runner = new BenchmarkRunner(SessionReturning(Enumerable.Repeat(10.0, 50).ToArray()));
         var r = await runner.RunAsync(1, TimeSpan.FromMilliseconds(10), 1, default);
         r.Value!.MeanGpuBusyMs.Should().BeNull();
@@ -147,7 +147,7 @@ public class BenchmarkRunnerTests
         s.IsServiceAvailable().Returns(Result<bool>.Ok(true));
         s.CaptureAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
          .Returns(Result<FrameCapture>.Fail(ErrorCodes.NoFrames, "x"));
-        // 28/09/2026 : sans cette réponse fixée, le test demandait à la vraie machine si le PID 1234 vivait.
+        // Sans cette réponse fixée, le test demandait à la vraie machine si le PID 1234 vivait.
         // Sur un runner où il vivait, le code devenait NoPresentingFrames : rouge en CI deux fois ce jour-là.
         var r = await new BenchmarkRunner(s, isProcessAlive: _ => false).RunAsync(1234, TimeSpan.FromMilliseconds(10), 3, default);
         r.IsOk.Should().BeFalse();
@@ -180,7 +180,7 @@ public class BenchmarkRunnerTests
         s.CaptureAsync(livePid, Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
          .Returns(Result<FrameCapture>.Fail(ErrorCodes.NoFrames, "0"));
 
-        // process probe says the target is alive
+        // la sonde de processus dit que la cible est vivante
         var runner = new BenchmarkRunner(s, isProcessAlive: _ => true);
         var r = await runner.RunAsync(livePid, TimeSpan.FromSeconds(1), 1, default);
 
@@ -213,7 +213,7 @@ public class BenchmarkRunnerTests
         var runner = new BenchmarkRunner(s, isProcessAlive: _ => true);
         var r = await runner.RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
 
-        // only NO_FRAMES is remapped; other failures pass through untouched
+        // seul NO_FRAMES est retraduit ; les autres échecs passent intacts
         r.Error!.Value.Code.Should().Be(ErrorCodes.CaptureFail);
     }
 }

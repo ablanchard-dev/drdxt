@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 : « des animations partout ». Changer de domaine dans le rail remplaçait le panneau d'un coup :
+// « des animations partout ». Changer de domaine dans le rail remplaçait le panneau d'un coup :
 // l'entrée en scène (Revelation) ne joue qu'à l'apparition, pas au changement de contenu. Le panneau entre
 // maintenant par un fondu et un glissement court, sous le gouverneur : rien ne bouge quand il l'interdit.
 public sealed class TransitionDeContenuTests

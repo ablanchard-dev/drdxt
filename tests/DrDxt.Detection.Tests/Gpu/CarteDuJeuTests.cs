@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Gpu;
 
-// 07/10/2026 (A4) : la carte qui porte le jeu, d'après la mémoire graphique qu'il engage sur chacune.
+// La carte qui porte le jeu, d'après la mémoire graphique qu'il engage sur chacune.
 public sealed class CarteDuJeuTests
 {
     private const string Igpu = "luid_0x00000000_0x0000a001", Dgpu = "luid_0x00000000_0x0000b002";

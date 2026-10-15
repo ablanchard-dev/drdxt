@@ -68,7 +68,7 @@ public sealed class TheNeverAndUnknownClaimsHaveOneSourceGateTests
         var declared = DeclaredInTheDocument();
 
         // Garde de non-vacuite : trois listes vides seraient EGALES, et ce gate passerait au vert
-        // sur un produit qui ne promet plus rien. Le seuil est le compte du 06/09/2026.
+        // sur un produit qui ne promet plus rien. Le seuil est le compte releve le 06/09/2026.
         declared.Should().HaveCountGreaterThanOrEqualTo(
             10, "le document declarait 10 phrases le 06/09/2026 ; en perdre une doit se voir");
 

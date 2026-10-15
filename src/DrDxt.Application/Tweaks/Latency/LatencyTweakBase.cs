@@ -4,16 +4,15 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// Shared base for the M2 Phase D latency tweaks.
+// Base commune des leviers de latence.
 //
-// Every latency tweak follows the same revert contract: the snapshot's
-// OriginalValueJson is the serialized INVERSE typed PrivilegedOp carrying the
-// Real captured original; reverting = deserialize it and send it back through
-// IElevatedClient. A malformed / unknown-typed snapshot must never throw and
-// Never run an arbitrary op → SAFETY.SNAPSHOT_INVALID (fail clean).
+// Tous suivent le même contrat d'annulation : le OriginalValueJson du snapshot est la PrivilegedOp
+// typée inverse, sérialisée, qui porte l'original réellement relu ; annuler = la désérialiser et la
+// renvoyer par IElevatedClient. Un snapshot mal formé ou de type inconnu ne lève jamais d'exception
+// et ne lance jamais une op arbitraire : SAFETY.SNAPSHOT_INVALID (échec propre).
 //
-// This mirrors ISafetyManager.RevertAsync (Phase B) so the engine's generic
-// revert path and the tweak's own RevertAsync behave identically.
+// Même chemin que ISafetyManager.RevertAsync : l'annulation générique du moteur et le RevertAsync
+// du levier se comportent pareil.
 // -----------------------------------------------------------------------
 public abstract class LatencyTweakBase : ITweak
 {
@@ -29,11 +28,11 @@ public abstract class LatencyTweakBase : ITweak
     public bool RequiresElevation => true;
     public bool RequiresRestorePoint => true;
 
-    /// <summary>Most latency tweaks take effect immediately; a reboot-required one (HAGS)
-    /// overrides this to true so the engine skips its immediate A/B (see ITweak).</summary>
+    /// <summary>La plupart des leviers de latence agissent tout de suite ; celui qui exige un
+    /// redémarrage (HAGS) passe ceci à vrai pour que le moteur saute son A/B immédiat (voir ITweak).</summary>
     public virtual bool TakesEffectAfterReboot => false;
 
-    /// <summary>The honest summary key surfaced to the UI (no "+FPS" claim).</summary>
+    /// <summary>La clé de résumé honnête affichée par l'UI (aucune promesse de « +FPS »).</summary>
     public abstract string SummaryKey { get; }
 
     public abstract bool AppliesTo(HardwareInventory hw, SettingsState state);
@@ -46,8 +45,8 @@ public abstract class LatencyTweakBase : ITweak
 
     public abstract Task<Result<TweakSnapshot>> ApplyAsync();
 
-    /// <summary>Reverts by replaying the serialized inverse op from the snapshot.
-    /// Defensive: malformed snapshot → SAFETY.SNAPSHOT_INVALID, never throws.</summary>
+    /// <summary>Annule en rejouant l'op inverse sérialisée du snapshot.
+    /// Prudent : snapshot malformé → SAFETY.SNAPSHOT_INVALID, ne lève jamais.</summary>
     public virtual async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
@@ -77,9 +76,9 @@ public abstract class LatencyTweakBase : ITweak
         }
     }
 
-    /// <summary>Builds the serialized inverse op for a single DWORD registry leaf:
-    /// if the value existed, restore it; if it was absent, the faithful inverse is a
-    /// delete. Returns the codec wire form to store in the snapshot.</summary>
+    /// <summary>Construit l'op inverse sérialisée d'une feuille de registre DWORD : si la valeur
+    /// existait, la remettre ; si elle était absente, l'inverse fidèle est une suppression.
+    /// Rend la forme filaire du codec à ranger dans le snapshot.</summary>
     protected static Result<string> BuildRegistryInverse(
         RegistryHiveKind hive, string path, string name, uint? capturedOriginal)
     {
@@ -91,7 +90,7 @@ public abstract class LatencyTweakBase : ITweak
     }
 
     /// <summary>
-    /// Le snapshot d'un levier de registre : l'op INVERSE (pour revenir) **et** l'op avant (pour
+    /// Le snapshot d'un levier de registre : l'op inverse (pour revenir) **et** l'op avant (pour
     /// prouver que la cible est en place).
     ///
     /// Sans la seconde, la relecture ne sait dire que « la valeur a change », jamais « la valeur
@@ -100,7 +99,7 @@ public abstract class LatencyTweakBase : ITweak
     ///
     /// Une serialisation de la cible qui echoue ne fait pas echouer l'apply : le levier est
     /// deja ecrit a ce stade, et perdre la preuve est un cout, pas une raison de tout defaire. Le
-    /// verificateur rendra <c>Unknown</c> — donc aucune mesure, ce qui est le comportement voulu.
+    /// verificateur rendra <c>Unknown</c>, donc aucune mesure, ce qui est le comportement voulu.
     /// </summary>
     protected static TweakSnapshot SnapshotAvec(string id, string inverseJson, PrivilegedOp demande)
     {
@@ -109,15 +108,13 @@ public abstract class LatencyTweakBase : ITweak
     }
 
     /// <summary>
-    /// PHASE 18 F1 lot 3 (PreferMaxPerf), etendu le 14/09/2026 aux deux autres leviers DRS (plan
-    /// complet 1.3 : ils ecrivaient dans « Base Profile », donc dans tous les jeux et le bureau,
-    /// pour une mesure faite sur un seul) — une ecriture DRS et son inverse, au scope que le
-    /// pilote applique au jeu.
+    /// Une ecriture DRS et son inverse, au profil que le pilote applique au jeu, pour les trois leviers
+    /// DRS : ecrire dans « Base Profile » toucherait tous les jeux et le bureau pour une mesure faite sur un seul.
     ///
     /// Jeu connu avec un profil lisible : on ecrit dans ce profil (rayon d'effet = un executable),
-    /// et l'inverse depend de la PROVENANCE lue avant l'ecriture :
+    /// et l'inverse depend de la provenance lue avant l'ecriture :
     ///   * pose sur ce profil (`SetByUser`) ⇒ reecrire la valeur d'avant ;
-    ///   * herite, defaut pilote, ou livre par NVIDIA ⇒ SUPPRIMER le reglage du profil (reecrire
+    ///   * herite, defaut pilote, ou livre par NVIDIA ⇒ supprimer le reglage du profil (reecrire
     ///     laisserait au jeu un reglage « pose par toi » qu'il n'avait pas) ;
     ///   * provenance inconnue ⇒ refus : ni ecriture au jeu, ni repli sur le global.
     /// Jeu inconnu ou sans profil lisible : le global, lu par <paramref name="lireGlobal"/>.
@@ -127,7 +124,7 @@ public abstract class LatencyTweakBase : ITweak
     protected static Result<(PrivilegedOp Inverse, ApplyNvApiDrsSettingOp Op)> PlanifierDrs(
         INvApi nvApi, bool jeuCherche, string? jeu, uint settingId, uint cible, Func<Result<uint>> lireGlobal, string quoi)
     {
-        // 24/09/2026 : le produit cherche toujours le jeu. Pas trouvé (PC au repos, anti-triche qui
+        // Le produit cherche toujours le jeu. Pas trouvé (PC au repos, anti-triche qui
         // refuse l'ouverture du processus) ⇒ rien d'écrit, jamais le global à sa place.
         if (jeuCherche && jeu is null)
             return Result<(PrivilegedOp, ApplyNvApiDrsSettingOp)>.Fail(ErrorCodes.TweakSdkUnavailable,
@@ -135,7 +132,7 @@ public abstract class LatencyTweakBase : ITweak
                 + "and nothing falls back to the global profile.");
 
         // Une portee pour l'ecriture et son inverse : le gate `DrsRevertMatchesItsScopeGateTests`
-        // l'exige, et c'est la propriete qui compte — restaurer le profil qu'on a modifie.
+        // l'exige, et c'est la propriete qui compte : restaurer le profil qu'on a modifie.
         var portee = ProfilDeBase;
         uint avant;
         DrsValueOrigin? origineAuJeu = null;
@@ -147,14 +144,14 @@ public abstract class LatencyTweakBase : ITweak
             avant = auJeu.Value.Value;
             origineAuJeu = auJeu.Value.Origin.Origin;
         }
-        // 14/09/2026 (relecture 12/20, lot B) : un profil de jeu qui existe mais ne se lit pas
+        // Un profil de jeu qui existe mais ne se lit pas
         // n'est pas « pas de profil ». Se rabattre sur le global ecrivait la ou le pilote n'applique
         // rien au jeu, et la relecture globale prouvait ensuite `Applied`. Seul « pas de profil » replie.
         else if (auJeu is { } echec && echec.Error?.Code != ErrorCodes.DrsNoGameProfile)
             return Result<(PrivilegedOp, ApplyNvApiDrsSettingOp)>.Fail(ErrorCodes.TweakSdkUnavailable,
                 $"The game's driver profile exists but its {quoi} could not be read: nothing is written, "
                 + "and nothing falls back to the global profile.");
-        // 24/09/2026 : un jeu CONNU sans profil pilote ne replie plus sur le global. Sur la machine
+        // Un jeu connu sans profil pilote ne replie pas sur le global. Sur la machine
         // de référence, le global portait « performances maximales » : carte au maximum hors jeu
         // toute la journée, pour un gain mesuré sur un seul jeu. Seul « aucun jeu » (outils, bancs)
         // garde le repli.
@@ -182,6 +179,12 @@ public abstract class LatencyTweakBase : ITweak
                 new DeleteNvApiDrsSettingOp(settingId, portee, origineAuJeu.Value, avant),
             _ => null,
         };
+
+        // Un inverse qui réécrit une origine hors de l'énumération documentée ne se rejouerait pas (le helper la refuse) : rien n'est écrit, sinon le
+        // réglage de DrDXT resterait posé pour toujours.
+        if (inverse is ApplyNvApiDrsSettingOp rejeu && !ValeursDrs.Documentee(settingId, rejeu.Value))
+            return Result<(PrivilegedOp, ApplyNvApiDrsSettingOp)>.Fail(ErrorCodes.TweakSdkUnavailable,
+                $"The current {quoi} (0x{avant:X}) is outside NVIDIA's documented values and could not be restored: nothing is written.");
 
         return inverse is null
             ? Result<(PrivilegedOp, ApplyNvApiDrsSettingOp)>.Fail(ErrorCodes.TweakSdkUnavailable,

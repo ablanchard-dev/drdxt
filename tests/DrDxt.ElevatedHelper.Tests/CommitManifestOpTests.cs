@@ -11,7 +11,7 @@ using NSubstitute;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// 11/09/2026 — CommitManifestOp, la nouvelle op privilegiee : l'App envoie les entrees, le helper eleve
+// CommitManifestOp, la nouvelle op privilegiee : l'App envoie les entrees, le helper eleve
 // valide, fusionne, signe avec la cle de la machine et ecrit.
 //
 // Trois questions, dans l'ordre ou un attaquant les poserait :
@@ -92,7 +92,7 @@ public sealed class CommitManifestOpTests
             RegistryHiveKind.LocalMachine, Nvtweak, "AutreValeur", RegistryValueType.DWord, "1"))) }) },
         { "valeur trop longue", Op(revertOnly: new[] { Garde(origine: new string('x', 5000)) }) },
         { "origine vide", Op(revertOnly: new[] { Garde(origine: " ") }) },
-        // 08/10/2026 : la carte se rend à la désinstallation, mais jamais sa tension ni sa fréquence (règle du 29/09).
+        // La carte se rend à la désinstallation, mais jamais sa tension ni sa fréquence (règle de la carte).
         { "origine = sous-tension ADLX", Op(revertOnly: new[] { Garde(id: "gpu.power_limit", origine: OpJson(new ApplyAdlxTuningOp(0, AdlxTuningKind.Undervolt, 2500))) }) },
         { "origine = décalage d'horloge NVIDIA", Op(revertOnly: new[] { Garde(id: "gpu.power_limit", origine: OpJson(new ApplyNvApiClockOffsetOp(0, 100, 0))) }) },
         { "trop d'entrees", Op(revertOnly: Enumerable.Repeat(Garde(), 33).ToArray()) },
@@ -100,7 +100,7 @@ public sealed class CommitManifestOpTests
         { "commit vide sans reprise", Op() },
     };
 
-    // 08/10/2026 : les réglages de la carte gardés par le joueur entrent au manifeste, pour être rendus à la désinstallation.
+    // Les réglages de la carte gardés par le joueur entrent au manifeste, pour être rendus à la désinstallation.
     [Fact]
     public void Les_reglages_de_la_carte_qui_ne_sont_ni_tension_ni_frequence_entrent_au_manifeste()
     {
@@ -121,7 +121,7 @@ public sealed class CommitManifestOpTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted, pourquoi);
     }
 
-    // 06/10/2026 (plan 4.3) : les origines que « Optimiser » inscrit désormais pour les leviers de la session
+    // Les origines que « Optimiser » inscrit désormais pour les leviers de la session
     // Windows, sous la forme exacte que leurs leviers capturent. Refusées ici, elles n'atteindraient jamais le
     // manifeste, et la désinstallation ne les rendrait pas.
     public static TheoryData<string, string, string> OriginesDeSession()
@@ -159,7 +159,7 @@ public sealed class CommitManifestOpTests
     public void Temoin_l_origine_d_un_levier_de_session_garde_passe(string id, string pose, string origine)
         => Allowlist.Validate(Op(revertOnly: new[] { new AppliedTweak(id, pose, origine, T) })).IsOk.Should().BeTrue();
 
-    // 06/10/2026 (revue) : retirer un levier annulé. Seuls des identifiants courts et imprimables, bornés.
+    // Retirer un levier annulé. Seuls des identifiants courts et imprimables, bornés.
     [Fact]
     public void Temoin_retirer_un_levier_annule_passe()
         => Allowlist.Validate(new CommitManifestOp(Array.Empty<AppliedTweak>(), Array.Empty<AppliedTweak>(),
@@ -177,7 +177,7 @@ public sealed class CommitManifestOpTests
         => Allowlist.Validate(new CommitManifestOp(Array.Empty<AppliedTweak>(), Array.Empty<AppliedTweak>(),
             Retirer: Enumerable.Repeat("os.hags", 33).ToArray())).IsOk.Should().BeFalse();
 
-    // 06/10/2026 (plan 4.5b) : le helper retire les anciens points d'après leur nom ; il n'accepte donc de créer que
+    // Le helper retire les anciens points d'après leur nom ; il n'accepte donc de créer que
     // sous le nom fixe de DrDXT, sinon un appelant ferait retirer les points d'un autre logiciel.
     [Fact]
     public void Un_point_de_restauration_ne_se_cree_que_sous_le_nom_de_DrDXT()
@@ -185,6 +185,13 @@ public sealed class CommitManifestOpTests
         Allowlist.Validate(new CreateRestorePointOp(CreateRestorePointOp.NomDrDxt)).IsOk.Should().BeTrue();
         Allowlist.Validate(new CreateRestorePointOp("Windows Update")).IsOk.Should().BeFalse();
     }
+
+    // Le manifeste est écrit sans droits : une tension comme « origine » ferait poser une sous-tension par le helper
+    // élevé à la désinstallation. Aucun levier ne garde la tension dans le manifeste.
+    [Fact]
+    public void Une_tension_processeur_n_est_jamais_une_origine()
+        => Allowlist.Validate(Op(revertOnly: new[] { Garde(origine: OpJson(new SetCpuVoltageOffsetOp(-125))) }))
+            .IsOk.Should().BeFalse();
 
     [Fact]
     public void La_reprise_peut_commencer_un_manifeste_vide()
@@ -291,7 +298,7 @@ public sealed class CommitManifestOpTests
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.ElevationDenied);
-        r.Error.Value.Message.Should().Contain("serveur du tube non authentifié");
+        r.Error.Value.Message.Should().Contain("pipe server not authenticated");
         ecrivain.DidNotReceiveWithAnyArgs().Commit(default!);
     }
 

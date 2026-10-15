@@ -82,8 +82,8 @@ public class MemoryBaselineServiceTests
         banc.Lancements.Should().Be(1);
     }
 
-    // 26/09/2026 : la reference du 16/09 (12,7 Go/s au lieu de 33,4) a ete prise dans le scan ou Warzone
-    // tournait. Jeu lance : aucune mesure, rien d'enregistre, rien de prouve.
+    // Une reference prise pendant que Warzone tourne est faussee (12,7 Go/s au lieu de 33,4, mesure).
+    // Jeu lance : aucune mesure, rien d'enregistre, rien de prouve.
     [Fact]
     public void Jeu_lance_le_banc_ne_tourne_pas_et_rien_n_est_enregistre()
     {
@@ -111,8 +111,7 @@ public class MemoryBaselineServiceTests
     public void Une_mesure_rejetee_n_est_pas_enregistree_et_ne_prouve_rien()
     {
         // Machine occupee : sigma 9 %. La reference resterait fausse pour toujours.
-        // Ce test disait « un seul lancement » jusqu'au 07/09 : le service reessaie desormais
-        // sur Q-03, parce que l'usage a montre 4 rejets sur 10 sur une machine qui travaille.
+        // Le service reessaie sur Q-03 : mesure, 4 rejets sur 10 sur une machine qui travaille.
         var (service, banc, fichier) = Monter(Mesure(34.20, sigma: 9.0));
 
         service.ProvenChannelsForScan("MACHINE-A", Barrettes()).Should().Be(0);
@@ -400,8 +399,8 @@ public class MemoryBaselineServiceTests
         fichier.Contenu.Should().BeNull();
     }
 
-    // ── 26/09/2026 : la mesure d'avant doit dater du depart vers le BIOS ──────────────────────
-    // L'horloge du service est figee au 06/09 10:00 : la reference enregistree porte cette heure.
+    // ── La mesure d'avant doit dater du depart vers le BIOS ──────────────────────
+    // L'horloge du service est figee (06/09 10:00) : la reference enregistree porte cette heure.
 
     [Fact]
     public void La_mesure_d_avant_voyage_est_prise_et_enregistree()

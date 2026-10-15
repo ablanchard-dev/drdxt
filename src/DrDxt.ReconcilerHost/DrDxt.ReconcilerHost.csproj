@@ -2,14 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <!-- 10/10/2026 (revue de sécurité) : même règle que l'App et le helper, aucun code injecté au lancement. -->
+    <!-- Même règle que l'App et le helper, aucun code injecté au lancement. -->
     <StartupHookSupport>false</StartupHookSupport>
     <TargetFramework>net10.0-windows</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Generic host packaged as a Windows Service (UseWindowsService). All real
-         logic lives in tested classes; Program/Worker are a thin shell. -->
+    <!-- Hôte générique empaqueté en service Windows (UseWindowsService). Toute la vraie
+         logique vit dans des classes testées ; Program/Worker sont une coquille mince. -->
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
   </ItemGroup>
@@ -18,18 +18,18 @@
     <ProjectReference Include="..\DrDxt.Core\DrDxt.Core.csproj" />
     <ProjectReference Include="..\DrDxt.Reconciler\DrDxt.Reconciler.csproj" />
     <ProjectReference Include="..\DrDxt.Reconciler.Adapters\DrDxt.Reconciler.Adapters.csproj" />
-    <!-- Detection's IWmiQuery / ManagementWmiQuery — the bare WMI read seam the
-         reconciler's WmiGpuDriverProbe needs (not the full Detection scan graph). -->
+    <!-- IWmiQuery / ManagementWmiQuery de Detection : la couture de lecture WMI nue dont a besoin
+         le WmiGpuDriverProbe du réconciliateur (pas tout le graphe d'analyse de Detection). -->
     <ProjectReference Include="..\DrDxt.Detection\DrDxt.Detection.csproj" />
     <ProjectReference Include="..\DrDxt.Infrastructure\DrDxt.Infrastructure.csproj" />
-    <!-- Real signed-IPC IElevatedClient (talks to the elevated helper); the host
-         wires it behind a fail-clean factory until the service-context handshake lands. -->
+    <!-- Vrai IElevatedClient à IPC signé (parle au helper élevé) ; l'hôte
+         le branche derrière une fabrique à échec propre tant que le handshake du contexte service n'existe pas. -->
     <ProjectReference Include="..\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Test-only access to the host's internal testable classes (TDD: the worker is
-         a thin shell; the logic is in these classes, exercised with fakes). -->
+    <!-- Accès réservé aux tests aux classes internes testables de l'hôte (TDD : le worker est
+         une coquille mince ; la logique est dans ces classes, exercées avec des faux). -->
     <InternalsVisibleTo Include="DrDxt.ReconcilerHost.Tests" />
   </ItemGroup>
 

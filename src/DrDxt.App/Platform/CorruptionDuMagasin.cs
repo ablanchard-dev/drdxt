@@ -3,18 +3,18 @@ using System.IO;
 namespace DrDxt.App.Platform;
 
 /// <summary>
-/// 04/10/2026 — pourquoi la réparation de Microsoft n'a pas abouti, lu dans <c>CBS.log</c>. Vu sur la machine de référence : DISM
+/// Pourquoi la réparation de Microsoft n'a pas abouti, lu dans <c>CBS.log</c>. Vu sur la machine de référence : DISM
 /// /RestoreHealth rend 0x800f0915 (CBS_E_REPAIR_CONTENT_MISSING), 1 512 fichiers abîmés, tous dans des composants de
 /// l'installation (10.0.26100.1591, juin 2025) que des versions plus récentes (8972, 9278) remplacent ; sfc ne trouve
 /// rien. Windows Update ne distribue plus ces vieilles versions : relancer la même réparation tournait en rond.
-/// DOC-WIN (09/10/2026, le mainteneur : /ResetBase non) : le geste est alors la réinstallation de Microsoft (Paramètres >
+/// Le geste est alors la réinstallation de Microsoft (Paramètres >
 /// Système > Récupération > « Réinstaller maintenant »), qui garde fichiers, applications et réglages
 /// (support.microsoft.com, « Fix issues by reinstalling the current version of Windows »).
 /// </summary>
 public static class CorruptionDuMagasin
 {
-    /// <param name="Complete">Revue du 04/10 (P0) : vrai seulement si chaque ligne « Corrupt » de la session a été lue
-    /// ET que leur nombre retombe sur le total que CBS écrit lui-même. Une liste incomplète ne propose jamais un geste
+    /// <param name="Complete">Vrai seulement si chaque ligne « Corrupt » de la session a été lue
+    /// et que leur nombre retombe sur le total que CBS écrit lui-même. Une liste incomplète ne propose jamais un geste
     /// irréversible.</param>
     public sealed record Lecture(bool SourceIntrouvable, IReadOnlyList<string> Composants, bool Complete = true);
 

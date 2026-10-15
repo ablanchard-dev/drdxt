@@ -6,7 +6,7 @@ namespace DrDxt.Integration.Tests;
 /// <summary>
 /// Un chiffre ecrit a la main est une dette — y compris dans le fichier qui l'enseigne.
 ///
-/// Constate le 07/09/2026 : `docs/INSTRUMENTS.md` concluait « **5 instruments. 4 UTILISABLES** »
+/// `docs/INSTRUMENTS.md` concluait « **5 instruments. 4 UTILISABLES** »
 /// alors que son propre registre en listait **six, tous utilisables**. I-06 avait ete ajoute le
 /// 06/09 sans que le total soit refait. Le fichier dont le sujet est « ce qu'on peut prouver » se
 /// trompait sur le nombre de choses qu'il prouve.

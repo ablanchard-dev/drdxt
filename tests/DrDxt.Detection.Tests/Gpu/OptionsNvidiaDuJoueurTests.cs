@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Gpu;
 
-// D1 (10/10/2026) : sur une carte NVIDIA, le docteur nomme la surcouche DLSS et le mode « Ultra » comme des choix du
+// Sur une carte NVIDIA, le docteur nomme la surcouche DLSS et le mode « Ultra » comme des choix du
 // joueur, sans chiffre promis ; sur une autre carte, rien.
 public sealed class OptionsNvidiaDuJoueurTests
 {

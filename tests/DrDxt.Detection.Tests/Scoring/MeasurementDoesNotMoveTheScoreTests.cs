@@ -6,7 +6,7 @@ using Xunit;
 namespace DrDxt.Detection.Tests.Scoring;
 
 // -----------------------------------------------------------------------
-// L1.3 — le test d'invariance : qu'est-ce qui change et ne doit rien changer ?
+// Le test d'invariance : qu'est-ce qui change et ne doit rien changer ?
 //
 // Brancher le classifieur sur le catalogue de leviers introduit un risque precis et facile a ne
 // pas voir : que le /100 se mette a dependre de ce qui a ete mesure. Le score d'une machine
@@ -77,27 +77,13 @@ public sealed class MeasurementDoesNotMoveTheScoreTests
 
     [Theory]
     [MemberData(nameof(WildlyDifferentMeasurements))]
-    public void The_overall_score_is_the_same_whatever_was_measured(string label, BenchmarkResult? baseline)
+    public void The_ledger_is_the_same_whatever_was_measured(string label, BenchmarkResult? baseline)
     {
-        var reference = Score(null).Score;
+        var reference = Score(null).Ledger!.Select(e => (e.LeverId, e.Penalty)).ToList();
 
-        Score(baseline).Score.Should().Be(reference, label);
+        Score(baseline).Ledger!.Select(e => (e.LeverId, e.Penalty)).Should().Equal(reference, label);
     }
 
-    [Theory]
-    [MemberData(nameof(WildlyDifferentMeasurements))]
-    public void The_performance_and_latency_sub_scores_are_the_same_whatever_was_measured(
-        string label, BenchmarkResult? baseline)
-    {
-        // La STABILITE est deliberement exclue : elle doit bouger avec une mesure (NS-6 §1/§7 la
-        // rend mesuree des qu'une capture existe). C'est un couplage voulu, documente et anterieur
-        // a ce lot — le confondre avec celui qu'on interdit ici rendrait ce test faux.
-        var reference = Score(null).Breakdown;
-        var actual = Score(baseline).Breakdown;
-
-        actual.Performance.Should().Be(reference.Performance, label);
-        actual.Latency.Should().Be(reference.Latency, label);
-    }
 
     [Theory]
     [MemberData(nameof(WildlyDifferentMeasurements))]

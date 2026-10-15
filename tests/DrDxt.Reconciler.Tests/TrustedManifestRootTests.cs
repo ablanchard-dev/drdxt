@@ -7,12 +7,12 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// BLOCKER #1 — at-rest integrity of the SYSTEM-trusted manifest root.
+// Intégrité au repos de la racine de manifeste à laquelle SYSTEM fait confiance.
 //
-// The trust decision is a pure function over (owner SID, ACEs), so the logic is asserted
-// here with synthetic inputs — no admin, no real FS. A small FS check then proves the
-// real EnsureTrustedDirectory rejects a directory whose owner is forced to the (non-admin)
-// current user (deterministic regardless of the runner's elevation).
+// La décision de confiance est une fonction pure de (SID propriétaire, ACE), donc la logique
+// se vérifie ici avec des entrées synthétiques, sans admin ni vrai système de fichiers. Un petit
+// contrôle sur disque prouve ensuite que le vrai EnsureTrustedDirectory rejette un dossier dont
+// le propriétaire est forcé à l'utilisateur courant (non admin), quelle que soit l'élévation du runner.
 // -----------------------------------------------------------------------
 public sealed class TrustedManifestRootTests
 {
@@ -69,7 +69,7 @@ public sealed class TrustedManifestRootTests
         {
             Allow(Admins, FileSystemRights.FullControl),
             Allow(SystemSid, FileSystemRights.FullControl),
-            Allow(SomeUser, userRights), // a user can write / delete / re-ACL → poisonable
+            Allow(SomeUser, userRights), // un utilisateur peut écrire, supprimer ou changer l'ACL → empoisonnable
         };
 
         TrustedManifestRoot.Evaluate("root", Admins, aces).IsOk.Should().BeFalse(
@@ -129,7 +129,7 @@ public sealed class TrustedManifestRootTests
         }
     }
 
-    // ── F3: the hardened FILE descriptor pins owner=Administrators ────────────────────
+    // ── Le descripteur de fichier durci fige owner=Administrators ─────────────────
     [Fact]
     public void BuildHardenedFileSecurity_PinsOwnerToAdministrators()
     {
@@ -145,10 +145,10 @@ public sealed class TrustedManifestRootTests
             "not the user's S-1-5-21 SID, or the SYSTEM reconciler would reject a legitimate root (F3)");
     }
 
-    // ── F1: a pre-squatted user-owned existing root is REPAIRED (when elevated) or fails
-    // LOUD (when not) — it is never returned Ok while still untrusted. Deterministic on
-    // either runner: a non-admin token cannot set owner=Administrators (Administrators is
-    // deny-only) so the repair fails; an admin/SYSTEM token repairs it to admin-owned.
+    // ── Une racine existante squattée, possédée par l'utilisateur, est réparée (élevé) ou échoue
+    // bruyamment (non élevé) ; elle n'est jamais rendue Ok tant qu'elle reste non fiable. Déterministe
+    // sur les deux runners : un jeton non admin ne peut pas poser owner=Administrators (Administrators
+    // est refus seulement), donc la réparation échoue ; un jeton admin/SYSTEM la répare en possession admin.
     [Fact]
     public void EnsureCreatedHardened_OnUserOwnedExistingRoot_NeverReturnsOkOnUntrusted()
     {
@@ -170,7 +170,7 @@ public sealed class TrustedManifestRootTests
                 PropagationFlags.None, AccessControlType.Allow));
             di.SetAccessControl(sec);
 
-            // Precondition: it IS untrusted before the ensure call.
+            // Précondition : elle est bien non fiable avant l'appel ensure.
             TrustedManifestRoot.EnsureTrustedDirectory(dir).IsOk.Should().BeFalse(
                 "the squatted root must start untrusted for this test to mean anything");
 
@@ -178,8 +178,8 @@ public sealed class TrustedManifestRootTests
 
             if (result.IsOk)
             {
-                // Only legitimate when elevated: Ok must mean the root was repaired to
-                // admin-owned. Ok on a still-untrusted root would be the F1 defect.
+                // Légitime seulement élevé : Ok doit vouloir dire que la racine a été réparée en
+                // possession admin. Ok sur une racine encore non fiable serait le défaut.
                 TrustedManifestRoot.EnsureTrustedDirectory(dir).IsOk.Should().BeTrue(
                     "Ok must mean the squatted root was repaired to admin-owned, never trusted as-is (F1)");
             }
@@ -197,10 +197,10 @@ public sealed class TrustedManifestRootTests
         }
     }
 
-    // ── F3: a hardened write yields an admin-owned file (elevated) or fails LOUD with no
-    // half-written user-owned file left behind (non-elevated). Covers the manifest + key
-    // write path (same helper). The complementary "user-owned file is rejected by Evaluate"
-    // is covered by Untrusted_WhenOwnerIsAUser and the HostPublicKeyProvider FS test.
+    // ── Une écriture durcie donne un fichier possédé par un admin (élevé) ou échoue bruyamment
+    // sans laisser de fichier à moitié écrit possédé par l'utilisateur (non élevé). Couvre le chemin
+    // d'écriture du manifeste et de la clé (même aide). Le complément « un fichier possédé par
+    // l'utilisateur est rejeté par Evaluate » est couvert par Untrusted_WhenOwnerIsAUser et le test disque de HostPublicKeyProvider.
     [Fact]
     public void WriteTrustedFile_ProducesAdminOwnedFile_OrFailsLoudly()
     {
@@ -231,10 +231,10 @@ public sealed class TrustedManifestRootTests
         }
     }
 
-    // ── F2: a reparse-point root (junction/symlink) is rejected before trust. The OS would
-    // follow it to attacker-controlled storage, so the SD we'd read is the target's, not the
-    // root's. Symlink creation needs SeCreateSymbolicLinkPrivilege / Developer Mode; if the
-    // runner lacks it the test is platform-gated (skipped) — fail-closed either way.
+    // ── Une racine point de reparse (jonction/lien symbolique) est rejetée avant la confiance. L'OS
+    // la suivrait vers un stockage contrôlé par l'attaquant, donc le descripteur lu serait celui de la
+    // cible, pas de la racine. Créer un lien symbolique demande SeCreateSymbolicLinkPrivilege ou le mode
+    // développeur ; si le runner ne l'a pas, le test est filtré par plateforme (sauté) : fermé dans les deux cas.
     [Fact]
     public void EnsureTrustedDirectory_OnAReparsePoint_FailsClosed()
     {
@@ -261,7 +261,7 @@ public sealed class TrustedManifestRootTests
         }
     }
 
-    // ── F2: a reparse-point FILE (symlink) is rejected before trust, same reasoning.
+    // ── Un fichier point de reparse (lien symbolique) est rejeté avant la confiance, même raisonnement.
     [Fact]
     public void EnsureTrustedFile_OnAReparsePointFile_FailsClosed()
     {
@@ -287,7 +287,7 @@ public sealed class TrustedManifestRootTests
         }
     }
 
-    // RED TEAM 26/08/2026 — un ACE peut porter le masque GENERIQUE brut (GENERIC_WRITE /
+    // Un ACE peut porter le masque GENERIQUE brut (GENERIC_WRITE /
     // GENERIC_ALL) au lieu des bits specifiques mappes. Ces bits ne recoupent aucun droit
     // specifique, donc avant le correctif Evaluate jugeait "de confiance" un non-admin qui
     // detient GENERIC_WRITE/GENERIC_ALL sur la racine — soit exactement le grant d'ecriture
@@ -308,8 +308,8 @@ public sealed class TrustedManifestRootTests
             $"a non-admin holding the raw generic mask 0x{genericMask:X8} can rewrite the trust root");
     }
 
-    // Complement: GENERIC_READ / GENERIC_EXECUTE are read-only and must not trip the guard
-    // (a low-priv reader legitimately reads the key), else the fix would false-positive.
+    // Complément : GENERIC_READ / GENERIC_EXECUTE sont en lecture seule et ne doivent pas déclencher
+    // la garde (un lecteur peu privilégié lit légitimement la clé), sinon le correctif ferait un faux positif.
     [Theory]
     [InlineData(0x20000000)] // GENERIC_EXECUTE
     public void Trusted_WhenNonAdminHoldsOnlyGenericReadOrExecute(int genericMask)

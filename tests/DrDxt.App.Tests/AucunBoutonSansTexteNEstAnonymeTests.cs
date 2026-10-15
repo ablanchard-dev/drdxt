@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Un bouton dont tout le contenu est un trace geometrique n'a rien
+// Un bouton dont tout le contenu est un trace geometrique n'a rien
 // a dire a un lecteur d'ecran : il s'annonce « bouton », sans plus. C'est
 // exactement le defaut du texte alternatif manquant sur une image -- le dessin
 // porte le sens, et le sens ne sort pas du dessin.
@@ -37,7 +37,7 @@ public sealed class AucunBoutonSansTexteNEstAnonymeTests
                         .Where(File.Exists);
     }
 
-    // 19/09/2026 — ce crible ne connaissait que deux formes de bouton.
+    // Ce crible ne connaissait que deux formes de bouton.
     //
     // Mesure : les vues portent aussi deux `ToggleButton`, les en-tetes repliables de
     // l'ecran de licence et de l'ecran de scan. Elles parlent aujourd'hui — chacune

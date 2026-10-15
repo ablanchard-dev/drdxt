@@ -4,12 +4,12 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Cpu;
 
-// 04/10/2026 (plan 2.2) : le microcode des Core de 13e et 14e génération de bureau, avant tout conseil de puissance.
+// Le microcode des Core de 13e et 14e génération de bureau, avant tout conseil de puissance.
 public sealed class MicrocodeRaptorLakeTests
 {
     private const string Rpl = "Intel64 Family 6 Model 183 Stepping 1";   // relevé sur la machine de référence
 
-    // Revue du 04/10 (P1) : un i5-13400 sur puce Alder Lake (autre modèle, microcode 0x3x) n'est pas concerné.
+    // Un i5-13400 sur puce Alder Lake (autre modèle, microcode 0x3x) n'est pas concerné.
     [Fact]
     public void Un_i5_13400_sur_puce_Alder_Lake_n_est_pas_accuse()
         => MicrocodeRaptorLake.Juger("13th Gen Intel(R) Core(TM) i5-13400", 0x36, "Intel64 Family 6 Model 151 Stepping 5").Should().BeEmpty();

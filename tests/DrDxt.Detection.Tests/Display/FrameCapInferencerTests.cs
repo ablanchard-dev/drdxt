@@ -7,14 +7,14 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Display;
 
 /// <summary>
-/// Pins the defect found on the author's own machine on 02/09/2026: the driver frame cap sat at
-/// 141 while the PRIMARY display ran at 200 Hz. 141 is 144 - 3, and 144 is the SECONDARY screen —
-/// the cap was computed on the wrong panel and cost frames on every session.
+/// Fige le défaut trouvé sur la machine de référence : le plafond d'images du pilote était à
+/// 141 alors que l'écran principal tournait à 200 Hz. 141 = 144 - 3, et 144 est l'écran secondaire :
+/// le plafond était calculé sur le mauvais écran et coûtait des images à chaque session.
 ///
-/// The whole point of these tests is that 141 is not a magic bad number: on a machine whose
-/// primary IS 144 Hz, the very same 141 is correct. Only the RELATION to the primary display
-/// decides, which is why <see cref="Same_cap_is_coherent_when_the_primary_is_the_144_screen"/>
-/// exists next to <see cref="Cap_matching_a_secondary_display_is_named_as_computed_elsewhere"/>.
+/// Tout l'enjeu de ces tests : 141 n'est pas un chiffre magique. Sur une machine dont l'écran
+/// principal est bien à 144 Hz, le même 141 est juste. Seule la relation à l'écran principal
+/// décide, d'où <see cref="Same_cap_is_coherent_when_the_primary_is_the_144_screen"/>
+/// à côté de <see cref="Cap_matching_a_secondary_display_is_named_as_computed_elsewhere"/>.
 /// </summary>
 public class FrameCapInferencerTests
 {
@@ -32,7 +32,7 @@ public class FrameCapInferencerTests
     [Fact]
     public void Cap_matching_a_secondary_display_is_named_as_computed_elsewhere()
     {
-        // THE BUG: 141 = 144 - 3, and 144 is the second screen, not the one the game runs on.
+        // Le défaut : 141 = 144 - 3, et 144 est le second écran, pas celui où tourne le jeu.
         var s = FrameCapInferencer.Infer(141, TwoScreens);
 
         s.Verdict.Should().Be(FrameCapVerdict.ComputedOnAnotherDisplay);
@@ -43,8 +43,8 @@ public class FrameCapInferencerTests
     [Fact]
     public void Same_cap_is_coherent_when_the_primary_is_the_144_screen()
     {
-        // Same number, opposite verdict. Proves the rule reads the display relation,
-        // not a hardcoded 141.
+        // Même nombre, verdict opposé. Prouve que la règle lit la relation entre écrans,
+        // pas un 141 codé en dur.
         var s = FrameCapInferencer.Infer(141, new[] { Screen(144, true), Screen(200, false) });
 
         s.Verdict.Should().Be(FrameCapVerdict.Coherent);
@@ -66,7 +66,7 @@ public class FrameCapInferencerTests
         var s = FrameCapInferencer.Infer(120, TwoScreens);
 
         s.Verdict.Should().Be(FrameCapVerdict.CapsBelowPrimary);
-        s.Reason.Should().NotContain("144"); // no display explains 120: do not name one
+        s.Reason.Should().NotContain("144"); // aucun écran n'explique 120 : n'en nommer aucun
     }
 
     // ---- qui a pose ce cap ------------------------------------------------------------

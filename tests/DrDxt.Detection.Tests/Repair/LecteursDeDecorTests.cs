@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. Cinq tests unitaires lisaient la vraie machine — 18,7 s CHACUN.
+// Cinq tests unitaires lisaient la vraie machine — 18,7 s CHACUN.
 //
 // Mesure sur les journaux d'execution de la solution (4 447 tests, 411 s cumulees) : les
 // cinq tests les plus lents durent tous **exactement** ~18,7 s. Un plateau identique n'est

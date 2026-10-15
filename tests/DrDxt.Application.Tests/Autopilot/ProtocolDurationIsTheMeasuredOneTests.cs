@@ -11,7 +11,7 @@ namespace DrDxt.Application.Tests.Autopilot;
 /// passe avec le temps total, et le produit a mesure les jeux pendant des mois avec une resolution
 /// deux a trois fois pire que necessaire.
 ///
-/// Rejeu des huit captures Warzone reelles (07/09/2026) : resolution mediane ~3,4 % a 10 s,
+/// Rejeu des huit captures Warzone reelles : resolution mediane ~3,4 % a 10 s,
 /// ~4,8 % a 20 s, ~30 % a 45 s.
 ///
 /// Elle a ensuite valu **15 s** par crainte qu'a 10 s le 1 % low ne repose que sur ~14 frames.

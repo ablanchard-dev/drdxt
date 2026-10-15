@@ -8,13 +8,13 @@ namespace DrDxt.Detection.Settings;
 ///
 /// <c>GetSystemCpuSetInformation</c> rend, pour chaque processeur logique, son index de cœur et un
 /// bit <c>Parked</c>. Documentée, en espace utilisateur, <b>sans élévation</b> et sans dépendance
-/// nouvelle — le compteur de performance équivalent porte un nom localisé (« État de parcage » sur
+/// nouvelle ; le compteur de performance équivalent porte un nom localisé (« État de parcage » sur
 /// un Windows français), ce qui obligerait à résoudre les noms par index et à ajouter un paquet.
 ///
 /// Contrat : <c>null</c> quand la lecture n'a pas abouti, liste (éventuellement vide) sinon. Cette
-/// distinction est la raison d'être du fichier : le lecteur précédent rendait toujours une liste
-/// vide, donc « je n'ai pas pu lire » était indiscernable de « aucun cœur n'est parqué », et deux
-/// consommateurs en tiraient des conclusions opposées — dont une qui proposait une écriture.
+/// distinction est la raison d'être du fichier : un lecteur qui rendrait toujours une liste
+/// vide rendrait « je n'ai pas pu lire » indiscernable de « aucun cœur n'est parqué », et deux
+/// consommateurs en tireraient des conclusions opposées, dont une qui proposerait une écriture.
 ///
 /// Ne lève jamais : tout échec natif devient <c>null</c>.
 /// </summary>
@@ -34,7 +34,7 @@ internal static class CoreParkingReader
         try
         {
             // Premier appel : la taille nécessaire. Il échoue par construction (tampon nul), donc
-            // son faux retour n'est pas un signal — seule la taille compte.
+            // son faux retour n'est pas un signal : seule la taille compte.
             GetSystemCpuSetInformation(IntPtr.Zero, 0, out var needed, IntPtr.Zero, 0);
             if (needed == 0 || needed > MaxBufferBytes)
                 return null;

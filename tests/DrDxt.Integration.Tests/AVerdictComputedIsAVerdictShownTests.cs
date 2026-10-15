@@ -10,7 +10,7 @@ namespace DrDxt.Integration.Tests;
 /// Le test qui manquait, et son histoire.
 ///
 /// Le verdict de la boucle BIOS -- « on te dit quoi changer, et on prouve que ca a pris » -- etait
-/// calcule a chaque scan depuis M3, couvert par **17 tests de cablage**, et binde dans **zero
+/// calcule a chaque scan, couvert par **17 tests de cablage**, et binde dans **zero
 /// fichier .xaml**. Dix-sept tests verts pour zero pixel. Aucun d'eux ne pouvait le voir : ils
 /// s'arretaient tous exactement la ou l'ecran commence.
 ///
@@ -47,14 +47,14 @@ public class AVerdictComputedIsAVerdictShownTests
     [InlineData("HasMemoryAb")]
     [InlineData("MemoryAb.Lines")]
     [InlineData("MemoryAb.Conclusion")]
-    // 11/09/2026 : la phrase de session (dont le refus SceneContract) — calculee, jamais vue par ce gate.
+    // La phrase de session (dont le refus SceneContract) — calculee, jamais vue par ce gate.
     [InlineData("ResultatOptimisation")]
-    // 11/09/2026 : la scene declaree. Sans ces trois liaisons, la question existerait dans le VM et
+    // La scene declaree. Sans ces trois liaisons, la question existerait dans le VM et
     // le joueur ne pourrait jamais y repondre : le contrat resterait `Inconnue` pour toujours.
     [InlineData("{Binding ChoixDeScene}")]
     [InlineData("{Binding SceneDeclaree}")]
     [InlineData("{Binding DescriptionScene")]
-    // 11/09/2026, demande produit : ce qui tournait A cote du jeu, et la MARGE collee au FPS moyen.
+    // Demande produit : ce qui tournait A cote du jeu, et la MARGE collee au FPS moyen.
     // Un scan a affiche 164 FPS pendant qu'il regardait l'ecran de DrDXT, jeu en arriere-plan.
     [InlineData("{Binding VoisinsDuJeu}")]
     [InlineData("{Binding VoisinsResume}")]
@@ -68,7 +68,7 @@ public class AVerdictComputedIsAVerdictShownTests
     }
 
     /// <summary>
-    /// 11/09/2026 — la consigne doit etre vue avant le scan, pas seulement a « OPTIMISER ».
+    /// La consigne doit etre vue avant le scan, pas seulement a « OPTIMISER ».
     ///
     /// Le selecteur de scene pose la veille ne vivait que dans le panneau de RESULTAT : le joueur
     /// apprenait apres coup qu'il aurait fallu jouer une vraie partie pendant la mesure. Ce test

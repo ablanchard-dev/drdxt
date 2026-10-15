@@ -4,12 +4,12 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Settings;
 
 /// <summary>
-/// PHASE 18 F2 — HAGS tel que Windows l'APPLIQUE, pas tel que le registre le raconte.
+/// HAGS tel que Windows l'applique, pas tel que le registre le raconte.
 ///
-/// Le produit lisait la presence de `HwSchMode`. Mesure du 10/09/2026 sur la machine de
-/// reference : cle absente, HAGS actif (`0x0B` par D3DKMT). Le gate lisait donc « inconnu » la ou
-/// l'etat etait connaissable, et l'ancien gate (`!= On`) aurait meme propose d'activer un
-/// ordonnancement deja actif — un placebo.
+/// Lire la presence de `HwSchMode` ne suffit pas. Mesure du 10/09/2026 sur la machine de
+/// reference : cle absente, HAGS actif (`0x0B` par D3DKMT). Un gate sur la cle lirait « inconnu »
+/// la ou l'etat est connaissable, et un gate `!= On` proposerait meme d'activer un
+/// ordonnancement deja actif : un placebo.
 /// </summary>
 public interface IHagsEffectiveReader
 {
@@ -22,11 +22,11 @@ public readonly record struct AdaptateurHags(uint Sources, bool Lu, uint Caps);
 
 /// <summary>
 /// `D3DKMTEnumAdapters2` → `D3DKMTQueryAdapterInfo(KMTQAITYPE_WDDM_2_7_CAPS = 70, 4 octets)` →
-/// `D3DKMTCloseAdapter`. Sequence reprise de la sonde lecture seule qui a rendu `0x0B` sur la
-/// machine de reference le 10/09/2026 (audit externe du 10/09).
+/// `D3DKMTCloseAdapter`. Sequence reprise de la sonde lecture seule
+/// (releve le 10/09/2026 sur la machine de reference : `0x0B`).
 ///
 /// La structure `D3DKMT_WDDM_2_7_CAPS` est documentee (d3dkmthk.h) mais marquee « reserved for
-/// system use » : c'est une lecture de BONNE FOI, jamais utilisee pour ecrire, et toute reponse
+/// system use » : c'est une lecture de bonne foi, jamais utilisee pour ecrire, et toute reponse
 /// qu'on ne sait pas lire devient Unknown.
 /// </summary>
 public sealed class D3dkmtHagsReader : IHagsEffectiveReader
@@ -42,7 +42,7 @@ public sealed class D3dkmtHagsReader : IHagsEffectiveReader
     }
 
     /// <summary>
-    /// Pur. L'adaptateur qui compte est celui qui AFFICHE (au moins une source) : un adaptateur
+    /// Pur. L'adaptateur qui compte est celui qui affiche (au moins une source) : un adaptateur
     /// sans sortie (rendu hors ecran, adaptateur logiciel) ne dit rien de ce que le jeu obtient.
     /// Rien de lisible, ou HAGS non supporte ⇒ Unknown : « on ne peut pas l'activer » n'est pas
     /// « il est eteint ». Deux adaptateurs qui affichent et se contredisent ⇒ Unknown : choisir

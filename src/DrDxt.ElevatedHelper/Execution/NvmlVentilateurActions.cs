@@ -4,7 +4,7 @@ using DrDxt.GpuNative.Nvml;
 namespace DrDxt.ElevatedHelper.Execution;
 
 /// <summary>
-/// GPU-OC (08/10/2026) : le ventilateur d'une carte NVIDIA en mode Expert, par NVML (docs.nvidia.com/deploy/nvml-api).
+/// Le ventilateur d'une carte NVIDIA en mode Expert, par NVML (docs.nvidia.com/deploy/nvml-api).
 /// NVIDIA prévient qu'une vitesse fixe trop basse peut abîmer la carte, et un retour à l'automatique raté a été signalé
 /// (forum NVIDIA, 2022, sous Linux). D'où trois règles, tenues ici et pas chez l'appelant :
 /// on ne pose qu'en partant de l'automatique, jamais sous la vitesse que l'automatique vise à cet instant ni sous le

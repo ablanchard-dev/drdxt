@@ -37,8 +37,7 @@ public class ScanViewModelDisplayTests
 
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), 72, baseline,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(baseline?.EstimatedPcLatencyMs != null, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), baseline)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
@@ -58,7 +57,7 @@ public class ScanViewModelDisplayTests
         vm.AvgFpsDisplay.Should().Be("143");
         vm.P1LowDisplay.Should().Be("98");
         vm.MarginDisplay.Should().Be("± 2.1");
-        // 11/09/2026, demande produit : Jamais un chiffre seul. C'est cette propriete qui est liee au
+        // Demande produit : Jamais un chiffre seul. C'est cette propriete qui est liee au
         // grand chiffre de l'ecran, et elle ne peut pas exister sans sa marge.
         vm.AvgFpsAvecMarge.Should().Be("143 ± 2.1");
     }
@@ -75,7 +74,7 @@ public class ScanViewModelDisplayTests
         vm.AvgFpsAvecMarge.Should().NotBe(vm.AvgFpsDisplay, "un chiffre seul est trompeur");
     }
 
-    // 27/09/2026 : le 1 % low porte sa propre marge, comme la moyenne ; inconnue, elle se dit.
+    // Le 1 % low porte sa propre marge, comme la moyenne ; inconnue, elle se dit.
     [Fact]
     public async Task Le_1_pourcent_low_porte_sa_propre_marge()
     {
@@ -89,7 +88,7 @@ public class ScanViewModelDisplayTests
         sansMarge.P1LowAvecMarge.Should().Be("98 Dashboard.Marge.Inconnue").And.NotContain("Infinity");
     }
 
-    // 26/09/2026 : sous trois passes la marge vaut +inf, et l'ecran ecrivait « 143 ± Infinity »
+    // Sous trois passes la marge vaut +inf, et l'ecran ecrivait « 143 ± Infinity »
     // (symbole de la culture invariante). Meme phrase que le tableau de bord : marge inconnue.
     [Fact]
     public async Task Une_marge_infinie_se_dit_inconnue_jamais_Infinity()
@@ -135,18 +134,18 @@ public class ScanViewModelDisplayTests
 
         await vm.ScanCommand.ExecuteAsync(null);
 
-        // Must be "100" not "100,0" or localized (99.5 rounds to 100 via banker's rounding)
+        // Doit être « 100 », pas « 100,0 » ni localisé (99,5 s'arrondit à 100 par arrondi bancaire)
         vm.AvgFpsDisplay.Should().Be("100");
         vm.P1LowDisplay.Should().Be("61");
-        // Margin uses 0.# format — "1.6" not "1,6"
+        // La marge utilise le format 0.# : « 1.6 », pas « 1,6 »
         vm.MarginDisplay.Should().Be("± 1.6");
         vm.MarginDisplay.Should().NotContain(",");
     }
 
-    // --- Coverage honesty (24/08) --------------------------------------------------------------
-    // The scorer already computes ScanCoverage and it rode all the way to the UI unused, so a
-    // machine whose levers could not be read still displayed "100 — in excellent health".
-    // These tests pin the fix: the headline stops asserting when the read is incomplete.
+    // --- Honnêteté de la couverture -----------------------------------------------------
+    // Le noteur calcule déjà ScanCoverage et il remontait jusqu'à l'interface sans être utilisé :
+    // une machine dont les leviers n'avaient pas pu être lus affichait quand même « 100 — en excellente santé ».
+    // Ces tests figent le correctif : le titre cesse d'affirmer quand la lecture est incomplète.
     private static ScanViewModel BuildWithCoverage(int score, ScanCoverage? coverage)
     {
         var hd = Substitute.For<IHardwareDetector>();
@@ -161,8 +160,7 @@ public class ScanViewModelDisplayTests
 
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), score, null,
-              new ScoreBreakdown(score, score, score), new DimensionStatus(false, false),
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), null,
               Ledger: null, Coverage: coverage)));
 
         var sd = Substitute.For<IStorageDetector>();
@@ -175,7 +173,7 @@ public class ScanViewModelDisplayTests
     [Fact]
     public async Task Unread_levers_do_not_get_announced_as_excellent_health()
     {
-        // The exact shape that made the scan feel untrue: nothing readable, so nothing deducted.
+        // La forme exacte qui rendait le scan faux : rien de lisible, donc rien de déduit.
         var vm = BuildWithCoverage(100, new ScanCoverage(ApplicableLevers: 6, KnownLevers: 2, UnknownLevers: 4));
 
         await vm.ScanCommand.ExecuteAsync(null);
@@ -194,7 +192,7 @@ public class ScanViewModelDisplayTests
         await vm.ScanCommand.ExecuteAsync(null);
 
         vm.IsCoverageComplete.Should().BeTrue();
-        // Le verdict ne suit plus le score depuis le 05/09 : couverture complete et grand livre
+        // Le verdict ne suit pas le score : couverture complete et grand livre
         // vide -> « rien a corriger dans ce qui a ete lu ». Un score de 100 ne le rend pas
         // « excellent » : c'est la lecture qui parle, pas la note.
         vm.VerdictText.Should().Be("UI.Verdict.Clean");
@@ -204,7 +202,7 @@ public class ScanViewModelDisplayTests
     [Fact]
     public async Task Absent_coverage_is_treated_as_incomplete_not_as_full()
     {
-        // A scorer that reports no coverage at all must not be read as "everything was read".
+        // Un noteur qui ne rapporte aucune couverture ne doit pas se lire comme « tout a été lu ».
         var vm = BuildWithCoverage(100, null);
 
         await vm.ScanCommand.ExecuteAsync(null);

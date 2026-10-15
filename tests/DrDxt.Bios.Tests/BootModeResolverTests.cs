@@ -5,8 +5,8 @@ using FluentAssertions;
 namespace DrDxt.Bios.Tests;
 
 /// <summary>
-/// BootModeResolver derives the boot mode that gates CSM-off advice (§16 / B2): UEFI
-/// → safe; non-UEFI → Legacy (conservative, no-boot-safe); null BIOS → Unknown.
+/// BootModeResolver déduit le mode de démarrage qui filtre le conseil de couper le CSM : UEFI
+/// → sûr ; hors UEFI → Legacy (prudent, sans risque de non-démarrage) ; BIOS null → Unknown.
 /// </summary>
 public class BootModeResolverTests
 {

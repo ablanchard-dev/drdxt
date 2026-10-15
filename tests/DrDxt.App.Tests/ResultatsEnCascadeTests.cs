@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 (boucle « vivant et prouvé », B2) : à la fin du scan, verdict, liste, aperçu, Optimiser et domaines
+// À la fin du scan, verdict, liste, aperçu, Optimiser et domaines
 // apparaissaient d'un bloc. Ils entrent maintenant dans l'ordre de lecture, chacun après le précédent.
 public sealed class ResultatsEnCascadeTests
 {

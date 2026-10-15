@@ -4,43 +4,43 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// M2 Phase E1 — GpuSafeBounds.
+// GpuSafeBounds.
 //
-// The conservative bounds gate that sits in front of the elevated helper: no
-// value outside these bounds can ever reach the driver. Values are deliberately
-// TIMID for M2 (hardened later with team data §10). Pure, fully unit-tested.
+// La porte de bornes prudentes devant le helper élevé : aucune valeur hors de ces bornes
+// ne peut atteindre le pilote. Les valeurs sont timides à dessein (à durcir avec des
+// données de terrain). Pur, entièrement testé.
 //
-//  - Core clock offset is bounded to a conservative band (undervolt = a small
-//    negative core-clock offset under Option A; an over-aggressive offset is
-//    refused outright before it can touch the driver).
-//  - Power limit can never go below a safe floor (starving the GPU = stutter).
-//  - Fan curve can never drop below a minimum duty at high temperature
-//    (anti-overheat) — a "0 RPM everywhere" curve is clamped up.
+//  - Le décalage d'horloge cœur est borné à une bande prudente (undervolt = petit décalage
+//    négatif de l'horloge cœur ; un décalage trop agressif est refusé net avant de
+//    pouvoir toucher le pilote).
+//  - La limite de puissance ne descend jamais sous un plancher sûr (affamer la carte = saccades).
+//  - La courbe de ventilation ne descend jamais sous un régime minimal à haute température
+//    (anti-surchauffe) : une courbe « 0 tr/min partout » est relevée.
 // -----------------------------------------------------------------------
 public sealed class GpuSafeBoundsTests
 {
-    // --- Core clock offset band (MHz, signed; negative = undervolt direction). ---
+    // --- Bande de décalage d'horloge cœur (MHz, signé ; négatif = sens undervolt). ---
 
     [Theory]
-    [InlineData(-150, true)]   // conservative undervolt offset → OK
+    [InlineData(-150, true)]   // décalage d'undervolt prudent → OK
     [InlineData(0, true)]      // no-op offset → OK
-    [InlineData(30, true)]     // small positive offset within band → OK
-    [InlineData(-400, false)]  // too aggressive (undervolt) → refused outright
-    [InlineData(500, false)]   // too aggressive (overclock) → refused outright
+    [InlineData(30, true)]     // petit décalage positif dans la bande → OK
+    [InlineData(-400, false)]  // trop agressif (undervolt) → refusé net
+    [InlineData(500, false)]   // trop agressif (overclock) → refusé net
     public void Core_offset_must_stay_within_conservative_band(int mhz, bool ok) =>
         GpuSafeBounds.IsCoreOffsetSafe(mhz).Should().Be(ok);
 
     [Fact]
     public void Core_offset_band_is_exactly_the_published_min_max()
     {
-        // The band edges are inclusive and conservative.
+        // Les bords de la bande sont inclus et prudents.
         GpuSafeBounds.IsCoreOffsetSafe(GpuSafeBounds.MinCoreOffsetMhz).Should().BeTrue();
         GpuSafeBounds.IsCoreOffsetSafe(GpuSafeBounds.MaxCoreOffsetMhz).Should().BeTrue();
         GpuSafeBounds.IsCoreOffsetSafe(GpuSafeBounds.MinCoreOffsetMhz - 1).Should().BeFalse();
         GpuSafeBounds.IsCoreOffsetSafe(GpuSafeBounds.MaxCoreOffsetMhz + 1).Should().BeFalse();
     }
 
-    // --- Memory offset band. ---
+    // --- Bande de décalage mémoire. ---
 
     [Theory]
     [InlineData(0, true)]
@@ -50,7 +50,7 @@ public sealed class GpuSafeBoundsTests
     public void Memory_offset_must_stay_within_conservative_band(int mhz, bool ok) =>
         GpuSafeBounds.IsMemoryOffsetSafe(mhz).Should().Be(ok);
 
-    // --- Power-limit floor (% of TDP). ---
+    // --- Plancher de limite de puissance (% du TDP). ---
 
     [Fact]
     public void Power_limit_floor_never_below_safe_minimum() =>
@@ -70,7 +70,7 @@ public sealed class GpuSafeBoundsTests
 
     [Fact]
     public void Power_limit_floor_is_meaningfully_conservative() =>
-        // Never let the GPU be starved below half power (would cause stutter, not gains).
+        // Ne jamais affamer la carte sous la moitié de sa puissance (saccades, pas de gain).
         GpuSafeBounds.MinPowerLimitPct.Should().BeGreaterThanOrEqualTo(50);
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class GpuSafeBoundsTests
         GpuSafeBounds.IsPowerLimitSafe(101).Should().BeFalse();
     }
 
-    // --- Fan curve: min duty at high temperature (anti-overheat). ---
+    // --- Courbe de ventilation : régime minimal à haute température (anti-surchauffe). ---
 
     [Fact]
     public void Fan_curve_min_duty_prevents_overheat()
@@ -91,7 +91,7 @@ public sealed class GpuSafeBoundsTests
         {
             new FanCurvePoint(TempC: 40, DutyPct: 0),
             new FanCurvePoint(TempC: 70, DutyPct: 0),
-            new FanCurvePoint(TempC: 85, DutyPct: 0),  // hot, but silent = dangerous
+            new FanCurvePoint(TempC: 85, DutyPct: 0),  // chaud mais silencieux = dangereux
         });
 
         var clamped = GpuSafeBounds.ClampFanCurve(zeroRpmEverywhere);
@@ -105,15 +105,15 @@ public sealed class GpuSafeBoundsTests
     {
         var curve = new FanCurve(new[]
         {
-            new FanCurvePoint(TempC: 40, DutyPct: 20),  // cool: low duty is fine, left alone
-            new FanCurvePoint(TempC: 85, DutyPct: 10),  // hot: below floor → raised
+            new FanCurvePoint(TempC: 40, DutyPct: 20),  // froid : un régime bas convient, laissé tel quel
+            new FanCurvePoint(TempC: 85, DutyPct: 10),  // chaud : sous le plancher → relevé
         });
 
         var clamped = GpuSafeBounds.ClampFanCurve(curve);
 
-        // The cool point keeps its quiet duty.
+        // Le point froid garde son régime silencieux.
         clamped.Points.First(p => p.TempC == 40).DutyPct.Should().Be(20);
-        // The hot point is raised to at least the floor.
+        // Le point chaud est relevé au moins au plancher.
         clamped.Points.First(p => p.TempC == 85).DutyPct.Should().BeGreaterThanOrEqualTo(GpuSafeBounds.MinFanDutyAtHotTempPct);
     }
 
@@ -141,7 +141,7 @@ public sealed class GpuSafeBoundsTests
         GpuSafeBounds.IsFanCurveSafe(safe).Should().BeTrue();
     }
 
-    /// <summary>24/09/2026 : la promesse porte sur la température, pas sur les points. Le point qui
+    /// <summary>La promesse porte sur la température, pas sur les points. Le point qui
     /// gouverne 80 °C tient le plancher, sinon le ventilateur descend sous 40 % juste au-dessus.</summary>
     [Fact]
     public void Is_fan_curve_safe_regarde_le_point_qui_gouverne_80C()

@@ -78,7 +78,7 @@ public class MemoryBaselineStoreTests
         lu.IsOk.Should().BeFalse();
     }
 
-    // 26/09/2026 : une reference sans ses dispersions se relisait avec sigma = 0. Le seuil de
+    // Une reference sans ses dispersions se relisait avec sigma = 0. Le seuil de
     // MemoryVerdict (3 sigma) tombait alors a 0, et n'importe quel ecart de bruit devenait
     // « significatif ». Un banc de dix passes ne rend jamais une dispersion nulle.
     [Theory]

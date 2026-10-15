@@ -2,17 +2,17 @@ namespace DrDxt.Core;
 
 /// <summary>
 /// Un instant de la machine (a ne pas confondre avec `PerformanceSample`, qui est une mesure
-/// entiere conservee dans le journal entre deux sessions : ici c'est un instant dans une session) — sparse, et c'est deliberé.
+/// entiere conservee dans le journal entre deux sessions : ici c'est un instant dans une session), creux, et c'est deliberé.
 ///
 /// Jusqu'ici, DrDXT correlait « la frame 872 avec la valeur 872 » : les series etaient
-/// appariees par INDEX, ce qui interdit de fusionner deux producteurs qui n'echantillonnent pas au
+/// appariees par index, ce qui interdit de fusionner deux producteurs qui n'echantillonnent pas au
 /// meme rythme. Le frametime vient de PresentMon a chaque presentation, la telemetrie GPU de NVML
-/// toutes les N millisecondes, les DPC/ISR d'ETW par rafales. Trois horloges, trois cadences —
+/// toutes les N millisecondes, les DPC/ISR d'ETW par rafales. Trois horloges, trois cadences :
 /// aucune ne s'aligne sur un index.
 ///
 /// Chaque champ optionnel vaut <c>null</c> quand il n'a pas ete mesure. **Une timeline creuse avec
 /// des trous honnetes vaut mieux qu'une timeline pleine de valeurs inventees** : c'est la meme
-/// doctrine que `null = PAS MESURE, jamais zero` ailleurs dans le produit.
+/// doctrine que `null = pas mesure, jamais zero` ailleurs dans le produit.
 /// </summary>
 /// <param name="TimestampNs">L'instant, en nanosecondes depuis une origine commune a tous les
 /// producteurs de la session. La valeur absolue n'a aucun sens ; seuls les ecarts en ont.</param>
@@ -30,11 +30,11 @@ public sealed record TimelineSample(
     double? DpcIsrMs = null);
 
 /// <summary>
-/// La base de temps commune — sans elle, aucun producteur ne peut etre fusionne avec un autre.
+/// La base de temps commune : sans elle, aucun producteur ne peut etre fusionne avec un autre.
 ///
 /// Windows expose un compteur haute resolution (QPC) monotone et partage par tous les processus :
 /// c'est la seule horloge sur laquelle PresentMon, NVML et ETW peuvent s'accorder. Cette interface
-/// est la couture qui permet de tester toute la fusion **sans machine** — et de brancher le vrai
+/// est la couture qui permet de tester toute la fusion **sans machine**, et de brancher le vrai
 /// QPC en production.
 ///
 /// Bonne nouvelle mesuree le 07/09 : PresentMon 2.5.1 expose `PM_METRIC_SESSION_START_QPC`.
@@ -49,15 +49,15 @@ public interface IMonotonicTimestamps
 }
 
 /// <summary>
-/// LA FUSION : plusieurs producteurs, une seule ligne de temps.
+/// La fusion : plusieurs producteurs, une seule ligne de temps.
 ///
 /// Ce que ce type permet, et qu'aucune serie parallele ne permettait : demander **« a cet instant
 /// precis, que faisait la machine ? »** en rapprochant des mesures qui n'ont ni la meme cadence ni
 /// la meme origine.
 ///
-/// Le rapprochement a une TOLERANCE, et elle est explicite. Deux echantillons distants de
+/// Le rapprochement a une tolerance, et elle est explicite. Deux echantillons distants de
 /// 500 ms ne decrivent pas le meme instant, meme s'ils sont les plus proches l'un de l'autre. Au
-/// dela de la tolerance, le champ reste <c>null</c> — « je n'ai pas regarde a cet instant » plutot
+/// dela de la tolerance, le champ reste <c>null</c> : « je n'ai pas regarde a cet instant » plutot
 /// qu'une valeur prise ailleurs.
 ///
 /// Pur, aucune I/O, aucune horloge : les instants sont fournis par l'appelant.
@@ -67,7 +67,7 @@ public static class PerformanceTimeline
     /// <summary>Ecart maximal, par defaut, pour qu'un echantillon de telemetrie soit considere
     /// comme decrivant le meme instant qu'une frame.
     ///
-    /// **NON CHIFFRÉ** : 20 ms est de l'ordre de trois frames a 144 Hz et du pas d'echantillonnage
+    /// **Non chiffré** : 20 ms est de l'ordre de trois frames a 144 Hz et du pas d'echantillonnage
     /// typique d'un capteur GPU. Ecrit ici pour etre trouve et discute, pas dilue dans une boucle.</summary>
     public const long ToleranceParDefautNs = 20_000_000;
 
@@ -91,7 +91,7 @@ public static class PerformanceTimeline
 
         foreach (var r in reference)
         {
-            // Avance tant que l'echantillon SUIVANT est plus proche : le plus proche peut etre
+            // Avance tant que l'echantillon suivant est plus proche : le plus proche peut etre
             // avant comme apres, et prendre systematiquement le precedent decalerait tout.
             while (j + 1 < telemetrie.Count
                    && Math.Abs(telemetrie[j + 1].TimestampNs - r.TimestampNs)
@@ -107,7 +107,7 @@ public static class PerformanceTimeline
         return fusionnes;
     }
 
-    /// <summary>Complete les champs VIDES de la reference avec ceux de l'echantillon. Ne remplace
+    /// <summary>Complete les champs vides de la reference avec ceux de l'echantillon. Ne remplace
     /// jamais une valeur deja mesuree : la reference reste la source de ce qu'elle porte.</summary>
     private static TimelineSample Completer(TimelineSample r, TimelineSample t) => r with
     {
@@ -124,7 +124,7 @@ public static class PerformanceTimeline
 
     /// <summary>Quelle part des elements de reference a pu etre completee ? Dans [0, 1].
     ///
-    /// C'est l'honnetete de la timeline, et elle doit etre AFFICHEE : une correlation calculee sur
+    /// C'est l'honnetete de la timeline, et elle doit etre affichee : une correlation calculee sur
     /// 4 % des frames ne vaut rien, et rien d'autre ne le dirait.</summary>
     public static double Couverture(IReadOnlyList<TimelineSample> fusionnes, Func<TimelineSample, double?> champ)
     {

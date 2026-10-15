@@ -26,6 +26,11 @@ public sealed class NoVoltageWriteOpExistsGateTests
 {
     private static readonly string[] Forbidden = ["voltage", "undervolt", "millivolt", "vfcurve", "vfpoint"];
 
+    /// <summary>La seule tension admise, celle des cœurs du PROCESSEUR vers le bas (decision produit ; voir
+    /// ThePrivilegedSurfaceIsClosedGateTests.TensionAdmise et docs/NON-NUISANCE.md). Ce controle reste le souvenir pour les
+    /// cartes graphiques : une op de tension de carte le fait toujours tomber.</summary>
+    private static readonly HashSet<string> TensionAdmise = ["SetCpuVoltageOffsetOp"];
+
     private static IEnumerable<string> OpNames() =>
         typeof(PrivilegedOp).Assembly
             .GetTypes()
@@ -33,7 +38,7 @@ public sealed class NoVoltageWriteOpExistsGateTests
             .Select(t => t.Name);
 
     private static List<string> Offenders(IEnumerable<string> names) =>
-        names.Where(n => Forbidden.Any(f => n.Contains(f, StringComparison.OrdinalIgnoreCase)))
+        names.Where(n => !TensionAdmise.Contains(n) && Forbidden.Any(f => n.Contains(f, StringComparison.OrdinalIgnoreCase)))
              .OrderBy(n => n, StringComparer.Ordinal)
              .ToList();
 
@@ -54,7 +59,7 @@ public sealed class NoVoltageWriteOpExistsGateTests
     public void The_gate_would_actually_catch_a_voltage_op_if_one_appeared()
     {
         // Controle POSITIF sur des noms synthetiques : il prouve que le detecteur sait dire non.
-        Offenders(["PingOp", "SetGpuVoltageOffsetOp", "SetActivePowerPlanOp"])
-            .Should().ContainSingle().Which.Should().Be("SetGpuVoltageOffsetOp");
+        Offenders(["PingOp", "SetGpuVoltageOffsetOp", "SetActivePowerPlanOp", "SetCpuVoltageOffsetOp"])
+            .Should().ContainSingle().Which.Should().Be("SetGpuVoltageOffsetOp", "la tension d'une carte reste attrapée, celle des cœurs admise est nommée");
     }
 }

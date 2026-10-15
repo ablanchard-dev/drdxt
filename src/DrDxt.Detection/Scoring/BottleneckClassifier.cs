@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Scoring;
 
 /// <summary>
-/// Répond à « qu'est-ce qui te coûte des images ? » — et donc à son inverse, « qu'est-ce qu'il
+/// Répond à « qu'est-ce qui te coûte des images ? », et donc à son inverse, « qu'est-ce qu'il
 /// ne faut pas te vendre parce que ça ne changera rien chez toi ».
 ///
 /// Pur et total : aucune E/S, aucune horloge, aucun état. Même entrée, même verdict.
@@ -23,7 +23,7 @@ namespace DrDxt.Detection.Scoring;
 ///
 /// Source des seuils : la note de conception du classifieur (non publiée). Les grandeurs
 /// viennent de PresentMon (github.com/GameTechDev/PresentMon, README-ConsoleApplication.md). La spec
-/// dit elle-même qu'aucun seuil canonique public n'existe : ce sont des seuils de POLITIQUE
+/// dit elle-même qu'aucun seuil canonique public n'existe : ce sont des seuils de politique
 /// DrDXT, dérivés de la sémantique des métriques PresentMon. Chacun est un bouton de calibration.
 /// </summary>
 public static class BottleneckClassifier
@@ -73,15 +73,15 @@ public static class BottleneckClassifier
     /// 2 ms est le choix conservateur de DrDXT. Bouton de calibration.</summary>
     public const double CappedPresentStallMs = 2.0;
 
-    /// <summary>Multiple du frametime MEDIAN au-delà duquel la latence render→present p95 est
-    /// dite haute. heuristic-v1 : la spec nomme la condition (« MsRenderPresentLatency high »)
+    /// <summary>Multiple du frametime médian au-delà duquel la latence render→present p95 est
+    /// dite haute. heuristique v1 : la spec nomme la condition (« MsRenderPresentLatency high »)
     /// sans publier de valeur. 2× le frametime médian = la frame met plus de deux frames à
-    /// sortir, ce qui se sent. Exprimé en RELATION et pas en millisecondes fixes, sans quoi le
+    /// sortir, ce qui se sent. Exprimé en relation et pas en millisecondes fixes, sans quoi le
     /// seuil serait juste à 143 FPS et faux à 60. Bouton de calibration.</summary>
     public const double LatencyHighFactor = 2.0;
 
     /// <summary>Nombre de runs qu'exige une affirmation forte. Spec : « Strong claims require
-    /// 3-run repeatability » — en dessous, le verdict s'affiche mais reste provisoire.</summary>
+    /// 3-run repeatability » ; en dessous, le verdict s'affiche mais reste provisoire.</summary>
     public const int RunsForStrongClaim = 3;
 
     /// <summary>
@@ -92,8 +92,8 @@ public static class BottleneckClassifier
     /// état confiant par défaut.
     /// </param>
     /// <param name="frameCap">
-    /// Le verdict de cap déjà prononcé ailleurs par le produit, quand il existe. Un cap CONNU
-    /// suffit à classer CAPPED sans attendre que les grandeurs de frame le trahissent — et une
+    /// Le verdict de cap déjà prononcé ailleurs par le produit, quand il existe. Un cap connu
+    /// suffit à classer CAPPED sans attendre que les grandeurs de frame le trahissent, et une
     /// session bridée est celle où l'A/B ment le plus.
     /// </param>
     /// <param name="gpuThrottling">
@@ -119,7 +119,7 @@ public static class BottleneckClassifier
         {
             // Une seule exception : la pression mémoire ne dépend d'aucune grandeur de frame.
             // Une machine qui gèle par manque de validation mérite de l'apprendre même quand la
-            // capture a échoué — c'est justement ce que fait une machine qui gèle.
+            // capture a échoué : c'est justement ce que fait une machine qui gèle.
             if (result.CommitPressure is { } onlyCommit && onlyCommit >= CommitPressureLimit)
                 return CommitVerdict(onlyCommit, provisional);
 
@@ -140,7 +140,7 @@ public static class BottleneckClassifier
         // Le plus important pour l'honnêteté du produit : sous un cap, la moyenne FPS ne bouge
         // pas quoi qu'on règle, donc tout A/B sur la moyenne est une illusion. C'est exactement
         // le piège mesuré le 01/09 (ne rien faire « gagnait » plus que l'overclock).
-        if (IsCapped(frameCap, gpuBusy, result.PresentStallMsP95, out var capReason))
+        if (IsCapped(frameCap, gpuBusy, P95Lisible(result.PresentStallMsP95, result.PresentStallSamples), out var capReason))
             return new BottleneckVerdict(
                 BottleneckState.CappedOrVsyncLimited,
                 BottleneckConfidence.High,
@@ -209,13 +209,13 @@ public static class BottleneckClassifier
                 BottleneckReasonKeys.MixedGpuLeaning, new[] { gpuBusy });
 
         // ── 7. Le débit va, la latence non ──────────────────────────────────────────────────
-        // La latence « haute » est une RELATION, jamais un nombre magique : 14 ms est mauvais à
+        // La latence « haute » est une relation, jamais un nombre magique : 14 ms est mauvais à
         // 143 FPS et parfaitement normal à 60. Un seuil en millisecondes fixes serait juste sur
         // une machine et faux sur toutes les autres. On la compare donc au frametime médian.
         //
-        // Premier jet de ce classifieur : la condition ne testait que « la latence a été
-        // mesurée », sans jamais demander qu'elle soit MAUVAISE. Deux tests l'ont attrapé —
-        // des sessions parfaitement saines ressortaient « problème de latence ».
+        // Tester seulement « la latence a été mesurée », sans demander qu'elle soit mauvaise,
+        // ferait ressortir des sessions parfaitement saines en « problème de latence » ; deux
+        // tests le verrouillent.
         if (result.RenderPresentLatencyMsP95 is { } latencyP95
             && result.FrameMsP50 is { } medianFrameMs and > 0
             && latencyP95 >= LatencyHighFactor * medianFrameMs
@@ -254,14 +254,14 @@ public static class BottleneckClassifier
     private static bool IsCapped(
         FrameCapState? frameCap, double gpuBusy, double? presentStallMsP95, out string reason)
     {
-        // Un cap déjà PRONONCÉ par le produit vaut mieux que son inférence depuis les frames :
+        // Un cap déjà prononcé par le produit vaut mieux que son inférence depuis les frames :
         // c'est une lecture du pilote, pas une déduction.
         //
-        // On ne retient que les deux verdicts qui disent d'eux-mêmes que le cap MORD
+        // On ne retient que les deux verdicts qui disent d'eux-mêmes que le cap mord
         // (« costs frames », « binds under the primary refresh »). `Coherent` est délibérément
         // absent : un cap correct à refresh−3 existe mais ne bride que si le jeu l'atteint, et
         // rien ici ne dit à quel FPS il tourne. S'il mord vraiment, la signature de frame
-        // ci-dessous l'attrape — c'est exactement à ça qu'elle sert. Le classer capé sur le seul
+        // ci-dessous l'attrape : c'est exactement à ça qu'elle sert. Le classer capé sur le seul
         // verdict `Coherent` interdirait tout A/B à une machine bien réglée qui n'atteint jamais
         // son cap.
         if (frameCap is { Verdict: FrameCapVerdict.ComputedOnAnotherDisplay or FrameCapVerdict.CapsBelowPrimary })
@@ -284,6 +284,11 @@ public static class BottleneckClassifier
         return false;
     }
 
+    /// <summary>La règle de l'écran (FrametimeStatistics.CadenceP95 / AttenteP95) : un p95 sous vingt échantillons,
+    /// ou sans compte, se confond avec le maximum et ne décide rien.</summary>
+    private static double? P95Lisible(double? p95, int? echantillons) =>
+        p95 is { } v && echantillons is { } n && TailStatistic.P95EstInterpretable(n) ? v : null;
+
     private static bool IsFramePacing(BenchmarkResult result, out string reason)
     {
         if (result.FrameMsCv is { } cv && cv >= FramePacingCv)
@@ -300,7 +305,7 @@ public static class BottleneckClassifier
             return true;
         }
 
-        if (result.AnimationErrorMsP95 is { } animation && animation >= FramePacingAnimationErrorMs)
+        if (P95Lisible(result.AnimationErrorMsP95, result.AnimationErrorSamples) is { } animation && animation >= FramePacingAnimationErrorMs)
         {
             reason = $"Animation error reaches {animation:F1} ms at p95, so frames arrive off-beat from "
                    + "the simulation. The average frame rate does not describe this.";
@@ -312,13 +317,13 @@ public static class BottleneckClassifier
     }
 
     // ── Les gardes d'attente GPU ────────────────────────────────────────────────────────────
-    // Une attente NON mesurée ne doit ni confirmer ni infirmer. Ces deux fonctions disent
+    // Une attente non mesurée ne doit ni confirmer ni infirmer. Ces deux fonctions disent
     // explicitement ce qu'il advient d'un null, au lieu de le laisser à un `?? 0` qui aurait
     // silencieusement rendu tout le monde GPU-bound.
 
     /// <summary>L'attente est-elle au plus <paramref name="ceiling"/> ? Une attente non mesurée
-    /// PASSE : GPU_BOUND est alors décidé par le seul ratio busy, ce qui est le comportement
-    /// d'avant ce classifieur — dégradé, pas faux.</summary>
+    /// passe : GPU_BOUND est alors décidé par le seul ratio busy, un comportement
+    /// dégradé, pas faux.</summary>
     private static bool WaitAtMost(double? wait, double ceiling) => wait is null || wait <= ceiling;
 
     /// <summary>L'attente est-elle au moins <paramref name="floor"/> ? Une attente non mesurée

@@ -1,6 +1,6 @@
 """L'icône de DrDXT : la bille de chrome du bouton central, sur une tuile noire arrondie.
 
-08/10/2026 (le mainteneur, entre quatre pistes : « 1 », la bille sur tuile). La bille est la vraie : capturée dans l'App
+La bille sur tuile. La bille est la vraie : capturée dans l'App
 (bille.png, 212 px, détourée), contraste relevé pour tenir en petit. La tuile noire la détache sur une barre des tâches
 claire comme sombre (Microsoft, « Design guidelines for Windows app icons » : contraste 3:1 sur les deux thèmes,
 lumière en haut à gauche, aucun texte).

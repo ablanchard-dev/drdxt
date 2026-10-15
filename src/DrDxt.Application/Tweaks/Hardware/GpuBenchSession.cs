@@ -4,20 +4,20 @@ using DrDxt.Measurement;
 namespace DrDxt.Application.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// P1 — the deterministic GPU perf-METER. GpuBench turns ONE run into a comparable
-// throughput score; this runs it N times and aggregates the scores into a mean + an
-// inter-run margin, so a stock-vs-offset A/B has a real error bar (never a single-run
-// guess). Because the workload is identical run-to-run, the only thing that moves the
-// score is GPU clock/throughput — no map/scene noise (the reason we can't trust raw
-// in-game for GPU levers). The margin reuses the same NS-6 statistic as the frametime
-// A/B (FrametimeStatistics.InterRunMarginOfError: +Infinity under 3 runs = "not
-// provable"), so the two proof paths stay consistent.
+// Le compteur de performance GPU déterministe. GpuBench transforme une passe en score de
+// débit comparable ; ceci la lance N fois et agrège les scores en une moyenne + une marge
+// entre passes, pour qu'un A/B origine contre décalage ait une vraie barre d'erreur (jamais
+// une supposition sur une seule passe). La charge étant identique d'une passe à l'autre,
+// seuls l'horloge et le débit du GPU font bouger le score : aucun bruit de carte ni de scène
+// (raison pour laquelle on ne se fie pas au jeu brut pour les leviers GPU). La marge reprend
+// la statistique de l'A/B des frametimes (FrametimeStatistics.InterRunMarginOfError : +Infinity
+// sous 3 passes = « non prouvable »), pour que les deux chemins de preuve restent cohérents.
 // -----------------------------------------------------------------------
 
-/// <summary>Aggregate of N deterministic bench runs: the mean throughput SCORE, its 95%
-/// inter-run margin (across the stable runs; +Infinity under 3), how many runs were stable,
-/// and whether every run was stable (checksum-ok, no TDR). An aggregate with AllStable=false
-/// is not trustworthy for an A/B — an unstable candidate (offset) must be reverted.</summary>
+/// <summary>Agrégat de N passes déterministes du banc : le score de débit moyen, sa marge à
+/// 95 % entre passes (sur les passes stables ; +Infinity sous 3), combien de passes étaient
+/// stables, et si toutes l'étaient (somme de contrôle juste, pas de TDR). Un agrégat avec
+/// AllStable=false n'est pas fiable pour un A/B : un candidat instable (décalage) doit être annulé.</summary>
 public sealed record GpuBenchAggregate(double MeanScore, double MarginOfError, int StableRuns, bool AllStable);
 
 public sealed class GpuBenchSession
@@ -26,10 +26,10 @@ public sealed class GpuBenchSession
 
     public GpuBenchSession(GpuBench bench) => _bench = bench;
 
-    /// <summary>Runs the deterministic bench <paramref name="runs"/> times (>=1). Collects the
-    /// throughput score of every STABLE run; any non-stable / inconclusive run sets AllStable to
-    /// false and is excluded from the score. The margin needs ≥3 stable scores (else +Infinity —
-    /// a gain can never be claimed on fewer). Fails clean only when NO run could execute.</summary>
+    /// <summary>Lance le banc déterministe <paramref name="runs"/> fois (>=1). Garde le score de
+    /// débit de chaque passe stable ; toute passe instable ou non concluante met AllStable à faux
+    /// et sort du score. La marge exige ≥3 scores stables (sinon +Infinity : aucun gain ne peut
+    /// s'affirmer avec moins). N'échoue proprement que si aucune passe n'a pu tourner.</summary>
     public Result<GpuBenchAggregate> Measure(int gpuIndex, TimeSpan perRun, int runs, CancellationToken ct)
     {
         if (runs < 1)
@@ -43,7 +43,7 @@ public sealed class GpuBenchSession
             var r = _bench.Run(gpuIndex, perRun, ct);
             if (!r.IsOk || r.Value is null || r.Value.Stability != StabilityOutcome.Stable)
             {
-                allStable = false; // TDR / checksum-mismatch / could-not-run — never counts as a good score
+                allStable = false; // TDR / somme de contrôle fausse / passe impossible : jamais un bon score
                 continue;
             }
             scores.Add(r.Value.ElementIterationsPerSecond);
@@ -54,27 +54,27 @@ public sealed class GpuBenchSession
                 "No stable bench run: GPU unavailable, or the applied setting is unstable.");
 
         var mean = scores.Average();
-        var margin = FrametimeStatistics.InterRunMarginOfError(scores); // +inf with < 3 stable runs
+        var margin = FrametimeStatistics.InterRunMarginOfError(scores); // +inf sous 3 passes stables
         return Result<GpuBenchAggregate>.Ok(new GpuBenchAggregate(mean, margin, scores.Count, allStable));
     }
 }
 
-/// <summary>The clean stock-vs-candidate verdict for a GPU-tuning A/B.</summary>
+/// <summary>Le verdict net origine contre candidat d'un A/B de réglage GPU.</summary>
 public enum GpuBenchAbVerdict
 {
-    /// <summary>Candidate score beats stock BEYOND the combined inter-run margin.</summary>
+    /// <summary>Le score du candidat bat l'origine au-delà de la marge cumulée entre passes.</summary>
     Gain,
-    /// <summary>Candidate score is below stock beyond the combined margin.</summary>
+    /// <summary>Le score du candidat est sous l'origine au-delà de la marge cumulée.</summary>
     Regression,
-    /// <summary>The score moved within the combined margin — not a provable change.</summary>
+    /// <summary>Le score a bougé dans la marge cumulée : pas un changement prouvable.</summary>
     NoMeasurableChange,
-    /// <summary>Either side had an unstable run — the candidate must be reverted, never kept.</summary>
+    /// <summary>Un des deux côtés a eu une passe instable : le candidat doit être annulé, jamais gardé.</summary>
     Unstable,
 }
 
-/// <summary>Pure A/B verdict between two <see cref="GpuBenchAggregate"/>. A gain REQUIRES the
-/// score delta to clear the combined margin (never a within-noise claim) AND both sides fully
-/// stable — an unstable candidate is always <see cref="GpuBenchAbVerdict.Unstable"/> (revert).</summary>
+/// <summary>Verdict A/B pur entre deux <see cref="GpuBenchAggregate"/>. Un gain exige que l'écart
+/// de score dépasse la marge cumulée (jamais une affirmation dans le bruit) et que les deux côtés
+/// soient entièrement stables : un candidat instable est toujours <see cref="GpuBenchAbVerdict.Unstable"/> (retour).</summary>
 public static class GpuBenchAb
 {
     public static GpuBenchAbVerdict Compare(GpuBenchAggregate stock, GpuBenchAggregate candidate)

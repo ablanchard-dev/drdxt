@@ -113,7 +113,7 @@ public class PairedAbRobustnessTests
 
         r.Game!.Preuve.DeltaPct.Should().BeGreaterThan(3.0);
 
-        // Corrige le 07/09/2026 : « visible » n'est pas « prouve ». Le plateau laisse un gros
+        // « visible » n'est pas « prouve ». Le plateau laisse un gros
         // residu, et sur six passes il ne reste que trois degres de liberte pour l'estimer. Le
         // chiffre sort juste ; le declarer prouve demanderait des alternances supplementaires.
         r.Game.Preuve.Outcome.Should().NotBe(EvidenceOutcome.Invalid,

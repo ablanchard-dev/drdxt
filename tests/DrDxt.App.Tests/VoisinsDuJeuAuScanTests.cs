@@ -9,16 +9,15 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 11/09/2026, demande produit — l'ecran dit ce qui tournait a cote du jeu.
+// L'ecran dit ce qui tournait a cote du jeu.
 //
-// Le fait qui l'a declenchee : un scan a affiche « 164 FPS » pendant qu'on regardait l'ecran de
-// DrDXT, le jeu en arriere-plan. Le meme soir, en partie reelle avec nos compilations sur son
-// processeur : 79,5 FPS, 1 % low 23,7. Le meme produit, la meme machine, deux chiffres qui ne
-// veulent rien dire l'un sans l'autre — parce que rien ne disait ce qu'il y avait autour.
+// Mesure sur la meme machine : 164 FPS jeu en arriere-plan, 79,5 FPS (1 % low 23,7) en partie reelle
+// avec des compilations sur le processeur. Deux chiffres qui ne veulent rien dire l'un sans l'autre
+// tant que rien ne dit ce qu'il y avait autour.
 //
 // Ce que ces tests tiennent :
 //   * un voisin notable arrive jusqu'a l'ecran, avec son nom lisible et ses parts ;
-//   * rien vu (ou rien lu) ⇒ liste vide et phrase qui le dit — jamais « rien ne tournait » ;
+//   * rien vu (ou rien lu) ⇒ liste vide et phrase qui le dit, jamais « rien ne tournait » ;
 //   * un lecteur qui jette ne casse pas le scan.
 // -----------------------------------------------------------------------
 public class VoisinsDuJeuAuScanTests
@@ -61,8 +60,7 @@ public class VoisinsDuJeuAuScanTests
 
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), 72, baseline,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), baseline)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
@@ -105,7 +103,7 @@ public class VoisinsDuJeuAuScanTests
 
         vm.VoisinsDuJeu.Should().BeEmpty();
         vm.VoisinsConnus.Should().BeFalse();
-        // Le harnais ne lance aucun jeu : la phrase est celle « sans jeu » (17/09/2026), jamais le silence.
+        // Le harnais ne lance aucun jeu : la phrase est celle « sans jeu », jamais le silence.
         vm.VoisinsResume.Should().Be("Scan.Voisins.AucunSansJeu",
             "une liste vide doit DIRE qu'on n'a rien vu (ou rien su lire), pas laisser croire que rien ne tournait");
     }
@@ -119,7 +117,7 @@ public class VoisinsDuJeuAuScanTests
 
         vm.State.Should().Be(ScanState.Done);
         vm.VoisinsConnus.Should().BeFalse();
-        // 03/10/2026 (D8.6) : un lecteur qui jette n'a pas regardé ; l'écran le dit, il ne dit pas « rien vu ».
+        // Un lecteur qui jette n'a pas regardé ; l'écran le dit, il ne dit pas « rien vu ».
         vm.VoisinsResume.Should().Be("Scan.Voisins.NonLus");
     }
 
@@ -143,7 +141,7 @@ public class VoisinsDuJeuAuScanTests
         }
     }
 
-    // 11/09/2026 — la borne de cout. Cette lecture tourne pendant que le joueur joue : 600 ms
+    // La borne de cout. Cette lecture tourne pendant que le joueur joue : 600 ms
     // d'attente et deux enumerations de processus. Mesuree au banc `tools/voisinscout` a 39 ms de
     // processeur par appel, soit 0,195 % d'UN cœur sur un scan de 20 s — negligeable une fois,
     // inacceptable en boucle. Ce test tient le « une fois » : remettre un appel par echantillon de
@@ -160,9 +158,9 @@ public class VoisinsDuJeuAuScanTests
             "la mesure des voisins coute un cœur pendant la partie : une fois par scan, jamais dans la boucle de mesure");
     }
 
-    // Le calcul de la part GPU, isole. Avant le 11/09 il lisait un seul echantillon d'un compteur
-    // cumulatif : il rendait toujours 0, au prix de 552 ms de processeur. Ici la difference de deux
-    // cumuls sur une duree connue doit rendre le vrai pourcentage.
+    // Le calcul de la part GPU, isole. Un seul echantillon d'un compteur cumulatif rendrait toujours 0
+    // (au prix de 552 ms de processeur, mesure). La difference de deux cumuls sur une duree connue doit
+    // rendre le vrai pourcentage.
     [Fact]
     public void La_part_de_carte_graphique_vient_de_la_DIFFERENCE_de_deux_lectures()
     {
@@ -218,7 +216,7 @@ public class VoisinsDuJeuAuScanTests
         vm.VoisinsConnus.Should().BeFalse();
     }
 
-    // 03/10/2026 (D10.3, revue n° 4) : la phrase de la carte finissait par « : » suivi de rien (la liste est repliée).
+    // La phrase de la carte finissait par « : » suivi de rien (la liste est repliée).
     [Theory]
     [InlineData("Scan.Voisins.Header", "fr")]
     [InlineData("Scan.Voisins.HeaderSansJeu", "fr")]

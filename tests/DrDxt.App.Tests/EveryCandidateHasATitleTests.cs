@@ -7,7 +7,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 14/09/2026 (plan 2.4) — l'ecran de resultat nomme chaque levier par son titre traduit. Un levier ajoute
+// L'ecran de resultat nomme chaque levier par son titre traduit. Un levier ajoute
 // au catalogue sans titre s'afficherait par son id interne : ce test le refuse, en anglais et en francais.
 // Lu sans remontee aux parents (piege note dans DashboardLocalizationTests, 21/08/2026) : la premiere
 // version passait par ResxLocalizer.Get, qui rend l'anglais quand le francais manque — sa moitie FR ne
@@ -26,7 +26,7 @@ public sealed class EveryCandidateHasATitleTests
     [InlineData("fr")]
     public void Every_catalogue_lever_has_a_translated_title(string langue)
     {
-        // Temoin de lecture (18/09/2026) : « aucun levier sans titre » est aussi ce que rend un
+        // Temoin de lecture : « aucun levier sans titre » est aussi ce que rend un
         // catalogue vide. Sans cette ligne, un catalogue qui ne se charge plus rendrait ce test
         // vert en n'ayant regarde aucun levier.
         CatalogueDeCandidats.Ids.Should().HaveCountGreaterThan(10,

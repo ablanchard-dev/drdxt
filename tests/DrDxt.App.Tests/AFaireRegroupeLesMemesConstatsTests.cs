@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D5.6, revue) : trois des cinq « à faire d'abord » étaient le même constat. Ils deviennent
+// Trois des cinq « à faire d'abord » étaient le même constat. Ils deviennent
 // une ligne qui les nomme tous ; le domaine garde chacun avec son remède.
 public sealed class AFaireRegroupeLesMemesConstatsTests
 {
@@ -31,7 +31,7 @@ public sealed class AFaireRegroupeLesMemesConstatsTests
         windows.Lignes.Should().HaveCount(4, "le domaine garde chaque constat et son remède");
     }
 
-    // 03/10/2026 (D8.3, revue n° 3) : repris dans le verdict après « ici : », un titre ne garde ni sa majuscule de
+    // Repris dans le verdict après « ici : », un titre ne garde ni sa majuscule de
     // tête ni son deux-points intérieur ; un nom propre en tête reste écrit comme il est.
     [Theory]
     [InlineData("Écran de récupération au démarrage", "écran de récupération au démarrage")]

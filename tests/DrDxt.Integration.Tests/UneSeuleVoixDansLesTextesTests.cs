@@ -5,14 +5,14 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 25/09/2026. Le produit parle de lui en « DrDXT » (« DrDXT n'a pas testé ce réglage »), mais six textes
-/// affichés disaient « nous » (« Ce que nous ne savons pas… notre propre instrument »), vus sur la photo de
-/// la page Réseau. Deux voix dans un même écran se lisent comme deux auteurs. Ce crible lit toutes les
+/// Le produit parle de lui en « DrDXT » (« DrDXT n'a pas testé ce réglage »), jamais en « nous »
+/// (« Ce que nous ne savons pas… notre propre instrument »). Deux voix dans un même écran se lisent
+/// comme deux auteurs. Ce crible lit toutes les
 /// valeurs du fichier de textes français.
 /// </summary>
 public sealed class UneSeuleVoixDansLesTextesTests
 {
-    // 25/09/2026 : aussi « on » quand le sujet est le produit (« on te le prouve », « ce qu'on n'a pas su lire »),
+    // Aussi « on » quand le sujet est le produit (« on te le prouve », « ce qu'on n'a pas su lire »),
     // vu sur la photo de l'écran de scan. Le « on » général (« quand on cherche la latence ») reste permis.
     private static readonly Regex Nous = new(
         @"\b(nous|notre|nos)\b|\bon (te|t'|t’|ne te|ne le|n'a|n’a|corrige|mesure|annule)\b",

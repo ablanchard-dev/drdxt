@@ -3,20 +3,20 @@ using System.Security.Cryptography;
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// ISessionKeyGenerator — mints the ephemeral per-session HMAC key (§9.13).
+// ISessionKeyGenerator : frappe la clé HMAC éphémère par session.
 //
-// Seam so tests can inject a deterministic key and assert exactly what the
-// server hands the authenticated client. The production implementation uses a
-// cryptographically secure RNG. The key never leaves the elevated host except
-// over the authenticated, DACL-protected pipe.
+// Couture pour que les tests injectent une clé déterministe et vérifient exactement ce que le
+// serveur remet au client authentifié. L'implémentation de production utilise un RNG
+// cryptographiquement sûr. La clé ne quitte jamais l'hôte élevé, sauf par le pipe
+// authentifié et protégé par DACL.
 // -----------------------------------------------------------------------
 public interface ISessionKeyGenerator
 {
-    /// <summary>Returns a fresh ephemeral session key (32 bytes).</summary>
+    /// <summary>Rend une clé de session éphémère neuve (32 octets).</summary>
     byte[] NewSessionKey();
 }
 
-/// <summary>CSPRNG-backed session-key generator (production).</summary>
+/// <summary>Générateur de clé de session adossé à un CSPRNG (production).</summary>
 public sealed class CryptoSessionKeyGenerator : ISessionKeyGenerator
 {
     public byte[] NewSessionKey() => RandomNumberGenerator.GetBytes(HandshakeProtocol.SessionKeyBytes);

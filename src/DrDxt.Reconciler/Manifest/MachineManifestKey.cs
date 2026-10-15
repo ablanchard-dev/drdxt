@@ -7,32 +7,32 @@ using NSec.Cryptography;
 namespace DrDxt.Reconciler.Manifest;
 
 // -----------------------------------------------------------------------
-// MachineManifestKey — la cle de signature du manifeste, propre a cette machine (11/09/2026).
+// MachineManifestKey : la cle de signature du manifeste, propre a cette machine.
 //
 // Pourquoi une cle par machine. La regle du projet est « rien hors du PC » : pas de signataire serveur.
 // La graine en variable d'environnement ne sert a personne sur une machine installee. Il reste une
-// cle creee LOCALEMENT, par le seul processus qui a le droit d'ecrire la racine admin : le helper
+// cle creee localement, par le seul processus qui a le droit d'ecrire la racine admin : le helper
 // eleve, au premier `CommitManifestOp`. L'App (integrite moyenne) ne la tient jamais.
 //
 // Ou elle vit. `%ProgramData%\DrDxt\manifest-signing.key`, dans la racine deja durcie par la revue de
-// securite (proprietaire Administrateurs, ACE, points de reparse — TrustedManifestRoot). Le fichier a
+// securite (proprietaire Administrateurs, ACE, points de reparse : TrustedManifestRoot). Le fichier a
 // sa propre ACL, plus stricte que celle des fichiers publics : Administrateurs + SYSTEM seulement,
 // posee a la creation (TrustedManifestRoot.BuildPrivateFileSecurity), verifiee a chaque lecture
 // (EnsurePrivateFile : un fichier lisible par un non-admin est refuse).
 //
-// DPAPI, et ce qu'il ne fait pas. La graine est chiffree DPAPI portee MACHINE. Cette portee se
-// dechiffre depuis N'IMPORTE quel compte local : face a un processus local, DPAPI ne protege rien, et
-// c'est l'ACL qui garde la cle. DPAPI ne sert qu'a rendre inutilisable une COPIE du fichier sortie de
+// DPAPI, et ce qu'il ne fait pas. La graine est chiffree DPAPI portee machine. Cette portee se
+// dechiffre depuis n'importe quel compte local : face a un processus local, DPAPI ne protege rien, et
+// c'est l'ACL qui garde la cle. DPAPI ne sert qu'a rendre inutilisable une copie du fichier sortie de
 // la machine (sauvegarde, image disque, archive de support) : il faudrait aussi la cle maitresse de
 // cette machine. Deux lignes pour cela ; ce n'est pas la garantie.
 //
 // La cle privee est la source de verite. La cle publique (`manifest-public.key`, lue par l'App et par le
-// service) en est DERIVEE et reecrite si elle differe. Ordre d'ecriture : cle privee, puis manifeste,
-// puis cle publique — une coupure entre les deux derniers laisse une publique perimee, reparee au
+// service) en est derivee et reecrite si elle differe. Ordre d'ecriture : cle privee, puis manifeste,
+// puis cle publique : une coupure entre les deux derniers laisse une publique perimee, reparee au
 // commit suivant ; jamais une cle privee perdue.
 //
 // Ce qui n'est jamais fait en silence. Une cle privee presente mais inutilisable (ACL non fiable,
-// illisible, ou c'est la cle de DEV) n'est ni ecrasee ni remplacee : refus nomme
+// illisible, ou c'est la cle de dev) n'est ni ecrasee ni remplacee : refus nomme
 // (ErrorCodes.ManifestKeyUnusable). Seule la reprise explicite la met de cote (renommee, jamais
 // effacee) et en cree une neuve.
 // -----------------------------------------------------------------------
@@ -50,10 +50,10 @@ public static class MachineManifestKey
 
     public sealed record Paire(IManifestSigner Signataire, IManifestVerifier Verificateur, byte[] ClePublique);
 
-    /// <summary>La cle de la machine : chargee si elle existe, CREEE si elle n'existe pas. Presente mais
+    /// <summary>La cle de la machine : chargee si elle existe, creee si elle n'existe pas. Presente mais
     /// inutilisable ⇒ <see cref="ErrorCodes.ManifestKeyUnusable"/>, et rien n'est touche.</summary>
     /// <param name="appliquerAcl">Production : true. Les tests passent false (dossier temporaire, aucune
-    /// ACL posee ni verifiee) — la decision d'ACL est prouvee a part, en fonction pure.</param>
+    /// ACL posee ni verifiee) : la decision d'ACL est prouvee a part, en fonction pure.</param>
     public static Result<Paire> ChargerOuCreer(string racine, bool appliquerAcl)
     {
         var chemin = Path.Combine(racine, PrivateFileName);
@@ -108,7 +108,7 @@ public static class MachineManifestKey
         return Ecrire(chemin, clePublique, appliquerAcl, prive: false);
     }
 
-    /// <summary>11/09/2026 — la desinstallation relit le manifeste avec la cle PUBLIQUE de la machine, comme
+    /// <summary>La desinstallation relit le manifeste avec la cle publique de la machine, comme
     /// l'App et le service. Elle ne cree jamais de cle : absente ⇒ rien n'a jamais ete signe ici. Un fichier
     /// non fiable au repos, de mauvaise longueur, ou qui contient la cle de dev est refuse.</summary>
     public static Result<IManifestVerifier> ChargerVerificateur(string racine, bool appliquerAcl)
@@ -207,7 +207,7 @@ public static class MachineManifestKey
             $"The machine's manifest signing key exists but cannot be used: {pourquoi}");
 }
 
-/// <summary>Mettre de cote = RENOMMER a cote, avec l'heure UTC. Jamais effacer : ce qui ne se relit plus
+/// <summary>Mettre de cote = renommer a cote, avec l'heure UTC. Jamais effacer : ce qui ne se relit plus
 /// reste la seule trace de ce qu'il contenait, et la regle du depot interdit de supprimer.</summary>
 internal static class MiseDeCote
 {

@@ -10,7 +10,7 @@ namespace DrDxt.App.Effets;
 /// <summary>Le shader de chrome liquide (Effets/ChromeLiquide.hlsl), exposé à WPF.</summary>
 public sealed class ChromeLiquideEffect : ShaderEffect
 {
-    // 24/09/2026 : partagé par toutes les instances, il n'était pas gelé, donc lié au thread qui
+    // Partagé par toutes les instances, il n'était pas gelé, donc lié au thread qui
     // l'avait créé. crash.log, 18/09 01:18 : « Le thread appelant ne peut pas accéder à cet objet »
     // depuis PixelShader.get_ShaderRenderMode. Gelé, un Freezable se lit depuis tout thread.
     private static readonly PixelShader Shader = Geler(new PixelShader
@@ -93,7 +93,7 @@ public sealed class ChampDeChrome : Border
         SizeChanged += (_, _) => _effet.Rapport = ActualHeight > 0 ? ActualWidth / ActualHeight : 1.0;
     }
 
-    /// <summary>02/10/2026 : la sphère du bouton central est un indicateur (elle dit que le produit vit et travaille),
+    /// <summary>La sphère du bouton central est un indicateur (elle dit que le produit vit et travaille),
     /// pas une décoration : elle bouge même quand Windows a coupé ses animations. Le fond reste une décoration.
     /// Lu au chargement : se pose dans le XAML, pas en cours de route.</summary>
     public bool Indicateur { get; set; }

@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 03/10/2026 (tour H1) : « si je télécharge un truc qui casse tout, DrDXT doit le voir ». Ce qui est apparu, a disparu ou a
+// « si je télécharge un truc qui casse tout, DrDXT doit le voir ». Ce qui est apparu, a disparu ou a
 // changé de version depuis le scan précédent est nommé ; le premier scan pose la référence et le dit.
 public sealed class InventaireMachineTests
 {
@@ -37,7 +37,7 @@ public sealed class InventaireMachineTests
         c.Single(x => x.Nom == "services tiers changés").Explication.Should().Contain("disparus : AncienService");
     }
 
-    // Revue R1 : une machine fraîche n'a aucun service tiers ; le premier qui apparaît est justement « le truc téléchargé ».
+    // Une machine fraîche n'a aucun service tiers ; le premier qui apparaît est justement « le truc téléchargé ».
     [Fact]
     public void Une_famille_lue_et_vide_annonce_le_premier_element_qui_apparait()
     {
@@ -63,7 +63,7 @@ public sealed class InventaireMachineTests
             .Should().Contain("NVIDIA nvmdi.inf + 32.0.16.1714 (à côté de 32.0.16.1656)");
     }
 
-    // 06/10/2026 : les vraies lignes de l'aperçu après les pilotes Realtek de Windows Update. « A + B ⇒ A + B + C » se
+    // Les vraies lignes de l'aperçu après les pilotes Realtek de Windows Update. « A + B ⇒ A + B + C » se
     // lisait comme un changement ; un service mis à jour recopiait deux chemins entiers.
     [Theory]
     [InlineData("11.0.6000.374 + 11.0.6000.383", "11.0.6000.374 + 11.0.6000.383 + 11.0.6000.398",
@@ -142,7 +142,7 @@ public sealed class InventaireMachineTests
         finally { File.Delete(fichier); }
     }
 
-    // 04/10/2026 (plan 3b.1) : à l'ouverture de l'appli, ce qui a changé depuis le dernier scan est relu sans toucher à
+    // À l'ouverture de l'appli, ce qui a changé depuis le dernier scan est relu sans toucher à
     // la référence (le scan suivant le juge encore) ; sans référence, rien n'est dit.
     [Fact]
     public void L_apercu_dit_ce_qui_a_change_sans_deplacer_la_reference()

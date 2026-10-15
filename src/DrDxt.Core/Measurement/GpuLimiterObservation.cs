@@ -14,32 +14,32 @@ public enum ClocksEventReason : ulong
     /// confondre avec « pas lisible ».</summary>
     Aucune = 0x0,
 
-    /// <summary>`GpuIdle` — le GPU ne fait rien. En jeu, c'est le signe qu'on mesure autre chose
+    /// <summary>`GpuIdle` : le GPU ne fait rien. En jeu, c'est le signe qu'on mesure autre chose
     /// que du jeu.</summary>
     GpuInactif = 0x1,
 
-    /// <summary>`ApplicationsClocksSetting` — horloges figees par une consigne applicative.</summary>
+    /// <summary>`ApplicationsClocksSetting` : horloges figees par une consigne applicative.</summary>
     ConsigneApplicative = 0x2,
 
-    /// <summary>`SwPowerCap` — plafond de puissance logiciel atteint.</summary>
+    /// <summary>`SwPowerCap` : plafond de puissance logiciel atteint.</summary>
     PlafondPuissanceLogiciel = 0x4,
 
-    /// <summary>`HwSlowdown` — ralentissement materiel (thermique ou alimentation).</summary>
+    /// <summary>`HwSlowdown` : ralentissement materiel (thermique ou alimentation).</summary>
     RalentissementMateriel = 0x8,
 
-    /// <summary>`SyncBoost` — synchronisation multi-GPU.</summary>
+    /// <summary>`SyncBoost` : synchronisation multi-GPU.</summary>
     SyncBoost = 0x10,
 
-    /// <summary>`SwThermalSlowdown` — ralentissement thermique logiciel.</summary>
+    /// <summary>`SwThermalSlowdown` : ralentissement thermique logiciel.</summary>
     ThermiqueLogiciel = 0x20,
 
-    /// <summary>`HwThermalSlowdown` — ralentissement thermique materiel.</summary>
+    /// <summary>`HwThermalSlowdown` : ralentissement thermique materiel.</summary>
     ThermiqueMateriel = 0x40,
 
-    /// <summary>`HwPowerBrakeSlowdown` — frein d'alimentation materiel.</summary>
+    /// <summary>`HwPowerBrakeSlowdown` : frein d'alimentation materiel.</summary>
     FreinAlimentation = 0x80,
 
-    /// <summary>`DisplayClockSetting` — horloge limitee par l'affichage.</summary>
+    /// <summary>`DisplayClockSetting` : horloge limitee par l'affichage.</summary>
     ContrainteAffichage = 0x100,
 }
 
@@ -53,11 +53,11 @@ public enum GpuLimiterObserved
     /// <summary>Lu, et rien ne bride. Le GPU tourne librement.</summary>
     RienDeBridant,
 
-    /// <summary>Le GPU passe l'essentiel de la frame occupe. Il est le rythme de la scene — ce
+    /// <summary>Le GPU passe l'essentiel de la frame occupe. Il est le rythme de la scene, ce
     /// qui ne dit pas qu'il est la cause d'un a-coup.</summary>
     GpuSature,
 
-    /// <summary>Un plafond de PUISSANCE a ete observe pendant la passe.</summary>
+    /// <summary>Un plafond de puissance a ete observe pendant la passe.</summary>
     PlafondPuissanceObserve,
 
     /// <summary>Un ralentissement thermique a ete observe pendant la passe.</summary>
@@ -73,7 +73,7 @@ public enum GpuLimiterObserved
 /// La lecture materielle minimale, sur la fenetre ou la decision est prise.
 ///
 /// Six grandeurs : frametime (ailleurs), GPU busy, frequence, watts, temperature, raisons de
-/// bridage. Elles viennent toutes de la meme passe — c'est la seule facon qu'elles aient de
+/// bridage. Elles viennent toutes de la meme passe : c'est la seule facon qu'elles aient de
 /// parler du meme instant.
 ///
 /// **Corrélation, jamais causalité.** Le produit a le droit de dire « pendant les fenetres
@@ -81,21 +81,19 @@ public enum GpuLimiterObserved
 /// le droit d'en deduire « c'est la puissance qui te coute des FPS » : il faudrait pour cela
 /// changer la limite et remesurer, ce qui est une experience, pas une lecture.
 ///
-/// Et une gate a saute en ecrivant ceci. Le 07/09/2026, il etait ecrit que la frequence et la
-/// raison de bridage « demanderaient NVAPI et ses identifiants prives ». Verification dans la doc
-/// officielle le 08/09 : `nvmlDeviceGetClockInfo` et `nvmlDeviceGetCurrentClocksEventReasons` sont
-/// des exports NVML publics, nommes et documentes. La gate etait fausse et privait le root-cause
-/// de sa grandeur la plus directe. Une gate est une hypothese datee, pas un fait.
+/// La frequence et la raison de bridage ne demandent pas NVAPI : `nvmlDeviceGetClockInfo` et
+/// `nvmlDeviceGetCurrentClocksEventReasons` sont des exports NVML publics et documentes (source :
+/// documentation NVML officielle, lue le 08/09/2026).
 /// </summary>
 public static class GpuLimiter
 {
     /// <summary>Au-dela, le GPU passe l'essentiel de la frame occupe.
-    /// **NON CHIFFRÉ** : reprend le seuil du classifieur de goulot du produit (0,92), pour
+    /// **Non chiffré** : reprend le seuil du classifieur de goulot du produit (0,92), pour
     /// qu'il n'existe pas deux definitions de « GPU-bound » qui divergeraient.</summary>
     public const double SeuilGpuSature = 0.92;
 
     /// <summary>Chute de frequence, en part de la frequence mediane, au-dela de laquelle on la
-    /// nomme. **NON CHIFFRÉ** : 10 % est assez grand pour ne pas se declencher sur le boost
+    /// nomme. **Non chiffré** : 10 % est assez grand pour ne pas se declencher sur le boost
     /// opportuniste ordinaire d'une carte NVIDIA, assez petit pour attraper un decrochage.</summary>
     public const double ChuteFrequenceNotable = 0.10;
 
@@ -111,7 +109,7 @@ public static class GpuLimiter
         double? frequenceMedianeMhz,
         double? frequenceMinimaleMhz)
     {
-        // L'ordre compte : une raison PUBLIEE par le pilote bat toute inference de notre part.
+        // L'ordre compte : une raison publiee par le pilote bat toute inference de notre part.
         if (raisons is { } r)
         {
             if (r.HasFlag(ClocksEventReason.ThermiqueMateriel)
@@ -122,7 +120,7 @@ public static class GpuLimiter
                 || r.HasFlag(ClocksEventReason.FreinAlimentation))
                 return GpuLimiterObserved.PlafondPuissanceObserve;
 
-            // `RalentissementMateriel` seul ne dit pas LEQUEL des deux : le pilote le pose en
+            // `RalentissementMateriel` seul ne dit pas lequel des deux : le pilote le pose en
             // meme temps que le bit precis quand il le connait. Seul, il reste un ralentissement
             // materiel non attribue, et on ne choisit pas a sa place.
             if (r.HasFlag(ClocksEventReason.RalentissementMateriel))
@@ -151,14 +149,11 @@ public static class GpuLimiter
     /// pendant les fenetres mesurees, jamais ce qui « cause » quoi que ce soit.</summary>
     public static string Phrase(GpuLimiterObserved o) => o switch
     {
-        GpuLimiterObserved.RienDeBridant => "rien ne bridait le GPU pendant les fenêtres mesurées",
-        GpuLimiterObserved.GpuSature => "le GPU était occupé l'essentiel de chaque frame",
-        GpuLimiterObserved.PlafondPuissanceObserve =>
-            "un plafond de puissance a été observé pendant les fenêtres mesurées",
-        GpuLimiterObserved.PlafondThermiqueObserve =>
-            "un ralentissement thermique a été observé pendant les fenêtres mesurées",
-        GpuLimiterObserved.ChuteDeFrequenceObservee =>
-            "la fréquence GPU a chuté pendant les fenêtres mesurées, sans raison publiée par le pilote",
-        _ => "le matériel n'a pas été lu pendant cette session",
+        GpuLimiterObserved.RienDeBridant => Docteur.T("GL.Rien"),
+        GpuLimiterObserved.GpuSature => Docteur.T("GL.Sature"),
+        GpuLimiterObserved.PlafondPuissanceObserve => Docteur.T("GL.Puissance"),
+        GpuLimiterObserved.PlafondThermiqueObserve => Docteur.T("GL.Thermique"),
+        GpuLimiterObserved.ChuteDeFrequenceObservee => Docteur.T("GL.Chute"),
+        _ => Docteur.T("GL.NonLu"),
     };
 }

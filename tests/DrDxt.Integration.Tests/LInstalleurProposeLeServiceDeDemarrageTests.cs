@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // -----------------------------------------------------------------------
-// 27/09/2026. Le service qui reapplique les reglages au demarrage (DrDxtReconciler) existait dans le
+// Le service qui reapplique les reglages au demarrage (DrDxtReconciler) existait dans le
 // code, teste, et l'installeur ne le livrait pas : ni publie, ni enregistre. « Survit au boot » restait
 // une promesse que rien ne pouvait tenir chez un joueur.
 //
@@ -49,7 +49,7 @@ public sealed class LInstalleurProposeLeServiceDeDemarrageTests
     [Fact]
     public void Le_nom_du_service_est_celui_que_le_code_connait()
     {
-        // 08/10/2026 : le nom vient de l'hote lui-meme (l'ancien desinstalleur de l'App, jamais appele, est retire).
+        // Le nom vient de l'hote lui-meme (l'ancien desinstalleur de l'App, jamais appele, est retire).
         var code = Regex.Match(Lire("src", "DrDxt.ReconcilerHost", "Program.cs"),
             @"\bServiceName\s*=\s*""([^""]*)""").Groups[1].Value;
         code.Should().NotBeEmpty();

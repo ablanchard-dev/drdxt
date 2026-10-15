@@ -4,18 +4,14 @@
 Lancer :  python tools/banc/hyperviseur.py
 Autotest :  python tools/banc/hyperviseur.py --autotest
 
-Pourquoi ce script existe. Le 06/09/2026, GATES.md concluait : « VirtualBox,
-VMware et QEMU **absents** [...] il n'existe donc aucun moyen de tester un no-boot
-puis sa recuperation », et renvoyait la balle au mainteneur (« une machine sacrifiable »).
-Le 17/09, une seule commande a suffi a dementir la phrase : VirtualBox 7.2.4 est
-installe, avec un invite **Windows 11** et un instantane nomme `Windows-propre`.
-
-La ligne n'etait pas fausse quand elle a ete ecrite. Elle a vieilli, et personne
-ne l'a relancee pendant onze jours — c'est le defaut que ce script repare : il
-rend la reponse re-verifiable au lieu d'etre datee.
+Pourquoi ce script existe. « Aucun hyperviseur, donc aucun moyen de tester un no-boot
+puis sa recuperation » est une phrase qui vieillit : un hyperviseur peut etre installe
+entre-temps (releve sur la machine de reference : VirtualBox 7.2.4, un invite
+**Windows 11** et un instantane nomme `Windows-propre`). Ce script rend la reponse
+re-verifiable au lieu d'etre datee.
 
 Ce script ne DEMARRE rien. Il lit. Demarrer une machine virtuelle ecrit sur le
-disque de la machine et consomme quatre coeurs : c'est un geste du mainteneur, pas du script.
+disque de la machine et consomme quatre coeurs : c'est un geste humain, pas du script.
 """
 import json
 import os
@@ -86,7 +82,7 @@ def main() -> int:
     if utilisables:
         print(f"{utilisables} machine(s) Windows avec instantane : un no-boot peut etre "
               "provoque puis annule par restauration.")
-        print("Ce script n'en demarre aucune — demarrer ecrit sur le disque, c'est la decision du mainteneur.")
+        print("Ce script n'en demarre aucune : demarrer ecrit sur le disque, c'est une decision humaine, pas celle d'un script.")
         return 0
     print("Aucun invite Windows avec instantane : pas de banc de no-boot exploitable.")
     return 1

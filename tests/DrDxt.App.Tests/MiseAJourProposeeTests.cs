@@ -7,9 +7,8 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 06/10/2026 (chantier B10, plan 6.4 ; le mainteneur : « pas super souvent, et un message dans l'appli »). La vérification
-/// signée existait (phase 18) ; l'écran disait « une nouvelle version signée est vérifiée » sans dire laquelle. La version
-/// est nommée et exposée au contrat de l'interface ; rien ne s'installe sans le clic.
+/// Une version signée et vérifiée est nommée (« une nouvelle version » ne dirait pas laquelle) et exposée au
+/// contrat de l'interface ; rien ne s'installe sans le clic.
 /// </summary>
 public class MiseAJourProposeeTests
 {
@@ -29,7 +28,7 @@ public class MiseAJourProposeeTests
         vm.CanInstallUpdate.Should().BeTrue();
     }
 
-    // Revue (F-33) : l'installeur vérifié n'est plus là (ou a changé) ⇒ refusé ; la version n'est plus proposée.
+    // L'installeur vérifié n'est plus là (ou a changé) ⇒ refusé ; la version n'est plus proposée.
     [Fact]
     public void Un_installeur_refuse_retire_la_proposition()
     {

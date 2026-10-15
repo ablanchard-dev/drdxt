@@ -4,7 +4,7 @@ using System.Runtime.Versioning;
 namespace DrDxt.App.Platform;
 
 /// <summary>
-/// 27/09/2026 : ce que la remesure au repos lit du poste, en lecture seule.
+/// Ce que la remesure au repos lit du poste, en lecture seule.
 ///   * temps sans saisie : GetLastInputInfo (dernier clavier ou souris de la session) ;
 ///   * charge du processeur : deux GetSystemTimes a une seconde d'ecart ((noyau + utilisateur - repos) / total ;
 ///     le temps noyau compte deja le repos, d'ou la soustraction, documentee par Microsoft pour GetSystemTimes).

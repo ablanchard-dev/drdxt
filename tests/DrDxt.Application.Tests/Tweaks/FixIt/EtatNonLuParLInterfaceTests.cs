@@ -7,7 +7,7 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.FixIt;
 
 /// <summary>
-/// Revue n° 14 (08/10/2026) : la liste « ce que DrDXT fait ici » disait « déjà bon » pour un réglage que le scan n'avait
+/// La liste « ce que DrDXT fait ici » ne dit pas « déjà bon » pour un réglage que le scan n'a
 /// pas pu lire. L'état non lu est demandé par l'interface (<see cref="ITweak"/>), comme le fait la liste : une méthode
 /// d'un dérivé que l'interface n'atteint pas ne compte pas.
 /// </summary>

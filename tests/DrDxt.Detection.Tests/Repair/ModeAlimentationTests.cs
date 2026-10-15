@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 06/10/2026 (chantier B4) : le plan « Économie d'énergie » et le mode d'alimentation de Windows 11. Source :
+// Le plan « Économie d'énergie » et le mode d'alimentation de Windows 11. Source :
 // Microsoft Learn, « Customize the Windows performance power slider » : le mode ne s'applique qu'avec le plan Équilibré, et
 // sur un PC sans batterie aucun réglage n'y est attaché par défaut.
 public sealed class ModeAlimentationTests
@@ -58,12 +58,12 @@ public sealed class ModeAlimentationTests
     public void Hors_du_plan_Equilibre_le_mode_ne_s_applique_pas_et_rien_n_est_dit()
         => ModeAlimentation.JugerMode(Hautes, MeilleureAutonomie, batterie: true).Should().BeEmpty();
 
-    // Revue F-12 : un plan de constructeur dérivé d'Équilibré a la personnalité Équilibré ; c'est elle qu'on passe.
+    // Un plan de constructeur dérivé d'Équilibré a la personnalité Équilibré ; c'est elle qu'on passe.
     [Fact]
     public void Un_plan_derive_d_Equilibre_est_juge_comme_Equilibre()
         => ModeAlimentation.JugerMode(Equilibre, MeilleureAutonomie, batterie: true).Should().ContainSingle();
 
-    // Revue F-13 : batterie non lue, rien n'est dit (et rien ne casse).
+    // Batterie non lue, rien n'est dit (et rien ne casse).
     [Fact]
     public void Batterie_non_lue_rien_n_est_dit()
         => ModeAlimentation.JugerMode(Equilibre, MeilleureAutonomie, batterie: null).Should().BeEmpty();

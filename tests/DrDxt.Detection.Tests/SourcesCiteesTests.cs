@@ -26,18 +26,18 @@ public class SourcesCiteesTests
     {
         "learn.microsoft.com",      // documentation Windows
         "www.nvidia.com",
-        "gfwsl.geforce.com",        // 03/10/2026 (tour G) : la source publique des versions de pilote NVIDIA, interrogée en ligne
-        "www.amd.com",              // 03/10/2026 (G4) : la page de téléchargement d'AMD, lue en ligne pour la dernière version
+        "gfwsl.geforce.com",        // La source publique des versions de pilote NVIDIA, interrogée en ligne
+        "www.amd.com",              // La page de téléchargement d'AMD, lue en ligne pour la dernière version
         "www.intel.com",
         "intel.github.io",
         "arxiv.org",
         "www.noobfeed.com",
         "presentmon.com",
         "github.com",
-        "ablanchard-dev.github.io", // 09/10/2026 : le site GitHub Pages du projet, racine des manifestes de mise à jour signés
-        "www.techpowerup.com",      // 10/10/2026 (B1) : mesure publique des limites de puissance (i9-14900K, 35 a 253 W, jeux 720p a 4K)
-        "hwbusters.com",            // 08/10/2026 (A6) : mesure publique du parcage X3D (7950X3D, 1080p), graphique relu
-        "www.msi.com",              // 07/10/2026 (D12) : la page d'assistance d'une carte MSI (manuel), ouverte sur clic ; relevée dans un vrai navigateur
+        "ablanchard-dev.github.io", // Le site GitHub Pages du projet, racine des manifestes de mise à jour signés
+        "www.techpowerup.com",      // Mesure publique des limites de puissance (i9-14900K, 35 a 253 W, jeux 720p a 4K)
+        "hwbusters.com",            // Mesure publique du parcage X3D (7950X3D, 1080p), graphique relu
+        "www.msi.com",              // La page d'assistance d'une carte MSI (manuel), ouverte sur clic ; relevée dans un vrai navigateur
     };
 
     private static DirectoryInfo RacineDuDepot()

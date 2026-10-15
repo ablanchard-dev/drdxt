@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D4.6) : l'en-tête vivant d'un domaine, un point par lecture. Les points restent dans le cadre,
+// L'en-tête vivant d'un domaine, un point par lecture. Les points restent dans le cadre,
 // ne dépassent jamais le maximum, et ne s'alignent pas en une droite.
 public sealed class ConstellationDuDomaineTests
 {
@@ -20,7 +20,7 @@ public sealed class ConstellationDuDomaineTests
         points.Where(p => p.X < 0 || p.X > 230 || p.Y < 0 || p.Y > 84).Should().BeEmpty();
     }
 
-    // 03/10/2026 (D8.1, revue n° 3) : sous trois lectures, le pôle seul ressemblait à un rendu raté ; rien n'est dessiné.
+    // Sous trois lectures, le pôle seul ressemblait à un rendu raté ; rien n'est dessiné.
     [Theory]
     [InlineData(2, false)]
     [InlineData(5, true)]

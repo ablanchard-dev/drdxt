@@ -1,41 +1,42 @@
 namespace DrDxt.Application.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// R2 GPU bench — the DETERMINISTIC workload definition + its CPU known-answer.
+// Banc GPU : la définition de la charge déterministe + sa réponse connue calculée par le CPU.
 //
-// This is the single source of truth for what the bench computes. The real D3D11
-// compute shader (Detection) and this CPU reference implement the same integer
-// recurrence, so the GPU's output checksum can be verified against a known answer
-// computed here. A mismatch = silent GPU corruption = unstable ("no TDR ≠ stable").
+// La source unique de ce que calcule le banc. Le vrai compute shader D3D11 (Detection)
+// et cette référence CPU appliquent la même récurrence entière : la somme de contrôle du
+// GPU se vérifie contre une réponse connue calculée ici. Un écart = corruption GPU
+// silencieuse = instable (« pas de TDR ≠ stable »).
 //
-// The recurrence is a plain integer hash mix (xorshift + multiply-add) with NO
-// floating point and NO time/RNG — so the result is bit-exact and identical on every
-// healthy device and every run. Each element is folded over `Iterations` rounds, then
-// all elements are reduced into one 64-bit checksum.
+// La récurrence est un simple mélange de hachage entier (xorshift + multiplication-addition)
+// sans virgule flottante ni heure ni aléa : le résultat est exact au bit près et identique
+// sur tout périphérique sain, à chaque passe. Chaque élément est replié sur `Iterations`
+// tours, puis tous les éléments sont réduits en une somme de contrôle de 64 bits.
 //
-// Default spec is sized to be a few-second bounded load on a mid-range GPU yet finish
-// quickly on CPU for the known-answer (the CPU side only needs to reproduce the math,
-// it is the GPU that does the bounded stress).
+// La spec par défaut donne quelques secondes de charge bornée sur un GPU milieu de gamme,
+// mais se calcule vite sur CPU pour la réponse connue (le CPU ne fait que reproduire le
+// calcul, c'est le GPU qui subit la charge bornée).
 // -----------------------------------------------------------------------
 public static class GpuBenchWorkload
 {
-    /// <summary>The fixed default workload spec used by the probe and the bench tool.
-    /// Constant seed ⇒ reproducible known-answer; sized for a multi-second GPU load.</summary>
+    /// <summary>La spec de charge fixe par défaut, utilisée par la sonde et l'outil de banc.
+    /// Graine constante ⇒ réponse connue reproductible ; dimensionnée pour quelques secondes de charge GPU.</summary>
     public static readonly GpuWorkloadSpec Default = new(ElementCount: 1 << 20, Iterations: 256, Seed: 0x9E3779B1u);
 
-    /// <summary>A write-bandwidth-leaning spec: a big output buffer (1&lt;&lt;25 = 128 MB, far
-    /// beyond the 4060's ~24 MB L2) with only 1 ALU round per element, so the bounded load is
-    /// dominated by streaming the buffer out to VRAM rather than by core ALU. Same shader / same
-    /// deterministic checksum. This is the cheap first probe for whether the bench can SEE a
-    /// memory-clock change (the Default spec's 4 MB working set is L2-resident, so it can't). If
-    /// this still doesn't move with the memory offset, a read-bandwidth kernel is warranted.</summary>
+    /// <summary>Une spec qui charge surtout la bande passante en écriture : un grand tampon de sortie
+    /// (1&lt;&lt;25 = 128 Mo, bien au-delà des ~24 Mo de L2 de la 4060) avec un seul tour d'ALU par
+    /// élément : la charge bornée est dominée par l'écriture du tampon en VRAM, pas par l'ALU. Même
+    /// shader, même somme de contrôle déterministe. C'est la première sonde, peu coûteuse, pour savoir
+    /// si le banc voit un changement d'horloge mémoire (les 4 Mo de travail de la spec Default tiennent
+    /// dans la L2, il ne le voit donc pas). Si ceci ne bouge toujours pas avec le décalage mémoire,
+    /// un noyau de bande passante en lecture se justifie.</summary>
     public static readonly GpuWorkloadSpec BandwidthWrite = new(ElementCount: 1 << 25, Iterations: 1, Seed: 0x9E3779B1u);
 
-    /// <summary>Per-element deterministic mix for one round. Pure integer ops; matches
-    /// the HLSL compute shader (GpuBench.hlsl) exactly. Used by the CPU known-answer.</summary>
+    /// <summary>Mélange déterministe d'un élément pour un tour. Opérations entières pures ;
+    /// identique au compute shader HLSL (GpuBench.hlsl). Sert à la réponse connue du CPU.</summary>
     private static uint MixRound(uint state)
     {
-        // xorshift32 + a multiply-add avalanche — cheap, deterministic, no FP.
+        // xorshift32 + une avalanche multiplication-addition : peu coûteux, déterministe, sans virgule flottante.
         state ^= state << 13;
         state ^= state >> 17;
         state ^= state << 5;
@@ -43,10 +44,10 @@ public static class GpuBenchWorkload
         return state;
     }
 
-    /// <summary>The deterministic per-element recurrence: from a per-index start
-    /// (Seed + i), run <paramref name="iterations" /> rounds of MixRound. This is the
-    /// HEAVY part the GPU runs in the compute shader (clock-sensitive). The HLSL shader
-    /// computes the IDENTICAL value for each element index.</summary>
+    /// <summary>La récurrence déterministe par élément : depuis un départ par index (Seed + i),
+    /// <paramref name="iterations" /> tours de MixRound. C'est la partie lourde que le GPU fait
+    /// tourner dans le compute shader (sensible à l'horloge). Le shader HLSL calcule la même
+    /// valeur pour chaque index d'élément.</summary>
     public static uint ComputeElement(uint seed, int index, int iterations)
     {
         uint state = unchecked(seed + (uint)index);
@@ -55,10 +56,10 @@ public static class GpuBenchWorkload
         return state;
     }
 
-    /// <summary>The deterministic CPU reduction of the per-element results into one
-    /// 64-bit checksum. Position-weighted + rotated so a single wrong element changes
-    /// the checksum (order-sensitive). The real runner reads back the GPU's per-element
-    /// output buffer and folds it with this exact function, so GPU and CPU agree.</summary>
+    /// <summary>La réduction déterministe, côté CPU, des résultats par élément en une somme de
+    /// contrôle de 64 bits. Pondérée par la position et tournée, pour qu'un seul élément faux la
+    /// change (sensible à l'ordre). Le vrai runner relit le tampon de sortie du GPU et le replie
+    /// avec cette même fonction : GPU et CPU s'accordent.</summary>
     public static ulong Fold(ReadOnlySpan<uint> elements)
     {
         ulong checksum = 0;
@@ -71,9 +72,9 @@ public static class GpuBenchWorkload
         return checksum;
     }
 
-    /// <summary>Computes the exact 64-bit checksum the GPU must produce for a healthy run
-    /// of <paramref name="spec" /> — the composition of the per-element recurrence and the
-    /// fold. This is the known-answer the probe compares against (mismatch ⇒ Unstable).</summary>
+    /// <summary>Calcule la somme de contrôle exacte sur 64 bits que le GPU doit produire pour une
+    /// passe saine de <paramref name="spec" /> : la récurrence par élément puis le repli. C'est la
+    /// réponse connue à laquelle la sonde compare (écart ⇒ Unstable).</summary>
     public static ulong ComputeKnownChecksum(GpuWorkloadSpec spec)
     {
         var elements = new uint[spec.ElementCount];

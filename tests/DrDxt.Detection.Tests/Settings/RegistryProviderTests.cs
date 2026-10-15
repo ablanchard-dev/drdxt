@@ -32,7 +32,7 @@ public class RegistryProviderTests
     [Fact]
     public void Vrr_read_never_throws_returns_tristate()
     {
-        // Windows "Variable refresh rate" toggle — may or may not be set → honest Unknown
+        // bascule Windows « Fréquence de rafraîchissement variable » : posée ou non → Unknown honnête
         var sut = new RegistryProvider();
         var act = () => sut.GetVrr();
         var r = act.Should().NotThrow().Subject;

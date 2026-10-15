@@ -5,7 +5,7 @@ using NSubstitute;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-/// <summary>Revue de sécurité du 08/10/2026 : un bail est borné (10 minutes par renouvellement, 8 par appelant). Sans
+/// <summary>Un bail est borné (10 minutes par renouvellement, 8 par appelant). Sans
 /// plafond, un appelant gardait le helper administrateur vivant pour toujours et annulait l'arrêt pour inactivité.</summary>
 public sealed class BauxPlafonnesTests
 {

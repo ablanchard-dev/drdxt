@@ -1,9 +1,9 @@
 namespace DrDxt.Bios;
 
 /// <summary>
-/// Centralized resx keys for BIOS Doctor findings (FR+en live in the shared
-/// Infrastructure resx). No UI text is hard-coded in the advisor — only these
-/// keys, mirroring the <c>ErrorCodes</c> discipline.
+/// Clés resx centralisées des constats du BIOS Doctor (FR et EN vivent dans la resx partagée
+/// d'Infrastructure). Aucun texte d'interface en dur dans le conseiller : seulement ces clés, même
+/// discipline que <c>ErrorCodes</c>.
 /// </summary>
 internal static class BiosStringKeys
 {
@@ -37,7 +37,7 @@ internal static class BiosStringKeys
     public const string PcieNotReadTitle = "Bios.Pcie.NotRead.Title";
     public const string PcieNotReadRationale = "Bios.Pcie.NotRead.Rationale";
 
-    // BIOS / AGESA version
+    // Version BIOS / AGESA
     public const string BiosOldTitle = "Bios.Version.Old.Title";
     public const string BiosOldRationale = "Bios.Version.Old.Rationale";
     public const string BiosUpdateAction = "Bios.Version.Action.Update";
@@ -47,8 +47,8 @@ internal static class BiosStringKeys
     public const string NotApplicableRationale = "Bios.NotApplicable.Rationale";
     public const string NoneAction = "Bios.Action.None";
 
-    // ── Honest gain estimates: each is a sourced RANGE + caveat (decision §2/§5),
-    //    never a bare promised point-% (mirrors M6's GainEvidence discipline). ──
+    // ── Estimations de gain honnêtes : chacune est une plage sourcée + une réserve, jamais un %
+    //    promis isolé (même discipline que le GainEvidence des profils). ──
     public const string GainXmpSource = "Bios.Gain.Xmp.Source";
     public const string GainXmpCaveat = "Bios.Gain.Xmp.Caveat";
     public const string GainReBarSource = "Bios.Gain.ReBar.Source";

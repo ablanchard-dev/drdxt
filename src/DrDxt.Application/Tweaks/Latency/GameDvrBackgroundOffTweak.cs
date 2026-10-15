@@ -4,26 +4,28 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// NS-1 — GameDvrBackgroundOffTweak (OS, persistent).
+// GameDvrBackgroundOffTweak (système, persistant).
 //
-// Turns OFF Game DVR "background recording" (the always-on "Record what happened"
-// buffer = the real overhead) via the per-user leaf
+// Coupe l'enregistrement en arrière-plan de Game DVR (le tampon « Enregistrer ce qui s'est passé »,
+// toujours actif, qui est le vrai coût) par la feuille de l'utilisateur
 //   HKCU\Software\Microsoft\Windows\CurrentVersion\GameDVR\HistoricalCaptureEnabled = 0.
 //
-// SURGICAL (cahier §6, plan §0): only the background buffer is disabled. Manual capture
-// (AppCaptureEnabled) and the whole Game Bar are deliberately left alone — we never sell
-// "disable a feature" as FPS. Captures the real original first → serialized inverse → write 0.
+// Chirurgical : seul le tampon d'arrière-plan est coupé. La capture manuelle (AppCaptureEnabled) et la
+// Game Bar restent intactes : couper une fonction ne se vend pas comme des images. L'original est relu
+// d'abord, l'inverse sérialisé, puis 0 est écrit.
 //
-// Takes effect after reboot / next game launch → the engine skips the immediate A/B
-// (TakesEffectAfterReboot = true); the proof is the next in-game scan, never this session.
+// Effet au redémarrage ou au prochain lancement du jeu : le moteur saute l'A/B immédiat
+// (TakesEffectAfterReboot = true) ; la preuve est le prochain scan en jeu, jamais cette session.
 //
-// HONESTY (§6): the SummaryKey says "less background overhead", never "+FPS".
+// Le SummaryKey dit « moins de charge en arrière-plan », jamais « +FPS ».
 //
-// Gating: AppliesTo reads the same leaf the apply writes — already 0 ⇒ not applicable.
+// Gating : AppliesTo lit la feuille même que l'application écrit ; déjà à 0, rien n'est proposé.
 // -----------------------------------------------------------------------
+/// <summary>Coupe l'enregistrement en arrière-plan de Game DVR (HistoricalCaptureEnabled = 0), proposé tant qu'il
+/// n'est pas lu déjà coupé. La capture manuelle et la Game Bar restent.</summary>
 public sealed class GameDvrBackgroundOffTweak : LatencyTweakBase
 {
-    private const uint Disabled = 0; // 0 = background recording off, 1 = on.
+    private const uint Disabled = 0; // 0 = enregistrement en arrière-plan coupé, 1 = actif.
     private const string GameDvrPath = @"Software\Microsoft\Windows\CurrentVersion\GameDVR";
     private const string HistoricalCaptureName = "HistoricalCaptureEnabled";
 
@@ -35,16 +37,15 @@ public sealed class GameDvrBackgroundOffTweak : LatencyTweakBase
     public override string Id => "latency.gameDvrBackgroundOff";
     public override string SummaryKey => "tweak.latency.game_dvr.background_off";
 
-    // The DVR re-reads the setting at the next game launch → engine defers its A/B proof.
+    // Le DVR relit le réglage au prochain lancement du jeu → le moteur diffère sa preuve A/B.
     public override bool TakesEffectAfterReboot => true;
 
-    // Revue du 12/09 (C1) : deja a 0 ⇒ rien a faire, hors du plan ; illisible ⇒ applicable, non lu
+    // Deja a 0 ⇒ rien a faire, hors du plan ; illisible ⇒ applicable, non lu
     // n'est pas « deja regle ».
-    // 14/09/2026 (C1 bis) : ce commentaire disait « absent = defaut Windows (actif) », sans source.
-    // C'est l'inverse : « Record what happened » est desactive par defaut, et une valeur absente vaut 0
+    // « Record what happened » est desactive par defaut, et une valeur absente vaut 0
     // (elevenforum.com/t/…record-what-happened-for-gaming-captures-in-windows-11.17900 ;
-    // github.com/FunkyFr3sh/GameDVR_Config). Le poste de reference n'a pas la valeur : le levier y
-    // restait au plan, « rien a tenter » n'etait jamais vrai et le client passait par l'achat pour rien.
+    // github.com/FunkyFr3sh/GameDVR_Config). Le poste de reference n'a pas la valeur : sans cette regle,
+    // le levier y resterait au plan, « rien a tenter » ne serait jamais vrai et le client paierait pour rien.
     public override bool AppliesTo(HardwareInventory hw, SettingsState state)
     {
         try
@@ -59,7 +60,7 @@ public sealed class GameDvrBackgroundOffTweak : LatencyTweakBase
     {
         try
         {
-            // Capture the real original before writing (faithful revert).
+            // Relever la vraie origine avant d'écrire (retour arrière fidèle).
             var read = _registry.ReadDword(RegistryHiveKind.CurrentUser, GameDvrPath, HistoricalCaptureName);
             if (!read.IsOk)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
@@ -71,7 +72,7 @@ public sealed class GameDvrBackgroundOffTweak : LatencyTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "Could not serialize the revert op.");
 
-            // Disable background recording (=0) through the allowlisted typed op.
+            // Couper l'enregistrement en arrière-plan (=0) par l'op typée sur liste blanche.
             var op = new SetRegistryValueOp(
                 RegistryHiveKind.CurrentUser, GameDvrPath, HistoricalCaptureName,
                 RegistryValueType.DWord,
@@ -85,7 +86,7 @@ public sealed class GameDvrBackgroundOffTweak : LatencyTweakBase
         }
         catch (Exception ex)
         {
-            // Every external boundary wrapped → fail clean, never throw.
+            // Chaque frontière externe protégée → échec propre, jamais d'exception.
             return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                 $"Game DVR background-off apply boundary error: {ex.Message}");
         }

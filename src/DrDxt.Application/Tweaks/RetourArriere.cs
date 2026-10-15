@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks;
 
 /// <summary>
-/// 08/10/2026 (revue n° 10) : le retour arrière d'un levier à plusieurs écritures, quand l'une d'elles est refusée.
+/// Le retour arrière d'un levier à plusieurs écritures, quand l'une d'elles est refusée.
 /// Les trois copies d'avant (Vsync et plafond, mode Jeu, X3D) avalaient l'échec d'un inverse : un levier à moitié posé
 /// rendait le refus d'origine, l'appelant concluait « rien n'a changé » et levait son journal. Ici, un inverse refusé
 /// change le code en <see cref="ErrorCodes.TweakPartiallyApplied"/>, que les appelants lisent pour garder le journal.
@@ -27,6 +27,6 @@ internal static class RetourArriere
         return rendu
             ? Result<TweakSnapshot>.Fail(code, message)
             : Result<TweakSnapshot>.Fail(ErrorCodes.TweakPartiallyApplied,
-                $"{message} ; le retour arrière a aussi échoué : une partie du réglage est encore en place.");
+                Docteur.T("RA2.RetourEchoue", message));
     }
 }

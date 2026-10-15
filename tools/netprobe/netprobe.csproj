@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- NS-9 live smoke for the network latency instrument. Lives OUTSIDE the .sln (like
+  <!-- Live smoke for the network latency instrument. Lives OUTSIDE the .sln (like
        tools/r2probe, tools/smoke) so it never affects the product build/test. Read-only:
        it sends ICMP echoes and prints the report. No elevation, no write, nothing installed. -->
   <PropertyGroup>

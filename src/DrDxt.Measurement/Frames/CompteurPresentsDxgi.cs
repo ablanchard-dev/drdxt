@@ -5,16 +5,16 @@ using DrDxt.Core;
 namespace DrDxt.Measurement.Frames;
 
 /// <summary>
-/// 24/09/2026 — compter les images soi-meme, quand PresentMon n'y arrive plus.
+/// Compter les images soi-meme, quand PresentMon n'y arrive plus.
 ///
-/// Mesure du 24/09 sur la machine de reference (Windows 26200.9457) : PresentMon 2.4.1, 2.5.1 ET
-/// 2.6.0 ne voient aucune image, sur aucun processus — alors qu'une trace ETW brute de 7 s porte
+/// Mesure du 24/09 sur la machine de reference (Windows 26200.9457) : PresentMon 2.4.1, 2.5.1 et
+/// 2.6.0 ne voient aucune image, sur aucun processus, alors qu'une trace ETW brute de 7 s porte
 /// 1 307 evenements DXGI `Present_Start` (id 42) pour la scene de mesure, soit 193,9 img/s, ce que
 /// la scene compte elle-meme. Windows emet ; c'est PresentMon qui ne reconstruit plus rien.
 ///
 /// Ce compteur lit l'evenement 42 du fournisseur `Microsoft-Windows-DXGI` pour un processus : les
 /// intervalles entre deux Present sont les frametimes, et toutes les grandeurs sortent de
-/// <see cref="FrametimeStatistics"/> — les memes formules que le banc PresentMon.
+/// <see cref="FrametimeStatistics"/> : les memes formules que le banc PresentMon.
 ///
 /// Ce qu'il ne sait pas : les jeux Vulkan / OpenGL (pas de DXGI), la latence d'affichage, le
 /// focus. Et il demande les droits administrateur (session ETW) : sans eux, il echoue et le dit.
@@ -25,7 +25,7 @@ public sealed class CompteurPresentsDxgi
     private const int PresentStart = 42;
     public const int MinImages = 10;
 
-    /// <summary>26/09/2026 — borne du fichier de trace. Sans elle, une session laissee ouverte par un
+    /// <summary>Borne du fichier de trace. Sans elle, une session laissee ouverte par un
     /// plantage ecrit tous les evenements DXGI du PC dans %TEMP% jusqu'au redemarrage. En mode
     /// sequentiel, la session cesse d'ecrire a la borne : une trace qui l'atteint est tronquee.</summary>
     public const int MaxMo = 1024;
@@ -33,7 +33,7 @@ public sealed class CompteurPresentsDxgi
     public static string ArgumentsCreation(string etl)
         => $"create trace {NomSession} -ets -o \"{etl}\" -max {MaxMo} -p Microsoft-Windows-DXGI 0xFFFFFFFFFFFFFFFF 5";
 
-    /// <summary>26/09/2026 — les .etl laisses par un plantage en pleine capture. Une seule session
+    /// <summary>Les .etl laisses par un plantage en pleine capture. Une seule session
     /// a la fois (la mesure arrete d'abord la precedente) : au demarrage, tout fichier du compteur
     /// est un reste. Rend le nombre de fichiers retires.</summary>
     public static int RangerRestes(string dossier)
@@ -68,12 +68,12 @@ public sealed class CompteurPresentsDxgi
             RangerRestes(Path.GetTempPath());     // et son fichier, libere par l'arret
             if (Lancer(ArgumentsCreation(etl)) != 0)
                 return Result<BenchmarkResult>.Fail(ErrorCodes.CaptureFail,
-                    "La session ETW DXGI n'a pas pu demarrer (droits administrateur requis).");
+                    Docteur.T("DXGI.SessionEtw"));
             try { Task.Delay(duree, ct).GetAwaiter().GetResult(); }
             finally { Lancer($"stop {NomSession} -ets"); }
             if (TracePleine(new FileInfo(etl).Length))
                 return Result<BenchmarkResult>.Fail(ErrorCodes.CaptureFail,
-                    $"La trace DXGI a atteint sa borne ({MaxMo} Mo) : la fenêtre est tronquée, pas de mesure.");
+                    Docteur.T("DX.Borne", MaxMo));
 
             var ticks = new List<long>();
             using (var lecteur = new EventLogReader(new EventLogQuery(etl, PathType.FilePath,
@@ -88,7 +88,7 @@ public sealed class CompteurPresentsDxgi
             var ft = Intervalles(ticks);
             return ft.Count < MinImages
                 ? Result<BenchmarkResult>.Fail(ErrorCodes.NoPresentingFrames,
-                    $"{ft.Count} image(s) DXGI pour le processus {pid} : pas de quoi mesurer.")
+                    Docteur.T("DX.TropPeu", ft.Count, pid))
                 : Result<BenchmarkResult>.Ok(FrametimeStatistics.PasseDepuisSerie(ft, runs: 1, marginOfError: double.PositiveInfinity));
         }
         catch (OperationCanceledException) { throw; }

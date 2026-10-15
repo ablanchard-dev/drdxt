@@ -1,4 +1,4 @@
-<!-- Manual LIVE smoke harness for the R2 LEASE WATCHDOG (dead-man's-switch). -->
+<!-- Manual LIVE smoke harness for the LEASE WATCHDOG (dead-man's-switch). -->
 <!-- NOT part of DrDXT.sln (like tools/m2smoke, tools/r2smoke, tools/r2probe) so it -->
 <!-- never affects the product build/test. -->
 <!-- -->

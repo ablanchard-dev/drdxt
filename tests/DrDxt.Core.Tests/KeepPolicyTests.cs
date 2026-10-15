@@ -110,7 +110,7 @@ public class KeepPolicyTests
         d.Keep.Should().BeTrue();
     }
 
-    // 26/09/2026 : deux regles de DecideParMetrique que des mutations laissaient vertes.
+    // Deux regles de DecideParMetrique que des mutations laissaient vertes.
 
     [Fact]
     public void Une_grandeur_invalide_interdit_le_keep_meme_avec_un_gain_de_queue_ailleurs()

@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 06/10/2026 (J1b) : le relevé tourne aussi DrDXT fermé ; l'App ouverte en même temps ne doit pas relever la même partie
+// Le relevé tourne aussi DrDXT fermé ; l'App ouverte en même temps ne doit pas relever la même partie
 // une seconde fois. Un seul relevé tient le verrou ; l'autre attend.
 public sealed class VerrouDuReleveTests : IDisposable
 {

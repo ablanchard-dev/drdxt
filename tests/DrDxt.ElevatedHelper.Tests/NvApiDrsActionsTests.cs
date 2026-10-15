@@ -10,10 +10,10 @@ namespace DrDxt.ElevatedHelper.Tests;
 // -----------------------------------------------------------------------
 // NvApiDrsActions : le contrat fail-clean, sans jamais toucher au pilote de la machine.
 //
-// 02/09/2026 : ces tests passaient 141 au vrai pilote, et chaque `dotnet test` plafonnait la machine
+// Ces tests passaient 141 au vrai pilote, et chaque `dotnet test` plafonnait la machine
 // de dev a 141 images/s. Corrige alors en reecrivant « la valeur deja en place ».
 //
-// 25/09/2026 : ce n'etait pas assez. Reecrire la meme valeur passe quand meme par SetSetting puis
+// Ce n'etait pas assez. Reecrire la meme valeur passe quand meme par SetSetting puis
 // SaveSettings : la base du pilote (nvdrsdb0.bin) est reecrite a chaque suite (vu : 09:55, pendant la
 // suite complete), la provenance du reglage devient « pose par un humain » (drsprobe : SetByUser), et
 // NVIDIA documente que SaveSettings ecrase ce qu'un autre processus a modifie entre-temps (le panneau

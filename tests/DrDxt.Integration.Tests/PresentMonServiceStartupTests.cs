@@ -12,7 +12,7 @@ namespace DrDxt.Integration.Tests;
 /// quand on le lui demande, il ne s'installe pas en resident dans la machine du client.
 /// Un PC de testeur doit rester un PC naturel.
 ///
-/// CONSTATE le 27/08/2026 : sur la machine de reference, le service tournait en
+/// Sur la machine de reference, le service tournait en
 /// **Automatic** alors que le code et l'installeur posent tous deux `start= demand`. La
 /// derive venait d'une installation manuelle, pas du produit -- mais rien ne verrouillait
 /// la garantie cote source. Ce fichier est ce verrou : il rougit si un jour quelqu'un

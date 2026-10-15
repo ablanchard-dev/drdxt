@@ -54,8 +54,7 @@ public sealed class ScanShowsStutterTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(
-              Hw(), St, new List<Finding>(), 68, bl,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              Hw(), St, new List<Finding>(), bl)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
@@ -68,9 +67,7 @@ public sealed class ScanShowsStutterTests
         return new ScanViewModel(
             hd, sr, br, sc, sd,
             ScanViewModelTestSeams.Safety(), ScanViewModelTestSeams.Engine(),
-            ScanViewModelTestSeams.ProfileConsumer(), ScanViewModelTestSeams.GpuTuningStep(),
-            ScanViewModelTestSeams.Navigation(), ScanViewModelTestSeams.DashboardFactory(),
-            store, new AppliedTweakManifestMapper(),
+            ScanViewModelTestSeams.ProfileConsumer(), store, new AppliedTweakManifestMapper(),
             ScanViewModelTestSeams.BiosAdvisor(),
             ScanViewModelTestSeams.GuideGenerator(), key => key);
     }
@@ -133,19 +130,16 @@ public sealed class ScanShowsStutterTests
     }
 
     /// <summary>
-    /// Le sens du p95 ne s'inverse pas. La premiere version disait « les 5 % les plus lentes
-    /// durent JUSQU'A 8,8 ms » — exactement le contraire de ce qu'un 95e centile signifie : 5 %
-    /// des trames sont AU-dessus de cette valeur, et rien ne borne leur duree. Ecrit ainsi, le
-    /// produit minimisait la saccade au moment meme ou il pretendait la montrer.
+    /// Le sens du p95 ne s'inverse pas. « Les 5 % les plus lentes durent jusqu'a 8,8 ms » dirait le
+    /// contraire de ce qu'un 95e centile signifie : 5 % des trames sont au-dessus de cette valeur, et
+    /// rien ne borne leur duree. Ecrit ainsi, le produit minimiserait la saccade en pretendant la montrer.
     ///
     /// Ce test verrouille la phrase des deux cotes : elle doit dire « au moins », et elle ne doit
     /// plus jamais dire « jusqu'a ».
     /// </summary>
     ///
-    /// Et le verrou couvre les deux phrases de percentile. La revue n'avait signale que la
-    /// saccade ; la cadence, ecrite au tour precedent, portait exactement la meme inversion
-    /// (« derive jusqu'a X ms au 95e centile »). Corriger celle qu'on nous montre et laisser sa
-    /// jumelle est la faute qui suit toujours une correction ponctuelle.
+    /// Et le verrou couvre les deux phrases de percentile : la cadence peut porter la meme inversion
+    /// que la saccade (« derive jusqu'a X ms au 95e centile »).
     [Theory]
     [InlineData("fr", "Scan.Stutter.Measured")]
     [InlineData("en", "Scan.Stutter.Measured")]

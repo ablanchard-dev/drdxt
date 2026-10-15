@@ -7,16 +7,16 @@ namespace DrDxt.Measurement.Cpu;
 /// <summary>Ce qu'une charge deterministe a rendu, avec sa dispersion.</summary>
 /// <param name="Threads">Nombre de threads charges, chacun sur un cœur physique distinct.</param>
 /// <param name="MopsParThread">Millions d'operations par seconde et par thread. C'est la
-/// Grandeur qui suit la frequence : la charge est en dependance stricte, donc un thread avance
+/// grandeur qui suit la frequence : la charge est en dependance stricte, donc un thread avance
 /// proportionnellement a l'horloge de son cœur. Le total, lui, monte forcement avec le nombre de
 /// threads et ne dit rien d'un bridage.</param>
-/// <param name="EcartTypePourcent">Dispersion des passes, en pourcent de la moyenne. Sans elle
-/// Aucun A/b ne peut conclure : c'est le plancher de ce que l'instrument sait distinguer.</param>
+/// <param name="EcartTypePourcent">Dispersion des passes, en pourcent de la moyenne. Sans elle,
+/// aucun A/B ne peut conclure : c'est le plancher de ce que l'instrument sait distinguer.</param>
 /// <param name="Somme">Somme de controle du travail effectue. Elle doit etre identique d'une
 /// execution a l'autre pour le meme nombre de threads.</param>
 /// <param name="Passes">Nombre de passes effectuees.</param>
 /// <param name="ChauffeSecondes">Duree de charge continue avant la premiere passe retenue.</param>
-/// <param name="EpinglesReussis">Threads reellement epingles, au PIRE des passes retenues.
+/// <param name="EpinglesReussis">Threads reellement epingles, au pire des passes retenues.
 /// Le pire, jamais la derniere : un echec en cours de route laisse un debit mesure sur un cœur
 /// que l'ordonnanceur a choisi seul, et une derniere passe reussie l'effacerait du compte tout en
 /// le gardant dans la moyenne.</param>
@@ -27,49 +27,47 @@ public sealed record CpuBenchResult(
 /// <summary>La charge a executer.</summary>
 public enum ChargeCpu
 {
-    /// <summary>Chaine de dependances sur un registre. Consomme PEU : elle sonde la frequence
+    /// <summary>Chaine de dependances sur un registre. Consomme peu : elle sonde la frequence
     /// maximale accessible, pas le comportement sous budget.</summary>
     Legere,
 
     /// <summary>Multiplications larges plus balayage d'un tampon qui tient dans le L2. Consomme
-    /// BEAUCOUP plus, et c'est le seul moyen de reproduire un budget de puissance.</summary>
+    /// beaucoup plus, et c'est le seul moyen de reproduire un budget de puissance.</summary>
     Lourde,
 }
 
 /// <summary>
-/// Le banc CPU deterministe — l'instrument qui manquait, et dont l'absence a rendu deux mois
-/// d'hypotheses CPU indecidables.
+/// Le banc CPU deterministe : l'instrument sans lequel les hypotheses CPU restent indecidables.
 ///
 /// ══ pourquoi il existe ══
 /// Le depot possede un banc GPU deterministe (resolution 0,122 %) et un banc memoire (1,83 % sur
-/// le debit). Il n'avait rien pour le processeur — alors que la mesure du 09/09/2026 montre que
+/// le debit). Celui-ci couvre le processeur : la mesure du 09/09/2026 montre que
 /// le goulot de cette machine en jeu est le chemin CPU (`gpuWait` a 0-3 % sur quatre series).
 /// Toute question CPU devait donc se juger en partie en ligne, ou l'etendue mesuree du 1 % low
 /// atteint ±45 % sur des tranches de 30 s : rien n'y est demontrable.
 ///
 /// ══ ce que la charge mesure, et ce qu'elle evite ══
 /// Une chaine de dependances entiere sur un seul registre : chaque operation attend la
-/// precedente. Aucune memoire au-dela d'un registre, donc ni cache ni DRAM dans le resultat —
-/// c'est l'HORLOGE qu'on lit, pas le sous-systeme memoire (celui-la a deja son banc).
+/// precedente. Aucune memoire au-dela d'un registre, donc ni cache ni DRAM dans le resultat :
+/// c'est l'horloge qu'on lit, pas le sous-systeme memoire (celui-la a deja son banc).
 ///
 /// La somme de controle n'est pas un ornement. Une boucle arithmetique dont le resultat n'est
 /// pas lu est une boucle que le compilateur a le droit de supprimer entierement. Un banc optimise
-/// en neant rend des chiffres magnifiques et parfaitement stables — le mode d'echec le plus
+/// en neant rend des chiffres magnifiques et parfaitement stables : le mode d'echec le plus
 /// difficile a voir. La somme est rendue, comparee, et un test echoue si elle change.
 ///
-/// ══ L'EPINGLAGE ══
+/// ══ l'epinglage ══
 /// Sans epinglage, l'ordonnanceur deplace les threads et la dispersion explose : la repetabilite
 /// est la seule raison d'etre d'un banc.
 ///
-/// Mais la liste des processeurs vient de l'appelant, jamais d'une formule. Une premiere
-/// version epinglait sur `idx * 2`, en supposant « un indice logique sur deux = un cœur physique
-/// rapide ». C'est vrai des huit P-cores de cette machine et faux partout ailleurs : au-dela du
-/// huitieme thread la formule tombait sur des cœurs LENTS (16, 18, 20...) tout en annoncant
-/// « 12 cœurs rapides », et elle serait fausse sur un CPU sans SMT, sur AMD, ou avec plusieurs
-/// groupes de processeurs. `CpuTopology` publie la reponse ; la deviner etait le defaut que ce
-/// depot s'interdit explicitement ailleurs.
+/// Mais la liste des processeurs vient de l'appelant, jamais d'une formule. Epingler sur
+/// `idx * 2`, en supposant « un indice logique sur deux = un cœur physique rapide », est vrai des
+/// huit P-cores de cette machine et faux partout ailleurs : au-dela du huitieme thread la formule
+/// tomberait sur des cœurs lents (16, 18, 20...) tout en annoncant « 12 cœurs rapides », et elle
+/// serait fausse sur un CPU sans SMT, sur AMD, ou avec plusieurs groupes de processeurs.
+/// `CpuTopology` publie la reponse ; la deviner est le defaut que ce depot s'interdit ailleurs.
 ///
-/// Et l'epinglage est VERIFIE : `SetThreadAffinityMask` rend 0 en cas d'echec, et le nombre de
+/// Et l'epinglage est verifie : `SetThreadAffinityMask` rend 0 en cas d'echec, et le nombre de
 /// reussites sort avec le resultat. Un banc qui croit epingler sans y parvenir rend une dispersion
 /// inexplicable et aucune trace de la cause.
 ///
@@ -88,18 +86,18 @@ public static class CpuBench
     /// <summary>Mesure <paramref name="threads"/> cœurs charges simultanement.</summary>
     /// <param name="passes">Passes mesurees. La premiere est jetee : elle sert a etablir le boost
     /// et les caches d'instructions, et l'inclure gonflerait la dispersion sans rien apprendre.</param>
-    /// <param name="chauffeSecondes">Duree de charge CONTINUE avant de mesurer.
+    /// <param name="chauffeSecondes">Duree de charge continue avant de mesurer.
     ///
     /// Ce parametre n'est pas un confort, il decide de ce qu'on mesure. Sur cette machine
-    /// (09/09/2026), huit cœurs sous charge continue tiennent 4 798 MHz au depart, glissent a
+    ///, huit cœurs sous charge continue tiennent 4 798 MHz au depart, glissent a
     /// 4 485 en douze secondes, puis tombent d'une marche a 3 716 MHz vers la quinzieme seconde et
-    /// y restent. C'est le passage de la limite de turbo a la limite SOUTENUE. Un banc dont les
+    /// y restent. C'est le passage de la limite de turbo a la limite soutenue. Un banc dont les
     /// passes durent deux secondes ne sort jamais du turbo : il rend 5 296 MHz et conclut
-    /// tranquillement que rien ne bride. Un jeu, lui, vit du mauvais cote de cette marche —
-    /// mesure en partie : 3 861 MHz. Pour juger ce qu'un JEU obtient, il faut chauffer.</param>
+    /// tranquillement que rien ne bride. Un jeu, lui, vit du mauvais cote de cette marche
+    /// (mesure en partie : 3 861 MHz). Pour juger ce qu'un jeu obtient, il faut chauffer.</param>
     /// <param name="processeurs">Les processeurs logiques a occuper, un par thread, dans l'ordre.
     /// Fournis par l'appelant depuis la topologie reelle. Quand la liste est absente ou trop
-    /// courte, on retombe sur les indices consecutifs — et <c>EpinglesReussis</c> dit alors ce qui
+    /// courte, on retombe sur les indices consecutifs, et <c>EpinglesReussis</c> dit alors ce qui
     /// a vraiment ete epingle, au lieu de le supposer.</param>
     public static CpuBenchResult Measure(int threads, int passes = 5, ChargeCpu charge = ChargeCpu.Legere,
         double chauffeSecondes = 0, IReadOnlyList<int>? processeurs = null)
@@ -109,11 +107,11 @@ public static class CpuBench
 
         var debits = new List<double>(passes);
         ulong somme = 0;
-        // Le pire cas sur les passes retenues, pas la derniere. Une premiere version ecrasait ce
-        // compteur a chaque passe : un echec d'epinglage a la deuxieme passe disparaissait derriere
-        // une cinquieme reussie, et son debit — mesure sur un cœur que l'ordonnanceur avait choisi
-        // seul — restait dans la moyenne et alimentait le verdict. On garde donc le minimum, et
-        // seulement sur les passes qui COMPTENT : un echec pendant la chauffe ne salit aucun
+        // Le pire cas sur les passes retenues, pas la derniere. Ecraser ce compteur a chaque passe
+        // ferait disparaitre un echec d'epinglage a la deuxieme passe derriere une cinquieme reussie,
+        // et son debit (mesure sur un cœur que l'ordonnanceur a choisi seul) resterait dans la moyenne
+        // et alimenterait le verdict. On garde donc le minimum, et
+        // seulement sur les passes qui comptent : un echec pendant la chauffe ne salit aucun
         // chiffre, il ne fait que rechauffer ailleurs.
         var reussites = int.MaxValue;
         var finChauffe = DateTime.UtcNow.AddSeconds(chauffeSecondes);
@@ -153,8 +151,8 @@ public static class CpuBench
 
             if (passe == 0) { somme = Melanger(sommes); continue; }   // passe d'echauffement, jetee
 
-            // Tant que la chauffe n'est pas finie, on TRAVAILLE sans rien retenir : la charge doit
-            // etre CONTINUE pour franchir la marche, et une passe gardee avant serait un melange
+            // Tant que la chauffe n'est pas finie, on travaille sans rien retenir : la charge doit
+            // etre continue pour franchir la marche, et une passe gardee avant serait un melange
             // des deux regimes.
             if (enChauffe)
             {
@@ -178,7 +176,7 @@ public static class CpuBench
     }
 
     /// <summary>La charge : une chaine de dependances stricte. Chaque tour a besoin du resultat du
-    /// precedent, donc le processeur ne peut pas l'etaler sur ses unites paralleles — le temps est
+    /// precedent, donc le processeur ne peut pas l'etaler sur ses unites paralleles : le temps est
     /// gouverne par l'horloge, ce qu'on veut mesurer.</summary>
     private static ulong Travail(ulong graine)
     {
@@ -194,19 +192,19 @@ public static class CpuBench
     }
 
     /// <summary>
-    /// La charge lourde, et pourquoi elle a du exister.
+    /// La charge lourde, et pourquoi elle existe.
     ///
-    /// Mesure du 09/09/2026 : avec la charge legere, HUIT cœurs charges tournent a 5 297 MHz et
+    /// Mesure du 09/09/2026 : avec la charge legere, huit cœurs charges tournent a 5 297 MHz et
     /// le debit par thread ne bouge pas de 0,4 %. Avec des processus PowerShell sur les memes huit
-    /// cœurs, la frequence tombait a 3 698 MHz. Les deux mesures etaient justes : **ce n'est pas le
-    /// Nombre de cœurs qui fait tomber la frequence, c'est la PUISSANCE que la charge appelle.**
-    /// Une premiere lecture avait conclu « la frequence s'effondre avec le nombre de cœurs » — la
-    /// correlation etait reelle, la cause etait fausse.
+    /// cœurs, la frequence tombait a 3 698 MHz. Les deux mesures sont justes : ce n'est pas le
+    /// nombre de cœurs qui fait tomber la frequence, c'est la puissance que la charge appelle.
+    /// Conclure « la frequence s'effondre avec le nombre de cœurs » prendrait une correlation reelle
+    /// pour une cause.
     ///
     /// Un banc qui ne consomme rien mesure donc le plafond de boost et rien d'autre. Celui-ci
     /// multiplie sur 64 bits (unites larges sollicitees) et balaie un tampon de 192 Ko, taille
     /// choisie pour tenir dans le L2 d'un cœur : assez de trafic pour appeler du courant, pas assez
-    /// pour que le resultat depende de la DRAM — la memoire a deja son propre banc.
+    /// pour que le resultat depende de la DRAM : la memoire a deja son propre banc.
     /// </summary>
     private static ulong TravailLourd(ulong graine)
     {

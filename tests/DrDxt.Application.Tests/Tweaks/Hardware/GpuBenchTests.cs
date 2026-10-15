@@ -5,13 +5,13 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// R2 GPU bench — GpuBench: turns one deterministic compute run into a repeatable,
-// comparable RESULT (throughput score + stable/unstable + checksum-ok), for the
-// tools/r2bench A/B. Unit-tested with a FAKE runner — the score math, the verdict
-// mapping, and the checksum-ok flag are all covered without a GPU.
+// Banc GPU : GpuBench transforme une passe de calcul déterministe en résultat répétable
+// et comparable (score de débit + stable/instable + somme de contrôle ok), pour l'A/B de
+// tools/r2bench. Testé avec un faux exécutant : le calcul du score, la correspondance du
+// verdict et le drapeau de somme de contrôle sont couverts sans carte.
 //
-// Score metric = iterations completed per second (ElementCount * Iterations / sec):
-// deterministic workload, so the only thing that moves the score is GPU clock/throughput.
+// Métrique du score = itérations accomplies par seconde (ElementCount * Iterations / s) :
+// charge déterministe, donc seule l'horloge ou le débit de la carte fait bouger le score.
 // -----------------------------------------------------------------------
 public sealed class GpuBenchTests
 {
@@ -31,7 +31,7 @@ public sealed class GpuBenchTests
     [Fact]
     public void Healthy_correct_run_is_stable_checksum_ok_with_positive_score()
     {
-        // 256 iterations over the default element count in 2000 ms.
+        // 256 itérations sur le nombre d'éléments par défaut en 2000 ms.
         var outcome = new GpuComputeOutcome(GpuDeviceStatus.Healthy, KnownChecksum, 256, 2000);
         var bench = Build(Result<GpuComputeOutcome>.Ok(outcome));
 
@@ -40,7 +40,7 @@ public sealed class GpuBenchTests
         r.IsOk.Should().BeTrue();
         r.Value!.Stability.Should().Be(StabilityOutcome.Stable);
         r.Value.ChecksumOk.Should().BeTrue();
-        // score = ElementCount * IterationsCompleted / seconds = 1048576*256 / 2.0
+        // score = ElementCount * IterationsCompleted / secondes = 1048576*256 / 2.0
         var expected = (double)Spec.ElementCount * 256 / 2.0;
         r.Value.ElementIterationsPerSecond.Should().BeApproximately(expected, expected * 1e-9);
         r.Value.Checksum.Should().Be(KnownChecksum);

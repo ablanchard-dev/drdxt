@@ -5,23 +5,12 @@ using FluentAssertions;
 namespace DrDxt.Infrastructure.Tests.Updates;
 
 // -----------------------------------------------------------------------
-// 19/09/2026. Deux commentaires du meme chemin se contredisaient.
+// Aucune doc du chemin de mise a jour ne promet un epinglage du serveur : il n'existe pas.
+// Le client HTTP de la mise a jour est nu, et l'epinglage SPKI du serveur se posera avec son
+// deploiement (ses empreintes n'existent pas encore).
 //
-// `HttpUpdateFeed` s'ouvre sur : « The real update feed over an injected, PINNED
-// HttpClient (T1 — the caller passes the pinned client…) ». Au present, comme un fait.
-//
-// `VerificationMiseAJour`, trois fichiers plus loin, dit l'inverse : « L'epinglage SPKI
-// du serveur de mise a jour se posera avec son deploiement (ses empreintes n'existent
-// pas encore) ».
-//
-// Mesure : le seul appelant reel, `App.xaml.cs`, construit `new HttpClient()` — nu. Et
-// `PinnedHttpClientFactory` n'expose qu'un `CreateForKeygen()`, dont les empreintes
-// visent `api.keygen.sh`, pas notre serveur de mise a jour. La seconde phrase dit vrai ;
-// la premiere promet une protection qui n'existe pas.
-//
-// Pourquoi ca compte plus qu'une faute de style. Quelqu'un qui audite ce transport — le mainteneur
-// dans six mois, un client, un acheteur — lit le fichier qui porte le mot « PINNED » et
-// coche la case. Une documentation fausse ne se contente pas d'etre fausse : elle EMPECHE
+// Pourquoi ca compte plus qu'une faute de style. Quelqu'un qui audite ce transport (dans six
+// mois, un client, un acheteur) lit le fichier qui porte le mot « PINNED » et coche la case. Une documentation fausse ne se contente pas d'etre fausse : elle EMPECHE
 // de trouver le trou, parce qu'elle repond a la question qu'on venait poser. Et le canal
 // concerne installe des executables sur une machine ou le produit tourne en administrateur.
 //
@@ -31,8 +20,8 @@ namespace DrDxt.Infrastructure.Tests.Updates;
 //   * le manifeste est signe en Ed25519 et le binaire verifie par son sha256.
 // L'epinglage viendra quand le serveur aura des empreintes. D'ici la, on le DIT.
 //
-// Ce crible refuse qu'une doc du chemin de mise a jour reclame un epinglage tant que la
-// fabrique n'en propose pas un pour ce serveur.
+// Ce crible refuse qu'une doc du chemin de mise a jour reclame un epinglage tant qu'aucun
+// n'existe pour ce serveur.
 // -----------------------------------------------------------------------
 public sealed class AucuneDocNePrometUnEpinglageQuiNExistePasTests
 {
@@ -61,7 +50,7 @@ public sealed class AucuneDocNePrometUnEpinglageQuiNExistePasTests
     /// <summary>Les fabriques de clients epingles que le depot propose vraiment.</summary>
     private static string[] FabriquesEpinglees()
     {
-        // 23/09/2026 : la seule fabrique (CreateForKeygen) est partie avec la licence. On cherche
+        // La seule fabrique (CreateForKeygen) est partie avec la licence. On cherche
         // desormais dans tout src/, pour qu'une fabrique ajoutee ailleurs demain soit vue.
         return Directory.EnumerateFiles(Path.Combine(Racine(), "src"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
@@ -131,11 +120,10 @@ public sealed class AucuneDocNePrometUnEpinglageQuiNExistePasTests
             foreach (var texte in BlocsDeCommentaires(fichier))
             {
 
-                // Premiere VERSION : elle accusait le correctif lui-meme. Le commentaire
-                // qui explique que la phrase etait fausse CITE le mot — « cette phrase disait
-                // "PINNED" ». Un crible qui ne distingue pas une citation d'une affirmation
-                // interdit d'ecrire l'histoire du defaut, c'est-a-dire la seule chose qui
-                // empeche de le refaire. Un mot entre guillemets est cite, pas promis.
+                // Un commentaire qui explique pourquoi une phrase est fausse peut CITER le mot
+                // (« "PINNED" »). Un crible qui ne distingue pas une citation d'une affirmation
+                // interdirait d'expliquer le defaut, c'est-a-dire la seule chose qui empeche de
+                // le refaire. Un mot entre guillemets est cite, pas promis.
                 var sansCitation = Regex.Replace(texte, "«[^»]*»", " ");
                 sansCitation = Regex.Replace(sansCitation, "\"[^\"]*\"", " ");
 

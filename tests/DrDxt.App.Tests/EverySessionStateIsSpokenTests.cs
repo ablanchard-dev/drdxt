@@ -7,11 +7,11 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 14/09/2026 (plan 2.4) — l'ecran de fin de session disait « RejectedUnresolved » ou « Drifted » : le nom
-// d'une enum. Chaque etat se dit maintenant par une cle de convention ; ce test exige la cle de chaque
-// valeur, en anglais et en francais, pour qu'une valeur ajoutee demain ne reparte pas brute a l'ecran.
-// Lu sans remontee aux parents (piege note dans DashboardLocalizationTests, 21/08/2026) : une cle
-// absente du resx FR rendrait sinon la phrase anglaise, et le test passerait. Vu ici par mutation.
+// Chaque etat de fin de session se dit par une cle de convention, jamais par le nom de l'enum
+// (« RejectedUnresolved », « Drifted »). Ce test exige la cle de chaque valeur, en anglais et en
+// francais, pour qu'une valeur ajoutee demain ne parte pas brute a l'ecran.
+// Lu sans remontee aux parents : sinon une cle absente du resx FR rendrait la phrase anglaise, et
+// le test passerait (verifie par mutation).
 public sealed class EverySessionStateIsSpokenTests
 {
     private static readonly ResourceManager Resources =
@@ -32,7 +32,7 @@ public sealed class EverySessionStateIsSpokenTests
     [InlineData("fr")]
     public void Every_state_the_session_can_show_has_words(string langue)
     {
-        // Temoin de lecture (18/09/2026) : sans lui, une liste d'etats devenue vide rendrait ce
+        // Temoin de lecture : sans lui, une liste d'etats devenue vide rendrait ce
         // test vert en n'ayant regarde aucun etat.
         Cles().Should().NotBeEmpty("le crible doit avoir de vrais etats a examiner");
 

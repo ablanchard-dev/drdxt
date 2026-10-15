@@ -13,21 +13,21 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// M5 manifest key-custody, APP side (review finding #2). The host already has a
-// Release counterpart (Host_InRelease_FailsClosed_EvenOnAnEmbeddedDevKeySignedManifest);
-// the App had none — so a fail-open (dropping the App's #if DEBUG fence) shipped silently.
-// These mirror the host's tests for AppManifestPublicKey / AppFailClosedManifestVerifier:
-//   * 11/09/2026 — the App has NO signer any more (the elevated helper signs with the machine's
-//     own key); a provisioned key FILE holding the dev key is refused in every config;
-//   * verifier custody is config-DEPENDENT — in RELEASE, with no provisioned key, the
-//     loader fails closed and the wired verifier REJECTS a dev-key-signed manifest; in
-//     DEBUG the team build falls back to the embedded key and verifies it.
+// Garde de la clé du manifeste, côté App. L'hôte a déjà son pendant Release
+// (Host_InRelease_FailsClosed_EvenOnAnEmbeddedDevKeySignedManifest) ;
+// l'App n'en avait pas, donc retirer sa barrière #if DEBUG ouvrait la porte sans qu'un test rougisse.
+// Ces tests reflètent ceux de l'hôte pour AppManifestPublicKey / AppReloadingManifestVerifier :
+//   * l'App n'a plus de signataire (le helper élevé signe avec la clé propre à la
+//     machine) ; un fichier de clé provisionné portant la clé de dev est refusé dans toute configuration ;
+//   * la garde du vérificateur dépend de la configuration : en Release, sans clé provisionnée,
+//     le chargeur se ferme et le vérificateur câblé rejette un manifeste signé par la clé de dev ;
+//     en Debug la version d'équipe se replie sur la clé embarquée et le vérifie.
 // -----------------------------------------------------------------------
 public sealed class AppManifestCustodyTests
 {
     private static readonly IReconcilabilityPolicy Policy = new DefaultReconcilabilityPolicy();
 
-    // ── 11/09/2026 — un fichier de cle publique provisionne qui contient la cle de DEV (config-INDEPENDENT) ──
+    // ── Un fichier de cle publique provisionne qui contient la cle de DEV (config-INDEPENDENT) ──
     //
     // L'App ne signe plus (le signataire a graine d'environnement est supprime du produit : c'est le helper
     // eleve qui signe, avec la cle de la machine). Reste la moitie verification : la cle publique lue sous
@@ -44,9 +44,9 @@ public sealed class AppManifestCustodyTests
             charge.IsOk.Should().BeFalse("une cle publique provisionnee egale a la cle de dev n'est jamais crue");
             charge.Error!.Value.Code.Should().Be(ErrorCodes.SignatureInvalid);
 
-            // Ce que l'injection de l'App en fait : le verificateur qui refuse tout, donc un manifeste signe
+            // Le verificateur que l'App injecte relit ce fichier et refuse tout, donc un manifeste signe
             // par la cle de dev ne se relit pas.
-            var verificateur = charge.IsOk ? charge.Value! : new AppFailClosedManifestVerifier();
+            var verificateur = new AppReloadingManifestVerifier(chemin, enforceTrust: false);
             (await VerifyOnly(await DevSignedManifestStorageAsync(), verificateur).LoadAsync())
                 .IsOk.Should().BeFalse();
         }
@@ -97,7 +97,7 @@ public sealed class AppManifestCustodyTests
         }
     }
 
-    // ── verifier custody (config-DEPENDENT — the heart of finding #2) ─────────────
+    // ── garde du vérificateur (dépend de la configuration) ─────────────────────────
 
 #if DEBUG
     [Fact]
@@ -126,8 +126,6 @@ public sealed class AppManifestCustodyTests
     public async Task InRelease_WiredVerifier_RejectsADevKeySignedManifest()
     {
         var verifier = WiredVerifierWithNoProvisionedKey();
-        verifier.Should().BeOfType<AppFailClosedManifestVerifier>(
-            "with no provisioned key, the RELEASE App wires the fail-closed verifier (mirrors the DI graph)");
 
         var storage = await DevSignedManifestStorageAsync();
         var loaded = await VerifyOnly(storage, verifier).LoadAsync();
@@ -142,12 +140,8 @@ public sealed class AppManifestCustodyTests
     private static string NoKeyPath()
         => Path.Combine(Path.GetTempPath(), "DrDxtNoKey_" + Guid.NewGuid().ToString("N") + ".key");
 
-    // Exactly how AppServiceCollectionExtensions wires the App's manifest verifier.
-    private static IManifestVerifier WiredVerifierWithNoProvisionedKey()
-    {
-        var v = AppManifestPublicKey.LoadVerifier(NoKeyPath());
-        return v.IsOk ? v.Value! : new AppFailClosedManifestVerifier();
-    }
+    // Exactement comme AppServiceCollectionExtensions câble le vérificateur de manifeste de l'App.
+    private static IManifestVerifier WiredVerifierWithNoProvisionedKey() => new AppReloadingManifestVerifier(NoKeyPath());
 
     private static async Task<InMemoryManifestStorage> DevSignedManifestStorageAsync()
     {

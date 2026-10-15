@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        # 06/10/2026 : l'historique entier. Le test d'hygiene relit tous les messages de commit ; un clone a 1 commit
+        # L'historique entier. Le test d'hygiene relit tous les messages de commit ; un clone a 1 commit
         # lui en donnait 6 et il echouait (« plus de mille commits attendus »).
         with:
           fetch-depth: 0
@@ -34,9 +34,8 @@ jobs:
       - name: Build (Release)
         run: dotnet build DrDXT.sln --configuration Release --no-restore
 
-      # Les outils de tools/ restent hors solution (smokes lancés à la main), donc aucune étape ne les
-      # compilait : ils pouvaient casser sans bruit. Le 27/09/2026, compilés à la main, ils ont rendu
-      # 3 avertissements, dont une constante morte. Le dépôt en suit 33 : r2apply reste local, ignoré exprès. Compilés ici sans être lancés, avertissements en
+      # Les outils de tools/ restent hors solution (smokes lancés à la main) : sans cette étape, rien ne les
+      # compilerait et ils pourraient casser sans bruit. Le dépôt en suit 33 : r2apply reste local, ignoré exprès. Compilés ici sans être lancés, avertissements en
       # erreurs ; un outil ajouté demain est pris sans modifier ce fichier.
       - name: Build tools hors solution
         shell: pwsh
@@ -111,7 +110,7 @@ jobs:
           --configuration Release --no-build --verbosity normal
           --filter "Category=SecurityGate" -- RunConfiguration.TreatNoTestsAsError=true
 
-      # 06/10/2026 (chantier B8b, S6) : les 5 machines de tests/Shared/machines (référence, sans droits
+      # Les 5 machines de tests/Shared/machines (référence, sans droits
       # administrateur, AMD, Intel Arc, portable) rejouées par le scan et l'écran, sans matériel. Un seul PC réel existe :
       # c'est la seule preuve qu'une autre machine n'obtient pas de phrase fausse. Un filtre vide rougit.
       - name: Gate — machines-fixtures (5 machines rejouées sans matériel)
@@ -121,7 +120,7 @@ jobs:
           --configuration Release --no-build --verbosity normal
           --filter "FullyQualifiedName~MachinesEnregistreesTests" -- RunConfiguration.TreatNoTestsAsError=true
 
-      # 18/09/2026 — un rouge doit rester NOMMABLE.
+      # Un rouge doit rester NOMMABLE.
       #
       # `dotnet test DrDXT.sln` a rendu ce jour-la 1 rouge sur 4 366, dans
       # DrDxt.Integration.Tests ; le meme projet lance seul repassait vert, et huit
@@ -141,9 +140,9 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      # Reste ADVISORY, volontairement : au 06/09/2026 l'un des trois avis
-      # (GHSA-2m69-gcr7-jv3q, SQLite embarque) n'a AUCUNE version corrigee publiee. Un gate dur ici
-      # serait un gate qu'on ne peut pas passer, donc un gate qu'on desactive — et un gate desactive
+      # Reste ADVISORY, volontairement : l'un des trois avis (GHSA-2m69-gcr7-jv3q, SQLite embarque)
+      # n'avait aucune version corrigee publiee au 06/09/2026. Un gate dur ici
+      # serait un gate qu'on ne peut pas passer, donc un gate qu'on desactive, et un gate desactive
       # ment mieux qu'un gate absent. Ce qui est DUR, c'est le tri : voir l'etape suivante.
       - name: Dependency vulnerability audit
         run: dotnet list DrDXT.sln package --vulnerable --include-transitive
@@ -179,13 +178,20 @@ jobs:
       - name: Gate — every guard named in the table has a real test
         run: python tools/nonuisance/check-guard-tests.py docs/NON-NUISANCE.md docs/RAPPORT-VERIFICATION.md
 
-      # 18/09/2026 - Les quatre gates de `tools/gates/` existaient, avec leur `--autotest`, et
-      # AUCUN n'etait lance par quoi que ce soit : la CI ne connaissait que `tools/nonuisance/`,
-      # et GATES.md demandait au mainteneur de lancer les autres a la main. Un gate que personne ne
-      # lance ne garde rien. Celui qui BLOQUE tient, celui qui RAPPELLE meurt.
-      # Un test de la suite (`UnGardeQuePersonneNeLanceNeGardeRienTests`) tient desormais les
+      # Les quatre gates de `tools/gates/` tournent ici, avec leur `--autotest` : un gate que
+      # personne ne lance ne garde rien. Celui qui bloque tient, celui qui rappelle meurt.
+      # Un test de la suite (`UnGardeQuePersonneNeLanceNeGardeRienTests`) tient les
       # deux sens : un gate ajoute et non branche fait rougir, une entree qui cite un script
       # absent aussi.
+      # Chaque gate se verifie d'abord lui-meme : un autotest jamais lance peut cesser de passer
+      # sans que rien ne le dise.
+      - name: Gates — autotests
+        run: |
+          python tools/gates/ages.py --autotest
+          python tools/gates/liens.py --autotest
+          python tools/gates/hors_ci.py --autotest
+          python tools/gates/compte_des_tests.py --autotest
+
       - name: Gate — les dates de GATES.md sont lisibles (ages.py)
         run: python tools/gates/ages.py
 

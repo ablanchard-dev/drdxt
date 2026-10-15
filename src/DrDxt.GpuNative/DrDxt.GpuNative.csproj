@@ -1,32 +1,34 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Leaf project: the SINGLE verified GPU native boundaries —
-         • AMD: AdlxNative + AdlxVtableSlots + IAdlxNative (DrDxt.Detection.Gpu.Adlx
-           namespace; ADLX-SLOTS.md carries the per-slot citation), and
-         • NVIDIA: NvApiNative + INvApiNative (+ NvApiEntry / structs / status /
-           NvApiConvert) in the DrDxt.GpuNative.NvApi namespace.
-       Both boundaries carry BOTH the reads (non-elevated) AND the writes, so the
-       verified vtable slots / reverse-engineered function IDs + write recipe have ONE
-       copy, never a divergent duplicate. Zero project references, zero NuGet — only
-       System.Runtime.InteropServices / System.Runtime.Versioning from the framework.
-       Referenced by DrDxt.Detection (the non-elevated readers) and DrDxt.ElevatedHelper
-       (the write orchestrators). The leaf must NEVER reference the helper. -->
+  <!-- Projet feuille : les uniques frontières natives GPU vérifiées :
+         • AMD : AdlxNative + AdlxVtableSlots + IAdlxNative (espace de noms
+           DrDxt.Detection.Gpu.Adlx ; ADLX-SLOTS.md porte la citation par emplacement), et
+         • NVIDIA : NvApiNative + INvApiNative (+ NvApiEntry / structs / statut /
+           NvApiConvert) dans l'espace de noms DrDxt.GpuNative.NvApi.
+       Les deux frontières portent les lectures (non élevées) et les écritures, pour que les
+       emplacements de vtable vérifiés / ids de fonction rétro-ingéniés + recette d'écriture n'aient
+       qu'une copie, jamais un doublon divergent. Aucune référence de projet, aucun NuGet : seulement
+       System.Runtime.InteropServices / System.Runtime.Versioning du framework.
+       Référencé par DrDxt.Detection (les lecteurs non élevés) et DrDxt.ElevatedHelper
+       (les orchestrateurs d'écriture). La feuille ne doit jamais référencer le helper. -->
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- PAWN1 (09/10/2026) puis B1 (10/10/2026) : modules de namazso/PawnIO.Modules, publication 0.2.11 (LGPL-2.1+,
+    <!-- Modules de namazso/PawnIO.Modules, publication 0.2.11 (LGPL-2.1+,
          third_party/pawnio-modules), figes par empreinte dans PawnIoIntel. IntelMSR lit les registres et ecrit la limite
          de puissance ; IntelMCHBAR lit la copie MMIO de cette limite. -->
     <EmbeddedResource Include="PawnIo\IntelMSR.bin" LogicalName="DrDxt.GpuNative.PawnIo.IntelMSR.bin" />
     <EmbeddedResource Include="PawnIo\IntelMCHBAR.bin" LogicalName="DrDxt.GpuNative.PawnIo.IntelMCHBAR.bin" />
+    <!-- LpcIO (même publication 0.2.11) lit les ventilateurs par la puce Super I/O de la carte mère. -->
+    <EmbeddedResource Include="PawnIo\LpcIO.bin" LogicalName="DrDxt.GpuNative.PawnIo.LpcIO.bin" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The interop structs / entry / status / conversions are INTERNAL to the leaf;
-         the struct-size, finder, entry and conversion freeze-tests live in
-         DrDxt.GpuNative.Tests (the only consumer that needs the internals). -->
+    <!-- Les structs d'interop / l'entrée / le statut / les conversions sont internes à la feuille ;
+         les tests de gel de taille de struct, de chercheur, d'entrée et de conversion vivent dans
+         DrDxt.GpuNative.Tests (le seul consommateur qui a besoin des internes). -->
     <InternalsVisibleTo Include="DrDxt.GpuNative.Tests" />
   </ItemGroup>
 

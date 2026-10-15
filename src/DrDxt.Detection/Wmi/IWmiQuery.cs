@@ -14,8 +14,8 @@ public sealed record WmiRow(IReadOnlyDictionary<string, object?> Properties)
         return v switch
         {
             int i => i,
-            // 04/10/2026 : WMI rend les UInt16 (BusType, MediaType…) et les UInt8 tels quels ; sans ces deux lignes,
-            // toute propriété de ces types se lisait « absente ».
+            // WMI rend les UInt16 (BusType, MediaType…) et les UInt8 tels quels ; sans ces deux lignes,
+            // toute propriété de ces types passerait pour « absente ».
             ushort us => us,
             short sh => sh,
             byte by => by,

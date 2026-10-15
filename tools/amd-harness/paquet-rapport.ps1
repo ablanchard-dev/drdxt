@@ -2,9 +2,9 @@
 <#
 .SYNOPSIS
     07/10/2026 : fabrique le zip du RAPPORT EN LECTURE SEULE pour un joueur (machine AMD ou autre).
-    (Le zip de juillet, session d'écriture retirée par la règle du 29/09, et son script sont supprimés.)
+    (Le zip de juillet, session d'écriture retirée par la règle de la carte, et son script sont supprimés.)
     Dossier publié, pas un exe en un seul fichier : un exe qui se décompresse dans %TEMP% au lancement
-    est ce que les antivirus aiment le moins (revue n° 8).
+    est ce que les antivirus aiment le moins.
 #>
 [CmdletBinding()]
 # -Validation : le zip de la validation complète (écrit puis remet d'origine), à envoyer peu avant la mise en public.
@@ -17,7 +17,7 @@ if (Test-Path $pub) { Remove-Item $pub -Recurse -Force }
 dotnet publish (Join-Path $ici 'DrDxt.AmdHarness\DrDxt.AmdHarness.csproj') -c Release -r win-x64 --self-contained -o $pub -nodeReuse:false -v q
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish a échoué ($LASTEXITCODE)" }
 Rename-Item (Join-Path $pub 'DrDxt.AmdHarness.exe') 'DrDXT-Test.exe'
-# 10/10/2026 (revue de sécurité) : le lanceur natif reçoit l'élévation et démarre le banc avec un environnement reconstruit.
+# Le lanceur natif reçoit l'élévation et démarre le banc avec un environnement reconstruit.
 # NativeAOT cherche vswhere.exe sur le PATH (cible Microsoft.NETCore.Native) : le dossier de l'installeur Visual Studio y passe.
 $vsInstaller = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
 if (Test-Path $vsInstaller) { $env:PATH = "$vsInstaller;$env:PATH" }

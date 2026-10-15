@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Display;
 
-// 06/10/2026 (chantier B2) : l'écran annonce dans son EDID les fréquences qu'il tient à sa résolution ; quand
+// L'écran annonce dans son EDID les fréquences qu'il tient à sa résolution ; quand
 // Windows en propose moins, quelque chose entre la carte et l'écran bride (câble, port, pilote). EDID relevés le 06/10 sur
 // la machine de référence, numéros de série effacés.
 public sealed class EcranBrideTests
@@ -70,7 +70,7 @@ public sealed class EcranBrideTests
         EdidDuMoniteur.Instance("pas un nom d'interface").Should().BeNull();
     }
 
-    // Revue F-17 : la tolérance d'arrondi est un bord, il se teste.
+    // La tolérance d'arrondi est un bord, il se teste.
     [Fact]
     public void Un_hertz_d_ecart_est_un_arrondi_deux_sont_une_bride()
     {
@@ -78,12 +78,12 @@ public sealed class EcranBrideTests
         EcranBride.Juger(198, 200, 10).Should().NotBeNull();
     }
 
-    // F-16 : la cause la plus fréquente, et la seule gratuite : le menu de l'écran.
+    // La cause la plus fréquente, et la seule gratuite : le menu de l'écran.
     [Fact]
     public void Le_menu_de_l_ecran_est_nomme_avant_le_cable()
         => EcranBride.Juger(144, 200, 10)!.Explication.Should().Contain("menu de l'écran");
 
-    // F-14 : une dalle de portable (DisplayPort embarqué, ou sortie interne) n'a ni câble ni port à changer.
+    // Une dalle de portable (DisplayPort embarqué, ou sortie interne) n'a ni câble ni port à changer.
     [Theory]
     [InlineData(11u)]
     [InlineData(0x8000000Bu)]
@@ -91,12 +91,12 @@ public sealed class EcranBrideTests
     public void Une_dalle_interne_n_envoie_pas_changer_de_cable(uint sortie)
         => EcranBride.Juger(60, 165, sortie)!.Explication.Should().NotContain("câble").And.Contain("dalle");
 
-    // F-15 : en écrans dupliqués, Windows ne propose que les modes communs : ce n'est pas une bride.
+    // En écrans dupliqués, Windows ne propose que les modes communs : ce n'est pas une bride.
     [Fact]
     public void Des_ecrans_dupliques_ne_sont_pas_juges()
         => EcranBride.Comparer(Asus, (_, _) => 144, 10, duplique: true).Should().BeNull();
 
-    // F-18 : un EDID illisible est un « non lu » compté, pas un silence.
+    // Un EDID illisible est un « non lu » compté, pas un silence.
     [Fact]
     public void Un_EDID_illisible_se_dit_non_lu()
     {

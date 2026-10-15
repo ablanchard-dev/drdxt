@@ -24,7 +24,7 @@ public interface IBootPerformanceLog
 }
 
 /// <summary>
-/// 25/09/2026 — le « docteur » : ce qui ralentit le demarrage, tel que WINDOWS l'a mesure, et non
+/// Le « docteur » : ce qui ralentit le demarrage, tel que Windows l'a mesure, et non
 /// une liste de programmes au demarrage suspectes d'avance. Le journal
 /// Microsoft-Windows-Diagnostics-Performance/Operational porte, evenement 101, la phrase de Windows :
 /// « Le démarrage de cette application a été plus long que l'habitude ce qui a entraîné une
@@ -43,22 +43,20 @@ public static class DemarrageMesure
     private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
     private static string F(FormattableString s) => s.ToString(Fr);
 
-    public const string Source = "journal Microsoft-Windows-Diagnostics-Performance/Operational, événements 100 et 101";
+    public static string Source => Docteur.T("BP.Source");
 
     public static IReadOnlyList<RepairFinding> Juger(IReadOnlyList<MesureDemarrage> mesures, DateTimeOffset maintenant, TimeSpan fenetre)
     {
         var dernier = mesures.Where(m => m.EstLeDemarrage).MaxBy(m => m.Quand);
         if (dernier is null)
             return [new RepairFinding("DEMARRAGE", "mesure de Windows", null, null, RepairStatus.Unknown,
-                "Windows n'a enregistré aucune mesure de démarrage sur ce PC : DrDXT ne peut rien en dire.")];
+                Docteur.T("BP.Aucune"))];
 
         if (maintenant - dernier.Quand > fenetre)
-            // Observed et non Unknown : la mesure a ete LUE, elle est seulement perimee. Unknown la rangeait
-            // dans « Non lus » du rapport (vu dans le rapport reel du 25/09), ce qui etait faux.
-            return [new RepairFinding("DEMARRAGE", "mesure de Windows", F($"périmée, la dernière date du {dernier.Quand.ToLocalTime():dd/MM/yyyy}"),
-                null, RepairStatus.Observed,
-                F($"Windows n'a plus mesuré de démarrage depuis le {dernier.Quand.ToLocalTime():dd/MM/yyyy}. Ce qu'il ")
-                + "en disait alors ne décrit plus ce PC : DrDXT ne cite pas ces chiffres.")];
+            // Observed et non Unknown : la mesure a ete lue, elle est seulement perimee. Unknown la rangerait
+            // dans « Non lus » du rapport, ce qui serait faux.
+            return [new RepairFinding("DEMARRAGE", "mesure de Windows", Docteur.T("BP.Perimee", dernier.Quand.ToLocalTime()),
+                null, RepairStatus.Observed, Docteur.T("BP.PerimeeExplication", dernier.Quand.ToLocalTime()))];
 
         // Les applications du dernier demarrage mesure : celles qui l'ont ralenti ce jour-la.
         var jour = dernier.Quand.ToLocalTime().Date;
@@ -71,21 +69,19 @@ public static class DemarrageMesure
 
         var constats = new List<RepairFinding>
         {
-            new("DEMARRAGE", "mesure de Windows", F($"{dernier.DureeMs / 1000.0:0.0} s le {dernier.Quand.ToLocalTime():dd/MM/yyyy}"),
-                null, RepairStatus.Observed,
-                $"durée du dernier démarrage mesuré par Windows. {lentes.Count} application(s) l'ont ralenti selon lui."),
+            new("DEMARRAGE", "mesure de Windows", Docteur.T("BP.Duree", dernier.DureeMs / 1000.0, dernier.Quand.ToLocalTime()),
+                null, RepairStatus.Observed, Docteur.T("BP.DureeExplication", lentes.Count)),
         };
         constats.AddRange(lentes.Select(m => new RepairFinding("DEMARRAGE", m.Nom,
-            F($"+{m.DegradationMs / 1000.0:0.0} s"), null, RepairStatus.Observed,
-            "Windows note que son démarrage « a été plus long que l'habitude » et a retardé celui du système "
-            + F($"de {m.DegradationMs / 1000.0:0.0} s. C'est la mesure de Windows, pas un jugement de DrDXT."))));
+            Docteur.T("BP.Plus", m.DegradationMs / 1000.0), null, RepairStatus.Observed,
+            Docteur.T("BP.Lente", m.DegradationMs / 1000.0))));
         return constats;
     }
 
     /// <summary>
-    /// 25/09/2026 — l'autre mesure du demarrage, celle que Windows ecrit encore quand l'evenement 100
-    /// ne vient plus (machine de reference : plus aucun depuis le 31/07/2025, cause inconnue).
-    /// Kernel-Boot 30 porte les temps que le BIOS publie dans sa table ACPI FPDT, a CHAQUE allumage,
+    /// L'autre mesure du demarrage, celle que Windows ecrit encore quand l'evenement 100
+    /// ne vient plus (releve sur la machine de reference : plus aucun depuis le 31/07/2025, cause inconnue).
+    /// Kernel-Boot 30 porte les temps que le BIOS publie dans sa table ACPI FPDT, a chaque allumage,
     /// demarrage rapide compris. Unite prouvee sur la machine de reference : StartOSImageStart du
     /// 23/09/2026 = 11 386 = FwPOSTTime, le « Dernier temps BIOS » du Gestionnaire des taches, en ms.
     /// Aucun seuil : DrDXT n'a pas de source pour dire a partir de quand ce temps est « trop long ».
@@ -94,16 +90,14 @@ public static class DemarrageMesure
     {
         if (allumages.Count == 0)
             return [new RepairFinding("BIOS", "temps du BIOS", null, null, RepairStatus.Unknown,
-                "le BIOS de ce PC ne publie pas ses temps d'allumage à Windows : DrDXT ne peut rien en dire.")];
+                Docteur.T("BP.BiosNePubliePas"))];
 
         var dernier = allumages.MaxBy(a => a.Quand)!;
         var min = allumages.Min(a => a.BiosMs) / 1000.0;
         var max = allumages.Max(a => a.BiosMs) / 1000.0;
-        var plage = allumages.Count > 1 ? F($" ({min:0.0} à {max:0.0} s sur les {allumages.Count} derniers)") : "";
-        return [new RepairFinding("BIOS", "temps du BIOS", F($"{dernier.BiosMs / 1000.0:0.0} s"), null, RepairStatus.Observed,
-            F($"mesuré par le BIOS lui-même à l'allumage du {dernier.Quand.ToLocalTime():dd/MM/yyyy}{plage}, avant que ")
-            + F($"Windows ne démarre ; le chargeur de Windows a pris ensuite {dernier.ChargeurMs / 1000.0:0.0} s. ")
-            + "C'est le « Dernier temps BIOS » du Gestionnaire des tâches. Aucun réglage de Windows ne le change.")];
+        var plage = allumages.Count > 1 ? Docteur.T("BP.Plage", min, max, allumages.Count) : "";
+        return [new RepairFinding("BIOS", "temps du BIOS", Docteur.T("BP.Secondes", dernier.BiosMs / 1000.0), null, RepairStatus.Observed,
+            Docteur.T("BP.Bios", dernier.Quand.ToLocalTime(), plage, dernier.ChargeurMs / 1000.0))];
     }
 }
 

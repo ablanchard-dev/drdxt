@@ -20,7 +20,7 @@ public sealed record LogicalProcessor(
     bool Parque);
 
 /// <summary>
-/// La carte reelle des coeurs — sans jamais coder « CPU 0-15 = P-core ».
+/// La carte reelle des coeurs, sans jamais coder « CPU 0-15 = P-core ».
 ///
 /// Un i7-14700F melange huit coeurs performants et douze coeurs efficaces. Un tableau statique
 /// d'index serait faux sur la machine suivante, faux apres une mise a jour de firmware, et faux sur
@@ -28,16 +28,16 @@ public sealed record LogicalProcessor(
 /// `EfficiencyClass` par processeur logique.
 ///
 /// **`EfficiencyClass` est un ordre, pas un nom.** Windows ne dit ni « P-core » ni « E-core » :
-/// il dit « cette classe est plus performante que celle-la ». Ce fichier respecte ca — il parle de
-/// classe haute et BASSE, et laisse le vocabulaire marketing dehors. Sur un CPU homogene il n'y a
+/// il dit « cette classe est plus performante que celle-la ». Ce fichier respecte ca : il parle de
+/// classe haute et basse, et laisse le vocabulaire marketing dehors. Sur un CPU homogene il n'y a
 /// qu'une seule classe, et c'est une reponse valide.
 ///
 /// `Parque` est un etat instantane, pas une configuration. Mesure du 08/09/2026 : trois lectures
 /// a quelques secondes d'ecart rendaient « 19, 20 », « 20 », « 19, 20 », et « aucun » pendant que
 /// le jeu tournait.
 ///
-/// FAIL-CLEAN : ne leve jamais ; une lecture impossible rend une liste vide, et l'appelant doit
-/// traiter « vide » comme Unknown — jamais comme « un seul coeur ».
+/// Échec propre : ne leve jamais ; une lecture impossible rend une liste vide, et l'appelant doit
+/// traiter « vide » comme Unknown, jamais comme « un seul coeur ».
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class CpuTopology
@@ -57,7 +57,7 @@ public sealed class CpuTopology
     private const byte DrapeauParque = 0x01;
     private const uint OctetsMaximum = 1 << 20;
 
-    /// <summary>Tous les processeurs logiques. Liste vide quand la lecture echoue — et « vide »
+    /// <summary>Tous les processeurs logiques. Liste vide quand la lecture echoue, et « vide »
     /// veut dire Unknown, jamais « un seul coeur ».</summary>
     public IReadOnlyList<LogicalProcessor> Lire()
     {
@@ -111,7 +111,7 @@ public sealed class CpuTopology
         carte.Select(p => p.ClasseEfficacite).Distinct().OrderByDescending(x => x).ToList();
 
     /// <summary>Un processeur logique par cœur physique de la classe la plus rapide, groupe 0 seulement (hors du groupe 0
-    /// le masque d'affinité change de sens). 04/10/2026 : sorti du câblage de l'App pour que le banc processeur et le
+    /// le masque d'affinité change de sens). Sorti du câblage de l'App pour que le banc processeur et le
     /// relevé des parties lisent les mêmes cœurs ; sinon leurs fréquences ne se comparent pas.</summary>
     public static IReadOnlyList<int> CoeursRapides(IReadOnlyList<LogicalProcessor> carte)
     {
@@ -125,7 +125,7 @@ public sealed class CpuTopology
             .ToList();
     }
 
-    /// <summary>Le nom PRUDENT d'une classe. On ne dit « P-core » ni « E-core » nulle part : la
+    /// <summary>Le nom prudent d'une classe. On ne dit « P-core » ni « E-core » nulle part : la
     /// seule chose que Windows garantit est un ordre relatif.</summary>
     public static string NommerClasse(byte classe, IReadOnlyList<byte> classes)
     {

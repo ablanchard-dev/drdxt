@@ -16,7 +16,7 @@ using DrDxt.Measurement.Memory;
 //          Protocole dans docs/INSTRUMENTS.md : machine AU REPOS, meme protocole avant et apres.
 // ─────────────────────────────────────────────────────────────────────────────────────────
 
-// 24/09/2026 — `--stabilite <Go> <secondes>` : le test memoire EN SESSION du produit, sans redemarrer.
+// `--stabilite <Go> <secondes>` : le test memoire EN SESSION du produit, sans redemarrer.
 if (args.Length > 0 && args[0] == "--stabilite")
 {
     var go = args.Length > 1 && int.TryParse(args[1], out var g) ? g : 4;

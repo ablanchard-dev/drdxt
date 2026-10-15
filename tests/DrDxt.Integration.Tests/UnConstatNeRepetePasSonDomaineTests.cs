@@ -4,8 +4,8 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 25/09/2026 : vu sur photo, « Mémoire : overclock actif… » sous le titre « Mémoire », et
-/// dans le rapport « Mémoire · à savoir : Mémoire : overclock… ». Un constat s'affiche toujours sous son
+/// Pas de « Mémoire : overclock actif… » sous le titre « Mémoire », ni de « Mémoire · à savoir : Mémoire :
+/// overclock… » dans le rapport. Un constat s'affiche toujours sous son
 /// domaine, à l'écran comme dans le rapport : son texte ne le répète pas.
 /// </summary>
 public sealed class UnConstatNeRepetePasSonDomaineTests

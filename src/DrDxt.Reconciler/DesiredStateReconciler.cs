@@ -3,26 +3,25 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// Reconciler — the core IReconciler (DrDxt.Core).
+// Reconciler : l'IReconciler central (DrDxt.Core).
 //
-// Given a verified manifest (the host loads it via IDesiredStateStore.LoadAsync,
-// which fails-closed on tamper), it reconciles item-by-item:
-//   1. global kill-switch OR item paused           → skip write (I7), continue
-//   2. tweak not allowlisted / protected surface    → refuse + security log (I3)
-//   3. read current; probe fail                      → item KO (I2), continue
-//   4. current == desired                            → NO-OP (idempotence I1)
-//   5. drift → classify:
-//        WindowsReset    → re-apply via existing typed op, read-BACK to confirm,
-//                          log Change (I2 compare-and-set); GPU-tuning items are
-//                          SUSPENDED if the boot-loop guard says so (T27b)
-//        UserIntentional → NOTIFY, do not overwrite (I5)
-//        Unknown         → conservative: notify, do not overwrite by default
-//   6. aggregate: any KO → Fail(RECONCILE_PARTIAL) listing the KO ids; else Ok.
+// À partir d'un manifeste vérifié (l'hôte le charge via IDesiredStateStore.LoadAsync, qui
+// refuse au moindre doute en cas d'altération), il réconcilie élément par élément :
+//   1. coupe-circuit global ou élément en pause      → pas d'écriture (I7), on continue
+//   2. levier hors allowlist / surface protégée       → refus + journal de sécurité (I3)
+//   3. lire l'actuel ; échec de sonde                  → élément KO (I2), on continue
+//   4. actuel == voulu                                 → rien à faire (idempotence I1)
+//   5. dérive → classer :
+//        WindowsReset    → réappliquer par l'op typée existante, relire pour confirmer,
+//                          journaliser le changement (I2 compare-and-set) ; les réglages GPU
+//                          sont suspendus si la garde anti-boucle de démarrage le dit (T27b)
+//        UserIntentional → notifier, ne pas écraser (I5)
+//        Unknown         → prudence : notifier, ne pas écraser par défaut
+//   6. bilan : un KO → Fail(RECONCILE_PARTIAL) avec la liste des ids KO ; sinon Ok.
 //
-// SECURITY: re-apply only ever happens through IElevatedReapplyClient, which maps a
-// validated tweakId to an existing typed PrivilegedOp — never a new privileged
-// primitive. A tweakId not in the verified manifest's allowlisted set is refused
-// before any IPC.
+// Sécurité : la réapplication ne passe jamais que par IElevatedReapplyClient, qui traduit un
+// tweakId validé en une PrivilegedOp typée existante, jamais une nouvelle primitive
+// privilégiée. Un tweakId hors de l'ensemble admis du manifeste vérifié est refusé avant tout IPC.
 // -----------------------------------------------------------------------
 public sealed class DesiredStateReconciler : IReconciler
 {
@@ -62,8 +61,8 @@ public sealed class DesiredStateReconciler : IReconciler
     }
 
     // -------------------------------------------------------------------
-    // The orchestration entry point. Returns a Result AND publishes a structured
-    // ReconcileReport via the out-of-band overload below.
+    // Le point d'entrée de l'orchestration. Rend un Result et publie un ReconcileReport
+    // structuré par la surcharge à part ci-dessous.
     // -------------------------------------------------------------------
     public async Task<Result> ReconcileAsync(DesiredState desired, CancellationToken ct)
     {
@@ -71,22 +70,22 @@ public sealed class DesiredStateReconciler : IReconciler
         return result;
     }
 
-    /// <summary>Same as <see cref="ReconcileAsync"/> but also returns the structured
-    /// report (what drifted / re-applied / notified / failed). Host uses this.</summary>
+    /// <summary>Comme <see cref="ReconcileAsync"/>, mais rend aussi le rapport structuré
+    /// (ce qui a dérivé / été réappliqué / notifié / échoué). L'hôte s'en sert.</summary>
     public async Task<(Result result, ReconcileReport report)> ReconcileWithReportAsync(
         DesiredState desired, CancellationToken ct)
     {
         var stateRes = await _stateStore.LoadAsync(ct);
-        // 26/09/2026 : un etat illisible etait remplace par l'etat par defaut (non suspendu) : la passe
+        // Un etat illisible etait remplace par l'etat par defaut (non suspendu) : la passe
         // reappliquait, puis ecrivait ce defaut par-dessus, et une pause du joueur disparaissait sur une
         // panne de lecture. Etat inconnu = rien d'ecrit, ni sur la machine ni dans l'etat.
         if (!stateRes.IsOk)
             return (Result.Fail(stateRes.Error!.Value.Code,
-                    "État du réconciliateur illisible : rien n'est réappliqué. " + stateRes.Error.Value.Message),
+                    Docteur.T("DSR.Illisible", stateRes.Error.Value.Message)),
                 new ReconcileReport(GloballyPaused: false, Array.Empty<ReconcileItemResult>()));
         var state = stateRes.Value!;
 
-        // Global kill-switch: compare nothing, write nothing, report paused (I7/T24).
+        // Coupe-circuit global : rien comparer, rien écrire, rapporter la pause.
         if (state.GlobalPaused)
         {
             var pausedReport = new ReconcileReport(GloballyPaused: true, Array.Empty<ReconcileItemResult>());
@@ -108,9 +107,9 @@ public sealed class DesiredStateReconciler : IReconciler
 
         var report = new ReconcileReport(GloballyPaused: false, results);
 
-        // Persist sidecar bookkeeping for the next pass / the UI (§5). This is the
-        // mutable sidecar — not the signed manifest. Best-effort: a save failure does
-        // not change the reconcile outcome (the writes already happened).
+        // Enregistrer la comptabilité du sidecar pour la passe suivante / l'interface. C'est le
+        // sidecar modifiable, pas le manifeste signé. Au mieux : un échec d'enregistrement ne change
+        // pas l'issue de la réconciliation (les écritures ont déjà eu lieu).
         await PersistBookkeepingAsync(state, results, ct);
 
         var final = failedIds.Count == 0
@@ -127,30 +126,27 @@ public sealed class DesiredStateReconciler : IReconciler
         var currentBuild = _buildProbe.ReadCurrentBuild();
         var buildToken = currentBuild.IsOk ? currentBuild.Value! : string.Empty;
 
-        // Corrige LE 11/09/2026 — le signal pilote ne s'etait jamais declenche.
+        // Le signal pilote se rafraichit ici, comme le build.
         //
-        // Cette methode rafraichissait `LastSeenBuild` depuis la sonde, mais RECOPIAIT
-        // `LastSeenDriverVersion` depuis l'item precedent. Or aucun autre endroit de `src/`
-        // n'ecrivait jamais ce champ : il naissait vide et le restait a perpetuite. Et
-        // `Classify` garde sa branche pilote derriere `!string.IsNullOrEmpty(item.LastSeenDriverVersion)`
-        // — donc un reglage GPU remis a zero par une mise a jour de pilote n'etait jamais
-        // classe `WindowsReset` : il tombait en `Unknown` et etait NOTIFIE au lieu d'etre
-        // reapplique. La revalidation apres reboot marchait (le build, lui, est ecrit) ; la
-        // revalidation apres changement de pilote etait une branche morte.
+        // Aucun autre endroit de `src/` n'ecrit `LastSeenDriverVersion`. Si cette methode le recopiait
+        // depuis l'item precedent, il naitrait vide et le resterait ; or `Classify` garde sa branche
+        // pilote derriere `!string.IsNullOrEmpty(item.LastSeenDriverVersion)` : un reglage GPU remis a
+        // zero par une mise a jour de pilote ne serait jamais classe `WindowsReset`, il tomberait en
+        // `Unknown` et serait notifie au lieu d'etre reapplique.
         //
-        // Les tests T8b/T8c etaient VERTS pendant ce temps : ils posaient `lastDriver` a la main
-        // dans l'etat initial, une valeur que le produit ne produisait pas. Un test peut nommer une
-        // garantie sans la prouver — d'ou le test a deux passes qui accompagne cette correction.
+        // Un test qui pose `lastDriver` a la main dans l'etat initial (T8b/T8c) reste vert sans que le
+        // produit ecrive la valeur : un test peut nommer une garantie sans la prouver, d'ou le test a
+        // deux passes.
         //
-        // Une lecture par VENDEUR, memorisee : un item sans vendeur n'en demande aucune, et dix
+        // Une lecture par vendeur, memorisee : un item sans vendeur n'en demande aucune, et dix
         // items NVIDIA n'en demandent qu'une (la sonde reelle interroge WMI).
         var versionsParVendeur = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
         var byId = state.Items.ToDictionary(i => i.TweakId, StringComparer.Ordinal);
         foreach (var r in results)
         {
-            // Preserve the existing item's flags (Paused) so we never clobber the
-            // kill-switch; only refresh the reconcile bookkeeping.
+            // Garder les drapeaux de l'élément existant (Paused) pour ne jamais écraser le
+            // coupe-circuit ; ne rafraîchir que la comptabilité de réconciliation.
             byId.TryGetValue(r.TweakId, out var prev);
 
             var vendeur = _policy.VendorFor(r.TweakId);
@@ -167,7 +163,7 @@ public sealed class DesiredStateReconciler : IReconciler
                 Paused: prev?.Paused ?? false,
                 LastSeenBuild: buildToken.Length > 0 ? buildToken : prev?.LastSeenBuild ?? string.Empty,
                 // Meme prudence que pour le build : une lecture muette garde le jeton precedent
-                // plutot que de l'effacer — effacer reviendrait a desarmer le signal a la premiere
+                // plutot que de l'effacer : effacer reviendrait a desarmer le signal a la premiere
                 // passe ou WMI ne repond pas.
                 LastSeenDriverVersion: string.IsNullOrEmpty(versionPilote)
                     ? prev?.LastSeenDriverVersion ?? string.Empty
@@ -185,7 +181,7 @@ public sealed class DesiredStateReconciler : IReconciler
     {
         var id = tweak.TweakId;
 
-        // (2) SECURITY: only allowlisted, non-protected, OS-side surfaces (I3, T20/T22).
+        // (2) Sécurité : seulement des surfaces côté OS, admises et non protégées.
         if (_policy.IsProtected(id))
         {
             _log.Change(id, "?", "?", "DrDXT/refused-protected");
@@ -202,7 +198,7 @@ public sealed class DesiredStateReconciler : IReconciler
 
         var item = FindItem(state, id);
 
-        // (1) per-item kill-switch: read for diagnostics, never re-apply (I7/T23).
+        // (1) coupe-circuit par élément : lu pour le diagnostic, jamais de réapplication.
         if (item is { Paused: true })
         {
             var paused = await _probe.ReadCurrentValueAsync(id, ct);
@@ -211,14 +207,14 @@ public sealed class DesiredStateReconciler : IReconciler
             return new ReconcileItemResult(id, ItemOutcome.Skipped, null, cur, null);
         }
 
-        // (3) read current value.
+        // (3) lire la valeur actuelle.
         var read = await _probe.ReadCurrentValueAsync(id, ct);
         if (!read.IsOk)
             return new ReconcileItemResult(id, ItemOutcome.Failed, null, null, read.Error);
 
         var current = read.Value!;
 
-        // (4) idempotence: already desired → no write, no Change (I1).
+        // (4) idempotence : déjà à la valeur voulue → aucune écriture, aucun Change (I1).
         if (string.Equals(current, tweak.DesiredValueJson, StringComparison.Ordinal))
             return new ReconcileItemResult(id, ItemOutcome.NoOp, null, current, null);
 
@@ -235,7 +231,7 @@ public sealed class DesiredStateReconciler : IReconciler
             case DriftCause.UserIntentional:
             case DriftCause.Unknown:
             default:
-                // Conservative: notify, never overwrite a user choice silently (I5/§16).
+                // Prudence : notifier, ne jamais écraser en silence un choix de l'utilisateur.
                 await _notifier.NotifyUserIntentionalDriftAsync(tweak, current, ct);
                 _log.Change(id, current, tweak.DesiredValueJson, "DrDXT/notified");
                 return new ReconcileItemResult(id, ItemOutcome.Notified, cause.Value, current, null);
@@ -247,19 +243,19 @@ public sealed class DesiredStateReconciler : IReconciler
     {
         var id = tweak.TweakId;
 
-        // Anti boot-loop: a GPU-tuning item is suspended while boots are unhealthy (T27b).
+        // Anti-boucle de démarrage : un réglage GPU est suspendu tant que les démarrages sont malsains (T27b).
         if (suspendGpu && _policy.VendorFor(id) is not null)
         {
             _log.Change(id, current, tweak.DesiredValueJson, "DrDXT/suspended-bootloop");
             return new ReconcileItemResult(id, ItemOutcome.Suspended, DriftCause.WindowsReset, current, null);
         }
 
-        // Re-apply via the existing typed op (never a new privileged primitive, I3).
+        // Réappliquer par l'op typée existante (jamais une nouvelle primitive privilégiée, I3).
         var applied = await _reapply.ReapplyAsync(id, tweak.DesiredValueJson, ct);
         if (!applied.IsOk)
             return new ReconcileItemResult(id, ItemOutcome.Failed, DriftCause.WindowsReset, current, applied.Error);
 
-        // (compare-and-set) read-BACK to confirm the write actually took (T21).
+        // (compare-and-set) relire pour confirmer que l'écriture a vraiment pris.
         var confirm = await _probe.ReadCurrentValueAsync(id, ct);
         if (!confirm.IsOk)
             return new ReconcileItemResult(id, ItemOutcome.Failed, DriftCause.WindowsReset, current, confirm.Error);
@@ -276,7 +272,7 @@ public sealed class DesiredStateReconciler : IReconciler
     }
 
     // -------------------------------------------------------------------
-    // ClassifyDriftAsync (Core contract) — reads the signals itself. Never writes.
+    // ClassifyDriftAsync (contrat Core) : lit lui-même les signaux. N'écrit jamais.
     // -------------------------------------------------------------------
     public async Task<Result<DriftCause>> ClassifyDriftAsync(AppliedTweak tweak)
     {
@@ -291,17 +287,20 @@ public sealed class DesiredStateReconciler : IReconciler
         return Classify(tweak, read.Value!, item, CancellationToken.None);
     }
 
-    // The shared, pure classification (no IO beyond the read seams already done).
+    // La classification partagée et pure (aucune E/S au-delà des coutures de lecture déjà faites).
     private Result<DriftCause> Classify(
         AppliedTweak tweak, string current, ReconcilerItemState? item, CancellationToken ct)
     {
         var id = tweak.TweakId;
 
-        // No drift at all → neutral, no effect (T11).
+        // Aucune dérive → neutre, sans effet.
         if (string.Equals(current, tweak.DesiredValueJson, StringComparison.Ordinal))
             return Result<DriftCause>.Ok(DriftCause.Unknown);
 
-        // --- per-vendor driver-version signal (I8 / T8b/T8c) ---
+        var isOriginal = string.Equals(current, tweak.OriginalValueJson, StringComparison.Ordinal);
+
+        // --- signal de version du pilote par constructeur (I8 / T8b/T8c) --- seulement quand la valeur est revenue à l'origine : une
+        // valeur tierce après une mise à jour du pilote peut être celle de l'utilisateur, et dans le doute on la respecte.
         var vendor = _policy.VendorFor(id);
         if (vendor is not null)
         {
@@ -309,31 +308,30 @@ public sealed class DesiredStateReconciler : IReconciler
             if (driver.IsOk && driver.Value is { } currentDriver
                 && item is not null
                 && !string.IsNullOrEmpty(item.LastSeenDriverVersion)
-                && !string.Equals(currentDriver, item.LastSeenDriverVersion, StringComparison.OrdinalIgnoreCase))
+                && !string.Equals(currentDriver, item.LastSeenDriverVersion, StringComparison.OrdinalIgnoreCase)
+                && isOriginal)
             {
-                // The vendor pushed a new driver since apply → non-user cause.
+                // Le constructeur a poussé un nouveau pilote depuis l'apply → cause non utilisateur.
                 return Result<DriftCause>.Ok(DriftCause.WindowsReset);
             }
         }
 
-        // --- OS build signal (primary, reliable) ---
+        // --- signal du build de l'OS (principal, fiable) ---
         var buildRes = _buildProbe.ReadCurrentBuild();
         var buildChanged = buildRes.IsOk
             && item is not null
             && !string.IsNullOrEmpty(item.LastSeenBuild)
             && !string.Equals(buildRes.Value, item.LastSeenBuild, StringComparison.OrdinalIgnoreCase);
 
-        var isOriginal = string.Equals(current, tweak.OriginalValueJson, StringComparison.Ordinal);
-
         if (buildChanged && isOriginal)
             return Result<DriftCause>.Ok(DriftCause.WindowsReset);
 
-        // No build change:
+        // Pas de changement de build :
         if (!isOriginal)
-            // A third value the user set → respect it (T9).
+            // Une valeur tierce posée par l'utilisateur → la respecter.
             return Result<DriftCause>.Ok(DriftCause.UserIntentional);
 
-        // current == original, no build change → ambiguous (T10).
+        // actuel == origine, pas de changement de build → ambigu.
         return Result<DriftCause>.Ok(DriftCause.Unknown);
     }
 

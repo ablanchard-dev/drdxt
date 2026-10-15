@@ -3,62 +3,62 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// R2 GPU bench — the THIN D3D11 boundary, behind a seam.
+// Banc GPU : la fine frontière D3D11, derrière une couture.
 //
-// IGpuLoadProbe (GpuSeams.cs) is the contract the stability tester consumes. The
-// Real probe (DeterministicGpuLoadProbe) is pure orchestration over this seam:
-// it owns the deterministic workload spec + the known-answer checksum + the
-// score/device-lost/checksum decision logic, and is fully unit-tested with a FAKE
-// IGpuComputeRunner (no GPU needed).
+// IGpuLoadProbe (GpuSeams.cs) est le contrat que consomme le testeur de stabilité. La
+// vraie sonde (DeterministicGpuLoadProbe) n'est qu'orchestration sur cette couture : elle
+// possède la charge déterministe + la somme de contrôle de réponse connue + la logique de
+// décision score / périphérique perdu / somme de contrôle, et elle est testée en entier
+// avec un faux IGpuComputeRunner (sans GPU).
 //
-// IGpuComputeRunner is the only real-D3D11 surface. Its single job: dispatch a
-// BOUNDED, DETERMINISTIC compute workload on the GPU and report back what happened
-// (device health + the GPU-computed checksum + how much work completed + wall time).
-// The real Vortice/Direct3D11 implementation lives in Detection and is covered by a
-// live smoke (like the PresentMon spine), not by unit tests.
+// IGpuComputeRunner est la seule surface D3D11 réelle. Son seul rôle : lancer sur le GPU une
+// charge de calcul bornée et déterministe et rapporter ce qui s'est passé (santé du
+// périphérique + somme de contrôle calculée par le GPU + travail fait + temps écoulé).
+// La vraie implémentation Vortice/Direct3D11 vit dans Detection et est couverte par un
+// smoke test réel (comme la colonne PresentMon), pas par des tests unitaires.
 //
-// Determinism contract: for a given GpuWorkloadSpec the output checksum is identical
-// run-to-run on a healthy device (no time-seeded randomness in the result). The
-// throughput SCORE varies with GPU clock — that is the whole point of the bench.
+// Contrat de déterminisme : pour un GpuWorkloadSpec donné, la somme de contrôle est identique
+// d'une passe à l'autre sur un périphérique sain (aucun aléa tiré de l'heure). Le score de
+// débit varie avec l'horloge GPU : c'est tout le but du banc.
 // -----------------------------------------------------------------------
 
-/// <summary>Device health observed by the compute runner after the workload.</summary>
+/// <summary>Santé du périphérique observée par le runner après la charge.</summary>
 public enum GpuDeviceStatus
 {
-    /// <summary>The device ran the workload and is still healthy (no removed-reason).</summary>
+    /// <summary>Le périphérique a fait tourner la charge et reste sain (aucune raison de retrait).</summary>
     Healthy = 0,
-    /// <summary>GetDeviceRemovedReason() reported HUNG / REMOVED / RESET (a TDR) →
-    /// the offset is unstable.</summary>
+    /// <summary>GetDeviceRemovedReason() a rendu HUNG / REMOVED / RESET (un TDR) →
+    /// le décalage est instable.</summary>
     DeviceLost = 1,
-    /// <summary>The workload could not run at all (device creation failed, FL11
-    /// unsupported, dispatch errored) → the probe treats this as CouldNotRun.</summary>
+    /// <summary>La charge n'a pas pu tourner (création du périphérique ratée, FL11 non pris
+    /// en charge, lancement en erreur) → la sonde le traite comme CouldNotRun.</summary>
     Error = 2,
 }
 
-/// <summary>A fixed, deterministic compute workload request. Same spec ⇒ same GPU work
-/// and same expected checksum every run. <paramref name="Seed" /> is a FIXED constant
-/// (part of the spec, not time-seeded) so the known-answer is reproducible.</summary>
+/// <summary>Une demande de charge de calcul fixe et déterministe. Même spec ⇒ même travail
+/// GPU et même somme de contrôle attendue à chaque passe. <paramref name="Seed" /> est une
+/// constante fixe (dans la spec, pas tirée de l'heure) : la réponse connue est reproductible.</summary>
 public sealed record GpuWorkloadSpec(int ElementCount, int Iterations, uint Seed);
 
-/// <summary>What the GPU compute run produced. <see cref="Checksum" /> is a deterministic
-/// 64-bit reduction of the output buffer (verified against the CPU known-answer).
-/// <see cref="IterationsCompleted" /> and <see cref="ElapsedMilliseconds" /> feed the
-/// throughput score. <see cref="DeviceStatus" /> carries TDR / error info.</summary>
+/// <summary>Ce que le calcul GPU a produit. <see cref="Checksum" /> est une réduction
+/// déterministe sur 64 bits du tampon de sortie (vérifiée contre la réponse connue du CPU).
+/// <see cref="IterationsCompleted" /> et <see cref="ElapsedMilliseconds" /> nourrissent le
+/// score de débit. <see cref="DeviceStatus" /> porte l'info TDR / erreur.</summary>
 public sealed record GpuComputeOutcome(
     GpuDeviceStatus DeviceStatus,
     ulong Checksum,
     int IterationsCompleted,
     double ElapsedMilliseconds);
 
-/// <summary>The THIN real-D3D11 seam: run one deterministic compute workload and report
-/// what happened. Returns a Result so a missing/failed device fails CLEAN
-/// (TWEAK.SDK_UNAVAILABLE) — it must not throw on a device loss (that is
-/// GpuDeviceStatus.DeviceLost on an Ok result). The fake used in unit tests implements
-/// this; the real Vortice implementation is the only D3D boundary.</summary>
+/// <summary>La fine couture D3D11 réelle : lancer une charge de calcul déterministe et dire
+/// ce qui s'est passé. Rend un Result : un périphérique absent ou en panne échoue proprement
+/// (TWEAK.SDK_UNAVAILABLE) ; elle ne doit pas lever sur une perte de périphérique (c'est
+/// GpuDeviceStatus.DeviceLost dans un résultat Ok). La doublure des tests unitaires
+/// l'implémente ; la vraie implémentation Vortice est la seule frontière D3D.</summary>
 public interface IGpuComputeRunner
 {
-    /// <summary>Runs the deterministic compute workload described by <paramref name="spec" />
-    /// for up to <paramref name="duration" /> (or until <paramref name="ct" /> trips), then
-    /// reports the outcome. Never throws across this boundary in the real impl.</summary>
+    /// <summary>Lance la charge déterministe décrite par <paramref name="spec" /> pendant au
+    /// plus <paramref name="duration" /> (ou jusqu'au déclenchement de <paramref name="ct" />),
+    /// puis rapporte le résultat. La vraie implémentation ne lève jamais à travers cette frontière.</summary>
     Result<GpuComputeOutcome> Run(GpuWorkloadSpec spec, TimeSpan duration, CancellationToken ct);
 }

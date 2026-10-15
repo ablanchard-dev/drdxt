@@ -4,8 +4,8 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D11.5, revue n° 5) : « Remesurer · 40 s » pesait autant que « Rendre à Windows ». Les gestes
-// qui mesurent ou testent ont la capsule sombre cerclée de cyan ; le chrome plein reste à ceux qui changent la machine.
+// Trois poids de bouton. Le chrome plein n'appartient qu'à l'action principale de l'écran, Optimiser (DESIGN.md, règle 5).
+// Les gestes qui changent la machine ont la capsule sombre au liseré chrome ; ceux qui mesurent ou testent, cerclée de cyan.
 public sealed class MesurerNePesePasCommeCorrigerTests
 {
     private static string Vue()
@@ -32,5 +32,14 @@ public sealed class MesurerNePesePasCommeCorrigerTests
     [InlineData("RendreLeReposALaCarteCommand")]
     [InlineData("RendreBcdCommand")]
     [InlineData("LancerReparationCommand")]
-    public void Corriger_garde_le_chrome_plein(string commande) => StyleDe(commande).Should().Be("CapsuleDeMaintien");
+    public void Corriger_a_la_capsule_de_correction(string commande) => StyleDe(commande).Should().Be("CapsuleDeCorrection");
+
+    [Fact]
+    public void Un_seul_chrome_plein_sur_l_ecran_et_c_est_optimiser()
+    {
+        var vue = Vue();
+        Regex.Matches(vue, @"StaticResource CapsuleChrome\b").Count.Should().Be(1, "une seule action principale");
+        Regex.IsMatch(vue, @"x:Name=""BoutonOptimiser"" Style=""\WStaticResource CapsuleChrome\W").Should().BeTrue("et c'est Optimiser");
+        Regex.IsMatch(vue, @"StaticResource CapsuleDeMaintien\b").Should().BeFalse("la capsule de maintien en chrome plein ferait une seconde action principale");
+    }
 }

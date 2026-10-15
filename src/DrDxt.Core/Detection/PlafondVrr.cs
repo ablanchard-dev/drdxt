@@ -3,7 +3,7 @@ namespace DrDxt.Core;
 /// <summary>
 /// Le plafond d'images qui garde un écran G-SYNC / FreeSync dans sa plage variable, sans retomber sur la latence de la Vsync.
 ///
-/// 09/10/2026 (audit des gains) : « fréquence − 3 » est le MINIMUM donné par Blur Busters (« at least 3 FPS below »), pas
+/// « fréquence − 3 » est le minimum donné par Blur Busters (« at least 3 FPS below »), pas
 /// une cible. Aux hautes fréquences, les variations de temps d'image retouchent le plafond de la Vsync avec une marge de 3 :
 /// NVIDIA Reflex, mesuré par Blur Busters, plafonne à ~138 sur 144 Hz et ~224 sur 240 Hz, soit fréquence − fréquence²/3600.
 /// La cible prend la plus basse des deux. Source : https://blurbusters.com/gsync/gsync101-input-lag-tests-and-settings/14/

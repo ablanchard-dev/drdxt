@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 23/09/2026. Décision produit : « gratuit, GPL ». Sans fichier LICENSE, un code publié n'est
+// Décision produit : « gratuit, GPL ». Sans fichier LICENSE, un code publié n'est
 // pas libre : tous les droits restent réservés, quoi qu'en dise un README. Le texte est celui de
 // gnu.org (gpl-3.0.txt, SHA-256 3972dc97...), jamais réécrit à la main.
 // -----------------------------------------------------------------------
@@ -26,7 +26,7 @@ public sealed class LeDepotPorteSaLicenceTests
     [Fact]
     public void Le_programme_livre_porte_sa_licence_a_cote_de_lui()
     {
-        // 23/09/2026 : la licence était à la racine du dépôt, mais ni le build publié ni l'installeur
+        // La licence était à la racine du dépôt, mais ni le build publié ni l'installeur
         // ne la contenaient (l'installeur copie `publish\*`, le paquet de Downloads avait 292
         // fichiers, aucun LICENSE). La GPL-3.0 (§4) veut que chaque copie livrée soit accompagnée
         // du texte. Le fichier suit maintenant la sortie de l'application : ce test lit le dossier

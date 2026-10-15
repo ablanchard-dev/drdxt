@@ -5,11 +5,11 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// Real named-pipe transport for a typed privileged request.
+// Vrai transport par pipe nommé pour une requête privilégiée typée.
 //
-// Connects to the ACL'd server pipe, writes the framed request, reads the
-// framed response. All transport faults are wrapped → a fail-clean
-// PrivilegedResponse (IO_FAILURE); an exception never escapes.
+// Se connecte au pipe serveur protégé par ACL, écrit la requête tramée, lit la réponse
+// tramée. Toutes les pannes de transport sont emballées → une PrivilegedResponse en échec
+// propre (IO_FAILURE) ; aucune exception ne s'échappe.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class NamedPipeTypedRequestTransport : ITypedRequestTransport

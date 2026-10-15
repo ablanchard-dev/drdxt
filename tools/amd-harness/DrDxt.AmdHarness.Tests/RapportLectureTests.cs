@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.AmdHarness.Tests;
 
-// 07/10/2026 (T3) : le rapport chez un joueur ne s'arrête jamais : une étape qui plante ou qui pend est notée, la suite part.
+// Le rapport chez un joueur ne s'arrête jamais : une étape qui plante ou qui pend est notée, la suite part.
 public sealed class RapportLectureTests
 {
     [Fact]
@@ -24,7 +24,7 @@ public sealed class RapportLectureTests
         texte.Should().Contain("=== répond — OK").And.Contain("carte AMD trouvée");
     }
 
-    // Revue n° 8 : chaque bloc s'écrit dès que son étape finit.
+    // Chaque bloc s'écrit dès que son étape finit.
     [Fact]
     public async Task Chaque_etape_s_ecrit_des_qu_elle_finit()
     {

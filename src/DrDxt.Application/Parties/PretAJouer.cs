@@ -9,16 +9,16 @@ public sealed record EtatAvantPartie(
     double? Celsius, ulong? MemoireLibreOctets);
 
 /// <summary>
-/// 04/10/2026 (plan 3b.3) : « prêt à jouer » en quelques secondes. Ce que DrDXT sait déjà mesurer, relu juste avant la
+/// « prêt à jouer » en quelques secondes. Ce que DrDXT sait déjà mesurer, relu juste avant la
 /// partie : les programmes qui chargent le processeur, la connexion (box et internet), la chaleur, la mémoire libre.
-/// Les seuils sont ceux déjà fondés ailleurs dans le produit quand ils existent ; les autres sont dits NON CHIFFRÉS.
+/// Les seuils sont ceux déjà fondés ailleurs dans le produit quand ils existent ; les autres sont dits non chiffrés.
 /// </summary>
 public static class PretAJouer
 {
     /// <summary>Un quart de cœur : le seuil du calmeur de voisins (« plus d'un quart de cœur »).</summary>
     public const double SeuilVoisinPourcent = 25;
 
-    /// <summary>**NON CHIFFRÉ** : un aller-retour jusqu'à la box en câble tient sous 2 ms ; au-delà de 10 ms, le lien
+    /// <summary>**Non chiffré** : un aller-retour jusqu'à la box en câble tient sous 2 ms ; au-delà de 10 ms, le lien
     /// local (Wi-Fi, CPL, saturation) coûte avant même d'atteindre internet.</summary>
     public const double SeuilBoxMs = 10;
 
@@ -37,9 +37,9 @@ public static class PretAJouer
         if (e.Voisins?.Where(v => v.ProcesseurPourcent >= SeuilVoisinPourcent).OrderByDescending(v => v.ProcesseurPourcent).Take(3).ToList()
             is { Count: > 0 } lourds)
             genes.Add(F("PretAJouer.Voisins", string.Join(", ", lourds.Select(v => $"{v.Nom} ({v.ProcesseurPourcent:0} %)"))));
-        // Revue du 04/10 (P1) : une perte vers la box est un vrai problème de lien local ; vers internet, un ping isolé
+        // Une perte vers la box est un vrai problème de lien local ; vers internet, un ping isolé
         // perdu (limitation des réponses) ou filtré à 100 % (pare-feu, opérateur) n'en est pas un. Dite à partir de 2 sur 10,
-        // et pas quand AUCUN ne revient alors que la box répond (filtrage, rien de mesuré).
+        // et pas quand aucun ne revient alors que la box répond (filtrage, rien de mesuré).
         if (e.PertesBoxPourcent > 0 || e.PertesInternetPourcent is >= 20 and < 100)
             genes.Add(F("PretAJouer.Pertes", (e.PertesBoxPourcent ?? 0).ToString("0", fr), (e.PertesInternetPourcent ?? 0).ToString("0", fr)));
         if (e.PingBoxMs >= SeuilBoxMs)

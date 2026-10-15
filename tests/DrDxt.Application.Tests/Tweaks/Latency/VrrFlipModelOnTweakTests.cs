@@ -7,10 +7,10 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// NS-1 — VrrFlipModelOnTweak. Turns on VRR + flip-model by MERGING the shared
-// DirectXUserGlobalSettings REG_SZ (preserving AutoHDR et al.). The merge logic is
-// exercised here through the public tweak surface (the written string is asserted).
-// Reboot-required (deferred A/B proof). NSubstitute fakes, no real registry.
+// VrrFlipModelOnTweak. Active VRR + modèle de retournement en fusionnant la REG_SZ
+// partagée DirectXUserGlobalSettings (AutoHDR et autres préservés). La logique de fusion
+// s'exerce ici par la surface publique du levier (la chaîne écrite est vérifiée).
+// Redémarrage requis (preuve A/B différée). Faux NSubstitute, aucun vrai registre.
 // -----------------------------------------------------------------------
 public sealed class VrrFlipModelOnTweakTests
 {
@@ -45,7 +45,7 @@ public sealed class VrrFlipModelOnTweakTests
     {
         var r = await t.ApplyAsync();
         r.IsOk.Should().BeTrue();
-        // Inspect the recorded calls: the single SetRegistryValueOp on our value carries the merge.
+        // Inspecter les appels enregistrés : l'unique SetRegistryValueOp sur notre valeur porte la fusion.
         var write = _elevated.ReceivedCalls()
             .Select(c => c.GetArguments()[0])
             .OfType<SetRegistryValueOp>()
@@ -53,7 +53,7 @@ public sealed class VrrFlipModelOnTweakTests
         return write.Value;
     }
 
-    // 06/10/2026 (plan 4.3) : sans la valeur posée, la désinstallation ne sait pas si la chaîne est encore celle de
+    // Sans la valeur posée, la désinstallation ne sait pas si la chaîne est encore celle de
     // DrDXT, et n'y touche pas (« valeur posée inconnue »). Ses voisins HKCU la portaient déjà (SnapshotAvec).
     [Fact]
     public async Task Snapshot_carries_the_merged_string_it_wrote()
@@ -95,7 +95,7 @@ public sealed class VrrFlipModelOnTweakTests
         Build(original).AppliesTo(Hw, State).Should().BeTrue();
     }
 
-    // 14/09/2026 (C1 bis) : flip-model deja la, reste la seule moitie VRR. Elle ne vaut rien sur un
+    // Flip-model deja la, reste la seule moitie VRR. Elle ne vaut rien sur un
     // ecran qui ne fait pas de VRR : le poste de reference (`SwapEffectUpgradeEnable=1;`) gardait ce
     // levier au plan pour rien, et « rien a tenter » n'etait jamais vrai.
 
@@ -121,7 +121,7 @@ public sealed class VrrFlipModelOnTweakTests
     [InlineData("AutoHDREnable=1; swapeffectupgradeenable=1 ;VRROptimizeEnable=1;")]
     public void AppliesTo_is_false_when_both_toggles_are_already_on(string original)
     {
-        // Revue du 12/09 (C1) : deja regle ⇒ hors du plan, sinon le paiement est demande pour rien.
+        // Deja regle ⇒ hors du plan, sinon le paiement est demande pour rien.
         Build(original).AppliesTo(Hw, State).Should().BeFalse();
     }
 
@@ -137,7 +137,7 @@ public sealed class VrrFlipModelOnTweakTests
     [Fact]
     public async Task Apply_merges_and_preserves_autohdr_and_flips_existing_vrr()
     {
-        // VRR off (0) → flipped to 1; AutoHDR preserved; flip-model appended.
+        // VRR désactivé (0) → passé à 1 ; AutoHDR préservé ; modèle de retournement ajouté.
         var written = await CapturedWrittenValue(Build("AutoHDREnable=1;VRROptimizeEnable=0"));
         written.Should().Be("AutoHDREnable=1;VRROptimizeEnable=1;SwapEffectUpgradeEnable=1");
     }
@@ -152,7 +152,7 @@ public sealed class VrrFlipModelOnTweakTests
     [Fact]
     public async Task Apply_preserves_a_value_that_contains_special_chars()
     {
-        // HighPerfAdapter holds a "&"-separated id and must survive the merge verbatim.
+        // HighPerfAdapter porte un identifiant séparé par « & » et doit survivre tel quel à la fusion.
         var written = await CapturedWrittenValue(Build("HighPerfAdapter=10DE&2684&89321043;AutoHDREnable=1"));
         written.Should().Be(
             "HighPerfAdapter=10DE&2684&89321043;AutoHDREnable=1;VRROptimizeEnable=1;SwapEffectUpgradeEnable=1");
@@ -167,7 +167,7 @@ public sealed class VrrFlipModelOnTweakTests
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         inverse.IsOk.Should().BeTrue();
         inverse.Value.Should().BeOfType<SetRegistryValueOp>()
-            .Which.Value.Should().Be("AutoHDREnable=1;VRROptimizeEnable=0"); // exact original
+            .Which.Value.Should().Be("AutoHDREnable=1;VRROptimizeEnable=0"); // origine exacte
     }
 
     [Fact]

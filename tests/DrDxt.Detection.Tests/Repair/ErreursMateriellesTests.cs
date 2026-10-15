@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 04/10/2026 (plan 3.2) : les erreurs matérielles WHEA, jugées sur la gravité de l'en-tête CPER.
+// Les erreurs matérielles WHEA, jugées sur la gravité de l'en-tête CPER.
 public sealed class ErreursMateriellesTests
 {
     // Début de l'enregistrement relevé sur la machine de référence le 17/09 : « CPER », révision 0101, FFFFFFFF, 1 section,
@@ -27,7 +27,7 @@ public sealed class ErreursMateriellesTests
         c.Explication.Should().Contain("aucune erreur").And.Contain("1 enregistrement");
     }
 
-    // Revue du 04/10 (P1) : un journal illisible n'est pas « aucune erreur ».
+    // Un journal illisible n'est pas « aucune erreur ».
     [Fact]
     public void Un_journal_non_lu_se_dit_non_lu()
         => ErreursMaterielles.Juger(null).Single().Statut.Should().Be(RepairStatus.Unknown);
@@ -40,5 +40,26 @@ public sealed class ErreursMateriellesTests
         var grave = ErreursMaterielles.Juger([new(t, 2), new(t.AddHours(-1), 1)]).Single();
         grave.Statut.Should().Be(RepairStatus.Suspicious);
         grave.ValeurCourante.Should().Be("1 grave(s), 1 corrigée(s)");
+    }
+
+    // Seules les erreurs du processeur jugent un palier ; une erreur PCIe corrigée qu'une
+    // carte relève en continu ne doit pas faire croire à une instabilité. UEFI, annexe N : nombre de sections en octet 10,
+    // descripteurs à l'octet 128 (72 octets), type de section (GUID) à l'octet 16 du descripteur.
+    [Fact]
+    public void Une_section_du_processeur_se_distingue_d_une_erreur_PCIe()
+    {
+        static byte[] Cper(Guid type)
+        {
+            var b = new byte[128 + 72];
+            "CPER"u8.CopyTo(b);
+            BitConverter.GetBytes((ushort)1).CopyTo(b, 10);
+            BitConverter.GetBytes(2u).CopyTo(b, 12); // corrigée
+            type.ToByteArray().CopyTo(b, 128 + 16);
+            return b;
+        }
+        ErreursMaterielles.DuProcesseur(Cper(new Guid("DC3EA0B0-A144-4797-B95B-53FA242B6E1D"))).Should().BeTrue("IA32/X64");
+        ErreursMaterielles.DuProcesseur(Cper(new Guid("9876CCAD-47B4-4BDB-B65E-16F193C4F3DB"))).Should().BeTrue("Processor Generic");
+        ErreursMaterielles.DuProcesseur(Cper(new Guid("D995E954-BBC1-430F-AD91-B44DCB3C6F35"))).Should().BeFalse("PCI Express");
+        ErreursMaterielles.DuProcesseur(null).Should().BeFalse();
     }
 }

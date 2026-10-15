@@ -3,27 +3,27 @@ using DrDxt.Core;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// BIOS Doctor foundation: a pure read+diff advisor. It consumes the
-/// <see cref="HardwareInventory"/> + <see cref="SettingsState"/> already produced
-/// by M1 (it never re-detects them, never re-runs XMP inference, never writes the
-/// BIOS) and emits only the firmware <see cref="BiosFinding"/>s that concern this
-/// machine.
+/// Fondation du BIOS Doctor : un conseiller pur, lecture + écart. Il consomme le
+/// <see cref="HardwareInventory"/> + le <see cref="SettingsState"/> déjà produits par le scan (il ne
+/// les redétecte jamais, ne relance jamais l'inférence XMP, n'écrit jamais le BIOS) et n'émet que les
+/// constats firmware <see cref="BiosFinding"/> qui concernent cette machine.
 ///
-/// Honesty (decision §9 / §22.3, plan §0.7):
-///   • a setting we can read and is mis-set → an actionable <see cref="BiosMatrixClass.Guide"/>
-///     Finding (V1 = guide, never write);
-///   • a setting we cannot read → an honest <see cref="BiosMatrixClass.Read"/> Finding flagged
-///     <see cref="BiosFinding.StateNotReadable"/> — never a fabricated state;
-///   • an already-good machine → no actionable Finding (a valid, assumed result).
+/// Honnêteté :
+///   • un réglage lisible et mal réglé → un constat <see cref="BiosMatrixClass.Guide"/> actionnable
+///     (V1 = guide, jamais d'écriture) ;
+///   • un réglage illisible → un constat honnête <see cref="BiosMatrixClass.Read"/> marqué
+///     <see cref="BiosFinding.StateNotReadable"/>, jamais un état fabriqué ;
+///   • une machine déjà bien réglée → aucun constat actionnable (un résultat valide, assumé).
 ///
-/// Safety (plan B2): CSM-off is never advised on a Legacy boot (no-boot risk).
-/// Gating (§16): laptop/handheld BIOS is locked → no actionable Findings.
+/// Sécurité (plan B2) : la désactivation du CSM n'est jamais conseillée sur un démarrage Legacy
+/// (risque de non-démarrage). Filtre : le BIOS d'un portable / d'une console portable est verrouillé
+/// → aucun constat actionnable.
 /// </summary>
 public sealed class BiosAdvisor : IBiosAdvisor
 {
-    // BIOS older than this is informationally flagged "consider updating". We have
-    // NO motherboard knowledge base in the foundation (that is a later increment),
-    // so this is a soft, honest hint — never a hard AGESA/version claim.
+    // Un BIOS plus ancien que ceci est signalé pour information « envisager une mise à jour ». La
+    // fondation n'a aucune base de connaissance des cartes mères (c'est pour plus tard) : c'est donc
+    // une indication douce et honnête, jamais une affirmation ferme sur l'AGESA ou la version.
     private static readonly TimeSpan OldBiosThreshold = TimeSpan.FromDays(365 * 2);
 
     public Result<IReadOnlyList<BiosFinding>> Advise(HardwareInventory hw, SettingsState state)
@@ -38,8 +38,8 @@ public sealed class BiosAdvisor : IBiosAdvisor
 
         var findings = new List<BiosFinding>();
 
-        // ── §16 chassis gating: laptop/handheld BIOS is typically locked. ──
-        // Surface ONE honest informational Finding rather than impossible steps.
+        // ── Filtre par châssis : le BIOS d'un portable / d'une console portable est en général verrouillé. ──
+        // Montrer un seul constat honnête d'information plutôt que des étapes impossibles.
         if (hw.Chassis is ChassisType.Laptop or ChassisType.Handheld)
         {
             findings.Add(new BiosFinding(
@@ -65,7 +65,7 @@ public sealed class BiosAdvisor : IBiosAdvisor
         return Result<IReadOnlyList<BiosFinding>>.Ok(findings);
     }
 
-    // ── XMP / EXPO (consumes M1's inferred state; we never re-infer here). ──
+    // ── XMP / EXPO (consomme l'état inféré par le scan ; jamais de nouvelle inférence ici). ──
     private static void AddXmpExpo(List<BiosFinding> findings, SettingsState state)
     {
         switch (state.XmpExpo)
@@ -76,7 +76,7 @@ public sealed class BiosAdvisor : IBiosAdvisor
                     BiosStringKeys.XmpOffTitle, BiosStringKeys.XmpOffRationale,
                     BiosMatrixClass.Guide, TriState.Off,
                     BiosRecommendedAction.Enable, BiosStringKeys.XmpEnableAction,
-                    // 23/09/2026 : plus de fourchette. Mesures publiques : de quelques % (jeu limite
+                    // Pas de fourchette. Mesures publiques : de quelques % (jeu limite
                     // par la carte graphique) a ~42 % (jeu tres sensible a la memoire), ~1 % sur un
                     // X3D (TechSpot, XDA, AMD). Aucune plage unique ne decrit une machine : le
                     // chiffre de la personne vient de l'A/B du produit. La mise en garde le dit.
@@ -87,7 +87,7 @@ public sealed class BiosAdvisor : IBiosAdvisor
                 break;
 
             case TriState.Unknown:
-                // Honest "not read": we report the unknown, we never assert OFF.
+                // « Non lu » honnête : on rapporte l'inconnu, on n'affirme jamais « désactivé ».
                 findings.Add(new BiosFinding(
                     FirmwareSettingKind.XmpExpo, Severity.Info,
                     BiosStringKeys.XmpUnknownTitle, BiosStringKeys.XmpUnknownRationale,
@@ -100,11 +100,11 @@ public sealed class BiosAdvisor : IBiosAdvisor
         }
     }
 
-    // ── ReBAR + ordered prerequisites (Above-4G → CSM → Re-Size BAR). ──
+    // ── ReBAR + prérequis ordonnés (Above-4G → CSM → Re-Size BAR). ──
     private static void AddReBarChain(List<BiosFinding> findings, HardwareInventory hw, SettingsState state)
     {
-        // Prefer the per-GPU ReBAR read (the primary GPU); fall back to the
-        // settings-level read. Both come straight from M1 — no re-detection.
+        // Préférer la lecture ReBAR par GPU (le GPU principal) ; à défaut, la lecture au niveau des
+        // réglages. Les deux viennent directement du scan : aucune redétection.
         var primary = hw.Gpus[0];
         var rebar = primary.ReBar != TriState.Unknown ? primary.ReBar : state.ReBar;
         var isNvidia = primary.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase)
@@ -113,7 +113,7 @@ public sealed class BiosAdvisor : IBiosAdvisor
         switch (rebar)
         {
             case TriState.Off:
-                // Ordered prerequisites first so the chain reads top-to-bottom.
+                // Les prérequis ordonnés d'abord, pour que la chaîne se lise de haut en bas.
                 findings.Add(new BiosFinding(
                     FirmwareSettingKind.Above4G, Severity.Minor,
                     BiosStringKeys.Above4GTitle, BiosStringKeys.Above4GRationale,
@@ -121,8 +121,8 @@ public sealed class BiosAdvisor : IBiosAdvisor
                     BiosRecommendedAction.Enable, BiosStringKeys.Above4GEnableAction,
                     Gain: null, StateNotReadable: false));
 
-                // §16/B2: CSM-off is only safe to advise when booting UEFI.
-                // Legacy/MBR → suppress the step (no-boot risk), keep the rest.
+                // Conseiller de désactiver le CSM n'est sûr que sur un démarrage UEFI.
+                // Legacy/MBR → retirer l'étape (risque de non-démarrage), garder le reste.
                 if (hw.Bios.IsUefi)
                     findings.Add(new BiosFinding(
                         FirmwareSettingKind.Csm, Severity.Minor,
@@ -136,8 +136,8 @@ public sealed class BiosAdvisor : IBiosAdvisor
                     BiosStringKeys.ReBarOffTitle, BiosStringKeys.ReBarOffRationale,
                     BiosMatrixClass.Guide, TriState.Off,
                     BiosRecommendedAction.Enable, BiosStringKeys.ReBarEnableAction,
-                    // decision §2: ReBAR is game-dependent and can REGRESS some titles —
-                    // no honest global %. Conditional, with a "verify per game" caveat.
+                    // Le ReBAR dépend du jeu et peut faire régresser certains titres : pas de % global honnête.
+                    // Conditionnel, avec une réserve « vérifier jeu par jeu ».
                     Gain: new BiosGainEstimate(
                         MinPct: null, MaxPct: null, Conditional: true,
                         SourceKey: BiosStringKeys.GainReBarSource, CaveatKey: BiosStringKeys.GainReBarCaveat),
@@ -145,8 +145,8 @@ public sealed class BiosAdvisor : IBiosAdvisor
                 break;
 
             case TriState.Unknown:
-                // §16: recommend-with-caveat, honest unknown, never Major, never force,
-                // and never drag in the CSM/Above-4G write steps.
+                // Recommandation avec réserve, inconnu honnête, jamais Major, jamais forcé,
+                // et sans jamais entraîner les étapes d'écriture CSM / Above-4G.
                 findings.Add(new BiosFinding(
                     FirmwareSettingKind.ReBar, Severity.Info,
                     BiosStringKeys.ReBarUnknownTitle, BiosStringKeys.ReBarUnknownRationale,
@@ -158,15 +158,15 @@ public sealed class BiosAdvisor : IBiosAdvisor
             // On → nothing.
         }
 
-        _ = isNvidia; // vendor distinction already captured by per-GPU read vs Unknown.
+        _ = isNvidia; // la distinction de constructeur est déjà portée par la lecture par GPU ou Unknown.
     }
 
-    // ── X3D / CPPC routing — only matters on AMD multi-CCD X3D. ──
-    // decision §2: the PRIMARY routing fix is Windows-side (AMD 3D V-Cache service /
-    // Game Bar), and BIOS CPPC only matters "if mis-set". We cannot read the routing
-    // state from M1, so we do not blare a Major BIOS write step — we surface a Verify
-    // finding that LEADS with the Windows-side check (the rationale resx) and treats the
-    // BIOS CPPC path as a secondary "only if mis-set" step.
+    // ── Routage X3D / CPPC : ne compte que sur un AMD X3D à plusieurs CCD. ──
+    // La correction principale du routage est côté Windows (service AMD 3D V-Cache / Game Bar), et le
+    // CPPC du BIOS ne compte que « s'il est mal réglé ». Le scan ne lit pas l'état du routage : on ne
+    // claironne donc pas une étape Major d'écriture BIOS ; on montre un constat Verify qui commence par
+    // la vérification côté Windows (la resx de justification) et traite le chemin CPPC du BIOS comme
+    // une étape secondaire « seulement s'il est mal réglé ».
     private static void AddX3dCppc(List<BiosFinding> findings, HardwareInventory hw)
     {
         if (hw.Cpu.IsX3D && hw.Cpu.CcdCount > 1)
@@ -176,7 +176,7 @@ public sealed class BiosAdvisor : IBiosAdvisor
                 BiosMatrixClass.Read, TriState.Unknown,
                 BiosRecommendedAction.Verify, BiosStringKeys.VerifyAction,
                 // Gain seulement si le routage des CCD est mal regle ; le plus souvent deja correct.
-                // 23/09/2026 : plus de fourchette « 0–10 % », tiree de nos notes et non d'une mesure
+                // Pas de fourchette « 0–10 % », tiree de nos notes et non d'une mesure
                 // publique. Conditionnel, et c'est la mise en garde qui porte la nuance.
                 Gain: new BiosGainEstimate(
                     MinPct: null, MaxPct: null, Conditional: true,
@@ -184,7 +184,7 @@ public sealed class BiosAdvisor : IBiosAdvisor
                 StateNotReadable: true));
     }
 
-    // ── PCIe link — not in M1 inventory → honest "not read", never fabricated. ──
+    // ── Lien PCIe : absent de l'inventaire du scan → « non lu » honnête, jamais fabriqué. ──
     private static void AddPcieGen(List<BiosFinding> findings)
     {
         findings.Add(new BiosFinding(
@@ -195,10 +195,10 @@ public sealed class BiosAdvisor : IBiosAdvisor
             Gain: null, StateNotReadable: true));
     }
 
-    // ── BIOS / AGESA version — soft, honest hint only (no KB in the foundation). ──
+    // ── Version BIOS / AGESA : indication douce et honnête seulement (pas de base de connaissance dans la fondation). ──
     private static void AddBiosVersion(List<BiosFinding> findings, HardwareInventory hw)
     {
-        // No release date → we cannot judge age honestly → no finding (never fabricate).
+        // Pas de date de publication → âge impossible à juger honnêtement → aucun constat (jamais fabriquer).
         if (hw.Bios.ReleaseDate is not { } released) return;
 
         var age = DateTimeOffset.UtcNow - released;

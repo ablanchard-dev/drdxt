@@ -1,4 +1,4 @@
-﻿using DrDxt.Application.Support;
+using DrDxt.Application.Support;
 using DrDxt.Core;
 using FluentAssertions;
 using Xunit;
@@ -6,7 +6,7 @@ using Xunit;
 namespace DrDxt.Application.Tests.Support;
 
 // -----------------------------------------------------------------------
-// D7 / gate G6 — le rapport que le client colle dans son ticket.
+// Le rapport que le client colle dans son ticket.
 //
 // « Jamais de debogage a l'aveugle par mail. » Sans ce rapport, le premier client difficile
 // consomme une semaine : une question a la fois, avec quelqu'un qui ne sait pas ou regarder.
@@ -35,8 +35,7 @@ public sealed class DiagnosticReportTests
         new(Hw(),
             new SettingsState(TriState.Off, TriState.On, "guid", TriState.On, TriState.On,
                 Array.Empty<int>(), TriState.Unknown),
-            Array.Empty<Finding>(), 72, baseline,
-            new ScoreBreakdown(80, 80, 85), new DimensionStatus(true, false),
+            Array.Empty<Finding>(), baseline,
             ledger ?? new[]
             {
                 new ScoreLedgerEntry("xmp", "Performance", 15, LeverState.Suboptimal, "k", "s"),
@@ -45,6 +44,17 @@ public sealed class DiagnosticReportTests
             },
             coverage ?? new ScanCoverage(3, 2, 1),
             bottleneck);
+
+    [Fact]
+    public void En_anglais_le_rapport_n_a_plus_un_mot_de_francais()
+    {
+        using var _ = Docteur.Portee(System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+
+        var rapport = DiagnosticReport.Build(Scan(), "1.0", When);
+
+        rapport.Should().Contain("diagnostic report").And.Contain("Graphics card").And.Contain("Levers to fix");
+        rapport.Should().NotMatchRegex("[éèàùçêâîôû]");
+    }
 
     [Fact]
     public void Le_rapport_dit_ce_que_le_BIOS_a_rendu_et_le_dit_quand_il_n_a_rien_rendu()
@@ -65,7 +75,7 @@ public sealed class DiagnosticReportTests
     [Fact]
     public void Le_rapport_porte_ce_que_le_processeur_rend_sous_charge_longue()
     {
-        // 25/09/2026 : affiche a l'ecran, absent du rapport (relu dans le rapport reel).
+        // Affiche a l'ecran, absent du rapport (relu dans le rapport reel).
         const string phrase = "Sous une charge longue sur 8 cœurs, ton processeur tient 30,0 % de puissance en moins.";
         DiagnosticReport.Build(Scan(), "1.0", When, processeur: new DrDxt.Measurement.Cpu.CpuDeficitSoutenu(30, 7.4, true, phrase))
             .Should().Contain("--- Processeur sous charge longue ---").And.Contain(phrase);
@@ -76,7 +86,7 @@ public sealed class DiagnosticReportTests
     [Fact]
     public void Le_rapport_ne_promet_pas_un_reglage_de_la_carte_sans_ses_conditions()
     {
-        // 25/09/2026 : « Ce que cette machine reçoit : RTX 4060 réglable », sans condition. 06/10/2026 (L-GPU) : le
+        // « Ce que cette machine reçoit : RTX 4060 réglable », sans condition. Le
         // réglage est ouvert machine par machine ; le rapport dit à quelles conditions il est gardé ou fermé.
         DiagnosticReport.Build(Scan(), "1.0", When)
             .Should().Contain("--- Réglage de la carte graphique ---")
@@ -98,20 +108,20 @@ public sealed class DiagnosticReportTests
     [Fact]
     public void Le_rapport_nomme_le_processus_mesure()
     {
-        // 25/09/2026 : 99 FPS sur un scan cru « sans jeu », c'etait JeuB au premier plan.
+        // 99 FPS sur un scan cru « sans jeu », c'etait JeuB au premier plan.
         var serie = DrDxt.Measurement.FrametimeStatistics.PasseDepuisSerie(Enumerable.Repeat(5.0, 100).ToList(), 1, 0);
         DiagnosticReport.Build(Scan(baseline: serie with { ProcessusMesure = "JeuBClient-Win64-Shipping.exe" }), "1.0", When)
             .Should().MatchRegex(@"Processus mesuré\s+: JeuBClient-Win64-Shipping\.exe");
         DiagnosticReport.Build(Scan(baseline: serie), "1.0", When).Should().MatchRegex(@"Processus mesuré\s+: inconnu");
     }
 
-    // ====================== lot 1 : la preuve porte la SANTE ======================
+    // ====================== La preuve porte la SANTE ======================
 
     [Fact]
     public void La_sante_de_la_machine_arrive_dans_le_rapport_avec_ses_trois_nombres()
     {
-        // Le rapport genere sur la machine de reference le 10/09 ne portait aucun de ses vrais
-        // problemes (arrets brutaux, memoire jamais testee) : ils vivaient a l'ecran seulement.
+        // Les vrais problemes de la machine (arrets brutaux, memoire jamais testee) arrivent dans le
+        // rapport, pas seulement a l'ecran.
         var sante = RepairTriage.Trier(new[]
         {
             new RepairFinding("STABILITE", "arrets brutaux", "8 en 45 jours", "aucun",
@@ -124,13 +134,70 @@ public sealed class DiagnosticReportTests
 
         report.Should().Contain("--- Santé de la machine ---");
         report.Should().Contain(sante.Phrase, "les trois nombres voyagent ensemble");
-        // 17/09/2026 : les memes mots que l'ecran, plus les cles du journal.
+        // Les memes mots que l'ecran, plus les cles du journal.
         report.Should().Contain("Stabilité · Arrêts brutaux").And.Contain("8 en 45 jours")
             .And.NotContain("STABILITE");
         report.Should().Contain("Non lus").And.Contain("BIOS · XMP");
     }
 
-    /// <summary>24/09/2026 : l'écran ne montre que la valeur d'un état lu sans geste ; son
+    /// <summary>Un nom porté par deux familles garde son titre de famille dans le rapport, comme à l'écran.</summary>
+    [Fact]
+    public void Le_rapport_nomme_les_echecs_par_famille()
+    {
+        var sante = RepairTriage.Trier(new[]
+        {
+            new RepairFinding("SERVICES", "echecs", "3", null, RepairStatus.Suspicious, "trois services en échec."),
+            new RepairFinding("WINDOWS UPDATE", "echecs", "2", null, RepairStatus.Observed, "deux mises à jour en échec."),
+        });
+
+        DiagnosticReport.Build(Scan(), "1.0.0", When, sante).Should()
+            .Contain("Échecs de services").And.Contain("Échecs de Windows Update");
+    }
+
+    /// <summary>Un nom qui dit déjà son domaine ne le répète pas : « Mises à jour Windows · mises à jour Windows en attente ».</summary>
+    [Fact]
+    public void Le_rapport_ne_repete_pas_un_domaine_que_le_nom_dit_deja()
+    {
+        var sante = RepairTriage.Trier(new[]
+        {
+            new RepairFinding("WINDOWS UPDATE", "en attente", "aucune", null, RepairStatus.Observed, "rien en attente."),
+        });
+
+        var rapport = DiagnosticReport.Build(Scan(), "1.0.0", When, sante);
+        rapport.Should().Contain("Mises à jour Windows en attente").And.NotContain("Mises à jour Windows · Mises à jour Windows");
+    }
+
+    /// <summary>Un état lu sans geste peut porter ses étapes (le test mémoire jamais lancé) : elles arrivent dans le rapport.</summary>
+    [Fact]
+    public void Les_etapes_d_un_etat_lu_arrivent_dans_le_rapport()
+    {
+        var sante = RepairTriage.Trier(new[]
+        {
+            new RepairFinding("STABILITE", "test memoire Windows", "jamais lancé", null, RepairStatus.Observed,
+                "aucun résultat du test.", Remede: "1) Windows + R, mdsched.exe."),
+        });
+
+        DiagnosticReport.Build(Scan(), "1.0.0", When, sante).Should().Contain("mdsched.exe");
+    }
+
+    /// <summary>Le geste a sa propre ligne, sous le constat, à part de l'explication.</summary>
+    [Fact]
+    public void Le_geste_d_un_constat_a_corriger_a_sa_propre_ligne()
+    {
+        var sante = RepairTriage.Trier(new[]
+        {
+            new RepairFinding("STABILITE", "arrets brutaux", "8 en 45 jours", "aucun",
+                RepairStatus.Suspicious, "un arret sec ne laisse aucun dump", Remede: "1) Lance le test mémoire. 2) Relis le résultat."),
+        });
+
+        var lignes = DiagnosticReport.Build(Scan(), "1.0.0", When, sante).Split('\n').Select(l => l.TrimEnd('\r')).ToList();
+
+        var i = lignes.FindIndex(l => l.Contains("Arrêts brutaux"));
+        lignes[i].Should().NotContain("Lance le test mémoire", "le geste ne se noie plus dans l'explication");
+        lignes[i + 1].Should().Contain("Comment corriger").And.Contain("1) Lance le test mémoire. 2) Relis le résultat.");
+    }
+
+    /// <summary>L'écran ne montre que la valeur d'un état lu sans geste ; son
     /// explication sourcée n'apparaissait nulle part. Le rapport la porte.</summary>
     [Fact]
     public void Les_etats_lus_sans_geste_arrivent_avec_leur_explication()
@@ -147,7 +214,7 @@ public sealed class DiagnosticReportTests
             .And.Contain("1x 0x144").And.Contain("vidage à chaud du contrôleur USB 3");
     }
 
-    /// <summary>25/09/2026 : relu sur un rapport réel, le constat principal (pilote en performances
+    /// <summary>Relu sur un rapport réel, le constat principal (pilote en performances
     /// maximales pour tout le PC) n'y était pas. Avec le traducteur, les constats du scan y sont.</summary>
     [Fact]
     public void Les_constats_du_scan_arrivent_traduits_et_par_gravite()
@@ -374,16 +441,16 @@ public sealed class DiagnosticReportTests
             .Select(p => p.Name!)
             .ToList();
 
-        // 10/09/2026 (lot 1) : `sante` entre, TYPE verrouille — un RepairTriage ne porte que des
+        // `sante` entre, TYPE verrouille — un RepairTriage ne porte que des
         // lectures machine (domaine, nom, valeur, explication), jamais une chaine libre.
-        // 25/09/2026 : `localiser` entre, TYPE verrouille — il ne fait que traduire les cles de texte
+        // `localiser` entre, TYPE verrouille — il ne fait que traduire les cles de texte
         // des constats (TitleKey, resx) ; il ne recoit ni ne rend rien que l'appelant choisisse librement.
-        // 25/09/2026 : `processeur` entre, TYPE verrouille (le verdict CpuDeficitSoutenu, produit par la
+        // `processeur` entre, TYPE verrouille (le verdict CpuDeficitSoutenu, produit par la
         // mesure) — une premiere version passait une chaine libre, refusee par cette garde a juste titre.
-        // 25/09/2026 : `reseau` entre, TYPE verrouillé (LigneReseau, la phrase de la mesure réseau
+        // `reseau` entre, TYPE verrouillé (LigneReseau, la phrase de la mesure réseau
         // de l'écran) ; une chaîne libre a été refusée par cette garde, comme pour `processeur`.
-        // 26/09/2026 : `memoire` entre, TYPE verrouillé (LigneMemoireMesuree) ; même refus d'une chaîne libre.
-        // 27/09/2026 : `derive` entre, TYPE verrouillé (LigneDerive), même motif.
+        // `memoire` entre, TYPE verrouillé (LigneMemoireMesuree) ; même refus d'une chaîne libre.
+        // `derive` entre, TYPE verrouillé (LigneDerive), même motif.
         parameters.Should().BeEquivalentTo(new[] { "scan", "appVersion", "when", "sante", "localiser", "processeur", "reseau", "memoire", "derive" });
         typeof(DiagnosticReport).GetMethod(nameof(DiagnosticReport.Build))!.GetParameters()
             .Single(p => p.Name == "derive").ParameterType.Should().Be(typeof(DrDxt.Measurement.LigneDerive));
@@ -408,7 +475,7 @@ public sealed class DiagnosticReportTests
     [Fact]
     public void The_report_carries_no_machine_identifier()
     {
-        // 23/09/2026 — DrDXT est gratuit : plus de licence a retrouver, donc plus d'empreinte de la
+        // DrDXT est gratuit : plus de licence a retrouver, donc plus d'empreinte de la
         // machine dans un fichier fait pour etre colle dans un salon public.
         var report = DiagnosticReport.Build(Scan(), "1.0.0", When);
 
@@ -457,7 +524,7 @@ public sealed class DiagnosticReportTests
     [Fact]
     public void Un_intitule_plus_long_que_la_colonne_garde_ses_deux_points_espaces()
     {
-        // 25/09/2026 : rapport réel, « Long Duration Power Limit (PL1): Auto ».
+        // Rapport réel, « Long Duration Power Limit (PL1): Auto ».
         var lu = Scan() with
         {
             State = Scan().State with
@@ -468,14 +535,14 @@ public sealed class DiagnosticReportTests
         var rapport = DiagnosticReport.Build(lu, "1.0.0", When);
         rapport.Should().Contain("Long Duration Power Limit (PL1) : Auto");
         rapport.Should().Contain("Version               : 1.0.0", "les intitulés courts ne bougent pas");
-        // 06/10/2026 (plan 4.6) : le runtime embarqué ne suit pas les correctifs de la machine ; le support doit le lire.
+        // Le runtime embarqué ne suit pas les correctifs de la machine ; le support doit le lire.
         rapport.Should().Contain($"Runtime .NET          : {Environment.Version}");
     }
 
     [Fact]
     public void La_mesure_reseau_de_l_ecran_sort_aussi_dans_le_rapport()
     {
-        // 25/09/2026 : l'écran affichait la gigue mesurée, le rapport rien du tout. Le réseau
+        // L'écran affichait la gigue mesurée, le rapport rien du tout. Le réseau
         // est ce qu'un joueur ressent en premier ; le document envoyé au support ne peut pas le taire.
         const string ligne = "Réseau : mesuré, 0 ms de gigue au premier saut contre 0,78 ms sur le chemin complet.";
         DiagnosticReport.Build(Scan(), "1.0.0", When, reseau: new DrDxt.Measurement.Network.LigneReseau(ligne))
@@ -562,8 +629,8 @@ public sealed class DiagnosticReportTests
 
         report.Should().MatchRegex(@"Leviers à corriger\s*: 1\r?\n");
         report.Should().Contain("2 sur 3", "la couverture dit ce qui n'a PAS ete lu");
-        // Les etats sont dits en francais depuis le 05/09 : le client lit ce fichier. L'INTENTION
-        // du test ne change pas — chaque levier apparait avec son etat, et les deux etats
+        // Les etats sont dits en francais : le client lit ce fichier. Chaque levier apparait avec
+        // son etat, et les deux etats
         // differents restent distinguables.
         report.Should().Contain("xmp").And.Contain("à corriger");
         report.Should().Contain("x3d-ccd").And.Contain("non lu");
@@ -622,7 +689,7 @@ public sealed class DiagnosticReportTests
         report.Should().Contain("138.9").And.NotContain("138,9");
     }
 
-    // 26/09/2026 : sous trois passes la marge vaut +inf ; le rapport ecrivait « Infinity ».
+    // Sous trois passes la marge vaut +inf ; le rapport ecrivait « Infinity ».
     [Fact]
     public void Une_marge_infinie_se_dit_inconnue_dans_le_rapport()
     {
@@ -650,21 +717,16 @@ public sealed class DiagnosticReportTests
         // levier n'a rien fait.
         var report = DiagnosticReport.Build(Scan(), "1.0.0", When);
 
-        // T4 (08/10/2026) : la carte dit son état ; ADM1 : la RTX 4060 (Ada) a son rapport archivé.
+        // La carte dit son état ; ADM1 : la RTX 4060 (Ada) a son rapport archivé.
         report.Should().Contain("RTX 4060").And.Contain("réglable, validé sur cette architecture");
     }
 
     [Fact]
     public void The_report_uses_the_same_memory_unit_as_the_screen()
     {
-        // Une source, deux surfaces, et c'est la seconde qui ment.
-        //
-        // `ScanViewModel` porte ce commentaire depuis sa correction : « MT/s, pas MHz : 3800 MT/s
-        // = 1900 MHz reels. L'etiquette precedente etait fausse. » L'ecran a ete corrige. Le
-        // rapport SAV, lui, dit toujours MHz -- et c'est justement celui que le client COLLE dans
-        // son ticket, donc celui qui voyage et qu'on relit six mois plus tard.
-        //
-        // Trouve le 06/09/2026 en rendant le rapport reel de la machine de reference.
+        // Une source, deux surfaces : le rapport dit MT/s comme l'ecran (3800 MT/s = 1900 MHz reels).
+        // C'est le rapport que le client colle dans son ticket, donc celui qui voyage et qu'on relit
+        // six mois plus tard.
         var report = DiagnosticReport.Build(Scan(), appVersion: "1.0.0", when: When);
 
         report.Should().NotContain(" MHz", "l'etiquette MHz est fausse pour une DDR : 3800 MT/s = 1900 MHz");

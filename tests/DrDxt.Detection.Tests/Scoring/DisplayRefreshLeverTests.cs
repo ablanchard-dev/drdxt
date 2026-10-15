@@ -6,12 +6,9 @@ using Xunit;
 namespace DrDxt.Detection.Tests.Scoring;
 
 // -----------------------------------------------------------------------
-// L1.4 — le levier le plus gratuit, enfin cable.
+// Le levier le plus gratuit : la frequence d'affichage.
 //
-// Le plan du levier (non publie) portait « heuristique ecrite et prouvee, LEVIER NON CABLE »
-// depuis le 15/08/2026. Sur la machine de reference, un panneau 200 Hz tournait a 143 Hz pendant
-// trois jours pendant qu'un scan la declarait saine. L'heuristique avait ses 9 tests ; le produit,
-// lui, n'en disait pas un mot.
+// Mesure sur la machine de reference : un panneau 200 Hz pilote a 143 Hz.
 //
 // Ces tests ne re-testent pas l'heuristique : ils testent que le SCAN la prononce, et surtout
 // qu'un ecran illisible ne devient jamais un ecran sain.
@@ -49,7 +46,7 @@ public sealed class DisplayRefreshLeverTests
         var r = Score(new RefreshHeadroom(TriState.On, 143, 200));
 
         r.Findings.Should().Contain(f => f.TitleKey == "Finding.Display.RefreshBelowMax");
-        r.Score.Should().BeLessThan(100, "un ecran sous-exploite est un vrai deficit, pas un detail");
+        r.Ledger!.Sum(e => e.Penalty).Should().BeGreaterThan(0, "un ecran sous-exploite est un vrai deficit, pas un detail");
     }
 
     [Fact]
@@ -67,7 +64,7 @@ public sealed class DisplayRefreshLeverTests
     {
         var r = Score(new RefreshHeadroom(TriState.Off, 200, 200));
 
-        r.Score.Should().Be(100);
+        r.Ledger!.Sum(e => e.Penalty).Should().Be(0);
         r.Findings.Should().NotContain(f => f.TitleKey == "Finding.Display.RefreshBelowMax");
     }
 
@@ -79,7 +76,7 @@ public sealed class DisplayRefreshLeverTests
         // heriter de cette regle, pas seulement l'heuristique isolee.
         var r = Score(DisplayRefreshHeuristicHeadroom(currentHz: 143, bestHz: 144));
 
-        r.Score.Should().Be(100);
+        r.Ledger!.Sum(e => e.Penalty).Should().Be(0);
     }
 
     [Fact]
@@ -90,7 +87,7 @@ public sealed class DisplayRefreshLeverTests
         // sur toute machine dont l'affichage ne se lit pas — l'inverse exact de sa raison d'etre.
         var r = Score(new RefreshHeadroom(TriState.Unknown, 143, 0));
 
-        r.Score.Should().Be(100, "un inconnu ne deduit jamais de points");
+        r.Ledger!.Sum(e => e.Penalty).Should().Be(0, "un inconnu ne deduit jamais de points");
         r.Ledger!.Should().ContainSingle(e => e.LeverId == "display-refresh")
             .Which.State.Should().Be(LeverState.Unknown);
         r.Coverage!.UnknownLevers.Should().BeGreaterThan(0, "et il doit se VOIR dans la couverture");

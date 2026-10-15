@@ -4,39 +4,33 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// D1 — NvidiaUltraLowLatencyTweak (anciennement « NvidiaUltraLowLatencyTweak »).
+// NvidiaUltraLowLatencyTweak.
 //
-// Applique NVIDIA Ultra Low Latency Mode (NULL) = Ultra, via la feuille de registre
-// allowlistee ...\NVTweak\LowLatencyMode, ecrite par l'helper eleve.
+// Pose le mode faible latence de NVIDIA (NULL) sur Ultra, par la feuille de registre autorisée
+// ...\NVTweak\LowLatencyMode, écrite par le helper élevé.
 //
-// Dette semantique payee le 08/09/2026. Ce tweak s'appelait « Reflex » et son titre
-// affichait « NVIDIA Reflex — plancher de faible latence pilote ». **Ce sont deux
-// technologies differentes**, verifie dans la documentation NVIDIA :
+// Ce n'est pas Reflex : ce sont deux technologies différentes (documentation NVIDIA).
+//   * NULL (ce réglage) limite la file d'images côté pilote. Il ne fonctionne qu'en DirectX 9 à 11 :
+//     en DX12 et Vulkan, le moteur du jeu gère lui-même la file et le pilote n'a pas la main.
+//   * Reflex aligne le travail du moteur juste à temps. C'est un SDK intégré au jeu, que DrDXT ne peut
+//     ni activer ni désactiver.
+// Les confondre donnerait un titre faux et un candidat essayé sur un jeu DirectX 12, où ce réglage
+// ne peut rien.
 //
-//   * NULL (ce reglage) limite la file de frames cote pilote. Il ne fonctionne qu'en
-//     DirectX 9 a 11 : en DX12 et Vulkan, le moteur du jeu gere lui-meme la file et le
-//     pilote n'a pas la main.
-//   * Reflex aligne le travail du MOTEUR juste-a-temps. C'est un SDK integre au jeu,
-//     que DrDXT ne peut ni activer ni desactiver.
+// L'identifiant `latency.reflex` est gardé : c'est une clé de persistance, lue par le réconciliateur
+// et par les manifestes déjà écrits. La renommer est une migration à part entière (GATES.md).
 //
-// Les confondre parce qu'elles poursuivent un but voisin a produit un titre faux et,
-// pire, un candidat qu'on aurait essaye sur Warzone — un jeu DirectX 12, ou ce reglage
-// ne peut rien faire.
+// Jamais proposé (voir AppliesTo) ; le code reste pour défaire une écriture passée.
 //
-// L'identifiant `latency.reflex` est conserve : c'est une cle de PERSISTANCE, lue par
-// le reconciliateur et par les manifestes deja ecrits. La renommer est une migration a
-// part entiere, tracee dans GATES.md — pas un renommage de confort.
-//
-// Gating: NVIDIA render GPU on a desktop. False on AMD-only / iGPU / handheld /
-// laptop (mobile GPUs are driver-locked — guided, not scripted).
-//
-// Apply: capture the real original LowLatencyMode (registry-read seam) → store as a
-// serialized inverse PrivilegedOp in the snapshot → write Ultra (=2) via the helper.
-// Any unavailable SDK / registry path → TWEAK.SDK_UNAVAILABLE (fail clean, no throw).
+// Application : l'original de LowLatencyMode est relu, l'op inverse sérialisée rangée dans le
+// snapshot, puis Ultra (= 2) est écrit par le helper. SDK ou chemin de registre absent :
+// TWEAK.SDK_UNAVAILABLE (échec propre, sans exception).
 // -----------------------------------------------------------------------
+/// <summary>Pose LowLatencyMode = Ultra dans le registre NVIDIA. Jamais proposé : rien ne prouve que le pilote lise
+/// cette valeur ; il ne sert plus qu'à défaire une écriture passée.</summary>
 public sealed class NvidiaUltraLowLatencyTweak : LatencyTweakBase
 {
-    // Ultra = 2 (0 = Off, 1 = On, 2 = Ultra). The "floor" we set.
+    // Ultra = 2 (0 = Off, 1 = On, 2 = Ultra). Le « plancher » qu'on pose.
     private const uint UltraLowLatency = 2;
     private const string NvTweakPath = @"SOFTWARE\NVIDIA Corporation\Global\NVTweak";
     private const string LowLatencyName = "LowLatencyMode";
@@ -57,7 +51,7 @@ public sealed class NvidiaUltraLowLatencyTweak : LatencyTweakBase
     public override string Id => "latency.reflex";
     public override string SummaryKey => "tweak.latency.reflex.driver_floor";
 
-    // 24/09/2026 : jamais proposé. Rien ne prouve que le pilote lise cette valeur : absente de
+    // Jamais proposé. Rien ne prouve que le pilote lise cette valeur : absente de
     // l'en-tête public NvApiDriverSettings.h, absente du registre de la machine de référence (seul
     // `OverridePRR` y vit), et le « Low Latency Mode » du panneau passe par PRERENDERLIMIT, déjà
     // posé par `latency.render_queue_cap`. Le code reste pour défaire une écriture passée ;
@@ -72,7 +66,7 @@ public sealed class NvidiaUltraLowLatencyTweak : LatencyTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "NVIDIA driver / NVAPI is not available.");
 
-            // Capture the real original value before writing (faithful revert).
+            // Relever la vraie valeur d'origine avant d'écrire (retour arrière fidèle).
             var read = _registry.ReadDword(RegistryHiveKind.LocalMachine, NvTweakPath, LowLatencyName);
             if (!read.IsOk)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
@@ -84,7 +78,7 @@ public sealed class NvidiaUltraLowLatencyTweak : LatencyTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "Could not serialize the revert op.");
 
-            // Apply the driver floor (Ultra) through the allowlisted typed op.
+            // Poser le plancher du pilote (Ultra) par l'op typée sur liste blanche.
             var op = new SetRegistryValueOp(
                 RegistryHiveKind.LocalMachine, NvTweakPath, LowLatencyName,
                 RegistryValueType.DWord,
@@ -99,7 +93,7 @@ public sealed class NvidiaUltraLowLatencyTweak : LatencyTweakBase
         }
         catch (Exception ex)
         {
-            // Every external boundary wrapped → fail clean, never throw.
+            // Chaque frontière externe protégée → échec propre, jamais d'exception.
             return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                 $"NVIDIA Ultra Low Latency apply boundary error: {ex.Message}");
         }

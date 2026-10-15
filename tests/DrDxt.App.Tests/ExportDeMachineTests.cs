@@ -7,7 +7,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 07/10/2026 (T1) : « Exporter ma machine ». Le fichier d'un joueur testeur doit devenir une fixture de
+/// « Exporter ma machine ». Le fichier d'un joueur testeur doit devenir une fixture de
 /// tests/Shared/machines telle quelle, et ne rien porter qui désigne le joueur ou son PC. Aucun test ne lit ce PC : les
 /// valeurs propres à la machine sont semées dans une fausse machine.
 /// </summary>
@@ -34,10 +34,12 @@ public class ExportDeMachineTests
     private const string Mac = "A4-BB-6D-12-34-56", MacPoints = "a4:bb:6d:12:34:57", MacColle = "A4BB6D123458";
     private const string Ipv4 = "192.168.1.42", Ipv6 = "fe80::1c2d:3e4f:5a6b:7c8d";
     private const string Sid = "S-1-5-21-1111111111-2222222222-3333333333-1001";
+    private const string CleLicence = "7KQ2M-XW9TR-B4HNP-3JC8D-VF6GY";
+    private const string EmpreinteHex = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
     private const string Volume = @"\\?\Volume{0e1f2a3b-4c5d-6e7f-8091-a2b3c4d5e6f7}\";
     private const string Courriel = "joueur.secret@example.com";
     private const string AutreCompte = "Bernard";
-    // F-21 : un compte de deux lettres, et l'employeur d'un dossier OneDrive.
+    // Un compte de deux lettres, et l'employeur d'un dossier OneDrive.
     private const string CompteCourt = "Qz", Entreprise = "Zorglub Industries";
 
     private static readonly Dictionary<string, string[]> Semees = new()
@@ -51,6 +53,7 @@ public class ExportDeMachineTests
         [MachineExportee.CeQuiEstRetire[6]] = ["0e1f2a3b-4c5d-6e7f-8091-a2b3c4d5e6f7"],
         [MachineExportee.CeQuiEstRetire[7]] = [Courriel],
         [MachineExportee.CeQuiEstRetire[8]] = [Entreprise],
+        [MachineExportee.CeQuiEstRetire[9]] = [CleLicence, EmpreinteHex],
     };
 
     private static (HardwareInventory, SettingsState, List<RepairFinding>) FausseMachine()
@@ -70,14 +73,21 @@ public class ExportDeMachineTests
             new("RESEAU", "carte", $"{MacPoints} {MacColle}", null, RepairStatus.Observed, $"adresses {Ipv4} et {Ipv6}"),
             new("FICHIERS", "synchro", $@"C:\Users\{Compte}\OneDrive - {Entreprise}\notes.txt", null, RepairStatus.Observed,
                 $"ouvert par {CompteCourt} hier"),
+            new("LICENCE", "clé", CleLicence, null, RepairStatus.Observed, $"empreinte {EmpreinteHex}"),
         };
         return (hw, st, sante);
     }
 
+    // « Unknown » est ce que WMI rend pour un numéro de série vide : il ne désigne aucun PC, le rapport le garde lisible.
+    [Fact]
+    public void Une_valeur_generique_de_wmi_ne_se_retire_pas()
+        => MachineExportee.AnonymiserTexte("mémoire : unknown (moins de 3 passes) ; série Default string", ["Unknown", "Default string", "Bob"])
+            .Should().Contain("unknown (moins de 3 passes)").And.Contain("Default string");
+
     [Fact]
     public void Un_rapport_en_texte_libre_perd_les_memes_valeurs_et_garde_le_materiel()
     {
-        // 09/10/2026 : le rapport de vérification part en public (ticket GitHub) ; les règles de la machine exportée s'y appliquent.
+        // Le rapport de vérification part en public (ticket GitHub) ; les règles de la machine exportée s'y appliquent.
         // Le même texte que la fausse machine, mis à plat comme un rapport : chaque valeur semée dans son contexte réel.
         var (hw, st, sante) = FausseMachine();
         var texte = string.Join(Environment.NewLine, sante.SelectMany(f => new[] { f.Nom, f.ValeurCourante ?? "", f.Explication, f.Provenance ?? "" }))

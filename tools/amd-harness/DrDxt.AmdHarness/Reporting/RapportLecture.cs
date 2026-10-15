@@ -7,8 +7,8 @@ using DrDxt.Detection.Gpu.Adlx;
 namespace DrDxt.AmdHarness.Reporting;
 
 /// <summary>
-/// 07/10/2026 (chantier T3, demande d'un banc qui tourne seul chez un joueur AMD) : tout ce que DrDXT lit sur la
-/// machine, étape par étape, en LECTURE SEULE. Règles : aucune écriture (la règle du 29/09 interdit tension, fréquence et
+/// Tout ce que DrDXT lit sur la
+/// machine, étape par étape, en LECTURE SEULE. Règles : aucune écriture (la règle de la carte interdit tension, fréquence et
 /// ventilateur sur la carte ; ce rapport n'écrit même pas la limite de puissance) ; chaque étape est isolée et bornée dans
 /// le temps, une étape qui plante ou qui pend est notée et la suivante part ; le rapport s'écrit toujours, même si tout
 /// échoue, dans Téléchargements, puis la fenêtre attend une touche pour que le joueur sache quoi envoyer.
@@ -21,7 +21,7 @@ public static class RapportLecture
     public sealed record Etape(string Nom, Func<CancellationToken, Task<string>> Lire);
 
     /// <summary>Déroule toutes les étapes ; ne lève jamais. Chaque résultat, réussi ou non, va dans le texte.</summary>
-    /// <param name="ecrireBloc">Revue n° 8 : chaque bloc est écrit dès que l'étape finit ; un plantage plus tard ne
+    /// <param name="ecrireBloc">Chaque bloc est écrit dès que l'étape finit ; un plantage plus tard ne
     /// perd pas ce qui est déjà lu.</param>
     public static async Task<string> DeroulerAsync(IReadOnlyList<Etape> etapes, TimeSpan delai, Action<string>? progres = null,
         Action<string>? ecrireBloc = null)
@@ -34,7 +34,7 @@ public static class RapportLecture
             var chrono = Stopwatch.StartNew();
             string statut, texte;
             using var cts = new CancellationTokenSource(delai);
-            // Revue n° 8 : le délai annule aussi l'étape ; une étape en processus enfant est alors tuée, pas abandonnée.
+            // Le délai annule aussi l'étape ; une étape en processus enfant est alors tuée, pas abandonnée.
             try
             {
                 var tache = Task.Run(() => e.Lire(cts.Token));
@@ -80,7 +80,7 @@ public static class RapportLecture
                 if (materiel is null && await detecteur.DetectAsync().ConfigureAwait(false) is { IsOk: true } lu) materiel = lu.Value!;
                 if (materiel is null) return "sauté : la détection n'a rien rendu.";
                 var r = await etat.ReadAsync(materiel).ConfigureAwait(false);
-                // Revue n° 8 (5) : sur un APU + carte, dire quelle carte porte ReBAR (la première de la liste).
+                // Sur un APU + carte, dire quelle carte porte ReBAR (la première de la liste).
                 var cartes = string.Join(Environment.NewLine, materiel.Gpus.Select((g, i) => $"carte {i} : {g}"));
                 return (r.IsOk ? r.Value!.ToString() : $"non lu : {r.Error?.Message}")
                        + $"{Environment.NewLine}ReBAR lu sur la carte 0 de cette liste :{Environment.NewLine}{cartes}";
@@ -133,7 +133,7 @@ public static class RapportLecture
                + $"{Environment.NewLine}Administrateur : {new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent()).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator)}";
     }
 
-    /// <summary>Revue n° 8 (1) : chaque étape tourne dans un processus enfant (le même exe, « --etape N »). Un
+    /// <summary>Chaque étape tourne dans un processus enfant (le même exe, « --etape N »). Un
     /// plantage du pilote AMD tue l'enfant, pas le rapport ; une étape bloquée est tuée au délai, pas abandonnée.</summary>
     public static IReadOnlyList<Etape> EtapesEnProcessus(IReadOnlyList<string> noms)
         => noms.Select((nom, i) => new Etape(nom, ct => EnfantAsync(i, ct))).ToList();

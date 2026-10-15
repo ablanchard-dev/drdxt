@@ -6,7 +6,7 @@ using NSubstitute;
 
 namespace DrDxt.Application.Tests.Tweaks.Gpu;
 
-/// <summary>GPU-OC (08/10/2026) : le ventilateur en mode Expert. Doublures seulement : aucune carte n'est touchée.</summary>
+/// <summary>Le ventilateur en mode Expert. Doublures seulement : aucune carte n'est touchée.</summary>
 public sealed class VentilateurExpertTests
 {
     private readonly IElevatedClient _eleve = Substitute.For<IElevatedClient>();
@@ -85,7 +85,7 @@ public sealed class VentilateurExpertTests
             PrivilegedOpCodec.Serialize(new ApplyGpuFanCurveOp(0, [new FanCurvePointDto(0, 100)])).Value).Should().BeFalse();
     }
 
-    // Revue du 08/10 : la section s'affichait sur un portable NVIDIA (que la couverture dit exclu) et, avec deux cartes
+    // La section s'affichait sur un portable NVIDIA (que la couverture dit exclu) et, avec deux cartes
     // NVIDIA, l'index 0 seul était piloté sans que l'écran le dise. PC fixe, une seule carte NVIDIA.
     private static HardwareInventory Machine(ChassisType chassis, params string[] vendeurs) => new(
         new CpuInfo("Core i7-14700F", "Intel", 20, 28, false, 1),

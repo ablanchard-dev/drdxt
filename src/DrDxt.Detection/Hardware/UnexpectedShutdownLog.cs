@@ -7,7 +7,7 @@ namespace DrDxt.Detection.Hardware;
 
 /// <summary>
 /// Les arrets brutaux de la machine, dates. Un arret brutal est un `Kernel-Power 41` : Windows a
-/// redemarre sans avoir ete arrete proprement -- gel, coupure, reset, gardien materiel.
+/// redemarre sans avoir ete arrete proprement : gel, coupure, reset, gardien materiel.
 ///
 /// Pourquoi un seam a soi plutot que le seam WMI deja en place : mesure du 06/09/2026 sur la
 /// machine de reference, meme resultat (15 lignes), **16 701 ms en WMI `Win32_NTLogEvent` contre
@@ -18,12 +18,12 @@ public interface IUnexpectedShutdownLog
 {
     /// <summary>Les dates des arrets brutaux depuis <paramref name="earliest"/>, plus recentes
     /// d'abord. Une liste vide est une reponse ; un echec de lecture est un `Fail`, jamais une
-    /// liste vide -- la difference decide de ce que le produit a le droit de dire.</summary>
+    /// liste vide : la difference decide de ce que le produit a le droit de dire.</summary>
     Result<IReadOnlyList<DateTimeOffset>> Since(DateTimeOffset earliest);
 
     /// <summary>Les memes arrets, avec ce que l'evenement dit de chacun. Par defaut, un lecteur qui
     /// ne sait rendre que des dates rend des arrets sans detail : ni ecran bleu, ni bouton, ni
-    /// transition -- « pas lu » ne s'invente pas en ecran bleu.</summary>
+    /// transition : « pas lu » ne s'invente pas en ecran bleu.</summary>
     Result<IReadOnlyList<ArretBrutal>> Detail(DateTimeOffset earliest)
     {
         var dates = Since(earliest);
@@ -34,23 +34,23 @@ public interface IUnexpectedShutdownLog
 }
 
 /// <summary>
-/// Un arret brutal, avec ce que WINDOWS en a note.
+/// Un arret brutal, avec ce que Windows en a note.
 ///
-/// `Kernel-Power 41` porte trois champs qui changent tout (doc Microsoft « Event ID 41 », mise a jour
-/// du 12/02/2026) :
+/// `Kernel-Power 41` porte trois champs qui changent tout
+/// (doc Microsoft « Event ID 41 », version du 12/02/2026) :
 /// - `BugcheckCode` non nul : un ecran bleu, et son code ;
 /// - `PowerButtonTimestamp` non nul : quelqu'un a maintenu le bouton ;
 /// - `SleepInProgress` non nul : une transition d'alimentation (veille, extinction) etait en cours.
 ///
 /// Mesure du 16/09/2026 sur la machine de reference : onze evenements en 90 jours, dont 2 ecrans
 /// bleus, 1 arret sans code, 1 appui long sur le bouton et 7 pendant une transition. Les compter
-/// tous pareil faisait dire au produit « nous ne savons pas distinguer » -- le journal le distinguait.
+/// tous pareil ferait dire « nous ne savons pas distinguer » alors que le journal distingue.
 /// </summary>
 public sealed record ArretBrutal(DateTimeOffset Quand, int CodeArret, bool BoutonMaintenu, bool TransitionEnCours)
 {
     public bool EcranBleu => CodeArret != 0;
 
-    /// <summary>06/10/2026 (D1) : la famille probable, jamais une cause affirmee (voir <see cref="FamilleDArret"/>).</summary>
+    /// <summary>La famille probable, jamais une cause affirmee (voir <see cref="FamilleDArret"/>).</summary>
     public FamilleDArret Famille => ClasseurDArrets.Classer(CodeArret, TransitionEnCours);
 
     public ArretClasse Classe => new(Quand, Famille, CodeArret);
@@ -59,7 +59,7 @@ public sealed record ArretBrutal(DateTimeOffset Quand, int CodeArret, bool Bouto
     public string CodeHexa => "0x" + CodeArret.ToString("X8", CultureInfo.InvariantCulture);
 
     /// <summary>Un appui long sur le bouton est un geste de l'utilisateur : il ne compte pas comme
-    /// une instabilite. Le reste reste compte -- une transition interrompue n'est pas innocente pour
+    /// une instabilite. Le reste reste compte : une transition interrompue n'est pas innocente pour
     /// autant, et rien ici ne permet de l'affirmer.</summary>
     public static IReadOnlyList<ArretBrutal> HorsBouton(IEnumerable<ArretBrutal> arrets)
         => arrets.Where(a => !a.BoutonMaintenu).ToList();
@@ -86,8 +86,8 @@ public sealed record ArretBrutal(DateTimeOffset Quand, int CodeArret, bool Bouto
 }
 
 /// <summary>
-/// La lecture reelle. Le journal `System` est lisible sans elevation (verifie le 06/09/2026 sur la
-/// machine de reference : 15 evenements rendus en session non elevee) -- c'est ce qui rend ce
+/// La lecture reelle. Le journal `System` est lisible sans elevation (releve le 06/09/2026 sur la
+/// machine de reference : 15 evenements rendus en session non elevee) : c'est ce qui rend ce
 /// constat possible dans un produit qui ne demande l'UAC que pour ecrire.
 /// </summary>
 public sealed class WindowsUnexpectedShutdownLog : IUnexpectedShutdownLog
@@ -136,7 +136,7 @@ public sealed class WindowsUnexpectedShutdownLog : IUnexpectedShutdownLog
         }
         catch (Exception ex)
         {
-            // Journal absent, service arrete, acces refuse sur une machine durcie : on le DIT.
+            // Journal absent, service arrete, acces refuse sur une machine durcie : on le dit.
             // Rendre une liste vide ferait passer « je n'ai pas pu lire » pour « tout va bien »,
             // et c'est precisement le mensonge que ce produit existe pour ne pas faire.
             return Result<IReadOnlyList<ArretBrutal>>.Fail(

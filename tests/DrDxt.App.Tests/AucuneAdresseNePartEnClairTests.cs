@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026 — « forcer le HTTPS ». DrDXT contacte trois choses : le service de
+// « forcer le HTTPS ». DrDXT contacte trois choses : le service de
 // licence (api.keygen.sh), un flux de mises a jour quand l'hebergeur en
 // configure un, et la page de paiement ouverte dans le navigateur.
 //

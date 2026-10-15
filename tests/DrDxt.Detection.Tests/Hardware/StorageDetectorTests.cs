@@ -43,7 +43,7 @@ public class StorageDetectorTests
         return wmi;
     }
 
-    // 04/10/2026 (audit à l'écran, plan 5.2) : sur la machine de référence, Windows liste la clé USB (bus 7) avant le
+    // Sur la machine de référence, Windows liste la clé USB (bus 7) avant le
     // SSD NVMe, et l'accueil affichait « Stockage : JetFlash Transcend 32GB ». Les bus amovibles (USB 7, SD 12, MMC 13)
     // passent après les disques internes.
     [Fact]
@@ -54,7 +54,7 @@ public class StorageDetectorTests
             .Should().Equal("Samsung SSD 990 PRO 2TB", "JetFlash Transcend 32GB");
     }
 
-    // 04/10/2026 : WMI rend BusType et MediaType en entier 16 bits non signé (UInt16), pas en int. GetInt ne le lisait
+    // WMI rend BusType et MediaType en entier 16 bits non signé (UInt16), pas en int. GetInt ne le lisait
     // pas : aucun NVMe ni aucune clé USB n'était reconnu sur une vraie machine, les tests passaient avec des int.
     [Fact]
     public void Les_types_reels_de_wmi_en_uint16_sont_lus()
@@ -74,7 +74,7 @@ public class StorageDetectorTests
     [Fact]
     public void NVMe_disk_detected_via_bus_type_17()
     {
-        // BusType=17 → NVMe regardless of MediaType
+        // BusType=17 → NVMe quel que soit MediaType
         var wmi = MakeMsft(("Samsung 970 EVO", 4, 17, 1_000_000_000_000UL));
         var result = new StorageDetector(wmi).Detect();
         result.IsOk.Should().BeTrue();
@@ -146,7 +146,7 @@ public class StorageDetectorTests
     [Fact]
     public void Real_machine_has_at_least_one_storage_device()
     {
-        // Light real-machine integration test — no throw, ≥1 device
+        // Test d'intégration léger sur la vraie machine : ne lève pas, ≥ 1 périphérique
         var provider = new ServiceCollection().AddDrDxtDetection().BuildServiceProvider();
         var detector = provider.GetRequiredService<IStorageDetector>();
         var result = detector.Detect();

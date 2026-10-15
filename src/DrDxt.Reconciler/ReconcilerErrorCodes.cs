@@ -1,42 +1,42 @@
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// M4 reconciler error codes — module-local, namespaced so literals are never
-// scattered (master plan §10 convention). Core ErrorCodes (IoFailure,
-// ManifestTampered, OpNotAllowed…) are reused where they already fit.
+// Codes d'erreur du réconciliateur : locaux au module, dans un espace de noms pour que les
+// littéraux ne soient jamais éparpillés. Les ErrorCodes de Core (IoFailure,
+// ManifestTampered, OpNotAllowed…) sont repris là où ils conviennent déjà.
 // -----------------------------------------------------------------------
 public static class ReconcilerErrorCodes
 {
-    // A manifest with an unknown / future schemaVersion → refuse, never guess (T5).
+    // Un manifeste à schemaVersion inconnu / futur → refus, jamais de supposition.
     public const string ManifestSchema = "MANIFEST_SCHEMA";
 
-    // A committed manifest carried a tweak whose category is not OS-side
-    // reconcilable (firmware-persistent: XMP/EXPO/undervolt BIOS) → refuse at
-    // save (T7). The reconciler only owns volatile OS-side settings (cahier §4 P4).
+    // Un manifeste commité porte un levier dont la catégorie n'est pas réconciliable côté OS
+    // (persistée dans le firmware : XMP/EXPO/undervolt BIOS) → refus à l'enregistrement. Le
+    // réconciliateur ne possède que des réglages volatils côté OS.
     public const string ManifestNonReconcilable = "MANIFEST_NON_RECONCILABLE";
 
-    // A tweakId reached the reconcile loop that is not mapped to an allowlisted
-    // typed op (not in the verified manifest's known set) → refuse, security log (T20).
+    // Un tweakId arrivé dans la boucle de réconciliation sans correspondance avec une op typée admise
+    // (hors de l'ensemble connu du manifeste vérifié) → refus, journal de sécurité.
     public const string TweakNotAllowlisted = "TWEAK_NOT_ALLOWLISTED";
 
-    // A tweakId targets a protected surface (Defender / Windows Update / BITS) →
-    // hard refuse even if present in the manifest (T22, cahier §6 blacklist).
+    // Un tweakId vise une surface protégée (Defender / Windows Update / BITS) →
+    // refus strict même s'il est dans le manifeste (liste noire).
     public const string ProtectedSurface = "PROTECTED_SURFACE";
 
-    // One or more items failed to reconcile; the others completed. Aggregated,
-    // never a half-applied state (T19 / I2).
+    // Un ou plusieurs éléments n'ont pas pu être réconciliés ; les autres ont abouti. Regroupé,
+    // jamais un état à moitié appliqué.
     public const string ReconcilePartial = "RECONCILE_PARTIAL";
 
-    // A privileged write reported Ok but the confirming read-back did not show the
-    // desired value (e.g. a GPO silently re-forces it) → item marked failed (T21).
+    // Une écriture privilégiée a rendu Ok mais la relecture de confirmation ne montre pas la valeur
+    // voulue (par exemple une GPO la réimpose en silence) → élément marqué en échec.
     public const string ConfirmFailed = "RECONCILE_CONFIRM_FAILED";
 
-    // A read probe failed during drift classification → fail-clean, no guess,
-    // no write (T12).
+    // Une sonde de lecture a échoué pendant la classification de dérive → échec propre, aucune
+    // supposition, aucune écriture.
     public const string ProbeFailed = "RECONCILE_PROBE_FAILED";
 
-    // Clean uninstall (T37): the loop was stopped, the lease disarmed and the host
-    // removed, but one or more "revert to original" writes failed (or did not confirm).
-    // Aggregated and reported, never an orphaned still-reconciling install.
+    // Désinstallation propre : la boucle a été arrêtée, le bail désarmé et l'hôte retiré, mais une
+    // ou plusieurs écritures « retour à l'origine » ont échoué (ou n'ont pas été confirmées).
+    // Regroupé et rapporté, jamais une installation orpheline qui réconcilie encore.
     public const string UninstallRevertPartial = "UNINSTALL_REVERT_PARTIAL";
 }

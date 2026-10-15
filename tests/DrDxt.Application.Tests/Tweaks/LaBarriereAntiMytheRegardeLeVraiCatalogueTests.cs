@@ -6,14 +6,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.Application.Tests.Tweaks;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 17/09/2026 — la barriere anti-mythe ne regardait pas le catalogue livre.
+// La barriere anti-mythe ne regardait pas le catalogue livre.
 //
 // Le README annonce, parmi les cinq invariants : « Les mythes (Nagle/TcpAckFrequency,
 // NetworkThrottlingIndex, debloat de services, polling 8000 Hz, timer global, priorite
 // Realtime, C-states off en bloc…) sont rendus *inshippables* par un test qui casse si
-// l'un d'eux entre au catalogue. » L'en-tete de `TweakCatalogTests` va plus loin : « it is
-// impossible to introduce a banned/placebo tweak without failing this test ».
-//
+// Realtime, C-states off en bloc…) sont rendus *inshippables* par un test qui casse si
+// l'un d'eux entre au catalogue. » L'en-tete de `TweakCatalogTests` va plus loin : « impossible
+// d'introduire un levier interdit ou placebo sans faire échouer ce test ».
 // C'etait faux. Les quatre tests de cette barriere construisent chacun leur propre
 // catalogue, a partir de deux ou trois `Substitute.For<ITweak>()` fabriques sur place, puis
 // verifient que ce catalogue-la ne contient aucun mythe. Y compris celui qui passe par le
@@ -29,7 +29,7 @@ namespace DrDxt.Application.Tests.Tweaks;
 public sealed class LaBarriereAntiMytheRegardeLeVraiCatalogueTests
 {
     /// <summary>
-    /// La liste du §6, recopiee ici EXPRES plutot que partagee avec `TweakCatalogTests` :
+    /// La liste des leviers bannis, recopiee ici EXPRES plutot que partagee avec `TweakCatalogTests` :
     /// deux gardes qui puisent dans la meme liste tombent ensemble si quelqu'un allege la
     /// liste. Ici la liste est le CONTRAT, et un mythe retire d'un cote doit rougir de l'autre.
     /// </summary>
@@ -86,7 +86,7 @@ public sealed class LaBarriereAntiMytheRegardeLeVraiCatalogueTests
             "c'est l'assertion du test precedent, et elle doit se retourner ici");
     }
 
-    /// <summary>La priorite Realtime : le mythe le mieux documente de `cpu-all.md` §3.</summary>
+    /// <summary>La priorite Realtime : le mythe le mieux documente de la recherche processeur.</summary>
     private sealed class MytheRealtime : ITweak
     {
         public string Id => "cpu.priority_realtime";

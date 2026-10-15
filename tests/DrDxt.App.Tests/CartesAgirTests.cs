@@ -6,7 +6,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 24/09/2026 — les cartes « Agir » (spec §3c du registre de boucle). Leurs etats « rendu » et
+/// Les cartes « Agir ». Leurs etats « rendu » et
 /// « allume » ne se photographient pas sans ecrire sur la machine : ils se prouvent ici, avec un
 /// helper factice qui enregistre ce qu'on lui demande.
 /// </summary>
@@ -46,8 +46,7 @@ public sealed class CartesAgirTests
           .Returns(Result<BenchmarkResult>.Ok(bl));
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), st, new List<Finding>(),
-              68, bl, new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), st, new List<Finding>(), bl)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
         return ScanViewModelTestSeams.Build(hd, sr, br, sc, sd, loc ?? (k => k), repairAudit: () => audit, helper: helper, writeReport: writeReport,
@@ -85,6 +84,116 @@ public sealed class CartesAgirTests
         vm.ErreurBcd.Should().BeNull();
         vm.RepairFindings.Should().ContainSingle(v => v.DomaineCle == "BCD" && v.NomCle == "bootstatuspolicy",
             "annulé, le réglage est revenu : le constat aussi");
+    }
+
+    // Le test mémoire jamais lancé : DrDXT le demande lui-même au prochain démarrage, et l'annule. Le redémarrage
+    // reste au joueur.
+    [Fact]
+    public async Task Le_test_memoire_jamais_lance_porte_son_geste_qui_le_demande_et_l_annule()
+    {
+        var helper = Helper(Result.Ok());
+        var jamais = new RepairFinding("STABILITE", "test memoire Windows", "jamais lancé", null, RepairStatus.Observed,
+            "aucun résultat du test.", RepairAction.Recommandation, Remede: "1) mdsched.exe.");
+        var vm = Vm(new[] { jamais }, helper);
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        var geste = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!.Single();
+        await geste.FaireCommand.ExecuteAsync(null);
+        await helper.Received(1).ExecuteAsync(new ScheduleMemoryDiagnosticOp(), Arg.Any<CancellationToken>());
+        geste.Fait.Should().BeTrue();
+
+        await geste.AnnulerCommand.ExecuteAsync(null);
+        await helper.Received(1).ExecuteAsync(new CancelMemoryDiagnosticOp(), Arg.Any<CancellationToken>());
+    }
+
+    // Le périphérique en échec se relance par l'identifiant lu ; rien à défaire, donc pas d'« Annuler ».
+    [Fact]
+    public async Task Un_peripherique_en_echec_se_relance_par_son_identifiant_lu()
+    {
+        var helper = Helper(Result.Ok());
+        var enEchec = new RepairFinding("PERIPHERIQUES", "Contrôleur USB", "en échec (code 10)", "sans erreur", RepairStatus.Suspicious,
+            "son pilote ne fonctionne pas.", RepairAction.Recommandation, Remede: "1) Gestionnaire de périphériques.",
+            Cible: @"USB\VID_046D\5&1");
+        var vm = Vm(new[] { enEchec }, helper);
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        var geste = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!.Single();
+        await geste.FaireCommand.ExecuteAsync(null);
+
+        await helper.Received(1).ExecuteAsync(new RestartDeviceOp(@"USB\VID_046D\5&1"), Arg.Any<CancellationToken>());
+        geste.PeutAnnuler.Should().BeFalse();
+    }
+
+    // Un geste par paquet, chacun avec son « Annuler » qui le remet depuis l'export.
+    [Fact]
+    public async Task Chaque_vieux_pilote_d_affichage_se_retire_et_se_remet()
+    {
+        var helper = Helper(Result.Ok());
+        var vieux = new RepairFinding("GPU DRIVER", "anciens pilotes d'affichage gardés", "NVIDIA 1 (oem98.inf), AMD 2 (oem41.inf)", null,
+            RepairStatus.Suspicious, "2 paquets.", RepairAction.Recommandation, Remede: "1) Terminal.", Cible: "oem98.inf oem41.inf");
+        var vm = Vm(new[] { vieux }, helper, loc: k => k + ":{0}");
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        var gestes = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!;
+        gestes.Select(g => g.Titre).Should().Equal("Geste.Pilote.Titre:oem98.inf", "Geste.Pilote.Titre:oem41.inf");
+        await gestes[1].FaireCommand.ExecuteAsync(null);
+        await gestes[1].AnnulerCommand.ExecuteAsync(null);
+
+        await helper.Received(1).ExecuteAsync(new RemoveDriverPackageOp("oem41.inf"), Arg.Any<CancellationToken>());
+        await helper.Received(1).ExecuteAsync(new RestoreDriverPackageOp("oem41.inf"), Arg.Any<CancellationToken>());
+        await helper.DidNotReceive().ExecuteAsync(new RemoveDriverPackageOp("oem98.inf"), Arg.Any<CancellationToken>());
+    }
+
+    // Un geste fait garde son « Annuler » quand la carte se refait, même si le scan suivant ne propose plus ce paquet.
+    [Fact]
+    public async Task Un_pilote_retire_garde_son_annuler_apres_un_nouveau_scan()
+    {
+        var helper = Helper(Result.Ok());
+        RepairFinding Constat(string cible) => new("GPU DRIVER", "anciens pilotes d'affichage gardés", "x", null,
+            RepairStatus.Suspicious, "paquets.", RepairAction.Recommandation, Remede: "1) Terminal.", Cible: cible);
+        var audit = new List<RepairFinding> { Constat("oem98.inf oem41.inf") };
+        var vm = Vm(audit, helper, loc: k => k + ":{0}");
+        await vm.ScanCommand.ExecuteAsync(null);
+        var retire = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes![1];
+        await retire.FaireCommand.ExecuteAsync(null);
+
+        audit[0] = Constat("oem98.inf");
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        var gestes = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!;
+        gestes.Should().Contain(retire);
+        retire.PeutAnnuler.Should().BeTrue();
+    }
+
+    // La recherche de Windows Update ne demande pas de droits : elle se propose même sans helper, et ne se défait pas.
+    [Fact]
+    public async Task Une_verification_ancienne_de_Windows_Update_se_relance_sans_droits()
+    {
+        var ancienne = new RepairFinding("WINDOWS UPDATE", "en attente", "aucune", null, RepairStatus.Suspicious,
+            "rien en attente, mais pas vérifié depuis 30 jours.", RepairAction.Recommandation, Remede: "1) Paramètres.",
+            Cible: DrDxt.Detection.Hardware.MisesAJourEnAttente.CibleRecherche);
+        var vm = Vm(new[] { ancienne }, helper: null);
+        var recherches = 0;
+        vm.ChercherWindowsUpdate = () => { recherches++; return Task.FromResult(Result.Ok()); };
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        var geste = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!.Single();
+        await geste.FaireCommand.ExecuteAsync(null);
+
+        recherches.Should().Be(1);
+        geste.Fait.Should().BeTrue();
+        geste.PeutAnnuler.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Sans_helper_aucun_geste_n_est_propose()
+    {
+        var jamais = new RepairFinding("STABILITE", "test memoire Windows", "jamais lancé", null, RepairStatus.Observed,
+            "aucun résultat du test.", RepairAction.Recommandation, Remede: "1) mdsched.exe.");
+        var vm = Vm(new[] { jamais }, helper: null);
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.Domaines.SelectMany(d => d.Lignes).Should().NotContain(l => l.AGestes);
     }
 
     [Fact]
@@ -128,7 +237,7 @@ public sealed class CartesAgirTests
         finally { System.IO.File.Delete(fichier); }
     }
 
-    // 26/09/2026 : la garde vit sous %LOCALAPPDATA%, ecrivable par tout programme du compte. Modifiee, elle
+    // La garde vit sous %LOCALAPPDATA%, ecrivable par tout programme du compte. Modifiee, elle
     // faisait poser par « Annuler » un autre element BCD permis (useplatformclock Yes force le HPET), alors
     // que la carte ne retire que bootstatuspolicy.
     [Fact]
@@ -196,6 +305,21 @@ public sealed class CartesAgirTests
     }
 
     [Fact]
+    public async Task Le_rapport_exporte_ne_porte_ni_le_nom_du_pc_ni_une_adresse_ip()
+    {
+        var detail = $"partage \\\\{Environment.MachineName}\\jeux, routeur 192.168.1.42";
+        var constat = new RepairFinding("RESEAU", "chemin du jeu", detail, null, RepairStatus.Suspicious, "lu.");
+        string? ecrit = null;
+        var vm = Vm(new[] { constat }, helper: null, writeReport: (_, texte) => { ecrit = texte; return "rapport.txt"; });
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        await vm.ExportReportCommand.ExecuteAsync(null);
+
+        ecrit.Should().Contain("Chemin du jeu", "témoin : le constat est bien dans le rapport");
+        ecrit.Should().NotContain(Environment.MachineName).And.NotContain("192.168.1.42");
+    }
+
+    [Fact]
     public async Task Le_test_memoire_lance_depuis_la_carte_rend_son_resultat_et_libere_la_carte()
     {
         var vm = Vm(Array.Empty<RepairFinding>(), helper: null);
@@ -232,7 +356,7 @@ public sealed class CartesAgirTests
     // Un exe qu'aucune machine ne fait tourner : le mode s'allume sans jamais poser le plafond.
     private const string JeuAbsent = "drdxt-jeu-absent-des-tests.exe";
 
-    // 27/09/2026 : la veille du ping. Sans scan en partie saturee, la carte n'offrait rien a faire.
+    // La veille du ping. Sans scan en partie saturee, la carte n'offrait rien a faire.
     private static IReadOnlyList<DrDxt.Measurement.Network.EchantillonEnvoi> Fenetre(double pingEnCharge)
         => Enumerable.Range(0, 25).Select(_ => new DrDxt.Measurement.Network.EchantillonEnvoi(1, 10))
             .Concat(Enumerable.Range(0, 25).Select(_ => new DrDxt.Measurement.Network.EchantillonEnvoi(100, pingEnCharge))).ToList();
@@ -268,7 +392,7 @@ public sealed class CartesAgirTests
         await vm.DesactiverPlafondEnvoiAsync();
     }
 
-    // Revue du 08/10 : pendant la veille, la commande restait grisée (l'interrupteur ne s'éteignait plus) ; et un clic sans
+    // Pendant la veille, la commande restait grisée (l'interrupteur ne s'éteignait plus) ; et un clic sans
     // effet (veille plus proposée) laissait l'interrupteur coché par WPF sans que l'état le redise.
     [Fact]
     public async Task L_interrupteur_de_la_veille_reste_cliquable_et_redit_son_etat()
@@ -401,7 +525,7 @@ public sealed class CartesAgirTests
             Arg.Is<PrivilegedOp>(o => o is RemoveUploadCapOp), Arg.Any<CancellationToken>());
     }
 
-    // 28/09/2026 : la protection retenue part aussi au service de démarrage, par le helper (seul à écrire sous
+    // La protection retenue part aussi au service de démarrage, par le helper (seul à écrire sous
     // %ProgramData%\DrDxt). Éteinte, elle y est oubliée : le service ne plafonne plus rien.
     [Fact]
     public async Task La_bascule_retient_la_protection_pour_le_service_puis_l_oublie()
@@ -422,7 +546,7 @@ public sealed class CartesAgirTests
             Arg.Is<PrivilegedOp>(o => o is ForgetServiceUploadCapOp), Arg.Any<CancellationToken>());
     }
 
-    // 28/09/2026 : un seul poseur. Service de démarrage en marche : il porte la protection, l'App n'arme pas son
+    // Un seul poseur. Service de démarrage en marche : il porte la protection, l'App n'arme pas son
     // propre mode (deux poseurs se retireraient l'un l'autre le plafond quand l'App se ferme en pleine partie).
     [Fact]
     public async Task Service_en_marche_l_App_n_arme_pas_son_propre_mode_mais_la_protection_est_active()
@@ -444,8 +568,8 @@ public sealed class CartesAgirTests
         await helper.Received(1).ExecuteAsync(Arg.Is<PrivilegedOp>(o => o is ForgetServiceUploadCapOp), Arg.Any<CancellationToken>());
     }
 
-    // 28/09/2026 : service en marche, l'App ne pose rien elle-même ; si le helper refuse de retenir la protection
-    // pour le service (UAC déclinée), personne ne la porte. La carte disait pourtant « active ».
+    // Service en marche, l'App ne pose rien elle-même ; si le helper refuse de retenir la protection
+    // pour le service (UAC déclinée), personne ne la porte : la carte ne doit pas dire « active ».
     [Fact]
     public async Task Service_en_marche_un_refus_de_retenir_laisse_la_protection_eteinte_et_le_dit()
     {
@@ -459,8 +583,8 @@ public sealed class CartesAgirTests
         vm.ErreurPlafondEnvoi.Should().NotBeNull();
     }
 
-    // 28/09/2026 : symétrique du refus à l'allumage. Éteindre demande au helper d'oublier la protection sous
-    // %ProgramData% ; refusé, le service continuait de plafonner à chaque partie alors que la carte disait « inactive ».
+    // Symétrique du refus à l'allumage. Éteindre demande au helper d'oublier la protection sous
+    // %ProgramData% ; refusé, le service continue de plafonner à chaque partie : la carte ne doit pas dire « inactive ».
     [Fact]
     public async Task Service_en_marche_un_refus_d_oublier_laisse_la_protection_active_et_le_dit()
     {
@@ -479,7 +603,7 @@ public sealed class CartesAgirTests
         vm.ErreurPlafondEnvoi.Should().NotBeNull();
     }
 
-    // 28/09/2026 : la carte disait « elle n'agit que pendant que DrDXT est ouvert ». Faux dès que le service de
+    // « Elle n'agit que pendant que DrDXT est ouvert » est faux dès que le service de
     // démarrage la porte : le texte suit celui qui pose le plafond.
     [Fact]
     public void La_carte_dit_qui_porte_la_protection()
@@ -492,8 +616,8 @@ public sealed class CartesAgirTests
         vm.LabelPingDescription.Should().Be("Ping.Protection.Description.Service");
     }
 
-    // 28/09/2026, vu sur photo : la fenêtre s'affiche avant que l'App branche la question du service, et la carte
-    // gardait le texte lu à l'affichage. Brancher la question doit prévenir la carte.
+    // La fenêtre s'affiche avant que l'App branche la question du service : sans prévenir la carte,
+    // elle garderait le texte lu à l'affichage. Brancher la question doit prévenir la carte.
     [Fact]
     public void Brancher_la_question_du_service_previent_la_carte()
     {
@@ -509,7 +633,7 @@ public sealed class CartesAgirTests
     [Fact]
     public void La_carte_nomme_le_jeu_que_la_protection_surveille()
     {
-        // 25/09/2026 : la carte disait « le jeu, lui, n'est pas plafonne » sans le nommer. Nomme, on sait
+        // « Le jeu, lui, n'est pas plafonne » nomme le jeu : on sait
         // quel jeu est protege ; et un fichier retenu modifie (explorer.exe) se voit tout de suite.
         var vm = Vm(Array.Empty<RepairFinding>(), Helper(Result.Ok()),
             loc: k => k == "Ping.Protection.Plafond" ? "{0:0.#} Mbit/s, jeu : {1}" : k);
@@ -520,7 +644,7 @@ public sealed class CartesAgirTests
     [Fact]
     public async Task Une_seconde_activation_pendant_l_attente_de_la_premiere_n_ouvre_pas_un_second_mode()
     {
-        // 25/09/2026 : au lancement, le rallumage attend le helper (UAC) ; un clic pendant ce temps
+        // Au lancement, le rallumage attend le helper (UAC) ; un clic pendant ce temps
         // passait le garde (le mode n'est retenu qu'apres l'attente). Deux modes, deux boucles : en
         // eteignant, seule la seconde s'arretait, et la premiere reposait le plafond au jeu suivant.
         var bail = new TaskCompletionSource<Result>();
@@ -540,9 +664,9 @@ public sealed class CartesAgirTests
         await vm.DesactiverPlafondEnvoiAsync();
     }
 
-    // 28/09/2026 : une protection allumée avant le service n'était retenue que sous %LOCALAPPDATA%. Au premier
-    // lancement avec le service, la carte disait « le service la porte » alors qu'il n'avait rien à porter. Elle lui
-    // est transmise une fois (une invite, comme le rallumage d'avant) ; déjà retenue, le lancement ne demande rien.
+    // Une protection allumée avant le service n'est retenue que sous %LOCALAPPDATA%. Sans transmission, au premier
+    // lancement avec le service, la carte dirait « le service la porte » alors qu'il n'a rien à porter. Elle lui
+    // est transmise une fois (une invite, comme un rallumage) ; déjà retenue, le lancement ne demande rien.
     [Theory]
     [InlineData(false, 1)]
     [InlineData(true, 0)]
@@ -638,9 +762,9 @@ public sealed class CartesAgirTests
         var vm = Vm(Array.Empty<RepairFinding>(), helper);
         // Le tour de 5 s de la boucle, court ici : l'attente du test ne dépend plus de la charge du runner.
         vm.TourDuPlafond = TimeSpan.FromMilliseconds(50);
-        // Le jeu est vivant par la couture, pas par une vraie recherche de processus (CI rouge du 07/10).
+        // Le jeu est vivant par la couture, pas par une vraie recherche de processus (sinon le test dépend de la machine de CI).
         vm.JeuVivant = exe => exe == jeu;
-        // 07/10/2026 (CI rouge 37614885766, même trace avec la couture) : le mode démarre mais aucun battement ne tourne en
+        // Le mode démarre mais aucun battement ne tourne en
         // 34 s. Hypothèse, non prouvée : la boucle part par Task.Run sur le pool de .NET, que d'autres tests bloquent en
         // parallèle sur le runner, alors que xUnit déroule ce test sur ses propres fils. Un minimum de fils plus haut
         // retire cette famine ; si le rouge revient, l'hypothèse est fausse.
@@ -677,7 +801,7 @@ public sealed class CartesAgirTests
         }
     }
 
-    // 28/09/2026 : service en marche, l'App n'arme pas son mode et l'ajustement ne tournait plus : le plafond du
+    // Service en marche, l'App n'arme pas son mode et l'ajustement ne tournait plus : le plafond du
     // service restait figé à la valeur du scan. DrDXT ouvert, le plafond suit encore le ping, par le service.
     [Fact]
     public async Task Service_en_marche_le_plafond_suit_encore_le_ping_mesure()
@@ -710,7 +834,7 @@ public sealed class CartesAgirTests
         }
     }
 
-    // 28/09/2026 : l'ajustement en mode service passait par le helper qui se lance à la demande, donc une invite
+    // L'ajustement en mode service passait par le helper qui se lance à la demande, donc une invite
     // UAC en pleine partie, répétée toutes les 20 s si elle était refusée. Il ne passe plus que par un client qui
     // ne lance jamais le helper ; sans lui, le plafond du service reste celui retenu.
     [Fact]
@@ -754,7 +878,7 @@ public sealed class CartesAgirTests
             Arg.Is<PrivilegedOp>(o => o is ApplyUploadCapOp), Arg.Any<CancellationToken>());
     }
 
-    // ── 25/09/2026 : réparer Windows (DISM puis sfc, console visible) ─────────────────────────
+    // ── Réparer Windows (DISM puis sfc, console visible) ─────────────────────────
     private static readonly RepairFinding MagasinReparable = new(
         "STABILITE", "magasin de composants", "abîmé, réparable", "sain", RepairStatus.Suspicious,
         "DISM /CheckHealth signale des composants réparables.", RepairAction.Recommandation);
@@ -777,7 +901,7 @@ public sealed class CartesAgirTests
         vm.ReparationAOuvrir.Should().BeFalse("une console suffit : le bouton ne la rouvre pas");
     }
 
-    // 29/09/2026, critique B10 (passage 3) : la console fermée, rien ne revenait dans DrDXT ; le joueur ne savait
+    // Critique B10 (passage 3) : la console fermée, rien ne revenait dans DrDXT ; le joueur ne savait
     // pas si la réparation avait marché. À la fermeture, l'état de Windows est relu (lecture) et la carte le dit.
     [Theory]
     [InlineData("sain", RepairStatus.ExpectedDefault, "Reparation.Windows.Terminee.Sain", false)]
@@ -800,7 +924,7 @@ public sealed class CartesAgirTests
         vm.ReparationAOuvrir.Should().Be(relancable);
     }
 
-    // 30/09/2026 (boucle « la carte, prouvée », G3) : au lancement, une preuve du repos commencée avant un redémarrage se
+    // Au lancement, une preuve du repos commencée avant un redémarrage se
     // conclut, et la carte dit ce que la mesure a décidé. Rien n'attendait : aucune phrase.
     [Theory]
     [InlineData(14.0, "Carte.Repos.Prouve")]
@@ -822,7 +946,27 @@ public sealed class CartesAgirTests
         (await Task.FromResult(attente.Charger())).Should().BeNull();
     }
 
-    // 30/09/2026 (G4) : un réglage gardé au repos reste sous surveillance en jeu. Trois parties d'après, toutes sous les
+    // Pas de baisse, et le helper refuse le retrait : l'écran ne doit pas dire « retiré, la carte est revenue comme
+    // avant », ni effacer la preuve en attente. Le réglage reste suivi (la preuve reste) et l'échec est dit.
+    [Fact]
+    public async Task Un_retrait_rate_apres_la_preuve_garde_le_reglage_suivi_et_le_dit()
+    {
+        var vm = Vm(Array.Empty<RepairFinding>(), helper: null);
+        var levier = Substitute.For<DrDxt.Core.ITweak>();
+        levier.Id.Returns("gpu.repos_global_normal");
+        levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Fail(ErrorCodes.HelperOpFailed, "helper refusé"));
+        var attente = new DrDxt.Application.Tweaks.PreuvesEnAttente(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"preuve-{Guid.NewGuid():N}.json"));
+        attente.Garder(new("gpu.repos_global_normal", "inverse", "normal", [50.0, 50.5, 51.0]));
+        var sonde = Substitute.For<IHardwareProbe>();
+        sonde.Lire().Returns(new HardwareReading(55.8, null));
+
+        await vm.ConclureReposCarteAsync(levier, sonde, attente, _ => Task.CompletedTask);
+
+        vm.VerdictReposCarte.Should().StartWith("Carte.Repos.PreuveRetraitRate");
+        attente.Charger().Should().NotBeNull("le réglage est toujours posé : la preuve reste, le retrait se retentera");
+    }
+
+    // Un réglage gardé au repos reste sous surveillance en jeu. Trois parties d'après, toutes sous les
     // trois d'avant sur le même jeu : il est retiré et c'est dit. Pas encore trois : rien ne bouge.
     [Theory]
     [InlineData(80.0, true)]
@@ -851,7 +995,29 @@ public sealed class CartesAgirTests
         else await levier.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
     }
 
-    // 30/09/2026 (G5) : le geste sur la page Carte graphique. Maintenir mesure le repos, écrit « Normal » et garde la
+    // Un retrait refusé (helper qui dit non) laisse « Normal » posé : effacer le retenu et dire « retiré »
+    // ferait que plus rien ne le rendrait. Le retenu reste, et l'échec est dit.
+    [Fact]
+    public async Task Un_retrait_rate_garde_le_reglage_suivi_et_le_dit()
+    {
+        var vm = Vm(Array.Empty<RepairFinding>(), helper: null);
+        var levier = Substitute.For<DrDxt.Core.ITweak>();
+        levier.Id.Returns("gpu.repos_global_normal");
+        levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Fail(ErrorCodes.HelperOpFailed, "helper refusé"));
+        var le = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+        var retenu = new DrDxt.Application.Tweaks.ReglagesRetenus(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"retenu-{Guid.NewGuid():N}.json"));
+        retenu.Garder(new("gpu.repos_global_normal", "inverse", null, le));
+        DrDxt.Application.Parties.PartieRelevee P(int j, double l) =>
+            new("cod", le.AddDays(j), le.AddDays(j).AddMinutes(20), 10, 140, l, BottleneckState.CpuBoundStrong);
+        var parties = new[] { P(-3, 90), P(-2, 92), P(-1, 91), P(1, 80), P(2, 81), P(3, 80.5) };
+
+        await vm.SurveillerLaCarteEnJeuAsync(levier, parties, retenu);
+
+        retenu.Charger().Should().NotBeNull("le réglage est toujours posé : il reste suivi");
+        vm.VerdictReposCarte.Should().StartWith("Carte.Repos.RetraitRate");
+    }
+
+    // Le geste sur la page Carte graphique. Maintenir mesure le repos, écrit « Normal » et garde la
     // preuve ; la carte dit qu'elle se jugera au prochain redémarrage. Un levier qui refuse : rien d'attendu, et dit.
     [Theory]
     [InlineData(true)]
@@ -906,7 +1072,7 @@ public sealed class CartesAgirTests
         copies.Should().Equal("icacls \"C:\\x.exe\" /reset");
     }
 
-    // 29/09/2026, critique B10 (passage 3) : rien ne disait de quand dataient les points affichés.
+    // Les points affichés disent de quand ils datent.
     [Fact]
     public async Task Le_resultat_dit_l_heure_du_scan()
     {
@@ -939,11 +1105,10 @@ public sealed class CartesAgirTests
         vm.ErreurReparation.Should().Be("Reparation.Windows.Refusee");
     }
 
-    // 04/10/2026 : vu sur la machine de référence, RestoreHealth échoue (0x800f0915) et ce qui est abîmé n'est que des versions
+    // Vu sur la machine de référence, RestoreHealth échoue (0x800f0915) et ce qui est abîmé n'est que des versions
     // remplacées. Relancer la même réparation tournait en rond : la carte le dit et propose le nettoyage.
     [Fact]
-    // DOC-WIN (09/10/2026, le mainteneur : DISM /ResetBase non, « un meilleur moyen de gérer les problèmes Windows ») :
-    // même quand tout ce qui est abîmé est une version remplacée, le geste est la réinstallation de Microsoft (elle garde
+    // Même quand tout ce qui est abîmé est une version remplacée, le geste est la réinstallation de Microsoft (elle garde
     // fichiers, applications et réglages), jamais le nettoyage irréversible.
     public async Task Une_reparation_sans_source_ouvre_toujours_la_reinstallation_jamais_ResetBase()
     {
@@ -993,7 +1158,7 @@ public sealed class CartesAgirTests
         2026-10-04 04:59:10, Info  CBS    Failed to run Detect and repair. [HRESULT = 0x800f0915 - CBS_E_REPAIR_CONTENT_MISSING]
         """;
 
-    // Revue du 04/10 (P0) : une ligne « Corrupt » d'un autre format (fichier en service au hash faux), ou un compte
+    // Une ligne « Corrupt » d'un autre format (fichier en service au hash faux), ou un compte
     // qui ne retombe pas sur le total écrit par CBS, ne doit jamais mener au nettoyage irréversible.
     [Fact]
     public void Une_lecture_incomplete_du_journal_CBS_garde_la_reparation()
@@ -1031,7 +1196,7 @@ public sealed class CartesAgirTests
             .Should().Be(DrDxt.App.Platform.CorruptionDuMagasin.Geste.Reparer, "sans échec lu, la réparation reste le geste");
     }
 
-    // 04/10/2026 (plan 1.3) : un réglage BIOS changé entre deux références se note, daté du démarrage du PC.
+    // Un réglage BIOS changé entre deux références se note, daté du démarrage du PC.
     [Fact]
     public void Un_reglage_BIOS_change_se_note_date_du_demarrage()
     {
@@ -1040,6 +1205,10 @@ public sealed class CartesAgirTests
         {
             var vm = Vm(Array.Empty<RepairFinding>(), helper: null);
             vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(chemin);
+            // L'heure du démarrage est la couture, pas l'horloge du PC (le compteur de ticks et le journal de
+            // démarrage peuvent diverger : 20 h mesurées sur la machine de référence le 12/10).
+            var demarrage = DateTimeOffset.Now.AddHours(-5);
+            vm.DemarrageDuPc = () => demarrage;
             vm.NoterChangementBios("Intel Default Settings", "Intel Default Settings");
             vm.NoterChangementBios(null, "MSI Performance Settings");
             vm.JournalChangements.Lire().Should().BeEmpty("témoin : rien de changé, ou pas d'avant connu");
@@ -1049,15 +1218,14 @@ public sealed class CartesAgirTests
 
             var c = vm.JournalChangements.Lire().Should().ContainSingle().Subject;
             c.Libelle.Should().Contain("Changement.Bios");
-            var demarrage = DateTimeOffset.Now - TimeSpan.FromMilliseconds(Environment.TickCount64);
-            c.Quand.Should().BeCloseTo(demarrage, TimeSpan.FromSeconds(5), "le changement a pris effet au plus tard au démarrage");
+            c.Quand.Should().Be(demarrage, "le changement a pris effet au plus tard au démarrage");
             c.Depuis.Should().Be(mesureAvant, "et au plus tôt après la dernière mesure sous l'ancien réglage");
             vm.ChangementsEnAttente.Should().ContainSingle(l => l.EnJeu == "Changement.Tableau.SansAvant", "la carte se refait aussitôt, sans partie d'avant (08/10 : en tableau)");
         }
         finally { System.IO.File.Delete(chemin); }
     }
 
-    // 04/10/2026 (plan 2.1) : l'Instant Replay basculé entre deux scans entre au journal, nommé en mots.
+    // L'Instant Replay basculé entre deux scans entre au journal, nommé en mots.
     [Fact]
     public void Un_reglage_bascule_entre_deux_scans_entre_au_journal()
     {
@@ -1081,7 +1249,53 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // 04/10/2026 (plan 2.3) : le mode Jeu et HAGS effectif entrent au suivi ; un état non lu n'y entre pas.
+    // La courbe du ventilateur processeur se suit en une valeur : huit octets au BIOS, un seul changement daté.
+    [Fact]
+    public void La_courbe_du_ventilateur_processeur_est_suivie_en_une_valeur()
+    {
+        var bios = new List<BiosSettingReading> { new("CPU Fan1 Smart Fan Control", 1, "Enabled", true) };
+        long[] t = [40, 62, 80, 92], v = [35, 55, 70, 100];
+        for (var i = 0; i < 4; i++)
+        {
+            bios.Add(new($"CPU Fan1 level {i + 1} Temperature", t[i], $"{t[i]} °C", false));
+            bios.Add(new($"CPU Fan1 level {i + 1} Fan Speed", v[i], $"{v[i]} %", false));
+        }
+
+        var etats = ScanViewModel.EtatsSuivis(bios: bios);
+
+        etats["bios.courbe_ventilateur_cpu"].Should().Be("40-62-80-92 °C, 35-55-70-100 %");
+        etats["bios.ventilateur_cpu_intelligent"].Should().Be("Enabled");
+        etats.Keys.Should().NotContain(k => k.Contains("level"), "les paliers ne se suivent pas un par un");
+
+        bios.RemoveAt(bios.Count - 1);
+        ScanViewModel.EtatsSuivis(bios: bios).Should().NotContainKey("bios.courbe_ventilateur_cpu", "un palier manquant : rien n'est inventé");
+    }
+
+    // La limite de courant, le Lite Load et CEP lus au BIOS entrent au suivi ; un changement date du démarrage.
+    [Fact]
+    public void Les_reglages_BIOS_du_processeur_sont_suivis_et_dates_au_demarrage()
+    {
+        var bios = new[]
+        {
+            new BiosSettingReading("CPU Current Limit", 160, "160 A", false),
+            new BiosSettingReading("CPU Lite Load", 80, "Mode 9", false),
+            new BiosSettingReading("XMP", 1, "Profile 1", false),
+        };
+        var etats = ScanViewModel.EtatsSuivis(bios: bios);
+        etats["bios.limite_courant"].Should().Be("160 A");
+        etats["bios.lite_load"].Should().Be("Mode 9");
+        etats.Should().NotContainKey("XMP", "hors des réglages suivis");
+
+        var scanAvant = DateTimeOffset.Now.AddHours(-10);
+        var demarrage = DateTimeOffset.Now.AddHours(-3);
+        var vu = new DrDxt.Application.Parties.Changement(DateTimeOffset.Now, "Changement.Reglage", scanAvant, "bios.limite_courant:Auto");
+        ScanViewModel.DaterAuDemarrage(vu, demarrage).Quand.Should().Be(demarrage);
+        ScanViewModel.DaterAuDemarrage(vu with { Cle = "windows.hags:on" }, demarrage).Quand.Should().Be(vu.Quand, "pas un réglage du BIOS");
+        ScanViewModel.DaterAuDemarrage(vu with { Depuis = demarrage.AddHours(1) }, demarrage).Quand.Should().Be(vu.Quand,
+            "démarrage avant le scan d'avant : le changement n'est pas de lui");
+    }
+
+    // Le mode Jeu et HAGS effectif entrent au suivi ; un état non lu n'y entre pas.
     [Fact]
     public void Le_mode_Jeu_et_HAGS_effectif_sont_suivis_quand_ils_sont_lus()
     {
@@ -1099,7 +1313,7 @@ public sealed class CartesAgirTests
         ScanViewModel.EtatsSuivis(null, Hw() with { Memory = [] }).Should().NotContainKey("memoire.frequence");
     }
 
-    // 04/10/2026 (plan 2.3, règle 4) : un levier de DrDXT moins bien en jeu se retire seul ; un réglage basculé par le
+    // Un levier de DrDXT moins bien en jeu se retire seul ; un réglage basculé par le
     // joueur (absent du journal des leviers) n'est jamais touché.
     [Fact]
     public async Task Un_levier_de_DrDXT_moins_bien_en_jeu_se_retire_seul()
@@ -1131,7 +1345,7 @@ public sealed class CartesAgirTests
 
             (await vm.RetirerCeQuiCouteAsync(pire)).Should().BeEmpty("déjà retiré : plus au journal des leviers");
 
-            // 06/10/2026 (revue) : retiré de la machine mais resté au manifeste signé : la carte le dit.
+            // Retiré de la machine mais resté au manifeste signé : la carte le dit.
             leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.hagsOn", true, false, pose, null)], null));
             vm.RetirerDuManifeste = _ => Task.FromResult(Result.Fail(ErrorCodes.ManifestUnreadable, "illisible"));
             (await vm.RetirerCeQuiCouteAsync(pire)).Should().Equal("Changement.RetireAuRedemarrage", "Changement.PasSortiDuManifeste");
@@ -1145,7 +1359,7 @@ public sealed class CartesAgirTests
         public bool Poser(int pid, System.Diagnostics.ProcessPriorityClass priorite) => false;
     }
 
-    // 07/10/2026 (L-VOISINS) : le calmeur de voisins se juge comme un levier. Sa bascule est datée au journal (visible sur
+    // Le calmeur de voisins se juge comme un levier. Sa bascule est datée au journal (visible sur
     // la carte), « Arrêter » reste cliquable pendant qu'il tourne, et un « moins bien en jeu » l'éteint seul ; « mieux »
     // le laisse. Aucun vrai processus : priorités factices, aucun jeu en cours.
     [Theory]
@@ -1192,7 +1406,7 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // 07/10/2026 (L-VOISINS) : les parties relevées nomment un voisin gourmand : le calmeur est proposé d'office, sans être
+    // Les parties relevées nomment un voisin gourmand : le calmeur est proposé d'office, sans être
     // allumé ; exclu par le joueur, il ne l'est plus, et l'exclusion est gardée.
     [Fact]
     public void Un_voisin_gourmand_des_parties_fait_proposer_le_calmeur_sauf_s_il_est_exclu()
@@ -1225,7 +1439,7 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // 07/10/2026 (revue F-7) : HAGS posé, deux parties, puis le joueur baisse sa limite au BIOS (B) et tout chute.
+    // HAGS posé, deux parties, puis le joueur baisse sa limite au BIOS (B) et tout chute.
     // Jugé sans borne, l'après de HAGS prenait les parties de B et HAGS était annulé à cause du BIOS. Borné comme à
     // l'écran : deux parties seulement, « pas encore jugé », rien n'est retiré.
     [Fact]
@@ -1256,7 +1470,7 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // 07/10/2026 (revue F-23) : le retrait part à l'ouverture de l'App, sans geste. Si le helper ne tourne pas déjà,
+    // Le retrait part à l'ouverture de l'App, sans geste. Si le helper ne tourne pas déjà,
     // l'annuler ferait surgir une invite UAC que le joueur n'a pas demandée : rien n'est retiré, et la carte dit d'annuler.
     [Fact]
     public async Task Sans_helper_deja_lance_le_retrait_ne_fait_surgir_aucune_invite_et_le_dit()
@@ -1291,7 +1505,7 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // 07/10/2026 (revue F-9) : le fichier d'échange remis par DrDXT protège des plantages, il n'annonce aucune image.
+    // Le fichier d'échange remis par DrDXT protège des plantages, il n'annonce aucune image.
     // « Moins bien en jeu » sur trois parties ne le retire pas : l'annuler re-désactiverait le fichier d'échange.
     [Fact]
     public async Task Le_fichier_d_echange_pose_par_DrDXT_ne_se_retire_pas_sur_les_images()
@@ -1327,7 +1541,7 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // 06/10/2026 (plan 4.4) : un réglage posé par DrDXT il y a des jours s'annule depuis l'écran. Avant, « Annuler »
+    // Un réglage posé par DrDXT il y a des jours s'annule depuis l'écran. Avant, « Annuler »
     // n'existait que juste après un réglage de carte graphique ; le reste ne partait que par le retrait automatique.
     [Fact]
     public async Task Un_reglage_pose_par_DrDXT_s_annule_depuis_l_ecran()
@@ -1360,8 +1574,41 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // 06/10/2026 : après une désinstallation puis une réinstallation, le journal des leviers disait encore « posé » alors
-    // que la valeur était revenue à l'origine. La carte ne montre que ce qui est encore en place.
+    // Le réglage est bien annulé sur la machine, mais le journal n'a pas pu être réécrit : le scan
+    // suivant le dirait « revenu à la valeur d'avant ». C'est dit tout de suite, plutôt qu'une fausse régression plus tard.
+    [Fact]
+    public async Task Un_journal_qui_ne_se_reecrit_pas_apres_une_annulation_est_dit()
+    {
+        var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"annuler-{Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dossier);
+        var chemin = System.IO.Path.Combine(dossier, "l.json");
+        try
+        {
+            var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(chemin);
+            var pose = new TweakSnapshot("latency.vrrFlipModelOn", "origine", "posee");
+            leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.vrrFlipModelOn", true, false, pose, null)], null));
+            System.IO.File.SetAttributes(chemin, System.IO.FileAttributes.ReadOnly); // se lit, ne se réécrit plus
+            var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
+            var levier = Substitute.For<ITweak>();
+            levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Ok());
+            vm.LevierParId = id => id == "latency.vrrFlipModelOn" ? levier : null;
+            vm.RetirerDuManifeste = _ => Task.FromResult(Result.Ok());
+            vm.ChargerLeviersPoses();
+
+            await vm.AnnulerLevierCommand.ExecuteAsync("latency.vrrFlipModelOn");
+
+            await levier.Received(1).RevertAsync(pose);
+            vm.MessageLeviers.Should().Contain("Leviers.JournalPasMisAJour");
+        }
+        finally
+        {
+            System.IO.File.SetAttributes(chemin, System.IO.FileAttributes.Normal);
+            System.IO.Directory.Delete(dossier, true);
+        }
+    }
+
+    // Après une désinstallation puis une réinstallation, le journal des leviers peut encore dire « posé » alors
+    // que la valeur est revenue à l'origine. La carte ne montre que ce qui est encore en place.
     [Fact]
     public void Un_reglage_revenu_a_sa_valeur_d_avant_n_est_pas_montre_comme_pose()
     {
@@ -1387,7 +1634,7 @@ public sealed class CartesAgirTests
             vm.ChargerLeviersPoses();
             vm.LeviersPoses.Should().ContainSingle("témoin : encore en place, il est montré");
 
-            // Revue du 06/10 : changé depuis par le joueur (ni l'origine, ni la valeur de DrDXT) : pas montré,
+            // Changé depuis par le joueur (ni l'origine, ni la valeur de DrDXT) : pas montré,
             // « Annuler » réécrirait la valeur d'avant par-dessus son choix.
             registre.ReadDword(RegistryHiveKind.CurrentUser, chemin, "HistoricalCaptureEnabled").Returns(Result<uint?>.Ok(2u));
             vm.ChargerLeviersPoses();
@@ -1396,7 +1643,7 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // Revue du 06/10 (P2) : un levier qui ne prend effet qu'au redémarrage le dit ; un levier introuvable (retiré
+    // Un levier qui ne prend effet qu'au redémarrage le dit ; un levier introuvable (retiré
     // entre-temps) le dit au lieu de ne rien faire ; le message reste visible après la dernière annulation.
     [Fact]
     public async Task Une_annulation_au_redemarrage_ou_introuvable_le_dit()
@@ -1462,7 +1709,7 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // Revue du 04/10 (P0) : le retrait ne touche que la bascule née de la pose de DrDXT.
+    // Le retrait ne touche que la bascule née de la pose de DrDXT.
     [Theory]
     [InlineData("joueur")]      // DrDXT pose, le joueur coupe puis rallume lui-même : la dernière bascule est la sienne
     [InlineData("ancienne")]    // une vieille bascule jugée pire, puis une nouvelle pose pas encore suivie d'effet
@@ -1500,7 +1747,7 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // 04/10/2026 (plan 3b.2) : la frise rassemble changements, parties et incidents, datés, le plus récent en haut.
+    // La frise rassemble changements, parties et incidents, datés, le plus récent en haut.
     [Fact]
     public async Task L_historique_rassemble_changements_parties_et_incidents()
     {
@@ -1516,7 +1763,7 @@ public sealed class CartesAgirTests
 
             vm.AHistorique.Should().BeTrue();
             vm.LignesHistorique.Should().Equal(["Historique.Bilan"], "plan 3b.5 : le bilan de la semaine en tête");
-            // 08/10/2026 (critique UI, défaut 12) : la frise est une liste structurée, son genre donne la couleur du point.
+            // La frise est une liste structurée, son genre donne la couleur du point.
             vm.FriseHistorique.Select(e => e.Genre).Should().Equal(
                 DrDxt.Application.Parties.GenreDEvenement.Partie, DrDxt.Application.Parties.GenreDEvenement.Changement,
                 DrDxt.Application.Parties.GenreDEvenement.ArretBrutal);
@@ -1527,7 +1774,7 @@ public sealed class CartesAgirTests
         finally { System.IO.File.Delete(chemin); }
     }
 
-    // 07/10/2026 (D7) : une mise à jour faite sans DrDXT se juge sur les parties d'avant et d'après, bornée par les autres.
+    // Une mise à jour faite sans DrDXT se juge sur les parties d'avant et d'après, bornée par les autres.
     [Fact]
     public void Une_mise_a_jour_de_la_machine_se_juge_en_jeu_bornee_par_les_autres_changements()
     {
@@ -1565,7 +1812,7 @@ public sealed class CartesAgirTests
         finally { System.IO.File.Delete(chemin); }
     }
 
-    // Revue F-47 : les journaux d'installation ne se relisent pas à chaque fin de partie.
+    // Les journaux d'installation ne se relisent pas à chaque fin de partie.
     [Fact]
     public async Task Les_mises_a_jour_de_la_machine_se_lisent_une_fois_par_heure_au_plus()
     {
@@ -1583,7 +1830,7 @@ public sealed class CartesAgirTests
         lectures.Should().Be(2);
     }
 
-    // 04/10/2026 (plan 3b.1) : ce qui a changé depuis le dernier scan passe en tête, même sans partie ni changement noté.
+    // Ce qui a changé depuis le dernier scan passe en tête, même sans partie ni changement noté.
     [Fact]
     public async Task L_historique_commence_par_ce_qui_a_change_depuis_le_dernier_scan()
     {
@@ -1601,7 +1848,7 @@ public sealed class CartesAgirTests
         finally { System.IO.File.Delete(chemin); }
     }
 
-    // 04/10/2026 (plan 3b.3) : « prêt à jouer » dit les gênes mesurées, puis la ligne de ce qui a été mesuré.
+    // « prêt à jouer » dit les gênes mesurées, puis la ligne de ce qui a été mesuré.
     [Fact]
     public async Task Pret_a_jouer_dit_les_genes_puis_ce_qui_a_ete_mesure()
     {
@@ -1627,7 +1874,7 @@ public sealed class CartesAgirTests
             .And.NotContain("$env:");
     }
 
-    // 10/10/2026 (revue de sécurité) : installée, la console passe par le lanceur natif, avec sa commande fixe.
+    // Installée, la console passe par le lanceur natif, avec sa commande fixe.
     [Fact]
     public void Installee_la_console_passe_par_le_lanceur_natif_sans_argument_venu_de_l_app()
     {
@@ -1647,7 +1894,7 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
-    // ── 25/09/2026 : remesurer le processeur a la demande ─────────────────────────────────────
+    // ── Remesurer le processeur a la demande ─────────────────────────────────────
     private sealed class FichierCpu(string? contenu) : DrDxt.Measurement.Cpu.ICpuBaselineFile
     {
         public string? Ecrit { get; private set; }
@@ -1702,13 +1949,13 @@ public sealed class CartesAgirTests
         ScanViewModel.PhraseProcesseur(limite with { LimiteDePuissance = false }, bios).Should()
             .Be("Base.", "sans limite prouvee, le reglage n'est pas mis en cause");
         ScanViewModel.PhraseProcesseur(null, bios).Should().BeNull();
-        // La date ferme la phrase : le réglage BIOS se place avant elle (vu au rapport réel du 25/09).
+        // La date ferme la phrase : le réglage BIOS se place avant elle.
         ScanViewModel.PhraseProcesseur(limite with { Lisible = "Base. Mesuré le 25/09/2026." }, bios).Should()
             .EndWith("en risque d'instabilité. Mesuré le 25/09/2026.");
     }
 
-    // 26/09/2026 : le banc processeur charge tous les coeurs rapides plus de quarante secondes. Jeu lance,
-    // ni le scan ni le bouton ne le lancent (la reference memoire du 16/09 a ete faussee ainsi).
+    // Le banc processeur charge tous les coeurs rapides plus de quarante secondes. Jeu lance,
+    // ni le scan ni le bouton ne le lancent (sinon la reference memoire serait faussee).
     [Fact]
     public async Task Un_premier_scan_jeu_lance_ne_lance_pas_le_banc_processeur()
     {
@@ -1729,7 +1976,7 @@ public sealed class CartesAgirTests
         vm.ErreurRemesureCpu.Should().BeNull("une information, pas une erreur");
     }
 
-    // 26/09/2026 : la référence processeur de la machine de référence (11/09 17:46, ±7,4 %) précède de cinq minutes
+    // La référence processeur de la machine de référence (11/09 17:46, ±7,4 %) précède de cinq minutes
     // une capture de Warzone. Écrite avant le garde, elle n'a pas le champ JeuFermeVerifie : la ligne le dit.
     private sealed class JournalCpu : DrDxt.Measurement.IPerformanceJournalFile
     {
@@ -1821,7 +2068,7 @@ public sealed class CartesAgirTests
         vm.ErreurRemesureCpu.Should().Be("Cpu.Remesure.JeuEnCours");
     }
 
-    // 27/09/2026 : la remesure sans geste. Une reference suspecte se refait seule quand le poste est au repos.
+    // La remesure sans geste. Une reference suspecte se refait seule quand le poste est au repos.
     private static Func<CancellationToken, Task<(TimeSpan SansSaisie, double? ChargeCpu)>> Poste(TimeSpan sansSaisie, double? charge)
         => _ => Task.FromResult((sansSaisie, charge));
 

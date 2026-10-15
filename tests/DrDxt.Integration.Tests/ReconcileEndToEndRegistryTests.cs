@@ -9,25 +9,25 @@ using Microsoft.Win32;
 namespace DrDxt.Integration.Tests;
 
 // =======================================================================
-// T35 — end-to-end reconcile against a real registry key (no elevation).
+// Réconciliation de bout en bout contre une vraie clé de registre (sans élévation).
 //
-// The whole reconcile loop is wired with the real pieces — the only thing
-// short-circuited is the elevated TRANSPORT (no IPC, no UAC):
-//   * SurfaceSettingProbe (real) reads the real HKCU test leaf via its production
-//     Win32 raw reader,
-//   * DefaultReapplyOpMapper (real) resolves the tweakId → the existing typed
-//     SetRegistryValueOp from a test catalog,
-//   * ElevatedReapplyClient (real) dispatches that op through an in-process
-//     IElevatedClient that runs the real R1 registry write leaf
-//     (Win32RegistryActions.SetValue) directly — no by-hand registry write,
-//   * JsonReconcilerStateStore (real) over a TEMP file (no ProgramData / admin).
+// Toute la boucle de réconciliation est câblée avec les vraies pièces ; la seule chose
+// court-circuitée est le transport élevé (pas d'IPC, pas d'UAC) :
+//   * SurfaceSettingProbe (vrai) lit la vraie feuille de test HKCU via son lecteur
+//     brut Win32 de production,
+//   * DefaultReapplyOpMapper (vrai) résout le tweakId → la SetRegistryValueOp typée
+//     existante depuis un catalogue de test,
+//   * ElevatedReapplyClient (vrai) envoie cette op par un IElevatedClient en processus
+//     qui joue directement la vraie feuille d'écriture du registre
+//     (Win32RegistryActions.SetValue) : aucune écriture de registre à la main,
+//   * JsonReconcilerStateStore (vrai) sur un fichier temporaire (ni ProgramData ni admin).
 //
-// HKCU is user-writable, so this needs no elevation. The test key lives under an
-// isolated, unique subkey and is DELETED in a finally so reruns stay clean.
+// HKCU est inscriptible par l'utilisateur, donc aucune élévation. La clé de test vit sous
+// une sous-clé isolée et unique, supprimée dans un finally pour que les relances restent propres.
 //
-// The production catalog/policy are a CLOSED 3-entry table — we do not add a test
-// id to them; a test catalog + test policy carry the one "integ.test.dword" id for
-// this test only (the same byte-exact canonicalization the production probe uses).
+// Le catalogue et la politique de production sont une table fermée à 3 entrées ; on n'y
+// ajoute pas d'identifiant de test : un catalogue et une politique de test portent le seul
+// identifiant « integ.test.dword », pour ce test seulement (même canonisation à l'octet près que la sonde de production).
 // =======================================================================
 [Trait("Category", "Integration")]
 [SupportedOSPlatform("windows")]
@@ -37,8 +37,8 @@ public sealed class ReconcileEndToEndRegistryTests
     private const string KeyPath = @"Software\DrDxt\IntegrationTest";
     private const string ValueName = "Value";
 
-    // The desired/original DWORDs, canonicalized to the exact JSON the probe reads
-    // back (invariant decimal) so the reconciler's ordinal comparison holds.
+    // Les DWORD voulu et d'origine, canonisés dans le JSON exact que la sonde relit
+    // (décimal invariant) pour que la comparaison ordinale du réconciliateur tienne.
     private static readonly string DesiredJson = ReconcilableValueCanonicalizer.Dword(7);
     private static readonly string OriginalJson = ReconcilableValueCanonicalizer.Dword(0);
     private static readonly DateTimeOffset AppliedAt = new(2026, 6, 24, 12, 0, 0, TimeSpan.Zero);
@@ -46,18 +46,18 @@ public sealed class ReconcileEndToEndRegistryTests
     [Fact]
     public async Task RealHkcuDrift_IsReconciledBackToDesired_ThenSecondPassIsNoOp()
     {
-        // Skip cleanly on a non-Windows runner (the registry/HKCU surface is Windows-only).
+        // Se retirer proprement sur un runner hors Windows (la surface registre/HKCU est Windows seulement).
         if (!OperatingSystem.IsWindows())
             return;
 
-        // A unique isolated leaf per run so concurrent/repeat runs never collide.
+        // Une feuille isolée unique par passage, pour que des passages concurrents ou répétés n'entrent jamais en collision.
         var uniqueValueName = ValueName + "_" + Guid.NewGuid().ToString("N");
         var catalog = new TestCatalog(uniqueValueName);
         var statePath = Path.Combine(
             Path.GetTempPath(), "drdxt-integ-" + Guid.NewGuid().ToString("N") + ".json");
 
-        // Real probe over the real HKCU leaf; real mapper over the same catalog; the
-        // in-process elevated client runs the real R1 registry write leaf.
+        // Vraie sonde sur la vraie feuille HKCU ; vrai mappeur sur le même catalogue ; le client
+        // élevé en processus joue la vraie feuille d'écriture du registre.
         var probe = new SurfaceSettingProbe(catalog);
         var mapper = new DefaultReapplyOpMapper(catalog);
         var elevated = new CountingInProcessElevatedClient(new Win32RegistryActions());
@@ -67,8 +67,8 @@ public sealed class ReconcileEndToEndRegistryTests
         var diagnostics = new RecordingDiagnostics();
         var policy = new TestPolicy();
         var bootGuard = new BootLoopGuard(new HealthyBootStore());
-        // A build probe reporting a build DIFFERENT from the item's LastSeenBuild, so a
-        // drift back to the original value classifies as WindowsReset → re-apply.
+        // Une sonde de build qui annonce un build différent du LastSeenBuild de l'élément, pour
+        // qu'une dérive vers la valeur d'origine soit classée WindowsReset → réappliquer.
         var buildProbe = new FixedBuildProbe("22635.5000");
         var driverProbe = new NoDriverProbe();
 
@@ -76,8 +76,8 @@ public sealed class ReconcileEndToEndRegistryTests
             probe, buildProbe, driverProbe, stateStore, reapply, notifier, policy,
             diagnostics, bootGuard, new SystemClock());
 
-        // Seed the sidecar so the item is "known applied" at an OLDER build (the build
-        // change is what makes a drift-to-original a WindowsReset, not a user choice).
+        // Amorcer le fichier d'état pour que l'élément soit « connu appliqué » à un build plus
+        // ancien (c'est le changement de build qui fait d'une dérive vers l'origine un WindowsReset, pas un choix du joueur).
         var seeded = ReconcilerState.Default with
         {
             Items = new[]
@@ -95,16 +95,16 @@ public sealed class ReconcileEndToEndRegistryTests
 
         try
         {
-            // (1) Apply desired: write the desired DWORD to the real HKCU leaf via the
-            //     Real write leaf, and confirm the probe reads it back byte-exact.
+            // (1) Appliquer la valeur voulue : écrire le DWORD voulu dans la vraie feuille HKCU via
+            //     la vraie feuille d'écriture, et confirmer que la sonde le relit à l'octet près.
             WriteDword(uniqueValueName, 7);
             (await probe.ReadCurrentValueAsync(TweakId, default)).Value
                 .Should().Be(DesiredJson, "the seeded value is the canonical desired");
 
-            // (2) Mutate the key "like Windows": a feature update reset it to original (0).
+            // (2) Muter la clé « comme Windows » : une mise à jour de fonctionnalité l'a remise à l'origine (0).
             WriteDword(uniqueValueName, 0);
 
-            // (3) Reconcile: the drift (0 != 7) is classified WindowsReset and re-applied.
+            // (3) Réconcilier : la dérive (0 != 7) est classée WindowsReset et réappliquée.
             var first = await reconciler.ReconcileWithReportAsync(desired, default);
 
             first.result.IsOk.Should().BeTrue();
@@ -115,7 +115,7 @@ public sealed class ReconcileEndToEndRegistryTests
             diagnostics.Changes.Should().ContainSingle(c =>
                 c.TweakId == TweakId && c.To == DesiredJson && c.Actor == "DrDXT");
 
-            // (4) SECOND pass on the now-correct key → strict NO-OP: no new write at all.
+            // (4) Second passage sur la clé désormais correcte → strictement rien : aucune nouvelle écriture.
             var second = await reconciler.ReconcileWithReportAsync(desired, default);
 
             second.result.IsOk.Should().BeTrue();
@@ -127,18 +127,18 @@ public sealed class ReconcileEndToEndRegistryTests
         }
         finally
         {
-            // Negative/cleanup: the isolated test value and (if now empty) key are removed.
+            // Négatif et nettoyage : la valeur de test isolée et (si vide) la clé sont retirées.
             DeleteTestArtifacts();
             if (File.Exists(statePath))
                 File.Delete(statePath);
         }
 
-        // Cleanup assertion: nothing of ours is left behind under HKCU.
+        // Assertion de nettoyage : rien de nous ne reste sous HKCU.
         using var key = Registry.CurrentUser.OpenSubKey(KeyPath, writable: false);
         key?.GetValue(uniqueValueName).Should().BeNull("the test value was deleted on cleanup");
     }
 
-    // ---- real-registry helpers (HKCU is user-writable; no elevation needed) ----
+    // ---- aides pour le vrai registre (HKCU est inscriptible par l'utilisateur ; aucune élévation) ----
 
     private static void WriteDword(string valueName, int value)
     {
@@ -160,11 +160,11 @@ public sealed class ReconcileEndToEndRegistryTests
             return;
         foreach (var name in key.GetValueNames())
             key.DeleteValue(name, throwOnMissingValue: false);
-        // Remove the now-empty test subkey tree we created (best-effort, isolated path).
+        // Retirer l'arbre de sous-clés de test désormais vide (au mieux, chemin isolé).
         if (key.GetValueNames().Length == 0 && key.GetSubKeyNames().Length == 0)
             Registry.CurrentUser.DeleteSubKey(KeyPath, throwOnMissingSubKey: false);
 
-        // 24/09/2026 : le parent « Software\DrDxt », créé en passant par CreateSubKey, restait vide
+        // Le parent « Software\DrDxt », créé en passant par CreateSubKey, restait vide
         // dans le registre de la machine de test. Le produit n'utilise pas cette clé : vide, elle part.
         using var parent = Registry.CurrentUser.OpenSubKey(@"Software\DrDxt");
         if (parent is { ValueCount: 0, SubKeyCount: 0 })
@@ -174,7 +174,7 @@ public sealed class ReconcileEndToEndRegistryTests
         }
     }
 
-    // ---- test-only catalog + policy carrying the single integ id ----
+    // ---- catalogue et politique de test portant le seul identifiant integ ----
 
     private sealed class TestCatalog : IReconcilableTweakCatalog
     {
@@ -201,7 +201,7 @@ public sealed class ReconcileEndToEndRegistryTests
         public bool IsProtected(string tweakId) => false;
     }
 
-    // ---- the in-process elevated client: real R1 write leaf, no IPC, counting ----
+    // ---- le client élevé en processus : vraie feuille d'écriture, pas d'IPC, qui compte ----
 
     private sealed class CountingInProcessElevatedClient : IElevatedClient
     {
@@ -214,7 +214,7 @@ public sealed class ReconcileEndToEndRegistryTests
         public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
         {
             ExecuteCount++;
-            // Exercise the real op→registry path (the same leaf R1 ships); never the IPC.
+            // Exercer le vrai chemin op → registre (la même feuille que le produit livre) ; jamais l'IPC.
             return Task.FromResult(op switch
             {
                 SetRegistryValueOp r => _registry.SetValue(r.Hive, r.Path, r.Name, r.Kind, r.Value),
@@ -223,7 +223,7 @@ public sealed class ReconcileEndToEndRegistryTests
         }
     }
 
-    // ---- recording / fixed seams ----
+    // ---- coutures enregistreuses / fixes ----
 
     private sealed record DiagChange(string TweakId, string From, string To, string Actor);
 

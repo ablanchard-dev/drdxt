@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DrDxt.App.Navigation;
 using DrDxt.App.Profiles;
 using DrDxt.Core;
 using Geste = DrDxt.App.Platform.CorruptionDuMagasin.Geste;
@@ -20,11 +19,11 @@ public sealed partial class ScanViewModel
     public bool PlafondEnvoiDisponible => _plafondEnvoiMesure > 0 && _exeJeuMesure is not null && _helper is not null;
     public bool PlafondEnvoiActif => _modePlafond is not null || _porteeParLeService;
 
-    // 28/09/2026 : un seul poseur. Le service de demarrage en marche porte la protection (il relit le reglage que
+    // Un seul poseur. Le service de demarrage en marche porte la protection (il relit le reglage que
     // le helper vient d'ecrire) : l'App n'arme pas son propre mode, sinon, l'App fermee en pleine partie, son bail
     // expire et retire le plafond que le service croit encore pose. L'installeur livre l'App et le service de la
     // meme version : un service en marche sait porter la protection. <c>null</c> = pas de service (les tests).
-    // 28/09/2026, vu sur photo : la fenetre s'affiche avant ce branchement, la carte gardait le texte lu a l'affichage.
+    // La fenetre s'affiche avant ce branchement : le setter previent la carte, qui garderait sinon le texte lu a l'affichage.
     internal Func<bool>? ServiceDemarrageActif
     {
         get => _serviceDemarrageActif;
@@ -42,11 +41,11 @@ public sealed partial class ScanViewModel
         SignalerPlafondEnvoi();
     }
 
-    /// <summary>24/09/2026 — allume le plafond d'envoi automatique : pose au lancement du jeu,
+    /// <summary>Allume le plafond d'envoi automatique : pose au lancement du jeu,
     /// retrait a sa fermeture, bail du helper comme filet si l'appli meurt.</summary>
     public async Task<Result> ActiverPlafondEnvoiAsync()
     {
-        // 25/09/2026 : le mode n'est retenu qu'apres l'attente du helper (UAC). Un second appel dans
+        // Le mode n'est retenu qu'apres l'attente du helper (UAC). Un second appel dans
         // cet intervalle (rallumage au lancement puis clic) ouvrait un second mode : en eteignant,
         // seule sa boucle s'arretait. Il attend maintenant l'activation en cours et en rend l'issue.
         if (_activationPlafond is { IsCompleted: false } enCours) return await enCours;
@@ -60,11 +59,11 @@ public sealed partial class ScanViewModel
     private async Task<Result> ActiverPlafondEnvoiUneFoisAsync()
     {
         if (!PlafondEnvoiDisponible)
-            return Result.Fail(ErrorCodes.TweakNotApplicable, "Aucun bufferbloat mesuré : rien à plafonner.");
+            return Result.Fail(ErrorCodes.TweakNotApplicable, Docteur.T("App.PasDeBufferbloat"));
         if (_modePlafond is not null || _porteeParLeService) return Result.Ok();
         if (ServiceDemarrageActif?.Invoke() == true)
         {
-            // 28/09/2026 : le service pose un plafond fixe. DrDXT ouvert, l'ajustement tourne encore et lui
+            // Le service pose un plafond fixe. DrDXT ouvert, l'ajustement tourne encore et lui
             // passe chaque nouveau plafond ; il le repose au battement suivant.
             _porteeParLeService = true;
             var exe = _exeJeuMesure!;
@@ -110,7 +109,7 @@ public sealed partial class ScanViewModel
         return Result.Ok();
     }
 
-    // 25/09/2026 : la boucle fermee (AjustementDuPlafond) : plafond en place, une fenetre du
+    // La boucle fermee (AjustementDuPlafond) : plafond en place, une fenetre du
     // trafic reel, le meme juge que le scan, et le plafond suit. Jamais au-dessus de la capacite
     // vue au scan (plafond / FractionPlafond).
     private void LancerAjustement(Func<bool> pose, Func<long> actuel,
@@ -132,7 +131,7 @@ public sealed partial class ScanViewModel
                         var apres = DrDxt.Measurement.Network.AjustementDuPlafond.Suivant(avant, max, fenetre);
                         if (apres != avant && await changer(apres, ct))
                         {
-                            // 25/09/2026 — la trace qui rend l'essai reel lisible : chaque changement, avec
+                            // La trace qui rend l'essai reel lisible : chaque changement, avec
                             // les deux p90 qui l'ont decide (journal de diagnostic, bouton d'export).
                             var v = DrDxt.Measurement.Network.Bufferbloat.Juger(fenetre);
                             JournalPlafond?.Change(IdJournalPlafond,
@@ -157,27 +156,27 @@ public sealed partial class ScanViewModel
     /// fixe, sans boucle fermee (les tests ; l'appli le pose au demarrage).</summary>
     internal Func<TimeSpan, CancellationToken, Task<IReadOnlyList<DrDxt.Measurement.Network.EchantillonEnvoi>>>? CollecteurFenetre { get; set; }
 
-    /// <summary>07/10/2026 : le tour de la boucle du plafond d'envoi (5 s). Réglable pour les tests : un tour fixe de 5 s faisait
+    /// <summary>Le tour de la boucle du plafond d'envoi (5 s). Réglable pour les tests : un tour fixe de 5 s faisait
     /// dépasser au test du plafond toute attente raisonnable sur un runner GitHub chargé (10 s, puis 30 s : 31 s mesurés).</summary>
     internal TimeSpan TourDuPlafond { get; set; } = TimeSpan.FromSeconds(5);
 
     internal TimeSpan FenetreAjustement { get; set; } = TimeSpan.FromSeconds(20);
 
-    /// <summary>28/09/2026 : un client qui ne lance jamais le helper (pas d'invite UAC sans geste du joueur). Il
+    /// <summary>Un client qui ne lance jamais le helper (pas d'invite UAC sans geste du joueur). Il
     /// porte l'ajustement quand le service tient la protection ; <c>null</c> = pas d'ajustement dans ce mode.</summary>
     internal IElevatedClient? HelperSansLancer { get; set; }
 
-    /// <summary>28/09/2026 : le service a-t-il deja une protection retenue sous %ProgramData% ? <c>null</c> = on
+    /// <summary>Le service a-t-il deja une protection retenue sous %ProgramData% ? <c>null</c> = on
     /// ne sait pas (les tests), traite comme oui : rien n'est transmis au lancement.</summary>
     internal Func<bool>? ServicePorteUnRetenu { get; set; }
 
-    /// <summary>07/10/2026 (CI rouge, run 37601619886) : le jeu est-il vivant, pour poser le plafond. Couture : le test
+    /// <summary>Le jeu est-il vivant, pour poser le plafond. Couture : le test
     /// s'appuyait sur une vraie recherche de processus (le sien), la seule partie qu'il ne tenait pas sur un runner chargé.</summary>
     internal Func<string, bool> JeuVivant { get; set; } = DrDxt.Application.Network.PlafondEnvoiPendantLeJeu.ProcessusVivant;
 
     public const string IdJournalPlafond = "network.upload-cap";
 
-    // ── 27/09/2026 : la veille du ping ─────────────────────────────────────────────────────
+    // ── La veille du ping ─────────────────────────────────────────────────────
     // Sans scan en partie saturee, la protection restait grisee. La veille s'allume sans mesure : elle
     // juge les vraies parties (VeilleDuPing), et n'allume la protection que sur un verdict detecte.
     [ObservableProperty] private bool _veillePingActive;
@@ -185,7 +184,7 @@ public sealed partial class ScanViewModel
 
     /// <summary>Proposee tant que rien n'a ete mesure : c'est l'autre chemin vers la protection.</summary>
     public bool VeillePingProposee => PlafondEnvoiIndisponible && CollecteurFenetre is not null && _helper is not null;
-    public string LabelVeilleBascule => _localize("Ping.Veille.Libelle");   // 08/10/2026 (défaut 10) : l'état est dans l'interrupteur
+    public string LabelVeilleBascule => _localize("Ping.Veille.Libelle");   // L'état est dans l'interrupteur
     public string LabelVeilleDescription => _localize(VeillePingActive ? "Ping.Veille.EnCours" : "Ping.Veille.Description");
 
     internal TimeSpan FenetreVeille { get; set; } = TimeSpan.FromSeconds(60);
@@ -209,8 +208,8 @@ public sealed partial class ScanViewModel
         OnPropertyChanged(nameof(LabelVeilleDescriptionSuite));
     }
 
-    // 08/10/2026 (revue) : sans exécutions concurrentes, la commande restait « en cours » tant que la veille attendait un
-    // verdict (parfois jamais) : l'interrupteur, grisé, ne pouvait plus l'éteindre. Calmer et Relevé l'avaient déjà (07/10).
+    // Sans exécutions concurrentes, la commande restait « en cours » tant que la veille attendait un
+    // verdict (parfois jamais) : l'interrupteur, grisé, ne pouvait plus l'éteindre. Calmer et Relevé l'avaient déjà.
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task BasculerVeillePing()
     {
@@ -256,7 +255,7 @@ public sealed partial class ScanViewModel
         catch (Exception ex)
         {
             VeillePingActive = false;
-            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")} : {ex.Message}";
+            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{ex.Message}";
             return;
         }
 
@@ -265,10 +264,10 @@ public sealed partial class ScanViewModel
         MemoireVeille?.Eteindre();
         RetenirMesureEnvoi(trouve.Verdict.PlafondConseilleBps, trouve.Exe);
         JournalPlafond?.Change(IdJournalPlafond, "veille",
-            FormattableString.Invariant($"{trouve.Verdict.PlafondConseilleBps / 1e6:0.#} Mbit/s pour {trouve.Exe} (ping p90 repos {trouve.Verdict.PingReposP90:0} ms, en charge {trouve.Verdict.PingChargeP90:0} ms)"),
+            FormattableString.Invariant($"{trouve.Verdict.PlafondConseilleBps / 1e6:0.#} Mbit/s for {trouve.Exe} (idle ping p90 {trouve.Verdict.PingReposP90:0} ms, en charge {trouve.Verdict.PingChargeP90:0} ms)"),
             "DrDXT");
         if (await ActiverEtRetenirAsync(trouve.Exe, trouve.Verdict.PlafondConseilleBps) is { IsOk: false } echec)
-            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")} : {echec.Error?.Message}";
+            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{echec.Error?.Message}";
         SignalerPlafondEnvoi();
     }
 
@@ -288,10 +287,15 @@ public sealed partial class ScanViewModel
         catch { return null; }
     }
 
-    // 24/09/2026 — le dernier test memoire en session, rendu dans la sante au prochain audit.
+    /// <summary>Le chemin complet de l'exe (pour écarter tout programme de Windows, à toute profondeur) ; null si
+    /// le processus est parti (la règle des noms suffit alors). Lu avec les droits les plus faibles, sans ouvrir la mémoire
+    /// du processus : un jeu protégé par un anti-triche le refuserait, et le surveille.</summary>
+    private static string? CheminDuProcessus(int pid) => pid > 0 ? DrDxt.App.Platform.Win32GameLocator.CheminDe((uint)pid) : null;
+
+    // Le dernier test memoire en session, rendu dans la sante au prochain audit.
     private RepairFinding? _constatTestMemoire;
 
-    // ── La carte « Agir » du domaine memoire (spec §3c du registre de boucle) ──────────────────
+    // ── La carte « Agir » du domaine memoire ──────────────────
     public static readonly TimeSpan DureeTestMemoire = TimeSpan.FromMinutes(5);
     // Coutures de test : cinq minutes et un quart de la memoire ne se testent pas en suite. L'ecran
     // ne les touche jamais ; null = la valeur du produit.
@@ -376,12 +380,12 @@ public sealed partial class ScanViewModel
 
     public bool PlafondEnvoiIndisponible => !PlafondEnvoiDisponible;
     public string LabelPingTitre => _localize("Ping.Protection.Titre");
-    // 28/09/2026 : le texte suit celui qui pose le plafond. « N'agit que DrDXT ouvert » est faux quand le service la porte.
+    // Le texte suit celui qui pose le plafond. « N'agit que DrDXT ouvert » est faux quand le service la porte.
     public string LabelPingDescription => _localize(ServiceDemarrageActif?.Invoke() == true
         ? "Ping.Protection.Description.Service" : "Ping.Protection.Description");
     public string LabelPingIndisponible => _localize("Ping.Protection.Indisponible");
 
-    // 03/10/2026 (D8.8b, revue n° 3) : trois paragraphes d'un bloc faisaient un mur de texte dans « Agir » ; la
+    // Trois paragraphes d'un bloc faisaient un mur de texte dans « Agir » ; la
     // première phrase reste, la suite s'ouvre sous le « ? », comme pour un constat.
     public string LabelPingDescriptionCourte => CarteDeLaMachine.TitreEtSuite(LabelPingDescription).Titre;
     public string LabelPingDescriptionSuite => CarteDeLaMachine.TitreEtSuite(LabelPingDescription).Suite;
@@ -409,7 +413,7 @@ public sealed partial class ScanViewModel
         OnPropertyChanged(nameof(LabelPingDescriptionSuite));
     }
 
-    /// <summary>Allume ou eteint la protection. Un refus (UAC decline, helper absent) se DIT : la
+    /// <summary>Allume ou eteint la protection. Un refus (UAC decline, helper absent) se dit : la
     /// bascule ne pretend jamais un etat qu'elle n'a pas obtenu.</summary>
     [RelayCommand]
     private async Task BasculerPlafondEnvoi()
@@ -424,14 +428,14 @@ public sealed partial class ScanViewModel
                 // Service en marche, c'est lui qui pose : un refus d'oublier le laisserait plafonner a chaque partie.
                 if (await OublierPourLeServiceAsync() is { IsOk: false } refus && _porteeParLeService)
                 {
-                    ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")} : {refus.Error?.Message}";
+                    ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{refus.Error?.Message}";
                     return;
                 }
                 await DesactiverPlafondEnvoiAsync();
                 MemoirePlafond?.Oublier();
             }
             else if (await ActiverEtRetenirAsync(_exeJeuMesure!, _plafondEnvoiMesure) is { IsOk: false } echec)
-                ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")} : {echec.Error?.Message}";
+                ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{echec.Error?.Message}";
         }
         finally
         {
@@ -441,12 +445,12 @@ public sealed partial class ScanViewModel
     }
 
     // ── La carte « Agir » du domaine windows : rendre l'écran de recuperation ─────────────────
-    // L'element et la valeur LUS par l'audit. `_bcdRendu` garde exactement ce qui a ete retire :
+    // L'element et la valeur lus par l'audit. `_bcdRendu` garde exactement ce qui a ete retire :
     // l'annulation repose cette valeur-la, pas une valeur supposee.
     private (string Element, string Valeur)? _bcdARendre;
     private (string Element, string Valeur)? _bcdRendu;
 
-    // 25/09/2026 : la carte promet « Réversible », mais `_bcdRendu` ne vivait qu'en memoire. DrDXT
+    // La carte promet « Réversible », mais `_bcdRendu` ne vivait qu'en memoire. DrDXT
     // ferme ou PC redemarre, le bouton Annuler disparaissait. La valeur retiree est gardee dans ce
     // fichier jusqu'a l'annulation. Null (tests) : rien n'est ecrit. Un fichier modifie a la main ne
     // peut rien poser d'autre : le helper n'accepte que les elements et valeurs BCD de sa liste.
@@ -461,7 +465,7 @@ public sealed partial class ScanViewModel
         {
             if (FichierBcdRendu is null || !File.Exists(FichierBcdRendu)) return null;
             var g = System.Text.Json.JsonSerializer.Deserialize<BcdGarde>(File.ReadAllText(FichierBcdRendu));
-            // 26/09/2026 : la carte ne retire que bootstatuspolicy. Le helper borne les valeurs, pas l'element :
+            // La carte ne retire que bootstatuspolicy. Le helper borne les valeurs, pas l'element :
             // une garde modifiee faisait poser par « Annuler » un autre element permis (useplatformclock Yes).
             return g is { Element: ElementBcdDeLaCarte, Valeur.Length: > 0 } ? (g.Element, g.Valeur) : null;
         }
@@ -529,12 +533,12 @@ public sealed partial class ScanViewModel
             {
                 _bcdRendu = cible;
                 EcrireBcdGarde(cible);
-                // 25/09/2026 : le constat restait sur la page à côté de la carte « rendu » (même
+                // Le constat restait sur la page à côté de la carte « rendu » (même
                 // défaut que la remesure processeur). Retiré de la page, gardé pour l'annulation.
                 _constatBcdRetire = RepairFindings.FirstOrDefault(v => v.DomaineCle == "BCD" && v.NomCle == cible.Element);
                 if (_constatBcdRetire is not null) { RepairFindings.Remove(_constatBcdRetire); ReconstruireCarteSurLeDomaineOuvert(); }
             }
-            else ErreurBcd = $"{_localize("Bcd.Rendre.Echec")} : {r.Error?.Message}";
+            else ErreurBcd = $"{_localize("Bcd.Rendre.Echec")}{Docteur.DeuxPoints}{r.Error?.Message}";
         }
         finally { BcdEnCours = false; SignalerBcd(); }
     }
@@ -566,14 +570,14 @@ public sealed partial class ScanViewModel
                 EcrireBcdGarde(null);
                 if (_constatBcdRetire is not null) { RepairFindings.Add(_constatBcdRetire); _constatBcdRetire = null; ReconstruireCarteSurLeDomaineOuvert(); }
             }
-            else ErreurBcd = $"{_localize("Bcd.Rendre.Echec")} : {r.Error?.Message}";
+            else ErreurBcd = $"{_localize("Bcd.Rendre.Echec")}{Docteur.DeuxPoints}{r.Error?.Message}";
         }
         finally { BcdEnCours = false; SignalerBcd(); }
     }
 
     // ── La carte « Agir » du domaine processeur : remesurer a la demande ────────────────────────
-    // 25/09/2026. La reference se mesure au premier scan puis se relit : sans ce bouton, elle ne se
-    // refaisait plus jamais (celle de la machine de reference date du 11/09 et ignore la puissance).
+    // La reference se mesure au premier scan puis se relit : sans ce bouton, elle ne se
+    // referait jamais, meme devenue fausse (une reference ancienne peut ignorer la limite de puissance).
     [ObservableProperty] private bool _remesureCpuEnCours;
     [ObservableProperty] private bool _remesureCpuFaite;
     [ObservableProperty] private string? _erreurRemesureCpu;
@@ -581,7 +585,7 @@ public sealed partial class ScanViewModel
     public bool RemesureCpuVisible => _cpuBaseline is not null && _machineId is not null
         && (CpuSustainedLabel is not null || CpuSauteJeu);
 
-    // 26/09/2026 : le scan capture le jeu, donc le parcours normal le lance avant de scanner. Sans mesure
+    // Le scan capture le jeu, donc le parcours normal le lance avant de scanner. Sans mesure
     // jeu lancé, ce joueur n'avait ni ligne, ni raison, ni bouton : la carte s'affiche et dit pourquoi.
     [ObservableProperty] private bool _cpuSauteJeu;
     partial void OnCpuSauteJeuChanged(bool value) => OnPropertyChanged(nameof(RemesureCpuVisible));
@@ -589,7 +593,7 @@ public sealed partial class ScanViewModel
     public string LabelCpuSauteJeu => _localize("Cpu.Remesure.SauteJeu");
     public string LabelRemesureCpuTitre => _localize("Cpu.Remesure.Titre");
     public string LabelRemesureCpuDescription => _localize("Cpu.Remesure.Description");
-    // UI1 (08/10/2026) : la ligne qui reste à l'écran ; le texte entier passe en info-bulle.
+    // La ligne qui reste à l'écran ; le texte entier passe en info-bulle.
     public string LabelRemesureCpuDescriptionCourte => _localize("Cpu.Remesure.Description.Court");
     public string LabelRemesureCpuMaintenir => _localize("Cpu.Remesure.Maintenir");
     public string LabelRemesureCpuEnCours => _localize("Cpu.Remesure.EnCours");
@@ -605,20 +609,20 @@ public sealed partial class ScanViewModel
         OnPropertyChanged(nameof(LignesLimiteSuite));
     }
 
-    /// <summary>25/09/2026 — la phrase du processeur, reliee au reglage BIOS lu. La composition vit
+    /// <summary>La phrase du processeur, reliee au reglage BIOS lu. La composition vit
     /// dans <see cref="DrDxt.Measurement.Cpu.CpuDeficitSoutenu.PhraseAvec"/>, partagee avec le rapport.</summary>
     internal static string? PhraseProcesseur(DrDxt.Measurement.Cpu.CpuDeficitSoutenu? deficit, IReadOnlyList<BiosSettingReading>? bios)
         => deficit?.PhraseAvec(bios);
 
-    /// <summary>29/09/2026 (boucle « vivant et prouvé », A1) : en partie, le jeu est limité par le processeur, bridé
-    /// par sa limite de puissance soutenue ; la phrase qui le disait était sous « Pourquoi ? ». Quatre lignes en clair :
+    /// <summary>En partie, le jeu est limité par le processeur, bridé
+    /// par sa limite de puissance soutenue ; cachée sous « Pourquoi ? », l'explication passerait inaperçue. Quatre lignes en clair :
     /// ce qui bride (mesuré), le réglage lu, le risque, le retour. <c>null</c> sans limite démontrée ou sans BIOS lu.
     /// DrDXT n'écrit pas le BIOS et ne conseille pas de changer ce réglage.</summary>
     internal static IReadOnlyList<string>? GuideLimiteDePuissance(
         DrDxt.Measurement.Cpu.CpuDeficitSoutenu? deficit, IReadOnlyList<BiosSettingReading>? bios, Func<string, string> localiser)
     {
         var reglage = bios?.FirstOrDefault(r => r.Setting == "CPU Cooler Tuning");
-        // 04/10/2026 (plan 2.2) : la bride se MESURE sur toute machine ; seul le réglage n'est lu que sur les cartes que
+        // La bride se mesure sur toute machine ; seul le réglage n'est lu que sur les cartes que
         // DrDXT connaît. Ailleurs, le guide reste, avec le nom générique du réglage, au lieu de se taire.
         if (deficit is not ({ Demontrable: true, LimiteDePuissance: true } or { BrideDesLeDepart: true })) return null;
         var watts = deficit.Reference?.PuissanceSoutenueW;
@@ -636,7 +640,7 @@ public sealed partial class ScanViewModel
         ];
     }
 
-    /// <summary>29/09/2026 (A2) : les réglages du BIOS qui fixent la puissance du processeur, tels que lus, en une
+    /// <summary>Les réglages du BIOS qui fixent la puissance du processeur, tels que lus, en une
     /// chaîne notée avec chaque mesure. <c>null</c> sans aucun d'eux lu : rien à comparer, aucune remesure.</summary>
     internal static string? ReglageDePuissanceLu(IReadOnlyList<BiosSettingReading>? bios)
     {
@@ -654,7 +658,7 @@ public sealed partial class ScanViewModel
     /// <summary>Le guide, pour la vue.</summary>
     public IReadOnlyList<string>? LignesLimiteDePuissance => GuideLimiteDePuissance(_dernierDeficitCpu, _reglagesBiosLus, _localize);
     public bool ALimiteDePuissance => LignesLimiteDePuissance is not null;
-    /// <summary>29/09/2026 (B22) : la bride en une phrase ; le réglage, le risque et le retour arrière se déplient.</summary>
+    /// <summary>La bride en une phrase ; le réglage, le risque et le retour arrière se déplient.</summary>
     public string? LimitePremiereLigne => LignesLimiteDePuissance?.FirstOrDefault();
     public IReadOnlyList<string> LignesLimiteSuite => LignesLimiteDePuissance?.Skip(1).ToList() ?? [];
     public string LabelLimiteTitre => _localize("Cpu.Limite.Titre");
@@ -688,8 +692,8 @@ public sealed partial class ScanViewModel
                 CpuSustainedLabel = PhraseProcesseur(deficit, _reglagesBiosLus);
                 RemesureCpuFaite = true;
                 CpuSauteJeu = false; // la mesure existe maintenant : « pas mesuré » serait faux
-                // 25/09/2026 : vu sur la photo, la carte gardait la phrase de l'ANCIENNE mesure (« ne peut pas
-                // dire… remesurer le dira ») sous la pastille « mesure refaite » : la carte est construite au scan.
+                // La carte est construite au scan : sans reconstruction, elle garderait la phrase de l'ancienne
+                // mesure (« ne peut pas dire… remesurer le dira ») sous la pastille « mesure refaite ».
                 ReconstruireCarteSurLeDomaineOuvert();
             }
         }
@@ -697,7 +701,7 @@ public sealed partial class ScanViewModel
         finally { RemesureCpuEnCours = false; }
     }
 
-    // ── 27/09/2026 : remesurer sans geste ──────────────────────────────────────────────────────
+    // ── Remesurer sans geste ──────────────────────────────────────────────────────
     // Une reference soupconnee (prise pendant une partie) se refait seule quand le poste est au repos
     // (RemesureAuRepos). Memes commandes qu'a la main, donc memes gardes : jeu ouvert refuse, mesure trop
     // bruitee gardee. Une seule mesure par passage : deux bancs a la suite se generaient.
@@ -733,10 +737,10 @@ public sealed partial class ScanViewModel
         }
     }
 
-    // ── Remesurer la mémoire à la demande (26/09/2026) ──────────────────────────────────────────
-    // La référence se mesure au premier scan puis se relit tant que la configuration ne change pas. Sur la
-    // machine de référence, celle du 16/09 rendait 12,7 Go/s et 128,5 ns, la même machine 33,4 Go/s et
-    // 74 ns dix jours plus tard : l'écran affichait (daté) un chiffre que rien ne permettait de refaire.
+    // ── Remesurer la mémoire à la demande ──────────────────────────────────────────
+    // La référence se mesure au premier scan puis se relit tant que la configuration ne change pas.
+    // Mesuré sur la machine de référence : 12,7 Go/s et 128,5 ns le 16/09, 33,4 Go/s et 74 ns dix jours plus tard.
+    // Sans ce bouton, l'écran garderait un chiffre faux que rien ne permet de refaire.
     [ObservableProperty] private bool _remesureMemoireEnCours;
     [ObservableProperty] private bool _remesureMemoireFaite;
     [ObservableProperty] private string? _erreurRemesureMemoire;
@@ -786,9 +790,9 @@ public sealed partial class ScanViewModel
     }
 
     // ── La carte « Agir » du domaine windows : réparer Windows avec les outils de Microsoft ───────
-    // 25/09/2026. Armee seulement quand DISM /CheckHealth a dit « reparable ». La reparation dure de
+    // Armee seulement quand DISM /CheckHealth a dit « reparable ». La reparation dure de
     // longues minutes : elle ne passe pas par le helper (elle bloquerait ses baux, dont celui de la
-    // protection du ping). Elle s'ouvre dans une console VISIBLE, elevee par la fenetre UAC de Windows,
+    // protection du ping). Elle s'ouvre dans une console visible, elevee par la fenetre UAC de Windows,
     // ou le joueur voit DISM puis sfc avancer et peut fermer quand il veut.
     private bool _reparationARelancer;
     [ObservableProperty] private bool _reparationLancee;
@@ -800,7 +804,7 @@ public sealed partial class ScanViewModel
     public string LabelReparationTitre => _localize(_geste switch { Geste.Reinstaller => "Reparation.Windows.Reinstallation.Titre", _ => "Reparation.Windows.Titre" });
     public string LabelReparationDescription => _localize(_geste switch { Geste.Reinstaller => "Reparation.Windows.Reinstallation.Description", _ => "Reparation.Windows.Description" });
 
-    // 04/10/2026 : la réparation a échoué faute de source. Relancer RestoreHealth tournait en rond : si tout ce qui est
+    // La réparation a échoué faute de source. Relancer RestoreHealth tournait en rond : si tout ce qui est
     // abîmé est une version remplacée, le geste devient le nettoyage ; sinon la réinstallation de Microsoft.
     private Geste _geste;
 
@@ -823,7 +827,7 @@ public sealed partial class ScanViewModel
     public string LabelReparationMaintenir => _localize("Reparation.Windows.Maintenir");
     public bool CarteWindowsVisible => BcdVisible || ReparationVisible;
 
-    /// <summary>29/09/2026 (B16) : « en cours » tant que la console est ouverte, puis ce que la relecture de
+    /// <summary>« en cours » tant que la console est ouverte, puis ce que la relecture de
     /// Windows trouve à sa fermeture. Avant, rien ne revenait dans DrDXT et le joueur restait sans réponse.</summary>
     [ObservableProperty] private string? _etatReparation;
     internal Task? FinDeReparation { get; private set; }
@@ -836,7 +840,7 @@ public sealed partial class ScanViewModel
         return p is null ? null : p.WaitForExitAsync().ContinueWith(_ => p.Dispose(), TaskScheduler.Default);
     };
 
-    // ── 30/09/2026 (boucle « la carte, prouvée », G3) : la preuve du repos de la carte, conclue au lancement ──────
+    // ── La preuve du repos de la carte, conclue au lancement ──────
     /// <summary>Ce que la mesure du repos a décidé, dit sur la page Carte graphique. <c>null</c> = rien n'attendait.</summary>
     [ObservableProperty] private string? _verdictReposCarte;
 
@@ -853,6 +857,7 @@ public sealed partial class ScanViewModel
         {
             DrDxt.Application.Tweaks.EtatDeLaPreuve.Prouve => "Carte.Repos.Prouve",
             DrDxt.Application.Tweaks.EtatDeLaPreuve.PasDeGain => "Carte.Repos.PasDeGain",
+            DrDxt.Application.Tweaks.EtatDeLaPreuve.RetraitRate => "Carte.Repos.PreuveRetraitRate",
             _ => "Carte.Repos.NonMesure",
         };
         VerdictReposCarte = string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize(cle), v.ApresW, v.AvantW);
@@ -860,11 +865,11 @@ public sealed partial class ScanViewModel
             retenus.Garder(new(e.TweakId, e.OriginalValueJson, e.AppliedValueJson, DateTimeOffset.Now));
     }
 
-    /// <summary>G4 : ce qui garde le réglage prouvé au repos, et l'écriture qu'il annulerait. Posés au lancement.</summary>
+    /// <summary>Ce qui garde le réglage prouvé au repos, et l'écriture qu'il annulerait. Posés au lancement.</summary>
     internal DrDxt.Application.Tweaks.ReglagesRetenus? ReglagesDeLaCarte { get; set; }
     internal ITweak? LevierReposCarte { get; set; }
 
-    // ── G5 : le geste, sur la page Carte graphique ───────────────────────────────────────────────────────────
+    // ── Le geste, sur la page Carte graphique ───────────────────────────────────────────────────────────
     internal IHardwareProbe? SondeCarte { get; set; }
     internal DrDxt.Application.Tweaks.PreuvesEnAttente? AttenteReposCarte { get; set; }
     internal Func<TimeSpan, Task> AttendreCarte { get; set; } = t => Task.Delay(t);
@@ -877,7 +882,7 @@ public sealed partial class ScanViewModel
     public bool ReposCarteVisible =>
         (LevierReposCarte is not null && _lastScan?.Findings.Any(f => f.TitleKey == "Finding.Gpu.PerfMaxGlobal") == true)
         || ReposCarteEnAttente || VerdictReposCarte is not null;
-    // Revue du 10/10/2026 : sans sonde ni attente, le geste rendait la main en silence et Optimiser écrivait « rien n'a été
+    // Sans sonde ni attente, le geste rendait la main en silence et Optimiser écrivait « rien n'a été
     // posé » pour une tentative qui n'avait pas eu lieu.
     public bool ReposCarteAOuvrir => ReposCarteVisible && SondeCarte is not null && AttenteReposCarte is not null
         && !ReposCarteEnAttente && !ReposCarteEnCours && VerdictReposCarte is null;
@@ -887,7 +892,7 @@ public sealed partial class ScanViewModel
     internal void SignalerReposCarte() { OnPropertyChanged(nameof(ReposCarteVisible)); OnPropertyChanged(nameof(ReposCarteAOuvrir)); }
     public string LabelReposCarteTitre => _localize("Carte.Repos.Titre");
     public string LabelReposCarteDescription => _localize("Carte.Repos.Description");
-    // UI1 (08/10/2026) : la ligne qui reste à l'écran ; le texte entier passe en info-bulle.
+    // La ligne qui reste à l'écran ; le texte entier passe en info-bulle.
     public string LabelReposCarteDescriptionCourte => _localize("Carte.Repos.Description.Court");
     public string LabelReposCarteMaintenir => _localize("Carte.Repos.Maintenir");
     public string LabelReposCarteEnCours => _localize("Carte.Repos.EnCours");
@@ -916,7 +921,7 @@ public sealed partial class ScanViewModel
         LevierReposCarte is { } l && ReglagesDeLaCarte is { } r ? SurveillerLaCarteEnJeuAsync(l, parties, r) : Task.CompletedTask;
     private DrDxt.Application.Tweaks.PreuveEnAttente? EcritureReposCarte { get; set; }
 
-    /// <summary>G4 : un réglage gardé au repos reste sous surveillance en jeu. Sur le jeu le plus joué depuis, trois
+    /// <summary>Un réglage gardé au repos reste sous surveillance en jeu. Sur le jeu le plus joué depuis, trois
     /// parties toutes sous les trois d'avant (1 % le plus lent) : retiré, et dit. Sinon rien ne bouge.</summary>
     internal async Task SurveillerLaCarteEnJeuAsync(ITweak levier, IReadOnlyList<DrDxt.Application.Parties.PartieRelevee> parties,
         DrDxt.Application.Tweaks.ReglagesRetenus retenus)
@@ -926,7 +931,13 @@ public sealed partial class ScanViewModel
             .OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
         if (jeu is null) return;
         if (DrDxt.Application.Parties.ComparaisonDesParties.Juger(parties, r.Le, jeu) != DrDxt.Application.Parties.VerdictEnJeu.Pire) return;
-        await levier.RevertAsync(new TweakSnapshot(r.TweakId, r.OriginalValueJson, r.AppliedValueJson));
+        var retrait = await levier.RevertAsync(new TweakSnapshot(r.TweakId, r.OriginalValueJson, r.AppliedValueJson));
+        // Un retrait refusé laisse le réglage posé : il reste suivi (le retenu reste), et l'échec est dit.
+        if (!retrait.IsOk)
+        {
+            VerdictReposCarte = string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize("Carte.Repos.RetraitRate"), jeu);
+            return;
+        }
         retenus.Effacer();
         VerdictReposCarte = string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize("Carte.Repos.PireEnJeu"), jeu);
     }
@@ -954,10 +965,10 @@ public sealed partial class ScanViewModel
         if (relu?.Statut != RepairStatus.ExpectedDefault) ReparationLancee = false;
     }
 
-    /// <summary>La commande de la console. Chemins ABSOLUS tires de l'API, jamais du PATH ni de
+    /// <summary>La commande de la console. Chemins absolus tires de l'API, jamais du PATH ni de
     /// $env:SystemRoot (tous deux reglables par l'utilisateur, et la console est elevee) ; -NoProfile
     /// pour ne pas executer en administrateur le profil PowerShell de l'utilisateur.</summary>
-    /// <para>10/10/2026 (revue de sécurité) : installée, la console passe par le lanceur natif (environnement reconstruit,
+    /// <para>Installée, la console passe par le lanceur natif (environnement reconstruit,
     /// commande fixe écrite dans le lanceur) ; sans lanceur à côté de l'App (build de développement), elle s'ouvre seule.</para>
     internal static System.Diagnostics.ProcessStartInfo ConsoleDeReparation(string system32, string? lanceur = null)
     {
@@ -1010,15 +1021,15 @@ public sealed partial class ScanViewModel
         }
         catch (Exception ex)
         {
-            ErreurReparation = $"{_localize("Reparation.Windows.Echec")} : {ex.Message}";
+            ErreurReparation = $"{_localize("Reparation.Windows.Echec")}{Docteur.DeuxPoints}{ex.Message}";
         }
     }
 
-    /// <summary>25/09/2026 — le choix du joueur, garde entre deux lancements. <c>null</c> = rien n'est
+    /// <summary>Le choix du joueur, garde entre deux lancements. <c>null</c> = rien n'est
     /// garde (les tests ; l'appli pose le fichier reel au demarrage).</summary>
     internal DrDxt.Application.Network.PlafondEnvoiMemorise? MemoirePlafond { get; set; }
 
-    /// <summary>Au lancement : rallume le mode que le joueur avait laisse allume. Un echec se DIT sur
+    /// <summary>Au lancement : rallume le mode que le joueur avait laisse allume. Un echec se dit sur
     /// la carte et ne l'efface pas : le joueur l'avait voulu, le prochain lancement reessaiera.</summary>
     public async Task RallumerPlafondEnvoiAsync()
     {
@@ -1035,16 +1046,16 @@ public sealed partial class ScanViewModel
                 ? await ActiverEtRetenirAsync(retenu.Exe, retenu.PlafondBps)
                 : await ActiverPlafondEnvoiAsync();
             if (issue is { IsOk: false } echec)
-                ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")} : {echec.Error?.Message}";
+                ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{echec.Error?.Message}";
         }
         catch (Exception ex)
         {
-            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")} : {ex.Message}";
+            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{ex.Message}";
         }
         SignalerPlafondEnvoi();
     }
 
-    // 28/09/2026 : la protection retenue part aussi au service de demarrage, qui la porte sans DrDXT ouvert.
+    // La protection retenue part aussi au service de demarrage, qui la porte sans DrDXT ouvert.
     // Par le helper, seul a ecrire sous %ProgramData%\DrDxt. Un refus (service absent de cette version,
     // helper qui ne connait pas l'ordre) ne change rien a la protection de l'App : elle reste active.
     private async Task<Result> RetenirPourLeServiceAsync(string exe, long plafondBps)
@@ -1054,7 +1065,7 @@ public sealed partial class ScanViewModel
         catch (Exception ex) when (ex is not OperationCanceledException) { return Result.Fail(ErrorCodes.IoFailure, ex.Message); }
     }
 
-    // 28/09/2026 : service en marche, l'App ne pose rien elle-meme ; un refus de retenir (UAC declinee) laissait
+    // Service en marche, l'App ne pose rien elle-meme ; un refus de retenir (UAC declinee) laissait
     // la carte dire « active » alors que personne ne portait la protection. Ce refus-la eteint et se dit.
     private async Task<Result> ActiverEtRetenirAsync(string exe, long plafondBps)
     {

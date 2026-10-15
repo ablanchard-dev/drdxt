@@ -7,19 +7,19 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Gpu.Nvapi;
 
 // -----------------------------------------------------------------------
-// NvApiGpuTuningReaderTests — fake-based unit tests for NvApiGpuTuningReader.
+// NvApiGpuTuningReaderTests : tests unitaires sur faux de NvApiGpuTuningReader.
 //
-// ALL tests use FakeNvApiNative — no native NVAPI calls, no NVIDIA GPU needed
-// (nvapi64.dll is never loaded in a test process). Mirrors the ADLX reader suite:
-//   1. FAIL-CLEAN: when native is unavailable, every read returns Fail (never throws).
-//   2. PASS-THROUGH: when native succeeds, reader maps the raw read to Result.Ok.
-//   3. Real memory read: core AND memory offsets are each real distinct reads — the
-//      memory read is not a fake 0 (ApplyNvidiaAsync fails the undervolt if it can't
-//      read the memory offset, so a placebo here would defeat NVIDIA undervolt).
-//   4. ERROR CODES: all failures carry ErrorCodes.TweakSdkUnavailable.
-//   5. INPUT GUARD: negative GPU index → Fail before any native call.
-//   6. FAN = HONEST UNAVAILABLE (§22.3): GetFanCurve always fails clean — the NVAPI
-//      fan-curve read is not in the verified recipe; never a fake/empty curve.
+// Tous les tests utilisent FakeNvApiNative : aucun appel NVAPI natif, aucune carte NVIDIA requise
+// (nvapi64.dll n'est jamais chargée dans un processus de test). Miroir de la suite du lecteur ADLX :
+//   1. Échec propre : natif indisponible → chaque lecture rend Fail (ne lève jamais).
+//   2. Transmission : natif réussi → le lecteur traduit la lecture brute en Result.Ok.
+//   3. Vraie lecture mémoire : les décalages cœur et mémoire sont deux vraies lectures distinctes ;
+//      la lecture mémoire n'est pas un faux 0 (ApplyNvidiaAsync fait échouer l'undervolt s'il ne
+//      peut pas lire le décalage mémoire, donc un placebo ici tuerait l'undervolt NVIDIA).
+//   4. Codes d'erreur : chaque échec porte ErrorCodes.TweakSdkUnavailable.
+//   5. Garde d'entrée : index GPU négatif → Fail avant tout appel natif.
+//   6. Ventilation = indisponible, honnêtement : GetFanCurve échoue toujours proprement ; la lecture
+//      de courbe NVAPI n'est pas dans la recette vérifiée ; jamais une courbe fausse ou vide.
 // -----------------------------------------------------------------------
 public sealed class NvApiGpuTuningReaderTests
 {
@@ -67,8 +67,8 @@ public sealed class NvApiGpuTuningReaderTests
     [Fact]
     public void GetCoreClockOffsetMhz_returns_fail_when_read_fails()
     {
-        // The fake carries a non-zero value but the read FAILS → the reader must Fail,
-        // never leak the stale value as a fake number.
+        // Le faux porte une valeur non nulle mais la lecture échoue → le lecteur doit rendre Fail,
+        // jamais laisser fuir la valeur périmée comme un faux nombre.
         var fake = new FakeNvApiNative { IsAvailable = true, CoreSuccess = false, CoreOffsetMhz = 123 };
         var r    = new NvApiGpuTuningReader(fake).GetCoreClockOffsetMhz(0);
         r.IsOk.Should().BeFalse();
@@ -84,7 +84,7 @@ public sealed class NvApiGpuTuningReaderTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
     }
 
-    // ── GetMemoryClockOffsetMhz (real read — not fail-clean by design) ────
+    // ── GetMemoryClockOffsetMhz (vraie lecture, pas d'échec propre par construction) ────
 
     [Fact]
     public void GetMemoryClockOffsetMhz_returns_fail_when_native_unavailable()
@@ -98,7 +98,7 @@ public sealed class NvApiGpuTuningReaderTests
     [Fact]
     public void GetMemoryClockOffsetMhz_returns_ok_with_REAL_value_when_read_succeeds()
     {
-        // The memory offset is a real read off the native boundary — not a hardcoded 0.
+        // Le décalage mémoire est une vraie lecture sur la frontière native, pas un 0 codé en dur.
         var fake = new FakeNvApiNative
         {
             IsAvailable     = true,
@@ -113,8 +113,8 @@ public sealed class NvApiGpuTuningReaderTests
     [Fact]
     public void GetMemoryClockOffsetMhz_returns_fail_when_read_fails()
     {
-        // Memory clock domain genuinely absent on this GPU → native returns false →
-        // the reader fails clean honestly (never a fabricated 0).
+        // Domaine d'horloge mémoire vraiment absent sur cette carte → le natif rend false →
+        // le lecteur échoue proprement et honnêtement (jamais un 0 fabriqué).
         var fake = new FakeNvApiNative { IsAvailable = true, MemorySuccess = false, MemoryOffsetMhz = 999 };
         var r    = new NvApiGpuTuningReader(fake).GetMemoryClockOffsetMhz(0);
         r.IsOk.Should().BeFalse();
@@ -133,8 +133,8 @@ public sealed class NvApiGpuTuningReaderTests
     [Fact]
     public void Core_and_memory_offsets_are_independent_real_reads()
     {
-        // Pins the design correction: core and memory are SEPARATE real reads, each
-        // mapping its own native value — proving memory is not aliased to core / 0.
+        // Fige la correction de conception : cœur et mémoire sont deux vraies lectures séparées,
+        // chacune traduisant sa propre valeur native ; la mémoire n'est pas un alias du cœur ni de 0.
         var fake = new FakeNvApiNative
         {
             IsAvailable     = true,
@@ -189,13 +189,13 @@ public sealed class NvApiGpuTuningReaderTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
     }
 
-    // ── GetFanCurve — HONEST UNAVAILABLE (§22.3), never a fake curve ──────
+    // ── GetFanCurve : indisponible, honnêtement, jamais une fausse courbe ──────
 
     [Fact]
     public void GetFanCurve_returns_honest_unavailable_even_when_native_available()
     {
-        // The NVAPI fan-curve read is not in the verified recipe and the fan tweak is
-        // deferred → honest fail-clean, never an empty/fabricated curve.
+        // La lecture de courbe NVAPI n'est pas dans la recette vérifiée et le levier de ventilation
+        // est différé → échec propre honnête, jamais une courbe vide ou fabriquée.
         var sut = new NvApiGpuTuningReader(new FakeNvApiNative { IsAvailable = true });
         var r   = sut.GetFanCurve(0);
         r.IsOk.Should().BeFalse();
@@ -211,7 +211,7 @@ public sealed class NvApiGpuTuningReaderTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
     }
 
-    // ── Native unavailable never throws ───────────────────────────────────
+    // ── Natif indisponible : ne lève jamais ──────────────────────────────────
 
     [Fact]
     public void All_reads_on_unavailable_native_never_throw()
@@ -229,16 +229,16 @@ public sealed class NvApiGpuTuningReaderTests
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// FakeNvApiNative — in-process substitute for unit tests.
-// Never calls nvapi64.dll; fully configurable per test. The Try* reads return the
-// configured value + a per-surface success flag; the Try*Set writes are never reached
-// by the read seam (and return false here — no driver is touched in tests).
+// FakeNvApiNative : substitut en processus pour les tests unitaires.
+// N'appelle jamais nvapi64.dll ; entièrement configurable par test. Les lectures Try* rendent
+// la valeur configurée et un drapeau de succès par surface ; les écritures Try*Set ne sont jamais
+// atteintes par la couture de lecture (et rendent false ici : aucun pilote touché en test).
 // ────────────────────────────────────────────────────────────────────────
 internal sealed class FakeNvApiNative : INvApiNative
 {
     public bool IsAvailable { get; set; }
 
-    // ── read state ────────────────────────────────────────────────────────
+    // ── état de lecture ───────────────────────────────────────────────────
     public bool CoreSuccess   { get; set; } = true;
     public int  CoreOffsetMhz { get; set; }
 
@@ -266,7 +266,7 @@ internal sealed class FakeNvApiNative : INvApiNative
         return PowerSuccess;
     }
 
-    // ── write surface — never exercised by the non-elevated read reader ────
+    // ── surface d'écriture : jamais exercée par le lecteur non élevé ─────────
     public bool TrySetCoreClockOffset(int gpuIndex, int offsetMhz) => false;
     public bool TrySetMemoryClockOffset(int gpuIndex, int offsetMhz) => false;
     public bool TrySetPowerLimitPercent(int gpuIndex, float pct) => false;

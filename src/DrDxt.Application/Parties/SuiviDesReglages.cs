@@ -4,7 +4,7 @@ using DrDxt.Core;
 namespace DrDxt.Application.Parties;
 
 /// <summary>
-/// 04/10/2026 (plan 2.1) : un réglage que le joueur bascule lui-même (Instant Replay de NVIDIA, et demain le mode Jeu
+/// Un réglage que le joueur bascule lui-même (Instant Replay de NVIDIA, et demain le mode Jeu
 /// ou HAGS) doit pouvoir se juger sur ses parties, comme un réglage du BIOS. Chaque scan relève ces états ; ce qui a
 /// changé depuis le relevé précédent devient un <see cref="Changement"/>, borné entre les deux relevés (l'heure exacte
 /// de la bascule n'est pas connue). Le premier relevé ne produit rien : sans avant, aucun changement n'est inventé.
@@ -18,7 +18,7 @@ public sealed class SuiviDesReglages
 
     public static SuiviDesReglages ParDefaut() => new(FichierJsonAtomique.CheminLocal("reglages-suivis.json"));
 
-    /// <param name="Lus">Revue du 04/10 (P1) : la date du dernier relevé de CHAQUE réglage. Un relevé qui n'a pas lu un
+    /// <param name="Lus">La date du dernier relevé de chaque réglage. Un relevé qui n'a pas lu un
     /// réglage ne le borne pas : la bascule peut dater d'avant lui.</param>
     private sealed record Releve(DateTimeOffset Le, Dictionary<string, string> Etats, Dictionary<string, DateTimeOffset>? Lus = null);
 

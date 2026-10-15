@@ -3,7 +3,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 23/09/2026 — le rouge intermittent de <c>AucunOctetNulDansLesSourcesTests</c> (vu trois fois),
+/// Le rouge intermittent de <c>AucunOctetNulDansLesSourcesTests</c> (vu trois fois),
 /// enfin nommé : <c>FileNotFoundException</c> sur <c>src\DrDxt.App\DrDxt.App_lahfo0ht_wpftmp.csproj</c>.
 /// Pendant la compilation XAML, WPF écrit un projet temporaire À côté du vrai, pas dans
 /// <c>obj</c>, puis l'efface. Une garde qui liste le dossier pendant ce temps le voit, puis ne

@@ -6,7 +6,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>25/09/2026 — le constat du magasin de composants. Machine de reference : « repairable ».</summary>
+/// <summary>Le constat du magasin de composants. Machine de reference : « repairable ».</summary>
 public class SanteWindowsTests
 {
     private static Func<Result<byte[]>> Lu(string etat) => () => Result<byte[]>.Ok(Encoding.UTF8.GetBytes(etat));
@@ -17,10 +17,12 @@ public class SanteWindowsTests
         var c = SanteWindows.Constat(Lu(SanteDesComposants.Reparable));
         c.Statut.Should().Be(RepairStatus.Suspicious);
         c.Action.Should().Be(RepairAction.Recommandation);
-        c.Explication.Should().Contain("/RestoreHealth").And.Contain("sfc /scannow");
+        c.Explication.Should().NotContain("/RestoreHealth", "le geste a sa place à part");
+        c.Remede.Should().Contain("1)").And.Contain("Terminal (administrateur)").And.Contain("/RestoreHealth").And.Contain("sfc /scannow")
+            .And.Contain("Réinstaller maintenant");
     }
 
-    // 29/09/2026, troisième critique : « Magasin de composants » et « DISM /CheckHealth » en tête parlaient à un
+    // « Magasin de composants » et « DISM /CheckHealth » en tête parlaient à un
     // technicien. Le titre dit ce que c'est, la première phrase dit le fait ; l'outil et ses commandes suivent.
     [Fact]
     public void Le_constat_parle_au_joueur_avant_de_citer_l_outil()
@@ -41,7 +43,7 @@ public class SanteWindowsTests
         => SanteWindows.Constat(() => Result<byte[]>.Fail(ErrorCodes.HelperOpFailed, "helper absent"))
             .Statut.Should().Be(RepairStatus.Unknown);
 
-    // 07/10/2026 (D8) : après « Réinstaller maintenant », la preuve est datée par la dernière installation de Windows.
+    // Après « Réinstaller maintenant », la preuve est datée par la dernière installation de Windows.
     [Fact]
     public void Le_constat_lu_dit_la_date_de_la_derniere_installation_et_le_non_lu_ne_dit_rien()
     {
@@ -51,6 +53,6 @@ public class SanteWindowsTests
             .Explication.Should().NotContain("2026");
         SanteWindows.Constat(Lu(SanteDesComposants.Reparable), () => null).Explication.Should().NotContain("Dernière installation");
         SanteWindows.Constat(Lu(SanteDesComposants.Sain), () => reinstalle).Explication.Should().Contain("mise à niveau",
-            "une mise à niveau de Windows réécrit la même date (revue F-49)");
+            "une mise à niveau de Windows réécrit la même date");
     }
 }

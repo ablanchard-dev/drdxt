@@ -1,13 +1,13 @@
 namespace DrDxt.Core;
 
-/// <summary>Un instant de telemetrie materielle. <c>null</c> = pas lisible, jamais zero — une
+/// <summary>Un instant de telemetrie materielle. <c>null</c> = pas lisible, jamais zero : une
 /// carte qui ne rend pas ses watts n'en consomme pas zero.</summary>
 public readonly record struct HardwareReading(
     double? GpuPowerW,
     double? GpuTemperatureC,
     double? GpuClockMhz = null,
-    /// <summary>Le bitmask publie par le pilote. <c>0</c> est une vraie valeur — rien ne
-    /// bride — a ne jamais confondre avec <c>null</c>, qui veut dire « pas lisible ».</summary>
+    /// <summary>Le bitmask publie par le pilote. <c>0</c> est une vraie valeur (rien ne
+    /// bride), a ne jamais confondre avec <c>null</c>, qui veut dire « pas lisible ».</summary>
     ClocksEventReason? Raisons = null);
 
 /// <summary>Ce qui sait lire le materiel pendant une passe. Une couture, pour que la boucle se
@@ -19,12 +19,11 @@ public interface IHardwareProbe
 }
 
 /// <summary>
-/// Ce que le materiel a fait pendant la passe — sur la meme fenetre que les frames.
+/// Ce que le materiel a fait pendant la passe, sur la meme fenetre que les frames.
 ///
-/// La capture initiale de la session Warzone du 07/09/2026 montrait GPU busy 97 %, et c'est
-/// tout ce que le produit savait dire. Deux problemes : cette lecture venait d'une capture prise
-/// avant l'experience, pas des fenetres que l'Autopilot a reellement utilisees ; et elle ne disait
-/// rien de la puissance ni de la temperature, donc rien sur un eventuel plafond.
+/// Un seul GPU busy, lu sur une capture prise avant l'experience, ne parlerait pas des fenetres
+/// que l'Autopilot utilise vraiment, et ne dirait rien de la puissance ni de la temperature,
+/// donc rien d'un eventuel plafond.
 ///
 /// Ces agregats sont echantillonnes pendant chaque passe, comme le focus. La distinction n'est pas
 /// theorique : lire les watts une fois la passe finie mesure une carte qui a deja commence a
@@ -39,7 +38,7 @@ public interface IHardwareProbe
 /// agregats valent <c>null</c>.</param>
 /// <param name="PuissanceMedianeW">La mediane et non la moyenne : une seule lecture aberrante
 /// pendant un changement d'etat tirerait une moyenne, pas une mediane.</param>
-/// <param name="TemperatureMaxC">Le MAX et non la moyenne : un plafond thermique est un
+/// <param name="TemperatureMaxC">Le max et non la moyenne : un plafond thermique est un
 /// evenement, et une moyenne le noie.</param>
 public sealed record HardwareObservation(
     int Echantillons,
@@ -48,9 +47,9 @@ public sealed record HardwareObservation(
     /// <summary>Frequence mediane de la passe. La mediane parce qu'une carte NVIDIA boost et
     /// redescend en permanence : une moyenne melangerait les deux regimes.</summary>
     double? FrequenceMedianeMhz = null,
-    /// <summary>Frequence MINIMALE. C'est elle qui porte un decrochage — la mediane le noie.</summary>
+    /// <summary>Frequence minimale. C'est elle qui porte un decrochage : la mediane le noie.</summary>
     double? FrequenceMinimaleMhz = null,
-    /// <summary>L'UNION des raisons vues pendant la passe. Un plafond qui n'a dure qu'un instant
+    /// <summary>L'union des raisons vues pendant la passe. Un plafond qui n'a dure qu'un instant
     /// a quand meme eu lieu, et une intersection l'effacerait.</summary>
     ClocksEventReason? RaisonsVues = null)
 {
@@ -70,8 +69,8 @@ public sealed record HardwareObservation(
         var mhz = lectures.Select(l => l.GpuClockMhz).OfType<double>()
             .Where(x => x > 0 && double.IsFinite(x)).OrderBy(x => x).ToList();
 
-        // L'UNION, pas l'intersection : un plafond qui n'a dure qu'un echantillon a quand meme
-        // eu lieu. Et si aucune lecture n'a abouti, on rend null — pas `Aucune`, qui affirmerait
+        // L'union, pas l'intersection : un plafond qui n'a dure qu'un echantillon a quand meme
+        // eu lieu. Et si aucune lecture n'a abouti, on rend null, pas `Aucune`, qui affirmerait
         // que rien ne bridait alors que personne n'a regarde.
         var lues = lectures.Select(l => l.Raisons).OfType<ClocksEventReason>().ToList();
         ClocksEventReason? raisons = lues.Count == 0

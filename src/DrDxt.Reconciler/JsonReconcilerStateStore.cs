@@ -4,15 +4,15 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// JsonReconcilerStateStore — the runtime sidecar persistence (plan §5 / T14).
+// JsonReconcilerStateStore : la persistance du sidecar d'exécution.
 //
-// Not signed: the sidecar carries no privileged authority. Anything an attacker
-// could change here only makes the reconciler do LESS (pause an item, skip GPU
-// re-apply) — never more, and never bypasses the signed manifest. It lives next to
-// the manifest under the same admin-write root for tamper-resistance at rest, but
-// the integrity authority is the manifest signature, not this file.
+// Non signé : le sidecar ne porte aucune autorité privilégiée. Tout ce qu'un attaquant pourrait
+// y changer ne fait qu'en faire moins au réconciliateur (mettre un élément en pause, sauter la
+// réapplication GPU), jamais plus, et ne contourne jamais le manifeste signé. Il vit à côté du
+// manifeste sous la même racine en écriture admin, pour résister à l'altération au repos, mais
+// l'autorité d'intégrité est la signature du manifeste, pas ce fichier.
 //
-// Absent file → ReconcilerState.Default (first run), not a failure.
+// Fichier absent → ReconcilerState.Default (premier lancement), pas un échec.
 // -----------------------------------------------------------------------
 public sealed class JsonReconcilerStateStore : IReconcilerStateStore
 {
@@ -22,15 +22,15 @@ public sealed class JsonReconcilerStateStore : IReconcilerStateStore
 
     public JsonReconcilerStateStore(string path) => _path = path;
 
-    /// <summary>The default sidecar path under the admin-write manifest root.</summary>
+    /// <summary>Le chemin par défaut du sidecar sous la racine du manifeste en écriture admin.</summary>
     public static string DefaultPath()
         => Path.Combine(
             Manifest.ProgramDataManifestStorage.DefaultRoot(), "reconciler-state.json");
 
-    /// <summary>True iff <paramref name="dir"/> is the shared manifest trust root
-    /// (<c>%ProgramData%\DrDxt</c>) — the only directory whose at-rest posture this store
-    /// enforces/repairs. Any other (test / overridden) location is treated as untrusted
-    /// scratch and only ensured to exist.</summary>
+    /// <summary>Vrai si et seulement si <paramref name="dir"/> est la racine de confiance partagée
+    /// du manifeste (<c>%ProgramData%\DrDxt</c>) : le seul dossier dont ce store impose et répare
+    /// la protection au repos. Tout autre emplacement (test / surchargé) est traité comme un brouillon
+    /// non fiable dont on assure seulement l'existence.</summary>
     private static bool IsSharedTrustRoot(string dir)
     {
         try
@@ -55,7 +55,7 @@ public sealed class JsonReconcilerStateStore : IReconcilerStateStore
 
             var json = File.ReadAllText(_path);
             var state = JsonSerializer.Deserialize<ReconcilerState>(json, Options);
-            // 26/09/2026 : un etat ampute se relisait sans erreur (Items nul, build nul) et le service le
+            // Un etat ampute se relisait sans erreur (Items nul, build nul) et le service le
             // parcourait au demarrage. Ampute = illisible ; le reconciliateur n'ecrit alors rien.
             if (state is null || state.LastFeatureUpdateBuild is null || state.Items is null
                 || state.Items.Any(i => i?.TweakId is null))
@@ -77,29 +77,28 @@ public sealed class JsonReconcilerStateStore : IReconcilerStateStore
             {
                 if (IsSharedTrustRoot(dir))
                 {
-                    // The sidecar lives under the same admin-write root as manifest-public.key
-                    // + the signed manifest. Whether the root exists or not, ensure it is
-                    // admin-owned (create / verify / REPAIR): a non-elevated writer (e.g. the
-                    // App reaching SaveAsync via the reconciler's bookkeeping) cannot create or
-                    // repair it and fails CLEAN — it never pre-creates a user-owned
-                    // %ProgramData%\DrDxt nor writes its sidecar into a pre-squatted user-owned
-                    // root (BLOCKER #1 / F1). The elevated/SYSTEM service SELF-HEALS a squatted
-                    // root here before persisting the sidecar.
+                    // Le sidecar vit sous la même racine en écriture admin que manifest-public.key + le manifeste
+                    // signé. Que la racine existe ou non, s'assurer qu'elle appartient aux administrateurs (créer /
+                    // vérifier / réparer) : un écrivain non élevé (par exemple l'App qui atteint SaveAsync par la
+                    // comptabilité du réconciliateur) ne peut ni la créer ni la réparer et échoue proprement : il ne
+                    // crée jamais d'avance un %ProgramData%\DrDxt appartenant à l'utilisateur et n'écrit jamais son
+                    // sidecar dans une racine squattée par l'utilisateur. Le service élevé / SYSTEM répare ici une
+                    // racine squattée avant d'enregistrer le sidecar.
                     var ensured = Manifest.TrustedManifestRoot.EnsureCreatedHardened(dir);
                     if (!ensured.IsOk)
                         return Task.FromResult(ensured);
                 }
                 else if (!Directory.Exists(dir))
                 {
-                    // A non-shared sidecar location (tests / explicit override) carries no
-                    // trust — just ensure the directory exists.
+                    // Un emplacement de sidecar non partagé (tests / surcharge explicite) ne porte aucune
+                    // confiance : s'assurer seulement que le dossier existe.
                     Directory.CreateDirectory(dir);
                 }
             }
 
             var json = JsonSerializer.Serialize(state, Options);
             var tmp = _path + ".tmp";
-            // Revue de sécurité du 08/10 : un .tmp posé à l'avance (propriétaire, ACL, lien) est supprimé, puis le
+            // Un .tmp posé à l'avance (propriétaire, ACL, lien) est supprimé, puis le
             // fichier est créé en exclusif.
             if (File.Exists(tmp)) File.Delete(tmp);
             using (var flux = new FileStream(tmp, FileMode.CreateNew, FileAccess.Write, FileShare.None))

@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using DrDxt.App.Navigation;
 using DrDxt.App.Profiles;
 using DrDxt.App.ViewModels;
 using DrDxt.Core;
@@ -14,14 +13,14 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// L8 b — « OPTIMISER » (revue du 10/09/2026).
+// « OPTIMISER ».
 //
 //   * juger avant d'encaisser : rien a tenter ⇒ motifs, et jamais l'achat ;
-//   * gate paye, puis point de restauration (§16), avant toute ecriture ;
+//   * gate paye, puis point de restauration, avant toute ecriture ;
 //   * ce qui ne se mesure pas (effet au redemarrage) part au moteur sans baseline ;
 //   * Un seul levier a chaud part en session mesuree ; un levier ecarte n'est jamais applique.
 //
-// Every seam is a fake — NO real elevation, NO real registry, NO real System Restore.
+// Chaque couture est un faux : aucune vraie élévation, aucun vrai registre, aucune vraie restauration système.
 // -----------------------------------------------------------------------
 public sealed class ScanApplyCommandTests
 {
@@ -31,7 +30,7 @@ public sealed class ScanApplyCommandTests
     private static readonly string[] AuRedemarrage = { "latency.hagsOn", "latency.gameModeOn" };
     private static readonly string[] AChaud = { "fixit.power_plan", "latency.reflex" };
 
-    // ---- shared fakes -------------------------------------------------
+    // ---- faux partagés ------------------------------------------------
 
     private static HardwareInventory Hw(ChassisType c = ChassisType.Desktop) => new(
         new CpuInfo("AMD Ryzen 7 7800X3D", "AMD", 8, 16, true, 1),
@@ -67,9 +66,7 @@ public sealed class ScanApplyCommandTests
         public DrDxt.App.Platform.IGameLocator? Locator { get; init; }
         public required ISafetyManager Safety { get; init; }
         public required ITweakEngine Engine { get; init; }
-        public required INavigationService Nav { get; init; }
         public required List<string> CandidatsCrees { get; init; }
-        public required IGpuTuningApplyStep GpuStep { get; init; }
     }
 
     private static Harness Build(
@@ -96,9 +93,7 @@ public sealed class ScanApplyCommandTests
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(
               Hw(), St,
-              new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) },
-              Score, Bl,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) }, Bl)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
@@ -114,8 +109,6 @@ public sealed class ScanApplyCommandTests
         var consumer = ScanViewModelTestSeams.ProfileConsumer(
             consumption ?? ScanViewModelTestSeams.PlanConsumption(graines ?? AuRedemarrage));
 
-        var nav = Substitute.For<INavigationService>();
-
         var locator = Substitute.For<DrDxt.App.Platform.IGameLocator>();
         locator.LocateRunningGamePid().Returns(pid > 0 ? pid : null);
         if (nomDuJeu is not null) locator.NameOfGame(pid).Returns(nomDuJeu);
@@ -124,10 +117,9 @@ public sealed class ScanApplyCommandTests
         IReadOnlyList<ArretClasse> arrets = Enumerable.Range(1, arretsRecents)
             .Select(j => ArretClasse.SansDetail(DateTimeOffset.UtcNow.AddDays(-j))).ToList();
 
-        var gpuStep = ScanViewModelTestSeams.GpuTuningStep();
         var vm = new ScanViewModel(
-            hd, sr, br, sc, sd, safety, engine, consumer, gpuStep,
-            nav, () => new DashboardViewModel(), ScanViewModelTestSeams.DesiredStateStore(),
+            hd, sr, br, sc, sd, safety, engine, consumer,
+            ScanViewModelTestSeams.DesiredStateStore(),
             new AppliedTweakManifestMapper(), ScanViewModelTestSeams.BiosAdvisor(),
             ScanViewModelTestSeams.GuideGenerator(), key => key,
             gameLocator: locator,
@@ -135,7 +127,7 @@ public sealed class ScanApplyCommandTests
             lireStabilite: () => (null, arrets),
             journalCandidats: journal);
 
-        return new Harness { Vm = vm, Safety = safety, Engine = engine, Nav = nav, CandidatsCrees = crees, GpuStep = gpuStep, Locator = locator };
+        return new Harness { Vm = vm, Safety = safety, Engine = engine, CandidatsCrees = crees, Locator = locator };
     }
 
     private static async Task ScanThenApply(Harness h)
@@ -165,7 +157,7 @@ public sealed class ScanApplyCommandTests
     [Fact]
     public async Task Optimiser_est_offert_a_tous_c_est_lui_qui_juge()
     {
-        // 23/09/2026 — DrDXT est gratuit : aucune licence ne conditionne l'action principale.
+        // DrDXT est gratuit : aucune licence ne conditionne l'action principale.
         var h = Build();
         await h.Vm.ScanCommand.ExecuteAsync(null);
 
@@ -187,7 +179,7 @@ public sealed class ScanApplyCommandTests
         h.Vm.ResultatOptimisation.Should().Contain("Apply.Result.RebootSet");
     }
 
-    // 07/10/2026 (L-ECRAN) : le moteur défait un lot entier sur un échec. Un mode d'écran que le joueur ne garde pas ne
+    // Le moteur défait un lot entier sur un échec. Un mode d'écran que le joueur ne garde pas ne
     // doit pas défaire les heures d'activité ni les corrections au redémarrage cliquées avec lui : chacun son lot.
     [Fact]
     public async Task Un_mode_d_ecran_refuse_ne_defait_pas_les_autres_reglages_au_clic()
@@ -209,7 +201,7 @@ public sealed class ScanApplyCommandTests
     [Fact]
     public async Task Quand_Windows_garde_un_point_existant_l_ecran_dit_lequel_protege()
     {
-        // 14/09/2026 : un 2e « Optimiser » dans la journee n'est plus bloque ; le point que Windows a
+        // Un 2e « Optimiser » dans la journee n'est plus bloque ; le point que Windows a
         // garde protege le changement, et le client doit savoir de quand il date.
         var h = Build(graines: new[] { "latency.hagsOn", "latency.gameModeOn", "fixit.power_plan" });
         h.Safety.PointReutiliseUtc.Returns(new DateTime(2026, 9, 14, 7, 0, 0, DateTimeKind.Utc));
@@ -232,7 +224,7 @@ public sealed class ScanApplyCommandTests
             .And.Contain("personne n'a dit ce qui était joué", "aucune scene n'est fournie dans ce test : le contrat doit le dire");
     }
 
-    // 26/09/2026 : sur un seul écran, le clic sur « Optimiser » réduit un plein écran exclusif. La session
+    // Sur un seul écran, le clic sur « Optimiser » réduit un plein écran exclusif. La session
     // attend que le jeu revienne à l'écran ; s'il reste réduit, elle n'a pas lieu et c'est dit.
     [Fact]
     public async Task Jeu_reduit_au_clic_la_session_attend_son_retour_puis_a_lieu()
@@ -286,7 +278,7 @@ public sealed class ScanApplyCommandTests
         h.Vm.ResultatOptimisation.Should().Contain("Apply.Session.JeuReduit");
     }
 
-    // ====================== la scene declaree (11/09/2026) ======================
+    // ====================== la scene declaree ======================
     //
     // Du choix a l'ecran jusqu'a la phrase montree, par le vrai chemin : scan, jugement, session,
     // moteur. La ligne « scene declaree » est relue sur le PROFIL rendu par la session, donc sur le
@@ -302,8 +294,7 @@ public sealed class ScanApplyCommandTests
         return h;
     }
 
-    // 29/09/2026, seconde critique : Optimiser ne disait pas, avant le clic, ce qu'il allait changer. Après le
-    // scan, l'écran nomme les réglages qu'il essaiera.
+    // Avant le clic, Optimiser dit ce qu'il va changer : après le scan, l'écran nomme les réglages qu'il essaiera.
     [Fact]
     public async Task Avant_le_clic_Optimiser_nomme_ce_qu_il_essaiera()
     {
@@ -316,7 +307,7 @@ public sealed class ScanApplyCommandTests
             h.Vm.ApercuOptimisation.Should().Contain(TweakDisplayKeys.TitleKey(id));
     }
 
-    // UI1 (critique du 08/10, défaut 1) : « Rien à changer automatiquement ici » s'affichait juste au-dessus de « DrDXT
+    // « Rien à changer automatiquement ici » s'affichait juste au-dessus de « DrDXT
     // essaie lui-même : … ». Quand le jugement ne retient rien, Optimiser ne pose rien : l'aperçu se tait, la phrase seule dit.
     [Fact]
     public async Task Quand_rien_n_est_a_poser_l_apercu_ne_promet_rien()
@@ -333,7 +324,7 @@ public sealed class ScanApplyCommandTests
         annonces.Should().Contain(nameof(h.Vm.ApercuOptimisation), "l'écran doit se mettre à jour");
     }
 
-    // 29/09/2026, troisième critique : l'aperçu promettait le VRR sans dire qu'il n'est pas encore validé sur une
+    // L'aperçu promettait le VRR sans dire qu'il n'est pas encore validé sur une
     // vraie machine, alors que la carte Latence le dit. L'aperçu porte la même réserve.
     [Fact]
     public void L_apercu_dit_quand_un_reglage_n_est_pas_encore_valide()
@@ -343,18 +334,18 @@ public sealed class ScanApplyCommandTests
 
         var apercu = ScanViewModel.ApercuDe(["a", "b"], [Item("a", true), Item("b", false)], id => "T-" + id, "Essaiera :", "Sans validation :", "Aucune validation.");
 
-        // 29/09/2026, photo de l'accueil : « Optimisations pour les jeux en fenêtre (VRR) pas encore validé », la
+        // Photo de l'accueil : « Optimisations pour les jeux en fenêtre (VRR) pas encore validé », la
         // réserve collée au titre s'accordait mal. Elle devient une phrase à part, sans participe à accorder.
         apercu.Should().Be("Essaiera : T-a, T-b. Sans validation : T-b.");
         ScanViewModel.ApercuDe(["a"], [Item("a", true)], id => "T-" + id, "Essaiera :", "Sans validation :", "Aucune validation.")
             .Should().Be("Essaiera : T-a", "témoin : tout validé, pas de réserve");
 
-        // Un seul réglage, sans validation : le répéter derrière la réserve le disait deux fois de suite.
+        // Un seul réglage, sans validation : le répéter derrière la réserve le dirait deux fois de suite.
         ScanViewModel.ApercuDe(["b"], [Item("b", false)], id => "T-" + id, "Essaiera :", "Sans validation :", "Aucune validation.")
             .Should().Be("Essaiera : T-b. Aucune validation.");
     }
 
-    // 29/09/2026, critique de l'app : le sélecteur de scène revenait en entier avant Optimiser, déjà répondu
+    // Critique de l'app : le sélecteur de scène revenait en entier avant Optimiser, déjà répondu
     // avant le scan. Il se replie en une ligne qui dit le choix retenu, et suit ce choix.
     [Fact]
     public void Avant_Optimiser_la_scene_retenue_se_dit_en_une_ligne_et_suit_le_choix()
@@ -370,7 +361,7 @@ public sealed class ScanApplyCommandTests
         suivis.Should().Contain(nameof(vm.LabelSceneRetenue), "la ligne suit un changement de choix");
     }
 
-    // 29/09/2026, photo de l'accueil : « Pendant la mesure en jeu, tu joues : Je ne sais pas ». Dans le
+    // Photo de l'accueil : « Pendant la mesure en jeu, tu joues : Je ne sais pas ». Dans le
     // sélecteur c'est une réponse ; dans la phrase, c'est un aveu qui n'a pas de sens. Pas de choix = on le dit.
     [Fact]
     public void Sans_scene_choisie_la_ligne_le_dit_au_lieu_de_faire_parler_le_joueur()
@@ -388,9 +379,9 @@ public sealed class ScanApplyCommandTests
 
         vm.SceneDeclaree.Valeur.Should().Be(SceneRepresentativity.Unknown, "le silence ne vaut jamais « partie reelle »");
 
-        // 23/09/2026 — cette liste etait ecrite a la main, dans le produit comme dans ce test : les
-        // deux disaient la meme chose, donc le test ne pouvait pas voir une scene manquante. Elle se
-        // DEDUIT maintenant de l'enum ; ajouter un membre sans lui donner de case a l'ecran rougit ici.
+        // La liste se deduit de l'enum : ecrite a la main dans le produit comme dans le test, les deux
+        // diraient la meme chose et le test ne verrait pas une scene manquante. Ajouter un membre sans
+        // lui donner de case a l'ecran rougit ici.
         vm.ChoixDeScene.Select(c => c.Valeur).Should().BeEquivalentTo(
             Enum.GetValues<SceneRepresentativity>(),
             "une scene que le produit connait mais qu'il ne propose pas est une scene indeclarable");
@@ -427,7 +418,7 @@ public sealed class ScanApplyCommandTests
     [Theory]
     [InlineData(SceneRepresentativity.Entrainement, "terrain d'entraînement")]
     [InlineData(SceneRepresentativity.MenuLobby, "mesure dans un menu ou un lobby")]
-    // 23/09/2026 — « je n'etais pas en jeu » doit arriver a l'ecran avec sa phrase : la machine
+    // « je n'etais pas en jeu » doit arriver a l'ecran avec sa phrase : la machine
     // etait au repos, donc ce qui est lu est une configuration, pas un ressenti de partie.
     [InlineData(SceneRepresentativity.HorsJeu, "aucun jeu ne tournait pendant la mesure")]
     public async Task Chaque_scene_declaree_porte_SA_reserve_jusqu_a_l_ecran(SceneRepresentativity scene, string reserve)
@@ -500,7 +491,7 @@ public sealed class ScanApplyCommandTests
     [Fact]
     public async Task Des_arrets_brutaux_ne_ferment_ni_le_processeur_ni_le_pilote_et_l_ecran_dit_la_garde()
     {
-        // 08/10/2026 (le mainteneur : « DrDXT n'est pas censé me dire non ») : le processeur se tente sous garde ; 09/10/2026 :
+        // Le processeur se tente sous garde ; 09/10/2026 :
         // le pilote aussi (un arrêt après la pose le rend), et l'écran dit la garde.
         var h = Build(graines: AChaud, pid: PidDuJeu, arretsRecents: 2);
         await ScanThenApply(h);
@@ -519,7 +510,7 @@ public sealed class ScanApplyCommandTests
         await h.Engine.Received(1).ApplyAsync(
             Arg.Is<TweakPlan>(p => p.TweakIds.Order().SequenceEqual(new[] { "latency.gameModeOn", "latency.hagsOn" })),
             Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
-        // 09/10/2026 : HAGS et Reflex (pilote graphique) passent sous garde, comme le reste ; Reflex se tente à chaud.
+        // HAGS et Reflex (pilote graphique) passent sous garde, comme le reste ; Reflex se tente à chaud.
         h.CandidatsCrees.Should().Equal("latency.reflex");
         h.Vm.ResultatOptimisation.Should().StartWith("Ordonnance.Titre").And.Contain("Apply.SousGarde")
             .And.Contain("Apply.Result.AtReboot · tweak.latency.hagsOn.title").And.NotContain("Apply.Result.Discarded · tweak.latency.hagsOn.title");
@@ -528,7 +519,7 @@ public sealed class ScanApplyCommandTests
     [Fact]
     public async Task Avec_des_arrets_la_correction_du_fichier_d_echange_se_pose_sous_garde()
     {
-        // 08/10/2026 (le mainteneur : « DrDXT n'est pas censé me dire non ») : les arrêts ne bloquent plus ; la correction qui
+        // Les arrêts ne bloquent plus ; la correction qui
         // agit au redémarrage se pose (point de restauration d'abord), et l'écran dit la garde.
         var h = Build(graines: new[] { "fixit.power_plan", "fixit.sane_pagefile" }, arretsRecents: 3);
         await ScanThenApply(h);
@@ -537,7 +528,7 @@ public sealed class ScanApplyCommandTests
         h.Vm.ResultatOptimisation.Should().StartWith("Ordonnance.Titre").And.Contain("Apply.SousGarde");
     }
 
-    // GARDE1 (09/10/2026) : un levier rendu par la garde d'incident n'est pas reposé avant une semaine, et l'écran le dit ;
+    // Un levier rendu par la garde d'incident n'est pas reposé avant une semaine, et l'écran le dit ;
     // sinon pose, arrêt, rendu, repose tournaient sans fin.
     [Fact]
     public async Task Un_levier_rendu_par_la_garde_n_est_pas_repose_avant_une_semaine()
@@ -570,7 +561,7 @@ public sealed class ScanApplyCommandTests
     [Fact]
     public async Task Sans_jeu_un_levier_a_chaud_n_est_pas_a_tenter_et_rien_n_est_vendu()
     {
-        // Revue du 10/09 : le client payait et creait un point de restauration pour lire
+        // Le client payait et creait un point de restauration pour lire
         // ensuite « lance ton jeu ». Le jeu entre dans le JUGEMENT, donc avant l'achat.
         var h = Build(graines: AChaud, pid: 0);
         await ScanThenApply(h);
@@ -581,7 +572,7 @@ public sealed class ScanApplyCommandTests
         h.Vm.ResultatOptimisation.Should().Contain("aucun jeu");
     }
 
-    // ====================== le tuning GPU passe par le meme jugement (revue du 12/09, C3) ======================
+    // ====================== le tuning GPU passe par le meme jugement ======================
     // Le bouton GPU ecrivait sur la carte sans jamais demander au selecteur, alors que le diagnostic
     // porte la decision « rien ne s'ecrit sur la carte depuis l'App » et le veto des arrets brutaux.
 
@@ -598,23 +589,21 @@ public sealed class ScanApplyCommandTests
     [Fact]
     public async Task Sans_arret_qui_touche_la_carte_le_tuning_GPU_se_mesure_en_jeu_et_jamais_par_lot()
     {
-        // 06/10/2026 (L-GPU) : le drapeau global retiré, la carte se règle comme tout levier à chaud : point de
+        // Le drapeau global retiré, la carte se règle comme tout levier à chaud : point de
         // restauration, puis la session mesurée en jeu (gardé seulement avec un gain mesuré). L'étape par lot, qui
         // gardait un réglage sans gain, n'est plus jamais appelée.
         var h = Build(consumption: AvecPlanGpu(), pid: PidDuJeu);
         await ScanThenApplyGpu(h);
 
-        await h.GpuStep.DidNotReceive().ApplyAsync(Arg.Any<ScanProfileConsumption>(),
-            Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         await h.Safety.Received(1).EnsureRestorePointAsync();
-        h.CandidatsCrees.Should().Equal("gpu.power_limit"); // 07/10 : la fréquence reste fermée (règle du 29/09)
+        h.CandidatsCrees.Should().Equal("gpu.power_limit"); // La fréquence reste fermée (règle de la carte)
         h.Vm.PhraseReglageCarte.Should().StartWith("Réglage de la carte ouvert chez toi");
     }
 
     [Fact]
     public async Task Optimiser_atteint_la_carte_le_bouton_visible_et_pas_seulement_la_commande_sans_bouton()
     {
-        // 06/10/2026 (L-GPU) : la commande GPU dédiée n'a aucun bouton ; rouvrir la carte n'a de sens que si
+        // La commande GPU dédiée n'a aucun bouton ; rouvrir la carte n'a de sens que si
         // « Optimiser » la propose, mesurée en jeu comme le reste.
         var h = Build(consumption: AvecPlanGpu(), pid: PidDuJeu);
         await ScanThenApply(h);
@@ -632,8 +621,8 @@ public sealed class ScanApplyCommandTests
         }, pid: PidDuJeu, arretsRecents: 2);
         await ScanThenApplyGpu(h);
 
-        // 09/10/2026 (le mainteneur : « DrDXT n'est pas censé me dire non ») : la limite de puissance se tente sous garde ;
-        // la fréquence et la tension restent hors d'Optimiser (règle du 29/09), quels que soient les arrêts.
+        // La limite de puissance se tente sous garde ;
+        // la fréquence et la tension restent hors d'Optimiser (règle de la carte), quels que soient les arrêts.
         h.CandidatsCrees.Should().Equal("gpu.power_limit");
         h.Vm.PhraseReglageCarte.Should().StartWith("Réglage de la carte ouvert sous garde").And.Contain("arrêt sec sans code")
             .And.NotContain("inattribuable");
@@ -646,9 +635,7 @@ public sealed class ScanApplyCommandTests
         var h = Build(consumption: AvecPlanGpu(), pid: PidDuJeu, arretsRecents: 3);
         await ScanThenApplyGpu(h);
 
-        // 09/10/2026 : comme sans arrêt (la session mesurée en jeu, jamais l'étape par lot), et la phrase dit la garde.
-        await h.GpuStep.DidNotReceive().ApplyAsync(Arg.Any<ScanProfileConsumption>(),
-            Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        // Comme sans arrêt (la session mesurée en jeu, jamais l'étape par lot), et la phrase dit la garde.
         h.CandidatsCrees.Should().Equal("gpu.power_limit");
         h.Vm.PhraseReglageCarte.Should().StartWith("Réglage de la carte ouvert sous garde");
     }
@@ -659,12 +646,10 @@ public sealed class ScanApplyCommandTests
         var h = Build(consumption: AvecPlanGpu(), pid: 0);
         await ScanThenApplyGpu(h);
 
-        await h.GpuStep.DidNotReceive().ApplyAsync(Arg.Any<ScanProfileConsumption>(),
-            Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingApplicable");
     }
 
-    // ====================== restore-point gate (§16) ======================
+    // ====================== porte du point de restauration ======================
 
     [Fact]
     public async Task Restore_point_gate_runs_before_any_apply()
@@ -689,7 +674,6 @@ public sealed class ScanApplyCommandTests
         await EngineReceived(h, 0);
         h.CandidatsCrees.Should().BeEmpty("rien ne s'ecrit sans point de restauration");
         h.Vm.ApplyBlockedMessage.Should().Be("Apply.RestoreRequired.Blocked");
-        h.Nav.DidNotReceive().NavigateToDashboard(Arg.Any<object>());
     }
 
     [Fact]
@@ -702,8 +686,8 @@ public sealed class ScanApplyCommandTests
         h.Vm.ApplyBlockedMessage.Should().Be("Apply.RestoreRequired.Declined");
     }
 
-    // 06/10/2026 (plan 4.5) : chez moi, Windows n'a pas réussi à créer le point et l'écran disait « la restauration
-    // est désactivée » alors qu'elle était active. Chaque cause a ses mots, et la raison de Windows est dite.
+    // La restauration peut être active et Windows échouer à créer le point : l'écran ne doit pas dire « la
+    // restauration est désactivée ». Chaque cause a ses mots, et la raison de Windows est dite.
     [Fact]
     public async Task Un_point_que_Windows_n_a_pas_cree_ne_se_dit_pas_restauration_desactivee()
     {
@@ -724,7 +708,7 @@ public sealed class ScanApplyCommandTests
         h.Vm.ApplyBlockedMessage.Should().Be("Apply.RestoreRequired.NotFound");
     }
 
-    // 06/10/2026, chez moi : « je clique et rien ». « Optimiser » avait posé le VRR, mais son résultat (et ses refus)
+    // Chez moi : « je clique et rien ». « Optimiser » avait posé le VRR, mais son résultat (et ses refus)
     // s'écrivaient ~900 lignes plus bas, sous le pli. Le résultat suit le bouton, avant le choix de scène.
     [Fact]
     public void Le_resultat_d_Optimiser_s_affiche_sous_le_bouton()
@@ -741,7 +725,7 @@ public sealed class ScanApplyCommandTests
                 .BeInRange(bouton, scene, $"{message} doit se lire sous le bouton qui le produit");
     }
 
-    // Revue du 06/10 (P2) : jusqu'à ~40 s sans retour (création du point puis relectures) ; le bouton le dit.
+    // Jusqu'à ~40 s sans retour (création du point puis relectures) ; le bouton le dit.
     [Fact]
     public void Optimiser_dit_qu_il_travaille_pendant_le_point_de_restauration()
     {
@@ -761,10 +745,9 @@ public sealed class ScanApplyCommandTests
         await ScanThenApply(h);
 
         h.Vm.ApplyBlockedMessage.Should().Be("Apply.Failed");
-        h.Nav.DidNotReceive().NavigateToDashboard(Arg.Any<object>());
     }
 
-    // ====================== scan surfaces the profile recommendations (§16) ======================
+    // ====================== le scan fait remonter les recommandations du profil ======================
 
     [Fact]
     public async Task Scan_surfaces_profile_recommendations_with_evidence_and_unverified_marking()
@@ -785,13 +768,13 @@ public sealed class ScanApplyCommandTests
         h.Vm.Recommendations.Should().OnlyContain(i => !i.IsVerified);
         h.Vm.LabelUnverified.Should().Be("UI.Profile.Unverified");
 
-        // 27/09/2026, vu sur photo (latence) : l'étiquette « non vérifié » ne disait pas CE qui ne l'était
-        // pas, et la même chaîne veut dire « état illisible » côté BIOS. Sur la carte, un réglage proposé
+        // L'étiquette « non vérifié » ne dit pas ce qui ne l'est pas, et la même chaîne veut dire
+        // « état illisible » côté BIOS. Sur la carte, un réglage proposé
         // non encore validé le dit en clair.
         h.Vm.Domaines.SelectMany(d => d.Proposes).Should().NotBeEmpty()
             .And.OnlyContain(p => p.Valeur == "Carte.Propose.NonValide");
 
-        // 29/09/2026, photo (latence) : le titre en gras était tout l'argumentaire, trois lignes. Le titre est le
+        // Photo (latence) : le titre en gras était tout l'argumentaire, trois lignes. Le titre est le
         // nom du réglage, celui qu'Optimiser annonce ; l'argumentaire passe dessous.
         var propose = h.Vm.Domaines.SelectMany(d => d.Proposes).Single(p => p.Detail.Contains("cooler, steadier"));
         propose.Titre.Should().Be(TweakDisplayKeys.TitleKey("fixit.power_plan"));
@@ -800,7 +783,7 @@ public sealed class ScanApplyCommandTests
     [Fact]
     public async Task Ce_qui_ne_s_applique_pas_ou_ne_sera_jamais_ecrit_n_est_pas_recommande()
     {
-        // 16/09/2026, scan reel de la machine de reference : 10 « optimisations recommandees »
+        // Scan reel de la machine de reference : 10 « optimisations recommandees »
         // affichees, dont 5 que le catalogue declare NON applicables a cette machine et 2 reglages
         // GPU que la decision de fermeture n'ecrira jamais. L'ecran les recommandait quand meme.
         var consumption = ScanViewModelTestSeams.PlanConsumption(
@@ -814,7 +797,7 @@ public sealed class ScanApplyCommandTests
 
         h.Vm.Recommendations.Select(i => i.TweakId).Should().NotContain("latency.hagsOn",
             "un levier que le catalogue declare inapplicable n'est pas une recommandation");
-        // 06/10/2026 (L-GPU) : la carte est ouverte machine par machine ; sans arret qui la touche, elle se recommande.
+        // La carte est ouverte machine par machine ; sans arret qui la touche, elle se recommande.
         h.Vm.Recommendations.Select(i => i.TweakId).Should().Contain("gpu.undervolt");
         h.Vm.Recommendations.Select(i => i.TweakId).Should().Contain("latency.gameDvrBackgroundOff");
     }
@@ -822,7 +805,7 @@ public sealed class ScanApplyCommandTests
     [Fact]
     public async Task Sans_recommandation_l_ecran_le_dit_en_clair()
     {
-        // 16/09/2026 : sur la machine de reference, plus aucun levier logiciel n'est recommande. L'ecran
+        // Sur la machine de reference, plus aucun levier logiciel n'est recommande. L'ecran
         // affichait « Optimisations recommandees 0 » et une liste vide, sans une phrase.
         var h = Build(consumption: ScanViewModelTestSeams.EmptyConsumption());
         await h.Vm.ScanCommand.ExecuteAsync(null);

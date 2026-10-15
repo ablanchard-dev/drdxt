@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 11/09/2026 — la desinstallation REND les reglages : l'installeur lance
+/// La desinstallation REND les reglages : l'installeur lance
 /// `DrDxt.ElevatedHelper.exe --uninstall-revert` depuis `[UninstallRun]`, qui tourne en premier dans
 /// `PerformUninstall`, apres `usUninstall` (App et helper tues) et avant le retrait des fichiers. La ligne
 /// est relue ici : l'argument doit etre celui que le helper reconnait, et rien ne doit rendre l'appel
@@ -29,7 +29,7 @@ public sealed class DesinstallationInstalleurTests
     [Fact]
     public void Le_dossier_d_installation_ne_se_choisit_pas()
     {
-        // 25/09/2026 (revue de sécurité) : la page de choix du dossier était affichée. Un dossier créé à
+        // La page de choix du dossier était affichée. Un dossier créé à
         // la racine (C:\DrDXT) hérite de C:\ : les utilisateurs authentifiés y modifient les fichiers.
         // Le helper, lancé élevé à la demande et par le désinstalleur, y devenait remplaçable sans droits.
         var iss = File.ReadAllText(Path.Combine(RepoRoot(), "installer", "DrDXT.iss"));

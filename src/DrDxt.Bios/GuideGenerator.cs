@@ -3,29 +3,30 @@ using DrDxt.Core;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// Assembles the <see cref="PersonalizedGuide"/> (content only — NO rendering) from
-/// the actionable findings + the board/BIOS identity.
+/// Assemble le <see cref="PersonalizedGuide"/> (contenu seulement, aucun rendu) à partir des
+/// constats actionnables + de l'identité carte / BIOS.
 ///
-/// Rules enforced here:
-///   • only <see cref="BiosMatrixClass.Guide"/> findings produce write steps
-///     (read/auto/lab/forbidden findings carry no menu navigation — honesty + safety);
-///   • exact menu paths come from <see cref="IGuideLibrary"/>; an uncovered board
-///     yields a labelled <see cref="GuideConfidence.UnverifiedFallback"/> guide whose
-///     steps still carry the exact setting name (decision §9 — never strand the user);
-///   • the ReBAR dependency order is Above-4G → CSM → Re-Size BAR;
-///   • §16 / B2: on a non-UEFI boot the CSM-off step is SUPPRESSED (no-boot guard) and
-///     <see cref="RecoverySection.CsmAdviceSuppressed"/> is set;
-///   • the mandatory recovery ladder is emitted at the TOP and the BOTTOM.
+/// Règles imposées ici :
+///   • seuls les constats <see cref="BiosMatrixClass.Guide"/> produisent des étapes d'écriture
+///     (les constats lecture / auto / labo / interdits ne portent aucune navigation de menu :
+///     honnêteté + sécurité) ;
+///   • les chemins de menu exacts viennent de <see cref="IGuideLibrary"/> ; une carte non couverte
+///     donne un guide étiqueté <see cref="GuideConfidence.UnverifiedFallback"/> dont les étapes
+///     portent quand même le nom exact du réglage (ne jamais laisser l'utilisateur en plan) ;
+///   • l'ordre de dépendance du ReBAR est Above-4G → CSM → Re-Size BAR ;
+///   • sur un démarrage non UEFI, l'étape de désactivation du CSM est retirée (garde contre le
+///     non-démarrage) et <see cref="RecoverySection.CsmAdviceSuppressed"/> est posé ;
+///   • l'échelle de récupération obligatoire est émise en haut et en bas.
 ///
-/// Never writes the BIOS — a guide is text/steps for a human.
+/// N'écrit jamais le BIOS : un guide est du texte / des étapes pour un humain.
 /// </summary>
 public sealed class GuideGenerator : IGuideGenerator
 {
     private readonly IGuideLibrary _library;
 
-    // The canonical ordering used to sort the emitted steps: the ReBAR chain stays
-    // Above-4G → CSM → Re-Size BAR; XMP/EXPO leads (independent, highest impact);
-    // X3D and the read-only kinds trail. Anything unlisted sorts last, stably.
+    // L'ordre canonique de tri des étapes émises : la chaîne ReBAR reste Above-4G → CSM → Re-Size BAR ;
+    // XMP/EXPO passe en tête (indépendant, plus fort impact) ; X3D et les types en lecture seule
+    // ferment la marche. Tout ce qui n'est pas listé passe en dernier, de façon stable.
     private static readonly FirmwareSettingKind[] StepOrder =
     {
         FirmwareSettingKind.XmpExpo,
@@ -51,9 +52,9 @@ public sealed class GuideGenerator : IGuideGenerator
         var uiGen = BiosUiGenerationDetector.Detect(vendor, hw.Bios);
         var bootMode = BootModeResolver.Resolve(hw.Bios);
 
-        // Resolve with the board + BIOS-version KB key (decision §9.1): only a verified
-        // board+version KB hit yields GuideConfidence.Verified. A vendor/UI-generation
-        // match resolves to a best-known fallback (IsVerified=false) → UnverifiedFallback.
+        // Résoudre avec la clé de base de connaissance carte + version BIOS : seule une entrée vérifiée
+        // carte + version donne GuideConfidence.Verified. Une correspondance constructeur / génération
+        // d'interface se résout en meilleur repli connu (IsVerified=false) → UnverifiedFallback.
         var templateResult = _library.Resolve(vendor, uiGen, hw.Board.Product, hw.Bios.Version);
         if (!templateResult.IsOk)
             return Result<PersonalizedGuide>.Fail(templateResult.Error!.Value.Code, templateResult.Error!.Value.Message);
@@ -63,31 +64,31 @@ public sealed class GuideGenerator : IGuideGenerator
             ? GuideConfidence.Verified
             : GuideConfidence.UnverifiedFallback;
 
-        // Keep only actionable (Guide-class) findings; sort by the canonical order so
-        // the ReBAR chain reads correctly. Stable, deterministic.
+        // Ne garder que les constats actionnables (classe Guide) ; trier selon l'ordre canonique pour que
+        // la chaîne ReBAR se lise correctement. Stable, déterministe.
         //
-        // D4 (lot L5, gate G7) — LE PERIMETRE V1 est REDUIT. Le cahier exigeait « la precision
-        // par-carte est le produit » ; cette exigence n'est pas tenable par un dev solo avant la
-        // premiere vente, et la bibliotheque compte 9 guides dont ZERO verifie sur une vraie
-        // carte. Un guide vague qui envoie un client dans son BIOS, c'est le SAV qui explose.
+        // Le perimetre V1 est reduit. Le cahier exige « la precision par-carte est le produit » ; cette
+        // exigence n'est pas tenable par un dev solo avant la premiere vente, et la bibliotheque compte
+        // 9 guides dont zero verifie sur une vraie carte. Un guide vague qui envoie un client dans son
+        // BIOS, c'est le SAV qui explose.
         var actionable = findings
             .Where(f => f.MatrixClass == BiosMatrixClass.Guide)
             .Where(f => V1Settings.Contains(f.Kind))
             .OrderBy(f => OrderIndex(f.Kind))
             .ToList();
 
-        // Le CSM ne fait plus partie du pas a pas (D4), mais on regarde si l'advisor en a emis
+        // Le CSM ne fait pas partie du pas a pas, mais on regarde si l'advisor en a emis
         // un : c'est le signal que ReBAR est desactive, et ca decide de ce qu'on dit ensuite.
         var csmWasAdvisable = findings.Any(f =>
             f.MatrixClass == BiosMatrixClass.Guide && f.Kind == FirmwareSettingKind.Csm);
 
-        // §16 / B2 — le meme garde-fou, deplace. Sur un demarrage Legacy, conseiller de couper
-        // le CSM risque d'empecher la machine de demarrer. Le pas a pas ne le propose plus a
-        // personne ; ce booleen decide desormais lequel des deux messages sort :
+        // Le meme garde-fou. Sur un demarrage Legacy, conseiller de couper le CSM risque d'empecher la
+        // machine de demarrer. Le pas a pas ne le propose a personne ; ce booleen decide lequel des deux
+        // messages sort :
         //   Legacy  -> « laissez le CSM tel quel » (la note existante, toujours vraie) ;
         //   UEFI    -> « si ReBAR refuse, c'est probablement le CSM » (la ligne de secours).
-        // Ecrite d'abord sans condition, cette ligne de secours conseillait le CSM a un
-        // utilisateur en Legacy — exactement le non-demarrage que ce garde-fou existe pour eviter.
+        // Sans condition, cette ligne de secours conseillerait le CSM a un utilisateur en Legacy :
+        // exactement le non-demarrage que ce garde-fou existe pour eviter.
         var csmSuppressed = csmWasAdvisable && bootMode != BootMode.Uefi;
         var mentionCsmInRecovery = csmWasAdvisable && bootMode == BootMode.Uefi;
 
@@ -107,8 +108,8 @@ public sealed class GuideGenerator : IGuideGenerator
             Findings: actionable,
             Steps: steps,
             Recovery: recovery,
-            // The enter/save keys come straight from the resolved template (the library
-            // validates them) — pass them through verbatim; never invent a key.
+            // Les touches d'entrée / d'enregistrement viennent directement du modèle résolu (la bibliothèque
+            // les valide) : les transmettre telles quelles ; ne jamais inventer de touche.
             EnterKey: template.EnterKey,
             SaveKey: template.SaveKey,
             BoardProduct: (hw.Board.Product ?? string.Empty).Trim());
@@ -116,8 +117,8 @@ public sealed class GuideGenerator : IGuideGenerator
         return Result<PersonalizedGuide>.Ok(guide);
     }
 
-    // Builds one write step: the human instruction key + the exact navigation value
-    // (menu path "→" setting name "→" target value) drawn from the library template.
+    // Construit une étape d'écriture : la clé de l'instruction humaine + la valeur de navigation
+    // exacte (chemin de menu « → » nom du réglage « → » valeur cible) tirée du modèle de la bibliothèque.
     private static GuideStep BuildStep(int order, BiosFinding finding, GuideTemplate template)
     {
         var path = template.Paths.FirstOrDefault(p => p.Setting == finding.Kind);
@@ -133,9 +134,9 @@ public sealed class GuideGenerator : IGuideGenerator
             IsRecoveryRelated: false);
     }
 
-    // The exact value the UI shows verbatim: "<menu path> → <setting name> → <target>".
-    // For a name-only fallback (empty menu path) it degrades to "<setting name> → <target>"
-    // so the client still gets the exact name to look for (decision §9).
+    // La valeur exacte que l'interface affiche telle quelle : « <chemin de menu> → <nom du réglage> →
+    // <cible> ». Pour un repli sur le seul nom (chemin de menu vide), elle se réduit à « <nom du
+    // réglage> → <cible> » : le client a toujours le nom exact à chercher.
     private static string ComposeExactValue(GuideSettingPath path)
     {
         var parts = new List<string>(3);
@@ -152,8 +153,8 @@ public sealed class GuideGenerator : IGuideGenerator
             Bottom: RecoverySteps(mentionCsm),
             CsmAdviceSuppressed: csmSuppressed);
 
-    // The mandatory recovery ladder, in the exact order D2 requires. Fresh lists so
-    // Top and Bottom are independent instances (no shared mutable reference).
+    // L'échelle de récupération obligatoire, dans l'ordre exact exigé. Des listes neuves pour que Top
+    // et Bottom soient des instances indépendantes (aucune référence modifiable partagée).
     private static IReadOnlyList<GuideStep> RecoverySteps(bool mentionCsm)
     {
         var steps = new List<GuideStep>
@@ -165,13 +166,13 @@ public sealed class GuideGenerator : IGuideGenerator
             Recovery(5, BiosGuideStringKeys.RecoveryOneChangeAtATime),
         };
 
-        // D4 : le CSM ne fait plus partie du pas a pas (risque de non-demarrage), mais il reste
-        // la cause n°1 d'un ReBAR qui refuse de s'activer. Le NOMMER sans le faire faire, c'est
+        // Le CSM ne fait pas partie du pas a pas (risque de non-demarrage), mais il reste
+        // la cause n°1 d'un ReBAR qui refuse de s'activer. Le nommer sans le faire faire, c'est
         // la difference entre « on a retire une etape » et « on a retire une etape et laisse le
         // client en plan ».
         //
         // Uniquement en demarrage UEFI. En Legacy, cette phrase enverrait quelqu'un couper un
-        // CSM dont sa machine a besoin pour demarrer — et la note « laissez le CSM tel quel »
+        // CSM dont sa machine a besoin pour demarrer, et la note « laissez le CSM tel quel »
         // sort a la place.
         if (mentionCsm)
             steps.Add(Recovery(6, BiosGuideStringKeys.RecoveryRebarNeedsCsmOff));
@@ -183,22 +184,22 @@ public sealed class GuideGenerator : IGuideGenerator
         => new(order, key, ExactValue: null, Setting: FirmwareSettingKind.BiosVersion, IsRecoveryRelated: true);
 
     /// <summary>
-    /// Les seuls reglages que la V1 fait faire a un client (D4). Ensemble ferme et volontairement
+    /// Les seuls reglages que la V1 fait faire a un client. Ensemble ferme et volontairement
     /// petit : chaque etape en plus est un ticket de support en plus, sur des chemins de menu que
     /// personne n'a verifies sur une vraie carte.
     ///
-    /// Ce qui est DEHORS, et pourquoi :
+    /// Ce qui est dehors, et pourquoi :
     ///
-    /// • <b>CSM</b> — l'etape la plus dangereuse de tout le guide. Mal suivie, la machine NE
-    ///   DEMARRE plus. Et on la conseillait a l'aveugle : `SettingsState.Csm` vaut Unknown en
-    ///   permanence (le lecteur refuse d'affirmer), donc on demandait de desactiver quelque chose
-    ///   dont on ignorait l'etat. Sortie du guide ; le filet de recuperation la nomme quand meme,
-    ///   pour que quelqu'un dont ReBAR refuse de s'activer sache ou regarder.
+    /// • <b>CSM</b> : l'etape la plus dangereuse de tout le guide. Mal suivie, la machine ne
+    ///   demarre plus. Et elle serait conseillee a l'aveugle : `SettingsState.Csm` vaut Unknown en
+    ///   permanence (le lecteur refuse d'affirmer), on demanderait donc de desactiver quelque chose dont
+    ///   on ignore l'etat. Hors du guide ; le filet de recuperation la nomme quand meme, pour que
+    ///   quelqu'un dont ReBAR refuse de s'activer sache ou regarder.
     ///
-    /// • <b>Routage CPPC / X3D</b> — un levier separe, hors du perimetre « XMP et ReBAR », et
+    /// • <b>Routage CPPC / X3D</b> : un levier separe, hors du perimetre « XMP et ReBAR », et
     ///   dont la detection de parking reste fragile.
     ///
-    /// <b>Above 4G reste</b>, et c'est un ecart assume par rapport a la lettre de D4 (« limites a
+    /// <b>Above 4G reste</b>, et c'est un ecart assume par rapport a la regle (« limites a
     /// XMP et ReBAR ») : ce n'est pas une etape de plus, c'est la moitie mecanique de ReBAR. Sur
     /// la plupart des cartes ReBAR ne s'active pas sans elle, et elle vit dans le meme menu. Un
     /// pas a pas ReBAR qui ne peut pas aboutir est pire que pas de pas a pas.

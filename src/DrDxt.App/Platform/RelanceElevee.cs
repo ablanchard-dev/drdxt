@@ -4,7 +4,7 @@ using System.IO;
 namespace DrDxt.App.Platform;
 
 /// <summary>
-/// 10/10/2026 (revue de sécurité) : l'App ne se relance plus élevée directement. Un processus élevé par l'UAC hérite
+/// L'App ne se relance plus élevée directement. Un processus élevé par l'UAC hérite
 /// de HKCU\Environment, écrivable par tout programme du compte, et le runtime .NET y lit de quoi charger une DLL avant
 /// la première ligne (CORECLR_PROFILER_PATH). L'invite Windows porte le lanceur natif (DrDxt.Lanceur.exe), qui
 /// redémarre l'App avec un environnement reconstruit. Sans lanceur à côté (build de développement), relance directe.

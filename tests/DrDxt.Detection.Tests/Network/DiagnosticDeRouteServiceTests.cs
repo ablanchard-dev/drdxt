@@ -6,7 +6,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Network;
 
-// 03/10/2026 (boucle 2D2P, P3.1c) : du serveur repéré à la phrase du domaine Réseau. Les sondes sont simulées : la route
+// Du serveur repéré à la phrase du domaine Réseau. Les sondes sont simulées : la route
 // vers le serveur et la box rendent ce qu'on leur dit, et le service doit en tirer le bon verdict, ou se taire.
 public sealed class DiagnosticDeRouteServiceTests
 {
@@ -75,7 +75,7 @@ public sealed class DiagnosticDeRouteServiceTests
             Task.FromResult<(IPAddress?, double?)>(ttl == 1 ? (IPAddress.Parse("192.168.1.254"), 1) : (null, null));
     }
 
-    // 03/10/2026 (P3.1d, test en vraie partie) : le serveur de Call of Duty ignore le ping. La route est jugée jusqu'au
+    // Le serveur de Call of Duty ignore le ping. La route est jugée jusqu'au
     // dernier routeur qui répond, la phrase dit où la mesure s'arrête, et la remontée s'arrête après trois rangs muets.
     [Fact]
     public async Task Un_serveur_qui_ignore_le_ping_est_juge_jusqu_au_dernier_routeur_qui_repond()

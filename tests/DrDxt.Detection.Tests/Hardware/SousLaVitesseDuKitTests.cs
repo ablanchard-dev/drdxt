@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Hardware;
 
 /// <summary>
-/// 17/09/2026, remarque du joueur : « a pas vu que dans mon BIOS mon vrai profil XMP pas activé ».
+/// Remarque du joueur : « a pas vu que dans mon BIOS mon vrai profil XMP pas activé ».
 ///
 /// Sa mémoire (kit prévu pour 4000 MT/s) tourne à 3800. Le produit la classait « XMP actif » et se
 /// taisait. Le fait mesuré est simple : la vitesse réglée est sous celle du kit, donc le profil du
@@ -43,10 +43,9 @@ public sealed class SousLaVitesseDuKitTests
         f.EstimatedGainPct.Should().BeNull("aucun gain n'est mesuré pour 200 MT/s de plus");
     }
 
-    // 25/09/2026, vu sur la photo du domaine Mémoire : le constat disait « Si des arrêts brutaux sont relevés
-    // sur ce PC » juste sous la carte qui en comptait dix. Quand ils sont relevés, la variante l'affirme.
-    // UI1 (critique du 08/10) : deux constats orange se suivaient, « au-dessus de JEDEC » puis « sous la vitesse du kit »,
-    // et se lisaient comme contradictoires. Avec des arrêts relevés, un seul constat dit les trois faits ensemble.
+    // Pas « Si des arrêts brutaux sont relevés sur ce PC » sous une carte qui en compte dix : quand ils sont
+    // relevés, la variante l'affirme. Et deux constats orange à la suite, « au-dessus de JEDEC » puis « sous la
+    // vitesse du kit », passeraient pour contradictoires. Avec des arrêts relevés, un seul constat dit les trois faits ensemble.
     [Fact]
     public void Avec_des_arrets_brutaux_releves_un_seul_constat_dit_les_trois_faits()
     {

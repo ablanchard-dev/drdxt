@@ -4,11 +4,11 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 03/10/2026 (tour H2) : un incident est rapproché de ce qui a été installé dans les trois jours avant, dates à l'appui,
+// Un incident est rapproché de ce qui a été installé dans les trois jours avant, dates à l'appui,
 // sans jamais affirmer la cause.
 public sealed class AvantLIncidentTests
 {
-    // 06/10/2026 : le journal d'installation est écrit à l'heure LOCALE et l'écran affiche l'heure locale. Figer +2 h (Paris)
+    // Le journal d'installation est écrit à l'heure LOCALE et l'écran affiche l'heure locale. Figer +2 h (Paris)
     // faisait échouer ces tests sur la CI GitHub, en UTC (« 03:09 » au lieu de « 05:09 ») : la date se construit dans le
     // fuseau de la machine qui lance les tests.
     private static DateTimeOffset T(int mois, int jour, int h, int m)
@@ -106,7 +106,7 @@ public sealed class AvantLIncidentTests
         AvantLIncident.Juger([ecran], [physx], T(9, 10, 0, 0)).Should().BeEmpty();
     }
 
-    // Revue R1, relevé sur la machine : Edge daté du 03/10, Chrome et Brave du 02/10, par leurs mises à jour automatiques.
+    // Relevé sur la machine : Edge daté du 03/10, Chrome et Brave du 02/10, par leurs mises à jour automatiques.
     [Fact]
     public void Un_logiciel_seul_ne_rapproche_rien()
     {
@@ -154,13 +154,18 @@ public sealed class AvantLIncidentTests
         var pilotes = AvantLIncident.LirePilotes();
         var logiciels = AvantLIncident.LireLogiciels();
 
-        pilotes.Should().OnlyContain(p => p.Libelle.StartsWith("pilote "));
-        logiciels.Should().OnlyContain(l => l.AuJour);
-        if (OperatingSystem.IsWindows() && File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "INF", "setupapi.dev.log")))
-            pilotes.Should().NotBeEmpty("le journal d'installation de Windows existe : au moins un pilote tiers y figure");
+        // OnlyContain échoue sur une liste vide : une machine sans pilote tiers installé n'est pas en faute.
+        pilotes.Where(p => !p.Libelle.StartsWith("pilote ")).Should().BeEmpty();
+        logiciels.Where(l => !l.AuJour).Should().BeEmpty();
+        // Après une réinstallation de Windows, le journal existe mais ne porte que des pilotes Microsoft
+        // et des suppressions de l'Assistant de stockage. On n'exige un pilote que si le journal en installe un d'un tiers.
+        var journal = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "INF", "setupapi.dev.log");
+        if (OperatingSystem.IsWindows() && File.Exists(journal)
+            && File.ReadLines(journal).Any(l => System.Text.RegularExpressions.Regex.IsMatch(l, @"^\s*inf:\s+Provider:\s+(?!Microsoft)\S")))
+            pilotes.Should().NotBeEmpty("le journal installe au moins un pilote tiers");
     }
 
-    // Revue adverse du docteur (09/10/2026, R3) : « revenir à la version précédente » contredisait « mets-le à jour » du
+    // « revenir à la version précédente » contredisait « mets-le à jour » du
     // constat de la version du même pilote. La piste est de changer de version, dans un sens ou dans l'autre.
     [Fact]
     public void La_piste_ne_contredit_pas_la_mise_a_jour_du_pilote()

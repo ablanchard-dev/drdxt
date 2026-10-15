@@ -32,22 +32,22 @@ public sealed record VendorBiosInterface(
 /// **ce probe n'appelle aucune methode.** Il lit la forme des classes, jamais leur contenu.
 /// Trois raisons, et chacune suffit :
 ///
-///   1. `GetBiosSetting` prend un NOM de reglage que nous ne connaissons pas. L'appeler
+///   1. `GetBiosSetting` prend un nom de reglage que nous ne connaissons pas. L'appeler
 ///      reviendrait a tatonner le parseur d'un firmware.
 ///   2. L'existence d'une classe WMI ACPI n'etablit pas que le constructeur la supporte
-///      publiquement — elle peut n'exister que pour son propre logiciel. `VendorSupportedWrite`
+///      publiquement : elle peut n'exister que pour son propre logiciel. `VendorSupportedWrite`
 ///      exige une interface **officiellement supportee**, pas une interface presente.
 ///   3. Sur une machine qui porte des arrets non propres inexpliques, sonder une interface
 ///      firmware non documentee est exactement le mauvais geste.
 ///
 /// Ce que ce probe etablit est donc : **une piste serieuse vers `VendorSupportedWrite`**, a
 /// qualifier par la documentation constructeur avant tout appel. Rien de plus, et c'est deja
-/// beaucoup — la plupart des machines n'en ont aucune.
+/// beaucoup : la plupart des machines n'en ont aucune.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class VendorBiosInterfaceProbe
 {
-    /// <summary>Les interfaces connues des grands constructeurs. Cette liste dit ou REGARDER,
+    /// <summary>Les interfaces connues des grands constructeurs. Cette liste dit ou regarder,
     /// jamais ce qui est supporte : trouver la classe est un fait, la qualifier en est un autre.</summary>
     public static readonly (string Namespace, string Classe, string Constructeur)[] Connues =
     {
@@ -76,7 +76,7 @@ public sealed class VendorBiosInterfaceProbe
     {
         try
         {
-            // La DEFINITION de la classe, pas son contenu : on veut savoir ce qui existe.
+            // La definition de la classe, pas son contenu : on veut savoir ce qui existe.
             using var definition = new ManagementClass(new ManagementScope(espace),
                 new ManagementPath(classe), null);
             definition.Get();
@@ -97,7 +97,7 @@ public sealed class VendorBiosInterfaceProbe
     }
 
     /// <summary>
-    /// Le niveau de capacite que cette decouverte autorise — et il s'arrete a `Unsupported`.
+    /// Le niveau de capacite que cette decouverte autorise, et il s'arrete a `Unsupported`.
     ///
     /// Trouver une interface ne la qualifie pas. La promotion vers `VendorSupportedWrite`
     /// demande une documentation constructeur, une matrice carte + firmware, et une voie de
@@ -108,10 +108,6 @@ public sealed class VendorBiosInterfaceProbe
 
     /// <summary>La phrase a mettre dans le journal quand une interface est trouvee.</summary>
     public static string Constat(VendorBiosInterface i) =>
-        // 25/09/2026 (rapport réel) : sans accents, un tiret cadratin et « ECRITURE » en capitales.
-        $"{i.Classe} dans {i.Namespace}, {i.Instances} instance(s) : "
-        + $"{(i.SaitLire ? "lecture" : "pas de lecture")} et "
-        + $"{(i.SaitEcrire ? "écriture" : "pas d'écriture")} exposées "
-        + $"({string.Join(", ", i.Methodes)}). Présente ne veut pas dire prise en charge : aucune méthode "
-        + "n'est appelée tant que la documentation du constructeur n'a pas qualifié cette interface.";
+        Docteur.T("VB.Constat", i.Classe, i.Namespace, i.Instances, Docteur.T(i.SaitLire ? "VB.Lecture" : "VB.PasLecture"),
+            Docteur.T(i.SaitEcrire ? "VB.Ecriture" : "VB.PasEcriture"), string.Join(", ", i.Methodes));
 }

@@ -9,15 +9,13 @@ namespace DrDxt.Infrastructure.Tests.Updates;
 /// <summary>
 /// Le moteur se monte, ou il dit pourquoi il ne se monte pas.
 ///
-/// Aucune url de serveur n'existe dans le depot : le deploiement est un geste du mainteneur. La question
-/// n'est donc pas « est-ce que la mise a jour marche » mais « que fait le produit tant qu'elle ne
-/// peut pas marcher ». Deux reponses seraient mauvaises et une seule est juste :
+/// Sans url de serveur configuree, la question n'est pas « est-ce que la mise a jour marche » mais
+/// « que fait le produit tant qu'elle ne peut pas marcher ». Deux reponses seraient mauvaises et une seule est juste :
 ///   • monter un updater quand meme -> il echoue a chaque tour en disant « hors ligne », le client
 ///     lit une panne de reseau qui n'existe pas, et le jour ou le reseau tombe vraiment plus
 ///     personne ne regarde ce message ;
 ///   • ne rien dire du tout -> l'etat « pas de mise a jour » devient indistinguable d'un moteur qui
-///     tourne et ne trouve rien, ce qui est exactement le silence dans lequel ce composant a vecu
-///     depuis M5 ;
+///     tourne et ne trouve rien ;
 ///   • REFUSER de se monter, une fois, avec un code a soi (`UPDATE_NOT_CONFIGURED`).
 ///
 /// Et un refus doit etre silencieux sur le reseau : ces tests comptent les requetes reellement
@@ -96,8 +94,8 @@ public sealed class TheUpdaterIsMountedOrSaysWhyNotTests
     [Fact]
     public void With_the_production_key_an_https_server_mounts_and_nothing_is_fetched_at_mount()
     {
-        // Revue du 10/09/2026 : le montage verifiait avec la clef de DEV, dont la graine privee est dans le depot.
-        // SEC5 (09/10/2026) : la clef de release existe (graine chiffree hors depot) ; le montage passe, et il ne touche
+        // Le montage verifiait avec la clef de DEV, dont la graine privee est dans le depot.
+        // La clef de release existe (graine chiffree hors depot) ; le montage passe, et il ne touche
         // toujours pas le reseau : c'est la verification, plus tard, qui lit le manifeste.
         var (client, handler) = Wire();
 
@@ -140,7 +138,6 @@ public sealed class TheUpdaterIsMountedOrSaysWhyNotTests
         // Ce chemin est ecrit deux fois — ici et dans la route du serveur. Le pin ci-dessous le
         // fige ; `TheClientReadsTheRealServerTests` prouve qu'il atteint vraiment la route.
         UpdateComposition.ManifestPath(UpdateChannel.App).Should().Be("/updates/app/manifest");
-        UpdateComposition.ManifestPath(UpdateChannel.Profiles).Should().Be("/updates/profiles/manifest");
     }
 
     [Theory]

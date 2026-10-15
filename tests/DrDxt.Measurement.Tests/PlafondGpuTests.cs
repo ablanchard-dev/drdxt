@@ -6,7 +6,7 @@ namespace DrDxt.Measurement.Tests;
 /// <summary>
 /// Le plafond qui contredit une annonce que j'ai failli faire.
 ///
-/// Le 09/09/2026, apres avoir mesure que le processeur tombe de 5 292 a 3 698 MHz sous charge
+/// Apres avoir mesure que le processeur tombe de 5 292 a 3 698 MHz sous charge
 /// soutenue, la conclusion tentante etait « lever la limite rendrait +25 a +30 % d'images ». Le
 /// meme jeu de mesures la contredit : le GPU est occupe 86 a 95 % du temps de trame, donc il ne
 /// peut pas en dessiner 30 % de plus. Ces tests figent le calcul qui l'interdit.
@@ -65,7 +65,7 @@ public class PlafondGpuTests
         var (basse, haute) = PlafondGpu.Etendue([0, -1, 200]);
 
         basse.PlafondPercent.Should().Be(0);
-        haute.Lisible.Should().Contain("aucune serie exploitable");
+        haute.Lisible.Should().Contain("aucune série exploitable");
         PlafondGpu.Etendue(null).Basse.PlafondPercent.Should().Be(0);
     }
 

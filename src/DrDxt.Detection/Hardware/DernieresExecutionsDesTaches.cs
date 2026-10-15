@@ -2,7 +2,7 @@ using DrDxt.Core;
 
 namespace DrDxt.Detection.Hardware;
 
-/// <summary>07/10/2026 (D4) : la dernière exécution de chaque tâche planifiée, par l'objet COM « Schedule.Service »
+/// <summary>La dernière exécution de chaque tâche planifiée, par l'objet COM « Schedule.Service »
 /// (IRegisteredTask.LastRunTime), sans droits, dossiers compris. Une tâche jamais lancée (année avant 2000) est écartée.
 /// <c>null</c> = non lu.</summary>
 public static class DernieresExecutionsDesTaches

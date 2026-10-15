@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using DrDxt.App.Navigation;
 using DrDxt.App.ViewModels;
 using DrDxt.Core;
 using DrDxt.Reconciler;
@@ -15,7 +14,7 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// 11/09/2026 — le manifeste signe etait remplace a chaque clic.
+/// Le manifeste signe etait remplace a chaque clic.
 ///
 /// Le vrai chemin de l'App : deux clics sur « Optimiser », un vrai magasin signe (cle de test, stockage
 /// en memoire). Chaque clic arme une correction au redemarrage differente. Avant la fusion, le second
@@ -72,8 +71,7 @@ public sealed class ManifesteFusionTests
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
           .Returns(Result<ScanResult>.Ok(new ScanResult(hw, st,
-              new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) },
-              68, bl, new ScoreBreakdown(80, 80, 85), new DimensionStatus(false, false))));
+              new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12) }, bl)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
             new List<StorageDevice> { new("Samsung 990 Pro", "NVMe", 1L << 40) }));
@@ -82,10 +80,8 @@ public sealed class ManifesteFusionTests
 
         var consumer = ScanViewModelTestSeams.ProfileConsumer(
             ScanViewModelTestSeams.PlanConsumption(new[] { "latency.hagsOn" }));
-        var dashboard = new DashboardViewModel();
         return new ScanViewModel(
-            hd, sr, br, sc, sd, safety, moteur, consumer, ScanViewModelTestSeams.GpuTuningStep(),
-            Substitute.For<INavigationService>(), () => dashboard, magasin, new AppliedTweakManifestMapper(),
+            hd, sr, br, sc, sd, safety, moteur, consumer, magasin, new AppliedTweakManifestMapper(),
             ScanViewModelTestSeams.BiosAdvisor(),
             ScanViewModelTestSeams.GuideGenerator(), key => key);
     }
@@ -215,7 +211,7 @@ public sealed class ManifesteFusionTests
             m.Valeur.Should().Be(Cible);
             candidat.OrigineHorsManifeste.Should().BeNull();
 
-            // 08/10/2026 : le rendu passe par le vrai chemin de la desinstallation (le helper, --uninstall-revert).
+            // Le rendu passe par le vrai chemin de la desinstallation (le helper, --uninstall-revert).
             var rapport = await new DrDxt.Reconciler.Desinstallation.RenduALaDesinstallation(magasin, new Lecture(m), new CanalEleve(m))
                 .ExecuterAsync(CancellationToken.None);
 

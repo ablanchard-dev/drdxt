@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Autopilot;
 
-// 07/10/2026 (revue n° 8) : la validation complète pose, relit, rend, relit ; un levier qui ne revient pas est dit.
+// La validation complète pose, relit, rend, relit ; un levier qui ne revient pas est dit.
 public sealed class ValidationCompleteTests : IDisposable
 {
     private readonly string _chemin = Path.Combine(Path.GetTempPath(), $"drdxt-validation-{Guid.NewGuid():N}.json");
@@ -54,7 +54,7 @@ public sealed class ValidationCompleteTests : IDisposable
     [Fact]
     public async Task Le_rapport_dit_le_materiel_et_prend_la_carte_dediee_pas_l_igpu()
     {
-        // 09/10/2026 : un rapport reçu d'un inconnu doit dire de quelle machine il vient. Sur un APU + Radeon, la première
+        // Un rapport reçu d'un inconnu doit dire de quelle machine il vient. Sur un APU + Radeon, la première
         // carte listée est souvent l'iGPU : c'est la carte qui a de la mémoire vidéo qui fait tourner les jeux.
         var hw = new HardwareInventory(new CpuInfo("AMD Ryzen 7 7800X3D", "AuthenticAMD", 8, 16, true, 1),
             [new GpuInfo("AMD Radeon(TM) Graphics", "AMD", 512L << 20, "32.0.21013.1000", TriState.Unknown),
@@ -113,7 +113,7 @@ public sealed class ValidationCompleteTests : IDisposable
         journal.Lire().Value.Should().BeNull();
     }
 
-    // 09/10/2026 (revue) : un journal piégé ne fait rien rejouer en administrateur.
+    // Un journal piégé ne fait rien rejouer en administrateur.
     [Fact]
     public async Task Un_inverse_qui_n_est_pas_celui_du_levier_n_est_jamais_rejoue()
     {
@@ -129,7 +129,7 @@ public sealed class ValidationCompleteTests : IDisposable
         journal.Lire().Value!.TweakId.Should().Be("a");
     }
 
-    // Revue n° 9 : le levier suivant écraserait l'essai au journal ; la validation s'arrête au premier non rendu.
+    // Le levier suivant écraserait l'essai au journal ; la validation s'arrête au premier non rendu.
     [Fact]
     public async Task Le_premier_levier_non_rendu_arrete_la_validation_et_reste_seul_au_journal()
     {
@@ -143,7 +143,7 @@ public sealed class ValidationCompleteTests : IDisposable
         journal.Lire().Value!.TweakId.Should().Be("a");
     }
 
-    // Revue n° 9 : arrêté pendant l'écriture (origine pas encore gardée) = à vérifier, jamais « tout est remis ».
+    // Arrêté pendant l'écriture (origine pas encore gardée) = à vérifier, jamais « tout est remis ».
     [Fact]
     public async Task Un_essai_coupe_pendant_l_ecriture_n_est_jamais_dit_propre()
     {
@@ -169,7 +169,7 @@ public sealed class ValidationCompleteTests : IDisposable
         _machine.Values.Should().OnlyContain(v => v == 0);
     }
 
-    // Revue n° 10 : le bilan compte, et un refus de l'accord de Windows arrête tout au lieu de se reproposer.
+    // Le bilan compte, et un refus de l'accord de Windows arrête tout au lieu de se reproposer.
     [Fact]
     public async Task Le_bilan_compte_et_un_refus_de_Windows_arrete_la_boucle()
     {
@@ -186,7 +186,7 @@ public sealed class ValidationCompleteTests : IDisposable
         journal.Lire().Value.Should().BeNull();
     }
 
-    // Revue n° 10 : posé en partie, retour arrière raté : à vérifier, journal gardé, boucle arrêtée.
+    // Posé en partie, retour arrière raté : à vérifier, journal gardé, boucle arrêtée.
     [Fact]
     public async Task Un_levier_pose_en_partie_reste_au_journal_et_arrete_la_boucle()
     {
@@ -213,7 +213,7 @@ public sealed class ValidationCompleteTests : IDisposable
         _machine.Should().NotContainKey("b");
     }
 
-    // Revue n° 10 : un autre levier ne s'écrit pas par-dessus un essai pas encore rendu.
+    // Un autre levier ne s'écrit pas par-dessus un essai pas encore rendu.
     [Fact]
     public void Le_journal_refuse_un_autre_essai_par_dessus_un_essai_pas_rendu()
     {
@@ -224,7 +224,7 @@ public sealed class ValidationCompleteTests : IDisposable
         journal.Poser("a", new TweakSnapshot("a", "1")).IsOk.Should().BeTrue("le même levier complète son essai");
         journal.Lire().Value!.TweakId.Should().Be("a");
 
-        // Revue n° 11 : le MÊME levier, retenté, ne recapture pas par-dessus son origine gardée.
+        // Le MÊME levier, retenté, ne recapture pas par-dessus son origine gardée.
         journal.Poser("a", null).IsOk.Should().BeFalse();
         journal.Lire().Value!.Snapshot!.OriginalValueJson.Should().Be("1");
 

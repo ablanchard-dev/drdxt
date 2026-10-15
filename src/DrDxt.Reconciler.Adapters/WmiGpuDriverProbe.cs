@@ -5,17 +5,17 @@ using DrDxt.Reconciler;
 namespace DrDxt.Reconciler.Adapters;
 
 // -----------------------------------------------------------------------
-// WmiGpuDriverProbe — IGpuDriverProbe over the existing IWmiQuery seam.
+// WmiGpuDriverProbe : IGpuDriverProbe sur la couture IWmiQuery existante.
 //
-// Queries Win32_VideoController and returns the DriverVersion of the adapter whose
-// vendor matches (case-insensitive substring on AdapterCompatibility or Name). A
-// per-vendor DriverVersion change since apply time is the driver-update drift signal
-// (plan T8b/T8c).
+// Interroge Win32_VideoController et rend le DriverVersion de l'adaptateur dont le constructeur
+// correspond (sous-chaîne sans tenir compte de la casse sur AdapterCompatibility ou Name). Un
+// changement de DriverVersion par constructeur depuis l'apply est le signal de dérive par mise à
+// jour du pilote (plan T8b/T8c).
 //
-// HONESTY of absence: no matching adapter (or a matching adapter with no usable
-// DriverVersion) → Ok(null) — the vendor simply isn't present; that is not an error.
-// Only a genuine WMI query failure → Fail. The WMI boundary is the existing
-// ManagementWmiQuery, which already wraps every System.Management throw in a Result.
+// Honnêteté de l'absence : aucun adaptateur correspondant (ou un adaptateur correspondant sans
+// DriverVersion utilisable) → Ok(null) : le constructeur n'est simplement pas présent, ce n'est
+// pas une erreur. Seul un vrai échec de requête WMI → Fail. La frontière WMI est le
+// ManagementWmiQuery existant, qui emballe déjà chaque exception de System.Management dans un Result.
 // -----------------------------------------------------------------------
 public sealed class WmiGpuDriverProbe : IGpuDriverProbe
 {
@@ -48,13 +48,13 @@ public sealed class WmiGpuDriverProbe : IGpuDriverProbe
                 continue;
 
             var driverVersion = row.GetString("DriverVersion");
-            // A matching adapter with no usable version is treated as "absent" (Ok(null)),
-            // not an error — the drift signal simply has no value to compare this tick.
+            // Un adaptateur correspondant sans version utilisable est traité comme « absent » (Ok(null)),
+            // pas comme une erreur : le signal de dérive n'a simplement pas de valeur à comparer à ce tour.
             return Result<string?>.Ok(
                 string.IsNullOrWhiteSpace(driverVersion) ? null : driverVersion);
         }
 
-        // No adapter for this vendor — absence is not an error.
+        // Aucun adaptateur pour ce constructeur : l'absence n'est pas une erreur.
         return Result<string?>.Ok(null);
     }
 }

@@ -3,56 +3,55 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// Read seams the reconciler uses — all user-mode, NO admin, never write
-// (writes go through IElevatedClient with typed ops). Production adapters
-// back these with the existing App readers (IRegistryReader / IPowerPlanReader /
-// IServiceStateReader / IHardwareDetector); wiring those adapters is the NEXT
-// increment. Unit tests use in-memory fakes.
+// Coutures de lecture du réconciliateur : toutes en mode utilisateur, sans admin, sans jamais
+// écrire (les écritures passent par IElevatedClient avec des ops typées). Les adaptateurs de
+// production les adossent aux lecteurs existants de l'App (IRegistryReader / IPowerPlanReader /
+// IServiceStateReader / IHardwareDetector). Les tests unitaires utilisent des faux en mémoire.
 // -----------------------------------------------------------------------
 
-/// <summary>Reads the CURRENT serialized value of a reconcilable tweak (same JSON
-/// shape as <see cref="AppliedTweak.DesiredValueJson"/>) so the reconciler can
-/// compare desired-vs-actual and confirm a write took effect. Plan §1.</summary>
+/// <summary>Lit la valeur sérialisée actuelle d'un levier réconciliable (même forme JSON que
+/// <see cref="AppliedTweak.DesiredValueJson"/>) pour que le réconciliateur compare voulu et
+/// réel et confirme qu'une écriture a pris.</summary>
 public interface ISettingProbe
 {
-    /// <summary>True when this probe knows how to read the given tweak's surface.</summary>
+    /// <summary>Vrai quand cette sonde sait lire la surface du levier donné.</summary>
     bool CanProbe(string tweakId);
 
-    /// <summary>Reads the current serialized value. Unreadable → Fail (no guess).</summary>
+    /// <summary>Lit la valeur sérialisée actuelle. Illisible → Fail (aucune supposition).</summary>
     Task<Result<string>> ReadCurrentValueAsync(string tweakId, CancellationToken ct);
 }
 
-/// <summary>Reads the Windows feature-update signal — CurrentBuild + UBR from
-/// HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion. A change since the value
-/// captured at apply time is the PRIMARY, reliable WindowsReset signal (I8 / plan §4).</summary>
+/// <summary>Lit le signal de mise à jour de fonctionnalité Windows : CurrentBuild + UBR dans
+/// HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion. Un changement depuis la valeur capturée à
+/// l'apply est le signal WindowsReset principal et fiable.</summary>
 public interface IOsBuildProbe
 {
-    /// <summary>Returns a stable token like "22631.3447" (CurrentBuild.UBR).
-    /// Unreadable → Fail.</summary>
+    /// <summary>Rend un jeton stable comme « 22631.3447 » (CurrentBuild.UBR).
+    /// Illisible → Fail.</summary>
     Result<string> ReadCurrentBuild();
 }
 
-/// <summary>Reads the installed driver version for a GPU vendor (NVIDIA / AMD),
-/// from Win32_VideoController / vendor registry. A change since apply time is the
-/// per-vendor driver-update drift signal (I8 / plan T8b/T8c). Vendor is matched
-/// case-insensitively against GpuInfo.Vendor.</summary>
+/// <summary>Lit la version du pilote installé pour un constructeur GPU (NVIDIA / AMD), depuis
+/// Win32_VideoController / le registre du constructeur. Un changement depuis l'apply est le
+/// signal de dérive par mise à jour du pilote, par constructeur (I8 / plan T8b/T8c). Le
+/// constructeur se compare à GpuInfo.Vendor sans tenir compte de la casse.</summary>
 public interface IGpuDriverProbe
 {
-    /// <summary>The current DriverVersion for the adapter whose vendor matches
-    /// <paramref name="vendor"/>, or Ok(null) if no such adapter is present.
-    /// Unreadable → Fail.</summary>
+    /// <summary>Le DriverVersion actuel de l'adaptateur dont le constructeur correspond à
+    /// <paramref name="vendor"/>, ou Ok(null) si aucun adaptateur de ce type n'est présent.
+    /// Illisible → Fail.</summary>
     Result<string?> ReadDriverVersion(string vendor);
 }
 
-/// <summary>Injectable UTC clock — the reconciler computes boot-streak windows and
-/// timestamps against this, never DateTimeOffset.UtcNow directly, so tests drive
-/// time deterministically (mirrors the ElevatedHelper IClock convention).</summary>
+/// <summary>Horloge UTC injectable : le réconciliateur calcule les fenêtres de série de
+/// démarrages et les horodatages sur elle, jamais directement sur DateTimeOffset.UtcNow, pour
+/// que les tests mènent le temps de façon déterministe (même convention que l'IClock du helper).</summary>
 public interface IClock
 {
     DateTimeOffset UtcNow { get; }
 }
 
-/// <summary>Production clock — the real UTC wall-clock.</summary>
+/// <summary>Horloge de production : la vraie horloge murale UTC.</summary>
 public sealed class SystemClock : IClock
 {
     public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;

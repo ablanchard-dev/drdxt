@@ -7,7 +7,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// PHASE 18 F1 lot 3 — le revert au profil d'un jeu prouve par la provenance.
+/// Le revert au profil d'un jeu prouve par la provenance.
 ///
 /// Ce que ces tests gardent :
 ///   * la preuve est la PROVENANCE relue en session neuve, pas la valeur — une reecriture de la
@@ -118,7 +118,7 @@ public sealed class DrsPerApplicationDeleteTests
     [Fact]
     public void Une_valeur_LIVREE_par_le_pilote_revient_comme_livree()
     {
-        // `[Hypothesis to test]` sur la vraie carte (gate G2) : Delete remet la valeur predefinie.
+        // `[Hypothesis to test]` sur la vraie carte : Delete remet la valeur predefinie.
         var native = new FakeNative { LocationAfter = Current, PredefinedAfter = 1 };
 
         Actions(native).DeleteSettingForApplication(GamePath, PreferredPstate,

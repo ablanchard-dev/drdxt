@@ -3,20 +3,20 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper;
 
 // -----------------------------------------------------------------------
-// LaunchOnDemandElevatedClient — the App's IElevatedClient that defers the UAC
-// elevation to the first privileged op (so the App never prompts at startup),
-// then delegates to the real handshaking client.
+// LaunchOnDemandElevatedClient : l'IElevatedClient de l'App qui reporte l'élévation UAC à la
+// première op privilégiée (l'App ne demande donc jamais rien au démarrage), puis délègue au vrai
+// client à handshake.
 //
-// On the first ExecuteAsync it runs the ensure-running step (HelperLauncher: one
-// interactive UAC, or reuse if already up). Once that succeeds, every op (this and
-// future) delegates to the inner handshaking client, which negotiates an ephemeral
-// session key per connection (§9.13). A failed launch (UAC declined / helper never
-// comes up) is surfaced as a clean Fail and is RETRYABLE on a later op — a single
-// dismissed prompt must not permanently break apply.
+// Au premier ExecuteAsync, il lance l'étape « s'assurer qu'il tourne » (HelperLauncher : une UAC
+// interactive, ou réutilisation s'il tourne déjà). Une fois réussie, chaque op (celle-ci et les
+// suivantes) passe au client interne à handshake, qui négocie une clé de session éphémère par
+// connexion. Un lancement raté (UAC refusée, helper qui ne démarre jamais) remonte en Fail propre
+// et peut être repris à une op suivante : une seule invite fermée ne doit pas casser
+// l'application pour de bon.
 //
-// Both seams (ensure-running + inner client) are injected so the gate is fully
-// unit-tested without spawning anything. Concurrency-safe: ensure runs at most once
-// at a time and is only "latched" after success.
+// Les deux coutures (s'assurer qu'il tourne + client interne) sont injectées : la barrière est
+// entièrement testée sans rien lancer. Sûr en concurrence : l'étape tourne au plus une fois à la
+// fois et ne se « verrouille » qu'après un succès.
 // -----------------------------------------------------------------------
 public sealed class LaunchOnDemandElevatedClient : IElevatedClient
 {
@@ -36,21 +36,21 @@ public sealed class LaunchOnDemandElevatedClient : IElevatedClient
     {
         var ensure = await EnsureOnceAsync(ct).ConfigureAwait(false);
         if (!ensure.IsOk)
-            return ensure; // launch failed → no channel (retryable next op)
+            return ensure; // lancement raté → aucun canal (reprise possible à l'op suivante)
 
         var r = await _inner.ExecuteAsync(op, ct).ConfigureAwait(false);
         if (r.Error?.Code != ErrorCodes.HelperUnreachable) return r;
 
-        // 08/10/2026 (revue n° 14) : le helper s'arrête seul après 15 minutes d'inactivité (SEC1). « Déjà lancé » ne
+        // Le helper s'arrête seul après 15 minutes d'inactivité (SEC1). « Déjà lancé » ne
         // vaut plus : il est relancé une fois, sur ce geste, et l'op est rejouée.
         _ensured = false;
         ensure = await EnsureOnceAsync(ct).ConfigureAwait(false);
         return ensure.IsOk ? await _inner.ExecuteAsync(op, ct).ConfigureAwait(false) : ensure;
     }
 
-    /// <summary>Une op qui REPOND a besoin du meme helper lance que les autres. Sans ce
-    /// relais, une lecture serait tombee sur le refus par defaut de IElevatedClient au lieu
-    /// d'atteindre le client interne -- un canal cable de bout en bout, muet a l'avant-dernier
+    /// <summary>Une op qui repond a besoin du meme helper lance que les autres. Sans ce
+    /// relais, une lecture tomberait sur le refus par defaut de IElevatedClient au lieu
+    /// d'atteindre le client interne : un canal cable de bout en bout, muet a l'avant-dernier
     /// maillon.</summary>
     public async Task<Result<byte[]>> ReadAsync(PrivilegedOp op, CancellationToken ct)
     {
@@ -66,8 +66,8 @@ public sealed class LaunchOnDemandElevatedClient : IElevatedClient
                            : Result<byte[]>.Fail(ensure.Error!.Value.Code, ensure.Error.Value.Message);
     }
 
-    // Runs the ensure-running step at most once SUCCESSFULLY. A failure does not
-    // latch, so a later op can retry (e.g. after the user dismissed the first UAC).
+    // Lance l'étape « s'assurer qu'il tourne » au plus une fois avec succès. Un échec ne
+    // verrouille rien : une op suivante peut réessayer (par exemple après une première UAC fermée).
     private async Task<Result> EnsureOnceAsync(CancellationToken ct)
     {
         if (_ensured)

@@ -41,6 +41,24 @@ public class AbComparerEvidenceTests
     }
 
     [Fact]
+    public void Une_passe_PresentMon_et_une_passe_DXGI_ne_se_comparent_PAS()
+    {
+        // Le repli DXGI ne passe ni par l'hygiene ni par l'exposition : sans cette garde, une passe
+        // PresentMon face a une passe DXGI rendait une regression prouvee, et le moteur annulait sur elle.
+        var avant = Passe(140, 2, partGardee: 1.0);
+        var apres = Passe(110, 2, partGardee: null) with { Instrument = "DXGI" };
+
+        var preuve = AbComparer.Evidence(avant, apres);
+
+        preuve.Game!.Preuve.Outcome.Should().Be(EvidenceOutcome.Invalid);
+        AbComparer.Evidence(avant with { Instrument = "DXGI" }, apres).Game!.Preuve.Outcome
+            .Should().Be(EvidenceOutcome.ProvenRegression, "deux passes DXGI se comparent entre elles");
+        var verdict = AbComparer.Compare(avant, apres);
+        verdict.IsMeasurableGain.Should().BeFalse();
+        verdict.SummaryKey.Should().Be("Scan.Ab.NoMeasurableGain", "entre deux instruments, ni gain ni régression ne se lisent");
+    }
+
+    [Fact]
     public void Deux_passes_EGALEMENT_amputees_restent_comparables()
     {
         // Le controle qui empeche la garde d'etre trop zelee : si les deux passes ont perdu
@@ -85,7 +103,7 @@ public class AbComparerEvidenceTests
     public void Le_cas_REEL_de_la_machine_de_reference_ecart_sous_le_plancher()
     {
         // Le +2,7 % du GPU, vu en jeu, avec la resolution reelle d'une session de rejeu.
-        // L'ancien booleen disait « pas de gain » ; c'est faux, il n'a rien pu resoudre.
+        // Un simple booleen dirait « pas de gain » ; c'est faux, rien n'a pu etre resolu.
         var preuve = AbComparer.Evidence(Passe(137.2, 3.3), Passe(140.9, 3.3));
 
         preuve.Game!.Preuve.Outcome.Should().Be(EvidenceOutcome.NoResolvedChange);

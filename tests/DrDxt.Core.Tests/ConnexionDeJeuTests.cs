@@ -4,7 +4,7 @@ using Xunit;
 
 namespace DrDxt.Core.Tests;
 
-// 07/10/2026 (chantier D6) : le jeu passe-t-il par le Wi-Fi ?
+// Le jeu passe-t-il par le Wi-Fi ?
 public sealed class ConnexionDeJeuTests
 {
     [Fact]
@@ -16,7 +16,7 @@ public sealed class ConnexionDeJeuTests
         c.Explication.Should().Contain("Activision").And.Contain("ne change rien");
     }
 
-    // Revue F-43 : câble et Wi-Fi reliés ensemble, la route décide ; sans elle, rien n'est affirmé.
+    // Câble et Wi-Fi reliés ensemble, la route décide ; sans elle, rien n'est affirmé.
     [Fact]
     public void Cable_et_wifi_relies_la_route_decide()
     {
@@ -25,7 +25,7 @@ public sealed class ConnexionDeJeuTests
         ConnexionDeJeu.Juger([new("Wi-Fi", true), new("Ethernet", false)]).Statut.Should().Be(RepairStatus.Unknown);
     }
 
-    // Revue F-43 : un VPN se dit « Ethernet » ; derrière lui, le Wi-Fi reste le Wi-Fi.
+    // Un VPN se dit « Ethernet » ; derrière lui, le Wi-Fi reste le Wi-Fi.
     [Fact]
     public void Un_vpn_ne_passe_pas_pour_un_cable()
     {

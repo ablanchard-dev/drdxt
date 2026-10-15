@@ -91,7 +91,7 @@ public class TweakReadbackTests
             "« je n'ai pas pu lire » ne doit jamais se ranger avec « la valeur est revenue »");
     }
 
-    // 06/10/2026 (revue, case 4.4) : seuls les DWORD se relisaient. Le VRR (chaîne), le mode Jeu (composite) et le
+    // Seuls les DWORD se relisaient. Le VRR (chaîne), le mode Jeu (composite) et le
     // fichier d'échange (chaîne multiple) étaient « non relisables » : la carte « Ce que DrDXT a posé » les montrait
     // encore posés après qu'ils étaient revenus, et « Annuler » aurait réécrit la chaîne d'avant par-dessus un réglage
     // fait depuis.
@@ -134,7 +134,7 @@ public class TweakReadbackTests
             .Etat.Should().Be(attendu);
     }
 
-    // Revue du 06/10 : le levier ne s'applique que fichier d'échange désactivé ; l'origine réelle est vide.
+    // Le levier ne s'applique que fichier d'échange désactivé ; l'origine réelle est vide.
     [Theory]
     [InlineData("", EtatRelu.RevenuAvantApplication)]
     [InlineData("?:\\pagefile.sys", EtatRelu.DifferentDeAvant)]

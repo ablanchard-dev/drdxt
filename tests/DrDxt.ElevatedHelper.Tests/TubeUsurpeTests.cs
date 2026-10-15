@@ -27,8 +27,8 @@ namespace DrDxt.ElevatedHelper.Tests;
 //     et le squatteur n'apprend rien (le refus tombe avant que l'op parte sur le fil).
 //
 // Ce qui n'est pas prouve ici : la traversee d'integrite reelle (App moyenne →
-// helper ELEVE). Tout tourne ici a integrite egale. Voir « GATE FERME » dans
-// la revue de securite interne (non publiee).
+// helper ELEVE). Tout tourne ici a integrite egale ; elle se mesure avec
+// `tools/helperhandshake`.
 //
 // Rien ici n'eleve ni ne touche la machine : un tube nomme vit en memoire, le nom est
 // unique par test, et le seul processus lance est un cmd.exe inerte aussitot tue.
@@ -119,9 +119,9 @@ public sealed class TubeUsurpeTests
         resultat.IsOk.Should().BeFalse(
             "le processus qui repond n'est pas le helper attendu : c'est un squatteur");
         resultat.Error!.Value.Code.Should().Be(ErrorCodes.ElevationDenied);
-        resultat.Error.Value.Message.Should().Contain("serveur du tube non authentifié",
+        resultat.Error.Value.Message.Should().Contain("pipe server not authenticated",
             "un refus qui ne se nomme pas se confond avec une panne de tube");
-        resultat.Error.Value.Message.Should().Contain("processus attendu",
+        resultat.Error.Value.Message.Should().Contain("expected process",
             "le message doit dire ce qu'on attendait ET ce qu'on a trouve");
 
         recues.Should().BeEmpty(
@@ -137,7 +137,7 @@ public sealed class TubeUsurpeTests
 
         resultat.IsOk.Should().BeFalse("omettre l'argument ne doit pas desactiver la garde");
         resultat.Error!.Value.Code.Should().Be(ErrorCodes.ElevationDenied);
-        resultat.Error.Value.Message.Should().Contain("aucun chemin de helper attendu");
+        resultat.Error.Value.Message.Should().Contain("no expected helper path");
         recues.Should().BeEmpty();
     }
 

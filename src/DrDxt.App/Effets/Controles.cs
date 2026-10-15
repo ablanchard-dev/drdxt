@@ -11,7 +11,7 @@ using System.Windows.Threading;
 namespace DrDxt.App.Effets;
 
 /// <summary>
-/// LE NOYAU : on ne clique pas pour lancer un scan, on maintient.
+/// Le noyau : on ne clique pas pour lancer un scan, on maintient.
 ///
 /// Maintenir la souris remplit l'anneau ; relâcher avant la fin le vide. Le geste dit ce que le scan
 /// est : un examen qui prend du temps, lancé exprès. Au clavier, Espace ou Entrée lancent tout de
@@ -30,7 +30,7 @@ public sealed class NoyauDeMaintien : ButtonBase
         MoteurDAnimation.HorlogePour(this, Respirer, indicateur: () => true);
     }
 
-    // 29/09/2026 : au travail, le noyau respire et lance une onde (« pendant le scan il n'y a rien », retour sur
+    // Au travail, le noyau respire et lance une onde (« pendant le scan il n'y a rien », retour sur
     // l'app). Par le moteur d'animation : dès que le jeu passe devant, plus rien ne bat.
     public const double PeriodeDuPouls = 1.2;
     private const double PeriodeDeLOnde = 1.6;
@@ -66,7 +66,7 @@ public sealed class NoyauDeMaintien : ButtonBase
     public double OndeOpacite { get => (double)GetValue(OndeOpaciteProperty); private set => SetValue(OndeOpaciteProperty, value); }
     public double OndeEchelle { get => (double)GetValue(OndeEchelleProperty); private set => SetValue(OndeEchelleProperty, value); }
 
-    /// <summary>29/09/2026 : l'échelle de l'onde était liée dans le modèle, sur une ScaleTransform, par
+    /// <summary>L'échelle de l'onde était liée dans le modèle, sur une ScaleTransform, par
     /// TemplatedParent. Une transformation n'a pas d'élément gouvernant : quand l'écran n'était pas encore mis en
     /// page, la liaison échouait (« Cannot find governing FrameworkElement »). Le contrôle pose lui-même la
     /// transformation, liée à sa propre propriété par une source explicite.</summary>
@@ -99,12 +99,12 @@ public sealed class NoyauDeMaintien : ButtonBase
         nameof(EnMaintien), typeof(bool), typeof(NoyauDeMaintien), new PropertyMetadata(false));
 
     /// <summary>
-    /// 23/09/2026 — le noyau travaille, il ne s'éteint pas.
+    /// Le noyau travaille, il ne s'éteint pas.
     ///
     /// Pendant le scan, le noyau est désactivé (on ne relance pas un scan en cours) et le style
     /// le grisait à 50 % comme n'importe quel bouton hors service. Mesuré en photographiant la
     /// fenêtre : au moment précis où la personne vient d'appuyer, la sphère, son chrome et son
-    /// anneau passent tous à demi-teinte — le seul signe de vie restant est un arc fin, lui aussi
+    /// anneau passent tous à demi-teinte ; le seul signe de vie restant est un arc fin, lui aussi
     /// à demi-teinte. Le geste répond donc par une extinction, et le scan durant moins d'une
     /// seconde, on ne voit que ça : « j'appuie, ça s'éteint, il ne se passe rien ».
     ///
@@ -117,17 +117,22 @@ public sealed class NoyauDeMaintien : ButtonBase
             // Annexe de B5 : le travail vient de finir (vrai puis faux), la capsule le dit.
             (d, e) => { if (e.OldValue is true && e.NewValue is false) ((NoyauDeMaintien)d).SignalerFait(MoteurDAnimation.Actif); }));
 
-    /// <summary>Annexe de B5 : la coche « Fait » du gabarit apparaît en 150 ms, reste 2 s, s'efface ; rien quand le
+    /// <summary>Annexe de B5 : la coche « Fait » du gabarit apparaît en 120 ms, reste 2 s, s'efface en 200 ms ; rien quand le
     /// gouverneur fige tout (le résultat s'écrit de toute façon à côté de la capsule).</summary>
     internal void SignalerFait(bool animer)
     {
         if (!animer || GetTemplateChild("Fait") is not UIElement coche) return;
-        var montre = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(2500) };
-        montre.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(150))));
-        montre.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(2150))));
-        montre.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(2500))));
+        var montre = new DoubleAnimationUsingKeyFrames { Duration = CocheEntree + CocheTenue + CocheSortie };
+        montre.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(CocheEntree)));
+        montre.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromTimeSpan(CocheEntree + CocheTenue)));
+        montre.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromTimeSpan(CocheEntree + CocheTenue + CocheSortie)));
         coche.BeginAnimation(UIElement.OpacityProperty, montre);
     }
+
+    /// <summary>La coche « Fait » : apparition, temps affiché, effacement.</summary>
+    internal static readonly TimeSpan CocheEntree = TimeSpan.FromMilliseconds(120);
+    internal static readonly TimeSpan CocheTenue = TimeSpan.FromMilliseconds(2000);
+    internal static readonly TimeSpan CocheSortie = TimeSpan.FromMilliseconds(200);
 
     /// <summary>Vrai quand le travail que ce noyau a lancé est en cours.</summary>
     public bool Occupe { get => (bool)GetValue(OccupeProperty); set => SetValue(OccupeProperty, value); }
@@ -212,7 +217,7 @@ public sealed class NoyauDeMaintien : ButtonBase
 
     internal void Declencher() => OnClick();
 
-    /// <summary>29/09/2026 (B5) : l'action part, l'éclair le dit tout de suite, au maintien comme au clavier.</summary>
+    /// <summary>L'action part, l'éclair le dit tout de suite, au maintien comme au clavier.</summary>
     protected override void OnClick()
     {
         Eclairer(MoteurDAnimation.Actif);
@@ -268,7 +273,7 @@ public sealed class ArcDeProgression : FrameworkElement
         }, indicateur: () => true);
     }
 
-    /// <summary>03/10/2026 (boucle 2D2P, D3.1) : la jauge sautait d'un huitième à chaque étape puis restait figée (« pas
+    /// <summary>La jauge sautait d'un huitième à chaque étape puis restait figée (« pas
     /// très fluide »). Ce qui est affiché glisse vers <paramref name="valeur"/> (la moitié du chemin en un dixième de
     /// seconde environ), puis avance lentement vers <paramref name="plafond"/>, la fin de l'étape en cours, sans jamais le
     /// dépasser : elle ne promet rien que l'analyse n'a pas fait. Une valeur qui baisse (nouveau scan) est suivie aussitôt.</summary>
@@ -278,7 +283,7 @@ public sealed class ArcDeProgression : FrameworkElement
         if (affiche < valeur) return Math.Min(valeur, affiche + (valeur - affiche) * (1 - Math.Exp(-dt * 7)) + 0.0005);
         var haut = Math.Max(valeur, plafond);
         if (affiche >= haut) return affiche;
-        // 03/10/2026 (D6.1) : avec une vitesse (part de jauge par seconde, tirée de la durée attendue de l'étape), la
+        // Avec une vitesse (part de jauge par seconde, tirée de la durée attendue de l'étape), la
         // jauge avance au rythme réel de l'analyse ; sans elle, l'ancienne approche lente.
         if (vitesse > 0) return Math.Min(haut, affiche + vitesse * dt);
         return Math.Min(haut, affiche + (haut - affiche) * (1 - Math.Exp(-dt * 0.25)));
@@ -378,16 +383,16 @@ public sealed class PanneauOrbital : Panel
     /// <summary>Décalage vertical du libellé par rapport à son pôle (vers le bas si positif).</summary>
     public double DecalageY { get => (double)GetValue(DecalageYProperty); set => SetValue(DecalageYProperty, value); }
 
-    /// <summary>08/10/2026 : le libellé du haut est posé par son bord bas sur son pôle (son icône, en bas, fait face au centre)
+    /// <summary>Le libellé du haut est posé par son bord bas sur son pôle (son icône, en bas, fait face au centre)
     /// au lieu d'être centré dessous ; les autres ne bougent pas.</summary>
     public static readonly DependencyProperty PortVersCentreProperty = DependencyProperty.Register(
         nameof(PortVersCentre), typeof(bool), typeof(PanneauOrbital), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsArrange));
 
     public bool PortVersCentre { get => (bool)GetValue(PortVersCentreProperty); set => SetValue(PortVersCentreProperty, value); }
 
-    /// <summary>10/10/2026 (le mainteneur : « des ronds chelous sous Réseau, Windows, pas alignés ») : centrée sur son pôle, une
+    /// <summary>Centrée sur son pôle, une
     /// carte voyait son icône bouger avec la hauteur de son texte (une ligne d'état de plus après le scan la remontait de
-    /// 10 px), loin de la douille fixe du shader. Posée par son icône, chaque carte met le centre de l'icône SUR son pôle.
+    /// 10 px), loin de la douille fixe du shader. Posée par son icône, chaque carte met le centre de l'icône sur son pôle.
     /// La valeur est la distance du bord de la carte au centre de l'icône (marge + demi-icône). NaN : ancienne mise en page.</summary>
     public static readonly DependencyProperty CentreIconeProperty = DependencyProperty.Register(
         nameof(CentreIcone), typeof(double), typeof(PanneauOrbital), new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsArrange));
@@ -441,7 +446,7 @@ public sealed class PanneauOrbital : Panel
 
 /// <summary>
 /// Le reflet qui suit la souris. L'idée vient du « Specular Button » de React Bits ; le code est propre à DrDXT (08/10/2026,
-/// PUB1 : aucune ligne reprise, la licence MIT avec Commons Clause n'est pas compatible avec la GPL).
+/// Aucune ligne reprise, la licence MIT avec Commons Clause n'est pas compatible avec la GPL).
 ///
 /// Le liseré d'un contrôle est un dégradé ; ce comportement le fait tourner vers le curseur, comme
 /// une arête de métal qui accroche la lumière. Au départ du curseur, le reflet revient se poser.
@@ -493,40 +498,7 @@ public static class Speculaire
 }
 
 /// <summary>
-/// 29/09/2026 (boucle « vivant et prouvé », B7) : les courbes avant/après surgissaient d'un bloc. À chaque nouvelle mesure
-/// (<c>Declencheur</c> lié aux données), un masque balaie le graphique de gauche à droite en 900 ms : les courbes se
-/// tracent. Sous le gouverneur ; figé, elles sont là d'un coup.
-/// </summary>
-public static class TraceDesCourbes
-{
-    public static readonly DependencyProperty DeclencheurProperty = DependencyProperty.RegisterAttached(
-        "Declencheur", typeof(object), typeof(TraceDesCourbes),
-        new PropertyMetadata(null, (d, e) => { if (d is FrameworkElement el && e.NewValue is not null) Jouer(el, MoteurDAnimation.Actif); }));
-
-    public static object? GetDeclencheur(DependencyObject d) => d.GetValue(DeclencheurProperty);
-    public static void SetDeclencheur(DependencyObject d, object? valeur) => d.SetValue(DeclencheurProperty, valeur);
-
-    internal static void Jouer(FrameworkElement el, bool animer)
-    {
-        if (!animer) { el.OpacityMask = null; return; }
-        var bord = new GradientStop(Colors.Black, 0);
-        var fondu = new GradientStop(Colors.Transparent, 0.02);
-        var masque = new LinearGradientBrush { StartPoint = new Point(0, 0.5), EndPoint = new Point(1, 0.5) };
-        masque.GradientStops.Add(new GradientStop(Colors.Black, 0));
-        masque.GradientStops.Add(bord);
-        masque.GradientStops.Add(fondu);
-        el.OpacityMask = masque;
-        var duree = TimeSpan.FromMilliseconds(900);
-        var courbe = new CubicEase { EasingMode = EasingMode.EaseInOut };
-        var fin = new DoubleAnimation(0.02, 1.02, duree) { EasingFunction = courbe };
-        fin.Completed += (_, _) => el.OpacityMask = null;
-        bord.BeginAnimation(GradientStop.OffsetProperty, new DoubleAnimation(0, 1, duree) { EasingFunction = courbe });
-        fondu.BeginAnimation(GradientStop.OffsetProperty, fin);
-    }
-}
-
-/// <summary>
-/// 29/09/2026 (boucle « vivant et prouvé », B4) : choisir un domaine éteignait une ligne et en allumait une autre. Une
+/// Choisir un domaine éteignait une ligne et en allumait une autre. Une
 /// seule capsule (« Glisseur », dans le gabarit du rail) glisse jusqu'à la ligne choisie en 280 ms, sous le gouverneur ;
 /// figée, elle s'y pose d'un coup.
 /// </summary>
@@ -579,8 +551,69 @@ public static class CapsuleGlissante
 }
 
 /// <summary>
-/// 29/09/2026 (boucle « vivant et prouvé », B3) : un chiffre qui compte. Le premier nombre de la phrase monte de 0 à sa
-/// valeur en 600 ms ; la fin est toujours la vraie phrase, et le nom lu par un lecteur d'écran l'est dès le départ.
+/// Le reflet d'Optimiser, une fois, quand le bouton apparaît avec le résultat. Il joue sans geste du joueur : il passe donc
+/// par le <see cref="MoteurDAnimation"/>, et ne part pas quand Windows coupe les effets ou que la fenêtre est derrière le jeu.
+/// </summary>
+public static class RefletALApparition
+{
+    public static readonly DependencyProperty ActifProperty = DependencyProperty.RegisterAttached(
+        "Actif", typeof(bool), typeof(RefletALApparition), new PropertyMetadata(false, SurActif));
+
+    public static bool GetActif(DependencyObject d) => (bool)d.GetValue(ActifProperty);
+    public static void SetActif(DependencyObject d, bool valeur) => d.SetValue(ActifProperty, valeur);
+
+    private static readonly Duration Duree = new(TimeSpan.FromMilliseconds(700));
+
+    private static void SurActif(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not Control bouton || e.NewValue is not true) return;
+        // Désabonné d'abord : un style réappliqué au même bouton ne double pas le reflet.
+        bouton.IsVisibleChanged -= SurVisible;
+        bouton.IsVisibleChanged += SurVisible;
+    }
+
+    private static readonly DependencyProperty DejaJoueProperty = DependencyProperty.RegisterAttached(
+        "DejaJoue", typeof(bool), typeof(RefletALApparition), new PropertyMetadata(false));
+
+    private static void SurVisible(object sender, DependencyPropertyChangedEventArgs v)
+    {
+        if (v.NewValue is true && sender is Control bouton) AuPremierAffichage(bouton, MoteurDAnimation.Actif);
+    }
+
+    /// <summary>Une fois par bouton et par session : ni revenir sur la page ni un nouveau scan ne le rejouent (une animation
+    /// qui revient souvent lasse).</summary>
+    internal static bool AuPremierAffichage(Control bouton, bool animer)
+    {
+        if ((bool)bouton.GetValue(DejaJoueProperty) || !Jouer(bouton, animer)) return false;
+        bouton.SetValue(DejaJoueProperty, true);
+        return true;
+    }
+
+    /// <summary>Lance le reflet sur l'élément « Eclat » du gabarit ; faux quand rien ne joue. Le gabarit est construit
+    /// d'abord : à sa première apparition, un bouton jamais mesuré n'en a pas encore. Le reflet attend la fin du masque de
+    /// <see cref="Revelation"/> (son retard, puis l'essentiel du dévoilement) : il jouait sous le masque.</summary>
+    internal static bool Jouer(Control bouton, bool animer)
+    {
+        if (!animer) return false;
+        bouton.ApplyTemplate();
+        if (bouton.Template?.FindName("Eclat", bouton) is not FrameworkElement eclat) return false;
+        var depart = TimeSpan.FromMilliseconds(Revelation.GetActive(bouton) ? Revelation.GetRetard(bouton) + 300 : 0);
+        var opacite = new DoubleAnimationUsingKeyFrames { Duration = Duree, BeginTime = depart };
+        opacite.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+        opacite.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(100))));
+        opacite.KeyFrames.Add(new LinearDoubleKeyFrame(1, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(550))));
+        opacite.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(700))));
+        eclat.BeginAnimation(UIElement.OpacityProperty, opacite);
+        if (eclat.RenderTransform is TranslateTransform glisse && !glisse.IsFrozen)
+            glisse.BeginAnimation(TranslateTransform.XProperty,
+                new DoubleAnimation(-120, 420, Duree) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }, BeginTime = depart });
+        return true;
+    }
+}
+
+/// <summary>
+/// Un chiffre qui compte. Le premier nombre de la phrase monte de 0 à sa
+/// valeur en 300 ms ; la fin est toujours la vraie phrase, et le nom lu par un lecteur d'écran l'est dès le départ.
 /// Se pose à la place de <c>Text</c> (une liaison sur <c>Text</c> serait écrasée pendant l'animation), sous le gouverneur.
 /// </summary>
 public static class Compteur
@@ -593,7 +626,7 @@ public static class Compteur
     public static void SetTexte(DependencyObject d, string? valeur) => d.SetValue(TexteProperty, valeur);
 
     private static readonly System.Text.RegularExpressions.Regex Nombre = new(@"\d+");
-    private static readonly TimeSpan Duree = TimeSpan.FromMilliseconds(600);
+    internal static readonly TimeSpan Duree = TimeSpan.FromMilliseconds(300);
 
     /// <summary>La phrase à l'avancement donné : le premier nombre ramené à sa fraction, le reste inchangé.</summary>
     internal static string Etape(string texte, double avancement)
@@ -607,7 +640,8 @@ public static class Compteur
     internal static void Poser(TextBlock t, string texte, bool animer)
     {
         System.Windows.Automation.AutomationProperties.SetName(t, texte);
-        if (!animer || !Nombre.IsMatch(texte)) { t.Text = texte; return; }
+        // Une valeur inchangée (le même résultat après un nouveau scan) ne rejoue rien.
+        if (!animer || !Nombre.IsMatch(texte) || t.Text == texte) { t.Text = texte; return; }
 
         t.Text = Etape(texte, 0);
         // Une animation WPF, pas une horloge à soi : elle s'arrête avec la fenêtre, comme l'entrée en scène.
@@ -627,7 +661,7 @@ public static class Compteur
 }
 
 /// <summary>
-/// 29/09/2026 : « des animations partout ». Changer de domaine dans le rail remplaçait le panneau d'un coup,
+/// « des animations partout ». Changer de domaine dans le rail remplaçait le panneau d'un coup,
 /// <see cref="Revelation"/> ne jouant qu'à l'apparition. Au changement de contenu, le panneau entre par un fondu
 /// et un glissement de 14 px en 280 ms, seulement si le <see cref="MoteurDAnimation"/> l'autorise.
 /// </summary>
@@ -672,7 +706,7 @@ public static class Revelation
     public static bool GetActive(DependencyObject d) => (bool)d.GetValue(ActiveProperty);
     public static void SetActive(DependencyObject d, bool valeur) => d.SetValue(ActiveProperty, valeur);
 
-    /// <summary>28/09/2026 : décalage de l'entrée, en millisecondes. Les cartes d'un même écran entrent
+    /// <summary>Décalage de l'entrée, en millisecondes. Les cartes d'un même écran entrent
     /// l'une après l'autre, dans l'ordre de lecture, au lieu d'apparaître d'un bloc.</summary>
     public static readonly DependencyProperty RetardProperty = DependencyProperty.RegisterAttached(
         "Retard", typeof(double), typeof(Revelation), new PropertyMetadata(0.0));
@@ -713,54 +747,7 @@ public static class Revelation
 }
 
 /// <summary>
-/// 28/09/2026 : une barre qui monte depuis sa base quand elle devient visible. Seule la barre grandit :
-/// le chiffre écrit au-dessus est le vrai dès la première image, aucun nombre de passage n'est affiché.
-/// 650 ms, décalable, et rien du tout si le <see cref="MoteurDAnimation"/> ne l'autorise pas.
-/// </summary>
-public static class Croissance
-{
-    public static readonly DependencyProperty ActiveProperty = DependencyProperty.RegisterAttached(
-        "Active", typeof(bool), typeof(Croissance), new PropertyMetadata(false, SurActive));
-
-    public static bool GetActive(DependencyObject d) => (bool)d.GetValue(ActiveProperty);
-    public static void SetActive(DependencyObject d, bool valeur) => d.SetValue(ActiveProperty, valeur);
-
-    public static readonly DependencyProperty RetardProperty = DependencyProperty.RegisterAttached(
-        "Retard", typeof(double), typeof(Croissance), new PropertyMetadata(0.0));
-
-    public static double GetRetard(DependencyObject d) => (double)d.GetValue(RetardProperty);
-    public static void SetRetard(DependencyObject d, double valeur) => d.SetValue(RetardProperty, valeur);
-
-    /// <summary>Vrai pour une barre couchée : elle s'étire depuis la gauche au lieu de monter.</summary>
-    public static readonly DependencyProperty HorizontaleProperty = DependencyProperty.RegisterAttached(
-        "Horizontale", typeof(bool), typeof(Croissance), new PropertyMetadata(false));
-
-    public static bool GetHorizontale(DependencyObject d) => (bool)d.GetValue(HorizontaleProperty);
-    public static void SetHorizontale(DependencyObject d, bool valeur) => d.SetValue(HorizontaleProperty, valeur);
-
-    private static void SurActive(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is not FrameworkElement el || e.NewValue is not true) return;
-        el.IsVisibleChanged += (_, ev) =>
-        {
-            if (ev.NewValue is not true || !MoteurDAnimation.Actif) return;
-            var couchee = GetHorizontale(el);
-            var echelle = couchee ? new ScaleTransform(0, 1) : new ScaleTransform(1, 0);
-            el.RenderTransformOrigin = couchee ? new Point(0, 0.5) : new Point(0.5, 1);
-            el.RenderTransform = echelle;
-            var montee = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(650))
-            {
-                BeginTime = TimeSpan.FromMilliseconds(GetRetard(el)),
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-            };
-            montee.Completed += (_, _) => el.RenderTransform = Transform.Identity;
-            echelle.BeginAnimation(couchee ? ScaleTransform.ScaleXProperty : ScaleTransform.ScaleYProperty, montee);
-        };
-    }
-}
-
-/// <summary>
-/// 29/09/2026, troisième critique : en lisant un long domaine, le rail partait avec la page et laissait une colonne
+/// En lisant un long domaine, le rail partait avec la page et laissait une colonne
 /// vide. Posé sur un élément, il le fait suivre la lecture dans la vue défilante, sans sortir de sa section (le
 /// parent direct). Un simple décalage de rendu : la mise en page ne bouge pas.
 /// </summary>

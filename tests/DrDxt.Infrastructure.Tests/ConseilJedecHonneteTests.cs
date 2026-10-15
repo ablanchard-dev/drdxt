@@ -5,8 +5,8 @@ using FluentAssertions;
 namespace DrDxt.Infrastructure.Tests;
 
 /// <summary>
-/// 16/09/2026, question du joueur : « repasser en JEDEC pour voir la diff avec EXPO/XMP, je vois pas
-/// pourquoi ». Le conseil disait « quelques jours » et « la mémoire est hors de cause ». Deux erreurs :
+/// Le conseil « repasser en JEDEC pour voir la différence avec EXPO/XMP » ne dit ni « quelques jours »
+/// ni « la mémoire est hors de cause ». Deux erreurs à éviter :
 /// avec un arrêt tous les neuf jours environ, une semaine sans arrêt arrive par hasard presque une fois
 /// sur deux ; et le JEDEC n'innocente que le profil, pas les barrettes, qui se testent autrement.
 /// </summary>
@@ -17,7 +17,7 @@ public sealed class ConseilJedecHonneteTests
     [Theory]
     [InlineData("fr", "quelques jours", "hors de cause", "écart habituel", "test mémoire")]
     [InlineData("en", "a few days", "the memory is cleared", "usual gap", "memory test")]
-    // 17/09/2026 : des arrêts qui cessent rendent le profil probable, pas coupable.
+    // Des arrêts qui cessent rendent le profil probable, pas coupable.
     [InlineData("fr", "c’était le profil", "hors de cause", "suspect le plus probable", "test mémoire")]
     [InlineData("en", "it was the profile", "the memory is cleared", "most likely suspect", "memory test")]
     public void Le_conseil_ne_conclut_ni_trop_vite_ni_trop_large(string langue, string tropCourt, string tropLarge,
@@ -29,7 +29,7 @@ public sealed class ConseilJedecHonneteTests
         texte.Should().Contain(duree).And.Contain(autreTest);
     }
 
-    // 17/09/2026 : le bilan de stabilite lit desormais le resultat du test integre a Windows ; le
+    // Le bilan de stabilite lit desormais le resultat du test integre a Windows ; le
     // conseil doit nommer ce test-la, celui dont le produit sait rendre le resultat.
     [Theory]
     [InlineData("fr")]
@@ -37,7 +37,7 @@ public sealed class ConseilJedecHonneteTests
     public void Le_conseil_nomme_le_test_integre_a_Windows(string langue)
         => new ResxLocalizer().Get(Cle, new CultureInfo(langue)).Should().Contain("mdsched.exe");
 
-    // 17/09/2026, signalé par Remarque du joueur : « a pas vu que dans mon BIOS mon vrai profil XMP pas activé ».
+    // Signalé par Remarque du joueur : « a pas vu que dans mon BIOS mon vrai profil XMP pas activé ».
     // Sa mémoire (kit 4000) tourne à 3800 : au-dessus du standard JEDEC, sous la vitesse du kit.
     // DrDXT mesure l'overclock, il ne sait pas si c'est le profil du kit ou un réglage à la main :
     // la phrase ne peut pas affirmer qu'un profil est actif.

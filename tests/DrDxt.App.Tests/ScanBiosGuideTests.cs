@@ -11,18 +11,18 @@ using NSubstitute;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// M3 — the scan surfaces the PERSONALIZED BIOS guide (the "HOW", not just the "WHAT"): the
-/// exact menu path → setting → value to set on the user's board, the mandatory recovery
-/// section, and an HONEST confidence label.
+/// Le scan fait remonter le guide BIOS personnalisé (le « comment », pas seulement le « quoi ») :
+/// le chemin de menu exact → réglage → valeur à poser sur la carte mère du joueur, la section
+/// de récupération obligatoire, et une étiquette de confiance honnête.
 ///
-/// Invariants proven here:
-///   • a scan with actionable Guide findings surfaces BiosGuide with ordered steps carrying
-///     their exact value;
-///   • an UnverifiedFallback guide is labelled unverified and never claims to be verified;
-///   • the recovery section (top + bottom) is mandatory and non-empty;
-///   • when CSM-off was suppressed (Legacy boot) the honest note surfaces;
-///   • a guide with no actionable step (recovery-only) leaves BiosGuide null;
-///   • a failing generator leaves BiosGuide null and never breaks the (free) scan.
+/// Invariants prouvés ici :
+///   • un scan avec des constats guidés actionnables fait remonter BiosGuide avec des étapes
+///     ordonnées portant leur valeur exacte ;
+///   • un guide UnverifiedFallback est étiqueté non vérifié et ne se dit jamais vérifié ;
+///   • la section de récupération (haut + bas) est obligatoire et non vide ;
+///   • quand la coupure du CSM a été retenue (démarrage Legacy), la note honnête remonte ;
+///   • un guide sans étape actionnable (récupération seule) laisse BiosGuide null ;
+///   • un générateur en échec laisse BiosGuide null et ne casse jamais le scan (gratuit).
 /// </summary>
 public class ScanBiosGuideTests
 {
@@ -38,15 +38,15 @@ public class ScanBiosGuideTests
         TriState.On, TriState.On, "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
         TriState.On, TriState.On, Array.Empty<int>(), TriState.Unknown);
 
-    // A Guide-class advisor finding — its only job here is to make the advisor return a
-    // non-empty raw list so the (substituted) generator is invoked. The generator itself is
-    // a fake whose returned guide drives the assertions.
+    // Un constat de classe Guide du conseiller : son seul rôle ici est de faire rendre au
+    // conseiller une liste brute non vide pour que le générateur (substitué) soit appelé. Le
+    // générateur lui-même est un faux dont le guide rendu pilote les assertions.
     private static BiosFinding AdvisorFinding() =>
         new(FirmwareSettingKind.XmpExpo, Severity.Major, "XmpExpo.Title", "XmpExpo.Rationale",
             BiosMatrixClass.Guide, TriState.Off, BiosRecommendedAction.Enable, "XmpExpo.Action",
             Gain: null, StateNotReadable: false);
 
-    // A BIOS advisor that returns one actionable finding (so the guide generator runs).
+    // Un conseiller BIOS qui rend un constat actionnable (pour que le générateur de guide tourne).
     private static IBiosAdvisor AdvisorWithFinding() =>
         ScanViewModelTestSeams.BiosAdvisor(AdvisorFinding());
 
@@ -65,8 +65,7 @@ public class ScanBiosGuideTests
 
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), 72, null,
-              new ScoreBreakdown(80, 80, 85), new DimensionStatus(true, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), St, new List<Finding>(), null)));
 
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(
@@ -91,7 +90,7 @@ public class ScanBiosGuideTests
         vm.HasBiosGuide.Should().BeTrue();
         vm.BiosGuide!.BoardLabel.Should().Be("MSI MAG B650 TOMAHAWK WIFI");
         vm.BiosGuide.Steps.Should().HaveCount(2);
-        // Order preserved; the localized instruction + the RAW exact value both surface.
+        // Ordre préservé ; l'instruction localisée et la valeur exacte brute remontent toutes deux.
         vm.BiosGuide.Steps[0].Instruction.Should().Be("Bios.Guide.Step.Xmp");
         vm.BiosGuide.Steps[0].ExactValue.Should().Contain("EXPO I");
         vm.BiosGuide.Steps[1].ExactValue.Should().Contain("Re-Size BAR Support");
@@ -108,7 +107,7 @@ public class ScanBiosGuideTests
 
         vm.BiosGuide!.IsVerified.Should().BeFalse("a best-known fallback is never verified for the exact board");
         vm.BiosGuide.ConfidenceLabel.Should().NotBeNullOrEmpty();
-        // Honesty: the label is the UNVERIFIED key, never the verified one (identity localize).
+        // Honnêteté : l'étiquette est la clé « non vérifié », jamais la vérifiée (localisation identité).
         vm.BiosGuide.ConfidenceLabel.Should().Be("Scan.Bios.Guide.Unverified");
         vm.BiosGuide.ConfidenceLabel.Should().NotBe("Scan.Bios.Guide.Verified");
     }
@@ -156,8 +155,8 @@ public class ScanBiosGuideTests
     [Fact]
     public async Task Guide_with_no_actionable_steps_leaves_bios_guide_null()
     {
-        // A recovery-only guide (no actionable step) is nothing to guide → BiosGuide stays null.
-        var recoveryOnly = ScanViewModelTestSeams.Guide(); // default: empty steps
+        // Un guide de récupération seule (sans étape actionnable) n'a rien à guider → BiosGuide reste null.
+        var recoveryOnly = ScanViewModelTestSeams.Guide(); // par défaut : aucune étape
         var vm = BuildWith(AdvisorWithFinding(), ScanViewModelTestSeams.GuideGenerator(recoveryOnly));
 
         await vm.ScanCommand.ExecuteAsync(null);
@@ -175,10 +174,10 @@ public class ScanBiosGuideTests
         var vm = BuildWith(AdvisorWithFinding(), ScanViewModelTestSeams.GuideGenerator(guide));
         await vm.ScanCommand.ExecuteAsync(null);
 
-        // The raw keys surface verbatim.
+        // Les touches brutes remontent telles quelles.
         vm.BiosGuide!.EnterKey.Should().Be("Del");
         vm.BiosGuide.SaveKey.Should().Be("F10");
-        // The localized instruction names the key (identity localize returns the template).
+        // L'instruction localisée nomme la clé (la localisation identité rend le gabarit).
         vm.BiosGuide.EnterInstruction.Should().Contain("Del");
         vm.BiosGuide.SaveInstruction.Should().Contain("F10");
     }
@@ -186,7 +185,7 @@ public class ScanBiosGuideTests
     [Fact]
     public async Task Blank_enter_or_save_key_yields_an_empty_instruction()
     {
-        // An honest empty key must never render "Press  to enter".
+        // Une touche vide honnête ne doit jamais rendre « Appuyez sur  pour entrer ».
         var guide = ScanViewModelTestSeams.GuideWithKeys(enterKey: "", saveKey: "  ");
 
         var vm = BuildWith(AdvisorWithFinding(), ScanViewModelTestSeams.GuideGenerator(guide));
@@ -206,13 +205,13 @@ public class ScanBiosGuideTests
 
         vm.HasBiosGuide.Should().BeFalse();
         vm.BiosGuide.Should().BeNull();
-        // The guide is additive: a fault must never break the free scan.
+        // Le guide est additif : une faute ne doit jamais casser le scan gratuit.
         vm.State.Should().Be(ScanState.Done);
     }
 }
 
 /// <summary>
-/// M3 lot 2 — « emmene-moi dans le BIOS ». DrDXT peut demander a Windows d'envoyer le prochain
+/// « emmene-moi dans le BIOS ». DrDXT peut demander a Windows d'envoyer le prochain
 /// demarrage dans le setup firmware (shutdown /r /fw) au lieu de demander a l'utilisateur de
 /// marteler une touche au demarrage.
 ///
@@ -256,10 +255,8 @@ public sealed class BiosGuideFirmwareTripTests
     [Fact]
     public async Task The_default_delay_stays_inside_the_band_the_allowlist_accepts()
     {
-        // Corrige le 26/08 : ce test reecrivait la bande EN DUR (BeInRange(0, 300)), donc il
-        // ne reliait rien a rien. Resserrer l'allowlist a 0..60 l'aurait laisse vert avec un
-        // bouton qui echoue a chaque clic -- le scenario que son propre commentaire disait
-        // vouloir prevenir. On interroge maintenant la vraie allowlist.
+        // On interroge la vraie allowlist, pas une bande ecrite en dur : avec BeInRange(0, 300), resserrer
+        // l'allowlist a 0..60 laisserait le test vert avec un bouton qui echoue a chaque clic.
         new DrDxt.ElevatedHelper.OpAllowlist()
             .Validate(new RebootToFirmwareSetupOp(BiosGuideViewModel.DefaultFirmwareRebootDelaySeconds))
             .IsOk.Should().BeTrue();

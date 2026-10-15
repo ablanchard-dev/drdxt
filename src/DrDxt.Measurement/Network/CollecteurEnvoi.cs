@@ -3,7 +3,7 @@
 namespace DrDxt.Measurement.Network;
 
 /// <summary>
-/// 24/09/2026 — releve, a pas regulier, ce que la machine envoie (compteur des cartes actives,
+/// Releve, a pas regulier, ce que la machine envoie (compteur des cartes actives,
 /// lecture locale) et le ping vers la reference internet. N'envoie rien d'autre que ce ping :
 /// c'est le trafic du joueur qui fait la charge, jamais DrDXT.
 /// </summary>

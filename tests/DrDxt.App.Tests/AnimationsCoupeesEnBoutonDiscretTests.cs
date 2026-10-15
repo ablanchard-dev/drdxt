@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, D8.5, revue n° 3) : « Animations coupées par Windows » était un lien cyan collé sous l'action
+// « Animations coupées par Windows » était un lien cyan collé sous l'action
 // principale et lui faisait concurrence. C'est un bouton discret : gris, cerclé, cyan au survol seulement, et écarté.
 public sealed class AnimationsCoupeesEnBoutonDiscretTests
 {

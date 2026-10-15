@@ -16,24 +16,24 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.AmdHarness;
 
 /// <summary>
-/// 07/10/2026 : « --valider » (et « --remettre ») sur la vraie machine. Les leviers sont ceux du produit, construits par
+/// « --valider » (et « --remettre ») sur la vraie machine. Les leviers sont ceux du produit, construits par
 /// la composition de l'App ; le canal élevé est celui du helper, exécuté dans ce processus (le banc tourne déjà en
 /// administrateur, son manifeste le demande). Aucun point de restauration : chaque levier est rendu et relu sur place.
 /// </summary>
 internal static class ValidationMachine
 {
-    /// <summary>09/10/2026 (diffusion publique) : le journal est rejoué en administrateur ; il vit donc dans un dossier que
+    /// <summary>Le journal est rejoué en administrateur ; il vit donc dans un dossier que
     /// seuls les administrateurs et SYSTEM peuvent écrire, pas dans Téléchargements où n'importe quel programme du compte
     /// pourrait y glisser un retour arrière de son choix.</summary>
     public static string CheminDuJournal => Path.Combine(DossierProtege(), "a-remettre.json");
 
-    /// <summary>L'ancien emplacement (zips d'avant le 09/10/2026). Jamais rejoué : il est signalé, à vérifier à la main.</summary>
+    /// <summary>L'ancien emplacement (zips d'une ancienne version). Jamais rejoué : il est signalé, à vérifier à la main.</summary>
     public static string AncienJournal => Path.Combine(RapportLecture.Dossier(), "DrDXT-a-remettre.json");
 
     private static readonly SecurityIdentifier Administrateurs = new(WellKnownSidType.BuiltinAdministratorsSid, null);
     private static readonly SecurityIdentifier Systeme = new(WellKnownSidType.LocalSystemSid, null);
 
-    /// <summary>09/10/2026 (revue) : un compte sans droits peut créer un dossier dans ProgramData avant le premier lancement,
+    /// <summary>Un compte sans droits peut créer un dossier dans ProgramData avant le premier lancement,
     /// et il en reste propriétaire (donc maître de ses droits). Le dossier est créé avec les administrateurs pour
     /// propriétaire ; un dossier existant qui est un lien, ou qui appartient à un autre compte, est refusé.</summary>
     private static string DossierProtege()
@@ -72,7 +72,7 @@ internal static class ValidationMachine
         return collection.BuildServiceProvider();
     }
 
-    // 08/10/2026 (T1b) : le moteur vit dans le produit (ValidationDeLaMachine), l'App et ce banc l'appellent.
+    // Le moteur vit dans le produit (ValidationDeLaMachine), l'App et ce banc l'appellent.
     public static async Task<ValidationComplete.Remise> RemettreAsync(ServiceProvider sp)
     {
         // Le vrai journal d'abord : un vieux fichier dans Téléchargements ne doit pas empêcher de rendre un essai interrompu.
@@ -92,7 +92,7 @@ internal static class ValidationMachine
 }
 
 /// <summary>
-/// 09/10/2026 : la règle du 29/09 (jamais tension, fréquence ni ventilateur) tenue par le code de ce banc, pas seulement
+/// La règle de la carte (jamais tension, fréquence ni ventilateur) tenue par le code de ce banc, pas seulement
 /// par la liste de ses leviers : le helper sait ces écritures pour le mode Expert de l'App, le banc les refuse toutes.
 /// </summary>
 internal sealed class SansFrequenceNiVentilateur(IElevatedClient interieur) : IElevatedClient

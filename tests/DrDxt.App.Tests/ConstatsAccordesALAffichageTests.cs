@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>UI1 (08/10/2026, vu sur capture) : « 2 échec(s), aucun vidage gardé », « 9 dossier(s) de jeux »… une vingtaine
+/// <summary>« 2 échec(s), aucun vidage gardé », « 9 dossier(s) de jeux »… une vingtaine
 /// de textes du moteur. Ils s'accordent une fois, à l'affichage ; le constat d'origine (comparé d'un scan à l'autre) ne change pas.</summary>
 public sealed class ConstatsAccordesALAffichageTests
 {
@@ -21,7 +21,7 @@ public sealed class ConstatsAccordesALAffichageTests
         f.ValeurCourante.Should().Be("2 échec(s), aucun vidage gardé", "l'historique compare la valeur d'origine");
     }
 
-    // UI1 (critique du 08/10) : « Incident noyau conservé » titrait deux incidents différents (USB 3 et carte graphique) ;
+    // « Incident noyau conservé » titrait deux incidents différents (USB 3 et carte graphique) ;
     // on croyait lire deux versions du même fait. Le titre affiché dit lequel ; la clé de l'historique ne change pas.
     [Theory]
     [InlineData("1x 0x144 BUGCODE_USB3_DRIVER, contrôleur USB 3 (vidage à chaud)", "incident isolé, conservé par Windows. ", "Incident du pilote USB 3, conservé")]
@@ -40,7 +40,7 @@ public sealed class ConstatsAccordesALAffichageTests
                 "1x 0x144 BUGCODE_USB3_DRIVER, contrôleur USB 3 (vidage à chaud)", null, RepairStatus.Observed, "incident isolé."))
             .Should().StartWith("Incident du pilote USB 3, conservé : 1x 0x144");
 
-    // UI1 (critique du 08/10) : la pastille montrait « IgnoreAllFailures » seul. Elle dit ce que la valeur veut dire, le nom
+    // La pastille montrait « IgnoreAllFailures » seul. Elle dit ce que la valeur veut dire, le nom
     // technique entre parenthèses ; la valeur gardée pour l'historique ne change pas.
     [Fact]
     public void Une_valeur_BCD_se_dit_en_clair_avec_son_nom_technique()

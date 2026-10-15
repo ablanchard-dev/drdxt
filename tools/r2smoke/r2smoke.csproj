@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- R2 WRITE smoke. Lives OUTSIDE the .sln (like tools/smoke, tools/m2smoke,
+  <!-- NVAPI WRITE smoke. Lives OUTSIDE the .sln (like tools/smoke, tools/m2smoke,
        tools/r2probe). REQUIRES ELEVATION: it calls the real NVAPI write methods
        (SetPstates20 / ClientPowerPoliciesSetStatus) which need admin. Conservative
        and self-reverting — see Program.cs. -->

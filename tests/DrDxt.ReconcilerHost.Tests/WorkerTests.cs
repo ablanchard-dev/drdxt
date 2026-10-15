@@ -5,32 +5,32 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// Worker semantics — the host must reconcile unconditionally at boot and on every
-// daily poll. Feature-update detection is an ADDITIONAL trigger/recorder, never a gate.
+// Sémantique du Worker : l'hôte doit réconcilier inconditionnellement au démarrage et à chaque
+// scrutation quotidienne. La détection de mise à jour de fonctionnalité est un déclencheur et
+// un enregistreur en plus, jamais une porte.
+// Toute la raison d'être du réconciliateur est la persistance après redémarrage : un décalage
+// d'horloge GPU volatil (perdu à chaque redémarrage) et tout réglage de registre ou d'alimentation
+// dérivé doivent être réappliqués à chaque démarrage, que le build de l'OS ait changé ou non. Le
+// passage est idempotent (il ne réapplique que les éléments dérivés ; une machine propre = rien,
+// zéro écriture), donc le jouer à chaque déclencheur est sûr et correct.
 //
-// The whole point of the reconciler is persistence after a reboot: a volatile GPU clock
-// offset (gone after every reboot) and any drifted registry/power setting must be
-// re-applied at every boot, regardless of whether the OS build changed. The reconcile
-// pass is idempotent (it re-applies only drifted items; a clean machine = a no-op with
-// zero writes), so running it on every trigger is safe and correct.
-//
-// These tests use the host's existing seams: an instrumented single-flight tick to
-// count passes, a controllable IDelay (no real timer), and the in-memory fakes for the
-// feature-update trigger's units. They also pin the preserved invariants:
-//   * T29 single-flight: passes go through SingleFlightReconcile (serialized).
-//   * dead-man boot marking: MarkBootOnce exactly once at startup; MarkStable after the
-//     window; cancel-before-window leaves the boot counted.
-//   * the recorder side effect: a detected feature update still records
-//     LastFeatureUpdateBuild.
+// Ces tests utilisent les coutures existantes de l'hôte : un tic à vol unique instrumenté pour
+// compter les passages, un IDelay pilotable (pas de vrai minuteur), et les faux en mémoire des
+// unités du déclencheur de mise à jour. Ils figent aussi les invariants préservés :
+//   * vol unique : les passages passent par SingleFlightReconcile (sérialisés).
+//   * marquage homme mort du démarrage : MarkBootOnce exactement une fois au démarrage ; MarkStable
+//     après la fenêtre ; une annulation avant la fenêtre laisse le démarrage compté.
+//   * l'effet de bord d'enregistrement : une mise à jour de fonctionnalité détectée enregistre
+//     toujours LastFeatureUpdateBuild.
 // -----------------------------------------------------------------------
 public sealed class WorkerTests
 {
     private static readonly TimeSpan StableWindow = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan PollInterval = TimeSpan.FromHours(24);
 
-    // Builds a Worker over fully in-memory fakes. The reconcile pass is the instrumented
-    // counter so a test can assert exactly how many passes ran. The feature-update trigger
-    // is composed from the standard probe/store/signal fakes the caller supplies.
+    // Construit un Worker sur des faux entièrement en mémoire. Le passage de réconciliation est le
+    // compteur instrumenté, pour qu'un test vérifie exactement combien de passages ont tourné. Le
+    // déclencheur de mise à jour est composé des faux standard sonde/magasin/signal fournis par l'appelant.
     private static (Worker worker, CountingTick tick) Build(
         FakeOsBuildProbe probe,
         InMemoryReconcilerStateStore stateStore,
@@ -52,8 +52,8 @@ public sealed class WorkerTests
     [Fact]
     public async Task Boot_RunsAReconcilePass_EvenWhenNoFeatureUpdateIsDetected()
     {
-        // Build unchanged + no corroborating event = NO feature update. The OLD code would
-        // early-return and not reconcile. The CORRECTED Worker reconciles unconditionally.
+        // Build inchangé + aucun événement de corroboration = pas de mise à jour de fonctionnalité.
+        // Le Worker réconcilie inconditionnellement, sans retour anticipé.
         var probe = new FakeOsBuildProbe { Build = "22631.3447" };
         var stateStore = new InMemoryReconcilerStateStore(
             ReconcilerState.Default with { LastFeatureUpdateBuild = "22631.3447" });
@@ -65,7 +65,7 @@ public sealed class WorkerTests
         var cts = new CancellationTokenSource();
         var run = worker.StartAsync(cts.Token);
 
-        // Wait for the boot pass to land, then shut down cleanly.
+        // Attendre que le passage de démarrage atterrisse, puis arrêter proprement.
         await tick.WaitForPasses(1);
         cts.Cancel();
         await StopAsync(worker, run);
@@ -78,7 +78,7 @@ public sealed class WorkerTests
     [Fact]
     public async Task DailyPoll_RunsAReconcilePassUnconditionally_WithNoFeatureUpdate()
     {
-        // No feature update on any tick; we still want one boot pass + one pass per poll.
+        // Aucune mise à jour à aucun tic ; on veut quand même un passage au démarrage + un par scrutation.
         var probe = new FakeOsBuildProbe { Build = "22631.3447" };
         var stateStore = new InMemoryReconcilerStateStore(
             ReconcilerState.Default with { LastFeatureUpdateBuild = "22631.3447" });
@@ -90,10 +90,10 @@ public sealed class WorkerTests
         var cts = new CancellationTokenSource();
         var run = worker.StartAsync(cts.Token);
 
-        // Boot pass.
+        // Passage de démarrage.
         await tick.WaitForPasses(1);
 
-        // Release the first daily-poll delay so one daily pass runs unconditionally.
+        // Libérer le premier délai de scrutation quotidienne pour qu'un passage quotidien tourne inconditionnellement.
         await delay.ReleasePollOnce(PollInterval);
         await tick.WaitForPasses(2);
 
@@ -107,8 +107,8 @@ public sealed class WorkerTests
     [Fact]
     public async Task DetectedFeatureUpdate_StillRecordsLastFeatureUpdateBuild_AndReconciles()
     {
-        // Build CHANGED at boot: a real feature update. The detector (called as part of the
-        // loop for its side effect) must record the new build, AND the boot pass must run.
+        // Build changé au démarrage : une vraie mise à jour de fonctionnalité. Le détecteur (appelé dans
+        // la boucle pour son effet de bord) doit enregistrer le nouveau build, et le passage de démarrage doit tourner.
         var probe = new FakeOsBuildProbe { Build = "22631.4000" };
         var stateStore = new InMemoryReconcilerStateStore(
             ReconcilerState.Default with { LastFeatureUpdateBuild = "22631.3447" });
@@ -133,8 +133,8 @@ public sealed class WorkerTests
     [Fact]
     public async Task FeatureUpdateTriggerReadFailure_DoesNotPreventTheUnconditionalBootPass()
     {
-        // Even if the feature-update trigger read fails (e.g. build probe unreadable), the
-        // unconditional reconcile must still run — the trigger is additive, never a gate.
+        // Même si la lecture du déclencheur de mise à jour échoue (sonde de build illisible), la
+        // réconciliation inconditionnelle doit tourner : le déclencheur est additif, jamais une porte.
         var probe = new FakeOsBuildProbe { Fail = true };
         var stateStore = new InMemoryReconcilerStateStore();
         var signal = new FakeUpdateSignal { Recent = false };
@@ -159,7 +159,7 @@ public sealed class WorkerTests
     [Fact]
     public async Task CancelledBeforeStableWindow_LeavesTheBootCounted()
     {
-        // Dead-man: cancel before the stable window elapses → session is not marked stable.
+        // Homme mort : annuler avant la fin de la fenêtre stable → la session n'est pas marquée stable.
         var probe = new FakeOsBuildProbe { Build = "22631.3447" };
         var stateStore = new InMemoryReconcilerStateStore(
             ReconcilerState.Default with { LastFeatureUpdateBuild = "22631.3447" });
@@ -172,7 +172,7 @@ public sealed class WorkerTests
         var run = worker.StartAsync(cts.Token);
 
         await tick.WaitForPasses(1);
-        // Shut down without ever releasing the stable-window delay.
+        // Arrêter sans jamais libérer le délai de la fenêtre stable.
         cts.Cancel();
         await StopAsync(worker, run);
 
@@ -191,12 +191,12 @@ public sealed class WorkerTests
         }
         catch (OperationCanceledException)
         {
-            // Normal shutdown.
+            // Arrêt normal.
         }
     }
 
-    // An instrumented reconcile body (the SingleFlightReconcile delegate). Counts passes
-    // and signals waiters so a test can await "N passes have run" without a real timer.
+    // Un corps de réconciliation instrumenté (le délégué de SingleFlightReconcile). Compte les passages
+    // et signale les attendants pour qu'un test attende « N passages ont tourné » sans vrai minuteur.
     private sealed class CountingTick
     {
         private readonly object _lock = new();
@@ -216,8 +216,8 @@ public sealed class WorkerTests
             return Task.FromResult(Result.Ok());
         }
 
-        // Spins (briefly, no real sleep loop on the hot path) until at least <paramref
-        // name="count"/> passes have run. Generous deadline so a regression is caught, not hung.
+        // Tourne (brièvement, sans boucle de sommeil réelle sur le chemin chaud) jusqu'à ce qu'au moins
+        // <paramref name="count"/> passages aient tourné. Délai généreux pour qu'une régression soit attrapée, pas suspendue.
         public async Task WaitForPasses(int count)
         {
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
@@ -232,11 +232,11 @@ public sealed class WorkerTests
         }
     }
 
-    // A controllable IDelay that distinguishes the stable-window wait (the first, long
-    // StableWindow request) from the daily-poll waits. The stable-window delay never
-    // completes on its own (so a test that does not release it can prove the dead-man
-    // invariant); each daily-poll delay blocks until the test releases it. Cancellation is
-    // honored through the same token the production delay observes.
+    // Un IDelay pilotable qui distingue l'attente de la fenêtre stable (la première, longue demande
+    // StableWindow) des attentes de scrutation quotidienne. Le délai de fenêtre stable ne s'achève
+    // jamais seul (un test qui ne le libère pas peut ainsi prouver l'invariant de l'homme mort) ;
+    // chaque délai de scrutation bloque jusqu'à ce que le test le libère. L'annulation est
+    // honorée par le même jeton que le délai de production observe.
     private sealed class BlockingDelay : IDelay
     {
         private readonly object _lock = new();
@@ -250,11 +250,11 @@ public sealed class WorkerTests
 
             if (duration == StableWindow)
             {
-                // The dead-man stable window — leave it pending (never auto-completes).
+                // La fenêtre stable de l'homme mort : la laisser en attente (ne s'achève jamais seule).
                 return tcs.Task;
             }
 
-            // A daily-poll wait — record it so a test can release exactly one.
+            // Une attente de scrutation quotidienne : l'enregistrer pour qu'un test en libère exactement une.
             lock (_lock)
             {
                 _pendingPoll = tcs;
@@ -263,8 +263,8 @@ public sealed class WorkerTests
             return tcs.Task;
         }
 
-        // Waits until the loop has requested its next daily-poll delay, then completes it
-        // so exactly one daily pass proceeds.
+        // Attend que la boucle ait demandé son prochain délai de scrutation quotidienne, puis l'achève
+        // pour qu'exactement un passage quotidien avance.
         public async Task ReleasePollOnce(TimeSpan expected)
         {
             Task requested;

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Measurement.Tests.Memory;
 
-// 03/10/2026 (boucle 2D2P, P3.3) : le cas ISLC, dit seulement quand il est mesuré : mémoire libre sous 1 024 Mo ET à-coups.
+// Le cas ISLC, dit seulement quand il est mesuré : mémoire libre sous 1 024 Mo ET à-coups.
 public sealed class MemoireEnPartieTests
 {
     private const ulong Mo = 1024 * 1024;

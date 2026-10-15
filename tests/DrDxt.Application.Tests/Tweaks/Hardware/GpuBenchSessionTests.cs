@@ -5,12 +5,12 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// P1 — GpuBenchSession: the deterministic GPU perf-METER. Runs the deterministic
-// GpuBench N times and aggregates the comparable throughput scores into a mean + an
-// inter-run margin (same NS-6 honesty as the frametime A/B: +Infinity under 3 runs),
-// plus AllStable (every run checksum-ok / no TDR). GpuBenchAb turns two aggregates
-// (stock vs candidate) into a clean verdict — a gain must CLEAR the combined margin.
-// Fully unit-tested with a sequence fake runner — no GPU.
+// GpuBenchSession : le perf-mètre GPU déterministe. Joue le GpuBench déterministe N fois
+// et agrège les scores de débit comparables en une moyenne et une marge inter-passes
+// (même honnêteté que l'A/B de temps d'image : +Infinity sous 3 passes), plus AllStable
+// (chaque passe somme de contrôle ok, sans TDR). GpuBenchAb transforme deux agrégats
+// (origine et candidat) en verdict propre : un gain doit franchir la marge combinée.
+// Entièrement testé avec un faux exécutant à séquence, sans carte.
 // -----------------------------------------------------------------------
 public sealed class GpuBenchSessionTests
 {
@@ -73,7 +73,7 @@ public sealed class GpuBenchSessionTests
         r.IsOk.Should().BeFalse();
     }
 
-    // --- A/B verdict (a gain must clear the COMBINED inter-run margin; unstable = revert) ---
+    // --- Verdict A/B (un gain doit franchir la marge inter-passes combinée ; instable = retour) ---
     private static GpuBenchAggregate Agg(double mean, double margin, bool stable = true) => new(mean, margin, 3, stable);
 
     [Fact]

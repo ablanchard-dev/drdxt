@@ -3,19 +3,18 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks;
 
 // -----------------------------------------------------------------------
-// F4 — TweakCatalog.
+// TweakCatalog.
 //
-// Aggregates every registered ITweak (injected as IEnumerable<ITweak> by DI) and
-// implements the reconciled ITweakCatalog (master §10): Get(id) / All(). It is the
-// single place the rest of the app discovers tweaks — and the place the §6
-// anti-blacklist barrier is enforced by tests.
+// Rassemble chaque ITweak enregistré (injecté en IEnumerable<ITweak> par la DI) et
+// implémente ITweakCatalog : Get(id) / All(). C'est le seul endroit où le reste de l'app
+// découvre les leviers, et celui où les tests imposent la barrière anti-liste noire.
 //
-// The HARD anti-blacklist gate (TweakCatalogTests) asserts that AllTweakIds
-// contains none of the banned placebo / harmful ids — a permanent barrier: a
-// placebo tweak cannot be introduced without failing the build's tests.
+// La garde stricte anti-liste noire (TweakCatalogTests) vérifie qu'AllTweakIds ne contient
+// aucun des ids placebo ou nuisibles interdits : une barrière permanente, un levier placebo
+// ne peut pas entrer sans faire échouer les tests.
 //
-// Resolvable via DI: register each ITweak + this catalog, then
-// IEnumerable<ITweak> flows into the constructor automatically.
+// Résoluble par la DI : enregistrer chaque ITweak + ce catalogue, et IEnumerable<ITweak>
+// arrive tout seul dans le constructeur.
 // -----------------------------------------------------------------------
 public sealed class TweakCatalog : ITweakCatalog
 {
@@ -24,11 +23,11 @@ public sealed class TweakCatalog : ITweakCatalog
     public TweakCatalog(IEnumerable<ITweak> tweaks) =>
         _tweaks = tweaks.ToList();
 
-    /// <summary>The ids of every registered tweak. The anti-blacklist gate checks
-    /// this against the §6 banned list.</summary>
+    /// <summary>Les ids de chaque levier enregistré. La garde anti-liste noire les compare à
+    /// la liste des interdits.</summary>
     public IReadOnlyList<string> AllTweakIds => _tweaks.Select(t => t.Id).ToList();
 
-    /// <summary>Resolves a tweak by id. Unknown id → Fail(TWEAK.NOT_APPLICABLE).</summary>
+    /// <summary>Trouve un levier par son id. Id inconnu → Fail(TWEAK.NOT_APPLICABLE).</summary>
     public Result<ITweak> Get(string tweakId)
     {
         foreach (var tweak in _tweaks)

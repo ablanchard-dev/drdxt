@@ -24,7 +24,7 @@ public class RepliDxgiBenchmarkRunnerTests
             .Should().Equal(5.0, 5.0, 5.0);
     }
 
-    // 26/09/2026 : sans `-max`, une session laissee ouverte par un plantage ecrit tous les evenements
+    // Sans `-max`, une session laissee ouverte par un plantage ecrit tous les evenements
     // DXGI du PC dans %TEMP% jusqu'au redemarrage. Borne, et une trace qui touche la borne est tronquee :
     // elle le dit au lieu de rendre une mesure partielle.
     [Fact]
@@ -35,7 +35,7 @@ public class RepliDxgiBenchmarkRunnerTests
         CompteurPresentsDxgi.TracePleine(5L * 1024 * 1024).Should().BeFalse();
     }
 
-    // 26/09/2026 : un plantage en pleine capture laisse son .etl (jusqu'a la borne) ; son nom change a
+    // Un plantage en pleine capture laisse son .etl (jusqu'a la borne) ; son nom change a
     // chaque mesure, personne ne le reprenait. Une seule session a la fois : au demarrage, tout .etl du
     // compteur est un reste. Les autres fichiers du dossier ne sont pas touches.
     [Fact]
@@ -86,7 +86,7 @@ public class RepliDxgiBenchmarkRunnerTests
         r.Value.ForegroundFraction.Should().BeNull("sans sonde de premier plan : non observe, jamais 0 %");
     }
 
-    // 26/09/2026 : une seule passe DXGI rendait une marge de 0 ; l'A/B voyait alors dans le moindre
+    // Une seule passe DXGI rendait une marge de 0 ; l'A/B voyait alors dans le moindre
     // ecart un gain « mesurable ». Le chemin PresentMon rend +inf sous trois passes : meme regle ici.
     [Theory]
     [InlineData(0)]

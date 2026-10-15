@@ -1,10 +1,11 @@
-﻿using System.Text;
+﻿using DrDxt.Core;
+using System.Text;
 using DrDxt.Detection.Cpu;
 using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Cpu;
 
-// 04/10/2026 (plan 1.2) : la température du processeur lue dans la mémoire partagée de HWiNFO, construite ici octet
+// La température du processeur lue dans la mémoire partagée de HWiNFO, construite ici octet
 // par octet selon la disposition du SDK (relevés de 316 octets, ou plus longs dans les versions récentes).
 public sealed class TemperatureHwinfoTests
 {
@@ -49,7 +50,7 @@ public sealed class TemperatureHwinfoTests
     public void Un_releve_plus_long_des_versions_recentes_se_lit_par_la_taille_de_l_en_tete()
         => TemperatureHwinfo.Analyser(Bloc(460, (1, "CPU (Tctl/Tdie)", 71.0)), Maintenant)!.Celsius.Should().Be(71.0);
 
-    // Revue du 04/10 (P2) : HWiNFO figé garde son bloc ; une valeur de plus de 15 s ne se dit pas « au moment du scan ».
+    // HWiNFO figé garde son bloc ; une valeur de plus de 15 s ne se dit pas « au moment du scan ».
     [Fact]
     public void Une_publication_perimee_ne_se_lit_pas()
     {
@@ -67,5 +68,36 @@ public sealed class TemperatureHwinfoTests
         TemperatureHwinfo.Analyser(Bloc(316, (1, "GPU Temperature", 60.0)), Maintenant).Should().BeNull();
         TemperatureHwinfo.Analyser(Bloc(316, (1, "CPU Package", 400.0)), Maintenant).Should().BeNull("400 °C est une disposition mal lue");
         TemperatureHwinfo.Analyser(new byte[10], Maintenant).Should().BeNull();
+    }
+
+    // HWiNFO publie les ventilateurs de presque toutes les cartes (type 3, tr/min).
+    // Gardés avec leur nom HWiNFO, numérotés à partir de 100 ; HWiNFO ne donne pas le cycle : inconnu, jamais inventé.
+    [Fact]
+    public void Les_ventilateurs_publies_par_HWiNFO_se_lisent_avec_leur_nom()
+    {
+        var b = Bloc(316, (1, "CPU Package", 70.0), (3, "CPU", 1180.4), (3, "Chassis1", 0.0), (7, "Chassis1", 45.0), (3, "Chassis2", 950.0));
+
+        var v = TemperatureHwinfo.AnalyserVentilateurs(b, Maintenant)!;
+
+        v.Should().Equal(new VentilateurLu(100, 1180, null, "CPU"), new VentilateurLu(101, 0, null, "Chassis1"), new VentilateurLu(102, 950, null, "Chassis2"));
+        TemperatureHwinfo.AnalyserVentilateurs(Bloc(316, (1, "CPU Package", 70.0)), Maintenant).Should().BeNull("aucun ventilateur publié");
+    }
+
+    // Les ventilateurs de la carte graphique (mode 0 tr/min) ne se jugent pas comme ceux du boîtier.
+    [Fact]
+    public void Les_ventilateurs_de_la_carte_graphique_sont_ecartes()
+    {
+        var releves = Bloc(316, (3, "Chassis1", 900.0), (3, "GPU Fan1", 0.0));
+        const int tailleCapteur = 264;
+        var b = new byte[releves.Length + 2 * tailleCapteur];
+        releves.CopyTo(b, 0);
+        BitConverter.GetBytes((uint)releves.Length).CopyTo(b, 20);
+        BitConverter.GetBytes((uint)tailleCapteur).CopyTo(b, 24);
+        BitConverter.GetBytes(2u).CopyTo(b, 28);
+        Encoding.ASCII.GetBytes("MSI MAG B760 (Nuvoton NCT6687D)").CopyTo(b, releves.Length + 8);
+        Encoding.ASCII.GetBytes("GPU [#0]: NVIDIA GeForce RTX 4060").CopyTo(b, releves.Length + tailleCapteur + 8);
+        BitConverter.GetBytes(1u).CopyTo(b, 64 + 316 + 4);
+
+        TemperatureHwinfo.AnalyserVentilateurs(b, Maintenant).Should().Equal(new VentilateurLu(100, 900, null, "Chassis1"));
     }
 }

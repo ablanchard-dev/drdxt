@@ -7,10 +7,9 @@ namespace DrDxt.Detection.Tests.Settings;
 /// <summary>
 /// Un chemin que la machine de reference n'exerce jamais.
 ///
-/// Aucun element de la famille horloge n'est pose sur cette machine — verifie le 08/09/2026,
-/// `bcdedit /enum {current}` rend 21 lignes et aucune ne les contient. Le code qui les juge ne
-/// tournait donc jamais, et « ca compile » tenait lieu de preuve. Ces tests sont la seule chose
-/// qui l'exerce.
+/// Aucun element de la famille horloge n'est pose sur cette machine (releve le 08/09/2026 :
+/// `bcdedit /enum {current}` rend 21 lignes et aucune ne les contient). Le code qui les juge n'y
+/// tourne donc jamais ; ces tests sont la seule chose qui l'exerce.
 ///
 /// La regression qu'ils empechent est double : qu'un futur lot cesse de reconnaitre ces elements
 /// (ils retomberaient dans le repli « je ne sais pas juger », muets), ou au contraire qu'il se
@@ -18,6 +17,19 @@ namespace DrDxt.Detection.Tests.Settings;
 /// </summary>
 public class BcdInterpretationTests
 {
+    // L'écran de récupération a sa carte dans DrDXT : le geste la nomme. Les éléments d'horloge n'en ont pas :
+    // le geste est la commande, sur l'élément lu, à part de l'explication qui reste une phrase.
+    [Fact]
+    public void Le_geste_se_lit_a_part_et_nomme_l_element_lu()
+    {
+        BcdInterpretation.Juger("bootstatuspolicy", "IgnoreAllFailures").Remede
+            .Should().StartWith("1) ").And.Contain("Rendre l'écran de récupération à Windows").And.Contain("Annuler");
+
+        var horloge = BcdInterpretation.Juger("useplatformclock", "Yes");
+        horloge.Remede.Should().StartWith("1) ").And.Contain("bcdedit /deletevalue \"{current}\" useplatformclock", "PowerShell lit {current} sans guillemets comme un bloc de code");
+        horloge.Explication.Should().NotContain("bcdedit");
+    }
+
     [Theory]
     [InlineData("useplatformclock")]
     [InlineData("useplatformtick")]
@@ -43,7 +55,7 @@ public class BcdInterpretationTests
     [InlineData("inconnu", "x")]
     public void L_EXPLICATION_SE_LIT_COMME_UNE_PHRASE_ET_PAS_COMME_UNE_NOTE_TECHNIQUE(string cle, string valeur)
     {
-        // 16/09/2026 : le joueur lisait `bcdedit /enum`, des mots en capitales et des pictogrammes.
+        // Le joueur lisait `bcdedit /enum`, des mots en capitales et des pictogrammes.
         var texte = BcdInterpretation.Juger(cle, valeur).Explication ?? string.Empty;
 
         texte.Should().NotContainAny("`", "bcdedit", "\u26A0");

@@ -7,7 +7,7 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 14/09/2026 — la V1 relit au lancement ce que DrDXT a pose. Le manifeste porte un reglage garde : HKLM
+// La V1 relit au lancement ce que DrDXT a pose. Le manifeste porte un reglage garde : HKLM
 // ...\Test\Valeur, pose a 1, origine 0. Le registre dit ce qui est vraiment la. Chemin reel : le vrai
 // AppliedStateVerifier et la vraie regle PoseesDe ; seuls le manifeste et le registre sont simules.
 public sealed class VerificationDesReglagesTests

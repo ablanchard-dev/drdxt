@@ -6,81 +6,80 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// HelperLauncher — obtains a RUNNING elevated helper ON DEMAND.
+// HelperLauncher : obtient à la demande un helper élevé en marche.
 //
-// What this is (and the migration path — read before changing):
-//   This is the DEV/test stepping-stone for elevation. When the App needs to
-//   apply a privileged tweak it asks the launcher to ensure the helper is up;
-//   the launcher spawns DrDxt.ElevatedHelper.exe ELEVATED via an interactive UAC
-//   prompt (ProcessStartInfo { UseShellExecute=true, Verb="runas" } — see
-//   RunAsProcessLauncher). The SPEC's end-state (05-M5 §1 invariant
-//   "Élévation minimale: seul l'installeur élève — 1 UAC") is a PERMANENT helper
-//   registered as a Windows service at install time (one UAC, ever).
+// Ce que c'est (et la voie de migration, à lire avant de modifier) :
+//   C'est la marche de dev/test pour l'élévation. Quand l'App doit appliquer un levier
+//   privilégié, elle demande au lanceur de s'assurer que le helper tourne ; le lanceur
+//   démarre DrDxt.ElevatedHelper.exe en élevé via une invite UAC interactive
+//   (ProcessStartInfo { UseShellExecute=true, Verb="runas" }, voir RunAsProcessLauncher).
+//   L'état final visé (invariant « Élévation minimale : seul l'installeur élève, 1 UAC »)
+//   est un helper permanent, enregistré comme service Windows à l'installation (une seule
+//   UAC, pour toujours).
 //
-//   This class is deliberately structured so that migration is a SEAM SWAP, not a
-//   rewrite: the launch mechanism is IHelperProcessLauncher and "is it up?" is a
-//   real connect+handshake ATTEMPT (IHelperHandshakeAttempt). The installer-era
-//   code registers/starts the same helper exe as a service (a different
-//   IHelperProcessLauncher that does `sc start` / ServiceController.Start instead of
-//   `runas`), and the same pipe + handshake negotiate the session key. The channel
-//   does not change — only how the helper process gets started.
+//   La classe est construite exprès pour que la migration soit un échange de couture, pas
+//   une réécriture : le mécanisme de lancement est IHelperProcessLauncher, et « tourne-t-il ? »
+//   est une vraie tentative connexion+handshake (IHelperHandshakeAttempt). Le code de l'ère
+//   installeur enregistre et démarre le même exe comme service (un autre IHelperProcessLauncher
+//   qui fait `sc start` / ServiceController.Start au lieu de `runas`), et le même pipe + handshake
+//   négocient la clé de session. Le canal ne change pas : seul le démarrage du processus change.
 //
-// FIX 1 — no separate bare-connect liveness probe (it raced the single-instance
-//   pipe). Liveness/reuse is detected by a COMPLETE connect+handshake attempt (a
-//   clean, fully-serviced connection — never a truncated, probe-consumed slot that
-//   forces the server to re-create its FIRST_PIPE_INSTANCE pipe mid-race). The
-//   post-launch startup latency is absorbed by a bounded RETRY of that same
-//   attempt (connect failures retried up to a deadline). So there is exactly ONE
-//   accept per attempt; a launched helper that never serves in time fails clean as
-//   HELPER_UNREACHABLE rather than spinning or racing.
+// Pas de sonde de vie à connexion nue séparée (elle entrerait en course avec le pipe à instance
+//   unique). La vie et la réutilisation se détectent par une tentative complète connexion+handshake
+//   (une connexion propre et servie jusqu'au bout, jamais un créneau tronqué, consommé par une sonde,
+//   qui forcerait le serveur à recréer son pipe FIRST_PIPE_INSTANCE en pleine course). La latence de
+//   démarrage après lancement est absorbée par une reprise bornée de cette même tentative (échecs
+//   de connexion repris jusqu'à une échéance). Il y a donc exactement une acceptation par tentative ;
+//   un helper lancé qui ne sert pas à temps échoue proprement en HELPER_UNREACHABLE, sans tourner
+//   en boucle ni entrer en course.
 //
-// DECISIONS:
-//   * already running (a handshake attempt SUCCEEDS first try) -> REUSE, never
-//     spawn a second elevated process.
-//   * a live pipe that REJECTS the handshake (auth/protocol mismatch) -> Fail
-//     ELEVATION_DENIED, never launch a 2nd elevated process onto it, never spin.
-//   * not running (connect fails) -> launch, then retry the attempt until the
-//     helper serves or the deadline is hit (HELPER_UNREACHABLE).
-//   * UAC cancelled -> Result.Fail(ELEVATION_DECLINED) — clean, never a throw/crash.
+// Décisions :
+//   * déjà en marche (une tentative de handshake réussit du premier coup) -> réutiliser, jamais
+//     de second processus élevé.
+//   * un pipe vivant qui rejette le handshake (désaccord d'auth ou de protocole) -> échec
+//     ELEVATION_DENIED, jamais de 2e processus élevé lancé dessus, jamais de boucle.
+//   * pas en marche (la connexion échoue) -> lancer, puis reprendre la tentative jusqu'à ce que
+//     le helper serve ou que l'échéance tombe (HELPER_UNREACHABLE).
+//   * UAC annulée -> Result.Fail(ELEVATION_DECLINED) : propre, jamais une exception ni un crash.
 //
-// Fail-clean: every path returns a Result; the App treats Fail by falling back to
-// the UnavailableElevatedClient (an apply fails clean rather than crashing).
+// Échec propre : chaque chemin rend un Result ; sur un échec, l'App se rabat sur
+// UnavailableElevatedClient (une application échoue proprement au lieu de planter).
 // -----------------------------------------------------------------------
 
-/// <summary>Inputs needed to start the elevated helper: the helper exe, the
-/// trusted App image path (so the helper authorizes only us), and the pipe name.</summary>
+/// <summary>Les entrées pour démarrer le helper élevé : l'exe du helper, le chemin de
+/// l'image de l'App de confiance (le helper n'autorise qu'elle) et le nom du pipe.</summary>
 public readonly record struct HelperLaunchSpec(string HelperExePath, string AppImagePath, string PipeName);
 
-/// <summary>Seam: starts the elevated helper process. Production = interactive
-/// `runas` UAC; the installer era swaps in a service-start launcher.</summary>
+/// <summary>Couture : démarre le processus du helper élevé. En production : UAC `runas`
+/// interactive ; l'ère installeur y met un lanceur par démarrage de service.</summary>
 public interface IHelperProcessLauncher
 {
-    /// <summary>Starts the helper. Result.Ok if the process was launched (the host
-    /// may still be initializing); ELEVATION_DECLINED if the user cancelled UAC.</summary>
+    /// <summary>Démarre le helper. Result.Ok si le processus est lancé (l'hôte peut encore
+    /// s'initialiser) ; ELEVATION_DECLINED si l'utilisateur a annulé l'UAC.</summary>
     Result Launch(HelperLaunchSpec spec);
 }
 
-/// <summary>Outcome of a single COMPLETE connect+handshake attempt against the
-/// helper pipe. This replaces the old bare-connect liveness probe (FIX 1).</summary>
+/// <summary>Issue d'une seule tentative complète connexion+handshake sur le pipe du
+/// helper. Remplace la sonde de vie à connexion nue.</summary>
 public enum HelperAttemptOutcome
 {
-    /// <summary>Connected AND the handshake completed (helper is up and authorized
-    /// us). The negotiated session is discarded — this is only a liveness/reuse
-    /// signal; the real op runs its own handshake.</summary>
+    /// <summary>Connecté et handshake terminé (le helper tourne et nous a autorisés).
+    /// La session négociée est jetée : ce n'est qu'un signal de vie et de réutilisation ;
+    /// la vraie op fait son propre handshake.</summary>
     Connected,
 
-    /// <summary>Could not connect (pipe absent / connect timeout). The helper is not
-    /// serving yet → retryable while it starts up.</summary>
+    /// <summary>Connexion impossible (pipe absent, délai de connexion dépassé). Le helper ne
+    /// sert pas encore → on peut reprendre pendant son démarrage.</summary>
     ConnectFailed,
 
-    /// <summary>Connected but the handshake was REJECTED (caller-auth denied or a
-    /// protocol error). A live but hostile/mismatched peer — TERMINAL, not retryable.</summary>
+    /// <summary>Connecté mais handshake rejeté (auth de l'appelant refusée ou erreur de
+    /// protocole). Un pair vivant mais hostile ou incompatible : définitif, pas de reprise.</summary>
     HandshakeRejected,
 }
 
-/// <summary>Seam: performs ONE complete connect+handshake attempt against the helper
-/// pipe and classifies the outcome. Replaces the bare-connect liveness probe so there
-/// is no truncated, probe-consumed slot. Tests fake it; production = PipeHandshakeAttempt.</summary>
+/// <summary>Couture : fait une seule tentative complète connexion+handshake sur le pipe
+/// du helper et classe l'issue. Remplace la sonde à connexion nue : aucun créneau tronqué,
+/// consommé par une sonde. Les tests la simulent ; en production : PipeHandshakeAttempt.</summary>
 public interface IHelperHandshakeAttempt
 {
     Task<HelperAttemptOutcome> TryHandshakeAsync(HelperLaunchSpec spec, CancellationToken ct);
@@ -89,7 +88,7 @@ public interface IHelperHandshakeAttempt
 [SupportedOSPlatform("windows")]
 public sealed class HelperLauncher
 {
-    /// <summary>The user cancelled the UAC prompt — apply is declined, not broken.</summary>
+    /// <summary>L'utilisateur a annulé l'invite UAC : l'application est refusée, pas cassée.</summary>
     public const string ElevationDeclined = ErrorCodes.ElevationDeclined;
 
     private readonly IHelperProcessLauncher _processLauncher;
@@ -101,9 +100,9 @@ public sealed class HelperLauncher
         _attempt = attempt ?? throw new ArgumentNullException(nameof(attempt));
     }
 
-    /// <summary>Ensures an elevated helper is serving the pipe, launching it (one
-    /// interactive UAC) if needed and retrying the connect+handshake until it comes
-    /// up. Reuse is detected by a successful handshake (FIX 1 — no bare probe).</summary>
+    /// <summary>S'assure qu'un helper élevé sert le pipe : le lance au besoin (une UAC
+    /// interactive) et reprend connexion+handshake jusqu'à ce qu'il réponde. La réutilisation
+    /// se détecte par un handshake réussi (pas de sonde nue).</summary>
     public async Task<Result> EnsureRunningAsync(
         HelperLaunchSpec spec,
         CancellationToken ct,
@@ -113,33 +112,33 @@ public sealed class HelperLauncher
         if (string.IsNullOrWhiteSpace(spec.HelperExePath))
             return Result.Fail(ErrorCodes.IoFailure, "Helper executable path was not provided.");
 
-        // 1. One COMPLETE handshake attempt: is a helper already serving?
+        // 1. Une tentative complète de handshake : un helper sert-il déjà ?
         var first = await _attempt.TryHandshakeAsync(spec, ct).ConfigureAwait(false);
         switch (first)
         {
             case HelperAttemptOutcome.Connected:
-                // Already up and authorizes us → reuse, never spawn a second process.
+                // Déjà en marche et nous autorise → réutiliser, jamais de second processus.
                 return Result.Ok();
             case HelperAttemptOutcome.HandshakeRejected:
-                // A live pipe is up but rejected the handshake. Do not launch a second
-                // elevated process onto it and do not spin — fail clean.
+                // Un pipe vivant a rejeté le handshake. Ne pas lancer de second processus élevé
+                // dessus et ne pas boucler : échec propre.
                 return Result.Fail(ErrorCodes.ElevationDenied,
                     "An elevated helper is serving the pipe but rejected the handshake.");
             case HelperAttemptOutcome.ConnectFailed:
             default:
-                break; // not running → launch below
+                break; // pas en marche → lancement plus bas
         }
 
-        // 2. Launch elevated (interactive UAC). A cancelled prompt comes back as a
-        //    clean ELEVATION_DECLINED from the process-launcher seam.
+        // 2. Lancer en élevé (UAC interactive). Une invite annulée revient de la couture
+        //    du lanceur en ELEVATION_DECLINED propre.
         var launch = _processLauncher.Launch(spec);
         if (!launch.IsOk)
             return launch;
 
-        // 3. The elevated host needs a moment to create its FirstPipeInstance pipe.
-        //    Retry the same complete connect+handshake until it serves or we time out.
-        //    A connect failure → keep retrying (still starting). A handshake REJECTION
-        //    → terminal (the helper is up but won't authorize us — never fixed by waiting).
+        // 3. L'hôte élevé met un instant à créer son pipe FirstPipeInstance.
+        //    Reprendre la même tentative complète connexion+handshake jusqu'à ce qu'il serve ou
+        //    jusqu'à l'échéance. Échec de connexion → reprendre (il démarre encore). Handshake
+        //    rejeté → définitif (le helper tourne mais ne nous autorise pas : attendre n'y change rien).
         var deadline = Environment.TickCount64 + Math.Max(0, postLaunchWaitMs);
         var interval = Math.Max(10, pollIntervalMs);
         while (true)
@@ -151,7 +150,7 @@ public sealed class HelperLauncher
                 return Result.Fail(ErrorCodes.ElevationDenied,
                     "The launched elevated helper rejected the handshake.");
 
-            // ConnectFailed → still coming up. Stop once we hit the deadline.
+            // ConnectFailed → démarre encore. Arrêter à l'échéance.
             if (Environment.TickCount64 >= deadline)
                 return Result.Fail(ErrorCodes.HelperUnreachable,
                     "The elevated helper was launched but did not start serving in time.");
@@ -162,28 +161,28 @@ public sealed class HelperLauncher
 }
 
 // -----------------------------------------------------------------------
-// RunAsProcessLauncher — the real interactive-UAC spawn (the untested live edge).
+// RunAsProcessLauncher : le vrai lancement par UAC interactive (le bord réel non testé).
 //
-// Uses ShellExecute with Verb="runas" so Windows shows the consent dialog. The
-// helper is passed --app-path (the trusted DrDxt.App image, for caller-auth) and
-// --pipe; the session key is not passed here — it is NEGOTIATED over the pipe by
-// the handshake (HandshakeServerCore/HandshakeClientCore), replacing the old
-// env-var pre-share.
+// Utilise ShellExecute avec Verb="runas" pour que Windows affiche la boîte de consentement.
+// Le helper reçoit --app-path (l'image DrDxt.App de confiance, pour l'auth de l'appelant) et
+// --pipe ; la clé de session n'est pas passée ici : elle est négociée sur le pipe par le
+// handshake (HandshakeServerCore/HandshakeClientCore), sans partage préalable par variable
+// d'environnement.
 //
-// Win32Exception with NativeErrorCode 1223 (ERROR_CANCELLED) == the user clicked
-// "No" on UAC -> ELEVATION_DECLINED (clean). Any other failure -> IO_FAILURE.
+// Win32Exception avec NativeErrorCode 1223 (ERROR_CANCELLED) == l'utilisateur a cliqué « Non »
+// sur l'UAC -> ELEVATION_DECLINED (propre). Tout autre échec -> IO_FAILURE.
 //
-// NOTE: this method is the boundary that the unit tests intentionally do not
-// exercise (it shows real UI / elevates). The helperhandshake smoke tool drives
-// it end-to-end live.
+// Note : cette méthode est la frontière que les tests unitaires n'exercent pas exprès (elle
+// affiche une vraie interface et élève). L'outil de smoke test helperhandshake la pilote de
+// bout en bout, en réel.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class RunAsProcessLauncher : IHelperProcessLauncher
 {
-    private const int ErrorCancelled = 1223; // ERROR_CANCELLED — UAC "No".
+    private const int ErrorCancelled = 1223; // ERROR_CANCELLED : « Non » à l'UAC.
     public const string Lanceur = "DrDxt.Lanceur.exe";
 
-    /// <summary>10/10/2026 (revue de sécurité) : l'invite Windows porte le lanceur natif quand il est à côté du helper ;
+    /// <summary>L'invite Windows porte le lanceur natif quand il est à côté du helper ;
     /// il redémarre le helper avec un environnement reconstruit (un processus élevé hérite de HKCU\Environment, où tout
     /// programme du compte peut poser CORECLR_PROFILER_PATH). Sans lanceur (build de développement) : le helper lui-même.</summary>
     internal static (string Fichier, IReadOnlyList<string> Prefixe) Cible(string helperExePath)
@@ -201,14 +200,14 @@ public sealed class RunAsProcessLauncher : IHelperProcessLauncher
         var psi = new ProcessStartInfo
         {
             FileName = fichier,
-            UseShellExecute = true, // REQUIRED for Verb="runas" (UAC): no shell-out of a command string.
+            UseShellExecute = true, // Obligatoire pour Verb="runas" (UAC) : aucune chaîne de commande passée au shell.
             Verb = "runas",
             WindowStyle = ProcessWindowStyle.Hidden,
             WorkingDirectory = Path.GetDirectoryName(spec.HelperExePath) ?? Environment.CurrentDirectory,
         };
-        // Pass identity/config as a typed argument LIST (never a concatenated
-        // command string) — no injection surface. The session key is negotiated
-        // over the pipe, not passed here.
+        // Identité et config passent en liste d'arguments typée (jamais une chaîne de commande
+        // concaténée) : aucune surface d'injection. La clé de session est négociée sur le pipe,
+        // pas passée ici.
         foreach (var a in prefixe) psi.ArgumentList.Add(a);
         psi.ArgumentList.Add($"--app-path={spec.AppImagePath}");
         if (!string.IsNullOrWhiteSpace(spec.PipeName))
@@ -233,19 +232,18 @@ public sealed class RunAsProcessLauncher : IHelperProcessLauncher
 }
 
 // -----------------------------------------------------------------------
-// PipeHandshakeAttempt — the real connect+handshake liveness/reuse probe (FIX 1).
+// PipeHandshakeAttempt : la vraie sonde de vie et de réutilisation par connexion+handshake.
 //
-// One COMPLETE attempt: connect to the named pipe, run the §9.13 client handshake,
-// then immediately drop the negotiated session (this is a liveness signal only —
-// the real op runs its own handshake). Unlike the retired bare-connect probe, the
-// server services this as a normal, complete connection and re-creates its
-// FIRST_PIPE_INSTANCE pipe in the usual accept-loop step — no truncated, half-open
-// slot that races the App's real connect.
+// Une tentative complète : se connecter au pipe nommé, faire le handshake client, puis jeter
+// aussitôt la session négociée (simple signal de vie : la vraie op fait son propre handshake).
+// Contrairement à une sonde à connexion nue, le serveur la sert comme une connexion normale et
+// complète, et recrée son pipe FIRST_PIPE_INSTANCE à l'étape habituelle de la boucle d'acceptation :
+// aucun créneau tronqué, à moitié ouvert, en course avec la vraie connexion de l'App.
 //
-// Outcome mapping:
-//   * connect throws/times out  -> ConnectFailed (helper not serving yet; retry).
-//   * handshake returns a key    -> Connected (up and authorizes us; reuse).
-//   * handshake returns Fail     -> HandshakeRejected (live pipe, denied/garbage).
+// Correspondance des issues :
+//   * la connexion lève ou expire  -> ConnectFailed (le helper ne sert pas encore ; reprendre).
+//   * le handshake rend une clé     -> Connected (tourne et nous autorise ; réutiliser).
+//   * le handshake rend Fail        -> HandshakeRejected (pipe vivant, refus ou déchet).
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class PipeHandshakeAttempt : IHelperHandshakeAttempt
@@ -277,12 +275,12 @@ public sealed class PipeHandshakeAttempt : IHelperHandshakeAttempt
             }
             catch
             {
-                // Not up yet / cannot connect → retryable.
+                // Pas encore en marche, connexion impossible → reprise possible.
                 return HelperAttemptOutcome.ConnectFailed;
             }
 
-            // Connected → run the COMPLETE handshake so the server services a clean
-            // connection (no truncated slot). The negotiated key is then discarded.
+            // Connecté → faire le handshake complet pour que le serveur serve une connexion
+            // propre (pas de créneau tronqué). La clé négociée est ensuite jetée.
             var handshake = await HandshakeClientCore.RunAsync(client, ct).ConfigureAwait(false);
             if (handshake.IsOk && handshake.Value is not null)
             {
@@ -290,7 +288,7 @@ public sealed class PipeHandshakeAttempt : IHelperHandshakeAttempt
                 return HelperAttemptOutcome.Connected;
             }
 
-            // Connected but the helper refused us (auth denied / protocol error) — terminal.
+            // Connecté mais le helper nous a refusés (auth refusée, erreur de protocole) : définitif.
             return HelperAttemptOutcome.HandshakeRejected;
         }
         catch (OperationCanceledException)
@@ -299,14 +297,14 @@ public sealed class PipeHandshakeAttempt : IHelperHandshakeAttempt
         }
         catch
         {
-            // Any other transport fault on an already-connected pipe → treat as a
-            // rejection (a live but unusable peer), fail-closed and don't spin.
+            // Toute autre panne de transport sur un pipe déjà connecté → traitée comme un rejet
+            // (pair vivant mais inutilisable) : refus au moindre doute (fail-closed), sans boucle.
             return HelperAttemptOutcome.HandshakeRejected;
         }
         finally
         {
             if (sessionKey is not null)
-                Array.Clear(sessionKey); // the liveness session dies immediately
+                Array.Clear(sessionKey); // la session de vie meurt aussitôt
             client?.Dispose();
         }
     }

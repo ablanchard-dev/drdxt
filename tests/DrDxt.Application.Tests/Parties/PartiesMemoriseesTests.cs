@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 29/09/2026 (A3, 3/3) : le choix et les parties survivent à la fermeture de DrDXT ; un fichier abîmé n'invente rien.
+// Le choix et les parties survivent à la fermeture de DrDXT ; un fichier abîmé n'invente rien.
 public sealed class PartiesMemoriseesTests : IDisposable
 {
     private readonly string _dossier = Directory.CreateTempSubdirectory("drdxt-parties-").FullName;
@@ -16,7 +16,7 @@ public sealed class PartiesMemoriseesTests : IDisposable
     [Fact]
     public void Le_choix_et_les_parties_se_relisent()
     {
-        // 06/10/2026 (chantier J1) : le relevé est le juge de tout gain ; éteint par défaut, il a relevé 1 partie
+        // Le relevé est le juge de tout gain ; éteint par défaut, il a relevé 1 partie
         // en un mois. Allumé par défaut (données locales seulement), éteint seulement par le choix du joueur.
         Memoire().EstAllume().Should().BeTrue("rien d'enregistré : allumé par défaut");
         Memoire().Eteindre();
@@ -43,7 +43,7 @@ public sealed class PartiesMemoriseesTests : IDisposable
         // Un choix illisible n'est pas un « éteint » du joueur : le défaut (allumé) s'applique.
         Memoire().EstAllume().Should().BeTrue();
     }
-    // 07/10/2026 (revue F-10) : la dernière capture ratée se relit d'un lancement à l'autre (le relevé de fond
+    // La dernière capture ratée se relit d'un lancement à l'autre (le relevé de fond
     // n'a pas de fenêtre, l'App la dit à la prochaine ouverture) ; rien d'écrit ou un fichier abîmé ne disent rien.
     [Fact]
     public void La_derniere_capture_ratee_se_relit()

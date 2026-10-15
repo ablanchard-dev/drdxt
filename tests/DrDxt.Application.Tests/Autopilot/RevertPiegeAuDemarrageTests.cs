@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Application.Tests.Autopilot;
 
 /// <summary>
-/// 25/09/2026 (revue de sécurité) — pending-revert.json vit sous %LOCALAPPDATA%, écrivable par tout
+/// Pending-revert.json vit sous %LOCALAPPDATA%, écrivable par tout
 /// processus du compte, et son contenu est rejoué par le helper élevé au démarrage. Un fichier piégé ne
 /// doit jamais atteindre le levier.
 /// </summary>
@@ -49,7 +49,7 @@ public sealed class RevertPiegeAuDemarrageTests : IDisposable
         return (RevertAuDemarrage.Executer(new FichierRevertEnAttente(Fichier), new Catalogue(levier)), levier, journal);
     }
 
-    // 26/09/2026 : le demarrage ne doit jamais tomber sur un fichier abime, et un fichier abime ne doit
+    // Le demarrage ne doit jamais tomber sur un fichier abime, et un fichier abime ne doit
     // jamais atteindre le levier. Contenus bruts ecrits a la place du journal, exceptions comprises.
     public static TheoryData<string> Abimes() => new()
     {
@@ -79,7 +79,7 @@ public sealed class RevertPiegeAuDemarrageTests : IDisposable
         levier.Rendus.Should().Be(0);
     }
 
-    // 26/09/2026 : deux cas que des mutations laissaient verts. Le plus grave : si la barrière acceptait un
+    // Deux cas que des mutations laissaient verts. Le plus grave : si la barrière acceptait un
     // composite dès qu'UN de ses ops est une remise en état, un fichier piégé cacherait un redémarrage dans le
     // BIOS derrière une écriture de registre légitime.
     private static readonly SetRegistryValueOp EcritureLegitime = new(
@@ -124,7 +124,7 @@ public sealed class RevertPiegeAuDemarrageTests : IDisposable
     public void Un_contenu_illisible_est_refuse()
         => RevertAuDemarrage.InverseRejouable("latency.hagsOn", "{ pas un op").Should().BeFalse();
 
-    // 26/09/2026 : la barrière ne regardait que le TYPE. Un fichier qui nomme le levier HAGS (registre) et
+    // La barrière ne regardait que le TYPE. Un fichier qui nomme le levier HAGS (registre) et
     // porte une limite de puissance GPU faisait écrire le GPU par le helper au lancement, sans clic.
     [Fact]
     public void Une_ecriture_GPU_rangee_sous_un_levier_de_registre_n_atteint_jamais_le_levier()
@@ -144,7 +144,7 @@ public sealed class RevertPiegeAuDemarrageTests : IDisposable
         => RevertAuDemarrage.InverseRejouable(id, PrivilegedOpCodec.Serialize(new ApplyNvApiPowerLimitOp(0, 80)).Value!)
             .Should().Be(permis);
 
-    // 26/09/2026 : le type seul laissait un levier de registre rejouer n'importe quelle feuille permise. Un
+    // Le type seul laissait un levier de registre rejouer n'importe quelle feuille permise. Un
     // fichier nommant HAGS et portant « PagingFiles vide » désactivait le fichier d'échange au lancement.
     private const string MemoryManagement = @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
 
@@ -226,7 +226,7 @@ public sealed class RevertPiegeAuDemarrageTests : IDisposable
         // refuserait son inverse. Exceptions relevées dans le code le 26/09/2026 :
         //   gpu.core_offset : aucun levier ne porte cet identifiant ;
         //   (gpu.fan_curve en est sorti le 08/10/2026 : son inverse est RestoreGpuFanAutoOp, le mode Expert ;)
-        //   fixit.ecran_frequence (07/10/2026) : jamais un essai automatique (AutoReglage) ; le mode n'est enregistré
+        //   fixit.ecran_frequence : jamais un essai automatique (AutoReglage) ; le mode n'est enregistré
         //   qu'après confirmation du joueur, et avant, un changement dynamique ne survit pas à la session.
         string[] sansRejeu = ["gpu.core_offset", "fixit.ecran_frequence"];
         CatalogueDeCandidats.Decrire("fixit.ecran_frequence")!.Kind.Should().Be(CandidateKind.AutoReglage);

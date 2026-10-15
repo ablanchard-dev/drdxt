@@ -5,9 +5,9 @@ using FluentAssertions;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// LoggingReconcilerNotifier — the host IReconcilerNotifier. A UserIntentional/Unknown
-// drift is NOTIFIED (logged), never overwritten (I5). i18n: the message comes from a
-// resx KEY via ILocalizer (no hardcoded UI string), with the tweak id as the argument.
+// LoggingReconcilerNotifier : l'IReconcilerNotifier de l'hôte. Une dérive UserIntentional ou
+// Unknown est notifiée (journalisée), jamais écrasée. i18n : le message vient d'une clé
+// resx via ILocalizer (aucune chaîne d'interface en dur), avec l'identifiant du levier en argument.
 // -----------------------------------------------------------------------
 public sealed class LoggingReconcilerNotifierTests
 {
@@ -41,8 +41,8 @@ public sealed class LoggingReconcilerNotifierTests
             "the notification text comes from a resx key, never a hardcoded string");
     }
 
-    /// <summary>A localizer that records requested keys and echoes the key (the resx
-    /// fallback contract) so the test never depends on satellite assemblies.</summary>
+    /// <summary>Localisateur qui enregistre les clés demandées et renvoie la clé (le contrat de
+    /// repli resx) pour que le test ne dépende jamais des assemblys satellites.</summary>
     private sealed class FakeLocalizer : ILocalizer
     {
         public List<string> RequestedKeys { get; } = new();

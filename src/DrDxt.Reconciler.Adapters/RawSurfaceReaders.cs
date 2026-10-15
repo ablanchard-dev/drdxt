@@ -7,32 +7,32 @@ using Microsoft.Win32;
 namespace DrDxt.Reconciler.Adapters;
 
 // -----------------------------------------------------------------------
-// The three RAW OS read seams behind SurfaceSettingProbe, plus their thin real
-// implementations. The probe's dispatch + canonical serialization are unit-tested
-// against fakes of these seams; the real readers below are the only untested edges
-// (each just touches one OS boundary and wraps any throw in a Result).
+// Les trois coutures de lecture OS brutes derrière SurfaceSettingProbe, avec leurs vraies
+// implémentations minces. L'aiguillage et la sérialisation canonique de la sonde sont testés
+// avec des faux de ces coutures ; les vrais lecteurs ci-dessous sont les seuls bords non testés
+// (chacun touche une seule frontière OS et emballe toute exception dans un Result).
 //
-// Each reader returns the value already CANONICALIZED (via
-// ReconcilableValueCanonicalizer) so the probe never has to know the surface's raw
-// representation — and the value byte-matches the manifest's DesiredValueJson.
+// Chaque lecteur rend la valeur déjà canonicalisée (via ReconcilableValueCanonicalizer) : la
+// sonde n'a jamais à connaître la représentation brute de la surface, et la valeur correspond à
+// l'octet près au DesiredValueJson du manifeste.
 // -----------------------------------------------------------------------
 
-/// <summary>Reads ONE registry value described by a <see cref="RegistryDescriptor"/>
-/// and returns its canonical string. Missing key/value or read error → Fail.</summary>
+/// <summary>Lit une seule valeur de registre décrite par un <see cref="RegistryDescriptor"/> et
+/// rend sa chaîne canonique. Clé ou valeur absente, ou erreur de lecture → Fail.</summary>
 internal interface IRawRegistryValueReader
 {
     Result<string> ReadCanonical(RegistryDescriptor descriptor);
 }
 
-/// <summary>Reads the active power scheme GUID and returns it canonicalized. Read
-/// error → Fail.</summary>
+/// <summary>Lit le GUID du plan d'alimentation actif et le rend canonicalisé. Erreur de
+/// lecture → Fail.</summary>
 internal interface IRawPowerPlanReader
 {
     Result<string> ReadActiveSchemeCanonical();
 }
 
-/// <summary>Reads a named service's run state and returns the canonical token. A
-/// not-installed service is a VALID state ("notinstalled"); a genuine query error →
+/// <summary>Lit l'état de marche d'un service nommé et rend le jeton canonique. Un service non
+/// installé est un état valide (« notinstalled ») ; une vraie erreur de requête →
 /// Fail.</summary>
 internal interface IRawServiceStateReader
 {
@@ -40,12 +40,12 @@ internal interface IRawServiceStateReader
 }
 
 // -----------------------------------------------------------------------
-// Real implementations (untested edges).
+// Vraies implémentations (bords non testés).
 // -----------------------------------------------------------------------
 
-/// <summary>The thin real registry value reader. Opens the hive sub-key read-only,
-/// reads the named value, and canonicalizes it per the descriptor's kind. A missing
-/// key/value or any boundary throw → Fail(RegistryFail).</summary>
+/// <summary>Le vrai lecteur mince de valeur de registre. Ouvre la sous-clé de la ruche en
+/// lecture seule, lit la valeur nommée et la canonicalise selon le type du descripteur. Clé ou
+/// valeur absente, ou toute exception à la frontière → Fail(RegistryFail).</summary>
 internal sealed class Win32RegistryValueReader : IRawRegistryValueReader
 {
     public Result<string> ReadCanonical(RegistryDescriptor descriptor)
@@ -120,8 +120,8 @@ internal sealed class Win32RegistryValueReader : IRawRegistryValueReader
     }
 }
 
-/// <summary>The active-power-plan reader : the native call lives in PlanActif (Core).
-/// Any non-zero return / boundary throw → Fail(PowerFail).</summary>
+/// <summary>Le lecteur du plan d'alimentation actif : l'appel natif vit dans PlanActif (Core).
+/// Tout retour non nul / toute exception à la frontière → Fail(PowerFail).</summary>
 internal sealed class PInvokePowerPlanReader : IRawPowerPlanReader
 {
     public Result<string> ReadActiveSchemeCanonical()
@@ -133,9 +133,9 @@ internal sealed class PInvokePowerPlanReader : IRawPowerPlanReader
     }
 }
 
-/// <summary>The thin real service-state reader via System.ServiceProcess. A service
-/// that is not installed → "notinstalled" (a valid state, not an error). Any other
-/// boundary throw → Fail(IoFailure).</summary>
+/// <summary>Le vrai lecteur mince d'état de service via System.ServiceProcess. Un service non
+/// installé → « notinstalled » (un état valide, pas une erreur). Toute autre exception à la
+/// frontière → Fail(IoFailure).</summary>
 internal sealed class ServiceControllerStateReader : IRawServiceStateReader
 {
     public Result<string> ReadStateCanonical(string serviceName)
@@ -143,7 +143,7 @@ internal sealed class ServiceControllerStateReader : IRawServiceStateReader
         try
         {
             using var controller = new ServiceController(serviceName);
-            var status = controller.Status; // throws if the service is not installed
+            var status = controller.Status; // lève si le service n'est pas installé
             var state = status switch
             {
                 ServiceControllerStatus.Running
@@ -155,7 +155,7 @@ internal sealed class ServiceControllerStateReader : IRawServiceStateReader
         }
         catch (InvalidOperationException)
         {
-            // Not installed — a valid, comparable state, not a probe failure.
+            // Non installé : un état valide et comparable, pas un échec de sonde.
             return Result<string>.Ok(
                 ReconcilableValueCanonicalizer.Service(ServiceRunState.NotInstalled));
         }

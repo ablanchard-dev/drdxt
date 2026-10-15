@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>UI1 (08/10/2026, vu sur capture de la page Windows) : un réglage défait depuis portait son identifiant
+/// <summary>Un réglage défait depuis portait son identifiant
 /// (« Latency.vrrFlipModelOn ») pour titre ; il porte le nom que DrDXT lui donne partout ailleurs.</summary>
 public sealed class TitreDUnReglageDefaitTests
 {

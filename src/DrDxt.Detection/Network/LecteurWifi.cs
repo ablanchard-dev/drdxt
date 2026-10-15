@@ -4,7 +4,7 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Network;
 
 /// <summary>
-/// NET1 (08/10/2026) : la qualité de la connexion Wi-Fi, lue sans la localisation. Microsoft Learn (« Changes to API behavior
+/// La qualité de la connexion Wi-Fi, lue sans la localisation. Microsoft Learn (« Changes to API behavior
 /// for Wi-Fi access and location ») soumet à l'accord de localisation WlanQueryInterface avec current_connection, la liste
 /// des réseaux et le scan ; DrDXT n'appelle aucun des trois. Il lit wlan_intf_opcode_realtime_connection_quality (19) et
 /// wlan_intf_opcode_channel_number (8), dans l'ordre de l'énumération de wlanapi.h (SDK 10.0.26100). Lecture seule ;
@@ -49,7 +49,7 @@ public static class LecteurWifi
         IntPtr qualite = IntPtr.Zero, canal = IntPtr.Zero;
         try
         {
-            // Revue n° 13 : un bloc plus court que la structure connue n'est pas lu (pas de lecture hors tampon).
+            // Un bloc plus court que la structure connue n'est pas lu (pas de lecture hors tampon).
             if (WlanQueryInterface(handle, ref guid, OpcodeQualiteTempsReel, IntPtr.Zero, out var taille, out qualite, IntPtr.Zero) != 0
                 || qualite == IntPtr.Zero || taille < Marshal.SizeOf<QualiteTempsReel>())
                 return null;

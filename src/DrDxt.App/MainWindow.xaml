@@ -39,7 +39,7 @@
 
                     <Grid Grid.Row="0">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0">
-                            <!-- 06/10/2026 (maquette « 20h32 ») : la marque en chrome poli, penchée vers l'avant. -->
+                            <!-- La marque en chrome poli, penchée vers l'avant. -->
                             <TextBlock FontFamily="{StaticResource MarqueFont}" FontSize="20" VerticalAlignment="Center"
                                        Foreground="{StaticResource ChromeTexteBrush}" Text="DrDXT">
                                 <TextBlock.RenderTransform><SkewTransform AngleX="-12"/></TextBlock.RenderTransform>

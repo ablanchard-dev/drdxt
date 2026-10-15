@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. DrDXT anime : du chrome qui coule, un reseau qui respire. La regle
+// DrDXT anime : du chrome qui coule, un reseau qui respire. La regle
 // est ecrite en tete d'App.xaml : « Tout ce qui bouge obeit a
 // Effets/MoteurDAnimation : la fenetre doit etre au premier plan. Pendant une
 // mesure en jeu, c'est le jeu qui l'est, et l'interface ne coute rien. »
@@ -102,7 +102,7 @@ public sealed class RienNeBougeHorsDuPremierPlanTests
         DrDxt.App.Effets.MoteurDAnimation.Decider(true, false, false).Should().BeFalse("animations coupees par Windows");
     }
 
-    // 29/09/2026 : sur ma machine, les animations de Windows sont coupées (un réglage d'optimisation courant) ; tout
+    // Sur ma machine, les animations de Windows sont coupées (un réglage d'optimisation courant) ; tout
     // DrDXT était figé et il ne voyait « rien bouger ». Le joueur peut animer DrDXT malgré Windows ; le premier
     // plan et la fenêtre réduite restent des portes fermées, c'est ce qui protège la mesure en jeu.
     [Fact]
@@ -113,7 +113,7 @@ public sealed class RienNeBougeHorsDuPremierPlanTests
         DrDxt.App.Effets.MoteurDAnimation.Decider(true, true, false, animerMalgreWindows: true).Should().BeFalse("fenetre reduite");
     }
 
-    // 02/10/2026 : animations de Windows coupées sur ma machine, l'anneau du scan figé, « ça fait buggé ». L'anneau
+    // Animations de Windows coupées sur ma machine, l'anneau du scan figé, « ça fait buggé ». L'anneau
     // est un indicateur de travail : il tourne malgré Windows (les portes premier plan / réduite restent dans Reevaluer).
     [Fact]
     public void L_anneau_du_scan_est_un_indicateur_et_tourne_malgre_Windows()

@@ -3,7 +3,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 26/09/2026 : trois copies de la table de Student affirmaient chacune qu'il n'y en avait qu'une, et
+/// Trois copies de la table de Student affirmaient chacune qu'il n'y en avait qu'une, et
 /// divergeaient. La table vit dans `DrDxt.Core.Student` ; sa premiere valeur ne doit apparaitre nulle
 /// part ailleurs dans `src/`.
 /// </summary>

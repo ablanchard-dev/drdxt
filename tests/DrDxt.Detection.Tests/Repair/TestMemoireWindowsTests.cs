@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// 17/09/2026 : le test memoire est le geste qui tranche les arrets brutaux (conseil JEDEC), et le
+/// Le test memoire est le geste qui tranche les arrets brutaux (conseil JEDEC), et le
 /// produit ne savait pas s'il avait ete fait. Il lit maintenant le journal du Diagnostic de memoire
 /// Windows. Les sources se contredisent sur le sens des numeros d'evenements : le produit ne juge donc
 /// pas le resultat, il rend la date et la phrase exacte de Windows, et dit « jamais lance » quand le
@@ -60,12 +60,13 @@ public class TestMemoireWindowsTests
     [Fact]
     public void Jamais_lance_avec_des_arrets_repetes_arrive_dans_ce_qui_merite_l_attention()
     {
-        // 17/09/2026 : rangee en « verifie », la ligne etait comptee mais jamais affichee. Avec des
+        // Rangee en « verifie », la ligne etait comptee mais jamais affichee. Avec des
         // arrets brutaux qui se repetent, c'est le geste qui tranche : il doit se voir.
         var c = ConstatAvecArrets(10, Result<IReadOnlyList<ResultatTestMemoire>>.Ok([]));
 
         RepairTriage.Trier([c]).Attention.Should().ContainSingle();
-        c.Explication.Should().Contain("10 arrêts brutaux");
+        c.Explication.Should().Contain("10 arrêts brutaux").And.NotContain("mdsched", "le geste a sa place à part");
+        c.Remede.Should().Contain("1)").And.Contain("mdsched.exe").And.Contain("Redémarrer maintenant");
     }
 
     [Fact]

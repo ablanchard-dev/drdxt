@@ -12,8 +12,8 @@ public class PresentMonSessionCaptureTests
     private const nint Session = 1;
     private const nint Query = 2;
 
-    // Deterministic clock: each read of Elapsed advances time by a big step, so any
-    // duration-bounded loop terminates within a couple of iterations without sleeping.
+    // Horloge déterministe : chaque lecture d'Elapsed avance le temps d'un grand pas, pour que toute
+    // boucle bornée par une durée s'arrête en deux ou trois itérations sans dormir.
     private sealed class FakeClock : IMonotonicClock
     {
         private long _ms;
@@ -24,8 +24,8 @@ public class PresentMonSessionCaptureTests
         public void Restart() => _ms = 0;
     }
 
-    // Configures a fake api whose ConsumeFrames yields exactly the given frametimes on the
-    // first poll, then 0 frames thereafter. Frametime is at dataOffset 0, latency at offset 8.
+    // Configure une fausse API dont ConsumeFrames rend exactement les temps d'image donnés au
+    // premier appel, puis 0 image ensuite. Le temps d'image est à dataOffset 0, la latence à l'offset 8.
     private static IPresentMonApi ApiYielding(double[] frametimes, uint blobSize = 24,
         ulong frametimeOffset = 0, ulong latencyOffset = 8, double[]? latencies = null,
         ulong gpuBusyOffset = 16, double[]? gpuBusy = null, int[]? presentModes = null, ulong presentModeSize = 0,
@@ -37,13 +37,13 @@ public class PresentMonSessionCaptureTests
         api.RegisterFrameQuery(Session, Arg.Any<PM_QUERY_ELEMENT[]>(), out Arg.Any<nint>(), out Arg.Any<uint>())
             .Returns(c =>
             {
-                // Fill dataOffset on the elements like the native call would.
+                // Remplir dataOffset sur les éléments comme le ferait l'appel natif.
                 var elements = (PM_QUERY_ELEMENT[])c[1];
                 if (elements.Length > 0) elements[0].dataOffset = frametimeOffset;
                 if (elements.Length > 1) elements[1].dataOffset = latencyOffset;
                 if (elements.Length > 2) elements[2].dataOffset = gpuBusyOffset;
                 if (elements.Length > 7) { elements[7].dataOffset = 24; elements[7].dataSize = presentModeSize; }
-                // B4 : la latence d'affichage n'est livrée (taille 8) que si le test la donne.
+                // La latence d'affichage n'est livrée (taille 8) que si le test la donne.
                 if (elements.Length > 9 && displayLatencies is not null) { elements[9].dataOffset = displayLatencyOffset; elements[9].dataSize = 8; }
                 c[2] = Query;
                 c[3] = blobSize;
@@ -99,7 +99,7 @@ public class PresentMonSessionCaptureTests
     [Fact]
     public async Task Capture_reads_frametime_at_the_registered_offset_not_zero()
     {
-        // frametime lives at offset 8 this time — proves we honor the registered dataOffset.
+        // le temps d'image est à l'offset 8 cette fois : preuve qu'on honore le dataOffset enregistré.
         var api = ApiYielding(new[] { 12.5, 13.0 }, blobSize: 16, frametimeOffset: 8, latencyOffset: 0);
         var r = await Sut(api).CaptureAsync(42, TimeSpan.FromMilliseconds(30), default);
 
@@ -110,8 +110,8 @@ public class PresentMonSessionCaptureTests
     [Fact]
     public async Task Capture_decodes_render_present_latency_at_the_registered_offset()
     {
-        // The query's 2nd element (RENDER_PRESENT_LATENCY) lands at offset 8; the service writes
-        // it there per frame. We decode it as a parallel per-frame series alongside the frametimes.
+        // Le 2e élément de la requête (RENDER_PRESENT_LATENCY) atterrit à l'offset 8 ; le service l'y écrit
+        // pour chaque image. On le décode comme une série par image parallèle aux temps d'image.
         var api = ApiYielding(new[] { 8.3, 8.4 }, latencies: new[] { 3.1, 3.5 });
         var r = await Sut(api).CaptureAsync(42, TimeSpan.FromMilliseconds(30), default);
 
@@ -120,7 +120,7 @@ public class PresentMonSessionCaptureTests
         r.Value.RenderPresentLatencyMs.Should().BeEquivalentTo(new[] { 3.1, 3.5 });
     }
 
-    // B4 (10/10/2026) : la latence d'affichage, lue à son décalage et à la taille annoncée ; non annoncée = null, jamais zéro.
+    // La latence d'affichage, lue à son décalage et à la taille annoncée ; non annoncée = null, jamais zéro.
     [Fact]
     public async Task Capture_decodes_display_latency_at_the_registered_offset_and_null_when_not_delivered()
     {
@@ -138,7 +138,7 @@ public class PresentMonSessionCaptureTests
     [Fact]
     public async Task Capture_decodes_gpu_busy_at_the_registered_offset()
     {
-        // The query's 3rd element (GPU_BUSY) lands at offset 16; decode it as a parallel series.
+        // Le 3e élément de la requête (GPU_BUSY) atterrit à l'offset 16 ; le décoder comme une série parallèle.
         var api = ApiYielding(new[] { 8.3, 8.4 }, gpuBusy: new[] { 7.0, 7.5 });
         var r = await Sut(api).CaptureAsync(42, TimeSpan.FromMilliseconds(30), default);
 
@@ -149,7 +149,7 @@ public class PresentMonSessionCaptureTests
     [Fact]
     public async Task Capture_decodes_present_mode_at_the_size_the_service_announces()
     {
-        // 3 = independent flip, 4 = composed flip (PM_PRESENT_MODE, PresentMon 2.5.1).
+        // 3 = retournement indépendant, 4 = retournement composé (PM_PRESENT_MODE, PresentMon 2.5.1).
         var api = ApiYielding(new[] { 8.3, 8.4, 8.5 }, blobSize: 28, presentModes: new[] { 3, 4, 3 }, presentModeSize: 4);
         var r = await Sut(api).CaptureAsync(42, TimeSpan.FromMilliseconds(30), default);
 
@@ -256,7 +256,7 @@ public class PresentMonSessionCaptureTests
     {
         var api = ApiYielding(new[] { 8.3 });
         api.ConsumeFrames(Query, Pid, Arg.Any<byte[]>(), Arg.Any<uint>(), out Arg.Any<uint>())
-            .Returns(_ => throw new InvalidOperationException("boom")); // simulate a native/marshalling fault
+            .Returns(_ => throw new InvalidOperationException("boom")); // simuler une faute native ou de marshalling
         var r = await Sut(api).CaptureAsync(42, TimeSpan.FromMilliseconds(10), default);
 
         r.Error!.Value.Code.Should().Be(ErrorCodes.CaptureFail);
@@ -312,7 +312,7 @@ public class PresentMonSessionCaptureTests
         r.IsOk.Should().BeTrue();
         r.Value.Should().BeFalse();
     }
-    // 07/10/2026 (J3) : le service PresentMon est partagé ; un autre client qui suit déjà le jeu laisse un arriéré que
+    // Le service PresentMon est partagé ; un autre client qui suit déjà le jeu laisse un arriéré que
     // notre premier pmConsumeFrames rend tout de suite (mesuré le 06/10 : 9,9 s d'images pour 6 s de capture). Les images
     // démarrées avant le début du suivi (instant QPC de chaque image) ne comptent pas.
     [Fact]
@@ -358,7 +358,7 @@ public class PresentMonSessionCaptureTests
         r.Value!.FrameTimesMs.Should().Equal(8.3, 8.4);
     }
 
-    // 07/10/2026 (J3) : le service livre les images avec 1 à 2 s de retard ; mesurée sur l'horloge de DrDXT, une capture de
+    // Le service livre les images avec 1 à 2 s de retard ; mesurée sur l'horloge de DrDXT, une capture de
     // 6 s n'en gardait que 4,2. Sur les instants des images : la fenêtre va de la première image gardée à + durée, et la
     // première image au-delà la ferme. Ici 1 000 unités QPC par seconde, 30 ms = 30 unités : 100, 110, 120 comptent, 135 non.
     [Fact]
@@ -401,7 +401,7 @@ public class PresentMonSessionCaptureTests
 
         r.Value!.FrameTimesMs.Should().Equal(10.0, 10.1, 10.2);
     }
-    // Revue F-34 : un arriéré seul (aucune image d'après le suivi) n'est pas « aucune image » muet : le message dit
+    // Un arriéré seul (aucune image d'après le suivi) n'est pas « aucune image » muet : le message dit
     // combien d'images ont été écartées et pourquoi, pour qu'une horloge qui ne coïncide pas se voie.
     [Fact]
     public async Task Un_arriere_seul_se_dit_dans_l_echec()

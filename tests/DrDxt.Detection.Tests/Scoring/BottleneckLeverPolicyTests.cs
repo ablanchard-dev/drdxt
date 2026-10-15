@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Scoring;
 
 // -----------------------------------------------------------------------
-// L1.3 — la mesure decide ce qu'on a le droit de PROMETTRE.
+// La mesure decide ce qu'on a le droit de PROMETTRE.
 //
 // La ligne a ne jamais franchir, et que ces tests gardent : une suppression retire la promesse de
 // gain, jamais le constat ni la penalite. XMP desactive reste XMP desactive sur une machine

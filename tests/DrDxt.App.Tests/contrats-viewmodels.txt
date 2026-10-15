@@ -79,71 +79,6 @@ ComponentItem
   IconKey : String
   Label : String
   Value : String
-DashboardViewModel
-  AfterFrameTimes : ObservableCollection<Double>
-  AppliedChanges : ObservableCollection<TweakChangeItem>
-  AppliedTweakIds : ObservableCollection<String>
-  AvgFpsAfter : Double
-  AvgFpsBefore : Double
-  AvgFpsLabelKey : String
-  BackToScanActionKey : String
-  BackToScanCommand : IRelayCommand
-  BadgeTextKey : String
-  BeforeFrameTimes : ObservableCollection<Double>
-  BottleneckCaveatKey : String
-  CanRevert : Boolean
-  ChangesAppliedTitleKey : String
-  ChangesNoneKey : String
-  ChangesRevertedTitleKey : String
-  ChangesTitleKey : String
-  EchelleBasTexte : String
-  EchelleHautTexte : String
-  EstimatedPcLatencyAfterMs : Nullable<Double>
-  EstimatedPcLatencyBeforeMs : Nullable<Double>
-  FrametimeChartCaptionKey : String
-  FrametimeChartTitleKey : String
-  GpuBusyLabelKey : String
-  GpuBusyMesure : Boolean
-  GpuBusyPercentAfter : Nullable<Double>
-  GpuBusyPercentBefore : Nullable<Double>
-  GpuNonMesureTexte : String
-  HasReverted : Boolean
-  HeadlineKey : String
-  LabelFooterVersion : String
-  LatencyLabelKey : String
-  LatencyTitleKey : String
-  LectureFps : String
-  LectureGpu : String
-  LectureGraphique : String
-  LectureLatence : String
-  LectureLow : String
-  LowsTitleKey : String
-  MargeFpsTexte : String
-  MargeLow01Texte : String
-  MargeLowTexte : String
-  MarginOfError : Double
-  MarginOfErrorLow : Double
-  MarginOfErrorLow01 : Double
-  NoteDuGain : String
-  P01LowAfter : Double
-  P01LowBefore : Double
-  P01LowLabelKey : String
-  P1LowAfter : Double
-  P1LowBefore : Double
-  P1LowLabelKey : String
-  ResolutionNote : String
-  RevertAllActionKey : String
-  RevertCommand : IAsyncRelayCommand
-  RevertErrorMessage : String
-  RevertHintKey : String
-  RevertedChanges : ObservableCollection<TweakChangeItem>
-  RevertedTweakIds : ObservableCollection<String>
-  SeriesAfterKey : String
-  SeriesBeforeKey : String
-  ShowBottleneckCaveat : Boolean
-  ShowGainBadge : Boolean
-  SubtitleKey : String
-  VerdictKey : String
 DomaineMachine
   ADesLeviers : Boolean
   ADesLignes : Boolean
@@ -179,7 +114,9 @@ DomaineMachine
   Verdict : String
 EntreeCarte
   ACommande : Boolean
+  ACommentCorriger : Boolean
   ADetailSuite : Boolean
+  AGestes : Boolean
   ARemede : Boolean
   Action : String
   ActionAAfficher : String
@@ -189,10 +126,12 @@ EntreeCarte
   DetailCourt : String
   DetailSuite : String
   Domaine : String
+  Gestes : IReadOnlyList<GesteDuDocteur>
   Gravite : Severity
   NonLu : Boolean
   Propose : Boolean
   Remede : String
+  RemedeDuConstat : String
   RemedeLisible : String
   ReserveDeValidation : String
   Titre : String
@@ -211,6 +150,16 @@ FindingViewModel
   GainLabel : String
   Severity : Severity
   Title : String
+GesteDuDocteur
+  AEchoue : Boolean
+  AnnulerCommand : IAsyncRelayCommand
+  Detail : String
+  EnCours : Boolean
+  FaireCommand : IAsyncRelayCommand
+  Fait : Boolean
+  PeutAnnuler : Boolean
+  PeutFaire : Boolean
+  Titre : String
 LigneEnAttente
   Changement : String
   Date : String
@@ -247,6 +196,7 @@ PointAFaire
   Entree : EntreeCarte
 RepairFindingViewModel
   ActionLabel : String
+  Cible : String
   Constat : Constat
   Domaine : String
   DomaineCle : String
@@ -255,6 +205,7 @@ RepairFindingViewModel
   Nom : String
   NomCle : String
   Provenance : String
+  Remede : String
   Severity : Severity
   Statut : String
   StatutLabel : String
@@ -288,7 +239,9 @@ ScanViewModel
   ApplyHint : String
   ApplyHintKey : String
   ArreterEssaiCommand : IAsyncRelayCommand
+  ArreterRechercheSousTensionCommand : IRelayCommand
   ArreterTestMemoireCommand : IRelayCommand
+  ArreterTestRefroidissementCommand : IRelayCommand
   AssistantSummary : String
   AttenteDuJeu : Boolean
   AttenteDuJeuSession : Boolean
@@ -349,6 +302,8 @@ ScanViewModel
   EssaiEnCours : Boolean
   EssaiProposable : Boolean
   EssayerEnAlternanceCommand : IAsyncRelayCommand
+  EtapeHorsListe : String
+  EtapeSousTension : String
   EtatReparation : String
   ExpertAccord : Boolean
   ExpertDecalageMhz : Int32
@@ -413,6 +368,8 @@ ScanViewModel
   LabelBiosOptional : String
   LabelBiosRecoveryHeader : String
   LabelBiosReturnHeader : String
+  LabelCadreALaMain : String
+  LabelCadreReversible : String
   LabelCalmerBascule : String
   LabelCalmerDescription : String
   LabelCalmerDescriptionCourte : String
@@ -423,7 +380,9 @@ ScanViewModel
   LabelCapsuleRemesureMemoire : String
   LabelCapsuleReparation : String
   LabelCapsuleReposCarte : String
+  LabelCapsuleSousTension : String
   LabelCapsuleTestMemoire : String
+  LabelCapsuleTestRefroidissement : String
   LabelCarteAgir : String
   LabelCarteConstats : String
   LabelCarteLeviers : String
@@ -433,6 +392,7 @@ ScanViewModel
   LabelCarteTitre : String
   LabelCarteVide : String
   LabelCommentCaMarche : String
+  LabelCommentCorriger : String
   LabelConsigneScene : String
   LabelCopierCommande : String
   LabelCoverageCaption : String
@@ -459,6 +419,9 @@ ScanViewModel
   LabelFindings : String
   LabelFooterUpdates : String
   LabelFooterVersion : String
+  LabelGesteAnnuler : String
+  LabelGesteEchec : String
+  LabelGesteFait : String
   LabelGuide : String
   LabelHeaderTagline : String
   LabelHistoriqueDescription : String
@@ -491,6 +454,7 @@ ScanViewModel
   LabelPingEtat : String
   LabelPingIndisponible : String
   LabelPingTitre : String
+  LabelPlusDOptions : String
   LabelPourquoi : String
   LabelPretAJouer : String
   LabelProductPromise : String
@@ -526,7 +490,6 @@ ScanViewModel
   LabelReposCarteMaintenir : String
   LabelReposCarteTitre : String
   LabelRescan : String
-  LabelResultHeadlineLead : String
   LabelRienAPoserSeul : String
   LabelScanButton : String
   LabelScanDone : String
@@ -535,12 +498,27 @@ ScanViewModel
   LabelSceneDescription : String
   LabelSceneQuestion : String
   LabelSceneRetenue : String
+  LabelSousTensionArreter : String
+  LabelSousTensionDescription : String
+  LabelSousTensionEnCours : String
+  LabelSousTensionEtat : String
+  LabelSousTensionGuide : String
+  LabelSousTensionMaintenir : String
+  LabelSousTensionPrerequis : String
+  LabelSousTensionRelancer : String
+  LabelSousTensionTitre : String
   LabelTestMemoireArreter : String
   LabelTestMemoireDescription : String
   LabelTestMemoireEnCours : String
   LabelTestMemoireMaintenir : String
   LabelTestMemoireRelancer : String
   LabelTestMemoireTitre : String
+  LabelTestRefroidissementArreter : String
+  LabelTestRefroidissementDescription : String
+  LabelTestRefroidissementEnCours : String
+  LabelTestRefroidissementMaintenir : String
+  LabelTestRefroidissementRelancer : String
+  LabelTestRefroidissementTitre : String
   LabelTrustData : String
   LabelTrustLocal : String
   LabelUnverified : String
@@ -558,8 +536,10 @@ ScanViewModel
   LabelVoirVoisins : String
   LabelVoisins : String
   LabelVoisinsTitre : String
+  LancerRechercheSousTensionCommand : IAsyncRelayCommand
   LancerReparationCommand : IRelayCommand
   LancerTestMemoireCommand : IAsyncRelayCommand
+  LancerTestRefroidissementCommand : IAsyncRelayCommand
   LastMachineExportPath : String
   LastReportPath : String
   LevierAEssayer : String
@@ -586,6 +566,7 @@ ScanViewModel
   NetworkPathLabel : String
   OublierChangementBiosCommand : IRelayCommand
   OuvrirGuideCommand : IRelayCommand
+  OuvrirGuideSousTensionCommand : IRelayCommand
   P1LowAvecMarge : String
   P1LowDisplay : String
   PerformanceDriftLabel : String
@@ -605,11 +586,13 @@ ScanViewModel
   PretAJouerEnCours : Boolean
   ProblemSummary : String
   ProchaineEtape : String
-  ProchaineEtapeBouton : String
   ProgressionDuScan : Double
   ProgressionTestMemoire : Double
+  ProgressionTestRefroidissement : Double
   PropositionCalmer : String
   ProvenProblemCount : Int32
+  RechercheSousTensionATermine : Boolean
+  RechercheSousTensionEnCours : Boolean
   Recommendations : ObservableCollection<ProfileRecommendationItem>
   RegisterText : String
   ReglagesModifies : String
@@ -640,21 +623,27 @@ ScanViewModel
   ReposCarteEnCours : Boolean
   ReposCarteVisible : Boolean
   ResultatOptimisation : String
+  ResultatSousTension : String
   ResultatTestMemoire : String
+  ResultatTestRefroidissement : String
   RienAPoserDuTout : Boolean
   RienAPoserSeul : Boolean
   Satellites : IReadOnlyList<SatelliteDomaine>
   ScanCommand : IAsyncRelayCommand
   SceneDeclaree : ChoixScene
-  Score : Int32
+  SousTensionPrerequisVisible : Boolean
+  SousTensionTrouvee : Boolean
   State : ScanState
   StutterLabel : String
   SubtitleText : String
-  SuivreLaProchaineEtapeCommand : IRelayCommand
   TempsRestantTestMemoire : String
+  TempsRestantTestRefroidissement : String
   TestMemoireATermine : Boolean
   TestMemoireEnCours : Boolean
   TestMemoireEnDefaut : Boolean
+  TestRefroidissementATermine : Boolean
+  TestRefroidissementEnCours : Boolean
+  TestRefroidissementEnDefaut : Boolean
   TextePlafondEnvoi : String
   VeillePingActive : Boolean
   VeillePingProposee : Boolean
@@ -681,13 +670,6 @@ ScanViewModel.LevierPose
   NomAccessible : String
   Titre : String
 ScoreNarrative
-ScoreNarrative.Band
-  = Excellent, Good, Fair, Poor
-TweakChangeItem
-  SummaryKey : String
-  TitleKey : String
-  TweakId : String
-  WasReverted : Boolean
 TweakDisplayKeys
 VerificationRendue
   AVerifier : IReadOnlyList<String>

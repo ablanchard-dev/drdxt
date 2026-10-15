@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// 17/09/2026 — audit du handshake. Tout est en ordre : l'authentification passe
+// Audit du handshake. Tout est en ordre : l'authentification passe
 // Avant que la moindre cle soit forgee, la fabrique ne rend jamais autre chose
 // qu'un authentificateur durci (chemin + SHA-256) ou un « refuse tout », et la
 // production n'appelle qu'elle (`Program.cs` → `BuildMulti`).
@@ -48,10 +48,9 @@ public class UneSeulePorteVersLAuthentificationTests
         // Le constructeur « chemin seul ». La forme durcie passe par `WithImageIdentity`,
         // et la production par la fabrique.
         //
-        // La premiere version de ce motif exigeait `new` COLLE au nom de la classe.
-        // Mutation du 17/09 : une ligne `new DrDxt.ElevatedHelper.Ipc.DrDxtAppCallerAuthenticator(...)`
-        // ajoutee dans `Program.cs` est passee sans faire rougir quoi que ce soit — le test
-        // NOMMAIT une garantie sans la tenir. Le prefixe qualifie est donc optionnel ici.
+        // Le prefixe qualifie est optionnel : un motif qui exige `new` colle au nom de la classe laisserait
+        // passer `new DrDxt.ElevatedHelper.Ipc.DrDxtAppCallerAuthenticator(...)` dans `Program.cs`
+        // (verifie par mutation).
         var coupables = LignesDuProduit()
             .Where(x => Regex.IsMatch(x.ligne, @"new\s+([A-Za-z_][\w]*\s*\.\s*)*DrDxtAppCallerAuthenticator\s*\("))
             .Where(x => x.fichier != "CallerAuthentication.cs")   // ses propres constructeurs

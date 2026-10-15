@@ -5,8 +5,8 @@ using FluentAssertions;
 namespace DrDxt.Infrastructure.Tests;
 
 /// <summary>
-/// 16/09/2026 : « Relance le scan en jeu » poussait a scanner pendant une partie, donc a charger la
-/// machine pendant qu'on joue (le 11/09, une charge de fond avait coute 40 % d'images). Les reglages
+/// « Relance le scan en jeu » pousserait a scanner pendant une partie, donc a charger la
+/// machine pendant qu'on joue (mesure : une charge de fond coute 40 % d'images). Les reglages
 /// qui dependent du jeu ont seulement besoin que le processus du jeu tourne : le menu suffit.
 /// </summary>
 public sealed class RelancerLeScanSansCoutEnJeuTests

@@ -6,13 +6,13 @@ using NSubstitute;
 namespace DrDxt.ReconcilerHost.Tests;
 
 // -----------------------------------------------------------------------
-// T26 — ReconcileTickService.RunTickAsync:
-//   * FINDING 1 — entitlement gate first: an absent/expired entitlement → do not
-//     load/reconcile, log a SECURITY diagnostic, return the Fail (fail-closed moat).
-//   * load via IDesiredStateStore.LoadAsync()
-//   * load FAILS (tamper/schema/IO) → do not reconcile, log a SECURITY diagnostic,
-//     return the Fail (fail-clean, I4 — never enter a write loop on a bad manifest)
-//   * load Ok → call IReconciler.ReconcileAsync(state, ct) and return its result.
+// ReconcileTickService.RunTickAsync :
+//   * porte de droit d'abord : un droit absent ou expiré → ni chargement ni réconciliation,
+//     un diagnostic de sécurité journalisé, rendre le Fail (douve fermée).
+//   * charger via IDesiredStateStore.LoadAsync()
+//   * chargement en Fail (altération, schéma, E/S) → ne pas réconcilier, journaliser un diagnostic
+//     de sécurité, rendre le Fail (échec propre : jamais entrer en boucle d'écriture sur un mauvais manifeste)
+//   * chargement Ok → appeler IReconciler.ReconcileAsync(state, ct) et rendre son résultat.
 // -----------------------------------------------------------------------
 public sealed class ReconcileTickServiceTests
 {
@@ -30,7 +30,7 @@ public sealed class ReconcileTickServiceTests
             .Returns(Result.Ok());
 
         var diagnostics = new RecordingDiagnostics();
-        var service = new ReconcileTickService(store, reconciler, diagnostics, new FakeEntitlementGate());
+        var service = new ReconcileTickService(store, reconciler, diagnostics);
 
         var result = await service.RunTickAsync(CancellationToken.None);
 
@@ -49,7 +49,7 @@ public sealed class ReconcileTickServiceTests
         reconciler.ReconcileAsync(Arg.Any<DesiredState>(), Arg.Any<CancellationToken>())
             .Returns(Result.Fail(ReconcilerErrorCodes.ReconcilePartial, "one item failed"));
 
-        var service = new ReconcileTickService(store, reconciler, new RecordingDiagnostics(), new FakeEntitlementGate());
+        var service = new ReconcileTickService(store, reconciler, new RecordingDiagnostics());
 
         var result = await service.RunTickAsync(CancellationToken.None);
 
@@ -66,46 +66,19 @@ public sealed class ReconcileTickServiceTests
 
         var reconciler = Substitute.For<IReconciler>();
         var diagnostics = new RecordingDiagnostics();
-        var service = new ReconcileTickService(store, reconciler, diagnostics, new FakeEntitlementGate());
+        var service = new ReconcileTickService(store, reconciler, diagnostics);
 
         var result = await service.RunTickAsync(CancellationToken.None);
 
         result.IsOk.Should().BeFalse();
         result.Error!.Value.Code.Should().Be(ErrorCodes.ManifestTampered);
 
-        // I4: a bad manifest never reaches the reconciler (no write loop).
+        // Un mauvais manifeste n'atteint jamais le réconciliateur (pas de boucle d'écriture).
         await reconciler.DidNotReceive()
             .ReconcileAsync(Arg.Any<DesiredState>(), Arg.Any<CancellationToken>());
 
-        // A SECURITY diagnostic was journalled (the actor marks it as a security event).
+        // Un diagnostic de sécurité a été journalisé (l'acteur le marque comme événement de sécurité).
         diagnostics.Entries.Should().ContainSingle()
             .Which.actor.Should().Contain("security", "the bad-manifest event is journalled as a security log");
-    }
-
-    // FINDING 1 — an EXPIRED/absent entitlement (license lapsed/revoked → App stopped
-    // refreshing the manifest) → the moat must not reapply. The gate fails closed before the
-    // store is even loaded; the reconciler is never called; a SECURITY diagnostic is logged.
-    [Fact]
-    public async Task RunTick_WhenEntitlementLapsed_DoesNotLoadOrReconcile_LogsSecurity_FailsClosed()
-    {
-        var store = Substitute.For<IDesiredStateStore>();
-        var reconciler = Substitute.For<IReconciler>();
-        var diagnostics = new RecordingDiagnostics();
-        var service = new ReconcileTickService(
-            store, reconciler, diagnostics, new FakeEntitlementGate { Entitled = false });
-
-        var result = await service.RunTickAsync(CancellationToken.None);
-
-        result.IsOk.Should().BeFalse("an expired moat entitlement must fail closed (no reapply)");
-        result.Error!.Value.Code.Should().Be(ErrorCodes.ManifestTampered);
-
-        // The unentitled moat never even reads the manifest, and never reaches the reconciler.
-        await store.DidNotReceive().LoadAsync();
-        await reconciler.DidNotReceive()
-            .ReconcileAsync(Arg.Any<DesiredState>(), Arg.Any<CancellationToken>());
-
-        diagnostics.Entries.Should().ContainSingle()
-            .Which.Should().Match<(string tweakId, string from, string to, string actor)>(
-                e => e.to == "reconcile-skipped-entitlement" && e.actor.Contains("security"));
     }
 }

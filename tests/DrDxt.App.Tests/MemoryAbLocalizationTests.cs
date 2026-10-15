@@ -7,7 +7,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// LM — i18n de la section « ton passage dans le BIOS », moitie memoire.
+// I18n de la section « ton passage dans le BIOS », moitie memoire.
 //
 // ATTENTION, meme piege que le tableau de bord : `ILocalizer.Get(cle, "fr")` passe par
 // `ResourceManager`, qui RETOMBE sur la culture neutre. Une cle absente du resx FR rendrait

@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 17/09/2026 — la phrase du readme que rien ne tenait.
+// La phrase du readme que rien ne tenait.
 //
 // La carte du code annonce : « `DrDxt.ElevatedHelper` — **le seul** processus qui écrit :
 // exécuteur d'ops typées + allowlist ». C'est l'architecture de sûreté du produit : tout

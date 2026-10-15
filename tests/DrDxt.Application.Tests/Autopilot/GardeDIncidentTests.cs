@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Autopilot;
 
-/// <summary>08/10/2026 : les arrêts ne refusent plus Optimiser ; un réglage suivi d'un arrêt brutal hors veille se rend.</summary>
+/// <summary>Les arrêts ne refusent plus Optimiser ; un réglage suivi d'un arrêt brutal hors veille se rend.</summary>
 public sealed class GardeDIncidentTests
 {
     private static readonly DateTimeOffset Pose = new(2026, 10, 8, 21, 0, 0, TimeSpan.Zero);
@@ -21,7 +21,7 @@ public sealed class GardeDIncidentTests
     public void Hors_de_la_garde_rien_n_est_rendu(int jours, FamilleDArret famille)
         => GardeDIncident.ARendre([("fixit.power_plan", Pose)], [new ArretClasse(Pose.AddDays(jours), famille)]).Should().BeEmpty();
 
-    // GARDE2 (09/10/2026) : le pilote graphique qui décroche (vidage à chaud WER) dans la semaine après une pose rend les
+    // Le pilote graphique qui décroche (vidage à chaud WER) dans la semaine après une pose rend les
     // réglages de la carte et du pilote, et seulement eux ; le refus « instabilité du pilote » du sélecteur tombe.
     [Theory]
     [InlineData("gpu.power_limit", true)]

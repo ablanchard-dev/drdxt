@@ -9,23 +9,16 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 // =======================================================================
-// 19/09/2026. Un gate qui choisit ses leviers ne garantit que ceux-la.
+// Un gate qui choisit ses leviers ne garantit que ceux-la.
 //
 // La premiere phrase du README promet : « il n'applique jamais un levier qu'il ne peut pas
-// defaire ». Le gate qui la tient, `RevertRestoresStateTests`, construit sa propre liste --
-// huit leviers, ecrits a la main -- et son plan en nomme sept. Le produit en enregistre
-// QUINZE dans `ApplicationServiceCollectionExtensions`.
+// defaire ». `RevertRestoresStateTests` construit sa propre liste, ecrite a la main : elle ne
+// couvre pas tous les leviers que le produit enregistre dans `ApplicationServiceCollectionExtensions`.
+// Les oublies seraient souvent des ecritures registre MACHINE qui ne prennent effet qu'au
+// redemarrage : celles dont l'inverse est le moins souvent joue pour de vrai. Et sans comparaison
+// des deux listes, un levier ajoute demain naitrait HORS du gate, en silence.
 //
-// Sept leviers n'avaient donc jamais traverse le gate : latency.hagsOn, latency.gameModeOn,
-// latency.gameDvrBackgroundOff, latency.vrrFlipModelOn, latency.prefer_max_perf,
-// fixit.sane_pagefile, fixit.stale_driver (retire le 08/10/2026). Ce sont, pour quatre d'entre eux, des ecritures
-// registre MACHINE qui ne prennent effet qu'au redemarrage : celles qu'on annule le moins
-// souvent le jour meme, donc celles dont l'inverse est le moins souvent joue pour de vrai.
-//
-// Et rien ne comparait les deux listes. C'est le defaut deja corrige ailleurs, deplace d'un
-// cran : un levier ajoute demain naissait HORS du gate, en silence.
-//
-// Ici : le banc construit les quinze, la comparaison avec l'enregistrement du produit est
+// Ici : le banc construit tous les leviers, la comparaison avec l'enregistrement du produit est
 // DEDUITE du code, et chaque levier fait le tour complet -- appliquer, annuler, machine
 // identique octet pour octet.
 // =======================================================================
@@ -40,21 +33,21 @@ public sealed class ChaqueLevierDuProduitSaitSeDefaireTests
         {
             NvApiAvailable = true,
             ActivePowerPlan = KnownPowerPlans.Balanced,
-            // L-CPU : le boost coupé sur le plan actif, son défaut à 2.
+            // Le boost coupé sur le plan actif, son défaut à 2.
             ModeBoostSecteur = 0,
             ModeBoostDefaut = 2,
             NvLowLatencyMode = 0,
-            NvVsyncMode = 0,
+            NvVsyncMode = 0x60925292, // PASSIVE, le défaut du pilote
             NvFrameRateLimit = 0,
             PrimaryGameDisplay = new DisplayInfo(IsPrimaryGameDisplay: true, SupportsVrr: true, RefreshHz: 144,
                 MaxRefreshHz: 165, DeviceName: Ecran),
-            // L-ECRAN : un écran 165 Hz laissé à 144, le mode d'avant enregistré tel quel.
+            // Un écran 165 Hz laissé à 144, le mode d'avant enregistré tel quel.
             ModeEcranCourant = new ModeEcran(Ecran, 2560, 1440, 32, 144),
             ModeEcranEnregistre = new ModeEcran(Ecran, 2560, 1440, 32, 144),
         };
         s.SetRegistry(RegistryHiveKind.LocalMachine,
             @"SOFTWARE\NVIDIA Corporation\Global\NVTweak", "LowLatencyMode", 0);
-        s.SetDrs(0x00A879CF, 0);   // VSYNCMODE_ID
+        s.SetDrs(0x00A879CF, 0x60925292);   // VSYNCMODE_ID = PASSIVE, le défaut du pilote
         s.SetDrs(0x10835002, 0);   // FRL_FPS_ID
         s.SetDrs(0x1057EB71, 0);   // PREFERRED_PSTATE_ID — sinon « absent » puis « 0 » differeraient
         // MAX_PRERENDERED_FRAMES, ensemencee a la valeur que la couture rapporte (3).
@@ -94,11 +87,23 @@ public sealed class ChaqueLevierDuProduitSaitSeDefaireTests
         s.SetRegistryValue(RegistryHiveKind.LocalMachine,
             @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management",
             "PagingFiles", RegistryValueType.MultiString, string.Empty);
-        // L-WU : les heures d'activité lues sur la machine de référence le 06/10 (15 h à 8 h).
+        // Les heures d'activité relevées sur la machine de référence le 06/10 (15 h à 8 h).
         s.SetRegistry(RegistryHiveKind.LocalMachine, HeuresActives.Cle, HeuresActives.NomDebut, 15);
         s.SetRegistry(RegistryHiveKind.LocalMachine, HeuresActives.Cle, HeuresActives.NomFin, 8);
-        // 07/10/2026 (revue F-17) : le levier n'écrit qu'en mode manuel lu.
+        // Le levier n'écrit qu'en mode manuel lu.
         s.SetRegistry(RegistryHiveKind.LocalMachine, HeuresActives.Cle, HeuresActives.NomAutomatique, 0);
+        return s;
+    }
+
+    /// <summary>Le socle, plus l'état qu'un levier vient réparer quand il contredit celui des autres : le plan Économie
+    /// n'est quitté que s'il est actif, et le reste du socle part d'Équilibré.</summary>
+    private static FakeSystemState SocleDe(string id)
+    {
+        var s = Socle();
+        if (id == "fixit.plan_economie") s.ActivePowerPlan = KnownPowerPlans.PowerSaver;
+        if (id == "fixit.pagefile_ssd")
+            s.SetRegistryValue(RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management",
+                "PagingFiles", RegistryValueType.MultiString, @"D:\pagefile.sys 0 0");
         return s;
     }
 
@@ -141,8 +146,11 @@ public sealed class ChaqueLevierDuProduitSaitSeDefaireTests
             new SanePowerPlanTweak(power, client),
             new ModeBoostTweak(power, client),
             new EconomieSansFilTweak(power, client),
+            new PlanEconomieTweak(power, client),
             new LimitePuissanceCpuTweak(new FakeCpuPowerLimitReader(etat), client),
+            new PlafondThermiqueCpuTweak(new FakeCpuPowerLimitReader(etat, plafondThermique: 50), client),
             new SanePagefileTweak(reg, client),
+            new PagefileSurSsdTweak(reg, client),
             new HeuresActivesTweak(reg, client, PartieDu0410, Paris),
             new EcranFrequenceTweak(display, new FakeModeEcran(etat), new ConfirmationQuiGarde()),
         };
@@ -163,7 +171,7 @@ public sealed class ChaqueLevierDuProduitSaitSeDefaireTests
     [MemberData(nameof(Leviers))]
     public async Task Applique_puis_annule_rend_la_machine_identique(string id)
     {
-        var etat = Socle();
+        var etat = SocleDe(id);
         var client = new FakeElevatedClient(etat);
         var levier = TousLesLeviers(etat, client).Single(t => t.Id == id);
 
@@ -188,7 +196,7 @@ public sealed class ChaqueLevierDuProduitSaitSeDefaireTests
         // Sans ce contrepoids, le tour complet ci-dessus serait vert pour quinze no-ops :
         // ne rien ecrire restaure toujours. On exige donc que l'application CHANGE la
         // machine — sauf pour le seul levier qui, par contrat, n'ecrit jamais.
-        var etat = Socle();
+        var etat = SocleDe(id);
         var client = new FakeElevatedClient(etat);
         var levier = TousLesLeviers(etat, client).Single(t => t.Id == id);
 
@@ -196,7 +204,7 @@ public sealed class ChaqueLevierDuProduitSaitSeDefaireTests
         await levier.ApplyAsync();
         var aEcrit = etat.Snapshot() != avant;
 
-        // 08/10/2026 : le guide DDU, seul levier qui n'ecrivait rien, est retire ; tous ecrivent desormais.
+        // Le guide DDU, seul levier qui n'ecrivait rien, est retire ; tous ecrivent desormais.
         aEcrit.Should().BeTrue($"{id} n'a rien ecrit sur le banc : son tour complet est un vert vide");
     }
 

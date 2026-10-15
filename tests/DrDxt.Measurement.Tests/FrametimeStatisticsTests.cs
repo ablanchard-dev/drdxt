@@ -36,13 +36,13 @@ public class FrametimeStatisticsTests
         FrametimeStatistics.P1LowFps(new List<double>()).Should().Be(0);
     }
 
-    // --- Inter-run margin (NS-6 §6): the honest A/B margin is the spread BETWEEN runs,
-    //     not a per-frame CI (frametimes are autocorrelated → per-frame is far too tight). ---
+    // --- Marge inter-passes : la marge A/B honnête est l'écart entre passes,
+    //     pas un IC par image (les temps d'image sont autocorrélés → par image est bien trop serré). ---
 
     [Fact]
     public void Inter_run_margin_is_infinite_below_three_runs()
     {
-        // Fewer than 3 independent runs → run-to-run variance can't be bounded → "gain not provable".
+        // Moins de 3 passes indépendantes → la variance entre passes ne peut pas être bornée → « gain non prouvable ».
         FrametimeStatistics.InterRunMarginOfError(new List<double> { 60 }).Should().Be(double.PositiveInfinity);
         FrametimeStatistics.InterRunMarginOfError(new List<double> { 60, 61 }).Should().Be(double.PositiveInfinity);
         FrametimeStatistics.InterRunMarginOfError(new List<double>()).Should().Be(double.PositiveInfinity);

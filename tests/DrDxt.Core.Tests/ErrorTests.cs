@@ -5,7 +5,7 @@ namespace DrDxt.Core.Tests;
 
 public class ErrorTests
 {
-    // --- Error is a record struct: value equality ---
+    // --- Error est un record struct : égalité de valeur ---
 
     [Fact]
     public void Error_ValueEquality_SameFields_AreEqual()
@@ -37,7 +37,7 @@ public class ErrorTests
         (a != b).Should().BeTrue();
     }
 
-    // --- Error properties hold values ---
+    // --- Les propriétés d'Error tiennent leurs valeurs ---
 
     [Fact]
     public void Error_Code_IsStoredCorrectly()

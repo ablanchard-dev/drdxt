@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026 — le garde STRUCTUREL, ecrit apres avoir corrige quatre boutons un
+// Le garde STRUCTUREL, ecrit apres avoir corrige quatre boutons un
 // par un (Appliquer, Tout annuler, Activer, Rafraichir). Corriger des instances
 // ne protege pas la prochaine : la lecon de la journee est qu'une garantie doit
 // tenir au SELECTEUR, pas a l'element.
@@ -21,11 +21,9 @@ namespace DrDxt.App.Tests;
 public sealed class AucunBoutonGriseNEstMuetTests
 {
     /// <summary>
-    /// La seule commande grisable sans bouton, re-verifiee le 18/09/2026 (pas heritee
-    /// d'une note) : le reglage GPU est une fonctionnalite PAYANTE que personne ne peut
-    /// declencher. La correction n'est pas technique — la brancher ou la sortir du
-    /// perimetre payant est une decision produit, et ce test la garde visible dans le
-    /// code au lieu de la laisser dans une note qu'on ne relit pas.
+    /// La seule commande grisable sans bouton : le reglage GPU, que personne ne peut declencher
+    /// depuis l'ecran. La brancher ou la retirer est une decision produit ; ce test la garde
+    /// visible dans le code au lieu de la laisser dans une note qu'on ne relit pas.
     /// </summary>
     private static readonly string[] SansBoutonEnAttenteDArbitrage = ["ApplyGpuTuningCommand"];
 
@@ -67,9 +65,9 @@ public sealed class AucunBoutonGriseNEstMuetTests
         // Temoin : un motif qui ne trouverait rien ferait passer tous les tests
         // suivants sur une liste vide, en annoncant une garantie inexistante.
         var trouvees = CommandesGrisables();
-        trouvees.Should().HaveCountGreaterThanOrEqualTo(4); // 23/09/2026 : 4 commandes de l'ecran de licence sont parties avec lui
+        trouvees.Should().HaveCountGreaterThanOrEqualTo(3);
         trouvees.Should().Contain("ApplyCommand")
-                .And.Contain("RevertCommand").And.Contain("InstallUpdateCommand");
+                .And.Contain("ApplyGpuTuningCommand").And.Contain("InstallUpdateCommand");
     }
 
     [Fact]

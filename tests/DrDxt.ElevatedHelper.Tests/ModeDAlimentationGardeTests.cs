@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
-/// <summary>07/10/2026 (revue F-28) : réactiver le plan après PERFBOOSTMODE, ou changer de plan, peut remettre le mode
+/// <summary>Réactiver le plan après PERFBOOSTMODE, ou changer de plan, peut remettre le mode
 /// d'alimentation de Windows 11 à son défaut. Un powrprof factice qui le fait : rien n'est lu ni écrit sur la machine.</summary>
 public sealed class ModeDAlimentationGardeTests
 {
@@ -82,7 +82,7 @@ public sealed class ModeDAlimentationGardeTests
         var sansEffet = new Powrprof { PoserSansEffet = true };
         new Win32PowerPlanActions(sansEffet).SetActivePlan(Equilibre).IsOk.Should().BeFalse("relu : le mode n'est pas revenu");
     }
-    // Revue F-36 : le mode ne se repose pas, l'op est ratée : la valeur de boost d'avant revient (rien n'est laissé
+    // Le mode ne se repose pas, l'op est ratée : la valeur de boost d'avant revient (rien n'est laissé
     // changé sans retour), et un changement de plan raté rend le plan d'avant.
     [Fact]
     public void Une_op_ratee_ne_laisse_rien_change()
@@ -96,7 +96,7 @@ public sealed class ModeDAlimentationGardeTests
         q.Plan.Should().Be(Equilibre, "le plan d'avant revient");
     }
 
-    // Revue du 07/10 (F-36 suite) : le mode d'avant aussi est retenté après le retour en arrière, et l'échec le dit.
+    // Le mode d'avant aussi est retenté après le retour en arrière, et l'échec le dit.
     [Fact]
     public void Le_retour_en_arriere_retente_le_mode_et_dit_s_il_n_a_pas_pu()
     {

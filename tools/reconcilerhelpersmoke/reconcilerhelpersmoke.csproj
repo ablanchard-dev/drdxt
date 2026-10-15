@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- M5 reconciler-to-helper CHANNEL live smoke. Lives OUTSIDE DrDXT.sln (like
+  <!-- Reconciler-to-helper CHANNEL live smoke. Lives OUTSIDE DrDXT.sln (like
        tools/helperhandshake, tools/m2smoke). Launches DrDxt.ElevatedHelper.exe
        ELEVATED in service mode (the long-lived, multi-connection accept loop) with
        BOTH a trusted App path AND a trusted reconciler path, then connects AS the

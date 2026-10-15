@@ -3,51 +3,51 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// M6 — IGpuTuningTargetSource: the live GPU context the GPU tweaks read at APPLY time.
+// IGpuTuningTargetSource : le contexte GPU en cours que les leviers GPU lisent à la pose.
 //
-// In M2 the targets were injected as immutable value records (pure, unit-testable). M6
-// makes them OVERRIDABLE per scan: a per-chip profile (DrDxt.Profiles) supplies the
-// values, and the scan flow Set()s them here after clamping each one to GpuSafeBounds.
+// Les cibles sont remplaçables à chaque scan : un profil de puce (DrDxt.Profiles) fournit
+// les valeurs, et le flux du scan les pose ici par Set() après avoir borné chacune à
+// GpuSafeBounds.
 //
-// The source is a HOLDER, not an authorization: every GPU tweak still re-clamps/gates
-// the value via GpuSafeBounds before any privileged write (defense in depth — "a profile
-// is a request, not an authorization", mirroring GpuTuningTarget's own contract).
+// La source porte la valeur, elle n'autorise rien : chaque levier GPU reborne et filtre
+// encore la valeur par GpuSafeBounds avant toute écriture privilégiée (défense en
+// profondeur : « un profil est une demande, pas une autorisation », comme le contrat de GpuTuningTarget).
 //
-// It also carries the HARDWARE fact "is an AMD GPU present" (computed from the scanned
-// HardwareInventory via GpuGating.IsAmd — DXGI vendor 0x1002), set at scan time from the
-// Same hw that drives the targets. This fact is always knowable, INDEPENDENT of whether
-// the ADLX tuning SDK loaded — so a GPU tweak can surface an honest "AMD GPU detected —
-// tuning coming soon" (§22.3) instead of a silent skip when ADLX is unavailable. It must
-// live here, not on the ADLX seam, whose prod impl reports unavailable on every machine.
+// Elle porte aussi le fait matériel « un GPU AMD est présent » (calculé depuis le
+// HardwareInventory scanné via GpuGating.IsAmd, fabricant DXGI 0x1002), posé au scan à partir
+// du même matériel que les cibles. Ce fait se sait toujours, que le SDK de réglage ADLX soit
+// chargé ou non : un levier GPU peut ainsi afficher « GPU AMD détecté, réglage à venir » au
+// lieu d'un saut silencieux quand ADLX manque. Il doit vivre ici et pas sur la couture ADLX,
+// dont l'implémentation de prod dit « indisponible » sur toute machine.
 //
-// Seeded with the same conservative, in-bounds defaults M2 used, so behaviour with NO
-// profile override is byte-identical to before. Reset() returns to those defaults (and
-// clears the presence flag) so a previous scan's override never leaks into the next.
+// Amorcée avec les défauts prudents et dans les bornes : sans remplacement par un profil, le
+// comportement est identique à l'octet près. Reset() revient à ces défauts (et efface le
+// drapeau de présence), pour que le remplacement d'un scan ne fuie jamais dans le suivant.
 // -----------------------------------------------------------------------
 public interface IGpuTuningTargetSource
 {
-    /// <summary>The current core/memory clock-offset target the undervolt tweak applies.</summary>
+    /// <summary>La cible courante de décalage d'horloge cœur/mémoire que pose le levier de sous-tension.</summary>
     GpuTuningTarget Tuning { get; }
 
-    /// <summary>The current power-limit target the power-limit tweak applies.</summary>
+    /// <summary>La cible courante de limite de puissance que pose le levier de limite de puissance.</summary>
     GpuPowerLimitTarget PowerLimit { get; }
 
-    /// <summary>True when an AMD GPU was detected in the scanned hardware, INDEPENDENT of
-    /// whether the ADLX tuning SDK is available. A hardware fact (always knowable), used so
-    /// the GPU tweaks surface the honest "AMD GPU detected — tuning coming soon" status
-    /// instead of a silent skip when ADLX is unavailable. False until set from hardware.</summary>
+    /// <summary>Vrai quand un GPU AMD a été détecté dans le matériel scanné, que le SDK de réglage
+    /// ADLX soit disponible ou non. Un fait matériel (toujours connaissable), pour que les leviers
+    /// GPU affichent l'état honnête « GPU AMD détecté, réglage à venir » au lieu d'un saut
+    /// silencieux quand ADLX manque. Faux tant qu'il n'est pas posé depuis le matériel.</summary>
     bool IsAmdGpuPresent { get; }
 
-    /// <summary>Overrides the live targets (caller must have clamped to GpuSafeBounds).</summary>
+    /// <summary>Remplace les cibles en cours (l'appelant doit les avoir bornées à GpuSafeBounds).</summary>
     void Set(GpuTuningTarget tuning, GpuPowerLimitTarget powerLimit);
 
-    /// <summary>Records whether an AMD GPU is present, computed internally from the scanned
-    /// hardware (hw.Gpus via GpuGating.IsAmd). Called at scan time, before any GPU tweak
-    /// applies. A null / empty inventory → not present (fail-closed).</summary>
+    /// <summary>Note si un GPU AMD est présent, calculé ici depuis le matériel scanné
+    /// (hw.Gpus via GpuGating.IsAmd). Appelé au scan, avant la pose de tout levier GPU.
+    /// Inventaire null ou vide → absent (refus au moindre doute).</summary>
     void SetAmdGpuPresenceFromHardware(HardwareInventory hw);
 
-    /// <summary>Restores the conservative seeded defaults and clears the presence flag
-    /// (no profile override active, no stale hardware fact).</summary>
+    /// <summary>Remet les défauts prudents d'amorce et efface le drapeau de présence
+    /// (aucun remplacement de profil actif, aucun fait matériel périmé).</summary>
     void Reset();
 }
 

@@ -1,14 +1,14 @@
 namespace DrDxt.Bios;
 
 /// <summary>
-/// Resx keys for the personalized GUIDE content (steps + recovery + labels). FR+EN
-/// live in the shared Infrastructure resx; the generator emits only these keys, never
-/// hard-coded UI text (mirrors the <c>ErrorCodes</c> / <c>BiosStringKeys</c> discipline).
+/// Clés resx du contenu de guide personnalisé (étapes + récupération + libellés). FR et EN vivent
+/// dans la resx partagée d'Infrastructure ; le générateur n'émet que ces clés, jamais de texte
+/// d'interface en dur (même discipline que <c>ErrorCodes</c> / <c>BiosStringKeys</c>).
 /// </summary>
 public static class BiosGuideStringKeys
 {
-    // ── Per-setting instruction steps (the exact path/value is carried separately on
-    //    GuideStep.ExactValue; the key is the human sentence around it). ──
+    // ── Étapes d'instruction par réglage (le chemin / la valeur exacts sont portés à part par
+    //    GuideStep.ExactValue ; la clé est la phrase humaine autour). ──
     public const string StepXmp = "Bios.Guide.Step.Xmp";
     public const string StepAbove4G = "Bios.Guide.Step.Above4G";
     public const string StepCsm = "Bios.Guide.Step.Csm";
@@ -22,17 +22,17 @@ public static class BiosGuideStringKeys
     public const string Verified = "Bios.Guide.Confidence.Verified";
     public const string UnverifiedFallback = "Bios.Guide.Confidence.Unverified";
 
-    // ── §16: CSM-off suppressed on Legacy boot — a warning step replaces it. ──
+    // ── Désactivation du CSM retirée sur démarrage Legacy : une étape d'avertissement la remplace. ──
     public const string CsmSuppressedLegacy = "Bios.Guide.Csm.SuppressedLegacy";
 
-    // ── Recovery ladder (top AND bottom, in this exact order — D2). ──
+    // ── Échelle de récupération (en haut et en bas, dans cet ordre exact). ──
     public const string RecoveryNoBootNormal = "Bios.Guide.Recovery.NoBootNormal";
     public const string RecoveryMemoryTraining = "Bios.Guide.Recovery.MemoryTraining";
     public const string RecoveryClearCmos = "Bios.Guide.Recovery.ClearCmos";
     public const string RecoveryLoadDefaults = "Bios.Guide.Recovery.LoadDefaults";
     public const string RecoveryOneChangeAtATime = "Bios.Guide.Recovery.OneChangeAtATime";
 
-    /// <summary>D4 : le CSM ne fait plus partie du pas a pas (risque de non-demarrage), mais il
+    /// <summary>Le CSM ne fait pas partie du pas a pas (risque de non-demarrage), mais il
     /// reste la cause n°1 d'un ReBAR qui refuse de s'activer. On le nomme sans le faire faire.</summary>
     public const string RecoveryRebarNeedsCsmOff = "Bios.Guide.Recovery.RebarNeedsCsmOff";
 }

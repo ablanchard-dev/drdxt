@@ -3,17 +3,12 @@
 namespace DrDxt.App.ViewModels;
 
 /// <summary>
-/// Un constat d'audit, pret a afficher.
-///
-/// Ce type existe parce que l'audit ne sortait nulle part. Le 09/09/2026, onze types de
-/// lecture — <see cref="RepairAuditService"/> compris — n'etaient references ni par
-/// <c>DrDxt.App</c> ni par <c>DrDxt.Application</c> : deux jours de travail prouve, testes,
-/// et invisibles de quiconque ouvre le produit. Un outil prouve qu'un lecteur fonctionne ;
-/// il ne met rien entre les mains de quelqu'un.
+/// Un constat d'audit (<see cref="RepairAuditService"/>), pret a afficher : c'est par lui que
+/// l'audit de sante arrive a l'ecran.
 ///
 /// Ce VM ne juge pas : le tri appartient a <see cref="RepairTriage"/>, la contrainte
 /// statut/action au constructeur de <see cref="RepairFinding"/>. Ici on ne fait que mettre en
-/// forme — sinon la regle vivrait a deux endroits et divergerait au premier ajout.
+/// forme ; sinon la regle vivrait a deux endroits et divergerait au premier ajout.
 /// </summary>
 public sealed class RepairFindingViewModel
 {
@@ -25,14 +20,16 @@ public sealed class RepairFindingViewModel
         DomaineCle = f.Domaine;
         NomCle = f.Nom;
         Nom = TitreAffiche(f);
-        // UI1 (08/10/2026) : une vingtaine de textes du moteur portent « (s) » ; ils s'accordent ici, une fois, au moment
+        // Une vingtaine de textes du moteur portent « (s) » ; ils s'accordent ici, une fois, au moment
         // d'être affichés. Le constat gardé pour l'historique reste tel quel (aucun faux « changement »).
-        Explication = Pluriels.Accorder(f.Explication, Francais);
+        Explication = Pluriels.Accorder(f.Explication, Docteur.Langue);
+        Remede = f.Remede is { } remede ? Pluriels.Accorder(remede, Docteur.Langue) : null;
+        Cible = f.Cible;
 
-        // `null` = pas LISIBLE, et ca se dit. Rendre une chaine vide ferait passer un angle
-        // mort pour une absence de probleme — la faute exacte que RepairStatus.Unknown existe
+        // `null` = pas lisible, et ca se dit. Rendre une chaine vide ferait passer un angle
+        // mort pour une absence de probleme : la faute exacte que RepairStatus.Unknown existe
         // pour empecher.
-        ValeurCourante = ValeurAffichee(f) ?? "non lisible";
+        ValeurCourante = ValeurAffichee(f) ?? Docteur.T("RF.NonLisible");
         ValeurLue = f.ValeurCourante is not null;
 
         // Le default n'est affiche que quand on en a un defendable. Fabriquer une reference
@@ -52,7 +49,7 @@ public sealed class RepairFindingViewModel
         Constat = DrDxt.Core.Constat.Depuis(f);
     }
 
-    /// <summary>chantier B0 : la forme commune, ce que l'écran affiche.</summary>
+    /// <summary>La forme commune, ce que l'écran affiche.</summary>
     public DrDxt.Core.Constat Constat { get; }
 
     public string Domaine { get; }
@@ -62,9 +59,15 @@ public sealed class RepairFindingViewModel
     public string NomCle { get; }
     public string Nom { get; }
     public string Explication { get; }
+
+    /// <summary>Comment corriger, quand le constat le porte à part ; null sinon.</summary>
+    public string? Remede { get; }
+
+    /// <summary>Ce que le geste de DrDXT viserait, tel que lu ; null quand aucun geste ne s'y rattache.</summary>
+    public string? Cible { get; }
     public string ValeurCourante { get; }
 
-    /// <summary>Faux quand l'etat n'a pas pu etre lu — l'angle mort se voit au lieu de se taire.</summary>
+    /// <summary>Faux quand l'etat n'a pas pu etre lu : l'angle mort se voit au lieu de se taire.</summary>
     public bool ValeurLue { get; }
 
     /// <summary>Le default ou known-good, vide quand nous n'avons pas de reference honnete.</summary>
@@ -77,64 +80,74 @@ public sealed class RepairFindingViewModel
     public bool NecessiteUneDecisionHumaine { get; }
 
     /// <summary>Reutilise l'echelle de gravite du scan pour que la barre de couleur du panneau
-    /// soit la meme que partout ailleurs — un joueur n'apprend pas deux codes couleur.</summary>
+    /// soit la meme que partout ailleurs : un joueur n'apprend pas deux codes couleur.</summary>
     public Severity Severity { get; }
 
-    // Simplification voulue : libelles en dur, comme `RepairFinding.Explication` et `RepairTriage.Phrase` qui
-    // sont deja de la prose francaise dans Core. Passer par le resx ici et pas la donnerait une
-    // moitie de section traduite et l'autre non. Le jour ou l'audit passe au resx, il y passe en
-    // entier — Core compris.
-    internal static string LibelleStatut(RepairStatus s) => s switch
+    // Les libellés suivent la langue du docteur, comme les phrases des constats.
+    internal static string LibelleStatut(RepairStatus s) => Docteur.T(s switch
     {
-        RepairStatus.KnownHarmful      => "nuisible connu",
-        RepairStatus.Suspicious        => "suspect",
-        RepairStatus.NonDefault        => "différent du défaut",
-        RepairStatus.UserChoiceProbable => "choix probable de ta part",
-        RepairStatus.ExpectedDefault   => "valeur par défaut",
-        RepairStatus.Unknown           => "non lu",
-        _                              => "observé",
-    };
+        RepairStatus.KnownHarmful      => "RF.Statut.Nuisible",
+        RepairStatus.Suspicious        => "RF.Statut.Suspect",
+        RepairStatus.NonDefault        => "RF.Statut.NonDefaut",
+        RepairStatus.UserChoiceProbable => "RF.Statut.ChoixProbable",
+        RepairStatus.ExpectedDefault   => "RF.Statut.Defaut",
+        RepairStatus.Unknown           => "RF.Statut.NonLu",
+        _                              => "RF.Statut.Observe",
+    });
 
     // Les mots vivent dans Core (RepairLibelles) : le rapport de diagnostic dit les memes.
     internal static string LibelleDomaine(string cle) => RepairLibelles.Domaine(cle);
-    internal static string LibelleNom(string cle) => RepairLibelles.Nom(cle);
 
-    /// <summary>UI1 (08/10/2026) : deux incidents noyau différents (USB 3, carte graphique) partageaient un titre. Le titre
+    /// <summary>Deux incidents noyau différents (USB 3, carte graphique) partageaient un titre. Le titre
     /// affiché dit lequel, d'après ce que le constat dit déjà ; la clé (comparée par l'historique) ne change pas.</summary>
-    /// <summary>UI1 (08/10/2026) : la valeur à l'écran, accordée ; une valeur BCD dit ce qu'elle veut dire, son nom technique
+    /// <summary>La valeur à l'écran, accordée ; une valeur BCD dit ce qu'elle veut dire, son nom technique
     /// entre parenthèses. <c>null</c> = non lue. La valeur d'origine (comparée par l'historique) ne change pas.</summary>
     internal static string? ValeurAffichee(RepairFinding f) => f.ValeurCourante is not { } v ? null
-        : f.Nom == "bootstatuspolicy" && SensDuDemarrage.TryGetValue(v, out var sens) ? $"{sens} ({v})"
-        // UI1 (critique du 08/10, défaut 11) : la version installée et la disponible sur une seule ligne.
-        : f.Nom == DrDxt.Detection.Gpu.VersionDuPilote.Nom && f.ValeurAttendue is { Length: > 0 } dispo ? $"{v} installé → {dispo} disponible"
-        : Pluriels.Accorder(v, Francais);
+        : f.Nom == "bootstatuspolicy" && SensDuDemarrage.TryGetValue(v, out var sens) ? $"{Docteur.T(sens)} ({v})"
+        // L'incident du pilote graphique se dit en mots ; le code d'arrêt reste entre parenthèses pour qui le cherche.
+        : f.Nom == "incident noyau conserve" && IncidentGraphique(v) is { } incident
+            ? Docteur.T("RF.Incident.Graphique.Valeur", incident.Fois, incident.Code)
+        // La version installée et la disponible sur une seule ligne.
+        : f.Nom == DrDxt.Detection.Gpu.VersionDuPilote.Nom && f.ValeurAttendue is { Length: > 0 } dispo ? Docteur.T("RF.VersionInstalleeDisponible", v, dispo)
+        : Pluriels.Accorder(v, Docteur.Langue);
 
-    // Les textes du moteur sont écrits en français, quelle que soit la langue de l'interface.
-    private static readonly System.Globalization.CultureInfo Francais = System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
+    /// <summary>« 3x 0x193 VIDEO_DXGKRNL_LIVEDUMP (…) » : le nombre et le code, si le code est celui du pilote graphique.
+    /// Le code se lit par <see cref="CodeDArret"/>, comme pour le titre : seul le nombre de fois se lit ici.</summary>
+    private static (int Fois, string Code)? IncidentGraphique(string valeur) =>
+        System.Text.RegularExpressions.Regex.Match(valeur, @"^(\d+)x ") is { Success: true } m
+        && CodeDArret(valeur) is { } code && DrDxt.Detection.Hardware.LiveKernelReport.CodeGraphique(code)
+            ? (int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture), $"0x{code:X}")
+            : null;
 
     // Doc Microsoft « BCDEdit /set » (bootstatuspolicy), traduite au plus près.
     private static readonly Dictionary<string, string> SensDuDemarrage = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["IgnoreAllFailures"] = "erreurs de démarrage ignorées",
-        ["IgnoreShutdownFailures"] = "réglage par défaut",
-        ["IgnoreBootFailures"] = "échecs de démarrage ignorés",
-        ["DisplayAllFailures"] = "écran de récupération toujours affiché",
+        ["IgnoreAllFailures"] = "RF.Bcd.IgnoreAll",
+        ["IgnoreShutdownFailures"] = "RF.Bcd.IgnoreShutdown",
+        ["IgnoreBootFailures"] = "RF.Bcd.IgnoreBoot",
+        ["DisplayAllFailures"] = "RF.Bcd.DisplayAll",
     };
 
     internal static string TitreAffiche(RepairFinding f) => f.Nom switch
     {
         "incident noyau conserve" when f.ValeurCourante?.Contains("USB 3", StringComparison.Ordinal) == true
-            => "Incident du pilote USB 3, conservé",
-        "incident noyau conserve" when f.Explication.Contains("carte graphique", StringComparison.Ordinal)
-            => "Incident du pilote graphique, conservé",
-        _ => LibelleNom(f.Nom),
+            => Docteur.T("RF.IncidentUsb3"),
+        // Reconnu au code d'arrêt (« 3x 0x193 VIDEO_… »), pas à la phrase : « carte graphique » échouait en anglais.
+        "incident noyau conserve" when CodeDArret(f.ValeurCourante) is { } code && DrDxt.Detection.Hardware.LiveKernelReport.CodeGraphique(code)
+            => Docteur.T("RF.IncidentGraphique"),
+        _ => RepairLibelles.Nom(f.Domaine, f.Nom),
     };
+
+    private static uint? CodeDArret(string? valeur) =>
+        valeur is null ? null
+        : System.Text.RegularExpressions.Regex.Match(valeur, @"0x([0-9A-Fa-f]+)") is { Success: true } m
+          && uint.TryParse(m.Groups[1].Value, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out var c) ? c : null;
 
     private static string LibelleAction(RepairAction a) => a switch
     {
-        RepairAction.ReparationAutomatique => "DrDXT peut le réparer",
-        RepairAction.GuidedBios            => "passage guidé par le BIOS",
-        RepairAction.Recommandation        => "recommandation",
+        RepairAction.ReparationAutomatique => Docteur.T("RF.Action.Reparer"),
+        RepairAction.GuidedBios            => Docteur.T("RF.Action.Bios"),
+        RepairAction.Recommandation        => Docteur.T("RF.Action.Recommandation"),
         _                                  => string.Empty,
     };
 

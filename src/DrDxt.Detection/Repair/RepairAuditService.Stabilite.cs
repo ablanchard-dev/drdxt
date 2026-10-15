@@ -13,9 +13,10 @@ using Microsoft.Win32;
 
 namespace DrDxt.Detection.Repair;
 
+/// <summary>Stabilité : test mémoire, vidages, incidents noyau, point de restauration et arrêts brutaux.</summary>
 public sealed partial class RepairAuditService
 {
-    // 17/09/2026, doc Microsoft « Event ID 41 » (maj 12/02/2026), scenario 3 (arrets sans code) : « Disable
+    // Doc Microsoft « Event ID 41 » (maj 12/02/2026), scenario 3 (arrets sans code) : « Disable
     // overclocking … Check the memory. Use a memory checker ». C'est la source du conseil JEDEC et de cette
     // recommandation. La meme page ne definit pas SleepInProgress : ce que vaut un arret « en transition »
     // pour la memoire reste sans source (D19 du registre de boucle).
@@ -28,7 +29,7 @@ public sealed partial class RepairAuditService
         if (!lus.IsOk)
         {
             yield return new RepairFinding("STABILITE", "test memoire Windows", null, null, RepairStatus.Unknown,
-                "Le journal du Diagnostic de mémoire Windows n'a pas pu être lu.");
+                Docteur.T("ST.Memoire.NonLu"));
             yield break;
         }
 
@@ -40,24 +41,21 @@ public sealed partial class RepairAuditService
             var comptes = arrets.IsOk ? ArretBrutal.HorsBouton(arrets.Value!) : [];
             var n = comptes.Count;
             var repetes = n >= SeuilArretsRepetes;
-            yield return new RepairFinding("STABILITE", "test memoire Windows", "jamais lancé", null, RepairStatus.Observed,
+            yield return new RepairFinding("STABILITE", "test memoire Windows", Docteur.T("ST.Memoire.JamaisLance"), null, RepairStatus.Observed,
                 (repetes
-                    ? $"Avec {n} arrêts brutaux en {FenetreArrets.TotalDays:0} jours{DontEnVeille(comptes)}, c'est le test qui dit si la mémoire est en cause, "
-                      + "et il n'a jamais été lancé sur cette machine (ou son résultat a été effacé). "
-                    : "Aucun résultat du Diagnostic de mémoire Windows dans le journal : ce test n'a pas été lancé sur "
-                      + "cette machine, ou son résultat a été effacé. ")
-                + "C'est l'outil intégré à Windows (Windows + R, puis mdsched.exe) : il redémarre le PC et le garde pour lui "
-                + "pendant le test, à lancer quand tu n'en as pas besoin. MemTest86 teste plus longuement.",
-                repetes ? RepairAction.Recommandation : RepairAction.Aucune);
+                    ? Docteur.T("ST.Memoire.AvecArrets", n, FenetreArrets.TotalDays, DontEnVeille(comptes))
+                    : Docteur.T("ST.Memoire.AucunResultat")).TrimEnd(),
+                repetes ? RepairAction.Recommandation : RepairAction.Aucune,
+                Remede: Docteur.T("ST.Memoire.Outil"));
             yield break;
         }
 
         var dernier = lus.Value[0];
         yield return new RepairFinding("STABILITE", "test memoire Windows",
-            dernier.Quand.ToLocalTime().ToString("dd/MM/yyyy HH:mm"), null, RepairStatus.Observed,
+            dernier.Quand.ToLocalTime().ToString(Docteur.T("ST.FormatDateHeure"), Docteur.Langue), null, RepairStatus.Observed,
             string.IsNullOrWhiteSpace(dernier.Message)
-                ? $"Windows a noté un passage du test (événement {dernier.EventId}) sans message lisible."
-                : $"Windows a noté : « {dernier.Message} »");
+                ? Docteur.T("ST.Memoire.SansMessage", dernier.EventId)
+                : Docteur.T("ST.WindowsANote", dernier.Message));
     }
 
     // Le type de vidage dit ce que Windows est configure pour garder ; volmgr 161 dit qu'il n'y est
@@ -68,7 +66,7 @@ public sealed partial class RepairAuditService
         if (!lu.IsOk)
         {
             yield return new RepairFinding("STABILITE", "creation de vidage", null, null, RepairStatus.Unknown,
-                "Le journal des échecs de vidage ou le dossier des vidages n'a pas pu être lu.");
+                Docteur.T("ST.Vidage.NonLu"));
             yield break;
         }
 
@@ -77,26 +75,24 @@ public sealed partial class RepairAuditService
         if (v.Echecs.Count > 0 && !garde)
         {
             yield return new RepairFinding("STABILITE", "creation de vidage",
-                $"{v.Echecs.Count} échec(s), aucun vidage gardé", null, RepairStatus.Suspicious,
-                $"Windows a voulu écrire un fichier de vidage après un plantage et n'y est pas arrivé (le "
-                + string.Join(" et le ", v.Echecs.Select(d => d.ToLocalTime().ToString("dd/MM à HH:mm")))
-                + "). Sans ce fichier, la cause d'un écran bleu ne peut pas être relue après coup. Changer le "
-                + "type de vidage ne réglerait rien : c'est l'écriture qui échoue. La cause de l'échec n'est pas établie."
-                + (v.DernierMessage.Length > 0 ? $" Windows a noté : « {v.DernierMessage} »" : ""));
+                Docteur.T("ST.Vidage.EchecsValeur", v.Echecs.Count), null, RepairStatus.Suspicious,
+                Docteur.T("ST.Vidage.Echecs", string.Join(Docteur.T("ST.Vidage.EtLe"),
+                    v.Echecs.Select(d => d.ToLocalTime().ToString(Docteur.T("ST.FormatDateA"), Docteur.Langue))))
+                + (v.DernierMessage.Length > 0 ? Docteur.T("ST.Vidage.WindowsANote", v.DernierMessage) : ""));
             yield break;
         }
 
         yield return new RepairFinding("STABILITE", "creation de vidage",
-            $"{v.PetitsVidages} petit(s) vidage(s)" + (v.VidageComplet ? " et un vidage complet" : "") + $", {v.Echecs.Count} échec(s)",
-            null, RepairStatus.Observed,
-            $"Ce que Windows a gardé après ses plantages, et ses échecs d'écriture sur {FenetreArrets.TotalDays:0} jours.");
+            Docteur.T("ST.Vidage.Petits", v.PetitsVidages) + (v.VidageComplet ? Docteur.T("ST.Vidage.Complet") : "")
+            + Docteur.T("ST.Vidage.EchecsCompte", v.Echecs.Count),
+            null, RepairStatus.Observed, Docteur.T("ST.Vidage.Garde", FenetreArrets.TotalDays));
     }
 
-    // 03/10/2026 (tour H2) : chaque incident rapproché de ce qui a été installé juste avant.
+    // Chaque incident rapproché de ce qui a été installé juste avant.
     private IEnumerable<RepairFinding> AvantLesIncidents()
         => AvantLIncident.Juger(IncidentsDates() ?? [], [.. AvantLIncident.LirePilotes(), .. AvantLIncident.LireLogiciels()], DateTimeOffset.Now);
 
-    // 06/10/2026 (plan 3.4) : le point de restauration d'avant le souci en cours.
+    // Le point de restauration d'avant le souci en cours.
     private IEnumerable<RepairFinding> PointSain()
     {
         var lus = _wmi.QueryInNamespace(@"\\.\root\default", "SELECT CreationTime, Description FROM SystemRestore");
@@ -119,7 +115,7 @@ public sealed partial class RepairAuditService
         return PointDeRestaurationSain.Juger(points, IncidentsDates(), DateTimeOffset.Now, DateTimeOffset.UtcNow - FenetreArrets);
     }
 
-    // Revue adverse du 09/10/2026 (P1) : null quand un des deux journaux est illisible (« non lu » n'est pas « aucun »).
+    // Null quand un des deux journaux est illisible (« non lu » n'est pas « aucun »).
     private List<FaitDate>? IncidentsDates()
     {
         var depuis = DateTimeOffset.UtcNow - FenetreArrets;
@@ -129,40 +125,38 @@ public sealed partial class RepairAuditService
         if (!lus.IsOk || !rapports.IsOk) return null;
         if (lus is { IsOk: true } arrets)
             incidents.AddRange(ArretBrutal.HorsBouton(arrets.Value!).Select(a =>
-                new FaitDate(a.Quand, a.EcranBleu ? $"écran bleu {a.CodeHexa}"
-                    : a.TransitionEnCours ? "arrêt brutal (mise en veille signalée)" : "arrêt brutal sans code")));
+                new FaitDate(a.Quand, a.EcranBleu ? Docteur.T("ST.Fait.EcranBleu", a.CodeHexa)
+                    : Docteur.T(a.TransitionEnCours ? "ST.Fait.ArretVeille" : "ST.Fait.ArretSansCode"))));
         if (rapports is { IsOk: true } noyau)
-            // Revue adverse du 09/10/2026 (R6) : un vidage à chaud isolé n'est pas un plantage (la machine a continué) ;
+            // Un vidage à chaud isolé n'est pas un plantage (la machine a continué) ;
             // seule une signature répétée (3 fois, comme son constat) entre dans la chaîne des incidents.
             incidents.AddRange(noyau.Value!.Where(r => r.Quand >= depuis).GroupBy(r => (r.Code, r.Parametre1))
                 .Where(g => g.Count() >= 3).SelectMany(g => g).Select(r =>
-                new FaitDate(r.Quand, r.EstGraphique ? "blocage de la carte graphique" : $"incident noyau 0x{r.Code:X}")));
+                new FaitDate(r.Quand, r.EstGraphique ? Docteur.T("ST.Fait.BlocageCarte") : Docteur.T("ST.Fait.IncidentNoyau", r.Code))));
         return incidents;
     }
 
     private IEnumerable<RepairFinding> IncidentsNoyau()
     {
         var rapports = _noyau.Lire();
-        // F-36 : la cause d'un refus dépend des droits : sans eux, les relancer ; avec, le dossier est durci.
-        string Cause() => _eleve() ? " DrDXT tourne déjà en administrateur : le dossier des rapports est verrouillé."
-            : " " + SansDroits;
+        // La cause d'un refus dépend des droits : sans eux, les relancer ; avec, le dossier est durci.
+        string Cause() => _eleve() ? Docteur.T("ST.Noyau.CauseAdmin") : " " + SansDroits;
         if (!rapports.IsOk)
         {
             yield return new RepairFinding("STABILITE", "incident noyau conserve", null, null,
-                RepairStatus.Unknown, (rapports.Error?.Message ?? "rapports WER illisibles") + Cause());
+                RepairStatus.Unknown, (rapports.Error?.Message ?? Docteur.T("ST.Noyau.WerIllisibles")) + Cause());
             yield break;
         }
 
-        // F-31 : refus partiel : les lus sont jugés plus bas, les refusés sont dits à part.
+        // Refus partiel : les lus sont jugés plus bas, les refusés sont dits à part.
         if (_noyau.Refuses > 0)
             yield return new RepairFinding("STABILITE", "incidents noyau non lus", $"{_noyau.Refuses}", null, RepairStatus.Unknown,
-                $"{_noyau.Refuses} rapport(s) d'incident noyau n'ont pas pu être lus (accès refusé) ; ceux qui suivent sont "
-                + "les seuls lus." + Cause());
+                Docteur.T("ST.Noyau.Refuses", _noyau.Refuses) + Cause());
 
         if (rapports.Value!.Count == 0)
         {
-            yield return new RepairFinding("STABILITE", "incident noyau conserve", "aucun", null,
-                RepairStatus.ExpectedDefault, "aucun rapport noyau conserve par WER");
+            yield return new RepairFinding("STABILITE", "incident noyau conserve", Docteur.T("ST.Noyau.Aucun"), null,
+                RepairStatus.ExpectedDefault, Docteur.T("ST.Noyau.AucunRapport"));
             yield break;
         }
 
@@ -170,47 +164,47 @@ public sealed partial class RepairAuditService
         {
             var dernier = groupe.First();
             var n = groupe.Count();
-            // DOC-QUALITE (09/10/2026) : répété ET récent (30 jours), c'est une condition qui revient ; plus ancien, un fait daté.
+            // Répété et récent (30 jours), c'est une condition qui revient ; plus ancien, un fait daté.
             var plusRecent = groupe.Max(r => r.Quand);
             var recent = DateTimeOffset.UtcNow - plusRecent <= TimeSpan.FromDays(30);
             yield return new RepairFinding("STABILITE", "incident noyau conserve",
-                // 24/09/2026 : un incident isolé est « observé » et s'affiche dans la liste sans geste,
+                // Un incident isolé est « observé » et s'affiche dans la liste sans geste,
                 // qui ne montre que la valeur. L'explication de CauseUsb3 n'était donc jamais lue :
                 // sa famille entre dans la valeur.
                 $"{n}x {dernier.Phrase}" + FamilleUsb3(dernier.Code, dernier.Parametre1), null,
                 // Un incident isole est une observation ; repete a l'identique, il decrit une
                 // condition qui revient.
                 n >= 3 && recent ? RepairStatus.Suspicious : RepairStatus.Observed,
-                // 25/09/2026 (photo) : deux incidents distincts portaient le même titre, l'un dans
+                // Deux incidents distincts portaient le même titre, l'un dans
                 // « Mesuré », l'autre dans « Constaté » ; le code n'était que dans l'étiquette. Il est
                 // nommé dès la première phrase.
-                (n >= 3 ? $"{n} fois la même signature, 0x{dernier.Code:X}{(dernier.NomSdk is { } sdk ? " " + sdk : "")} : "
-                          + (recent ? "ce n'est pas du bruit. " : $"ce n'était pas du bruit, mais rien depuis le {plusRecent.ToLocalTime():dd/MM}. ")
-                        : "incident isolé, conservé par Windows. ")
-                + (dernier.EstGraphique
-                    ? "Il vient de la carte graphique et de son pilote : Windows a photographié le pilote "
-                      + "pendant un blocage. DrDXT ne sait pas ce que veut dire le paramètre, il ne l'invente pas. "
-                    : CauseUsb3(dernier.Code, dernier.Parametre1))
-                + "Dates : "
-                + string.Join(", ", groupe.Select(r => r.Quand.ToLocalTime().ToString("dd/MM/yyyy HH:mm")))
-                // 17/09/2026, reference Microsoft « Bug Check 0x193 VIDEO_DXGKRNL_LIVEDUMP » (maj 10/09/2024) :
+                (n >= 3 ? Docteur.T("ST.Noyau.MemeSignature", n, dernier.Code, dernier.NomSdk is { } sdk ? " " + sdk : "")
+                          + (recent ? Docteur.T("ST.Noyau.PasDuBruit") : Docteur.T("ST.Noyau.PlusDuBruit", plusRecent.ToLocalTime()))
+                        : Docteur.T("ST.Noyau.Isole"))
+                + (dernier.EstGraphique ? Docteur.T("ST.Noyau.Graphique") : CauseUsb3(dernier.Code, dernier.Parametre1))
+                + Docteur.T("ST.Noyau.Dates",
+                    string.Join(", ", groupe.Select(r => r.Quand.ToLocalTime().ToString(Docteur.T("ST.FormatDateHeure"), Docteur.Langue))))
+                // Reference Microsoft « Bug Check 0x193 VIDEO_DXGKRNL_LIVEDUMP » (maj 10/09/2024) :
                 // « This code can never be used for a real bug check; it is used to identify live dumps »,
                 // et le parametre 1 n'y est documente que pour 0x100 (Internal). Le 0x80e vu sur la machine de
                 // reference n'y figure pas : « ne l'invente pas » est la seule phrase juste.
-                + ". Un vidage à chaud n'est pas un plantage : la machine a continué de tourner.");
+                + Docteur.T("ST.Noyau.VidageAChaud"));
         }
     }
 
-    // 24/09/2026, référence Microsoft « Bug Check 0x144 BUGCODE_USB3_DRIVER » : les paramètres
+    // Référence Microsoft « Bug Check 0x144 BUGCODE_USB3_DRIVER » : les paramètres
     // 0x1001-0x1022 et 0x3000-0x3003 portent un contexte de vidage à chaud (XHCI_LIVEDUMP_CONTEXT,
     // USBHUB3_LIVEDUMP_CONTEXT). Seul 0x1009, vu sur la machine de référence, a sa cause recopiée ;
     // les autres sont nommés par leur famille, rien de plus.
     /// <summary>La famille seule, pour la valeur affichée : « , contrôleur USB 3 (vidage à chaud) ».</summary>
     internal static string FamilleUsb3(uint code, string? parametre1)
     {
-        var cause = CauseUsb3(code, parametre1);
-        return cause.Contains("concentrateur", StringComparison.Ordinal) ? ", concentrateur USB 3 (vidage à chaud)"
-            : cause.Contains("contrôleur", StringComparison.Ordinal) ? ", contrôleur USB 3 (vidage à chaud)"
+        // Par le paramètre, pas par le texte de la cause : il change de langue.
+        if (code != 0x144 || !uint.TryParse(parametre1, System.Globalization.NumberStyles.HexNumber,
+                System.Globalization.CultureInfo.InvariantCulture, out var p))
+            return "";
+        return p is >= 0x3000 and <= 0x3003 ? Docteur.T("ST.Usb3.Concentrateur")
+            : p is >= 0x1001 and <= 0x1022 ? Docteur.T("ST.Usb3.Controleur")
             : "";
     }
 
@@ -220,29 +214,23 @@ public sealed partial class RepairAuditService
             || !uint.TryParse(parametre1, System.Globalization.NumberStyles.HexNumber,
                    System.Globalization.CultureInfo.InvariantCulture, out var p))
             return "";
-        var cause = p == 0x1009
-            ? "une commande du contrôleur n'a pas abouti, même après son abandon sur délai dépassé. "
-            : "";
         return p is >= 0x1001 and <= 0x1022
-            ? "Il vient du contrôleur USB 3 de la carte mère : Microsoft range ce paramètre parmi les "
-              + "vidages à chaud du contrôleur" + (cause.Length > 0 ? ", ici : " + cause : ". ")
+            ? Docteur.T("ST.Usb3.ControleurCause") + (p == 0x1009 ? Docteur.T("ST.Usb3.Ici", Docteur.T("ST.Usb3.Cause1009")) : ". ")
             : p is >= 0x3000 and <= 0x3003
-                ? "Il vient d'un concentrateur USB 3 : Microsoft range ce paramètre parmi les vidages à "
-                  + "chaud du concentrateur. "
+                ? Docteur.T("ST.Usb3.ConcentrateurCause")
                 : "";
     }
 
     /// <summary>
     /// Les arrets brutaux, dits sans condition.
     ///
-    /// Ce lecteur existait depuis le 06/09 et n'atteignait l'ecran que par
-    /// <see cref="Settings.MemoryStabilityAdvisor"/>, qui ne parle que si XMP est actif et que des
-    /// arrets existent. Sur une machine dont la memoire tourne au JEDEC, onze arrets brutaux en
-    /// quatre-vingt-dix jours n'etaient donc dits nulle part. Un fait de cette taille ne peut pas
-    /// dependre d'une hypothese sur la memoire pour avoir le droit d'exister.
+    /// <see cref="Settings.MemoryStabilityAdvisor"/> ne parle que si XMP est actif et que des arrets
+    /// existent : sur une machine dont la memoire tourne au JEDEC, onze arrets brutaux en
+    /// quatre-vingt-dix jours ne seraient dits nulle part. Un fait de cette taille ne depend pas
+    /// d'une hypothese sur la memoire.
     ///
-    /// Ce constat ne DESIGNE aucune cause. Un `Kernel-Power 41` dit que Windows a redemarre sans
-    /// avoir ete arrete proprement — gel, coupure de courant, reset, gardien materiel, tout y
+    /// Ce constat ne designe aucune cause. Un `Kernel-Power 41` dit que Windows a redemarre sans
+    /// avoir ete arrete proprement : gel, coupure de courant, reset, gardien materiel, tout y
     /// ressemble. Nommer un coupable ici serait inventer.
     /// </summary>
     private IEnumerable<RepairFinding> ArretsBrutaux()
@@ -252,49 +240,44 @@ public sealed partial class RepairAuditService
 
         if (!lus.IsOk)
         {
-            yield return new RepairFinding("STABILITE", "arrets brutaux", null, "aucun",
-                RepairStatus.Unknown,
-                $"le journal n'a pas pu être lu ({lus.Error?.Message}). « Non lu » n'est pas "
-                + "« aucun arrêt ».");
+            yield return new RepairFinding("STABILITE", "arrets brutaux", null, Docteur.T("ST.Arrets.Aucun"),
+                RepairStatus.Unknown, Docteur.T("ST.Arrets.NonLu", lus.Error?.Message));
             yield break;
         }
 
-        // 16/09/2026 : un appui long sur le bouton est un geste, pas une instabilite. Il est dit,
+        // Un appui long sur le bouton est un geste, pas une instabilite. Il est dit,
         // jamais compte.
         var tous = lus.Value!;
         var comptes = ArretBrutal.HorsBouton(tous);
         var bouton = tous.Count - comptes.Count;
         if (comptes.Count == 0)
         {
-            yield return new RepairFinding("STABILITE", "arrets brutaux", "aucun", "aucun",
-                RepairStatus.ExpectedDefault, $"aucun redémarrage non propre sur {jours} jours"
-                + (bouton > 0 ? $" ({bouton} appui(s) long(s) sur le bouton, non compte(s))" : ""));
+            yield return new RepairFinding("STABILITE", "arrets brutaux", Docteur.T("ST.Arrets.Aucun"), Docteur.T("ST.Arrets.Aucun"),
+                RepairStatus.ExpectedDefault, Docteur.T("ST.Arrets.AucunRedemarrage", jours)
+                + (bouton > 0 ? Docteur.T("ST.Arrets.BoutonNonCompte", bouton) : ""));
             yield break;
         }
 
         var repete = comptes.Count >= SeuilArretsRepetes;
         yield return new RepairFinding("STABILITE", "arrets brutaux",
-            $"{comptes.Count} sur {jours} jours", "aucun",
+            Docteur.T("ST.Arrets.SurJours", comptes.Count, jours), Docteur.T("ST.Arrets.Aucun"),
             repete ? RepairStatus.Suspicious : RepairStatus.Observed,
-            (repete
-                ? $"{comptes.Count} redémarrages non propres{DontEnVeille(comptes)} : ce n'est plus un accident isolé. "
-                : "redémarrage non propre, isolé à ce stade. ")
-            + "Ce que le journal en dit : " + Repartition(comptes, bouton, PartiesInterrompues()) + "."
-            // Revue adverse du 09/10/2026 (R9) : « à corriger » portait son geste ailleurs, ou nulle part. Celui de la page
+            (repete ? Docteur.T("ST.Arrets.Repetes", comptes.Count, DontEnVeille(comptes)) : Docteur.T("ST.Arrets.Isole"))
+            + Docteur.T("ST.Arrets.CeQueDit", Repartition(comptes, bouton, PartiesInterrompues()))
+            // « à corriger » portait son geste ailleurs, ou nulle part. Celui de la page
             // Microsoft « Event ID 41 » (scénario 3, citée en tête de ce fichier).
-            + (repete ? " Ce que conseille Microsoft : couper tout surcadençage (y compris la mémoire), puis tester la mémoire "
-                        + "(voir le constat du test mémoire)." : ""),
+            + (repete ? Docteur.T("ST.Arrets.Microsoft") : ""),
             repete ? RepairAction.Recommandation : RepairAction.Aucune);
     }
 
-    // DOC-QUALITE (09/10/2026) : la part signalée en veille dès la première phrase. Sur la machine de référence, 8 des 11
-    // arrêts ; le chiffre seul se lisait comme 11 plantages. Le sens de ce signal reste non documenté : il est dit, pas jugé.
+    // La part signalée en veille dès la première phrase. Sur la machine de référence, 8 des 11
+    // arrêts ; le chiffre seul passerait pour 11 plantages. Le sens de ce signal reste non documenté : il est dit, pas jugé.
     private static string DontEnVeille(IReadOnlyList<ArretBrutal> comptes)
         => comptes.Count(a => !a.EcranBleu && a.TransitionEnCours) is var t and > 0
-            ? $", dont {t} pendant une mise en veille signalée"
+            ? Docteur.T("ST.Arrets.DontVeille", t)
             : "";
 
-    /// <summary>D1 (08/10/2026) : les parties que le relevé n'a pas pu clore (écrites par PartiesMemorisees, dans le dossier
+    /// <summary>Les parties que le relevé n'a pas pu clore (écrites par PartiesMemorisees, dans le dossier
     /// des données). Illisible ou absent : aucune, rien n'est inventé.</summary>
     internal static IReadOnlyList<PartieInterrompue> PartiesInterrompues()
     {
@@ -311,48 +294,46 @@ public sealed partial class RepairAuditService
     /// <summary>La repartition lue dans `Kernel-Power 41`, dans l'ordre de ce qui pese le plus.</summary>
     internal static string Repartition(IReadOnlyList<ArretBrutal> comptes, int bouton, IReadOnlyList<PartieInterrompue>? interrompues = null)
     {
-        static string Pluriel(int n, string un, string plusieurs) => n == 1 ? un : plusieurs;
+        static string Pluriel(int n, string un, string plusieurs) => Docteur.T(n == 1 ? un : plusieurs);
         var morceaux = new List<string>();
 
         var ecrans = comptes.Where(a => a.EcranBleu).OrderByDescending(a => a.Quand).ToList();
         if (ecrans.Count > 0)
-            morceaux.Add($"{ecrans.Count} {Pluriel(ecrans.Count, "écran bleu", "écrans bleus")} ("
+            morceaux.Add($"{ecrans.Count} {Pluriel(ecrans.Count, "ST.Rep.EcranBleu", "ST.Rep.EcransBleus")} ("
                          + string.Join(", ", ecrans.Select(a => $"{a.CodeHexa}"
                              + (WerLiveKernelReportLog.NomSdk(a.CodeArret) is { } nom ? $" {nom}" : "")
-                             + F($" le {a.Quand.ToLocalTime():dd/MM}"))) + ")");
+                             + Docteur.T("ST.Rep.Le", a.Quand.ToLocalTime()))) + ")");
 
-        // 17/09/2026 : les dates changent la lecture. Sur la machine de reference, les 7 arrets en
-        // transition datent du 22/07 au 05/08 et plus rien depuis : sans les dates, ils passaient
-        // pour un probleme en cours.
+        // Les dates changent la lecture : des arrets tous anciens, sans leurs dates,
+        // passeraient pour un probleme en cours.
         static string Quand(IEnumerable<ArretBrutal> a)
         {
             var d = a.Select(x => x.Quand.ToLocalTime()).OrderBy(x => x).ToList();
-            return d.Count == 1 ? F($"le {d[0]:dd/MM}") : F($"du {d[0]:dd/MM} au {d[^1]:dd/MM}");
+            return d.Count == 1 ? Docteur.T("ST.Rep.QuandLe", d[0]) : Docteur.T("ST.Rep.QuandDuAu", d[0], d[^1]);
         }
 
         var sansCodeListe = comptes.Where(a => !a.EcranBleu && !a.TransitionEnCours).ToList();
         var sansCode = sansCodeListe.Count;
         if (sansCode > 0)
-            morceaux.Add($"{sansCode} {Pluriel(sansCode, "arrêt sans aucun code", "arrêts sans aucun code")} "
-                         + $"(gel, coupure de courant ou alimentation ; {Quand(sansCodeListe)})");
+            morceaux.Add($"{sansCode} {Pluriel(sansCode, "ST.Rep.SansCode", "ST.Rep.SansCodes")}"
+                         + Docteur.T("ST.Rep.SansCodeSuite", Quand(sansCodeListe)));
 
         var transitionListe = comptes.Where(a => !a.EcranBleu && a.TransitionEnCours).ToList();
         var transition = transitionListe.Count;
         if (transition > 0)
-            // 24/09/2026 : « pendant une mise en veille » lisait le NOM du champ. Microsoft ne définit
+            // « pendant une mise en veille » lirait le nom du champ. Microsoft ne définit
             // SleepInProgress nulle part (page Event ID 41, archive TechNet, Q&A relues ce jour).
-            morceaux.Add($"{transition} avec une mise en veille signalée en cours, sens que Microsoft "
-                         + $"ne documente pas ({Quand(transitionListe)})");
+            morceaux.Add(Docteur.T("ST.Rep.Transition", transition, Quand(transitionListe)));
 
-        // 08/10/2026 (D1 « sous charge ») : le journal ne le dit pas ; une partie interrompue juste avant le dit.
+        // Le journal ne le dit pas ; une partie interrompue juste avant le dit.
         if (interrompues is { Count: > 0 }
             && ClasseurDArrets.MarquerSousCharge(comptes.Select(a => a.Classe).ToList(), interrompues)
                 .Where(a => a.PendantLaPartieDe is not null).ToList() is { Count: > 0 } enPartie)
-            morceaux.Add($"{enPartie.Count} en pleine partie ({string.Join(", ", enPartie.Select(a => a.PendantLaPartieDe).Distinct())}"
-                         + F($", {string.Join(", ", enPartie.Select(a => a.Quand.ToLocalTime().ToString("dd/MM", System.Globalization.CultureInfo.InvariantCulture)))})"));
+            morceaux.Add(Docteur.T("ST.Rep.EnPartie", enPartie.Count, string.Join(", ", enPartie.Select(a => a.PendantLaPartieDe).Distinct()),
+                string.Join(", ", enPartie.Select(a => a.Quand.ToLocalTime().ToString(Docteur.T("ST.Rep.FormatJour"), System.Globalization.CultureInfo.InvariantCulture)))));
 
         if (bouton > 0)
-            morceaux.Add($"{bouton} {Pluriel(bouton, "appui long sur le bouton, non compté", "appuis longs sur le bouton, non comptés")}");
+            morceaux.Add($"{bouton} {Pluriel(bouton, "ST.Rep.Bouton", "ST.Rep.Boutons")}");
 
         return string.Join(", ", morceaux);
     }

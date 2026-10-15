@@ -2,7 +2,7 @@ using FluentAssertions;
 
 namespace DrDxt.Profiles.Tests;
 
-// M6 — model invariants (records + the fix-misconfig-first ordering helper).
+// Invariants du modèle (records et l'aide d'ordre « mauvaise configuration d'abord »).
 public sealed class ProfileModelTests
 {
     private static ProfileTweakSelection Sel(string id, ProfileIntent intent) =>

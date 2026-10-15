@@ -7,7 +7,7 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 06/10/2026 (revue) — ce qui suit une annulation retire VRAIMENT le levier du manifeste signé. Avant, il
+// Ce qui suit une annulation retire VRAIMENT le levier du manifeste signé. Avant, il
 // cherchait l'identifiant de l'App (« latency.hagsOn ») parmi ceux du service (« os.hags ») et ne trouvait rien,
 // et il renvoyait un manifeste privé du levier que le magasin FUSIONNAIT, sans jamais rien retirer. Le service
 // reposait donc au démarrage un levier annulé, et la désinstallation en gardait la première origine.
@@ -41,5 +41,21 @@ public sealed class RetraitDeLevierTests
         (await RetraitDeLevier.ApresAnnulationAsync(refuse, new JournalDesLeviersAppliques(_journal), "os.hags")).IsOk.Should().BeFalse();
         (await RetraitDeLevier.ApresAnnulationAsync(jette, new JournalDesLeviersAppliques(_journal), "os.hags"))
             .Error!.Value.Message.Should().Contain("verrou");
+    }
+
+    // Un journal illisible ne doit pas laisser le levier au manifeste, sinon le service relit une
+    // annulation voulue comme une dérive (ou la repose). Le manifeste se nettoie toujours ; l'échec du journal se dit après.
+    [Fact]
+    public async Task Un_journal_illisible_n_empeche_pas_de_nettoyer_le_manifeste_et_l_echec_se_dit()
+    {
+        File.WriteAllText(_journal, "null");
+        var manifeste = Substitute.For<IDesiredStateStore>();
+        manifeste.RetirerAsync(default!).ReturnsForAnyArgs(Result.Ok());
+
+        var r = await RetraitDeLevier.ApresAnnulationAsync(manifeste, new JournalDesLeviersAppliques(_journal), "latency.hagsOn");
+
+        await manifeste.Received(1).RetirerAsync(Arg.Any<IReadOnlyList<string>>());
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Message.Should().Contain("journal");
     }
 }

@@ -3,24 +3,24 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// R2 GPU bench — GpuBench: a measurement-facing wrapper over the deterministic
-// compute runner. Turns ONE run into a repeatable, comparable result for the
-// tools/r2bench A/B: a throughput SCORE + a stability verdict + a checksum-ok flag.
+// Banc GPU : GpuBench, une enveloppe de mesure sur le runner de calcul déterministe.
+// Transforme une passe en résultat répétable et comparable pour l'A/B de tools/r2bench :
+// un score de débit + un verdict de stabilité + un drapeau « somme de contrôle juste ».
 //
-// The score (ElementIterationsPerSecond = ElementCount * IterationsCompleted /
-// seconds) is the comparable number: because the workload is identical run-to-run,
-// the only thing that moves it is GPU clock/throughput. So: run at stock, apply the
-// +offset via the helper (separate UAC step), run again, compare scores cleanly.
+// Le score (ElementIterationsPerSecond = ElementCount * IterationsCompleted / secondes) est
+// le nombre comparable : la charge étant identique d'une passe à l'autre, seuls l'horloge et
+// le débit du GPU le font bouger. Donc : passe à l'origine, pose du +décalage par le helper
+// (étape UAC à part), nouvelle passe, comparaison nette des scores.
 //
-// Verdict mapping mirrors the probe's fail-safe contract:
-//   * Healthy + checksum-ok  → Stable
-//   * DeviceLost OR checksum-mismatch → Unstable  ("no TDR ≠ stable")
-//   * Error / runner failure → Inconclusive
-// It never throws. Read/compute only — no NVAPI, no GPU write, no elevation.
+// Correspondance des verdicts, même contrat de sécurité que la sonde :
+//   * sain + somme de contrôle juste → Stable
+//   * DeviceLost ou somme de contrôle fausse → Unstable  (« pas de TDR ≠ stable »)
+//   * erreur / panne du runner → Inconclusive
+// Ne lève jamais. Lecture et calcul seulement : pas de NVAPI, pas d'écriture GPU, pas d'élévation.
 // -----------------------------------------------------------------------
 
-/// <summary>One repeatable bench result: a comparable throughput score plus the
-/// stability verdict and whether the deterministic checksum matched the known answer.</summary>
+/// <summary>Un résultat de banc répétable : un score de débit comparable, le verdict de
+/// stabilité, et si la somme de contrôle déterministe correspond à la réponse connue.</summary>
 public sealed record GpuBenchResult(
     StabilityOutcome Stability,
     bool ChecksumOk,

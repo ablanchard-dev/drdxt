@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 04/10/2026 (plan 3b.3) : « prêt à jouer » ne dit une gêne que sur une mesure ; un trou n'est ni une gêne ni un feu vert.
+// « prêt à jouer » ne dit une gêne que sur une mesure ; un trou n'est ni une gêne ni un feu vert.
 public sealed class PretAJouerTests
 {
     private static readonly EtatAvantPartie Propre = new([("explorer", 3)], 1, 0, 12, 0, 60, 18UL << 30);
@@ -25,7 +25,7 @@ public sealed class PretAJouerTests
         PretAJouer.Genes(e, k => k == "PretAJouer.Voisins" ? "{0}" : k)[0].Should().Contain("TiWorker").And.NotContain("explorer");
     }
 
-    // Revue du 04/10 (P1) : un ping internet isolé perdu, ou tous filtrés alors que la box répond, n'est pas une gêne.
+    // Un ping internet isolé perdu, ou tous filtrés alors que la box répond, n'est pas une gêne.
     [Theory]
     [InlineData(10.0)]
     [InlineData(100.0)]

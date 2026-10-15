@@ -4,9 +4,9 @@ using FluentAssertions;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// chantier L-WU : les heures d'activité de Windows Update contre les heures des parties relevées. Les valeurs sont
-/// celles de la machine de référence, lues le 06/10/2026 : heures 15 h à 8 h, une partie le 04/10 de 8:23 à 8:44, un
-/// redémarrage de Windows Update le 06/10 à 10:15.
+/// Les heures d'activité de Windows Update contre les heures des parties relevées. Les valeurs sont
+/// celles relevées sur la machine de référence le 06/10/2026 : heures 15 h à 8 h, une partie de 8:23 à 8:44,
+/// un redémarrage de Windows Update à 10:15.
 /// </summary>
 public sealed class HeuresActivesTests
 {
@@ -70,7 +70,7 @@ public sealed class HeuresActivesTests
         c.Statut.Should().Be(RepairStatus.Suspicious);
         c.Action.Should().Be(RepairAction.Recommandation);
         c.ValeurCourante.Should().Be("15 h à 8 h");
-        // 07/10/2026 (revue F-17) : le mode n'est pas lu sur cette machine ; DrDXT ne propose pas d'écrire, il dit
+        // Le mode n'est pas lu sur cette machine ; DrDXT ne propose pas d'écrire, il dit
         // comment passer en manuel et quelle plage couvrirait la partie. En manuel lu, la plage devient la valeur attendue.
         c.ValeurAttendue.Should().BeNull();
         c.Explication.Should().Contain("Windows ne dit pas s'il les règle tout seul").And.Contain("de 15 h à 9 h couvrirait tes parties");
@@ -127,7 +127,7 @@ public sealed class HeuresActivesTests
         HeuresActives.Depuis(24, 8, null).Should().BeNull();
         HeuresActives.Depuis(null, 8, null).Should().BeNull();
     }
-    // 07/10/2026 (revue F-18) : la plage proposée peut retirer des heures protégées aujourd'hui ; le constat les nomme.
+    // La plage proposée peut retirer des heures protégées aujourd'hui ; le constat les nomme.
     [Fact]
     public void Les_heures_que_la_plage_proposee_ne_protege_plus_sont_dites()
     {

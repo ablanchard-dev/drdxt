@@ -7,7 +7,7 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// 03/10/2026 (boucle 2D2P, P3.2b) : la boucle « programmes gourmands après le jeu ». Système simulé : aucune priorité n'est
+// La boucle « programmes gourmands après le jeu ». Système simulé : aucune priorité n'est
 // posée sur la machine des tests. Le jeu tourne deux lectures, puis s'arrête : le voisin calmé doit retrouver sa priorité.
 public sealed class CalmerPendantLesPartiesTests
 {
@@ -71,7 +71,7 @@ public sealed class CalmerPendantLesPartiesTests
         sys.Historique.Should().Contain(ProcessPriorityClass.BelowNormal);
     }
 
-    // 07/10/2026 (revue F-26) : une vidéo en plein écran n'est pas une partie ; rien n'est calmé à côté d'elle.
+    // Une vidéo en plein écran n'est pas une partie ; rien n'est calmé à côté d'elle.
     [Fact]
     public async Task Une_fenetre_qui_n_est_pas_un_jeu_ne_calme_rien()
     {

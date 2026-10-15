@@ -1,4 +1,4 @@
-<!-- Manual LIVE smoke harness for the M2 SAFE apply->revert pipeline. NOT part of DrDXT.sln. -->
+<!-- Manual LIVE smoke harness for the SAFE apply->revert pipeline. NOT part of DrDXT.sln. -->
 <!-- Talks to the RUNNING elevated helper over the signed, allowlisted typed IPC and -->
 <!-- performs a real power-plan switch + revert (the boundary unit tests can't cover). -->
 <!-- See README.md in this folder for the exact launch + run commands. -->

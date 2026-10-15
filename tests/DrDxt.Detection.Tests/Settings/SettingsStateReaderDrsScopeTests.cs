@@ -8,7 +8,7 @@ using NSubstitute;
 namespace DrDxt.Detection.Tests.Settings;
 
 /// <summary>
-/// PHASE 18 F1 — le mode de gestion d'alimentation du pilote se lit au profil que le pilote
+/// Le mode de gestion d'alimentation du pilote se lit au profil que le pilote
 /// Applique au jeu. Le produit lisait le profil de base : un profil de jeu portant sa propre
 /// valeur rendait le gate aveugle, dans les deux sens.
 /// </summary>
@@ -85,7 +85,7 @@ public class SettingsStateReaderDrsScopeTests
     [Fact]
     public async Task Le_plafond_d_images_pose_AU_PROFIL_DU_JEU_est_vu_par_le_scan()
     {
-        // 14/09/2026 (relecture 12/20, lot A) : VrrVsyncCap pose le plafond au profil du jeu
+        // VrrVsyncCap pose le plafond au profil du jeu
         // depuis `5619aa8`, et le scan le relisait au GLOBAL (0 ici) : le produit ne voyait plus le
         // plafond qu'il avait lui-meme pose, et le classifieur jugeait l'A/B suivant sans lui.
         var etat = await Lire(new Pilote(global: 1, auJeu: (141, Propre)), new JeuFixe(Jeu), EcranUnique144());
@@ -139,7 +139,7 @@ public class SettingsStateReaderDrsScopeTests
         etat.NvidiaDrsScope.Should().BeNull();
     }
 
-    // 06/10/2026 (L-PROF) : l'en-tête officiel NvApiDriverSettings.h (github.com/NVIDIA/nvapi) donne six valeurs à
+    // L'en-tête officiel NvApiDriverSettings.h (github.com/NVIDIA/nvapi) donne six valeurs à
     // PREFERRED_PSTATE, et sa valeur par défaut est OPTIMAL_POWER (5), pas ADAPTIVE (0). Seul 1 (PREFER_MAX) est « au
     // maximum » : toute autre valeur LUE de l'en-tête dit « pas au maximum ». Avant, 2 à 5 rendaient Unknown, et le levier
     // n'était jamais proposé sur une carte au réglage par défaut du pilote.

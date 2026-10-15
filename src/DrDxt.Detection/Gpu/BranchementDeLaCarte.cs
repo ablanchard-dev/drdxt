@@ -5,7 +5,7 @@ using DrDxt.Detection.Wmi;
 namespace DrDxt.Detection.Gpu;
 
 /// <summary>
-/// 06/10/2026 (chantier B3) : la carte graphique est-elle branchée comme elle le peut ?
+/// La carte graphique est-elle branchée comme elle le peut ?
 ///
 /// (a) Le lien PCIe, lu par Windows pour toute carte, sans pilote : <c>DEVPKEY_PciDevice_MaxLinkWidth</c> (ce que la carte
 /// sait faire) et <c>CurrentLinkWidth</c> (ce qui est négocié avec l'emplacement), devpkey.h, propriétés 9 à 12 de
@@ -26,35 +26,31 @@ public static class BranchementDeLaCarte
     private static readonly System.Text.RegularExpressions.Regex CarteDediee =
         new(@"GeForce|Quadro|Radeon RX|Radeon Pro|\bArc\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-    /// <param name="batterie">Revue T3+T4 (F-20) : sur un portable la puce est soudée, câblée par le constructeur
+    /// <param name="batterie">Sur un portable la puce est soudée, câblée par le constructeur
     /// (RTX 4080 Laptop en x8) ; la largeur y est dite, pas jugée. null = non lu : rien n'est dit.</param>
     public static IEnumerable<RepairFinding> JugerLien(Lien l, bool? batterie = false)
     {
         if (l.LargeurMax <= 0 || l.Largeur <= 0) yield break;
         var lu = $"x{l.Largeur}" + (l.Generation > 0 ? $", PCIe {l.Generation}.0" : "");
-        // Revue (F-35) : batterie non lue ⇒ le lien est dit sans jugement, pas tu.
+        // Batterie non lue ⇒ le lien est dit sans jugement, pas tu.
         if (batterie is null && l.Largeur < l.LargeurMax)
         {
-            yield return new RepairFinding("GPU", $"lien PCIe de {l.Carte}", lu, $"x{l.LargeurMax}", RepairStatus.Unknown,
-                $"la carte sait travailler en x{l.LargeurMax} et tourne en x{l.Largeur}. DrDXT n'a pas pu lire si ce PC est un "
-                + "portable (carte soudée, câblage choisi par le constructeur) ou un fixe (emplacement, rallonge) : non jugé.");
+            yield return new RepairFinding("GPU", Docteur.Nom("BR.Nom.Lien", l.Carte), lu, $"x{l.LargeurMax}", RepairStatus.Unknown,
+                Docteur.T("BR.NonJuge", l.LargeurMax, l.Largeur));
             yield break;
         }
         if (batterie == true && l.Largeur < l.LargeurMax)
         {
-            yield return new RepairFinding("GPU", $"lien PCIe de {l.Carte}", lu, $"x{l.LargeurMax}", RepairStatus.Observed,
-                $"la carte sait travailler en x{l.LargeurMax} et tourne en x{l.Largeur}. Sur un portable, la carte est soudée "
-                + "et le constructeur choisit ce câblage : c'est dit, pas un défaut.");
+            yield return new RepairFinding("GPU", Docteur.Nom("BR.Nom.Lien", l.Carte), lu, $"x{l.LargeurMax}", RepairStatus.Observed,
+                Docteur.T("BR.Portable", l.LargeurMax, l.Largeur));
             yield break;
         }
         yield return l.Largeur < l.LargeurMax
-            ? new RepairFinding("GPU", $"lien PCIe de {l.Carte}", lu, $"x{l.LargeurMax}", RepairStatus.Suspicious,
-                $"ta carte sait travailler en x{l.LargeurMax} et tourne en x{l.Largeur}. Les causes habituelles : elle est dans un "
-                + "emplacement secondaire (moins de lignes câblées), sur une rallonge, ou mal enfoncée. Le manuel de ta carte "
-                + "mère dit quel emplacement est câblé en x16 ; éteins le PC avant de la déplacer.",
+            ? new RepairFinding("GPU", Docteur.Nom("BR.Nom.Lien", l.Carte), lu, $"x{l.LargeurMax}", RepairStatus.Suspicious,
+                Docteur.T("BR.Fixe", l.LargeurMax, l.Largeur),
                 RepairAction.Recommandation)
-            : new RepairFinding("GPU", $"lien PCIe de {l.Carte}", lu, $"x{l.LargeurMax}", RepairStatus.ExpectedDefault,
-                "la carte tourne à la largeur qu'elle sait faire. La génération PCIe peut baisser au repos pour économiser.");
+            : new RepairFinding("GPU", Docteur.Nom("BR.Nom.Lien", l.Carte), lu, $"x{l.LargeurMax}", RepairStatus.ExpectedDefault,
+                Docteur.T("BR.PleineLargeur"));
     }
 
     /// <param name="adaptateursDesEcrans">Le nom de l'adaptateur de chaque écran actif (EnumDisplayDevices).</param>
@@ -64,19 +60,16 @@ public static class BranchementDeLaCarte
         if (batterie is not false) yield break;
         var dediee = cartes.FirstOrDefault(c => c.VramBytes >= Dediee);
         if (dediee is null) yield break;
-        // Revue T3+T4 (F-21) : une GT 710 ou une Quadro de 1 Go est une carte dédiée, pas la carte mère.
+        // Une GT 710 ou une Quadro de 1 Go est une carte dédiée, pas la carte mère.
         var integrees = adaptateursDesEcrans
             .Where(a => cartes.Any(c => c.VramBytes > 0 && c.VramBytes <= Integree && !CarteDediee.IsMatch(c.Model)
                                         && c.Model.Equals(a, StringComparison.OrdinalIgnoreCase)))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (integrees.Count == 0) yield break;
-        yield return new RepairFinding("GPU", "écran branché sur la carte mère", string.Join(", ", integrees), dediee.Model,
+        yield return new RepairFinding("GPU", Docteur.Nom("BR.Nom.Ecran"), string.Join(", ", integrees), dediee.Model,
             RepairStatus.Suspicious,
-            // F-22 : un 2e écran sur la carte mère ne dit rien du jeu sur l'écran principal : la phrase parle de cet écran.
-            $"un écran est branché sur une sortie de la carte mère ({string.Join(", ", integrees)}) alors que ta carte "
-            + $"{dediee.Model} est là : un jeu affiché sur cet écran passe par la puce intégrée, ou recopie chaque image "
-            + "d'une carte à l'autre. Pour l'écran où tu joues, "
-            + "branche le câble sur une sortie de la carte graphique (en général plus bas, à l'horizontale).",
+            // Un 2e écran sur la carte mère ne dit rien du jeu sur l'écran principal : la phrase parle de cet écran.
+            Docteur.T("BR.Ecran", string.Join(", ", integrees), dediee.Model),
             RepairAction.Recommandation);
     }
 
@@ -95,7 +88,7 @@ public static class BranchementDeLaCarte
         return liens;
     }
 
-    /// <summary>07/10/2026 (chantier D5) : le lien PCIe de chaque SSD NVMe, par les mêmes propriétés que la carte.
+    /// <summary>Le lien PCIe de chaque SSD NVMe, par les mêmes propriétés que la carte.
     /// Le contrôleur se reconnaît à son code de classe PCI (CompatibleID « PCI\CC_010802 », stockage NVMe), pas à son nom
     /// traduit (« Contrôleur NVM Express standard »).</summary>
     public static IReadOnlyList<Lien> LireLiensNvme(IWmiQuery wmi)
@@ -113,7 +106,7 @@ public static class BranchementDeLaCarte
         return liens;
     }
 
-    /// <summary>D5 : un SSD NVMe câblé sur moins de lignes que les siennes (x2 au lieu de x4) perd la moitié de son débit :
+    /// <summary>Un SSD NVMe câblé sur moins de lignes que les siennes (x2 au lieu de x4) perd la moitié de son débit :
     /// un emplacement M.2 partagé ou relié au chipset. La génération sous son maximum est dite sans jugement (emplacement
     /// plus ancien, ou état d'économie). Le temps de chargement gagné n'est pas chiffré.</summary>
     public static IEnumerable<RepairFinding> JugerLienSsd(Lien l)
@@ -122,18 +115,14 @@ public static class BranchementDeLaCarte
         var lu = $"x{l.Largeur}" + (l.Generation > 0 ? $", PCIe {l.Generation}.0" : "");
         var max = $"x{l.LargeurMax}" + (l.GenerationMax > 0 ? $", PCIe {l.GenerationMax}.0" : "");
         if (l.Largeur < l.LargeurMax)
-            yield return new RepairFinding("STOCKAGE", $"lien PCIe du SSD {l.Carte}", lu, max, RepairStatus.Suspicious,
-                $"ton SSD sait travailler en x{l.LargeurMax} et tourne en x{l.Largeur} : son débit maximal est divisé d'autant. "
-                + "Les causes habituelles : un emplacement M.2 qui partage ses lignes avec un autre (carte graphique, port SATA), "
-                + "ou relié au chipset. Le manuel de ta carte mère dit quel emplacement M.2 a toutes ses lignes ; éteins le PC "
-                + "avant de déplacer le SSD.", RepairAction.Recommandation);
+            yield return new RepairFinding("STOCKAGE", Docteur.Nom("BR.Nom.LienSsd", l.Carte), lu, max, RepairStatus.Suspicious,
+                Docteur.T("BR.SsdLargeur", l.LargeurMax, l.Largeur), RepairAction.Recommandation);
         else if (l.GenerationMax > 0 && l.Generation > 0 && l.Generation < l.GenerationMax)
-            yield return new RepairFinding("STOCKAGE", $"lien PCIe du SSD {l.Carte}", lu, max, RepairStatus.Observed,
-                $"ton SSD sait travailler en PCIe {l.GenerationMax}.0 et tourne en PCIe {l.Generation}.0 : l'emplacement M.2 est "
-                + "peut-être d'une génération plus ancienne, ou le lien était en économie au moment de la lecture. Dit, pas jugé.");
+            yield return new RepairFinding("STOCKAGE", Docteur.Nom("BR.Nom.LienSsd", l.Carte), lu, max, RepairStatus.Observed,
+                Docteur.T("BR.SsdGeneration", l.GenerationMax, l.Generation));
         else
-            yield return new RepairFinding("STOCKAGE", $"lien PCIe du SSD {l.Carte}", lu, max, RepairStatus.ExpectedDefault,
-                "ton SSD tourne à la largeur et à la génération qu'il sait faire.");
+            yield return new RepairFinding("STOCKAGE", Docteur.Nom("BR.Nom.LienSsd", l.Carte), lu, max, RepairStatus.ExpectedDefault,
+                Docteur.T("BR.SsdPlein"));
     }
 
     private static readonly Guid FmtPci = new("3AB22E31-8264-4B4E-9AF5-A8D2D8E33E62");

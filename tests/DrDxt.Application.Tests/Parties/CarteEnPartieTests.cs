@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-// 07/10/2026 (A4) : la carte qui a porté la partie, et la vraie carte laissée de côté.
+// La carte qui a porté la partie, et la vraie carte laissée de côté.
 public sealed class CarteEnPartieTests
 {
     private static CaptureEnPartie C(string? carte, string? ignoree)

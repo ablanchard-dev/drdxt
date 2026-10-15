@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.Profiles.Tests;
 
-// M6 — chip classification is the conservative, fail-closed core of the matcher.
+// La classification des puces est le cœur prudent et fermé de l'apparieur.
 public sealed class ChipClassifierTests
 {
     [Theory]
@@ -32,7 +32,7 @@ public sealed class ChipClassifierTests
     }
 
     [Fact]
-    public void IsAmdX3dDualCcd_false_for_single_ccd_x3d() // 7800X3D/9800X3D — out of scope
+    public void IsAmdX3dDualCcd_false_for_single_ccd_x3d() // 7800X3D/9800X3D : hors périmètre
     {
         ChipClassifier.IsAmdX3dDualCcd(TestInventory.AmdX3dSingleCcd()).Should().BeFalse();
     }
@@ -55,9 +55,9 @@ public sealed class ChipClassifierTests
     [Fact]
     public void IsTunableNvidiaGpu_false_for_mobile_quadro_amd_igpu_null()
     {
-        ChipClassifier.IsTunableNvidiaGpu(TestInventory.NvidiaRtxMobile()).Should().BeFalse(); // driver-locked
-        ChipClassifier.IsTunableNvidiaGpu(TestInventory.NvidiaQuadro()).Should().BeFalse();    // not a GeForce name
-        ChipClassifier.IsTunableNvidiaGpu(TestInventory.AmdRadeonDesktop()).Should().BeFalse(); // separate ADLX path
+        ChipClassifier.IsTunableNvidiaGpu(TestInventory.NvidiaRtxMobile()).Should().BeFalse(); // verrouillé par le pilote
+        ChipClassifier.IsTunableNvidiaGpu(TestInventory.NvidiaQuadro()).Should().BeFalse();    // pas un nom GeForce
+        ChipClassifier.IsTunableNvidiaGpu(TestInventory.AmdRadeonDesktop()).Should().BeFalse(); // chemin ADLX séparé
         ChipClassifier.IsTunableNvidiaGpu(TestInventory.IntelIgpu()).Should().BeFalse();        // iGPU
         ChipClassifier.IsTunableNvidiaGpu(null).Should().BeFalse();
     }

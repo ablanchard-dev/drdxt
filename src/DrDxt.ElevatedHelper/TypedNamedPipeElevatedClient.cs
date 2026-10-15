@@ -4,18 +4,18 @@ using DrDxt.ElevatedHelper.Ipc;
 namespace DrDxt.ElevatedHelper;
 
 // -----------------------------------------------------------------------
-// TypedNamedPipeElevatedClient — the M2 IElevatedClient (unelevated app side).
+// TypedNamedPipeElevatedClient : l'IElevatedClient (côté app non élevée).
 //
-// Serializes a typed PrivilegedOp via the BOUNDED codec, signs the canonical
-// (opJson, nonce) bytes with the injected session key, and sends it over the
-// transport seam. Surfaces the server's fail-clean codes verbatim.
+// Sérialise une PrivilegedOp typée par le codec borné, signe les octets canoniques
+// (opJson, nonce) avec la clé de session injectée et les envoie par la couture de transport.
+// Remonte mot pour mot les codes d'échec propre du serveur.
 //
-// SECURITY: the codec refuses any op outside the closed leaf set CLIENT-SIDE
-// before anything is sent (defense in depth — the allowlist is also enforced
-// server-side). The session key is INJECTED, never baked. This client lives in
-// DrDxt.ElevatedHelper alongside the M0 client (plan §2 relocates the client
-// abstraction to Infrastructure later); it must not pull elevated code into the
-// unelevated app — only the IElevatedClient abstraction (Core) is consumed there.
+// Sécurité : le codec refuse côté client toute op hors de l'ensemble fermé de feuilles avant
+// tout envoi (défense en profondeur : l'allowlist est aussi imposée côté serveur). La clé de
+// session est injectée, jamais codée en dur. Ce client vit dans DrDxt.ElevatedHelper à côté du
+// premier client (l'abstraction client pourrait passer plus tard dans Infrastructure) ; il ne doit
+// pas tirer de code élevé dans l'app non élevée : seule l'abstraction IElevatedClient (Core) y
+// est consommée.
 // -----------------------------------------------------------------------
 public sealed class TypedNamedPipeElevatedClient : IElevatedClient
 {
@@ -42,9 +42,9 @@ public sealed class TypedNamedPipeElevatedClient : IElevatedClient
     }
 
     /// <summary>Le canal de retour de donnees, cote client. Meme aller-retour signe que
-    /// <see cref="ExecuteAsync"/> — seule la lecture de la reponse change.</summary>
+    /// <see cref="ExecuteAsync"/> : seule la lecture de la reponse change.</summary>
     /// <summary>Le canal de retour de donnees, cote client. Meme aller-retour signe que
-    /// <see cref="ExecuteAsync"/> — seule la lecture de la reponse change, et elle vit dans
+    /// <see cref="ExecuteAsync"/> : seule la lecture de la reponse change, et elle vit dans
     /// PrivilegedResponse.ToBytes() pour que les deux clients partagent la meme regle.</summary>
     public async Task<Result<byte[]>> ReadAsync(PrivilegedOp op, CancellationToken ct)
     {
@@ -57,8 +57,8 @@ public sealed class TypedNamedPipeElevatedClient : IElevatedClient
     // L'aller-retour commun : serialisation bornee, signature, envoi. Un seul endroit signe.
     private async Task<Result<PrivilegedResponse>> RoundTripAsync(PrivilegedOp op, CancellationToken ct)
     {
-        // Serialize via the bounded codec. A null / unknown leaf is refused here,
-        // client-side, before anything touches the wire.
+        // Sérialiser par le codec borné. Une feuille null ou inconnue est refusée ici,
+        // côté client, avant que quoi que ce soit parte sur le fil.
         var serialized = PrivilegedOpCodec.Serialize(op);
         if (!serialized.IsOk || serialized.Value is null)
             return Result<PrivilegedResponse>.Fail(ErrorCodes.NotAllowlisted, "Unsupported privileged operation.");

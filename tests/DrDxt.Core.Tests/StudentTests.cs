@@ -3,9 +3,8 @@ using FluentAssertions;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// 26/09/2026 : trois copies de la table de Student disaient chacune « une seule regle dans le produit,
-/// pas deux qui divergeraient », et divergeaient : l'une s'arretait a 9 degres de liberte, et toutes
-/// retombaient sur 1,96 au-dela, une marge trop etroite (jusqu'a 13,7 % a 10 degres). Une marge trop
+/// Une seule table de Student dans le produit : des copies divergeraient (l'une s'arretant a 9 degres
+/// de liberte, toutes retombant sur 1,96 au-dela, une marge trop etroite, jusqu'a 13,7 % a 10 degres). Une marge trop
 /// etroite annonce un gain que la mesure ne prouve pas.
 /// Valeurs de reference : t(0,975 ; ddl), scipy.stats.t.ppf.
 /// </summary>

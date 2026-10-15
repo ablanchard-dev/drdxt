@@ -13,7 +13,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="NSubstitute" Version="5.3.0" />
-    <!-- Ed25519 (T12/T13): tests act as the "release pipeline", signing fixture update
+    <!-- Ed25519: tests act as the "release pipeline", signing fixture update
          manifests with the dev/test private seed against the embedded update public key.
          Same pinned version as the production layer. -->
     <PackageReference Include="NSec.Cryptography" Version="26.4.0" />

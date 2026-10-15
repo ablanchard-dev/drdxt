@@ -3,7 +3,7 @@ using DrDxt.Core;
 namespace DrDxt.Measurement.Memory;
 
 /// <summary>
-/// 03/10/2026 (boucle 2D2P, P3.3) : ISLC (Wagnardsoft) vide la mémoire « en attente » de Windows quand la mémoire libre
+/// ISLC (Wagnardsoft) vide la mémoire « en attente » de Windows quand la mémoire libre
 /// tombe sous 1 024 Mo (son réglage par défaut). Ça n'aide que sur une machine où la mémoire libre s'effondre en partie,
 /// en pratique 16 Go. DrDXT ne vide rien : il dit, mesure à l'appui, quand ce cas se produit pendant la partie mesurée,
 /// et seulement s'il s'accompagne d'à-coups dans les images. Sans les deux, il ne dit rien.
@@ -37,10 +37,8 @@ public static class MemoireEnPartie
         var acoups = ACoups(imagesMs);
         if (acoups < ACoupsMinimum) return null;
         var mo = libre / (1024 * 1024);
-        return new RepairFinding(TestMemoireEnSession.Domaine, Nom, $"{mo} Mo libres au plus bas, {acoups} à-coups", "plus de 1 024 Mo libres",
+        return new RepairFinding(TestMemoireEnSession.Domaine, Nom, Docteur.T("ME.Valeur", mo, acoups), Docteur.T("ME.Attendu"),
             RepairStatus.Suspicious,
-            $"pendant la partie, la mémoire libre est descendue à {mo} Mo et {acoups} images ont duré plus du double de la "
-            + "normale. C'est le cas où fermer des programmes ouverts à côté, ou vider la mémoire en attente de Windows "
-            + "(ce que fait ISLC), réduit les à-coups. DrDXT ne vide rien lui-même.");
+            Docteur.T("ME.Explication", mo, acoups));
     }
 }

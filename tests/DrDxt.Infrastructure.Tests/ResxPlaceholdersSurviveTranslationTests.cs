@@ -10,8 +10,7 @@ namespace DrDxt.Infrastructure.Tests;
 /// <summary>
 /// Une entree traduite qui PERD son emplacement de valeur fait disparaitre un chiffre en silence.
 ///
-/// Trouve le 02/09/2026 en ecrivant le registre (D2) : « {0} problemes prouves » sans son `{0}`
-/// s'affiche « problemes prouves », sans le nombre. Rien ne plante, rien ne rougit, et la seule
+/// « {0} problemes prouves » sans son `{0}` s'afficherait « problemes prouves », sans le nombre. Rien ne plante, rien ne rougit, et la seule
 /// information que la ligne existe pour porter a disparu. C'est la forme la plus discrete de
 /// regression de traduction : elle survit a tous les tests qui comparent des cles.
 ///
@@ -26,12 +25,9 @@ public sealed class ResxPlaceholdersSurviveTranslationTests
     /// <summary>
     /// Les cles a emplacements, DERIVEES du fichier de ressources lui-meme.
     ///
-    /// Elles etaient trois, ecrites a la main. Le commentaire de cette classe disait deja pourquoi
-    /// c'est faux — « comparer a une liste ecrite a la main deriverait » — et la liste derivait :
-    /// mesure du 05/09/2026, le produit porte 13 cles a emplacement, ce gate en surveillait 3.
-    /// Les dix autres n'etaient gardees par rien, dont `Scan.Bios.Guide.EnterKey`, qui porte la
-    /// TOUCHE a presser dans le BIOS : sans son emplacement, le guide dit d'appuyer sur une touche
-    /// sans dire laquelle, et rien ne rougit.
+    /// Une liste ecrite a la main deriverait (mesure : 3 cles surveillees pour 13 dans le produit). Une
+    /// cle oubliee comme `Scan.Bios.Guide.EnterKey`, qui porte la TOUCHE a presser dans le BIOS, ferait
+    /// dire au guide d'appuyer sur une touche sans dire laquelle, sans que rien ne rougisse.
     ///
     /// Enumerer le jeu de ressources anglais fait grandir ce gate tout seul a la prochaine cle.
     /// </summary>

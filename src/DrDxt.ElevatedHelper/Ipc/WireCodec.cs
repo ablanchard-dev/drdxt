@@ -6,26 +6,26 @@ using System.Text.Json.Serialization;
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// Length-prefixed JSON framing over the pipe stream.
+// Tramage JSON préfixé par sa longueur sur le flux du pipe.
 //
-// Each message = a 4-byte big-endian length prefix followed by exactly that
-// many UTF-8 JSON bytes. A length prefix is bounded (MaxMessageBytes) so a
-// hostile/garbage peer cannot make the server allocate unbounded memory.
+// Chaque message = un préfixe de longueur de 4 octets big-endian suivi d'exactement autant
+// d'octets JSON UTF-8. Le préfixe est borné (MaxMessageBytes) pour qu'un pair hostile ou
+// déchet ne puisse pas faire allouer au serveur une mémoire sans borne.
 //
-// SECURITY: deserialization is into FIXED, closed DTOs only. OpKind is an enum
-// (closed discriminator); there is no type-name-driven instantiation here.
+// Sécurité : la désérialisation ne vise que des DTO fixes et fermés ; aucune instanciation
+// guidée par un nom de type ici.
 // -----------------------------------------------------------------------
 public static class WireCodec
 {
-    // Generous for a tiny envelope; defends against an oversized length prefix.
+    // Large pour une enveloppe minuscule ; protège d'un préfixe de longueur démesuré.
     public const int MaxMessageBytes = 64 * 1024;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        // Reject unknown members fail-closed: an unexpected field makes Deserialize
-        // throw JsonException → ReadMessageAsync returns null → the caller treats it
-        // as a bad request (OP_NOT_ALLOWED). Enums travel as their integer value
-        // (the closed discriminator), never by name. Property names are case-sensitive.
+        // Rejeter les membres inconnus (fail-closed) : un champ inattendu fait lever à Deserialize
+        // une JsonException → ReadMessageAsync rend null → l'appelant la traite comme une
+        // mauvaise requête (OP_NOT_ALLOWED). Les enums voyagent par leur valeur entière
+        // (le discriminant fermé), jamais par leur nom. Les noms de propriétés respectent la casse.
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         PropertyNameCaseInsensitive = false,
     };
@@ -41,20 +41,20 @@ public static class WireCodec
     }
 
     /// <summary>
-    /// Reads one framed message. Returns null if the stream closed cleanly
-    /// before any data, or if the frame is malformed/oversized (fail-closed:
-    /// the caller treats null as a bad request rather than crashing).
+    /// Lit un message tramé. Rend null si le flux s'est fermé proprement avant toute
+    /// donnée, ou si la trame est malformée ou démesurée (fail-closed : l'appelant
+    /// traite null comme une mauvaise requête au lieu de planter).
     /// </summary>
     public static async Task<T?> ReadMessageAsync<T>(Stream stream, CancellationToken ct)
         where T : class
     {
         var prefix = new byte[4];
         if (!await ReadExactAsync(stream, prefix, ct).ConfigureAwait(false))
-            return null; // clean EOF or short read on the prefix
+            return null; // EOF propre ou lecture courte sur le préfixe
 
         var length = BinaryPrimitives.ReadInt32BigEndian(prefix);
         if (length <= 0 || length > MaxMessageBytes)
-            return null; // out-of-range length → malformed, fail-closed
+            return null; // longueur hors plage → malformée, fail-closed
 
         var payload = new byte[length];
         if (!await ReadExactAsync(stream, payload, ct).ConfigureAwait(false))
@@ -66,7 +66,7 @@ public static class WireCodec
         }
         catch (JsonException)
         {
-            return null; // malformed JSON → fail-closed
+            return null; // JSON malformé → fail-closed
         }
     }
 
@@ -79,7 +79,7 @@ public static class WireCodec
                 .ReadAsync(buffer.AsMemory(offset, buffer.Length - offset), ct)
                 .ConfigureAwait(false);
             if (read == 0)
-                return false; // EOF before the full buffer was read
+                return false; // EOF avant la lecture complète du tampon
             offset += read;
         }
         return true;

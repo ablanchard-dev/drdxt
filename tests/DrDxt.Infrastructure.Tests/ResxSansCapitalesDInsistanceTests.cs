@@ -8,7 +8,7 @@ using FluentAssertions;
 namespace DrDxt.Infrastructure.Tests;
 
 /// <summary>
-/// Retour du 16/09/2026 : les mots en capitales pour insister (« n'est PAS », « fréquences
+/// Les mots en capitales pour insister (« n'est PAS », « fréquences
 /// Différentes ») font lire le texte comme genere, au meme titre que les tirets cadratins. Les sigles
 /// sont declares ; les etiquettes courtes (moins de 40 caracteres) sont une mise en page, pas une phrase.
 /// </summary>
@@ -18,12 +18,19 @@ public sealed class ResxSansCapitalesDInsistanceTests
     {
         "BIOS", "GPU", "BAR", "XMP", "EXPO", "CSM", "FPS", "CCD", "NVIDIA", "CPU", "VRR", "UEFI", "CPPC",
         "AMD", "RAM", "DVR", "CMOS", "JEDEC", "SSD", "SYNC", "HDR", "DDU", "SAM", "RSS", "VBIOS", "BITS", "API", "PCI", "XDA",
-        // 25/09/2026 : l'outil de reparation de Microsoft, nomme tel quel dans la carte « Réparer Windows ».
+        // L'outil de reparation de Microsoft, nomme tel quel dans la carte « Réparer Windows ».
         "DISM",
-        // 29/09/2026 : la marque de la carte mère, nommée avec son réglage « CPU Cooler Tuning » (page Processeur).
+        // La marque de la carte mère, nommée avec son réglage « CPU Cooler Tuning » (page Processeur).
         "MSI",
-        // 06/10/2026 : la marque dont les manuels demandent A2/B2 (« Finding.Memory.SlotsNotA2B2 »).
+        // La marque dont les manuels demandent A2/B2 (« Finding.Memory.SlotsNotA2B2 »).
         "ASUS",
+        // L'enclave d'Intel que vise Plundervolt, nommée dans « SousTension.Refusee » (la raison pour laquelle le
+        // verrou du BIOS ne protège rien sur un processeur qui ne l'a pas).
+        "SGX",
+        // Le nom exact du réglage ASUS « SVID Behavior », cité dans « SousTension.Refusee.ASUS ».
+        "SVID",
+        // La mise à l'échelle de NVIDIA, nommée dans le geste « Geste.Dlss.Detail ».
+        "DLSS",
     };
 
     [Theory]

@@ -7,34 +7,34 @@ using NSubstitute;
 namespace DrDxt.Application.Tests.Tweaks;
 
 // -----------------------------------------------------------------------
-// M2 Phase F4 — TweakCatalog + the HARD anti-blacklist gate (§6 permanent barrier).
+// TweakCatalog et la porte dure anti-liste-noire (barrière permanente).
 //
-// The catalog aggregates all ITweak (DI IEnumerable<ITweak>) and implements the
-// reconciled ITweakCatalog (Get(id) / All()).
+// Le catalogue agrège tous les ITweak (IEnumerable<ITweak> du DI) et implémente
+// l'ITweakCatalog réconcilié (Get(id) / All()).
 //
-//   * Anti-blacklist gate: AllTweakIds contains none of the banned placebo ids.
-//   * Every Latency / GpuTuning / FixIt tweak has RequiresRestorePoint == true.
-//   * The catalog resolves via DI.
+//   * Porte anti-liste-noire : AllTweakIds ne contient aucun identifiant placebo interdit.
+//   * Chaque levier Latency / GpuTuning / FixIt a RequiresRestorePoint == true.
+//   * Le catalogue se résout via le DI.
 //
-// The anti-blacklist gate is a PERMANENT barrier: it is impossible to introduce a
-// banned/placebo tweak without failing this test.
+// La porte anti-liste-noire est une barrière permanente : impossible d'introduire un
+// levier interdit ou placebo sans faire échouer ce test.
 // -----------------------------------------------------------------------
 public sealed class TweakCatalogTests
 {
-    // §6 blacklist — these placebo / harmful ids may never appear in the catalog.
-    // The CPU-domain entries are the myths debunked by the project's CPU research (unpublished)
-    // (Realtime priority, MMCSS/SystemResponsiveness=0, blanket C-state disable, blanket
-    // affinity pinning, blanket core-unpark, useplatformclock/HPET). NS-3 concluded the
-    // granular powercfg "levers" (PROCTHROTTLEMIN/PERFBOOSTMODE) are no-ops on HWP CPUs and
-    // redundant with SanePowerPlan, so instead of shipping placebos we make the myths
-    // permanently unshippable here (they are already structurally denied by OpAllowlist's
-    // default-DENY too — this is the belt-and-suspenders documentation guard).
-    // The last three were named by the project's OS-latency research (unpublished) as myths to lock, and
-    // were never added — found 2026-09-01 while auditing a public 74-script optimisation pack
-    // that writes all three (MSISupported=1 forced per-device, SwapEffectUpgradeEnable=0,
-    // PowerThrottlingOff). The other two ids that recommendation listed already exist here
-    // under different names: mmcss.systemresponsiveness -> cpu.mmcss_disable, and
-    // clock.useplatformclock -> timer.useplatformclock.
+    // Liste noire : ces identifiants placebo ou nuisibles ne doivent jamais entrer au catalogue.
+    // Les entrées du domaine processeur sont les mythes démontés par la recherche processeur du projet
+    // (priorité Realtime, MMCSS/SystemResponsiveness=0, C-states coupés en bloc, affinité
+    // épinglée en bloc, dé-parcage en bloc, useplatformclock/HPET). Cette recherche a conclu que les
+    // « leviers » powercfg fins (PROCTHROTTLEMIN/PERFBOOSTMODE) sont sans effet sur les processeurs HWP
+    // et redondants avec SanePowerPlan ; plutôt que livrer des placebos, les mythes sont rendus
+    // définitivement inlivrables ici (OpAllowlist les refuse déjà structurellement par son refus
+    // par défaut : cette garde est la ceinture et les bretelles, et la documentation).
+    // Les trois derniers ont été nommés mythes à verrouiller par la recherche du projet sur la latence
+    // de l'OS, et n'avaient jamais été ajoutés ; un pack public de 74 scripts d'optimisation
+    // écrit les trois (MSISupported=1 forcé par périphérique, SwapEffectUpgradeEnable=0,
+    // PowerThrottlingOff). Les deux autres identifiants de cette recommandation existent déjà ici
+    // sous d'autres noms : mmcss.systemresponsiveness → cpu.mmcss_disable, et
+    // clock.useplatformclock → timer.useplatformclock.
     private static readonly string[] BannedTweakIds =
     {
         "net.nagle", "net.tcpack", "net.throttlingindex", "debloat.services",
@@ -56,7 +56,7 @@ public sealed class TweakCatalogTests
     [Fact]
     public void Catalog_contains_no_blacklisted_tweak_ids()
     {
-        // Include a couple of legitimate tweaks; assert none of the banned ids leak in.
+        // Inclure deux leviers légitimes ; vérifier qu'aucun identifiant interdit ne s'y glisse.
         var catalog = new TweakCatalog(new[]
         {
             Fake("latency.reflex", TweakCategory.Latency),
@@ -64,19 +64,19 @@ public sealed class TweakCatalogTests
             Fake("fixit.x3d_ccd", TweakCategory.FixIt),
         });
 
-        catalog.AllTweakIds.Should().NotContain(BannedTweakIds); // §6 hard barrier
+        catalog.AllTweakIds.Should().NotContain(BannedTweakIds); // barrière dure
     }
 
     [Fact]
     public void A_registered_cpu_myth_tweak_is_caught_by_the_barrier()
     {
-        // Proves the §6 gate actually BITES on the debunked CPU myths (cpu-all.md §3), not
-        // just that the list holds strings: a catalog that registered one must intersect the
-        // ban-list, so the NotContain assertion above would fail for it.
+        // Prouve que la porte mord vraiment sur les mythes processeur démontés, et pas seulement
+        // que la liste contient des chaînes : un catalogue qui en enregistrerait un intersecterait
+        // la liste noire, donc l'assertion NotContain ci-dessus échouerait pour lui.
         var catalog = new TweakCatalog(new[]
         {
             Fake("latency.reflex", TweakCategory.Latency),
-            Fake("cpu.priority_realtime", TweakCategory.FixIt), // Realtime priority — banned
+            Fake("cpu.priority_realtime", TweakCategory.FixIt), // priorité Realtime : interdite
         });
 
         catalog.AllTweakIds.Intersect(BannedTweakIds).Should().Contain("cpu.priority_realtime");
@@ -144,7 +144,7 @@ public sealed class TweakCatalogTests
 
         catalog.Should().NotBeNull();
         catalog.All().Should().HaveCount(2);
-        // The §6 gate also holds through the resolved interface.
+        // La porte tient aussi à travers l'interface résolue.
         catalog.All().Select(t => t.Id).Should().NotContain(BannedTweakIds);
     }
 }

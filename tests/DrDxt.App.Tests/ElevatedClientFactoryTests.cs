@@ -6,15 +6,15 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// ElevatedClientFactory.Create() wiring (§9.13 + smoke override):
-//   * DRDXT_HELPER_SESSION_KEY set (>=32 bytes base64) -> the LEGACY env-var-keyed
-//     TypedNamedPipeElevatedClient, so m2smoke/r2smoke keep working.
-//   * no env key -> the launch-on-demand + handshake client (UAC deferred to the
-//     first op), OR a fail-clean client if the helper exe cannot be located.
+// Câblage d'ElevatedClientFactory.Create() (négociation + dérogation des outils de fumée) :
+//   * DRDXT_HELPER_SESSION_KEY posée (>= 32 octets en base64) → l'ancien
+//     TypedNamedPipeElevatedClient à clé d'environnement, pour que m2smoke/r2smoke marchent toujours.
+//   * pas de clé d'environnement → le client à lancement à la demande + négociation (UAC repoussé
+//     à la première op), ou un client à échec propre si l'exécutable du helper est introuvable.
 //
-// These assert the WIRING DECISION (which client is built); nothing here elevates
-// or spawns a process. The env var is set/cleared per test (serialized so they do
-// not race each other's process-wide env).
+// Ces tests vérifient la décision de câblage (quel client est construit) ; rien ici n'élève
+// ni ne lance un processus. La variable d'environnement est posée et effacée par test (en série
+// pour qu'ils ne se disputent pas l'environnement du processus).
 // -----------------------------------------------------------------------
 [Collection("EnvSerial")]
 public sealed class ElevatedClientFactoryTests : IDisposable
@@ -37,7 +37,7 @@ public sealed class ElevatedClientFactoryTests : IDisposable
 
         var client = ElevatedClientFactory.Create();
 
-        // SEC2 (08/10/2026) : enveloppé dans ClientSessionUtilisateur (HKCU par l'App, le reste au helper).
+        // Enveloppé dans ClientSessionUtilisateur (HKCU par l'App, le reste au helper).
         client.Should().BeOfType<ClientSessionUtilisateur>().Which.VersLeHelper.Should().BeOfType<TypedNamedPipeElevatedClient>(
             "a pre-shared key selects the legacy smoke-compatible client");
     }
@@ -49,9 +49,9 @@ public sealed class ElevatedClientFactoryTests : IDisposable
 
         var client = ElevatedClientFactory.Create();
 
-        // Either launch-on-demand (helper located next to the test host) or the
-        // fail-clean client (helper not located). Both are valid; never null,
-        // never the legacy env-keyed client when no key is present.
+        // Soit le lancement à la demande (helper trouvé à côté de l'hôte de test), soit le client à
+        // échec propre (helper introuvable). Les deux sont valides ; jamais null, jamais l'ancien
+        // client à clé d'environnement quand aucune clé n'est présente.
         client.Should().NotBeNull();
         client.Should().NotBeOfType<TypedNamedPipeElevatedClient>();
     }
@@ -79,9 +79,9 @@ public sealed class ElevatedClientFactoryTests : IDisposable
             "a key shorter than 32 bytes is rejected, not used");
     }
 
-    // 26/09/2026 : la cle d'environnement se pose dans HKCU\Environment, que tout programme du compte ecrit.
-    // L'App installee prenait alors le client legacy, qui ne verifie pas le serveur du tube : un squatteur
-    // muni de la meme cle recevait les demandes et faisait afficher « applique » (le defaut D.3 du 11/09,
+    // La cle d'environnement se pose dans HKCU\Environment, que tout programme du compte ecrit.
+    // Si l'App installee la suivait, elle prendrait le client legacy, qui ne verifie pas le serveur du tube : un
+    // squatteur muni de la meme cle recevrait les demandes et ferait afficher « applique » (le defaut D.3,
     // rouvert par une variable). Installee sous Program Files, l'App ignore cette cle.
     [Theory]
     [InlineData(@"C:\Program Files\DrDXT\DrDxt.App.exe", false)]

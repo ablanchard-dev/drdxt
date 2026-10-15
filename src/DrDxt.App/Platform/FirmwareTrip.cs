@@ -8,16 +8,16 @@ using DrDxt.Core;
 namespace DrDxt.App.Platform;
 
 // -----------------------------------------------------------------------
-// FirmwareTrip — L0.2 : le protocole en deux temps, enfin cable.
+// FirmwareTrip : le protocole en deux temps.
 //
-// Le module BIOS existait en entier -- store de marqueur atomique, verifieur post-redemarrage,
-// libelles FR+EN -- et n'etait resolu par personne. `PendingBiosChangeStore.Save()` n'avait
+// Le module BIOS existait en entier (store de marqueur atomique, verifieur post-redemarrage,
+// libelles FR+EN) et n'etait resolu par personne. `PendingBiosChangeStore.Save()` n'avait
 // aucun appelant. Le differenciateur « on te dit quoi changer, et on prouve que ca a pris »
 // n'avait donc jamais tourne en production, et la regle du depot s'applique : ce qui n'a
 // jamais ete execute ne marche pas.
 //
 // Les deux temps
-//   1. ARMER  : avant d'envoyer l'utilisateur dans le BIOS, on ecrit le marqueur avec
+//   1. Armer  : avant d'envoyer l'utilisateur dans le BIOS, on ecrit le marqueur avec
 //               l'instantane des grandeurs observables (2133 MHz maintenant), puis seulement
 //               apres on demande le redemarrage.
 //   2. Relire : au retour de Windows, le verifieur compare l'etat frais au marqueur et rend
@@ -25,7 +25,7 @@ namespace DrDxt.App.Platform;
 //
 // L'ordre n'est pas negociable, et l'echec non plus :
 //   * marqueur d'abord, redemarrage ensuite. L'inverse laisse une fenetre ou la machine part
-//     dans le BIOS sans que rien ne sache ce qu'on y attendait -- l'utilisateur revient, fait
+//     dans le BIOS sans que rien ne sache ce qu'on y attendait : l'utilisateur revient, fait
 //     son reglage, et le produit n'a plus rien a verifier.
 //   * si l'ecriture du marqueur echoue, on ne redemarre pas. Envoyer quelqu'un dans son BIOS
 //     en sachant qu'on ne pourra rien lui prouver au retour, c'est vendre la preuve sans la
@@ -35,7 +35,7 @@ namespace DrDxt.App.Platform;
 //     un changement que personne n'a fait.
 //
 // N'ecrit aucune variable firmware. Le marqueur est un fichier de l'OS ; le redemarrage passe
-// par l'op allowlistee du helper, qui appelle shutdown.exe /r /fw -- Windows detient le bit
+// par l'op allowlistee du helper, qui appelle shutdown.exe /r /fw ; Windows detient le bit
 // OsIndications, DrDXT n'y touche pas.
 // -----------------------------------------------------------------------
 
@@ -53,12 +53,12 @@ public interface IFirmwareTrip
     /// <summary>Le verdict au retour de Windows, contre l'etat frais relu par le scan.</summary>
     Result<BiosLoopResult> VerifyOnReturn(SettingsState fresh);
 
-    /// <summary>26/09/2026 : se retracter pendant le delai : annule le redemarrage et le depart vers le
+    /// <summary>Se retracter pendant le delai : annule le redemarrage et le depart vers le
     /// firmware, puis retire le marqueur (le voyage n'aura pas lieu, rien ne sera a verifier).</summary>
     Task<Result> AnnulerAsync(CancellationToken ct)
         => Task.FromResult(Result.Fail(ErrorCodes.BiosInputInvalid, "Cancelling is not available on this host."));
 
-    /// <summary>26/09/2026 : le joueur renonce au changement. Sans ceci, un changement qui n'a pas pris gardait
+    /// <summary>Le joueur renonce au changement. Sans ceci, un changement qui n'a pas pris gardait
     /// son marqueur pour toujours, et chaque scan redisait « n'a pas pris » avec sa carte de recuperation.</summary>
     Result Oublier() => Result.Fail(ErrorCodes.BiosInputInvalid, "Forgetting is not available on this host.");
 }
@@ -94,13 +94,13 @@ public sealed class FirmwareTrip : IFirmwareTrip
 
         var targets = TargetsFrom(findings, before);
         if (targets.Count == 0)
-            // Rien d'ACTIONNABLE : un constat informatif ne se verifie pas au retour. On refuse
+            // Rien d'actionnable : un constat informatif ne se verifie pas au retour. On refuse
             // le voyage plutot que d'ecrire un marqueur vide que le store rejetterait de toute
-            // facon -- et l'utilisateur apprend pourquoi, au lieu de redemarrer pour rien.
+            // facon, et l'utilisateur apprend pourquoi, au lieu de redemarrer pour rien.
             return Result.Fail(ErrorCodes.BiosInputInvalid,
                 "No firmware change to verify: nothing would be proven by this reboot.");
 
-        // TEMPS 1 : le marqueur avant le redemarrage.
+        // Temps 1 : le marqueur avant le redemarrage.
         var save = _store.Save(new PendingBiosChange(targets, _clock.UtcNow, _machineId.Current));
         if (!save.IsOk)
             return Result.Fail(save.Error!.Value.Code, save.Error.Value.Message);
@@ -112,7 +112,7 @@ public sealed class FirmwareTrip : IFirmwareTrip
         if (!reboot.IsOk)
         {
             // Le voyage n'aura pas lieu : le marqueur ne doit pas lui survivre. Un echec de
-            // nettoyage est DIT en plus du motif d'origine -- il laisse un marqueur perime,
+            // nettoyage est dit en plus du motif d'origine : il laisse un marqueur perime,
             // et le taire ferait mentir la prochaine ouverture de l'app.
             var clear = _store.Clear();
             return clear.IsOk
@@ -147,9 +147,9 @@ public sealed class FirmwareTrip : IFirmwareTrip
     }
 
     // ── Ce qu'on s'attend a lire au retour, par reglage. ────────────────────────────────
-    // On ne retient que les constats ACTIONNABLES : un Enable/Disable nomme un etat concret.
+    // On ne retient que les constats actionnables : un Enable/Disable nomme un etat concret.
     // Un `None` (deja bon, ou juste rapporte) et un `SetSupportedRoute` (qui ne se ramene pas a
-    // un booleen) n'ont pas d'attente verifiable ici -- les inclure fabriquerait une attente
+    // un booleen) n'ont pas d'attente verifiable ici : les inclure fabriquerait une attente
     // que le verifieur trancherait au hasard.
     private static IReadOnlyList<PendingSettingTarget> TargetsFrom(
         IReadOnlyList<BiosFinding>? findings, SettingsState before)

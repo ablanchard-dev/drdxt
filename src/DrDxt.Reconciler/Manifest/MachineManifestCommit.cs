@@ -4,27 +4,27 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler.Manifest;
 
 // -----------------------------------------------------------------------
-// MachineManifestCommit — ce que fait le HELPER eleve d'un `CommitManifestOp` (11/09/2026).
+// MachineManifestCommit : ce que fait le helper eleve d'un `CommitManifestOp`.
 //
 // Les entrees sont deja validees par l'allowlist du helper quand elles arrivent ici (identifiants du
 // catalogue, valeurs bornees, ce qui serait execute passe l'allowlist). Cette classe fait le reste :
 //   1. charge la cle de la machine, la cree si elle n'existe pas (MachineManifestKey) ;
 //   2. relit le manifeste existant par le meme chemin verifie que le reconciliateur ;
-//   3. Fusionne (SignedDesiredStateStore.CommitAsync → DesiredState.Fusionner : premiere origine gagne),
-//      retire ce qu'on lui demande de retirer (levier annule, 06/10/2026), signe, ecrit atomiquement ;
+//   3. fusionne (SignedDesiredStateStore.CommitAsync → DesiredState.Fusionner : premiere origine gagne),
+//      retire ce qu'on lui demande de retirer (levier annule), signe, ecrit atomiquement ;
 //   4. pose ou repare la cle publique a cote, pour l'App et le service.
 //
-// La regle de l'illisible. Un manifeste qui ne se relit pas (altere, signe par une autre cle — une
-// ancienne, ou celle de dev —, JSON casse, ACL non fiable) n'est jamais ecrase : refus nomme
+// La regle de l'illisible. Un manifeste qui ne se relit pas (altere, signe par une autre cle, une
+// ancienne ou celle de dev, JSON casse, ACL non fiable) n'est jamais ecrase : refus nomme
 // ErrorCodes.ManifestUnreadable, rien n'est ecrit. Meme chose pour une cle inutilisable
-// (ManifestKeyUnusable). La seule sortie est la REPRISE explicite (`repartir`) : l'illisible est mis
+// (ManifestKeyUnusable). La seule sortie est la reprise explicite (`repartir`) : l'illisible est mis
 // de cote (renomme, jamais efface) et un manifeste neuf commence avec les entrees recues. Sur un
-// manifeste LISIBLE, la reprise est refusee : on ne jette jamais des origines qu'on sait relire.
+// manifeste lisible, la reprise est refusee : on ne jette jamais des origines qu'on sait relire.
 //
 // Pourquoi pas « reconstruire depuis `Gardes` » : ce journal vit sous %LOCALAPPDATA%, ecrivable par
-// tout processus du compte. Le rejouer ici ferait d'un simple fichier utilisateur une autorite SIGNEE
+// tout processus du compte. Le rejouer ici ferait d'un simple fichier utilisateur une autorite signee
 // que la desinstallation executerait elevee. La reprise part des entrees que l'App vient d'envoyer, et
-// elle DIT que les origines de l'ancien manifeste ne seront plus rendues.
+// elle dit que les origines de l'ancien manifeste ne seront plus rendues.
 //
 // Un seul appel a la fois : la boucle du helper sert une connexion apres l'autre.
 // -----------------------------------------------------------------------
@@ -40,7 +40,7 @@ public sealed class MachineManifestCommit
     private readonly IGpuDriverProbe? _pilote;
 
     /// <param name="appliquerAcl">Production : true. Tests : false (dossier temporaire).</param>
-    /// <param name="reference">11/09/2026 — le fichier du reconciliateur ou la reference de derive (build,
+    /// <param name="reference">Le fichier du reconciliateur ou la reference de derive (build,
     /// pilote) est posee dans le meme geste que le manifeste (ApplyReferenceSeedingStore), par ce processus
     /// eleve. Absent (avec ses sondes) = pas de reference posee.</param>
     public MachineManifestCommit(string racine, bool appliquerAcl, IClock horloge,
@@ -67,7 +67,18 @@ public sealed class MachineManifestCommit
             if (!repartir)
                 return Result.Fail(ErrorCodes.ManifestKeyUnusable, cle.Error.Value.Message + " Nothing was written.");
 
-            // Reprise : la cle et le manifeste qu'elle signait sont mis de cote (sans cle, il ne se relit plus).
+            // Reprise : la cle et le manifeste qu'elle signait sont mis de cote. Ce que la cle publique relit encore est
+            // repris et re-signe par la nouvelle cle : ce sont les seules origines que la desinstallation sait rendre.
+            DesiredState? repris = null;
+            var verificateur = MachineManifestKey.ChargerVerificateur(_racine, _appliquerAcl);
+            if (verificateur.IsOk)
+            {
+                var lu = await new SignedDesiredStateStore(stockage, signer: null, verificateur.Value!, _politique, _horloge)
+                    .LoadAsync().ConfigureAwait(false);
+                if (lu.IsOk) repris = lu.Value;
+            }
+            if (repris is not null) ajout = DesiredState.Fusionner(repris, ajout);
+
             var cleDeCote = MachineManifestKey.MettreDeCote(_racine);
             if (!cleDeCote.IsOk) return cleDeCote;
             var manifesteDeCote = stockage.MettreDeCote();
@@ -102,7 +113,7 @@ public sealed class MachineManifestCommit
         IDesiredStateStore ecrivain = _reference is not null && _build is not null && _pilote is not null
             ? new ApplyReferenceSeedingStore(magasin, _reference, _build, _pilote, _politique)
             : magasin;
-        // 06/10/2026 : un retrait seul (levier annulé) n'inscrit rien.
+        // Un retrait seul (levier annulé) n'inscrit rien.
         var commit = ajout.Tweaks.Count + (ajout.RevertOnly?.Count ?? 0) == 0 && retirer is { Count: > 0 }
             ? Result.Ok()
             : await ecrivain.CommitAsync(ajout).ConfigureAwait(false);

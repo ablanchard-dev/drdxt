@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 29/09/2026 (boucle « vivant et prouvé », B5) : un maintien arrivé au bout ne se voyait pas partir ; l'action
+// Un maintien arrivé au bout ne se voyait pas partir ; l'action
 // répondait parfois plusieurs secondes après. L'éclair irisé part à l'instant du déclenchement, sous le gouverneur.
 public sealed class MaintienQuiRepondTests
 {

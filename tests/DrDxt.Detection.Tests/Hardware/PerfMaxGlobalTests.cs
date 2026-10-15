@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Hardware;
 
 /// <summary>
-/// 24/09/2026, machine de référence, PC inactif : 2 490 MHz, mémoire vidéo au maximum, 55,6 W, raison
+/// Machine de référence, PC inactif : 2 490 MHz, mémoire vidéo au maximum, 55,6 W, raison
 /// publiée « GPU inactif ». Cause lue dans le pilote : « performances maximales » au profil GLOBAL.
 /// Le constat ne vise que le global : au profil du jeu, c'est le levier de DrDXT, et c'est voulu.
 /// </summary>

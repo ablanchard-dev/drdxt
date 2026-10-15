@@ -7,14 +7,14 @@ using FluentAssertions;
 namespace DrDxt.Reconciler.Tests;
 
 // -----------------------------------------------------------------------
-// The V1 EMBEDDED manifest keypair (ManifestDevKeys) must be a real matched
-// Ed25519 pair: a manifest signed by the embedded DEV PRIVATE seed must VERIFY
-// under the embedded PUBLIC verifier (so the team build verifies real manifests,
-// not just fail-closed), and a manifest signed by ANY OTHER key must fail closed.
+// La paire de clés de manifeste embarquée V1 (ManifestDevKeys) doit être une vraie paire
+// Ed25519 assortie : un manifeste signé par la graine privée de dev embarquée doit se vérifier
+// sous le vérificateur public embarqué (pour que la version d'équipe vérifie de vrais
+// manifestes, pas seulement se ferme), et un manifeste signé par toute autre clé doit se fermer.
 //
-// This exercises the real Ed25519 (NSec) sign/verify — not the in-memory fake —
-// end-to-end through the SignedDesiredStateStore, proving the embedded pair is the
-// trust root the App (sign) and the host/App (verify) actually share.
+// Ceci exerce le vrai Ed25519 (NSec), signature et vérification, pas le faux en mémoire,
+// de bout en bout à travers le SignedDesiredStateStore : preuve que la paire embarquée est
+// la racine de confiance que l'App (signe) et l'hôte/l'App (vérifient) partagent vraiment.
 // -----------------------------------------------------------------------
 public sealed class ManifestDevKeysTests
 {
@@ -28,7 +28,7 @@ public sealed class ManifestDevKeysTests
         new AppliedTweak("reflex.lowlatency", "2", "0", At),
     });
 
-    // The embedded public key is the canonical 32-byte Ed25519 length.
+    // La clé publique embarquée a la longueur canonique Ed25519 de 32 octets.
     [Fact]
     public void EmbeddedKeys_AreEd25519RawLength()
     {
@@ -36,8 +36,8 @@ public sealed class ManifestDevKeysTests
         ManifestDevTestKeys.DevPrivateSeed.Should().HaveCount(32);
     }
 
-    // The embedded PRIVATE seed and PUBLIC key are a MATCHED pair: sign with the dev
-    // signer, verify with the embedded verifier → true.
+    // La graine privée embarquée et la clé publique sont une paire assortie : signer avec le
+    // signataire de dev, vérifier avec le vérificateur embarqué → vrai.
     [Fact]
     public void DevSigner_AndEmbeddedVerifier_AreAMatchedPair()
     {
@@ -51,9 +51,9 @@ public sealed class ManifestDevKeysTests
         verifier.Verify(payload, sig.Value!).Should().BeTrue();
     }
 
-    // End-to-end through the real store: the App-style signer commits, the embedded
-    // verifier loads it back. Proves the host/App verify path (embedded key) accepts a
-    // manifest the App actually produced.
+    // De bout en bout à travers le vrai magasin : le signataire façon App committe, le
+    // vérificateur embarqué le recharge. Prouve que le chemin de vérification hôte/App (clé
+    // embarquée) accepte un manifeste que l'App a réellement produit.
     [Fact]
     public async Task SignWithDevSeed_ThenLoadWithEmbeddedVerifier_RoundTrips()
     {
@@ -65,8 +65,8 @@ public sealed class ManifestDevKeysTests
             ManifestDevKeys.CreateVerifier().Value!, ReconcilablePolicy(), clock);
         (await committing.CommitAsync(OneTweak())).IsOk.Should().BeTrue();
 
-        // A SEPARATE verify-only store (signer:null) that holds only the embedded public
-        // key — exactly how the host is wired.
+        // Un magasin séparé, vérification seule (signer:null), qui ne tient que la clé publique
+        // embarquée : exactement le câblage de l'hôte.
         var verifyOnly = new SignedDesiredStateStore(
             storage, signer: null, ManifestDevKeys.CreateVerifier().Value!,
             ReconcilablePolicy(), clock);
@@ -76,15 +76,15 @@ public sealed class ManifestDevKeysTests
         loaded.Value!.Tweaks.Should().ContainSingle().Which.TweakId.Should().Be("reflex.lowlatency");
     }
 
-    // A manifest signed by a DIFFERENT (foreign) key must fail closed under the embedded
-    // verifier — the owner cannot forge with their own keypair.
+    // Un manifeste signé par une autre clé (étrangère) doit se fermer sous le vérificateur
+    // embarqué : le propriétaire ne peut pas forger avec sa propre paire.
     [Fact]
     public async Task ForeignKeySignedManifest_FailsClosed_UnderEmbeddedVerifier()
     {
         var storage = new InMemoryManifestStorage();
         var clock = new FakeClock { UtcNow = At };
 
-        // Commit with a foreign keypair (not the embedded one).
+        // Committer avec une paire étrangère (pas celle embarquée).
         var foreignSeed = new byte[32];
         for (var i = 0; i < foreignSeed.Length; i++) foreignSeed[i] = (byte)(i + 1);
         var foreignSigner = Ed25519ManifestSigner.FromSeed(foreignSeed);
@@ -95,7 +95,7 @@ public sealed class ManifestDevKeysTests
             storage, foreignSigner, foreignVerifier, ReconcilablePolicy(), clock);
         (await foreignStore.CommitAsync(OneTweak())).IsOk.Should().BeTrue();
 
-        // Now load with the EMBEDDED verifier → must reject (fail-closed).
+        // Charger maintenant avec le vérificateur embarqué → doit rejeter (fermé).
         var verifyOnly = new SignedDesiredStateStore(
             storage, signer: null, ManifestDevKeys.CreateVerifier().Value!,
             ReconcilablePolicy(), clock);
@@ -108,7 +108,7 @@ public sealed class ManifestDevKeysTests
 
     private static byte[] DeriveForeignPublicKey(byte[] seed)
     {
-        // Use NSec via the signer's own key to export the matching public key.
+        // Utiliser NSec via la clé du signataire pour exporter la clé publique correspondante.
         var key = NSec.Cryptography.Key.Import(
             NSec.Cryptography.SignatureAlgorithm.Ed25519, seed,
             NSec.Cryptography.KeyBlobFormat.RawPrivateKey);

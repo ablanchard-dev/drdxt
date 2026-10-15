@@ -8,16 +8,15 @@ namespace DrDxt.Detection.Tests.Repair;
 /// <summary>
 /// Les arrets brutaux doivent arriver a l'ecran, pas seulement etre lus.
 ///
-/// Ces tests portent sur le PARCOURS, pas sur le lecteur. Le 09/09/2026, une famille a ete
-/// branchee dans le service en annoncant qu'elle rendait visible la signature des scripts
-/// d'optimisation — elle etait collectee, comptee, et `RepairTriage` la rangeait parmi les etats
-/// « verifies », qui ne s'affichent jamais. Un test qui s'arrete au service aurait ete vert.
+/// Ces tests portent sur le PARCOURS, pas sur le lecteur : une famille collectee et comptee peut
+/// etre rangee par `RepairTriage` parmi les etats « verifies », qui ne s'affichent jamais. Un test
+/// qui s'arrete au service resterait vert.
 ///
 /// Ils passent donc tous par <see cref="RepairTriage.Trier"/> : c'est lui qui decide si un constat
 /// est vu ou seulement compte.
 ///
-/// Et le lecteur d'arrets n'atteignait l'ecran que via l'avis memoire, qui exige XMP actif.
-/// Sur une machine au JEDEC, onze arrets en quatre-vingt-dix jours n'etaient dits nulle part.
+/// Et le lecteur d'arrets n'atteint pas l'ecran que via l'avis memoire, qui exige XMP actif : sinon,
+/// sur une machine au JEDEC, onze arrets en quatre-vingt-dix jours ne seraient dits nulle part.
 /// </summary>
 public class ArretsBrutauxTests
 {
@@ -82,7 +81,7 @@ public class ArretsBrutauxTests
         triage.NonLus.Should().ContainSingle();
     }
 
-    // ── 16/09/2026 : le journal dit de quel arret il s'agit, et l'audit doit le dire aussi ──
+    // ── Le journal dit de quel arret il s'agit, et l'audit doit le dire aussi ──
 
     private sealed class JournalDetaille(IReadOnlyList<ArretBrutal> arrets) : IUnexpectedShutdownLog
     {
@@ -96,7 +95,7 @@ public class ArretsBrutauxTests
     [Fact]
     public void Le_constat_separe_ecrans_bleus_arrets_sans_code_et_appuis_sur_le_bouton()
     {
-        // La repartition lue le 16/09/2026 sur la machine de reference : 2 ecrans bleus, 1 arret
+        // La repartition relevee le 16/09/2026 sur la machine de reference : 2 ecrans bleus, 1 arret
         // tout a zero, 1 appui long sur le bouton, 7 arrets pendant une transition d'alimentation.
         var maintenant = DateTimeOffset.UtcNow;
         var arrets = new List<ArretBrutal>
@@ -121,9 +120,9 @@ public class ArretsBrutauxTests
             .And.Contain("1 appui long sur le bouton");
         constat.Explication.Should().NotContain("—", "pas de tiret cadratin dans ce que le client lit");
     }
-    // DOC-QUALITE (09/10/2026) : sur la machine de référence, l'en-tête disait « 11 redémarrages non propres : ce n'est plus
-    // un accident isolé » et le test mémoire « avec 11 arrêts brutaux », alors que 8 sont signalés pendant une mise en veille
-    // (sens non documenté par Microsoft). Le chiffre reste, la part en veille est dite dès la première phrase.
+    // « 11 redémarrages non propres : ce n'est plus un accident isolé » serait trompeur quand 8 sont signalés pendant une
+    // mise en veille (sens non documenté par Microsoft ; relevé sur la machine de référence). Le chiffre reste, la part en
+    // veille est dite dès la première phrase.
     [Fact]
     public void L_en_tete_et_le_test_memoire_disent_la_part_en_veille_des_la_premiere_phrase()
     {
@@ -144,7 +143,7 @@ public class ArretsBrutauxTests
             .Should().StartWith("Avec 10 arrêts brutaux en 90 jours, dont 7 pendant une mise en veille signalée, ");
     }
 
-    // Revue adverse du docteur (09/10/2026, R8 et R9) : « à corriger » sans rien à faire. Des arrêts répétés portent le
+    // « à corriger » sans rien à faire. Des arrêts répétés portent le
     // geste de Microsoft (page Event ID 41) ; un service qui échoue sur 3 journées, le sien.
     [Fact]
     public void Des_arrets_repetes_portent_le_geste_de_Microsoft()

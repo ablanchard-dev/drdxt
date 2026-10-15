@@ -5,7 +5,7 @@ namespace DrDxt.Detection.Hardware;
 
 /// <summary>
 /// Détecte les disques physiques via MSFT_PhysicalDisk (root\Microsoft\Windows\Storage),
-/// avec fallback sur Win32_DiskDrive (root\cimv2). UI-facing uniquement — non scoré.
+/// avec repli sur Win32_DiskDrive (root\cimv2). Pour l'UI seulement : non noté.
 /// Frontière WMI complète : jamais d'exception, non-admin.
 /// </summary>
 public sealed class StorageDetector : IStorageDetector
@@ -17,7 +17,7 @@ public sealed class StorageDetector : IStorageDetector
     // MSFT_PhysicalDisk BusType values
     private const int BusTypeNvme = 17;
 
-    // 04/10/2026 : USB (7), SD (12), MMC (13). Windows peut lister une clé avant le disque système, et l'écran prend
+    // USB (7), SD (12), MMC (13). Windows peut lister une clé avant le disque système, et l'écran prend
     // le premier disque : les amovibles passent après les internes.
     private static readonly int[] BusAmovibles = [7, 12, 13];
 
@@ -38,9 +38,9 @@ public sealed class StorageDetector : IStorageDetector
     {
         var result = _wmi.QueryInNamespace(
             // Sans le prefixe `\\.\`, et ce n'est pas cosmetique. Avec lui,
-            // `ManagementObjectSearcher` rend « Parametre non valide » sur ce namespace imbrique —
-            // mesure du 10/09/2026. Cette requete echouait donc DEPUIS toujours, et le
-            // `TryWin32DiskDrive()` juste en dessous la rattrapait en silence : le produit tournait
+            // `ManagementObjectSearcher` rend « Parametre non valide » sur ce namespace imbrique
+            // (mesure du 10/09/2026). La requete echouerait donc toujours, et le
+            // `TryWin32DiskDrive()` juste en dessous la rattraperait en silence : le produit tournerait
             // sur le lecteur degrade sans que rien ne le signale. Un repli qui ne se voit pas est
             // un repli qu'on ne corrige jamais.
             @"root\Microsoft\Windows\Storage",
@@ -85,7 +85,7 @@ public sealed class StorageDetector : IStorageDetector
             var sizeBytes = (long)(row.GetUlong("Size") ?? 0UL);
             var mediaTypeStr = row.GetString("MediaType") ?? string.Empty;
 
-            // Win32_DiskDrive MediaType is a string describing the media
+            // Le MediaType de Win32_DiskDrive est une chaîne qui décrit le support
             string kind = mediaTypeStr.Contains("Fixed", StringComparison.OrdinalIgnoreCase)
                 ? "HDD"
                 : "Unknown";

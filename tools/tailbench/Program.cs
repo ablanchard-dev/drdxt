@@ -109,7 +109,7 @@ internal static class Banc
                 .ToList();
 
             if (frames.Count < 3000) continue;
-            // Deux fichiers du 07/09 sont des COPIES de captures du 01/09 : les compter deux fois
+            // Deux fichiers sont des COPIES d'autres captures (releve : 07/09 et 01/09) : les compter deux fois
             // gonflerait la confiance avec le meme temoignage.
             var signature = $"{frames.Count}:{frames.Sum():F3}";
             if (vues.Add(signature))

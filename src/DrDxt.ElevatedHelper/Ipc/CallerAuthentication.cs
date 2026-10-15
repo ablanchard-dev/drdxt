@@ -4,33 +4,33 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Ipc;
 
 // -----------------------------------------------------------------------
-// Caller authorization seam.
+// Couture d'autorisation de l'appelant.
 //
-// SECURITY (master plan §9.14: "jamais d'auth stubée en build distribuable"):
-//   * Authorization is a SEPARATE concern from transport integrity (HMAC).
-//     HMAC proves "the bytes are intact and the peer holds the session key";
-//     this seam decides "is the connecting peer ENTITLED to run privileged
-//     ops at all" — i.e. is it really our DrDxt.App.
-//   * The production/default implementation denies by default. It must never
-//     silently allow-all in a shippable build. Tests inject an allowing fake.
+// Sécurité (« jamais d'auth stubée en build distribuable ») :
+//   * L'autorisation est une question distincte de l'intégrité du transport (HMAC).
+//     Le HMAC prouve « les octets sont intacts et le pair détient la clé de session » ;
+//     cette couture décide « le pair qui se connecte a-t-il seulement le droit de lancer des
+//     ops privilégiées », c'est-à-dire est-ce vraiment notre DrDxt.App.
+//   * L'implémentation de production / par défaut refuse par défaut. Elle ne doit jamais tout
+//     autoriser en silence dans un build distribuable. Les tests injectent un faux qui autorise.
 // -----------------------------------------------------------------------
 
-/// <summary>Caller context for an authorization decision. Carries the connecting
-/// peer's process id (resolved from the pipe via GetNamedPipeClientProcessId) so
-/// the authenticator can verify the peer is our DrDxt.App. A null pid means the
-/// pid could not be resolved → deny.</summary>
+/// <summary>Contexte de l'appelant pour une décision d'autorisation. Porte le process id du
+/// pair qui se connecte (résolu depuis le pipe via GetNamedPipeClientProcessId) pour que
+/// l'authentificateur vérifie que le pair est notre DrDxt.App. Un pid null veut dire que le
+/// pid n'a pas pu être résolu → refus.</summary>
 public readonly record struct CallerInfo(int? ClientProcessId = null);
 
-/// <summary>Fail-closed authorization decision for a connecting peer.</summary>
+/// <summary>Décision d'autorisation en refus au moindre doute (fail-closed) pour un pair qui se connecte.</summary>
 public interface ICallerAuthenticator
 {
     Result Authorize(CallerInfo caller);
 }
 
 /// <summary>
-/// DEFAULT fail-closed authenticator. DENIES every caller. Used as a safe
-/// fallback / in tests of the deny path; the App-process authenticator
-/// (DrDxtAppCallerAuthenticator) is what a real elevated host wires.
+/// Authentificateur fail-closed par défaut. Refuse tout appelant. Sert de repli sûr et dans
+/// les tests du chemin de refus ; un vrai hôte élevé branche l'authentificateur du processus
+/// App (DrDxtAppCallerAuthenticator).
 /// </summary>
 public sealed class DenyByDefaultCallerAuthenticator : ICallerAuthenticator
 {
@@ -39,18 +39,18 @@ public sealed class DenyByDefaultCallerAuthenticator : ICallerAuthenticator
 }
 
 /// <summary>
-/// Authorizes a peer that matches ANY ONE of a SET of trusted caller images — the
-/// helper must accept MULTIPLE distinct callers (the interactive DrDxt.App AND the
-/// low-priv reconciler host), each its own path+SHA-256 authenticator.
+/// Autorise un pair qui correspond à l'une quelconque d'un ensemble d'images d'appelants de
+/// confiance : le helper doit accepter plusieurs appelants distincts (le DrDxt.App interactif et
+/// l'hôte réconciliateur peu privilégié), chacun avec son authentificateur chemin + SHA-256.
 ///
-/// SECURITY (M5 multi-caller channel): the peer is exactly one process, so an OR over
-/// the per-image authenticators is correct — it authorizes iff the peer IS one of the
-/// trusted images. It is fail-closed by construction:
-///   * an EMPTY set authorizes nothing (deny-by-default — no trusted image provisioned);
-///   * a peer that matches none of the members → DENY (third-party, or a swapped binary
-///     at a trusted path: each member also enforces SHA-256, so the path alone never wins);
-///   * a member that THROWS is treated as "did not authorize" (defense in depth) — one
-///     faulty member can never crash the decision, and never silently allow.
+/// Sécurité (canal multi-appelant) : le pair est exactement un processus, donc un « ou » logique sur les
+/// authentificateurs par image est correct : il autorise si et seulement si le pair est l'une des
+/// images de confiance. Fail-closed par construction :
+///   * un ensemble vide n'autorise rien (refus par défaut : aucune image de confiance fournie) ;
+///   * un pair qui ne correspond à aucun membre → refus (tiers, ou binaire remplacé à un chemin
+///     de confiance : chaque membre impose aussi le SHA-256, le chemin seul ne gagne jamais) ;
+///   * un membre qui lève compte comme « n'a pas autorisé » (défense en profondeur) : un membre
+///     défaillant ne fait jamais planter la décision, et n'autorise jamais en silence.
 /// </summary>
 public sealed class CompositeCallerAuthenticator : ICallerAuthenticator
 {
@@ -59,7 +59,7 @@ public sealed class CompositeCallerAuthenticator : ICallerAuthenticator
     public CompositeCallerAuthenticator(params ICallerAuthenticator[] members)
     {
         ArgumentNullException.ThrowIfNull(members);
-        // Defensive copy; reject null entries so a null can never short-circuit/throw.
+        // Copie défensive ; refuser les entrées null pour qu'un null ne court-circuite ni ne lève jamais.
         _members = members.ToArray();
         if (Array.IndexOf(_members, null) >= 0)
             throw new ArgumentNullException(nameof(members), "Authenticator members must be non-null.");
@@ -79,7 +79,7 @@ public sealed class CompositeCallerAuthenticator : ICallerAuthenticator
             }
             catch
             {
-                // A throwing member never allows and never crashes the decision.
+                // Un membre qui lève n'autorise jamais et ne fait jamais planter la décision.
                 continue;
             }
 
@@ -87,44 +87,44 @@ public sealed class CompositeCallerAuthenticator : ICallerAuthenticator
                 return Result.Ok();
         }
 
-        // No member authorized the peer (or there were none) → deny, fail-closed.
+        // Aucun membre n'a autorisé le pair (ou il n'y en avait aucun) → refus, fail-closed.
         return Result.Fail(ErrorCodes.ElevationDenied,
             "Caller authorization denied (not one of the trusted caller images).");
     }
 }
 
 /// <summary>
-/// Authorizes a connecting peer only when its process image is the trusted
-/// DrDxt.App executable.
+/// N'autorise un pair qui se connecte que si l'image de son processus est l'exécutable
+/// DrDxt.App de confiance.
 ///
-/// SECURITY: the pipe is already ACL-restricted to the current user, so the peer
-/// runs as the same user. This adds a process-IDENTITY check on top:
-///   * resolve the client's PID (from the pipe) → its main-module image path,
-///     and require it to equal the expected DrDxt.App path (full, case-insensitive);
-///   * (HARDENED, M5) also require the image's SHA-256 to match the expected
-///     App's — so a DIFFERENT binary sitting at the same path is rejected. This
-///     is the UNSIGNED dev-build identity proof. Use <see cref="WithImageIdentity"/>.
-/// Anything uncertain — no PID, unresolved path/hash, mismatch, or a throwing
-/// resolver — DENIES (fail-closed; never fail-open).
+/// Sécurité : le pipe est déjà limité par ACL à l'utilisateur courant, donc le pair tourne sous
+/// le même utilisateur. On ajoute par-dessus une vérification d'identité de processus :
+///   * résoudre le PID du client (depuis le pipe) → le chemin d'image de son module principal,
+///     et exiger qu'il égale le chemin DrDxt.App attendu (complet, sans tenir compte de la casse) ;
+///   * (durci) exiger aussi que le SHA-256 de l'image égale celui de l'App attendue : un autre
+///     binaire posé au même chemin est rejeté. C'est la preuve d'identité d'un build de dev non
+///     signé. Utiliser <see cref="WithImageIdentity"/>.
+/// Tout ce qui est incertain (pas de PID, chemin ou empreinte non résolus, désaccord, résolveur
+/// qui lève) refuse (fail-closed ; jamais fail-open).
 ///
-/// Known limit, until the App is code-signed: replace the image-hash equality with full Authenticode
-/// verification of the caller image (WinVerifyTrust + pin OUR publisher cert,
-/// 07-SECURITY §2.4/§3.2) once DrDxt.App is code-signed. The image-hash is the
-/// dev-grade stand-in until then; the seam shape does not change when it lands.
+/// Limite connue tant que l'App n'est pas signée : remplacer l'égalité d'empreinte d'image par une
+/// vérification Authenticode complète de l'image de l'appelant (WinVerifyTrust + épinglage de
+/// notre certificat d'éditeur, une fois DrDxt.App signé). L'empreinte d'image en tient lieu au
+/// niveau dev d'ici là ; la forme de la couture ne changera pas.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class DrDxtAppCallerAuthenticator : ICallerAuthenticator
 {
     private readonly string _expectedImagePath;
-    private readonly byte[]? _expectedImageHash;        // null → path-only (legacy dev-grade)
+    private readonly byte[]? _expectedImageHash;        // null → chemin seul (historique, niveau dev)
     private readonly Func<int, string?> _resolveImagePath;
     private readonly ICallerImageIdentity? _imageIdentity; // non-null → hardened path
 
-    /// <summary>Path-only authenticator (legacy R1 dev-grade). Kept for callers/tests
-    /// that only assert the image path. Prefer <see cref="WithImageIdentity"/>.</summary>
-    /// <param name="expectedImagePath">Full path of the trusted DrDxt.App exe.</param>
-    /// <param name="resolveImagePath">Maps a client PID → its main-module image
-    /// path. Defaults to the real Win32 resolver; tests inject a fake.</param>
+    /// <summary>Authentificateur par chemin seul (historique, niveau dev). Gardé pour les appelants
+    /// et tests qui ne vérifient que le chemin d'image. Préférer <see cref="WithImageIdentity"/>.</summary>
+    /// <param name="expectedImagePath">Chemin complet de l'exe DrDxt.App de confiance.</param>
+    /// <param name="resolveImagePath">Relie un PID client → le chemin d'image de son module
+    /// principal. Le vrai résolveur Win32 par défaut ; les tests injectent un faux.</param>
     public DrDxtAppCallerAuthenticator(string expectedImagePath, Func<int, string?>? resolveImagePath = null)
     {
         if (string.IsNullOrWhiteSpace(expectedImagePath))
@@ -145,20 +145,20 @@ public sealed class DrDxtAppCallerAuthenticator : ICallerAuthenticator
         _expectedImagePath = Path.GetFullPath(expectedImagePath);
         _expectedImageHash = (byte[])expectedImageHash.Clone();
         _imageIdentity = imageIdentity ?? throw new ArgumentNullException(nameof(imageIdentity));
-        _resolveImagePath = DefaultResolveImagePath; // unused on the hardened path
+        _resolveImagePath = DefaultResolveImagePath; // inutilisé sur le chemin durci
     }
 
-    /// <summary>HARDENED authenticator: requires the peer's image path AND its
-    /// SHA-256 to match the expected App. The dev-build identity gate (closes the
-    /// swapped-exe-at-same-path gap). <paramref name="imageIdentity"/> defaults to
-    /// the real Win32 path+hash resolver.</summary>
+    /// <summary>Authentificateur durci : exige que le chemin d'image du pair et son SHA-256
+    /// correspondent à l'App attendue. La barrière d'identité du build de dev (ferme le trou de
+    /// l'exe remplacé au même chemin). <paramref name="imageIdentity"/> vaut par défaut le vrai
+    /// résolveur Win32 chemin + empreinte.</summary>
     public static DrDxtAppCallerAuthenticator WithImageIdentity(
         string expectedImagePath, byte[] expectedImageHash, ICallerImageIdentity? imageIdentity = null) =>
         new(expectedImagePath, expectedImageHash, imageIdentity ?? new Win32CallerImageIdentity());
 
     public Result Authorize(CallerInfo caller)
     {
-        // No PID resolved → cannot identify the peer → deny.
+        // Aucun PID résolu → pair non identifiable → refus.
         if (caller.ClientProcessId is not { } pid || pid <= 0)
             return Deny("Could not resolve the connecting client's process id.");
 
@@ -167,7 +167,7 @@ public sealed class DrDxtAppCallerAuthenticator : ICallerAuthenticator
             : AuthorizeByImageIdentity(pid);
     }
 
-    // Legacy dev-grade: path equality only.
+    // Historique, niveau dev : égalité de chemin seulement.
     private Result AuthorizeByPath(int pid)
     {
         string? actual;
@@ -177,7 +177,7 @@ public sealed class DrDxtAppCallerAuthenticator : ICallerAuthenticator
         }
         catch
         {
-            // A throwing resolver (process exited, access denied, …) → deny.
+            // Un résolveur qui lève (processus terminé, accès refusé…) → refus.
             return Deny("Could not resolve the connecting client's image path.");
         }
 
@@ -199,7 +199,7 @@ public sealed class DrDxtAppCallerAuthenticator : ICallerAuthenticator
             : Deny("Connecting client is not the trusted DrDxt.App process.");
     }
 
-    // Hardened: path equality AND image-hash equality (constant-time).
+    // Durci : égalité de chemin et égalité d'empreinte d'image (en temps constant).
     private Result AuthorizeByImageIdentity(int pid)
     {
         CallerImage? resolved;
@@ -228,7 +228,7 @@ public sealed class DrDxtAppCallerAuthenticator : ICallerAuthenticator
         if (!PathMatches(normalized))
             return Deny("Connecting client is not the trusted DrDxt.App process.");
 
-        // No hash resolved (file unreadable) → identity unprovable → deny.
+        // Aucune empreinte résolue (fichier illisible) → identité improuvable → refus.
         if (image.Sha256 is null || image.Sha256.Length == 0)
             return Deny("Connecting client image could not be hashed for identity.");
 

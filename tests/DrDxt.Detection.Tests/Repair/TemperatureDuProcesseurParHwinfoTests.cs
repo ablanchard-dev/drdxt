@@ -5,7 +5,7 @@ using FluentAssertions;
 
 namespace DrDxt.Detection.Tests.Repair;
 
-// 04/10/2026 (plan 1.2) : quand HWiNFO publie le capteur du paquet, la carte dit la vraie température et sa source ;
+// Quand HWiNFO publie le capteur du paquet, la carte dit la vraie température et sa source ;
 // sans lui, la phrase d'avant reste, et dit comment l'obtenir.
 public sealed class TemperatureDuProcesseurParHwinfoTests
 {
@@ -24,7 +24,7 @@ public sealed class TemperatureDuProcesseurParHwinfoTests
         c.Explication.Should().Contain("HWiNFO").And.Contain("CPU Package");
     }
 
-    // 10/10/2026 soir : lue par PawnIO (registres, Intel seulement), 100 °C en partie était dite « observée » et « lue dans
+    // Lue par PawnIO (registres, Intel seulement), 100 °C en partie était dite « observée » et « lue dans
     // HWiNFO ». Les registres se jugent comme le paquet, nomment leur source, et à la limite disent le freinage.
     [Fact]
     public void Lue_par_les_registres_la_limite_est_jugee_et_la_source_est_la_bonne()
@@ -39,8 +39,8 @@ public sealed class TemperatureDuProcesseurParHwinfoTests
         tiede.Explication.Should().NotContain("HWiNFO");
     }
 
-    // 06/10/2026 (plan 4.6) : chez moi, un HWiNFO de 2012 tournait sans rien publier, et la carte disait seulement « pas
-    // pu lire ». Quand HWiNFO tourne sans publier, la carte nomme sa version et les deux causes connues.
+    // Un HWiNFO ancien (2012) peut tourner sans rien publier : « pas pu lire » seul ne suffit pas. Quand
+    // HWiNFO tourne sans publier, la carte nomme sa version et les deux causes connues.
     [Fact]
     public void HWiNFO_qui_tourne_sans_publier_est_nomme_avec_sa_version_et_le_geste()
     {
@@ -51,7 +51,7 @@ public sealed class TemperatureDuProcesseurParHwinfoTests
             .And.Contain("peut la décocher au bout de 12 heures").And.Contain("mets-le à jour");
     }
 
-    // Revue du 06/10 (P2) : HWiNFO publie, mais la lecture échoue (en pause, capteur au nom inattendu) : ne pas
+    // HWiNFO publie, mais la lecture échoue (en pause, capteur au nom inattendu) : ne pas
     // envoyer cocher une case déjà cochée.
     [Fact]
     public void HWiNFO_qui_publie_sans_temperature_lisible_ne_renvoie_pas_a_la_case()
@@ -61,7 +61,7 @@ public sealed class TemperatureDuProcesseurParHwinfoTests
         c.Explication.Should().Contain("HWiNFO 8.54-6090 publie").And.NotContain("Shared Memory Support");
     }
 
-    // Revue du 06/10 (P2) : version illisible (HWiNFO lancé sous SYSTEM) : pas de « HWiNFO ? ».
+    // Version illisible (HWiNFO lancé sous SYSTEM) : pas de « HWiNFO ? ».
     [Fact]
     public void Une_version_illisible_n_est_pas_un_point_d_interrogation()
         => Thermique("?", publie: false).Explication.Should().Contain("HWiNFO tourne").And.NotContain("HWiNFO ?");
@@ -83,7 +83,7 @@ public sealed class TemperatureDuProcesseurParHwinfoTests
     public void Pres_de_la_limite_la_carte_le_signale()
         => Constat(new TemperatureHwinfo.Lecture(97, "CPU Package")).Statut.Should().Be(RepairStatus.Suspicious);
 
-    // Revue du 04/10 (P1) : un Ryzen 7000 tourne à 95 °C par conception ; le seuil d'Intel ne le juge pas.
+    // Un Ryzen 7000 tourne à 95 °C par conception ; le seuil d'Intel ne le juge pas.
     [Fact]
     public void Un_Ryzen_a_95_degres_n_est_pas_signale()
     {

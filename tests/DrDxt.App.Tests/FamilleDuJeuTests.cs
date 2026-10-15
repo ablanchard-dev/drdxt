@@ -3,7 +3,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 07/10/2026 (revue F-27) : le lanceur du jeu et ce qu'il fait tourner ne sont pas des voisins à calmer. Une table de
+// Le lanceur du jeu et ce qu'il fait tourner ne sont pas des voisins à calmer. Une table de
 // processus écrite à la main ; aucun vrai processus n'est lu.
 public sealed class FamilleDuJeuTests
 {

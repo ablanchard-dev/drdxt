@@ -45,6 +45,7 @@ Avant l'écriture, DrDXT en retire :
 - les identifiants de volume (Volume{…})
 - les adresses de courriel
 - le nom d'organisation des dossiers OneDrive (« OneDrive - <organisation> »)
+- les clés à tirets (licence : au moins quatre groupes de cinq lettres ou chiffres) et les empreintes (32 caractères hexadécimaux ou plus)
 
 Ce qui reste : les modèles de ton matériel, tes réglages, les noms de tes périphériques (souris, casques) et des
 programmes qui démarrent avec Windows. Relis le fichier avant de l'envoyer si l'un d'eux te gêne.

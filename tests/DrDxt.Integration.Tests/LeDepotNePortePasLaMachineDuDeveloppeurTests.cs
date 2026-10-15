@@ -3,7 +3,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// 25/09/2026 : l'adresse e-mail du développeur, son nom d'utilisateur Windows et le nom de sa
+/// L'adresse e-mail du développeur, son nom d'utilisateur Windows et le nom de sa
 /// machine servaient d'exemples dans des tests. Le dépôt est destiné à être public. Ce garde lit, au moment
 /// où il tourne, le nom d'utilisateur et le nom de la machine qui l'exécutent, et refuse de les trouver dans
 /// les fichiers du dépôt : il ne contient donc lui-même aucune de ces valeurs.

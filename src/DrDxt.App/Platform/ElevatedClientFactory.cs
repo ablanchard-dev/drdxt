@@ -7,45 +7,45 @@ using DrDxt.ElevatedHelper.Ipc;
 namespace DrDxt.App.Platform;
 
 // -----------------------------------------------------------------------
-// ElevatedClientFactory — builds the App-side IElevatedClient.
+// ElevatedClientFactory : construit l'IElevatedClient côté App.
 //
-// TWO PATHS:
-//   1. DEFAULT (M5, §9.13): launch-on-demand + handshake. The App locates
-//      DrDxt.ElevatedHelper.exe next to itself, and on the first privileged op
-//      launches it ELEVATED (one interactive UAC via HelperLauncher), then talks
-//      to it over the ACL'd named pipe, NEGOTIATING an ephemeral per-session key
-//      on connect (HandshakingElevatedClient). No dev pre-shares a key.
-//   2. OVERRIDE (legacy R1 smoke): if DRDXT_HELPER_SESSION_KEY (base64, >=32 bytes)
-//      is set, the proven env-var-keyed TypedNamedPipeElevatedClient is returned
-//      instead, so the existing m2smoke/r2smoke tools keep working unchanged
-//      (they launch the helper in legacy mode and pre-share the key).
+// Deux chemins :
+//   1. Par défaut : lancement à la demande et handshake. L'App trouve
+//      DrDxt.ElevatedHelper.exe à côté d'elle et, à la première opération privilégiée,
+//      le lance élevé (une seule invite UAC via HelperLauncher), puis lui parle par le
+//      named pipe protégé par ACL, en négociant à la connexion une clé éphémère par
+//      session (HandshakingElevatedClient). Aucun développeur ne partage de clé à l'avance.
+//   2. Forcé (ancien smoke test) : si DRDXT_HELPER_SESSION_KEY (base64, >= 32 octets)
+//      est posée, on rend à la place le TypedNamedPipeElevatedClient éprouvé, à clé par
+//      variable d'environnement, pour que les outils m2smoke/r2smoke existants marchent
+//      sans changement (ils lancent le helper en mode ancien et partagent la clé à l'avance).
 //
-// When nothing can yield a channel (helper exe missing, etc.) a fail-clean client
-// is returned that refuses every op (Result.Fail) — the App never throws/crashes
-// on a missing helper; an apply simply fails clean.
+// Quand rien ne peut donner de canal (exe du helper absent, etc.), on rend un client qui
+// échoue proprement et refuse chaque opération (Result.Fail) : l'App ne lève ni ne plante
+// jamais sur un helper absent ; une application échoue simplement proprement.
 //
-// NOTE (05-M5 §1 end-state): the on-demand UAC launch is the dev/test stepping-
-// stone. The installer later registers the same helper exe as a Windows service
-// (one UAC at install) over the same pipe + handshake — only the launch mechanism
-// changes (a service-start IHelperProcessLauncher), not this channel.
+// Note : le lancement UAC à la demande est l'étape de dev et de test. L'installeur
+// enregistre ensuite le même exe du helper comme service Windows (une seule invite UAC à
+// l'installation) sur le même pipe et le même handshake : seul le mécanisme de lancement
+// change (un IHelperProcessLauncher qui démarre le service), pas ce canal.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class ElevatedClientFactory
 {
     public const string SessionKeyEnv = "DRDXT_HELPER_SESSION_KEY";
 
-    /// <summary>File name of the elevated helper, copied next to the App exe at build.
-    /// Source de verite unique, partagee avec la garde qui AUTHENTIFIE le serveur du tube
+    /// <summary>Nom de fichier du helper élevé, copié à côté de l'exe de l'App à la compilation.
+    /// Source de verite unique, partagee avec la garde qui authentifie le serveur du tube
     /// cote client : le fichier qu'on lance et le fichier qu'on accepte d'ecouter doivent
     /// etre nommes au meme endroit, sinon les deux derivent.</summary>
     public const string HelperExeName = PipeServerIdentity.HelperExeName;
 
-    /// <summary>SEC2 (08/10/2026) : les valeurs HKCU s'écrivent par l'App (jeton de l'utilisateur), le reste par le helper.</summary>
+    /// <summary>Les valeurs HKCU s'écrivent par l'App (jeton de l'utilisateur), le reste par le helper.</summary>
     public static IElevatedClient Create() => new ClientSessionUtilisateur(CreerVersLeHelper());
 
     private static IElevatedClient CreerVersLeHelper()
     {
-        // OVERRIDE path: a pre-shared key keeps the existing smoke tools working.
+        // Chemin forcé : une clé partagée à l'avance garde les smoke tests existants en état de marche.
         var key = ReadSessionKey();
         if (key is not null)
         {
@@ -53,35 +53,36 @@ public static class ElevatedClientFactory
             return new TypedNamedPipeElevatedClient(key, legacyTransport);
         }
 
-        // DEFAULT path: launch-on-demand + handshake. Locate the helper next to us.
+        // Chemin par défaut : lancement à la demande et handshake. On cherche le helper à côté de nous.
         var appExe = TryGetAppExePath();
         var helperExe = TryGetHelperExePath();
         if (appExe is null || helperExe is null)
         {
-            // No helper available → fail-clean client (every op refused, no crash).
+            // Pas de helper → client qui échoue proprement (chaque opération refusée, pas de plantage).
             return new UnavailableElevatedClient();
         }
 
         var pipeName = PipeSecurityFactory.DefaultPipeName;
         var spec = new HelperLaunchSpec(helperExe, appExe, pipeName);
 
-        // FIX 1: reuse/liveness is detected by a COMPLETE connect+handshake attempt
-        // (no separate bare-connect probe that raced the single-instance pipe).
+        // La réutilisation et la présence du helper se détectent par une tentative complète de
+        // connexion et de handshake (pas de sonde de connexion nue à part, qui entrerait en course
+        // avec le pipe à instance unique).
         var launcher = new HelperLauncher(
             new RunAsProcessLauncher(),
             new PipeHandshakeAttempt(pipeName));
 
-        // Le client n'accepte de parler qu'au helper qu'on vient de LANCER : meme chemin des
+        // Le client n'accepte de parler qu'au helper qu'on vient de lancer : meme chemin des
         // deux cotes. Un squatteur non privilegie qui aurait pris le nom du tube avant lui est
         // refuse avant le handshake, donc avant d'apprendre ce que DrDXT voulait appliquer.
         var inner = new HandshakingElevatedClient(pipeName, helperExe);
 
-        // Defer the UAC launch to the first privileged op; reuse if already running.
+        // Le lancement UAC attend la première opération privilégiée ; on réutilise le helper s'il tourne déjà.
         return new LaunchOnDemandElevatedClient(
             ct => launcher.EnsureRunningAsync(spec, ct), inner);
     }
 
-    /// <summary>11/09/2026 — un client qui ne lance jamais le helper : il le reutilise s'il sert deja son
+    /// <summary>Un client qui ne lance jamais le helper : il le reutilise s'il sert deja son
     /// tube (meme garde d'authentification du serveur), sinon il echoue vite (HELPER_UNREACHABLE). Pour les
     /// gestes de fond, comme le rafraichissement de l'habilitation du manifeste : une invite UAC sans geste
     /// de l'utilisateur n'est jamais acceptable.</summary>
@@ -99,7 +100,7 @@ public static class ElevatedClientFactory
             : new HandshakingElevatedClient(PipeSecurityFactory.DefaultPipeName, helperExe, connectTimeoutMs: 500);
     }
 
-    /// <summary>26/09/2026 — la cle d'environnement vient de HKCU\Environment, ecrivable par tout programme du
+    /// <summary>La cle d'environnement vient de HKCU\Environment, ecrivable par tout programme du
     /// compte, et elle selectionne le client legacy, qui ne verifie pas le serveur du tube. Installee sous
     /// Program Files, l'App l'ignore et passe toujours par la poignee de main ; les outils de developpement
     /// (lances hors installation) la gardent.</summary>
@@ -133,7 +134,7 @@ public static class ElevatedClientFactory
         }
     }
 
-    // The running App's own exe (the trusted caller image the helper authorizes).
+    // L'exe de l'App en cours (l'image appelante de confiance que le helper autorise).
     private static string? TryGetAppExePath()
     {
         try
@@ -147,7 +148,7 @@ public static class ElevatedClientFactory
         }
     }
 
-    // The helper exe sitting next to the App exe (ProjectReference copy — see csproj).
+    // L'exe du helper posé à côté de celui de l'App (copié par ProjectReference, voir le csproj).
     private static string? TryGetHelperExePath()
     {
         try
@@ -164,8 +165,8 @@ public static class ElevatedClientFactory
         }
     }
 
-    /// <summary>Fail-clean client used when no helper channel can be obtained:
-    /// refuses every op so an apply fails clean rather than crashing.</summary>
+    /// <summary>Client qui échoue proprement, utilisé quand aucun canal vers le helper n'est
+    /// possible : il refuse chaque opération, pour qu'une application échoue proprement au lieu de planter.</summary>
     private sealed class UnavailableElevatedClient : IElevatedClient
     {
         public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct) =>

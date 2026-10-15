@@ -12,7 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 // rival -- un geste manuel, a refaire a chaque demarrage, puisque `PresentMonSharedService`
 // demarre en AUTOMATIQUE.
 //
-// CET OUTIL A REPONDU NON, ET IL A DIT POURQUOI (07/09/2026). Le serveur ignore
+// CET OUTIL A REPONDU NON, ET IL A DIT POURQUOI. Le serveur ignore
 // `--control-pipe` : aucun tube prive n'est possible, ni en 2.4.1 ni avec le binaire Intel 2.5.1.
 // Et le refus n'est meme pas un conflit de nom -- le client 2.4.1 atteint le service 2.5.1 et se
 // fait refuser (PM_STATUS 12), la ou il reussit avec un service 2.4.1. C'est une incompatibilite

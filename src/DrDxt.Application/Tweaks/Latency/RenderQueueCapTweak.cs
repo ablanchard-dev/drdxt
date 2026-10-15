@@ -4,28 +4,27 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// D2 — RenderQueueCapTweak.
+// RenderQueueCapTweak.
 //
-// The universal low-latency floor when the NVIDIA Reflex / Low Latency Mode path (D1) isn't the
-// route. Caps the render queue depth so the CPU never queues frames ahead of the
-// GPU (lower input→display latency, 0 FPS cost):
-//   * AMD  → ADLX Anti-Lag ON (ApplyAdlxTuningOp).
-//   * NVIDIA legacy / universal → DRS "Max Pre-Rendered Frames" = 1
-//     (ApplyNvApiDrsSettingOp) — never a raw unsupported registry write (§6).
+// Le plancher de faible latence pour les deux marques, quand le jeu n'a pas Reflex. Limite la
+// profondeur de la file de rendu pour que le processeur ne prépare jamais d'images d'avance sur la
+// carte (moins de latence entre l'entrée et l'affichage, sans coût en images) :
+//   * AMD : Anti-Lag d'ADLX activé (ApplyAdlxTuningOp) ;
+//   * NVIDIA : DRS « Max Pre-Rendered Frames » = 1 (ApplyNvApiDrsSettingOp), au profil du jeu en
+//     cours, jamais une écriture de registre brute non prise en charge.
 //
-// 08/10/2026 (V-NV1) : D1 (Reflex par le registre) ne s'applique plus. Ce levier porte les deux cartes : Anti-Lag
-// sur AMD, et sur NVIDIA la file a 1 au profil du jeu, pour un jeu sans Reflex.
+// La branche NVIDIA écrit au profil du jeu, comme PreferMaxPerf : « Base Profile » toucherait tous
+// les jeux et le bureau.
 //
-// 14/09/2026 (plan complet 1.3) : la branche NVIDIA ecrit au profil du JEU en cours, comme
-// PreferMaxPerf — elle ecrivait dans « Base Profile », donc pour tous les jeux et le bureau.
-//
-// Captures the real original value first → serialized inverse op in the snapshot;
-// every external boundary wrapped → fail clean (TWEAK.SDK_UNAVAILABLE), never throws.
+// L'original est relu d'abord, l'op inverse sérialisée rangée dans le snapshot ; chaque frontière
+// externe est protégée : échec propre (TWEAK.SDK_UNAVAILABLE), jamais d'exception.
 // -----------------------------------------------------------------------
+/// <summary>Limite la file de rendu à une image : Anti-Lag sur AMD, « Max Pre-Rendered Frames » = 1 au profil du jeu
+/// sur NVIDIA. Proposé quand la valeur est lue autrement (sur AMD, Anti-Lag et Chill lus éteints).</summary>
 public sealed class RenderQueueCapTweak : LatencyTweakBase
 {
-    // NVIDIA DRS setting id for the pre-render limit (PRERENDERLIMIT_ID). The cap
-    // value 1 = a single pre-rendered frame (lowest-latency queue depth).
+    // Id du réglage DRS NVIDIA de la limite de pré-rendu (PRERENDERLIMIT_ID). La valeur
+    // 1 = une seule image pré-rendue (la file la plus courte, la latence la plus basse).
     private const uint MaxPreRenderedFramesSettingId = 0x007ba09e;
     private const uint RenderQueueCapValue = 1;
 
@@ -48,7 +47,7 @@ public sealed class RenderQueueCapTweak : LatencyTweakBase
     public override string Id => "latency.render_queue_cap";
     public override string SummaryKey => "tweak.latency.render_queue_cap.floor";
 
-    // V-NV1 (08/10/2026) : les jeux qui ont Reflex. Quand le jeu l'active, Reflex remplace la file du pilote : l'essai ne
+    // Les jeux qui ont Reflex. Quand le jeu l'active, Reflex remplace la file du pilote : l'essai ne
     // mesurerait que du bruit. Source : https://www.nvidia.com/en-us/geforce/technologies/reflex/supported-products/
     // Liste courte des jeux compétitifs les plus joués ; un jeu absent est essayé, mesuré, et rendu s'il ne gagne rien.
     private static readonly HashSet<string> JeuxAvecReflex = new(StringComparer.OrdinalIgnoreCase)
@@ -71,11 +70,11 @@ public sealed class RenderQueueCapTweak : LatencyTweakBase
     {
         if (!LatencyGating.FixeOuPortable(hw))
             return false;
-        // V-NV1 (08/10/2026) : sur NVIDIA, « Low Latency Mode : On » (une seule image d'avance), au profil du jeu
+        // Sur NVIDIA, « Low Latency Mode : On » (une seule image d'avance), au profil du jeu
         // seulement ; sans profil de jeu, rien ne s'écrit (pas de repli sur le global, voir PlanifierDrs).
         if (LatencyGating.HasNvidiaDriverPath(hw))
             return FileNvidiaAuJeu() is { IsOk: true } lu && lu.Value.Value != RenderQueueCapValue;
-        // A2 (07/10/2026) : l'écriture existe (IADLX3DAntiLag.SetEnabled, carte dédiée). Proposé seulement quand Anti-Lag
+        // L'écriture existe (IADLX3DAntiLag.SetEnabled, carte dédiée). Proposé seulement quand Anti-Lag
         // est LU éteint et Chill LU éteint : allumer Anti-Lag éteint Chill, et le rendre ne le rallume pas.
         return LatencyGating.HasAmdDriverPath(hw)
             && _adlx.GetAntiLagState() is { IsOk: true, Value: 0 }
@@ -86,14 +85,14 @@ public sealed class RenderQueueCapTweak : LatencyTweakBase
     public override bool EtatNonLu(SettingsState state)
         => (_adlx.IsAvailable && (!_adlx.GetAntiLagState().IsOk || !_adlx.GetChillActif().IsOk))
            || FileNvidiaAuJeu() is { IsOk: false } echec && echec.Error?.Code != ErrorCodes.DrsNoGameProfile
-           // Revue n° 13 : sur NVIDIA, la file se lit au profil du jeu ; scanné sans jeu ouvert, elle n'est pas lue.
+           // Sur NVIDIA, la file se lit au profil du jeu ; scanné sans jeu ouvert, elle n'est pas lue.
            || (_nvApi.IsAvailable && !_adlx.IsAvailable && _game is not null && _game.RunningGameExecutablePath() is null);
 
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
         try
         {
-            // Prefer AMD Anti-Lag; fall back to the NVIDIA DRS render-queue cap.
+            // D'abord Anti-Lag d'AMD ; sinon le plafond DRS de file de rendu de NVIDIA.
             if (_adlx.IsAvailable)
                 return await ApplyAntiLagAsync().ConfigureAwait(false);
             if (_nvApi.IsAvailable)
@@ -131,7 +130,7 @@ public sealed class RenderQueueCapTweak : LatencyTweakBase
         if (!applied.IsOk)
             return Result<TweakSnapshot>.Fail(applied.Error!.Value.Code, applied.Error!.Value.Message);
 
-        // 08/10/2026 : la valeur posée, pour que la désinstallation rende Anti-Lag seulement s'il porte encore la sienne.
+        // La valeur posée, pour que la désinstallation rende Anti-Lag seulement s'il porte encore la sienne.
         return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, inverse.Value, PrivilegedOpCodec.Serialize(pose).Value));
     }
 

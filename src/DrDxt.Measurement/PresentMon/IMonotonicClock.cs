@@ -3,19 +3,19 @@ using System.Diagnostics;
 namespace DrDxt.Measurement.PresentMon;
 
 /// <summary>
-/// Monotonic clock seam so the duration-bounded capture loop can be driven
-/// deterministically in tests (no real wall-clock waiting).
+/// Couture d'horloge monotone pour mener de façon déterministe, en test, la boucle de capture
+/// bornée en durée (sans vraie attente sur l'horloge murale).
 /// </summary>
 public interface IMonotonicClock
 {
-    /// <summary>Time elapsed since the last <see cref="Restart"/>.</summary>
+    /// <summary>Temps écoulé depuis le dernier <see cref="Restart"/>.</summary>
     TimeSpan Elapsed { get; }
 
-    /// <summary>Resets <see cref="Elapsed"/> to zero and starts counting.</summary>
+    /// <summary>Remet <see cref="Elapsed"/> à zéro et commence à compter.</summary>
     void Restart();
 }
 
-/// <summary>Production clock backed by <see cref="Stopwatch"/>.</summary>
+/// <summary>Horloge de production adossée à <see cref="Stopwatch"/>.</summary>
 public sealed class StopwatchClock : IMonotonicClock
 {
     private readonly Stopwatch _sw = new();

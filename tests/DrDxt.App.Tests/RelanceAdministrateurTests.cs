@@ -10,11 +10,10 @@ using Xunit;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// « LIRE AUSSI CE QUI DEMANDE L'ADMINISTRATEUR ».
+/// « Lire aussi ce qui demande l'administrateur ».
 ///
-/// Demande produit du 16/09/2026 : pousser les lectures plus loin pendant les tests. Le produit ne
-/// demandait l'UAC que pour ECRIRE, donc la latence des pilotes, le BCD et les incidents noyau
-/// restaient « non lus » dans l'appli. Le bouton relance DrDXT eleve pour lire, il n'ecrit rien.
+/// Sans droits administrateur, la latence des pilotes, le BCD et les incidents noyau restent
+/// « non lus ». Le bouton relance DrDXT eleve pour lire, il n'ecrit rien.
 /// </summary>
 public class RelanceAdministrateurTests
 {
@@ -41,8 +40,7 @@ public class RelanceAdministrateurTests
           .Returns(Result<BenchmarkResult>.Ok(bl));
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
-          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), st, new List<Finding>(), 90, bl,
-              new ScoreBreakdown(90, 90, 90), new DimensionStatus(false, false))));
+          .Returns(Result<ScanResult>.Ok(new ScanResult(Hw(), st, new List<Finding>(), bl)));
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
 
@@ -96,7 +94,7 @@ public class RelanceAdministrateurTests
         vm.MessageRelanceAdministrateur.Should().Be("Scan.Elevation.Refused");
     }
 
-    // 03/10/2026 (boucle 2D2P, D6.2) : « aucun intérêt de faire un scan sans puis un scan avec admin, faut tout faire
+    // « aucun intérêt de faire un scan sans puis un scan avec admin, faut tout faire
     // direct ». Sans droits, lancer l'analyse demande l'élévation une fois et confie l'analyse à l'instance élevée.
     [Fact]
     public async Task Sans_droits_lancer_l_analyse_la_confie_a_l_instance_elevee_avec_la_scene()

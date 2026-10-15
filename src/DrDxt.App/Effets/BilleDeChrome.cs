@@ -61,7 +61,7 @@ public sealed class BilleLiquideEffect : ShaderEffect
 }
 
 /// <summary>
-/// 07/10/2026 (le mainteneur, validé sur aperçu : « là c'est bien ») : la bille du bouton central. Le chrome liquide du fond posé
+/// La bille du bouton central. Le chrome liquide du fond posé
 /// sur une sphère qui tourne en 3D, des rubans nets à liseré de lumière, un effet qui évolue sans jamais se répéter
 /// (Effets/BilleLiquide.hlsl). Calculée sur la carte graphique, à la taille réelle : nette à toute échelle.
 ///
@@ -87,7 +87,7 @@ public sealed class BilleDeChrome : System.Windows.Controls.Border
 
     public bool Rapide { get => (bool)GetValue(RapideProperty); set => SetValue(RapideProperty, value); }
 
-    /// <summary>08/10/2026 (le mainteneur) : la bille s'éclaire au survol, davantage au maintien. 1 = au repos.</summary>
+    /// <summary>La bille s'éclaire au survol, davantage au maintien. 1 = au repos.</summary>
     public static readonly DependencyProperty LuminositeProperty = DependencyProperty.Register(
         nameof(Luminosite), typeof(double), typeof(BilleDeChrome),
         new PropertyMetadata(1.0, (d, e) => ((BilleDeChrome)d)._effet.Luminosite = (double)e.NewValue));

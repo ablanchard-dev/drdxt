@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// 26/09/2026 : les fréquences d'écran décident du plafond d'images et du conseil VRR ; le lecteur
+// Les fréquences d'écran décident du plafond d'images et du conseil VRR ; le lecteur
 // (EnumDisplayDevices + EnumDisplaySettings) n'était exercé par aucun test sur le vrai système. Il est
 // confronté à une autre API de Windows (EnumDisplayMonitors + GetMonitorInfo) : même nombre d'écrans, même
 // écran principal, et des fréquences cohérentes (courante positive, jamais au-dessus du maximum lu).

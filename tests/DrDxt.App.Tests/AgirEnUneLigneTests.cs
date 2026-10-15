@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 /// <summary>
-/// UI1 (critique du 08/10, défaut 9) : sous « Rendre le repos » et « Remesurer le processeur », trois à cinq lignes grises.
+/// Sous « Rendre le repos » et « Remesurer le processeur », trois à cinq lignes grises.
 /// Une ligne reste à l'écran ; le texte entier passe en info-bulle sur cette ligne, rien n'est perdu. Les réparations de
 /// Windows gardent leur texte entier : il porte un coût à lire avant le geste.
 /// </summary>

@@ -5,12 +5,9 @@ using Xunit;
 namespace DrDxt.Core.Tests;
 
 /// <summary>
-/// Le root-cause doit choisir, pas seulement s'afficher.
-///
-/// Le classifieur de goulot existait depuis des semaines sans jamais voir une session de jeu, et
-/// la telemetrie materielle, branchee le 08/09/2026, s'affichait sans rien decider. L'autopilote
-/// aurait essaye les memes leviers sur une machine que le GPU sature et sur une machine ou il
-/// attend — a quatre minutes et demie de temps de jeu la tentative.
+/// Le root-cause doit choisir, pas seulement s'afficher : sans lui, l'autopilote essaierait les memes
+/// leviers sur une machine que le GPU sature et sur une machine ou il attend, a quatre minutes et
+/// demie de temps de jeu la tentative.
 ///
 /// Ces tests gravent la seule chose que ce selecteur a le droit de faire : ELIMINER ce que la
 /// mesure disqualifie deja, en disant pourquoi. Il n'autorise aucun keep et n'annonce aucun gain.
@@ -79,8 +76,8 @@ public class CandidateSelectorTests
         appreciation.Motif.Should().Contain("arrêts non propres");
     }
 
-    // 08/10/2026 (chantier V4) : le juge etait inverse. `gpu.power_limit` ABAISSE la limite (90 %, profil
-    // option A : moins de chaleur et de consommation). Il n'etait propose que si la carte butait deja sur sa limite --
+    // Le juge etait inverse. `gpu.power_limit` ABAISSE la limite (90 %, profil
+    // de base : moins de chaleur et de consommation). Il n'etait propose que si la carte butait deja sur sa limite --
     // le seul cas ou l'abaisser coute a coup sur des images -- et refuse partout ailleurs (« rien a relever »).
     [Fact]
     public void UNE_CARTE_QUI_BUTE_DEJA_SUR_SA_LIMITE_ne_se_voit_pas_baisser_la_limite()
@@ -266,7 +263,7 @@ public class CandidateSelectorTests
     {
         // La porte protege l'ecriture GPU. Un levier scheduler ne devient pas interdit parce que le
         // pilote graphique a crie : ce serait punir une famille pour la faute d'une autre.
-        // 11/09/2026 : le veto lit la SURFACE ecrite. Ce levier la declare (processeur) ; sans surface il
+        // Le veto lit la SURFACE ecrite. Ce levier la declare (processeur) ; sans surface il
         // serait refuse, comme tout levier qui ne dit pas ce qu'il ecrit.
         Juger(Machine() with { InstabiliteGpu = Watchdogs(3, 17) },
               Levier("cpu.affinity_hint", "cpu.residence") with { Surface = SurfaceTouchee.Processeur })

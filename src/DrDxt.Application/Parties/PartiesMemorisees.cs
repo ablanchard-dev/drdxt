@@ -4,8 +4,8 @@ using DrDxt.Core;
 namespace DrDxt.Application.Parties;
 
 /// <summary>
-/// 29/09/2026 (A3) : le choix « Relever mes parties » et les dernières parties relevées, gardés entre deux lancements.
-/// 06/10/2026 (chantier J1) : le relevé est le juge de tout gain ; éteint par défaut, il a relevé une partie en un
+/// Le choix « Relever mes parties » et les dernières parties relevées, gardés entre deux lancements.
+/// Le relevé est le juge de tout gain ; éteint par défaut, il a relevé une partie en un
 /// mois sur la machine de référence. Il est donc **allumé par défaut** : les parties restent sur ce PC, rien n'est envoyé,
 /// et seul « éteint », écrit par le clic du joueur, l'éteint (un fichier absent ou abîmé n'est pas un choix). Une liste
 /// abîmée n'invente toujours aucune partie.
@@ -19,7 +19,7 @@ public sealed class PartiesMemorisees
     private readonly FichierJsonAtomique _enCours;
     private readonly FichierJsonAtomique _interrompues;
 
-    /// <param name="cheminEchec">07/10/2026 (revue F-10) : la dernière capture ratée. Par défaut à côté de la liste.</param>
+    /// <param name="cheminEchec">La dernière capture ratée. Par défaut à côté de la liste.</param>
     public PartiesMemorisees(string cheminChoix, string cheminListe, string? cheminEchec = null)
     {
         _choix = new FichierJsonAtomique(cheminChoix, CodeErreur);
@@ -30,7 +30,7 @@ public sealed class PartiesMemorisees
         _interrompues = new FichierJsonAtomique(Path.Combine(Path.GetDirectoryName(cheminListe) ?? "", "parties-interrompues.json"), CodeErreur);
     }
 
-    /// <summary>D1 (08/10/2026) : la partie que le relevé suit, réécrite à chaque regard ; null quand elle se clôt. Restée
+    /// <summary>La partie que le relevé suit, réécrite à chaque regard ; null quand elle se clôt. Restée
     /// écrite au démarrage suivant, c'est une partie que le PC n'a pas laissé finir.</summary>
     public Result NoterEnCours(PartieInterrompue? partie)
         => _enCours.WriteAtomic(partie is null ? "" : JsonSerializer.Serialize(partie));
@@ -62,7 +62,7 @@ public sealed class PartiesMemorisees
     /// <summary>Une capture ratée en cours de partie : sa raison et son heure, la dernière seulement.</summary>
     public sealed record EchecDeCapture(DateTimeOffset Quand, string Raison);
 
-    /// <summary>07/10/2026 (revue F-10) : le relevé de fond n'a pas de fenêtre. Sans ce fichier, un service de mesure
+    /// <summary>Le relevé de fond n'a pas de fenêtre. Sans ce fichier, un service de mesure
     /// refusé (antivirus, PresentMon absent) donnait des semaines de « relevé allumé » et zéro partie, sans un mot.</summary>
     public Result NoterEchec(EchecDeCapture echec) => _echec.WriteAtomic(JsonSerializer.Serialize(echec));
 

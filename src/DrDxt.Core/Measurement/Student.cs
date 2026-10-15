@@ -3,7 +3,7 @@ namespace DrDxt.Core;
 /// <summary>
 /// Le facteur de Student bilateral a 95 %, une seule fois pour tout le produit.
 ///
-/// 26/09/2026 : trois copies existaient et divergeaient (l'une s'arretait a 9 degres de liberte) ;
+/// Trois copies existaient et divergeaient (l'une s'arretait a 9 degres de liberte) ;
 /// toutes retombaient sur 1,96 au-dela de leur table, soit une marge jusqu'a 13,7 % trop etroite.
 /// Au-dela de 20 degres, la derniere valeur de la table est gardee : t decroit avec les degres de
 /// liberte, donc la marge reste au moins aussi large que la vraie (au plus 6 % de trop), jamais plus

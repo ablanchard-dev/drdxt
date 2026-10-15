@@ -29,7 +29,7 @@ if (!signatureConfiguree)
         "ManifestSigning:Ed25519PrivateSeedBase64 is BLANK — every update manifest request answers 503. Set the ManifestSigning__Ed25519PrivateSeedBase64 environment variable.");
 }
 
-// LU — le canal de mise a jour. Il ne sert jamais un manifeste non signe (503 plutot), et repond 204
+// Le canal de mise a jour. Il ne sert jamais un manifeste non signe (503 plutot), et repond 204
 // sur un canal sans version publiee — que le client lit comme « rien a offrir », pas comme une panne.
 app.MapGet("/updates/{channel}/manifest",
     (string channel, IConfiguration config, IManifestSigningService signer)

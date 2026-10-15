@@ -3,33 +3,33 @@ using DrDxt.Core;
 namespace DrDxt.Application.Safety;
 
 // -----------------------------------------------------------------------
-// SafetyManager — the M2 reversibility gate (master plan §6, §8.1, §16).
+// SafetyManager : la garde de réversibilité.
 //
-// B1 EnsureRestorePointAsync: Nothing is ever applied without a verified System
-//    Restore point. If restore is off and cannot be enabled (or the user
-//    declines) we BLOCK — we never silently proceed. The point is created
-//    through the elevated helper via a typed CreateRestorePointOp, then verified
-//    to actually exist (GPO/SKU can silently no-op the create). Throttled to one
-//    point per session/batch so we never spam.
+// EnsureRestorePointAsync : rien n'est jamais posé sans point de restauration vérifié.
+//    Si la restauration est coupée et ne peut pas être activée (ou si l'utilisateur
+//    refuse), on bloque, jamais d'avance silencieuse. Le point est créé par le helper
+//    élevé via un CreateRestorePointOp typé, puis on vérifie qu'il existe vraiment (une
+//    GPO ou l'édition peut annuler la création en silence). Limité à un point par
+//    session ou lot, pour ne jamais en créer en trop.
 //
-// B2 RevertAsync: reconstruct the inverse typed PrivilegedOp from the snapshot's
-//    typed OriginalValueJson (the codec wire form, carrying the real captured
-//    original value) and send it back through the elevated client. The generic
-//    low-level path covers registry / power-plan reverts; tweak-specific reverts
-//    (e.g. a GPU V/F curve) live in ITweak.RevertAsync (Phase E).
+// RevertAsync : reconstruit la PrivilegedOp inverse typée à partir de l'OriginalValueJson
+//    typé du snapshot (la forme filaire du codec, qui porte la vraie valeur d'origine
+//    relevée) et la renvoie par le client élevé. Le chemin générique bas niveau couvre les
+//    retours de registre et de plan d'alimentation ; les retours propres à un levier
+//    (par exemple une courbe V/F du GPU) vivent dans ITweak.RevertAsync (Phase E).
 //
-// Every external boundary is wrapped → Result.Fail. NO exception ever escapes.
+// Chaque frontière externe est protégée → Result.Fail. Aucune exception ne sort jamais.
 // -----------------------------------------------------------------------
 public sealed class SafetyManager : ISafetyManager
 {
-    /// <summary>06/10/2026 (plan 4.5b) : une création sans point relu est retentée une fois. VSS échoue par
-    /// intermittence (8193) et réussit à l'essai suivant (mesuré deux fois sur ma machine).</summary>
+    /// <summary>Une création sans point relu est retentée une fois. VSS échoue par
+    /// intermittence (8193) et réussit à l'essai suivant (mesuré deux fois sur la machine de référence).</summary>
     public const int Creations = 2;
 
-    /// <summary>14/09/2026 — la fenetre ou Windows refuse de creer un nouveau point : 24 h par defaut
+    /// <summary>La fenetre ou Windows refuse de creer un nouveau point : 24 h par defaut
     /// (Microsoft Learn, SRSetRestorePointW, cle SystemRestorePointCreationFrequency absente). Un point de
-    /// cette fenetre est accepte et DIT, plutot que de forcer la frequence a 0 : cela evincerait les points
-    /// plus anciens de l'utilisateur (audit adverse du projet, non publie, point M9). Au-dela : on bloque.</summary>
+    /// cette fenetre est accepte et dit, plutot que de forcer la frequence a 0 : cela evincerait les points
+    /// plus anciens de l'utilisateur (audit adverse du projet, non publie). Au-dela : on bloque.</summary>
     public static readonly TimeSpan FenetreDuRefusDeWindows = TimeSpan.FromHours(24);
 
     public DateTime? PointReutiliseUtc { get; private set; }
@@ -38,14 +38,14 @@ public sealed class SafetyManager : ISafetyManager
     private readonly IConsentPrompt _consent;
     private readonly IElevatedClient _elevated;
 
-    // Throttle: once a verified point exists for this session/batch, we don't
-    // create another (master plan B1: "one point per session/batch").
+    // Limite : dès qu'un point vérifié existe pour cette session ou ce lot, on n'en crée
+    // pas d'autre (« un point par session ou lot »).
     private bool _pointEnsured;
 
-    /// <summary>06/10/2026 (plan 4.5) : lectures de la liste des points avant de conclure qu'aucun n'existe.</summary>
+    /// <summary>Lectures de la liste des points avant de conclure qu'aucun n'existe.</summary>
     public const int LecturesDuPoint = 8;
 
-    /// <summary>**NON CHIFFRÉ** au-delà de la mesure : sur ma machine, un point WMI est listé dès la fin de l'appel
+    /// <summary>**Non chiffré** au-delà de la mesure : sur la machine de référence, un point WMI est listé dès la fin de l'appel
     /// (9 à 19 s) ; 7 attentes de 3 s laissent 21 s de plus avant de dire « pas de point ».</summary>
     internal static readonly TimeSpan EntreDeuxLectures = TimeSpan.FromSeconds(3);
 
@@ -69,8 +69,8 @@ public sealed class SafetyManager : ISafetyManager
         {
             if (!_restore.IsEnabled())
             {
-                // Restore is off: we may proceed only by enabling it with explicit
-                // consent. No consent → declined; consent but cannot enable → disabled.
+                // Restauration coupée : on ne peut avancer qu'en l'activant avec un accord explicite.
+                // Pas d'accord → refusé ; accord mais activation impossible → désactivée.
                 if (!_consent.AskEnableRestore())
                     return Result.Fail(ErrorCodes.RestoreDeclined,
                         "System Restore is disabled and the user declined enabling it.");
@@ -80,7 +80,7 @@ public sealed class SafetyManager : ISafetyManager
                         "System Restore could not be enabled (GPO/SKU/locked).");
             }
 
-            // 06/10/2026 (plan 4.5b, le mainteneur : « pas un point à chaque fois qu'on optimise ») : un point de moins de
+            // Un point de moins de
             // 24 h, de DrDXT ou de Windows, protège déjà ; on le réutilise et l'écran le dit.
             var demandeUtc = DateTime.UtcNow;
             if (_restore.DernierPointDepuis(demandeUtc - FenetreDuRefusDeWindows) is { } recent)
@@ -90,9 +90,9 @@ public sealed class SafetyManager : ISafetyManager
                 return Result.Ok();
             }
 
-            // Create the point through the typed, allowlisted elevated path, under DrDXT's fixed name.
+            // Crée le point par le chemin élevé typé et sur liste blanche, sous le nom fixe de DrDXT.
             // Le retour de Windows ne prouve pas le point (plan 4.5) : la liste est relue avant de conclure.
-            // Revue du 06/10 (P1) : l'échec VSS intermittent remonte en refus ; il est retenté lui aussi.
+            // L'échec VSS intermittent remonte en refus ; il est retenté lui aussi.
             DateTime? trouve = null;
             string? dernierRefus = null;
             for (var essai = 0; essai < Creations && trouve is null; essai++)
@@ -130,9 +130,8 @@ public sealed class SafetyManager : ISafetyManager
 
     public async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
-        // Defensive validation of the incoming JSON (master plan §9.6): a malformed
-        // or unknown-typed snapshot must never throw and must never run an arbitrary
-        // op — fail clean with SAFETY.SNAPSHOT_INVALID.
+        // Validation prudente du JSON reçu : un snapshot malformé ou de type inconnu ne doit
+        // jamais lever ni lancer une op arbitraire ; échec propre avec SAFETY.SNAPSHOT_INVALID.
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Snapshot has no original-value payload.");
 
@@ -152,8 +151,8 @@ public sealed class SafetyManager : ISafetyManager
 
         try
         {
-            // Send the captured-original op back through the elevated client to
-            // restore the exact prior value. Surface the helper's result verbatim.
+            // Renvoie l'op d'origine relevée par le client élevé pour remettre exactement la valeur
+            // d'avant. Le résultat du helper est rendu tel quel.
             return await _elevated.ExecuteAsync(decoded.Value, CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception ex)

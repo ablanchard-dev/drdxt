@@ -4,7 +4,7 @@ using DrDxt.Reconciler.Manifest;
 
 namespace DrDxt.ElevatedHelper.Execution;
 
-/// <summary>11/09/2026 — le geste d'ecriture du manifeste signe, derriere une couture comme les autres
+/// <summary>Le geste d'ecriture du manifeste signe, derriere une couture comme les autres
 /// actions du helper. Atteinte seulement apres HMAC → anti-rejeu → authentification de l'appelant → codec
 /// borne → OpAllowlist (ValidateCommitManifest).</summary>
 public interface IManifestCommitActions
@@ -24,7 +24,7 @@ public sealed class ManifestCommitActions : IManifestCommitActions
     /// <param name="appliquerAcl">Production : true. Les tests passent un dossier temporaire et false.</param>
     public ManifestCommitActions(string racine, bool appliquerAcl)
         => _commit = new MachineManifestCommit(racine, appliquerAcl, new DrDxt.Reconciler.SystemClock(),
-            // 11/09/2026 — la reference de derive est posee ici, processus eleve, dans le meme geste que le
+            // La reference de derive est posee ici, processus eleve, dans le meme geste que le
             // manifeste ; l'App non elevee ne pouvait pas l'ecrire (et l'echec etait avale).
             new DrDxt.Reconciler.JsonReconcilerStateStore(Path.Combine(racine, "reconciler-state.json")),
             new SondeDeBuildWin32(), new SondeDePiloteWmi());

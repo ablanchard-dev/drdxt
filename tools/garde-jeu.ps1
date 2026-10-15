@@ -39,7 +39,7 @@ param(
 
     # Processus ignores par la detection plein ecran : DrDXT lui-meme, le shell, et les overlays
     # connus qui posent une fenetre invisible de la taille de l'ecran sans etre un jeu. Mesure du
-    # 12/09/2026 : « NVIDIA Overlay » (NVIDIA App) a fait refuser la garde alors qu'aucun jeu ne
+    # « NVIDIA Overlay » (NVIDIA App) a fait refuser la garde alors qu'aucun jeu ne
     # tournait. Le VRAI GameLocator (src/DrDxt.App/Platform/GameLocator.cs) a la MEME lacune
     # (aucun filtre d'overlay) : note pour une correction du produit, pas seulement de la garde.
     [string[]] $Ignorer = @('DrDxt.App', 'DrDxt.ElevatedHelper', 'explorer', 'Idle', 'NVIDIA Overlay'),

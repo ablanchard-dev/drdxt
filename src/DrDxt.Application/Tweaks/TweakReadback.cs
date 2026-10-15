@@ -6,12 +6,12 @@ namespace DrDxt.Application.Tweaks;
 /// <summary>Ce que la relecture peut dire d'un levier applique.</summary>
 public enum EtatRelu
 {
-    /// <summary>La valeur courante est REVENUE a celle d'avant l'application. Le gain de ce levier
-    /// n'existe plus — un reboot, une mise a jour ou un autre outil l'a defait.
+    /// <summary>La valeur courante est revenue a celle d'avant l'application. Le gain de ce levier
+    /// n'existe plus : un reboot, une mise a jour ou un autre outil l'a defait.
     /// C'est le seul etat qui appelle un geste, et le seul que personne ne remarquait.</summary>
     RevenuAvantApplication,
 
-    /// <summary>La valeur courante DIFFERE de celle d'avant l'application.
+    /// <summary>La valeur courante differe de celle d'avant l'application.
     ///
     /// **Ce n'est pas « le levier est correctement applique »**, et la nuance decide de ce que le
     /// produit a le droit de dire. Le snapshot ne porte que l'etat original ; il ne porte pas la
@@ -19,7 +19,7 @@ public enum EtatRelu
     /// resultat.</summary>
     DifferentDeAvant,
 
-    /// <summary>L'op de ce snapshot ne sait pas se relire — elle ne touche pas le registre, ou
+    /// <summary>L'op de ce snapshot ne sait pas se relire : elle ne touche pas le registre, ou
     /// porte un type qu'on ne lit pas encore. « Je ne sais pas lire » n'est jamais « c'est
     /// applique ».</summary>
     NonRelisable,
@@ -37,28 +37,27 @@ public sealed record Relecture(
     EtatRelu Etat, string? Cible, string? ValeurAvant, string? ValeurCourante);
 
 /// <summary>
-/// Relire ce qu'un levier a ecrit — une fois, pour tous les leviers de registre.
+/// Relire ce qu'un levier a ecrit : une fois, pour tous les leviers de registre.
 ///
 /// ══ pourquoi cette classe tient en une page ══
-/// La matrice mesuree le 09/09/2026 disait : quinze leviers savent agir, **READBACK inconnu sur
-/// douze**. La reponse evidente etait d'ajouter une methode a `ITweak` et de l'implementer douze
-/// fois. Elle n'etait pas necessaire : **le snapshot porte deja la reponse.**
+/// Pas de methode de relecture dans `ITweak`, a implementer levier par levier : le snapshot porte
+/// deja la reponse.
 ///
 /// `LatencyTweakBase.RevertAsync` deserialise `OriginalValueJson` en `PrivilegedOp` et la rejoue.
-/// Ce JSON est donc une op TYPEE qui nomme exactement la feuille touchee — ruche, chemin, nom,
+/// Ce JSON est donc une op typee qui nomme exactement la feuille touchee : ruche, chemin, nom,
 /// type, valeur d'avant. Relire ne demande alors aucune connaissance du levier : la feuille est
 /// dans le snapshot, et une seule fonction couvre tous les leviers qui ecrivent dans le registre.
 ///
 /// ══ ce qu'elle ne dit pas, et c'est la moitie de son interet ══
 /// Elle ne peut pas affirmer « ce levier est correctement applique ». Le snapshot porte l'etat
-/// Original, jamais la valeur VISEE. Tout ce qui se deduit honnetement, c'est : la valeur courante
+/// original, jamais la valeur visee. Tout ce qui se deduit honnetement, c'est : la valeur courante
 /// est-elle revenue a celle d'avant, ou non. Les deux etats s'appellent donc
 /// <see cref="EtatRelu.RevenuAvantApplication"/> et <see cref="EtatRelu.DifferentDeAvant"/>, et pas
-/// « perdu » et « applique » — deux noms qui affirmeraient plus que la mesure ne porte.
+/// « perdu » et « applique », deux noms qui affirmeraient plus que la mesure ne porte.
 ///
 /// ══ ce qu'elle debloque ══
-/// Onze leviers sur quinze ne sont pas persistes : leurs gains disparaissent au reboot **sans que
-/// rien ne le remarque**. `RevenuAvantApplication` est exactement le constat qui le remarque.
+/// Une partie des leviers n'est pas reposee au demarrage : leurs gains disparaitraient au redemarrage sans que
+/// rien ne le remarque. `RevenuAvantApplication` est exactement le constat qui le remarque.
 /// </summary>
 public static class TweakReadback
 {
@@ -85,7 +84,7 @@ public static class TweakReadback
             return new Relecture(EtatRelu.NonLu, null, null, null);
         }
 
-        // 06/10/2026 (revue) : un composite (mode Jeu : deux feuilles) n'est revenu que si toutes ses feuilles le
+        // Un composite (mode Jeu : deux feuilles) n'est revenu que si toutes ses feuilles le
         // sont ; une feuille non lue ou non relisable rend tout le composite non lu ou non relisable.
         if (composite is not null)
         {
@@ -103,11 +102,11 @@ public static class TweakReadback
 
     private static Relecture RelireOp(PrivilegedOp? op, IRegistryReader lecteur) => op switch
     {
-        // La valeur d'avant EXISTAIT : revert la reposerait.
+        // La valeur d'avant existait : revert la reposerait.
         SetRegistryValueOp set when set.Kind == RegistryValueType.DWord
             => Comparer(lecteur, set.Hive, set.Path, set.Name, set.Value),
 
-        // 06/10/2026 (revue) : les chaînes (VRR) et les chaînes multiples (fichier d'échange) se relisent aussi,
+        // Les chaînes (VRR) et les chaînes multiples (fichier d'échange) se relisent aussi,
         // comparées telles quelles : la chaîne d'avant est exactement ce que revert reposerait.
         SetRegistryValueOp { Kind: RegistryValueType.String } set
             => ComparerTexte(lecteur.ReadString(set.Hive, set.Path, set.Name), set),

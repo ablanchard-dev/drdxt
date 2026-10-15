@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Integration.Tests;
 
 /// <summary>
-/// L2, etape 3 — un revert doit restaurer la valeur du profil qu'il a modifie.
+/// Un revert doit restaurer la valeur du profil qu'il a modifie.
 ///
 /// Le piege, maintenant que l'ecriture DRS sait viser un profil de jeu : un tweak ecrit dans
 /// « C:\Games\cod.exe », capture son cliche de revert sur le profil de base, et le retour

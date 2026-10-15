@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. La fenetre se laisse reduire jusqu'a 1040x680 (MinWidth/MinHeight).
+// La fenetre se laisse reduire jusqu'a 1040x680 (MinWidth/MinHeight).
 // Les trois vues defilent verticalement mais leur ScrollViewer porte
 // HorizontalScrollBarVisibility="Disabled" : a cette largeur, rien ne peut
 // deborder vers la droite -- ce qui ne tient pas est ecrase, en silence.
@@ -79,20 +79,6 @@ public sealed class LInterfaceTientALaTailleMinimaleTests
     // afficher pour de vrai fait tomber le runner (rendu materiel dans une session de test).
 
     [Fact]
-    public void Le_tableau_de_bord_tient_dans_la_fenetre_la_plus_petite()
-    {
-        var dehors = StaApplication.Run(() =>
-        {
-            var vue = new DrDxt.App.Views.DashboardView();
-            return HorsCadre(vue);
-        });
-
-        dehors.Should().BeEmpty(
-            "a 1040 de large, le defilement horizontal est desactive : ce qui ne tient pas " +
-            "est rogne sans un mot. Reduisez les largeurs fixes ou remontez MinWidth");
-    }
-
-    [Fact]
     public void L_ecran_de_scan_tient_dans_la_fenetre_la_plus_petite()
     {
         var dehors = StaApplication.Run(() =>
@@ -111,7 +97,6 @@ public sealed class LInterfaceTientALaTailleMinimaleTests
         // tests ci-dessus seraient verts sur du vide. On compte ce qu'on mesure.
         var comptes = StaApplication.Run(() => new[]
         {
-            Mesure(new DrDxt.App.Views.DashboardView()),
             Mesure(new DrDxt.App.Views.ScanView()),
         });
 

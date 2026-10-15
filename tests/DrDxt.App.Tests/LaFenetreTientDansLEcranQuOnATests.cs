@@ -5,7 +5,7 @@ using DrDxt.App;
 namespace DrDxt.App.Tests;
 
 // -----------------------------------------------------------------------
-// 18/09/2026. « Site responsive » de la liste produit, applique a l'application.
+// « Site responsive » de la liste produit, applique a l'application.
 //
 // `MainWindow.xaml` demande une taille de depart de **1320 x 900 DIP**, sans
 // jamais regarder la place disponible. WPF ne redimensionne pas : il ouvre a la

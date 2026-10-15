@@ -9,16 +9,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Test-only access to internal canonicalization helpers (TDD). -->
+    <!-- Accès réservé aux tests aux aides internes de canonicalisation (TDD). -->
     <InternalsVisibleTo Include="DrDxt.Reconciler.Tests" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Project-tranched Ed25519 (master plan §11). Used ONLY by the real
-         Ed25519SignatureScheme; all logic sits behind the ISignatureScheme seam so
-         unit tests use an in-memory fake and never touch the native libsodium. -->
+    <!-- Ed25519 retenu par le projet. Utilisé seulement par le vrai
+         Ed25519SignatureScheme ; toute la logique est derrière la couture ISignatureScheme, pour que
+         les tests unitaires utilisent un faux en mémoire et ne touchent jamais la libsodium native. -->
     <PackageReference Include="NSec.Cryptography" Version="26.4.0" />
-    <!-- 11/09/2026 : la cle de signature de la machine, protegee au repos par DPAPI portee machine. -->
+    <!-- La cle de signature de la machine, protegee au repos par DPAPI portee machine. -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
   </ItemGroup>
 

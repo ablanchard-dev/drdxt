@@ -6,24 +6,24 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // -----------------------------------------------------------------------
-// §9.13 handshake STATE MACHINE — unit-tested behind seams (a real in-memory
-// duplex stream pair, a fake caller authenticator, a deterministic key gen).
-// NO real pipe, nothing elevated, no spawned process.
+// Machine à états de la négociation, testée derrière des coutures (une vraie paire de flux
+// duplex en mémoire, un faux authentificateur d'appelant, une génération de clé déterministe).
+// Pas de vrai tube, rien d'élevé, aucun processus lancé.
 //
-// The handshake establishes the EPHEMERAL session key that the existing typed
-// HMAC layer then uses unchanged. Order under test (the spec's order):
-//   AUTH the caller first  ->  then mint+send the key.
+// La négociation établit la clé de session éphémère que la couche HMAC typée existante
+// utilise ensuite inchangée. Ordre testé (celui de la spécification) :
+//   authentifier l'appelant d'abord → puis forger et envoyer la clé.
 //
-// Properties proven:
-//   * caller-auth PASS  -> key negotiated, client can sign a typed op the server accepts
-//   * caller-auth FAIL  -> fail-closed, NO key sent, no channel
-//   * forged/garbage hello -> fail-clean, no key
-//   * truncated handshake (peer closes early) -> fail-clean, no key, no throw
-//   * the negotiated key actually drives the proven typed protocol (replay still rejected)
+// Propriétés prouvées :
+//   * authentification réussie → clé négociée, le client signe une op typée que le serveur accepte
+//   * authentification refusée → fermé, aucune clé envoyée, pas de canal
+//   * hello forgé ou corrompu → échec propre, pas de clé
+//   * négociation tronquée (le pair ferme tôt) → échec propre, pas de clé, pas d'exception
+//   * la clé négociée pilote vraiment le protocole typé prouvé (le rejeu reste refusé)
 // -----------------------------------------------------------------------
 public sealed class HandshakeStateMachineTests
 {
-    // A fixed key the fake generator hands out so the test can assert the exact bytes.
+    // Clé fixe que rend le faux générateur, pour vérifier les octets exacts.
     private static readonly byte[] FixedKey = Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
 
     private sealed class FixedKeyGen : ISessionKeyGenerator
@@ -42,7 +42,7 @@ public sealed class HandshakeStateMachineTests
             Result.Fail(ErrorCodes.ElevationDenied, "denied");
     }
 
-    // Builds a connected, full-duplex in-memory stream pair (a <-> b).
+    // Construit une paire de flux duplex connectés en mémoire (a <-> b).
     private static (Stream a, Stream b) DuplexPair()
     {
         var a2b = new AnonymousPipeServerStreamPairFactory();
@@ -50,14 +50,14 @@ public sealed class HandshakeStateMachineTests
     }
 
     // ----------------------------------------------------------------
-    // PASS path: auth ok -> the client receives the exact ephemeral key.
+    // Chemin nominal : authentification ok → le client reçoit la clé éphémère exacte.
     // ----------------------------------------------------------------
     [Fact]
     public async Task Auth_pass_negotiates_the_ephemeral_key_to_the_client()
     {
         var (clientSide, serverSide) = DuplexPair();
 
-        // Server runs its half against serverSide; client runs against clientSide.
+        // Le serveur joue sa moitié sur serverSide, le client sur clientSide.
         var serverTask = new HandshakeServerCore(new AllowAuth(), new FixedKeyGen())
             .RunAsync(serverSide, new CallerInfo(4321), default);
         var clientTask = HandshakeClientCore.RunAsync(clientSide, default);
@@ -73,9 +73,9 @@ public sealed class HandshakeStateMachineTests
     }
 
     // ----------------------------------------------------------------
-    // The negotiated key actually keys the PROVEN typed protocol: a request the
-    // client signs with the negotiated key passes the server's HMAC gate.
-    // (Proves we changed only HOW the key is obtained, not the message protocol.)
+    // La clé négociée alimente bien le protocole typé prouvé : une requête que le client signe
+    // avec elle passe la porte HMAC du serveur.
+    // (Seule la façon d'obtenir la clé change, pas le protocole des messages.)
     // ----------------------------------------------------------------
     [Fact]
     public async Task Negotiated_key_drives_the_proven_typed_protocol()
@@ -88,7 +88,7 @@ public sealed class HandshakeStateMachineTests
 
         var negotiated = clientResult.Value!;
 
-        // The negotiated key signs a typed request the existing TypedPrivilegedServer accepts.
+        // La clé négociée signe une requête typée que le TypedPrivilegedServer existant accepte.
         var op = new SetActivePowerPlanOp(KnownPowerPlans.HighPerformance);
         var json = PrivilegedOpCodec.Serialize(op).Value!;
         var nonce = Guid.NewGuid().ToString("N");
@@ -103,7 +103,7 @@ public sealed class HandshakeStateMachineTests
         resp.Ok.Should().BeTrue();
         exec.WasInvoked.Should().BeTrue();
 
-        // Anti-replay still intact: replaying the same signed request is rejected.
+        // L'anti-rejeu tient toujours : rejouer la même requête signée est refusé.
         var replay = await typedServer.ProcessTypedRequestAsync(request, default, new CallerInfo(4321));
         replay.Ok.Should().BeFalse();
     }
@@ -119,7 +119,7 @@ public sealed class HandshakeStateMachineTests
     }
 
     // ----------------------------------------------------------------
-    // FAIL-CLOSED: caller-auth denied -> server sends NO key, client gets none.
+    // Fermé : authentification refusée → le serveur n'envoie aucune clé, le client n'en reçoit aucune.
     // ----------------------------------------------------------------
     [Fact]
     public async Task Auth_fail_is_fail_closed_no_key_negotiated()
@@ -134,8 +134,8 @@ public sealed class HandshakeStateMachineTests
 
         var serverResult = await serverTask;
         serverResult.IsOk.Should().BeFalse();
-        // A well-formed peer that FAILED caller-auth → ELEVATION_DENIED (not a
-        // transport/protocol error). This is the authorization-denial code.
+        // Un pair bien formé dont l'authentification a échoué → ELEVATION_DENIED (pas une erreur
+        // de transport ou de protocole) : c'est le code du refus d'autorisation.
         serverResult.Error!.Value.Code.Should().Be(ErrorCodes.ElevationDenied);
         var clientResult = await clientTask;
         clientResult.IsOk.Should().BeFalse();
@@ -143,8 +143,8 @@ public sealed class HandshakeStateMachineTests
     }
 
     // ----------------------------------------------------------------
-    // FIX 3: a malformed/garbage/unsupported handshake is a TRANSPORT/PROTOCOL
-    // fault, not an authorization denial → HANDSHAKE_PROTOCOL_ERROR, fail-closed.
+    // Une négociation malformée, corrompue ou d'une version inconnue est une faute de transport
+    // ou de protocole, pas un refus d'autorisation → HANDSHAKE_PROTOCOL_ERROR, fermé.
     // ----------------------------------------------------------------
     [Fact]
     public async Task Forged_protocol_returns_handshake_protocol_error_not_auth_denied()
@@ -158,7 +158,7 @@ public sealed class HandshakeStateMachineTests
             return await WireCodec.ReadMessageAsync<HandshakeResult>(clientSide, default);
         });
 
-        // AUTH would PASS here — proving the code reflects the PROTOCOL fault, not auth.
+        // L'authentification passerait ici : le code reflète bien la faute de protocole, pas l'authentification.
         var serverResult = await new HandshakeServerCore(new AllowAuth(), new FixedKeyGen())
             .RunAsync(serverSide, new CallerInfo(4321), default);
 
@@ -175,7 +175,7 @@ public sealed class HandshakeStateMachineTests
     public async Task Truncated_handshake_returns_handshake_protocol_error()
     {
         var (clientSide, serverSide) = DuplexPair();
-        clientSide.Dispose(); // peer closes before sending the hello
+        clientSide.Dispose(); // le pair ferme avant d'envoyer le hello
 
         var serverResult = await new HandshakeServerCore(new AllowAuth(), new FixedKeyGen())
             .RunAsync(serverSide, new CallerInfo(4321), default);
@@ -185,14 +185,14 @@ public sealed class HandshakeStateMachineTests
     }
 
     // ----------------------------------------------------------------
-    // Forged / garbage hello (wrong protocol marker) -> fail-clean, no key.
+    // Hello forgé ou corrompu (mauvais marqueur de protocole) → échec propre, pas de clé.
     // ----------------------------------------------------------------
     [Fact]
     public async Task Forged_hello_protocol_is_rejected_no_key()
     {
         var (clientSide, serverSide) = DuplexPair();
 
-        // Client sends a hello with a BOGUS protocol marker, then tries to read a result.
+        // Le client envoie un hello avec un marqueur de protocole bidon, puis tente de lire un résultat.
         var clientTask = Task.Run(async () =>
         {
             await WireCodec.WriteMessageAsync(
@@ -205,20 +205,20 @@ public sealed class HandshakeStateMachineTests
 
         serverResult.IsOk.Should().BeFalse();
         var clientResp = await clientTask;
-        // Either the server replied Ok=false, or it closed — never a key.
+        // Soit le serveur a répondu Ok=false, soit il a fermé : jamais une clé.
         (clientResp is null || clientResp.Ok == false).Should().BeTrue();
         clientResp?.SessionKeyBase64.Should().BeNull();
     }
 
     // ----------------------------------------------------------------
-    // Truncated handshake: the peer closes before sending the hello -> fail-clean.
+    // Négociation tronquée : le pair ferme avant d'envoyer le hello → échec propre.
     // ----------------------------------------------------------------
     [Fact]
     public async Task Truncated_handshake_fails_clean_no_throw()
     {
         var (clientSide, serverSide) = DuplexPair();
 
-        // Client closes immediately without sending a hello.
+        // Le client ferme aussitôt sans envoyer de hello.
         clientSide.Dispose();
 
         var serverResult = await new HandshakeServerCore(new AllowAuth(), new FixedKeyGen())
@@ -228,14 +228,14 @@ public sealed class HandshakeStateMachineTests
     }
 
     // ----------------------------------------------------------------
-    // Client sees a malformed/empty server reply -> fail-clean, no key.
+    // Le client voit une réponse serveur malformée ou vide → échec propre, pas de clé.
     // ----------------------------------------------------------------
     [Fact]
     public async Task Client_fails_clean_when_server_closes_without_a_result()
     {
         var (clientSide, serverSide) = DuplexPair();
 
-        // Server reads the hello then closes without replying.
+        // Le serveur lit le hello puis ferme sans répondre.
         var serverTask = Task.Run(async () =>
         {
             await WireCodec.ReadMessageAsync<HandshakeHello>(serverSide, default);
@@ -250,7 +250,7 @@ public sealed class HandshakeStateMachineTests
     }
 
     // ----------------------------------------------------------------
-    // A key of the wrong size from a hostile server is rejected by the client.
+    // Une clé de mauvaise taille venue d'un serveur hostile est refusée par le client.
     // ----------------------------------------------------------------
     [Fact]
     public async Task Client_rejects_a_wrong_size_key()
@@ -260,7 +260,7 @@ public sealed class HandshakeStateMachineTests
         var serverTask = Task.Run(async () =>
         {
             await WireCodec.ReadMessageAsync<HandshakeHello>(serverSide, default);
-            var shortKey = Convert.ToBase64String(new byte[8]); // too short
+            var shortKey = Convert.ToBase64String(new byte[8]); // trop courte
             await WireCodec.WriteMessageAsync(
                 serverSide, new HandshakeResult { Ok = true, SessionKeyBase64 = shortKey }, default);
         });
@@ -273,13 +273,13 @@ public sealed class HandshakeStateMachineTests
     }
 }
 
-// Builds a connected full-duplex stream pair from two anonymous pipes so the two
-// handshake halves can talk in-memory (no named pipe, nothing elevated).
+// Construit une paire de flux duplex connectés à partir de deux tubes anonymes, pour que les
+// deux moitiés de la négociation se parlent en mémoire (pas de tube nommé, rien d'élevé).
 internal sealed class AnonymousPipeServerStreamPairFactory
 {
     public (Stream clientSide, Stream serverSide) Create()
     {
-        // Two one-way anonymous pipes wired into a duplex via a bridging stream.
+        // Deux tubes anonymes à sens unique câblés en duplex par un flux pont.
         var c2s = new System.IO.Pipes.AnonymousPipeServerStream(
             System.IO.Pipes.PipeDirection.Out, System.IO.HandleInheritability.None);
         var c2sIn = new System.IO.Pipes.AnonymousPipeClientStream(
@@ -289,13 +289,13 @@ internal sealed class AnonymousPipeServerStreamPairFactory
         var s2cIn = new System.IO.Pipes.AnonymousPipeClientStream(
             System.IO.Pipes.PipeDirection.In, s2c.GetClientHandleAsString());
 
-        var clientSide = new DuplexStream(s2cIn, c2s);   // client reads s2c, writes c2s
-        var serverSide = new DuplexStream(c2sIn, s2c);   // server reads c2s, writes s2c
+        var clientSide = new DuplexStream(s2cIn, c2s);   // le client lit s2c, écrit c2s
+        var serverSide = new DuplexStream(c2sIn, s2c);   // le serveur lit c2s, écrit s2c
         return (clientSide, serverSide);
     }
 }
 
-// Minimal full-duplex stream that reads from one stream and writes to another.
+// Flux duplex minimal qui lit sur un flux et écrit sur un autre.
 internal sealed class DuplexStream : Stream
 {
     private readonly Stream _in;

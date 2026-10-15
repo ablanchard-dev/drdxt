@@ -78,7 +78,7 @@ public class TheGainStateOfTheArtHasNoUnsourcedClaimTests
     {
         // La ligne qui garde la promesse. G-05 est le seul chiffre capable de transformer
         // « certains PC gagnent beaucoup » en « X % des PC gagnent Y » -- la phrase que toute page
-        // de vente veut ecrire. Recherche du 07/09/2026 : aucune enquete chiffree n'existe, juste
+        // de vente veut ecrire. Recherche documentee le 07/09/2026 : aucune enquete chiffree n'existe, juste
         // des affirmations qualitatives. Le jour ou quelqu'un remplit cette case, il devra faire
         // passer ce test, donc apporter une source datee.
         var parc = Claims().Single(c => c.Id == "G-05");

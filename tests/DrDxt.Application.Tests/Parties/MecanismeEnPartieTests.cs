@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Application.Tests.Parties;
 
-/// <summary>08/10/2026 (J-MECA) : la veille lit la carte pendant chaque capture, et la partie résumée le porte.</summary>
+/// <summary>La veille lit la carte pendant chaque capture, et la partie résumée le porte.</summary>
 public sealed class MecanismeEnPartieTests
 {
     [Fact]
