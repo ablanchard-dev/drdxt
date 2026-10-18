@@ -24,14 +24,24 @@ public static class InstallationMiseAJour
 {
     public const string CodeRefus = "UPDATE_INSTALLER_REFUSED";
 
+    /// <summary>Refus parce que l'App tourne élevée : la version reste proposée, relancer l'App normalement suffit.</summary>
+    public const string CodeEleve = "UPDATE_INSTALLER_ELEVATED";
+
     /// <param name="cheminStage">La charge verifiee (payload.pkg).</param>
     /// <param name="sha256Attendu">L'empreinte du manifeste signe.</param>
     /// <param name="version">Pour nommer l'installeur (ShellExecute exige un .exe).</param>
     /// <param name="lancer">Lance l'executable ; par defaut ShellExecute (UAC par l'installeur).</param>
-    public static Result Lancer(string cheminStage, string sha256Attendu, string version, Func<string, bool>? lancer = null)
+    /// <param name="eleve">Vrai si l'App tourne elevee ; par defaut, le jeton du processus. Couture de test.</param>
+    public static Result Lancer(string cheminStage, string sha256Attendu, string version, Func<string, bool>? lancer = null,
+        Func<bool>? eleve = null)
     {
         try
         {
+            // Lance depuis une App elevee, le setup heriterait du jeton administrateur et chargerait ce qui est pose a
+            // cote de lui, dans un dossier que le compte peut ecrire. Lance depuis l'App normale, il tourne sans
+            // elevation et seule la partie d'Inno qui demande l'UAC devient administrateur (docs/SECURITE.md §9).
+            if ((eleve ?? ProcessusEleve)())
+                return Result.Fail(CodeEleve, Docteur.T("MAJ.InstalleurEleve"));
             if (!File.Exists(cheminStage))
                 return Result.Fail(CodeRefus, Docteur.T("MAJ.InstalleurAbsent"));
 
@@ -69,6 +79,12 @@ public static class InstallationMiseAJour
         {
             return Result.Fail(CodeRefus, $"Installation impossible : {ex.Message}");
         }
+    }
+
+    private static bool ProcessusEleve()
+    {
+        using var identite = System.Security.Principal.WindowsIdentity.GetCurrent();
+        return new System.Security.Principal.WindowsPrincipal(identite).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
     }
 
     private static string Nettoyer(string version)

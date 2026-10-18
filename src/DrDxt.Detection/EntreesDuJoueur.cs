@@ -26,7 +26,7 @@ public sealed class EntreesDuJoueur
             if (GetLastInputInfo(ref info))
                 clavier = unchecked((uint)Environment.TickCount - info.dwTime) < Recent.TotalMilliseconds;
         }
-        catch (Exception) { }
+        catch (Exception) { /* clavier reste null : non observé, ni pour ni contre */ }
 
         bool? manette = null;
         try

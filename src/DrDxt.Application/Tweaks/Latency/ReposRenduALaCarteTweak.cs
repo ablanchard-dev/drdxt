@@ -30,7 +30,9 @@ public sealed class ReposRenduALaCarteTweak : LatencyTweakBase
         && state.NvidiaPreferMaxPerf == TriState.On
         && state.NvidiaDrsScope is null;
 
-    public override bool EtatNonLu(SettingsState state) => state.NvidiaPreferMaxPerf == TriState.Unknown;
+    // Lu au profil du jeu, l'état ne dit rien du global.
+    public override bool EtatNonLu(SettingsState state)
+        => state.NvidiaPreferMaxPerf == TriState.Unknown || state.NvidiaDrsScope is not null;
 
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {

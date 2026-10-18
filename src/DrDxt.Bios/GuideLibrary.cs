@@ -107,25 +107,6 @@ public static class GuideLibraryFactory
         return new GuideLibrary(parsed.Value!);
     }
 
-    /// <summary>Charge la bibliothèque embarquée en <see cref="Result"/> (aucune exception sur de mauvaises données).</summary>
-    public static Result<GuideLibrary> TryCreateDefault()
-    {
-        string json;
-        try
-        {
-            json = ReadEmbedded();
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or System.IO.IOException)
-        {
-            return Result<GuideLibrary>.Fail(ErrorCodes.BiosTemplateInvalid, ex.Message);
-        }
-
-        var parsed = GuideTemplateValidator.ParseAndValidate(json);
-        if (!parsed.IsOk)
-            return Result<GuideLibrary>.Fail(parsed.Error!.Value.Code, parsed.Error!.Value.Message);
-        return Result<GuideLibrary>.Ok(new GuideLibrary(parsed.Value!));
-    }
-
     private static string ReadEmbedded()
     {
         var asm = Assembly.GetExecutingAssembly();

@@ -17,10 +17,21 @@ public sealed class EnvironnementPropreTests
 
         env.Keys.Should().NotContain(k => EnvironnementPropre.EstUneVariableDuRuntime(k));
         env.Keys.Should().BeEquivalentTo(["SystemRoot", "windir", "SystemDrive", "ComSpec", "PATH", "PATHEXT", "OS", "TEMP", "TMP",
-            "USERPROFILE", "APPDATA", "LOCALAPPDATA"]);
+            "USERPROFILE", "APPDATA", "LOCALAPPDATA", "PSModulePath"]);
         env["PATH"].Split(';').Should().OnlyContain(p => p.StartsWith(@"C:\Windows", StringComparison.OrdinalIgnoreCase),
             "un programme élevé ne cherche ses DLL que sous Windows");
         env["SystemDrive"].Should().Be("C:");
+    }
+
+    // La console de réparation est un PowerShell élevé et interactif : sans chemin de modules fixé, il chargeait
+    // d'abord ceux de Documents, que le compte écrit sans droits.
+    [Fact]
+    public void Les_modules_PowerShell_ne_viennent_que_de_Windows()
+    {
+        var env = EnvironnementPropre.Construire(@"C:\Windows", @"C:\Users\joueur\AppData\Local\Temp", @"C:\Users\joueur",
+            @"C:\Users\joueur\AppData\Roaming", @"C:\Users\joueur\AppData\Local");
+
+        env["PSModulePath"].Should().Be(@"C:\Windows\System32\WindowsPowerShell\v1.0\Modules");
     }
 
     // L'audit de santé lit « %ProgramFiles%\... » et « %ProgramData%\... » au registre ; sans ces
@@ -65,4 +76,27 @@ public sealed class EnvironnementPropreTests
     [Fact]
     public void Seuls_les_programmes_de_drdxt_sont_lances()
         => EnvironnementPropre.Executables.Should().BeEquivalentTo(["DrDxt.ElevatedHelper.exe", "DrDxt.App.exe", "DrDXT-Test.exe"]);
+    // Le désinstalleur passe par le lanceur, qui attend le helper dans ce seul mode : le mot doit être celui du helper.
+    [Fact]
+    public void Le_lanceur_reconnait_le_rendu_de_la_desinstallation()
+        => EnvironnementPropre.RenduDeDesinstallation.Should().Be(ModeDesinstallation.Argument);
+
+    // Le PowerShell du point de restauration (.NET Framework) ne reçoit aucune variable du runtime, même si le helper
+    // n'a pas été lancé par le lanceur ; même liste des deux côtés.
+    [Theory]
+    [InlineData("COR_PROFILER")]
+    [InlineData("COR_ENABLE_PROFILING")]
+    [InlineData("CORECLR_PROFILER_PATH")]
+    [InlineData("DOTNET_STARTUP_HOOKS")]
+    [InlineData("COMPLUS_Version")]
+    public void Le_point_de_restauration_ne_transmet_aucune_variable_du_runtime(string nom)
+    {
+        var environnement = new Dictionary<string, string?> { [nom] = @"C:\piege.dll", ["PATH"] = @"C:\Windows\System32" };
+
+        DrDxt.ElevatedHelper.Execution.Win32RestorePointActions.RetirerLeRuntime(environnement);
+
+        environnement.Should().ContainKey("PATH").And.NotContainKey(nom);
+        DrDxt.ElevatedHelper.Execution.Win32RestorePointActions.VariableDuRuntime(nom)
+            .Should().Be(EnvironnementPropre.EstUneVariableDuRuntime(nom));
+    }
 }

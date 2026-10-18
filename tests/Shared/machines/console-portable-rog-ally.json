@@ -297,7 +297,7 @@
       "ValeurCourante": null,
       "ValeurAttendue": null,
       "Statut": "Unknown",
-      "Explication": "DrDXT n'a pas pu lire la température de ta carte (AMD Radeon RX 7800 XT) par le pilote AMD. Le logiciel AMD ou HWiNFO la montre.",
+      "Explication": "DrDXT n'a pas pu lire la température de ta carte (AMD Radeon(TM) Graphics) par le pilote AMD. Le logiciel AMD ou HWiNFO la montre.",
       "Action": "Aucune",
       "Provenance": null
     },
@@ -308,16 +308,6 @@
       "ValeurAttendue": null,
       "Statut": "Unknown",
       "Explication": "Windows ne publie pas la température du processeur sans outil tiers.",
-      "Action": "Aucune",
-      "Provenance": null
-    },
-    {
-      "Domaine": "LATENCE",
-      "Nom": "limite d'images de la carte",
-      "ValeurCourante": null,
-      "ValeurAttendue": null,
-      "Statut": "Unknown",
-      "Explication": "DrDXT n'a pas pu lire la limite d'images de ta carte (AMD Radeon RX 7800 XT) par le pilote AMD. Avec un écran à fréquence variable, une limite juste sous sa fréquence maximale garde le rafraîchissement variable actif ; elle se règle dans le logiciel AMD ou dans le jeu.",
       "Action": "Aucune",
       "Provenance": null
     },

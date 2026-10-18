@@ -84,16 +84,21 @@ public sealed class Win32PnpActions : IPnpActions
     public Result RestoreDriverPackage(string publie)
     {
         // Le dernier retrait de ce nom : c'est lui que l'Annuler du geste défait.
-        var dossier = Directory.Exists(_exports)
+        var candidats = Directory.Exists(_exports)
             ? Directory.GetDirectories(_exports, Path.GetFileNameWithoutExtension(publie) + "-*")
-                .OrderByDescending(d => d, StringComparer.Ordinal).FirstOrDefault()
-            : null;
-        if (dossier is null)
+                .OrderByDescending(d => d, StringComparer.Ordinal).ToList()
+            : [];
+        if (candidats.Count == 0)
             return Result.Fail(ErrorCodes.HelperOpFailed, $"No export of {publie} to restore.");
-        // Un dossier qu'un programme sans droits pourrait remplir ferait installer son propre pilote en administrateur.
-        foreach (var d in new[] { _exports, dossier })
-            if (_fiable(d) is { IsOk: false } refus)
-                return refus;
+        // Un dossier qu'un programme sans droits pourrait remplir ferait installer son propre pilote en administrateur. Le
+        // plus récent est pris parmi les fiables : un dossier posé d'avance au nom plus récent (la réparation de la racine
+        // ne descend pas) est sauté, jamais installé, et ne bloque pas la remise du vrai export.
+        if (_fiable(_exports) is { IsOk: false } refusRacine)
+            return refusRacine;
+        Result? refus = null;
+        var dossier = candidats.FirstOrDefault(d => (refus = _fiable(d)) is { IsOk: true });
+        if (dossier is null)
+            return refus!;
 
         var infs = InfsDAffichage(dossier);
         if (infs.Count != 1)
@@ -159,17 +164,9 @@ public sealed class Win32PnpActions : IPnpActions
         {
             var psi = new ProcessStartInfo(Pnputil) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (var a in args) psi.ArgumentList.Add(a);
-            using var p = Process.Start(psi);
-            if (p is null) return (-1, "");
-            var sortie = p.StandardOutput.ReadToEndAsync();
-            _ = p.StandardError.ReadToEndAsync();
             // Une installation de pilote peut prendre du temps ; au-delà, le processus est arrêté et l'échec dit.
-            if (!p.WaitForExit(120_000))
-            {
-                try { p.Kill(entireProcessTree: true); } catch { /* déjà parti */ }
-                return (-1, "");
-            }
-            return (p.ExitCode, sortie.GetAwaiter().GetResult());
+            var r = ProcessusBorne.Executer(psi, TimeSpan.FromSeconds(120));
+            return r.Fini ? (r.Code, r.Sortie) : (-1, "");
         }
         catch { return (-1, ""); }
     }

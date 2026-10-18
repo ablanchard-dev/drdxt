@@ -19,15 +19,13 @@ namespace DrDxt.ElevatedHelper.Execution.Adlx;
 //      (TryReadGfx) pour lire la tension actuelle (renvoyée inchangée) et la plage matérielle
 //      MaxFreq du pilote, utilisée par la vérification de défense en profondeur plus bas.
 //   #2 Bornes de défense en profondeur (deux plages distinctes, voulues) :
-//        • La plage de règle prudente [-200,+100] MHz est une plage de décalage et vit dans la
-//          couche App (GpuSafeBounds), imposée avant que l'op atteigne l'IPC. L'op d'undervolt
-//          porte une MaxFreq absolue (MHz), pas un décalage : une plage de décalage n'a pas de
-//          sens ici et n'est pas revérifiée dans le helper.
-//        • Le helper valide plutôt la cible absolue contre la plage matérielle annoncée par le
-//          pilote (AdlxGfxReads.MaxFreqRange) et rejette (échec propre, jamais de bornage) tout ce
-//          qui en sort : même un appelant compromis ne peut jamais pousser une MaxFreq hors plage
-//          matérielle vers le GPU. Le chemin PowerLimit reprend toujours la plage prudente en %
-//          via AdlxTuningMath (cette plage-là est absolue).
+//        • La plage de règle prudente [-200,+100] MHz (GpuSafeBounds, recopiée dans AdlxTuningMath)
+//          est imposée par l'App, puis revérifiée ici autour de la MaxFreq retenue au premier passage
+//          du helper depuis le démarrage : l'op porte une MaxFreq absolue, la bande se lit donc sur la carte.
+//        • La cible absolue reste aussi dans la plage matérielle annoncée par le pilote
+//          (AdlxGfxReads.MaxFreqRange) ; hors de l'une ou de l'autre, rejet (échec propre, jamais de
+//          bornage). Après l'écriture, la MaxFreq est relue ; autre que la cible, l'origine est reposée.
+//          Le chemin PowerLimit reprend la plage prudente en % via AdlxTuningMath (cette plage-là est absolue).
 //   #3 Tout false ou panne native → Result.Fail(HELPER.OP_FAILED), jamais un Ok sur un échec.
 //
 // Sur une machine sans AMD / sans amdadlx64.dll, IAdlxNative.IsAvailable vaut false et chaque
@@ -42,11 +40,24 @@ public sealed class ADLXTuningActions : IADLXTuningActions
     private const string Unavailable = "AMD ADLX unavailable (no AMD GPU / Adrenalin driver).";
 
     private readonly IAdlxNative _native;
+    private readonly Func<int, int, int?> _origineMaxFreq;
+    private readonly Func<int, int, int, bool> _noterEcriture;
 
-    public ADLXTuningActions() : this(new AdlxNative()) { }
+    public ADLXTuningActions() : this(new AdlxNative(), OrigineAdlx.ParDefaut()) { }
 
-    internal ADLXTuningActions(IAdlxNative native) =>
+    private ADLXTuningActions(IAdlxNative native, OrigineAdlx origine) : this(native, origine.Retenir, origine.Noter) { }
+
+    /// <param name="origineMaxFreq">L'origine de la MaxFreq retenue au premier passage depuis le démarrage, gardée d'un démarrage
+    /// à l'autre (<see cref="OrigineAdlx"/> ; reçoit l'index et la valeur lue, rend l'origine, ou null si la mémoire est
+    /// inaccessible : rien n'est écrit). Par défaut des tests : la valeur lue.</param>
+    /// <param name="noterEcriture">Note l'origine et la valeur sur le point d'être écrite (index, origine, valeur) ; faux = rien
+    /// n'est écrit. Par défaut des tests : vrai.</param>
+    internal ADLXTuningActions(IAdlxNative native, Func<int, int, int?>? origineMaxFreq = null, Func<int, int, int, bool>? noterEcriture = null)
+    {
         _native = native ?? throw new ArgumentNullException(nameof(native));
+        _origineMaxFreq = origineMaxFreq ?? ((_, lue) => lue);
+        _noterEcriture = noterEcriture ?? ((_, _, _) => true);
+    }
 
     public Result SetTuning(int gpuIndex, AdlxTuningKind kind, int intValue)
     {
@@ -61,6 +72,7 @@ public sealed class ADLXTuningActions : IADLXTuningActions
             {
                 AdlxTuningKind.Undervolt => SetUndervolt(gpuIndex, intValue),
                 AdlxTuningKind.PowerLimit => SetPowerLimit(gpuIndex, intValue),
+                AdlxTuningKind.RemiseUsine => intValue == 0 ? RemettreUsine(gpuIndex) : Fail("Factory reset carries no value."),
 
                 // Anti-Lag classique, 0 ou 1, sur la carte dédiée (l'index est ignoré : c'est
                 // la carte que le lecteur lit, jamais la puce intégrée d'un APU).
@@ -102,16 +114,35 @@ public sealed class ADLXTuningActions : IADLXTuningActions
         if (!_native.TryReadGfx(gpuIndex, out var current))
             return Fail("ADLX graphics tuning read failed (GPU not supported or interface absent).");
 
-        // Défense en profondeur : le helper ne fait jamais confiance à l'appelant pour les bornes. L'op
-        // porte une MaxFreq absolue : la plage de règle prudente en décalage [-200,+100] (GpuSafeBounds,
-        // couche App) n'a pas de sens ici ; rejeter plutôt (échec propre, jamais de bornage) toute cible
-        // hors de la plage matérielle annoncée par le pilote. Même un appelant compromis ne peut jamais
-        // pousser une MaxFreq hors plage matérielle sur la vraie puce.
+        // Défense en profondeur : le helper ne fait jamais confiance à l'appelant pour les bornes. Rejet (échec propre,
+        // jamais de bornage) de toute cible hors de la plage matérielle annoncée par le pilote.
         var range = current.MaxFreqRange;
         if (targetMaxFreqMhz < range.Min || targetMaxFreqMhz > range.Max)
             return Fail(
                 $"Refused: ADLX absolute target MaxFreq {targetMaxFreqMhz} MHz is outside the driver's " +
                 $"reported hardware range [{range.Min}, {range.Max}] MHz.");
+
+        // La plage du pilote monte jusqu'au plafond d'overclock : seule, elle laissait un programme du compte y pousser la
+        // MaxFreq. La bande prudente de l'App ([-200, +100] MHz, GpuSafeBounds) s'applique aussi ici, autour d'une origine
+        // gardée d'un démarrage à l'autre (OrigineAdlx) : relative à la valeur lue, ou retenue par démarrage seulement, des
+        // écritures répétées monteraient de +100 en +100 quand le pilote garde la valeur au redémarrage. Une valeur réglée
+        // par le joueur entre deux démarrages devient la nouvelle origine. Rendre une origine au-delà de la bande ne passe
+        // que par la remise à l'usine du pilote, un geste du joueur à part (RemiseUsine) : ici, rien n'est écrit, et le
+        // refus le dit.
+        if (current.MaxFreqMhz == targetMaxFreqMhz)
+            return Result.Ok(); // déjà là (une remise à l'usine précédente, par exemple) : rien à écrire
+        if (_origineMaxFreq(gpuIndex, current.MaxFreqMhz) is not { } origine)
+            return Fail("Refused: the GPU clock read at this boot could not be retained; nothing written.");
+        if ((long)targetMaxFreqMhz > (long)origine + AdlxTuningMath.MaxCoreOffsetMhz)
+            return Result.Fail(ErrorCodes.GpuRemiseUsineRequise, Docteur.T("ADLX.UsineRequise", targetMaxFreqMhz));
+        if ((long)targetMaxFreqMhz < (long)origine + AdlxTuningMath.MinCoreOffsetMhz)
+            return Fail(
+                $"Refused: ADLX target MaxFreq {targetMaxFreqMhz} MHz is outside the safe band " +
+                $"[{AdlxTuningMath.MinCoreOffsetMhz}, +{AdlxTuningMath.MaxCoreOffsetMhz}] MHz around {origine} MHz read at this boot.");
+
+        // Notée avant l'écriture : une valeur posée sans trace serait prise pour celle du joueur au démarrage suivant.
+        if (!_noterEcriture(gpuIndex, origine, targetMaxFreqMhz))
+            return Fail("Refused: the GPU clock origin could not be kept across boots; nothing written.");
 
         // SET : AdlxNative relit (ceinture et bretelles), valide la cible contre le
         // GetGPUMaxFrequencyRange du pilote, écrit MaxFreq et saute la tension (inchangée).
@@ -123,16 +154,42 @@ public sealed class ADLXTuningActions : IADLXTuningActions
             if (_native.TryReadGfx(gpuIndex, out var apres) && apres.MaxFreqMhz != current.MaxFreqMhz)
             {
                 _native.TrySetGfx(gpuIndex, current.MaxFreqMhz, current.VoltMv, out _);
-                if (!_native.TryReadGfx(gpuIndex, out var rendu) || rendu.MaxFreqMhz != current.MaxFreqMhz)
-                    return Fail($"ADLX graphics tuning write failed and left MaxFreq at {apres.MaxFreqMhz} MHz (was {current.MaxFreqMhz} MHz); " +
+                var relu = _native.TryReadGfx(gpuIndex, out var rendu);
+                NoterLaCarte(gpuIndex, origine, relu ? rendu.MaxFreqMhz : null);
+                if (!relu || rendu.MaxFreqMhz != current.MaxFreqMhz)
+                    return Result.Fail(ErrorCodes.TweakPartiallyApplied, $"ADLX graphics tuning write failed and left MaxFreq at {apres.MaxFreqMhz} MHz (was {current.MaxFreqMhz} MHz); " +
                                 "reset GPU tuning to default in AMD Software.");
             }
+            else NoterLaCarte(gpuIndex, origine, current.MaxFreqMhz);
             return Fail(
                 "ADLX graphics tuning write failed (range violation, unsupported GPU, or driver fault).");
         }
 
-        return Result.Ok();
+        // Relue : un pilote qui arrondit ou ramène la cible ne laisse pas une valeur que personne n'a demandée ; l'origine
+        // est reposée, et un Ok n'est rendu que sur la valeur écrite.
+        if (_native.TryReadGfx(gpuIndex, out var relue) && relue.MaxFreqMhz == targetMaxFreqMhz)
+            return Result.Ok();
+        _native.TrySetGfx(gpuIndex, current.MaxFreqMhz, current.VoltMv, out _);
+        var relue2 = _native.TryReadGfx(gpuIndex, out var rendue);
+        NoterLaCarte(gpuIndex, origine, relue2 ? rendue.MaxFreqMhz : null);
+        return relue2 && rendue.MaxFreqMhz == current.MaxFreqMhz
+            ? Fail($"ADLX MaxFreq was not read back at {targetMaxFreqMhz} MHz; the original {current.MaxFreqMhz} MHz is back.")
+            : Result.Fail(ErrorCodes.TweakPartiallyApplied, $"ADLX MaxFreq was not read back at {targetMaxFreqMhz} MHz and the original {current.MaxFreqMhz} MHz could not be restored; " +
+                   "reset GPU tuning to default in AMD Software.");
     }
+
+    // Après un échec, la carte porte ce que la dernière relecture dit : la valeur d'avant reposée, ou une écriture partielle.
+    // Notée telle quelle, au mieux : la valeur d'avant reposée n'est pas prise au démarrage suivant pour un réglage du joueur.
+    // Non relue : la cible reste notée, et un démarrage qui lit autre chose repart de la valeur lue.
+    private void NoterLaCarte(int gpuIndex, int origine, int? lue)
+    {
+        if (lue is { } v) _noterEcriture(gpuIndex, origine, v);
+    }
+
+    // La remise à l'usine, geste à part (AdlxTuningKind.RemiseUsine) : le seul retour vers le défaut du pilote au-delà de la
+    // bande. Elle remet aussi la mémoire, le ventilateur et la puissance réglés dans AMD Software ; l'appelant le dit.
+    private Result RemettreUsine(int gpuIndex)
+        => _native.RemettreReglageUsine(gpuIndex) is { } refus ? Fail(Docteur.T("ADLX.UsineImpossible", refus)) : Result.Ok();
 
     // --- PowerLimit : une limite de puissance absolue (% du TDP). ---
 

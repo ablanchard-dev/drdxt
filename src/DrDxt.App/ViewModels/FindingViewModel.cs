@@ -19,7 +19,12 @@ public sealed class FindingViewModel
         // Un problème prouvé dont l'ampleur ne l'est pas se dit sans nombre : le constat nomme ce qui est mal réglé, il ne
         // chiffre pas ce que ça coûte. Le champ reste sur `Finding`, il sert au tri et au registre côté Detection.
         GainLabel = string.Empty;
+        PromesseRetiree = f.GainSuppressedReason;
     }
+
+    /// <summary>Ce que la mesure de cette session dit de ce levier ici (le goulot, puis ce qu'il ne rendra pas) ; null
+    /// sans mesure. Le constat reste, la promesse tombe : le joueur sait pourquoi le corriger ne lui donnera pas d'images.</summary>
+    public string? PromesseRetiree { get; }
 
     /// <summary>La forme commune, ce que l'écran affiche.</summary>
     public DrDxt.Core.Constat Constat { get; }

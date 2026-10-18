@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
+using static DrDxt.Detection.Natif;
 
 namespace DrDxt.Detection.Latency;
 
@@ -86,6 +87,9 @@ public sealed class DpcLatencyTracer
     private static readonly Guid PerfInfoGuid = new("ce1dbfb4-137e-4da6-87b0-3f59aa102cbc");
 
     // Opcodes PerfInfo. Un DPC arrive a la fin de son execution, son `InitialTime` porte le debut.
+    // La table officielle (Microsoft Learn, « PerfInfo class ») ne liste que 46, 51, 52 et 66 a 69 : aucun
+    // evenement propre aux ISR des interruptions MSI n'y est documente, donc aucun opcode n'est ajoute sur la foi d'un
+    // nom vu ailleurs. Un ISR MSI non compte reste une limite connue de cette mesure.
     private const byte OpcodeThreadedDpc = 66;
     private const byte OpcodeIsr = 67;
     private const byte OpcodeDpc = 68;
@@ -129,6 +133,7 @@ public sealed class DpcLatencyTracer
     private int _rejetesDeltaInvalide;
     private readonly Dictionary<string, Accumulateur> _parModule = new(StringComparer.OrdinalIgnoreCase);
     private ulong[] _basesTriees = Array.Empty<ulong>();
+    private uint[] _taillesTriees = Array.Empty<uint>();
     private string[] _nomsTries = Array.Empty<string>();
 
     private sealed class Accumulateur
@@ -148,6 +153,9 @@ public sealed class DpcLatencyTracer
         var taille = Marshal.SizeOf<EVENT_TRACE_PROPERTIES>() + 2 * 1024;
         var proprietes = Marshal.AllocHGlobal(taille);
         var debut = DateTime.UtcNow;
+        // Libérés par le `finally` sur tous les chemins, retour anticipé ou exception compris.
+        var nomSession = IntPtr.Zero;
+        var poignee = unchecked((ulong)-1);
         try
         {
             Remplir(proprietes, taille);
@@ -170,7 +178,7 @@ public sealed class DpcLatencyTracer
             // Le delegue vit dans un champ : en variable locale, le ramasse-miettes pourrait le
             // collecter pendant que le noyau detient encore son adresse.
             _rappel = SurEvenement;
-            var nomSession = Marshal.StringToHGlobalUni(NomSession);
+            nomSession = Marshal.StringToHGlobalUni(NomSession);
 
             // `EnableFlags` seul ne livre rien a une session privee (mesure du 08/09/2026) : depuis
             // Windows 10 build 20348 le fournisseur systeme s'active par `EnableTraceEx2`.
@@ -192,7 +200,7 @@ public sealed class DpcLatencyTracer
                 EventRecordCallback = Marshal.GetFunctionPointerForDelegate(_rappel),
             };
 
-            var poignee = OpenTrace(ref journal);
+            poignee = OpenTrace(ref journal);
             if (poignee == unchecked((ulong)-1))
                 return Echec(DpcOutcome.Echec, Marshal.GetLastWin32Error(), 0);
 
@@ -219,6 +227,7 @@ public sealed class DpcLatencyTracer
 
             consommateur.Join(TimeSpan.FromSeconds(3));
             CloseTrace(poignee);
+            poignee = unchecked((ulong)-1);
 
             if (_evenements == 0)
                 return Echec(DpcOutcome.AucunEvenement, _codeProcessTrace, observee);
@@ -245,6 +254,8 @@ public sealed class DpcLatencyTracer
                 finally { Marshal.FreeHGlobal(arret); }
             }
             catch { /* deja fermee : rien a rattraper */ }
+            if (poignee != unchecked((ulong)-1)) CloseTrace(poignee);
+            if (nomSession != IntPtr.Zero) Marshal.FreeHGlobal(nomSession);
             Marshal.FreeHGlobal(proprietes);
         }
     }
@@ -322,16 +333,17 @@ public sealed class DpcLatencyTracer
         if (ms >= 1.0) acc.AuDelaDeUneMs++;
     }
 
-    /// <summary>L'adresse d'une routine → le fichier du pilote qui la contient.
+    /// <summary>L'adresse d'une routine → le fichier du pilote qui la contient : base ≤ adresse &lt; base + taille.
     ///
-    /// Simplification voulue : recherche du plus grand base ≤ adresse. `EnumDeviceDrivers` ne donne pas la taille
-    /// des modules : une adresse au-dela du dernier module serait donc attribuee a tort. Garde-fou :
-    /// au-dela de 64 Mo du base, on rend `?` plutot qu'un nom faux. Passer aux evenements
-    /// `Image/Load` (qui portent ImageSize) le jour ou un `?` devient genant.</summary>
-    private string Attribuer(ulong routine) => Attribuer(routine, _basesTriees, _nomsTries);
+    /// `EnumDeviceDrivers` ne donne pas la taille des modules : elle est lue dans l'en-tête PE du fichier
+    /// (`SizeOfImage`, la taille de l'image chargée en mémoire, doc Microsoft « PE Format »). Une adresse entre la fin
+    /// d'un module et le base du suivant rend `?` au lieu du nom du précédent. Taille illisible (fichier introuvable) :
+    /// `?` aussi, jamais le plus grand base ≤ adresse, qui donnerait le temps d'un pilote inconnu à son voisin. Mesuré le
+    /// 16/10/2026 sur la machine de référence : 3 pilotes sur 244 sans taille lisible, les copies de vidage `dump_*`.</summary>
+    private string Attribuer(ulong routine) => Attribuer(routine, _basesTriees, _taillesTriees, _nomsTries);
 
-    /// <summary>Logique pure, exposee pour etre testable sans session noyau.</summary>
-    public static string Attribuer(ulong routine, ulong[] basesTriees, string[] nomsTries)
+    /// <summary>Logique pure, exposee pour etre testable sans session noyau. Une taille à 0 veut dire « non lue ».</summary>
+    public static string Attribuer(ulong routine, ulong[] basesTriees, uint[] tailles, string[] nomsTries)
     {
         if (basesTriees.Length == 0 || routine < basesTriees[0]) return "?";
 
@@ -342,27 +354,49 @@ public sealed class DpcLatencyTracer
             var mid = (lo + hi + 1) / 2;
             if (basesTriees[mid] <= routine) lo = mid; else hi = mid - 1;
         }
-        return routine - basesTriees[lo] > 64UL * 1024 * 1024 ? "?" : nomsTries[lo];
+        return tailles[lo] == 0 || routine - basesTriees[lo] >= tailles[lo] ? "?" : nomsTries[lo];
+    }
+
+    /// <summary>`SizeOfImage` du fichier d'un pilote, ou 0 si illisible. Le chemin rendu par
+    /// `GetDeviceDriverFileName` est un chemin noyau (`\SystemRoot\…`, `\??\C:\…`) : ramené à un chemin Win32.</summary>
+    internal static uint TailleImage(string cheminNoyau)
+    {
+        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        var chemin = cheminNoyau.StartsWith(@"\SystemRoot\", StringComparison.OrdinalIgnoreCase) ? windows + cheminNoyau[@"\SystemRoot".Length..]
+            : cheminNoyau.StartsWith(@"\??\", StringComparison.Ordinal) ? cheminNoyau[4..]
+            : cheminNoyau.StartsWith(@"\Windows\", StringComparison.OrdinalIgnoreCase) ? windows + cheminNoyau[@"\Windows".Length..]
+            : cheminNoyau;
+        try
+        {
+            using var fichier = File.OpenRead(chemin);
+            using var pe = new System.Reflection.PortableExecutable.PEReader(fichier);
+            return (uint)(pe.PEHeaders.PEHeader?.SizeOfImage ?? 0);
+        }
+        catch (Exception) { return 0; }
     }
 
     private void ChargerCarteDesPilotes()
     {
         var bases = new IntPtr[2048];
-        if (!EnumDeviceDrivers(bases, (uint)(bases.Length * IntPtr.Size), out var octets) || octets == 0)
+        if (!Natif.EnumDeviceDrivers(bases, (uint)(bases.Length * IntPtr.Size), out var octets) || octets == 0)
             return;
 
         var nombre = (int)(octets / IntPtr.Size);
-        var paires = new List<(ulong Base, string Nom)>(nombre);
+        var paires = new List<(ulong Base, uint Taille, string Nom)>(nombre);
         var tampon = new StringBuilder(260);
         for (var i = 0; i < nombre && i < bases.Length; i++)
         {
             tampon.Clear();
-            var lu = GetDeviceDriverBaseName(bases[i], tampon, tampon.Capacity);
-            paires.Add(((ulong)bases[i].ToInt64(), lu > 0 ? tampon.ToString() : "?"));
+            var lu = Natif.GetDeviceDriverBaseName(bases[i], tampon, tampon.Capacity);
+            var nom = lu > 0 ? tampon.ToString() : "?";
+            tampon.Clear();
+            var taille = Natif.GetDeviceDriverFileName(bases[i], tampon, tampon.Capacity) > 0 ? TailleImage(tampon.ToString()) : 0;
+            paires.Add(((ulong)bases[i].ToInt64(), taille, nom));
         }
 
         paires.Sort((a, b) => a.Base.CompareTo(b.Base));
         _basesTriees = paires.Select(p => p.Base).ToArray();
+        _taillesTriees = paires.Select(p => p.Taille).ToArray();
         _nomsTries = paires.Select(p => p.Nom).ToArray();
     }
 
@@ -417,48 +451,6 @@ public sealed class DpcLatencyTracer
         public ushort ExtendedDataCount; public ushort UserDataLength;
         public IntPtr ExtendedData; public IntPtr UserData; public IntPtr UserContext;
     }
-
-    /// <summary>Disposition verifiee contre le SDK par <c>tools/etwlayout</c>, pas deduite : deux
-    /// versions fausses ont compile sans un mot, l'une bloquant `ProcessTrace`, l'autre rendant
-    /// zero evenement. Les decalages sont publies par <see cref="DecalagesUtilises"/> et compares
-    /// au SDK par `EtwInteropLayoutTests`.</summary>
-    [StructLayout(LayoutKind.Explicit, Size = 448)]
-    private struct EVENT_TRACE_LOGFILE
-    {
-        [FieldOffset(8)] public IntPtr LoggerName;
-        [FieldOffset(28)] public uint ProcessTraceMode;
-        [FieldOffset(376)] public long PerfFreq;
-        [FieldOffset(424)] public IntPtr EventRecordCallback;
-    }
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "StartTraceW", SetLastError = true)]
-    private static extern int StartTrace(out ulong sessionHandle, string sessionName, IntPtr properties);
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "ControlTraceW")]
-    private static extern int ControlTrace(ulong sessionHandle, string sessionName,
-        IntPtr properties, uint controlCode);
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "OpenTraceW", SetLastError = true)]
-    private static extern ulong OpenTrace(ref EVENT_TRACE_LOGFILE logfile);
-
-    [DllImport("advapi32.dll")]
-    private static extern int ProcessTrace(ulong[] handleArray, uint handleCount,
-        IntPtr startTime, IntPtr endTime);
-
-    [DllImport("advapi32.dll")]
-    private static extern int CloseTrace(ulong traceHandle);
-
-    [DllImport("advapi32.dll")]
-    private static extern int EnableTraceEx2(ulong traceHandle, ref Guid providerId,
-        uint controlCode, byte level, ulong matchAnyKeyword, ulong matchAllKeyword,
-        uint timeout, IntPtr enableParameters);
-
-    [DllImport("psapi.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool EnumDeviceDrivers(IntPtr[] imageBase, uint cb, out uint needed);
-
-    [DllImport("psapi.dll", CharSet = CharSet.Unicode, EntryPoint = "GetDeviceDriverBaseNameW")]
-    private static extern int GetDeviceDriverBaseName(IntPtr imageBase, StringBuilder baseName, int size);
 
     private static ref Guid Unsafe(Guid valeur)
     {

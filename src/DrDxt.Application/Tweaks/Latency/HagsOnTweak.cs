@@ -55,6 +55,23 @@ public sealed class HagsOnTweak : LatencyTweakBase
     // HwSchMode n'agit qu'après un redémarrage → le moteur saute l'A/B immédiat (preuve = scan suivant).
     public override bool TakesEffectAfterReboot => true;
 
+    // Banc profond : HAGS effectif, la clé absente (défaut du pilote) ou à 2 ; l'exercice écrit 1, puis rend l'origine
+    // exacte. Une clé à 1 sous un HAGS effectif est un redémarrage en attente : pas d'exercice.
+    public override ExerciceProfond? PreparerExercice(HardwareInventory hw, SettingsState state)
+    {
+        if (state.HagsEffective != TriState.On) return null;
+        try
+        {
+            if (_registry.ReadDword(RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName) is not { IsOk: true, Value: null or HagsOn } lu)
+                return null;
+            var origine = BuildRegistryInverse(RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName, lu.Value);
+            var horsCible = PrivilegedOpCodec.Serialize(new SetRegistryValueOp(RegistryHiveKind.LocalMachine, GraphicsDriversPath,
+                HwSchModeName, RegistryValueType.DWord, "1"));
+            return origine is { IsOk: true, Value: { } o } && horsCible is { IsOk: true, Value: { } h } ? new ExerciceProfond(o, h) : null;
+        }
+        catch (Exception) { return null; }
+    }
+
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
         try

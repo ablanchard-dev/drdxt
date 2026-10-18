@@ -103,6 +103,28 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         ecriture.Recues.Should().Equal(frtcOrigine, vsyncOrigine);
     }
 
+    // Le fichier d'échange rendu à Windows depuis un fichier d'échange désactivé : son origine (PagingFiles absente ou vide)
+    // le couperait. Quel que soit le chemin qui l'a inscrite au manifeste (le mapper, un keep de l'autopilote, un manifeste
+    // déjà écrit), la désinstallation ne l'écrit jamais, et le dit.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Une_origine_qui_coupe_le_fichier_d_echange_n_est_jamais_ecrite_au_rendu(bool supprimee)
+    {
+        const string Memoire = @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
+        var pose = new SetRegistryValueOp(RegistryHiveKind.LocalMachine, Memoire, "PagingFiles", RegistryValueType.MultiString, @"?:\pagefile.sys");
+        PrivilegedOp origine = supprimee
+            ? new DeleteRegistryValueOp(RegistryHiveKind.LocalMachine, Memoire, "PagingFiles")
+            : new SetRegistryValueOp(RegistryHiveKind.LocalMachine, Memoire, "PagingFiles", RegistryValueType.MultiString, "");
+        await Signer(Gardes(new AppliedTweak("fixit.sane_pagefile", Op(pose), Op(origine), Quand)));
+        var ecriture = new EcritureFactice();
+
+        var rapport = await Rendre(new LectureFactice { [Cle(pose)] = @"?:\pagefile.sys" }, ecriture);
+
+        ecriture.Recues.Should().BeEmpty();
+        rapport.Should().Contain("fixit.sane_pagefile").And.Contain("fichier d'échange");
+    }
+
     // Même si un manifeste porte une origine de fréquence, la désinstallation ne l'écrit jamais.
     [Fact]
     public async Task Une_origine_de_frequence_n_est_jamais_ecrite_au_rendu()
@@ -507,6 +529,77 @@ public sealed class RenduALaDesinstallationTests : IDisposable
             .Returns<Task<Result>>(_ => throw new IOException("tube ferme"));
         (await ModeDesinstallation.RetirerPlafondEnvoiAsync(panne, CancellationToken.None))
             .Should().Contain("IOException");
+    }
+
+    // ── la carte NVIDIA : les baux du helper tué ne se rendent plus, le désinstalleur la rend ──────────
+
+    [Fact]
+    public async Task La_desinstallation_rend_le_ventilateur_et_le_decalage_d_une_carte_nvidia()
+    {
+        var ecriture = new EcritureFactice();
+
+        var ligne = await ModeDesinstallation.RendreLaCarteNvidiaAsync(ecriture, [new(-150, true)], CancellationToken.None);
+
+        ecriture.Recues.Should().Equal(new RestoreGpuFanAutoOp(0), new ApplyNvApiClockOffsetOp(0, 0, 0));
+        ligne.Should().Contain("automatique").And.Contain("0 MHz");
+    }
+
+    [Fact]
+    public async Task Un_decalage_deja_a_zero_n_est_pas_reecrit_et_sans_carte_nvidia_rien_ne_part()
+    {
+        var ecriture = new EcritureFactice();
+        await ModeDesinstallation.RendreLaCarteNvidiaAsync(ecriture, [new(0, true)], CancellationToken.None);
+        ecriture.Recues.Should().Equal(new RestoreGpuFanAutoOp(0));
+
+        var sansNvidia = new EcritureFactice();
+        (await ModeDesinstallation.RendreLaCarteNvidiaAsync(sansNvidia, [], CancellationToken.None)).Should().BeEmpty();
+        sansNvidia.Recues.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Une_carte_pas_rendue_est_dite_et_le_reste_part_quand_meme()
+    {
+        var refus = new EcritureFactice { Echoue = op => op is RestoreGpuFanAutoOp };
+
+        var ligne = await ModeDesinstallation.RendreLaCarteNvidiaAsync(refus, [new(-150, true)], CancellationToken.None);
+
+        refus.Recues.Should().Contain(new ApplyNvApiClockOffsetOp(0, 0, 0), "un ventilateur refusé n'empêche pas de rendre le décalage");
+        ligne.Should().Contain("pas entièrement rendue").And.Contain("refus (test)").And.Contain("redémarrage");
+    }
+
+    [Fact]
+    public async Task Une_carte_au_decalage_illisible_rend_quand_meme_son_ventilateur()
+    {
+        var ecriture = new EcritureFactice();
+
+        await ModeDesinstallation.RendreLaCarteNvidiaAsync(ecriture, [new(null, true)], CancellationToken.None);
+
+        ecriture.Recues.Should().Equal(new RestoreGpuFanAutoOp(0));
+    }
+
+    // Un portable sans ventilateur lisible : DrDXT n'a pas pu en poser un qu'il ne lit pas, rien n'est tenté ni dit à son sujet.
+    [Fact]
+    public async Task Sans_ventilateur_lisible_seul_le_decalage_est_rendu_sans_rien_dire_du_ventilateur()
+    {
+        var ecriture = new EcritureFactice();
+
+        var ligne = await ModeDesinstallation.RendreLaCarteNvidiaAsync(ecriture, [new(-150, false)], CancellationToken.None);
+
+        ecriture.Recues.Should().Equal(new ApplyNvApiClockOffsetOp(0, 0, 0));
+        ligne.Should().NotContain("pas entièrement rendue");
+    }
+
+    [Fact]
+    public void Chaque_carte_se_lit_seule_jusqu_a_la_premiere_qui_ne_repond_a_rien()
+    {
+        // Carte 0 : décalage illisible, ventilateurs lus ; carte 1 : tout lu ; carte 2 : rien (il n'y en a pas).
+        int?[] decalages = [null, -100, null];
+        bool[] ventilateurs = [true, true, false];
+
+        var cartes = ModeDesinstallation.LireLesCartes(i => i < 3 ? decalages[i] : null, i => i < 3 && ventilateurs[i]);
+
+        cartes.Should().Equal(new ModeDesinstallation.CarteNvidia(null, true), new ModeDesinstallation.CarteNvidia(-100, true));
+        ModeDesinstallation.LireLesCartes(_ => 0, _ => true).Should().HaveCount(8, "borné : NVAPI n'énumère jamais plus");
     }
 
     // ── doublures ─────────────────────────────────────────────────────────────────────────────

@@ -332,9 +332,9 @@ public static class AutopilotEngine
             // qu'il n'y en a pas. Tant que ce n'est pas implemente et calibre, le
             // protocole va au bout : une decision, sur l'experience complete.
             //
-            // Les seules interruptions permises sont physiques et pre-declarees
-            // (voir `ArretPhysique`) : elles ne dependent pas du resultat mesure, donc
-            // elles ne biaisent pas le verdict.
+            // La seule interruption permise est physique : une bascule d'etat qui echoue
+            // (`Interrompu`, plus haut). Elle ne depend pas du resultat mesure, donc elle
+            // ne biaise pas le verdict.
         }
         return (passes, interrompu);
     }

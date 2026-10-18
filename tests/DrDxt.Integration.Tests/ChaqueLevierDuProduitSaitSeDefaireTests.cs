@@ -97,7 +97,7 @@ public sealed class ChaqueLevierDuProduitSaitSeDefaireTests
 
     /// <summary>Le socle, plus l'état qu'un levier vient réparer quand il contredit celui des autres : le plan Économie
     /// n'est quitté que s'il est actif, et le reste du socle part d'Équilibré.</summary>
-    private static FakeSystemState SocleDe(string id)
+    internal static FakeSystemState SocleDe(string id)
     {
         var s = Socle();
         if (id == "fixit.plan_economie") s.ActivePowerPlan = KnownPowerPlans.PowerSaver;
@@ -115,7 +115,7 @@ public sealed class ChaqueLevierDuProduitSaitSeDefaireTests
     /// <summary>Les quinze leviers du produit, construits contre les coutures du banc.
     /// Cette liste est la seule ecrite a la main ici — et le test plus bas la confronte a
     /// l'enregistrement reel, donc elle ne peut pas deriver en silence.</summary>
-    internal static IReadOnlyList<ITweak> TousLesLeviers(FakeSystemState etat, FakeElevatedClient client)
+    internal static IReadOnlyList<ITweak> TousLesLeviers(FakeSystemState etat, IElevatedClient client)
     {
         var nv = new FakeNvApi(etat);
         var nvTuning = new FakeNvApiGpuTuning(etat);

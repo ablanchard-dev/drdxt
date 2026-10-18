@@ -23,7 +23,7 @@ public static class TemperatureProcesseur
         foreach (var source in sources)
         {
             try { if (source() is { } lue) return lue; }
-            catch (Exception) { }
+            catch (Exception) { /* cette source passe la main à la suivante */ }
         }
         return null;
     }

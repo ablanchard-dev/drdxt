@@ -50,7 +50,9 @@ public partial class ScanViewModel
 
     [RelayCommand]
     private Task PoserVentilateurExpertAsync()
-        => PoserVentilateurExpert is { } poser ? PoserEssaiAsync(() => poser(ExpertVentilateurPct)) : Task.CompletedTask;
+        => PoserVentilateurExpert is { } poser
+            ? PoserEssaiAsync(() => poser(ExpertVentilateurPct), _localize("Carte.Expert.GardeVentilateur"))
+            : Task.CompletedTask;
 
     [ObservableProperty] private bool _expertAccord;
     [ObservableProperty] private int _expertDecalageMhz;
@@ -77,9 +79,14 @@ public partial class ScanViewModel
 
     [RelayCommand]
     private Task PoserCarteExpertAsync()
-        => PoserCarteExpert is { } poser ? PoserEssaiAsync(() => poser(ExpertDecalageMhz)) : Task.CompletedTask;
+        => PoserCarteExpert is { } poser
+            ? PoserEssaiAsync(() => poser(ExpertDecalageMhz), string.Format(System.Globalization.CultureInfo.CurrentCulture,
+                _localize("Carte.Expert.Garde"), DrDxt.Application.Tweaks.Hardware.GpuStabilityTester.DureeDeCharge.TotalSeconds))
+            : Task.CompletedTask;
 
-    private async Task PoserEssaiAsync(Func<Task<Result<IEssaiCarte>>> poser)
+    /// <param name="garde">Ce que l'écran dit une fois l'essai gardé : le décalage a passé un court test de charge, le
+    /// ventilateur n'en a aucun.</param>
+    private async Task PoserEssaiAsync(Func<Task<Result<IEssaiCarte>>> poser, string garde)
     {
         if (ExpertEnCours || ExpertGarde) return;
         if (!ExpertAccord) { ExpertEtat = _localize("Carte.Expert.AccordRequis"); return; }
@@ -94,22 +101,30 @@ public partial class ScanViewModel
             {
                 _essaiCarte = r.Value;
                 _essaiCarte!.BailPerdu += BailDeLaCartePerdu;
+                if (_essaiCarte is EssaiVentilateur ventilateur) ventilateur.ResteFixe += VentilateurResteFixe;
                 ExpertGarde = true;
-                ExpertEtat = _localize("Carte.Expert.Garde");
+                ExpertEtat = garde;
             }
             else
             {
                 ExpertEtat = r.Error?.Code switch
                 {
                     ErrorCodes.TweakUnstable => _localize("Carte.Expert.Instable"),
+                    ErrorCodes.GpuReglageTiers => _localize("Carte.Expert.AutreOutil"),
+                    ErrorCodes.GpuDecalageNonLu => _localize("Carte.Expert.DecalageNonLu"),
                     // Instable et retour raté ; jamais « rendue ».
-                    ErrorCodes.TweakPartiallyApplied => $"{_localize("Carte.Expert.RenduRate")} {r.Error?.Message}",
-                    _ => $"{_localize("Carte.Expert.Refuse")} {r.Error?.Message}",
+                    ErrorCodes.TweakPartiallyApplied => _localize("Carte.Expert.RenduRate"),
+                    _ => RaisonLisible.OuIncertain(r, $"{_localize("Carte.Expert.Refuse")} {RaisonLisible.Dire(r, _localize)}", _localize),
                 };
             }
         }
         finally { ExpertEnCours = false; }
     }
+
+    /// <summary>Le helper ne répondait plus et le retour à l'automatique a été refusé : la vitesse fixe reste, et l'écran le
+    /// dit. « Rendre » reste proposé : le clic du joueur peut, lui, relancer le helper.</summary>
+    private void VentilateurResteFixe(Result echec)
+        => ExpertEtat = RaisonLisible.OuIncertain(echec, Docteur.T("GX.VentilateurResteFixe", RaisonLisible.Dire(echec, _localize)), _localize);
 
     /// <summary>Le helper a rendu l'origine de lui-même : l'écran cesse de dire « Gardé ».</summary>
     private void BailDeLaCartePerdu()
@@ -151,6 +166,7 @@ public partial class ScanViewModel
             if (r.IsOk)
             {
                 essai.BailPerdu -= BailDeLaCartePerdu;
+                if (essai is EssaiVentilateur ventilateur) ventilateur.ResteFixe -= VentilateurResteFixe;
                 await essai.DisposeAsync();
                 _essaiCarte = null;
                 ExpertGarde = false;
@@ -158,7 +174,7 @@ public partial class ScanViewModel
             }
             else
             {
-                ExpertEtat = $"{_localize("Carte.Expert.RenduRate")} {r.Error?.Message}";
+                ExpertEtat = _localize("Carte.Expert.RenduRate");
             }
         }
         finally { ExpertEnCours = false; }

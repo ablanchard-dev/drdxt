@@ -152,6 +152,20 @@ public class MachinesEnregistreesTests
         else levier.AppliesTo(m.Inventaire, m.Reglages).Should().BeFalse($"{nom} a lu son boost, à son défaut");
     }
 
+    // Une machine synthétique se copie d'une autre : chacune citait « ta carte (AMD Radeon RX 7800 XT) », y compris les
+    // NVIDIA et les Intel. Une carte nommée dans un constat est une carte de son inventaire.
+    [Theory]
+    [MemberData(nameof(Noms))]
+    public void Chaque_carte_nommee_par_un_constat_est_dans_l_inventaire(string nom)
+    {
+        var m = Charger(nom);
+        var cartes = m.Inventaire.Gpus.Select(g => g.Model).ToList();
+        foreach (var texte in m.Sante.SelectMany(s => new[] { s.ValeurCourante, s.Explication }).OfType<string>())
+            foreach (var marque in new[] { "ta carte (", "your card (" })
+                for (var i = texte.IndexOf(marque, StringComparison.Ordinal); i >= 0; i = texte.IndexOf(marque, i + 1, StringComparison.Ordinal))
+                    cartes.Should().Contain(c => texte.Substring(i + marque.Length).StartsWith(c, StringComparison.Ordinal), $"{nom} : « {texte} »");
+    }
+
     [Fact]
     public void Sur_une_carte_AMD_ce_que_DrDXT_ne_lit_que_chez_NVIDIA_se_dit_non_lu()
     {

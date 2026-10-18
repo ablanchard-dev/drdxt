@@ -80,27 +80,38 @@ public sealed class MemoryBaselineService
         return reference.ConfiguredMts == CurrentMts(modules) ? reference : null;
     }
 
-    public int ProvenChannelsForScan(string machineId, IReadOnlyList<MemoryModule> modules, bool jeuEnCours = false)
+    /// <summary>Le scan va-t-il lancer le banc mémoire ? La même règle que <see cref="ProvenChannelsForScan"/>, lue
+    /// avant : la jauge du scan prévoit la vraie durée de l'étape.</summary>
+    public bool MesureraPourScan(string machineId, IReadOnlyList<MemoryModule> modules, bool jeuEnCours = false)
+        => Decider(_store.Read(machineId), CurrentMts(modules), jeuEnCours) == Suite.Mesurer;
+
+    private enum Suite { Rien, Relire, Mesurer }
+
+    private static Suite Decider(Result<MemoryBaseline?> existing, int mts, bool jeuEnCours)
     {
-        var mts = CurrentMts(modules);
-
-        var existing = _store.Read(machineId);
-
         // Une panne de lecture n'est pas une reference absente. Une reference amputee se
         // remplace : elle est inutilisable. Mais un fichier qu'on n'a pas pu lire (antivirus,
-        // disque occupe) est peut-etre parfait, et la suite de cette methode ecrit. Continuer
+        // disque occupe) est peut-etre parfait, et la suite du scan ecrit. Continuer
         // detruirait la seule mesure d'avant que le client possede, pour une panne passagere.
-        if (!existing.IsOk && existing.Error?.Code == ErrorCodes.MemoryBaselineIo)
-            return 0;
-
-        if (existing.IsOk && existing.Value is { } baseline && baseline.ConfiguredMts == mts)
-            return MemoryInference.ProvenMinimumChannels(baseline.Measurement.BandwidthGBs, modules);
-
+        if (!existing.IsOk && existing.Error?.Code == ErrorCodes.MemoryBaselineIo) return Suite.Rien;
+        if (existing.IsOk && existing.Value is { } baseline && baseline.ConfiguredMts == mts) return Suite.Relire;
         // Jamais de référence prise pendant qu'un jeu tourne. Celle du 16/09 a été mesurée dans le même scan
         // que Warzone (17:53, capture à 17:54) : 12,7 Go/s, contre 33,4 Go/s pour la même machine au repos.
         // Le jeu prend la bande passante, et une charge régulière ne disperse pas assez la mesure pour que
         // Q-03 l'écarte. Rien de prouvé ce scan-ci ; le suivant, sans jeu, mesurera.
-        if (jeuEnCours) return 0;
+        return jeuEnCours ? Suite.Rien : Suite.Mesurer;
+    }
+
+    public int ProvenChannelsForScan(string machineId, IReadOnlyList<MemoryModule> modules, bool jeuEnCours = false)
+    {
+        var mts = CurrentMts(modules);
+        var existing = _store.Read(machineId);
+        switch (Decider(existing, mts, jeuEnCours))
+        {
+            case Suite.Rien: return 0;
+            case Suite.Relire:
+                return MemoryInference.ProvenMinimumChannels(MemoryInference.MeilleurDebit(existing.Value!.Measurement), modules);
+        }
 
         var (measurement, _) = MeasureAccepted(MemoryInference.UpperBoundPeakGBs(modules));
         if (measurement is null) return 0;
@@ -109,7 +120,7 @@ public sealed class MemoryBaselineService
         // et ce qu'elle prouve reste vrai pour ce scan : on le rend. Ce qu'on perd alors, c'est la
         // memoire du resultat : le scan suivant remesurera. C'est un cout, pas un mensonge.
         _store.Save(new MemoryBaseline(machineId, _now(), mts, measurement, JeuFermeVerifie: true));
-        return MemoryInference.ProvenMinimumChannels(measurement.BandwidthGBs, modules);
+        return MemoryInference.ProvenMinimumChannels(MemoryInference.MeilleurDebit(measurement), modules);
     }
 
     /// <summary>

@@ -22,9 +22,9 @@ namespace DrDxt.Detection.Settings;
 /// Cette correction ne dépend donc pas de la qualité de la source : seul l'ordre de priorité
 /// en dépend, et il ne départage que le cas où les deux se contredisent.</para>
 ///
-/// <para>Mesure du 18/09/2026 sur la machine de référence : la clé <c>GameBar</c> existe et ne
-/// porte que <c>GamepadDoublePressIntervalMs</c>. Aucune des deux valeurs n'est écrite :
-/// <c>Unknown</c> est la bonne réponse ici, et le reste.</para>
+/// <para>Aucune des deux valeurs écrite (c'est le cas de la machine de référence : la clé <c>GameBar</c> ne porte que
+/// <c>GamepadDoublePressIntervalMs</c>) : le mode Jeu n'a jamais été réglé, il est dans l'état par défaut de Windows,
+/// actif : Microsoft l'active par défaut pour tout le système, et l'interrupteur des Paramètres est actif par défaut.</para>
 /// </summary>
 internal static class GameModeLecture
 {
@@ -37,7 +37,8 @@ internal static class GameModeLecture
     internal const string NomAncien = "AllowAutoGameMode";
 
     /// <summary>
-    /// <c>On</c>, <c>Off</c>, ou <c>Unknown</c> si rien de lisible n'est écrit.
+    /// <c>On</c>, <c>Off</c>, <c>On</c> quand rien n'est écrit (le défaut de Windows), ou <c>Unknown</c> pour une valeur
+    /// d'un type inattendu.
     ///
     /// Pur exprès : c'est la seule partie qui peut se tromper en silence, donc la seule qui a
     /// besoin d'être testée sans registre.
@@ -49,8 +50,8 @@ internal static class GameModeLecture
             return m == 1 ? TriState.On : TriState.Off;
         if (ancien is int a)
             return a == 1 ? TriState.On : TriState.Off;
-        // Une valeur absente ou d'un type inattendu est un « je n'ai pas lu », jamais un
-        // « c'est éteint », et jamais non plus le défaut de Windows, qu'on n'a pas mesuré.
-        return TriState.Unknown;
+        // Rien d'écrit : le défaut de Windows. Une valeur d'un type inattendu est un « je n'ai pas lu », jamais un
+        // « c'est éteint ».
+        return moderne is null && ancien is null ? TriState.On : TriState.Unknown;
     }
 }

@@ -239,6 +239,76 @@ public sealed class AutoUpdaterTests
         feed.DownloadCount.Should().Be(2, "une charge stagee qui ne correspond plus au manifeste signe n'est jamais reprise");
     }
 
+    // ── L'installeur ne part qu'au clic ──
+    // Au démarrage, l'App ne doit lire que le manifeste signé (quelques centaines d'octets) : l'installeur (jusqu'à 400 Mo)
+    // partait sans clic, alors que le README et MISE-A-JOUR.md disent l'inverse.
+
+    [Fact]
+    public async Task Annoncer_dit_la_version_signee_sans_rien_telecharger()
+    {
+        var payload = Payload("installeur signe 1.3.0");
+        var feed = new FakeFeed(SignedManifest(UpdateChannel.App, "1.3.0", "https://u/DrDXT-Setup.exe", payload), payload);
+        var fs = new InMemoryFs();
+
+        var annonce = await Build(feed, fs: fs).AnnoncerAsync(CancellationToken.None);
+
+        annonce.Value!.Version.Should().Be("1.3.0");
+        feed.DownloadCount.Should().Be(0, "rien ne se télécharge avant le clic");
+        fs.WriteCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Annoncer_ne_propose_ni_la_version_installee_ni_une_plus_ancienne()
+    {
+        var payload = Payload("x");
+        (await Build(new FakeFeed(SignedManifest(UpdateChannel.App, Installed, "https://u/a.exe", payload), payload))
+            .AnnoncerAsync(CancellationToken.None)).Value.Should().BeNull();
+        (await Build(new FakeFeed(SignedManifest(UpdateChannel.App, "1.1.0", "https://u/a.exe", payload), payload))
+            .AnnoncerAsync(CancellationToken.None)).Error!.Value.Code.Should().Be(UpdateErrorCodes.Downgrade);
+    }
+
+    [Fact]
+    public async Task Au_clic_la_charge_est_telechargee_verifiee_puis_stagee()
+    {
+        var payload = Payload("installeur signe 1.3.0");
+        var manifest = SignedManifest(UpdateChannel.App, "1.3.0", "https://u/DrDXT-Setup.exe", payload);
+        var feed = new FakeFeed(manifest, payload);
+        var fs = new InMemoryFs();
+        var updater = Build(feed, fs: fs);
+
+        var chemin = await updater.TelechargerAsync(manifest, CancellationToken.None);
+
+        chemin.Value.Should().Be(updater.StagedAppPayloadPath);
+        fs.TryReadFile(chemin.Value!).Should().Equal(payload);
+        feed.DownloadCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Au_clic_une_charge_trafiquee_n_est_jamais_stagee()
+    {
+        var manifest = SignedManifest(UpdateChannel.App, "1.3.0", "https://u/DrDXT-Setup.exe", Payload("vrai"));
+        var fs = new InMemoryFs();
+
+        var r = await Build(new FakeFeed(manifest, Payload("trafique")), fs: fs).TelechargerAsync(manifest, CancellationToken.None);
+
+        r.Error!.Value.Code.Should().Be(UpdateErrorCodes.HashMismatch);
+        fs.WriteCalls.Should().Be(0);
+    }
+
+    // Le manifeste a fait l'aller-retour par l'écran : il est relu signé avant tout téléchargement.
+    [Fact]
+    public async Task Au_clic_un_manifeste_modifie_ne_telecharge_rien()
+    {
+        var payload = Payload("vrai");
+        var manifest = SignedManifest(UpdateChannel.App, "1.3.0", "https://u/DrDXT-Setup.exe", payload);
+        var feed = new FakeFeed(manifest, payload);
+
+        var r = await Build(feed).TelechargerAsync(manifest with { Url = "https://evil/x.exe" }, CancellationToken.None);
+
+        r.Error!.Value.Code.Should().Be(UpdateErrorCodes.SignatureInvalid);
+        feed.DownloadCount.Should().Be(0);
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────────
 
     private sealed class FakeFeed : IUpdateFeed

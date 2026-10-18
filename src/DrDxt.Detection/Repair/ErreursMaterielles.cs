@@ -18,7 +18,14 @@ public static class ErreursMaterielles
 {
     /// <summary><paramref name="DuProcesseur"/> : une section CPER du processeur (générique ou IA32/X64), pas une erreur PCIe,
     /// mémoire ou de plateforme.</summary>
-    public sealed record Enregistrement(DateTimeOffset Quand, int Gravite, bool DuProcesseur = false);
+    public sealed record Enregistrement(DateTimeOffset Quand, int Gravite, bool DuProcesseur = false, Origine? Source = null);
+
+    /// <summary>D'où vient l'erreur, lue dans les champs nommés de l'événement (manifeste du fournisseur WHEA-Logger,
+    /// relevé le 16/10/2026 : 18, 19 et 20 portent ApicId, MCABank, MciStat ; 17 porte Bus, Device, Function, VendorID,
+    /// DeviceID, PortType, CorrectableErrorStatus). Jamais le message, qui change avec la langue de Windows.</summary>
+    /// <param name="ApicId">Processeur logique qui a relevé l'erreur (identifiant APIC) ; null pour une erreur PCIe.</param>
+    public sealed record Origine(int? ApicId, int? Banque, ulong? Statut, int? Bus, int? Peripherique, int? Fonction,
+        int? Fabricant, int? Produit, int? TypeDePort, uint? StatutCorrigeable);
 
     /// <summary><c>null</c> quand le journal n'a pas pu être lu ; une liste vide veut dire
     /// « lu, rien trouvé ». Avaler l'échec rendait « aucune erreur en 90 jours » sur un journal refusé.</summary>
@@ -37,11 +44,73 @@ public static class ErreursMaterielles
                     var brut = e.Properties.Select(p => p.Value).OfType<byte[]>().FirstOrDefault()
                                ?? (e.Properties.Select(p => p.Value as string).FirstOrDefault(s => s?.StartsWith("43504552", StringComparison.Ordinal) == true) is { } hex
                                    ? Convert.FromHexString(hex) : null);
-                    if (e.TimeCreated is { } t && Gravite(brut) is { } g) lus.Add(new(new DateTimeOffset(t), g, DuProcesseur(brut)));
+                    if (e.TimeCreated is { } t && Gravite(brut) is { } g)
+                        lus.Add(new(new DateTimeOffset(t), g, DuProcesseur(brut), e.Id is >= 17 and <= 20 ? LireOrigine(e.ToXml()) : null));
                 }
         }
         catch (Exception) { return null; }
         return lus;
+    }
+
+    /// <summary>Pur : les champs nommés de l'événement (XML rendu par Windows) ; null si aucun n'est lisible.</summary>
+    public static Origine? LireOrigine(string? xml)
+    {
+        if (string.IsNullOrEmpty(xml)) return null;
+        Dictionary<string, string> champs;
+        try
+        {
+            champs = System.Xml.Linq.XDocument.Parse(xml).Descendants()
+                .Where(d => d.Name.LocalName == "Data" && d.Attribute("Name") is not null)
+                .GroupBy(d => d.Attribute("Name")!.Value).ToDictionary(g => g.Key, g => g.First().Value.Trim());
+        }
+        catch (System.Xml.XmlException) { return null; }
+        ulong? N(string nom) => champs.TryGetValue(nom, out var v) && v.Length > 0
+            && (v.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? ulong.TryParse(v.AsSpan(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var h) ? h : (ulong?)null
+                : ulong.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var d) ? d : (ulong?)null) is { } x ? x : null;
+        int? I(string nom) => N(nom) is { } x && x <= int.MaxValue ? (int)x : null;
+        var o = new Origine(I("ApicId"), I("MCABank"), N("MciStat"), I("Bus"), I("Device"), I("Function"), I("VendorID"),
+            I("DeviceID"), I("PortType"), N("CorrectableErrorStatus") is { } s && s <= uint.MaxValue ? (uint)s : null);
+        return o.ApicId is null && o.Bus is null ? null : o;
+    }
+
+    // PCI Express Base Specification, registre « Correctable Error Status » de la capacité AER : un bit par cause.
+    private static readonly (int Bit, string Nom)[] BitsCorrigeables =
+    [
+        (0, "Receiver Error"), (6, "Bad TLP"), (7, "Bad DLLP"), (8, "REPLAY_NUM Rollover"), (12, "Replay Timer Timeout"),
+        (13, "Advisory Non-Fatal Error"), (14, "Corrected Internal Error"), (15, "Header Log Overflow"),
+    ];
+    private const uint AvisNonFatal = 1u << 13;
+
+    /// <summary>
+    /// Pur : d'où viennent les erreurs. Une erreur du processeur est dite par le processeur logique qui l'a relevée et sa
+    /// banque MCA ; le bloc en cause n'est jamais déduit du numéro de banque. Sur les processeurs AMD récents (SMCA), le
+    /// rôle d'une banque se lit dans son registre MCA_IPID (AMD PPR, chapitre Machine Check Architecture), que l'événement
+    /// ne porte pas : le bloc reste « non identifié ». Une erreur PCIe est dite par son périphérique et ses causes AER ; un
+    /// avis non fatal seul est un avertissement, pas une panne du lien.
+    /// </summary>
+    public static IEnumerable<RepairFinding> Attribuer(IReadOnlyList<Enregistrement>? lus)
+    {
+        var sources = (lus ?? []).Where(e => e.Gravite is 0 or 1 or 2 && e.Source is not null)
+            .GroupBy(e => e.Source! with { Statut = null, StatutCorrigeable = null })
+            .OrderByDescending(g => g.Count()).Take(5).ToList();
+        if (sources.Count == 0) yield break;
+        var morceaux = sources.Select(g =>
+        {
+            var o = g.Key;
+            var n = g.Count();
+            if (o.ApicId is { } apic)
+                return Docteur.T("EM.Processeur", n, apic, o.Banque?.ToString(CultureInfo.InvariantCulture) ?? "?",
+                    g.Select(e => e.Source!.Statut).OfType<ulong>().Select(s => $"0x{s:X16}").FirstOrDefault() ?? "?");
+            var bits = g.Aggregate(0u, (acc, e) => acc | (e.Source!.StatutCorrigeable ?? 0));
+            var causes = BitsCorrigeables.Where(b => (bits & (1u << b.Bit)) != 0).Select(b => b.Nom).ToList();
+            return Docteur.T("EM.Pcie", n, $"{o.Bus:X2}:{o.Peripherique:X2}.{o.Fonction:X}",
+                o.Fabricant is { } v ? $"{v:X4}" : "?", o.Produit is { } p ? $"{p:X4}" : "?",
+                causes.Count > 0 ? string.Join(", ", causes) : Docteur.T("EM.CauseNonLue"))
+                + (bits == AvisNonFatal ? Docteur.T("EM.AvisSeul") : "");
+        });
+        yield return new RepairFinding("STABILITE", "origine des erreurs materielles", null, null, RepairStatus.Observed,
+            string.Join(" ", morceaux) + Docteur.T("EM.OrigineSuite"));
     }
 
     /// <summary>La gravité CPER, ou <c>null</c> si l'en-tête n'en est pas un.</summary>

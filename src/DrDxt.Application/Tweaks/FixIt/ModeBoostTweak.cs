@@ -44,6 +44,18 @@ public sealed class ModeBoostTweak : FixItTweakBase
     internal static uint? ARendre(ModeDeBoostLu lu) =>
         lu.Valeur == 0 && lu.Defaut is >= 1 and <= ModeDeBoostLu.MaxDocumente ? lu.Defaut : null;
 
+    // Banc profond : boost déjà au défaut du plan actif, l'exercice le coupe (0, l'état que le levier répare) le temps de
+    // l'exercice, puis rend la valeur d'origine exacte.
+    public override ExerciceProfond? PreparerExercice(HardwareInventory hw, SettingsState state)
+    {
+        if (hw.Chassis is not (ChassisType.Desktop or ChassisType.Laptop)
+            || state.ModeDeBoost is not { } lu || !Guid.TryParse(state.PowerPlanGuid, out var actif) || lu.Plan != actif
+            || lu.Valeur != lu.Defaut || ARendre(lu with { Valeur = 0 }) is null)
+            return null;
+        string Op(uint v) => PrivilegedOpCodec.Serialize(new SetProcessorBoostModeOp(lu.Plan, v)).Value!;
+        return new ExerciceProfond(Op(lu.Valeur), Op(0));
+    }
+
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
         try

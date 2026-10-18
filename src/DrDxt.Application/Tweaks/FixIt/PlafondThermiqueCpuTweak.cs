@@ -35,4 +35,11 @@ public sealed class PlafondThermiqueCpuTweak : LevierPl1TweakBase
     }
 
     protected override double? CibleDe(LimiteDePuissanceLue lu) => Cible(lu);
+
+    // Aucune température relevée en partie (et pas de plafond encore posé) : le freinage par la chaleur n'est pas lu. Seule
+    // la chaleur manque quand une partie freinée poserait un plafond (sondé au plus bas, 0 W) : un verrou, un registre
+    // « sans limite » ou une PL1 au-dessus de la PL2 l'excluent déjà, chaleur ou pas.
+    public override bool EtatNonLu(SettingsState state)
+        => base.EtatNonLu(state) || state.LimitePuissance is { ChaleurEnPartieMaxC: null, PlafondThermiqueW: null } lu
+            && Cible(lu with { PlafondThermiqueW = 0 }) is not null;
 }

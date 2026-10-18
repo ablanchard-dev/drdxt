@@ -48,7 +48,8 @@ public sealed class SondeDePiloteWmi : IGpuDriverProbe
         {
             using var requete = new ManagementObjectSearcher(
                 "SELECT DriverVersion, AdapterCompatibility, Name FROM Win32_VideoController");
-            foreach (var ligne in requete.Get())
+            using var rangees = requete.Get();
+            foreach (var ligne in rangees)
             {
                 using (ligne)
                 {

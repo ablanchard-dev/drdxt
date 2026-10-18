@@ -10,12 +10,10 @@ namespace DrDxt.ElevatedHelper.Execution.Adlx;
 // silence : une op IPC brute (une future version de l'App qui branche les coutures de réglage, ou
 // un appelant compromis) ne peut jamais pousser une valeur hors règle sur le vrai matériel.
 //
-// Pourquoi seule la plage de limite de puissance vit ici : une limite de puissance est un %
-// absolu, une plage fixe [60,100] a donc du sens dans le helper et reprend GpuSafeBounds. L'op
-// d'undervolt, elle, porte une MaxFreq absolue (MHz) : la plage prudente en décalage [-200,+100]
-// n'a pas de sens sur une valeur absolue ; elle reste dans la couche App (GpuSafeBounds) et le
-// helper valide plutôt la cible absolue contre la plage matérielle annoncée par le pilote (voir
-// ADLXTuningActions.SetUndervolt).
+// Une limite de puissance est un % absolu : la plage fixe [60,100] s'applique telle quelle. L'op
+// d'undervolt porte une MaxFreq absolue (MHz) : la plage prudente en décalage [-200,+100] s'applique
+// autour de la MaxFreq que le helper a lue à son premier passage depuis le démarrage (voir
+// ADLXTuningActions.SetUndervolt), en plus de la plage matérielle annoncée par le pilote.
 //
 // GpuSafeBounds (DrDxt.Application) est la source unique de la plage en %. Le helper ne dépend
 // que de DrDxt.Core (+ la feuille DrDxt.GpuNative) et ne peut pas référencer DrDxt.Application :
@@ -29,6 +27,11 @@ internal static class AdlxTuningMath
     // de puissance absolue : ne jamais affamer le GPU sous le plancher).
     internal const int MinPowerLimitPct = 60;
     internal const int MaxPowerLimitPct = 100;
+
+    // Reprise de GpuSafeBounds.MinCoreOffsetMhz / MaxCoreOffsetMhz : la MaxFreq absolue de l'op ne s'écarte pas de plus que
+    // cette bande de la MaxFreq que le helper a lue à son premier passage depuis le démarrage (ADLXTuningActions.SetUndervolt).
+    internal const int MinCoreOffsetMhz = -200;
+    internal const int MaxCoreOffsetMhz = 100;
 
     /// <summary>Vrai si un pourcentage absolu de limite de puissance est dans la plage de règle
     /// [<see cref="MinPowerLimitPct"/>, <see cref="MaxPowerLimitPct"/>].</summary>

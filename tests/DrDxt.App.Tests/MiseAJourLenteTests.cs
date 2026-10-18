@@ -10,8 +10,8 @@ using NSec.Cryptography;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>La borne de démarrage tient le manifeste, pas le téléchargement de l'installeur : à 15 s, un
-/// installeur de 49 Mo demandait 26 Mbit/s, et une connexion plus lente ne recevait jamais la mise à jour.</summary>
+/// <summary>Le démarrage ne lit que le manifeste signé : l'installeur (49 Mo) ne se télécharge qu'au clic, sous sa propre
+/// borne. Sous la borne de démarrage, il demandait 26 Mbit/s, et chaque lancement le retéléchargeait sans qu'on l'ait demandé.</summary>
 public sealed class MiseAJourLenteTests : IDisposable
 {
     private readonly string _racine = Path.Combine(Path.GetTempPath(), $"drdxt-maj-lente-{Guid.NewGuid():N}");
@@ -23,6 +23,8 @@ public sealed class MiseAJourLenteTests : IDisposable
 
     private sealed class ServeurLent(byte[] installeur, TimeSpan attenteInstalleur) : HttpMessageHandler
     {
+        public int Installeurs { get; private set; }
+
         private static readonly System.Text.Json.JsonSerializerOptions Json = new(System.Text.Json.JsonSerializerDefaults.Web)
         {
             Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
@@ -33,6 +35,7 @@ public sealed class MiseAJourLenteTests : IDisposable
             var url = request.RequestUri!.ToString();
             if (url.EndsWith("/setup.exe", StringComparison.Ordinal))
             {
+                Installeurs++;
                 await Task.Delay(attenteInstalleur, ct);
                 return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(installeur) };
             }
@@ -51,17 +54,45 @@ public sealed class MiseAJourLenteTests : IDisposable
     }
 
     [Fact]
-    public async Task Un_installeur_plus_long_a_telecharger_que_la_borne_arrive_quand_meme()
+    public async Task Le_demarrage_annonce_la_version_et_l_installeur_ne_part_qu_au_clic()
     {
         Directory.CreateDirectory(_racine);
-        // Borne large : elle couvre aussi le montage (clés, crypto, dossiers), mesuré jusqu'à 7,7 s sur une CI chargée.
-        // L'installeur reste plus lent qu'elle, c'est ce que le test prouve.
-        using var client = new HttpClient(new ServeurLent(new byte[4096], TimeSpan.FromSeconds(12)));
+        var serveur = new ServeurLent(new byte[4096], TimeSpan.Zero);
+        using var client = new HttpClient(serveur);
 
+        // Borne large : elle couvre aussi le montage (clés, crypto, dossiers), mesuré jusqu'à 7,7 s sur une CI chargée.
         var r = await VerificationMiseAJour.VerifierAsync(
             () => UpdateComposition.TryCreate("https://u.test", client, _racine, _racine, "1.0.0", UpdateDevKeys.CreateUpdateVerifier().Value!),
             TimeSpan.FromSeconds(10), CancellationToken.None);
 
-        r.Etat.Should().Be(EtatMiseAJour.NouvelleVersionVerifiee, "le manifeste a répondu à temps ; seul l'installeur est lent");
+        r.Etat.Should().Be(EtatMiseAJour.NouvelleVersionVerifiee);
+        r.Installable.Should().BeTrue();
+        serveur.Installeurs.Should().Be(0, "sans clic, rien que le manifeste");
+
+        var chemin = await r.Telecharger!(CancellationToken.None);
+        chemin.IsOk.Should().BeTrue();
+        File.Exists(chemin.Value).Should().BeTrue();
+        serveur.Installeurs.Should().Be(1);
+    }
+
+    // Le chemin de l'App : la vérification du démarrage finie, le clic arrive plus tard, sur le client qu'elle a monté.
+    // Libéré à la fin de la vérification (using), ce client faisait échouer le clic par une ObjectDisposedException.
+    [Fact]
+    public async Task Le_clic_Installer_plus_tard_telecharge_par_le_client_du_demarrage()
+    {
+        Directory.CreateDirectory(_racine);
+        var serveur = new ServeurLent(new byte[4096], TimeSpan.Zero);
+
+        var (r, client) = await VerificationMiseAJour.VerifierAuDemarrageAsync(
+            c => UpdateComposition.TryCreate("https://u.test", c, _racine, _racine, "1.0.0", UpdateDevKeys.CreateUpdateVerifier().Value!),
+            serveur);
+        using var _ = client;
+        r.Installable.Should().BeTrue();
+        await Task.Yield();
+
+        var chemin = await r.Telecharger!(CancellationToken.None);
+
+        chemin.IsOk.Should().BeTrue(chemin.Error?.Message);
+        serveur.Installeurs.Should().Be(1);
     }
 }

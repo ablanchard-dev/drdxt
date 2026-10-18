@@ -1,4 +1,3 @@
-using static DrDxt.Core.TexteFrancais;
 using DrDxt.Core;
 
 namespace DrDxt.Detection.Latency;

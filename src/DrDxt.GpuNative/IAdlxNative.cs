@@ -178,6 +178,10 @@ public interface IAdlxNative
     /// raison ; ne lève jamais. Par défaut (doublures qui ne la portent pas) : refusé.</summary>
     string? EcrireAntiLag(bool actif) => "This seam does not write Anti-Lag.";
 
+    /// <summary>Remet tout le réglage de la carte à l'usine (IADLXGPUTuningServices.ResetToFactory) : fréquence, tension,
+    /// mémoire, ventilateur et puissance. Rend null si fait, sinon la raison.</summary>
+    string? RemettreReglageUsine(int gpuIndex) => "This seam does not reset GPU tuning.";
+
     /// <summary>Pose FRTC sur la carte dédiée. <paramref name="code"/> &gt; 0 = allumé à cette cible ;
     /// &lt; 0 = éteint, cible rendue à <c>-code</c> ; 0 refusé. La cible doit tenir dans GetFPSRange. Rend <c>null</c>
     /// si écrit, sinon la raison ; ne lève jamais.</summary>

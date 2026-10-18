@@ -22,16 +22,21 @@ public sealed class PreuvesEnAttente(string chemin)
 
     public PreuveEnAttente? Charger()
     {
-        try { return File.Exists(chemin) ? System.Text.Json.JsonSerializer.Deserialize<PreuveEnAttente>(File.ReadAllText(chemin)) : null; }
+        // Même garde que les réglages retenus : un retrait raté rejoue cette annulation par le helper élevé.
+        try
+        {
+            return File.Exists(chemin) && System.Text.Json.JsonSerializer.Deserialize<PreuveEnAttente>(File.ReadAllText(chemin)) is { } p
+                   && DrDxt.Application.Autopilot.RevertAuDemarrage.AnnulationSure(p.TweakId, p.OriginalValueJson) ? p : null;
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { return null; }
     }
 
     public void Garder(PreuveEnAttente p)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(chemin)!);
-        var tmp = chemin + ".tmp";
-        File.WriteAllText(tmp, System.Text.Json.JsonSerializer.Serialize(p));
-        File.Move(tmp, chemin, overwrite: true);
+        // Rejoué par le helper élevé : écrit au temporaire aléatoire, jamais par-dessus un lien posé d'avance. Un échec lève,
+        // comme avant : l'appelant ne ferme pas la portée de pose, et le helper garde l'origine.
+        var ecrit = new FichierJsonAtomique(chemin, ErrorCodes.IoFailure).WriteAtomic(System.Text.Json.JsonSerializer.Serialize(p));
+        if (!ecrit.IsOk) throw new IOException(ecrit.Error!.Value.Message);
     }
 
     public void Effacer()
@@ -50,15 +55,19 @@ public sealed class ReglagesRetenus(string chemin)
 
     public ReglageRetenu? Charger()
     {
-        try { return File.Exists(chemin) ? System.Text.Json.JsonSerializer.Deserialize<ReglageRetenu>(File.ReadAllText(chemin)) : null; }
+        // Fichier du compte, rejoue par le helper eleve au retrait : seule l'annulation de son levier est rendue.
+        try
+        {
+            return File.Exists(chemin) && System.Text.Json.JsonSerializer.Deserialize<ReglageRetenu>(File.ReadAllText(chemin)) is { } r
+                   && DrDxt.Application.Autopilot.RevertAuDemarrage.AnnulationSure(r.TweakId, r.OriginalValueJson) ? r : null;
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { return null; }
     }
 
     public void Garder(ReglageRetenu r)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(chemin)!);
-        File.WriteAllText(chemin + ".tmp", System.Text.Json.JsonSerializer.Serialize(r));
-        File.Move(chemin + ".tmp", chemin, overwrite: true);
+        var ecrit = new FichierJsonAtomique(chemin, ErrorCodes.IoFailure).WriteAtomic(System.Text.Json.JsonSerializer.Serialize(r));
+        if (!ecrit.IsOk) throw new IOException(ecrit.Error!.Value.Message);
     }
 
     public void Effacer()
@@ -104,9 +113,12 @@ public static class PreuveDuRepos
     {
         var avant = await LireAsync(sonde, echantillons, attendre).ConfigureAwait(false);
         if (avant.Count == 0) return false;
+        // Rien ne garde encore l'origine : le helper la garde jusqu'à ce que la preuve en attente la porte.
+        using var portee = PorteeDePose.Ouvrir();
         var ecrit = await levier.ApplyAsync().ConfigureAwait(false);
         if (!ecrit.IsOk || ecrit.Value is null) return false;
         attente.Garder(new PreuveEnAttente(ecrit.Value.TweakId, ecrit.Value.OriginalValueJson, ecrit.Value.AppliedValueJson, avant));
+        await portee.FermerAsync().ConfigureAwait(false);
         return true;
     }
 

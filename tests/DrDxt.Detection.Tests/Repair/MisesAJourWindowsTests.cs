@@ -29,4 +29,17 @@ public sealed class MisesAJourWindowsTests
         faits.Where(f => !(f.Libelle.StartsWith("Windows Update : ") && MisesAJourWindows.Garder(f.Libelle))).Should().BeEmpty();
         faits.Where(f => f.Quand > DateTimeOffset.Now).Should().BeEmpty();
     }
+
+    // Le radar des régressions compare des numéros KB : ceux des titres d'installation, une fois chacun.
+    [Fact]
+    public void Les_numeros_KB_se_lisent_dans_les_titres_sans_doublon()
+    {
+        var t = DateTimeOffset.UnixEpoch;
+        MisesAJourWindows.NumerosKb([
+            new FaitDate(t, "Windows Update : 2025-08 Cumulative Update for Windows 11 Version 24H2 (KB5063878)"),
+            new FaitDate(t, "Windows Update : 2025-08 Cumulative Update for Windows 11 Version 24H2 (KB5063878)"),
+            new FaitDate(t, "Windows Update : Mise à jour de la pile de maintenance KB5065381"),
+            new FaitDate(t, "Windows Update : Realtek - Net - 10.68.815.2023"),
+        ]).Should().Equal("KB5063878", "KB5065381");
+    }
 }

@@ -70,28 +70,61 @@ public sealed class VentilateurExpert(IElevatedClient elevated, IRevertEnAttente
 }
 
 /// <summary>Une vitesse fixe gardée pour la session. Rendre remet l'automatique (relu par le helper) ; libérer sans
-/// rendre laisse le bail expirer, et le helper rend l'automatique de lui-même.</summary>
-public sealed class EssaiVentilateur(IElevatedClient elevated, IRevertEnAttente journal, RestoreGpuFanAutoOp retour, HeartbeatSender bail)
-    : IEssaiCarte
+/// rendre laisse le bail expirer, et le helper rend l'automatique de lui-même. Si le helper meurt, sa garde à 80 °C meurt
+/// avec lui : au premier battement qui ne l'atteint plus, l'automatique est demandé tout de suite (le helper est relancé
+/// pour cela), et le journal n'est levé qu'une fois le retour relu.</summary>
+public sealed class EssaiVentilateur : IEssaiCarte
 {
-    private readonly bool _journalSuitLeBail = SuiviDuBail.LeverAuBailPerdu(bail, journal);
+    private readonly IElevatedClient _elevated;
+    private readonly IRevertEnAttente _journal;
+    private readonly RestoreGpuFanAutoOp _retour;
+    private readonly HeartbeatSender _bail;
 
-    public event Action? BailPerdu
+    public EssaiVentilateur(IElevatedClient elevated, IRevertEnAttente journal, RestoreGpuFanAutoOp retour, HeartbeatSender bail)
     {
-        add => bail.Perdu += value;
-        remove => bail.Perdu -= value;
+        (_elevated, _journal, _retour, _bail) = (elevated, journal, retour, bail);
+        SuiviDuBail.LeverAuBailPerdu(bail, journal);
+        bail.Perdu += () => BailPerdu?.Invoke();
+        bail.Injoignable += () => RenduApresPerte = RendreSansHelperAsync();
+    }
+
+    /// <summary>Le retour à l'automatique lancé quand le helper ne répondait plus, ou null.</summary>
+    public Task? RenduApresPerte { get; private set; }
+
+    public event Action? BailPerdu;
+
+    /// <summary>Le retour à l'automatique n'a pas pu se faire (invite Windows refusée, helper injoignable) : la vitesse fixe
+    /// est restée, sans garde. L'échec du retour, que l'écran dit par sa raison lisible (jamais le message du helper) ; aucune
+    /// nouvelle invite ne suit.</summary>
+    public event Action<Result>? ResteFixe;
+
+    private async Task RendreSansHelperAsync()
+    {
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
+        Result rendu;
+        try { rendu = await _elevated.ExecuteAsync(_retour, CancellationToken.None).ConfigureAwait(false); }
+        catch (Exception ex) { rendu = Result.Fail(ErrorCodes.HelperUnreachable, ex.Message); }
+        // Une seule tentative, la seule à pouvoir ouvrir une invite. Refusée : le journal reste (le prochain lancement de l'App
+        // rend l'automatique) et l'écran le dit.
+        if (!rendu.IsOk) { ResteFixe?.Invoke(rendu); return; }
+        _journal.Lever();
+        await _bail.DisposeAsync().ConfigureAwait(false);
+        BailPerdu?.Invoke();
     }
 
     public async Task<Result> RendreAsync()
     {
-        var rendu = await elevated.ExecuteAsync(retour, CancellationToken.None).ConfigureAwait(false);
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
+        var rendu = await _elevated.ExecuteAsync(_retour, CancellationToken.None).ConfigureAwait(false);
         if (rendu.IsOk)
         {
-            journal.Lever();
-            await bail.LibererAsync().ConfigureAwait(false);
+            _journal.Lever();
+            await _bail.LibererAsync().ConfigureAwait(false);
         }
         return rendu;
     }
 
-    public ValueTask DisposeAsync() => bail.DisposeAsync();
+    public ValueTask DisposeAsync() => _bail.DisposeAsync();
 }

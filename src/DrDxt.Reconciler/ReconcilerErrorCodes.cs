@@ -34,9 +34,4 @@ public static class ReconcilerErrorCodes
     // Une sonde de lecture a échoué pendant la classification de dérive → échec propre, aucune
     // supposition, aucune écriture.
     public const string ProbeFailed = "RECONCILE_PROBE_FAILED";
-
-    // Désinstallation propre : la boucle a été arrêtée, le bail désarmé et l'hôte retiré, mais une
-    // ou plusieurs écritures « retour à l'origine » ont échoué (ou n'ont pas été confirmées).
-    // Regroupé et rapporté, jamais une installation orpheline qui réconcilie encore.
-    public const string UninstallRevertPartial = "UNINSTALL_REVERT_PARTIAL";
 }

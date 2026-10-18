@@ -19,6 +19,15 @@ public sealed class ReleveDesPartiesEcranTests
         ligne.Should().Contain("Call of Duty").And.Contain("128").And.Contain("94").And.Contain("Parties.Goulot.Processeur");
     }
 
+    [Fact]
+    public void La_frise_dit_la_latence_pc_et_la_part_composee_seulement_quand_elles_sont_lues()
+    {
+        var p = new PartieRelevee("cod.exe", DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch.AddMinutes(30), 7, 128, 94, BottleneckState.CpuBoundOrAppBound);
+        ScanViewModel.ResumeCourt(p, k => k).Should().NotContain("Parties.LatencePc").And.NotContain("Parties.Composees");
+        ScanViewModel.ResumeCourt(p with { LatencePcMedianMs = 21, PartComposeeMediane = 0.4, HorsCarteMoMax = 900 }, k => k)
+            .Should().Contain("Parties.LatencePc").And.Contain("Parties.Composees").And.Contain("Parties.HorsCarte");
+    }
+
     // Le processeur pendant la partie, et la phrase quand il ralentit sous ce que le banc tient.
     [Fact]
     public void La_ligne_dit_le_processeur_en_partie_et_s_il_ralentit()
@@ -83,7 +92,7 @@ public sealed class ReleveDesPartiesEcranTests
         string L(string k) => k switch
         {
             "Changement.Tableau.SansAvant" => "jamais", "Changement.Tableau.PeuAvant" => "jamais {0}/{1}",
-            "Changement.Tableau.Attend" => "attend {0} partie(s)", _ => k,
+            "Changement.Tableau.Attend" => "attend {0} partie(s)", "Format.Jour" => "dd/MM", _ => k,
         };
         (Changement, BilanDuChangement)[] tous = [(new Changement(t, "la carte"), sansAvant), (new Changement(t, "le jeu"), peuAvant),
             (new Changement(t.AddHours(-4), "le BIOS"), attend), (new Changement(t.AddDays(-1), "HAGS"), juge)];
@@ -94,6 +103,44 @@ public sealed class ReleveDesPartiesEcranTests
             new LigneEnAttente("le jeu", "04/10", "jamais 1/3"),
             new LigneEnAttente("le BIOS", "04/10", "attend 2 parties"));
     }
+
+    // La mesure qui juge se dit : la latence pour un levier de latence qui la porte, sinon les 1 % bas, et c'est dit aussi.
+    [Fact]
+    public void Un_changement_de_latence_dit_sur_quelle_mesure_il_est_juge()
+    {
+        var hags = new Changement(new DateTimeOffset(2026, 10, 4, 4, 30, 0, TimeSpan.Zero), "HAGS", Cle: "windows.hags:on");
+        string L(string k) => k switch
+        {
+            "Changement.JugeLatence" => "{0}|{2}|{4}>{5} ms|{6}/{7}",
+            "Changement.Juge" => "{0}|{2}|{4}>{5}",
+            _ => k,
+        };
+
+        ScanViewModel.LigneChangement(hags, new BilanDuChangement(VerdictEnJeu.Mieux, "cod.exe", 3, 3, 95, 81, 120, 118,
+                SurLaLatence: true, LatenceAvant: 30, LatenceApres: 20), L)
+            .Should().Be("HAGS|Changement.Mieux|30>20 ms|3/3");
+        ScanViewModel.LigneChangement(hags, new BilanDuChangement(VerdictEnJeu.Pire, "cod.exe", 3, 3, 95, 81, 120, 118), L)
+            .Should().Be("HAGS|Changement.Pire|95>81 Changement.JugeSurLesImages");
+    }
+
+    // Avant et après mesurés de deux façons : le joueur lit « pas comparable », jamais « pas de différence ».
+    [Fact]
+    public void Un_changement_pas_comparable_le_dit()
+    {
+        var c = new Changement(new DateTimeOffset(2026, 10, 4, 4, 30, 0, TimeSpan.Zero), "le BIOS");
+
+        ScanViewModel.LigneChangement(c, new BilanDuChangement(VerdictEnJeu.PasComparable, "cod.exe", 3, 3, null, null, null, null),
+                k => k == "Changement.PasComparable" ? "{0}|{1}|{2}" : k == "Format.Jour" ? "dd/MM" : k)
+            .Should().Be("le BIOS|04/10|3");
+    }
+
+    // « Pas comparable » vient de l'avant OU de l'après (MemeEstimateur) : la phrase ne désigne pas un côté.
+    [Theory]
+    [InlineData("fr-FR", "d'avant")]
+    [InlineData("en-US", "before")]
+    public void Pas_comparable_n_accuse_pas_un_cote(string langue, string cote)
+        => new DrDxt.Infrastructure.Localization.ResxLocalizer().Get("Changement.PasComparable", System.Globalization.CultureInfo.GetCultureInfo(langue))
+            .Should().NotContain(cote);
 
     // Un changement daté se dit jugé, avec ses médianes, ou avec ce qui manque pour le juger.
     [Fact]
@@ -164,7 +211,7 @@ public sealed class ReleveDesPartiesEcranTests
 
     // Les overlays ouverts sur la ligne de la partie, et leur coût seulement quand il est mesuré.
     [Fact]
-    public void Les_overlays_se_lisent_sur_la_partie_et_leur_cout_n_apparait_qu_avec_deux_parties_de_chaque_cote()
+    public void Les_overlays_se_lisent_sur_la_partie_et_leur_cout_n_apparait_qu_avec_trois_parties_de_chaque_cote()
     {
         PartieRelevee P(double fps, params string[] o) => new("cod.exe", DateTimeOffset.Now, DateTimeOffset.Now, 3, fps, fps * 0.6,
             BottleneckState.CpuBoundOrAppBound, Overlays: o);
@@ -178,9 +225,9 @@ public sealed class ReleveDesPartiesEcranTests
 
         ScanViewModel.LignePartie(P(140, "Steam"), L).Should().Contain("overlays Steam");
         ScanViewModel.LignePartie(P(140), L).Should().NotContain("overlays");
-        ScanViewModel.LignesOverlays([P(140, "Steam"), P(150, "Steam"), P(170)], L).Should().Equal("attente Steam Call of Duty 2 2");
-        ScanViewModel.LignesOverlays([P(140, "Steam"), P(150, "Steam"), P(170), P(160)], L)
-            .Should().Equal($"ecart Steam Call of Duty {145} {165} 2 2 Parties.OverlayEcart.Pire");
+        ScanViewModel.LignesOverlays([P(140, "Steam"), P(150, "Steam"), P(170)], L).Should().Equal("attente Steam Call of Duty 2 3");
+        ScanViewModel.LignesOverlays([P(140, "Steam"), P(150, "Steam"), P(145, "Steam"), P(170), P(160), P(165)], L)
+            .Should().Equal($"ecart Steam Call of Duty {145} {165} 3 3 Parties.OverlayEcart.Pire");
         ScanViewModel.LignesOverlays([P(140), P(150)], L).Should().BeEmpty("aucun overlay vu, rien à dire");
     }
 }

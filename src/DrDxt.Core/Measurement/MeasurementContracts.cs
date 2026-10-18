@@ -174,7 +174,14 @@ public record BenchmarkResult(
     double P01LowMarginOfError = double.PositiveInfinity,
     /// <summary>Médiane de la latence d'affichage de PresentMon (début de l'image → écran), en ms ;
     /// null quand la série n'a pas été livrée. Le chiffre sur lequel l'essai en alternance juge un levier de latence.</summary>
-    double? DisplayLatencyMsMedian = null)
+    double? DisplayLatencyMsMedian = null,
+    /// <summary>Latence PC de PresentMon (entrée → écran), médiane et p95, en ms ; null quand le jeu ne pose pas les
+    /// marqueurs de latence ou que la série n'a pas été livrée.</summary>
+    double? PcLatencyMsMedian = null,
+    double? PcLatencyMsP95 = null,
+    /// <summary>La part des images recopiées par le compositeur de Windows (0-1), sur celles dont le mode est connu ;
+    /// null = aucun mode connu.</summary>
+    double? PartImagesComposees = null)
 {
     /// <summary>GPU-busy en % du temps de trame : le signal CPU-bound (≪ 100) contre GPU-bound (≈ 100).
     /// Null si le GPU busy n'est pas mesuré ou si la cadence est inconnue, jamais un 0 inventé.

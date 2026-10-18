@@ -61,18 +61,14 @@ public sealed class Win32FirmwareBootActions : IFirmwareBootActions
                 RedirectStandardError = true,
             };
 
-            using var p = Process.Start(psi);
-            if (p is null)
+            var r = ProcessusBorne.Executer(psi, CallTimeout);
+            if (!r.Lance)
                 return Result.Fail(ErrorCodes.HelperOpFailed, "shutdown.exe could not be started.");
-
-            if (!p.WaitForExit((int)CallTimeout.TotalMilliseconds))
-            {
-                try { p.Kill(entireProcessTree: true); } catch { /* already gone */ }
+            if (!r.Fini)
                 return Result.Fail(ErrorCodes.HelperOpFailed, "shutdown.exe did not return in time.");
-            }
 
             // Une sortie en échec est dite, jamais avalée en succès silencieux.
-            if (!(aboutie ?? (c => c == 0))(p.ExitCode))
+            if (!(aboutie ?? (c => c == 0))(r.Code))
                 return Result.Fail(ErrorCodes.HelperOpFailed, failureMessage);
 
             return Result.Ok();

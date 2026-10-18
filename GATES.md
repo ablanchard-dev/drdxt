@@ -23,9 +23,9 @@ reçu là où les tests le rejouent, après avoir refusé tout ce qui identifie 
 |---|---|---|
 | 09/10 | **Aucune Radeon n'a de rapport de validation en écriture.** Les RX 6000, 7000 et 9000 sont reconnues, lues, et rejouées en tests sur toute la gamme ; leurs réglages se posent sous garde, mais aucun n'a été vu écrit, relu et rendu sur une vraie carte. | un rapport « Vérifier DrDXT » d'une vraie Radeon |
 | 09/10 | **Anti-Lag et FreeSync ne s'ouvrent que sur une lecture ADLX réelle.** Les tests couvrent la décision, pas la lecture d'une vraie carte. | le même rapport, ou un export de machine AMD |
-| 09/10 | **Les cartes NVIDIA hors RTX 40 n'ont pas de rapport de validation.** Seule une RTX 40 a le sien. | un rapport d'une RTX 20, 30 ou 50 |
+| 09/10 | **Les cartes NVIDIA hors RTX 40 n'ont pas de rapport de validation.** Seule une RTX 40 a le sien : une RTX 4060. Toute la série RTX 40, de la 4050 à la 4090, est dite validée sur ce seul rapport ; les RTX 20 et 30 et les GTX 10 et 16 restent en lecture seule. | un rapport d'une RTX 20, 30 ou 50, ou d'une autre RTX 40 |
 | 09/10 | **Aucun gain en jeu n'est encore prouvé.** Le juge compare des parties en alternance (réglage posé, puis rendu) ; il n'a pas encore assez de parties pour trancher au-dessus du bruit. | des parties normales jouées avec le relevé de fond |
 | 09/10 | **Les binaires ne sont pas signés.** Windows SmartScreen prévient à l'installation. | la signature par SignPath Foundation (projet open source) |
-| 09/10 | **La mise à jour n'a pas encore de clé de production.** Le moteur (manifeste Ed25519) est en place et testé. | la première version publiée |
 | 09/10 | **Les guides BIOS ne sont vérifiés sur aucune carte mère.** Ils restent des guides (le joueur fait le geste), jamais une écriture. | des retours de joueurs, carte par carte |
 | 09/10 | **Intel Arc : rien ne se règle.** La lecture IGCL attend une vraie carte pour être prouvée. | un export de machine Intel Arc |
+| 17/10 | **La couverture ne décrit pas encore deux gestes.** La surcouche DLSS et la recherche de sous-tension du processeur existent, mais n'ont pas de règle dans `CouvertureDesLeviers` : `docs/COUVERTURE.md` ne dit pas sur quel matériel elles s'ouvrent. | une règle de couverture pour chacune, puis la régénération du document |

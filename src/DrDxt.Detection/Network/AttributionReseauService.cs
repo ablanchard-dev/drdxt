@@ -1,5 +1,4 @@
 ﻿using DrDxt.Core;
-using static DrDxt.Core.TexteFrancais;
 using DrDxt.Measurement.Network;
 
 namespace DrDxt.Detection.Network;
@@ -48,7 +47,9 @@ public sealed class AttributionReseauService
     /// <summary>La phrase a afficher, ou <c>null</c> quand rien n'a pu etre attribue.</summary>
     public async Task<string?> LigneAsync(CancellationToken ct = default)
     {
-        var passerelle = Passerelle();
+        // La passerelle se lit par WMI (centaines de millisecondes) : hors du fil appelant, qui est celui de l'écran
+        // quand le scan l'appelle.
+        var passerelle = await Task.Run(Passerelle, ct).ConfigureAwait(false);
         if (passerelle is null) return null;
 
         var premier = await Comparer(passerelle, ct).ConfigureAwait(false);

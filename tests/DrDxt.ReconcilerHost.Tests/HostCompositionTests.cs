@@ -19,6 +19,8 @@ public sealed class HostCompositionTests
     private static ServiceProvider BuildProvider()
     {
         var services = new ServiceCollection();
+        // Le vrai journal réparerait %ProgramData%\DrDxt : jamais depuis un test.
+        services.AddSingleton(new JournalDuService(null));
         services.AddDrDxtReconcilerHost();
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = false });
     }
@@ -140,7 +142,14 @@ public sealed class HostCompositionTests
         // Une seconde tache de fond, la protection du ping portee par le service.
         var hosted = sp.GetServices<IHostedService>().Select(h => h.GetType()).ToList();
         // Une troisième, le tube de l'état du processeur, en lecture seule.
-        hosted.Should().BeEquivalentTo(new[] { typeof(Worker), typeof(ProtectionDuPingWorker), typeof(ServeurDuProcesseur) });
+        hosted.Should().BeEquivalentTo(new[] { typeof(RejeuAuDemarrage), typeof(Worker), typeof(ProtectionDuPingWorker),
+            typeof(ServeurDuProcesseur), typeof(TemoinDIncidentWorker) });
+        // Le rejeu démarre avant la première réconciliation.
+        hosted.IndexOf(typeof(RejeuAuDemarrage)).Should().BeLessThan(hosted.IndexOf(typeof(Worker)));
+        // Et le Worker attend sa fin avant la première passe, même quand il attend la fin d'une partie.
+        var worker = sp.GetServices<IHostedService>().OfType<Worker>().Single();
+        typeof(Worker).GetField("_finDuRejeu", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .GetValue(worker).Should().NotBeNull();
     }
 
     [Fact]

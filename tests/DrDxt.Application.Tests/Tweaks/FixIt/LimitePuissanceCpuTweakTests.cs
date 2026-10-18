@@ -28,9 +28,10 @@ public sealed class LimitePuissanceCpuTweakTests
         new[] { new MemoryModule("PN", "Kingston", 3200, 3200) },
         new MotherboardInfo("MSI", "B760"), new BiosInfo("1.0", null, true), chassis);
 
+    // Le lecteur rend des parties relevées sous le seuil (80 °C) : sans température de partie, la montée n'est jamais proposée.
     private LimitePuissanceCpuTweak Build(ulong registre = Registre65W, ulong info = Info65W, double? mmio = 0)
     {
-        var lu = RegistreDeLimiteCpu.Decoder(Unite, registre, info)! with { CopieMmioPl1W = mmio };
+        var lu = RegistreDeLimiteCpu.Decoder(Unite, registre, info)! with { CopieMmioPl1W = mmio, ChaleurEnPartieMaxC = 80 };
         _lecteur.LireRegistres().Returns(Result<LectureLimiteCpu>.Ok(new LectureLimiteCpu(new RegistresCpuLus(Unite, registre, info), lu)));
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
         return new LimitePuissanceCpuTweak(_lecteur, _elevated);
@@ -38,7 +39,7 @@ public sealed class LimitePuissanceCpuTweakTests
 
     [Fact]
     public void Un_Intel_de_bureau_tenu_a_65_W_sous_une_PL2_de_219_W_est_propose() =>
-        Build().AppliesTo(Hw(ChassisType.Desktop), Etat(new LimiteDePuissanceLue(65, 219, 65, false))).Should().BeTrue();
+        Build().AppliesTo(Hw(ChassisType.Desktop), Etat(new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 80))).Should().BeTrue();
 
     [Theory]
     [InlineData(ChassisType.Laptop)]
@@ -51,6 +52,18 @@ public sealed class LimitePuissanceCpuTweakTests
         Build().AppliesTo(Hw(ChassisType.Desktop, "AuthenticAMD"), Etat(new LimiteDePuissanceLue(65, 219, 65, false))).Should().BeFalse();
 
     // Un processeur qui touche déjà 95 °C en partie ne se voit pas monter sa PL1, quelle que soit la PL2.
+    // Aucune température relevée en partie : « inconnu » n'est pas « pas chaud ». La montée était proposée sur un processeur
+    // qui touchait peut-être déjà 100 °C (le cas réel de la machine de référence) ; elle ne l'est plus, et c'est dit « non lu ».
+    [Fact]
+    public void Sans_temperature_relevee_en_partie_la_montee_n_est_jamais_proposee()
+    {
+        var sansPartie = new LimiteDePuissanceLue(65, 219, 65, false);
+
+        Build().AppliesTo(Hw(ChassisType.Desktop), Etat(sansPartie)).Should().BeFalse();
+        Build().EtatNonLu(Etat(sansPartie)).Should().BeTrue();
+        Build().AppliesTo(Hw(ChassisType.Desktop), Etat(sansPartie with { ChaleurEnPartieMaxC = 80 })).Should().BeTrue("parties lues, sous le seuil");
+    }
+
     [Fact]
     public void Un_processeur_qui_se_freine_en_partie_n_est_pas_monte()
     {
@@ -65,7 +78,7 @@ public sealed class LimitePuissanceCpuTweakTests
     [Fact]
     public void Jamais_plus_de_puissance_sur_un_microcode_d_avant_le_correctif_Vmin()
     {
-        var lu = new LimiteDePuissanceLue(65, 219, 65, false);
+        var lu = new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 80);
         Build().AppliesTo(Hw(ChassisType.Desktop), Etat(lu with { MicrocodeVminPerime = true })).Should().BeFalse();
         Build().AppliesTo(Hw(ChassisType.Desktop), Etat(lu)).Should().BeTrue();
         LimitePuissanceCpuTweak.Cible(lu with { MicrocodeVminPerime = true }).Should().BeNull();
@@ -87,16 +100,16 @@ public sealed class LimitePuissanceCpuTweakTests
     {
         Build().AppliesTo(Hw(ChassisType.Desktop), Etat(null)).Should().BeFalse();
         Build().EtatNonLu(Etat(null)).Should().BeTrue();
-        Build().EtatNonLu(Etat(new LimiteDePuissanceLue(65, 219, 65, false))).Should().BeFalse();
+        Build().EtatNonLu(Etat(new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 80))).Should().BeFalse();
     }
 
     [Fact]
     public void La_cible_est_la_PL2_de_la_carte_bornee_par_le_maximum_publie_et_la_copie_MMIO_active()
     {
-        LimitePuissanceCpuTweak.Cible(new LimiteDePuissanceLue(65, 219, 65, false)).Should().Be(219);
-        LimitePuissanceCpuTweak.Cible(new LimiteDePuissanceLue(65, 219, 65, false, MaximaleW: 154)).Should().Be(154, "le processeur publie son maximum");
-        LimitePuissanceCpuTweak.Cible(new LimiteDePuissanceLue(65, 219, 65, false, CopieMmioPl1W: 125)).Should().Be(125, "la carte tient 125 W par sa copie MMIO");
-        LimitePuissanceCpuTweak.Cible(new LimiteDePuissanceLue(65, 219, 65, false, CopieMmioPl1W: 0)).Should().Be(219, "copie inactive : elle ne borne rien");
+        LimitePuissanceCpuTweak.Cible(new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 80)).Should().Be(219);
+        LimitePuissanceCpuTweak.Cible(new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 80, MaximaleW: 154)).Should().Be(154, "le processeur publie son maximum");
+        LimitePuissanceCpuTweak.Cible(new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 80, CopieMmioPl1W: 125)).Should().Be(125, "la carte tient 125 W par sa copie MMIO");
+        LimitePuissanceCpuTweak.Cible(new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 80, CopieMmioPl1W: 0)).Should().Be(219, "copie inactive : elle ne borne rien");
     }
 
     [Theory]
@@ -156,5 +169,17 @@ public sealed class LimitePuissanceCpuTweakTests
         d!.Kind.Should().Be(CandidateKind.AutoHot);
         d.Surface.Should().Be(SurfaceTouchee.Processeur);
         d.Family.Should().Be(CandidateFamily.Cpu);
+    }
+    // Sans température de partie, la réponse est parfois déjà connue : verrou, PL1 déjà à la PL2, microcode d'avant le
+    // correctif Vmin. Ce n'est pas « non lu » : la montée n'aurait pas lieu, chaleur ou pas.
+    [Fact]
+    public void Une_reponse_connue_sans_temperature_n_est_pas_dite_non_lue()
+    {
+        var sansPartie = new LimiteDePuissanceLue(65, 219, 65, false);
+
+        Build().EtatNonLu(Etat(sansPartie with { Verrou = true })).Should().BeFalse("verrouillée");
+        Build().EtatNonLu(Etat(sansPartie with { Pl2W = 65 })).Should().BeFalse("PL1 déjà à la PL2 : aucune marge");
+        Build().EtatNonLu(Etat(sansPartie with { MicrocodeVminPerime = true })).Should().BeFalse("microcode d'avant le correctif");
+        Build().EtatNonLu(Etat(sansPartie)).Should().BeTrue("seule la chaleur manque");
     }
 }

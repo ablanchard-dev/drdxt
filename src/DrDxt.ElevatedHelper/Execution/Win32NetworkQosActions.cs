@@ -93,17 +93,10 @@ public sealed class Win32NetworkQosActions : INetworkQosActions
             foreach (var a in new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", systeme + script })
                 psi.ArgumentList.Add(a);
 
-            using var p = Process.Start(psi);
-            if (p is null) return Result.Fail(ErrorCodes.HelperOpFailed, "powershell.exe could not be started.");
-            // Lues, jamais affichées : une sortie non lue remplit le tampon et bloque powershell jusqu'au délai.
-            _ = p.StandardOutput.ReadToEndAsync();
-            _ = p.StandardError.ReadToEndAsync();
-            if (!p.WaitForExit((int)CallTimeout.TotalMilliseconds))
-            {
-                try { p.Kill(entireProcessTree: true); } catch { /* deja parti */ }
-                return Result.Fail(ErrorCodes.HelperOpFailed, PasRevenu);
-            }
-            return p.ExitCode == 0 ? Result.Ok() : Result.Fail(ErrorCodes.HelperOpFailed, failureMessage);
+            var r = ProcessusBorne.Executer(psi, CallTimeout);
+            if (!r.Lance) return Result.Fail(ErrorCodes.HelperOpFailed, "powershell.exe could not be started.");
+            if (!r.Fini) return Result.Fail(ErrorCodes.HelperOpFailed, PasRevenu);
+            return r.Code == 0 ? Result.Ok() : Result.Fail(ErrorCodes.HelperOpFailed, failureMessage);
         }
         catch
         {

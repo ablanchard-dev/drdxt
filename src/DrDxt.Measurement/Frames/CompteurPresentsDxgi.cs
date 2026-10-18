@@ -104,12 +104,7 @@ public sealed class CompteurPresentsDxgi
 
     private static int Lancer(string arguments)
     {
-        using var p = Process.Start(new ProcessStartInfo(Logman, arguments)
-        {
-            UseShellExecute = false, CreateNoWindow = true,
-            RedirectStandardOutput = true, RedirectStandardError = true,
-        })!;
-        p.WaitForExit(15_000);
-        return p.HasExited ? p.ExitCode : -1;
+        var r = DrDxt.Core.ProcessusBorne.Executer(new ProcessStartInfo(Logman, arguments), TimeSpan.FromSeconds(15));
+        return r.Fini ? r.Code : -1;
     }
 }

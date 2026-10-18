@@ -38,17 +38,12 @@ public static class SanteDesComposants
                 RedirectStandardOutput = true, RedirectStandardError = true,
             };
             foreach (var a in new[] { "/Online", "/Cleanup-Image", "/CheckHealth", "/English" }) psi.ArgumentList.Add(a);
-            using var p = Process.Start(psi);
-            if (p is null) return Result<byte[]>.Fail(ErrorCodes.HelperOpFailed, "dism.exe could not be started.");
-            var sortie = p.StandardOutput.ReadToEnd();
-            if (!p.WaitForExit(120_000))
-            {
-                try { p.Kill(entireProcessTree: true); } catch { /* deja parti */ }
-                return Result<byte[]>.Fail(ErrorCodes.HelperOpFailed, "dism.exe did not return in time.");
-            }
-            return Interpreter(sortie) is { } etat
+            var r = ProcessusBorne.Executer(psi, TimeSpan.FromSeconds(120));
+            if (!r.Lance) return Result<byte[]>.Fail(ErrorCodes.HelperOpFailed, "dism.exe could not be started.");
+            if (!r.Fini) return Result<byte[]>.Fail(ErrorCodes.HelperOpFailed, "dism.exe did not return in time.");
+            return Interpreter(r.Sortie) is { } etat
                 ? Result<byte[]>.Ok(Encoding.UTF8.GetBytes(etat))
-                : Result<byte[]>.Fail(ErrorCodes.HelperOpFailed, $"DISM output not recognised (exit {p.ExitCode}).");
+                : Result<byte[]>.Fail(ErrorCodes.HelperOpFailed, $"DISM output not recognised (exit {r.Code}).");
         }
         catch (Exception ex)
         {

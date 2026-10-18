@@ -36,8 +36,9 @@ public static class OverlaysEnPartie
     /// <summary>Un overlay vu sur des parties d'un jeu, sans assez de parties sans lui pour le comparer.</summary>
     public sealed record SansComparaison(string Jeu, string Overlay, int PartiesAvec, int PartiesSans);
 
-    /// <summary>Deux parties de chaque côté au moins : une seule partie, c'est une carte et une soirée.</summary>
-    public const int PartiesParCote = 2;
+    /// <summary>Le minimum des autres juges de chaque côté : à deux contre deux, une séparation nette arrive par hasard une
+    /// fois sur six dans chaque sens ; à trois contre trois, une fois sur vingt.</summary>
+    public const int PartiesParCote = ComparaisonDesParties.PartiesMinimum;
 
     /// <summary>Par jeu et par overlay vu. Une partie sans relevé d'overlays ne compte d'aucun côté ; une partie jouée en
     /// essai d'un réglage non plus, l'essai changerait l'écart. Une partie où l'overlay n'a été vu qu'un moment compte
@@ -53,8 +54,11 @@ public static class OverlaysEnPartie
         foreach (var jeu in parties.Where(p => p.Overlays is not null && p.Essai is null && p.Debut >= depuis).GroupBy(p => p.Jeu, StringComparer.OrdinalIgnoreCase))
             foreach (var overlay in jeu.SelectMany(p => p.Overlays!).Distinct().Order(StringComparer.Ordinal))
             {
-                var avec = jeu.Where(p => p.Overlays!.Contains(overlay)).ToList();
-                var sans = jeu.Where(p => !p.Overlays!.Contains(overlay)).ToList();
+                // Deux estimateurs du 1 % low ne se comparent pas : une partie de l'autre ne compte d'aucun côté.
+                var estimateur = ComparaisonDesParties.EstimateurMajoritaire(jeu.ToList());
+                var memes = jeu.Where(p => p.Low1SurToutesLesImages == estimateur).ToList();
+                var avec = memes.Where(p => p.Overlays!.Contains(overlay)).ToList();
+                var sans = memes.Where(p => !p.Overlays!.Contains(overlay)).ToList();
                 if (avec.Count >= PartiesParCote && sans.Count >= PartiesParCote)
                     ecarts.Add(new Ecart(jeu.Key, overlay, Mediane(avec), Mediane(sans), avec.Count, sans.Count,
                         avec.Max(p => p.Low1Median) < sans.Min(p => p.Low1Median) ? VerdictEnJeu.Pire

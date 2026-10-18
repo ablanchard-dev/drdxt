@@ -74,9 +74,6 @@ public sealed class CalmeurDeVoisins
         _exclus = new HashSet<string>(exclus ?? [], StringComparer.OrdinalIgnoreCase);
     }
 
-    /// <summary>Les processus calmés en ce moment.</summary>
-    public IReadOnlyCollection<int> Abaisses => _abaisses.Keys;
-
     /// <summary>Une lecture des voisins pendant la partie. Rend les noms des programmes calmés à cette lecture.</summary>
     public IReadOnlyList<string> Lecture(IEnumerable<VoisinDuJeu> vus, int pidDuJeu, int pidPremierPlan)
     {

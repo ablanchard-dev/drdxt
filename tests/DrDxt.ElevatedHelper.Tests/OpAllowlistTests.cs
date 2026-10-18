@@ -375,6 +375,33 @@ public sealed class OpAllowlistTests
               .IsOk.Should().BeTrue();
     }
 
+    [Fact]
+    public void ReadFirmwareVariable_the_factory_defaults_store_is_readable_under_its_own_guid_only()
+    {
+        // GUID nommé AmiStandardDefaultsVariable par la liste de UEFITool (common/guids.csv), et relu le 17/10/2026 sur la
+        // carte de référence : 11 356 octets sous ce GUID. Sous le GUID de Setup, le même nom reste fermé.
+        _allow.Validate(new ReadFirmwareVariableOp("StdDefaults", OpAllowlist.AmiStandardDefaultsGuid))
+              .IsOk.Should().BeTrue();
+        _allow.Validate(new ReadFirmwareVariableOp("StdDefaults", OpAllowlist.AmiSetupVarstoreGuid))
+              .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
+        _allow.Validate(new ReadFirmwareVariableOp("Setup", OpAllowlist.AmiStandardDefaultsGuid))
+              .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
+    }
+
+    [Fact]
+    public void ReadFirmwareVariable_every_variable_an_AMD_board_table_reads_is_allowlisted_and_nothing_more()
+    {
+        // Une table BIOS AMD qui entre nomme ses variables ; si le helper ne les lit pas, la lecture rendrait « non lu »
+        // en silence. Ce test rougit tant que la liste blanche n'a pas le nom exact sous le GUID exact.
+        foreach (var v in DrDxt.Core.TablesBiosAmd.Connues.SelectMany(t => t.Variables))
+            _allow.Validate(new ReadFirmwareVariableOp(v.Nom, v.Guid)).IsOk.Should().BeTrue($"{v.Nom} {v.Guid}");
+        // Les noms AMD jamais relevés sur une carte restent fermés, sous n'importe quel GUID (inventés ici).
+        _allow.Validate(new ReadFirmwareVariableOp("AodSetup", "{0d1c2b3a-4f5e-4a6b-8c7d-9e0f1a2b3c4d}"))
+              .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
+        _allow.Validate(new ReadFirmwareVariableOp("AmdSetup", "{7a6b5c4d-3e2f-4a1b-9c8d-7e6f5a4b3c2d}"))
+              .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
+    }
+
     [Theory]
     [InlineData("BootOrder")]
     [InlineData("SecureBoot")]

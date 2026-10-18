@@ -15,7 +15,10 @@ public sealed class ClientSessionUtilisateur(IElevatedClient eleve, IRegistryAct
 
     /// <summary>Le client qui porte tout le reste au helper.</summary>
     public IElevatedClient VersLeHelper => eleve;
-    private readonly IRegistryActions _registre = registre ?? new Win32RegistryActions();
+
+    /// <summary>Sans relance du helper : le battement d'un bail ne porte que des ordres de bail, tous pour le helper.</summary>
+    public IElevatedClient SansRelance => eleve.SansRelance;
+    private readonly IRegistryActions _registre = registre ?? new Win32RegistryActions(Win32RegistryActions.TraceDeLaSession);
 
     public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct) => op switch
     {

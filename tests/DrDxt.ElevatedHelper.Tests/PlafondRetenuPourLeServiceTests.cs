@@ -45,6 +45,19 @@ public sealed class PlafondRetenuPourLeServiceTests : IDisposable
     public void Un_lanceur_ou_un_binaire_de_Windows_n_est_pas_retenu_pour_le_service(string exe)
         => new OpAllowlist().Validate(new RetainServiceUploadCapOp(exe, 20_000_000)).IsOk.Should().BeFalse();
 
+    // Retenu, le plafond est porté par le service SYSTEM à chaque session : un programme qui donnait son propre nom
+    // bridait tout l'envoi de la machine dès qu'il tournait, et s'en exemptait. Seul un jeu reconnu par son nom est retenu ;
+    // la pose directe (App ouverte, sous bail) reste permise pour un autre jeu.
+    [Fact]
+    public void Seul_un_jeu_reconnu_est_retenu_pour_le_service()
+    {
+        var liste = new OpAllowlist();
+
+        liste.Validate(new RetainServiceUploadCapOp("monoutil.exe", 1_000_000)).IsOk.Should().BeFalse();
+        liste.Validate(new RetainServiceUploadCapOp("cs2.exe", 20_000_000)).IsOk.Should().BeTrue("un jeu reconnu passe toujours");
+        liste.Validate(new ApplyUploadCapOp("monjeu.exe", 20_000_000)).IsOk.Should().BeTrue("la pose sous bail reste permise");
+    }
+
     // La pose directe passait avec un simple nom valide : un appelant qui contournerait les filtres de l'App
     // pouvait brider toute la machine sauf explorer.exe. Le helper tient la même règle que pour le service.
     [Theory]

@@ -38,13 +38,22 @@ public sealed class PlafondEnvoiPendantLeJeu
     public PlafondEnvoiPendantLeJeu(IElevatedClient helper, Func<string, bool> jeuEnCours, string exe, long plafondBps)
         => (_helper, _jeuEnCours, _exe, _plafondBps) = (helper, jeuEnCours, exe, plafondBps);
 
+    // Le battement et l'ajustement tournent sans geste du joueur : ils ne lancent jamais le helper. Mort en pleine partie,
+    // il ouvrait une invite Windows à chaque tour, revenue à chaque refus. Injoignable, le filet manque : rien ne se pose.
+    // Seuls les gestes du joueur (allumer, éteindre le mode) peuvent le lancer.
+    private IElevatedClient Fond => _helper.SansRelance;
+
     public bool PlafondPose => _pose;
+
+    /// <summary>Le dernier battement n'a pas joint le helper (ni bail renouvelé, ni rouvert) : pas de filet, rien n'est posé.
+    /// À dire à l'écran.</summary>
+    public bool SansFilet { get; private set; }
 
     /// <summary>Ouvre le bail. Sans bail, le mode refuse de demarrer : un plafond sans filet
     /// pourrait survivre a un plantage de l'application.</summary>
     public async Task<Result> DemarrerAsync(CancellationToken ct)
     {
-        var bail = await OuvrirBailAsync(ct).ConfigureAwait(false);
+        var bail = await OuvrirBailAsync(_helper, ct).ConfigureAwait(false);
         _bailOuvert = bail.IsOk;
         // Un helper tue net emporte ses baux, et sa politique reste jusqu'au redemarrage.
         // Au demarrage, rien n'est pose a notre connaissance : on retire ce qui serait reste (retrait
@@ -52,17 +61,17 @@ public sealed class PlafondEnvoiPendantLeJeu
         if (bail.IsOk)
         {
             try { await _helper.ExecuteAsync(new RemoveUploadCapOp(), ct).ConfigureAwait(false); }
-            catch (Exception ex) when (ex is not OperationCanceledException) { }
+            catch (Exception ex) when (ex is not OperationCanceledException) { /* ménage facultatif : le bail tient */ }
         }
         return bail;
     }
 
-    private async Task<Result> OuvrirBailAsync(CancellationToken ct)
+    private static async Task<Result> OuvrirBailAsync(IElevatedClient client, CancellationToken ct)
     {
         var inverse = PrivilegedOpCodec.Serialize(new RemoveUploadCapOp());
         if (!inverse.IsOk || inverse.Value is null)
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Could not serialize the upload-cap revert.");
-        return await _helper.ExecuteAsync(new EstablishLeaseOp(IdBail, inverse.Value, BailSecondes), ct).ConfigureAwait(false);
+        return await client.ExecuteAsync(new EstablishLeaseOp(IdBail, inverse.Value, BailSecondes), ct).ConfigureAwait(false);
     }
 
     /// <summary>Un battement : renouvelle le bail, pose le plafond si le jeu vient de demarrer,
@@ -87,23 +96,24 @@ public sealed class PlafondEnvoiPendantLeJeu
             // bail : on le rouvre. S'il ne se rouvre pas, le filet manque, et la regle de la classe
             // s'applique (pas de plafond sans filet) : le jeu est traite comme absent, rien ne se pose
             // et un plafond deja pose est retire.
-            var filet = await _helper.RenewLease(IdBail, BailSecondes, ct).ConfigureAwait(false);
+            var filet = await Fond.RenewLease(IdBail, BailSecondes, ct).ConfigureAwait(false);
             // Un refus veut dire que l'etat reel est inconnu. Bail expire : le helper a
             // execute l'inverse, le plafond est parti. Helper relance : la politique est restee. On ne
             // se fie plus a `_pose` : jeu lance, on repose (la pose remplace sans empiler) ; jeu ferme,
             // on retire (le retrait est idempotent).
             var etatInconnu = !filet.IsOk;
-            if (etatInconnu) filet = await OuvrirBailAsync(ct).ConfigureAwait(false);
+            if (etatInconnu) filet = await OuvrirBailAsync(Fond, ct).ConfigureAwait(false);
+            SansFilet = !filet.IsOk;
 
             var enJeu = filet.IsOk && _jeuEnCours(_exe);
             if (enJeu && (!_pose || etatInconnu))
             {
-                _pose = (await _helper.ExecuteAsync(new ApplyUploadCapOp(_exe, _plafondBps), ct).ConfigureAwait(false)).IsOk;
+                _pose = (await Fond.ExecuteAsync(new ApplyUploadCapOp(_exe, _plafondBps), ct).ConfigureAwait(false)).IsOk;
                 _poseIncertaine = !_pose;
             }
             else if (!enJeu && (_pose || _poseIncertaine || etatInconnu))
             {
-                _pose = !(await _helper.ExecuteAsync(new RemoveUploadCapOp(), ct).ConfigureAwait(false)).IsOk;
+                _pose = !(await Fond.ExecuteAsync(new RemoveUploadCapOp(), ct).ConfigureAwait(false)).IsOk;
                 _poseIncertaine = _pose;
             }
         }
@@ -133,7 +143,7 @@ public sealed class PlafondEnvoiPendantLeJeu
             _plafondBps = plafondBps;
             return Result.Ok();
         }
-        var r = await _helper.ExecuteAsync(new ApplyUploadCapOp(_exe, plafondBps), ct).ConfigureAwait(false);
+        var r = await Fond.ExecuteAsync(new ApplyUploadCapOp(_exe, plafondBps), ct).ConfigureAwait(false);
         if (r.IsOk) _plafondBps = plafondBps;
         else
         {

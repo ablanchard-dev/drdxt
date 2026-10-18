@@ -37,7 +37,9 @@ public sealed class WorkerTests
         FakeUpdateSignal signal,
         FakeBootOutcomeStore bootStore,
         IDelay delay,
-        RecordingDiagnostics diagnostics)
+        RecordingDiagnostics diagnostics,
+        Func<bool>? jeuEnCours = null,
+        FinDuRejeu? finDuRejeu = null)
     {
         var tick = new CountingTick();
         var single = new SingleFlightReconcile(tick.RunAsync);
@@ -45,7 +47,7 @@ public sealed class WorkerTests
         var bootMarker = new BootSessionMarker(bootStore, delay);
         var worker = new Worker(
             single, trigger, bootMarker, diagnostics, delay,
-            new HostTimingOptions(StableWindow, PollInterval));
+            new HostTimingOptions(StableWindow, PollInterval), jeuEnCours ?? (() => false), finDuRejeu);
         return (worker, tick);
     }
 
@@ -73,6 +75,44 @@ public sealed class WorkerTests
         tick.Passes.Should().BeGreaterThanOrEqualTo(1,
             "the boot pass must reconcile unconditionally even with no feature update detected");
         bootStore.MarkBootStartedCount.Should().Be(1, "boot is marked exactly once at startup (dead-man +1)");
+    }
+
+    /// <summary>Une partie que le test termine quand il veut.</summary>
+    private sealed class PartieEnCours : IDelay
+    {
+        public readonly TaskCompletionSource Fin = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public volatile bool EnJeu = true;
+        public async Task DelayAsync(TimeSpan duration, CancellationToken ct)
+        {
+            await Fin.Task.WaitAsync(ct);
+            EnJeu = false;
+        }
+    }
+
+    // Le rejeu du journal passe avant la première réconciliation, même quand il attend la fin d'une partie.
+    [Fact]
+    public async Task Le_Worker_ne_reconcilie_pas_avant_la_fin_du_rejeu_du_journal()
+    {
+        var partie = new PartieEnCours();
+        var rejeu = new RejeuAuDemarrage(new JournalDuService(null), NSubstitute.Substitute.For<DrDxt.Reconciler.Desinstallation.ILectureDesCibles>(),
+            NSubstitute.Substitute.For<DrDxt.Core.IElevatedClient>(), jeuEnCours: () => partie.EnJeu, delai: partie);
+        var (worker, tick) = Build(new FakeOsBuildProbe { Build = "22631.3447" },
+            new InMemoryReconcilerStateStore(ReconcilerState.Default with { LastFeatureUpdateBuild = "22631.3447" }),
+            new FakeUpdateSignal { Recent = false }, new FakeBootOutcomeStore(), new BlockingDelay(), new RecordingDiagnostics(),
+            finDuRejeu: new FinDuRejeu(() => rejeu.Differe));
+
+        await rejeu.StartAsync(CancellationToken.None);
+        var cts = new CancellationTokenSource();
+        var run = worker.StartAsync(cts.Token);
+        await Task.Delay(300);
+        tick.Passes.Should().Be(0, "le rejeu attend encore la fin de la partie");
+
+        partie.Fin.SetResult();
+        await tick.WaitForPasses(1);
+
+        cts.Cancel();
+        await StopAsync(worker, run);
+        tick.Passes.Should().BeGreaterThanOrEqualTo(1);
     }
 
     [Fact]
@@ -237,11 +277,40 @@ public sealed class WorkerTests
     // jamais seul (un test qui ne le libère pas peut ainsi prouver l'invariant de l'homme mort) ;
     // chaque délai de scrutation bloque jusqu'à ce que le test le libère. L'annulation est
     // honorée par le même jeton que le délai de production observe.
+    // Rien ne se réapplique pendant une partie : la passe quotidienne attend la fin du jeu, relue toutes les 10 minutes.
+    [Fact]
+    public async Task DailyPoll_WaitsForTheGameToEnd()
+    {
+        var probe = new FakeOsBuildProbe { Build = "22631.3447" };
+        var stateStore = new InMemoryReconcilerStateStore(
+            ReconcilerState.Default with { LastFeatureUpdateBuild = "22631.3447" });
+        var delay = new BlockingDelay();
+        // Une partie à la première relecture, finie à la suivante : lu par la seule boucle, dans cet ordre.
+        var reponses = new Queue<bool>([true, false]);
+        var (worker, tick) = Build(probe, stateStore, new FakeUpdateSignal { Recent = false }, new FakeBootOutcomeStore(), delay,
+            new RecordingDiagnostics(), () => reponses.Count > 0 && reponses.Dequeue());
+
+        var cts = new CancellationTokenSource();
+        var run = worker.StartAsync(cts.Token);
+        await tick.WaitForPasses(1);
+
+        await delay.ReleasePollOnce(PollInterval);
+        tick.Passes.Should().Be(1, "en partie, la passe attend au lieu de tourner");
+        await delay.ReleaseNext();
+        await tick.WaitForPasses(2);
+
+        cts.Cancel();
+        await StopAsync(worker, run);
+        delay.Attentes.Should().Contain(Worker.AttenteEnPartie);
+        tick.Passes.Should().Be(2, "la partie finie, la passe tourne une fois");
+    }
+
     private sealed class BlockingDelay : IDelay
     {
         private readonly object _lock = new();
         private TaskCompletionSource? _pendingPoll;
         private TaskCompletionSource _pollRequested = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public System.Collections.Concurrent.ConcurrentQueue<TimeSpan> Attentes { get; } = new();
 
         public Task DelayAsync(TimeSpan duration, CancellationToken ct)
         {
@@ -257,6 +326,7 @@ public sealed class WorkerTests
             // Une attente de scrutation quotidienne : l'enregistrer pour qu'un test en libère exactement une.
             lock (_lock)
             {
+                Attentes.Enqueue(duration);
                 _pendingPoll = tcs;
                 _pollRequested.TrySetResult();
             }
@@ -280,6 +350,22 @@ public sealed class WorkerTests
             }
             toRelease?.TrySetResult();
             expected.Should().Be(PollInterval, "daily polls use the configured interval");
+        }
+
+        // Attend la prochaine attente demandée (quotidienne ou en partie), puis l'achève.
+        public async Task ReleaseNext()
+        {
+            Task requested;
+            lock (_lock) { requested = _pollRequested.Task; }
+            await requested.ConfigureAwait(false);
+            TaskCompletionSource? toRelease;
+            lock (_lock)
+            {
+                toRelease = _pendingPoll;
+                _pendingPoll = null;
+                _pollRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+            toRelease?.TrySetResult();
         }
     }
 }

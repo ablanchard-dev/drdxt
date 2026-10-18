@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using static DrDxt.Detection.Natif;
 
 namespace DrDxt.Detection.Cpu;
 
@@ -135,7 +136,4 @@ public sealed class CpuTopology
         return $"classe intermediaire ({classe})";
     }
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetSystemCpuSetInformation(
-        IntPtr information, uint bufferLength, out uint returnedLength, IntPtr process, uint flags);
 }

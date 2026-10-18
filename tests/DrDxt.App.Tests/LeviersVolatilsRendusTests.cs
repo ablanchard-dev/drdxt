@@ -1,3 +1,4 @@
+using DrDxt.Tests.Shared;
 using System.IO;
 using DrDxt.App.ViewModels;
 using DrDxt.Application.Parties;
@@ -21,7 +22,7 @@ public sealed class LeviersVolatilsRendusTests : IDisposable
     private (ScanViewModel Vm, JournalDesLeviersAppliques Leviers) Vm(string id, DateTimeOffset? posele)
     {
         var chemin = Path.Combine(_dossier, "leviers.json");
-        File.WriteAllText(chemin, System.Text.Json.JsonSerializer.Serialize(new[] { new TweakSnapshot(id, "100", "90") }));
+        File.WriteAllText(chemin, System.Text.Json.JsonSerializer.Serialize(new[] { new TweakSnapshot(id, InversesDeTest.Pour(id, "100"), "90") }));
         var leviers = new JournalDesLeviersAppliques(chemin);
         var changements = new JournalDesChangements(Path.Combine(_dossier, "changements.json"));
         if (posele is { } quand) changements.Ajouter(new Changement(quand, id, null, "pose:" + id));

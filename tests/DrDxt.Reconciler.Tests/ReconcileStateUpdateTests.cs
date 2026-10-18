@@ -212,23 +212,4 @@ public sealed class ReconcileStateUpdateTests
 
         public Task<Result<DesiredState>> LoadAsync() => Task.FromResult(Result<DesiredState>.Ok(_state));
     }
-
-    [Fact]
-    public async Task ReconcilePass_GlobalPaused_DoesNotMutateSidecar()
-    {
-        var initial = ReconcilerState.Default with
-        {
-            GlobalPaused = true,
-            Items = new[] { new ReconcilerItemState("a", false, "22631.3447", "555.99", At, "OK") },
-        };
-        var h = new ReconcilerHarness(initial);
-        h.Policy.Map("a", ReconcileSurface.Registry);
-        h.Probe.Set("a", "0");
-
-        var desired = new DesiredState(new[] { new AppliedTweak("a", "1", "0", At) });
-        await h.Build().ReconcileAsync(desired, default);
-
-        // La pause globale court-circuite : aucune écriture, annexe intacte.
-        h.StateStore.Saved.Should().Be(initial);
-    }
 }

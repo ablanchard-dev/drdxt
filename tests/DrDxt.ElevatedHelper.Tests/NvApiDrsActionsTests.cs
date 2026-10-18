@@ -60,8 +60,22 @@ public sealed class NvApiDrsActionsTests
     {
         var pilote = Pilote(disponible: true);
         pilote.TrySetDrsGlobalSetting(0x10835002u, 141u).Returns(true);
+        pilote.TryGetDrsGlobalSetting(0x10835002u, out Arg.Any<uint>()).Returns(x => { x[1] = 141u; return true; });
 
         new NvApiDrsActions(pilote).SetGlobalSetting(0x10835002u, 141u).IsOk.Should().BeTrue();
+    }
+
+    // Un « true » natif dit que l'appel est accepté, pas que la valeur a pris : relue, autre valeur ou illisible = échec.
+    [Theory]
+    [InlineData(true, 60u)]
+    [InlineData(false, 0u)]
+    public void Une_ecriture_globale_non_relue_a_la_valeur_echoue(bool relue, uint valeur)
+    {
+        var pilote = Pilote(disponible: true);
+        pilote.TrySetDrsGlobalSetting(0x10835002u, 141u).Returns(true);
+        pilote.TryGetDrsGlobalSetting(0x10835002u, out Arg.Any<uint>()).Returns(x => { x[1] = valeur; return relue; });
+
+        new NvApiDrsActions(pilote).SetGlobalSetting(0x10835002u, 141u).IsOk.Should().BeFalse();
     }
 
     [Fact]

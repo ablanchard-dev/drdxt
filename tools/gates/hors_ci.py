@@ -55,6 +55,7 @@ ATTENDU = {
     "DrDxt.Detection.Tests/HagsReaderSurLeVraiSystemeTests.cs": (1, "lance dxdiag et lit la vraie carte graphique"),
     "DrDxt.Detection.Tests/Bios/VendorBiosInterfaceProbeTests.cs": (1, "interroge le WMI du BIOS"),
     "DrDxt.Detection.Tests/Cpu/CpuFrequencyStateTests.cs": (1, "lit la frequence reelle du processeur"),
+    "DrDxt.Detection.Tests/Repair/TracesDuRegistreTests.cs": (1, "lit le vrai registre et la date de la cle MMCSS"),
     "DrDxt.Measurement.Tests/Cpu/CpuBenchTests.cs": (1, "juge la dispersion du vrai processeur, qu'un runner partage ne tient pas (63 % mesures le 27/09)"),
     "DrDxt.Detection.Tests/Hardware/UnexpectedShutdownLogTests.cs": (1, "lit le journal Systeme"),
     # Trois tests lisent la vraie machine : la CI (runner vierge) les verrait rouges, et un echec plus tot

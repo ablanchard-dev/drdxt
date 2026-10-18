@@ -23,8 +23,7 @@ public sealed class JsonReconcilerStateStoreTests
         var loaded = await store.LoadAsync(CancellationToken.None);
         loaded.IsOk.Should().BeTrue();
         loaded.Value.Should().Be(ReconcilerState.Default);
-        loaded.Value!.GlobalPaused.Should().BeFalse();
-        loaded.Value.Items.Should().BeEmpty();
+        loaded.Value!.Items.Should().BeEmpty();
         loaded.Value.UncleanBootStreak.Should().Be(0);
     }
 
@@ -36,7 +35,6 @@ public sealed class JsonReconcilerStateStoreTests
         {
             var store = new JsonReconcilerStateStore(path);
             var state = new ReconcilerState(
-                GlobalPaused: true,
                 LastFeatureUpdateBuild: "22631.3447",
                 UncleanBootStreak: 2,
                 LastStableSessionAt: new DateTimeOffset(2026, 6, 23, 9, 0, 0, TimeSpan.Zero),

@@ -12,12 +12,16 @@ public sealed class VerrouDuBusAbandonneTests
     public void Un_verrou_abandonne_est_pris_puis_se_relache()
     {
         var nom = $@"Local\drdxt-test-{Guid.NewGuid():N}";
+        // Ouvert avant le fil : sinon le finaliseur pouvait fermer sa poignée, le verrou disparaissait, et la prise d'un
+        // verrou neuf passait sans jamais rencontrer l'abandon.
+        using var verrou = new Mutex(false, nom);
         var fil = new Thread(() => new Mutex(false, nom).WaitOne()); // pris, jamais relâché : abandonné à la fin du fil
         fil.Start();
         fil.Join();
 
-        using var verrou = new Mutex(false, nom);
-        PawnIoSuperIo.Prendre(verrou, TimeSpan.FromMilliseconds(500)).Should().BeTrue();
+        // Join rend la main avant que le système ait fini le fil (mesuré : jusqu'à 775 ms sur une machine chargée) ; le
+        // verrou n'est abandonné qu'à cette fin. Une attente large la laisse arriver : la prise rend alors l'abandon.
+        PawnIoSuperIo.Prendre(verrou, TimeSpan.FromSeconds(30)).Should().BeTrue();
         verrou.ReleaseMutex();
 
         var autre = false;

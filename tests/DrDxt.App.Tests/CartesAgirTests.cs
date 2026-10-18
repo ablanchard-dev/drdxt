@@ -1,4 +1,5 @@
-﻿using DrDxt.App.ViewModels;
+﻿using DrDxt.Tests.Shared;
+using DrDxt.App.ViewModels;
 using DrDxt.Core;
 using FluentAssertions;
 using NSubstitute;
@@ -58,6 +59,9 @@ public sealed class CartesAgirTests
     {
         var h = Substitute.For<IElevatedClient>();
         h.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(reponse));
+        // Un faux NSubstitute rend un autre faux pour un membre par défaut d'interface : le client sans relance (battements,
+        // plafond d'envoi) est ici le même faux, comme pour un vrai client qui ne lance rien.
+        h.SansRelance.Returns(h);
         return h;
     }
 
@@ -207,7 +211,7 @@ public sealed class CartesAgirTests
 
         vm.BcdRendu.Should().BeFalse();
         vm.BcdARendre.Should().BeTrue();
-        vm.ErreurBcd.Should().Contain("UAC refuse");
+        vm.ErreurBcd.Should().Contain("Erreur.Generique").And.NotContain("UAC refuse");
         vm.RepairFindings.Should().Contain(v => v.DomaineCle == "BCD", "rien n'a été fait : le constat reste");
     }
 
@@ -219,13 +223,13 @@ public sealed class CartesAgirTests
         {
             var helper = Helper(Result.Ok());
             var avant = Vm(new[] { RecuperationCoupee }, helper);
-            avant.FichierBcdRendu = fichier;
+            avant.GardeBcd = new DrDxt.Application.Safety.GardeDuBcdRetire(fichier);
             await avant.ScanCommand.ExecuteAsync(null);
             await avant.RendreBcdCommand.ExecuteAsync(null);
 
             // Nouvelle session : l'audit ne voit plus le reglage, puisqu'il a ete retire.
             var apres = Vm(Array.Empty<RepairFinding>(), helper);
-            apres.FichierBcdRendu = fichier;
+            apres.GardeBcd = new DrDxt.Application.Safety.GardeDuBcdRetire(fichier);
             await apres.ScanCommand.ExecuteAsync(null);
             apres.BcdRendu.Should().BeTrue("la carte promet « Réversible » : l'Annuler survit a la session");
 
@@ -249,12 +253,51 @@ public sealed class CartesAgirTests
             System.IO.File.WriteAllText(fichier, """{"Element":"useplatformclock","Valeur":"Yes"}""");
             var helper = Helper(Result.Ok());
             var vm = Vm(Array.Empty<RepairFinding>(), helper);
-            vm.FichierBcdRendu = fichier;
+            vm.GardeBcd = new DrDxt.Application.Safety.GardeDuBcdRetire(fichier);
             await vm.ScanCommand.ExecuteAsync(null);
 
             vm.BcdRendu.Should().BeFalse();
             await vm.AnnulerBcdCommand.ExecuteAsync(null);
             await helper.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+        }
+        finally { System.IO.File.Delete(fichier); }
+    }
+
+    // bcdedit écrit tout de suite : sans garde sur le disque, le retrait n'aurait plus d'annulation après une coupure.
+    [Fact]
+    public async Task Sans_garde_ecrite_le_reglage_n_est_pas_retire()
+    {
+        var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"drdxt-bcd-{Guid.NewGuid():N}");
+        System.IO.File.WriteAllText(dossier, "un fichier, pas un dossier");
+        try
+        {
+            var helper = Helper(Result.Ok());
+            var vm = Vm(new[] { RecuperationCoupee }, helper);
+            vm.GardeBcd = new DrDxt.Application.Safety.GardeDuBcdRetire(System.IO.Path.Combine(dossier, "bcd-rendu.json"));
+            await vm.ScanCommand.ExecuteAsync(null);
+
+            await vm.RendreBcdCommand.ExecuteAsync(null);
+
+            await helper.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+            vm.ErreurBcd.Should().Be("Bcd.Rendre.GardeImpossible");
+            vm.BcdARendre.Should().BeTrue("rien n'a été retiré");
+        }
+        finally { System.IO.File.Delete(dossier); }
+    }
+
+    [Fact]
+    public async Task Un_refus_du_helper_efface_la_garde_ecrite_avant_lui()
+    {
+        var fichier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"drdxt-bcd-{Guid.NewGuid():N}.json");
+        try
+        {
+            var vm = Vm(new[] { RecuperationCoupee }, Helper(Result.Fail(ErrorCodes.TweakNotApplicable, "UAC refuse")));
+            vm.GardeBcd = new DrDxt.Application.Safety.GardeDuBcdRetire(fichier);
+            await vm.ScanCommand.ExecuteAsync(null);
+
+            await vm.RendreBcdCommand.ExecuteAsync(null);
+
+            System.IO.File.Exists(fichier).Should().BeFalse("le réglage est toujours là : une garde ferait proposer un faux Annuler");
         }
         finally { System.IO.File.Delete(fichier); }
     }
@@ -532,6 +575,7 @@ public sealed class CartesAgirTests
     {
         var helper = Helper(Result.Ok());
         var vm = Vm(Array.Empty<RepairFinding>(), helper);
+        vm.JeuPorteParLeService = _ => true;
         vm.RetenirMesureEnvoi(20_000_000, JeuAbsent);
 
         await vm.BasculerPlafondEnvoiCommand.ExecuteAsync(null);
@@ -553,6 +597,7 @@ public sealed class CartesAgirTests
     {
         var helper = Helper(Result.Ok());
         var vm = Vm(Array.Empty<RepairFinding>(), helper);
+        vm.JeuPorteParLeService = _ => true;
         vm.ServiceDemarrageActif = () => true;
         vm.RetenirMesureEnvoi(20_000_000, JeuAbsent);
 
@@ -574,6 +619,7 @@ public sealed class CartesAgirTests
     public async Task Service_en_marche_un_refus_de_retenir_laisse_la_protection_eteinte_et_le_dit()
     {
         var vm = Vm(Array.Empty<RepairFinding>(), Helper(Result.Fail(ErrorCodes.TweakNotApplicable, "UAC refuse")));
+        vm.JeuPorteParLeService = _ => true;
         vm.ServiceDemarrageActif = () => true;
         vm.RetenirMesureEnvoi(20_000_000, JeuAbsent);
 
@@ -583,6 +629,23 @@ public sealed class CartesAgirTests
         vm.ErreurPlafondEnvoi.Should().NotBeNull();
     }
 
+    // Un jeu que le service ne porte pas (absent de la liste des jeux reconnus) : le service en marche n'éteint pas sa
+    // protection, l'App la porte elle-même avec son bail, et rien n'est retenu pour le service.
+    [Fact]
+    public async Task Service_en_marche_un_jeu_non_reconnu_garde_la_protection_de_l_App()
+    {
+        var helper = Helper(Result.Ok());
+        var vm = Vm(Array.Empty<RepairFinding>(), helper);
+        vm.ServiceDemarrageActif = () => true;
+        vm.RetenirMesureEnvoi(20_000_000, JeuAbsent);
+
+        await vm.BasculerPlafondEnvoiCommand.ExecuteAsync(null);
+
+        vm.PlafondEnvoiActif.Should().BeTrue();
+        await helper.Received(1).ExecuteAsync(Arg.Is<PrivilegedOp>(o => o is EstablishLeaseOp), Arg.Any<CancellationToken>());
+        await helper.DidNotReceive().ExecuteAsync(Arg.Is<PrivilegedOp>(o => o is RetainServiceUploadCapOp), Arg.Any<CancellationToken>());
+    }
+
     // Symétrique du refus à l'allumage. Éteindre demande au helper d'oublier la protection sous
     // %ProgramData% ; refusé, le service continue de plafonner à chaque partie : la carte ne doit pas dire « inactive ».
     [Fact]
@@ -590,6 +653,7 @@ public sealed class CartesAgirTests
     {
         var helper = Helper(Result.Ok());
         var vm = Vm(Array.Empty<RepairFinding>(), helper);
+        vm.JeuPorteParLeService = _ => true;
         vm.ServiceDemarrageActif = () => true;
         vm.RetenirMesureEnvoi(20_000_000, JeuAbsent);
         await vm.BasculerPlafondEnvoiCommand.ExecuteAsync(null);
@@ -679,6 +743,7 @@ public sealed class CartesAgirTests
             memoire.Retenir(new(JeuAbsent, 20_000_000, DateTimeOffset.Now));
             var helper = Helper(Result.Ok());
             var vm = Vm(Array.Empty<RepairFinding>(), helper);
+        vm.JeuPorteParLeService = _ => true;
             vm.MemoirePlafond = memoire;
             vm.ServiceDemarrageActif = () => true;
             vm.ServicePorteUnRetenu = () => dejaRetenu;
@@ -784,7 +849,7 @@ public sealed class CartesAgirTests
             // La boucle attend 5 s tant que le plafond n'est pas pose, puis une fenetre : deux tours sur un runner charge depassent 10 s.
             var limite = DateTime.UtcNow.AddSeconds(30);
             while (DateTime.UtcNow < limite && !helper.ReceivedCalls().Any(c =>
-                       c.GetArguments()[0] is ApplyUploadCapOp { CapBitsPerSecond: 16_000_000 }))
+                       c.GetArguments().FirstOrDefault() is ApplyUploadCapOp { CapBitsPerSecond: 16_000_000 }))
                 await Task.Delay(50);
             await helper.Received().ExecuteAsync(
                 Arg.Is<PrivilegedOp>(o => o is ApplyUploadCapOp && ((ApplyUploadCapOp)o).CapBitsPerSecond == 16_000_000),
@@ -801,6 +866,44 @@ public sealed class CartesAgirTests
         }
     }
 
+    // Le helper meurt en pleine partie : le battement ne le relance pas (aucune invite sans geste), le bail ne se renouvelle ni
+    // ne se rouvre, rien n'est posé, et la carte dit pourquoi. Le helper revenu, le texte part.
+    [Fact]
+    public async Task Sans_filet_le_plafond_ne_se_pose_pas_et_la_carte_le_dit()
+    {
+        var jeu = System.Diagnostics.Process.GetCurrentProcess().ProcessName + ".exe";
+        var helper = Substitute.For<IElevatedClient>();
+        helper.SansRelance.Returns(helper);
+        var joignable = true;
+        helper.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(joignable ? Result.Ok() : Result.Fail(ErrorCodes.HelperUnreachable, "tube absent")));
+        helper.RenewLease(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(joignable ? Result.Ok() : Result.Fail(ErrorCodes.HelperUnreachable, "tube absent")));
+        var vm = Vm(Array.Empty<RepairFinding>(), helper);
+        vm.TourDuPlafond = TimeSpan.FromMilliseconds(50);
+        vm.JeuVivant = _ => false;
+        vm.RetenirMesureEnvoi(20_000_000, jeu);
+        await vm.BasculerPlafondEnvoiCommand.ExecuteAsync(null);
+        try
+        {
+            vm.PlafondEnvoiActif.Should().BeTrue();
+            joignable = false;
+            var limite = DateTime.UtcNow.AddSeconds(30);
+            while (DateTime.UtcNow < limite && vm.ErreurPlafondEnvoi != "Ping.Protection.SansFilet") await Task.Delay(50);
+            vm.ErreurPlafondEnvoi.Should().Be("Ping.Protection.SansFilet");
+
+            joignable = true;
+            limite = DateTime.UtcNow.AddSeconds(30);
+            while (DateTime.UtcNow < limite && vm.ErreurPlafondEnvoi is not null) await Task.Delay(50);
+            vm.ErreurPlafondEnvoi.Should().BeNull("un battement a rejoint le helper : le filet est revenu");
+        }
+        finally
+        {
+            joignable = true;
+            await vm.DesactiverPlafondEnvoiAsync();
+        }
+    }
+
     // Service en marche, l'App n'arme pas son mode et l'ajustement ne tournait plus : le plafond du
     // service restait figé à la valeur du scan. DrDXT ouvert, le plafond suit encore le ping, par le service.
     [Fact]
@@ -809,6 +912,7 @@ public sealed class CartesAgirTests
         var jeu = System.Diagnostics.Process.GetCurrentProcess().ProcessName + ".exe";
         var helper = Helper(Result.Ok());
         var vm = Vm(Array.Empty<RepairFinding>(), helper);
+        vm.JeuPorteParLeService = _ => true;
         vm.ServiceDemarrageActif = () => true;
         vm.CollecteurFenetre = (_, _) => Task.FromResult<IReadOnlyList<DrDxt.Measurement.Network.EchantillonEnvoi>>(
             Enumerable.Range(0, 40).Select(_ => new DrDxt.Measurement.Network.EchantillonEnvoi(1, 8))
@@ -843,6 +947,7 @@ public sealed class CartesAgirTests
         var jeu = System.Diagnostics.Process.GetCurrentProcess().ProcessName + ".exe";
         var helper = Helper(Result.Ok());
         var vm = Vm(Array.Empty<RepairFinding>(), helper);
+        vm.JeuPorteParLeService = _ => true;
         vm.ServiceDemarrageActif = () => true;
         vm.FenetreAjustement = TimeSpan.Zero;
         vm.CollecteurFenetre = (_, _) => Task.FromResult<IReadOnlyList<DrDxt.Measurement.Network.EchantillonEnvoi>>(
@@ -873,7 +978,7 @@ public sealed class CartesAgirTests
         await vm.BasculerPlafondEnvoiCommand.ExecuteAsync(null);
 
         vm.PlafondEnvoiActif.Should().BeFalse();
-        vm.ErreurPlafondEnvoi.Should().Contain("UAC refuse");
+        vm.ErreurPlafondEnvoi.Should().Contain("Erreur.Generique").And.NotContain("UAC refuse");
         await helper.DidNotReceive().ExecuteAsync(
             Arg.Is<PrivilegedOp>(o => o is ApplyUploadCapOp), Arg.Any<CancellationToken>());
     }
@@ -936,7 +1041,7 @@ public sealed class CartesAgirTests
         levier.Id.Returns("gpu.repos_global_normal");
         levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Ok());
         var attente = new DrDxt.Application.Tweaks.PreuvesEnAttente(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"preuve-{Guid.NewGuid():N}.json"));
-        attente.Garder(new("gpu.repos_global_normal", "inverse", null, [55.0, 55.5, 56.0]));
+        attente.Garder(new("gpu.repos_global_normal", InversesDeTest.Pour("gpu.repos_global_normal"), null, [55.0, 55.5, 56.0]));
         var sonde = Substitute.For<IHardwareProbe>();
         sonde.Lire().Returns(new HardwareReading(apresW, null));
 
@@ -956,7 +1061,7 @@ public sealed class CartesAgirTests
         levier.Id.Returns("gpu.repos_global_normal");
         levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Fail(ErrorCodes.HelperOpFailed, "helper refusé"));
         var attente = new DrDxt.Application.Tweaks.PreuvesEnAttente(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"preuve-{Guid.NewGuid():N}.json"));
-        attente.Garder(new("gpu.repos_global_normal", "inverse", "normal", [50.0, 50.5, 51.0]));
+        attente.Garder(new("gpu.repos_global_normal", InversesDeTest.Pour("gpu.repos_global_normal"), "normal", [50.0, 50.5, 51.0]));
         var sonde = Substitute.For<IHardwareProbe>();
         sonde.Lire().Returns(new HardwareReading(55.8, null));
 
@@ -979,7 +1084,7 @@ public sealed class CartesAgirTests
         levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Ok());
         var le = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
         var retenu = new DrDxt.Application.Tweaks.ReglagesRetenus(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"retenu-{Guid.NewGuid():N}.json"));
-        retenu.Garder(new("gpu.repos_global_normal", "inverse", null, le));
+        retenu.Garder(new("gpu.repos_global_normal", InversesDeTest.Pour("gpu.repos_global_normal"), null, le));
         DrDxt.Application.Parties.PartieRelevee P(int j, double l) =>
             new("cod", le.AddDays(j), le.AddDays(j).AddMinutes(20), 10, 140, l, BottleneckState.CpuBoundStrong);
         var parties = new[] { P(-3, 90), P(-2, 92), P(-1, 91), P(1, low1Apres), P(2, low1Apres + 1), P(3, low1Apres + 0.5) };
@@ -1006,7 +1111,7 @@ public sealed class CartesAgirTests
         levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Fail(ErrorCodes.HelperOpFailed, "helper refusé"));
         var le = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
         var retenu = new DrDxt.Application.Tweaks.ReglagesRetenus(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"retenu-{Guid.NewGuid():N}.json"));
-        retenu.Garder(new("gpu.repos_global_normal", "inverse", null, le));
+        retenu.Garder(new("gpu.repos_global_normal", InversesDeTest.Pour("gpu.repos_global_normal"), null, le));
         DrDxt.Application.Parties.PartieRelevee P(int j, double l) =>
             new("cod", le.AddDays(j), le.AddDays(j).AddMinutes(20), 10, 140, l, BottleneckState.CpuBoundStrong);
         var parties = new[] { P(-3, 90), P(-2, 92), P(-1, 91), P(1, 80), P(2, 81), P(3, 80.5) };
@@ -1028,7 +1133,7 @@ public sealed class CartesAgirTests
         var levier = Substitute.For<DrDxt.Core.ITweak>();
         levier.Id.Returns("gpu.repos_global_normal");
         levier.ApplyAsync().Returns(ecrit
-            ? Result<TweakSnapshot>.Ok(new TweakSnapshot("gpu.repos_global_normal", "inverse"))
+            ? Result<TweakSnapshot>.Ok(new TweakSnapshot("gpu.repos_global_normal", InversesDeTest.Pour("gpu.repos_global_normal")))
             : Result<TweakSnapshot>.Fail(ErrorCodes.TweakNotApplicable, "non"));
         var sonde = Substitute.For<IHardwareProbe>();
         sonde.Lire().Returns(new HardwareReading(55.8, null));
@@ -1227,7 +1332,7 @@ public sealed class CartesAgirTests
 
     // L'Instant Replay basculé entre deux scans entre au journal, nommé en mots.
     [Fact]
-    public void Un_reglage_bascule_entre_deux_scans_entre_au_journal()
+    public async Task Un_reglage_bascule_entre_deux_scans_entre_au_journal()
     {
         var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"suivi-{Guid.NewGuid():N}");
         System.IO.Directory.CreateDirectory(dossier);
@@ -1237,14 +1342,45 @@ public sealed class CartesAgirTests
             vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(System.IO.Path.Combine(dossier, "j.json"));
             vm.SuiviReglages = new DrDxt.Application.Parties.SuiviDesReglages(System.IO.Path.Combine(dossier, "s.json"));
             var t = DateTimeOffset.Now;
-            vm.ReleverReglagesSuivis(new Dictionary<string, string> { ["nvidia.instant_replay"] = "on" }, t);
+            await vm.ReleverReglagesSuivisAsync(new Dictionary<string, string> { ["nvidia.instant_replay"] = "on" }, t);
             vm.JournalChangements.Lire().Should().BeEmpty("témoin : premier relevé");
 
-            vm.ReleverReglagesSuivis(new Dictionary<string, string> { ["nvidia.instant_replay"] = "off" }, t.AddHours(1));
+            await vm.ReleverReglagesSuivisAsync(new Dictionary<string, string> { ["nvidia.instant_replay"] = "off" }, t.AddHours(1));
 
             var c = vm.JournalChangements.Lire().Should().ContainSingle().Subject;
             c.Libelle.Should().Be("Changement.Reglage");
             c.Depuis.Should().Be(t);
+        }
+        finally { System.IO.Directory.Delete(dossier, true); }
+    }
+
+    // Le relevé de fond tient le verrou des réglages suivis : le relevé de l'écran attend son tour hors du fil de l'écran,
+    // qui sinon se figeait jusqu'à la fin de l'attente. Le verrou rendu, le relevé aboutit et la bascule entre au journal.
+    [Fact]
+    public async Task Un_releve_qui_attend_son_tour_ne_fige_pas_l_ecran()
+    {
+        var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"suivi-{Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dossier);
+        try
+        {
+            var chemin = System.IO.Path.Combine(dossier, "s.json");
+            var vm = Vm(Array.Empty<RepairFinding>(), helper: null);
+            vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(System.IO.Path.Combine(dossier, "j.json"));
+            vm.SuiviReglages = new DrDxt.Application.Parties.SuiviDesReglages(chemin, attenteMax: TimeSpan.FromSeconds(3));
+            var t = DateTimeOffset.Now;
+            await vm.ReleverReglagesSuivisAsync(new Dictionary<string, string> { ["nvidia.instant_replay"] = "on" }, t);
+
+            Task releve;
+            var chrono = System.Diagnostics.Stopwatch.StartNew();
+            using (DrDxt.Application.Parties.VerrouDuReleve.Prendre(chemin + ".verrou") ?? throw new InvalidOperationException("verrou du test"))
+            {
+                releve = vm.ReleverReglagesSuivisAsync(new Dictionary<string, string> { ["nvidia.instant_replay"] = "off" }, t.AddHours(1));
+                chrono.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1), "l'appelant reprend la main pendant que le relevé attend");
+                releve.IsCompleted.Should().BeFalse("le verrou est tenu : le relevé attend encore");
+            }
+            await releve;
+
+            vm.JournalChangements.Lire().Should().ContainSingle("le verrou rendu, la bascule est relevée");
         }
         finally { System.IO.Directory.Delete(dossier, true); }
     }
@@ -1323,7 +1459,7 @@ public sealed class CartesAgirTests
         try
         {
             var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
-            var pose = new TweakSnapshot("latency.hagsOn", "1", "2");
+            var pose = new TweakSnapshot("latency.hagsOn", InversesDeTest.Pour("latency.hagsOn", "1"), "2");
             leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.hagsOn", true, false, pose, null)], null));
             var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
             vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(System.IO.Path.Combine(dossier, "j.json"));
@@ -1349,6 +1485,37 @@ public sealed class CartesAgirTests
             leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.hagsOn", true, false, pose, null)], null));
             vm.RetirerDuManifeste = _ => Task.FromResult(Result.Fail(ErrorCodes.ManifestUnreadable, "illisible"));
             (await vm.RetirerCeQuiCouteAsync(pire)).Should().Equal("Changement.RetireAuRedemarrage", "Changement.PasSortiDuManifeste");
+        }
+        finally { System.IO.Directory.Delete(dossier, true); }
+    }
+
+    // HAGS est un levier de latence : il coûte un peu d'images et baisse la latence. Jugé sur le 1 % low, ce gain passait pour
+    // « moins bien en jeu » et le retrait automatique le défaisait. Ses parties portent la latence : il se juge sur elle.
+    [Fact]
+    public async Task Un_levier_de_latence_qui_baisse_la_latence_ne_se_retire_pas_sur_les_images()
+    {
+        var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"retrait-{Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dossier);
+        try
+        {
+            var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
+            var pose = new TweakSnapshot("latency.hagsOn", InversesDeTest.Pour("latency.hagsOn", "1"), "2");
+            leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.hagsOn", true, false, pose, null)], null));
+            var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
+            vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(System.IO.Path.Combine(dossier, "j.json"));
+            var quand = new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero);
+            vm.NoterPoses(["latency.hagsOn"], quand.AddHours(-2));
+            vm.JournalChangements.Ajouter(new DrDxt.Application.Parties.Changement(quand, "HAGS", quand.AddHours(-1), "windows.hags:on"));
+            var levier = Substitute.For<ITweak>();
+            levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Ok());
+            vm.LevierParId = id => id == "latency.hagsOn" ? levier : null;
+            DrDxt.Application.Parties.PartieRelevee P(double h, double low1, double ms) => new("cod.exe", quand.AddHours(h),
+                quand.AddHours(h).AddMinutes(20), 6, 120, low1, BottleneckState.CpuBoundOrAppBound, LatenceAffichageMedianMs: ms);
+            var parties = new[] { P(-30, 95, 30), P(-20, 96, 31), P(-10, 94, 29), P(10, 80, 20), P(20, 82, 21), P(30, 81, 19) };
+
+            (await vm.RetirerCeQuiCouteAsync(parties)).Should().BeEmpty("la latence a nettement baissé");
+            await levier.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
+            leviers.Lire().Should().ContainSingle();
         }
         finally { System.IO.Directory.Delete(dossier, true); }
     }
@@ -1450,7 +1617,7 @@ public sealed class CartesAgirTests
         try
         {
             var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
-            var pose = new TweakSnapshot("latency.hagsOn", "1", "2");
+            var pose = new TweakSnapshot("latency.hagsOn", InversesDeTest.Pour("latency.hagsOn", "1"), "2");
             leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.hagsOn", true, false, pose, null)], null));
             var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
             vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(System.IO.Path.Combine(dossier, "j.json"));
@@ -1480,7 +1647,7 @@ public sealed class CartesAgirTests
         try
         {
             var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
-            var pose = new TweakSnapshot("latency.hagsOn", "1", "2");
+            var pose = new TweakSnapshot("latency.hagsOn", InversesDeTest.Pour("latency.hagsOn", "1"), "2");
             leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.hagsOn", true, false, pose, null)], null));
             var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
             vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(System.IO.Path.Combine(dossier, "j.json"));
@@ -1501,6 +1668,36 @@ public sealed class CartesAgirTests
 
             vm.HelperJoignableSansUac = () => Task.FromResult(true);
             (await vm.RetirerCeQuiCouteAsync(pire)).Should().ContainSingle().Which.Should().Be("Changement.Retire", "helper déjà lancé : le retrait part, sans invite");
+        }
+        finally { System.IO.Directory.Delete(dossier, true); }
+    }
+
+    // Un retrait refusé laisse le levier posé, toujours listé : l'écran dit qu'il n'est pas parti.
+    [Fact]
+    public async Task Un_retrait_refuse_se_dit()
+    {
+        var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"retrait-rate-{Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dossier);
+        try
+        {
+            var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
+            var pose = new TweakSnapshot("latency.hagsOn", InversesDeTest.Pour("latency.hagsOn", "1"), "2");
+            leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.hagsOn", true, false, pose, null)], null));
+            var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
+            vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(System.IO.Path.Combine(dossier, "j.json"));
+            var quand = new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero);
+            vm.NoterPoses(["latency.hagsOn"], quand.AddHours(-2));
+            vm.JournalChangements.Ajouter(new DrDxt.Application.Parties.Changement(quand, "HAGS", quand.AddHours(-1), "windows.hags:on"));
+            var levier = Substitute.For<ITweak>();
+            levier.RequiresElevation.Returns(true);
+            levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Fail("REFUS", "pilote"));
+            vm.LevierParId = id => id == "latency.hagsOn" ? levier : null;
+            vm.HelperJoignableSansUac = () => Task.FromResult(true);
+            DrDxt.Application.Parties.PartieRelevee P(double h, double low1) => new("cod.exe", quand.AddHours(h), quand.AddHours(h).AddMinutes(20), 6, 120, low1, BottleneckState.CpuBoundOrAppBound);
+            var pire = new[] { P(-30, 95), P(-20, 96), P(-10, 94), P(10, 80), P(20, 82), P(30, 81) };
+
+            (await vm.RetirerCeQuiCouteAsync(pire)).Should().ContainSingle().Which.Should().Be("Changement.RetraitRate");
+            leviers.Lire().Should().ContainSingle("témoin : il reste listé, le bouton Annuler reste là");
         }
         finally { System.IO.Directory.Delete(dossier, true); }
     }
@@ -1551,7 +1748,7 @@ public sealed class CartesAgirTests
         try
         {
             var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
-            var pose = new TweakSnapshot("latency.vrrFlipModelOn", "origine", "posee");
+            var pose = new TweakSnapshot("latency.vrrFlipModelOn", InversesDeTest.Pour("latency.vrrFlipModelOn", "origine"), "posee");
             leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.vrrFlipModelOn", true, false, pose, null)], null));
             var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
             var levier = Substitute.For<ITweak>();
@@ -1574,6 +1771,109 @@ public sealed class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
+    // Une sous-tension AMD que le pilote a gardée au redémarrage : rendre l'origine dépasse la bande du helper. Sur « Annuler »,
+    // la carte est remise à l'usine et le réglage quitte le journal ; la garde d'incident, qui rend sans clic, dit le refus.
+    private static (IElevatedClient Helper, ITweak Levier) CarteQuiRefuseLOrigine()
+    {
+        var helper = Substitute.For<IElevatedClient>();
+        helper.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));
+        var levier = Substitute.For<ITweak>();
+        levier.RevertAsync(Arg.Any<TweakSnapshot>())
+            .Returns(Result.Fail(ErrorCodes.GpuRemiseUsineRequise, "au-delà de la bande"));
+        return (helper, levier);
+    }
+
+    private static readonly TweakSnapshot SousTensionAmd = new("gpu.undervolt",
+        PrivilegedOpCodec.Serialize(new ApplyAdlxTuningOp(0, AdlxTuningKind.Undervolt, 0)).Value!, "-50");
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task La_remise_a_l_usine_de_la_carte_ne_part_que_sur_le_clic(bool parClic)
+    {
+        var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"usine-{Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dossier);
+        try
+        {
+            var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
+            leviers.Enregistrer(new ApplyReport([new ApplyOutcome("gpu.undervolt", true, false, SousTensionAmd, null)], null));
+            var (helper, levier) = CarteQuiRefuseLOrigine();
+            var vm = Vm(Array.Empty<RepairFinding>(), helper, journalLeviers: leviers);
+            vm.LevierParId = id => id == "gpu.undervolt" ? levier : null;
+            vm.RetirerDuManifeste = _ => Task.FromResult(Result.Ok());
+
+            await vm.AnnulerLevierAsync("gpu.undervolt", parClic);
+
+            if (parClic)
+            {
+                await helper.Received(1).ExecuteAsync(new ApplyAdlxTuningOp(0, AdlxTuningKind.RemiseUsine, 0), Arg.Any<CancellationToken>());
+                leviers.Lire().Should().BeEmpty("remise à l'usine = rendu : un second « Annuler » ne la relance pas");
+                vm.MessageLeviers.Should().Contain(Docteur.T("ADLX.UsineRemise"));
+            }
+            else
+            {
+                await helper.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+                leviers.Lire().Should().ContainSingle("rien n'est rendu sans clic : le refus se dit");
+            }
+        }
+        finally { System.IO.Directory.Delete(dossier, true); }
+    }
+
+    // Le constat de démarrage : le démarrage a dit le refus ; le bouton remet la carte à l'usine, puis le journal se lève.
+    [Fact]
+    public async Task Le_bouton_du_demarrage_remet_la_carte_a_l_usine_et_leve_l_essai()
+    {
+        var chemin = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"essai-{Guid.NewGuid():N}.json");
+        try
+        {
+            var journal = new DrDxt.Application.Autopilot.FichierRevertEnAttente(chemin);
+            journal.Poser("gpu.undervolt", SousTensionAmd).IsOk.Should().BeTrue();
+            var (helper, levier) = CarteQuiRefuseLOrigine();
+            var vm = Vm(Array.Empty<RepairFinding>(), helper);
+            vm.LevierParId = id => id == "gpu.undervolt" ? levier : null;
+
+            vm.RemiseUsineProposee.Should().BeFalse("jamais proposée sans refus au démarrage");
+            vm.ProposerRemiseUsine(journal);
+            vm.RemiseUsineProposee.Should().BeTrue();
+            await helper.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+
+            await vm.RemettreLaCarteALUsineCommand.ExecuteAsync(null);
+
+            await helper.Received(1).ExecuteAsync(new ApplyAdlxTuningOp(0, AdlxTuningKind.RemiseUsine, 0), Arg.Any<CancellationToken>());
+            journal.Lire().Value.Should().BeNull("rendu : le démarrage suivant ne retente rien");
+            vm.RemiseUsineProposee.Should().BeFalse();
+            vm.MessageDemarrage.Should().Be(Docteur.T("ADLX.UsineRemise"));
+        }
+        finally { System.IO.File.Delete(chemin); }
+    }
+
+    // Le journal vit sous %LOCALAPPDATA%, écrivable par tout programme du compte : relu au clic, un inverse qui n'est pas
+    // celui du levier ne part pas, même sur le bouton.
+    [Fact]
+    public async Task Un_essai_modifie_ne_part_pas_sur_le_bouton_du_demarrage()
+    {
+        var chemin = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"essai-{Guid.NewGuid():N}.json");
+        try
+        {
+            var journal = new DrDxt.Application.Autopilot.FichierRevertEnAttente(chemin);
+            journal.Poser("gpu.undervolt", SousTensionAmd).IsOk.Should().BeTrue();
+            var (helper, levier) = CarteQuiRefuseLOrigine();
+            var vm = Vm(Array.Empty<RepairFinding>(), helper);
+            vm.LevierParId = id => id == "gpu.undervolt" ? levier : null;
+            vm.ProposerRemiseUsine(journal);
+            journal.Lever();
+            journal.Poser("gpu.undervolt", new TweakSnapshot("gpu.undervolt",
+                InversesDeTest.Pour("latency.hagsOn"), "x")).IsOk.Should().BeTrue();
+
+            await vm.RemettreLaCarteALUsineCommand.ExecuteAsync(null);
+
+            await helper.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+            await levier.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
+            vm.MessageDemarrage.Should().Be("Demarrage.RemiseUsineIntrouvable");
+        }
+        finally { System.IO.File.Delete(chemin); }
+    }
+
     // Le réglage est bien annulé sur la machine, mais le journal n'a pas pu être réécrit : le scan
     // suivant le dirait « revenu à la valeur d'avant ». C'est dit tout de suite, plutôt qu'une fausse régression plus tard.
     [Fact]
@@ -1585,7 +1885,7 @@ public sealed class CartesAgirTests
         try
         {
             var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(chemin);
-            var pose = new TweakSnapshot("latency.vrrFlipModelOn", "origine", "posee");
+            var pose = new TweakSnapshot("latency.vrrFlipModelOn", InversesDeTest.Pour("latency.vrrFlipModelOn", "origine"), "posee");
             leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.vrrFlipModelOn", true, false, pose, null)], null));
             System.IO.File.SetAttributes(chemin, System.IO.FileAttributes.ReadOnly); // se lit, ne se réécrit plus
             var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
@@ -1653,7 +1953,7 @@ public sealed class CartesAgirTests
         try
         {
             var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
-            var pose = new TweakSnapshot("latency.hagsOn", "1", "2");
+            var pose = new TweakSnapshot("latency.hagsOn", InversesDeTest.Pour("latency.hagsOn", "1"), "2");
             leviers.Enregistrer(new ApplyReport([new ApplyOutcome(pose.TweakId, true, false, pose, null)], null));
             var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
             var levier = Substitute.For<ITweak>();
@@ -1689,7 +1989,7 @@ public sealed class CartesAgirTests
         try
         {
             var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
-            var pose = new TweakSnapshot("latency.vrrFlipModelOn", "origine", "posee");
+            var pose = new TweakSnapshot("latency.vrrFlipModelOn", InversesDeTest.Pour("latency.vrrFlipModelOn", "origine"), "posee");
             leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.vrrFlipModelOn", true, false, pose, null)], null));
             var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
             var levier = Substitute.For<ITweak>();
@@ -1720,7 +2020,7 @@ public sealed class CartesAgirTests
         try
         {
             var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
-            leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.hagsOn", true, false, new TweakSnapshot("latency.hagsOn", "1", "2"), null)], null));
+            leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.hagsOn", true, false, new TweakSnapshot("latency.hagsOn", InversesDeTest.Pour("latency.hagsOn", "1"), "2"), null)], null));
             var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
             vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(System.IO.Path.Combine(dossier, "j.json"));
             var t = new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero);

@@ -35,6 +35,32 @@ public partial class ScanViewModel
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(ADesLignesVerification))] private IReadOnlyList<string> _lignesVerification = [];
     public bool ADesLignesVerification => LignesVerification.Count > 0;
 
+    // Suivre en direct : un fil des réglages essayés, et un arrêt demandé par le joueur, confirmé, lu par la validation
+    // avant chaque réglage (jamais au milieu : chaque réglage est posé, relu et rendu d'un seul tenant). Aucune question
+    // n'est répondue à la place du joueur.
+    private volatile bool _arretVerificationDemande;
+    internal bool ArretVerificationDemande => _arretVerificationDemande;
+    [ObservableProperty] private bool _arretVerificationAConfirmer;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(ADesEtapesVerification))] private IReadOnlyList<string> _etapesVerification = [];
+    public bool ADesEtapesVerification => EtapesVerification.Count > 0;
+    public string LabelVerifierArreter => _localize("Verifier.Arreter");
+    public string LabelVerifierArretConsigne => _localize("Verifier.ArretConsigne");
+    public string LabelVerifierArretConfirmer => _localize("Verifier.ArretConfirmer");
+
+    [RelayCommand]
+    private void DemanderArretVerification() => ArretVerificationAConfirmer = true;
+
+    [RelayCommand]
+    private void AnnulerArretVerification() => ArretVerificationAConfirmer = false;
+
+    [RelayCommand]
+    private void ConfirmerArretVerification()
+    {
+        ArretVerificationAConfirmer = false;
+        _arretVerificationDemande = true;
+        VerificationProgres = _localize("Verifier.ArretEnCours");
+    }
+
     internal IReadOnlyList<string> Lignes(VerificationRendue r) =>
         DrDxt.Application.Autopilot.ValidationComplete.Leviers.Select(id =>
         {
@@ -69,7 +95,7 @@ public partial class ScanViewModel
         catch (Exception) { return false; }
     };
 
-    /// <summary>Le rapport part par un ticket GitHub pré-rempli, sans serveur ; DrDXT
+    /// <summary>Le rapport part par le modèle de ticket GitHub, vide, sans serveur : le joueur y joint son rapport ; DrDXT
     /// n'envoie rien, le joueur relit et soumet. Rapport illisible ou navigateur absent : dit, rien n'est inventé.</summary>
     [RelayCommand]
     private void EnvoyerRapport()
@@ -98,7 +124,7 @@ public partial class ScanViewModel
     private void OuvrirOuCopier(string lien)
     {
         if (OuvrirLien(lien)) return;
-        try { System.Windows.Clipboard.SetText(lien); } catch (Exception) { }
+        try { System.Windows.Clipboard.SetText(lien); } catch (Exception) { /* presse-papiers pris par un autre programme : le lien reste écrit à l'écran */ }
     }
 
     [RelayCommand]
@@ -124,13 +150,18 @@ public partial class ScanViewModel
             return;
         }
         VerificationEnCours = true;
+        _arretVerificationDemande = false;
+        EtapesVerification = [];
         try
         {
             var r = await Task.Run(() => verifier(bloc =>
             {
                 // « === latency.gameModeOn » : le réglage en cours, dit avec son nom.
                 var id = bloc.StartsWith("=== ", StringComparison.Ordinal) ? bloc[4..].Split('\n')[0].Trim() : null;
-                if (id is not null) VerificationProgres = string.Format(_localize("Verifier.EnCours"), _localize(TweakDisplayKeys.TitleKey(id)));
+                if (id is null) return;
+                var titre = _localize(TweakDisplayKeys.TitleKey(id));
+                EtapesVerification = [.. EtapesVerification, string.Format(_localize("Verifier.Etape"), titre)];
+                if (!_arretVerificationDemande) VerificationProgres = string.Format(_localize("Verifier.EnCours"), titre);
             }));
             VerificationChemin = r.Chemin ?? string.Empty;
             LignesVerification = r.Refus is null ? Lignes(r) : [];
@@ -140,6 +171,8 @@ public partial class ScanViewModel
                 : r.AVerifier.Count > 0 ? string.Format(_localize("Verifier.AVerifier"), string.Join(Environment.NewLine, r.AVerifier))
                 : r.ArretPar == DrDxt.Application.Autopilot.ValidationComplete.Arret.RefusDeWindows ? _localize("Verifier.RefusWindows")
                 : r.ArretPar == DrDxt.Application.Autopilot.ValidationComplete.Arret.JeuOuvert ? _localize("Verifier.JeuOuvertEnCours")
+                : r.ArretPar == DrDxt.Application.Autopilot.ValidationComplete.Arret.ParLeJoueur
+                    ? Pluriels.Accorder(string.Format(_localize("Verifier.ArreteParToi"), r.Valides, r.NonTouches, r.Refuses))
                 : Pluriels.Accorder(string.Format(_localize("Verifier.Compte"), r.Valides, r.NonTouches, r.Refuses));
         }
         catch (Exception)
@@ -149,6 +182,7 @@ public partial class ScanViewModel
         finally
         {
             VerificationProgres = string.Empty;
+            ArretVerificationAConfirmer = false;
             VerificationEnCours = false;
             _verrouEssai.Release();
         }

@@ -28,6 +28,20 @@ public sealed class StartupApprovalAllowlistTests
     public void Le_reste_est_refuse(RegistryHiveKind ruche, string liste, string nom, bool actif)
         => _allow.Validate(new SetStartupApprovalOp(ruche, liste, nom, actif)).IsOk.Should().BeFalse();
 
+    // Un antivirus ou un contrôle parental coupé au démarrage n'est pas un gain de confort, et un appelant compromis le
+    // pouvait. Réactivé, il passe toujours.
+    [Theory]
+    [InlineData("AvastUI.exe")]
+    [InlineData("Bitdefender Agent")]
+    [InlineData("Malwarebytes Tray Application")]
+    [InlineData("ESET Security")]
+    [InlineData("Qustodio")]
+    public void Un_antivirus_ou_un_controle_parental_ne_se_coupe_pas(string nom)
+    {
+        _allow.Validate(new SetStartupApprovalOp(RegistryHiveKind.LocalMachine, SetStartupApprovalOp.Run, nom, false)).IsOk.Should().BeFalse();
+        _allow.Validate(new SetStartupApprovalOp(RegistryHiveKind.LocalMachine, SetStartupApprovalOp.Run, nom, true)).IsOk.Should().BeTrue();
+    }
+
     [Fact]
     public void Une_autre_ruche_est_refusee()
         => _allow.Validate(new SetStartupApprovalOp((RegistryHiveKind)99, SetStartupApprovalOp.Run, "x", false)).IsOk.Should().BeFalse();

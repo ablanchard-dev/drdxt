@@ -209,6 +209,35 @@ public class ScanDashboardTests
         vm.ProblemSummary.Should().Be(attendu);
     }
 
+    // La mesure dit que ce levier ne rendra pas d'images ici : le constat reste sur la carte et dit pourquoi.
+    [Fact]
+    public async Task Une_promesse_retiree_par_la_mesure_se_lit_sur_la_carte()
+    {
+        const string motif = "Ta carte graphique est le goulot. Ça ne te donnera pas d'images sur cette machine.";
+        var vm = Build(findings: new List<Finding>
+        {
+            new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12, GainSuppressedReason: motif),
+            new("Latency", Severity.Minor, "Finding.Latency.VrrOff", null),
+        });
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        var lignes = vm.Domaines.SelectMany(d => d.Lignes).ToList();
+        lignes.Single(l => l.Cle == "Finding.Memory.XmpOff").Detail.Should().Contain(motif);
+        lignes.Single(l => l.Cle == "Finding.Latency.VrrOff").Detail.Should().NotContain(motif);
+    }
+
+    // XMP coupé vit aussi dans le guide BIOS : le motif de la mesure y suit la raison, pas seulement sur le constat du scan.
+    [Fact]
+    public async Task Le_guide_bios_dit_aussi_la_promesse_retiree_pour_xmp()
+    {
+        const string motif = "Ta carte graphique est le goulot. Ça ne te donnera pas d'images sur cette machine.";
+        var vm = Build(biosAdvisor: ScanViewModelTestSeams.BiosAdvisor(XmpCoupe),
+            findings: new List<Finding> { new("Memory", Severity.Major, "Finding.Memory.XmpOff", 12, GainSuppressedReason: motif) });
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.BiosFindings.Single(b => b.Kind == nameof(FirmwareSettingKind.XmpExpo)).Rationale.Should().EndWith(motif);
+    }
+
     [Fact]
     public async Task Major_findings_count_into_recommendation_summary()
     {

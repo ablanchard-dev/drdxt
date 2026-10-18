@@ -106,7 +106,7 @@ public static class AppliedStateVerifier
     /// n'est Applied que si toutes le sont ; une seule feuille illisible le rend Unknown ou Unavailable.
     /// </summary>
     private static AppliedStateEvidence VerifierComposite(TweakSnapshot snapshot, IReadOnlyList<PrivilegedOp> posees,
-        IRegistryReader lecteur, INvApi? nvApi, IPowerPlanReader? alimentation)
+        IRegistryReader lecteur, INvApi? nvApi, IPowerPlanReader? alimentation, IServiceStateReader? services)
     {
         var inverses = CompositeSnapshotCodec.Decode(snapshot.OriginalValueJson) is { IsOk: true, Value: { } lus }
             ? lus
@@ -117,7 +117,7 @@ public static class AppliedStateVerifier
             var inverse = inverses.FirstOrDefault(inv => MemeFeuille(inv, posee));
             var origine = inverse is null ? "" : PrivilegedOpCodec.Serialize(inverse).Value ?? "";
             var cible = PrivilegedOpCodec.Serialize(posee).Value ?? "";
-            return Verifier(new TweakSnapshot(snapshot.TweakId, origine, cible), lecteur, nvApi, alimentation);
+            return Verifier(new TweakSnapshot(snapshot.TweakId, origine, cible), lecteur, nvApi, alimentation, services);
         }).ToList();
 
         return new AppliedStateEvidence(snapshot.TweakId, Combiner(feuilles.Select(f => f.Verdict).ToList()),
@@ -144,6 +144,8 @@ public static class AppliedStateVerifier
     {
         (SetRegistryValueOp i, SetRegistryValueOp p) => MemeCle(i.Hive, i.Path, i.Name, p),
         (DeleteRegistryValueOp i, SetRegistryValueOp p) => MemeCle(i.Hive, i.Path, i.Name, p),
+        // Une valeur à rendre absente (origine d'un exercice profond) face à la valeur écrite de la même feuille.
+        (SetRegistryValueOp i, DeleteRegistryValueOp p) => MemeCle(p.Hive, p.Path, p.Name, i),
         (ApplyNvApiDrsSettingOp i, ApplyNvApiDrsSettingOp p) =>
             i.SettingId == p.SettingId && string.Equals(i.ProfileName, p.ProfileName, StringComparison.OrdinalIgnoreCase),
         (DeleteNvApiDrsSettingOp i, ApplyNvApiDrsSettingOp p) =>
@@ -164,8 +166,9 @@ public static class AppliedStateVerifier
     /// <param name="nvApi">Le pilote NVIDIA, quand il est disponible : sans lui, un reglage DRS
     /// rend <c>Unavailable</c> : « je ne sais pas lire » n'est jamais « c'est applique ».</param>
     /// <param name="alimentation">Le lecteur de plan d'alimentation, meme role.</param>
+    /// <param name="services">Le lecteur d'etat des services, meme role.</param>
     public static AppliedStateEvidence Verifier(TweakSnapshot? snapshot, IRegistryReader lecteur,
-        INvApi? nvApi = null, IPowerPlanReader? alimentation = null)
+        INvApi? nvApi = null, IPowerPlanReader? alimentation = null, IServiceStateReader? services = null)
     {
         if (snapshot is null)
             return new AppliedStateEvidence("?", EtatApplique.Unknown, null, null, null, null);
@@ -176,7 +179,7 @@ public static class AppliedStateVerifier
             return new AppliedStateEvidence(snapshot.TweakId, EtatApplique.Unknown, null, null, null, null);
 
         if (CompositeSnapshotCodec.Decode(snapshot.AppliedValueJson) is { IsOk: true, Value: { Count: > 0 } posees })
-            return VerifierComposite(snapshot, posees, lecteur, nvApi, alimentation);
+            return VerifierComposite(snapshot, posees, lecteur, nvApi, alimentation, services);
 
         var cible = Decoder(snapshot.AppliedValueJson);
         var origine = Decoder(snapshot.OriginalValueJson);
@@ -195,6 +198,36 @@ public static class AppliedStateVerifier
         // Une valeur a l'interieur d'un plan, relue par la meme API que le levier lit avant d'ecrire.
         if (cible is SetProcessorBoostModeOp boost)
             return VerifierBoost(snapshot.TweakId, boost, origine as SetProcessorBoostModeOp, alimentation);
+        if (cible is SetWirelessPowerSavingOp sansFil)
+            return VerifierSansFil(snapshot.TweakId, sansFil, origine as SetWirelessPowerSavingOp, alimentation);
+
+        // Un service demarre ou arrete, relu par son etat.
+        if (cible is RunServiceControlOp { Action: ServiceAction.Start or ServiceAction.Stop } service)
+            return VerifierService(snapshot.TweakId, service, origine as RunServiceControlOp, services);
+
+        // Une valeur à rendre absente (l'origine « absente » d'un exercice profond) : absente = la cible est là.
+        if (cible is DeleteRegistryValueOp supprimee)
+        {
+            var feuilleSupprimee = $"{supprimee.Hive}\\{supprimee.Path}\\{supprimee.Name}";
+            var setAvant = origine as SetRegistryValueOp;
+            // Lue selon le type que l'autre op du snapshot donne à la feuille (une chaîne ne se lit pas en DWORD).
+            var luSupprimee = setAvant?.Kind switch
+            {
+                RegistryValueType.String => lecteur.ReadString(supprimee.Hive, supprimee.Path, supprimee.Name),
+                _ => lecteur.ReadDword(supprimee.Hive, supprimee.Path, supprimee.Name) is var d && d.IsOk
+                    ? Result<string?>.Ok(d.Value?.ToString()) : Result<string?>.Fail(ErrorCodes.TweakSdkUnavailable, "non lu"),
+            };
+            if (!luSupprimee.IsOk)
+                return new AppliedStateEvidence(snapshot.TweakId, EtatApplique.Unknown, feuilleSupprimee, setAvant?.Value, null, null);
+            var verdictSupprimee = luSupprimee.Value is null ? EtatApplique.Applied
+                : string.Equals(luSupprimee.Value, setAvant?.Value, StringComparison.Ordinal) ? EtatApplique.NotApplied
+                : EtatApplique.Drifted;
+            return new AppliedStateEvidence(snapshot.TweakId, verdictSupprimee, feuilleSupprimee, setAvant?.Value, null, luSupprimee.Value);
+        }
+
+        // Une chaîne ou une chaîne multiple, relue comme le scan la relit (TweakReadback), comparée telle quelle.
+        if (cible is SetRegistryValueOp { Kind: RegistryValueType.String or RegistryValueType.MultiString } texte)
+            return VerifierTexte(snapshot.TweakId, texte, origine, lecteur);
 
         // Sinon, seules les ops de registre savent se relire aujourd'hui.
         if (cible is not SetRegistryValueOp demande || demande.Kind != RegistryValueType.DWord)
@@ -227,6 +260,22 @@ public static class AppliedStateVerifier
 
         return new AppliedStateEvidence(snapshot.TweakId, EtatApplique.Drifted,
             feuille, avant, demande.Value, observe);
+    }
+
+    private static AppliedStateEvidence VerifierTexte(string tweakId, SetRegistryValueOp demande, PrivilegedOp? origine,
+        IRegistryReader lecteur)
+    {
+        var feuille = $"{demande.Hive}\\{demande.Path}\\{demande.Name}";
+        var avant = origine is SetRegistryValueOp set ? set.Value : null;   // une suppression : absente avant
+        var lu = demande.Kind == RegistryValueType.String
+            ? lecteur.ReadString(demande.Hive, demande.Path, demande.Name)
+            : lecteur.ReadMultiString(demande.Hive, demande.Path, demande.Name);
+        if (!lu.IsOk)
+            return new AppliedStateEvidence(tweakId, EtatApplique.Unknown, feuille, avant, demande.Value, null);
+        var verdict = string.Equals(lu.Value, demande.Value, StringComparison.Ordinal) ? EtatApplique.Applied
+            : string.Equals(lu.Value, avant, StringComparison.Ordinal) ? EtatApplique.NotApplied
+            : EtatApplique.Drifted;
+        return new AppliedStateEvidence(tweakId, verdict, feuille, avant, demande.Value, lu.Value);
     }
 
     /// <summary>La meme comparaison a trois termes, cote pilote NVIDIA.</summary>
@@ -319,6 +368,46 @@ public static class AppliedStateVerifier
             : origine is not null && lu.Value.Valeur == origine.AcValue ? EtatApplique.NotApplied
             : EtatApplique.Drifted;
         return new AppliedStateEvidence(tweakId, verdict, feuille, avant, vise, observe);
+    }
+
+    private static AppliedStateEvidence VerifierSansFil(string tweakId, SetWirelessPowerSavingOp demande,
+        SetWirelessPowerSavingOp? origine, IPowerPlanReader? alimentation)
+    {
+        var feuille = $"économie d'énergie sans fil secteur (plan {demande.PlanGuid:D})";
+        var avant = origine?.AcValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var vise = demande.AcValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        if (alimentation is null)
+            return new AppliedStateEvidence(tweakId, EtatApplique.Unavailable, feuille, avant, vise, null);
+        var lu = alimentation.LireEconomieSansFil(demande.PlanGuid);
+        if (!lu.IsOk || lu.Value is null)
+            return new AppliedStateEvidence(tweakId, EtatApplique.Unknown, feuille, avant, vise, null);
+
+        var observe = lu.Value.Valeur.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var verdict = lu.Value.Valeur == demande.AcValue ? EtatApplique.Applied
+            : origine is not null && lu.Value.Valeur == origine.AcValue ? EtatApplique.NotApplied
+            : EtatApplique.Drifted;
+        return new AppliedStateEvidence(tweakId, verdict, feuille, avant, vise, observe);
+    }
+
+    private static AppliedStateEvidence VerifierService(string tweakId, RunServiceControlOp demande, RunServiceControlOp? origine,
+        IServiceStateReader? services)
+    {
+        static ServiceState Attendu(ServiceAction a) => a == ServiceAction.Start ? ServiceState.Running : ServiceState.Stopped;
+        var feuille = $"service {demande.ServiceName}";
+        var avant = origine is null ? null : Attendu(origine.Action).ToString();
+        var vise = Attendu(demande.Action).ToString();
+
+        if (services is null)
+            return new AppliedStateEvidence(tweakId, EtatApplique.Unavailable, feuille, avant, vise, null);
+        var lu = services.GetServiceState(demande.ServiceName);
+        if (!lu.IsOk)
+            return new AppliedStateEvidence(tweakId, EtatApplique.Unknown, feuille, avant, vise, null);
+
+        var verdict = lu.Value == Attendu(demande.Action) ? EtatApplique.Applied
+            : origine is not null && lu.Value == Attendu(origine.Action) ? EtatApplique.NotApplied
+            : EtatApplique.Drifted;
+        return new AppliedStateEvidence(tweakId, verdict, feuille, avant, vise, lu.Value.ToString());
     }
 
     private static PrivilegedOp? Decoder(string? json)

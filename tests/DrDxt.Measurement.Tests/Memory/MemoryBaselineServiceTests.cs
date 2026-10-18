@@ -58,6 +58,26 @@ public class MemoryBaselineServiceTests
         return (service, banc, fichier);
     }
 
+    // La jauge du scan prévoit la durée de l'étape d'après MesureraPourScan : il annonce ce que le scan fait ensuite.
+    [Theory]
+    [InlineData("vide", 3800, false, true)]
+    [InlineData("meme vitesse", 3800, false, false)]
+    [InlineData("vitesse changee", 3600, false, true)]
+    [InlineData("vide", 3800, true, false)]
+    [InlineData("lecture en panne", 3800, false, false)]
+    public void MesureraPourScan_annonce_ce_que_le_scan_fait(string etat, int mts, bool jeu, bool attendu)
+    {
+        var (service, banc, fichier) = Monter(Mesure(34.20));
+        if (etat is "meme vitesse" or "vitesse changee") service.ProvenChannelsForScan("MACHINE-A", Barrettes());
+        if (etat == "lecture en panne") fichier.LectureCassee = true;
+        var avant = banc.Lancements;
+
+        service.MesureraPourScan("MACHINE-A", Barrettes(mts), jeu).Should().Be(attendu);
+        service.ProvenChannelsForScan("MACHINE-A", Barrettes(mts), jeu);
+        (banc.Lancements > avant).Should().Be(attendu, "l'annonce et le scan suivent la même règle");
+        fichier.Should().NotBeNull();
+    }
+
     [Fact]
     public void Le_premier_scan_mesure_enregistre_et_prouve_les_canaux()
     {

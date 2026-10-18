@@ -24,6 +24,16 @@ public sealed class JournalDesChangementsTests : IDisposable
         j.Lire().Select(c => c.Libelle).Should().Equal("Levier", "BIOS");
     }
 
+    // Un JSON valide aux entrées vides : elles sont écartées, et l'ajout suivant ne tombe pas dessus.
+    [Fact]
+    public void Les_entrees_vides_d_un_journal_valide_sont_ecartees()
+    {
+        File.WriteAllText(_chemin, "[null, {}, {\"Quand\":\"2026-10-04T04:30:00+00:00\",\"Libelle\":\"BIOS\"}]");
+        var j = new JournalDesChangements(_chemin);
+        j.Lire().Select(c => c.Libelle).Should().Equal("BIOS");
+        j.Ajouter(new Changement(new DateTimeOffset(2026, 10, 5, 0, 0, 0, TimeSpan.Zero), "Levier")).IsOk.Should().BeTrue();
+    }
+
     [Fact]
     public void Un_fichier_abime_se_lit_vide()
     {

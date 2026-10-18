@@ -23,6 +23,9 @@ public abstract class FixItTweakBase : ITweak
     /// (la méthode d'un dérivé sans elle n'était jamais appelée : la valeur par défaut de l'interface répondait).</summary>
     public virtual bool EtatNonLu(SettingsState state) => false;
 
+    /// <summary>Virtuel ici pour la même raison qu'<see cref="EtatNonLu"/> : null = pas d'exercice sûr.</summary>
+    public virtual ExerciceProfond? PreparerExercice(HardwareInventory hw, SettingsState state) => null;
+
     /// <summary>Virtuelle pour la même raison : un réglage relu par Windows au démarrage le déclare.</summary>
     public virtual bool TakesEffectAfterReboot => false;
 
@@ -47,6 +50,8 @@ public abstract class FixItTweakBase : ITweak
     /// Prudent : snapshot malformé → SAFETY.SNAPSHOT_INVALID, ne lève jamais.</summary>
     public virtual async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Snapshot has no original-value payload.");
 

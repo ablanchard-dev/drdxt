@@ -59,7 +59,8 @@ public sealed class JournalDesChangements
     {
         var texte = _fichier.Read();
         if (!texte.IsOk || string.IsNullOrWhiteSpace(texte.Value)) return [];
-        try { return JsonSerializer.Deserialize<List<Changement>>(texte.Value) ?? []; }
+        // Les entrées vides d'un JSON valide ([null], [{}]) sont écartées : la frise et l'ajout suivant les liraient.
+        try { return JsonSerializer.Deserialize<List<Changement?>>(texte.Value)?.OfType<Changement>().Where(c => c.Libelle is not null).ToList() ?? []; }
         catch (JsonException) { return []; }
     }
 

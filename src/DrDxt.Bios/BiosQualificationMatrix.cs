@@ -210,7 +210,7 @@ public static class BiosQualificationMatrix
         // Trois réglages qui brident le processeur, relevés sur la machine de référence (IFR 1.H0, une
         // déclaration chacun) : la limite de courant (160 A mesurés : le processeur tombe de 4,9 à 3,9 GHz),
         // le Lite Load (tension ; Mode 9 = 80, relevé le 11/10) et la protection contre les excursions de courant (CEP).
-        Lecture("CPU Current Limit", new NvramLocation("Setup", "{ec87d643-eba4-4bb5-a1e5-3f3e36b20da9}", VarSize: 0x13D9, 0xF29,
+        Lecture("CPU Current Limit", new NvramLocation("Setup", GuidsUefi.AmiSetup, VarSize: 0x13D9, 0xF29,
             new Dictionary<byte, string>(), Default: 0, Taille: 2, Min: 0, Max: 512, Unite: "A", ZeroVautAuto: true)),
         Lecture("CPU Lite Load Control", Setup(0xF62, Defaut: 0, (0, "Normal"), (1, "Advanced"), (2, "Intel Default"))),
         Lecture("CPU Lite Load", Setup(0xF63, Defaut: 0, (0, "Auto"), (1, "Mode 1"), (10, "Mode 2"), (20, "Mode 3"),
@@ -235,12 +235,12 @@ public static class BiosQualificationMatrix
     ];
 
     private static NvramLocation Cpu(int offset, byte Defaut, params (byte Valeur, string Libelle)[] valeurs) =>
-        new("CpuSetup", "{b08f97ff-e6e8-4193-a997-5e9e9b0adb32}", VarSize: 0x3C1, offset,
+        new("CpuSetup", GuidsUefi.IntelCpuSetup, VarSize: 0x3C1, offset,
             valeurs.ToDictionary(v => v.Valeur, v => v.Libelle), Defaut);
 
     // IFR : « Max: 4096W / Min: 1W », Size 32, defaut 0 (Auto).
     private static NvramLocation CpuWatts(int offset) =>
-        new("CpuSetup", "{b08f97ff-e6e8-4193-a997-5e9e9b0adb32}", VarSize: 0x3C1, offset,
+        new("CpuSetup", GuidsUefi.IntelCpuSetup, VarSize: 0x3C1, offset,
             new Dictionary<byte, string>(), Default: 0, Taille: 4, Min: 0, Max: 4096, Unite: "W", ZeroVautAuto: true);
 
     private static BiosQualification Lecture(string reglage, NvramLocation nvram) =>
@@ -255,12 +255,12 @@ public static class BiosQualificationMatrix
     private const string SourceIfr = "IFR du BIOS officiel MSI 1.H0 (7D98v1H.zip), IFRExtractor-RS 1.6.1, 24/09/2026";
 
     private static NvramLocation Setup(int offset, byte Defaut, params (byte Valeur, string Libelle)[] valeurs) =>
-        new("Setup", "{ec87d643-eba4-4bb5-a1e5-3f3e36b20da9}", VarSize: 0x13D9, offset,
+        new("Setup", GuidsUefi.AmiSetup, VarSize: 0x13D9, offset,
             valeurs.ToDictionary(v => v.Valeur, v => v.Libelle), Defaut);
 
     // Un réglage numérique d'un octet de la variable Setup (IFR : Min 0, Max 100, Step 1), avec son unité.
     private static NvramLocation SetupNombre(int offset, byte Defaut, string Unite) =>
-        new("Setup", "{ec87d643-eba4-4bb5-a1e5-3f3e36b20da9}", VarSize: 0x13D9, offset,
+        new("Setup", GuidsUefi.AmiSetup, VarSize: 0x13D9, offset,
             new Dictionary<byte, string>(), Defaut, Taille: 1, Min: 0, Max: 100, Unite: Unite);
 
     /// <summary>Toutes les entrees de cette carte partagent le meme etat de connaissance : chemin

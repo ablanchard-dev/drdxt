@@ -38,6 +38,8 @@ public class SourcesCiteesTests
         "www.techpowerup.com",      // Mesure publique des limites de puissance (i9-14900K, 35 a 253 W, jeux 720p a 4K)
         "hwbusters.com",            // Mesure publique du parcage X3D (7950X3D, 1080p), graphique relu
         "www.msi.com",              // La page d'assistance d'une carte MSI (manuel), ouverte sur clic ; relevée dans un vrai navigateur
+        "semiconductor.samsung.com", // Les firmwares des SSD Samsung et leur correctif (défauts connus), relevée le 16/10/2026
+        "speed.cloudflare.com",     // Le serveur public de mesure de Cloudflare, chargé par le seul clic « Tester ma ligne sous charge »
     };
 
     private static DirectoryInfo RacineDuDepot()

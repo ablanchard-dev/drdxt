@@ -56,6 +56,22 @@ public sealed class GameDvrBackgroundOffTweak : LatencyTweakBase
         catch (Exception) { return true; } // frontiere externe : non lu, jamais « deja regle »
     }
 
+    // Banc profond : déjà à 0 ou absente (absente vaut 0), l'exercice passe par 1 (l'enregistrement en arrière-plan
+    // allumé) puis rend l'origine exacte, 0 ou absente.
+    public override ExerciceProfond? PreparerExercice(HardwareInventory hw, SettingsState state)
+    {
+        try
+        {
+            if (_registry.ReadDword(RegistryHiveKind.CurrentUser, GameDvrPath, HistoricalCaptureName) is not { IsOk: true, Value: null or Disabled } lu)
+                return null;
+            static string Op(string v) => PrivilegedOpCodec.Serialize(new SetRegistryValueOp(RegistryHiveKind.CurrentUser, GameDvrPath,
+                HistoricalCaptureName, RegistryValueType.DWord, v)).Value!;
+            var origine = BuildRegistryInverse(RegistryHiveKind.CurrentUser, GameDvrPath, HistoricalCaptureName, lu.Value);
+            return origine.IsOk && origine.Value is { } o ? new ExerciceProfond(o, Op("1")) : null;
+        }
+        catch (Exception) { return null; }
+    }
+
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
         try

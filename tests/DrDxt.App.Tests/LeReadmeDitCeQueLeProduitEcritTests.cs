@@ -14,6 +14,26 @@ public sealed class LeReadmeDitCeQueLeProduitEcritTests
     private static readonly Regex Feuille = new(
         @"new\(RegistryHiveKind\.\w+,\s*@""[^""]+"",\s*""([^""]+)"",\s*RegistryValueType\.\w+\)", RegexOptions.Compiled);
 
+    // Une feuille déclarée par constantes (les heures d'activité : HeuresActives.NomDebut) échappait au crible ci-dessus, et
+    // le README a pu taire une écriture réelle. Son nom se relit dans la classe qui déclare la constante.
+    private static readonly Regex FeuilleParConstante = new(
+        @"new\(RegistryHiveKind\.\w+,\s*[\w.]+,\s*(\w+)\.(\w+),\s*RegistryValueType\.\w+\)", RegexOptions.Compiled);
+
+    /// <summary>Les noms de valeurs que la liste blanche du helper peut écrire, en clair ou par constante.</summary>
+    private static HashSet<string> ValeursEcrivables()
+    {
+        var code = File.ReadAllText(Path.Combine(Racine(), "src", "DrDxt.ElevatedHelper", "OpAllowlist.cs"));
+        var valeurs = Feuille.Matches(code).Select(m => m.Groups[1].Value).ToHashSet();
+        foreach (Match m in FeuilleParConstante.Matches(code))
+        {
+            var (classe, constante) = (m.Groups[1].Value, m.Groups[2].Value);
+            var source = Directory.EnumerateFiles(Path.Combine(Racine(), "src"), "*.cs", SearchOption.AllDirectories)
+                .Select(File.ReadAllText).Single(t => Regex.IsMatch(t, $@"\bclass {classe}\b"));
+            valeurs.Add(Regex.Match(source, $@"const string {constante} = ""([^""]+)""").Groups[1].Value);
+        }
+        return valeurs;
+    }
+
     private static string Racine()
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
@@ -35,9 +55,9 @@ public sealed class LeReadmeDitCeQueLeProduitEcritTests
     [InlineData("README.md", "## What DrDXT writes on your machine")]
     public void Chaque_valeur_de_registre_ecrivable_est_nommee_dans_le_README(string fichier, string titre)
     {
-        var code = File.ReadAllText(Path.Combine(Racine(), "src", "DrDxt.ElevatedHelper", "OpAllowlist.cs"));
-        var valeurs = Feuille.Matches(code).Select(m => m.Groups[1].Value).Distinct().ToList();
+        var valeurs = ValeursEcrivables();
         valeurs.Should().HaveCountGreaterThan(5, "témoin : le crible lit bien la liste blanche");
+        valeurs.Should().Contain("ActiveHoursStart", "témoin : une feuille déclarée par constante est lue aussi");
 
         var section = Section(File.ReadAllText(Path.Combine(Racine(), fichier)), titre);
         valeurs.Where(v => !section.Contains($"`{v}`", StringComparison.Ordinal))
@@ -51,8 +71,7 @@ public sealed class LeReadmeDitCeQueLeProduitEcritTests
     [InlineData("README.md", "## What DrDXT writes on your machine", "- **Registry")]
     public void Le_README_n_annonce_aucune_valeur_que_le_helper_ne_peut_plus_ecrire(string fichier, string titre, string puce)
     {
-        var code = File.ReadAllText(Path.Combine(Racine(), "src", "DrDxt.ElevatedHelper", "OpAllowlist.cs"));
-        var valeurs = Feuille.Matches(code).Select(m => m.Groups[1].Value).ToHashSet();
+        var valeurs = ValeursEcrivables();
 
         var section = Section(File.ReadAllText(Path.Combine(Racine(), fichier)), titre);
         var debut = section.IndexOf(puce, StringComparison.Ordinal);

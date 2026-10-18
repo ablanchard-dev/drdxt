@@ -159,21 +159,38 @@ public static class InventaireMachine
         }
     }
 
+    /// <summary>Chaque service et pilote inscrit sous HKLM\SYSTEM\CurrentControlSet\Services qui porte un ImagePath : son nom et
+    /// son ImagePath tel quel. Une seule énumération, partagée par l'inventaire et par le constat RTCore. null = clé illisible.</summary>
+    internal static IReadOnlyList<(string Nom, string Image)>? ServicesDuRegistre()
+    {
+        try
+        {
+            using var cle = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services");
+            if (cle is null) return null;
+            var lus = new List<(string, string)>();
+            foreach (var nom in cle.GetSubKeyNames())
+            {
+                using var s = cle.OpenSubKey(nom);
+                if (s?.GetValue("ImagePath") is string image && !string.IsNullOrWhiteSpace(image)) lus.Add((nom, image.Trim()));
+            }
+            return lus;
+        }
+        catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException) { return null; }
+    }
+
     private static IEnumerable<ElementInstalle> ServicesTiers()
     {
-        using var cle = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services");
-        if (cle is null) yield break;
+        var services = ServicesDuRegistre();
+        if (services is null) yield break;
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        foreach (var nom in cle.GetSubKeyNames())
+        foreach (var (nom, image) in services)
         {
-            using var s = cle.OpenSubKey(nom);
-            if (s?.GetValue("ImagePath") is not string image || string.IsNullOrWhiteSpace(image)) continue;
             var chemin = Environment.ExpandEnvironmentVariables(image.Trim().Trim('"'));
             // Le dossier Windows lu, plus « C:\Windows » écrit en dur (Windows installé sur D:).
             if (chemin.StartsWith(windows, StringComparison.OrdinalIgnoreCase) || chemin.StartsWith(@"\SystemRoot", StringComparison.OrdinalIgnoreCase)
                 || chemin.StartsWith(@"System32\", StringComparison.OrdinalIgnoreCase) || chemin.StartsWith(@"\??\" + windows, StringComparison.OrdinalIgnoreCase))
                 continue;
-            yield return new ElementInstalle(Services, nom, image.Trim());
+            yield return new ElementInstalle(Services, nom, image);
         }
     }
 
@@ -191,7 +208,8 @@ public static class InventaireMachine
     public static IReadOnlyList<RepairFinding> Apercu(string fichier, Func<string, string> pnputil)
     {
         Releve? precedent = null;
-        try { if (File.Exists(fichier)) precedent = JsonSerializer.Deserialize<Releve>(File.ReadAllText(fichier)); } catch { }
+        try { if (File.Exists(fichier)) precedent = JsonSerializer.Deserialize<Releve>(File.ReadAllText(fichier)); }
+        catch { /* relevé précédent illisible : pas de référence, donc rien à comparer */ }
         return precedent is null ? [] : Juger(precedent, Lire(pnputil)).ToList();
     }
 
@@ -202,14 +220,9 @@ public static class InventaireMachine
         try { if (File.Exists(fichier)) precedent = JsonSerializer.Deserialize<Releve>(File.ReadAllText(fichier)); } catch { /* abîmé : on repart */ }
         var actuel = Lire(pnputil);
         var constats = Juger(precedent, actuel).ToList();
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(fichier)!);
-            var temp = fichier + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(actuel));
-            File.Move(temp, fichier, overwrite: true);
-        }
-        catch { /* référence non gardée : le prochain scan reposera un point de référence */ }
+        // Un échec laisse la référence non gardée : le prochain scan reposera un point de référence.
+        try { new FichierJsonAtomique(fichier, ErrorCodes.IoFailure).WriteAtomic(JsonSerializer.Serialize(actuel)); }
+        catch { /* référence non gardée */ }
         return constats;
     }
 }

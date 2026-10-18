@@ -1,5 +1,4 @@
 ﻿using DrDxt.Core;
-using System.Globalization;
 
 namespace DrDxt.Measurement;
 
@@ -41,11 +40,9 @@ public static class PlafondGpu
     /// qu'on imprime.</summary>
     private const double MurEnVue = 50.0;
 
-    /// <summary>La phrase parle francais meme quand Windows tourne dans une autre langue : sans
-    /// ceci, `ToString` prend la culture courante du processus et sort un point au lieu d'une
-    /// virgule sur une machine non francaise (mesure sur GitHub Actions le 12/09/2026).</summary>
-    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
-    private static string Pct(double v) => v.ToString("0.#", Fr);
+    /// <summary>Le nombre suit la langue de l'App (<see cref="Docteur.Langue"/>), pas celle du processus : une virgule en
+    /// français, un point en anglais, quelle que soit la langue de Windows.</summary>
+    private static string Pct(double v) => v.ToString("0.#", Docteur.Langue);
 
     /// <summary>La borne pour une occupation GPU donnee, en pourcent.</summary>
     public static BorneDuGain Borner(double gpuBusyPercent)

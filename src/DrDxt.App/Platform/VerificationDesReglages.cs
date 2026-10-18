@@ -21,7 +21,7 @@ public static class VerificationDesReglages
 {
     /// <summary>La preuve de chaque reglage garde. Manifeste illisible ⇒ liste vide (on ne dit rien de faux).</summary>
     public static async Task<IReadOnlyList<AppliedStateEvidence>> VerifierAsync(IDesiredStateStore manifeste,
-        IRegistryReader registre, INvApi? nvApi = null, IPowerPlanReader? alimentation = null)
+        IRegistryReader registre, INvApi? nvApi = null, IPowerPlanReader? alimentation = null, IServiceStateReader? services = null)
     {
         var charge = await manifeste.LoadAsync().ConfigureAwait(false);
         if (!charge.IsOk || charge.Value is not { } etat)
@@ -40,7 +40,7 @@ public static class VerificationDesReglages
                 _ => CompositeSnapshotCodec.Encode(posees).Value,
             };
             return AppliedStateVerifier.Verifier(
-                new TweakSnapshot(e.t.TweakId, e.t.OriginalValueJson, appliquee), registre, nvApi, alimentation);
+                new TweakSnapshot(e.t.TweakId, e.t.OriginalValueJson, appliquee), registre, nvApi, alimentation, services);
         }).ToList();
     }
 
@@ -67,7 +67,8 @@ public static class VerificationDesReglages
                 services.GetRequiredService<IDesiredStateStore>(),
                 services.GetRequiredService<IRegistryReader>(),
                 services.GetService<INvApi>(),
-                services.GetService<IPowerPlanReader>())).ConfigureAwait(true);
+                services.GetService<IPowerPlanReader>(),
+                services.GetService<IServiceStateReader>())).ConfigureAwait(true);
             ecran.ReglagesModifies = Dire(preuves, k => localiseur.Get(k));
         }
         catch

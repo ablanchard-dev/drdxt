@@ -41,7 +41,7 @@ public static class ElevatedClientFactory
     public const string HelperExeName = PipeServerIdentity.HelperExeName;
 
     /// <summary>Les valeurs HKCU s'écrivent par l'App (jeton de l'utilisateur), le reste par le helper.</summary>
-    public static IElevatedClient Create() => new ClientSessionUtilisateur(CreerVersLeHelper());
+    public static IElevatedClient Create() => new ClientSessionUtilisateur(new ClientDesPoses(CreerVersLeHelper()));
 
     private static IElevatedClient CreerVersLeHelper()
     {
@@ -86,7 +86,10 @@ public static class ElevatedClientFactory
     /// tube (meme garde d'authentification du serveur), sinon il echoue vite (HELPER_UNREACHABLE). Pour les
     /// gestes de fond, comme le rafraichissement de l'habilitation du manifeste : une invite UAC sans geste
     /// de l'utilisateur n'est jamais acceptable.</summary>
-    public static IElevatedClient CreateSansLancer() => new ClientSessionUtilisateur(CreerSansLancerVersLeHelper());
+    /// <summary>Le dernier essai des acquits refusés, à la fermeture : sans lancer le helper, aucune invite à ce moment-là.</summary>
+    public static Task<string?> DernierEssaiDesAcquitsAsync() => new ClientDesPoses(CreerSansLancerVersLeHelper()).DernierEssaiAsync();
+
+    public static IElevatedClient CreateSansLancer() => new ClientSessionUtilisateur(new ClientDesPoses(CreerSansLancerVersLeHelper()));
 
     private static IElevatedClient CreerSansLancerVersLeHelper()
     {

@@ -25,6 +25,7 @@ public sealed class TweakCandidate : IAutopilotCandidate
     private readonly IRegistryReader _registre;
     private readonly INvApi? _nvApi;
     private readonly IPowerPlanReader? _alimentation;
+    private readonly IServiceStateReader? _services;
     private readonly IRevertEnAttente _journal;
     private readonly IDesiredStateStore? _manifeste;
     private TweakSnapshot? _snapshot;
@@ -40,8 +41,9 @@ public sealed class TweakCandidate : IAutopilotCandidate
     /// et <see cref="OrigineHorsManifeste"/> le dit.</param>
     public TweakCandidate(ITweak tweak, CandidateDescriptor descriptor, IRegistryReader registre,
         IRevertEnAttente journal, INvApi? nvApi = null, IPowerPlanReader? alimentation = null,
-        IDesiredStateStore? manifeste = null)
+        IDesiredStateStore? manifeste = null, IServiceStateReader? services = null)
     {
+        _services = services;
         _manifeste = manifeste;
         _journal = journal ?? throw new ArgumentNullException(nameof(journal));
         _tweak = tweak ?? throw new ArgumentNullException(nameof(tweak));
@@ -71,6 +73,8 @@ public sealed class TweakCandidate : IAutopilotCandidate
             return Result.Fail(pose.Error?.Code ?? FichierRevertEnAttente.CodeErreur,
                 Docteur.T("GX.SansFilet", pose.Error?.Message));
 
+        // Le journal ci-dessus ne connaît pas encore l'origine : le helper la garde jusqu'à ce qu'il la porte.
+        using var portee = PorteeDePose.Ouvrir();
         var r = _tweak.ApplyAsync().GetAwaiter().GetResult();
         if (!r.IsOk || r.Value is null)
         {
@@ -101,6 +105,7 @@ public sealed class TweakCandidate : IAutopilotCandidate
         }
 
         _snapshot = r.Value;
+        portee.FermerAsync().GetAwaiter().GetResult();
         return Result.Ok();
     }
 
@@ -172,7 +177,7 @@ public sealed class TweakCandidate : IAutopilotCandidate
     {
         if (_snapshot is not { } s) return Result<bool>.Ok(false);
 
-        DernierePreuve = AppliedStateVerifier.Verifier(s, _registre, _nvApi, _alimentation);
+        DernierePreuve = AppliedStateVerifier.Verifier(s, _registre, _nvApi, _alimentation, _services);
         return Result<bool>.Ok(DernierePreuve.AutoriseLaMesure);
     }
 }

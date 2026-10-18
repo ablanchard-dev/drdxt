@@ -74,15 +74,20 @@ public sealed class FichierRevertEnAttente : IRevertEnAttente
         // pas encore rendu effacerait son origine pour toujours (essai démarré après une remise au démarrage refusée).
         // Le même levier aussi. Retenté après une remise ratée, il recapturerait comme « origine » la valeur
         // que DrDXT avait posée. Seul compléter son propre essai (pose sans origine puis avec) est permis.
-        if (LireContenu() is { IsOk: true, Value: { TweakId: { } enCours } contenu }
+        var lu = LireContenu();
+        if (lu is { IsOk: true, Value: { TweakId: { } enCours } contenu }
             && (!string.Equals(enCours, tweakId, StringComparison.Ordinal) || (contenu.Snapshot is not null && snapshot is null)))
             return Result.Fail(CodeErreur, Docteur.T("RV.EncoreEnEssai", enCours));
-        return Ecrire(new Contenu(tweakId, snapshot, GardesActuels()));
+        if (!lu.IsOk && !MettreDeCoteSiIllisible()) return Result.Fail(CodeErreur, lu.Error?.Message ?? "lecture impossible");
+        return Ecrire(new Contenu(tweakId, snapshot, lu.Value?.Gardes ?? Array.Empty<RevertEnAttenteEntree>()));
     }
 
     public Result Lever()
     {
-        var gardes = GardesActuels();
+        var lu = LireContenu();
+        if (!lu.IsOk)
+            return MettreDeCoteSiIllisible() ? Result.Ok() : Result.Fail(CodeErreur, lu.Error?.Message ?? "lecture impossible");
+        var gardes = lu.Value?.Gardes ?? Array.Empty<RevertEnAttenteEntree>();
         if (gardes.Count > 0) return Ecrire(new Contenu(null, null, gardes));
         try
         {
@@ -97,9 +102,9 @@ public sealed class FichierRevertEnAttente : IRevertEnAttente
 
     public Result Garder(string tweakId, TweakSnapshot snapshot)
     {
-        // Relu avant d'ecrire : un fichier illisible n'est pas une liste vide a ecraser.
+        // Relu avant d'ecrire : un fichier illisible n'est pas une liste vide a ecraser, il est mis de cote.
         var lu = LireContenu();
-        if (!lu.IsOk) return Result.Fail(CodeErreur, lu.Error?.Message ?? "lecture impossible");
+        if (!lu.IsOk && !MettreDeCoteSiIllisible()) return Result.Fail(CodeErreur, lu.Error?.Message ?? "lecture impossible");
         var gardes = (lu.Value?.Gardes ?? Array.Empty<RevertEnAttenteEntree>()).ToList();
         if (!gardes.Any(g => string.Equals(g.TweakId, tweakId, StringComparison.Ordinal)))
             gardes.Add(new RevertEnAttenteEntree(tweakId, snapshot));
@@ -117,10 +122,12 @@ public sealed class FichierRevertEnAttente : IRevertEnAttente
 
     private Result Ecrire(Contenu c) => _fichier.WriteAtomic(JsonSerializer.Serialize(c));
 
-    // Simplification voulue : un fichier illisible au moment de poser un essai est ecrase ; le demarrage
-    // l'a deja signale. Seul Garder refuse de l'ecraser, parce qu'il y ajouterait une trace.
-    private IReadOnlyList<RevertEnAttenteEntree> GardesActuels()
-        => LireContenu() is { IsOk: true, Value.Gardes: { } g } ? g : Array.Empty<RevertEnAttenteEntree>();
+    // Un fichier illisible (coupure, ou fichier ecrit par un autre programme du compte) portait peut-etre les origines des
+    // leviers gardes : ecrase, elles disparaissaient ; garde, il bloquait tout nouvel essai. Le demarrage l'a dit
+    // (RV.JournalIllisible) ; il est mis de cote, sa trace reste. Faux si le fichier ne s'est pas lu du tout (tenu, droits) :
+    // ce n'est pas un contenu illisible, rien n'est ecrit.
+    private bool MettreDeCoteSiIllisible()
+        => _fichier.Read().IsOk && _fichier.MettreDeCote();
 
     private Result<Contenu?> LireContenu()
     {
@@ -142,26 +149,48 @@ public sealed class FichierRevertEnAttente : IRevertEnAttente
 /// <summary>Au demarrage : rendre ce qu'une session interrompue a laisse pose.</summary>
 public static class RevertAuDemarrage
 {
+    /// <summary>Les leviers dont chaque écriture passe par le journal d'écriture anticipée du helper : tué avant d'en garder
+    /// l'origine, l'App ne sait pas la rendre, le helper si. Tenue égale à ce que le rejeu rend vraiment, levier par levier
+    /// (InvariantsDesLeviersTests).</summary>
+    public static readonly IReadOnlySet<string> LeviersJournalises = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "latency.reflex", "latency.render_queue_cap", "latency.vrr_vsync_cap", "latency.hagsOn", "latency.gameModeOn",
+        "latency.gameDvrBackgroundOff", "latency.mouse_acceleration_off", "latency.vrrFlipModelOn", "latency.prefer_max_perf",
+        "gpu.power_limit", "fixit.x3d_ccd", "fixit.power_plan", "fixit.mode_boost", "fixit.wifi_performances",
+        "fixit.plan_economie", "fixit.cpu_power_limit", "fixit.cpu_power_cap", "fixit.pagefile_ssd", "fixit.heures_actives",
+    };
+
     /// <summary>Rend la phrase a montrer au joueur, ou <c>null</c> quand rien n'etait en attente.
     /// Le journal n'est leve que si le levier est rendu (ou s'il n'y a rien a rendre) : un revert
     /// rate se retentera au prochain demarrage. Un levier garde n'est jamais en essai : il n'est
     /// ni rendu ni efface ici.</summary>
-    public static string? Executer(IRevertEnAttente journal, ITweakCatalog catalogue)
+    public static string? Executer(IRevertEnAttente journal, ITweakCatalog catalogue) => Executer(journal, catalogue, out _);
+
+    /// <param name="remiseUsineRequise">Vrai quand le helper a refusé de rendre la fréquence de la carte AMD (au-delà de
+    /// sa bande) : l'écran propose alors la remise à l'usine, sur clic seulement. Le démarrage, lui, n'agit pas.</param>
+    /// <param name="nom">Le titre affiché d'un réglage, que l'App passe ; par défaut, l'identifiant.</param>
+    /// <param name="raison">La raison lisible d'un échec, que l'App passe ; par défaut, son code. Le message (souvent
+    /// l'anglais technique du helper) n'entre jamais dans la phrase.</param>
+    public static string? Executer(IRevertEnAttente journal, ITweakCatalog catalogue, out bool remiseUsineRequise,
+        Func<string, string>? nom = null, Func<Result, string>? raison = null)
     {
+        remiseUsineRequise = false;
+        string Nom(string id) => nom?.Invoke(id) ?? id;
+        string Raison(Result r) => raison?.Invoke(r) ?? r.Error?.Code ?? string.Empty;
         var lu = journal.Lire();
         if (!lu.IsOk)
-            return Docteur.T("RV.JournalIllisible", lu.Error?.Message);
+            return Docteur.T("RV.JournalIllisible", Raison(lu));
         if (lu.Value is not { } entree) return null;
 
         if (entree.Snapshot is not { } snapshot)
         {
             journal.Lever();
-            return Docteur.T("RV.SansOrigine", entree.TweakId);
+            return Docteur.T(LeviersJournalises.Contains(entree.TweakId) ? "RV.SansOrigineGardee" : "RV.SansOrigine", Nom(entree.TweakId));
         }
 
         var levier = catalogue.Get(entree.TweakId);
         if (!levier.IsOk || levier.Value is null)
-            return Docteur.T("RV.LevierDisparu", entree.TweakId);
+            return Docteur.T("RV.LevierDisparu", Nom(entree.TweakId));
 
         // Ce fichier vit sous %LOCALAPPDATA%, écrivable par tout
         // processus du compte, et le levier rejoue son contenu par le helper élevé. Sans ce contrôle,
@@ -169,18 +198,21 @@ public static class RevertAuDemarrage
         // BCD, écriture du manifeste…) sous une autorisation Windows donnée « à DrDXT ». Seuls les
         // types qu'un levier utilise réellement comme inverse passent ; tout le reste, et tout type
         // futur, est refusé. Le journal reste en place : le joueur est prévenu, rien n'est rejoué.
-        if (!InverseRejouable(entree.TweakId, snapshot.OriginalValueJson))
-            return Docteur.T("RV.InverseRefuse", entree.TweakId);
+        if (!AnnulationSure(entree.TweakId, snapshot.OriginalValueJson))
+            return Docteur.T("RV.InverseRefuse", Nom(entree.TweakId));
 
         Result rendu;
         try { rendu = levier.Value.RevertAsync(snapshot).GetAwaiter().GetResult(); }
         catch (Exception ex) { rendu = Result.Fail(CodeRevert, ex.Message); }
 
         if (!rendu.IsOk)
-            return Docteur.T("RV.RenduEchoue", entree.TweakId, rendu.Error?.Message);
+        {
+            remiseUsineRequise = rendu.Error?.Code == ErrorCodes.GpuRemiseUsineRequise;
+            return Docteur.T("RV.RenduEchoue", Nom(entree.TweakId), Raison(rendu));
+        }
 
         journal.Lever();
-        return Docteur.T("RV.Remis", entree.TweakId);
+        return Docteur.T("RV.Remis", Nom(entree.TweakId));
     }
 
     private const string CodeRevert = "REVERT_AU_DEMARRAGE";
@@ -240,11 +272,18 @@ public static class RevertAuDemarrage
                 && string.Equals(f.Nom, nom, StringComparison.Ordinal));
     }
 
+    /// <summary>Les clés de HKLM où écrivent ces leviers : la date de dernière écriture d'une telle clé peut être celle
+    /// de DrDXT, et les traces d'autres outils le disent.</summary>
+    public static IEnumerable<string> ClesMachineDesLeviers(IEnumerable<string> leviers)
+        => leviers.SelectMany(id => FeuillesParLevier.TryGetValue(id, out var f) ? f : [])
+            .Where(f => f.Ruche == RegistryHiveKind.LocalMachine).Select(f => f.Chemin).Distinct(StringComparer.OrdinalIgnoreCase);
+
     // Identifiants relevés dans chaque levier (NvApiDriverSettings.h) : PREFERRED_PSTATE, VSYNCMODE et
     // FRL_FPS, PRERENDERLIMIT.
     private static readonly IReadOnlyDictionary<string, uint[]> DrsParLevier = new Dictionary<string, uint[]>(StringComparer.Ordinal)
     {
         ["latency.prefer_max_perf"] = [0x1057EB71],
+        ["gpu.repos_global_normal"] = [0x1057EB71],
         ["latency.vrr_vsync_cap"] = [0x00A879CF, 0x10835002],
         ["latency.render_queue_cap"] = [0x007BA09E],
     };
@@ -273,6 +312,7 @@ public static class RevertAuDemarrage
                                                 (RegistryHiveKind.CurrentUser, @"Control Panel\Mouse", "MouseThreshold2")],
             ["latency.reflex"] = [(RegistryHiveKind.LocalMachine, @"SOFTWARE\NVIDIA Corporation\Global\NVTweak", "LowLatencyMode")],
             ["fixit.sane_pagefile"] = [(RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "PagingFiles")],
+            ["fixit.pagefile_ssd"] = [(RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", "PagingFiles")],
             ["fixit.heures_actives"] = [(RegistryHiveKind.LocalMachine, HeuresActives.Cle, HeuresActives.NomDebut),
                                         (RegistryHiveKind.LocalMachine, HeuresActives.Cle, HeuresActives.NomFin)],
             ["fixit.x3d_ccd"] = [(RegistryHiveKind.CurrentUser, GameBar, "AllowAutoGameMode"),
@@ -280,6 +320,15 @@ public static class RevertAuDemarrage
         };
 
     public static IEnumerable<string> LeviersRejouables => InverseParLevier.Keys;
+
+    /// <summary>Une annulation lue dans un fichier du compte (%LOCALAPPDATA%) peut-elle servir ? Les leviers
+    /// rejouent leur inverse par le helper élevé sans le relire : la garde est donc à la lecture de chaque fichier, et
+    /// tout fichier qui porte une annulation passe ici. Le mode d'écran se rend hors du helper, sans droits, depuis
+    /// son propre format : il n'a pas d'op à filtrer.</summary>
+    public static bool AnnulationSure(string tweakId, string? json)
+        => InverseRejouable(tweakId, json) || InversesHorsHelper.Contains(tweakId);
+
+    private static readonly HashSet<string> InversesHorsHelper = new(StringComparer.Ordinal) { "fixit.ecran_frequence" };
 
     // Le type seul ne suffit pas. Un fichier nommant HAGS avec une limite de
     // puissance GPU ferait écrire le GPU au lancement. Chaque levier ne rejoue que ce que son ApplyAsync écrit
@@ -298,6 +347,7 @@ public static class RevertAuDemarrage
             ["latency.mouse_acceleration_off"] = [.. Registre],
             ["latency.reflex"] = [.. Registre],
             ["latency.prefer_max_perf"] = [.. Drs],
+            ["gpu.repos_global_normal"] = [.. Drs],
             ["latency.vrr_vsync_cap"] = [.. Drs, typeof(ApplyAdlxTuningOp)],
             ["latency.render_queue_cap"] = [.. Drs, typeof(ApplyAdlxTuningOp)],
             ["fixit.sane_pagefile"] = [.. Registre],

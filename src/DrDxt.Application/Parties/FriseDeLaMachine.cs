@@ -5,6 +5,10 @@ public sealed record EvenementDeFrise(DateTimeOffset Quand, GenreDEvenement Genr
 {
     /// <summary>Ce qui s'aligne à droite (les FPS d'une partie) ; vide sinon.</summary>
     public string Detail { get; init; } = "";
+
+    /// <summary>Le nom que le lecteur d'écran annonce pour l'élément de liste : WPF lit ToString quand l'élément n'a pas de nom.</summary>
+    public override string ToString()
+        => $"{Quand.ToLocalTime().ToString("g", DrDxt.Core.Docteur.Langue)} {Texte}" + (Detail.Length > 0 ? $", {Detail}" : "");
 }
 
 public enum GenreDEvenement { Changement, Partie, ArretBrutal, ErreurMaterielle }

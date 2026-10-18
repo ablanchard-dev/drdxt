@@ -9,13 +9,17 @@ files you choose to send yourself, below.
 
 To tell you what is slowing your PC down, DrDXT reads the hardware (processor, graphics card, memory, drives,
 display), the Windows and driver settings that matter in games, the Windows event logs (unexpected shutdowns,
-hardware errors, updates) and, during a match, the frame timing of your game (not its content) and the ping to its
-server.
+hardware errors, updates), the reports your game writes when it crashes, OBS settings and logs (encoder, bitrate,
+dropped frames; never your scenes, your account or your paths), how much each program sends during 3 s of the scan
+(its name and a rate, never the content or the address), the reports your mouse and controller send when you start
+their measurement and, during a match, the frame timing of your game (not its content) and the ping to its server.
 
 What it keeps stays on your machine:
 
 - `%LOCALAPPDATA%\DrDXT`: your history (scans, measured matches, applied settings and their original value);
-- `%ProgramData%\DrDxt`: what DrDXT applied so it can revert it, and the log of the program that writes settings;
+- `%ProgramData%\DrDxt`: what DrDXT applied so it can revert it, the log of the program that writes settings, and the
+  incident records (the time of an unexpected shutdown and the names of the Windows events around it, never their
+  message);
 - `Documents`: only the files you ask for (report, export of your machine).
 
 Uninstalling removes the program, its service and what it applied; your history stays in `%LOCALAPPDATA%\DrDXT`.
@@ -24,15 +28,23 @@ Deleting that folder and `%ProgramData%\DrDxt` erases everything.
 ## What goes over the network
 
 Only what the "What leaves the machine" section of the README lists: the public version of graphics drivers, pings,
-the update check, and the pages you open yourself. Nothing that identifies you. A test fails if the code contacts an
+one question to your router on the home network (its WAN address, never shown), the update check, the line test under
+load if you click it (`speed.cloudflare.com`), and the pages you open yourself. Nothing that identifies you. A test fails if the code contacts an
 address the README does not name.
 
-## The two files you can send
+Your Windows account credentials go to a proxy only if someone configured it: an HTTP(S)_PROXY variable, or a manual
+proxy while neither automatic detection nor a setup script is on. A proxy found automatically (WPAD) or given by a script
+receives nothing, even when it asks: on a public network, a fake proxy would otherwise get your account's sign-in
+exchange. Behind a company proxy found that way that requires sign-in, the update check stays unreachable.
 
-**"Send my report"** opens your browser on a pre-filled GitHub issue: the title carries the model of your processor
-and graphics card, the body the report of "Check DrDXT on my PC" (the settings tried, their original value, what was
-read back). DrDXT sends nothing itself. You review the issue before submitting it; once submitted, it is readable by
-anyone who can see the repository, under your GitHub account.
+## The files you can send
+
+**"Send my report"** opens your browser on the GitHub issue template, empty: nothing from your machine is in the
+link. You attach the report of "Check DrDXT on my PC" yourself (the settings tried, their original value, what was read
+back), saved in your `Documents`. DrDXT sends nothing itself. You review the issue before submitting it; once
+submitted, it is readable by anyone who can see the repository, under your GitHub account.
+
+**"Prepare a help package"** first shows the list of files it will hold and the exact text of each, already anonymized, then writes a zip where you choose, which you send yourself (Discord, issue). It holds only the doctor's report, your recorded matches, the change log and DrDXT's crash log, with the same removals as the export below. No other file goes in, and never a firmware variable or table.
 
 **"Export my machine"** writes a file to your Documents, which you send if you want your machine to serve as a test.
 Before writing, DrDXT removes from it:

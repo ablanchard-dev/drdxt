@@ -205,6 +205,7 @@ public sealed class RevertPiegeAuDemarrageTests : IDisposable
     [InlineData("latency.render_queue_cap", AdlxTuningKind.Undervolt, false)]
     [InlineData("gpu.undervolt", AdlxTuningKind.Undervolt, true)]
     [InlineData("gpu.undervolt", AdlxTuningKind.PowerLimit, false)]
+    [InlineData("gpu.undervolt", AdlxTuningKind.RemiseUsine, false)] // le démarrage ne remet jamais la carte à l'usine
     [InlineData("gpu.power_limit", AdlxTuningKind.PowerLimit, true)]
     [InlineData("gpu.power_limit", AdlxTuningKind.Undervolt, false)]
     [InlineData("latency.vrr_vsync_cap", AdlxTuningKind.FrameRateTarget, true)]

@@ -19,20 +19,25 @@
 
 ## Ce qui est deja etabli, et prouve par mutation
 
-- **La surface privilegiee est FERMEE a 20 operations** (`ThePrivilegedSurfaceIsClosedGateTests`).
+- **La surface privilegiee est FERMEE** (`ThePrivilegedSurfaceIsClosedGateTests`, qui tient la liste exacte des
+  noms d'ops : un chiffre ecrit ici a derive de 20 a 38).
   Tout ce qui s'execute avec des droits d'administrateur passe par le tube nomme du helper, et ce
-  tube ne transporte que des sous-types de `PrivilegedOp`. Un 21e op fait rougir deux gardes.
+  tube ne transporte que des sous-types de `PrivilegedOp`. Un op de plus fait rougir deux gardes.
   La 19e, ajoutee le 10/09/2026 : **`DeleteNvApiDrsSettingOp`**, l'inverse d'une ecriture DRS au
   profil d'un jeu (detail dans la table H3). La 20e, ajoutee le 11/09/2026 : **`CommitManifestOp`**,
   l'ecriture du manifeste signe par le helper (detail dans H-AUCUNE) — les deux gardes ont rougi,
   comme elles le doivent, avant qu'elle entre.
-- **Aucune operation n'ecrit une tension.** H1 est donc tenu par **absence**, pas par garde — la
-  forme la plus solide, et la plus facile a perdre en silence. Deux controles la gardent
-  (`NoVoltageWriteOpExistsGateTests`, et le controle de nommage ci-dessus).
+- **Une seule operation ecrit une tension : `SetCpuVoltageOffsetOp`, depuis le 12/10/2026** (decision du
+  mainteneur, section du 12/10 plus bas). Les cœurs et le cache du processeur Intel, vers le bas seulement, de 0 a
+  -125 mV au total relatifs a l'origine du demarrage, refuse si SGX est present, chaque plan relu, jamais rejoue au
+  demarrage ni a la desinstallation. Aucune tension GPU n'est ecrite. `NoVoltageWriteOpExistsGateTests` admet ce seul
+  nom (`TensionAdmise`) : toute autre operation de tension fait rougir la garde, comme le controle de nommage ci-dessus.
+  (Corrige le 17/10/2026 par l'audit de securite : cette ligne disait « aucune operation n'ecrit une tension ».)
 - **`DrDxt.Bios` ne peut pas ecrire** : il ne reference que `DrDxt.Core`. Le composant qui envoie
   l'utilisateur dans son BIOS n'a aucun moyen d'y toucher (`TheGuideNeverWritesTheBiosGateTests`).
 - **Aucune operation n'ecrit dans le firmware** : la seule est une LECTURE. Depuis L3.1 (27/08),
-  elle lit les varstores `Setup` (AMI) et `CpuSetup` (Intel), noms fermes dans l'allowlist ;
+  elle lit les varstores `Setup` (AMI) et `CpuSetup` (Intel), et le magasin d'usine `StdDefaults` (AMI, sous son
+  propre GUID), noms fermes dans l'allowlist ;
   corrige le 25/09/2026, cette ligne disait « le varstore Setup est refuse », ce qui n'etait plus vrai.
 - **Le revert DRS restaure la portee qu'il a modifiee** (`DrsRevertMatchesItsScopeGateTests`).
 - **Les 4 rails GPU tiennent, ecretage ET refus** — 8 mutations le 06/09, 8 rouges, 0 survivant.
@@ -50,7 +55,10 @@ plutot que masque, et il s'agrandit chaque fois qu'on ajoute un motif — jamais
 SetFirmwareEnvironmentVariable   NvAPI_GPU_Set*   Registry.SetValue   .SetValue(
 bcdedit.exe   shutdown.exe   sc.exe   File.Write*   File.AppendAll*   Process.Start
 TrySet*   TryDelete*   ChangeDisplaySettings*(   .PriorityClass =   PowerWrite*(   PowerSetActiveScheme(
-PowerSetUserConfigured*(
+PowerSetUserConfigured*(   FileMode.Create*   TryPoser*(   TryRendre*(   WriteTrustedFile(   .WriteAtomic(
+File.Delete(   File.Move(   File.Copy(   File.Replace(   Directory.Delete(   Directory.Move(   .Delete()
+DeleteValue(   DeleteSubKey*(   CreateSubKey(   .SetAccessControl(
+.InvokeMethod("<pas Get…>"   SRRemoveRestorePoint   EcrireAntiLag/Frtc/Vsync(   .SetValue(… RegistryValueKind
 ```
 
 **Deux corrections de cet instrument le 05/09, et elles disent quelque chose.**
@@ -108,13 +116,18 @@ Ce qui est apparu :
 | Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
 |---|---|---|
 | `App/App.xaml.cs` (4 → 7) | le journal de plantage (ajout, jamais ecrasement) ; une sonde de gel et les fichiers temoins du mode photos hors ecran, **diagnostics seulement** | `%TEMP%` et donnees locales ; rien sur la machine |
-| `ViewModels/ScanViewModel.Agir.cs` (0 → 2) | la garde d'annulation BCD ; la **console de reparation Windows**, sur clic et sous UAC : `DISM /RestoreHealth` puis `sfc /scannow`, outils de Windows, visibles et fermables | donnees locales ; H3, outils Microsoft, geste du joueur |
+| `ViewModels/ScanViewModel.Agir.cs` (0 → 2) | la **console de reparation Windows**, sur clic et sous UAC : `DISM /RestoreHealth` puis `sfc /scannow`, outils de Windows, visibles et fermables | donnees locales ; H3, outils Microsoft, geste du joueur |
 | `Application/Tweaks/JournalDesLeviersAppliques.cs` (0 → 1) | le journal des leviers gardes (source des constats « gain disparu ») ; n'ecrase jamais un journal illisible | donnees locales |
 | `Detection/Repair/RepairAuditService.cs` (1 → 2) | `bcdedit /enum {current}` : **lecture seule** | rien d'ecrit |
 | `ElevatedHelper/Execution/SanteDesComposants.cs` (0 → 1) | `dism /CheckHealth` : **lecture seule** | rien d'ecrit |
 | `ViewModels/BiosGuideViewModel.cs` (0 → 1) | 07/10/2026 (D12) : ouvre la page d'assistance MSI de la carte dans le navigateur, **sur clic** | rien d'ecrit ; adresse https://www.msi.com seulement, nom de carte filtre |
 | `ElevatedHelper/Execution/Win32BcdActions.cs` (0 → 2) | `bcdedit /set` et `/deletevalue` sur `{current}` | H3 ; liste fermee de **5 elements** et de leurs seules valeurs documentees, dans l'allowlist du helper (`OpAllowlistTests`) |
 | `ElevatedHelper/Execution/Win32NetworkQosActions.cs` (0 → 1) | une politique QoS (plafond d'envoi) par PowerShell, dans le **magasin actif** de Windows | effacee au redemarrage ; posee sous bail, retiree a la fermeture du jeu et a l'arret du helper |
+| `ElevatedHelper/Journal/JournalDEcritureAnticipee.cs` (0 → 3) | le journal d'écriture anticipée : avant une écriture privilégiée journalisée, l'op et la valeur d'avant de sa cible, pour la rendre si le demandeur meurt avant d'avoir noté l'origine ; un fichier verrou à côté ; l'accès du dossier du journal, réservé à SYSTEM et aux Administrateurs | des fichiers de DrDXT, par `FichierJsonAtomique` (jamais lu vide ni écrasé illisible) ; le dossier est propre au journal ; rien sur le système ; ouvert par le helper, le service et la désinstallation dans la racine réparée d'abord |
+| `App/Platform/RejeuDuJournalLu.cs` (0 → 1) | la date du dernier rapport de rejeu dit au joueur, pour ne le dire qu'une fois | un fichier de DrDXT dans ses données, par `FichierJsonAtomique` ; rien sur le système |
+| `ElevatedHelper/Execution/TraceDesCoupures.cs` (0 → 2) | la trace des programmes que DrDXT a coupés au démarrage, notée avant l'écriture : celle de la machine par le helper à la racine des données, celle de la session par l'App dans ses données | des fichiers de DrDXT (`TrustedManifestRoot.WriteTrustedFile`, `FichierJsonAtomique`) ; rien sur le système |
+| `ElevatedHelper/Program.cs` (0 → 1) | les derniers rapports du rejeu du journal d'écriture anticipée, `rejeu-du-journal.helper.json` à la racine des données, pour que l'App les dise | un fichier de DrDXT, par `TrustedManifestRoot.WriteTrustedFile` (écriture admin, lecture pour l'App) ; rien sur le système |
+| `ReconcilerHost/HostServiceCollectionExtensions.cs` (0 → 1) | les rapports du rejeu du service au démarrage, `rejeu-du-journal.service.json` | un fichier par écrivain, qui garde ses vingt derniers rapports : aucun n'efface ce que l'App n'a pas lu ; jamais un rapport tout en suspens |
 | `Measurement/Frames/CompteurPresentsDxgi.cs` (0 → 1) | `logman start/stop` : une session de trace ETW temporaire | arretee en fin de mesure, et nettoyee si une interruption l'a laissee ouverte |
 
 Ce qui a disparu, et pourquoi :
@@ -155,6 +168,9 @@ Hors de l'instrument : `App/Platform/ReleveAuDemarrage.cs` (J1b) cree le raccour
 `DrDXT releve.lnk` dans le dossier Demarrage **du joueur** (objet COM `WScript.Shell`, qu'aucun motif
 ne voit), pour que le releve des parties tourne DrDXT ferme. Pose seulement si DrDXT est installe ;
 retire quand le releve est eteint et a la desinstallation (`[UninstallDelete]`).
+**Remplace depuis** : ce fichier et ce raccourci n'existent plus. L'installeur cree la tache planifiee
+« DrDXT releve » (`schtasks /Create /SC ONLOGON /RL LIMITED`, sans droits, qui lance l'App directement ;
+`installer/DrDXT.iss`), la supprime a la desinstallation, et efface l'ancien raccourci.
 **Limite (revue F-11, 07/10/2026)** : la desinstallation tourne sous le compte qui a valide l'UAC. Un joueur
 sans droits qui a fait valider l'UAC par un autre compte garde le raccourci dans SON Demarrage, pointant vers
 un exe efface (rien ne se lance ; ce que Windows affiche alors n'a pas ete observe). A retirer a la main : `shell:startup`.
@@ -171,6 +187,165 @@ un exe efface (rien ne se lance ; ce que Windows affiche alors n'a pas ete obser
 |---|---|---|
 | `App/AppServiceCollectionExtensions.cs` (meme site que l'export, `EcrireDansDocuments`) | un fichier `verification-drdxt-<date>.txt` : le bilan, puis chaque reglage pose, relu, rendu, relu, avec sa valeur d'origine ; sans le nom du PC | **Documents du joueur**, apres son accord a l'ecran |
 | `Application/Autopilot/ValidationDeLaMachine.cs` (0, ecrit par les leviers) | chaque levier de `ValidationComplete.Leviers`, par **le canal eleve du produit** (helper, accord de Windows sur le clic du joueur), puis rendu aussitot | jeu ferme exige, refuse si un essai est deja au journal ; journal de remise du produit (`pending-revert.json`) pose AVANT chaque ecriture, rejoue au demarrage si l'App meurt ; arret au premier levier non rendu ; aucun point de restauration |
+
+### 16/10/2026 — le témoin d'incident écrit par le service (lot 2)
+
+Il ecrit par `TrustedManifestRoot.WriteTrustedFile` et supprime par `File.Delete`, deux appels que la LIGNE ZERO ne
+cherchait pas : la table le disait « a jour » sans le voir. Les motifs sont elargis (section suivante), et il est compte.
+
+| Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
+|---|---|---|
+| `ReconcilerHost/TemoinDIncidentWorker.cs` (service, **SYSTEM**) | un fichier `temoin-<date>.json` par incident (arret brutal, WHEA 18, Display 4101, Resource-Exhaustion 2004) : l'heure, le genre, et au plus 300 lignes « journal, fournisseur, numero, niveau » des journaux Systeme et Application, **jamais le message** ; au plus un temoin par 2 min ; au-dela de 20 fichiers, les plus anciens `temoin-*.json` de ce dossier sont **supprimes** | `%ProgramData%\DrDxt\temoins` seulement : le parent `DrDxt` puis `temoins` sont durcis par `EnsureCreatedHardened` (proprietaire Administrateurs, ecriture Administrateurs et SYSTEM, lecture des utilisateurs, point de reparse refuse) avant toute ecriture ; la suppression ne vise que les noms `temoin-*.json` enumeres dans ce dossier ; aucun script, aucune tache planifiee ; une exception ne sort jamais du rappel du journal ; l'installeur retire le dossier a la desinstallation (`TemoinDIncidentWorkerTests`) |
+
+### 17/10/2026 — l'etat du monde de la machine (lot 3)
+
+| Fichier | Ce qu'il ecrit | Ou, et ce qui le borne |
+|---|---|---|
+| `Detection/Hardware/MondeDeLaMachine.cs` | `monde-de-la-machine.json` : la version de chaque jeu prouve et celle du pilote de chaque carte d'affichage, pour dater leur changement au scan suivant | dans les donnees de DrDXT du compte (`DossierDonnees`), par `FichierJsonAtomique` ; rien sur le systeme ; les changements vont au journal des changements de l'App |
+
+### 17/10/2026 — affichage, carte, reseau et stream (lot 4)
+
+Aucun site d'ecriture de plus : les lecteurs du lot sont dans `LesLecteursNeTouchentRienTests`. Ce qui sort de la
+machine, ou touche a un reglage, est borne ainsi :
+
+| Ce que fait le lot | Ce qu'il envoie, pose ou refuse | Ou, et ce qui le borne |
+|---|---|---|
+| `Detection/Network/TypeDeNat.cs` (type de NAT) | une recherche SSDP en multicast, puis deux requetes http a la box : sa description, et l'action UPnP `GetExternalIPAddress` | **lecture seule** : aucune ouverture ni fermeture de port, aucun reglage de la box ; la recherche part avec un saut de vie (aucun routeur ne la relaie), les URL suivies sont en http, en IPv4 privee, sur l'adresse meme du repondeur ; 3 s et 64 Kio par echange, sans proxy ni redirection ; l'adresse publique n'est jamais affichee (`TypeDeNatTests.L_echange_upnp_ne_fait_que_lire_et_reste_sur_le_reseau_de_la_maison`) |
+| `Detection/Network/EnvoisParProgramme.cs` (programmes qui occupent la montee) | une session de trace ETW du noyau (reseau) pendant 3 s | arretee en fin d'ecoute ; seuls le numero de processus et la taille de chaque envoi sont lus, jamais le contenu ni l'adresse |
+| `Application/Tweaks/Gpu/GpuUndervoltTweak.cs` (G1) | **refuse** de regler la carte NVIDIA quand un autre outil y a deja pose un decalage (coeur different de la cible de DrDXT, ou memoire non nulle) | rien n'est ecrit, rien n'atteint le helper (`GpuUndervoltTweakTests.Un_decalage_pose_par_un_autre_outil_fait_refuser_sans_rien_ecrire`) ; le refus est dit au joueur ; AMD n'a pas ce refus (GATES) |
+| `Application/Autopilot/ValidationComplete.cs` et `ScanViewModel.Verifier.cs` (arret en direct) | un arret demande par le joueur, **apres confirmation**, lu avant chaque levier | jamais au milieu d'un levier : celui en cours est pose, relu et rendu, le suivant n'est pas touche, le journal de remise est vide (`ValidationCompleteTests.Un_arret_demande_arrete_avant_le_levier_suivant_sans_rien_laisser`, `VerifierLaMachineTests.Le_fil_suit_les_reglages_et_l_arret_ne_part_qu_apres_confirmation`) |
+| `Detection/Diffusion/ObsStudio.cs` (stream) | rien : lit les reglages et les journaux d'OBS | lecture partagee, sans verrou ; aucun chemin, nom de scene ni de compte dans le rapport |
+
+### 17/10/2026 — les tables signees, recues sans changer de binaire (U5)
+
+| Fichier | Ce qu'il ecrit | Ou, et ce qui le borne |
+|---|---|---|
+| `Infrastructure/Updates/DonneesSignees.cs` (0 → 2) | `donnees.json`, le paquet de tables (radar des regressions) recu du serveur de mise a jour, et `donnees-precedentes.json`, la copie du paquet qu'il remplace | dans les donnees de DrDXT du compte (`DossierDonnees`), par `FichierJsonAtomique` ; ecrit seulement apres la signature (cle de release des mises a jour, domaine propre aux donnees), une version plus recente que celle en service et le schema ferme (`TablesDeDonnees.Lire`) ; ce sont des donnees lues par l'audit, jamais du code ni un reglage : rien sur le systeme, aucune operation du helper. Le paquet est reverifie a chaque demarrage ; s'il ne se verifie plus, le precedent, puis les tables livrees avec l'App, prennent sa place (`DonneesSigneesTests`) |
+
+### 17/10/2026 — le test de la ligne sous charge (N5) : du trafic, aucune ecriture
+
+`Measurement/Network/TestDeLigneSousCharge.cs` n'ecrit rien sur la machine : il fait du trafic, sur le seul clic du
+joueur (« Tester ma ligne sous charge »), jamais au scan ni au demarrage. Des octets nuls recus de et envoyes a
+`speed.cloudflare.com`, quatre requetes a la fois, huit secondes et 400 Mo au plus par sens, annules sur-le-champ si le
+test s'arrete (`TestDeLigneSousChargeTests.Annuler_arrete_le_trafic`) ; l'hote est dit dans les README et la politique
+de confidentialite avant le clic.
+
+### 17/10/2026 — « Details techniques » replie ou deplie
+
+| Fichier | Ce qu'il ecrit | Ou, et ce qui le borne |
+|---|---|---|
+| `App/ViewModels/ScanViewModel.cs` (1 → 2) | `details-techniques.json` : `true` ou `false`, la section « Details techniques » depliee ou non, comme le choix des animations | les donnees de DrDXT du compte (`FichierJsonAtomique`) ; rien sur le systeme ; absent ou abime = replie |
+
+### 17/10/2026 — l'App elevee n'ecrit plus dans Documents a travers une jonction
+
+L'ecriture de la machine exportee et du rapport de « Verifier DrDXT » quitte `AppServiceCollectionExtensions` (3 → 2) pour
+`Platform/EcritureDansDocuments.cs` (0 → 2) : le meme fichier sous Documents, ecrit comme avant sans elevation ; elevee,
+l'App refuse une jonction ou un lien symbolique sur Documents et ses parents jusqu'au profil, et cree le fichier sans
+rouvrir un nom existant. Un fichier de l'utilisateur, dans ses Documents.
+
+### 17/10/2026 — le fichier d'echange n'est coupe que si c'etait l'origine
+
+`Execution/GardeDuFichierDEchange.cs` (0 → 3) : la note `HKLM\SOFTWARE\DrDXT\Helper\PagingFilesOrigineVide` (la valeur que DrDXT a posee), posee
+par le helper quand il ecrit `PagingFiles` par-dessus une valeur vide (`fixit.sane_pagefile`), effacee quand il rend ce vide,
+et la lecture de la valeur actuelle. Un `PagingFiles` vide n'est ecrit que si la valeur actuelle est deja vide ou que la note
+existe ; une entree sur un lecteur nomme doit viser un lecteur fixe qui existe. Avant, un appelant compromis ou un journal
+d'annulation forge coupait le fichier d'echange au redemarrage suivant. Retiree a la desinstallation avec `HKLM\Software\DrDXT`.
+
+### 17/10/2026 — l'origine de la frequence d'une carte AMD est gardee d'un demarrage a l'autre
+
+`Adlx/OrigineAdlx.cs` (0 → 2) : une valeur QWORD par carte AMD (index ADLX et identifiants PNP des cartes AMD) sous
+`HKLM\SOFTWARE\DrDXT\Helper\AdlxOrigine` : l'origine de la MaxFreq et la derniere valeur que DrDXT y a ecrite, notee avant
+chaque ecriture (et apres un retour a la valeur d'avant), et la cle volatile du demarrage par `OrigineDuDemarrage`. Ecrit
+par le helper eleve seulement ; retire a la desinstallation avec `HKLM\Software\DrDXT` (`uninsdeletekey`). Sans elle, la
+bande de +100 MHz se mesurait autour de la valeur posee la fois d'avant si le pilote la garde au redemarrage.
+
+### 17/10/2026 — les journaux d'annulation sont vides sur le disque, et un journal illisible est mis de cote
+
+`FichierJsonAtomique` passe de 2 a 3 sites, SuiviDesReglages de 2 a 1 : la mise de cote d'un fichier illisible (renomme en
+`.mis-de-cote-<horodatage UTC>`) vit maintenant dans `FichierJsonAtomique.MettreDeCote`, partagee. Le temporaire de
+`WriteAtomic` est ecrit en WriteThrough et vide sur le disque avant le renommage : apres une coupure, le journal n'est plus
+illisible. Le journal des leviers poses et celui de la session (`pending-revert.json`) illisibles sont mis de cote au lieu
+d'etre ignores, ecrases ou supprimes ; le scan dit le premier, le demarrage le second. Des fichiers de l'utilisateur, sous
+LocalAppData.
+
+### 17/10/2026 — le releve des reglages suivis ne perd plus son historique
+
+SuiviDesReglages passe de 1 a 2 sites : un fichier illisible (lu, mais pas du JSON) est mis de cote, renomme en
+`.mis-de-cote-<horodatage UTC>` comme le manifeste, au lieu d'etre ecrase ; le suivi repart d'un releve neuf. Une lecture
+ratee (fichier tenu un instant par une ecriture) n'ecrit plus rien : recrit avec les seuls reglages du releve en cours, le
+fichier perdait l'avant des autres, et leurs bascules ne se relevaient plus. Un fichier de l'utilisateur, sous LocalAppData.
+
+### 17/10/2026 — le ventilateur fixe rend la main a la carte des 80 °C (audit de securite)
+
+Une vitesse fixe du mode Expert (jamais sous 40 %, ni sous la cible automatique du moment) ne suivait pas la chaleur :
+tant que l'App battait, personne ne lisait la temperature. La surveillance des baux du helper (toutes les 5 s) la lit
+desormais tant qu'un bail de ventilateur est tenu : des 80 °C, ou si elle ne se lit pas, le retour enregistre du bail part
+(l'automatique, relu), le bail est clos et journalise, l'App l'apprend a son battement suivant ; aucune reprise de la
+vitesse fixe ensuite (`GardeThermiqueVentilateur`, `LeaseWatchdogTests`). Aucun site d'ecriture de plus : c'est le retour
+du bail. Si le helper lui-meme meurt, sa garde meurt avec lui : au premier battement qui ne l'atteint plus (transport en
+echec, ou helper relance qui ne connait plus le bail), l'App demande tout de suite l'automatique (le helper est relance pour
+cela, une invite Windows s'il n'etait plus la) et ne leve son journal qu'une fois le retour relu (`EssaiRenduLibereLeBailTests`).
+Residuel dit : si DrDXT s'arrete tout entier, la vitesse fixe reste jusqu'a son prochain lancement (le journal la rend) ou
+jusqu'au redemarrage ; la carte se bride alors d'elle-meme en chauffant.
+
+### 17/10/2026 — sixieme trou : WMI, l'elagage des points, trois reglages AMD et la memoire du demarrage (audit de securite)
+
+L'audit de securite a trouve quatre ecritures que l'instrument ne voyait pas, et la table se disait « a jour » :
+l'activation de la Restauration du systeme par une methode WMI (`InvokeMethod("Enable")`), l'elagage des points de
+DrDXT (`SRRemoveRestorePoint`), l'Anti-Lag, la cible d'images et la synchro verticale AMD (`AdlxNative.EcrireAntiLag`,
+`EcrireFrtc`, `EcrireVsync`), et la valeur retenue dans la cle volatile `HKLM\SOFTWARE\DrDXT\Helper\CeDemarrage` (un
+`SetValue` sur une cle nommee `cle`). Quatre motifs de plus : une methode WMI qui ne commence pas par Get, le nom de la
+fonction d'elagage, les trois noms d'ecriture ADLX, et tout `SetValue` qui porte un `RegistryValueKind`. Win32RestorePointActions
+passe de 2 a 5, AdlxNative et IAdlxNative de 2 a 5 (declarations et appels), ADLXTuningActions de 4 a 7, PawnIoCpuPowerActions
+de 6 a 7. La cle `CeDemarrage` est ecrite hors de l'allowlist par le helper lui-meme : une valeur par nom, volatile (effacee a
+chaque redemarrage), reservee aux administrateurs, qui ne sert qu'a garder l'origine du demarrage (PL1, tension, MaxFreq AMD).
+
+### 17/10/2026 — la garde du BCD retire, ecrite avant bcdedit (audit de securite)
+
+GardeDuBcdRetire (2 sites : le fichier ecrit directement, en ecriture directe, et son effacement) garde la valeur de
+bootstatuspolicy que la carte Windows retire. bcdedit ecrit son magasin sur disque tout de suite : la garde s'ecrit donc
+AVANT l'appel au helper, forcee sur le disque, et s'efface s'il refuse. Un fichier du compte, sous LocalAppData.
+**Branchee** depuis 70a4fd8a : l'ecran (ScanViewModel.Agir, RendreBcd) ecrit la garde avant bcdedit et l'efface sur un
+refus ; une garde impossible n'ote rien.
+
+### 17/10/2026 — la sous-tension AMD bornee dans le helper (audit de securite)
+
+ADLXTuningActions passe de 3 a 4 sites : la MaxFreq ecrite est relue, et une valeur que le pilote a ramenee fait reposer
+l'origine (une ecriture de RENDU, vers une valeur deja lue sur la carte). La cible reste dans la bande prudente
+[-200, +100] MHz autour de la MaxFreq retenue au premier passage du helper depuis le demarrage, en plus de la plage du
+pilote, qui monte jusqu'au plafond d'overclock ; l'allowlist dit la forme de chaque valeur ADLX.
+Une remontee au-dela de la bande (rendre une sous-tension que le pilote a gardee au redemarrage) n'ecrit jamais la
+frequence demandee, et ne remet rien a l'usine d'elle-meme : le helper la refuse (`GpuRemiseUsineRequise`) et le dit. La
+remise a l'usine (`RemettreReglageUsine`, IADLXGPUTuningServices.ResetToFactory, entree 5 de IGPUTuning.h) est un geste a
+part (`AdlxTuningKind.RemiseUsine`), qui ne part que sur un clic (`AnnulationParClic` : « Annuler », ou le bouton du constat) ;
+jamais le retour d'un bail (`LeaseWatchdog`), jamais rejouee au demarrage (`InverseRejouable`). Elle remet aussi la memoire,
+le ventilateur et la puissance reglees dans AMD Software, et le joueur le lit ; reussie, elle vaut « rendu ». Un site de
+plus dans ADLXTuningActions, AdlxNative et IAdlxNative. Un programme hostile du compte peut envoyer ce geste lui-meme :
+nuisance vers le defaut du pilote, reversible dans AMD Software, jamais au-dela.
+
+### 16/10/2026 — cinquieme trou : suppressions, deplacements, ACL, registre et ecritures enveloppees
+
+La revue du lot 2 a trouve un service SYSTEM qui ecrivait et supprimait sans apparaitre au compte. Ce n'etait pas un
+oubli de la table : l'instrument ne cherchait aucune suppression, aucun deplacement, aucun changement d'ACL ni de cle
+de registre, et aucune des enveloppes par lesquelles DrDXT ecrit ses fichiers d'etat. Motifs ajoutes (LIGNE ZERO) :
+`WriteTrustedFile(`, `.WriteAtomic(`, `File.Delete|Move|Copy|Replace(`, `Directory.Delete|Move(`, `.Delete()`,
+`DeleteValue(`, `DeleteSubKey*(`, `CreateSubKey(`, `.SetAccessControl(`. Le compte passe de 110 sites dans
+52 fichiers a 199 dans 81.
+
+Ce que ces sites ecrivent, par famille (le detail par fichier est dans le bloc `counts` plus bas) :
+
+| Famille | Ce qu'elle ecrit | Ou, et ce qui la borne |
+|---|---|---|
+| fichiers d'etat de DrDXT (`FichierJsonAtomique.WriteAtomic` et son `Delete`) | releves, references, points d'etape, journaux de DrDXT | le dossier des donnees de DrDXT (`LocalAppData`) ; ecriture atomique ; rien hors de ce dossier |
+| fichiers de confiance du service et du helper (`WriteTrustedFile`, `SetAccessControl`) | manifeste signe, cle publique, temoins d'incident | `%ProgramData%\DrDxt`, durci (proprietaire Administrateurs, point de reparse refuse) |
+| suppressions, deplacements et copies (`File.Delete/Move/Copy`, `Directory.Delete`) | renommage atomique d'un fichier ecrit, menage des temporaires et des anciens temoins, remplacement de l'exe a la mise a jour | dans le dossier que chaque site possede ; aucun chemin venu de l'exterieur |
+| registre (`CreateSubKey`, `DeleteValue`, `DeleteSubKey*`) | les valeurs de la liste blanche du helper, et ce qu'il retient de la limite de puissance au demarrage | sous la liste blanche (H3) ; chaque ecriture a son inverse |
+
+### 16/10/2026 — le paquet d'aide en un clic (U3)
+
+| Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
+|---|---|---|
+| `Detection/Repair/PaquetDeSupport.cs` (0 → 1) | un zip : le rapport du docteur et les seuls fichiers de `PaquetDeSupport.ListeBlanche` (parties, changements, journal de plantage), anonymises par `MachineExportee.AnonymiserTexte` ; rien d'autre n'entre, quel que soit son nom (prouve par `PaquetDeSupportTests.Seule_la_liste_blanche_entre_anonymisee_et_rien_d_inconnu`) | **le dossier que le joueur choisit** dans la boite d'enregistrement de Windows, apres avoir vu la liste des fichiers ; rien n'est envoye sur le reseau, rien n'est touche sur la machine |
 
 ### 08/10/2026 — les réglages de la carte gardés par le joueur sont rendus à la désinstallation (revue n° 10)
 
@@ -228,7 +403,7 @@ page OEM « Disabled » aussi en mode autonome). La mesure en jeu le tranche. Ga
 | Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
 |---|---|---|
 | `App/App.xaml.cs` (7 → 10) | `drdxt-verification.txt`, `drdxt-expert.txt` et `drdxt-expert-crash.txt` dans `%TEMP%` : les bilans de « verifier-auto », « expert-auto » et « expert-crash » | **compilation de mise au point seulement** (`#if DEBUG`) : absent du produit livré ; mode qui relance « Vérifier DrDXT » hors écran |
-| `App/ViewModels/ScanViewModel.Verifier.cs` (0 → 1) | ouvre le navigateur par défaut (`Process.Start` d'une adresse https) sur un ticket GitHub pré-rempli : CONTRIB1, « Envoyer mon rapport » | **App**, sans droits, sur le clic du joueur seulement ; rien n'est envoyé par DrDXT, le joueur relit et soumet ; l'adresse est construite par `LienDeRapport` (dépôt fixe, longueur bornée) |
+| `App/ViewModels/ScanViewModel.Verifier.cs` (0 → 1) | ouvre le navigateur par défaut (`Process.Start` d'une adresse https) sur le modèle de ticket GitHub vide : CONTRIB1, « Envoyer mon rapport » | **App**, sans droits, sur le clic du joueur seulement ; rien n'est envoyé par DrDXT, le joueur y glisse le fichier, relit et soumet ; l'adresse est fixe (`LienDeRapport.Nouveau`) : rien du rapport ni du matériel n'y va (17/10/2026, audit de sécurité) |
 | `Application/Tweaks/LeviersVerifies.cs` (0 → 1) | `leviers-verifies.json` : la liste des identifiants de leviers que « Verifier DrDXT sur mon PC » a poses, relus, rendus et relus sur cette machine | **App**, sans droits administrateur, dans le dossier de donnees de DrDXT (`DossierDonnees`). Ecrit seulement apres une verification lancee par le joueur ; cumule ; illisible, la liste est vide (rien n'est dit verifie sans preuve). Aucune ecriture systeme |
 
 ### 08/10/2026 — GPU-OC, le ventilateur NVIDIA en mode Expert (NVML)
@@ -237,6 +412,7 @@ page OEM « Disabled » aussi en mode autonome). La mesure en jeu le tranche. Ga
 |---|---|---|
 | `GpuNative/Nvml/NvmlNative.cs` (0 → 2) et `GpuNative/Nvml/INvmlNative.cs` (0 → 2, les membres par defaut qui rendent `false`) | `nvmlDeviceSetFanSpeed_v2` (une vitesse fixe, la politique passe en manuel) et `nvmlDeviceSetDefaultFanSpeed_v2` (le retour a l'automatique), exports documentes de NVML (docs.nvidia.com/deploy/nvml-api, Maxwell et plus, droits administrateur) | **helper eleve** seulement, par `NvmlVentilateurActions` |
 | `GpuNative/PawnIo/PawnIoIntel.cs` (0 → 1) | `ioctl_write_msr` du module IntelMSR de PawnIO (namazso/PawnIO.Modules 0.2.11, qui n'accepte d'ecrire que ses registres de puissance et de tension) : la **limite de puissance du processeur Intel** (MSR 0x610, `SetCpuPackagePowerLimitOp`), B1 du 10/10/2026. PL1 seule (bits 15:0), jamais PL2, fenetre, courant, tension ni verrou ; relu avant (le registre porte encore l'origine, pas de verrou BIOS) et apres (le registre porte ce qui a ete ecrit, sinon echec dit). Volatil : le BIOS remet sa valeur au redemarrage | **helper eleve** seulement, par `PawnIoCpuPowerActions` ; borne par `OpAllowlist` (`PawnIoIntel.NeToucheQuePl1` : PL1 entre 1 et la PL2 que la carte porte deja) ; le service de demarrage ne la recoit pas ; PawnIO jamais installe par DrDXT |
+| `GpuNative/PawnIo/PawnIoSuperIo.cs` (hors du bloc des comptes : des ports d'entree-sortie, pas un reglage) | pour **lire** les ventilateurs de la carte mere (puce Super I/O NCT6687), les **ports de configuration** 0x2E ou 0x4E (entree 0x87 0x87, choix du bloc 0x0B, sortie 0xAA, toujours dans un finally) et la **page de la memoire EC** de la puce (selection de page, puis liberation 0xFF), toutes les 5 s au plus. Jamais un regime, une courbe ni un mode du ventilateur : rien de ce que la puce garde n'est change | par **l'App et le service de demarrage**, par le module LpcIO de PawnIO (jamais installe par DrDXT) ; une lecture servie 5 s (`LireRecent`) ; un emplacement refuse par le module laisse l'autre |
 | `ElevatedHelper/Execution/NvmlVentilateurActions.cs` (0 → 2) | la pose d'une vitesse fixe (`ApplyGpuFanCurveOp` a un seul point) et le retour a l'automatique (`RestoreGpuFanAutoOp`) | **helper eleve**, mode Expert sur geste du joueur seulement. NVIDIA previent qu'une vitesse trop basse peut abimer la carte : DrDXT ne pose qu'en partant de l'automatique, jamais sous la vitesse que l'automatique vise a cet instant ni sous le minimum de la carte, et jamais sous 40 % (plancher a chaud de `OpAllowlist`). Tout est relu apres l'ecriture ; un echec rend l'automatique. Le retour se prouve par la politique relue (un retour rate a ete signale en 2022 sur le forum NVIDIA) : non confirme, l'echec le dit. Une courbe a plusieurs points reste refusee |
 
 ### 07/10/2026 — revue F-28, le mode d'alimentation de Windows 11 que l'activation d'un plan peut remettre
@@ -286,13 +462,58 @@ elevee passe par le lanceur natif qui reconstruit l'environnement (12/10/2026).
 **Limite assumee, reglages DRS du pilote NVIDIA.** Une valeur DRS est bornee a l'enumeration que NVIDIA documente
 (`ValeursDrs`, NvApiDriverSettings.h), pas plus strictement : un inverse rejoue la valeur LUE chez le joueur (synchro
 « adaptative demi-frequence », plafond bas), et une borne plus stricte rendait cette origine irrejouable, le reglage de DrDXT
-pose pour toujours. Un programme hostile du compte peut donc poser une valeur documentee mais genante sur le profil de base
-(un plafond d'images tres bas) : nuisance reversible par le joueur dans le panneau NVIDIA, sans dommage durable. Le levier,
-lui, n'ecrit pas quand l'origine lue sort de l'enumeration.
+pose pour toujours. Exception : au profil de base, jamais un limiteur d'images sous 20 i/s (1 i/s est documente et rend
+toute la machine inutilisable en jeu ; 17/10/2026). Un programme hostile du compte peut encore poser une autre valeur
+documentee mais genante sur le profil de base (la synchronisation verticale forcee) : nuisance reversible par le joueur
+dans le panneau NVIDIA, sans dommage durable. Le levier, lui, n'ecrit pas quand l'origine lue sort de ces bornes. Une
+ecriture globale est relue, en session neuve, comme celle d'un jeu.
 
 NvApiTuningActions passe de 2 a 4 sites : une ecriture que le pilote ramene a sa borne ou arrondit n'est plus laissee en
 place, l'origine lue avant est reposee (puissance, decalage du coeur) ; deux ecritures de RENDU, vers une valeur deja lue
 sur la carte.
+
+### 18/10/2026 — les temporaires au nom previsible
+
+Un temporaire `<fichier>.tmp` ouvert en ecrasement suit un lien dur pose d'avance : six magasins passent par
+l'ecriture atomique de `FichierJsonAtomique` (nom aleatoire, creation exclusive), qui gagne une surcharge en octets.
+`tests/DrDxt.Integration.Tests/AucunTemporairePrevisibleTests.cs` refuse le retour d'un tel temporaire.
+
+| Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
+|---|---|---|
+| `App/Platform/DossierDeLAppEleve.cs` (0 → 1) | un fichier temoin vide, `.drdxt-tenu`, tenu ouvert dans chaque dossier de donnees de l'App elevee : jamais vide, le dossier ne peut pas recevoir de jonction | donnees locales ; ouvert en lecture seule, jamais ecrit |
+| `Core/Storage/FichierJsonAtomique.cs` (3 → 4) | la meme ecriture atomique, en texte ou en octets | la cible de l'appelant |
+| `Application/Tweaks/PreuveDuRepos.cs` (6 → 4), `Detection/Repair/InventaireMachine.cs` (2 → 1), `Infrastructure/Updates/UpdateSeams.cs` (3 → 2), `Reconciler/Manifest/MachineManifestKey.cs` (4 → 3), `Reconciler/Manifest/ProgramDataManifestStorage.cs` (3 → 2) | les memes fichiers qu'avant, par `FichierJsonAtomique` | inchange |
+
+### 18/10/2026 — aucune écriture en place dans le dossier du joueur
+
+Le dossier de données appartient au joueur ; après le contrôle du démarrage, un nom y posé en lien ferait écrire l'App
+élevée dans un autre fichier. Les ajouts passent par `FichierJsonAtomique.AjouterSansLien`, les réécritures par
+l'écriture atomique ; `tests/DrDxt.Integration.Tests/AucuneEcritureEnPlaceDansLesDonneesTests.cs` refuse le retour d'une
+écriture en place.
+
+| Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
+|---|---|---|
+| `Core/Storage/FichierJsonAtomique.cs` (4 → 5) | l'ajout à un journal, ouvert sans suivre de point de reparse, écrit seulement dans un fichier à un seul nom | la cible de l'appelant |
+| `Application/Safety/GardeDuBcdRetire.cs` (2 → 3) | la garde du BCD : son nom est retiré (un lien n'est que ce nom), puis le fichier créé en exclusif | donnees locales |
+| `App/App.xaml.cs` (11 → 10), `Infrastructure/Diagnostics/DiagnosticsLog.cs` (3 → 2), `Application/Autopilot/JournalDesCandidats.cs` (1 → 0) | crash.log, le journal des changements et celui des candidats, par `AjouterSansLien` | inchange |
+
+`ElevatedHelper/Leases/HelperDiagnosticsLog.cs` (1 → 0) : le journal du helper s'allonge par
+`FichierJsonAtomique.AjouterSansLien` (un fichier posé d'avance en lien dur dans un %ProgramData%\DrDxt préparé par un
+compte n'est jamais écrit). Le journal d'écriture anticipée s'écrit par `TrustedManifestRoot.WriteTrustedFile`, et
+son verrou (3 → 4) naît aux Administrateurs ; un verrou d'avant, au propriétaire non fiable, est retiré puis recréé.
+
+### 18/10/2026 — un seul lanceur des outils de Windows
+
+DISM lisait toute sa sortie avant d'attendre : sa borne de 120 s ne jouait jamais, et un `dism` qui ne rendait pas la
+main figeait le helper. Les outils dont DrDXT lit la sortie (dism, bcdedit, pnputil, shutdown, sc, powershell, vssadmin,
+logman) se lancent désormais par `Core/ProcessusBorne.cs` : chemin absolu exigé, dossier de travail System32, deux flux
+lus pendant l'attente et bornés en taille, arbre arrêté à la borne. Le motif `ProcessusBorne\.Executer\(` compte chaque
+appel chez l'appelant : les comptes des appelants sont inchangés. `tests/DrDxt.Core.Tests/ProcessusBorneTests.cs`
+refuse un `Process.Start` qui redirige ses flux hors du lanceur.
+
+| Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
+|---|---|---|
+| `Core/ProcessusBorne.cs` (0 → 1) | le processus de l'outil demandé par l'appelant | chemin absolu, System32, attente bornée puis arbre arrêté |
 
 `python tools/nonuisance/count-write-sites.py` refait ce compte et **sort non-zero** si un fichier
 apparait, disparait, ou change de compte. Le script ne recopie rien : un chiffre ecrit a la main
@@ -301,58 +522,101 @@ est une dette tant qu'aucun outil ne le refait.
 ```counts
 src/DrDxt.App/App.xaml.cs 10
 src/DrDxt.App/AppServiceCollectionExtensions.cs 2
+src/DrDxt.App/Effets/MoteurDAnimation.cs 1
 src/DrDxt.App/Platform/CalmeurDeVoisins.cs 1
+src/DrDxt.App/Platform/DossierDeLAppEleve.cs 1
+src/DrDxt.App/Platform/EcritureDansDocuments.cs 2
+src/DrDxt.App/Platform/RejeuDuJournalLu.cs 1
 src/DrDxt.App/Platform/RelanceElevee.cs 1
-src/DrDxt.App/Updates/InstallationMiseAJour.cs 1
+src/DrDxt.App/Updates/InstallationMiseAJour.cs 3
 src/DrDxt.App/ViewModels/BiosGuideViewModel.cs 1
-src/DrDxt.App/ViewModels/ScanViewModel.Agir.cs 2
+src/DrDxt.App/ViewModels/ScanViewModel.Agir.cs 1
+src/DrDxt.App/ViewModels/ScanViewModel.QuoiDeNeuf.cs 1
 src/DrDxt.App/ViewModels/ScanViewModel.Verifier.cs 1
-src/DrDxt.Application/Autopilot/JournalDesCandidats.cs 1
+src/DrDxt.App/ViewModels/ScanViewModel.Voisins.cs 1
+src/DrDxt.App/ViewModels/ScanViewModel.cs 2
+src/DrDxt.Application/Autopilot/RevertEnAttente.cs 2
+src/DrDxt.Application/Network/PlafondEnvoiMemorise.cs 2
+src/DrDxt.Application/Network/VeillePingMemorisee.cs 2
+src/DrDxt.Application/Parties/ImagesDesParties.cs 1
+src/DrDxt.Application/Parties/JournalDesChangements.cs 2
+src/DrDxt.Application/Parties/MemoireDeLEssai.cs 1
+src/DrDxt.Application/Parties/MemoireSousTension.cs 1
+src/DrDxt.Application/Parties/PartiesMemorisees.cs 7
+src/DrDxt.Application/Parties/SuiviDesReglages.cs 1
 src/DrDxt.Application/Parties/VerrouDuReleve.cs 1
+src/DrDxt.Application/Safety/GardeDuBcdRetire.cs 3
+src/DrDxt.Application/Tweaks/JournalDesLeviersAppliques.cs 2
 src/DrDxt.Application/Tweaks/LeviersVerifies.cs 1
-src/DrDxt.Application/Tweaks/PreuveDuRepos.cs 2
-src/DrDxt.Core/Storage/FichierJsonAtomique.cs 1
+src/DrDxt.Application/Tweaks/PreuveDuRepos.cs 4
+src/DrDxt.Bios/BiosMarkerFile.cs 2
+src/DrDxt.Bios/PendingBiosChangeStore.cs 2
+src/DrDxt.Core/ProcessusBorne.cs 1
+src/DrDxt.Core/Storage/FichierJsonAtomique.cs 5
+src/DrDxt.Detection/Cpu/EtatsDeVeille.cs 1
 src/DrDxt.Detection/Display/Win32ModeEcran.cs 2
 src/DrDxt.Detection/Gpu/MagasinDePilotes.cs 1
 src/DrDxt.Detection/Hardware/MisesAJourEnAttente.cs 1
+src/DrDxt.Detection/Hardware/MondeDeLaMachine.cs 1
+src/DrDxt.Detection/Hardware/SanteNvme.cs 1
 src/DrDxt.Detection/Repair/InventaireMachine.cs 1
+src/DrDxt.Detection/Repair/PaquetDeSupport.cs 1
 src/DrDxt.Detection/Repair/RepairAuditService.cs 2
-src/DrDxt.ElevatedHelper/Execution/Adlx/ADLXTuningActions.cs 3
+src/DrDxt.ElevatedHelper/ClientSessionUtilisateur.cs 1
+src/DrDxt.ElevatedHelper/Execution/Adlx/ADLXTuningActions.cs 8
+src/DrDxt.ElevatedHelper/Execution/Adlx/OrigineAdlx.cs 2
+src/DrDxt.ElevatedHelper/Execution/GardeDuFichierDEchange.cs 3
+src/DrDxt.ElevatedHelper/Execution/IPrivilegedActions.cs 2
 src/DrDxt.ElevatedHelper/Execution/NvApi/NvApiDrsActions.cs 3
 src/DrDxt.ElevatedHelper/Execution/NvApi/NvApiTuningActions.cs 4
 src/DrDxt.ElevatedHelper/Execution/NvmlVentilateurActions.cs 2
-src/DrDxt.ElevatedHelper/Execution/PrivilegedOpExecutor.cs 1
+src/DrDxt.ElevatedHelper/Execution/PawnIoCpuPowerActions.cs 7
+src/DrDxt.ElevatedHelper/Execution/PrivilegedOpExecutor.cs 3
 src/DrDxt.ElevatedHelper/Execution/SanteDesComposants.cs 1
-src/DrDxt.ElevatedHelper/Execution/Win32BcdActions.cs 2
+src/DrDxt.ElevatedHelper/Execution/TraceDesCoupures.cs 2
+src/DrDxt.ElevatedHelper/Execution/Win32BcdActions.cs 3
 src/DrDxt.ElevatedHelper/Execution/Win32FirmwareBootActions.cs 4
 src/DrDxt.ElevatedHelper/Execution/Win32NetworkQosActions.cs 1
 src/DrDxt.ElevatedHelper/Execution/Win32PnpActions.cs 1
 src/DrDxt.ElevatedHelper/Execution/Win32PowerPlanActions.cs 6
-src/DrDxt.ElevatedHelper/Execution/Win32RegistryActions.cs 5
-src/DrDxt.ElevatedHelper/Execution/Win32RestorePointActions.cs 2
+src/DrDxt.ElevatedHelper/Execution/Win32RegistryActions.cs 9
+src/DrDxt.ElevatedHelper/Execution/Win32RestorePointActions.cs 5
 src/DrDxt.ElevatedHelper/Execution/Win32ServiceActions.cs 4
-src/DrDxt.Lanceur/Program.cs 2
 src/DrDxt.ElevatedHelper/Ipc/HelperLauncher.cs 1
-src/DrDxt.ElevatedHelper/Leases/HelperDiagnosticsLog.cs 1
-src/DrDxt.ElevatedHelper/ModeDesinstallation.cs 1
-src/DrDxt.GpuNative/AdlxNative.cs 2
-src/DrDxt.GpuNative/IAdlxNative.cs 2
+src/DrDxt.ElevatedHelper/Journal/JournalDEcritureAnticipee.cs 4
+src/DrDxt.ElevatedHelper/ModeDesinstallation.cs 2
+src/DrDxt.ElevatedHelper/Program.cs 1
+src/DrDxt.GpuNative/AdlxNative.cs 6
+src/DrDxt.GpuNative/IAdlxNative.cs 6
 src/DrDxt.GpuNative/INvApiNative.cs 6
 src/DrDxt.GpuNative/NvApiNative.cs 6
 src/DrDxt.GpuNative/Nvml/INvmlNative.cs 2
 src/DrDxt.GpuNative/Nvml/NvmlNative.cs 2
 src/DrDxt.GpuNative/PawnIo/PawnIoIntel.cs 2
-src/DrDxt.Infrastructure/Diagnostics/DiagnosticsLog.cs 3
-src/DrDxt.Infrastructure/Updates/UpdateSeams.cs 1
-src/DrDxt.Measurement/Frames/CompteurPresentsDxgi.cs 1
-src/DrDxt.Reconciler/JsonReconcilerStateStore.cs 1
-src/DrDxt.Reconciler/Manifest/MachineManifestKey.cs 1
-src/DrDxt.Reconciler/Manifest/ProgramDataManifestStorage.cs 1
-src/DrDxt.Reconciler/Manifest/TrustedManifestRoot.cs 2
-src/DrDxt.Reconciler/Reseau/PlafondEnvoiDuService.cs 1
+src/DrDxt.Infrastructure/Diagnostics/DiagnosticsLog.cs 2
+src/DrDxt.Infrastructure/Repair/RepairHistoryStore.cs 1
+src/DrDxt.Infrastructure/Updates/DonneesSignees.cs 2
+src/DrDxt.Infrastructure/Updates/UpdateSeams.cs 2
+src/DrDxt.Lanceur/Program.cs 2
+src/DrDxt.Measurement/Cpu/CpuBaseline.cs 1
+src/DrDxt.Measurement/Cpu/CpuBaselineSeams.cs 1
+src/DrDxt.Measurement/Frames/CompteurPresentsDxgi.cs 3
+src/DrDxt.Measurement/Memory/FileSystemMemoryBaselineFile.cs 1
+src/DrDxt.Measurement/Memory/MemoryBaselineStore.cs 1
+src/DrDxt.Measurement/Memory/RepriseDuTestMemoire.cs 2
+src/DrDxt.Measurement/NoOpCalibrationStore.cs 1
+src/DrDxt.Measurement/PerformanceJournalStore.cs 2
+src/DrDxt.Reconciler/JsonReconcilerStateStore.cs 3
+src/DrDxt.Reconciler/Manifest/MachineManifestKey.cs 3
+src/DrDxt.Reconciler/Manifest/ProgramDataManifestStorage.cs 2
+src/DrDxt.Reconciler/Manifest/TrustedManifestRoot.cs 8
+src/DrDxt.Reconciler/PauseDuMaintien.cs 3
+src/DrDxt.Reconciler/Reseau/PlafondEnvoiDuService.cs 3
+src/DrDxt.ReconcilerHost/HostServiceCollectionExtensions.cs 1
+src/DrDxt.ReconcilerHost/TemoinDIncidentWorker.cs 2
 ```
 
-## H1 — MATERIEL : les 24 sites d'ecriture GPU
+## H1 — MATERIEL : les sites d'ecriture GPU
 
 **C'est la seule classe irreversible, donc la seule qui compte vraiment.** Elle a ete tracee de bout
 en bout le 05/09/2026, appelant par appelant.
@@ -361,7 +625,7 @@ en bout le 05/09/2026, appelant par appelant.
 
 | Etage | Fichier | Ce qu'il fait |
 |---|---|---|
-| 1. Appelant | `GpuTuningApplyStep`, `ScanProfileConsumer`, `GpuFanCurveTweak` | **ECRETE** la valeur demandee (`GpuSafeBounds.Clamp*`) |
+| 1. Appelant | `GpuPowerLimitTweak`, `ScanProfileConsumer`, `GpuFanCurveTweak` | **ECRETE** la valeur demandee (`GpuSafeBounds.Clamp*`) |
 | 2. Executeur eleve | `NvApiTuningActions`, `ADLXTuningActions`, `NvApiDrsActions` | **REFUSE** hors bande — il n'ecrete pas, il rejette |
 | 3. Primitive native | `NvApiNative`, `AdlxNative` (`TrySet*`) | ecrit, **puis RELIT** pour confirmer |
 
@@ -393,7 +657,7 @@ Deux choses que la mutation a apprises et que la lecture n'aurait pas dites :
   les 390 tests du projet qui CONTIENT le code au vert ; ce sont `DrDxt.App.Tests` et
   `DrDxt.Detection.Tests` qui le tuent. Lancer le projet d'une garde seul ne dit donc rien sur elle.
 - **L'ecretage memoire ne tient qu'a UN test.** C'est la maille la plus fine des quatre rails :
-  supprimer `Reclamps_out_of_bounds_live_targets_to_safe_bounds_before_applying` rendrait la bande
+  supprimer `GpuUndervoltTweakTests.Apply_rejects_memory_offset_outside_safe_bounds` (hors bande : refuse) rendrait la bande
   memoire libre sans qu'aucune autre couleur ne change.
 
 Ces bornes existent en **DEUX exemplaires** (`GpuSafeBounds` cote application,
@@ -403,18 +667,19 @@ constantes deux a deux. **La duplication est donc assumee et gardee, pas subie.*
 
 ### Le residuel, dit et non masque
 
-- **Aucune tension n'est jamais ecrite.** Il n'existe aucun op de tension dans le contrat privilegie
-  (`NoVoltageWriteOpExistsGateTests`, `ThePrivilegedSurfaceIsClosedGateTests`). L'undervolt du
-  produit est un **offset d'horloge**, pas une courbe V/F. C'est ce qui rend H1 vrai par ABSENCE.
+- **Aucune tension GPU n'est ecrite.** L'undervolt de la carte est un **offset d'horloge** (NVIDIA) ou une MaxFreq
+  bornee (AMD), pas une courbe V/F ; cote NVIDIA, la structure ecrite ne porte aucune tension (`NumBaseVoltages = 0`).
+  La seule tension ecrite est celle du processeur (`SetCpuVoltageOffsetOp`, voir plus haut), bornee et relue
+  (`NoVoltageWriteOpExistsGateTests` admet ce seul nom).
 - **UNKNOWN — l'enveloppe constructeur.** Le pilote NVIDIA borne lui-meme les offsets ; la SOURCE de
   cette enveloppe n'a pas ete retrouvee. On sait qu'on ecrit dans une bande plus etroite que celle du
   pilote, on ne sait pas la nommer. A ne pas presenter comme une garantie.
 - **UNKNOWN — un plantage de pilote (TDR)** reste possible sur un offset pourtant dans la bande. Il
   est **reversible** (l'offset est volatil, il retombe a zero au redemarrage), mais le produit ne
   doit jamais ecrire « ne peut pas planter ».
-- Ce que le produit a le droit de dire, exactement : **« DrDXT n'ecrit ni tension, ni firmware, ni
-  VBIOS ; au GPU il n'ecrit qu'un offset d'horloge, une limite de puissance et une courbe de
-  ventilateur, toutes trois bornees et relues. »**
+- Ce que le produit a le droit de dire, exactement : **« DrDXT n'ecrit ni firmware, ni VBIOS, ni tension de carte
+  graphique ; au processeur, il ne fait que baisser la tension de 125 mV au plus, et regler la limite de puissance
+  continue ; a la carte, un decalage d'horloge, une limite de puissance et le ventilateur ; tout est borne et relu. »**
 
 ## H2 — BIOS : ce qui peut rendre une machine non demarrable
 
@@ -425,8 +690,8 @@ tient par la structure du contrat privilegie, pas par une garde qu'on pourrait d
 |---|---|---|---|---|
 | `Win32FirmwareBootActions` | `shutdown.exe /r /fw` — le **voyage** vers le setup UEFI, une facilite documentee par Microsoft | delai borne **0 a 300 s** (`OpAllowlist`), et le code de sortie de `shutdown.exe` est **LU** : un echec se dit, il ne se rattrape pas | le comportement sur un firmware inconnu est **UNKNOWN** | `OpAllowlistTests.Firmware_reboot_outside_the_band_is_denied` |
 | `CancelPendingFirmwareBootOp` | `shutdown /a /fw` — **l'annulation** du precedent | — | c'est la sortie de secours du voyage | `LeaseWatchdogTests.A_firmware_reboot_can_NEVER_be_a_lease_revert` |
-| `ReadFirmwareVariableOp` | **LECTURE seule** d'une variable firmware | **deux espaces de noms fermes** : sous le GUID EFI global, 3 noms (`BootOrder`, `SecureBoot`, `BootCurrent`) ; sous le GUID constructeur, le seul `Setup`. Tout autre GUID est hors de portee par construction, et un espace n'herite pas des noms de l'autre | — | `OpAllowlistTests.ReadFirmwareVariable_ForeignGuid_IsDenied` (+2) |
-| `BiosMarkerFile`, `FirmwareTrip` | un marqueur **fichier** pour savoir au retour si le voyage a eu lieu | ecrit sous `ProgramData`, pas dans le firmware | H-aucune | — |
+| `ReadFirmwareVariableOp` | **LECTURE seule** d'une variable firmware | **quatre ensembles fermes** : sous le GUID EFI global, 3 noms (`BootOrder`, `SecureBoot`, `BootCurrent`) ; sous le GUID constructeur, `Setup` ; sous le GUID du varstore Intel, `CpuSetup` ; sous le GUID des valeurs d'usine AMI, `StdDefaults`. Tout autre GUID est hors de portee par construction, et un espace n'herite pas des noms de l'autre | — | `OpAllowlistTests.ReadFirmwareVariable_ForeignGuid_IsDenied` (+2) |
+| `PendingBiosChangeStore`, `FirmwareTrip` | un marqueur **fichier** pour savoir au retour si le voyage a eu lieu | ecrit dans les donnees locales du joueur (`%LOCALAPPDATA%\DrDXT`), pas dans le firmware | H-aucune | — |
 
 **Mesure du 06/09/2026 — 6 mutations, 6 tuees, 0 survivant.** Bornes du delai de reboot retirees
 une par une (haute puis basse) ; les deux ops firmware retirees une par une de l'interdit de revert
@@ -462,16 +727,16 @@ facon — contre une machine potentiellement non demarrable, sans annulation.
 
 | Site | Ce qu'il fait | Garde | Prouve par |
 |---|---|---|---|
-| `Win32RegistryActions` | ecrit une valeur de registre | **liste blanche de 10 FEUILLES EXACTES** — hive + chemin + nom, **jamais un sous-arbre** | `OpAllowlistTests.Registry_allowed_path_but_wrong_value_name_is_denied_leaf_exact` (+1) |
+| `Win32RegistryActions` | ecrit une valeur de registre | **liste blanche de 13 FEUILLES EXACTES** — hive + chemin + nom, **jamais un sous-arbre** | `OpAllowlistTests.Registry_allowed_path_but_wrong_value_name_is_denied_leaf_exact` (+1) |
 | — | — | **plus 11 sous-arbres toujours refuses** : Windows Defender (3 chemins), Windows Update (2), `wuauserv`, BITS, `bam`, Safer, `SECURITY`, `SAM` | `OpAllowlistTests.Every_blacklisted_subtree_denies_the_key_AND_its_children_by_the_blacklist` — **ecrit le 06/09** |
 | Heures d'activite de Windows Update (`fixit.heures_actives`, L-WU, 06/10/2026) | ecrit `ActiveHoursStart` et `ActiveHoursEnd` sous `HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings` : le reglage de Parametres, **pas la strategie** (qui reste sous liste noire). Windows Update reste allume | **deux feuilles exactes**, valeur = une heure de 0 a 23 sans zero de tete ; original relu avant, rendu par l'annulation ; propose seulement en mode manuel LU (revue F-17) | `OpAllowlistTests` (heures 0-23, valeur forgee refusee), `HeuresActivesTweakTests` (demi-ecriture rendue, F-20) |
 | `Win32ServiceActions` | `sc.exe` install/start/stop/query | **deux services seulement** : `AMD3DVCacheSvc`, et le service PresentMon vendu via son op dedie | `OpAllowlistTests.Service_unknown_or_blacklisted_name_is_denied` |
 | Plan d'alimentation | applique un GUID de plan | **GUID connu seulement** | `OpAllowlistTests.PowerPlan_random_guid_is_denied` |
 | Mode de boost du processeur (`fixit.mode_boost`, L-CPU, 07/10/2026) | ecrit PERFBOOSTMODE sur secteur dans un plan, rien d'autre du plan | **un reglage fixe par le type**, valeur 0 a 4 documentee, plan non vide | `OpAllowlistTests.Mode_de_boost_refuse_une_valeur_forgee` (+1) |
-| Reglages pilote NVIDIA (DRS) | ecrit un reglage par id | **4 ids fermes**, un scope par application n'elargit pas l'ensemble | `LatencyTweakOpsAllowlistTests.Forged_drs_setting_id_is_denied_even_with_valid_profile` (+3) |
+| Reglages pilote NVIDIA (DRS) | ecrit un reglage par id | **6 ids fermes** (dont les 2 de la surcouche DLSS), un scope par application n'elargit pas l'ensemble | `LatencyTweakOpsAllowlistTests.Forged_drs_setting_id_is_denied_even_with_valid_profile` (+3) |
 | Suppression DRS au profil d'un jeu (`DeleteNvApiDrsSettingOp`, `NvAPI_DRS_DeleteProfileSetting` 0xE4A26362, 10/09/2026) | **retire** un reglage que le profil du jeu ne possedait pas — c'est l'INVERSE d'une ecriture au jeu, rien d'autre | **plus etroite que l'ecriture** : chemin d'executable complet uniquement, **jamais le profil de base** ; 4 ids fermes ; provenance attendue = heritee, defaut ou livree (jamais `SetByUser`, jamais `Unknown`, jamais hors enum). Le helper relit en session neuve : succes **seulement** si la provenance d'origine est revenue | `OpAllowlistTests.NvApiDrsDelete_*` (+8), `DrsPerApplicationDeleteTests` (6). 5 mutations le 10/09, 5 rouges. `[Hypothesis to test]` sur la vraie carte : « Delete sur une valeur livree la remet livree » — gate du mainteneur G2 |
 | `Win32RestorePointActions` | cree un point de restauration | **PROTECTEUR** : c'est le filet, pas le risque | — |
-| `HelperLauncher`, `HelperServiceLoop`, `ReconcilerHost/Worker` | lancent ou pilotent le helper | le canal reste le tube nomme ; aucun op hors des 20 | `ThePrivilegedSurfaceIsClosedGateTests` |
+| `HelperLauncher`, `HelperServiceLoop`, `ReconcilerHost/Worker` | lancent ou pilotent le helper | le canal reste le tube nomme ; aucun op hors de la surface figee | `ThePrivilegedSurfaceIsClosedGateTests` |
 
 **Mesure du 06/09/2026 — 6 mutations, 5 tuees, 1 SURVIVANTE, et la survivante etait la plus
 instructive.** Rendre `IsUnderSubtree` incapable de reconnaitre un ENFANT (la liste noire ne bannit
@@ -499,10 +764,10 @@ noire protege de la prochaine bonne idee.
 ## H-AUCUNE — les ecritures de fichiers, dites plutot qu'omises
 
 Ces sites ecrivent des fichiers **sous `LocalAppData` ou `ProgramData`**, jamais dans
-`Program Files`, jamais dans le systeme : `DpapiLicenseCache`, `LicenseAntiRollbackStore`,
+`Program Files`, jamais dans le systeme :
 `DiagnosticsLog`, `HelperDiagnosticsLog`, `JsonReconcilerStateStore`,
 `ProgramDataManifestStorage`, `TrustedManifestRoot`, `UpdateSeams`, `App.xaml.cs`,
-`AppServiceCollectionExtensions`, `UninstallProdSeams`, `BiosMarkerFile`, `PlafondEnvoiDuService`.
+`AppServiceCollectionExtensions`, `PendingBiosChangeStore`, `PlafondEnvoiDuService`.
 Le compte exact est celui de `tools/nonuisance/count-write-sites.py`, lu par la CI ; cette phrase ne le
 recopie plus (elle disait « douze » quand la table en portait davantage).
 
@@ -595,6 +860,16 @@ c'est l'effet demande. La sequence ne sert qu'une fois : l'ordre de demarrage ha
 Nuisance possible, dite : relancer un peripherique le coupe un instant (une souris, une carte reseau). Retirer un vieux
 paquet empeche Windows d'y revenir apres une mise a jour ratee, ce qui est l'effet voulu ; la sauvegarde et « Annuler »
 le rendent. Le pilote en service n'est jamais propose (MagasinDePilotes), et Windows le refuserait de toute facon.
+
+### 18/10/2026 — `SetMaintenancePauseOp` : la pause du maintien, un fichier qui ne peut qu'en faire moins
+
+| Site | Ce qu'il fait | Garde | Prouve par |
+|---|---|---|---|
+| `PauseDuMaintien` (helper eleve) | pose ou efface `%ProgramData%\DrDxt\pause-du-maintien`. Present, le reconciliateur du service de demarrage ne compare ni ne reecrit plus rien, ni sur la machine ni dans son sidecar ; absent, il reprend depuis le manifeste signe. Aucun registre, aucun pilote. | un booleen seul : le fichier et son dossier sont ecrits en dur, l'appelant ne choisit rien ; ecriture atomique au proprietaire Administrateurs (`TrustedManifestRoot.WriteTrustedFile`) ; a la lecture, un fichier qui n'est pas aux administrateurs vaut pause (dans le doute, rien n'est ecrit), le journal du service le dit et l'App propose de la remettre ou de la retirer ; il est efface a la desinstallation. Branche dans le helper seul : le service le lit, il ne l'ecrit jamais, donc une passe en cours ne peut pas l'ecraser (le `GlobalPaused` du sidecar, jamais ecrit, est retire). | `PauseDuMaintienTests` (pause sans aucune ecriture, reprise, pause posee pendant une passe qui survit a sa sauvegarde, fichier non fiable qui vaut pause et se journalise), `PauseDuMaintienParLeHelperTests` (allowlist, codec, passage par le fichier, echec honnete sans fichier branche), `PauseDuMaintienDansLAppTests` |
+
+Nuisance possible, dite : en pause, un reglage que Windows remet a zero n'est plus reapplique au demarrage, ce que le
+joueur a demande. La protection du ping, les temoins d'incident et le rejeu du journal du helper restent actifs : la
+pause ne coupe que le maintien.
 
 ### 15/10/2026 — deux reglages DRS de plus : la surcouche DLSS d'un jeu
 

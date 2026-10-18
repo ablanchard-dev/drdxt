@@ -58,6 +58,36 @@ public sealed class MagasinDePilotesTests
         c[0].Cible.Should().Be("oem98.inf oem41.inf", "les paquets que le geste retire, et seulement eux");
     }
 
+    // Un paquet du même fournisseur plus récent que celui en service n'est pas un reste : le retirer détruirait la mise à jour.
+    [Fact]
+    public void Un_paquet_plus_recent_que_celui_en_service_n_est_jamais_propose_au_retrait()
+    {
+        const string plusRecent = """
+            <PnpUtil>
+              <Driver DriverName="oem98.inf"><ProviderName>NVIDIA</ProviderName><DriverVersion>05/02/2026 32.0.15.9186</DriverVersion></Driver>
+              <Driver DriverName="oem127.inf"><ProviderName>NVIDIA</ProviderName><DriverVersion>08/20/2026 32.0.16.1656</DriverVersion></Driver>
+              <Driver DriverName="oem200.inf"><ProviderName>NVIDIA</ProviderName><DriverVersion>10/01/2026 32.0.16.2000</DriverVersion></Driver>
+            </PnpUtil>
+            """;
+        var c = MagasinDePilotes.Juger(plusRecent, Fichier("pnputil-cartes-2026-10-03.xml"), "<PnpUtil/>").ToList();
+        c.Should().HaveCount(2);
+        c[0].ValeurCourante.Should().Be("NVIDIA 32.0.16.2000 (oem200.inf)");
+        c[0].Action.Should().Be(RepairAction.Aucune);
+        c.Should().ContainSingle(x => x.Action == RepairAction.Recommandation)
+            .Which.Cible.Should().Be("oem98.inf");
+
+        // Windows dit si le paquet dormant déclare la carte branchée (MatchingDrivers, SUBSYS compris).
+        const string correspondants = """
+            <PnpUtil><Device InstanceId="PCI\VEN_10DE"><MatchingDrivers>
+              <DriverName DriverName="oem127.inf"/><DriverName DriverName="oem200.inf"/>
+            </MatchingDrivers></Device></PnpUtil>
+            """;
+        MagasinDePilotes.Juger(plusRecent, Fichier("pnputil-cartes-2026-10-03.xml"), "<PnpUtil/>", correspondants).First()
+            .Explication.Should().Contain("compatibles avec ta carte branchée");
+        MagasinDePilotes.Juger(plusRecent, Fichier("pnputil-cartes-2026-10-03.xml"), "<PnpUtil/>", "<PnpUtil/>").First()
+            .Explication.Should().Contain("ne déclare aucune");
+    }
+
     // Relevé sur la machine : pnputil écrit dans la page de code OEM ; lu en UTF-8, « carte mère » sortait abîmé.
     [Fact]
     public void Le_vrai_pnputil_se_lit_sans_caractere_abime()

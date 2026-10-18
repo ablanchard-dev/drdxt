@@ -48,10 +48,19 @@ public sealed class HeuresActivesTweak : ITweak
     public bool AppliesTo(HardwareInventory hw, SettingsState state) =>
         // Seulement « manuel » LU. Absent, Windows peut les régler seul et réécrire ce que
         // DrDXT poserait : « posé » à l'écran, effet nul. Sur la machine de référence la valeur est absente (15 h - 8 h).
-        state.HeuresActives is { Automatique: false } h && state.HeuresDeJeu is { } parties
+        state.HeuresActives is { Automatique: false } h && Parties(state) is { } parties
         && HeuresActives.Proposer(h, parties, _fuseau) is not null;
 
-    public bool EtatNonLu(SettingsState state) => state.HeuresActives is null || state.HeuresDeJeu is null;
+    public bool EtatNonLu(SettingsState state) => state.HeuresActives is null || Parties(state) is null;
+
+    // Le lecteur d'état de la machine ne porte pas les parties (seul le scan de l'App les y ajoute) : le levier lit alors
+    // les parties relevées, la même source que son Apply. Une lecture qui lève reste « non lu ».
+    private IReadOnlyList<PlageDeJeu>? Parties(SettingsState state)
+    {
+        if (state.HeuresDeJeu is { } parties) return parties;
+        try { return _parties(); }
+        catch (Exception) { return null; }
+    }
 
     public async Task<Result<TweakSnapshot>> ApplyAsync()
     {
@@ -78,13 +87,10 @@ public sealed class HeuresActivesTweak : ITweak
             for (var i = 0; i < avants.Count; i++)
             {
                 var res = await _elevated.ExecuteAsync(avants[i], CancellationToken.None).ConfigureAwait(false);
+                // Une moitié écrite ne reste pas : la première valeur est rendue, et un rendu refusé se dit.
                 if (!res.IsOk)
-                {
-                    // Une moitié écrite ne reste pas : la première valeur est rendue.
-                    for (var j = i - 1; j >= 0; j--)
-                        await _elevated.ExecuteAsync(inverses[j], CancellationToken.None).ConfigureAwait(false);
-                    return Result<TweakSnapshot>.Fail(res.Error!.Value.Code, res.Error!.Value.Message);
-                }
+                    return await RetourArriere.EchecAsync(_elevated, inverses.Take(i).ToList(), res.Error!.Value.Code, res.Error!.Value.Message)
+                        .ConfigureAwait(false);
             }
             var posees = CompositeSnapshotCodec.Encode(avants);
             return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, original.Value, posees.IsOk ? posees.Value : null));
@@ -97,6 +103,8 @@ public sealed class HeuresActivesTweak : ITweak
 
     public async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
         var ops = CompositeSnapshotCodec.Decode(snapshot?.OriginalValueJson);
         if (!ops.IsOk || ops.Value is null)
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Active hours snapshot is not a known composite of typed ops.");

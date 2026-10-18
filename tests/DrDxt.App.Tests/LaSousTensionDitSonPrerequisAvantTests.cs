@@ -51,5 +51,8 @@ public sealed class LaSousTensionDitSonPrerequisAvantTests
         prerequis.Should().BeGreaterThan(0, "la carte porte la ligne de prérequis");
         vue.IndexOf("SousTensionPrerequisVisible", StringComparison.Ordinal).Should().BeGreaterThan(0, "et ne la montre qu'aux processeurs concernés");
         prerequis.Should().BeLessThan(vue.IndexOf("LabelSousTensionMaintenir", StringComparison.Ordinal), "elle se lit avant le lancement");
+        var possible = vue.IndexOf("DataContext.SousTensionPossible", StringComparison.Ordinal);
+        possible.Should().BeGreaterThan(0, "la carte ne se montre que là où la sous-tension peut se poser");
+        possible.Should().BeLessThan(vue.IndexOf("LancerRechercheSousTensionCommand", StringComparison.Ordinal), "elle porte le bouton");
     }
 }

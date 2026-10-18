@@ -121,6 +121,8 @@ public sealed class HandshakingElevatedClient : IElevatedClient
         var opJson = serialized.Value;
 
         byte[]? sessionKey = null;
+        // Une fois la requête écrite, une panne du tube ne dit plus « rien n'est parti » : l'op a pu s'exécuter.
+        var envoyee = false;
         try
         {
             using var client = new NamedPipeClientStream(
@@ -155,12 +157,13 @@ public sealed class HandshakingElevatedClient : IElevatedClient
             var request = new TypedPrivilegedRequest { OpJson = opJson, Nonce = nonce, HmacBase64 = hmac };
 
             await WireCodec.WriteMessageAsync(client, request, ct).ConfigureAwait(false);
+            envoyee = true;
             var response = await WireCodec
                 .ReadMessageAsync<PrivilegedResponse>(client, ct)
                 .ConfigureAwait(false);
 
             return response is null
-                ? Result<PrivilegedResponse>.Fail(ErrorCodes.IoFailure, "No response from elevated helper.")
+                ? Result<PrivilegedResponse>.Fail(ErrorCodes.HelperNoReply, "The request was sent, then the elevated helper stopped answering.")
                 : Result<PrivilegedResponse>.Ok(response);
         }
         catch (OperationCanceledException)
@@ -169,7 +172,9 @@ public sealed class HandshakingElevatedClient : IElevatedClient
         }
         catch (Exception ex) when (ex is IOException or TimeoutException or UnauthorizedAccessException)
         {
-            return Result<PrivilegedResponse>.Fail(ErrorCodes.IoFailure, "Could not reach the elevated helper.");
+            return envoyee
+                ? Result<PrivilegedResponse>.Fail(ErrorCodes.HelperNoReply, "The request was sent, then the elevated helper stopped answering.")
+                : Result<PrivilegedResponse>.Fail(ErrorCodes.IoFailure, "Could not reach the elevated helper.");
         }
         finally
         {

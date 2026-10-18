@@ -71,7 +71,7 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
             return false;
 
         var display = _display.GetPrimaryGameDisplay();
-        if (!display.IsOk || display.Value is not { SupportsVrr: true } ecran)
+        if (!display.IsOk || display.Value is not { SupportsVrr: true } ecran || !FrequenceLue(ecran))
             return false;
         if (LatencyGating.HasNvidiaDriverPath(hw))
             return true;
@@ -90,11 +90,17 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
     /// <summary>ADLX_WAIT_FOR_VERTICAL_REFRESH_MODE.WFVR_ALWAYS_ON (ADLXDefines.h).</summary>
     private const int VsyncAmdToujours = 3;
 
-    /// <summary>Carte AMD sans NVAPI, mais FRTC ou Chill illisible : rien n'est proposé, et c'est dit.</summary>
+    /// <summary>Carte AMD sans NVAPI, mais FRTC ou Chill illisible, ou écran VRR dont la fréquence n'est pas lue : rien n'est
+    /// proposé, et c'est dit.</summary>
     public override bool EtatNonLu(SettingsState state)
-        => !_nvApi.IsAvailable && _adlx is { IsAvailable: true }
-           && (!_adlx.GetFrameRateTarget().IsOk || !_adlx.GetChillActif().IsOk
-               || !_adlx.GetVsyncMode().IsOk || !_adlx.GetEnhancedSyncActif().IsOk);
+        => (_display.GetPrimaryGameDisplay() is { IsOk: true, Value: { SupportsVrr: true } ecran } && !FrequenceLue(ecran))
+           || (!_nvApi.IsAvailable && _adlx is { IsAvailable: true }
+               && (!_adlx.GetFrameRateTarget().IsOk || !_adlx.GetChillActif().IsOk
+                   || !_adlx.GetVsyncMode().IsOk || !_adlx.GetEnhancedSyncActif().IsOk));
+
+    // Win32 rend 0 ou 1 pour « fréquence par défaut du matériel » (dmDisplayFrequency) : la cible calculée dessus vaudrait
+    // 1 image/s.
+    private static bool FrequenceLue(DisplayInfo ecran) => ecran.RefreshHz > 3;
 
     private static int Cible(int rafraichissementHz) => Math.Min(PlafondVrr.Cible(rafraichissementHz), FrlMaxFps);
 
@@ -159,6 +165,9 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
             if (!display.Value.SupportsVrr)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakNotApplicable,
                     "No VRR/G-Sync/FreeSync display detected: no blind frame cap.");
+            if (!FrequenceLue(display.Value))
+                return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
+                    "The display refresh rate was not read: no frame cap computed from it.");
 
             if (!_nvApi.IsAvailable)
                 return _adlx is { IsAvailable: true }
@@ -227,6 +236,8 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
     /// → SAFETY.SNAPSHOT_INVALID ; ne lève jamais, ne lance jamais une op inconnue.</summary>
     public override async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Snapshot has no original-value payload.");
 

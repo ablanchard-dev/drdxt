@@ -37,8 +37,12 @@ public class TweakCandidateTests
                 Fil(new SetRegistryValueOp(RegistryHiveKind.LocalMachine, Chemin, "HwSchMode", RegistryValueType.DWord, "1")),
                 Fil(new SetRegistryValueOp(RegistryHiveKind.LocalMachine, Chemin, "HwSchMode", RegistryValueType.DWord, "2")));
             Rendus.Add(s);
+            // Comme le client élevé de l'App : une écriture journalisée posée dans une portée note son acquit.
+            PorteeDePose.Courante?.Noter(() => { Log?.Add("acquit"); return Task.FromResult(Result.Ok()); });
             return Task.FromResult(Result<TweakSnapshot>.Ok(s));
         }
+
+        public List<string>? Log;
 
         public bool RevertEchoue;
 
@@ -63,12 +67,14 @@ public class TweakCandidateTests
         public int? EcrituresAuPremierPoser;
 
         public bool RefuseApresPremier;
+        public List<string>? Log;
         private int _poses;
 
         public Result Poser(string tweakId, TweakSnapshot? snapshot)
         {
             if (Refuse || (RefuseApresPremier && _poses++ >= 1)) return Result.Fail("X", "disque plein");
             EcrituresAuPremierPoser ??= Sonde?.Invoke();
+            if (snapshot is not null) Log?.Add("origine");
             Entree = new RevertEnAttenteEntree(tweakId, snapshot);
             return Result.Ok();
         }
@@ -87,6 +93,32 @@ public class TweakCandidateTests
 
     private static CandidateDescriptor Descripteur(string id = "latency.hagsOn") =>
         new(id, CandidateKind.AutoHot, RiskLevel: 1, NeedsStability: false, new[] { "latence" });
+
+    // Le helper garde l'origine de la pose jusqu'à ce que le journal de l'essai la porte : l'acquit part après, une fois.
+    [Fact]
+    public void La_pose_s_acquitte_une_fois_apres_que_le_journal_porte_l_origine()
+    {
+        var log = new List<string>();
+        var c = new TweakCandidate(new LevierFaux { Log = log }, Descripteur(), new Registre(2), new JournalFaux { Log = log });
+
+        c.Apply().IsOk.Should().BeTrue();
+
+        log.Should().Equal("origine", "acquit");
+        PorteeDePose.Courante.Should().BeNull("la portée ne survit pas à la pose");
+    }
+
+    // Sans origine au journal de l'essai, seul le helper sait revenir : rien n'est acquitté.
+    [Fact]
+    public void Une_origine_que_le_journal_refuse_n_est_pas_acquittee()
+    {
+        var log = new List<string>();
+        var c = new TweakCandidate(new LevierFaux { Log = log, RevertEchoue = true }, Descripteur(), new Registre(2),
+            new JournalFaux { Log = log, RefuseApresPremier = true });
+
+        c.Apply().IsOk.Should().BeFalse();
+
+        log.Should().NotContain("acquit");
+    }
 
     [Fact]
     public void Une_cible_RELUE_en_place_autorise_la_mesure()
@@ -265,7 +297,8 @@ public class TweakCandidateTests
             var phrase = RevertAuDemarrage.Executer(new FichierRevertEnAttente(chemin),
                 new TweakCatalog(new ITweak[] { levier }));
 
-            phrase.Should().Contain("Vérifie ce réglage", "DrDXT ne sait pas revenir, il le DIT");
+            // L'App ne sait pas revenir : le helper, si la pose a eu lieu. Le message le DIT, sans promettre une remise.
+            phrase.Should().Be(Docteur.T("RV.SansOrigineGardee", "latency.hagsOn"));
             levier.Annules.Should().BeEmpty("il n'y a aucun inverse a jouer : en inventer un serait pire");
             File.Exists(chemin).Should().BeFalse(
                 "le journal est leve, sinon la meme phrase revient a CHAQUE demarrage, pour toujours");
@@ -328,4 +361,32 @@ public class TweakCandidateTests
     public void Au_demarrage_rien_en_attente_ne_dit_rien()
         => RevertAuDemarrage.Executer(new JournalFaux(), new TweakCatalog(Array.Empty<ITweak>()))
             .Should().BeNull();
+    // Le service du composite X3D se relit par son état : sans lecteur de services, le candidat rendait Unavailable et ne
+    // pouvait jamais mesurer.
+    private sealed class LevierService : ITweak
+    {
+        public string Id => "latency.hagsOn";
+        public TweakCategory Category => default;
+        public bool RequiresElevation => true;
+        public bool RequiresRestorePoint => false;
+        public string SummaryKey => Id;
+        public bool AppliesTo(HardwareInventory hw, SettingsState state) => true;
+        public Task<Result<TweakSnapshot>> ApplyAsync() => Task.FromResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id,
+            PrivilegedOpCodec.Serialize(new RunServiceControlOp("AMD3DVCacheSvc", ServiceAction.Stop)).Value!,
+            PrivilegedOpCodec.Serialize(new RunServiceControlOp("AMD3DVCacheSvc", ServiceAction.Start)).Value!)));
+        public Task<Result> RevertAsync(TweakSnapshot snapshot) => Task.FromResult(Result.Ok());
+    }
+
+    [Fact]
+    public void Un_service_demarre_se_relit_par_le_lecteur_de_services()
+    {
+        var services = NSubstitute.Substitute.For<IServiceStateReader>();
+        NSubstitute.SubstituteExtensions.Returns(services.GetServiceState("AMD3DVCacheSvc"), Result<ServiceState>.Ok(ServiceState.Running));
+        var c = new TweakCandidate(new LevierService(), Descripteur(), new Registre(null), new JournalFaux(), services: services);
+
+        c.Apply().IsOk.Should().BeTrue();
+        c.DernierePreuve.Should().BeNull();
+        c.ReadBack().Value.Should().BeTrue();
+        c.DernierePreuve!.Verdict.Should().Be(EtatApplique.Applied);
+    }
 }

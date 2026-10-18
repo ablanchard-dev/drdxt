@@ -35,4 +35,17 @@ public sealed class MemoryBenchChaineTests
     [Fact]
     public void La_chaine_est_la_meme_d_une_execution_a_l_autre()
         => MemoryBench.ChaineUnique(4096).Should().Equal(MemoryBench.ChaineUnique(4096));
+
+    // La zone « DRAM » déborde du L3 lu : sur un X3D (96 Mo), 128 Mio fixes laissaient une part des accès dans le cache.
+    [Theory]
+    [InlineData(0L, 128L * 1024 * 1024)]                         // L3 non lu : le plancher
+    [InlineData(16L * 1024 * 1024, 128L * 1024 * 1024)]          // 16 Mo de L3 : le plancher suffit
+    [InlineData(96L * 1024 * 1024, 4 * 96L * 1024 * 1024)]       // 5800X3D, 96 Mo
+    [InlineData(128L * 1024 * 1024, 4 * 128L * 1024 * 1024)]     // 9950X3D, 2 x 64 Mo
+    public void La_zone_de_latence_vaut_au_moins_quatre_fois_le_l3(long l3, long octetsAttendus)
+        => ((long)MemoryBench.ElementsLatence(l3) * sizeof(int)).Should().Be(octetsAttendus);
+
+    [Fact]
+    public void Le_l3_se_lit_sans_lever()
+        => MemoryBench.OctetsL3().Should().BeGreaterThanOrEqualTo(0);
 }

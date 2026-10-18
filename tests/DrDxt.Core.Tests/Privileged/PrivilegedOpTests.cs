@@ -289,6 +289,9 @@ public sealed class PrivilegedOpTests
             nameof(PrivilegedOpType.EnableSystemRestore),
             nameof(PrivilegedOpType.EstablishLease),
             nameof(PrivilegedOpType.RenewLease),
+            // Le journal d'écriture anticipée : une pose marquée (validée par son op intérieure) et son acquit.
+            nameof(PrivilegedOpType.PoseEnAttenteDOrigine),
+            nameof(PrivilegedOpType.AcquitterEcriture),
             // Elargi deliberement. Ce test existe pour qu'on ne puisse pas
             // ajouter une op privilegiee sans le decider.
             // Les deux ops ci-dessous passent par shutdown.exe et n'ecrivent aucune variable
@@ -353,6 +356,9 @@ public sealed class PrivilegedOpTests
             nameof(PrivilegedOpType.RestartDevice),
             nameof(PrivilegedOpType.RemoveDriverPackage),
             nameof(PrivilegedOpType.RestoreDriverPackage),
+            // Elargie deliberement : la pause du maintien posee ou levee par le joueur (un fichier sous %ProgramData%\DrDxt,
+            // un booleen, ne peut qu'en faire moins). Documentee dans docs/NON-NUISANCE.md.
+            nameof(PrivilegedOpType.SetMaintenancePause),
         });
     }
 

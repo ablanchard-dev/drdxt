@@ -36,7 +36,7 @@ public sealed class LeviersJamaisApplicablesTests
         ["fixit.plan_economie"] = (hw, s) => (hw, s with { PowerPlanGuid = KnownPowerPlans.PowerSaver.ToString() }),
         ["fixit.mode_boost"] = (hw, s) => (hw, s with { PowerPlanGuid = Equilibre, ModeDeBoost = new ModeDeBoostLu(Guid.Parse(Equilibre), 0, 2) }),
         ["latency.mouse_acceleration_off"] = (hw, s) => (hw, s with { AccelerationSouris = TriState.On }),
-        ["fixit.cpu_power_limit"] = (hw, s) => (hw, s with { LimitePuissance = new LimiteDePuissanceLue(65, 219, 65, false) }),
+        ["fixit.cpu_power_limit"] = (hw, s) => (hw, s with { LimitePuissance = new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 80) }),
         ["fixit.cpu_power_cap"] = (hw, s) => (hw, s with { LimitePuissance = new LimiteDePuissanceLue(253, 253, 65, false, PlafondThermiqueW: 150) }),
         ["fixit.wifi_performances"] = (hw, s) => (hw, s with
         {

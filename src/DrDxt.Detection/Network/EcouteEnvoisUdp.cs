@@ -1,6 +1,7 @@
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using static DrDxt.Detection.Natif;
 
 namespace DrDxt.Detection.Network;
 
@@ -30,10 +31,29 @@ public sealed class EcouteEnvoisUdp
     private EventRecordCallback? _rappel;
     private readonly Dictionary<(int Pid, uint Adresse, int Port), long> _cumul = new();
     private int? _pidVise;
+    // Mode « qui occupe la montée » : TCP et UDP, IPv4 et IPv6, cumulés par programme seulement.
+    private Dictionary<int, long>? _parProcessus;
+
+    // Une seule session de ce nom à la fois dans le processus : deux écoutes en même temps (la route du scan et la montée)
+    // se fermeraient l'une l'autre par ERROR_ALREADY_EXISTS.
+    private static readonly object Verrou = new();
+
+    /// <summary>Les octets envoyés par chaque programme pendant la fenêtre, en TCP et en UDP, sur IPv4 et IPv6 (événements
+    /// 10, 26, 42, 58 de <see cref="EnvoisUdp.Fournisseur"/>). <c>null</c> si la session n'a pas pu s'ouvrir.</summary>
+    public IReadOnlyDictionary<int, long>? OctetsParProcessus(TimeSpan duree)
+    {
+        _parProcessus = new Dictionary<int, long>();
+        return Ecouter(duree) is null ? null : _parProcessus;
+    }
 
     /// <summary>Les envois de la fenêtre, cumulés par programme et destination ; seulement ceux de <paramref name="pid"/>
     /// s'il est donné. <c>null</c> si la session n'a pas pu s'ouvrir.</summary>
     public IReadOnlyList<EnvoiUdp>? Ecouter(TimeSpan duree, int? pid = null)
+    {
+        lock (Verrou) return EcouterSeul(duree, pid);
+    }
+
+    private IReadOnlyList<EnvoiUdp>? EcouterSeul(TimeSpan duree, int? pid)
     {
         _pidVise = pid;
         var taille = Marshal.SizeOf<EVENT_TRACE_PROPERTIES>() + 2 * 1024;
@@ -53,12 +73,14 @@ public sealed class EcouteEnvoisUdp
 
             var fournisseur = EnvoisUdp.Fournisseur;
             if (EnableTraceEx2(session, ref fournisseur, EVENT_CONTROL_CODE_ENABLE_PROVIDER, TRACE_LEVEL_VERBOSE,
-                    EnvoisUdp.MotCleIpv4, 0, 0, IntPtr.Zero) != ERROR_SUCCESS) return null;
+                    _parProcessus is null ? EnvoisUdp.MotCleIpv4 : EnvoisUdp.MotCleIpv4 | EnvoisUdp.MotCleIpv6, 0, 0, IntPtr.Zero) != ERROR_SUCCESS) return null;
 
             // Le délégué vit dans un champ : en variable locale, le ramasse-miettes pourrait le collecter pendant que le
             // noyau détient encore son adresse.
             _rappel = SurEvenement;
             var nom = Marshal.StringToHGlobalUni(NomSession);
+            // Fermée par le `finally` aussi quand une exception sort entre l'ouverture et la fin.
+            var poignee = unchecked((ulong)-1);
             try
             {
                 var journal = new EVENT_TRACE_LOGFILE
@@ -67,7 +89,7 @@ public sealed class EcouteEnvoisUdp
                     ProcessTraceMode = PROCESS_TRACE_MODE_REAL_TIME | PROCESS_TRACE_MODE_EVENT_RECORD,
                     EventRecordCallback = Marshal.GetFunctionPointerForDelegate(_rappel),
                 };
-                var poignee = OpenTrace(ref journal);
+                poignee = OpenTrace(ref journal);
                 if (poignee == unchecked((ulong)-1)) return null;
 
                 var poignees = new[] { poignee };
@@ -80,9 +102,12 @@ public sealed class EcouteEnvoisUdp
                 Thread.Sleep(duree);
                 Arreter(taille);
                 consommateur.Join(TimeSpan.FromSeconds(3));
-                CloseTrace(poignee);
             }
-            finally { Marshal.FreeHGlobal(nom); }
+            finally
+            {
+                if (poignee != unchecked((ulong)-1)) CloseTrace(poignee);
+                Marshal.FreeHGlobal(nom);
+            }
 
             lock (_cumul)
                 return _cumul.Select(kv => new EnvoiUdp(kv.Key.Pid, (int)Math.Min(kv.Value, int.MaxValue),
@@ -98,6 +123,16 @@ public sealed class EcouteEnvoisUdp
 
     private void SurEvenement(ref EVENT_RECORD e)
     {
+        if (_parProcessus is { } parPid)
+        {
+            if (e.EventHeader.ProviderId != EnvoisUdp.Fournisseur || !EnvoisUdp.EvenementsEnvoi.Contains(e.EventHeader.EventDescriptor.Id)
+                || e.UserData == IntPtr.Zero || e.UserDataLength < 8) return;
+            var tete = new byte[8];
+            Marshal.Copy(e.UserData, tete, 0, 8);
+            var (pid, taille) = EnvoisUdp.PidEtTaille(tete);
+            lock (parPid) parPid[pid] = parPid.GetValueOrDefault(pid) + taille;
+            return;
+        }
         if (e.EventHeader.ProviderId != EnvoisUdp.Fournisseur || e.EventHeader.EventDescriptor.Id != EnvoisUdp.EvenementEnvoiIpv4) return;
         if (e.UserData == IntPtr.Zero || e.UserDataLength < 20) return;
         var octets = new byte[20];
@@ -173,31 +208,4 @@ public sealed class EcouteEnvoisUdp
         public IntPtr ExtendedData; public IntPtr UserData; public IntPtr UserContext;
     }
 
-    [StructLayout(LayoutKind.Explicit, Size = 448)]
-    private struct EVENT_TRACE_LOGFILE
-    {
-        [FieldOffset(8)] public IntPtr LoggerName;
-        [FieldOffset(28)] public uint ProcessTraceMode;
-        [FieldOffset(376)] public long PerfFreq;
-        [FieldOffset(424)] public IntPtr EventRecordCallback;
-    }
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "StartTraceW")]
-    private static extern int StartTrace(out ulong sessionHandle, string sessionName, IntPtr properties);
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "ControlTraceW")]
-    private static extern int ControlTrace(ulong sessionHandle, string sessionName, IntPtr properties, uint controlCode);
-
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, EntryPoint = "OpenTraceW", SetLastError = true)]
-    private static extern ulong OpenTrace(ref EVENT_TRACE_LOGFILE logfile);
-
-    [DllImport("advapi32.dll")]
-    private static extern int ProcessTrace(ulong[] handleArray, uint handleCount, IntPtr startTime, IntPtr endTime);
-
-    [DllImport("advapi32.dll")]
-    private static extern int CloseTrace(ulong traceHandle);
-
-    [DllImport("advapi32.dll")]
-    private static extern int EnableTraceEx2(ulong traceHandle, ref Guid providerId, uint controlCode, byte level,
-        ulong matchAnyKeyword, ulong matchAllKeyword, uint timeout, IntPtr enableParameters);
 }

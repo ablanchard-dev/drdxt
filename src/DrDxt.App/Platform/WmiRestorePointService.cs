@@ -42,7 +42,8 @@ public sealed class WmiRestorePointService : IRestorePointService
             // D'abord : WMI SystemRestoreConfig (RPSessionInterval > 0 veut dire restauration active).
             using var searcher = new ManagementObjectSearcher(
                 SystemRestoreScope, "SELECT RPSessionInterval FROM SystemRestoreConfig");
-            foreach (var o in searcher.Get())
+            using var rangees = searcher.Get();
+            foreach (var o in rangees)
             {
                 using (o)
                 {
@@ -123,7 +124,8 @@ public sealed class WmiRestorePointService : IRestorePointService
             using var searcher = new ManagementObjectSearcher(
                 SystemRestoreScope, "SELECT CreationTime FROM SystemRestore");
             var creations = new List<string?>();
-            foreach (var o in searcher.Get())
+            using var rangees = searcher.Get();
+            foreach (var o in rangees)
             {
                 using (o) creations.Add(o["CreationTime"]?.ToString());
             }

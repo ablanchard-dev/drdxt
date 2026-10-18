@@ -41,6 +41,9 @@ public sealed record EntreeCarte(
     IReadOnlyList<GesteDuDocteur>? Gestes = null)
 {
     public bool AGestes => Gestes is { Count: > 0 };
+
+    /// <summary>Le nom que le lecteur d'écran annonce pour la ligne (voir <see cref="DomaineMachine.ToString"/>).</summary>
+    public override string ToString() => string.IsNullOrWhiteSpace(Valeur) ? Titre : $"{Titre}{Docteur.DeuxPoints}{Valeur}";
     /// <summary>L'encadré « Comment corriger » : un texte de remède, des gestes, ou les deux. Sans texte, les gestes restaient cachés.</summary>
     public bool ACommentCorriger => ARemede || AGestes;
 
@@ -90,10 +93,15 @@ public sealed record EntreeCarte(
     /// (« Version du pilote graphique » puis la même version). Elle ne s'affiche que si elle apprend quelque chose.</summary>
     public string ValeurAAfficher => ValeurLue.Length == 0 || DejaDit(ValeurLue) ? string.Empty : ValeurLue;
 
-    /// <summary>L'étiquette « recommandation » sur un point rouge (à corriger) se contredisait.
-    /// Sur un constat à corriger, elle se tait ; les autres étiquettes d'action restent.</summary>
-    public string ActionAAfficher => Gravite > Severity.Info && string.Equals(Action, "recommandation", StringComparison.Ordinal)
-        ? string.Empty : Action;
+    /// <summary>L'étiquette « recommandation » ne disait rien que la couleur du point ne dise déjà, et se lisait comme un
+    /// mot de code ; elle se tait, dans toutes les langues. Les étiquettes qui informent (« DrDXT peut le réparer »,
+    /// « passage guidé par le BIOS ») restent.</summary>
+    public string ActionAAfficher => LibellesRecommandation.Contains(Action) ? string.Empty : Action;
+
+    // Le libellé est écrit dans la langue du scan ; l'écran peut parler une autre langue : toutes celles du docteur.
+    private static readonly HashSet<string> LibellesRecommandation = new[] { "fr-FR", "en-US" }
+        .Select(l => { using var _ = Docteur.Portee(System.Globalization.CultureInfo.GetCultureInfo(l)); return Docteur.T("RF.Action.Recommandation"); })
+        .ToHashSet(StringComparer.Ordinal);
 
     private bool DejaDit(string valeur)
     {
@@ -116,7 +124,11 @@ public sealed record EntreeCarte(
 }
 
 /// <summary>Un point de la liste « À faire d'abord » : le constat et le domaine qu'un clic ouvre.</summary>
-public sealed record PointAFaire(DomaineMachine Domaine, EntreeCarte Entree);
+public sealed record PointAFaire(DomaineMachine Domaine, EntreeCarte Entree)
+{
+    /// <summary>Le nom que le lecteur d'écran annonce (voir <see cref="DomaineMachine.ToString"/>).</summary>
+    public override string ToString() => $"{Domaine.Nom}{Docteur.DeuxPoints}{Entree.Titre}";
+}
 
 /// <summary>Une ligne mesurée, et l'explication qui l'accompagne quand il y en a une.</summary>
 public sealed record LigneMesure(string Texte, string? Explication, bool EstTitre = false, bool EstEntete = false)
@@ -130,6 +142,9 @@ public sealed record LigneMesure(string Texte, string? Explication, bool EstTitr
     public string Suite => string.Join(" ", new[] { CarteDeLaMachine.TitreEtSuite(Texte).Suite, Explication ?? "" }
         .Where(s => s.Length > 0));
     public bool ASuite => Suite.Length > 0;
+
+    /// <summary>Le nom que le lecteur d'écran annonce pour la ligne (voir <see cref="DomaineMachine.ToString"/>).</summary>
+    public override string ToString() => Texte;
 }
 
 /// <summary>Un domaine de la machine et tout ce que le scan en sait.</summary>
@@ -146,12 +161,11 @@ public sealed record DomaineMachine(
     IReadOnlyList<EntreeCarte> Proposes)
 {
     public bool AUnComposant => !string.IsNullOrWhiteSpace(Composant);
-    public bool ADesMesures => Mesures.Count > 0;
 
-    /// <summary>Ce que la constellation de l'en-tête dessine. Une lecture par mesure ou état lu (ni
-    /// l'en-tête « N états lus », ni les sous-titres de famille) et par constat ; les constats sont les points vifs.</summary>
-    public int NombreDeLectures => Mesures.Count(m => m != Entete && Titres?.Contains(m) != true) + Lignes.Count;
-    public int NombreDeConstats => Lignes.Count;
+    /// <summary>Ce que le lecteur d'écran annonce pour la page dans le rail : WPF lit ToString quand l'élément de liste n'a
+    /// pas de nom, et celui d'un record énumère tous ses champs (« DomaineMachine { Cle = bios, … } »).</summary>
+    public override string ToString() => $"{Nom}, {EtatLibelle}";
+    public bool ADesMesures => Mesures.Count > 0;
 
     /// <summary>L'explication sourcée d'un état lu sans geste, par texte de ligne. Sans
     /// elle, l'écran ne montrait que la valeur et la phrase n'était lue nulle part.</summary>
@@ -198,7 +212,14 @@ public sealed record DomaineMachine(
     public bool ADesLignes => Lignes.Count > 0;
     public bool ADesNonLus => NonLus.Count > 0;
     public bool ADesProposes => Proposes.Count > 0;
-    public bool EstVide => !ADesMesures && !ADesLignes && !ADesNonLus && !ADesProposes;
+    public bool EstVide => !ADesMesures && !ADesLignes && !ADesNonLus && !ADesProposes && !ADesDetails;
+
+    /// <summary>« Détails techniques » : l'information d'expert sans problème ni geste (<see cref="DetailsTechniques"/>),
+    /// repliée par défaut, comptée dans son titre.</summary>
+    public IReadOnlyList<LigneMesure> Details { get; init; } = [];
+    public bool ADesDetails => Details.Count > 0;
+    /// <summary>« Détails techniques (N) » : le titre et le nom accessible de la section, compte compris.</summary>
+    public string TitreDesDetails { get; init; } = "";
 
     /// <summary>Ce que DrDXT fait sur cette page, levier par levier.</summary>
     public IReadOnlyList<LigneLevier> Leviers { get; init; } = [];
@@ -209,6 +230,9 @@ public sealed record DomaineMachine(
 public sealed record LigneLevier(string Nom, string Statut, string? Raison, DrDxt.Application.Tweaks.StatutDuLevier Code)
 {
     public bool ARaison => Raison is not null;
+
+    /// <summary>Le nom que le lecteur d'écran annonce pour l'élément de liste : WPF lit ToString quand l'élément n'a pas de nom.</summary>
+    public override string ToString() => $"{Nom}{Docteur.DeuxPoints}{Statut}";
 }
 
 /// <summary>
@@ -358,6 +382,12 @@ public static class CarteDeLaMachine
         }
         return lignes;
     }
+
+    /// <summary>Les réglages qui ne sont plus à leur valeur d'usine, comparés au magasin d'usine du firmware : ceux que la
+    /// table nomme, puis le compte des autres octets changés. Null quand rien n'a été comparé.</summary>
+    public static string? LigneEcartsUsine(DrDxt.Bios.EcartsAUsine? e) => e is null ? null
+        : Docteur.T("Carte.Bios.Ecarts", e.Nommes.Count, e.AutresOctets, e.OctetsCompares)
+          + (e.Nommes.Count == 0 ? "" : Docteur.DeuxPoints + string.Join(", ", e.Nommes.Select(n => $"{n.Reglage} {n.Usine} → {n.Valeur}")));
 
     private static bool EstPalierDeVentilateur(string reglage) => reglage.StartsWith("CPU Fan1 level ", StringComparison.Ordinal);
 
@@ -555,7 +585,8 @@ public static class CarteDeLaMachine
         IReadOnlyDictionary<string, IReadOnlyList<string>>? verifies = null,
         IReadOnlyDictionary<string, string>? explications = null,
         IReadOnlySet<string>? titres = null,
-        IReadOnlySet<string>? mesureDemontree = null)
+        IReadOnlySet<string>? mesureDemontree = null,
+        IReadOnlyDictionary<string, IReadOnlyList<LigneMesure>>? details = null)
     {
         var parDomaine = entrees.ToLookup(e => e.Domaine);
         var composantsParDomaine = composants
@@ -601,7 +632,7 @@ public static class CarteDeLaMachine
                 : mesureDemontree?.Contains(cle) == true && lesMesures.Count > 0 ? EtatDomaine.ARegarder
                 // Connaître le nom du composant n'est pas l'avoir examiné : seule une mesure fait
                 // « rien de signalé ».
-                : lesMesures.Count > 0 ? EtatDomaine.RienDeSignale
+                : lesMesures.Count > 0 || details?.ContainsKey(cle) == true ? EtatDomaine.RienDeSignale
                 : EtatDomaine.NonLu;
 
             return new DomaineMachine(
@@ -614,7 +645,10 @@ public static class CarteDeLaMachine
                 lesMesures,
                 lignes,
                 nonLus,
-                proposes) { Explications = explications, Titres = titres, Entete = entete, Verdict = VerdictDuDomaine(etat, lignes, proposes, localiser) };
+                proposes) { Explications = explications, Titres = titres, Entete = entete, Verdict = VerdictDuDomaine(etat, lignes, proposes, localiser),
+                Details = details?.GetValueOrDefault(cle) ?? [],
+                TitreDesDetails = string.Format(System.Globalization.CultureInfo.CurrentCulture, localiser("Carte.DetailsTechniques"),
+                    details?.GetValueOrDefault(cle)?.Count ?? 0) };
         }).ToList();
     }
 

@@ -16,7 +16,7 @@ mutations, consignees dans le journal. Il etablit qu'une affirmation a un instru
 
 | domaine | ce qui est etabli | l'instrument |
 |---|---|---|
-| non-nuisance materiel | aucune operation privilegiee n'ecrit une tension ni un firmware ; l'ensemble des operations est **ferme a 18 records** | `ThePrivilegedSurfaceIsClosedGateTests` · `docs/NON-NUISANCE.md` (53 sites d'ecriture recomptes par `tools/nonuisance/count-write-sites.py`) |
+| non-nuisance materiel | la seule ecriture de tension est la sous-tension du processeur (`SetCpuVoltageOffsetOp` : vers le bas seulement, jusqu'a `TensionCpu.PlancherMv`, volatile, rendue au redemarrage) ; la carte graphique ne recoit que decalage d'horloge, frequence maximale, limite de puissance et ventilateur, bornes par la liste blanche ; aucune operation n'ecrit une variable du firmware (le voyage vers son setup passe par `shutdown.exe /r /fw`) ; l'ensemble des operations est **ferme** : la liste exacte est celle du test | `ThePrivilegedSurfaceIsClosedGateTests` · `docs/NON-NUISANCE.md` (la table des sites d'ecriture, que `tools/nonuisance/count-write-sites.py` recalcule) |
 | bornes GPU | coeur, memoire, limite de puissance et ventilateur sont bornes, et chaque borne meurt sous mutation | `GpuSafeBoundsTests` |
 | refus par defaut | le registre, les services, les identifiants DRS et les plans d'energie sont en **liste blanche**, et le refus se prouve par son MOTIF, pas par son resultat | `OpAllowlistTests` |
 | mise a jour | le manifeste est signe Ed25519, verifie par la clef **reellement embarquee** ; un octet modifie est refuse ; la couture client-serveur est testee de bout en bout | `UpdateManifestEndpointTests` · `TheClientReadsTheRealServerTests` |
@@ -56,9 +56,8 @@ qu'il verifie.
 
 `GATES.md` porte le detail date. Aucune n'est un blocage technique.
 
-1. **L'emission des licences** : aujourd'hui **aucun remboursement ne peut revoquer une licence**,
-   parce que rien ne remplit `order_id -> license_id`. Choisir entre l'integration native Keygen et
-   un handler `order_created` maison. C'est un choix sur **qui detient la verite des droits**.
+1. **L'emission des licences** : sans objet. DrDXT est gratuit et open source (GPL) depuis le 23/09/2026
+   (e2a1e541) : plus de licence, de paiement ni de Keygen.
 2. **Le certificat de signature** (~100 €/an) : sans lui, l'installeur declenche SmartScreen.
 3. **Le prix**, jamais tranche.
 4. **La garantie 14 jours** : l'ecran de licence la **promet deja** alors qu'elle n'est pas

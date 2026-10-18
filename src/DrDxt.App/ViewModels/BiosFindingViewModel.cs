@@ -18,13 +18,15 @@ namespace DrDxt.App.ViewModels;
 /// </summary>
 public sealed class BiosFindingViewModel
 {
-    public BiosFindingViewModel(BiosFinding f, Func<string, string> localize)
+    /// <param name="promesseRetiree">Ce que la mesure de cette session dit du même réglage côté scan (XMP coupé sur une
+    /// machine dont la carte graphique sature) : joint à la raison, que la carte affiche.</param>
+    public BiosFindingViewModel(BiosFinding f, Func<string, string> localize, string? promesseRetiree = null)
     {
         Kind = f.Kind.ToString();
         Severity = f.Severity;
         Title = localize(f.TitleKey);
         Constat = DrDxt.Core.Constat.Depuis(f);
-        Rationale = localize(f.RationaleKey);
+        Rationale = promesseRetiree is null ? localize(f.RationaleKey) : localize(f.RationaleKey) + " " + promesseRetiree;
         ActionLabel = localize(f.RecommendedActionKey);
 
         // Guidage seul : chaque correction BIOS à faire est un guide, on n'écrit jamais le firmware.

@@ -29,4 +29,40 @@ public sealed class GestesDuDemarrageTests
     [Fact]
     public void Rien_d_actif_rien_a_proposer()
         => ScanViewModel.GestesDuDemarrage([DejaCoupe], _ => Task.FromResult(Result.Ok()), c => c).Should().BeEmpty();
+
+    // Ce que DrDXT a écrit pour couper Steam, horodatage compris : la trace le garde, la machine le porte encore.
+    private const string OctetsCoupe = "030000000102030405060708";
+    private static readonly ProgrammesAuDemarrage.Entree SteamCoupe = new("Steam", false, "steam.exe", Octets: OctetsCoupe);
+    private static readonly DrDxt.ElevatedHelper.Execution.CoupureDuDemarrage Trace = new(RegistryHiveKind.CurrentUser, SetStartupApprovalOp.Run, "Steam", OctetsCoupe);
+
+    private static List<GesteDuDocteur> Gestes(IReadOnlyList<ProgrammesAuDemarrage.Entree> entrees, List<PrivilegedOp> envoyes,
+        params DrDxt.ElevatedHelper.Execution.CoupureDuDemarrage[] coupures)
+        => ScanViewModel.GestesDuDemarrage(entrees, op => { envoyes.Add(op); return Task.FromResult(Result.Ok()); }, c => c + "|{0}", coupures)
+            .Select(g => g.Creer()).ToList();
+
+    // L'App tuée après avoir coupé Steam : relancée, elle sait encore le réactiver.
+    [Fact]
+    public async Task Un_programme_coupe_par_DrDXT_se_reactive_apres_un_redemarrage_de_l_App()
+    {
+        var envoyes = new List<PrivilegedOp>();
+
+        var gestes = Gestes([SteamCoupe], envoyes, Trace);
+
+        gestes.Should().ContainSingle().Which.PeutAnnuler.Should().BeTrue("la coupure est déjà faite, son annulation proposée");
+        await gestes[0].AnnulerCommand.ExecuteAsync(null);
+        envoyes.Should().Equal(SteamCoupe.Geste(true));
+    }
+
+    // Coupé puis réactivé ou recoupé ailleurs, la valeur n'est plus celle que DrDXT a écrite : rien ne se propose.
+    [Fact]
+    public void Un_programme_modifie_ailleurs_ne_se_propose_pas()
+        => Gestes([SteamCoupe with { Octets = "03000000AAAAAAAAAAAAAAAA" }], [], Trace).Should().BeEmpty();
+
+    [Fact]
+    public void Un_programme_protege_ne_se_propose_jamais_a_la_reactivation()
+    {
+        var securite = new ProgrammesAuDemarrage.Entree("SecurityHealth", false, "x", Octets: OctetsCoupe);
+
+        Gestes([securite], [], Trace with { Nom = "SecurityHealth" }).Should().BeEmpty();
+    }
 }

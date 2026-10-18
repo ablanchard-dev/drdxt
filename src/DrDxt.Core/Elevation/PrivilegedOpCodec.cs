@@ -74,6 +74,10 @@ public enum PrivilegedOpType
     RestartDevice = 42,
     RemoveDriverPackage = 43,
     RestoreDriverPackage = 44,
+    PoseEnAttenteDOrigine = 45,
+    AcquitterEcriture = 46,
+    // La pause du maintien posée ou levée par le joueur. Appendue : ne jamais renumeroter.
+    SetMaintenancePause = 47,
 }
 
 // -----------------------------------------------------------------------
@@ -152,6 +156,9 @@ public static class PrivilegedOpCodec
             RestartDeviceOp rd => (PrivilegedOpType.RestartDevice, rd),
             RemoveDriverPackageOp rp2 => (PrivilegedOpType.RemoveDriverPackage, rp2),
             RestoreDriverPackageOp rr => (PrivilegedOpType.RestoreDriverPackage, rr),
+            PoseEnAttenteDOrigineOp pe => (PrivilegedOpType.PoseEnAttenteDOrigine, pe),
+            AcquitterEcritureOp ae => (PrivilegedOpType.AcquitterEcriture, ae),
+            SetMaintenancePauseOp mp => (PrivilegedOpType.SetMaintenancePause, mp),
             _ =>((PrivilegedOpType)(-1), (object?)null),
         };
 
@@ -261,6 +268,9 @@ public static class PrivilegedOpCodec
                 PrivilegedOpType.RestartDevice => Read<RestartDeviceOp>(rawJson),
                 PrivilegedOpType.RemoveDriverPackage => Read<RemoveDriverPackageOp>(rawJson),
                 PrivilegedOpType.RestoreDriverPackage => Read<RestoreDriverPackageOp>(rawJson),
+                PrivilegedOpType.PoseEnAttenteDOrigine => Read<PoseEnAttenteDOrigineOp>(rawJson),
+                PrivilegedOpType.AcquitterEcriture => Read<AcquitterEcritureOp>(rawJson),
+                PrivilegedOpType.SetMaintenancePause => Read<SetMaintenancePauseOp>(rawJson),
                 _ => null,
             };
 

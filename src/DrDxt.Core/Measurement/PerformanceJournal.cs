@@ -1,5 +1,4 @@
-﻿using static DrDxt.Core.TexteFrancais;
-namespace DrDxt.Core;
+﻿namespace DrDxt.Core;
 
 /// <summary>
 /// Une mesure conservee entre deux sessions. Le strict necessaire pour repondre a « mon PC est-il

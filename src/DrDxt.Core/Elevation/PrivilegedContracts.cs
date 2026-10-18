@@ -16,6 +16,11 @@ public interface IElevatedClient
     Task<Result> RenewLease(string leaseId, int leaseSeconds, CancellationToken ct)
         => ExecuteAsync(new RenewLeaseOp(leaseId, leaseSeconds), ct);
 
+    /// <summary>Le même canal, sans jamais lancer le helper : pour ce qui part sans geste du joueur (le battement d'un bail).
+    /// Un helper absent rend alors HELPER_UNREACHABLE au lieu d'ouvrir une invite Windows ; refusée, elle reviendrait à
+    /// chaque battement, en jeu compris. Par défaut le client lui-même (il ne lance rien).</summary>
+    IElevatedClient SansRelance => this;
+
     /// <summary>Envoie une op qui repond au lieu d'agir, et rend ses octets. Même chemin
     /// signé/allowlisté que <see cref="ExecuteAsync"/> ; seul le retour diffère.
     ///
@@ -218,6 +223,16 @@ public sealed record InstallPresentMonServiceOp : PrivilegedOp;
 /// processus) ; lui seul peut le renouveler ou le clore. Échéance =
 /// maintenant + <see cref="LeaseSeconds"/> ; le bail vit en mémoire du helper seulement
 /// (rien sur disque, ce serait une surface d'attaque).</summary>
+/// <summary>Une pose de levier dont l'App n'a pas encore noté l'origine : le journal d'écriture anticipée du helper garde la
+/// valeur d'avant de sa cible jusqu'à l'acquit (<see cref="AcquitterEcritureOp"/>). <see cref="PoseJson"/> est le JSON du
+/// codec de l'op posée, validée comme elle (OpAllowlist) ; une enveloppe dans une enveloppe est refusée. Seule une pose
+/// marquée est journalisée : une annulation, toujours nue, n'est jamais rejouée.</summary>
+public sealed record PoseEnAttenteDOrigineOp(string PoseJson) : PrivilegedOp;
+
+/// <summary>L'App a noté l'origine de cette pose : son entrée du journal d'écriture anticipée, et seulement celle de cet
+/// appelant, sort du journal. <see cref="PoseeJson"/> est le JSON du codec de l'op posée.</summary>
+public sealed record AcquitterEcritureOp(string PoseeJson) : PrivilegedOp;
+
 public sealed record EstablishLeaseOp(
     string LeaseId,
     string RevertOpJson,
@@ -260,6 +275,20 @@ public enum RegistryValueType
     MultiString = 3,
 }
 
+/// <summary>La forme d'une valeur REG_MULTI_SZ telle que l'écriture la pose (Win32RegistryActions : une entrée par ligne,
+/// lignes rognées, vides retirées) : la désinstallation compare la valeur posée et la valeur relue sous cette forme.</summary>
+public static class MultiTexteDuRegistre
+{
+    /// <summary>Les entrées : une par ligne, rognées, vides retirées. La seule copie de la règle.</summary>
+    public static string[] Entrees(IEnumerable<string> lignes) => lignes.Select(l => l.Trim()).Where(l => l.Length > 0).ToArray();
+
+    public static string[] Entrees(string valeur) => Entrees(valeur.Split('\n'));
+
+    public static string Canonique(IEnumerable<string> lignes) => string.Join('\n', Entrees(lignes));
+
+    public static string Canonique(string valeur) => Canonique(valeur.Split('\n'));
+}
+
 /// <summary>L'ensemble fermé des actions de service que le helper accepte.</summary>
 public enum ServiceAction
 {
@@ -282,6 +311,9 @@ public enum AdlxTuningKind
     /// ADLX_WAIT_FOR_VERTICAL_REFRESH_MODE : 0 toujours coupée, 1 coupée sauf avis du jeu, 2 activée sauf avis du jeu,
     /// 3 toujours activée.</summary>
     VerticalRefresh = 4,
+    /// <summary>La remise à l'usine de tout le réglage de la carte (IADLXGPUTuningServices.ResetToFactory). IntValue = 0.
+    /// Un geste du joueur seulement : jamais le retour d'un bail, jamais rejouée au démarrage.</summary>
+    RemiseUsine = 5,
 }
 
 /// <summary>
@@ -351,6 +383,10 @@ public sealed record RetainServiceUploadCapOp(string GameExeName, long CapBitsPe
 
 /// <summary>L'inverse de <see cref="RetainServiceUploadCapOp"/> : le service ne porte plus rien.</summary>
 public sealed record ForgetServiceUploadCapOp : PrivilegedOp;
+
+/// <summary>Met le maintien du service de démarrage en pause, ou le reprend : le fichier `pause-du-maintien` sous
+/// %ProgramData%\DrDxt, que le réconciliateur lit. Un booléen seul : ni chemin, ni texte. Ne peut qu'en faire moins.</summary>
+public sealed record SetMaintenancePauseOp(bool EnPause) : PrivilegedOp;
 
 /// <summary>
 /// Retire un element du magasin BCD de l'entree de demarrage courante (`{current}`).

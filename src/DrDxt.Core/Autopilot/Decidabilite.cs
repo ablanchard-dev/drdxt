@@ -1,4 +1,3 @@
-using static DrDxt.Core.TexteFrancais;
 namespace DrDxt.Core;
 
 /// <summary>

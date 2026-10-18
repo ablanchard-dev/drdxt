@@ -28,7 +28,7 @@ public static partial class ConfigurationCallOfDuty
            && int.TryParse(m.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) ? v : null;
 
     /// <summary>Le fichier de réglages le plus récent du dossier des joueurs qui porte la ligne, et sa valeur ; null sans
-    /// dossier, sans fichier ou sans ligne. Le dossier : <c>Documents\Call of Duty\players</c>.</summary>
+    /// dossier, sans fichier ou sans ligne. Le dossier : celui que rend <c>ReglagesCod.Trouver</c>.</summary>
     public static (int Valeur, string Fichier)? Lire(string dossierPlayers)
     {
         try

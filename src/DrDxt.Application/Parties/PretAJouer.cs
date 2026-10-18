@@ -6,7 +6,9 @@ public sealed record EtatAvantPartie(
     IReadOnlyList<(string Nom, double ProcesseurPourcent)>? Voisins,
     double? PingBoxMs, double? PertesBoxPourcent,
     double? PingInternetMs, double? PertesInternetPourcent,
-    double? Celsius, ulong? MemoireLibreOctets);
+    double? Celsius, ulong? MemoireLibreOctets,
+    DateTimeOffset? DernierDemarrage = null, IReadOnlyList<(string Nom, long Octets)>? MemoireVideo = null,
+    IReadOnlyList<string>? AudioVirtuel = null, bool? ConversionDuDisque = null);
 
 /// <summary>
 /// « prêt à jouer » en quelques secondes. Ce que DrDXT sait déjà mesurer, relu juste avant la
@@ -28,8 +30,19 @@ public static class PretAJouer
     /// <summary>Même seuil que le ralentissement en partie (10 °C sous le freinage des Intel récents).</summary>
     public const double SeuilChaleurC = ReleveDesParties.SeuilChaleurC;
 
+    /// <summary>**Non chiffré**, choix DrDXT : au-delà d'une semaine sans vrai redémarrage (le démarrage rapide ne compte
+    /// pas, il reprend le noyau), les fuites de mémoire des pilotes et des programmes ouverts s'accumulent, et une mise à
+    /// jour peut attendre son redémarrage.</summary>
+    public const int SeuilJoursSansRedemarrage = 7;
+
+    /// <summary>**Non chiffré**, choix DrDXT : un demi-gigaoctet de mémoire vidéo tenu par un autre programme, c'est le
+    /// budget de textures d'un réglage entier sur une carte de 8 Go. Le compositeur du bureau (dwm) et DrDXT ne comptent pas.</summary>
+    public const long SeuilMemoireVideoOctets = 512L * 1024 * 1024;
+
+    private static readonly string[] SansCompter = ["dwm", "DrDxt.App", "Idle", "System"];
+
     /// <summary>Les gênes, en phrases ; vide = rien ne gêne parmi ce qui a pu être lu.</summary>
-    public static IReadOnlyList<string> Genes(EtatAvantPartie e, Func<string, string> localiser)
+    public static IReadOnlyList<string> Genes(EtatAvantPartie e, Func<string, string> localiser, DateTimeOffset? maintenant = null)
     {
         var fr = System.Globalization.CultureInfo.CurrentCulture;
         string F(string cle, params object[] a) => string.Format(fr, localiser(cle), a);
@@ -48,6 +61,15 @@ public static class PretAJouer
             genes.Add(F("PretAJouer.Memoire", (e.MemoireLibreOctets.Value / 1024 / 1024).ToString("0", fr)));
         if (e.Celsius >= SeuilChaleurC)
             genes.Add(F("PretAJouer.Chaleur", e.Celsius.Value.ToString("0", fr)));
+        if (e.DernierDemarrage is { } d && (maintenant ?? DateTimeOffset.Now) - d is { TotalDays: >= SeuilJoursSansRedemarrage } depuis)
+            genes.Add(F("PretAJouer.Redemarrage", ((int)depuis.TotalDays).ToString(fr)));
+        if (e.MemoireVideo?.Where(p => p.Octets >= SeuilMemoireVideoOctets && !SansCompter.Contains(p.Nom, StringComparer.OrdinalIgnoreCase))
+                .Take(3).ToList() is { Count: > 0 } video)
+            genes.Add(F("PretAJouer.MemoireVideo", string.Join(", ", video.Select(p => $"{p.Nom} ({p.Octets / 1024 / 1024} {localiser("Unite.Mo")})"))));
+        if (e.AudioVirtuel is { Count: > 0 } audio)
+            genes.Add(F("PretAJouer.AudioVirtuel", string.Join(", ", audio)));
+        if (e.ConversionDuDisque == true)
+            genes.Add(localiser("PretAJouer.Conversion"));
         return genes;
     }
 

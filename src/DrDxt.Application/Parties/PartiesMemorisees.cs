@@ -90,7 +90,8 @@ public sealed class PartiesMemorisees
     {
         var texte = _liste.Read();
         if (!texte.IsOk || string.IsNullOrWhiteSpace(texte.Value)) return [];
-        try { return JsonSerializer.Deserialize<List<PartieRelevee>>(texte.Value) ?? []; }
+        // Un « null » de la liste n'est pas une partie : écarté ici, il n'est ni rendu ni réécrit par Ajouter.
+        try { return (JsonSerializer.Deserialize<List<PartieRelevee?>>(texte.Value) ?? []).OfType<PartieRelevee>().ToList(); }
         catch (JsonException) { return []; }
     }
 

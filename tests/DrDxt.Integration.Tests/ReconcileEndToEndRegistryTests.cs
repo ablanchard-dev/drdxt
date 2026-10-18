@@ -34,7 +34,10 @@ namespace DrDxt.Integration.Tests;
 public sealed class ReconcileEndToEndRegistryTests
 {
     private const string TweakId = "integ.test.dword";
-    private const string KeyPath = @"Software\DrDxt\IntegrationTest";
+    private const string Racine = @"Software\DrDxt\IntegrationTest";
+    // Une clé par passage : deux suites lancées en même temps partageaient la clé, et le nettoyage de l'une effaçait toutes
+    // ses valeurs, celle de l'autre comprise, au milieu de sa réconciliation.
+    private readonly string KeyPath = Racine + @"\" + Guid.NewGuid().ToString("N");
     private const string ValueName = "Value";
 
     // Les DWORD voulu et d'origine, canonisés dans le JSON exact que la sonde relit
@@ -52,7 +55,7 @@ public sealed class ReconcileEndToEndRegistryTests
 
         // Une feuille isolée unique par passage, pour que des passages concurrents ou répétés n'entrent jamais en collision.
         var uniqueValueName = ValueName + "_" + Guid.NewGuid().ToString("N");
-        var catalog = new TestCatalog(uniqueValueName);
+        var catalog = new TestCatalog(KeyPath, uniqueValueName);
         var statePath = Path.Combine(
             Path.GetTempPath(), "drdxt-integ-" + Guid.NewGuid().ToString("N") + ".json");
 
@@ -74,7 +77,8 @@ public sealed class ReconcileEndToEndRegistryTests
 
         var reconciler = new DesiredStateReconciler(
             probe, buildProbe, driverProbe, stateStore, reapply, notifier, policy,
-            diagnostics, bootGuard, new SystemClock());
+            diagnostics, bootGuard, new SystemClock(),
+            new PauseDuMaintien(Path.Combine(Path.GetTempPath(), "drdxt-pause-" + Guid.NewGuid().ToString("N")), verifierConfiance: false));
 
         // Amorcer le fichier d'état pour que l'élément soit « connu appliqué » à un build plus
         // ancien (c'est le changement de build qui fait d'une dérive vers l'origine un WindowsReset, pas un choix du joueur).
@@ -135,42 +139,37 @@ public sealed class ReconcileEndToEndRegistryTests
 
         // Assertion de nettoyage : rien de nous ne reste sous HKCU.
         using var key = Registry.CurrentUser.OpenSubKey(KeyPath, writable: false);
-        key?.GetValue(uniqueValueName).Should().BeNull("the test value was deleted on cleanup");
+        key.Should().BeNull("the test key was deleted on cleanup");
     }
 
     // ---- aides pour le vrai registre (HKCU est inscriptible par l'utilisateur ; aucune élévation) ----
 
-    private static void WriteDword(string valueName, int value)
+    private void WriteDword(string valueName, int value)
     {
         using var key = Registry.CurrentUser.CreateSubKey(KeyPath, writable: true);
         key.SetValue(valueName, value, RegistryValueKind.DWord);
     }
 
-    private static int ReadDword(string valueName)
+    private int ReadDword(string valueName)
     {
         using var key = Registry.CurrentUser.OpenSubKey(KeyPath, writable: false);
         key.Should().NotBeNull();
         return (int)key!.GetValue(valueName)!;
     }
 
-    private static void DeleteTestArtifacts()
+    private void DeleteTestArtifacts()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(KeyPath, writable: true);
-        if (key is null)
-            return;
-        foreach (var name in key.GetValueNames())
-            key.DeleteValue(name, throwOnMissingValue: false);
-        // Retirer l'arbre de sous-clés de test désormais vide (au mieux, chemin isolé).
-        if (key.GetValueNames().Length == 0 && key.GetSubKeyNames().Length == 0)
-            Registry.CurrentUser.DeleteSubKey(KeyPath, throwOnMissingSubKey: false);
+        Registry.CurrentUser.DeleteSubKeyTree(KeyPath, throwOnMissingSubKey: false);
 
-        // Le parent « Software\DrDxt », créé en passant par CreateSubKey, restait vide
-        // dans le registre de la machine de test. Le produit n'utilise pas cette clé : vide, elle part.
-        using var parent = Registry.CurrentUser.OpenSubKey(@"Software\DrDxt");
-        if (parent is { ValueCount: 0, SubKeyCount: 0 })
+        // Les parents, créés en passant par CreateSubKey, restaient vides dans le registre de la machine de test. Le produit
+        // n'utilise pas ces clés : vides, elles partent. Le système refuse d'effacer une clé qui a des sous-clés : celle d'un
+        // passage concurrent la garde.
+        foreach (var parent in new[] { Racine, @"Software\DrDxt" })
         {
-            parent.Dispose();
-            Registry.CurrentUser.DeleteSubKey(@"Software\DrDxt", throwOnMissingSubKey: false);
+            using (var cle = Registry.CurrentUser.OpenSubKey(parent))
+                if (cle is not { ValueCount: 0, SubKeyCount: 0 }) return;
+            try { Registry.CurrentUser.DeleteSubKey(parent, throwOnMissingSubKey: false); }
+            catch (Exception e) when (e is InvalidOperationException or UnauthorizedAccessException or IOException) { return; }
         }
     }
 
@@ -180,12 +179,12 @@ public sealed class ReconcileEndToEndRegistryTests
     {
         private readonly ReconcilableDescriptor _descriptor;
 
-        public TestCatalog(string valueName)
+        public TestCatalog(string keyPath, string valueName)
             => _descriptor = new ReconcilableDescriptor(
                 TweakId,
                 ReconcileSurface.Registry,
                 Registry: new RegistryDescriptor(
-                    RegistryHiveKind.CurrentUser, KeyPath, valueName, RegistryValueType.DWord));
+                    RegistryHiveKind.CurrentUser, keyPath, valueName, RegistryValueType.DWord));
 
         public ReconcilableDescriptor? DescriptorFor(string tweakId)
             => string.Equals(tweakId, TweakId, StringComparison.Ordinal) ? _descriptor : null;

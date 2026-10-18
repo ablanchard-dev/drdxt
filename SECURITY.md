@@ -36,6 +36,8 @@ correctifs et de tests. Ce qui en sort, en bref :
 - **Les dossiers sensibles appartiennent aux administrateurs**, et un dossier piégé d'avance (lien, autre propriétaire)
   est refusé.
 - **Aucun secret dans le code**, et rien ne quitte la machine que le README ne nomme.
+- **Les identifiants Windows ne vont qu'à un proxy configuré** (variable ou proxy manuel) : un proxy découvert par WPAD
+  ne reçoit rien, même s'il les demande.
 
 Le détail, menace par menace, avec le test qui prouve chaque ligne et les limites acceptées :
 [docs/SECURITE.md](docs/SECURITE.md).
@@ -80,6 +82,8 @@ DrDXT went through several independent adversarial reviews, each followed by fix
   and never without your click.
 - **Sensitive folders belong to administrators**, and a folder planted in advance (link, other owner) is refused.
 - **No secret in the code**, and nothing leaves the machine that the README does not name.
+- **Windows credentials go only to a configured proxy** (variable or manual proxy): a proxy discovered through WPAD
+  gets nothing, even when it asks.
 
 The details, threat by threat, with the test proving each line and the accepted limits:
 [docs/SECURITE.md](docs/SECURITE.md) (in French).

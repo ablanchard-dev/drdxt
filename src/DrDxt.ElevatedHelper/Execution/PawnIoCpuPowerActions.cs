@@ -123,6 +123,11 @@ public sealed class PawnIoCpuPowerActions : ICpuPowerActions
         // correctif Vmin : refusé, quel que soit l'appelant (guide 5.3). Baisser reste permis, et revenir jusqu'à la valeur
         // du firmware aussi (annuler un plafond est une remontée : la refuser laisserait le plafond collé).
         var firmware = _firmwareDuDemarrage(courant.PkgPowerLimit);
+        // Le bit 15 éteint la PL1 : le processeur tient alors la PL2 sans fin (4095 W sur une carte « sans limite »), sans que
+        // le champ ne « monte ». Aucun levier ne l'éteint (ComposerPl1 le pose toujours) ; seul le rendu exact des bits 15:0
+        // du firmware de ce démarrage peut le laisser à 0.
+        if ((valeur & (1UL << 15)) == 0 && (valeur & 0xFFFF) != (firmware & 0xFFFF))
+            return Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit PL1 may not be disabled (bit 15); nothing written.");
         // Une PL1 jamais sous le cinquième de la PL2 que la carte porte (0,125 W briderait le processeur jusqu'au redémarrage, à la
         // demande de n'importe quel programme du compte), sauf la PL1 d'usine de ce démarrage, qui se rend toujours (un portable
         // OEM tient parfois 25 W sous une PL2 de 157 W). Non chiffré : un non-K rendu à 65 W sous 219 W (30 %) et le plafond
@@ -131,6 +136,19 @@ public sealed class PawnIoCpuPowerActions : ICpuPowerActions
             return Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit PL1 may not go below a fifth of the PL2 the board holds; nothing written.");
         if ((valeur & 0x7FFF) > (firmware & 0x7FFF) && _microcodePerime() == true)
             return Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit raise refused: this Core 13th/14th gen runs a microcode older than Intel's Vmin fix; nothing written.");
+        // Une montée au-delà du firmware n'a pour plafond que la PL2 du registre, que bien des cartes mettent à 0x7FFF
+        // (4095 W, « sans limite ») : les bornes de la montée du levier (LimiteDePuissance.CibleDeMontee) sont relues ici,
+        // quel que soit l'appelant. Jamais au-dessus de la puissance maximale que le processeur publie (0x614, bits 46:32,
+        // même unité que la PL1) ; sans maximum publié, jamais sous une PL2 « sans limite ». Rendre la valeur du firmware
+        // n'est pas une montée et passe toujours.
+        if ((valeur & 0x7FFF) > (firmware & 0x7FFF))
+        {
+            var maximale = (courant.PkgPowerInfo >> 32) & 0x7FFF;
+            if (maximale > 0 && (valeur & 0x7FFF) > maximale)
+                return Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit raise refused: PL1 above the maximum power the processor publishes; nothing written.");
+            if (maximale == 0 && ((valeur >> 32) & 0x7FFF) == 0x7FFF)
+                return Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit raise refused: the board's PL2 says no limit and the processor publishes no maximum; nothing written.");
+        }
         if (RegistreDeLimiteCpu.Verrou(courant.PkgPowerLimit))
             return Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit register is locked by the firmware until the next boot; nothing written.");
         return _ecrire(valeur)

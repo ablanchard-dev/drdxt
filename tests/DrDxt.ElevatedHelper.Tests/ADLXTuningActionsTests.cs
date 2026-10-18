@@ -63,6 +63,7 @@ internal sealed class FakeAdlxNative : IAdlxNative
 
     // Un échec qui a quand même écrit la fréquence (écriture partielle), et un retour qui ne prend pas.
     public bool EcrireMemeEnEchec { get; set; }
+    public int? PiloteRamene { get; set; }
     public bool RetourRefuse { get; set; }
     private bool _dejaEcrit;
 
@@ -74,6 +75,8 @@ internal sealed class FakeAdlxNative : IAdlxNative
         original = GfxReads;
         if (ThrowOnAnyCall) throw new InvalidOperationException("simulated native fault");
         if (EcrireMemeEnEchec && !(_dejaEcrit && RetourRefuse)) GfxReads = GfxReads with { MaxFreqMhz = newMaxFreqMhz };
+        // Une écriture acceptée prend, sauf un pilote qui ramène la cible à sa propre valeur (PiloteRamene).
+        else if (SetGfxSucceeds && !EcrireMemeEnEchec) GfxReads = GfxReads with { MaxFreqMhz = PiloteRamene ?? newMaxFreqMhz };
         _dejaEcrit = true;
         return SetGfxSucceeds;
     }
@@ -112,6 +115,17 @@ internal sealed class FakeAdlxNative : IAdlxNative
         return null;
     }
 
+    public int Usine { get; private set; }
+    public string? UsineRefus { get; set; }
+
+    public string? RemettreReglageUsine(int gpuIndex)
+    {
+        Calls.Add(nameof(RemettreReglageUsine));
+        Usine++;
+        if (UsineRefus is null) GfxReads = GfxReads with { MaxFreqMhz = 2900 };
+        return UsineRefus;
+    }
+
     public string? EcrireAntiLag(bool actif)
     {
         Calls.Add(nameof(EcrireAntiLag));
@@ -146,8 +160,8 @@ public sealed class ADLXTuningActionsTests
         var result = actions.SetTuning(0, AdlxTuningKind.Undervolt, 2800);
 
         result.IsOk.Should().BeTrue("an in-range absolute target with a healthy GPU must apply");
-        // Lecture avant écriture : l'état courant est lu avant que quoi que ce soit soit écrit.
-        fake.Calls.Should().Equal(nameof(IAdlxNative.TryReadGfx), nameof(IAdlxNative.TrySetGfx));
+        // Lecture avant écriture, puis relecture de la valeur écrite.
+        fake.Calls.Should().Equal(nameof(IAdlxNative.TryReadGfx), nameof(IAdlxNative.TrySetGfx), nameof(IAdlxNative.TryReadGfx));
         // La cible absolue est écrite telle quelle : aucune arithmétique de décalage côté helper.
         fake.SetGfxMaxFreqMhz.Should().Be(2800);
         // La tension repart inchangée, preuve que seule MaxFreq est écrite (la frontière native
@@ -178,9 +192,8 @@ public sealed class ADLXTuningActionsTests
     // la lecture a lieu même pour une cible refusée, l'écriture jamais.
 
     [Theory]
-    [InlineData(2800, true)]            // dans la plage pilote : atteint l'écriture
-    [InlineData(500, true)]             // bord bas matériel : atteint l'écriture
-    [InlineData(4000, true)]            // bord haut matériel : atteint l'écriture
+    [InlineData(2800, true)]            // dans la plage pilote et dans la bande : atteint l'écriture
+    [InlineData(500, false)]            // bord bas matériel, mais 2400 MHz sous la lecture : hors bande
     [InlineData(499, false)]            // un cran sous le plancher pilote : refusé
     [InlineData(4001, false)]           // un cran au-dessus du plafond pilote : refusé
     [InlineData(int.MinValue, false)]   // total, sans débordement
@@ -195,14 +208,15 @@ public sealed class ADLXTuningActionsTests
         if (reachesDriver)
         {
             result.IsOk.Should().BeTrue();
-            fake.Calls.Should().Equal(nameof(IAdlxNative.TryReadGfx), nameof(IAdlxNative.TrySetGfx));
+            fake.Calls.Should().Equal(nameof(IAdlxNative.TryReadGfx), nameof(IAdlxNative.TrySetGfx), nameof(IAdlxNative.TryReadGfx));
             fake.SetGfxMaxFreqMhz.Should().Be(targetMhz, "an in-range target is written verbatim");
         }
         else
         {
             result.IsOk.Should().BeFalse();
             result.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
-            // La lecture a eu lieu (la plage en vient), l'écriture jamais.
+            // La lecture a eu lieu (la plage en vient), l'écriture jamais. Le plafond d'overclock dans la plage (4000 MHz)
+            // est au-dessus de la bande : Au_dessus_de_la_bande_rien_n_est_ecrit_et_la_remise_a_l_usine_est_demandee.
             fake.Calls.Should().Equal(nameof(IAdlxNative.TryReadGfx));
             fake.SetGfxMaxFreqMhz.Should().BeNull("an out-of-range target must NEVER reach the driver write");
         }
@@ -421,5 +435,110 @@ public sealed class ADLXTuningActionsTests
         var act = () => new ADLXTuningActions();
 
         act.Should().NotThrow();
+    }
+    // La plage du pilote monte jusqu'au plafond d'overclock : la bande prudente de l'App ([-200, +100] MHz) s'applique aussi
+    // dans le helper, autour de la MaxFreq retenue à ce démarrage, pas de la valeur lue (sinon +100 en +100).
+    [Theory]
+    [InlineData(2700, true)]
+    [InlineData(3000, true)]
+    [InlineData(2699, false)]
+    public void Undervolt_reste_dans_la_bande_autour_de_la_frequence_du_demarrage(int cible, bool ecrit)
+    {
+        var fake = new FakeAdlxNative { GfxReads = StockGfx(maxFreqMhz: 2950) }; // déjà montée de 50 depuis le démarrage
+        var actions = new ADLXTuningActions(fake, (_, _) => 2900);
+
+        actions.SetTuning(0, AdlxTuningKind.Undervolt, cible).IsOk.Should().Be(ecrit);
+        if (!ecrit) fake.SetGfxMaxFreqMhz.Should().BeNull("hors bande, rien n'atteint le pilote");
+    }
+
+    // Au-dessus de la bande (une sous-tension gardée au redémarrage, à rendre) : jamais la fréquence demandée, la remise à
+    // l'usine du pilote, dite au joueur même réussie (elle remet aussi la mémoire, le ventilateur et la puissance).
+    [Fact]
+    public void Au_dessus_de_la_bande_rien_n_est_ecrit_et_la_remise_a_l_usine_est_demandee()
+    {
+        var fake = new FakeAdlxNative { GfxReads = StockGfx(maxFreqMhz: 2700) };
+        var actions = new ADLXTuningActions(fake, (_, _) => 2700);
+
+        var r = actions.SetTuning(0, AdlxTuningKind.Undervolt, 2900);
+
+        fake.Usine.Should().Be(0, "la remise à l'usine est un geste du joueur, jamais celui d'une annulation");
+        fake.SetGfxMaxFreqMhz.Should().BeNull("la fréquence demandée au-dessus de la bande n'est jamais écrite");
+        r.Error!.Value.Code.Should().Be(ErrorCodes.GpuRemiseUsineRequise);
+        r.Error.Value.Message.Should().Be(Docteur.T("ADLX.UsineRequise", 2900));
+    }
+
+    // Le geste à part : la remise à l'usine, et rien d'autre.
+    [Fact]
+    public void La_remise_a_l_usine_demandee_remet_la_carte_sans_ecrire_de_frequence()
+    {
+        var fake = new FakeAdlxNative { GfxReads = StockGfx(maxFreqMhz: 2500) };
+
+        new ADLXTuningActions(fake, (_, _) => 2500).SetTuning(0, AdlxTuningKind.RemiseUsine, 0).IsOk.Should().BeTrue();
+
+        fake.Usine.Should().Be(1);
+        fake.SetGfxMaxFreqMhz.Should().BeNull();
+    }
+
+    [Fact]
+    public void Une_remise_a_l_usine_ratee_dit_le_geste_dans_AMD_Software()
+    {
+        var fake = new FakeAdlxNative { GfxReads = StockGfx(maxFreqMhz: 2700), UsineRefus = "refus du pilote" };
+
+        var r = new ADLXTuningActions(fake, (_, _) => 2700).SetTuning(0, AdlxTuningKind.RemiseUsine, 0);
+
+        r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
+        r.Error.Value.Message.Should().Be(Docteur.T("ADLX.UsineImpossible", "refus du pilote"));
+    }
+
+    // Une fois à la fréquence demandée (après la remise à l'usine), l'essai suivant n'écrit rien et rend Ok.
+    [Fact]
+    public void Deja_a_la_frequence_demandee_rien_n_est_ecrit()
+    {
+        var fake = new FakeAdlxNative { GfxReads = StockGfx(maxFreqMhz: 2900) };
+
+        new ADLXTuningActions(fake, (_, _) => 2700).SetTuning(0, AdlxTuningKind.Undervolt, 2900).IsOk.Should().BeTrue();
+        fake.Usine.Should().Be(0);
+        fake.SetGfxMaxFreqMhz.Should().BeNull();
+    }
+
+    [Fact]
+    public void Undervolt_ne_s_ecrit_pas_sans_frequence_du_demarrage_retenue()
+    {
+        var fake = new FakeAdlxNative { GfxReads = StockGfx() };
+        var actions = new ADLXTuningActions(fake, (_, _) => null);
+
+        actions.SetTuning(0, AdlxTuningKind.Undervolt, 2800).IsOk.Should().BeFalse();
+        fake.SetGfxMaxFreqMhz.Should().BeNull();
+    }
+
+    // Un pilote qui ramène la cible ne laisse pas une valeur que personne n'a demandée : l'origine revient, l'échec est dit.
+    [Fact]
+    public void Undervolt_non_relu_a_la_cible_rend_l_origine_et_echoue()
+    {
+        var fake = new FakeAdlxNative { GfxReads = StockGfx(maxFreqMhz: 2900), PiloteRamene = 2850 };
+        var actions = new ADLXTuningActions(fake);
+
+        var r = actions.SetTuning(0, AdlxTuningKind.Undervolt, 2800);
+
+        r.IsOk.Should().BeFalse();
+        fake.SetGfxMaxFreqMhz.Should().Be(2900, "la dernière écriture repose l'origine");
+    }
+
+    // L'origine qui ne revient pas porte le code qui garde le bail (son expiration la rend) et le journal : l'écran ne dit pas
+    // « rendue ». Revenue, l'échec reste générique.
+    [Fact]
+    public void Une_origine_qui_ne_revient_pas_porte_le_code_qui_garde_le_bail_et_le_journal()
+    {
+        var restee = new FakeAdlxNative { SetGfxSucceeds = false, GfxReads = StockGfx(), EcrireMemeEnEchec = true, RetourRefuse = true };
+        new ADLXTuningActions(restee).SetTuning(0, AdlxTuningKind.Undervolt, 2800).Error!.Value.Code
+            .Should().Be(ErrorCodes.TweakPartiallyApplied, "écriture partielle restée");
+
+        var ramenee = new FakeAdlxNative { GfxReads = StockGfx(maxFreqMhz: 2900), PiloteRamene = 2850 };
+        new ADLXTuningActions(ramenee).SetTuning(0, AdlxTuningKind.Undervolt, 2800).Error!.Value.Code
+            .Should().Be(ErrorCodes.TweakPartiallyApplied, "le pilote ramène aussi l'origine : 2850 reste");
+
+        var rendue = new FakeAdlxNative { SetGfxSucceeds = false, GfxReads = StockGfx(), EcrireMemeEnEchec = true };
+        new ADLXTuningActions(rendue).SetTuning(0, AdlxTuningKind.Undervolt, 2800).Error!.Value.Code
+            .Should().Be(ErrorCodes.HelperOpFailed, "l'origine est revenue : rien ne reste");
     }
 }

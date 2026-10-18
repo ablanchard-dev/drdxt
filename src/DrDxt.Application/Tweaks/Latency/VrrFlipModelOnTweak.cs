@@ -71,6 +71,35 @@ public sealed class VrrFlipModelOnTweak : LatencyTweakBase
         catch (Exception) { return true; } // frontiere externe : non lu, jamais « deja regle »
     }
 
+    // Flip-model pose, moitie VRR absente, capacite VRR de l'ecran jamais lue : ce n'est pas « deja regle ».
+    public override bool EtatNonLu(SettingsState state)
+    {
+        try
+        {
+            var read = _registry.ReadString(RegistryHiveKind.CurrentUser, PrefsPath, ValueName);
+            return read.IsOk && DirectXUserGlobalSettings.AlreadyHas(read.Value, [TurnOn[1]])
+                && !DirectXUserGlobalSettings.AlreadyHas(read.Value, [TurnOn[0]])
+                && state.VrrCapableDisplay == TriState.Unknown;
+        }
+        catch (Exception) { return false; } // AppliesTo l'a deja rendu applicable
+    }
+
+    // Banc profond : les deux interrupteurs déjà à 1, l'exercice les met à 0 (la forme que Windows écrit quand on les
+    // éteint), voisins préservés par la fusion, puis rend la chaîne d'origine à l'identique.
+    public override ExerciceProfond? PreparerExercice(HardwareInventory hw, SettingsState state)
+    {
+        try
+        {
+            if (_registry.ReadString(RegistryHiveKind.CurrentUser, PrefsPath, ValueName) is not { IsOk: true, Value: { } origine }
+                || !DirectXUserGlobalSettings.AlreadyHas(origine, TurnOn))
+                return null;
+            string Op(string v) => PrivilegedOpCodec.Serialize(new SetRegistryValueOp(RegistryHiveKind.CurrentUser, PrefsPath, ValueName,
+                RegistryValueType.String, v)).Value!;
+            return new ExerciceProfond(Op(origine), Op(DirectXUserGlobalSettings.Merge(origine, TurnOn.Select(t => (t.Key, "0")).ToList())));
+        }
+        catch (Exception) { return null; }
+    }
+
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
         try

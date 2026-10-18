@@ -76,6 +76,23 @@ public sealed class VentilateurExpertTests
         _journal.Received(1).Lever();
     }
 
+    // Rendre l'automatique pendant une pose (un autre essai qui remplace celui-ci) part hors portée : le helper ne le
+    // rejouera jamais.
+    [Fact]
+    public async Task Rendre_dans_une_portee_de_pose_part_hors_portee()
+    {
+        await using var essai = (await Ventilateur().PoserAsync(70)).Value!;
+        PorteeDePose? vue = null;
+        _eleve.When(e => e.ExecuteAsync(new RestoreGpuFanAutoOp(0), Arg.Any<CancellationToken>()))
+            .Do(_ => vue = PorteeDePose.Courante);
+        var portee = PorteeDePose.Ouvrir();
+
+        (await essai.RendreAsync()).IsOk.Should().BeTrue();
+
+        PorteeDePose.Courante.Should().BeSameAs(portee);
+        vue.Should().BeNull();
+    }
+
     [Fact]
     public void Le_demarrage_ne_rejoue_que_le_retour_a_l_automatique()
     {

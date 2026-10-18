@@ -103,10 +103,9 @@ public sealed class JournalDesCandidats
                 lignes.Append(JsonSerializer.Serialize(ligne, Options)).Append('\n');
             }
 
-            var dossier = Path.GetDirectoryName(_chemin);
-            if (!string.IsNullOrEmpty(dossier)) Directory.CreateDirectory(dossier);
-            File.AppendAllText(_chemin, lignes.ToString());
-            return Result.Ok();
+            // Dossier du joueur : jamais à travers un nom posé d'avance en lien.
+            var ajout = FichierJsonAtomique.AjouterSansLien(_chemin, lignes.ToString(), ErrorCodes.IoFailure);
+            return ajout.IsOk ? Result.Ok() : Result.Fail(ErrorCodes.IoFailure, Docteur.T("TC.JournalCandidats", ajout.Error!.Value.Message));
         }
         catch (Exception ex)
         {

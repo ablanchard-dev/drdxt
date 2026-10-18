@@ -186,7 +186,7 @@ public sealed class Win32DisplayInfo : IDisplayInfo
                     IsPrimaryGameDisplay: (flags & DisplayDevicePrimaryDevice) != 0,
                     // Lu au pilote quand NVAPI est la : voir l'en-tete. Non lu => faux, et Unknown.
                     SupportsVrr: vrr.Possible == TriState.On && vrr.Enabled == TriState.On,
-                    RefreshHz: current.dmDisplayFrequency,
+                    RefreshHz: FrequenceLue(current.dmDisplayFrequency),
                     MaxRefreshHz: MaxRefreshAtResolution(
                         name, current.dmPelsWidth, current.dmPelsHeight, current.dmBitsPerPel),
                     DeviceName: name,
@@ -236,6 +236,10 @@ public sealed class Win32DisplayInfo : IDisplayInfo
         return EnumDisplayDevices(deviceName, 1, ref moniteur, 0) && (moniteur.StateFlags & DisplayDeviceAttachedToDesktop) != 0;
     }
 
+    /// <summary>Win32 rend 0 ou 1 pour « la fréquence par défaut du matériel » (DEVMODE) : ce n'est pas une fréquence, elle
+    /// sort 0 (non lue), comme une lecture ratée.</summary>
+    internal static int FrequenceLue(int dmDisplayFrequency) => dmDisplayFrequency > 1 ? dmDisplayFrequency : 0;
+
     private static int MaxRefreshAtResolution(string deviceName, int width, int height, int bpp)
     {
         var max = 0;
@@ -245,7 +249,7 @@ public sealed class Win32DisplayInfo : IDisplayInfo
         for (int i = 0; EnumDisplaySettings(deviceName, i, ref mode); i++)
         {
             if (mode.dmPelsWidth == width && mode.dmPelsHeight == height && mode.dmBitsPerPel == bpp
-                && mode.dmDisplayFrequency > max)
+                && FrequenceLue(mode.dmDisplayFrequency) > max)
                 max = mode.dmDisplayFrequency;
 
             mode.dmSize = (ushort)Marshal.SizeOf<DevMode>();

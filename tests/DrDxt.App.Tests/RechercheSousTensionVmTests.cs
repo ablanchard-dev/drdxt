@@ -28,7 +28,8 @@ public sealed class RechercheSousTensionVmTests : IDisposable
         var vm = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
             Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k switch
             {
-                "SousTension.Verdict" => "{0} mV tient : {1} contre {2} °C, freiné {3} contre {4} % ; au BIOS",
+                "SousTension.Verdict" => "{0} mV tient {5} min : {1} contre {2} °C, freiné {3} contre {4} % ; au BIOS {6} mV",
+                "SousTension.VerdictUnPalier" => "{0} mV seul tient {5} min : {1} contre {2} °C, freiné {3} contre {4} % ; au BIOS {6} mV",
                 "SousTension.Aucune" => "aucun palier : {0}",
                 "SousTension.Refusee" => "UnderVolt Protection",
                 "SousTension.Raison.Erreurs" => "{0} erreur(s) matérielle(s)",
@@ -39,6 +40,8 @@ public sealed class RechercheSousTensionVmTests : IDisposable
                 "SousTension.Raison.NonLu" => "non lu",
                 "SousTension.Raison.TropChaudAuDepart" => "trop chaud au départ",
                 "SousTension.NonRendue" => " NON RENDUE : redémarre",
+                "SousTension.Rendue" => " ORIGINE RENDUE",
+                "SousTension.NonDisponible" => "NON DISPONIBLE",
                 _ => k,
             });
         vm.MemoireSousTension = new MemoireSousTension(Path.Combine(_dossier, "sous-tension.json"));
@@ -100,6 +103,99 @@ public sealed class RechercheSousTensionVmTests : IDisposable
         var vm = Vm(poser: mv => mv == 0 ? Result.Fail(ErrorCodes.HelperOpFailed, "tube") : Result.Ok());
         await vm.LancerRechercheSousTensionCommand.ExecuteAsync(null);
         vm.ResultatSousTension.Should().Contain("NON RENDUE : redémarre");
+    }
+
+    // Deux minutes de charge ne prouvent pas une sous-tension en jeu : le texte dit ce qui a été mesuré, et le conseil BIOS
+    // garde un palier de marge, le tenu juste au-dessus du plus profond.
+    [Fact]
+    public async Task Le_verdict_dit_la_duree_mesuree_et_le_BIOS_garde_un_palier_de_marge()
+    {
+        var vm = Vm();
+        await vm.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+
+        vm.ResultatSousTension.Should().StartWith("-90 mV tient 0.08 min").And.Contain("au BIOS -70 mV");
+    }
+
+    // Un seul palier a tenu : il n'y a pas de palier tenu au-dessus de lui, le conseil reste ce palier, et le texte ne parle
+    // d'aucune marge.
+    [Fact]
+    public async Task Un_seul_palier_tenu_reste_le_conseil_du_BIOS_sans_parler_de_marge()
+    {
+        var vm = Vm(whea: mv => mv <= -50 ? 2 : 0);
+        await vm.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+
+        vm.ResultatSousTension.Should().StartWith("-30 mV seul tient").And.Contain("au BIOS -30 mV");
+    }
+
+    // Le helper refuse avant tout palier (tension illisible, module absent) : rien n'a été posé, et son message anglais ne
+    // se colle jamais dans la phrase.
+    [Fact]
+    public async Task Un_refus_avant_tout_palier_dit_non_disponible_sans_le_message_du_helper()
+    {
+        var vm = Vm(poser: _ => Result.Fail(ErrorCodes.HelperOpFailed, "CPU voltage could not be read"));
+        await vm.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+        _testsDeCharge.Should().Be(0);
+        vm.SousTensionTrouvee.Should().BeFalse();
+        vm.ResultatSousTension.Should().Be("NON DISPONIBLE");
+    }
+
+    [Fact]
+    public void Non_disponible_ne_parle_d_aucun_retour_dans_les_deux_langues()
+    {
+        var textes = new DrDxt.Infrastructure.Localization.ResxLocalizer();
+        foreach (var (culture, rendue) in new[] { ("fr", "rendu"), ("en", "restor") })
+            textes.Get("SousTension.NonDisponible", new System.Globalization.CultureInfo(culture))
+                .Should().NotBe("SousTension.NonDisponible", culture).And.NotContain(rendue, culture);
+    }
+
+    // La carte suit la condition du helper (Intel et PawnIO, lus sur la machine), pas le fabricant lu au scan.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void La_recherche_ne_se_propose_que_la_ou_le_helper_peut_poser(bool possible)
+    {
+        var vm = Vm();
+        vm.SousTensionPossibleSurLaMachine = () => possible;
+        vm.SousTensionPossible.Should().Be(possible);
+    }
+
+    [Fact]
+    public void Le_verdict_a_un_seul_palier_ne_promet_aucune_marge_dans_les_deux_langues()
+    {
+        var textes = new DrDxt.Infrastructure.Localization.ResxLocalizer();
+        foreach (var (culture, marge) in new[] { ("fr", "marge"), ("en", "margin") })
+        {
+            var langue = new System.Globalization.CultureInfo(culture);
+            textes.Get("SousTension.Verdict", langue).Should().Contain(marge, culture);
+            textes.Get("SousTension.VerdictUnPalier", langue).Should().NotBe("SousTension.VerdictUnPalier", culture).And.NotContain(marge, culture);
+        }
+    }
+
+    // « Rendue » ne se dit que si le retour a réussi : les deux phrases à la suite se contredisaient.
+    [Fact]
+    public async Task L_origine_n_est_dite_rendue_que_si_le_retour_a_reussi()
+    {
+        var reussi = Vm();
+        await reussi.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+        reussi.ResultatSousTension.Should().Contain("ORIGINE RENDUE").And.NotContain("NON RENDUE");
+
+        _poses.Clear();
+        var rate = Vm(poser: mv => mv == 0 ? Result.Fail(ErrorCodes.HelperOpFailed, "tube") : Result.Ok());
+        await rate.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+        rate.ResultatSousTension.Should().Contain("NON RENDUE").And.NotContain("ORIGINE RENDUE");
+    }
+
+    [Fact]
+    public async Task Sans_palier_tenu_l_origine_n_est_dite_rendue_que_si_le_retour_a_reussi()
+    {
+        var reussi = Vm(whea: _ => 2);
+        await reussi.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+        reussi.ResultatSousTension.Should().StartWith("aucun palier").And.Contain("ORIGINE RENDUE");
+
+        _poses.Clear();
+        var rate = Vm(whea: _ => 2, poser: mv => mv == 0 ? Result.Fail(ErrorCodes.HelperOpFailed, "tube") : Result.Ok());
+        await rate.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+        rate.ResultatSousTension.Should().Contain("NON RENDUE").And.NotContain("ORIGINE RENDUE");
     }
 
     [Fact]
@@ -324,5 +420,22 @@ public sealed class RechercheSousTensionVmTests : IDisposable
         await vm.LancerRechercheSousTensionCommand.ExecuteAsync(null);
 
         vm.ResultatSousTension.Should().Contain("-30 mV").And.Contain("UnderVolt Protection").And.NotContain(ErrorCodes.TensionRefusee);
+    }
+
+    // Au lancement, l'origine d'une recherche interrompue se rend sans clic : aucune invite Windows (SansGesteDuJoueur).
+    [Fact]
+    public async Task L_origine_rendue_au_relancement_se_rend_sans_geste()
+    {
+        var demarrage = new DateTimeOffset(2026, 10, 12, 8, 0, 0, TimeSpan.Zero);
+        var memoire = new MemoireSousTension(Path.Combine(_dossier, "sous-tension.json"));
+        memoire.Ecrire(RechercheSousTension.Nouvelle(demarrage.AddHours(1)).Apres(IssuePalier.Stable(92, 20))
+            with { PalierCommenceLe = demarrage.AddHours(1).AddMinutes(3) });
+        var portees = new List<bool>();
+        var vm = Vm(poser: _ => { portees.Add(SansGesteDuJoueur.Actif); return Result.Ok(); });
+        vm.DemarrageDuPc = () => demarrage;
+
+        await vm.ReprendreRechercheSousTensionAsync();
+
+        portees.Should().NotBeEmpty("témoin : l'origine est rendue").And.OnlyContain(actif => actif);
     }
 }

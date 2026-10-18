@@ -276,6 +276,8 @@ internal sealed class FakeNvApiNative : INvApiNative
 
     // ── DRS read (non-elevated) ────────────────────────────────────────────
     public bool DrsReadSuccess { get; set; }
+    public bool DrsAuDefaut { get; set; }
+    public bool DrsGlobalAuDefaut(uint settingId) => DrsAuDefaut;
     public uint DrsSettingValue { get; set; }
     public uint DrsSettingLocation { get; set; }
     public uint DrsIsCurrentPredefined { get; set; }

@@ -41,28 +41,46 @@ public static class MemoryBench
     /// </summary>
     public static MemoryMeasurement Measure(int passes = 10)
     {
+        var zone = ElementsLatence(OctetsL3());
         // Chauffe : la premiere passe paie l'allocation et les defauts de page. La compter
         // fausserait la moyenne et gonflerait l'ecart-type.
         BandwidthGBs(1);
-        LatencyNs(BandwidthElements, 1_000_000);
+        LatencyNs(zone, 1_000_000);
 
         var bw = new double[passes];
         for (int i = 0; i < passes; i++) bw[i] = BandwidthGBs(3);
+        // Plusieurs fils, la mediane de trois : c'est elle qui peut dire « un seul canal ». Le nombre de fils est borne par la
+        // memoire libre ; 0 = non mesure.
+        var multi = BandwidthMultiFilGBs(FilsDuDebit(Environment.ProcessorCount, CommitPressureReader.LibrePhysique()));
 
-        var lat = new double[passes];
-        for (int i = 0; i < passes; i++) lat[i] = LatencyNs(BandwidthElements, 3_000_000);
-
-        var staircase = StaircaseWindows
-            .Select(w => new StaircasePoint(w, LatencyNs((int)(w / sizeof(int)), 2_000_000)))
-            .ToList();
+        // La latence et l'escalier sur un seul cœur, puis l'affinité d'origine rendue.
+        var (lat, staircase) = SurUnSeulCoeur.Executer(() =>
+        {
+            var l = new double[passes];
+            for (int i = 0; i < passes; i++) l[i] = LatencyNs(zone, 3_000_000);
+            return (l, StaircaseWindows
+                .Select(w => new StaircasePoint(w, LatencyNs((int)(w / sizeof(int)), 2_000_000)))
+                .ToList());
+        });
 
         return new MemoryMeasurement(
             BandwidthGBs: bw.Average(),
             BandwidthSigmaPct: SigmaPct(bw),
             LatencyNs: lat.Average(),
             LatencySigmaPct: SigmaPct(lat),
-            Staircase: staircase);
+            Staircase: staircase,
+            BandwidthMultiFilGBs: multi);
     }
+
+    /// <summary>La zone de la latence « DRAM », en entiers : au moins 128 Mio, et au moins quatre fois le L3 lu. 128 Mio
+    /// fixes laissaient une part des accès dans le cache d'un X3D (96 Mo de L3, 128 Mo sur un 9950X3D) : la latence
+    /// de la mémoire était sous-estimée. Quatre fois, pour que la part encore servie par le L3 reste sous 25 %.</summary>
+    internal static int ElementsLatence(long octetsL3)
+        => (int)Math.Min(int.MaxValue / 2, Math.Max(128L * 1024 * 1024, 4 * octetsL3) / sizeof(int));
+
+    /// <summary>La somme des caches L3 de la machine (un par CCD sur un Ryzen à deux CCD), sur tous les groupes de
+    /// processeurs (<see cref="DrDxt.Core.CachesL3"/>). 0 si illisible.</summary>
+    internal static long OctetsL3() => DrDxt.Core.CachesL3.Lire()?.Sum(c => c.Octets) ?? 0;
 
     private static double SigmaPct(double[] v)
     {
@@ -70,6 +88,48 @@ public static class MemoryBench
         if (m <= 0) return 0;
         double sd = Math.Sqrt(v.Sum(x => (x - m) * (x - m)) / v.Length);
         return 100.0 * sd / m;
+    }
+
+    /// <summary>Le debit de lecture de <paramref name="fils"/> fils a la fois, chacun sur son tampon de 64 Mio, une lecture
+    /// par ligne de 64 octets. Mesure le 17/10/2026 sur la machine de reference (DDR4-3800, deux canaux, plafond 60,8 Go/s) :
+    /// 39,6 Go/s sur un fil, 50 a 53 Go/s de 2 a 28 fils.
+    /// La mediane de trois series, sur les memes tampons : alloues une fois, ils ne s'empilent pas d'une serie a l'autre.
+    /// 0 sans fil (memoire libre trop basse ou non lue).</summary>
+    internal static double BandwidthMultiFilGBs(int fils)
+    {
+        if (fils <= 0) return 0;
+        const int Elements = (int)(TamponDuDebit / sizeof(long));
+        var tampons = Enumerable.Range(0, fils).Select(_ => { var a = new long[Elements]; for (int i = 0; i < a.Length; i++) a[i] = i; return a; }).ToArray();
+        var sommes = new long[fils];
+        double Serie()
+        {
+            var sw = Stopwatch.StartNew();
+            Parallel.For(0, fils, new ParallelOptions { MaxDegreeOfParallelism = fils }, f =>
+            {
+                long s = 0;
+                var a = tampons[f];
+                for (int r = 0; r < 3; r++)
+                    for (int i = 0; i < a.Length; i += Stride) s += a[i];
+                sommes[f] = s;
+            });
+            sw.Stop();
+            return fils * (double)(Elements / Stride) * 64.0 * 3 / sw.Elapsed.TotalSeconds / 1e9;
+        }
+        return new[] { Serie(), Serie(), Serie() }.Order().ElementAt(1);
+    }
+
+    /// <summary>Le tampon de chaque fil du debit multi-fil.</summary>
+    internal const long TamponDuDebit = 64L << 20;
+
+    /// <summary>Pur : combien de fils mesurent le debit multi-fil. Au plus 8 et le nombre de coeurs, et jamais plus de la
+    /// moitie de la memoire libre (meme regle que le test memoire : ne jamais faire paginer). Moins de deux fils ne
+    /// saturent pas le controleur et ne peuvent pas dire « un seul canal » : 0, comme une memoire libre non lue.
+    /// **Non chiffre.**</summary>
+    internal static int FilsDuDebit(int coeurs, ulong? libreOctets)
+    {
+        if (libreOctets is not { } libre) return 0;
+        var fils = (int)Math.Min(Math.Min(coeurs, 8), (long)(libre / 2 / TamponDuDebit));
+        return fils >= 2 ? fils : 0;
     }
 
     private static double BandwidthGBs(int rounds)

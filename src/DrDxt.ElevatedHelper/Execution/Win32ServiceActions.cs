@@ -187,13 +187,12 @@ public sealed class Win32ServiceActions : IServiceActions
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        using var proc = Process.Start(psi);
-        if (proc is null)
+        var r = ProcessusBorne.Executer(psi, TimeSpan.FromSeconds(15));
+        if (!r.Lance)
             return Fail("Could not launch sc.exe.");
-        proc.WaitForExit(15000);
-        return proc.HasExited && proc.ExitCode == 0
+        return r.Fini && r.Code == 0
             ? Result.Ok()
-            : Fail($"sc.exe failed (exit {(proc.HasExited ? proc.ExitCode : -1)}).");
+            : Fail($"sc.exe failed (exit {(r.Fini ? r.Code : -1)}).");
     }
 
     // Le binaire embarqué se déploie à côté de l'exe du helper (ou, en dev, dans un dossier

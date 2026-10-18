@@ -34,6 +34,9 @@ public sealed class CouvertureDocTests
 
     internal static string Generer(IReadOnlyList<ITweak> catalogue)
     {
+        // Le catalogue et les gestes qui vivent hors de lui mais ont leur page (le repos de la carte) : la liste promet
+        // « réglage par réglage ».
+        var ids = catalogue.Select(t => t.Id).Union(CouvertureDesLeviers.ReglagesDecrits, StringComparer.Ordinal).ToList();
         var sb = new StringBuilder();
         sb.AppendLine("# Ce que DrDXT fait, selon le PC");
         sb.AppendLine();
@@ -43,16 +46,16 @@ public sealed class CouvertureDocTests
         sb.AppendLine();
         sb.AppendLine("| Levier | Page | " + string.Join(" | ", Machines.Select(m => m.Nom)) + " |");
         sb.AppendLine("|---|---|" + string.Concat(Machines.Select(_ => "---|")));
-        foreach (var t in catalogue.OrderBy(t => CouvertureDesLeviers.Domaine(t.Id), StringComparer.Ordinal).ThenBy(t => t.Id, StringComparer.Ordinal))
+        foreach (var id in ids.OrderBy(CouvertureDesLeviers.Domaine, StringComparer.Ordinal).ThenBy(i => i, StringComparer.Ordinal))
         {
             var cases = Machines.Select(m =>
-                CouvertureDesLeviers.Calculer([new Toujours(t.Id)], m.Hw, Etat, new HashSet<string>()).Single() switch
+                CouvertureDesLeviers.Calculer([new Toujours(id)], m.Hw, Etat, new HashSet<string>()).Single() switch
                 {
                     { RaisonCle: { } r } => Fr(r),
                     { Statut: StatutDuLevier.Expert } => "mode Expert, sur ton accord",
                     _ => "possible",
                 });
-            sb.AppendLine($"| {Fr(DrDxt.App.ViewModels.TweakDisplayKeys.TitleKey(t.Id))} (`{t.Id}`) | {CouvertureDesLeviers.Domaine(t.Id)} | "
+            sb.AppendLine($"| {Fr(DrDxt.App.ViewModels.TweakDisplayKeys.TitleKey(id))} (`{id}`) | {CouvertureDesLeviers.Domaine(id)} | "
                           + string.Join(" | ", cases) + " |");
         }
         return sb.ToString();

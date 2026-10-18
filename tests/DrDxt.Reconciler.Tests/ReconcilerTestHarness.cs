@@ -22,6 +22,13 @@ public sealed class ReconcilerHarness
 
     public int BootLoopThreshold { get; set; } = 3;
 
+    // La pause du maintien vit dans un dossier temporaire propre au banc, sans vérification de confiance
+    // sauf si le test la demande.
+    public string DossierPause { get; } = Path.Combine(Path.GetTempPath(), "drdxt-pause-" + Guid.NewGuid().ToString("N"));
+    public bool VerifierConfiancePause { get; set; }
+    public PauseDuMaintien Pause => new(DossierPause, VerifierConfiancePause);
+    public IReconcilerStateStore? StoreOverride { get; set; }
+
     public ReconcilerHarness(ReconcilerState? initialState = null)
     {
         StateStore = new InMemoryReconcilerStateStore(initialState);
@@ -38,7 +45,7 @@ public sealed class ReconcilerHarness
     {
         var guard = new BootLoopGuard(BootStore, BootLoopThreshold);
         return new DesiredStateReconciler(
-            Probe, BuildProbe, DriverProbe, StateStore, Reapply, Notifier,
-            Policy, Diagnostics, guard, Clock);
+            Probe, BuildProbe, DriverProbe, StoreOverride ?? StateStore, Reapply, Notifier,
+            Policy, Diagnostics, guard, Clock, Pause);
     }
 }

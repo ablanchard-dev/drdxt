@@ -96,7 +96,8 @@ public static class MisesAJourEnAttente
                 RepairStatus.Unknown, Docteur.T("WU.ProposeesNonLu"));
             yield break;
         }
-        foreach (var v in proposees.Where(p => p.Genre == GenreDeMiseAJour.NouvelleVersion))
+        // Windows Update peut proposer la même version sous deux identifiants (deux paquets, un titre) : une ligne par titre.
+        foreach (var v in proposees.Where(p => p.Genre == GenreDeMiseAJour.NouvelleVersion).DistinctBy(p => p.Titre, StringComparer.OrdinalIgnoreCase))
             yield return new RepairFinding("WINDOWS UPDATE", "nouvelle version de Windows proposée", v.Titre,
                 versionInstallee is null ? null : Docteur.T("WU.VersionInstallee", versionInstallee), RepairStatus.Observed,
                 Docteur.T("WU.Proposee", v.Titre, versionInstallee is null ? "" : Docteur.T("WU.TuEsEn", versionInstallee)),
@@ -211,10 +212,9 @@ public static class RechercheWindowsUpdate
             dynamic chercheur = session.CreateUpdateSearcher();
             chercheur.Online = true;
             chercheur.Search("IsInstalled=0 and IsHidden=0");
-            var chemin = marque ?? MarqueParDefaut;
-            Directory.CreateDirectory(Path.GetDirectoryName(chemin)!);
-            File.WriteAllText(chemin, DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
-            return Result.Ok();
+            // Fichier du compte : jamais à travers un nom posé d'avance en lien (l'App peut tourner élevée).
+            return new FichierJsonAtomique(marque ?? MarqueParDefaut, ErrorCodes.IoFailure)
+                .WriteAtomic(DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));
         }
         catch (Exception ex)
         {

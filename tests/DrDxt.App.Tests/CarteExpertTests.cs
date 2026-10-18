@@ -21,13 +21,59 @@ public sealed class CarteExpertTests
         public ValueTask DisposeAsync() { Liberes++; return ValueTask.CompletedTask; }
     }
 
-    private static ScanViewModel Vm(bool jeu = false)
+    private static ScanViewModel Vm(bool jeu = false, Func<string, string>? localiser = null)
     {
         var locator = Substitute.For<DrDxt.App.Platform.IGameLocator>();
         locator.JeuOuvert().Returns(jeu);
         return ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
             Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(),
-            k => k, gameLocator: locator);
+            localiser ?? (k => k), gameLocator: locator);
+    }
+
+    // Quelques secondes de charge sans décrocher ne prouvent pas la stabilité en jeu : le texte dit la durée réelle du test.
+    // Le ventilateur n'a pas de test de stabilité : il ne s'en dit aucun.
+    [Fact]
+    public async Task Garde_dit_la_duree_du_test_de_stabilite_et_rien_pour_le_ventilateur()
+    {
+        var vm = Vm(localiser: k => k == "Carte.Expert.Garde" ? "tenu {0} s" : k);
+        vm.PoserCarteExpert = _ => Task.FromResult(Result<IEssaiCarte>.Ok(new Essai()));
+        vm.ExpertAccord = true;
+        await vm.PoserCarteExpertCommand.ExecuteAsync(null);
+        vm.ExpertEtat.Should().Be($"tenu {DrDxt.Application.Tweaks.Hardware.GpuStabilityTester.DureeDeCharge.TotalSeconds} s");
+
+        var autre = Vm(localiser: k => k == "Carte.Expert.Garde" ? "tenu {0} s" : k);
+        autre.PoserVentilateurExpert = _ => Task.FromResult(Result<IEssaiCarte>.Ok(new Essai()));
+        autre.ExpertAccord = true;
+        await autre.PoserVentilateurExpertCommand.ExecuteAsync(null);
+        autre.ExpertEtat.Should().Be("Carte.Expert.GardeVentilateur");
+    }
+
+    // Le helper meurt pendant que le ventilateur est fixé : le retour à l'automatique est tenté une fois, refusé, et l'écran le
+    // dit au lieu de rester sur « Gardé ».
+    private sealed class HelperMort : IElevatedClient
+    {
+        public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
+            => Task.FromResult(Result.Fail(ErrorCodes.HelperUnreachable, "tube absent (test)"));
+    }
+
+    [Fact]
+    public async Task Un_ventilateur_reste_fixe_faute_de_helper_le_dit_sur_la_carte()
+    {
+        var vm = Vm();
+        var helper = new HelperMort();
+        var bail = new HeartbeatSender(helper, VentilateurExpert.IdBail, 120);
+        await using var essai = new EssaiVentilateur(helper, Substitute.For<DrDxt.Application.Autopilot.IRevertEnAttente>(),
+            new RestoreGpuFanAutoOp(0), bail);
+        vm.PoserVentilateurExpert = _ => Task.FromResult(Result<IEssaiCarte>.Ok(essai));
+        vm.ExpertAccord = true;
+        await vm.PoserVentilateurExpertCommand.ExecuteAsync(null);
+        vm.ExpertGarde.Should().BeTrue();
+
+        for (var i = 0; i < 5; i++) await bail.PulseAsync(CancellationToken.None);
+        await essai.RenduApresPerte!;
+
+        vm.ExpertEtat.Should().Be(Docteur.T("GX.VentilateurResteFixe", "Erreur.Generique"), "la raison lisible, jamais le message du helper");
+        vm.ExpertGarde.Should().BeTrue("la vitesse fixe est restée : « Rendre » reste proposé");
     }
 
     [Fact]
@@ -158,7 +204,7 @@ public sealed class CarteExpertTests
         await vm.PoserCarteExpertCommand.ExecuteAsync(null);
 
         vm.ExpertGarde.Should().BeFalse();
-        vm.ExpertEtat.Should().Contain("Carte.Expert.Refuse").And.Contain("bail refusé");
+        vm.ExpertEtat.Should().Contain("Carte.Expert.Refuse").And.Contain("Erreur.Generique").And.NotContain("bail refusé");
     }
 
     // Le ventilateur partage l'accord, la règle du jeu ouvert et « Rendre » de la fréquence ; un seul

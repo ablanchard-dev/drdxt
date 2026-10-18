@@ -33,7 +33,7 @@ public sealed partial class ScanViewModel
             ]),
             // Un geste par programme lancé au démarrage, relu à l'instant (le constat ne garde que des noms).
             ("DEMARRAGE", "programmes au démarrage") when LireDemarrage() is { IsOk: true, Value: { } entrees }
-                => AvecLesFaits("demarrage", GestesDuDemarrage(entrees, Envoyer, _localize)),
+                => AvecLesFaits("demarrage", GestesDuDemarrage(entrees, Envoyer, _localize, LireCoupures())),
             // Le périphérique se relance par l'identifiant que Windows a lu, porté par le constat.
             ("PERIPHERIQUES", _) when r.Cible is { Length: > 0 } id => AvecLesFaits("peripherique",
             [
@@ -134,16 +134,30 @@ public sealed partial class ScanViewModel
     internal Func<Result<IReadOnlyList<DrDxt.Detection.Repair.ProgrammesAuDemarrage.Entree>>> LireDemarrage { get; set; }
         = DrDxt.Detection.Repair.ProgrammesAuDemarrage.Lire;
 
-    /// <summary>Couper chaque programme actif comme le Gestionnaire des tâches ; Annuler le réactive. La sécurité de Windows
-    /// n'a pas de geste (le helper refuserait de la couper).</summary>
+    /// <summary>Les programmes que DrDXT a coupés au démarrage, notés avant l'écriture (TraceDesCoupures) ; aucun dans les
+    /// tests qui ne les portent pas.</summary>
+    internal Func<IReadOnlyList<DrDxt.ElevatedHelper.Execution.CoupureDuDemarrage>> LireCoupures { get; set; } = () => [];
+
+    /// <summary>Couper chaque programme actif comme le Gestionnaire des tâches ; Annuler le réactive. La sécurité de Windows,
+    /// un antivirus ou un contrôle parental n'ont pas de geste (le helper refuserait de les couper).
+    /// Un programme que DrDXT a coupé dans une session précédente revient, déjà fait, avec son Annuler : seulement si la
+    /// valeur de la machine est encore exactement celle que DrDXT a écrite. Changée ailleurs, la coupure n'est plus la sienne.</summary>
     internal static IReadOnlyList<(string Cle, Func<GesteDuDocteur> Creer)> GestesDuDemarrage(
         IReadOnlyList<DrDxt.Detection.Repair.ProgrammesAuDemarrage.Entree> entrees, Func<PrivilegedOp, Task<Result>> envoyer,
-        Func<string, string> localiser)
+        Func<string, string> localiser, IReadOnlyList<DrDxt.ElevatedHelper.Execution.CoupureDuDemarrage>? coupures = null)
         => entrees
-            .Where(e => e.Actif && !e.Nom.Equals("SecurityHealth", StringComparison.OrdinalIgnoreCase))
+            .Where(e => !ProtegesAuDemarrage.Est(e.Nom) && !ProtegesAuDemarrage.Est(e.Cle))
+            .Where(e => e.Actif || CoupeParDrDxt(e, coupures))
             .Select(e => ($"demarrage|{e.Ruche}|{e.Liste}|{e.Cle ?? e.Nom}", (Func<GesteDuDocteur>)(() => new GesteDuDocteur(
                 string.Format(System.Globalization.CultureInfo.CurrentCulture, localiser("Geste.Demarrage.Titre"), e.Nom),
                 string.IsNullOrWhiteSpace(e.Commande) ? localiser("Geste.Demarrage.Detail") : e.Commande,
-                () => envoyer(e.Geste(false)), () => envoyer(e.Geste(true))))))
+                () => envoyer(e.Geste(false)), () => envoyer(e.Geste(true)), dejaFait: !e.Actif))))
             .ToList();
+
+    private static bool CoupeParDrDxt(DrDxt.Detection.Repair.ProgrammesAuDemarrage.Entree e,
+        IReadOnlyList<DrDxt.ElevatedHelper.Execution.CoupureDuDemarrage>? coupures)
+        => e.Octets is { } octets && coupures?.Any(c => c.Ruche == e.Ruche
+            && string.Equals(c.Liste, e.Liste, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(c.Nom, e.Cle ?? e.Nom, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(c.Octets, octets, StringComparison.OrdinalIgnoreCase)) == true;
 }

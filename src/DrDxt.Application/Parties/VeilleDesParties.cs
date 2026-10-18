@@ -39,6 +39,8 @@ public sealed class VeilleDesParties
     private readonly Func<double?>? _temperatureProcesseur;
     private readonly Func<bool?>? _entrees;
     private readonly Func<EtatCpu?>? _etatProcesseur;
+    private readonly Func<int, double?>? _horsCarte;
+    private readonly Action<PartieRelevee, IReadOnlyList<CaptureEnPartie>>? _garderLesImages;
 
     public VeilleDesParties(
         Func<(string Exe, int Pid)?> jeu,
@@ -70,8 +72,14 @@ public sealed class VeilleDesParties
         Func<double?>? temperatureProcesseur = null,
         Func<bool?>? entrees = null,
         // La seconde du processeur entière (cœur le plus chaud, cœur 0, raisons de freiner).
-        Func<EtatCpu?>? etatProcesseur = null)
+        Func<EtatCpu?>? etatProcesseur = null,
+        // La mémoire du jeu tenue hors de la carte (en mémoire système), en Mo, à la fin de la capture.
+        Func<int, double?>? horsCarte = null,
+        // Option de développement (ImagesDesParties) : la partie close et ses fenêtres ; null hors développement.
+        Action<PartieRelevee, IReadOnlyList<CaptureEnPartie>>? garderLesImages = null)
     {
+        _garderLesImages = garderLesImages;
+        _horsCarte = horsCarte;
         _etatProcesseur = etatProcesseur;
         _temperatureProcesseur = temperatureProcesseur;
         _entrees = entrees;
@@ -118,7 +126,12 @@ public sealed class VeilleDesParties
         void Clore()
         {
             processeurSignale = false;
-            if (enCours is not null && ReleveDesParties.Resumer(enCours, captures) is { } partie) _enregistrer(partie);
+            if (enCours is not null && ReleveDesParties.Resumer(enCours, captures) is { } partie)
+            {
+                _enregistrer(partie);
+                try { _garderLesImages?.Invoke(partie, [.. captures]); }
+                catch (Exception) { /* option de développement : son échec, quel qu'il soit, n'empêche jamais le relevé */ }
+            }
             if (enCours is not null) Suivre(null);
             enCours = null;
             captures.Clear();
@@ -167,26 +180,29 @@ public sealed class VeilleDesParties
                 // Lu juste après la capture, le jeu tourne encore. Un relevé raté n'annule pas la capture.
                 (double? Mhz, double? Watts, double? Celsius) cpu = (null, null, null);
                 try { if (_processeur is not null) cpu = _processeur(); }
-                catch (Exception) { }
+                catch (Exception) { /* lecture facultative : null = non lue, la capture reste */ }
                 double? vram = null;
                 try { vram = _memoireVideo?.Invoke(); }
-                catch (Exception) { }
+                catch (Exception) { /* lecture facultative : null = non lue, la capture reste */ }
                 IReadOnlyList<(string, double)>? voisins = null;
                 try { voisins = _voisins?.Invoke(jeu.Value.Pid); }
-                catch (Exception) { }
+                catch (Exception) { /* lecture facultative : null = non lue, la capture reste */ }
                 double? carte = null;
                 try { carte = _carte?.Invoke(); }
-                catch (Exception) { }
+                catch (Exception) { /* lecture facultative : null = non lue, la capture reste */ }
                 IReadOnlyList<string>? overlays = null;
                 try { overlays = _overlays?.Invoke(); }
-                catch (Exception) { }
+                catch (Exception) { /* lecture facultative : null = non lue, la capture reste */ }
                 (double? Box, double? Internet, double? Pertes) reseau = (null, null, null);
                 try { if (_reseau is not null) reseau = await _reseau(ct); }
                 catch (OperationCanceledException) { return; }
-                catch (Exception) { }
+                catch (Exception) { /* lecture facultative : null = non lue, la capture reste */ }
+                double? horsCarte = null;
+                try { horsCarte = _horsCarte?.Invoke(jeu.Value.Pid); }
+                catch (Exception) { /* lecture facultative : null = non lue, la capture reste */ }
                 (string Carte, string? DedieeIgnoree)? carteDuJeu = null;
                 try { carteDuJeu = _carteDuJeu?.Invoke(jeu.Value.Pid); }
-                catch (Exception) { }
+                catch (Exception) { /* lecture facultative : null = non lue, la capture reste */ }
                 // Le pic lu seconde par seconde pendant la fenêtre ; sans échantillon, la lecture d'après la capture.
                 var celsiusMax = celsius.Count > 0 ? celsius.Max() : cpu.Celsius;
                 captures.Add(new CaptureEnPartie(_horloge(), mesure.AvgFps, mesure.P1LowFps, _classer(mesure), cpu.Mhz, cpu.Watts, celsiusMax, vram, voisins, carte, overlays,
@@ -194,7 +210,8 @@ public sealed class VeilleDesParties
                     MecanismeCarte.Depuis(echantillons), LatenceAffichageMs: mesure.DisplayLatencyMsMedian,
                     ImagesMs: mesure.FrameTimesMs, PremierPlan: mesure.ForegroundFraction,
                     Entrees: entrees.Count > 0 ? entrees.Count(e => e) / (double)entrees.Count : null,
-                    Freinage: FreinageCpu.Depuis(etats), Ventilateurs: VentilateursEnPartie.Depuis(etats.Select(e => e.Ventilateurs))));
+                    Freinage: FreinageCpu.Depuis(etats), Ventilateurs: VentilateursEnPartie.Depuis(etats.Select(e => e.Ventilateurs)),
+                    PartComposee: mesure.PartImagesComposees, LatencePcMs: mesure.PcLatencyMsMedian, HorsCarteMo: horsCarte));
             }
             await Attendre(EntreDeuxCaptures, ct);
         }
@@ -210,13 +227,13 @@ public sealed class VeilleDesParties
         while (!fin.IsCancellationRequested)
         {
             try { if (_lireCarte?.Invoke() is { } r) echantillons.Add(r); }
-            catch (Exception) { }
+            catch (Exception) { /* seconde non lue : la suivante l'est */ }
             try { if (_temperatureProcesseur?.Invoke() is { } t) celsius.Add(t); }
-            catch (Exception) { }
+            catch (Exception) { /* seconde non lue : la suivante l'est */ }
             try { if (_entrees?.Invoke() is { } e) entrees.Add(e); }
-            catch (Exception) { }
+            catch (Exception) { /* seconde non lue : la suivante l'est */ }
             try { if (_etatProcesseur?.Invoke() is { } s) etats.Add(s); }
-            catch (Exception) { }
+            catch (Exception) { /* seconde non lue : la suivante l'est */ }
             try { await Task.Delay(TimeSpan.FromSeconds(1), fin).ConfigureAwait(false); }
             catch (OperationCanceledException) { return; }
         }

@@ -1,5 +1,4 @@
-﻿using static DrDxt.Core.TexteFrancais;
-using System.Diagnostics.Eventing.Reader;
+﻿using System.Diagnostics.Eventing.Reader;
 using System.Xml.Linq;
 using DrDxt.Core;
 

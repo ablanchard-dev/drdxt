@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -14,7 +16,9 @@ public partial class ScanViewModel
     [ObservableProperty] private bool _calmerVoisinsActif;
     [ObservableProperty] private string? _voisinsCalmes;
     private CancellationTokenSource? _calmerVoisins;
-    private CalmeurDeVoisins? _calmeur;
+    // Les calmeurs des boucles en cours : éteint puis rallumé pendant une lecture, l'ancien tourne encore et garde ce qu'il a
+    // abaissé.
+    private readonly HashSet<CalmeurDeVoisins> _calmeurs = [];
 
     public string LabelCalmerTitre => _localize("Voisins.Calmer.Titre");
     public string LabelCalmerDescription => _localize("Voisins.Calmer.Description");
@@ -167,8 +171,15 @@ public partial class ScanViewModel
         ProposerDepuis(_partiesPourProposition);
     }
 
-    /// <summary>À la fermeture de DrDXT : rien ne reste abaissé derrière lui.</summary>
-    public void RendreLesPriorites() => _calmeur?.Rendre();
+    /// <summary>À la fermeture de DrDXT : rien ne reste abaissé derrière lui, quelle que soit la boucle qui l'a abaissé. Rendu
+    /// sur place, sans attendre les boucles : leur suite passe par le fil d'interface, celui-là même qui ferme. Un calmeur
+    /// rendu repart de zéro : il lui faut deux lectures pour abaisser à nouveau.</summary>
+    public void RendreLesPriorites()
+    {
+        CalmeurDeVoisins[] tous;
+        lock (_calmeurs) tous = [.. _calmeurs];
+        foreach (var calmeur in tous) calmeur.Rendre();
+    }
 
     /// <summary>Ce processus est-il un jeu possible (ni navigateur, ni lecteur, ni Windows) ? Le filtre F-5
     /// de la veille des parties ; injectable pour les tests.</summary>
@@ -177,7 +188,8 @@ public partial class ScanViewModel
 
     internal async Task CalmerPendantLesPartiesAsync(CancellationToken ct)
     {
-        _calmeur = new CalmeurDeVoisins(Priorites, Exclus());
+        var calmeur = new CalmeurDeVoisins(Priorites, Exclus());
+        lock (_calmeurs) _calmeurs.Add(calmeur);
         var enPartie = false;
         try
         {
@@ -190,20 +202,24 @@ public partial class ScanViewModel
                 {
                     enPartie = true;
                     var vus = await Task.Run(() => _voisins.Lire(pid, ct), ct).ConfigureAwait(true);
-                    if (vus is not null && _calmeur.Lecture(vus, pid, PidPremierPlan()) is { Count: > 0 } calmes)
+                    if (vus is not null && calmeur.Lecture(vus, pid, PidPremierPlan()) is { Count: > 0 } calmes)
                         VoisinsCalmes = string.Format(System.Globalization.CultureInfo.CurrentCulture,
                             _localize("Voisins.Calmer.Fait"), string.Join(", ", calmes));
                 }
                 else if (enPartie)
                 {
                     enPartie = false;
-                    _calmeur.Rendre();
+                    calmeur.Rendre();
                 }
                 await Task.Delay(PasCalmer, ct).ConfigureAwait(true);
             }
         }
         catch (OperationCanceledException) { /* arrêt demandé */ }
-        finally { _calmeur.Rendre(); }
+        finally
+        {
+            calmeur.Rendre();
+            lock (_calmeurs) _calmeurs.Remove(calmeur);
+        }
     }
 
     private static int PremierPlanWindows()
@@ -217,4 +233,63 @@ public partial class ScanViewModel
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    // ── Ce qui tournait a cote, et la marge ──────────────────────────────────────
+    //
+    // Un scan a affiche « 164 FPS » pendant qu'on regardait l'ecran de DrDXT, le jeu en
+    // arriere-plan. Le meme soir, en partie reelle avec nos compilations sur son processeur : 79,5.
+    // Un FPS moyen seul est trompeur. L'ecran montre donc, a cote du chiffre, sa marge d'erreur (que
+    // BenchmarkResult calcule deja) et la liste courte de ce qui consommait en meme temps.
+
+    /// <summary>Ce qui tournait a cote du jeu pendant la mesure, une ligne lisible par voisin. Liste
+    /// Vide = on n'a rien vu au-dessus du seuil, ou on n'a pas su regarder. <see cref="VoisinsConnus"/>
+    /// dit lequel des deux, pour que l'ecran ne fasse jamais passer « on ne sait pas » pour « rien ».</summary>
+    public ObservableCollection<string> VoisinsDuJeu { get; } = new();
+
+    /// <summary>Vrai des qu'au moins un voisin notable a ete vu. Faux = rien a montrer.</summary>
+    [ObservableProperty]
+    private bool _voisinsConnus;
+
+    /// <summary>La phrase d'en-tete de la liste, ou la phrase qui dit qu'on n'a rien vu de notable.</summary>
+    [ObservableProperty]
+    private string? _voisinsResume;
+
+    public string LabelVoisins => _localize("Scan.Voisins.Header");
+    public string LabelVoisinsTitre => _localize("Scan.Voisins.Titre");
+    public string LabelConsigneScene => _localize("Scan.Scene.Consigne");
+
+    /// <summary>Le FPS moyen avec sa marge, dans le meme champ : « 148 ± 3,2 ». Jamais un chiffre
+    /// seul : c'est la demande produit, et c'est la seule forme honnete d'une mesure.</summary>
+    [ObservableProperty]
+    private string _avgFpsAvecMarge = Dash;
+
+    /// <summary>Le 1 % low avec sa marge (`P1LowMarginOfError`) : il varie plus d'une passe à l'autre que la
+    /// moyenne, un chiffre seul tromperait. Même règle que le FPS moyen.</summary>
+    [ObservableProperty]
+    private string _p1LowAvecMarge = Dash;
+
+    private void PeuplerLesVoisins(IReadOnlyList<DrDxt.App.Platform.VoisinDuJeu>? vus)
+    {
+        VoisinsDuJeu.Clear();
+        // « pas pu lire » a sa propre phrase, au lieu d'une parenthèse sous « rien vu ».
+        if (vus is null)
+        {
+            VoisinsConnus = false;
+            VoisinsResume = _localize("Scan.Voisins.NonLus");
+            return;
+        }
+        foreach (var v in vus)
+            VoisinsDuJeu.Add(v.GpuPourcent is { } gpu
+                ? string.Format(CultureInfo.CurrentUICulture, _localize("Scan.Voisins.LigneGpu"), v.Nom,
+                    v.ProcesseurPourcent, gpu)
+                : string.Format(CultureInfo.CurrentUICulture, _localize("Scan.Voisins.Ligne"), v.Nom,
+                    v.ProcesseurPourcent));
+
+        VoisinsConnus = VoisinsDuJeu.Count > 0;
+        // Sans jeu lu, la liste ne dit pas « à côté du jeu ».
+        var avecJeu = _gamePid != 0;
+        VoisinsResume = VoisinsConnus
+            ? _localize(avecJeu ? "Scan.Voisins.Header" : "Scan.Voisins.HeaderSansJeu")
+            : _localize(avecJeu ? "Scan.Voisins.Aucun" : "Scan.Voisins.AucunSansJeu");
+    }
 }

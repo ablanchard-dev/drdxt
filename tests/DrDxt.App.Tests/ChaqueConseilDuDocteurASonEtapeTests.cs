@@ -27,6 +27,14 @@ public sealed class ChaqueConseilDuDocteurASonEtapeTests
     // Fichier qui emet ⇒ phrase du guide (espaces normalises : une phrase peut passer a la ligne dans le .md).
     private static readonly Dictionary<string, string> EtapeParFichier = new()
     {
+        ["TypeDeNat.cs"] = "Double NAT (DrDXT dit « box derrière box »)",
+        ["ObsStudio.cs"] = "Pertes en stream au-dessus de 5 %",
+        ["PiloteRTCore.cs"] = "Pilote RTCore présent",
+        ["EcransDupliques.cs"] = "Écrans dupliqués à des fréquences différentes",
+        ["PiloteGraphique32Bits.cs"] = "Pilote graphique 32 bits absent ou manquant",
+        ["VitesseDeLaCarte.cs"] = "Vitesse ou duplex de la carte réseau forcés",
+        ["SuperpositionsMaterielles.cs"] = "Superpositions matérielles coupées",
+        ["HorlogeQpc.cs"] = "Horloge haute résolution lente ou qui recule",
         ["StabiliteApresChangement.cs"] = "la semaine qui a suivi un changement",
         ["ConnexionDeJeu.cs"] = "Câble Ethernet plutôt que Wi-Fi",
         ["CurveOptimizerAmd.cs"] = "Curve Optimizer",
@@ -65,11 +73,22 @@ public sealed class ChaqueConseilDuDocteurASonEtapeTests
         ["BcdInterpretation.cs"] = "la politique de démarrage",
         ["CrashDumpPolicy.cs"] = "le type de vidage",
         ["TestMemoireEnSession.cs"] = "le test mémoire en session",
+        ["RepriseDuTestMemoire.cs"] = "que la machine n'a pas fini",
+        ["DefautsConnus.cs"] = "Firmware d'un SSD signalé par son fabricant",
+        ["FtpmAmd.cs"] = "Ryzen avec le TPM du processeur (fTPM) actif",
         ["Bufferbloat.cs"] = "SQM",
         ["JournalDesLeviersAppliques.cs"] = "relance l'optimisation",
         ["SanteWindows.cs"] = "Récupération > « Réinstaller maintenant »",
         ["OptionsNvidiaDuJoueur.cs"] = "Surcouche DLSS et mode faible latence",
         ["ConfigurationCallOfDuty.cs"] = "Fils de rendu (Call of Duty)",
+        ["EcransBleus.cs"] = "le compte par trois sources",
+        ["PannesDuJournal.cs"] = "Pilote graphique relancé par Windows",
+        ["SanteNvme.cs"] = "lève son avertissement critique",
+        ["ChiffrementDuDisque.cs"] = "Reprendre la protection",
+        ["PiloteExigeParLeJeu.cs"] = "Pilote sous le plancher qu'un jeu exige",
+        ["InventaireDesPilotes.cs"] = "Pilote non signé : si tu ne t'en sers plus",
+        ["InstallationDePilote.cs"] = "Installation de pilote bloquée par stratégie",
+        ["PreferencesDefender.cs"] = "Accès contrôlé aux dossiers activé sans ton jeu",
     };
 
     // Chaque reglage de firmware que DrDXT lit et guide (jamais ecrit) ⇒ son etape.

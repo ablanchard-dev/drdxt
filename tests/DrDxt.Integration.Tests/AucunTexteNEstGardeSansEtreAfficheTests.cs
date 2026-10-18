@@ -16,6 +16,7 @@ public sealed class AucunTexteNEstGardeSansEtreAfficheTests
 {
     private static readonly Dictionary<string, string> GardesSciemment = new(StringComparer.Ordinal)
     {
+        ["Erreur."] = "phrase d'un code d'échec, composée par son code (RaisonLisible.Dire)",
         ["NonNuisance."] = "relus par la garde qui les relie a docs/NON-NUISANCE.md, une source pour chaque promesse",
         ["Reglage.nvidia."] = "nom d'un reglage suivi, compose par son identifiant (ScanViewModel.Parties, ReleverReglagesSuivis)",
         ["Reglage.windows."] = "nom d'un reglage suivi, compose par son identifiant (ScanViewModel.Parties, ReleverReglagesSuivis)",

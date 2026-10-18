@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using static DrDxt.App.Natif;
 
 namespace DrDxt.App.Platform;
 
@@ -319,9 +320,6 @@ public sealed class Win32GameLocator : IGameLocator
     private static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "QueryFullProcessImageNameW")]
     private static extern bool QueryFullProcessImageName(IntPtr process, uint flags, System.Text.StringBuilder name, ref uint size);
-    [DllImport("kernel32.dll")]
-    private static extern bool CloseHandle(IntPtr handle);
-
     private const uint MonitorDefaultToNearest = 2;
     private const int DwmwaCloaked = 14; // DWMWINDOWATTRIBUTE.DWMWA_CLOAKED (dwmapi.h)
 

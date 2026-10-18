@@ -18,15 +18,24 @@ public sealed class ModeDAlimentationGardeTests
         public bool PoserEchoue;
         public int EchecsRestants = int.MaxValue;
         public bool PoserSansEffet;
+        public int EcrituresReussies = int.MaxValue;
+        public int ActivationsReussies = int.MaxValue;
         public readonly List<string> Appels = [];
 
         public Guid? PlanActif() => Plan;
         public uint Boost = 0;
-        public uint EcrireValeurSecteur(Guid plan, Guid sousGroupe, Guid reglage, uint valeur) { Appels.Add("ecrire"); Boost = valeur; return 0; }
+        public uint EcrireValeurSecteur(Guid plan, Guid sousGroupe, Guid reglage, uint valeur)
+        {
+            Appels.Add("ecrire");
+            if (EcrituresReussies-- <= 0) return 5;
+            Boost = valeur;
+            return 0;
+        }
         public uint? LireValeurSecteur(Guid plan, Guid sousGroupe, Guid reglage) => Boost;
         public uint Activer(Guid plan)
         {
             Appels.Add("activer");
+            if (ActivationsReussies-- <= 0) return 5;
             Plan = plan;
             if (ActiverRemetLeMode && Mode is not null) Mode = Guid.Empty;
             return 0;
@@ -106,5 +115,22 @@ public sealed class ModeDAlimentationGardeTests
 
         var toujours = new Powrprof { PoserEchoue = true, Plan = Equilibre };
         (new Win32PowerPlanActions(toujours).SetActivePlan(MeilleuresPerformances).Error?.Message ?? "").Should().Contain("NOT set back");
+    }
+
+    // Le retour en arrière lui-même rate : la cible reste changée, l'échec le dit avec le code qui garde le journal, jamais
+    // « set back ».
+    [Fact]
+    public void Un_retour_en_arriere_rate_se_dit_pose_et_garde_le_journal()
+    {
+        var valeur = new Powrprof { PoserEchoue = true, EcrituresReussies = 1 };
+        var r = new Win32PowerPlanActions(valeur).SetBoostModeAc(Equilibre, 2);
+        valeur.Boost.Should().Be(2u, "témoin : la réécriture de la valeur d'avant a raté");
+        r.Error!.Value.Code.Should().Be(DrDxt.Core.ErrorCodes.TweakPartiallyApplied);
+        r.Error.Value.Message.Should().NotContain("Boost mode set back");
+
+        var plan = new Powrprof { PoserEchoue = true, Plan = Equilibre, ActivationsReussies = 1 };
+        var p = new Win32PowerPlanActions(plan).SetActivePlan(MeilleuresPerformances);
+        plan.Plan.Should().Be(MeilleuresPerformances, "témoin : le plan d'avant n'a pas pu revenir");
+        p.Error!.Value.Code.Should().Be(DrDxt.Core.ErrorCodes.TweakPartiallyApplied);
     }
 }

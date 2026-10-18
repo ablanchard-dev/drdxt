@@ -180,6 +180,10 @@ public record SettingsState(
     // Ce compte n'est pas un compte de plantages : une extinction au bouton ou a la prise se
     // logue a l'identique. Tout lecteur de ce champ doit porter cette reserve.
     IReadOnlyList<DateTimeOffset>? UncleanShutdowns = null,
+    // Les incidents datés de la garde de stabilité (arrêts brutaux classés, écrans bleus, vidages, erreurs matérielles
+    // graves, hausses d'arrêts dangereux du SSD) : la même source que la garde Curve Optimizer. null = une source non lue,
+    // ou lecteur non branché ; une garde le lit comme « instable », jamais comme « stable ».
+    IReadOnlyList<DateTimeOffset>? IncidentsDeStabilite = null,
     // Le nombre de canaux memoire que la mesure prouve. Un canal a un plafond de debit
     // (MT/s x 8 octets) et rien ne le depasse : lire au-dessus prouve qu'il y en a plusieurs,
     // meme quand la carte nomme mal ses emplacements et que `MemoryTopologyAdvisor` doit avouer
@@ -188,6 +192,9 @@ public record SettingsState(
     // « simple canal » : un seul fil d'execution ne sature pas forcement deux canaux, donc un
     // debit bas ne conclut rien. Seul un compte >= 2 ferme une inconnue.
     int MemoryProvenChannels = 0,
+    // Un seul canal probable, dit par la mesure multi-fil (au moins deux barrettes, et plusieurs fils sous le plafond
+    // d'un canal). La seule conclusion vers le bas que DrDXT tire du debit.
+    bool MemoryUnSeulCanalMesure = false,
     // La frequence de chaque ecran attache. Le lecteur lisait deja tous les ecrans et
     // n'en gardait que le principal : la question « les frequences different-elles ? » etait donc
     // impossible a poser, alors que c'est elle qui decide de la consommation au repos.

@@ -111,7 +111,8 @@ public static class MoteurDAnimation
         }
 
         EventHandler surChange = (_, _) => Suivre();
-        element.Loaded += (_, _) => { Change += surChange; Suivre(); };
+        // WPF peut lever Loaded deux fois sans Unloaded entre les deux : l'abonnement n'est pris qu'une fois.
+        element.Loaded += (_, _) => { Change -= surChange; Change += surChange; Suivre(); };
         element.Unloaded += (_, _) => { Change -= surChange; horloge.Stop(); };
         element.IsVisibleChanged += (_, _) => Suivre();
         return horloge;

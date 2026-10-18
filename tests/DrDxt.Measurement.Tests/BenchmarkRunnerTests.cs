@@ -110,6 +110,21 @@ public class BenchmarkRunnerTests
         r.Value!.EstimatedPcLatencyMs.Should().BeApproximately(5.0, 1e-9);
     }
 
+    // Les modes de présentation capturés deviennent la part d'images composées ; la latence PC sans marqueurs (NaN) reste null.
+    [Fact]
+    public async Task Present_modes_become_the_composed_share_and_nan_pc_latency_stays_null()
+    {
+        var cap = new FrameCapture(new[] { 10.0, 10.0, 10.0, 10.0 }, Array.Empty<double>(), Array.Empty<double>(),
+            PresentModes: new[] { 3, 4, 3, 3 }, PcLatencyMs: new[] { double.NaN, double.NaN, double.NaN, double.NaN });
+        var s = Substitute.For<IPresentMonSession>();
+        s.IsServiceAvailable().Returns(Result<bool>.Ok(true));
+        s.CaptureAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+         .Returns(Result<FrameCapture>.Ok(cap));
+        var r = await new BenchmarkRunner(s).RunAsync(1, TimeSpan.FromMilliseconds(10), 1, default);
+        r.Value!.PartImagesComposees.Should().Be(0.25);
+        r.Value.PcLatencyMsMedian.Should().BeNull();
+    }
+
     [Fact]
     public async Task Estimated_latency_is_null_when_no_latency_samples()
     {

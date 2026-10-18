@@ -223,4 +223,49 @@ public sealed class LeaseIpcPipelineTests
         resp.ErrorCode.Should().Be(ErrorCodes.NotAllowlisted);
         exec.WasInvoked.Should().BeFalse();
     }
+    // Une vitesse fixe sans bail : ni la garde thermique (80 °C) ni l'expiration ne la voyaient, elle restait jusqu'au
+    // redémarrage. Refusée sans bail actif du même appelant qui rend ce ventilateur ; posée sous ce bail.
+    [Fact]
+    public async Task Une_vitesse_fixe_n_est_posee_que_sous_un_bail_qui_rend_ce_ventilateur()
+    {
+        var key = NewKey();
+        var (server, _, exec, clock) = Build(key);
+        var joueur = new CallerInfo(4242);
+        var fixe = new ApplyGpuFanCurveOp(0, [new FanCurvePointDto(0, 60)]);
+        var retour = PrivilegedOpCodec.Serialize(new RestoreGpuFanAutoOp(0)).Value!;
+
+        (await server.ProcessTypedRequestAsync(SignedRequest(key, fixe), CancellationToken.None, joueur)).Ok.Should().BeFalse("sans bail");
+        exec.WasInvoked.Should().BeFalse();
+
+        (await server.ProcessTypedRequestAsync(SignedRequest(key, new EstablishLeaseOp("autre", RevertJson(), 60)),
+            CancellationToken.None, joueur)).Ok.Should().BeTrue();
+        (await server.ProcessTypedRequestAsync(SignedRequest(key, fixe), CancellationToken.None, joueur)).Ok.Should().BeFalse("un bail qui ne rend pas le ventilateur");
+
+        (await server.ProcessTypedRequestAsync(SignedRequest(key, new EstablishLeaseOp("gpu-ventilateur", retour, 60)),
+            CancellationToken.None, joueur)).Ok.Should().BeTrue();
+        (await server.ProcessTypedRequestAsync(SignedRequest(key, new ApplyGpuFanCurveOp(1, [new FanCurvePointDto(0, 60)])),
+            CancellationToken.None, joueur)).Ok.Should().BeFalse("le bail rend une autre carte");
+        (await server.ProcessTypedRequestAsync(SignedRequest(key, fixe), CancellationToken.None, new CallerInfo(99)))
+            .Ok.Should().BeFalse("le bail d'un autre appelant");
+        (await server.ProcessTypedRequestAsync(SignedRequest(key, fixe), CancellationToken.None, joueur)).Ok.Should().BeTrue("sous le bail");
+        exec.WasInvoked.Should().BeTrue();
+
+        clock.Advance(TimeSpan.FromSeconds(61));
+        (await server.ProcessTypedRequestAsync(SignedRequest(key, fixe), CancellationToken.None, joueur)).Ok.Should().BeFalse("bail échu");
+    }
+
+    // L'enveloppe du journal d'écriture anticipée ne porte qu'une op journalisée : enveloppée, la vitesse fixe passait le
+    // filtre « ventilateur sans bail », qui regarde le type reçu, puis partait nue, sans bail ni garde thermique.
+    [Fact]
+    public async Task Une_vitesse_fixe_enveloppee_sans_bail_est_refusee()
+    {
+        var key = NewKey();
+        var (server, _, exec, _) = Build(key);
+        var enveloppe = new PoseEnAttenteDOrigineOp(PrivilegedOpCodec.Serialize(new ApplyGpuFanCurveOp(0, [new FanCurvePointDto(0, 60)])).Value!);
+
+        (await server.ProcessTypedRequestAsync(SignedRequest(key, enveloppe), CancellationToken.None, new CallerInfo(4242)))
+            .Ok.Should().BeFalse();
+
+        exec.WasInvoked.Should().BeFalse();
+    }
 }

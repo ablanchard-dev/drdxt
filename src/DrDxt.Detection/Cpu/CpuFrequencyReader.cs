@@ -193,6 +193,7 @@ public sealed class CpuFrequencyReader
                 for (var i = 0; i < instances.Length; i++)
                 {
                     double? p = null, u = null;
+                    // Un compteur illisible reste null pour ce cœur : non lu, jamais zéro.
                     try { p = perf[i].NextValue(); } catch { }
                     try { u = temps[i]?.NextValue(); } catch { }
                     resultat.Add(new CoeurFrequence(instances[i], IndexDe(instances[i]), p, u));

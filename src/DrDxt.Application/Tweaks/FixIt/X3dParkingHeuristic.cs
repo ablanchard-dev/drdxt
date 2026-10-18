@@ -44,12 +44,12 @@ public static class X3dParkingHeuristic
             return true;
 
         // État cassé n° 2 : un cœur du CCD à V-Cache (index bas) est parqué = mauvais CCD.
-        // Les cœurs sont répartis également entre les CCD détectés ; le CCD0 à V-Cache possède
-        // le bloc d'index le plus bas [0 .. coresPerCcd-1].
-        var coresPerCcd = Math.Max(1, cpu.Cores / cpu.CcdCount);
+        // Windows numérote un cœur par son premier processeur logique (CoreIndex : 0, 2, 4… avec l'hyperthreading) : le
+        // CCD0 à V-Cache possède les numéros [0 .. processeurs logiques par CCD - 1].
+        var logiquesParCcd = Math.Max(1, cpu.Threads / cpu.CcdCount);
         foreach (var index in parked)
         {
-            if (index >= 0 && index < coresPerCcd)
+            if (index >= 0 && index < logiquesParCcd)
                 return true; // un cœur du CCD à cache est parqué → mauvais parcage.
         }
 

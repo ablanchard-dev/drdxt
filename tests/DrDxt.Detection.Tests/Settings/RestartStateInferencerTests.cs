@@ -98,7 +98,7 @@ public class RestartStateInferencerTests
         // gamingservicesproxy) alors que les deux clés de maintenance lisent false. La machine est saine.
         // Tout contrôle qui teste la simple présence de cette valeur crierait « redémarrage requis » ici.
         var renames = Enumerable.Range(0, 86)
-            .Select(i => $@"\??\C:\Program Files (x86)\Microsoft\EdgeUpdate.3.{i}")
+            .Select(i => $@"\??\C:\Program Files (x86)\Microsoft\EdgeUpdate\1.3.{i}")
             .ToArray();
 
         var r = RestartStateInferencer.Infer(false, renames, TriState.On, TimeSpan.FromDays(11), null);

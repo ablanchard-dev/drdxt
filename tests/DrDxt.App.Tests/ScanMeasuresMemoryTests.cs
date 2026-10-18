@@ -837,7 +837,7 @@ public sealed class ScanMeasuresMemoryTests
         vm.OublierChangementBiosCommand.Execute(null);
 
         vm.HasBiosLoopResult.Should().BeTrue();
-        vm.ErreurOubliBios.Should().Contain("Bios.Retour.OublierEchec").And.Contain("fichier verrouillé");
+        vm.ErreurOubliBios.Should().Contain("Bios.Retour.OublierEchec").And.Contain("Erreur.Generique").And.NotContain("fichier verrouillé");
     }
 
     [Fact]

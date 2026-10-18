@@ -90,8 +90,8 @@ def main() -> int:
 
 def _autotest() -> int:
     """Le parsing est la seule logique non triviale ici : il se verifie hors machine."""
-    liste = '"frubuntu" {8893286c-908d-4c28-a418-79584779f6f0}\n"wzp" {20892e4a-6e4f}\n'
-    assert machines(liste) == ["frubuntu", "wzp"], machines(liste)
+    liste = '"frubuntu" {8893286c-908d-4c28-a418-79584779f6f0}\n"win11" {20892e4a-6e4f}\n'
+    assert machines(liste) == ["frubuntu", "win11"], machines(liste)
 
     info_win = ('ostype="Windows 11 (64-bit)"\nmemory=8192\ncpus=4\n'
                 'VMState="aborted-saved"\nSnapshotName="Windows-propre"\n')

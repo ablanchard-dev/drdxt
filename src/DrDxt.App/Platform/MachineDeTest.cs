@@ -41,6 +41,16 @@ internal static class MachineDeTest
         return dossier;
     }
 
+    /// <summary>Un constat enregistré dans l'autre langue du docteur (un testeur anglophone, relu en français) : ses phrases
+    /// réécrites dans la langue de l'App, ce qui n'est pas reconnu tel quel (<see cref="Retraduction"/>).</summary>
+    public static RepairFinding DansLaLangueDuDocteur(RepairFinding f) => f with
+    {
+        Explication = Retraduction.Retraduire(f.Explication)!,
+        ValeurCourante = Retraduction.Retraduire(f.ValeurCourante),
+        ValeurAttendue = Retraduction.Retraduire(f.ValeurAttendue),
+        Remede = Retraduction.Retraduire(f.Remede),
+    };
+
     /// <param name="nomOuChemin">Un chemin de fichier, ou un nom cherché dans tests/Shared/machines en remontant depuis l'App.</param>
     public static Machine Charger(string nomOuChemin)
     {

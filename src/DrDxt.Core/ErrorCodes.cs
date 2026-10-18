@@ -32,6 +32,13 @@ public static class ErrorCodes
     // Distinct d'ELEVATION_DECLINED (UAC annulé par l'utilisateur) : ici un helper lancé
     // n'est pas monté à temps. Propre, à retenter sur une op suivante.
     public const string HelperUnreachable = "HELPER_UNREACHABLE";
+    // La requête est partie, puis le helper s'est tu (tué, planté) avant de répondre : l'op a pu s'exécuter ou non.
+    // Distinct d'HELPER_UNREACHABLE, où rien n'est parti. Jamais rejouée d'office.
+    public const string HelperNoReply = "HELPER_NO_REPLY";
+    // La même chose pour une pose notée au journal d'écriture anticipée : si elle est posée, le rejeu la rendra.
+    public const string HelperNoReplyJournalisee = "HELPER_NO_REPLY.JOURNALED";
+    // Le helper n'a pas de journal d'écriture anticipée (racine non fiable) : une pose qui devait y être notée est refusée.
+    public const string JournalIndisponible = "WRITE_AHEAD_JOURNAL_UNAVAILABLE";
     public const string SignatureInvalid = "SIGNATURE_INVALID";
     public const string ManifestTampered = "MANIFEST_TAMPERED";
     // Le manifeste existant ne se relit pas (altere, signe par une autre cle, illisible) :
@@ -182,6 +189,14 @@ public static class ErrorCodes
     // honnêtement et rien n'est réglé. Distinct de TweakSdkUnavailable (pas de SDK du tout) et
     // de TweakNotApplicable (condition matérielle / valeur hors bornes).
     public const string TweakUnsupportedOnThisGpu = "TWEAK.UNSUPPORTED_ON_THIS_GPU";
+    // Un autre outil (logiciel de réglage, profil du fabricant) a déjà posé un décalage sur la carte : DrDXT n'empile pas
+    // le sien et ne l'écrase pas. Rien n'est écrit.
+    public const string GpuReglageTiers = "TWEAK.GPU_THIRD_PARTY_TUNING";
+    // Le décalage courant de la carte (cœur ou mémoire) n'a pas pu être lu : non lu n'est jamais 0, rien n'est écrit.
+    public const string GpuDecalageNonLu = "TWEAK.GPU_OFFSET_UNREAD";
+    /// <summary>Rendre cette fréquence AMD dépasse la bande : seule la remise à l'usine de la carte y mène, et elle ne part
+    /// que sur un geste du joueur (AnnulationParClic). Rien n'a été écrit.</summary>
+    public const string GpuRemiseUsineRequise = "TWEAK.GPU_FACTORY_RESET_REQUIRED";
 
     // Profils d'optimisation par puce.
     // Le HardwareInventory passé au matcher est absent ou incohérent (par exemple null)
@@ -194,10 +209,10 @@ public static class ErrorCodes
     // Une étape du lot a échoué à l'application → tout le lot déjà appliqué a été
     // annulé (LIFO). Jamais d'état à moitié appliqué.
     public const string BatchReverted     = "ENGINE.BATCH_REVERTED";
-    // La remesure a vu une régression au-delà des marges cumulées → tout le lot a été
-    // annulé automatiquement (LIFO). On ne garde jamais une perte mesurée.
-    public const string RegressionReverted = "ENGINE.REGRESSION_REVERTED";
     // La remesure ne montre aucun gain mesurable au-delà des marges cumulées.
     // C'est un état valide et gardé (pas une régression) : dit honnêtement, pas annulé.
     public const string NoMeasurableGain  = "ENGINE.NO_MEASURABLE_GAIN";
+
+    // Un paquet de données (tables) hors du schéma fermé : refusé en entier, les tables en service restent.
+    public const string DonneesHorsSchema = "DATA.OUT_OF_SCHEMA";
 }

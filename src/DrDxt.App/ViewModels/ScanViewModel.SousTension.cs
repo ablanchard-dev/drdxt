@@ -62,6 +62,13 @@ public partial class ScanViewModel
         modele is { Length: > 0 } && modele.Contains("Intel", StringComparison.OrdinalIgnoreCase)
         && System.Text.RegularExpressions.Regex.IsMatch(modele, @"\bi[3579]-1[234]\d{2,3}");
 
+    /// <summary>Couture de test. La condition du helper pour poser la tension, lue par les mêmes fonctions que lui : PawnIO
+    /// installé et un processeur Intel. Ailleurs, la recherche ne se propose pas.</summary>
+    internal Func<bool> SousTensionPossibleSurLaMachine { get; set; } =
+        () => DrDxt.GpuNative.PawnIo.PawnIoIntel.Installe() && DrDxt.GpuNative.PawnIo.PawnIoIntel.ProcesseurIntel();
+
+    public bool SousTensionPossible => SousTensionPossibleSurLaMachine();
+
     /// <summary>La ligne de prérequis se montre avant la recherche, sur le processeur lu au dernier scan.</summary>
     public bool SousTensionPrerequisVisible => PrerequisUndervoltProtection(_lastScan?.Hw.Cpu.Model);
     public string LabelSousTensionEtat => _localize(SousTensionTrouvee ? "SousTension.Etat.Trouvee" : "SousTension.Etat.NonTrouvee");
@@ -98,8 +105,14 @@ public partial class ScanViewModel
             if (!essai.IsOk)
             {
                 if (essai.Error?.Code == ErrorCodes.TensionNonRendue) pose = true;
-                r = RechercheSousTension.Nouvelle(DateTimeOffset.Now).Apres(IssuePalier.Refuse(essai.Error?.Code == ErrorCodes.TensionRefusee
-                    ? ErrorCodes.TensionRefusee : essai.Error?.Message ?? _localize("SousTension.Raison.SansHelper")));
+                // Refusé avant tout palier pour une autre raison que le BIOS : la sous-tension n'est pas disponible ici, et le
+                // message du helper, en anglais, ne se colle pas dans la phrase.
+                r = RechercheSousTension.Nouvelle(DateTimeOffset.Now).Apres(IssuePalier.Refuse(essai.Error?.Code switch
+                {
+                    ErrorCodes.TensionRefusee => ErrorCodes.TensionRefusee,
+                    ErrorCodes.TensionNonRendue => RaisonLisible.Dire(essai, _localize),
+                    _ => NonDisponible,
+                }));
                 return;
             }
             pose = true;
@@ -131,7 +144,7 @@ public partial class ScanViewModel
                     // Un plan laissé changé après un refus : le retour à l'origine se tente à la fin.
                     if (posee.Error?.Code == ErrorCodes.TensionNonRendue) pose = true;
                     r = r.Apres(IssuePalier.Refuse(posee.Error?.Code == ErrorCodes.TensionRefusee
-                        ? ErrorCodes.TensionRefusee : posee.Error?.Message ?? _localize("SousTension.Raison.SansHelper")));
+                        ? ErrorCodes.TensionRefusee : RaisonLisible.Dire(posee, _localize)));
                     break;
                 }
                 pose = true;
@@ -156,7 +169,9 @@ public partial class ScanViewModel
             var rendue = !pose || (await RendreOrigineSure()).IsOk;
             if (r is not null)
             {
-                try { memoire.Ecrire(r); } catch (Exception) { }
+                // Non gardée, la recherche ne se reprendra pas après un plantage ; la tension d'origine, elle, est déjà rendue.
+                try { memoire.Ecrire(r); }
+                catch (Exception ex) { System.Diagnostics.Trace.TraceError("Undervolt search state not saved: {0}", ex); }
                 Dire(r, rendue);
             }
             EtapeSousTension = string.Empty;
@@ -186,7 +201,7 @@ public partial class ScanViewModel
             if (MemoireSousTension is { } memoire && memoire.Lire() is { Finie: false } enCours)
                 memoire.Ecrire(enCours.Interrompre(_localize("SousTension.Raison.Interrompue")));
         }
-        catch (Exception) { }
+        catch (Exception) { /* la tension d'origine est rendue juste avant ; seule la mention « interrompue » manque */ }
     }
 
     /// <summary>À la fermeture de l'App : une recherche en cours est arrêtée, et la tension d'origine rendue avant de partir.</summary>
@@ -217,6 +232,8 @@ public partial class ScanViewModel
     /// recherche notée interrompue. Sans helper déjà en marche, aucune invite d'élévation sans geste : redémarrer la rend, c'est dit.</summary>
     internal async Task ReprendreRechercheSousTensionAsync()
     {
+        // Au lancement, sans clic : aucune invite Windows (SansGesteDuJoueur).
+        using var sansGeste = SansGesteDuJoueur.Ouvrir();
         if (MemoireSousTension?.Lire() is not { Finie: false } r) return;
         var demarrage = DemarrageDuPc();
         var apres = r.ApresRedemarrage(demarrage);
@@ -234,21 +251,33 @@ public partial class ScanViewModel
         Dire(interrompue, rendue);
     }
 
+    private const string NonDisponible = "SousTension.NonDisponible";
+
     private void Dire(RechercheSousTension r, bool rendue)
     {
         var fr = CultureInfo.InvariantCulture;
         var raison = (r.Raison ?? "").Replace(RechercheSousTension.RaisonPlantage, _localize(RechercheSousTension.RaisonPlantage), StringComparison.Ordinal);
-        var suite = rendue ? "" : _localize("SousTension.NonRendue");
         // Le refus du BIOS se dit en mots, avec le chemin de la marque de la carte, qu'un palier ait tenu avant ou non.
         var refus = raison == ErrorCodes.TensionRefusee
             ? _localize(MarqueSourcee((FabricantDeCarte ?? (() => _lastScan?.Hw.Board.Manufacturer))()) is { } marque
                 ? "SousTension.Refusee." + marque : "SousTension.Refusee")
+            : raison == NonDisponible ? _localize(NonDisponible)
             : null;
+        // Le retour se dit tel qu'il a eu lieu : « rendue » seulement s'il a réussi, jamais à côté d'un échec ; refusée dès
+        // le premier palier, rien n'a été posé, rien n'est à rendre.
+        var suite = !rendue ? _localize("SousTension.NonRendue")
+            : refus is not null && r.Stables.Count == 0 ? ""
+            : _localize("SousTension.Rendue");
         if (r.Verdict is { } mv && r.Stables.LastOrDefault(s => s.Mv == mv) is { } tenu)
         {
             SousTensionTrouvee = true;
-            ResultatSousTension = string.Format(fr, _localize("SousTension.Verdict"), mv, tenu.MaxC, r.Reference?.MaxC.ToString(fr) ?? "?",
-                tenu.FreinePourcent, r.Reference?.FreinePourcent.ToString("0", fr) ?? "?") + " (" + (refus ?? raison) + ")" + suite;
+            // Quelques minutes de charge ne prouvent pas une sous-tension en jeu : le texte dit ce qui a été mesuré, et le
+            // conseil BIOS garde un palier de marge, le tenu juste au-dessus du plus profond (le seul tenu, faute d'autre).
+            var marge = r.Stables.Count >= 2;
+            var auBios = marge ? r.Stables[^2].Mv : mv;
+            ResultatSousTension = string.Format(fr, _localize(marge ? "SousTension.Verdict" : "SousTension.VerdictUnPalier"), mv, tenu.MaxC, r.Reference?.MaxC.ToString(fr) ?? "?",
+                tenu.FreinePourcent, r.Reference?.FreinePourcent.ToString("0", fr) ?? "?",
+                DureeDuTestRefroidissement.TotalMinutes.ToString("0.##", fr), auBios) + " (" + (refus ?? raison) + ")" + suite;
             return;
         }
         SousTensionTrouvee = false;

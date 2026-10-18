@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using DrDxt.Core;
 using DrDxt.Detection.Wmi;
+using static DrDxt.Detection.Natif;
 
 namespace DrDxt.Detection.Gpu;
 
@@ -133,7 +134,7 @@ public static class BranchementDeLaCarte
         try
         {
             if (CM_Locate_DevNodeW(out var noeud, instance, 0) != 0) return 0;
-            var cle = new DevPropKey { Fmtid = FmtPci, Pid = pid };
+            var cle = new DEVPROPKEY { fmtid = FmtPci, pid = pid };
             var tampon = new byte[4];
             uint taille = 4;
             return CM_Get_DevNode_PropertyW(noeud, ref cle, out _, tampon, ref taille, 0) == 0 && taille == 4
@@ -142,13 +143,4 @@ public static class BranchementDeLaCarte
         catch (Exception) { return 0; }
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct DevPropKey { public Guid Fmtid; public uint Pid; }
-
-    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-    private static extern int CM_Locate_DevNodeW(out uint pdnDevInst, string pDeviceID, uint ulFlags);
-
-    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-    private static extern int CM_Get_DevNode_PropertyW(uint dnDevInst, ref DevPropKey propertyKey, out uint propertyType,
-        byte[] propertyBuffer, ref uint propertyBufferSize, uint ulFlags);
 }

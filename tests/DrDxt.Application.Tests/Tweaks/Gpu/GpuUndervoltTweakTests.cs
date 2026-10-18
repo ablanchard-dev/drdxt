@@ -154,13 +154,11 @@ public sealed class GpuUndervoltTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // La mémoire ne s'écrit pas : ni la cible (un profil à +200), ni celle de la carte (+1000 posé par un autre outil, hors
-    // des bornes de la liste blanche, qui refuserait alors le réglage cœur) ne partent dans l'op.
+    // La mémoire ne s'écrit pas : la cible d'un profil (+200) ne part pas dans l'op.
     [Fact]
     public async Task L_op_ne_porte_aucune_memoire()
     {
         var t = Build(new GpuTuningTarget(GpuIndex: 0, CoreOffsetMhz: -120, MemoryOffsetMhz: 200));
-        _nvApi.GetMemoryClockOffsetMhz(0).Returns(Result<int>.Ok(1000));
 
         (await t.ApplyAsync()).IsOk.Should().BeTrue();
 
@@ -170,13 +168,40 @@ public sealed class GpuUndervoltTweakTests
             Arg.Is<ApplyNvApiClockOffsetOp>(o => o.MemoryOffsetMhz != 0), Arg.Any<CancellationToken>());
     }
 
+    // DrDXT n'empile ni n'écrase le réglage d'un autre outil : un
+    // décalage cœur d'un autre outil (+15) ou une mémoire déjà montée (+1000) font refuser, et rien n'atteint le helper.
+    [Theory]
+    [InlineData(15, 0)]
+    [InlineData(0, 1000)]
+    public async Task Un_decalage_pose_par_un_autre_outil_fait_refuser_sans_rien_ecrire(int coeur, int memoire)
+    {
+        var t = Build(SafeTarget(coreOffsetMhz: -120));
+        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(coeur));
+        _nvApi.GetMemoryClockOffsetMhz(0).Returns(Result<int>.Ok(memoire));
+
+        var r = await t.ApplyAsync();
+
+        r.Error!.Value.Code.Should().Be(ErrorCodes.GpuReglageTiers);
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<ApplyNvApiClockOffsetOp>(), Arg.Any<CancellationToken>());
+        await _stability.DidNotReceive().RunAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void Seul_le_decalage_de_drdxt_lui_meme_passe()
+    {
+        GpuUndervoltTweak.ReglageTiers(0, 0, -120).Should().BeFalse();
+        GpuUndervoltTweak.ReglageTiers(-120, 0, -120).Should().BeFalse("le décalage que DrDXT pose lui-même");
+        GpuUndervoltTweak.ReglageTiers(-90, 0, -120).Should().BeTrue();
+        GpuUndervoltTweak.ReglageTiers(0, 50, -120).Should().BeTrue("DrDXT n'écrit jamais la mémoire");
+    }
+
     // --- Application : capture de l'origine → instantané, application via le helper (décalage d'horloge NVAPI). ---
 
     [Fact]
     public async Task Apply_captures_original_offset_and_applies_via_helper()
     {
         var t = Build(SafeTarget(coreOffsetMhz: -120));
-        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(15)); // un décalage antérieur quelconque
+        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(-120)); // déjà posé par DrDXT lui-même
 
         var r = await t.ApplyAsync();
 
@@ -185,11 +210,11 @@ public sealed class GpuUndervoltTweakTests
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyNvApiClockOffsetOp>(o => o.GpuIndex == 0 && o.CoreOffsetMhz == -120),
             Arg.Any<CancellationToken>());
-        // L'instantané porte le décalage d'origine capturé (15) en op inverse.
+        // L'instantané porte le décalage d'origine capturé (-120) en op inverse.
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
         inverse.IsOk.Should().BeTrue();
         inverse.Value.Should().BeOfType<ApplyNvApiClockOffsetOp>()
-            .Which.CoreOffsetMhz.Should().Be(15);
+            .Which.CoreOffsetMhz.Should().Be(-120);
     }
 
     [Fact]
@@ -223,6 +248,27 @@ public sealed class GpuUndervoltTweakTests
         await _elevated.Received(3).ExecuteAsync(Arg.Any<ApplyNvApiClockOffsetOp>(), Arg.Any<CancellationToken>());
         await _elevated.Received().ExecuteAsync(
             Arg.Is<ApplyNvApiClockOffsetOp>(o => o.CoreOffsetMhz == 0), Arg.Any<CancellationToken>());
+    }
+
+    // Le retour d'un décalage instable se fait pendant la pose, donc dans sa portée : marqué, le helper le rejouerait
+    // après un arrêt sec et remettrait le décalage instable.
+    [Fact]
+    public async Task Le_retour_d_un_decalage_instable_part_hors_de_la_portee_de_pose()
+    {
+        var t = Build();
+        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(0));
+        _stability.RunAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(Result<StabilityOutcome>.Ok(StabilityOutcome.Unstable)));
+        var vues = new List<PorteeDePose?>();
+        _elevated.When(e => e.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()))
+            .Do(_ => vues.Add(PorteeDePose.Courante));
+        var portee = PorteeDePose.Ouvrir();
+
+        await t.ApplyAsync();
+
+        vues.Should().HaveCount(3);
+        vues[1].Should().BeSameAs(portee, "le décalage lui-même est posé dans la portée");
+        vues[2].Should().BeNull();
     }
 
     [Fact]
@@ -420,6 +466,8 @@ public sealed class GpuUndervoltTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
+    // Un décalage non lu (cœur ou mémoire) n'est jamais 0 : sans savoir si un autre outil règle la carte, DrDXT refuse, et rien
+    // n'atteint le helper.
     [Fact]
     public async Task Apply_fails_clean_when_original_capture_fails()
     {
@@ -429,8 +477,22 @@ public sealed class GpuUndervoltTweakTests
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeFalse();
-        r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
+        r.Error!.Value.Code.Should().Be(ErrorCodes.GpuDecalageNonLu);
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Une_memoire_non_lue_fait_refuser_au_lieu_de_compter_zero()
+    {
+        var t = Build(SafeTarget(coreOffsetMhz: -120));
+        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(0));
+        _nvApi.GetMemoryClockOffsetMhz(0).Returns(Result<int>.Fail(ErrorCodes.TweakSdkUnavailable, "no memory read"));
+
+        var r = await t.ApplyAsync();
+
+        r.Error!.Value.Code.Should().Be(ErrorCodes.GpuDecalageNonLu);
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+        await _stability.DidNotReceive().RunAsync(Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -497,9 +559,9 @@ public sealed class GpuUndervoltTweakTests
     public async Task Apply_refuses_when_the_identity_probe_write_does_not_take_nvidia()
     {
         var t = Build(SafeTarget(coreOffsetMhz: -120));
-        // 1re lecture = capture (15). 2e lecture = relecture de la sonde, et la carte n'a pas
-        // pris l'écriture identité (toujours 0 d'origine) → le chemin d'écriture n'est pas vivant ici.
-        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(15), Result<int>.Ok(0));
+        // 1re lecture = capture (0). 2e lecture = relecture de la sonde, et la carte n'a pas
+        // gardé l'écriture identité (15 relu) → le chemin d'écriture n'est pas vivant ici.
+        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(0), Result<int>.Ok(15));
 
         var r = await t.ApplyAsync();
 
@@ -534,14 +596,14 @@ public sealed class GpuUndervoltTweakTests
     {
         // La sonde doit être sans effet pour le matériel : elle écrit la valeur qu'elle vient de lire.
         var t = Build(SafeTarget(coreOffsetMhz: -120));
-        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(15)); // constante → la sonde passe
+        _nvApi.GetCoreClockOffsetMhz(0).Returns(Result<int>.Ok(0)); // constante → la sonde passe
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeTrue();
-        // La sonde a écrit 15 (l'origine capturée), soit la valeur courante sur elle-même.
+        // La sonde a écrit 0 (l'origine capturée), soit la valeur courante sur elle-même.
         await _elevated.Received().ExecuteAsync(
-            Arg.Is<ApplyNvApiClockOffsetOp>(o => o.CoreOffsetMhz == 15), Arg.Any<CancellationToken>());
+            Arg.Is<ApplyNvApiClockOffsetOp>(o => o.CoreOffsetMhz == 0), Arg.Any<CancellationToken>());
     }
 
     // --- Le retour arrière rend l'origine capturée. ---

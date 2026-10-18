@@ -35,4 +35,11 @@ public sealed class LimitePuissanceCpuTweak : LevierPl1TweakBase
     /// <summary>La cible de la montée : une seule source, partagée avec ce que le docteur promet
     /// (<see cref="LimiteDePuissance.CibleDeMontee"/>).</summary>
     public static double? Cible(LimiteDePuissanceLue lu) => LimiteDePuissance.CibleDeMontee(lu);
+
+    // Aucune température relevée en partie : la chaleur n'est pas lue, la montée attend.
+    public override bool EtatNonLu(SettingsState state)
+        // Seule la chaleur manque quand, parties froides, la montée aurait lieu : un verrou, aucune marge ou un microcode
+        // d'avant le correctif Vmin donnent déjà la réponse, chaleur ou pas.
+        => base.EtatNonLu(state) || (state.LimitePuissance is { ChaleurEnPartieMaxC: null } lu
+            && LimiteDePuissance.CibleDeMontee(lu with { ChaleurEnPartieMaxC = 0 }) is not null);
 }

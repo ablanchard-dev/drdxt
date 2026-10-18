@@ -371,4 +371,34 @@ public class PlafondEnvoiPendantLeJeuTests
         PlafondEnvoiPendantLeJeu.ProcessusVivant(exe.ToUpperInvariant()).Should().BeTrue("Windows ignore la casse des noms");
         PlafondEnvoiPendantLeJeu.ProcessusVivant("aucun-jeu-" + Guid.NewGuid().ToString("N") + ".exe").Should().BeFalse();
     }
+    // Helper mort en pleine partie : le battement ne le relance jamais (une invite Windows à chaque tour, revenue à chaque
+    // refus). Seul le clic qui allume le mode peut le lancer.
+    private sealed class TubeMort : IElevatedClient
+    {
+        public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
+            => Task.FromResult(Result.Fail(ErrorCodes.HelperUnreachable, "tube absent (test)"));
+    }
+
+    private sealed class Lanceur(IElevatedClient tube) : IElevatedClient
+    {
+        public int Lancements;
+        public IElevatedClient SansRelance => tube;
+        public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct) { Lancements++; return Task.FromResult(Result.Ok()); }
+    }
+
+    [Fact]
+    public async Task Helper_mort_les_tours_ne_relancent_jamais_le_helper()
+    {
+        var lanceur = new Lanceur(new TubeMort());
+        var mode = new PlafondEnvoiPendantLeJeu(lanceur, _ => true, "cod.exe", 5_000_000);
+        (await mode.DemarrerAsync(CancellationToken.None)).IsOk.Should().BeTrue();
+        var apresLeClic = lanceur.Lancements;
+
+        for (var i = 0; i < 5; i++) await mode.TickAsync(CancellationToken.None);
+        await mode.ChangerPlafondAsync(4_000_000, CancellationToken.None);
+
+        lanceur.Lancements.Should().Be(apresLeClic, "ni les tours ni l'ajustement ne lancent le helper");
+        mode.SansFilet.Should().BeTrue();
+        mode.PlafondPose.Should().BeFalse("sans filet, rien n'est posé");
+    }
 }

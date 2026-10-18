@@ -43,4 +43,21 @@ public sealed class LeviersVerifiesTests : IDisposable
     }
 
     public void Dispose() { try { Directory.Delete(_dossier, true); } catch (IOException) { } }
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateHardLink(string lien, string cible, IntPtr securite);
+
+    // Fichier du compte, écrit par l'App (élevée) : un nom posé d'avance en lien dur faisait réécrire un autre fichier.
+    [Fact]
+    public void Un_lien_dur_pose_sous_son_nom_ne_fait_jamais_reecrire_sa_cible()
+    {
+        Directory.CreateDirectory(_dossier);
+        var temoin = Path.Combine(_dossier, "temoin.txt");
+        File.WriteAllText(temoin, "intact");
+        CreateHardLink(Chemin, temoin, IntPtr.Zero).Should().BeTrue();
+
+        LeviersVerifies.Enregistrer(Chemin, Ici, ["latency.hagsOn"], ["latency.hagsOn"]);
+
+        File.ReadAllText(temoin).Should().Be("intact");
+        LeviersVerifies.Lire(Chemin, Ici).Should().Contain("latency.hagsOn");
+    }
 }

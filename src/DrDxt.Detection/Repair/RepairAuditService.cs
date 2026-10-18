@@ -1,5 +1,4 @@
-﻿using static DrDxt.Core.TexteFrancais;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Globalization;
 using DrDxt.Core;
@@ -34,9 +33,21 @@ public sealed partial class RepairAuditService
 {
     private readonly IServiceFailureLog _services;
     private readonly ILiveKernelReportLog _noyau;
-    private readonly IUnexpectedShutdownLog _arrets;
+    private readonly IUnexpectedShutdownLog _journalDesArrets;
+    // Le journal des arrêts du scan en cours, lu une fois pour toutes les familles (ArretsDuScan) ; refait à chaque Lire.
+    private IUnexpectedShutdownLog _arrets;
     private readonly IMemoryDiagnosticLog _testMemoire;
-    private readonly IDumpCreationLog _vidages;
+    private readonly IDumpCreationLog _journalDesVidages;
+    // Le journal des vidages du scan en cours, lu une fois par fenêtre (VidagesDuScan) ; refait à chaque Lire.
+    private IDumpCreationLog _vidages;
+    // L'instant du scan : les familles qui partagent une fenêtre la comptent depuis lui, et lisent donc une fois.
+    private DateTimeOffset _instantDuScan = DateTimeOffset.UtcNow;
+    // Les rapports d'écran bleu (WER 1001, journal Système) : la source, et sa lecture du scan en cours.
+    private readonly Func<DateTimeOffset, IReadOnlyList<DateTimeOffset>?> _journalDesRapports;
+    private Func<DateTimeOffset, IReadOnlyList<DateTimeOffset>?> _rapports;
+    // Les erreurs matérielles WHEA (journal Système), par nombre de jours : la source, et sa lecture du scan en cours.
+    private readonly Func<int, IReadOnlyList<ErreursMaterielles.Enregistrement>?> _journalWhea;
+    private Func<int, IReadOnlyList<ErreursMaterielles.Enregistrement>?> _whea;
     /// <summary>La source WMI. Injectee comme les autres lecteurs.
     ///
     /// Cablee en dur (`= new()`), elle serait le seul lecteur du service sans couture, alors que
@@ -54,6 +65,28 @@ public sealed partial class RepairAuditService
     private readonly Func<RepairFinding>? _tachesEnPartie;
     private readonly Func<RepairFinding>? _jeuxSurDisqueDur;
     private readonly Func<RepairFinding>? _connexionDeJeu;
+    // Les octets envoyés par programme pendant une fenêtre du scan : mesurés en production seulement, en fond.
+    private readonly Func<IReadOnlyDictionary<int, long>?>? _envoisParProgramme;
+    // Le type de NAT, demandé à la box par UPnP : en production seulement, en fond.
+    private readonly Func<DrDxt.Detection.Network.TypeDeNat.Nat>? _typeDeNat;
+    // L'accès contrôlé aux dossiers et les exclusions de Defender contre les dossiers de jeux : lus en production seulement.
+    private readonly Func<IEnumerable<RepairFinding>>? _preferencesDefender;
+    // La version de pilote que chaque jeu installé exige dans son propre fichier : lue en production seulement.
+    private readonly Func<IEnumerable<RepairFinding>>? _piloteExige;
+    // Les lectures de pages dures sur deux secondes : mesurées en production seulement (deux secondes de plus au scan).
+    private readonly Func<double?>? _lecturesDures;
+    // Les dossiers de jeux prouvés par l'exécutable du jeu, et la version installée : lu en production seulement.
+    private readonly Func<IEnumerable<RepairFinding>>? _jeuxProuves;
+    // Le radar des régressions connues contre les mises à jour installées, les pilotes et le processeur : lu en production seulement.
+    private readonly Func<IEnumerable<RepairFinding>>? _radar;
+    // Les traces d'autres outils de réglage dans le registre, datées : lues en production seulement.
+    private readonly Func<IEnumerable<RepairFinding>>? _traces;
+    // Les périphériques d'entrée, leur rôle déclaré et leur liaison : lu en production seulement.
+    private readonly Func<IEnumerable<RepairFinding>>? _peripheriquesDEntree;
+    // Les couches logicielles entre les périphériques d'entrée et le jeu (manette virtuelle, filtre tiers) : lu en production seulement.
+    private readonly Func<IEnumerable<RepairFinding>>? _couchesDEntree;
+    // Les interruptions et les DPC par cœur sur une seconde : mesurés en production seulement, pendant le reste de l'audit.
+    private readonly Func<IReadOnlyList<DrDxt.Detection.Latency.RecensementParCoeur.Coeur>?>? _recensementParCoeur;
     // PL1/PL2 du processeur Intel par ses registres (PawnIO installé), sinon non lu.
     private readonly Func<LimiteDePuissanceLue?> _limitesPuissance;
     private readonly Func<IEnumerable<RepairFinding>>? _plantagesDeJeu;
@@ -82,9 +115,86 @@ public sealed partial class RepairAuditService
                hwinfoQuiTourne: DrDxt.Detection.Cpu.TemperatureHwinfo.VersionQuiTourne,
                hwinfoPublie: DrDxt.Detection.Cpu.TemperatureHwinfo.MemoirePubliee,
                amd: DrDxt.Detection.Gpu.Adlx.AdlxReglages.Lire, intel: DrDxt.Detection.Gpu.TemperatureCarte.LireIntel,
-               heuresActives: HeuresActivesDuPc, plantagesDeJeu: PlantagesDeJeu.DuPc, defender: DefenderDuPc,
+               heuresActives: HeuresActivesDuPc, plantagesDeJeu: () => [.. PlantagesDeJeu.DuPc(), .. RapportsDePlantageCod.DuPc()], defender: DefenderDuPc,
                tachesEnPartie: TachesEnPartieDuPc, jeuxSurDisqueDur: () => JeuxSurDisqueDur.Juger(DossiersDeJeux.Lire()),
-               connexionDeJeu: () => ConnexionDeJeu.Juger(DrDxt.Detection.Network.CartesVersInternet.Lire(), DrDxt.Detection.Network.LecteurWifi.Lire())) { }
+               connexionDeJeu: () => ConnexionDeJeu.Juger(DrDxt.Detection.Network.CartesVersInternet.Lire(), DrDxt.Detection.Network.LecteurWifi.Lire()),
+               preferencesDefender: PreferencesDefenderDuPc, piloteExige: PiloteExigeDuPc,
+               // Deux secondes qui ne dépendent pas du repos : mesurées pendant les autres lectures de l'audit.
+               lecturesDures: EnFond(() => PressionMemoire.LecturesDuresParSeconde(TimeSpan.FromSeconds(2))),
+               recensementParCoeur: EnFond(() => DrDxt.Detection.Latency.RecensementParCoeur.Mesurer(TimeSpan.FromSeconds(1))),
+               envoisParProgramme: EnFond(() => new DrDxt.Detection.Network.EcouteEnvoisUdp().OctetsParProcessus(DrDxt.Detection.Network.EnvoisParProgramme.Fenetre)),
+               typeDeNat: EnFond(() => DrDxt.Detection.Network.TypeDeNat.LireAsync().GetAwaiter().GetResult()),
+               couchesDEntree: () => { var (appareils, classes) = Hardware.CouchesDEntree.Lire(); return [Hardware.CouchesDEntree.Juger(appareils, classes)]; },
+               peripheriquesDEntree: () => { var a = Hardware.PeripheriquesDEntree.Lire(); return [Hardware.PeripheriquesDEntree.Juger(a), .. Hardware.FrequenceSouris.JugerManettes(a), Hardware.ReveilDesPeripheriques.LireEtJuger(a)]; },
+               jeuxProuves: () => [Hardware.JeuxProuves.Juger(Hardware.JeuxProuves.Lire())], radar: RadarDuPc, traces: TracesDuPc) { }
+
+    /// <summary>Le vrai, en lecture seule : les clés de la liste fermée et leur date, l'installation de Windows, le dernier
+    /// démarrage (GetTickCount64 : le temps écoulé depuis), et les clés où DrDXT tient un réglage gardé.</summary>
+    internal static IEnumerable<RepairFinding> TracesDuPc()
+    {
+        var gardes = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(DrDxt.Application.Tweaks.JournalDesLeviersAppliques.CheminParDefaut())
+            .Lire().Select(s => s.TweakId);
+        var tenues = new HashSet<string>(DrDxt.Application.Autopilot.RevertAuDemarrage.ClesMachineDesLeviers(gardes), StringComparer.OrdinalIgnoreCase);
+        return TracesDOptimiseurs.Juger(TracesDuRegistre.Lire(), InstallationDeWindows.Lire(),
+            DateTimeOffset.Now - TimeSpan.FromMilliseconds(Environment.TickCount64), tenues);
+    }
+
+    /// <summary>Le vrai, en lecture seule : les KB installés (correctifs listés par WMI et historique), chaque carte et la version de son
+    /// pilote, le nom du processeur, contre les tables en service.</summary>
+    internal static IEnumerable<RepairFinding> RadarDuPc()
+    {
+        var kb = MisesAJourWindows.KbInstalles();
+        List<(string, string?)>? cartes = null;
+        try
+        {
+            using var s = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion FROM Win32_VideoController");
+            cartes = [];
+            using var rangees = s.Get();
+            foreach (var o in rangees.Cast<System.Management.ManagementObject>())
+                using (o)
+                    if (o["Name"] is string nom) cartes.Add((nom, o["DriverVersion"] as string));
+        }
+        catch (Exception) { cartes = null; }
+        string? processeur;
+        using (var cle = Registry.LocalMachine.OpenSubKey(@"Hardware\Description\System\CentralProcessor\0"))
+            processeur = cle?.GetValue("ProcessorNameString") as string;
+        return RadarDesRegressions.Juger(DonneesEnService.Courantes, kb, cartes, processeur?.Trim());
+    }
+
+    /// <summary>Lance la mesure tout de suite, en fond, et rend sa lecture : la valeur est attendue quand on la demande.
+    /// Seulement pour une mesure que la charge de l'audit ne fausse pas (mesuré le 16/10/2026 : 0 à 1 lecture dure par
+    /// seconde seule comme pendant l'audit). Les états de veille, qui se lisent au repos, restent après l'audit.</summary>
+    internal static Func<T> EnFond<T>(Func<T> mesure)
+    {
+        var enCours = Task.Run(mesure);
+        return () => enCours.GetAwaiter().GetResult();
+    }
+
+    /// <summary>Le vrai, en lecture seule : les fichiers de versions des jeux, et chaque carte avec sa version en service.</summary>
+    internal static IEnumerable<RepairFinding> PiloteExigeDuPc()
+    {
+        var fichiers = DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Trouver(DossiersDeJeux.Lire() ?? [])
+            .Select(f => (f, DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Contenu(f))).ToList();
+        if (fichiers.Count == 0) return [];
+        var cartes = new List<DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Carte>();
+        using (var s = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion FROM Win32_VideoController"))
+        using (var rangees = s.Get())
+            foreach (var o in rangees.Cast<System.Management.ManagementObject>())
+                using (o)
+                    if (o["Name"]?.ToString() is { } nom)
+                        cartes.Add(new(nom, o["DriverVersion"]?.ToString(), DrDxt.Detection.Gpu.VersionDuPilote.RadeonSoftwareVersion(nom)));
+        return DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Juger(fichiers, cartes);
+    }
+
+    /// <summary>Le vrai, en lecture seule : MSFT_MpPreference, le chiffrement des disques des jeux, et les dossiers des lanceurs.</summary>
+    internal static IEnumerable<RepairFinding> PreferencesDefenderDuPc()
+    {
+        var lu = PreferencesDefender.Lire();
+        var jeux = DossiersDeJeux.Lire()?.Select(d => d.Chemin).ToList();
+        var lettres = (jeux ?? []).Where(c => c.Length > 1 && c[1] == ':').Select(c => c[..1]).ToList();
+        return [PreferencesDefender.JugerAccesControle(lu, jeux), .. PreferencesDefender.JugerExclusions(lu, jeux),
+            .. ChiffrementDuDisque.Juger(ChiffrementDuDisque.Lire(), lettres)];
+    }
 
     /// <summary>Les tâches planifiées lancées pendant une partie relevée, en lecture seule.</summary>
     internal static RepairFinding TachesEnPartieDuPc() => TachesEnPartie.Juger(DernieresExecutionsDesTaches.Lire(),
@@ -115,8 +225,35 @@ public sealed partial class RepairAuditService
         Func<RepairFinding>? heuresActives = null, Func<IEnumerable<RepairFinding>>? plantagesDeJeu = null,
         Func<(double? Celsius, string? Raison)>? intel = null, Func<RepairFinding>? defender = null,
         Func<RepairFinding>? tachesEnPartie = null, Func<RepairFinding>? jeuxSurDisqueDur = null,
-        Func<RepairFinding>? connexionDeJeu = null, Func<LimiteDePuissanceLue?>? limitesPuissance = null)
+        Func<RepairFinding>? connexionDeJeu = null, Func<LimiteDePuissanceLue?>? limitesPuissance = null,
+        Func<IEnumerable<RepairFinding>>? preferencesDefender = null, Func<IEnumerable<RepairFinding>>? piloteExige = null,
+        Func<double?>? lecturesDures = null,
+        Func<IReadOnlyList<DrDxt.Detection.Latency.RecensementParCoeur.Coeur>?>? recensementParCoeur = null,
+        Func<IEnumerable<RepairFinding>>? couchesDEntree = null,
+        Func<IEnumerable<RepairFinding>>? peripheriquesDEntree = null,
+        Func<IEnumerable<RepairFinding>>? jeuxProuves = null,
+        Func<IReadOnlyDictionary<int, long>?>? envoisParProgramme = null,
+        Func<DrDxt.Detection.Network.TypeDeNat.Nat>? typeDeNat = null,
+        Func<IEnumerable<RepairFinding>>? radar = null,
+        Func<IEnumerable<RepairFinding>>? traces = null,
+        Func<DateTimeOffset, IReadOnlyList<DateTimeOffset>?>? rapportsEcransBleus = null,
+        Func<int, IReadOnlyList<ErreursMaterielles.Enregistrement>?>? erreursMaterielles = null)
     {
+        _journalWhea = erreursMaterielles ?? (jours => ErreursMaterielles.Lire(jours));
+        _whea = _journalWhea;
+        _journalDesRapports = rapportsEcransBleus ?? EcransBleus.LireRapports;
+        _rapports = _journalDesRapports;
+        _typeDeNat = typeDeNat;
+        _envoisParProgramme = envoisParProgramme;
+        _radar = radar;
+        _traces = traces;
+        _lecturesDures = lecturesDures;
+        _jeuxProuves = jeuxProuves;
+        _peripheriquesDEntree = peripheriquesDEntree;
+        _couchesDEntree = couchesDEntree;
+        _recensementParCoeur = recensementParCoeur;
+        _piloteExige = piloteExige;
+        _preferencesDefender = preferencesDefender;
         _connexionDeJeu = connexionDeJeu;
         _limitesPuissance = limitesPuissance ?? DrDxt.Detection.Cpu.TemperaturePawnIo.LireLimites;
         _jeuxSurDisqueDur = jeuxSurDisqueDur;
@@ -149,9 +286,11 @@ public sealed partial class RepairAuditService
         _misesAJour = misesAJour ?? new WindowsUpdateEventLog();
         _services = services;
         _noyau = noyau;
-        _arrets = arrets ?? new WindowsUnexpectedShutdownLog();
+        _journalDesArrets = arrets ?? new WindowsUnexpectedShutdownLog();
+        _arrets = _journalDesArrets;
         _testMemoire = testMemoire ?? new WindowsMemoryDiagnosticLog();
-        _vidages = vidages ?? new WindowsDumpCreationLog();
+        _journalDesVidages = vidages ?? new WindowsDumpCreationLog();
+        _vidages = _journalDesVidages;
     }
 
     /// <summary>Depuis quand on regarde les echecs de services. **Non chiffré.** Trente jours
@@ -175,17 +314,37 @@ public sealed partial class RepairAuditService
 
     public IReadOnlyList<RepairFinding> Lire()
     {
+        _fixesDuScan = new();
+        _instantDuScan = DateTimeOffset.UtcNow;
+        _vidages = new VidagesDuScan(_journalDesVidages);
+        _rapports = new LectureDuScan<DateTimeOffset>(_journalDesRapports, d => d, _instantDuScan - FenetreArrets).Depuis;
+        // La source compte en jours : elle lit un jour entier de plus que la fenêtre, et la lecture garde la fenêtre exacte.
+        var whea = new LectureDuScan<ErreursMaterielles.Enregistrement>(
+            depuis => _journalWhea((int)Math.Ceiling((DateTimeOffset.UtcNow - depuis).TotalDays)), e => e.Quand, _instantDuScan - FenetreArrets);
+        _whea = jours => whea.Depuis(DateTimeOffset.UtcNow.AddDays(-jours));
+        // Une minute de marge : chaque famille calcule sa fenêtre un peu plus tard, donc plus courte.
+        _arrets = new ArretsDuScan(_journalDesArrets, DateTimeOffset.UtcNow - FenetreArrets - TimeSpan.FromMinutes(1));
         var constats = new List<RepairFinding>();
         constats.AddRange(Isoler("POWER", Power));
         // La frequence se lit seule, au calme : elle compte les cœurs charges a plus de 60 %, et lue pendant que les autres
         // familles interrogent WMI et les journaux, elle mesurait l'audit lui-meme (cœurs en turbo, bridage fausse). Deux
         // secondes de plus au scan, pour une mesure de la machine.
         constats.AddRange(Isoler("CPU", Cpu));
+        // Les L3 et les processeurs qu'ils servent : sur un X3D à deux CCD, le bloc à cache empilé.
+        constats.AddRange(Isoler("CPU", () => CachesL3.Juger(CachesL3.Lire())));
+        // Ce que coûte une lecture de l'horloge haute résolution, et si elle recule d'un cœur à l'autre (une seconde environ).
+        constats.AddRange(Isoler("CPU", () => [DrDxt.Detection.Cpu.HorlogeQpc.Juger(DrDxt.Detection.Cpu.HorlogeQpc.Mesurer())]));
         // Le garde de stabilité des Core de 13e et 14e génération, avant tout conseil de puissance.
         constats.AddRange(Isoler("CPU", () =>
         {
             var (nom, revision, identifiant) = DrDxt.Detection.Cpu.MicrocodeRaptorLake.Lire();
             return DrDxt.Detection.Cpu.MicrocodeRaptorLake.Juger(nom, revision, identifiant);
+        }));
+        // La génération AMD par CPUID : le portail des lectures propres à AMD.
+        constats.AddRange(Isoler("CPU", () =>
+        {
+            var (fabricant, signature) = DrDxt.Detection.Cpu.Cpuid.Lire();
+            return GenerationAmd.Juger(fabricant, signature);
         }));
         // La limite de puissance effective, lue dans les registres quand PawnIO est là ; jamais écrite.
         constats.AddRange(Isoler("CPU", () => [LimiteDePuissance.Juger(_limitesPuissance())]));
@@ -208,7 +367,14 @@ public sealed partial class RepairAuditService
         constats.AddRange(Isoler("CPU", () =>
         {
             var carte = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"Hardware\Description\System\Bios")?.GetValue("BaseBoardManufacturer") as string;
-            return CurveOptimizerAmd.Juger(DrDxt.Detection.Cpu.MicrocodeRaptorLake.Lire().Nom, carte) is { } c ? [c] : [];
+            // Le garde de stabilité : jamais de baisse de tension conseillée sur une machine qui s'arrête, ou non lue.
+            var maintenant = DateTimeOffset.UtcNow;
+            var (arrets, autres) = IncidentsDuGarde(maintenant);
+            // Le Curve Optimizer lu dans le BIOS nommé au dernier scan ; le témoin SMU n'est pas lu (module PawnIO AMD absent).
+            var bios = DrDxt.Detection.Cpu.ChaleurEnPartie.LireBios(DossierDonnees.Chemin(ChaleurEnPartie.FichierBios),
+                DrDxt.Detection.Hardware.DemarrageDuSysteme.Valeur)?.Reglages;
+            var lu = LectureCurveOptimizer.Croiser(LectureCurveOptimizer.DepuisBios(bios), echelleSmu: null, margesParCoeur: null);
+            return CurveOptimizerAmd.Juger(DrDxt.Detection.Cpu.MicrocodeRaptorLake.Lire().Nom, carte, arrets, maintenant, autres, lu) is { } c ? [c] : [];
         }));
         constats.AddRange(Isoler("SERVICES", Services));
         // Une seule requete des services pour les deux familles de securite (mesure du 25/09 : 200 a 340 ms
@@ -216,6 +382,10 @@ public sealed partial class RepairAuditService
         Result<IReadOnlyList<DrDxt.Detection.Wmi.WmiRow>>? servicesLus = null;
         Result<IReadOnlyList<DrDxt.Detection.Wmi.WmiRow>> ServicesLus() => servicesLus ??= ServicesSysteme();
         constats.AddRange(Isoler("SERVICES", () => ServicesRemplacables(ServicesLus())));
+        constats.AddRange(Isoler("STREAM", () => DrDxt.Detection.Diffusion.ObsStudio.Juger(Directory.Exists(DrDxt.Detection.Diffusion.ObsStudio.Dossier),
+            DrDxt.Detection.Diffusion.ObsStudio.LireReglages(DrDxt.Detection.Diffusion.ObsStudio.Dossier),
+            DrDxt.Detection.Diffusion.ObsStudio.LireSessions(DrDxt.Detection.Diffusion.ObsStudio.Dossier, DateTime.Now))));
+        constats.AddRange(Isoler("GPU DRIVER", () => [DrDxt.Detection.Gpu.PiloteRTCore.Juger(InventaireMachine.ServicesDuRegistre(), DrDxt.Detection.Gpu.PiloteRTCore.Charge)]));
         constats.AddRange(Isoler("SERVICES", () => CheminsNonCites(ServicesLus())));
         constats.AddRange(Isoler("TACHES", () => TachesRemplacables(TachesLues(), CheminProtege.Verifier)));
         constats.AddRange(Isoler("MMCSS", Mmcss));
@@ -226,8 +396,16 @@ public sealed partial class RepairAuditService
         constats.AddRange(Isoler("STABILITE", ArretsBrutaux));
         constats.AddRange(Isoler("STABILITE", TestMemoire));
         // Ce qui ralentit le démarrage (mesuré par Windows) et la place libre du disque système.
+        // La mesure du dernier démarrage est lue une fois : elle nomme ses programmes lents, que le récapitulatif ne
+        // renomme pas, puis elle est jugée plus bas.
         var ralentisseurs = DemarrageEtDisque.LireRalentisseurs();
-        constats.AddRange(Isoler("DEMARRAGE", () => DemarrageEtDisque.JugerDemarrage(ralentisseurs)));
+        // Lue hors d'Isoler : une lecture qui lève devient un échec de lecture, que les familles du démarrage disent,
+        // au lieu de faire tomber tout l'audit.
+        Result<IReadOnlyList<MesureDemarrage>> mesuresDemarrage;
+        try { mesuresDemarrage = _demarrage.Lire(); }
+        catch (Exception ex) { mesuresDemarrage = Result<IReadOnlyList<MesureDemarrage>>.Fail(ErrorCodes.DetectionFailed, ex.Message); }
+        constats.AddRange(Isoler("DEMARRAGE", () => DemarrageEtDisque.JugerDemarrage(ralentisseurs, dejaNommes: mesuresDemarrage.IsOk
+            ? DemarrageMesure.Nommes(mesuresDemarrage.Value!, DateTimeOffset.UtcNow, FenetreMisesAJour) : null)));
         // Ce qui se lance avec Windows, lu seulement.
         constats.AddRange(Isoler("DEMARRAGE", () => ProgrammesAuDemarrage.Juger(ProgrammesAuDemarrage.Lire(), ralentisseurs)));
         constats.AddRange(Isoler("STOCKAGE", () =>
@@ -237,23 +415,62 @@ public sealed partial class RepairAuditService
         }));
         constats.AddRange(Isoler("STOCKAGE", () => DemarrageEtDisque.JugerCacheDeShaders(DemarrageEtDisque.LireCacheDeShaders())));
         // Les erreurs matérielles WHEA, premier signe d'une marge qui manque.
-        constats.AddRange(Isoler("STABILITE", () => ErreursMaterielles.Juger(ErreursMaterielles.Lire())));
+        constats.AddRange(Isoler("STABILITE", () =>
+        {
+            var whea = _whea(90);
+            // Le cœur ou le lien qui a relevé chaque erreur, à côté du compte.
+            return [.. ErreursMaterielles.Juger(whea), .. ErreursMaterielles.Attribuer(whea)];
+        }));
         constats.AddRange(Isoler("STABILITE", CreationDeVidage));
+        constats.AddRange(Isoler("STABILITE", EcransBleusCroises));
+        // Les autres pannes notées par Windows (carte relancée, disque, NTFS, pilote, mémoire épuisée), et jusqu'où le
+        // journal remonte : un journal de trois jours ne prouve pas « aucune panne » sur la fenêtre.
+        constats.AddRange(Isoler("STABILITE", () =>
+        {
+            var maintenant = DateTimeOffset.Now;
+            var depuis = maintenant - CandidateSelector.FenetreInstabilite;
+            return PannesDuJournal.Juger(PannesDuJournal.Lire(depuis), PannesDuJournal.DebutDuJournal(), depuis, maintenant);
+        }));
         if (_plantagesDeJeu is { } pj) constats.AddRange(Isoler("STABILITE", pj));
         constats.AddRange(Isoler("STABILITE", AvantLesIncidents));
+        // Le dernier témoin d'incident écrit par le service : ce que Windows a noté juste avant.
+        constats.AddRange(Isoler("STABILITE", () => TemoinDIncident.Juger(TemoinDIncident.LireTous(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DrDxt", TemoinDIncident.Dossier)), DateTimeOffset.Now)));
         constats.AddRange(Isoler("STABILITE", PointSain));
         constats.AddRange(Isoler("DISPLAY", Display));
+        // Les superpositions matérielles coupées par un ancien réglage (OverlayTestMode).
+        constats.AddRange(Isoler("DISPLAY", () => { var (lu, v) = DrDxt.Detection.Display.SuperpositionsMaterielles.Lire(); return [DrDxt.Detection.Display.SuperpositionsMaterielles.Juger(lu, v)]; }));
+        // Lus une fois pour la topologie et la couleur ; une lecture qui lève vaut « non lus », comme dans Isoler.
+        IReadOnlyList<DrDxt.Detection.Display.CheminsDAffichage.Chemin>? chemins = null;
+        try { chemins = DrDxt.Detection.Display.CheminsDAffichage.Lire(); } catch (Exception) { /* chemins null : non lus */ }
+        constats.AddRange(Isoler("DISPLAY", () => [DrDxt.Detection.Display.EcransDupliques.Juger(chemins)]));
+        constats.AddRange(Isoler("DISPLAY", () => DrDxt.Detection.Display.CouleurDeSortie.Juger(DrDxt.Detection.Display.CouleurDeSortie.Lire(chemins))));
         // La fréquence que chaque souris USB annonce.
         constats.AddRange(Isoler("LATENCE", () => FrequenceSouris.LireEtJuger(_wmi)));
+        // Le cœur que les pilotes occupent le plus.
+        if (_recensementParCoeur is { } rc)
+            constats.AddRange(Isoler("LATENCE", () => [DrDxt.Detection.Latency.RecensementParCoeur.Juger(rc())]));
         constats.AddRange(Isoler("LATENCE", () => LimiteImagesHorsNvidia(CartesLues(), _amd.Value)));
         constats.AddRange(Isoler("LATENCE", () => AntiLagAmd(CartesLues(), _amd.Value)));
         constats.AddRange(Isoler("GPU DRIVER", GpuDriver));
+        // Le pilote graphique 32 bits de chaque vraie carte (un lanceur 32 bits reste noir sans lui).
+        constats.AddRange(Isoler("GPU DRIVER", () => DrDxt.Detection.Gpu.PiloteGraphique32Bits.Juger(DrDxt.Detection.Gpu.PiloteGraphique32Bits.Lire(_wmi), File.Exists)));
         // Le lien PCIe de chaque carte, et un écran branché sur la carte mère.
+        // Le Resizable BAR prouvé par la plage que Windows a allouée à chaque carte.
+        constats.AddRange(Isoler("GPU", () => DrDxt.Detection.Gpu.FenetreReBar.LireEtJuger(_wmi)));
         constats.AddRange(Isoler("GPU", () => DrDxt.Detection.Gpu.BranchementDeLaCarte.LireLiens(_wmi)
             .SelectMany(l => DrDxt.Detection.Gpu.BranchementDeLaCarte.JugerLien(l, Batterie()))));
         // Le jeu passe-t-il par le Wi-Fi ?
         if (_connexionDeJeu is { } cj)
             constats.AddRange(Isoler("RESEAU", () => [cj()]));
+        if (_typeDeNat is { } nat)
+            constats.AddRange(Isoler("RESEAU", () => [DrDxt.Detection.Network.TypeDeNat.Juger(nat())]));
+        // Qui occupe la montée pendant le scan.
+        if (_envoisParProgramme is { } ep)
+            constats.AddRange(Isoler("RESEAU", () => [DrDxt.Detection.Network.EnvoisParProgramme.Juger(ep(), DrDxt.Detection.Network.EnvoisParProgramme.Fenetre,
+                DrDxt.Detection.Network.EnvoisParProgramme.NomDuProcessus)]));
+        // La vitesse ou le duplex forcés de chaque carte filaire, contre le lien négocié.
+        constats.AddRange(Isoler("RESEAU", () => DrDxt.Detection.Network.VitesseDeLaCarte.Juger(DrDxt.Detection.Network.VitesseDeLaCarte.Lire(_wmi))));
         // Les jeux posés sur un disque dur, et le lien PCIe de chaque SSD NVMe.
         if (_jeuxSurDisqueDur is { } jd)
             constats.AddRange(Isoler("STOCKAGE", () => [jd()]));
@@ -262,6 +479,8 @@ public sealed partial class RepairAuditService
         constats.AddRange(Isoler("GPU", () => DrDxt.Detection.Gpu.BranchementDeLaCarte.JugerEcrans(
             new Win32DisplayInfo().GetAllDisplays() is { IsOk: true } e ? e.Value!.Select(d => d.Adaptateur).OfType<string>().ToList() : [],
             CartesLues(), Batterie())));
+        // Les protections contre les failles d'exécution spéculative, en information ; jamais un levier.
+        constats.AddRange(Isoler("SECURITE", () => [AttenuationsProcesseur.Juger(AttenuationsProcesseur.Lire())]));
         // L'intégrité de la mémoire, dite dans les deux sens (coût et protection), jamais écrite.
         constats.AddRange(Isoler("SECURITE", () =>
         {
@@ -282,14 +501,49 @@ public sealed partial class RepairAuditService
             // Sans « /connected », pnputil liste aussi les cartes absentes, et le pilote d'une carte fantôme
             // passait pour « en service ».
             DrDxt.Detection.Gpu.MagasinDePilotes.Pnputil("/enum-devices /class Display /connected"),
-            DrDxt.Detection.Gpu.MagasinDePilotes.Pnputil("/enum-devices /class Display /disconnected"))));
+            DrDxt.Detection.Gpu.MagasinDePilotes.Pnputil("/enum-devices /class Display /disconnected"),
+            DrDxt.Detection.Gpu.MagasinDePilotes.Pnputil("/enum-devices /class Display /connected /drivers"))));
+        // Une stratégie qui interdit l'installation d'un pilote, rapportée à la carte qu'elle vise vraiment.
+        constats.AddRange(Isoler("GPU DRIVER", () => InstallationDePilote.Juger(InstallationDePilote.Lire(), CartesEtIdentifiants())));
         constats.AddRange(Isoler("PAGEFILE", Pagefile));
         constats.AddRange(Isoler("BIOS", BiosIdentite));
+        // Les saccades du fTPM d'AMD : la génération par CPUID, le fabricant du TPM, la date du BIOS ; jamais une méthode du firmware.
+        constats.AddRange(Isoler("BIOS", () =>
+        {
+            var (fabricant, signature) = DrDxt.Detection.Cpu.Cpuid.Lire();
+            var generation = signature is { } s ? GenerationAmd.Reconnaitre(fabricant, s) : null;
+            if (generation is null) return [];
+            var tpm = _wmi.QueryInNamespace(@"\\.\root\CIMV2\Security\MicrosoftTpm", "SELECT ManufacturerId FROM Win32_Tpm");
+            // Au jour seul : convertie en heure locale, une date sans heure recule d'un jour à l'ouest de Greenwich.
+            var dateBios = InventaireDesPilotes.DateDmtf(WmiFixe(RequeteBios, "ReleaseDate"));
+            return FtpmAmd.Juger(generation, tpm.IsOk ? (uint?)tpm.Value!.FirstOrDefault()?.GetInt("ManufacturerId") : null, tpm.IsOk, dateBios);
+        }));
+        // Les lectures AMD profondes d'un Ryzen : timings appliqués et réglé contre appliqué (registres UMC en SMN), table PM
+        // (SMU), BIOS AMD nommé. Module de lecture AMD absent : une seule ligne le dit ; installé, chaque constat a sa ligne.
+        constats.AddRange(Isoler("CPU", () =>
+        {
+            var (fabricant, signature) = DrDxt.Detection.Cpu.Cpuid.Lire();
+            var generation = signature is { } s ? GenerationAmd.Reconnaitre(fabricant, s) : null;
+            return LecturesAmdProfondes.Juger(generation, LecturesAmdProfondes.ModuleInstalle, () => LecturesAmdDetaillees(generation!));
+        }));
         constats.AddRange(Isoler("THERMIQUE", ThermiqueGpu));
         constats.AddRange(Isoler("STOCKAGE", UsureDisques));
+        if (_jeuxProuves is { } jeuxProuvesLu)
+            constats.AddRange(Isoler("STOCKAGE", jeuxProuvesLu));
+        // Un firmware de disque que son fabricant a corrigé depuis (table de bulletins datés).
+        constats.AddRange(Isoler("STOCKAGE", () =>
+        {
+            var r = _wmi.QueryInNamespace(@"\\.\root\Microsoft\Windows\Storage", "SELECT FriendlyName, FirmwareVersion FROM MSFT_PhysicalDisk");
+            return DefautsConnus.Juger(r.IsOk ? r.Value!.Select(l => (l.GetString("FriendlyName") ?? "", l.GetString("FirmwareVersion"))).ToList() : null);
+        }));
         // L'usure de la batterie d'un portable ; rien sur un PC fixe.
         constats.AddRange(Isoler("POWER", () => DrDxt.Detection.Hardware.UsureBatterie.LireEtJuger(_wmi)));
         constats.AddRange(Isoler("PERIPHERIQUES", Peripheriques));
+        if (_peripheriquesDEntree is { } peripheriquesDEntreeLu)
+            constats.AddRange(Isoler("PERIPHERIQUES", peripheriquesDEntreeLu));
+        if (_couchesDEntree is { } couchesDEntreeLu)
+            constats.AddRange(Isoler("PERIPHERIQUES", couchesDEntreeLu));
+        constats.AddRange(Isoler("PERIPHERIQUES", () => InventaireDesPilotes.Juger(PilotesLus(), DateTime.Now)));
         constats.AddRange(Isoler(SuspensionUsb.Domaine, SuspensionSelectiveUsb));
         constats.AddRange(Isoler("WINDOWS UPDATE", MisesAJour));
         // Ce qui attend dans Windows Update, pas seulement ce qui a échoué.
@@ -306,16 +560,24 @@ public sealed partial class RepairAuditService
                                 "DisplayVersion", null) as string)
                         : []];
             }));
+        if (_radar is { } rd)
+            constats.AddRange(Isoler(RadarDesRegressions.Domaine, rd));
+        if (_traces is { } tr)
+            constats.AddRange(Isoler(TracesDOptimiseurs.Domaine, tr));
         // Les heures d'activité contre les heures des parties relevées.
         if (_heuresActives is { } ha)
             constats.AddRange(Isoler("WINDOWS UPDATE", () => [ha()]));
+        if (_piloteExige is { } pe)
+            constats.AddRange(Isoler("GPU DRIVER", pe));
+        if (_preferencesDefender is { } pd)
+            constats.AddRange(Isoler("SECURITE", pd));
         if (_defender is { } df)
             constats.AddRange(Isoler(AnalysesDefender.Domaine, () => [df()]));
         if (_tachesEnPartie is { } tp)
             constats.AddRange(Isoler("TACHES", () => [tp()]));
         constats.AddRange(Isoler("DEMARRAGE", () =>
         {
-            var lus = _demarrage.Lire();
+            var lus = mesuresDemarrage;
             var bios = _demarrage.LireTempsBios();
             return [
                 .. lus.IsOk
@@ -385,11 +647,19 @@ public sealed partial class RepairAuditService
             // le rendre visible sans le declarer nuisible : la doctrine « different n'est pas
             // endommage » interdit `Suspicious`, elle n'impose pas le silence.
             // DISPLAY suit la meme regle.
+            // Un frein caché (plafond de fréquence, refroidissement passif) se dit comme tel ; sur un portable il est souvent
+            // voulu par le constructeur, et le constat le dit au lieu de l'accuser.
+            if (PowerSettingsReader.Frein(v) == true)
+            {
+                var portable = Batterie() == true;
+                (statut, phrase) = (portable ? RepairStatus.NonDefault : RepairStatus.Suspicious,
+                    Docteur.T("RA.Power.Frein") + (portable ? Docteur.T("RA.Power.FreinPortable") : ""));
+            }
             yield return new RepairFinding("POWER", v.Nom,
                 v.ValeurAc is { } a ? Lisible(v.Nom, a, v.Unite) : null,
                 v.DefautAc is { } d ? Lisible(v.Nom, d, v.Unite) : null,
                 statut, phrase,
-                statut == RepairStatus.NonDefault ? RepairAction.Recommandation : RepairAction.Aucune);
+                statut is RepairStatus.NonDefault or RepairStatus.Suspicious ? RepairAction.Recommandation : RepairAction.Aucune);
         }
     }
 
@@ -409,6 +679,9 @@ public sealed partial class RepairAuditService
             _ => valeur.ToString(System.Globalization.CultureInfo.InvariantCulture),
         },
         "preference energie/perf" => Docteur.T("RA.Epp", valeur),
+        "politique de refroidissement" => Docteur.T(valeur == 0 ? "RA.Refroidissement.Passif" : "RA.Refroidissement.Actif"),
+        // 0 MHz n'est pas une fréquence : c'est « aucun plafond ».
+        "frequence maximale" or "frequence maximale (coeurs efficaces)" when valeur == 0 => Docteur.T("RA.Freq.SansPlafond"),
         // « 100% » sur la page Processeur ; en français l'unité se sépare du nombre.
         _ => string.IsNullOrEmpty(unite) ? valeur.ToString(System.Globalization.CultureInfo.InvariantCulture) : $"{valeur} {unite}",
     };
@@ -428,7 +701,9 @@ public sealed partial class RepairAuditService
     // puce intégrée d'une carte dédiée).
     private IEnumerable<RepairFinding> FilsDeRenduCallOfDuty()
     {
-        var dossier = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Call of Duty", "players");
+        // Le dossier du fichier le plus récent parmi les emplacements connus : la version courante écrit sous
+        // %LOCALAPPDATA%, Documents ne garde qu'une ancienne version (voir ReglagesCod.Trouver).
+        if (DrDxt.Detection.Game.ReglagesCod.Trouver()?.DirectoryName is not { } dossier) return [];
         var lu = DrDxt.Detection.Jeu.ConfigurationCallOfDuty.Lire(dossier);
         if (lu is null) return [];
         // Les cœurs de la classe la plus rapide, lus comme le banc processeur ; l'estimation par les comptes WMI en secours.
@@ -456,6 +731,44 @@ public sealed partial class RepairAuditService
                 .Select(l => new GpuInfo(l.GetString("Name")!, "", Convert.ToInt64(l.Properties.GetValueOrDefault("AdapterRAM") ?? 0L,
                     CultureInfo.InvariantCulture), "", TriState.Unknown)).ToList()
             : [];
+    }
+
+    // Les quatre constats AMD détaillés, quand le module de lecture AMD est installé. Les lecteurs du module (canaux UMC,
+    // table PM) restent à brancher le jour où il l'est : d'ici là, leurs entrées sont null et chaque constat dit « non lu ».
+    private IEnumerable<RepairFinding> LecturesAmdDetaillees(GenerationAmd.Ligne generation)
+    {
+        var barrettes = _wmi.QueryInNamespace(@"\\.\root\cimv2", "SELECT SMBIOSMemoryType, Speed FROM Win32_PhysicalMemory");
+        var types = barrettes.IsOk ? barrettes.Value!.Select(b => b.GetInt("SMBIOSMemoryType") ?? 0).ToList() : [];
+        var vitesseKit = barrettes.IsOk ? barrettes.Value!.Select(b => b.GetInt("Speed") ?? 0).DefaultIfEmpty(0).Min() : 0;
+        // Le réglé contre l'appliqué : le BIOS nommé au dernier scan, contre les timings du contrôleur.
+        var bios = DrDxt.Detection.Cpu.ChaleurEnPartie.LireBios(DossierDonnees.Chemin(ChaleurEnPartie.FichierBios),
+            DrDxt.Detection.Hardware.DemarrageDuSysteme.Valeur)?.Reglages;
+        return [.. TimingsMemoireAmd.Juger(generation, types, canaux: null),
+            .. RegleContreApplique.Juger(generation, bios, appliques: null, vitesseKit),
+            .. TablePmAmd.Juger(generation, bridage: null),
+            .. TablesBiosAmd.Juger(generation, WmiFixe(RequeteCarte, "Product"),
+                WmiFixe(RequeteBios, "SMBIOSBIOSVersion"))];
+    }
+
+    // Les pilotes installés (Win32_PnPSignedDriver) ; null = non lu. Une date ou une signature illisible reste null.
+    private IReadOnlyList<InventaireDesPilotes.Pilote>? PilotesLus()
+    {
+        var r = _wmi.Query("SELECT DeviceClass, DeviceName, DriverProviderName, DriverDate, IsSigned, InfName FROM Win32_PnPSignedDriver");
+        if (!r.IsOk) return null;
+        return r.Value!.Select(l => new InventaireDesPilotes.Pilote(l.GetString("DeviceClass") ?? "?", l.GetString("DeviceName") ?? "?",
+            l.GetString("DriverProviderName"), InventaireDesPilotes.DateDmtf(l.GetString("DriverDate")),
+            l.Properties.GetValueOrDefault("IsSigned") is bool b ? b : null, l.GetString("InfName"))).ToList();
+    }
+
+    // Chaque carte d'affichage avec ses identifiants matériels et compatibles ; null = non lu.
+    private IReadOnlyList<InstallationDePilote.Carte>? CartesEtIdentifiants()
+    {
+        var r = _wmi.Query("SELECT Name, PNPDeviceID, HardwareID, CompatibleID FROM Win32_PnPEntity WHERE PNPClass = 'Display'");
+        if (!r.IsOk) return null;
+        static IEnumerable<string> Ids(object? v) => v is Array a ? a.Cast<object?>().Select(x => x?.ToString()).OfType<string>() : [];
+        return r.Value!.Select(l => new InstallationDePilote.Carte(l.GetString("Name") ?? "?",
+            [.. Ids(l.Properties.GetValueOrDefault("HardwareID")), .. Ids(l.Properties.GetValueOrDefault("CompatibleID"))],
+            l.GetString("PNPDeviceID"))).ToList();
     }
 
     // Une batterie présente (Win32_Battery) ; null = non lu.
@@ -736,11 +1049,9 @@ public sealed partial class RepairAuditService
             {
                 RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true,
             };
-            using var proc = Process.Start(psi);
-            if (proc is null) return null;
-            var sortie = proc.StandardOutput.ReadToEnd();
+            var r = DrDxt.Core.ProcessusBorne.Executer(psi, TimeSpan.FromSeconds(5));
             // Un refus (accès refusé) sort avec un code non nul : ce n'est pas « aucune entrée ».
-            return proc.WaitForExit(5000) && proc.ExitCode == 0 ? sortie : null;
+            return r.Fini && r.Code == 0 ? r.Sortie : null;
         }
         catch { return null; }
     }
@@ -828,7 +1139,7 @@ public sealed partial class RepairAuditService
                 Docteur.T("RA.Pf.TailleExplication"));
         yield return FichierDEchangeSurDisqueDur.Juger(EmplacementsDuFichierDEchange(out var ssdPresent), ssdPresent);
         // La mémoire pleine est le défaut de fluidité d'un PC de bureau ; lue à l'instant, dite avec ses gestes.
-        yield return MemoireSaturee.Juger(Hardware.PressionMemoire.Lire());
+        yield return MemoireSaturee.Juger(Hardware.PressionMemoire.Lire(), _lecturesDures?.Invoke());
     }
 
     // Chaque fichier d'échange en service et le type du disque qui le porte (même relevé que les jeux).
@@ -841,7 +1152,8 @@ public sealed partial class RepairAuditService
             ssdPresent = SsdInterne();
             using var s = new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_PageFileUsage");
             var fichiers = new List<(string, int)>();
-            foreach (var o in s.Get().Cast<System.Management.ManagementObject>())
+            using var rangees = s.Get();
+            foreach (var o in rangees.Cast<System.Management.ManagementObject>())
                 using (o)
                     if (o["Name"]?.ToString() is { Length: > 1 } chemin)
                         fichiers.Add((chemin, chemin[1] == ':' && types.TryGetValue(char.ToUpperInvariant(chemin[0]), out var t) ? t : 0));
@@ -856,7 +1168,8 @@ public sealed partial class RepairAuditService
     {
         var disques = new List<(int Type, int Bus)>();
         using (var s = new System.Management.ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", "SELECT MediaType, BusType FROM MSFT_PhysicalDisk"))
-            foreach (var o in s.Get().Cast<System.Management.ManagementObject>())
+        using (var rangees = s.Get())
+            foreach (var o in rangees.Cast<System.Management.ManagementObject>())
                 using (o)
                     disques.Add((Convert.ToInt32(o["MediaType"] ?? 0), Convert.ToInt32(o["BusType"] ?? 0)));
         return SsdInterneParmi(disques);
@@ -875,9 +1188,9 @@ public sealed partial class RepairAuditService
     // dependance a l'envers.
     private IEnumerable<RepairFinding> BiosIdentite()
     {
-        var carte = Wmi("SELECT Manufacturer, Product FROM Win32_BaseBoard", "Product");
-        var fabricant = Wmi("SELECT Manufacturer FROM Win32_BaseBoard", "Manufacturer");
-        var versionBios = Wmi("SELECT SMBIOSBIOSVersion FROM Win32_BIOS", "SMBIOSBIOSVersion");
+        var carte = WmiFixe(RequeteCarte, "Product");
+        var fabricant = WmiFixe(RequeteCarte, "Manufacturer");
+        var versionBios = WmiFixe(RequeteBios, "SMBIOSBIOSVersion");
         yield return new RepairFinding("BIOS", "carte mere / firmware",
             (fabricant ?? "?") + " " + (carte ?? "?") + ", BIOS " + (versionBios ?? "?"), null,
             RepairStatus.Observed,
@@ -1109,6 +1422,18 @@ public sealed partial class RepairAuditService
     // ── LECTEURS ───────────────────────────────────────────────────────────────────────────
 
     private string? Wmi(string requete, string propriete) => WmiDans(@"\\.\root\cimv2", requete, propriete);
+
+    // Le BIOS et la carte mère ne changent pas pendant un scan : une requête chacun, gardée le temps du scan, sert toutes
+    // les familles qui les lisent (jusqu'à trois sur un Ryzen). Refaite à chaque Lire.
+    private const string RequeteBios = "SELECT SMBIOSBIOSVersion, ReleaseDate FROM Win32_BIOS";
+    private const string RequeteCarte = "SELECT Manufacturer, Product FROM Win32_BaseBoard";
+    private System.Collections.Concurrent.ConcurrentDictionary<string, Lazy<IReadOnlyList<WmiRow>?>> _fixesDuScan = new();
+
+    private string? WmiFixe(string requete, string propriete) => _fixesDuScan.GetOrAdd(requete, r => new Lazy<IReadOnlyList<WmiRow>?>(() =>
+    {
+        var lignes = _wmi.QueryInNamespace(@"\\.\root\cimv2", r);
+        return lignes.IsOk ? lignes.Value : null;
+    })).Value?.FirstOrDefault()?.GetString(propriete);
 
     /// <summary>La premiere ligne d'une requete WMI, ou <c>null</c> quand rien ne repond, jamais
     /// une valeur fabriquee. `root\WMI` porte les zones thermiques ACPI, `root\cimv2` le reste.</summary>

@@ -1,4 +1,3 @@
-using static DrDxt.Core.TexteFrancais;
 namespace DrDxt.Core;
 
 /// <summary>Ce que le joueur cherche. Il n'existe pas de meilleur PC absolu : il existe un

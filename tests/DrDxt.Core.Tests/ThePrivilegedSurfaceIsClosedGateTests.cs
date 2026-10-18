@@ -50,6 +50,8 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
         // La protection du ping retenue pour le service, et son inverse (docs/NON-NUISANCE.md, section du 28/09).
         "RetainServiceUploadCapOp",
         "ForgetServiceUploadCapOp",
+        // La pause du maintien posee ou levee par le joueur : un fichier, un booleen (docs/NON-NUISANCE.md, section du 18/10).
+        "SetMaintenancePauseOp",
         // Retirer / reposer un element BCD de l'ensemble ferme (docs/NON-NUISANCE.md).
         "DeleteBcdValueOp",
         "SetBcdValueOp",
@@ -60,6 +62,10 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
         "RestartDeviceOp",
         "RemoveDriverPackageOp",
         "RestoreDriverPackageOp",
+        // Le journal d'écriture anticipée du helper : une pose marquée, validée par l'op qu'elle porte, et son acquit.
+        // Aucune nouvelle surface : chacune ne vaut que ce que vaut son op intérieure (OpAllowlist).
+        "PoseEnAttenteDOrigineOp",
+        "AcquitterEcritureOp",
         "CreateRestorePointOp",
         "DeleteNvApiDrsSettingOp",
         "DeleteRegistryValueOp",

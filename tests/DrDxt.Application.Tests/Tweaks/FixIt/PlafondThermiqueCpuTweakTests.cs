@@ -53,10 +53,22 @@ public sealed class PlafondThermiqueCpuTweakTests
         Build(150).AppliesTo(Hw(ChassisType.Laptop), Etat(lu)).Should().BeFalse();
     }
 
+    // Aucune température relevée en partie : on ne sait pas si le processeur se freine par la chaleur. La vérification disait
+    // « déjà réglé » ; c'est « non lu ». Des parties lues sans freinage, elles, disent bien qu'il n'y a rien à plafonner.
+    [Fact]
+    public void Sans_temperature_relevee_en_partie_l_etat_est_dit_non_lu()
+    {
+        var sansPartie = new LimiteDePuissanceLue(253, 253, 125, false);
+
+        Build(null).AppliesTo(Hw(), Etat(sansPartie)).Should().BeFalse();
+        Build(null).EtatNonLu(Etat(sansPartie)).Should().BeTrue();
+        Build(null).EtatNonLu(Etat(sansPartie with { ChaleurEnPartieMaxC = 82 })).Should().BeFalse("des parties lues, pas freinées");
+    }
+
     [Fact]
     public void La_montee_s_abstient_tant_que_le_plafond_a_quelque_chose_a_dire()
     {
-        var lu = new LimiteDePuissanceLue(65, 219, 65, false);
+        var lu = new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 80);
         LimitePuissanceCpuTweak.Cible(lu).Should().Be(219);
         LimitePuissanceCpuTweak.Cible(lu with { PlafondThermiqueW = 150 }).Should().BeNull();
     }
@@ -101,5 +113,16 @@ public sealed class PlafondThermiqueCpuTweakTests
         var levier = Build(null);
         (await levier.ApplyAsync()).IsOk.Should().BeFalse();
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
+    // Sans température de partie, un verrou ou une PL1 au-dessus de la PL2 donnent déjà la réponse : pas de plafond, chaleur
+    // ou pas. Ce n'est pas « non lu ».
+    [Fact]
+    public void Une_reponse_connue_sans_temperature_n_est_pas_dite_non_lue()
+    {
+        var sansPartie = new LimiteDePuissanceLue(253, 253, 125, false);
+
+        Build(null).EtatNonLu(Etat(sansPartie with { Verrou = true })).Should().BeFalse("verrouillée");
+        Build(null).EtatNonLu(Etat(sansPartie with { Pl1W = 300 })).Should().BeFalse("PL1 au-dessus de la PL2 : le helper refuserait");
+        Build(null).EtatNonLu(Etat(sansPartie)).Should().BeTrue("seule la chaleur manque");
     }
 }

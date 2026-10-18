@@ -259,7 +259,7 @@ public static class DiagnosticReport
         Line(sb, Docteur.T("Rapport.Provisoire"), Docteur.T(verdict.Provisional ? "Rapport.Oui" : "Rapport.Non"));
         // Le motif en clair : c'est lui qui permet au support de comprendre le verdict sans
         // rejouer le scan. Un etat sans son motif est un code, pas un diagnostic.
-        Line(sb, Docteur.T("Rapport.Motif"), Motif(verdict));
+        Line(sb, Docteur.T("Rapport.Motif"), MotifDuGoulot.Dire(verdict));
         sb.AppendLine();
     }
 
@@ -359,43 +359,6 @@ public static class DiagnosticReport
     // Le `_ =>` rend le nom brut plutot que de mentir : une valeur ajoutee demain sera visible
     // dans le rapport, et le test `No_raw_identifier_reaches_the_client` la fera rougir.
     // ══════════════════════════════════════════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Le motif du limiteur, rendu depuis la cle et ses valeurs.
-    ///
-    /// Le classifieur ne construit plus de phrase pour le client : il rend un fait et ses
-    /// grandeurs, et chaque bord l'ecrit dans sa langue. Le formatage des nombres appartient donc
-    /// ici : « 96 % » et « 96.0% » ne s'ecrivent pas pareil selon la langue, et c'est le rendu qui
-    /// le sait, pas le classifieur.
-    ///
-    /// Cle absente ou inconnue -> on rend le motif technique anglais plutot que rien. C'est laid
-    /// et c'est voulu : un motif manquant doit se voir dans le rapport, et le test
-    /// `The_motif_reaches_the_client_in_French` le fera rougir avant qu'un client ne le lise.
-    /// </summary>
-    private static string Motif(BottleneckVerdict verdict)
-    {
-        var v = verdict.ReasonValues ?? Array.Empty<double>();
-        string Pct(int i) => i < v.Count ? (v[i] * 100).ToString("F0", Docteur.Langue) : "?";
-        string Ms(int i) => i < v.Count ? v[i].ToString("F1", Docteur.Langue) : "?";
-
-        return verdict.ReasonKey switch
-        {
-            BottleneckReasonKeys.NoMeasurement => Docteur.T("Rapport.Motif.AucuneMesure"),
-            BottleneckReasonKeys.GpuBusyUnmeasured => Docteur.T("Rapport.Motif.GpuBusyInconnu"),
-            BottleneckReasonKeys.CommitPressure => Docteur.T("Rapport.Motif.Commit", Pct(0)),
-            BottleneckReasonKeys.Capped => Docteur.T("Rapport.Motif.Plafonne"),
-            BottleneckReasonKeys.Throttling => Docteur.T("Rapport.Motif.Bridage"),
-            BottleneckReasonKeys.FramePacing => Docteur.T("Rapport.Motif.Cadence"),
-            BottleneckReasonKeys.GpuBound => Docteur.T("Rapport.Motif.Gpu", Pct(0)),
-            BottleneckReasonKeys.CpuBoundStrong => Docteur.T("Rapport.Motif.CpuFort", Pct(0)),
-            BottleneckReasonKeys.CpuOrAppBound => Docteur.T("Rapport.Motif.CpuOuJeu", Pct(0)),
-            BottleneckReasonKeys.MixedGpuLeaning => Docteur.T("Rapport.Motif.PlutotGpu", Pct(0)),
-            BottleneckReasonKeys.LatencyOnly => Docteur.T("Rapport.Motif.Latence", Ms(0), Ms(1)),
-            BottleneckReasonKeys.BetweenStates => Docteur.T("Rapport.Motif.Entre", Pct(0)),
-
-            _ => verdict.Reason,
-        };
-    }
 
     private static string Texte(ChassisType chassis) => chassis switch
     {

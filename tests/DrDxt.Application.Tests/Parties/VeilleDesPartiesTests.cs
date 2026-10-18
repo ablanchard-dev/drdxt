@@ -35,6 +35,49 @@ public sealed class VeilleDesPartiesTests
         enregistrees[0].Goulot.Should().Be(BottleneckState.CpuBoundOrAppBound);
     }
 
+    // L'option de développement des images reçoit, à la clôture, la partie et ses fenêtres telles que le relevé les a vues.
+    [Fact]
+    public async Task Une_partie_close_passe_ses_fenetres_a_l_option_des_images()
+    {
+        var etats = new Queue<(string, int)?>([null, ("cod.exe", 42), ("cod.exe", 42), ("cod.exe", 42), null]);
+        var gardees = new List<(PartieRelevee Partie, int Fenetres)>();
+        using var fin = new CancellationTokenSource();
+
+        var veille = new VeilleDesParties(
+            jeu: () => etats.Count > 0 ? etats.Dequeue() : null,
+            capturer: (_, _, _) => Task.FromResult<BenchmarkResult?>(Capture(120)),
+            classer: _ => BottleneckState.CpuBoundOrAppBound,
+            enregistrer: _ => fin.Cancel(),
+            patienter: (_, _) => Task.CompletedTask,
+            garderLesImages: (p, c) => gardees.Add((p, c.Count)));
+
+        await veille.VeillerAsync(fin.Token);
+
+        gardees.Should().ContainSingle().Which.Fenetres.Should().Be(3);
+        gardees[0].Partie.Jeu.Should().Be("cod.exe");
+    }
+
+    // L'option de développement ne fait jamais tomber le relevé, quelle que soit l'exception qu'elle lève : la veille continue
+    // et la partie suivante s'enregistre.
+    [Fact]
+    public async Task Une_exception_inattendue_de_l_option_des_images_n_arrete_pas_le_releve()
+    {
+        var etats = new Queue<(string, int)?>([("cod.exe", 1), ("cod.exe", 1), null, ("cod.exe", 2), ("cod.exe", 2), null]);
+        var enregistrees = new List<PartieRelevee>();
+        using var fin = new CancellationTokenSource();
+
+        var veille = new VeilleDesParties(
+            jeu: () => etats.Count > 0 ? etats.Dequeue() : null,
+            capturer: (_, _, _) => Task.FromResult<BenchmarkResult?>(Capture(120)),
+            classer: _ => BottleneckState.CpuBoundOrAppBound,
+            enregistrer: p => { enregistrees.Add(p); if (enregistrees.Count == 2) fin.Cancel(); },
+            patienter: (_, _) => Task.CompletedTask,
+            garderLesImages: (_, _) => throw new ArgumentException("chemin invalide"));
+
+        await veille.Invoking(v => v.VeillerAsync(fin.Token)).Should().NotThrowAsync();
+        enregistrees.Should().HaveCount(2, "la seconde partie s'enregistre malgré l'échec de l'option sur la première");
+    }
+
     // Le jeu fermé puis relancé entre deux regards garde son nom mais pas son processus ; ce sont
     // deux parties.
     [Fact]

@@ -30,25 +30,32 @@ public sealed class Win32RegistryReader : IRegistryReader
             if (key is null)
                 return Result<uint?>.Ok(null); // absent
 
-            var raw = key.GetValue(name, defaultValue: null);
-            if (raw is null)
-                return Result<uint?>.Ok(null); // absent
-
-            // Un DWORD revient en int boxé ; on le ramène en uint.
-            return raw switch
-            {
-                int i => Result<uint?>.Ok(unchecked((uint)i)),
-                long l => Result<uint?>.Ok(unchecked((uint)l)),
-                _ => uint.TryParse(raw.ToString(), out var u)
-                    ? Result<uint?>.Ok(u)
-                    : Result<uint?>.Fail(ErrorCodes.TweakSdkUnavailable, "Registry value is not a DWORD."),
-            };
+            return Dword(key.GetValue(name, defaultValue: null));
         }
         catch (Exception)
         {
             return Result<uint?>.Fail(ErrorCodes.TweakSdkUnavailable, "Registry read failed.");
         }
     }
+
+    /// <summary>Seul un vrai REG_DWORD (un int boxé) est un DWORD. Un REG_SZ « 1 » ou un REG_QWORD lu comme tel devenait
+    /// l'origine d'un levier, que son annulation réécrivait en REG_DWORD : le type d'origine était perdu, et l'allowlist (un
+    /// type par feuille) refuse de le reposer autrement. Lu « pas un DWORD », le levier ne touche à rien.</summary>
+    internal static Result<uint?> Dword(object? raw) => raw switch
+    {
+        null => Result<uint?>.Ok(null), // absent
+        int i => Result<uint?>.Ok(unchecked((uint)i)),
+        _ => Result<uint?>.Fail(ErrorCodes.TweakSdkUnavailable, "Registry value is not a REG_DWORD."),
+    };
+
+    /// <summary>Même règle pour le texte : seul un REG_SZ en est un. Un DWORD rendu en chaîne, ou un REG_EXPAND_SZ que
+    /// GetValue rend déjà développé, deviendrait à l'annulation un REG_SZ qui n'était pas là.</summary>
+    internal static Result<string?> Texte(object? raw, RegistryValueKind genre) => raw switch
+    {
+        null => Result<string?>.Ok(null), // absent
+        string s when genre == RegistryValueKind.String => Result<string?>.Ok(s),
+        _ => Result<string?>.Fail(ErrorCodes.TweakSdkUnavailable, "Registry value is not a REG_SZ."),
+    };
 
     public Result<string?> ReadString(RegistryHiveKind hive, string path, string name)
     {
@@ -65,8 +72,7 @@ public sealed class Win32RegistryReader : IRegistryReader
                 return Result<string?>.Ok(null); // absent
 
             var raw = key.GetValue(name, defaultValue: null);
-            // Absent → Ok(null). Présent → sa forme texte (un REG_SZ revient en chaîne).
-            return Result<string?>.Ok(raw?.ToString());
+            return Texte(raw, raw is null ? RegistryValueKind.Unknown : key.GetValueKind(name));
         }
         catch (Exception)
         {

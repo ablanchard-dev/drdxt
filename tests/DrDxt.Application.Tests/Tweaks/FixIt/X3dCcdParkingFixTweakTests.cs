@@ -43,9 +43,10 @@ public sealed class X3dCcdParkingFixTweakTests
     // (AMD3DVCacheSvc + CppcEnable). Ne jamais proposer une ecriture sur un signal non lu.
     private static SettingsState DualCcdUnreadableParking() => StateWith(null);
 
-    // X3D à deux CCD avec le CCD fréquence (index hauts 8..15) parqué = sain :
-    // les jeux tournent sur le CCD0 V-Cache (0..7). Rien à corriger.
-    private static SettingsState DualCcdGoodParking() => StateWith(new[] { 8, 9, 10, 11, 12, 13, 14, 15 });
+    // X3D à deux CCD avec le CCD fréquence parqué = sain : les jeux tournent sur le CCD0 V-Cache. Windows numérote un cœur
+    // par son premier processeur logique (CoreIndex, relevé sur la machine de référence : 0, 2, 4… avec l'hyperthreading) :
+    // sur un 7950X3D, le CCD0 porte les numéros 0 à 14, le CCD fréquence 16 à 30. Rien à corriger.
+    private static SettingsState DualCcdGoodParking() => StateWith(new[] { 16, 18, 20, 22, 24, 26, 28, 30 });
 
     private static SettingsState StateWith(IReadOnlyList<int>? parked) => new(
         TriState.On, TriState.On, KnownPowerPlans.Balanced.ToString(), TriState.On,
@@ -106,6 +107,23 @@ public sealed class X3dCcdParkingFixTweakTests
     [Fact]
     public void AppliesTo_true_only_on_dual_ccd_x3d_with_bad_parking() =>
         Build().AppliesTo(Ryzen7950X3D(), DualCcdBadParking()).Should().BeTrue();
+
+    // Les cœurs hauts du CCD à cache portent les numéros 8 à 14 : parqués, c'est le mauvais CCD. L'heuristique comparait les
+    // numéros au nombre de cœurs par CCD (8) et disait « sain ».
+    [Fact]
+    public void AppliesTo_true_when_the_upper_vcache_cores_are_parked() =>
+        Build().AppliesTo(Ryzen7950X3D(), StateWith(new[] { 8, 10, 12, 14 })).Should().BeTrue();
+
+    // Hyperthreading coupé : un cœur = un processeur logique, le CCD à cache porte les numéros 0 à 7, le CCD fréquence 8 à 15.
+    [Fact]
+    public void Sans_hyperthreading_le_ccd_a_cache_porte_les_numeros_0_a_7()
+    {
+        var hw = Ryzen7950X3D();
+        var smtCoupe = hw with { Cpu = hw.Cpu with { Threads = hw.Cpu.Cores } };
+
+        Build().AppliesTo(smtCoupe, StateWith(new[] { 8, 9, 10, 11, 12, 13, 14, 15 })).Should().BeFalse("CCD fréquence parqué : sain");
+        Build().AppliesTo(smtCoupe, StateWith(new[] { 7 })).Should().BeTrue("un cœur du CCD à cache parqué");
+    }
 
     [Fact]
     public void AppliesTo_false_on_dual_ccd_x3d_with_healthy_parking() =>

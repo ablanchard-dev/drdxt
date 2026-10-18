@@ -17,7 +17,7 @@ public static class SanteWindows
         var constat = Lu(lire);
         DateTimeOffset? quand = null;
         try { quand = (installation ?? DrDxt.Detection.Repair.InstallationDeWindows.Lire)(); }
-        catch (Exception) { }
+        catch (Exception) { /* sans date d'installation, le constat reste, sans « depuis la réinstallation » */ }
         return quand is { } q && constat.ValeurCourante is not null
             ? constat with { Explication = constat.Explication + " " + Docteur.T("WinSante.DerniereInstallation", q.LocalDateTime) }
             : constat;

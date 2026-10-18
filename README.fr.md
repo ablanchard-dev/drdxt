@@ -14,7 +14,7 @@
   <a href="https://github.com/ablanchard-dev/drdxt/releases"><b>Télécharger</b></a> ·
   <a href="#ce-quil-fait">Ce qu'il fait</a> ·
   <a href="#participer">Participer</a> ·
-  <a href="docs/COUVERTURE.md">Ce qui est prouvé</a> ·
+  <a href="docs/COUVERTURE.md">Ce que DrDXT fait, selon le PC</a> ·
   <a href="https://discord.gg/z6HJWDzfB3">Discord</a> ·
   <a href="README.md">English</a>
 </p>
@@ -41,7 +41,7 @@ réglée, il te le dit aussi.
   ce qui se fait à la main (BIOS, câbles, réglages du jeu). Quand un point a son correctif, il se lit à part sous
   **Comment corriger**, en étapes numérotées qui nomment ce qui a été lu sur ta machine : l'appli, la valeur, le chemin.
 - **Optimiser** pose les réglages utiles, un par un, après un point de restauration. **Essayer en alternance** compare
-  un réglage sur tes parties, une sur deux, et tranche au bout de six.
+  un réglage sur tes parties, en blocs avec, sans, sans, avec, et tranche à 3 parties avec contre 6 sans.
 - **Tes parties** sont relevées en arrière-plan : images par seconde, 1 % les plus lentes, ce qui limitait, programmes
   ouverts à côté. C'est la seule preuve que DrDXT accepte. Le jeu est trouvé tout seul, en plein écran ou sans bordure,
   et les plus joués même en fenêtré ; les lanceurs, Discord et les applis agrandies sont laissés de côté.
@@ -74,17 +74,14 @@ Cinq règles tiennent le code, et chacune vient d'un échec réel :
 ## Où en est le projet
 
 Version 0.9, utilisable aujourd'hui. Le scan, le docteur, le relevé de tes parties, Optimiser, l'essai en alternance et
-le retour arrière de chaque réglage tournent sur de vrais PC, et chaque réglage a été posé, relu et rendu sur une vraie
-machine avant d'être proposé.
-
-Des joueurs ont déjà utilisé une version dérivée d'une partie de DrDXT, préparée par un proche du projet. Certains
-rapportent une latence stable autour de 10 ms, d'autres 30 à 50 images par seconde de plus. Ces chiffres viennent d'eux :
-DrDXT ne les a pas encore mesurés lui-même, et on ne sait pas encore ce que cette version fait de plus. C'est exactement
-ce que l'essai en alternance et les rapports de vérification servent à établir, PC par PC.
+le retour arrière de chaque réglage tournent sur de vrais PC. Les réglages de la vérification complète (« Vérifier
+DrDXT sur mon PC ») ont été posés, relus et rendus sur la machine de référence (Intel, NVIDIA) ; ceux qui ne touchent
+que du matériel AMD restent à vérifier sur une vraie machine ([docs/VALIDATION-AMD.fr.md](docs/VALIDATION-AMD.fr.md)).
 
 Ce qui reste à prouver : un gain mesuré par DrDXT sur des parties, et les cartes AMD, Intel Arc, les portables à deux
 cartes et les consoles portables, prévus dans le code mais testés seulement sur des machines reconstituées.
-[docs/COUVERTURE.md](docs/COUVERTURE.md) dit, réglage par réglage, ce qui est prouvé, à prouver, ou absent de ton matériel.
+[docs/COUVERTURE.md](docs/COUVERTURE.md) dit, réglage par réglage, ce que DrDXT fait sur chaque type de PC, et pourquoi pas
+là où il ne le fait pas.
 
 ## Installer
 
@@ -104,13 +101,34 @@ Windows 10 ou 11, 64 bits, sur un **compte administrateur** : c'est lui qui donn
 compte standard, Windows demanderait le mot de passe d'un administrateur et les réglages iraient dans son profil : ce
 n'est pas prévu. Aucun .NET à installer, tout est dans l'installeur.
 
+### Ce qui reste après désinstallation
+
+- **Les réglages gardés sont rendus** : ceux du manifeste signé, et ceux d'un essai en alternance en cours. Un réglage
+  qui n'a pas pu l'être est écrit dans le rapport `desinstallation-<date>.txt`, sous `%ProgramData%\DrDxt` ; le manifeste
+  reste alors en place, et réinstaller puis désinstaller réessaie.
+- **La carte NVIDIA** revient au ventilateur automatique et à un décalage d'horloge de 0 MHz. Une courbe de ventilateur
+  ou un décalage posés par un autre outil (MSI Afterburner) repassent aussi à l'automatique et à 0, jusqu'à ce que cet
+  outil les remette à son prochain lancement.
+- **Une sous-tension AMD** posée par DrDXT peut rester, si le pilote la garde au redémarrage : la désinstallation ne sait
+  pas la rendre. Un essai en alternance ne la pose jamais. Voir [docs/SECURITE.md](docs/SECURITE.md), §10.
+- **`%ProgramData%\DrDxt`** : les rapports de désinstallation, le manifeste mis de côté, la clé qui le signait, et la
+  copie des paquets de pilote que tu as retirés.
+- **`%LOCALAPPDATA%\DrDXT`** : tes relevés de parties et l'historique de ce que DrDXT a fait.
+- **La restauration système** reste activée, avec sa réserve de 5 % et les points DrDXT ; Windows les efface avec le
+  temps.
+
+Aucun programme de DrDXT ne tourne plus. Les deux dossiers se suppriment à la main si tu veux repartir de zéro.
+
+Une **mise à jour** arrête le helper pour remplacer ses fichiers : un ventilateur fixe ou un décalage d'horloge posés en
+mode Expert restent alors posés jusqu'au redémarrage suivant, qui les efface.
+
 ## Participer
 
 DrDXT s'améliore un PC à la fois, et presque tout ce qui reste à prouver l'est sur du matériel qu'il n'a jamais
 vu. L'aide la plus utile ne demande pas de savoir coder :
 
 - **Vérifier DrDXT sur ton PC**, puis glisser le rapport dans un ticket « Rapport de vérification ». Chaque rapport
-  fait passer un réglage de « à prouver » à « prouvé » sur ce matériel, dans [docs/COUVERTURE.md](docs/COUVERTURE.md).
+  montre ce que les réglages font vraiment sur ce matériel, à côté de ce que [docs/COUVERTURE.md](docs/COUVERTURE.md) prévoit.
 - **Sans installer DrDXT** : les zips de la [Release](https://github.com/ablanchard-dev/drdxt/releases) lisent ton PC,
   ou font la même vérification, et écrivent le même rapport.
 - **Signaler un bug**, ou une phrase de l'appli qui est floue ou fausse dans ta langue.
@@ -124,32 +142,48 @@ Chaque demande de fusion passe toute la suite de tests en CI. Une faille de séc
 
 ## Ce que DrDXT écrit sur ta machine
 
-Tout réglage passe par un programme élevé séparé, le helper, qui refuse ce qui n'est pas dans sa liste. Chaque écriture
-lit d'abord la valeur d'origine et sait la rendre. La liste, en entier :
+Tout réglage passe par la liste du helper, le programme élevé séparé de l'App, qui refuse ce qui n'y est pas ; le
+service DrDXT, qui rend tes réglages au démarrage, et la désinstallation appliquent la même liste eux-mêmes.
+Chaque écriture lit d'abord la valeur d'origine et sait la rendre. La liste, en entier :
 
 - **Registre, valeurs exactes**, jamais une branche entière : `HwSchMode` (planification GPU accélérée),
   `PagingFiles` (fichier d'échange désactivé remis, ou déplacé vers un SSD), `AllowAutoGameMode` et `AutoGameModeEnabled` (mode Jeu),
   `HistoricalCaptureEnabled` (enregistrement en arrière-plan de la Game Bar), `DirectXUserGlobalSettings` (VRR et
-  modèle d'affichage), `MouseSpeed`, `MouseThreshold1` et `MouseThreshold2` (accélération du pointeur). Deux valeurs
-  ne sont plus posées, seulement rendues si une ancienne version les a écrites : `LowLatencyMode` et `CppcEnable`.
+  modèle d'affichage), `MouseSpeed`, `MouseThreshold1` et `MouseThreshold2` (accélération du pointeur),
+  `ActiveHoursStart` et `ActiveHoursEnd` (heures d'activité de Windows Update, le réglage de Paramètres, pas la
+  stratégie). Deux valeurs ne sont plus posées, seulement rendues si une ancienne version les a écrites :
+  `LowLatencyMode` et `CppcEnable`.
 - **Programmes au démarrage**, sur ta demande : l'interrupteur de Windows (`StartupApproved`) d'une entrée que tu
   choisis, comme le Gestionnaire des tâches.
-- **Pilote NVIDIA**, au profil du jeu seulement : file de rendu, synchronisation verticale, limiteur d'images, mode
-  d'alimentation, et sur ta demande la surcouche DLSS vers le dernier modèle.
-- **Pilote AMD**, par ADLX : limite de puissance, Anti-Lag, limite d'images, synchronisation verticale.
+- **Pilote NVIDIA**, au profil du jeu, ou au profil global quand le jeu n'en a pas : file de rendu, synchronisation
+  verticale, limiteur d'images, mode d'alimentation, et sur ta demande la surcouche DLSS vers le dernier modèle. Le
+  profil global aussi, pour rendre « Normal » au mode d'alimentation.
+- **Pilote AMD**, par ADLX : limite de puissance, Anti-Lag, limite d'images, synchronisation verticale. Sur ton clic
+  seulement, la remise à l'usine de la carte, quand une sous-tension gardée par le pilote ne peut pas être rendue
+  autrement.
+- **Écran** : la fréquence de l'écran principal, réglée sur la plus haute que Windows propose à sa résolution, dans ton
+  profil Windows et sans droits administrateur ; gardée seulement si tu confirmes l'image dans les 15 secondes.
 - **Plan d'alimentation** : un plan Windows connu, le boost du processeur dans ce plan, et l'économie d'énergie de la
   carte Wi-Fi quand le jeu passe par le Wi-Fi.
 - **Processeur** (Intel de bureau) : la limite de puissance PL1 dans son registre, montée à ce que la carte mère permet
   ou plafonnée quand il chauffe trop ; le BIOS remet la sienne au démarrage suivant. Sur ta demande, une recherche de
   sous-tension, palier par palier sous charge, la tension d'origine rendue à la fin ; le résultat, c'est toi qui le
-  poses au BIOS.
+  poses au BIOS. Pour rendre la valeur lue au démarrage (PL1, tension, fréquence maximale AMD), le helper la garde dans
+  sa propre clé volatile, `HKLM\SOFTWARE\DrDXT\Helper\CeDemarrage`, que Windows efface au démarrage suivant.
 - **Un point de restauration** avant d'appliquer ; la restauration système est activée sur le disque système si elle
-  ne l'était pas. Deux points DrDXT au plus, réutilisés sous 24 heures.
+  ne l'était pas, avec une réserve de 5 % du disque quand il n'y en avait aucune (laissée à la désinstallation). Deux
+  points DrDXT au plus, réutilisés sous 24 heures.
 - **Deux services** : PresentMon, qui mesure les images, et le service AMD 3D V-Cache.
+- **La puce Super I/O de la carte mère** (NCT6687), pour lire ses ventilateurs : ses ports de configuration (0x2E ou
+  0x4E) et sa page EC, toutes les 5 secondes au plus, depuis l'App et le service de démarrage, par PawnIO (module
+  LpcIO). Des ports pour lire la puce, jamais un réglage : aucun régime, aucune courbe, aucun mode n'est changé.
 - **Carte graphique**, dans des bornes : la limite de puissance, essayée en jeu et gardée seulement avec un gain
   mesuré ; en mode Expert, sur ton accord, le décalage d'horloge et une vitesse fixe du ventilateur, rendus seuls si
   DrDXT s'arrête.
 - **Deux règles QoS** pendant une partie, sur ta demande, pour plafonner l'envoi ; retirées à la fin de la partie.
+- **Les programmes ouverts à côté du jeu**, sur ta demande, pendant une partie : leur priorité passée de normale à
+  inférieure à la normale, jamais le jeu, Windows, un logiciel de sécurité ou un antitriche. Windows ne la garde pas ;
+  DrDXT la rend à la fin de la partie.
 - **Démarrage de Windows**, cinq éléments exacts, sur ta demande, pour retirer un réglage posé par un script.
 - **Pilotes**, sur ta demande : redémarrer un périphérique, retirer un ancien paquet de pilote du magasin de pilotes et
   le remettre.
@@ -157,8 +191,12 @@ lit d'abord la valeur d'origine et sait la rendre. La liste, en entier :
 - **Redémarrer vers le BIOS**, sur ta demande. Le BIOS est lu, jamais écrit.
 - **Le manifeste signé** des réglages gardés, dans `%ProgramData%\DrDxt`, que la désinstallation relit pour les
   rendre.
+- **Une tâche planifiée**, « DrDXT releve », créée par l'installeur : elle relève tes parties à l'ouverture de ta
+  session, sans droits d'administrateur. Sans le service DrDXT, une partie jouée DrDXT fermé n'a donc pas la
+  température du processeur. Retirée à la désinstallation.
 
-Jamais écrit, quoi qu'on demande : Windows Defender, Windows Update, les services de Windows, le firmware. Le détail,
+Jamais écrit, quoi qu'on demande : Windows Defender, les stratégies et le service de Windows Update, les services de
+Windows, le firmware. Le détail,
 site par site, est dans [docs/NON-NUISANCE.md](docs/NON-NUISANCE.md) ; la sécurité du helper et ce qui est accepté
 comme limite, dans [docs/SECURITE.md](docs/SECURITE.md).
 
@@ -172,15 +210,26 @@ dans [CONFIDENTIALITE.md](CONFIDENTIALITE.md).
   interrogé seulement sur une carte GeForce). Rien ne te désigne.
 - **Des pings** vers ta box et vers `1.1.1.1`, pour mesurer la latence ; pendant une partie, aussi vers le serveur du
   jeu, pour suivre la route d'une partie à l'autre.
-- **La vérification de mise à jour**, au démarrage : deux petits fichiers lus sur `https://ablanchard-dev.github.io/drdxt`.
-  GitHub voit ton adresse IP, comme pour toute page web. Pour la couper : la variable d'environnement `DRDXT_UPDATE_URL`
-  posée à `off`. Une mise à jour ne s'installe jamais sans ton clic ([docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)).
+- **Une question à ta box**, à chaque scan, pour le type de NAT : une recherche UPnP sur le réseau de la maison
+  (`239.255.255.250`), puis une seule demande de son adresse WAN, qui n'est jamais affichée. Rien ne sort de la maison,
+  aucun port n'est ouvert.
+- **La vérification de mise à jour**, au démarrage : deux petits fichiers lus sur `https://ablanchard-dev.github.io/drdxt`,
+  et le paquet signé des tables (la liste des régressions connues, des données seulement) sur le même site. GitHub voit
+  ton adresse IP, comme pour toute page web. Pour la couper : la variable d'environnement `DRDXT_UPDATE_URL` posée à
+  `off`. Une mise à jour ne s'installe jamais sans ton clic ([docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)).
+- **Le test de ta ligne sous charge**, seulement si tu cliques « Tester ma ligne sous charge » : une vingtaine de
+  secondes d'octets nuls reçus de et envoyés à `speed.cloudflare.com` (le serveur de mesure public de Cloudflare), au plus
+  400 Mo dans chaque sens, pendant que DrDXT pingue `1.1.1.1` et ta box. Rien qui te désigne.
 - **La page support de ta carte mère MSI**, seulement si tu cliques « Ouvrir la page de ta carte » dans le guide du
   BIOS : ton navigateur ouvre `www.msi.com/Motherboard/<modèle>/support`.
 - **Une recherche Windows Update**, seulement si tu cliques « Chercher maintenant » sous le constat Windows Update :
   Windows Update demande aux serveurs de Microsoft ce qui attend, comme Paramètres > Windows Update. Rien ne s'installe.
-- **Ton rapport de vérification**, seulement si tu cliques « Envoyer mon rapport » : DrDXT ouvre ton navigateur sur un
-  ticket GitHub déjà rempli. Rien ne part tant que tu ne le soumets pas.
+- **Ton rapport de vérification**, seulement si tu cliques « Envoyer mon rapport » : DrDXT ouvre ton navigateur sur le
+  modèle de ticket GitHub, vide, et tu y joins toi-même le rapport. Rien ne part tant que tu ne le soumets pas.
+- **L'installeur d'une nouvelle version**, seulement si tu cliques « Installer » : téléchargé à l'adresse écrite dans le
+  manifeste signé (la Release GitHub du dépôt), puis son empreinte vérifiée avant qu'il ne se lance.
+- **Des pages de `github.com`**, ouvertes dans ton navigateur seulement sur ton clic : le guide pas à pas, le modèle
+  de ticket.
 
 Un plantage est écrit dans `%LOCALAPPDATA%\DrDXT\crash.log`, sur ta machine seulement. Un test échoue si une adresse
 contactée par le code manque dans cette liste.
@@ -194,7 +243,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**7 164 tests, 0 échec**, mesuré le 15/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
+**8 593 tests, 0 échec**, mesuré le 18/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
 matériel). Ce chiffre est vérifié par `tools/gates/compte_des_tests.py` contre la dernière exécution. La commande qui
 le redonne :
 
@@ -213,12 +262,14 @@ Visual Studio, pour compiler en natif le lanceur qui reçoit l'élévation.
 | `DrDxt.Core` | contrats, résultats, codes d'erreur, opérations privilégiées |
 | `DrDxt.Detection` | matériel, état des réglages, réseau |
 | `DrDxt.Measurement` | PresentMon, repli DXGI, réseau, test mémoire |
+| `DrDxt.Profiles` | profils par puce et leurs recommandations |
 | `DrDxt.Application` | catalogue des réglages, moteur d'application, retour arrière, bornes GPU |
 | `DrDxt.ElevatedHelper` | le programme élevé qui écrit, derrière sa liste blanche |
 | `DrDxt.Lanceur` | l'exécutable natif qui reçoit l'élévation et relance les autres avec un environnement propre |
 | `DrDxt.Reconciler*` | manifeste signé, réapplication au démarrage |
 | `DrDxt.Bios` | lecture du BIOS et guide, jamais d'écriture |
 | `DrDxt.GpuNative` | NVAPI, ADLX, NVML |
+| `DrDxt.Infrastructure` | les textes de l'App (français et anglais), la mise à jour signée, le journal de diagnostic, l'historique des réparations |
 | `DrDxt.App` | l'interface (WPF) |
 | `tools/` | bancs et sondes hors solution, dont le zip de validation (`amd-harness`) |
 

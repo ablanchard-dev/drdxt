@@ -40,6 +40,11 @@ public sealed class Worker : BackgroundService
     private readonly IDiagnosticsLog _diagnostics;
     private readonly IDelay _delay;
     private readonly HostTimingOptions _timing;
+    private readonly Func<bool> _jeuEnCours;
+    private readonly FinDuRejeu? _finDuRejeu;
+
+    /// <summary>Une passe quotidienne qui tombe pendant une partie attend sa fin, relue à ce rythme.</summary>
+    public static readonly TimeSpan AttenteEnPartie = TimeSpan.FromMinutes(10);
 
     public Worker(
         SingleFlightReconcile single,
@@ -47,14 +52,32 @@ public sealed class Worker : BackgroundService
         BootSessionMarker bootMarker,
         IDiagnosticsLog diagnostics,
         IDelay delay,
-        HostTimingOptions timing)
+        HostTimingOptions timing,
+        Func<bool>? jeuEnCours = null,
+        FinDuRejeu? finDuRejeu = null)
     {
+        _finDuRejeu = finDuRejeu;
         _single = single;
         _trigger = trigger;
         _bootMarker = bootMarker;
         _diagnostics = diagnostics;
         _delay = delay;
         _timing = timing;
+        _jeuEnCours = jeuEnCours ?? JeuConnuLance;
+    }
+
+    // Le service tourne en session 0, sans accès aux fenêtres du joueur : seuls les jeux connus par leur nom de
+    // processus sont vus (NomExeDeJeu). Un jeu absent de la liste n'arrête pas la passe ; l'étendre si un joueur en voit un.
+    internal static bool JeuConnuLance()
+    {
+        try
+        {
+            foreach (var p in System.Diagnostics.Process.GetProcesses())
+                using (p)
+                    if (NomExeDeJeu.EstUnJeuConnu(p.ProcessName + ".exe")) return true;
+        }
+        catch (Exception) { /* liste illisible : la passe tourne, comme avant cette garde */ }
+        return false;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -64,7 +87,13 @@ public sealed class Worker : BackgroundService
         if (!booted.IsOk)
             LogFailure("boot-mark", booted);
 
-        // (2) Réconcilier une fois maintenant, sans condition : le démarrage est la principale fenêtre de dérive.
+        // (2) Le rejeu du journal d'écriture anticipée d'abord (il attend la fin d'une partie), puis réconcilier une fois,
+        // sans condition : le démarrage est la principale fenêtre de dérive.
+        if (_finDuRejeu is { } fin)
+        {
+            try { await fin.Attendre().WaitAsync(stoppingToken).ConfigureAwait(false); }
+            catch (OperationCanceledException) { return; }
+        }
         await RunPassAsync(stoppingToken).ConfigureAwait(false);
 
         // (3) Planifier la remise à zéro « homme mort » après la fenêtre de marche stable. La lancer en
@@ -78,6 +107,10 @@ public sealed class Worker : BackgroundService
             while (!stoppingToken.IsCancellationRequested)
             {
                 await _delay.DelayAsync(_timing.DailyPollInterval, stoppingToken).ConfigureAwait(false);
+                // Rien ne se réapplique pendant une partie (un changement de plan d'alimentation en plein jeu se sent) :
+                // la passe attend la fin du jeu. Le démarrage, lui, passe toujours.
+                while (_jeuEnCours())
+                    await _delay.DelayAsync(AttenteEnPartie, stoppingToken).ConfigureAwait(false);
                 await RunPassAsync(stoppingToken).ConfigureAwait(false);
             }
         }

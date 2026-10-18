@@ -91,15 +91,17 @@ public sealed class GuideBiosAuTelephoneTests
         => new BiosGuideViewModel(ScanViewModelTestSeams.Guide(GuideConfidence.UnverifiedFallback, steps: ScanViewModelTestSeams.Step()), Fr)
             .ConfidenceLabel.Should().NotContain("rien d'autre");
 
+    // Des valeurs toutes différentes : la compression de l'adresse ne les réduit pas, et ni la page ni le texte ne tiennent
+    // dans la version 25.
     [Fact]
     public void Un_guide_trop_long_pour_un_qr_garde_son_texte_sans_image()
     {
-        var etapes = Enumerable.Range(1, 400).Select(i => ScanViewModelTestSeams.Step(order: i)).ToArray();
+        var etapes = Enumerable.Range(1, 400)
+            .Select(i => ScanViewModelTestSeams.Step(FirmwareSettingKind.XmpExpo, "Bios.Guide.Step.Xmp", Guid.NewGuid().ToString(), i)).ToArray();
         var g = new BiosGuideViewModel(ScanViewModelTestSeams.Guide(steps: etapes), Fr);
 
         g.QrVisible.Should().BeFalse();
+        g.ModulesQr.Should().Be(0);
         g.Steps.Should().HaveCount(400);
-        // Vingt réglages tiennent dans un QR, mais au-delà de la version 25 : trop dense pour un téléphone.
-        new BiosGuideViewModel(ScanViewModelTestSeams.Guide(steps: etapes.Take(20).ToArray()), Fr).QrVisible.Should().BeFalse();
     }
 }

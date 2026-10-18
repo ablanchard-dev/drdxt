@@ -108,6 +108,10 @@ public interface INvApiNative
     /// </summary>
     bool TryReadDrsGlobalSetting(uint settingId, out DrsReading reading);
 
+    /// <summary>Vrai seulement quand le réglage est absent du profil de base (NVAPI_SETTING_NOT_FOUND) : il est au défaut du
+    /// pilote. Une panne de lecture rend faux. Par défaut : faux, le cas prudent.</summary>
+    bool DrsGlobalAuDefaut(uint settingId) => false;
+
     /// <summary>
     /// Lit un réglage dans le profil que le pilote applique vraiment à un exécutable
     /// (CreateSession -> LoadSettings -> FindApplicationByName -> GetSetting -> DestroySession).

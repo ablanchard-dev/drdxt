@@ -78,6 +78,8 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
         var perRunP01Low = new List<double>();
         var allLatencies = new List<double>();
         var allDisplayLatencies = new List<double>();
+        var allPcLatencies = new List<double>();
+        var allPresentModes = new List<double>();
         var allGpuBusy = new List<double>();
         // Le denominateur de l'occupation GPU : les memes trames que `allGpuBusy`, et elles seules.
         var tramesAvecGpu = new List<double>();
@@ -195,6 +197,11 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             // La latence d'affichage, même masque, même frame.
             if (cap.Value.DisplayLatencyMs is { } latenceAffichage)
                 allDisplayLatencies.AddRange(Filtrer(latenceAffichage, masque, brut.Count)!);
+            if (cap.Value.PcLatencyMs is { } latencePc)
+                allPcLatencies.AddRange(Filtrer(latencePc, masque, brut.Count)!);
+            // Les modes de présentation, même masque : comptés en double pour passer par le même filtre.
+            if (cap.Value.PresentModes is { Count: > 0 } modes)
+                AppendAligned(allPresentModes, Filtrer(modes.Select(m => (double)m).ToList(), masque, brut.Count), frames.Count);
             // La serie GPU emporte son propre denominateur.
             //
             // Empilee sans appariement (`AddRange`), une capture desynchronisee contribuerait quand meme a
@@ -290,6 +297,10 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             RenderPresentLatencyMsP95: FrametimeStatistics.PercentileOrNull(allLatencies, 0.95),
             // La médiane, pas le p95 : un levier de latence se juge sur ce que le joueur sent à chaque image.
             DisplayLatencyMsMedian: FrametimeStatistics.PercentileOrNull(allDisplayLatencies, 0.5),
+            // NaN par image quand le jeu ne pose pas les marqueurs : le filtre commun les retire, tout NaN = null.
+            PcLatencyMsMedian: FrametimeStatistics.PercentileOrNull(allPcLatencies, 0.5),
+            PcLatencyMsP95: FrametimeStatistics.PercentileOrNull(allPcLatencies, 0.95),
+            PartImagesComposees: FrametimeStatistics.PartComposee(allPresentModes.Select(m => (int)m).ToList()),
             // Valeur absolue : une frame affichee 5 ms trop tot casse la cadence autant qu'une
             // frame 5 ms trop tard, et l'erreur d'animation est signee.
             AnimationErrorMsP95: FrametimeStatistics.AbsPercentileOrNull(allAnimationError, 0.95),

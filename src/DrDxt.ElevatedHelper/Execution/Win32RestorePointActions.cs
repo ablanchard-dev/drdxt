@@ -18,9 +18,6 @@ namespace DrDxt.ElevatedHelper.Execution;
 [SupportedOSPlatform("windows")]
 public sealed class Win32RestorePointActions : IRestorePointActions
 {
-    private const uint APPLICATION_INSTALL = 0;
-    private const uint BEGIN_SYSTEM_CHANGE = 100;
-
     // La création, injectable pour les tests : description -> (code de sortie, sortie d'erreur).
     private readonly Func<string, (uint Code, string? Erreur)> _creerParWmi;
     private readonly Func<IReadOnlyList<(uint Sequence, string Description)>> _lister;
@@ -72,34 +69,64 @@ public sealed class Win32RestorePointActions : IRestorePointActions
 
     private static (uint Code, string? Erreur) CreerParCheckpoint(string description)
     {
-        var powershell = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
-            "WindowsPowerShell", "v1.0", "powershell.exe");
-        var psi = new ProcessStartInfo(powershell)
+        var psi = InfosCheckpoint(description, Environment.GetFolderPath(Environment.SpecialFolder.System));
+        // Checkpoint-Computer attend lui-même le point jusqu'à 90 s (décompilé) : 120 s laissent la marge.
+        var r = ProcessusBorne.Executer(psi, TimeSpan.FromSeconds(120));
+        if (!r.Lance) throw new InvalidOperationException("powershell.exe not started");
+        if (!r.Fini) return (0x800705B4, null); // ERROR_TIMEOUT
+        return (unchecked((uint)r.Code), r.Erreurs);
+    }
+
+    /// <summary>Le PowerShell qui crée le point, tel que le helper le lance. PowerShell 5.1 met
+    /// <c>Documents\WindowsPowerShell\Modules</c> en tête de PSModulePath, même élevé, et l'utilisateur y écrit sans droits : un
+    /// module qui y exporte Checkpoint-Computer passait avant celui de Windows, donc tournait en administrateur. Fixé dans
+    /// l'environnement du processus, PSModulePath ne garde que les modules de Windows (PowerShell y ajoute Program Files,
+    /// réservé aux administrateurs, jamais Documents) ; le module est en plus importé par son chemin, et le script s'arrête
+    /// si la commande vient d'ailleurs.</summary>
+    internal static ProcessStartInfo InfosCheckpoint(string description, string system32)
+    {
+        var psi = new ProcessStartInfo(Path.Combine(system32, "WindowsPowerShell", "v1.0", "powershell.exe"))
         {
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
-        foreach (var a in ArgumentsCheckpoint(description)) psi.ArgumentList.Add(a);
-        using var p = Process.Start(psi) ?? throw new InvalidOperationException("powershell.exe not started");
-        var sortie = p.StandardOutput.ReadToEndAsync();
-        var erreurs = p.StandardError.ReadToEndAsync();
-        // Checkpoint-Computer attend lui-même le point jusqu'à 90 s (décompilé) : 120 s laissent la marge.
-        if (!p.WaitForExit(TimeSpan.FromSeconds(120)))
-        {
-            p.Kill(entireProcessTree: true);
-            return (0x800705B4, null); // ERROR_TIMEOUT
-        }
-        Task.WaitAll(sortie, erreurs);
-        return (unchecked((uint)p.ExitCode), erreurs.Result);
+        psi.Environment["PSModulePath"] = ModulesDeWindows(system32);
+        // powershell.exe est un programme .NET Framework : COR_PROFILER (et ses voisines du runtime) y chargerait une DLL.
+        // Le lanceur ne les transmet pas ; un helper lancé autrement (outils de banc) les retire quand même ici.
+        RetirerLeRuntime(psi.Environment);
+        foreach (var a in ArgumentsCheckpoint(description, system32)) psi.ArgumentList.Add(a);
+        return psi;
     }
 
+    internal static void RetirerLeRuntime(IDictionary<string, string?> environnement)
+    {
+        foreach (var nom in environnement.Keys.Where(VariableDuRuntime).ToList()) environnement.Remove(nom);
+    }
+
+    /// <summary>Même liste que celle du lanceur (EnvironnementPropre.EstUneVariableDuRuntime).</summary>
+    internal static bool VariableDuRuntime(string nom)
+        => nom.StartsWith("CORECLR_", StringComparison.OrdinalIgnoreCase)
+        || nom.StartsWith("DOTNET_", StringComparison.OrdinalIgnoreCase)
+        || nom.StartsWith("COMPLUS_", StringComparison.OrdinalIgnoreCase)
+        || nom.StartsWith("COR_", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Les modules livrés avec Windows ($PSHOME\Modules), par le chemin tiré de l'API.</summary>
+    internal static string ModulesDeWindows(string system32) => Path.Combine(system32, @"WindowsPowerShell\v1.0\Modules");
+
+    /// <summary>Le module qui porte Checkpoint-Computer, importé par son chemin ; sortie 3 si la commande n'en vient pas.</summary>
+    internal static string ModuleSysteme(string system32) =>
+        $"Import-Module -Name '{ModulesDeWindows(system32)}\\Microsoft.PowerShell.Management\\Microsoft.PowerShell.Management.psd1' -ErrorAction Stop;" +
+        "if (-not (Get-Command Checkpoint-Computer).Module.Path.StartsWith(" +
+        $"'{system32}\\', [StringComparison]::OrdinalIgnoreCase)) {{ exit 3 }};";
+
     /// <summary>Les arguments de Checkpoint-Computer : fixes ; le nom, entre apostrophes PowerShell échappées.</summary>
-    internal static IReadOnlyList<string> ArgumentsCheckpoint(string description) =>
+    internal static IReadOnlyList<string> ArgumentsCheckpoint(string description, string system32) =>
     [
-        "-NoProfile", "-NonInteractive", "-Command",
-        $"Checkpoint-Computer -Description '{description.Replace("'", "''")}' -RestorePointType APPLICATION_INSTALL -ErrorAction Stop",
+        "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command",
+        ModuleSysteme(system32)
+        + $"Checkpoint-Computer -Description '{description.Replace("'", "''")}' -RestorePointType APPLICATION_INSTALL -ErrorAction Stop",
     ];
 
     /// <summary>Les points de DrDXT à retirer pour n'en garder que <see cref="PointsGardes"/>. Pur.
@@ -134,14 +161,15 @@ public sealed class Win32RestorePointActions : IRestorePointActions
             foreach (var sequence in AElaguer(_lister()))
                 _retirer(sequence);
         }
-        catch (Exception) { }
+        catch (Exception) { /* ménage remis à la prochaine création */ }
     }
 
     private static IReadOnlyList<(uint, string)> ListerParWmi()
     {
         var points = new List<(uint, string)>();
         using var s = new ManagementObjectSearcher(@"\\.\root\default", "SELECT SequenceNumber, Description FROM SystemRestore");
-        foreach (var o in s.Get())
+        using var rangees = s.Get();
+        foreach (var o in rangees)
             using (o)
                 if (o["SequenceNumber"] is { } n)
                     points.Add((Convert.ToUInt32(n, System.Globalization.CultureInfo.InvariantCulture), o["Description"]?.ToString() ?? ""));
@@ -239,7 +267,8 @@ public sealed class Win32RestorePointActions : IRestorePointActions
         try
         {
             using var s = new ManagementObjectSearcher(@"\\.\root\cimv2", "SELECT MaxSpace FROM Win32_ShadowStorage");
-            return s.Get().Cast<ManagementObject>().Select(o => Convert.ToUInt64(o["MaxSpace"] ?? 0UL)).ToList();
+            using var rangees = s.Get();
+            return rangees.Cast<ManagementObject>().Select(o => { using (o) return Convert.ToUInt64(o["MaxSpace"] ?? 0UL); }).ToList();
         }
         catch (Exception)
         {
@@ -264,8 +293,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             };
-            using var proc = Process.Start(psi);
-            proc?.WaitForExit(15000);
+            ProcessusBorne.Executer(psi, TimeSpan.FromSeconds(15));
         }
         catch
         {

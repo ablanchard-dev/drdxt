@@ -44,6 +44,7 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
     private readonly DrDxt.Reconciler.Reseau.PlafondEnvoiDuService? _plafondDuService;
     private readonly IBcdActions? _bcd;
     private readonly IPnpActions? _pnp;
+    private readonly DrDxt.Reconciler.PauseDuMaintien? _pauseDuMaintien;
     private const string PnpNotWiredMessage = "The pnputil seam is not wired in this host: nothing was done.";
     private readonly IVentilateurActions? _ventilateur;
     private readonly ICpuPowerActions? _cpu;
@@ -54,6 +55,9 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
 
     private const string PlafondDuServiceNotWiredMessage =
         "The service ping-protection store is not wired in this host: nothing was retained.";
+
+    private const string PauseDuMaintienNotWiredMessage =
+        "The maintenance-pause file is not wired in this host: nothing was written.";
 
     private const string ManifestCommitNotWiredMessage =
         "The signed-manifest writer is not wired in this host: nothing was signed or written.";
@@ -85,8 +89,11 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
         // La limite de puissance du processeur par PawnIO. Absente : refusée honnêtement.
         ICpuPowerActions? cpu = null,
         // Les gestes pnputil (peripherique, vieux pilotes d'affichage). Absents : refuses honnetement.
-        IPnpActions? pnp = null)
+        IPnpActions? pnp = null,
+        // La pause du maintien. Branchee dans le helper seul : le service la lit, il ne l'ecrit pas.
+        DrDxt.Reconciler.PauseDuMaintien? pauseDuMaintien = null)
     {
+        _pauseDuMaintien = pauseDuMaintien;
         _pnp = pnp;
         _cpu = cpu;
         _ventilateur = ventilateur;
@@ -168,6 +175,8 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                         : _plafondDuService.Retenir(new DrDxt.Reconciler.Reseau.PlafondRetenuDuService(rs.GameExeName, rs.CapBitsPerSecond)),
                 ForgetServiceUploadCapOp =>
                     _plafondDuService is null ? Fail(PlafondDuServiceNotWiredMessage) : _plafondDuService.Oublier(),
+                SetMaintenancePauseOp mp =>
+                    _pauseDuMaintien is null ? Fail(PauseDuMaintienNotWiredMessage) : _pauseDuMaintien.Poser(mp.EnPause),
                 DeleteBcdValueOp db =>
                     _bcd is null ? Fail(BcdNotWiredMessage) : _bcd.DeleteValue(db.Element),
                 SetBcdValueOp sb =>
@@ -235,6 +244,13 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                     _ventilateur.Poser(f.GpuIndex, f.Points[0].DutyPct),
                 ApplyGpuFanCurveOp => FanCurveDeferred(),
                 RestoreGpuFanAutoOp rf => _ventilateur is null ? FanCurveDeferred() : _ventilateur.Rendre(rf.GpuIndex),
+
+                // Une pose marquée n'arrive ici que sans journal d'écriture anticipée devant l'exécuteur (racine non fiable au
+                // lancement du helper) : le journal la déballe lui-même. L'écrire nue rouvrirait la fenêtre de plantage que le
+                // journal ferme, et l'App promettrait un rendu sans entrée : refusée, rien n'est écrit. Un acquit n'a rien à retirer.
+                PoseEnAttenteDOrigineOp => Result.Fail(ErrorCodes.JournalIndisponible,
+                    "No write-ahead journal in this host: a marked pose is refused, nothing was written."),
+                AcquitterEcritureOp => Result.Ok(),
 
                 // Le manifeste signe : son echec garde son code (MANIFEST_UNREADABLE, MANIFEST_KEY_UNUSABLE),
                 // parce que l'App en tire la reprise explicite.

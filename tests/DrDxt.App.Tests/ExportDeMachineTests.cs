@@ -146,12 +146,31 @@ public class ExportDeMachineTests
 
         await vm.ExporterMaMachineCommand.ExecuteAsync(null);
         vm.LastMachineExportPath.Should().BeEmpty();
-        vm.ApplyBlockedMessage.Should().Be("Machine.ExportFailed");
+        vm.MessageDExport.Should().Be("Machine.ExportFailed");
 
         await vm.ScanCommand.ExecuteAsync(null);
         await vm.ExporterMaMachineCommand.ExecuteAsync(null);
         vm.LastMachineExportPath.Should().BeEmpty();
-        vm.ApplyBlockedMessage.Should().Be("Machine.ExportFailed");
+        vm.MessageDExport.Should().Be("Machine.ExportFailed");
+    }
+
+    // L'échec d'un export s'écrivait dans le message d'Optimiser, loin des boutons d'export, et y restait : il se dit près
+    // de l'export, et un export réussi l'efface.
+    [Fact]
+    public async Task L_echec_d_un_export_se_dit_pres_de_l_export_et_un_export_reussi_l_efface()
+    {
+        var m = MachinesEnregistreesTests.Charger("amd-radeon-synthetique");
+        var essais = 0;
+        var vm = Vm(m, (_, _, _) => ++essais == 1 ? throw new IOException("disque plein") : @"D:\Documents\machine.json");
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        await vm.ExporterMaMachineCommand.ExecuteAsync(null);
+        vm.MessageDExport.Should().Be("Machine.ExportFailed");
+        vm.ApplyBlockedMessage.Should().BeNullOrEmpty("le message d'Optimiser ne parle pas de l'export");
+
+        await vm.ExporterMaMachineCommand.ExecuteAsync(null);
+        vm.MessageDExport.Should().BeEmpty();
+        vm.LastMachineExportPath.Should().Be(@"D:\Documents\machine.json");
     }
 
     [Fact]

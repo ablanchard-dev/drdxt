@@ -70,11 +70,13 @@ public sealed class TweakEngine : ITweakEngine
 
     /// <summary>Le lecteur de plan d'alimentation actif, meme role que les deux precedents.</summary>
     private readonly IPowerPlanReader? _alimentation;
+    private readonly IServiceStateReader? _services;
 
     public TweakEngine(ISafetyManager safety, IBenchmarkRunner bench, IDiagnosticsLog diag,
         ITweakCatalog catalog, IRegistryReader? registre = null, INvApi? nvApi = null,
-        IPowerPlanReader? alimentation = null)
+        IPowerPlanReader? alimentation = null, IServiceStateReader? services = null)
     {
+        _services = services;
         _safety = safety;
         _bench = bench;
         _diag = diag;
@@ -181,7 +183,7 @@ public sealed class TweakEngine : ITweakEngine
             // l'A/B est saute, exactement comme pour un changement qui n'agit qu'apres redemarrage.
             if (_registre is not null)
             {
-                var preuve = AppliedStateVerifier.Verifier(snapshot, _registre, _nvApi, _alimentation);
+                var preuve = AppliedStateVerifier.Verifier(snapshot, _registre, _nvApi, _alimentation, _services);
                 _diag.Change(tweak.Id, preuve.RequestedState ?? "?",
                     $"readback:{preuve.Verdict}", "DrDXT");
 

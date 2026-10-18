@@ -153,10 +153,16 @@ puis A-B-B-A, B-A-A-B, …  → jusqu'à 24 alternances de 10 s
 
 - A-B-B-A est **exactement orthogonal au temps** (r² = 0 contre 0,2 pour A-B-A-B) ; son miroir
   B-A-A-B aussi. On empile donc les blocs sans jamais recorréler l'état et l'horloge.
-- **Arrêt séquentiel** après chaque bloc : une régression prouvée ou un gain de fluidité prouvé
-  terminent l'expérience. Un « non résolu » ne l'arrête **jamais** — c'est ce qui empêche les
-  regards répétés de gonfler le taux de faux positifs.
-- Pire cas : 27 passes de 10 s = **4 min 30** de jeu.
+- **Pas d'arrêt séquentiel : le protocole va au bout**, et décide une fois, sur l'expérience complète.
+  Ce document disait l'inverse (s'arrêter dès qu'une régression ou un gain est prouvé, jamais sur un
+  « non résolu »), et c'était faux : regarder après chaque bloc et s'arrêter au premier
+  franchissement, c'est de l'*optional stopping*. Chaque regard est une chance de plus de franchir le
+  seuil par hasard, et le taux de faux positifs réel dépasse celui annoncé, justement parce qu'on ne
+  s'arrête que sur les succès. Un arrêt séquentiel juste existe (dépense du risque au fil des regards,
+  séquences de confiance) ; tant qu'il n'est pas écrit et calibré, le code ne s'arrête que quand une
+  bascule d'état échoue, une cause qui ne dépend pas de la mesure (`AutopilotEngine.MesurerEnAlternance`,
+  `Interrompu`).
+- Durée : 27 passes de 10 s = **4 min 30** de jeu, à chaque expérience.
 
 ## Ce qui reste à faire
 

@@ -6,16 +6,16 @@ namespace DrDxt.Measurement;
 ///
 ///   • <see cref="Clean"/> retire les images qui ne sont pas du jeu : le chargement du début et les
 ///     secondes passées derrière une autre fenêtre (alt-tab). Publiées brutes, ces secondes passent
-///     pour des défauts de la machine du joueur. Mesuré sur une capture de référence de 39 minutes :
-///     0.1 % low 33,87 ms brut → 18,54 ms nettoyé, latence p99 63,0 → 14,2 ms, soit un facteur 4,4
-///     sur le pire centile, dû à des images qui n'étaient pas du jeu.
+///     pour des défauts de la machine du joueur : un jeu plafonné à 30 fps hors focus pèse 33,3 ms par
+///     image, et quelques secondes d'alt-tab suffisent à faire le pire centile d'une partie à 140 fps.
 ///
-///   • <see cref="Slice"/> découpe une longue session en tranches de même durée. Les centiles
-///     extrêmes se dégradent mécaniquement avec la durée : comparer une session de 3,4 h à une de
-///     39 min est truqué. Le découpage donne la dispersion propre de la machine d'une passe à
-///     l'autre, exactement l'entrée dont a besoin <see cref="FrametimeStatistics.InterRunMarginOfError"/> :
-///     une seule longue session peut ainsi produire une marge A/B honnête au lieu d'exiger trois
-///     passes de banc séparées.
+///   • <see cref="Slice"/> découpe une longue session en tranches de même durée. Plus une capture
+///     dure, plus elle a de chances de croiser une image rare et lente, donc plus son pire centile
+///     paraît mauvais, sans que la machine ait changé : deux sessions de durées très différentes
+///     ne se comparent pas sur leurs centiles extrêmes. Le découpage donne la
+///     dispersion propre de la machine d'une passe à l'autre, exactement l'entrée dont a besoin
+///     <see cref="FrametimeStatistics.InterRunMarginOfError"/> : une seule longue session peut ainsi
+///     produire une marge A/B honnête au lieu d'exiger trois passes de banc séparées.
 ///
 /// <see cref="PresentMon.FrameCapture"/> ne porte aucun horodatage et n'en a pas besoin : les temps
 /// d'image sont les écarts, le temps écoulé est leur somme cumulée.

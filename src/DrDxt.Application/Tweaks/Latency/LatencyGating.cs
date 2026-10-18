@@ -17,11 +17,6 @@ internal static class LatencyGating
     public static bool HasDesktopNvidiaRenderGpu(HardwareInventory hw) =>
         hw.Gpus.Any(g => IsNvidia(g) && IsDiscreteRenderGpu(g) && !IsMobileGpu(g));
 
-    /// <summary>Vrai si un GPU de rendu AMD dédié est présent (et qu'aucun GPU de rendu NVIDIA
-    /// ne prend la voie Reflex). Sert à la branche AMD du plafond de file de rendu.</summary>
-    public static bool HasAmdRenderGpu(HardwareInventory hw) =>
-        hw.Gpus.Any(g => IsAmd(g) && IsDiscreteRenderGpu(g) && !IsMobileGpu(g));
-
     /// <summary>Les réglages du pilote (file de rendu, plafond sous VRR) sont réversibles et marchent
     /// aussi sur une carte de portable : seules ses fréquences sont verrouillées. Fixe ou portable, jamais console.</summary>
     public static bool FixeOuPortable(HardwareInventory hw) => hw.Chassis is ChassisType.Desktop or ChassisType.Laptop;

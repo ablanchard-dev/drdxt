@@ -178,7 +178,7 @@ jobs:
       - name: Gate — every guard named in the table has a real test
         run: python tools/nonuisance/check-guard-tests.py docs/NON-NUISANCE.md docs/RAPPORT-VERIFICATION.md
 
-      # Les quatre gates de `tools/gates/` tournent ici, avec leur `--autotest` : un gate que
+      # Les gates de `tools/gates/` tournent ici, avec leur `--autotest` : un gate que
       # personne ne lance ne garde rien. Celui qui bloque tient, celui qui rappelle meurt.
       # Un test de la suite (`UnGardeQuePersonneNeLanceNeGardeRienTests`) tient les
       # deux sens : un gate ajoute et non branche fait rougir, une entree qui cite un script
@@ -191,6 +191,7 @@ jobs:
           python tools/gates/liens.py --autotest
           python tools/gates/hors_ci.py --autotest
           python tools/gates/compte_des_tests.py --autotest
+          python tools/carte/carte.py --autotest
 
       - name: Gate — les dates de GATES.md sont lisibles (ages.py)
         run: python tools/gates/ages.py
@@ -200,6 +201,14 @@ jobs:
 
       - name: Gate — l'inventaire des tests hors CI est exact (hors_ci.py)
         run: python tools/gates/hors_ci.py
+
+      # Les tests ne lisent le script de l'installeur que comme du texte : celui-ci le compile (ISCC, sans
+      # sortie, rien n'est construit ni signe). Sans Inno Setup sur le runner, il est installe ; sinon le
+      # gate rendrait 3 (rien de verifie), jamais un faux vert.
+      - name: Gate — le script de l'installeur compile (installeur.py)
+        run: |
+          if (-not (Get-Command ISCC.exe -ErrorAction SilentlyContinue) -and -not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          python tools/gates/installeur.py
 
       # Celui-ci lit les journaux .trx de l'etape « Test (Release) » ci-dessus : il doit donc
       # venir apres elle, et elle ecrit maintenant dans UN dossier (`--results-directory`),

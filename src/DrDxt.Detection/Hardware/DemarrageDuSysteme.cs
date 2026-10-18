@@ -21,6 +21,24 @@ public static class DemarrageDuSysteme
     internal static DateTimeOffset Choisir(DateTimeOffset? evenement, DateTimeOffset parLeCompteur)
         => evenement is { } e && e > parLeCompteur ? e : parLeCompteur;
 
+    /// <summary>Chaque démarrage noté (Kernel-Boot 27) depuis <paramref name="depuis"/> ; null si le journal n'a pas été lu.</summary>
+    public static IReadOnlyList<DateTimeOffset>? Depuis(DateTimeOffset depuis)
+    {
+        try
+        {
+            var requete = new EventLogQuery("System", PathType.LogName,
+                "*[System[Provider[@Name='Microsoft-Windows-Kernel-Boot'] and (EventID=27) and TimeCreated[@SystemTime>='"
+                + depuis.UtcDateTime.ToString("o", System.Globalization.CultureInfo.InvariantCulture) + "']]]");
+            var dates = new List<DateTimeOffset>();
+            using var lecteur = new EventLogReader(requete);
+            for (var e = lecteur.ReadEvent(); e is not null && dates.Count < 500; e = lecteur.ReadEvent())
+                using (e)
+                    if (e.TimeCreated is { } t) dates.Add(new DateTimeOffset(t));
+            return dates;
+        }
+        catch (Exception) { return null; }
+    }
+
     internal static DateTimeOffset? DernierEvenement()
     {
         try

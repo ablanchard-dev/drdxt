@@ -13,6 +13,53 @@ public sealed class ReleveDesPartiesTests
     private static CaptureEnPartie C(int minute, double fps, double low, BottleneckState goulot)
         => new(T0.AddMinutes(minute), fps, low, goulot);
 
+    // La part composée et la latence PC à leur médiane ; non lues = null, jamais zéro.
+    [Fact]
+    public void La_part_composee_et_la_latence_pc_se_resument_a_leur_mediane()
+    {
+        var p = ReleveDesParties.Resumer("cod.exe",
+        [
+            C(1, 130, 95, BottleneckState.CpuBoundOrAppBound) with { PartComposee = 0.0, LatencePcMs = 18 },
+            C(4, 140, 100, BottleneckState.CpuBoundOrAppBound) with { PartComposee = 1.0, LatencePcMs = 22 },
+            C(7, 120, 80, BottleneckState.CpuBoundOrAppBound) with { PartComposee = 0.2 },
+        ])!;
+        p.PartComposeeMediane.Should().Be(0.2);
+        p.HorsCarteMoMax.Should().BeNull("aucune capture ne l'a lue");
+        ReleveDesParties.Resumer("cod.exe", [C(1, 130, 95, BottleneckState.CpuBoundOrAppBound) with { HorsCarteMo = 120 },
+            C(4, 140, 100, BottleneckState.CpuBoundOrAppBound) with { HorsCarteMo = 900 }])!.HorsCarteMoMax.Should().Be(900, "à son pic");
+        p.LatencePcMedianMs.Should().Be(20);
+        ReleveDesParties.Resumer("cod.exe", [C(1, 130, 95, BottleneckState.CpuBoundOrAppBound), C(4, 140, 100, BottleneckState.CpuBoundOrAppBound)])!
+            .PartComposeeMediane.Should().BeNull();
+    }
+
+    // Le 1 % low d'une partie se calcule sur toutes ses images, ou, si une fenêtre jouée ne les a pas gardées, comme la médiane
+    // des 1 % low de chaque fenêtre, plus haute en général. La partie dit lequel : deux estimateurs ne se comparent pas.
+    [Fact]
+    public void La_partie_dit_si_son_1_pour_cent_low_porte_sur_toutes_ses_images()
+    {
+        var images = Enumerable.Repeat(7.0, ReleveDesParties.ImagesMinimum).ToList();
+        CaptureEnPartie Avec(int minute) => C(minute, 140, 100, BottleneckState.CpuBoundOrAppBound) with { ImagesMs = images };
+
+        ReleveDesParties.Resumer("cod.exe", [Avec(1), Avec(4)])!.Low1SurToutesLesImages.Should().BeTrue();
+        ReleveDesParties.Resumer("cod.exe", [Avec(1), C(4, 140, 100, BottleneckState.CpuBoundOrAppBound)])!
+            .Low1SurToutesLesImages.Should().BeFalse("une fenêtre sans ses images : la médiane des fenêtres");
+    }
+
+    // Le menu et le lobby ne sont pas la partie : leur latence ne se mêle pas à celle des fenêtres jouées, comme les images.
+    [Fact]
+    public void La_latence_d_affichage_ne_prend_que_les_fenetres_jouees()
+    {
+        var p = ReleveDesParties.Resumer("cod.exe",
+        [
+            C(1, 130, 95, BottleneckState.CpuBoundOrAppBound) with { LatenceAffichageMs = 20, PremierPlan = 1 },
+            C(4, 130, 95, BottleneckState.CpuBoundOrAppBound) with { LatenceAffichageMs = 20, PremierPlan = 1 },
+            C(7, 60, 50, BottleneckState.CpuBoundOrAppBound) with { LatenceAffichageMs = 60, PremierPlan = 0 },
+            C(9, 60, 50, BottleneckState.CpuBoundOrAppBound) with { LatenceAffichageMs = 60, PremierPlan = 0 },
+        ])!;
+
+        p.LatenceAffichageMedianMs.Should().Be(20, "les deux fenêtres hors premier plan sont le menu, pas la partie");
+    }
+
     // La latence d'affichage à sa médiane ; aucune capture ne l'a = non livrée, jamais zéro.
     [Fact]
     public void La_latence_d_affichage_se_resume_a_sa_mediane_ou_reste_non_livree()

@@ -1,5 +1,4 @@
-﻿using static DrDxt.Core.TexteFrancais;
-namespace DrDxt.Core;
+﻿namespace DrDxt.Core;
 
 /// <summary>Une passe d'un protocole apparie : dans quel etat elle a ete prise, et ce qu'elle a
 /// rendu. L'ordre de la liste est le protocole : le melanger detruit l'information qui compte.</summary>

@@ -10,6 +10,18 @@ namespace DrDxt.Measurement;
 /// </summary>
 public static class FrametimeStatistics
 {
+    /// <summary>
+    /// La part des images que le compositeur de Windows a recopiées (`PM_PRESENT_MODE` 4, 5 et 6 de l'en-tête PresentMon
+    /// livré dans `third_party/presentmon`), sur les images dont le mode est connu (0 = inconnu, écarté). Le retournement
+    /// indépendant, matériel ou par superposition (3 et 8), n'est pas composé. null = aucun mode connu.
+    /// </summary>
+    public static double? PartComposee(IReadOnlyList<int>? modes)
+    {
+        var connus = modes?.Where(m => m != 0).ToList();
+        if (connus is null || connus.Count == 0) return null;
+        return connus.Count(m => m is 4 or 5 or 6) / (double)connus.Count;
+    }
+
     private static List<double> Clean(IReadOnlyList<double> ft)
         => ft.Where(x => x > 0 && double.IsFinite(x)).ToList();
 
@@ -217,22 +229,6 @@ public static class FrametimeStatistics
     public static double? AttenteP95(BenchmarkResult? mesure)
         => mesure?.PresentStallMsP95 is { } p95 && mesure.PresentStallSamples is { } n
            && TailStatistic.P95EstInterpretable(n) ? p95 : null;
-
-    /// <summary>
-    /// Coefficient de variation des frametimes (ecart-type / moyenne) : le proxy de cadence
-    /// normalise, qui compare une machine a 60 FPS et une a 240 FPS sur la meme echelle. Null
-    /// quand il y a moins de deux frames valides : une seule frame n'a pas de dispersion, et en
-    /// rendre 0 dirait « parfaitement regulier » sur une absence de mesure.
-    /// </summary>
-    public static double? CoefficientOfVariationOrNull(IReadOnlyList<double> frameTimesMs)
-    {
-        var ft = Clean(frameTimesMs);
-        if (ft.Count < 2) return null;
-        var mean = ft.Average();
-        if (mean <= 0) return null;
-        var variance = ft.Sum(x => (x - mean) * (x - mean)) / (ft.Count - 1);
-        return Math.Sqrt(variance) / mean;
-    }
 
     /// <summary>
     /// Une passe reconstruite depuis une serie deja enregistree : rejeu, re-analyse hors ligne.

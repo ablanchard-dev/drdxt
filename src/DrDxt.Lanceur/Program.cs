@@ -72,8 +72,9 @@ internal static class Program
         {
             using var fils = Process.Start(psi);
             if (fils is null) return 1;
-            // La console de réparation : l'App attend sa fermeture pour relire la santé de Windows.
-            if (reparer) fils.WaitForExit();
+            // La console de réparation : l'App attend sa fermeture pour relire la santé de Windows. Le rendu de la
+            // désinstallation : l'installeur attend le lanceur, puis retire les fichiers du helper.
+            if (reparer || args.Contains(EnvironnementPropre.RenduDeDesinstallation, StringComparer.Ordinal)) fils.WaitForExit();
             return 0;
         }
         catch (Exception) { return 1; }

@@ -28,7 +28,13 @@ public static class MesureAvantPartie
             lusVoisins.Result?.Select(v => (v.Nom, v.ProcesseurPourcent)).ToList(),
             pingBox, pertesBox, pingNet, pertesNet,
             DrDxt.Detection.Cpu.TemperatureProcesseur.Lire()?.Celsius,
-            DrDxt.Measurement.CommitPressureReader.LibrePhysique());
+            DrDxt.Measurement.CommitPressureReader.LibrePhysique(),
+            // Le dernier vrai démarrage (le démarrage rapide ne compte pas), la mémoire vidéo déjà tenue, la chaîne audio
+            // virtuelle, et une conversion BitLocker en cours (lisible en administrateur seulement, sinon non lue).
+            DrDxt.Detection.Hardware.DemarrageDuSysteme.Valeur,
+            DrDxt.Detection.Gpu.MemoireVideoOccupee.ParProcessus(),
+            DrDxt.Detection.Hardware.ChaineAudio.Virtuelles(),
+            DrDxt.Detection.Repair.ChiffrementDuDisque.ConversionEnCours(DrDxt.Detection.Repair.ChiffrementDuDisque.Lire()));
     }
 
     /// <summary>La même mesure pendant la partie, pour le relevé : box, internet, pertes vers internet.</summary>

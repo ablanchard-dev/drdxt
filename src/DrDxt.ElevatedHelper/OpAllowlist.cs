@@ -134,7 +134,7 @@ public sealed class OpAllowlist
     /// mesure sur la carte. Sous le GUID EFI global, « Setup » rend 203 (ERROR_ENVVAR_NOT_FOUND) :
     /// il vit ailleurs.
     /// </summary>
-    public const string AmiSetupVarstoreGuid = "{ec87d643-eba4-4bb5-a1e5-3f3e36b20da9}";
+    public const string AmiSetupVarstoreGuid = GuidsUefi.AmiSetup;
 
     // Les seules variables firmware que DrDXT lit, par espace de noms. Deux ensembles fermes
     // plutot qu'un, parce que le nom seul ne dit pas le risque : « Setup » sous le GUID
@@ -156,9 +156,16 @@ public sealed class OpAllowlist
 
     /// <summary>GUID du varstore « CpuSetup » (reference Intel), mesure le 24/09/2026 sur la machine
     /// de reference (961 octets) et declare tel quel par l'IFR du BIOS officiel 1.H0.</summary>
-    public const string IntelCpuSetupGuid = "{b08f97ff-e6e8-4193-a997-5e9e9b0adb32}";
+    public const string IntelCpuSetupGuid = GuidsUefi.IntelCpuSetup;
     private static readonly IReadOnlySet<string> ReadableCpuVariables =
         new HashSet<string>(StringComparer.Ordinal) { "CpuSetup" };
+
+    /// <summary>GUID du magasin des valeurs d'usine d'AMI, nommé AmiStandardDefaultsVariable par la liste de GUID de
+    /// UEFITool (github.com/LongSoft/UEFITool, common/guids.csv) ; relu le 17/10/2026 sur la machine de référence
+    /// (« StdDefaults », 11 356 octets). Lu pour dire quels réglages ne sont plus à leur valeur d'usine.</summary>
+    public const string AmiStandardDefaultsGuid = GuidsUefi.AmiStandardDefaults;
+    private static readonly IReadOnlySet<string> ReadableDefaultsVariables =
+        new HashSet<string>(StringComparer.Ordinal) { "StdDefaults" };
     private static readonly ServiceAction[] AllowedServiceActions =
     {
         ServiceAction.Install, ServiceAction.Start, ServiceAction.Stop, ServiceAction.Query,
@@ -246,6 +253,9 @@ public sealed class OpAllowlist
             // (un retour hostile ne passe donc jamais) ; ici on ne rejette que des métadonnées de bail
             // manifestement malformées (id absent, durée non positive, retour vide).
             EstablishLeaseOp el => ValidateEstablishLease(el),
+            // Une pose marquée et son acquit se valent ce que vaut l'op qu'ils portent ; jamais l'une dans l'autre.
+            PoseEnAttenteDOrigineOp pe => ValiderLInterieure(pe.PoseJson),
+            AcquitterEcritureOp ae => ValiderLInterieure(ae.PoseeJson),
             RenewLeaseOp rl => ValidateRenewLease(rl),
 
             // Le manifeste signe. Ce que le helper signe, le service SYSTEM le rejoue au
@@ -260,10 +270,15 @@ public sealed class OpAllowlist
             ApplyUploadCapOp uc when !NomExeDeJeu.EstUnJeuPossible(uc.GameExeName)
                 => Deny("Not a game executable (launcher, background program or Windows binary)."),
             ApplyUploadCapOp uc => ValidateUploadCap(uc),
-            RetainServiceUploadCapOp rs when !NomExeDeJeu.EstUnJeuPossible(rs.GameExeName)
-                => Deny("Not a game executable (launcher, background program or Windows binary)."),
+            // Retenu, le plafond est porté par le service SYSTEM à chaque session, sans DrDXT ouvert : un programme qui donnait
+            // son propre nom bridait tout l'envoi de la machine dès qu'il tournait, et s'en exemptait. Seul un jeu reconnu
+            // par son nom est retenu ; un autre jeu garde la protection de l'App, tant qu'elle est ouverte.
+            RetainServiceUploadCapOp rs when !NomExeDeJeu.EstUnJeuConnu(rs.GameExeName)
+                => Deny("Only a recognised game is kept for the startup service."),
             RetainServiceUploadCapOp rs => ValidateUploadCap(new ApplyUploadCapOp(rs.GameExeName, rs.CapBitsPerSecond)),
             ForgetServiceUploadCapOp => Result.Ok(),
+            // Un booléen seul : le fichier et son dossier sont écrits en dur dans PauseDuMaintien.
+            SetMaintenancePauseOp => Result.Ok(),
             RemoveUploadCapOp => Result.Ok(),
 
             // BCD : ensemble ferme d'elements, valeurs fermees, `{current}` seulement.
@@ -353,7 +368,7 @@ public sealed class OpAllowlist
 
     // Memes lignes que l'executeur ecrit : decoupees sur '\n', rognees, les vides retirees.
     // Trois listes, deux ruches (Run32 n'existe qu'en machine), un nom simple : la valeur ecrite ne vise que StartupApproved,
-    // jamais un autre chemin. La securite de Windows (SecurityHealth) ne se coupe pas.
+    // jamais un autre chemin. La securite de Windows, un antivirus ou un controle parental ne se coupent pas (ProtegesAuDemarrage).
     private static Result ValidateStartupApproval(SetStartupApprovalOp s)
     {
         if (s.Hive is not (RegistryHiveKind.CurrentUser or RegistryHiveKind.LocalMachine))
@@ -363,14 +378,14 @@ public sealed class OpAllowlist
             return Deny("Startup approval list is not allowlisted.");
         if (string.IsNullOrWhiteSpace(s.Nom) || s.Nom.Length > 260 || s.Nom.IndexOfAny(['\\', '/']) >= 0 || s.Nom.Any(char.IsControl))
             return Deny("Startup approval name is not a plain entry name.");
-        if (!s.Actif && s.Nom.Equals("SecurityHealth", StringComparison.OrdinalIgnoreCase))
-            return Deny("Windows Security stays at startup.");
+        if (!s.Actif && ProtegesAuDemarrage.Est(s.Nom))
+            return Deny("Security software and parental controls stay at startup.");
         return Result.Ok();
     }
 
     private static bool PagingFilesPermis(string? valeur)
     {
-        var entrees = (valeur ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToArray();
+        var entrees = MultiTexteDuRegistre.Entrees(valeur ?? "");
         // Ou ce que l'Annuler de fixit.pagefile_ssd remet : des tailles gérées par le système sur des lecteurs nommés.
         return entrees.Length == 0
             || (entrees.Length == 1 && string.Equals(entrees[0], PagingFilesGereParWindows, StringComparison.Ordinal))
@@ -438,6 +453,9 @@ public sealed class OpAllowlist
             // Le bloc processeur (C-states, limites de puissance), en lecture, meme regle.
             _ when string.Equals(op.VendorGuid, IntelCpuSetupGuid, StringComparison.Ordinal)
                 => ReadableCpuVariables,
+            // Les valeurs d'usine du firmware AMI, en lecture, meme regle.
+            _ when string.Equals(op.VendorGuid, AmiStandardDefaultsGuid, StringComparison.Ordinal)
+                => ReadableDefaultsVariables,
             // Tout autre espace de noms reste hors de portee par construction.
             _ => null,
         };
@@ -525,12 +543,14 @@ public sealed class OpAllowlist
         // Un nom de profil non vide ne suffit jamais à lui seul.
         if (Array.IndexOf(AllowedDrsSettingIds, d.SettingId) < 0)
             return Deny("DRS setting id is not allowlisted.");
-        // La valeur aussi : l'énumération documentée par NVIDIA, rien de plus strict (un inverse rejoue la valeur lue chez le
-        // joueur). Limite assumée : une valeur documentée mais gênante (un plafond bas sur le profil de base) reste admise,
+        // La valeur aussi : l'énumération documentée par NVIDIA (un inverse rejoue la valeur lue chez le joueur), et au
+        // profil de base jamais un limiteur d'images sous 20 i/s, qui rend toute la machine inutilisable en jeu. Limite
+        // assumée : une autre valeur documentée mais gênante (la synchronisation verticale forcée) reste admise,
         // réversible par le joueur dans le panneau NVIDIA ; voir docs/NON-NUISANCE.md.
-        return ValeursDrs.Documentee(d.SettingId, d.Value)
+        return ValeursDrs.Admise(d.SettingId, d.Value, IsBaseProfileScope(d.ProfileName))
             ? Result.Ok()
-            : Deny($"DRS value 0x{d.Value:X} for setting 0x{d.SettingId:X8} is outside NVIDIA's documented values.");
+            : Deny($"DRS value 0x{d.Value:X} for setting 0x{d.SettingId:X8} is outside NVIDIA's documented values, "
+                 + "or a frame-rate limit under 20 fps on the base profile.");
     }
 
 
@@ -596,7 +616,19 @@ public sealed class OpAllowlist
             return Deny("Negative GPU index.");
         if (!Enum.IsDefined(typeof(AdlxTuningKind), a.Kind))
             return Deny("Unknown ADLX tuning kind.");
-        return Result.Ok();
+        // La forme de chaque valeur. La bande de l'undervolt est relative à la MaxFreq lue sur la carte : elle se vérifie
+        // dans l'exécuteur (ADLXTuningActions), ici seulement une fréquence positive.
+        return a.Kind switch
+        {
+            AdlxTuningKind.Undervolt when a.IntValue <= 0 => Deny("ADLX undervolt carries an absolute MaxFreq in MHz, above zero."),
+            AdlxTuningKind.PowerLimit when !Execution.Adlx.AdlxTuningMath.IsPowerLimitWithinHardRail(a.IntValue)
+                => Deny($"ADLX power limit outside [{Execution.Adlx.AdlxTuningMath.MinPowerLimitPct}, {Execution.Adlx.AdlxTuningMath.MaxPowerLimitPct}] %."),
+            AdlxTuningKind.AntiLag when a.IntValue is not (0 or 1) => Deny("ADLX Anti-Lag is 0 or 1."),
+            AdlxTuningKind.VerticalRefresh when a.IntValue is < 0 or > 3 => Deny("ADLX vertical refresh mode is 0 to 3."),
+            AdlxTuningKind.FrameRateTarget when a.IntValue == 0 => Deny("ADLX frame rate target 0 is neither a target nor a state."),
+            AdlxTuningKind.RemiseUsine when a.IntValue != 0 => Deny("ADLX factory reset carries no value."),
+            _ => Result.Ok(),
+        };
     }
 
     // Bornes structurelles de défense en profondeur pour une courbe de ventilateur (indépendantes
@@ -639,6 +671,19 @@ public sealed class OpAllowlist
         if (string.IsNullOrWhiteSpace(el.RevertOpJson))
             return Deny("Lease op missing revert payload.");
         return Result.Ok();
+    }
+
+    private Result ValiderLInterieure(string json)
+    {
+        var interieure = PrivilegedOpCodec.Deserialize(json);
+        if (!interieure.IsOk || interieure.Value is null) return Deny("The carried op cannot be read.");
+        if (interieure.Value is PoseEnAttenteDOrigineOp or AcquitterEcritureOp)
+            return Deny("A write-ahead journal op cannot carry another one.");
+        // L'App n'enveloppe qu'une op journalisée. Une autre, enveloppée, échapperait aux filtres du serveur qui regardent le
+        // type reçu (la vitesse fixe sans bail) puis partirait nue : refusée ici, pour tout filtre présent ou à venir.
+        if (Journal.ClassesDuJournal.De(interieure.Value) != Journal.ClasseDuJournal.Journalisee)
+            return Deny("A write-ahead journal op only carries a journaled write.");
+        return Validate(interieure.Value);
     }
 
     private static Result ValidateRenewLease(RenewLeaseOp rl)

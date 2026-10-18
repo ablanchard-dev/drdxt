@@ -1,5 +1,4 @@
-﻿using static DrDxt.Core.TexteFrancais;
-namespace DrDxt.Core;
+﻿namespace DrDxt.Core;
 
 /// <summary>Ce que le diagnostic dit d'un candidat, avant de depenser le temps du joueur.</summary>
 /// <param name="Id">Le candidat juge.</param>

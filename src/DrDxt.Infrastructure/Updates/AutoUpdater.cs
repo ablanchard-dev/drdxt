@@ -112,33 +112,85 @@ public sealed class AutoUpdater
     private async Task<Result<(UpdateManifest Manifest, byte[] Payload)?>> GateAsync(
         CancellationToken ct, CancellationToken telechargement)
     {
+        var annonce = await AnnoncerAsync(ct);
+        if (!annonce.IsOk)
+            return Result<(UpdateManifest, byte[])?>.Fail(annonce.Error!.Value.Code, annonce.Error.Value.Message);
+        if (annonce.Value is not { } manifest)
+            return Result<(UpdateManifest, byte[])?>.Ok(null);
+
+        var charge = await ChargeVerifieeAsync(manifest, telechargement);
+        if (!charge.IsOk)
+            return Result<(UpdateManifest, byte[])?>.Fail(charge.Error!.Value.Code, charge.Error.Value.Message);
+        return Result<(UpdateManifest, byte[])?>.Ok((manifest, charge.Value!));
+    }
+
+    /// <summary>La version App signée et plus récente qu'offre le serveur, sans rien télécharger : le manifeste seul (quelques
+    /// centaines d'octets), signature et canal vérifiés. null = à jour. L'installeur ne part qu'au clic, par
+    /// <see cref="TelechargerAsync"/>.</summary>
+    public async Task<Result<UpdateManifest?>> AnnoncerAsync(CancellationToken ct)
+    {
         var manifestResult = await _feed.GetManifestAsync(UpdateChannel.App, ct);
         if (!manifestResult.IsOk)
             // Hors ligne (ou toute panne de transport) → non bloquant ; l'app reste sur sa version actuelle.
-            return Result<(UpdateManifest, byte[])?>.Fail(
-                manifestResult.Error!.Value.Code, manifestResult.Error.Value.Message);
+            return Result<UpdateManifest?>.Fail(manifestResult.Error!.Value.Code, manifestResult.Error.Value.Message);
 
         var manifest = manifestResult.Value;
         if (manifest is null)
-            return Result<(UpdateManifest, byte[])?>.Ok(null); // already current
+            return Result<UpdateManifest?>.Ok(null); // already current
 
         // Le canal fait partie des octets signés : un manifeste signé pour autre chose est refusé.
         if (manifest.Channel != UpdateChannel.App)
-            return Result<(UpdateManifest, byte[])?>.Fail(UpdateErrorCodes.SignatureInvalid,
+            return Result<UpdateManifest?>.Fail(UpdateErrorCodes.SignatureInvalid,
                 $"Update manifest is for channel {manifest.Channel}, not App.");
 
         // (1) La signature d'abord : on ne télécharge même pas la charge depuis une url non fiable.
         var sig = _verifier.VerifyManifest(manifest);
         if (!sig.IsOk)
-            return Result<(UpdateManifest, byte[])?>.Fail(sig.Error!.Value.Code, sig.Error.Value.Message);
+            return Result<UpdateManifest?>.Fail(sig.Error!.Value.Code, sig.Error.Value.Message);
 
         // Le site sert toujours le dernier manifeste. La version déjà installée n'est pas une
         // nouvelle version : sans ce test, elle était retéléchargée et « Installer » la reproposait à chaque démarrage.
         if (!UpdateVerifier.IsDowngrade(manifest.Version, _installedVersion)
             && !UpdateVerifier.IsDowngrade(_installedVersion, manifest.Version))
-            return Result<(UpdateManifest, byte[])?>.Ok(null);
+            return Result<UpdateManifest?>.Ok(null);
+        // Une version plus ancienne n'est pas offerte non plus.
+        if (UpdateVerifier.IsDowngrade(manifest.Version, _installedVersion))
+            return Result<UpdateManifest?>.Fail(UpdateErrorCodes.Downgrade,
+                $"Update manifest offers {manifest.Version}, older than the installed {_installedVersion}.");
 
-        // (2) Seulement maintenant, récupérer la charge (l'url vient d'un manifeste signé).
+        return Result<UpdateManifest?>.Ok(manifest);
+    }
+
+    /// <summary>Au clic « Installer » : la charge du manifeste annoncé, téléchargée (ou reprise si déjà stagée avec la même
+    /// empreinte), vérifiée (signature relue, empreinte, non-rétrogradation), puis stagée. Rend le chemin de l'installeur
+    /// vérifié, à passer à InstallationMiseAJour, qui relit l'empreinte sur le fichier même qu'il lance.</summary>
+    public async Task<Result<string>> TelechargerAsync(UpdateManifest annonce, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(annonce);
+        // Le manifeste a fait l'aller-retour par l'écran : relu, il n'est cru que signé.
+        if (annonce.Channel != UpdateChannel.App)
+            return Result<string>.Fail(UpdateErrorCodes.SignatureInvalid, $"Update manifest is for channel {annonce.Channel}, not App.");
+        var sig = _verifier.VerifyManifest(annonce);
+        if (!sig.IsOk)
+            return Result<string>.Fail(sig.Error!.Value.Code, sig.Error.Value.Message);
+
+        var charge = await ChargeVerifieeAsync(annonce, ct);
+        if (!charge.IsOk)
+            return Result<string>.Fail(charge.Error!.Value.Code, charge.Error.Value.Message);
+
+        var staging = CombinePath(_stagingRoot, "app-staging");
+        var stage = StagePayload(charge.Value!, staging);
+        if (!stage.IsOk)
+        {
+            _fs.DeleteDirectory(staging);
+            return Result<string>.Fail(stage.Error!.Value.Code, stage.Error.Value.Message);
+        }
+        return Result<string>.Ok(stage.Value!);
+    }
+
+    // (2) puis (3) : la charge d'un manifeste déjà vérifié, puis son empreinte (+ non-rétrogradation).
+    private async Task<Result<byte[]>> ChargeVerifieeAsync(UpdateManifest manifest, CancellationToken telechargement)
+    {
         // Tant que l'installation est manuelle, le canal App retelechargerait la meme charge a chaque
         // demarrage : une charge deja stagee avec l'empreinte du manifeste signe est reprise, et repasse
         // la verification (3) comme une charge neuve.
@@ -152,18 +204,17 @@ public sealed class AutoUpdater
         {
             var download = await _feed.DownloadAsync(manifest.Url, telechargement);
             if (!download.IsOk)
-                return Result<(UpdateManifest, byte[])?>.Fail(
-                    download.Error!.Value.Code, download.Error.Value.Message);
+                return Result<byte[]>.Fail(download.Error!.Value.Code, download.Error.Value.Message);
             payload = download.Value!;
         }
 
         // (3) Empreinte (+ non-rétrogradation) contre le manifeste désormais fiable. Désaccord → jamais utilisée.
         var hash = _verifier.VerifyPayload(manifest, payload, _installedVersion, allowDowngrade: false);
         if (!hash.IsOk)
-            return Result<(UpdateManifest, byte[])?>.Fail(hash.Error!.Value.Code, hash.Error.Value.Message);
+            return Result<byte[]>.Fail(hash.Error!.Value.Code, hash.Error.Value.Message);
 
         DerniereVersionApp = manifest;
-        return Result<(UpdateManifest, byte[])?>.Ok((manifest, payload));
+        return Result<byte[]>.Ok(payload);
     }
 
     /// <summary>Le manifeste App verifie au dernier passage (signature, empreinte, non-retrogradation).

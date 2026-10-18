@@ -29,7 +29,7 @@ public static class RegistreDeLimiteCpu
         if (pl1 <= 0 || nominale <= 0 || nominale > 2000) return null;
         return new LimiteDePuissanceLue(pl1, pl2, nominale, ((pkgPowerLimit >> 63) & 1) == 1,
             Pl1Active: ((pkgPowerLimit >> 15) & 1) == 1, RegistreAuMaximum: pl1Brut == 0x7FFF,
-            MaximaleW: ((pkgPowerInfo >> 32) & 0x7FFF) * unite);
+            MaximaleW: ((pkgPowerInfo >> 32) & 0x7FFF) * unite, Pl2SansLimite: ((pkgPowerLimit >> 32) & 0x7FFF) == 0x7FFF);
     }
 
     /// <summary>La copie MMIO décodée en watts : null = non lue ; 0 = présente mais inactive (bit 15 à zéro ou champ vide :

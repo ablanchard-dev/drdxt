@@ -8,6 +8,12 @@ namespace DrDxt.Core;
 /// </summary>
 public static class ValeursDrs
 {
+    /// <summary>Documentée, et au profil de base jamais un limiteur d'images sous 20 i/s (1 i/s est documenté, et rend toute
+    /// la machine inutilisable en jeu). Un levier dont l'origine au profil de base y tombe n'écrit pas : son inverse serait
+    /// refusé.</summary>
+    public static bool Admise(uint id, uint valeur, bool auProfilDeBase)
+        => Documentee(id, valeur) && !(auProfilDeBase && id == 0x10835002 && valeur is > 0 and < 20);
+
     public static bool Documentee(uint id, uint valeur) => id switch
     {
         // FRL_FPS : DISABLED = MIN = 0, MAX = 0x3FF.

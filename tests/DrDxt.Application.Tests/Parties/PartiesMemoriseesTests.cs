@@ -29,6 +29,21 @@ public sealed class PartiesMemoriseesTests : IDisposable
         Memoire().Lire().Select(p => p.FpsMedian).Should().Equal(130, 120);
     }
 
+    // Un « null » dans la liste (fichier écrit à la main, ou par une version qui en laissait) n'est pas une partie : il
+    // n'atteint aucun lecteur, et l'ajout suivant ne le réécrit pas.
+    [Fact]
+    public void Un_null_dans_le_fichier_n_est_ni_lu_ni_reecrit()
+    {
+        File.WriteAllText(Path.Combine(_dossier, "parties.json"), "[null]");
+        Memoire().Lire().Should().BeEmpty();
+
+        Memoire().Ajouter(P(120));
+
+        Memoire().Lire().Should().ContainSingle().Which.FpsMedian.Should().Be(120);
+        using var ecrit = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(_dossier, "parties.json")));
+        ecrit.RootElement.EnumerateArray().Select(e => e.ValueKind).Should().Equal(System.Text.Json.JsonValueKind.Object);
+    }
+
     [Fact]
     public void Un_fichier_abime_ne_donne_aucune_partie_et_n_allume_rien()
     {

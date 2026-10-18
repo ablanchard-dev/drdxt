@@ -37,7 +37,9 @@ public static class LeviersVerifies
         var tentes = essayes.ToHashSet(StringComparer.Ordinal);
         var tous = Lire(chemin, empreinte).Where(id => !tentes.Contains(id)).Concat(valides)
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
-        Directory.CreateDirectory(Path.GetDirectoryName(chemin)!);
-        File.WriteAllText(chemin, JsonSerializer.Serialize(new Contenu(empreinte, tous)));
+        // Fichier du compte : jamais à travers un nom posé d'avance en lien (l'App peut tourner élevée).
+        var ecrit = new DrDxt.Core.FichierJsonAtomique(chemin, DrDxt.Core.ErrorCodes.IoFailure)
+            .WriteAtomic(JsonSerializer.Serialize(new Contenu(empreinte, tous)));
+        if (!ecrit.IsOk) throw new IOException(ecrit.Error!.Value.Message);
     }
 }

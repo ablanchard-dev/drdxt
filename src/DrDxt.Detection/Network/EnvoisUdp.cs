@@ -18,6 +18,16 @@ public static class EnvoisUdp
     public static readonly Guid Fournisseur = new("7dd42a49-5329-4832-8dfd-43d979153a88");
     public const ushort EvenementEnvoiIpv4 = 42;
     public const ulong MotCleIpv4 = 0x10;
+    public const ulong MotCleIpv6 = 0x20;
+
+    /// <summary>Les envois TCPv4 (10), TCPv6 (26), UDPv4 (42) et UDPv6 (58). Relevé sur la machine de référence le
+    /// 17/10/2026 par `wevtutil gp Microsoft-Windows-Kernel-Network /ge /gm` : mots-clés 0x10 (IPv4) et 0x20 (IPv6), message
+    /// « %2 bytes transmitted from %4:%6 to %3:%5 », le PID en %1 et la taille en %2, comme l'événement 42.</summary>
+    public static readonly ushort[] EvenementsEnvoi = [10, 26, 42, 58];
+
+    /// <summary>Le PID et la taille en tête de chaque événement d'envoi, dans l'ordre de la machine.</summary>
+    public static (int Pid, int Octets) PidEtTaille(ReadOnlySpan<byte> tete)
+        => (BinaryPrimitives.ReadInt32LittleEndian(tete), BinaryPrimitives.ReadInt32LittleEndian(tete[4..]));
     private const int TailleMinimale = 20;
 
     /// <summary>Lit la charge d'un événement 42, ou <c>null</c> si elle est trop courte pour être cet événement.</summary>

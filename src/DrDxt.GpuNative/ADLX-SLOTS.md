@@ -23,6 +23,7 @@ later edit fails the build.
 | IADLXSystem (`ISystem.h`) | GetGPUTuningServices | 8 |
 | IADLXGPUList (`ISystem.h`) | Size | 3 |
 | IADLXGPUList (`ISystem.h`) | At_GPUList | 11 |
+| IADLXGPUTuningServices (`IGPUTuning.h`) | ResetToFactory | 5 |
 | IADLXGPUTuningServices (`IGPUTuning.h`) | IsSupportedManualGFXTuning | 8 |
 | IADLXGPUTuningServices (`IGPUTuning.h`) | IsSupportedManualFanTuning | 10 |
 | IADLXGPUTuningServices (`IGPUTuning.h`) | IsSupportedManualPowerTuning | 11 |

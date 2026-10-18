@@ -1,0 +1,45 @@
+name: Validation AMD / AMD validation
+description: Un chemin AMD de DrDXT vérifié sur ton Ryzen ou ta Radeon. / A DrDXT AMD path checked on your Ryzen or Radeon.
+title: "Validation AMD : <processeur / processor> + <carte graphique / graphics card>"
+labels: ["preuve"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci ! Le protocole et ce que le rapport doit montrer, chemin par chemin : docs/VALIDATION-AMD.fr.md. Le rapport du zip est dans `Téléchargements\DrDXT-validation-<date>.txt` ou `DrDXT-rapport-<date>.txt` ; le nom du PC et du compte, les numéros de série et les adresses réseau en sont retirés. Relis-le avant de l'envoyer.
+
+        Thank you! The protocol and what the report must show, path by path: docs/VALIDATION-AMD.md. The zip's report is in `Downloads\DrDXT-validation-<date>.txt` or `DrDXT-rapport-<date>.txt`; the PC and account names, serial numbers and network addresses are removed from it. Read it before sending.
+  - type: input
+    id: materiel
+    attributes:
+      label: Processeur, carte, version du pilote AMD, version de DrDXT / Processor, card, AMD driver version, DrDXT version
+      placeholder: "Ryzen 7 7800X3D, RX 7800 XT, Adrenalin 25.x, DrDXT 0.9.x"
+    validations:
+      required: true
+  - type: textarea
+    id: rapport
+    attributes:
+      label: Le rapport / The report
+      description: Glisse le fichier ici, ou colle son contenu. / Drop the file here, or paste its content.
+    validations:
+      required: true
+  - type: textarea
+    id: reference
+    attributes:
+      label: Les valeurs de l'outil de référence, avant et après / The reference tool values, before and after
+      description: Adrenalin, HWiNFO, Ryzen Master ou ZenTimings, selon le chemin (une capture d'écran convient). / Adrenalin, HWiNFO, Ryzen Master or ZenTimings, depending on the path (a screenshot is fine).
+    validations:
+      required: true
+  - type: checkboxes
+    id: protocole
+    attributes:
+      label: Le protocole / The protocol
+      options:
+        - label: Tous les jeux étaient fermés. / All games were closed.
+        - label: Refait avec HWiNFO ouvert pendant le test. / Done again with HWiNFO open during the test.
+        - label: Refait sans droits administrateur. / Done again without administrator rights.
+  - type: textarea
+    id: remarques
+    attributes:
+      label: Ce que tu as remarqué / What you noticed
+      description: Un réglage qui ne s'est pas rendu, une valeur qui diffère de l'outil de référence, un plantage. / A setting that was not restored, a value that differs from the reference tool, a crash.

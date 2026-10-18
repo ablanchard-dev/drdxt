@@ -132,6 +132,8 @@ public sealed class FakeSystemState
 
     // --- DRS ---
     public uint GetDrs(uint id) => _drs.TryGetValue(id, out var v) ? v : 0;
+    /// <summary>Le réglage DRS, ou null quand il n'est posé nulle part (le pilote applique alors son défaut).</summary>
+    public uint? LireDrs(uint id) => _drs.TryGetValue(id, out var v) ? v : null;
     public void SetDrs(uint id, uint value) => _drs[id] = value;
 
     // -----------------------------------------------------------------------
@@ -255,6 +257,11 @@ public sealed class FakeElevatedClient : IElevatedClient
                     f.Points.Select(pt => new FanCurvePoint(pt.TempC, pt.DutyPct)).ToArray());
                 break;
 
+            // Comme Win32ServiceActions : démarrer ou arrêter un service absent lève, et l'op échoue.
+            case RunServiceControlOp { Action: ServiceAction.Start or ServiceAction.Stop } s
+                when _state.GetService(s.ServiceName) == ServiceState.NotInstalled:
+                return Task.FromResult(Result.Fail(ErrorCodes.HelperOpFailed, "service not installed (test)"));
+
             case RunServiceControlOp s:
                 ApplyService(s);
                 break;
@@ -323,14 +330,18 @@ public sealed class FakeNvApi : INvApi
 
     public bool IsAvailable => _state.NvApiAvailable;
     public Result<uint> GetLowLatencyMode() => Result<uint>.Ok(_state.NvLowLatencyMode);
-    public Result<uint> GetMaxPreRenderedFrames() => Result<uint>.Ok(_state.NvMaxPreRenderedFrames);
+    // Comme le vrai lecteur (NvApiNative.TryGetDrsGlobalSetting) : un réglage posé nulle part échoue
+    // (NVAPI_SETTING_NOT_FOUND), il ne rend pas une valeur que personne n'a écrite.
+    public Result<uint> GetMaxPreRenderedFrames() => Drs(0x007ba09e);
     public Result<uint> GetVsyncMode() => Result<uint>.Ok(_state.NvVsyncMode);
     public Result<uint> GetFrameRateLimit() => Result<uint>.Ok(_state.NvFrameRateLimit);
     public Result<DrsOriginState> GetFrameRateLimitOrigin() =>
         Result<DrsOriginState>.Ok(DrsSettingOrigin.Describe(0, 0, 0));
-    // heuristique : adaptatif (0) par défaut ; aucun flux d'intégration n'exerce encore Prefer-Max-Perf ;
-    // ajouter un champ à FakeSystemState le jour où l'un le fait.
-    public Result<uint> GetPreferredPstate() => Result<uint>.Ok(0);
+    public Result<uint> GetPreferredPstate() => Drs(0x1057EB71);
+
+    private Result<uint> Drs(uint id) => _state.LireDrs(id) is { } v
+        ? Result<uint>.Ok(v)
+        : Result<uint>.Fail(ErrorCodes.TweakSdkUnavailable, "DRS setting not set (driver default).");
 }
 
 public sealed class FakeAdlx : IAdlx
@@ -426,7 +437,8 @@ public sealed class FakePowerPlanReader : IPowerPlanReader
         : Result<EconomieSansFilLue>.Fail(ErrorCodes.TweakSdkUnavailable, "plan non modélisé");
 }
 
-/// <summary>Les registres de limite de puissance du banc (unité = huitièmes de watt, base 65 W).</summary>
+/// <summary>Les registres de limite de puissance du banc (unité = huitièmes de watt, base 65 W), avec des parties relevées
+/// sous le seuil de chaleur (80 °C) : sans température de partie, la montée n'est jamais proposée.</summary>
 public sealed class FakeCpuPowerLimitReader : ICpuPowerLimitReader
 {
     private readonly FakeSystemState _state;
@@ -444,7 +456,7 @@ public sealed class FakeCpuPowerLimitReader : ICpuPowerLimitReader
         var lu = RegistreDeLimiteCpu.Decoder(0x3, _state.CpuPkgPowerLimit, 520UL);
         return lu is null
             ? Result<LectureLimiteCpu>.Fail(ErrorCodes.TweakSdkUnavailable, "registres vides")
-            : Result<LectureLimiteCpu>.Ok(new LectureLimiteCpu(registres, lu with { CopieMmioPl1W = 0, PlafondThermiqueW = _plafondThermique }));
+            : Result<LectureLimiteCpu>.Ok(new LectureLimiteCpu(registres, lu with { CopieMmioPl1W = 0, PlafondThermiqueW = _plafondThermique, ChaleurEnPartieMaxC = 80 }));
     }
 }
 

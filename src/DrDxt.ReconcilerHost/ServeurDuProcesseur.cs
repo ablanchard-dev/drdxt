@@ -41,6 +41,7 @@ public sealed class ServeurDuProcesseur : BackgroundService
     private readonly Func<bool> _ouvert;
     private readonly Func<DateTimeOffset> _horloge;
     private readonly string _nom;
+    private readonly TimeSpan _delaiEcriture;
     private long _derniereDemandeTicks = DateTimeOffset.MinValue.UtcTicks;
 
     public ServeurDuProcesseur()
@@ -49,11 +50,13 @@ public sealed class ServeurDuProcesseur : BackgroundService
             VentilateursDirects) { }
 
     /// <summary>Coutures de test : la lecture, la fermeture de PawnIO, l'horloge, le nom du tube, la lecture des limites, celle
-    /// des ventilateurs.</summary>
+    /// des ventilateurs, la borne d'écriture.</summary>
     internal ServeurDuProcesseur(Func<EtatCpu?> lire, Action fermer, Func<bool> ouvert, Func<DateTimeOffset> horloge, string nom,
-        Func<(RegistresCpuLus? Limites, ulong? CopieMmio)>? lireLimites = null, Func<IReadOnlyList<VentilateurLu>?>? lireVentilateurs = null)
-        => (_lire, _fermer, _ouvert, _horloge, _nom, _lireLimites, _lireVentilateurs)
-            = (lire, fermer, ouvert, horloge, nom, lireLimites ?? (() => (null, null)), lireVentilateurs ?? (() => null));
+        Func<(RegistresCpuLus? Limites, ulong? CopieMmio)>? lireLimites = null, Func<IReadOnlyList<VentilateurLu>?>? lireVentilateurs = null,
+        TimeSpan? delaiEcriture = null)
+        => (_lire, _fermer, _ouvert, _horloge, _nom, _lireLimites, _lireVentilateurs, _delaiEcriture)
+            = (lire, fermer, ouvert, horloge, nom, lireLimites ?? (() => (null, null)), lireVentilateurs ?? (() => null),
+                delaiEcriture ?? DelaiEcriture);
 
     /// <summary>Les ventilateurs de la carte mère, lus ici (le service a les droits) ; null sans PawnIO ou sur une puce non lue.
     /// Une lecture coûte ~79 ms de processeur : la dernière sert pendant PawnIoSuperIo.IntervalleLecture (5 s).</summary>
@@ -118,7 +121,7 @@ public sealed class ServeurDuProcesseur : BackgroundService
                 enCours.Add(Task.Run(async () =>
                 {
                     try { if (connecte) await RepondreAsync(servie, ct).ConfigureAwait(false); }
-                    catch (Exception) { }
+                    catch (Exception) { /* une réponse ratée n'arrête pas le serveur : le client suivant est servi */ }
                     finally { await servie.DisposeAsync().ConfigureAwait(false); }
                 }, CancellationToken.None));
                 courante = suivante;
@@ -141,15 +144,15 @@ public sealed class ServeurDuProcesseur : BackgroundService
         EtatCpu? etat = null;
         (RegistresCpuLus? Limites, ulong? CopieMmio) limites = (null, null);
         try { etat = _lire(); }
-        catch (Exception) { }
+        catch (Exception) { /* servi null : le client dit « non lu » */ }
         try { limites = _lireLimites(); }
-        catch (Exception) { }
+        catch (Exception) { /* servies null : le client dit « non lues » */ }
         IReadOnlyList<VentilateurLu>? ventilateurs = null;
         try { ventilateurs = _lireVentilateurs(); }
         catch (Exception) { } // une panne des ventilateurs ne prive jamais de l'état du processeur
         var octets = Encoding.UTF8.GetBytes(new EtatCpuServi(_horloge(), etat, limites.Limites, limites.CopieMmio, ventilateurs).VersJson() + "\n");
         using var borne = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        borne.CancelAfter(DelaiEcriture);
+        borne.CancelAfter(_delaiEcriture);
         try
         {
             await tube.WriteAsync(octets, borne.Token).ConfigureAwait(false);

@@ -136,4 +136,74 @@ public sealed class PawnIoCpuPowerActionsTests
         a.SetPackagePowerLimit(bas, Usine).IsOk.Should().BeFalse("1 W : une baisse arbitraire sous le cinquième de la PL2");
         ecrites.Should().Equal(Usine);
     }
+    // Bien des cartes mettent la PL2 à 0x7FFF (4095 W, « sans limite ») : borner la montée à la seule PL2 laissait
+    // n'importe quel programme du compte poser une PL1 de 4095 W. Les bornes de la montée du levier sont relues ici.
+    private const ulong Pl2SansLimite = (0x7FFFUL << 32) | (1UL << 47) | (1UL << 15) | 520UL; // PL2 « sans limite », PL1 65 W
+
+    [Fact]
+    public void Sous_une_PL2_sans_limite_et_sans_maximum_publie_aucune_montee()
+    {
+        var ecrites = 0;
+        var a = new PawnIoCpuPowerActions(() => new(0x3, Pl2SansLimite, 520UL), _ => { ecrites++; return true; });
+
+        var r = a.SetPackagePowerLimit(RegistreDeLimiteCpu.ComposerPl1(Pl2SansLimite, 4095, 0x3), Pl2SansLimite);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Message.Should().Contain("no limit");
+        ecrites.Should().Be(0);
+    }
+
+    [Fact]
+    public void La_montee_s_arrete_a_la_puissance_maximale_que_le_processeur_publie()
+    {
+        const ulong pl2Haute = (4000UL << 32) | (1UL << 47) | (1UL << 15) | 520UL; // PL2 500 W, PL1 65 W
+        const ulong info = (2024UL << 32) | 520UL; // maximale 253 W, base 65 W (unité 1/8 W)
+        var ecrites = new List<ulong>();
+        var a = new PawnIoCpuPowerActions(() => new(0x3, pl2Haute, info), v => { ecrites.Add(v); return true; });
+
+        a.SetPackagePowerLimit(RegistreDeLimiteCpu.ComposerPl1(pl2Haute, 300, 0x3), pl2Haute).IsOk.Should().BeFalse();
+        ecrites.Should().BeEmpty("300 W dépasse les 253 W publiés");
+
+        var a253 = RegistreDeLimiteCpu.ComposerPl1(pl2Haute, 253, 0x3);
+        a.SetPackagePowerLimit(a253, pl2Haute).IsOk.Should().BeTrue();
+        ecrites.Should().Equal(a253);
+    }
+
+    [Fact]
+    public void Rendre_la_PL1_du_firmware_passe_meme_sous_une_PL2_sans_limite()
+    {
+        var cap = RegistreDeLimiteCpu.ComposerPl1(Pl2SansLimite, 50, 0x3);
+        var ecrites = new List<ulong>();
+        var a = new PawnIoCpuPowerActions(() => new(0x3, cap, 520UL), v => { ecrites.Add(v); return true; },
+            firmwareDuDemarrage: _ => Pl2SansLimite);
+
+        a.SetPackagePowerLimit(Pl2SansLimite, cap).IsOk.Should().BeTrue();
+        ecrites.Should().Equal(Pl2SansLimite);
+    }
+    // Éteindre la PL1 (bit 15 à 0) n'est pas une « montée » du champ, mais le processeur tient alors la PL2 sans fin.
+    [Fact]
+    public void La_PL1_ne_s_eteint_pas_par_son_bit_d_activation()
+    {
+        var ecrites = 0;
+        var a = new PawnIoCpuPowerActions(() => new(0x3, Pl2SansLimite, 520UL), _ => { ecrites++; return true; });
+
+        var r = a.SetPackagePowerLimit(Pl2SansLimite & ~(1UL << 15), Pl2SansLimite);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Message.Should().Contain("bit 15");
+        ecrites.Should().Be(0);
+    }
+
+    [Fact]
+    public void Un_firmware_qui_avait_la_PL1_eteinte_se_rend_tel_quel()
+    {
+        var firmware = Pl2SansLimite & ~(1UL << 15);
+        var cap = RegistreDeLimiteCpu.ComposerPl1(firmware, 50, 0x3);
+        var ecrites = new List<ulong>();
+        var a = new PawnIoCpuPowerActions(() => new(0x3, cap, 520UL), v => { ecrites.Add(v); return true; },
+            firmwareDuDemarrage: _ => firmware);
+
+        a.SetPackagePowerLimit(firmware, cap).IsOk.Should().BeTrue();
+        ecrites.Should().Equal(firmware);
+    }
 }
