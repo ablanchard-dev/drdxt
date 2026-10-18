@@ -108,14 +108,16 @@ public sealed class AppliedTweakManifestMapper
     /// ne relit que lui : elle laissait leur réglage en place. Leur origine y entre en <c>RevertOnly</c> (rendue à la
     /// désinstallation, jamais réaffirmée), comme le fait déjà un levier gardé en jeu (TweakCandidate.Garder).
     /// Seulement une origine que la désinstallation sait rendre : un réglage de carte graphique n'y entre pas.</summary>
-    public IReadOnlyList<AppliedTweak> ToRevertOnly(ApplyReport report)
+    /// <param name="pourUnEssai">Un essai en alternance rend lui-même son levier une partie sur deux : même un levier que le
+    /// service réapplique n'est gardé que pour la désinstallation, jamais réappliqué.</param>
+    public IReadOnlyList<AppliedTweak> ToRevertOnly(ApplyReport report, bool pourUnEssai = false)
     {
         var quand = DateTimeOffset.UtcNow;
         return report.Outcomes
             // Sans valeur posée, la désinstallation ne sait pas si la valeur est encore
             // celle de DrDXT et n'y touche jamais (le fichier d'échange) : l'inscrire ferait croire qu'elle la rend.
             .Where(o => o.Applied && !o.AutoReverted && o.Snapshot is { AppliedValueJson: { Length: > 0 } }
-                        && !Map.ContainsKey(o.TweakId) && OrigineRendable(o.Snapshot.OriginalValueJson))
+                        && (pourUnEssai || !Map.ContainsKey(o.TweakId)) && OrigineRendable(o.Snapshot.OriginalValueJson))
             .Select(o => new AppliedTweak(o.TweakId, o.Snapshot!.AppliedValueJson!, o.Snapshot.OriginalValueJson, quand))
             .ToList();
     }
@@ -134,6 +136,14 @@ public sealed class AppliedTweakManifestMapper
             if (PrivilegedOpCodec.Deserialize(origine) is { IsOk: true, Value: { } une }) return Rendable(une);
             return CompositeSnapshotCodec.Decode(origine) is { IsOk: true, Value: { Count: > 0 } toutes } && toutes.All(Rendable);
         }
+        catch (Exception) { return false; }
+    }
+
+    /// <summary>Une origine que la désinstallation rend sans manifeste (RendreLaCarteNvidiaAsync) : le décalage du cœur et le
+    /// ventilateur NVIDIA, volatils, remis à 0 et à l'automatique. Aucune autre.</summary>
+    public static bool RemiseALAutomatiqueALaDesinstallation(string origine)
+    {
+        try { return PrivilegedOpCodec.Deserialize(origine) is { IsOk: true, Value: ApplyNvApiClockOffsetOp or RestoreGpuFanAutoOp }; }
         catch (Exception) { return false; }
     }
 

@@ -1,10 +1,10 @@
 namespace DrDxt.App.Platform;
 
 /// <summary>
-/// Le rapport de « Vérifier DrDXT » part par un ticket GitHub
-/// pré-rempli (modèle .github/ISSUE_TEMPLATE/rapport-de-verification.yml, champ « rapport »). Aucun serveur : DrDXT ouvre
-/// le navigateur, le joueur relit et soumet lui-même. Une adresse trop longue est refusée par les navigateurs et par
-/// GitHub : au-delà de <see cref="LongueurMax"/>, le rapport est coupé et le dit (le fichier complet se joint au ticket).
+/// Le rapport de « Vérifier DrDXT » part par un ticket GitHub (modèle .github/ISSUE_TEMPLATE/rapport-de-verification.yml).
+/// Aucun serveur : DrDXT ouvre le navigateur sur le modèle vide, le joueur y glisse le fichier, le relit et soumet lui-même.
+/// Rien du rapport ni du matériel ne va dans l'adresse : le navigateur l'envoie à GitHub dès l'ouverture (et la garde dans
+/// son historique), avant toute relecture.
 /// </summary>
 public static class LienDeRapport
 {
@@ -18,25 +18,10 @@ public static class LienDeRapport
     /// n'est pas stable.</summary>
     public const string GuideSousTension = Guide + "#sous-tension";
 
-    public const int LongueurMax = 7000;
+    /// <summary>Le modèle de ticket, vide.</summary>
+    public const string Nouveau = $"https://github.com/{Depot}/issues/new?template=rapport-de-verification.yml";
 
-    private static string Coupure => "\n\n" + DrDxt.Core.Docteur.T("App.RapportCoupe");
-
-    public static string Construire(string processeur, string carte, string rapport)
-    {
-        string Lien(string texte) => $"https://github.com/{Depot}/issues/new?template=rapport-de-verification.yml"
-            + $"&title={Uri.EscapeDataString($"Vérification : {processeur} + {carte}")}"
-            + $"&rapport={Uri.EscapeDataString(texte)}";
-
-        var lien = Lien(rapport);
-        if (lien.Length <= LongueurMax) return lien;
-        // Coupe par moitiés : l'encodage change la longueur d'un caractère à l'autre.
-        int bas = 0, haut = rapport.Length;
-        while (bas < haut)
-        {
-            var milieu = (bas + haut + 1) / 2;
-            if (Lien(rapport[..milieu] + Coupure).Length <= LongueurMax) bas = milieu; else haut = milieu - 1;
-        }
-        return Lien(rapport[..bas] + Coupure);
-    }
+    /// <summary>Le modèle vide, quel que soit le rapport : processeur, carte et texte restent sur la machine jusqu'à ce que
+    /// le joueur les glisse lui-même dans le ticket. Les paramètres restent pour l'appelant de l'écran.</summary>
+    public static string Construire(string processeur, string carte, string rapport) => Nouveau;
 }

@@ -24,8 +24,21 @@ public sealed class GpuTweakOpsAllowlistTests
 
     [Fact]
     public void E2_adlx_undervolt_is_allowlisted() =>
-        _allow.Validate(new ApplyAdlxTuningOp(0, AdlxTuningKind.Undervolt, IntValue: -100))
+        _allow.Validate(new ApplyAdlxTuningOp(0, AdlxTuningKind.Undervolt, IntValue: 2500))
             .IsOk.Should().BeTrue();
+
+    // L'allowlist dit enfin la forme de chaque valeur ADLX ; la bande de l'undervolt, relative à la carte, est dans l'exécuteur.
+    [Theory]
+    [InlineData(AdlxTuningKind.Undervolt, 0)]
+    [InlineData(AdlxTuningKind.Undervolt, -100)]
+    [InlineData(AdlxTuningKind.PowerLimit, 59)]
+    [InlineData(AdlxTuningKind.PowerLimit, 101)]
+    [InlineData(AdlxTuningKind.AntiLag, 2)]
+    [InlineData(AdlxTuningKind.VerticalRefresh, 4)]
+    [InlineData(AdlxTuningKind.FrameRateTarget, 0)]
+    [InlineData(AdlxTuningKind.RemiseUsine, 1)]
+    public void Une_valeur_ADLX_hors_de_sa_forme_est_refusee(AdlxTuningKind genre, int valeur) =>
+        _allow.Validate(new ApplyAdlxTuningOp(0, genre, valeur)).Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
 
     [Fact]
     public void E2_negative_gpu_index_is_denied() =>

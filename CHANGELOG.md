@@ -1,6 +1,118 @@
 # Changements
 
-## 0.9.1 (en cours)
+English version of the coming changes: [CHANGELOG.en.md](CHANGELOG.en.md).
+
+## Non publié
+
+Pour le joueur :
+
+### Sûreté de la machine
+- Un réglage que DrDXT pose est noté avant d'être écrit : si DrDXT s'arrête avant d'avoir gardé son origine, elle est
+  rendue au prochain geste en administrateur, ou au démarrage de Windows si le service est installé, jamais pendant
+  une partie.
+- Aucune invite de Windows ne s'ouvre sans un geste de ta part ; le relevé de fond des parties tourne sans droits
+  d'administrateur.
+- Une écriture que DrDXT ne peut pas noter d'avance est refusée, plutôt que faite sans filet.
+- Les programmes ralentis pendant une partie retrouvent toujours leur priorité, même si l'option est coupée puis
+  remise, et à la fermeture de DrDXT.
+- Les fichiers de DrDXT ne s'écrivent jamais à travers un lien posé d'avance, et une réécriture passe par un fichier
+  neuf, jamais en place.
+- Mise à jour : la nouvelle version est annoncée par un fichier signé, le téléchargement ne part que sur ton clic, et
+  jamais depuis une App lancée en administrateur.
+- Installeur : une mise à jour arrête proprement les programmes de DrDXT et retire les anciennes copies de PresentMon.
+- Désinstallation : les réglages gardés reviennent à leur origine et seuls les fichiers de DrDXT sont retirés ; une
+  carte NVIDIA revient au ventilateur automatique et à un décalage de 0 MHz, même un décalage posé par un autre outil ;
+  la sous-tension AMD n'est pas encore rendue, et c'est dit.
+- Fichier d'échange : jamais coupé par la désinstallation ; déplacé sur un SSD, il revient à sa place, sauf des tailles
+  fixées à la main, dites au rapport.
+- Ventilateur réglé à vitesse fixe : il rend la main à la courbe de la carte dès 80 °C, et dans les deux minutes si
+  DrDXT ne répond plus.
+- Carte AMD : la remise à l'usine ne part que sur ton clic.
+- Limite de puissance et sous-tension du processeur : bornes revérifiées au moment d'écrire ; aucune hausse de limite
+  tant qu'aucune température de partie n'a été relevée.
+- Le réglage de la carte est refusé quand un autre outil y a déjà posé un décalage, ou quand ce décalage n'a pas pu
+  être lu.
+- Plafond d'envoi pendant une partie : seulement pour un jeu reconnu, et oublié au redémarrage.
+- Un antivirus ou un contrôle parental n'est jamais coupé au démarrage.
+- Les identifiants Windows ne vont qu'à un proxy que tu as configuré, jamais à un proxy découvert sur le réseau.
+- Les lecteurs de stabilité, de pilotes, de Defender et de BitLocker ne peuvent rien écrire.
+- Dossier des témoins d'incident durci ; clé de signature des mises à jour de développement tournée.
+
+### Honnêteté des messages
+- Un échec se dit en phrase claire, jamais par le message technique, et sa raison n'affirme rien sur l'état de la
+  machine qu'elle ne sait pas.
+- Quand la partie administrateur ne répond plus après un envoi, l'App dit « peut être posé ou non », plus « échec ».
+- Ce qui n'a pas pu être lu reste « non lu », jamais une valeur supposée : fréquence de l'écran, VRR, plafond
+  thermique sans température de partie.
+- À l'inverse, un réglage jamais écrit se lit comme le défaut de Windows ou du pilote, plus comme illisible : mode Jeu,
+  réglages NVIDIA.
+- Un réglage déjà à sa valeur est dit déjà réglé ; un retour arrière refusé est dit à moitié posé ; une inscription ou
+  un retrait ratés le disent.
+- La latence PC est dite estimée ; un seul palier de sous-tension tenu ne promet aucune marge ; le mode Expert de la
+  carte dit la durée réelle de son test au lieu de « Stable ».
+- Les nombres et les dates suivent la langue de l'App ; les textes anglais prennent des guillemets anglais.
+- L'information d'expert sans problème est repliée dans « Détails techniques » sous chaque page ; l'étiquette
+  « recommandation » est retirée.
+- Le README dit exactement ce qui reste après la désinstallation, et ce qui a été vérifié sur une vraie machine.
+- « Envoyer mon rapport » dit que le ticket s'ouvre vide.
+- « Quoi de neuf » montré une fois après une mise à jour de DrDXT ; paquet d'aide en un clic, montré avant d'être
+  écrit.
+
+### Mesure
+- Essai en alternance en blocs A-B-B-A, avec un test à blanc avant tout verdict ; un réglage de latence se juge sur la
+  latence de ses parties.
+- La latence d'affichage ne compte que les moments joués ; les menus ne comptent plus.
+- Courbe des temps de trame de chaque mesure, avec sa médiane ; les pics au-dessus du 99e centile sont marqués.
+- Deux façons différentes de calculer le 1 % low ne se comparent plus ; « pas comparable » ne désigne plus à tort la
+  partie d'avant.
+- Le coût d'un overlay se juge sur trois parties de chaque côté, comme les autres réglages.
+- Parties : part d'images composées, latence PC, mémoire du jeu hors de la carte ; bilan des sessions d'OBS.
+- Test de ta ligne sous charge, sur un clic, contre un serveur nommé à l'avance, plafonné et annulable.
+- La jauge du scan suit la vraie durée des tests ; les journaux de Windows ne sont lus qu'une fois par scan.
+
+### Diagnostic
+- Stabilité : écrans bleus comptés par trois sources (code d'arrêt, rapport de Windows, vidages), arrêts brutaux par le
+  seul événement Kernel-Power 41, erreurs matérielles avec le cœur ou le lien PCIe qui les a relevées, et ce que
+  Windows a noté juste avant un plantage gardé sans rien à lancer.
+- Santé des SSD NVMe lue sur le disque lui-même ; firmware de SSD que son fabricant a corrigé depuis, signalé avec son
+  bulletin.
+- Test mémoire de Windows : un arrêt pendant le test compte comme un échec, et le test ne prend jamais plus que la
+  moitié de la mémoire libre.
+- Conseils Curve Optimizer et profil mémoire (XMP/EXPO) retenus sur toute machine instable ; plus de Curve Optimizer
+  proposé à un X3D de la série 5000.
+- Pilotes : inventaire complet, plancher de pilote que chaque jeu fixe, installation bloquée jugée comme Windows,
+  pilote graphique 32 bits manquant (lanceur qui reste noir), pilote RTCore signalé.
+- Mémoire saturée jugée sur la pagination mesurée, pas sur la seule mémoire libre.
+- Processeur : temps passé en C1, C2 et C3, coût de l'horloge haute résolution, cœur le plus occupé par les pilotes,
+  protections Spectre et Meltdown dites sans jamais proposer de les couper.
+- Ryzen : génération lue par CPUID ; Curve Optimizer et échelle PBO lus au BIOS ; timings appliqués et butées PPT,
+  TDC, EDC et thermique prêts, en attente du module de lecture AMD.
+- BIOS : les réglages qui ne sont plus à leur valeur d'usine ; ceux d'une carte AMD nommés, carte par carte.
+- Régressions publiées : DrDXT prévient quand une mise à jour, un pilote ou ton processeur y figure ; ses tables
+  arrivent signées, sans changer de version de l'App.
+- Réglages qu'un autre outil a pu laisser dans le registre, avec leur date.
+- Resizable BAR prouvé par la plage mémoire allouée à chaque carte ; sur un X3D, les cœurs du bloc à cache mal parqués
+  sont vus.
+- Entrées : chaque souris, clavier et manette avec son rôle et sa liaison, couches logicielles intercalées, cadence
+  demandée au bus, rapports réellement envoyés.
+- Affichage : superpositions matérielles coupées, écrans dupliqués à deux fréquences, encodage et profondeur de
+  couleur écran par écran.
+- Réseau : vitesse ou duplex forcés, programmes qui occupent la montée, type de NAT lu à la box (lecture seule).
+- Frise : jeux mis à jour et pilotes d'affichage changés depuis le scan précédent.
+- Avant de jouer : dernier vrai redémarrage, mémoire vidéo déjà prise, audio virtuel, disque chiffré.
+
+### Maintien
+- Pause du maintien : un interrupteur dans l'App suspend la remise des réglages au démarrage ; un fichier de pause
+  douteux vaut pause, et la désinstallation l'efface.
+- Le service de démarrage attend la fin d'une partie pour sa passe quotidienne.
+- Après une mise à jour de Windows, tout ce que DrDXT a posé est relu et le bilan est dit.
+- « Vérifier DrDXT sur mon PC » se suit en direct, s'arrête entre deux réglages après confirmation, relit chaque
+  réglage après l'avoir posé, et ne touche pas un réglage tenu par l'essai en alternance.
+- Réglages suivis : une lecture ratée ne fait plus perdre l'historique, et l'App et le relevé de fond ne se gênent
+  plus.
+- Une seule App par session : un second lancement montre la fenêtre ouverte.
+
+## 0.9.1 (15/10/2026)
 
 Pour le joueur :
 - Les parties sont mesurées en entier, menus et autres fenêtres à part : FPS et 1 % low sur toutes les images, minutes

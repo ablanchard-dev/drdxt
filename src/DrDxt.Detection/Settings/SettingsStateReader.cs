@@ -21,6 +21,8 @@ public sealed class SettingsStateReader : ISettingsStateReader
     private readonly IHagsEffectiveReader? _hags;
     // La limite d'images d'une carte AMD (FRTC / Chill par ADLX), quand NVAPI n'en rend pas.
     private readonly IAdlx? _adlx;
+    // Les vidages d'écran bleu, pour la garde de stabilité partagée avec Curve Optimizer.
+    private readonly IDumpCreationLog? _vidages;
 
     private const uint PreferredPstateId = 0x1057EB71; // PREFERRED_PSTATE_ID
 
@@ -29,9 +31,9 @@ public sealed class SettingsStateReader : ISettingsStateReader
         IUnexpectedShutdownLog? shutdowns = null, IGameExecutable? game = null,
         IHagsEffectiveReader? hags = null, IAdlx? adlx = null,
         // La limite de puissance du processeur (PawnIO). null = non lue : le levier ne s'arme pas.
-        DrDxt.Application.Tweaks.Hardware.ICpuPowerLimitReader? limitePuissance = null)
-        => (_power, _registry, _network, _nvApi, _display, _shutdowns, _game, _hags, _adlx, _limitePuissance)
-            = (power, registry, network, nvApi, display, shutdowns, game, hags, adlx, limitePuissance);
+        DrDxt.Application.Tweaks.Hardware.ICpuPowerLimitReader? limitePuissance = null, IDumpCreationLog? vidages = null)
+        => (_power, _registry, _network, _nvApi, _display, _shutdowns, _game, _hags, _adlx, _limitePuissance, _vidages)
+            = (power, registry, network, nvApi, display, shutdowns, game, hags, adlx, limitePuissance, vidages);
 
     private readonly DrDxt.Application.Tweaks.Hardware.ICpuPowerLimitReader? _limitePuissance;
 
@@ -170,6 +172,10 @@ public sealed class SettingsStateReader : ISettingsStateReader
             UncleanShutdowns: _shutdowns?.Since(
                 DateTimeOffset.UtcNow.AddDays(-MemoryStabilityAdvisor.WindowDays))
                 is { IsOk: true } log ? log.Value : null,
+            // La garde XMP lit les mêmes incidents que la garde Curve Optimizer ; sans lecteur, null : « non lu ».
+            IncidentsDeStabilite: _shutdowns is not null && _vidages is not null
+                ? DrDxt.Detection.Repair.GardeDeStabilite.Dates(DrDxt.Detection.Repair.GardeDeStabilite.Lire(_shutdowns, _vidages, DateTimeOffset.UtcNow))
+                : null,
             // Sans cette ligne, tout le diagnostic de consommation au repos serait mort : la liste
             // calculee plus haut serait jetee et l'etat dirait « jamais lu ». Une chaine complete
             // avec un null au milieu se comporte comme une chaine qui marche.
@@ -225,8 +231,11 @@ public sealed class SettingsStateReader : ISettingsStateReader
         if (jeu is not null && _nvApi.GetDrsForApplication(PreferredPstateId, jeu) is { IsOk: true } auJeu)
             return (Traduire(auJeu.Value.Value), auJeu.Value.Origin, jeu);
 
+        // Absent du profil de base : au défaut du pilote, PREFERRED_PSTATE_DEFAULT = OPTIMAL_POWER (5), donc pas au maximum.
         var lu = _nvApi.GetPreferredPstate();
-        return lu.IsOk ? (Traduire(lu.Value), null, null) : (TriState.Unknown, null, null);
+        return lu.IsOk ? (Traduire(lu.Value), null, null)
+            : _nvApi.PreferredPstateAuDefaut() ? (Traduire(5), null, null)
+            : (TriState.Unknown, null, null);
     }
 
     /// <summary>NvApiDriverSettings.h (github.com/NVIDIA/nvapi) définit PREFERRED_PSTATE de 0 à 5,

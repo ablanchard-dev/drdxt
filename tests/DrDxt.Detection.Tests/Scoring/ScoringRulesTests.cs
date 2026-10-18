@@ -138,10 +138,11 @@ public class ScoringRulesTests
 
     // Seul le CCD de fréquence parqué, c'est le routage sain (la règle du levier fixit.x3d_ccd).
     // Le docteur ne le dit pas « à vérifier » avec un gain de 12 % sur un 7950X3D qui marche, quand le levier ne propose rien.
+    // Windows numérote un cœur par son premier processeur logique : 8 cœurs, 16 threads, 2 CCD ⇒ CCD fréquence = 8 à 14.
     [Fact]
     public void X3d_dual_ccd_with_only_frequency_ccd_parked_is_healthy()
     {
-        var f = ScoringRules.Evaluate(Desktop(x3d: true, ccd: 2), State(power: HighPerfPlan, parked: new[] { 4, 5, 6, 7 }));
+        var f = ScoringRules.Evaluate(Desktop(x3d: true, ccd: 2), State(power: HighPerfPlan, parked: new[] { 8, 10, 12, 14 }));
         f.Should().NotContain(x => x.TitleKey == "Finding.Scheduling.X3dCcd");
         f.Should().NotContain(x => x.TitleKey == "Finding.Scheduling.X3dUnknown");
     }

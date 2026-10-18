@@ -16,13 +16,15 @@ namespace DrDxt.Detection.Scoring;
 /// </summary>
 public static class ScoringRules
 {
-    public static IReadOnlyList<Finding> Evaluate(HardwareInventory hw, SettingsState state)
+    /// <param name="measured">Le verdict mesuré de la session : un levier qu'il dément porte son motif dans son constat
+    /// (<see cref="Finding.GainSuppressedReason"/>). Null = rien de mesuré, rien de retiré.</param>
+    public static IReadOnlyList<Finding> Evaluate(HardwareInventory hw, SettingsState state, BottleneckVerdict? measured = null)
     {
         var findings = new List<Finding>();
 
-        foreach (var lever in LeverCatalog.Evaluate(hw, state))
+        foreach (var lever in LeverCatalog.Evaluate(hw, state, measured))
             if (lever.Finding is { } f)
-                findings.Add(f);
+                findings.Add(f with { GainSuppressedReason = lever.GainSuppressedReason });
 
         // Fiabilité de la RAM : un fichier d'échange désactivé est un vrai risque (à la limite de
         // validation, Windows manque de mémoire → gel / plantage ; Microsoft, https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file). Constat honnête : Minor,
@@ -40,6 +42,11 @@ public static class ScoringRules
         // `ChannelTopologyUnknown` est Info et non Minor : ne pas savoir lire une carte est notre
         // lacune, pas un defaut du client, et on ne penalise personne pour un trou de notre
         // couverture.
+        // La mesure multi-fil qui reste sous le plafond d'un canal avec deux barrettes ou plus : un seul canal probable, quel
+        // que soit le nom des emplacements.
+        if (state.MemoryUnSeulCanalMesure)
+            findings.Add(new Finding("Memory", Severity.Minor, "Finding.Memory.SingleChannelMeasured", null));
+
         foreach (var g in MemoryTopologyAdvisor.Advise(hw.Memory, hw.Chassis, hw.MemorySlots))
         {
             // La mesure ferme ce que la lecture des chaines croyait savoir. Quand le debit

@@ -26,8 +26,10 @@ namespace DrDxt.ElevatedHelper.Leases;
 //     clore ; tout autre appelant est refusé (ELEVATION_DENIED). Un propriétaire non identifié est
 //     refusé (refus par défaut).
 //   * L'état vit en mémoire seulement (aucune persistance disque : ce serait une surface
-//     d'attaque). Si le helper meurt lui-même, les décalages NVAPI sont volatils (un redémarrage
-//     les efface) : c'est le filet documenté, pas un cas contourné.
+//     d'attaque). Si le helper meurt lui-même, ses baux et la garde thermique du ventilateur
+//     meurent avec lui. Les décalages NVAPI comme la vitesse fixe NVML sont volatils (un
+//     redémarrage les efface) ; d'ici là, l'App qui ne joint plus le helper rend elle-même le
+//     ventilateur à l'automatique (EssaiVentilateur), et son journal rend le reste au lancement suivant.
 //   * Rien ne lève à travers la frontière : un échec de retour à l'échéance est journalisé via
 //     IDiagnosticsLog, remonte un code d'erreur et est repris au mieux au tick suivant (le bail
 //     est gardé jusqu'à ce qu'un retour réussisse).
@@ -120,12 +122,18 @@ public sealed class LeaseWatchdog
         // verrait qu'au démarrage suivant. Les ops BCD restent des gestes du joueur, jamais d'un bail.
         if (decoded.Value is RestartDeviceOp or RemoveDriverPackageOp or RestoreDriverPackageOp)
             return Deny("A device or driver-store op can never be a lease revert: it would act with nobody at the machine.");
+        // La remise à l'usine de la carte AMD efface aussi ce que le joueur a réglé dans AMD Software : un geste, jamais un bail.
+        if (decoded.Value is ApplyAdlxTuningOp { Kind: AdlxTuningKind.RemiseUsine })
+            return Deny("A GPU factory reset can never be a lease revert: it is the player's gesture only.");
         if (decoded.Value is SetBcdValueOp or DeleteBcdValueOp or ScheduleMemoryDiagnosticOp or CancelMemoryDiagnosticOp)
             return Deny("A boot-configuration op can never be a lease revert: it would change the next boot unattended.");
         // Un ordre de bail n'est pas executable par l'executeur (le serveur le route vers ce
         // registre). En inverse, il echouait a chaque passage, remis et rejoue toutes les 5 s, sans fin.
         if (decoded.Value is EstablishLeaseOp or RenewLeaseOp)
             return Deny("A lease op can never be a lease revert: the executor cannot run it.");
+        // Un retour de bail rend l'origine : il n'a ni pose à marquer ni acquit à donner.
+        if (decoded.Value is PoseEnAttenteDOrigineOp or AcquitterEcritureOp)
+            return Deny("A write-ahead journal op can never be a lease revert.");
 
         var key = new LeaseKey(owner, leaseId);
         var expiry = _clock.UtcNow.AddSeconds(leaseSeconds);
@@ -136,6 +144,12 @@ public sealed class LeaseWatchdog
         _rendus.TryRemove(key, out _);
         return Result.Ok();
     }
+
+    /// <summary>Vrai si cet appelant tient un bail non échu dont le retour rend le ventilateur de cette carte à
+    /// l'automatique : la garde thermique (80 °C) et l'expiration ne couvrent que les baux.</summary>
+    public bool VentilateurSousBail(LeaseOwner owner, int gpuIndex)
+        => _leases.Any(b => b.Key.Owner == owner && b.Value.Expiry > _clock.UtcNow
+                            && b.Value.RevertOp is RestoreGpuFanAutoOp r && r.GpuIndex == gpuIndex);
 
     /// <summary>Battement de cœur : repousse l'échéance d'un bail existant à maintenant + leaseSeconds.
     /// Seul le propriétaire peut renouveler ; un bail inconnu (ou un autre appelant) est refusé :
@@ -209,6 +223,20 @@ public sealed class LeaseWatchdog
     {
         foreach (var kvp in _leases)
             await FireRevertAsync(kvp.Key, kvp.Value, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Rend tout de suite chaque bail dont le retour répond à <paramref name="aRendre"/>, expiré ou non (la garde
+    /// thermique du ventilateur). Même chemin que l'expiration : revalidation feuille-exacte, jamais d'exception ; le
+    /// contrôleur l'apprend à son battement suivant (« rendu »).</summary>
+    public async Task RendreSiAsync(Func<PrivilegedOp, bool> aRendre, string pourquoi, CancellationToken ct)
+    {
+        foreach (var kvp in _leases)
+        {
+            if (!aRendre(kvp.Value.RevertOp)) continue;
+            // Journalisé à la première tentative : un retour raté est remis et retenté à chaque passage.
+            if (kvp.Value.DernierEchec is null) _log.Change(LeaseTweakId(kvp.Key), "held", pourquoi, "DrDXT");
+            await FireRevertAsync(kvp.Key, kvp.Value, ct).ConfigureAwait(false);
+        }
     }
 
     // L'inverse reste « en cours » jusqu'à ce que son issue soit écrite (rendu, ou bail remis) : un battement qui arrive

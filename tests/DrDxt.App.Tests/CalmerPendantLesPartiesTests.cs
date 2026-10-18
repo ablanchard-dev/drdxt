@@ -83,6 +83,83 @@ public sealed class CalmerPendantLesPartiesTests
         sys.Historique.Should().BeEmpty();
     }
 
+    // Une lecture des voisins qui ne finit qu'au signal du test : la boucle reste suspendue au milieu d'une partie.
+    private sealed class ObsBloque : ILecteurDeVoisins
+    {
+        public readonly TaskCompletionSource Bloquee = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public readonly ManualResetEventSlim Liberer = new();
+        private int _appels;
+        public IReadOnlyList<VoisinDuJeu> Lire(int? pidDuJeu, CancellationToken ct)
+        {
+            if (Interlocked.Increment(ref _appels) == 3) { Bloquee.TrySetResult(); Liberer.Wait(TimeSpan.FromSeconds(10)); }
+            return [new("obs64", 60, null, Obs)];
+        }
+    }
+
+    // Deux lectures abaissent OBS, la troisième reste suspendue ; le joueur éteint puis rallume, et la seconde boucle ne voit
+    // plus de jeu. La première boucle doit rendre ce que SON calmeur a abaissé.
+    private static (ScanViewModel vm, Systeme sys, ObsBloque lecteur, Func<bool> phase2) BuildBloque()
+    {
+        var locator = Substitute.For<IGameLocator>();
+        var phase2 = false;
+        locator.LocateRunningGamePid().Returns(_ => phase2 ? null : Jeu);
+        var lecteur = new ObsBloque();
+        var vm = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
+            Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k,
+            gameLocator: locator, voisins: lecteur);
+        var sys = new Systeme();
+        vm.Priorites = sys;
+        vm.PasCalmer = TimeSpan.FromMilliseconds(10);
+        vm.PidPremierPlan = () => 0;
+        vm.EstUnJeu = _ => true;
+        return (vm, sys, lecteur, () => phase2 = true);
+    }
+
+    [Fact]
+    public async Task Eteindre_puis_rallumer_pendant_une_lecture_rend_ce_que_la_premiere_boucle_a_abaisse()
+    {
+        var (vm, sys, lecteur, phase2) = BuildBloque();
+        using var premiere = new CancellationTokenSource();
+        var boucle1 = vm.CalmerPendantLesPartiesAsync(premiere.Token);
+        await lecteur.Bloquee.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        sys.Priorites[Obs].Should().Be(ProcessPriorityClass.BelowNormal, "témoin : la première boucle a abaissé OBS");
+
+        premiere.Cancel();
+        phase2();
+        using var seconde = new CancellationTokenSource();
+        var boucle2 = vm.CalmerPendantLesPartiesAsync(seconde.Token);
+        lecteur.Liberer.Set();
+        await boucle1.WaitAsync(TimeSpan.FromSeconds(10));
+        seconde.Cancel();
+        await boucle2.WaitAsync(TimeSpan.FromSeconds(10));
+
+        sys.Priorites[Obs].Should().Be(ProcessPriorityClass.Normal);
+    }
+
+    // La fermeture de l'App pendant la lecture suspendue rend tout, quelle que soit la boucle qui l'a abaissé, et rien n'est
+    // abaissé après.
+    [Fact]
+    public async Task Fermer_l_app_pendant_une_lecture_suspendue_rend_tout()
+    {
+        var (vm, sys, lecteur, phase2) = BuildBloque();
+        using var premiere = new CancellationTokenSource();
+        var boucle1 = vm.CalmerPendantLesPartiesAsync(premiere.Token);
+        await lecteur.Bloquee.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        premiere.Cancel();
+        phase2();
+        using var seconde = new CancellationTokenSource();
+        var boucle2 = vm.CalmerPendantLesPartiesAsync(seconde.Token);
+
+        vm.RendreLesPriorites();
+
+        sys.Priorites[Obs].Should().Be(ProcessPriorityClass.Normal, "rendu à la fermeture, la lecture encore suspendue");
+        lecteur.Liberer.Set();
+        await boucle1.WaitAsync(TimeSpan.FromSeconds(10));
+        seconde.Cancel();
+        await boucle2.WaitAsync(TimeSpan.FromSeconds(10));
+        sys.Priorites[Obs].Should().Be(ProcessPriorityClass.Normal);
+    }
+
     [Fact]
     public void Coupe_par_defaut_rien_ne_tourne()
     {

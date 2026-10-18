@@ -84,6 +84,56 @@ public sealed class EssaiRenduLibereLeBailTests
         journal.Received(1).Lever();
     }
 
+    // Le helper mort, sa garde à 80 °C meurt avec lui : au premier battement qui ne l'atteint plus (transport en échec, ou
+    // helper relancé qui ne connaît plus le bail), la vitesse fixe ne reste pas posée sans garde. L'automatique est demandé
+    // tout de suite, et le journal n'est levé qu'une fois le retour relu.
+    private sealed class HelperMort(string? codeDuBattement, Result retour, bool leve = false) : IElevatedClient
+    {
+        public List<PrivilegedOp> Ops { get; } = [];
+        public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
+        {
+            Ops.Add(op);
+            if (op is RenewLeaseOp)
+                return leve ? throw new IOException("tube rompu (test)") : Task.FromResult(Result.Fail(codeDuBattement!, "battement (test)"));
+            return Task.FromResult(op is RestoreGpuFanAutoOp ? retour : Result.Ok());
+        }
+    }
+
+    [Theory]
+    [InlineData(ErrorCodes.HelperUnreachable, false)]
+    [InlineData(ErrorCodes.LeaseUnknown, false)]
+    [InlineData(null, true)] // le transport lève
+    public async Task Helper_injoignable_le_ventilateur_revient_a_l_automatique_tout_de_suite(string? code, bool leve)
+    {
+        var client = new HelperMort(code, Result.Ok(), leve);
+        var journal = Substitute.For<IRevertEnAttente>();
+        var bail = new HeartbeatSender(client, VentilateurExpert.IdBail, 120);
+        await using var essai = new EssaiVentilateur(client, journal, new RestoreGpuFanAutoOp(0), bail);
+        var dit = false;
+        essai.BailPerdu += () => dit = true;
+
+        await bail.PulseAsync(CancellationToken.None);
+        await essai.RenduApresPerte!;
+
+        client.Ops.OfType<RestoreGpuFanAutoOp>().Should().ContainSingle();
+        journal.Received(1).Lever();
+        dit.Should().BeTrue("l'écran apprend que la vitesse fixe est rendue");
+    }
+
+    [Fact]
+    public async Task Retour_non_relu_le_journal_reste_pour_le_lancement_suivant()
+    {
+        var client = new HelperMort(ErrorCodes.HelperUnreachable, Result.Fail(ErrorCodes.HelperUnreachable, "toujours injoignable"));
+        var journal = Substitute.For<IRevertEnAttente>();
+        var bail = new HeartbeatSender(client, VentilateurExpert.IdBail, 120);
+        await using var essai = new EssaiVentilateur(client, journal, new RestoreGpuFanAutoOp(0), bail);
+
+        await bail.PulseAsync(CancellationToken.None);
+        await essai.RenduApresPerte!;
+
+        journal.DidNotReceive().Lever();
+    }
+
     [Fact]
     public async Task Bail_perdu_le_journal_de_la_carte_est_leve()
     {

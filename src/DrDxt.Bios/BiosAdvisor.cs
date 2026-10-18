@@ -70,6 +70,19 @@ public sealed class BiosAdvisor : IBiosAdvisor
     {
         switch (state.XmpExpo)
         {
+            // Un profil mémoire est un surcadençage : jamais conseillé sur une machine instable (les incidents de la garde
+            // Curve Optimizer : arrêt brutal, écran bleu, vidage, erreur grave, arrêt dangereux du SSD), ou non lue (null).
+            // Le conseil revient seul après la fenêtre de la garde sans incident, aucune levée à la main.
+            case TriState.Off when state.IncidentsDeStabilite is not { } incidents
+                                   || incidents.Any(d => DateTimeOffset.UtcNow - d <= CandidateSelector.FenetreInstabilite):
+                findings.Add(new BiosFinding(
+                    FirmwareSettingKind.XmpExpo, Severity.Info,
+                    BiosStringKeys.XmpOffUnstableTitle, BiosStringKeys.XmpOffUnstableRationale,
+                    BiosMatrixClass.Read, TriState.Off,
+                    BiosRecommendedAction.None, BiosStringKeys.NoneAction,
+                    Gain: null, StateNotReadable: false));
+                break;
+
             case TriState.Off:
                 findings.Add(new BiosFinding(
                     FirmwareSettingKind.XmpExpo, Severity.Major,

@@ -84,14 +84,14 @@ public sealed class SanePagefileTweak : ITweak
             if (!snapshotJson.IsOk || snapshotJson.Value is null)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable, "Could not serialize the revert op.");
 
-            var applied = await _elevated.ExecuteAsync(
-                new SetRegistryValueOp(RegistryHiveKind.LocalMachine, MemoryManagementPath,
-                                       PagingFilesName, RegistryValueType.MultiString, SystemManagedEntry),
-                CancellationToken.None).ConfigureAwait(false);
+            var pose = new SetRegistryValueOp(RegistryHiveKind.LocalMachine, MemoryManagementPath,
+                                              PagingFilesName, RegistryValueType.MultiString, SystemManagedEntry);
+            var applied = await _elevated.ExecuteAsync(pose, CancellationToken.None).ConfigureAwait(false);
             if (!applied.IsOk)
                 return Result<TweakSnapshot>.Fail(applied.Error!.Value.Code, applied.Error!.Value.Message);
 
-            return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, snapshotJson.Value));
+            // La valeur posée voyage avec le snapshot : sans elle, la relecture après pose ne peut rien prouver.
+            return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, snapshotJson.Value, PrivilegedOpCodec.Serialize(pose).Value));
         }
         catch (Exception ex)
         {
@@ -102,6 +102,8 @@ public sealed class SanePagefileTweak : ITweak
 
     public async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
         var op = PrivilegedOpCodec.Deserialize(snapshot.OriginalValueJson);
         if (!op.IsOk || op.Value is null)
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Page file snapshot is not a known typed op.");

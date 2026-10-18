@@ -110,10 +110,16 @@ public sealed class TypedPrivilegedServer
                 //    donnees. Elles sont nommees une par une ici : c'est l'unique endroit qui
                 //    decide qu'une op rend des octets, et une op non nommee ne peut donc pas
                 //    en rendre par accident. Elles ont subi exactement les memes gardes (a)..(e).
+                //  * Une vitesse fixe de ventilateur n'est posée que sous un bail du même appelant qui rend ce ventilateur à
+                //    l'automatique : sans lui, ni la garde thermique (80 °C) ni l'expiration ne la verraient, et elle
+                //    restait jusqu'au redémarrage pendant que la carte chauffe.
+                ApplyGpuFanCurveOp f when _leaseWatchdog?.VentilateurSousBail(LeaseOwnerOf(caller), f.GpuIndex) != true
+                    => Fail(ErrorCodes.NotAllowlisted, "A fixed fan speed needs an active lease that gives the fan back to the card."),
+
                 ReadFirmwareVariableOp => await ExecuteReadAsync(decoded.Value, ct).ConfigureAwait(false),
                 ReadComponentStoreHealthOp => await ExecuteReadAsync(decoded.Value, ct).ConfigureAwait(false),
 
-                _ => await ExecutePrivilegedAsync(decoded.Value, ct).ConfigureAwait(false),
+                _ => await ExecutePrivilegedAsync(decoded.Value, ct, caller).ConfigureAwait(false),
             };
         }
         catch (OperationCanceledException)
@@ -173,9 +179,9 @@ public sealed class TypedPrivilegedServer
         }
     }
 
-    private async Task<PrivilegedResponse> ExecutePrivilegedAsync(PrivilegedOp op, CancellationToken ct)
+    private async Task<PrivilegedResponse> ExecutePrivilegedAsync(PrivilegedOp op, CancellationToken ct, CallerInfo caller)
     {
-        var exec = await _executor.ExecuteAsync(op, ct).ConfigureAwait(false);
+        var exec = await _executor.ExecuteAsync(op, ct, caller).ConfigureAwait(false);
         return exec.IsOk
             ? new PrivilegedResponse { Ok = true }
             : Fail(exec.Error?.Code ?? ErrorCodes.HelperOpFailed,

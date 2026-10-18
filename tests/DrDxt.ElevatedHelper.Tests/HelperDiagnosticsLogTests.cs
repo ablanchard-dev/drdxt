@@ -64,4 +64,21 @@ public sealed class HelperDiagnosticsLogTests : IDisposable
         Directory.GetFiles(cible).Should().HaveCount(1, "seul le témoin : l'écriture élevée ne traverse pas une jonction");
         File.Exists(Path.Combine(cible, "helper.journal.log")).Should().BeFalse();
     }
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateHardLink(string lien, string cible, IntPtr securite);
+
+    // La réparation de la racine ne descend pas : un journal posé d'avance en lien dur dans un %ProgramData%\DrDxt préparé
+    // par un compte faisait écrire le helper élevé dans un autre fichier. L'ajout n'écrit que dans un fichier à un seul nom.
+    [Fact]
+    public void Un_journal_pose_d_avance_en_lien_dur_ne_fait_jamais_ecrire_ailleurs()
+    {
+        var dossier = Directory.CreateDirectory(Path.Combine(_base, "racine")).FullName;
+        var temoin = Path.Combine(_base, "temoin.txt");
+        File.WriteAllText(temoin, "intact");
+        CreateHardLink(Path.Combine(dossier, "helper.journal.log"), temoin, IntPtr.Zero).Should().BeTrue();
+
+        new HelperDiagnosticsLog(dossier).Change("t", "a", "b", "test");
+
+        File.ReadAllText(temoin).Should().Be("intact");
+    }
 }

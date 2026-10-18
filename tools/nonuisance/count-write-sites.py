@@ -57,6 +57,26 @@ PATTERNS = [
     # Le ventilateur NVIDIA (NVML) s'ecrit par TryPoserVentilateur / TryRendreVentilateur, des noms
     # francais qu'aucun autre motif ne voit : meme reponse, un motif d'INTENTION.
     r"TryPoser\w+\(", r"TryRendre\w+\(",
+    # Cinquieme trou, trouve par la revue du lot 2 : le service SYSTEM du temoin d'incident ecrivait par
+    # TrustedManifestRoot.WriteTrustedFile et supprimait par File.Delete, et la table se disait « a jour ».
+    # Une suppression, un deplacement, une copie, un changement d'ACL ou de cle de registre sont des
+    # ecritures ; les fichiers d'etat passent par des enveloppes (WriteAtomic, WriteTrustedFile, le Delete
+    # de FichierJsonAtomique) : motifs d'INTENTION, comme TrySet.
+    r"WriteTrustedFile\(", r"\.WriteAtomic\(", r"File\.(?:Delete|Move|Copy|Replace)\(",
+    r"Directory\.(?:Delete|Move)\(", r"\.Delete\(\)", r"DeleteValue\(", r"DeleteSubKey\w*\(",
+    r"CreateSubKey\(", r"\.SetAccessControl\(",
+    # Sixieme trou, trouve par l'audit de securite du 17/10/2026 : l'activation de la Restauration du systeme passe par une
+    # methode WMI (InvokeMethod("Enable")), l'elagage des points par SRRemoveRestorePoint, trois reglages AMD par
+    # AdlxNative.EcrireAntiLag/Frtc/Vsync, et la memoire volatile du demarrage par un SetValue sur une cle nommee `cle`.
+    # Une methode WMI qui ne commence pas par Get est comptee comme une ecriture ; un SetValue qui porte un
+    # RegistryValueKind est une ecriture de registre, quel que soit le nom de la cle (pas le setter WPF).
+    r"\.InvokeMethod\(\"(?!Get)", r"SRRemoveRestorePoint\b", r"Ecrire(?:AntiLag|Frtc|Vsync)\(",
+    r"\.SetValue\(.*RegistryValueKind",
+    # La remise a l'usine de la carte AMD (IADLXGPUTuningServices.ResetToFactory), le seul retour au-dela de la bande.
+    r"RemettreReglageUsine\(",
+    # Les outils de Windows se lancent par un seul lanceur borne (Core/ProcessusBorne.cs) : son Process.Start compte
+    # chez lui, et chaque appel compte chez l'appelant, la ou se decide ce que l'outil ecrit.
+    r"ProcessusBorne\.Executer\(",
 ]
 RX = re.compile("|".join(PATTERNS))
 

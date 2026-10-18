@@ -50,6 +50,10 @@ public interface INvApi
     /// Fail(TWEAK.SDK_UNAVAILABLE).</summary>
     Result<uint> GetPreferredPstate();
 
+    /// <summary>Vrai seulement quand PREFERRED_PSTATE est absent du profil de base (NVAPI_SETTING_NOT_FOUND) : il est au
+    /// défaut du pilote, OPTIMAL_POWER. Une panne de lecture rend faux. Par défaut : faux, le cas prudent.</summary>
+    bool PreferredPstateAuDefaut() => false;
+
     /// <summary>Un reglage DRS tel que le pilote l'applique a un executable, avec sa
     /// provenance. Le profil de base n'est pas ce que le jeu recoit : un profil de jeu peut porter
     /// sa propre valeur, et ecrire ou relire le global validerait alors un reglage sans effet.

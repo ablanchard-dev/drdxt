@@ -4,8 +4,8 @@
 
 1. Au démarrage, l'App lit un petit fichier : `<racine>/updates/app/manifest`.
    La racine est `https://ablanchard-dev.github.io/drdxt` (le site GitHub Pages du dépôt public) ; la variable
-   d'environnement `DRDXT_UPDATE_URL` la remplace, et posée à `off` elle coupe toute vérification (aucun réseau touché, le
-   pied de page le dit). Un fichier absent (404) veut dire « rien à offrir », jamais une erreur.
+   d'environnement `DRDXT_UPDATE_URL` posée à `off` coupe toute vérification (aucun réseau touché, le
+   pied de page le dit) ; une autre adresse n'y est prise qu'en compilation Debug. Un fichier absent (404) veut dire « rien à offrir », jamais une erreur.
 2. Le manifeste est signé (Ed25519) par la clé de release du projet. La clé publique est dans l'App
    (`UpdateTrust.ProductionPublicKey`) ; elle ne peut que vérifier. Un manifeste non signé, mal signé, ou qui propose une
    version plus ancienne est refusé, et le refus est affiché : jamais tu, jamais installé.
@@ -14,8 +14,16 @@
 4. Une nouvelle version de l'App ne s'installe **jamais sans toi** : le pied de page propose « Installer », l'empreinte est
    relue juste avant le lancement, le fichier est verrouillé entre les deux, et l'installeur demande lui-même l'élévation.
 5. Il n'y a pas de canal silencieux : tout ce qui change ce que DrDXT règle arrive dans une nouvelle version de l'App, que
-   tu installes toi-même. Rien d'autre que ce manifeste et, sur ton accord, l'installeur ne quitte ni n'entre.
+   tu installes toi-même. Rien d'autre que ce manifeste, le paquet des tables (point 7) et, sur ton accord, l'installeur
+   ne quitte ni n'entre.
 6. Tant que le mainteneur n'a publié aucun manifeste sur ce site, rien n'arrive et le pied de page dit « à jour ».
+7. Les **tables** (le radar des régressions connues) arrivent sans nouvelle version de l'App : `<racine>/donnees/paquet.json`,
+   lu juste après le manifeste. Ce sont des données JSON au schéma fermé, jamais du code ni un réglage : une clé inconnue,
+   une ligne sans source https ou sans date refusent tout le paquet. Il est signé par la même clé de release, sous un
+   domaine propre (`DonneesSignees.OctetsSignes`) : une signature de manifeste ne vaut pas pour des données. Sa version
+   est dans les octets signés ; un paquet plus ancien que celui en service est refusé. Gardé dans `%LOCALAPPDATA%\DrDXT`
+   (`donnees.json`, avec le précédent à côté), il est revérifié à chaque démarrage ; s'il ne se vérifie plus, le précédent
+   puis les tables livrées avec l'App prennent sa place. Le pied de page dit la version en service, ou un paquet refusé.
 
 ## Ce que fait le mainteneur (hors de l'App)
 
@@ -35,6 +43,9 @@
   possibilité de signer : les joueurs devraient alors réinstaller à la main une version portant une nouvelle clé.
 - Pas d'épinglage de certificat sur GitHub : ses certificats tournent ; la confiance repose sur la signature du manifeste,
   pas sur le transport.
+- Pour les tables : `signer.cs -- donnees <version> <contenu.json> <sortie>` vérifie le contenu contre le schéma, signe,
+  relit avec la clé embarquée, et le paquet est publié à `<racine>/donnees/paquet.json`. La version monte à chaque
+  publication : un numéro déjà servi ne remplace rien.
 
 ## Ce qui n'est pas encore là
 

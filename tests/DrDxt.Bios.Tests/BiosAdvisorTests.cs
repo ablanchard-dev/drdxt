@@ -45,7 +45,9 @@ public class BiosAdvisorTests
             Hags: TriState.On,
             GameMode: TriState.On,
             ParkedCoreIndexes: Array.Empty<int>(),
-            Vrr: TriState.On);
+            Vrr: TriState.On,
+            UncleanShutdowns: Array.Empty<DateTimeOffset>(),
+            IncidentsDeStabilite: Array.Empty<DateTimeOffset>());
 
     private static IReadOnlyList<BiosFinding> Advise(HardwareInventory hw, SettingsState state)
     {
@@ -75,6 +77,35 @@ public class BiosAdvisorTests
         f.TitleKey.Should().NotBeNullOrWhiteSpace();
         f.RationaleKey.Should().NotBeNullOrWhiteSpace();
         f.RecommendedActionKey.Should().NotBeNullOrWhiteSpace();
+    }
+
+    // Un profil mémoire pousse la machine : sur une machine qui s'arrête, ou dont les arrêts n'ont pas été lus, le
+    // conseil d'activer devient « d'abord stabiliser », sans action ni gain.
+    [Fact]
+    public void XmpOff_n_est_jamais_conseille_sur_une_machine_instable_ou_non_lue()
+    {
+        foreach (var incidents in new[] { null, new[] { DateTimeOffset.UtcNow.AddDays(-3) } })
+        {
+            var f = Advise(Hw(), State(xmp: TriState.Off) with { IncidentsDeStabilite = incidents })
+                .Single(x => x.Kind == FirmwareSettingKind.XmpExpo);
+            f.RecommendedAction.Should().Be(BiosRecommendedAction.None);
+            f.TitleKey.Should().Be("Bios.Xmp.Off.Unstable.Title");
+            f.Gain.Should().BeNull();
+        }
+        Advise(Hw(), State(xmp: TriState.Off) with { IncidentsDeStabilite = [DateTimeOffset.UtcNow.AddDays(-60)] })
+            .Single(x => x.Kind == FirmwareSettingKind.XmpExpo).RecommendedAction.Should().Be(BiosRecommendedAction.Enable,
+                "le conseil revient seul après la fenêtre sans arrêt");
+    }
+
+    // La même source que la garde Curve Optimizer : un vidage écrit (écran bleu) sans aucun arrêt brutal noté suffit.
+    [Fact]
+    public void XmpOff_est_retenu_par_un_vidage_recent_meme_sans_arret_brutal()
+    {
+        var f = Advise(Hw(), State(xmp: TriState.Off) with { UncleanShutdowns = [], IncidentsDeStabilite = [DateTimeOffset.UtcNow.AddDays(-2)] })
+            .Single(x => x.Kind == FirmwareSettingKind.XmpExpo);
+
+        f.TitleKey.Should().Be("Bios.Xmp.Off.Unstable.Title");
+        f.RecommendedAction.Should().Be(BiosRecommendedAction.None);
     }
 
     [Fact] // Honnêteté : déjà actif → aucun constat XMP (pas de besoin fabriqué)

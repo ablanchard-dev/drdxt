@@ -271,11 +271,15 @@ public sealed class TypedServerHasNoGenericPathTests
     public void Executor_contract_only_accepts_typed_PrivilegedOp()
     {
         // La couture d'exécuteur prend une PrivilegedOp : la hiérarchie scellée, fermée.
-        // Aucune surcharge chaîne/commande/chemin nulle part sur le contrat.
-        var method = typeof(IPrivilegedOpExecutor).GetMethod(nameof(IPrivilegedOpExecutor.ExecuteAsync))!;
-        var paramTypes = method.GetParameters().Select(p => p.ParameterType).ToArray();
-        paramTypes.Should().Contain(typeof(PrivilegedOp));
-        paramTypes.Should().NotContain(typeof(string), "no free string command/path may reach the executor");
+        // Aucune surcharge chaîne/commande/chemin nulle part sur le contrat, la forme avec appelant comprise.
+        var surcharges = typeof(IPrivilegedOpExecutor).GetMethods().Where(m => m.Name == nameof(IPrivilegedOpExecutor.ExecuteAsync)).ToList();
+        surcharges.Should().NotBeEmpty();
+        foreach (var method in surcharges)
+        {
+            var paramTypes = method.GetParameters().Select(p => p.ParameterType).ToArray();
+            paramTypes.Should().Contain(typeof(PrivilegedOp));
+            paramTypes.Should().NotContain(typeof(string), "no free string command/path may reach the executor");
+        }
     }
 
     [Fact]

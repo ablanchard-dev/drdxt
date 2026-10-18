@@ -20,14 +20,16 @@ public static class ValidationComplete
     [
         "latency.gameModeOn", "latency.gameDvrBackgroundOff", "latency.vrrFlipModelOn", "latency.hagsOn", "latency.mouse_acceleration_off",
         "fixit.power_plan", "fixit.mode_boost", "fixit.cpu_power_limit", "gpu.power_limit", "latency.render_queue_cap", "latency.vrr_vsync_cap",
+        "fixit.wifi_performances", "fixit.heures_actives",
     ];
 
     /// <summary>Ce que la relecture a vu. <paramref name="Pose"/> : vrai = la valeur du levier est en place, faux = la
     /// valeur d'origine est en place, <c>null</c> = pas su lire.</summary>
-    public sealed record Lecture(bool? Pose, string Texte);
+    /// <param name="Lu">La valeur relue seule, pour le rapport d'un exercice ; <c>null</c> quand elle n'a pas été lue.</param>
+    public sealed record Lecture(bool? Pose, string Texte, string? Lu = null);
 
     /// <summary>Pourquoi la boucle s'est arrêtée avant la fin.</summary>
-    public enum Arret { Aucun, LevierNonRendu, RefusDeWindows, JeuOuvert }
+    public enum Arret { Aucun, LevierNonRendu, RefusDeWindows, JeuOuvert, ParLeJoueur }
 
     /// <param name="NonRemis">Les leviers à vérifier à la main : pas rendus, ou rendus sans relecture qui le confirme.</param>
     /// <param name="Valides">Posés, relus, rendus, relus. <paramref name="NonTouches"/> : déjà réglés, sans objet ici ou
@@ -49,9 +51,14 @@ public static class ValidationComplete
 
     /// <param name="jeuOuvert">Relu avant chaque levier ; un jeu lancé en cours arrête la vérification
     /// (un réglage global posé quelques secondes toucherait la partie).</param>
+    /// <param name="arretDemande">Le joueur a demandé l'arrêt : relu avant chaque levier, jamais au milieu d'un levier, qui
+    /// est posé, relu et rendu d'un seul tenant. Rien ne reste donc à moitié fait.</param>
+    /// <param name="tenuParUnEssai">Vrai pour le levier qu'un essai en alternance tient : posé puis rendu ici, il fausserait la
+    /// partie suivante de l'essai. Il n'est pas touché, et le rapport dit comment le vérifier.</param>
     public static async Task<Resultat> ValiderAsync(IReadOnlyList<ITweak> leviers, HardwareInventory materiel,
         SettingsState etat, IRevertEnAttente journal, Func<TweakSnapshot, Lecture> relire, Action<string>? ecrireBloc = null,
-        Func<bool>? jeuOuvert = null)
+        Func<bool>? jeuOuvert = null, Func<bool>? arretDemande = null, Func<string, bool>? tenuParUnEssai = null,
+        bool profond = false)
     {
         var sb = new StringBuilder();
         var nonRemis = new List<string>();
@@ -70,6 +77,12 @@ public static class ValidationComplete
         Ecrire(Docteur.T("VC.Materiel", Materiel(materiel)) + Environment.NewLine + Environment.NewLine);
         foreach (var levier in leviers)
         {
+            if (arretDemande?.Invoke() == true)
+            {
+                arret = Arret.ParLeJoueur;
+                Ecrire(Docteur.T("VC.Arret.Joueur") + Environment.NewLine);
+                break;
+            }
             if (jeuOuvert?.Invoke() == true)
             {
                 arret = Arret.JeuOuvert;
@@ -78,7 +91,12 @@ public static class ValidationComplete
             }
             string bloc;
             Issue issue;
-            try { (bloc, issue) = await UnLevierAsync(levier, materiel, etat, journal, relire, nonRemis).ConfigureAwait(false); }
+            try
+            {
+                (bloc, issue) = tenuParUnEssai?.Invoke(levier.Id) == true
+                    ? (Docteur.T("VC.PasTouche.Essai"), Issue.NonTouche)
+                    : await UnLevierAsync(levier, materiel, etat, journal, relire, nonRemis, profond).ConfigureAwait(false);
+            }
             catch (Exception ex)
             {
                 (bloc, issue) = (Docteur.T("VC.ErreurInattendue", ex.Message), Issue.AVerifier);
@@ -113,18 +131,71 @@ public static class ValidationComplete
         return new Resultat(sb.ToString(), nonRemis, valides, nonTouches, refuses, arret) { ValidesIds = validesIds, EssayesIds = essayesIds, Empreinte = DrDxt.Application.Tweaks.LeviersVerifies.Empreinte(materiel) };
     }
 
+    /// <summary>Le banc profond : origine au journal, état non cible posé et relu, levier posé et relu, origine exacte rendue
+    /// et relue. L'origine est rendue quoi qu'il arrive après la première écriture ; le journal n'est levé que si elle est relue.</summary>
+    private static async Task<(string, Issue)> ExercerAsync(ITweak levier, ExerciceProfond exercice, IRevertEnAttente journal,
+        Func<TweakSnapshot, Lecture> relire, List<string> nonRemis)
+    {
+        var origine = new TweakSnapshot(levier.Id, exercice.OrigineJson);
+        var note = journal.Poser(levier.Id, origine);
+        if (!note.IsOk) return (Docteur.T("VC.PasTouche.Journal", note.Error?.Message), Issue.NonTouche);
+
+        Lecture? nonCible = null, prise = null;
+        Result rendu;
+        Lecture remis;
+        try
+        {
+            var horsCible = await levier.RevertAsync(new TweakSnapshot(levier.Id, exercice.HorsCibleJson)).ConfigureAwait(false);
+            nonCible = Relire(relire, new TweakSnapshot(levier.Id, exercice.OrigineJson, exercice.HorsCibleJson));
+            if (horsCible.IsOk && nonCible.Pose == true && await levier.ApplyAsync().ConfigureAwait(false) is { IsOk: true, Value: { } pose })
+                prise = Relire(relire, pose);
+        }
+        catch (Exception) { /* l'origine est rendue ci-dessous, et l'exercice dit non conclu */ }
+        finally
+        {
+            rendu = await RendreAsync(levier, origine).ConfigureAwait(false);
+            if (!rendu.IsOk) rendu = await RendreAsync(levier, origine).ConfigureAwait(false);   // une seconde chance
+            remis = Relire(relire, new TweakSnapshot(levier.Id, exercice.HorsCibleJson, exercice.OrigineJson));
+            if (rendu.IsOk && remis.Pose == true) journal.Lever();
+            else nonRemis.Add(Docteur.T("VC.PasRemis.Levier", levier.Id, remis.Texte));
+        }
+
+        // Les étapes nommées, avec ce qui a été lu à chacune : l'« origine » d'une relecture, aux étapes 2 et 3, était l'état
+        // intermédiaire, pas l'origine du joueur.
+        static string Etape(Lecture? l) => l?.Lu is { } v ? Docteur.T("VC.Exercice.Lu", v) : l?.Texte ?? "-";
+        var detail = Docteur.T("VC.Exercice.Etapes", Etape(nonCible), Etape(prise), Etape(remis));
+        if (rendu.IsOk && remis.Pose == true && prise?.Pose == true)
+            return (Docteur.T("VC.Exerce", detail) + (levier.TakesEffectAfterReboot ? " " + Docteur.T("VC.Exercice.AuRedemarrage") : ""),
+                Issue.Valide);
+        return rendu.IsOk && remis.Pose == true
+            ? (Docteur.T("VC.Exercice.NonConclu", detail), Issue.AVerifier)
+            : (Docteur.T("VC.Verdict.PasRemis"), Issue.AVerifier);
+    }
+
+    private static async Task<Result> RendreAsync(ITweak levier, TweakSnapshot origine)
+    {
+        try { return await levier.RevertAsync(origine).ConfigureAwait(false); }
+        catch (Exception ex) { return Result.Fail(ErrorCodes.HelperOpFailed, ex.Message); }
+    }
+
     private static async Task<(string, Issue)> UnLevierAsync(ITweak levier, HardwareInventory materiel, SettingsState etat,
-        IRevertEnAttente journal, Func<TweakSnapshot, Lecture> relire, List<string> nonRemis)
+        IRevertEnAttente journal, Func<TweakSnapshot, Lecture> relire, List<string> nonRemis, bool profond = false)
     {
         if (!levier.AppliesTo(materiel, etat))
-            return (levier.EtatNonLu(etat)
-                ? Docteur.T("VC.PasTouche.NonLu")
-                : Docteur.T("VC.PasTouche.DejaRegle"), Issue.NonTouche);
+        {
+            if (levier.EtatNonLu(etat)) return (Docteur.T("VC.PasTouche.NonLu"), Issue.NonTouche);
+            if (!profond) return (Docteur.T("VC.PasTouche.DejaRegle"), Issue.NonTouche);
+            return levier.PreparerExercice(materiel, etat) is { } exercice
+                ? await ExercerAsync(levier, exercice, journal, relire, nonRemis).ConfigureAwait(false)
+                : (Docteur.T("VC.PasTouche.PasDInverse"), Issue.NonTouche);
+        }
 
         // Le journal avant la machine : sans filet, rien n'est écrit.
         var pose = journal.Poser(levier.Id, null);
         if (!pose.IsOk) return (Docteur.T("VC.PasTouche.Journal", pose.Error?.Message), Issue.NonTouche);
 
+        // Le journal ci-dessus ne connaît pas encore l'origine : le helper la garde jusqu'à ce qu'il la porte.
+        using var portee = PorteeDePose.Ouvrir();
         var ecrit = await levier.ApplyAsync().ConfigureAwait(false);
         if (!ecrit.IsOk || ecrit.Value is not { } snapshot)
         {
@@ -139,7 +210,16 @@ public static class ValidationComplete
             return (Docteur.T("VC.EcritureRefusee", ecrit.Error?.Code, ecrit.Error?.Message),
                 ecrit.Error?.Code == ErrorCodes.ElevationDeclined ? Issue.RefusDeWindows : Issue.Refuse);
         }
+        // La machine portait déjà la valeur du levier (un essai en alternance l'avait posée, par exemple) : la pose a réécrit la
+        // même valeur, et aucune relecture ne peut la distinguer de l'origine. Rien n'est à prouver ni à rendre.
+        if (snapshot.AppliedValueJson is { } valeurPosee && valeurPosee == snapshot.OriginalValueJson)
+        {
+            journal.Lever();
+            return (Docteur.T("VC.PasTouche.DejaRegle"), Issue.NonTouche);
+        }
         var complete = journal.Poser(levier.Id, snapshot);
+        if (complete.IsOk) await portee.FermerAsync().ConfigureAwait(false);
+        else portee.Dispose();
 
         var sb = new StringBuilder();
         var posee = Relire(relire, snapshot);

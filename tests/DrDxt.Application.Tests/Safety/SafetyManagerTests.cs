@@ -343,4 +343,87 @@ public sealed class SafetyManagerTests
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.HelperOpFailed);
     }
+
+    // Le clic sur Appliquer attend ce point depuis le fil de l'interface : les lectures WMI (77 + 133 ms à froid sur la
+    // machine de référence, plus avec beaucoup de points) ne s'y font pas, l'appel rend la main avant elles.
+    [Fact]
+    public async Task Les_lectures_de_la_restauration_ne_bloquent_pas_l_appelant()
+    {
+        using var lu = new ManualResetEventSlim();
+        _restore.IsEnabled().Returns(_ => { lu.Wait(TimeSpan.FromSeconds(10)); return true; });
+        var safety = Build();
+
+        var appel = Task.Factory.StartNew(() => safety.EnsureRestorePointAsync(), CancellationToken.None,
+            TaskCreationOptions.LongRunning, TaskScheduler.Default);
+
+        (await Task.WhenAny(appel, Task.Delay(TimeSpan.FromSeconds(2)))).Should().BeSameAs(appel,
+            "l'appelant reprend la main pendant la lecture WMI");
+        lu.Set();
+        (await await appel).IsOk.Should().BeTrue();
+    }
+
+    // « Optimiser » puis le réglage de la carte avant la fin du premier : les deux attendent le même point, un seul est créé.
+    [Fact]
+    public async Task Deux_demandes_en_meme_temps_ne_creent_qu_un_point()
+    {
+        using var lu = new ManualResetEventSlim();
+        var crees = 0;
+        _restore.IsEnabled().Returns(_ => { lu.Wait(TimeSpan.FromSeconds(10)); return true; });
+        var safety = Build();
+        _restore.DernierPointDepuis(Arg.Any<DateTime>()).Returns(_ => Volatile.Read(ref crees) > 0 ? DateTime.UtcNow : null);
+        _elevated.ExecuteAsync(Arg.Any<CreateRestorePointOp>(), Arg.Any<CancellationToken>()).Returns(async _ =>
+        {
+            await Task.Delay(100);
+            Interlocked.Increment(ref crees);
+            return Result.Ok();
+        });
+
+        var premiere = Task.Run(safety.EnsureRestorePointAsync);
+        var seconde = Task.Run(safety.EnsureRestorePointAsync);
+        await Task.Delay(200);
+        lu.Set();
+
+        (await premiere).IsOk.Should().BeTrue();
+        (await seconde).IsOk.Should().BeTrue();
+        crees.Should().Be(1);
+    }
+
+    // La question au joueur est une fenêtre : elle revient sur le fil de l'appelant (celui de l'interface), même si la
+    // lecture de la restauration est partie sur le pool.
+    [Fact]
+    public async Task La_question_au_joueur_se_pose_sur_le_fil_de_l_appelant()
+    {
+        var filDeLaQuestion = -1;
+        _restore.IsEnabled().Returns(false);
+        _restore.TryEnable().Returns(true);
+        _consent.AskEnableRestore().Returns(_ => { filDeLaQuestion = Environment.CurrentManagedThreadId; return true; });
+        var safety = Build();
+        using var fil = new FilUnique();
+        var fini = new TaskCompletionSource<Result>();
+
+        fil.Post(async _ => fini.SetResult(await safety.EnsureRestorePointAsync()), null);
+
+        (await fini.Task.WaitAsync(TimeSpan.FromSeconds(10))).IsOk.Should().BeTrue();
+        filDeLaQuestion.Should().Be(fil.Id);
+    }
+
+    private sealed class FilUnique : SynchronizationContext, IDisposable
+    {
+        private readonly System.Collections.Concurrent.BlockingCollection<(SendOrPostCallback, object?)> _file = new();
+        private readonly Thread _fil;
+        public int Id => _fil.ManagedThreadId;
+
+        public FilUnique()
+        {
+            _fil = new Thread(() =>
+            {
+                SetSynchronizationContext(this);
+                foreach (var (d, s) in _file.GetConsumingEnumerable()) d(s);
+            }) { IsBackground = true };
+            _fil.Start();
+        }
+
+        public override void Post(SendOrPostCallback d, object? state) => _file.Add((d, state));
+        public void Dispose() => _file.CompleteAdding();
+    }
 }

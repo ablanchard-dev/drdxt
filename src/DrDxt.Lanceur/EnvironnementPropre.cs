@@ -32,6 +32,10 @@ public static class EnvironnementPropre
             ["PATH"] = string.Join(';', Path.Combine(w, "System32"), w, Path.Combine(w, "System32", "Wbem"),
                 Path.Combine(w, "System32", "WindowsPowerShell", "v1.0")),
             ["PATHEXT"] = ".COM;.EXE;.BAT;.CMD",
+            // Sans lui, PowerShell 5.1 met Documents\WindowsPowerShell\Modules en tête, que le compte écrit sans droits : la
+            // console de réparation (interactive, donc PSReadLine) et tout PowerShell lancé par un programme élevé y
+            // chargeraient un module du compte. Fixé, PowerShell n'y ajoute que Program Files, réservé aux administrateurs.
+            ["PSModulePath"] = Path.Combine(w, "System32", "WindowsPowerShell", "v1.0", "Modules"),
             ["OS"] = "Windows_NT",
             ["TEMP"] = dossierTemp,
             ["TMP"] = dossierTemp,
@@ -62,6 +66,11 @@ public static class EnvironnementPropre
     /// <summary>Les dossiers du système que l'audit de santé lit par leurs variables ; lus aux API par le lanceur.</summary>
     public sealed record DossiersDuSysteme(string? ProgramFiles, string? ProgramFilesX86, string? CommonProgramFiles,
         string? CommonProgramFilesX86, string? ProgramData, string? Public, string? NomUtilisateur, int Processeurs, string? Architecture);
+
+    /// <summary>L'argument du helper qui rend les réglages à la désinstallation (ModeDesinstallation.Argument). Le
+    /// désinstalleur, déjà élevé, passe par le lanceur comme tout lancement élevé, et le lanceur attend alors la fin du
+    /// helper : l'installeur retire les fichiers juste après.</summary>
+    public const string RenduDeDesinstallation = "--uninstall-revert";
 
     /// <summary>Le mot qui demande au lanceur la console de réparation de Windows (DISM puis sfc), au lieu d'un programme.</summary>
     public const string ReparerWindows = "reparer-windows";

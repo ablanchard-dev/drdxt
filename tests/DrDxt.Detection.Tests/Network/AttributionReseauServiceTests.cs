@@ -49,6 +49,35 @@ public class AttributionReseauServiceTests
             => Result<string?>.Ok(adapter.IsWired ? passerelle : null);
     }
 
+    // Une lecture des cartes lente (WMI) : le scan l'appelle depuis le fil de l'écran, qui ne doit pas l'attendre.
+    private sealed class CartesLentes(ManualResetEventSlim feu) : INetworkAdapterReader
+    {
+        public Result<IReadOnlyList<NetworkAdapterState>> Read()
+        {
+            feu.Wait(TimeSpan.FromSeconds(5));
+            return Result<IReadOnlyList<NetworkAdapterState>>.Fail(ErrorCodes.WmiFail, "lent");
+        }
+        public Result<string?> ReadDefaultGateway(NetworkAdapterState adapter) => Result<string?>.Ok(null);
+        public Result<IReadOnlyList<string>> ReadAllDefaultGateways()
+        {
+            feu.Wait(TimeSpan.FromSeconds(5));
+            return Result<IReadOnlyList<string>>.Fail(ErrorCodes.WmiFail, "lent");
+        }
+    }
+
+    [Fact]
+    public async Task La_lecture_de_la_passerelle_ne_bloque_pas_le_fil_appelant()
+    {
+        using var feu = new ManualResetEventSlim(false);
+        var service = new AttributionReseauService(new CartesLentes(feu), new CompteurFictif(1, 1));
+        var chrono = System.Diagnostics.Stopwatch.StartNew();
+        var tache = service.LigneAsync();
+        chrono.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1), "l'appel rend la main avant la lecture WMI");
+        tache.IsCompleted.Should().BeFalse("témoin : la lecture est bien en cours");
+        feu.Set();
+        (await tache).Should().BeNull();
+    }
+
     private sealed class CompteurFictif(double? gigueSaut, double? gigueInternet, bool refuse = false,
         double? secondSaut = null, double? secondInternet = null)
         : INetworkLatencyMeter

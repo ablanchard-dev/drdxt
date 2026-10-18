@@ -501,11 +501,20 @@
   <data name="UI.Footer.Updates.Failed" xml:space="preserve">
     <value>Updates: check failed, staying on this version</value>
   </data>
+  <data name="UI.Footer.Data" xml:space="preserve">
+    <value>tables version {0} of {1}</value>
+  </data>
+  <data name="UI.Footer.Data.Rejected" xml:space="preserve">
+    <value>a tables package was refused, the previous tables stay</value>
+  </data>
   <data name="UI.Footer.Install" xml:space="preserve">
     <value>Install update</value>
   </data>
   <data name="UI.Footer.Updates.InstallerLaunched" xml:space="preserve">
     <value>Updates: installer started. Accept the Windows prompt to install</value>
+  </data>
+  <data name="UI.Footer.Updates.Downloading" xml:space="preserve">
+    <value>Updates: downloading the new version…</value>
   </data>
   <data name="UI.Footer.Updates.InstallerRefused" xml:space="preserve">
     <value>Updates: installer refused. The file no longer matches the verified version</value>
@@ -930,9 +939,6 @@
   <data name="Bios.X3dCppc.Rationale" xml:space="preserve">
     <value>On a multi-CCD X3D CPU, games must run on the V-Cache cores. First check the Windows-side routing: the AMD 3D V-Cache service and Game Bar handle this on most systems and are almost certainly already correct. Only if games still run on the wrong cores after that is the BIOS CPPC / Preferred Cores setting worth touching.</value>
   </data>
-  <data name="Bios.X3dCppc.Action.SetRoute" xml:space="preserve">
-    <value>Set CPPC / Preferred Cores to the supported route for V-Cache.</value>
-  </data>
 
   <!-- Honest gain estimates (sourced range + caveat, never a bare promised %) -->
   <data name="Bios.Gain.Xmp.Source" xml:space="preserve">
@@ -1198,7 +1204,7 @@
     <value>reading impossible: this scan could not measure what it covered</value>
   </data>
   <data name="NonNuisance.Never.Voltage" xml:space="preserve">
-    <value>DrDXT never writes a voltage. The undervolt it offers is a clock offset, not a voltage/frequency curve.</value>
+    <value>DrDXT never writes a graphics card voltage: the card undervolt is a clock offset, not a voltage/frequency curve. On the processor, it only lowers the voltage, by 125 mV at most, and reads it back.</value>
   </data>
   <data name="NonNuisance.Never.Firmware" xml:space="preserve">
     <value>DrDXT never writes to firmware, to the BIOS or to your card's VBIOS: it reads BIOS settings from Windows without changing them. For "Restart into the BIOS", it asks Windows, which sets that boot request itself.</value>
@@ -1207,10 +1213,10 @@
     <value>DrDXT never touches Windows Defender, Windows Update, BITS or the app activity log. Those registry areas are refused whatever it asks.</value>
   </data>
   <data name="NonNuisance.Never.KernelDriver" xml:space="preserve">
-    <value>DrDXT loads no driver on your machine. It goes through the Windows APIs and your graphics vendor's own.</value>
+    <value>DrDXT installs no new driver on your machine; on your Undo, it can only put back a driver it had removed. It goes through the Windows APIs and your graphics vendor's own; if you installed PawnIO yourself, DrDXT loads into it only its own modules, built into DrDXT and checked against a pinned fingerprint before loading (to read and set the processor's power limit and voltage, and to read its temperature and the motherboard's fans).</value>
   </data>
   <data name="NonNuisance.Never.SilentFan" xml:space="preserve">
-    <value>DrDXT never lets the card's fan sit below 40% above 80 °C, even if you ask for a quieter curve.</value>
+    <value>DrDXT never leaves your card's fan at a fixed speed above 80 °C: from 80 °C, or if the temperature cannot be read, the fan returns to the card's own curve, and if DrDXT's elevated helper stops answering, the app returns it at once. A fixed speed is never below 40 %, nor below what the card aims for at that moment. Limit: if DrDXT stops entirely, the fixed speed stays until its next launch or a restart, and the card throttles itself as it heats.</value>
   </data>
   <data name="NonNuisance.Unknown.VendorEnvelope" xml:space="preserve">
     <value>What DrDXT does not know: how far your card's driver accepts a clock offset. It writes inside a narrower band than the driver's, without being able to name that band.</value>
@@ -1276,6 +1282,15 @@
   </data>
   <data name="Scan.Memory.Measured" xml:space="preserve">
     <value>Your memory, measured on this machine on {0:d}: {1:0.#} GB/s throughput (precision ±{2:0.#} %) and {3:0.#} ns access time (±{4:0.#} %).</value>
+  </data>
+  <data name="Scan.Courbe.Pics" xml:space="preserve">
+    <value>{0} spike(s) above the scale, marked at the top of the curve; the highest: {1} ms.</value>
+  </data>
+  <data name="Scan.Courbe.Titre" xml:space="preserve">
+    <value>Frame times of this measurement</value>
+  </data>
+  <data name="Scan.Courbe.Legende" xml:space="preserve">
+    <value>Each point is the slowest frame of its moment; the dotted line is the median. What rises above it are the stutters. A single measurement: this is not a before/after.</value>
   </data>
   <data name="Scan.Cadence.Measured" xml:space="preserve">
     <value>Cadence: 5% of frames drift at least {0:0.#} ms from where they should have been shown, some drift further. That is the unevenness you feel while aiming, which an average frame rate never shows.</value>
@@ -1473,6 +1488,12 @@ Turn on the game's FPS counter to compare.</value>
   <data name="Window.Minimize" xml:space="preserve">
     <value>Minimize</value>
   </data>
+  <data name="Curseur.Diminuer" xml:space="preserve">
+    <value>Decrease</value>
+  </data>
+  <data name="Curseur.Augmenter" xml:space="preserve">
+    <value>Increase</value>
+  </data>
   <data name="Window.Maximize" xml:space="preserve">
     <value>Maximize</value>
   </data>
@@ -1493,6 +1514,9 @@ Turn on the game's FPS counter to compare.</value>
   </data>
   <data name="Scan.Ab.Regression" xml:space="preserve">
     <value>Regression: the second run is worse than the first, beyond both margins of error.</value>
+  </data>
+  <data name="Dialog.DossierAvecLien.Message" xml:space="preserve">
+    <value>DrDXT will not start as administrator: its data folder contains a link placed by another program ({0}). A write as administrator would land elsewhere. Start DrDXT normally, or remove that link.</value>
   </data>
   <data name="Dialog.Crash.Title" xml:space="preserve">
     <value>DrDXT</value>
@@ -1554,10 +1578,13 @@ No setting on your machine was changed by this error.</value>
     <value>Search running</value>
   </data>
   <data name="SousTension.Verdict" xml:space="preserve">
-    <value>Undervolt that holds: {0} mV. Under full load, {1} °C at most instead of {2} °C, held back {3} % of the time instead of {4} %. To keep it, set it in the BIOS: core voltage offset, adaptive mode with a negative offset, at {0} mV (guide 5.23). DrDXT restored the original voltage.</value>
+    <value>Undervolt that held {5} min of full load: {0} mV. During that test, {1} °C at most instead of {2} °C, held back {3} % of the time instead of {4} %. A test this short does not prove stability in games: to keep it, set one step of margin in the BIOS, {6} mV (core voltage offset, adaptive mode with a negative offset, guide 5.23), then run an hour of load or several matches before keeping it; at the first crash, go back to the original voltage.</value>
+  </data>
+  <data name="SousTension.VerdictUnPalier" xml:space="preserve">
+    <value>Only one step held {5} min of full load: {0} mV. During that test, {1} °C at most instead of {2} °C, held back {3} % of the time instead of {4} %. A test this short does not prove stability in games, and it is the only step that held, with no safer step above it: if you set it in the BIOS, {6} mV (core voltage offset, adaptive mode with a negative offset, guide 5.23), run an hour of load or several matches before keeping it; at the first crash, go back to the original voltage.</value>
   </data>
   <data name="SousTension.Aucune" xml:space="preserve">
-    <value>No step held: {0}. DrDXT restored the original voltage; keep the original voltage.</value>
+    <value>No step held: {0}. Keep the original voltage.</value>
   </data>
   <data name="SousTension.Refusee" xml:space="preserve">
     <value>Your BIOS refuses undervolting from Windows: "UnderVolt Protection" is enabled (the default). Nothing was changed. Two ways, in the BIOS: 1) OC menu, disable "UnderVolt Protection" (without SGX it protects nothing), then run the search again (guide 5.23). 2) Option not there (often hidden on MSI boards): lower the voltage in the BIOS itself. On MSI, OC menu, "CPU Lite Load": a lower mode gives less voltage; go down one step at a time, play a match or run ten minutes of load at each step, and go back up one step at the first crash. On other boards: "CPU Core Voltage" in adaptive mode with a negative offset, -30 mV to start.</value>
@@ -1601,6 +1628,12 @@ No setting on your machine was changed by this error.</value>
   <data name="SousTension.NonRendue" xml:space="preserve">
     <value> Warning: the original voltage could not be restored; restart the PC, the restart restores it.</value>
   </data>
+  <data name="SousTension.NonDisponible" xml:space="preserve">
+    <value>Undervolting is not available on this processor: nothing was set.</value>
+  </data>
+  <data name="SousTension.Rendue" xml:space="preserve">
+    <value> DrDXT restored the original voltage.</value>
+  </data>
   <data name="SousTension.Etat.Trouvee" xml:space="preserve">
     <value>found</value>
   </data>
@@ -1614,7 +1647,7 @@ No setting on your machine was changed by this error.</value>
     <value>Test your memory without restarting</value>
   </data>
   <data name="Memoire.Test.Description" xml:space="preserve">
-    <value>Writes then reads back a quarter of your memory on every core for five minutes. Use the PC normally, without launching a game.</value>
+    <value>Writes then reads back a quarter of your memory, never more than half of what is free, on every core for five minutes. Use the PC normally, without launching a game. A checkpoint is noted in DrDXT’s data and erased at the end: if the PC stops during the test, the doctor will say so at the next launch.</value>
   </data>
   <data name="Memoire.Test.Maintenir" xml:space="preserve">
     <value>Hold to start, or press Enter</value>
@@ -1638,7 +1671,7 @@ No setting on your machine was changed by this error.</value>
     <value>Caps the upload of other programs while the game runs, so your router's queue does not fill up. At rest nothing changes. Removed when the game closes. It only works while DrDXT is open. Until you turn it off, DrDXT turns it back on at every launch, and Windows asks for your permission then.</value>
   </data>
   <data name="Ping.Protection.Description.Service" xml:space="preserve">
-    <value>Caps the upload of other programs while the game runs, so your router's queue does not fill up. At rest nothing changes. Removed when the game closes. DrDXT's startup service carries it: it works even with DrDXT closed, without a permission prompt, until you turn it off.</value>
+    <value>Caps the upload of other programs while the game runs, so your router's queue does not fill up. At rest nothing changes. Removed when the game closes. For the games it recognises by name (the most played competitive ones), DrDXT's startup service carries it: it works even with DrDXT closed, without a permission prompt, until you turn it off. For any other game, it only works while DrDXT is open.</value>
   </data>
   <data name="Ping.Protection.Indisponible" xml:space="preserve">
     <value>Ping protection not offered: nothing has shown your ping rising when your upload saturates. The monitoring below records it during your games; if it never happens, there is nothing to protect.</value>
@@ -1670,6 +1703,9 @@ No setting on your machine was changed by this error.</value>
   <data name="Ping.Protection.Echec" xml:space="preserve">
     <value>Protection could not start</value>
   </data>
+  <data name="Ping.Protection.SansFilet" xml:space="preserve">
+    <value>Cap not set: DrDXT's administrator tool no longer answers. Turn protection off, then on again.</value>
+  </data>
   <data name="Bcd.Rendre.Titre" xml:space="preserve">
     <value>Give the recovery screen back to Windows</value>
   </data>
@@ -1687,6 +1723,18 @@ No setting on your machine was changed by this error.</value>
   </data>
   <data name="Bcd.Rendre.Echec" xml:space="preserve">
     <value>The setting could not be written</value>
+  </data>
+  <data name="Demarrage.RemiseUsine" xml:space="preserve">
+    <value>Reset the card setting to factory</value>
+  </data>
+  <data name="Demarrage.RemiseUsineIntrouvable" xml:space="preserve">
+    <value>The setting to give back is no longer in DrDXT's log: nothing was reset.</value>
+  </data>
+  <data name="Demarrage.RendreEssai" xml:space="preserve">
+    <value>Give the setting back now</value>
+  </data>
+  <data name="Bcd.Rendre.GardeImpossible" xml:space="preserve">
+    <value>Nothing was removed: the undo could not be saved to disk</value>
   </data>
   <data name="Cpu.Remesure.Titre" xml:space="preserve">
     <value>Measure your processor again</value>
@@ -1982,6 +2030,12 @@ No setting on your machine was changed by this error.</value>
   <data name="Leviers.Annule" xml:space="preserve">
     <value>Undone: {0}. The value from before DrDXT is back.</value>
   </data>
+  <data name="Leviers.PasInscrit" xml:space="preserve">
+    <value>Set, but not listed in “What DrDXT set”: {0}. To undo, restart the PC, then, if it is still set, use the restore point.</value>
+  </data>
+  <data name="Changement.RetraitRate" xml:space="preserve">
+    <value>“{0}” costs you in games, but DrDXT could not remove it ({1}): undo it from “What DrDXT set”.</value>
+  </data>
   <data name="Leviers.PasAnnule" xml:space="preserve">
     <value>{0} was not undone ({1}). Nothing changed.</value>
   </data>
@@ -1992,7 +2046,25 @@ No setting on your machine was changed by this error.</value>
     <value>“{0}” is worse in game. DrDXT did not remove it on its own (it would have needed a Windows prompt you did not ask for): undo it in one click under “What DrDXT set”.</value>
   </data>
   <data name="Essai.EnCours" xml:space="preserve">
-    <value>Alternating trial: “{0}”, every other game launch while DrDXT is open (several matches in one launch count on one side) ({1} with, {2} without; next game: {3}). DrDXT decides at a clear 3 vs 3.</value>
+    <value>Alternating trial: “{0}”, per game launch while DrDXT is open, in blocks with, without, without, with (several matches in one launch count on one side) ({1} with, {2} without; next game: {3}). DrDXT decides at 3 with against 6 without, after checking that the 6 without do not split among themselves.</value>
+  </data>
+  <data name="Essai.PasInscrit" xml:space="preserve">
+    <value>“{0}” was not set: DrDXT could not record how to restore it if you uninstall ({1}). Nothing changed.</value>
+  </data>
+  <data name="Essai.PasInscritResteJournal" xml:space="preserve">
+    <value>“{0}” is still set: DrDXT could not record how to restore it if you uninstall ({1}), nor restore it right away. Undo it from “What DrDXT set”.</value>
+  </data>
+  <data name="Essai.ResteSansJournal" xml:space="preserve">
+    <value>“{0}” is still set: DrDXT could neither restore it nor list it in “What DrDXT set”. Restart the PC, then, if it is still set, use the restore point.</value>
+  </data>
+  <data name="Essai.PasRendable" xml:space="preserve">
+    <value>“{0}” is not tried: {1} Nothing changed.</value>
+  </data>
+  <data name="Essai.PasRendable.Raison" xml:space="preserve">
+    <value>uninstalling could not restore it.</value>
+  </data>
+  <data name="Essai.JugeSurLesImages" xml:space="preserve">
+    <value>Judged on the 1% lows: display latency was not read on any of your trial games.</value>
   </data>
   <data name="Essai.Pause" xml:space="preserve">
     <value>Trial of “{0}” paused: it could not switch without asking you for a Windows prompt. Open DrDXT, it resumes on the next game.</value>
@@ -2022,7 +2094,7 @@ No setting on your machine was changed by this error.</value>
     <value>Trial of “{0}”: the previous state could not be restored; the trial goes on, try again.</value>
   </data>
   <data name="Essai.Explication" xml:space="preserve">
-    <value>For a setting that is judged in game: DrDXT alternates it from one game to the next, with then without, and keeps it only if it gains you something. Optimize also starts it on its own.</value>
+    <value>For a setting that is judged in game: DrDXT alternates it from one game to the next, in blocks of with, without, without, with, and keeps it only if it gains you something. Optimize also starts it on its own.</value>
   </data>
   <data name="Essai.Bouton" xml:space="preserve">
     <value>Try it every other game</value>
@@ -2108,6 +2180,12 @@ No setting on your machine was changed by this error.</value>
   <data name="Changement.PasEncore" xml:space="preserve">
     <value>Since {0} ({1}): not judged in game yet. {2} game(s) recorded after, {3} before; it takes {4} on each side, same game.</value>
   </data>
+  <data name="Changement.JugeLatence" xml:space="preserve">
+    <value>Since {0} ({1}): {2} in {3}, judged on display latency. {4} ms then {5} ms (medians of {6} games before, {7} after).</value>
+  </data>
+  <data name="Changement.JugeSurLesImages" xml:space="preserve">
+    <value>Judged on the 1% lows: display latency, this setting's measure, was not read on any of these games.</value>
+  </data>
   <data name="Changement.Juge" xml:space="preserve">
     <value>Since {0} ({1}): {2} in {3}. 1% low {4} then {5}, FPS {6} then {7} (medians of {8} games before, {9} after).</value>
   </data>
@@ -2116,6 +2194,9 @@ No setting on your machine was changed by this error.</value>
   </data>
   <data name="Changement.Pire" xml:space="preserve">
     <value>worse in game</value>
+  </data>
+  <data name="Changement.PasComparable" xml:space="preserve">
+    <value>{0} ({1}): not comparable in game, it is not judged. On one side of the change, fewer than {2} of your games measure the 1% low the same way as the others (an older DrDXT version, or windows without their frames).</value>
   </data>
   <data name="Changement.Pareil" xml:space="preserve">
     <value>no clear difference in game</value>
@@ -2303,6 +2384,9 @@ No setting on your machine was changed by this error.</value>
   <data name="Carte.VoirLesAutres" xml:space="preserve">
     <value>Show more (</value>
   </data>
+  <data name="Carte.DetailsTechniques" xml:space="preserve">
+    <value>Technical details ({0})</value>
+  </data>
   <data name="Animations.MalgreWindows" xml:space="preserve">
     <value>Animations turned off by Windows: turn them on in DrDXT</value>
   </data>
@@ -2337,25 +2421,25 @@ No setting on your machine was changed by this error.</value>
     <value>Copy to clipboard</value>
   </data>
   <data name="tweak.gpu.repos_global_normal" xml:space="preserve">
-    <value>Sets the graphics card's global power management mode back to « Normal »: the card idles on the desktop. A game with its own setting keeps it. Removed on its own unless the drop in idle power is measured.</value>
+    <value>Sets the graphics card's global power management mode back to "Normal": the card idles on the desktop. A game with its own setting keeps it. Removed on its own unless the drop in idle power is measured.</value>
   </data>
   <data name="Carte.Repos.Prouve" xml:space="preserve">
-    <value>Card idle proven: {0:0.0} W at idle instead of {1:0.0} W before. « Normal » stays on the global profile; a game with its own setting keeps it.</value>
+    <value>Card idle proven: {0:0.0} W at idle instead of {1:0.0} W before. "Normal" stays on the global profile; a game with its own setting keeps it.</value>
   </data>
   <data name="Carte.Repos.NonMesure" xml:space="preserve">
-    <value>The card's power could not be read back: « Normal » was removed, nothing stays without proof.</value>
+    <value>The card's power could not be read back: "Normal" was removed, nothing stays without proof.</value>
   </data>
   <data name="Carte.Repos.PasDeGain" xml:space="preserve">
-    <value>No clear drop at idle ({0:0.0} W against {1:0.0} W before): « Normal » was removed and the card is back as it was.</value>
+    <value>No clear drop at idle ({0:0.0} W against {1:0.0} W before): "Normal" was removed and the card is back as it was.</value>
   </data>
   <data name="Carte.Repos.PireEnJeu" xml:space="preserve">
-    <value>In {0}, your last three matches were all choppier than the three before « Normal »: it was removed and the card is back as it was.</value>
+    <value>In {0}, your last three matches were all choppier than the three before "Normal": it was removed and the card is back as it was.</value>
   </data>
   <data name="Carte.Repos.Titre" xml:space="preserve">
     <value>Let your card idle, and prove it</value>
   </data>
   <data name="Carte.Repos.Description" xml:space="preserve">
-    <value>Your driver keeps « maximum performance » for the whole PC: the card never idles on the desktop. DrDXT measures its idle power, sets « Normal » on the global setting (your game keeps its own if it has one), then measures again after your next restart: without a clear drop it removes the setting on its own, and choppier matches afterwards remove it too.</value>
+    <value>Your driver keeps "maximum performance" for the whole PC: the card never idles on the desktop. DrDXT measures its idle power, sets "Normal" on the global setting (your game keeps its own if it has one), then measures again after your next restart: without a clear drop it removes the setting on its own, and choppier matches afterwards remove it too.</value>
   </data>
   <data name="Carte.Repos.Maintenir" xml:space="preserve">
     <value>Hold to measure and set, or Enter</value>
@@ -2370,7 +2454,7 @@ No setting on your machine was changed by this error.</value>
     <value>Let it idle</value>
   </data>
   <data name="Carte.Repos.Refuse" xml:space="preserve">
-    <value>Nothing was set: the card's power could not be read, or the global setting is no longer on « maximum performance ».</value>
+    <value>Nothing was set: the card's power could not be read, or the global setting is no longer on "maximum performance".</value>
   </data>
   <data name="Scan.Etape.Format" xml:space="preserve">
     <value>Step {0} of {1} · {2}</value>
@@ -2506,7 +2590,10 @@ No setting on your machine was changed by this error.</value>
     <value>Stability test…</value>
   </data>
   <data name="Carte.Expert.Garde" xml:space="preserve">
-    <value>Stable. Kept while DrDXT is open: when it closes, the card returns on its own (within two minutes).</value>
+    <value>Held {0} s of load without dropping out: a test this short does not prove stability in games; at the first frozen frame or crash, use "Restore the original". Kept while DrDXT is open: when it closes, the card returns on its own (within two minutes).</value>
+  </data>
+  <data name="Carte.Expert.GardeVentilateur" xml:space="preserve">
+    <value>Kept while DrDXT is open: when it closes, the fan returns to automatic (within two minutes).</value>
   </data>
   <data name="Carte.Expert.Instable" xml:space="preserve">
     <value>Unstable: the card was restored to its original.</value>
@@ -2604,8 +2691,26 @@ No setting on your machine was changed by this error.</value>
   <data name="Levier.VerifieIci" xml:space="preserve">
     <value>verified here (set, read back, restored)</value>
   </data>
+  <data name="Format.Jour" xml:space="preserve">
+    <value>MM/dd</value>
+  </data>
+  <data name="Format.JourHeure" xml:space="preserve">
+    <value>MM/dd HH:mm</value>
+  </data>
+  <data name="Erreur.Generique" xml:space="preserve">
+    <value>technical reason: {0}</value>
+  </data>
+  <data name="Erreur.HELPER.CPU_VOLTAGE_NOT_RESTORED" xml:space="preserve">
+    <value>the voltage could not be restored after a refusal: it stays changed until the PC restarts, which restores it</value>
+  </data>
+  <data name="Erreur.HELPER_UNREACHABLE" xml:space="preserve">
+    <value>DrDXT's administrator tool did not answer</value>
+  </data>
+  <data name="Erreur.UPDATE_INSTALLER_ELEVATED" xml:space="preserve">
+    <value>Restart DrDXT normally to install the update.</value>
+  </data>
   <data name="Verifier.Envoyer" xml:space="preserve">
-    <value>Send my report (opens a prefilled GitHub issue that you review before sending)</value>
+    <value>Send my report (opens an empty GitHub issue template: you attach the report file and review it before sending)</value>
   </data>
   <data name="Verifier.EnvoiImpossible" xml:space="preserve">
     <value>The report could not be opened in the browser: it stays in the file above, to attach yourself.</value>
@@ -2668,12 +2773,183 @@ No setting on your machine was changed by this error.</value>
     <value>A regression was measured, but at least one change could not be reverted: it is still applied.</value>
   </data>
   <data name="Carte.Repos.RetraitRate" xml:space="preserve">
-    <value>In {0}, your last three matches were all choppier than the three before « Normal », but DrDXT could not remove it: it is still applied. Set it back to its previous value in the NVIDIA Control Panel: Manage 3D settings, Global Settings, « Power management mode ».</value>
+    <value>In {0}, your last three matches were all choppier than the three before "Normal", but DrDXT could not remove it: it is still applied. Set it back to its previous value in the NVIDIA Control Panel: Manage 3D settings, Global Settings, "Power management mode".</value>
   </data>
   <data name="Carte.Repos.PreuveRetraitRate" xml:space="preserve">
-    <value>No clear drop at idle, but DrDXT could not remove « Normal »: it is still applied, and the removal will be retried at the next launch. You can also set it back to its previous value in the NVIDIA Control Panel: Manage 3D settings, Global Settings, « Power management mode ».</value>
+    <value>No clear drop at idle, but DrDXT could not remove "Normal": it is still applied, and the removal will be retried at the next launch. You can also set it back to its previous value in the NVIDIA Control Panel: Manage 3D settings, Global Settings, "Power management mode".</value>
   </data>
   <data name="Parties.Gains.SousLeBruit" xml:space="preserve">
     <value>{1} change(s) proven one by one, but their total ({0:+0.0;-0.0}% on the 1% low) does not exceed its noise (±{2:0.0}%): together, nothing proven</value>
+  </data>
+  <data name="Bios.Xmp.Off.Unstable.Title" xml:space="preserve">
+    <value>Memory: XMP/EXPO profile off, stabilize first</value>
+  </data>
+  <data name="Bios.Xmp.Off.Unstable.Rationale" xml:space="preserve">
+    <value>Your RAM runs below its rated speed, but DrDXT does not suggest turning its profile on while the machine is not stable: an incident in the last 45 days (unclean shutdown, blue screen, crash dump, serious hardware error, SSD unsafe shutdown), or a stability log that could not be read. A memory profile is an overclock: on an unstable machine, it would add a suspect. The suggestion comes back on its own after 45 days without an incident.</value>
+  </data>
+  <data name="PretAJouer.Redemarrage" xml:space="preserve">
+    <value>no real restart for {0} days (fast startup does not count, it resumes the kernel): restart before playing, not shut down.</value>
+  </data>
+  <data name="PretAJouer.MemoireVideo" xml:space="preserve">
+    <value>other programs already hold video memory: {0}. Close them before launching, the game will have that much less.</value>
+  </data>
+  <data name="PretAJouer.AudioVirtuel" xml:space="preserve">
+    <value>the sound goes through a virtual audio chain ({0}): it adds audio latency and some processor, and can skew a measurement.</value>
+  </data>
+  <data name="PretAJouer.Conversion" xml:space="preserve">
+    <value>BitLocker is converting a disk: until it ends, the disk is busy and any measurement measures the conversion. Wait for it to finish.</value>
+  </data>
+  <data name="QuoiDeNeuf.Titre" xml:space="preserve">
+    <value>What's new since your last version (from the changelog shipped with DrDXT):</value>
+  </data>
+  <data name="QuoiDeNeuf.Vu" xml:space="preserve">
+    <value>Seen</value>
+  </data>
+  <data name="Paquet.Preparer" xml:space="preserve">
+    <value>Prepare a help package</value>
+  </data>
+  <data name="Paquet.Enregistrer" xml:space="preserve">
+    <value>Save the package (zip)…</value>
+  </data>
+  <data name="Paquet.Contient" xml:space="preserve">
+    <value>The package will hold only these files, with your name, your PC's name, addresses and serial numbers removed:</value>
+  </data>
+  <data name="Unite.Ko" xml:space="preserve">
+    <value>KB</value>
+  </data>
+  <data name="Unite.Mo" xml:space="preserve">
+    <value>MB</value>
+  </data>
+  <data name="Paquet.Apercu" xml:space="preserve">
+    <value>Select a file to read exactly what it will hold.</value>
+  </data>
+  <data name="Paquet.Echec" xml:space="preserve">
+    <value>The help package could not be written there (disk full or rights refused).</value>
+  </data>
+  <data name="Agir.Capsule.Cadence" xml:space="preserve">
+    <value>Measure the rate</value>
+  </data>
+  <data name="Entrees.Cadence.Titre.SansManette" xml:space="preserve">
+    <value>What your mouse really sends</value>
+  </data>
+  <data name="Entrees.Cadence.Titre" xml:space="preserve">
+    <value>What your mouse and controller really send</value>
+  </data>
+  <data name="Entrees.Cadence.Description.SansManette" xml:space="preserve">
+    <value>Five seconds of listening while you move the mouse: reports per second, regularity, gaps. Nothing is intercepted or written; your inputs keep going to your programs.</value>
+  </data>
+  <data name="Entrees.Cadence.Description" xml:space="preserve">
+    <value>Five seconds of listening while you move the mouse and the controller: reports per second, regularity, gaps. Nothing is intercepted or written; your inputs keep going to your programs.</value>
+  </data>
+  <data name="Entrees.Cadence.Maintenir.SansManette" xml:space="preserve">
+    <value>Hold to start, then move the mouse</value>
+  </data>
+  <data name="Entrees.Cadence.Maintenir" xml:space="preserve">
+    <value>Hold to start, then move the mouse and the controller</value>
+  </data>
+  <data name="Entrees.Cadence.EnCours.SansManette" xml:space="preserve">
+    <value>Move the mouse now…</value>
+  </data>
+  <data name="Entrees.Cadence.EnCours" xml:space="preserve">
+    <value>Move the mouse and the controller now…</value>
+  </data>
+  <data name="Finding.Memory.SingleChannelMeasured" xml:space="preserve">
+    <value>Measured: even with several threads at once, your memory does not go above what a single channel can carry, with two or more sticks installed. One channel is probable: check that the sticks sit in the slots the motherboard manual gives for dual channel.</value>
+  </data>
+  <data name="Ligne.Test.Arreter" xml:space="preserve">
+    <value>Stop the test</value>
+  </data>
+  <data name="Ligne.Test.Annule" xml:space="preserve">
+    <value>Test stopped: nothing more is sent.</value>
+  </data>
+  <data name="Ligne.Test.Libelle" xml:space="preserve">
+    <value>Test my line under load</value>
+  </data>
+  <data name="Ligne.Test.EnCours" xml:space="preserve">
+    <value>Test running</value>
+  </data>
+  <data name="Ligne.Test.Description" xml:space="preserve">
+    <value>About twenty seconds: DrDXT measures your ping at rest, then while your line receives and sends empty bytes at full speed with {0} (Cloudflare's public speed test server), at most {1} MB each way. Nothing leaves without this click.</value>
+  </data>
+  <data name="Ligne.Test.Echec" xml:space="preserve">
+    <value>The test could not finish: {0}</value>
+  </data>
+  <data name="Essai.Fini.NonConcluant" xml:space="preserve">
+    <value>Trial of “{0}” inconclusive: compared with each other, your games without the setting already showed a gap, the measure sees noise. No verdict is drawn, the pre-trial state is back.</value>
+  </data>
+  <data name="Parties.LatencePc" xml:space="preserve">
+    <value>estimated PC latency {0} ms</value>
+  </data>
+  <data name="Parties.Composees" xml:space="preserve">
+    <value>{0} % of frames copied by Windows</value>
+  </data>
+  <data name="Parties.HorsCarte" xml:space="preserve">
+    <value>{0} MB of the game outside the card</value>
+  </data>
+  <data name="Carte.Expert.AutreOutil" xml:space="preserve">
+    <value>Another tool already tunes the card: close it or reset its settings. DrDXT does not stack its setting and writes nothing.</value>
+  </data>
+  <data name="Carte.Expert.DecalageNonLu" xml:space="preserve">
+    <value>The card's current offsets (core and memory) could not be read: DrDXT cannot tell whether another tool already tunes it, so it does not tune it and writes nothing.</value>
+  </data>
+  <data name="Verifier.Arreter" xml:space="preserve">
+    <value>Stop the check</value>
+  </data>
+  <data name="Verifier.ArretConsigne" xml:space="preserve">
+    <value>The current setting finishes its round (set, read back, put back, read back), then the check stops. Nothing is left half done.</value>
+  </data>
+  <data name="Verifier.ArretConfirmer" xml:space="preserve">
+    <value>Stop after this setting</value>
+  </data>
+  <data name="Verifier.ArretEnCours" xml:space="preserve">
+    <value>Stop requested: the current setting is being put back.</value>
+  </data>
+  <data name="Verifier.Etape" xml:space="preserve">
+    <value>Tried: {0}</value>
+  </data>
+  <data name="Verifier.ArreteParToi" xml:space="preserve">
+    <value>Check stopped at your request, between two settings: {0} setting(s) validated, {1} not touched, {2} refused. The remaining ones were not touched.</value>
+  </data>
+  <data name="Maintien.Pause.Titre" xml:space="preserve">
+    <value>Keeping settings at startup</value>
+  </data>
+  <data name="Maintien.Pause.Description" xml:space="preserve">
+    <value>While paused, your settings are no longer reapplied at startup. Ping protection and recovery after a crash stay active.</value>
+  </data>
+  <data name="Maintien.Pause.EnPause" xml:space="preserve">
+    <value>Upkeep is paused.</value>
+  </data>
+  <data name="Maintien.Pause.Poser" xml:space="preserve">
+    <value>Pause upkeep</value>
+  </data>
+  <data name="Maintien.Pause.Reprendre" xml:space="preserve">
+    <value>Resume upkeep</value>
+  </data>
+  <data name="Maintien.Pause.Echec" xml:space="preserve">
+    <value>The upkeep pause could not be changed</value>
+  </data>
+  <data name="Maintien.Pause.Incertaine" xml:space="preserve">
+    <value>The pause state is uncertain: set it again or remove it. Until then, nothing is reapplied.</value>
+  </data>
+  <data name="Maintien.Pause.Remettre" xml:space="preserve">
+    <value>Set the pause again</value>
+  </data>
+  <data name="Maintien.Pause.Retirer" xml:space="preserve">
+    <value>Remove the pause</value>
+  </data>
+  <data name="Erreur.HELPER_NO_REPLY" xml:space="preserve">
+    <value>The helper stopped answering: this setting may or may not be applied. Run the scan again to see.</value>
+  </data>
+  <data name="Erreur.HELPER_NO_REPLY.JOURNALED" xml:space="preserve">
+    <value>The helper stopped answering: this setting may or may not be applied. Run the scan again to see. If it is applied, DrDXT will restore its original value once closed: at the next action that asks for administrator rights, or at Windows startup if the service is installed.</value>
+  </data>
+  <data name="Erreur.WRITE_AHEAD_JOURNAL_UNAVAILABLE" xml:space="preserve">
+    <value>DrDXT cannot record the original value on this PC (DrDXT's folder is not trusted): it does not write this setting.</value>
+  </data>
+  <data name="Erreur.JEA_REFUS" xml:space="preserve">
+    <value>DrDXT could not record the original value before writing: nothing was written. Try again in a moment.</value>
+  </data>
+  <data name="Erreur.JEA_JOURNAL" xml:space="preserve">
+    <value>DrDXT could not record the original value before writing: nothing was written. Try again in a moment.</value>
   </data>
 </root>

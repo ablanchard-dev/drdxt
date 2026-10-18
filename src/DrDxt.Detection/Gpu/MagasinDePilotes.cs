@@ -26,6 +26,13 @@ public static class MagasinDePilotes
             .Select(d => ((string?)d.Element("DeviceDescription") ?? "?", (string?)d.Element("DriverName")))
             .ToList() ?? [];
 
+    /// <summary>Les paquets que Windows trouve compatibles avec chaque carte branchée (pnputil /enum-devices /drivers :
+    /// MatchingDrivers, rapprochés par l'identifiant matériel, SUBSYS compris). <c>null</c> = sortie illisible.</summary>
+    internal static HashSet<string>? Correspondants(string? xml) =>
+        xml is null || Racine(xml) is not { } r ? null
+            : r.Elements("Device").SelectMany(d => d.Element("MatchingDrivers")?.Elements("DriverName") ?? [])
+                .Select(e => (string?)e.Attribute("DriverName")).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     private static XElement? Racine(string xml)
     {
         try { return XDocument.Parse(xml).Root; }
@@ -34,8 +41,9 @@ public static class MagasinDePilotes
 
     private const string NomInstalles = "pilotes d'affichage installés";
 
-    public static IEnumerable<RepairFinding> Juger(string pilotesXml, string cartesXml, string deconnecteesXml)
+    public static IEnumerable<RepairFinding> Juger(string pilotesXml, string cartesXml, string deconnecteesXml, string? correspondantsXml = null)
     {
+        var correspondants = Correspondants(correspondantsXml);
         var paquets = Paquets(pilotesXml);
         var cartes = Cartes(cartesXml);
         var enService = cartes.Select(c => c.Pilote).Where(p => p is not null).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -55,14 +63,30 @@ public static class MagasinDePilotes
             yield break;
         }
 
-        var inutiles = paquets.Where(p => !enService.Contains(p.Nom)).ToList();
+        // Un paquet non lié n'est un reste que s'il est plus ancien que celui en service du même fournisseur : un plus récent
+        // non lié est un pilote installé que Windows n'a pas pris, et le retirer détruirait la mise à jour. Une version
+        // illisible n'est pas dite plus ancienne. Un paquet d'un autre fournisseur reste celui d'une ancienne carte.
+        var servis = paquets.Where(p => enService.Contains(p.Nom)).ToList();
+        bool PasPlusAncien(Paquet p) => servis.Any(s => string.Equals(s.Fournisseur, p.Fournisseur, StringComparison.OrdinalIgnoreCase)
+            && (!Version.TryParse(p.Version, out var v) || !Version.TryParse(s.Version, out var vs) || v > vs));
+        var nonLies = paquets.Where(p => !enService.Contains(p.Nom)).ToList();
+        var dormants = nonLies.Where(PasPlusAncien).ToList();
+        var inutiles = nonLies.Except(dormants).ToList();
         var lu = string.Join(", ", paquets.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})"));
-        if (inutiles.Count == 0)
+        if (dormants.Count > 0)
+            yield return new RepairFinding("GPU DRIVER", "pilote d'affichage dormant",
+                string.Join(", ", dormants.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")), null, RepairStatus.Observed,
+                Docteur.T("MP.Dormant", string.Join(", ", dormants.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")),
+                    string.Join(", ", servis.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")))
+                // Windows dit lui-même si ce paquet déclare la carte branchée (identifiant matériel, SUBSYS compris).
+                + (correspondants is null ? ""
+                    : Docteur.T(dormants.Any(p => correspondants.Contains(p.Nom)) ? "MP.DormantPourLaCarte" : "MP.DormantAutreMateriel")));
+        if (inutiles.Count == 0 && dormants.Count == 0)
             yield return new RepairFinding("GPU DRIVER", NomInstalles, lu, null, RepairStatus.ExpectedDefault,
                 paquets.Count == 1
                     ? Docteur.T("MP.UnSeul")
                     : Docteur.T("MP.ChacunSert"));
-        else
+        else if (inutiles.Count > 0)
             // La valeur listait aussi le paquet en service sous le titre « anciens pilotes ».
             yield return new RepairFinding("GPU DRIVER", "anciens pilotes d'affichage gardés",
                 string.Join(", ", inutiles.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")), null, RepairStatus.Suspicious,
@@ -105,11 +129,8 @@ public static class MagasinDePilotes
                 // de la console (« carte m\uFFFDre » lu en UTF-8).
                 StandardOutputEncoding = EncodageOem(),
             };
-            using var proc = Process.Start(psi);
-            if (proc is null) return "";
-            var sortie = proc.StandardOutput.ReadToEnd();
-            proc.WaitForExit(10000);
-            return sortie;
+            var r = DrDxt.Core.ProcessusBorne.Executer(psi, TimeSpan.FromSeconds(10));
+            return r.Fini ? r.Sortie : "";
         }
         catch { return ""; }
     }

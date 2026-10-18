@@ -53,6 +53,16 @@ public sealed class VorticeGpuComputeRunner : IGpuComputeRunner
         }
     }
 
+    private static IDXGIAdapter1? AdaptateurHautePerformance()
+    {
+        try
+        {
+            using var fabrique = DXGI.CreateDXGIFactory1<IDXGIFactory6>();
+            return fabrique.EnumAdapterByGpuPreference(0, GpuPreference.HighPerformance, out IDXGIAdapter1? a).Success ? a : null;
+        }
+        catch (Exception) { return null; }
+    }
+
     private static Result<GpuComputeOutcome> RunCore(GpuWorkloadSpec spec, TimeSpan duration, CancellationToken ct)
     {
         var bytecode = LoadShaderBytecode();
@@ -61,9 +71,14 @@ public sealed class VorticeGpuComputeRunner : IGpuComputeRunner
                 "Embedded compute-shader bytecode not found.");
 
         // Périphérique matériel, FL11 (cs_5_0). Un seul thread : tous les appels passent par ici.
+        // Sur l'adaptateur « haute performance » de DXGI (IDXGIFactory6::EnumAdapterByGpuPreference), la carte dédiée
+        // que les réglages visent : l'adaptateur par défaut est la puce intégrée sur un portable hybride, et le banc y
+        // jugeait la stabilité d'une carte qu'il ne chargeait pas. Avec un adaptateur, le type de pilote doit être
+        // Unknown (doc D3D11CreateDevice). Sans IDXGIFactory6 (Windows 10 antérieur à 1803), l'adaptateur par défaut.
         var featureLevels = new[] { FeatureLevel.Level_11_1, FeatureLevel.Level_11_0 };
+        using var adaptateur = AdaptateurHautePerformance();
         var hr = D3D11.D3D11CreateDevice(
-            null, DriverType.Hardware, DeviceCreationFlags.Singlethreaded, featureLevels,
+            adaptateur, adaptateur is null ? DriverType.Hardware : DriverType.Unknown, DeviceCreationFlags.Singlethreaded, featureLevels,
             out ID3D11Device? device, out _, out ID3D11DeviceContext? context);
 
         if (hr.Failure || device is null || context is null)

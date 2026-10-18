@@ -3,7 +3,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:conv="clr-namespace:DrDxt.App.Converters"
         mc:Ignorable="d"
         Title="DrDXT"
         Height="900"
@@ -17,7 +16,6 @@
     <Window.Resources>
         <!-- Les boutons de la barre de titre ne sont que des tracés : leur nom parlé vient
              du catalogue, comme le reste de ce que le client lit. -->
-        <conv:KeyToLocalizedStringConverter x:Key="Loc"/>
     </Window.Resources>
 
     <!-- La barre de titre de Windows est remplacée par la nôtre ; le système garde le

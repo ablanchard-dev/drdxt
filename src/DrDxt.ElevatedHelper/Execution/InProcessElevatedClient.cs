@@ -40,6 +40,7 @@ public sealed class InProcessElevatedClient : IElevatedClient
         if (!allowed.IsOk)
             return allowed;
 
-        return await _executor.ExecuteAsync(op, ct).ConfigureAwait(false);
+        // Le demandeur est ce processus même (le service, la désinstallation).
+        return await _executor.ExecuteAsync(op, ct, new DrDxt.ElevatedHelper.Ipc.CallerInfo(Environment.ProcessId)).ConfigureAwait(false);
     }
 }

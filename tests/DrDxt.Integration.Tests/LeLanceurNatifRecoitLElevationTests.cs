@@ -43,7 +43,10 @@ public sealed class LeLanceurNatifRecoitLElevationTests
         // Le banc ne demande plus l'élévation lui-même : lancé sans droits, il passe par le lanceur.
         Lire("tools", "amd-harness", "DrDxt.AmdHarness", "app.manifest").Should().Contain("level=\"asInvoker\"");
         Lire("tools", "amd-harness", "DrDxt.AmdHarness", "Program.cs").Should().Contain("LanceurDuBanc.RelancerParLeLanceur(args)");
-        Lire("tools", "amd-harness", "VALIDER.cmd").Should().Contain("DrDXT-Test.exe\" --valider");
+        Lire("tools", "amd-harness", "VALIDER.cmd").Should().Contain("DrDXT-Test.exe\" --valider").And.NotContain("--valider-frequence");
+        // La fréquence de la carte AMD est un geste à part, son propre fichier, livré dans le même zip.
+        Lire("tools", "amd-harness", "VALIDER-FREQUENCE.cmd").Should().Contain("DrDXT-Test.exe\" --valider-frequence");
+        Lire("tools", "amd-harness", "paquet-rapport.ps1").Should().Contain("'VALIDER-FREQUENCE.cmd'");
         Lire("tools", "amd-harness", "REMETTRE.cmd").Should().Contain("DrDXT-Test.exe\" --remettre");
     }
 

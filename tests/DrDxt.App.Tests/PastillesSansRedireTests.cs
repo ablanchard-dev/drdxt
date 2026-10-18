@@ -47,7 +47,11 @@ public sealed class PastillesSansRedireTests
     public void Un_point_rouge_ne_dit_pas_recommandation_mais_les_autres_actions_restent()
     {
         E(Severity.Major, "Écran de récupération", "x", "", "recommandation").ActionAAfficher.Should().BeEmpty();
-        E(Severity.Info, "Mode jeu", "x", "", "recommandation").ActionAAfficher.Should().Be("recommandation");
+        E(Severity.Info, "Mode jeu", "x", "", "recommandation").ActionAAfficher.Should().BeEmpty("la couleur du point le dit déjà");
+        using (Docteur.Portee(System.Globalization.CultureInfo.GetCultureInfo("en-US")))
+            E(Severity.Major, "Recovery screen", "x", "", "recommendation").ActionAAfficher.Should().BeEmpty("en anglais aussi");
+        E(Severity.Info, "Mode jeu", "x", "", "recommendation").ActionAAfficher.Should()
+            .BeEmpty("un scan en anglais relu par un écran en français : la pastille reste muette");
         E(Severity.Major, "Ligne", "x", "", "DrDXT peut le réparer").ActionAAfficher.Should().Be("DrDXT peut le réparer");
     }
 }

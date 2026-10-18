@@ -17,6 +17,11 @@ public interface IPrivilegedOpExecutor
 {
     Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct);
 
+    /// <summary>La même exécution, avec le processus qui l'a demandée. Les deux entrées du helper appellent cette forme ;
+    /// le journal d'écriture anticipée la redéfinit pour noter le demandeur. Par défaut, l'appelant est ignoré.</summary>
+    Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct, DrDxt.ElevatedHelper.Ipc.CallerInfo appelant)
+        => ExecuteAsync(op, ct);
+
     /// <summary>
     /// Exécute une op qui répond au lieu d'agir, et rend ses octets. Même contrat de sécurité
     /// que <see cref="ExecuteAsync"/> : la feuille est déjà passée par HMAC → anti-rejeu →

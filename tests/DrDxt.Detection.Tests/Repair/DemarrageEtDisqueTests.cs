@@ -19,6 +19,37 @@ public sealed class DemarrageEtDisqueTests
         c.Explication.IndexOf("Discord", StringComparison.Ordinal).Should().BeLessThan(c.Explication.IndexOf("Norton", StringComparison.Ordinal));
     }
 
+    // Un programme que la mesure du dernier démarrage nomme déjà n'est pas renommé par le récapitulatif de 90 jours :
+    // le même retard ne s'annonce qu'une fois.
+    [Fact]
+    public void Un_programme_deja_nomme_au_dernier_demarrage_ne_l_est_pas_une_seconde_fois()
+    {
+        var t = DateTimeOffset.Now;
+        var lus = new List<DemarrageEtDisque.Ralentisseur> { new(t.AddDays(-1), "Lecteur A", 3100), new(t.AddDays(-20), "Lecteur B", 11100) };
+
+        var c = DemarrageEtDisque.JugerDemarrage(lus, dejaNommes: new HashSet<string>(["lecteur a"], StringComparer.OrdinalIgnoreCase))
+            .Should().ContainSingle().Subject;
+        c.Explication.Should().Contain("Lecteur B").And.NotContain("Lecteur A");
+        c.ValeurCourante.Should().Be("1 programme(s)");
+        DemarrageEtDisque.JugerDemarrage(lus, dejaNommes: new HashSet<string>(["Lecteur A", "Lecteur B"])).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void La_mesure_du_dernier_demarrage_dit_quels_programmes_elle_nomme()
+    {
+        var jour = DateTimeOffset.Now.AddDays(-1);
+        IReadOnlyList<DrDxt.Detection.Hardware.MesureDemarrage> mesures =
+        [
+            new(jour, true, "", 27_600, 0),
+            new(jour.AddMinutes(1), false, "Lecteur A", 0, 3100),
+            new(jour.AddDays(-10), false, "Lecteur C", 0, 9000),
+        ];
+
+        DrDxt.Detection.Hardware.DemarrageMesure.Nommes(mesures, DateTimeOffset.Now, TimeSpan.FromDays(30)).Should().BeEquivalentTo(["Lecteur A"]);
+        DrDxt.Detection.Hardware.DemarrageMesure.Nommes(mesures, DateTimeOffset.Now.AddDays(60), TimeSpan.FromDays(30))
+            .Should().BeEmpty("une mesure périmée ne nomme personne");
+    }
+
     [Fact]
     public void Sans_ralentisseur_recent_rien_n_est_dit()
         => DemarrageEtDisque.JugerDemarrage([]).Should().BeEmpty();

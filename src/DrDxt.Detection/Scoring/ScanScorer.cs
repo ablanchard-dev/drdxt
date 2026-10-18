@@ -22,7 +22,7 @@ public sealed class ScanScorer : IScanScorer
         var levers = LeverCatalog.Evaluate(hw, state, bottleneck);
 
         // Les constats viennent du même catalogue (plus le pilier latence, toujours présent).
-        var findings = ScoringRules.Evaluate(hw, state);
+        var findings = ScoringRules.Evaluate(hw, state, bottleneck);
 
         // Registre auditable : une ligne par vrai levier noté (occasions neutres exclues).
         var ledger = levers

@@ -14,10 +14,9 @@ namespace DrDxt.ElevatedHelper.Tests;
 // copie dérive, et figent le rail côté helper (le refus par défaut que traverse chaque
 // écriture de limite de puissance ADLX) aux bords de la bande.
 //
-// L'op Undervolt porte une MaxFreq absolue (MHz), pas un décalage : il n'y a donc pas de
-// bande de décalage à recopier ici. La bande prudente [-200, +100] est imposée côté App
-// (GpuSafeBounds) et le helper valide la cible absolue contre la plage matérielle annoncée
-// par le pilote (vérifié dans ADLXTuningActionsTests, pas ici).
+// L'op Undervolt porte une MaxFreq absolue (MHz) : la bande prudente [-200, +100] est recopiée
+// aussi, et le helper l'applique autour de la MaxFreq retenue à ce démarrage (vérifié dans
+// ADLXTuningActionsTests).
 // -----------------------------------------------------------------------
 public sealed class AdlxTuningPolicyBoundSyncTests
 {
@@ -28,6 +27,13 @@ public sealed class AdlxTuningPolicyBoundSyncTests
     {
         AdlxTuningMath.MinPowerLimitPct.Should().Be(GpuSafeBounds.MinPowerLimitPct);
         AdlxTuningMath.MaxPowerLimitPct.Should().Be(GpuSafeBounds.MaxPowerLimitPct);
+    }
+
+    [Fact]
+    public void Undervolt_band_mirrors_GpuSafeBounds()
+    {
+        AdlxTuningMath.MinCoreOffsetMhz.Should().Be(GpuSafeBounds.MinCoreOffsetMhz);
+        AdlxTuningMath.MaxCoreOffsetMhz.Should().Be(GpuSafeBounds.MaxCoreOffsetMhz);
     }
 
     // --- Le rail côté helper impose la même bande (le refus par défaut). ---

@@ -24,6 +24,7 @@
   <ItemGroup>
     <!-- TEST-ONLY manifest dev/test PRIVATE seed (never in any shipping binary). -->
     <Compile Include="..\Shared\ManifestDevTestKeys.cs" Link="Shared\ManifestDevTestKeys.cs" />
+    <Compile Include="..\Shared\InversesDeTest.cs" Link="Shared\InversesDeTest.cs" />
   </ItemGroup>
 
   <ItemGroup>

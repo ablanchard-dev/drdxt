@@ -260,7 +260,8 @@ public static class TrustedManifestRoot
     /// et le blob DPAPI « machine » se dechiffre depuis n'importe quel compte local.</param>
     public static Result WriteTrustedFile(string path, byte[] bytes, bool prive = false)
     {
-        var tmp = path + ".tmp";
+        // Nom aléatoire, créé en exclusif : un lien dur posé d'avance sous un nom prévisible ferait réécrire sa cible.
+        var tmp = FichierJsonAtomique.NomTemporaire(path);
         try
         {
             var dir = Path.GetDirectoryName(path);
@@ -282,7 +283,8 @@ public static class TrustedManifestRoot
             }
             else
             {
-                File.WriteAllBytes(tmp, bytes);
+                using (var flux = new FileStream(tmp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+                    flux.Write(bytes);
                 // Épingler propriétaire + DACL protégée sur le fichier temporaire avant de le publier sous son
                 // vrai nom : le fichier de confiance n'appartient jamais, même un instant, à l'utilisateur.
                 new FileInfo(tmp).SetAccessControl(BuildHardenedFileSecurity());

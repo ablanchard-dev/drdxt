@@ -55,7 +55,8 @@ public sealed class HelperDiagnosticsLog : IDiagnosticsLog
                 // dossier remplace par une jonction enverrait cet ajout eleve n'importe ou, System32
                 // compris. On n'ecrit jamais a travers un point de reparse.
                 if (!_ecrivable || TraverseUnPointDeReparse(_journalPath)) return;
-                File.AppendAllText(_journalPath, line + Environment.NewLine);
+                // La réparation de la racine ne descend pas : un fichier posé d'avance en lien dur n'est jamais écrit.
+                DrDxt.Core.FichierJsonAtomique.AjouterSansLien(_journalPath, line + Environment.NewLine, "HELPER_JOURNAL");
             }
             catch { /* secondary audit trail — never abort the helper on a write failure */ }
         }

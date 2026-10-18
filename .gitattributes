@@ -23,3 +23,7 @@
 *.pfx       binary
 *.dll       binary
 *.exe       binary
+
+# La page du guide BIOS : sa politique de sécurité autorise son script par son empreinte, calculée sur les fins de ligne LF.
+# Un checkout Windows en CRLF changerait l empreinte du fichier lu par les tests.
+docs/guide-bios/index.html text eol=lf

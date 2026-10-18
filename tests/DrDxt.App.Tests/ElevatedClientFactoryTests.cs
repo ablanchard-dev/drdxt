@@ -37,8 +37,10 @@ public sealed class ElevatedClientFactoryTests : IDisposable
 
         var client = ElevatedClientFactory.Create();
 
-        // Enveloppé dans ClientSessionUtilisateur (HKCU par l'App, le reste au helper).
-        client.Should().BeOfType<ClientSessionUtilisateur>().Which.VersLeHelper.Should().BeOfType<TypedNamedPipeElevatedClient>(
+        // Enveloppé dans ClientSessionUtilisateur (HKCU par l'App, le reste au helper), puis dans ClientDesPoses : une
+        // écriture HKCU ne passe jamais par le marquage des poses.
+        client.Should().BeOfType<ClientSessionUtilisateur>().Which.VersLeHelper.Should().BeOfType<ClientDesPoses>()
+            .Which.VersLeHelper.Should().BeOfType<TypedNamedPipeElevatedClient>(
             "a pre-shared key selects the legacy smoke-compatible client");
     }
 

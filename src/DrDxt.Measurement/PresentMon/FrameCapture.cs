@@ -40,7 +40,7 @@ namespace DrDxt.Measurement.PresentMon;
 /// (en-tête PresentMon 2.5.1 livré dans `third_party/presentmon`). « Composed » veut dire que le
 /// compositeur de Windows recopie l'image ; « independent flip » qu'il s'efface. C'est ce qui dit, en
 /// fenêtré sans bordure, si G-Sync et la latence se comportent comme en plein écran. Vide quand le
-/// service ne donne pas la taille attendue.
+/// service ne donne pas la taille attendue. Lu par <c>FrametimeStatistics.PartComposee</c> pour la frise des parties.
 /// </param>
 public sealed record FrameCapture(
     IReadOnlyList<double> FrameTimesMs,
@@ -53,16 +53,7 @@ public sealed record FrameCapture(
     IReadOnlyList<int>? PresentModes = null,
     // DisplayLatency de PresentMon, « du début de l'image jusqu'à son affichage à l'écran », pour toute
     // application sans instrumentation. null = non demandée ou non livrée (taille inconnue).
-    IReadOnlyList<double>? DisplayLatencyMs = null)
-{
-    /// <summary>Part des images passées par le compositeur, parmi celles dont le mode est connu ;
-    /// null quand aucune ne l'est. Composed = valeurs 4, 5 et 6 de `PM_PRESENT_MODE`.</summary>
-    public double? PartComposee
-    {
-        get
-        {
-            var connues = PresentModes?.Count(m => m != 0) ?? 0;
-            return connues == 0 ? null : (double)PresentModes!.Count(m => m is 4 or 5 or 6) / connues;
-        }
-    }
-}
+    IReadOnlyList<double>? DisplayLatencyMs = null,
+    // PcLatency de PresentMon, de l'entrée du joueur jusqu'à l'écran ; NaN par image quand le jeu ne pose pas les
+    // marqueurs de latence. null = non livrée.
+    IReadOnlyList<double>? PcLatencyMs = null);

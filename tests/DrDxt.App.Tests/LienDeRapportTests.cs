@@ -4,27 +4,18 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-/// <summary>Le rapport part par un ticket GitHub pré-rempli,
-/// sans serveur ; DrDXT n'envoie rien lui-même, le joueur relit et soumet.</summary>
+/// <summary>Le rapport part par un ticket GitHub, sans serveur ; DrDXT n'envoie rien lui-même, le joueur y glisse le
+/// fichier, le relit et soumet.</summary>
 public sealed class LienDeRapportTests
 {
+    // Le navigateur envoie l'adresse à GitHub dès l'ouverture, avant toute relecture : rien du rapport ni du matériel n'y va.
     [Fact]
-    public void Le_lien_ouvre_le_modele_avec_le_titre_et_le_rapport()
+    public void Le_lien_ouvre_le_modele_vide_sans_rien_du_rapport_ni_du_materiel()
     {
         var lien = LienDeRapport.Construire("Core i7-14700F", "NVIDIA GeForce RTX 4060", "BILAN : tout est remis d'origine.\n=== gpu.power_limit");
 
-        lien.Should().StartWith($"https://github.com/{LienDeRapport.Depot}/issues/new?template=rapport-de-verification.yml");
-        var decode = Uri.UnescapeDataString(lien);
-        decode.Should().Contain("title=Vérification : Core i7-14700F + NVIDIA GeForce RTX 4060")
-            .And.Contain("rapport=BILAN : tout est remis d'origine.\n=== gpu.power_limit");
-    }
-
-    [Fact]
-    public void Un_long_rapport_est_coupe_et_le_dit()
-    {
-        var lien = LienDeRapport.Construire("cpu", "gpu", new string('x', 20_000));
-        lien.Length.Should().BeLessThanOrEqualTo(LienDeRapport.LongueurMax);
-        Uri.UnescapeDataString(lien).Should().Contain("rapport coupé");
+        lien.Should().Be($"https://github.com/{LienDeRapport.Depot}/issues/new?template=rapport-de-verification.yml");
+        Uri.UnescapeDataString(lien).Should().NotContain("14700F").And.NotContain("RTX").And.NotContain("BILAN");
     }
 
     [Fact]
@@ -43,7 +34,7 @@ public sealed class LienDeRapportTests
 
             vm.EnvoyerRapportCommand.Execute(null);
 
-            Uri.UnescapeDataString(ouvert!).Should().Contain("rapport=BILAN : tout est remis d'origine.");
+            ouvert.Should().Be(LienDeRapport.Nouveau);
         }
         finally { File.Delete(chemin); }
     }

@@ -9,7 +9,11 @@ namespace DrDxt.Application.Tests.Tweaks;
 public class JournalDesLeviersAppliquesTests : IDisposable
 {
     private readonly string _chemin = Path.Combine(Path.GetTempPath(), $"drdxt-journal-{Guid.NewGuid():N}.json");
-    public void Dispose() { try { File.Delete(_chemin); } catch { } }
+    public void Dispose()
+    {
+        foreach (var f in Directory.GetFiles(Path.GetDirectoryName(_chemin)!, Path.GetFileName(_chemin) + "*"))
+            try { File.Delete(f); } catch { }
+    }
 
     private sealed class Registre(uint? valeur) : IRegistryReader
     {
@@ -55,24 +59,31 @@ public class JournalDesLeviersAppliquesTests : IDisposable
     }
 
     [Fact]
-    public void Un_journal_absent_ou_illisible_ne_dit_rien()
+    public void Un_journal_absent_ne_dit_rien_un_journal_illisible_est_dit()
     {
-        new JournalDesLeviersAppliques(_chemin).Lire().Should().BeEmpty();
-        File.WriteAllText(_chemin, "{ pas du json");
         new JournalDesLeviersAppliques(_chemin).Constats(new Registre(1)).Should().BeEmpty();
+        File.WriteAllText(_chemin, "{ pas du json");
+
+        var constats = new JournalDesLeviersAppliques(_chemin).Constats(new Registre(1));
+
+        constats.Should().ContainSingle().Which.Statut.Should().Be(RepairStatus.Unknown,
+            "sans lui, « Annuler » et le retrait automatique ne voient plus ce que DrDXT a posé");
     }
 
-    // Un journal illisible lu comme vide serait reecrit par Enregistrer avec les seuls leviers du
-    // jour : l'historique des gains disparaitrait en silence. Sans lecture sure, on n'ecrit pas.
+    // Illisible (coupure, ou fichier écrit par un autre programme du compte), le journal s'arrêtait en silence pour toujours :
+    // plus aucun levier noté. Il est mis de côté, sa trace reste, et le journal repart.
     [Fact]
-    public void Un_journal_illisible_n_est_pas_ecrase_par_le_suivant()
+    public void Un_journal_illisible_est_mis_de_cote_et_le_journal_repart()
     {
         File.WriteAllText(_chemin, "{ pas du json");
+        var j = new JournalDesLeviersAppliques(_chemin);
 
-        new JournalDesLeviersAppliques(_chemin)
-            .Enregistrer(new ApplyReport(new[] { Garde(Snapshot("latency.gameDvrBackgroundOff", "1")) }, null));
+        j.Enregistrer(new ApplyReport(new[] { Garde(Snapshot("latency.gameDvrBackgroundOff", "1")) }, null));
 
-        File.ReadAllText(_chemin).Should().Be("{ pas du json");
+        j.Lire().Should().ContainSingle();
+        var deCote = Directory.GetFiles(Path.GetDirectoryName(_chemin)!, Path.GetFileName(_chemin) + ".mis-de-cote-*");
+        deCote.Should().ContainSingle();
+        File.ReadAllText(deCote[0]).Should().Be("{ pas du json");
     }
 
     // Une entree nulle ou sans identifiant faisait lever Constats, appele pendant le scan.

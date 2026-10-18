@@ -7,9 +7,11 @@ namespace DrDxt.App.ViewModels;
 /// <summary>
 /// Un geste du guide que DrDXT sait faire lui-même, posé sous « Comment corriger » du constat qui le demande :
 /// le joueur lit les étapes, ou laisse DrDXT les faire. <paramref name="annuler"/> absent : rien à défaire
-/// (relancer un périphérique, par exemple), aucun « Annuler » n'est proposé.
+/// (relancer un périphérique, par exemple), aucun « Annuler » n'est proposé. <paramref name="dejaFait"/> : un geste fait
+/// dans une session précédente, dont seul l'Annuler reste à proposer.
 /// </summary>
-public sealed partial class GesteDuDocteur(string titre, string detail, Func<Task<Result>> faire, Func<Task<Result>>? annuler = null)
+public sealed partial class GesteDuDocteur(string titre, string detail, Func<Task<Result>> faire, Func<Task<Result>>? annuler = null,
+    bool dejaFait = false)
     : ObservableObject
 {
     public string Titre { get; } = titre;
@@ -17,7 +19,7 @@ public sealed partial class GesteDuDocteur(string titre, string detail, Func<Tas
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PeutFaire), nameof(PeutAnnuler))]
-    private bool _fait;
+    private bool _fait = dejaFait;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PeutFaire), nameof(PeutAnnuler))]

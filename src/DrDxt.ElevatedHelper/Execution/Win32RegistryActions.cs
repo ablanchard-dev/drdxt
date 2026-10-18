@@ -12,9 +12,26 @@ namespace DrDxt.ElevatedHelper.Execution;
 // la feuille près par le serveur. Tout échec est emballé → HELPER.OP_FAILED ; ne lève jamais.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
-public sealed class Win32RegistryActions : IRegistryActions
+public sealed class Win32RegistryActions(Func<RegistryHiveKind, TraceDesCoupures?>? traces = null) : IRegistryActions
 {
+    /// <summary>Le helper tient la trace des coupures de la machine ; l'App, celle de la session qu'elle écrit elle-même.</summary>
+    public static TraceDesCoupures? TraceDuHelper(RegistryHiveKind ruche) => ruche == RegistryHiveKind.LocalMachine ? TraceDesCoupures.DeLaMachine() : null;
+
+    public static TraceDesCoupures? TraceDeLaSession(RegistryHiveKind ruche) => ruche == RegistryHiveKind.CurrentUser ? TraceDesCoupures.DeLaSession() : null;
+
+    // Les trois exécutants (helper, désinstallation, service) écrivent par ici : la garde du fichier d'échange les couvre tous.
+    private readonly GardeDuFichierDEchange _fichierDEchange = new();
+
     public Result SetValue(RegistryHiveKind hive, string path, string name, RegistryValueType kind, string value)
+    {
+        if (!GardeDuFichierDEchange.Vise(hive, path, name)) return Ecrire(hive, path, name, kind, value);
+        if (_fichierDEchange.Avant(value) is { } refus) return Fail(refus);
+        var r = Ecrire(hive, path, name, kind, value);
+        if (r.IsOk) _fichierDEchange.Apres(value);
+        return r;
+    }
+
+    private static Result Ecrire(RegistryHiveKind hive, string path, string name, RegistryValueType kind, string value)
     {
         try
         {
@@ -41,7 +58,7 @@ public sealed class Win32RegistryActions : IRegistryActions
                     // certaines API Windows, et le reste serait silencieusement ignore.
                     key.SetValue(
                         name,
-                        value.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToArray(),
+                        MultiTexteDuRegistre.Entrees(value),
                         RegistryValueKind.MultiString);
                     return Result.Ok();
 
@@ -82,8 +99,14 @@ public sealed class Win32RegistryActions : IRegistryActions
             using var key = root.CreateSubKey(Approuve + liste, writable: true);
             if (key is null)
                 return Fail("Could not open the StartupApproved key.");
-            key.SetValue(nom, SetStartupApprovalOp.Octets(actif, DateTime.UtcNow), RegistryValueKind.Binary);
-            return Result.Ok();
+            var octets = SetStartupApprovalOp.Octets(actif, DateTime.UtcNow);
+            // Une coupure est notée avant d'être écrite : l'App tuée juste après sait encore la réactiver.
+            return TraceDesCoupures.Autour(traces?.Invoke(hive), new CoupureDuDemarrage(hive, liste, nom, Convert.ToHexString(octets)), actif,
+                () =>
+                {
+                    try { key.SetValue(nom, octets, RegistryValueKind.Binary); return Result.Ok(); }
+                    catch (Exception ex) { return Fail($"Startup approval write failed: {ex.GetType().Name}."); }
+                });
         }
         catch (Exception ex)
         {

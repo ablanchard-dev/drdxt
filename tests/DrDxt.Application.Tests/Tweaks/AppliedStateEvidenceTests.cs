@@ -54,6 +54,59 @@ public class AppliedStateEvidenceTests
         return new TweakSnapshot("latency.hagsOn", Serialise(inverse), Serialise(cible));
     }
 
+    // Une chaîne (flip-model, souris) ou une chaîne multiple (fichier d'échange) rendait toujours Unavailable : ces leviers ne
+    // pouvaient jamais être « validés ». Relues comme la relecture du scan (TweakReadback), comparées telles quelles.
+    // Seule la méthode du type de la feuille rend la valeur : l'autre rend une troisième valeur, qu'un verdict lu par la
+    // mauvaise méthode trahirait.
+    private sealed class LecteurTexte(RegistryValueType type, string? valeur, bool echoue = false) : IRegistryReader
+    {
+        public Result<uint?> ReadDword(RegistryHiveKind hive, string path, string name) => Result<uint?>.Ok(null);
+        public Result<string?> ReadString(RegistryHiveKind hive, string path, string name) => Lire(RegistryValueType.String);
+        public Result<string?> ReadMultiString(RegistryHiveKind hive, string path, string name) => Lire(RegistryValueType.MultiString);
+        private Result<string?> Lire(RegistryValueType methode) => methode != type ? Result<string?>.Ok("mauvaise méthode")
+            : echoue ? Result<string?>.Fail(ErrorCodes.TweakSdkUnavailable, "refus") : Result<string?>.Ok(valeur);
+    }
+
+    [Theory]
+    [InlineData(RegistryValueType.String)]
+    [InlineData(RegistryValueType.MultiString)]
+    public void Une_chaine_se_relit_et_se_compare_a_la_cible_et_a_l_origine(RegistryValueType type)
+    {
+        var inverse = new SetRegistryValueOp(RegistryHiveKind.CurrentUser, Chemin, Feuille, type, "avant");
+        var cible = new SetRegistryValueOp(RegistryHiveKind.CurrentUser, Chemin, Feuille, type, "apres");
+        var s = new TweakSnapshot("levier", Serialise(inverse), Serialise(cible));
+
+        AppliedStateVerifier.Verifier(s, new LecteurTexte(type, "apres")).Verdict.Should().Be(EtatApplique.Applied);
+        AppliedStateVerifier.Verifier(s, new LecteurTexte(type, "avant")).Verdict.Should().Be(EtatApplique.NotApplied);
+        AppliedStateVerifier.Verifier(s, new LecteurTexte(type, "autre")).Verdict.Should().Be(EtatApplique.Drifted);
+        AppliedStateVerifier.Verifier(s, new LecteurTexte(type, null, echoue: true)).Verdict.Should().Be(EtatApplique.Unknown);
+    }
+
+    [Fact]
+    public void Une_chaine_absente_avant_et_toujours_absente_donne_NotApplied()
+    {
+        var inverse = new DeleteRegistryValueOp(RegistryHiveKind.CurrentUser, Chemin, Feuille);
+        var cible = new SetRegistryValueOp(RegistryHiveKind.CurrentUser, Chemin, Feuille, RegistryValueType.String, "apres");
+
+        AppliedStateVerifier.Verifier(new TweakSnapshot("levier", Serialise(inverse), Serialise(cible)), new LecteurTexte(RegistryValueType.String, null))
+            .Verdict.Should().Be(EtatApplique.NotApplied);
+    }
+
+    // Une valeur à rendre absente (l'origine d'un exercice profond était « absente ») rendait Unavailable : l'origine
+    // n'était jamais relue. Absente = la cible est là ; la valeur d'origine encore là = pas appliqué.
+    [Fact]
+    public void Une_valeur_a_rendre_absente_se_relit()
+    {
+        var inverse = new SetRegistryValueOp(RegistryHiveKind.CurrentUser, Chemin, Feuille, RegistryValueType.DWord, "1");
+        var cible = new DeleteRegistryValueOp(RegistryHiveKind.CurrentUser, Chemin, Feuille);
+        var s = new TweakSnapshot("levier", Serialise(inverse), Serialise(cible));
+
+        AppliedStateVerifier.Verifier(s, new Lecteur(null)).Verdict.Should().Be(EtatApplique.Applied);
+        AppliedStateVerifier.Verifier(s, new Lecteur(1)).Verdict.Should().Be(EtatApplique.NotApplied);
+        AppliedStateVerifier.Verifier(s, new Lecteur(7)).Verdict.Should().Be(EtatApplique.Drifted);
+        AppliedStateVerifier.Verifier(s, new Lecteur(null, echoue: true)).Verdict.Should().Be(EtatApplique.Unknown);
+    }
+
     [Fact]
     public void La_valeur_lue_EGALE_la_cible_donne_Applied()
     {
@@ -144,6 +197,50 @@ public class AppliedStateEvidenceTests
         public Result<Guid> GetActivePowerPlan()
             => actif is { } g ? Result<Guid>.Ok(g)
                               : Result<Guid>.Fail(ErrorCodes.TweakSdkUnavailable, "non lu");
+    }
+
+    // L'économie d'énergie du Wi-Fi rendait toujours Unavailable : fixit.wifi_performances ne pouvait jamais être « validé ».
+    // Relue par le même lecteur que le levier lit avant d'écrire.
+    private sealed class SansFilFige(uint? valeur) : IPowerPlanReader
+    {
+        public Result<Guid> GetActivePowerPlan() => Result<Guid>.Ok(HautesPerfs);
+        public Result<EconomieSansFilLue> LireEconomieSansFil(Guid plan)
+            => valeur is { } v ? Result<EconomieSansFilLue>.Ok(new EconomieSansFilLue(plan, v))
+                               : Result<EconomieSansFilLue>.Fail(ErrorCodes.TweakSdkUnavailable, "non lu");
+    }
+
+    [Fact]
+    public void L_economie_d_energie_du_wifi_se_relit_par_le_plan()
+    {
+        var s = new TweakSnapshot("fixit.wifi_performances",
+            Serialise(new SetWirelessPowerSavingOp(HautesPerfs, 3)), Serialise(new SetWirelessPowerSavingOp(HautesPerfs, 0)));
+
+        AppliedStateVerifier.Verifier(s, new Lecteur(null), alimentation: new SansFilFige(0)).Verdict.Should().Be(EtatApplique.Applied);
+        AppliedStateVerifier.Verifier(s, new Lecteur(null), alimentation: new SansFilFige(3)).Verdict.Should().Be(EtatApplique.NotApplied);
+        AppliedStateVerifier.Verifier(s, new Lecteur(null), alimentation: new SansFilFige(1)).Verdict.Should().Be(EtatApplique.Drifted);
+        AppliedStateVerifier.Verifier(s, new Lecteur(null), alimentation: new SansFilFige(null)).Verdict.Should().Be(EtatApplique.Unknown);
+    }
+
+    // Le démarrage du service AMD3DVCacheSvc rendait toujours Unavailable : le composite X3D ne pouvait jamais être prouvé
+    // posé. Relu par le lecteur d'état de service que le levier lit avant d'écrire.
+    private sealed class ServiceFige(ServiceState? etat) : IServiceStateReader
+    {
+        public Result<ServiceState> GetServiceState(string serviceName)
+            => etat is { } e ? Result<ServiceState>.Ok(e) : Result<ServiceState>.Fail(ErrorCodes.TweakSdkUnavailable, "non lu");
+    }
+
+    [Fact]
+    public void Le_demarrage_d_un_service_se_relit_par_son_etat()
+    {
+        var s = new TweakSnapshot("fixit.x3d_ccd",
+            Serialise(new RunServiceControlOp("AMD3DVCacheSvc", ServiceAction.Stop)),
+            Serialise(new RunServiceControlOp("AMD3DVCacheSvc", ServiceAction.Start)));
+
+        AppliedStateVerifier.Verifier(s, new Lecteur(null), services: new ServiceFige(ServiceState.Running)).Verdict.Should().Be(EtatApplique.Applied);
+        AppliedStateVerifier.Verifier(s, new Lecteur(null), services: new ServiceFige(ServiceState.Stopped)).Verdict.Should().Be(EtatApplique.NotApplied);
+        AppliedStateVerifier.Verifier(s, new Lecteur(null), services: new ServiceFige(ServiceState.NotInstalled)).Verdict.Should().Be(EtatApplique.Drifted);
+        AppliedStateVerifier.Verifier(s, new Lecteur(null), services: new ServiceFige(null)).Verdict.Should().Be(EtatApplique.Unknown);
+        AppliedStateVerifier.Verifier(s, new Lecteur(null)).Verdict.Should().Be(EtatApplique.Unavailable, "sans lecteur, rien n'est affirmé");
     }
 
     private static TweakSnapshot SnapshotPlan(Guid avant, Guid demande) =>

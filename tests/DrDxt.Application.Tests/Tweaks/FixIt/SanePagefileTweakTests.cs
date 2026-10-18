@@ -1,3 +1,4 @@
+using DrDxt.Application.Tweaks;
 using DrDxt.Application.Tweaks.FixIt;
 using DrDxt.Application.Tweaks.Hardware;
 using DrDxt.Core;
@@ -176,5 +177,18 @@ public sealed class SanePagefileTweakTests
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.SnapshotInvalid);
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
+    // Sans la valeur posée dans le snapshot, la relecture après pose rendait Unknown : le levier ne pouvait jamais être
+    // « validé ». Le snapshot porte la gestion automatique écrite, et la relecture la reconnaît.
+    [Fact]
+    public async Task Le_snapshot_porte_la_valeur_posee_et_la_relecture_la_reconnait()
+    {
+        var r = await Build(current: "").ApplyAsync();
+
+        r.IsOk.Should().BeTrue(r.Error?.Message);
+        PrivilegedOpCodec.Deserialize(r.Value!.AppliedValueJson).Value.Should().Be(
+            new SetRegistryValueOp(RegistryHiveKind.LocalMachine, MmPath, "PagingFiles", RegistryValueType.MultiString, @"?:\pagefile.sys"));
+        _registry.ReadMultiString(RegistryHiveKind.LocalMachine, MmPath, "PagingFiles").Returns(Result<string?>.Ok(@"?:\pagefile.sys"));
+        AppliedStateVerifier.Verifier(r.Value, _registry).Verdict.Should().Be(EtatApplique.Applied);
     }
 }

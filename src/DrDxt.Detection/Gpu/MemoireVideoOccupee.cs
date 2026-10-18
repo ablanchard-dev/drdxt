@@ -36,6 +36,69 @@ public static class MemoireVideoOccupee
     private static IReadOnlyList<DxgiAdapter>? _cartes;
     private static bool? _compteurPresent;
 
+    /// <summary>Pur : la mémoire vidéo dédiée par processus, sommée sur ses instances (« pid_1234_luid_…_phys_0 » du
+    /// compteur « GPU Process Memory\Dedicated Usage »), les plus gros d'abord.</summary>
+    public static IReadOnlyList<(int Pid, long Octets)> ParPid(IEnumerable<(string Instance, long Occupe)> compteurs)
+        => compteurs.Select(c => (Pid: Pid(c.Instance), c.Occupe)).Where(c => c.Pid is not null)
+            .GroupBy(c => c.Pid!.Value).Select(g => (g.Key, g.Sum(c => c.Occupe))).OrderByDescending(c => c.Item2).ToList();
+
+    private static int? Pid(string instance)
+    {
+        if (!instance.StartsWith("pid_", StringComparison.Ordinal)) return null;
+        var fin = instance.IndexOf('_', 4);
+        return fin > 4 && int.TryParse(instance.AsSpan(4, fin - 4), out var pid) ? pid : null;
+    }
+
+    /// <summary>Les processus qui tiennent de la mémoire vidéo dédiée maintenant, nommés ; <c>null</c> = compteur absent.</summary>
+    public static IReadOnlyList<(string Nom, long Octets)>? ParProcessus()
+    {
+        try
+        {
+            if (!PerformanceCounterCategory.Exists("GPU Process Memory")) return null;
+            var lot = new PerformanceCounterCategory("GPU Process Memory").ReadCategory();
+            if (!lot.Contains("Dedicated Usage")) return null;
+            return ParPid(lot["Dedicated Usage"].Values.Cast<InstanceData>().Select(i => (i.InstanceName, i.RawValue)))
+                .Select(p =>
+                {
+                    try { using var proc = Process.GetProcessById(p.Pid); return (proc.ProcessName, p.Octets); }
+                    catch (Exception) { return ($"pid {p.Pid}", p.Octets); }
+                }).ToList();
+        }
+        catch (Exception) { return null; }
+    }
+
+    /// <summary>
+    /// Pur : la mémoire hors carte (« Non Local Usage », en mémoire système) d'un processus sur les cartes dédiées, en octets,
+    /// sommée sur ses instances « pid_…_luid_…_phys_N » rattachées à chaque carte par son identifiant ; plusieurs cartes
+    /// acceptées, une puce intégrée ne compte pas (tout y est en mémoire système). null = aucune instance sur une carte dédiée.
+    /// Relevé sur la machine de référence le 17/10/2026 : instances « pid_2232_luid_0x00000000_0x0221C866_phys_0 », même
+    /// identifiant que la carte vue par DisplayConfig.
+    /// </summary>
+    public static long? HorsCarte(int pid, IReadOnlyList<(string Instance, long Octets)> compteurs, IReadOnlyList<DxgiAdapter> cartes)
+    {
+        long? total = null;
+        foreach (var carte in cartes.Where(c => c.Luid is not null && c.DedicatedVramBytes >= CarteDedieeMin))
+            foreach (var c in compteurs.Where(c => c.Instance.StartsWith($"pid_{pid}_{carte.Luid}_", StringComparison.OrdinalIgnoreCase)))
+                total = (total ?? 0) + c.Octets;
+        return total;
+    }
+
+    /// <summary>La mémoire hors carte du processus maintenant, en Mo ; null = compteur, carte ou processus absents.</summary>
+    public static double? HorsCarteMo(int pid)
+    {
+        try
+        {
+            if (_cartes is null && new VorticeDxgiProvider().EnumerateAdapters() is { IsOk: true, Value: { Count: > 0 } lues })
+                _cartes = lues;
+            if (_cartes is null || !PerformanceCounterCategory.Exists("GPU Process Memory")) return null;
+            var lot = new PerformanceCounterCategory("GPU Process Memory").ReadCategory();
+            if (!lot.Contains("Non Local Usage")) return null;
+            return HorsCarte(pid, lot["Non Local Usage"].Values.Cast<InstanceData>().Select(i => (i.InstanceName, i.RawValue)).ToList(), _cartes)
+                is { } o ? o / (1024.0 * 1024) : null;
+        }
+        catch (Exception) { return null; }
+    }
+
     /// <summary>Le pourcentage maintenant, ou <c>null</c> si le compteur ou la carte manque.</summary>
     public static double? Lire()
     {

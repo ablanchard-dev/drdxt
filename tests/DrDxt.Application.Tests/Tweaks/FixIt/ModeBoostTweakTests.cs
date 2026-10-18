@@ -116,4 +116,42 @@ public sealed class ModeBoostTweakTests
         CatalogueDeCandidats.Decrire(t.Id)!.Surface.Should().Be(SurfaceTouchee.Processeur);
         CandidateSelector.FermeeParLesArrets(SurfaceTouchee.Processeur).Should().BeTrue();
     }
+    // Banc profond : boost déjà au défaut du plan, l'exercice le coupe (0, l'état que le levier répare) le temps de
+    // l'exercice, puis le levier le rend au défaut, puis l'origine exacte revient. De bout en bout avec le vrai vérificateur.
+    [Fact]
+    public async Task En_profond_le_boost_deja_au_defaut_est_exerce_puis_rendu()
+    {
+        uint valeur = 2;
+        var vues = new List<uint>();
+        _power.GetActivePowerPlan().Returns(Result<Guid>.Ok(Plan));
+        _power.LireModeDeBoost(Plan).Returns(_ => Result<ModeDeBoostLu>.Ok(new ModeDeBoostLu(Plan, valeur, 2)));
+        _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(c =>
+        {
+            if (c.Arg<PrivilegedOp>() is SetProcessorBoostModeOp o) { valeur = o.AcValue; vues.Add(valeur); }
+            return Task.FromResult(Result.Ok());
+        });
+        var levier = new ModeBoostTweak(_power, _elevated);
+        var journal = new DrDxt.Application.Autopilot.FichierRevertEnAttente(Path.Combine(Path.GetTempPath(), $"drdxt-profond-{Guid.NewGuid():N}.json"));
+        DrDxt.Application.Autopilot.ValidationComplete.Lecture Relire(TweakSnapshot sn)
+        {
+            var p = DrDxt.Application.Tweaks.AppliedStateVerifier.Verifier(sn, Substitute.For<IRegistryReader>(), alimentation: _power);
+            return new(p.Verdict switch { DrDxt.Application.Tweaks.EtatApplique.Applied => true,
+                DrDxt.Application.Tweaks.EtatApplique.NotApplied => false, _ => (bool?)null }, p.Verdict.ToString());
+        }
+
+        var r = await DrDxt.Application.Autopilot.ValidationComplete.ValiderAsync([levier], Hw(ChassisType.Desktop),
+            Etat(new ModeDeBoostLu(Plan, 2, 2)), journal, Relire, profond: true);
+
+        vues.Should().Equal([0u, 2u, 2u], "coupé, puis rendu au défaut par le levier, puis l'origine exacte");
+        r.Texte.Should().Contain("exercé");
+        r.NonRemis.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Un_boost_qui_n_est_pas_au_defaut_ou_sur_un_autre_plan_n_est_pas_exerce()
+    {
+        Build().PreparerExercice(Hw(ChassisType.Desktop), Etat(new ModeDeBoostLu(Plan, 3, 2))).Should().BeNull("réglé à la main, pas au défaut");
+        Build().PreparerExercice(Hw(ChassisType.Desktop), Etat(new ModeDeBoostLu(Guid.NewGuid(), 2, 2))).Should().BeNull("un autre plan");
+        Build().PreparerExercice(Hw(ChassisType.Handheld), Etat(new ModeDeBoostLu(Plan, 2, 2))).Should().BeNull("hors du champ du levier");
+    }
 }

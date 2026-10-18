@@ -132,6 +132,16 @@ public sealed class TheUpdaterIsMountedOrSaysWhyNotTests
         => UpdateTrust.CreateVerifier(UpdateDevKeys.UpdatePublicKey).IsOk.Should().BeFalse(
             "sa graine privee est publique : quiconque a lu le depot signerait une mise a jour");
 
+    // La paire de dev a tourne : l'ancienne graine circule hors du depot. Son ancienne clef publique n'est plus la clef
+    // de dev, et reste refusee comme clef de production.
+    [Fact]
+    public void L_ancienne_cle_de_dev_a_tourne_et_reste_refusee()
+    {
+        var ancienne = Convert.FromHexString("F07364290342905893C87BDDEB8189ED36496414EE6F5D8D590CE7CB35EC23D8");
+        UpdateDevKeys.UpdatePublicKey.Should().NotEqual(ancienne);
+        UpdateTrust.CreateVerifier(ancienne).IsOk.Should().BeFalse();
+    }
+
     [Fact]
     public void The_manifest_path_is_the_one_the_server_serves()
     {

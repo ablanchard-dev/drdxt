@@ -17,15 +17,43 @@ public sealed class OverlaysEnPartieTests
             .Should().Equal("Discord (ouvert)", "NVIDIA", "RivaTuner", "Steam");
 
     [Fact]
-    public void Deux_parties_de_chaque_cote_donnent_l_ecart_en_fps_median()
+    public void Trois_parties_de_chaque_cote_donnent_l_ecart_en_fps_median()
     {
         var (ecarts, autres) = OverlaysEnPartie.Comparer([
             Partie("cod.exe", 140, ["Steam"]), Partie("cod.exe", 150, ["Steam"]), Partie("cod.exe", 120, ["Steam"]),
+            Partie("cod.exe", 160, []), Partie("cod.exe", 170, []), Partie("cod.exe", 165, []),
+        ]);
+
+        ecarts.Should().ContainSingle().Which.Should().Be(new OverlaysEnPartie.Ecart("cod.exe", "Steam", 140, 165, 3, 3, VerdictEnJeu.Pire));
+        autres.Should().BeEmpty();
+    }
+
+    // Deux parties contre deux, sans aucun écart réel : toutes celles avec sous toutes celles sans arrive par hasard une fois
+    // sur six (1 disposition sur C(4,2) = 6). Le verdict demande le même minimum que les autres juges.
+    [Fact]
+    public void Deux_parties_contre_deux_ne_donnent_pas_de_verdict()
+    {
+        var (ecarts, autres) = OverlaysEnPartie.Comparer([
+            Partie("cod.exe", 140, ["Steam"]), Partie("cod.exe", 150, ["Steam"]),
             Partie("cod.exe", 160, []), Partie("cod.exe", 170, []),
         ]);
 
-        ecarts.Should().ContainSingle().Which.Should().Be(new OverlaysEnPartie.Ecart("cod.exe", "Steam", 140, 165, 3, 2, VerdictEnJeu.Pire));
-        autres.Should().BeEmpty();
+        ecarts.Should().BeEmpty();
+        autres.Should().ContainSingle().Which.Should().Be(new OverlaysEnPartie.SansComparaison("cod.exe", "Steam", 2, 2));
+    }
+
+    // Les parties d'un autre estimateur du 1 % low ne comptent d'aucun côté : sans elles, il n'y a plus trois parties sans.
+    [Fact]
+    public void Les_parties_d_un_autre_estimateur_ne_se_comparent_pas()
+    {
+        static PartieRelevee N(PartieRelevee p) => p with { Low1SurToutesLesImages = true };
+        var (ecarts, autres) = OverlaysEnPartie.Comparer([
+            N(Partie("cod.exe", 140, ["Steam"])), N(Partie("cod.exe", 145, ["Steam"])), N(Partie("cod.exe", 150, ["Steam"])),
+            N(Partie("cod.exe", 160, [])), N(Partie("cod.exe", 165, [])), Partie("cod.exe", 170, []),
+        ]);
+
+        ecarts.Should().BeEmpty();
+        autres.Should().ContainSingle().Which.Should().Be(new OverlaysEnPartie.SansComparaison("cod.exe", "Steam", 3, 2));
     }
 
     // Un levier posé entre les parties avec et celles sans ; son écart n'est pas celui de l'overlay.
@@ -35,7 +63,7 @@ public sealed class OverlaysEnPartieTests
         var t = DateTimeOffset.Now;
         PartieRelevee P(double h, double fps, params string[] o) => new("cod.exe", t.AddHours(h), t.AddHours(h).AddMinutes(20), 3, fps, fps * 0.6,
             BottleneckState.CpuBoundOrAppBound, Overlays: o);
-        var parties = new[] { P(-30, 80, "RivaTuner"), P(-20, 80, "RivaTuner"), P(10, 100), P(20, 100) };
+        var parties = new[] { P(-30, 80, "RivaTuner"), P(-25, 80, "RivaTuner"), P(-20, 80, "RivaTuner"), P(10, 100), P(15, 100), P(20, 100) };
 
         OverlaysEnPartie.Comparer(parties).Ecarts.Should().ContainSingle();
         var (ecarts, autres) = OverlaysEnPartie.Comparer(parties, [t]);
@@ -48,12 +76,14 @@ public sealed class OverlaysEnPartieTests
     public void Le_verdict_ne_tombe_que_sur_une_separation_nette_du_1_pour_cent_low()
     {
         var (ecarts, _) = OverlaysEnPartie.Comparer([
-            Partie("cod.exe", 140, ["Steam"]), Partie("cod.exe", 170, ["Steam"]), Partie("cod.exe", 150, []), Partie("cod.exe", 160, []),
+            Partie("cod.exe", 140, ["Steam"]), Partie("cod.exe", 145, ["Steam"]), Partie("cod.exe", 170, ["Steam"]),
+            Partie("cod.exe", 150, []), Partie("cod.exe", 155, []), Partie("cod.exe", 160, []),
         ]);
         ecarts.Single().Verdict.Should().Be(VerdictEnJeu.PasDeDifference, "170 avec passe au-dessus de 150 sans");
 
         var (mieux, _) = OverlaysEnPartie.Comparer([
-            Partie("cod.exe", 170, ["Steam"]), Partie("cod.exe", 180, ["Steam"]), Partie("cod.exe", 150, []), Partie("cod.exe", 160, []),
+            Partie("cod.exe", 170, ["Steam"]), Partie("cod.exe", 175, ["Steam"]), Partie("cod.exe", 180, ["Steam"]),
+            Partie("cod.exe", 150, []), Partie("cod.exe", 155, []), Partie("cod.exe", 160, []),
         ]);
         mieux.Single().Verdict.Should().Be(VerdictEnJeu.Mieux);
     }

@@ -37,8 +37,8 @@ public sealed record ReconcileItemResult(
     string? CurrentValueJson,
     Error? Error);
 
-/// <summary>Toute la passe. <see cref="GloballyPaused"/> vaut true quand le coupe-circuit global
-/// a court-circuité la passe.</summary>
+/// <summary>Toute la passe. <see cref="GloballyPaused"/> vaut true quand la pause du maintien
+/// (<see cref="PauseDuMaintien"/>) a court-circuité la passe.</summary>
 public sealed record ReconcileReport(
     bool GloballyPaused,
     IReadOnlyList<ReconcileItemResult> Items)

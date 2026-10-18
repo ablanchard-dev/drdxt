@@ -41,6 +41,31 @@ public sealed class AccelerationSourisOffTweak : LatencyTweakBase
     public override bool EtatNonLu(SettingsState state) =>
         state.AccelerationSouris is null or TriState.Unknown;
 
+    // Banc profond : accélération lue coupée, l'exercice remet le défaut de Windows (« Améliorer la précision du pointeur » :
+    // 1, 6, 10), puis rend l'origine exacte de chaque valeur (absente = supprimée).
+    private static readonly string[] DefautWindows = ["1", "6", "10"];
+
+    public override ExerciceProfond? PreparerExercice(HardwareInventory hw, SettingsState state)
+    {
+        if (state.AccelerationSouris != TriState.Off) return null;
+        try
+        {
+            var origines = new List<PrivilegedOp>(Noms.Length);
+            var horsCible = new List<PrivilegedOp>(Noms.Length);
+            for (var i = 0; i < Noms.Length; i++)
+            {
+                if (_registry.ReadString(RegistryHiveKind.CurrentUser, Chemin, Noms[i]) is not { IsOk: true } lu) return null;
+                origines.Add(lu.Value is { } v
+                    ? new SetRegistryValueOp(RegistryHiveKind.CurrentUser, Chemin, Noms[i], RegistryValueType.String, v)
+                    : new DeleteRegistryValueOp(RegistryHiveKind.CurrentUser, Chemin, Noms[i]));
+                horsCible.Add(new SetRegistryValueOp(RegistryHiveKind.CurrentUser, Chemin, Noms[i], RegistryValueType.String, DefautWindows[i]));
+            }
+            return CompositeSnapshotCodec.Encode(origines) is { IsOk: true, Value: { } o } && CompositeSnapshotCodec.Encode(horsCible) is { IsOk: true, Value: { } h }
+                ? new ExerciceProfond(o, h) : null;
+        }
+        catch (Exception) { return null; }
+    }
+
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
         try
@@ -85,6 +110,8 @@ public sealed class AccelerationSourisOffTweak : LatencyTweakBase
 
     public override async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Snapshot has no original-value payload.");
 

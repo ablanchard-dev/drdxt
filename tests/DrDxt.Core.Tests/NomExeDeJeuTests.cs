@@ -18,6 +18,21 @@ public sealed class NomExeDeJeuTests
     public void Les_programmes_de_Windows_vus_en_plein_ecran_ne_sont_pas_des_jeux(string exe)
         => NomExeDeJeu.EstUnJeuPossible(exe).Should().BeFalse();
 
+    // La fenêtre de DrDXT, agrandie ou posée hors écran pour une capture, ne passe jamais pour une partie. SondeJeu.exe
+    // n'est pas de DrDXT : c'est le faux jeu des tests machine, qui doit rester reconnu comme un jeu.
+    [Theory]
+    [InlineData("DrDxt.App.exe")]
+    [InlineData("DrDxt.Lanceur.exe")]
+    [InlineData("DrDxt.ElevatedHelper.exe")]
+    [InlineData("DrDxt.ReconcilerHost.exe")]
+    [InlineData("PresentMonService.exe")]
+    public void Les_executables_de_DrDXT_ne_sont_jamais_des_jeux(string exe)
+    {
+        NomExeDeJeu.EstUnJeuPossible(exe).Should().BeFalse();
+        NomExeDeJeu.EstSurementPasUnJeu(exe, @"C:\Program Files\DrDXT\" + exe).Should().BeTrue();
+        NomExeDeJeu.EstUnJeuPossible("SondeJeu.exe").Should().BeTrue("témoin : le faux jeu des tests machine reste un jeu possible");
+    }
+
     [Fact]
     public void Tout_ce_qui_vit_sous_le_dossier_de_Windows_n_est_pas_un_jeu_meme_dans_un_sous_dossier()
     {
@@ -36,6 +51,7 @@ public sealed class NomExeDeJeuTests
     [InlineData("cs2.exe", true)]
     [InlineData("VALORANT-Win64-Shipping.exe", true)]
     [InlineData("League of Legends.exe", true)]
+    [InlineData("JeuBClient-Win64-Shipping.exe", true)]
     [InlineData("Discord.exe", false)]
     [InlineData("Inconnu.exe", false)]
     [InlineData(null, false)]

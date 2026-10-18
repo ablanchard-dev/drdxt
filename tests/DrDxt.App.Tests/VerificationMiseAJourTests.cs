@@ -49,16 +49,25 @@ public sealed class VerificationMiseAJourTests : IDisposable
         VerificationMiseAJour.UrlEffective(" OFF ").Should().BeNull();
         // Sous Windows, une variable posée vide n'existe pas : elle ne peut pas servir à couper.
         VerificationMiseAJour.UrlEffective("").Should().Be(VerificationMiseAJour.UrlParDefaut);
-        VerificationMiseAJour.UrlEffective("https://exemple.test").Should().Be("https://exemple.test");
+        VerificationMiseAJour.UrlEffective("https://exemple.test", adresseRemplacable: true).Should().Be("https://exemple.test");
         VerificationMiseAJour.UrlParDefaut.Should().StartWith("https://");
+    }
+
+    // Livrée, l'App ne se laisse pas détourner vers un autre serveur par une variable posée par un autre programme.
+    [Fact]
+    public void Livree_la_variable_coupe_mais_ne_remplace_pas_l_adresse()
+    {
+        VerificationMiseAJour.UrlEffective("https://exemple.test", adresseRemplacable: false).Should().Be(VerificationMiseAJour.UrlParDefaut);
+        VerificationMiseAJour.UrlEffective("off", adresseRemplacable: false).Should().BeNull();
     }
 
     [Fact]
     public void Seule_une_version_verifiee_et_complete_est_installable()
     {
-        new ResultatMiseAJour(EtatMiseAJour.NouvelleVersionVerifiee, "p.pkg", "abc", "1.3.0").Installable.Should().BeTrue();
+        Func<CancellationToken, Task<Result<string>>> telecharger = _ => Task.FromResult(Result<string>.Ok("p.pkg"));
+        new ResultatMiseAJour(EtatMiseAJour.NouvelleVersionVerifiee, "abc", "1.3.0", telecharger).Installable.Should().BeTrue();
         new ResultatMiseAJour(EtatMiseAJour.NouvelleVersionVerifiee).Installable.Should().BeFalse();
-        new ResultatMiseAJour(EtatMiseAJour.AJour, "p.pkg", "abc", "1.3.0").Installable.Should().BeFalse();
+        new ResultatMiseAJour(EtatMiseAJour.AJour, "abc", "1.3.0", telecharger).Installable.Should().BeFalse();
     }
 
     // ── L'installeur : l'empreinte est RE-VERIFIEE au clic ──────────────────────────────
@@ -74,12 +83,28 @@ public sealed class VerificationMiseAJourTests : IDisposable
         return (stage, sha, new List<string>());
     }
 
+    // Depuis une App relancée en administrateur, le setup hériterait du jeton élevé et chargerait ce qui est posé à côté de
+    // lui, dans un dossier que le compte peut écrire. Refusé : rien n'est copié, rien n'est lancé.
+    [Fact]
+    public void Une_App_elevee_ne_lance_pas_l_installeur()
+    {
+        var (stage, sha, lances) = Installeur("installeur signe 1.3.0");
+
+        var r = InstallationMiseAJour.Lancer(stage, sha, "1.3.0", p => { lances.Add(p); return true; }, eleve: () => true);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(InstallationMiseAJour.CodeEleve);
+        r.Error!.Value.Message.Should().Be(DrDxt.Core.Docteur.T("MAJ.InstalleurEleve"));
+        lances.Should().BeEmpty();
+        File.Exists(Path.Combine(Path.GetDirectoryName(stage)!, "DrDXT-Setup-1.3.0.exe")).Should().BeFalse("rien n'est copié à côté");
+    }
+
     [Fact]
     public void Un_installeur_intact_est_lance_sous_un_nom_exe()
     {
         var (stage, sha, lances) = Installeur("installeur signe 1.3.0");
 
-        InstallationMiseAJour.Lancer(stage, sha, "1.3.0", p => { lances.Add(p); return true; }).IsOk.Should().BeTrue();
+        InstallationMiseAJour.Lancer(stage, sha, "1.3.0", p => { lances.Add(p); return true; }, eleve: () => false).IsOk.Should().BeTrue();
 
         lances.Should().ContainSingle().Which.Should().EndWith("DrDXT-Setup-1.3.0.exe");
         File.ReadAllText(lances[0]).Should().Be("installeur signe 1.3.0");
@@ -91,7 +116,7 @@ public sealed class VerificationMiseAJourTests : IDisposable
         var (stage, sha, lances) = Installeur("installeur signe 1.3.0");
         File.WriteAllText(stage, "autre chose");   // remplace entre la verification et le clic
 
-        InstallationMiseAJour.Lancer(stage, sha, "1.3.0", p => { lances.Add(p); return true; }).IsOk.Should().BeFalse();
+        InstallationMiseAJour.Lancer(stage, sha, "1.3.0", p => { lances.Add(p); return true; }, eleve: () => false).IsOk.Should().BeFalse();
 
         lances.Should().BeEmpty();
     }
@@ -116,7 +141,7 @@ public sealed class VerificationMiseAJourTests : IDisposable
             try { File.Delete(exe); }
             catch (Exception ex) { suppression = ex; }
             return true;
-        });
+        }, eleve: () => false);
 
         lancement.IsOk.Should().BeTrue();
         ecriture.Should().NotBeNull("le binaire lance doit etre verrouille en ecriture pendant le lancement");
@@ -127,7 +152,7 @@ public sealed class VerificationMiseAJourTests : IDisposable
 
     [Fact]
     public void Un_installeur_disparu_est_refuse()
-        => InstallationMiseAJour.Lancer(Path.Combine(Path.GetTempPath(), $"absent-{Guid.NewGuid():N}.pkg"), "abc", "1.3.0", _ => true)
+        => InstallationMiseAJour.Lancer(Path.Combine(Path.GetTempPath(), $"absent-{Guid.NewGuid():N}.pkg"), "abc", "1.3.0", _ => true, eleve: () => false)
             .IsOk.Should().BeFalse();
 
     /// <summary>La clef de release est embarquée ; avec une URL https, la vérification lit le
@@ -237,7 +262,7 @@ public sealed class VerificationMiseAJourTests : IDisposable
         var demarrage = app[app.IndexOf("protected override void OnStartup", StringComparison.Ordinal)..];
         demarrage = demarrage[..demarrage.IndexOf("\n    }", StringComparison.Ordinal)];
         demarrage.Should().Contain("_ = VerifierMisesAJourAsync(scan);");
-        app.Should().Contain("VerificationMiseAJour.VerifierAsync(");
+        app.Should().Contain("VerificationMiseAJour.VerifierAuDemarrageAsync(");
     }
 
     private static string Racine()

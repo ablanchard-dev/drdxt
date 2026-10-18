@@ -72,7 +72,8 @@ public sealed class PlafondEnvoiDuService
             if (!File.Exists(_chemin)) return null;
             if (_verifierConfiance && !TrustedManifestRoot.EnsureTrustedFile(_chemin).IsOk) return null;
             var r = JsonSerializer.Deserialize<PlafondRetenuDuService>(File.ReadAllText(_chemin));
-            return r is { PlafondBps: > 0 } && NomExeDeJeu.EstUnJeuPossible(r.Exe) ? r : null;
+            // Un plafond retenu avant que seuls les jeux reconnus le soient ne se rejoue pas.
+            return r is { PlafondBps: > 0 } && NomExeDeJeu.EstUnJeuConnu(r.Exe) ? r : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {

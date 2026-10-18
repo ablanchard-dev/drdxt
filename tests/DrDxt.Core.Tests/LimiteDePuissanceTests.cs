@@ -17,12 +17,14 @@ public sealed class LimiteDePuissanceTests
         f.ValeurCourante.Should().Be("PL1 45 W, PL2 125 W, verrouillée");
         f.Explication.Should().Contain("BIOS").And.Contain("verrouillé").And.NotContain("Optimiser", "verrouillée : seul le BIOS la change");
 
-        var ouverte = LimiteDePuissance.Juger(new LimiteDePuissanceLue(45, 125, 65, Verrou: false));
+        var ouverte = LimiteDePuissance.Juger(new LimiteDePuissanceLue(45, 125, 65, Verrou: false, ChaleurEnPartieMaxC: 80));
         ouverte.Statut.Should().Be(RepairStatus.Suspicious);
         ouverte.Explication.Should().Contain("Optimiser").And.Contain("125 W").And.Contain("BIOS");
 
         // À la base mais sous une PL2 plus haute, le docteur dit qu'Optimiser peut l'essayer.
-        LimiteDePuissance.Juger(new LimiteDePuissanceLue(65, 219, 65, Verrou: false)).Explication.Should().Contain("Optimiser");
+        LimiteDePuissance.Juger(new LimiteDePuissanceLue(65, 219, 65, Verrou: false, ChaleurEnPartieMaxC: 80)).Explication.Should().Contain("Optimiser");
+        LimiteDePuissance.Juger(new LimiteDePuissanceLue(65, 219, 65, Verrou: false)).Explication
+            .Should().NotContain("Optimiser", "aucune température de partie relevée : « inconnu » n'est pas « pas chaud »");
         LimiteDePuissance.Juger(new LimiteDePuissanceLue(65, 65, 65, Verrou: false)).Explication.Should().NotContain("Optimiser", "aucune marge");
     }
 
@@ -86,11 +88,22 @@ public sealed class LimiteDePuissanceTests
     [Fact]
     public void Optimiser_n_est_promis_que_si_le_levier_monterait_et_jusqu_a_sa_vraie_cible()
     {
-        var sous = new LimiteDePuissanceLue(45, 219, 65, false);
+        var sous = new LimiteDePuissanceLue(45, 219, 65, false, ChaleurEnPartieMaxC: 80);
         LimiteDePuissance.Juger(sous).Explication.Should().Contain("jusqu'à 219 W");
         LimiteDePuissance.Juger(sous with { MicrocodeVminPerime = true }).Explication.Should().NotContain("Optimiser");
         LimiteDePuissance.Juger(sous with { ChaleurEnPartieMaxC = 97 }).Explication.Should().NotContain("Optimiser");
         LimiteDePuissance.Juger(sous with { MaximaleW = 180 }).Explication.Should().Contain("jusqu'à 180 W", "bornée par la puissance maximale publiée");
         LimiteDePuissance.CibleDeMontee(sous with { CopieMmioPl1W = 120 }).Should().Be(120);
+    }
+    // Une PL2 « sans limite » (champ 0x7FFF) sans puissance maximale publiée ne borne rien, et le helper refuse alors toute
+    // montée : le levier ne la propose pas. Avec un maximum publié, la montée s'y arrête.
+    [Fact]
+    public void Sous_une_PL2_sans_limite_sans_maximum_publie_aucune_montee_n_est_proposee()
+    {
+        var lu = RegistreDeLimiteCpu.Decoder(0x3, (0x7FFFUL << 32) | (1UL << 47) | (1UL << 15) | 520UL, 520UL)! with { ChaleurEnPartieMaxC = 80 };
+
+        lu.Pl2SansLimite.Should().BeTrue();
+        LimiteDePuissance.CibleDeMontee(lu).Should().BeNull();
+        LimiteDePuissance.CibleDeMontee(lu with { MaximaleW = 253 }).Should().Be(253);
     }
 }

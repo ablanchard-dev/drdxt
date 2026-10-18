@@ -25,7 +25,8 @@ public sealed record VerdictBufferbloat(
 /// Pourquoi passif : le README promet que rien ne quitte la machine hors mise a jour. Un test de
 /// debit enverrait des centaines de Mo a un tiers. Ici on lit le compteur d'envoi de la carte
 /// pendant que le joueur envoie deja (stream, sauvegarde cloud, partage d'ecran) : si l'envoi ne
-/// sature jamais, il n'y a rien a corriger et le verdict le dit.
+/// sature jamais, il n'y a rien a corriger et le verdict le dit. Le test qui fabrique la charge
+/// (<see cref="TestDeLigneSousCharge"/>) n'existe que sur un clic du joueur, contre un serveur dit avant.
 ///
 /// Mesure sur la machine de reference le 24/09 (upload sature ~720 Mbit/s, A/B alterne x3, 120
 /// pings par cote) : repos p90 9 ms ; envoi libre p90 26 / p99 48 ; plafond 400 Mbit/s demande

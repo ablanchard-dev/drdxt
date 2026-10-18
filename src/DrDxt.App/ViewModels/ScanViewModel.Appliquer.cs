@@ -148,6 +148,7 @@ public sealed partial class ScanViewModel
         // (4) ce qui ne se mesure pas : un A/B avant redemarrage mesurerait le neant. Le moteur
         //     applique, relit et revient sur echec ; baseline null = aucune pretention de gain.
         ApplyReport? auRedemarrage = null;
+        string? pasInscrit = null;
         // Les réglages sans effet sur les images (heures d'activité) partent aussi sans mesure.
         // Chacun dans son propre lot. Le moteur défait un lot entier sur un échec : un mode d'écran
         // que le joueur ne garde pas défaisait le fichier d'échange et les heures cliqués avec lui.
@@ -155,6 +156,8 @@ public sealed partial class ScanViewModel
             .Concat(jugement.PosesSansMesure.Select(id => new List<string> { id })).ToList();
         if (lots.Count > 0)
         {
+            // L'origine de ces poses n'est notée qu'au journal des leviers, plus bas : le helper la garde jusque-là.
+            using var portee = PorteeDePose.Ouvrir();
             var issues = new List<ApplyOutcome>();
             foreach (var lot in lots)
             {
@@ -175,7 +178,9 @@ public sealed partial class ScanViewModel
             await CommitDesiredStateAsync(reussi).ConfigureAwait(true);
             // Tous les leviers gardes, cote utilisateur : le scan suivant remarquera
             // s'ils ont ete defaits (le manifeste n'en porte que quatre).
-            _journalLeviers?.Enregistrer(reussi);
+            (var inscrit, pasInscrit) = InscrireAuJournal(reussi);
+            if (inscrit) await portee.FermerAsync().ConfigureAwait(true);
+            else portee.Dispose();
             ChargerLeviersPoses();
             var posees = reussi.Outcomes.Where(o => o.Applied && !o.AutoReverted).Select(o => o.TweakId).ToList();
             NoterPoses(posees, Horloge());
@@ -191,7 +196,17 @@ public sealed partial class ScanViewModel
             ? await MesurerEnJeuAsync(aChaud).ConfigureAwait(true)
             : null;
 
-        ResultatOptimisation = Resumer(jugement, auRedemarrage, session);
+        ResultatOptimisation = Resumer(jugement, auRedemarrage, session) + (pasInscrit is null ? "" : Environment.NewLine + pasInscrit);
+    }
+
+    /// <summary>Les leviers gardés entrent au journal des leviers, celui que « Annuler » relit. Raté, ils restent posés sans
+    /// ligne pour les annuler : la phrase le dit, sans promettre que DrDXT les rende. Sans journal branché, rien n'est dit.</summary>
+    private (bool Inscrit, string? Phrase) InscrireAuJournal(ApplyReport gardes)
+    {
+        if (_journalLeviers is null) return (false, null);
+        if (_journalLeviers.Enregistrer(gardes)) return (true, null);
+        var titres = string.Join(", ", gardes.Outcomes.Where(o => o.Applied && !o.AutoReverted).Select(o => Titre(o.TweakId)));
+        return (false, string.Format(CultureInfo.CurrentCulture, _localize("Leviers.PasInscrit"), titres));
     }
 
     /// <summary>Le jugement d'Optimiser, rendu dès la fin de l'analyse plutôt qu'au clic : s'il n'y a rien que DrDXT
@@ -333,16 +348,17 @@ public sealed partial class ScanViewModel
         _ = SurveillerLeJeuAsync(pid, surveillance, BorneSurveillanceSession);
         var profil = await Task.Run(() => session.Run(pid, new[] { candidat }, scene: scene)).ConfigureAwait(true);
         surveillance.Fini = true;
+        string? pasInscrit = null;
         // Un levier gardé par la session s'inscrit comme ceux d'Optimiser (journal + pose datée) :
         // « Annuler » le voit, et la garde d'incident le rend si un arrêt suit.
         if (profil.Results.Any(r => r.Id == candidat.Descriptor.Id && r.Outcome == CandidateOutcome.Kept)
             && candidat is DrDxt.Application.Autopilot.TweakCandidate { SnapshotPose: { } pose })
         {
-            _journalLeviers?.Enregistrer(new ApplyReport([new ApplyOutcome(pose.TweakId, true, false, pose, null)], null));
+            pasInscrit = InscrireAuJournal(new ApplyReport([new ApplyOutcome(pose.TweakId, true, false, pose, null)], null)).Phrase;
             ChargerLeviersPoses();
             NoterPoses([pose.TweakId], Horloge());
         }
-        var recit = DecrireSession(profil, candidat);
+        var recit = DecrireSession(profil, candidat) + (pasInscrit is null ? "" : Environment.NewLine + pasInscrit);
         return surveillance.Quitte ? recit + Environment.NewLine + _localize("Apply.Session.JeuQuitte") : recit;
     }
 
@@ -370,8 +386,9 @@ public sealed partial class ScanViewModel
         // Un keep dont l'origine n'a pas atteint le manifeste signe : la desinstallation ne le rendra pas.
         if (candidat is DrDxt.Application.Autopilot.TweakCandidate { OrigineHorsManifeste: { } raison } refuse)
         {
-            sb.AppendLine($"{_localize(KeyKeptOriginNotSigned)} ({raison})");
-            SignalerManifesteIllisible(refuse.OrigineHorsManifesteCode, raison);
+            var echec = Result.Fail(refuse.OrigineHorsManifesteCode ?? ErrorCodes.IoFailure, raison);
+            sb.AppendLine(RaisonLisible.Echec(echec, _localize(KeyKeptOriginNotSigned), _localize));
+            SignalerManifesteIllisible(echec);
         }
         sb.Append(_localize(profil.EndedInBestState ? "Apply.Session.BestState" : "Apply.Session.RevertFailed"));
         return sb.ToString();
@@ -413,8 +430,8 @@ public sealed partial class ScanViewModel
         // GARDE1 : ce que la garde a rendu, et jusqu'à quand DrDXT ne le repose pas.
         foreach (var (id, quand) in RendusParLaGarde())
             sb.AppendLine(string.Format(CultureInfo.CurrentCulture, _localize("Garde.PasRepose"), Titre(id),
-                quand.ToLocalTime().ToString("dd/MM", CultureInfo.CurrentCulture),
-                (quand + DrDxt.Application.Autopilot.GardeDIncident.Surveillance).ToLocalTime().ToString("dd/MM", CultureInfo.CurrentCulture)));
+                quand.ToLocalTime().ToString(_localize("Format.Jour"), CultureInfo.CurrentCulture),
+                (quand + DrDxt.Application.Autopilot.GardeDIncident.Surveillance).ToLocalTime().ToString(_localize("Format.Jour"), CultureInfo.CurrentCulture)));
         foreach (var a in j.Appreciations)
         {
             var etiquette = _localize(!a.Retenu ? "Apply.Result.Discarded"
@@ -516,9 +533,9 @@ public sealed partial class ScanViewModel
             {
                 // Manifeste ecrit, repere de derive non pose : ce n'est pas « non arme ».
                 MoatUnarmedMessage = commit.Error?.Code == ErrorCodes.ManifestReferenceNotSeeded
-                    ? $"{_localize(KeyReferenceNotSeeded)} ({commit.Error?.Message})"
+                    ? RaisonLisible.Echec(commit, _localize(KeyReferenceNotSeeded), _localize)
                     : _localize(KeyMoatUnarmed);
-                SignalerManifesteIllisible(commit.Error?.Code, commit.Error?.Message);
+                SignalerManifesteIllisible(commit);
             }
         }
         catch (Exception)
@@ -544,8 +561,8 @@ public sealed partial class ScanViewModel
             var r = await _desiredStateStore.CommitAsync(new DesiredState(Array.Empty<AppliedTweak>(), gardes))
                 .ConfigureAwait(true);
             if (r.IsOk) return;
-            raison = r.Error?.Message;
-            SignalerManifesteIllisible(r.Error?.Code, r.Error?.Message);
+            raison = RaisonLisible.Dire(r, _localize);
+            SignalerManifesteIllisible(r);
         }
         catch (Exception ex)
         {
@@ -565,16 +582,17 @@ public sealed partial class ScanViewModel
         ErrorCodes.RestoreDeclined => _localize("Apply.RestoreRequired.Declined"),
         ErrorCodes.RestoreDisabled => _localize(KeyRestoreBlocked),
         ErrorCodes.RestoreNotVerified => _localize("Apply.RestoreRequired.NotFound"),
-        _ => string.Format(CultureInfo.CurrentCulture, _localize("Apply.RestoreRequired.Failed"), gate.Error?.Message),
+        _ => RaisonLisible.OuIncertain(gate,
+            string.Format(CultureInfo.CurrentCulture, _localize("Apply.RestoreRequired.Failed"), RaisonLisible.Dire(gate, _localize)), _localize),
     };
 
     // Un refus « illisible » n'est pas une panne passagere : il se repetera a chaque commit tant que
     // personne ne decide. Il est donc nomme, et la reprise est proposee.
-    private void SignalerManifesteIllisible(string? code, string? raison)
+    private void SignalerManifesteIllisible(Result r)
     {
-        if (code is not (ErrorCodes.ManifestUnreadable or ErrorCodes.ManifestKeyUnusable))
+        if (r.Error?.Code is not (ErrorCodes.ManifestUnreadable or ErrorCodes.ManifestKeyUnusable))
             return;
-        ManifesteIllisibleMessage = $"{_localize(KeyManifestUnreadable)} ({raison})";
+        ManifesteIllisibleMessage = RaisonLisible.Echec(r, _localize(KeyManifestUnreadable), _localize);
         PeutRepartirDuManifeste = true;
     }
 
@@ -602,7 +620,7 @@ public sealed partial class ScanViewModel
         }
         else
         {
-            ManifesteIllisibleMessage = $"{_localize(KeyManifestResetFailed)} ({r.Error?.Message})";
+            ManifesteIllisibleMessage = RaisonLisible.Echec(r, _localize(KeyManifestResetFailed), _localize);
         }
     }
 }

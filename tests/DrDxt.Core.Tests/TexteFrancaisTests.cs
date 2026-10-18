@@ -28,6 +28,23 @@ public sealed class TexteFrancaisTests
         }
     }
 
+    // Le docteur en anglais écrit ses nombres à l'anglaise : « CAS 9,5 ns » au milieu d'une page anglaise est un défaut.
+    [Fact]
+    public void Un_docteur_anglais_ecrit_ses_nombres_a_l_anglaise_quelle_que_soit_la_langue_de_Windows()
+    {
+        var avant = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
+            using var _ = Docteur.Portee(CultureInfo.GetCultureInfo("en-US"));
+            TexteFrancais.F($"CAS {9.5:0.0} ns").Should().Be("CAS 9.5 ns");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = avant;
+        }
+    }
+
     // La barre d'une date « dd/MM/yyyy » est le séparateur de la culture : un Windows allemand écrit
     // « 26.09.2026 ». La culture anglaise ne le voit pas (elle écrit aussi « / »), d'où l'allemand ici.
     [Fact]

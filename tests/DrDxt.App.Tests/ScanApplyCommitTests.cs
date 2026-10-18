@@ -56,11 +56,13 @@ public sealed class ScanApplyCommitTests
     {
         public required ScanViewModel Vm { get; init; }
         public required IDesiredStateStore Store { get; init; }
+        public required ITweakEngine Engine { get; init; }
     }
 
     private static Harness Build(
         Result<ApplyReport>? applyResult = null,
-        Result? commitResult = null)
+        Result? commitResult = null,
+        DrDxt.Application.Tweaks.JournalDesLeviersAppliques? journalLeviers = null)
     {
         var hd = Substitute.For<IHardwareDetector>();
         hd.DetectAsync().Returns(Result<HardwareInventory>.Ok(Hw()));
@@ -104,15 +106,82 @@ public sealed class ScanApplyCommitTests
             hd, sr, br, sc, sd, safety, engine, consumer,
             store, new AppliedTweakManifestMapper(),
             ScanViewModelTestSeams.BiosAdvisor(),
-            ScanViewModelTestSeams.GuideGenerator(), key => key);
+            ScanViewModelTestSeams.GuideGenerator(), key => key, journalLeviers: journalLeviers);
 
-        return new Harness { Vm = vm, Store = store };
+        return new Harness { Vm = vm, Store = store, Engine = engine };
     }
 
     private static async Task ScanThenApply(Harness h)
     {
         await h.Vm.ScanCommand.ExecuteAsync(null);
         await h.Vm.ApplyCommand.ExecuteAsync(null);
+    }
+
+    // Le moteur pose dans la portée d'Optimiser : chaque écriture journalisée s'acquitte une fois, quand le journal des
+    // leviers porte déjà son origine (c'est lui que « Annuler » relit).
+    private static async Task<List<bool>> AcquitsDOptimiser(string fichier)
+    {
+        var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(fichier);
+        var h = Build(journalLeviers: leviers);
+        var acquits = new List<bool>();
+        h.Engine.ApplyAsync(Arg.Any<TweakPlan>(), Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                PorteeDePose.Courante?.Noter(() =>
+                {
+                    acquits.Add(leviers.Lire().Any(s => s.TweakId == "fixit.power_plan"));
+                    return Task.FromResult(Result.Ok());
+                });
+                return Task.FromResult(Result<ApplyReport>.Ok(ReportOf(Kept("fixit.power_plan", DrDxt.Tests.Shared.InversesDeTest.Pour("fixit.power_plan")))));
+            });
+        await ScanThenApply(h);
+        return acquits;
+    }
+
+    [Fact]
+    public async Task Optimiser_acquitte_ses_poses_une_fois_apres_avoir_note_leur_origine()
+    {
+        var fichier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"leviers-{Guid.NewGuid():N}.json");
+        try { (await AcquitsDOptimiser(fichier)).Should().Equal(true); }
+        finally { System.IO.File.Delete(fichier); }
+    }
+
+    // Le journal des leviers ne s'écrit pas (son fichier est un dossier) : l'origine n'est notée nulle part chez l'App,
+    // le helper la garde.
+    [Fact]
+    public async Task Optimiser_n_acquitte_rien_quand_le_journal_des_leviers_ne_s_ecrit_pas()
+    {
+        var dossier = System.IO.Directory.CreateDirectory(
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"leviers-{Guid.NewGuid():N}")).FullName;
+        try { (await AcquitsDOptimiser(dossier)).Should().BeEmpty(); }
+        finally { System.IO.Directory.Delete(dossier, recursive: true); }
+    }
+
+    // Optimiser peut garder plusieurs réglages : la phrase reste juste pour un comme pour plusieurs, sans accord à calculer.
+    [Theory]
+    [InlineData("fr", "l'inscrire", "l'annuler")]
+    [InlineData("en", "list it", "undo it")]
+    public void La_phrase_pas_inscrit_ne_depend_pas_du_nombre_de_reglages(string culture, string singulier, string singulier2)
+    {
+        var texte = string.Format(new System.Globalization.CultureInfo(culture),
+            new DrDxt.Infrastructure.Localization.ResxLocalizer().Get("Leviers.PasInscrit", new System.Globalization.CultureInfo(culture)),
+            "HAGS, Mode Jeu");
+        texte.Should().Contain("HAGS, Mode Jeu").And.NotContain(singulier).And.NotContain(singulier2);
+    }
+
+    // Posé mais absent de « Ce que DrDXT a posé » : aucune ligne ne l'annule, l'écran le dit.
+    [Fact]
+    public async Task Optimiser_dit_qu_un_levier_pose_n_a_pas_pu_etre_inscrit()
+    {
+        var dossier = System.IO.Directory.CreateDirectory(
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"leviers-{Guid.NewGuid():N}")).FullName;
+        try
+        {
+            var h = Build(journalLeviers: new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(dossier));
+            await ScanThenApply(h);
+            h.Vm.ResultatOptimisation.Should().Contain("Leviers.PasInscrit");
+        }
+        finally { System.IO.Directory.Delete(dossier, recursive: true); }
     }
 
     // Une application validée committe exactement les leviers gardés (traduits en identifiants du réconciliateur).
@@ -220,7 +289,7 @@ public sealed class ScanApplyCommitTests
         await ScanThenApply(h);
 
         await h.Store.Received(1).CommitAsync(Arg.Any<DesiredState>());
-        h.Vm.MoatUnarmedMessage.Should().Contain("Optimize.KeptOriginNotSigned").And.Contain("disk full");
+        h.Vm.MoatUnarmedMessage.Should().Contain("Optimize.KeptOriginNotSigned").And.Contain("Erreur.Generique").And.NotContain("disk full");
     }
 
     // Une application ratée ne committe jamais (rien n'a été validé).

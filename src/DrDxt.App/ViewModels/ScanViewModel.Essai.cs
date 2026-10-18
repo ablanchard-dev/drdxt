@@ -8,7 +8,7 @@ using DrDxt.Core;
 namespace DrDxt.App.ViewModels;
 
 /// <summary>
-/// Un levier à chaud essayé une partie sur deux, sans geste à chaque partie. Le clic
+/// Un levier à chaud essayé en blocs A-B-B-A, sans geste à chaque partie. Le clic
 /// « Essayer en alternance » est le consentement (et porte l'invite Windows éventuelle) ; ensuite DrDXT pose ou rend le
 /// levier entre deux parties, seulement si son helper tourne déjà : jamais d'invite Windows pendant que tu joues. Helper
 /// absent : l'essai se met en pause et la carte le dit. Tranché (<see cref="AlternanceDesEssais"/>), il s'arrête sur le
@@ -76,15 +76,13 @@ public partial class ScanViewModel
 
     private readonly SemaphoreSlim _verrouEssai = new(1, 1);
 
-    /// <summary>Le levier en essai, pour le relevé de fond élevé (le joueur ne garde pas l'App ouverte en jouant :
-    /// sans lui, l'essai ne bougeait jamais). Le seul levier en essai, pas l'accès général de <see cref="LevierParId"/>, qui
-    /// ouvrirait le retrait automatique sans fenêtre. <c>null</c> = l'App, qui passe par <see cref="LevierParId"/>.</summary>
-    internal Func<string, ITweak?>? LevierDeLEssai { get; set; }
-
+    // Le fichier de l'essai vit sous le profil du joueur, que tout programme du compte peut écrire : forgé avec une origine
+    // « posé », il faisait poser n'importe quel levier du catalogue au moment où le joueur croyait arrêter. Un levier qui n'a
+    // pas le droit d'alterner n'est ni posé ni rendu ici ; l'essai s'efface.
     private async Task ArreterEssaiSousVerrouAsync()
     {
         if (MemoireEssai?.Lire() is not { } e) return;
-        if (LevierParId?.Invoke(e.LevierId) is { } levier && e.PoseMaintenant != e.PoseALOrigine)
+        if (PeutAlterner(e.LevierId) && LevierParId?.Invoke(e.LevierId) is { } levier && e.PoseMaintenant != e.PoseALOrigine)
         {
             var ok = e.PoseALOrigine ? await PoserPourLEssaiAsync(levier).ConfigureAwait(true) : await RendrePourLEssaiAsync(levier).ConfigureAwait(true);
             if (!ok) { LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.ArretRate"), Titre(e.LevierId)); return; }
@@ -132,7 +130,7 @@ public partial class ScanViewModel
                     OnPropertyChanged(nameof(EssaiProposable));
                 }
             }
-            catch (Exception) { }
+            catch (Exception) { /* mémoire de l'essai illisible : aucun essai n'est repris, rien n'est affirmé */ }
         }
         finally { _verrouEssai.Release(); }
     }
@@ -147,7 +145,7 @@ public partial class ScanViewModel
         // (le relevé de fond) : l'essai dit l'état vrai au lieu de rester figé sur « posé ».
         var e = Effectif(lu);
         if (e != lu) MemoireEssai.Ecrire(e);
-        if ((LevierDeLEssai ?? LevierParId)?.Invoke(e.LevierId) is not { } levier) return;
+        if (LevierParId?.Invoke(e.LevierId) is not { } levier) return;
         // Après un redémarrage, l'état réel du levier n'est plus sûr ; l'essai s'arrête honnêtement.
         if (RedemarreDepuis(e))
         {
@@ -156,6 +154,7 @@ public partial class ScanViewModel
             // sans invite Windows ; sinon il attend, et « Arrêter l'essai » la rend.
             if (e.PoseMaintenant != e.PoseALOrigine)
             {
+                if (e.PoseALOrigine && JeuOuvertPourLEssai()) return;
                 if (HelperJoignableSansUac is { } peut && levier.RequiresElevation && !await peut().ConfigureAwait(true))
                 {
                     MemoireEssai.Ecrire(e with { EnPause = true });
@@ -174,12 +173,16 @@ public partial class ScanViewModel
         var (pose, fini, verdict) = AlternanceDesEssais.Suivante(parties, e.LevierId, e.PoseALOrigine, e.Debut);
         if (pose != e.PoseMaintenant)
         {
+            // Rien ne se pose sans clic pendant qu'un jeu tourne (une autre partie lancée aussitôt, un second jeu) : l'essai
+            // garde son état, et la partie suivante le refait avancer.
+            if (pose && JeuOuvertPourLEssai()) return;
             if (HelperJoignableSansUac is { } joignable && levier.RequiresElevation && !await joignable().ConfigureAwait(true))
             {
                 MemoireEssai.Ecrire(e with { EnPause = true });
                 LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.Pause"), Titre(e.LevierId));
                 return;
             }
+            var dit = LigneEssai;
             var ok = pose ? await PoserPourLEssaiAsync(levier).ConfigureAwait(true) : await RendrePourLEssaiAsync(levier).ConfigureAwait(true);
             // « Annuler » pendant la bascule a arrêté l'essai ; ce qui vient d'être posé repart, rien ne revit.
             if (MemoireEssai.Lire() is null)
@@ -190,7 +193,8 @@ public partial class ScanViewModel
             if (!ok)
             {
                 MemoireEssai.Ecrire(e with { EnPause = true });
-                LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.Pause"), Titre(e.LevierId));
+                // La pose a pu dire pourquoi elle n'a rien gardé ; « pause » ne l'efface pas.
+                if (LigneEssai == dit) LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.Pause"), Titre(e.LevierId));
                 return;
             }
         }
@@ -201,8 +205,12 @@ public partial class ScanViewModel
             {
                 VerdictEnJeu.Mieux => "Essai.Fini.Mieux",
                 VerdictEnJeu.Pire => "Essai.Fini.Pire",
+                VerdictEnJeu.NonConcluant => "Essai.Fini.NonConcluant",
                 _ => "Essai.Fini.Pareil",
-            }), Titre(e.LevierId));
+            }), Titre(e.LevierId))
+                // La mesure qui a jugé se dit quand ce n'est pas celle du levier.
+                + (AlternanceDesEssais.JugeSurLesImagesFauteDeLatence(parties.Where(p => p.Debut >= e.Debut).ToList(), e.LevierId)
+                    ? " " + _localize("Essai.JugeSurLesImages") : "");
             OnPropertyChanged(nameof(EssaiEnCours));
         OnPropertyChanged(nameof(EssaiProposable));
             return;
@@ -210,6 +218,8 @@ public partial class ScanViewModel
         MemoireEssai.Ecrire(e with { PoseMaintenant = pose, EnPause = false, DerniereBascule = pose != e.PoseMaintenant ? Horloge() : e.DerniereBascule });
         DireEssai(parties);
     }
+
+    private bool JeuOuvertPourLEssai() => (JeuOuvertPourLeTest ?? _gameLocator.JeuOuvert)();
 
     /// <summary>Le joueur annule le levier en essai depuis « Ce que DrDXT a posé » : l'essai s'arrête,
     /// rien ne le repose.</summary>
@@ -234,15 +244,45 @@ public partial class ScanViewModel
 
     private async Task<bool> PoserPourLEssaiAsync(ITweak levier)
     {
+        // L'origine n'est notée qu'au journal des leviers, plus bas : le helper la garde jusque-là.
+        using var portee = PorteeDePose.Ouvrir();
         var r = await levier.ApplyAsync().ConfigureAwait(true);
         if (!r.IsOk || r.Value is null) return false;
-        _journalLeviers?.Enregistrer(new ApplyReport([new ApplyOutcome(levier.Id, true, false, r.Value, null)], null));
+        var report = new ApplyReport([new ApplyOutcome(levier.Id, true, false, r.Value, null)], null);
+        // La désinstallation ne rend que ce que le manifeste signé porte : l'origine y entre avant que la pose ne soit gardée.
+        // Sans garde possible, seule une origine que la désinstallation remet d'elle-même à l'automatique est essayée.
+        var gardes = _manifestMapper.ToRevertOnly(report, pourUnEssai: true);
+        var (cle, raison) = (default(string), default(string));
+        if (gardes.Count > 0)
+        {
+            if (await _desiredStateStore.CommitAsync(new DesiredState(Array.Empty<AppliedTweak>(), gardes)).ConfigureAwait(true) is { IsOk: false } refus)
+                (cle, raison) = ("Essai.PasInscrit", RaisonLisible.Dire(refus, _localize));
+        }
+        else if (!AppliedTweakManifestMapper.RemiseALAutomatiqueALaDesinstallation(r.Value.OriginalValueJson))
+            (cle, raison) = ("Essai.PasRendable", _localize("Essai.PasRendable.Raison"));
+        if (cle is not null)
+        {
+            if (await levier.RevertAsync(r.Value).ConfigureAwait(true) is { IsOk: false })
+            {
+                // Resté posé : au journal, il reste visible et s'annule depuis « Ce que DrDXT a posé » ; hors du journal, aucune
+                // ligne ne l'annule, et l'écran ne la promet pas.
+                var inscrit = _journalLeviers?.Enregistrer(report) == true;
+                if (inscrit) await portee.FermerAsync().ConfigureAwait(true);
+                ChargerLeviersPoses();
+                cle = inscrit ? "Essai.PasInscritResteJournal" : "Essai.ResteSansJournal";
+            }
+            LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize(cle), Titre(levier.Id), raison);
+            return false;
+        }
+        _journalLeviers?.Enregistrer(report);
         // Un journal qui n'a rien gardé laisserait un levier posé, invisible et jamais rendu ; il repart.
         if (_journalLeviers is not null && _journalLeviers.Lire().All(s => s.TweakId != levier.Id))
         {
-            await levier.RevertAsync(r.Value).ConfigureAwait(true);
+            if (await levier.RevertAsync(r.Value).ConfigureAwait(true) is { IsOk: false })
+                LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.ResteSansJournal"), Titre(levier.Id));
             return false;
         }
+        if (_journalLeviers is not null) await portee.FermerAsync().ConfigureAwait(true);
         ChargerLeviersPoses();
         // Chaque pose de l'essai se date, comme celles d'Optimiser : la garde d'incident la couvre.
         NoterPoses([levier.Id], Horloge());
@@ -258,6 +298,10 @@ public partial class ScanViewModel
         if (!r.IsOk) return false;
         // Rendu sur la machine : l'essai continue ; un journal non réécrit se dit (sinon le scan suivant croirait à une régression).
         if (!_journalLeviers.Retirer(levier.Id)) MessageLeviers = _localize("Leviers.JournalPasMisAJour");
+        // Sa garde sort du manifeste. Restée, la désinstallation réécrirait une origine déjà en place : rien de faux, c'est dit.
+        if (await RetirerDuManifesteAsync(levier.Id).ConfigureAwait(true) is { IsOk: false } sorti)
+            MessageLeviers = RaisonLisible.OuIncertain(sorti, string.Format(CultureInfo.CurrentCulture, _localize("Changement.PasSortiDuManifeste"),
+                Titre(levier.Id), RaisonLisible.Dire(sorti, _localize)), _localize, Titre(levier.Id));
         ChargerLeviersPoses();
         return true;
     }

@@ -21,6 +21,11 @@ namespace DrDxt.Detection.Tests.Hardware;
 /// </summary>
 public sealed class UnexpectedShutdownLogTests
 {
+    // Un evenement 41 d'un autre fournisseur (une appli, un pilote) n'est pas un arret brutal.
+    [Fact]
+    public void La_requete_ne_retient_que_le_41_du_noyau()
+        => WindowsUnexpectedShutdownLog.Requete.Should().Contain("Provider[@Name='Microsoft-Windows-Kernel-Power']").And.Contain("EventID=41");
+
     [Fact]
     [Trait("Category", "Machine")] // lit le vrai journal Systeme : vierge sur un runner CI
     public void TheSystemLogIsReadableWithoutElevationAndRespectsTheWindow()

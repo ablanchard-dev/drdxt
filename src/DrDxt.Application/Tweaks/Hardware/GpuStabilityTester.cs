@@ -17,8 +17,8 @@ namespace DrDxt.Application.Tweaks.Hardware;
 public sealed class GpuStabilityTester : IStabilityTester
 {
     // Quelques secondes suffisent pour qu'un décalage instable tout juste posé provoque un TDR,
-    // sans rendre la pose lente.
-    private static readonly TimeSpan LoadDuration = TimeSpan.FromSeconds(3);
+    // sans rendre la pose lente. L'écran dit cette durée : elle ne prouve pas la stabilité en jeu.
+    public static readonly TimeSpan DureeDeCharge = TimeSpan.FromSeconds(3);
 
     private readonly IGpuLoadProbe _probe;
 
@@ -28,7 +28,7 @@ public sealed class GpuStabilityTester : IStabilityTester
     {
         try
         {
-            var load = await _probe.RunBriefLoadAsync(gpuIndex, LoadDuration, ct).ConfigureAwait(false);
+            var load = await _probe.RunBriefLoadAsync(gpuIndex, DureeDeCharge, ct).ConfigureAwait(false);
             if (!load.IsOk)
                 return Result<StabilityOutcome>.Ok(StabilityOutcome.Inconclusive);
 

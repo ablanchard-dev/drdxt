@@ -10,9 +10,7 @@ namespace DrDxt.Core;
 // Quand l'application finit (ou que le processus qui pilote meurt ou le libère), le
 // battement s'arrête ; le bail expire et le chien de garde annule le levier tenu.
 //
-// État : pas encore branché sur le vrai chemin d'application. Les leviers GPU n'arment
-// pas de bail (voir la note sur le bail dans GpuUndervoltTweak) ; ce sender et le
-// LeaseWatchdog ne servent qu'aux tests. Une fois branché, le contrat ci-dessus tient.
+// Branché sur le mode Expert de la carte (décalage, ventilateur) et sur le plafond d'envoi.
 //
 // Le renouvellement passe par IElevatedClient.RenewLease → le même pipeline IPC signé et
 // la même identité d'appelant que toute autre op (le helper ne laisse que le détenteur du
@@ -31,10 +29,16 @@ public sealed class HeartbeatSender : IAsyncDisposable
     private Task? _loop;
     private volatile bool _disposed;
     private int _perdu;
+    private int _injoignable;
 
     /// <summary>Le helper a refusé un renouvellement (il ne connaît plus ce bail : il a
     /// expiré et l'origine a été rendue). Levé une fois. Une erreur passagère du transport ne le lève pas.</summary>
     public event Action? Perdu;
+
+    /// <summary>Le helper ne répond plus (transport en échec) ou ne connaît plus ce bail (relancé, registre vide) : ce qu'il
+    /// gardait en mémoire, l'homme mort et ses gardes, est mort avec lui, et le réglage est peut-être encore posé. Levé une
+    /// fois. Le levier qui ne doit jamais rester posé sans garde (le ventilateur fixe) rend lui-même son origine.</summary>
+    public event Action? Injoignable;
 
     /// <param name="client">Le client élevé qui envoie le renouvellement.</param>
     /// <param name="leaseId">Le bail à maintenir (l'id de l'EstablishLeaseOp).</param>
@@ -43,7 +47,9 @@ public sealed class HeartbeatSender : IAsyncDisposable
     /// tolérer quelques ratés avant une vraie échéance.</param>
     public HeartbeatSender(IElevatedClient client, string leaseId, int leaseSeconds, TimeSpan? interval = null)
     {
-        _client = client ?? throw new ArgumentNullException(nameof(client));
+        // Jamais de lancement du helper par un battement : une invite Windows sans geste du joueur, et refusée, elle
+        // reviendrait à chaque battement. Un helper absent se dit par Injoignable.
+        _client = (client ?? throw new ArgumentNullException(nameof(client))).SansRelance;
         if (string.IsNullOrWhiteSpace(leaseId))
             throw new ArgumentException("Lease id must be non-empty.", nameof(leaseId));
         if (leaseSeconds <= 0)
@@ -72,6 +78,7 @@ public sealed class HeartbeatSender : IAsyncDisposable
                 try { _cts.Cancel(); } catch { /* déjà libéré */ }
                 if (r.Error?.Code == ErrorCodes.LeaseReverted) Perdu?.Invoke();
             }
+            if (r is { IsOk: false, Error.Code: ErrorCodes.HelperUnreachable or ErrorCodes.LeaseUnknown }) LeverInjoignable();
         }
         catch (OperationCanceledException)
         {
@@ -79,8 +86,14 @@ public sealed class HeartbeatSender : IAsyncDisposable
         }
         catch
         {
-            // Une erreur de transport passagère ne doit pas faire planter le contrôleur.
+            // Une erreur de transport ne fait pas planter le contrôleur ; elle se dit à qui doit rendre son réglage.
+            LeverInjoignable();
         }
+    }
+
+    private void LeverInjoignable()
+    {
+        if (Interlocked.Exchange(ref _injoignable, 1) == 0) Injoignable?.Invoke();
     }
 
     /// <summary>Lance la boucle de renouvellement en fond, à l'intervalle choisi. Idempotent.
@@ -89,7 +102,9 @@ public sealed class HeartbeatSender : IAsyncDisposable
     {
         if (_disposed || _loop is not null)
             return;
-        _loop = RunLoopAsync(_cts.Token);
+        // La boucle ne prend rien du flux qui la lance : une portée de pose ouverte autour de la pose ne la suit pas.
+        using (ExecutionContext.SuppressFlow())
+            _loop = Task.Run(() => RunLoopAsync(_cts.Token));
     }
 
     private async Task RunLoopAsync(CancellationToken ct)

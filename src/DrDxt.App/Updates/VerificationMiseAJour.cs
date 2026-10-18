@@ -11,8 +11,7 @@ public enum EtatMiseAJour
     NonConfigure,
     /// <summary>Serveur joint, rien de plus recent a offrir.</summary>
     AJour,
-    /// <summary>Une version de l'App signee et verifiee attend ; son installation n'est pas encore
-    /// automatique (l'echange des binaires eleve est differe).</summary>
+    /// <summary>Une version de l'App signee et verifiee est annoncee ; son installeur ne se telecharge qu'au clic.</summary>
     NouvelleVersionVerifiee,
     /// <summary>Serveur injoignable (ou trop lent) : on reste sur la version installee.</summary>
     Injoignable,
@@ -22,12 +21,14 @@ public enum EtatMiseAJour
     Echec,
 }
 
-/// <summary>Ce que la verification a constate, et, pour une version App verifiee, de quoi l'installer.</summary>
+/// <summary>Ce que la verification a constate, et, pour une version App verifiee, de quoi la telecharger au clic
+/// (rend le chemin de l'installeur verifie).</summary>
 public sealed record ResultatMiseAJour(
-    EtatMiseAJour Etat, string? CheminInstalleur = null, string? Sha256 = null, string? Version = null)
+    EtatMiseAJour Etat, string? Sha256 = null, string? Version = null,
+    Func<CancellationToken, Task<Result<string>>>? Telecharger = null)
 {
     public bool Installable => Etat == EtatMiseAJour.NouvelleVersionVerifiee
-                               && CheminInstalleur is not null && Sha256 is not null && Version is not null;
+                               && Telecharger is not null && Sha256 is not null && Version is not null;
 }
 
 /// <summary>
@@ -36,7 +37,8 @@ public sealed record ResultatMiseAJour(
 /// Au demarrage : montage de `UpdateComposition` et `AutoUpdater`, canal App, sous un
 /// delai borne, et le pied de page dit ce qui a ete constate.
 ///
-/// L'URL du serveur : <see cref="UrlParDefaut"/>, ou la variable <see cref="VariableUrl"/> qui la remplace (« off » = coupée).
+/// L'URL du serveur : <see cref="UrlParDefaut"/> ; la variable <see cref="VariableUrl"/> la coupe (« off »), et ne la
+/// remplace qu'en compilation Debug.
 /// Coupée : aucun reseau touche, « aucun serveur configure ».
 ///
 /// Transport : HTTPS exige par le montage, contenu garanti par la signature Ed25519 du manifeste.
@@ -56,14 +58,24 @@ public static class VerificationMiseAJour
     /// Pas « vide » : sous Windows, une variable posée vide n'existe pas pour le processus.</summary>
     public const string Coupee = "off";
 
-    public static string? UrlEffective(string? variable) => string.IsNullOrWhiteSpace(variable) ? UrlParDefaut
-        : string.Equals(variable.Trim(), Coupee, StringComparison.OrdinalIgnoreCase) ? null : variable;
+    /// <summary>Une autre adresse n'est prise qu'en compilation Debug (un serveur d'essai). Livrée, l'App ne lit que la sienne :
+    /// une variable posée par un autre programme ne détourne pas la vérification ; « off » coupe toujours.</summary>
+#if DEBUG
+    public const bool AdresseRemplacable = true;
+#else
+    public const bool AdresseRemplacable = false;
+#endif
+
+    public static string? UrlEffective(string? variable, bool adresseRemplacable = AdresseRemplacable)
+        => string.IsNullOrWhiteSpace(variable) ? UrlParDefaut
+        : string.Equals(variable.Trim(), Coupee, StringComparison.OrdinalIgnoreCase) ? null
+        : adresseRemplacable ? variable : UrlParDefaut;
 
     /// <summary>Au-dela, « injoignable » : une verification ne doit jamais tenir le demarrage. Elle borne le montage et
-    /// les manifestes, pas le téléchargement : à 15 s, un installeur de 49 Mo demandait 26 Mbit/s.</summary>
+    /// le manifeste ; le téléchargement, au clic, a sa propre borne.</summary>
     public static readonly TimeSpan DelaiParDefaut = TimeSpan.FromSeconds(15);
 
-    /// <summary>Le téléchargement de la charge, qui tourne déjà hors du démarrage : 49 Mo en 15 min passent à 0,5 Mbit/s.</summary>
+    /// <summary>Le téléchargement de la charge, au clic : 49 Mo en 15 min passent à 0,5 Mbit/s.</summary>
     public static readonly TimeSpan DelaiTelechargement = TimeSpan.FromMinutes(15);
 
     /// <param name="verifierDeTest">Pour les tests seulement. null = clef de production (embarquée ;
@@ -77,6 +89,24 @@ public static class VerificationMiseAJour
             AppContext.BaseDirectory,
             versionInstallee,
             verifierDeTest);
+
+    /// <summary>La vérification du démarrage, et le client par lequel le bouton « Installer » téléchargera plus tard. Ce
+    /// client n'est jamais libéré ici : libéré à la fin de la vérification, il faisait échouer le clic (ObjectDisposedException
+    /// au téléchargement).</summary>
+    /// <param name="transport">Pour les tests seulement. null = le transport de l'App : les identifiants du compte vont au
+    /// seul proxy configuré (<see cref="DrDxt.App.Platform.ProxyDuCompte"/>) ; derrière un proxy d'entreprise manuel qui
+    /// les demande, sans eux il répondait 407 et la mise à jour restait « injoignable » pour toujours.</param>
+    public static async Task<(ResultatMiseAJour Etat, HttpClient Client)> VerifierAuDemarrageAsync(
+        Func<HttpClient, Result<AutoUpdater>> monter, HttpMessageHandler? transport = null)
+    {
+        var client = new HttpClient(transport ?? DrDxt.App.Platform.ProxyDuCompte.Transport())
+        {
+            // Les bornes de VerifierAsync et du clic décident ; les 100 s par défaut coupaient un installeur sous 4 Mbit/s.
+            Timeout = Timeout.InfiniteTimeSpan,
+        };
+        var etat = await VerifierAsync(() => monter(client), DelaiParDefaut, CancellationToken.None).ConfigureAwait(false);
+        return (etat, client);
+    }
 
     public static async Task<ResultatMiseAJour> VerifierAsync(
         Func<Result<AutoUpdater>> monter, TimeSpan delai, CancellationToken ct)
@@ -95,14 +125,13 @@ public static class VerificationMiseAJour
 
         try
         {
-            using var telechargement = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            telechargement.CancelAfter(DelaiTelechargement);
-            var app = await monte.Value.UpdateAppAsync(borne.Token, telechargement.Token).ConfigureAwait(false);
-            var etat = Classer(app);
-            // Le bouton « Installer » n'a de sens qu'avec ce qui a ete verifie : chemin, empreinte, version.
-            return etat == EtatMiseAJour.NouvelleVersionVerifiee && monte.Value.DerniereVersionApp is { } m
-                ? new(etat, monte.Value.StagedAppPayloadPath, m.Sha256, m.Version)
-                : new(etat);
+            // Le manifeste signé seul : l'installeur (des dizaines de Mo) ne part qu'au clic « Installer ».
+            var updater = monte.Value;
+            var annonce = await updater.AnnoncerAsync(borne.Token).ConfigureAwait(false);
+            if (!annonce.IsOk) return new(ClasserErreur(annonce.Error?.Code));
+            return annonce.Value is { } m
+                ? new(EtatMiseAJour.NouvelleVersionVerifiee, m.Sha256, m.Version, jeton => updater.TelechargerAsync(m, jeton))
+                : new(EtatMiseAJour.AJour);
         }
         catch (OperationCanceledException) { return new(EtatMiseAJour.Injoignable); }
         catch (Exception) { return new(EtatMiseAJour.Echec); }
@@ -116,8 +145,12 @@ public static class VerificationMiseAJour
             || app.Error?.Code == UpdateErrorCodes.ReplacerUnavailable)
             return EtatMiseAJour.NouvelleVersionVerifiee;
 
-        if (app.IsOk) return EtatMiseAJour.AJour;
-        return app.Error?.Code switch
+        return app.IsOk ? EtatMiseAJour.AJour : ClasserErreur(app.Error?.Code);
+    }
+
+    internal static EtatMiseAJour ClasserErreur(string? code)
+    {
+        return code switch
         {
             UpdateErrorCodes.SignatureInvalid or UpdateErrorCodes.HashMismatch or UpdateErrorCodes.Downgrade => EtatMiseAJour.Refusee,
             UpdateErrorCodes.Offline => EtatMiseAJour.Injoignable,

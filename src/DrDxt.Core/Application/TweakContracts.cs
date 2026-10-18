@@ -61,9 +61,18 @@ public interface ITweak
     /// marque de GPU) sait toujours repondre, il n'a rien a declarer ici.
     /// </summary>
     bool EtatNonLu(SettingsState state) => false;
+
+    /// <summary>Le banc profond (--valider-profond) : pour un levier déjà dans son état cible sur cette machine, l'origine
+    /// EXACTE lue maintenant et l'état NON cible à poser le temps de l'exercice, deux ops sur la même feuille que le levier
+    /// écrit (rejouées par son RevertAsync, donc par la liste blanche). <c>null</c> = pas d'exercice sûr (par défaut) : le
+    /// levier reste « pas touché » et la vérification le dit.</summary>
+    ExerciceProfond? PreparerExercice(HardwareInventory hw, SettingsState state) => null;
     Task<Result<TweakSnapshot>> ApplyAsync();
     Task<Result> RevertAsync(TweakSnapshot snapshot);
 }
+
+/// <summary>Les deux ops d'un exercice profond, sérialisées comme dans un snapshot : l'origine exacte et l'état non cible.</summary>
+public sealed record ExerciceProfond(string OrigineJson, string HorsCibleJson);
 
 public interface ISafetyManager
 {

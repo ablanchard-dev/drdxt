@@ -75,6 +75,10 @@ public static class CouvertureDesLeviers
     /// <summary>Pour la garde : un levier du catalogue a une page choisie, pas la page par défaut.</summary>
     public static bool DomaineChoisi(string id) => Domaines.ContainsKey(id);
 
+    /// <summary>Les réglages qui ont une page, catalogue ou non : un geste construit hors du catalogue (rendre le repos à
+    /// la carte) entre ainsi dans docs/COUVERTURE.md dès qu'il a sa page.</summary>
+    public static IEnumerable<string> ReglagesDecrits => Domaines.Keys;
+
     // Ces raisons ne tiennent pas au matériel ; « pas sur ton matériel » mentait sur un fixe RTX.
     private static readonly HashSet<string> SansObjet = ["Levier.PasIci.ReflexDuJeu"];
 

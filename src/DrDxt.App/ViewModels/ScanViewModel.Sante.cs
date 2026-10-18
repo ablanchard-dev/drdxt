@@ -166,6 +166,27 @@ public sealed partial class ScanViewModel
     [ObservableProperty]
     private string? _cadenceLabel;
 
+    /// <summary>La courbe des temps de trame de CETTE mesure, et sa médiane ; null sans trames. Jamais un avant/après :
+    /// l'App n'a qu'une passe.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ACourbe), nameof(PointsDeLaCourbe), nameof(PicsDeLaCourbe), nameof(LabelPicsEcretes))]
+    private CourbeDesTempsDeTrame? _courbeDeLaMesure;
+
+    public bool ACourbe => CourbeDeLaMesure is not null;
+    /// <summary>Les pics au-dessus de l'échelle, marqués en haut de la courbe.</summary>
+    public IReadOnlyList<System.Windows.Point> PicsDeLaCourbe => CourbeDeLaMesure?.PicsEcretes ?? [];
+    public string? LabelPicsEcretes => LignePics(CourbeDeLaMesure, _localize);
+
+    /// <summary>Écrêtés, les pics se disent : leur nombre et le plus haut. Sans pic, rien.</summary>
+    internal static string? LignePics(CourbeDesTempsDeTrame? courbe, Func<string, string> localiser)
+        => courbe is { PicsEcretes.Count: > 0 } c
+            ? Pluriels.Accorder(string.Format(System.Globalization.CultureInfo.CurrentCulture, localiser("Scan.Courbe.Pics"),
+                c.PicsEcretes.Count, c.MaxMs.ToString("0", System.Globalization.CultureInfo.CurrentCulture)))
+            : null;
+    public System.Windows.Media.PointCollection? PointsDeLaCourbe => CourbeDeLaMesure is { } c ? new(c.Points) : null;
+    public string LabelCourbe => _localize("Scan.Courbe.Titre");
+    public string LabelCourbeLegende => _localize("Scan.Courbe.Legende");
+
     /// <summary>La saccade : les 5 % de trames les plus lentes, en millisecondes. <c>null</c> sans
     /// mesure exploitable.
     ///

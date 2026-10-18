@@ -284,4 +284,19 @@ public sealed class PreferMaxPerfTweakTests
         r.IsOk.Should().BeFalse();
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
+    // Au profil global, réglage au défaut du pilote : l'origine exacte serait « absent », que seule une suppression au profil
+    // de base rendrait, et la liste blanche n'en admet aucune. Rien n'est écrit, et c'est dit.
+    [Fact]
+    public async Task Au_defaut_du_pilote_au_profil_global_rien_n_est_ecrit()
+    {
+        var t = Build();
+        _nvApi.GetPreferredPstate().Returns(Result<uint>.Fail(ErrorCodes.TweakSdkUnavailable, "absent du profil"));
+        _nvApi.PreferredPstateAuDefaut().Returns(true);
+
+        var r = await t.ApplyAsync();
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Message.Should().Contain("driver default");
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
 }

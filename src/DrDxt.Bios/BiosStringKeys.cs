@@ -11,6 +11,8 @@ internal static class BiosStringKeys
     public const string XmpOffTitle = "Bios.Xmp.Off.Title";
     public const string XmpOffRationale = "Bios.Xmp.Off.Rationale";
     public const string XmpEnableAction = "Bios.Xmp.Action.Enable";
+    public const string XmpOffUnstableTitle = "Bios.Xmp.Off.Unstable.Title";
+    public const string XmpOffUnstableRationale = "Bios.Xmp.Off.Unstable.Rationale";
     public const string XmpUnknownTitle = "Bios.Xmp.Unknown.Title";
     public const string XmpUnknownRationale = "Bios.Xmp.Unknown.Rationale";
     public const string VerifyAction = "Bios.Action.VerifyInBios";
@@ -31,7 +33,6 @@ internal static class BiosStringKeys
     // X3D / CPPC
     public const string X3dCppcTitle = "Bios.X3dCppc.Title";
     public const string X3dCppcRationale = "Bios.X3dCppc.Rationale";
-    public const string X3dCppcRouteAction = "Bios.X3dCppc.Action.SetRoute";
 
     // PCIe link
     public const string PcieNotReadTitle = "Bios.Pcie.NotRead.Title";

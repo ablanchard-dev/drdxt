@@ -18,7 +18,9 @@ public sealed record LimiteDePuissanceLue(double Pl1W, double Pl2W, double Nomin
     bool MicrocodeVminPerime = false,
     // Le plafond de la limite continue que la dernière partie relevée demande (freinée par la chaleur : sa
     // médiane plus un tiers) ; null = rien à plafonner. Le levier `fixit.cpu_power_cap` le pose, la montée s'abstient.
-    double? PlafondThermiqueW = null)
+    double? PlafondThermiqueW = null,
+    // Champ PL2 brut à 0x7FFF : la PL2 de la carte dit « sans limite » (4095 W), ce n'est pas un plafond.
+    bool Pl2SansLimite = false)
 {
     public bool SansLimite => RegistreAuMaximum;
     public bool SeFreineEnPartie => ChaleurEnPartieMaxC is { } c && c >= 95;
@@ -41,11 +43,16 @@ public static class LimiteDePuissance
     /// la carte, bornée par la puissance maximale publiée (quand elle l'est) et par la copie MMIO active (quand elle l'est) ;
     /// il faut qu'il dépasse la PL1 lue d'au moins un demi-watt, sans verrou ni registre « sans limite ». Jamais sur un Core
     /// 13e/14e au microcode d'avant le correctif Vmin (guide 5.3), ni pendant que la chaleur parle (95 °C en partie, ou un
-    /// plafond thermique à poser). Une seule source pour le levier et pour ce que le docteur promet.</summary>
+    /// plafond thermique à poser), ni tant qu'aucune température de partie n'est relevée : « inconnu » n'est pas « pas
+    /// chaud ». Une seule source pour le levier et pour ce que le docteur promet.</summary>
     public static double? CibleDeMontee(LimiteDePuissanceLue lu)
     {
-        if (lu.Verrou || lu.SansLimite || lu.Pl2W <= 0 || lu.SeFreineEnPartie || lu.MicrocodeVminPerime || lu.PlafondThermiqueW is not null)
+        if (lu.Verrou || lu.SansLimite || lu.Pl2W <= 0 || lu.ChaleurEnPartieMaxC is null || lu.SeFreineEnPartie
+            || lu.MicrocodeVminPerime || lu.PlafondThermiqueW is not null)
             return null;
+        // Une PL2 « sans limite » sans puissance maximale publiée ne borne rien : le helper refuse alors toute montée
+        // (PawnIoCpuPowerActions), le levier ne la propose donc pas.
+        if (lu.Pl2SansLimite && lu.MaximaleW <= 0) return null;
         var plafond = lu.Pl2W;
         if (lu.MaximaleW > 0) plafond = Math.Min(plafond, lu.MaximaleW);
         if (lu.CopieMmioPl1W is > 0 and var mmio) plafond = Math.Min(plafond, mmio);

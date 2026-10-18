@@ -40,6 +40,7 @@ public sealed class AdlxSlotsTests
     [Fact] // IGPUTuning.h — IADLXGPUTuningServices
     public void TuningServices_Slots_AreCanonical()
     {
+        AdlxVtableSlots.Tuning_ResetToFactory.Should().Be(5);
         AdlxVtableSlots.Tuning_IsSupportedManualGfx.Should().Be(8);
         AdlxVtableSlots.Tuning_IsSupportedManualFan.Should().Be(10);
         AdlxVtableSlots.Tuning_IsSupportedManualPower.Should().Be(11);

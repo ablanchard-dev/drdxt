@@ -41,6 +41,9 @@ public static class NomExeDeJeu
         // Écran de verrouillage,
         // consoles et terminal.
         "LockApp.exe", "powershell.exe", "pwsh.exe", "cmd.exe", "WindowsTerminal.exe", "OpenConsole.exe",
+        // DrDXT lui-même : sa fenêtre (agrandie, ou posée hors écran pour une capture) n'est pas une partie.
+        "DrDxt.App.exe", "DrDxt.Lanceur.exe", "DrDxt.ElevatedHelper.exe", "DrDxt.ReconcilerHost.exe",
+        "PresentMonService.exe",
     };
 
     // Les jeux compétitifs les plus joués, reconnus par leur nom même en fenêtré ou réduits. Liste courte et fermée : un
@@ -49,7 +52,7 @@ public static class NomExeDeJeu
     {
         "cod.exe", "cs2.exe", "VALORANT-Win64-Shipping.exe", "FortniteClient-Win64-Shipping.exe", "r5apex.exe", "r5apex_dx12.exe",
         "Overwatch.exe", "TslGame.exe", "RainbowSix.exe", "RainbowSix_DX12.exe", "RainbowSix_Vulkan.exe",
-        "Marvel-Win64-Shipping.exe", "League of Legends.exe", "RocketLeague.exe", "dota2.exe",
+        "Marvel-Win64-Shipping.exe", "League of Legends.exe", "RocketLeague.exe", "dota2.exe", "JeuBClient-Win64-Shipping.exe",
     };
 
     public static bool EstUnJeuConnu(string? exe) => exe is not null && JeuxConnus.Contains(exe);

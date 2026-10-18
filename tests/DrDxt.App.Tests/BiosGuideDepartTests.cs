@@ -84,7 +84,7 @@ public sealed class BiosGuideDepartTests
         await vm.ConfirmerDepartCommand.ExecuteAsync(null);
 
         vm.BoutonDepartVisible.Should().BeTrue();
-        vm.ErreurDepart.Should().Contain("Bios.Depart.Echec").And.Contain("UAC refusée");
+        vm.ErreurDepart.Should().Contain("Bios.Depart.Echec").And.Contain("Erreur.Generique").And.NotContain("UAC refusée");
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class BiosGuideDepartTests
         await vm.ConfirmerDepartCommand.ExecuteAsync(null);
 
         vm.BoutonDepartVisible.Should().BeTrue();
-        vm.ErreurDepart.Should().Contain("tube fermé");
+        vm.ErreurDepart.Should().Contain("Erreur.Generique").And.NotContain("tube fermé");
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class BiosGuideDepartTests
         await vm.AnnulerRedemarrageCommand.ExecuteAsync(null);
 
         vm.DepartLanceVisible.Should().BeTrue();
-        vm.ErreurDepart.Should().Contain("Bios.Depart.AnnulationEchec").And.Contain("shutdown /a refusé");
+        vm.ErreurDepart.Should().Contain("Bios.Depart.AnnulationEchec").And.Contain("Erreur.Generique").And.NotContain("shutdown /a refusé");
     }
 
     [Fact]

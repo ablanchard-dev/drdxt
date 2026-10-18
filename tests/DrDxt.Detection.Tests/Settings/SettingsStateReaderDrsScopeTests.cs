@@ -20,8 +20,9 @@ public class SettingsStateReaderDrsScopeTests
 
     /// <param name="global">Ce que rend le profil de base ; null = non lu.</param>
     /// <param name="auJeu">Ce que rend le profil du jeu ; null = pas de profil propre.</param>
-    private sealed class Pilote(uint? global, (uint Valeur, DrsOriginState Origine)? auJeu) : INvApi
+    private sealed class Pilote(uint? global, (uint Valeur, DrsOriginState Origine)? auJeu, bool auDefaut = false) : INvApi
     {
+        public bool PreferredPstateAuDefaut() => auDefaut;
         public int LecturesAuJeu { get; private set; }
         public bool IsAvailable => true;
 
@@ -163,5 +164,13 @@ public class SettingsStateReaderDrsScopeTests
 
         etat.NvidiaPreferMaxPerf.Should().Be(TriState.Unknown);
         etat.NvidiaPreferMaxPerfOrigin.Should().BeNull();
+    }
+    // Absent du profil de base, PREFERRED_PSTATE est au défaut du pilote (OPTIMAL_POWER) : pas au maximum, et lu. Une
+    // panne de lecture reste non lue.
+    [Fact]
+    public async Task Au_defaut_du_pilote_le_mode_de_gestion_n_est_pas_au_maximum()
+    {
+        (await Lire(new Pilote(global: null, auJeu: null, auDefaut: true), jeu: null)).NvidiaPreferMaxPerf.Should().Be(TriState.Off);
+        (await Lire(new Pilote(global: null, auJeu: null), jeu: null)).NvidiaPreferMaxPerf.Should().Be(TriState.Unknown);
     }
 }

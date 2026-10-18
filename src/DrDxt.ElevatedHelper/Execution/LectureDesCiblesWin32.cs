@@ -32,33 +32,39 @@ public sealed class LectureDesCiblesWin32 : ILectureDesCibles
     {
         try
         {
-            return ecriture switch
-            {
-                SetRegistryValueOp s => LireRegistre(s),
-                SetActivePowerPlanOp => LirePlanActif(),
-                SetProcessorBoostModeOp b => LireModeDeBoost(b.PlanGuid),
-                SetWirelessPowerSavingOp w => LireValeurDePlanAc(w.PlanGuid, EconomieSansFilLue.SousGroupe, EconomieSansFilLue.Reglage),
-                // Le registre entier, en décimal, comme l'op le pose.
-                SetCpuPackagePowerLimitOp => DrDxt.GpuNative.PawnIo.PawnIoIntel.LireRegistres() is { } r
-                    ? Result<string?>.Ok(r.PkgPowerLimit.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                    : Result<string?>.Fail(ErrorCodes.HelperOpFailed, "CPU power limit register not readable."),
-                RunServiceControlOp r => LireService(r.ServiceName),
-                ApplyNvApiDrsSettingOp d when OpAllowlist.IsBaseProfileScope(d.ProfileName) => LireDrs(d.SettingId),
-                ApplyNvApiDrsSettingOp d when OpAllowlist.IsQualifiedExecutablePath(d.ProfileName)
-                    => LireDrsAuJeu(d.ProfileName, d.SettingId),
-                // Les réglages de la carte, relus sous la forme que leur op pose (un entier).
-                ApplyNvApiPowerLimitOp n => _nvApi.Value.IsAvailable && _nvApi.Value.TryReadPowerLimitPct(n.GpuIndex, out var pct)
-                    ? Result<string?>.Ok(pct.ToString(CultureInfo.InvariantCulture))
-                    : Illisible(Docteur.T("LC.LimiteNvidia")),
-                ApplyAdlxTuningOp a => LireAdlx(a),
-                _ => Illisible(Docteur.T("LC.AucuneLecture", ecriture.GetType().Name)),
-            };
+            return Lecteur(ecriture) is { } lire ? lire() : Illisible(Docteur.T("LC.AucuneLecture", ecriture.GetType().Name));
         }
         catch (Exception ex)
         {
             return Illisible(ex.Message);
         }
     }
+
+    /// <summary>La lecture qui sait relire la cible de cette op, sans la faire ; <c>null</c> quand aucune ne sait. Le journal
+    /// d'écriture anticipée ne journalise que ce qui a une lecture (ClassesDuJournal).</summary>
+    internal Func<Result<string?>>? Lecteur(PrivilegedOp ecriture) => ecriture switch
+    {
+        SetRegistryValueOp s => () => LireRegistre(s),
+        SetActivePowerPlanOp => LirePlanActif,
+        SetProcessorBoostModeOp b => () => LireModeDeBoost(b.PlanGuid),
+        SetWirelessPowerSavingOp w => () => LireValeurDePlanAc(w.PlanGuid, EconomieSansFilLue.SousGroupe, EconomieSansFilLue.Reglage),
+        // Le registre entier, en décimal, comme l'op le pose.
+        SetCpuPackagePowerLimitOp => () => DrDxt.GpuNative.PawnIo.PawnIoIntel.LireRegistres() is { } r
+            ? Result<string?>.Ok(r.PkgPowerLimit.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            : Result<string?>.Fail(ErrorCodes.HelperOpFailed, "CPU power limit register not readable."),
+        RunServiceControlOp r => () => LireService(r.ServiceName),
+        ApplyNvApiDrsSettingOp d when OpAllowlist.IsBaseProfileScope(d.ProfileName) => () => LireDrs(d.SettingId),
+        ApplyNvApiDrsSettingOp d when OpAllowlist.IsQualifiedExecutablePath(d.ProfileName)
+            => () => LireDrsAuJeu(d.ProfileName, d.SettingId),
+        // Les réglages de la carte, relus sous la forme que leur op pose (un entier).
+        ApplyNvApiPowerLimitOp n => () => _nvApi.Value.IsAvailable && _nvApi.Value.TryReadPowerLimitPct(n.GpuIndex, out var pct)
+            ? Result<string?>.Ok(pct.ToString(CultureInfo.InvariantCulture))
+            : Illisible(Docteur.T("LC.LimiteNvidia")),
+        // Les genres que LireAdlx relit ; la sous-tension et la remise à l'usine n'ont pas encore de lecture.
+        ApplyAdlxTuningOp a when a.Kind is AdlxTuningKind.PowerLimit or AdlxTuningKind.AntiLag
+            or AdlxTuningKind.FrameRateTarget or AdlxTuningKind.VerticalRefresh => () => LireAdlx(a),
+        _ => null,
+    };
 
     private Result<string?> LireAdlx(ApplyAdlxTuningOp a)
     {
@@ -178,15 +184,30 @@ public sealed class LectureDesCiblesWin32 : ILectureDesCibles
         using var cle = racine.OpenSubKey(s.Path, writable: false);
         var brute = cle?.GetValue(s.Name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
         if (brute is null) return Result<string?>.Ok(null);
-
-        return (s.Kind, brute) switch
-        {
-            (RegistryValueType.DWord, int i) => Result<string?>.Ok(unchecked((uint)i).ToString(CultureInfo.InvariantCulture)),
-            (RegistryValueType.QWord, long l) => Result<string?>.Ok(unchecked((ulong)l).ToString(CultureInfo.InvariantCulture)),
-            (RegistryValueType.String, string texte) => Result<string?>.Ok(texte),
-            _ => Illisible(Docteur.T("LC.Type", s.Name, s.Kind)),
-        };
+        // .NET rend une chaîne pour REG_SZ comme pour REG_EXPAND_SZ : le type se lit à part.
+        return TypeConforme(s.Kind, cle!.GetValueKind(s.Name)) ? Forme(s.Kind, s.Name, brute) : Illisible(Docteur.T("LC.Type", s.Name, s.Kind));
     }
+
+    /// <summary>Le type de la valeur en place est-il celui que l'op pose ? Sinon l'origine, réécrite sous le type posé,
+    /// changerait de type (un REG_EXPAND_SZ deviendrait un REG_SZ) : elle est illisible, rien ne se rejoue.</summary>
+    internal static bool TypeConforme(RegistryValueType pose, RegistryValueKind lu) => (pose, lu) switch
+    {
+        (RegistryValueType.String, RegistryValueKind.String) => true,
+        (RegistryValueType.DWord, RegistryValueKind.DWord) => true,
+        (RegistryValueType.QWord, RegistryValueKind.QWord) => true,
+        (RegistryValueType.MultiString, RegistryValueKind.MultiString) => true,
+        _ => false,
+    };
+
+    /// <summary>La valeur brute du registre, sous la forme que l'op la pose (ValeurPosee du rendu).</summary>
+    internal static Result<string?> Forme(RegistryValueType type, string nom, object brute) => (type, brute) switch
+    {
+        (RegistryValueType.DWord, int i) => Result<string?>.Ok(unchecked((uint)i).ToString(CultureInfo.InvariantCulture)),
+        (RegistryValueType.QWord, long l) => Result<string?>.Ok(unchecked((ulong)l).ToString(CultureInfo.InvariantCulture)),
+        (RegistryValueType.String, string texte) => Result<string?>.Ok(texte),
+        (RegistryValueType.MultiString, string[] entrees) => Result<string?>.Ok(MultiTexteDuRegistre.Canonique(entrees)),
+        _ => Illisible(Docteur.T("LC.Type", nom, type)),
+    };
 
     private static Result<string?> LirePlanActif()
     {

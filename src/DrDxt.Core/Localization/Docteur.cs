@@ -43,12 +43,17 @@ public static class Docteur
 
     private static readonly CultureInfo Francais = CultureInfo.GetCultureInfo("fr-FR");
 
+    /// <summary>Le texte est-il celui de la clé, dans l'une des langues du docteur (français, ou l'anglais du fichier
+    /// neutre) ? Pour reconnaître un texte formé sous une autre langue que celle d'aujourd'hui.</summary>
+    public static bool EstLeTexteDe(string cle, string? texte)
+        => texte is not null && (texte == s_textes.GetString(cle, Francais) || texte == s_textes.GetString(cle, CultureInfo.InvariantCulture));
+
     // Les noms de constats qui portent une partie variable (le disque, la carte, le jeu, le service). Seuls ceux-ci se
     // reformulent à l'affichage ; un nom fixe se traduit par sa clé « Nom.<nom> ».
     private static readonly string[] ClesDeNom =
     [
         "SW.ErreursNom", "SW.SanteNom", "BR.Nom.Lien", "BR.Nom.LienSsd", "BR.Nom.Ecran", "FS.Nom", "RU.Nom", "IM.NomChanges",
-        "SE.Remplacable.Nom", "SE.NonCite.Nom", "TA.Nom",
+        "SE.Remplacable.Nom", "SE.NonCite.Nom", "TA.Nom", "NV.Nom", "PX.Nom", "BL.Nom", "DC.Nom", "RB.Nom", "FS.NomManette", "RR.NomRegle", "TO.NomAffinite", "VC.Nom", "G32.Nom", "COUL.Nom",
     ];
 
     /// <summary>Le nom d'un constat, toujours formé en français : c'est la clé du journal (deux scans se comparent par
@@ -78,6 +83,14 @@ public static class Docteur
             System.Text.RegularExpressions.Regex.Escape(s_textes.GetString(cle, Francais)!),
             @"\\\{(\d+)\}", m => $"(?<v{m.Groups[1].Value}>.+?)") + "$", System.Text.RegularExpressions.RegexOptions.Compiled)))
         .ToArray());
+
+    /// <summary>Tous les textes du docteur dans une langue, clé et gabarit (pour <see cref="Retraduction"/>).</summary>
+    public static IEnumerable<(string Cle, string Texte)> Textes(CultureInfo langue)
+    {
+        if (s_textes.GetResourceSet(langue, createIfNotExists: true, tryParents: true) is not { } jeu) yield break;
+        foreach (System.Collections.DictionaryEntry e in jeu)
+            if (e.Key is string cle && e.Value is string texte) yield return (cle, texte);
+    }
 
     // Une partie variable qui est elle-même un texte du docteur (la famille d'un changement : « pilotes ») se traduit aussi.
     private static string ValeurTraduite(string valeur)

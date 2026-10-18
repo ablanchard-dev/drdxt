@@ -17,12 +17,12 @@ public sealed class ConsigneAuSurvolTests
         => ConsigneAuSurvol.Opacite(survol, focus).Should().Be(attendu);
 
     [Fact]
-    public void Les_huit_consignes_des_cartes_Agir_suivent_la_regle_et_l_accueil_garde_la_sienne()
+    public void Les_dix_consignes_des_cartes_Agir_suivent_la_regle_et_l_accueil_garde_la_sienne()
     {
         var dir = AppContext.BaseDirectory;
         while (!File.Exists(Path.Combine(dir, "DrDXT.sln"))) dir = Path.GetDirectoryName(dir)!;
         var vue = File.ReadAllText(Path.Combine(dir, "src", "DrDxt.App", "Views", "ScanView.xaml"));
-        Regex.Matches(vue, @"<TextBlock Text=""\{Binding Label\w+Maintenir\}"" effets:ConsigneAuSurvol\.Actif=""True""").Count.Should().Be(8, "12/10/2026 : les cartes du test de refroidissement et de la recherche de sous-tension");
+        Regex.Matches(vue, @"<TextBlock Text=""\{Binding Label\w+Maintenir\}"" effets:ConsigneAuSurvol\.Actif=""True""").Count.Should().Be(9, "les cartes du test de refroidissement, de la recherche de sous-tension et de la cadence des entrées");
         Regex.IsMatch(vue, @"LabelMaintenirPourLancer\}""[^>]*ConsigneAuSurvol").Should().BeFalse("l'accueil enseigne le geste");
     }
 }

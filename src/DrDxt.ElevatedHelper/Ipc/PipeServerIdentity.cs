@@ -2,6 +2,7 @@ using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
+using static DrDxt.ElevatedHelper.Natif;
 
 namespace DrDxt.ElevatedHelper.Ipc;
 
@@ -110,7 +111,4 @@ public static class PipeServerIdentity
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool QueryFullProcessImageName(IntPtr process, uint flags, StringBuilder name, ref uint size);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool CloseHandle(IntPtr handle);
 }

@@ -13,8 +13,29 @@ public sealed class SuiviDesReglages
 {
     public const string CodeErreur = "SUIVI_REGLAGES";
     private readonly FichierJsonAtomique _fichier;
+    private readonly string _chemin;
+    private readonly Func<Result<string?>> _lire;
 
-    public SuiviDesReglages(string chemin) => _fichier = new FichierJsonAtomique(chemin, CodeErreur);
+    // Deux relevés du même fichier lisaient puis récrivaient sans s'attendre : le second écrasait le premier. Ils viennent
+    // d'un même processus (le scan, le relevé d'après Optimiser, celui d'un retrait) ou de deux (l'App et le relevé de fond,
+    // l'un élevé, l'autre non). Dans le processus, un verrou qui attend son tour : un relevé n'y est jamais perdu. Entre
+    // processus, le verrou du relevé des parties (VerrouDuReleve) : un fichier ouvert sans partage, que Windows rend à la mort
+    // du processus ; recréé à chaque relevé, un antivirus peut le tenir un instant, d'où une attente bornée large, au-delà
+    // de laquelle rien n'est écrit, comme une lecture ratée.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> VerrousDuProcessus = new(StringComparer.OrdinalIgnoreCase);
+    public static readonly TimeSpan AttenteParDefaut = TimeSpan.FromSeconds(5);
+    private readonly TimeSpan _attenteMax;
+
+    /// <param name="lire">La lecture du fichier ; par défaut, celle du disque. Couture de test : une lecture ratée à un instant
+    /// précis.</param>
+    /// <param name="attenteMax">L'attente bornée du verrou ; par défaut <see cref="AttenteParDefaut"/>.</param>
+    public SuiviDesReglages(string chemin, Func<Result<string?>>? lire = null, TimeSpan? attenteMax = null)
+    {
+        _fichier = new FichierJsonAtomique(chemin, CodeErreur);
+        _chemin = chemin;
+        _lire = lire ?? _fichier.Read;
+        _attenteMax = attenteMax ?? AttenteParDefaut;
+    }
 
     public static SuiviDesReglages ParDefaut() => new(FichierJsonAtomique.CheminLocal("reglages-suivis.json"));
 
@@ -27,11 +48,42 @@ public sealed class SuiviDesReglages
     public IReadOnlyList<Changement> Relever(IReadOnlyDictionary<string, string> actuels, DateTimeOffset maintenant,
         Func<string, string, string, string> libeller)
     {
+        lock (VerrousDuProcessus.GetOrAdd(Path.GetFullPath(_chemin), _ => new object()))
+        {
+            using var verrou = PrendreVerrou();
+            return verrou is null ? [] : ReleverSousVerrou(actuels, maintenant, libeller);
+        }
+    }
+
+    private IDisposable? PrendreVerrou()
+    {
+        var limite = DateTime.UtcNow + _attenteMax;
+        while (true)
+        {
+            if (VerrouDuReleve.Prendre(_chemin + ".verrou") is { } v) return v;
+            if (DateTime.UtcNow >= limite) return null;
+            Thread.Sleep(10);
+        }
+    }
+
+    private IReadOnlyList<Changement> ReleverSousVerrou(IReadOnlyDictionary<string, string> actuels, DateTimeOffset maintenant,
+        Func<string, string, string, string> libeller)
+    {
+        // Absent : premier relevé, l'historique vide est le vrai. Lecture ratée (fichier tenu un instant par une écriture) :
+        // ce n'est pas un historique vide ; récrit avec les seuls réglages de cet appel, il effaçait les autres (le relevé
+        // d'après Optimiser ne porte que le mode Jeu, et les bascules de HAGS et du fichier d'échange ne se relevaient plus).
+        // Rien n'est écrit, le relevé suivant reprend l'historique intact.
+        var texte = _lire();
+        if (!texte.IsOk) return [];
         Releve? avant = null;
-        var texte = _fichier.Read();
-        if (texte.IsOk && !string.IsNullOrWhiteSpace(texte.Value))
+        if (!string.IsNullOrWhiteSpace(texte.Value))
+        {
             try { avant = JsonSerializer.Deserialize<Releve>(texte.Value); }
             catch (JsonException) { }
+            // Lu mais illisible : mis de côté (sa trace reste), et le suivi repart comme d'un premier relevé, au lieu d'être
+            // bloqué pour toujours. Si la mise de côté échoue, rien n'est écrit : le relevé suivant retente.
+            if (avant is null && !_fichier.MettreDeCote()) return [];
+        }
 
         var changes = avant is null ? [] : actuels
             .Where(a => avant.Etats.TryGetValue(a.Key, out var v) && v != a.Value)

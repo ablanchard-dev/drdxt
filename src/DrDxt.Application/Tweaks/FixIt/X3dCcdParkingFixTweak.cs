@@ -140,6 +140,8 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
     /// → SAFETY.SNAPSHOT_INVALID ; ne lève jamais, ne lance jamais une op inconnue.</summary>
     public override async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Snapshot has no original-value payload.");
 

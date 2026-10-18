@@ -61,6 +61,8 @@ public sealed class WorkerArchitectureGuardTests
             typeof(IDiagnosticsLog),
             typeof(IDelay),
             typeof(HostTimingOptions),
+            typeof(Func<bool>), // « un jeu tourne ? » : une lecture, qui retarde la passe quotidienne
+            typeof(FinDuRejeu), // la fin du rejeu du journal, attendue avant la première passe : une attente, aucune écriture
         });
     }
 

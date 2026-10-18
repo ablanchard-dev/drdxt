@@ -66,6 +66,25 @@ public sealed class PowerSettingsReader
         // parques a un instant donne : le second bouge en permanence selon la charge.
         ("parking : coeurs min", new Guid("0cc5b647-c1df-4637-891a-dec35c318583"), "%"),
         ("parking : coeurs max", new Guid("ea062031-0e34-4ff1-9b6d-eb1059334028"), "%"),
+
+        // Les freins que l'interface de Windows cache (Microsoft Learn, « Processor power management options » et « System
+        // cooling policy ») : PROCFREQMAX et PROCFREQMAX1 plafonnent la fréquence en MHz (0 = aucun plafond),
+        // PROCTHROTTLEMAX1 l'état maximal des cœurs de la 2e classe d'efficacité, SYSCOOLPOL (0 passif, 1 actif) ralentit le
+        // processeur avant de lancer les ventilateurs. Lus sur cette machine le 16/10/2026 par powercfg /qh : 0, 0, 100 %, actif.
+        ("frequence maximale", new Guid("75b0ae3f-bce0-45a7-8c89-c9611c25e100"), "MHz"),
+        ("frequence maximale (coeurs efficaces)", new Guid("75b0ae3f-bce0-45a7-8c89-c9611c25e101"), "MHz"),
+        ("etat maximal (coeurs efficaces)", new Guid("bc5038f7-23e0-4960-96da-33abaf5935ed"), "%"),
+        ("politique de refroidissement", new Guid("94d3a615-a899-4ac5-ae2b-e4d8f634367f"), ""),
+    };
+
+    /// <summary>Pur : la valeur lue bride-t-elle le processeur ? Un plafond de fréquence posé, un état maximal sous 100 %, un
+    /// refroidissement passif. <c>null</c> = non lu ou pas un frein connu.</summary>
+    public static bool? Frein(PowerSettingValue v) => v.ValeurAc is not { } a ? null : v.Nom switch
+    {
+        "frequence maximale" or "frequence maximale (coeurs efficaces)" => a != 0,
+        "maximum processeur" or "etat maximal (coeurs efficaces)" => a < 100,
+        "politique de refroidissement" => a == 0,
+        _ => null,
     };
 
     /// <summary>

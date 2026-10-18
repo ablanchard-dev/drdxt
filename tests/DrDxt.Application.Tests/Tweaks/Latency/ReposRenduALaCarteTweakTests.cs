@@ -35,6 +35,17 @@ public sealed class ReposRenduALaCarteTweakTests
         return new ReposRenduALaCarteTweak(_nvApi, _elevated);
     }
 
+    // Lu au profil du jeu (un jeu tournait), l'état ne dit rien du profil global : ce levier ne sait pas si le bureau est
+    // au maximum. La vérification disait « déjà réglé » ; c'est « non lu ». Lu au global, il répond.
+    [Fact]
+    public void Lu_au_profil_du_jeu_le_global_est_dit_non_lu()
+    {
+        var t = Build();
+
+        t.EtatNonLu(MaxAuGlobal with { NvidiaDrsScope = @"C:\Jeux\cod.exe" }).Should().BeTrue();
+        t.EtatNonLu(MaxAuGlobal with { NvidiaPreferMaxPerf = TriState.Off }).Should().BeFalse("lu au global : déjà au repos");
+    }
+
     [Fact]
     public void Ne_s_applique_qu_au_maximum_lu_au_global_d_un_pc_de_bureau_nvidia()
     {

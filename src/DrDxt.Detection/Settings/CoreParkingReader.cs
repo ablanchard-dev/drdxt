@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using static DrDxt.Detection.Natif;
 
 namespace DrDxt.Detection.Settings;
 
@@ -21,10 +22,6 @@ namespace DrDxt.Detection.Settings;
 [SupportedOSPlatform("windows")]
 internal static class CoreParkingReader
 {
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool GetSystemCpuSetInformation(
-        IntPtr information, uint bufferLength, out uint returnedLength, IntPtr process, uint flags);
-
     /// <summary>Garde-fou de taille : au-delà, on refuse d'allouer plutôt que de faire confiance
     /// à une valeur rendue par un appel qui vient d'échouer.</summary>
     private const uint MaxBufferBytes = 1 << 20;

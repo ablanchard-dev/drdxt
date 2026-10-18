@@ -56,12 +56,17 @@ public sealed partial class ScanViewModel
 
     private Task<Result>? _activationPlafond;
 
+    /// <summary>Les jeux dont le service porte le plafond (la règle du helper) ; couture de test : un jeu vivant de test.</summary>
+    internal Func<string?, bool> JeuPorteParLeService { get; set; } = NomExeDeJeu.EstUnJeuConnu;
+
     private async Task<Result> ActiverPlafondEnvoiUneFoisAsync()
     {
         if (!PlafondEnvoiDisponible)
             return Result.Fail(ErrorCodes.TweakNotApplicable, Docteur.T("App.PasDeBufferbloat"));
         if (_modePlafond is not null || _porteeParLeService) return Result.Ok();
-        if (ServiceDemarrageActif?.Invoke() == true)
+        // Le service ne porte que le plafond d'un jeu reconnu par son nom (le helper refuse les autres) : un autre jeu garde
+        // la protection de l'App, comme sans service.
+        if (ServiceDemarrageActif?.Invoke() == true && JeuPorteParLeService(_exeJeuMesure))
         {
             // Le service pose un plafond fixe. DrDXT ouvert, l'ajustement tourne encore et lui
             // passe chaque nouveau plafond ; il le repose au battement suivant.
@@ -99,7 +104,12 @@ public sealed partial class ScanViewModel
             using var minuterie = new PeriodicTimer(TourDuPlafond);
             try
             {
-                do { await mode.TickAsync(ct); } while (await minuterie.WaitForNextTickAsync(ct));
+                do
+                {
+                    await mode.TickAsync(ct);
+                    DireLeFiletDuPlafond(mode.SansFilet);
+                }
+                while (await minuterie.WaitForNextTickAsync(ct));
             }
             catch (OperationCanceledException) { /* le mode a ete eteint */ }
         }, ct);
@@ -107,6 +117,16 @@ public sealed partial class ScanViewModel
         LancerAjustement(() => mode.PlafondPose, () => mode.PlafondBps,
             async (apres, c) => (await mode.ChangerPlafondAsync(apres, c)).IsOk, ct);
         return Result.Ok();
+    }
+
+    /// <summary>Le battement ne relance plus le helper (aucune invite sans geste) : injoignable, le plafond ne se pose pas,
+    /// et sans ce texte le joueur ne saurait pas pourquoi. Il part de lui-même dès qu'un battement rejoint le helper ; une
+    /// autre erreur de la carte n'est jamais effacée par lui.</summary>
+    private void DireLeFiletDuPlafond(bool sansFilet)
+    {
+        var texte = _localize("Ping.Protection.SansFilet");
+        if (sansFilet) ErreurPlafondEnvoi = texte;
+        else if (ErreurPlafondEnvoi == texte) ErreurPlafondEnvoi = null;
     }
 
     // La boucle fermee (AjustementDuPlafond) : plafond en place, une fenetre du
@@ -266,8 +286,10 @@ public sealed partial class ScanViewModel
         JournalPlafond?.Change(IdJournalPlafond, "veille",
             FormattableString.Invariant($"{trouve.Verdict.PlafondConseilleBps / 1e6:0.#} Mbit/s for {trouve.Exe} (idle ping p90 {trouve.Verdict.PingReposP90:0} ms, en charge {trouve.Verdict.PingChargeP90:0} ms)"),
             "DrDXT");
+        // La veille trouve le défaut en pleine partie : aucune invite Windows ne s'y ouvre (SansGesteDuJoueur).
+        using var sansGeste = SansGesteDuJoueur.Ouvrir();
         if (await ActiverEtRetenirAsync(trouve.Exe, trouve.Verdict.PlafondConseilleBps) is { IsOk: false } echec)
-            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{echec.Error?.Message}";
+            ErreurPlafondEnvoi = RaisonLisible.Echec(echec, _localize("Ping.Protection.Echec"), _localize);
         SignalerPlafondEnvoi();
     }
 
@@ -294,6 +316,49 @@ public sealed partial class ScanViewModel
 
     // Le dernier test memoire en session, rendu dans la sante au prochain audit.
     private RepairFinding? _constatTestMemoire;
+
+    // ── La carte « Agir » du domaine latence : ce que la souris et la manette envoient vraiment ──────────
+    /// <summary>La mesure des entrées (cinq secondes d'écoute, puis le constat) ; l'appli la pose, null = carte cachée.</summary>
+    internal Func<CancellationToken, RepairFinding>? MesureDesEntrees { get; set; }
+    public bool MesureDesEntreesDisponible => MesureDesEntrees is not null;
+    private RepairFinding? _constatCadence;
+    [ObservableProperty] private bool _cadenceEnCours;
+    [ObservableProperty] private string? _resultatCadence;
+    public bool CadencePrete => !CadenceEnCours;
+    partial void OnCadenceEnCoursChanged(bool value) => OnPropertyChanged(nameof(CadencePrete));
+    public string LabelCapsuleCadence => _localize("Agir.Capsule.Cadence");
+    public string LabelCadenceTitre => _localize(SansManette ? "Entrees.Cadence.Titre.SansManette" : "Entrees.Cadence.Titre");
+    public string LabelCadenceDescription => _localize(SansManette ? "Entrees.Cadence.Description.SansManette" : "Entrees.Cadence.Description");
+    public string LabelCadenceMaintenir => _localize(SansManette ? "Entrees.Cadence.Maintenir.SansManette" : "Entrees.Cadence.Maintenir");
+    public string LabelCadenceEnCours => _localize(SansManette ? "Entrees.Cadence.EnCours.SansManette" : "Entrees.Cadence.EnCours");
+
+    /// <summary>Une manette est-elle branchée ? Posé au lancement ; null = non lu, le texte nomme alors la manette.</summary>
+    internal Func<bool>? ManetteBranchee { get; set; }
+
+    // « bouge la souris et la manette » ne se dit qu'à qui en a une, ou quand on ne sait pas.
+    private bool SansManette => ManetteBranchee?.Invoke() == false;
+
+    /// <summary>Le maintien du noyau est la confirmation ; l'écoute tourne hors du fil d'interface.</summary>
+    [RelayCommand]
+    private async Task MesurerCadence()
+    {
+        if (CadenceEnCours || MesureDesEntrees is not { } mesure) return;
+        CadenceEnCours = true;
+        ResultatCadence = null;
+        try
+        {
+            _constatCadence = await Task.Run(() => mesure(CancellationToken.None));
+            ResultatCadence = _constatCadence.Explication;
+        }
+        finally { CadenceEnCours = false; }
+    }
+
+    /// <summary>Le point d'étape du test mémoire, dans les données de DrDXT ; null = aucun (les tests qui ne le vérifient
+    /// pas).</summary>
+    internal string? FichierRepriseTestMemoire { get; set; }
+
+    /// <summary>Le jugement d'un test resté sans fin (l'appli lit le point d'étape et les journaux) ; null = rien lu.</summary>
+    internal Func<RepairFinding?>? JugerRepriseTestMemoire { get; set; }
 
     // ── La carte « Agir » du domaine memoire ──────────────────
     public static readonly TimeSpan DureeTestMemoire = TimeSpan.FromMinutes(5);
@@ -362,14 +427,25 @@ public sealed partial class ScanViewModel
     private void ArreterTestMemoire() => _arretTestMemoire?.Cancel();
 
     /// <summary>Teste la RAM sans redemarrer (motifs ecrits puis relus sur tous les coeurs). Le volume
-    /// par defaut est le quart de la memoire que .NET voit disponible : assez pour charger le controleur,
-    /// pas assez pour faire paginer la machine. Zero erreur n'est jamais « sain » : c'est « observe ».</summary>
+    /// par defaut est le quart de la memoire, borne a la moitie de la memoire libre : assez pour charger le
+    /// controleur, pas assez pour faire paginer la machine. Zero erreur n'est jamais « sain » : c'est « observe ».</summary>
     public async Task<DrDxt.Measurement.Memory.ResultatTestMemoire> TesterMemoireEnSessionAsync(
         TimeSpan duree, long? octets = null, CancellationToken ct = default)
     {
-        var volume = octets ?? GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / 4;
+        var volume = octets ?? DrDxt.Measurement.Memory.TestMemoireEnSession.Volume(
+            GC.GetGCMemoryInfo().TotalAvailableMemoryBytes, DrDxt.Measurement.CommitPressureReader.LibrePhysique());
+        // Le point d'étape : posé avant, relevé à chaque passe, effacé à la fin normale (arrêt du joueur compris). Resté
+        // en place, il dit au lancement suivant que la machine s'est arrêtée pendant le test.
+        var debut = DateTimeOffset.Now;
+        void Point(int passes)
+        {
+            if (FichierRepriseTestMemoire is { } f)
+                DrDxt.Measurement.Memory.RepriseDuTestMemoire.Poser(f, new(debut, DateTimeOffset.Now, passes));
+        }
+        Point(0);
         var r = await Task.Run(() => DrDxt.Measurement.Memory.TestMemoireEnSession.Lancer(
-            volume, duree, Environment.ProcessorCount, ct));
+            volume, duree, Environment.ProcessorCount, ct, Point));
+        if (FichierRepriseTestMemoire is { } fini) DrDxt.Measurement.Memory.RepriseDuTestMemoire.Effacer(fini);
         _constatTestMemoire = DrDxt.Measurement.Memory.TestMemoireEnSession.Constat(r);
         return r;
     }
@@ -428,14 +504,14 @@ public sealed partial class ScanViewModel
                 // Service en marche, c'est lui qui pose : un refus d'oublier le laisserait plafonner a chaque partie.
                 if (await OublierPourLeServiceAsync() is { IsOk: false } refus && _porteeParLeService)
                 {
-                    ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{refus.Error?.Message}";
+                    ErreurPlafondEnvoi = RaisonLisible.Echec(refus, _localize("Ping.Protection.Echec"), _localize);
                     return;
                 }
                 await DesactiverPlafondEnvoiAsync();
                 MemoirePlafond?.Oublier();
             }
             else if (await ActiverEtRetenirAsync(_exeJeuMesure!, _plafondEnvoiMesure) is { IsOk: false } echec)
-                ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{echec.Error?.Message}";
+                ErreurPlafondEnvoi = RaisonLisible.Echec(echec, _localize("Ping.Protection.Echec"), _localize);
         }
         finally
         {
@@ -450,43 +526,10 @@ public sealed partial class ScanViewModel
     private (string Element, string Valeur)? _bcdARendre;
     private (string Element, string Valeur)? _bcdRendu;
 
-    // La carte promet « Réversible », mais `_bcdRendu` ne vivait qu'en memoire. DrDXT
-    // ferme ou PC redemarre, le bouton Annuler disparaissait. La valeur retiree est gardee dans ce
-    // fichier jusqu'a l'annulation. Null (tests) : rien n'est ecrit. Un fichier modifie a la main ne
-    // peut rien poser d'autre : le helper n'accepte que les elements et valeurs BCD de sa liste.
-    internal string? FichierBcdRendu { get; set; }
+    // La carte promet « Réversible » : la valeur retirée est gardée sur disque jusqu'à l'annulation, écrite avant le
+    // helper. Null (tests) : rien n'est écrit et le retrait ne vit que pour la session.
+    internal DrDxt.Application.Safety.GardeDuBcdRetire? GardeBcd { get; set; }
 
-    private sealed record BcdGarde(string Element, string Valeur);
-    private const string ElementBcdDeLaCarte = "bootstatuspolicy";
-
-    private (string Element, string Valeur)? LireBcdGarde()
-    {
-        try
-        {
-            if (FichierBcdRendu is null || !File.Exists(FichierBcdRendu)) return null;
-            var g = System.Text.Json.JsonSerializer.Deserialize<BcdGarde>(File.ReadAllText(FichierBcdRendu));
-            // La carte ne retire que bootstatuspolicy. Le helper borne les valeurs, pas l'element :
-            // une garde modifiee faisait poser par « Annuler » un autre element permis (useplatformclock Yes).
-            return g is { Element: ElementBcdDeLaCarte, Valeur.Length: > 0 } ? (g.Element, g.Valeur) : null;
-        }
-        catch (Exception) { return null; }
-    }
-
-    private void EcrireBcdGarde((string Element, string Valeur)? rendu)
-    {
-        try
-        {
-            if (FichierBcdRendu is null) return;
-            if (rendu is { } r)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(FichierBcdRendu)!);
-                File.WriteAllText(FichierBcdRendu, System.Text.Json.JsonSerializer.Serialize(new BcdGarde(r.Element, r.Valeur)));
-            }
-            else if (File.Exists(FichierBcdRendu))
-                File.Delete(FichierBcdRendu);
-        }
-        catch (Exception) { /* la carte reste juste pour la session ; l'ecriture BCD, elle, a eu lieu */ }
-    }
     [ObservableProperty] private string? _erreurBcd;
     [ObservableProperty] private bool _bcdEnCours;
 
@@ -501,13 +544,13 @@ public sealed partial class ScanViewModel
 
     private void ArmerBcd(RepairTriage triage)
     {
-        var f = triage.Attention.FirstOrDefault(x => x.Domaine == "BCD" && x.Nom == ElementBcdDeLaCarte
+        var f = triage.Attention.FirstOrDefault(x => x.Domaine == "BCD" && x.Nom == DrDxt.Application.Safety.GardeDuBcdRetire.Element
                                                      && !string.IsNullOrWhiteSpace(x.ValeurCourante));
         _bcdARendre = f is null ? null : (f.Nom, f.ValeurCourante!);
         // L'audit ne voit plus le reglage : s'il a ete retire par DrDXT lors d'une session precedente,
         // la carte le redit et garde son Annuler. S'il est revenu, le fichier est perime et ignore.
         if (f is null && _bcdRendu is null)
-            _bcdRendu = LireBcdGarde();
+            _bcdRendu = GardeBcd?.Lire();
         SignalerBcd();
     }
 
@@ -528,17 +571,26 @@ public sealed partial class ScanViewModel
         ErreurBcd = null;
         try
         {
+            // La garde d'abord : bcdedit écrit tout de suite, une coupure entre les deux laisserait un retrait sans annulation.
+            if (GardeBcd is { } garde && !garde.Ecrire(cible.Element, cible.Valeur))
+            {
+                ErreurBcd = _localize("Bcd.Rendre.GardeImpossible");
+                return;
+            }
             var r = await _helper.ExecuteAsync(new DeleteBcdValueOp(cible.Element), CancellationToken.None);
             if (r.IsOk)
             {
                 _bcdRendu = cible;
-                EcrireBcdGarde(cible);
                 // Le constat restait sur la page à côté de la carte « rendu » (même
                 // défaut que la remesure processeur). Retiré de la page, gardé pour l'annulation.
                 _constatBcdRetire = RepairFindings.FirstOrDefault(v => v.DomaineCle == "BCD" && v.NomCle == cible.Element);
                 if (_constatBcdRetire is not null) { RepairFindings.Remove(_constatBcdRetire); ReconstruireCarteSurLeDomaineOuvert(); }
             }
-            else ErreurBcd = $"{_localize("Bcd.Rendre.Echec")}{Docteur.DeuxPoints}{r.Error?.Message}";
+            else
+            {
+                GardeBcd?.Effacer();
+                ErreurBcd = RaisonLisible.Echec(r, _localize("Bcd.Rendre.Echec"), _localize);
+            }
         }
         finally { BcdEnCours = false; SignalerBcd(); }
     }
@@ -567,10 +619,10 @@ public sealed partial class ScanViewModel
             if (r.IsOk)
             {
                 _bcdRendu = null;
-                EcrireBcdGarde(null);
+                GardeBcd?.Effacer();
                 if (_constatBcdRetire is not null) { RepairFindings.Add(_constatBcdRetire); _constatBcdRetire = null; ReconstruireCarteSurLeDomaineOuvert(); }
             }
-            else ErreurBcd = $"{_localize("Bcd.Rendre.Echec")}{Docteur.DeuxPoints}{r.Error?.Message}";
+            else ErreurBcd = RaisonLisible.Echec(r, _localize("Bcd.Rendre.Echec"), _localize);
         }
         finally { BcdEnCours = false; SignalerBcd(); }
     }
@@ -825,7 +877,72 @@ public sealed partial class ScanViewModel
         catch (Exception) { return Geste.Reparer; }
     }
     public string LabelReparationMaintenir => _localize("Reparation.Windows.Maintenir");
-    public bool CarteWindowsVisible => BcdVisible || ReparationVisible;
+    public bool CarteWindowsVisible => BcdVisible || ReparationVisible || PauseMaintienVisible;
+
+    // ── La carte « Agir » du domaine windows : la pause du maintien du service de demarrage ──
+    // Le fichier de pause est sous %ProgramData%\DrDxt : le helper l'ecrit, l'App le relit apres chaque geste.
+    // La fenetre s'affiche avant ce branchement : le setter previent la carte.
+    internal Func<bool>? ServiceInstalle
+    {
+        get => _serviceInstalle;
+        set { _serviceInstalle = value; OnPropertyChanged(nameof(PauseMaintienVisible)); OnPropertyChanged(nameof(CarteWindowsVisible)); }
+    }
+    private Func<bool>? _serviceInstalle;
+    internal Func<DrDxt.Reconciler.EtatDeLaPause>? LirePauseDuMaintien
+    {
+        get => _lirePauseDuMaintien;
+        set { _lirePauseDuMaintien = value; SignalerPauseMaintien(); }
+    }
+    private Func<DrDxt.Reconciler.EtatDeLaPause>? _lirePauseDuMaintien;
+
+    [ObservableProperty] private string? _erreurPauseMaintien;
+    [ObservableProperty] private bool _pauseMaintienEnCours;
+
+    public bool PauseMaintienVisible => _helper is not null && ServiceInstalle?.Invoke() == true;
+    public bool MaintienEnPause => LirePauseDuMaintien?.Invoke() == DrDxt.Reconciler.EtatDeLaPause.EnPause;
+    // Un fichier de pause qui n'est pas aux administrateurs : le service s'arrete (l'echec sur), l'App dit le doute.
+    public bool PauseIncertaine => LirePauseDuMaintien?.Invoke() == DrDxt.Reconciler.EtatDeLaPause.NonFiable;
+    public string LabelPauseMaintienTitre => _localize("Maintien.Pause.Titre");
+    public string LabelPauseMaintienDescription => _localize("Maintien.Pause.Description");
+    public bool PauseMaintienEtatVisible => MaintienEnPause || PauseIncertaine;
+    public string LabelPauseMaintienEtat => _localize(PauseIncertaine ? "Maintien.Pause.Incertaine" : "Maintien.Pause.EnPause");
+    public string LabelPauseMaintienBascule => _localize(PauseIncertaine ? "Maintien.Pause.Remettre"
+        : MaintienEnPause ? "Maintien.Pause.Reprendre" : "Maintien.Pause.Poser");
+    public string LabelPauseMaintienRetirer => _localize("Maintien.Pause.Retirer");
+
+    // Incertaine, la bascule repose la pause : le geste qui fait le moins.
+    [RelayCommand]
+    private Task BasculerPauseMaintien() => PoserPauseMaintienAsync(PauseIncertaine || !MaintienEnPause);
+
+    [RelayCommand]
+    private Task RetirerPauseMaintien() => PoserPauseMaintienAsync(false);
+
+    private async Task PoserPauseMaintienAsync(bool enPause)
+    {
+        if (PauseMaintienEnCours || _helper is null) return;
+        PauseMaintienEnCours = true;
+        ErreurPauseMaintien = null;
+        try
+        {
+            var r = await _helper.ExecuteAsync(new SetMaintenancePauseOp(enPause), CancellationToken.None);
+            if (!r.IsOk)
+                ErreurPauseMaintien = RaisonLisible.Echec(r, _localize("Maintien.Pause.Echec"), _localize);
+        }
+        finally
+        {
+            PauseMaintienEnCours = false;
+            SignalerPauseMaintien();
+        }
+    }
+
+    private void SignalerPauseMaintien()
+    {
+        OnPropertyChanged(nameof(MaintienEnPause));
+        OnPropertyChanged(nameof(PauseIncertaine));
+        OnPropertyChanged(nameof(PauseMaintienEtatVisible));
+        OnPropertyChanged(nameof(LabelPauseMaintienEtat));
+        OnPropertyChanged(nameof(LabelPauseMaintienBascule));
+    }
 
     /// <summary>« en cours » tant que la console est ouverte, puis ce que la relecture de
     /// Windows trouve à sa fermeture. Avant, rien ne revenait dans DrDXT et le joueur restait sans réponse.</summary>
@@ -850,6 +967,8 @@ public sealed partial class ScanViewModel
     internal async Task ConclureReposCarteAsync(ITweak levier, IHardwareProbe sonde,
         DrDxt.Application.Tweaks.PreuvesEnAttente attente, Func<TimeSpan, Task> attendre)
     {
+        // Au lancement, sans clic : un retrait du réglage ne lance pas le helper (SansGesteDuJoueur).
+        using var sansGeste = SansGesteDuJoueur.Ouvrir();
         EcritureReposCarte = attente.Charger();
         var v = await DrDxt.Application.Tweaks.PreuveDuRepos.ConclureAsync(levier, sonde, 20, attendre, attente);
         if (v is null) return;
@@ -926,6 +1045,8 @@ public sealed partial class ScanViewModel
     internal async Task SurveillerLaCarteEnJeuAsync(ITweak levier, IReadOnlyList<DrDxt.Application.Parties.PartieRelevee> parties,
         DrDxt.Application.Tweaks.ReglagesRetenus retenus)
     {
+        // Après une partie relevée, sans clic : aucune invite Windows ; un retrait refusé reste suivi et se dit.
+        using var sansGeste = SansGesteDuJoueur.Ouvrir();
         if (retenus.Charger() is not { } r || r.TweakId != levier.Id) return;
         var jeu = parties.Where(p => p.Debut >= r.Le).GroupBy(p => p.Jeu, StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
@@ -1033,6 +1154,8 @@ public sealed partial class ScanViewModel
     /// la carte et ne l'efface pas : le joueur l'avait voulu, le prochain lancement reessaiera.</summary>
     public async Task RallumerPlafondEnvoiAsync()
     {
+        // Au lancement, sans clic : le helper déjà ouvert pose la protection, sinon la carte dit qu'elle attend un clic.
+        using var sansGeste = SansGesteDuJoueur.Ouvrir();
         if (MemoirePlafond?.Lire() is not { } retenu) return;
         RetenirMesureEnvoi(retenu.PlafondBps, retenu.Exe);
         // Appele au lancement sans etre attendu : une exception s'y perdrait sans un mot, et
@@ -1046,7 +1169,7 @@ public sealed partial class ScanViewModel
                 ? await ActiverEtRetenirAsync(retenu.Exe, retenu.PlafondBps)
                 : await ActiverPlafondEnvoiAsync();
             if (issue is { IsOk: false } echec)
-                ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{echec.Error?.Message}";
+                ErreurPlafondEnvoi = RaisonLisible.Echec(echec, _localize("Ping.Protection.Echec"), _localize);
         }
         catch (Exception ex)
         {
@@ -1070,7 +1193,7 @@ public sealed partial class ScanViewModel
     private async Task<Result> ActiverEtRetenirAsync(string exe, long plafondBps)
     {
         if (await ActiverPlafondEnvoiAsync() is { IsOk: false } echec) return echec;
-        var retenu = await RetenirPourLeServiceAsync(exe, plafondBps);
+        var retenu = JeuPorteParLeService(exe) ? await RetenirPourLeServiceAsync(exe, plafondBps) : Result.Ok();
         if (_porteeParLeService && !retenu.IsOk)
         {
             await DesactiverPlafondEnvoiAsync();

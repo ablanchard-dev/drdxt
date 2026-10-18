@@ -145,6 +145,8 @@ public sealed class PresentMonSession : IPresentMonSession
                 new PM_QUERY_ELEMENT { metric = PM_METRIC.PM_METRIC_CPU_START_QPC, stat = PM_STAT.PM_STAT_NONE },
                 // La latence d'affichage (début de l'image → écran), pour juger les leviers de latence.
                 new PM_QUERY_ELEMENT { metric = PM_METRIC.PM_METRIC_DISPLAY_LATENCY, stat = PM_STAT.PM_STAT_NONE },
+                // La latence PC (entrée → écran), livrée seulement quand le jeu pose les marqueurs de latence.
+                new PM_QUERY_ELEMENT { metric = PM_METRIC.PM_METRIC_PC_LATENCY, stat = PM_STAT.PM_STAT_NONE },
             };
 
             var regRc = _api.RegisterFrameQuery(session, elements, out query, out var blobSize);
@@ -173,6 +175,8 @@ public sealed class PresentMonSession : IPresentMonSession
             // Lue à la taille annoncée seulement : une taille autre que 8 = série absente, jamais un chiffre inventé.
             var latenceAffichageOffset = (int)elements[9].dataOffset;
             var latenceAffichageLue = elements[9].dataSize == 8;
+            var latencePcOffset = (int)elements[10].dataOffset;
+            var latencePcLue = elements[10].dataSize == 8;
             var buffer = new byte[checked((int)blobSize * (int)MaxFramesPerPoll)];
             var frames = new List<double>();
             var latencies = new List<double>();
@@ -183,6 +187,7 @@ public sealed class PresentMonSession : IPresentMonSession
             var animationError = new List<double>();
             var presentModes = new List<int>();
             var latenceAffichage = new List<double>();
+            var latencePc = new List<double>();
 
             // La durée se compte à partir de la première image, pas du pmStartTrackingProcess.
             // Mesure du 06/10/2026 (scène D3D11, service Intel 2.5.1, `tools/scene`) : le service
@@ -240,6 +245,7 @@ public sealed class PresentMonSession : IPresentMonSession
                     presentApi.Add(BitConverter.ToDouble(buffer, frameBase + presentApiOffset));
                     animationError.Add(BitConverter.ToDouble(buffer, frameBase + animationErrorOffset));
                     if (latenceAffichageLue) latenceAffichage.Add(BitConverter.ToDouble(buffer, frameBase + latenceAffichageOffset));
+                    if (latencePcLue) latencePc.Add(BitConverter.ToDouble(buffer, frameBase + latencePcOffset));
                     if (presentModeSize == 4) presentModes.Add(BitConverter.ToInt32(buffer, frameBase + presentModeOffset));
                     else if (presentModeSize == 8) presentModes.Add((int)BitConverter.ToInt64(buffer, frameBase + presentModeOffset));
                 }
@@ -252,7 +258,7 @@ public sealed class PresentMonSession : IPresentMonSession
 
             return Result<FrameCapture>.Ok(
                 new FrameCapture(frames, latencies, gpuBusy, gpuWait, cpuBusy, presentApi, animationError, presentModes,
-                    DisplayLatencyMs: latenceAffichageLue ? latenceAffichage : null));
+                    DisplayLatencyMs: latenceAffichageLue ? latenceAffichage : null, PcLatencyMs: latencePcLue ? latencePc : null));
         }
         catch (OperationCanceledException)
         {

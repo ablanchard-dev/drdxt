@@ -1,5 +1,4 @@
 using System.Diagnostics.Eventing.Reader;
-using System.Globalization;
 using System.Xml.Linq;
 using DrDxt.Core;
 
@@ -38,11 +37,6 @@ public interface IBootPerformanceLog
 /// </summary>
 public static class DemarrageMesure
 {
-    // Phrases francaises : nombres et dates en fr-FR, quelle que soit la langue de Windows (« 10,7 s »,
-    // jamais « 10.7 s » sur un Windows anglais).
-    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
-    private static string F(FormattableString s) => s.ToString(Fr);
-
     public static string Source => Docteur.T("BP.Source");
 
     public static IReadOnlyList<RepairFinding> Juger(IReadOnlyList<MesureDemarrage> mesures, DateTimeOffset maintenant, TimeSpan fenetre)
@@ -58,14 +52,7 @@ public static class DemarrageMesure
             return [new RepairFinding("DEMARRAGE", "mesure de Windows", Docteur.T("BP.Perimee", dernier.Quand.ToLocalTime()),
                 null, RepairStatus.Observed, Docteur.T("BP.PerimeeExplication", dernier.Quand.ToLocalTime()))];
 
-        // Les applications du dernier demarrage mesure : celles qui l'ont ralenti ce jour-la.
-        var jour = dernier.Quand.ToLocalTime().Date;
-        var lentes = mesures
-            .Where(m => !m.EstLeDemarrage && m.Quand.ToLocalTime().Date == jour && m.DegradationMs > 0)
-            .GroupBy(m => m.Nom)
-            .Select(g => g.MaxBy(m => m.DegradationMs)!)
-            .OrderByDescending(m => m.DegradationMs)
-            .ToList();
+        var lentes = Lentes(mesures, dernier);
 
         var constats = new List<RepairFinding>
         {
@@ -76,6 +63,28 @@ public static class DemarrageMesure
             Docteur.T("BP.Plus", m.DegradationMs / 1000.0), null, RepairStatus.Observed,
             Docteur.T("BP.Lente", m.DegradationMs / 1000.0))));
         return constats;
+    }
+
+    // Les applications du dernier demarrage mesure : celles qui l'ont ralenti ce jour-la.
+    private static List<MesureDemarrage> Lentes(IReadOnlyList<MesureDemarrage> mesures, MesureDemarrage dernier)
+    {
+        var jour = dernier.Quand.ToLocalTime().Date;
+        return mesures
+            .Where(m => !m.EstLeDemarrage && m.Quand.ToLocalTime().Date == jour && m.DegradationMs > 0)
+            .GroupBy(m => m.Nom)
+            .Select(g => g.MaxBy(m => m.DegradationMs)!)
+            .OrderByDescending(m => m.DegradationMs)
+            .ToList();
+    }
+
+    /// <summary>Pur : les applications que <see cref="Juger"/> nomme une à une (celles du dernier démarrage mesuré, s'il
+    /// est dans la fenêtre), pour que le récapitulatif de 90 jours ne les nomme pas une seconde fois.</summary>
+    public static IReadOnlySet<string> Nommes(IReadOnlyList<MesureDemarrage> mesures, DateTimeOffset maintenant, TimeSpan fenetre)
+    {
+        var dernier = mesures.Where(m => m.EstLeDemarrage).MaxBy(m => m.Quand);
+        return dernier is null || maintenant - dernier.Quand > fenetre
+            ? new HashSet<string>()
+            : Lentes(mesures, dernier).Select(m => m.Nom).ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>

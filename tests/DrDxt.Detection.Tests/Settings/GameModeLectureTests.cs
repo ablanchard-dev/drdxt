@@ -7,10 +7,9 @@ namespace DrDxt.Detection.Tests.Settings;
 /// <summary>
 /// Le Game Mode de Windows a deux noms dans le registre, et le produit n'en lisait qu'un.
 ///
-/// Mesure du 18/09/2026 sur la machine de reference : `HKCU\Software\Microsoft\GameBar`
-/// existe et ne porte que `GamepadDoublePressIntervalMs`. Ni `AllowAutoGameMode` ni
-/// `AutoGameModeEnabled` : le reglage n'a jamais ete touche ici, et `Unknown` est la bonne
-/// reponse pour cette machine.
+/// Sur la machine de reference, `HKCU\Software\Microsoft\GameBar` ne porte que
+/// `GamepadDoublePressIntervalMs`. Ni `AllowAutoGameMode` ni `AutoGameModeEnabled` : le reglage n'a jamais ete touche
+/// ici, et le mode Jeu est dans l'etat par defaut de Windows, actif.
 ///
 /// Mais l'asymetrie, elle, est un defaut. `GameModeOnTweak` ecrit les deux valeurs, et son
 /// propre commentaire designe `AllowAutoGameMode` comme « the one detection reads ». Sur
@@ -50,11 +49,12 @@ public class GameModeLectureTests
         // C'est tout l'interet de la correction : celui que Windows 11 honore l'emporte.
         => Lire(moderne: 0, ancien: 1).Should().Be(TriState.Off);
 
+    // Aucune des deux valeurs (ni la cle) : le mode Jeu n'a jamais ete regle, il est donc dans l'etat par defaut de
+    // Windows, actif (Microsoft l'active par defaut pour tout le systeme). « Non lu » disait une panne pour un mode Jeu
+    // actif.
     [Fact]
-    public void Aucune_des_deux_valeurs_rend_Unknown_jamais_Off()
-        // Mesure du 18/09 sur cette machine. « Auto = UNKNOWN, pas OK » : ne pas deviner un
-        // defaut Windows qu'on n'a pas lu.
-        => Lire(moderne: null, ancien: null).Should().Be(TriState.Unknown);
+    public void Aucune_des_deux_valeurs_est_le_defaut_de_Windows_actif()
+        => Lire(moderne: null, ancien: null).Should().Be(TriState.On);
 
     [Theory]
     [InlineData("1")]

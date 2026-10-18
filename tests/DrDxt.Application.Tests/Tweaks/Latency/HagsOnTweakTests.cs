@@ -207,4 +207,46 @@ public sealed class HagsOnTweakTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.SnapshotInvalid);
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
+    // Banc profond : HAGS effectif, HwSchMode absent (le défaut du pilote, l'état de la machine de référence) ou à 2.
+    // L'exercice écrit 1, le levier écrit 2, l'origine exacte revient (absente = supprimée), chaque étape relue dans le
+    // registre ; HAGS n'agit qu'au redémarrage, et le rapport le dit.
+    [Theory]
+    [InlineData(null)]
+    [InlineData(2u)]
+    public async Task En_profond_HAGS_effectif_est_exerce_dans_le_registre_et_l_effet_au_redemarrage_est_dit(uint? origine)
+    {
+        var valeur = origine;
+        var vues = new List<uint?>();
+        _registry.ReadDword(RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName).Returns(_ => Result<uint?>.Ok(valeur));
+        _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(c =>
+        {
+            valeur = c.Arg<PrivilegedOp>() switch { SetRegistryValueOp o => uint.Parse(o.Value), _ => null };
+            vues.Add(valeur);
+            return Task.FromResult(Result.Ok());
+        });
+        var levier = new HagsOnTweak(_registry, _elevated);
+        var journal = new DrDxt.Application.Autopilot.FichierRevertEnAttente(Path.Combine(Path.GetTempPath(), $"drdxt-profond-{Guid.NewGuid():N}.json"));
+        DrDxt.Application.Autopilot.ValidationComplete.Lecture Relire(TweakSnapshot sn)
+        {
+            var p = DrDxt.Application.Tweaks.AppliedStateVerifier.Verifier(sn, _registry);
+            return new(p.Verdict switch { DrDxt.Application.Tweaks.EtatApplique.Applied => true,
+                DrDxt.Application.Tweaks.EtatApplique.NotApplied => false, _ => (bool?)null }, p.Verdict.ToString());
+        }
+
+        var r = await DrDxt.Application.Autopilot.ValidationComplete.ValiderAsync([levier], Hw, State(TriState.On), journal, Relire, profond: true);
+
+        vues.Should().Equal(new uint?[] { 1, 2, origine });
+        valeur.Should().Be(origine);
+        r.Texte.Should().Contain("exercé").And.Contain("redémarrage");
+        r.NonRemis.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void HAGS_pas_effectif_ou_une_cle_a_1_n_est_pas_exerce()
+    {
+        _registry.ReadDword(RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName).Returns(Result<uint?>.Ok(1u));
+        new HagsOnTweak(_registry, _elevated).PreparerExercice(Hw, State(TriState.On)).Should().BeNull("clé à 1 : un redémarrage en attente");
+        _registry.ReadDword(RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName).Returns(Result<uint?>.Ok(2u));
+        new HagsOnTweak(_registry, _elevated).PreparerExercice(Hw, State(TriState.Off)).Should().BeNull("pas effectif : pas déjà réglé");
+    }
 }

@@ -132,11 +132,27 @@ public static class AppServiceCollectionExtensions
             ISettingsStateReader reglages = sp.GetRequiredService<ISettingsStateReader>();
             IBenchmarkRunner mesure = sp.GetRequiredService<IBenchmarkRunner>();
             IStorageDetector disques = sp.GetRequiredService<IStorageDetector>();
-            Func<IReadOnlyList<RepairFinding>> sante = () => [.. new DrDxt.Detection.Repair.RepairAuditService().Lire(), DrDxt.App.Platform.SanteWindows.Constat(),
+            Func<IReadOnlyList<RepairFinding>> sante = () =>
+            {
+                return [
+                    // La santé NVMe d'abord : elle garde le compteur d'arrêts dangereux que la garde de stabilité de l'audit relit.
+                    .. DrDxt.Detection.Hardware.SanteNvme.ComparerEtGarder(DrDxt.Core.DossierDonnees.Chemin(DrDxt.Detection.Hardware.SanteNvme.Fichier),
+                        new DrDxt.Detection.Hardware.WindowsUnexpectedShutdownLog().Since(DateTimeOffset.UtcNow.AddDays(-90)) is { IsOk: true } kp41 ? kp41.Value : null,
+                        DateTimeOffset.UtcNow.AddDays(-90)),
+                    .. new DrDxt.Detection.Repair.RepairAuditService().Lire(), DrDxt.App.Platform.SanteWindows.Constat(),
+                    // Les états de veille du processeur, comparés au relevé de repos gardé. Après l'audit, jamais pendant :
+                    // le relevé se prend au repos, et la charge du scan entrerait dans la référence (mesuré le 16/10/2026 sur
+                    // 28 fils : 2 à 4 points de repos en moins pendant l'audit, bien plus sur un processeur de 4 cœurs).
+                    .. DrDxt.Detection.Cpu.EtatsDeVeille.ComparerEtGarder(
+                        DrDxt.Core.DossierDonnees.Chemin(DrDxt.Detection.Cpu.EtatsDeVeille.Fichier)),
                     .. DrDxt.Detection.Repair.InventaireMachine.ComparerEtGarder(
                         DrDxt.Core.DossierDonnees.Chemin("inventaire-machine.json"), DrDxt.Detection.Gpu.MagasinDePilotes.Pnputil),
+                    // Les changements venus de l'extérieur (jeu mis à jour, pilote d'affichage changé), notés dans la frise
+                    // avant d'être rapprochés des arrêts.
+                    .. NoterLeMonde(),
                     // Un arrêt brutal ou une erreur matérielle dans la semaine d'un changement daté.
                     .. StabiliteApresLesChangements()];
+            };
             bool? eleve = new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
                 .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
             DrDxt.Bios.NvramBiosSettingsReader? nvram = new(DrDxt.App.Platform.VariablesFirmware.Lire);
@@ -153,14 +169,21 @@ public static class AppServiceCollectionExtensions
                 // Les jeux Unreal Engine joués sur ce PC (relevé des parties), réglages lus.
                 .. ReglagesDesJeuxUnreal(),
             ];
+            // La version du pilote graphique, demandée au fabricant (seule requête vers un serveur
+            // hors des pings : NVIDIA, pour la dernière version publiée).
+            Func<IReadOnlyList<GpuInfo>, Task<RepairFinding?>>? verifierPilote = gpus => DrDxt.Detection.Gpu.VersionDuPilote.VerifierAsync(gpus,
+                new DrDxt.Detection.Gpu.SourceNvidia(), new DrDxt.Detection.Gpu.SourceAmd(), DrDxt.Detection.Gpu.VersionDuPilote.RadeonSoftwareVersion);
 #if DEBUG
             // « machine=<nom> » rejoue une machine enregistrée à la place de ce PC.
             // Les droits viennent du fichier ; PCIe (NVML), NVRAM du BIOS et réglages du jeu, qui
-            // liraient ce PC, sont coupés.
+            // liraient ce PC, sont coupés. La version du pilote aussi : la machine porte déjà son constat, relevé
+            // le jour de l'export ; redemandé aujourd'hui, il partait sur le réseau et s'affichait en double.
             if (DrDxt.App.Platform.MachineDeTest.Active is { } machine)
             {
+                verifierPilote = null;
                 var doublure = new DrDxt.App.Platform.MachineDeTest.Detecteur(machine);
-                (detecteur, reglages, mesure, disques, sante) = (doublure, doublure, doublure, doublure, () => machine.Sante);
+                (detecteur, reglages, mesure, disques, sante) = (doublure, doublure, doublure, doublure,
+                    () => machine.Sante.Select(DrDxt.App.Platform.MachineDeTest.DansLaLangueDuDocteur).ToList());
                 (eleve, nvram, pcie, reglagesJeu) = (machine.Eleve ?? true, null, null, null);
             }
 #endif
@@ -287,7 +310,8 @@ public static class AppServiceCollectionExtensions
                         sp.GetRequiredService<DrDxt.Application.Tweaks.Hardware.INvApi>(),
                         sp.GetRequiredService<DrDxt.Application.Tweaks.Hardware.IPowerPlanReader>(),
                         // Un keep inscrit son origine au manifeste signe : la desinstallation la rend.
-                        sp.GetRequiredService<IDesiredStateStore>())
+                        sp.GetRequiredService<IDesiredStateStore>(),
+                        sp.GetRequiredService<DrDxt.Application.Tweaks.Hardware.IServiceStateReader>())
                     : null,
                 // Ce que la stabilite interdit : les memes lectures que tools/candidatprobe.
                 () => (DrDxt.Detection.Hardware.StabiliteLue.InstabiliteGpu(
@@ -363,10 +387,7 @@ public static class AppServiceCollectionExtensions
                         (p, d) => new DrDxt.Detection.Network.EcouteEnvoisUdp().Ecouter(d, p), compteur, attribution.Passerelle)
                         .MesurerAsync(pid, fenetre);
                 },
-                // La version du pilote graphique, demandée au fabricant (seule requête vers un serveur
-                // hors des pings : NVIDIA, pour la dernière version publiée).
-                verifierPilote: gpus => DrDxt.Detection.Gpu.VersionDuPilote.VerifierAsync(gpus, new DrDxt.Detection.Gpu.SourceNvidia(),
-                    new DrDxt.Detection.Gpu.SourceAmd(), DrDxt.Detection.Gpu.VersionDuPilote.RadeonSoftwareVersion),
+                verifierPilote: verifierPilote,
                 // La mémoire libre, relevée toutes les demi-secondes pendant la fenêtre : le plus bas.
                 mesurerMemoireLibre: async fenetre =>
                 {
@@ -391,7 +412,10 @@ public static class AppServiceCollectionExtensions
                         constats, DrDxt.Detection.Repair.MachineExportee.ValeursDeCePc()));
                 })
             {
-                FichierBcdRendu = DrDxt.Core.DossierDonnees.Chemin("bcd-rendu.json"),
+                GardeBcd = new DrDxt.Application.Safety.GardeDuBcdRetire(DrDxt.Core.DossierDonnees.Chemin("bcd-rendu.json")),
+                // Chaque magasin cru pour sa seule ruche : celui du profil ne peut pas faire proposer une coupure de la machine.
+                LireCoupures = () => [.. DrDxt.ElevatedHelper.Execution.TraceDesCoupures.DeLaSession().Lire(),
+                    .. DrDxt.ElevatedHelper.Execution.TraceDesCoupures.DeLaMachine().Lire()],
             };
             // « Vérifier DrDXT sur mon PC » : la validation complète par les leviers et le canal élevé du
             // produit, dans le journal de remise du produit (la reprise au démarrage rend un essai interrompu).
@@ -404,7 +428,7 @@ public static class AppServiceCollectionExtensions
                 if (journal.Lire() is not { IsOk: true, Value: null })
                     return new VerificationRendue("Verifier.EssaiEnCours", [], null);
                 var r = await sp.GetRequiredService<DrDxt.Application.Autopilot.ValidationDeLaMachine>()
-                    .ValiderAsync(journal, progres, JeuOuvert).ConfigureAwait(false);
+                    .ValiderAsync(journal, progres, JeuOuvert, () => vm.ArretVerificationDemande).ConfigureAwait(false);
                 string? chemin = null;
                 try { chemin = EcrireRapportDeVerification(r); }
                 catch (Exception) { /* le bilan reste à l'écran */ }
@@ -414,6 +438,11 @@ public static class AppServiceCollectionExtensions
                 return new VerificationRendue(null, r.NonRemis, chemin, r.Valides, r.NonTouches, r.Refuses, r.ArretPar) { ValidesIds = r.ValidesIds };
             };
             // L'analyse lancée sans droits se relance en administrateur et enchaîne, une seule fois.
+#if DEBUG
+            // Jamais depuis un rejeu : la relance perd « machine= » et « hors-ecran », et une seconde App visible
+            // analyserait ce PC. Le bouton « relancer en administrateur » reste dessiné, il ne dépend pas de ce délégué.
+            if (DrDxt.App.Platform.MachineDeTest.Active is null)
+#endif
             vm.RelancerEleveEtAnalyser = scene =>
             {
                 // Par le lanceur natif, environnement reconstruit (RelanceElevee).
@@ -617,11 +646,12 @@ public static class AppServiceCollectionExtensions
     /// </summary>
     private static string WriteSupportReport(string fileName, string content)
     {
-        var folder = DrDxt.Core.DossierDonnees.Racine();
-        Directory.CreateDirectory(folder);
-
-        var path = Path.Combine(folder, fileName);
-        File.WriteAllText(path, content, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        var path = Path.Combine(DrDxt.Core.DossierDonnees.Racine(), fileName);
+        // Dossier du joueur : jamais à travers un nom posé d'avance en lien (l'App peut tourner élevée).
+        var octets = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true).GetPreamble()
+            .Concat(System.Text.Encoding.UTF8.GetBytes(content)).ToArray();
+        var ecrit = new DrDxt.Core.FichierJsonAtomique(path, DrDxt.Core.ErrorCodes.IoFailure).WriteAtomic(octets);
+        if (!ecrit.IsOk) throw new IOException(ecrit.Error!.Value.Message);
         return path;
     }
 
@@ -650,13 +680,32 @@ public static class AppServiceCollectionExtensions
         return EcrireDansDocuments($"verification-drdxt-{maintenant:yyyy-MM-dd-HHmmss}.txt", texte);
     }
 
+    // L'élévation réelle du processus, pas celle d'une machine rejouée : élevée, l'écriture hors du dossier tenu est gardée.
     private static string EcrireDansDocuments(string nomDeFichier, string json)
     {
         var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         if (documents.Length == 0) throw new DirectoryNotFoundException("dossier Documents introuvable");
-        var chemin = Path.Combine(documents, nomDeFichier);
-        File.WriteAllText(chemin, json, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-        return chemin;
+        using var id = System.Security.Principal.WindowsIdentity.GetCurrent();
+        var eleve = new System.Security.Principal.WindowsPrincipal(id).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+        return DrDxt.App.Platform.EcritureDansDocuments.Ecrire(documents, nomDeFichier, json, eleve);
+    }
+
+    /// <summary>Les jeux mis à jour et les pilotes d'affichage changés depuis le scan précédent, notés dans le journal des
+    /// changements (la frise les montre) à l'heure du scan, le scan précédent comme borne basse. Ne rend aucun constat :
+    /// la frise est leur seul affichage. Une lecture ratée ne note rien.</summary>
+    private static IReadOnlyList<DrDxt.Core.RepairFinding> NoterLeMonde()
+    {
+        try
+        {
+            var maintenant = DateTimeOffset.Now;
+            var (ecarts, depuis) = DrDxt.Detection.Hardware.MondeDeLaMachine.ComparerEtGarder(
+                DrDxt.Core.DossierDonnees.Chemin(DrDxt.Detection.Hardware.MondeDeLaMachine.Fichier), maintenant);
+            var journal = DrDxt.Application.Parties.JournalDesChangements.ParDefaut();
+            foreach (var e in ecarts)
+                journal.Ajouter(new DrDxt.Application.Parties.Changement(maintenant, e.Libelle, depuis, e.Cle));
+        }
+        catch (Exception) { /* un monde non relu ne fait pas échouer la santé */ }
+        return [];
     }
 
     /// <summary>Les changements datés des 30 derniers jours, rapprochés des arrêts brutaux et des

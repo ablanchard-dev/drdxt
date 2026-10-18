@@ -122,17 +122,8 @@ public sealed class Win32BcdActions : IBcdActions
         {
             var psi = new ProcessStartInfo(Bcdedit) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (var a in args) psi.ArgumentList.Add(a);
-            using var p = Process.Start(psi);
-            if (p is null) return (-1, "");
-            // Lue en parallèle : lue avant l'attente, un bcdedit bloqué figeait l'appel sans que le délai serve.
-            var sortie = p.StandardOutput.ReadToEndAsync();
-            _ = p.StandardError.ReadToEndAsync();
-            if (!p.WaitForExit(15_000))
-            {
-                try { p.Kill(entireProcessTree: true); } catch { /* déjà parti */ }
-                return (-1, "");
-            }
-            return (p.ExitCode, sortie.GetAwaiter().GetResult());
+            var r = ProcessusBorne.Executer(psi, TimeSpan.FromSeconds(15));
+            return r.Fini ? (r.Code, r.Sortie) : (-1, "");
         }
         catch { return (-1, ""); }
     }

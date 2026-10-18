@@ -10,6 +10,17 @@ namespace DrDxt.App.ViewModels;
 /// <summary>Remplit l'écran après le scan : composants, mesure en jeu, résumé, constats du BIOS et audit de santé.</summary>
 public sealed partial class ScanViewModel
 {
+    /// <summary>Le build et l'UBR de Windows (« 26200.6899 »), lus sans droits ; <c>null</c> = non lu.</summary>
+    internal static string? BuildDeWindows()
+    {
+        try
+        {
+            using var cle = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+            return cle?.GetValue("CurrentBuild") is string b && cle.GetValue("UBR") is int ubr ? $"{b}.{ubr}" : null;
+        }
+        catch (Exception) { return null; }
+    }
+
     private void ApplyBaseline(BenchmarkResult? baseline)
     {
         if (baseline is null)
@@ -357,8 +368,10 @@ public sealed partial class ScanViewModel
                 .ThenBy(x => x.i)
                 .Select(x => x.f);
 
+            // XMP coupé est aussi un constat du scan : si la mesure y a retiré la promesse d'images, le BIOS le dit pareil.
+            var motifXmp = Findings.FirstOrDefault(x => x.Cle == "Finding.Memory.XmpOff")?.PromesseRetiree;
             foreach (var f in ordered)
-                BiosFindings.Add(new BiosFindingViewModel(f, _localize));
+                BiosFindings.Add(new BiosFindingViewModel(f, _localize, f.Kind == FirmwareSettingKind.XmpExpo ? motifXmp : null));
         }
         catch
         {
@@ -420,7 +433,13 @@ public sealed partial class ScanViewModel
                 constats = constats.Append(pertesReseau).ToList();
             // Les gains que DrDXT avait poses et qui ont ete defaits depuis.
             if (_journalLeviers is { } journalLeviers && _registreGains is { } registre)
+            {
                 constats = constats.Concat(journalLeviers.Constats(registre)).ToList();
+                // Windows mis à jour depuis le dernier scan : le bilan de ce que DrDXT avait posé, relu sans rien reposer.
+                if (BuildDeWindows() is { } build
+                    && journalLeviers.ApresMiseAJour(registre, build, DrDxt.Core.DossierDonnees.Chemin("build-windows-vu.json")) is { } apres)
+                    constats = constats.Append(apres).ToList();
+            }
             // Les reglages de latence du jeu (Reflex, generation d'images), lus, jamais ecrits.
             if (_lireReglagesJeu is { } lireJeu)
             {
@@ -430,6 +449,14 @@ public sealed partial class ScanViewModel
             }
             if (_constatTestMemoire is { } testMemoire)
                 constats = constats.Append(testMemoire).ToList();
+            // Un test d'une session précédente resté sans fin : la machine s'est-elle arrêtée pendant ?
+            else if (!TestMemoireEnCours && JugerRepriseTestMemoire is { } reprise)
+            {
+                try { if (await Task.Run(reprise) is { } r) constats = constats.Append(r).ToList(); }
+                catch { /* journaux illisibles : rien d'affirme */ }
+            }
+            if (_constatCadence is { } cadence)
+                constats = constats.Append(cadence).ToList();
             if (_constatBufferbloat is { } bufferbloat)
                 constats = constats.Append(bufferbloat).ToList();
             if (_constatDpc is { } latenceDpc)

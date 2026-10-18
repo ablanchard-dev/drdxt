@@ -1,5 +1,4 @@
-﻿using static DrDxt.Core.TexteFrancais;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Globalization;
 using DrDxt.Core;
@@ -62,7 +61,7 @@ public sealed partial class RepairAuditService
     // pas arrive. Sans vidage, la cause d'un ecran bleu ne se relit pas apres coup.
     private IEnumerable<RepairFinding> CreationDeVidage()
     {
-        var lu = _vidages.Lire(DateTimeOffset.UtcNow - FenetreArrets);
+        var lu = _vidages.Lire(_instantDuScan - FenetreArrets);
         if (!lu.IsOk)
         {
             yield return new RepairFinding("STABILITE", "creation de vidage", null, null, RepairStatus.Unknown,
@@ -84,8 +83,23 @@ public sealed partial class RepairAuditService
 
         yield return new RepairFinding("STABILITE", "creation de vidage",
             Docteur.T("ST.Vidage.Petits", v.PetitsVidages) + (v.VidageComplet ? Docteur.T("ST.Vidage.Complet") : "")
-            + Docteur.T("ST.Vidage.EchecsCompte", v.Echecs.Count),
+            + Docteur.T("ST.Vidage.EchecsCompte", v.Echecs.Count)
+            + (v.DernierVidage is { } dernier ? Docteur.T("ST.Vidage.Dernier", dernier.ToLocalTime().ToString(Docteur.T("ST.FormatDateHeure"), Docteur.Langue)) : ""),
             null, RepairStatus.Observed, Docteur.T("ST.Vidage.Garde", FenetreArrets.TotalDays));
+    }
+
+    // Tout ce qui dit « instable » pour la garde, la même source que la garde XMP (GardeDeStabilite).
+    private (IReadOnlyList<ArretClasse>? Arrets, IReadOnlyList<DateTimeOffset> Autres) IncidentsDuGarde(DateTimeOffset maintenant)
+        => GardeDeStabilite.Lire(_arrets, _vidages, maintenant, _rapports, _whea);
+
+    // Trois sources dans la même fenêtre : un vidage récent interdit « aucun écran bleu ».
+    private IEnumerable<RepairFinding> EcransBleusCroises()
+    {
+        var depuis = _instantDuScan - FenetreArrets;
+        var arrets = _arrets.Detail(depuis);
+        var vidages = _vidages.Lire(depuis);
+        yield return EcransBleus.Juger(arrets.IsOk ? arrets.Value : null, _rapports(depuis),
+            vidages.IsOk ? vidages.Value : null, (int)FenetreArrets.TotalDays);
     }
 
     // Chaque incident rapproché de ce qui a été installé juste avant.
@@ -109,7 +123,7 @@ public sealed partial class RepairAuditService
                         points.Add((new DateTimeOffset(System.Management.ManagementDateTimeConverter.ToDateTime(dmtf)),
                             l.Properties.TryGetValue("Description", out var d) ? d?.ToString() ?? "" : ""));
                 }
-                catch (Exception) { }
+                catch (Exception) { /* voir plus haut : point laissé */ }
             }
         }
         return PointDeRestaurationSain.Juger(points, IncidentsDates(), DateTimeOffset.Now, DateTimeOffset.UtcNow - FenetreArrets);

@@ -1,5 +1,6 @@
 ﻿using System.IO.MemoryMappedFiles;
 using System.Text;
+using static DrDxt.Detection.Natif;
 
 namespace DrDxt.Detection.Cpu;
 
@@ -165,9 +166,6 @@ public static class TemperatureHwinfo
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
     private static extern bool QueryFullProcessImageName(IntPtr h, uint drapeaux, StringBuilder nom, ref int taille);
-
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
-    private static extern bool CloseHandle(IntPtr h);
 
     // Le nom du capteur d'un relevé (index en +4 du relevé, section des capteurs décrite en +20/+24/+28 de l'en-tête, nom
     // d'origine en +8 du capteur) ; null si la section n'est pas lisible.

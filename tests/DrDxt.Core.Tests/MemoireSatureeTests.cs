@@ -9,6 +9,17 @@ public sealed class MemoireSatureeTests
 {
     private const ulong Go = 1UL << 30;
 
+    // Entre 50 et 500 lectures dures par seconde avec de la place : « pas de pression visible » suivi de « Windows pagine »
+    // se contredisait. C'est dit comme vu, sans alarme.
+    [Fact]
+    public void De_la_place_et_une_pagination_moderee_se_disent_sans_dire_rien_ni_alarmer()
+    {
+        var f = MemoireSaturee.Juger(new MemoireLue(32 * Go, 20 * Go, 12 * Go, 40 * Go), 120);
+
+        f.Statut.Should().Be(RepairStatus.Observed);
+        f.Explication.Should().Contain("pas pleine").And.Contain("Windows pagine").And.NotContain("pas de pression visible");
+    }
+
     [Fact]
     public void Pleine_sous_dix_pour_cent_libres_se_dit_avec_ses_gestes()
     {
@@ -48,5 +59,19 @@ public sealed class MemoireSatureeTests
     {
         MemoireSaturee.Juger(null).Statut.Should().Be(RepairStatus.Unknown);
         MemoireSaturee.Juger(new MemoireLue(0, 0, 0, 0)).Statut.Should().Be(RepairStatus.Unknown, "un total nul est une lecture ratée");
+    }
+
+    // Pleine mais calme n'est pas pleine et qui pagine : la mesure sur deux secondes tranche, et rien ne conseille de vider.
+    [Fact]
+    public void Une_memoire_pleine_mais_calme_n_est_pas_une_alarme()
+    {
+        var pleine = new MemoireLue(8 * Go, 400 * (1UL << 20), 9 * Go, 12 * Go);
+
+        MemoireSaturee.Juger(pleine, 3).Statut.Should().Be(RepairStatus.Observed);
+        MemoireSaturee.Juger(pleine, 3).Explication.Should().Contain("rien n'attend le disque");
+        MemoireSaturee.Juger(pleine, 900).Statut.Should().Be(RepairStatus.Suspicious);
+        MemoireSaturee.Juger(pleine).Statut.Should().Be(RepairStatus.Suspicious, "non mesuré ne vaut pas calme");
+        MemoireSaturee.Juger(new MemoireLue(32 * Go, 20 * Go, 12 * Go, 40 * Go), 900).Statut.Should().Be(RepairStatus.Suspicious);
+        MemoireSaturee.Juger(new MemoireLue(32 * Go, 20 * Go, 12 * Go, 40 * Go), 900).ValeurCourante.Should().EndWith("900 lectures de pages dures/s");
     }
 }

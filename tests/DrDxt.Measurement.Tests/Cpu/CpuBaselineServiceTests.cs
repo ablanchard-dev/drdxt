@@ -42,6 +42,39 @@ public class CpuBaselineServiceTests
     private static string Json(CpuBaseline b)
         => System.Text.Json.JsonSerializer.Serialize(b);
 
+    // La jauge du scan prévoit la durée de l'étape d'après MesureraPourScan : il doit annoncer exactement ce que le scan
+    // fait ensuite, banc lancé ou non, dans chaque cas de la règle.
+    public static TheoryData<string, bool, string?> CasDuBanc => new()
+    {
+        { "aucune reference", false, null },
+        { "reference recente, meme reglage", false, "Intel Default Settings" },
+        { "reglage du BIOS change", false, "Lite Load 1" },
+        { "aucune reference, jeu ouvert", true, null },
+        { "reference sans frequences d'avant le banc qui les releve", false, "Intel Default Settings" },
+        { "lecture en panne", false, null },
+    };
+
+    [Theory]
+    [MemberData(nameof(CasDuBanc))]
+    public void MesureraPourScan_annonce_ce_que_le_scan_fait(string cas, bool jeu, string? reglage)
+    {
+        var fichier = cas switch
+        {
+            "aucune reference" or "aucune reference, jeu ouvert" => new FichierFictif(),
+            "lecture en panne" => new FichierFictif(lectureEchoue: true),
+            "reference sans frequences d'avant le banc qui les releve" => new FichierFictif(Json(new CpuBaseline("m1",
+                CpuBaselineService.BancAvecFrequence.AddDays(-3), 8, 1391, 1533, 1.8, 66, 3.9, true, "Intel Default Settings"))),
+            _ => new FichierFictif(Json(AvecPuissance(1695, 1343, 68, "Intel Default Settings"))),
+        };
+        var banc = new BancFictif(AvecPuissance(1695, 1343, 68, null));
+        var service = new CpuBaselineService(banc, new CpuBaselineStore(fichier));
+
+        var annonce = service.MesureraPourScan("m1", jeu, reglage);
+        service.DeficitPourScan("m1", jeu, reglage);
+
+        annonce.Should().Be(banc.Appels > 0, cas);
+    }
+
     [Fact]
     public void Le_premier_scan_mesure_puis_ENREGISTRE()
     {

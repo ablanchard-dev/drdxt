@@ -182,6 +182,10 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    avec des débits légèrement sous ceux de l'abonnement (environ 90 %). Sinon, DrDXT plafonne l'envoi de la machine
    pendant la partie.
 3. Pendant la partie, pas d'envoi lourd (cloud, mise en ligne de vidéos) sur le même réseau.
+4. Vitesse ou duplex de la carte réseau forcés à autre chose que le lien (DrDXT compare les deux) : Gestionnaire de
+   périphériques, carte réseau, Propriétés, onglet Avancé, « Vitesse et duplex » sur négociation automatique.
+5. Double NAT (DrDXT dit « box derrière box ») : dans l'interface de l'un des deux routeurs, mode pont (bridge), ou
+   branche le PC directement sur le premier. Ce qui en profite : la connexion directe aux autres joueurs (le NAT du jeu).
 
 ### 5.9 Programmes au démarrage et à côté du jeu
 1. Programmes au démarrage : sous « Comment corriger » du constat, DrDXT coupe chaque programme sur ton clic, comme le
@@ -190,12 +194,21 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 2. Overlays : coupe ceux dont tu ne te sers pas (Discord : Paramètres > Overlay du jeu ; GeForce : Alt+Z, Paramètres).
 3. Instant Replay de NVIDIA (enregistre en continu, environ 5 % d'images selon NVIDIA) : Alt+Z > Instant Replay >
    Désactiver, si tu ne t'en sers pas.
+4. Pertes en stream au-dessus de 5 % (DrDXT lit les journaux d'OBS) : si l'encodage ne suit pas, baisse dans OBS le
+   préréglage de l'encodeur, la taille de sortie ou la fréquence d'images ; si le rendu manque des images, plafonne les
+   FPS du jeu un peu sous leur niveau habituel ; si le réseau en jette, baisse le débit du stream. DrDXT n'écrit pas
+   dans OBS.
 
 ### 5.10 Pilote graphique et fichiers Windows abîmés
 1. Pilote : application NVIDIA ou AMD Adrenalin > Pilotes > Vérifier les mises à jour. DrDXT te dit si tu es en retard.
 2. Fichiers Windows abîmés que `sfc` et `DISM` ne réparent plus (DrDXT te le dit) : Paramètres > Système > Récupération >
    « Réinstaller maintenant » (garde fichiers, applications et réglages ; long, redémarre le PC : hors partie ;
    **sans retour**, mais c'est la même version de Windows).
+3. Pilote graphique 32 bits absent ou manquant (un lanceur reste noir) : réinstalle le pilote de la carte depuis le
+   site de son fabricant, installation propre ; DrDXT relit les deux parties du pilote au scan suivant.
+4. Pilote RTCore présent (DrDXT le dit) : mets à jour ou désinstalle l'outil de réglage de carte qui l'a installé, puis
+   Sécurité Windows > Sécurité de l'appareil > Isolation du noyau > « Liste de blocage des pilotes vulnérables Microsoft »
+   activée, et redémarre. DrDXT ne retire pas ce pilote.
 
 ### 5.11 Écran
 1. Branche l'écran sur la carte graphique, pas sur la carte mère.
@@ -203,6 +216,10 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 3. G-SYNC/FreeSync : activé dans le menu de l'écran et dans le pilote.
 4. Si DrDXT dit « écran bridé » (une fréquence sous celle de l'écran) : menu de l'écran d'abord (version DisplayPort
    ou HDMI, overclock), puis un autre câble ou un autre port.
+5. Superpositions matérielles coupées (DrDXT lit OverlayTestMode = 5) : télécharge le fichier de retour de l'article
+   NVIDIA « MPO » (mpo_restore.reg), lance-le, puis redémarre. DrDXT ne touche pas à cette valeur.
+6. Écrans dupliqués à des fréquences différentes (DrDXT dit les deux fréquences) : Windows + P, puis Étendre ; chaque
+   écran reprend sa fréquence.
 
 ### 5.12 Ryzen X3D à deux blocs (7900X3D, 7950X3D, 9900X3D, 9950X3D) : le jeu sur le bloc à cache
 1. BIOS, Advanced > AMD CBS > SMU : « CPPC » et « CPPC Preferred Cores » sur Enabled. C'est ce qui laisse Windows et le
@@ -229,6 +246,8 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    un orage, onduleur si tu en as un : une coupure pendant l'écriture rend la carte muette. **Sans retour** la plupart
    du temps : un BIOS qui porte le correctif microcode refuse souvent de revenir en arrière.
 3. Après : tes réglages (XMP/EXPO, limite de puissance) reviennent à « Auto », refais 5.1 et 5.3.
+4. Ryzen avec le TPM du processeur (fTPM) actif et un BIOS d'avant mai 2022 : de courts gels peuvent venir du fTPM (AMD,
+   article PA-410). Même geste que 1 et 2 : un BIOS fondé sur AGESA 1207 ou plus récente, sa note le dit.
 
 ### 5.15 Disques
 1. Jeux sur un disque dur : déplace-les sur un SSD (le lanceur sait déplacer un jeu installé : Steam > Propriétés >
@@ -241,6 +260,9 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    Téléchargements et la corbeille, puis Paramètres > Système > Stockage.
 4. Erreurs non corrigées sur un disque : copie ce qui compte ailleurs D'ABORD, puis `chkdsk` ou l'outil du fabricant
    (**sans retour** : sur un disque qui lâche, la réparation peut finir d'abîmer ce qu'elle touche).
+5. Firmware d'un SSD signalé par son fabricant : DrDXT compare le firmware du disque à un bulletin du fabricant
+   (adresse et date de relevé dans le constat). Sauvegarde d'abord, puis mets-le à jour avec l'outil du fabricant
+   (Samsung Magician pour un Samsung) ; DrDXT n'écrit jamais le firmware d'un disque.
 
 ### 5.16 Windows et périphériques
 1. Windows Update : Paramètres > Windows Update > Rechercher des mises à jour, puis Microsoft Store > Bibliothèque > Obtenir
@@ -257,13 +279,20 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    supprimé. Le pilote en service n'est jamais dans la liste.
 4. Plan d'alimentation « Économie d'énergie » pour jouer : sur un PC de bureau, DrDXT repasse en Équilibré lui-même (Optimiser,
    réversible). Sur un portable, où l'économie peut être voulue : Paramètres > Système > Alimentation, repasse en Équilibré.
-5. Un réglage posé par DrDXT et défait depuis (mise à jour, autre programme) : relance l'optimisation, DrDXT ne le repose
-   pas tout seul.
+5. Un réglage posé par DrDXT et défait depuis (mise à jour, autre programme) : relance l'optimisation. Sans le service de
+   maintien (case décochée par défaut à l'installation), DrDXT ne le repose pas tout seul ; avec lui, il repose au démarrage
+   de Windows les réglages qu'il suit (plan d'alimentation, Reflex, cache X3D, HAGS) que tu avais gardés.
 6. Doute sur la mémoire : Windows + R, `mdsched.exe`, le test tourne au redémarrage ; DrDXT lit le résultat. DrDXT
    peut aussi le demander lui-même pour le prochain redémarrage (« Le lancer au prochain démarrage », sous le constat),
    une seule fois, et l'annuler ; le redémarrage reste à toi.
+   Si la machine s'est arrêtée pendant un test mémoire en session que la machine n'a pas fini, c'est un échec du test :
+   lance `mdsched.exe` pour savoir si la mémoire elle-même est en cause, avant tout autre réglage.
 7. Un service Windows qui plante ou redémarre sans cesse (DrDXT le nomme) : mets à jour ou réinstalle le logiciel à qui
-   il appartient, ou désinstalle-le s'il ne sert plus. DrDXT ne touche pas aux services.
+   il appartient, ou désinstalle-le s'il ne sert plus. DrDXT ne redémarre ni ne coupe ce service ; le seul service Windows
+   qu'il démarre est celui d'AMD pour le cache 3D, sur un Ryzen X3D à deux blocs (5.12), rendu à son état d'origine si tu annules.
+8. Horloge haute résolution lente ou qui recule (DrDXT mesure ce que coûte une lecture) : en administrateur,
+   `bcdedit /enum {current}` ; si `useplatformclock` y figure, `bcdedit /deletevalue useplatformclock` puis redémarre.
+   Sinon, mets à jour le BIOS (5.14) : c'est lui qui dit à Windows si le compteur du processeur est fiable.
 
 ### 5.17 Mémoire saturée (PC de bureau comme PC de jeu)
 1. DrDXT lit deux choses à l'instant du relevé (seuils DrDXT, pas une norme) : la mémoire libre, sous 10 % ce qui ne tient
@@ -281,8 +310,9 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    code source public) les lit dans les registres du processeur. **DrDXT ne l'installe jamais** : c'est ton choix, c'est un
    pilote noyau. Installé dans son dossier par défaut (`Program Files\PawnIO`), DrDXT s'en sert pour LIRE la température, la
    limite de puissance et les raisons de freinage, si DrDXT est lancé en administrateur ; sinon ces constats restent « non
-   lus », et c'est dit. Une seule ÉCRITURE passe par lui : la limite de puissance longue (PL1) quand tu acceptes ce levier,
-   par le helper de DrDXT seulement, relue après coup, défaite au redémarrage (le BIOS remet sa valeur) ou en un clic.
+   lus », et c'est dit. Deux ÉCRITURES passent par lui, chacune quand tu acceptes son levier : la limite de puissance longue
+   (PL1), et le décalage de tension de la sous-tension (refusé si le processeur a SGX). Toutes deux par le helper de DrDXT
+   seulement, relues après coup, défaites au redémarrage (le BIOS remet sa valeur) ou en un clic.
 2. Intel seulement pour l'instant ; sur un Ryzen, ces deux constats restent non lus.
 3. Anti-triche : un pilote de lecture de registres est connu des anti-triches ; FACEIT bloque PawnIO (il refuse de lancer, il
    ne bannit pas) ; rien de connu côté Ricochet, Vanguard ou EAC, mais ce n'est pas mesuré : si tu joues en compétition,
@@ -342,6 +372,47 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 3. Pour garder la valeur trouvée : au BIOS, la tension des cœurs en mode adaptatif avec un décalage (offset) négatif de la
    valeur que DrDXT a dite. Rejoue : le docteur relit tes parties et dit si le processeur se freine moins.
 4. Un écran bleu ou un jeu qui se ferme dans les jours qui suivent : remonte le décalage de 10 à 20 mV, ou remets-le à zéro.
+
+### 5.24 Pannes notées par Windows
+1. Écran bleu : DrDXT le compte par trois sources (le code d'arrêt, le rapport BugCheck, les vidages écrits dans la
+   fenêtre). Si tu as changé un réglage du BIOS, un surcadençage ou un pilote juste avant, reviens d'abord à la valeur
+   d'avant et observe ; sans vidage gardé, règle le type de vidage (6) pour que le prochain se relise.
+2. Pilote graphique relancé par Windows (Display 4101) : remets la carte à ses réglages d'usine (mode Expert de DrDXT ou
+   outil du fabricant), puis réinstalle le pilote (5.10).
+3. Erreurs du disque, contrôleur de stockage réinitialisé, système de fichiers abîmé : sauvegarde ce qui compte, puis 5.15
+   (santé du disque, `chkdsk`, micrologiciel du SSD chez son fabricant).
+4. Mémoire virtuelle épuisée : 5.17. Pilote non chargé au démarrage : seulement si un appareil ne marche plus, 5.16.
+5. Santé NVMe : un SSD qui lève son avertissement critique, passe sous sa réserve ou compte des erreurs de support,
+   sauvegarde d'abord, puis micrologiciel chez son fabricant ; s'il reste en alerte, prévois de le remplacer. Ses arrêts
+   dangereux croisés avec les arrêts brutaux disent coupure de courant (les deux) ou gel (Windows seul).
+6. Le journal Système ne garde que 20 Mio : quand DrDXT dit qu'il ne couvre pas la fenêtre, un « aucun » n'y vaut rien.
+
+### 5.25 Freins cachés et Defender
+1. Plafond de fréquence, état maximal sous 100 % ou refroidissement passif dans le plan : Windows ne les montre pas. Sur un
+   PC de bureau, `powercfg /restoredefaultschemes` en administrateur rend les plans de Windows (tes plans personnalisés sont
+   perdus) ; sur un portable, le constructeur les pose souvent exprès, vérifie avant.
+2. Accès contrôlé aux dossiers activé sans ton jeu : Sécurité Windows > Protection contre les virus et menaces > Protection
+   contre les ransomwares > Autoriser une application, ajoute l'exécutable du jeu.
+3. Exclusion de processus par simple nom : si tu ne l'as pas posée, retire-la (Gérer les paramètres > Exclusions). DrDXT ne
+   touche jamais à Defender et ne conseille jamais d'ajouter une exclusion.
+
+### 5.26 Pilotes : installation bloquée, inventaire, version exigée par le jeu
+1. Installation de pilote bloquée par stratégie : DrDXT nomme la carte que la règle vise (souvent la puce intégrée, pas la
+   carte dédiée). Si le PC est le tien et que tu ne l'as pas posée : `gpedit.msc` > Configuration ordinateur > Modèles
+   d'administration > Système > Installation de périphériques > Restrictions d'installation de périphériques, règle sur
+   « Non configuré », puis redémarre. Sur un PC de travail, demande à son administrateur. DrDXT ne la retire jamais.
+
+2. Pilote non signé : si tu ne t'en sers plus, désinstalle le logiciel qui l'a posé (Paramètres > Applications) ; sinon,
+   prends une version signée chez son fabricant. Un pilote ancien n'est à changer que si son périphérique se comporte mal.
+
+3. Pilote sous le plancher qu'un jeu exige (lu dans le fichier que le jeu livre) : installe le dernier pilote depuis le site
+   ou l'application du fabricant de la carte, puis redémarre.
+
+### 5.27 Disque des jeux chiffré (BitLocker)
+1. Protection suspendue : redémarre d'abord (une mise à jour la suspend exprès jusque-là). Si elle reste suspendue : Panneau
+   de configuration > Chiffrement de lecteur BitLocker > Reprendre la protection. DrDXT ne le fait jamais à ta place et ne
+   propose jamais de déchiffrer.
+2. Conversion en cours : laisse le PC allumé jusqu'à la fin ; toute mesure faite avant mesure la conversion.
 
 ## 6. Ce que DrDXT dit sans geste à faire
 

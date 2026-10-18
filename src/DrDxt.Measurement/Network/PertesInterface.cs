@@ -1,4 +1,3 @@
-using static DrDxt.Core.TexteFrancais;
 using System.Net.NetworkInformation;
 using DrDxt.Core;
 

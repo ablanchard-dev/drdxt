@@ -55,6 +55,8 @@ public static class DetectionServiceCollectionExtensions
                 sp.GetService<DrDxt.Detection.Gpu.Adlx.IAdlxNative>()));
 
         services.TryAddSingleton<IUnexpectedShutdownLog, WindowsUnexpectedShutdownLog>();
+        // Les vidages d'écran bleu : la garde XMP de SettingsStateReader lit la même stabilité que Curve Optimizer.
+        services.TryAddSingleton<IDumpCreationLog, WindowsDumpCreationLog>();
         // HAGS effectif (D3DKMT), meme convention de parametre optionnel.
         services.TryAddSingleton<IHagsEffectiveReader, D3dkmtHagsReader>();
         services.TryAddSingleton<ISettingsStateReader, SettingsStateReader>();

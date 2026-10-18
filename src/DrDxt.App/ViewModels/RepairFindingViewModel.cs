@@ -130,9 +130,8 @@ public sealed class RepairFindingViewModel
 
     internal static string TitreAffiche(RepairFinding f) => f.Nom switch
     {
-        "incident noyau conserve" when f.ValeurCourante?.Contains("USB 3", StringComparison.Ordinal) == true
-            => Docteur.T("RF.IncidentUsb3"),
-        // Reconnu au code d'arrêt (« 3x 0x193 VIDEO_… »), pas à la phrase : « carte graphique » échouait en anglais.
+        // Reconnus au code d'arrêt (« 3x 0x193 VIDEO_… »), pas à la phrase : « carte graphique » échouait en anglais.
+        "incident noyau conserve" when CodeDArret(f.ValeurCourante) == 0x144 => Docteur.T("RF.IncidentUsb3"),
         "incident noyau conserve" when CodeDArret(f.ValeurCourante) is { } code && DrDxt.Detection.Hardware.LiveKernelReport.CodeGraphique(code)
             => Docteur.T("RF.IncidentGraphique"),
         _ => RepairLibelles.Nom(f.Domaine, f.Nom),

@@ -172,7 +172,7 @@ public sealed class ManifesteParLeHelperTests
         await vm.ScanCommand.ExecuteAsync(null);
         await vm.ApplyCommand.ExecuteAsync(null);
 
-        vm.ManifesteIllisibleMessage.Should().Be("Apply.ManifestUnreadable (la raison du helper)");
+        vm.ManifesteIllisibleMessage.Should().Be($"Apply.ManifestUnreadable{Docteur.DeuxPoints}Erreur.Generique");
         vm.PeutRepartirDuManifeste.Should().BeTrue();
         vm.MoatUnarmedMessage.Should().Be("Apply.MoatUnarmed");
 
@@ -202,7 +202,7 @@ public sealed class ManifesteParLeHelperTests
         await vm.ScanCommand.ExecuteAsync(null);
         await vm.ApplyCommand.ExecuteAsync(null);
 
-        vm.MoatUnarmedMessage.Should().Be("Apply.ReferenceNotSeeded (la raison du helper)");
+        vm.MoatUnarmedMessage.Should().Be($"Apply.ReferenceNotSeeded{Docteur.DeuxPoints}Erreur.Generique");
         vm.ManifesteIllisibleMessage.Should().BeNull();
     }
 

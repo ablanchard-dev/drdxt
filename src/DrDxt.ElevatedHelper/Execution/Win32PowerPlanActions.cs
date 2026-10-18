@@ -49,7 +49,10 @@ public sealed class Win32PowerPlanActions : IPowerPlanActions
             var mode = _alimentation.ModeSecteur();
             var r = ActiverEnGardantLeMode(planGuid);
             if (r.IsOk || avant is not { } plan || plan == planGuid) return r;
-            _alimentation.Activer(plan);
+            // Le plan d'avant, relu : s'il ne revient pas, l'échec le dit et garde le journal.
+            if (_alimentation.Activer(plan) != 0 || _alimentation.PlanActif() != plan)
+                return Result.Fail(ErrorCodes.TweakPartiallyApplied,
+                    $"{r.Error?.Message} The previous power plan {plan} could not be set back. {RendreLeMode(mode)}");
             return Fail($"{r.Error?.Message} {RendreLeMode(mode)}");
         }
         catch (Exception ex)
@@ -84,9 +87,14 @@ public sealed class Win32PowerPlanActions : IPowerPlanActions
             if (actif != planGuid) return Result.Ok();
             var r = ActiverEnGardantLeMode(planGuid);
             if (r.IsOk) return r;
-            _alimentation.EcrireValeurSecteur(planGuid, sousGroupe, reglage, avant);
-            _alimentation.Activer(planGuid);
-            return Fail($"{r.Error?.Message} {libelle} set back to {avant}. {RendreLeMode(mode)}");
+            // La valeur d'avant, réécrite puis relue : si elle ne revient pas, l'échec le dit et garde le journal.
+            var reecrite = _alimentation.EcrireValeurSecteur(planGuid, sousGroupe, reglage, avant) == 0
+                && _alimentation.LireValeurSecteur(planGuid, sousGroupe, reglage) == avant;
+            var reactive = _alimentation.Activer(planGuid) == 0;
+            return reecrite && reactive
+                ? Fail($"{r.Error?.Message} {libelle} set back to {avant}. {RendreLeMode(mode)}")
+                : Result.Fail(ErrorCodes.TweakPartiallyApplied,
+                    $"{r.Error?.Message} {libelle} could not be set back to {avant}. {RendreLeMode(mode)}");
         }
         catch (Exception ex)
         {

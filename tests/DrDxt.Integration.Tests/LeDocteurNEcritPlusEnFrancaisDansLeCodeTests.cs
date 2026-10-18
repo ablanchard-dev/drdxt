@@ -9,7 +9,7 @@ namespace DrDxt.Integration.Tests;
 public sealed class LeDocteurNEcritPlusEnFrancaisDansLeCodeTests
 {
     // Baisser ce nombre à chaque tranche convertie ; jamais le remonter.
-    private const int Plafond = 38;
+    private const int Plafond = 36;
 
     private static readonly Regex ChaineAccentuee = new("\"[^\"\n]*[éèàùçêâîôûÉÀ][^\"\n]*\"");
 

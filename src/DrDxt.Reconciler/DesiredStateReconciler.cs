@@ -7,7 +7,7 @@ namespace DrDxt.Reconciler;
 //
 // À partir d'un manifeste vérifié (l'hôte le charge via IDesiredStateStore.LoadAsync, qui
 // refuse au moindre doute en cas d'altération), il réconcilie élément par élément :
-//   1. coupe-circuit global ou élément en pause      → pas d'écriture (I7), on continue
+//   1. maintien en pause (PauseDuMaintien) ou élément en pause → pas d'écriture (I7), on continue
 //   2. levier hors allowlist / surface protégée       → refus + journal de sécurité (I3)
 //   3. lire l'actuel ; échec de sonde                  → élément KO (I2), on continue
 //   4. actuel == voulu                                 → rien à faire (idempotence I1)
@@ -35,6 +35,7 @@ public sealed class DesiredStateReconciler : IReconciler
     private readonly IDiagnosticsLog _log;
     private readonly BootLoopGuard _bootGuard;
     private readonly IClock _clock;
+    private readonly PauseDuMaintien _pause;
 
     public DesiredStateReconciler(
         ISettingProbe probe,
@@ -46,8 +47,10 @@ public sealed class DesiredStateReconciler : IReconciler
         IReconcilabilityPolicy policy,
         IDiagnosticsLog log,
         BootLoopGuard bootGuard,
-        IClock clock)
+        IClock clock,
+        PauseDuMaintien pause)
     {
+        _pause = pause;
         _probe = probe;
         _buildProbe = buildProbe;
         _driverProbe = driverProbe;
@@ -85,12 +88,14 @@ public sealed class DesiredStateReconciler : IReconciler
                 new ReconcileReport(GloballyPaused: false, Array.Empty<ReconcileItemResult>()));
         var state = stateRes.Value!;
 
-        // Coupe-circuit global : rien comparer, rien écrire, rapporter la pause.
-        if (state.GlobalPaused)
-        {
-            var pausedReport = new ReconcileReport(GloballyPaused: true, Array.Empty<ReconcileItemResult>());
-            return (Result.Ok(), pausedReport);
-        }
+        // La pause du maintien, posée par le joueur : rien comparer, rien écrire, ni sur la machine ni dans le sidecar.
+        // Un fichier non fiable ne peut pas venir d'un programme du compte (la racine est aux administrateurs) : abîmé ou au
+        // propriétaire changé, il vaut pause, l'échec sûr. Le journal le dit, l'App propose de la reposer ou de la retirer.
+        var pause = _pause.Lire();
+        if (pause == EtatDeLaPause.NonFiable)
+            _log.Change(PauseDuMaintien.NomFichier, "?", "paused", "DrDXT/untrusted");
+        if (pause != EtatDeLaPause.Actif)
+            return (Result.Ok(), new ReconcileReport(GloballyPaused: true, Array.Empty<ReconcileItemResult>()));
 
         var suspendGpu = await _bootGuard.ShouldSuspendGpuReapplyAsync(ct);
 

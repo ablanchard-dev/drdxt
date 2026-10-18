@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using DrDxt.Core;
 using DrDxt.Detection.Wmi;
 using Microsoft.Win32.SafeHandles;
+using static DrDxt.Detection.Natif;
 
 namespace DrDxt.Detection.Hardware;
 
@@ -84,6 +85,19 @@ public static class FrequenceSouris
         return constats;
     }
 
+    /// <summary>La cadence que chaque manette USB demande au bus, lue comme celle de la souris (même arrondi du contrôleur).
+    /// Une manette déclare souvent plusieurs points d'accès (audio, haptique) : des intervalles différents rendent « non
+    /// lu » plutôt qu'un chiffre pris au hasard. Rien n'est jugé : aucune source ne fixe une cadence minimale de manette.</summary>
+    public static IEnumerable<RepairFinding> JugerManettes(IReadOnlyList<PeripheriquesDEntree.Appareil>? appareils, Func<string, int?>? lire = null)
+    {
+        lire ??= instance => CM_Locate_DevNodeW(out var n, instance, 0) == 0 ? LireHz(n, composite: true) : null;
+        foreach (var a in (appareils ?? []).Where(a => a.Liaison == PeripheriquesDEntree.Bus.Usb && a.Roles.Contains(PeripheriquesDEntree.Role.Manette)))
+            yield return lire(a.Noeud) is { } hz
+                ? new RepairFinding("LATENCE", Docteur.Nom("FS.NomManette", a.Nom), Docteur.T("FS.JusquA", hz), null, RepairStatus.Observed,
+                    Docteur.T("FS.Manette", hz, 1000.0 / hz))
+                : new RepairFinding("LATENCE", Docteur.Nom("FS.NomManette", a.Nom), null, null, RepairStatus.Unknown, Docteur.T("FS.ManetteNonLue"));
+    }
+
     private static int? LireHz(uint noeud, bool composite)
     {
         try
@@ -139,7 +153,7 @@ public static class FrequenceSouris
 
     private static int? Entier(uint noeud, (Guid Fmt, uint Pid) cle)
     {
-        var k = new DevPropKey { Fmtid = cle.Fmt, Pid = cle.Pid };
+        var k = new DEVPROPKEY { fmtid = cle.Fmt, pid = cle.Pid };
         var tampon = new byte[4];
         uint taille = 4;
         return CM_Get_DevNode_PropertyW(noeud, ref k, out _, tampon, ref taille, 0) == 0 && taille == 4 ? BitConverter.ToInt32(tampon, 0) : null;
@@ -147,40 +161,11 @@ public static class FrequenceSouris
 
     private static string? Texte(uint noeud, (Guid Fmt, uint Pid) cle)
     {
-        var k = new DevPropKey { Fmtid = cle.Fmt, Pid = cle.Pid };
+        var k = new DEVPROPKEY { fmtid = cle.Fmt, pid = cle.Pid };
         var tampon = new byte[512];
         uint taille = 512;
         return CM_Get_DevNode_PropertyW(noeud, ref k, out _, tampon, ref taille, 0) == 0 && taille > 2
             ? System.Text.Encoding.Unicode.GetString(tampon, 0, (int)taille).TrimEnd('\0') : null;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct DevPropKey { public Guid Fmtid; public uint Pid; }
-
-    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-    private static extern int CM_Locate_DevNodeW(out uint pdnDevInst, string pDeviceID, uint ulFlags);
-
-    [DllImport("cfgmgr32.dll")]
-    private static extern int CM_Get_Parent(out uint pdnDevInst, uint dnDevInst, uint ulFlags);
-
-    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-    private static extern int CM_Get_Device_IDW(uint dnDevInst, char[] buffer, int bufferLen, uint ulFlags);
-
-    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-    private static extern int CM_Get_DevNode_PropertyW(uint dnDevInst, ref DevPropKey propertyKey, out uint propertyType,
-        byte[] propertyBuffer, ref uint propertyBufferSize, uint ulFlags);
-
-    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-    private static extern int CM_Get_Device_Interface_List_SizeW(out uint pulLen, ref Guid interfaceClassGuid, string deviceID, uint ulFlags);
-
-    [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
-    private static extern int CM_Get_Device_Interface_ListW(ref Guid interfaceClassGuid, string deviceID, char[] buffer, uint bufferLen, uint ulFlags);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern SafeFileHandle CreateFileW(string fileName, uint access, uint share, IntPtr security, uint creation,
-        uint flags, IntPtr template);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool DeviceIoControl(SafeFileHandle device, uint code, byte[] inBuffer, int inSize, byte[] outBuffer,
-        int outSize, out int returned, IntPtr overlapped);
 }

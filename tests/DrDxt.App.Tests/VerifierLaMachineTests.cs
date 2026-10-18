@@ -42,6 +42,36 @@ public class VerifierLaMachineTests
         vm.LignesVerification.Should().HaveCount(0, "refusée avant de commencer : aucun réglage n'a été essayé");
     }
 
+    // Suivre en direct : chaque réglage essayé s'ajoute au fil ; « Arrêter » demande confirmation, puis l'arrêt est lu par la
+    // validation. Aucune question n'est répondue à la place du joueur : rien ne part sans le clic qui confirme.
+    [Fact]
+    public async Task Le_fil_suit_les_reglages_et_l_arret_ne_part_qu_apres_confirmation()
+    {
+        var vm = Vm();
+        var lusParLaValidation = new List<bool>();
+        vm.VerifierLaMachine = progres =>
+        {
+            progres("=== latency.gameModeOn\nposé, relu, rendu");
+            vm.EtapesVerification.Should().ContainSingle();
+            lusParLaValidation.Add(vm.ArretVerificationDemande);
+            vm.DemanderArretVerificationCommand.Execute(null);
+            vm.ArretVerificationAConfirmer.Should().BeTrue();
+            lusParLaValidation.Add(vm.ArretVerificationDemande);
+            vm.ConfirmerArretVerificationCommand.Execute(null);
+            lusParLaValidation.Add(vm.ArretVerificationDemande);
+            progres("=== gpu.power_limit\nposé, relu, rendu");
+            return Task.FromResult(new VerificationRendue(null, [], null, Valides: 2,
+                ArretPar: DrDxt.Application.Autopilot.ValidationComplete.Arret.ParLeJoueur));
+        };
+
+        await vm.ConfirmerVerificationCommand.ExecuteAsync(null);
+
+        lusParLaValidation.Should().Equal(false, false, true);
+        vm.EtapesVerification.Should().HaveCount(2);
+        vm.VerificationBilan.Should().Be("Verifier.ArreteParToi");
+        vm.ArretVerificationAConfirmer.Should().BeFalse();
+    }
+
     [Fact]
     public void Sans_branchement_pas_de_bouton()
         => Vm().CanVerifierMachine.Should().BeFalse();

@@ -8,7 +8,7 @@ This test CHANGES Windows settings, one at a time, and restores each one right a
 Game Mode, Game Bar background recording, optimizations for windowed games, hardware-accelerated GPU scheduling,
 mouse acceleration, power plan, processor boost mode, graphics card power limit,
 Anti-Lag, Vsync and the FRTC frame cap (AMD driver settings).
-It never touches the BIOS, nor the voltage, clock or fan of the graphics card: the program itself refuses these
+VALIDER.cmd never touches the BIOS, nor the voltage, clock or fan of the graphics card: the program itself refuses these
 writes. It creates no service and no restore point, and installs nothing.
 
 The program's messages and the report are in French; the report is easy to read for the project either way.
@@ -41,3 +41,21 @@ If the first line says "A VERIFIER A LA MAIN" (check by hand): the report gives,
 original value. Run REMETTRE.cmd first. If the line is still there, restore that setting yourself (AMD Adrenalin
 software for Anti-Lag, the frame cap and the power limit; Windows Settings for the rest), then send the report
 anyway: that is exactly the case the project needs to know about.
+
+EXTRA, ONLY IF YOU WANT IT: your AMD card's frequency (VALIDER-FREQUENCE.cmd)
+
+This is a separate test that touches the graphics card: run it only if you agree, and after VALIDER.cmd.
+It lowers your AMD card's maximum frequency by 50 MHz, reads it back, runs the card for about thirty seconds to check it
+holds, then restores the original frequency and reads it again. It is the setting DrDXT's Expert mode writes. A lower
+frequency can only slow the card down a little during the test.
+It writes nothing else: no voltage, no fan, no power limit, no Windows setting; and never a frequency more than 100 MHz
+above your card's. On an NVIDIA card it does nothing.
+
+1. Close all games and AMD Software.
+2. Double-click VALIDER-FREQUENCE.cmd, then answer "Yes" to Windows as for VALIDER.cmd.
+3. At the end, the DrDXT-validation-....txt file is in Downloads, as for the other test. Send it the same way.
+
+The worst case is safe: if the test crashes, the card stays at most 50 MHz SLOWER, never faster.
+If the PC crashes or the window closes during this test: run REMETTRE.cmd again, it restores the original frequency.
+If the frequency stays low after a restart, reset the card's tuning to default in AMD Software (Performance, Tuning),
+then send the report anyway: that is a case the project needs to know about.

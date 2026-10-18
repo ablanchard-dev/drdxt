@@ -77,7 +77,10 @@ public sealed class ScanApplyCommandTests
         int pid = 0,
         int arretsRecents = 0,
         DrDxt.Application.Autopilot.JournalDesCandidats? journal = null,
-        string? nomDuJeu = null)
+        string? nomDuJeu = null,
+        IBenchmarkRunner? banc = null,
+        Func<CandidateDescriptor, IAutopilotCandidate>? creer = null,
+        DrDxt.Application.Tweaks.JournalDesLeviersAppliques? journalLeviers = null)
     {
         var hd = Substitute.For<IHardwareDetector>();
         hd.DetectAsync().Returns(Result<HardwareInventory>.Ok(Hw()));
@@ -85,9 +88,10 @@ public sealed class ScanApplyCommandTests
         var sr = Substitute.For<ISettingsStateReader>();
         sr.ReadAsync(Arg.Any<HardwareInventory>()).Returns(Result<SettingsState>.Ok(St));
 
-        var br = Substitute.For<IBenchmarkRunner>();
-        br.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-          .Returns(Result<BenchmarkResult>.Ok(Bl));
+        var br = banc ?? Substitute.For<IBenchmarkRunner>();
+        if (banc is null)
+            br.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+              .Returns(Result<BenchmarkResult>.Ok(Bl));
 
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
@@ -123,9 +127,10 @@ public sealed class ScanApplyCommandTests
             new AppliedTweakManifestMapper(), ScanViewModelTestSeams.BiosAdvisor(),
             ScanViewModelTestSeams.GuideGenerator(), key => key,
             gameLocator: locator,
-            creerCandidat: d => { crees.Add(d.Id); return new CandidatFaux(d); },
+            creerCandidat: d => { crees.Add(d.Id); return creer?.Invoke(d) ?? new CandidatFaux(d); },
             lireStabilite: () => (null, arrets),
-            journalCandidats: journal);
+            journalCandidats: journal,
+            journalLeviers: journalLeviers);
 
         return new Harness { Vm = vm, Safety = safety, Engine = engine, CandidatsCrees = crees, Locator = locator };
     }
@@ -261,6 +266,66 @@ public sealed class ScanApplyCommandTests
         h.CandidatsCrees.Should().Equal(new[] { "fixit.power_plan" }, "temoin : la session a bien eu lieu");
         if (quitte) h.Vm.ResultatOptimisation.Should().Contain("Apply.Session.JeuQuitte");
         else h.Vm.ResultatOptimisation.Should().NotContain("Apply.Session.JeuQuitte");
+    }
+
+    // Un levier que la session garde, et que le journal des leviers n'inscrit pas : posé sans ligne « Annuler », c'est dit.
+    private sealed class Machine { public bool Pose; }
+
+    private static string OpReflex(int v) => PrivilegedOpCodec.Serialize(new SetRegistryValueOp(RegistryHiveKind.LocalMachine,
+        @"SOFTWARE\NVIDIA Corporation\Global\NVTweak", "LowLatencyMode", RegistryValueType.DWord,
+        v.ToString(System.Globalization.CultureInfo.InvariantCulture))).Value!;
+
+    private sealed class LevierReflex(Machine m, string id) : ITweak
+    {
+        public string Id => id;
+        public TweakCategory Category => TweakCategory.Latency;
+        public bool RequiresElevation => true;
+        public bool RequiresRestorePoint => true;
+        public string SummaryKey => "tweak." + id;
+        public bool AppliesTo(HardwareInventory hw, SettingsState state) => true;
+        public Task<Result<TweakSnapshot>> ApplyAsync()
+        {
+            m.Pose = true;
+            return Task.FromResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, OpReflex(1), OpReflex(2))));
+        }
+        public Task<Result> RevertAsync(TweakSnapshot snapshot) { m.Pose = false; return Task.FromResult(Result.Ok()); }
+    }
+
+    private sealed class RegistreReflex(Machine m) : DrDxt.Application.Tweaks.Hardware.IRegistryReader
+    {
+        public Result<uint?> ReadDword(RegistryHiveKind hive, string path, string name) => Result<uint?>.Ok(m.Pose ? 2u : 1u);
+        public Result<string?> ReadString(RegistryHiveKind hive, string path, string name) => Result<string?>.Ok(null);
+        public Result<string?> ReadMultiString(RegistryHiveKind hive, string path, string name) => Result<string?>.Ok(null);
+    }
+
+    // Posé, le levier améliore le p95 : la session le garde.
+    private sealed class BancReflex(Machine m) : IBenchmarkRunner
+    {
+        public Task<Result<BenchmarkResult>> RunAsync(int pid, TimeSpan d, int runs, CancellationToken ct)
+            => Task.FromResult(Result<BenchmarkResult>.Ok(new BenchmarkResult(100, 60, 48, new List<double> { 10.0 }, null, 1.0, runs,
+                P95FrametimeMs: m.Pose ? 11.0 : 12.0, HygieneKeptFraction: 1.0)));
+    }
+
+    [Fact]
+    public async Task Un_levier_garde_en_session_et_non_inscrit_le_dit()
+    {
+        var dossier = System.IO.Directory.CreateTempSubdirectory("drdxt-session-").FullName;
+        try
+        {
+            var m = new Machine();
+            var h = Build(graines: AChaud, pid: PidDuJeu, banc: new BancReflex(m),
+                journalLeviers: new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(dossier),
+                creer: d => new DrDxt.Application.Autopilot.TweakCandidate(new LevierReflex(m, d.Id), d, new RegistreReflex(m),
+                    new DrDxt.Application.Autopilot.FichierRevertEnAttente(System.IO.Path.Combine(dossier, "revert.json"))));
+            await h.Vm.ScanCommand.ExecuteAsync(null);
+            h.Vm.Patienter = _ => Task.CompletedTask;
+
+            await h.Vm.ApplyCommand.ExecuteAsync(null);
+
+            m.Pose.Should().BeTrue("témoin : la session a gardé le levier");
+            h.Vm.ResultatOptimisation.Should().Contain("Leviers.PasInscrit");
+        }
+        finally { System.IO.Directory.Delete(dossier, recursive: true); }
     }
 
     [Fact]

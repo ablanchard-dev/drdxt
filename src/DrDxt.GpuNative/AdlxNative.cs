@@ -164,7 +164,7 @@ public sealed class AdlxNative : IAdlxNative
     {
         if (p == IntPtr.Zero) return;
         try { Slot<ReleaseDelegate>(p, AdlxVtableSlots.Release)?.Invoke(p); }
-        catch { }
+        catch { /* libération au mieux : une référence perdue ne fait pas échouer la lecture */ }
     }
 
     // ── TryReadGfx ────────────────────────────────────────────────────────
@@ -564,7 +564,11 @@ public sealed class AdlxNative : IAdlxNative
                 var setVolt = Slot<SetIntDelegate>(pT, AdlxVtableSlots.Gfx2_SetVolt);
                 if (setVolt == null || setVolt(pT, newVoltMv) != 0)
                 {
-                    // Retour arrière d'une écriture partielle : remettre MaxFreq au mieux
+                    // Retour arrière d'une écriture partielle, au mieux : son code retour est ignoré. S'il rate (exception ou
+                    // code non nul), la nouvelle fréquence reste posée et l'appel rend false. Le seul appelant
+                    // (ADLXTuningActions.SetUndervolt) repasse la tension qu'il vient de lire : cette branche n'est prise que
+                    // si la tension change entre ses deux lectures, et sur false il relit, rend et dit lui-même l'écriture
+                    // partielle.
                     try { setMaxFreq(pT, originalMaxFreqMhz); } catch { }
                     return false;
                 }
@@ -867,6 +871,36 @@ public sealed class AdlxNative : IAdlxNative
         }
     }
 
+    // ── RemettreReglageUsine ─────────────────────────────────────────────
+    // IADLXGPUTuningServices::ResetToFactory(pGPU), entrée 5 de IGPUTuning.h (ADLX d9f04a9b). Le seul retour vers le défaut
+    // du pilote quand une sous-tension gardée au redémarrage ne se rend plus dans la bande : tout le réglage de la carte
+    // repart à l'usine, jamais une fréquence choisie par l'appelant. Rend null si fait.
+    public string? RemettreReglageUsine(int gpuIndex)
+    {
+        if (!IsAvailable) return _initDetail ?? "ADLXInitialize did not succeed.";
+        if (gpuIndex < 0) return "Invalid GPU index.";
+
+        IntPtr pGpuList = IntPtr.Zero, pGpu = IntPtr.Zero, pTuningSvc = IntPtr.Zero;
+        try
+        {
+            if (!GetGpuAtIndex(gpuIndex, out pGpuList, out pGpu)) return "GPU not found.";
+            var getTuningSvc = Slot<GetOutPtrDelegate>(_pSystem, AdlxVtableSlots.System_GetGPUTuningServices);
+            if (getTuningSvc == null || getTuningSvc(_pSystem, out pTuningSvc) != 0 || pTuningSvc == IntPtr.Zero)
+                return "IADLXGPUTuningServices absent.";
+            var reset = Slot<ResetDelegate>(pTuningSvc, AdlxVtableSlots.Tuning_ResetToFactory);
+            if (reset == null) return "IADLXGPUTuningServices.ResetToFactory introuvable.";
+            var res = reset(pTuningSvc, pGpu);
+            return res == 0 ? null : $"IADLXGPUTuningServices.ResetToFactory a rendu {res}.";
+        }
+        catch (Exception ex) { return $"ADLX reset interrupted: {ex.GetType().Name}."; }
+        finally
+        {
+            if (pTuningSvc != IntPtr.Zero) Release(pTuningSvc);
+            if (pGpu != IntPtr.Zero) Release(pGpu);
+            if (pGpuList != IntPtr.Zero) Release(pGpuList);
+        }
+    }
+
     // ── EcrireAntiLag (A2, 07/10/2026) ──────────────────────────────────
     // Anti-Lag classique (IADLX3DAntiLag.SetEnabled, entrée 5 de I3DSettings.h), sur la même carte dédiée que
     // LireReglages. Le niveau (Anti-Lag Next, IADLX3DAntiLag1) n'est jamais touché. Rend null si écrit.
@@ -1157,6 +1191,10 @@ public sealed class AdlxNative : IAdlxNative
     // (pThis, pGpu, out supported) : IsSupportedManualGFX/Fan/PowerTuning
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int IsSupportedDelegate(IntPtr pThis, IntPtr pGpu, out sbyte supported);
+
+    // (pThis, pGpu) : ResetToFactory
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    private delegate int ResetDelegate(IntPtr pThis, IntPtr pGpu);
 
     // (pThis, pGpu, out ppIface) : GetManualGFX/Fan/PowerTuning
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]

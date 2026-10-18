@@ -58,7 +58,7 @@ public class PeripheriquesEnErreurTests
     private static IReadOnlyList<RepairFinding> Famille(IWmiQuery wmi)
         => new RepairAuditService(new ServicesMuets(), new NoyauMuet(), new ArretsMuets(), new MemoireMuette(),
                 new VidagesMuets(), wmi).Lire()
-            .Where(c => c.Domaine == "PERIPHERIQUES").ToList();
+            .Where(c => c.Domaine == "PERIPHERIQUES" && c.Nom is not ("inventaire des pilotes" or "pilotes non signes")).ToList();
 
     [Fact]
     public void L_audit_rend_les_peripheriques_branches_et_ignore_les_absents()

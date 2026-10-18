@@ -3,9 +3,9 @@ using DrDxt.Core;
 
 namespace DrDxt.Detection.Hardware;
 
-/// <summary>Ce que Windows a garde apres ses plantages, et combien de fois il n'a rien pu garder.</summary>
+/// <summary>Ce que Windows a garde apres ses plantages dans la fenetre lue, et combien de fois il n'a rien pu garder.</summary>
 public sealed record EtatDesVidages(IReadOnlyList<DateTimeOffset> Echecs, int PetitsVidages, bool VidageComplet,
-    string DernierMessage = "");
+    string DernierMessage = "", DateTimeOffset? DernierVidage = null);
 
 /// <summary>
 /// Les echecs de creation de vidage (`volmgr` 161) et les vidages presents.
@@ -45,16 +45,40 @@ public sealed class WindowsDumpCreationLog : IDumpCreationLog
                     }
             echecs.Sort();
 
-            var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-            var minidump = Path.Combine(windows, "Minidump");
-            var petits = Directory.Exists(minidump) ? Directory.GetFiles(minidump, "*.dmp").Length : 0;
-            var complet = File.Exists(Path.Combine(windows, "MEMORY.DMP"));
-
-            return Result<EtatDesVidages>.Ok(new EtatDesVidages(echecs, petits, complet, dernierMessage));
+            var (petits, complet, dernier) = VidagesGardes(Environment.GetFolderPath(Environment.SpecialFolder.Windows), depuis);
+            return Result<EtatDesVidages>.Ok(new EtatDesVidages(echecs, petits, complet, dernierMessage, dernier));
         }
         catch (Exception ex) when (ex is EventLogException or UnauthorizedAccessException or IOException)
         {
             return Result<EtatDesVidages>.Fail(ErrorCodes.DetectionFailed, ex.Message);
         }
     }
+
+    /// <summary>Les vidages ecrits depuis <paramref name="depuis"/> (date de derniere ecriture du fichier) : un vidage
+    /// vieux de six mois ne dit rien des plantages de la fenetre, et ne doit pas masquer ses echecs d'ecriture.</summary>
+    internal static (int Petits, bool Complet, DateTimeOffset? Dernier) VidagesGardes(string windows, DateTimeOffset depuis)
+    {
+        var minidump = Path.Combine(windows, "Minidump");
+        var petits = Directory.Exists(minidump)
+            ? new DirectoryInfo(minidump).GetFiles("*.dmp").Select(f => new DateTimeOffset(f.LastWriteTimeUtc, TimeSpan.Zero)).Where(d => d >= depuis).ToList()
+            : [];
+        var memory = new FileInfo(Path.Combine(windows, "MEMORY.DMP"));
+        DateTimeOffset? complet = memory.Exists && new DateTimeOffset(memory.LastWriteTimeUtc, TimeSpan.Zero) is var d && d >= depuis ? d : null;
+        DateTimeOffset? dernier = petits.Count > 0 ? petits.Max() : null;
+        if (complet > dernier || dernier is null) dernier = complet;
+        return (petits.Count, complet is not null, dernier);
+    }
+}
+
+/// <summary>
+/// Le journal des vidages lu une fois par fenêtre pour tout un scan. Une fenêtre ne se tire pas d'une plus large : le
+/// compte des vidages et le dernier message dépendent de la fenêtre. Les familles qui partagent une fenêtre la
+/// demandent depuis le même instant, et ne lisent donc qu'une fois. Un nouveau scan crée un nouveau journal.
+/// </summary>
+public sealed class VidagesDuScan(IDumpCreationLog source) : IDumpCreationLog
+{
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<DateTimeOffset, Lazy<Result<EtatDesVidages>>> _lus = new();
+
+    public Result<EtatDesVidages> Lire(DateTimeOffset depuis)
+        => _lus.GetOrAdd(depuis, d => new Lazy<Result<EtatDesVidages>>(() => source.Lire(d))).Value;
 }

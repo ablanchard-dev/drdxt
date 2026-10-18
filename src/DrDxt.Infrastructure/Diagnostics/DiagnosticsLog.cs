@@ -114,7 +114,9 @@ public sealed class DiagnosticsLog : IDiagnosticsLog
                    + $"[DrDXT] journal borne a {_plafondOctets} octets : "
                    + $"{retirees} {MarqueDeTroncature}.";
 
-        File.WriteAllLines(_journalPath, new[] { entete }.Concat(lignes.Skip(retirees)));
+        var borne = new FichierJsonAtomique(_journalPath, ErrorCodes.IoFailure)
+            .WriteAtomic(string.Join(Environment.NewLine, new[] { entete }.Concat(lignes.Skip(retirees))) + Environment.NewLine);
+        if (!borne.IsOk) throw new IOException(borne.Error!.Value.Message);
     }
 
     /// <inheritdoc/>
@@ -128,7 +130,9 @@ public sealed class DiagnosticsLog : IDiagnosticsLog
         {
             try
             {
-                File.AppendAllText(_journalPath, line + Environment.NewLine);
+                // Dossier du joueur : jamais à travers un nom posé d'avance en lien.
+                var ajout = FichierJsonAtomique.AjouterSansLien(_journalPath, line + Environment.NewLine, ErrorCodes.IoFailure);
+                if (!ajout.IsOk) throw new IOException(ajout.Error!.Value.Message);
                 BornerSiBesoin();
             }
             catch (Exception ex)
@@ -159,7 +163,8 @@ public sealed class DiagnosticsLog : IDiagnosticsLog
             var exportPath = Path.Combine(_exportDirectory, $"export_{timestamp}.log");
 
             // Écrire hors du verrou : on a déjà la chaîne de l'instantané.
-            File.WriteAllText(exportPath, exportContent);
+            var ecrit = new FichierJsonAtomique(exportPath, ErrorCodes.IoFailure).WriteAtomic(exportContent);
+            if (!ecrit.IsOk) throw new IOException(ecrit.Error!.Value.Message);
 
             return Task.FromResult(Result<string>.Ok(Path.GetFullPath(exportPath)));
         }

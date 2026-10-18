@@ -92,8 +92,9 @@ public sealed record ArretBrutal(DateTimeOffset Quand, int CodeArret, bool Bouto
 /// </summary>
 public sealed class WindowsUnexpectedShutdownLog : IUnexpectedShutdownLog
 {
-    // Kernel-Power 41 : « le systeme a redemarre sans s'etre arrete proprement au prealable ».
-    private const int UnexpectedShutdownEventId = 41;
+    // Kernel-Power 41 : « le systeme a redemarre sans s'etre arrete proprement au prealable ». Le numero 41 seul
+    // n'identifie rien : tout fournisseur du journal System peut en ecrire un ; seul celui du noyau compte.
+    internal const string Requete = "*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and (EventID=41)]]";
 
     // Borne dure : on ne rapatrie jamais tout le journal, meme si la fenetre demandee est large.
     private const int MaxEvents = 200;
@@ -113,8 +114,7 @@ public sealed class WindowsUnexpectedShutdownLog : IUnexpectedShutdownLog
             // Le filtre est fait par le journal, pas par nous : c'est lui qui rend la lecture
             // rapide. `TimeCreated` est en heure locale ; on le convertit, on ne le compare pas
             // a une date UTC sans conversion.
-            var query = new EventLogQuery("System", PathType.LogName,
-                $"*[System[(EventID={UnexpectedShutdownEventId})]]")
+            var query = new EventLogQuery("System", PathType.LogName, Requete)
             {
                 ReverseDirection = true,
             };
@@ -141,6 +141,45 @@ public sealed class WindowsUnexpectedShutdownLog : IUnexpectedShutdownLog
             // et c'est precisement le mensonge que ce produit existe pour ne pas faire.
             return Result<IReadOnlyList<ArretBrutal>>.Fail(
                 ErrorCodes.DetectionFailed, "Journal System illisible : " + ex.Message);
+        }
+    }
+}
+
+/// <summary>
+/// Le journal des arrêts lu une fois pour tout un scan : chaque famille de l'audit (arrêts, écrans bleus, garde de
+/// stabilité, incidents datés) reprend la même lecture du journal Système. Une fenêtre plus courte se tire de la lecture
+/// gardée ; seule une fenêtre plus large relit le journal. Un nouveau scan crée un nouveau journal, et relit donc.
+/// <paramref name="lireDepuis"/> : la fenêtre la plus large que le scan demandera, lue dès la première demande pour
+/// qu'une fenêtre courte demandée d'abord n'oblige pas à relire.
+/// </summary>
+public sealed class ArretsDuScan(IUnexpectedShutdownLog source, DateTimeOffset? lireDepuis = null) : IUnexpectedShutdownLog
+{
+    private readonly Lock _verrou = new();
+    private DateTimeOffset _depuis = DateTimeOffset.MaxValue;
+    private Result<IReadOnlyList<ArretBrutal>>? _lu;
+
+    public Result<IReadOnlyList<DateTimeOffset>> Since(DateTimeOffset earliest)
+    {
+        // Même contrat que WindowsUnexpectedShutdownLog.Since : un appui long sur le bouton n'est pas un arrêt brutal.
+        var detail = Detail(earliest);
+        return detail.IsOk
+            ? Result<IReadOnlyList<DateTimeOffset>>.Ok(ArretBrutal.HorsBouton(detail.Value!).Select(a => a.Quand).ToList())
+            : Result<IReadOnlyList<DateTimeOffset>>.Fail(detail.Error!.Value.Code, detail.Error.Value.Message);
+    }
+
+    public Result<IReadOnlyList<ArretBrutal>> Detail(DateTimeOffset earliest)
+    {
+        lock (_verrou)
+        {
+            if (_lu is null || earliest < _depuis)
+            {
+                var depuis = lireDepuis is { } d && d < earliest ? d : earliest;
+                _lu = source.Detail(depuis);
+                _depuis = depuis;
+            }
+            return _lu.IsOk
+                ? Result<IReadOnlyList<ArretBrutal>>.Ok(_lu.Value!.Where(a => a.Quand >= earliest).ToList())
+                : _lu;
         }
     }
 }

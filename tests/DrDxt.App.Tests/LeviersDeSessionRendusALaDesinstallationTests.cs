@@ -243,4 +243,19 @@ public sealed class LeviersDeSessionRendusALaDesinstallationTests : IDisposable
             return Task.FromResult(Result.Ok());
         }
     }
+    // Un essai sur le fichier d'échange inscrit son origine au manifeste comme les autres : c'est le rendu de désinstallation
+    // qui refuse d'écrire une origine qui coupe le fichier d'échange, quel que soit le chemin qui l'a inscrite.
+    [Fact]
+    public void Un_essai_sur_le_fichier_d_echange_inscrit_son_origine()
+    {
+        const string Memoire = @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
+        var origine = PrivilegedOpCodec.Serialize(new DeleteRegistryValueOp(RegistryHiveKind.LocalMachine, Memoire, "PagingFiles")).Value!;
+        var pose = PrivilegedOpCodec.Serialize(new SetRegistryValueOp(RegistryHiveKind.LocalMachine, Memoire, "PagingFiles",
+            RegistryValueType.MultiString, @"?:\pagefile.sys")).Value!;
+        var snapshot = new TweakSnapshot("fixit.sane_pagefile", origine, pose);
+
+        new AppliedTweakManifestMapper().ToRevertOnly(new ApplyReport([new ApplyOutcome(snapshot.TweakId, true, false, snapshot, null)], null),
+                pourUnEssai: true)
+            .Should().HaveCount(1).And.Contain(e => e.TweakId == "fixit.sane_pagefile");
+    }
 }

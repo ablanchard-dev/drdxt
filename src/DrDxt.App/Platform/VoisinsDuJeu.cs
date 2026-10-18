@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using static DrDxt.App.Natif;
 
 namespace DrDxt.App.Platform;
 
@@ -301,6 +302,4 @@ public sealed class VoisinsWin32 : ILecteurDeVoisins
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool Process32NextW(IntPtr hSnapshot, ref ProcessEntry32W lppe);
 
-    [DllImport("kernel32.dll")]
-    private static extern bool CloseHandle(IntPtr hObject);
 }

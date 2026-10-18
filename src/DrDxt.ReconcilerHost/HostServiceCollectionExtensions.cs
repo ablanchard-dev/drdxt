@@ -7,6 +7,7 @@ using DrDxt.Infrastructure;
 using DrDxt.Reconciler;
 using DrDxt.Reconciler.Adapters;
 using DrDxt.Reconciler.Manifest;
+using DrDxt.ElevatedHelper.Journal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -127,7 +128,12 @@ public static class HostServiceCollectionExtensions
         // d'alimentation / service), jamais de décalages GPU volatils. Le canal réconciliateur peu
         // privilégié + courtier helper (HostElevatedClientFactory.CreateConnectOnly) est gardé comme
         // durcissement V2 documenté, pas comme défaut V1. ---
-        services.TryAddSingleton<IElevatedClient>(_ =>
+        // Le journal d'écriture anticipée, dans la racine réparée d'abord. Préenregistré par un test, il n'est jamais ouvert.
+        services.TryAddSingleton(_ => new JournalDuService(DrDxt.ElevatedHelper.Journal.JournalDuHelper.Ouvrir(
+            ProgramDataManifestStorage.DefaultRoot(), TrustedManifestRoot.EnsureCreatedHardened)));
+        services.TryAddSingleton<LectureDesCiblesWin32>();
+        services.TryAddSingleton<DrDxt.Reconciler.Desinstallation.ILectureDesCibles>(sp => sp.GetRequiredService<LectureDesCiblesWin32>());
+        services.TryAddSingleton<IElevatedClient>(sp =>
         {
             var nvApiDisabled = new DisabledNvApiActions();
             var executor = new PrivilegedOpExecutor(
@@ -148,10 +154,13 @@ public static class HostServiceCollectionExtensions
             // raisonnement que pour les coutures GPU ci-dessus : cet hôte réconcilie un état, il n'accomplit
             // jamais un geste que l'utilisateur vient de ne pas demander. Omise (null) plutôt que simulée :
             // toute tentative échoue bruyamment au lieu de ne rien faire en silence.
-            return new InProcessElevatedClient(new OpAllowlist(), executor);
+            return new InProcessElevatedClient(new OpAllowlist(), DrDxt.ElevatedHelper.Journal.JournalDuHelper.Decorer(executor,
+                sp.GetRequiredService<JournalDuService>().Journal, sp.GetRequiredService<LectureDesCiblesWin32>()));
         });
 
         // --- Le réconciliateur concret (enregistré pour lui-même et via IReconciler). ---
+        // La pause du maintien : le service la lit, seul le helper élevé l'écrit.
+        services.TryAddSingleton(_ => PauseDuMaintien.ParDefaut());
         services.TryAddSingleton<DesiredStateReconciler>();
         services.TryAddSingleton<IReconciler>(sp => sp.GetRequiredService<DesiredStateReconciler>());
 
@@ -165,7 +174,14 @@ public static class HostServiceCollectionExtensions
         services.TryAddSingleton<BootSessionMarker>();
         services.TryAddSingleton(_ => HostTimingOptions.Default);
 
-        // --- Le Worker hébergé (coquille mince). ---
+        // --- Le rejeu du journal d'abord (StartAsync attendu avant le service suivant), puis le Worker (coquille mince). ---
+        services.TryAddSingleton(sp => new RejeuAuDemarrage(sp.GetRequiredService<JournalDuService>(),
+            sp.GetRequiredService<DrDxt.Reconciler.Desinstallation.ILectureDesCibles>(), sp.GetRequiredService<IElevatedClient>(),
+            sp.GetService<IDiagnosticsLog>(),
+            rapport => RapportDuRejeu.Ecrire(ProgramDataManifestStorage.DefaultRoot(), RapportDuRejeu.Service, rapport, DateTimeOffset.UtcNow,
+                (chemin, octets) => TrustedManifestRoot.WriteTrustedFile(chemin, octets)), delai: sp.GetRequiredService<IDelay>()));
+        services.AddHostedService(sp => sp.GetRequiredService<RejeuAuDemarrage>());
+        services.TryAddSingleton(sp => new FinDuRejeu(() => sp.GetRequiredService<RejeuAuDemarrage>().Differe));
         services.AddHostedService<Worker>();
 
         // La protection du ping sans DrDXT ouvert. Lit le reglage que le helper a ecrit sous
@@ -181,6 +197,9 @@ public static class HostServiceCollectionExtensions
         // L'état du processeur servi en lecture seule à l'App sans droits (tube sans entrée, PawnIO
         // fermé sans demande). Rien n'est lu tant que personne ne se connecte.
         services.AddHostedService<ServeurDuProcesseur>();
+
+        // Le témoin d'incident : ce que Windows a noté juste avant un plantage, lu et gardé sans que le joueur lance rien.
+        services.AddHostedService<TemoinDIncidentWorker>();
 
         return services;
     }

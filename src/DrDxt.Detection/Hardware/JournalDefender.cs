@@ -56,7 +56,8 @@ public static class JournalDefender
         try
         {
             using var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\Defender", "SELECT ScanOnlyIfIdleEnabled FROM MSFT_MpPreference");
-            foreach (var o in s.Get().Cast<ManagementObject>())
+            using var rangees = s.Get();
+            foreach (var o in rangees.Cast<ManagementObject>())
                 using (o)
                     if (o["ScanOnlyIfIdleEnabled"] is bool b) return b;
             return null;

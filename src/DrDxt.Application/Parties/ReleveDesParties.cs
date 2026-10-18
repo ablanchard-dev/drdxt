@@ -20,7 +20,11 @@ public sealed record CaptureEnPartie(DateTimeOffset Quand, double Fps, double Lo
     // Les secondes du processeur (cœur le plus chaud, cœur 0, raisons de freiner) ; null = PawnIO absent.
     FreinageCpu? Freinage = null,
     // Chaque ventilateur de la carte sur la capture ; null = non lus.
-    IReadOnlyList<VentilateurEnPartie>? Ventilateurs = null);
+    IReadOnlyList<VentilateurEnPartie>? Ventilateurs = null,
+    // La part des images composées par Windows (0-1) et la latence PC médiane (ms) de la capture ; null = non lues.
+    double? PartComposee = null, double? LatencePcMs = null,
+    // La mémoire du jeu hors de la carte (mémoire système), en Mo ; null = non lue.
+    double? HorsCarteMo = null);
 
 /// <summary>Un programme qui a chargé le processeur à côté du jeu : son pic (en % d'un cœur, tous ses
 /// processus additionnés) et le nombre de relevés où il dépassait le seuil.</summary>
@@ -41,7 +45,14 @@ public sealed record PartieRelevee(
     // Le freinage du processeur sur les fenêtres jouées ; null = non lu.
     FreinageCpu? Freinage = null,
     // Chaque ventilateur de la carte sur toute la partie ; null = non lus.
-    IReadOnlyList<VentilateurEnPartie>? Ventilateurs = null);
+    IReadOnlyList<VentilateurEnPartie>? Ventilateurs = null,
+    // La part des images composées par Windows (0-1) et la latence PC (ms), à leur médiane ; null = non lues.
+    double? PartComposeeMediane = null, double? LatencePcMedianMs = null,
+    // La mémoire du jeu hors de la carte, à son pic, en Mo ; null = non lue.
+    double? HorsCarteMoMax = null,
+    // Vrai quand le 1 % low porte sur toutes les images des fenêtres jouées ; faux quand c'est la médiane des 1 % low de
+    // chaque fenêtre (une fenêtre sans ses images, ou une partie écrite avant). Deux estimateurs ne se comparent pas.
+    bool Low1SurToutesLesImages = false);
 
 /// <summary>
 /// Aucune partie jouée ne laissait de trace dans DrDXT. La veille
@@ -124,13 +135,18 @@ public static class ReleveDesParties
             captures.Select(c => c.Celsius).OfType<double>().DefaultIfEmpty().Max() is var t and > 0 ? t : null)
         {
             MinutesJouees = minutesJouees,
+            Low1SurToutesLesImages = images is not null,
             Freinage = FreinageCpu.Cumuler(jouees.Select(c => c.Freinage)),
             // Sur toutes les captures : un ventilateur qui s'arrête dans un menu s'arrête quand même.
             Ventilateurs = VentilateursEnPartie.Cumuler(captures.Select(c => c.Ventilateurs)),
             // La mémoire vidéo aussi, à son pic : une saturation fait des à-coups même brève.
             VramPourcentMax = captures.Select(c => c.VramPourcent).OfType<double>().DefaultIfEmpty().Max() is var v and > 0 ? v : null,
-            // La latence d'affichage, à sa médiane, comme les images.
-            LatenceAffichageMedianMs = MedianeLue(captures.Select(c => c.LatenceAffichageMs)),
+            // La latence d'affichage, à sa médiane, sur les fenêtres jouées comme les images : le menu n'est pas la partie.
+            LatenceAffichageMedianMs = MedianeLue(jouees.Select(c => c.LatenceAffichageMs)),
+            PartComposeeMediane = MedianeLue(jouees.Select(c => c.PartComposee)),
+            LatencePcMedianMs = MedianeLue(jouees.Select(c => c.LatencePcMs)),
+            // À son pic, comme la mémoire vidéo : un débordement fait des à-coups même bref.
+            HorsCarteMoMax = captures.Select(c => c.HorsCarteMo).OfType<double>().DefaultIfEmpty(-1).Max() is var hc and >= 0 ? hc : null,
             Voisins = VoisinsLourds(captures),
             // La carte aussi, à son pic ; non lue sur toutes les captures, elle reste non lue.
             CarteCelsiusMax = captures.Select(c => c.CarteCelsius).OfType<double>().DefaultIfEmpty().Max() is var g and > 0 ? g : null,

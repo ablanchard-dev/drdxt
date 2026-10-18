@@ -810,6 +810,9 @@
   <data name="ST.Vidage.EchecsCompte" xml:space="preserve">
     <value>, {0} failure(s)</value>
   </data>
+  <data name="ST.Vidage.Dernier" xml:space="preserve">
+    <value>, the last kept on {0}</value>
+  </data>
   <data name="ST.Vidage.Garde" xml:space="preserve">
     <value>What Windows kept after its crashes, and its write failures over {0:0} days.</value>
   </data>
@@ -1686,6 +1689,9 @@
   <data name="MP.Inutiles" xml:space="preserve">
     <value>{0} display driver package(s) serve no present card: {1}. Leftovers of an old driver: Windows can fall back to them after a failed update. DrDXT does not remove them itself.</value>
   </data>
+  <data name="MP.Dormant" xml:space="preserve">
+    <value>a display driver newer than the one in use is installed but not used: {0} (in use: {1}). Windows did not pick it for your card. It is not a leftover: DrDXT never suggests removing it.</value>
+  </data>
   <data name="MP.Puis" xml:space="preserve">
     <value> then </value>
   </data>
@@ -1703,6 +1709,9 @@
   </data>
   <data name="Nom.pilotes d'affichage installés" xml:space="preserve">
     <value>installed display drivers</value>
+  </data>
+  <data name="Nom.pilote d'affichage dormant" xml:space="preserve">
+    <value>newer display driver not in use</value>
   </data>
   <data name="Nom.anciens pilotes d'affichage gardés" xml:space="preserve">
     <value>old display drivers kept</value>
@@ -1747,7 +1756,7 @@
     <value>Device Manager reports code {0}. Its meaning is in the Microsoft list cited as the source; DrDXT does not interpret it.</value>
   </data>
   <data name="PD.Securite" xml:space="preserve">
-    <value> (the Windows Security icon, keep it)</value>
+    <value> (a security program, keep it)</value>
   </data>
   <data name="PD.NonLu" xml:space="preserve">
     <value>the list of programs started with Windows could not be read: "not read" is not "none".</value>
@@ -2835,6 +2844,15 @@
   <data name="CO.Explication" xml:space="preserve">
     <value>Your {0} supports Curve Optimizer in the BIOS: a per-core voltage reduction that can let it boost higher. MSI measured about +6% in Cinebench R23 on a Ryzen 9 9950X3D at -31/-25 (https://www.msi.com/blog/how-to-use-curve-optimizer-to-lower-ryzen-9-9950x3d-temperatures-and-boost-performance); on your PC the gain is not measured, each chip has its own margin. {1} MSI warns: instability possible, go in small steps and test stability at each step. If unclean shutdowns or hardware errors (WHEA) appear afterwards, DrDXT reports them: go back to the previous value. DrDXT never writes to the BIOS.</value>
   </data>
+  <data name="CO.ExplicationX3D5000" xml:space="preserve">
+    <value>On your {0}, AMD locks overclocking, Precision Boost Overdrive and Curve Optimizer included. Some board makers reopened a negative Curve Optimizer (a per-core voltage reduction) through a BIOS update, from AGESA 1.2.0.8: DrDXT cannot tell whether yours did. If the menu does not appear, your BIOS does not offer it. {1} The gain is not measured on your PC, each chip has its own margin. Instability possible: go in small steps and test stability at each step. If unclean shutdowns or hardware errors (WHEA) appear afterwards, DrDXT reports them: go back to the previous value. DrDXT never writes to the BIOS.</value>
+  </data>
+  <data name="CO.StabiliteNonLue" xml:space="preserve">
+    <value>One of the stability logs (unclean shutdowns, blue screens, dumps, hardware errors) could not be read: without knowing whether the machine is stable, DrDXT does not suggest lowering the processor voltage (Curve Optimizer).</value>
+  </data>
+  <data name="CO.DabordStabiliser" xml:space="preserve">
+    <value>Stabilize first: {0} incident(s) in {1} days (unclean shutdown, blue screen, serious hardware error or SSD unsafe shutdown), the last on {2:yyyy-MM-dd}. A voltage reduction (Curve Optimizer) can cause them: DrDXT does not suggest it on a machine that is not stable. If a Curve Optimizer, PBO or EXPO is already set in the BIOS, it is a suspect: go back to the original value and watch. The suggestion comes back on its own after {1} days without an incident.</value>
+  </data>
   <data name="CP.Absent" xml:space="preserve">
     <value>the executable does not exist</value>
   </data>
@@ -3189,9 +3207,6 @@
   <data name="App.Bilan.Entete" xml:space="preserve">
     <value>DrDXT {0}, check of {1:g}</value>
   </data>
-  <data name="App.RapportCoupe" xml:space="preserve">
-    <value>[… report cut: attach the full file to the ticket]</value>
-  </data>
   <data name="App.JournalLeviersRetrait" xml:space="preserve">
     <value>the applied-levers log could not remove "{0}"</value>
   </data>
@@ -3209,6 +3224,12 @@
   </data>
   <data name="App.ConstatDisparu" xml:space="preserve">
     <value>{0} ({1}) no longer appears. {2}</value>
+  </data>
+  <data name="App.DocumentsAvecLien" xml:space="preserve">
+    <value>DrDXT, running as administrator, does not write to this folder: {0} is a junction or a symbolic link, and a write as administrator would land elsewhere. Start DrDXT normally to save this file.</value>
+  </data>
+  <data name="App.DocumentsNomPris" xml:space="preserve">
+    <value>DrDXT, running as administrator, does not open a file that already exists: {0}. Start DrDXT normally to save it, or delete the old file.</value>
   </data>
   <data name="App.VerificationSessionEchec" xml:space="preserve">
     <value>Checking the last session failed ({0}): a trial setting may still be in place.</value>
@@ -3233,6 +3254,9 @@
   </data>
   <data name="Carte.Bios.Usine" xml:space="preserve">
     <value> (factory setting)</value>
+  </data>
+  <data name="Carte.Bios.Ecarts" xml:space="preserve">
+    <value>Away from factory settings: {0} named settings, {1} other bytes changed, out of {2} compared with the firmware's own factory store</value>
   </data>
   <data name="Carte.Bios.Modifie" xml:space="preserve">
     <value> (changed)</value>
@@ -3900,6 +3924,9 @@
   <data name="RV.JournalIllisible" xml:space="preserve">
     <value>The last session's log could not be read ({0}): a trial setting may still be in place.</value>
   </data>
+  <data name="RV.SansOrigineGardee" xml:space="preserve">
+    <value>A trial of “{0}” was interrupted before the app kept its original state: if the setting was applied, DrDXT kept its origin and will put it back, and the report will say so.</value>
+  </data>
   <data name="RV.SansOrigine" xml:space="preserve">
     <value>A trial of "{0}" was interrupted before its original state was saved: DrDXT cannot put it back on its own. Check this setting.</value>
   </data>
@@ -3911,6 +3938,12 @@
   </data>
   <data name="RV.RenduEchoue" xml:space="preserve">
     <value>"{0}" stayed in place after an interrupted session, and putting it back failed ({1}). New attempt at next startup.</value>
+  </data>
+  <data name="Format.Date" xml:space="preserve">
+    <value>MM/dd/yyyy</value>
+  </data>
+  <data name="Format.DateHeure" xml:space="preserve">
+    <value>MM/dd/yyyy HH:mm</value>
   </data>
   <data name="RV.Remis" xml:space="preserve">
     <value>The last session was interrupted: "{0}" was put back as it was.</value>
@@ -3932,6 +3965,12 @@
   </data>
   <data name="GOS.Attention" xml:space="preserve">
     <value> Note: {0}.</value>
+  </data>
+  <data name="JL.Illisible" xml:space="preserve">
+    <value>unreadable log</value>
+  </data>
+  <data name="JL.IllisibleExplication" xml:space="preserve">
+    <value>The log of what DrDXT applied could not be read: Undo and automatic removal no longer see those settings. It will be set aside, its trace kept, at the next applied setting.</value>
   </data>
   <data name="JL.Revenu" xml:space="preserve">
     <value>back to the previous value</value>
@@ -3982,10 +4021,34 @@
     <value>STOP: {0} did not come back; the next levers are not tried, and the log keeps it: DrDXT will put it back at next launch.</value>
   </data>
   <data name="VC.PasTouche.NonLu" xml:space="preserve">
-    <value>not touched: its state could not be read.</value>
+    <value>not touched: its state was not read here (some settings can only be read with a game open, and the check runs with no game).</value>
+  </data>
+  <data name="VC.PasTouche.PasDInverse" xml:space="preserve">
+    <value>not touched: already set or does not apply to this PC, and no safe exercise.</value>
+  </data>
+  <data name="VC.Exerce" xml:space="preserve">
+    <value>exercised: moved off its target, applied by the lever, returned to its exact origin, each step read back ({0}).</value>
+  </data>
+  <data name="VC.Exercice.Etapes" xml:space="preserve">
+    <value>off target, {0}; applied, {1}; returned to origin, {2}</value>
+  </data>
+  <data name="VC.Exercice.Lu" xml:space="preserve">
+    <value>read {0}</value>
+  </data>
+  <data name="VM.Supprimee" xml:space="preserve">
+    <value>deleted</value>
+  </data>
+  <data name="VC.Exercice.NonConclu" xml:space="preserve">
+    <value>exercise inconclusive, origin returned and read back ({0}).</value>
+  </data>
+  <data name="VC.Exercice.AuRedemarrage" xml:space="preserve">
+    <value>Write and read-back proven; this setting itself only takes effect after a restart.</value>
   </data>
   <data name="VC.PasTouche.DejaRegle" xml:space="preserve">
     <value>not touched: already set, or does not apply to this PC.</value>
+  </data>
+  <data name="VC.PasTouche.Essai" xml:space="preserve">
+    <value>not touched: held by the alternating trial, not checked; stop the trial to check it.</value>
   </data>
   <data name="VC.PasTouche.Journal" xml:space="preserve">
     <value>not touched: the log could not be written ({0}).</value>
@@ -4332,6 +4395,9 @@
   <data name="RD.Rendue" xml:space="preserve">
     <value>{0} still in place, put back: {1}</value>
   </data>
+  <data name="RD.FichierDEchange" xml:space="preserve">
+    <value>this origin would turn the page file off: never written, not even to put back</value>
+  </data>
   <data name="RD.RegleCarte" xml:space="preserve">
     <value>the card's frequency, voltage or fan: never written, not even to put back</value>
   </data>
@@ -4409,6 +4475,12 @@
   </data>
   <data name="MD.ManifesteNonDeCote" xml:space="preserve">
     <value>signed manifest: not set aside ({0}); a reinstall would find it.</value>
+  </data>
+  <data name="MD.CarteRendue" xml:space="preserve">
+    <value>NVIDIA card {0}: fan on automatic, core offset at 0 MHz.</value>
+  </data>
+  <data name="MD.CarteReste" xml:space="preserve">
+    <value>NVIDIA card {0}: not fully restored ({1}); a restart clears this setting.</value>
   </data>
   <data name="MD.PlafondRetire" xml:space="preserve">
     <value>upload cap: none is left active.</value>
@@ -4500,6 +4572,33 @@
   <data name="RD.Respecte" xml:space="preserve">
     <value>current value {0}, DrDXT had set {1}: changed since, left as it is</value>
   </data>
+  <data name="ADLX.UsineRequise" xml:space="preserve">
+    <value>Returning the card to {0} MHz is beyond what DrDXT moves on its own: only resetting the card's tuning to factory in AMD Software gets there, and DrDXT does it only when you ask (Cancel, or the button). Memory, fan and power limit set in AMD Software would return to default too. Nothing was written.</value>
+  </data>
+  <data name="ADLX.UsineRemise" xml:space="preserve">
+    <value>DrDXT reset the card's tuning to factory in AMD Software. Memory, fan and power limit set there are back to default too.</value>
+  </data>
+  <data name="ADLX.UsineImpossible" xml:space="preserve">
+    <value>The factory reset of the card's tuning failed ({0}). In AMD Software, Performance tab, Tuning: reset the tuning to default.</value>
+  </data>
+  <data name="GX.VentilateurResteFixe" xml:space="preserve">
+    <value>The card's fan stayed at its fixed speed: DrDXT's elevated helper no longer answers and returning it to automatic failed ({0}). Restart DrDXT, or set the fan back to automatic in the NVIDIA app.</value>
+  </data>
+  <data name="JEA.AcquitRefuse" xml:space="preserve">
+    <value>A setting you kept is applied, but DrDXT could not confirm its original value: it will restore that value at the next action that asks for administrator rights, or at Windows startup if the service is installed.</value>
+  </data>
+  <data name="JEA.SessionUtilisateur" xml:space="preserve">
+    <value>The replay waits for the player's session: seen from the service, this value is not in their hive.</value>
+  </data>
+  <data name="JEA.OrigineNonRendable" xml:space="preserve">
+    <value>What DrDXT noted before writing ({0}) cannot be put back for this setting: it is not restored, check it.</value>
+  </data>
+  <data name="JEA.Rapport" xml:space="preserve">
+    <value>After an interrupted session, DrDXT put {0} setting(s) back as they were; {1} changed since were left as they are; {2} to check.</value>
+  </data>
+  <data name="Elevation.SansGeste" xml:space="preserve">
+    <value>DrDXT's administrator tool is not running, and DrDXT does not start it without your click: nothing was done, the action is still there on screen</value>
+  </data>
   <data name="LW.RetourEnCours" xml:space="preserve">
     <value>The previous lease's rollback is in progress: try again in a moment.</value>
   </data>
@@ -4547,5 +4646,1382 @@
   </data>
   <data name="App.NonLuProfilJeu" xml:space="preserve">
     <value>not read in the game's profile</value>
+  </data>
+  <data name="EC.NonLu" xml:space="preserve">
+    <value>not read</value>
+  </data>
+  <data name="EC.Valeur" xml:space="preserve">
+    <value>stop code: {0}, reports: {1}, dumps: {2}</value>
+  </data>
+  <data name="EC.Attendu" xml:space="preserve">
+    <value>0 everywhere</value>
+  </data>
+  <data name="EC.Aucun" xml:space="preserve">
+    <value>No blue screen in {0} days, and all three sources agree: the stop code noted at restart (Kernel-Power 41), the Windows blue screen report (BugCheck 1001) and the dump files written in the window.</value>
+  </data>
+  <data name="EC.AucunPartiel" xml:space="preserve">
+    <value>No blue screen seen in {0} days in the sources read, but at least one could not be read: this does not prove there was none.</value>
+  </data>
+  <data name="EC.Vus" xml:space="preserve">
+    <value>At least {0} blue screen(s) in {1} days, the last on {2}. </value>
+  </data>
+  <data name="EC.Desaccord" xml:space="preserve">
+    <value>The sources do not give the same number: a dump can be missing (dump disabled or failed), a code can be missing (power lost before it was noted), a report can have left the log. The largest number is kept. </value>
+  </data>
+  <data name="EC.SansVidage" xml:space="preserve">
+    <value>No dump file was kept: the cause cannot be read afterwards, see the dump creation line. </value>
+  </data>
+  <data name="EC.Geste" xml:space="preserve">
+    <value>If you changed a BIOS setting, an overclock or a driver just before, go back to the previous value first and watch.</value>
+  </data>
+  <data name="Nom.ecrans bleus" xml:space="preserve">
+    <value>blue screens</value>
+  </data>
+  <data name="Nom.profondeur du journal" xml:space="preserve">
+    <value>System log depth</value>
+  </data>
+  <data name="JP.Profondeur" xml:space="preserve">
+    <value>since {0} ({1} days)</value>
+  </data>
+  <data name="JP.ProfondeurAttendue" xml:space="preserve">
+    <value>{0} days</value>
+  </data>
+  <data name="JP.Couvert" xml:space="preserve">
+    <value>The System log covers the whole {0}-day window: a family with no failure below is a real absence.</value>
+  </data>
+  <data name="JP.Court" xml:space="preserve">
+    <value>The System log does not go back to the start of the {0}-day window: Windows deletes the oldest events when it is full. A family with no failure below is therefore not read over the window, not healthy.</value>
+  </data>
+  <data name="JP.ProfondeurNonLue" xml:space="preserve">
+    <value>The start of the System log could not be read: how far back it goes is unknown.</value>
+  </data>
+  <data name="JP.NonLu" xml:space="preserve">
+    <value>{0}: the System log could not be read for this family.</value>
+  </data>
+  <data name="JP.Aucun" xml:space="preserve">
+    <value>none</value>
+  </data>
+  <data name="JP.AucunEn" xml:space="preserve">
+    <value>{0}: none in {1} days.</value>
+  </data>
+  <data name="JP.AucunMaisCourt" xml:space="preserve">
+    <value>{0}: none in what the log keeps, but it does not cover the {1} days.</value>
+  </data>
+  <data name="JP.Compte" xml:space="preserve">
+    <value>{0}, the last on {1}</value>
+  </data>
+  <data name="JP.Nom.pilote graphique relance" xml:space="preserve">
+    <value>graphics driver restarted by Windows</value>
+  </data>
+  <data name="JP.Nom.erreurs du disque" xml:space="preserve">
+    <value>disk errors</value>
+  </data>
+  <data name="JP.Nom.controleur de stockage reinitialise" xml:space="preserve">
+    <value>storage controller reset</value>
+  </data>
+  <data name="JP.Nom.systeme de fichiers abime" xml:space="preserve">
+    <value>damaged file system</value>
+  </data>
+  <data name="JP.Nom.memoire virtuelle epuisee" xml:space="preserve">
+    <value>virtual memory exhausted</value>
+  </data>
+  <data name="JP.Nom.pilote non charge au demarrage" xml:space="preserve">
+    <value>driver not loaded at startup</value>
+  </data>
+  <data name="Nom.pilote graphique relance" xml:space="preserve">
+    <value>graphics driver restarted by Windows</value>
+  </data>
+  <data name="Nom.erreurs du disque" xml:space="preserve">
+    <value>disk errors</value>
+  </data>
+  <data name="Nom.controleur de stockage reinitialise" xml:space="preserve">
+    <value>storage controller reset</value>
+  </data>
+  <data name="Nom.systeme de fichiers abime" xml:space="preserve">
+    <value>damaged file system</value>
+  </data>
+  <data name="Nom.memoire virtuelle epuisee" xml:space="preserve">
+    <value>virtual memory exhausted</value>
+  </data>
+  <data name="Nom.pilote non charge au demarrage" xml:space="preserve">
+    <value>driver not loaded at startup</value>
+  </data>
+  <data name="JP.Explication.pilote graphique relance" xml:space="preserve">
+    <value>Windows restarted the graphics driver {0} time(s) in {1} days (Display 4101): the card did not answer in time. Known causes: a pushed card setting (overclock, voltage), a damaged driver, power or heat. Go back to the card's factory settings first, then reinstall the driver.</value>
+  </data>
+  <data name="JP.Explication.erreurs du disque" xml:space="preserve">
+    <value>The disk reported {0} error(s) in {1} days (disk 7, 11, 51 or 153: bad block, controller error, error during paging, retried input or output). Back up what matters, then look at the disk health in the Storage lines, and at its cable or slot.</value>
+  </data>
+  <data name="JP.Explication.controleur de stockage reinitialise" xml:space="preserve">
+    <value>The storage controller reset a disk {0} time(s) in {1} days (event 129): the disk did not answer in time. Known causes: SSD firmware, PCIe link power saving, cable or slot. Check whether the SSD maker offers a firmware update.</value>
+  </data>
+  <data name="JP.Explication.systeme de fichiers abime" xml:space="preserve">
+    <value>Windows found the file system damaged {0} time(s) in {1} days (Ntfs 55). After a backup, check the disk: its Properties, Tools, Check.</value>
+  </data>
+  <data name="JP.Explication.memoire virtuelle epuisee" xml:space="preserve">
+    <value>Windows ran out of virtual memory {0} time(s) in {1} days (event 2004): a game may have closed because of it. Leave the page file managed by Windows, and close what holds the most memory before playing.</value>
+  </data>
+  <data name="JP.Explication.pilote non charge au demarrage" xml:space="preserve">
+    <value>{0} driver load failure(s) at startup in {1} days (Kernel-PnP 219). It is often a missing device with no consequence; it only matters if a device no longer works.</value>
+  </data>
+  <data name="NV.Nom" xml:space="preserve">
+    <value>NVMe health · {0}</value>
+  </data>
+  <data name="Nom.sante NVMe" xml:space="preserve">
+    <value>NVMe health</value>
+  </data>
+  <data name="NV.ListeNonLue" xml:space="preserve">
+    <value>The list of NVMe drives could not be read (MSFT_PhysicalDisk): what the SSDs count about themselves is not read.</value>
+  </data>
+  <data name="NV.NonLu" xml:space="preserve">
+    <value>The drive did not return its health page (NVMe log 02h). Some drivers from the SSD maker do not pass this request; this is not read, not healthy.</value>
+  </data>
+  <data name="NV.Valeur" xml:space="preserve">
+    <value>wear {0}%, spare {1}%, {2} °C, {3} h, {4} power cycles, {5} unsafe shutdowns, {6} media errors</value>
+  </data>
+  <data name="NV.Critique" xml:space="preserve">
+    <value>The SSD raises its critical warning: {0}. </value>
+  </data>
+  <data name="NV.Bit0" xml:space="preserve">
+    <value>spare below its threshold</value>
+  </data>
+  <data name="NV.Bit1" xml:space="preserve">
+    <value>temperature out of range</value>
+  </data>
+  <data name="NV.Bit2" xml:space="preserve">
+    <value>reliability degraded</value>
+  </data>
+  <data name="NV.Bit3" xml:space="preserve">
+    <value>switched to read only</value>
+  </data>
+  <data name="NV.Bit4" xml:space="preserve">
+    <value>volatile memory backup failed</value>
+  </data>
+  <data name="NV.Bit5" xml:space="preserve">
+    <value>persistent memory region read only</value>
+  </data>
+  <data name="NV.Reserve" xml:space="preserve">
+    <value>Its spare is at {0}%, under the {1}% threshold it sets itself. </value>
+  </data>
+  <data name="NV.Media" xml:space="preserve">
+    <value>It counts {0} media error(s) it could not recover. </value>
+  </data>
+  <data name="NV.Reference" xml:space="preserve">
+    <value>First reading of its unsafe shutdown counter: from the next scan, DrDXT says how many were added and crosses them with the unclean shutdowns noted by Windows. </value>
+  </data>
+  <data name="NV.HausseSansJournal" xml:space="preserve">
+    <value>{0} unsafe shutdown(s) since the scan of {1}; the Windows shutdown log could not be read to cross them. </value>
+  </data>
+  <data name="NV.JournalTropCourt" xml:space="preserve">
+    <value>{0} unsafe shutdown(s) since the scan of {1}; the Windows shutdown log that was read does not go back that far, so DrDXT does not cross them.</value>
+  </data>
+  <data name="NV.Coupure" xml:space="preserve">
+    <value>Since the scan of {2}: {0} unsafe shutdown(s) counted by the SSD and {1} unclean shutdown(s) noted by Windows. Both together point to power that was cut, not only Windows that froze. </value>
+  </data>
+  <data name="NV.SansArret" xml:space="preserve">
+    <value>Since the scan of {1}, the SSD counted {0} unsafe shutdown(s) that Windows did not note: power was cut while Windows was not running (sleep, hibernation, shutdown with fast startup) or the PC was switched off at the wall. </value>
+  </data>
+  <data name="NV.SansCoupure" xml:space="preserve">
+    <value>Since the scan of {1}, Windows noted {0} unclean shutdown(s) but the SSD counted no unsafe shutdown: power stayed on, so a freeze or a reset is more likely than a power cut. </value>
+  </data>
+  <data name="NV.Rien" xml:space="preserve">
+    <value>No unsafe shutdown and no unclean shutdown since the scan of {0}. </value>
+  </data>
+  <data name="NV.Bridage" xml:space="preserve">
+    <value>It spent {0} min above its warning temperature and {1} min above its critical temperature, and slowed itself down for {2} min. </value>
+  </data>
+  <data name="NV.Lecture" xml:space="preserve">
+    <value>Read in the SSD's own health page (NVMe log 02h), nothing written.</value>
+  </data>
+  <data name="NV.Remede" xml:space="preserve">
+    <value>Back up what matters first. Then look for a firmware update on the SSD maker's site, and plan to replace it if the warning stays.</value>
+  </data>
+  <data name="RA.Power.Frein" xml:space="preserve">
+    <value>this setting holds the processor back: a frequency cap, a maximum state under 100% or a passive cooling policy slows it down before anything else, without Windows showing it anywhere. On a desktop PC, set it back to the plan's default (powercfg /restoredefaultschemes, or the plan's default value with powercfg /setacvalueindex).</value>
+  </data>
+  <data name="RA.Power.FreinPortable" xml:space="preserve">
+    <value> On a laptop, the maker often sets it on purpose to hold heat and battery: check before changing it.</value>
+  </data>
+  <data name="RA.Refroidissement.Passif" xml:space="preserve">
+    <value>passive (slows down first)</value>
+  </data>
+  <data name="RA.Refroidissement.Actif" xml:space="preserve">
+    <value>active (fans first)</value>
+  </data>
+  <data name="RA.Freq.SansPlafond" xml:space="preserve">
+    <value>no cap</value>
+  </data>
+  <data name="Nom.frequence maximale" xml:space="preserve">
+    <value>maximum processor frequency</value>
+  </data>
+  <data name="Nom.frequence maximale (coeurs efficaces)" xml:space="preserve">
+    <value>maximum frequency (efficient cores)</value>
+  </data>
+  <data name="Nom.etat maximal (coeurs efficaces)" xml:space="preserve">
+    <value>maximum state (efficient cores)</value>
+  </data>
+  <data name="Nom.politique de refroidissement" xml:space="preserve">
+    <value>system cooling policy</value>
+  </data>
+  <data name="Nom.acces controle aux dossiers" xml:space="preserve">
+    <value>controlled folder access</value>
+  </data>
+  <data name="Nom.exclusions Defender" xml:space="preserve">
+    <value>Defender exclusions</value>
+  </data>
+  <data name="Nom.exclusion de processus par nom" xml:space="preserve">
+    <value>process excluded by name</value>
+  </data>
+  <data name="DF.NonLu" xml:space="preserve">
+    <value>Microsoft Defender did not answer (turned off, replaced by another antivirus, or WMI refused): not read.</value>
+  </data>
+  <data name="DF.Desactive" xml:space="preserve">
+    <value>off</value>
+  </data>
+  <data name="DF.Active" xml:space="preserve">
+    <value>on</value>
+  </data>
+  <data name="DF.Audit" xml:space="preserve">
+    <value>audit only</value>
+  </data>
+  <data name="DF.Invisible" xml:space="preserve">
+    <value>hidden from here</value>
+  </data>
+  <data name="DF.AccesDesactive" xml:space="preserve">
+    <value>Controlled folder access is off (the Windows default): no game is blocked from writing its settings or saves.</value>
+  </data>
+  <data name="DF.AccesAudit" xml:space="preserve">
+    <value>Controlled folder access is in audit mode: it notes what it would block but blocks nothing.</value>
+  </data>
+  <data name="DF.DisqueSeul" xml:space="preserve">
+    <value>disk only</value>
+  </data>
+  <data name="DF.AccesDisqueSeul" xml:space="preserve">
+    <value>Controlled folder access only watches writes to the disk sectors, not the folders: it does not block a game from writing its settings or saves.</value>
+  </data>
+  <data name="DF.AccesAutorisesNonLus" xml:space="preserve">
+    <value>Controlled folder access is on, but the list of allowed apps or the game folders could not be read: whether your games may write under Documents is not read.</value>
+  </data>
+  <data name="DF.AccesJeuxAutorises" xml:space="preserve">
+    <value>Controlled folder access is on and {0} program(s) from your game folders are allowed through it.</value>
+  </data>
+  <data name="DF.AccesAucunJeu" xml:space="preserve">
+    <value>Controlled folder access is on and no program from your game folders is allowed: a game that keeps its settings or saves under Documents can fail to write them, and lose what you set.</value>
+  </data>
+  <data name="DF.AccesRemede" xml:space="preserve">
+    <value>Windows Security, Virus and threat protection, Ransomware protection, Allow an app through Controlled folder access: add the game's executable. DrDXT never changes Defender.</value>
+  </data>
+  <data name="DF.ExclusionsCachees" xml:space="preserve">
+    <value>Defender hides its exclusions from an account without administrator rights: they are not read, which does not mean there are none.</value>
+  </data>
+  <data name="DF.ProcessusNu" xml:space="preserve">
+    <value>A process is excluded from scanning by its name alone ({0}): any program that carries this name, wherever it is, escapes the scan.</value>
+  </data>
+  <data name="DF.ProcessusNuRemede" xml:space="preserve">
+    <value>If you did not set it yourself, remove it: Windows Security, Virus and threat protection, Manage settings, Exclusions. DrDXT never changes Defender.</value>
+  </data>
+  <data name="DF.Compte" xml:space="preserve">
+    <value>{0} excluded, {1} covered by a parent folder, {2} not excluded</value>
+  </data>
+  <data name="DF.ExclusionsExplication" xml:space="preserve">
+    <value>Your game folders compared with the paths Defender does not scan. DrDXT never adds an exclusion: it is a hole in the protection, and no measurement has shown it helps games.</value>
+  </data>
+  <data name="MP.DormantPourLaCarte" xml:space="preserve">
+    <value> Windows lists it among the drivers compatible with your connected card (same hardware ID): it is a newer driver for your card that Windows did not take; installing it again from the maker's site makes it the one in use.</value>
+  </data>
+  <data name="MP.DormantAutreMateriel" xml:space="preserve">
+    <value> Windows does not list it among the drivers compatible with your connected cards: it declares no card plugged in now, probably another model. It is still not suggested for removal.</value>
+  </data>
+  <data name="Nom.installation de pilote bloquee" xml:space="preserve">
+    <value>driver installation blocked by policy</value>
+  </data>
+  <data name="Nom.pilotes exclus de Windows Update" xml:space="preserve">
+    <value>drivers excluded from Windows Update</value>
+  </data>
+  <data name="IP.NonLu" xml:space="preserve">
+    <value>The device installation policy or the display cards could not be read: whether a driver installation is blocked is not read.</value>
+  </data>
+  <data name="IP.Aucune" xml:space="preserve">
+    <value>none</value>
+  </data>
+  <data name="IP.Carte" xml:space="preserve">
+    <value>{0} ({1})</value>
+  </data>
+  <data name="IP.ParClasse" xml:space="preserve">
+    <value>the whole display class</value>
+  </data>
+  <data name="IP.NonDecrit" xml:space="preserve">
+    <value>no rule allows it, and devices not described by a rule are blocked</value>
+  </data>
+  <data name="IP.Bloquee" xml:space="preserve">
+    <value>A device installation policy forbids installing or updating a driver for: {0}. A driver setup for this card fails or rolls back. It was set by a group policy or by a tool; DrDXT does not remove it. </value>
+  </data>
+  <data name="IP.Retroactif" xml:space="preserve">
+    <value>It is also retroactive: Windows removes the driver already installed for it. </value>
+  </data>
+  <data name="IP.Remede" xml:space="preserve">
+    <value>If this PC is yours and you did not set it: gpedit.msc, Computer Configuration, Administrative Templates, System, Device Installation, Device Installation Restrictions, set the rule to Not configured, then restart. On a work PC, ask its administrator.</value>
+  </data>
+  <data name="IP.AutreMateriel" xml:space="preserve">
+    <value>{0} rule(s), none for your cards</value>
+  </data>
+  <data name="IP.AutreMaterielExplication" xml:space="preserve">
+    <value>A device installation policy forbids some hardware IDs ({0}), but none is a hardware or compatible ID of your display cards: it does not block their driver.</value>
+  </data>
+  <data name="IP.AucuneExplication" xml:space="preserve">
+    <value>No device installation policy forbids a driver for your display cards.</value>
+  </data>
+  <data name="IP.Exclus" xml:space="preserve">
+    <value>excluded</value>
+  </data>
+  <data name="IP.ExclusExplication" xml:space="preserve">
+    <value>A policy stops Windows Update from delivering drivers: your graphics driver only comes from its maker's site or app. It is a choice, often a good one for a gaming PC; DrDXT does not change it.</value>
+  </data>
+  <data name="Nom.inventaire des pilotes" xml:space="preserve">
+    <value>installed drivers</value>
+  </data>
+  <data name="Nom.pilotes non signes" xml:space="preserve">
+    <value>unsigned drivers</value>
+  </data>
+  <data name="IV.NonLu" xml:space="preserve">
+    <value>The list of installed drivers could not be read (Win32_PnPSignedDriver): not read.</value>
+  </data>
+  <data name="IV.Valeur" xml:space="preserve">
+    <value>{0} drivers, {1} unsigned, {2} old, {3} signature not read</value>
+  </data>
+  <data name="IV.Explication" xml:space="preserve">
+    <value>Most common classes: {0}. Old means a third-party package from another provider than Microsoft, dated more than {1} years ago; the dates Windows and Intel put on purpose on their reference drivers (2006 and 1968) do not count. </value>
+  </data>
+  <data name="IV.Anciens" xml:space="preserve">
+    <value>Old: {0}. Look for a newer version on the maker's site if the device misbehaves.</value>
+  </data>
+  <data name="IV.NonSignes" xml:space="preserve">
+    <value>Windows reads {0} driver(s) as unsigned: their author is not proven, and an unsigned driver can be refused by an anti-cheat or by memory integrity.</value>
+  </data>
+  <data name="IV.NonSignesRemede" xml:space="preserve">
+    <value>If you do not use it any more, uninstall the software that installed it; otherwise, get a signed version from its maker.</value>
+  </data>
+  <data name="PX.Nom" xml:space="preserve">
+    <value>driver required by {0}</value>
+  </data>
+  <data name="PX.Illisible" xml:space="preserve">
+    <value>The driver versions file this game ships could not be read ({0}): the minimum it requires is not read.</value>
+  </data>
+  <data name="PX.VersionNonLue" xml:space="preserve">
+    <value>The version in use on {0} could not be read: whether it reaches the {1} the game requires is not read.</value>
+  </data>
+  <data name="PX.Sous" xml:space="preserve">
+    <value>{0} requires at least driver {3} for {1}, and {2} is in use: below the floor the game sets itself, it may refuse to start, warn at each launch or crash.</value>
+  </data>
+  <data name="PX.AuDessus" xml:space="preserve">
+    <value>{0} requires at least driver {3} for {1}; {2} is in use, above the floor.</value>
+  </data>
+  <data name="PX.Remede" xml:space="preserve">
+    <value>Install the latest driver from the card maker's site or app (NVIDIA app, AMD Software, Intel Graphics), then restart.</value>
+  </data>
+  <data name="MS.Lectures" xml:space="preserve">
+    <value>, {0} hard page reads/s</value>
+  </data>
+  <data name="MS.Calme" xml:space="preserve">
+    <value> Measured over two seconds: calm, the disk is not answering for missing memory.</value>
+  </data>
+  <data name="MS.Pagine" xml:space="preserve">
+    <value> Measured over two seconds: Windows is paging, programs wait for the disk now and then.</value>
+  </data>
+  <data name="MS.PagineFort" xml:space="preserve">
+    <value> Measured over two seconds: Windows is paging hard, programs wait for the disk almost constantly.</value>
+  </data>
+  <data name="MS.CompteurInclut" xml:space="preserve">
+    <value> The counter also counts mapped files and programs being loaded: a game that loads can raise it on its own.</value>
+  </data>
+  <data name="MS.PleineCalme" xml:space="preserve">
+    <value>the memory is full at the time of the reading, but nothing waits for the disk: Windows uses what is free to cache, and freeing it would gain nothing.</value>
+  </data>
+  <data name="MS.PagineSansEtrePleine" xml:space="preserve">
+    <value>the memory is not full, but Windows reads pages from the disk at a high rate at the time of the reading.</value>
+  </data>
+  <data name="MS.PagineUnPeu" xml:space="preserve">
+    <value>memory is not full, and Windows reads pages from disk now and then at the time of the reading.</value>
+  </data>
+  <data name="BL.Nom" xml:space="preserve">
+    <value>encryption of disk {0}</value>
+  </data>
+  <data name="BL.NonLu" xml:space="preserve">
+    <value>BitLocker can only be read with administrator rights, or it is not installed: the encryption of the games' disk is not read.</value>
+  </data>
+  <data name="BL.Clair" xml:space="preserve">
+    <value>not encrypted</value>
+  </data>
+  <data name="BL.ClairExplication" xml:space="preserve">
+    <value>The disk that holds your games is not encrypted by BitLocker.</value>
+  </data>
+  <data name="BL.Conversion" xml:space="preserve">
+    <value>conversion in progress ({0}%)</value>
+  </data>
+  <data name="BL.Pause" xml:space="preserve">
+    <value>conversion paused ({0}%)</value>
+  </data>
+  <data name="BL.PauseExplication" xml:space="preserve">
+    <value>The BitLocker conversion of this drive is paused: the drive is only partly encrypted, but nothing is running on it, so measurements are not affected. It resumes on its own or from Control Panel, BitLocker Drive Encryption.</value>
+  </data>
+  <data name="BL.ConversionExplication" xml:space="preserve">
+    <value>BitLocker is encrypting or decrypting this disk: until it ends, the disk is busy and any measurement DrDXT makes would measure the conversion. DrDXT waits for the end.</value>
+  </data>
+  <data name="BL.ConversionRemede" xml:space="preserve">
+    <value>Leave the PC on until the conversion ends (Control Panel, BitLocker Drive Encryption shows the progress), then measure.</value>
+  </data>
+  <data name="BL.Suspendu" xml:space="preserve">
+    <value>protection suspended</value>
+  </data>
+  <data name="BL.Protege" xml:space="preserve">
+    <value>protected</value>
+  </data>
+  <data name="BL.SuspenduExplication" xml:space="preserve">
+    <value>The disk is encrypted but its protection is suspended: the key is left in clear on the disk, so you pay the cost of encryption without its security. A BIOS or Windows update suspends it on purpose until the next restart; if it stays, it was forgotten.</value>
+  </data>
+  <data name="BL.SuspenduRemede" xml:space="preserve">
+    <value>Restart first. If it is still suspended: Control Panel, BitLocker Drive Encryption, Resume protection; or in an administrator terminal, manage-bde -protectors -enable {0}:. DrDXT never does it for you and never offers to decrypt.</value>
+  </data>
+  <data name="BL.EtatNonLu" xml:space="preserve">
+    <value>BitLocker answered but the state of this disk could not be read: not read.</value>
+  </data>
+  <data name="BL.Materiel" xml:space="preserve">
+    <value>encrypted by the disk itself, protected</value>
+  </data>
+  <data name="BL.Logiciel" xml:space="preserve">
+    <value>encrypted by Windows, protected</value>
+  </data>
+  <data name="BL.ProtegeExplication" xml:space="preserve">
+    <value>The disk that holds your games is encrypted and protected. For information: DrDXT never suggests decrypting it.</value>
+  </data>
+  <data name="Nom.releve apres mise a jour de Windows" xml:space="preserve">
+    <value>settings read again after a Windows update</value>
+  </data>
+  <data name="JL.Bilan" xml:space="preserve">
+    <value>{0} still different from the origin, {1} back to the previous value, {2} not read</value>
+  </data>
+  <data name="JL.BilanExplication" xml:space="preserve">
+    <value>Windows changed build since the last scan ({0} to {1}): DrDXT read again every setting it had set, without writing anything. Still different from the origin does not prove it is exactly DrDXT's value; a setting back to the previous value is named in its own line, and Optimize sets it again if you want.</value>
+  </data>
+  <data name="Nom.generation AMD" xml:space="preserve">
+    <value>AMD processor generation</value>
+  </data>
+  <data name="GA.Reconnue" xml:space="preserve">
+    <value>CPUID names an AMD {0} processor (family / model {1}), a pair named by {2}. The AMD-specific readings open only for this generation.</value>
+  </data>
+  <data name="GA.NonReconnue" xml:space="preserve">
+    <value>CPUID gives family / model {0}, a pair no AMD reference in DrDXT's table names: generation not recognised. The AMD-specific readings stay closed rather than guessing a neighbouring chip.</value>
+  </data>
+  <data name="GA.NonLue" xml:space="preserve">
+    <value>CPUID could not be read: the processor generation is unknown, and the AMD-specific readings stay closed.</value>
+  </data>
+  <data name="Nom.etats de veille" xml:space="preserve">
+    <value>processor sleep states (C-states)</value>
+  </data>
+  <data name="CS.NonLu" xml:space="preserve">
+    <value>the C1, C2 and C3 counters of Windows could not be read: the time spent in sleep states is not read.</value>
+  </data>
+  <data name="CS.Valeur" xml:space="preserve">
+    <value>C1 {0:0.0} %, C2 {1:0.0} %, C3 {2:0.0} %, {3:0} entries/s</value>
+  </data>
+  <data name="CS.AuRepos" xml:space="preserve">
+    <value>Share of time each core spent in each sleep state over two seconds of the scan, machine at rest.</value>
+  </data>
+  <data name="CS.PasAuRepos" xml:space="preserve">
+    <value>Measured while the processor was working ({0:0} % idle): this reading says nothing about rest and is not kept as a reference.</value>
+  </data>
+  <data name="CS.Saut" xml:space="preserve">
+    <value> Clear change since the scan of {0} (C1 {1:0.0} %, C2 {2:0.0} %, C3 {3:0.0} %): a lower voltage that lacks margin usually fails at rest, when cores enter and leave sleep. If the machine also stops abruptly, this change is the first place to look.</value>
+  </data>
+  <data name="CS.Levier" xml:space="preserve">
+    <value> This is a signal, not a setting: turning the C-states off hides an instability without curing it, and DrDXT never suggests it.</value>
+  </data>
+  <data name="Nom.origine des erreurs materielles" xml:space="preserve">
+    <value>where the hardware errors come from</value>
+  </data>
+  <data name="EM.Processeur" xml:space="preserve">
+    <value>{0} raised by the logical processor with APIC ID {1}, MCA bank {2} (status {3}).</value>
+  </data>
+  <data name="EM.Pcie" xml:space="preserve">
+    <value>{0} on the PCIe link of device {1} (vendor {2}, device {3}): {4}.</value>
+  </data>
+  <data name="EM.CauseNonLue" xml:space="preserve">
+    <value>cause not given by the event</value>
+  </data>
+  <data name="EM.AvisSeul" xml:space="preserve">
+    <value> An advisory alone is a warning the link handled, not a link failure.</value>
+  </data>
+  <data name="EM.OrigineSuite" xml:space="preserve">
+    <value> The processor that raises an error is not always the block at fault: the role of a bank is written in its MCA_IPID register, which the Windows event does not carry, so the block stays unidentified rather than guessed from the bank number.</value>
+  </data>
+  <data name="TR.Interrompu" xml:space="preserve">
+    <value>not finished</value>
+  </data>
+  <data name="TR.Plantage" xml:space="preserve">
+    <value>the machine stopped during the test</value>
+  </data>
+  <data name="TR.JournauxNonLus" xml:space="preserve">
+    <value>the memory test started on {0} did not finish ({1} passes noted), and Windows' logs could not be read to say whether the machine stopped during it. Unfinished is not a success.</value>
+  </data>
+  <data name="TR.SansPlantage" xml:space="preserve">
+    <value>the memory test started on {0} did not finish ({1} passes noted), and no abrupt shutdown or serious hardware error was logged during it: DrDXT was probably closed. Unfinished is not a success; run it again to the end.</value>
+  </data>
+  <data name="TR.ArretPendant" xml:space="preserve">
+    <value>the memory test started on {0} did not finish ({1} passes noted): at the startup that followed it, on {2}, Windows recorded an unclean shutdown, so the machine stopped during the test. A machine that stops under a memory test fails it. Windows' memory test (at restart) tells whether the memory itself is at fault.</value>
+  </data>
+  <data name="TR.ErreurPendant" xml:space="preserve">
+    <value>the memory test started on {0} did not finish ({1} passes noted): Windows logged a serious hardware error on {2}, during the test. A machine that fails under a memory test fails it. Windows' memory test (on restart) says whether the memory itself is at fault.</value>
+  </data>
+  <data name="Nom.temoin d'incident" xml:space="preserve">
+    <value>incident witness</value>
+  </data>
+  <data name="TI.Valeur" xml:space="preserve">
+    <value>incident of {0}</value>
+  </data>
+  <data name="TI.Releve" xml:space="preserve">
+    <value>DrDXT's service kept what Windows logged before the incident of {0} ({1}), over the {2} minutes before: {3} errors and warnings, {4} of them errors. Most frequent sources: {5}. This is what happened just before, not a verdict on the cause.</value>
+  </data>
+  <data name="TI.Vide" xml:space="preserve">
+    <value>DrDXT's service looked at what Windows logged in the {2} minutes before the incident of {0} ({1}): no error or warning. Nothing announced it in the logs.</value>
+  </data>
+  <data name="TI.Autres" xml:space="preserve">
+    <value> {0} other witness(es) in the last 30 days.</value>
+  </data>
+  <data name="TI.Genre.arret brutal" xml:space="preserve">
+    <value>abrupt shutdown</value>
+  </data>
+  <data name="TI.Genre.erreur materielle fatale" xml:space="preserve">
+    <value>fatal hardware error</value>
+  </data>
+  <data name="TI.Genre.pilote graphique relance" xml:space="preserve">
+    <value>graphics driver restarted</value>
+  </data>
+  <data name="TI.Genre.memoire virtuelle epuisee" xml:space="preserve">
+    <value>virtual memory exhausted</value>
+  </data>
+  <data name="Nom.rapports de plantage de Call of Duty" xml:space="preserve">
+    <value>Call of Duty crash reports</value>
+  </data>
+  <data name="RC.NonLu" xml:space="preserve">
+    <value>Call of Duty's crash report folder exists but could not be read: what the game noted when it crashed is not read.</value>
+  </data>
+  <data name="RC.NonLuCourt" xml:space="preserve">
+    <value>not read</value>
+  </data>
+  <data name="RC.Compte" xml:space="preserve">
+    <value>Call of Duty wrote {0} crash report(s) in {1} days; the last one on {2}, exception {3}.</value>
+  </data>
+  <data name="RC.Memoire" xml:space="preserve">
+    <value> At that moment, as noted by the game: free memory {0} MB, committed {1} MB out of a limit of {2} MB, video memory deficit {3} MB.</value>
+  </data>
+  <data name="RC.Signature" xml:space="preserve">
+    <value> The same stack signature comes back {0} times ({1}): the same fault, not chance.</value>
+  </data>
+  <data name="RC.DirectX" xml:space="preserve">
+    <value> In {0} report(s), DirectX says the graphics card was lost ({1}): the driver stopped answering or was restarted.</value>
+  </data>
+  <data name="RC.Modules" xml:space="preserve">
+    <value> Modules outside the game and Windows on the crash stack: {0}.</value>
+  </data>
+  <data name="RC.MemeIncident" xml:space="preserve">
+    <value> {0} of these reports coincide with an abrupt shutdown or a crash already noted by Windows: the same incident, not another one.</value>
+  </data>
+  <data name="RC.Faits" xml:space="preserve">
+    <value> These are the game's own facts, read without changing anything; they name no culprit by themselves.</value>
+  </data>
+  <data name="Nom.defauts connus des disques" xml:space="preserve">
+    <value>known drive defects</value>
+  </data>
+  <data name="DC.Nom" xml:space="preserve">
+    <value>known defect · {0}</value>
+  </data>
+  <data name="DC.NonLu" xml:space="preserve">
+    <value>the list of drives and their firmware could not be read: known maker defects are not checked.</value>
+  </data>
+  <data name="DC.OuPlusRecent" xml:space="preserve">
+    <value>{0} or newer</value>
+  </data>
+  <data name="DC.Samsung990Pro" xml:space="preserve">
+    <value>this drive runs firmware {0}, older than {1}, which Samsung published "to address the intermittent non-recognition and blue screen issue". Update it with Samsung Magician (back up first); DrDXT never writes a drive's firmware.</value>
+  </data>
+  <data name="DC.AJour" xml:space="preserve">
+    <value>this drive's firmware ({0}) already carries the maker's fix ({1}).</value>
+  </data>
+  <data name="DC.NonCompare" xml:space="preserve">
+    <value>this drive's firmware ({0}) is not of the same family as the fixed one ({1}): it is not compared rather than guessed.</value>
+  </data>
+  <data name="DC.Source" xml:space="preserve">
+    <value> Source: {0}, read on {1}.</value>
+  </data>
+  <data name="Nom.fTPM AMD" xml:space="preserve">
+    <value>AMD fTPM stutter</value>
+  </data>
+  <data name="FT.TpmNonLu" xml:space="preserve">
+    <value>the TPM could not be read (administrator rights needed): whether this Ryzen's firmware TPM is the active one is not read.</value>
+  </data>
+  <data name="FT.DateNonLue" xml:space="preserve">
+    <value>the processor's firmware TPM is the active TPM, but the BIOS date could not be read: to check against AMD's fix.</value>
+  </data>
+  <data name="FT.Attendu" xml:space="preserve">
+    <value>BIOS with AGESA 1207 or newer</value>
+  </data>
+  <data name="FT.Ancien" xml:space="preserve">
+    <value>the processor's firmware TPM is the active TPM, and the BIOS dates from {0:dd/MM/yyyy}, before AMD's fix for the short system freezes it can cause (BIOS based on AGESA 1207 or newer, from May 2022). To check: update the BIOS from the motherboard maker's site. DrDXT does not read the AGESA version, only the BIOS date.</value>
+  </data>
+  <data name="FT.Recent" xml:space="preserve">
+    <value>the processor's firmware TPM is the active TPM; the BIOS dates from {0:dd/MM/yyyy}, after AMD's fix came out. DrDXT does not read the AGESA version: its release notes say whether it is 1207 or newer.</value>
+  </data>
+  <data name="FT.Source" xml:space="preserve">
+    <value> Source: AMD, article PA-410 (amd.com).</value>
+  </data>
+  <data name="Nom.caches L3" xml:space="preserve">
+    <value>L3 caches</value>
+  </data>
+  <data name="L3.NonLu" xml:space="preserve">
+    <value>Windows did not give the processor's caches: the L3 size is not read, and the memory bench falls back to its fixed size.</value>
+  </data>
+  <data name="L3.Uniforme" xml:space="preserve">
+    <value>{0} L3 cache(s) of {1} MB each, the same for every core.</value>
+  </data>
+  <data name="L3.Asymetrique" xml:space="preserve">
+    <value>The L3 caches are not the same size: the {0} MB one serves logical processors {1}, the block with the stacked cache. A game runs faster there when it fits in that cache.</value>
+  </data>
+  <data name="L3.Groupe" xml:space="preserve">
+    <value>group {0}: </value>
+  </data>
+  <data name="Nom.horloge haute resolution" xml:space="preserve">
+    <value>high-resolution clock</value>
+  </data>
+  <data name="QP.NonLu" xml:space="preserve">
+    <value>the cost of the high-resolution clock could not be measured.</value>
+  </data>
+  <data name="QP.Valeur" xml:space="preserve">
+    <value>{0:0.0} ns per read</value>
+  </data>
+  <data name="QP.Attendu" xml:space="preserve">
+    <value>under {0:0} ns</value>
+  </data>
+  <data name="QP.Tsc" xml:space="preserve">
+    <value>A read of Windows' high-resolution clock costs {0:0.0} ns, measured: it reads the processor's counter, without a system call. It never went backwards across {1} logical processors. Nothing to change.</value>
+  </data>
+  <data name="QP.Plateforme" xml:space="preserve">
+    <value>A read of Windows' high-resolution clock costs {0:0} ns, measured: that is the cost of a timer on the motherboard (HPET or ACPI timer) reached through a system call, not of the processor's counter (Microsoft: tens to hundreds of cycles against about 0.8 to 1 µs). A game reads it thousands of times per frame.</value>
+  </data>
+  <data name="QP.Recul" xml:space="preserve">
+    <value>Windows' high-resolution clock went backwards {0} time(s) while moving across {1} logical processors. Microsoft says it never does: the processor's counters are not in step, which disturbs every time measurement, frame times included.</value>
+  </data>
+  <data name="Nom.attenuations du processeur" xml:space="preserve">
+    <value>processor speculation protections</value>
+  </data>
+  <data name="AP.NonLu" xml:space="preserve">
+    <value>Windows did not answer about its protections against the processor's speculative execution flaws: not read.</value>
+  </data>
+  <data name="AP.BtiActive" xml:space="preserve">
+    <value>Protection against branch target injection (Spectre variant 2): active.</value>
+  </data>
+  <data name="AP.BtiRetpoline" xml:space="preserve">
+    <value>Protection against branch target injection (Spectre variant 2): active, with retpoline.</value>
+  </data>
+  <data name="AP.BtiStrategie" xml:space="preserve">
+    <value>Protection against branch target injection (Spectre variant 2): turned off by a system policy.</value>
+  </data>
+  <data name="AP.BtiSansMateriel" xml:space="preserve">
+    <value>Protection against branch target injection (Spectre variant 2): not available, the processor or its microcode does not support it.</value>
+  </data>
+  <data name="AP.BtiInactive" xml:space="preserve">
+    <value>Protection against branch target injection (Spectre variant 2): not active.</value>
+  </data>
+  <data name="AP.KvaNonConcerne" xml:space="preserve">
+    <value>Kernel page table isolation (Meltdown): not needed, Windows reports this processor is not affected.</value>
+  </data>
+  <data name="AP.KvaActive" xml:space="preserve">
+    <value>Kernel page table isolation (Meltdown): active.</value>
+  </data>
+  <data name="AP.KvaActivePcid" xml:space="preserve">
+    <value>Kernel page table isolation (Meltdown): active, with PCID.</value>
+  </data>
+  <data name="AP.KvaInactive" xml:space="preserve">
+    <value>Kernel page table isolation (Meltdown): not active.</value>
+  </data>
+  <data name="AP.JamaisCoupees" xml:space="preserve">
+    <value> These are security protections, read for information: DrDXT never offers to turn them off.</value>
+  </data>
+  <data name="Nom.recensement par coeur" xml:space="preserve">
+    <value>interrupts and DPCs per core</value>
+  </data>
+  <data name="RP.NonLu" xml:space="preserve">
+    <value>Windows' per-processor counters could not be read: which core serves the drivers is not read.</value>
+  </data>
+  <data name="RP.Valeur" xml:space="preserve">
+    <value>core {0}: {1:0.0} %</value>
+  </data>
+  <data name="RP.Plus" xml:space="preserve">
+    <value>Over one second, the busiest core for drivers is {0} (group,number): {1:0} interrupts/s, {2:0} DPCs/s, {3:0.0} % of its time serving them; the median of the other cores is {4:0.0} %, across {5} logical processors.</value>
+  </data>
+  <data name="RP.Confisque" xml:space="preserve">
+    <value> This core loses a large share of its time to drivers: a game thread placed on it runs slower. The usual cause is a driver or a tool that pinned its interrupts there; the DPC trace names the driver. DrDXT never pins anything itself.</value>
+  </data>
+  <data name="RB.Nom" xml:space="preserve">
+    <value>Resizable BAR · {0}</value>
+  </data>
+  <data name="RB.NonLu" xml:space="preserve">
+    <value>Windows did not give the memory ranges allocated to this card: whether Resizable BAR is applied is not read.</value>
+  </data>
+  <data name="RB.Valeur" xml:space="preserve">
+    <value>{0} MiB</value>
+  </data>
+  <data name="RB.SansVram" xml:space="preserve">
+    <value>Largest memory range allocated to the card: {0} MiB. Its video memory was not read, so this range cannot be compared to it.</value>
+  </data>
+  <data name="RB.PetiteMemoire" xml:space="preserve">
+    <value>Windows allocated {0} MiB to this card, which declares {1} MiB of dedicated memory: no more than the classic 256 MiB opening, as an integrated graphics chip that borrows system memory does. The comparison does not settle whether Resizable BAR is active.</value>
+  </data>
+  <data name="RB.Actif" xml:space="preserve">
+    <value>Resizable BAR is applied, proven by what Windows allocated: a {0} MiB range for {1} MiB of video memory, the processor sees all of it.</value>
+  </data>
+  <data name="RB.Inactif" xml:space="preserve">
+    <value>Resizable BAR is not applied: the card's largest range is {0} MiB, the classic opening, for {1} MiB of video memory. It is switched on in the BIOS (Re-Size BAR Support, with Above 4G Decoding).</value>
+  </data>
+  <data name="RB.Partiel" xml:space="preserve">
+    <value>Resizable BAR is partial: the card's largest range is {0} MiB for {1} MiB of video memory, more than the classic opening but not all of it.</value>
+  </data>
+  <data name="RB.Au4G" xml:space="preserve">
+    <value> The range sits above 4 GiB: Above 4G Decoding is applied.</value>
+  </data>
+  <data name="Nom.couches logicielles d'entree" xml:space="preserve">
+    <value>software input layers</value>
+  </data>
+  <data name="CE.NonLu" xml:space="preserve">
+    <value>the input devices could not be listed: whether a software layer sits between them and the game is not read.</value>
+  </data>
+  <data name="CE.Aucune" xml:space="preserve">
+    <value>none</value>
+  </data>
+  <data name="CE.Direct" xml:space="preserve">
+    <value>{0} input devices read, all attached to a hardware controller, with no third-party filter driver on them or on their class: input measurements read the devices themselves.</value>
+  </data>
+  <data name="CE.Virtuel" xml:space="preserve">
+    <value>"{0}" is created by software (virtual bus), not by a device plugged in: it is not your controller.</value>
+  </data>
+  <data name="CE.FiltreAppareil" xml:space="preserve">
+    <value>Third-party kernel filter driver {0} ({1}, {2}) on "{3}" (node {4}).</value>
+  </data>
+  <data name="CE.FiltreClasse" xml:space="preserve">
+    <value>Third-party kernel filter driver {0} ({1}, {2}) on every device of class {3}.</value>
+  </data>
+  <data name="CE.EditeurNonLu" xml:space="preserve">
+    <value>publisher not read</value>
+  </data>
+  <data name="CE.Mesure" xml:space="preserve">
+    <value> Every input measurement (rate, latency, drift) is taken through this software layer: it measures the layer as much as the device.</value>
+  </data>
+  <data name="Nom.appareils d'entree" xml:space="preserve">
+    <value>input devices</value>
+  </data>
+  <data name="PE.NonLu" xml:space="preserve">
+    <value>the HID devices could not be listed: the input devices are not read.</value>
+  </data>
+  <data name="PE.Aucun" xml:space="preserve">
+    <value>No mouse, keyboard or controller is connected right now (a controller that is switched off has no HID collection).</value>
+  </data>
+  <data name="PE.Ligne" xml:space="preserve">
+    <value>"{0}": {1}, {2}.</value>
+  </data>
+  <data name="PE.Role.Souris" xml:space="preserve">
+    <value>mouse</value>
+  </data>
+  <data name="PE.Role.Clavier" xml:space="preserve">
+    <value>keyboard</value>
+  </data>
+  <data name="PE.Role.Manette" xml:space="preserve">
+    <value>controller</value>
+  </data>
+  <data name="PE.Role.Multimedia" xml:space="preserve">
+    <value>media keys</value>
+  </data>
+  <data name="PE.Role.Autre" xml:space="preserve">
+    <value>other</value>
+  </data>
+  <data name="PE.Bluetooth" xml:space="preserve">
+    <value>over Bluetooth</value>
+  </data>
+  <data name="PE.UsbDirect" xml:space="preserve">
+    <value>USB, straight to a port of the motherboard</value>
+  </data>
+  <data name="PE.UsbConcentrateur" xml:space="preserve">
+    <value>USB, behind {0} hub(s)</value>
+  </data>
+  <data name="PE.AutreBus" xml:space="preserve">
+    <value>on another bus</value>
+  </data>
+  <data name="PE.Declare" xml:space="preserve">
+    <value> The role is the one each device declares in its HID collections, not guessed from its maker.</value>
+  </data>
+  <data name="FS.NomManette" xml:space="preserve">
+    <value>controller rate · {0}</value>
+  </data>
+  <data name="FS.Manette" xml:space="preserve">
+    <value>This USB controller asks the bus for a report every {1:0.###} ms, up to {0} Hz, after the rounding the USB controller applies. It is what the controller asks for; how often it really sends is measured by moving it.</value>
+  </data>
+  <data name="FS.ManetteNonLue" xml:space="preserve">
+    <value>the rate this USB controller asks for could not be read (several interfaces with different intervals, or a descriptor that could not be read).</value>
+  </data>
+  <data name="Nom.reveil des appareils d'entree" xml:space="preserve">
+    <value>input devices wake-up time</value>
+  </data>
+  <data name="RV.NonLu" xml:space="preserve">
+    <value>the power data of the input devices could not be read.</value>
+  </data>
+  <data name="RV.NonAnnonce" xml:space="preserve">
+    <value>not announced</value>
+  </data>
+  <data name="RV.Valeur" xml:space="preserve">
+    <value>up to {0:0.#} ms</value>
+  </data>
+  <data name="RV.AucunAnnonce" xml:space="preserve">
+    <value>The drivers of the {0} input devices announce no wake-up time from sleep.</value>
+  </data>
+  <data name="RV.Pire" xml:space="preserve">
+    <value>The longest wake-up time announced is "{0}": up to {1:0.#} ms to come back from sleep ({2} device(s) announce one). If it sleeps during a pause, its first move after waking can come late.</value>
+  </data>
+  <data name="RV.Incoherent" xml:space="preserve">
+    <value> Inconsistent value for {0}: a wake-up time is given for a sleep state the device says it does not support; it is shown as inconsistent, not converted.</value>
+  </data>
+  <data name="RV.Jamais" xml:space="preserve">
+    <value> DrDXT says it and never changes how USB devices go to sleep.</value>
+  </data>
+  <data name="Nom.cadence reelle des entrees" xml:space="preserve">
+    <value>real input rate</value>
+  </data>
+  <data name="CR.NonLu" xml:space="preserve">
+    <value>listening to the raw inputs could not start: the real rate is not measured.</value>
+  </data>
+  <data name="CR.RienBouge" xml:space="preserve">
+    <value>Nothing moved during the {0:0} seconds of listening: move the mouse or the controller while it runs.</value>
+  </data>
+  <data name="CR.Valeur" xml:space="preserve">
+    <value>{0:0} reports/s</value>
+  </data>
+  <data name="CR.Ligne" xml:space="preserve">
+    <value>"{0}": {1:0} reports/s, median interval {2:0.###} ms, p99 {3:0.###} ms ({4:0.0}× the median), {5} gap(s).</value>
+  </data>
+  <data name="CR.LigneVirtuelle" xml:space="preserve">
+    <value>"{0}" is a virtual device, not your controller: {1:0} reports/s, median interval {2:0.###} ms, p99 {3:0.###} ms ({4:0.0}× the median), {5} gap(s).</value>
+  </data>
+  <data name="CR.Couche" xml:space="preserve">
+    <value> Measured through a software layer (see the software input layers): it measures the layer as much as the device.</value>
+  </data>
+  <data name="CR.Mythe" xml:space="preserve">
+    <value> This is what arrives, not what the box promises; DrDXT never raises a device's rate itself.</value>
+  </data>
+  <data name="CR.SeulementVirtuels" xml:space="preserve">
+    <value> Only virtual devices sent reports: their cadence is the software's that produces them, not your controller's or mouse's. Nothing is measured; move a real device during the listen.</value>
+  </data>
+  <data name="Nom.jeux installes" xml:space="preserve">
+    <value>installed games</value>
+  </data>
+  <data name="JX.NonLu" xml:space="preserve">
+    <value>the game folders declared by the launchers could not be read.</value>
+  </data>
+  <data name="JX.Aucun" xml:space="preserve">
+    <value>No folder declared by a launcher contains the executable of a game DrDXT knows.</value>
+  </data>
+  <data name="JX.Prouve" xml:space="preserve">
+    <value>"{0}" ({1}): {2} is there, version {3}.</value>
+  </data>
+  <data name="JX.VersionNonLue" xml:space="preserve">
+    <value>not read</value>
+  </data>
+  <data name="JX.NonProuves" xml:space="preserve">
+    <value> Folders not proven (declared by a launcher, without the executable of a known game): {0}.</value>
+  </data>
+  <data name="JX.Regle" xml:space="preserve">
+    <value> A folder is a game folder only when the game's executable is in it, by its exact name.</value>
+  </data>
+  <data name="MO.Jeu" xml:space="preserve">
+    <value>Game updated: {0} {1} → {2}</value>
+  </data>
+  <data name="MO.Pilote" xml:space="preserve">
+    <value>Display driver changed: {0} {1} → {2}</value>
+  </data>
+  <data name="TBA.Table" xml:space="preserve">
+    <value>The BIOS settings of this AMD board ({0}) are named by DrDXT's table for exactly this board and BIOS version, built from {1}.</value>
+  </data>
+  <data name="TBA.SansTable" xml:space="preserve">
+    <value>The BIOS settings of this AMD board ({0}) are not named: DrDXT has no table for exactly this board and BIOS version. PBO, Curve Optimizer, EXPO and Power Down stay not read rather than borrowed from a neighbouring board or version.</value>
+  </data>
+  <data name="Nom.reglages BIOS AMD nommes" xml:space="preserve">
+    <value>AMD BIOS settings named</value>
+  </data>
+  <data name="Nom.timings appliques" xml:space="preserve">
+    <value>Applied memory timings</value>
+  </data>
+  <data name="TMA.TypeNonDecode" xml:space="preserve">
+    <value>The memory timings actually applied are not read: your modules do not all report DDR4, or all DDR5 (mixed, LPDDR or type not read), and DrDXT decodes only those two.</value>
+  </data>
+  <data name="TMA.NonLus" xml:space="preserve">
+    <value>The memory timings actually applied are not read: they live in the AMD memory controller, which DrDXT could only read through an AMD PawnIO module it does not ship. Timings shown elsewhere are those of the kit or of the BIOS, not those that run.</value>
+  </data>
+  <data name="TMA.Invraisemblables" xml:space="preserve">
+    <value>The memory controller registers were read, but a value fell outside its plausible range: the applied timings are reported as not read rather than as a wrong timing.</value>
+  </data>
+  <data name="TMA.Lus" xml:space="preserve">
+    <value>Timings actually applied by the memory controller, channel by channel: {0}.</value>
+  </data>
+  <data name="TMA.LusDdr5NonVerifiee" xml:space="preserve">
+    <value>Timings applied by the memory controller, channel by channel: {0}. The DDR5 register layout comes from a community compilation never checked against a reference reading: these values are not verified.</value>
+  </data>
+  <data name="Nom.regle contre applique (memoire)" xml:space="preserve">
+    <value>Memory set against applied</value>
+  </data>
+  <data name="RCA.AppliquesNonLus" xml:space="preserve">
+    <value>Whether the memory runs what your BIOS asks is not known: the timings applied by the AMD memory controller are not read, so neither a profile that failed training nor a timing that does not run can be seen.</value>
+  </data>
+  <data name="RCA.BiosNonNomme" xml:space="preserve">
+    <value>Whether the memory runs what your BIOS asks is not known: DrDXT has no name table for this board and BIOS version, so what you set there is not read.</value>
+  </data>
+  <data name="RCA.Secours" xml:space="preserve">
+    <value>Your BIOS asks for a memory profile ({0}), but every channel runs at {1} MT/s, the JEDEC floor, while your kit announces {2} MT/s: memory training most likely failed and the board fell back to safe speeds.</value>
+  </data>
+  <data name="RCA.Conforme" xml:space="preserve">
+    <value>Every timing set in your BIOS (Auto aside) runs as set, on all {0} channels.</value>
+  </data>
+  <data name="RCA.Ecarts" xml:space="preserve">
+    <value>Some timings set in your BIOS do not run as set: {0}. The BIOS value is not the one the memory controller applies.</value>
+  </data>
+  <data name="CO.DejaActif" xml:space="preserve">
+    <value>Curve Optimizer is already active on your {0}, read in your BIOS: {1}. DrDXT does not advise going further: a deeper value pushes the chip harder, and only a stability test proves it holds.</value>
+  </data>
+  <data name="Nom.limites PPT/TDC/EDC (AMD)" xml:space="preserve">
+    <value>PPT/TDC/EDC limits (AMD)</value>
+  </data>
+  <data name="PMA.NonLue" xml:space="preserve">
+    <value>Whether your Ryzen hits its PPT, TDC, EDC or thermal limit during a game is not read: these limits live in the SMU power table, which DrDXT could only copy and read through an AMD PawnIO module it does not ship. For Zen 4 and Zen 5, no public source gives the layout of that table.</value>
+  </data>
+  <data name="PMA.RienNeBride" xml:space="preserve">
+    <value>Over {0} seconds of play, no limit held your Ryzen back: PPT, TDC, EDC and the thermal limit each stayed under 5 % of the time at 97 % of their ceiling or more (a threshold chosen by DrDXT, not a figure from AMD).</value>
+  </data>
+  <data name="PMA.Bride" xml:space="preserve">
+    <value>Over {1} seconds of play, your Ryzen spent this share of the time at 97 % of a limit or more (a threshold chosen by DrDXT, not a figure from AMD): {0}. A power or current limit is set in the BIOS (PBO limits); the thermal limit is lifted by cooling.</value>
+  </data>
+  <data name="Nom.lectures AMD profondes" xml:space="preserve">
+    <value>deep AMD readings</value>
+  </data>
+  <data name="LAP.Fermee" xml:space="preserve">
+    <value>Deep AMD readings unavailable: the AMD reading module is not installed. Concerned: {0}.</value>
+  </data>
+  <data name="LAP.Liste" xml:space="preserve">
+    <value>memory timings actually applied, memory set against applied, PPT/TDC/EDC limits in game (PM table), BIOS settings named for this AMD board</value>
+  </data>
+  <data name="MO.HvciActive" xml:space="preserve">
+    <value>Memory integrity (HVCI) turned back on since the previous scan.</value>
+  </data>
+  <data name="MO.HvciCoupee" xml:space="preserve">
+    <value>Memory integrity (HVCI) turned off since the previous scan.</value>
+  </data>
+  <data name="Nom.radar des regressions connues" xml:space="preserve">
+    <value>known regressions radar</value>
+  </data>
+  <data name="RR.NomRegle" xml:space="preserve">
+    <value>known regression · {0}</value>
+  </data>
+  <data name="RR.NonLu" xml:space="preserve">
+    <value>The Windows Update history could not be read: the known regressions radar compared nothing. This is not "no regression".</value>
+  </data>
+  <data name="RR.Vide" xml:space="preserve">
+    <value>No rule in the known regressions radar (tables version {0}): a regression only goes in with its source published by Microsoft or the manufacturer. Nothing is claimed here.</value>
+  </data>
+  <data name="RR.ValeurVide" xml:space="preserve">
+    <value>no rule</value>
+  </data>
+  <data name="RR.Concerne" xml:space="preserve">
+    <value>{0} Source: {1}, read on {2} (tables version {3}).</value>
+  </data>
+  <data name="RR.Remede" xml:space="preserve">
+    <value>The fix is update {0}: Settings &gt; Windows Update &gt; Check for updates.</value>
+  </data>
+  <data name="RR.NonJugees" xml:space="preserve">
+    <value>{0} rules read (tables version {2}); {1} could not be judged: the driver or the processor was not read.</value>
+  </data>
+  <data name="RR.AucuneConcerne" xml:space="preserve">
+    <value>{0} rules read (tables version {1}): none applies to this PC.</value>
+  </data>
+  <data name="Nom.traces de reglages" xml:space="preserve">
+    <value>settings traces</value>
+  </data>
+  <data name="Nom.traces : MMCSS (SystemResponsiveness)" xml:space="preserve">
+    <value>traces: MMCSS (SystemResponsiveness)</value>
+  </data>
+  <data name="Nom.traces : delais TDR de la carte" xml:space="preserve">
+    <value>traces: graphics card TDR delays</value>
+  </data>
+  <data name="TO.NomAffinite" xml:space="preserve">
+    <value>traces: interrupt affinity · {0}</value>
+  </data>
+  <data name="TO.NonLu" xml:space="preserve">
+    <value>The registry could not be read: traces of other tuning tools were not looked for. This is not "no trace".</value>
+  </data>
+  <data name="TO.Date" xml:space="preserve">
+    <value> The key was last written on {0}, the date of the whole key and not of this value alone: {1}.</value>
+  </data>
+  <data name="TO.Origine.TenueParDrDxt" xml:space="preserve">
+    <value>DrDXT itself keeps a setting in it, the date may be its own</value>
+  </data>
+  <data name="TO.Origine.AuDemarrage" xml:space="preserve">
+    <value>within minutes of Windows starting, which rewrites keys at startup; nothing is attributed</value>
+  </data>
+  <data name="TO.Origine.AvantInstallation" xml:space="preserve">
+    <value>before the last installation or upgrade of Windows, which keeps the earlier registry: the date does not say who set it</value>
+  </data>
+  <data name="TO.Origine.ApresInstallation" xml:space="preserve">
+    <value>within 24 hours of Windows being installed or upgraded</value>
+  </data>
+  <data name="TO.Origine.SansRepere" xml:space="preserve">
+    <value>after Windows was installed and outside startup: something changed it since, Windows itself included</value>
+  </data>
+  <data name="TO.Origine.DateNonLue" xml:space="preserve">
+    <value>date not read</value>
+  </data>
+  <data name="TO.Mmcss" xml:space="preserve">
+    <value>MMCSS read: {0}. According to Microsoft, this value is the share of the processor guaranteed to low-priority tasks (20 = 20%, 100 turns MMCSS off). DrDXT reads it and does not touch it.</value>
+  </data>
+  <data name="TO.Absente" xml:space="preserve">
+    <value>SystemResponsiveness absent</value>
+  </data>
+  <data name="TO.Tdr" xml:space="preserve">
+    <value>Graphics card delay values set ({0}). Microsoft reserves them for driver development and writes that end users should not change them. DrDXT does not remove them: if you did not set them yourself, another program did.</value>
+  </data>
+  <data name="TO.Affinite" xml:space="preserve">
+    <value>This device's interrupts go to designated processors (IrqPolicySpecifiedProcessors: {0}). Microsoft recommends the default policy when it fits. DrDXT does not remove it.</value>
+  </data>
+  <data name="TO.Source" xml:space="preserve">
+    <value> Source: {0}.</value>
+  </data>
+  <data name="TL.Entete" xml:space="preserve">
+    <value>Test of {0} against {1}, about {2} MB exchanged.</value>
+  </data>
+  <data name="TL.Descente" xml:space="preserve">
+    <value>Download at {0:0} Mbit/s:</value>
+  </data>
+  <data name="TL.Montee" xml:space="preserve">
+    <value>Upload at {0:0} Mbit/s:</value>
+  </data>
+  <data name="TL.NonMesurable" xml:space="preserve">
+    <value> not enough ping replies (fewer than {0}) to judge.</value>
+  </data>
+  <data name="TL.SansCharge" xml:space="preserve">
+    <value> nothing could get through to {0} (server unreachable or requests refused): the line was not loaded, nothing is judged.</value>
+  </data>
+  <data name="TL.Ping" xml:space="preserve">
+    <value> the ping to the internet goes from {0:0} to {1:0} ms (+{2:0} ms)</value>
+  </data>
+  <data name="TL.Box" xml:space="preserve">
+    <value>, to your router +{0:0} ms</value>
+  </data>
+  <data name="TL.Calme" xml:space="preserve">
+    <value>. It does not rise by {0:0} ms or more: nothing to fix.</value>
+  </data>
+  <data name="TL.Monte" xml:space="preserve">
+    <value>. When the line is full, your ping takes {0:0} ms more.</value>
+  </data>
+  <data name="TL.Carte" xml:space="preserve">
+    <value>. The line runs at {0:0}% of your network card's speed ({1:0} Mbit/s): the queue that raises the ping is probably in the PC's card, not in your router.</value>
+  </data>
+  <data name="Nom.superpositions materielles" xml:space="preserve">
+    <value>hardware overlays (MPO)</value>
+  </data>
+  <data name="MPO.NonLu" xml:space="preserve">
+    <value>Windows' DWM settings could not be read: whether hardware overlays are turned off is not read.</value>
+  </data>
+  <data name="MPO.Defaut" xml:space="preserve">
+    <value>Windows default</value>
+  </data>
+  <data name="MPO.Absente" xml:space="preserve">
+    <value>No setting turns hardware overlays off: Windows default.</value>
+  </data>
+  <data name="MPO.Coupees" xml:space="preserve">
+    <value>Hardware overlays are turned off (OverlayTestMode = 5, the value NVIDIA's own file sets to turn them off). A game in borderless window then loses independent flip and goes through Windows' composition. NVIDIA's restore file removes the value; restart afterwards.</value>
+  </data>
+  <data name="MPO.Autre" xml:space="preserve">
+    <value>OverlayTestMode is set to {0}, a value no public source describes: said as read, without a verdict.</value>
+  </data>
+  <data name="VC.Nom" xml:space="preserve">
+    <value>speed and duplex · {0}</value>
+  </data>
+  <data name="Nom.vitesse de la carte" xml:space="preserve">
+    <value>network card speed</value>
+  </data>
+  <data name="VC.NonLu" xml:space="preserve">
+    <value>the network cards could not be read: their speed and duplex settings are not read.</value>
+  </data>
+  <data name="VC.SansMotCle" xml:space="preserve">
+    <value>This card does not expose the standard speed and duplex setting: not read.</value>
+  </data>
+  <data name="VC.Auto" xml:space="preserve">
+    <value>auto-negotiation</value>
+  </data>
+  <data name="VC.Integral" xml:space="preserve">
+    <value>full duplex</value>
+  </data>
+  <data name="VC.Semi" xml:space="preserve">
+    <value>half duplex</value>
+  </data>
+  <data name="VC.Lien" xml:space="preserve">
+    <value>link negotiated at {0} Mbit/s, {1}</value>
+  </data>
+  <data name="VC.LienNonLu" xml:space="preserve">
+    <value>negotiated link not read</value>
+  </data>
+  <data name="VC.Negocie" xml:space="preserve">
+    <value>Speed and duplex left to auto-negotiation: {0}.</value>
+  </data>
+  <data name="VC.ForceeValeur" xml:space="preserve">
+    <value>forced to {0} Mbit/s, {1}</value>
+  </data>
+  <data name="VC.Incoherente" xml:space="preserve">
+    <value>Speed or duplex forced to a value the link did not take ({0}): the link runs below what it can, or loses packets. Put "Speed &amp; Duplex" back to auto-negotiation in the card's properties.</value>
+  </data>
+  <data name="VC.ForceeEgale" xml:space="preserve">
+    <value>Speed and duplex are forced, and the link matches them ({0}).</value>
+  </data>
+  <data name="VC.Inconnue" xml:space="preserve">
+    <value>*SpeedDuplex is set to {0}, a value the Microsoft table does not describe (the card's maker defines it): {1}. Said as read.</value>
+  </data>
+  <data name="VC.Constructeur" xml:space="preserve">
+    <value> As the driver names them: {0}. Their effect in game is not proven; DrDXT does not change them.</value>
+  </data>
+  <data name="Nom.pilote graphique 32 bits" xml:space="preserve">
+    <value>32-bit graphics driver</value>
+  </data>
+  <data name="G32.Nom" xml:space="preserve">
+    <value>32-bit graphics driver · {0}</value>
+  </data>
+  <data name="G32.NonLu" xml:space="preserve">
+    <value>the display cards could not be read: the 32-bit graphics driver is not read.</value>
+  </data>
+  <data name="G32.ValeurPresent" xml:space="preserve">
+    <value>present</value>
+  </data>
+  <data name="G32.ValeurAbsent" xml:space="preserve">
+    <value>missing</value>
+  </data>
+  <data name="G32.Present" xml:space="preserve">
+    <value>The card's driver declares its 32-bit user-mode part and its files are there: 32-bit programs (launchers) can open the card.</value>
+  </data>
+  <data name="G32.Absent" xml:space="preserve">
+    <value>The driver of "{0}" declares no 32-bit user-mode part: a 32-bit program (a launcher, for instance) cannot open the card and may stay black. Reinstall the card's driver from its maker.</value>
+  </data>
+  <data name="G32.Manquant" xml:space="preserve">
+    <value>The driver of "{0}" declares its 32-bit part but the file is missing ({1}): a 32-bit program (a launcher, for instance) may stay black. Reinstall the card's driver from its maker.</value>
+  </data>
+  <data name="Nom.topologie d'affichage" xml:space="preserve">
+    <value>display topology</value>
+  </data>
+  <data name="TOPO.NonLu" xml:space="preserve">
+    <value>Windows did not give its display paths: the topology is not read.</value>
+  </data>
+  <data name="TOPO.ValeurUnique" xml:space="preserve">
+    <value>one screen</value>
+  </data>
+  <data name="TOPO.ValeurEtendue" xml:space="preserve">
+    <value>{0} screens, extended</value>
+  </data>
+  <data name="TOPO.ValeurDupliquee" xml:space="preserve">
+    <value>duplicated</value>
+  </data>
+  <data name="TOPO.ValeurEtendueSeule" xml:space="preserve">
+    <value>extended</value>
+  </data>
+  <data name="TOPO.EcranSansNom" xml:space="preserve">
+    <value>unnamed screen</value>
+  </data>
+  <data name="TOPO.Unique" xml:space="preserve">
+    <value>A single active screen: nothing is duplicated.</value>
+  </data>
+  <data name="TOPO.Etendue" xml:space="preserve">
+    <value>{0} screens, each with its own desktop (extended): each one keeps its own refresh rate.</value>
+  </data>
+  <data name="TOPO.DupliqueeCoute" xml:space="preserve">
+    <value>"{0}" ({1} Hz) duplicates "{2}" ({3} Hz): one image for two different refresh rates. What duplication costs the fast screen is not measured. Switch to Extend (Windows + P) to give each screen its own rate.</value>
+  </data>
+  <data name="TOPO.DupliqueeMeme" xml:space="preserve">
+    <value>Duplicated screens at the same refresh rate: no wait between them. If one screen can go faster, the screen line says so.</value>
+  </data>
+  <data name="Nom.sortie couleur" xml:space="preserve">
+    <value>colour output</value>
+  </data>
+  <data name="COUL.Nom" xml:space="preserve">
+    <value>colour output · {0}</value>
+  </data>
+  <data name="COUL.NonLu" xml:space="preserve">
+    <value>Windows did not give the colour of its outputs: not read.</value>
+  </data>
+  <data name="COUL.Rvb" xml:space="preserve">
+    <value>RGB</value>
+  </data>
+  <data name="COUL.Autre" xml:space="preserve">
+    <value>other encoding</value>
+  </data>
+  <data name="COUL.Valeur" xml:space="preserve">
+    <value>{0}, {1} bits, {2}</value>
+  </data>
+  <data name="COUL.Complete" xml:space="preserve">
+    <value>Full colour reaches the screen: every pixel carries its own colour, 8 bits or more per channel.</value>
+  </data>
+  <data name="COUL.SousEchantillonne" xml:space="preserve">
+    <value>The card sends YCbCr with shared colour between neighbouring pixels: small text and thin lines can look blurred. It can come from a cable or port that cannot carry RGB at this rate; DrDXT does not say whether it could be avoided.</value>
+  </data>
+  <data name="COUL.PeuDeBits" xml:space="preserve">
+    <value>Only {0} bits per colour channel: gradients can show bands.</value>
+  </data>
+  <data name="Nom.pilote RTCore" xml:space="preserve">
+    <value>RTCore driver</value>
+  </data>
+  <data name="RTC.NonLu" xml:space="preserve">
+    <value>The system drivers could not be read: the RTCore driver is not checked.</value>
+  </data>
+  <data name="RTC.ValeurAbsent" xml:space="preserve">
+    <value>absent</value>
+  </data>
+  <data name="RTC.Absent" xml:space="preserve">
+    <value>No RTCore driver: this kernel driver, versions of which Microsoft blocks as vulnerable, is not installed.</value>
+  </data>
+  <data name="RTC.Installe" xml:space="preserve">
+    <value>The RTCore kernel driver is installed (not loaded right now). Versions of it are on Microsoft's vulnerable driver blocklist: a program can use it to take over the kernel. Update or uninstall the tuning tool that brought it.</value>
+  </data>
+  <data name="RTC.Charge" xml:space="preserve">
+    <value>The RTCore kernel driver is loaded. Versions of it are on Microsoft's vulnerable driver blocklist: a program can use it to take over the kernel. Update or uninstall the tuning tool that brought it, and turn on the vulnerable driver blocklist in Windows Security.</value>
+  </data>
+  <data name="Nom.OBS Studio" xml:space="preserve">
+    <value>OBS Studio</value>
+  </data>
+  <data name="Nom.configuration d'OBS" xml:space="preserve">
+    <value>OBS configuration</value>
+  </data>
+  <data name="Nom.pertes en stream" xml:space="preserve">
+    <value>stream losses</value>
+  </data>
+  <data name="OBS.ValeurAbsent" xml:space="preserve">
+    <value>not installed</value>
+  </data>
+  <data name="OBS.Absent" xml:space="preserve">
+    <value>OBS Studio is not set up for this account: nothing to read on the stream side.</value>
+  </data>
+  <data name="OBS.ReglagesNonLus" xml:space="preserve">
+    <value>OBS is there but its active profile could not be read.</value>
+  </data>
+  <data name="OBS.Reglages" xml:space="preserve">
+    <value>The encoder, bitrate and output size of the active OBS profile, as OBS saved them.</value>
+  </data>
+  <data name="OBS.Logiciel" xml:space="preserve">
+    <value>OBS encodes with x264, on the processor: the processor then shares itself between the game and the stream. A graphics card encoder (NVENC, AMF, Quick Sync), when the card has one, leaves the processor to the game.</value>
+  </data>
+  <data name="OBS.JournauxNonLus" xml:space="preserve">
+    <value>The OBS logs could not be read.</value>
+  </data>
+  <data name="OBS.ValeurAucune" xml:space="preserve">
+    <value>no session</value>
+  </data>
+  <data name="OBS.AucuneSession" xml:space="preserve">
+    <value>No stream or recording in the last {0} days of logs.</value>
+  </data>
+  <data name="OBS.BilanNonReconnu" xml:space="preserve">
+    <value>{0} OBS sessions stopped, but their summary line was not recognised (new OBS version?): losses not read.</value>
+  </data>
+  <data name="OBS.ValeurPertes" xml:space="preserve">
+    <value>encoding {0} %, rendering {1} %, network {2} %</value>
+  </data>
+  <data name="OBS.Propres" xml:space="preserve">
+    <value>{0} OBS sessions in {1} days, losses at or under 1 % (OBS's own warning threshold).</value>
+  </data>
+  <data name="OBS.Quelques" xml:space="preserve">
+    <value>{0} OBS sessions in {1} days: some losses, between 1 and 5 % (OBS shows them in warning).</value>
+  </data>
+  <data name="OBS.Encodage" xml:space="preserve">
+    <value>Up to {0} % of frames skipped because the encoder could not keep up (over {1} sessions in {2} days; OBS shows over 5 % as an error). Lower the encoder preset, the output size or the frame rate in OBS.</value>
+  </data>
+  <data name="OBS.Rendu" xml:space="preserve">
+    <value>Up to {0} % of frames missed by OBS's rendering, usually because the game takes the whole graphics card (over {1} sessions in {2} days; OBS shows over 5 % as an error). Cap the game's frame rate a little under its usual level.</value>
+  </data>
+  <data name="OBS.Reseau" xml:space="preserve">
+    <value>Up to {0} % of frames dropped by the network (over {1} sessions in {2} days; OBS shows over 5 % as an error). Lower the stream bitrate under what the connection carries upward.</value>
+  </data>
+  <data name="Nom.programmes qui envoient" xml:space="preserve">
+    <value>programs sending</value>
+  </data>
+  <data name="ENV.NonLu" xml:space="preserve">
+    <value>The network send trace could not be opened: who uses the upload is not read.</value>
+  </data>
+  <data name="ENV.ValeurRien" xml:space="preserve">
+    <value>nothing</value>
+  </data>
+  <data name="ENV.Rien" xml:space="preserve">
+    <value>No program sent anything during the {0} s of the scan.</value>
+  </data>
+  <data name="ENV.Liste" xml:space="preserve">
+    <value>The programs that sent the most during {0} s of the scan, TCP and UDP: {1}. A file sync, a voice call or a launcher downloading takes the upload the game needs; DrDXT does not measure the connection's upload, so it gives no share.</value>
+  </data>
+  <data name="Nom.type de NAT" xml:space="preserve">
+    <value>NAT type</value>
+  </data>
+  <data name="NAT.ValeurSimple" xml:space="preserve">
+    <value>one NAT (the box)</value>
+  </data>
+  <data name="NAT.ValeurDouble" xml:space="preserve">
+    <value>double NAT</value>
+  </data>
+  <data name="NAT.ValeurCgnat" xml:space="preserve">
+    <value>operator NAT (CGNAT)</value>
+  </data>
+  <data name="NAT.ValeurTunnel" xml:space="preserve">
+    <value>operator NAT (IPv4 over a tunnel)</value>
+  </data>
+  <data name="NAT.Simple" xml:space="preserve">
+    <value>The box holds a public address: one NAT only, the box's. A "strict" NAT in a game then comes from the box's settings (UPnP, open ports), not from the line.</value>
+  </data>
+  <data name="NAT.Double" xml:space="preserve">
+    <value>The box gets a private address from another router between it and the Internet: two NATs in a row (box behind box). The box's UPnP opens ports only on the box, not on the router in front of it: hence a "strict" NAT in games. Put one of the two in bridge mode, or connect the PC to the first one.</value>
+  </data>
+  <data name="NAT.Cgnat" xml:space="preserve">
+    <value>The box's address is in the operators' shared space (100.64.0.0/10, RFC 6598): the operator has its own NAT between the box and the Internet, which neither the box nor the PC can open. It hinders direct connections to other players ("strict" NAT in games); only the operator can give a public IPv4 (an option sometimes called "full-stack" or fixed IP).</value>
+  </data>
+  <data name="NAT.DsLite" xml:space="preserve">
+    <value>The address the box gives is in the IPv4 service continuity range (192.0.0.0/29, RFC 6333 and RFC 7335), the one used by DS-Lite and similar mechanisms: the box has no public IPv4 of its own, its IPv4 goes through a tunnel to the operator's NAT. That NAT hinders direct connections to other players ("strict" NAT in games); only the operator can give a public IPv4.</value>
+  </data>
+  <data name="NAT.AucunePasserelle" xml:space="preserve">
+    <value>No box answered in UPnP: the NAT type is not read (UPnP off on the box, or no box).</value>
+  </data>
+  <data name="NAT.NonLu" xml:space="preserve">
+    <value>The box answered but did not give its WAN address: the NAT type is not read.</value>
+  </data>
+  <data name="VC.Arret.Joueur" xml:space="preserve">
+    <value>Stopped at the player's request, between two settings: the remaining ones were not touched.</value>
+  </data>
+  <data name="TOPO.ValeurDupliqueeHz" xml:space="preserve">
+    <value>duplicated, {0} Hz and {1} Hz</value>
+  </data>
+  <data name="Promesse.GpuSature" xml:space="preserve">
+    <value>{0} Fixing this is still worth doing, but it will not give you frames on this machine.</value>
+  </data>
+  <data name="Promesse.ProcesseurLimite" xml:space="preserve">
+    <value>{0} A graphics-side change is not the answer to this.</value>
+  </data>
+  <data name="Promesse.Memoire" xml:space="preserve">
+    <value>{0} Nothing here is sold as frames while that holds.</value>
+  </data>
+  <data name="Promesse.Plafond" xml:space="preserve">
+    <value>{0} No frame-rate gain can be proven while the cap holds.</value>
+  </data>
+  <data name="Promesse.Chaleur" xml:space="preserve">
+    <value>{0} Give it thermal headroom before asking more of it.</value>
+  </data>
+  <data name="Promesse.Cadence" xml:space="preserve">
+    <value>{0} Steady pacing is the fix here, not more raw throughput.</value>
+  </data>
+  <data name="VM.FrequenceMax" xml:space="preserve">
+    <value>Maximum GPU frequency (MHz)</value>
+  </data>
+  <data name="MAJ.InstalleurEleve" xml:space="preserve">
+    <value>Restart DrDXT normally to install the update.</value>
   </data>
 </root>

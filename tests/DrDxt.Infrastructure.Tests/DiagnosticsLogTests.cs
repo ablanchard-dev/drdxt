@@ -152,4 +152,21 @@ public sealed class DiagnosticsLogTests : IDisposable
         result.IsOk.Should().BeTrue();
         Path.IsPathRooted(result.Value!).Should().BeTrue("returned path must be absolute");
     }
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateHardLink(string lien, string cible, IntPtr securite);
+
+    // Le dossier des diagnostics appartient au joueur : un nom posé d'avance en lien dur faisait écrire l'App élevée dans
+    // un autre fichier. Le journal des changements ne s'allonge que s'il n'a qu'un nom.
+    [Fact]
+    public void Le_journal_des_changements_ne_s_ecrit_jamais_a_travers_un_lien_dur()
+    {
+        Directory.CreateDirectory(_tempDir);
+        var temoin = Path.Combine(_tempDir, "temoin.txt");
+        File.WriteAllText(temoin, "intact");
+        CreateHardLink(Path.Combine(_tempDir, "changes.journal.log"), temoin, IntPtr.Zero).Should().BeTrue();
+
+        new DiagnosticsLog(_tempDir).Change("latency.hagsOn", "0", "2", "DrDXT");
+
+        File.ReadAllText(temoin).Should().Be("intact");
+    }
 }

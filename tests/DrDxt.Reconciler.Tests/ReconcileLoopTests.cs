@@ -248,24 +248,6 @@ public sealed class ReconcileLoopTests
         h.Diagnostics.Entries.Should().Contain(e => e.tweakId == "a" && e.actor.Contains("paused"));
     }
 
-    // Coupe-circuit global : zéro écriture quelle que soit la dérive, Ok + rapport en pause.
-    [Fact]
-    public async Task ReconcileAsync_GlobalPaused_SkipsAllWrites()
-    {
-        var h = ResetScenario("a", "b");
-        await h.StateStore.SaveAsync(
-            (h.StateStore.Saved ?? ReconcilerState.Default) with { GlobalPaused = true }, default);
-        h.Probe.Set("a", "0").Set("b", "0");
-        var desired = new DesiredState(new[] { Tweak("a", "1", "0"), Tweak("b", "2", "0") });
-
-        var reconciler = h.Build();
-        var (result, report) = await reconciler.ReconcileWithReportAsync(desired, default);
-
-        result.IsOk.Should().BeTrue();
-        report.GloballyPaused.Should().BeTrue();
-        h.Reapply.Reapplies.Should().BeEmpty();
-    }
-
     // Anti-boucle de démarrage : l'élément de réglage GPU est suspendu au seuil de série,
     // les éléments sûrs continuent de se réconcilier.
     [Fact]

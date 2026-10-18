@@ -188,18 +188,7 @@ public static class MachineManifestKey
         if (appliquerAcl)
             return TrustedManifestRoot.WriteTrustedFile(chemin, octets, prive);
 
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(chemin)!);
-            var tmp = chemin + ".tmp";
-            File.WriteAllBytes(tmp, octets);
-            File.Move(tmp, chemin, overwrite: true);
-            return Result.Ok();
-        }
-        catch (Exception ex)
-        {
-            return Result.Fail(ErrorCodes.IoFailure, $"Could not write '{chemin}': {ex.Message}");
-        }
+        return new FichierJsonAtomique(chemin, ErrorCodes.IoFailure).WriteAtomic(octets);
     }
 
     private static Result<Paire> Inutilisable(string pourquoi)

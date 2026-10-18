@@ -229,4 +229,24 @@ public sealed class GestesPnpTests : IDisposable
         PrivilegedOpCodec.Deserialize(PrivilegedOpCodec.Serialize(new RestoreDriverPackageOp("oem98.inf")).Value!).Value
             .Should().Be(new RestoreDriverPackageOp("oem98.inf"));
     }
+    // Un dossier non fiable au nom plus récent (posé d'avance dans un %ProgramData%\DrDxt préparé par un compte, la
+    // réparation ne descendant pas) passait en tête et bloquait pour toujours la remise du vrai export. Le plus récent est
+    // pris parmi les exports fiables : le posé est sauté, jamais installé.
+    [Fact]
+    public void Un_export_non_fiable_au_nom_plus_recent_ne_bloque_pas_la_remise()
+    {
+        var p = new Pnputil(Inf);
+        File.WriteAllText(Path.Combine(Inf, "oem12.inf"), Affichage);
+        Actions(p).RemoveDriverPackage("oem12.inf").IsOk.Should().BeTrue();
+        var vrai = Export("oem12");
+        var pose = Path.Combine(Exports, "oem12-99999999999999999");
+        Directory.CreateDirectory(pose);
+        File.WriteAllText(Path.Combine(pose, "pose.inf"), Affichage);
+        var a = new Win32PnpActions(p.Run, Inf, Exports, d => { Directory.CreateDirectory(d); return Result.Ok(); },
+            d => d == pose ? Result.Fail(ErrorCodes.SignatureInvalid, "non fiable") : Result.Ok(), _ => true, () => _horloge);
+
+        a.RestoreDriverPackage("oem12.inf").IsOk.Should().BeTrue();
+
+        p.Appels.Last().Should().Be($"/add-driver {Path.Combine(vrai, "nv_dispi.inf")} /install");
+    }
 }

@@ -43,12 +43,17 @@ public abstract class LatencyTweakBase : ITweak
     /// <c>TriState</c> le redefinissent ; les autres repondent toujours, donc n'ont rien a dire.</remarks>
     public virtual bool EtatNonLu(SettingsState state) => false;
 
+    /// <summary>Virtuel ici pour la même raison qu'<see cref="EtatNonLu"/> : null = pas d'exercice sûr.</summary>
+    public virtual ExerciceProfond? PreparerExercice(HardwareInventory hw, SettingsState state) => null;
+
     public abstract Task<Result<TweakSnapshot>> ApplyAsync();
 
     /// <summary>Annule en rejouant l'op inverse sérialisée du snapshot.
     /// Prudent : snapshot malformé → SAFETY.SNAPSHOT_INVALID, ne lève jamais.</summary>
     public virtual async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Snapshot has no original-value payload.");
 
@@ -182,7 +187,7 @@ public abstract class LatencyTweakBase : ITweak
 
         // Un inverse qui réécrit une origine hors de l'énumération documentée ne se rejouerait pas (le helper la refuse) : rien n'est écrit, sinon le
         // réglage de DrDXT resterait posé pour toujours.
-        if (inverse is ApplyNvApiDrsSettingOp rejeu && !ValeursDrs.Documentee(settingId, rejeu.Value))
+        if (inverse is ApplyNvApiDrsSettingOp rejeu && !ValeursDrs.Admise(settingId, rejeu.Value, portee == ProfilDeBase))
             return Result<(PrivilegedOp, ApplyNvApiDrsSettingOp)>.Fail(ErrorCodes.TweakSdkUnavailable,
                 $"The current {quoi} (0x{avant:X}) is outside NVIDIA's documented values and could not be restored: nothing is written.");
 

@@ -38,16 +38,17 @@ public sealed class ServeurDuProcesseurTests
     public async Task Un_client_qui_ne_lit_pas_ne_bloque_pas_les_suivants()
     {
         var nom = NomUnique();
-        var serveur = new ServeurDuProcesseur(() => Etat, () => { }, () => false, () => DateTimeOffset.Now, nom);
-        using var fin = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        // Le muet garde son instance 60 s, la lecture a 10 s : un serveur qui servirait un client après l'autre ne répond
+        // jamais à temps, un serveur qui les sert à part répond en quelques dizaines de ms. Avec la borne réelle (1 s), un
+        // serveur en série répondait lui aussi dans les 2 s, et la marge sous charge (pool de fils du test affamé) était nulle.
+        var serveur = new ServeurDuProcesseur(() => Etat, () => { }, () => false, () => DateTimeOffset.Now, nom,
+            delaiEcriture: TimeSpan.FromSeconds(60));
+        using var fin = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var service = serveur.ServirAsync(fin.Token, connexionsMax: 6);
 
         using var muet = new NamedPipeClientStream(".", nom, PipeDirection.In);
         await muet.ConnectAsync(2000);
-        // Le client attend 300 ms une instance libre puis retente à la seconde suivante : sous charge (suite complète en
-        // parallèle), un premier essai peut tomber entre deux instances. Ce qui compte : une lecture aboutit, bien avant la
-        // borne d'écriture d'une seconde que garde le client muet.
-        (await LireDansLes(nom, TimeSpan.FromSeconds(2))).Should().Be(Etat);
+        (await LireDansLes(nom, TimeSpan.FromSeconds(10))).Should().Be(Etat);
         fin.Cancel();
         (await service).Should().BeTrue();
     }

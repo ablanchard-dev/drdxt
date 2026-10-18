@@ -62,7 +62,7 @@ public sealed class RealCpuSustainedBench : ICpuSustainedBench
 
     /// <summary>Lance <paramref name="charge"/> et relève la fréquence des <paramref name="processeurs"/> pendant
     /// qu'elle tourne, à partir de <paramref name="apresSecondes"/> ; la médiane des relevés, <c>null</c> sans relevé.</summary>
-    private T PendantQue<T>(Func<T> charge, IReadOnlyList<int> processeurs, double apresSecondes, out double? frequence)
+    internal T PendantQue<T>(Func<T> charge, IReadOnlyList<int> processeurs, double apresSecondes, out double? frequence)
     {
         if (_frequenceMhz is null) { frequence = null; return charge(); }
         var releves = new List<double>();
@@ -72,10 +72,13 @@ public sealed class RealCpuSustainedBench : ICpuSustainedBench
             var debut = DateTime.UtcNow;
             while (!fin.IsCancellationRequested)
             {
-                // Chaque lecture attend elle-même ~300 ms entre ses deux échantillons.
+                // Chaque lecture attend elle-même ~300 ms entre ses deux échantillons ; celle qui rend aussitôt (compteurs
+                // absents) attend le reste, sinon la boucle occupe un cœur pendant le banc.
                 if ((DateTime.UtcNow - debut).TotalSeconds < apresSecondes) { fin.Token.WaitHandle.WaitOne(250); continue; }
+                var lecture = System.Diagnostics.Stopwatch.StartNew();
                 try { if (_frequenceMhz(processeurs) is { } f && f > 0) lock (releves) releves.Add(f); }
                 catch { /* un relevé perdu n'invalide pas le banc */ }
+                if (lecture.ElapsedMilliseconds < 250) fin.Token.WaitHandle.WaitOne(250 - (int)lecture.ElapsedMilliseconds);
             }
         });
         var resultat = charge();

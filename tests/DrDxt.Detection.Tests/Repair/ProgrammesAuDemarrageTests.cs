@@ -43,7 +43,11 @@ public sealed class ProgrammesAuDemarrageTests
 
     [Fact]
     public void La_securite_de_Windows_est_dite_a_garder()
-        => ProgrammesAuDemarrage.Juger(Ok(E("SecurityHealth")), [], Existe).Single().Explication.Should().Contain("Sécurité Windows, à garder");
+        => ProgrammesAuDemarrage.Juger(Ok(E("SecurityHealth")), [], Existe).Single().Explication.Should().Contain("programme de sécurité, à garder");
+
+    [Fact]
+    public void Un_antivirus_est_dit_a_garder()
+        => ProgrammesAuDemarrage.Juger(Ok(E("AvastUI.exe")), [], Existe).Single().Explication.Should().Contain("programme de sécurité, à garder");
 
     [Fact]
     public void Rien_au_demarrage_rien_n_est_dit()

@@ -29,6 +29,13 @@ public sealed class MisesAJourEnAttenteTests
         c.Explication.Should().Contain("Télécharger et installer").And.Contain("hors partie").And.Contain("rien ne presse");
     }
 
+    // Relevé sur la machine de référence : la même version proposée deux fois sous le même titre. Une seule ligne.
+    [Fact]
+    public void Une_version_proposee_deux_fois_sous_le_meme_titre_n_est_dite_qu_une_fois()
+        => MisesAJourEnAttente.JugerProposees(
+            [new("Windows 11, version 26H2", GenreDeMiseAJour.NouvelleVersion), new("Windows 11, version 26H2", GenreDeMiseAJour.NouvelleVersion)], "25H2")
+            .Should().ContainSingle().Which.ValeurCourante.Should().Be("Windows 11, version 26H2");
+
     // La seconde recherche en panne est « non lu », pas « rien de proposé ».
     [Fact]
     public void Une_recherche_des_propositions_ratee_se_dit_non_lue()

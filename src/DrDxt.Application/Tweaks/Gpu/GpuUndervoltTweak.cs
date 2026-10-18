@@ -96,6 +96,16 @@ public sealed class GpuUndervoltTweak : GpuTweakBase
         }
     }
 
+    /// <summary>Pose une cible donnée, sans bail : pour le banc de validation, dont le canal élevé vit dans son propre
+    /// processus (un bail n'y rendrait rien) et dont le journal rend l'essai au lancement suivant. Mêmes bornes, même
+    /// sonde d'écriture et même test de stabilité que la pose normale.</summary>
+    internal async Task<Result<TweakSnapshot>> ApplyAvecCibleAsync(GpuTuningTarget cible)
+    {
+        _cibleExpert = cible;
+        try { return await ApplyAsync().ConfigureAwait(false); }
+        finally { _cibleExpert = null; }
+    }
+
     /// <summary>null = rien à armer ou bail armé ; sinon le refus, et l'écriture n'a pas lieu.</summary>
     private async Task<Result?> ArmerLeBailSiDemandeAsync(PrivilegedOp inverse)
     {
@@ -140,13 +150,26 @@ public sealed class GpuUndervoltTweak : GpuTweakBase
         }
     }
 
+    /// <summary>Pur : un autre outil règle-t-il déjà la carte ? Décalage cœur non nul et différent de la cible de DrDXT, ou
+    /// décalage mémoire non nul (DrDXT n'écrit jamais la mémoire).</summary>
+    public static bool ReglageTiers(int coeurMhz, int memoireMhz, int cibleCoeurMhz)
+        => (coeurMhz != 0 && coeurMhz != cibleCoeurMhz) || memoireMhz != 0;
+
     private async Task<Result<TweakSnapshot>> ApplyNvidiaAsync()
     {
         // (3) Relever le vrai décalage d'origine avant d'écrire (retour arrière fidèle).
+        // Non lu n'est jamais 0 : sans les deux décalages, DrDXT ne sait pas si un autre outil règle déjà la carte, et refuse.
         var core = _nvApi.GetCoreClockOffsetMhz(Target.GpuIndex);
         if (!core.IsOk)
-            return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
-                $"Could not read original core-clock offset: {core.Error?.Code}.");
+            return Result<TweakSnapshot>.Fail(ErrorCodes.GpuDecalageNonLu, $"core: {core.Error?.Code}");
+        var memoire = _nvApi.GetMemoryClockOffsetMhz(Target.GpuIndex);
+        if (!memoire.IsOk)
+            return Result<TweakSnapshot>.Fail(ErrorCodes.GpuDecalageNonLu, $"memory: {memoire.Error?.Code}");
+        // Un décalage déjà posé par un autre outil : DrDXT refuse plutôt que d'empiler ou d'écraser. Seul le décalage cœur que
+        // DrDXT pose lui-même (même valeur que sa cible) passe ; la mémoire, que DrDXT n'écrit jamais, doit être à zéro.
+        if (ReglageTiers(core.Value, memoire.Value, Target.CoreOffsetMhz))
+            return Result<TweakSnapshot>.Fail(ErrorCodes.GpuReglageTiers,
+                $"core {core.Value:+0;-0;0} MHz, memory {memoire.Value:+0;-0;0} MHz");
         // La mémoire ne s'écrit jamais (le helper n'applique que le cœur) : son champ part à 0. Y mettre la mémoire de la
         // carte ferait refuser par la liste blanche un réglage cœur sur une carte déjà montée à +1000 MHz par un autre outil.
         var inverse = new ApplyNvApiClockOffsetOp(Target.GpuIndex, core.Value, MemoryOffsetMhz: 0);
@@ -276,7 +299,9 @@ public sealed class GpuUndervoltTweak : GpuTweakBase
         Result revert;
         try
         {
-            revert = await Elevated.ExecuteAsync(inverse, CancellationToken.None).ConfigureAwait(false);
+            // Ce retour annule la pose : hors portée, sinon le helper le rejouerait et remettrait le décalage instable.
+            using (PorteeDePose.Suspendre())
+                revert = await Elevated.ExecuteAsync(inverse, CancellationToken.None).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

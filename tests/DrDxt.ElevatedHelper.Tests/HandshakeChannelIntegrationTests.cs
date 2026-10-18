@@ -116,6 +116,43 @@ public sealed class HandshakeChannelIntegrationTests
         exec.WasInvoked.Should().BeFalse();
     }
 
+    // Le helper tué au milieu d'une op : la requête est partie, l'écriture a pu se faire. « Injoignable » faisait dire
+    // « échec » à l'App, et relancer l'op ; ce n'est pas ce qu'on sait. Le code dit que la réponse manque, pas l'op.
+    private sealed class MeurtEnExecutant(CancellationTokenSource serveur) : IPrivilegedOpExecutor
+    {
+        public async Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
+        {
+            await serveur.CancelAsync();
+            await Task.Delay(Timeout.Infinite, ct);
+            return Result.Ok();
+        }
+    }
+
+    [Fact]
+    public async Task Un_helper_qui_meurt_apres_la_requete_ne_se_dit_pas_injoignable()
+    {
+        var pipe = UniquePipe();
+        using var serveur = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var server = new HandshakeAcceptingServer(
+            new AllowAuth(), new CryptoSessionKeyGenerator(), new OpAllowlist(), new MeurtEnExecutant(serveur), pipe);
+        var serverTask = server.AcceptOneAsync(serveur.Token);
+
+        var result = await new HandshakingElevatedClient(pipe, CeProcessus)
+            .ExecuteAsync(new SetActivePowerPlanOp(KnownPowerPlans.HighPerformance), CancellationToken.None);
+        try { await serverTask; } catch (OperationCanceledException) { }
+
+        result.Error?.Code.Should().Be(ErrorCodes.HelperNoReply);
+    }
+
+    [Fact]
+    public async Task Sans_helper_rien_n_est_parti_et_il_se_dit_injoignable()
+    {
+        var result = await new HandshakingElevatedClient(UniquePipe(), CeProcessus, connectTimeoutMs: 300)
+            .ExecuteAsync(new SetActivePowerPlanOp(KnownPowerPlans.HighPerformance), CancellationToken.None);
+
+        result.Error?.Code.Should().Be(ErrorCodes.HelperUnreachable);
+    }
+
     // --- une op hors liste blanche reste refusée après une négociation valide ---
     [Fact]
     public async Task Non_allowlisted_op_refused_after_valid_handshake()

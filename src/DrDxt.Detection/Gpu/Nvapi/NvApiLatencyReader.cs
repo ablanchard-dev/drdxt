@@ -43,6 +43,10 @@ public sealed class NvApiLatencyReader : INvApi
     public Result<uint> GetFrameRateLimit() => ReadDrs(FrameRateLimitId);
     public Result<uint> GetMaxPreRenderedFrames() => ReadDrs(PreRenderLimitId);
     public Result<uint> GetPreferredPstate() => ReadDrs(PreferredPstateId);
+
+    // Absent du profil de base (NVAPI_SETTING_NOT_FOUND) : au défaut du pilote. La lecture brute, elle, reste un échec : un
+    // inverse ne se construit pas sur un défaut que seule une suppression rendrait.
+    public bool PreferredPstateAuDefaut() => _native.DrsGlobalAuDefaut(PreferredPstateId);
     public Result<uint> GetGsyncMode() => ReadDrs(VrrModeId);
 
     public Result<uint> GetLowLatencyMode()

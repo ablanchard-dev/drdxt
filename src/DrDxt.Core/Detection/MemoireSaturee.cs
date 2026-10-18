@@ -26,7 +26,13 @@ public static class MemoireSaturee
 
     private static string Gestes => Docteur.T("MS.Gestes");
 
-    public static RepairFinding Juger(MemoireLue? lu)
+    /// <summary>Seuils de pagination, en lectures de pages dures par seconde. **Choix DrDXT, pas une norme Microsoft** :
+    /// sous 50, le disque sert surtout des fichiers ouverts et des chargements ; au-dessus de 500, une lecture sur disque
+    /// attend presque à chaque instant. Mesuré le 16/10/2026 sur la machine de référence au repos : 0 par seconde.</summary>
+    public const int PaginationSeuil = 50, PaginationForte = 500;
+
+    /// <param name="lecturesDures">Lectures de pages dures par seconde sur deux secondes ; <c>null</c> = non mesuré.</param>
+    public static RepairFinding Juger(MemoireLue? lu, double? lecturesDures = null)
     {
         if (lu is null || lu.TotalOctets == 0)
             return new RepairFinding(Domaine, Nom, null, null, RepairStatus.Unknown,
@@ -37,9 +43,19 @@ public static class MemoireSaturee
         var courante = Docteur.T("MS.Courante", Go(lu.DisponiblesOctets), Go(lu.TotalOctets), librePct, engagementPct);
         var attendue = Docteur.T("MS.Attendue", LibreMinimumPourcent, EngagementMaximumPourcent);
 
-        if (librePct < LibreMinimumPourcent)
+        var pagination = lecturesDures is not { } l ? null
+            : l >= PaginationForte ? "MS.PagineFort" : l >= PaginationSeuil ? "MS.Pagine" : "MS.Calme";
+        if (lecturesDures is { } lp)
+            courante += Docteur.T("MS.Lectures", Math.Round(lp).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        var mesure = pagination is null ? "" : Docteur.T(pagination) + Docteur.T("MS.CompteurInclut");
+
+        // Pleine mais calme : la mémoire est prise, rien n'attend le disque ; c'est dit, sans alarme ni « purge ».
+        if (librePct < LibreMinimumPourcent && pagination == "MS.Calme")
+            return new RepairFinding(Domaine, Nom, courante, attendue, RepairStatus.Observed, Docteur.T("MS.PleineCalme") + mesure);
+
+        if (librePct < LibreMinimumPourcent || pagination == "MS.PagineFort")
             return new RepairFinding(Domaine, Nom, courante, attendue, RepairStatus.Suspicious,
-                Docteur.T("MS.Pleine") + Gestes,
+                Docteur.T(librePct < LibreMinimumPourcent ? "MS.Pleine" : "MS.PagineSansEtrePleine") + mesure + Gestes,
                 RepairAction.Recommandation);
 
         if (engagementPct > EngagementMaximumPourcent)
@@ -47,8 +63,12 @@ public static class MemoireSaturee
                 Docteur.T("MS.Virtuelle") + Gestes,
                 RepairAction.Recommandation);
 
+        // De la place, et Windows lit un peu le disque : ce n'est pas « rien », ce n'est pas une alarme.
+        if (pagination == "MS.Pagine")
+            return new RepairFinding(Domaine, Nom, courante, attendue, RepairStatus.Observed, Docteur.T("MS.PagineUnPeu") + mesure);
+
         return new RepairFinding(Domaine, Nom, courante, attendue, RepairStatus.ExpectedDefault,
-            Docteur.T("MS.Rien"));
+            Docteur.T("MS.Rien") + mesure);
     }
 
     private static string Go(ulong octets) => (octets / 1073741824.0).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);

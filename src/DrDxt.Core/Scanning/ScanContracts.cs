@@ -4,11 +4,14 @@
 
 public enum Severity { Info, Minor, Major }
 
+/// <param name="GainSuppressedReason">Non nul quand la mesure de cette session dit que ce levier ne rendra pas d'images
+/// ici : le constat reste, la promesse de gain tombe. Le motif est dans la langue du docteur, montrable tel quel.</param>
 public record Finding(
     string Category,
     Severity Severity,
     string TitleKey,
-    double? EstimatedGainPct);
+    double? EstimatedGainPct,
+    string? GainSuppressedReason = null);
 
 /// <summary>
 /// État d'un levier noté sur une machine donnée. Seul <see cref="Suboptimal"/> retire des

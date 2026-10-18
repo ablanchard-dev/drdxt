@@ -48,7 +48,8 @@ public sealed class GameModeOnTweak : LatencyTweakBase
     public override bool AppliesTo(HardwareInventory hw, SettingsState state) =>
         state.GameMode == TriState.Off;
 
-    // `AllowAutoGameMode` absent du registre => Unknown. Ne rien ecrire, mais le dire.
+    // Unknown = une valeur GameBar d'un type inattendu, ou le registre illisible (absentes, c'est le defaut de Windows,
+    // actif). Ne rien ecrire, mais le dire.
     public override bool EtatNonLu(SettingsState state) => state.GameMode == TriState.Unknown;
 
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
@@ -109,6 +110,8 @@ public sealed class GameModeOnTweak : LatencyTweakBase
     // SAFETY.SNAPSHOT_INVALID ; ne lève jamais, ne lance jamais une op inconnue.
     public override async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Snapshot has no original-value payload.");
 

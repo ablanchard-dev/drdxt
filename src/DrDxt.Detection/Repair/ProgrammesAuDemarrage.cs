@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.RegularExpressions;
 using DrDxt.Core;
 using Microsoft.Win32;
@@ -22,20 +21,25 @@ public static class ProgrammesAuDemarrage
     /// <param name="Ruche">La ruche de sa clé Run ou de son dossier Démarrage (utilisateur ou tous les utilisateurs).</param>
     /// <param name="Liste">Sa liste sous StartupApproved : Run, Run32 ou StartupFolder.</param>
     /// <param name="Cle">Le nom que StartupApproved porte, s'il diffère du nom affiché (le fichier, extension comprise).</param>
+    /// <param name="Octets">La valeur StartupApproved lue, en hexadécimal ; null si elle n'existe pas.</param>
     public sealed record Entree(string Nom, bool Actif, string Commande = "", bool DansRun = true,
-        RegistryHiveKind Ruche = RegistryHiveKind.CurrentUser, string Liste = SetStartupApprovalOp.Run, string? Cle = null)
+        RegistryHiveKind Ruche = RegistryHiveKind.CurrentUser, string Liste = SetStartupApprovalOp.Run, string? Cle = null,
+        string? Octets = null)
     {
         /// <summary>Le couper (false) ou le réactiver (true), comme le Gestionnaire des tâches.</summary>
         public SetStartupApprovalOp Geste(bool actif) => new(Ruche, Liste, Cle ?? Nom, actif);
     }
 
-    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
     // « MicrosoftEdgeAutoLaunch_E5F5B93C… » : le suffixe est un identifiant d'installation, pas un nom.
     private static readonly Regex Suffixe = new(@"_[0-9A-F]{16,}$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    // Ce qu'un joueur couperait par erreur : la sécurité de Windows n'est pas un programme de confort.
-    private static string Garder(string nom) => nom.Equals("SecurityHealth", StringComparison.OrdinalIgnoreCase)
+    // Ce qu'un joueur couperait par erreur : la sécurité de Windows, un antivirus ou un contrôle parental ne sont pas des
+    // programmes de confort.
+    private static string Garder(string nom) => ProtegesAuDemarrage.Est(nom)
         ? Docteur.T("PD.Securite") : "";
+
+    private static string? Hex(string nom, IReadOnlyDictionary<string, byte[]> approuves)
+        => approuves.TryGetValue(nom, out var v) ? Convert.ToHexString(v) : null;
 
     public static bool Actif(string nom, IReadOnlyDictionary<string, byte[]> approuves)
         => !approuves.TryGetValue(nom, out var v) || v.Length == 0 || (v[0] & 1) == 0;
@@ -107,7 +111,8 @@ public static class ProgrammesAuDemarrage
                 var ok = Approbations(racine, Approuve + approuve);
                 var ruche = racine == Registry.LocalMachine ? RegistryHiveKind.LocalMachine : RegistryHiveKind.CurrentUser;
                 entrees.AddRange(r.GetValueNames().Where(n => n.Length > 0)
-                    .Select(n => new Entree(n, Actif(n, ok), (r.GetValue(n) as string ?? "").Trim(), Ruche: ruche, Liste: approuve)));
+                    .Select(n => new Entree(n, Actif(n, ok), (r.GetValue(n) as string ?? "").Trim(), Ruche: ruche, Liste: approuve,
+                        Octets: Hex(n, ok))));
             }
             Cles(Registry.CurrentUser, @"Software\Microsoft\Windows\CurrentVersion\Run", "Run");
             Cles(Registry.LocalMachine, @"Software\Microsoft\Windows\CurrentVersion\Run", "Run");
@@ -122,7 +127,7 @@ public static class ProgrammesAuDemarrage
                 entrees.AddRange(Directory.EnumerateFiles(chemin)
                     .Where(f => !Path.GetFileName(f).Equals("desktop.ini", StringComparison.OrdinalIgnoreCase))
                     .Select(f => new Entree(Path.GetFileNameWithoutExtension(f), Actif(Path.GetFileName(f), ok), f, DansRun: false,
-                        Ruche: ruche, Liste: SetStartupApprovalOp.DossierDemarrage, Cle: Path.GetFileName(f))));
+                        Ruche: ruche, Liste: SetStartupApprovalOp.DossierDemarrage, Cle: Path.GetFileName(f), Octets: Hex(Path.GetFileName(f), ok))));
             }
             Dossier(Environment.SpecialFolder.Startup, Registry.CurrentUser);
             Dossier(Environment.SpecialFolder.CommonStartup, Registry.LocalMachine);

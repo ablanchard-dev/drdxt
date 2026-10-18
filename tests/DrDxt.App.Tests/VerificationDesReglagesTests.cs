@@ -59,4 +59,19 @@ public sealed class VerificationDesReglagesTests
         (await VerificationDesReglages.VerifierAsync(manifeste, Substitute.For<IRegistryReader>()))
             .Should().BeEmpty();
     }
+    // Le service du composite X3D gardé au manifeste se relit par son état au lancement : sans lecteur, Unavailable.
+    [Fact]
+    public async Task Un_service_garde_se_relit_par_son_etat()
+    {
+        static string Ser(ServiceAction a) => PrivilegedOpCodec.Serialize(new RunServiceControlOp("AMD3DVCacheSvc", a)).Value!;
+        var manifeste = Substitute.For<IDesiredStateStore>();
+        manifeste.LoadAsync().Returns(Result<DesiredState>.Ok(new DesiredState(Array.Empty<AppliedTweak>(),
+            new[] { new AppliedTweak("fixit.x3d_ccd", Ser(ServiceAction.Start), Ser(ServiceAction.Stop), DateTimeOffset.UtcNow) })));
+        var services = Substitute.For<DrDxt.Application.Tweaks.Hardware.IServiceStateReader>();
+        services.GetServiceState("AMD3DVCacheSvc").Returns(Result<DrDxt.Application.Tweaks.Hardware.ServiceState>.Ok(
+            DrDxt.Application.Tweaks.Hardware.ServiceState.Running));
+
+        (await VerificationDesReglages.VerifierAsync(manifeste, Substitute.For<IRegistryReader>(), services: services))
+            .Single().Verdict.Should().Be(EtatApplique.Applied);
+    }
 }

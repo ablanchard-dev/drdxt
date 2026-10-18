@@ -13,6 +13,11 @@
 //       Calcule le SHA-256 du paquet, signe la forme canonique (celle que l'App vérifie : UpdateVerifier.CanonicalBytes),
 //       écrit le manifeste JSON, puis le relit avec la clé publique : « signature vérifiée » ou rien n'est écrit.
 //
+//   dotnet run tools/publication/signer.cs -- donnees <version> <contenu.json> <sortie>
+//       Les tables de l'App (radar des régressions) sans nouveau binaire : vérifie le contenu contre le schéma fermé
+//       (TablesDeDonnees.Lire), signe la version et le contenu sous le domaine des données (DonneesSignees.OctetsSignes),
+//       écrit le paquet, puis le relit avec la clé embarquée. À publier en <racine>/donnees/paquet.json.
+//
 // Ce que l'App attend (UpdateComposition.ManifestPath) : <racine>/updates/app/manifest.
 // Avec GitHub Pages du dépôt public comme racine, ce manifeste est un fichier statique du site ; le paquet lui-même
 // est un asset de GitHub Releases (son URL est dans le manifeste, son empreinte aussi).
@@ -31,6 +36,7 @@ try
     {
         case "cle": return Cle(args.Contains("--creer"));
         case "manifeste" when args.Length == 6: return Manifeste(args[1], args[2], args[3], args[4], args[5]);
+        case "donnees" when args.Length == 4: return Donnees(args[1], args[2], args[3]);
         default: Usage(); return 2;
     }
 }
@@ -125,6 +131,26 @@ int Manifeste(string canal, string version, string url, string fichier, string s
     return 0;
 }
 
+int Donnees(string version, string fichier, string sortie)
+{
+    if (!int.TryParse(version, out var v) || v < 1) { Console.Error.WriteLine("version : un entier, 1 ou plus, plus grand que le paquet publié"); return 2; }
+    var contenu = File.ReadAllText(fichier);
+    var schema = DrDxt.Core.TablesDeDonnees.Lire(contenu, v);
+    if (!schema.IsOk) { Console.Error.WriteLine("contenu hors schéma : " + schema.Error?.Message); return 1; }
+    using var k = Ouvrir();
+    var embarquee = UpdateTrust.ProductionPublicKey ?? [];
+    if (!embarquee.AsSpan().SequenceEqual(k.PublicKey.Export(KeyBlobFormat.RawPublicKey)))
+    { Console.Error.WriteLine("la graine de ce PC ne correspond pas à la clé publique embarquée dans l'App : rien n'est écrit."); return 1; }
+    var paquet = new DonneesSignees.Paquet(v, contenu,
+        Convert.ToBase64String(SignatureAlgorithm.Ed25519.Sign(k, DonneesSignees.OctetsSignes(v, contenu))));
+    var verif = DonneesSignees.Verificateur.DeProduction();
+    if (!verif.IsOk || verif.Value!.Verifier(paquet, 1) is not { IsOk: true } relu)
+    { Console.Error.WriteLine("le paquet ne se relit pas avec la clé embarquée : rien n'est écrit."); return 1; }
+    File.WriteAllText(sortie, DonneesSignees.Ecrire(paquet));
+    Console.WriteLine($"paquet écrit : {sortie}  (version {v}, {relu.Value!.Radar.Count} règles du radar, signature vérifiée)");
+    return 0;
+}
+
 Key Ouvrir()
 {
     var entropie = Entropie();
@@ -140,4 +166,5 @@ void Usage()
 {
     Console.WriteLine("signer.cs -- cle");
     Console.WriteLine("signer.cs -- manifeste App <version> <url https du paquet> <fichier du paquet> <sortie.json>");
+    Console.WriteLine("signer.cs -- donnees <version> <contenu.json> <sortie.json>");
 }

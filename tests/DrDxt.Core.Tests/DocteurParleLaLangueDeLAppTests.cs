@@ -45,4 +45,15 @@ public sealed class DocteurParleLaLangueDeLAppTests
         using (Docteur.Portee(CultureInfo.GetCultureInfo("de-DE")))
             Docteur.T("WU.PourInstaller").Should().StartWith("1) Settings", "une langue sans traduction lit l'anglais");
     }
+
+    // La phrase dite à la fermeture quand un acquit reste refusé. Une App relancée est un autre processus : elle n'acquitte
+    // pas l'entrée de la précédente, « relance DrDXT pour le confirmer » était faux. Ce qui suit est le rejeu, et quand.
+    [Theory]
+    [InlineData("fr-FR", "relance", "service")]
+    [InlineData("en-US", "restart", "service")]
+    public void Un_acquit_refuse_dit_le_rendu_jamais_une_relance(string langue, string interdit, string condition)
+    {
+        using (Docteur.Portee(CultureInfo.GetCultureInfo(langue)))
+            Docteur.T("JEA.AcquitRefuse").Should().NotContainEquivalentOf(interdit).And.Contain(condition);
+    }
 }

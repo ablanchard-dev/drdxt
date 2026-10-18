@@ -111,13 +111,40 @@ Type: files; Name: "{app}\*.pdb"
 ; 11/10/2026 : jusqu'au 10/10, l'App posait ce raccourci dans le dossier Demarrage du joueur. Lance par lui, le releve
 ; tournait sans droits administrateur et ne lisait jamais la temperature du processeur (PawnIO refuse). La tache
 ; planifiee de [Run] le remplace ; le raccourci d'une installation precedente est retire.
+; C'est le seul usage de {userstartup} (ici et dans la section de desinstallation) : effacer ce raccourci, jamais en poser un. ISCC en
+; avertit (« UsedUserAreasWarning ») parce que l'installation tourne en administrateur : c'est le Demarrage du compte qui
+; valide l'UAC qui est nettoye ; un autre compte garde son ancien raccourci (limite ecrite dans docs/NON-NUISANCE.md, F-11).
 Type: files; Name: "{userstartup}\DrDXT releve.lnk"
 Type: files; Name: "{app}\service\*.pdb"
+; Les copies de repli de PresentMon ne sont plus livrees (voir [Files]) ; une mise a jour n'efface que ce qu'elle remplace :
+; sans ces lignes, celles d'une ancienne version resteraient, jamais lues.
+Type: filesandordirs; Name: "{app}\third_party"
+Type: filesandordirs; Name: "{app}\service\third_party"
 
 [UninstallDelete]
 ; Le raccourci d'une ancienne version (voir [InstallDelete]) : sans ce retrait, Windows lancerait a
 ; chaque session un programme desinstalle.
 Type: files; Name: "{userstartup}\DrDXT releve.lnk"
+; Les temoins d'incident ecrits par le service partent avec lui.
+Type: filesandordirs; Name: "{commonappdata}\DrDxt\temoins"
+; Ce que le helper a ecrit pour le service part avec lui : une pause du maintien laissee survivrait a une
+; reinstallation. Le plafond lui-meme est deja rendu (service arrete au desinstallement, puis RemoveUploadCapOp
+; dans [UninstallRun]). Le fichier exact, jamais le dossier : la cle et le manifeste de la machine y vivent.
+Type: files; Name: "{commonappdata}\DrDxt\pause-du-maintien"
+Type: files; Name: "{commonappdata}\DrDxt\plafond-envoi.json"
+; Un dossier "%ProgramData%" litteral, depose par un composant de Windows quand l'App elevee
+; tournait sans cette variable, bloquait la suppression du dossier ("Failed to delete directory
+; (145)"). Seul le fichier exact part, puis chaque dossier parent s'il est vide, dans l'ordre (Inno
+; traite cette section dans l'ordre du script). Jamais filesandordirs sous {app} : il suivrait une
+; jonction posee dans le residu, et {app} peut etre un dossier du joueur (installation d'avant la
+; page de choix fermee, ou /DIR=).
+Type: files; Name: "{app}\%ProgramData%\Microsoft\Windows\UUS\State\_active.uusver"
+Type: dirifempty; Name: "{app}\%ProgramData%\Microsoft\Windows\UUS\State"
+Type: dirifempty; Name: "{app}\%ProgramData%\Microsoft\Windows\UUS"
+Type: dirifempty; Name: "{app}\%ProgramData%\Microsoft\Windows"
+Type: dirifempty; Name: "{app}\%ProgramData%\Microsoft"
+Type: dirifempty; Name: "{app}\%ProgramData%"
+Type: dirifempty; Name: "{app}"
 
 [Registry]
 ; Le helper y retient la limite de puissance du firmware a ce demarrage (garde Vmin) : partie avec DrDXT.
@@ -141,7 +168,12 @@ Root: HKLM; Subkey: "Software\DrDXT"; Flags: uninsdeletekey dontcreatekey
 ; repli EN DEVELOPPEMENT. Or le locator essaie la racine d'abord, et l'installeur la garantit : chez le
 ; joueur cette seconde copie n'est jamais lue. On poserait 3,6 Mo d'un binaire de service que
 ; l'installeur n'enregistre pas. Le repli reste PRODUIT cote build, c'est sa livraison qui est refusee.
-Source: "publish\*";           DestDir: "{app}"; Excludes: "*.pdb,\third_party"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Excludes "\service\third_party" : la meme copie de repli, posee par le publish du service. Elle n'est jamais lue : la seule
+; op qui cherche ce binaire (InstallPresentMonServiceOp) n'est emise que par SelfHealingBenchmarkRunner, que seule l'App
+; enregistre (AddDrDxtMeasurement) ; elle part au helper lance depuis {app}, qui prend {app}\PresentMonService.exe ; le
+; service n'a ni banc ni mesure, et le service PresentMon s'enregistre depuis {app} (InstallPresentMonService plus bas).
+; Garde : InstallateurPresentMonTests.
+Source: "publish\*";           DestDir: "{app}"; Excludes: "*.pdb,\third_party,\service\third_party"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "README-testeur.txt";  DestDir: "{app}"; Flags: ignoreversion isreadme
 
 [Icons]
@@ -164,7 +196,10 @@ Name: "{autodesktop}\DrDXT";      Filename: "{app}\{#AppExe}"; WorkingDir: "{app
 ; [UninstallRun] ; le mode borne lui-meme sa duree (120 s), rend 0, et ecrit son rapport sous
 ; %ProgramData%\DrDxt\desinstallation-<heure UTC>.txt. skipifdoesntexist : un helper absent n'ajoute
 ; pas d'avertissement. Un test d'integration relit cette ligne.
-Filename: "{app}\DrDxt.ElevatedHelper.exe"; Parameters: "--uninstall-revert"; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "DrDxtRendreLesReglages"
+; 17/10/2026 (audit de securite) - PAR LE LANCEUR NATIF, comme tout lancement eleve : lance directement, le helper .NET
+; heritait de HKCU\Environment (CORECLR_PROFILER... charge une DLL du compte en administrateur). Le lanceur reconstruit
+; l'environnement et attend la fin du helper dans ce mode.
+Filename: "{app}\DrDxt.Lanceur.exe"; Parameters: "DrDxt.ElevatedHelper.exe --uninstall-revert"; Flags: runhidden waituntilterminated skipifdoesntexist; RunOnceId: "DrDxtRendreLesReglages"
 [Code]
 { --- 25/09/2026 : les outils Windows se lancent par la constante sys d'Inno (System32 64 bits, installeur en
       mode 64 bits), jamais par leur nom seul. Il tourne en administrateur ; un nom seul laisse
@@ -282,6 +317,11 @@ begin
   { 11/10/2026 : le releve de fond tourne sans fenetre a chaque session ; sans ceci, une mise a jour butait sur
     DrDxt.App.exe en cours d'utilisation. }
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#AppExe} /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  { Le helper et notre service PresentMon tiennent aussi leurs .exe du dossier de l'App ouverts. Celui d'un autre produit
+    (meme nom) continue ; le notre est en demarrage a la demande, l'App le relance quand elle mesure. }
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM DrDxt.ElevatedHelper.exe /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  if PresentMonEstANous() then
+    Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#PmService}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Result := '';
 end;
 
@@ -316,12 +356,14 @@ begin
     begin
       InstallPresentMonService();
       InstallOrRemoveReconcilerService();
-      { Le releve des parties, a l'ouverture de session du joueur, au niveau le plus eleve (/RL HIGHEST : la temperature du
-        processeur se lit dans ses registres par PawnIO). Par le lanceur natif, jamais l'App directement : une tache HIGHEST
-        herite de HKCU\Environment, que tout programme du compte ecrit sans droits (CORECLR_PROFILER... chargerait une DLL
-        dans un programme .NET eleve) ; le lanceur reconstruit l'environnement. Sans /RU, la tache est celle du joueur qui
-        installe. Lancee tout de suite, pour que la prochaine partie soit relevee sans attendre une nouvelle session. }
-      Exec(ExpandConstant('{sys}\schtasks.exe'), '/Create /F /TN "DrDXT releve" /SC ONLOGON /RL HIGHEST /TR "\"' + ExpandConstant('{app}') + '\DrDxt.Lanceur.exe\" DrDxt.App.exe --releve"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      { Le releve des parties, a l'ouverture de session du joueur, sans droits (/RL LIMITED). Eleve, il ecrirait dans le
+        dossier du compte, ou un programme sans droits peut poser une jonction : creation, ecrasement ou suppression de
+        fichier en administrateur a chaque ouverture de session. Sans droits, il lit le processeur par le service DrDXT
+        s'il est installe, comme l'App. L'App directement, pas le lanceur : non eleve, celui-ci demanderait l'elevation (une
+        invite a chaque ouverture de session). /Create /F remplace la tache HIGHEST d'une installation precedente. Sans /RU,
+        la tache est celle du joueur qui installe. Lancee tout de suite, pour que la prochaine partie soit relevee sans
+        attendre une nouvelle session. }
+      Exec(ExpandConstant('{sys}\schtasks.exe'), '/Create /F /TN "DrDXT releve" /SC ONLOGON /RL LIMITED /TR "\"' + ExpandConstant('{app}') + '\DrDxt.App.exe\" --releve"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       Exec(ExpandConstant('{sys}\schtasks.exe'), '/Run /TN "DrDXT releve"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end
     else

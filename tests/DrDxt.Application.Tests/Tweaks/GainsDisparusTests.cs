@@ -111,4 +111,15 @@ public class GainsDisparusTests
         GainsDisparus.Detecter([sansChangement], new LecteurParFeuille(new() { ["VRR"] = 1 })).Should().BeEmpty();
         GainsDisparus.Detecter([avant], new LecteurParFeuille(new() { ["VRR"] = 1 })).Should().ContainSingle("témoin : sans valeur posée connue, le retour se dit");
     }
+
+    // Le bilan d'après mise à jour compte sans prétendre : « différent d'avant » n'est pas « appliqué », non lu n'est pas perdu.
+    [Fact]
+    public void Le_bilan_separe_differents_revenus_et_non_relus()
+    {
+        var appliques = new[] { Applique("a", "A", "1"), Applique("b", "B", "1"), Applique("c", "C", "1") };
+        var lecteur = new LecteurParFeuille(new() { ["A"] = 2, ["B"] = 1 });
+
+        GainsDisparus.Bilan(appliques, lecteur).Should().Be((2, 1, 0), "une valeur absente est relue, et différente d'avant");
+        GainsDisparus.Bilan(appliques, new LecteurParFeuille([], echoue: true)).Should().Be((0, 0, 3));
+    }
 }

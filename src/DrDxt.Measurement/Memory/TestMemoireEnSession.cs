@@ -1,4 +1,3 @@
-using static DrDxt.Core.TexteFrancais;
 using DrDxt.Core;
 
 namespace DrDxt.Measurement.Memory;
@@ -50,7 +49,8 @@ public static class TestMemoireEnSession
     /// <summary>Teste <paramref name="octets"/> repartis sur <paramref name="fils"/> fils jusqu'a
     /// <paramref name="duree"/> (au moins une passe complete). Une allocation refusee reduit le volume
     /// au lieu d'echouer : le resultat dit ce qui a ete teste, pas ce qui etait demande.</summary>
-    public static ResultatTestMemoire Lancer(long octets, TimeSpan duree, int fils, CancellationToken ct)
+    /// <param name="apresChaquePasse">Appelé avec le nombre de passes finies (le point d'étape du test).</param>
+    public static ResultatTestMemoire Lancer(long octets, TimeSpan duree, int fils, CancellationToken ct, Action<int>? apresChaquePasse = null)
     {
         fils = Math.Max(1, fils);
         var motsParFil = Math.Max(1, octets / 8 / fils);
@@ -79,6 +79,7 @@ public static class TestMemoireEnSession
                 b => parBloc[b] = EcrireVerifier(blocs[b], graine + (ulong)b));
             erreurs += parBloc.Sum();
             passes++;
+            apresChaquePasse?.Invoke(passes);
         }
         while (chrono.Elapsed < duree && !ct.IsCancellationRequested);
 
@@ -87,17 +88,25 @@ public static class TestMemoireEnSession
         return new ResultatTestMemoire(teste, passes, erreurs, chrono.Elapsed, fils);
     }
 
+    /// <summary>Pur : le volume testé. Un quart de la mémoire, et jamais plus de la moitié de ce qui est libre à
+    /// l'instant : sur une machine déjà chargée, un quart de toute la mémoire ferait paginer. **Non chiffré.**</summary>
+    public static long Volume(long totalOctets, ulong? libreOctets)
+        => libreOctets is { } libre ? Math.Min(totalOctets / 4, (long)Math.Min(libre / 2, long.MaxValue)) : totalOctets / 4;
+
     public const string Domaine = "MEMOIRE";
+
+    /// <summary>Le nom du constat, clé du journal (en français, comme tous les noms de constat).</summary>
+    public const string NomDuConstat = "test mémoire en session";
 
     /// <summary>Le resultat, tel que la sante l'affiche. Des erreurs : un defaut prouve. Zero erreur :
     /// « observe », jamais « sain » : ce test peut trouver un defaut, il ne prouve pas l'absence.</summary>
     public static RepairFinding Constat(ResultatTestMemoire r) => r.OctetsTestes == 0
-        ? new RepairFinding(Domaine, "test mémoire en session", Docteur.T("TM.NonTeste"), null, RepairStatus.Unknown, r.Phrase)
+        ? new RepairFinding(Domaine, NomDuConstat, Docteur.T("TM.NonTeste"), null, RepairStatus.Unknown, r.Phrase)
         : r.Erreurs > 0
-        ? new RepairFinding(Domaine, "test mémoire en session", Docteur.T("TM.NErreurs", r.Erreurs), Docteur.T("TM.AucuneErreur"),
+        ? new RepairFinding(Domaine, NomDuConstat, Docteur.T("TM.NErreurs", r.Erreurs), Docteur.T("TM.AucuneErreur"),
             RepairStatus.KnownHarmful, r.Phrase + Docteur.T("TM.Baisser"),
             RepairAction.Recommandation)
-        : new RepairFinding(Domaine, "test mémoire en session", Docteur.T("TM.AucuneErreur"), null, RepairStatus.Observed, r.Phrase);
+        : new RepairFinding(Domaine, NomDuConstat, Docteur.T("TM.AucuneErreur"), null, RepairStatus.Observed, r.Phrase);
 
     private static ulong Motif(ulong graine, ulong index)
     {

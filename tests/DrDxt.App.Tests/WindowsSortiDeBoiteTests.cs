@@ -44,7 +44,8 @@ public sealed class WindowsSortiDeBoiteTests
             MemoryConfiguredMhz: 2133, DisplayRefresh: new RefreshHeadroom(TriState.Off, 144, 144),
             NvidiaPreferMaxPerf: TriState.Off, HagsEffective: TriState.On,
             ModeDeBoost: new ModeDeBoostLu(Guid.Parse(Equilibre), 2, 2), AccelerationSouris: TriState.On,
-            // Un i5-12400F livré à sa puissance de base (65 W) sous une pointe de 117 W (Intel), sans verrou.
+            // Un i5-12400F livré à sa puissance de base (65 W) sous une pointe de 117 W (Intel), sans verrou, aucune partie
+            // encore relevée : la machine sort de sa boîte.
             LimitePuissance: new LimiteDePuissanceLue(65, 117, 65, false, CopieMmioPl1W: 0));
         return (hw, etat);
     }
@@ -62,8 +63,12 @@ public sealed class WindowsSortiDeBoiteTests
             "l'accélération du pointeur et les optimisations pour les jeux en fenêtre sont les défauts de Windows");
 
         var enJeu = JugementApply.Juger(diagnostic, ouverts, jeuEnCours: true);
-        enJeu.LotAChaud.Select(c => c.Id).Should().BeEquivalentTo(["latency.prefer_max_perf", "gpu.power_limit", "fixit.cpu_power_limit"],
-            "le mode NVIDIA, la limite de puissance de la carte et celle du processeur se jugent en jeu, une partie avec, une sans");
+        enJeu.LotAChaud.Select(c => c.Id).Should().BeEquivalentTo(["latency.prefer_max_perf", "gpu.power_limit"],
+            "le mode NVIDIA et la limite de puissance de la carte se jugent en jeu, une partie avec, une sans");
+        // Sans aucune partie relevée, la chaleur du processeur n'est pas connue : sa limite ne monte pas, et c'est dit.
+        var pl1 = VraisLeviers().Single(t => t.Id == "fixit.cpu_power_limit");
+        ouverts.Should().NotContain(pl1.Id);
+        pl1.EtatNonLu(etat).Should().BeTrue();
     }
 
     [Fact]

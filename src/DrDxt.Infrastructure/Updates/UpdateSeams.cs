@@ -52,14 +52,9 @@ public sealed class LocalFileSystemUpdateStore : IUpdateFileSystem
     {
         try
         {
-            var dir = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-            // Écriture quasi atomique par fichier : temporaire + déplacement, un plantage ne laisse jamais un fichier déchiré.
-            var tmp = path + ".tmp";
-            File.WriteAllBytes(tmp, bytes);
-            File.Move(tmp, path, overwrite: true);
-            return Result.Ok();
+            // Temporaire aléatoire + déplacement : un plantage ne laisse jamais un fichier déchiré, et aucun lien posé d'avance
+            // n'est suivi.
+            return new FichierJsonAtomique(path, UpdateErrorCodes.StageFailed).WriteAtomic(bytes);
         }
         catch (Exception ex)
         {

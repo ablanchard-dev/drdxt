@@ -59,4 +59,20 @@ public sealed class VerrouDuReleveTests : IDisposable
 
         veilles.Should().Be(0);
     }
+
+    // Le verrou vit dans le dossier du joueur et se supprime à sa fermeture. L'App (élevée parfois) l'ouvrait en suivant un
+    // lien symbolique posé d'avance sous son nom : la suppression à la fermeture retirait alors la cible du lien. Ouvert
+    // sans suivre de point de reparse, c'est le nom seul qui part.
+    [Fact]
+    public void Un_lien_symbolique_pose_sous_le_nom_du_verrou_ne_fait_jamais_supprimer_sa_cible()
+    {
+        Directory.CreateDirectory(_dossier);
+        var temoin = Path.Combine(_dossier, "temoin.txt");
+        File.WriteAllText(temoin, "intact");
+        File.CreateSymbolicLink(Chemin, temoin);
+
+        VerrouDuReleve.Prendre(Chemin)?.Dispose();
+
+        File.ReadAllText(temoin).Should().Be("intact");
+    }
 }

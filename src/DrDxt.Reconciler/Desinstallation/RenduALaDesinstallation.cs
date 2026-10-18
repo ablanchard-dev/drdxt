@@ -247,6 +247,8 @@ public sealed class RenduALaDesinstallation
             if (retour is ApplyNvApiClockOffsetOp or ApplyGpuFanCurveOp or ApplyAdlxTuningOp { Kind: AdlxTuningKind.Undervolt })
                 return new FeuilleJugee(retour.GetType().Name, IssueDuRendu.ValeurPoseeInconnue,
                     Docteur.T("RD.RegleCarte"));
+            if (CoupeLeFichierDEchange(retour))
+                return new FeuilleJugee(Cible(retour)!, IssueDuRendu.ValeurPoseeInconnue, Docteur.T("RD.FichierDEchange"));
             var cible = Cible(retour);
             if (cible is null)
                 return new FeuilleJugee(retour.GetType().Name, IssueDuRendu.ValeurPoseeInconnue,
@@ -284,6 +286,19 @@ public sealed class RenduALaDesinstallation
             return new FeuilleJugee(cible, IssueDuRendu.Rendu, string.Empty, retour, attendue);
         }
     }
+
+    // PagingFiles absente ou vide = aucun fichier d'échange : le jeu et le système gèlent ou plantent quand la mémoire manque.
+    // Une origine ainsi ne se rend jamais, quel que soit le chemin qui l'a inscrite au manifeste.
+    private static bool CoupeLeFichierDEchange(PrivilegedOp op) => op switch
+    {
+        DeleteRegistryValueOp d => EstPagingFiles(d.Hive, d.Path, d.Name),
+        SetRegistryValueOp s => EstPagingFiles(s.Hive, s.Path, s.Name) && string.IsNullOrWhiteSpace(s.Value.Replace("\0", "")),
+        _ => false,
+    };
+
+    private static bool EstPagingFiles(RegistryHiveKind ruche, string chemin, string nom) => ruche == RegistryHiveKind.LocalMachine
+        && string.Equals(chemin.Trim().Trim('\\'), @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", StringComparison.OrdinalIgnoreCase)
+        && string.Equals(nom, "PagingFiles", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyList<PrivilegedOp>? Reaffirmee(AppliedTweak t)
     {
@@ -338,6 +353,7 @@ public sealed class RenduALaDesinstallation
             => ulong.TryParse(s.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var q)
                 ? q.ToString(CultureInfo.InvariantCulture) : null,
         SetRegistryValueOp { Kind: RegistryValueType.String } s => s.Value,
+        SetRegistryValueOp { Kind: RegistryValueType.MultiString } s => MultiTexteDuRegistre.Canonique(s.Value),
         SetActivePowerPlanOp p => p.PlanGuid.ToString("D", CultureInfo.InvariantCulture),
         SetProcessorBoostModeOp b => b.AcValue.ToString(CultureInfo.InvariantCulture),
         SetCpuPackagePowerLimitOp c => c.Valeur.ToString(CultureInfo.InvariantCulture),

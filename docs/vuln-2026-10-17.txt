@@ -1,0 +1,53 @@
+Sortie COMPLETE, non filtree, de :
+
+    dotnet list DrDXT.sln package --vulnerable --include-transitive
+
+Lancee le 17/10/2026. Conservee telle quelle : un extrait choisi se relit comme un tri deja fait,
+et c'est precisement le tri qui doit etre ecrit ailleurs (docs/SECURITE.md) et discutable.
+
+Un avis peut apparaitre ou disparaitre sans qu'une seule ligne du depot change : la base d'avis
+bouge, pas le code. Ce fichier est donc DATE, jamais mis a jour en place.
+
+--------------------------------------------------------------------------------------------
+
+  Identification des projets à restaurer...
+  Tous les projets sont à jour pour la restauration.
+
+Les sources suivantes ont été utilisées :
+   https://api.nuget.org/v3/index.json
+
+Le projet spécifié 'DrDxt.Core' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Infrastructure' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Detection' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Measurement' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Application' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Bios' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Reconciler' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Profiles' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.ElevatedHelper' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.App' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Core.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Profiles.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Bios.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Infrastructure.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Detection.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Measurement.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Application.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Reconciler.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.ElevatedHelper.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.App.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Integration.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Reconciler.Adapters' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Reconciler.Adapters.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.ReconcilerHost' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.ReconcilerHost.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.GpuNative' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.GpuNative.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Server' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Server.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.AmdHarness' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.AmdHarness.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Tools.Tests' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'coeurs' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'cpubench' n'a aucun package vulnérable compte tenu des sources actuelles.
+Le projet spécifié 'DrDxt.Lanceur' n'a aucun package vulnérable compte tenu des sources actuelles.

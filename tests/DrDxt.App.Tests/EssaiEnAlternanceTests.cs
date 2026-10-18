@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using DrDxt.Tests.Shared;
+using System.IO;
 using DrDxt.App.ViewModels;
 using DrDxt.Application.Parties;
 using DrDxt.Application.Tweaks;
@@ -23,15 +24,15 @@ public sealed class EssaiEnAlternanceTests : IDisposable
     private DateTimeOffset _maintenant = new(2026, 10, 7, 20, 0, 0, TimeSpan.Zero);
     private DateTimeOffset _demarrage = new(2026, 10, 7, 8, 0, 0, TimeSpan.Zero);
 
-    private ScanViewModel Vm(bool helperJoignable = true, string id = Id)
+    private ScanViewModel Vm(bool helperJoignable = true, string id = Id, IDesiredStateStore? manifeste = null, string? origine = null)
     {
         _levier.Id.Returns(id);
         _levier.RequiresElevation.Returns(true);
-        _levier.ApplyAsync().Returns(_ => { _poses++; return Task.FromResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(id, "100", "90"))); });
+        _levier.ApplyAsync().Returns(_ => { _poses++; return Task.FromResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(id, origine ?? InversesDeTest.Pour(id, "100"), "90"))); });
         _levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(_ => { _rendus++; return Task.FromResult(Result.Ok()); });
         var vm = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
             Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k,
-            journalLeviers: new JournalDesLeviersAppliques(Path.Combine(_dossier, "leviers.json")));
+            journalLeviers: new JournalDesLeviersAppliques(Path.Combine(_dossier, "leviers.json")), manifeste: manifeste);
         vm.MemoireParties = new PartiesMemorisees(Path.Combine(_dossier, "choix.json"), Path.Combine(_dossier, "parties.json"));
         vm.MemoireEssai = new MemoireDeLEssai(Path.Combine(_dossier, "essai.json"));
         vm.LevierParId = demande => demande == id ? _levier : null;
@@ -50,7 +51,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
     }
 
     [Fact]
-    public async Task Le_levier_alterne_une_partie_sur_deux_puis_reste_sur_le_meilleur_etat()
+    public async Task Le_levier_suit_des_blocs_abba_puis_reste_sur_le_meilleur_etat()
     {
         var vm = Vm();
         (await vm.DemarrerEssaiAsync(Id)).Should().BeTrue();
@@ -59,17 +60,201 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         await Jouer(vm, 90);
         _rendus.Should().Be(1, "après une partie avec, la suivante est sans");
         await Jouer(vm, 80);
-        _poses.Should().Be(2);
-        await Jouer(vm, 91);
+        _poses.Should().Be(1, "A-B-B-A : deux parties sans de suite");
         await Jouer(vm, 81);
-        await Jouer(vm, 92);
-        vm.EssaiEnCours.Should().BeTrue("2 contre 3 : pas encore tranché");
-        await Jouer(vm, 79);
+        _poses.Should().Be(2);
+        // Avec : 91, 92, 93, 94 ; sans : 79, 82, 80.5, puis la sixième.
+        foreach (var low1 in new[] { 91, 92, 79, 82, 93, 94, 80.5 }) await Jouer(vm, low1);
+        vm.EssaiEnCours.Should().BeTrue("cinq parties sans : le test à blanc en demande six");
+        await Jouer(vm, 78);
 
-        vm.EssaiEnCours.Should().BeFalse("3 contre 3 nets : tranché");
+        vm.EssaiEnCours.Should().BeFalse("test à blanc calme, puis avec nettement au-dessus : tranché");
         vm.LigneEssai.Should().Be("Essai.Fini.Mieux");
         vm.MemoireParties!.Lire().Select(p => p.Essai).Should().OnlyContain(e => e != null && e.StartsWith(Id + ":", StringComparison.Ordinal));
         (_poses - _rendus).Should().Be(1, "mieux en jeu : il reste posé");
+    }
+
+    // La désinstallation ne rend que ce que le manifeste signé porte : posé hors de lui, le levier de l'essai lui survivait.
+    [Fact]
+    public async Task La_pose_de_l_essai_inscrit_de_quoi_la_rendre_a_la_desinstallation()
+    {
+        var manifeste = ScanViewModelTestSeams.DesiredStateStore();
+        (await Vm(manifeste: manifeste).DemarrerEssaiAsync(Id)).Should().BeTrue();
+
+        await manifeste.Received(1).CommitAsync(Arg.Is<DesiredState>(d => d.Tweaks.Count == 0
+            && d.RevertOnly!.Count == 1 && d.RevertOnly[0].TweakId == Id
+            && d.RevertOnly[0].OriginalValueJson == InversesDeTest.Pour(Id, "100")));
+    }
+
+    // Pour l'Optimiser, la limite de latence part au service qui la réapplique ; pendant un essai, il la reposerait
+    // pendant la partie « sans ». La garde de l'essai ne fait que la rendre à la désinstallation.
+    [Fact]
+    public async Task Un_levier_que_le_service_reapplique_n_est_garde_que_pour_la_desinstallation()
+    {
+        var manifeste = ScanViewModelTestSeams.DesiredStateStore();
+        (await Vm(manifeste: manifeste, id: "latency.reflex").DemarrerEssaiAsync("latency.reflex")).Should().BeTrue();
+
+        await manifeste.Received(1).CommitAsync(Arg.Is<DesiredState>(d => d.Tweaks.Count == 0
+            && d.RevertOnly!.Count == 1 && d.RevertOnly[0].TweakId == "latency.reflex"));
+    }
+
+    // Rendu, le levier est à l'origine : sa garde sort du manifeste, la désinstallation n'a plus rien à rendre pour lui.
+    [Fact]
+    public async Task Chaque_rendu_de_l_essai_retire_sa_garde()
+    {
+        var retraits = new List<string>();
+        var vm = Vm();
+        vm.RetirerDuManifeste = id => { retraits.Add(id); return Task.FromResult(Result.Ok()); };
+        (await vm.DemarrerEssaiAsync(Id)).Should().BeTrue();
+        retraits.Should().BeEmpty("témoin : posé, la garde reste");
+
+        await Jouer(vm, 90);
+
+        retraits.Should().Equal(Id);
+    }
+
+    // Une sous-tension AMD peut survivre au redémarrage et la désinstallation ne sait pas la rendre : jamais essayée.
+    [Fact]
+    public async Task Un_levier_que_la_desinstallation_ne_rendrait_pas_n_est_jamais_essaye()
+    {
+        var manifeste = ScanViewModelTestSeams.DesiredStateStore();
+        var adlx = PrivilegedOpCodec.Serialize(new ApplyAdlxTuningOp(0, AdlxTuningKind.Undervolt, 1100)).Value!;
+        var vm = Vm(id: "gpu.undervolt", manifeste: manifeste, origine: adlx);
+
+        (await vm.DemarrerEssaiAsync("gpu.undervolt")).Should().BeFalse();
+
+        (_poses, _rendus).Should().Be((1, 1), "posé, puis rendu aussitôt");
+        vm.EssaiEnCours.Should().BeFalse();
+        vm.LigneEssai.Should().Be("Essai.PasRendable");
+        await manifeste.DidNotReceive().CommitAsync(Arg.Any<DesiredState>());
+    }
+
+    // Témoin : la même sous-tension sur NVIDIA est un décalage du cœur, volatil, que la désinstallation remet à 0.
+    [Fact]
+    public async Task Un_decalage_nvidia_volatil_rendu_a_la_desinstallation_s_essaie()
+    {
+        (await Vm(id: "gpu.undervolt").DemarrerEssaiAsync("gpu.undervolt")).Should().BeTrue();
+        _rendus.Should().Be(0);
+    }
+
+    // La pose de l'essai s'acquitte une fois, quand le journal des leviers porte son origine ; rendue aussitôt faute de garde,
+    // elle n'a rien à acquitter (le helper trouvera la valeur d'origine en place).
+    private List<bool> AcquitsALaPose(string id = Id)
+    {
+        var acquits = new List<bool>();
+        _levier.ApplyAsync().Returns(_ =>
+        {
+            _poses++;
+            PorteeDePose.Courante?.Noter(() =>
+            {
+                acquits.Add(new JournalDesLeviersAppliques(Path.Combine(_dossier, "leviers.json")).Lire().Any(s => s.TweakId == id));
+                return Task.FromResult(Result.Ok());
+            });
+            return Task.FromResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(id, InversesDeTest.Pour(id, "100"), "90")));
+        });
+        return acquits;
+    }
+
+    [Fact]
+    public async Task La_pose_de_l_essai_s_acquitte_une_fois_apres_que_le_journal_porte_l_origine()
+    {
+        var vm = Vm();
+        var acquits = AcquitsALaPose();
+
+        (await vm.DemarrerEssaiAsync(Id)).Should().BeTrue();
+
+        acquits.Should().Equal(true);
+    }
+
+    [Fact]
+    public async Task Sans_garde_inscrite_la_pose_rendue_n_acquitte_rien()
+    {
+        var manifeste = ScanViewModelTestSeams.DesiredStateStore();
+        manifeste.CommitAsync(Arg.Any<DesiredState>()).Returns(Result.Fail("MANIFESTE", "helper absent"));
+        var vm = Vm(manifeste: manifeste);
+        var acquits = AcquitsALaPose();
+
+        (await vm.DemarrerEssaiAsync(Id)).Should().BeFalse();
+
+        _rendus.Should().Be(1, "posé, puis rendu aussitôt");
+        acquits.Should().HaveCount(0);
+    }
+
+    // Resté posé faute de rendu : son origine entre au journal des leviers, l'acquit part après.
+    [Fact]
+    public async Task Sans_garde_inscrite_un_rendu_rate_s_acquitte_apres_que_le_journal_porte_l_origine()
+    {
+        var manifeste = ScanViewModelTestSeams.DesiredStateStore();
+        manifeste.CommitAsync(Arg.Any<DesiredState>()).Returns(Result.Fail("MANIFESTE", "helper absent"));
+        var vm = Vm(manifeste: manifeste);
+        var acquits = AcquitsALaPose();
+        _levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Fail("REFUS", "pilote"));
+
+        (await vm.DemarrerEssaiAsync(Id)).Should().BeFalse();
+
+        acquits.Should().Equal(true);
+    }
+
+    // Helper absent, manifeste illisible : sans garde inscrite, une désinstallation laisserait le levier posé.
+    [Fact]
+    public async Task Sans_garde_inscrite_l_essai_ne_garde_rien_de_pose_et_le_dit()
+    {
+        var manifeste = ScanViewModelTestSeams.DesiredStateStore();
+        manifeste.CommitAsync(Arg.Any<DesiredState>()).Returns(Result.Fail("MANIFESTE", "helper absent"));
+        var vm = Vm(manifeste: manifeste);
+
+        (await vm.DemarrerEssaiAsync(Id)).Should().BeFalse();
+
+        (_poses, _rendus).Should().Be((1, 1), "posé, puis rendu aussitôt");
+        vm.EssaiEnCours.Should().BeFalse();
+        vm.LeviersPoses.Should().BeEmpty("rien n'est gardé au journal");
+        vm.LigneEssai.Should().Be("Essai.PasInscrit");
+    }
+
+    // Ni inscrit ni rendu : le levier reste posé. Il reste alors au journal, visible et annulable, et l'écran le dit.
+    [Fact]
+    public async Task Sans_garde_inscrite_un_rendu_rate_garde_le_levier_visible_et_le_dit()
+    {
+        var manifeste = ScanViewModelTestSeams.DesiredStateStore();
+        manifeste.CommitAsync(Arg.Any<DesiredState>()).Returns(Result.Fail("MANIFESTE", "helper absent"));
+        var vm = Vm(manifeste: manifeste);
+        _levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Fail("REFUS", "pilote"));
+
+        (await vm.DemarrerEssaiAsync(Id)).Should().BeFalse();
+
+        vm.EssaiEnCours.Should().BeFalse();
+        vm.LeviersPoses.Should().ContainSingle(l => l.Id == Id);
+        vm.LigneEssai.Should().Be("Essai.PasInscritResteJournal");
+    }
+
+    [Fact]
+    public async Task Une_bascule_sans_garde_inscrite_rend_aussitot_et_dit_pourquoi()
+    {
+        var manifeste = ScanViewModelTestSeams.DesiredStateStore();
+        var vm = Vm(manifeste: manifeste);
+        (await vm.DemarrerEssaiAsync(Id)).Should().BeTrue();
+        await Jouer(vm, 90);
+        await Jouer(vm, 80);
+        manifeste.CommitAsync(Arg.Any<DesiredState>()).Returns(Result.Fail("MANIFESTE", "illisible"));
+
+        await Jouer(vm, 81);
+
+        (_poses - _rendus).Should().Be(0, "A-B-B-A voulait poser ; sans garde, rien ne reste");
+        vm.MemoireEssai!.Lire()!.EnPause.Should().BeTrue();
+        vm.LigneEssai.Should().Be("Essai.PasInscrit");
+    }
+
+    // Un levier de latence que l'instrument n'a mesuré sur aucune partie se juge sur les images : le verdict le dit.
+    [Fact]
+    public async Task Le_verdict_d_un_levier_de_latence_juge_sur_les_images_le_dit()
+    {
+        var vm = Vm(id: "latency.reflex");
+        (await vm.DemarrerEssaiAsync("latency.reflex")).Should().BeTrue();
+
+        foreach (var low1 in new[] { 90, 80, 81, 91, 92, 79, 82, 93, 94, 80.5, 78 }) await Jouer(vm, low1);
+
+        vm.EssaiEnCours.Should().BeFalse();
+        vm.LigneEssai.Should().Be("Essai.Fini.Mieux Essai.JugeSurLesImages");
     }
 
     // La pose de l'essai se date, comme celles d'Optimiser : la garde d'incident la couvre.
@@ -257,7 +442,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.EssaiEnCours.Should().BeTrue("le redémarrage n'arrête plus l'essai d'un réglage volatil");
         vm.MemoireParties!.Lire()[0].Essai.Should().Be(AlternanceDesEssais.Marque(Id, false), "jouée après le démarrage : sans le réglage");
         _rendus.Should().Be(0, "rien à rendre : le redémarrage l'a déjà fait");
-        _poses.Should().Be(2, "après une partie sans, la suivante est avec");
+        _poses.Should().Be(1, "A-B-B-A : le rang suivant est sans, rien à reposer");
     }
 
     // Le cas réel : le relevé de fond (aucun levier accessible) enregistre la partie. Il ne pose rien, mais il note l'état vrai.
@@ -278,37 +463,54 @@ public sealed class EssaiEnAlternanceTests : IDisposable
 
     // Le relevé de fond élevé fait AVANCER l'essai (le joueur ne garde pas l'App ouverte en jouant), avec le seul
     // levier en essai : jamais l'accès général aux leviers, qui ouvrirait le retrait automatique sans fenêtre.
-    [Fact]
-    public async Task Le_releve_de_fond_eleve_fait_avancer_l_essai_avec_le_seul_levier_en_essai()
-    {
-        var vm = Vm();
-        await vm.DemarrerEssaiAsync(Id);
-        var demandes = new List<string>();
-        vm.LevierParId = null;
-        vm.LevierDeLEssai = id => { demandes.Add(id); return id == Id ? _levier : null; };
-
-        await Jouer(vm, 90);
-
-        _rendus.Should().Be(1, "après une partie avec, la suivante est sans : rendu en fond");
-        vm.MemoireEssai!.Lire()!.PoseMaintenant.Should().BeFalse();
-        demandes.Should().OnlyContain(id => id == Id);
-    }
-
-    // Essai-alternance.json vit sous le profil du joueur, que tout programme du compte peut écrire. Le
-    // relevé de fond élevé ne pose jamais un levier qui n'a pas le droit d'alterner (AutoHot), même écrit dans ce fichier.
+    // Essai-alternance.json vit sous le profil du joueur, que tout programme du compte peut écrire. L'avancée de l'essai ne
+    // pose jamais un levier qui n'a pas le droit d'alterner (AutoHot), même écrit dans ce fichier.
     [Fact]
     public async Task Un_essai_ecrit_sur_un_levier_qui_n_alterne_pas_ne_pose_rien_et_s_efface()
     {
         const string horsEssai = "fixit.cpu_power_cap"; // posé au clic, jamais en alternance
         var vm = Vm(id: horsEssai);
         vm.MemoireEssai!.Ecrire(new EssaiEnAlternance(horsEssai, false, false, _maintenant, DerniereBascule: _maintenant));
-        vm.LevierParId = null;
-        vm.LevierDeLEssai = _ => _levier;
 
         await Jouer(vm, 90);
 
-        (_poses, _rendus).Should().Be((0, 0), "aucun levier hors alternance n'est posé en fond");
+        (_poses, _rendus).Should().Be((0, 0), "aucun levier hors alternance n'est posé sans clic");
         vm.MemoireEssai.Lire().Should().BeNull("l'essai trafiqué est effacé");
+    }
+
+    // Le même fichier forgé avec une origine « posé » : « Arrêter l'essai » rendait l'origine, donc posait le levier, au
+    // moment où le joueur croyait arrêter.
+    [Fact]
+    public async Task Arreter_un_essai_forge_sur_un_levier_qui_n_alterne_pas_ne_pose_rien()
+    {
+        const string horsEssai = "fixit.cpu_power_cap";
+        var vm = Vm(id: horsEssai);
+        vm.MemoireEssai!.Ecrire(new EssaiEnAlternance(horsEssai, true, false, _maintenant, DerniereBascule: _maintenant));
+
+        await vm.ArreterEssaiAsync();
+
+        (_poses, _rendus).Should().Be((0, 0));
+        vm.MemoireEssai.Lire().Should().BeNull();
+    }
+
+    // Une partie enchaînée aussitôt, ou un second jeu ouvert : rien ne se pose sans clic pendant qu'un jeu tourne.
+    [Fact]
+    public async Task Rien_ne_se_pose_sans_clic_pendant_qu_un_jeu_tourne()
+    {
+        var vm = Vm();
+        await vm.DemarrerEssaiAsync(Id);
+        await Jouer(vm, 90);
+        await Jouer(vm, 80);
+        var jeuOuvert = true;
+        vm.JeuOuvertPourLeTest = () => jeuOuvert;
+
+        await Jouer(vm, 81);
+        _poses.Should().Be(1, "le tour de poser tombe pendant un jeu : rien n'est posé");
+        vm.MemoireEssai!.Lire()!.PoseMaintenant.Should().BeFalse();
+
+        jeuOuvert = false;
+        await Jouer(vm, 82);
+        _poses.Should().Be(2, "jeu fermé, la partie suivante pose");
     }
 
     // Les parties d'un essai précédent du même levier ne tranchent pas le nouvel essai.
@@ -336,13 +538,14 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         var vm = Vm();
         await vm.DemarrerEssaiAsync(Id);
         await Jouer(vm, 90);
+        await Jouer(vm, 80);   // A-B-B-A : la partie d'après celle-ci repose le levier
         var enAttente = new TaskCompletionSource<Result<TweakSnapshot>>();
         _levier.ApplyAsync().Returns(_ => { _poses++; return enAttente.Task; });
 
         _maintenant = _maintenant.AddDays(1);
         vm.EnregistrerPartie(new PartieRelevee("cod.exe", _maintenant, _maintenant.AddMinutes(30), 4, 130, 80, BottleneckState.CpuBoundOrAppBound));
         vm.ArreterEssaiSurAnnulation(Id);
-        enAttente.SetResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, "100", "90")));
+        enAttente.SetResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, InversesDeTest.Pour(Id, "100"), "90")));
         await vm.DerniereAvanceeEssai;
 
         vm.MemoireEssai!.Lire().Should().BeNull("le joueur a annulé : rien ne relance l'essai");
@@ -356,13 +559,14 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         var vm = Vm();
         await vm.DemarrerEssaiAsync(Id);
         await Jouer(vm, 90);
+        await Jouer(vm, 80);   // A-B-B-A : la partie d'après celle-ci repose le levier
         var enAttente = new TaskCompletionSource<Result<TweakSnapshot>>();
         _levier.ApplyAsync().Returns(_ => { _poses++; return enAttente.Task; });
 
         _maintenant = _maintenant.AddDays(1);
         vm.EnregistrerPartie(new PartieRelevee("cod.exe", _maintenant, _maintenant.AddMinutes(30), 4, 130, 80, BottleneckState.CpuBoundOrAppBound));
         var arret = vm.ArreterEssaiAsync();
-        enAttente.SetResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, "100", "90")));
+        enAttente.SetResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, InversesDeTest.Pour(Id, "100"), "90")));
         await vm.DerniereAvanceeEssai;
         await arret;
 
@@ -377,10 +581,11 @@ public sealed class EssaiEnAlternanceTests : IDisposable
     {
         var vm = Vm();
         new JournalDesLeviersAppliques(Path.Combine(_dossier, "leviers.json"))
-            .Enregistrer(new ApplyReport([new ApplyOutcome(Id, true, false, new TweakSnapshot(Id, "100", "90"), null)], null));
+            .Enregistrer(new ApplyReport([new ApplyOutcome(Id, true, false, new TweakSnapshot(Id, InversesDeTest.Pour(Id, "100"), "90"), null)], null));
         await vm.DemarrerEssaiAsync(Id);
         await Jouer(vm, 90);
         _rendus.Should().Be(1);
+        await Jouer(vm, 80);   // A-B-B-A : la partie d'après celle-ci repose le levier
         var enAttente = new List<TaskCompletionSource<Result<TweakSnapshot>>>();
         _levier.ApplyAsync().Returns(_ => { _poses++; var t = new TaskCompletionSource<Result<TweakSnapshot>>(); enAttente.Add(t); return t.Task; });
 
@@ -388,9 +593,9 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.EnregistrerPartie(new PartieRelevee("cod.exe", _maintenant, _maintenant.AddMinutes(30), 4, 130, 80, BottleneckState.CpuBoundOrAppBound));
         var arret = vm.ArreterEssaiAsync();
         // La pose de l'arrêt (s'il n'attend pas) finit avant celle de la fin de partie : le pire ordre.
-        for (var i = enAttente.Count - 1; i >= 0; i--) enAttente[i].SetResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, "100", "90")));
+        for (var i = enAttente.Count - 1; i >= 0; i--) enAttente[i].SetResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, InversesDeTest.Pour(Id, "100"), "90")));
         await vm.DerniereAvanceeEssai;
-        foreach (var t in enAttente.Where(t => !t.Task.IsCompleted)) t.SetResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, "100", "90")));
+        foreach (var t in enAttente.Where(t => !t.Task.IsCompleted)) t.SetResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, InversesDeTest.Pour(Id, "100"), "90")));
         await arret;
 
         _rendus.Should().Be(1, "l'état d'origine est « posé » : rien ne le retire");
@@ -407,6 +612,35 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         (await vm.DemarrerEssaiAsync(Id)).Should().BeFalse();
         _rendus.Should().Be(1);
         vm.MemoireEssai!.Lire().Should().BeNull();
+    }
+
+    // Ni rendu ni inscrit au journal des leviers : rien ne l'annule depuis l'App, l'écran le dit sans promettre une ligne
+    // qui n'existe pas.
+    [Fact]
+    public async Task Sans_garde_ni_journal_un_rendu_rate_dit_qu_il_reste_pose_sans_ligne_a_annuler()
+    {
+        Directory.CreateDirectory(Path.Combine(_dossier, "leviers.json"));
+        var manifeste = ScanViewModelTestSeams.DesiredStateStore();
+        manifeste.CommitAsync(Arg.Any<DesiredState>()).Returns(Result.Fail("MANIFESTE", "helper absent"));
+        var vm = Vm(manifeste: manifeste);
+        _levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Fail("REFUS", "pilote"));
+
+        (await vm.DemarrerEssaiAsync(Id)).Should().BeFalse();
+
+        vm.LeviersPoses.Should().BeEmpty("témoin : le journal n'a rien gardé");
+        vm.LigneEssai.Should().Be("Essai.ResteSansJournal");
+    }
+
+    [Fact]
+    public async Task Un_journal_qui_ne_garde_rien_et_un_rendu_rate_le_disent()
+    {
+        Directory.CreateDirectory(Path.Combine(_dossier, "leviers.json"));
+        var vm = Vm();
+        _levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Fail("REFUS", "pilote"));
+
+        (await vm.DemarrerEssaiAsync(Id)).Should().BeFalse();
+
+        vm.LigneEssai.Should().Be("Essai.ResteSansJournal");
     }
 
     // Un journal illisible ne vaut pas « déjà rendu ».
@@ -435,5 +669,26 @@ public sealed class EssaiEnAlternanceTests : IDisposable
 
         vm.MemoireEssai!.Lire().Should().BeNull();
         vm.LigneEssai.Should().Be("Essai.Incertain");
+    }
+
+    // Le clic « Essayer » peut lancer le helper ; les bascules d'après, faites sans clic après chaque partie relevée, jamais
+    // (SansGesteDuJoueur) : le client qui lance le helper n'y ouvre aucune invite.
+    [Fact]
+    public async Task Les_bascules_de_l_essai_apres_une_partie_se_font_sans_geste()
+    {
+        var vm = Vm();
+        var portees = new List<bool>();
+        _levier.ApplyAsync().Returns(_ => { portees.Add(SansGesteDuJoueur.Actif); _poses++;
+            return Task.FromResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, InversesDeTest.Pour(Id, "100"), "90"))); });
+        _levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(_ => { portees.Add(SansGesteDuJoueur.Actif); _rendus++; return Task.FromResult(Result.Ok()); });
+
+        (await vm.DemarrerEssaiAsync(Id)).Should().BeTrue();
+        portees.Should().Equal([false], "témoin : la pose du clic a le droit de lancer le helper");
+
+        await Jouer(vm, 90);
+        await Jouer(vm, 80);
+        await Jouer(vm, 81);
+
+        portees.Should().HaveCount(3).And.EndWith([true, true], "chaque bascule d'après une partie se fait sans geste");
     }
 }

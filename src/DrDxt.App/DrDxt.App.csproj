@@ -32,6 +32,9 @@
     <None Include="Assets\Fonts\OFL-Unbounded.txt" CopyToOutputDirectory="PreserveNewest" />
     <!-- La GPL-3.0 (§4) accompagne chaque copie livrée. L'installeur copie publish\*. -->
     <None Include="..\..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <!-- « Quoi de neuf » lit le CHANGELOG de la version installée, dans le binaire signé. -->
+    <EmbeddedResource Include="..\..\CHANGELOG.md" LogicalName="CHANGELOG.md" />
+    <EmbeddedResource Include="..\..\CHANGELOG.en.md" LogicalName="CHANGELOG.en.md" />
   </ItemGroup>
 
   <ItemGroup>

@@ -42,4 +42,15 @@ public class MesuresEnAnglaisTests
 
         PlafondGpu.Borner(100).Lisible.Should().Be("Your graphics card is already saturated: lightening the processor gives no extra frame.");
     }
+
+    // Un nombre décimal suit la langue de l'App : un point en anglais, jamais la virgule française.
+    [Fact]
+    public void Le_pourcentage_du_plafond_gpu_prend_le_point_en_anglais()
+    {
+        using var _ = Docteur.Portee(CultureInfo.GetCultureInfo("en-US"));
+
+        PlafondGpu.Borner(80).Lisible.Should().Contain("80% busy").And.Contain("25% more");
+        PlafondGpu.Borner(90).Lisible.Should().Contain("11.1% more");
+        PlafondGpu.Borner(42.5).Lisible.Should().Contain("42.5% busy");
+    }
 }

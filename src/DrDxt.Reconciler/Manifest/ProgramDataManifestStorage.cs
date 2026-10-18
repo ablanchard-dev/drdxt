@@ -78,13 +78,7 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
             }
 
             // Mode test / sans ACL (dossier temporaire possédé par l'utilisateur de test) : simple écriture atomique.
-            if (!Directory.Exists(_root))
-                Directory.CreateDirectory(_root);
-            var tmp = FilePath + ".tmp";
-            File.WriteAllText(tmp, json);
-            // Remplacement atomique : File.Move(overwrite) est un renommage atomique sur NTFS.
-            File.Move(tmp, FilePath, overwrite: true);
-            return Task.FromResult(Result.Ok());
+            return Task.FromResult(new FichierJsonAtomique(FilePath, ErrorCodes.IoFailure).WriteAtomic(json));
         }
         catch (Exception ex)
         {

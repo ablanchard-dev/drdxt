@@ -18,6 +18,16 @@ public sealed class MemoireVideoOccupeeTests
         => MemoireVideoOccupee.Pourcent([(Rtx + "_phys_0", 7800L << 20), (Igpu + "_phys_0", 500L << 20)], Cartes)!
             .Value.Should().BeApproximately(95.2, 0.1, "la carte intégrée pleine à 98 % n'est pas la mémoire du jeu");
 
+    // Deux cartes (puce intégrée + dédiée) n'empêchent pas de conclure : chaque instance du jeu va à
+    // sa carte par son identifiant, et seule la dédiée compte.
+    [Fact]
+    public void La_memoire_hors_carte_du_jeu_se_rattache_a_la_carte_dediee_meme_avec_une_puce_integree()
+    {
+        (string, long)[] compteurs = [($"pid_42_{Rtx}_phys_0", 300L << 20), ($"pid_42_{Igpu}_phys_0", 900L << 20), ($"pid_7_{Rtx}_phys_0", 1L << 30)];
+        MemoireVideoOccupee.HorsCarte(42, compteurs, Cartes).Should().Be(300L << 20);
+        MemoireVideoOccupee.HorsCarte(99, compteurs, Cartes).Should().BeNull("aucune instance du processus");
+    }
+
     [Fact]
     public void Une_carte_integree_seule_ne_dit_rien()
         => MemoireVideoOccupee.Pourcent([(Igpu + "_phys_0", 500L << 20)], [Cartes[1]]).Should().BeNull();

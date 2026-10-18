@@ -1,0 +1,74 @@
+# À valider sur AMD
+
+English version: [VALIDATION-AMD.md](VALIDATION-AMD.md).
+
+DrDXT n'a pas de machine AMD. Tout ce qui touche un processeur Ryzen ou une carte Radeon est écrit et testé sur des
+données, **jamais vérifié sur une vraie machine AMD**. Une génération ne passe « validée » qu'avec un rapport réel,
+archivé dans `tests/Shared/validations` (voir [CONTRIBUTING.fr.md](../CONTRIBUTING.fr.md) §1). Pour une carte, c'est
+`GpuTuningCoverage.ValideesEnVie`, et une garde refuse une architecture validée sans son rapport ; les lectures du
+processeur suivront la même règle, génération par génération.
+
+Chaque ligne ci-dessous dit ce que fait le chemin, son état, comment le tester et ce que le rapport doit montrer. Le
+test se fait avec les zips de la [Release](https://github.com/ablanchard-dev/drdxt/releases) :
+`DrDXT-Validation-AMD.zip` (`VALIDER.cmd`, qui pose, relit, rend et relit chaque réglage) et
+`DrDXT-Rapport-Lecture-Seule.zip` (`DrDXT-Test.exe`, qui ne modifie rien). Le rapport part par une issue
+« Validation AMD ».
+
+## Les machines qui manquent
+
+Une génération à la fois suffit ; chacune compte :
+
+- Processeur : Zen 2 (Ryzen 3000), Zen 3 (Ryzen 5000), Zen 4 (Ryzen 7000), Zen 5 (Ryzen 9000), et un X3D à deux
+  blocs (7950X3D, 9950X3D) pour le routage du cache.
+- Carte : RDNA 2 (RX 6000), RDNA 3 (RX 7000), RDNA 4 (RX 9000).
+
+## Le protocole, pour chaque chemin
+
+1. Fermer tous les jeux. Noter le processeur, la carte, la version du pilote AMD et la version de DrDXT.
+2. Avant : relever la valeur dans l'outil de référence (logiciel AMD Adrenalin pour la carte, HWiNFO pour les capteurs,
+   Ryzen Master pour le processeur, ZenTimings pour la mémoire).
+3. Lancer le zip. Pour une écriture, `VALIDER.cmd` ; pour une lecture, `DrDXT-Test.exe`.
+4. Après : relever de nouveau la valeur dans l'outil de référence ; elle doit être celle d'avant.
+5. Refaire une fois avec HWiNFO ouvert pendant le test (deux outils qui lisent en même temps ne doivent rien corrompre).
+6. Refaire une fois sans droits administrateur (refuser la demande de Windows) : chaque lecture qui en a besoin doit se
+   dire « non lue », rien ne doit planter.
+
+Le rapport doit porter, pour une écriture, la ligne `rendu        : oui` sans « PAS REMIS D'ORIGINE » ; pour une lecture, la valeur
+lue par DrDXT à côté de celle de l'outil de référence.
+
+## Écritures sur la carte (pilote AMD, ADLX)
+
+| Chemin | Ce qu'il fait | État | Test | Le rapport montre |
+|---|---|---|---|---|
+| Limite de puissance (`gpu.power_limit`) | baisse la limite de puissance de la carte par le pilote | non validé sur AMD réel | `VALIDER.cmd` | la limite d'origine, celle posée, puis l'origine relue ; Adrenalin d'accord avant et après |
+| Anti-Lag (`latency.render_queue_cap`) | active Anti-Lag pour raccourcir la file de rendu | non validé sur AMD réel | `VALIDER.cmd` | Anti-Lag posé, relu, rendu, relu ; Adrenalin d'accord |
+| Vsync du pilote et plafond FRTC (`latency.vrr_vsync_cap`) | sur un écran à fréquence variable, Vsync « toujours activée » et un plafond d'images sous la fréquence de l'écran | non validé sur AMD réel | `VALIDER.cmd`, écran à fréquence variable branché sur la carte | les deux réglages posés puis rendus à leur valeur d'origine ; Adrenalin d'accord |
+| Fréquence maximale testée (`gpu.undervolt`, mode Expert) | essaie une fréquence maximale plus basse, la garde seulement si elle tient | non validé sur AMD réel | `VALIDER-FREQUENCE.cmd`, à part de `VALIDER.cmd` (qui n'écrit jamais de fréquence) | la fréquence maximale d'origine, celle baissée de 50 MHz, puis l'origine relue ; Adrenalin d'accord avant et après |
+
+## Écritures sur le processeur
+
+| Chemin | Ce qu'il fait | État | Test | Le rapport montre |
+|---|---|---|---|---|
+| Routage CCD X3D (`fixit.x3d_ccd`) | démarre l'optimiseur 3D V-Cache d'AMD et le mode Jeu automatique, pour que le jeu tourne sur le bloc à cache | non validé sur AMD réel | pas encore dans le kit | à venir |
+| Mode boost (`fixit.mode_boost`), plan d'alimentation (`fixit.power_plan`) | réglages Windows, aussi sur un Ryzen ; le plan n'est pas proposé sur un X3D à deux blocs | non validé sur AMD réel | `VALIDER.cmd` | posé, relu, rendu, relu |
+
+## Lectures de la carte (ADLX)
+
+| Chemin | Ce qu'il fait | État | Test | Le rapport montre |
+|---|---|---|---|---|
+| Réglages du pilote | lit SAM, Anti-Lag, Chill, FRTC, Vsync et la température de la carte | non validé sur AMD réel | `DrDXT-Test.exe --lire`, dans une invite de commandes ouverte dans le dossier du zip | chaque valeur lue par DrDXT, et la même dans Adrenalin (HWiNFO pour la température) |
+
+## Lectures du processeur
+
+| Chemin | Ce qu'il fait | État | Test | Le rapport montre |
+|---|---|---|---|---|
+| Génération et fTPM | reconnaît la génération par CPUID ; pour les saccades liées au fTPM (article AMD PA-410), dit un BIOS « à vérifier » d'après sa date | non validé sur AMD réel | `DrDXT-Test.exe` (étape « Docteur : tous les constats ») | la génération lue, et le processeur exact (Ryzen Master) |
+| Réglages du BIOS AMD nommés | lit les réglages du BIOS (dont le Curve Optimizer et l'échelle PBO) et ce qui s'écarte des valeurs d'usine | non validé sur AMD réel | pas encore dans le kit | à venir : les réglages lus, et les mêmes dans le BIOS |
+| Température (Tctl et par CCD) | registres thermiques, par le module de lecture AMD de PawnIO, en lecture seule | en attente : le module n'est pas encore embarqué | à venir dans le kit | Tctl et chaque CCD à moins de 1 °C de HWiNFO |
+| Cause matérielle des redémarrages | le registre de redémarrage du processeur (S5_RESET_STATUS), lu sans l'effacer | en attente du module | à venir | la cause lue après un arrêt propre, puis après un appui long sur le bouton |
+| Timings mémoire appliqués | les timings que le contrôleur mémoire applique vraiment, canal par canal | en attente du module | à venir | chaque timing, et le même dans ZenTimings |
+| Limites PPT, TDC, EDC et thermique | la table de puissance du processeur, en jeu | en attente du module | à venir | valeurs et limites, et les mêmes dans HWiNFO ou Ryzen Master |
+| Erreurs matérielles corrigées (MCA) | les erreurs que le processeur a corrigées | en attente du module | à venir | les erreurs lues, et les mêmes dans l'Observateur d'événements (WHEA) |
+
+Le Curve Optimizer par cœur n'est pas lu dans le processeur : il faudrait une commande hors de la liste fermée de
+lecture. Il reste lu dans le BIOS.

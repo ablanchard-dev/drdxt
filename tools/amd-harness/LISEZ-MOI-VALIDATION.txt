@@ -8,7 +8,7 @@ Ce test MODIFIE des réglages de Windows, un par un, et remet chacun d'origine a
 mode Jeu, enregistrement en arrière-plan de la Game Bar, mode fenêtré optimisé, planification GPU accélérée,
 accélération de la souris, plan d'alimentation, mode boost du processeur, limite de puissance de la carte graphique,
 Anti-Lag, Vsync et plafond d'images FRTC (réglages du pilote AMD).
-Il ne touche jamais au BIOS, ni à la tension, à la fréquence ou au ventilateur de la carte : le programme refuse
+VALIDER.cmd ne touche jamais au BIOS, ni à la tension, à la fréquence ou au ventilateur de la carte : le programme refuse
 lui-même ces écritures. Il ne crée ni service ni point de restauration, et n'installe rien.
 
 1. Ferme tous les jeux. Si un jeu s'ouvre pendant le test, le test s'arrête avant le réglage suivant.
@@ -41,3 +41,22 @@ Si la première ligne dit « À VÉRIFIER À LA MAIN » : le rapport donne, pour
 d'origine. Lance d'abord REMETTRE.cmd. Si la ligne reste là, remets ce réglage toi-même (logiciel AMD Adrenalin pour
 Anti-Lag, le plafond d'images et la limite de puissance ; Paramètres de Windows pour le reste), puis envoie quand même
 le rapport : c'est justement ce cas que le projet doit connaître.
+
+EN PLUS, SEULEMENT SI TU LE VEUX : la fréquence de ta carte AMD (VALIDER-FREQUENCE.cmd)
+
+C'est un test à part, qui touche à la carte graphique : lance-le seulement si tu es d'accord, et après VALIDER.cmd.
+Il baisse la fréquence maximale de ta carte AMD de 50 MHz, la relit, fait tourner la carte une trentaine de secondes
+pour vérifier qu'elle tient, puis remet la fréquence d'origine et la relit encore. C'est le réglage que le mode Expert de
+DrDXT écrit. Une fréquence plus basse ne peut que ralentir un peu la carte le temps du test.
+Il n'écrit rien d'autre : ni tension, ni ventilateur, ni limite de puissance, ni aucun réglage de Windows ; et jamais une
+fréquence plus de 100 MHz au-dessus de celle de ta carte. Sur une carte NVIDIA, il ne fait rien.
+
+1. Ferme tous les jeux et AMD Software.
+2. Double-clique sur VALIDER-FREQUENCE.cmd, puis réponds « Oui » à Windows comme pour VALIDER.cmd.
+3. À la fin, le fichier DrDXT-validation-....txt est dans Téléchargements, comme pour l'autre test. Envoie-le de la même
+   façon.
+
+Le pire cas est sûr : si le test plante, la carte reste au plus 50 MHz PLUS LENTE, jamais plus rapide.
+Si le PC plante ou que la fenêtre se ferme pendant ce test : relance REMETTRE.cmd, il remet la fréquence d'origine. Si
+la fréquence reste basse après un redémarrage, remets le réglage de la carte par défaut dans AMD Software (Performances,
+Réglage), puis envoie quand même le rapport : c'est un cas que le projet doit connaître.

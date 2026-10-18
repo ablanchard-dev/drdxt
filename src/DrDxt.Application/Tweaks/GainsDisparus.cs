@@ -62,4 +62,22 @@ public static class GainsDisparus
 
         return perdus;
     }
+
+    /// <summary>Le bilan de la relecture : toujours différents de l'origine (sans prétendre « appliqués », voir
+    /// <see cref="EtatRelu.DifferentDeAvant"/>), revenus à la valeur d'avant, et non relus.</summary>
+    public static (int Differents, int Revenus, int NonRelus) Bilan(IEnumerable<TweakSnapshot>? appliques, IRegistryReader lecteur)
+    {
+        var (d, r, n) = (0, 0, 0);
+        foreach (var s in appliques ?? [])
+        {
+            if (s is null || string.Equals(s.AppliedValueJson, s.OriginalValueJson, StringComparison.Ordinal)) continue;
+            switch (TweakReadback.Relire(s, lecteur).Etat)
+            {
+                case EtatRelu.RevenuAvantApplication: r++; break;
+                case EtatRelu.DifferentDeAvant: d++; break;
+                default: n++; break;
+            }
+        }
+        return (d, r, n);
+    }
 }

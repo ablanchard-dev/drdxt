@@ -15,14 +15,18 @@ internal static class RetourArriere
         string code, string message)
     {
         var rendu = true;
-        for (var i = posees.Count - 1; i >= 0; i--)
+        // Ces écritures annulent une pose : elles partent nues, jamais journalisées, donc jamais rejouées.
+        using (PorteeDePose.Suspendre())
         {
-            if (posees[i] is not { } inverse) continue;
-            try
+            for (var i = posees.Count - 1; i >= 0; i--)
             {
-                if (!(await eleve.ExecuteAsync(inverse, CancellationToken.None).ConfigureAwait(false)).IsOk) rendu = false;
+                if (posees[i] is not { } inverse) continue;
+                try
+                {
+                    if (!(await eleve.ExecuteAsync(inverse, CancellationToken.None).ConfigureAwait(false)).IsOk) rendu = false;
+                }
+                catch (Exception) { rendu = false; }
             }
-            catch (Exception) { rendu = false; }
         }
         return rendu
             ? Result<TweakSnapshot>.Fail(code, message)

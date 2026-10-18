@@ -18,4 +18,7 @@ public sealed record MemoryMeasurement(
     double BandwidthSigmaPct,
     double LatencyNs,
     double LatencySigmaPct,
-    IReadOnlyList<StaircasePoint> Staircase);
+    IReadOnlyList<StaircasePoint> Staircase,
+    // Le debit lu par plusieurs fils a la fois, chacun sur son tampon : un seul fil ne sature pas toujours deux canaux.
+    // 0 = non mesure (references enregistrees avant cette mesure).
+    double BandwidthMultiFilGBs = 0);

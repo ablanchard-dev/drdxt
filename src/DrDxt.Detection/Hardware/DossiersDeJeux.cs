@@ -119,11 +119,13 @@ public static class DossiersDeJeux
         {
             var disques = new Dictionary<string, int>();
             using (var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", "SELECT DeviceId, MediaType FROM MSFT_PhysicalDisk"))
-                foreach (var o in s.Get().Cast<ManagementObject>())
+            using (var rangees = s.Get())
+                foreach (var o in rangees.Cast<ManagementObject>())
                     using (o)
                         if (o["DeviceId"]?.ToString() is { } id) disques[id] = Convert.ToInt32(o["MediaType"] ?? 0);
             using (var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", "SELECT DriveLetter, DiskNumber FROM MSFT_Partition"))
-                foreach (var o in s.Get().Cast<ManagementObject>())
+            using (var rangees = s.Get())
+                foreach (var o in rangees.Cast<ManagementObject>())
                     using (o)
                         if (o["DriveLetter"] is char lettre && lettre != '\0' && disques.TryGetValue(o["DiskNumber"]?.ToString() ?? "", out var t))
                             types[char.ToUpperInvariant(lettre)] = t;

@@ -10,6 +10,10 @@ using Microsoft.Extensions.DependencyInjection;
 // DrDXT-Test : le banc portable distribué aux joueurs (zip de validation ou zip de rapport en lecture seule).
 //   sans argument / --rapport : rapport en LECTURE SEULE, rien n'est modifié ;
 //   --valider : chaque levier du produit posé, relu, rendu, relu (ValidationMachine) ;
+//   --valider-profond : de même, et un levier déjà réglé qui sait s'exercer est mis hors de sa cible, posé, rendu à son
+//     origine exacte (jamais tension, fréquence, ventilateur, BIOS, PL1 ni DRS : aucun de ceux-là ne s'exerce) ;
+//   --valider-frequence : la fréquence maximale d'une carte AMD seule, baissée, relue, rendue, relue (geste à part :
+//     --valider n'écrit jamais de fréquence) ;
 //   --remettre : rend seulement ce qu'un essai interrompu a laissé ;
 //   --lire : ce que l'ADLX lit sur la carte AMD dédiée ;
 //   --etape N : une étape du rapport, dans un processus enfant (usage interne).
@@ -50,19 +54,10 @@ if (args.Length == 2 && args[0] == "--etape" && int.TryParse(args[1], out var nu
 }
 
 // « --lire » lit par ADLX, sur la carte AMD dédiée, ce que le produit affiche (SAM, Anti-Lag,
-// FRTC / Chill, température), puis s'arrête. Lecture seule : aucune entrée Set* n'est appelée, aucun service lancé.
+// FRTC / Chill, Vsync, température), puis s'arrête. Lecture seule : aucune entrée Set* n'est appelée, aucun service lancé.
 if (args.Contains("--lire"))
 {
-    static string Etat(bool? v) => v switch { true => "activé", false => "désactivé", null => "non lu" };
-    var lus = AdlxReglages.Lire();
-    Console.WriteLine($"amdadlx64.dll dans System32 : {(AdlxReglages.DllPresente() ? "présente" : "absente")}");
-    Console.WriteLine(lus.Raison is null ? "ADLX : carte dédiée trouvée" : $"ADLX : rien lu ({lus.Raison})");
-    Console.WriteLine($"SAM (ReBAR)   : {Etat(lus.Sam)}");
-    Console.WriteLine($"Anti-Lag      : {Etat(lus.AntiLag)}");
-    Console.WriteLine($"FRTC          : {Etat(lus.FrtcActif)}{(lus.FrtcFps is { } f ? $", {f} images/s" : "")}");
-    Console.WriteLine($"Chill         : {Etat(lus.ChillActif)}{(lus.ChillMaxFps is { } c ? $", {lus.ChillMinFps}-{c} images/s" : "")}");
-    Console.WriteLine($"Limite images : {(lus.LimiteImages is { } l ? (l == 0 ? "aucune" : $"{l} images/s") : "non lue")}");
-    Console.WriteLine($"Température   : {(lus.TemperatureC is { } t ? $"{t:0.0} °C" : "non lue")}");
+    foreach (var ligne in LectureAdlx.Lignes(AdlxReglages.Lire(), AdlxReglages.DllPresente())) Console.WriteLine(ligne);
     return;
 }
 
@@ -74,25 +69,30 @@ var version = typeof(DrDxt.Application.Autopilot.ValidationComplete).Assembly.Ge
 var horodatage = DateTime.Now;
 
 // « --valider » pose chaque levier du produit, le relit, le rend, le relit encore.
-// « --remettre » rend seulement ce qu'un essai interrompu a laissé. Les deux commencent par rendre ce qui reste.
-if (args.Contains("--valider") || args.Contains("--remettre"))
+// « --valider-frequence » fait de même pour la seule fréquence maximale d'une carte AMD.
+// « --remettre » rend seulement ce qu'un essai interrompu a laissé. Tous commencent par rendre ce qui reste.
+if (args.Contains("--valider") || args.Contains("--valider-profond") || args.Contains("--valider-frequence") || args.Contains("--remettre"))
 {
-    var valider = args.Contains("--valider");
+    var frequence = args.Contains("--valider-frequence");
+    var profond = args.Contains("--valider-profond");
+    var valider = frequence || profond || args.Contains("--valider");
     var chemin = Path.Combine(RapportLecture.Dossier(), $"DrDXT-validation-{horodatage:yyyyMMdd-HHmmss}.txt");
     var corps = new System.Text.StringBuilder();
     // Écrit au fil de l'eau (un arrêt brutal laisse au moins le début), puis réécrit en entier avec le bilan en tête.
     void Ecrire(string t) { corps.Append(t); var p = Propre(t); Console.Write(p); try { File.AppendAllText(chemin, p, new System.Text.UTF8Encoding(false)); } catch (Exception) { } }
-    Ecrire($"DrDXT {version}, vérification du {horodatage:dd/MM/yyyy HH:mm} ({(valider ? "validation complète : chaque réglage est posé puis remis d'origine" : "remise d'origine")}, zip de validation){Environment.NewLine}{Environment.NewLine}");
+    Ecrire($"DrDXT {version}, vérification du {horodatage:dd/MM/yyyy HH:mm} ({(frequence ? "fréquence maximale de la carte AMD : baissée puis remise d'origine" : profond ? "validation profonde : chaque réglage est posé puis remis d'origine, et ceux déjà en place sont exercés" : valider ? "validation complète : chaque réglage est posé puis remis d'origine" : "remise d'origine")}, zip de validation){Environment.NewLine}{Environment.NewLine}");
     var nonRemis = new List<string>();
     try
     {
-        using var sp = ValidationMachine.Services();
-        var remise = await ValidationMachine.RemettreAsync(sp);
+        DrDxt.Application.Autopilot.ValidationComplete.Remise remise;
+        using (var spRemise = ValidationMachine.Services(ValidationMachine.Geste.Remettre))
+            remise = await ValidationMachine.RemettreAsync(spRemise);
         Ecrire($"=== essai précédent{Environment.NewLine}{remise.Texte}{Environment.NewLine}{Environment.NewLine}");
         if (!remise.Propre) nonRemis.Add(remise.Texte);
         else if (valider)
         {
-            var r = await ValidationMachine.ValiderAsync(sp, Ecrire);
+            using var sp = ValidationMachine.Services(frequence ? ValidationMachine.Geste.Frequence : ValidationMachine.Geste.Valider);
+            var r = frequence ? await ValidationMachine.ValiderFrequenceAsync(sp, Ecrire) : await ValidationMachine.ValiderAsync(sp, Ecrire, profond);
             nonRemis.AddRange(r.NonRemis);
         }
     }

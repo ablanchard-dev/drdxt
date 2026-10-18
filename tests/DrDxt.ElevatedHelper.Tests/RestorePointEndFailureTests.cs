@@ -100,10 +100,11 @@ public sealed class RestorePointEndFailureTests
     [Fact]
     public void Checkpoint_Computer_recoit_des_arguments_fixes_et_le_nom_echappe()
     {
-        var args = Win32RestorePointActions.ArgumentsCheckpoint("DrDXT : l'essai");
+        var args = Win32RestorePointActions.ArgumentsCheckpoint("DrDXT : l'essai", @"C:\Windows\system32");
 
-        args.Should().StartWith(new[] { "-NoProfile", "-NonInteractive", "-Command" });
-        args[^1].Should().Be("Checkpoint-Computer -Description 'DrDXT : l''essai' -RestorePointType APPLICATION_INSTALL -ErrorAction Stop");
+        args.Should().StartWith(new[] { "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command" });
+        args[^1].Should().Be(Win32RestorePointActions.ModuleSysteme(@"C:\Windows\system32")
+            + "Checkpoint-Computer -Description 'DrDXT : l''essai' -RestorePointType APPLICATION_INSTALL -ErrorAction Stop");
     }
 
     // Powershell -Command sort 1 sur toute erreur ; la raison est dans sa sortie d'erreur,

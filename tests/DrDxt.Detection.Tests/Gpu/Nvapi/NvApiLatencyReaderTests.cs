@@ -32,6 +32,21 @@ public class NvApiLatencyReaderTests
         r.Value.Should().Be(1u);
     }
 
+    // Absent du profil de base (NVAPI_SETTING_NOT_FOUND), le réglage est au défaut du pilote : PREFERRED_PSTATE_DEFAULT =
+    // OPTIMAL_POWER (5, NvApiDriverSettings.h). Lu « illisible », il faisait dire « état illisible » à tout pilote d'origine.
+    // Une panne de lecture, elle, reste illisible.
+    [Fact]
+    public void Absent_du_profil_de_base_le_reglage_est_dit_au_defaut_et_la_lecture_reste_brute()
+    {
+        _native.DrsReadSuccess = false;
+        _native.DrsAuDefaut = true;
+        Reader().GetPreferredPstate().IsOk.Should().BeFalse("la lecture brute : l'inverse d'un levier ne se construit pas sur un défaut");
+        Reader().PreferredPstateAuDefaut().Should().BeTrue();
+
+        _native.DrsAuDefaut = false;
+        Reader().PreferredPstateAuDefaut().Should().BeFalse("une panne n'est pas le défaut du pilote");
+    }
+
     [Fact]
     public void Drs_getters_fail_clean_when_the_setting_is_not_readable()
     {

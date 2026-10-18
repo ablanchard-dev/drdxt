@@ -222,7 +222,7 @@ public static class PawnIoIntel
     private static void Fermer(ref nint poignee)
     {
         if (poignee == 0) return;
-        try { pawnio_close(poignee); } catch (Exception) { }
+        try { pawnio_close(poignee); } catch (Exception) { /* fermeture au mieux : la poignée est oubliée dans tous les cas */ }
         poignee = 0;
     }
 

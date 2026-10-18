@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using DrDxt.Core;
+using static DrDxt.ElevatedHelper.Natif;
 
 namespace DrDxt.ElevatedHelper.Execution;
 
@@ -66,9 +67,6 @@ public static class FirmwarePrivilege
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetCurrentProcess();
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr handle);
 
     /// <summary>Active SeSystemEnvironmentPrivilege sur le process courant. Echec propre : ne jette
     /// jamais. Un echec est dit avec son motif, notamment ERROR_NOT_ALL_ASSIGNED (1300), qui

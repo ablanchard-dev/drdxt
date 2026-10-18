@@ -203,8 +203,9 @@ internal static class ScanViewModelTestSeams
         Func<IReadOnlyList<GpuInfo>, Task<RepairFinding?>>? verifierPilote = null,
         DrDxt.Application.Tweaks.JournalDesLeviersAppliques? journalLeviers = null,
         DrDxt.Application.Tweaks.Hardware.IRegistryReader? registreGains = null,
-        Func<HardwareInventory, SettingsState, IReadOnlyList<RepairFinding>, string>? exporterMachine = null) =>
-        new(hd, sr, br, sc, sd, Safety(), Engine(), profileConsumer ?? ProfileConsumer(), DesiredStateStore(), new AppliedTweakManifestMapper(), biosAdvisor ?? BiosAdvisor(),
+        Func<HardwareInventory, SettingsState, IReadOnlyList<RepairFinding>, string>? exporterMachine = null,
+        IDesiredStateStore? manifeste = null) =>
+        new(hd, sr, br, sc, sd, Safety(), Engine(), profileConsumer ?? ProfileConsumer(), manifeste ?? DesiredStateStore(), new AppliedTweakManifestMapper(), biosAdvisor ?? BiosAdvisor(),
             guideGenerator ?? GuideGenerator(), localize, gameLocator: gameLocator, firmwareTrip: firmwareTrip,
             repairAudit: repairAudit, journalSante: journalSante, voisins: voisins,
             estEleve: estEleve, relancerEnAdministrateur: relancerEnAdministrateur, helper: helper, writeReport: writeReport,

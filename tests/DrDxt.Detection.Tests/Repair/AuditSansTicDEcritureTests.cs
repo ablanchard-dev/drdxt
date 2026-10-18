@@ -51,6 +51,8 @@ public sealed class AuditSansTicDEcritureTests
         "LATENCE", "RESEAU", "KMDF", "PERIPHERIQUES", "TACHES", "WINDOWS", "UPDATE", "DEMARRAGE",
         // La clé de domaine de l'intégrité de la mémoire, comme STABILITE.
         "SECURITE",
+        // La clé de domaine du stream (OBS).
+        "STREAM",
         // L'API Microsoft par laquelle le compteur de repli lit les images. Un nom propre
         // technique, comme NVIDIA ou MMCSS, pas un mot crie.
         "DXGI",

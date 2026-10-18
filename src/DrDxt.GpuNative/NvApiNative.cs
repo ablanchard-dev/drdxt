@@ -662,9 +662,18 @@ public sealed class NvApiNative : INvApiNative
     }
 
     public bool TryReadDrsGlobalSetting(uint settingId, out DrsReading reading)
+        => LireDrsGlobal(settingId, out reading) == (int)NvApiStatus.Ok;
+
+    public bool DrsGlobalAuDefaut(uint settingId)
+        => LireDrsGlobal(settingId, out _) == (int)NvApiStatus.SettingNotFound;
+
+    // Le statut de GetSetting au profil de base, ou Error si une étape d'avant tombe : seul un SettingNotFound de
+    // GetSetting lui-même dit « au défaut du pilote ».
+    private int LireDrsGlobal(uint settingId, out DrsReading reading)
     {
+        const int Echec = (int)NvApiStatus.Error;
         reading = default;
-        if (!IsAvailable) return false;
+        if (!IsAvailable) return Echec;
         try
         {
             var createSession = _entry.GetDelegate<CreateSessionDelegate>(Id_DRS_CreateSession);
@@ -676,18 +685,18 @@ public sealed class NvApiNative : INvApiNative
             if (createSession is null || loadSettings is null || getBaseProfile is null
                 || getSetting is null || destroySession is null)
             {
-                return false;
+                return Echec;
             }
 
             if (createSession(out var session) != (int)NvApiStatus.Ok || session == IntPtr.Zero)
-                return false;
+                return Echec;
 
             try
             {
-                if (loadSettings(session) != (int)NvApiStatus.Ok) return false;
+                if (loadSettings(session) != (int)NvApiStatus.Ok) return Echec;
 
                 if (getBaseProfile(session, out var profile) != (int)NvApiStatus.Ok || profile == IntPtr.Zero)
-                    return false;
+                    return Echec;
 
                 // Préallouer chaque ByValArray (règle d'or n°2) + mot de version à l'exécution (n°1).
                 var setting = new NVDRS_SETTING_V1
@@ -703,11 +712,11 @@ public sealed class NvApiNative : INvApiNative
                     currentValue = new byte[NvapiSettingMaxValues],
                 };
 
-                // GetSetting remplit `setting`. Un réglage absent du profil rend un statut non Ok
-                // (NVAPI_SETTING_NOT_FOUND) → false : un « pas de valeur posée » honnête, jamais un 0 fabriqué
-                // (l'état vrai est « au défaut du pilote »).
-                if (getSetting(session, profile, settingId, ref setting) != (int)NvApiStatus.Ok)
-                    return false;
+                // GetSetting remplit `setting`. Un réglage absent du profil rend NVAPI_SETTING_NOT_FOUND : un « pas de valeur
+                // posée » honnête, jamais un 0 fabriqué (l'état vrai est « au défaut du pilote », dit par DrsGlobalAuDefaut).
+                var statut = getSetting(session, profile, settingId, ref setting);
+                if (statut != (int)NvApiStatus.Ok)
+                    return statut;
 
                 // Le DWORD vit dans les 4 premiers octets de currentValue (recette §C). Les champs de provenance
                 // reviennent avec la même lecture : les garder ne coûte rien et c'est le seul moyen de distinguer
@@ -717,14 +726,14 @@ public sealed class NvApiNative : INvApiNative
                     setting.settingLocation,
                     setting.isCurrentPredefined,
                     setting.isPredefinedValid);
-                return true;
+                return (int)NvApiStatus.Ok;
             }
             finally
             {
                 try { destroySession(session); } catch { /* best-effort cleanup */ }
             }
         }
-        catch { return false; }
+        catch { return Echec; }
     }
 
     // ── Chercheurs d'entrée d'horloge P0 ──────────────────────────────────────────────

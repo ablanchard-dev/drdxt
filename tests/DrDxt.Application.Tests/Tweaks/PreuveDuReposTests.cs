@@ -1,3 +1,4 @@
+using DrDxt.Tests.Shared;
 using DrDxt.Application.Tweaks;
 using DrDxt.Core;
 using FluentAssertions;
@@ -17,7 +18,7 @@ public sealed class PreuveDuReposTests
     }
 
     private static readonly Func<TimeSpan, Task> SansAttente = _ => Task.CompletedTask;
-    private static readonly TweakSnapshot Snapshot = new("gpu.repos_global_normal", "inverse");
+    private static readonly TweakSnapshot Snapshot = new("gpu.repos_global_normal", InversesDeTest.Pour("gpu.repos_global_normal"));
 
     private static ITweak Levier(bool ecrit = true)
     {
@@ -26,6 +27,55 @@ public sealed class PreuveDuReposTests
         t.ApplyAsync().Returns(ecrit ? Result<TweakSnapshot>.Ok(Snapshot) : Result<TweakSnapshot>.Fail(ErrorCodes.TweakNotApplicable, "non"));
         t.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Ok());
         return t;
+    }
+
+    // Une écriture journalisée posée dans une portée note son acquit, comme le client élevé de l'App ; l'acquit dit si
+    // l'avant et l'écriture étaient déjà gardés quand il est parti.
+    private static ITweak LevierQuiAcquitte(PreuvesEnAttente attente, List<string> log)
+    {
+        var t = Substitute.For<ITweak>();
+        t.Id.Returns(Snapshot.TweakId);
+        t.ApplyAsync().Returns(_ =>
+        {
+            log.Add("noté");
+            PorteeDePose.Courante?.Noter(() =>
+            {
+                log.Add(attente.Charger() is not null ? "acquit, preuve gardée" : "acquit sans preuve");
+                return Task.FromResult(Result.Ok());
+            });
+            return Task.FromResult(Result<TweakSnapshot>.Ok(Snapshot));
+        });
+        return t;
+    }
+
+    [Fact]
+    public async Task L_ecriture_s_acquitte_une_fois_apres_que_la_preuve_est_gardee()
+    {
+        var attente = new PreuvesEnAttente(Fichier());
+        var log = new List<string>();
+
+        (await PreuveDuRepos.EcrireAsync(LevierQuiAcquitte(attente, log), new SondeEnFile(Serie(55)), 6, SansAttente, attente))
+            .Should().BeTrue();
+
+        log.Should().Equal("noté", "acquit, preuve gardée");
+    }
+
+    // La preuve n'a pas pu être gardée : seul le helper sait rendre l'origine, rien n'est acquitté.
+    [Fact]
+    public async Task Une_preuve_qui_ne_se_garde_pas_n_acquitte_rien()
+    {
+        var dossier = Directory.CreateDirectory(Fichier()).FullName;
+        var attente = new PreuvesEnAttente(dossier);
+        var log = new List<string>();
+
+        var ecrire = () => PreuveDuRepos.EcrireAsync(LevierQuiAcquitte(attente, log), new SondeEnFile(Serie(55)), 6, SansAttente, attente);
+
+        try
+        {
+            await ecrire.Should().ThrowAsync<Exception>("le fichier de la preuve est un dossier");
+            log.Should().Equal("noté");
+        }
+        finally { Directory.Delete(dossier, recursive: true); }
     }
 
     private static double?[] Serie(double baseW, int n = 6) => Enumerable.Range(0, n).Select(i => (double?)(baseW + (i % 3) * 0.5)).ToArray();
@@ -144,5 +194,33 @@ public sealed class PreuveDuReposTests
 
         v.Etat.Should().Be(EtatDeLaPreuve.NonMesure);
         await levier.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
+    }
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateHardLink(string lien, string cible, IntPtr securite);
+
+    // Le fichier de la preuve vit dans le profil du joueur et le helper élevé le rejoue au retrait : un lien dur posé sous
+    // le nom prévisible « <fichier>.tmp » faisait réécrire sa cible par l'App élevée. Les deux magasins passent par
+    // l'écriture atomique, au temporaire aléatoire.
+    [Fact]
+    public void Un_lien_dur_pose_sous_le_nom_du_temporaire_ne_fait_jamais_reecrire_sa_cible()
+    {
+        var dossier = Directory.CreateTempSubdirectory("drdxt-preuve-").FullName;
+        try
+        {
+            var protege = Path.Combine(dossier, "protege.txt");
+            File.WriteAllText(protege, "intact");
+            var preuve = Path.Combine(dossier, "preuve.json");
+            var retenu = Path.Combine(dossier, "retenu.json");
+            CreateHardLink(preuve + ".tmp", protege, IntPtr.Zero).Should().BeTrue();
+            CreateHardLink(retenu + ".tmp", protege, IntPtr.Zero).Should().BeTrue();
+
+            new PreuvesEnAttente(preuve).Garder(new PreuveEnAttente(Snapshot.TweakId, Snapshot.OriginalValueJson, null, [10]));
+            new ReglagesRetenus(retenu).Garder(new ReglageRetenu(Snapshot.TweakId, Snapshot.OriginalValueJson, null, DateTimeOffset.Now));
+
+            File.ReadAllText(protege).Should().Be("intact");
+            new PreuvesEnAttente(preuve).Charger().Should().NotBeNull();
+            new ReglagesRetenus(retenu).Charger().Should().NotBeNull();
+        }
+        finally { Directory.Delete(dossier, recursive: true); }
     }
 }

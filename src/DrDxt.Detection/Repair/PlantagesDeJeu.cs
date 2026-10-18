@@ -115,10 +115,10 @@ public static class PlantagesDeJeu
                                 paquets.Add(new(p, fabricant));
                     }
                 }
-                catch (Exception) { }
+                catch (Exception) { /* carte illisible : ses paquets ne sont pas reconnus */ }
             }
         }
-        catch (Exception) { }
+        catch (Exception) { /* classe illisible : liste vide, aucun module attribué au hasard */ }
         return paquets.Distinct().ToList();
     }
 

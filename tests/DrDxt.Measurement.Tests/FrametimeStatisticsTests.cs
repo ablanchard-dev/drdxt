@@ -6,6 +6,15 @@ namespace DrDxt.Measurement.Tests;
 
 public class FrametimeStatisticsTests
 {
+    // Composé = 4, 5, 6 ; le retournement indépendant (3) et par superposition (8) ne l'est pas ; inconnu (0) écarté.
+    [Fact]
+    public void La_part_composee_compte_les_recopies_sur_les_modes_connus()
+    {
+        FrametimeStatistics.PartComposee([3, 4, 0, 8, 5, 6, 0, 3]).Should().Be(0.5);
+        FrametimeStatistics.PartComposee([0, 0]).Should().BeNull();
+        FrametimeStatistics.PartComposee(null).Should().BeNull();
+    }
+
     [Fact]
     public void Avg_fps_of_constant_16_67ms_is_60()
     {

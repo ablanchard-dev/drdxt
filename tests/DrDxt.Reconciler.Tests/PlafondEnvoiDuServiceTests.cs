@@ -31,6 +31,7 @@ public sealed class PlafondEnvoiDuServiceTests : IDisposable
     // antérieure du helper qui ne les refusait pas.
     [Theory]
     [InlineData("steam.exe")]
+    [InlineData("monoutil.exe")]   // retenu avant que seuls les jeux reconnus le soient
     [InlineData("explorer.exe")]
     public void Un_lanceur_ou_un_binaire_de_Windows_retenu_n_allume_rien(string exe)
     {

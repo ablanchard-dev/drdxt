@@ -90,17 +90,43 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
         }
 
         TexteTelephone = Telephone(this, localize);
+        AdressePage = PageDuGuide.UrlSiAcceptee(PageDuGuide.Depuis(guide, this, Docteur.Langue.TwoLetterISOLanguageName == "fr" ? "fr" : "en"));
         // Un QR montré à 180 points avec 93 à 165 modules tombait sous 2 pixels par module, illisible
         // par un téléphone. Il s'affiche maintenant à sa taille (4 pixels par module) et ne dépasse pas la version 25 ;
-        // au-delà, pas d'image plutôt qu'une image qu'aucun téléphone ne lit.
+        // au-delà, pas d'image plutôt qu'une image qu'aucun téléphone ne lit. La page d'abord (lisible et mise en forme),
+        // quand elle est en ligne et accepte ce guide ; sinon, ou si son adresse ne tient pas, le texte brut, comme avant.
+        foreach (var contenu in PageDuGuide.EnLigne && AdressePage is { } page ? new[] { page, TexteTelephone } : [TexteTelephone])
+        {
+            try
+            {
+                using var donnees = new QRCoder.QRCodeGenerator().CreateQrCode(contenu, QRCoder.QRCodeGenerator.ECCLevel.L, forceUtf8: true);
+                if (donnees.ModuleMatrix.Count > ModulesMaximum) continue;
+                ModulesQr = donnees.ModuleMatrix.Count;
+                QrTelephone = new QRCoder.PngByteQRCode(donnees).GetGraphic(PixelsParModule);
+                QrPorteLaPage = ReferenceEquals(contenu, AdressePage);
+                break;
+            }
+            catch (Exception) { /* trop long pour un QR : le suivant, ou le texte reste à l'écran */ }
+        }
+    }
+
+    /// <summary>L'adresse de la page du guide au téléphone, le guide entier dans son fragment (<see cref="PageDuGuide"/>) ;
+    /// null quand la page refuserait ce guide (une phrase qu'elle ne connaît pas, une valeur hors de ses règles).</summary>
+    internal string? AdressePage { get; }
+
+    /// <summary>La taille d'un QR de ce texte, marge comprise, ou null s'il ne tient dans aucun QR.</summary>
+    internal static int? Modules(string texte)
+    {
         try
         {
-            using var donnees = new QRCoder.QRCodeGenerator().CreateQrCode(TexteTelephone, QRCoder.QRCodeGenerator.ECCLevel.L, forceUtf8: true);
-            ModulesQr = donnees.ModuleMatrix.Count;
-            QrTelephone = ModulesQr <= ModulesMaximum ? new QRCoder.PngByteQRCode(donnees).GetGraphic(PixelsParModule) : null;
+            using var donnees = new QRCoder.QRCodeGenerator().CreateQrCode(texte, QRCoder.QRCodeGenerator.ECCLevel.L, forceUtf8: true);
+            return donnees.ModuleMatrix.Count;
         }
-        catch (Exception) { QrTelephone = null; /* trop long pour un QR : le texte reste à l'écran */ }
+        catch (Exception) { return null; }
     }
+
+    /// <summary>Vrai quand le QR ouvre la page ; faux quand il porte le texte brut (adresse trop longue) ou rien.</summary>
+    internal bool QrPorteLaPage { get; }
 
     /// <summary>La phrase qui renvoie au manuel du constructeur ; <c>null</c> pour une carte vérifiée.</summary>
     public string? ManuelDeLaCarte { get; }
@@ -139,7 +165,8 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
     /// donc ailleurs que sur son écran. Le texte entier tient dans le QR : le téléphone le lit sans réseau ni serveur.</summary>
     public string TexteTelephone { get; }
 
-    /// <summary>Le QR de <see cref="TexteTelephone"/>, en PNG ; <c>null</c> si le texte ne tient pas dans un QR.</summary>
+    /// <summary>Le QR de <see cref="AdressePage"/>, ou de <see cref="TexteTelephone"/> si l'adresse ne tient pas, en PNG ;
+    /// <c>null</c> si aucun des deux ne tient.</summary>
     public byte[]? QrTelephone { get; }
 
     public bool QrVisible => QrTelephone is not null;
@@ -273,7 +300,7 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
         try { r = await _annulerDepart(); }
         catch (Exception ex) { r = Result.Fail(ErrorCodes.BiosInputInvalid, ex.Message); }
         if (r.IsOk) { ErreurDepart = null; Depart = EtatDepart.Repos; return; }
-        ErreurDepart = $"{_localize("Bios.Depart.AnnulationEchec")}{Docteur.DeuxPoints}{r.Error?.Message}";
+        ErreurDepart = RaisonLisible.Echec(r, _localize("Bios.Depart.AnnulationEchec"), _localize);
     }
 
     public string LabelDepart => _localize("Bios.Depart.Bouton");
@@ -308,7 +335,7 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
         try { r = await OpenFirmwareSetupAsync(); }
         catch (Exception ex) { r = Result.Fail(ErrorCodes.BiosInputInvalid, ex.Message); }
         if (r.IsOk) { Depart = EtatDepart.Lance; return; }
-        ErreurDepart = $"{_localize("Bios.Depart.Echec")}{Docteur.DeuxPoints}{r.Error?.Message}";
+        ErreurDepart = RaisonLisible.Echec(r, _localize("Bios.Depart.Echec"), _localize);
         Depart = EtatDepart.Repos;
     }
 

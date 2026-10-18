@@ -22,6 +22,10 @@ A validated report goes into `tests/Shared/validations` (named `<architecture>-<
 architecture is added to `GpuTuningCoverage.ValideesEnVie`; a guard test refuses the opposite.
 [docs/COUVERTURE.md](docs/COUVERTURE.md) says what DrDXT does on which PC.
 
+**Do you have a Ryzen processor or a Radeon card?** That is what we lack most: nothing that touches AMD has been checked
+on a real machine. [docs/VALIDATION-AMD.md](docs/VALIDATION-AMD.md) lists each path, how to test it and what the report
+must show; the report goes in an "AMD validation" issue.
+
 ## 2. Report a problem
 
 A "Bug" issue: what you did, what you expected, what happened, and your DrDXT version (bottom of the screen). Attach
@@ -31,9 +35,12 @@ the diagnostic report ("View report") if the app produced one. A security issue 
 ## 3. Write code
 
 Start with [ARCHITECTURE.md](ARCHITECTURE.md): the projects, the rules the code keeps, and how to add a setting
-from end to end.
+from end to end. A new setting also passes the safety checklist in
+[docs/AJOUTER-UN-REGLAGE.md](docs/AJOUTER-UN-REGLAGE.md).
 
-Requirements: Windows 10 or 11, the .NET 10 SDK.
+Requirements: Windows 10 or 11, the .NET 10 SDK, and a clone in a short folder (for example `C:\src\drdxt`): under a
+deep folder, files in the build output go past the length Windows accepts to load a native library, and the signing
+tests fail for reasons that have nothing to do with the code.
 
 ```
 dotnet build DrDXT.sln -c Release
@@ -41,6 +48,25 @@ dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
 `Category=Machine` tests read the real hardware; they run by hand, not in CI.
+
+To see the app without the hardware, a Debug build replays a recorded machine from `tests/Shared/machines` (an AMD
+card, a laptop on battery, an account without admin rights...); its data go to a throwaway folder:
+
+```
+dotnet build src\DrDxt.App -c Debug
+src\DrDxt.App\bin\Debug\net10.0-windows\DrDxt.App.exe machine=amd-rx6600-ryzen5-5600 --langue=en-US
+```
+
+`tools/parcours-ui/parcours.ps1 -Machine <name> -Langue en-US` runs the same replay off screen, visits every page, and
+lists through UI Automation what a screen reader would read: unnamed controls, untranslated keys, unfilled
+placeholders, French left in the English interface. Read only: it never clicks.
+
+**A change that writes on the machine** (a new or changed setting, the helper allowlist, a revert, the installer
+or the uninstaller) is merged only after a review by a second person, and with CI green.
+
+**Dependencies.** We rely on security alerts (Dependabot alerts), without version updates: nothing
+opens a pull request on its own. A version bump is made by hand in the private lab, reviewed and tested like any
+change, then reaches this repository with the next copy.
 
 The rules the test suite enforces:
 
@@ -55,7 +81,8 @@ The rules the test suite enforces:
 - **App texts exist in French and English.**
 - The test count in the README follows the last run (`python tools/gates/compte_des_tests.py`).
 
-The code is written in French on purpose (identifiers, comments, test names), and new code follows that rule; each
+The code is mostly written in French on purpose (identifiers, comments, test names), and new code follows that
+rule; each
 file opens with a short French summary of what it does and why. See "Language of the code" in
 [ARCHITECTURE.md](ARCHITECTURE.md). Pull requests and issues are welcome in English or French. A commit says what
 changes for the player, then why.

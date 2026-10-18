@@ -9,11 +9,13 @@ DrDXT runs as three programs:
 
 - **The app** (`src/DrDxt.App`, WPF) reads the machine, explains it and asks before changing anything. It never writes
   a Windows or hardware setting itself.
-- **The helper** (`src/DrDxt.ElevatedHelper`) is the only elevated program that writes. It receives an operation,
+- **The helper** (`src/DrDxt.ElevatedHelper`) writes for the app, elevated. It receives an operation,
   checks it against its allowlist (default deny, exact targets), reads the original value, writes, and keeps the
   inverse. The native launcher (`src/DrDxt.Lanceur`) receives the elevation and starts it with a clean environment.
 - **The service** (`src/DrDxt.ReconcilerHost`, `DrDxtReconciler`, optional) reapplies at Windows startup the settings
-  you kept, from a signed manifest, and the uninstaller reads that same manifest to revert them.
+  you kept, from a signed manifest, and the uninstaller reads that same manifest to revert them. Both run the helper's
+  operations themselves, behind the same allowlist: the service as SYSTEM, the uninstaller elevated. A separate helper
+  for the service is hardening still to come.
 
 ```
             App (WPF)  ─── asks ───>  Helper (elevated, allowlist)  ───>  registry, driver, power plan
@@ -21,7 +23,7 @@ DrDXT runs as three programs:
                │ reads                    └── writes the signed manifest
                v                                       │
    Detection, Measurement, Bios                        v
-                                        Service (startup)  ─── reapplies through the helper
+                                        Service (startup)  ─── reapplies itself, same allowlist
 ```
 
 ## Projects and dependencies
@@ -100,6 +102,10 @@ A setting is a lever: a class that knows when it applies, how to apply itself an
 If the setting writes a new registry value, name it in the "What DrDXT writes on your machine" section of both READMEs.
 `tests/DrDxt.App.Tests/LeReadmeDitCeQueLeProduitEcritTests.cs` compares the French one with the helper allowlist.
 
+Before it ships, a setting passes the safety checklist in [docs/AJOUTER-UN-REGLAGE.md](docs/AJOUTER-UN-REGLAGE.md):
+allowlist and bounds, exact inverse read back, write-ahead journal class, pose scope, replay at the next start,
+uninstall, the invariant bench, non-nuisance, what the docs promise, and the review.
+
 ## Where the texts live
 
 - **The app's interface**: `src/DrDxt.Infrastructure/Resources/Strings.resx` and `Strings.fr.resx`, read through
@@ -127,17 +133,25 @@ a `--autotest` mode:
 - `tools/gates/hors_ci.py`: the inventory of tests that do not run in CI is exact.
 - `tools/gates/ages.py`: the dates in `GATES.md` are readable.
 
+## The map of the code
+
+`tools/carte/carte.py` rebuilds, from the sources, the graph to read before changing code: which project references
+which (`projets`), each privileged op from end to end, with its allowlist rule, its journal class, the code that creates
+it and its tests (`ops`, `op <Name>`), every file that cites a name (`qui <Name>`), and the sites that write on the
+machine (`ecrit [Project]`). Its output is never committed, so it is never stale: run it before a fix to see every caller.
+
 ## Why things are the way they are
 
 Decisions that look odd from the outside, with where the detail lives.
 
-- **A separate elevated helper.** The app runs as the player; only the helper is elevated, and it trusts nothing it
-  receives: each operation is checked by type and exact target. Threat model and accepted limits:
+- **A separate elevated helper.** The app runs as the player; the helper is elevated for it, and it trusts nothing it
+  receives: each operation is checked by type and exact target. The service and the uninstaller check the same way.
+  Threat model and accepted limits:
   [docs/SECURITE.md](docs/SECURITE.md).
 - **The BIOS is read, never written.** There is no clean, universal interface to change settings on every
   motherboard without a per-BIOS mapping, and a wrong write can leave a PC that does not boot. DrDXT finds what is
   wrong, gives the exact BIOS path, guides the player on their phone and checks the result back in Windows.
-- **Graphics card tuning is power limit, clock offset and fan speed, never voltage.** All are bounded, and the Expert
+- **Graphics card tuning is power limit, clock offset or maximum frequency, and fan speed, never voltage.** All are bounded, and the Expert
   mode values are reverted on their own if DrDXT stops.
 - **The settings catalog ships with the code.** There is no remote channel that could change what DrDXT writes
   without a release, reviewed and tested like the rest.
@@ -149,7 +163,7 @@ Decisions that look odd from the outside, with where the detail lives.
 
 ## Language of the code
 
-The code is written in French, on purpose: identifiers, comments and test names, so that the project's owner can
+The code is mostly written in French, on purpose: identifiers, comments and test names, so that the project's owner can
 read every line and keep improving it. New code follows the same rule. Only what the player reads is in English too
 (`Strings.resx`, `Docteur.resx`, the READMEs, CONTRIBUTING and this file), along with names imposed by a framework or
 an API.

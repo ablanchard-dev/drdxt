@@ -69,6 +69,13 @@ public sealed class PreferMaxPerfTweak : LatencyTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "NVIDIA driver / NVAPI is not available to set the power management mode.");
 
+            // Au profil global (aucun jeu), réglage au défaut du pilote : l'origine exacte serait « absent », que seule une
+            // suppression au profil de base rendrait, et la liste blanche n'en admet aucune. Rien n'est écrit.
+            if (_game?.RunningGameExecutablePath() is null && !_nvApi.GetPreferredPstate().IsOk && _nvApi.PreferredPstateAuDefaut())
+                return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
+                    "The power management mode is at the driver default on the global profile: its exact origin (absent) "
+                    + "could not be restored, so nothing is written.");
+
             // Relever la vraie origine avant d'écrire (retour fidèle), au scope écrit.
             var plan = PlanifierDrs(_nvApi, _game is not null, _game?.RunningGameExecutablePath(), PreferredPstateSettingId,
                 PreferMax, _nvApi.GetPreferredPstate, "power management mode");

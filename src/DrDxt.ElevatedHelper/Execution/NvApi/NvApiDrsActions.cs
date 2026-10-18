@@ -38,9 +38,15 @@ public sealed class NvApiDrsActions : INvApiDrsActions
 
         try
         {
-            return _native.TrySetDrsGlobalSetting(settingId, value)
+            if (!_native.TrySetDrsGlobalSetting(settingId, value))
+                return Fail("DRS write failed (session or setting fault).");
+            // Relue, comme l'écriture par jeu : un « true » natif dit que l'appel est accepté, pas que la valeur a pris (une
+            // sauvegarde concurrente du panneau NVIDIA l'écrase). La lecture ouvre sa propre session.
+            if (!_native.TryGetDrsGlobalSetting(settingId, out var relue))
+                return Fail("The global DRS write was accepted but could not be read back, so it is NOT confirmed.");
+            return relue == value
                 ? Result.Ok()
-                : Fail("DRS write failed (session or setting fault).");
+                : Fail($"The global DRS setting was not applied: asked {value}, the driver holds {relue}.");
         }
         catch (Exception ex)
         {

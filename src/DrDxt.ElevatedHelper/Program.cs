@@ -3,6 +3,7 @@ using DrDxt.ElevatedHelper.Execution;
 using DrDxt.ElevatedHelper.Execution.Adlx;
 using DrDxt.ElevatedHelper.Execution.NvApi;
 using DrDxt.ElevatedHelper.Ipc;
+using DrDxt.ElevatedHelper.Journal;
 using DrDxt.ElevatedHelper.Leases;
 
 [assembly: SupportedOSPlatform("windows")]
@@ -113,8 +114,10 @@ internal static class Program
         // Les appels natifs sont la frontière du smoke test ; sur une machine AMD / sans NVIDIA, toute
         // action NVAPI échoue proprement (« NVIDIA NVAPI unavailable »), et sur une machine sans AMD,
         // toute action ADLX échoue proprement (« AMD ADLX unavailable »).
+        // Le pilote AMD, un seul par processus : celui qui écrit et celui qui relit avant d'écrire.
+        var adlx = new DrDxt.Detection.Gpu.Adlx.AdlxNative();
         var executor = new PrivilegedOpExecutor(
-            new Win32RegistryActions(),
+            new Win32RegistryActions(Win32RegistryActions.TraceDuHelper),
             new Win32PowerPlanActions(),
             new Win32RestorePointActions(),
             new Win32ServiceActions(),
@@ -125,7 +128,7 @@ internal static class Program
             new NvApiTuningActions(),
             // Écritures de réglage ADLX (AMD) risquées (le miroir AMD) : GET puis SET par l'unique
             // frontière AdlxNative vérifiée, nouvelle vérification de plage en refus par défaut, échec propre.
-            new ADLXTuningActions(),
+            new ADLXTuningActions(adlx),
             // Le voyage firmware (shutdown /r /fw) et son annulation (/a /fw). Branché ici et
             // nulle part ailleurs : ce helper n'agit que sur une op que l'utilisateur vient de lancer
             // depuis l'app, donc un redémarrage a toujours une cause visible. DrDXT n'écrit aucune
@@ -140,6 +143,8 @@ internal static class Program
             new Win32BcdActions(),
             // Le seul ecrivain du reglage de protection du ping que porte le service de demarrage.
             plafondDuService: DrDxt.Reconciler.Reseau.PlafondEnvoiDuService.ParDefaut(),
+            // Le seul ecrivain de la pause du maintien que lit le service.
+            pauseDuMaintien: DrDxt.Reconciler.PauseDuMaintien.ParDefaut(),
             // Le ventilateur en mode Expert, vers le haut seulement, rendu sous bail.
             ventilateur: new NvmlVentilateurActions(),
             // La limite de puissance du processeur, relue avant et après, par PawnIO s'il est là.
@@ -154,6 +159,30 @@ internal static class Program
         var watchdog = new LeaseWatchdog(
             new SystemClock(), new OpAllowlist(), executor, new HelperDiagnosticsLog());
 
+        // Le journal d'écriture anticipée, dans la racine réparée d'abord. Le tube sert l'exécuteur décoré ; le chien de garde
+        // ci-dessus garde l'intérieur (le retour d'un bail est une annulation, jamais journalisée).
+        var lecture = new LectureDesCiblesWin32(adlx: adlx);
+        var journal = JournalDuHelper.Ouvrir(DrDxt.Reconciler.Manifest.ProgramDataManifestStorage.DefaultRoot(),
+            DrDxt.Reconciler.Manifest.TrustedManifestRoot.EnsureCreatedHardened);
+        if (journal is null)
+            Console.Error.WriteLine("DrDxt.ElevatedHelper: write-ahead journal unavailable (data root not trusted); marked poses are refused.");
+        var servi = JournalDuHelper.Decorer(executor, journal, lecture.Lecteur);
+        // Le rejeu, en tâche de fond : au démarrage, puis à chaque client authentifié (l'App relancée après un plantage
+        // retrouve ce helper vivant). Jamais avant d'écouter : l'App qui vient de lancer le helper n'attend le tube que
+        // quelques secondes. Le dernier rapport non vide est écrit pour l'App.
+        var racineDesDonnees = DrDxt.Reconciler.Manifest.ProgramDataManifestStorage.DefaultRoot();
+        var rejeu = new RejeuEnSerie(
+            ct => JournalDuHelper.RejouerAsync(journal, lecture, new InProcessElevatedClient(new OpAllowlist(), executor),
+                RejeuDuJournal.ProcessusVivant, RejeuDuJournal.CompteCourant, ct),
+            rapport =>
+            {
+                Console.Out.WriteLine(rapport.EnTexte(DateTimeOffset.UtcNow));
+                if (RapportDuRejeu.Ecrire(racineDesDonnees, RapportDuRejeu.Helper, rapport, DateTimeOffset.UtcNow,
+                        (chemin, octets) => DrDxt.Reconciler.Manifest.TrustedManifestRoot.WriteTrustedFile(chemin, octets)) is { IsOk: false } e)
+                    Console.Error.WriteLine($"DrDxt.ElevatedHelper: replay report not written: {e.Error?.Message}");
+            },
+            TimeSpan.FromSeconds(30));
+
         // Choisir la stratégie d'acceptation selon le mode. Le mode handshake frappe une clé éphémère
         // par connexion après l'auth de l'appelant ; le mode historique donne au TypedPrivilegedServer
         // éprouvé la clé HMAC partagée d'avance (compatibilité m2smoke/r2smoke).
@@ -166,15 +195,21 @@ internal static class Program
         if (handshakeMode)
         {
             var hsServer = new HandshakeAcceptingServer(
-                authenticator, new CryptoSessionKeyGenerator(), new OpAllowlist(), executor, pipeName, watchdog)
-            { ApresAuthentification = pid => inactivite?.ClientAuthentifie(pid) };
+                authenticator, new CryptoSessionKeyGenerator(), new OpAllowlist(), servi, pipeName, watchdog)
+            {
+                ApresAuthentification = pid =>
+                {
+                    inactivite?.ClientAuthentifie(pid);
+                    _ = rejeu.DemanderHorsJeu(RejeuEnSerie.JeuConnuLance);
+                },
+            };
             acceptOne = hsServer.AcceptOneAsync;
             Console.Out.WriteLine("DrDxt.ElevatedHelper: handshake mode (per-session key negotiated on connect).");
         }
         else
         {
             var typedServer = new TypedPrivilegedServer(
-                sessionKey!, authenticator, new OpAllowlist(), executor, pipeName, watchdog);
+                sessionKey!, authenticator, new OpAllowlist(), servi, pipeName, watchdog);
             acceptOne = async ct =>
             {
                 try { await typedServer.AcceptOneAsync(ct).ConfigureAwait(false); }
@@ -190,12 +225,20 @@ internal static class Program
         // Surveillance de fond : faire battre le chien de garde à cadence fixe pour que les baux
         // expirés reviennent en arrière tout seuls. Tourne à côté de la boucle d'acceptation ; les
         // pannes sont avalées pour qu'un mauvais tick ne fasse jamais planter l'hôte.
-        var monitor = RunLeaseMonitorAsync(watchdog, TimeSpan.FromSeconds(5), cts.Token, () =>
+        // La garde thermique du ventilateur : tant qu'une vitesse fixe est tenue, la température est lue à chaque passage.
+        var nvml = new DrDxt.GpuNative.Nvml.NvmlNative();
+        uint? Temperature(int gpu) => nvml.TryGetTemperatureCelsius(gpu, out var c) ? c : null;
+        var monitor = RunLeaseMonitorAsync(watchdog, TimeSpan.FromSeconds(5), cts.Token,
+            ct => watchdog.RendreSiAsync(op => GardeThermiqueVentilateur.DoitRendre(op, Temperature), "fan-auto-hot-or-unread", ct), () =>
         {
             if (inactivite?.DoitSArreter(watchdog.NombreDeBaux, ProcessusVivant) != true) return;
             Console.Out.WriteLine("DrDxt.ElevatedHelper: app closed or 15 minutes without a connection, and no lease: stopping.");
             cts.Cancel();
         });
+
+        // Lancé à la demande, souvent sur un geste de l'App qui peut tomber en pleine partie : le rejeu attend la fin du jeu,
+        // la connexion suivante le reprend, et le service le fait au démarrage de Windows.
+        _ = rejeu.DemanderHorsJeu(RejeuEnSerie.JeuConnuLance);
 
         Console.Out.WriteLine(
             $"DrDxt.ElevatedHelper: listening on pipe '{pipeName}' (elevated{(serviceMode ? ", service mode" : string.Empty)}).");
@@ -249,6 +292,7 @@ internal static class Program
     // (le chien de garde avale les échecs de retour), mais la boucle reste gardée par prudence
     // pour qu'une panne ne fasse jamais planter l'hôte élevé.
     private static async Task RunLeaseMonitorAsync(LeaseWatchdog watchdog, TimeSpan period, CancellationToken ct,
+        Func<CancellationToken, Task> garde,
         Action? apresChaqueTour = null)
     {
         try
@@ -259,6 +303,7 @@ internal static class Program
                 try
                 {
                     await watchdog.TickAsync(ct).ConfigureAwait(false);
+                    await garde(ct).ConfigureAwait(false);
                     apresChaqueTour?.Invoke();
                 }
                 catch (OperationCanceledException)

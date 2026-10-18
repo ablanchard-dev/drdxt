@@ -12,7 +12,7 @@ using DrDxt.Detection.Gpu.Bench;
 // offset stays the helper's job (a separate UAC step). See README.md for the A/B.
 //
 // Usage:  dotnet run --project tools/r2bench -- [gpuIndex] [seconds]
-//   gpuIndex  default 0   (informational; the runner uses the default hardware device)
+//   gpuIndex  default 0   (informational; the runner uses DXGI's high-performance adapter)
 //   seconds   default 5   (bounded load duration)
 // -----------------------------------------------------------------------
 

@@ -65,6 +65,21 @@ public static class MemoryInference
     public static double LinesInFlight(double bandwidthGBs, double latencyNs)
         => latencyNs <= 0 ? 0 : bandwidthGBs * latencyNs / 64.0;
 
+    /// <summary>Le debit qui prouve le plus : le meilleur d'un fil et de plusieurs fils.</summary>
+    public static double MeilleurDebit(MemoryMeasurement m) => Math.Max(m.BandwidthGBs, m.BandwidthMultiFilGBs);
+
+    /// <summary>
+    /// Un seul canal probable : au moins deux barrettes lues, et meme plusieurs fils a la fois ne depassent pas le plafond
+    /// d'un canal. Plusieurs fils saturent le controleur sur un PC de bureau ; c'est ce qui autorise ici la conclusion
+    /// vers le bas que le debit d'un seul fil n'autorise pas. Le plafond se calcule dans la meme unite que la mesure (Go/s
+    /// decimaux : octets par seconde / 10^9, et MT/s x 8 octets / 1000). Sans debit multi-fil ou sans frequence : non.
+    /// </summary>
+    public static bool UnSeulCanalProbable(double debitMultiFilGBs, IReadOnlyList<MemoryModule> modules)
+    {
+        var parCanal = PerChannelPeakGBs(modules);
+        return modules.Count >= 2 && parCanal > 0 && debitMultiFilGBs > 0 && debitMultiFilGBs <= parCanal;
+    }
+
     /// <summary>
     /// Nombre de canaux que le debit mesure prouve. 1 signifie « rien de prouve au-dela d'un » :
     /// lire le commentaire de classe avant d'en faire un diagnostic de simple canal.

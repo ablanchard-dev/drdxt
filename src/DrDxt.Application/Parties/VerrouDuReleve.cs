@@ -18,11 +18,23 @@ public static class VerrouDuReleve
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(chemin)!);
-            return new FileStream(chemin, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+            // Dossier du joueur : ouvert sans suivre de point de reparse, la suppression à la fermeture ne retire que ce nom,
+            // jamais la cible d'un lien posé d'avance (l'App peut tourner élevée).
+            var h = CreateFileW(chemin, LireEcrireSupprimer, FileShare.None, IntPtr.Zero, FileMode.OpenOrCreate,
+                SupprimerALaFermeture | OuvrirLePointDeReparse, IntPtr.Zero);
+            if (h.IsInvalid) { h.Dispose(); return null; }
+            return new FileStream(h, FileAccess.ReadWrite);
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
     }
+
+    // GENERIC_READ | GENERIC_WRITE | DELETE ; FILE_FLAG_DELETE_ON_CLOSE, FILE_FLAG_OPEN_REPARSE_POINT.
+    private const uint LireEcrireSupprimer = 0xC0010000, SupprimerALaFermeture = 0x04000000, OuvrirLePointDeReparse = 0x00200000;
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFileW(string nom, uint acces, FileShare partage, IntPtr securite,
+        FileMode creation, uint drapeaux, IntPtr modele);
 
     /// <summary>Veille seulement en tenant le verrou ; sinon réessaie toutes les trente secondes, jusqu'à l'annulation.</summary>
     public static async Task VeillerSeulAsync(Func<IDisposable?> prendre, Func<CancellationToken, Task> veiller,

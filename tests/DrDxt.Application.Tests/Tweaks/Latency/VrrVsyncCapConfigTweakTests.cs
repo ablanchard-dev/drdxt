@@ -75,6 +75,21 @@ public sealed class VrrVsyncCapConfigTweakTests
     public void AppliesTo_true_when_vrr_display_present() =>
         Build(vrr: true).AppliesTo(DesktopNvidia(), State).Should().BeTrue();
 
+    // Win32 rend 0 ou 1 pour « fréquence par défaut du matériel » (dmDisplayFrequency) : ce n'est pas une fréquence lue, et
+    // la cible calculée dessus vaut 1 image/s. Rien n'est proposé ni écrit, et c'est dit « non lu ».
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task Une_frequence_non_lue_ne_pose_jamais_un_plafond_de_1_image_par_seconde(int refresh)
+    {
+        var t = Build(vrr: true, refresh: refresh);
+
+        t.AppliesTo(DesktopNvidia(), State).Should().BeFalse();
+        t.EtatNonLu(State).Should().BeTrue();
+        (await t.ApplyAsync()).IsOk.Should().BeFalse();
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public void AppliesTo_false_when_no_vrr_display() =>
         Build(vrr: false).AppliesTo(DesktopNvidia(), State).Should().BeFalse();

@@ -82,13 +82,16 @@ public sealed class TestDeRefroidissementTests
         r.Freinage!.Secondes.Should().Be(117);
     }
 
+    // Libérer n'attend les fils que 2 s : sur une machine pleine, un fil en priorité basse peut ne pas avoir eu de tranche
+    // de temps depuis l'annulation. Il ne calcule pas (0 ms de processeur mesurée pendant ce retard) et sort dès qu'il est
+    // servi. Ce qui compte : il sort. Sans l'annulation, il tourne sans fin et la borne large échoue.
     [Fact]
     public void La_charge_pleine_s_arrete_quand_on_la_libere()
     {
         var charge = (TestDeRefroidissement.Charge)TestDeRefroidissement.ChargePleine(CancellationToken.None);
         charge.Tourne.Should().BeTrue();
         charge.Dispose();
-        charge.Tourne.Should().BeFalse("libérer annule : les fils sortent de leur boucle");
+        SpinWait.SpinUntil(() => !charge.Tourne, TimeSpan.FromSeconds(30)).Should().BeTrue("libérer annule : les fils sortent de leur boucle");
     }
 
     // Compter les secondes lues fausserait « arrêté à N s » : avec un raté du service (3 secondes nulles), le

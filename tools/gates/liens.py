@@ -29,7 +29,8 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[2]
 
-DOCUMENTS = ["GATES.md", "README.md", "README.fr.md", "CONTRIBUTING.md", "CONTRIBUTING.fr.md", "ARCHITECTURE.md"]
+DOCUMENTS = ["GATES.md", "README.md", "README.fr.md", "CONTRIBUTING.md", "CONTRIBUTING.fr.md", "ARCHITECTURE.md",
+             "docs/AJOUTER-UN-REGLAGE.md", "docs/AJOUTER-UN-REGLAGE.fr.md"]
 
 # Un chemin du depot cite entre accents graves : au moins un dossier connu en
 # tete, pour ne pas confondre avec un identifiant de code (`Result`, `Ok(vide)`).
@@ -89,6 +90,7 @@ def autotest() -> int:
     with tempfile.TemporaryDirectory() as d:
         faux = Path(d)
         for nom in DOCUMENTS:
+            (faux / nom).parent.mkdir(parents=True, exist_ok=True)
             (faux / nom).write_text("rien", encoding="utf-8")
         (faux / "GATES.md").write_text("voir `docs/INEXISTANT.md`", encoding="utf-8")
         assert manquants(faux) == [("GATES.md", "docs/INEXISTANT.md")], manquants(faux)

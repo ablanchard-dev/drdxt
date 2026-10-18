@@ -313,4 +313,30 @@ public sealed class HeartbeatSenderTests
     }
 
     internal sealed class Tracker { public int Fired; }
+
+    // Le battement naît pendant la pose, mais vit après elle : il ne voit jamais la portée qui entourait son lancement.
+    private sealed class PorteeVue : IElevatedClient
+    {
+        public readonly TaskCompletionSource<PorteeDePose?> Premier = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
+        {
+            Premier.TrySetResult(PorteeDePose.Courante);
+            return Task.FromResult(Result.Ok());
+        }
+    }
+
+    [Fact]
+    public async Task Un_battement_lance_dans_une_portee_de_pose_n_en_herite_pas()
+    {
+        var client = new PorteeVue();
+        var hb = new HeartbeatSender(client, "gpu-expert", 120, TimeSpan.FromMilliseconds(10));
+        PorteeDePose.Ouvrir();
+
+        hb.Start();
+        var vue = await client.Premier.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await hb.DisposeAsync();
+
+        PorteeDePose.Courante.Should().NotBeNull("la portée reste ouverte pour la pose elle-même");
+        vue.Should().BeNull();
+    }
 }

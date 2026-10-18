@@ -36,15 +36,19 @@ public static class DemarrageEtDisque
                         lus.Add(new(new DateTimeOffset(t), nomLisible, ms));
                 }
         }
-        catch (Exception) { }
+        catch (Exception) { /* lecture interrompue : seuls les événements déjà lus sont dits ; journal illisible = rien */ }
         return lus;
     }
 
-    /// <summary>Pur. Rien sur la période : rien n'est dit (une absence d'événement n'est pas un fait à afficher).</summary>
-    public static IEnumerable<RepairFinding> JugerDemarrage(IReadOnlyList<Ralentisseur> lus, int jours = 90)
+    /// <summary>Pur. Rien sur la période : rien n'est dit (une absence d'événement n'est pas un fait à afficher).
+    /// <paramref name="dejaNommes"/> : les programmes que la mesure du dernier démarrage nomme déjà
+    /// (<c>DemarrageMesure.Nommes</c>) ; ils ne sont pas renommés ici.</summary>
+    public static IEnumerable<RepairFinding> JugerDemarrage(IReadOnlyList<Ralentisseur> lus, int jours = 90,
+        IReadOnlySet<string>? dejaNommes = null)
     {
-        if (lus.Count == 0) yield break;
-        var pires = lus.GroupBy(r => r.Nom, StringComparer.OrdinalIgnoreCase)
+        var restants = lus.Where(r => dejaNommes?.Contains(r.Nom) != true).ToList();
+        if (restants.Count == 0) yield break;
+        var pires = restants.GroupBy(r => r.Nom, StringComparer.OrdinalIgnoreCase)
             .Select(g => (Nom: g.Key, Fois: g.Count(), Max: g.Max(r => r.DegradationMs)))
             .OrderByDescending(r => r.Max).Take(5).ToList();
         yield return new RepairFinding("DEMARRAGE", "programmes qui ralentissent le démarrage",

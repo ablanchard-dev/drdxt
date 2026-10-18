@@ -3,6 +3,7 @@ using System.Runtime.Versioning;
 using System.Security.Principal;
 using System.Text;
 using DrDxt.Core;
+using DrDxt.ElevatedHelper.Journal;
 using DrDxt.ElevatedHelper.Execution;
 using DrDxt.ElevatedHelper.Execution.Adlx;
 using DrDxt.ElevatedHelper.Execution.NvApi;
@@ -24,9 +25,9 @@ namespace DrDxt.ElevatedHelper;
 // Ce que le mode peut faire, et rien d'autre :
 //   * Lire le manifeste signe sous %ProgramData%\DrDxt, verifie par la cle publique de la machine (jamais
 //     cree de cle) ;
-//   * rendre les origines par l'executeur en processus, derriere l'allowlist feuille-exacte ; les ecritures
-//     GPU (horloge, puissance, ADLX), le redemarrage firmware et l'ecriture du manifeste n'y sont pas
-//     branches ;
+//   * rendre les origines par l'executeur en processus, derriere l'allowlist feuille-exacte ; le redemarrage
+//     firmware et l'ecriture du manifeste n'y sont pas branches ;
+//   * rendre la carte NVIDIA a l'automatique (ventilateur, decalage du coeur a 0), que les baux du helper tue ne rendent plus ;
 //   * ecrire son rapport `desinstallation-<heure UTC>.txt` dans la meme racine durcie (lisible apres coup).
 // Aucun argument ne choisit un chemin ou une op : la seule entree est le manifeste signe.
 //
@@ -57,10 +58,16 @@ public static class ModeDesinstallation
             // Une seule instance ADLX pour relire et rendre les réglages AMD.
             var adlx = new DrDxt.Detection.Gpu.Adlx.AdlxNative();
             var memeCompte = MemeCompteQueLaSession();
-            var client = GarderLaRucheDuJoueur(ClientEnProcessus(adlx), memeCompte);
-            var lecture = GarderLaRucheDuJoueur(new LectureDesCiblesWin32(adlx: adlx), memeCompte);
-            var travail = Task.Run(async () => await ExecuterAsync(racine, appliquerAcl: true, lecture,
-                client, quand, delai.Token) + await RetirerPlafondEnvoiAsync(client, delai.Token));
+            var lectureWin32 = new LectureDesCiblesWin32(adlx: adlx);
+            // Le journal d'écriture anticipée d'abord : ce qu'une App morte a posé sans en noter l'origine n'est pas au
+            // manifeste ; il est rendu avant lui.
+            var journalJea = JournalDuHelper.Ouvrir(racine, TrustedManifestRoot.EnsureCreatedHardened);
+            var client = GarderLaRucheDuJoueur(ClientEnProcessus(adlx, journalJea, lectureWin32.Lecteur), memeCompte);
+            var lecture = GarderLaRucheDuJoueur(lectureWin32, memeCompte);
+            var travail = Task.Run(async () => await RejouerLeJournalAsync(journalJea, lecture, client, quand, delai.Token)
+                + await ExecuterAsync(racine, appliquerAcl: true, lecture,
+                client, quand, delai.Token) + await RetirerPlafondEnvoiAsync(client, delai.Token)
+                + await RendreLaCarteNvidiaAsync(client, LireLesCartesDeLaMachine(), delai.Token));
             texte = travail.Wait(Budget + TimeSpan.FromSeconds(5))
                 ? travail.Result
                 : Docteur.T("RD.Titre") + Environment.NewLine + Docteur.T("MD.Delai", Budget.TotalSeconds);
@@ -75,6 +82,23 @@ public static class ModeDesinstallation
         if (!journal.IsOk)
             Console.Error.WriteLine("report not written: " + journal.Error?.Message);
         return 0;
+    }
+
+    /// <summary>Le rejeu du journal, en texte ; vide quand il n'avait rien. Ne jette jamais.</summary>
+    internal static async Task<string> RejouerLeJournalAsync(DrDxt.ElevatedHelper.Journal.JournalDEcritureAnticipee? journal,
+        ILectureDesCibles lecture, IElevatedClient ecriture, DateTimeOffset quand, CancellationToken ct)
+    {
+        try
+        {
+            return await JournalDuHelper.RejouerAsync(journal, lecture, ecriture, RejeuDuJournal.ProcessusVivant,
+                RejeuDuJournal.CompteCourant, ct).ConfigureAwait(false) is { } r && (r.Lignes.Count > 0 || r.ManifesteNonLu is not null)
+                ? r.EnTexte(quand)
+                : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            return $"exception {ex.GetType().Name} : {ex.Message}" + Environment.NewLine;
+        }
     }
 
     /// <summary>Compose la lecture verify-only et le rendu ; rend le texte du rapport. Ne jette jamais.</summary>
@@ -144,6 +168,63 @@ public static class ModeDesinstallation
         }
     }
 
+    /// <summary>Le ventilateur fixe et le décalage du cœur de l'Expert sont tenus par des baux, en mémoire du helper : le
+    /// désinstalleur tue le helper avant ce mode, ses baux ne se rendent plus. Volatils, un redémarrage les efface ; d'ici
+    /// là, chaque carte NVIDIA lue est rendue ici, chacune pour ce qui s'y lit (aucune ailleurs).</summary>
+    // Rend l'automatique et 0 MHz, pas la valeur d'avant (seul le bail mort la portait) : un décalage ou une courbe de
+    // ventilateur d'un autre outil (Afterburner) revient aussi à l'automatique jusqu'à sa relance. Garder l'origine
+    // voudrait un bail persistant, refusé (surface).
+    internal static async Task<string> RendreLaCarteNvidiaAsync(IElevatedClient ecriture, IReadOnlyList<CarteNvidia> cartes,
+        CancellationToken ct)
+    {
+        var texte = new StringBuilder();
+        for (var i = 0; i < cartes.Count; i++)
+        {
+            var ops = new List<PrivilegedOp>();
+            // Un ventilateur qui ne se lit pas n'a pas pu être posé par DrDXT (il relit avant d'écrire) : rien à en dire.
+            if (cartes[i].VentilateursLisibles) ops.Add(new RestoreGpuFanAutoOp(i));
+            if (cartes[i].DecalageDuCoeur is not (null or 0)) ops.Add(new ApplyNvApiClockOffsetOp(i, 0, 0));
+            if (ops.Count == 0) continue;
+            var refus = new List<string>();
+            foreach (var op in ops)
+            {
+                try
+                {
+                    if (await ecriture.ExecuteAsync(op, ct).ConfigureAwait(false) is { IsOk: false } r) refus.Add(r.Error?.Message ?? "");
+                }
+                catch (Exception ex) { refus.Add(ex.GetType().Name); }
+            }
+            texte.Append(refus.Count == 0 ? Docteur.T("MD.CarteRendue", i) : Docteur.T("MD.CarteReste", i, string.Join(" ; ", refus)))
+                .Append(Environment.NewLine);
+        }
+        return texte.ToString();
+    }
+
+    /// <summary>Ce qui se lit d'une carte NVIDIA : son décalage du cœur (null : illisible), et si ses ventilateurs se lisent.</summary>
+    internal sealed record CarteNvidia(int? DecalageDuCoeur, bool VentilateursLisibles);
+
+    /// <summary>Chaque carte se lit seule : un décalage illisible n'empêche pas de rendre son ventilateur. La lecture s'arrête
+    /// à la première carte qui ne répond à rien (il n'y en a plus), et à 8 au plus.</summary>
+    internal static IReadOnlyList<CarteNvidia> LireLesCartes(Func<int, int?> decalage, Func<int, bool> ventilateursLisibles)
+    {
+        var cartes = new List<CarteNvidia>();
+        while (cartes.Count < 8)
+        {
+            var carte = new CarteNvidia(decalage(cartes.Count), ventilateursLisibles(cartes.Count));
+            if (carte is { DecalageDuCoeur: null, VentilateursLisibles: false }) break;
+            cartes.Add(carte);
+        }
+        return cartes;
+    }
+
+    private static IReadOnlyList<CarteNvidia> LireLesCartesDeLaMachine()
+    {
+        var nvapi = new DrDxt.GpuNative.NvApi.NvApiNative();
+        var nvml = new DrDxt.GpuNative.Nvml.NvmlNative();
+        return LireLesCartes(i => nvapi.TryReadCoreOffsetMhz(i, out var mhz) ? mhz : null,
+            i => nvml.TryLireVentilateurs(i, out var v) && v.Count > 0);
+    }
+
     /// <summary>Le rapport, a cote du manifeste, dans la racine durcie : il survit a la desinstallation.</summary>
     internal static Result EcrireJournal(string racine, DateTimeOffset quand, string texte, bool appliquerAcl)
     {
@@ -169,7 +250,8 @@ public static class ModeDesinstallation
     // Les seams GPU de reglage fin sont desactives, le firmware et l'ecrivain du manifeste absents : ce mode
     // ne sait que rendre (registre, plan, service, DRS du profil de base).
     // La carte s'écrit aussi, pour rendre une limite de puissance, Anti-Lag, FRTC ou la Vsync AMD gardés ; seules
-    // les origines admises par OpAllowlist.ValiderOrigine passent (jamais fréquence, tension ni ventilateur).
+    // les origines admises par OpAllowlist.ValiderOrigine passent (jamais fréquence ni tension). Hors manifeste, le ventilateur
+    // et le décalage du cœur ne reviennent qu'à l'automatique et à 0 (RendreLaCarteNvidiaAsync).
     /// <summary>Élevé avec le compte d'un autre (UAC « par-dessus l'épaule »), HKCU est la ruche de cet autre : les origines
     /// de la session du joueur n'y sont pas écrites. Refusées et dites, elles gardent le manifeste en place (une origine non
     /// rendue ne le laisse pas mettre de côté).</summary>
@@ -240,8 +322,9 @@ public static class ModeDesinstallation
     [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
     private static extern void WTSFreeMemory(IntPtr memoire);
 
-    private static IElevatedClient ClientEnProcessus(DrDxt.Detection.Gpu.Adlx.IAdlxNative adlx) => new InProcessElevatedClient(new OpAllowlist(),
-        new PrivilegedOpExecutor(
+    private static IElevatedClient ClientEnProcessus(DrDxt.Detection.Gpu.Adlx.IAdlxNative adlx,
+        DrDxt.ElevatedHelper.Journal.JournalDEcritureAnticipee? journal, Func<PrivilegedOp, Func<Result<string?>>?> lecteur)
+        => new InProcessElevatedClient(new OpAllowlist(), JournalDuHelper.Decorer(new PrivilegedOpExecutor(
             new Win32RegistryActions(),
             new Win32PowerPlanActions(),
             new Win32RestorePointActions(),
@@ -256,5 +339,5 @@ public static class ModeDesinstallation
             // Rendre un ventilateur resté en vitesse fixe à l'automatique.
             ventilateur: new NvmlVentilateurActions(),
             // Rendre une limite de puissance du processeur restée posée.
-            cpu: new PawnIoCpuPowerActions()));
+            cpu: new PawnIoCpuPowerActions()), journal, lecteur));
 }

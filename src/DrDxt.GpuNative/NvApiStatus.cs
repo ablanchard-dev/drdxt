@@ -16,6 +16,9 @@ internal enum NvApiStatus
     IncompatibleStructVersion = -7,
     NotSupported = -104,
     // Source : NVIDIA/nvapi, nvapi_lite_common.h
+    // « NVAPI_SETTING_NOT_FOUND = -160, Setting is not found. »
+    SettingNotFound = -160,
+    // Source : NVIDIA/nvapi, nvapi_lite_common.h
     // « NVAPI_EXECUTABLE_NOT_FOUND = -166, Application not found in the Profile. »
     ExecutableNotFound = -166,
 }

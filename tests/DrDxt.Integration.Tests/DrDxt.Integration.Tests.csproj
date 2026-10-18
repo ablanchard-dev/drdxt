@@ -25,6 +25,9 @@
     <ProjectReference Include="..\..\src\DrDxt.Reconciler\DrDxt.Reconciler.csproj" />
     <ProjectReference Include="..\..\src\DrDxt.Reconciler.Adapters\DrDxt.Reconciler.Adapters.csproj" />
     <ProjectReference Include="..\..\src\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
+    <!-- Le manifeste de la désinstallation (AppliedTweakManifestMapper) vit dans l'App : les invariants le relisent sur
+         tous les leviers du banc. -->
+    <ProjectReference Include="..\..\src\DrDxt.App\DrDxt.App.csproj" />
   </ItemGroup>
 
   <ItemGroup>

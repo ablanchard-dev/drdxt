@@ -60,14 +60,27 @@ public sealed class SafetyManager : ISafetyManager
         _attendre = attendre ?? (d => Task.Delay(d));
     }
 
-    public async Task<Result> EnsureRestorePointAsync()
+    // La demande en cours : « Optimiser » et le réglage de la carte lancés ensemble attendent le même point, au lieu
+    // d'en créer deux.
+    private readonly Lock _verrou = new();
+    private Task<Result>? _enCours;
+
+    public Task<Result> EnsureRestorePointAsync()
+    {
+        lock (_verrou)
+            return _enCours is { IsCompleted: false } enCours ? enCours : _enCours = Assurer();
+    }
+
+    private async Task<Result> Assurer()
     {
         if (_pointEnsured)
             return Result.Ok();
 
         try
         {
-            if (!_restore.IsEnabled())
+            // Les lectures WMI et l'activation partent sur le pool : l'appelant est le fil de l'interface. La question au
+            // joueur, elle, revient sur son fil (ConfigureAwait(true)) pour garder sa fenêtre propriétaire.
+            if (!await Task.Run(_restore.IsEnabled).ConfigureAwait(true))
             {
                 // Restauration coupée : on ne peut avancer qu'en l'activant avec un accord explicite.
                 // Pas d'accord → refusé ; accord mais activation impossible → désactivée.
@@ -75,7 +88,7 @@ public sealed class SafetyManager : ISafetyManager
                     return Result.Fail(ErrorCodes.RestoreDeclined,
                         "System Restore is disabled and the user declined enabling it.");
 
-                if (!_restore.TryEnable())
+                if (!await Task.Run(_restore.TryEnable).ConfigureAwait(false))
                     return Result.Fail(ErrorCodes.RestoreDisabled,
                         "System Restore could not be enabled (GPO/SKU/locked).");
             }
@@ -83,7 +96,7 @@ public sealed class SafetyManager : ISafetyManager
             // Un point de moins de
             // 24 h, de DrDXT ou de Windows, protège déjà ; on le réutilise et l'écran le dit.
             var demandeUtc = DateTime.UtcNow;
-            if (_restore.DernierPointDepuis(demandeUtc - FenetreDuRefusDeWindows) is { } recent)
+            if (await Task.Run(() => _restore.DernierPointDepuis(demandeUtc - FenetreDuRefusDeWindows)).ConfigureAwait(false) is { } recent)
             {
                 PointReutiliseUtc = recent;
                 _pointEnsured = true;
@@ -130,6 +143,8 @@ public sealed class SafetyManager : ISafetyManager
 
     public async Task<Result> RevertAsync(TweakSnapshot snapshot)
     {
+        // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
+        using var horsPortee = PorteeDePose.Suspendre();
         // Validation prudente du JSON reçu : un snapshot malformé ou de type inconnu ne doit
         // jamais lever ni lancer une op arbitraire ; échec propre avec SAFETY.SNAPSHOT_INVALID.
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))

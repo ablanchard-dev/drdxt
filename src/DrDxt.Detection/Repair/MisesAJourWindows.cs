@@ -37,6 +37,34 @@ public static class MisesAJourWindows
         return false;
     }
 
+    private static readonly Regex NumeroKb = new(@"\bKB[0-9]{6,8}\b", RegexOptions.Compiled);
+
+    /// <summary>Pur : les numéros KB cités par les titres des installations (« … (KB5063878) »), sans doublon.</summary>
+    public static IReadOnlyList<string> NumerosKb(IEnumerable<FaitDate> faits)
+        => faits.SelectMany(f => NumeroKb.Matches(f.Libelle).Select(m => m.Value)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>Les KB installés : les correctifs que liste Win32_QuickFixEngineering, plus ceux que cite l'historique.
+    /// Null si aucune des deux sources n'a répondu. Un historique vide ne prouve rien (effacé, ou agent muet) : il ne
+    /// compte pas comme une lecture.</summary>
+    public static IReadOnlyList<string>? KbInstalles()
+    {
+        var kb = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var lu = false;
+        try
+        {
+            using var s = new System.Management.ManagementObjectSearcher("SELECT HotFixID FROM Win32_QuickFixEngineering");
+            using var rangees = s.Get();
+            foreach (var o in rangees.Cast<System.Management.ManagementObject>())
+                using (o)
+                    if (o["HotFixID"] is string id && NumeroKb.IsMatch(id)) kb.Add(id.Trim());
+            lu = true;
+        }
+        catch (Exception) { /* WMI muet : l'historique seul, s'il répond */ }
+        var historique = Lire();
+        if (historique.Count > 0) { lu = true; kb.UnionWith(NumerosKb(historique)); }
+        return lu ? kb.Order(StringComparer.OrdinalIgnoreCase).ToList() : null;
+    }
+
     /// <summary>Installations réussies (opération 1, résultat 2), les plus récentes d'abord. Vide si l'agent ne répond pas.</summary>
     public static IReadOnlyList<FaitDate> Lire(int combien = 200)
     {

@@ -1,3 +1,4 @@
+using DrDxt.ElevatedHelper.Execution;
 using DrDxt.Core;
 using DrDxt.ElevatedHelper;
 using DrDxt.ElevatedHelper.Ipc;
@@ -403,6 +404,52 @@ public sealed class LeaseWatchdogTests
         clock.Advance(TimeSpan.FromSeconds(60)); // B expiré aussi
         await wd.TickAsync(default);
         exec.Executed.Should().HaveCount(2);
+    }
+
+    // La garde thermique : une vitesse fixe de ventilateur tenue par un bail rend la main à la courbe de la carte dès 80 °C ou
+    // si la température ne se lit pas ; sous 80 °C, rien ne bouge. Le contrôleur l'apprend à son battement suivant.
+    [Theory]
+    [InlineData(81u, true)]
+    [InlineData(80u, true)]
+    [InlineData(79u, false)]
+    [InlineData(null, true)]
+    public async Task Le_ventilateur_fixe_rend_la_main_a_la_carte_des_80_degres_ou_sans_temperature(uint? celsius, bool rendu)
+    {
+        var exec = new RecordingExecutor();
+        var wd = Build(new FakeClock(), exec);
+        var retour = PrivilegedOpCodec.Serialize(new RestoreGpuFanAutoOp(0)).Value!;
+        wd.Establish(OwnerA, "gpu-ventilateur", retour, leaseSeconds: 120).IsOk.Should().BeTrue();
+
+        await wd.RendreSiAsync(op => GardeThermiqueVentilateur.DoitRendre(op, _ => celsius), "fan-auto-hot-or-unread", CancellationToken.None);
+
+        if (rendu)
+        {
+            exec.Executed.Should().ContainSingle().Which.Should().Be(new RestoreGpuFanAutoOp(0));
+            wd.Renew(OwnerA, "gpu-ventilateur", 120).Error!.Value.Code.Should().Be(ErrorCodes.LeaseReverted);
+        }
+        else
+        {
+            exec.Executed.Should().BeEmpty();
+            wd.Renew(OwnerA, "gpu-ventilateur", 120).IsOk.Should().BeTrue();
+        }
+    }
+
+    // Seul le retour d'un ventilateur est concerné : un autre bail (décalage de la carte) n'est pas rendu par la chaleur.
+    [Fact]
+    public void La_garde_thermique_ne_vise_que_le_ventilateur()
+        => GardeThermiqueVentilateur.DoitRendre(new ApplyNvApiClockOffsetOp(0, 0, 0), _ => 95).Should().BeFalse();
+
+    // La remise à l'usine de la carte AMD efface aussi ce que le joueur a réglé dans AMD Software : un geste, jamais un bail
+    // (qui partirait à la mort du contrôleur, sans personne devant la machine).
+    [Fact]
+    public void Une_remise_a_l_usine_de_la_carte_n_est_jamais_le_retour_d_un_bail()
+    {
+        var wd = Build(new FakeClock(), new RecordingExecutor());
+        var remise = PrivilegedOpCodec.Serialize(new ApplyAdlxTuningOp(0, AdlxTuningKind.RemiseUsine, 0)).Value!;
+
+        wd.Establish(OwnerA, "lease-usine", remise, leaseSeconds: 30).IsOk.Should().BeFalse();
+        new OpAllowlist().Validate(new ApplyAdlxTuningOp(0, AdlxTuningKind.RemiseUsine, 0)).IsOk
+            .Should().BeTrue("le clic du joueur reste permis : c'est le bail qui la refuse");
     }
 
     [Fact]

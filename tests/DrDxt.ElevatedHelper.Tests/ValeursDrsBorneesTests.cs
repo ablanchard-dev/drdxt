@@ -35,6 +35,19 @@ public sealed class ValeursDrsBorneesTests
     public void Une_origine_documentee_reste_rejouable(uint id, uint valeur) =>
         Admis(id, valeur).Should().BeTrue();
 
+    // 1 i/s est documenté, et au profil de base il rend toute la machine inutilisable en jeu : un appelant compromis ne le
+    // pose plus. Au profil d'un jeu, et éteint (0), il reste admis.
+    [Theory]
+    [InlineData(1u, false)]
+    [InlineData(19u, false)]
+    [InlineData(20u, true)]
+    [InlineData(0u, true)]
+    public void Un_limiteur_sous_20_ne_va_jamais_au_profil_de_base(uint valeur, bool admis)
+    {
+        Admis(Frl, valeur).Should().Be(admis);
+        _allow.Validate(new ApplyNvApiDrsSettingOp(Frl, 1u, @"C:\Jeux\cod.exe")).IsOk.Should().BeTrue("au profil d'un jeu");
+    }
+
     [Fact]
     public void Le_predicat_est_partage_avec_les_leviers() =>
         ValeursDrs.Documentee(Vsync, 0x32610244).Should().Be(Admis(Vsync, 0x32610244));

@@ -1,5 +1,4 @@
-﻿using static DrDxt.Core.TexteFrancais;
-using System.Text.Json;
+﻿using System.Text.Json;
 using DrDxt.Core;
 
 namespace DrDxt.Measurement.Cpu;
@@ -176,6 +175,25 @@ public sealed class CpuBaselineService
     /// <c>null</c> si absente ou illisible.</summary>
     public CpuBaseline? Reference(string machineId) => _store.Read(machineId) is { IsOk: true, Value: { } r } ? r : null;
 
+    /// <summary>Le scan va-t-il lancer le banc (plus de quarante secondes à pleine charge) ? La même règle que
+    /// <see cref="DeficitPourScan"/>, lue avant : la jauge du scan prévoit la vraie durée de l'étape.</summary>
+    public bool MesureraPourScan(string machineId, bool jeuEnCours = false, string? reglageBios = null)
+    {
+        var existante = _store.Read(machineId);
+        if (!existante.IsOk) return false;
+        return existante.Value is { } connue ? !ReferenceSuffit(connue, jeuEnCours, reglageBios) : !jeuEnCours;
+    }
+
+    // Le réglage de puissance du BIOS a changé depuis la mesure, ou la référence est d'avant la mesure de puissance : jeu
+    // fermé, on remesure et on dit l'avant et l'après. Une référence d'avant le relevé des fréquences ne peut pas montrer
+    // une limite atteinte dès le début ; elle est remesurée une fois, jeu fermé. Les références suivantes portent leur
+    // date : jamais de boucle, même sur une machine dont les compteurs de fréquence manquent.
+    private static bool ReferenceSuffit(CpuBaseline connue, bool jeuEnCours, string? reglageBios)
+    {
+        var sansFrequence = connue.FrequenceUnCoeurMhz is null && connue.TakenUtc < BancAvecFrequence;
+        return jeuEnCours || (!sansFrequence && (reglageBios is null || connue.ReglageBios == reglageBios));
+    }
+
     /// <summary>Le deficit soutenu pour le scan en cours. Mesure au besoin (premiere fois),
     /// sinon relit. <c>null</c> quand rien n'est mesurable : jamais un deficit invente.</summary>
     public CpuDeficitSoutenu? DeficitPourScan(string machineId, bool jeuEnCours = false, string? reglageBios = null)
@@ -190,13 +208,7 @@ public sealed class CpuBaselineService
 
         if (existante.Value is { } connue)
         {
-            // Le réglage de puissance du BIOS a changé depuis la mesure, ou la référence est
-            // d'avant la mesure de puissance. Jeu fermé, on remesure et on dit l'avant et l'après.
-            // Une référence d'avant le relevé des fréquences ne peut pas montrer une limite atteinte dès le début ;
-            // elle est remesurée une fois, jeu fermé. Les références suivantes portent leur date : jamais de boucle, même
-            // sur une machine dont les compteurs de fréquence manquent.
-            var sansFrequence = connue.FrequenceUnCoeurMhz is null && connue.TakenUtc < BancAvecFrequence;
-            if (jeuEnCours || (!sansFrequence && (reglageBios is null || connue.ReglageBios == reglageBios))) return Juger(connue);
+            if (ReferenceSuffit(connue, jeuEnCours, reglageBios)) return Juger(connue);
             var nouvelle = Mesurer(machineId);
             if (nouvelle is null) return Juger(connue);
             nouvelle = nouvelle with { ReglageBios = reglageBios ?? connue.ReglageBios };

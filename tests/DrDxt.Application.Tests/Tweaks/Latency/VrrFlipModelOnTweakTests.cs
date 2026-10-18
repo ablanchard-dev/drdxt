@@ -53,6 +53,19 @@ public sealed class VrrFlipModelOnTweakTests
         return write.Value;
     }
 
+    // Flip-model posé, moitié VRR absente, capacité VRR de l'écran jamais lue : rien ne dit que c'est réglé. La vérification
+    // écrivait « déjà réglé » ; c'est « état non lu ». Un écran lu sans VRR, ou les deux moitiés posées, ne sont pas du non lu.
+    [Fact]
+    public void Un_ecran_dont_la_capacite_VRR_n_est_pas_lue_est_dit_non_lu()
+    {
+        var t = Build("SwapEffectUpgradeEnable=1;");
+
+        t.AppliesTo(Hw, State).Should().BeFalse();
+        t.EtatNonLu(State).Should().BeTrue();
+        t.EtatNonLu(State with { VrrCapableDisplay = TriState.Off }).Should().BeFalse("lu : l'écran ne fait pas de VRR");
+        Build("SwapEffectUpgradeEnable=1;VRROptimizeEnable=1;").EtatNonLu(State).Should().BeFalse("les deux moitiés sont posées");
+    }
+
     // Sans la valeur posée, la désinstallation ne sait pas si la chaîne est encore celle de
     // DrDXT, et n'y touche pas (« valeur posée inconnue »). Ses voisins HKCU la portaient déjà (SnapshotAvec).
     [Fact]
@@ -247,4 +260,40 @@ public sealed class VrrFlipModelOnTweakTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.SnapshotInvalid);
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
+    // Banc profond : les deux interrupteurs déjà à 1, l'exercice les met à 0 (la forme que Windows écrit quand on les
+    // éteint), puis le levier les rallume, puis la chaîne d'origine revient à l'identique, voisins (AutoHDR) compris.
+    [Fact]
+    public async Task En_profond_flip_model_et_VRR_deja_poses_sont_exerces_et_la_chaine_revient_a_l_identique()
+    {
+        const string Origine = "AutoHDREnable=1;SwapEffectUpgradeEnable=1;VRROptimizeEnable=1;";
+        string? chaine = Origine;
+        var vues = new List<string?>();
+        _registry.ReadString(RegistryHiveKind.CurrentUser, PrefsPath, ValueName).Returns(_ => Result<string?>.Ok(chaine));
+        _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(c =>
+        {
+            chaine = c.Arg<PrivilegedOp>() switch { SetRegistryValueOp o => o.Value, _ => null };
+            vues.Add(chaine);
+            return Task.FromResult(Result.Ok());
+        });
+        var levier = new VrrFlipModelOnTweak(_registry, _elevated);
+        var etat = State with { VrrCapableDisplay = TriState.On };
+        var journal = new DrDxt.Application.Autopilot.FichierRevertEnAttente(Path.Combine(Path.GetTempPath(), $"drdxt-profond-{Guid.NewGuid():N}.json"));
+        DrDxt.Application.Autopilot.ValidationComplete.Lecture Relire(TweakSnapshot sn)
+        {
+            var p = DrDxt.Application.Tweaks.AppliedStateVerifier.Verifier(sn, _registry);
+            return new(p.Verdict switch { DrDxt.Application.Tweaks.EtatApplique.Applied => true,
+                DrDxt.Application.Tweaks.EtatApplique.NotApplied => false, _ => (bool?)null }, p.Verdict.ToString());
+        }
+
+        var r = await DrDxt.Application.Autopilot.ValidationComplete.ValiderAsync([levier], Hw, etat, journal, Relire, profond: true);
+
+        vues[0].Should().Contain("SwapEffectUpgradeEnable=0").And.Contain("VRROptimizeEnable=0").And.Contain("AutoHDREnable=1");
+        chaine.Should().Be(Origine, "la chaîne d'origine, à l'identique");
+        r.Texte.Should().Contain("exercé");
+        r.NonRemis.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Un_interrupteur_pas_encore_pose_n_est_pas_exerce()
+        => Build("SwapEffectUpgradeEnable=1;").PreparerExercice(Hw, State with { VrrCapableDisplay = TriState.On }).Should().BeNull();
 }

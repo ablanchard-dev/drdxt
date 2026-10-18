@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using static DrDxt.Detection.Natif;
 
 namespace DrDxt.Detection.Cpu;
 
@@ -125,6 +126,4 @@ public sealed class ThreadCpuReader
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool QueryThreadCycleTime(IntPtr thread, out ulong cycleTime);
 
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr handle);
 }

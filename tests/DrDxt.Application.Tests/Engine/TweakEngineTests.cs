@@ -17,7 +17,7 @@ namespace DrDxt.Application.Tests.Engine;
 //       quand même BATCH_REVERTED avec les identifiants non annulés (jamais d'exception).
 // C2  Retour arrière automatique sur régression mesurée : re-banc → significativité AbComparer :
 //       régression au-delà de la marge ⇒ retour arrière de tout le lot (LIFO) +
-//       ENGINE.REGRESSION_REVERTED + SummaryKey verdict.regression_reverted ;
+//       rapport réussi + SummaryKey verdict.regression_reverted ;
 //       aucun gain mesurable ⇒ gardé (ce n'est pas une régression) + verdict.no_measurable_gain ;
 //       gain mesurable ⇒ gardé + rapporté.
 //
