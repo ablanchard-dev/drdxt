@@ -89,6 +89,10 @@ public sealed class TestDeLigneSousChargeTests
         public readonly TaskCompletionSource PremiereDemande = new(TaskCreationOptions.RunContinuationsAsynchronously);
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            // Le réseau rend la main à chaque requête ; servie en mémoire, elle se terminait sur place, et les flux sans
+            // plafond tournaient sans jamais céder leur fil : la suite du test attendait un fil du pool pendant que le tas
+            // montait de centaines de Mo, au-delà de l'attente de 10 s sur un runner à 4 cœurs.
+            await Task.Yield();
             long octets = 0;
             if (request.Content is { } c)
             {

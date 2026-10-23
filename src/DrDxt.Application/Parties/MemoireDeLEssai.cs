@@ -21,6 +21,9 @@ public sealed class MemoireDeLEssai
 
     public static MemoireDeLEssai ParDefaut() => new(FichierJsonAtomique.CheminLocal("essai-alternance.json"));
 
+    /// <summary>Le verrou que l'App et le relevé de fond tiennent pour changer l'essai (pris par <see cref="VerrouDuReleve.Prendre"/>).</summary>
+    public static string CheminDuVerrou() => FichierJsonAtomique.CheminLocal("essai-alternance.verrou");
+
     /// <summary>L'essai en cours, ou <c>null</c> (aucun, ou un fichier abîmé : on n'alterne pas sur ce qu'on ne sait pas lire).</summary>
     public EssaiEnAlternance? Lire()
     {

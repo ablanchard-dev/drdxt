@@ -20,6 +20,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
     public void Dispose() => Directory.Delete(_dossier, true);
 
     private readonly ITweak _levier = Substitute.For<ITweak>();
+    private string CheminDuVerrou => Path.Combine(_dossier, "essai.verrou");
     private int _poses, _rendus;
     private DateTimeOffset _maintenant = new(2026, 10, 7, 20, 0, 0, TimeSpan.Zero);
     private DateTimeOffset _demarrage = new(2026, 10, 7, 8, 0, 0, TimeSpan.Zero);
@@ -35,6 +36,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
             journalLeviers: new JournalDesLeviersAppliques(Path.Combine(_dossier, "leviers.json")), manifeste: manifeste);
         vm.MemoireParties = new PartiesMemorisees(Path.Combine(_dossier, "choix.json"), Path.Combine(_dossier, "parties.json"));
         vm.MemoireEssai = new MemoireDeLEssai(Path.Combine(_dossier, "essai.json"));
+        vm.PrendreVerrouEssai = () => VerrouDuReleve.Prendre(CheminDuVerrou);
         vm.LevierParId = demande => demande == id ? _levier : null;
         vm.HelperJoignableSansUac = () => Task.FromResult(helperJoignable);
         vm.Horloge = () => _maintenant;
@@ -549,7 +551,9 @@ public sealed class EssaiEnAlternanceTests : IDisposable
 
         _maintenant = _maintenant.AddDays(1);
         vm.EnregistrerPartie(new PartieRelevee("cod.exe", _maintenant, _maintenant.AddMinutes(30), 4, 130, 80, BottleneckState.CpuBoundOrAppBound));
-        vm.ArreterEssaiSurAnnulation(Id);
+        var annulation = vm.ArreterEssaiSurAnnulationAsync(Id);
+        annulation.IsCompleted.Should().BeTrue("l'annulation n'attend pas la bascule de ce processus : elle la laisse rendre ce qu'elle pose");
+        await annulation;
         enAttente.SetResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, InversesDeTest.Pour(Id, "100"), "90")));
         await vm.DerniereAvanceeEssai;
 
@@ -704,6 +708,7 @@ public sealed class EssaiEnAlternanceTests : IDisposable
             Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k);
         fond.MemoireParties = app.MemoireParties;
         fond.MemoireEssai = app.MemoireEssai;
+        fond.PrendreVerrouEssai = app.PrendreVerrouEssai;
         fond.Horloge = () => _maintenant;
         fond.DemarrageDuPc = () => _demarrage;
         return fond;
@@ -768,5 +773,68 @@ public sealed class EssaiEnAlternanceTests : IDisposable
 
         ligne.Should().Contain("JeuB").And.Contain("DrDXT").And.Contain(dire.Get("Essai.Reprendre", culture));
         dire.Get("Essai.TonJeu", culture).Should().NotBe("Essai.TonJeu");
+    }
+
+    // L'App et le relevé de fond tournent ensemble et écrivent le même essai. Pendant qu'un processus tient le verrou de
+    // l'essai (il pose ou rend), l'autre n'écrit rien et ne marque pas la partie : écrite par-dessus, la pose était perdue
+    // (fichier « rendu », levier posé, et « Arrêter l'essai » ne rendait plus rien).
+    [Fact]
+    public async Task Pendant_que_l_autre_processus_tient_l_essai_le_releve_de_fond_n_ecrit_ni_ne_marque_rien()
+    {
+        var app = Vm();
+        (await app.DemarrerEssaiAsync(Id)).Should().BeTrue();
+        var fond = ReleveDeFond(app);
+        var fichier = Path.Combine(_dossier, "essai.json");
+        var avant = File.ReadAllText(fichier);
+
+        using (VerrouDuReleve.Prendre(CheminDuVerrou)) await JouerApresUnReveil(fond);
+
+        File.ReadAllText(fichier).Should().Be(avant);
+        app.MemoireParties!.Lire().Should().ContainSingle().Which.Essai.Should().BeNull();
+        await JouerApresUnReveil(fond);
+        File.ReadAllText(fichier).Should().NotBe(avant, "témoin : verrou libre, le réveil se note");
+    }
+
+    [Fact]
+    public async Task Reprendre_pendant_que_l_autre_processus_tient_l_essai_ne_pose_rien_et_le_dit()
+    {
+        var app = Vm(helperJoignable: false);
+        (await app.DemarrerEssaiAsync(Id)).Should().BeTrue();
+        await JouerApresUnReveil(ReleveDeFond(app));
+        app.AttenteDuVerrouEssai = TimeSpan.Zero;
+
+        using (VerrouDuReleve.Prendre(CheminDuVerrou)) await app.ReprendreEssaiCommand.ExecuteAsync(null);
+
+        _poses.Should().Be(1, "rien ne se pose pendant que l'autre processus change l'essai");
+        app.LigneEssai.Should().Be("Essai.Occupe");
+    }
+
+    // Rien ne se pose pendant une partie : le clic le dit au lieu de ne rien faire.
+    [Fact]
+    public async Task Reprendre_pendant_une_partie_dit_de_fermer_le_jeu()
+    {
+        var app = Vm(helperJoignable: false);
+        (await app.DemarrerEssaiAsync(Id)).Should().BeTrue();
+        await JouerApresUnReveil(ReleveDeFond(app));
+        app.JeuOuvertPourLeTest = () => true;
+
+        await app.ReprendreEssaiCommand.ExecuteAsync(null);
+
+        _poses.Should().Be(1);
+        app.LigneEssai.Should().Be("Essai.FermeLeJeu");
+    }
+
+    [Theory]
+    [InlineData("fr")]
+    [InlineData("en")]
+    public void Les_lignes_du_clic_qui_attend_disent_quoi_faire(string langue)
+    {
+        var dire = new DrDxt.Infrastructure.Localization.ResxLocalizer();
+        var culture = new System.Globalization.CultureInfo(langue);
+
+        string.Format(culture, dire.Get("Essai.FermeLeJeu", culture), "Limite de puissance", "JeuB")
+            .Should().Contain("JeuB").And.Contain(dire.Get("Essai.Reprendre", culture));
+        string.Format(culture, dire.Get("Essai.Occupe", culture), "Limite de puissance")
+            .Should().Contain(dire.Get("Essai.Reprendre", culture));
     }
 }

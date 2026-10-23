@@ -465,7 +465,7 @@ public partial class ScanViewModel
             return;
         }
         var journalReecrit = _journalLeviers.Retirer(id);
-        ArreterEssaiSurAnnulation(id);
+        await ArreterEssaiSurAnnulationAsync(id);
         var sorti = await RetirerDuManifesteAsync(id);
         MessageLeviers = string.Format(CultureInfo.CurrentCulture,
                 _localize(levier.TakesEffectAfterReboot ? "Leviers.AnnuleAuRedemarrage" : "Leviers.Annule"), titre)

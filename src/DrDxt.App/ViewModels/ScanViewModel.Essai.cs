@@ -69,6 +69,8 @@ public partial class ScanViewModel
     /// <summary>Le clic : la première partie l'a avec. Un levier déjà posé par DrDXT part de « posé ».</summary>
     internal async Task<bool> DemarrerEssaiAsync(string id)
     {
+        using var tenu = await TenirLEssaiAsync(AttenteDuVerrouEssai).ConfigureAwait(true);
+        if (tenu is null) { LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.Occupe"), Titre(id)); return false; }
         if (MemoireEssai is null || !PeutAlterner(id) || LevierParId?.Invoke(id) is not { } levier || MemoireEssai.Lire() is not null)
             return false;
         var dejaPose = _journalLeviers?.Lire().Any(s => s.TweakId == id) == true;
@@ -85,11 +87,51 @@ public partial class ScanViewModel
     {
         // Une bascule de fin de partie en cours se termine avant l'arrêt, qui lit alors l'état réel.
         await _verrouEssai.WaitAsync().ConfigureAwait(true);
-        try { await ArreterEssaiSousVerrouAsync().ConfigureAwait(true); }
+        try
+        {
+            using var tenu = await TenirLEssaiAsync(AttenteDuVerrouEssai).ConfigureAwait(true);
+            if (tenu is null)
+            {
+                if (MemoireEssai?.Lire() is { } occupe)
+                    LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.Occupe"), Titre(occupe.LevierId));
+                return;
+            }
+            await ArreterEssaiSousVerrouAsync().ConfigureAwait(true);
+        }
         finally { _verrouEssai.Release(); }
     }
 
     private readonly SemaphoreSlim _verrouEssai = new(1, 1);
+
+    /// <summary>L'App et le relevé de fond tournent ensemble et changent le même essai : chacun le lit, le change et l'écrit
+    /// sous ce verrou, commun aux deux processus (<see cref="MemoireDeLEssai.CheminDuVerrou"/>). <c>null</c> = pas de verrou
+    /// (tests).</summary>
+    internal Func<IDisposable?>? PrendreVerrouEssai { get; set; }
+
+    /// <summary>Ce qu'un clic attend que l'autre processus finisse : le relevé de fond ne tient l'essai que le temps d'une
+    /// écriture.</summary>
+    internal TimeSpan AttenteDuVerrouEssai { get; set; } = TimeSpan.FromSeconds(3);
+
+    private sealed class SansVerrou : IDisposable { public void Dispose() { } }
+
+    /// <summary>Une avancée de l'essai tient son verrou dans ce processus (sur le fil de l'écran, comme l'annulation).</summary>
+    private bool _avanceeEnCours;
+
+    /// <summary>Le verrou de l'essai, ou <c>null</c> si l'autre processus le tient encore après <paramref name="attente"/>.</summary>
+    private async Task<IDisposable?> TenirLEssaiAsync(TimeSpan attente)
+    {
+        if (PrendreVerrouEssai is not { } prendre) return new SansVerrou();
+        var fin = DateTime.UtcNow + attente;
+        while (true)
+        {
+            if (prendre() is { } tenu) return tenu;
+            if (DateTime.UtcNow >= fin) return null;
+            await Task.Delay(100).ConfigureAwait(true);
+        }
+    }
+
+    private string JeuDe(IReadOnlyList<PartieRelevee> parties)
+        => parties.OrderBy(p => p.Debut).LastOrDefault()?.Jeu is { Length: > 0 } jeu ? NomDuJeu(jeu) : _localize("Essai.TonJeu");
 
     // Le fichier de l'essai vit sous le profil du joueur, que tout programme du compte peut écrire : forgé avec une origine
     // « posé », il faisait poser n'importe quel levier du catalogue au moment où le joueur croyait arrêter. Un levier qui n'a
@@ -113,9 +155,14 @@ public partial class ScanViewModel
     /// touché), la partie compte. Un redémarrage depuis la dernière bascule rend l'état incertain (un levier de
     /// carte ne survit pas au redémarrage) : rien n'est marqué, l'essai s'arrête au prochain passage.</summary>
     internal PartieRelevee MarquerEssai(PartieRelevee p)
-        => MemoireEssai?.Lire() is { } lu && Effectif(lu) is { } e && p.Debut >= e.Depuis && !RedemarreDepuis(e) && SelonLePlan(e)
+    {
+        // L'autre processus change l'essai à cet instant : l'état de la partie n'est pas sûr, elle ne compte pas.
+        using var tenu = PrendreVerrouEssai is { } prendre ? prendre() : new SansVerrou();
+        return tenu is not null && MemoireEssai?.Lire() is { } lu && Effectif(lu) is { } e && p.Debut >= e.Depuis && !RedemarreDepuis(e)
+               && SelonLePlan(e)
             ? p with { Essai = AlternanceDesEssais.Marque(e.LevierId, e.PoseMaintenant) }
             : p;
+    }
 
     /// <summary>Le levier est dans l'état que les blocs A-B-B-A prévoient pour la prochaine partie. Une partie jouée hors du
     /// plan ne compte d'aucun côté : marquée de l'état courant, elle avancerait les blocs sans que le plan soit suivi.</summary>
@@ -135,7 +182,20 @@ public partial class ScanViewModel
     internal async Task AvancerEssaiAsync(IReadOnlyList<PartieRelevee> parties, bool avecGeste = false)
     {
         await _verrouEssai.WaitAsync().ConfigureAwait(true);
-        try { await AvancerEssaiSansFauteAsync(parties, avecGeste).ConfigureAwait(true); }
+        IDisposable? tenu = null;
+        try
+        {
+            // Sans geste (fin de partie), l'essai occupé ailleurs avance à la partie suivante ; un clic attend un peu.
+            tenu = await TenirLEssaiAsync(avecGeste ? AttenteDuVerrouEssai : TimeSpan.Zero).ConfigureAwait(true);
+            if (tenu is null)
+            {
+                if (avecGeste && MemoireEssai?.Lire() is { } occupe)
+                    LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.Occupe"), Titre(occupe.LevierId));
+                return;
+            }
+            _avanceeEnCours = true;
+            await AvancerEssaiSansFauteAsync(parties, avecGeste).ConfigureAwait(true);
+        }
         catch (Exception)
         {
             // Une faute ne se perd plus dans une tâche jamais observée. Elle a pu tomber après la
@@ -152,7 +212,12 @@ public partial class ScanViewModel
             }
             catch (Exception) { /* mémoire de l'essai illisible : aucun essai n'est repris, rien n'est affirmé */ }
         }
-        finally { _verrouEssai.Release(); }
+        finally
+        {
+            _avanceeEnCours = false;
+            tenu?.Dispose();
+            _verrouEssai.Release();
+        }
     }
 
     private async Task AvancerEssaiSansFauteAsync(IReadOnlyList<PartieRelevee> parties, bool avecGeste)
@@ -195,7 +260,11 @@ public partial class ScanViewModel
         {
             // Rien ne se pose sans clic pendant qu'un jeu tourne (une autre partie lancée aussitôt, un second jeu) : l'essai
             // garde son état, et la partie suivante le refait avancer.
-            if (pose && JeuOuvertPourLEssai()) return;
+            if (pose && JeuOuvertPourLEssai())
+            {
+                if (avecGeste) LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.FermeLeJeu"), Titre(e.LevierId), JeuDe(parties));
+                return;
+            }
             if (!avecGeste && HelperJoignableSansUac is { } joignable && levier.RequiresElevation && !await joignable().ConfigureAwait(true))
             {
                 MemoireEssai.Ecrire(e with { EnPause = true });
@@ -243,8 +312,12 @@ public partial class ScanViewModel
 
     /// <summary>Le joueur annule le levier en essai depuis « Ce que DrDXT a posé » : l'essai s'arrête,
     /// rien ne le repose.</summary>
-    internal void ArreterEssaiSurAnnulation(string id)
+    internal async Task ArreterEssaiSurAnnulationAsync(string id)
     {
+        // Une avancée de ce processus (bascule de fin de partie) relit l'essai après sa pose et rend ce qu'elle vient de
+        // poser : attendre son verrou la laisserait reposer le levier par-dessus l'annulation. Sinon, le verrou s'attend
+        // (l'autre processus écrit peut-être l'essai) ; passé l'attente, l'arrêt voulu par le joueur passe quand même.
+        using var tenu = _avanceeEnCours ? null : await TenirLEssaiAsync(AttenteDuVerrouEssai).ConfigureAwait(true);
         if (MemoireEssai?.Lire() is not { } e || e.LevierId != id) return;
         MemoireEssai.Ecrire(null);
         LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.Arrete"), Titre(id));
@@ -258,8 +331,7 @@ public partial class ScanViewModel
         if (MemoireEssai?.Lire() is not { } e) return;
         if (!SelonLePlan(Effectif(e)))
         {
-            LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.EnAttente"), Titre(e.LevierId),
-                parties.OrderBy(p => p.Debut).LastOrDefault()?.Jeu is { Length: > 0 } jeu ? NomDuJeu(jeu) : _localize("Essai.TonJeu"));
+            LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.EnAttente"), Titre(e.LevierId), JeuDe(parties));
             return;
         }
         parties = parties.Where(p => p.Debut >= e.Debut).ToList();

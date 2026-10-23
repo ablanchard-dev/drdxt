@@ -2078,6 +2078,12 @@ No setting on your machine was changed by this error.</value>
   <data name="Essai.TonJeu" xml:space="preserve">
     <value>your game</value>
   </data>
+  <data name="Essai.Occupe" xml:space="preserve">
+    <value>The “{0}” trial is changing state elsewhere (the game recorder): click “Resume the trial” again in a few seconds.</value>
+  </data>
+  <data name="Essai.FermeLeJeu" xml:space="preserve">
+    <value>Nothing is applied during a game: close {1}, then click “Resume the trial” for “{0}”.</value>
+  </data>
   <data name="Essai.Fini.Mieux" xml:space="preserve">
     <value>Trial of “{0}” done: better in game across your games, it stays set.</value>
   </data>
