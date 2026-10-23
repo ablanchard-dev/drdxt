@@ -5607,11 +5607,8 @@
   <data name="Nom.lectures AMD profondes" xml:space="preserve">
     <value>deep AMD readings</value>
   </data>
-  <data name="LAP.Fermee" xml:space="preserve">
-    <value>Deep AMD readings unavailable: the AMD reading module is not installed. Concerned: {0}.</value>
-  </data>
   <data name="LAP.Liste" xml:space="preserve">
-    <value>memory timings actually applied, memory set against applied, PPT/TDC/EDC limits in game (PM table), BIOS settings named for this AMD board</value>
+    <value>memory timings actually applied, memory set against applied, PPT/TDC/EDC limits in game (PM table), BIOS settings named for this AMD board, processor temperature, hardware cause of restarts</value>
   </data>
   <data name="MO.HvciActive" xml:space="preserve">
     <value>Memory integrity (HVCI) turned back on since the previous scan.</value>
@@ -6023,5 +6020,89 @@
   </data>
   <data name="MAJ.InstalleurEleve" xml:space="preserve">
     <value>Restart DrDXT normally to install the update.</value>
+  </data>
+  <data name="LAP.SansPawnIo" xml:space="preserve">
+    <value>Deep AMD readings unavailable: PawnIO is not installed (DrDXT never installs it, see the guide). Concerned: {0}.</value>
+  </data>
+  <data name="LAP.NonValidee" xml:space="preserve">
+    <value>Deep AMD readings not yet open on a {1}: nobody has checked them on a real machine of this generation yet. Concerned: {0}. A validation report opens them (see CONTRIBUTING).</value>
+  </data>
+  <data name="Nom.cause materielle des redemarrages" xml:space="preserve">
+    <value>hardware cause of restarts</value>
+  </data>
+  <data name="TP.LibelleAmd" xml:space="preserve">
+    <value>PawnIO (AMD thermal registers, Tctl)</value>
+  </data>
+  <data name="S5.NonLu" xml:space="preserve">
+    <value>The processor's restart register could not be read (PawnIO missing, administrator rights missing, or module refused).</value>
+  </data>
+  <data name="S5.Aucune" xml:space="preserve">
+    <value>no cause set ({0})</value>
+  </data>
+  <data name="S5.AucuneExplication" xml:space="preserve">
+    <value>The processor's restart register (S5_RESET_STATUS) holds no known cause.</value>
+  </data>
+  <data name="S5.Causes" xml:space="preserve">
+    <value>The processor's restart register (S5_RESET_STATUS) holds: {0}. These causes stay recorded until something clears them, and DrDXT never writes this register: they may date from an older stop than the last one.</value>
+  </data>
+  <data name="S5.Bit0" xml:space="preserve">
+    <value>the thermal trip pin (THERMTRIP) fired: the processor shut down from overheating</value>
+  </data>
+  <data name="S5.Bit1" xml:space="preserve">
+    <value>the power button was held for 4 seconds</value>
+  </data>
+  <data name="S5.Bit2" xml:space="preserve">
+    <value>the shutdown pin fired</value>
+  </data>
+  <data name="S5.Bit4" xml:space="preserve">
+    <value>a remote power-off command (ASF) was received</value>
+  </data>
+  <data name="S5.Bit9" xml:space="preserve">
+    <value>the processor's internal thermal limit was crossed</value>
+  </data>
+  <data name="S5.Bit16" xml:space="preserve">
+    <value>the system reset pin (reset button) was triggered</value>
+  </data>
+  <data name="S5.Bit17" xml:space="preserve">
+    <value>software requested a PCI reset</value>
+  </data>
+  <data name="S5.Bit18" xml:space="preserve">
+    <value>software requested a restart (0x4 written to register 0xCF9)</value>
+  </data>
+  <data name="S5.Bit19" xml:space="preserve">
+    <value>software requested a restart (0x6 written to register 0xCF9)</value>
+  </data>
+  <data name="S5.Bit20" xml:space="preserve">
+    <value>software requested a full restart (0xE written to register 0xCF9)</value>
+  </data>
+  <data name="S5.Bit21" xml:space="preserve">
+    <value>an ACPI power transition (sleep or normal shutdown)</value>
+  </data>
+  <data name="S5.Bit22" xml:space="preserve">
+    <value>the keyboard reset pin (KB_RST) fired</value>
+  </data>
+  <data name="S5.Bit23" xml:space="preserve">
+    <value>the processor shut itself down (internal shutdown event)</value>
+  </data>
+  <data name="S5.Bit24" xml:space="preserve">
+    <value>the system failed to boot before the boot timer expired</value>
+  </data>
+  <data name="S5.Bit25" xml:space="preserve">
+    <value>the hardware watchdog expired</value>
+  </data>
+  <data name="S5.Bit26" xml:space="preserve">
+    <value>a remote reset command (ASF) was received</value>
+  </data>
+  <data name="S5.Bit27" xml:space="preserve">
+    <value>an uncorrected hardware error stalled the data fabric (sync flood)</value>
+  </data>
+  <data name="S5.Bit29" xml:space="preserve">
+    <value>the FCH and the SMU failed the warm-restart handshake</value>
+  </data>
+  <data name="S5.Bit30" xml:space="preserve">
+    <value>a parity error</value>
+  </data>
+  <data name="S5.Bit31" xml:space="preserve">
+    <value>software triggered a data fabric sync flood</value>
   </data>
 </root>

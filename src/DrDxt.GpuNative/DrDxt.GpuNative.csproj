@@ -23,6 +23,11 @@
     <EmbeddedResource Include="PawnIo\IntelMCHBAR.bin" LogicalName="DrDxt.GpuNative.PawnIo.IntelMCHBAR.bin" />
     <!-- LpcIO (même publication 0.2.11) lit les ventilateurs par la puce Super I/O de la carte mère. -->
     <EmbeddedResource Include="PawnIo\LpcIO.bin" LogicalName="DrDxt.GpuNative.PawnIo.LpcIO.bin" />
+    <!-- AMDReset, AMDFamily17 et RyzenSMU (même publication 0.2.11), figés par empreinte dans PawnIoAmd : lus seulement, par
+         la liste fermée d'ioctl de PawnIoAmd. -->
+    <EmbeddedResource Include="PawnIo\AMDReset.bin" LogicalName="DrDxt.GpuNative.PawnIo.AMDReset.bin" />
+    <EmbeddedResource Include="PawnIo\AMDFamily17.bin" LogicalName="DrDxt.GpuNative.PawnIo.AMDFamily17.bin" />
+    <EmbeddedResource Include="PawnIo\RyzenSMU.bin" LogicalName="DrDxt.GpuNative.PawnIo.RyzenSMU.bin" />
   </ItemGroup>
 
   <ItemGroup>

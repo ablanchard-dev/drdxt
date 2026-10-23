@@ -58,6 +58,19 @@ if (args.Length == 2 && args[0] == "--etape" && int.TryParse(args[1], out var nu
 if (args.Contains("--lire"))
 {
     foreach (var ligne in LectureAdlx.Lignes(AdlxReglages.Lire(), AdlxReglages.DllPresente())) Console.WriteLine(ligne);
+    // Le processeur, par PawnIO s'il est installé : les seuls ioctl de lecture de PawnIoAmd, rien n'est écrit.
+    if (DrDxt.GpuNative.PawnIo.PawnIoAmd.ProcesseurAmd())
+    {
+        try
+        {
+            foreach (var ligne in LecturePawnIoAmd.Lignes(DrDxt.GpuNative.PawnIo.PawnIoAmd.Installe(), DrDxt.Detection.Cpu.LecturesAmd.Generation(),
+                         DrDxt.Detection.Cpu.LecturesAmd.Temperature(DrDxt.Detection.Cpu.LecturesAmd.NomDuProcesseur()), DrDxt.Detection.Cpu.LecturesAmd.TemperaturesCcd(),
+                         DrDxt.GpuNative.PawnIo.PawnIoAmd.EtatDuReset(), DrDxt.GpuNative.PawnIo.PawnIoAmd.Identite(),
+                         DrDxt.Detection.Cpu.LecturesAmd.CanauxMemoire()))
+                Console.WriteLine(ligne);
+        }
+        finally { DrDxt.GpuNative.PawnIo.PawnIoAmd.FermerTout(); }
+    }
     return;
 }
 

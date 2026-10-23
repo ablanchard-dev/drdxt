@@ -34,13 +34,14 @@ public sealed class ProcessusBorneTests
         try { relire(); } catch (ArgumentException) { /* déjà sorti de la table des processus : arrêté */ }
     }
 
-    // Une erreur standard abondante et non lue remplirait le tuyau : l'outil resterait bloqué jusqu'à la borne.
+    // Une erreur standard abondante et non lue remplirait le tuyau : l'outil resterait bloqué jusqu'à la borne. Bloqué, il
+    // ne finit à aucune borne : celle-ci n'a qu'à dépasser le temps honnête de l'outil, jusqu'à 5 s sur un processeur saturé.
     [Fact]
     public void Une_sortie_abondante_sur_les_deux_flux_ne_fige_pas_l_outil()
     {
         var r = ProcessusBorne.Executer(
             Cmd("for /l %i in (1,1,2000) do @(echo sortie-sortie-sortie-sortie-sortie & echo erreur-erreur-erreur-erreur-erreur 1>&2)"),
-            TimeSpan.FromSeconds(4));
+            TimeSpan.FromSeconds(30));
 
         r.Fini.Should().BeTrue("les deux flux sont lus pendant l'attente");
         r.Code.Should().Be(0);
@@ -54,7 +55,7 @@ public sealed class ProcessusBorneTests
     {
         var r = ProcessusBorne.Executer(
             Cmd("for /l %i in (1,1,2000) do @(echo sortie-sortie-sortie-sortie-sortie & echo erreur-erreur-erreur-erreur-erreur 1>&2)"),
-            TimeSpan.FromSeconds(4), maxCaracteres: 1000);
+            TimeSpan.FromSeconds(30), maxCaracteres: 1000);
 
         r.Fini.Should().BeTrue();
         r.Sortie.Length.Should().Be(1000);
@@ -75,7 +76,9 @@ public sealed class ProcessusBorneTests
         r.Fini.Should().BeTrue("l'outil lui-même a rendu la main");
         r.Code.Should().Be(0);
         r.Sortie.Should().Contain("parti");
-        Process.GetProcessesByName("PING").Where(p => { try { return p.StartTime >= debut; } catch (Exception) { return false; } })
+        // Arrêté, un processus reste un instant dans la table : sur un processeur saturé, le PING arrêté y figurait encore,
+        // déjà sorti. Seul un PING encore vivant contredit l'arrêt.
+        Process.GetProcessesByName("PING").Where(p => { try { return p.StartTime >= debut && !p.HasExited; } catch (Exception) { return false; } })
             .Should().BeEmpty("le petit-enfant est arrêté avec l'arbre");
     }
 

@@ -2108,6 +2108,9 @@
                                  (avant, dans la zone de résultats : sans scan, aucun moyen de l'arrêter). Le lancer reste avec Optimiser. -->
                             <TextBlock Text="{Binding LigneEssai}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,10,0,0"
                                        Visibility="{Binding LigneEssai, Converter={StaticResource StrVis}}"/>
+                            <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelEssaiReprendre}" HorizontalAlignment="Left"
+                                    Command="{Binding ReprendreEssaiCommand}" Margin="0,8,0,0"
+                                    Visibility="{Binding EssaiEnAttente, Converter={StaticResource BoolVis}}"/>
                             <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelEssaiArreter}" HorizontalAlignment="Left"
                                     Command="{Binding ArreterEssaiCommand}" Margin="0,8,0,0"
                                     Visibility="{Binding EssaiEnCours, Converter={StaticResource BoolVis}}"/>

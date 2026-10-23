@@ -524,7 +524,7 @@ public sealed partial class RepairAuditService
         {
             var (fabricant, signature) = DrDxt.Detection.Cpu.Cpuid.Lire();
             var generation = signature is { } s ? GenerationAmd.Reconnaitre(fabricant, s) : null;
-            return LecturesAmdProfondes.Juger(generation, LecturesAmdProfondes.ModuleInstalle, () => LecturesAmdDetaillees(generation!));
+            return LecturesAmdProfondes.Juger(generation, DrDxt.GpuNative.PawnIo.PawnIoAmd.Installe(), () => LecturesAmdDetaillees(generation!));
         }));
         constats.AddRange(Isoler("THERMIQUE", ThermiqueGpu));
         constats.AddRange(Isoler("STOCKAGE", UsureDisques));

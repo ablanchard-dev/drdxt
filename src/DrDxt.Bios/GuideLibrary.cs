@@ -97,14 +97,16 @@ public static class GuideLibraryFactory
     private const string ResourceName = "DrDxt.Bios.data.guides.json";
 
     /// <summary>Charge et valide la bibliothèque embarquée ; ne lève que sur une faute d'empaquetage.</summary>
-    public static GuideLibrary CreateDefault()
+    public static GuideLibrary CreateDefault() => new(Modeles());
+
+    /// <summary>Les modèles embarqués, validés ; ne lève que sur une faute d'empaquetage.</summary>
+    public static IReadOnlyList<GuideTemplate> Modeles()
     {
-        var json = ReadEmbedded();
-        var parsed = GuideTemplateValidator.ParseAndValidate(json);
+        var parsed = GuideTemplateValidator.ParseAndValidate(ReadEmbedded());
         if (!parsed.IsOk)
             throw new InvalidOperationException(
                 $"Embedded guide library is invalid ({parsed.Error!.Value.Code}): {parsed.Error!.Value.Message}");
-        return new GuideLibrary(parsed.Value!);
+        return parsed.Value!;
     }
 
     private static string ReadEmbedded()

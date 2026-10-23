@@ -2067,7 +2067,16 @@ No setting on your machine was changed by this error.</value>
     <value>Judged on the 1% lows: display latency was not read on any of your trial games.</value>
   </data>
   <data name="Essai.Pause" xml:space="preserve">
-    <value>Trial of “{0}” paused: it could not switch without asking you for a Windows prompt. Open DrDXT, it resumes on the next game.</value>
+    <value>Trial of “{0}” paused: it could not switch without asking you for a Windows prompt. Open DrDXT and click “Resume the trial” before your next game.</value>
+  </data>
+  <data name="Essai.EnAttente" xml:space="preserve">
+    <value>Trial of “{0}” on hold: your next game needs it, and only an open DrDXT can apply it (waking the PC from sleep removes it too). Before your next {1} game, open DrDXT and click “Resume the trial”. Games played without it meanwhile don&apos;t count.</value>
+  </data>
+  <data name="Essai.Reprendre" xml:space="preserve">
+    <value>Resume the trial</value>
+  </data>
+  <data name="Essai.TonJeu" xml:space="preserve">
+    <value>your game</value>
   </data>
   <data name="Essai.Fini.Mieux" xml:space="preserve">
     <value>Trial of “{0}” done: better in game across your games, it stays set.</value>
