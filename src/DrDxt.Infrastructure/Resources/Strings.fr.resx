@@ -2039,7 +2039,16 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
     <value>Jugé sur les 1 % bas : la latence d'affichage n'a été lue sur aucune de tes parties d'essai.</value>
   </data>
   <data name="Essai.Pause" xml:space="preserve">
-    <value>Essai de « {0} » en pause : il n'a pas pu changer d'état sans te demander une autorisation Windows. Ouvre DrDXT, il reprendra à la partie suivante.</value>
+    <value>Essai de « {0} » en pause : il n&apos;a pas pu changer d&apos;état sans te demander une autorisation Windows. Ouvre DrDXT et clique « Reprendre l&apos;essai » avant ta prochaine partie.</value>
+  </data>
+  <data name="Essai.EnAttente" xml:space="preserve">
+    <value>Essai de « {0} » en attente : ta prochaine partie doit l&apos;avoir, et seul DrDXT ouvert peut le poser (un réveil du PC le retire aussi). Avant ta prochaine partie de {1}, ouvre DrDXT et clique « Reprendre l&apos;essai ». Les parties jouées sans lui en attendant ne comptent pas.</value>
+  </data>
+  <data name="Essai.Reprendre" xml:space="preserve">
+    <value>Reprendre l&apos;essai</value>
+  </data>
+  <data name="Essai.TonJeu" xml:space="preserve">
+    <value>ton jeu</value>
   </data>
   <data name="Essai.Fini.Mieux" xml:space="preserve">
     <value>Essai de « {0} » terminé : mieux en jeu sur tes parties, il reste posé.</value>

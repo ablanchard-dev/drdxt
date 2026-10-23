@@ -86,8 +86,8 @@ public sealed class RetraductionTests
         });
         long_.Length.Should().BeGreaterThan(900, "témoin : un texte d'incident aussi long que celui qui figeait le rejeu");
 
-        // Les gabarits (des milliers d'expressions compilées) se construisent au premier appel, hors du budget du découpage :
-        // sous la charge de la suite complète, leur construction seule dépassait la fenêtre. Seul le découpage se chronomètre.
+        // Les gabarits (des milliers d'expressions) se construisent au premier appel : sous la charge de la suite complète,
+        // leur construction seule dépassait la fenêtre. Seul le découpage se chronomètre.
         Dans(En, () => Retraduction.Retraduire("x")!);
         var lecture = Task.Run(() => Dans(En, () => Retraduction.Retraduire(long_)!));
 

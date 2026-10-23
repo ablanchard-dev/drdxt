@@ -19,28 +19,35 @@ public static class Retraduction
 
     // Le découpage essaie chaque gabarit à chaque position, et chaque valeur capturée se relit à son tour : un long texte
     // d'incident (un millier de caractères) y passait plus de 10 s, et le scan rejoué ne finissait jamais. Un texte qui ne
-    // se découpe pas dans ce temps reste tel quel, comme un texte que rien ne reconnaît. Le temps court une fois les
-    // gabarits prêts : leur construction (des milliers d'expressions compilées, au premier appel) n'y entre pas.
-    private const long BudgetMs = 500;
+    // se découpe pas dans cette borne reste tel quel, comme un texte que rien ne reconnaît. Elle compte le travail, pas des
+    // millisecondes : en temps, un PC chargé (un jeu, une suite de tests en parallèle) rendait sans traduction un texte qui
+    // se traduit au repos ; comptée, le même texte donne le même résultat sur toutes les machines. Chaque essai d'un gabarit
+    // compte ce qu'il peut lire, le reste du texte. Sur les machines enregistrées, la traduction la plus chère en compte
+    // 1,6 million ; le long texte du test, qui ne se découpe pas, atteint la borne en une vingtaine de millisecondes.
+    internal const long TravailMax = 5_000_000;
 
-    // La borne ci-dessus se lit entre deux essais : une seule correspondance très lente lui échapperait. Chaque essai a donc
-    // sa propre limite, et son dépassement rend le texte tel quel, comme la borne.
+    // La borne se lit entre deux essais : une correspondance qui s'emballerait sur un texte forgé lui échapperait. Chaque
+    // essai a donc sa propre limite, son dépassement rendant le texte tel quel. Un essai normal dure quelques microsecondes.
     private static readonly TimeSpan CorrespondanceMax = TimeSpan.FromMilliseconds(100);
+
+    private sealed class Travail(long restant) { public long Restant = restant; }
+
+    private sealed class BorneAtteinte : Exception;
 
     public static string? Retraduire(string? texte)
     {
         if (string.IsNullOrWhiteSpace(texte)) return texte;
         var gabarits = Docteur.Langue.TwoLetterISOLanguageName == "fr" ? GabaritsAnglais.Value : GabaritsFrancais.Value;
-        try { return Relire(texte, gabarits, Environment.TickCount64 + BudgetMs); }
-        catch (Exception ex) when (ex is TimeoutException or RegexMatchTimeoutException) { return texte; }
+        try { return Relire(texte, gabarits, new Travail(TravailMax)); }
+        catch (Exception ex) when (ex is BorneAtteinte or RegexMatchTimeoutException) { return texte; }
     }
 
-    // La limite est celle du texte entier : les valeurs relues en chemin la partagent.
-    private static string Relire(string texte, IReadOnlyList<Gabarit> gabarits, long limite)
+    // La borne est celle du texte entier : les valeurs relues en chemin la partagent.
+    private static string Relire(string texte, IReadOnlyList<Gabarit> gabarits, Travail travail)
     {
         if (string.IsNullOrWhiteSpace(texte)) return texte;
         var memo = new Dictionary<int, List<string>?>();
-        return Decouper(texte, 0, gabarits, memo, limite) is { } morceaux ? string.Concat(morceaux) : texte;
+        return Decouper(texte, 0, gabarits, memo, travail) is { } morceaux ? string.Concat(morceaux) : texte;
     }
 
     // Les mots outils de la langue source : une valeur qui en porte est une phrase, pas une donnée.
@@ -54,9 +61,8 @@ public static class Retraduction
         => !(Docteur.Langue.TwoLetterISOLanguageName == "fr" ? MotsAnglais : MotsFrancais).IsMatch(retraduite);
 
     private static List<string>? Decouper(string texte, int i, IReadOnlyList<Gabarit> gabarits, Dictionary<int, List<string>?> memo,
-        long limite)
+        Travail travail)
     {
-        if (Environment.TickCount64 > limite) throw new TimeoutException();
         if (i == texte.Length) return [];
         if (memo.TryGetValue(i, out var deja)) return deja;
         memo[i] = null;
@@ -64,17 +70,18 @@ public static class Retraduction
         {
             foreach (var motif in g.Fin is { } fin ? new[] { g.Morceau, fin } : [g.Morceau])
             {
+                if ((travail.Restant -= texte.Length - i) < 0) throw new BorneAtteinte();
                 if (motif.Match(texte, i) is not { Success: true } m || m.Length == 0) continue;
-                if (Decouper(texte, i + m.Length, gabarits, memo, limite) is not { } suite) continue;
+                if (Decouper(texte, i + m.Length, gabarits, memo, travail) is not { } suite) continue;
                 var brutes = Enumerable.Range(0, 10).TakeWhile(n => m.Groups[$"v{n}"].Success).Select(n => m.Groups[$"v{n}"].Value).ToList();
-                var valeurs = brutes.Select(v => Relire(v, gabarits, limite)).ToList();
+                var valeurs = brutes.Select(v => Relire(v, gabarits, travail)).ToList();
                 if (!valeurs.All(ValeurAcceptable)) continue;
                 return memo[i] = [Docteur.T(g.Cle, valeurs.Cast<object?>().ToArray()), .. suite];
             }
         }
         // Une espace entre deux morceaux concaténés, ou le point qu'un constat enregistré ajoute au gabarit, se garde tel
         // quel, après les gabarits qui commencent par lui.
-        if ((char.IsWhiteSpace(texte[i]) || texte[i] is '.' or ';') && Decouper(texte, i + 1, gabarits, memo, limite) is { } apresSeparateur)
+        if ((char.IsWhiteSpace(texte[i]) || texte[i] is '.' or ';') && Decouper(texte, i + 1, gabarits, memo, travail) is { } apresSeparateur)
             return memo[i] = [texte[i].ToString(), .. apresSeparateur];
         return null;
     }
@@ -101,8 +108,11 @@ public static class Retraduction
             }
             // Un gabarit qui finit par une valeur ne se reconnaît en entier qu'en fin de texte.
             var finitParUneValeur = Regex.IsMatch(t.Texte, @"\{\d+(:[^}]*)?\}$");
-            return new Gabarit(t.Cle, new Regex(@"\G" + Trous(false), RegexOptions.Compiled, CorrespondanceMax),
-                finitParUneValeur ? new Regex(@"\G" + Trous(true) + "$", RegexOptions.Compiled, CorrespondanceMax) : null, t.Litteral);
+            // Interprétés, pas compilés : une expression compilée prépare son code au premier essai qui passe son début, et
+            // des milliers de gabarits le faisaient pendant le premier texte lu (1,5 s pour le long texte du test, 4 ms relu),
+            // dans la limite de chaque essai, que cette préparation faisait sauter sur un PC chargé.
+            return new Gabarit(t.Cle, new Regex(@"\G" + Trous(false), RegexOptions.None, CorrespondanceMax),
+                finitParUneValeur ? new Regex(@"\G" + Trous(true) + "$", RegexOptions.None, CorrespondanceMax) : null, t.Litteral);
         })
         .OrderByDescending(g => g.Litteral)
         .ToList();

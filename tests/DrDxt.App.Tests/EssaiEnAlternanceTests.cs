@@ -300,8 +300,9 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         vm.LigneEssai.Should().Be("Essai.Pause");
         vm.MemoireEssai!.Lire()!.EnPause.Should().BeTrue();
         await Jouer(vm, 80);
-        // En pause, rien n'a été touché : l'état (posé) est connu, la partie compte avec lui.
-        vm.MemoireParties!.Lire()[0].Essai.Should().Be(AlternanceDesEssais.Marque(Id, true));
+        // En pause, le levier est resté posé alors que les blocs voulaient la partie sans : jouée hors du plan, elle ne
+        // compte d'aucun côté (elle fausserait l'alternance A-B-B-A).
+        vm.MemoireParties!.Lire().OrderBy(p => p.Debut).Last().Essai.Should().BeNull();
     }
 
     [Fact]
@@ -427,8 +428,10 @@ public sealed class EssaiEnAlternanceTests : IDisposable
     }
 
     // Un réglage
-    // VOLATIL (limite de la carte, PL1) s'efface au redémarrage ; son état est alors connu sans rien écrire : « sans ». L'essai
-    // continue, les parties d'après le démarrage comptent côté « sans » ; sinon un joueur qui éteint le soir ne finit jamais.
+    // VOLATIL (limite de la carte, PL1) s'efface au redémarrage ou au réveil ; son état est alors connu sans rien écrire :
+    // « sans ». L'essai continue. La partie d'après, jouée sans alors que les blocs la voulaient avec, ne compte d'aucun côté
+    // (comptée « sans », elle avançait les blocs sans les suivre, et un joueur qui éteint le soir n'accumulait que des « sans ») ;
+    // l'App ouverte repose le réglage pour la suivante.
     [Fact]
     public async Task Un_redemarrage_rend_un_reglage_volatil_a_l_origine_et_l_essai_continue()
     {
@@ -440,12 +443,13 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         await Jouer(vm, 90);
 
         vm.EssaiEnCours.Should().BeTrue("le redémarrage n'arrête plus l'essai d'un réglage volatil");
-        vm.MemoireParties!.Lire()[0].Essai.Should().Be(AlternanceDesEssais.Marque(Id, false), "jouée après le démarrage : sans le réglage");
+        vm.MemoireParties!.Lire()[0].Essai.Should().BeNull("jouée sans le réglage alors que les blocs le voulaient");
         _rendus.Should().Be(0, "rien à rendre : le redémarrage l'a déjà fait");
-        _poses.Should().Be(1, "A-B-B-A : le rang suivant est sans, rien à reposer");
+        _poses.Should().Be(2, "les blocs le veulent toujours : l'App ouverte le repose pour la partie suivante");
     }
 
-    // Le cas réel : le relevé de fond (aucun levier accessible) enregistre la partie. Il ne pose rien, mais il note l'état vrai.
+    // Le cas réel : le relevé de fond (aucun levier accessible) enregistre la partie. Il ne pose rien, mais il note l'état vrai,
+    // et l'essai attend l'App ouverte.
     [Fact]
     public async Task Le_releve_de_fond_note_un_reglage_volatil_efface_sans_rien_poser()
     {
@@ -457,8 +461,9 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         await Jouer(vm, 90);
 
         vm.MemoireEssai!.Lire()!.PoseMaintenant.Should().BeFalse("le redémarrage l'a effacé : l'essai ne reste plus figé sur « posé »");
-        vm.MemoireParties!.Lire()[0].Essai.Should().Be(AlternanceDesEssais.Marque(Id, false));
+        vm.MemoireParties!.Lire()[0].Essai.Should().BeNull("jouée sans le réglage alors que les blocs le voulaient");
         (_poses, _rendus).Should().Be((1, 0), "le relevé de fond ne touche à aucun levier");
+        vm.EssaiEnAttente.Should().BeTrue();
     }
 
     // Le relevé de fond élevé fait AVANCER l'essai (le joueur ne garde pas l'App ouverte en jouant), avec le seul
@@ -690,5 +695,78 @@ public sealed class EssaiEnAlternanceTests : IDisposable
         await Jouer(vm, 81);
 
         portees.Should().HaveCount(3).And.EndWith([true, true], "chaque bascule d'après une partie se fait sans geste");
+    }
+
+    // Le relevé de fond (App.ReleverEnFond) : mêmes fichiers, aucun levier, aucun helper. Il ne pose ni ne rend rien.
+    private ScanViewModel ReleveDeFond(ScanViewModel app)
+    {
+        var fond = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
+            Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k);
+        fond.MemoireParties = app.MemoireParties;
+        fond.MemoireEssai = app.MemoireEssai;
+        fond.Horloge = () => _maintenant;
+        fond.DemarrageDuPc = () => _demarrage;
+        return fond;
+    }
+
+    // Le PC sort de veille le matin (Kernel-Boot 27 au réveil, un levier volatil est rendu), puis une partie est relevée.
+    private async Task JouerApresUnReveil(ScanViewModel releveur)
+    {
+        _demarrage = _maintenant.AddDays(1).AddMinutes(-3);
+        _maintenant = _maintenant.AddDays(1);
+        releveur.EnregistrerPartie(new PartieRelevee("JeuBClient-Win64-Shipping.exe", _maintenant, _maintenant.AddMinutes(30), 4,
+            130, 80, BottleneckState.CpuBoundOrAppBound));
+        await releveur.DerniereAvanceeEssai;
+    }
+
+    // Un réveil rend la limite et le relevé de fond ne la repose pas : les parties suivantes, jouées « sans » là où les
+    // blocs les voulaient « avec », comptaient dans les blocs. Jouées hors du plan, elles
+    // ne comptent plus, et l'App ouverte dit quoi faire, avec le nom du jeu.
+    [Fact]
+    public async Task Une_partie_jouee_hors_du_plan_ne_compte_pas_et_l_App_dit_quoi_faire()
+    {
+        var app = Vm();
+        (await app.DemarrerEssaiAsync(Id)).Should().BeTrue();
+        var fond = ReleveDeFond(app);
+
+        for (var jour = 0; jour < 4; jour++) await JouerApresUnReveil(fond);
+
+        app.MemoireParties!.Lire().Should().HaveCount(4).And.OnlyContain(p => p.Essai == null, "aucune n'avait le levier que les blocs voulaient");
+        _poses.Should().Be(1, "témoin : rien ne s'est posé sans fenêtre");
+        app.ChargerParties();
+        app.EssaiEnAttente.Should().BeTrue();
+        app.LigneEssai.Should().Be("Essai.EnAttente");
+    }
+
+    // « Reprendre l'essai » est un clic : il pose le levier (l'invite Windows éventuelle vient de lui), et la partie suivante
+    // compte avec.
+    [Fact]
+    public async Task Reprendre_l_essai_pose_le_levier_et_la_partie_suivante_compte()
+    {
+        var app = Vm(helperJoignable: false);
+        (await app.DemarrerEssaiAsync(Id)).Should().BeTrue();
+        await JouerApresUnReveil(ReleveDeFond(app));
+        app.ChargerParties();
+        app.EssaiEnAttente.Should().BeTrue("témoin");
+
+        await app.ReprendreEssaiCommand.ExecuteAsync(null);
+
+        _poses.Should().Be(2, "le clic pose, même sans helper déjà lancé : c'est lui qui porte l'invite");
+        app.EssaiEnAttente.Should().BeFalse();
+        await Jouer(app, 90);
+        app.MemoireParties!.Lire().OrderBy(p => p.Debut).Last().Essai.Should().Be(AlternanceDesEssais.Marque(Id, true));
+    }
+
+    [Theory]
+    [InlineData("fr")]
+    [InlineData("en")]
+    public void La_ligne_d_attente_nomme_le_jeu_et_le_geste(string langue)
+    {
+        var dire = new DrDxt.Infrastructure.Localization.ResxLocalizer();
+        var culture = new System.Globalization.CultureInfo(langue);
+        var ligne = string.Format(culture, dire.Get("Essai.EnAttente", culture), "Limite de puissance", "JeuB");
+
+        ligne.Should().Contain("JeuB").And.Contain("DrDXT").And.Contain(dire.Get("Essai.Reprendre", culture));
+        dire.Get("Essai.TonJeu", culture).Should().NotBe("Essai.TonJeu");
     }
 }

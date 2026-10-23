@@ -35,6 +35,12 @@ public partial class ScanViewModel
 
     public bool EssaiEnCours => MemoireEssai?.Lire() is not null;
 
+    /// <summary>Le levier n'est pas dans l'état que les blocs prévoient pour la prochaine partie : le relevé de fond ne pose
+    /// rien, et un réveil rend un levier volatil. Seule l'App ouverte le rattrape, par « Reprendre l'essai ».</summary>
+    public bool EssaiEnAttente => MemoireEssai?.Lire() is { } lu && !SelonLePlan(Effectif(lu));
+
+    public string LabelEssaiReprendre => _localize("Essai.Reprendre");
+
     /// <summary>Le bouton « Essayer en alternance » : un levier à essayer, et pas déjà un essai en cours.</summary>
     public bool EssaiProposable => LevierAEssayer is not null && MemoireEssai is not null && !EssaiEnCours;
     public string LabelEssaiBouton => _localize("Essai.Bouton");
@@ -50,6 +56,15 @@ public partial class ScanViewModel
 
     [RelayCommand]
     private async Task ArreterEssai() => await ArreterEssaiAsync().ConfigureAwait(true);
+
+    /// <summary>Le clic : l'essai rattrape son plan tout de suite. C'est un geste du joueur, il porte l'invite Windows
+    /// éventuelle, comme le clic qui a lancé l'essai.</summary>
+    [RelayCommand]
+    private async Task ReprendreEssai()
+    {
+        await AvancerEssaiAsync(MemoireParties?.Lire() ?? [], avecGeste: true).ConfigureAwait(true);
+        OnPropertyChanged(nameof(EssaiEnAttente));
+    }
 
     /// <summary>Le clic : la première partie l'a avec. Un levier déjà posé par DrDXT part de « posé ».</summary>
     internal async Task<bool> DemarrerEssaiAsync(string id)
@@ -98,9 +113,14 @@ public partial class ScanViewModel
     /// touché), la partie compte. Un redémarrage depuis la dernière bascule rend l'état incertain (un levier de
     /// carte ne survit pas au redémarrage) : rien n'est marqué, l'essai s'arrête au prochain passage.</summary>
     internal PartieRelevee MarquerEssai(PartieRelevee p)
-        => MemoireEssai?.Lire() is { } lu && Effectif(lu) is { } e && p.Debut >= e.Depuis && !RedemarreDepuis(e)
+        => MemoireEssai?.Lire() is { } lu && Effectif(lu) is { } e && p.Debut >= e.Depuis && !RedemarreDepuis(e) && SelonLePlan(e)
             ? p with { Essai = AlternanceDesEssais.Marque(e.LevierId, e.PoseMaintenant) }
             : p;
+
+    /// <summary>Le levier est dans l'état que les blocs A-B-B-A prévoient pour la prochaine partie. Une partie jouée hors du
+    /// plan ne compte d'aucun côté : marquée de l'état courant, elle avancerait les blocs sans que le plan soit suivi.</summary>
+    private bool SelonLePlan(EssaiEnAlternance e)
+        => AlternanceDesEssais.Suivante(MemoireParties?.Lire() ?? [], e.LevierId, e.PoseALOrigine, e.Debut).Pose == e.PoseMaintenant;
 
     private bool RedemarreDepuis(EssaiEnAlternance e) => DemarrageDuPc() > e.Depuis;
 
@@ -112,10 +132,10 @@ public partial class ScanViewModel
             : e;
 
     /// <summary>Après une partie : l'état de la suivante. Poser ou rendre se fait sans invite Windows, ou pas du tout.</summary>
-    internal async Task AvancerEssaiAsync(IReadOnlyList<PartieRelevee> parties)
+    internal async Task AvancerEssaiAsync(IReadOnlyList<PartieRelevee> parties, bool avecGeste = false)
     {
         await _verrouEssai.WaitAsync().ConfigureAwait(true);
-        try { await AvancerEssaiSansFauteAsync(parties).ConfigureAwait(true); }
+        try { await AvancerEssaiSansFauteAsync(parties, avecGeste).ConfigureAwait(true); }
         catch (Exception)
         {
             // Une faute ne se perd plus dans une tâche jamais observée. Elle a pu tomber après la
@@ -135,7 +155,7 @@ public partial class ScanViewModel
         finally { _verrouEssai.Release(); }
     }
 
-    private async Task AvancerEssaiSansFauteAsync(IReadOnlyList<PartieRelevee> parties)
+    private async Task AvancerEssaiSansFauteAsync(IReadOnlyList<PartieRelevee> parties, bool avecGeste)
     {
         if (MemoireEssai?.Lire() is not { } lu) return;
         // Le fichier de l'essai vit sous le profil du joueur, que tout programme du compte peut écrire : un levier qui n'a pas
@@ -176,7 +196,7 @@ public partial class ScanViewModel
             // Rien ne se pose sans clic pendant qu'un jeu tourne (une autre partie lancée aussitôt, un second jeu) : l'essai
             // garde son état, et la partie suivante le refait avancer.
             if (pose && JeuOuvertPourLEssai()) return;
-            if (HelperJoignableSansUac is { } joignable && levier.RequiresElevation && !await joignable().ConfigureAwait(true))
+            if (!avecGeste && HelperJoignableSansUac is { } joignable && levier.RequiresElevation && !await joignable().ConfigureAwait(true))
             {
                 MemoireEssai.Ecrire(e with { EnPause = true });
                 LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.Pause"), Titre(e.LevierId));
@@ -234,7 +254,14 @@ public partial class ScanViewModel
 
     private void DireEssai(IReadOnlyList<PartieRelevee> parties)
     {
+        OnPropertyChanged(nameof(EssaiEnAttente));
         if (MemoireEssai?.Lire() is not { } e) return;
+        if (!SelonLePlan(Effectif(e)))
+        {
+            LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.EnAttente"), Titre(e.LevierId),
+                parties.OrderBy(p => p.Debut).LastOrDefault()?.Jeu is { Length: > 0 } jeu ? NomDuJeu(jeu) : _localize("Essai.TonJeu"));
+            return;
+        }
         parties = parties.Where(p => p.Debut >= e.Debut).ToList();
         var avec = parties.Count(p => p.Essai == AlternanceDesEssais.Marque(e.LevierId, true));
         var sans = parties.Count(p => p.Essai == AlternanceDesEssais.Marque(e.LevierId, false));

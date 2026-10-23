@@ -64,9 +64,9 @@ lue par DrDXT à côté de celle de l'outil de référence.
 |---|---|---|---|---|
 | Génération et fTPM | reconnaît la génération par CPUID ; pour les saccades liées au fTPM (article AMD PA-410), dit un BIOS « à vérifier » d'après sa date | non validé sur AMD réel | `DrDXT-Test.exe` (étape « Docteur : tous les constats ») | la génération lue, et le processeur exact (Ryzen Master) |
 | Réglages du BIOS AMD nommés | lit les réglages du BIOS (dont le Curve Optimizer et l'échelle PBO) et ce qui s'écarte des valeurs d'usine | non validé sur AMD réel | pas encore dans le kit | à venir : les réglages lus, et les mêmes dans le BIOS |
-| Température (Tctl et par CCD) | registres thermiques, par le module de lecture AMD de PawnIO, en lecture seule | en attente : le module n'est pas encore embarqué | à venir dans le kit | Tctl et chaque CCD à moins de 1 °C de HWiNFO |
-| Cause matérielle des redémarrages | le registre de redémarrage du processeur (S5_RESET_STATUS), lu sans l'effacer | en attente du module | à venir | la cause lue après un arrêt propre, puis après un appui long sur le bouton |
-| Timings mémoire appliqués | les timings que le contrôleur mémoire applique vraiment, canal par canal | en attente du module | à venir | chaque timing, et le même dans ZenTimings |
+| Température (Tctl et par CCD) | registres thermiques, par les modules AMD de PawnIO (embarqués, en lecture seule) | non validé sur AMD réel | `DrDXT-Test.exe --lire`, PawnIO installé | les lignes `Tctl` et `CCD` à moins de 1 °C de HWiNFO |
+| Cause matérielle des redémarrages | le registre de redémarrage du processeur (S5_RESET_STATUS), lu sans l'effacer | non validé sur AMD réel | `DrDXT-Test.exe --lire`, PawnIO installé | la ligne `S5 (reset)` après un arrêt propre, puis après un appui long sur le bouton (bit 1) |
+| Timings mémoire appliqués | les timings que le contrôleur mémoire applique vraiment, canal par canal | non validé sur AMD réel | `DrDXT-Test.exe --lire`, PawnIO installé | les registres bruts `Timings canal`, et une capture de ZenTimings de la même session |
 | Limites PPT, TDC, EDC et thermique | la table de puissance du processeur, en jeu | en attente du module | à venir | valeurs et limites, et les mêmes dans HWiNFO ou Ryzen Master |
 | Erreurs matérielles corrigées (MCA) | les erreurs que le processeur a corrigées | en attente du module | à venir | les erreurs lues, et les mêmes dans l'Observateur d'événements (WHEA) |
 

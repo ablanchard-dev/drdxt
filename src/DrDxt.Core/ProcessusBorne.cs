@@ -63,13 +63,21 @@ public static class ProcessusBorne
         lock (garde) return garde.ToString();
     }
 
-    private static async Task Lire(StreamReader flux, StringBuilder garde, int max)
+    // Chaque flux se lit sur son propre fil, d'une lecture bloquante. Le tuyau n'est pas asynchrone : lu par ReadAsync, chaque
+    // morceau repassait par le pool de fils, et sur un processeur saturé (un jeu, la CI) chaque passage attendait son tour.
+    // L'outil, freiné par un tuyau plein, écrivait 4 000 lignes en plus de 30 s au lieu de 3 s vers un fichier, et la borne
+    // l'arrêtait.
+    private static Task Lire(StreamReader flux, StringBuilder garde, int max)
+        => Task.Factory.StartNew(() => LireJusquALaFin(flux, garde, max), CancellationToken.None, TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+
+    private static void LireJusquALaFin(StreamReader flux, StringBuilder garde, int max)
     {
         var tampon = new char[4096];
         int n;
         try
         {
-            while ((n = await flux.ReadAsync(tampon).ConfigureAwait(false)) > 0)
+            while ((n = flux.Read(tampon)) > 0)
                 lock (garde)
                     if (garde.Length < max) garde.Append(tampon, 0, Math.Min(n, max - garde.Length));
         }

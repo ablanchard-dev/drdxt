@@ -14,6 +14,9 @@ public sealed class ModulesPawnIoEpinglesTests
     [InlineData("IntelMSR", PawnIoIntel.EmpreinteMsr)]
     [InlineData("IntelMCHBAR", PawnIoIntel.EmpreinteMchbar)]
     [InlineData("LpcIO", PawnIoSuperIo.EmpreinteLpcIo)]
+    [InlineData("AMDReset", PawnIoAmd.EmpreinteReset)]
+    [InlineData("AMDFamily17", PawnIoAmd.EmpreinteFamille17)]
+    [InlineData("RyzenSMU", PawnIoAmd.EmpreinteSmu)]
     public void Chaque_module_embarque_porte_son_empreinte_epinglee(string nom, string empreinte)
         => PawnIoIntel.Module(nom, empreinte).Should().NotBeNull();
 

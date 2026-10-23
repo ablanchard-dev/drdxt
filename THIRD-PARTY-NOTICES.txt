@@ -23,6 +23,9 @@ Module embarqué pour PawnIO (rien n'installe PawnIO : DrDXT s'en sert seulement
   processeur Intel, écriture de la seule limite continue (PL1) sur accord, par le helper. https://github.com/namazso/PawnIO.Modules
 - LpcIO.bin (même publication 0.2.11, même licence) : lecture seule des ventilateurs de la carte mère par sa puce Super I/O
   (régime et cycle) ; aucun réglage de ventilateur n'est écrit.
+- AMDReset.bin, AMDFamily17.bin et RyzenSMU.bin (même publication 0.2.11, même licence) : lecture seule d'un processeur
+  Ryzen (cause des redémarrages, température et timings mémoire par SMN, table PM du SMU) ; aucune de leurs écritures
+  n'est appelée.
 - PawnIO (pilote et PawnIOLib.dll) : non livré ; appelé s'il est installé par le joueur. https://pawnio.eu
 
 Police

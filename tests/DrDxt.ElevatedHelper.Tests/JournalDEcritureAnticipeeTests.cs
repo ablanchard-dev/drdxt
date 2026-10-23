@@ -213,6 +213,12 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
     {
         Directory.CreateDirectory(_dossier);
         File.WriteAllText(Fichier + ".verrou", "");   // un verrou d'avant : propriétaire, le compte
+        // Élevé (le runner de la CI, une session admin), un fichier créé appartient d'office aux Administrateurs : le compte
+        // est posé propriétaire à la main, comme l'ancien code le laissait.
+        var ancien = new FileInfo(Fichier + ".verrou");
+        var acl = ancien.GetAccessControl();
+        acl.SetOwner(WindowsIdentity.GetCurrent().User!);
+        ancien.SetAccessControl(acl);
         ProprietaireDeConfiance(Fichier + ".verrou").Should().BeFalse("témoin : un fichier créé ici appartient au compte");
 
         new JournalDEcritureAnticipee(Fichier).Ajouter(Hags, "1", App, Le).IsOk.Should().BeTrue();

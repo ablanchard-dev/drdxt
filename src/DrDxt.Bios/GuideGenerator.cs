@@ -124,7 +124,7 @@ public sealed class GuideGenerator : IGuideGenerator
         var path = template.Paths.FirstOrDefault(p => p.Setting == finding.Kind);
         var exact = path is null
             ? null
-            : ComposeExactValue(path);
+            : ValeurExacte(path);
 
         return new GuideStep(
             Order: order,
@@ -137,7 +137,7 @@ public sealed class GuideGenerator : IGuideGenerator
     // La valeur exacte que l'interface affiche telle quelle : « <chemin de menu> → <nom du réglage> →
     // <cible> ». Pour un repli sur le seul nom (chemin de menu vide), elle se réduit à « <nom du
     // réglage> → <cible> » : le client a toujours le nom exact à chercher.
-    private static string ComposeExactValue(GuideSettingPath path)
+    public static string ValeurExacte(GuideSettingPath path)
     {
         var parts = new List<string>(3);
         if (!string.IsNullOrWhiteSpace(path.MenuPath))

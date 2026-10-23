@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-fq3HzhOaAtw0H32oVxPYKKMhceMByjIbrkylz+OwbzQ='; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PB0hugQEuhNb8Mi7B1B3yWMt70cy+qjFwDvz+F4O0UM='; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <title>DrDXT · BIOS</title>
 <style>
   :root { --fond: #ffffff; --texte: #111111; --doux: #4a4a4a; --trait: #d0d0d0; --accent: #0b4f9c; --alerte: #8a1c1c; --carte: #f3f3f3; }
@@ -16,7 +16,7 @@
   main { max-width: 640px; margin: 0 auto; padding: 16px; }
   h1 { font-size: 1.3rem; margin: 8px 0 4px; }
   h2 { font-size: 1.1rem; margin: 24px 0 8px; border-bottom: 2px solid var(--trait); padding-bottom: 4px; }
-  .carte { font-weight: 700; font-size: 1.15rem; }
+  .donnee { color: var(--doux); overflow-wrap: anywhere; }
   .touche { background: var(--carte); border: 1px solid var(--trait); border-radius: 8px; padding: 12px; margin: 8px 0; }
   kbd { font: 700 1.1rem ui-monospace, "Cascadia Mono", Consolas, monospace; border: 2px solid var(--texte); border-radius: 6px; padding: 0 8px; }
   ol { padding-left: 1.4rem; margin: 0; }
@@ -36,7 +36,7 @@
   <p id="erreur" class="erreur" hidden></p>
   <div id="guide" hidden>
     <p class="note" id="avertissement"></p>
-    <p class="carte" id="carte"></p>
+    <p class="donnee" id="carte" hidden></p>
     <div class="touche" id="entree" hidden></div>
     <h2 id="titre-avant"></h2>
     <ol id="secours-haut"></ol>
@@ -51,15 +51,20 @@
   <footer id="pied"></footer>
 </main>
 <script type="application/json" id="textes">{"fr": {"Xmp": "Active ton profil mémoire (XMP/EXPO) ici :", "Above4G": "D'abord, active Above 4G Decoding ici :", "Csm": "Ensuite, désactive le CSM ici (ton système démarre déjà en UEFI, Windows démarrera pareil) :", "ReBar": "Enfin, active Re-Size BAR Support ici :", "X3dCppc": "Règle CPPC / Preferred Cores sur la route supportée ici :", "Pcie": "Vérifie la vitesse de ton lien PCIe ici :", "BiosVersion": "Vérifie s'il existe un BIOS plus récent ici :", "Generic": "Modifie ce réglage ici :", "NoBootNormal": "Un écran noir ou l'absence d'affichage après le premier redémarrage est normal : rien n'est cassé.", "MemoryTraining": "Attends 30 à 60 secondes que l'entraînement mémoire se termine. Ne coupe pas l'alimentation.", "ClearCmos": "S'il ne démarre toujours pas, fais un Clear CMOS (le bouton ou le cavalier de ta carte mère, ou retire la pile une minute) pour réinitialiser le BIOS sans risque.", "LoadDefaults": "De retour dans le BIOS, utilise Load Optimized Defaults pour revenir à un état sain connu.", "OneChangeAtATime": "Puis réapplique un seul changement à la fois, en redémarrant entre chaque, pour savoir quel réglage a causé un éventuel souci.", "RebarNeedsCsmOff": "Si le Resizable BAR refuse de s'activer : sur la plupart des cartes il a aussi besoin que le CSM (module de compatibilité) soit désactivé. DrDXT ne te guide pas sur celui-là : mal réglé, il peut empêcher la machine de démarrer. N'y touche donc que si tu es à l'aise, et un réglage à la fois.", "CsmSuppressed": "Ton système démarre en mode Legacy, donc DrDXT n'a pas conseillé de désactiver le CSM : cela pourrait empêcher ton PC de démarrer. Laisse-le tel quel."}, "en": {"Xmp": "Enable your memory profile (XMP/EXPO) here:", "Above4G": "First, enable Above 4G Decoding here:", "Csm": "Then disable CSM here (your system already boots in UEFI, Windows will start the same way):", "ReBar": "Finally, enable Re-Size BAR Support here:", "X3dCppc": "Set CPPC / Preferred Cores to the supported route here:", "Pcie": "Check your PCIe link speed here:", "BiosVersion": "Check for a newer BIOS version here:", "Generic": "Adjust this setting here:", "NoBootNormal": "A black screen or no display after the first reboot is normal: nothing is broken.", "MemoryTraining": "Wait 30 to 60 seconds for memory training to finish. Do not cut the power.", "ClearCmos": "If it still will not boot, Clear CMOS (the button/jumper on your motherboard, or remove the battery for a minute) to reset the BIOS safely.", "LoadDefaults": "Back in the BIOS, use Load Optimized Defaults to return to a known-good state.", "OneChangeAtATime": "Then re-apply one change at a time, rebooting between each, so you know which setting caused any issue.", "RebarNeedsCsmOff": "If Resizable BAR refuses to turn on: on most boards it also needs CSM (Compatibility Support Module) disabled. We do not walk you through that one: set wrong, it can stop the machine booting. So change it only if you are comfortable, and one setting at a time.", "CsmSuppressed": "Your system boots in Legacy mode, so we did not advise disabling CSM: doing so could prevent your PC from booting. Leave it as it is."}}</script>
-<script type="application/json" id="regles">{"valeur": "^[A-Za-z0-9 ()./>=→-]{1,300}$", "carte": "^[A-Za-z0-9 ().,&/+_-]{0,120}$", "touche": "^[A-Za-z0-9 ()/+-]{0,40}$", "manuel": "^https://www\\.msi\\.com/Motherboard/[A-Za-z0-9+-]+/support$", "lien": "https?|www", "tension": "\\d\\s*[mM]?[vV](?:[oO][lL][tT][sS]?)?\\b"}</script>
+<script type="application/json" id="regles">{"carte":"^[A-Za-z0-9 ().,&/+_-]{0,120}$","manuel":"^https://www\\.msi\\.com/Motherboard/[A-Za-z0-9+-]+/support$","lien":"https?|www","tension":"\\d\\s*[mM]?[vV](?:[oO][lL][tT][sS]?)?\\b"}</script>
+<script type="application/json" id="valeurs">{"8-1K07":"Advanced (F7) > OC > Advanced CPU Configuration > AMD CBS > CPPC Preferred Cores  →  CPPC Preferred Cores  →  = Auto / Enabled","vPxpTj":"Advanced (F7) > OC > Extreme Memory Profile (X.M.P.) / EXPO  →  EXPO (AMD) / XMP (Intel)  →  = Profile 1 / Enabled","fbFMVI":"Advanced (F7) > Settings > Advanced > PCI Subsystem Settings > Above 4G Memory / Crypto Currency mining  →  Above 4G memory  →  = Enabled","UTN25w":"Advanced (F7) > Settings > Advanced > PCI Subsystem Settings > Re-Size BAR Support  →  Re-Size BAR Support  →  = Enabled","uZulKw":"Advanced (F7) > Settings > Advanced > Windows OS Configuration > BIOS CSM/UEFI Mode  →  BIOS UEFI/CSM Mode  →  = UEFI","7wzeSN":"Advanced / PCI Subsystem / Chipset section  →  Above 4G Decoding (a.k.a. Above 4G Memory)  →  = Enabled","DOcjBt":"Advanced / PCI Subsystem / Chipset section  →  Re-Size BAR Support (a.k.a. Smart Access Memory)  →  = Enabled","C8GWCS":"Advanced > AMD CBS > CPU Common Options  →  CPPC Preferred Cores  →  = Auto / Enabled","JwAqjM":"Advanced > Chipset Configuration  →  Above 4G Decoding  →  = Enabled","pMwq6P":"Advanced > Chipset Configuration  →  Re-Size BAR Support  →  = Enabled","cH3kor":"Advanced > PCI Subsystem Settings  →  Above 4G Decoding  →  = Enabled","eax6cV":"Advanced > PCI Subsystem Settings  →  Re-Size BAR Support  →  = Enabled","2ZnwSn":"Advanced Mode (F2) > BIOS > CSM Support  →  CSM Support  →  = Disabled","DYsmYP":"Advanced Mode (F2) > Settings > AMD CBS > CPU Common Options > CPPC Preferred Cores  →  CPPC Preferred Cores  →  = Auto / Enabled","umShO9":"Advanced Mode (F2) > Settings > Miscellaneous > Above 4G Decoding  →  Above 4G Decoding  →  = Enabled","qzhjs_":"Advanced Mode (F2) > Settings > Miscellaneous > Re-Size BAR Support  →  Re-Size BAR Support  →  = Enabled","iFmYUl":"Advanced Mode (F2) > Tweaker > Extreme Memory Profile (X.M.P.) / EXPO  →  Extreme Memory Profile (X.M.P.) / EXPO  →  = Profile1 / Enabled","m1dcfk":"Advanced Mode (F6) > Advanced > AMD CBS > CPU Common Options > CPPC Preferred Cores  →  CPPC Preferred Cores  →  = Auto / Enabled","O1-ogC":"Advanced Mode (F6) > Advanced > Chipset Configuration > Above 4G Decoding  →  Above 4G Decoding  →  = Enabled","73vjab":"Advanced Mode (F6) > Advanced > Chipset Configuration > Re-Size BAR Support  →  Re-Size BAR Support  →  = Enabled","OmYxm9":"Advanced Mode (F6) > Boot > CSM (Compatibility Support Module)  →  CSM  →  = Disabled","wXDBTW":"Advanced Mode (F6) > OC Tweaker > DRAM Profile Configuration > Load XMP/EXPO Setting  →  Load XMP / EXPO Setting  →  = XMP/EXPO 1.0 / Enabled","CxuULM":"Advanced Mode (F7) > Advanced > AMD CBS > CPU Common Options > CPPC Preferred Cores  →  CPPC Preferred Cores  →  = Auto / Enabled","TwzDP_":"Advanced Mode (F7) > Advanced > PCI Subsystem Settings > Above 4G Decoding  →  Above 4G Decoding  →  = Enabled","WGYnnu":"Advanced Mode (F7) > Advanced > PCI Subsystem Settings > Re-Size BAR Support  →  Re-Size BAR Support  →  = Enabled","TgIhl7":"Advanced Mode (F7) > Ai Tweaker > Ai Overclock Tuner  →  Ai Overclock Tuner  →  = EXPO I (AMD) / XMP I (Intel)","W2uWQs":"Advanced Mode (F7) > Boot > CSM (Compatibility Support Module) > Launch CSM  →  Launch CSM  →  = Disabled","GMqAnL":"Ai Tweaker (look for the memory profile)  →  Ai Overclock Tuner / XMP / EXPO  →  = EXPO / XMP enabled","t627bD":"BIOS  →  CSM Support  →  = Disabled","oYkz0j":"Boot  →  CSM  →  = Disabled","081E-G":"Boot / Windows OS Configuration section  →  CSM (Compatibility Support Module)  →  = Disabled","WPv5YM":"Boot > CSM (Compatibility Support Module)  →  Launch CSM  →  = Disabled","RkPcqZ":"OC (look for the memory profile)  →  EXPO / XMP / A-XMP  →  = Profile 1 / Enabled","-ul_T3":"OC > Advanced CPU Configuration > AMD CBS  →  CPPC Preferred Cores  →  = Auto / Enabled","Yx304x":"OC Tweaker > DRAM Profile Configuration  →  Load XMP / EXPO Setting  →  = XMP/EXPO 1.0 / Enabled","B0AIqa":"Overclocking / Tweaker / Ai Tweaker section of your BIOS  →  XMP / EXPO / DOCP / A-XMP (the memory profile)  →  = Profile 1 / Enabled","_efyB4":"Settings > AMD CBS > CPU Common Options  →  CPPC Preferred Cores  →  = Auto / Enabled","Ibinfr":"Settings > Advanced > PCI Subsystem Settings  →  Above 4G memory  →  = Enabled","GT155k":"Settings > Advanced > PCI Subsystem Settings  →  Re-Size BAR Support  →  = Enabled","4IzOdZ":"Settings > Advanced > Windows OS Configuration  →  BIOS UEFI/CSM Mode  →  = UEFI","73brL0":"Settings > Miscellaneous  →  Above 4G Decoding  →  = Enabled","ilAUEw":"Settings > Miscellaneous  →  Re-Size BAR Support  →  = Enabled","dj4Jvu":"Tweaker (look for the memory profile)  →  Extreme Memory Profile (X.M.P.) / EXPO  →  = Profile1 / Enabled"}</script>
+<script type="application/json" id="touches">{"cw6tOc":"Del","sF9hw3":"Del or F2 (watch the boot screen)","_WmR8-":"F10"}</script>
 <script>
 "use strict";
 (async function () {
   const textes = JSON.parse(document.getElementById("textes").textContent);
   const regles = JSON.parse(document.getElementById("regles").textContent);
+  const valeurs = JSON.parse(document.getElementById("valeurs").textContent);
+  const touches = JSON.parse(document.getElementById("touches").textContent);
   const ui = {
     fr: {
       avertissement: "Ces consignes viennent de DrDXT sur ton PC. Si tu n'as pas scanné ce QR toi-même depuis DrDXT, ne les suis pas.",
+      carte: "Carte mère détectée par DrDXT : ",
       entree: "Pour entrer dans le BIOS, appuie plusieurs fois sur cette touche dès l'allumage : ",
       sauvegarde: "Pour sauvegarder et redémarrer : ",
       avant: "Avant de commencer",
@@ -71,6 +76,7 @@
     },
     en: {
       avertissement: "These instructions come from DrDXT on your PC. If you did not scan this QR yourself from DrDXT, do not follow them.",
+      carte: "Motherboard detected by DrDXT: ",
       entree: "To enter the BIOS, press this key repeatedly as soon as the PC powers on: ",
       sauvegarde: "To save and restart: ",
       avant: "Before you start",
@@ -84,7 +90,7 @@
   const $ = (id) => document.getElementById(id);
   const langueDuTelephone = (navigator.language || "").toLowerCase().startsWith("fr") ? "fr" : "en";
   const motif = (cle) => new RegExp(regles[cle], "u");
-  const valeur = motif("valeur"), carte = motif("carte"), touche = motif("touche"), manuel = motif("manuel");
+  const carte = motif("carte"), manuel = motif("manuel");
   const lien = new RegExp(regles.lien, "iu"), tension = new RegExp(regles.tension, "u");
   const MAX_JSON = 20000;
 
@@ -95,17 +101,18 @@
     $("pied").textContent = ui[langueDuTelephone].pied;
   }
 
-  // Une seule liste fermée : les phrases de la page. Un texte libre n'est jamais affiché comme consigne.
+  // Des listes fermées : les phrases, les valeurs de menu et les touches de la page. Une adresse n'en porte que les codes ;
+  // seul le nom de la carte voyage en clair, borné, et se dit comme le nom détecté.
   function valide(d) {
-    if (!d || typeof d !== "object" || d.v !== 1 || (d.l !== "fr" && d.l !== "en")) return false;
-    const connu = (x) => typeof x === "string" && Object.prototype.hasOwnProperty.call(textes[d.l], x);
+    if (!d || typeof d !== "object" || d.v !== 2 || (d.l !== "fr" && d.l !== "en")) return false;
+    const dans = (liste, x) => typeof x === "string" && Object.prototype.hasOwnProperty.call(liste, x);
+    const connu = (x) => dans(textes[d.l], x);
     const propre = (x) => !lien.test(x) && !tension.test(x);
     const codes = (x) => Array.isArray(x) && x.length > 0 && x.length <= 20 && x.every(connu);
     return typeof d.c === "string" && carte.test(d.c) && propre(d.c)
-      && typeof d.e === "string" && touche.test(d.e) && propre(d.e) && typeof d.s === "string" && touche.test(d.s) && propre(d.s)
+      && (d.e === undefined || dans(touches, d.e)) && (d.s === undefined || dans(touches, d.s))
       && Array.isArray(d.p) && d.p.length <= 20
-      && d.p.every((e) => Array.isArray(e) && (e.length === 1 || e.length === 2) && connu(e[0])
-        && (e.length === 1 || (typeof e[1] === "string" && valeur.test(e[1]) && propre(e[1]))))
+      && d.p.every((e) => Array.isArray(e) && (e.length === 1 || e.length === 2) && connu(e[0]) && (e.length === 1 || dans(valeurs, e[1])))
       && codes(d.h) && (d.b === undefined || codes(d.b))
       && (d.n === undefined || connu(d.n))
       && (d.m === undefined || (typeof d.m === "string" && manuel.test(d.m)));
@@ -143,7 +150,13 @@
     document.documentElement.lang = d.l;
 
     $("avertissement").textContent = t.avertissement;
-    $("carte").textContent = d.c;
+    if (d.c) {
+      const nom = document.createElement("span");
+      nom.textContent = d.c;
+      $("carte").textContent = t.carte;
+      $("carte").append(nom);
+      $("carte").hidden = false;
+    }
 
     function laTouche(id, libelle, cle) {
       if (!cle) return;
@@ -154,8 +167,8 @@
       el.append(k);
       el.hidden = false;
     }
-    laTouche("entree", t.entree, d.e);
-    laTouche("sauvegarde", t.sauvegarde, d.s);
+    laTouche("entree", t.entree, d.e === undefined ? "" : touches[d.e]);
+    laTouche("sauvegarde", t.sauvegarde, d.s === undefined ? "" : touches[d.s]);
 
     function liste(id, lignes) {
       for (const l of lignes) {
@@ -176,7 +189,7 @@
       if (e.length === 2) {
         const v = document.createElement("span");
         v.className = "valeur";
-        v.textContent = e[1];
+        v.textContent = valeurs[e[1]];
         li.append(v);
       }
       $("etapes").append(li);

@@ -322,15 +322,23 @@ suivant ?) n'est pas mesuré (GATES). Ces valeurs sont des leviers du produit : 
 Le QR du guide BIOS ouvre `docs/guide-bios/index.html` (GitHub Pages), le guide dans le fragment de l'adresse, que le
 navigateur n'envoie jamais. N'importe qui peut forger une telle adresse et la poster sous forme de QR.
 
-**La page ne peut pas prouver qu'un QR vient de DrDXT ; elle n'affiche que des phrases fixes et des valeurs de menu bornées,
-sous un avertissement.** Chaque consigne, ligne de secours ou note est un code d'une liste fermée dont les phrases sont dans
-la page (aucune ne parle de tension) ; le nom de la carte, les touches et les valeurs suivent des règles de longueur et de
-caractères, sans adresse ni nombre suivi d'une unité de tension (V, mV, volt, volts, quelle que soit la casse) ; aucune ligne ne dit « vérifié » ; une ligne fixe en tête dit de ne
-suivre que le QR scanné depuis DrDXT. L'App applique les mêmes règles et garde le QR en texte pour un guide qu'elles
-refuseraient (`GuideBiosParLaPageTests`). Il n'y a pas de signature : une clé dans l'App serait publique.
+**La page ne peut pas prouver qu'un QR vient de DrDXT ; elle ne dit que ce qu'elle porte déjà, sous un avertissement.**
+L'adresse (format 2) ne porte que des codes : chaque consigne, ligne de secours ou note, chaque valeur de menu et chaque
+touche est un code d'une liste fermée écrite dans la page. Les valeurs et les touches sont celles que composent les
+modèles de `guides.json`, recopiées mot pour mot (un test les tient égales) ; une valeur ou une touche en clair, ou un
+code inconnu, fait refuser l'adresse entière. La page refuse toute autre version (la 1 n'a jamais été émise). Aucune
+ligne ne dit « vérifié » ; une ligne fixe en tête dit de ne suivre que le QR scanné depuis DrDXT. Il n'y a pas de
+signature : une clé dans l'App serait publique.
 
-Ce qui passe quand même : une valeur numérique sans unité, par exemple « CPU Core Voltage → Override = 1.550 », sous une
-consigne fixe comme « Active ton profil mémoire (XMP/EXPO) ici ».
+Ce qui passe quand même : le nom de la carte, seul champ en clair, parce qu'il vient du matériel. Il est borné
+(120 caractères, lettres, chiffres et `().,&/+_-`, sans adresse ni nombre suivi d'une unité de tension, quelle que soit
+la casse) et la page le dit comme une donnée, « Carte mère détectée par DrDXT : … », jamais comme un titre ni une
+consigne. Une phrase forgée à cette place, « Set CPU Core Voltage 1.650 then save », s'affiche donc comme le nom d'une
+carte.
+
+Les tests exécutent le script de la page lui-même (Node, `PageDuGuide.harnais.mjs`) : une valeur, une touche et une
+carte forgées, une adresse du format 1 (`GuideBiosParLaPageTests`). L'App applique les mêmes listes et garde le QR en
+texte pour un guide que la page refuserait.
 
 ## 7. Identifiants Windows et proxy — limite acceptée
 

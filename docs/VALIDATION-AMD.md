@@ -63,9 +63,9 @@ to the one from the reference tool.
 |---|---|---|---|---|
 | Generation and fTPM | recognises the generation by CPUID; for fTPM-related stutter (AMD article PA-410), calls a BIOS "to check" from its date | not validated on real AMD | `DrDXT-Test.exe` ("Docteur : tous les constats" step) | the generation read, and the exact processor (Ryzen Master) |
 | Named AMD BIOS settings | reads the BIOS settings (including Curve Optimizer and PBO scale) and what differs from factory values | not validated on real AMD | not in the kit yet | to come: the settings read, and the same in the BIOS |
-| Temperature (Tctl and per CCD) | thermal registers, through PawnIO's AMD reading module, read-only | pending: the module is not embedded yet | to come in the kit | Tctl and each CCD within 1 °C of HWiNFO |
-| Hardware cause of restarts | the processor's restart register (S5_RESET_STATUS), read without clearing it | pending the module | to come | the cause read after a clean shutdown, then after a long press on the power button |
-| Applied memory timings | the timings the memory controller really applies, channel by channel | pending the module | to come | each timing, and the same in ZenTimings |
+| Temperature (Tctl and per CCD) | thermal registers, through PawnIO's AMD modules (embedded, read-only) | not validated on real AMD | `DrDXT-Test.exe --lire`, PawnIO installed | the `Tctl` and `CCD` lines within 1 °C of HWiNFO |
+| Hardware cause of restarts | the processor's restart register (S5_RESET_STATUS), read without clearing it | not validated on real AMD | `DrDXT-Test.exe --lire`, PawnIO installed | the `S5 (reset)` line after a clean shutdown, then after a long press on the power button (bit 1) |
+| Applied memory timings | the timings the memory controller really applies, channel by channel | not validated on real AMD | `DrDXT-Test.exe --lire`, PawnIO installed | the raw `Timings channel` registers, and a ZenTimings screenshot of the same session |
 | PPT, TDC, EDC and thermal limits | the processor's power table, in game | pending the module | to come | values and limits, and the same in HWiNFO or Ryzen Master |
 | Corrected hardware errors (MCA) | the errors the processor corrected | pending the module | to come | the errors read, and the same in Event Viewer (WHEA) |
 

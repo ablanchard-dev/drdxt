@@ -324,6 +324,7 @@ ScanViewModel
   ErreurReparation : String
   ErreurReposCarte : String
   ErrorMessage : String
+  EssaiEnAttente : Boolean
   EssaiEnCours : Boolean
   EssaiProposable : Boolean
   EssayerEnAlternanceCommand : IAsyncRelayCommand
@@ -440,6 +441,7 @@ ScanViewModel
   LabelEssaiArreter : String
   LabelEssaiBouton : String
   LabelEssaiExplication : String
+  LabelEssaiReprendre : String
   LabelEtapeDuScan : String
   LabelExclusProteges : String
   LabelExclusTitre : String
@@ -696,6 +698,7 @@ ScanViewModel
   ReposCarteEnAttente : Boolean
   ReposCarteEnCours : Boolean
   ReposCarteVisible : Boolean
+  ReprendreEssaiCommand : IAsyncRelayCommand
   ResultatCadence : String
   ResultatOptimisation : String
   ResultatSousTension : String
