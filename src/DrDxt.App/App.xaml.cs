@@ -348,6 +348,7 @@ public partial class App : System.Windows.Application
             _services!.GetRequiredService<DrDxt.Core.IDesiredStateStore>(),
             new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(DrDxt.Application.Tweaks.JournalDesLeviersAppliques.CheminParDefaut()), id);
         scan.PrendreVerrouReleve = () => DrDxt.Application.Parties.VerrouDuReleve.Prendre(DrDxt.Application.Parties.VerrouDuReleve.CheminParDefaut());
+        scan.PrendreVerrouEssai = () => DrDxt.Application.Parties.VerrouDuReleve.Prendre(DrDxt.Application.Parties.MemoireDeLEssai.CheminDuVerrou());
         // Lue une fois, à la première question : la mesure de la cadence ne nomme la manette qu'à qui en a une.
         // Non lu : on ne sait pas, le texte nomme la manette.
         var manette = new Lazy<bool>(() => DrDxt.Detection.Hardware.PeripheriquesDEntree.Lire() is not { } appareils
@@ -603,6 +604,7 @@ public partial class App : System.Windows.Application
         var scan = services.GetRequiredService<ScanViewModel>();
         scan.MemoireParties = memoire;
         scan.PrendreVerrouReleve = () => DrDxt.Application.Parties.VerrouDuReleve.Prendre(DrDxt.Application.Parties.VerrouDuReleve.CheminParDefaut());
+        scan.PrendreVerrouEssai = () => DrDxt.Application.Parties.VerrouDuReleve.Prendre(DrDxt.Application.Parties.MemoireDeLEssai.CheminDuVerrou());
         // Lue une fois, à la première question : la mesure de la cadence ne nomme la manette qu'à qui en a une.
         // Non lu : on ne sait pas, le texte nomme la manette.
         var manette = new Lazy<bool>(() => DrDxt.Detection.Hardware.PeripheriquesDEntree.Lire() is not { } appareils

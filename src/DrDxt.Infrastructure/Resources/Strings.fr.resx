@@ -2050,6 +2050,12 @@ Aucun réglage de ta machine n'a été modifié par cette erreur.</value>
   <data name="Essai.TonJeu" xml:space="preserve">
     <value>ton jeu</value>
   </data>
+  <data name="Essai.Occupe" xml:space="preserve">
+    <value>L&apos;essai de « {0} » est en train de changer d&apos;état ailleurs (le relevé des parties) : clique « Reprendre l&apos;essai » de nouveau dans quelques secondes.</value>
+  </data>
+  <data name="Essai.FermeLeJeu" xml:space="preserve">
+    <value>Rien ne se pose pendant une partie : ferme {1}, puis clique « Reprendre l&apos;essai » pour « {0} ».</value>
+  </data>
   <data name="Essai.Fini.Mieux" xml:space="preserve">
     <value>Essai de « {0} » terminé : mieux en jeu sur tes parties, il reste posé.</value>
   </data>
