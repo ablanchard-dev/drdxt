@@ -39,11 +39,13 @@ public sealed class LInstalleurProposeLeServiceDeDemarrageTests
         => Regex.Match(Iss(), $@"^Name:\s*""{nom}"".*$", RegexOptions.Multiline) is { Success: true } m ? m.Value : null;
 
     [Fact]
-    public void Le_service_de_demarrage_est_une_case_decochee()
+    public void Le_service_de_demarrage_est_une_case_cochee_que_le_joueur_peut_decocher()
     {
         var tache = LigneDeTache("reconciler");
-        tache.Should().NotBeNull("sans case, le joueur n'a aucun moyen de choisir le service");
-        tache.Should().Contain("unchecked", "un service SYSTEM au demarrage ne s'installe pas par defaut");
+        tache.Should().NotBeNull("sans case, le joueur n'a aucun moyen de refuser le service");
+        tache.Should().NotContain("unchecked",
+            "sans lui, le releve des parties ne lit plus la temperature du processeur : il est coche par defaut")
+            .And.NotContain("fixed", "le joueur doit pouvoir le decocher");
     }
 
     [Fact]
@@ -66,6 +68,17 @@ public sealed class LInstalleurProposeLeServiceDeDemarrageTests
         iss.Should().Contain("start= auto");
         iss.Should().Contain("'delete {#RcService}'",
             "decochee a la mise a jour, la case retire le service d'avant ; et la desinstallation le retire");
+    }
+
+    // Un service qui plante ne reapplique plus rien jusqu'au prochain demarrage du PC : Windows le relance deux fois, une
+    // minute d'ecart, puis le laisse arrete ; le compte repart apres une journee. Un arret voulu ne relance rien.
+    [Fact]
+    public void Le_service_qui_plante_est_relance_deux_fois_puis_laisse_arrete()
+    {
+        var iss = Iss();
+        iss.Should().Contain("'failure {#RcService} reset= 86400 actions= restart/60000/restart/60000'");
+        iss.IndexOf("'failure {#RcService}", StringComparison.Ordinal)
+            .Should().BeLessThan(iss.IndexOf("'start {#RcService}'", StringComparison.Ordinal), "la regle est posee avant le premier demarrage");
     }
 
     [Fact]

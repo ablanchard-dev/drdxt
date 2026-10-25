@@ -26,7 +26,7 @@ serveur les atteint toutes.
 
 - **Ou il etait** : `DrDxt.Server`, qui tenait la base des commandes du paiement (Lemon Squeezy →
   Keygen). DrDXT est devenu gratuit : le webhook de paiement, la base et le paquet SQLite sont
-  partis ensemble. Le serveur ne sert plus que le canal de mise a jour signe.
+  partis ensemble. `server/` n'est pas deploye : la mise a jour passe par GitHub Pages (MISE-A-JOUR.md).
 - **Mesure** : `dotnet list package --vulnerable --include-transitive` sur la solution → aucun
   paquet vulnerable dans les projets de production (23/09/2026).
 - **Ce qui reste** : la garde `No_server_sql_text_is_built_from_anything_but_a_literal` continue
@@ -79,13 +79,16 @@ empeche, et voici le test qui le prouve.*
 | L'etat desire du reconciliateur | un fichier **altere** sur le disque | signature verifiee, chargement **fail-closed** | → test: `SignedDesiredStateStoreTests` |
 | Le rapport SAV | ce que le client **colle** dans un ticket public | profil, nom du PC, adresses, numéros de série et courriels retirés | → test: `ExportDeMachineTests`, `CartesAgirTests` |
 | L'installeur | livrer un binaire non signe **en le croyant signe** | sans `-Sign`, l'installeur s'appelle `DrDXT-Setup-NON-SIGNE.exe` ; `-Sign` sans certificat echoue tout de suite, sans repli sur du non signe ; une signature posee est relue avant d'etre annoncee. Un installeur non signe sort aujourd'hui (le certificat n'est pas achete) : son nom le dit | → test: `TheInstallerCannotShipUnsignedGateTests` |
+| Le dossier d'installation pendant la copie | un programme **non eleve** du compte qui installe **remplace** l'hote du service, PresentMonService, le helper ou le lanceur pendant l'extraction : les fichiers poses lui appartiennent, et CREATEUR PROPRIETAIRE de Program Files lui en donnait le controle total | le dossier se **verrouille avant la copie** (`PrepareToInstall`) : proprietaire Administrateurs, regles explicites retirees, DACL protegee heritable (SYSTEM et Administrateurs en controle total, Utilisateurs et DROITS DU PROPRIETAIRE en lecture) ; relue en liste blanche (aucune ecriture hors SYSTEM et Administrateurs) ; un echec n'installe rien. Apres la copie, verrou relu, puis l'empreinte SHA-256 de compilation de chaque executable lance en SYSTEM ou eleve (et de sa DLL) relue avant `sc start` et `schtasks` | → test: `LeDossierEstVerrouilleAvantLaCopieTests` (le script, lu comme du texte) ; gate `tools/gates/installeur.py` (le script compile, avec des fichiers témoins : il ne vérifie ni la charge, ni les empreintes, ni le Pascal exécuté) ; `installer/build-installer.ps1` refuse un binaire qui porte le chemin du développeur et un PresentMon dont l'empreinte ou la signature Intel ne correspondent pas. Le passage réel, installeur reconstruit puis installé, reste un geste sur une vraie machine |
 | L'installeur stage | il est **remplace** entre l'empreinte et le clic, dans un dossier ecrivable par l'utilisateur, puis lance **sous UAC** | le binaire est **verrouille** (partage lecture seule) de l'empreinte jusqu'apres le lancement | → test: `VerificationMiseAJourTests` |
-| Le tube nomme privilegie, cote App | un processus du meme compte qui **prend le nom du tube** avant le helper et repond « applique » | l'App compare l'image du serveur au helper pose a cote d'elle, avant le handshake (garde du 11/09/2026) | → test: `TubeUsurpeTests` |
+| Le tube nomme privilegie, cote App | un processus du meme compte qui **prend le nom du tube** avant le helper et repond « applique » | avant le handshake, l'App compare l'image du serveur au helper pose a cote d'elle, puis exige ses droits : le tube appartient aux Administrateurs ou a SYSTEM (le helper eleve se le donne ; un squatteur non eleve ne peut pas, Administrateurs est « deny-only » dans son jeton filtre) et le jeton du serveur, s'il se lit, est eleve. L'image seule laissait passer le vrai helper relance non eleve par un programme du compte. La traversee reelle (App moyenne, helper eleve) se mesure avec `tools/helperhandshake` | → test: `TubeUsurpeTests`, `PrivilegeDuServeurDuTubeTests` |
 | Le tube, cote App installee | un programme du compte qui pose `DRDXT_HELPER_SESSION_KEY` dans `HKCU\Environment` pour que l'App prenne le client legacy, qui ne verifie pas le serveur | installee sous Program Files, l'App ignore cette cle et passe toujours par la poignee de main (26/09/2026) ; le branchement n'est pas testable hors installation, seule la regle l'est | → test: `ElevatedClientFactoryTests` |
 | La disponibilite du helper | un programme du compte qui se **connecte au tube et se tait** (une seule instance) : plus rien a appliquer, plus rien a defaire | 10 s pour parler (poignee de main et requete) ; la connexion muette expire sans arreter le service (26/09/2026) | → test: `HandshakeChannelIntegrationTests` |
 | Les baux actifs | un arret du helper (normal, ou provoque par un squatteur du tube) qui laisserait un plafond pose jusqu'au redemarrage | a l'arret, tout bail actif est rendu par le meme chemin que l'expiration (26/09/2026) | → test: `LeaseWatchdogTests` |
 | Le tube nomme privilegie, depuis le reseau | une **session reseau** (SMB, meme compte ou administrateur) qui passe l'ACL : .NET ne pose pas `PIPE_REJECT_REMOTE_CLIENTS` (source de `NamedPipeServerStream.Windows.cs`, dotnet/runtime) | refus explicite du SID NETWORK dans l'ACL, evalue avant les autorisations ; la connexion locale reste permise, mesure ; le refus d'un vrai client distant n'est pas mesure faute d'une deuxieme machine (26/09/2026) | → test: `LeTubeDuHelperRefuseLeReseauTests` |
 | Le mode du helper installe | `DRDXT_HELPER_SESSION_KEY` posee dans `HKCU\Environment` pour le faire passer en mode legacy, que l'App ne parle plus | installe, le helper ignore cette variable ; regle commune `EstInstalle` (26/09/2026) | → test: `HelperAuthenticatorFactoryTests` |
+| Les donnees que SYSTEM croit (`ProgramData\DrDxt`) | un programme du compte qui **cree le dossier d'avance** (ProgramData laisse les comptes y creer) et y pose une jonction (`temoins` vers System32) ou un fichier piege (`pause-du-maintien`, journal) | l'installeur le cree et le durcit **avant la copie** : racine refusee si c'est une jonction, proprietaire Administrateurs, DACL de `TrustedManifestRoot.BuildHardenedSecurity` ; un enfant jonction perd son lien sans le suivre, un enfant ordinaire perd les regles posees par le compte et herite de la racine, sauf la cle privee, **sans changer de proprietaire** : pose par le compte, il reste hors confiance et ses lecteurs (`EnsureTrustedFile`) l'ignorent ; resultat relu. Limite acceptee : un fichier pose par le compte avec une DACL qui refuse les Administrateurs ne se laisse pas reinitialiser, la relecture le voit et l'installation est refusee (`DonneesImpossibles`) : un refus d'installer, pas une elevation. La desinstallation ne vide plus `temoins` a l'aveugle (`SupprimerLesTemoins`) | → test: `LesDonneesSontVerrouilleesAvantToutTests` |
+| Le dossier temporaire des processus eleves | un programme du compte qui prepare, dans `%LOCALAPPDATA%\Temp`, un fichier ou une jonction qu'un fils eleve (dism, PowerShell du helper, logman et `.etl` de l'App elevee) ouvrirait | le lanceur donne aux processus eleves `TEMP`/`TMP` = `Windows\SystemTemp` (SYSTEM et Administrateurs seuls) s'il est sur, sinon `ProgramData\DrDxt\temp` cree sous un `ProgramData\DrDxt` sur, sinon `Windows\Temp` ; jamais le dossier du compte. Sur : ni jonction ni lien jusqu'a la racine, proprietaire et seuls ecrivains SYSTEM, Administrateurs ou TrustedInstaller | → test: `DossierTemporaireEleveTests` |
 | Les programmes lances par le helper | un executable du meme nom pose dans le dossier courant, lance **eleve** si le helper l'appelait par son nom seul | tout lancement passe par un chemin absolu vers System32 ; une garde refuse un nom seul | → test: `AucunExecutableLanceParSonNomNuTests` |
 | Le helper installe | un programme du compte qui le **lance lui-meme** avec `--app-path` vers son propre executable, sous une UAC au nom de DrDXT | installe sous Program Files, le helper ne croit que les executables de son propre dossier (26/09/2026) | → test: `HelperAuthenticatorFactoryTests` |
 | Le rejeu au demarrage | un `pending-revert.json` **piege** (dossier du compte) qui range une ecriture GPU sous un levier de registre | chaque levier ne rejoue que les types d'op qu'il ecrit lui-meme (26/09/2026) | → test: `RevertPiegeAuDemarrageTests` |
@@ -162,8 +165,7 @@ variables (13 variables, PATH = Windows seul).
 Aussi corrigé : `StartupHookSupport=false` sur le service ; le téléchargement d'une mise à jour est borné à 400 Mo.
 
 Limites redites par cette revue, acceptées :
-- Ce qu'un programme du compte obtient à travers l'allowlist, sans exécution de code : fichier d'échange vide
-  (plantages jusqu'à remise à la main), redémarrage dans le BIOS, options BCD, plafond d'envoi. Réversible, borné.
+- Ce qu'un programme du compte obtient à travers l'allowlist, sans exécution de code : redémarrage dans le BIOS, options BCD, plafond d'envoi. Réversible, borné.
 - Le helper ne doit jamais être diffusé hors installeur : hors Program Files, il fait confiance à l'image passée en
   `--app-path`, et le compte peut le remplacer avant l'élévation. Seul l'installeur est publié.
 
@@ -218,7 +220,8 @@ Corrigé — **la tâche planifiée « DrDXT releve »** (limite R-H, puis H-1 d
 élevé (`/RL HIGHEST`, pour lire la température du processeur par PawnIO) : l'App élevée écrivait alors dans
 `%LOCALAPPDATA%\DrDXT`, où un programme sans droits du même compte peut poser une jonction, et chaque ouverture de session
 devenait une création, un écrasement ou une suppression de fichier en administrateur ; elle faisait aussi avancer l'essai en
-alternance sans invite. La tâche tourne désormais sans droits (`/RL LIMITED`), lance l'App directement (le lanceur, non
+alternance sans invite. La tâche tourne désormais sans droits, pour le compte qui ouvre sa session (principal du groupe Utilisateurs en
+LeastPrivilege, quel que soit le compte qui a validé l'UAC à l'installation), lance l'App directement (le lanceur, non
 élevé, demanderait l'élévation), ne lance jamais le helper (`CreateSansLancer`) et ne pose ni ne rend aucun levier. Une mise
 à jour remplace la tâche d'une installation précédente (`/Create /F`). Ce qu'elle perd : sans le service DrDXT, une partie
 jouée DrDXT fermé n'a ni température ni état du processeur, et le repli `logman` du compteur d'images (une session ETW,
@@ -280,6 +283,15 @@ reparse lue sans suivre le lien ; l'étiquette de fichiers cloud de OneDrive, re
 admise), et crée le fichier sans jamais ouvrir un nom qui existe déjà ; un nom déjà pris est dit, rien n'est supprimé.
 L'étiquette est lue sur des handles ouverts sans partage de suppression, tenus jusqu'à la fin de la création : entre le
 contrôle et l'écriture, aucun de ces dossiers ne peut être renommé ni remplacé par une jonction (`EcritureDansDocumentsTests`).
+Deux couches de plus ferment ce que le dossier tenu ne voit pas : un parent du dossier des données, et un sous-dossier créé
+après le contrôle (le `staging` d'une mise à jour téléchargée plus tard). Chaque processus élevé de DrDXT (l'App élevée, le
+helper et sa désinstallation, le service SYSTEM) pose au démarrage la protection RedirectionGuard de Windows
+(`ConfianceDesRedirections`, `SetProcessMitigationPolicy`, EnforceRedirectionTrust) : il ne suit plus une jonction ni un lien
+créé par un compte non administrateur ; Windows 10 22H2 et 11 seulement, sinon c'est dit au journal. Et partout, élevé, aucune
+écriture, aucun ajout, aucune mise de côté par `FichierJsonAtomique`, ni la purge du staging, ses écritures, la garde du BCD,
+la copie des données signées ou le retrait du journal d'essai, ne traversent un point d'analyse, du dossier racine au fichier
+(`FichierJsonAtomiqueTests`, sur une vraie jonction ; sans élévation, une jonction du compte reste suivie). Résidu : un
+composant créé entre ce contrôle et l'écriture, que RedirectionGuard seul ferme.
 
 Corrigé, résidu dit — **le plafond d'envoi retenu pour le service SYSTEM** (M-5, point 2, du second audit). Retenu, il est
 posé par le service à chaque session, sans DrDXT ouvert et sans invite, dès que l'exe nommé tourne. Le helper n'exigeait
@@ -405,3 +417,12 @@ Si le pilote AMD la garde après un redémarrage, elle reste posée après la d�
 le logiciel AMD. Le comportement réel au redémarrage n'a pas été mesuré, faute de carte AMD. Un essai en alternance ne
 la pose jamais : une origine ni rendable ni remise à l'automatique par la désinstallation est rendue aussitôt
 (`Un_levier_que_la_desinstallation_ne_rendrait_pas_n_est_jamais_essaye`).
+
+## 11. Baux liés au processus de l'App — limite acceptée
+
+Un bail (ventilateur Expert, décalage de la carte, plafond d'envoi) appartient au processus qui l'a établi : son pid,
+résolu par le tube, après l'authentification de l'App (`LeaseOwner`). Seul ce processus le renouvelle ou le clôt. Un
+programme du compte qui s'injecte dans l'App le peut donc aussi, comme il peut tout ce que l'App peut : c'est le modèle
+d'injection accepté de la section 3, que seuls l'allowlist et les rails de l'exécuteur bornent. Un pid réutilisé après la
+mort de l'App ne suffit pas : le nouveau processus doit d'abord passer l'authentification de l'App (image et empreinte),
+et le bail orphelin expire entre-temps, rendu par le chien de garde (`LeaseWatchdogTests`).

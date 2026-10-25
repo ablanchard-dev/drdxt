@@ -66,7 +66,8 @@ public static class CorruptionDuMagasin
         var journal = Path.Combine(windows, "Logs", "CBS", "CBS.log");
         if (!File.Exists(journal)) return Geste.Reparer;
         using var flux = new FileStream(journal, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        // 8 Mo de fin suffisent à une session de réparation (1 512 lignes sur la machine de référence) ; plus si une session dépasse.
+        // 8 Mo de fin suffisent à une session de réparation (1 512 lignes sur la machine de référence). Une session plus
+        // longue se lit incomplète (Complete = faux) : la réparation reste proposée, jamais la réinstallation.
         flux.Seek(Math.Max(0, flux.Length - 8 * 1024 * 1024), SeekOrigin.Begin);
         using var lecteur = new StreamReader(flux);
         var lignes = lecteur.ReadToEnd().Split('\n');

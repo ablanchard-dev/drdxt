@@ -6,7 +6,7 @@ namespace DrDxt.Application.Tweaks;
 /// <summary>
 /// Ce que DrDXT a applique et garde, cote utilisateur (sans elevation).
 ///
-/// Le manifeste signe ne porte que les quatre leviers que le service reapplique au demarrage. Les
+/// Le manifeste signe ne porte que les leviers que le service reapplique au demarrage. Les
 /// autres (Game DVR, Game Mode, VRR dans la ruche de l'utilisateur, leviers pilote) ne seraient
 /// notes nulle part, et `GainsDisparus` ne pourrait pas etre appele faute de snapshots. Ce
 /// journal les garde, un par levier (le plus recent l'emporte), pour que le scan suivant
@@ -16,7 +16,15 @@ public sealed class JournalDesLeviersAppliques
 {
     private readonly string _chemin;
 
-    public JournalDesLeviersAppliques(string chemin) => _chemin = chemin;
+    private readonly TimeSpan _attente;
+
+    /// <param name="attente">Combien attendre le verrou d'un autre processus avant de renoncer à écrire ; 5 s par défaut.</param>
+    public JournalDesLeviersAppliques(string chemin, TimeSpan? attente = null)
+        => (_chemin, _attente) = (chemin, attente ?? TimeSpan.FromSeconds(5));
+
+    // Enregistrer et Retirer lisent, modifient et réécrivent : deux processus du compte (l'App, le banc, l'outil) en même temps
+    // effaçaient la mise à jour de l'autre. Le verrou voisin est celui des autres journaux du compte.
+    private IDisposable? Verrou() => Parties.VerrouDuReleve.Attendre(_chemin + ".verrou", _attente);
 
     public static string CheminParDefaut() => DrDxt.Core.DossierDonnees.Chemin("leviers-appliques.json");
 
@@ -29,7 +37,7 @@ public sealed class JournalDesLeviersAppliques
         {
             return File.Exists(_chemin)
                 ? (JsonSerializer.Deserialize<List<TweakSnapshot>>(File.ReadAllText(_chemin)) ?? [])
-                    .Where(s => s is not null && DrDxt.Application.Autopilot.RevertAuDemarrage.AnnulationSure(s.TweakId, s.OriginalValueJson))
+                    .Where(s => s is { TweakId.Length: > 0 } && DrDxt.Application.Autopilot.RevertAuDemarrage.AnnulationSure(s.TweakId, s.OriginalValueJson))
                     .ToList()
                 : [];
         }
@@ -49,6 +57,8 @@ public sealed class JournalDesLeviersAppliques
     {
         try
         {
+            using var verrou = Verrou();
+            if (verrou is null) return false;
             // Un fichier illisible (coupure, ou fichier ecrit par un autre programme du compte) n'est ni pris pour vide ni garde
             // tel quel : le journal s'arretait alors en silence pour toujours. Il est mis de cote (sa trace reste, le scan l'a
             // dit) et le journal repart des leviers du jour. Mise de cote ratee : rien n'est ecrit.
@@ -60,10 +70,18 @@ public sealed class JournalDesLeviersAppliques
                 if (existants is null && !new FichierJsonAtomique(_chemin, "LEVIERS_APPLIQUES").MettreDeCote()) return false;
                 existants ??= [];
             }
-            var parId = existants.ToDictionary(s => s.TweakId);
+            // Une entrée vide ou un levier en double (écrits hors de DrDXT) ne bloquent plus chaque enregistrement.
+            var parId = existants.OfType<TweakSnapshot>().Where(s => s.TweakId is { Length: > 0 })
+                .GroupBy(s => s.TweakId).ToDictionary(g => g.Key, g => g.Last());
+            // Reposé sans avoir été rendu (un rendu retire l'entrée), le levier relit ce qu'il trouve. Encore la pose de DrDXT :
+            // l'origine du joueur est celle de la première pose, comme à la désinstallation. Une autre valeur : le joueur a
+            // repris la main entre-temps, l'origine est la sienne, la nouvelle. Pose d'avant inconnue : la première reste.
             foreach (var o in rapport.Outcomes)
                 if (o.Applied && !o.AutoReverted && o.Snapshot is { } s)
-                    parId[s.TweakId] = s;
+                    parId[s.TweakId] = parId.TryGetValue(s.TweakId, out var deja)
+                        && (deja.AppliedValueJson is not { Length: > 0 } posee || string.Equals(posee, s.OriginalValueJson, StringComparison.Ordinal))
+                        ? s with { OriginalValueJson = deja.OriginalValueJson }
+                        : s;
             Directory.CreateDirectory(Path.GetDirectoryName(_chemin)!);
             return Ecrire(parId.Values.ToList());
         }
@@ -78,6 +96,8 @@ public sealed class JournalDesLeviersAppliques
     {
         try
         {
+            using var verrou = Verrou();
+            if (verrou is null) return false;
             if (!File.Exists(_chemin)) return true;
             var existants = JsonSerializer.Deserialize<List<TweakSnapshot>>(File.ReadAllText(_chemin));
             if (existants is null) return false;
@@ -107,6 +127,12 @@ public sealed class JournalDesLeviersAppliques
             revenus > 0 ? RepairStatus.Suspicious : nonRelus > 0 ? RepairStatus.Unknown : RepairStatus.Observed,
             Docteur.T("JL.BilanExplication", avant, build));
     }
+
+    /// <summary>Des leviers encore dans la liste signée sans être dans ce journal (nommés par leur titre) : le service pourrait
+    /// les reposer, et l'écran ne les montrait pas.</summary>
+    public static RepairFinding ConstatDesOrphelins(IReadOnlyList<string> titres)
+        => new("PERSISTANCE", "manifeste", Docteur.T("JL.Orphelins", string.Join(", ", titres)), null,
+            RepairStatus.Suspicious, Docteur.T("JL.OrphelinsExplication"));
 
     /// <summary>Le scan : chaque gain revenu a la valeur d'avant devient un constat. Ni NonLu ni
     /// NonRelisable ne comptent (GainsDisparus les ecarte).

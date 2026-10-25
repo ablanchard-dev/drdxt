@@ -210,15 +210,15 @@ public sealed class RevertRestoresStateTests
     public async Task After_apply_then_revert_state_is_identical_on_the_amd_adlx_path()
     {
         // La porte « le retour arrière rend l'état », sur le chemin AMD. Avec NVAPI absent
-        // et ADLX présent, gpu.undervolt / gpu.power_limit résolvent la carte dédiée réglable
-        // et écrivent par ApplyAdlxTuningOp ; la régression simulée fait annuler le moteur en
+        // et ADLX présent, gpu.undervolt résout la carte dédiée réglable et écrit par ApplyAdlxTuningOp
+        // (la limite de puissance n'est pas écrite sur AMD) ; la régression simulée fait annuler le moteur en
         // rejouant les ops ADLX inverses capturées depuis les origines.
         var state = NewAmdBaseline();
         var (engine, _, _, client) = BuildReal(state, new RegressionBenchmark());
 
         var before = state.Snapshot();
 
-        var plan = new TweakPlan(new[] { "gpu.undervolt", "gpu.power_limit" });
+        var plan = new TweakPlan(new[] { "gpu.undervolt" });
 
         var result = await engine.ApplyAsync(plan, Baseline, Pid, default);
 
@@ -232,7 +232,7 @@ public sealed class RevertRestoresStateTests
         client.Writes.Should().Contain(op => op is ApplyAdlxTuningOp);
         client.Writes.Should().NotContain(op => op is ApplyNvApiClockOffsetOp);
 
-        // La porte : retour à l'origine identique à l'octet près, undervolt et limite de puissance ADLX rendus.
+        // La porte : retour à l'origine identique à l'octet près, undervolt ADLX rendu.
         state.Snapshot().Should().Be(before);
     }
 

@@ -29,15 +29,44 @@ public static class TemperatureHwinfo
     /// <summary>Lit HWiNFO s'il publie. Toute panne (absent, droits, disposition inattendue) : <c>null</c>.</summary>
     public static Lecture? Lire()
     {
-        try
-        {
-            using var mmf = MemoryMappedFile.OpenExisting(NomMemoire, MemoryMappedFileRights.Read);
-            using var vue = mmf.CreateViewStream(0, 0, MemoryMappedFileAccess.Read);
-            var octets = new byte[vue.Length];
-            vue.ReadExactly(octets);
-            return Analyser(octets, DateTimeOffset.UtcNow);
-        }
+        var maintenant = DateTimeOffset.UtcNow;
+        try { return BlocPublie(maintenant) is { } octets ? Analyser(octets, maintenant) : null; }
         catch (Exception) { return null; }
+    }
+
+    /// <summary>HWiNFO absent, chaque ouverture de sa mémoire lève une exception, et le relevé la demande une à deux fois
+    /// par seconde en partie : absente, elle n'est rouverte qu'après cette pause. HWiNFO lancé en cours de session est vu au plus tard après elle.</summary>
+    public static readonly TimeSpan PauseSiAbsent = TimeSpan.FromSeconds(10);
+
+    private static DateTimeOffset _absentJusqua = DateTimeOffset.MinValue;
+    private static readonly object Verrou = new();
+
+    private static byte[]? BlocPublie(DateTimeOffset maintenant)
+    {
+        lock (Verrou) return Bloc(OuvrirLeBloc, maintenant, ref _absentJusqua);
+    }
+
+    /// <summary>La mémoire est publiée par un autre processus : au-delà, elle n'est pas copiée. Une publication de HWiNFO tient
+    /// en quelques centaines de Ko.</summary>
+    internal const long OctetsMax = 16L * 1024 * 1024;
+
+    private static byte[] OuvrirLeBloc()
+    {
+        using var mmf = MemoryMappedFile.OpenExisting(NomMemoire, MemoryMappedFileRights.Read);
+        using var vue = mmf.CreateViewStream(0, 0, MemoryMappedFileAccess.Read);
+        if (vue.Length > OctetsMax) throw new InvalidDataException($"HWiNFO shared memory larger than {OctetsMax} bytes.");
+        var octets = new byte[vue.Length];
+        vue.ReadExactly(octets);
+        return octets;
+    }
+
+    /// <summary>Pur, sauf l'ouverture : le bloc publié, ou null pendant la pause qui suit une mémoire absente.</summary>
+    internal static byte[]? Bloc(Func<byte[]> ouvrir, DateTimeOffset maintenant, ref DateTimeOffset absentJusqua)
+    {
+        if (maintenant < absentJusqua) return null;
+        try { return ouvrir(); }
+        catch (FileNotFoundException) { absentJusqua = maintenant + PauseSiAbsent; return null; }
+        catch (InvalidDataException) { return null; }
     }
 
     /// <summary>Au-delà, la dernière publication de HWiNFO est trop vieille : HWiNFO figé ou en pause, la valeur ne dit
@@ -75,14 +104,8 @@ public static class TemperatureHwinfo
     /// ou null. Toute panne : null.</summary>
     public static IReadOnlyList<DrDxt.Core.VentilateurLu>? LireVentilateurs()
     {
-        try
-        {
-            using var mmf = MemoryMappedFile.OpenExisting(NomMemoire, MemoryMappedFileRights.Read);
-            using var vue = mmf.CreateViewStream(0, 0, MemoryMappedFileAccess.Read);
-            var octets = new byte[vue.Length];
-            vue.ReadExactly(octets);
-            return AnalyserVentilateurs(octets, DateTimeOffset.UtcNow);
-        }
+        var maintenant = DateTimeOffset.UtcNow;
+        try { return BlocPublie(maintenant) is { } octets ? AnalyserVentilateurs(octets, maintenant) : null; }
         catch (Exception) { return null; }
     }
 

@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// Le titre français disait « DirectX 9 a 11 » : il manquait l'accent du « à ».
+// Le titre français porte l'accent du « à » : « DirectX 9 à 11 ».
 public class TitreUltraLowLatencyTests
 {
     [Fact]

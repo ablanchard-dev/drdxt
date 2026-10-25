@@ -77,9 +77,12 @@ public sealed class LeManifesteSigneSeVerifieALaLectureTests
         (await store.CommitAsync(TwoTweaks())).IsOk.Should().BeTrue();
 
         var original = storage.Slot!;
-        var chars = original.CanonicalJson.ToCharArray();
-        chars[chars.Length / 2] = chars[chars.Length / 2] == 'x' ? 'y' : 'x';
-        storage.Slot = original with { CanonicalJson = new string(chars) };
+        // Une date changée garde un JSON valide : seule la signature peut refuser. Un caractère au hasard cassait le JSON,
+        // et le refus pouvait venir de la lecture sans que la signature soit vérifiée.
+        var altere = original.CanonicalJson.Replace("2026", "2027", StringComparison.Ordinal);
+        altere.Should().NotBe(original.CanonicalJson);
+        System.Text.Json.JsonDocument.Parse(altere).Dispose();
+        storage.Slot = original with { CanonicalJson = altere };
 
         var decision = await store.LoadAsync();
 

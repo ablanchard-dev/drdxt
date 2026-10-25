@@ -49,8 +49,17 @@ public static class MisesAJourEnEchec
     /// après, est rattrapée.</summary>
     public static readonly TimeSpan MargeDeDepot = TimeSpan.FromMinutes(10);
 
+    /// <summary>Le titre sans ce qui change d'une version à la suivante. Une mise à jour mensuelle (« 2026-09 … (KB…) »)
+    /// est remplacée par celle du mois suivant, qui ne porte ni le même mois ni le même KB : sans les deux, l'installation
+    /// d'octobre rattrape l'échec de septembre, que Windows ne proposera plus.</summary>
     internal static string SansVersion(string titre)
-        => System.Text.RegularExpressions.Regex.Replace(titre, @"\b(?:version\s*|v)?\d+(?:\.\d+){1,3}\b", "#");
+    {
+        var t = System.Text.RegularExpressions.Regex.Replace(titre, @"\b(?:version\s*|v)?\d+(?:\.\d+){1,3}\b", "#");
+        var mensuelle = System.Text.RegularExpressions.Regex.Match(t, @"^\d{4}-\d{2}\s");
+        return mensuelle.Success
+            ? System.Text.RegularExpressions.Regex.Replace("#" + t[(mensuelle.Length - 1)..], @"\(KB\d+\)", "(KB#)")
+            : t;
+    }
 
     /// <summary>Le nom de paquet d'un titre du Store (« 9PLM9XGG6VKS-Editeur.AppliX » ⇒ « Editeur.AppliX »), sinon <c>null</c>.</summary>
     internal static string? NomDePaquet(string titre)
@@ -142,7 +151,7 @@ public static class PaquetsInstalles
             foreach (var nom in cle.GetSubKeyNames().Where(n => n.StartsWith(nomDePaquet + "_", StringComparison.OrdinalIgnoreCase)))
             {
                 using var p = cle.OpenSubKey(nom);
-                if (p?.GetValue("PackageRootFolder") is string dossier && Directory.Exists(dossier))
+                if (p?.GetValue("PackageRootFolder") is string dossier && CheminsLocaux.EstLocal(dossier) && Directory.Exists(dossier))
                 {
                     var d = new DateTimeOffset(Directory.GetCreationTimeUtc(dossier), TimeSpan.Zero);
                     if (plusRecent is null || d > plusRecent) plusRecent = d;

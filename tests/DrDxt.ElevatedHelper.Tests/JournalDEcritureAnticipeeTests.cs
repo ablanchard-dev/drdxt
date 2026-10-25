@@ -98,8 +98,9 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
             .IsOk.Should().BeTrue();
         var j = new JournalDEcritureAnticipee(Fichier);
 
-        j.EnAttente().IsOk.Should().BeFalse();
-        j.Ajouter(Hags, "1", App, Le).IsOk.Should().BeFalse();
+        j.EnAttente().Error!.Value.Code.Should().Be(JournalDEcritureAnticipee.CodeIllisible);
+        j.Ajouter(Hags, "1", App, Le).Error!.Value.Code.Should().Be(JournalDEcritureAnticipee.CodeIllisible,
+            "pas un refus passager : le joueur ne lit pas « réessaie dans un instant »");
         File.ReadAllText(Fichier).Should().Be("{ pas du json");
     }
 
@@ -244,4 +245,38 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
     [Fact]
     public void La_borne_par_defaut_est_512()
         => JournalDEcritureAnticipee.MaxParAppelantParDefaut.Should().Be(512);
+
+    // ── le journal du compte : les valeurs de la session (HKCU), que l'App écrit elle-même ──────────────────────────────
+
+    private static readonly SetRegistryValueOp ModeJeu =
+        new(RegistryHiveKind.CurrentUser, @"Software\Microsoft\GameBar", "AutoGameModeEnabled", RegistryValueType.DWord, "1");
+
+    [Fact]
+    public void Le_journal_du_compte_garde_une_valeur_de_la_session_jusqu_a_son_acquit()
+    {
+        JournalDEcritureAnticipee.DuCompte(Fichier).Ajouter(ModeJeu, "0", App, Le).IsOk.Should().BeTrue();
+
+        // Le fichier appartient au compte, pas aux Administrateurs : le journal du compte le lit quand même.
+        var relu = JournalDEcritureAnticipee.DuCompte(Fichier).EnAttente();
+        relu.Value.Should().ContainSingle().Which.ImageAvant.Should().Be("0");
+
+        JournalDEcritureAnticipee.DuCompte(Fichier).Acquitter(ModeJeu, App).IsOk.Should().BeTrue();
+        JournalDEcritureAnticipee.DuCompte(Fichier).EnAttente().Value.Should().BeEmpty();
+    }
+
+    // Le compte peut réécrire son journal : une op hors de sa session n'y entre pas, et une op forgée n'en sort jamais pour
+    // être rendue (elle partirait au helper).
+    [Fact]
+    public void Le_journal_du_compte_ne_porte_que_la_session()
+    {
+        var compte = JournalDEcritureAnticipee.DuCompte(Fichier);
+        compte.Ajouter(Hags, "1", App, Le).IsOk.Should().BeFalse();
+
+        new JournalDEcritureAnticipee(Path.Combine(_cible, "admin.json")).Ajouter(Hags, "1", App, Le).IsOk.Should().BeTrue();
+        Directory.CreateDirectory(_dossier);
+        File.Copy(Path.Combine(_cible, "admin.json"), Fichier, overwrite: true);
+        compte.Ajouter(ModeJeu, "0", App, Le).IsOk.Should().BeTrue();
+
+        compte.EnAttente().Value!.Select(e => e.Op).Should().Equal(ModeJeu);
+    }
 }

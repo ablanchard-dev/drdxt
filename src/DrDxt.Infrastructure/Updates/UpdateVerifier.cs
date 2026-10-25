@@ -7,7 +7,7 @@ namespace DrDxt.Infrastructure.Updates;
 
 // -----------------------------------------------------------------------
 // La barrière de confiance des mises à jour. Vérifie la signature Ed25519 sur le manifeste
-// canonique avec la clé publique de mise à jour embarquée et dédiée (UpdateDevKeys.UpdatePublicKey),
+// canonique avec la clé publique reçue (en production, celle d'UpdateTrust, qui refuse la clé de dev),
 // puis, et seulement alors, l'empreinte de la charge.
 //
 // La règle cardinale : échec propre, jamais fail-open. Toute incertitude (clé embarquée corrompue,
@@ -32,8 +32,7 @@ public sealed class UpdateVerifier : IUpdateVerifier
 
     /// <summary>Construit un vérificateur à partir d'une clé publique Ed25519 brute de 32 octets.
     /// Échec propre : une clé corrompue ou de mauvaise longueur rend Fail(UPDATE_SIG_INVALID) au lieu
-    /// de lever, pour qu'un futur mauvais échange de clé ne fasse jamais planter la barrière (comme
-    /// Ed25519LicenseVerifier.Create).</summary>
+    /// de lever, pour qu'un futur mauvais échange de clé ne fasse jamais planter la barrière.</summary>
     public static Result<IUpdateVerifier> Create(ReadOnlySpan<byte> publicKey)
     {
         try
@@ -50,6 +49,8 @@ public sealed class UpdateVerifier : IUpdateVerifier
         }
     }
 
+    private const int SignatureEnBase64Max = 128;
+
     public Result VerifyManifest(UpdateManifest manifest)
     {
         if (manifest is null)
@@ -63,6 +64,10 @@ public sealed class UpdateVerifier : IUpdateVerifier
             if (string.IsNullOrEmpty(manifest.Signature))
                 return Result.Fail(
                     UpdateErrorCodes.SignatureInvalid, "Update manifest signature is absent.");
+            // 64 octets font 88 caractères en base64 : une signature plus longue n'est pas décodée.
+            if (manifest.Signature.Length > SignatureEnBase64Max)
+                return Result.Fail(
+                    UpdateErrorCodes.SignatureInvalid, "Update manifest signature is malformed.");
             signature = Convert.FromBase64String(manifest.Signature);
         }
         catch (FormatException)
@@ -122,7 +127,7 @@ public sealed class UpdateVerifier : IUpdateVerifier
 
         var expected = (manifest.Sha256 ?? string.Empty).Trim().ToLowerInvariant();
         // Comparaison ordinale, longueur vérifiée, casse normalisée. (Ce sont des empreintes hexadécimales
-        // publiques, pas un secret : pas d'exigence de temps constant, comme SpkiPinValidator.)
+        // publiques, pas un secret : pas d'exigence de temps constant.)
         if (expected.Length == 0 || !string.Equals(actual, expected, StringComparison.Ordinal))
             return Result.Fail(
                 UpdateErrorCodes.HashMismatch,
@@ -133,12 +138,11 @@ public sealed class UpdateVerifier : IUpdateVerifier
 
     // -------------------------------------------------------------------
     // Comparaison de versions : vrai si et seulement si `candidate` est strictement plus ancienne que
-    // `installed`. Comparaison numérique par points (1.2.10 > 1.2.9). Tout composant illisible vaut 0,
+    // `installed`. Comparaison numérique par points du cœur (1.2.10 > 1.2.9), puis, à cœur égal, une préversion avant
+    // sa version stable ; la métadonnée de build ne compte pas. Tout composant illisible vaut 0,
     // pour qu'une version malformée ne passe jamais en silence pour « plus récente » ; une version
     // égale n'est pas une rétrogradation (reproposer la même version est sans effet en amont, pas un
-    // retour en arrière). Échec propre : une panne d'analyse est avalée et traitée comme « pas une
-    // rétrogradation » seulement si les deux s'analysent proprement ; un chemin qui lève rend false
-    // (la barrière empreinte / signature tient toujours).
+    // retour en arrière). L'analyse ne lève pas (int.TryParse, null toléré).
     // -------------------------------------------------------------------
     internal static bool IsDowngrade(string candidate, string installed)
     {
@@ -152,14 +156,25 @@ public sealed class UpdateVerifier : IUpdateVerifier
             if (ai < bi) return true;   // strictement plus ancienne → rétrogradation
             if (ai > bi) return false;  // strictement plus récente → pas une rétrogradation
         }
-        return false; // égale → pas une rétrogradation
+        // Cœur égal : une préversion (« -rc.1 ») vient avant sa version stable, jamais après.
+        return EstUnePreversion(candidate) && !EstUnePreversion(installed);
     }
+
+    private static bool EstUnePreversion(string? version)
+        => version is not null && StripMetadata(version).Contains('-');
+
+    // La métadonnée de build (« +abc1234 ») ne compte jamais dans l'ordre.
+    private static string StripMetadata(string version)
+        => version.Trim() is var v && v.IndexOf('+') is var plus and >= 0 ? v[..plus] : v.Trim();
 
     private static int[] ParseVersion(string? version)
     {
         if (string.IsNullOrWhiteSpace(version))
             return new[] { 0 };
-        var parts = version.Trim().Split('.');
+        // Seul le cœur numérique (avant « - » ou « + ») se compare : « 1.0.0-rc.1 » ne se lit plus 1.0.0.1.
+        var coeur = StripMetadata(version);
+        if (coeur.IndexOf('-') is var tiret and >= 0) coeur = coeur[..tiret];
+        var parts = coeur.Split('.');
         var nums = new int[parts.Length];
         for (var i = 0; i < parts.Length; i++)
             nums[i] = int.TryParse(parts[i], out var n) ? n : 0;
@@ -169,8 +184,7 @@ public sealed class UpdateVerifier : IUpdateVerifier
     // -------------------------------------------------------------------
     // Sérialisation canonique des champs de confiance du manifeste : une forme d'octets déterministe
     // pour que la signature soit calculée et vérifiée sur exactement les mêmes octets des deux côtés.
-    // Le champ de signature lui-même ne fait pas partie des octets signés (c'est la signature). Comme
-    // Ed25519LicenseVerifier.Canonicalize :
+    // Le champ de signature lui-même ne fait pas partie des octets signés (c'est la signature) :
     //   * ordre des champs fixe (channel, version, url, sha256), écrit explicitement ;
     //   * le canal par son nom d'enum invariant (stable d'un runtime / d'une culture à l'autre) ;
     //   * aucune indentation ni mise en forme dépendant de la culture ; encodeur détendu (sans

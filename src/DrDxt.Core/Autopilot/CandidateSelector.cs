@@ -3,25 +3,15 @@
 /// <summary>Ce que le diagnostic dit d'un candidat, avant de depenser le temps du joueur.</summary>
 /// <param name="Id">Le candidat juge.</param>
 /// <param name="Retenu">Vaut-il la peine d'etre essaye sur cette machine, maintenant ?</param>
-/// <param name="Motifs">Pourquoi. Toujours au moins un : un refus sans motif est une autorite.
-///
-/// Ce champ etait un motif unique, et le premier trouve masquait les autres. Constate le
-/// 08/09/2026 sur `latency.prefer_max_perf` : il ressortait « ecriture GPU interdite » alors que
-/// la raison la plus forte etait mesuree : la frequence ne bouge pas d'un MHz. Les deux sont
-/// vraies, et n'en dire qu'une donne une image fausse de ce que la machine autorise.</param>
+/// <param name="Motifs">Pourquoi. Toujours au moins un : un refus sans motif est une autorite. Tous les motifs, pas le
+/// premier trouve : un interdit d'ecriture peut cacher la raison la plus forte, mesuree (une frequence qui ne bouge pas
+/// d'un MHz), et n'en dire qu'une donne une image fausse de ce que la machine autorise.</param>
 public sealed record CandidateAppraisal(string Id, bool Retenu, IReadOnlyList<string> Motifs)
 {
     /// <summary>Les motifs en une ligne, pour un affichage compact.</summary>
     public string Motif => string.Join(" · ", Motifs);
 }
 
-/// <summary>Ce que la machine a montre, reduit a ce dont le choix a besoin.</summary>
-/// <param name="Goulot">Qui donne le tempo, selon le classifieur.</param>
-/// <param name="Bridage">Ce que la telemetrie a observe pendant les fenetres mesurees.</param>
-/// <param name="FrequenceMedianeMhz">Frequence GPU mediane, ou <c>null</c> si non lue.</param>
-/// <param name="FrequenceMinimaleMhz">Frequence GPU minimale, ou <c>null</c> si non lue.</param>
-/// <param name="TuningGpuAutorise">Faux quand une decision de l'utilisateur interdit d'ecrire sur
-/// la carte, par exemple une machine qu'on debogue pour des arrets non propres.</param>
 /// <summary>Ce que les threads du jeu ont montre. Une observation, jamais une cause.</summary>
 public enum GameThreadPressure
 {
@@ -59,6 +49,13 @@ public sealed record InstabiliteGpuObservee(
     DateTimeOffset PlusRecente,
     string Signature);
 
+/// <summary>Ce que la machine a montre, reduit a ce dont le choix a besoin.</summary>
+/// <param name="Goulot">Qui donne le tempo, selon le classifieur.</param>
+/// <param name="Bridage">Ce que la telemetrie a observe pendant les fenetres mesurees.</param>
+/// <param name="FrequenceMedianeMhz">Frequence GPU mediane, ou <c>null</c> si non lue.</param>
+/// <param name="FrequenceMinimaleMhz">Frequence GPU minimale, ou <c>null</c> si non lue.</param>
+/// <param name="TuningGpuAutorise">Faux quand une decision de l'utilisateur interdit d'ecrire sur
+/// la carte, par exemple une machine qu'on debogue pour des arrets non propres.</param>
 public sealed record DiagnosticMachine(
     BottleneckState Goulot,
     GpuLimiterObserved Bridage,
@@ -184,12 +181,11 @@ public static class CandidateSelector
         // Rien a voir avec le diagnostic : l'autopilote n'ecrit pas dans un BIOS et ne reboote
         // pas la machine de quelqu'un.
         if (c.Kind != CandidateKind.AutoHot)
-            refus.Add(Docteur.T("AE.Nature", c.Kind));
+            refus.Add(Docteur.T("AE.Nature", RepairLibelles.Nature(c.Kind)));
 
         // ── 2. Les interdits de l'utilisateur ───────────────────────────────────────────────
         // Une decision prise n'est pas une preference a repeser a chaque session.
-        // Sur la surface ecrite, comme les deux vetos (`443e5be`, `62a53ce`), plus sur les
-        // grandeurs `gpu.` declarees. Voir `FermeeParLInterditGpu`.
+        // Sur la surface ecrite, comme les deux vetos, et non sur les grandeurs `gpu.` declarees. Voir `FermeeParLInterditGpu`.
         if (FermeeParLInterditGpu(c.Surface) && !d.TuningGpuAutorise)
             refus.Add(Docteur.T("CS.GpuInterdit"));
 
@@ -197,23 +193,15 @@ public static class CandidateSelector
         // Ecrire sur une carte dont le noyau graphique a deja crie plusieurs fois rend le
         // prochain incident inattribuable : il pourra toujours venir de notre reglage ou de la
         // condition preexistante. On perd alors la seule chose que ce produit vend, l'attribution.
-        // Sur la surface ecrite, plus sur les grandeurs `gpu.` : la faille d'avant
-        // `443e5be`, restee ici : `latency.reflex` se dit « latence », ecrit le pilote, et passait un noyau
-        // graphique qui crie des qu'il n'y avait pas d'arrets brutaux. Voir `FermeeParInstabiliteGraphique`.
+        // Sur la surface ecrite, et non sur les grandeurs `gpu.` : un levier qui se dit « latence » peut ecrire le pilote.
+        // Voir `FermeeParInstabiliteGraphique`.
         if (FermeeParInstabiliteGraphique(c.Surface) && InstabiliteBloquante(d, DateTimeOffset.UtcNow) is { } instable)
             refus.Add(instable);
 
-        // Les arrets brutaux ferment tout ce qui touche le materiel ou le pilote
-        // graphique. Meme raison que ci-dessus, plus forte encore : un arret sec ne laisse aucun
-        // dump, donc rien ne permettrait jamais de trancher entre notre reglage et la condition.
-        // Sur la surface ecrite, plus sur les grandeurs declarees : voir
-        // `SurfaceTouchee`. Une seule definition, lue par l'App, la campagne et l'ecran.
-        // Les arrêts passés
-        // ne refusent plus. La garde d'incident (Application, GardeDIncident) rend tout réglage suivi d'un arrêt hors veille
-        // dans la semaine : l'incident suivant n'est plus inattribuable, il retire ce qui a été posé juste avant.
-
-        // La carte, par machine et par famille d'arret. DrDXT ne dit pas non par principe : la carte et son pilote passent sous la garde d'incident comme le reste (un arrêt après la pose les rend
-        // seuls) ; seul un levier qui ne déclare pas ce qu'il écrit reste fermé par ces arrêts.
+        // Les arrêts passés ne ferment ni le matériel ni le pilote : la garde d'incident (Application, GardeDIncident) rend
+        // tout réglage suivi d'un arrêt hors veille dans la semaine, donc l'incident suivant n'est pas inattribuable, il
+        // retire ce qui a été posé juste avant. Seul un levier qui ne déclare pas ce qu'il écrit reste fermé par ces
+        // arrêts, par famille d'arrêt : rien ne le relierait à la garde.
         if (c.Surface == SurfaceTouchee.NonDeclaree && CarteFermeeParLesArrets(d, DateTimeOffset.UtcNow) is { } carte)
             refus.Add(carte);
 
@@ -301,6 +289,12 @@ public static class CandidateSelector
         return Docteur.T("CS.ArretsSousGarde", recents, FenetreInstabilite.Days);
     }
 
+    // Combien sont tombés pendant une partie, et de quel jeu.
+    private static string SousCharge(IReadOnlyList<ArretClasse> arrets)
+        => arrets.Where(a => a.PendantLaPartieDe is not null).ToList() is { Count: > 0 } enPartie
+            ? Docteur.T("CS.DontEnPartie", enPartie.Count, string.Join(", ", enPartie.Select(a => a.PendantLaPartieDe).Distinct()))
+            : "";
+
     /// <summary>
     /// Les arrêts qui
     /// ferment le réglage de la carte sur cette machine : un écran bleu graphique récent (une fois suffit, il désigne
@@ -308,12 +302,6 @@ public static class CandidateSelector
     /// serait inattribuable). Ne ferment rien : une coupure en veille, un écran bleu d'un autre code (il laisse son
     /// code), un arrêt hors de la fenêtre. Rend le motif, ou <c>null</c> ; « non lu » ne ferme rien.
     /// </summary>
-    // Combien sont tombés pendant une partie, et de quel jeu.
-    private static string SousCharge(IReadOnlyList<ArretClasse> arrets)
-        => arrets.Where(a => a.PendantLaPartieDe is not null).ToList() is { Count: > 0 } enPartie
-            ? Docteur.T("CS.DontEnPartie", enPartie.Count, string.Join(", ", enPartie.Select(a => a.PendantLaPartieDe).Distinct()))
-            : "";
-
     public static string? CarteFermeeParLesArrets(DiagnosticMachine d, DateTimeOffset maintenant)
         => ArretsDeLaCarte(d, maintenant, avecRaison: true);
 
@@ -343,8 +331,8 @@ public static class CandidateSelector
     }
 
     /// <summary>
-    /// Pourquoi le réglage de la carte est ouvert ou fermé sur cette machine, en une phrase,
-    /// avec la famille d'arrêt en cause. Les incidents noyau graphique répétés ferment aussi : la phrase le dit.
+    /// Ce que les arrêts et les incidents récents font au réglage de la carte sur cette machine, en une phrase, avec la
+    /// famille d'arrêt en cause : ils la mettent sous garde d'incident, ils ne la ferment pas.
     /// </summary>
     public static string PhraseReglageCarte(DiagnosticMachine d, DateTimeOffset maintenant)
     {
@@ -369,42 +357,17 @@ public static class CandidateSelector
             : Docteur.T("CS.Carte.ArretsSansLaCarte", string.Join(", ", ignores), regle);
     }
 
-    /// <summary>
-    /// Les surfaces que les arrets brutaux ferment : tout, sauf les preferences de la session
-    /// utilisateur et ce qui n'ecrit rien. `NonDeclaree` est fermee : un levier qui ne dit pas ce
-    /// qu'il ecrit ne passe jamais un veto de stabilite.
-    ///
-    /// Pourquoi l'OS utilisateur reste ouvert (Game Mode, Game DVR, modele flip) : ces valeurs
-    /// vivent dans HKCU, aucun pilote ni composant materiel ne les lit comme reglage d'etat, et un
-    /// arret sec ne peut pas leur etre attribue plus qu'a n'importe quelle preference de Windows.
-    /// Les fermer ne rendrait aucun incident attribuable ; ce serait un refus sans raison.
-    /// HAGS n'en fait pas partie : `HwSchMode` (HKLM GraphicsDrivers) change qui ordonnance le
-    /// travail de la carte, et c'est le noyau graphique qui a deja crie sur la machine de reference.
-    /// </summary>
     /// <summary>Les réglages de la carte que DrDXT n'écrit jamais : fréquence (décalage d'horloge) et ventilateur.</summary>
     public static readonly IReadOnlySet<string> ReglagesCarteInterdits =
         new HashSet<string>(StringComparer.Ordinal) { "gpu.core_offset", "gpu.undervolt", "gpu.fan_curve" };
 
-    // La carte n'en fait plus partie ; elle a son veto par famille, `CarteFermeeParLesArrets`.
-    public static bool FermeeParLesArrets(SurfaceTouchee surface) =>
-        surface is not (SurfaceTouchee.OsUtilisateur or SurfaceTouchee.Aucune or SurfaceTouchee.PlanificationWindows
-            or SurfaceTouchee.CarteGraphique);
-
     /// <summary>
-    /// Les surfaces que des incidents du noyau graphique ferment (TDR, 0x193
-    /// VIDEO_DXGKRNL_LIVEDUMP, nvlddmkm, LiveKernelReports) : la carte et le pilote graphique, et
-    /// `NonDeclaree` (un levier qui ne dit pas ce qu'il ecrit ne passe jamais un veto de stabilite).
-    ///
-    /// HAGS est ferme : il declare `PiloteGraphique`, et c'est voulu : `HwSchMode` confie
-    /// l'ordonnancement du travail de la carte au GPU, c'est-a-dire a dxgkrnl et au pilote, exactement
-    /// le composant qui produit la signature 0x193 sur la machine de reference. Un incident apres l'avoir
-    /// change serait inattribuable.
-    /// Restent ouverts : le processeur et la memoire (plan d'alimentation, CPPC, fichier d'echange ne
-    /// sont pas lus par le noyau graphique ; les arrets brutaux, eux, les ferment), l'OS utilisateur et
-    /// ce qui n'ecrit rien. Une seule definition des surfaces : <see cref="SurfaceTouchee"/>.
+    /// Les surfaces que des incidents du noyau graphique ferment (TDR, 0x193 VIDEO_DXGKRNL_LIVEDUMP, nvlddmkm,
+    /// LiveKernelReports) : `NonDeclaree` seule, un levier qui ne dit pas ce qu'il ecrit ne passant jamais un veto de
+    /// stabilite. La carte et le pilote passent sous la garde d'incident (vidages a chaud surveilles une semaine apres la
+    /// pose) ; le processeur, la memoire, l'OS utilisateur et ce qui n'ecrit rien restent ouverts. Une seule definition
+    /// des surfaces : <see cref="SurfaceTouchee"/>.
     /// </summary>
-    // La carte et le pilote passent sous la garde d'incident (vidages à chaud surveillés une semaine
-    // après la pose) ; seul un levier qui ne déclare pas ce qu'il écrit reste fermé par ces incidents.
     public static bool FermeeParInstabiliteGraphique(SurfaceTouchee surface) =>
         surface is SurfaceTouchee.NonDeclaree;
 
@@ -462,6 +425,6 @@ public static class CandidateSelector
     {
         BottleneckState.UnknownPartial => Docteur.T("CS.Retenu.Inconnu"),
         BottleneckState.CappedOrVsyncLimited => Docteur.T("CS.Retenu.Plafonne"),
-        _ => Docteur.T("CS.Retenu.Coherent", d.Goulot),
+        _ => Docteur.T("CS.Retenu.Coherent", MotifDuGoulot.Libelle(d.Goulot)),
     };
 }

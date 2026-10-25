@@ -35,6 +35,24 @@ public sealed class ProtectionDuPingParLeServiceTests
         _client.Ordres.Should().ContainSingle().Which.Should().BeOfType<RemoveUploadCapOp>();
     }
 
+    // Un retrait refusé au démarrage se croyait fait : sans jeu lancé, aucun battement ne le retentait, et le plafond d'une vie
+    // précédente du service bridait l'envoi de la machine jusqu'au redémarrage.
+    [Fact]
+    public async Task Un_retrait_refuse_au_demarrage_est_retente_au_battement_suivant()
+    {
+        var p = Protection();
+        _retenu = null;
+        _client.Refuser = true;
+        await p.DemarrerAsync(CancellationToken.None);
+
+        await p.TickAsync(CancellationToken.None);
+        _client.Refuser = false;
+        await p.TickAsync(CancellationToken.None);
+        await p.TickAsync(CancellationToken.None);
+
+        _client.Ordres.Should().HaveCount(3).And.AllBeOfType<RemoveUploadCapOp>("retenté jusqu'à ce qu'il passe, puis plus rien");
+    }
+
     [Fact]
     public async Task Le_plafond_se_pose_au_lancement_du_jeu_et_se_retire_a_sa_fermeture()
     {

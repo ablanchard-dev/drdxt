@@ -6,11 +6,10 @@ namespace DrDxt.Detection.Gpu.Intel;
 // -----------------------------------------------------------------------
 // Arrêter de se taire sur Intel.
 //
-// Le produit prétend couvrir 2015-2026 et les trois fabricants. Sur une machine Arc,
-// il ne dit rien : `GpuGating.IsDiscrete` exclut Intel par construction, donc une Arc
-// A770 est classée comme un iGPU, aucun levier GPU ne s'applique, et l'utilisateur
-// n'est pas prévenu. C'est un skip silencieux, exactement ce que le produit s'interdit,
-// et la recherche du projet (non publiée) le nomme déjà.
+// Le produit prétend couvrir 2015-2026 et les trois fabricants. Une Arc A770 est bien une
+// carte dédiée (`CartesGraphiques.EstDediee`), mais les leviers de réglage de carte ne
+// visent que NVIDIA et AMD (`GpuGating.IsTunableDiscreteGpu`) : sans ce conseiller, le
+// produit se tairait sur une machine Arc, un skip silencieux, exactement ce qu'il s'interdit.
 //
 // Cette tranche ne demande aucune carte Intel et n'écrit rien :
 //   * classer correctement un GPU Intel (Arc discrète vs intégrée),

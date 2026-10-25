@@ -92,4 +92,41 @@ public sealed class MondeDeLaMachineTests
         MondeDeLaMachine.Comparer(avant, E(1, "1", "1")).Should().BeEmpty("non lue n'est ni rallumée ni coupée");
         MondeDeLaMachine.Garder(avant, null, null, null, T.AddDays(1)).Hvci.Should().BeFalse("non lue, elle garde son état d'avant");
     }
+
+    // La clé d'un écart est gardée d'un scan à l'autre : un format régional à calendrier hégirien (ar-SA) l'écrivait en 1448,
+    // et un changement de format en faisait une autre clé pour le même écart.
+    [Fact]
+    public void La_cle_d_un_ecart_ne_depend_pas_du_format_regional()
+    {
+        var avant = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("ar-SA");
+            MondeDeLaMachine.Comparer(E(0, "1", "1") with { Hvci = false }, E(1, "1", "1") with { Hvci = true })
+                .Single().Cle.Should().Be("monde:hvci:active:202610172000");
+        }
+        finally { CultureInfo.CurrentCulture = avant; }
+    }
+
+    // La frise refuse l'écart (journal occupé, écriture ratée) : l'état d'avant reste gardé, sinon la mise à jour ne serait
+    // plus jamais vue. Elle revient au scan suivant, bornée au même scan d'avant.
+    [Fact]
+    public void Un_ecart_que_la_frise_refuse_revient_au_scan_suivant()
+    {
+        var fichier = Path.Combine(Path.GetTempPath(), $"monde-{Guid.NewGuid():N}.json");
+        try
+        {
+            Dictionary<string, string> Jeu(string v) => new() { [@"C:\Jeux\Call of Duty"] = v };
+            MondeDeLaMachine.ComparerEtGarder(fichier, T, Jeu("1"), null, null, null).Ecarts.Should().BeEmpty("premier relevé");
+
+            MondeDeLaMachine.ComparerEtGarder(fichier, T.AddDays(1), Jeu("2"), null, null, null, (_, _) => false)
+                .Ecarts.Should().BeEmpty("la frise n'a rien pris");
+
+            DateTimeOffset? borne = null;
+            MondeDeLaMachine.ComparerEtGarder(fichier, T.AddDays(2), Jeu("2"), null, null, null, (_, d) => { borne = d; return true; })
+                .Ecarts.Should().ContainSingle();
+            borne.Should().Be(T);
+        }
+        finally { File.Delete(fichier); }
+    }
 }

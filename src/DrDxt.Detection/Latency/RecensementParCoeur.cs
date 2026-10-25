@@ -13,7 +13,7 @@ namespace DrDxt.Detection.Latency;
 /// (Win32_PerfRawData_Counters_ProcessorInformation) : « Interrupts/sec » et « DPCs Queued/sec » sont des compteurs
 /// de type PERF_COUNTER_COUNTER (delta sur delta de Timestamp_PerfTime / Frequency_PerfTime), « % DPC Time » et
 /// « % Interrupt Time » des PERF_100NSEC_TIMER (delta sur delta de Timestamp_Sys100NS) ; types relevés dans les
-/// qualificatifs de la classe sur la machine de référence le 16/10/2026, définis par Microsoft Learn (« Counter Types »).
+/// qualificatifs de la classe sur la machine de référence (relevé du 16/10/2026), définis par Microsoft Learn (« Counter Types »).
 /// </remarks>
 public static class RecensementParCoeur
 {
@@ -26,7 +26,7 @@ public static class RecensementParCoeur
     /// un quart de son temps, c'est un cœur que le jeu ne peut plus compter comme entier.</summary>
     public const double SeuilConfisque = 0.25;
 
-    public static IReadOnlyDictionary<string, Brut>? Lire()
+    public static IReadOnlyDictionary<string, Brut>? Lire() => LectureWmiBornee.Lire<IReadOnlyDictionary<string, Brut>?>(() =>
     {
         try
         {
@@ -39,14 +39,14 @@ public static class RecensementParCoeur
                 using (o)
                 {
                     if (o["Name"] is not string nom || nom.Contains("_Total", StringComparison.Ordinal)) continue;
-                    ulong U(string n) => Convert.ToUInt64(o[n], CultureInfo.InvariantCulture);
+                    ulong U(string n) => LectureWmiBornee.Compteur(o[n]);
                     lus[nom] = new Brut(U("InterruptsPersec"), U("DPCsQueuedPersec"), U("PercentDPCTime"), U("PercentInterruptTime"),
                         U("Timestamp_Sys100NS"), U("Timestamp_PerfTime"), U("Frequency_PerfTime"));
                 }
             return lus.Count > 0 ? lus : null;
         }
         catch (Exception) { return null; }
-    }
+    }, () => null);
 
     public static IReadOnlyList<Coeur>? Mesurer(TimeSpan ecart)
     {

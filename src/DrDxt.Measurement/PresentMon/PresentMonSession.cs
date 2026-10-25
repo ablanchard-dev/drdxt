@@ -15,7 +15,9 @@ namespace DrDxt.Measurement.PresentMon;
 public sealed class PresentMonSession : IPresentMonSession
 {
     // Capacité du tampon, en images, pour une interrogation pmConsumeFrames. Dimensionnée pour qu'un
-    // jeu à FPS élevés ne puisse pas déborder une interrogation entre nos interrogations douces de 2 ms.
+    // jeu à FPS élevés ne puisse pas la déborder entre deux interrogations : le délai demandé est de 2 ms, mais
+    // l'horloge de Windows l'arrondit à environ 15,6 ms, et une interrogation qui rend des images est suivie aussitôt
+    // de la suivante.
     private const uint MaxFramesPerPoll = 4096;
     private static readonly TimeSpan PollDelay = TimeSpan.FromMilliseconds(2);
     // Mesuré : 1 à 2 s entre pmStartTrackingProcess et la première image. 5 s de marge.
@@ -126,12 +128,8 @@ public sealed class PresentMonSession : IPresentMonSession
                     Docteur.T("PM.Tracking", trackRc, targetPid));
             tracking = true;
 
-            // Les 8 series par frame, brutes (aucune agregation cote service).
-            //
-            // Les quatre dernieres sont nouvelles. Le classifieur de goulot demande
-            // 8 grandeurs ; le produit n'en calculait qu'une, parce que ces champs existaient
-            // cote PresentMon et n'etaient tout simplement pas demandes ici. L'ordre de ce
-            // tableau est le contrat : chaque `dataOffset` est lu par index juste apres.
+            // Les onze series par frame, brutes (aucune agregation cote service), dont les grandeurs que demande le
+            // classifieur de goulot. L'ordre de ce tableau est le contrat : chaque `dataOffset` est lu par index juste apres.
             var elements = new[]
             {
                 new PM_QUERY_ELEMENT { metric = PM_METRIC.PM_METRIC_BETWEEN_PRESENTS, stat = PM_STAT.PM_STAT_NONE },

@@ -59,6 +59,19 @@ public sealed class LectureDesCiblesDrsAuJeuTests
         r.Value.Should().BeNull();
     }
 
+    // L'image d'avant du journal : sans la provenance, le rejeu ne savait rien rendre d'une pose au profil du jeu, et le
+    // réglage restait dans le pilote quand l'App mourait avant d'en noter l'origine.
+    [Fact]
+    public void L_image_du_journal_d_un_reglage_herite_garde_sa_provenance()
+    {
+        var image = Lecture(lu: true, valeur: 1, emplacement: ProfilGlobal).Lecteur(new ApplyNvApiDrsSettingOp(Reglage, 1, Jeu))!();
+
+        image.IsOk.Should().BeTrue();
+        image.Value.Should().Be(LectureDesCiblesWin32.ImageHeritee + nameof(DrsValueOrigin.InheritedFromGlobalProfile));
+        Lecture(lu: true, valeur: 1, emplacement: ProfilCourant).Lecteur(new ApplyNvApiDrsSettingOp(Reglage, 1, Jeu))!()
+            .Value.Should().Be("1");
+    }
+
     [Fact]
     public void Une_lecture_ratee_est_illisible_et_rien_n_est_touche()
     {

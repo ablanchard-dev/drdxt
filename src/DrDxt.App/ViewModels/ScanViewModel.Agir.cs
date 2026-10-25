@@ -8,6 +8,7 @@ using DrDxt.App.Profiles;
 using DrDxt.Core;
 using Geste = DrDxt.App.Platform.CorruptionDuMagasin.Geste;
 using DrDxt.Detection.Hardware;
+using Pose = DrDxt.Application.Tweaks.PoseRelue;
 
 namespace DrDxt.App.ViewModels;
 
@@ -76,17 +77,17 @@ public sealed partial class ScanViewModel
             _battementPlafond = new CancellationTokenSource();
             // Jamais par _helper, qui se lance a la demande : une invite UAC en pleine partie, sans geste du joueur.
             if (HelperSansLancer is { } sansLancer)
-            LancerAjustement(
-                () => DrDxt.Application.Network.PlafondEnvoiPendantLeJeu.ProcessusVivant(exe),
-                () => plafond,
-                async (apres, ct) =>
-                {
-                    if (!(await sansLancer.ExecuteAsync(new RetainServiceUploadCapOp(exe, apres), ct)).IsOk)
-                        return false;
-                    plafond = apres;
-                    return true;
-                },
-                _battementPlafond.Token);
+                LancerAjustement(
+                    () => DrDxt.Application.Network.PlafondEnvoiPendantLeJeu.ProcessusVivant(exe),
+                    () => plafond,
+                    async (apres, ct) =>
+                    {
+                        if (!(await sansLancer.ExecuteAsync(new RetainServiceUploadCapOp(exe, apres), ct)).IsOk)
+                            return false;
+                        plafond = apres;
+                        return true;
+                    },
+                    _battementPlafond.Token);
             return Result.Ok();
         }
 
@@ -275,7 +276,7 @@ public sealed partial class ScanViewModel
         catch (Exception ex)
         {
             VeillePingActive = false;
-            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{ex.Message}";
+            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{RaisonLisible.Dire(ex, _localize)}";
             return;
         }
 
@@ -325,7 +326,7 @@ public sealed partial class ScanViewModel
     [ObservableProperty] private bool _cadenceEnCours;
     [ObservableProperty] private string? _resultatCadence;
     public bool CadencePrete => !CadenceEnCours;
-    partial void OnCadenceEnCoursChanged(bool value) => OnPropertyChanged(nameof(CadencePrete));
+    partial void OnCadenceEnCoursChanged(bool value) { OnPropertyChanged(nameof(CadencePrete)); OperationLongueChangee(); }
     public string LabelCapsuleCadence => _localize("Agir.Capsule.Cadence");
     public string LabelCadenceTitre => _localize(SansManette ? "Entrees.Cadence.Titre.SansManette" : "Entrees.Cadence.Titre");
     public string LabelCadenceDescription => _localize(SansManette ? "Entrees.Cadence.Description.SansManette" : "Entrees.Cadence.Description");
@@ -339,7 +340,7 @@ public sealed partial class ScanViewModel
     private bool SansManette => ManetteBranchee?.Invoke() == false;
 
     /// <summary>Le maintien du noyau est la confirmation ; l'écoute tourne hors du fil d'interface.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task MesurerCadence()
     {
         if (CadenceEnCours || MesureDesEntrees is not { } mesure) return;
@@ -350,6 +351,7 @@ public sealed partial class ScanViewModel
             _constatCadence = await Task.Run(() => mesure(CancellationToken.None));
             ResultatCadence = _constatCadence.Explication;
         }
+        catch (Exception ex) { ResultatCadence = RaisonLisible.Dire(ex, _localize); }
         finally { CadenceEnCours = false; }
     }
 
@@ -376,7 +378,7 @@ public sealed partial class ScanViewModel
 
     public bool TestMemoireATermine => ResultatTestMemoire is not null && !TestMemoireEnCours;
     partial void OnResultatTestMemoireChanged(string? value) => OnPropertyChanged(nameof(TestMemoireATermine));
-    partial void OnTestMemoireEnCoursChanged(bool value) => OnPropertyChanged(nameof(TestMemoireATermine));
+    partial void OnTestMemoireEnCoursChanged(bool value) { OnPropertyChanged(nameof(TestMemoireATermine)); OperationLongueChangee(); }
 
     public string LabelCarteAgir => _localize("Carte.Agir");
     public string LabelTestMemoireTitre => _localize("Memoire.Test.Titre");
@@ -388,7 +390,7 @@ public sealed partial class ScanViewModel
 
     /// <summary>Lance le test. Le maintien du noyau est la confirmation ; l'interface n'est jamais
     /// figee (le test tourne hors du fil d'interface) et l'arret se prend entre deux passes.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task LancerTestMemoire()
     {
         if (TestMemoireEnCours) return;
@@ -413,6 +415,11 @@ public sealed partial class ScanViewModel
             var r = await TesterMemoireEnSessionAsync(DureeDuTestMemoire, VolumeDuTestMemoire, _arretTestMemoire.Token);
             TestMemoireEnDefaut = r.Erreurs > 0;
             ResultatTestMemoire = r.Phrase;
+        }
+        catch (Exception ex)
+        {
+            TestMemoireEnDefaut = false;
+            ResultatTestMemoire = RaisonLisible.Dire(ex, _localize);
         }
         finally
         {
@@ -507,12 +514,16 @@ public sealed partial class ScanViewModel
                     ErreurPlafondEnvoi = RaisonLisible.Echec(refus, _localize("Ping.Protection.Echec"), _localize);
                     return;
                 }
-                await DesactiverPlafondEnvoiAsync();
+                var retrait = await DesactiverPlafondEnvoiAsync();
                 MemoirePlafond?.Oublier();
+                if (!retrait.IsOk)
+                    ErreurPlafondEnvoi = string.Format(CultureInfo.CurrentCulture, _localize("Ping.Protection.RetraitDiffere"),
+                        RaisonLisible.Dire(retrait, _localize));
             }
             else if (await ActiverEtRetenirAsync(_exeJeuMesure!, _plafondEnvoiMesure) is { IsOk: false } echec)
                 ErreurPlafondEnvoi = RaisonLisible.Echec(echec, _localize("Ping.Protection.Echec"), _localize);
         }
+        catch (Exception ex) { ErreurPlafondEnvoi = RaisonLisible.Dire(ex, _localize); }
         finally
         {
             PlafondEnvoiEnChangement = false;
@@ -563,7 +574,7 @@ public sealed partial class ScanViewModel
     }
 
     /// <summary>Retire l'element par le helper (UAC a la demande) ; le helper relit apres ecriture.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task RendreBcd()
     {
         if (BcdEnCours || _bcdARendre is not { } cible || _helper is null) return;
@@ -588,7 +599,10 @@ public sealed partial class ScanViewModel
             }
             else
             {
-                GardeBcd?.Effacer();
+                // Un refus n'a rien écrit : la garde ferait proposer un faux Annuler. Sans réponse du helper après l'envoi,
+                // bcdedit a pu retirer la valeur : la garde reste, et la session suivante propose l'Annuler si l'audit ne la
+                // voit plus.
+                if (r.Error?.Code is not (ErrorCodes.HelperNoReply or ErrorCodes.HelperNoReplyJournalisee)) GardeBcd?.Effacer();
                 ErreurBcd = RaisonLisible.Echec(r, _localize("Bcd.Rendre.Echec"), _localize);
             }
         }
@@ -718,7 +732,7 @@ public sealed partial class ScanViewModel
     /// <summary>Le dernier verdict processeur, typé, pour le rapport (jamais une chaine libre).</summary>
     private DrDxt.Measurement.Cpu.CpuDeficitSoutenu? _dernierDeficitCpu;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task RemesurerProcesseur()
     {
         if (RemesureCpuEnCours || _cpuBaseline is not { } service || _machineId is not { } id) return;
@@ -749,7 +763,7 @@ public sealed partial class ScanViewModel
                 ReconstruireCarteSurLeDomaineOuvert();
             }
         }
-        catch (Exception ex) { ErreurRemesureCpu = $"{_localize("Cpu.Remesure.Echec")} ({ex.Message})"; }
+        catch (Exception ex) { ErreurRemesureCpu = $"{_localize("Cpu.Remesure.Echec")}{Docteur.DeuxPoints}{RaisonLisible.Dire(ex, _localize)}"; }
         finally { RemesureCpuEnCours = false; }
     }
 
@@ -770,7 +784,7 @@ public sealed partial class ScanViewModel
     {
         var cpuSuspect = !string.IsNullOrEmpty(_dernierDeficitCpu?.Reserve);
         if (LirePoste is null || (!cpuSuspect && !_memoireSuspecte)
-            || RemesureCpuEnCours || RemesureMemoireEnCours) return;
+            || OperationLongueEnCours) return;
 
         var (sansSaisie, charge) = await LirePoste(ct);
         var jeuOuvert = _gameLocator.JeuOuvert();
@@ -811,7 +825,7 @@ public sealed partial class ScanViewModel
 
     partial void OnMemoryMeasuredLabelChanged(string? value) => OnPropertyChanged(nameof(RemesureMemoireVisible));
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task RemesurerMemoire()
     {
         if (RemesureMemoireEnCours || _memoryBaseline is not { } service || _machineId is not { } id
@@ -837,7 +851,7 @@ public sealed partial class ScanViewModel
                 ReconstruireCarteSurLeDomaineOuvert();
             }
         }
-        catch (Exception ex) { ErreurRemesureMemoire = $"{_localize("Memoire.Remesure.Echec")} ({ex.Message})"; }
+        catch (Exception ex) { ErreurRemesureMemoire = $"{_localize("Memoire.Remesure.Echec")}{Docteur.DeuxPoints}{RaisonLisible.Dire(ex, _localize)}"; }
         finally { RemesureMemoireEnCours = false; }
     }
 
@@ -856,8 +870,8 @@ public sealed partial class ScanViewModel
     public string LabelReparationTitre => _localize(_geste switch { Geste.Reinstaller => "Reparation.Windows.Reinstallation.Titre", _ => "Reparation.Windows.Titre" });
     public string LabelReparationDescription => _localize(_geste switch { Geste.Reinstaller => "Reparation.Windows.Reinstallation.Description", _ => "Reparation.Windows.Description" });
 
-    // La réparation a échoué faute de source. Relancer RestoreHealth tournait en rond : si tout ce qui est
-    // abîmé est une version remplacée, le geste devient le nettoyage ; sinon la réinstallation de Microsoft.
+    // La réparation a échoué faute de source. Relancer RestoreHealth tournerait en rond : le geste devient la
+    // réinstallation de Microsoft (CorruptionDuMagasin), jamais un nettoyage irréversible.
     private Geste _geste;
 
     /// <summary>Lu dans CBS.log et WinSxS : l'appli pose la vraie lecture au démarrage, les tests un faux. Faux quand
@@ -945,7 +959,7 @@ public sealed partial class ScanViewModel
     }
 
     /// <summary>« en cours » tant que la console est ouverte, puis ce que la relecture de
-    /// Windows trouve à sa fermeture. Avant, rien ne revenait dans DrDXT et le joueur restait sans réponse.</summary>
+    /// Windows trouve à sa fermeture : sans elle, rien ne reviendrait dans DrDXT et le joueur resterait sans réponse.</summary>
     [ObservableProperty] private string? _etatReparation;
     internal Task? FinDeReparation { get; private set; }
 
@@ -967,21 +981,41 @@ public sealed partial class ScanViewModel
     internal async Task ConclureReposCarteAsync(ITweak levier, IHardwareProbe sonde,
         DrDxt.Application.Tweaks.PreuvesEnAttente attente, Func<TimeSpan, Task> attendre)
     {
+        // Lancée sans attente au démarrage : personne n'observerait son exception, et la preuve resterait « en attente ».
+        try { await ConclureReposCarteSansFiletAsync(levier, sonde, attente, attendre); }
+        catch (Exception ex) { VerdictReposCarte = RaisonLisible.Dire(ex, _localize); }
+    }
+
+    private async Task ConclureReposCarteSansFiletAsync(ITweak levier, IHardwareProbe sonde,
+        DrDxt.Application.Tweaks.PreuvesEnAttente attente, Func<TimeSpan, Task> attendre)
+    {
         // Au lancement, sans clic : un retrait du réglage ne lance pas le helper (SansGesteDuJoueur).
         using var sansGeste = SansGesteDuJoueur.Ouvrir();
         EcritureReposCarte = attente.Charger();
-        var v = await DrDxt.Application.Tweaks.PreuveDuRepos.ConclureAsync(levier, sonde, 20, attendre, attente);
+        var v = await DrDxt.Application.Tweaks.PreuveDuRepos.ConclureAsync(levier, sonde, 20, attendre, attente, EtatDeLaPose);
         if (v is null) return;
         var cle = v.Etat switch
         {
             DrDxt.Application.Tweaks.EtatDeLaPreuve.Prouve => "Carte.Repos.Prouve",
             DrDxt.Application.Tweaks.EtatDeLaPreuve.PasDeGain => "Carte.Repos.PasDeGain",
             DrDxt.Application.Tweaks.EtatDeLaPreuve.RetraitRate => "Carte.Repos.PreuveRetraitRate",
+            DrDxt.Application.Tweaks.EtatDeLaPreuve.ChangeDepuis => "Carte.Repos.ChangeDepuis",
             _ => "Carte.Repos.NonMesure",
         };
         VerdictReposCarte = string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize(cle), v.ApresW, v.AvantW);
-        if (v.Etat == DrDxt.Application.Tweaks.EtatDeLaPreuve.Prouve && ReglagesDeLaCarte is { } retenus && EcritureReposCarte is { } e)
-            retenus.Garder(new(e.TweakId, e.OriginalValueJson, e.AppliedValueJson, DateTimeOffset.Now));
+        if (v.Etat != DrDxt.Application.Tweaks.EtatDeLaPreuve.Prouve || EcritureReposCarte is not { } e) return;
+        // Prouvé, il reste : comme tout levier gardé, au journal des leviers (« Annuler » dans « Ce que DrDXT a posé ») et au
+        // manifeste signé (la désinstallation le rend).
+        var rapport = new ApplyReport([new ApplyOutcome(e.TweakId, true, false, new TweakSnapshot(e.TweakId, e.OriginalValueJson, e.AppliedValueJson), null)], null);
+        _journalLeviers?.Enregistrer(rapport);
+        if (_manifestMapper.ToRevertOnly(rapport) is { Count: > 0 } gardes
+            && await _desiredStateStore.CommitAsync(new DesiredState(Array.Empty<AppliedTweak>(), gardes)).ConfigureAwait(true) is { IsOk: false } refus)
+            VerdictReposCarte += " " + string.Format(CultureInfo.CurrentCulture, _localize("Carte.Repos.PasInscrit"), RaisonLisible.Dire(refus, _localize));
+        ChargerLeviersPoses();
+        if (ReglagesDeLaCarte is not { } retenus) return;
+        // Prouvé, mais le suivi en jeu ne s'est pas gardé : le réglage reste, sans la surveillance des parties, et c'est dit.
+        try { retenus.Garder(new(e.TweakId, e.OriginalValueJson, e.AppliedValueJson, DateTimeOffset.Now)); }
+        catch (IOException) { VerdictReposCarte += " " + _localize("Carte.Repos.SuiviNonGarde"); }
     }
 
     /// <summary>Ce qui garde le réglage prouvé au repos, et l'écriture qu'il annulerait. Posés au lancement.</summary>
@@ -1006,7 +1040,7 @@ public sealed partial class ScanViewModel
     public bool ReposCarteAOuvrir => ReposCarteVisible && SondeCarte is not null && AttenteReposCarte is not null
         && !ReposCarteEnAttente && !ReposCarteEnCours && VerdictReposCarte is null;
     partial void OnReposCarteEnAttenteChanged(bool value) { OnPropertyChanged(nameof(ReposCarteVisible)); OnPropertyChanged(nameof(ReposCarteAOuvrir)); }
-    partial void OnReposCarteEnCoursChanged(bool value) => OnPropertyChanged(nameof(ReposCarteAOuvrir));
+    partial void OnReposCarteEnCoursChanged(bool value) { OnPropertyChanged(nameof(ReposCarteAOuvrir)); OperationLongueChangee(); }
     partial void OnVerdictReposCarteChanged(string? value) { OnPropertyChanged(nameof(ReposCarteVisible)); OnPropertyChanged(nameof(ReposCarteAOuvrir)); }
     internal void SignalerReposCarte() { OnPropertyChanged(nameof(ReposCarteVisible)); OnPropertyChanged(nameof(ReposCarteAOuvrir)); }
     public string LabelReposCarteTitre => _localize("Carte.Repos.Titre");
@@ -1020,17 +1054,30 @@ public sealed partial class ScanViewModel
 
     /// <summary>Premier temps de la preuve : 20 lectures du repos, l'écriture, la preuve gardée. Le second temps se
     /// joue au lancement qui suit un redémarrage (<see cref="ConclureReposCarteAsync"/>).</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task RendreLeReposALaCarte()
     {
         if (LevierReposCarte is not { } levier || SondeCarte is not { } sonde || AttenteReposCarte is not { } attente || ReposCarteEnCours) return;
+        // Jeu ouvert, les lectures « avant » seraient celles de la charge : la preuve du lancement suivant mentirait.
+        if (_gameLocator.JeuOuvert())
+        {
+            ErreurReposCarte = _localize("Carte.Repos.JeuOuvert");
+            return;
+        }
         ErreurReposCarte = null;
         ReposCarteEnCours = true;
         try
         {
-            var ok = await DrDxt.Application.Tweaks.PreuveDuRepos.EcrireAsync(levier, sonde, 20, AttendreCarte, attente);
-            ReposCarteEnAttente = ok;
-            if (!ok) ErreurReposCarte = _localize("Carte.Repos.Refuse");
+            var r = await DrDxt.Application.Tweaks.PreuveDuRepos.EcrireAsync(levier, sonde, 20, AttendreCarte, attente);
+            ReposCarteEnAttente = r.IsOk;
+            if (!r.IsOk) ErreurReposCarte = RaisonLisible.OuIncertain(r, _localize("Carte.Repos.Refuse"), _localize);
+        }
+        // Posé, mais la preuve ne s'est pas gardée : la portée de pose reste ouverte, le journal du helper garde l'origine et
+        // la rend au lancement suivant. L'App ne plante pas, et le dit.
+        catch (IOException)
+        {
+            ReposCarteEnAttente = false;
+            ErreurReposCarte = _localize("Carte.Repos.PreuveNonGardee");
         }
         finally { ReposCarteEnCours = false; }
     }
@@ -1041,8 +1088,17 @@ public sealed partial class ScanViewModel
     private DrDxt.Application.Tweaks.PreuveEnAttente? EcritureReposCarte { get; set; }
 
     /// <summary>Un réglage gardé au repos reste sous surveillance en jeu. Sur le jeu le plus joué depuis, trois
-    /// parties toutes sous les trois d'avant (1 % le plus lent) : retiré, et dit. Sinon rien ne bouge.</summary>
+    /// parties toutes sous les trois d'avant (1 % le plus lent) : retiré, et dit. Sinon rien ne bouge. Changé depuis hors de
+    /// DrDXT : rien n'est réécrit, il n'est plus suivi. « Retiré » ne se dit que relu à l'origine.</summary>
     internal async Task SurveillerLaCarteEnJeuAsync(ITweak levier, IReadOnlyList<DrDxt.Application.Parties.PartieRelevee> parties,
+        DrDxt.Application.Tweaks.ReglagesRetenus retenus)
+    {
+        // Lancée sans attente après chaque partie : son exception se dit au lieu de se perdre ; le réglage reste suivi.
+        try { await SurveillerLaCarteEnJeuSansFiletAsync(levier, parties, retenus); }
+        catch (Exception ex) { VerdictReposCarte = RaisonLisible.Dire(ex, _localize); }
+    }
+
+    private async Task SurveillerLaCarteEnJeuSansFiletAsync(ITweak levier, IReadOnlyList<DrDxt.Application.Parties.PartieRelevee> parties,
         DrDxt.Application.Tweaks.ReglagesRetenus retenus)
     {
         // Après une partie relevée, sans clic : aucune invite Windows ; un retrait refusé reste suivi et se dit.
@@ -1051,16 +1107,42 @@ public sealed partial class ScanViewModel
         var jeu = parties.Where(p => p.Debut >= r.Le).GroupBy(p => p.Jeu, StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
         if (jeu is null) return;
-        if (DrDxt.Application.Parties.ComparaisonDesParties.Juger(parties, r.Le, jeu) != DrDxt.Application.Parties.VerdictEnJeu.Pire) return;
-        var retrait = await levier.RevertAsync(new TweakSnapshot(r.TweakId, r.OriginalValueJson, r.AppliedValueJson));
-        // Un retrait refusé laisse le réglage posé : il reste suivi (le retenu reste), et l'échec est dit.
-        if (!retrait.IsOk)
+        // Jugé jusqu'au changement suivant, comme les bilans : un autre réglage, un pilote ou Windows Update fait après lui
+        // porterait sa perte. Tant que les mises à jour de la machine ne sont pas lues, rien ne se retire.
+        if (InstantsDesMisesAJour() is not { } machine) return;
+        var suivant = (JournalChangements?.Lire() ?? []).Where(c => c.Cle?.StartsWith("pose:", StringComparison.Ordinal) != true)
+            .Select(c => c.Quand).Concat(machine).Where(q => q > r.Le + MemeInstant).Order()
+            .Select(q => (DateTimeOffset?)q).FirstOrDefault();
+        if (DrDxt.Application.Parties.ComparaisonDesParties.Juger(parties, r.Le, jeu, suivant) != DrDxt.Application.Parties.VerdictEnJeu.Pire) return;
+        var snapshot = new TweakSnapshot(r.TweakId, r.OriginalValueJson, r.AppliedValueJson);
+        if (EtatDeLaPose(snapshot) != Pose.DeDrDxt)
+        {
+            retenus.Effacer();
+            await OublierAsync(snapshot.TweakId);
+            VerdictReposCarte = _localize("Carte.Repos.ChangeDepuis");
+            return;
+        }
+        var retrait = await levier.RevertAsync(snapshot);
+        // Un retrait refusé, ou relu encore posé, laisse le réglage en place : il reste suivi (le retenu reste), et l'échec est dit.
+        var relu = retrait.IsOk ? Relu(snapshot) : DrDxt.Application.Tweaks.EtatApplique.Applied;
+        if (relu == DrDxt.Application.Tweaks.EtatApplique.Applied)
         {
             VerdictReposCarte = string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize("Carte.Repos.RetraitRate"), jeu);
             return;
         }
         retenus.Effacer();
-        VerdictReposCarte = string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize("Carte.Repos.PireEnJeu"), jeu);
+        await OublierAsync(snapshot.TweakId);
+        VerdictReposCarte = string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize(
+            relu == DrDxt.Application.Tweaks.EtatApplique.NotApplied ? "Carte.Repos.PireEnJeu" : "Carte.Repos.PireEnJeuNonRelu"), jeu);
+    }
+
+    /// <summary>Un levier qui n'est plus celui de DrDXT (retiré, rendu, ou changé depuis) : il sort du manifeste, puis du journal des
+    /// leviers.</summary>
+    private async Task OublierAsync(string id)
+    {
+        await RetirerDuManifesteAsync(id).ConfigureAwait(true);
+        _journalLeviers?.Retirer(id);
+        ChargerLeviersPoses();
     }
 
     /// <summary>La relecture apres la console : la meme lecture que le scan (DISM /CheckHealth, jamais d'UAC).</summary>
@@ -1088,9 +1170,9 @@ public sealed partial class ScanViewModel
 
     /// <summary>La commande de la console. Chemins absolus tires de l'API, jamais du PATH ni de
     /// $env:SystemRoot (tous deux reglables par l'utilisateur, et la console est elevee) ; -NoProfile
-    /// pour ne pas executer en administrateur le profil PowerShell de l'utilisateur.</summary>
+    /// pour ne pas executer en administrateur le profil PowerShell de l'utilisateur.
     /// <para>Installée, la console passe par le lanceur natif (environnement reconstruit,
-    /// commande fixe écrite dans le lanceur) ; sans lanceur à côté de l'App (build de développement), elle s'ouvre seule.</para>
+    /// commande fixe écrite dans le lanceur) ; sans lanceur à côté de l'App (build de développement), elle s'ouvre seule.</para></summary>
     internal static System.Diagnostics.ProcessStartInfo ConsoleDeReparation(string system32, string? lanceur = null)
     {
         if (lanceur is not null && File.Exists(lanceur))
@@ -1113,7 +1195,7 @@ public sealed partial class ScanViewModel
         OnPropertyChanged(nameof(CarteWindowsVisible));
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private void LancerReparation()
     {
         if (!_reparationARelancer || ReparationLancee) return;
@@ -1131,7 +1213,11 @@ public sealed partial class ScanViewModel
             var console = LancerConsole(ConsoleDeReparation(Environment.GetFolderPath(Environment.SpecialFolder.System),
                 Path.Combine(AppContext.BaseDirectory, DrDxt.App.Platform.RelanceElevee.Lanceur)));
             ReparationLancee = console is not null;
-            if (console is null) return;
+            if (console is null)
+            {
+                EtatReparation = _localize("Reparation.Windows.NonLancee");
+                return;
+            }
             EtatReparation = _localize("Reparation.Windows.Lancee");
             FinDeReparation = AttendreFinDeReparation(console);
         }
@@ -1142,7 +1228,7 @@ public sealed partial class ScanViewModel
         }
         catch (Exception ex)
         {
-            ErreurReparation = $"{_localize("Reparation.Windows.Echec")}{Docteur.DeuxPoints}{ex.Message}";
+            ErreurReparation = $"{_localize("Reparation.Windows.Echec")}{Docteur.DeuxPoints}{RaisonLisible.Dire(ex, _localize)}";
         }
     }
 
@@ -1173,7 +1259,7 @@ public sealed partial class ScanViewModel
         }
         catch (Exception ex)
         {
-            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{ex.Message}";
+            ErreurPlafondEnvoi = $"{_localize("Ping.Protection.Echec")}{Docteur.DeuxPoints}{RaisonLisible.Dire(ex, _localize)}";
         }
         SignalerPlafondEnvoi();
     }
@@ -1210,11 +1296,14 @@ public sealed partial class ScanViewModel
         catch (Exception ex) when (ex is not OperationCanceledException) { return Result.Fail(ErrorCodes.IoFailure, ex.Message); }
     }
 
-    public async Task DesactiverPlafondEnvoiAsync()
+    /// <summary>Le résultat du retrait, relu par le helper ; refusé, le bail du helper le rejoue d'ici
+    /// <see cref="DrDxt.Application.Network.PlafondEnvoiPendantLeJeu.BailSecondes"/> s.</summary>
+    public async Task<Result> DesactiverPlafondEnvoiAsync()
     {
         _battementPlafond?.Cancel();
-        if (_modePlafond is { } mode) await mode.ArreterAsync(CancellationToken.None);
+        var retrait = _modePlafond is { } mode ? await mode.ArreterAsync(CancellationToken.None) : Result.Ok();
         _modePlafond = null;
         _porteeParLeService = false;
+        return retrait;
     }
 }

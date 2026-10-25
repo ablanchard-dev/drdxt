@@ -7,8 +7,7 @@ namespace DrDxt.Reconciler.Manifest;
 //  EMBEDDED PUBLIC MATERIAL ONLY : aucun secret ne doit jamais vivre ici, dans aucune configuration.
 // ───────────────────────────────────────────────────────────────────────────────
 //
-// Ce fichier est la racine de confiance client / service du manifeste du réconciliateur (le
-// moat de persistance). Il ne contient que du matériel sûr à livrer dans un binaire que
+// Ce fichier est la racine de confiance client / service du manifeste du réconciliateur. Il ne contient que du matériel sûr à livrer dans un binaire que
 // n'importe qui peut décompiler :
 //   * la clé publique Ed25519 brute de 32 octets qui vérifie le manifeste : elle ne peut que
 //     vérifier un manifeste d'état voulu signé, jamais en frapper un. L'App + l'hôte

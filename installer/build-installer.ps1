@@ -150,6 +150,23 @@ foreach ($f in @('DrDxt.App.exe', 'DrDxt.ElevatedHelper.exe', 'DrDxt.Lanceur.exe
 }
 
 # --- 3. Embarquer PresentMonService.exe (+ NOTICE) ----------------------------
+# Il tourne en SYSTEM : chaque binaire vendore doit avoir l'empreinte complete notee dans VERSION.txt et la signature
+# Authenticode valide d'Intel. Un binaire remplace (une PR, un disque abime) arrete la construction.
+foreach ($ligne in Get-Content (Join-Path $pmDir 'VERSION.txt')) {
+    if ($ligne -match '^\s+(\S+)\s+[\d ]+\s+sha256:([0-9A-F]{64})\s*$') {
+        $nom, $attendue = $Matches[1], $Matches[2]
+        $fichier = Join-Path $pmDir $nom
+        $lue = (Get-FileHash $fichier -Algorithm SHA256).Hash
+        if ($lue -ne $attendue) { throw "Empreinte differente de VERSION.txt : $nom ($lue)" }
+        if ($nom -match '\.(exe|dll)$') {
+            $sig = Get-AuthenticodeSignature $fichier
+            if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'O=Intel Corporation') {
+                throw "Signature Intel absente ou invalide : $nom ($($sig.Status))"
+            }
+        }
+        Write-Host "  [OK] $nom : empreinte et signature"
+    }
+}
 Copy-Item (Join-Path $pmDir 'PresentMonService.exe') -Destination $publishDir -Force
 Copy-Item (Join-Path $pmDir 'NOTICE-MIT.txt') -Destination (Join-Path $publishDir 'PresentMon-NOTICE-MIT.txt') -Force
 Write-Host "  [OK] PresentMonService.exe + NOTICE"
@@ -168,6 +185,19 @@ dotnet publish "$hostProj" -c $Configuration -r win-x64 --self-contained -o "$se
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish (service) failed (exit $LASTEXITCODE)" }
 if (Test-Path (Join-Path $serviceDir 'DrDxt.ReconcilerHost.exe')) { Write-Host "  [OK] service\DrDxt.ReconcilerHost.exe" }
 else { throw "Payload incomplet : DrDxt.ReconcilerHost.exe manquant dans $serviceDir" }
+
+# Aucun binaire livre ne porte le dossier du developpeur ni la racine du depot : l'editeur de liens natif y ecrivait le
+# chemin complet du .pdb (DrDxt.Lanceur.exe). Lu en ASCII et en UTF-16.
+$traces = @($env:USERPROFILE, $repoRoot) | Where-Object { $_ } | ForEach-Object { [regex]::Escape($_) }
+foreach ($bin in Get-ChildItem $publishDir -Recurse -Include *.exe, *.dll) {
+    $octets = [IO.File]::ReadAllBytes($bin.FullName)
+    $textes = @([Text.Encoding]::ASCII.GetString($octets), [Text.Encoding]::Unicode.GetString($octets),
+        [Text.Encoding]::Unicode.GetString($octets, 1, [Math]::Max(0, $octets.Length - 1)))
+    foreach ($t in $traces) {
+        if ($textes | Where-Object { $_ -match "(?i)$t" }) { throw "Chemin du developpeur dans $($bin.FullName)" }
+    }
+}
+Write-Host "  [OK] aucun chemin du developpeur dans les binaires"
 
 # --- 4. Signer la charge utile ------------------------------------------------
 # Les DEUX executables maison, pas seulement l'installeur : le helper demande l'UAC de son

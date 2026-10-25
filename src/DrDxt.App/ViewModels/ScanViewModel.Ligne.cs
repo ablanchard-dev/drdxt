@@ -36,7 +36,7 @@ public partial class ScanViewModel
         _localize("Ligne.Test.Description"), DrDxt.Measurement.Network.TestDeLigneSousCharge.Hote,
         DrDxt.Measurement.Network.TestDeLigneSousCharge.OctetsMaxParSens / 1_000_000);
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task TesterLigne()
     {
         if (_testerLaLigne is not { } tester || TestLigneEnCours) return;
@@ -47,7 +47,7 @@ public partial class ScanViewModel
         catch (OperationCanceledException) when (arret.IsCancellationRequested) { TexteTestLigne = _localize("Ligne.Test.Annule"); }
         catch (Exception ex)
         {
-            TexteTestLigne = string.Format(System.Globalization.CultureInfo.CurrentUICulture, _localize("Ligne.Test.Echec"), ex.Message);
+            TexteTestLigne = string.Format(System.Globalization.CultureInfo.CurrentUICulture, _localize("Ligne.Test.Echec"), RaisonLisible.Dire(ex, _localize));
         }
         finally
         {

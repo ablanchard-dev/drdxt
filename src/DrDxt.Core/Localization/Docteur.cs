@@ -68,7 +68,10 @@ public static class Docteur
         if (Langue.TwoLetterISOLanguageName == "fr") return null;
         foreach (var (cle, motif) in Motifs.Value)
         {
-            if (motif.Match(nom) is not { Success: true } trouve) continue;
+            System.Text.RegularExpressions.Match trouve;
+            try { trouve = motif.Match(nom); }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException) { return null; }
+            if (!trouve.Success) continue;
             var valeurs = Enumerable.Range(0, 10).TakeWhile(i => trouve.Groups[$"v{i}"].Success)
                 .Select(i => (object?)ValeurTraduite(trouve.Groups[$"v{i}"].Value)).ToArray();
             return T(cle, valeurs);
@@ -76,12 +79,16 @@ public static class Docteur
         return null;
     }
 
+    // Chaque essai a sa limite, comme dans Retraduction : un nom forgé ne fige pas l'affichage, il reste non traduit.
+    private static readonly TimeSpan CorrespondanceMax = TimeSpan.FromMilliseconds(100);
+
     // Les gabarits français ne changent pas : leurs motifs se compilent une fois.
     private static readonly Lazy<(string Cle, System.Text.RegularExpressions.Regex Motif)[]> Motifs = new(() => ClesDeNom
         .Where(cle => s_textes.GetString(cle, Francais) is not null)
         .Select(cle => (cle, new System.Text.RegularExpressions.Regex("^" + System.Text.RegularExpressions.Regex.Replace(
             System.Text.RegularExpressions.Regex.Escape(s_textes.GetString(cle, Francais)!),
-            @"\\\{(\d+)\}", m => $"(?<v{m.Groups[1].Value}>.+?)") + "$", System.Text.RegularExpressions.RegexOptions.Compiled)))
+            @"\\\{(\d+)\}", m => $"(?<v{m.Groups[1].Value}>.+?)") + "$", System.Text.RegularExpressions.RegexOptions.Compiled,
+            CorrespondanceMax)))
         .ToArray());
 
     /// <summary>Tous les textes du docteur dans une langue, clé et gabarit (pour <see cref="Retraduction"/>).</summary>

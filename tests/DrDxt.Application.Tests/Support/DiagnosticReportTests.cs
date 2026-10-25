@@ -342,6 +342,35 @@ public sealed class DiagnosticReportTests
             + "ete traduite en francais");
     }
 
+    // Le test au-dessus ne construit qu'un état : six des dix états de goulot sortaient en noms C# (« CpuBoundStrong »)
+    // sans qu'il rougisse. Chaque valeur de l'énumération est rendue ici.
+    public static TheoryData<BottleneckState> TousLesEtats() => new(Enum.GetValues<BottleneckState>());
+
+    [Theory]
+    [MemberData(nameof(TousLesEtats))]
+    public void Chaque_etat_de_goulot_se_dit_en_mots(BottleneckState etat)
+    {
+        var report = DiagnosticReport.Build(
+            Scan(bottleneck: new BottleneckVerdict(etat, BottleneckConfidence.High, "motif", true)), "1.0.0", When);
+
+        report.Should().NotContain(etat.ToString());
+    }
+
+    // DrDXT n'écrit aucune tension de carte graphique (NoVoltageWriteOpExistsGateTests) : ni une carte validée ni une
+    // carte en lecture seule ne se lisent « voltage manuel : oui » ou « possible après validation ».
+    [Theory]
+    [InlineData("NVIDIA GeForce RTX 3060")]
+    [InlineData("NVIDIA GeForce RTX 4060")]
+    public void Aucune_carte_ne_dit_le_voltage_ouvert(string modele)
+    {
+        var hw = Hw() with { Gpus = new[] { new GpuInfo(modele, "NVIDIA", 8L << 30, "551.86", TriState.On) } };
+
+        var report = DiagnosticReport.Build(Scan() with { Hw = hw }, "1.0.0", When);
+
+        var ligne = report.Split('\n').Single(l => l.Contains(modele) && l.Contains(Docteur.T("Rapport.VoltageJamaisEcrit")));
+        ligne.Should().NotContain(Docteur.T("Rapport.Oui"));
+    }
+
     [Fact]
     public void A_confidence_is_never_shown_without_the_thing_it_qualifies()
     {
@@ -565,10 +594,24 @@ public sealed class DiagnosticReportTests
     [Fact]
     public void Le_0_1_pourcent_low_sort_avec_sa_marge()
     {
-        var avec = new BenchmarkResult(140, 98.3, 80, new List<double> { 7.0 }, null, 2.1, 5, P01LowMarginOfError: 12.3);
+        var mille = Enumerable.Repeat(7.0, 1000).ToList();
+        var avec = new BenchmarkResult(140, 98.3, 80, mille, null, 2.1, 5, P01LowMarginOfError: 12.3);
         DiagnosticReport.Build(Scan(baseline: avec), "1.0.0", When).Should().Contain("Marge (0.1% low)").And.Contain("12.30");
-        var sans = new BenchmarkResult(140, 98.3, 80, new List<double> { 7.0 }, null, 2.1, 5);
+        var sans = new BenchmarkResult(140, 98.3, 80, mille, null, 2.1, 5);
         DiagnosticReport.Build(Scan(baseline: sans), "1.0.0", When).Should().Contain("Marge (0.1% low)");
+    }
+
+    // Sous mille images, le 0,1 % le plus lent n'est qu'une image : la pire. Le rapport collé en public la présentait
+    // comme un 0,1 % low. Il dit combien d'images il manque.
+    [Fact]
+    public void Sous_mille_images_le_0_1_pourcent_low_ne_se_chiffre_pas()
+    {
+        var mesure = new BenchmarkResult(140, 98.3, 80, Enumerable.Repeat(7.0, 300).ToList(), null, 2.1, 5, P01LowMarginOfError: 12.3);
+
+        var report = DiagnosticReport.Build(Scan(baseline: mesure), "1.0.0", When);
+
+        report.Should().Contain(Docteur.T("Rapport.P01Insuffisant", 300, DiagnosticReport.ImagesPourLe01Low));
+        report.Should().NotContain("80.0").And.NotContain("12.30");
     }
 
     [Fact]
@@ -717,7 +760,7 @@ public sealed class DiagnosticReportTests
         // levier n'a rien fait.
         var report = DiagnosticReport.Build(Scan(), "1.0.0", When);
 
-        // La carte dit son état ; ADM1 : la RTX 4060 (Ada) a son rapport archivé.
+        // La carte dit son état : la RTX 4060 (Ada) a son rapport archivé.
         report.Should().Contain("RTX 4060").And.Contain("réglable, validé sur cette architecture");
     }
 

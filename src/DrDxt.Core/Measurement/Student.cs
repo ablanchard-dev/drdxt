@@ -6,7 +6,7 @@ namespace DrDxt.Core;
 /// Trois copies existaient et divergeaient (l'une s'arretait a 9 degres de liberte) ;
 /// toutes retombaient sur 1,96 au-dela de leur table, soit une marge jusqu'a 13,7 % trop etroite.
 /// Au-dela de 20 degres, la derniere valeur de la table est gardee : t decroit avec les degres de
-/// liberte, donc la marge reste au moins aussi large que la vraie (au plus 6 % de trop), jamais plus
+/// liberte, donc la marge reste au moins aussi large que la vraie (au plus 6,4 % de trop), jamais plus
 /// etroite. Valeurs : t(0,975 ; ddl), verifiees contre scipy.stats.t.ppf.
 /// </summary>
 public static class Student

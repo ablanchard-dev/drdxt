@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Runtime.Versioning;
 using DrDxt.Core;
 using DrDxt.ElevatedHelper;
@@ -15,7 +15,7 @@ namespace DrDxt.App.Platform;
 //      le lance élevé (une seule invite UAC via HelperLauncher), puis lui parle par le
 //      named pipe protégé par ACL, en négociant à la connexion une clé éphémère par
 //      session (HandshakingElevatedClient). Aucun développeur ne partage de clé à l'avance.
-//   2. Forcé (ancien smoke test) : si DRDXT_HELPER_SESSION_KEY (base64, >= 32 octets)
+//   2. Forcé (outils de banc, build DEBUG hors Program Files seulement) : si DRDXT_HELPER_SESSION_KEY (base64, >= 32 octets)
 //      est posée, on rend à la place le TypedNamedPipeElevatedClient éprouvé, à clé par
 //      variable d'environnement, pour que les outils m2smoke/r2smoke existants marchent
 //      sans changement (ils lancent le helper en mode ancien et partagent la clé à l'avance).
@@ -24,10 +24,9 @@ namespace DrDxt.App.Platform;
 // échoue proprement et refuse chaque opération (Result.Fail) : l'App ne lève ni ne plante
 // jamais sur un helper absent ; une application échoue simplement proprement.
 //
-// Note : le lancement UAC à la demande est l'étape de dev et de test. L'installeur
-// enregistre ensuite le même exe du helper comme service Windows (une seule invite UAC à
-// l'installation) sur le même pipe et le même handshake : seul le mécanisme de lancement
-// change (un IHelperProcessLauncher qui démarre le service), pas ce canal.
+// Le helper n'est pas un service : il est lancé à la demande, à chaque session. Le service de
+// démarrage (DrDxt.ReconcilerHost) est un autre exécutable, qui exécute ses ops dans son propre
+// processus (InProcessElevatedClient) sans passer par ce canal.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class ElevatedClientFactory
@@ -41,7 +40,29 @@ public static class ElevatedClientFactory
     public const string HelperExeName = PipeServerIdentity.HelperExeName;
 
     /// <summary>Les valeurs HKCU s'écrivent par l'App (jeton de l'utilisateur), le reste par le helper.</summary>
-    public static IElevatedClient Create() => new ClientSessionUtilisateur(new ClientDesPoses(CreerVersLeHelper()));
+    public static IElevatedClient Create()
+        => Create(CompteDuJoueur.Standard(), DrDxt.ElevatedHelper.ModeDesinstallation.MemeCompteQueLaSession());
+
+    /// <param name="compteStandard">Compte hors des Administrateurs : ce qui passe par le helper échoue tout de suite, avec sa
+    /// raison, sans invite ; les valeurs du compte (HKCU) s'écrivent encore par l'App.</param>
+    /// <param name="memeCompteQueLaSession">Faux quand l'App tourne sous un autre compte que celui de la session
+    /// (« Exécuter en tant qu'administrateur » depuis un compte standard) : son HKCU est la ruche de cet autre compte, les
+    /// valeurs du compte y sont refusées plutôt qu'écrites et relues là en disant « posé ».</param>
+    internal static IElevatedClient Create(bool compteStandard, bool memeCompteQueLaSession = true)
+        => DrDxt.ElevatedHelper.ModeDesinstallation.GarderLaRucheDuJoueur(
+            Monter(compteStandard ? new CompteStandardClient() : CreerVersLeHelper(), JournalDuCompte()), memeCompteQueLaSession);
+
+    /// <summary>Le journal d'écriture anticipée des valeurs de la session (HKCU), que l'App écrit elle-même : dans le dossier du
+    /// compte, rejoué par l'App à son lancement (RejeuDuJournalDuCompte).</summary>
+    public static DrDxt.ElevatedHelper.Journal.JournalDEcritureAnticipee JournalDuCompte()
+        => DrDxt.ElevatedHelper.Journal.JournalDEcritureAnticipee.DuCompte(DossierDonnees.Chemin("jea-session.json"));
+
+    /// <summary>Le montage de chaque client de l'App : les valeurs de la session dans l'App, sous le journal du compte ; le reste
+    /// au helper, sous le marquage des poses. Les tests le montent avec un faux registre.</summary>
+    internal static IElevatedClient Monter(IElevatedClient versLeHelper, DrDxt.ElevatedHelper.Journal.JournalDEcritureAnticipee journalDuCompte,
+        DrDxt.ElevatedHelper.Execution.IRegistryActions? registre = null, Func<PrivilegedOp, Func<Result<string?>>?>? lecteur = null,
+        Func<DrDxt.ElevatedHelper.Journal.AppelantDuJournal?>? moi = null)
+        => new ClientSessionUtilisateur(new ClientDesPoses(versLeHelper), registre, journalDuCompte, lecteur, moi);
 
     private static IElevatedClient CreerVersLeHelper()
     {
@@ -82,14 +103,20 @@ public static class ElevatedClientFactory
             ct => launcher.EnsureRunningAsync(spec, ct), inner);
     }
 
+    /// <summary>Le dernier essai des acquits refusés, à la fermeture : sans lancer le helper, aucune invite à ce moment-là.</summary>
+    public static async Task<string?> DernierEssaiDesAcquitsAsync()
+    {
+        // Ceux du journal du compte d'abord : locaux, ils ne demandent pas le helper.
+        var locaux = ClientSessionUtilisateur.ReprendreLesAcquitsLocaux();
+        var helper = await new ClientDesPoses(CreerSansLancerVersLeHelper()).DernierEssaiAsync().ConfigureAwait(false);
+        return helper ?? (locaux ? null : Docteur.T("JEA.AcquitRefuse"));
+    }
+
     /// <summary>Un client qui ne lance jamais le helper : il le reutilise s'il sert deja son
     /// tube (meme garde d'authentification du serveur), sinon il echoue vite (HELPER_UNREACHABLE). Pour les
     /// gestes de fond, comme le rafraichissement de l'habilitation du manifeste : une invite UAC sans geste
     /// de l'utilisateur n'est jamais acceptable.</summary>
-    /// <summary>Le dernier essai des acquits refusés, à la fermeture : sans lancer le helper, aucune invite à ce moment-là.</summary>
-    public static Task<string?> DernierEssaiDesAcquitsAsync() => new ClientDesPoses(CreerSansLancerVersLeHelper()).DernierEssaiAsync();
-
-    public static IElevatedClient CreateSansLancer() => new ClientSessionUtilisateur(new ClientDesPoses(CreerSansLancerVersLeHelper()));
+    public static IElevatedClient CreateSansLancer() => Monter(CreerSansLancerVersLeHelper(), JournalDuCompte());
 
     private static IElevatedClient CreerSansLancerVersLeHelper()
     {
@@ -105,8 +132,8 @@ public static class ElevatedClientFactory
 
     /// <summary>La cle d'environnement vient de HKCU\Environment, ecrivable par tout programme du
     /// compte, et elle selectionne le client legacy, qui ne verifie pas le serveur du tube. Installee sous
-    /// Program Files, l'App l'ignore et passe toujours par la poignee de main ; les outils de developpement
-    /// (lances hors installation) la gardent.</summary>
+    /// Program Files, l'App l'ignore et passe toujours par la poignee de main ; un build de developpement lance hors
+    /// installation la garde. L'App livree l'ignore partout (<see cref="LireCleDeSession"/>).</summary>
     internal static bool CleDEnvironnementPermise(string? processus, string programFiles)
     {
         if (string.IsNullOrWhiteSpace(processus) || string.IsNullOrWhiteSpace(programFiles)) return true;
@@ -119,11 +146,21 @@ public static class ElevatedClientFactory
     }
 
     private static byte[]? ReadSessionKey()
+        => LireCleDeSession(Environment.ProcessPath, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetEnvironmentVariable);
+
+    /// <summary>La clé de session des outils de banc, ou null. Le helper livré l'ignore (mode legacy des builds de
+    /// développement seulement) ; l'App livrée aussi, où qu'elle soit installée : /DIR= ou un dossier copié la mettrait
+    /// hors de Program Files, et la variable ferait prendre le client qui ne vérifie pas le serveur du tube.</summary>
+    internal static byte[]? LireCleDeSession(string? processus, string programFiles, Func<string, string?> environnement)
     {
-        if (!CleDEnvironnementPermise(Environment.ProcessPath,
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)))
+#if !DEBUG
+        _ = (processus, programFiles, environnement);
+        return null;
+#else
+        if (!CleDEnvironnementPermise(processus, programFiles))
             return null;
-        var b64 = Environment.GetEnvironmentVariable(SessionKeyEnv);
+        var b64 = environnement(SessionKeyEnv);
         if (string.IsNullOrWhiteSpace(b64))
             return null;
         try
@@ -135,6 +172,7 @@ public static class ElevatedClientFactory
         {
             return null;
         }
+#endif
     }
 
     // L'exe de l'App en cours (l'image appelante de confiance que le helper autorise).
@@ -166,6 +204,14 @@ public static class ElevatedClientFactory
         {
             return null;
         }
+    }
+
+    /// <summary>Sur un compte standard, le helper ne servirait pas l'App du joueur : chaque opération échoue tout de suite.</summary>
+    private sealed class CompteStandardClient : IElevatedClient
+    {
+        public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct) =>
+            Task.FromResult(Result.Fail(ErrorCodes.CompteStandard,
+                "This Windows account is not an administrator: the elevated helper would run as another account."));
     }
 
     /// <summary>Client qui échoue proprement, utilisé quand aucun canal vers le helper n'est

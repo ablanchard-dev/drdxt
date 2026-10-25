@@ -176,4 +176,28 @@ public class ServiceFailureLogTests
         r[0].Service.Should().Be("chronique", "la recurrence passe avant le compte");
         r[1].Occurrences.Should().Be(10);
     }
+
+    // La lecture s'arrête aux 500 événements les plus récents. Un service qui plante toutes les minutes depuis trente jours
+    // tient alors en huit heures : lu ainsi, une seule journée, il passait pour une rafale d'installeur. Une lecture tronquée
+    // ne connaît pas l'étendue : ni rafale, et le constat le dit.
+    [Fact]
+    public void Une_lecture_tronquee_ne_passe_jamais_pour_une_rafale()
+    {
+        var debut = new DateTimeOffset(2026, 10, 25, 4, 0, 0, TimeSpan.Zero);
+        var boucle = Enumerable.Range(0, 500).Select(i => ("boucle", 7031, debut.AddMinutes(i)));
+
+        var f = WindowsServiceFailureLog.Regrouper(boucle, tronque: true).Single();
+
+        f.Tronque.Should().BeTrue();
+        f.EstUneRafale.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Une_lecture_complete_garde_la_rafale()
+    {
+        var debut = new DateTimeOffset(2026, 10, 25, 4, 0, 0, TimeSpan.Zero);
+        var rafale = Enumerable.Range(0, 21).Select(i => ("atvi-skuld", 7023, debut.AddSeconds(i)));
+
+        WindowsServiceFailureLog.Regrouper(rafale, tronque: false).Single().EstUneRafale.Should().BeTrue("témoin");
+    }
 }

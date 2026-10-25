@@ -45,11 +45,7 @@ public sealed record ProfileRecommendationItem(
     string? AdjustmentNote,
     // Le catalogue dit si le levier s'applique a cette machine. L'ecran s'en sert pour
     // ne pas recommander ce qui ne s'applique pas.
-    bool Applicable = true,
-    // Libellé de catégorie non technique et traduit, pour la vue verrouillée (gratuite) : posé par
-    // le ScanViewModel, qui a la traduction. En dernier et avec valeur par défaut, pour que la
-    // construction positionnelle du consumer compile toujours. Vide tant que le VM ne l'a pas posé.
-    string CategoryLabel = "")
+    bool Applicable = true)
 {
     /// <summary>Un profil pas encore validé sur du vrai matériel est « non vérifié ».</summary>
     public bool IsVerified => Tested;

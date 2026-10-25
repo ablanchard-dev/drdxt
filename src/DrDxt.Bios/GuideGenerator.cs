@@ -14,8 +14,9 @@ namespace DrDxt.Bios;
 ///     donne un guide étiqueté <see cref="GuideConfidence.UnverifiedFallback"/> dont les étapes
 ///     portent quand même le nom exact du réglage (ne jamais laisser l'utilisateur en plan) ;
 ///   • l'ordre de dépendance du ReBAR est Above-4G → CSM → Re-Size BAR ;
-///   • sur un démarrage non UEFI, l'étape de désactivation du CSM est retirée (garde contre le
-///     non-démarrage) et <see cref="RecoverySection.CsmAdviceSuppressed"/> est posé ;
+///   • le CSM n'est jamais une étape ; <see cref="RecoverySection.CsmAdviceSuppressed"/> est posé quand un constat CSM
+///     arrive sur un démarrage non UEFI (garde contre le non-démarrage). BiosAdvisor n'émet ce constat qu'en UEFI : en
+///     production, la garde ne se déclenche donc pas ;
 ///   • l'échelle de récupération obligatoire est émise en haut et en bas.
 ///
 /// N'écrit jamais le BIOS : un guide est du texte / des étapes pour un humain.
@@ -67,10 +68,8 @@ public sealed class GuideGenerator : IGuideGenerator
         // Ne garder que les constats actionnables (classe Guide) ; trier selon l'ordre canonique pour que
         // la chaîne ReBAR se lise correctement. Stable, déterministe.
         //
-        // Le perimetre V1 est reduit. Le cahier exige « la precision par-carte est le produit » ; cette
-        // exigence n'est pas tenable par un dev solo avant la premiere vente, et la bibliotheque compte
-        // 9 guides dont zero verifie sur une vraie carte. Un guide vague qui envoie un client dans son
-        // BIOS, c'est le SAV qui explose.
+        // Le perimetre V1 est reduit : la bibliotheque ne compte aucun guide verifie sur une vraie carte, et un guide
+        // vague qui envoie un joueur dans son BIOS pour un reglage hors de ce perimetre fait plus de mal que de bien.
         var actionable = findings
             .Where(f => f.MatrixClass == BiosMatrixClass.Guide)
             .Where(f => V1Settings.Contains(f.Kind))

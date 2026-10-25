@@ -219,71 +219,6 @@ public sealed class SecurityGateTests
         @"|return\s+true\s*;",
         RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
-    // ─────────────────────────────────────────────────────────────────────────
-    //  (3) fichiers de clés publiques seules : UpdateDevKeys (graine en fichier encadrée par bannière).
-    //
-    //  Invariant : les fichiers de racine de confiance du client n'exposent que du matériel public
-    //  consommable par le code de production. Pour UpdateDevKeys, une graine privée de dev/test n'est tolérée que si :
-    //    (a) elle est clairement encadrée par une bannière dev/test, et
-    //    (b) elle n'est jamais référencée par du code de production (seulement par des tests).
-    //  La porte échoue si une graine privée perd sa bannière dev/test, ou si un fichier de
-    //  production référence le membre graine. EmbeddedKeys (licence) et ManifestDevKeys sont
-    //  tenus à la barre plus stricte « aucune graine dans aucune configuration » (voir (4a) / (4a-bis)).
-    // ─────────────────────────────────────────────────────────────────────────
-    [Theory]
-    [Trait("Category", "SecurityGate")]
-    [InlineData("src/DrDxt.Infrastructure/Updates/UpdateDevKeys.cs", "UpdateDevKeys", "DevPrivateSeed")]
-    // La clé du manifeste (ManifestDevKeys) n'est pas dans cette liste : elle est tenue à une
-    // barre plus stricte qu'une graine en fichier encadrée : sa graine privée n'est livrée nulle
-    // part dans src/ (Debug ou Release), elle ne vit que dans les assemblys de test. Voir
-    // ManifestDevKeys_ShipsNoUsablePrivateSeedInAnyConfig ci-dessous. Seul UpdateDevKeys
-    // garde encore une graine de dev en fichier encadrée par bannière.
-    public void DevPrivateSeedIsBannerFencedAndNeverUsedByProductionCode(
-        string relativePath, string className, string seedMember)
-    {
-        var full = Path.Combine(RepoRoot(), relativePath.Replace('/', Path.DirectorySeparatorChar));
-        File.Exists(full).Should().BeTrue();
-        var source = File.ReadAllText(full);
-
-        // (a) Le membre graine est présent et encadré par une bannière dev/test. On exige le
-        // marqueur dev/test explicite près du fichier (la bannière bien visible « DEV / TEST PRIVATE
-        // SEED ») : son absence veut dire que quelqu'un a retiré l'avertissement.
-        source.Should().Contain(seedMember, $"{relativePath} declares the dev/test seed");
-        source.Should().MatchRegex(
-            @"DEV\s*/\s*TEST",
-            $"{relativePath}: the private seed MUST keep its DEV/TEST banner — a release ships public material only");
-        source.Should().Contain("NEVER READ AT RUNTIME",
-            $"{relativePath}: the private-seed banner must state it is never read by production code");
-
-        // (b1) Dans le fichier déclarant, la graine n'apparaît que comme sa déclaration
-        // (`… byte[] DevPrivateSeed =>`) ; elle n'est jamais consommée par une méthode de
-        // production voisine (ce qui ferait du client un faussaire, par exemple un
-        // `CreateDevSigner() => …FromSeed(DevPrivateSeed)`). Les commentaires et docs XML qui
-        // ne font que nommer la graine sont retirés d'abord, donc seul le vrai code compte.
-        var selfUses = CodeLinesReferencing(full, seedMember)
-            .Where(l => !IsSeedDeclaration(l, seedMember))
-            .ToList();
-        selfUses.Should().BeEmpty(
-            $"{relativePath}: {seedMember} must be DECLARED only — never consumed by production code " +
-            "in its own file (a sibling signer would let the client forge, not just verify):" +
-            Environment.NewLine + string.Join(Environment.NewLine, selfUses));
-
-        // (b2) Aucun autre fichier de production ne peut référencer la graine par son nom
-        // qualifié (`ClassName.DevPrivateSeed`) dans du code. Qualifié, pour qu'une graine de même
-        // nom dans une autre classe ne soit pas mal attribuée. Les tests s'en servent légitimement
-        // (pour signer des fixtures) et vivent hors de src/, donc ils ne sont pas balayés ici.
-        var qualified = $"{className}.{seedMember}";
-        var prodReferers = ProductionCsFiles()
-            .Where(p => !PathEquals(p, full))
-            .Where(p => CodeLinesReferencing(p, qualified).Any())
-            .Select(Rel)
-            .ToList();
-        prodReferers.Should().BeEmpty(
-            $"the dev/test {qualified} must NEVER be referenced by production code outside its own file " +
-            "(only by tests) — a prod reference would mean the client can mint/forge, not just verify:" +
-            Environment.NewLine + string.Join(Environment.NewLine, prodReferers));
-    }
-
     [Fact]
     [Trait("Category", "SecurityGate")]
     public void EmbeddedKeyFilesExposePublicMaterialBanner()
@@ -306,38 +241,37 @@ public sealed class SecurityGateTests
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  (4a) Clé du manifeste : aucune graine privée utilisable dans aucune configuration.
+    //  (4a) Clés de développement (manifeste, mises à jour) : aucune graine privée utilisable dans aucune configuration.
     //
-    //  La clé de signature du manifeste est la racine d'intégrité de la douve. Contrairement aux
-    //  graines de dev de licence et de mise à jour (qui gardent légitimement une graine en fichier
-    //  encadrée), la graine de dev du manifeste ne doit être livrée dans DrDxt.Reconciler.dll ni
-    //  en Debug ni en Release ; elle ne vit que dans les assemblys de test
-    //  (DrDxt.TestSupport.ManifestDevTestKeys, tests/Shared). Donc : ManifestDevKeys.cs ne déclare
-    //  aucun membre graine privée, et le motif d'octets de la graine de dev connue n'apparaît nulle part sous src/.
+    //  La clé du manifeste est la racine d'intégrité de la douve, celle des mises à jour la racine du canal de l'App. Leurs
+    //  graines de dev ne sont livrées dans aucun assemblage, ni en Debug ni en Release ; elles ne vivent que dans les
+    //  assemblys de test (DrDxt.TestSupport, tests/Shared). Donc : le fichier de clés ne déclare aucun membre graine privée,
+    //  et le motif d'octets de la graine de dev connue n'apparaît nulle part sous src/.
     // ─────────────────────────────────────────────────────────────────────────
-    [Fact]
+    [Theory]
     [Trait("Category", "SecurityGate")]
-    public void ManifestDevKeys_ShipsNoUsablePrivateSeedInAnyConfig()
+    [InlineData("src/DrDxt.Reconciler/Manifest/ManifestDevKeys.cs", KnownManifestDevSeedPattern)]
+    [InlineData("src/DrDxt.Infrastructure/Updates/UpdateDevKeys.cs", KnownUpdateDevSeedPattern)]
+    public void DevKeys_ShipNoUsablePrivateSeedInAnyConfig(string relativePath, string knownSeedPattern)
     {
-        var manifestKeys = Path.Combine(RepoRoot(),
-            "src", "DrDxt.Reconciler", "Manifest", "ManifestDevKeys.cs");
-        File.Exists(manifestKeys).Should().BeTrue();
-        var source = File.ReadAllText(manifestKeys);
+        var keys = Path.Combine(RepoRoot(), relativePath.Replace('/', Path.DirectorySeparatorChar));
+        File.Exists(keys).Should().BeTrue();
+        var source = File.ReadAllText(keys);
 
         // Aucun membre graine privée n'est déclaré (un `byte[] …Seed =>/=` serait une clé livrée).
         Regex.IsMatch(source, @"\bbyte\s*\[\s*\]\s*\w*Seed\b")
             .Should().BeFalse(
-                "ManifestDevKeys.cs (the moat's root of trust) must declare NO private seed " +
+                $"{relativePath} (a root of trust) must declare NO private seed " +
                 "member — the dev/test seed lives only in the test assemblies");
 
         // Le motif d'octets de la graine de dev connue ne doit apparaître nulle part dans l'arbre livré
         // (une barrière #if DEBUG embarquerait encore les octets dans un binaire Debug ; ceci est plus strict).
         var offenders = ProductionCsFiles()
-            .Where(p => NormalizeForByteScan(File.ReadAllText(p)).Contains(KnownManifestDevSeedPattern))
+            .Where(p => NormalizeForByteScan(File.ReadAllText(p)).Contains(knownSeedPattern))
             .Select(Rel)
             .ToList();
         offenders.Should().BeEmpty(
-            "the manifest dev/test PRIVATE seed must not be embedded in any src/ binary " +
+            $"the dev/test PRIVATE seed of {relativePath} must not be embedded in any src/ binary " +
             "(Debug or Release) — it belongs only in the test assemblies:" +
             Environment.NewLine + string.Join(Environment.NewLine, offenders));
     }
@@ -420,6 +354,10 @@ public sealed class SecurityGateTests
     private const string KnownManifestDevSeedPattern =
         "0x31,0x5d,0xed,0x95,0x60,0xb6,0xa4,0x94";
 
+    // Même rôle pour la graine de dev des mises à jour (UpdateDevKeys.UpdatePublicKey).
+    private const string KnownUpdateDevSeedPattern =
+        "0x58,0xb9,0x4a,0xa6,0xcb,0xc3,0x06,0x66";
+
     private static string NormalizeForByteScan(string s)
         => new string(s.Where(c => !char.IsWhiteSpace(c)).ToArray()).ToLowerInvariant();
 
@@ -462,31 +400,6 @@ public sealed class SecurityGateTests
             : fullPath;
     }
 
-    private static bool PathEquals(string a, string b)
-        => string.Equals(
-            Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
-
-    // Les lignes de code (commentaires et docs XML retirés) d'un fichier qui référencent le
-    // jeton donné comme mot entier. Le retrait des commentaires fait que les mentions
-    // `<see cref="…"/>` et les bannières en prose, qui nomment légitimement la graine, ne comptent pas.
-    private static IReadOnlyList<string> CodeLinesReferencing(string file, string token)
-    {
-        var word = new Regex($@"(?<![A-Za-z0-9_]){Regex.Escape(token)}(?![A-Za-z0-9_])",
-            RegexOptions.CultureInvariant);
-        return File.ReadLines(file)
-            .Select(StripLineComment)
-            .Where(code => word.IsMatch(code))
-            .Select(code => code.Trim())
-            .ToList();
-    }
-
-    // Vrai si une ligne (sans commentaires) est la déclaration de la graine, par exemple
-    // `public static byte[] DevPrivateSeed =>` : la définition, pas une utilisation pour forger.
-    private static bool IsSeedDeclaration(string codeLine, string seedMember)
-        => Regex.IsMatch(
-            codeLine,
-            $@"\bbyte\s*\[\s*\]\s*{Regex.Escape(seedMember)}\b",
-            RegexOptions.CultureInvariant);
 
     // Retire un commentaire de ligne // final, mais pas un // qui se trouve dans un littéral chaîne.
     private static string StripLineComment(string line)

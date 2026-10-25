@@ -50,8 +50,8 @@ public class GameModeLectureTests
         => Lire(moderne: 0, ancien: 1).Should().Be(TriState.Off);
 
     // Aucune des deux valeurs (ni la cle) : le mode Jeu n'a jamais ete regle, il est donc dans l'etat par defaut de
-    // Windows, actif (Microsoft l'active par defaut pour tout le systeme). « Non lu » disait une panne pour un mode Jeu
-    // actif.
+    // Windows, actif (Microsoft l'active par defaut pour tout le systeme). « Non lu » annoncerait une panne pour un mode
+    // Jeu actif.
     [Fact]
     public void Aucune_des_deux_valeurs_est_le_defaut_de_Windows_actif()
         => Lire(moderne: null, ancien: null).Should().Be(TriState.On);

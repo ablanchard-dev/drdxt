@@ -206,6 +206,22 @@ public sealed class AdlxGpuTuningReaderTests
         r.Value.Points[1].Should().Be(new FanCurvePoint(80, 75));
     }
 
+    // Une lecture réussie sans point n'est pas une courbe : le levier du ventilateur bâtirait son retour d'une courbe vide.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void GetFanCurve_sans_point_n_est_pas_une_courbe(bool pointsNuls)
+    {
+        var fake = new FakeAdlxNative
+        {
+            IsAvailable = true,
+            FanSuccess  = true,
+            FanReads    = new AdlxFanReads { Points = pointsNuls ? null : [] },
+        };
+
+        new AdlxGpuTuningReader(fake).GetFanCurve(0).IsOk.Should().BeFalse();
+    }
+
     [Fact]
     public void GetFanCurve_returns_fail_when_fan_read_fails()
     {
@@ -213,20 +229,6 @@ public sealed class AdlxGpuTuningReaderTests
         var r    = new AdlxGpuTuningReader(fake).GetFanCurve(0);
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
-    }
-
-    [Fact]
-    public void GetFanCurve_returns_empty_curve_when_points_are_null()
-    {
-        var fake = new FakeAdlxNative
-        {
-            IsAvailable = true,
-            FanSuccess  = true,
-            FanReads    = new AdlxFanReads { Points = null },
-        };
-        var r = new AdlxGpuTuningReader(fake).GetFanCurve(0);
-        r.IsOk.Should().BeTrue();
-        r.Value!.Points.Should().BeEmpty();
     }
 
     [Fact]

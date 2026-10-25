@@ -4,20 +4,21 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// 1 030 pictogrammes (dont une partie dans des textes affichés) et 17 marqueurs
-/// « ponytail: » ont été retirés du code. Le dépôt est destiné à être public : ce sont des traces
+/// 1 030 pictogrammes (dont une partie dans des textes affichés) et 17
+/// marqueurs de raccourci ont été retirés du code. Le dépôt est destiné à être public : ce sont des traces
 /// d'écriture générée, pas du code. Ce test fait échouer leur retour dans `src`.
 /// </summary>
 public sealed class SourceSansTraceDeGenerationTests
 {
     // Plages des pictogrammes, comparées par valeur : ce fichier ne doit pas en contenir lui-même.
     private static bool Pictogramme(string ligne) => ligne.EnumerateRunes().Any(r => r.Value is (>= 0x1F300 and <= 0x1FAFF) or (>= 0x2600 and <= 0x27BF) or 0x2B50 or 0x2B55);
-    private static readonly Regex Marqueur = new(@"\bponytail\b", RegexOptions.IgnoreCase);
+    private static readonly Regex Marqueur = new(@"\bp\u006Fnytail\b", RegexOptions.IgnoreCase);
 
     // Le dépôt devient public ; les noms internes du travail (l'agent de revue, les fichiers de boucle) n'y
-    // ont pas leur place. Sensible à la casse : « fable » et « loop » sont aussi des mots courants.
+    // ont pas leur place. Sensible à la casse : en minuscules, ce sont aussi des mots courants. Les noms s'écrivent ici
+    // par échappement, pour que ce test ne les porte pas lui-même.
     // Un prénom de personne n'a rien à faire dans src.
-    private static readonly Regex NomInterne = new(@"\bFable\b|LOOP-DRDXT|\bAlex\b");
+    private static readonly Regex NomInterne = new(@"\bF\u0061ble\b|LOOP-DRDXT|\bAlex\b");
     // Les mots d'insistance les plus fréquents (relevé : never 194, only 159...), en
     // capitales dans un commentaire. Le bandeau de sécurité des clés garde les siennes : c'est un
     // contrat vérifié par SecurityGateTests, pas un cri.

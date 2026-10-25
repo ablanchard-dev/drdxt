@@ -65,23 +65,25 @@ public static class GpuTuningCoverage
     public const string ReasonNotTunableHardware = "Coverage.Reason.NotTunableHardware";
     public const string ReasonLaptopOrHandheld = "Coverage.Reason.LaptopOrHandheld";
 
+    // La preuve d'Ada est celle d'une RTX 4060 (tests/Shared/validations/AdaOrOlder-rtx4060-2026-10-08.txt) : la classe
+    // ne se dit validée que pour les RTX 40.
+    private static readonly System.Text.RegularExpressions.Regex Rtx40 =
+        new(@"\bRTX\s*40\d{2}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Les architectures validées en vie (écriture, relecture, retour). Une architecture n'entre ici qu'avec
+    /// son rapport dans tests/Shared/validations ; la garde <c>UnePreuveDebloqueSonMaterielTests</c> refuse le reste.
+    /// Sans rapport archivé, une architecture reste « lecture seule » jusqu'à sa preuve. Ada est validée par
+    /// AdaOrOlder-rtx4060-2026-10-08.txt (limite de puissance d'une RTX 4060 posée 100 ⇒ 90 %, relue, rendue, relue à 100 %,
+    /// par « Vérifier DrDXT » sur la machine).
+    /// </summary>
+    public static readonly IReadOnlySet<GpuArchitecture> ValideesEnVie = new HashSet<GpuArchitecture> { GpuArchitecture.AdaOrOlder };
+
     /// <summary>
     /// La matrice pour cette machine, une ligne par GPU. Vide seulement quand aucun GPU n'a été
     /// détecté, et ça se dit aussi, plutôt que d'afficher une matrice vide qui ressemble à une
     /// machine sans problème.
     /// </summary>
-    /// <summary>
-    /// Les architectures validées en vie (écriture, relecture, retour). Une architecture n'entre ici qu'avec
-    /// son rapport dans tests/Shared/validations ; la garde <c>UnePreuveDebloqueSonMaterielTests</c> refuse le reste.
-    /// Sans rapport archivé, une architecture reste « lecture seule » jusqu'à sa preuve.
-    /// </summary>
-    /// Ada validée par sa preuve, tests/Shared/validations/AdaOrOlder-rtx4060-2026-10-08.txt (limite de
-    /// puissance d'une RTX 4060 posée 100 ⇒ 90 %, relue, rendue, relue à 100 %, par « Vérifier DrDXT » sur la machine).
-    private static readonly System.Text.RegularExpressions.Regex Rtx40 =
-        new(@"\bRTX\s*40\d{2}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-    public static readonly IReadOnlySet<GpuArchitecture> ValideesEnVie = new HashSet<GpuArchitecture> { GpuArchitecture.AdaOrOlder };
-
     public static IReadOnlyList<GpuCoverageRow> For(HardwareInventory hw) => For(hw, ValideesEnVie);
 
     public static IReadOnlyList<GpuCoverageRow> For(HardwareInventory hw, IReadOnlySet<GpuArchitecture> validees)

@@ -24,7 +24,17 @@ public sealed record CaptureEnPartie(DateTimeOffset Quand, double Fps, double Lo
     // La part des images composées par Windows (0-1) et la latence PC médiane (ms) de la capture ; null = non lues.
     double? PartComposee = null, double? LatencePcMs = null,
     // La mémoire du jeu hors de la carte (mémoire système), en Mo ; null = non lue.
-    double? HorsCarteMo = null);
+    double? HorsCarteMo = null,
+    // L'instrument de la capture (BenchmarkResult.Instrument) ; null = PresentMon.
+    string? Instrument = null,
+    // Les images d'une minute sortie de la fenêtre que le relevé garde entière (ImagesMs vaut alors null).
+    ImagesResumees? Resume = null);
+
+/// <summary>Ce que les chiffres d'une partie tirent des images d'une minute, sans les garder toutes : leur nombre, leur somme
+/// et leur régularité (pour dire la minute jouée ou au menu), ses pauses de présentation, et, sans ces pauses, nombre,
+/// somme et les images les plus lentes (le 1 % low de la partie se prend parmi elles).</summary>
+public sealed record ImagesResumees(int Nombre, double SommeMs, double Cv, int Pauses, int NombreSansPauses,
+    double SommeSansPausesMs, IReadOnlyList<double> PlusLentes);
 
 /// <summary>Un programme qui a chargé le processeur à côté du jeu : son pic (en % d'un cœur, tous ses
 /// processus additionnés) et le nombre de relevés où il dépassait le seuil.</summary>
@@ -52,14 +62,23 @@ public sealed record PartieRelevee(
     double? HorsCarteMoMax = null,
     // Vrai quand le 1 % low porte sur toutes les images des fenêtres jouées ; faux quand c'est la médiane des 1 % low de
     // chaque fenêtre (une fenêtre sans ses images, ou une partie écrite avant). Deux estimateurs ne se comparent pas.
-    bool Low1SurToutesLesImages = false);
+    bool Low1SurToutesLesImages = false,
+    // Vrai quand ce 1 % low écarte les pauses hors premier plan (ReleveDesParties.PauseDePresentationMs) ; une partie écrite
+    // avant les comptait. Un troisième estimateur, qui ne se compare pas aux deux autres.
+    bool Low1SansPauses = false,
+    // Les écarts de plus de PauseDePresentationMs écartés parce que le jeu avait perdu le premier plan dans leur fenêtre.
+    int PausesEcartees = 0,
+    // L'instrument de la partie, celui de la plupart de ses fenêtres ; null = PresentMon. Le repli DXGI ne passe ni par
+    // l'hygiène ni par l'exposition : deux instruments ne se comparent pas.
+    string? Instrument = null);
 
 /// <summary>
 /// Aucune partie jouée ne laissait de trace dans DrDXT. La veille
 /// prend des captures pendant la partie ; à la fin, une ligne. « Inconnu » ne gagne jamais au nombre contre un goulot mesuré.
 ///
 /// Les captures
-/// se suivent sans trou et portent toutes leurs images ; les FPS et le 1 % low se calculent sur toutes les images des
+/// se suivent sans attente (seule la seconde ou deux avant la première image de chaque fenêtre manque) et portent toutes
+/// leurs images ; les FPS et le 1 % low se calculent sur toutes les images des
 /// fenêtres jouées, pas sur une médiane de fenêtres. Les champs gardent leur nom (<c>FpsMedian</c>, <c>Low1Median</c>)
 /// pour ne pas casser les parties déjà écrites : sans images (rejeu, test), ils restent des médianes de captures.
 ///
@@ -77,6 +96,20 @@ public static class ReleveDesParties
 
     /// <summary>Sous ce nombre d'images, une capture n'a pas « ses images » : ses chiffres agrégés font foi.</summary>
     public const int ImagesMinimum = 200;
+
+    /// <summary>Au-delà, un écart dans une fenêtre où le jeu a perdu le premier plan n'est pas une image : le joueur était au
+    /// bureau, le jeu ne présentait plus. Compté, il tirait le 1 % low selon le nombre de passages au bureau. Dans une fenêtre
+    /// restée au premier plan, le même écart est un gel (shaders, pilote) et il compte : rien ne distingue les deux autrement.</summary>
+    public const double PauseDePresentationMs = 2000;
+
+    /// <summary>Les images d'une fenêtre, sans ses pauses quand le jeu y a perdu le premier plan ; et combien en sont parties.
+    /// Limite : le premier plan se lit par fenêtre d'une minute ; un gel au premier plan dans une minute où le joueur a aussi
+    /// quitté le jeu un instant s'écarte avec les pauses.</summary>
+    private static (IEnumerable<double> Images, int Pauses) SansLesPauses(CaptureEnPartie c)
+    {
+        if (c.PremierPlan is not < 0.99) return (c.ImagesMs!, 0);
+        return (c.ImagesMs!.Where(x => x <= PauseDePresentationMs), c.ImagesMs!.Count(x => x > PauseDePresentationMs));
+    }
     /// <summary>Jeu au premier plan moins de la moitié du temps : le joueur était ailleurs.</summary>
     public const double PremierPlanMinimum = 0.5;
     /// <summary>Moins de trois secondes sur dix avec une entrée : on attend, on ne joue pas.</summary>
@@ -92,9 +125,32 @@ public static class ReleveDesParties
     {
         if (c.PremierPlan is { } plan && plan < PremierPlanMinimum) return false;
         if (c.Entrees is { } entrees && entrees < EntreesMinimum) return false;
-        if (c.ImagesMs is { Count: >= ImagesMinimum } images && Cv(images) < CvPlafond && c.Fps < PartDuPlafondMenu * fpsDeReference)
+        if (Nombre(c) >= ImagesMinimum && CvDe(c) < CvPlafond && c.Fps < PartDuPlafondMenu * fpsDeReference)
             return false;
         return true;
+    }
+
+    private static int Nombre(CaptureEnPartie c) => c.ImagesMs?.Count ?? c.Resume?.Nombre ?? 0;
+    private static double CvDe(CaptureEnPartie c) => c.ImagesMs is { } images ? Cv(images) : c.Resume?.Cv ?? double.PositiveInfinity;
+    private static double SommeDe(CaptureEnPartie c) => c.ImagesMs?.Sum() ?? c.Resume?.SommeMs ?? 0;
+
+    /// <summary>Part des images les plus lentes qu'une minute résumée garde. Le 1 % low d'une partie en prend 1 % en tout :
+    /// une minute n'y en apporterait plus que dix fois sa part qu'en étant de loin la pire de la partie.</summary>
+    public const double PartDesPlusLentes = 0.10;
+
+    /// <summary>Pur : la minute, ses images remplacées par leur résumé.</summary>
+    public static CaptureEnPartie Comprimer(CaptureEnPartie c)
+    {
+        if (c.ImagesMs is not { } images) return c;
+        var (sansPauses, pauses) = SansLesPauses(c);
+        var gardees = sansPauses.Where(x => x > 0 && double.IsFinite(x)).ToList();
+        var lentes = gardees.OrderByDescending(x => x).Take((int)Math.Ceiling(gardees.Count * PartDesPlusLentes)).ToList();
+        return c with
+        {
+            ImagesMs = null,
+            Resume = new ImagesResumees(images.Count, images.Sum(), images.Count >= 2 ? Cv(images) : double.PositiveInfinity, pauses,
+                gardees.Count, gardees.Sum(), lentes),
+        };
     }
 
     /// <summary>Le niveau de FPS des fenêtres où le joueur jouait (premier plan + entrées) ; toutes à défaut.</summary>
@@ -124,18 +180,23 @@ public static class ReleveDesParties
             ? BottleneckState.UnknownPartial
             : mesures.GroupBy(c => c.Goulot).OrderByDescending(g => g.Count()).First().Key;
         // Toutes les images des fenêtres jouées ; une seule fenêtre sans ses images, et tout retombe sur les médianes.
-        var images = jouees.All(c => c.ImagesMs is { Count: >= ImagesMinimum }) ? jouees.SelectMany(c => c.ImagesMs!).ToList() : null;
-        double? minutesJouees = captures.Any(c => c.ImagesMs is { Count: >= ImagesMinimum })
-            ? vraimentJouees.Sum(c => (c.ImagesMs ?? []).Sum()) / 60_000 : null;
+        var toutesLesImages = jouees.All(c => Nombre(c) >= ImagesMinimum);
+        var (fps, low1, pauses) = !toutesLesImages ? (Mediane(jouees.Select(c => c.Fps)), Mediane(jouees.Select(c => c.Low1)), 0)
+            : jouees.Any(c => c.Resume is not null) ? DesResumes(jouees)
+            : DesImages(jouees);
+        double? minutesJouees = captures.Any(c => Nombre(c) >= ImagesMinimum)
+            ? vraimentJouees.Sum(SommeDe) / 60_000 : null;
         return new PartieRelevee(jeu, captures.Min(c => c.Quand), captures.Max(c => c.Quand), captures.Count,
-            images is null ? Mediane(jouees.Select(c => c.Fps)) : DrDxt.Measurement.FrametimeStatistics.AvgFps(images),
-            images is null ? Mediane(jouees.Select(c => c.Low1)) : DrDxt.Measurement.FrametimeStatistics.P1LowFps(images), goulot,
+            fps, low1, goulot,
             MedianeLue(jouees.Select(c => c.Mhz)), MedianeLue(jouees.Select(c => c.Watts)),
             // La chaleur se juge à son pic, pas à sa médiane.
             captures.Select(c => c.Celsius).OfType<double>().DefaultIfEmpty().Max() is var t and > 0 ? t : null)
         {
             MinutesJouees = minutesJouees,
-            Low1SurToutesLesImages = images is not null,
+            Low1SurToutesLesImages = toutesLesImages,
+            Low1SansPauses = toutesLesImages,
+            PausesEcartees = pauses,
+            Instrument = jouees.GroupBy(c => c.Instrument).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault(),
             Freinage = FreinageCpu.Cumuler(jouees.Select(c => c.Freinage)),
             // Sur toutes les captures : un ventilateur qui s'arrête dans un menu s'arrête quand même.
             Ventilateurs = VentilateursEnPartie.Cumuler(captures.Select(c => c.Ventilateurs)),
@@ -164,6 +225,30 @@ public static class ReleveDesParties
             // Ce que la limite de puissance a fait pendant la partie, par le pilote.
             MecanismeCarte = MecanismeCarte.Cumuler(captures.Select(c => c.MecanismeCarte)),
         };
+    }
+
+    /// <summary>Toutes les images des fenêtres jouées, sans leurs pauses.</summary>
+    private static (double Fps, double Low1, int Pauses) DesImages(IReadOnlyList<CaptureEnPartie> jouees)
+    {
+        var fenetres = jouees.Select(SansLesPauses).ToList();
+        var images = fenetres.SelectMany(f => f.Images).ToList();
+        return (DrDxt.Measurement.FrametimeStatistics.AvgFps(images), DrDxt.Measurement.FrametimeStatistics.P1LowFps(images),
+            fenetres.Sum(f => f.Pauses));
+    }
+
+    /// <summary>Le même calcul quand des minutes sont résumées : la moyenne par nombre et somme, le 1 % low parmi les images
+    /// gardées entières et les plus lentes des minutes résumées (même compte de pires images que sur toutes).</summary>
+    private static (double Fps, double Low1, int Pauses) DesResumes(IReadOnlyList<CaptureEnPartie> jouees)
+    {
+        var entieres = jouees.Where(c => c.ImagesMs is not null).Select(SansLesPauses).ToList();
+        var resumes = jouees.Select(c => c.Resume).OfType<ImagesResumees>().ToList();
+        var images = entieres.SelectMany(f => f.Images).Where(x => x > 0 && double.IsFinite(x)).ToList();
+        var nombre = images.Count + resumes.Sum(r => r.NombreSansPauses);
+        if (nombre == 0) return (0, 0, 0);
+        var moyenne = (images.Sum() + resumes.Sum(r => r.SommeSansPausesMs)) / nombre;
+        var pires = images.Concat(resumes.SelectMany(r => r.PlusLentes)).OrderByDescending(x => x)
+            .Take(Math.Max(1, (int)Math.Ceiling(nombre * 0.01))).Average();
+        return (moyenne <= 0 ? 0 : 1000.0 / moyenne, pires <= 0 ? 0 : 1000.0 / pires, entieres.Sum(f => f.Pauses) + resumes.Sum(r => r.Pauses));
     }
 
     /// <summary>La route qui se dégrade d'une partie à l'autre. Même règle que les autres juges :
@@ -225,7 +310,7 @@ public static class ReleveDesParties
     /// parties d'avant un changement de BIOS passeraient pour « ralenties » ; et un jeu limité par la carte ou plafonné charge
     /// peu les cœurs, leur fréquence basse n'y est pas un ralentissement. Sans l'une des valeurs : faux.</summary>
     public static bool RalentitEnPartie(PartieRelevee p)
-        => p.Goulot == BottleneckState.CpuBoundOrAppBound
+        => p.Goulot is BottleneckState.CpuBoundOrAppBound or BottleneckState.CpuBoundStrong
            && p.MhzMedian is { } enPartie && p.BancMhz is { } banc && banc > 0
            && enPartie < SeuilRalentissement * banc;
 

@@ -17,6 +17,10 @@ public interface IRestorePointService
     /// <summary>Vrai quand la Restauration du système est active et qu'un point peut être créé.</summary>
     bool IsEnabled();
 
+    /// <summary>Une stratégie de Windows (« Désactiver la Restauration du système », DisableSR) l'interdit : ni le joueur ni
+    /// DrDXT ne peuvent l'activer. Par défaut : non.</summary>
+    bool InterditeParStrategie() => false;
+
     /// <summary>Tentative, au mieux, d'activer la Restauration du système (peut échouer en silence
     /// sous GPO ou sur une édition non prise en charge). Vrai seulement si elle est utilisable ensuite.</summary>
     bool TryEnable();

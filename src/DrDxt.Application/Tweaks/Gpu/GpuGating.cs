@@ -35,18 +35,10 @@ internal static class GpuGating
     public static bool IsNvidia(GpuInfo g) =>
         g.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase);
 
-    public static bool IsAmd(GpuInfo g) =>
-        g.Vendor.Contains("AMD", StringComparison.OrdinalIgnoreCase)
-        || g.Vendor.Contains("Advanced Micro Devices", StringComparison.OrdinalIgnoreCase)
-        || g.Vendor.Contains("ATI", StringComparison.OrdinalIgnoreCase);
+    public static bool IsAmd(GpuInfo g) => CartesGraphiques.EstAmd(g.Vendor);
 
-    private static bool IsIntel(GpuInfo g) =>
-        g.Vendor.Contains("Intel", StringComparison.OrdinalIgnoreCase);
-
-    // Un GPU dédié a de la VRAM dédiée. Les GPU intégrés en rapportent ~0 (ils partagent
-    // la mémoire système) : tout ce qui est sous 1 Gio compte comme intégré.
-    private static bool IsDiscrete(GpuInfo g) =>
-        !IsIntel(g) && g.VramBytes >= (1L << 30);
+    // La règle unique du produit (mémoire et nom) : une APU à grosse réserve UMA n'est pas une carte dédiée.
+    private static bool IsDiscrete(GpuInfo g) => CartesGraphiques.EstDediee(g);
 
     // Les GPU mobiles sont verrouillés par le pilote (pas de contrôle horloge / puissance / ventilateur par ces chemins).
     private static bool IsMobileGpu(GpuInfo g) =>
@@ -54,10 +46,9 @@ internal static class GpuGating
         || g.Model.Contains("Mobile", StringComparison.OrdinalIgnoreCase)
         || g.Model.Contains("Max-Q", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Vrai quand ce GPU NVIDIA accepte l'écriture directe de sous-tension.
-    /// Sur Blackwell (RTX 50) la voie de tension est verrouillée (recette) : une garde de
-    /// sous-tension doit y passer par limite de puissance + décalage cœur. Délègue au
-    /// GpuArchitectureGate public (un seul classificateur partagé).</summary>
+    /// <summary>Vrai quand l'architecture de ce GPU permet l'écriture directe de sous-tension (voir
+    /// GpuArchitectureGate.SupportsVoltageUndervolt(GpuInfo), dont c'est le relais). Sur Blackwell (RTX 50) la voie de
+    /// tension est verrouillée : une garde de sous-tension y passe par limite de puissance + décalage cœur.</summary>
     public static bool SupportsVoltageUndervolt(GpuInfo g) =>
         GpuArchitectureGate.SupportsVoltageUndervolt(g);
 }
@@ -94,8 +85,8 @@ public static class GpuArchitectureGate
     private static readonly Regex Rdna4Model =
         new(@"\bRX\s*9\d{3}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    /// <summary>Classe le nom commercial d'un GPU NVIDIA en architecture grossière.
-    /// Nom inconnu ou non NVIDIA → Unknown (les gardes le traitent avec prudence).</summary>
+    /// <summary>Classe le nom commercial d'un GPU NVIDIA ou Radeon (RDNA 2 à 4) en architecture grossière.
+    /// Nom inconnu ou d'un autre fabricant → Unknown (les gardes le traitent avec prudence).</summary>
     public static GpuArchitecture ClassifyByName(string? model)
     {
         if (string.IsNullOrWhiteSpace(model))
@@ -118,7 +109,8 @@ public static class GpuArchitectureGate
     /// traité avec prudence comme non pris en charge (jamais d'écriture supposée sûre).</summary>
     public static bool SupportsVoltageUndervolt(GpuArchitecture architecture) => architecture switch
     {
-        // Validees en ecriture sur une vraie carte.
+        // L'architecture garde le voltage. Ce n'est pas une validation : le rapport archive (GpuTuningCoverage.ValideesEnVie,
+        // seule Ada en a un) ne sert qu'a la couverture affichee ; aucun levier ne le consulte avant d'ecrire.
         GpuArchitecture.AdaOrOlder => true,
         GpuArchitecture.Rdna4 => true,
         // Blackwell : NVIDIA a verrouille le chemin voltage.
@@ -131,9 +123,10 @@ public static class GpuArchitectureGate
         _ => false,
     };
 
-    /// <summary>Vrai quand ce GPU accepte l'écriture directe de sous-tension. Les GPU NVIDIA
-    /// Blackwell (RTX 50) sont exclus (passer par limite de puissance + décalage cœur) ;
-    /// les GPU non NVIDIA rendent vrai (la sous-tension ADLX d'AMD est une voie à part, non touchée).</summary>
+    /// <summary>Vrai quand ce GPU permet l'écriture directe de sous-tension. NVIDIA : vrai sauf Blackwell (RTX 50), qui
+    /// passe par limite de puissance + décalage cœur. AMD : faux pour RDNA 2 et RDNA 3 (jamais testées en écriture), vrai
+    /// pour les autres cartes, même non classées : elles gardent leur chemin ADLX. Le classificateur par architecture, lui,
+    /// rend faux pour une architecture inconnue ; les deux ne répondent donc pas pareil pour un AMD non classé.</summary>
     public static bool SupportsVoltageUndervolt(GpuInfo gpu)
     {
         var architecture = ClassifyByName(gpu.Model);

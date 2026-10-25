@@ -64,7 +64,7 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void VerifyManifest_RealKeySignature_IsOk()
     {
-        var manifest = Signed(UnsignedManifest(), UpdateDevKeys.DevPrivateSeed);
+        var manifest = Signed(UnsignedManifest(), UpdateDevTestKeys.DevPrivateSeed);
 
         EmbeddedVerifier().VerifyManifest(manifest).IsOk.Should().BeTrue();
     }
@@ -93,7 +93,7 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void VerifyManifest_SignatureFlippedByOneByte_Fails()
     {
-        var manifest = Signed(UnsignedManifest(), UpdateDevKeys.DevPrivateSeed);
+        var manifest = Signed(UnsignedManifest(), UpdateDevTestKeys.DevPrivateSeed);
         var sig = Convert.FromBase64String(manifest.Signature);
         sig[0] ^= 0x01;
         manifest = manifest with { Signature = Convert.ToBase64String(sig) };
@@ -107,7 +107,7 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void VerifyManifest_TamperedUrlAfterSigning_Fails()
     {
-        var signed = Signed(UnsignedManifest(), UpdateDevKeys.DevPrivateSeed);
+        var signed = Signed(UnsignedManifest(), UpdateDevTestKeys.DevPrivateSeed);
 
         // L'attaquant remplace l'URL de téléchargement mais réutilise l'ancienne signature.
         var tampered = signed with { Url = "https://evil.example/malware.zip" };
@@ -121,7 +121,7 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void VerifyManifest_TamperedSha256AfterSigning_Fails()
     {
-        var signed = Signed(UnsignedManifest(), UpdateDevKeys.DevPrivateSeed);
+        var signed = Signed(UnsignedManifest(), UpdateDevTestKeys.DevPrivateSeed);
 
         // L'attaquant remplace l'empreinte attendue (pour coller à sa charge) mais réutilise la signature.
         var tampered = signed with { Sha256 = Sha256Hex(Encoding.UTF8.GetBytes("attacker-payload")) };
@@ -137,7 +137,7 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void VerifyManifest_TamperedVersionAfterSigning_Fails()
     {
-        var signed = Signed(UnsignedManifest(version: "1.3.0"), UpdateDevKeys.DevPrivateSeed);
+        var signed = Signed(UnsignedManifest(version: "1.3.0"), UpdateDevTestKeys.DevPrivateSeed);
         var tampered = signed with { Version = "9.9.9" };
 
         EmbeddedVerifier().VerifyManifest(tampered).Error!.Value.Code
@@ -147,7 +147,7 @@ public sealed class UpdatePackageVerifierTests
     [Fact]
     public void VerifyManifest_TamperedChannelAfterSigning_Fails()
     {
-        var signed = Signed(UnsignedManifest(channel: (UpdateChannel)7), UpdateDevKeys.DevPrivateSeed);
+        var signed = Signed(UnsignedManifest(channel: (UpdateChannel)7), UpdateDevTestKeys.DevPrivateSeed);
         var tampered = signed with { Channel = UpdateChannel.App };
 
         EmbeddedVerifier().VerifyManifest(tampered).Error!.Value.Code
@@ -194,7 +194,7 @@ public sealed class UpdatePackageVerifierTests
         var created = UpdateDevKeys.CreateUpdateVerifier();
         created.IsOk.Should().BeTrue();
 
-        var manifest = Signed(UnsignedManifest(), UpdateDevKeys.DevPrivateSeed);
+        var manifest = Signed(UnsignedManifest(), UpdateDevTestKeys.DevPrivateSeed);
         created.Value!.VerifyManifest(manifest).IsOk.Should().BeTrue();
     }
 
@@ -204,7 +204,7 @@ public sealed class UpdatePackageVerifierTests
     public void VerifyPayload_MatchingHash_IsOk()
     {
         var payload = Encoding.UTF8.GetBytes("the-update-payload-bytes");
-        var manifest = Signed(UnsignedManifest(payload: payload), UpdateDevKeys.DevPrivateSeed);
+        var manifest = Signed(UnsignedManifest(payload: payload), UpdateDevTestKeys.DevPrivateSeed);
 
         EmbeddedVerifier()
             .VerifyPayload(manifest, payload, InstalledVersion, allowDowngrade: false)
@@ -218,7 +218,7 @@ public sealed class UpdatePackageVerifierTests
         // (remplacée sur le CDN, par exemple). Le sha256 signé ne correspond plus → refuser.
         var manifest = Signed(
             UnsignedManifest(payload: Encoding.UTF8.GetBytes("the-real-payload")),
-            UpdateDevKeys.DevPrivateSeed);
+            UpdateDevTestKeys.DevPrivateSeed);
         var attackerPayload = Encoding.UTF8.GetBytes("a-tampered-payload");
 
         var result = EmbeddedVerifier()
@@ -233,7 +233,7 @@ public sealed class UpdatePackageVerifierTests
     {
         var payload = Encoding.UTF8.GetBytes("older-version-payload");
         var manifest = Signed(
-            UnsignedManifest(version: "1.1.0", payload: payload), UpdateDevKeys.DevPrivateSeed);
+            UnsignedManifest(version: "1.1.0", payload: payload), UpdateDevTestKeys.DevPrivateSeed);
 
         var result = EmbeddedVerifier()
             .VerifyPayload(manifest, payload, InstalledVersion, allowDowngrade: false);
@@ -247,7 +247,7 @@ public sealed class UpdatePackageVerifierTests
     {
         var payload = Encoding.UTF8.GetBytes("beta-rollback-payload");
         var manifest = Signed(
-            UnsignedManifest(version: "1.1.0", payload: payload), UpdateDevKeys.DevPrivateSeed);
+            UnsignedManifest(version: "1.1.0", payload: payload), UpdateDevTestKeys.DevPrivateSeed);
 
         EmbeddedVerifier()
             .VerifyPayload(manifest, payload, InstalledVersion, allowDowngrade: true)
@@ -259,7 +259,7 @@ public sealed class UpdatePackageVerifierTests
     {
         var payload = Encoding.UTF8.GetBytes("same-version-payload");
         var manifest = Signed(
-            UnsignedManifest(version: InstalledVersion, payload: payload), UpdateDevKeys.DevPrivateSeed);
+            UnsignedManifest(version: InstalledVersion, payload: payload), UpdateDevTestKeys.DevPrivateSeed);
 
         EmbeddedVerifier()
             .VerifyPayload(manifest, payload, InstalledVersion, allowDowngrade: false)
@@ -275,6 +275,17 @@ public sealed class UpdatePackageVerifierTests
         UpdateVerifier.IsDowngrade("2.0.0", "1.9.9").Should().BeFalse();
         UpdateVerifier.IsDowngrade("1.0.0", "1.0.0").Should().BeFalse();
     }
+
+    // « 1.0.0-rc.1 » se découpait en 1.0.0.1 et passait pour plus récente que 1.0.0 : une préversion signée était proposée
+    // par-dessus la version stable. Seul le cœur numérique se compare ; à cœur égal, une préversion est plus ancienne.
+    [Theory]
+    [InlineData("1.0.0-rc.1", "1.0.0", true)]
+    [InlineData("1.0.0", "1.0.0-rc.1", false)]
+    [InlineData("1.0.1-rc.1", "1.0.0", false)]
+    [InlineData("1.0.0+abc1234", "1.0.0", false)]
+    [InlineData("1.0.0-rc.1", "1.0.0-rc.1", false)]
+    public void Une_preversion_est_plus_ancienne_que_sa_version_stable(string candidate, string installee, bool retrograde)
+        => UpdateVerifier.IsDowngrade(candidate, installee).Should().Be(retrograde);
 
     // ── Forme canonique : déterminisme et stabilité ───────────────────────────────
 

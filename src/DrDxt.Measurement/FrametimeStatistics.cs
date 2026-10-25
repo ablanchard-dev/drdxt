@@ -4,7 +4,7 @@ namespace DrDxt.Measurement;
 
 /// <summary>
 /// Stats frametime. 1%/0.1% low = moyenne du pire centile de frames (façon GamersNexus/CapFrameX),
-/// exprimée en FPS. Marge d'erreur = IC 95% de la moyenne (t≈1.96 grand n). Code pur, aucun I/O.
+/// exprimée en FPS. Marge d'erreur = IC 95% de la moyenne (t de Student selon les degrés de liberté). Code pur, aucun I/O.
 /// Garde-fou d'entrée : les frametimes invalides (≤ 0, NaN, Inf, ex. frame droppée PresentMon) sont
 /// filtrés avant tout calcul, pour qu'une ligne aberrante ne corrompe pas silencieusement un résultat.
 /// </summary>

@@ -88,4 +88,32 @@ public sealed class L_attente_des_compteurs_se_paie_avant_le_scan_Tests : IDispo
             "le gain vient du MOMENT ou l'attente se paie : sans l'appel au lancement, "
             + "elle retombe integralement sur le premier scan");
     }
+
+    [Fact]
+    public void L_amorce_est_branchee_au_releve_de_fond()
+    {
+        // Le releve de fond demarre a l'ouverture de session, sans fenetre et sans scan : sans l'amorce, l'initialisation
+        // de perflib tombait a la premiere lecture du processeur, en pleine premiere partie.
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DrDXT.sln"))) dir = dir.Parent;
+        var demarrage = File.ReadAllText(Path.Combine(dir!.FullName, "src", "DrDxt.App", "App.xaml.cs"));
+        var debut = demarrage.IndexOf("private void ReleverEnFond(", StringComparison.Ordinal);
+        var fin = demarrage.IndexOf("private static void BrancherReglagesSuivis(", debut, StringComparison.Ordinal);
+
+        demarrage[debut..fin].Should().Contain("AmorceDesCompteurs.AuLancementAsync()");
+    }
+
+    [Fact]
+    public void Le_releve_de_fond_se_met_lui_meme_en_priorite_basse()
+    {
+        // Seul le défaut du Planificateur le mettait sous Normal : le premier relevé, lancé par l'installeur, tournait en
+        // Normal jusqu'à la connexion suivante, à côté du jeu.
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DrDXT.sln"))) dir = dir.Parent;
+        var demarrage = File.ReadAllText(Path.Combine(dir!.FullName, "src", "DrDxt.App", "App.xaml.cs"));
+        var debut = demarrage.IndexOf("private void ReleverEnFond(", StringComparison.Ordinal);
+        var fin = demarrage.IndexOf("private static void BrancherReglagesSuivis(", debut, StringComparison.Ordinal);
+
+        demarrage[debut..fin].Should().Contain("ProcessPriorityClass.BelowNormal");
+    }
 }

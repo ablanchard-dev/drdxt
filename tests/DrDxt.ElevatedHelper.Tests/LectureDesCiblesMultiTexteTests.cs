@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 // La désinstallation ne rend une feuille que si la valeur relue est celle que DrDXT a posée. Un REG_MULTI_SZ (PagingFiles)
-// se lisait « illisible » : le fichier d'échange déplacé par DrDXT ne revenait jamais à sa place.
+// lu « illisible » empêcherait le fichier d'échange déplacé par DrDXT de revenir à sa place.
 public sealed class LectureDesCiblesMultiTexteTests
 {
     [Fact]

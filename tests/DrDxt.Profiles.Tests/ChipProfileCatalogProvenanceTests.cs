@@ -40,7 +40,7 @@ public sealed class ChipProfileCatalogProvenanceTests
         foreach (var profile in Catalog.All())
         foreach (var selection in profile.Selections)
             real.Should().Contain(selection.TweakId,
-                $"profile '{profile.Id}' must only select tweaks that exist in the M2 catalog");
+                $"profile '{profile.Id}' must only select tweaks that exist in the catalog");
     }
 
     [Fact]
@@ -50,7 +50,7 @@ public sealed class ChipProfileCatalogProvenanceTests
         foreach (var selection in profile.Selections)
         {
             selection.Evidence.Source.Should().NotBeNullOrWhiteSpace(
-                $"every gain claim in '{profile.Id}' must cite a source (honesty §11)");
+                $"every gain claim in '{profile.Id}' must cite a source");
             selection.Evidence.Claim.Should().NotBeNullOrWhiteSpace();
             selection.Parameters.Should().NotBeNull();
         }

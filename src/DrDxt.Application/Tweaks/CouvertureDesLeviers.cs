@@ -29,6 +29,26 @@ public static class CouvertureDesLeviers
                 ? l : l with { VerifieIci = true })
             .ToList();
 
+    // La carte de la machine se redessine plusieurs fois par scan, et un levier peut lire l'écran ou le pilote dans AppliesTo
+    // (mesuré le 25/10/2026 sur la machine de référence : 30 à 50 ms par lecture de l'écran de jeu, 60 à 180 ms pour tout le
+    // catalogue). Pour un même scan, le même inventaire et le même relevé (par référence), chaque levier se juge une fois par
+    // châssis. Un nouveau scan apporte un nouveau relevé, donc un nouveau jugement.
+    private sealed class Jugements
+    {
+        public readonly System.Collections.Concurrent.ConcurrentDictionary<(string Id, ChassisType Chassis), bool> Appliques = new();
+        public readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> NonLus = new(StringComparer.Ordinal);
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<HardwareInventory,
+        System.Runtime.CompilerServices.ConditionalWeakTable<SettingsState, Jugements>> ParScan = new();
+
+    private static bool Applique(ITweak t, HardwareInventory hw, ChassisType chassis, SettingsState etat)
+        => ParScan.GetOrCreateValue(hw).GetOrCreateValue(etat).Appliques
+            .GetOrAdd((t.Id, chassis), _ => t.AppliesTo(chassis == hw.Chassis ? hw : hw with { Chassis = chassis }, etat));
+
+    private static bool NonLu(ITweak t, HardwareInventory hw, SettingsState etat)
+        => ParScan.GetOrCreateValue(hw).GetOrCreateValue(etat).NonLus.GetOrAdd(t.Id, _ => t.EtatNonLu(etat));
+
     private static IEnumerable<LevierSurCeMateriel> Statuts(IEnumerable<ITweak> catalogue, HardwareInventory hw,
         SettingsState etat, IReadOnlySet<string> poses)
         => catalogue.Select(t =>
@@ -37,9 +57,15 @@ public static class CouvertureDesLeviers
             : poses.Contains(t.Id) ? new LevierSurCeMateriel(t.Id, StatutDuLevier.Pose)
             // L'autopilote n'écrit ni fréquence, ni tension, ni ventilateur : ces leviers vivent dans le mode Expert.
             : DrDxt.Core.CandidateSelector.ReglagesCarteInterdits.Contains(t.Id) ? new LevierSurCeMateriel(t.Id, StatutDuLevier.Expert)
-            : t.AppliesTo(hw, etat) ? new LevierSurCeMateriel(t.Id, StatutDuLevier.APoser)
-            : t.EtatNonLu(etat) ? new LevierSurCeMateriel(t.Id, StatutDuLevier.NonLu)
+            : Applique(t, hw, hw.Chassis, etat) ? new LevierSurCeMateriel(t.Id, StatutDuLevier.APoser)
+            : NonLu(t, hw, etat) || TenuParLeChassis(t, hw, etat) ? new LevierSurCeMateriel(t.Id, StatutDuLevier.NonLu)
             : new LevierSurCeMateriel(t.Id, StatutDuLevier.DejaBon));
+
+    /// <summary>Le châssis n'est pas lu (un portable dont le SMBIOS dit « Other », avec sa batterie) et le levier s'appliquerait
+    /// sur un PC fixe ou un portable : ce qui le tient hors d'ici, c'est le châssis inconnu, pas un réglage déjà bon.</summary>
+    private static bool TenuParLeChassis(ITweak t, HardwareInventory hw, SettingsState etat)
+        => hw.Chassis == ChassisType.Unknown
+           && (Applique(t, hw, ChassisType.Desktop, etat) || Applique(t, hw, ChassisType.Laptop, etat));
 
     private static readonly IReadOnlyDictionary<string, string> Domaines = new Dictionary<string, string>(StringComparer.Ordinal)
     {
@@ -86,7 +112,7 @@ public static class CouvertureDesLeviers
     {
         var console = hw.Chassis == ChassisType.Handheld;
         var portable = hw.Chassis == ChassisType.Laptop;
-        var carteDediee = hw.Gpus.Any(g => !g.Vendor.Contains("Intel", StringComparison.OrdinalIgnoreCase) && g.VramBytes >= 1L << 30);
+        var carteDediee = CartesGraphiques.CarteDediee(hw) is not null;
         var nvidia = hw.Gpus.Any(g => g.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase));
         var intel = hw.Cpu.Vendor.Contains("Intel", StringComparison.OrdinalIgnoreCase);
         return id switch
@@ -116,6 +142,7 @@ public static class CouvertureDesLeviers
             "latency.prefer_max_perf" or "gpu.repos_global_normal" when !nvidia => "Levier.PasIci.PasNvidia",
             "gpu.undervolt" or "gpu.power_limit" or "latency.render_queue_cap" or "latency.vrr_vsync_cap"
                 when !carteDediee => "Levier.PasIci.PasDeCarteDediee",
+            "gpu.power_limit" when !nvidia => "Levier.PasIci.PuissanceAmd",
             _ => null,
         };
     }

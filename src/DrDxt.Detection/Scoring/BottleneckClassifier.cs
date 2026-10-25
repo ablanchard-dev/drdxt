@@ -84,6 +84,19 @@ public static class BottleneckClassifier
     /// 3-run repeatability » ; en dessous, le verdict s'affiche mais reste provisoire.</summary>
     public const int RunsForStrongClaim = 3;
 
+    /// <summary>Le bridage vu pendant la mesure, par la règle du produit (<see cref="GpuLimiter.Classer"/>, la même que la
+    /// session d'optimisation) sur les raisons que le pilote publie : plafond thermique ou de puissance = bridé ; raisons lues
+    /// sans plafond = non bridé ; rien de lu, ou une chute sans raison publiée = non lu.</summary>
+    public static bool? Bridage(HardwareObservation? materiel)
+        => materiel is not { RaisonsVues: not null } m
+            ? null
+            : GpuLimiter.Classer(m.RaisonsVues, null, m.FrequenceMedianeMhz, m.FrequenceMinimaleMhz) switch
+            {
+                GpuLimiterObserved.PlafondThermiqueObserve or GpuLimiterObserved.PlafondPuissanceObserve => true,
+                GpuLimiterObserved.RienDeBridant => false,
+                _ => null,
+            };
+
     /// <summary>
     /// Classe une session mesurée.
     /// </summary>

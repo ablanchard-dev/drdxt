@@ -22,6 +22,33 @@ public sealed class ComparaisonDesPartiesTests
         ComparaisonDesParties.Juger(parties, Reglage, "cod").Should().Be(VerdictEnJeu.Pire);
     }
 
+    // Un autre changement fait après lui : les parties d'après le suivant portent l'effet de l'autre. Sans borne, il était
+    // retiré et la perte lui était attribuée.
+    [Fact]
+    public void Les_parties_d_apres_le_changement_suivant_ne_jugent_pas_celui_ci()
+    {
+        var parties = new[] { Partie(-3, 90), Partie(-2, 92), Partie(-1, 91), Partie(1, 85),
+            Partie(5, 80), Partie(6, 82), Partie(7, 81) };
+
+        ComparaisonDesParties.Juger(parties, Reglage, "cod").Should().Be(VerdictEnJeu.Pire, "témoin : sans borne, les parties 5 à 7 pèsent");
+        ComparaisonDesParties.Juger(parties, Reglage, "cod", jusqua: Reglage.AddDays(4))
+            .Should().Be(VerdictEnJeu.PasEncoreJuge, "une seule partie entre les deux changements : pas encore jugé, jamais pire");
+    }
+
+    // La borne d'une mesure est sa pire paire, plus bas d'après contre plus haut d'avant, pour une perte comme pour un gain :
+    // la valeur la plus basse que le rapport a prise. Pour une perte, la paire la plus proche de zéro (-2,0 % ici) ne
+    // borne rien par en dessous ; « au moins » compose ces bornes.
+    [Fact]
+    public void La_borne_d_une_perte_est_sa_pire_paire()
+    {
+        var parties = new[] { Partie(-3, 100), Partie(-2, 102), Partie(-1, 104), Partie(1, 90), Partie(2, 92), Partie(3, 98) };
+
+        var bilan = ComparaisonDesParties.Bilan(parties, Reglage);
+
+        bilan.Verdict.Should().Be(VerdictEnJeu.Pire);
+        bilan.EcartBornesPercent.Should().BeApproximately((90.0 / 104 - 1) * 100, 1e-9);
+    }
+
     // Avant : la médiane des 1 % low de chaque fenêtre (parties écrites avant le calcul sur toutes les images), plus haute en
     // général ; après : le 1 % low de toutes les images. Le « pire » venait de l'estimateur, pas du réglage.
     [Fact]
@@ -32,6 +59,43 @@ public sealed class ComparaisonDesPartiesTests
 
         ComparaisonDesParties.Juger(parties, Reglage, "cod").Should().Be(VerdictEnJeu.PasComparable);
         ComparaisonDesParties.Bilan(parties, Reglage).Verdict.Should().Be(VerdictEnJeu.PasComparable);
+    }
+
+    // Après, autant de parties de chaque estimateur : celui de la partie la plus récente fait foi, pas le premier dans l'ordre
+    // de ses lettres (« PresentMon|1 » avant « PresentMon|0 »), qui rendait ici « pas comparable ».
+    [Fact]
+    public void A_egalite_l_estimateur_de_la_partie_la_plus_recente_fait_foi()
+    {
+        static PartieRelevee Toutes(PartieRelevee p) => p with { Low1SurToutesLesImages = true };
+        var parties = new[] { Partie(-3, 80), Partie(-2, 81), Partie(-1, 82) }
+            .Concat(new[] { Partie(1, 70), Partie(2, 71), Partie(3, 72) }.Select(Toutes))
+            .Concat([Partie(4, 90), Partie(5, 91), Partie(6, 92)]).ToList();
+
+        ComparaisonDesParties.Bilan(parties, Reglage).Verdict.Should().Be(VerdictEnJeu.Mieux);
+    }
+
+    // Toutes les images des deux côtés, mais avant, les pauses de présentation (alt-tab, chargement) entraient dans le 1 % low :
+    // une partie écrite ensuite le perd, et le « mieux » viendrait du calcul, pas du réglage.
+    [Fact]
+    public void Un_1_pour_cent_low_avec_les_pauses_ne_se_compare_pas_a_un_sans()
+    {
+        static PartieRelevee Ancien(PartieRelevee p) => p with { Low1SurToutesLesImages = true };
+        static PartieRelevee Nouveau(PartieRelevee p) => p with { Low1SurToutesLesImages = true, Low1SansPauses = true };
+        var parties = new[] { Ancien(Partie(-3, 80)), Ancien(Partie(-2, 82)), Ancien(Partie(-1, 81)),
+            Nouveau(Partie(1, 90)), Nouveau(Partie(2, 92)), Nouveau(Partie(3, 91)) };
+
+        ComparaisonDesParties.Juger(parties, Reglage, "cod").Should().Be(VerdictEnJeu.PasComparable);
+    }
+
+    // Le repli DXGI (sans hygiène, sans exposition) ne compte pas comme PresentMon : l'écart dirait l'instrument.
+    [Fact]
+    public void Deux_instruments_ne_se_comparent_pas()
+    {
+        static PartieRelevee Pm(PartieRelevee p) => p with { Low1SurToutesLesImages = true, Low1SansPauses = true };
+        var parties = new[] { Pm(Partie(-3, 80)), Pm(Partie(-2, 82)), Pm(Partie(-1, 81)),
+            Pm(Partie(1, 90)) with { Instrument = "DXGI" }, Pm(Partie(2, 92)) with { Instrument = "DXGI" }, Pm(Partie(3, 91)) with { Instrument = "DXGI" } };
+
+        ComparaisonDesParties.Juger(parties, Reglage, "cod").Should().Be(VerdictEnJeu.PasComparable);
     }
 
     // Des parties de l'ancien estimateur parmi celles d'avant ne comptent pas ; assez du même estimateur, et le juge tranche.

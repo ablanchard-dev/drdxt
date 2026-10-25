@@ -18,8 +18,9 @@ namespace DrDxt.ElevatedHelper.Execution;
 [SupportedOSPlatform("windows")]
 public sealed class Win32RestorePointActions : IRestorePointActions
 {
-    // La création, injectable pour les tests : description -> (code de sortie, sortie d'erreur).
-    private readonly Func<string, (uint Code, string? Erreur)> _creerParWmi;
+    // La création (Checkpoint-Computer, voir CreerParCheckpoint), injectable pour les tests : description -> (code de
+    // sortie, sortie d'erreur).
+    private readonly Func<string, (uint Code, string? Erreur)> _creer;
     private readonly Func<IReadOnlyList<(uint Sequence, string Description)>> _lister;
     private readonly Func<uint, uint> _retirer;
 
@@ -34,7 +35,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
     internal Win32RestorePointActions(Func<string, (uint Code, string? Erreur)> creerParWmi,
         Func<IReadOnlyList<(uint Sequence, string Description)>> lister, Func<uint, uint> retirer)
     {
-        _creerParWmi = creerParWmi;
+        _creer = creerParWmi;
         _lister = lister;
         _retirer = retirer;
     }
@@ -43,7 +44,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
     {
         try
         {
-            var (code, erreur) = _creerParWmi(Truncate(description));
+            var (code, erreur) = _creer(Truncate(description));
             // Powershell -Command sort 1 sur toute erreur ; la raison est la 1re ligne
             // de sa sortie d'erreur, et c'est elle que l'écran dit.
             var cree = code != 0 && PremiereLigne(erreur) is { } raison ? Fail(raison) : LireRetour(code, "Checkpoint-Computer");
@@ -56,17 +57,17 @@ public sealed class Win32RestorePointActions : IRestorePointActions
         }
     }
 
-    /// <summary>Le point est créé par l'outil de Windows lui-même. Décompilé
-    /// (Microsoft.PowerShell.Commands.Management, CheckpointComputerCommand) : il appelle la même méthode WMI, puis son
-    /// processus relit la liste jusqu'à voir le point (90 s). Lancé ainsi, il a réussi 3 fois sur 3 sur la machine de référence,
-    /// une fois 18 s après un échec ; appelé depuis le helper lancé par l'App, le même appel WMI a échoué 2 fois sur 2
-    /// (VSS 8193). Code de sortie 0 = accepté ; le point est relu par SafetyManager.</summary>
     private static string? PremiereLigne(string? texte)
     {
         var ligne = texte?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
         return string.IsNullOrEmpty(ligne) ? null : ligne.Length <= 300 ? ligne : ligne[..300];
     }
 
+    /// <summary>Le point est créé par l'outil de Windows lui-même. Décompilé
+    /// (Microsoft.PowerShell.Commands.Management, CheckpointComputerCommand) : il appelle la même méthode WMI, puis son
+    /// processus relit la liste jusqu'à voir le point (90 s). Lancé ainsi, il a réussi 3 fois sur 3 sur la machine de référence,
+    /// une fois 18 s après un échec ; appelé depuis le helper lancé par l'App, le même appel WMI a échoué 2 fois sur 2
+    /// (VSS 8193). Code de sortie 0 = accepté ; le point est relu par SafetyManager.</summary>
     private static (uint Code, string? Erreur) CreerParCheckpoint(string description)
     {
         var psi = InfosCheckpoint(description, Environment.GetFolderPath(Environment.SpecialFolder.System));
@@ -164,7 +165,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
         catch (Exception) { /* ménage remis à la prochaine création */ }
     }
 
-    private static IReadOnlyList<(uint, string)> ListerParWmi()
+    private static IReadOnlyList<(uint, string)> ListerParWmi() => LectureWmiBornee.Lire<IReadOnlyList<(uint, string)>>(() =>
     {
         var points = new List<(uint, string)>();
         using var s = new ManagementObjectSearcher(@"\\.\root\default", "SELECT SequenceNumber, Description FROM SystemRestore");
@@ -174,7 +175,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
                 if (o["SequenceNumber"] is { } n)
                     points.Add((Convert.ToUInt32(n, System.Globalization.CultureInfo.InvariantCulture), o["Description"]?.ToString() ?? ""));
         return points;
-    }
+    }, () => throw new TimeoutException("WMI did not answer in time."));
 
     // ERROR_SUCCESS, ou ERROR_INVALID_DATA si le point n'existe plus (Microsoft Learn, SRRemoveRestorePoint).
     [System.Runtime.InteropServices.DllImport("srclient.dll")]
@@ -262,7 +263,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
     /// second disque protege fausse la decision.</summary>
     internal static bool DoitRedimensionner(IReadOnlyList<ulong>? reserves) => reserves is not null && reserves.All(r => r == 0);
 
-    private static IReadOnlyList<ulong>? LireReserves()
+    private static IReadOnlyList<ulong>? LireReserves() => LectureWmiBornee.Lire<IReadOnlyList<ulong>?>(() =>
     {
         try
         {
@@ -274,7 +275,7 @@ public sealed class Win32RestorePointActions : IRestorePointActions
         {
             return null;
         }
-    }
+    }, () => null);
 
     // vssadmin resize shadowstorage /for=<drive> /on=<drive> /maxsize=5%.
     // Au mieux : une sortie non nulle est avalée (l'appelant tient Enable pour la barrière ;

@@ -75,6 +75,50 @@ public sealed class VrrVsyncCapConfigTweakTests
     public void AppliesTo_true_when_vrr_display_present() =>
         Build(vrr: true).AppliesTo(DesktopNvidia(), State).Should().BeTrue();
 
+    // Vsync et plafond déjà au bon endroit sur NVIDIA : rien à poser, le levier ne reste pas « à poser » à chaque scan (la
+    // branche AMD le vérifiait déjà). Un seul des deux en place : le combo reste à poser.
+    [Theory]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    public void Sur_NVIDIA_le_combo_deja_en_place_n_est_plus_propose(bool vsyncPosee, bool plafondPose, bool propose)
+    {
+        var t = Build(vrr: true, refresh: 144);
+        _nvApi.GetVsyncMode().Returns(Result<uint>.Ok(vsyncPosee ? 0x47814940u : 0x60925292u));
+        _nvApi.GetFrameRateLimit().Returns(Result<uint>.Ok(plafondPose ? (uint)PlafondVrr.Cible(144) : 0u));
+
+        t.AppliesTo(DesktopNvidia(), State).Should().Be(propose);
+    }
+
+    // Sans jeu ouvert, la pose NVIDIA échoue toujours (elle écrit au profil du jeu) et le combo ne se lit nulle part : le
+    // levier se dit « non lu », pas « à poser », comme la file d'images.
+    [Fact]
+    public void Sans_jeu_ouvert_sur_NVIDIA_le_levier_se_dit_non_lu()
+    {
+        Build(vrr: true, refresh: 144);
+        var t = new VrrVsyncCapConfigTweak(_nvApi, _display, _elevated, new JeuFixe(null));
+
+        t.AppliesTo(DesktopNvidia(), State).Should().BeFalse();
+        t.EtatNonLu(State).Should().BeTrue();
+    }
+
+    // Jeu ouvert : le combo se lit au profil du jeu, là où la pose écrirait.
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Jeu_ouvert_le_combo_se_lit_au_profil_du_jeu(bool deja, bool propose)
+    {
+        Build(vrr: true, refresh: 144);
+        var jeu = Substitute.For<IGameExecutable>();
+        jeu.RunningGameExecutablePath().Returns(@"C:\Jeux\cod.exe");
+        static Result<(uint Value, DrsOriginState Origin)> Lu(uint v) =>
+            Result<(uint, DrsOriginState)>.Ok((v, new DrsOriginState(DrsValueOrigin.SetByUser, false, "")));
+        _nvApi.GetDrsForApplication(0x00A879CFu, @"C:\Jeux\cod.exe").Returns(Lu(0x47814940u));
+        _nvApi.GetDrsForApplication(0x10835002u, @"C:\Jeux\cod.exe").Returns(Lu(deja ? (uint)PlafondVrr.Cible(144) : 0u));
+
+        new VrrVsyncCapConfigTweak(_nvApi, _display, _elevated, jeu).AppliesTo(DesktopNvidia(), State).Should().Be(propose);
+    }
+
     // Win32 rend 0 ou 1 pour « fréquence par défaut du matériel » (dmDisplayFrequency) : ce n'est pas une fréquence lue, et
     // la cible calculée dessus vaut 1 image/s. Rien n'est proposé ni écrit, et c'est dit « non lu ».
     [Theory]
@@ -105,6 +149,21 @@ public sealed class VrrVsyncCapConfigTweakTests
     }
 
     // --- Apply. ---
+
+    // Un écran 144 Hz laissé à 60 : le plafond se calcule sur la fréquence maximale. Calculé sur 60, il briderait le jeu à
+    // 57 images dès que l'écran repasse à 144 (fixit.ecran_frequence, ou le joueur).
+    [Fact]
+    public async Task Le_plafond_se_calcule_sur_la_frequence_maximale_de_l_ecran()
+    {
+        var t = Build(refresh: 60);
+        _display.GetPrimaryGameDisplay().Returns(Result<DisplayInfo>.Ok(
+            new DisplayInfo(IsPrimaryGameDisplay: true, SupportsVrr: true, RefreshHz: 60, MaxRefreshHz: 144)));
+
+        (await t.ApplyAsync()).IsOk.Should().BeTrue();
+
+        await _elevated.Received(1).ExecuteAsync(
+            Arg.Is<ApplyNvApiDrsSettingOp>(o => o.SettingId == FrlId && o.Value == 138u), Arg.Any<CancellationToken>());
+    }
 
     [Fact]
     public async Task Apply_configures_vsync_and_cap_three_under_refresh()
@@ -273,7 +332,7 @@ public sealed class VrrVsyncCapConfigTweakTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
-    // --- 14/09/2026, plan complet 1.3 : le combo s'ecrit au profil du JEU, plus au pilote entier. ---
+    // --- Le combo s'ecrit au profil du JEU, plus au pilote entier. ---
     //
     // Ecrits dans « Base Profile », la synchro verticale et le plafond touchaient tous les jeux et
     // le bureau, pour une mesure faite sur un seul. PreferMaxPerf ecrivait deja par jeu ; ce levier non.

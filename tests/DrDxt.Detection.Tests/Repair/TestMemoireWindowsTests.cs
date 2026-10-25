@@ -40,7 +40,7 @@ public class TestMemoireWindowsTests
         var c = Constat(Result<IReadOnlyList<ResultatTestMemoire>>.Ok(
             [new ResultatTestMemoire(quand, 1201, "Le Diagnostic de mémoire Windows a testé la mémoire de l'ordinateur et n'a détecté aucune erreur")]));
 
-        c.ValeurCourante.Should().Contain("20/09/2026");
+        c.ValeurCourante.Should().Contain(quand.ToLocalTime().ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture));
         c.Explication.Should().Contain("n'a détecté aucune erreur");
         c.Explication.Should().NotContainAny("réussi", "sain", "valide");
     }

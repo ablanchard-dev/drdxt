@@ -57,6 +57,15 @@ public sealed class Win32RegistryReader : IRegistryReader
         _ => Result<string?>.Fail(ErrorCodes.TweakSdkUnavailable, "Registry value is not a REG_SZ."),
     };
 
+    /// <summary>Même règle pour la liste : seul un REG_MULTI_SZ (un string[]) en est une. Une valeur d'un autre type lue
+    /// « absente » ferait de l'absence l'origine du levier, et son annulation supprimerait la valeur du joueur.</summary>
+    internal static Result<string?> Liste(object? raw) => raw switch
+    {
+        null => Result<string?>.Ok(null), // absent
+        string[] entries => Result<string?>.Ok(string.Join('\n', entries)),
+        _ => Result<string?>.Fail(ErrorCodes.TweakSdkUnavailable, "Registry value is not a REG_MULTI_SZ."),
+    };
+
     public Result<string?> ReadString(RegistryHiveKind hive, string path, string name)
     {
         try
@@ -94,11 +103,7 @@ public sealed class Win32RegistryReader : IRegistryReader
             if (key is null)
                 return Result<string?>.Ok(null); // absent
 
-            // Un REG_MULTI_SZ revient en string[]. Une valeur d'un autre type n'est pas convertie
-            // en douce : on rend « absent » plutot qu'une chaine plausible et fausse.
-            return key.GetValue(name, defaultValue: null) is string[] entries
-                ? Result<string?>.Ok(string.Join('\n', entries))
-                : Result<string?>.Ok(null);
+            return Liste(key.GetValue(name, defaultValue: null));
         }
         catch (Exception ex)
         {

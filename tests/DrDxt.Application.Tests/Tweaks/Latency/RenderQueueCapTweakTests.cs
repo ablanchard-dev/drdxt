@@ -49,12 +49,13 @@ public sealed class RenderQueueCapTweakTests
         new BiosInfo("1.0", null, true),
         ChassisType.Desktop);
 
-    private RenderQueueCapTweak Build()
+    private RenderQueueCapTweak Build(bool sansNvapi = false)
     {
         _adlx.IsAvailable.Returns(true);
         _adlx.GetAntiLagState().Returns(Result<int>.Ok(0)); // désactivé à l'origine
         _adlx.GetChillActif().Returns(Result<bool>.Ok(false));
-        _nvApi.IsAvailable.Returns(true);
+        // Une machine AMD seule : NVAPI ne se charge pas.
+        _nvApi.IsAvailable.Returns(!sansNvapi);
         _nvApi.GetMaxPreRenderedFrames().Returns(Result<uint>.Ok(3)); // profondeur de file par défaut
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
@@ -79,7 +80,7 @@ public sealed class RenderQueueCapTweakTests
     // L'écriture d'Anti-Lag existe ; proposé sur AMD quand Anti-Lag ET Chill sont lus éteints.
     [Fact]
     public void AppliesTo_true_on_desktop_amd_when_anti_lag_and_chill_read_off() =>
-        Build().AppliesTo(DesktopAmd(), State).Should().BeTrue();
+        Build(sansNvapi: true).AppliesTo(DesktopAmd(), State).Should().BeTrue();
 
     [Fact]
     public void AppliesTo_false_when_anti_lag_already_on()
@@ -93,7 +94,7 @@ public sealed class RenderQueueCapTweakTests
     [Fact]
     public void AppliesTo_false_when_chill_on_and_unread_chill_is_said()
     {
-        var t = Build();
+        var t = Build(sansNvapi: true);
         _adlx.GetChillActif().Returns(Result<bool>.Ok(true));
         t.AppliesTo(DesktopAmd(), State).Should().BeFalse();
         t.EtatNonLu(State).Should().BeFalse();
@@ -106,7 +107,7 @@ public sealed class RenderQueueCapTweakTests
     [Fact]
     public async Task Apply_refuses_and_writes_nothing_when_chill_is_on()
     {
-        var t = Build();
+        var t = Build(sansNvapi: true);
         _adlx.GetChillActif().Returns(Result<bool>.Ok(true));
 
         var r = await t.ApplyAsync();
@@ -119,7 +120,7 @@ public sealed class RenderQueueCapTweakTests
     public void AppliesTo_false_on_desktop_nvidia_without_a_known_game() =>
         Build().AppliesTo(DesktopNvidia(), State).Should().BeFalse();
 
-    // ── V-NV1 : « Low Latency Mode : On » sur NVIDIA, au profil du jeu, jamais pour un jeu à Reflex. ──
+    // ── « Low Latency Mode : On » sur NVIDIA, au profil du jeu, jamais pour un jeu à Reflex. ──
     private const string JeuSansReflex = @"C:\Games\Hades II\Hades2.exe";
 
     private RenderQueueCapTweak SurNvidia(string? jeu, Result<(uint Value, DrsOriginState Origin)> lu)
@@ -127,7 +128,33 @@ public sealed class RenderQueueCapTweakTests
         Build();
         _adlx.IsAvailable.Returns(false);
         if (jeu is not null) _nvApi.GetDrsForApplication(0x007ba09eu, jeu).Returns(lu);
-        return new RenderQueueCapTweak(_nvApi, _adlx, _elevated, new JeuFixe(jeu));
+        return new RenderQueueCapTweak(_nvApi, _adlx, _elevated, new JeuFixe(jeu, Dx11));
+    }
+
+    private static readonly string[] Dx11 = ["kernel32.dll", "dxgi.dll", "d3d11.dll"];
+
+    // La file du pilote n'agit qu'en DirectX 9 à 11 : en DX12 et Vulkan, le moteur du jeu la gère. Le levier NVIDIA ne se
+    // propose que sur une API lue DX9/DX11 ; API illisible (accès refusé) : non lu, et dit ; DX12, Vulkan : pas proposé.
+    [Theory]
+    [InlineData(new[] { "d3d11.dll" }, true, false)]
+    [InlineData(new[] { "D3D9.dll" }, true, false)]
+    [InlineData(new[] { "d3d11.dll", "d3d12.dll" }, false, false)]
+    [InlineData(new[] { "vulkan-1.dll" }, false, false)]
+    [InlineData(new[] { "opengl32.dll" }, false, false)]
+    [InlineData(null, false, true)]
+    public async Task La_file_NVIDIA_ne_se_propose_que_sur_un_jeu_lu_en_DX9_ou_DX11(string[]? modules, bool propose, bool nonLu)
+    {
+        Build();
+        _adlx.IsAvailable.Returns(false);
+        _nvApi.GetDrsForApplication(0x007ba09eu, JeuSansReflex).Returns(Lu(3));
+        var t = new RenderQueueCapTweak(_nvApi, _adlx, _elevated, new JeuFixe(JeuSansReflex, modules));
+
+        t.AppliesTo(DesktopNvidia(), State).Should().Be(propose);
+        t.EtatNonLu(State).Should().Be(nonLu);
+        var pose = await t.ApplyAsync();
+        pose.IsOk.Should().Be(propose, "la pose suit la même règle que la proposition");
+        if (!propose)
+            await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
     private static Result<(uint Value, DrsOriginState Origin)> Lu(uint v) =>
@@ -188,7 +215,7 @@ public sealed class RenderQueueCapTweakTests
 
     [Fact]
     public void LAP1_Anti_Lag_est_propose_sur_un_portable_AMD() =>
-        Build().AppliesTo(LaptopAmd(), State).Should().BeTrue();
+        Build(sansNvapi: true).AppliesTo(LaptopAmd(), State).Should().BeTrue();
 
     [Fact]
     public void LAP1_la_file_NVIDIA_est_proposee_sur_une_carte_de_portable() =>
@@ -204,7 +231,7 @@ public sealed class RenderQueueCapTweakTests
     [Fact]
     public async Task Apply_enables_antilag_via_helper_and_captures_original()
     {
-        var t = Build();
+        var t = Build(sansNvapi: true);
         _adlx.GetAntiLagState().Returns(Result<int>.Ok(0)); // désactivé → on active
 
         var r = await t.ApplyAsync();
@@ -238,11 +265,8 @@ public sealed class RenderQueueCapTweakTests
     [Fact]
     public async Task Apply_falls_back_to_nvidia_drs_when_only_nvapi_available()
     {
-        // La branche NVIDIA universelle : plafond de file de rendu via DRS Max-Pre-Rendered-Frames = 1.
-        var t = Build();
-        _adlx.IsAvailable.Returns(false);
-        _nvApi.IsAvailable.Returns(true);
-        _nvApi.GetMaxPreRenderedFrames().Returns(Result<uint>.Ok(3));
+        // La branche NVIDIA : plafond de file de rendu via DRS Max-Pre-Rendered-Frames = 1, sur un jeu lu en DX11.
+        var t = SurNvidia(JeuSansReflex, Lu(3));
 
         var r = await t.ApplyAsync();
 
@@ -251,8 +275,8 @@ public sealed class RenderQueueCapTweakTests
             Arg.Is<ApplyNvApiDrsSettingOp>(o => o.Value == 1 && !string.IsNullOrWhiteSpace(o.ProfileName)),
             Arg.Any<CancellationToken>());
         var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
-        inverse.Value.Should().BeOfType<ApplyNvApiDrsSettingOp>()
-            .Which.Value.Should().Be(3);
+        // Hérité du profil global : le rendu retire le réglage du profil du jeu.
+        inverse.Value.Should().BeOfType<DeleteNvApiDrsSettingOp>();
     }
 
     [Fact]
@@ -272,7 +296,7 @@ public sealed class RenderQueueCapTweakTests
     [Fact]
     public async Task Apply_fails_clean_when_capture_fails()
     {
-        var t = Build();
+        var t = Build(sansNvapi: true);
         _adlx.GetAntiLagState().Returns(Result<int>.Fail(ErrorCodes.TweakSdkUnavailable, "no adlx"));
 
         var r = await t.ApplyAsync();
@@ -285,7 +309,7 @@ public sealed class RenderQueueCapTweakTests
     [Fact]
     public async Task Apply_surfaces_helper_failure_without_throwing()
     {
-        var t = Build();
+        var t = SurNvidia(JeuSansReflex, Lu(3));
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Fail(ErrorCodes.HelperOpFailed, "boom")));
 
@@ -298,7 +322,7 @@ public sealed class RenderQueueCapTweakTests
     [Fact]
     public async Task Apply_maps_thrown_seam_exception_to_failure()
     {
-        var t = Build();
+        var t = Build(sansNvapi: true);
         _adlx.GetAntiLagState().Returns(_ => throw new InvalidOperationException("kaboom"));
 
         var r = await t.ApplyAsync();
@@ -335,15 +359,16 @@ public sealed class RenderQueueCapTweakTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.SnapshotInvalid);
     }
 
-    // --- 14/09/2026, plan complet 1.3 : la branche NVIDIA ecrit au profil du JEU. ---
+    // --- La branche NVIDIA ecrit au profil du JEU. ---
     //
     // Elle ecrivait « Max Pre-Rendered Frames » dans « Base Profile » : tous les jeux et le bureau.
 
     private const uint PreRenderId = 0x007ba09eu;
     private const string Jeu = @"C:\Games\Call of Duty\cod.exe";
 
-    private sealed class JeuFixe(string? chemin) : IGameExecutable
+    private sealed class JeuFixe(string? chemin, string[]? modules = null) : IGameExecutable
     {
+        public IReadOnlyList<string>? ModulesDuJeu() => modules;
         public string? RunningGameExecutablePath() => chemin;
     }
 
@@ -366,7 +391,7 @@ public sealed class RenderQueueCapTweakTests
     {
         Build();
         _adlx.IsAvailable.Returns(false); // la branche NVIDIA
-        var r = await new RenderQueueCapTweak(new PiloteAuJeu(origine), _adlx, _elevated, new JeuFixe(Jeu))
+        var r = await new RenderQueueCapTweak(new PiloteAuJeu(origine), _adlx, _elevated, new JeuFixe(Jeu, Dx11))
             .ApplyAsync();
         return (r, r.IsOk ? PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson).Value : null);
     }
@@ -400,5 +425,19 @@ public sealed class RenderQueueCapTweakTests
 
         r.IsOk.Should().BeFalse();
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
+
+    // Un Ryzen à puce graphique AMD avec une RTX : ADLX se charge (pour la puce), NVAPI aussi. Le choix de carte est le même
+    // partout : proposé pour NVIDIA, posé sur NVIDIA, jamais Anti-Lag sur la puce intégrée.
+    [Fact]
+    public async Task Sur_une_machine_mixte_la_meme_carte_est_proposee_et_ecrite()
+    {
+        var t = Build();
+        _adlx.GetAntiLagState().Returns(Result<int>.Fail(ErrorCodes.TweakSdkUnavailable, "puce intégrée"));
+
+        t.EtatNonLu(State).Should().BeFalse("la carte du jeu est la NVIDIA : l'état d'Anti-Lag de la puce ne compte pas");
+        await t.ApplyAsync();
+
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Is<PrivilegedOp>(op => op is ApplyAdlxTuningOp), Arg.Any<CancellationToken>());
     }
 }

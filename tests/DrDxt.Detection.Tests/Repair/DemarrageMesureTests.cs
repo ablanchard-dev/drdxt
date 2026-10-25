@@ -5,9 +5,8 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Repair;
 
 /// <summary>
-/// Sur la machine de reference, la derniere mesure de demarrage de Windows date du
-/// L'annee ne s'affichait pas : ces
-/// chiffres passaient pour actuels. Au-dela de la fenetre, DrDXT le dit et ne cite rien.
+/// Une mesure de demarrage de Windows peut dater d'une autre annee : sans l'annee, ces chiffres passeraient pour
+/// actuels. Au-dela de la fenetre, DrDXT le dit et ne cite rien.
 /// </summary>
 public class DemarrageMesureTests
 {
@@ -28,8 +27,11 @@ public class DemarrageMesureTests
         // Lue mais perimee : observee, pas « non lue » (le rapport reel la rangeait dans « Non lus »).
         constats[0].Statut.Should().Be(RepairStatus.Observed);
         constats[0].ValeurCourante.Should().StartWith("périmée");
-        constats[0].Explication.Should().Contain("31/07/2025").And.NotContain("39,9");
+        constats[0].Explication.Should().Contain(juillet2025.ToLocalTime().ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)).And.NotContain("39,9");
     }
+
+    // Le dernier allumage ; sa date s'affiche à l'heure de la machine, l'attendu suit le même fuseau.
+    private static readonly DateTimeOffset Dernier = new(2026, 9, 23, 19, 0, 38, TimeSpan.Zero);
 
     [Fact]
     public void Une_mesure_recente_nomme_les_applications_du_dernier_demarrage_par_retard()
@@ -59,7 +61,7 @@ public class DemarrageMesureTests
         // Les quatre allumages reels de la machine de reference, 19-23/09/2026.
         var constats = DemarrageMesure.JugerBios(
         [
-            new(new DateTimeOffset(2026, 9, 23, 19, 0, 38, TimeSpan.Zero), 11386, 3685),
+            new(Dernier, 11386, 3685),
             new(new DateTimeOffset(2026, 9, 22, 16, 26, 4, TimeSpan.Zero), 11380, 3176),
             new(new DateTimeOffset(2026, 9, 20, 16, 43, 40, TimeSpan.Zero), 11208, 3445),
             new(new DateTimeOffset(2026, 9, 19, 17, 9, 18, TimeSpan.Zero), 11214, 3674),
@@ -68,8 +70,8 @@ public class DemarrageMesureTests
         var c = constats.Should().ContainSingle().Subject;
         c.Statut.Should().Be(RepairStatus.Observed, "aucune source ne dit a partir de quand c'est trop long");
         c.Domaine.Should().Be("BIOS", "range sur la page BIOS, a cote de Memory Fast Boot et MSI Fast Boot qui le gouvernent");
-        c.ValeurCourante.Should().Be("11,4 s"); // en francais, quelle que soit la langue de Windows
-        c.Explication.Should().Contain("23/09/2026").And.Contain("4 derniers").And.Contain("Dernier temps BIOS");
+        c.ValeurCourante.Should().Be("11,4 s"); // dans la langue du docteur, francais par defaut dans les tests
+        c.Explication.Should().Contain(Dernier.ToLocalTime().ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture)).And.Contain("4 derniers").And.Contain("Dernier temps BIOS");
     }
 
     [Fact]

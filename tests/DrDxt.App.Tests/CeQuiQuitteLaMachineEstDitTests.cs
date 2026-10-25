@@ -108,4 +108,27 @@ public sealed class CeQuiQuitteLaMachineEstDitTests
         contactes.Where(h => !section.Contains(h, StringComparison.OrdinalIgnoreCase)).Should().BeEmpty(
             "tout ce que DrDXT contacte est dit au joueur, dans le README");
     }
+
+    // Un programme de Windows lancé par DrDXT et qui sort lui-même sur le réseau n'a pas d'adresse dans le code : le motif
+    // de son appel, et le mot que la section doit porter. DISM /RestoreHealth télécharge depuis Windows Update.
+    private static readonly (Regex Appel, string Mot)[] ProgrammesQuiSortent =
+    [
+        (new Regex(@"RestoreHealth", RegexOptions.Compiled), "DISM"),
+    ];
+
+    [Theory]
+    [InlineData("README.fr.md", "## Ce qui quitte la machine")]
+    [InlineData("README.md", "## What leaves the machine")]
+    public void Chaque_programme_lance_qui_sort_sur_le_reseau_est_dit_dans_le_README(string readme, string titre)
+    {
+        var sources = new DirectoryInfo(Path.Combine(Racine().FullName, "src")).GetFiles("*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.FullName.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            .Select(f => File.ReadAllText(f.FullName)).ToList();
+        var lances = ProgrammesQuiSortent.Where(p => sources.Any(s => p.Appel.IsMatch(s))).ToList();
+        lances.Should().NotBeEmpty("témoin : le crible voit bien la réparation de Windows");
+
+        var section = SectionDuReadme(readme, titre);
+        lances.Where(p => !section.Contains(p.Mot, StringComparison.Ordinal)).Select(p => p.Mot).Should().BeEmpty(
+            "un programme que DrDXT lance et qui sort sur le réseau est dit au joueur, dans le README");
+    }
 }

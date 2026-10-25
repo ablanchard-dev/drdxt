@@ -27,4 +27,19 @@ public sealed class PaquetDAideTests
         vm.PaquetChoisi = -1;
         vm.ApercuPaquet.Should().BeEmpty();
     }
+
+    // L'échec d'écriture se dit à côté du bouton du paquet, en bas de page, et non sous Optimiser.
+    [Fact]
+    public void Un_echec_d_ecriture_se_dit_a_cote_du_paquet()
+    {
+        var vm = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
+            Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k);
+        vm.PoserPaquet([("rapport-du-docteur.txt", "rapport")]);
+        vm.ChoisirCheminDuPaquet = _ => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "dossier-qui-n-existe-pas-" + Guid.NewGuid().ToString("N"), "paquet.zip");
+
+        vm.EnregistrerPaquetCommand.Execute(null);
+
+        vm.MessageDExport.Should().Be("Paquet.Echec");
+        vm.ApplyBlockedMessage.Should().NotBe("Paquet.Echec");
+    }
 }

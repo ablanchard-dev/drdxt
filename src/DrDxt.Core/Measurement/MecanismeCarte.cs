@@ -29,7 +29,8 @@ public sealed record MecanismeCarte(int Echantillons, int BridesPuissance, doubl
         var valides = lues.Where(r => r.GpuPowerW is not { } w || pic <= 0 || w >= 0.6 * pic).ToList();
         if (valides.Count == 0) return null;
         var brides = valides.Where(r => (r.Raisons!.Value & ClocksEventReason.PlafondPuissanceLogiciel) != 0).ToList();
-        var libres = valides.Except(brides).ToList();
+        // Le complément, pas Except : une opération d'ensemble fondrait des lectures égales en une.
+        var libres = valides.Where(r => (r.Raisons!.Value & ClocksEventReason.PlafondPuissanceLogiciel) == 0).ToList();
         return new MecanismeCarte(valides.Count, brides.Count,
             Mediane(brides.Select(r => r.GpuClockMhz!.Value)), Mediane(libres.Select(r => r.GpuClockMhz!.Value)),
             chaudes, lues.Count);

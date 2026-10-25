@@ -59,7 +59,9 @@ public static class LimiteDePuissance
         return plafond > lu.Pl1W + 0.5 ? plafond : null;
     }
 
-    public static RepairFinding Juger(LimiteDePuissanceLue? lu)
+    /// <param name="portable">Sur un portable, une PL1 sous la puissance de base est celle du fabricant (batterie, chauffe) :
+    /// à regarder, sans geste de montée ni de BIOS.</param>
+    public static RepairFinding Juger(LimiteDePuissanceLue? lu, bool portable = false)
     {
         if (lu is null)
             return new RepairFinding("CPU", Nom, null, null, RepairStatus.Unknown,
@@ -72,6 +74,9 @@ public static class LimiteDePuissance
                 Docteur.T("LP.SansLimiteExplication"));
 
         var courante = Docteur.T("LP.Courante", W(lu.Pl1W), W(lu.Pl2W)) + (lu.Verrou ? Docteur.T("LP.Verrouillee") : "");
+        if (portable && lu.Pl1W + 0.5 < lu.NominaleW)
+            return new RepairFinding("CPU", Nom, courante, attendue, RepairStatus.NonDefault,
+                Docteur.T("LP.SousPortable", W(lu.Pl1W), W(lu.NominaleW)));
         if (lu.Pl1W + 0.5 < lu.NominaleW)
             return new RepairFinding("CPU", Nom, courante, attendue, RepairStatus.Suspicious,
                 Docteur.T("LP.Sous", W(lu.Pl1W), W(lu.NominaleW))
@@ -96,5 +101,6 @@ public static class LimiteDePuissance
             Docteur.T("LP.AuDessus", W(lu.NominaleW)));
     }
 
-    private static string W(double w) => w.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " W";
+    // La virgule suit la langue du docteur, comme le reste de la phrase.
+    private static string W(double w) => w.ToString("0.#", Docteur.Langue) + " W";
 }

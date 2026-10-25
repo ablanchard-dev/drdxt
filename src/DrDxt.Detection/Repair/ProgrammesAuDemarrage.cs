@@ -59,7 +59,7 @@ public static class ProgrammesAuDemarrage
     // dossier Démarrage existe par définition, et son chemin n'est pas une commande (« Start Menu » a un espace sans
     // guillemets : relevé le 06/10, deux raccourcis dits morts à tort sans cette règle).
     private static bool Morte(Entree e, Func<string, bool> existe)
-        => e.DansRun && Cible(e.Commande) is { } cible && Path.IsPathRooted(cible) && !existe(cible);
+        => e.DansRun && Cible(e.Commande) is { } cible && CheminsLocaux.EstLocal(cible) && !existe(cible);
 
     public static IEnumerable<RepairFinding> Juger(Result<IReadOnlyList<Entree>> lues, IReadOnlyList<DemarrageEtDisque.Ralentisseur> ralentisseurs,
         Func<string, bool>? existe = null)

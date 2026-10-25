@@ -48,15 +48,10 @@ public sealed partial class RepairAuditService
     // Les erreurs matérielles WHEA (journal Système), par nombre de jours : la source, et sa lecture du scan en cours.
     private readonly Func<int, IReadOnlyList<ErreursMaterielles.Enregistrement>?> _journalWhea;
     private Func<int, IReadOnlyList<ErreursMaterielles.Enregistrement>?> _whea;
-    /// <summary>La source WMI. Injectee comme les autres lecteurs.
-    ///
-    /// Cablee en dur (`= new()`), elle serait le seul lecteur du service sans couture, alors que
-    /// `UsureDisques` et `BiosIdentite` l'interrogent. Consequence mesuree : les tests d'audit
-    /// attendaient WMI meme quand ils verifiaient une famille qui n'a rien a voir ; cinq
-    /// d'entre eux tenaient un plateau de 28,3 s a 0,2 s pres en execution complete, signature
-    /// d'une ressource que Windows serialise.
-    ///
-    /// Le defaut reste `ManagementWmiQuery` : le produit ne change pas de comportement.</summary>
+    /// <summary>La source WMI, injectee comme les autres lecteurs : sans couture, chaque test d'audit attendrait le vrai
+    /// WMI, que Windows serialise, meme pour une famille qui ne le lit pas. Le defaut est `ManagementWmiQuery`. Quatre
+    /// lectures ouvrent encore WMI en direct (le pilote graphique pour le radar et pour le plancher du jeu, le fichier
+    /// d'echange, le SSD interne) et ne se doublent pas en test.</summary>
     private readonly IWmiQuery _wmi;
     private readonly IWindowsUpdateLog _misesAJour;
     private readonly ILecteurWindowsUpdate? _windowsUpdate;
@@ -144,17 +139,20 @@ public sealed partial class RepairAuditService
     internal static IEnumerable<RepairFinding> RadarDuPc()
     {
         var kb = MisesAJourWindows.KbInstalles();
-        List<(string, string?)>? cartes = null;
-        try
+        var cartes = LectureWmiBornee.Lire<List<(string, string?)>?>(() =>
         {
-            using var s = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion FROM Win32_VideoController");
-            cartes = [];
-            using var rangees = s.Get();
-            foreach (var o in rangees.Cast<System.Management.ManagementObject>())
-                using (o)
-                    if (o["Name"] is string nom) cartes.Add((nom, o["DriverVersion"] as string));
-        }
-        catch (Exception) { cartes = null; }
+            try
+            {
+                using var s = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion FROM Win32_VideoController");
+                List<(string, string?)> lues = [];
+                using var rangees = s.Get();
+                foreach (var o in rangees.Cast<System.Management.ManagementObject>())
+                    using (o)
+                        if (o["Name"] is string nom) lues.Add((nom, o["DriverVersion"] as string));
+                return lues;
+            }
+            catch (Exception) { return null; }
+        }, () => null);
         string? processeur;
         using (var cle = Registry.LocalMachine.OpenSubKey(@"Hardware\Description\System\CentralProcessor\0"))
             processeur = cle?.GetValue("ProcessorNameString") as string;
@@ -176,13 +174,17 @@ public sealed partial class RepairAuditService
         var fichiers = DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Trouver(DossiersDeJeux.Lire() ?? [])
             .Select(f => (f, DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Contenu(f))).ToList();
         if (fichiers.Count == 0) return [];
-        var cartes = new List<DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Carte>();
-        using (var s = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion FROM Win32_VideoController"))
-        using (var rangees = s.Get())
-            foreach (var o in rangees.Cast<System.Management.ManagementObject>())
-                using (o)
-                    if (o["Name"]?.ToString() is { } nom)
-                        cartes.Add(new(nom, o["DriverVersion"]?.ToString(), DrDxt.Detection.Gpu.VersionDuPilote.RadeonSoftwareVersion(nom)));
+        var cartes = LectureWmiBornee.Lire(() =>
+        {
+            var lues = new List<DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Carte>();
+            using (var s = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion FROM Win32_VideoController"))
+            using (var rangees = s.Get())
+                foreach (var o in rangees.Cast<System.Management.ManagementObject>())
+                    using (o)
+                        if (o["Name"]?.ToString() is { } nom)
+                            lues.Add(new(nom, o["DriverVersion"]?.ToString(), DrDxt.Detection.Gpu.VersionDuPilote.RadeonSoftwareVersion(nom)));
+            return lues;
+        }, () => throw new TimeoutException("WMI did not answer in time."));
         return DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Juger(fichiers, cartes);
     }
 
@@ -347,13 +349,14 @@ public sealed partial class RepairAuditService
             return GenerationAmd.Juger(fabricant, signature);
         }));
         // La limite de puissance effective, lue dans les registres quand PawnIO est là ; jamais écrite.
-        constats.AddRange(Isoler("CPU", () => [LimiteDePuissance.Juger(_limitesPuissance())]));
+        constats.AddRange(Isoler("CPU", () => [LimiteDePuissance.Juger(_limitesPuissance(), portable: Batterie() == true)]));
         // La chaleur relevée en partie, reliée à la limite de puissance lue (plafond conseillé).
         constats.AddRange(Isoler("CPU", () => DrDxt.Detection.Cpu.ChaleurEnPartie.Juger(
             DrDxt.Detection.Cpu.ChaleurEnPartie.Lire(DossierDonnees.Chemin("parties.json")), _limitesPuissance(),
             // Le BIOS lu au dernier scan, pour nommer la valeur de la limite de courant au lieu d'un conseil générique.
             DrDxt.Detection.Cpu.ChaleurEnPartie.LireBios(DossierDonnees.Chemin(ChaleurEnPartie.FichierBios), DrDxt.Detection.Hardware.DemarrageDuSysteme.Valeur),
-            DrDxt.Detection.Hardware.DemarrageDuSysteme.Valeur, intel: DrDxt.Detection.Cpu.TemperaturePawnIo.ProcesseurIntel())));
+            DrDxt.Detection.Hardware.DemarrageDuSysteme.Valeur, intel: DrDxt.Detection.Cpu.TemperaturePawnIo.ProcesseurIntel(),
+            portable: Batterie() == true)));
         // Un ventilateur de la carte qui s'arrête en partie, ou qui ne tourne plus d'une partie à l'autre.
         constats.AddRange(Isoler("THERMIQUE", () => VentilateursEnPartie.Juger(
             DrDxt.Detection.Cpu.ChaleurEnPartie.Lire(DossierDonnees.Chemin("parties.json"))
@@ -435,7 +438,8 @@ public sealed partial class RepairAuditService
         constats.AddRange(Isoler("STABILITE", AvantLesIncidents));
         // Le dernier témoin d'incident écrit par le service : ce que Windows a noté juste avant.
         constats.AddRange(Isoler("STABILITE", () => TemoinDIncident.Juger(TemoinDIncident.LireTous(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DrDxt", TemoinDIncident.Dossier)), DateTimeOffset.Now)));
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DrDxt", TemoinDIncident.Dossier),
+            f => CheminProtege.Verifier(f) is null), DateTimeOffset.Now)));
         constats.AddRange(Isoler("STABILITE", PointSain));
         constats.AddRange(Isoler("DISPLAY", Display));
         // Les superpositions matérielles coupées par un ancien réglage (OverlayTestMode).
@@ -476,9 +480,12 @@ public sealed partial class RepairAuditService
             constats.AddRange(Isoler("STOCKAGE", () => [jd()]));
         constats.AddRange(Isoler("STOCKAGE", () => DrDxt.Detection.Gpu.BranchementDeLaCarte.LireLiensNvme(_wmi)
             .SelectMany(DrDxt.Detection.Gpu.BranchementDeLaCarte.JugerLienSsd)));
-        constats.AddRange(Isoler("GPU", () => DrDxt.Detection.Gpu.BranchementDeLaCarte.JugerEcrans(
-            new Win32DisplayInfo().GetAllDisplays() is { IsOk: true } e ? e.Value!.Select(d => d.Adaptateur).OfType<string>().ToList() : [],
-            CartesLues(), Batterie())));
+        constats.AddRange(Isoler("GPU", () =>
+        {
+            var ecrans = new Win32DisplayInfo().GetAllDisplays() is { IsOk: true } e ? e.Value! : [];
+            return DrDxt.Detection.Gpu.BranchementDeLaCarte.JugerEcrans(ecrans.Select(d => d.Adaptateur).OfType<string>().ToList(),
+                CartesLues(), Batterie(), ecrans.FirstOrDefault(d => d.IsPrimaryGameDisplay)?.Adaptateur);
+        }));
         // Les protections contre les failles d'exécution spéculative, en information ; jamais un levier.
         constats.AddRange(Isoler("SECURITE", () => [AttenuationsProcesseur.Juger(AttenuationsProcesseur.Lire())]));
         // L'intégrité de la mémoire, dite dans les deux sens (coût et protection), jamais écrite.
@@ -524,7 +531,10 @@ public sealed partial class RepairAuditService
         {
             var (fabricant, signature) = DrDxt.Detection.Cpu.Cpuid.Lire();
             var generation = signature is { } s ? GenerationAmd.Reconnaitre(fabricant, s) : null;
-            return LecturesAmdProfondes.Juger(generation, DrDxt.GpuNative.PawnIo.PawnIoAmd.Installe(), () => LecturesAmdDetaillees(generation!));
+            // Les lectures finies, PawnIO est refermé : un pilote de lecture de registres resté chargé pendant les parties est ce
+            // que des anti-triches refusent (même règle que le service pour Intel).
+            try { return LecturesAmdProfondes.Juger(generation, DrDxt.GpuNative.PawnIo.PawnIoAmd.Installe(), () => LecturesAmdDetaillees(generation!)).ToList(); }
+            finally { DrDxt.GpuNative.PawnIo.PawnIoAmd.FermerTout(); }
         }));
         constats.AddRange(Isoler("THERMIQUE", ThermiqueGpu));
         constats.AddRange(Isoler("STOCKAGE", UsureDisques));
@@ -626,19 +636,14 @@ public sealed partial class RepairAuditService
         var personnaliteDuPlan = Guid.TryParse(planGuid, out var g) ? PowerSettingsReader.Personnalite(g)?.ToString() : null;
         foreach (var m in ModeAlimentation.JugerMode(personnaliteDuPlan, OverlaySecteur(), Batterie())) yield return m;
 
-        if (planGuid is null || !Guid.TryParse(planGuid, out var personnalite)) yield break;
+        if (planGuid is null || !Guid.TryParse(planGuid, out var planActif)) yield break;
 
-        foreach (var v in new PowerSettingsReader().LireProcesseur(personnalite))
+        // Les valeurs se lisent dans le plan actif, leur défaut dans sa personnalité : un plan personnalisé a les deux différents.
+        var (personnalite, planLu) = CleDeLecture(planActif, PowerSettingsReader.Personnalite);
+        var portable = Batterie() == true;
+        foreach (var v in new PowerSettingsReader().LireProcesseur(personnalite, planLu))
         {
-            var (statut, phrase) = v.EcarteDuDefaut switch
-            {
-                null => (RepairStatus.Unknown, Docteur.T("RA.Power.NonLu")),
-                false => (RepairStatus.ExpectedDefault, Docteur.T("RA.Power.Identique")),
-                // Un ecart au defaut reste un ecart. Il ne dit pas que la valeur est mauvaise ni
-                // que quelqu'un l'a posee par erreur, seulement que ce plan n'est plus celui que
-                // Windows installe.
-                true => (RepairStatus.NonDefault, Docteur.T("RA.Power.Ecart")),
-            };
+            var (statut, phrase) = JugerReglageProcesseur(v, portable);
             // Un ecart sans geste est un ecart invisible. `RepairTriage.Trier` range dans
             // « verifies » (comptes, jamais affiches) tout ce qui n'est ni suspect ni nuisible et
             // ne porte aucune action. Un `NonDefault` muet finirait donc dans le meme sac qu'un
@@ -647,20 +652,34 @@ public sealed partial class RepairAuditService
             // le rendre visible sans le declarer nuisible : la doctrine « different n'est pas
             // endommage » interdit `Suspicious`, elle n'impose pas le silence.
             // DISPLAY suit la meme regle.
-            // Un frein caché (plafond de fréquence, refroidissement passif) se dit comme tel ; sur un portable il est souvent
-            // voulu par le constructeur, et le constat le dit au lieu de l'accuser.
-            if (PowerSettingsReader.Frein(v) == true)
-            {
-                var portable = Batterie() == true;
-                (statut, phrase) = (portable ? RepairStatus.NonDefault : RepairStatus.Suspicious,
-                    Docteur.T("RA.Power.Frein") + (portable ? Docteur.T("RA.Power.FreinPortable") : ""));
-            }
             yield return new RepairFinding("POWER", v.Nom,
                 v.ValeurAc is { } a ? Lisible(v.Nom, a, v.Unite) : null,
                 v.DefautAc is { } d ? Lisible(v.Nom, d, v.Unite) : null,
                 statut, phrase,
                 statut is RepairStatus.NonDefault or RepairStatus.Suspicious ? RepairAction.Recommandation : RepairAction.Aucune);
         }
+    }
+
+    /// <summary>Pur : la personnalité dont se lisent les défauts, et le plan dont se lisent les valeurs. Personnalité non lue :
+    /// le plan lui-même (un plan Windows est sa propre personnalité ; sinon la lecture du défaut échoue et se dit non lue).</summary>
+    internal static (Guid Personnalite, Guid Plan) CleDeLecture(Guid planActif, Func<Guid, Guid?> personnaliteDe)
+        => (personnaliteDe(planActif) ?? planActif, planActif);
+
+    /// <summary>Pur : le jugement d'un réglage processeur contre le défaut de sa personnalité. Un écart reste un écart, il ne dit
+    /// pas que la valeur est mauvaise. Un frein (plafond de fréquence, refroidissement passif) n'est « à corriger » que s'il
+    /// s'écarte de ce défaut, sur un PC fixe : égal au défaut, c'est le réglage de Windows ; défaut non lu, rien ne prouve un
+    /// écart ; sur un portable, souvent voulu par le constructeur. Le constat le dit au lieu de l'accuser.</summary>
+    internal static (RepairStatus Statut, string Phrase) JugerReglageProcesseur(PowerSettingValue v, bool portable)
+    {
+        var (statut, phrase) = v.EcarteDuDefaut switch
+        {
+            null => (RepairStatus.Unknown, Docteur.T("RA.Power.NonLu")),
+            false => (RepairStatus.ExpectedDefault, Docteur.T("RA.Power.Identique")),
+            true => (RepairStatus.NonDefault, Docteur.T("RA.Power.Ecart")),
+        };
+        if (PowerSettingsReader.Frein(v) != true || v.EcarteDuDefaut == false) return (statut, phrase);
+        return (portable || v.EcarteDuDefaut is null ? RepairStatus.NonDefault : RepairStatus.Suspicious,
+            Docteur.T("RA.Power.Frein") + (portable ? Docteur.T("RA.Power.FreinPortable") : ""));
     }
 
     // « Mode de boost : 2 » ne dit rien à personne. Table PERFBOOSTMODE lue sur
@@ -697,8 +716,6 @@ public sealed partial class RepairAuditService
         catch (Exception) { return null; }
     }
 
-    // Les cartes vues par Windows, avec la mémoire qu'il leur prête (AdapterRAM plafonne à 4 Go : assez pour séparer une
-    // puce intégrée d'une carte dédiée).
     private IEnumerable<RepairFinding> FilsDeRenduCallOfDuty()
     {
         // Le dossier du fichier le plus récent parmi les emplacements connus : la version courante écrit sous
@@ -723,6 +740,8 @@ public sealed partial class RepairAuditService
         catch (Exception) { return 0; }
     }
 
+    // Les cartes vues par Windows, avec la mémoire qu'il leur prête (AdapterRAM plafonne à 4 Go : assez pour séparer une
+    // puce intégrée d'une carte dédiée).
     private IReadOnlyList<GpuInfo> CartesLues()
     {
         var r = _wmi.Query("SELECT Name, AdapterRAM FROM Win32_VideoController");
@@ -771,11 +790,16 @@ public sealed partial class RepairAuditService
             l.GetString("PNPDeviceID"))).ToList();
     }
 
-    // Une batterie présente (Win32_Battery) ; null = non lu.
-    private bool? Batterie()
+    private bool? Batterie() => Batterie(_wmi);
+
+    // Une batterie de portable (Win32_Battery) ; null = non lu. Un onduleur branché en USB se déclare aussi comme une
+    // batterie : sur un boîtier de bureau (SMBIOS), ce n'est pas un portable.
+    internal static bool? Batterie(IWmiQuery wmi)
     {
-        var r = _wmi.Query("SELECT DeviceID FROM Win32_Battery");
-        return r.IsOk ? r.Value!.Count > 0 : null;
+        var r = wmi.Query("SELECT DeviceID FROM Win32_Battery");
+        if (!r.IsOk) return null;
+        if (r.Value!.Count == 0) return false;
+        return new ChassisDetector(wmi).Detect() is not { IsOk: true, Value: ChassisType.Desktop };
     }
 
     // ── CPU : la frequence reelle, pas celle que WMI raconte ───────────────────────────────
@@ -869,6 +893,7 @@ public sealed partial class RepairAuditService
                     ? Docteur.T("RA.Services.DuAu", f.PlusAncien.ToLocalTime(), f.PlusRecent.ToLocalTime())
                     : Docteur.T("RA.Services.Le", f.PlusRecent.ToLocalTime()))
                 + Docteur.T(f.EstUneRafale ? "RA.Services.UneRafale" : "RA.Services.UnFait")
+                + (f.Tronque ? Docteur.T("RA.Services.Tronque") : "")
                 // « à corriger » sans geste.
                 + (f.EstRecurrent ? Docteur.T("RA.Services.Geste") : ""),
                 f.EstRecurrent ? RepairAction.Recommandation : RepairAction.Aucune);
@@ -903,14 +928,6 @@ public sealed partial class RepairAuditService
     /// devra etre remplace par une source ou par une mesure.</summary>
     private const int SeuilUsurePercent = 80;
 
-    /// <summary>
-    /// L'usure des disques. Un SSD qui a consomme son endurance ralentit puis lache : c'est une
-    /// piece qui vieillit de facon mesurable, la seule du PC dans ce cas.
-    ///
-    /// La forme de la requete a ete verifiee sur la machine avant d'etre ecrite, et la forme
-    /// evidente est fausse : interroger `MSFT_StorageReliabilityCounter` directement rend la classe
-    /// presente et aucune instance. Voir <see cref="StorageWearReader"/>.
-    /// </summary>
     private IEnumerable<RepairFinding> MisesAJour()
     {
         var lus = _misesAJour.Depuis(DateTimeOffset.UtcNow - FenetreMisesAJour);
@@ -973,6 +990,14 @@ public sealed partial class RepairAuditService
         catch (Exception) { return null; }
     }
 
+    /// <summary>
+    /// L'usure des disques. Un SSD qui a consomme son endurance ralentit puis lache : c'est une
+    /// piece qui vieillit de facon mesurable, la seule du PC dans ce cas.
+    ///
+    /// La forme de la requete a ete verifiee sur la machine avant d'etre ecrite, et la forme
+    /// evidente est fausse : interroger `MSFT_StorageReliabilityCounter` directement rend la classe
+    /// presente et aucune instance. Voir <see cref="StorageWearReader"/>.
+    /// </summary>
     private IEnumerable<RepairFinding> UsureDisques()
     {
         var lu = new StorageWearReader(_wmi).Lire();
@@ -1001,7 +1026,7 @@ public sealed partial class RepairAuditService
             var merite = usure >= SeuilUsurePercent;
             yield return new RepairFinding("STOCKAGE", $"usure · {d.Disque}",
                 ValeurDUsure(usure, d.TemperatureC), Docteur.T("RA.Usure.ZeroPourcent"),
-                merite ? RepairStatus.Suspicious : RepairStatus.Observed,
+                StatutDUsure(usure),
                 merite
                     ? Docteur.T("RA.Usure.Merite", usure, SeuilUsurePercent)
                     : Docteur.T("RA.Usure.Lecture", usure),
@@ -1009,7 +1034,10 @@ public sealed partial class RepairAuditService
         }
     }
 
-    // « 0 %, 40 °C » sous le mot « usure » laissait le second chiffre sans nom.
+    /// <summary>Le seuil d'usure est une convention du constructeur : il dit quand regarder, il ne prouve aucun tort.</summary>
+    public static RepairStatus StatutDUsure(int usure) => usure >= SeuilUsurePercent ? RepairStatus.NonDefault : RepairStatus.Observed;
+
+    // La température est nommée à côté de l'usure : « 0 %, 40 °C » sous le mot « usure » laisserait le second chiffre sans nom.
     internal static string ValeurDUsure(int usure, int? temperatureC) =>
         // Une clé USB publiait « 0 °C ». Zéro n'est pas une température de
         // disque en marche : c'est une valeur non publiée, elle n'est pas dite.
@@ -1060,6 +1088,23 @@ public sealed partial class RepairAuditService
     // Une resolution non native n'est pas une erreur. Beaucoup de joueurs competitifs la choisissent
     // deliberement, pour gagner des FPS ou pour l'etirement de l'image. Le dire autrement serait
     // accuser un choix.
+    /// <summary>Pur : la fréquence de l'écran de jeu contre son maximum. Une fréquence non lue (0 : Win32 rend la valeur par
+    /// défaut du matériel) se dit non lue : comparée au maximum, elle donnait « tourne à 0 Hz » avec une recommandation.</summary>
+    internal static RepairFinding FrequenceDeLEcran(DrDxt.Application.Tweaks.Hardware.DisplayInfo e)
+        => e.RefreshHz <= 0
+            ? new RepairFinding("DISPLAY", "frequence", null, e.MaxRefreshHz > 0 ? $"{e.MaxRefreshHz} Hz" : null, RepairStatus.Unknown,
+                Docteur.T("RA.Ecran.FrequenceNonLue"))
+            : e.MaxRefreshHz == 0
+                ? new RepairFinding("DISPLAY", "frequence", $"{e.RefreshHz} Hz", null, RepairStatus.Observed,
+                    Docteur.T("RA.Ecran.MaxNonLu"))
+                : e.RefreshHz >= e.MaxRefreshHz
+                    ? new RepairFinding("DISPLAY", "frequence", $"{e.RefreshHz} Hz", $"{e.MaxRefreshHz} Hz",
+                        RepairStatus.ExpectedDefault, Docteur.T("RA.Ecran.AuMax"))
+                    : new RepairFinding("DISPLAY", "frequence", $"{e.RefreshHz} Hz", $"{e.MaxRefreshHz} Hz",
+                        RepairStatus.NonDefault,
+                        Docteur.T("RA.Ecran.Bride", e.MaxRefreshHz, e.RefreshHz),
+                        RepairAction.Recommandation);
+
     private IEnumerable<RepairFinding> Display()
     {
         var ecran = new Win32DisplayInfo().GetPrimaryGameDisplay();
@@ -1071,16 +1116,7 @@ public sealed partial class RepairAuditService
         }
 
         var e = ecran.Value;
-        yield return e.MaxRefreshHz == 0
-            ? new RepairFinding("DISPLAY", "frequence", $"{e.RefreshHz} Hz", null, RepairStatus.Observed,
-                Docteur.T("RA.Ecran.MaxNonLu"))
-            : e.RefreshHz >= e.MaxRefreshHz
-                ? new RepairFinding("DISPLAY", "frequence", $"{e.RefreshHz} Hz", $"{e.MaxRefreshHz} Hz",
-                    RepairStatus.ExpectedDefault, Docteur.T("RA.Ecran.AuMax"))
-                : new RepairFinding("DISPLAY", "frequence", $"{e.RefreshHz} Hz", $"{e.MaxRefreshHz} Hz",
-                    RepairStatus.NonDefault,
-                    Docteur.T("RA.Ecran.Bride", e.MaxRefreshHz, e.RefreshHz),
-                    RepairAction.Recommandation);
+        yield return FrequenceDeLEcran(e);
 
         // Ce que l'écran annonce dans son EDID, contre ce que Windows propose.
         // Comparé à la résolution native : c'est elle que le câble transporte, même quand le joueur joue en étiré (1728×1080
@@ -1150,21 +1186,24 @@ public sealed partial class RepairAuditService
         {
             var types = DossiersDeJeux.TypesParLettre();
             ssdPresent = SsdInterne();
-            using var s = new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_PageFileUsage");
-            var fichiers = new List<(string, int)>();
-            using var rangees = s.Get();
-            foreach (var o in rangees.Cast<System.Management.ManagementObject>())
-                using (o)
-                    if (o["Name"]?.ToString() is { Length: > 1 } chemin)
-                        fichiers.Add((chemin, chemin[1] == ':' && types.TryGetValue(char.ToUpperInvariant(chemin[0]), out var t) ? t : 0));
-            return fichiers;
+            return LectureWmiBornee.Lire(() =>
+            {
+                using var s = new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_PageFileUsage");
+                var fichiers = new List<(string, int)>();
+                using var rangees = s.Get();
+                foreach (var o in rangees.Cast<System.Management.ManagementObject>())
+                    using (o)
+                        if (o["Name"]?.ToString() is { Length: > 1 } chemin)
+                            fichiers.Add((chemin, chemin[1] == ':' && types.TryGetValue(char.ToUpperInvariant(chemin[0]), out var t) ? t : 0));
+                return fichiers;
+            }, () => throw new TimeoutException("WMI did not answer in time."));
         }
         catch (Exception) { return null; }
     }
 
     /// <summary>Un SSD interne parmi tous les disques (avec ou sans lettre) ; un SSD en USB (BusType 7)
     /// ne compte pas. Aucun SSD mais un disque au type non dit : <c>null</c>, rien n'est affirmé.</summary>
-    private static bool? SsdInterne()
+    private static bool? SsdInterne() => LectureWmiBornee.Lire<bool?>(() =>
     {
         var disques = new List<(int Type, int Bus)>();
         using (var s = new System.Management.ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", "SELECT MediaType, BusType FROM MSFT_PhysicalDisk"))
@@ -1173,7 +1212,7 @@ public sealed partial class RepairAuditService
                 using (o)
                     disques.Add((Convert.ToInt32(o["MediaType"] ?? 0), Convert.ToInt32(o["BusType"] ?? 0)));
         return SsdInterneParmi(disques);
-    }
+    }, () => throw new TimeoutException("WMI did not answer in time."));
 
     internal static bool? SsdInterneParmi(IReadOnlyList<(int Type, int Bus)> disques)
     {
@@ -1206,7 +1245,7 @@ public sealed partial class RepairAuditService
 
     // ── Thermique ──────────────────────────────────────────────────────────────────────────
     //
-    // La temperature du processeur n'est pas lisible ici, et le chiffre qui semble la donner est
+    // La temperature du processeur ne se lit pas par WMI, et le chiffre qui semble la donner est
     // un piege. `MSAcpi_ThermalZoneTemperature` repond sur cette machine : `TZ00`, 27,9 °C. Un outil
     // d'opti l'affiche comme « CPU 28 °C » et personne ne bronche.
     //
@@ -1225,10 +1264,10 @@ public sealed partial class RepairAuditService
     // Le compteur « Thermal Zone Information » (Win32_PerfFormattedData_Counters_ThermalZoneInformation)
     // n'est pas une autre source : il rend la même zone `\_TZ.TZ00`, 301 K, constante pendant que la charge passait de
     // 10 à 90 % sur cette machine. Une zone ACPI est une région que le fabricant de la carte mère découpe et dont il
-    // choisit la sonde (Microsoft Learn, « ACPI-defined devices », zones thermiques et `_TMP`), pas le cœur. Lire la
-    // température des cœurs demande les registres MSR, donc un pilote noyau : hors de ce produit.
+    // choisit la sonde (Microsoft Learn, « ACPI-defined devices », zones thermiques et `_TMP`), pas le cœur. La
+    // température des cœurs se lit dans HWiNFO quand il publie, ou dans les registres MSR par PawnIO (ThermiqueGpu).
     //
-    // Ce qui reste vrai et utile : on ne sait pas combien il fait, mais on sait si un indicateur
+    // Sans ces deux sources, on ne sait pas combien il fait, mais on sait si un indicateur
     // de limite est leve, et ce constat vit dans la famille CPU, qui lit deja le masque.
     private readonly Func<DrDxt.Detection.Cpu.TemperatureHwinfo.Lecture?> _temperatureHwinfo;
 
@@ -1364,12 +1403,8 @@ public sealed partial class RepairAuditService
             RepairStatus.Observed, Docteur.T("RA.AntiLag.Explication", carte.Model));
     }
 
-    // DrDXT ne lit la température que des cartes NVIDIA (NVML). Sur une carte AMD ou
-    // Intel, « NVML n'a rien rendu » ne dirait rien au joueur ; on nomme sa carte et où la lire. La lecture AMD (ADLX) et
-    // Intel (IGCL) attend une machine pour être prouvée.
-    // DrDXT règle et lit la limite d'images (VRR, cap) par le pilote NVIDIA seulement.
-    // Sur une carte AMD sans carte NVIDIA, le silence passerait pour « rien à régler » : c'est un « non lu », dit. La lecture
-    // par ADLX attend une carte AMD pour être prouvée.
+    // La limite d'images (VRR, cap) se règle par le pilote NVIDIA, et se lit par ADLX sur une Radeon. Sur une carte AMD
+    // ou Intel sans carte NVIDIA, le silence passerait pour « rien à régler » : sans lecture, c'est un « non lu », dit.
     internal static IEnumerable<RepairFinding> LimiteImagesHorsNvidia(IReadOnlyList<GpuInfo> cartes,
         DrDxt.Detection.Gpu.Adlx.AdlxReglagesLus amd)
     {

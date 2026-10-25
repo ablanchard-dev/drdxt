@@ -149,4 +149,15 @@ public sealed class MisesAJourEnAttenteTests
         c.Statut.Should().Be(RepairStatus.Unknown);
         c.Explication.Should().Contain("service arrêté");
     }
+    // ISearchResult.ResultCode (Microsoft Learn, OperationResultCode) : seules 2 (réussie) et 3 (réussie avec erreurs) sont
+    // une recherche faite. Une recherche échouée ou abandonnée ne date pas « la dernière recherche réussie ».
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, true)]
+    [InlineData(3, true)]
+    [InlineData(4, false)]
+    [InlineData(5, false)]
+    public void Seule_une_recherche_reussie_compte(int code, bool reussie)
+        => RechercheWindowsUpdate.Reussie(code).Should().Be(reussie);
 }

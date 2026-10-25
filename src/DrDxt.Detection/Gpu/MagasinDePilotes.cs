@@ -50,6 +50,12 @@ public static class MagasinDePilotes
         // La classe Affichage déconnectée contient aussi des cartes virtuelles (Bureau à distance « SWD\\ »,
         // Parsec ou écrans virtuels « ROOT\\ ») ; seule une carte sur le bus PCI est une ancienne carte.
         var restes = Cartes(deconnecteesXml, seulementPci: true);
+        // pnputil qui ne rend pas de XML (un Windows qui ne connaît pas /format xml, une erreur) : non lu, et dit.
+        if (Racine(pilotesXml) is null)
+        {
+            yield return new RepairFinding("GPU DRIVER", NomInstalles, "", null, RepairStatus.Unknown, Docteur.T("MP.NonLu"));
+            yield break;
+        }
         if (paquets.Count == 0) yield break;
 
         // Une carte branchée dont le pilote n'est pas lu (pnputil rend "" sur toute erreur, ou une ligne sans DriverName) :
@@ -69,15 +75,20 @@ public static class MagasinDePilotes
         var servis = paquets.Where(p => enService.Contains(p.Nom)).ToList();
         bool PasPlusAncien(Paquet p) => servis.Any(s => string.Equals(s.Fournisseur, p.Fournisseur, StringComparison.OrdinalIgnoreCase)
             && (!Version.TryParse(p.Version, out var v) || !Version.TryParse(s.Version, out var vs) || v > vs));
+        // Une carte branchée sur un pilote hors du magasin (display.inf, le pilote de base de Windows après un plantage du
+        // pilote) : le paquet qu'elle devrait prendre ne sert aucune carte, mais c'est le sien. Est gardé tout paquet que
+        // Windows déclare compatible avec une carte branchée, et tous si cette liste n'est pas lue.
+        var horsMagasin = enService.Where(n => !paquets.Any(p => string.Equals(p.Nom, n, StringComparison.OrdinalIgnoreCase))).ToList();
+        bool PourUneCarteHorsMagasin(Paquet p) => horsMagasin.Count > 0 && (correspondants?.Contains(p.Nom) ?? true);
         var nonLies = paquets.Where(p => !enService.Contains(p.Nom)).ToList();
-        var dormants = nonLies.Where(PasPlusAncien).ToList();
+        var dormants = nonLies.Where(p => PasPlusAncien(p) || PourUneCarteHorsMagasin(p)).ToList();
         var inutiles = nonLies.Except(dormants).ToList();
         var lu = string.Join(", ", paquets.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})"));
         if (dormants.Count > 0)
             yield return new RepairFinding("GPU DRIVER", "pilote d'affichage dormant",
                 string.Join(", ", dormants.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")), null, RepairStatus.Observed,
                 Docteur.T("MP.Dormant", string.Join(", ", dormants.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")),
-                    string.Join(", ", servis.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")))
+                    string.Join(", ", servis.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})").Concat(horsMagasin)))
                 // Windows dit lui-même si ce paquet déclare la carte branchée (identifiant matériel, SUBSYS compris).
                 + (correspondants is null ? ""
                     : Docteur.T(dormants.Any(p => correspondants.Contains(p.Nom)) ? "MP.DormantPourLaCarte" : "MP.DormantAutreMateriel")));
@@ -87,9 +98,10 @@ public static class MagasinDePilotes
                     ? Docteur.T("MP.UnSeul")
                     : Docteur.T("MP.ChacunSert"));
         else if (inutiles.Count > 0)
-            // La valeur listait aussi le paquet en service sous le titre « anciens pilotes ».
+            // La valeur listait aussi le paquet en service sous le titre « anciens pilotes ». À regarder, pas à corriger : Windows
+            // peut y revenir après une mise à jour ratée, rien ne prouve qu'ils nuisent.
             yield return new RepairFinding("GPU DRIVER", "anciens pilotes d'affichage gardés",
-                string.Join(", ", inutiles.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")), null, RepairStatus.Suspicious,
+                string.Join(", ", inutiles.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})")), null, RepairStatus.NonDefault,
                 Docteur.T("MP.Inutiles", inutiles.Count, string.Join(", ", inutiles.Select(p => $"{p.Fournisseur} {p.Version} ({p.Nom})"))),
                 RepairAction.Recommandation,
                 // Un paquet encore lié à une carte déconnectée refuse de partir ; l'ordre des gestes est dit.
@@ -97,8 +109,9 @@ public static class MagasinDePilotes
                     string.Join(Docteur.T("MP.Puis"), inutiles.Select(p => $"pnputil /delete-driver {p.Nom}"))),
                 Cible: string.Join(" ", inutiles.Select(p => p.Nom)));
 
+        // Une carte déconnectée qui reste déclarée (puce coupée au BIOS, carte changée d'emplacement) ne fait rien : à regarder.
         if (restes.Count > 0)
-            yield return new RepairFinding("GPU DRIVER", "cartes graphiques déconnectées", $"{restes.Count}", "0", RepairStatus.Suspicious,
+            yield return new RepairFinding("GPU DRIVER", "cartes graphiques déconnectées", $"{restes.Count}", "0", RepairStatus.NonDefault,
                 Docteur.T("MP.Deconnectees", restes.Count, string.Join(", ", restes.Select(r => r.Description))),
                 Remede: Docteur.T("MP.Deconnectees.Remede", string.Join(", ", restes.Select(r => r.Description))));
     }

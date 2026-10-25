@@ -20,7 +20,10 @@ public sealed class TestDeRefroidissement
     /// que la pause de 2 s du client après un raté isolé du service, qui fait 3 secondes nulles sans perte réelle).</summary>
     public const int SecondesSansLectureMax = 5;
 
-    public sealed record Resultat(int Secondes, FreinageCpu? Freinage, bool ArretSecurite, int? SecondesAvantSeuil, bool LectureePerdue = false);
+    /// <param name="Interrompu">Arrêté avant la durée prévue sans arrêt de sécurité ni lecture perdue : le joueur a
+    /// arrêté le test, et une charge coupée court ne prouve pas que le refroidissement tient.</param>
+    public sealed record Resultat(int Secondes, FreinageCpu? Freinage, bool ArretSecurite, int? SecondesAvantSeuil, bool LectureePerdue = false,
+        bool Interrompu = false);
 
     private readonly Func<CancellationToken, IDisposable> _charger;
     private readonly Func<EtatCpu?> _lire;
@@ -63,7 +66,8 @@ public sealed class TestDeRefroidissement
                 else auSeuil = 0;
             }
         }
-        return new Resultat(ecoulees, FreinageCpu.Depuis(etats), arret, premierAuSeuil, perdue);
+        return new Resultat(ecoulees, FreinageCpu.Depuis(etats), arret, premierAuSeuil, perdue,
+            Interrompu: !arret && !perdue && ecoulees < (int)duree.TotalSeconds);
     }
 
     /// <summary>La charge : un fil par processeur logique, en priorité basse (le reste de la machine répond), qui calcule en
@@ -135,6 +139,10 @@ public sealed class TestDeRefroidissement
                 Docteur.T("TR.Seuil", SeuilSecuriteC, r.SecondesAvantSeuil, watts) + avertissement,
                 RepairAction.Recommandation);
         var chaleur = Math.Round(100 * f.Part(f.Chaleur)).ToString("0", inv);
+        // Un freinage vu pendant un test coupé reste vu ; son absence, sur quelques secondes, ne prouve rien.
+        if (r.Interrompu && f.Part(f.Chaleur) < 0.05)
+            return new RepairFinding("CPU", "test de refroidissement", null, null, RepairStatus.Unknown,
+                Docteur.T("TR.RefroidissementInterrompu", r.Secondes));
         return f.Part(f.Chaleur) >= 0.05
             ? new RepairFinding("CPU", "test de refroidissement", Docteur.T("TR.Freine", chaleur), Docteur.T("TR.Sous5"), RepairStatus.Suspicious,
                 Docteur.T("TR.FreineExplication", r.Secondes, watts, chaleur, f.ChaudMoyenC.ToString("0", inv))

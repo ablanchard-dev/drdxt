@@ -29,6 +29,72 @@ public class BenchmarkRunnerTests
         return s;
     }
 
+    // Le jeu se ferme à la quatrième passe sur cinq : l'échec jetait les trois bonnes. Au moins deux passes réussies se
+    // gardent (la marge entre passes en demande deux), et Runs dit combien ont servi, pas combien étaient demandées.
+    [Fact]
+    public async Task Un_echec_apres_deux_passes_garde_les_passes_reussies()
+    {
+        var bonne = Result<FrameCapture>.Ok(new FrameCapture(Enumerable.Repeat(10.0, 100).ToList(), Array.Empty<double>(), Array.Empty<double>()));
+        var ratee = Result<FrameCapture>.Fail(ErrorCodes.CaptureFail, "le jeu s'est fermé");
+        var s = Substitute.For<IPresentMonSession>();
+        s.IsServiceAvailable().Returns(Result<bool>.Ok(true));
+        s.CaptureAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>()).Returns(bonne, bonne, bonne, ratee, bonne);
+
+        var r = await new BenchmarkRunner(s).RunAsync(1, TimeSpan.FromMilliseconds(10), 5, default);
+
+        r.IsOk.Should().BeTrue();
+        r.Value!.Runs.Should().Be(3);
+    }
+
+    // Des images sans aucun temps exploitable (NaN, 0) ne font pas une mesure : rendue Ok, elle arrivait au scan comme
+    // une référence à 0 FPS, et le repli DXGI n'était même pas tenté.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task Une_capture_sans_aucune_image_exploitable_est_un_echec_pas_zero_fps(int passes)
+    {
+        var r = await new BenchmarkRunner(SessionReturning(double.NaN, 0.0)).RunAsync(1, TimeSpan.FromMilliseconds(10), passes, default);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.NoFrames);
+    }
+
+    // La session rend les images déjà vues quand le jeton tombe : une passe tronquée n'est pas une mesure, et l'annulation
+    // reste une annulation, comme le contrat de la classe le dit.
+    [Fact]
+    public async Task Une_annulation_pendant_une_passe_reste_une_annulation()
+    {
+        using var cts = new CancellationTokenSource();
+        var bonne = Result<FrameCapture>.Ok(new FrameCapture(Enumerable.Repeat(10.0, 100).ToList(), Array.Empty<double>(), Array.Empty<double>()));
+        var s = Substitute.For<IPresentMonSession>();
+        s.IsServiceAvailable().Returns(Result<bool>.Ok(true));
+        var appels = 0;
+        s.CaptureAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            if (++appels == 3) cts.Cancel();
+            return bonne;
+        });
+
+        var mesurer = () => new BenchmarkRunner(s).RunAsync(1, TimeSpan.FromMilliseconds(10), 3, cts.Token);
+
+        await mesurer.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task Un_echec_apres_une_seule_passe_reste_un_echec()
+    {
+        var bonne = Result<FrameCapture>.Ok(new FrameCapture(Enumerable.Repeat(10.0, 100).ToList(), Array.Empty<double>(), Array.Empty<double>()));
+        var ratee = Result<FrameCapture>.Fail(ErrorCodes.CaptureFail, "le jeu s'est fermé");
+        var s = Substitute.For<IPresentMonSession>();
+        s.IsServiceAvailable().Returns(Result<bool>.Ok(true));
+        s.CaptureAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>()).Returns(bonne, ratee);
+
+        var r = await new BenchmarkRunner(s).RunAsync(1, TimeSpan.FromMilliseconds(10), 5, default);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.CaptureFail);
+    }
+
     [Fact]
     public async Task Computes_avg_and_lows_from_frametimes()
     {
@@ -162,8 +228,8 @@ public class BenchmarkRunnerTests
         s.IsServiceAvailable().Returns(Result<bool>.Ok(true));
         s.CaptureAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
          .Returns(Result<FrameCapture>.Fail(ErrorCodes.NoFrames, "x"));
-        // Sans cette réponse fixée, le test demandait à la vraie machine si le PID 1234 vivait.
-        // Sur un runner où il vivait, le code devenait NoPresentingFrames : rouge en CI deux fois ce jour-là.
+        // La vie du processus est fixée : demandée à la vraie machine, un PID 1234 vivant changerait le code en
+        // NoPresentingFrames.
         var r = await new BenchmarkRunner(s, isProcessAlive: _ => false).RunAsync(1234, TimeSpan.FromMilliseconds(10), 3, default);
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.NoFrames);

@@ -78,6 +78,33 @@ public sealed class VeilleDesPartiesTests
         enregistrees.Should().HaveCount(2, "la seconde partie s'enregistre malgré l'échec de l'option sur la première");
     }
 
+    // Le regard sur le jeu, ou l'enregistrement d'une partie, qui lève ne fait pas tomber la veille de la session : l'échec se
+    // dit, et la partie suivante s'enregistre.
+    [Fact]
+    public async Task Un_regard_ou_un_enregistrement_qui_leve_n_arrete_pas_la_veille()
+    {
+        var etats = new Queue<Func<(string, int)?>>([
+            () => throw new InvalidOperationException("liste des processus"),
+            () => ("cod.exe", 1), () => ("cod.exe", 1), () => null,
+            () => ("cod.exe", 2), () => ("cod.exe", 2), () => null,
+        ]);
+        var enregistrees = new List<PartieRelevee>();
+        var signales = new List<string>();
+        using var fin = new CancellationTokenSource();
+
+        var veille = new VeilleDesParties(
+            jeu: () => { if (etats.Count == 0) { fin.Cancel(); return null; } return etats.Dequeue()(); },
+            capturer: (_, _, _) => Task.FromResult<BenchmarkResult?>(Capture(120)),
+            classer: _ => BottleneckState.CpuBoundOrAppBound,
+            enregistrer: p => { enregistrees.Add(p); if (enregistrees.Count == 1) throw new IOException("disque plein"); },
+            patienter: (_, _) => Task.CompletedTask,
+            signalerEchec: signales.Add);
+
+        await veille.Invoking(v => v.VeillerAsync(fin.Token)).Should().NotThrowAsync();
+        enregistrees.Should().HaveCount(2, "la seconde partie s'enregistre malgré l'échec de la première");
+        signales.Should().HaveCount(2, "le regard et l'enregistrement ratés se disent");
+    }
+
     // Le jeu fermé puis relancé entre deux regards garde son nom mais pas son processus ; ce sont
     // deux parties.
     [Fact]
@@ -316,6 +343,32 @@ public sealed class VeilleDesPartiesTests
         signales.Should().Equal("cod.exe : service refusé", "cod.exe : aucune image lue");
     }
 
+    // Une capture qui rate vite (service de mesure arrêté, relevé sans droits) se relançait sans pause : une
+    // tentative par seconde toute la partie, pendant que le joueur joue. Après un raté, la veille recule, de plus
+    // en plus, jamais au-delà du regard hors partie ; une bonne capture la remet bout à bout.
+    [Fact]
+    public async Task Une_capture_ratee_recule_avant_la_suivante_et_le_recul_reste_borne()
+    {
+        var resultats = new Queue<Func<BenchmarkResult?>>([
+            () => throw new InvalidOperationException("service arrêté"), () => null, () => Capture(0),
+            () => null, () => null, () => Capture(90), () => Capture(90)]);
+        var attentes = new List<TimeSpan>();
+        using var fin = new CancellationTokenSource();
+
+        var veille = new VeilleDesParties(
+            jeu: () => ("cod.exe", 42),
+            capturer: (_, _, _) => Task.FromResult(resultats.Dequeue()()),
+            classer: _ => BottleneckState.CpuBoundOrAppBound,
+            enregistrer: _ => { },
+            patienter: (d, _) => { attentes.Add(d); if (resultats.Count == 0) fin.Cancel(); return Task.CompletedTask; });
+
+        await veille.VeillerAsync(fin.Token);
+
+        attentes.Should().Equal(
+            TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20),
+            VeilleDesParties.HorsPartie, VeilleDesParties.HorsPartie, TimeSpan.Zero, TimeSpan.Zero);
+    }
+
     // La température de la carte à chaque capture ; la partie garde son pic. Un relevé non lu ou qui
     // lève n'est pas un zéro et n'annule pas la capture.
     [Fact]
@@ -346,5 +399,31 @@ public sealed class VeilleDesPartiesTests
         var t = DateTimeOffset.Now;
         ReleveDesParties.Resumer("cod.exe", [new(t, 120, 90, BottleneckState.GpuBound), new(t, 121, 91, BottleneckState.GpuBound)])!
             .CarteCelsiusMax.Should().BeNull();
+    }
+
+    // Un jeu laissé ouvert des heures gardait en mémoire chaque image de chaque minute (≈ 5,8 Mo/h à 200 i/s). Au-delà de la
+    // fenêtre, les minutes les plus anciennes ne gardent que leur résumé.
+    [Fact]
+    public async Task La_veille_ne_garde_qu_une_fenetre_d_images_brutes()
+    {
+        var etats = new Queue<(string, int)?>(Enumerable.Repeat<(string, int)?>(("cod.exe", 42), 10).Append(null));
+        IReadOnlyList<CaptureEnPartie>? gardees = null;
+        using var fin = new CancellationTokenSource();
+        var images = Enumerable.Range(0, 300).Select(i => 7.0 + i % 3 * 0.1).ToList();
+
+        var veille = new VeilleDesParties(
+            jeu: () => etats.Count > 0 ? etats.Dequeue() : null,
+            capturer: (_, _, _) => Task.FromResult<BenchmarkResult?>(Capture(140) with { FrameTimesMs = images }),
+            classer: _ => BottleneckState.CpuBoundOrAppBound,
+            enregistrer: _ => fin.Cancel(),
+            patienter: (_, _) => Task.CompletedTask,
+            garderLesImages: (_, c) => gardees = c,
+            imagesBrutesMax: 3);
+
+        await veille.VeillerAsync(fin.Token);
+
+        gardees.Should().HaveCount(10);
+        gardees!.Count(c => c.ImagesMs is not null).Should().Be(3);
+        gardees.Count(c => c.Resume is not null).Should().Be(7);
     }
 }

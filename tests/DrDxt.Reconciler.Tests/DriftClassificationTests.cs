@@ -48,6 +48,25 @@ public sealed class DriftClassificationTests
         cause.Value.Should().Be(DriftCause.WindowsReset);
     }
 
+    // Le joueur avait déjà remis la valeur d'origine lui-même (la passe précédente l'a notifié) : après une mise à jour de
+    // Windows, la même valeur d'origine est son choix, pas une remise à zéro. Le service ne la réécrit pas.
+    [Fact]
+    public async Task ClassifyDriftAsync_BuildChanged_ValueIsOriginal_AlreadyNotifiedBefore_ReturnsUserIntentional()
+    {
+        var state = ReconcilerState.Default with
+        {
+            Items = new[] { new ReconcilerItemState("reflex.lowlatency", false, "22631.3447", "", At, nameof(ItemOutcome.Notified)) },
+        };
+        var h = new ReconcilerHarness(state);
+        h.Policy.Map("reflex.lowlatency", ReconcileSurface.Registry);
+        h.BuildProbe.Build = "22635.5000";
+        h.Probe.Set("reflex.lowlatency", "{\"v\":0}");
+
+        var cause = await h.Build().ClassifyDriftAsync(Reg(desired: "{\"v\":2}", original: "{\"v\":0}"));
+
+        cause.Value.Should().Be(DriftCause.UserIntentional);
+    }
+
     // NVIDIA DriverVersion changed → WindowsReset-class (non-user) cause.
     [Fact]
     public async Task ClassifyDriftAsync_NvidiaDriverVersionChanged_ReturnsWindowsReset()

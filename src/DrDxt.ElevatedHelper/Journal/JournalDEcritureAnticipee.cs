@@ -29,11 +29,29 @@ public sealed record EntreeDuJournal(Guid Id, PrivilegedOp Op, string? ImageAvan
 /// </summary>
 /// <param name="maxParAppelant">Les entrées en attente d'un même appelant, au plus. Au-delà, sa pose est refusée : un appelant
 /// qui n'acquitterait jamais ferait grossir sans fin un journal relu et réécrit à chaque écriture.</param>
-public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente = null, int maxParAppelant = JournalDEcritureAnticipee.MaxParAppelantParDefaut)
+/// <param name="duCompte">Le journal du compte (<see cref="DuCompte"/>) : mêmes entrées, mêmes règles, pour les seules valeurs de
+/// la session (HKCU), que l'App écrit avec son jeton.</param>
+public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente = null, int maxParAppelant = JournalDEcritureAnticipee.MaxParAppelantParDefaut,
+    bool duCompte = false)
 {
+    /// <summary>
+    /// Le journal des valeurs de la session, dans le dossier du compte. Le compte peut réécrire ce fichier : il n'y gagne rien,
+    /// une entrée ne rend qu'une valeur de sa propre ruche (HKCU), qu'il peut déjà écrire lui-même. C'est la seule chose qu'il
+    /// porte : une autre op n'y entre pas, et une autre op lue n'est ni rendue ni recopiée. Le verrou est un mutex de la session,
+    /// l'écriture celle de FichierJsonAtomique.
+    /// </summary>
+    public static JournalDEcritureAnticipee DuCompte(string chemin, TimeSpan? attente = null) => new(chemin, attente, duCompte: true);
+
+    /// <summary>Une valeur de la session de l'utilisateur, la seule op que porte le journal du compte.</summary>
+    public static bool DeLaSession(PrivilegedOp op)
+        => op is SetRegistryValueOp { Hive: RegistryHiveKind.CurrentUser } or DeleteRegistryValueOp { Hive: RegistryHiveKind.CurrentUser };
+
     public const int MaxParAppelantParDefaut = 512;
 
     public const string CodeErreur = "JEA_JOURNAL";
+    /// <summary>Le journal ne se lit plus : il n'est jamais écrasé (une origine s'y perdrait), donc rien ne s'écrit plus tant
+    /// qu'il l'est. Pas un refus passager : le joueur ne doit pas lire « réessaie dans un instant ».</summary>
+    public const string CodeIllisible = "JEA_ILLISIBLE";
     /// <summary>Aucune entrée de cet appelant ne porte cette op : déjà rendue par un rejeu, ou journal réécrit. Définitif, à la
     /// différence d'un journal illisible ou occupé : l'App ne reprend pas cet acquit.</summary>
     public const string CodeSansEntree = "JEA_ACQUIT_SANS_ENTREE";
@@ -47,6 +65,8 @@ public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente =
 
     public Result<EntreeDuJournal> Ajouter(PrivilegedOp op, string? imageAvant, AppelantDuJournal appelant, DateTimeOffset le)
     {
+        if (duCompte && !DeLaSession(op))
+            return Result<EntreeDuJournal>.Fail(CodeErreur, "The account journal only carries the session's own values.");
         var json = PrivilegedOpCodec.Serialize(op);
         if (!json.IsOk) return Result<EntreeDuJournal>.Fail(CodeErreur, json.Error?.Message ?? "op not serializable");
         var ligne = new Ligne(Guid.NewGuid(), json.Value!, imageAvant, appelant.Sid, appelant.Pid, appelant.CreationDuProcessus, le);
@@ -91,7 +111,8 @@ public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente =
         foreach (var l in lu.Value!)
         {
             if (PrivilegedOpCodec.Deserialize(l.Op) is not { IsOk: true, Value: { } op })
-                return Result<IReadOnlyList<EntreeDuJournal>>.Fail(CodeErreur, $"Pending write {l.Id} carries an unreadable op.");
+                return Result<IReadOnlyList<EntreeDuJournal>>.Fail(CodeIllisible, $"Pending write {l.Id} carries an unreadable op.");
+            if (duCompte && !DeLaSession(op)) continue;
             entrees.Add(new EntreeDuJournal(l.Id, op, l.ImageAvant, new AppelantDuJournal(l.Sid, l.Pid, l.CreationDuProcessus), l.Le));
         }
         return Result<IReadOnlyList<EntreeDuJournal>>.Ok(entrees);
@@ -102,7 +123,7 @@ public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente =
         // %ProgramData% laisse tout compte créer un dossier, et la réparation de la racine ne descend pas : un journal qui
         // n'est pas de confiance (propriétaire Administrateurs/SYSTEM, aucune écriture pour un autre) n'est pas de DrDXT.
         // Mis de côté, il n'est ni rejoué ni recopié ; s'il ne peut pas l'être, il est illisible et rien n'est écrit.
-        if (File.Exists(_chemin) && !DrDxt.Reconciler.Manifest.TrustedManifestRoot.EnsureTrustedFile(_chemin).IsOk)
+        if (!duCompte && File.Exists(_chemin) && !DrDxt.Reconciler.Manifest.TrustedManifestRoot.EnsureTrustedFile(_chemin).IsOk)
             return _fichier.MettreDeCote() ? Result<List<Ligne>>.Ok([]) : Result<List<Ligne>>.Fail(CodeErreur, "Untrusted journal.");
         var texte = _fichier.Read();
         if (!texte.IsOk) return Result<List<Ligne>>.Fail(texte.Error!.Value.Code, texte.Error.Value.Message);
@@ -111,16 +132,17 @@ public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente =
         {
             return JsonSerializer.Deserialize<List<Ligne>>(texte.Value) is { } lignes && lignes.TrueForAll(l => l is not null)
                 ? Result<List<Ligne>>.Ok(lignes)
-                : Result<List<Ligne>>.Fail(CodeErreur, "Unreadable journal.");
+                : Result<List<Ligne>>.Fail(CodeIllisible, "Unreadable journal.");
         }
         catch (JsonException ex)
         {
-            return Result<List<Ligne>>.Fail(CodeErreur, $"Unreadable journal: {ex.Message}");
+            return Result<List<Ligne>>.Fail(CodeIllisible, $"Unreadable journal: {ex.Message}");
         }
     }
 
     private Result SousVerrou(Func<List<Ligne>, Result> modifier)
     {
+        if (duCompte) return SousVerrouDuCompte(modifier);
         try
         {
             // Le dossier est créé déjà fermé. Un dossier qui existait n'est jamais cru : %ProgramData% laisse tout compte en
@@ -149,6 +171,25 @@ public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente =
         {
             return Result.Fail(CodeErreur, $"Journal not writable: {ex.Message}");
         }
+    }
+
+    // Un mutex de la session, nommé d'après le fichier : deux App du même compte ne réécrivent jamais le journal en même temps.
+    private Result SousVerrouDuCompte(Func<List<Ligne>, Result> modifier)
+    {
+        using var verrou = new Mutex(false, @"Local\DrDXT-jea-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(_chemin).ToUpperInvariant())))[..32]);
+        var pris = false;
+        try
+        {
+            try { pris = verrou.WaitOne(_attente); }
+            catch (AbandonedMutexException) { pris = true; /* le détenteur est mort : le fichier, lui, est atomique */ }
+            if (!pris) return Result.Fail(CodeErreur, "The journal is busy.");
+            var lu = Lire();
+            if (!lu.IsOk) return Result.Fail(lu.Error!.Value.Code, lu.Error.Value.Message);
+            var r = modifier(lu.Value!);
+            return r.IsOk ? _fichier.WriteAtomic(JsonSerializer.Serialize(lu.Value)) : r;
+        }
+        finally { if (pris) verrou.ReleaseMutex(); }
     }
 
     // Créé sous le propriétaire par défaut (le compte qui a élevé), le verrou laissait ce compte, sans élévation, s'en rendre

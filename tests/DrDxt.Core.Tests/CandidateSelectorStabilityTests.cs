@@ -37,7 +37,8 @@ public class CandidateSelectorStabilityTests
     [InlineData("gpu.essai", "gpu.clock")]
     [InlineData("fixit.power_plan", "cpu.power")]
     [InlineData("ram.xmp", "ram.frequency")]
-    public void Des_arrets_brutaux_REPETES_ferment_le_GPU_le_CPU_et_la_RAM(string id, string grandeur)
+    // Le levier de laboratoire ne déclare pas sa surface : c'est lui que les arrêts ferment, quelles que soient ses grandeurs.
+    public void Des_arrets_brutaux_REPETES_ferment_un_levier_sans_surface_declaree(string id, string grandeur)
     {
         var a = Juger(IlYA(11, 1), id, grandeur);
 
@@ -61,9 +62,6 @@ public class CandidateSelectorStabilityTests
     public void Un_levier_qui_ecrit_le_pilote_passe_sous_garde()
         => Juger(IlYA(11, 1), "latency.x", "latence", SurfaceTouchee.PiloteGraphique).Retenu.Should().BeTrue();
 
-    // Un test mémoire sans erreur ne lève pas ce veto. Il n'attribue pas le prochain arrêt (l'alimentation, le
-    // processeur, le pilote restent possibles) et ne teste pas la mémoire du système. Le motif ne dit donc pas
-    // « un test mémoire vient avant toute campagne », comme si le test débloquait.
     [Fact]
     public void Des_arrets_hors_veille_ne_refusent_plus_le_processeur()
         // La garde d'incident remplace le refus.

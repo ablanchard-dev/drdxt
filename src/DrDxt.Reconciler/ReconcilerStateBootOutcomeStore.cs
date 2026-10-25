@@ -14,7 +14,7 @@ namespace DrDxt.Reconciler;
 //     LastStableSessionAt : la remise à zéro « homme mort » qui efface le compteur.
 //   • GetUncleanStreak ne fait que la lire (ce que consomme BootLoopGuard).
 //
-// Chaque modification est Load → record-with → Save, en échec propre : si Load ou Save échoue,
+// Chaque modification est Load → record-with → Save d'un seul tenant (MettreAJourAsync), en échec propre : si Load ou Save échoue,
 // l'op rend ce Fail tel quel, sans modification partielle ni exception à travers la couture. Le
 // sidecar n'a aucune autorité signée (il ne peut qu'en faire moins au réconciliateur) : l'enregistrer
 // ici n'élargit jamais les privilèges.
@@ -47,16 +47,12 @@ public sealed class ReconcilerStateBootOutcomeStore : IBootOutcomeStore
             state => state with { UncleanBootStreak = 0, LastStableSessionAt = _clock.UtcNow },
             ct);
 
-    /// <summary>Load → modifier → Save, en échec propre. Un Load raté court-circuite avant toute
-    /// modification ; un Save raté se propage sans avoir modifié l'état à moitié.</summary>
+    /// <summary>Load → modifier → Save d'un seul tenant (MettreAJourAsync), en échec propre. Un Load raté court-circuite
+    /// avant toute modification ; un Save raté se propage sans avoir modifié l'état à moitié.</summary>
     private async Task<Result> MutateAsync(
         Func<ReconcilerState, ReconcilerState> mutate, CancellationToken ct)
     {
-        var loaded = await _stateStore.LoadAsync(ct);
-        if (!loaded.IsOk)
-            return Result.Fail(loaded.Error!.Value.Code, loaded.Error.Value.Message);
-
-        var next = mutate(loaded.Value!);
-        return await _stateStore.SaveAsync(next, ct);
+        var r = await _stateStore.MettreAJourAsync(mutate, ct);
+        return r.IsOk ? Result.Ok() : Result.Fail(r.Error!.Value.Code, r.Error.Value.Message);
     }
 }

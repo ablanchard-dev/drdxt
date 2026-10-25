@@ -39,7 +39,7 @@ to the one from the reference tool.
 
 | Path | What it does | State | Test | The report shows |
 |---|---|---|---|---|
-| Power limit (`gpu.power_limit`) | lowers the card's power limit through the driver | not validated on real AMD | `VALIDER.cmd` | the original limit, the one set, then the original read back; Adrenalin agrees before and after |
+| Power limit (`gpu.power_limit`) | lowers the card's power limit through the driver | not offered on AMD: the unit of the ADLX range (GetPowerLimitRange), % of TDP or offset, is not read on a real card | `VALIDER.cmd` | nothing is written: the limit is only read |
 | Anti-Lag (`latency.render_queue_cap`) | turns Anti-Lag on to shorten the render queue | not validated on real AMD | `VALIDER.cmd` | Anti-Lag set, read back, restored, read back; Adrenalin agrees |
 | Driver Vsync and FRTC cap (`latency.vrr_vsync_cap`) | on a variable refresh display, Vsync "always on" and a frame cap below the display's refresh rate | not validated on real AMD | `VALIDER.cmd`, variable refresh display plugged into the card | both settings set then restored to their original value; Adrenalin agrees |
 | Tested maximum frequency (`gpu.undervolt`, Expert mode) | tries a lower maximum frequency, keeps it only if it holds | not validated on real AMD | `VALIDER-FREQUENCE.cmd`, separate from `VALIDER.cmd` (which never writes a frequency) | the original maximum frequency, the one lowered by 50 MHz, then the original read back; Adrenalin agrees before and after |

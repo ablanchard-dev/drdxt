@@ -27,6 +27,25 @@ public sealed class RegistresAmdTests
         TemperatureAmd.TemperatureCcd(792).Should().BeNull("CCD absent : le bit 11 est baissé");
     }
 
+    // Tous les bits à 1 : la réponse d'erreur du SMN, pas 206,9 °C ni un CCD présent.
+    [Fact]
+    public void Une_reponse_d_erreur_n_est_pas_une_temperature()
+    {
+        TemperatureAmd.Tctl(uint.MaxValue).Should().BeNull();
+        TemperatureAmd.TemperatureCcd(uint.MaxValue).Should().BeNull();
+    }
+
+    // Un registre qui n'est pas tout à 1 peut encore dire une température hors du physique (0xFFFFFFFE se lit 206,9 °C) : elle
+    // n'est pas une mesure. Une vraie température haute reste lue.
+    [Fact]
+    public void Une_temperature_hors_du_physique_n_est_pas_une_mesure()
+    {
+        TemperatureAmd.Tctl(uint.MaxValue - 1).Should().BeNull();
+        TemperatureAmd.TemperatureCcd(0x800u | 0x7FE).Should().BeNull();
+        TemperatureAmd.Tctl(880u << 21).Should().Be(110, "témoin : 110 °C est une vraie température");
+        TemperatureAmd.TemperatureCcd(0x800u | 1272).Should().Be(110);
+    }
+
     [Fact]
     public void Les_ccd_d_un_zen4_bureau_sont_a_leur_decalage()
     {

@@ -94,6 +94,41 @@ public sealed class GestesPnpTests : IDisposable
         File.Exists(Path.Combine(Export("oem98"), "nv_dispi.inf")).Should().BeTrue("l'annulation repart de cet export");
     }
 
+    // Un export de pilote NVIDIA pèse plusieurs Go, et seul Annuler le retirait : un retrait par nouveau pilote remplissait
+    // le disque. Les deux derniers restent ; Annuler d'un plus ancien dit que l'export n'est plus là.
+    [Fact]
+    public void Seuls_les_deux_derniers_exports_restent()
+    {
+        var p = new Pnputil(Inf);
+        foreach (var nom in new[] { "oem90.inf", "oem91.inf", "oem92.inf" })
+        {
+            File.WriteAllText(Path.Combine(Inf, nom), Affichage);
+            Actions(p).RemoveDriverPackage(nom).IsOk.Should().BeTrue();
+        }
+
+        Directory.GetDirectories(Exports).Select(Path.GetFileName).Should().HaveCount(2)
+            .And.OnlyContain(d => d!.StartsWith("oem91-") || d!.StartsWith("oem92-"));
+    }
+
+    // Un dossier que la racine n'a pas durci (posé d'avance) n'est jamais supprimé en administrateur.
+    [Fact]
+    public void Un_export_non_fiable_n_est_jamais_supprime()
+    {
+        var p = new Pnputil(Inf);
+        var pose = Path.Combine(Exports, "oem10-20200101000000000");
+        Directory.CreateDirectory(pose);
+        var a = new Win32PnpActions(p.Run, Inf, Exports, d => { Directory.CreateDirectory(d); return Result.Ok(); },
+            d => d == pose ? Result.Fail(ErrorCodes.SignatureInvalid, "non fiable") : Result.Ok(), _ => true,
+            () => _horloge = _horloge.AddSeconds(1));
+        foreach (var nom in new[] { "oem90.inf", "oem91.inf", "oem92.inf" })
+        {
+            File.WriteAllText(Path.Combine(Inf, nom), Affichage);
+            a.RemoveDriverPackage(nom).IsOk.Should().BeTrue();
+        }
+
+        Directory.Exists(pose).Should().BeTrue();
+    }
+
     [Fact]
     public void Un_paquet_qui_n_est_pas_un_pilote_d_affichage_n_est_pas_touche()
     {
@@ -142,10 +177,13 @@ public sealed class GestesPnpTests : IDisposable
         var p = new Pnputil(Inf);
         var a = Actions(p);
         a.RemoveDriverPackage("oem98.inf");
+        var export = Export("oem98");
 
         a.RestoreDriverPackage("oem98.inf").IsOk.Should().BeTrue();
 
-        p.Appels.Last().Should().Be($"/add-driver {Path.Combine(Export("oem98"), "nv_dispi.inf")} /install");
+        p.Appels.Last().Should().Be($"/add-driver {Path.Combine(export, "nv_dispi.inf")} /install");
+        // Réinstallé, l'export n'a plus d'usage : il part (des centaines de Mo par paquet).
+        Directory.Exists(export).Should().BeFalse();
     }
 
     // Windows redonne un même oemNN.inf à un autre paquet : le second retrait n'efface pas la sauvegarde du premier, et

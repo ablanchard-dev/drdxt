@@ -34,6 +34,18 @@ public sealed class GammeAmdTests
         return services.BuildServiceProvider().GetRequiredService<ITweakCatalog>().All().ToList();
     }
 
+    /// <summary>Le DVR et le flip-model se lisent dans le registre du compte. Le catalogue de test n'en a aucun (sa lecture
+    /// échoue) : ils se disent « non lus », jamais « à poser » ni « déjà réglés ». Ce qui les ouvre : leurs propres tests.</summary>
+    internal static void LeviersDuRegistreNonLus(IReadOnlyList<ITweak> leviers, MachinesEnregistreesTests.Machine m)
+    {
+        foreach (var id in new[] { "latency.gameDvrBackgroundOff", "latency.vrrFlipModelOn" })
+        {
+            var levier = leviers.Single(t => t.Id == id);
+            levier.AppliesTo(m.Inventaire, m.Reglages).Should().BeFalse(id);
+            levier.EtatNonLu(m.Reglages).Should().BeTrue(id);
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Gamme))]
     public void La_carte_est_reconnue_et_dite_en_lecture_seule_sans_tension(string nom, GpuArchitecture architecture, bool _)
@@ -53,9 +65,12 @@ public sealed class GammeAmdTests
         var m = MachinesEnregistreesTests.Charger(nom);
         var ouverts = VraisLeviers().Where(t => t.AppliesTo(m.Inventaire, m.Reglages)).Select(t => t.Id).ToList();
 
-        ouverts.Should().Contain(["gpu.power_limit", "latency.gameDvrBackgroundOff", "latency.vrrFlipModelOn"]);
+        // Lus dans le registre du compte, que la machine enregistrée ne porte pas : « non lus », ni ouverts ni « déjà réglés ».
+        LeviersDuRegistreNonLus(VraisLeviers(), m);
         // Lus seulement par le pilote NVIDIA : jamais proposés sur une Radeon.
         ouverts.Should().NotContain(["latency.prefer_max_perf", "gpu.repos_global_normal", "latency.reflex"]);
+        // L'unité de la limite de puissance d'ADLX n'est relevée sur aucune vraie carte.
+        ouverts.Should().NotContain("gpu.power_limit");
         // Le routage X3D ne concerne que les X3D à deux CCD (7950X3D) ; un 7800X3D n'a qu'un CCD.
         (ouverts.Contains("fixit.x3d_ccd")).Should().Be(deuxCcdX3d);
         // Même avec le processeur mesuré en goulot, un X3D à deux blocs garde Équilibré (le pilote AMD
@@ -84,15 +99,16 @@ public sealed class GammeAmdTests
 }
 
 /// <summary>
-/// Le mode Expert de la carte reste ouvert sur une Radeon (le joueur décide, le bail et le test
-/// de stabilité rendent la carte), mais l'accord dit que l'écriture n'a jamais été essayée sur cette architecture.
+/// Le mode Expert de la carte reste ouvert (le joueur décide, le bail et le test de stabilité rendent la carte), mais
+/// l'accord dit que le décalage cœur n'a jamais été essayé en écriture sur cette architecture. Une RTX 40 est validée pour
+/// sa limite de puissance seulement : la mention vaut aussi pour elle.
 /// </summary>
 public sealed class ExpertSurCarteNonValideeTests
 {
     [Theory]
     [InlineData("amd-rx6600-ryzen5-5600", true)]
     [InlineData("amd-rx7900xtx-ryzen9-7950x3d", true)]
-    [InlineData("reference-i7-14700f-rtx4060-2026-10-08", false)]
+    [InlineData("reference-i7-14700f-rtx4060-2026-10-08", true)]
     public async Task L_accord_dit_quand_la_carte_n_a_jamais_ete_essayee_en_ecriture(string nom, bool nonValidee)
     {
         var vm = MachinesEnregistreesTests.Vm(MachinesEnregistreesTests.Charger(nom));
@@ -119,9 +135,9 @@ public sealed class ConsolePortableTests
         services.AddSingleton(Substitute.For<IDiagnosticsLog>());
         services.AddSingleton(Substitute.For<IBenchmarkRunner>());
         services.AddDrDxtApplication();
-        var ouverts = services.BuildServiceProvider().GetRequiredService<ITweakCatalog>().All()
-            .Where(t => t.AppliesTo(m.Inventaire, m.Reglages)).Select(t => t.Id).ToList();
-        ouverts.Should().BeEquivalentTo(["latency.gameDvrBackgroundOff", "latency.vrrFlipModelOn"]);
+        var leviers = services.BuildServiceProvider().GetRequiredService<ITweakCatalog>().All().ToList();
+        leviers.Where(t => t.AppliesTo(m.Inventaire, m.Reglages)).Should().BeEmpty();
+        GammeAmdTests.LeviersDuRegistreNonLus(leviers, m);
 
         GpuTuningCoverage.For(m.Inventaire).Should().ContainSingle()
             .Which.ReasonKey.Should().Be(GpuTuningCoverage.ReasonLaptopOrHandheld);

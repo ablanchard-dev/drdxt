@@ -125,6 +125,36 @@ public class RelanceAdministrateurTests
         demandes.Should().Be(1, "une seule demande, pas à chaque analyse");
     }
 
+    // Depuis un compte standard, l'invite Windows demande le mot de passe d'un administrateur et l'App relancée tourne
+    // sous ce compte : elle lirait et écrirait ses réglages à lui, et dirait « posé » sur un compte qui n'est pas le joueur.
+    [Fact]
+    public async Task Compte_standard_l_analyse_se_fait_ici_sans_relance()
+    {
+        var vm = Vm(estEleve: false, relancer: () => true);
+        vm.CompteStandard = () => true;
+        var demandes = 0;
+        vm.RelancerEleveEtAnalyser = _ => { demandes++; return true; };
+
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        demandes.Should().Be(0);
+        vm.State.Should().NotBe(ViewModels.ScanState.Idle, "l'analyse tourne dans cette fenêtre, sans les lectures réservées");
+        vm.MessageRelanceAdministrateur.Should().BeNull("rien n'a été refusé");
+    }
+
+    [Fact]
+    public async Task Compte_standard_le_bouton_de_relance_n_existe_pas()
+    {
+        var appels = 0;
+        var vm = Vm(estEleve: false, relancer: () => { appels++; return true; });
+        vm.CompteStandard = () => true;
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.PeutRelancerEnAdministrateur.Should().BeFalse();
+        vm.RelancerEnAdministrateurCommand.Execute(null);
+        appels.Should().Be(0);
+    }
+
     [Fact]
     public async Task Deja_administrateur_aucune_relance()
     {

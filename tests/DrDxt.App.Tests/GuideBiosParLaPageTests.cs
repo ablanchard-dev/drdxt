@@ -70,6 +70,15 @@ public sealed class GuideBiosParLaPageTests(ITestOutputHelper sortie)
         }
     }
 
+    // Le QR qui ouvre la page demande du réseau au téléphone, une fois : « sans réseau » n'y est vrai que pour le texte brut.
+    [Fact]
+    public void Le_libelle_du_qr_suit_ce_qu_il_porte()
+    {
+        new BiosGuideViewModel(PireCas(Tous()[0]), c => c).LabelQr.Should().Be("Scan.Bios.Guide.Qr.Page");
+        new BiosGuideViewModel(AvecEtape("Bios.Guide.Step.Xmp", "valeur avec un accent : é"), c => c).LabelQr
+            .Should().Be("Scan.Bios.Guide.Qr");
+    }
+
     [Theory]
     [MemberData(nameof(Modeles))]
     public void Chaque_guide_du_depot_ouvre_la_page_dans_un_qr_lisible(int i)

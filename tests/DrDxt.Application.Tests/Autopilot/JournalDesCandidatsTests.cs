@@ -190,6 +190,17 @@ public sealed class JournalDesCandidatsTests : IDisposable
         lignes[0].Should().Be(premiere, "la mesure la plus ancienne ne se perd pas a la suivante");
     }
 
+    // Une experience qui n'a pas tenu, ou qui n'a rien mesure, est annulee sans avoir rien juge : le corpus ne la
+    // compte pas parmi les rejets.
+    [Theory]
+    [InlineData(KeepPolicy.CleInvalide)]
+    [InlineData(KeepPolicy.CleAucuneMesure)]
+    public void Une_experience_sans_jugement_est_NON_DECIDABLE_meme_annulee(string raison)
+    {
+        JournalDesCandidats.Decision(CandidateOutcome.RejectedUnresolved, raison).Should().Be("non_decidable");
+        JournalDesCandidats.Decision(CandidateOutcome.RejectedUnresolved, KeepPolicy.CleNonResolu).Should().Be("rejete");
+    }
+
     [Fact]
     public void Un_candidat_jamais_mesure_est_consigne_NON_DECIDABLE_sans_provenance()
     {

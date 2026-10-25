@@ -10,8 +10,10 @@ namespace DrDxt.Measurement.Tests.Cpu;
 /// </summary>
 public class BrideDesLeDepartTests
 {
+    private static readonly DateTimeOffset Prise = new(2026, 9, 30, 2, 30, 0, TimeSpan.FromHours(2));
+
     private static CpuBaseline Reference(double? unCoeur, double? tous, double ecartPuissance = 3.9) =>
-        new("m", new DateTimeOffset(2026, 9, 30, 2, 30, 0, TimeSpan.FromHours(2)), 8, RafaleMops: 1391.3, SoutenuMops: 1533.0,
+        new("m", Prise, 8, RafaleMops: 1391.3, SoutenuMops: 1533.0,
             BruitPercent: 1.84, PuissanceSoutenueW: 66.4, PuissanceEcartPercent: ecartPuissance,
             FrequenceUnCoeurMhz: unCoeur, FrequenceSoutenueMhz: tous);
 
@@ -24,7 +26,7 @@ public class BrideDesLeDepartTests
         v.LimiteDePuissance.Should().BeTrue("l'App nomme alors le réglage du BIOS");
         v.Demontrable.Should().BeFalse("il n'y a pas de baisse : « démontrable » garde son sens");
         v.Lisible.Should().Contain("à froid, il n'allait déjà pas plus vite").And.Contain("3698 MHz contre 5292 MHz")
-            .And.Contain("66 W stables").And.Contain("ou par le fabricant sur un portable").And.Contain("Mesuré le 30/09/2026")
+            .And.Contain("66 W stables").And.Contain("ou par le fabricant sur un portable").And.Contain($"Mesuré le {Prise.ToLocalTime():dd/MM/yyyy}")
             .And.NotContain("première seconde", "watts et fréquences se relèvent à partir de la 20e seconde");
     }
 

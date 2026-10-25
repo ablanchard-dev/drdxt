@@ -42,8 +42,6 @@ public sealed class TypedNamedPipeElevatedClient : IElevatedClient
     }
 
     /// <summary>Le canal de retour de donnees, cote client. Meme aller-retour signe que
-    /// <see cref="ExecuteAsync"/> : seule la lecture de la reponse change.</summary>
-    /// <summary>Le canal de retour de donnees, cote client. Meme aller-retour signe que
     /// <see cref="ExecuteAsync"/> : seule la lecture de la reponse change, et elle vit dans
     /// PrivilegedResponse.ToBytes() pour que les deux clients partagent la meme regle.</summary>
     public async Task<Result<byte[]>> ReadAsync(PrivilegedOp op, CancellationToken ct)

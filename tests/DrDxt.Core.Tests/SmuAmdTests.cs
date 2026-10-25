@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Core.Tests;
 
-// La décision du mainteneur : le SMU en lecture seule. Ce test rougit si une commande de réglage entre dans la liste.
+// Le SMU reste en lecture seule. Ce test rougit si une commande de réglage entre dans la liste.
 public sealed class SmuAmdTests
 {
     // Les numéros des commandes de RÉGLAGE de la boîte RSMU, relevés dans les mêmes sources (ZenStates-Core 869b7e82,

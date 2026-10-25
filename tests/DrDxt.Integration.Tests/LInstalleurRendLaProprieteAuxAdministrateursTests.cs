@@ -23,14 +23,17 @@ public sealed class LInstalleurRendLaProprieteAuxAdministrateursTests
     }
 
     [Fact]
-    public void La_propriete_revient_aux_Administrateurs_puis_les_droits_sont_recalcules()
+    public void La_propriete_des_fichiers_copies_revient_aux_Administrateurs_puis_l_arbre_est_relu()
     {
         var iss = Iss();
+        var proteger = iss[iss.IndexOf("function ProtegerLeDossier(): Boolean;", StringComparison.Ordinal)..];
+        proteger = proteger[..proteger.IndexOf("\nend;", StringComparison.Ordinal)];
 
-        iss.Should().Contain("/setowner *S-1-5-32-544 /T", "le SID des Administrateurs, pas un nom traduit selon la langue");
-        iss.IndexOf("/setowner", StringComparison.Ordinal).Should()
-            .BeLessThan(iss.IndexOf("/reset /T", StringComparison.Ordinal),
-                "le recalcul des droits lit le proprietaire : il vient apres");
+        proteger.Should().Contain("'\\*\" /setowner *S-1-5-32-544 /T /C /Q'",
+            "le SID des Administrateurs, pas un nom traduit selon la langue ; les fichiers, pas le dossier, qui perdrait sa regle "
+            + "DROITS DU PROPRIETAIRE");
+        proteger.IndexOf("/setowner", StringComparison.Ordinal).Should()
+            .BeLessThan(proteger.IndexOf("Droits('verifier'", StringComparison.Ordinal), "la relecture vient apres");
     }
 
     [Fact]

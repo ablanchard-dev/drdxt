@@ -7,7 +7,8 @@ namespace DrDxt.Reconciler.Desinstallation;
 // -----------------------------------------------------------------------
 // RenduALaDesinstallation : ce que la desinstallation rend, et ce qu'elle laisse.
 //
-// Lancee par l'installeur Inno (`DrDxt.ElevatedHelper.exe --uninstall-revert`, deja eleve), elle relit le
+// Lancee par l'installeur Inno, par le lanceur natif (`DrDxt.Lanceur.exe` puis le helper en `--uninstall-revert`, deja
+// eleve), elle relit le
 // manifeste signe (verify-only, cle publique de la machine) et, pour chaque origine qu'il porte (les
 // corrections au redemarrage (`Tweaks`) comme les leviers gardes (`RevertOnly`)) :
 //
@@ -20,6 +21,8 @@ namespace DrDxt.Reconciler.Desinstallation;
 //     coupable. Rendre les autres laisserait un melange que personne n'a choisi ;
 //   * avant toute ecriture, la cible doit exister encore (la cle, le service, le plan) : disparue ⇒ rien
 //     n'est ecrit, dit dans le rapport, plutot qu'une valeur orpheline laissee derriere ;
+//   * une feuille n'est dite rendue que relue a son origine, par le lecteur qui l'a jugee juste avant :
+//     une ecriture acceptee mais non confirmee reste a rendre (le manifeste est garde) ;
 //   * aucun echec n'arrete le reste : une entree qui echoue (ou qui jette) est ecrite dans le rapport, et
 //     l'entree suivante est tentee. Un manifeste absent ou illisible rend un rapport « rien rendu ».
 //
@@ -70,7 +73,8 @@ public enum IssueDuRendu
 
 /// <param name="EnSuspens">L'origine reste à rendre (écriture refusée, cible illisible, composite bloqué par l'une d'elles) :
 /// le manifeste ne se met pas de côté.</param>
-public sealed record LigneDuRendu(string TweakId, string Cible, IssueDuRendu Issue, string Detail, bool EnSuspens = false)
+/// <param name="Cle">La feuille, sous une forme qui ne dépend pas de la langue (le rejeu du journal la pose) ; null ailleurs.</param>
+public sealed record LigneDuRendu(string TweakId, string Cible, IssueDuRendu Issue, string Detail, bool EnSuspens = false, string? Cle = null)
 {
     public bool OrigineEnSuspens => EnSuspens || Issue is IssueDuRendu.EchecDEcriture or IssueDuRendu.Illisible;
 }
@@ -78,19 +82,22 @@ public sealed record LigneDuRendu(string TweakId, string Cible, IssueDuRendu Iss
 /// <param name="ManifesteNonLu">Pourquoi le manifeste n'a pas ete lu ; <c>null</c> quand il l'a ete.</param>
 public sealed record RapportDuRendu(string? ManifesteNonLu, IReadOnlyList<LigneDuRendu> Lignes)
 {
-    public string EnTexte(DateTimeOffset quand)
+    /// <param name="lu">La ligne qui dit ce qui a été lu, quand ce n'est pas le manifeste signé (le journal d'écriture anticipée).</param>
+    /// <param name="nonLu">Son pendant quand rien n'a été lu ; <c>{0}</c> porte la raison.</param>
+    public string EnTexte(DateTimeOffset quand, string? lu = null, string? nonLu = null)
     {
         var s = new StringBuilder();
         s.AppendLine(Docteur.T("RD.Titre"));
         s.AppendLine(Docteur.T("RD.Date") + quand.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
         if (ManifesteNonLu is not null)
         {
-            s.AppendLine(Docteur.T("RD.ManifesteNonLu", ManifesteNonLu));
+            s.AppendLine(nonLu is null ? Docteur.T("RD.ManifesteNonLu", ManifesteNonLu)
+                : string.Format(CultureInfo.CurrentCulture, nonLu, ManifesteNonLu));
             s.AppendLine(Docteur.T("RD.RienRendu"));
             return s.ToString();
         }
 
-        s.AppendLine(Docteur.T("RD.ManifesteLu"));
+        s.AppendLine(lu ?? Docteur.T("RD.ManifesteLu"));
         if (Lignes.Count == 0)
         {
             s.AppendLine(Docteur.T("RD.AucuneOrigine"));
@@ -152,11 +159,30 @@ public sealed class RenduALaDesinstallation
             .OrderBy(e => e.Entree.AppliedAt) // stable : a date egale, les corrections d'abord
             .ToList();
 
+        // Ce que DrDXT a laissé sur chaque cible : la valeur posée par l'entrée la PLUS RÉCENTE. Deux leviers sur la même
+        // cible (Économie→Équilibré, puis Équilibré→Hautes perf) forment une chaîne : rendre la plus ancienne origine
+        // (Économie) ramène à l'état d'avant DrDXT, et c'est elle qui fait foi. Sans ceci, la plus ancienne se jugerait
+        // « changée depuis » (sa valeur posée, Équilibré, n'est plus l'actuelle, Hautes perf), on ne la rendrait pas, et la
+        // machine resterait au plan intermédiaire. On compare donc l'actuel à ce que DrDXT a laissé, pas à chaque pose.
+        var laisseParDrDxt = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (entree, estCorrection) in entrees)
+        {
+            var ops = Ops(entree.OriginalValueJson);
+            var poseesDeLEntree = PoseesDe(entree, estCorrection);
+            if (ops is null) continue;
+            foreach (var retour in ops)
+            {
+                if (Cible(retour) is not { } cible) continue;
+                var posee = poseesDeLEntree?.FirstOrDefault(p => string.Equals(Cible(p), cible, StringComparison.OrdinalIgnoreCase));
+                if (posee is not null && ValeurPosee(posee) is { } valeur) laisseParDrDxt[cible] = valeur;
+            }
+        }
+
         foreach (var (entree, estCorrection) in entrees)
         {
             try
             {
-                await RendreAsync(entree, estCorrection, rendues, lignes, ct).ConfigureAwait(false);
+                await RendreAsync(entree, estCorrection, rendues, lignes, laisseParDrDxt, ct).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -171,10 +197,10 @@ public sealed class RenduALaDesinstallation
     /// <summary>Une feuille jugee, avant toute ecriture. <paramref name="Retour"/> non nul ⇒ elle est
     /// prete a etre rendue.</summary>
     private sealed record FeuilleJugee(string Cible, IssueDuRendu Issue, string Detail,
-        PrivilegedOp? Retour = null, string? Attendue = null);
+        PrivilegedOp? Retour = null, string? Attendue = null, PrivilegedOp? Posee = null);
 
     private async Task RendreAsync(AppliedTweak t, bool estCorrection, HashSet<string> rendues,
-        List<LigneDuRendu> lignes, CancellationToken ct)
+        List<LigneDuRendu> lignes, IReadOnlyDictionary<string, string> laisseParDrDxt, CancellationToken ct)
     {
         var retours = Ops(t.OriginalValueJson);
         if (retours is null)
@@ -228,7 +254,11 @@ public sealed class RenduALaDesinstallation
             }
 
             var ecrit = await _ecriture.ExecuteAsync(f.Retour, ct).ConfigureAwait(false);
-            if (ecrit.IsOk)
+            if (ecrit.IsOk && Relue(f) is { } nonConfirmee)
+            {
+                lignes.Add(new LigneDuRendu(t.TweakId, f.Cible, IssueDuRendu.EchecDEcriture, nonConfirmee));
+            }
+            else if (ecrit.IsOk)
             {
                 rendues.Add(f.Cible);
                 lignes.Add(new LigneDuRendu(t.TweakId, f.Cible, IssueDuRendu.Rendu,
@@ -243,7 +273,7 @@ public sealed class RenduALaDesinstallation
 
         FeuilleJugee Juger(PrivilegedOp retour, IReadOnlyList<PrivilegedOp>? posees)
         {
-            // La règle de la carte, écrite ici et non plus seulement à l'inscription au manifeste.
+            // La règle de la carte s'applique ici aussi, pas seulement à l'inscription au manifeste.
             if (retour is ApplyNvApiClockOffsetOp or ApplyGpuFanCurveOp or ApplyAdlxTuningOp { Kind: AdlxTuningKind.Undervolt })
                 return new FeuilleJugee(retour.GetType().Name, IssueDuRendu.ValeurPoseeInconnue,
                     Docteur.T("RD.RegleCarte"));
@@ -278,12 +308,51 @@ public sealed class RenduALaDesinstallation
                 return new FeuilleJugee(cible, IssueDuRendu.Illisible,
                     Docteur.T("RD.ValeurIllisible", lue.Error?.Code, lue.Error?.Message));
 
-            // La regle : on ne rend que ce que DrDXT a pose et qui est encore la.
-            if (!string.Equals(lue.Value, attendue, StringComparison.Ordinal))
-                return new FeuilleJugee(cible, IssueDuRendu.Respecte,
-                    Docteur.T("RD.Respecte", lue.Value ?? Docteur.T("TE.Absente"), attendue));
+            // Feuille d'un composite deja a sa valeur d'origine : une passe precedente l'a rendue avant qu'une autre feuille
+            // echoue. Jugee « respectee », elle bloquerait le composite sans le garder en suspens, et l'autre feuille ne
+            // serait jamais rendue. Seule, la meme valeur reste un choix du joueur.
+            if (retours.Count > 1 && !string.Equals(lue.Value, attendue, StringComparison.Ordinal)
+                && (retour is DeleteRegistryValueOp ? lue.Value is null : string.Equals(lue.Value, ValeurPosee(retour), StringComparison.Ordinal)))
+                return new FeuilleJugee(cible, IssueDuRendu.DejaRendu, Docteur.T("RD.DejaALOrigine"));
 
-            return new FeuilleJugee(cible, IssueDuRendu.Rendu, string.Empty, retour, attendue);
+            // DirectXUserGlobalSettings porte aussi Auto HDR, que le joueur règle lui-même : jugée en entier, une bascule d'Auto HDR
+            // la ferait respecter, et les clés de DrDXT resteraient pour toujours. Seules elles s'y jugent, et seules elles
+            // reprennent leur origine dans la chaîne courante.
+            if (ChaineDirectX(retour) is { } ruche)
+            {
+                if (DirectXUserGlobalSettings.ClesDeDrDxtDe(lue.Value) != DirectXUserGlobalSettings.ClesDeDrDxtDe(attendue))
+                    return new FeuilleJugee(cible, IssueDuRendu.Respecte,
+                        Docteur.T("RD.Respecte", lue.Value ?? Docteur.T("TE.Absente"), attendue));
+                var chaine = DirectXUserGlobalSettings.Rendre(lue.Value, (retour as SetRegistryValueOp)?.Value);
+                PrivilegedOp rendu = chaine is null
+                    ? new DeleteRegistryValueOp(ruche, DirectXUserGlobalSettings.Chemin, DirectXUserGlobalSettings.Nom)
+                    : new SetRegistryValueOp(ruche, DirectXUserGlobalSettings.Chemin, DirectXUserGlobalSettings.Nom, RegistryValueType.String, chaine);
+                return new FeuilleJugee(cible, IssueDuRendu.Rendu, string.Empty, rendu, attendue, posee);
+            }
+
+            // La regle : on ne rend que ce que DrDXT a pose et qui est encore la. Sur une cible touchee par plusieurs
+            // leviers (chaine de plans d'alimentation), « ce que DrDXT a pose » est la valeur de l'entree la plus recente ;
+            // l'actuel qui lui est egal veut dire que le joueur n'a rien change depuis, et la plus ancienne origine (celle de
+            // CETTE entree, rendue en premier) ramene a l'etat d'avant DrDXT.
+            var laisse = laisseParDrDxt.TryGetValue(cible, out var d) ? d : attendue;
+            if (!string.Equals(lue.Value, laisse, StringComparison.Ordinal))
+                return new FeuilleJugee(cible, IssueDuRendu.Respecte,
+                    Docteur.T("RD.Respecte", lue.Value ?? Docteur.T("TE.Absente"), laisse));
+
+            return new FeuilleJugee(cible, IssueDuRendu.Rendu, string.Empty, retour, attendue, posee);
+        }
+
+        // Relue par le lecteur qui vient de la juger : null si elle est à son origine, sinon pourquoi elle n'est pas
+        // confirmée. Une origine sans valeur comparable (la suppression d'un réglage du pilote NVIDIA, que le helper vérifie
+        // déjà par l'origine relue) garde la parole de l'écriture.
+        string? Relue(FeuilleJugee f)
+        {
+            var origine = ValeurPosee(f.Retour!); // null pour une valeur à supprimer : relue absente
+            if (origine is null && f.Retour is not DeleteRegistryValueOp) return null;
+            var lu = _lecture.Lire(f.Posee!);
+            if (lu.IsOk && string.Equals(lu.Value, origine, StringComparison.Ordinal)) return null;
+            return Docteur.T("RD.NonRelue", lu.IsOk ? lu.Value ?? Docteur.T("TE.Absente") : Docteur.T("VM.IllisibleMot"),
+                origine ?? Docteur.T("TE.Absente"));
         }
     }
 
@@ -322,6 +391,18 @@ public sealed class RenduALaDesinstallation
             return null;
         }
     }
+
+    /// <summary>La ruche d'une op sur DirectXUserGlobalSettings, ou <c>null</c> pour toute autre cible.</summary>
+    private static RegistryHiveKind? ChaineDirectX(PrivilegedOp op) => op switch
+    {
+        SetRegistryValueOp { Kind: RegistryValueType.String } s when EstLaChaineDirectX(s.Path, s.Name) => s.Hive,
+        DeleteRegistryValueOp d when EstLaChaineDirectX(d.Path, d.Name) => d.Hive,
+        _ => null,
+    };
+
+    private static bool EstLaChaineDirectX(string chemin, string nom)
+        => string.Equals(chemin.Trim().Trim('\\'), DirectXUserGlobalSettings.Chemin, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(nom, DirectXUserGlobalSettings.Nom, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Ou une op ecrit : la cle qui apparie une op de retour a l'op posee.</summary>
     private static string? Cible(PrivilegedOp op) => op switch

@@ -60,7 +60,15 @@ public class ChassisDetectorTests
     public void Steam_deck_detected_as_handheld()
     {
         new ChassisDetector(Enclosure(10, "Jupiter")).Detect().Value!.Should().Be(ChassisType.Handheld);
+        new ChassisDetector(Enclosure(10, "Galileo")).Detect().Value!.Should().Be(ChassisType.Handheld, "le Steam Deck OLED");
     }
+
+    // Un boîtier d'extension ou de périphérique n'est pas un portable : sans batterie, c'est un PC fixe.
+    [Theory]
+    [InlineData(18)]
+    [InlineData(21)]
+    public void Un_boitier_d_extension_n_est_pas_un_portable(int code)
+        => new ChassisDetector(Enclosure(code, batterie: false)).Detect().Value!.Should().Be(ChassisType.Desktop);
 
     // Mini PC, tout-en-un, carte mère qui dit « Other » : sans batterie, c'est un PC fixe.
     [Theory]

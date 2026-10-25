@@ -18,6 +18,9 @@ namespace DrDxt.Measurement;
 /// </summary>
 public static class AbComparer
 {
+    /// <summary>La clé d'un verdict de régression : le moteur la reconnaît pour retirer le lot.</summary>
+    public const string CleRegression = "Scan.Ab.Regression";
+
     /// <summary>Ecart maximal d'exposition entre deux passes A/B avant que la comparaison ne soit
     /// declaree invalide : dix points de trames gardees.
     ///
@@ -58,7 +61,7 @@ public static class AbComparer
         if (lowsRegressed || avgRegressed)
         {
             gain = false;
-            key = "Scan.Ab.Regression";
+            key = CleRegression;
         }
         else if (lowsGained || avgGained)
         {

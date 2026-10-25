@@ -51,7 +51,7 @@ public static class JournalDefender
     }
 
     /// <summary>ScanOnlyIfIdleEnabled, ou <c>null</c> si non lu.</summary>
-    public static bool? SeulementInactif()
+    public static bool? SeulementInactif() => LectureWmiBornee.Lire<bool?>(() =>
     {
         try
         {
@@ -63,5 +63,5 @@ public static class JournalDefender
             return null;
         }
         catch (Exception) { return null; }
-    }
+    }, () => null);
 }

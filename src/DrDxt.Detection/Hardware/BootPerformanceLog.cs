@@ -114,6 +114,16 @@ public sealed class WindowsBootPerformanceLog : IBootPerformanceLog
 {
     private const int MaxEvents = 400;
 
+    /// <summary>Pur : un événement 100 (le démarrage) ou 101 (une application qui le ralentit). Sans durée lue, ce n'est pas
+    /// une mesure : un démarrage à 0 ms entrerait dans la moyenne. Une dégradation non lue vaut 0, elle ne fait que s'ajouter.</summary>
+    internal static MesureDemarrage? Mesure(int id, DateTimeOffset quand, IReadOnlyDictionary<string, string> d)
+    {
+        long? Ms(string cle) => long.TryParse(d.GetValueOrDefault(cle), out var v) && v >= 0 ? v : null;
+        if (id == 100) return Ms("BootTime") is { } boot ? new MesureDemarrage(quand, true, "demarrage", boot, 0) : null;
+        var nom = d.GetValueOrDefault("FriendlyName") is { Length: > 0 } f ? f : d.GetValueOrDefault("Name") ?? "application";
+        return Ms("TotalTime") is { } total ? new MesureDemarrage(quand, false, nom, total, Ms("DegradationTime") ?? 0) : null;
+    }
+
     public Result<IReadOnlyList<MesureDemarrage>> Lire()
     {
         try
@@ -129,11 +139,7 @@ public sealed class WindowsBootPerformanceLog : IBootPerformanceLog
                     if (e.TimeCreated is not { } t) continue;
                     var d = XDocument.Parse(e.ToXml()).Descendants().Where(x => x.Name.LocalName == "Data")
                         .ToDictionary(x => (string?)x.Attribute("Name") ?? "", x => x.Value);
-                    long Ms(string cle) => long.TryParse(d.GetValueOrDefault(cle), out var v) ? v : 0;
-                    var nom = d.GetValueOrDefault("FriendlyName") is { Length: > 0 } f ? f : d.GetValueOrDefault("Name") ?? "application";
-                    mesures.Add(e.Id == 100
-                        ? new MesureDemarrage(new DateTimeOffset(t.ToUniversalTime(), TimeSpan.Zero), true, "demarrage", Ms("BootTime"), 0)
-                        : new MesureDemarrage(new DateTimeOffset(t.ToUniversalTime(), TimeSpan.Zero), false, nom, Ms("TotalTime"), Ms("DegradationTime")));
+                    if (Mesure(e.Id, new DateTimeOffset(t.ToUniversalTime(), TimeSpan.Zero), d) is { } m) mesures.Add(m);
                 }
             }
             return Result<IReadOnlyList<MesureDemarrage>>.Ok(mesures);

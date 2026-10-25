@@ -113,18 +113,23 @@ public sealed class DpcLatencyTracer
     /// en-tetes du SDK par `EtwInteropLayoutTests`.
     ///
     /// La garde porte sur ce code-ci, le seul d'interop ETW reellement expedie (appele par le scan) :
-    /// seize octets d'ecart rendent zero evenement, et rien ne leve.</summary>
+    /// seize octets d'ecart rendent zero evenement, et rien ne leve.
+    /// Lus sur la structure elle-meme : un decalage change dans <see cref="Natif.EVENT_TRACE_LOGFILE"/> fait rougir la garde.</summary>
     public static IReadOnlyDictionary<string, int> DecalagesUtilises => new Dictionary<string, int>
     {
-        ["EVENT_TRACE_LOGFILEW.size"] = 448,
-        ["LoggerName"] = 8,
-        ["ProcessTraceMode"] = 28,
-        ["PerfFreq"] = 376,
-        ["EventRecordCallback"] = 424,
+        ["EVENT_TRACE_LOGFILEW.size"] = Marshal.SizeOf<Natif.EVENT_TRACE_LOGFILE>(),
+        ["LoggerName"] = Decalage(nameof(Natif.EVENT_TRACE_LOGFILE.LoggerName)),
+        ["ProcessTraceMode"] = Decalage(nameof(Natif.EVENT_TRACE_LOGFILE.ProcessTraceMode)),
+        ["PerfFreq"] = Decalage(nameof(Natif.EVENT_TRACE_LOGFILE.PerfFreq)),
+        ["EventRecordCallback"] = Decalage(nameof(Natif.EVENT_TRACE_LOGFILE.EventRecordCallback)),
     };
 
+    private static int Decalage(string champ) => (int)Marshal.OffsetOf<Natif.EVENT_TRACE_LOGFILE>(champ);
+
     private EventRecordCallback? _rappel;
-    private long _frequenceQpc = 10_000_000;
+    /// <summary>Une durée de la trace en millisecondes. La session est en temps système (ClientContext = 2) : horodatages et
+    /// InitialTime sont en unités de 100 ns, quelle que soit la fréquence du compteur de performance de la machine.</summary>
+    internal static double DureeMs(long ticks) => ticks / 10_000.0;
     private int _evenements;
     private int _codeProcessTrace;
 
@@ -204,7 +209,6 @@ public sealed class DpcLatencyTracer
             if (poignee == unchecked((ulong)-1))
                 return Echec(DpcOutcome.Echec, Marshal.GetLastWin32Error(), 0);
 
-            if (journal.PerfFreq > 0) _frequenceQpc = journal.PerfFreq;
 
             // `ProcessTrace` peut ne jamais rendre la main : thread de fond, attente bornee, et
             // c'est le `finally` qui garantit l'arret. Un outil de diagnostic qui laisse une trace
@@ -320,7 +324,7 @@ public sealed class DpcLatencyTracer
         // Un delta negatif ou absurde vient d'un trou de trace ou d'une disposition mal lue : on ne
         // l'invente pas en le ramenant a zero, on le jette.
         if (ticks <= 0) { _rejetesDeltaInvalide++; return; }
-        var ms = ticks * 1000.0 / _frequenceQpc;
+        var ms = DureeMs(ticks);
         if (ms > 1000) { _rejetesDeltaInvalide++; return; }
 
         var module = Attribuer(routine);

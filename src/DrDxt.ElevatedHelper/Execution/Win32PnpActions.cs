@@ -76,9 +76,32 @@ public sealed class Win32PnpActions : IPnpActions
             return Result.Fail(ErrorCodes.HelperOpFailed, $"{publie} could not be exported; nothing removed.");
 
         _run(["/delete-driver", publie]);
-        return File.Exists(inf)
-            ? Result.Fail(ErrorCodes.HelperOpFailed, $"Windows kept {publie} (a device may still use it).")
-            : Result.Ok();
+        if (File.Exists(inf))
+            return Result.Fail(ErrorCodes.HelperOpFailed, $"Windows kept {publie} (a device may still use it).");
+        GarderLesDerniersExports();
+        return Result.Ok();
+    }
+
+    /// <summary>Les exports gardés : un paquet NVIDIA pèse plusieurs Go, et seul Annuler en retirait un. Au-delà des deux
+    /// plus récents, les exports partent ; l'Annuler d'un plus ancien dit alors que l'export n'est plus là.</summary>
+    internal const int ExportsGardes = 2;
+
+    private void GarderLesDerniersExports()
+    {
+        try
+        {
+            // Seuls les dossiers fiables se suppriment en administrateur : un dossier posé d'avance n'est jamais touché.
+            var anciens = Directory.GetDirectories(_exports)
+                .Where(d => _fiable(d).IsOk)
+                .OrderByDescending(d => Path.GetFileName(d)[(Path.GetFileName(d).LastIndexOf('-') + 1)..], StringComparer.Ordinal)
+                .Skip(ExportsGardes);
+            foreach (var d in anciens)
+            {
+                try { Directory.Delete(d, recursive: true); }
+                catch (Exception) { /* un export qui ne part pas reste, sans gêner le retrait */ }
+            }
+        }
+        catch (Exception) { /* dossier illisible : le retrait reste fait */ }
     }
 
     public Result RestoreDriverPackage(string publie)
@@ -105,9 +128,13 @@ public sealed class Win32PnpActions : IPnpActions
             return Result.Fail(ErrorCodes.HelperOpFailed, $"The export of {publie} does not hold exactly one display driver package.");
 
         var (code, _) = _run(["/add-driver", infs[0], "/install"]);
-        return code is 0 or RedemarrageRequis
-            ? Result.Ok()
-            : Result.Fail(ErrorCodes.HelperOpFailed, $"pnputil could not add the exported {publie} back (exit {code}).");
+        if (code is not (0 or RedemarrageRequis))
+            return Result.Fail(ErrorCodes.HelperOpFailed, $"pnputil could not add the exported {publie} back (exit {code}).");
+        // Remis dans le magasin, l'export n'a plus d'usage : il part (des centaines de Mo par paquet). Les exports d'un même
+        // nom plus anciens restent : Windows redonne un oemNN.inf à un autre paquet, et ce sont alors leurs seules copies.
+        try { Directory.Delete(dossier, recursive: true); }
+        catch (Exception) { /* un export qui ne part pas reste, sans gêner la remise */ }
+        return Result.Ok();
     }
 
     private static List<string> InfsDAffichage(string dossier) =>

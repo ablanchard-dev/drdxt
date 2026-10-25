@@ -20,4 +20,14 @@ public sealed class LectureAdlxTests
     [Fact]
     public void Une_vsync_non_lue_le_dit()
         => LectureAdlx.Lignes(new AdlxReglagesLus(), true).Should().Contain("Vsync         : non lue");
+
+    // La limite de puissance et sa plage, telles qu'ADLX les rend : c'est ce qui dira si l'unité est un % du TDP ou un
+    // décalage autour de 0, le jour où un testeur AMD les met à côté d'AMD Software.
+    [Fact]
+    public void La_limite_de_puissance_se_dit_avec_sa_plage_et_sinon_non_lue()
+    {
+        LectureAdlx.LignesPuissance([(1, new AdlxPowerReads { PowerLimitPct = 0, PowerRange = new AdlxIntRange { Min = -10, Max = 15, Step = 1 } })])
+            .Should().ContainSingle().Which.Should().Be("Puissance (carte 1) : limite 0, plage -10 à 15, pas 1");
+        LectureAdlx.LignesPuissance([]).Should().Equal("Puissance     : non lue");
+    }
 }

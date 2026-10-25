@@ -22,15 +22,17 @@ public sealed class HardwareDetector : IHardwareDetector
         if (!cpu.IsOk) return Fail(cpu.Error!.Value);
         var gpu = _gpu.Detect();
         if (!gpu.IsOk) return Fail(gpu.Error!.Value);
-        var mem = _mem.Detect();
-        if (!mem.IsOk) return Fail(mem.Error!.Value);
         var board = _board.Detect();
         if (!board.IsOk) return Fail(board.Error!.Value);
+        // La mémoire et le châssis ont leur « non lu » dans l'inventaire (aucune barrette, châssis inconnu), que le produit sait
+        // dire : une lecture WMI manquée (winmgmt lent au moment du scan) ne fait pas tomber tout le scan. Le processeur, la
+        // carte graphique et la carte mère restent indispensables.
+        var mem = _mem.Detect();
         var chassis = _chassis.Detect();
-        if (!chassis.IsOk) return Fail(chassis.Error!.Value);
 
         return Result<HardwareInventory>.Ok(new HardwareInventory(
-            cpu.Value!, gpu.Value!, mem.Value!, board.Value!.Board, board.Value.Bios, chassis.Value, _mem.Emplacements()));
+            cpu.Value!, gpu.Value!, mem.IsOk ? mem.Value! : [], board.Value!.Board, board.Value.Bios,
+            chassis.IsOk ? chassis.Value : ChassisType.Unknown, _mem.Emplacements()));
     });
 
     private static Result<HardwareInventory> Fail(Error e) => Result<HardwareInventory>.Fail(e.Code, e.Message);

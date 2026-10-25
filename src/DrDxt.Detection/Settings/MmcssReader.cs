@@ -79,14 +79,14 @@ public sealed class MmcssReader
     /// <summary>Lit le profil systeme et la tache demandee (`Games` par defaut).</summary>
     public IReadOnlyList<MmcssConstat> Lire(string tache = "Games")
     {
-        var constats = new List<MmcssConstat> { Reactivite() };
+        var constats = new List<MmcssConstat> { Reactivite(Dword(Profil, "SystemResponsiveness")) };
         constats.AddRange(Tache(tache));
         return constats;
     }
 
-    private static MmcssConstat Reactivite()
+    internal static MmcssConstat Reactivite(int? valeur)
     {
-        if (Dword(Profil, "SystemResponsiveness") is not { } v)
+        if (valeur is not { } v)
             return new MmcssConstat("SystemResponsiveness", null, MmcssEffet.NonLu,
                 Docteur.T("MM.Absente"));
 
@@ -97,6 +97,9 @@ public sealed class MmcssReader
             100 => new MmcssConstat("SystemResponsiveness", "100", MmcssEffet.Desactive,
                 // Sans capitales d'insistance, accents rétablis (règle d'écriture).
                 Docteur.T("MM.Cent")),
+
+            > 100 => new MmcssConstat("SystemResponsiveness", v.ToString(), MmcssEffet.SansEffet,
+                Docteur.T("MM.AuDessusDeCent", v)),
 
             < 10 => new MmcssConstat("SystemResponsiveness", v.ToString(), MmcssEffet.SansEffet,
                 Docteur.T("MM.SousDix", v)),

@@ -35,7 +35,7 @@ public sealed class PreferencesDefenderTests
     [Fact]
     public void L_acces_controle_actif_sans_jeu_autorise_merite_le_regard()
     {
-        PreferencesDefender.JugerAccesControle(Lu(1), Jeux).Statut.Should().Be(RepairStatus.Suspicious);
+        PreferencesDefender.JugerAccesControle(Lu(1), Jeux).Statut.Should().Be(RepairStatus.NonDefault, "un choix de sécurité du joueur, aucun blocage lu : à regarder");
         PreferencesDefender.JugerAccesControle(Lu(1, [@"C:\Program Files (x86)\Call of Duty\cod.exe"]), Jeux).Statut.Should().Be(RepairStatus.Observed);
         PreferencesDefender.JugerAccesControle(Lu(0), Jeux).Statut.Should().Be(RepairStatus.ExpectedDefault);
         PreferencesDefender.JugerAccesControle(null, Jeux).Statut.Should().Be(RepairStatus.Unknown);

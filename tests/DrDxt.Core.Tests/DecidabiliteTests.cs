@@ -31,10 +31,12 @@ public class DecidabiliteTests
     public void Les_alternances_se_fixent_par_l_effet_DECLARE(double effet, int attendu)
         => Decidabilite.AlternancesPour(effet).Should().Be(attendu);
 
+    // Le seuil reste prudent, mais la résolution de l'A/A sur trois passes est plus large que la marge qui juge : le motif ne
+    // la cite pas comme un chiffre.
     [Fact]
     public void Un_effet_SOUS_la_resolution_n_est_pas_decidable()
         => Decidabilite.NonDecidable(2, Scene(5.4), SceneRepresentativity.Entrainement)
-            .Should().Contain("résolution");
+            .Should().Contain("trop bruitée").And.NotContain("5,4").And.NotContain("5.4");
 
     [Fact]
     public void Un_effet_AU_DESSUS_de_la_resolution_se_tente()

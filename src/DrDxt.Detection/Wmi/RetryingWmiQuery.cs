@@ -10,7 +10,8 @@ namespace DrDxt.Detection.Wmi;
 /// doit pas voir une famille entiere apparaitre et disparaitre.
 /// Ce qu'il s'interdit : rejouer une lecture reussie mais vide. Zero ligne est une reponse
 /// de la machine, pas une panne ; la rejouer fabriquerait une difference entre deux passes
-/// identiques, c'est-a-dire exactement le defaut qu'on repare.
+/// identiques, c'est-a-dire exactement le defaut qu'on repare. Ni un delai depasse (WmiTimeout) :
+/// winmgmt fige, le rejouer doublerait l'attente et laisserait un second fil bloque.
 /// </summary>
 public sealed class RetryingWmiQuery(IWmiQuery inner, int attempts = 2, TimeSpan? delay = null) : IWmiQuery
 {
@@ -26,13 +27,14 @@ public sealed class RetryingWmiQuery(IWmiQuery inner, int attempts = 2, TimeSpan
     private Result<IReadOnlyList<WmiRow>> Run(Func<Result<IReadOnlyList<WmiRow>>> read)
     {
         Result<IReadOnlyList<WmiRow>> last = read();
-        for (var attempt = 2; attempt <= _attempts && !last.IsOk; attempt++)
+        for (var attempt = 2; attempt <= _attempts && !last.IsOk && last.Error!.Value.Code != ErrorCodes.WmiTimeout; attempt++)
         {
             if (_delay > TimeSpan.Zero) Thread.Sleep(_delay);
             last = read();
         }
 
-        if (last.IsOk) return last;
+        // Un delai depasse se dit tel quel : une seule tentative, son motif dit deja le delai.
+        if (last.IsOk || last.Error!.Value.Code == ErrorCodes.WmiTimeout) return last;
 
         // Le motif porte le nombre de tentatives : en aval, un Unknown doit rester lisible.
         var err = last.Error!.Value;

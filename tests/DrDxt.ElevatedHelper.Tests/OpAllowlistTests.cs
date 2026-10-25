@@ -19,6 +19,23 @@ public sealed class OpAllowlistTests
     private static SetRegistryValueOp Reg(string path, string name = "x") =>
         new(RegistryHiveKind.LocalMachine, path, name, RegistryValueType.DWord, "1");
 
+    // La liste noire du README ne tient pas seulement par les identifiants du catalogue : un levier nommé autrement qui
+    // écrirait un mythe passerait par l'une de ces feuilles, et le helper la refuse.
+    [Theory]
+    [InlineData(RegistryHiveKind.LocalMachine, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", "NetworkThrottlingIndex")]
+    [InlineData(RegistryHiveKind.LocalMachine, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile", "SystemResponsiveness")]
+    [InlineData(RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{00000000-0000-0000-0000-000000000000}", "TcpAckFrequency")]
+    [InlineData(RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{00000000-0000-0000-0000-000000000000}", "TCPNoDelay")]
+    [InlineData(RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Session Manager\kernel", "GlobalTimerResolutionRequests")]
+    [InlineData(RegistryHiveKind.LocalMachine, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\cod.exe\PerfOptions", "CpuPriorityClass")]
+    [InlineData(RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling", "PowerThrottlingOff")]
+    public void Les_feuilles_des_mythes_sont_refusees(RegistryHiveKind ruche, string path, string name)
+    {
+        var op = new SetRegistryValueOp(ruche, path, name, RegistryValueType.DWord, "1");
+        _allow.Validate(op).IsOk.Should().BeFalse();
+        _allow.Validate(new DeleteRegistryValueOp(ruche, path, name)).IsOk.Should().BeFalse();
+    }
+
     // --- Registre : les feuilles exactes autorisées passent ---
 
     [Theory]
@@ -378,7 +395,7 @@ public sealed class OpAllowlistTests
     [Fact]
     public void ReadFirmwareVariable_the_factory_defaults_store_is_readable_under_its_own_guid_only()
     {
-        // GUID nommé AmiStandardDefaultsVariable par la liste de UEFITool (common/guids.csv), et relu le 17/10/2026 sur la
+        // GUID nommé AmiStandardDefaultsVariable par la liste de UEFITool (common/guids.csv), et relevé le 17/10/2026 sur la
         // carte de référence : 11 356 octets sous ce GUID. Sous le GUID de Setup, le même nom reste fermé.
         _allow.Validate(new ReadFirmwareVariableOp("StdDefaults", OpAllowlist.AmiStandardDefaultsGuid))
               .IsOk.Should().BeTrue();
@@ -696,7 +713,8 @@ public sealed class OpAllowlistTests
         _allow.Validate(null!).Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
     }
 
-    private sealed record RogueOp : PrivilegedOp;
+    // Le seul chemin restant pour dériver hors de Core : le constructeur de copie, protégé.
+    private sealed record RogueOp() : PrivilegedOp(new PingOp());
 
     [Fact]
     public void Unknown_op_subtype_is_denied_default_deny()

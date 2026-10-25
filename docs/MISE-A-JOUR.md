@@ -8,15 +8,15 @@
    pied de page le dit) ; une autre adresse n'y est prise qu'en compilation Debug. Un fichier absent (404) veut dire « rien à offrir », jamais une erreur.
 2. Le manifeste est signé (Ed25519) par la clé de release du projet. La clé publique est dans l'App
    (`UpdateTrust.ProductionPublicKey`) ; elle ne peut que vérifier. Un manifeste non signé, mal signé, ou qui propose une
-   version plus ancienne est refusé, et le refus est affiché : jamais tu, jamais installé.
+   version plus ancienne est refusé, et le refus est affiché : jamais lu, jamais installé.
 3. Le paquet (l'installeur) n'est téléchargé qu'après la signature vérifiée ; son empreinte SHA-256 doit être celle du
    manifeste signé, sinon il n'est jamais lancé.
 4. Une nouvelle version de l'App ne s'installe **jamais sans toi** : le pied de page propose « Installer », l'empreinte est
    relue juste avant le lancement, le fichier est verrouillé entre les deux, et l'installeur demande lui-même l'élévation.
 5. Il n'y a pas de canal silencieux : tout ce qui change ce que DrDXT règle arrive dans une nouvelle version de l'App, que
-   tu installes toi-même. Rien d'autre que ce manifeste, le paquet des tables (point 7) et, sur ton accord, l'installeur
-   ne quitte ni n'entre.
-6. Tant que le mainteneur n'a publié aucun manifeste sur ce site, rien n'arrive et le pied de page dit « à jour ».
+   tu installes toi-même. Pour la mise à jour, rien d'autre que ce manifeste, le paquet des tables (point 7) et, sur ton
+   accord, l'installeur ne quitte ni n'entre. Le reste de ce qui touche le réseau est listé dans le README.
+6. Tant que le mainteneur n'a publié aucun manifeste sur ce site, rien n'arrive et le pied de page dit « aucune mise à jour publiée pour l'instant ».
 7. Les **tables** (le radar des régressions connues) arrivent sans nouvelle version de l'App : `<racine>/donnees/paquet.json`,
    lu juste après le manifeste. Ce sont des données JSON au schéma fermé, jamais du code ni un réglage : une clé inconnue,
    une ligne sans source https ou sans date refusent tout le paquet. Il est signé par la même clé de release, sous un

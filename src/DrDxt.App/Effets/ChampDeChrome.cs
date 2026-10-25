@@ -10,9 +10,9 @@ namespace DrDxt.App.Effets;
 /// <summary>Le shader de chrome liquide (Effets/ChromeLiquide.hlsl), exposé à WPF.</summary>
 public sealed class ChromeLiquideEffect : ShaderEffect
 {
-    // Partagé par toutes les instances, il n'était pas gelé, donc lié au thread qui
-    // l'avait créé. crash.log, 18/09 01:18 : « Le thread appelant ne peut pas accéder à cet objet »
-    // depuis PixelShader.get_ShaderRenderMode. Gelé, un Freezable se lit depuis tout thread.
+    // Partagé par toutes les instances : non gelé, il serait lié au thread qui l'a créé, et un autre fil lèverait
+    // « Le thread appelant ne peut pas accéder à cet objet » depuis PixelShader.get_ShaderRenderMode. Gelé, un
+    // Freezable se lit depuis tout thread.
     private static readonly PixelShader Shader = Geler(new PixelShader
     {
         UriSource = new Uri("pack://application:,,,/DrDxt.App;component/Effets/ChromeLiquide.ps"),

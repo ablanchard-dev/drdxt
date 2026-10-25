@@ -23,7 +23,7 @@ public static class ProcesseurParLeService
         // chaque seconde ; plus long, il priverait le levier et le test de refroidissement de lecture alors que le service
         // tournait. Service absent : le PID nul (relu toutes les 30 s) coupe court, sans attente.
         lock (Verrou) if (DateTimeOffset.Now < _pauseJusqua) return null;
-        var lu = LireTout(EtatCpuServi.NomDuTube, PidDuService, () => DateTimeOffset.Now);
+        var lu = LireToutPartage(EtatCpuServi.NomDuTube, PidDuService, () => DateTimeOffset.Now);
         if (lu is null)
             lock (Verrou)
             {
@@ -34,6 +34,23 @@ public static class ProcesseurParLeService
     }
 
     private static DateTimeOffset _pauseJusqua = DateTimeOffset.MinValue;
+
+    /// <summary>Le relevé demande chaque seconde la température puis l'état : sans partage, deux connexions pour la même
+    /// réponse, et le service relirait deux fois ses registres et ses ventilateurs. Une réponse lue il y a moins d'une
+    /// demi-seconde, au même tube, se reprend telle quelle ; bien en deçà de la fraîcheur exigée (<see cref="EtatCpuServi.Fraicheur"/>).</summary>
+    public static readonly TimeSpan Partage = TimeSpan.FromMilliseconds(500);
+
+    private static (string Nom, DateTimeOffset Le, EtatCpuServi Lu)? _derniere;
+
+    internal static EtatCpuServi? LireToutPartage(string nomDuTube, Func<uint?> pidAttendu, Func<DateTimeOffset> horloge)
+    {
+        var maintenant = horloge();
+        lock (Verrou)
+            if (_derniere is { } d && d.Nom == nomDuTube && maintenant >= d.Le && maintenant - d.Le < Partage) return d.Lu;
+        var lu = LireTout(nomDuTube, pidAttendu, horloge);
+        if (lu is not null) lock (Verrou) _derniere = (nomDuTube, maintenant, lu);
+        return lu;
+    }
 
     /// <summary>Coutures de test : le nom du tube, le PID attendu du serveur, l'horloge.</summary>
     internal static EtatCpu? Lire(string nomDuTube, Func<uint?> pidAttendu, Func<DateTimeOffset> horloge)

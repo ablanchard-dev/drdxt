@@ -139,6 +139,28 @@ public sealed class LeaseWatchdogTests
         exec.Executed.Should().BeEmpty("a completed lease must never auto-revert");
     }
 
+    // --- la sous-tension : l'App tuée en plein palier, le helper rend lui-même la tension d'origine ---
+
+    [Fact]
+    public async Task Le_bail_de_la_sous_tension_rend_la_tension_d_origine_quand_l_App_ne_bat_plus()
+    {
+        var clock = new FakeClock();
+        var exec = new RecordingExecutor();
+        var wd = Build(clock, exec);
+        var inverse = PrivilegedOpCodec.Serialize(new SetCpuVoltageOffsetOp(0)).Value!;
+
+        wd.Establish(OwnerA, "cpu-sous-tension", inverse, leaseSeconds: 30).IsOk.Should().BeTrue("0 mV est un inverse admis");
+        // L'App morte : son processus n'existe plus, mais le bail tient le helper en vie jusqu'à l'échéance.
+        var arret = new ArretSurInactivite(TimeSpan.FromMinutes(15), () => clock.UtcNow);
+        arret.ClientAuthentifie(OwnerA.ProcessId);
+        arret.DoitSArreter(wd.NombreDeBaux, _ => false).Should().BeFalse("un bail tenu garde le helper");
+
+        clock.Advance(TimeSpan.FromSeconds(31));
+        await wd.TickAsync(default);
+
+        exec.Executed.Should().ContainSingle().Which.Should().Be(new SetCpuVoltageOffsetOp(0));
+    }
+
     // --- Sécurité : un autre appelant ne peut ni renouveler ni clore le bail d'un tiers ---
 
     [Fact]

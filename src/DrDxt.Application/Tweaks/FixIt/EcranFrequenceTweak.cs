@@ -27,7 +27,8 @@ namespace DrDxt.Application.Tweaks.FixIt;
 // -----------------------------------------------------------------------
 /// <summary>Règle l'écran de jeu sur la plus haute fréquence que Windows propose à sa résolution, sans droits élevés.
 /// Proposé quand le scan lit une marge de fréquence ; gardé seulement si le joueur confirme l'image dans les 15 s.</summary>
-public sealed class EcranFrequenceTweak(IDisplayInfo ecrans, IModeEcran mode, IConfirmationEcran confirmation) : ITweak
+public sealed class EcranFrequenceTweak(IDisplayInfo ecrans, IModeEcran mode, IConfirmationEcran confirmation,
+    ISourceDAlimentation? alimentation = null) : ITweak
 {
     /// <summary>Le délai que Windows laisse lui-même avant de revenir à l'ancien affichage.</summary>
     public static readonly TimeSpan DelaiDeConfirmation = TimeSpan.FromSeconds(15);
@@ -40,8 +41,10 @@ public sealed class EcranFrequenceTweak(IDisplayInfo ecrans, IModeEcran mode, IC
     public bool RequiresRestorePoint => false;
     public string SummaryKey => "tweak.fixit.ecran_frequence.confort";
 
-    /// <summary>Seulement quand l'écran de jeu est lu sous sa fréquence max à la même résolution.</summary>
-    public bool AppliesTo(HardwareInventory hw, SettingsState state) => state.DisplayRefresh?.HasHeadroom == TriState.On;
+    /// <summary>Seulement quand l'écran de jeu est lu sous sa fréquence max à la même résolution, et pas sur batterie : un
+    /// portable y est souvent mis à 60 Hz exprès, pour l'autonomie.</summary>
+    public bool AppliesTo(HardwareInventory hw, SettingsState state)
+        => state.DisplayRefresh?.HasHeadroom == TriState.On && alimentation?.SurBatterie() != true;
 
     public bool EtatNonLu(SettingsState state) => state.DisplayRefresh is not { HasHeadroom: not TriState.Unknown };
 
@@ -49,6 +52,8 @@ public sealed class EcranFrequenceTweak(IDisplayInfo ecrans, IModeEcran mode, IC
     {
         try
         {
+            if (alimentation?.SurBatterie() == true)
+                return Echec(ErrorCodes.TweakNotApplicable, Docteur.T("EF.SurBatterie"));
             var ecran = ecrans.GetPrimaryGameDisplay();
             if (!ecran.IsOk || ecran.Value is not { DeviceName: { } nom } d)
                 return Echec(ErrorCodes.TweakSdkUnavailable, Docteur.T("EF.EcranIllisible"));
@@ -72,7 +77,8 @@ public sealed class EcranFrequenceTweak(IDisplayInfo ecrans, IModeEcran mode, IC
             if (mode.Ecrire(cible, enregistrer: true) is var garde and not 0)
                 return Revenir(avant, Docteur.T("EF.NonEnregistre", cible.Hz, garde));
 
-            return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, JsonSerializer.Serialize(avant)));
+            // Le mode posé voyage avec l'original : l'annulation ne remet l'original que si l'écran porte encore celui-ci.
+            return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, JsonSerializer.Serialize(avant), JsonSerializer.Serialize(cible)));
         }
         catch (Exception ex)
         {
@@ -96,6 +102,19 @@ public sealed class EcranFrequenceTweak(IDisplayInfo ecrans, IModeEcran mode, IC
 
         try
         {
+            // Le joueur a pu choisir une autre fréquence depuis : seule celle de DrDXT se rend. Un snapshot d'avant ce champ
+            // n'a pas de mode posé : l'original se remet comme avant.
+            if (Posee(snapshot) is { } posee)
+            {
+                if (mode.Courant(avant.Peripherique) is not { } courant)
+                    return Task.FromResult(Result.Fail(ErrorCodes.TweakSdkUnavailable, Docteur.T("EF.ModeIllisible")));
+                // Le nom \\.\DISPLAYn passe à l'écran branché à sa place : une autre définition, c'est un autre moniteur.
+                if ((courant.Largeur, courant.Hauteur) != (posee.Largeur, posee.Hauteur))
+                    return Task.FromResult(Result.Fail(ErrorCodes.TweakNotApplicable,
+                        Docteur.T("EF.AutreEcran", posee.Largeur, posee.Hauteur, courant.Largeur, courant.Hauteur)));
+                if (courant.Hz != posee.Hz)
+                    return Task.FromResult(Result.Fail(ErrorCodes.TweakNotApplicable, Docteur.T("EF.ChangeDepuis", courant.Hz, posee.Hz)));
+            }
             if (mode.Ecrire(avant, enregistrer: true) is var code and not 0)
                 return Task.FromResult(Result.Fail(ErrorCodes.TweakSdkUnavailable, Docteur.T("EF.NonRemis", avant.Hz, code)));
             return Task.FromResult(mode.Courant(avant.Peripherique)?.Hz == avant.Hz
@@ -108,10 +127,18 @@ public sealed class EcranFrequenceTweak(IDisplayInfo ecrans, IModeEcran mode, IC
         }
     }
 
+    private static ModeEcran? Posee(TweakSnapshot s)
+    {
+        if (string.IsNullOrEmpty(s.AppliedValueJson)) return null;
+        try { return JsonSerializer.Deserialize<ModeEcran>(s.AppliedValueJson) is { Hz: > 0 } m ? m : null; }
+        catch (JsonException) { return null; }
+    }
+
     private Result<TweakSnapshot> Revenir(ModeEcran avant, string pourquoi)
     {
         var retour = mode.Ecrire(avant, enregistrer: false);
-        return Echec(ErrorCodes.TweakSdkUnavailable, retour == 0
+        // Pas revenu : l'écran reste au mode posé pour la session ; le lot n'est pas défait.
+        return Echec(retour == 0 ? ErrorCodes.TweakSdkUnavailable : ErrorCodes.TweakPartiallyApplied, retour == 0
             ? Docteur.T("EF.Revenu", pourquoi, avant.Hz)
             : Docteur.T("EF.NonRevenu", pourquoi, avant.Hz, retour));
     }

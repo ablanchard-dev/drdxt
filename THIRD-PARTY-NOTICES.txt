@@ -20,7 +20,8 @@ Bibliothèques livrées avec l'application
 Module embarqué pour PawnIO (rien n'installe PawnIO : DrDXT s'en sert seulement s'il est déjà là)
 - IntelMSR.bin et IntelMCHBAR.bin (namazso/PawnIO.Modules, publication 0.2.11) : LGPL-2.1 ou ultérieure, © namazso (texte
   complet : third_party/pawnio-modules/COPYING). Lecture des registres de température et de limite de puissance du
-  processeur Intel, écriture de la seule limite continue (PL1) sur accord, par le helper. https://github.com/namazso/PawnIO.Modules
+  processeur Intel, écriture, par le helper et sur accord, de la limite continue (PL1) et du décalage de tension du processeur
+  (sous-tension pour la session en cours). https://github.com/namazso/PawnIO.Modules
 - LpcIO.bin (même publication 0.2.11, même licence) : lecture seule des ventilateurs de la carte mère par sa puce Super I/O
   (régime et cycle) ; aucun réglage de ventilateur n'est écrit.
 - AMDReset.bin, AMDFamily17.bin et RyzenSMU.bin (même publication 0.2.11, même licence) : lecture seule d'un processeur

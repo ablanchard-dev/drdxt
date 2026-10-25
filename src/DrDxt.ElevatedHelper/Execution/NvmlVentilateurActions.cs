@@ -21,6 +21,8 @@ public sealed class NvmlVentilateurActions(INvmlNative nvml) : IVentilateurActio
             return Echec("NVIDIA fans unreadable: nothing was written.");
         if (avant.Any(v => !v.Automatique))
             return Echec("A fan is already in manual mode: restore it to automatic first. Nothing was written.");
+        if (avant.Any(v => v.CiblePct is null || v.MinPct is null))
+            return Echec("The card's target or minimum fan speed was not read: the floor is unknown. Nothing was written.");
         if (avant.FirstOrDefault(v => pourcent < v.CiblePct || pourcent < v.MinPct) is { } bas)
             return Echec($"Refused: {pourcent} % is below what the card aims for now ({bas.CiblePct} %, minimum {bas.MinPct} %). " +
                          "DrDXT only raises the fan. Nothing was written.");

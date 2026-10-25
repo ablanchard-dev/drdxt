@@ -59,6 +59,8 @@ public sealed class AucunBoutonSansTexteNEstAnonymeTests
     private static bool Parle(XElement bouton)
     {
         if (bouton.Attribute("AutomationProperties.Name") is not null) return true;
+        // La même propriété en élément : un nom composé (MultiBinding) ne tient pas dans un attribut.
+        if (bouton.Elements(Wpf + "AutomationProperties.Name").Any()) return true;
         if (bouton.Attribute("Content") is not null) return true;
         return bouton.Descendants().Any(e => e.Name == Wpf + "TextBlock" || e.Name == Wpf + "AccessText");
     }

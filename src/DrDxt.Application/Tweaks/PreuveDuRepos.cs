@@ -2,8 +2,10 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks;
 
-/// <summary><see cref="RetraitRate"/> : pas de preuve, mais le retrait a été refusé ; le réglage est toujours posé.</summary>
-public enum EtatDeLaPreuve { Prouve, PasDeGain, NonMesure, RetraitRate }
+/// <summary>Ce que la preuve du repos a conclu. <c>RetraitRate</c> : pas de preuve, mais le retrait a été refusé ; le réglage
+/// est toujours posé. <c>ChangeDepuis</c> : le réglage ne porte plus la valeur de DrDXT (changé hors de DrDXT) ; rien n'est
+/// réécrit.</summary>
+public enum EtatDeLaPreuve { Prouve, PasDeGain, NonMesure, RetraitRate, ChangeDepuis }
 
 /// <summary>Ce que la mesure du repos a établi : les médianes avant et après, en watts.</summary>
 public sealed record VerdictDuRepos(EtatDeLaPreuve Etat, double? AvantW, double? ApresW)
@@ -26,6 +28,7 @@ public sealed class PreuvesEnAttente(string chemin)
         try
         {
             return File.Exists(chemin) && System.Text.Json.JsonSerializer.Deserialize<PreuveEnAttente>(File.ReadAllText(chemin)) is { } p
+                   && p.AvantW is { Count: > 0 } avant && avant.All(w => w > 0 && double.IsFinite(w))
                    && DrDxt.Application.Autopilot.RevertAuDemarrage.AnnulationSure(p.TweakId, p.OriginalValueJson) ? p : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { return null; }
@@ -41,7 +44,8 @@ public sealed class PreuvesEnAttente(string chemin)
 
     public void Effacer()
     {
-        try { File.Delete(chemin); } catch (IOException) { }
+        try { if (FichierJsonAtomique.RefusEleve(chemin, "PREUVE_REPOS") is null) File.Delete(chemin); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* lecture seule, antivirus : la conclusion a déjà rendu le réglage */ }
     }
 }
 
@@ -72,7 +76,8 @@ public sealed class ReglagesRetenus(string chemin)
 
     public void Effacer()
     {
-        try { File.Delete(chemin); } catch (IOException) { }
+        try { if (FichierJsonAtomique.RefusEleve(chemin, "PREUVE_REPOS") is null) File.Delete(chemin); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* lecture seule, antivirus : la conclusion a déjà rendu le réglage */ }
     }
 }
 
@@ -107,28 +112,37 @@ public static class PreuveDuRepos
 
     /// <summary>Mesure réelle : le global écrit ne change la carte qu'au redémarrage (chaque programme lit
     /// le profil à son lancement, le pilote suit le plus exigeant). Premier temps : l'avant et l'écriture sont gardés.
-    /// Rend <c>false</c> si rien n'a été écrit (watts illisibles, levier refusé).</summary>
-    public static async Task<bool> EcrireAsync(ITweak levier, IHardwareProbe sonde, int echantillons,
+    /// Un échec si rien n'a été écrit (watts illisibles) ou si le levier a échoué, avec son code : un helper qui n'a pas
+    /// répondu n'est pas « rien posé ». Une preuve qui ne se garde pas lève (<see cref="PreuvesEnAttente.Garder"/>).</summary>
+    public static async Task<Result> EcrireAsync(ITweak levier, IHardwareProbe sonde, int echantillons,
         Func<TimeSpan, Task> attendre, PreuvesEnAttente attente)
     {
         var avant = await LireAsync(sonde, echantillons, attendre).ConfigureAwait(false);
-        if (avant.Count == 0) return false;
+        if (avant.Count == 0) return Result.Fail(ErrorCodes.TweakSdkUnavailable, "The idle power draw could not be read: nothing written.");
         // Rien ne garde encore l'origine : le helper la garde jusqu'à ce que la preuve en attente la porte.
         using var portee = PorteeDePose.Ouvrir();
         var ecrit = await levier.ApplyAsync().ConfigureAwait(false);
-        if (!ecrit.IsOk || ecrit.Value is null) return false;
+        if (!ecrit.IsOk || ecrit.Value is null)
+            return Result.Fail(ecrit.Error?.Code ?? ErrorCodes.TweakSdkUnavailable, ecrit.Error?.Message ?? "No snapshot.");
         attente.Garder(new PreuveEnAttente(ecrit.Value.TweakId, ecrit.Value.OriginalValueJson, ecrit.Value.AppliedValueJson, avant));
         await portee.FermerAsync().ConfigureAwait(false);
-        return true;
+        return Result.Ok();
     }
 
     /// <summary>Second temps, au lancement suivant : mesure le repos, garde le réglage seulement sur séparation nette,
     /// sinon le retire. La preuve en attente est effacée, sauf si le retrait a raté (RetraitRate) : elle reste pour retenter le
     /// retrait au lancement suivant. <c>null</c> = rien n'attendait.</summary>
+    /// <param name="etatDeLaPose">La porte des rendus (<see cref="TweakReadback.EtatDeLaPose"/>) : un réglage qui ne porte plus
+    /// la valeur de DrDXT n'est ni mesuré ni réécrit, la preuve sort.</param>
     public static async Task<VerdictDuRepos?> ConclureAsync(ITweak levier, IHardwareProbe sonde, int echantillons,
-        Func<TimeSpan, Task> attendre, PreuvesEnAttente attente)
+        Func<TimeSpan, Task> attendre, PreuvesEnAttente attente, Func<TweakSnapshot, PoseRelue>? etatDeLaPose = null)
     {
         if (attente.Charger() is not { } p || p.TweakId != levier.Id) return null;
+        if (etatDeLaPose?.Invoke(new TweakSnapshot(p.TweakId, p.OriginalValueJson, p.AppliedValueJson)) is PoseRelue.ALOrigine or PoseRelue.ChangeDepuis)
+        {
+            attente.Effacer();
+            return new(EtatDeLaPreuve.ChangeDepuis, Mediane(p.AvantW), null);
+        }
         var apres = await LireAsync(sonde, echantillons, attendre).ConfigureAwait(false);
         var verdict = await JugerAsync(levier, new TweakSnapshot(p.TweakId, p.OriginalValueJson, p.AppliedValueJson),
             p.AvantW, apres).ConfigureAwait(false);

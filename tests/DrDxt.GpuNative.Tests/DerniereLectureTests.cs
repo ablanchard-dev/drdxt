@@ -33,7 +33,9 @@ public class DerniereLectureTests
         cache.Obtenir(() => $"l{++lectures}", T0.AddSeconds(-1)).Should().Be("l2");
     }
 
+    // ~79 ms de processeur par lecture : toutes les 15 s en partie. L'arrêt d'un ventilateur se dit sur deux lectures
+    // (VentilateursEnPartie.SecondesArretMinimum, 30 s, figé par VentilateursEnPartieTests).
     [Fact]
-    public void Les_ventilateurs_se_lisent_au_plus_toutes_les_cinq_secondes()
-        => PawnIoSuperIo.IntervalleLecture.Should().Be(TimeSpan.FromSeconds(5));
+    public void Les_ventilateurs_se_lisent_toutes_les_quinze_secondes()
+        => PawnIoSuperIo.IntervalleLecture.Should().Be(TimeSpan.FromSeconds(15));
 }

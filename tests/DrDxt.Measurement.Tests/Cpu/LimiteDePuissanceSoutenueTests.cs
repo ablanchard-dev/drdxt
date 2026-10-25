@@ -27,7 +27,7 @@ public class LimiteDePuissanceSoutenueTests
         var b = Baisse(65.8, 9.5) with { TakenUtc = new DateTimeOffset(2026, 10, 3, 12, 0, 0, TimeSpan.Zero) };
 
         CpuBaselineService.Juger(b).Lisible.Should().StartWith("Under a long load on 8 cores, your processor holds 30.0% less power")
-            .And.Contain("an average of 66 W").And.EndWith("Measured on 10/03/2026.");
+            .And.Contain("an average of 66 W").And.EndWith($"Measured on {b.TakenUtc.ToLocalTime():MM/dd/yyyy}.");
     }
 
     [Fact]

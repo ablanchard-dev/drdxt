@@ -177,10 +177,13 @@ public sealed class SourceAmd
 
     public SourceAmd(Func<string, CancellationToken, Task<string>>? lire = null) => _lire = lire ?? LireEnLigne;
 
+    /// <summary>L'en-tête d'un navigateur : la page d'AMD en veut un. Il ne nomme pas DrDXT, rien ne dit à AMD qui demande.</summary>
+    internal const string EnTeteNavigateur = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+
     private static async Task<string> LireEnLigne(string url, CancellationToken ct)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) DrDXT");
+        using var http = PageDuFabricant.Client();
+        http.DefaultRequestHeaders.UserAgent.ParseAdd(EnTeteNavigateur);
         return await http.GetStringAsync(url, ct).ConfigureAwait(false);
     }
 
@@ -204,7 +207,8 @@ public sealed class SourceAmd
 /// <summary>
 /// La source publique de NVIDIA (celle du formulaire de téléchargement du site), relevée le 03/10/2026 : une requête
 /// rend les dernières versions Game Ready WHQL pour Windows 11. La version GeForce est la même pour toutes les cartes
-/// de bureau d'une époque ; la série RTX 40 (psid 129, pfid 1004) sert de référence. Seule requête réseau de ce module.
+/// de bureau d'une époque ; la série RTX 40 (psid 129, pfid 1004) sert de référence. L'une des deux requêtes réseau de ce
+/// module, avec <see cref="SourceAmd"/>.
 /// </summary>
 public sealed class SourceNvidia
 {
@@ -217,7 +221,7 @@ public sealed class SourceNvidia
 
     private static async Task<string> LireEnLigne(string url, CancellationToken ct)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        using var http = PageDuFabricant.Client();
         return await http.GetStringAsync(url, ct).ConfigureAwait(false);
     }
 
@@ -245,4 +249,14 @@ public sealed class SourceNvidia
         }
         return liste.Count == 0 ? null : liste;
     }
+}
+
+/// <summary>La lecture d'une page de fabricant : 10 s au plus, et 4 Mio au plus. La réponse de NVIDIA fait 25 Ko (relevé le
+/// 03/10/2026) ; une page captive ou un incident côté fabricant qui rendrait des Mio n'est pas lu, la version reste non lue.</summary>
+internal static class PageDuFabricant
+{
+    public const int OctetsMax = 4 * 1024 * 1024;
+
+    public static HttpClient Client(HttpMessageHandler? transport = null)
+        => new(transport ?? new HttpClientHandler()) { Timeout = TimeSpan.FromSeconds(10), MaxResponseContentBufferSize = OctetsMax };
 }

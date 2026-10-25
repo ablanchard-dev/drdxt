@@ -28,8 +28,8 @@ public sealed class PointDeRestaurationSainTests
         var c = PointDeRestaurationSain.Juger(points, incidents, Maintenant).Single();
 
         c.Nom.Should().Be("point de restauration sain");
-        c.ValeurCourante.Should().Contain("Windows Update").And.Contain(T(9, 18).ToLocalTime().ToString("dd/MM/yyyy"));
-        c.Explication.Should().Contain(T(9, 20).ToLocalTime().ToString("dd/MM/yyyy"))
+        c.ValeurCourante.Should().Contain("Windows Update").And.Contain(T(9, 18).ToLocalTime().ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture));
+        c.Explication.Should().Contain(T(9, 20).ToLocalTime().ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))
             .And.Contain("1 point pris depuis").And.Contain("ne restaure jamais");
         c.Action.Should().Be(RepairAction.Recommandation);
     }
@@ -44,7 +44,8 @@ public sealed class PointDeRestaurationSainTests
         c.Action.Should().Be(RepairAction.Aucune);
         // Le souci daté voyage avec le constat, l'écran le nomme.
         // Début de la série : 25/09 ; 05/10 est à moins de deux semaines.
-        c.Provenance.Should().Be($"arrêt brutal sans code, le {T(9, 25).ToLocalTime():dd/MM/yyyy à HH:mm}");
+        // Le souci tient sur la ligne d'avertissement de l'accueil : le jour suffit, l'explication garde l'heure.
+        c.Provenance.Should().Be("arrêt brutal sans code, le " + T(9, 25).ToLocalTime().ToString("dd/MM", System.Globalization.CultureInfo.InvariantCulture));
     }
 
     // La comparaison se fait en instants. Un point à 00:30 à Paris (22:30 UTC la veille) est
@@ -70,7 +71,7 @@ public sealed class PointDeRestaurationSainTests
 
         var c = PointDeRestaurationSain.Juger([(T(7, 1), "Ancien")], incidents, Maintenant, lusDepuis).Single();
 
-        c.Explication.Should().Contain("au moins depuis le " + T(7, 10).ToLocalTime().ToString("dd/MM/yyyy"))
+        c.Explication.Should().Contain("au moins depuis le " + T(7, 10).ToLocalTime().ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture))
             .And.Contain("peut-être commencé avant");
         PointDeRestaurationSain.Juger([(T(7, 1), "Ancien")], incidents, Maintenant).Single().Explication
             .Should().NotContain("au moins depuis");

@@ -7,8 +7,9 @@ namespace DrDxt.Reconciler;
 //
 // À partir d'un manifeste vérifié (l'hôte le charge via IDesiredStateStore.LoadAsync, qui
 // refuse au moindre doute en cas d'altération), il réconcilie élément par élément :
-//   1. maintien en pause (PauseDuMaintien) ou élément en pause → pas d'écriture (I7), on continue
-//   2. levier hors allowlist / surface protégée       → refus + journal de sécurité (I3)
+//   1. maintien en pause (PauseDuMaintien)            → aucune écriture, rien n'est comparé
+//   2. levier hors allowlist / surface protégée       → refus + journal de sécurité (I3) ; puis un élément en pause
+//                                                       → pas d'écriture (I7), on continue
 //   3. lire l'actuel ; échec de sonde                  → élément KO (I2), on continue
 //   4. actuel == voulu                                 → rien à faire (idempotence I1)
 //   5. dérive → classer :
@@ -81,7 +82,8 @@ public sealed class DesiredStateReconciler : IReconciler
         var stateRes = await _stateStore.LoadAsync(ct);
         // Un etat illisible etait remplace par l'etat par defaut (non suspendu) : la passe
         // reappliquait, puis ecrivait ce defaut par-dessus, et une pause du joueur disparaissait sur une
-        // panne de lecture. Etat inconnu = rien d'ecrit, ni sur la machine ni dans l'etat.
+        // panne de lecture. Etat inconnu = rien d'ecrit, ni sur la machine ni dans l'etat. Un fichier abime, lui, ne revient pas
+        // ici : le magasin le met de cote et repart du premier lancement (JsonReconcilerStateStore).
         if (!stateRes.IsOk)
             return (Result.Fail(stateRes.Error!.Value.Code,
                     Docteur.T("DSR.Illisible", stateRes.Error.Value.Message)),
@@ -89,8 +91,8 @@ public sealed class DesiredStateReconciler : IReconciler
         var state = stateRes.Value!;
 
         // La pause du maintien, posée par le joueur : rien comparer, rien écrire, ni sur la machine ni dans le sidecar.
-        // Un fichier non fiable ne peut pas venir d'un programme du compte (la racine est aux administrateurs) : abîmé ou au
-        // propriétaire changé, il vaut pause, l'échec sûr. Le journal le dit, l'App propose de la reposer ou de la retirer.
+        // Un fichier non fiable (abîmé, au propriétaire changé, ou posé par un programme du compte avant que l'installeur
+        // ne durcisse la racine) vaut pause, l'échec sûr. Le journal le dit, l'App propose de la reposer ou de la retirer.
         var pause = _pause.Lire();
         if (pause == EtatDeLaPause.NonFiable)
             _log.Change(PauseDuMaintien.NomFichier, "?", "paused", "DrDXT/untrusted");
@@ -115,7 +117,7 @@ public sealed class DesiredStateReconciler : IReconciler
         // Enregistrer la comptabilité du sidecar pour la passe suivante / l'interface. C'est le
         // sidecar modifiable, pas le manifeste signé. Au mieux : un échec d'enregistrement ne change
         // pas l'issue de la réconciliation (les écritures ont déjà eu lieu).
-        await PersistBookkeepingAsync(state, results, ct);
+        await PersistBookkeepingAsync(results, ct);
 
         var final = failedIds.Count == 0
             ? Result.Ok()
@@ -124,8 +126,7 @@ public sealed class DesiredStateReconciler : IReconciler
         return (final, report);
     }
 
-    private async Task PersistBookkeepingAsync(
-        ReconcilerState state, IReadOnlyList<ReconcileItemResult> results, CancellationToken ct)
+    private async Task PersistBookkeepingAsync(IReadOnlyList<ReconcileItemResult> results, CancellationToken ct)
     {
         var now = _clock.UtcNow;
         var currentBuild = _buildProbe.ReadCurrentBuild();
@@ -145,8 +146,26 @@ public sealed class DesiredStateReconciler : IReconciler
         //
         // Une lecture par vendeur, memorisee : un item sans vendeur n'en demande aucune, et dix
         // items NVIDIA n'en demandent qu'une (la sonde reelle interroge WMI).
+        //
+        // Les sondes sont lues avant le verrou : il n'est tenu que le temps de relire l'état et de le réécrire. L'état est relu
+        // sous le verrou, pas repris du début de la passe : une référence posée par le helper pendant la passe reste.
         var versionsParVendeur = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in results)
+        {
+            var vendeur = _policy.VendorFor(r.TweakId);
+            if (vendeur is not null && !versionsParVendeur.ContainsKey(vendeur))
+            {
+                var lu = _driverProbe.ReadDriverVersion(vendeur);
+                versionsParVendeur[vendeur] = lu.IsOk ? lu.Value : null;
+            }
+        }
 
+        await _stateStore.MettreAJourAsync(state => AvecLaComptabilite(state, results, now, buildToken, versionsParVendeur), ct);
+    }
+
+    private ReconcilerState AvecLaComptabilite(ReconcilerState state, IReadOnlyList<ReconcileItemResult> results,
+        DateTimeOffset now, string buildToken, Dictionary<string, string?> versionsParVendeur)
+    {
         var byId = state.Items.ToDictionary(i => i.TweakId, StringComparer.Ordinal);
         foreach (var r in results)
         {
@@ -155,13 +174,7 @@ public sealed class DesiredStateReconciler : IReconciler
             byId.TryGetValue(r.TweakId, out var prev);
 
             var vendeur = _policy.VendorFor(r.TweakId);
-            string? versionPilote = null;
-            if (vendeur is not null && !versionsParVendeur.TryGetValue(vendeur, out versionPilote))
-            {
-                var lu = _driverProbe.ReadDriverVersion(vendeur);
-                versionPilote = lu.IsOk ? lu.Value : null;
-                versionsParVendeur[vendeur] = versionPilote;
-            }
+            var versionPilote = vendeur is null ? null : versionsParVendeur[vendeur];
 
             byId[r.TweakId] = new ReconcilerItemState(
                 TweakId: r.TweakId,
@@ -177,8 +190,7 @@ public sealed class DesiredStateReconciler : IReconciler
                 LastResultCode: r.Outcome.ToString());
         }
 
-        var updated = state with { Items = byId.Values.ToArray() };
-        await _stateStore.SaveAsync(updated, ct);
+        return state with { Items = byId.Values.ToArray() };
     }
 
     private async Task<ReconcileItemResult> ReconcileItemAsync(
@@ -303,6 +315,12 @@ public sealed class DesiredStateReconciler : IReconciler
             return Result<DriftCause>.Ok(DriftCause.Unknown);
 
         var isOriginal = string.Equals(current, tweak.OriginalValueJson, StringComparison.Ordinal);
+
+        // La passe précédente trouvait déjà le réglage hors de la valeur de DrDXT (le joueur l'avait remis lui-même) : une
+        // valeur d'origine vue après une mise à jour de Windows ou du pilote n'est pas une remise à zéro par Windows, c'est
+        // le choix du joueur, et il est respecté.
+        if (isOriginal && item is { LastResultCode: nameof(ItemOutcome.Notified) })
+            return Result<DriftCause>.Ok(DriftCause.UserIntentional);
 
         // --- signal de version du pilote par constructeur (I8 / T8b/T8c) --- seulement quand la valeur est revenue à l'origine : une
         // valeur tierce après une mise à jour du pilote peut être celle de l'utilisateur, et dans le doute on la respecte.

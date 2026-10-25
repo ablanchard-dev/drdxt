@@ -7,6 +7,7 @@ using DrDxt.App.Updates;
 using DrDxt.Infrastructure.Updates;
 using FluentAssertions;
 using NSec.Cryptography;
+using DrDxt.TestSupport;
 
 namespace DrDxt.App.Tests;
 
@@ -48,7 +49,7 @@ public sealed class MiseAJourLenteTests : IDisposable
         {
             var nu = new UpdateManifest(UpdateChannel.App, "1.3.0", "https://u.test/setup.exe",
                 Convert.ToHexString(SHA256.HashData(charge)).ToLowerInvariant(), Signature: string.Empty);
-            using var cle = Key.Import(SignatureAlgorithm.Ed25519, UpdateDevKeys.DevPrivateSeed, KeyBlobFormat.RawPrivateKey);
+            using var cle = Key.Import(SignatureAlgorithm.Ed25519, UpdateDevTestKeys.DevPrivateSeed, KeyBlobFormat.RawPrivateKey);
             return nu with { Signature = Convert.ToBase64String(SignatureAlgorithm.Ed25519.Sign(cle, UpdateVerifier.CanonicalBytes(nu))) };
         }
     }
@@ -62,7 +63,7 @@ public sealed class MiseAJourLenteTests : IDisposable
 
         // Borne large : elle couvre aussi le montage (clés, crypto, dossiers), mesuré jusqu'à 7,7 s sur une CI chargée.
         var r = await VerificationMiseAJour.VerifierAsync(
-            () => UpdateComposition.TryCreate("https://u.test", client, _racine, _racine, "1.0.0", UpdateDevKeys.CreateUpdateVerifier().Value!),
+            () => UpdateComposition.TryCreate("https://u.test", client, _racine, "1.0.0", UpdateDevKeys.CreateUpdateVerifier().Value!),
             TimeSpan.FromSeconds(10), CancellationToken.None);
 
         r.Etat.Should().Be(EtatMiseAJour.NouvelleVersionVerifiee);
@@ -84,7 +85,7 @@ public sealed class MiseAJourLenteTests : IDisposable
         var serveur = new ServeurLent(new byte[4096], TimeSpan.Zero);
 
         var (r, client) = await VerificationMiseAJour.VerifierAuDemarrageAsync(
-            c => UpdateComposition.TryCreate("https://u.test", c, _racine, _racine, "1.0.0", UpdateDevKeys.CreateUpdateVerifier().Value!),
+            c => UpdateComposition.TryCreate("https://u.test", c, _racine, "1.0.0", UpdateDevKeys.CreateUpdateVerifier().Value!),
             serveur);
         using var _ = client;
         r.Installable.Should().BeTrue();

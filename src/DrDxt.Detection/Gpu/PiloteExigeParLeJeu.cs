@@ -60,7 +60,7 @@ public static class PiloteExigeParLeJeu
         {
             var quand = File.GetLastWriteTimeUtc(chemin);
             if (Lus.TryGetValue(chemin, out var lu) && lu.Quand == quand) return lu.Texte;
-            var texte = File.ReadAllText(chemin);
+            var texte = FichierTiers.Lire(chemin);
             Lus[chemin] = (quand, texte);
             return texte;
         }

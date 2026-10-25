@@ -1,3 +1,5 @@
+using DrDxt.Core;
+
 namespace DrDxt.Detection.Hardware;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace DrDxt.Detection.Hardware;
 /// un logiciel de plus, qui coûte de la latence audio et un peu de processeur, et peut fausser une mesure. Reconnue par le
 /// nom des périphériques son (Win32_SoundDevice), sans rien ouvrir ni changer. Les noms sont ceux des produits connus
 /// (VB-Audio et ses câbles, Voicemeeter, SteelSeries Sonar, Virtual Audio Cable), relevés sur la machine de référence pour
-/// VB-Audio (« VB-Audio Hi-Fi Cable », le 16/10/2026).
+/// VB-Audio (« VB-Audio Hi-Fi Cable », relevé le 16/10/2026).
 /// </summary>
 public static class ChaineAudio
 {
@@ -16,7 +18,7 @@ public static class ChaineAudio
         => noms.Where(n => Motifs.Any(m => n.Contains(m, StringComparison.OrdinalIgnoreCase))).Distinct().ToList();
 
     /// <summary>Le vrai, en lecture seule ; <c>null</c> = WMI n'a pas répondu.</summary>
-    public static IReadOnlyList<string>? Virtuelles()
+    public static IReadOnlyList<string>? Virtuelles() => LectureWmiBornee.Lire<IReadOnlyList<string>?>(() =>
     {
         try
         {
@@ -29,5 +31,5 @@ public static class ChaineAudio
             return Filtrer(noms);
         }
         catch (Exception) { return null; }
-    }
+    }, () => null);
 }

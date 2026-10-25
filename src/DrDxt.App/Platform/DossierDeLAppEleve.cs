@@ -12,6 +12,8 @@ namespace DrDxt.App.Platform;
 /// vérifie sans suivre les liens que ni le dossier, ni un sous-dossier, ni un fichier n'est un point de reparse ou un lien dur,
 /// puis tient le dossier et ses sous-dossiers ouverts sans partage de suppression, chacun avec un fichier témoin tenu de même :
 /// tant qu'elle tourne, aucun ne peut être renommé, ni vidé pour recevoir une jonction.
+/// La création des dossiers précède leur vérification, et les dossiers parents sous le profil ne sont pas contrôlés : seule la
+/// vérification faite sur le handle tenu garantit qu'aucune écriture élevée ne part ailleurs, et rien n'est écrit avant elle.
 /// </summary>
 public sealed class DossierDeLAppEleve : IDisposable
 {
@@ -77,14 +79,19 @@ public sealed class DossierDeLAppEleve : IDisposable
     /// <summary>Le fichier témoin tenu dans chaque dossier.</summary>
     public const string Temoin = ".drdxt-tenu";
 
+    // Un niveau à la fois : on ne descend que dans un dossier qui n'est pas un point de reparse, lu sur l'entrée elle-même. Rien
+    // ne dépend de la façon dont une énumération récursive traite les liens.
     private static string? LienDessous(string racine)
     {
-        foreach (var entree in new DirectoryInfo(racine).EnumerateFileSystemInfos("*",
-                     new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = 0, IgnoreInaccessible = false }))
-        {
-            if (entree.Attributes.HasFlag(FileAttributes.ReparsePoint)) return entree.FullName;
-            if (entree is FileInfo && LiensDurs(entree.FullName) is not 1) return entree.FullName;
-        }
+        var aVoir = new Stack<string>([racine]);
+        while (aVoir.TryPop(out var dossier))
+            foreach (var entree in new DirectoryInfo(dossier).EnumerateFileSystemInfos("*",
+                         new EnumerationOptions { RecurseSubdirectories = false, AttributesToSkip = 0, IgnoreInaccessible = false }))
+            {
+                if (entree.Attributes.HasFlag(FileAttributes.ReparsePoint)) return entree.FullName;
+                if (entree is FileInfo) { if (LiensDurs(entree.FullName) is not 1) return entree.FullName; }
+                else aVoir.Push(entree.FullName);
+            }
         return null;
     }
 

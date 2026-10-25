@@ -2,7 +2,7 @@
 
 Version française, avec les versions publiées : [CHANGELOG.md](CHANGELOG.md).
 
-## Unreleased
+## 0.9.2 (unreleased)
 
 For the player:
 
@@ -31,7 +31,8 @@ For the player:
 - Processor power limit and undervolt: bounds checked again at the moment of writing; no higher limit while no match
   temperature has been recorded.
 - Card tuning is refused when another tool has already set an offset, or when that offset could not be read.
-- Upload cap during a match: only for a recognised game, and forgotten at restart.
+- Upload cap during a match: only for a recognised game; cleared when Windows restarts, set again by the service at
+  the next match while protection stays on.
 - An antivirus or a parental control is never turned off at startup.
 - Windows credentials only go to a proxy you configured, never to a proxy discovered on the network.
 - The stability, driver, Defender and BitLocker readers cannot write anything.
@@ -53,7 +54,7 @@ For the player:
 - Numbers and dates follow the app's language; English texts use English quotation marks.
 - Expert information with no problem is folded into "Technical details" under each page; the "recommendation" label
   is gone.
-- The README says exactly what remains after uninstalling, and what was checked on a real machine.
+- The README says exactly what remains after uninstalling.
 - "Send my report" says the ticket opens empty.
 - "What's new" shown once after a DrDXT update; a one-click support bundle, shown before it is written.
 

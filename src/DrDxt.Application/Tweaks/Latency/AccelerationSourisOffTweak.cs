@@ -123,12 +123,7 @@ public sealed class AccelerationSourisOffTweak : LatencyTweakBase
 
         try
         {
-            foreach (var op in decoded.Value)
-            {
-                var res = await Elevated.ExecuteAsync(op, CancellationToken.None).ConfigureAwait(false);
-                if (!res.IsOk) return res;
-            }
-            return Result.Ok();
+            return await RetourArriere.ToutRendreAsync(Elevated, decoded.Value).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

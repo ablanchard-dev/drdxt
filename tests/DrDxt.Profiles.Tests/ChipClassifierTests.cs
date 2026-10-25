@@ -10,6 +10,8 @@ public sealed class ChipClassifierTests
     [InlineData("AuthenticAMD", true)]
     [InlineData("Advanced Micro Devices, Inc.", true)]
     [InlineData("ATI Technologies Inc.", true)]
+    [InlineData("NVIDIA Corporation", false)]
+    [InlineData("Intel Corporation", false)]
     [InlineData("GenuineIntel", false)]
     [InlineData("NVIDIA", false)]
     [InlineData(null, false)]
@@ -79,4 +81,15 @@ public sealed class ChipClassifierTests
             TestInventory.Build(TestInventory.Intel(), new[] { TestInventory.IntelIgpu() })).Should().BeFalse();
         ChipClassifier.HasTunableNvidiaDesktopGpu(null).Should().BeFalse();
     }
+
+    // L'option A ne vise que les GeForce : une carte professionnelle au nom proche (Quadro RTX, RTX … Ada Generation) n'est
+    // pas réglée comme une carte de jeu.
+    [Theory]
+    [InlineData("NVIDIA GeForce RTX 4060", true)]
+    [InlineData("NVIDIA GeForce GTX 1660 SUPER", true)]
+    [InlineData("NVIDIA Quadro RTX 4000", false)]
+    [InlineData("NVIDIA RTX 2000 Ada Generation", false)]
+    [InlineData("NVIDIA RTX A4000", false)]
+    public void Seule_une_GeForce_est_reglable_par_l_option_A(string modele, bool reglable)
+        => ChipClassifier.IsTunableNvidiaGpu(new GpuInfo(modele, "NVIDIA", 8L << 30, "1", TriState.On)).Should().Be(reglable);
 }

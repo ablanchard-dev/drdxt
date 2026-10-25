@@ -38,7 +38,23 @@ public sealed class VrrFlipModelOnTweakTests
             .Returns(Result<string?>.Ok(original));
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
-        return new VrrFlipModelOnTweak(_registry, _elevated);
+        // Windows 11 fixé : le build lu de la machine ferait changer la moitié flip-model sous Windows 10.
+        return new VrrFlipModelOnTweak(_registry, _elevated, () => 22631);
+    }
+
+    // « Optimisations pour les jeux en fenêtré » n'existe que sous Windows 11 (support Microsoft). Sous Windows 10, la moitié
+    // flip-model ne compte pas : seul le VRR fenêtré, sur un écran lu compatible, fait proposer le levier.
+    [Fact]
+    public void Sous_Windows_10_la_moitie_flip_model_ne_fait_pas_proposer_le_levier()
+    {
+        Build(null);
+        var w10 = new VrrFlipModelOnTweak(_registry, _elevated, () => 19045);
+        var w11 = new VrrFlipModelOnTweak(_registry, _elevated, () => 22631);
+
+        w10.AppliesTo(Hw, State with { VrrCapableDisplay = TriState.Off }).Should().BeFalse();
+        w11.AppliesTo(Hw, State with { VrrCapableDisplay = TriState.Off }).Should().BeTrue("témoin : Windows 11");
+        w10.AppliesTo(Hw, State with { VrrCapableDisplay = TriState.On }).Should().BeTrue("la moitié VRR vaut sous Windows 10");
+        w10.EtatNonLu(State with { VrrCapableDisplay = TriState.Unknown }).Should().BeTrue();
     }
 
     private async Task<string> CapturedWrittenValue(VrrFlipModelOnTweak t)
@@ -139,12 +155,14 @@ public sealed class VrrFlipModelOnTweakTests
     }
 
     [Fact]
-    public void AppliesTo_when_unreadable()
+    public void Illisible_se_dit_non_lu_ni_deja_regle_ni_a_poser()
     {
+        // La pose relit la chaîne d'origine et échouerait : proposer le levier « à poser » mettrait au lot un échec certain.
         var t = Build("");
         _registry.ReadString(RegistryHiveKind.CurrentUser, PrefsPath, ValueName)
             .Returns(Result<string?>.Fail(ErrorCodes.TweakSdkUnavailable, "illisible"));
-        t.AppliesTo(Hw, State).Should().BeTrue(); // non lu n'est pas « deja regle »
+        t.AppliesTo(Hw, State).Should().BeFalse();
+        t.EtatNonLu(State).Should().BeTrue();
     }
 
     [Fact]
@@ -236,7 +254,7 @@ public sealed class VrrFlipModelOnTweakTests
     [Fact]
     public async Task Revert_restores_the_original_string_via_helper()
     {
-        var t = Build("");
+        var t = Build("AutoHDREnable=1;VRROptimizeEnable=1;SwapEffectUpgradeEnable=1");
         var original = new SetRegistryValueOp(
             RegistryHiveKind.CurrentUser, PrefsPath, ValueName, RegistryValueType.String, "AutoHDREnable=1");
         var snap = new TweakSnapshot("latency.vrrFlipModelOn", PrivilegedOpCodec.Serialize(original).Value!);
@@ -296,4 +314,51 @@ public sealed class VrrFlipModelOnTweakTests
     [Fact]
     public void Un_interrupteur_pas_encore_pose_n_est_pas_exerce()
         => Build("SwapEffectUpgradeEnable=1;").PreparerExercice(Hw, State with { VrrCapableDisplay = TriState.On }).Should().BeNull();
+
+    private static TweakSnapshot Pose(string? origine, string posee) => new("latency.vrrFlipModelOn",
+        PrivilegedOpCodec.Serialize(origine is null
+            ? new DeleteRegistryValueOp(RegistryHiveKind.CurrentUser, PrefsPath, ValueName)
+            : new SetRegistryValueOp(RegistryHiveKind.CurrentUser, PrefsPath, ValueName, RegistryValueType.String, origine)).Value!,
+        PrivilegedOpCodec.Serialize(new SetRegistryValueOp(RegistryHiveKind.CurrentUser, PrefsPath, ValueName, RegistryValueType.String, posee)).Value!);
+
+    // La chaîne porte aussi Auto HDR, que le joueur règle lui-même : remettre la chaîne d'origine entière effacerait son
+    // Auto HDR. Seules les clés de DrDXT reprennent leur origine, le reste garde la valeur courante.
+    [Theory]
+    [InlineData("AutoHDREnable=0;SwapEffectUpgradeEnable=1", "AutoHDREnable=1;SwapEffectUpgradeEnable=1")]
+    [InlineData(null, "AutoHDREnable=1")]
+    public async Task Le_rendu_ne_remet_que_les_cles_de_DrDXT_et_garde_l_Auto_HDR_du_joueur(string? origine, string attendue)
+    {
+        var t = Build("AutoHDREnable=1;SwapEffectUpgradeEnable=1;VRROptimizeEnable=1");
+
+        (await t.RevertAsync(Pose(origine, "AutoHDREnable=0;SwapEffectUpgradeEnable=1;VRROptimizeEnable=1"))).IsOk.Should().BeTrue();
+
+        await _elevated.Received(1).ExecuteAsync(Arg.Is<SetRegistryValueOp>(o => o.Name == ValueName && o.Value == attendue),
+            Arg.Any<CancellationToken>());
+    }
+
+    // La chaîne courante ne se lit pas : rien n'est écrit par-dessus ce qu'on ne voit pas.
+    [Fact]
+    public async Task Le_rendu_sans_lire_la_chaine_courante_n_ecrit_rien()
+    {
+        var t = Build("x");
+        _registry.ReadString(RegistryHiveKind.CurrentUser, PrefsPath, ValueName).Returns(Result<string?>.Fail("REG", "refusé"));
+
+        (await t.RevertAsync(Pose("AutoHDREnable=0", "AutoHDREnable=0;VRROptimizeEnable=1"))).IsOk.Should().BeFalse();
+
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
+
+    // Auto HDR basculé depuis par le joueur ne fait pas croire que la pose de DrDXT a changé : seules ses clés se relisent.
+    [Fact]
+    public void Auto_HDR_bascule_par_le_joueur_laisse_la_pose_a_DrDXT()
+    {
+        Build("AutoHDREnable=1;SwapEffectUpgradeEnable=1;VRROptimizeEnable=1");
+        var pose = Pose("AutoHDREnable=0;SwapEffectUpgradeEnable=1", "AutoHDREnable=0;SwapEffectUpgradeEnable=1;VRROptimizeEnable=1");
+
+        DrDxt.Application.Tweaks.TweakReadback.EtatDeLaPose(pose, _registry).Should().Be(DrDxt.Application.Tweaks.PoseRelue.DeDrDxt);
+
+        _registry.ReadString(RegistryHiveKind.CurrentUser, PrefsPath, ValueName).Returns(Result<string?>.Ok("AutoHDREnable=1;SwapEffectUpgradeEnable=1"));
+        DrDxt.Application.Tweaks.TweakReadback.EtatDeLaPose(pose, _registry).Should().Be(DrDxt.Application.Tweaks.PoseRelue.ALOrigine,
+            "témoin : les clés de DrDXT revenues à l'origine");
+    }
 }

@@ -79,6 +79,15 @@ public sealed class ObsStudioTests
         Statut(9.6).Should().Be(RepairStatus.Suspicious);
     }
 
+    // Une sortie arrêtée sur « Total frames output: 0 » : bilan reconnu, mais aucune image comptée. Rien n'est mesuré,
+    // donc jamais « pertes à 1 % ou moins ».
+    [Fact]
+    public void Un_lancement_sans_aucune_image_comptee_n_est_pas_dit_propre()
+    {
+        var s = ObsStudio.Bilan(Arret + "21:00:00.000: Output 'x': Total frames output: 0\n", T)!;
+        ObsStudio.Juger(true, null, [s]).Single(c => c.Nom == "pertes en stream").Statut.Should().Be(RepairStatus.Unknown);
+    }
+
     [Fact]
     public void Les_reglages_se_lisent_section_et_cle_exactes()
     {
@@ -92,4 +101,79 @@ public sealed class ObsStudioTests
     [Fact]
     public void Obs_absent_se_dit_et_rien_d_autre()
         => ObsStudio.Juger(false, null, null).Should().ContainSingle().Which.Statut.Should().Be(RepairStatus.ExpectedDefault);
+
+    private const string Arret = "21:00:00.000: Output 'x': stopping\n";
+
+    // Un journal abîmé ne fait pas tomber la famille : la ligne illisible est sautée, le bilan reste « non reconnu ».
+    [Theory]
+    [InlineData("21:00:00.000: Video stopped, number of skipped frames due to encoding lag: ٣/٥ (1.0%)")]
+    [InlineData("21:00:00.000: Video stopped, number of skipped frames due to encoding lag: 99999999999999999999/5 (1.0%)")]
+    public void Un_nombre_illisible_saute_la_ligne_sans_lever(string ligne)
+    {
+        var s = ObsStudio.Bilan(Arret + ligne, T)!;
+
+        s.Reconnu.Should().BeFalse();
+        s.Encodage.Should().BeNull();
+    }
+
+    // Plus d'images sautées que d'images tentées n'est pas un bilan : jamais « 99900 % ».
+    [Fact]
+    public void Plus_de_pertes_que_d_images_n_est_pas_un_bilan()
+    {
+        var s = ObsStudio.Bilan(Arret + "21:00:00.000: Video stopped, number of skipped frames due to encoding lag: 999/1 (99900.0%)", T)!;
+
+        s.Encodage.Should().BeNull();
+    }
+
+    private static string Profil(string user, string? streamEncoder = null)
+    {
+        var dossier = Path.Combine(Path.GetTempPath(), $"obs-{Guid.NewGuid():N}");
+        var profil = Path.Combine(dossier, "basic", "profiles", "P");
+        Directory.CreateDirectory(profil);
+        File.WriteAllText(Path.Combine(dossier, "user.ini"), user);
+        File.WriteAllText(Path.Combine(profil, "basic.ini"), "[Output]\nMode=Advanced\n[AdvOut]\nEncoder=obs_nvenc_h264_tex\n");
+        if (streamEncoder is not null) File.WriteAllText(Path.Combine(profil, "streamEncoder.json"), streamEncoder);
+        return dossier;
+    }
+
+    // Un streamEncoder.json dont la racine n'est pas un objet : débit non lu, le reste des réglages tient.
+    [Theory]
+    [InlineData("[1]")]
+    [InlineData("1")]
+    public void Un_encodeur_json_qui_n_est_pas_un_objet_laisse_le_debit_non_lu(string json)
+    {
+        var dossier = Profil("[Basic]\nProfileDir=P\n", json);
+        try
+        {
+            var r = ObsStudio.LireReglages(dossier)!;
+
+            r.Encodeur.Should().Be("obs_nvenc_h264_tex");
+            r.DebitKbps.Should().BeNull();
+        }
+        finally { Directory.Delete(dossier, true); }
+    }
+
+    // ProfileDir nomme un profil sous le dossier d'OBS : un chemin absolu ou réseau n'est jamais ouvert.
+    [Fact]
+    public void Un_profil_absolu_n_est_pas_lu()
+    {
+        var ailleurs = Profil("[Basic]\nProfileDir=P\n");
+        var dossier = Profil($"[Basic]\nProfileDir={Path.Combine(ailleurs, "basic", "profiles", "P")}\n");
+        try
+        {
+            ObsStudio.LireReglages(dossier).Should().BeNull();
+        }
+        finally { Directory.Delete(dossier, true); Directory.Delete(ailleurs, true); }
+    }
+
+    // Une cause qu'aucun lancement n'a comptée (pas de ligne de bilan pour elle) se dit non comptée, jamais « 0 % ».
+    [Fact]
+    public void Une_cause_jamais_comptee_ne_vaut_pas_zero()
+    {
+        var s = new ObsStudio.Session(T, Encodage: null, Rendu: 2.0, Reseau: 0.0, Reconnu: true);
+
+        var c = ObsStudio.Juger(true, null, [s]).Single(c => c.Nom == "pertes en stream");
+
+        c.ValeurCourante.Should().Be(Docteur.T("OBS.ValeurPertes", Docteur.T("OBS.NonCompte"), "2 %", "0 %"));
+    }
 }

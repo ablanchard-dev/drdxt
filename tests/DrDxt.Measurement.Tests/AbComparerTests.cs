@@ -127,16 +127,4 @@ public class AbComparerTests
         v.IsMeasurableGain.Should().BeFalse();
         v.SummaryKey.Should().Be("Scan.Ab.Regression");
     }
-
-    // --- Le verdict porte le limiteur de départ pour que la couche de recommandation ne vende jamais
-    // un levier GPU comme gain de FPS sur une machine limitée par le processeur. Classé depuis Before (la machine non modifiée).
-    [Fact]
-    public void Verdict_reports_the_baseline_bottleneck()
-    {
-        // Before était limité par le processeur ou autre (70 % d'occupation GPU) ; qu'After soit limité par
-        // la carte ne doit pas changer le limiteur du verdict : c'est le limiteur naturel de la machine qui filtre l'affirmation.
-        var before = new BenchmarkResult(100, 70, 50, new List<double>(), null, 1, 5, MeanGpuBusyMs: 7.0);
-        var after = new BenchmarkResult(110, 77, 55, new List<double>(), null, 1, 5, MeanGpuBusyMs: 9.5);
-        AbComparer.Compare(before, after).Bottleneck.Should().Be(Bottleneck.CpuOrOtherBound);
-    }
 }

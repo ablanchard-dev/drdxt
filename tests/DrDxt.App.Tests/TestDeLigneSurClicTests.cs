@@ -65,6 +65,7 @@ public class TestDeLigneSurClicTests
         var vm = Vm(" {0}");
         vm.TesterLaLigne = _ => throw new System.Net.Http.HttpRequestException("hors ligne");
         await vm.TesterLigneCommand.ExecuteAsync(null);
-        vm.TexteTestLigne.Should().Contain("Ligne.Test.Echec").And.Contain("hors ligne");
+        // Le message technique part au journal ; l'écran dit la phrase générique et le type, que le support relie au journal.
+        vm.TexteTestLigne.Should().Contain("Ligne.Test.Echec").And.Contain("HttpRequestException").And.NotContain("hors ligne");
     }
 }

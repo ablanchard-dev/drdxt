@@ -36,8 +36,15 @@ internal sealed class NvApiEntry
     private static extern IntPtr nvapi_QueryInterface(uint id);
 
     private readonly object _gate = new();
-    private bool _initAttempted;
+    // Levé seulement une fois l'init finie : un appelant concurrent attend le verrou au lieu de lire « indisponible ».
+    private volatile bool _initAttempted;
     private bool _initialized;
+    private readonly Func<int>? _initialiser;
+
+    public NvApiEntry() { }
+
+    /// <summary>Tests : remplace l'appel à NvAPI_Initialize.</summary>
+    internal NvApiEntry(Func<int> initialiser) => _initialiser = initialiser;
 
     /// <summary>MAKE_NVAPI_VERSION : taille de la struct dans les 16 bits bas, numéro de version
     /// dans les 16 hauts. Calculé à l'exécution depuis la taille marshalée de la struct, pour qu'un
@@ -93,18 +100,19 @@ internal sealed class NvApiEntry
         {
             if (_initAttempted)
                 return;
-            _initAttempted = true;
             try
             {
-                var init = GetDelegate<InitializeDelegate>(Id_Initialize);
-                if (init is null)
-                    return; // nvapi64 absent / Initialize non exporté → indisponible.
-                _initialized = init() == (int)NvApiStatus.Ok;
+                var init = _initialiser;
+                if (init is null && GetDelegate<InitializeDelegate>(Id_Initialize) is { } natif)
+                    init = () => natif();
+                // nvapi64 absent / Initialize non exporté → indisponible.
+                _initialized = init is not null && init() == (int)NvApiStatus.Ok;
             }
             catch (Exception)
             {
                 _initialized = false; // échec propre : ne jamais lever hors de l'init.
             }
+            _initAttempted = true;
         }
     }
 

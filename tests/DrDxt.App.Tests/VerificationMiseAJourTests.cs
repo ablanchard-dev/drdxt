@@ -222,22 +222,13 @@ public sealed class VerificationMiseAJourTests : IDisposable
         }
     }
 
-    private static Result<UpdateOutcome> Ok(UpdateOutcome o) => Result<UpdateOutcome>.Ok(o);
-    private static Result<UpdateOutcome> Ko(string code) => Result<UpdateOutcome>.Fail(code, "x");
-
     [Fact]
-    public void Classer_une_version_verifiee_passe_d_abord_un_refus_avant_le_hors_ligne()
+    public void Un_refus_se_classe_avant_le_hors_ligne()
     {
-        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.ReplacerUnavailable))
-            .Should().Be(EtatMiseAJour.NouvelleVersionVerifiee);
-        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.SignatureInvalid))
-            .Should().Be(EtatMiseAJour.Refusee, "un paquet rejete est une information de securite");
-        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.Offline))
-            .Should().Be(EtatMiseAJour.Injoignable);
-        VerificationMiseAJour.Classer(Ok(UpdateOutcome.UpToDate))
-            .Should().Be(EtatMiseAJour.AJour);
-        VerificationMiseAJour.Classer(Ko(UpdateErrorCodes.StageFailed))
-            .Should().Be(EtatMiseAJour.Echec);
+        foreach (var refus in new[] { UpdateErrorCodes.SignatureInvalid, UpdateErrorCodes.HashMismatch, UpdateErrorCodes.Downgrade })
+            VerificationMiseAJour.ClasserErreur(refus).Should().Be(EtatMiseAJour.Refusee, "un paquet rejete est une information de securite");
+        VerificationMiseAJour.ClasserErreur(UpdateErrorCodes.Offline).Should().Be(EtatMiseAJour.Injoignable);
+        VerificationMiseAJour.ClasserErreur(UpdateErrorCodes.StageFailed).Should().Be(EtatMiseAJour.Echec);
     }
 
     [Fact]

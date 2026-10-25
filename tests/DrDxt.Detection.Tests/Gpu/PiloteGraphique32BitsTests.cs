@@ -39,4 +39,13 @@ public sealed class PiloteGraphique32BitsTests
     [Fact]
     public void Une_carte_sans_pilote_mode_utilisateur_n_est_pas_jugee()
         => PiloteGraphique32Bits.Defaut(new("Microsoft Basic Display Adapter", null, null), _ => false).Should().BeNull();
+
+    // Rien de lu n'est pas « présent » : une carte sans pilote mode utilisateur lu (pilote de base, clé de classe introuvable
+    // ou illisible) se dit non lue, jamais « ses fichiers sont là ».
+    [Fact]
+    public void Une_carte_dont_rien_n_est_lu_se_dit_non_lue()
+    {
+        PiloteGraphique32Bits.Juger([new("RTX", null, null)], _ => true).Single().Statut.Should().Be(RepairStatus.Unknown);
+        PiloteGraphique32Bits.Juger([new("RTX", [], [Umd32])], _ => true).Single().Statut.Should().Be(RepairStatus.Unknown);
+    }
 }

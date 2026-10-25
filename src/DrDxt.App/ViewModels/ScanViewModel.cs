@@ -277,15 +277,7 @@ public sealed partial class ScanViewModel : ObservableObject
         _gameLocator = gameLocator ?? new DrDxt.App.Platform.NullGameLocator();
         _firmwareTrip = firmwareTrip;
         _writeReport = writeReport;
-        _appVersion = string.IsNullOrWhiteSpace(appVersion) ? "(version inconnue)" : appVersion;
-
-        Features = new ObservableCollection<FeatureItem>
-        {
-            new("Diagnostic", _localize("UI.Feature.Diagnostic.Title"), _localize("UI.Feature.Diagnostic.Body")),
-            new("Gaming", _localize("UI.Feature.Gaming.Title"), _localize("UI.Feature.Gaming.Body")),
-            new("Security", _localize("UI.Feature.Security.Title"), _localize("UI.Feature.Security.Body")),
-            new("Report", _localize("UI.Feature.Report.Title"), _localize("UI.Feature.Report.Body")),
-        };
+        _appVersion = string.IsNullOrWhiteSpace(appVersion) ? _localize("App.VersionInconnue") : appVersion;
 
         ChoixDeScene = new ChoixScene[]
         {
@@ -299,6 +291,7 @@ public sealed partial class ScanViewModel : ObservableObject
         };
         _sceneDeclaree = ChoixDeScene[0];
         AbonnerLaProchaineEtape();
+        SuivreLesOperationsLongues();
     }
 
     [ObservableProperty]
@@ -310,6 +303,8 @@ public sealed partial class ScanViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanApplyGpuTuning))]
     [NotifyCanExecuteChangedFor(nameof(ApplyCommand))]
     [NotifyCanExecuteChangedFor(nameof(ApplyGpuTuningCommand))]
+    [NotifyPropertyChangedFor(nameof(TitreAccueil))]
+    [NotifyPropertyChangedFor(nameof(SousTitreAccueil))]
     private ScanState _state = ScanState.Idle;
 
     /// <summary>Rempli quand une application est bloquée (garde du point de restauration, rien
@@ -445,12 +440,57 @@ public sealed partial class ScanViewModel : ObservableObject
     {
         using var sansGeste = SansGesteDuJoueur.Ouvrir();
         await RendreEssaiAsync(journal, catalogue).ConfigureAwait(true);
+        // Ce qu'une App morte a posé dans la session sans en noter l'origine, rendu par celle-ci.
+        (string? Texte, IReadOnlyList<DrDxt.ElevatedHelper.Journal.RapportDuRejeu.Ligne> Lignes) session;
+        try { session = RejeuDuCompte is { } rc ? await Task.Run(rc).ConfigureAwait(true) : (null, []); }
+        catch (Exception) { session = (null, []); }
+        if (session.Texte is { } texteSession)
+            MessageDemarrage = string.IsNullOrEmpty(MessageDemarrage) ? texteSession : MessageDemarrage + Environment.NewLine + texteSession;
+        await SortirLesLeviersRendusAsync(session.Lignes).ConfigureAwait(true);
         // Ce que le helper a rendu d'une session interrompue, dit une fois, après le constat de l'App.
         string? rejeu;
         try { rejeu = RejeuLu is { } r ? await Task.Run(r.TexteNouveau).ConfigureAwait(true) : null; }
         catch (Exception) { rejeu = null; }
         if (rejeu is not null)
             MessageDemarrage = string.IsNullOrEmpty(MessageDemarrage) ? rejeu : MessageDemarrage + Environment.NewLine + rejeu;
+        // Un compte standard se dit dès le lancement : sinon il ne se découvrait qu'au premier clic refusé.
+        if (CompteStandard())
+        {
+            var compte = _localize("Demarrage.CompteStandard");
+            MessageDemarrage = string.IsNullOrEmpty(MessageDemarrage) ? compte : MessageDemarrage + Environment.NewLine + compte;
+        }
+    }
+
+    /// <summary>Le compte Windows du joueur est-il standard ? Une couture pour les tests.</summary>
+    internal Func<bool> CompteStandard { get; set; } = DrDxt.App.Platform.CompteDuJoueur.Standard;
+
+    /// <summary>Le rejeu du journal du compte (valeurs de la session) ; null dans les tests qui ne le portent pas.</summary>
+    internal Func<Task<(string? Texte, IReadOnlyList<DrDxt.ElevatedHelper.Journal.RapportDuRejeu.Ligne> Lignes)>>? RejeuDuCompte { get; set; }
+
+    /// <summary>Les rapports du rejeu du helper et du service ; null dans les tests qui ne les portent pas.</summary>
+    internal Func<IReadOnlyList<DrDxt.ElevatedHelper.Journal.RapportDuRejeu>>? RapportsDuRejeu { get; set; }
+
+    /// <summary>Un levier gardé qu'un rejeu a rendu (l'App arrêtée avant d'acquitter son origine) n'est plus gardé : il sort de
+    /// la liste signée puis du journal, et c'est dit. Sans relecture branchée, rien n'est supposé.</summary>
+    private async Task SortirLesLeviersRendusAsync(IReadOnlyList<DrDxt.ElevatedHelper.Journal.RapportDuRejeu.Ligne> duCompte)
+    {
+        if (_journalLeviers is not { } journal || VerifierLaPose is not { } relu) return;
+        IReadOnlyList<DrDxt.ElevatedHelper.Journal.RapportDuRejeu.Ligne> lignes;
+        try { lignes = [.. duCompte, .. (RapportsDuRejeu?.Invoke() ?? []).SelectMany(r => r.Lignes)]; }
+        catch (Exception) { lignes = duCompte; }
+        string sid;
+        using (var moi = System.Security.Principal.WindowsIdentity.GetCurrent()) sid = moi.User?.Value ?? string.Empty;
+        var ids = DrDxt.App.Platform.LeviersRendusParLeRejeu.Ids(journal.Lire(), lignes, relu, sid);
+        foreach (var id in ids)
+        {
+            await RetirerDuManifesteAsync(id).ConfigureAwait(true);
+            journal.Retirer(id);
+        }
+        if (ids.Count == 0) return;
+        var texte = string.Format(CultureInfo.CurrentCulture, _localize("Leviers.RendusParLeRejeu"),
+            string.Join(", ", ids.Select(id => _localize(TweakDisplayKeys.TitleKey(id)))));
+        MessageDemarrage = string.IsNullOrEmpty(MessageDemarrage) ? texte : MessageDemarrage + Environment.NewLine + texte;
+        ChargerLeviersPoses();
     }
 
     /// <summary>Le rapport du rejeu du journal d'écriture anticipée ; null dans les tests qui ne le portent pas.</summary>
@@ -467,8 +507,8 @@ public sealed partial class ScanViewModel : ObservableObject
         // Hors du fil d'interface : le revert passe par le canal privilégié. Un refus de rendre la fréquence de la carte
         // AMD se dit ; la remise à l'usine attend le clic du joueur.
         try { phrase = await Task.Run(() => DrDxt.Application.Autopilot.RevertAuDemarrage.Executer(journal, catalogue, out remiseUsine,
-            id => _localize(TweakDisplayKeys.TitleKey(id)), r => RaisonLisible.Dire(r, _localize))).ConfigureAwait(true); }
-        catch (Exception ex) { phrase = Docteur.T("App.VerificationSessionEchec", ex.Message); }
+            id => _localize(TweakDisplayKeys.TitleKey(id)), r => RaisonLisible.Dire(r, _localize), _registreGains, VerifierLaPose)).ConfigureAwait(true); }
+        catch (Exception ex) { phrase = Docteur.T("App.VerificationSessionEchec", RaisonLisible.Dire(ex, _localize)); }
         if (remiseUsine) ProposerRemiseUsine(journal);
         // Pas rendu : l'essai reste au journal (le lancement suivant le retente), et le bouton le rend sur un clic.
         _essaiARendre = !remiseUsine && journal.Lire() is { IsOk: true, Value: not null } ? (journal, catalogue) : null;
@@ -507,9 +547,19 @@ public sealed partial class ScanViewModel : ObservableObject
             OnPropertyChanged(nameof(RemiseUsineProposee));
             return;
         }
+        // Rendu sans remise à l'usine : « annulé » seulement relu à l'origine ; encore posé, le bouton reste.
+        var relu = issue.Message is null ? Relu(snapshot) : DrDxt.Application.Tweaks.EtatApplique.NotApplied;
+        if (relu == DrDxt.Application.Tweaks.EtatApplique.Applied)
+        {
+            MessageDemarrage = string.Format(CultureInfo.CurrentCulture, _localize("Leviers.PasAnnule"), titre, _localize("Leviers.EncorePose"));
+            _essaiARemettreALUsine = journal;
+            OnPropertyChanged(nameof(RemiseUsineProposee));
+            return;
+        }
         // Rendue, l'entrée quitte le journal : le démarrage suivant ne la retente pas.
         journal.Lever();
-        MessageDemarrage = issue.Message ?? string.Format(CultureInfo.CurrentCulture, _localize("Leviers.Annule"), titre);
+        MessageDemarrage = issue.Message ?? string.Format(CultureInfo.CurrentCulture,
+            _localize(relu == DrDxt.Application.Tweaks.EtatApplique.NotApplied ? "Leviers.Annule" : "Leviers.AnnuleNonRelu"), titre);
     }
 
     /// <summary>Posé quand Optimiser a réussi mais que l'écriture du manifeste signé a échoué : les réglages sont
@@ -564,24 +614,34 @@ public sealed partial class ScanViewModel : ObservableObject
 
     // Récit dérivé : rempli pendant le scan, déjà traduit.
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SousTitreAccueil))]
     private string _subtitleText = string.Empty;
 
     // L'en-tête « À faire d'abord » reprend ce compte ; calculé une seule fois, avant
     // que la santé soit chargée, il affichait « les 1 points » sous « 13 points à corriger ». Il suit maintenant le résumé.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LabelAFaire))]
+    [NotifyPropertyChangedFor(nameof(TitreAccueil))]
     private string _problemSummary = string.Empty;
+
+    /// <summary>Le titre de l'accueil : l'état de l'analyse, pas l'inventaire de ce qui ne va pas. Le nombre vit dans le
+    /// dépliant des points (<see cref="LabelAFaire"/>), le plus grave en tête. Une analyse partielle (perf en jeu pas encore
+    /// mesurée, le cas d'un premier scan) a abouti ; seul un échec garde son résumé.</summary>
+    public string TitreAccueil => ScanPretAAgir ? _localize("Accueil.Titre") : ProblemSummary;
+
+    /// <summary>Sous le titre : rien après une analyse qui a abouti (« joue une partie, puis relance » était un conseil, pas
+    /// un état) ; ce qui manque, après un échec.</summary>
+    public string SousTitreAccueil => ScanPretAAgir ? string.Empty : SubtitleText;
 
     [ObservableProperty]
     private string _assistantSummary = string.Empty;
 
     public bool IsScanning => State == ScanState.Scanning;
-    public bool CanScan => State != ScanState.Scanning;
+    public bool CanScan => !OperationLongueEnCours;
 
     /// <summary>Optimiser est offert des qu'un scan a produit des resultats (Done / AlreadyOptimal /
     /// Degraded). Il juge d'abord ce qu'il y a a tenter, et le dit quand il n'y a rien.</summary>
-    public bool CanApply =>
-        State is ScanState.Done or ScanState.AlreadyOptimal or ScanState.Degraded;
+    public bool CanApply => ScanPretAAgir && !OperationLongueEnCours;
 
     /// <summary>Ce que l'infobulle du bouton « Appliquer » dit, selon qu'il peut agir ou non.
     /// <para>
@@ -592,7 +652,8 @@ public sealed partial class ScanViewModel : ObservableObject
     /// </para></summary>
     // L'info-bulle
     // n'était jamais recalculée après le scan. Elle suit l'état, et dit quand il n'y a rien à poser.
-    public string ApplyHintKey => !CanApply ? "scan.apply.needs_scan" : RienAPoserDuTout ? "Apply.RienAPoserSeul" : "scan.apply.ready";
+    public string ApplyHintKey => !ScanPretAAgir ? "scan.apply.needs_scan" : OperationLongueEnCours ? "UI.OperationEnCours"
+        : RienAPoserDuTout ? "Apply.RienAPoserSeul" : "scan.apply.ready";
 
     /// <summary>Le texte deja traduit. `ScanView` ne declare pas le convertisseur `Loc`
     /// (il n'est declare que dans `MainWindow.xaml`) : lier une cle ici aurait leve au rendu, et
@@ -766,7 +827,6 @@ public sealed partial class ScanViewModel : ObservableObject
 
     public ObservableCollection<FindingViewModel> Findings { get; } = new();
     public ObservableCollection<ComponentItem> Components { get; } = new();
-    public ObservableCollection<FeatureItem> Features { get; }
 
     /// <summary>Les recommandations du profil de la puce pour la machine scannée : chacune porte
     /// sa GainEvidence honnête (affirmation et source) et un drapeau
@@ -879,12 +939,22 @@ public sealed partial class ScanViewModel : ObservableObject
     {
         PopulateComponents(hw: null);
 
-        var hwResult = await Task.Run(async () => await _detector.DetectAsync()).ConfigureAwait(true);
-        if (State == ScanState.Idle && hwResult.IsOk && hwResult.Value is { } hw)
-            PopulateComponents(hw);
+        // Lancée sans attente : une détection qui lève laisse les composants « — » (non lus), et l'exception est observée.
+        var stockage = LireStockageAsync();
+        try
+        {
+            var hwResult = await Task.Run(async () => await _detector.DetectAsync()).ConfigureAwait(true);
+            await stockage.ConfigureAwait(true);
+            if (State == ScanState.Idle) PopulateComponents(hwResult.IsOk ? hwResult.Value : null);
+        }
+        catch (Exception)
+        {
+            await stockage.ConfigureAwait(true);
+            if (State == ScanState.Idle) PopulateComponents(hw: null);
+        }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanScan))]
     private async Task ScanAsync()
     {
         // Les sondes du scan parlent a WMI, au registre, a des pilotes et a des
@@ -922,7 +992,9 @@ public sealed partial class ScanViewModel : ObservableObject
         PolesLus = 0;
 
         Etape(1, "Scan.Etape.Materiel");
+        var stockage = LireStockageAsync();
         var hwResult = await _detector.DetectAsync();
+        await stockage;
         if (!hwResult.IsOk)
         {
             ErrorMessage = _localize("Scan.Error.Detection");
@@ -1051,11 +1123,16 @@ public sealed partial class ScanViewModel : ObservableObject
         State = ScanState.Scanning;
         Findings.Clear();
         ProvenProblemCount = 0;
+        // Le verdict du scan précédent ne reste pas au-dessus d'un scan qui échoue.
+        ProblemSummary = string.Empty;
+        SubtitleText = string.Empty;
+        DateDuScan = null;
         ErrorMessage = null;
         GatingNote = null;
         DegradedNote = null;
         ApplyBlockedMessage = null;
         MoatUnarmedMessage = null;
+        ResultatOptimisation = null;
         AvgFpsDisplay = Dash;
         P1LowDisplay = Dash;
         MarginDisplay = Dash;
@@ -1276,9 +1353,13 @@ public sealed partial class ScanViewModel : ObservableObject
                 : string.Format(System.Globalization.CultureInfo.CurrentCulture,
                     _localize("Scan.Degraded.JeuQuitte"), DureeCaptureEnJeu.TotalSeconds);
         else if (degraded)
-            DegradedNote = _localize(jeuReduit && _gamePid == 0
-                ? "Scan.Degraded.JeuReduit"
-                : CleDeCouvertureManquante(benchResult.Error!.Value.Code));
+            // La réparation du service déjà refusée dans la session se dit telle quelle : la phrase générique du service
+            // ferait chercher une panne alors qu'il suffit de relancer DrDXT.
+            DegradedNote = benchResult.Error is { Code: ErrorCodes.PmonUnavailable } e && e.Message == Docteur.T("SH.DejaRefusee")
+                ? e.Message
+                : _localize(jeuReduit && _gamePid == 0
+                    ? "Scan.Degraded.JeuReduit"
+                    : CleDeCouvertureManquante(benchResult.Error!.Value.Code));
 
         BenchmarkResult? baseline = benchResult.IsOk && !jeuQuitte ? benchResult.Value! with { ProcessusMesure = exeObserve } : null;
         return (baseline, degraded);
@@ -1374,14 +1455,7 @@ public sealed partial class ScanViewModel : ObservableObject
         // catalogue et 2 reglages GPU fermes par decision, qui ne seront jamais ecrits.
         foreach (var item in _consumption.Items.Where(i => i.InExecutedPlan
                      || (i.Applicable && i.Intent == DrDxt.Profiles.ProfileIntent.GpuTune)))
-            // Pose ici l'aperçu non technique de la catégorie pour la vue verrouillée (gratuite), là où
-            // vit la traduction (le consumer est pur, sans i18n). La version gratuite montre la catégorie,
-            // jamais le comment.
-            Recommendations.Add(item with
-            {
-                CategoryLabel = string.Format(
-                    _localize("Scan.Recommendation.Tease"), _localize(RecommendationCategoryKey(item.Intent))),
-            });
+            Recommendations.Add(item);
         return st;
     }
 

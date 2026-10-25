@@ -100,11 +100,23 @@ public sealed class Win32RegistryActions(Func<RegistryHiveKind, TraceDesCoupures
             if (key is null)
                 return Fail("Could not open the StartupApproved key.");
             var octets = SetStartupApprovalOp.Octets(actif, DateTime.UtcNow);
+            var trace = traces?.Invoke(hive);
+            // Couper : l'origine se lit juste avant d'écrire, et se note avec la coupure (vide si la valeur n'existait pas).
+            // Réactiver : l'origine notée revient telle quelle, ou la valeur part si elle n'existait pas ; une trace sans
+            // origine (écrite avant qu'on la note) se rend « actif », l'effet est le même pour Windows.
+            var origine = actif ? null : key.GetValue(nom) is byte[] avant ? Convert.ToHexString(avant) : "";
+            var notee = actif ? trace?.Lire().FirstOrDefault(c => string.Equals(c.Liste, liste, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(c.Nom, nom, StringComparison.OrdinalIgnoreCase))?.Origine : null;
             // Une coupure est notée avant d'être écrite : l'App tuée juste après sait encore la réactiver.
-            return TraceDesCoupures.Autour(traces?.Invoke(hive), new CoupureDuDemarrage(hive, liste, nom, Convert.ToHexString(octets)), actif,
+            return TraceDesCoupures.Autour(trace, new CoupureDuDemarrage(hive, liste, nom, Convert.ToHexString(octets), origine), actif,
                 () =>
                 {
-                    try { key.SetValue(nom, octets, RegistryValueKind.Binary); return Result.Ok(); }
+                    try
+                    {
+                        if (notee is "") key.DeleteValue(nom, throwOnMissingValue: false);
+                        else key.SetValue(nom, notee is { Length: > 0 } hex ? Convert.FromHexString(hex) : octets, RegistryValueKind.Binary);
+                        return Result.Ok();
+                    }
                     catch (Exception ex) { return Fail($"Startup approval write failed: {ex.GetType().Name}."); }
                 });
         }
@@ -117,6 +129,20 @@ public sealed class Win32RegistryActions(Func<RegistryHiveKind, TraceDesCoupures
         {
             using var k = racine.OpenSubKey(run);
             return k?.GetValue(nom) is not null;
+        }
+    }
+
+    /// <summary>Les octets sous StartupApproved pour ce programme ; null : absents ou illisibles.</summary>
+    public static byte[]? LireApprobation(CoupureDuDemarrage c)
+    {
+        try
+        {
+            using var key = OpenRoot(c.Ruche).OpenSubKey(Approuve + c.Liste);
+            return key?.GetValue(c.Nom) as byte[];
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or ArgumentException)
+        {
+            return null;
         }
     }
 

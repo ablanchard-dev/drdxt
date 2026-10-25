@@ -119,6 +119,11 @@ public interface INvApiTuningActions
     /// Indisponible / pas de NVIDIA → Fail(HELPER.OP_FAILED). Ne lève jamais.</summary>
     Result<int> GetCoreClockOffsetMhz(int gpuIndex);
 
+    /// <summary>Lit le décalage d'horloge mémoire appliqué (MHz) d'un GPU, pour comparer le champ mémoire d'une op à la
+    /// carte ; jamais écrit. Non branché → Fail(HELPER.OP_FAILED). Ne lève jamais.</summary>
+    Result<int> GetMemoryClockOffsetMhz(int gpuIndex) =>
+        Result<int>.Fail(ErrorCodes.HelperOpFailed, "Memory clock offset read is not wired in this executor.");
+
     /// <summary>Lit la limite de puissance appliquée (% du TDP) d'un GPU.
     /// Indisponible / pas de NVIDIA → Fail(HELPER.OP_FAILED). Ne lève jamais.</summary>
     Result<int> GetPowerLimitPercent(int gpuIndex);

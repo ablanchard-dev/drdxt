@@ -7,8 +7,8 @@ public enum TypeMemoireAmd { Ddr4, Ddr5 }
 public sealed record TimingsCanal(int Canal, int DebitMts, int Cl, int Rcd, int Rp, int Ras, int Rc, int Rfc,
     bool Commande2T, bool GearDown, bool PowerDown);
 
-/// <summary>Les canaux actifs lus. <paramref name="DispositionVerifiee"/> est faux en DDR5 : la disposition des registres
-/// n'a été confrontée à aucune lecture de référence.</summary>
+/// <summary>Les canaux actifs lus. <paramref name="DispositionVerifiee"/> reste faux tant qu'une disposition des registres
+/// n'a été confrontée à aucune lecture de référence sur une machine AMD réelle, en DDR4 comme en DDR5.</summary>
 public sealed record TimingsMemoire(TypeMemoireAmd Type, IReadOnlyList<TimingsCanal> Canaux, bool DispositionVerifiee);
 
 /// <summary>
@@ -89,22 +89,28 @@ public static class TimingsMemoireAmd
 
     private static bool Bit(uint x, int i) => ((x >> i) & 1) == 1;
 
-    /// <summary>Pur : tous les canaux actifs, ou null dès qu'un seul ne se décode pas (jamais une lecture partielle).</summary>
+    /// <summary>Pur : des canaux contigus à partir de 0 (canal A, B…).</summary>
     public static TimingsMemoire? Decoder(TypeMemoireAmd type, IReadOnlyList<IReadOnlyDictionary<uint, uint>> canaux)
+        => Decoder(type, canaux.Select((r, i) => (i, r)).ToList());
+
+    /// <summary>Pur : tous les canaux actifs, chacun sous son numéro physique, ou null dès qu'un seul ne se décode pas (jamais
+    /// une lecture partielle). Un canal vide sauté laisse sa lettre : le canal 1 seul se dit B, pas A.</summary>
+    public static TimingsMemoire? Decoder(TypeMemoireAmd type, IReadOnlyList<(int Canal, IReadOnlyDictionary<uint, uint> Registres)> canaux)
     {
         if (canaux.Count == 0) return null;
         var lus = new List<TimingsCanal>();
-        for (var i = 0; i < canaux.Count; i++)
+        foreach (var (canal, registres) in canaux)
         {
-            if (DecoderCanal(i, type, canaux[i]) is not { } c) return null;
+            if (DecoderCanal(canal, type, registres) is not { } c) return null;
             lus.Add(c);
         }
-        return new TimingsMemoire(type, lus, DispositionVerifiee: type == TypeMemoireAmd.Ddr4);
+        // DDR4 et DDR5 viennent de la même compilation communautaire, jamais confrontée à une lecture de référence.
+        return new TimingsMemoire(type, lus, DispositionVerifiee: false);
     }
 
     /// <summary>Pur : le constat sur une machine AMD reconnue. <paramref name="canaux"/> null = registres non lus.</summary>
     public static IEnumerable<RepairFinding> Juger(GenerationAmd.Ligne? generation, IReadOnlyList<int> typesSmbios,
-        IReadOnlyList<IReadOnlyDictionary<uint, uint>>? canaux)
+        IReadOnlyList<(int Canal, IReadOnlyDictionary<uint, uint> Registres)>? canaux)
     {
         if (generation is null) yield break;
         if (Type(typesSmbios) is not { } type)
@@ -122,6 +128,6 @@ public static class TimingsMemoireAmd
             $"{(char)('A' + c.Canal)} {c.DebitMts} MT/s {c.Cl}-{c.Rcd}-{c.Rp}-{c.Ras} tRC {c.Rc} tRFC {c.Rfc} {(c.Commande2T ? "2T" : "1T")}"
             + $" GDM {(c.GearDown ? "on" : "off")} PD {(c.PowerDown ? "on" : "off")}"));
         yield return new RepairFinding("RAM", "timings appliques", lignes, null, RepairStatus.Observed,
-            Docteur.T(t.DispositionVerifiee ? "TMA.Lus" : "TMA.LusDdr5NonVerifiee", lignes));
+            Docteur.T(t.DispositionVerifiee ? "TMA.Lus" : "TMA.LusNonVerifiee", lignes));
     }
 }

@@ -44,6 +44,21 @@ public sealed class PartiesMemoriseesTests : IDisposable
         ecrit.RootElement.EnumerateArray().Select(e => e.ValueKind).Should().Equal(System.Text.Json.JsonValueKind.Object);
     }
 
+    // Une partie non écrite sur le disque serait perdue au relancement : l'ajout le dit, la liste la porte quand même.
+    [Fact]
+    public void Une_partie_non_ecrite_se_dit()
+    {
+        var fichier = Path.Combine(_dossier, "pas-un-dossier");
+        File.WriteAllText(fichier, "");
+        var memoire = new PartiesMemorisees(Path.Combine(_dossier, "choix.json"), Path.Combine(fichier, "parties.json"));
+
+        var ajout = memoire.Ajouter(P(120));
+
+        ajout.Ecrite.IsOk.Should().BeFalse();
+        ajout.Liste.Should().ContainSingle();
+        Memoire().Ajouter(P(120)).Ecrite.IsOk.Should().BeTrue("témoin : un dossier écrivable");
+    }
+
     [Fact]
     public void Un_fichier_abime_ne_donne_aucune_partie_et_n_allume_rien()
     {
@@ -70,5 +85,34 @@ public sealed class PartiesMemoriseesTests : IDisposable
         Memoire().DernierEchec().Should().Be(new PartiesMemorisees.EchecDeCapture(quand, "cod.exe : service refusé"));
         File.WriteAllText(Path.Combine(_dossier, "releve-echec.json"), "{abîmé");
         Memoire().DernierEchec().Should().BeNull();
+    }
+
+    // Une liste abîmée (zéros après une coupure) n'est pas écrasée : mise de côté, sa trace reste.
+    [Fact]
+    public void Une_liste_abimee_est_mise_de_cote_avant_le_prochain_ajout()
+    {
+        var chemin = Path.Combine(_dossier, "parties.json");
+        File.WriteAllBytes(chemin, new byte[64]);
+
+        Memoire().Ajouter(P(140)).Ecrite.IsOk.Should().BeTrue();
+
+        Directory.GetFiles(_dossier, "parties.json.mis-de-cote-*").Should().ContainSingle();
+        Memoire().Lire().Should().ContainSingle();
+    }
+
+    // Les parties se relisent des mois plus tard : le goulot s'écrit par son nom, qui ne bouge pas quand l'énumération
+    // grandit. Les parties écrites en entiers se relisent encore.
+    [Fact]
+    public void Le_goulot_s_ecrit_par_son_nom_et_l_ancien_entier_se_relit()
+    {
+        Memoire().Ajouter(P(120) with { Goulot = BottleneckState.CpuBoundStrong });
+        var fichier = Path.Combine(_dossier, "parties.json");
+
+        File.ReadAllText(fichier).Should().Contain("\"Goulot\":\"CpuBoundStrong\"");
+
+        // 4 : l'entier qu'écrivaient les anciennes versions, en dur ; recalculé depuis l'énumération, il suivrait un
+        // réordonnancement et ne protégerait plus les vieux fichiers.
+        File.WriteAllText(fichier, File.ReadAllText(fichier).Replace("\"Goulot\":\"CpuBoundStrong\"", "\"Goulot\":4"));
+        Memoire().Lire().Single().Goulot.Should().Be(BottleneckState.CpuBoundStrong);
     }
 }

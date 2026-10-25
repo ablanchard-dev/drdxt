@@ -71,8 +71,11 @@ public class NvApiLatencyReaderTests
     {
         public uint? Value { get; set; }
         public bool Fail { get; set; }
+        // La valeur ne répond qu'à la clé NVTweak de NVIDIA : une lecture ailleurs rend « absente ».
         public Result<uint?> ReadDword(RegistryHiveKind hive, string path, string name) =>
-            Fail ? Result<uint?>.Fail(ErrorCodes.TweakSdkUnavailable, "x") : Result<uint?>.Ok(Value);
+            Fail ? Result<uint?>.Fail(ErrorCodes.TweakSdkUnavailable, "x")
+            : Result<uint?>.Ok(hive == RegistryHiveKind.LocalMachine && path == @"SOFTWARE\NVIDIA Corporation\Global\NVTweak"
+                               && name == "LowLatencyMode" ? Value : null);
         public Result<string?> ReadString(RegistryHiveKind hive, string path, string name) =>
             Result<string?>.Ok(null);
 

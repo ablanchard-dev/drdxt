@@ -6,7 +6,8 @@ namespace DrDxt.Application.Parties;
 /// allume l'alternance pour un seul levier ; DrDXT le pose en blocs A-B-B-A. Chaque partie relevée porte l'état de l'essai
 /// (<see cref="PartieRelevee.Essai"/> = « id:on » ou « id:off ») ; le juge compare les parties « avec » et « sans » du
 /// même jeu, à la même règle que les changements (séparation nette, <see cref="ComparaisonDesParties.PartiesMinimum"/>
-/// de chaque côté). Tranché, l'alternance s'arrête sur le meilleur état ; « pas de différence » rend l'état d'origine.
+/// de chaque côté). Tranché, l'alternance s'arrête sur le meilleur état : « mieux » garde le levier, « pire » le retire même
+/// s'il était posé à l'origine, « pas de différence » ou « non concluant » rend l'état d'origine.
 /// Ce type ne touche rien : il dit l'état de la prochaine partie, l'appelant pose ou rend le levier.
 ///
 /// Les parties suivent des blocs A-B-B-A (avec, sans, sans, avec…) : une dérive au fil des parties (chaleur, mise à jour,
@@ -40,8 +41,8 @@ public static class AlternanceDesEssais
         if (!surLaLatence)
         {
             var estimateur = ComparaisonDesParties.EstimateurMajoritaire([.. pAvec, .. pSans]);
-            pAvec = pAvec.Where(p => p.Low1SurToutesLesImages == estimateur).ToList();
-            pSans = pSans.Where(p => p.Low1SurToutesLesImages == estimateur).ToList();
+            pAvec = pAvec.Where(p => ComparaisonDesParties.Estimateur(p) == estimateur).ToList();
+            pSans = pSans.Where(p => ComparaisonDesParties.Estimateur(p) == estimateur).ToList();
         }
         // Le test à blanc demande deux moitiés de « sans » de PartiesMinimum chacune.
         if (pAvec.Count < ComparaisonDesParties.PartiesMinimum || pSans.Count < 2 * ComparaisonDesParties.PartiesMinimum)
@@ -73,7 +74,8 @@ public static class AlternanceDesEssais
 
     /// <summary>Ce que la prochaine partie doit avoir : posé ou non, et si l'alternance est finie. Pas encore tranché :
     /// le rang suivant des blocs A-B-B-A (la première partie après l'allumage l'a avec). Tranché : « mieux » garde le levier,
-    /// sinon (pas de différence, pire, non concluant) l'état d'origine revient.</summary>
+    /// « pire » le retire (mesuré pire, il ne reste pas, même posé à l'origine), « pas de différence » ou « non concluant »
+    /// rend l'état d'origine.</summary>
     public static (bool Pose, bool Fini, VerdictEnJeu Verdict) Suivante(IReadOnlyList<PartieRelevee> parties, string levierId,
         bool poseALOrigine, DateTimeOffset? depuis = null)
     {
@@ -81,7 +83,11 @@ public static class AlternanceDesEssais
         var verdict = Juger(parties, levierId);
         if (verdict != VerdictEnJeu.PasEncoreJuge)
             return (verdict == VerdictEnJeu.Mieux || (verdict is VerdictEnJeu.PasDeDifference or VerdictEnJeu.NonConcluant && poseALOrigine), true, verdict);
-        var jouees = parties.Count(p => p.Essai is { } e && e.StartsWith(levierId + ":", StringComparison.Ordinal));
+        // Le rang se compte sur le jeu le plus joué de l'essai, celui qui sera jugé : une partie d'un autre jeu ne décale pas
+        // ses blocs A-B-B-A.
+        var essai = parties.Where(p => p.Essai is { } e && e.StartsWith(levierId + ":", StringComparison.Ordinal)).ToList();
+        var jeu = essai.GroupBy(p => p.Jeu, StringComparer.OrdinalIgnoreCase).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
+        var jouees = essai.Count(p => string.Equals(p.Jeu, jeu, StringComparison.OrdinalIgnoreCase));
         return (PoseAuRang(jouees), false, verdict);
     }
 }

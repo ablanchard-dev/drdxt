@@ -161,7 +161,7 @@ public sealed class OpAllowlist
         new HashSet<string>(StringComparer.Ordinal) { "CpuSetup" };
 
     /// <summary>GUID du magasin des valeurs d'usine d'AMI, nommé AmiStandardDefaultsVariable par la liste de GUID de
-    /// UEFITool (github.com/LongSoft/UEFITool, common/guids.csv) ; relu le 17/10/2026 sur la machine de référence
+    /// UEFITool (github.com/LongSoft/UEFITool, common/guids.csv) ; relevé le 17/10/2026 sur la machine de référence
     /// (« StdDefaults », 11 356 octets). Lu pour dire quels réglages ne sont plus à leur valeur d'usine.</summary>
     public const string AmiStandardDefaultsGuid = GuidsUefi.AmiStandardDefaults;
     private static readonly IReadOnlySet<string> ReadableDefaultsVariables =
@@ -223,7 +223,7 @@ public sealed class OpAllowlist
             // l'autorisation tient dans cette borne. Ce n'est pas décoratif : un délai sans borne laisse un
             // appelant garer un redémarrage loin dans le futur, vécu comme un redémarrage spontané sans
             // cause visible, et un redémarrage que l'utilisateur ne relie à aucun geste est exactement ce
-            // qui détruit la confiance dans un outil payant.
+            // qui détruit la confiance dans l'outil.
             RebootToFirmwareSetupOp r =>
                 r.DelaySeconds is >= MinFirmwareRebootDelaySeconds and <= MaxFirmwareRebootDelaySeconds
                     ? Result.Ok()
@@ -644,6 +644,8 @@ public sealed class OpAllowlist
             return Deny("Negative GPU index.");
         if (f.Points is null || f.Points.Count == 0)
             return Deny("Fan curve has no points.");
+        if (f.Points.Any(p => p is null))
+            return Deny("Fan curve has a null point.");
         foreach (var p in f.Points)
         {
             if (p.TempC is < 0 or > 120)
@@ -762,7 +764,7 @@ public sealed class OpAllowlist
 
         foreach (var t in c.RevertOnly)
         {
-            if (CatalogueDeCandidats.Decrire(t.TweakId) is null)
+            if (CatalogueDeCandidats.Decrire(t.TweakId) is null && !GardeHorsCatalogue(t.TweakId))
                 return Deny($"'{t.TweakId}' is not a known lever.");
             var origine = ValiderOrigine(t);
             if (!origine.IsOk) return origine;
@@ -770,6 +772,12 @@ public sealed class OpAllowlist
 
         return Result.Ok();
     }
+
+    // Deux réglages gardés qui ne sont pas des candidats de l'autopilote, mais que la désinstallation doit rendre : le repos de
+    // la carte une fois prouvé, et un geste DLSS (préfixe suivi du jeu). Leur origine se valide comme les autres. Un paquet de
+    // pilote retiré n'entre pas : sa remise n'est pas une op de retour, elle se fait depuis l'App.
+    private static bool GardeHorsCatalogue(string id)
+        => id == "gpu.repos_global_normal" || id.StartsWith("geste.dlss|", StringComparison.Ordinal);
 
     private static Result ValiderFormeDEntree(AppliedTweak t)
     {
@@ -863,7 +871,7 @@ public sealed class OpAllowlist
     // « ...\bam » ne corresponde pas à « ...\bamboo »). La comparaison ignore la casse.
     private static bool IsUnderSubtree(string path, string subtree)
     {
-        if (string.Equals(path, subtree, StringComparison.Ordinal))
+        if (string.Equals(path, subtree, StringComparison.OrdinalIgnoreCase))
             return true;
         return path.StartsWith(subtree + "\\", StringComparison.OrdinalIgnoreCase);
     }

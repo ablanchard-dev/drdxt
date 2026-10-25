@@ -50,12 +50,29 @@ public sealed class TubeUsurpeTests
     // tournant sous le meme compte peut en creer un. Il ne sait rien faire — il dit oui.
     // Il tolere d'etre lache en cours de route : c'est exactement ce que fait un client
     // qui refuse la session avant de parler.
-    private static async Task SquatterAsync(string tube, List<TypedPrivilegedRequest> recues, CancellationToken ct)
+    // commeLeHelper : le tube porte l'ACL et le proprietaire du vrai helper (PipeSecurityFactory) ; sinon, celui d'un
+    // squatteur ordinaire, a son propre compte.
+    // Le propriétaire par défaut d'un tube dépend du jeton (le compte, ou les Administrateurs selon le processus qui lance les
+    // tests) : celui du squatteur est fixé au compte, le cas qu'un programme non élevé produit toujours.
+    private static System.IO.Pipes.PipeSecurity AuCompte()
+    {
+        var moi = System.Security.Principal.WindowsIdentity.GetCurrent().User!;
+        var s = new System.IO.Pipes.PipeSecurity();
+        s.SetOwner(moi);
+        s.AddAccessRule(new System.IO.Pipes.PipeAccessRule(moi, System.IO.Pipes.PipeAccessRights.FullControl,
+            System.Security.AccessControl.AccessControlType.Allow));
+        return s;
+    }
+
+    private static async Task SquatterAsync(string tube, List<TypedPrivilegedRequest> recues, CancellationToken ct, bool commeLeHelper)
     {
         try
         {
-            using var serveur = new NamedPipeServerStream(
-                tube, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            using var serveur = commeLeHelper
+                ? NamedPipeServerStreamAcl.Create(tube, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
+                    0, 0, PipeSecurityFactory.CreateRestrictiveSecurity())
+                : NamedPipeServerStreamAcl.Create(tube, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
+                    0, 0, AuCompte());
             await serveur.WaitForConnectionAsync(ct);
 
             // 1. Avaler le hello et repondre une cle de session de la bonne taille. Le squatteur
@@ -83,12 +100,12 @@ public sealed class TubeUsurpeTests
     }
 
     private static async Task<(Result Resultat, List<TypedPrivilegedRequest> Recues)> JouerUnOpAsync(
-        string? cheminAttendu)
+        string? cheminAttendu, bool commeLeHelper = true)
     {
         var tube = TubeUnique();
         var recues = new List<TypedPrivilegedRequest>();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        var squatteur = SquatterAsync(tube, recues, cts.Token);
+        var squatteur = SquatterAsync(tube, recues, cts.Token, commeLeHelper);
 
         var app = new HandshakingElevatedClient(tube, cheminAttendu);
         var resultat = await app.ExecuteAsync(
@@ -108,6 +125,19 @@ public sealed class TubeUsurpeTests
             "sans ce temoin, une garde qui refuserait TOUT rendrait les refus ci-dessous verts "
             + "sans qu'aucun canal privilegie ne soit plus jamais possible");
         recues.Should().ContainSingle("le canal legitime va bien jusqu'a l'op signee");
+    }
+
+    // --- REFUS : la bonne image, mais un tube au nom du compte (le vrai helper relance non eleve, ou un squatteur qui
+    // passerait la garde d'image) → refus nomme, et rien ne fuit. ---
+    [Fact]
+    public async Task Un_serveur_a_la_bonne_image_mais_au_tube_d_un_compte_ordinaire_est_refuse()
+    {
+        var (resultat, recues) = await JouerUnOpAsync(CeProcessus(), commeLeHelper: false);
+
+        resultat.IsOk.Should().BeFalse();
+        resultat.Error!.Value.Code.Should().Be(ErrorCodes.ElevationDenied);
+        resultat.Error.Value.Message.Should().Contain("not by Administrators or SYSTEM");
+        recues.Should().BeEmpty("le refus tombe avant le handshake");
     }
 
     // --- REFUS : meme serveur, autre image attendue → refus nomme, et rien ne fuit. ---

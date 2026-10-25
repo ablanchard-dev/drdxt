@@ -66,7 +66,39 @@ public class HardwareDetectorTests
         wmi.Query(Arg.Is<string>(s => s.Contains("Win32_Processor")))
            .Returns(Result<IReadOnlyList<WmiRow>>.Fail(ErrorCodes.WmiFail, "x"));
         var r = await BuildSut(wmi).DetectAsync();
-        r.IsOk.Should().BeFalse(); // jamais un inventaire à moitié rempli
+        // Sans processeur, carte graphique ou carte mère, il n'y a pas d'inventaire : jamais un inventaire à moitié rempli sur
+        // ces trois-là (la mémoire et le châssis, eux, se disent non lus).
+        r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.WmiFail);
+    }
+
+    // Une lecture WMI manquée sur la mémoire ou le châssis (winmgmt lent au moment du scan) ne fait plus tomber tout le scan :
+    // ces deux lectures ont déjà leur « non lu » honnête dans l'inventaire (aucune barrette, châssis inconnu), que le reste du
+    // produit sait dire. Le processeur et la carte mère restent indispensables.
+    [Fact]
+    public async Task Memoire_non_lue_l_inventaire_reste_sans_barrette()
+    {
+        var wmi = FullWmi();
+        wmi.Query(Arg.Is<string>(s => s.Contains("Win32_PhysicalMemory")))
+           .Returns(Result<IReadOnlyList<WmiRow>>.Fail(ErrorCodes.WmiFail, "délai"));
+
+        var r = await BuildSut(wmi).DetectAsync();
+
+        r.IsOk.Should().BeTrue();
+        r.Value!.Memory.Should().BeEmpty();
+        r.Value.Cpu.Model.Should().Be("AMD Ryzen 7 7800X3D", "témoin : le reste est lu");
+    }
+
+    [Fact]
+    public async Task Chassis_non_lu_l_inventaire_dit_chassis_inconnu()
+    {
+        var wmi = FullWmi();
+        wmi.Query(Arg.Is<string>(s => s.Contains("Win32_SystemEnclosure")))
+           .Returns(Result<IReadOnlyList<WmiRow>>.Fail(ErrorCodes.WmiFail, "délai"));
+
+        var r = await BuildSut(wmi).DetectAsync();
+
+        r.IsOk.Should().BeTrue();
+        r.Value!.Chassis.Should().Be(ChassisType.Unknown);
     }
 }

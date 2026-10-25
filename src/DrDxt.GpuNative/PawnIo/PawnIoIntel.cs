@@ -111,7 +111,7 @@ public static class PawnIoIntel
     public const uint MsrBoiteOc = 0x150;
 
     /// <summary>Un échange avec la boîte aux lettres OC (MSR 0x150) : la commande écrite, puis la réponse relue dès
-    /// que le bit 63 (occupé) retombe, 50 ms au plus ; null sur toute panne. Appelé par le seul helper élevé, qui borne les
+    /// que le bit 63 (occupé) retombe, en 50 relectures espacées d'au moins 1 ms ; null sur toute panne. Appelé par le seul helper élevé, qui borne les
     /// commandes (lecture 0x10, écriture 0x11 du décalage de tension).</summary>
     public static ulong? EchangerBoiteOc(ulong commande)
     {

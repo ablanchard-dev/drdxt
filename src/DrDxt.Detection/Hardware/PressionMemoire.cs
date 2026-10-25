@@ -24,18 +24,18 @@ public static class PressionMemoire
     /// « Win32_PerfRawData_PerfOS_Memory », PERF_COUNTER_COUNTER). <c>null</c> = non lu.</summary>
     public static double? LecturesDuresParSeconde(TimeSpan ecart)
     {
-        static (ulong N, ulong T, ulong F)? Releve()
+        static (ulong N, ulong T, ulong F)? Releve() => LectureWmiBornee.Lire<(ulong N, ulong T, ulong F)?>(() =>
         {
             using var s = new System.Management.ManagementObjectSearcher(
                 "SELECT PageReadsPersec, Timestamp_PerfTime, Frequency_PerfTime FROM Win32_PerfRawData_PerfOS_Memory");
             using var rangees = s.Get();
             foreach (var o in rangees.Cast<System.Management.ManagementObject>())
                 using (o)
-                    return (Convert.ToUInt64(o["PageReadsPersec"], System.Globalization.CultureInfo.InvariantCulture),
-                        Convert.ToUInt64(o["Timestamp_PerfTime"], System.Globalization.CultureInfo.InvariantCulture),
-                        Convert.ToUInt64(o["Frequency_PerfTime"], System.Globalization.CultureInfo.InvariantCulture));
+                    return (LectureWmiBornee.Compteur(o["PageReadsPersec"]),
+                        LectureWmiBornee.Compteur(o["Timestamp_PerfTime"]),
+                        LectureWmiBornee.Compteur(o["Frequency_PerfTime"]));
             return null;
-        }
+        }, () => null);
         try
         {
             if (Releve() is not { } a) return null;

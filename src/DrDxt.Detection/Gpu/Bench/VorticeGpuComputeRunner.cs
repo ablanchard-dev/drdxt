@@ -21,8 +21,8 @@ namespace DrDxt.Detection.Gpu.Bench;
 // Ne lève jamais à travers la couture : chaque échec rend un Result.Fail propre ou un résultat
 // GpuDeviceStatus.Error / DeviceLost.
 //
-// Pas de test unitaire (pas de GPU en CI) : couvert par un smoke test réel (tools/r2bench),
-// comme la colonne PresentMon. À garder fin ; la logique testable vit dans Application.
+// Sans GPU en CI, seuls le choix de la carte et la boucle de charge (Charger) ont des tests unitaires ;
+// la charge réelle n'en a pas. À garder fin ; la logique testable vit dans Application.
 // -----------------------------------------------------------------------
 public sealed class VorticeGpuComputeRunner : IGpuComputeRunner
 {
@@ -53,6 +53,12 @@ public sealed class VorticeGpuComputeRunner : IGpuComputeRunner
         }
     }
 
+    /// <summary>Plus d'une carte dédiée (la règle du produit, mémoire et nom) : rien ne relie l'index de la carte réglée
+    /// (NVAPI, ADLX) à l'adaptateur « haute performance » que charge le banc, qui ne sait donc pas laquelle il juge.</summary>
+    internal static bool PlusieursCartesDediees(IReadOnlyList<DxgiAdapter> cartes)
+        => cartes.Count(c => CartesGraphiques.EstDediee(
+            new GpuInfo(c.Description, GpuDetector.VendorName(c.VendorId), c.DedicatedVramBytes, "", TriState.Unknown))) > 1;
+
     private static IDXGIAdapter1? AdaptateurHautePerformance()
     {
         try
@@ -65,6 +71,10 @@ public sealed class VorticeGpuComputeRunner : IGpuComputeRunner
 
     private static Result<GpuComputeOutcome> RunCore(GpuWorkloadSpec spec, TimeSpan duration, CancellationToken ct)
     {
+        // Pas de verdict sur une carte peut-être jamais chargée : le banc rend « non concluant », jamais « stable ».
+        if (new VorticeDxgiProvider().EnumerateAdapters() is { IsOk: true, Value: { } cartes } && PlusieursCartesDediees(cartes))
+            return Result<GpuComputeOutcome>.Fail(ErrorCodes.TweakSdkUnavailable,
+                "Several dedicated graphics cards: the one the bench loads is not known, no stability verdict.");
         var bytecode = LoadShaderBytecode();
         if (bytecode is null)
             return Result<GpuComputeOutcome>.Fail(ErrorCodes.TweakSdkUnavailable,
@@ -144,15 +154,11 @@ public sealed class VorticeGpuComputeRunner : IGpuComputeRunner
                 // de lancements : la somme de contrôle reste déterministe ; dispatchCount ne fait que
                 // pondérer le score de débit.
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                long dispatchCount = 0;
-                do
+                var (dispatchCount, complete) = Charger(() =>
                 {
                     context.Dispatch(groups, 1, 1);
-                    dispatchCount++;
                     context.Flush();                 // soumet le travail de cette passe.
-                    if (ct.IsCancellationRequested) break;
-                }
-                while (sw.Elapsed < duration);
+                }, duration, ct);
                 sw.Stop();
 
                 // Santé du périphérique après la charge (un TDR apparaît ici).
@@ -160,6 +166,11 @@ public sealed class VorticeGpuComputeRunner : IGpuComputeRunner
                 if (removed.Failure)
                     return Result<GpuComputeOutcome>.Ok(new GpuComputeOutcome(
                         GpuDeviceStatus.DeviceLost, 0, 0, sw.Elapsed.TotalMilliseconds));
+
+                // Une charge coupée avant sa durée ne prouve aucune stabilité : jamais « sain ».
+                if (!complete)
+                    return Result<GpuComputeOutcome>.Ok(new GpuComputeOutcome(
+                        GpuDeviceStatus.Error, 0, 0, sw.Elapsed.TotalMilliseconds));
 
                 // Relire la sortie par élément et la replier en somme de contrôle.
                 context.CopyResource(stagingBuffer, outputBuffer);
@@ -190,6 +201,22 @@ public sealed class VorticeGpuComputeRunner : IGpuComputeRunner
                 shader?.Dispose();
             }
         }
+    }
+
+    /// <summary>Relance <paramref name="passe"/> jusqu'à épuisement de <paramref name="duree"/> (au moins une fois) ;
+    /// <c>Complete</c> est faux si <paramref name="ct"/> a coupé la charge.</summary>
+    internal static (long Lancees, bool Complete) Charger(Action passe, TimeSpan duree, CancellationToken ct)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        long lancees = 0;
+        do
+        {
+            passe();
+            lancees++;
+            if (ct.IsCancellationRequested) return (lancees, false);
+        }
+        while (sw.Elapsed < duree);
+        return (lancees, true);
     }
 
     private static byte[]? LoadShaderBytecode()

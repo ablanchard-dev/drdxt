@@ -16,7 +16,7 @@ namespace DrDxt.Detection.Gpu;
 /// ResType_Mem (0x1) et ResType_MemLarge (0x7, « Memory resources >= 4GB ») ; MEM_DES et MEM_LARGE_DES portent Count (4),
 /// Type (4), Alloc_Base (8), Alloc_End (8). La mémoire vidéo : la valeur HardwareInformation.qwMemorySize que le pilote
 /// d'affichage écrit sous sa clé de classe (Microsoft Learn, « Registering hardware information »). Relevé sur la machine
-/// de référence le 16/10/2026 : RTX 4060, plage de 8192 Mio à 0x4000000000 pour 8 585 740 288 octets de mémoire vidéo.
+/// de référence (relevé du 16/10/2026) : RTX 4060, plage de 8192 Mio à 0x4000000000 pour 8 585 740 288 octets de mémoire vidéo.
 /// </remarks>
 public static class FenetreReBar
 {
@@ -59,7 +59,9 @@ public static class FenetreReBar
     public static IEnumerable<RepairFinding> LireEtJuger(Wmi.IWmiQuery wmi)
     {
         var r = wmi.Query("SELECT Name, PNPDeviceID FROM Win32_VideoController");
-        if (!r.IsOk) return [];
+        // Les cartes non listées : un constat inconnu, pas une famille muette.
+        if (!r.IsOk)
+            return [new RepairFinding("GPU", "Resizable BAR", null, null, RepairStatus.Unknown, Docteur.T("RB.CartesNonLues"))];
         return r.Value!.Where(l => l.GetString("PNPDeviceID")?.StartsWith("PCI\\", StringComparison.OrdinalIgnoreCase) == true)
             .Select(l => Juger(Lire(l.GetString("Name") ?? "?", l.GetString("PNPDeviceID")!))).ToList();
     }

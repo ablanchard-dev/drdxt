@@ -80,7 +80,8 @@ public static partial class ConfigurationCallOfDuty
         var loin = p > 0 && (l.Valeur < p - 2 || l.Valeur > p);
         yield return new RepairFinding("CPU", Nom, Docteur.T("CF.Fils", l.Valeur.ToString(CultureInfo.InvariantCulture)),
             p > 0 ? Docteur.T("CF.Plage", Math.Max(1, p - 2), p) : null,
-            loin ? RepairStatus.Suspicious : RepairStatus.Observed,
+            // Le choix du joueur, comparé à des guides sans mesure publiée : à regarder.
+            loin ? RepairStatus.NonDefault : RepairStatus.Observed,
             Docteur.T("CF.Valeur", l.Fichier, l.Valeur, p)
             + Docteur.T(loin ? "CF.Loin" : "CF.DansPlage")
             + guide,

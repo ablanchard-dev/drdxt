@@ -17,8 +17,8 @@ public static class RegistreDeLimiteCpu
 {
     public static double UniteWatts(ulong raplPowerUnit) => 1.0 / (1 << (int)(raplPowerUnit & 0xF));
 
-    /// <summary>Une PL1 nulle ou une base nulle : registres vides, null. Une PL1 au maximum du champ (0x7FFF) n'est pas
-    /// Une lecture ratée : c'est la carte qui dit « sans limite ».</summary>
+    /// <summary>Une PL1 nulle ou une base nulle : registres vides, null. Une PL1 au maximum du champ (0x7FFF) n'est pas une
+    /// lecture ratée : c'est la carte qui dit « sans limite ».</summary>
     public static LimiteDePuissanceLue? Decoder(ulong raplPowerUnit, ulong pkgPowerLimit, ulong pkgPowerInfo)
     {
         var unite = UniteWatts(raplPowerUnit);
@@ -29,7 +29,18 @@ public static class RegistreDeLimiteCpu
         if (pl1 <= 0 || nominale <= 0 || nominale > 2000) return null;
         return new LimiteDePuissanceLue(pl1, pl2, nominale, ((pkgPowerLimit >> 63) & 1) == 1,
             Pl1Active: ((pkgPowerLimit >> 15) & 1) == 1, RegistreAuMaximum: pl1Brut == 0x7FFF,
-            MaximaleW: ((pkgPowerInfo >> 32) & 0x7FFF) * unite, Pl2SansLimite: ((pkgPowerLimit >> 32) & 0x7FFF) == 0x7FFF);
+            MaximaleW: ((pkgPowerInfo >> 32) & 0x7FFF) * unite, Pl2SansLimite: Pl2SansLimite(pkgPowerLimit, raplPowerUnit));
+    }
+
+    /// <summary>Au-delà, aucun processeur de bureau ne tire cette puissance : une PL2 plus haute ne borne rien.</summary>
+    public const double Pl2PhysiqueMaxW = 1000;
+
+    /// <summary>La PL2 de la carte dit « sans limite » : le champ au maximum (0x7FFF), ou une valeur que rien ne tire (une carte
+    /// qui écrit 0x7FF8, 4095 W). Le levier et le helper lisent la même règle : une PL2 de 4095 W ne borne pas une montée.</summary>
+    public static bool Pl2SansLimite(ulong pkgPowerLimit, ulong raplPowerUnit)
+    {
+        var champ = (pkgPowerLimit >> 32) & 0x7FFF;
+        return champ == 0x7FFF || champ * UniteWatts(raplPowerUnit) > Pl2PhysiqueMaxW;
     }
 
     /// <summary>La copie MMIO décodée en watts : null = non lue ; 0 = présente mais inactive (bit 15 à zéro ou champ vide :

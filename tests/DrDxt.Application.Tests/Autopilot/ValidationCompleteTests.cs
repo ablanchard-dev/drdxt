@@ -80,8 +80,8 @@ public sealed class ValidationCompleteTests : IDisposable
         public Result<RevertEnAttenteEntree?> Lire() => journal.Lire();
     }
 
-    // Le helper garde l'origine jusqu'à ce que le journal de la vérification la porte : l'acquit part entre les deux, avant
-    // que la vérification ne rende le levier.
+    // Le helper garde la pose jusqu'à ce que la vérification l'ait rendue : tuée entre la pose et le rendu, l'App laissait
+    // l'origine dans le seul fichier du compte, que la désinstallation élevée ne lit pas. L'acquit part après le rendu, une fois.
     [Fact]
     public async Task La_pose_verifiee_s_acquitte_une_fois_apres_que_le_journal_porte_l_origine()
     {
@@ -90,7 +90,7 @@ public sealed class ValidationCompleteTests : IDisposable
         await ValidationComplete.ValiderAsync([new Acquitte("fixit.power_plan", log)], null!, null!,
             new JournalTrace(new FichierRevertEnAttente(_chemin), log), Relire);
 
-        log.Should().Equal("origine", "acquit", "rendu");
+        log.Should().Equal("origine", "rendu", "acquit");
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class ValidationCompleteTests : IDisposable
     }
 
     // Sur NVIDIA, la file de rendu se lit au profil du jeu, et la vérification tourne toujours sans jeu (un jeu ouvert
-    // l'arrête). « Son état n'a pas pu être lu » disait une panne : sans jeu, il n'y a rien à lire.
+    // l'arrête). « Son état n'a pas pu être lu » annoncerait une panne : sans jeu, il n'y a rien à lire.
     [Fact]
     public async Task Un_levier_qui_ne_se_lit_qu_en_jeu_ne_se_dit_pas_en_panne()
     {
@@ -143,7 +143,7 @@ public sealed class ValidationCompleteTests : IDisposable
         public Task<Result> RevertAsync(TweakSnapshot snapshot) => Task.FromResult(Result.Ok());
     }
 
-    // Le vrai test du 17/10 : l'essai en alternance tenait déjà la limite de puissance de la carte à 90 %, la cible du levier.
+    // Le cas mesuré le 17/10 : l'essai en alternance tenait déjà la limite de puissance de la carte à 90 %, la cible du levier.
     // Posée à 90 sur 90, relue 90 : « pas pris », et le verdict « l'écriture n'a pas été vue » envoyait vérifier à la main un
     // levier qui n'avait rien à montrer. Déjà à sa valeur, il est dit déjà réglé.
     [Fact]
@@ -439,6 +439,41 @@ public sealed class ValidationCompleteTests : IDisposable
         r.NonRemis.Should().ContainSingle().Which.Should().StartWith("a");
         r.Texte.Should().Contain("PAS REMIS D'ORIGINE");
         journal.Lire().Value!.TweakId.Should().Be("a", "le lancement suivant doit pouvoir le rendre");
+    }
+
+    // Le banc rend au lancement suivant ce qu'une fenêtre morte a laissé : changé depuis hors de DrDXT, rien n'est réécrit ;
+    // rendu, « remis d'origine » ne se dit que relu à l'origine.
+    [Theory]
+    [InlineData(true, false, "VC.Remise.ChangeDepuis")]
+    [InlineData(false, true, "VC.Remise.EncorePose")]
+    public async Task Un_essai_interrompu_ne_se_rend_que_sur_la_valeur_posee_et_se_relit(bool changeDepuis, bool rendu, string cle)
+    {
+        var journal = new FichierRevertEnAttente(_chemin);
+        var levier = new Levier("a", _machine);
+        _machine["a"] = 0;
+        journal.Poser("a", (await levier.ApplyAsync()).Value);
+        var ecrit = false;
+        DrDxt.Application.Tweaks.EtatApplique Verdict(TweakSnapshot _) => changeDepuis ? DrDxt.Application.Tweaks.EtatApplique.Drifted
+            : DrDxt.Application.Tweaks.EtatApplique.Applied;
+
+        var remise = await ValidationComplete.RemettreAsync(journal, _ => new LevierQuiNote(levier, () => ecrit = true), (_, _) => true,
+            verdict: Verdict);
+
+        ecrit.Should().Be(rendu);
+        remise.Propre.Should().BeFalse();
+        remise.Texte.Should().Be(Docteur.T(cle, "a"));
+    }
+
+    private sealed class LevierQuiNote(ITweak levier, Action note) : ITweak
+    {
+        public string Id => levier.Id;
+        public TweakCategory Category => levier.Category;
+        public bool RequiresElevation => levier.RequiresElevation;
+        public bool RequiresRestorePoint => levier.RequiresRestorePoint;
+        public string SummaryKey => levier.SummaryKey;
+        public bool AppliesTo(HardwareInventory hw, SettingsState state) => levier.AppliesTo(hw, state);
+        public Task<Result<TweakSnapshot>> ApplyAsync() => levier.ApplyAsync();
+        public Task<Result> RevertAsync(TweakSnapshot s) { note(); return levier.RevertAsync(s); }
     }
 
     [Fact]

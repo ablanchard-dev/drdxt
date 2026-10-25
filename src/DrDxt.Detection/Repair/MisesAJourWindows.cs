@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using DrDxt.Core;
 
 namespace DrDxt.Detection.Repair;
 
@@ -49,24 +50,35 @@ public static class MisesAJourWindows
     public static IReadOnlyList<string>? KbInstalles()
     {
         var kb = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var lu = false;
-        try
+        // WMI muet ou figé : l'historique seul, s'il répond.
+        var wmi = LectureWmiBornee.Lire(() =>
         {
-            using var s = new System.Management.ManagementObjectSearcher("SELECT HotFixID FROM Win32_QuickFixEngineering");
-            using var rangees = s.Get();
-            foreach (var o in rangees.Cast<System.Management.ManagementObject>())
-                using (o)
-                    if (o["HotFixID"] is string id && NumeroKb.IsMatch(id)) kb.Add(id.Trim());
-            lu = true;
-        }
-        catch (Exception) { /* WMI muet : l'historique seul, s'il répond */ }
+            try
+            {
+                var lus = new List<string>();
+                using var s = new System.Management.ManagementObjectSearcher("SELECT HotFixID FROM Win32_QuickFixEngineering");
+                using var rangees = s.Get();
+                foreach (var o in rangees.Cast<System.Management.ManagementObject>())
+                    using (o)
+                        if (o["HotFixID"] is string id && NumeroKb.IsMatch(id)) lus.Add(id.Trim());
+                return lus;
+            }
+            catch (Exception) { return null; }
+        }, () => (List<string>?)null);
+        if (wmi is not null) kb.UnionWith(wmi);
+        var lu = wmi is not null;
         var historique = Lire();
         if (historique.Count > 0) { lu = true; kb.UnionWith(NumerosKb(historique)); }
         return lu ? kb.Order(StringComparer.OrdinalIgnoreCase).ToList() : null;
     }
 
     /// <summary>Installations réussies (opération 1, résultat 2), les plus récentes d'abord. Vide si l'agent ne répond pas.</summary>
+    /// <remarks>L'agent n'a pas de délai : un agent bloqué figerait l'audit, d'où la borne de temps (30 s, le temps d'un
+    /// historique long). Figé : vide, rien n'est affirmé.</remarks>
     public static IReadOnlyList<FaitDate> Lire(int combien = 200)
+        => DrDxt.Core.LectureWmiBornee.Lire<IReadOnlyList<FaitDate>>(() => LireSansBorne(combien), () => [], TimeSpan.FromSeconds(30));
+
+    private static IReadOnlyList<FaitDate> LireSansBorne(int combien)
     {
         var faits = new List<FaitDate>();
         try

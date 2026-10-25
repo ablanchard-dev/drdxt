@@ -30,7 +30,7 @@ public static class RepriseDuTestMemoire
 
     public static void Effacer(string chemin)
     {
-        try { File.Delete(chemin); }
+        try { if (FichierJsonAtomique.RefusEleve(chemin, ErrorCodes.StorageFail) is null) File.Delete(chemin); }
         catch (IOException) { /* un point resté se dira « interrompu », jamais « réussi » */ }
         catch (UnauthorizedAccessException) { }
     }

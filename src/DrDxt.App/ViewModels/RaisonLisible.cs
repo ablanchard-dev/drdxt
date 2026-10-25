@@ -24,6 +24,11 @@ public static class RaisonLisible
             : string.Format(CultureInfo.CurrentCulture, localiser("Erreur.Generique"), e.Code);
     }
 
+    /// <summary>Une exception imprévue : son type et son message au journal, la phrase générique à l'écran, avec le type pour
+    /// que le support relie les deux. Son message, dans la langue de Windows ou en anglais, ne va pas à l'écran.</summary>
+    public static string Dire(Exception ex, Func<string, string> localiser, Action<string>? journal = null)
+        => Dire(Result.Fail(ex.GetType().Name, ex.Message), localiser, journal);
+
     /// <summary>La phrase d'échec de l'appelant, sauf quand la réponse du helper manque après l'envoi : l'op a pu se faire,
     /// « échec » serait faux, et seule la phrase de l'incertitude se dit, après le nom du réglage s'il est donné.</summary>
     public static string OuIncertain(Result r, string phraseDEchec, Func<string, string> localiser, string? nom = null)

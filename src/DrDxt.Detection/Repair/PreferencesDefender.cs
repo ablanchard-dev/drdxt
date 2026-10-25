@@ -19,7 +19,7 @@ public static class PreferencesDefender
         IReadOnlyList<string> ExclusionsProcessus);
 
     /// <summary>Le vrai, en lecture seule ; <c>null</c> = Defender n'a pas répondu (désactivé, remplacé, ou WMI refusé).</summary>
-    public static Lues? Lire()
+    public static Lues? Lire() => LectureWmiBornee.Lire<Lues?>(() =>
     {
         try
         {
@@ -36,7 +36,7 @@ public static class PreferencesDefender
             return null;
         }
         catch (Exception) { return null; }
-    }
+    }, () => null);
 
     // Le texte que Defender rend à la place d'une liste qu'il cache.
     private static bool Cachee(IReadOnlyList<string> l) => l.Any(e => e.StartsWith("N/A", StringComparison.OrdinalIgnoreCase));
@@ -68,7 +68,8 @@ public static class PreferencesDefender
         var jeux = lu.Autorisees.Count(a => dossiersDeJeux.Any(d => Sous(a, d)));
         return jeux > 0
             ? new RepairFinding("SECURITE", Nom, Docteur.T("DF.Active"), null, RepairStatus.Observed, Docteur.T("DF.AccesJeuxAutorises", jeux))
-            : new RepairFinding("SECURITE", Nom, Docteur.T("DF.Active"), null, RepairStatus.Suspicious, Docteur.T("DF.AccesAucunJeu"),
+            // Un choix de sécurité du joueur ; aucun blocage d'un jeu n'a été lu : à regarder.
+            : new RepairFinding("SECURITE", Nom, Docteur.T("DF.Active"), null, RepairStatus.NonDefault, Docteur.T("DF.AccesAucunJeu"),
                 RepairAction.Recommandation, Remede: Docteur.T("DF.AccesRemede"));
     }
 

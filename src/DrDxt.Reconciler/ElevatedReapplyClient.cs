@@ -8,8 +8,7 @@ namespace DrDxt.Reconciler;
 //
 // Sécurité (I3, la leçon WinRing0) : la réapplication n'introduit jamais de nouvelle primitive
 // privilégiée. Elle traduit tweakId + valeur voulue en une des feuilles PrivilegedOp scellées
-// existantes (SetRegistryValueOp / SetActivePowerPlanOp / RunServiceControlOp /
-// ApplyNvApiDrsSettingOp / …) par l'IReapplyOpMapper injecté, puis l'envoie par le même
+// existantes (SetRegistryValueOp / SetActivePowerPlanOp / RunServiceControlOp) par l'IReapplyOpMapper injecté, puis l'envoie par le même
 // IElevatedClient.ExecuteAsync, dont elle hérite tout le chemin signature → autorisation de
 // l'appelant → allowlist côté serveur. Un tweakId inconnu du mappeur échoue avant tout IPC
 // (aucune op n'est jamais envoyée).

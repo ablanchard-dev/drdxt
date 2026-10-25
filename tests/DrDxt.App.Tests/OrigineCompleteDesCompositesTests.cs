@@ -41,13 +41,14 @@ public sealed class OrigineCompleteDesCompositesTests : IDisposable
         try { Directory.Delete(_racine, recursive: true); } catch { /* dossier temporaire */ }
     }
 
-    /// <summary>Le vrai levier X3D applique : service arrete au depart, Game Bar absent.</summary>
+    /// <summary>Le vrai levier X3D applique : service arrete au depart, les deux valeurs du mode Jeu absentes.</summary>
     private static async Task<TweakSnapshot> AppliquerLeVraiLevierX3d()
     {
         var service = Substitute.For<IServiceStateReader>();
         service.GetServiceState("AMD3DVCacheSvc").Returns(Result<ServiceState>.Ok(ServiceState.Stopped));
         var registre = Substitute.For<IRegistryReader>();
         registre.ReadDword(RegistryHiveKind.CurrentUser, GameBarPath, "AllowAutoGameMode").Returns(Result<uint?>.Ok(null));
+        registre.ReadDword(RegistryHiveKind.CurrentUser, GameBarPath, "AutoGameModeEnabled").Returns(Result<uint?>.Ok(null));
         var eleve = Substitute.For<IElevatedClient>();
         eleve.ExecuteAsync(default!, default).ReturnsForAnyArgs(Result.Ok());
 
@@ -93,14 +94,15 @@ public sealed class OrigineCompleteDesCompositesTests : IDisposable
         var verificateur = MachineManifestKey.ChargerVerificateur(_racine, appliquerAcl: false);
         verificateur.IsOk.Should().BeTrue();
 
-        // La machine porte encore ce que DrDXT y a pose : service demarre, Game Bar = 1. CppcEnable
-        // n'est plus ecrit.
+        // La machine porte encore ce que DrDXT y a pose : service demarre, mode Jeu = 1 sur ses deux valeurs.
+        // CppcEnable n'est plus ecrit.
         var lecture = new LectureFactice
         {
             ["service|AMD3DVCacheSvc"] = "running",
             [$"{RegistryHiveKind.CurrentUser}|{GameBarPath}|AllowAutoGameMode"] = "1",
+            [$"{RegistryHiveKind.CurrentUser}|{GameBarPath}|AutoGameModeEnabled"] = "1",
         };
-        var ecriture = new EcritureFactice();
+        var ecriture = new EcritureFactice { Machine = lecture };
 
         var rapport = await new RenduALaDesinstallation(
             new SignedDesiredStateStore(new ProgramDataManifestStorage(_racine, applyAcl: false), signer: null,
@@ -108,11 +110,11 @@ public sealed class OrigineCompleteDesCompositesTests : IDisposable
             lecture, ecriture).ExecuterAsync(CancellationToken.None);
 
         rapport.ManifesteNonLu.Should().BeNull();
-        ecriture.Recues.Should().HaveCount(2, "les deux feuilles du levier sont rendues, ou aucune");
+        ecriture.Recues.Should().HaveCount(3, "les trois feuilles du levier sont rendues, ou aucune");
         ecriture.Recues.Should().Contain(new RunServiceControlOp("AMD3DVCacheSvc", ServiceAction.Stop));
         ecriture.Recues.OfType<SetRegistryValueOp>().Should().BeEmpty("CppcEnable n'est plus pose");
-        ecriture.Recues.OfType<DeleteRegistryValueOp>().Should().ContainSingle()
-            .Which.Name.Should().Be("AllowAutoGameMode", "la valeur n'existait pas avant DrDXT");
+        ecriture.Recues.OfType<DeleteRegistryValueOp>().Select(d => d.Name)
+            .Should().BeEquivalentTo(["AllowAutoGameMode", "AutoGameModeEnabled"], "les valeurs n'existaient pas avant DrDXT");
         rapport.Lignes.Should().OnlyContain(l => l.Issue == IssueDuRendu.Rendu);
     }
 
@@ -136,13 +138,22 @@ public sealed class OrigineCompleteDesCompositesTests : IDisposable
         public Result<bool> CibleExiste(PrivilegedOp ecriture) => Result<bool>.Ok(true);
     }
 
+    // Une écriture acceptée se voit à la relecture, comme sur la vraie machine : le rendu n'est dit fait que relu.
     private sealed class EcritureFactice : IElevatedClient
     {
         public List<PrivilegedOp> Recues { get; } = new();
+        public LectureFactice? Machine { get; set; }
 
         public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
         {
             Recues.Add(op);
+            switch (op)
+            {
+                case DeleteRegistryValueOp when Machine is not null: Machine[Cle(op)] = null; break; // relue « absente »
+                case SetRegistryValueOp s when Machine is not null: Machine[Cle(op)] = s.Value; break;
+                case RunServiceControlOp { Action: ServiceAction.Stop } when Machine is not null: Machine[Cle(op)] = "stopped"; break;
+                case RunServiceControlOp { Action: ServiceAction.Start } when Machine is not null: Machine[Cle(op)] = "running"; break;
+            }
             return Task.FromResult(Result.Ok());
         }
     }

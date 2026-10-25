@@ -63,6 +63,21 @@ public sealed class NvmlVentilateurActionsTests
         nvml.Ecritures.Should().BeEmpty();
     }
 
+    // Un pilote sans nvmlDeviceGetMinMaxFanSpeed ou sans cible lisible : le plancher n'est pas connu, la garde ne peut
+    // pas dire qu'une vitesse est au-dessus.
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Une_plage_ou_une_cible_non_lue_refuse_d_ecrire(bool minimumLu, bool cibleLue)
+    {
+        var nvml = new FauxNvml();
+        nvml.Fans[0] = nvml.Fans[0] with { MinPct = minimumLu ? 30u : null, CiblePct = cibleLue ? 30u : null };
+        var r = new NvmlVentilateurActions(nvml).Poser(0, 60);
+        r.IsOk.Should().BeFalse();
+        (r.Error?.Message).Should().Contain("not read");
+        nvml.Ecritures.Should().BeEmpty();
+    }
+
     [Fact]
     public void Un_ventilateur_deja_en_manuel_n_est_pas_repose()
     {

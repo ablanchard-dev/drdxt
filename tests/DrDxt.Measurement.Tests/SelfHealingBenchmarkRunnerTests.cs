@@ -144,4 +144,39 @@ public class SelfHealingBenchmarkRunnerTests
         r.Error!.Value.Message.Should().Contain("cause d'origine",
             "le message rendu doit rester celui de la mesure, pas celui du helper");
     }
+
+    // Une réparation refusée (UAC refusé, service irréparable) n'est pas redemandée au scan suivant de la même session :
+    // sinon un service durablement cassé ferait revenir l'UAC à chaque scan.
+    [Fact]
+    public async Task Une_reparation_refusee_n_est_pas_redemandee_dans_la_session()
+    {
+        var banc = new BancScripte(
+            Result<BenchmarkResult>.Fail(ErrorCodes.PmonUnavailable, "service indisponible"),
+            Result<BenchmarkResult>.Fail(ErrorCodes.PmonUnavailable, "service indisponible"));
+        var helper = new HelperFake(Result.Fail(ErrorCodes.HelperOpFailed, "UAC refusé"));
+        var runner = new SelfHealingBenchmarkRunner(banc, helper);
+
+        await runner.RunAsync(1234, TimeSpan.FromSeconds(1), 1, CancellationToken.None);
+        var second = await runner.RunAsync(1234, TimeSpan.FromSeconds(1), 1, CancellationToken.None);
+
+        helper.Recues.Should().ContainSingle("la réparation n'est demandée qu'une fois par session");
+        second.Error!.Value.Code.Should().Be(ErrorCodes.PmonUnavailable);
+        second.Error.Value.Message.Should().Be(Docteur.T("SH.DejaRefusee"));
+    }
+
+    // Un helper injoignable (la veille, sans geste du joueur) n'a rien refusé : le scan suivant, sur un clic, répare.
+    [Fact]
+    public async Task Un_helper_injoignable_sans_geste_n_est_pas_un_refus()
+    {
+        var banc = new BancScripte(
+            Result<BenchmarkResult>.Fail(ErrorCodes.PmonUnavailable, "service indisponible"),
+            Result<BenchmarkResult>.Fail(ErrorCodes.PmonUnavailable, "service indisponible"));
+        var helper = new HelperFake(Result.Fail(ErrorCodes.HelperUnreachable, "sans geste"));
+        var runner = new SelfHealingBenchmarkRunner(banc, helper);
+
+        await runner.RunAsync(1234, TimeSpan.FromSeconds(1), 1, CancellationToken.None);
+        await runner.RunAsync(1234, TimeSpan.FromSeconds(1), 1, CancellationToken.None);
+
+        helper.Recues.Should().HaveCount(2);
+    }
 }

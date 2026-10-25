@@ -32,6 +32,7 @@ public sealed class FrequenceAmdDuBancTests
         _adlx.IsAvailable.Returns(true);
         _adlx.ResolveTunableGpuIndex().Returns(Result<int>.Ok(0));
         _adlx.GetGfxMaxFreqMhz(Arg.Any<int>()).Returns(Result<int>.Ok(2900));
+        _adlx.EstALUsine(Arg.Any<int>()).Returns(true);
         _stability.RunAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result<StabilityOutcome>.Ok(StabilityOutcome.Stable)));
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(Task.FromResult(Result.Ok()));

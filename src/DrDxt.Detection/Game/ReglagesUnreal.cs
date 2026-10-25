@@ -54,7 +54,9 @@ public static class ReglagesUnreal
         bool? B(string k) => S(k) is { } x && bool.TryParse(x, out var b) ? b : null;
         double? D(string k) => double.TryParse(S(k), NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : null;
         int? I(string k) => int.TryParse(S(k), NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) ? i : null;
-        return new ReglagesUnrealLus(jeu, fichier, modifieLe, B("bUseVSync"), D("FrameRateLimit"), I("FullscreenMode"),
+        // Un plafond se lit entre 0 (aucun) et 10 000 images/s : NaN, l'infini, un négatif ou 1e308 ne sont pas des plafonds.
+        double? Plafond(string k) => D(k) is { } p && p is >= 0 and <= 10_000 ? p : null;
+        return new ReglagesUnrealLus(jeu, fichier, modifieLe, B("bUseVSync"), Plafond("FrameRateLimit"), I("FullscreenMode"),
             S("NvidiaReflexMode"), S("UpscalingMethod"), I("sg.GlobalIlluminationQuality"), I("sg.ReflectionQuality"));
     }
 

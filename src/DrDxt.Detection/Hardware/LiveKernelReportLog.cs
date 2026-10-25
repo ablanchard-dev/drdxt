@@ -172,6 +172,8 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
                         if (Analyser(dossier) is { } r) rapports.Add(r);
                     }
                     catch (UnauthorizedAccessException) { refuses++; }
+                    // WER peut tenir le rapport ouvert : ce dossier seul n'est pas lu, les autres restent.
+                    catch (IOException) { }
                 }
             }
 
@@ -219,7 +221,9 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
         if (!champs.TryGetValue("EventType", out var type) || type != "LiveKernelEvent") return null;
 
         if (!champs.TryGetValue("EventTime", out var brut)
-            || !long.TryParse(brut, out var filetime)) return null;
+            || !long.TryParse(brut, out var filetime)
+            // Hors de la plage de Windows, FromFileTimeUtc lève : ce rapport-là est abîmé, pas les autres.
+            || filetime < 0 || filetime > DateTime.MaxValue.ToFileTimeUtc()) return null;
 
         // Hexadecimal, et ce n'est pas un pari. WER ecrit ces valeurs sans prefixe : `144`,
         // `193`, mais aussi `80e` et `ffff920c4059c760`, qui ne peuvent etre que de l'hexadecimal.

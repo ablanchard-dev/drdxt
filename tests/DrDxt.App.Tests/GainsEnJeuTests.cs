@@ -41,10 +41,9 @@ public class GainsEnJeuTests
         var ligne = ScanViewModel.LigneDesGains(
             [(C("HAGS"), Mieux(80, 88, 5)), (C("VRR"), Mieux(88, 92.4, 2)), (C("mode Jeu"), Rien()), (C("BIOS"), PasJuge())], Loc)!;
 
-        // 1,10 × 1,05 − 1 = 15,5 %, pas 15 % ; « au moins » porte le bruit des bornes, plus bas mais encore positif.
-        ligne.Should().StartWith(F(15.5) + " % de 1 % low (au moins +").And.EndWith("2 prouvés) | 1 sans effet | 1 pas encore jugés");
-        var auMoins = double.Parse(ligne.Split("au moins ")[1].Split(' ')[0], System.Globalization.CultureInfo.CurrentCulture);
-        auMoins.Should().BeGreaterThan(0).And.BeLessThan(15.5);
+        // 1,10 × 1,05 − 1 = 15,5 %, pas 15 %. « Au moins » prend le pire cas de chaque mesure, ses bornes, composées de même :
+        // 1,05 × 1,02 − 1 = 7,1 %. Une somme quadratique de ces écarts donnerait 9,3 %, plus que le vrai pire cas.
+        ligne.Should().StartWith(F(15.5) + " % de 1 % low (au moins " + F(7.1) + " %").And.EndWith("2 prouvés) | 1 sans effet | 1 pas encore jugés");
     }
 
     [Fact]
@@ -76,6 +75,23 @@ public class GainsEnJeuTests
 
         bilans.Single(x => x.C.Libelle == "A").B.Verdict.Should().Be(VerdictEnJeu.Mieux, "ses parties d'après sont celles du 5 au 7");
         bilans.Single(x => x.C.Libelle == "B").B.Verdict.Should().Be(VerdictEnJeu.Pire);
+    }
+
+    // B, allumé hors de DrDXT, n'est relevé qu'au scan du 12 : son heure exacte se situe entre le 8 (Depuis, le scan
+    // d'avant) et le 12 (Quand). Les parties du 9 au 11 ont pu être jouées sous B : elles ne comptent d'aucun côté, pas dans
+    // l'après de A, où elles feraient porter à A le coût de B (et le retireraient).
+    [Fact]
+    public void L_apres_d_un_changement_s_arrete_au_depuis_du_suivant()
+    {
+        var parties = new[] { P(1, 70), P(2, 71), P(3, 72), P(5, 73), P(6, 74), P(7, 75), P(9, 60), P(10, 61), P(11, 62) };
+        var a = new Changement(new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero), "A");
+        var b = new Changement(new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero), "B",
+            Depuis: new DateTimeOffset(2026, 10, 8, 12, 0, 0, TimeSpan.Zero));
+
+        var bilanA = ScanViewModel.BilansDesChangements([b, a], parties, journal: null).Single(x => x.C.Libelle == "A").B;
+
+        bilanA.Verdict.Should().Be(VerdictEnJeu.Mieux, "ses parties d'après sont celles du 5 au 7");
+        bilanA.Apres.Should().Be(3);
     }
 
     // Un bilan figé est repris tel quel, même quand les parties d'avant ont quitté l'anneau des 20.
@@ -135,6 +151,27 @@ public class GainsEnJeuTests
         ScanViewModel.LigneEchec(echec, [P(5, 80)], Loc).Should().Be("Parties.CaptureRatee");
         ScanViewModel.LigneEchec(echec, [P(9, 80)], Loc).Should().BeNull();
         ScanViewModel.LigneEchec(null, [], Loc).Should().BeNull();
+    }
+
+    // Le service de mesure de DrDXT arrêté (démarrage à la demande, après un redémarrage ou une mise à jour) : jouer n'y
+    // change rien, le relevé sans droits ne peut pas le relancer. « DrDXT réessaie à ta prochaine partie » était faux.
+    [Theory]
+    [InlineData("cod.exe : 0 image(s) DXGI pour le processus 42 (PresentMon avant lui : MEAS.PMON_UNAVAIL)")]
+    [InlineData("cod.exe : service injoignable (MEAS.PMON_UNAVAIL)")]
+    public void Une_capture_ratee_faute_du_service_de_mesure_le_dit(string raison)
+    {
+        var echec = new PartiesMemorisees.EchecDeCapture(new DateTimeOffset(2026, 10, 8, 21, 0, 0, TimeSpan.Zero), raison);
+
+        ScanViewModel.LigneEchec(echec, [P(5, 80)], Loc).Should().Be("Parties.CaptureRateeService");
+    }
+
+    // La raison notée garde le code du service injoignable même quand son message ne le porte pas : c'est lui qui choisit
+    // la phrase ci-dessus.
+    [Fact]
+    public void La_raison_d_une_capture_sans_service_porte_son_code()
+    {
+        ScanViewModel.RaisonDuRate(DrDxt.Core.ErrorCodes.PmonUnavailable, "service absent").Should().Contain(DrDxt.Core.ErrorCodes.PmonUnavailable);
+        ScanViewModel.RaisonDuRate(DrDxt.Core.ErrorCodes.NoFrames, "0 image").Should().Be("0 image");
     }
 
     // Le code d'erreur brut (« powershell.exe : 0 image(s) DXGI… MEAS.NO_FRAMES »)
@@ -248,5 +285,27 @@ public class GainsEnJeuTests
         var ligne = ScanViewModel.LigneDesGains([(C("HAGS"), Mieux(80, 88, 5)), (C("VRR"), pire)], Loc)!;
 
         ligne.Should().NotContain("au moins -").And.Contain("Parties.Gains.SousLeBruit");
+    }
+
+    // « Au moins » compose la borne de chaque mesure, sa pire paire : pour une perte, plus bas qu'elle, une valeur que les
+    // parties ont prise, jamais extrapolée.
+    [Fact]
+    public void Au_moins_prend_la_pire_paire_d_une_perte()
+    {
+        var pire = new BilanDuChangement(VerdictEnJeu.Pire, "cod.exe", 3, 3, 88, 80.5, 130, 125, -14);
+        var ligne = ScanViewModel.LigneDesGains([(C("HAGS"), Mieux(80, 88, 5)), (C("VRR"), Mieux(88, 105.6, 15)), (C("BIOS"), pire)], Loc)!;
+
+        ligne.Should().Contain("(au moins " + F((1.05 * 1.15 * 0.86 - 1) * 100) + " %");
+    }
+
+    // Un bilan figé avant que la borne d'une perte soit sa pire paire porte la paire la plus proche de zéro. « Au moins » n'en
+    // fait pas un plancher : la perte y compte pour son écart mesuré, jamais pour 2 × écart - borne.
+    [Fact]
+    public void Une_perte_figee_avec_l_ancienne_borne_compte_pour_son_ecart()
+    {
+        var pire = new BilanDuChangement(VerdictEnJeu.Pire, "cod.exe", 3, 3, 102, 92, 130, 125, -2);
+        var ligne = ScanViewModel.LigneDesGains([(C("HAGS"), Mieux(80, 100, 15)), (C("BIOS"), pire)], Loc)!;
+
+        ligne.Should().Contain("(au moins " + F((1.15 * (92.0 / 102) - 1) * 100) + " %");
     }
 }

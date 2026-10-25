@@ -38,8 +38,36 @@ public sealed class StartupApprovalMachineTests
 
             (await client.ExecuteAsync(new SetStartupApprovalOp(RegistryHiveKind.CurrentUser, SetStartupApprovalOp.Run, Essai, true), default))
                 .IsOk.Should().BeTrue();
-            Octets()![0].Should().Be(2);
+            Octets().Should().BeNull("la valeur n'existait pas avant la coupure : réactiver la retire, rien de DrDXT ne reste");
             await helper.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+        }
+        finally
+        {
+            using (var run = Registry.CurrentUser.OpenSubKey(Run, writable: true)) run?.DeleteValue(Essai, throwOnMissingValue: false);
+            using (var ok = Registry.CurrentUser.OpenSubKey(Approuve, writable: true)) ok?.DeleteValue(Essai, throwOnMissingValue: false);
+        }
+    }
+
+    // Une valeur d'origine existait (posée par le Gestionnaire des tâches) : réactiver la remet à l'octet près.
+    [Fact]
+    [Trait("Category", "Machine")] // écrit une entrée d'essai dans la vraie session, puis l'efface
+    public async Task Une_valeur_d_origine_revient_a_l_identique_apres_la_reactivation()
+    {
+        var client = new ClientSessionUtilisateur(Substitute.For<IElevatedClient>());
+        var origine = new byte[] { 6, 0, 0, 0, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x01 };
+        using (var run = Registry.CurrentUser.CreateSubKey(Run, writable: true))
+            run.SetValue(Essai, @"C:\Windows\System32\cmd.exe /c exit");
+        using (var ok = Registry.CurrentUser.CreateSubKey(Approuve, writable: true))
+            ok.SetValue(Essai, origine, RegistryValueKind.Binary);
+        try
+        {
+            (await client.ExecuteAsync(new SetStartupApprovalOp(RegistryHiveKind.CurrentUser, SetStartupApprovalOp.Run, Essai, false), default))
+                .IsOk.Should().BeTrue();
+            Octets()![0].Should().Be(3);
+
+            (await client.ExecuteAsync(new SetStartupApprovalOp(RegistryHiveKind.CurrentUser, SetStartupApprovalOp.Run, Essai, true), default))
+                .IsOk.Should().BeTrue();
+            Octets().Should().Equal(origine);
         }
         finally
         {

@@ -149,4 +149,15 @@ public class FrameSeriesHygieneTests
 
         r.WarmupSecondsDropped.Should().Be(10, "the knob is an upper bound on the search");
     }
+
+    // Le masque n'écarte comme hors focus que le temps que la sonde a vu passer derrière une autre fenêtre : 20 secondes
+    // lentes et régulières, mais 5 secondes seulement hors du premier plan, ne perdent que 5 secondes au plus.
+    [Fact]
+    public void Les_secondes_hors_focus_ecartees_ne_depassent_pas_le_temps_vu_hors_du_premier_plan()
+    {
+        var serie = Enumerable.Repeat(1000.0 / 60, 2400).Concat(Enumerable.Range(0, 600).Select(i => 1000.0 / 30 + (i % 3 - 1) * 0.25)).ToList();
+
+        FrameSeriesHygiene.Masque(serie, 0, horsFocusMaxSecondes: 5).OutOfFocusSecondsDropped.Should().BeLessThanOrEqualTo(5);
+        FrameSeriesHygiene.Masque(serie, 0, horsFocusMaxSecondes: 0).OutOfFocusSecondsDropped.Should().Be(0);
+    }
 }

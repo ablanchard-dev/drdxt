@@ -59,13 +59,13 @@ public sealed partial class ScanViewModel
             Text(NomLisible(hw?.Cpu.Model))));
 
         Components.Add(new ComponentItem("Gpu", _localize("UI.Component.Gpu"),
-            Text(hw is { Gpus.Count: > 0 } ? hw.Gpus[0].Model : null)));
+            Text(hw is { Gpus.Count: > 0 } ? (CartesGraphiques.CarteDediee(hw) ?? hw.Gpus[0]).Model : null)));
 
         Components.Add(new ComponentItem("Ram", _localize("UI.Component.Ram"),
             DescribeMemory(hw)));
 
         Components.Add(new ComponentItem("Ssd", _localize("UI.Component.Storage"),
-            DescribeStorage()));
+            _stockageLu));
 
         Components.Add(new ComponentItem("Windows", _localize("UI.Component.Windows"),
             DescribeWindows()));
@@ -127,6 +127,17 @@ public sealed partial class ScanViewModel
         return $"{slots} · {speed} MT/s{ratedNote}{latency}";
     }
 
+    /// <summary>Le disque principal tel que lu par <see cref="LireStockageAsync"/> ; un tiret tant qu'il ne l'est pas.</summary>
+    private string _stockageLu = Dash;
+
+    /// <summary>Lit le disque principal hors du fil de l'écran : WMI (MSFT_PhysicalDisk, puis Win32_DiskDrive, avec reprises)
+    /// peut prendre plusieurs secondes sur un service froid, et la fenêtre gelait pendant ce temps.</summary>
+    private async Task LireStockageAsync()
+    {
+        try { _stockageLu = await Task.Run(DescribeStorage).ConfigureAwait(true); }
+        catch (Exception) { _stockageLu = Dash; }
+    }
+
     private string DescribeStorage()
     {
         var result = _storage.Detect();
@@ -148,17 +159,6 @@ public sealed partial class ScanViewModel
         string name = v.Build >= 22000 ? "Windows 11" : "Windows 10";
         return $"{name} ({v.Build})";
     }
-
-    // Catégorie non technique affichée dans la vue gratuite (verrouillée) des recommandations :
-    // dire quel domaine est optimisé, jamais quel levier. Reprend les clés de catégorie des
-    // constats (traduites dans la couche UI).
-    private static string RecommendationCategoryKey(DrDxt.Profiles.ProfileIntent intent) => intent switch
-    {
-        DrDxt.Profiles.ProfileIntent.GpuTune => "Finding.Cat.Gpu",
-        DrDxt.Profiles.ProfileIntent.Latency => "Finding.Cat.Latency",
-        _ => "Finding.Cat.Generic", // FixMisconfig (plan d'alimentation, etc.) → System
-    };
-
 
     /// <summary>Pourquoi la perf en jeu manque, en distinguant ce que l'utilisateur peut y faire
     /// de ce qu'il ne peut pas.
@@ -306,7 +306,8 @@ public sealed partial class ScanViewModel
     private void PopulateNarrative(bool degraded)
     {
         ProblemSummary = ResumeDesProblemes();
-        DateDuScan = $"{_localize("Scan.Date")} {Maintenant():dd'/'MM · HH':'mm}";
+        // La langue du docteur, pas le format régional de Windows : celui-ci peut porter un autre calendrier.
+        DateDuScan = string.Create(Docteur.Langue, $"{_localize("Scan.Date")} {Maintenant():dd'/'MM · HH':'mm}");
         SignalerReposCarte();
         OnPropertyChanged(nameof(ExpertVisible));
         OnPropertyChanged(nameof(LabelExpertAccord));
@@ -418,7 +419,7 @@ public sealed partial class ScanViewModel
         {
             OnPropertyChanged(nameof(HasRepairFindings));
             OnPropertyChanged(nameof(HasRepairBlindSpots));
-        OnPropertyChanged(nameof(PeutRelancerEnAdministrateur));
+            OnPropertyChanged(nameof(PeutRelancerEnAdministrateur));
             return;
         }
 
@@ -435,6 +436,9 @@ public sealed partial class ScanViewModel
             if (_journalLeviers is { } journalLeviers && _registreGains is { } registre)
             {
                 constats = constats.Concat(journalLeviers.Constats(registre)).ToList();
+                // Encore dans la liste signée, plus dans le journal : le service pourrait le reposer, et l'écran ne le montrait pas.
+                if (await RelireOrphelinsDuManifesteAsync() is { Count: > 0 } orphelins)
+                    constats = constats.Append(DrDxt.Application.Tweaks.JournalDesLeviersAppliques.ConstatDesOrphelins(orphelins)).ToList();
                 // Windows mis à jour depuis le dernier scan : le bilan de ce que DrDXT avait posé, relu sans rien reposer.
                 if (BuildDeWindows() is { } build
                     && journalLeviers.ApresMiseAJour(registre, build, DrDxt.Core.DossierDonnees.Chemin("build-windows-vu.json")) is { } apres)
@@ -477,7 +481,8 @@ public sealed partial class ScanViewModel
             // est nommé. {0} = le souci ; {1} = le point sain.
             if (constats.FirstOrDefault(c => c.Nom == "point de restauration sain") is { } point)
             {
-                var souci = point.Provenance ?? "";
+                // L'avertissement commence par le souci : sa première lettre prend la majuscule.
+                var souci = point.Provenance is { Length: > 0 } p ? char.ToUpper(p[0], CultureInfo.CurrentUICulture) + p[1..] : "";
                 AvertissementPoint = point.ValeurCourante is not { } sain
                     ? (point.Statut == RepairStatus.Unknown
                         ? string.Format(CultureInfo.CurrentUICulture, _localize("Apply.RestorePoint.DuringIssueUnread"), souci) : null)

@@ -2,6 +2,7 @@ using DrDxt.Core;
 using DrDxt.ElevatedHelper.Execution;
 using DrDxt.ElevatedHelper.Execution.Adlx;
 using FluentAssertions;
+using NSubstitute;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -96,7 +97,9 @@ public sealed class PrivilegedOpExecutorTests
         public (int gpuIndex, float pct)? AppliedPower;
         private readonly Result _result;
         public RecordingTuning(Result? result = null) => _result = result ?? Result.Ok();
+        public Result<int>? MemoireLue;
         public Result<int> GetCoreClockOffsetMhz(int gpuIndex) => Result<int>.Ok(0);
+        public Result<int> GetMemoryClockOffsetMhz(int gpuIndex) => MemoireLue ?? Result<int>.Fail(ErrorCodes.HelperOpFailed, "non lu");
         public Result<int> GetPowerLimitPercent(int gpuIndex) => Result<int>.Ok(100);
         public Result SetCoreClockOffset(int gpuIndex, int offsetMHz) { AppliedOffset = (gpuIndex, offsetMHz); return _result; }
         public Result SetPowerLimitPercent(int gpuIndex, float pct) { AppliedPower = (gpuIndex, pct); return _result; }
@@ -446,6 +449,26 @@ public sealed class PrivilegedOpExecutorTests
 
         r.IsOk.Should().BeTrue();
         tuning.AppliedOffset.Should().Be((0, 0));
+    }
+
+    // Le champ mémoire décrit la carte à la capture, jamais une consigne : la carte le porte, rien à dire ; elle porte
+    // autre chose, ou ne se lit pas, le cœur est rendu quand même et l'écart se journalise (la mémoire n'est pas à DrDXT).
+    [Theory]
+    [InlineData(300, false)]
+    [InlineData(0, true)]
+    [InlineData(null, true)]
+    public async Task Un_champ_memoire_qui_n_est_pas_celui_de_la_carte_se_journalise(int? carte, bool journalise)
+    {
+        var tuning = new RecordingTuning { MemoireLue = carte is { } c ? Result<int>.Ok(c) : null };
+        var diagnostics = NSubstitute.Substitute.For<IDiagnosticsLog>();
+        var exec = new PrivilegedOpExecutor(new RecordingRegistry(), new RecordingPower(), new RecordingRestore(), new RecordingService(),
+            new RecordingDrs(), tuning, new RecordingAdlx(), diagnostics: diagnostics);
+
+        var r = await exec.ExecuteAsync(new ApplyNvApiClockOffsetOp(0, -50, 300), default);
+
+        r.IsOk.Should().BeTrue();
+        tuning.AppliedOffset.Should().Be((0, -50));
+        diagnostics.ReceivedCalls().Should().HaveCount(journalise ? 1 : 0);
     }
 
     [Fact]

@@ -13,10 +13,11 @@ namespace DrDxt.Detection.Gpu.Nvapi;
 // DRS NVAPI non élevée (CreateSession -> LoadSettings -> GetBaseProfile -> GetSetting -> DestroySession),
 // validée en vrai sur une RTX 4060. Les ids sont vérifiés mot pour mot contre NvApiDriverSettings.h
 // et imposés par OpAllowlist. Low Latency Mode n'est pas un réglage DRS : c'est le DWORD de
-// registre NVTweak qu'écrit le levier Reflex, on le lit donc là.
+// registre NVTweak que pose NvidiaUltraLowLatencyTweak, dont rien ne prouve que le pilote le lise ; il se lit là, et
+// aucun écran du produit ne s'en sert.
 //
 // Échec propre : pas de GPU ou de pilote NVIDIA -> IsAvailable faux et chaque lecture Fail(TWEAK.SDK_UNAVAILABLE).
-// Un réglage absent du profil (NVAPI_SETTING_NOT_FOUND) échoue aussi, jamais un 0 inventé.
+// Un réglage DRS absent du profil (NVAPI_SETTING_NOT_FOUND) échoue aussi, jamais un 0 inventé.
 // -----------------------------------------------------------------------
 public sealed class NvApiLatencyReader : INvApi
 {

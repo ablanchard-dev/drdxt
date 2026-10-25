@@ -32,7 +32,7 @@ public sealed class ScanDegradedReasonTests
         TriState.On, TriState.On, "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
         TriState.On, TriState.On, Array.Empty<int>(), TriState.Unknown);
 
-    private static ScanViewModel Build(string codeDEchec)
+    private static ScanViewModel Build(string codeDEchec, string message = "peu importe le texte interne")
     {
         var hd = Substitute.For<IHardwareDetector>();
         hd.DetectAsync().Returns(Result<HardwareInventory>.Ok(Hw()));
@@ -42,7 +42,7 @@ public sealed class ScanDegradedReasonTests
 
         var br = Substitute.For<IBenchmarkRunner>();
         br.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-          .Returns(Result<BenchmarkResult>.Fail(codeDEchec, "peu importe le texte interne"));
+          .Returns(Result<BenchmarkResult>.Fail(codeDEchec, message));
 
         var sc = Substitute.For<IScanScorer>();
         sc.Score(Arg.Any<HardwareInventory>(), Arg.Any<SettingsState>(), Arg.Any<BenchmarkResult?>())
@@ -76,6 +76,17 @@ public sealed class ScanDegradedReasonTests
 
         vm.DegradedNote.Should().Be("Scan.Degraded.ServiceUnavailable");
         vm.DegradedNote.Should().NotBe("Scan.Degraded.PresentMon");
+    }
+
+    // La réparation du service déjà refusée dans la session : le scan le dit, au lieu de la phrase générique du service.
+    [Fact]
+    public async Task Une_reparation_deja_refusee_se_dit_telle_quelle()
+    {
+        var vm = Build(ErrorCodes.PmonUnavailable, Docteur.T("SH.DejaRefusee"));
+
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.DegradedNote.Should().Be(Docteur.T("SH.DejaRefusee"));
     }
 
     [Fact]

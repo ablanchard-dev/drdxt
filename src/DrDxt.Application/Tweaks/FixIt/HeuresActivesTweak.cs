@@ -66,7 +66,8 @@ public sealed class HeuresActivesTweak : ITweak
     {
         try
         {
-            // L'original, relu juste avant d'écrire : c'est lui que l'annulation rend (absent ⇒ supprimé).
+            // L'original, relu juste avant d'écrire : c'est lui que l'annulation réécrit. Un début ou une fin absents sont
+            // refusés avant toute écriture : il n'y a rien à supprimer au retour.
             var debut = _registry.ReadDword(RegistryHiveKind.LocalMachine, HeuresActives.Cle, HeuresActives.NomDebut);
             var fin = _registry.ReadDword(RegistryHiveKind.LocalMachine, HeuresActives.Cle, HeuresActives.NomFin);
             var auto = _registry.ReadDword(RegistryHiveKind.LocalMachine, HeuresActives.Cle, HeuresActives.NomAutomatique);
@@ -108,12 +109,7 @@ public sealed class HeuresActivesTweak : ITweak
         var ops = CompositeSnapshotCodec.Decode(snapshot?.OriginalValueJson);
         if (!ops.IsOk || ops.Value is null)
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Active hours snapshot is not a known composite of typed ops.");
-        foreach (var op in ops.Value)
-        {
-            var res = await _elevated.ExecuteAsync(op, CancellationToken.None).ConfigureAwait(false);
-            if (!res.IsOk) return res;
-        }
-        return Result.Ok();
+        return await RetourArriere.ToutRendreAsync(_elevated, ops.Value).ConfigureAwait(false);
     }
 
     private static PrivilegedOp Poser(string nom, int heure) =>

@@ -24,6 +24,7 @@ public class BiosCapabilityTests
         string? valeurCourante = "3800") =>
         new("MSI B760", "7D91v1C", "memory.profile", valeurCourante, "4000",
             "provider.qualifie", capacite, recuperation, RequiresReboot: true, Validated: validee,
+            NoPost: NoPostRisk.CannotPreventPost,
             // Cette fixture construisait des entrees VALIDEES sans
             // SOURCE, un etat que le type interdit desormais a la construction. Les cinq tests qui
             // sont tombes decrivaient donc une entree impossible — c'est la garde qui a raison, et

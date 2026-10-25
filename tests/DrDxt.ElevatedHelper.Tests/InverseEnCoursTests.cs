@@ -55,4 +55,26 @@ public sealed class InverseEnCoursTests
         await w.TickAsync(CancellationToken.None); // l'ancien bail expire et rend l'origine
         w.Establish(new LeaseOwner(ProcessId: 2), "gpu-expert", Inverse, 120).IsOk.Should().BeTrue("rendu : le nouveau passe");
     }
+
+    // Le bail rétabli avant que l'inverse le retire n'est plus l'entrée que l'inverse attend : rien ne part, et le
+    // réglage gardé reste. C'est sur ce remplacement, fait sous le même verrou que la marque de l'inverse, que tient l'absence
+    // de course entre un rétablissement et un passage de surveillance.
+    [Fact]
+    public async Task Un_bail_retabli_apres_l_echeance_mais_avant_le_passage_n_est_pas_rendu()
+    {
+        var maintenant = new DateTimeOffset(2026, 10, 25, 12, 0, 0, TimeSpan.Zero);
+        var horloge = Substitute.For<IClock>();
+        horloge.UtcNow.Returns(_ => maintenant);
+        var executeur = Substitute.For<IPrivilegedOpExecutor>();
+        executeur.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(Result.Ok());
+        var w = new LeaseWatchdog(horloge, new OpAllowlist(), executeur, Substitute.For<IDiagnosticsLog>());
+
+        w.Establish(new LeaseOwner(ProcessId: 1), "gpu-expert", Inverse, 1).IsOk.Should().BeTrue();
+        maintenant = maintenant.AddSeconds(5);
+        w.Establish(new LeaseOwner(ProcessId: 1), "gpu-expert", Inverse, 120).IsOk.Should().BeTrue("le contrôleur rétablit");
+        await w.TickAsync(CancellationToken.None);
+
+        await executeur.DidNotReceiveWithAnyArgs().ExecuteAsync(default!, default);
+        w.NombreDeBaux.Should().Be(1);
+    }
 }

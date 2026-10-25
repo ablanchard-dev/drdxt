@@ -17,9 +17,10 @@ namespace DrDxt.Application.DependencyInjection;
 // AddDrDxtApplication() enregistre la couche Application :
 //   * ISafetyManager           -> SafetyManager
 //   * ITweakEngine             -> TweakEngine
-//   * chaque ITweak (D/E/F)    -> enregistré pour que IEnumerable<ITweak> ne soit pas vide
+//   * chaque ITweak            -> enregistré pour que IEnumerable<ITweak> ne soit pas vide
 //   * ITweakCatalog            -> TweakCatalog (consomme IEnumerable<ITweak>)
-//   * IStabilityTester         -> stub qui échoue proprement (vrai banc plus tard)
+//   * IStabilityTester         -> GpuStabilityTester, sur une sonde de charge qui échoue proprement tant que l'App
+//                                 n'enregistre pas la vraie
 //   * les coutures SDK         -> stubs qui échouent proprement (vrai P/Invoke plus tard)
 //
 // Les coutures sont enregistrées par TryAdd* : la racine de composition de l'App peut

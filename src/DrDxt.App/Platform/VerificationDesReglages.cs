@@ -15,7 +15,8 @@ namespace DrDxt.App.Platform;
 /// (<see cref="AppliedStateVerifier"/>) contre ce que DrDXT a pose (<see cref="RenduALaDesinstallation.PoseesDe"/>,
 /// la meme regle que la desinstallation). Ce qui a bouge est dit ; rien n'est reecrit (regle I5 : on
 /// notifie, on n'ecrase pas). Lecture seule, aucun service, aucune elevation.
-/// Les reglages HKCU (Game Mode, Game DVR, modele flip) ne sont pas dans le manifeste.
+/// Les reglages que le service ne reaffirme pas (HKCU : Game Mode, Game DVR, modele flip) y sont en RevertOnly
+/// (<see cref="AppliedTweakManifestMapper.ToRevertOnly"/>) : relus de meme.
 /// </summary>
 public static class VerificationDesReglages
 {
@@ -52,7 +53,9 @@ public static class VerificationDesReglages
         var lignes = preuves
             .Where(p => p.Verdict is EtatApplique.Drifted or EtatApplique.NotApplied)
             .Select(p => string.Format(System.Globalization.CultureInfo.CurrentUICulture,
-                localiser("reconciler.notify.user_drift"), localiser(TweakDisplayKeys.TitleKey(p.TweakId))))
+                // Un levier que le service réaffirme est au manifeste sous l'id du service : son titre est celui de l'App.
+                localiser(AppReconcilerNotifier.UserDriftKey),
+                localiser(TweakDisplayKeys.TitleKey(AppliedTweakManifestMapper.IdDeLApp(p.TweakId)))))
             .ToList();
         return lignes.Count == 0 ? null : string.Join(Environment.NewLine, lignes);
     }

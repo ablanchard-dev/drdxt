@@ -69,7 +69,8 @@ public sealed record CalibrationRapport(
 ///   * l'ecart trouve mesure directement l'erreur de la chaine complete ;
 ///   * un intervalle a 95 % doit exclure zero **environ une fois sur vingt**, pas plus.
 ///
-/// C'est la seule facon de detecter la surconfiance avant qu'elle ne coute un faux keep. Une
+/// C'est la seule facon de detecter la surconfiance. Elle ne garde pas un keep : seul l'outil de campagne
+/// (`tools/optimize`, par NoOpCalibrationStore) la calcule et l'affiche, et le moteur ne la consulte pas avant de garder. Une
 /// formule mathematiquement correcte peut etre surconfiante en pratique : il suffit que les
 /// passes ne soient pas aussi independantes qu'elle le suppose, ce qui est le cas normal en jeu.
 /// Mesure du 07/09/2026 sur le corpus des 8 captures Warzone : le p99 frametime annoncait 9,2 %
@@ -90,7 +91,7 @@ public static class NoOpCalibration
     /// dire « pas encore » plutot que de trancher sur trois tirages.
     ///
     /// **Non chiffré.** A 20 observations, le test exact ci-dessous ne detecte une surconfiance
-    /// qu'a partir d'environ 3 depassements : il faut donc que le modele soit franchement mauvais
+    /// qu'a partir de 4 depassements (P(X >= 4) = 0,016 ; 3 donnent 0,075) : il faut donc que le modele soit franchement mauvais
     /// pour etre attrape ici. C'est assume : mieux vaut manquer une petite surconfiance que la
     /// declarer sur du bruit.</summary>
     public const int ObservationsMinimum = 20;

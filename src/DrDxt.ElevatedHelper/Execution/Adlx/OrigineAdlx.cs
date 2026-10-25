@@ -1,3 +1,4 @@
+using DrDxt.Core;
 using System.Management;
 using System.Runtime.Versioning;
 using Microsoft.Win32;
@@ -60,7 +61,7 @@ internal sealed class OrigineAdlx(Func<int, string?> identite, RegistryKey? raci
     // Les cartes AMD de la machine, triées, et l'index ADLX : une carte ajoutée ou retirée change l'identité, et l'origine
     // repart de la valeur lue. Plus fin (l'identifiant PNP rendu par ADLX pour chaque index) demanderait une entrée de vtable
     // de plus, non vérifiée sur matériel.
-    private static string? IdentiteParWmi(int gpu)
+    private static string? IdentiteParWmi(int gpu) => LectureWmiBornee.Lire<string?>(() =>
     {
         try
         {
@@ -74,5 +75,5 @@ internal sealed class OrigineAdlx(Func<int, string?> identite, RegistryKey? raci
             return ids.Count == 0 ? null : gpu + "|" + string.Join(";", ids.Order(StringComparer.OrdinalIgnoreCase));
         }
         catch (Exception) { return null; }
-    }
+    }, () => null);
 }

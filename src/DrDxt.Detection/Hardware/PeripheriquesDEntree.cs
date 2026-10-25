@@ -83,7 +83,9 @@ public static class PeripheriquesDEntree
         try
         {
             var g = InterfaceHid;
-            if (CM_Get_Device_Interface_List_SizeW(out var taille, ref g, null, 0) != 0 || taille <= 1) return [];
+            // Une liste illisible est « non lu » ; seule une liste lue et vide est « aucun appareil ».
+            if (CM_Get_Device_Interface_List_SizeW(out var taille, ref g, null, 0) != 0) return null;
+            if (taille <= 1) return [];
             var tampon = new char[taille];
             if (CM_Get_Device_Interface_ListW(ref g, null, tampon, taille, 0) != 0) return null;
             var parNoeud = new Dictionary<string, (string Nom, List<Role> Roles, Bus Bus, int Hubs, ushort Vid, ushort Pid)>(StringComparer.OrdinalIgnoreCase);

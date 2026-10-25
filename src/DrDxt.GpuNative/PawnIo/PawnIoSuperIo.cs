@@ -33,9 +33,10 @@ public static class PawnIoSuperIo
     private const int Entetes = 8;
 
     /// <summary>Une lecture fait ~130 échanges avec PawnIO, ~79 ms de processeur (mesuré sur la machine de référence) : lue chaque
-    /// seconde en partie, ce serait ~8 % d'un cœur et le bus ISA tenu d'autant. La règle « ventilateur qui s'arrête » cumule
-    /// au moins 5 s d'arrêt sur la partie : une lecture toutes les 5 s suffit.</summary>
-    public static readonly TimeSpan IntervalleLecture = TimeSpan.FromSeconds(5);
+    /// seconde en partie, ce serait ~8 % d'un cœur et le bus ISA tenu d'autant ; toutes les 15 s, ~0,5 %. Un ventilateur qui
+    /// frotte et s'arrête reste arrêté : deux lectures à l'arrêt (VentilateursEnPartie.SecondesArretMinimum) suffisent à le
+    /// voir.</summary>
+    public static readonly TimeSpan IntervalleLecture = TimeSpan.FromSeconds(15);
     private static readonly DerniereLecture<VentilateursLus> Recente = new(IntervalleLecture);
 
     /// <summary>La dernière lecture si elle a moins de <see cref="IntervalleLecture"/>, sinon une neuve.</summary>

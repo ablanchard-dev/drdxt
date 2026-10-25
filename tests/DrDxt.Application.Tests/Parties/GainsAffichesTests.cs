@@ -6,9 +6,9 @@ namespace DrDxt.Application.Tests.Parties;
 
 // Les gains affichés doivent tenir dans la vraie vie, pas seulement sur
 // l'exemple du test.
-public sealed class RevueJ2Tests : IDisposable
+public sealed class GainsAffichesTests : IDisposable
 {
-    private readonly string _dossier = Directory.CreateTempSubdirectory("drdxt-j2-").FullName;
+    private readonly string _dossier = Directory.CreateTempSubdirectory("drdxt-gains-").FullName;
     public void Dispose() => Directory.Delete(_dossier, true);
 
     private static PartieRelevee P(int jour, double low1) =>

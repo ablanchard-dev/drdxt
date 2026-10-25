@@ -110,7 +110,6 @@ public class GuideGeneratorTests
         step.ExactValue.Should().Contain("XMP"); // le repli générique nomme le réglage
 
         // La récupération par effacement du CMOS doit être présente (le filet anti-panique).
-        AllRecoverySteps(g).Should().Contain(s => s.ExactValue == null || true);
         AllRecoveryInstructionKeys(g).Should().Contain(BiosGuideStringKeys.RecoveryClearCmos);
     }
 

@@ -11,7 +11,7 @@ namespace DrDxt.GpuNative.NvApi;
 // Invariant porteur : le Marshal.SizeOf de chaque struct doit égaler la taille de la struct C de
 // NVIDIA (épinglé par NvApiStructLayoutTests). Le mot de version est calculé depuis Marshal.SizeOf
 // à l'exécution (NvApiEntry.MakeVersion) : toute dérive remonte comme l'IncompatibleStructVersion
-// (-7) sûr du pilote, un rejet propre, jamais une écriture corrompue. Chaque ByValArray est
+// (-9) sûr du pilote, un rejet propre, jamais une écriture corrompue. Chaque ByValArray est
 // préalloué à son SizeConst par les fabriques de NvApiNative avant le marshaling (sinon
 // PtrToStructure lève).
 // -----------------------------------------------------------------------

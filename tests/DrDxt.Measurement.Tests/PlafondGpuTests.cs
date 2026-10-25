@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Measurement.Tests;
 
 /// <summary>
-/// Le plafond qui contredit une annonce que j'ai failli faire.
+/// Le plafond qui contredit une annonce tentante.
 ///
 /// Apres avoir mesure que le processeur tombe de 5 292 a 3 698 MHz sous charge
 /// soutenue, la conclusion tentante etait « lever la limite rendrait +25 a +30 % d'images ». Le

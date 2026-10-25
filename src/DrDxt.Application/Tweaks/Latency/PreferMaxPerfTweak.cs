@@ -32,14 +32,15 @@ public sealed class PreferMaxPerfTweak : LatencyTweakBase
     /// <summary>« Normal » du panneau NVIDIA = PREFERRED_PSTATE_ADAPTIVE (0) de NvApiDriverSettings.h
     /// (github.com/NVIDIA/nvapi). Depuis les pilotes 460, le panneau a renommé « Adaptive » en « Normal » : la fiche
     /// d'aide NVIDIA 3130 s'intitule « Setting Power management mode from Normal to Maximum Performance » et son
-    /// adresse garde « adaptive » (nvidia.custhelp.com/app/answers/detail/a_id/3130).</summary>
+    /// adresse garde « adaptive » (nvidia.custhelp.com/app/answers/detail/a_id/3130). Ce n'est pas le défaut du pilote
+    /// (PREFERRED_PSTATE_DEFAULT = OPTIMAL_POWER, 5, quand le réglage est absent du profil).</summary>
     public const uint Normal = 0;                             // PREFERRED_PSTATE_ADAPTIVE
 
     private readonly INvApi _nvApi;
     private readonly IGameExecutable? _game;
 
-    /// <param name="game">Le jeu en cours. Absent (outils, tests) ou jeu sans
-    /// profil propre : ecriture globale, comme avant.</param>
+    /// <param name="game">Le jeu en cours. Absent (outils, tests) : ecriture globale. Un jeu connu sans profil lisible
+    /// est refuse (LatencyTweakBase.PlanifierDrs) : son reglage ne part jamais dans le profil global.</param>
     public PreferMaxPerfTweak(INvApi nvApi, IElevatedClient elevated, IGameExecutable? game = null) : base(elevated)
         => (_nvApi, _game) = (nvApi, game);
 

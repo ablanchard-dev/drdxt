@@ -84,6 +84,16 @@ public class ScanDashboardTests
     }
 
     [Fact]
+    public async Task La_carte_graphique_affichee_est_la_carte_dediee_meme_listee_apres_la_puce_integree()
+    {
+        var uhd = new GpuInfo("Intel(R) UHD Graphics 770", "Intel", 128L << 20, "31.0", TriState.Unknown);
+        var vm = Build(hw: Hw() with { Gpus = new[] { uhd, Hw().Gpus[0] } });
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.Components.Single(c => c.IconKey == "Gpu").Value.Should().Be("NVIDIA RTX 4070");
+    }
+
+    [Fact]
     public async Task Storage_unavailable_shows_dash_not_crash()
     {
         var sdFail = Substitute.For<IStorageDetector>();
@@ -128,6 +138,48 @@ public class ScanDashboardTests
         await vm.ScanCommand.ExecuteAsync(null);
 
         vm.ProblemSummary.Should().Be("UI.Result.NoCritical");
+    }
+
+    // L'accueil ouvrait sur « 12 points à corriger », l'inventaire de ce qui ne va pas, avant Optimiser. Son titre dit l'état
+    // de l'analyse ; le nombre vit dans le dépliant des points, le plus grave en tête. Le conseil sous le titre (« joue une
+    // partie, puis relance ») se tait ; il ne parle que d'une analyse en échec ou partielle.
+    [Fact]
+    public async Task Le_titre_de_l_accueil_dit_l_etat_et_garde_le_nombre_pour_le_depliant()
+    {
+        var vm = Build(findings: new List<Finding> { new("Latency", Severity.Minor, "Finding.Latency.VrrOff", null) });
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.TitreAccueil.Should().Be("Accueil.Titre");
+        vm.LabelAFaire.Should().NotBeNullOrEmpty("le nombre reste, dans le dépliant");
+        vm.SousTitreAccueil.Should().BeEmpty("un conseil n'est pas un état");
+    }
+
+    // Une analyse partielle (perf en jeu pas encore mesurée, le cas d'un premier scan) est une analyse qui a abouti : même
+    // titre, même silence. Seul l'échec garde son résumé et dit ce qui manque.
+    [Theory]
+    [InlineData(ScanState.Degraded, true)]
+    [InlineData(ScanState.Failed, false)]
+    public void Une_analyse_partielle_garde_le_titre_neutre_un_echec_dit_ce_qui_manque(ScanState etat, bool neutre)
+    {
+        var vm = Build(findings: new List<Finding>());
+        vm.SubtitleText = "ce qui manque";
+        vm.State = etat;
+
+        (vm.TitreAccueil == "Accueil.Titre").Should().Be(neutre);
+        (vm.SousTitreAccueil.Length == 0).Should().Be(neutre);
+    }
+
+    [Fact]
+    public async Task Un_point_critique_ne_change_pas_le_titre_et_passe_en_tete_du_depliant()
+    {
+        var xmpCoupe = new BiosFinding(FirmwareSettingKind.XmpExpo, Severity.Major, "Bios.Xmp.Off.Title",
+            "Bios.Xmp.Off.Rationale", BiosMatrixClass.Guide, TriState.Off, BiosRecommendedAction.Enable,
+            "Bios.Xmp.Action.Enable", Gain: null, StateNotReadable: false);
+        var vm = Build(biosAdvisor: ScanViewModelTestSeams.BiosAdvisor(xmpCoupe));
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.TitreAccueil.Should().Be("Accueil.Titre");
+        vm.PointsAFaire.First().Entree.Gravite.Should().Be(Severity.Major, "le critique ouvre la liste");
     }
 
     [Fact]
@@ -250,15 +302,6 @@ public class ScanDashboardTests
 
         // Le localisateur identité rend la clé ; « {0} » n'y est pas, donc le VM préfixe le compte.
         vm.ProblemSummary.Should().StartWith("2 ");
-    }
-
-    [Fact]
-    public async Task Features_are_four_localized_cards()
-    {
-        var vm = Build();
-        await vm.ScanCommand.ExecuteAsync(null);
-        vm.Features.Should().HaveCount(4);
-        vm.Features.Select(f => f.IconKey).Should().ContainInOrder("Diagnostic", "Gaming", "Security", "Report");
     }
 
     // La ligne RAM dit la vitesse ENTRAINEE. Quand le kit est note plus haut, on le mentionne

@@ -96,14 +96,6 @@ public class ScanLocalizationTests
     [InlineData("UI.Component.Ram")]
     [InlineData("UI.Component.Storage")]
     [InlineData("UI.Component.Windows")]
-    [InlineData("UI.Feature.Diagnostic.Title")]
-    [InlineData("UI.Feature.Diagnostic.Body")]
-    [InlineData("UI.Feature.Gaming.Title")]
-    [InlineData("UI.Feature.Gaming.Body")]
-    [InlineData("UI.Feature.Security.Title")]
-    [InlineData("UI.Feature.Security.Body")]
-    [InlineData("UI.Feature.Report.Title")]
-    [InlineData("UI.Feature.Report.Body")]
     [InlineData("UI.Footer.Version")]
     [InlineData("UI.Footer.Updates")]
     // ── Colonne de mesure ──
@@ -170,12 +162,33 @@ public class ScanLocalizationTests
 
     // « 12 points à corriger » au-dessus de « 0 réglages à revoir · 7 lus sur 7 »
     // passeraient pour deux comptes de la même chose. Le registre dit de quoi il parle : les réglages que DrDXT
-    // sait poser lui-même.
+    // sait juger (XMP et le pilote compris, qu'il ne pose pas).
     [Fact]
-    public void Le_registre_dit_qu_il_compte_les_reglages_que_DrDXT_sait_poser()
+    public void Le_registre_dit_qu_il_compte_les_reglages_que_DrDXT_sait_juger()
     {
-        Localizer.Get("UI.Register.LeversRead", new CultureInfo("fr")).Should().StartWith("Réglages que DrDXT pose lui-même");
+        Localizer.Get("UI.Register.LeversRead", new CultureInfo("fr")).Should().StartWith("Réglages que DrDXT sait juger");
         Localizer.Get("UI.Register.Problems", new CultureInfo("fr")).Should().Be("{0} à changer");
+    }
+
+    // Ce qui part dans un export ou un paquet : le nom d'un périphérique renommé par le joueur reste, l'écran le dit avant
+    // qu'il partage (CONFIDENTIALITE.md le disait seul).
+    [Theory]
+    [InlineData("fr", "renommé")]
+    [InlineData("en", "renamed")]
+    public void L_export_et_le_paquet_disent_qu_un_peripherique_renomme_garde_son_nom(string langue, string mot)
+    {
+        Localizer.Get("Machine.ExportWritten", new CultureInfo(langue)).Should().Contain(mot);
+        Localizer.Get("Paquet.Contient", new CultureInfo(langue)).Should().Contain(mot);
+    }
+
+    // Le conseil « allume … » cite le libellé de l'interrupteur tel qu'il s'affiche : un autre nom ne se retrouve pas à l'écran.
+    [Theory]
+    [InlineData("fr")]
+    [InlineData("en")]
+    public void Le_conseil_des_voisins_cite_le_vrai_libelle_de_l_interrupteur(string langue)
+    {
+        var c = new CultureInfo(langue);
+        Localizer.Get("PretAJouer.Voisins", c).Should().ContainEquivalentOf(Localizer.Get("Voisins.Calmer.Libelle", c));
     }
 
     // L'en-tête de « À faire d'abord » rappelle le total et où sont les autres ;
@@ -185,9 +198,9 @@ public class ScanLocalizationTests
     {
         var fr = new CultureInfo("fr");
         string Loc(string k) => Localizer.Get(k, fr);
-        ScanViewModel.EnTeteAFaire(Loc, 13).Should().Contain("13").And.Contain("par domaine");
-        ScanViewModel.EnTeteAFaire(Loc, 0).Should().Be("À faire d'abord");
-        ScanViewModel.EnTeteAFaire(Loc, 1).Should().Contain("ce point").And.NotContain("1 points");
+        ScanViewModel.EnTeteAFaire(Loc, 13).Should().Be("Les 13 points à corriger");
+        ScanViewModel.EnTeteAFaire(Loc, 0).Should().Be("À corriger");
+        ScanViewModel.EnTeteAFaire(Loc, 1).Should().Be("Le point à corriger").And.NotContain("1 points");
         Loc("UI.Register.None").Should().Be("aucun à changer");
     }
 
@@ -248,6 +261,11 @@ public class ScanLocalizationTests
         var fr = Localizer.Get("UI.Footer.Updates.NotConfigured", new CultureInfo("fr"));
         fr.Should().NotContain("configuré").And.NotContain("aucun serveur");
         fr.Should().Contain("pings").And.Contain("fabricant de ta carte graphique");
+        // Vérification coupée, rien ne part vers le site du projet : le pied de page ne l'annonce pas, et dit que les mises à
+        // jour ne sont pas vérifiées.
+        fr.Should().NotContain("site du projet").And.Contain("vérification coupée");
+        Localizer.Get("UI.Footer.Updates.NotConfigured", new CultureInfo("en"))
+            .Should().NotContain("project site").And.Contain("checking is off");
     }
 
     // « Maintiens pour lancer » dit aussi qu'Entrée déclenche tout de suite : sinon, au clavier, le geste

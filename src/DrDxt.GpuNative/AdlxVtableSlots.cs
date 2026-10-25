@@ -33,6 +33,7 @@ public static class AdlxVtableSlots
     public const int GpuList_At   = 11; // At_GPUList
 
     // IADLXGPUTuningServices (IGPUTuning.h)
+    public const int Tuning_IsAtFactory            = 4; // Read : le réglage de la carte est-il à l'usine
     public const int Tuning_ResetToFactory         = 5; // Write : remet tout le réglage de la carte à l'usine
     public const int Tuning_IsSupportedManualGfx   = 8;
     public const int Tuning_IsSupportedManualFan   = 10;

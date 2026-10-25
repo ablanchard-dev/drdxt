@@ -37,6 +37,45 @@ public sealed class ReconcileStateUpdateTests
         item.LastResultCode.Should().Be(ItemOutcome.Reapplied.ToString());
     }
 
+    // Le helper pose la référence d'un réglage neuf pendant que la passe tourne. La passe réécrivait l'état lu à son début, et
+    // cette référence disparaissait : la comptabilité se pose sur l'état relu au moment d'écrire.
+    [Fact]
+    public async Task Une_reference_posee_pendant_la_passe_reste()
+    {
+        var h = new ReconcilerHarness(ReconcilerState.Default with
+        {
+            Items = new[] { new ReconcilerItemState("a", false, "22631.3447", "", At, "OK") },
+        });
+        var neuf = new ReconcilerItemState("b", false, "22631.3447", "560.00", default, "");
+        h.StoreOverride = new LeHelperEcritApresLaLecture(h.StateStore, neuf);
+        h.Policy.Map("a", ReconcileSurface.Registry);
+        h.Probe.Set("a", "1");
+
+        var desired = new DesiredState(new[] { new AppliedTweak("a", "1", "0", At) });
+        (await h.Build().ReconcileAsync(desired, default)).IsOk.Should().BeTrue();
+
+        h.StateStore.Saved!.Items.Select(i => i.TweakId).Should().BeEquivalentTo(new[] { "a", "b" });
+        h.StateStore.Saved.Items.Single(i => i.TweakId == "a").LastReconciledAt.Should().Be(h.Clock.UtcNow);
+    }
+
+    private sealed class LeHelperEcritApresLaLecture(InMemoryReconcilerStateStore interne, ReconcilerItemState ajout) : IReconcilerStateStore
+    {
+        private bool _fait;
+
+        public async Task<Result<ReconcilerState>> LoadAsync(CancellationToken ct)
+        {
+            var lu = await interne.LoadAsync(ct);
+            if (!_fait)
+            {
+                _fait = true;
+                await interne.SaveAsync(lu.Value! with { Items = [.. lu.Value!.Items, ajout] }, ct);
+            }
+            return lu;
+        }
+
+        public Task<Result> SaveAsync(ReconcilerState state, CancellationToken ct) => interne.SaveAsync(state, ct);
+    }
+
     // -------------------------------------------------------------------
     // Le signal pilote, prouve sans qu'aucune main ne le pose — 11/09/2026.
     //

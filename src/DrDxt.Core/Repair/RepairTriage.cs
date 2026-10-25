@@ -54,7 +54,8 @@ public sealed record RepairTriage(
     /// </summary>
     public string Phrase =>
         Attention.Count == 0
-            ? Docteur.T("RT.Rien", Verifies.Count)
+            // Le compte s'accorde ; zéro état vérifié ne se dit pas « rien ne demande ton attention ».
+            ? (Verifies.Count switch { 0 => Docteur.T("RT.RienAucun"), 1 => Docteur.T("RT.RienUn"), _ => Docteur.T("RT.Rien", Verifies.Count) })
               + (NonLus.Count > 0 ? Docteur.T("RT.Mais") + NonLusDits : "")
             : ACorrigerEtARegarder
               + (Verifies.Count == 1 ? Docteur.T("RT.UnVerifie") : Docteur.T("RT.Verifies", Verifies.Count))

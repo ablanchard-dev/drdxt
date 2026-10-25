@@ -71,13 +71,80 @@ public sealed record AppliedStateEvidence(
 /// simplement le produit du droit d'affirmer.
 ///
 /// ══ ce qu'elle ne couvre pas ══
-/// Les leviers qui n'ecrivent pas dans le registre (plan d'alimentation, courbe de ventilation,
-/// limite de puissance GPU) rendent `Unavailable` ici. Leur preuve d'application existe ailleurs
-/// (sonde d'ecriture NVAPI pour le GPU) ou reste a construire. Ne pas confondre « ce lecteur ne
-/// sait pas » avec « ce levier n'est pas verifiable ».
+/// La courbe de ventilation et les decalages de frequence NVIDIA ne posent pas de valeur cible : ils rendent `Unknown`
+/// ici. Ne pas confondre « ce lecteur ne sait pas » avec « ce levier n'est pas verifiable ».
 /// </summary>
 public static class AppliedStateVerifier
 {
+    /// <summary>Ce qui relit la carte et le processeur : la limite de puissance (NVAPI, ADLX), les réglages du pilote AMD, la
+    /// fréquence maximale AMD, le champ PL1 du registre 0x610. Un lecteur absent rend <c>Unavailable</c>.</summary>
+    public sealed record LecteursCarte(INvApiGpuTuning? Nvidia = null, IAdlxGpuTuning? Amd = null, IAdlx? PiloteAmd = null,
+        ICpuPowerLimitReader? Cpu = null);
+
+    /// <summary>Le champ PL1 du registre 0x610 (bits 14:0), le seul qu'écrit le levier.</summary>
+    private const ulong ChampPl1 = 0x7FFF;
+
+    /// <summary>La valeur qu'une op de la carte ou du processeur pose, dans l'unité que son lecteur rend (pourcentage
+    /// entier, MHz entiers, état du pilote, champ PL1 brut) ; null pour toute autre op.</summary>
+    public static long? ValeurDeCarte(PrivilegedOp op) => op switch
+    {
+        ApplyNvApiPowerLimitOp n => n.PowerLimitPercent,
+        ApplyAdlxTuningOp { Kind: AdlxTuningKind.PowerLimit or AdlxTuningKind.AntiLag or AdlxTuningKind.FrameRateTarget
+            or AdlxTuningKind.VerticalRefresh or AdlxTuningKind.Undervolt } a => a.IntValue,
+        SetCpuPackagePowerLimitOp c => (long)(c.Valeur & ChampPl1),
+        _ => null,
+    };
+
+    /// <summary>Ce qui relit la valeur d'une op de <see cref="ValeurDeCarte"/>, dans la même unité ; null sans lecteur.</summary>
+    public static Func<Result<long>>? LecteurDeCarte(PrivilegedOp op, LecteursCarte? carte)
+    {
+        static Result<long> Long(Result<int> r) => r.IsOk ? Result<long>.Ok(r.Value) : Result<long>.Fail(r.Error!.Value.Code, r.Error.Value.Message);
+        return op switch
+        {
+            ApplyNvApiPowerLimitOp n when carte?.Nvidia is { } nv => () => Long(nv.GetPowerLimitPct(n.GpuIndex)),
+            ApplyAdlxTuningOp { Kind: AdlxTuningKind.PowerLimit } a when carte?.Amd is { } amd => () => Long(amd.GetPowerLimitPct(a.GpuIndex)),
+            ApplyAdlxTuningOp { Kind: AdlxTuningKind.Undervolt } a when carte?.Amd is { } amd => () => Long(amd.GetGfxMaxFreqMhz(a.GpuIndex)),
+            ApplyAdlxTuningOp { Kind: AdlxTuningKind.AntiLag } when carte?.PiloteAmd is { } p => () => Long(p.GetAntiLagState()),
+            ApplyAdlxTuningOp { Kind: AdlxTuningKind.FrameRateTarget } when carte?.PiloteAmd is { } p => () => Long(p.GetFrameRateTarget()),
+            ApplyAdlxTuningOp { Kind: AdlxTuningKind.VerticalRefresh } when carte?.PiloteAmd is { } p => () => Long(p.GetVsyncMode()),
+            SetCpuPackagePowerLimitOp when carte?.Cpu is { } cpu => () => cpu.LireRegistres() is { IsOk: true } l
+                ? Result<long>.Ok((long)(l.Value!.Registres.PkgPowerLimit & ChampPl1))
+                : Result<long>.Fail(ErrorCodes.TweakSdkUnavailable, "PL1"),
+            _ => null,
+        };
+    }
+
+    /// <summary>Le nom d'une op de la carte ou du processeur, pour dire ce qui a été relu.</summary>
+    public static string NomDeCarte(PrivilegedOp op) => op switch
+    {
+        ApplyNvApiPowerLimitOp or ApplyAdlxTuningOp { Kind: AdlxTuningKind.PowerLimit } => Docteur.T("VM.LimitePuissance"),
+        ApplyAdlxTuningOp { Kind: AdlxTuningKind.Undervolt } => Docteur.T("VM.FrequenceMax"),
+        ApplyAdlxTuningOp { Kind: AdlxTuningKind.FrameRateTarget } => Docteur.T("VM.Frtc"),
+        ApplyAdlxTuningOp { Kind: AdlxTuningKind.AntiLag } => "Anti-Lag (0/1)",
+        ApplyAdlxTuningOp a => a.Kind.ToString(),
+        _ => "PL1",
+    };
+
+    // Comparée dans l'unité que le lecteur rend, sans conversion : un arrondi ne fait jamais « autre valeur ».
+    private static AppliedStateEvidence VerifierCarte(string tweakId, PrivilegedOp demande, PrivilegedOp? origine, LecteursCarte? carte)
+    {
+        var nom = NomDeCarte(demande);
+        var vise = ValeurDeCarte(demande)!.Value;
+        long? avant = origine is not null && MemeFeuille(origine, demande) ? ValeurDeCarte(origine) : null;
+        var texteAvant = avant?.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var texteVise = vise.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (LecteurDeCarte(demande, carte) is not { } lire)
+            return new AppliedStateEvidence(tweakId, EtatApplique.Unavailable, nom, texteAvant, texteVise, null);
+        var lu = lire();
+        if (!lu.IsOk)
+            return new AppliedStateEvidence(tweakId, EtatApplique.Unknown, nom, texteAvant, texteVise, null);
+        var verdict = lu.Value == vise ? EtatApplique.Applied
+            : lu.Value == avant ? EtatApplique.NotApplied
+            : EtatApplique.Drifted;
+        return new AppliedStateEvidence(tweakId, verdict, nom, texteAvant, texteVise,
+            lu.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
     /// <summary>
     /// Les quatre reglages du pilote NVIDIA que ce depot sait relire, par identifiant DRS.
     ///
@@ -98,15 +165,15 @@ public static class AppliedStateVerifier
 
     /// <summary>
     /// Un levier composite (Vsync + plafond ; X3D = service + deux
-    /// feuilles) se prouve feuille par feuille. Avant, son snapshot ne se decodait pas comme une op :
-    /// verdict Unknown, jamais de banc, pour toujours.
+    /// feuilles) se prouve feuille par feuille : son snapshot ne se decode pas comme une op, et lu d'un bloc
+    /// il resterait Unknown, sans jamais de banc.
     ///
     /// Chaque feuille posee est relue par le chemin d'une op seule, face a l'inverse de la meme feuille
     /// (jamais par position : `VrrVsyncCap` range ses inverses a l'envers de ses ecritures). Le levier
     /// n'est Applied que si toutes le sont ; une seule feuille illisible le rend Unknown ou Unavailable.
     /// </summary>
     private static AppliedStateEvidence VerifierComposite(TweakSnapshot snapshot, IReadOnlyList<PrivilegedOp> posees,
-        IRegistryReader lecteur, INvApi? nvApi, IPowerPlanReader? alimentation, IServiceStateReader? services)
+        IRegistryReader lecteur, INvApi? nvApi, IPowerPlanReader? alimentation, IServiceStateReader? services, LecteursCarte? carte)
     {
         var inverses = CompositeSnapshotCodec.Decode(snapshot.OriginalValueJson) is { IsOk: true, Value: { } lus }
             ? lus
@@ -117,7 +184,7 @@ public static class AppliedStateVerifier
             var inverse = inverses.FirstOrDefault(inv => MemeFeuille(inv, posee));
             var origine = inverse is null ? "" : PrivilegedOpCodec.Serialize(inverse).Value ?? "";
             var cible = PrivilegedOpCodec.Serialize(posee).Value ?? "";
-            return Verifier(new TweakSnapshot(snapshot.TweakId, origine, cible), lecteur, nvApi, alimentation, services);
+            return Verifier(new TweakSnapshot(snapshot.TweakId, origine, cible), lecteur, nvApi, alimentation, services, carte);
         }).ToList();
 
         return new AppliedStateEvidence(snapshot.TweakId, Combiner(feuilles.Select(f => f.Verdict).ToList()),
@@ -153,6 +220,9 @@ public static class AppliedStateVerifier
         (SetActivePowerPlanOp, SetActivePowerPlanOp) => true,
         (RunServiceControlOp i, RunServiceControlOp p) =>
             string.Equals(i.ServiceName, p.ServiceName, StringComparison.OrdinalIgnoreCase),
+        (ApplyNvApiPowerLimitOp i, ApplyNvApiPowerLimitOp p) => i.GpuIndex == p.GpuIndex,
+        (ApplyAdlxTuningOp i, ApplyAdlxTuningOp p) => i.GpuIndex == p.GpuIndex && i.Kind == p.Kind,
+        (SetCpuPackagePowerLimitOp, SetCpuPackagePowerLimitOp) => true,
         _ => false,
     };
 
@@ -167,8 +237,10 @@ public static class AppliedStateVerifier
     /// rend <c>Unavailable</c> : « je ne sais pas lire » n'est jamais « c'est applique ».</param>
     /// <param name="alimentation">Le lecteur de plan d'alimentation, meme role.</param>
     /// <param name="services">Le lecteur d'etat des services, meme role.</param>
+    /// <param name="carte">Les lecteurs de la carte et du processeur, meme role.</param>
     public static AppliedStateEvidence Verifier(TweakSnapshot? snapshot, IRegistryReader lecteur,
-        INvApi? nvApi = null, IPowerPlanReader? alimentation = null, IServiceStateReader? services = null)
+        INvApi? nvApi = null, IPowerPlanReader? alimentation = null, IServiceStateReader? services = null,
+        LecteursCarte? carte = null)
     {
         if (snapshot is null)
             return new AppliedStateEvidence("?", EtatApplique.Unknown, null, null, null, null);
@@ -179,7 +251,7 @@ public static class AppliedStateVerifier
             return new AppliedStateEvidence(snapshot.TweakId, EtatApplique.Unknown, null, null, null, null);
 
         if (CompositeSnapshotCodec.Decode(snapshot.AppliedValueJson) is { IsOk: true, Value: { Count: > 0 } posees })
-            return VerifierComposite(snapshot, posees, lecteur, nvApi, alimentation, services);
+            return VerifierComposite(snapshot, posees, lecteur, nvApi, alimentation, services, carte);
 
         var cible = Decoder(snapshot.AppliedValueJson);
         var origine = Decoder(snapshot.OriginalValueJson);
@@ -200,6 +272,10 @@ public static class AppliedStateVerifier
             return VerifierBoost(snapshot.TweakId, boost, origine as SetProcessorBoostModeOp, alimentation);
         if (cible is SetWirelessPowerSavingOp sansFil)
             return VerifierSansFil(snapshot.TweakId, sansFil, origine as SetWirelessPowerSavingOp, alimentation);
+
+        // La carte et le processeur, relus par ce qui les lit (NVAPI, ADLX, le registre 0x610).
+        if (ValeurDeCarte(cible) is not null)
+            return VerifierCarte(snapshot.TweakId, cible, origine, carte);
 
         // Un service demarre ou arrete, relu par son etat.
         if (cible is RunServiceControlOp { Action: ServiceAction.Start or ServiceAction.Stop } service)

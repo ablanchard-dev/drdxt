@@ -7,7 +7,9 @@ namespace DrDxt.Application.Tweaks.Latency;
 // Le profil global du pilote en « performances maximales » garde la carte au maximum hors jeu :
 // mesuré le 24/09 sur la machine de référence, 55,6 W et 2 490 MHz au repos. Ce levier rend
 // « Normal » (PREFERRED_PSTATE_ADAPTIVE, voir PreferMaxPerfTweak.Normal) au profil global
-// seulement : un maximum posé sur le profil d'un jeu reste le choix de ce jeu.
+// seulement : un maximum posé sur le profil d'un jeu reste le choix de ce jeu. C'est une valeur écrite, pas le défaut du
+// pilote (OPTIMAL_POWER, 5, quand le réglage est absent du profil) : le helper ne supprime jamais rien du profil de base
+// (OpAllowlist.ValidateNvApiDrsDelete). Les textes disent donc « Normal (mode adaptatif) », jamais « défaut du pilote ».
 //
 // L'original est relu au moment d'écrire (le scan peut dater) : s'il n'est plus au maximum, rien n'est
 // écrit. L'annulation réécrit la valeur lue ; la cible voyage dans le snapshot pour la relecture. Ce

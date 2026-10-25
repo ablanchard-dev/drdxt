@@ -49,9 +49,9 @@ public sealed class SettingsStateReader : ISettingsStateReader
             return Result<SettingsState>.Fail(power.Error!.Value.Code, power.Error.Value.Message);
 
         var xmp = XmpInferencer.Infer(hw.Memory);
-        // ReBar vient du GPU principal déjà détecté, pas relu ici.
+        // ReBar vient de la carte dédiée déjà détectée, pas relu ici : une puce intégrée listée en premier n'a pas de BAR.
         // NVIDIA → Unknown (étiquette honnête).
-        var rebar = hw.Gpus.Count > 0 ? hw.Gpus[0].ReBar : TriState.Unknown;
+        var rebar = CartesGraphiques.CarteDediee(hw)?.ReBar ?? TriState.Unknown;
 
         // Uptime = temps depuis la dernière initialisation du noyau. Environment.TickCount64 est
         // exactement GetTickCount64, et ne repart pas à zéro sans vrai redémarrage, c'est tout
@@ -63,8 +63,6 @@ public sealed class SettingsStateReader : ISettingsStateReader
             TimeSpan.FromMilliseconds(Environment.TickCount64),
             sinceChange: null);   // diagnostic à froid : décrit la machine, pas un changement
 
-        // Le cap d'images : mesure sur cette machine, il valait 141 (= 144 - 3, la regle de
-        // faible latence du second ecran) alors que le principal tourne a 200 Hz.
         // Une seule enumeration d'ecrans pour les deux verdicts qui en dependent. Deux appels
         // donneraient deux instantanes differents, et le cap pourrait etre juge contre un etat
         // d'affichage que le levier de frequence ne voit pas : deux verdicts qui se contredisent
@@ -153,7 +151,9 @@ public sealed class SettingsStateReader : ISettingsStateReader
             HagsEffective: _hags?.Lire() ?? TriState.Unknown,
             GameMode: _registry.GetGameMode(),   // passe-plat : l'Unknown survit jusqu'au levier
             AccelerationSouris: _registry.GetAccelerationSouris(),
-            ParkedCoreIndexes: _registry.GetParkedCoreIndexes(),
+            // Jeu ouvert seulement : hors jeu, l'optimiseur 3D V-Cache ne parque rien, et « aucun cœur parqué » serait lu
+            // comme un routage X3D cassé sur une machine saine. Sans jeu, non lu.
+            ParkedCoreIndexes: _game?.RunningGameExecutablePath() is null ? null : _registry.GetParkedCoreIndexes(),
             Vrr: vrrPilote ?? (ecranJeu?.VrrEnabled is TriState.On or TriState.Off ? ecranJeu.VrrEnabled : _registry.GetVrr()),
             VrrCapableDisplay: ecranJeu?.VrrPossible ?? TriState.Unknown,
             PagefileConfigured: _registry.GetPagefile(),
@@ -192,8 +192,7 @@ public sealed class SettingsStateReader : ISettingsStateReader
             // sur quatre la donnee n'a pas ete lue ; en conclure « CSM actif » promouvrait un Unknown.
             //
             // Un `bool` ne distingue pas « legacy » de « pas su ». Le rendre correct demande que
-            // `IFirmwareProvider` cesse d'aplatir le type firmware en booleen (6 appelants).
-            // En attendant, on n'affirme rien.
+            // `IFirmwareProvider` cesse d'aplatir le type firmware en booleen : tant qu'il le fait, on n'affirme rien.
             Csm: TriState.Unknown,
             Restart: restart,
             FrameCap: frameCap,

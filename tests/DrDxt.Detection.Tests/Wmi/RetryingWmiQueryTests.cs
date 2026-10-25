@@ -28,6 +28,21 @@ public class RetryingWmiQueryTests
 
     private static RetryingWmiQuery Sut(IWmiQuery inner) => new(inner, attempts: 2, delay: TimeSpan.Zero);
 
+    // Un délai dépassé n'est pas une panne passagère : winmgmt est figé. Le rejouer doublerait l'attente et laisserait un
+    // second fil bloqué.
+    [Fact]
+    public void Un_delai_depasse_n_est_pas_rejoue()
+    {
+        var inner = Substitute.For<IWmiQuery>();
+        inner.Query(Wql).Returns(Result<IReadOnlyList<WmiRow>>.Fail(ErrorCodes.WmiTimeout, "figé"));
+
+        var r = Sut(inner).Query(Wql);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.WmiTimeout);
+        inner.Received(1).Query(Wql);
+    }
+
     [Fact]
     public void Une_lecture_qui_echoue_puis_reussit_rend_la_reussite()
     {

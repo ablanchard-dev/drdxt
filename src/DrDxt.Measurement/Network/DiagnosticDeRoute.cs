@@ -1,4 +1,4 @@
-using DrDxt.Core;
+﻿using DrDxt.Core;
 
 namespace DrDxt.Measurement.Network;
 
@@ -29,16 +29,16 @@ public enum VerdictRoute
     EssaiAComparer = 4,
 }
 
-/// <param name="Echantillons">Nombre de réponses reçues du serveur de la partie.</param>
-/// <param name="PingMedianMs">Aller-retour moyen vers le serveur (le compteur de sondes rend la moyenne).</param>
-/// <param name="PertePourcent">Part des sondes sans réponse.</param>
-/// <param name="GigueMs">Écart moyen entre deux aller-retours successifs.</param>
-/// <param name="Attribution">Où commence l'instabilité (<see cref="NetworkPathAnalyzer"/>).</param>
 /// <summary>Un routeur du chemin vers le serveur : son rang (TTL), son adresse (<c>null</c> s'il n'a pas répondu) et son
 /// aller-retour chronométré (Windows rend 0 ms pour un TTL expiré, relevé sur la machine le 03/10).</summary>
 public sealed record SautDeRoute(int Ttl, System.Net.IPAddress? Adresse, double? Ms);
 
-public sealed record MesureDeRoute(int Echantillons, double PingMedianMs, double PertePourcent, double GigueMs, NetworkPathVerdict Attribution);
+/// <param name="Echantillons">Nombre de réponses reçues du serveur de la partie.</param>
+/// <param name="PingMoyenMs">Aller-retour moyen vers le serveur (le compteur de sondes rend la moyenne).</param>
+/// <param name="PertePourcent">Part des sondes sans réponse.</param>
+/// <param name="GigueMs">Écart moyen entre deux aller-retours successifs.</param>
+/// <param name="Attribution">Où commence l'instabilité (<see cref="NetworkPathAnalyzer"/>).</param>
+public sealed record MesureDeRoute(int Echantillons, double PingMoyenMs, double PertePourcent, double GigueMs, NetworkPathVerdict Attribution);
 
 public static class DiagnosticDeRoute
 {
@@ -52,6 +52,16 @@ public static class DiagnosticDeRoute
     /// <summary>Une perte de 1 % se voit déjà en partie (balles qui ne partent pas, téléportations).</summary>
     public const double PerteGenantePourcent = 1;
 
+    /// <summary>Un routeur de transit jette de temps en temps une réponse ICMP : une sonde perdue seule ne dit rien de la
+    /// route (une sur 60 fait déjà 1,6 %). La perte ne compte qu'à partir de deux.</summary>
+    public const int SondesPerduesMinimum = 2;
+
+    // Les sondes envoyées sans réponse, retrouvées depuis les réponses reçues et la part perdue.
+    private static int SondesPerdues(MesureDeRoute m)
+        => m.PertePourcent is > 0 and < 100
+            ? (int)Math.Round(m.Echantillons * m.PertePourcent / (100 - m.PertePourcent))
+            : 0;
+
     /// <summary>Au-delà, l'aller-retour varie d'une image à 60 Hz sur deux.</summary>
     public const double GigueGenanteMs = 8;
 
@@ -60,9 +70,10 @@ public static class DiagnosticDeRoute
         if (m.Echantillons < EchantillonsMinimum) return VerdictRoute.Inconnu;
         if (m.Attribution == NetworkPathVerdict.StartsAtFirstHop) return VerdictRoute.ProblemeLocal;
 
-        var instable = m.PertePourcent >= PerteGenantePourcent || m.GigueMs > GigueGenanteMs;
+        var instable = (m.PertePourcent >= PerteGenantePourcent && SondesPerdues(m) >= SondesPerduesMinimum)
+                       || m.GigueMs > GigueGenanteMs;
         if (instable) return VerdictRoute.RelaisPeutAider;
-        return m.PingMedianMs <= PingSansGainPossibleMs ? VerdictRoute.RouteDejaBonne : VerdictRoute.EssaiAComparer;
+        return m.PingMoyenMs <= PingSansGainPossibleMs ? VerdictRoute.RouteDejaBonne : VerdictRoute.EssaiAComparer;
     }
 
     public const string Nom = "route vers le serveur de la partie";
@@ -81,8 +92,14 @@ public static class DiagnosticDeRoute
     /// quand le serveur ignore le ping ; <c>null</c> quand le serveur lui-même a répondu.</summary>
     public static RepairFinding Constat(MesureDeRoute m, string serveur, SautDeRoute? jusqua = null)
     {
-        var c = ConstatBrut(m, serveur);
-        return jusqua is null ? c : c with
+        if (jusqua is null) return ConstatBrut(m, serveur);
+        // Un routeur répond au « TTL expiré » en basse priorité, sous débit limité : ses pertes et ses à-coups ne sont pas
+        // ceux de la route, et ne désignent pas le cas où un relais aide.
+        var c = Juger(m) == VerdictRoute.RelaisPeutAider
+            ? new RepairFinding(PertesInterface.Domaine, Nom, Docteur.T("DR.Lu", m.PingMoyenMs, m.PertePourcent, m.GigueMs), null,
+                RepairStatus.Observed, Docteur.T("DR.RouteurNAttribuePas"))
+            : ConstatBrut(m, serveur);
+        return c with
         {
             Explication = Docteur.T("DR.JusquAuRouteur", jusqua.Ttl, jusqua.Adresse, serveur)
                 + char.ToUpper(c.Explication[0], Docteur.Langue) + c.Explication[1..],
@@ -91,7 +108,7 @@ public static class DiagnosticDeRoute
 
     private static RepairFinding ConstatBrut(MesureDeRoute m, string serveur)
     {
-        var lu = Docteur.T("DR.Lu", m.PingMedianMs, m.PertePourcent, m.GigueMs);
+        var lu = Docteur.T("DR.Lu", m.PingMoyenMs, m.PertePourcent, m.GigueMs);
         return Juger(m) switch
         {
             VerdictRoute.RouteDejaBonne => new(PertesInterface.Domaine, Nom, lu, null, RepairStatus.ExpectedDefault,
@@ -101,7 +118,7 @@ public static class DiagnosticDeRoute
             VerdictRoute.RelaisPeutAider => new(PertesInterface.Domaine, Nom, lu, null, RepairStatus.Suspicious,
                 Docteur.T("DR.Relais", serveur)),
             VerdictRoute.EssaiAComparer => new(PertesInterface.Domaine, Nom, lu, null, RepairStatus.Observed,
-                Docteur.T("DR.Essai", m.PingMedianMs, serveur)),
+                Docteur.T("DR.Essai", m.PingMoyenMs, serveur)),
             _ => new(PertesInterface.Domaine, Nom, null, null, RepairStatus.Observed,
                 Docteur.T("DR.TropPeu", m.Echantillons)),
         };

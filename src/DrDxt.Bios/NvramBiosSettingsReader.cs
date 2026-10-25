@@ -132,7 +132,8 @@ public sealed class NvramBiosSettingsReader
     ///
     /// Recoupements (ce que Windows prouve, et seulement ca) :
     /// · ReBAR lu par Windows (On/Off) doit etre la valeur du BIOS ;
-    /// · un demarrage LEGACY prouve le CSM (st.Csm == On) : le BIOS ne peut pas dire « UEFI ».
+    /// · un demarrage LEGACY prouverait le CSM (st.Csm == On) : le BIOS ne pourrait pas dire « UEFI ». Le scan laisse
+    ///   st.Csm a Unknown (SettingsStateReader) : ce recoupement ne joue que si une autre source le remplit.
     /// XMP n'a pas de recoupement dur : « profil desactive » avec une RAM au-dessus du standard
     /// est un reglage a la main (le cas releve le 17/09), pas une contradiction.
     /// </summary>

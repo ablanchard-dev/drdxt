@@ -28,8 +28,7 @@ public interface IChipProfileCatalog
 // vague par vague, quand des machines réelles les confirment.
 //
 //   Tweak ids referenced (see DrDxt.Application.Tweaks):
-//     fixit.power_plan · fixit.x3d_ccd · latency.reflex · latency.vrr_vsync_cap
-//     latency.render_queue_cap · gpu.power_limit · gpu.undervolt
+//     fixit.power_plan · fixit.x3d_ccd · latency.vrr_vsync_cap · latency.render_queue_cap · gpu.power_limit
 //     fixit.sane_pagefile · latency.prefer_max_perf (06/10/2026 : en-têtes NVAPI,
 //     https://github.com/NVIDIA/nvapi, et Microsoft Learn sur le fichier d'échange)
 //     fixit.ecran_frequence (07/10/2026 : Microsoft Learn, ChangeDisplaySettingsExW et CDS_TEST)
@@ -76,8 +75,8 @@ public sealed class ChipProfileCatalog : IChipProfileCatalog
     private const string TweakGameDvr     = "latency.gameDvrBackgroundOff";
     private const string TweakVrrFlip     = "latency.vrrFlipModelOn";
 
-    // Deux leviers enregistrés, testés, et absents de tout profil,
-    // donc jamais proposés par « Optimiser ». Chacun garde son AppliesTo (état LU qui le justifie, Unknown ne déclenche
+    // Deux leviers enregistrés et testés : le fichier d'échange est du profil générique, l'état P du profil NVIDIA.
+    // Chacun garde son AppliesTo (état LU qui le justifie, Unknown ne déclenche
     // rien) et son juge : le fichier d'échange agit au redémarrage et se juge sur les parties (retrait si « moins bien en
     // jeu ») ; l'état P agit à chaud et passe par la session mesurée en jeu, qui l'annule s'il ne gagne rien.
     private const string TweakSanePagefile = "fixit.sane_pagefile";
@@ -270,15 +269,15 @@ public sealed class ChipProfileCatalog : IChipProfileCatalog
                     SrcX3d, GainConfidence.Sourced, SafetyLevel.Safe)),
         });
 
-    // --- NVIDIA : décalage, limite de puissance et Reflex. ---
+    // --- NVIDIA : l'état P « performances maximales » au profil du jeu et la limite de puissance. ---
     private static ChipProfile BuildNvidiaOptionA() => new(
         Id: "profile.nvidia.rtx.option_a",
         NameKey: "profile.nvidia.rtx.option_a.name",
         Family: ChipFamily.NvidiaOptionA,
         Tested: false,
-        Summary: "Desktop GeForce: Reflex latency floor + Option-A efficiency (power-limit trim + " +
-                 "conservative core-clock offset). NVAPI-stable, in-bounds, reversible; the felt gain " +
-                 "is latency, the tuning is cooler/steadier rather than big FPS.",
+        Summary: "Desktop GeForce: prefer maximum performance for the game + Option-A efficiency (power-limit " +
+                 "trim). NVAPI-stable, in-bounds, reversible; the felt gain is latency, the tuning is " +
+                 "cooler/steadier rather than big FPS.",
         Selections: new[]
         {
             new ProfileTweakSelection(

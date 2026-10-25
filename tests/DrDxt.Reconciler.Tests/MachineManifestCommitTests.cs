@@ -52,6 +52,23 @@ public sealed class MachineManifestCommitTests : IDisposable
 
     private string[] MisDeCote(string nom) => Directory.GetFiles(_racine, nom + ".mis-de-cote-*");
 
+    // Deux comptes ont chacun leur helper, et un seul manifeste : deux écritures simultanées gardent chacune leur entrée.
+    [Fact]
+    public async Task Deux_commits_simultanes_gardent_chacun_leur_entree()
+    {
+        (await Commit(Gardes(Garde("depart", "\"0\"")))).IsOk.Should().BeTrue("la clé existe avant la course");
+        for (var i = 0; i < 20; i++)
+        {
+            var a = Task.Run(() => Commit(Gardes(Garde($"a{i}", "\"1\""))));
+            var b = Task.Run(() => Commit(Gardes(Garde($"b{i}", "\"2\""))));
+            (await a).IsOk.Should().BeTrue();
+            (await b).IsOk.Should().BeTrue();
+        }
+
+        var relu = await RelireAvecLaSeulePublique();
+        relu.Value!.RevertOnly!.Select(t => t.TweakId).Should().Contain(Enumerable.Range(0, 20).SelectMany(i => new[] { $"a{i}", $"b{i}" }));
+    }
+
     // ── la cle ──────────────────────────────────────────────────────────────────────────────
 
     [Fact]

@@ -79,7 +79,12 @@ public sealed record KeepDecision(bool Keep, string RaisonCle, string Detail,
 /// </summary>
 public static class KeepPolicy
 {
-    /// <summary>Clés de message (resx). L'UI parle, le moteur nomme.</summary>
+    /// <summary>Codes stables de la décision, rendus dans CandidateResult.RaisonCle. Aucune ressource ne les traduit :
+    /// ce sont des identifiants, pas des phrases.</summary>
+    /// <summary>La marge qu'une seule grandeur de queue doit dépasser pour un keep : Bonferroni sur deux essais, z 2,24 contre
+    /// 1,96 (×1,14), porté à ×1,25 pour couvrir t de Student à cinq degrés de liberté (3,16 contre 2,57, ×1,23).</summary>
+    public const double FacteurDeBonferroni = 1.25;
+
     public const string CleGainProuve = "autopilot.keep.game_gain";
     public const string CleRegression = "autopilot.revert.regression";
     public const string CleNonResolu = "autopilot.revert.unresolved";
@@ -97,7 +102,7 @@ public static class KeepPolicy
     /// <summary>
     /// La decision par objectif, sur des preuves qui existent separement.
     ///
-    /// La ponderation 0,35/0,65 est une preference du joueur. Ce n'est pas une permission de
+    /// Une ponderation entre grandeurs serait une preference du joueur. Ce n'est pas une permission de
     /// melanger une grandeur bien resolue avec une grandeur inconnue et d'appeler le resultat une
     /// information. Mesure sur une session Warzone du 07/09/2026 : le score composite annoncait +/-72 %
     /// quand la moyenne seule resolvait a +/-4,6 % ; le 1 % low ruinait la mesure des deux.
@@ -135,7 +140,12 @@ public static class KeepPolicy
 
         var queue = preuves.Where(m =>
             m.Metrique is GameMetricKind.UnPourCentLow or GameMetricKind.P95Frametime).ToList();
-        var queueProuvee = queue.FirstOrDefault(m => m.Preuve.Outcome == EvidenceOutcome.ProvenGain);
+        // Deux grandeurs de queue, deux chances qu'un levier inerte passe pour un gain : à 95 % chacune, environ 5 % de faux
+        // keep au lieu de 2,5 %. Seule prouvée, une grandeur doit dépasser sa marge d'un facteur de Bonferroni (deux essais,
+        // arrondi vers le haut pour les petits échantillons de Student). Prouvées toutes deux, elles se confirment.
+        var gains = queue.Where(m => m.Preuve.Outcome == EvidenceOutcome.ProvenGain).ToList();
+        var queueProuvee = gains.Count >= 2 ? gains[0]
+            : gains.FirstOrDefault(m => Math.Abs(m.Preuve.DeltaPct) > FacteurDeBonferroni * m.Preuve.ResolutionPct);
         var moyenne = preuves.FirstOrDefault(m => m.Metrique == GameMetricKind.Moyenne);
 
         if (queueProuvee is not null)
@@ -176,11 +186,10 @@ public static class KeepPolicy
     /// <summary>
     /// Quelles grandeurs de queue sont en gain prouve dans ces preuves.
     ///
-    /// Publique et partagee expres. `DecideParMetrique` s'en sert pour etiqueter son verdict, et
-    /// un recolteur de corpus s'en sert sur `CandidateResult.Metriques`, qui porte deja la liste
-    /// complete. Deux lectures qui ne peuvent pas diverger, parce qu'il n'y en a qu'une : une
-    /// seconde definition de « ce qui compte comme queue », ecrite ailleurs, est exactement la
-    /// classe de derive silencieuse que ce fichier existe pour eviter.
+    /// Publique expres : `DecideParMetrique` s'en sert pour etiqueter son verdict, et une lecture du corpus
+    /// (`CandidateResult.Metriques` porte deja la liste complete) devra passer par elle. Une seconde definition de « ce qui
+    /// compte comme queue », ecrite ailleurs, est exactement la classe de derive silencieuse que ce fichier existe pour
+    /// eviter.
     ///
     /// Elle ne decide rien. Elle lit.
     /// </summary>

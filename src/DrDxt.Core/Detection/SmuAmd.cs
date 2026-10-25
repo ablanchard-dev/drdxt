@@ -17,7 +17,7 @@ public sealed class CommandeSmuLecture
 }
 
 /// <summary>
-/// La décision du mainteneur sur le SMU des Ryzen : LECTURE SEULE. Seules les commandes de la boîte aux lettres RSMU qui
+/// Le SMU des Ryzen est en LECTURE SEULE. Seules les commandes de la boîte aux lettres RSMU qui
 /// lisent (version du SMU, version et transfert de la table PM vers la DRAM, adresse de cette table, échelle PBO,
 /// marge du Curve Optimizer) sont nommées, par génération exacte : un même numéro règle quelque chose sur une autre
 /// génération (0x06 lit l'adresse de la table sur Zen 2 et Zen 3, et règle la marge d'un cœur du Curve Optimizer sur

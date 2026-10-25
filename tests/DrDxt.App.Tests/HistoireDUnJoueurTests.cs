@@ -212,7 +212,9 @@ public sealed class HistoireDUnJoueurTests : IDisposable
     private string Reglage(string id, bool allume) => string.Format(CultureInfo.CurrentCulture, Fr("Changement.Reglage"),
         Fr("Reglage." + id), Fr(allume ? "Reglage.Eteint" : "Reglage.Allume"), Fr(allume ? "Reglage.Allume" : "Reglage.Eteint"));
 
-    private string Retire(string id) => string.Format(CultureInfo.CurrentCulture, Fr("Changement.RetireAuRedemarrage"), Reglage(id, true));
+    // Le mode Jeu agit au prochain lancement du jeu : son retrait le dit ainsi.
+    private string Retire(string id) => string.Format(CultureInfo.CurrentCulture,
+        Fr(id == "windows.game_mode" ? "Changement.RetireAuLancementDuJeu" : "Changement.RetireAuRedemarrage"), Reglage(id, true));
 
     [Fact]
     public async Task Deux_semaines_de_parties_jugent_retirent_et_figent_comme_chez_un_joueur()
@@ -257,7 +259,7 @@ public sealed class HistoireDUnJoueurTests : IDisposable
         var cartes = _vm.LignesParties.ToList();
         cartes.Should().Contain(Retire("windows.hags")).And.Contain(Retire("windows.game_mode"));
         cartes.Should().NotContain(Retire("memoire.fichier_echange"), "F-9 : le fichier d'échange ne se retire pas sur les images");
-        cartes.Should().Contain(l => l.StartsWith("Ce que tes changements", StringComparison.Ordinal) && l.Contains("1 changement prouvé"));
+        cartes.Should().Contain(l => l.StartsWith("Ce que tes changements", StringComparison.Ordinal) && l.Contains("1 changement jugé avant/après"));
         // Le mode Jeu, jugé dès la pose, a été retiré pendant la partie du jour 6 ; le scan du jour 7 relève son retour
         // à « éteint », et la carte (trois changements au plus) ne montre plus sa bascule de la pose. Son bilan reste le même.
         cartes.Count(l => l.Contains(Fr("Changement.Pire")) && l.Contains("95 puis 81")).Should().Be(2);

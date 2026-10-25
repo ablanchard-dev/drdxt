@@ -2,7 +2,7 @@
 
 Version française : [CONFIDENTIALITE.md](CONFIDENTIALITE.md).
 
-DrDXT has no account, no telemetry, and no server of its own. What it reads on your PC stays there, except the two
+DrDXT has no account, no telemetry, and no server of its own. What it reads on your PC stays there, except the
 files you choose to send yourself, below.
 
 ## What DrDXT reads, and where it keeps it
@@ -22,14 +22,16 @@ What it keeps stays on your machine:
   message);
 - `Documents`: only the files you ask for (report, export of your machine).
 
-Uninstalling removes the program, its service and what it applied; your history stays in `%LOCALAPPDATA%\DrDXT`.
+Uninstalling removes the program and its services, and reverts the settings it knows; your history stays in
+`%LOCALAPPDATA%\DrDXT`, and the rest is listed in the README ("What remains").
 Deleting that folder and `%ProgramData%\DrDxt` erases everything.
 
 ## What goes over the network
 
 Only what the "What leaves the machine" section of the README lists: the public version of graphics drivers, pings,
-one question to your router on the home network (its WAN address, never shown), the update check, the line test under
-load if you click it (`speed.cloudflare.com`), and the pages you open yourself. Nothing that identifies you. A test fails if the code contacts an
+one question to your router on the home network (its WAN address, never shown), the update check at startup (turned
+off by setting `DRDXT_UPDATE_URL` to `off`), the line test under load if you click it (`speed.cloudflare.com`), the
+Windows repair if you start it (DISM downloads from Windows Update), and the pages you open yourself. Nothing that identifies you. A test fails if the code contacts an
 address the README does not name.
 
 Your Windows account credentials go to a proxy only if someone configured it: an HTTP(S)_PROXY variable, or a manual
@@ -49,10 +51,12 @@ submitted, it is readable by anyone who can see the repository, under your GitHu
 **"Export my machine"** writes a file to your Documents, which you send if you want your machine to serve as a test.
 Before writing, DrDXT removes from it:
 
+- the account's known folders read from Windows (Documents, Desktop, AppData, local AppData, and the profile outside X:\Users), wherever they are, even redirected: they become a marker (<Documents>, <Desktop>…), the rest of the path stays
 - the folder of any account (X:\Users\<name>): it becomes X:\Users\joueur, the rest of the path stays
 - the Windows account name (even two letters long), the PC name and its domain
 - serial numbers and hardware identifiers read on this PC (BIOS, motherboard, drives, memory, machine UUID, volume
   serial numbers)
+- the end of device identifiers (`USB\VID_…&PID_…\<instance>`): a serial number, a Bluetooth address; the model stays
 - MAC addresses (with dashes, colons or none, for the network cards of this PC)
 - IP addresses (v4 and v6); a four-number version (1.4.6.3) looks like a v4 address and is removed too, except in
   version fields (DriverVersion)
@@ -60,6 +64,7 @@ Before writing, DrDXT removes from it:
 - volume identifiers (Volume{…})
 - email addresses
 - the organization name of OneDrive folders ("OneDrive - <organization>")
+- dashed keys (license: at least four groups of five letters or digits) and fingerprints (32 hexadecimal characters or more)
 
 What remains: the models of your hardware, your settings, the names of your peripherals (mice, headsets) and of the
 programs that start with Windows. Read the file before sending it if any of them bothers you.

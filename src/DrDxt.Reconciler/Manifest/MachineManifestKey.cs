@@ -14,8 +14,8 @@ namespace DrDxt.Reconciler.Manifest;
 // cle creee localement, par le seul processus qui a le droit d'ecrire la racine admin : le helper
 // eleve, au premier `CommitManifestOp`. L'App (integrite moyenne) ne la tient jamais.
 //
-// Ou elle vit. `%ProgramData%\DrDxt\manifest-signing.key`, dans la racine deja durcie par la revue de
-// securite (proprietaire Administrateurs, ACE, points de reparse : TrustedManifestRoot). Le fichier a
+// Ou elle vit. `%ProgramData%\DrDxt\manifest-signing.key`, dans la racine deja durcie
+// (proprietaire Administrateurs, ACE, points de reparse : TrustedManifestRoot). Le fichier a
 // sa propre ACL, plus stricte que celle des fichiers publics : Administrateurs + SYSTEM seulement,
 // posee a la creation (TrustedManifestRoot.BuildPrivateFileSecurity), verifiee a chaque lecture
 // (EnsurePrivateFile : un fichier lisible par un non-admin est refuse).
@@ -201,7 +201,7 @@ public static class MachineManifestKey
 internal static class MiseDeCote
 {
     /// <param name="suffixe">pourquoi il est mis de cote : « mis-de-cote » (illisible, reprise) ou
-    /// « rendu » (11/09/2026 : ses origines viennent d'etre rendues a la desinstallation). Le nom du
+    /// « rendu » (ses origines viennent d'etre rendues a la desinstallation). Le nom du
     /// fichier laisse dit ce qui lui est arrive.</param>
     public static Result Renommer(string chemin, string suffixe = "mis-de-cote")
     {

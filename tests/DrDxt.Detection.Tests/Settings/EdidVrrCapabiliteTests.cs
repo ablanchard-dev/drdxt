@@ -27,13 +27,22 @@ public sealed class EdidVrrCapabiliteTests
         "203500132B2100001A5A8780A070384D4030203500132B2100001A60B480A070381E4030404500132B2100001A0000" +
         "0000000000000000000000000000000000000054";
 
-    /// <summary>Samsung 144 Hz, second écran. Plage 50-144 Hz, et aucun bloc VRR.</summary>
+    /// <summary>Samsung 144 Hz, second écran. Plage 50-144 Hz. Le registre ne garde que le bloc de base, alors que son octet
+    /// 126 annonce une extension : le bloc VRR, s'il existe, serait dans cette extension.</summary>
     private const string SamsungSansVrr =
         "00FFFFFFFFFFFF004C2DD97159365734121F010380351E782ACB75A656539D27125054BFEF80714F810081C081809500" +
         "A9C0B3000101B37D806A703817402C2035000F282100001E000000FD0032901E9F22000A202020202020000000FC00" +
         "4C53323441473332780A202020000000FF0048394A544330323931362020200106";
 
     private static byte[] Octets(string hex) => Convert.FromHexString(hex);
+
+    /// <summary>Le même bloc de base, sans extension annoncée : un EDID complet qui ne déclare aucun bloc VRR.</summary>
+    private static byte[] SansExtension(string hex)
+    {
+        var o = Octets(hex);
+        o[126] = 0;
+        return o;
+    }
 
     [Fact]
     public void Un_ecran_qui_declare_FreeSync_est_lu_CAPABLE()
@@ -47,7 +56,7 @@ public sealed class EdidVrrCapabiliteTests
         // `Off`, pas `Unknown` : « cet ecran n'est pas VRR » est une REPONSE. La confondre
         // avec « je n'ai pas su lire » ferait taire un levier pour une machine sur laquelle il
         // n'y a rien a dire — et le produit ne saurait jamais la difference.
-        EdidVrrCapabilite.Lire(Octets(SamsungSansVrr)).Should().Be(TriState.Off);
+        EdidVrrCapabilite.Lire(SansExtension(SamsungSansVrr)).Should().Be(TriState.Off);
     }
 
     [Fact]
@@ -57,7 +66,7 @@ public sealed class EdidVrrCapabiliteTests
         // descripteur « Monitor Range Limits » (0xFD) existe sur tous les ecrans : le Samsung en
         // porte un, 50-144 Hz, et n'est pas VRR pour autant. S'en servir ferait dire « capable »
         // a n'importe quel 144 Hz — exactement le genre de deduction que ce produit s'interdit.
-        var samsung = Octets(SamsungSansVrr);
+        var samsung = SansExtension(SamsungSansVrr);
         samsung.Should().Contain((byte)0xFD, "la fixture doit bien contenir un descripteur de plage");
         EdidVrrCapabilite.Lire(samsung).Should().Be(TriState.Off);
     }
@@ -85,4 +94,64 @@ public sealed class EdidVrrCapabiliteTests
         var bon = EdidFabrique.AvecHdmiForum(vrrMin: 48, vrrMax: 120);
         EdidVrrCapabilite.Lire(bon).Should().Be(TriState.On);
     }
+
+    // Une extension annoncée mais absente : on ne sait pas, ce n'est pas « pas de VRR ». Le Samsung relevé est ce cas : son
+    // extension n'est pas dans le registre.
+    [Fact]
+    public void Une_extension_annoncee_mais_absente_rend_UNKNOWN()
+    {
+        EdidVrrCapabilite.Lire(Octets(SamsungSansVrr)).Should().Be(TriState.Unknown);
+        EdidVrrCapabilite.Lire(EdidFabrique.AvecHdmiForum(48, 144)[..128]).Should().Be(TriState.Unknown);
+    }
+
+    /// <summary>L'extension CTA-861 du même Samsung, lue par WMI (WmiMonitorDescriptorMethods, bloc 1) sur la machine de
+    /// référence le 25/10/2026 : vidéo, audio, haut-parleurs et un VSDB HDMI 1.4 (OUI 000C03), aucun bloc VRR.</summary>
+    private const string SamsungBloc1 =
+        "02031CF147903F1F04130312230907078301000067030C001000B8440474801871382D40582C45000F282100001E023A" +
+        "801871382D40582C45000F282100001E0000000000000000000000000000000000000000000000000000000000000000" +
+        "00000000000000000000000000000000000000000000000000000000000000BF";
+
+    // Le registre ne garde que le bloc de base : l'extension annoncée se lit par WMI, et l'écran se juge sur l'EDID complet.
+    [Fact]
+    public void L_extension_absente_du_registre_se_complete_par_le_bloc_lu_ailleurs()
+    {
+        var complet = DrDxt.Detection.Display.EdidDuMoniteur.Completer(Octets(SamsungSansVrr), i => i == 1 ? Octets(SamsungBloc1) : null);
+
+        complet.Should().HaveCount(256);
+        EdidVrrCapabilite.Lire(complet).Should().Be(TriState.Off, "l'extension réelle ne déclare aucun bloc VRR");
+        EdidVrrCapabilite.Lire(DrDxt.Detection.Display.EdidDuMoniteur.Completer(
+            EdidFabrique.AvecHdmiForum(48, 144)[..128], i => EdidFabrique.AvecHdmiForum(48, 144)[128..])).Should().Be(TriState.On);
+    }
+
+    // Une extension DisplayID (tag 0x70) peut déclarer l'Adaptive-Sync d'un écran DisplayPort ; le lecteur ne la parcourt pas :
+    // « non lu », jamais « pas de VRR ». Une table de blocs (0xF0) ne porte rien : elle ne change pas la réponse.
+    [Theory]
+    [InlineData(0x70, TriState.Unknown)]
+    [InlineData(0xF0, TriState.Off)]
+    public void Une_extension_d_un_autre_type_que_CTA(int tag, TriState attendu)
+    {
+        var edid = new byte[256];
+        Octets(SamsungSansVrr).CopyTo(edid, 0);
+        edid[128] = (byte)tag;
+
+        EdidVrrCapabilite.Lire(edid).Should().Be(attendu);
+    }
+
+    // Le bloc illisible (WMI refusé, taille inattendue) : l'EDID reste tel quel, et la réponse reste « non lu ».
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Un_bloc_illisible_laisse_l_edid_tel_quel(bool tropLong)
+    {
+        var complet = DrDxt.Detection.Display.EdidDuMoniteur.Completer(Octets(SamsungSansVrr),
+            _ => tropLong ? [.. Octets(SamsungBloc1), .. new byte[64]] : null);
+
+        EdidVrrCapabilite.Lire(complet).Should().Be(TriState.Unknown);
+    }
+
+    // Un EDID déjà complet n'interroge rien d'autre.
+    [Fact]
+    public void Un_edid_complet_ne_demande_aucun_bloc()
+        => DrDxt.Detection.Display.EdidDuMoniteur.Completer(Octets(AsusVrr), _ => throw new InvalidOperationException("demandé"))
+            .Should().Equal(Octets(AsusVrr));
 }

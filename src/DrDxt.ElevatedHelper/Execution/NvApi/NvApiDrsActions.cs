@@ -15,8 +15,7 @@ namespace DrDxt.ElevatedHelper.Execution.NvApi;
 // fonction DRS ni de la struct NVDRS_SETTING_V1 ici ; c'est un orchestrateur mince, exactement
 // comme ADLXTuningActions sur IAdlxNative.
 //
-// Le settingId reçu est déjà validé par l'allowlist (l'ensemble fermé d'ids corrigés :
-// PRERENDERLIMIT / VSYNCMODE / FRL_FPS / PREFERRED_PSTATE, quatre). Sur une machine AMD / sans
+// Le settingId reçu est déjà validé par l'allowlist (l'ensemble fermé d'ids d'OpAllowlist). Sur une machine AMD / sans
 // NVIDIA, NVAPI est indisponible → un Result.Fail propre (« NVIDIA NVAPI unavailable »). Ne lève jamais.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]

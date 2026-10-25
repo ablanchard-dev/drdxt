@@ -91,10 +91,9 @@ public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifes
 
     private async Task<Result> SignerEtEcrireAsync(DesiredState state)
     {
-        // (2) octets canoniques + signature. Ces octets ne portent aucune duree de licence.
-        // La cle qui les signe est celle de la machine ; elle prouve « DrDXT a pose ceci », jamais
-        // « cette machine est payee » : le proprietaire administrateur peut la lire. Le droit de
-        // reappliquer se lit dans le fichier signe par l'editeur (LicenceDeLaMachine).
+        // (2) octets canoniques + signature. La cle qui les signe est celle de la machine ; elle prouve
+        // « DrDXT a pose ceci » face a un programme non eleve, pas face au proprietaire administrateur,
+        // qui peut la lire.
         var now = _clock.UtcNow;
         var manifest = new DesiredStateManifest(
             DesiredStateManifest.CurrentSchemaVersion, state, now);
@@ -114,7 +113,7 @@ public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifes
     {
         // Déléguer au cœur partagé « vérifier avant d'analyser » (ISignedManifestReader) et réduire à
         // la vue de l'état seul. Pas de fichier → état vide (première installation), altération /
-        // schéma → échec propre. Aucune licence : un manifeste dont la signature se vérifie se réapplique.
+        // schéma → échec propre. Un manifeste dont la signature se vérifie se réapplique.
         var manifest = await LoadManifestAsync();
         if (!manifest.IsOk)
             return Result<DesiredState>.Fail(manifest.Error!.Value.Code, manifest.Error.Value.Message);

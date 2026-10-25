@@ -18,12 +18,14 @@ namespace DrDxt.Detection.Hardware;
 ///
 /// Limite connue : les fabricants qui compressent la vitesse (Kingston Fury « KF4 32 » =
 /// DDR4-3200) n'ont pas de suite de 4 chiffres ; ils rendent null et retombent honnêtement sur WMI.
+/// Crucial (« CT… ») code la sienne autrement (CT16G4DFD8266 = DDR4-2666) : sa suite de 4 chiffres n'est pas un débit,
+/// et sa référence rend null elle aussi.
 /// </summary>
 public static partial class DramPartNumber
 {
     // Débits plausibles de la mémoire grand public : DDR4 ~2133 jusqu'à DDR5 ~8400+. Bornes
-    // larges, mais au-dessus des codes à 3 chiffres et sous les nombres qui ressemblent à une
-    // année, pour qu'une valeur parasite ne passe pas pour une vitesse.
+    // larges, au-dessus des codes à 3 chiffres. Une suite qui ressemble à une année (2000 à 2099) y entre : elle ne
+    // l'emporte que si elle dépasse le débit lu par WMI.
     private const int MinPlausibleMhz = 2000;
     private const int MaxPlausibleMhz = 9000;
 
@@ -33,6 +35,7 @@ public static partial class DramPartNumber
     public static int? TryParseRatedMhz(string? partNumber)
     {
         if (string.IsNullOrWhiteSpace(partNumber)) return null;
+        if (partNumber.TrimStart().StartsWith("CT", StringComparison.OrdinalIgnoreCase)) return null;
 
         int? best = null;
         foreach (Match m in FourDigitRun().Matches(partNumber))

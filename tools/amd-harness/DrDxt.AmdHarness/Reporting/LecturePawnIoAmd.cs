@@ -8,9 +8,9 @@ namespace DrDxt.AmdHarness.Reporting;
 /// testeur mette chaque valeur à côté de HWiNFO et de ZenTimings. Pur : met en forme des lectures déjà faites.</summary>
 internal static class LecturePawnIoAmd
 {
-    /// <param name="canaux">Les registres de timings (<see cref="TimingsMemoireAmd.Registres"/>) de chaque canal actif.</param>
+    /// <param name="canaux">Les registres de timings (<see cref="TimingsMemoireAmd.Registres"/>) de chaque canal actif, sous son numéro physique.</param>
     public static IReadOnlyList<string> Lignes(bool pawnIoInstalle, GenerationAmd.Ligne? generation, double? tctl,
-        IReadOnlyList<double>? ccd, uint? s5, (uint NomDeCode, uint VersionSmu)? smu, IReadOnlyList<IReadOnlyDictionary<uint, uint>>? canaux)
+        IReadOnlyList<double>? ccd, uint? s5, (uint NomDeCode, uint VersionSmu)? smu, IReadOnlyList<(int Canal, IReadOnlyDictionary<uint, uint> Registres)>? canaux)
     {
         if (!pawnIoInstalle) return ["PawnIO : absent, rien n'est lu sur le processeur (DrDXT ne l'installe jamais)"];
         var c = CultureInfo.InvariantCulture;
@@ -26,8 +26,8 @@ internal static class LecturePawnIoAmd
         if (canaux is null) lignes.Add("Timings       : non lus");
         else if (canaux.Count == 0) lignes.Add("Timings       : aucun canal actif");
         else
-            for (var i = 0; i < canaux.Count; i++)
-                lignes.Add($"Timings canal {i} : " + string.Join(" ", TimingsMemoireAmd.Registres.Select(r => $"{r:X5}={canaux[i][r]:X8}")));
+            foreach (var (canal, registres) in canaux)
+                lignes.Add($"Timings canal {canal} : " + string.Join(" ", TimingsMemoireAmd.Registres.Select(r => $"{r:X5}={registres[r]:X8}")));
         return lignes;
     }
 

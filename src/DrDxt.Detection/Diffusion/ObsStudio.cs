@@ -33,15 +33,16 @@ public static partial class ObsStudio
     private const long OctetsMax = 8L * 1024 * 1024;
     private const int JournauxMax = 30;
 
-    [GeneratedRegex(@"skipped frames due to encoding lag: (?<n>\d+)/(?<t>\d+) ")]
+    // [0-9] et non \d : \d accepte les chiffres de toutes les écritures, qu'OBS n'écrit jamais.
+    [GeneratedRegex(@"skipped frames due to encoding lag: (?<n>[0-9]+)/(?<t>[0-9]+) ")]
     private static partial Regex LigneEncodage();
-    [GeneratedRegex(@"': Total frames output: (?<a>\d+)(?: \((?<t>\d+) attempted\))?")]
+    [GeneratedRegex(@"': Total frames output: (?<a>[0-9]+)(?: \((?<t>[0-9]+) attempted\))?")]
     private static partial Regex LigneSortie();
-    [GeneratedRegex(@"': Total drawn frames: (?<a>\d+)(?: \((?<t>\d+) attempted\))?")]
+    [GeneratedRegex(@"': Total drawn frames: (?<a>[0-9]+)(?: \((?<t>[0-9]+) attempted\))?")]
     private static partial Regex LigneDessin();
-    [GeneratedRegex(@"Number of lagged frames due to rendering lag/stalls: (?<n>\d+) ")]
+    [GeneratedRegex(@"Number of lagged frames due to rendering lag/stalls: (?<n>[0-9]+) ")]
     private static partial Regex LigneRendu();
-    [GeneratedRegex(@"Number of dropped frames due to insufficient bandwidth/connection stalls: (?<n>\d+) ")]
+    [GeneratedRegex(@"Number of dropped frames due to insufficient bandwidth/connection stalls: (?<n>[0-9]+) ")]
     private static partial Regex LigneReseau();
     [GeneratedRegex(@"Output '.*': stopping")]
     private static partial Regex LigneArret();
@@ -56,16 +57,28 @@ public static partial class ObsStudio
         if (!LigneArret().IsMatch(journal)) return null;
         long encN = 0, encT = 0, renduN = 0, renduT = 0, reseauN = 0, reseauT = 0;
         var reconnu = false;
-        static long L(Group g) => long.Parse(g.Value, CultureInfo.InvariantCulture);
+        // OBS écrit ces nombres en %u / %ld (32 bits sous Windows) : au-delà, la ligne est abîmée et sautée. Les sommes en
+        // long ne débordent pas.
+        static bool L(Group g, out long v)
+        {
+            var ok = int.TryParse(g.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var i);
+            v = i;
+            return ok;
+        }
+        static Group TA(Match m) => m.Groups["t"].Success ? m.Groups["t"] : m.Groups["a"];
         foreach (var ligne in journal.Split('\n'))
         {
-            if (LigneEncodage().Match(ligne) is { Success: true } e) { encN += L(e.Groups["n"]); encT += L(e.Groups["t"]); reconnu = true; }
-            else if (LigneSortie().Match(ligne) is { Success: true } o) { reseauT += L(o.Groups["t"].Success ? o.Groups["t"] : o.Groups["a"]); reconnu = true; }
-            else if (LigneDessin().Match(ligne) is { Success: true } d) { renduT += L(d.Groups["t"].Success ? d.Groups["t"] : d.Groups["a"]); reconnu = true; }
-            else if (LigneRendu().Match(ligne) is { Success: true } r) renduN += L(r.Groups["n"]);
-            else if (LigneReseau().Match(ligne) is { Success: true } n) reseauN += L(n.Groups["n"]);
+            if (LigneEncodage().Match(ligne) is { Success: true } e)
+            {
+                if (L(e.Groups["n"], out var n) && L(e.Groups["t"], out var t)) { encN += n; encT += t; reconnu = true; }
+            }
+            else if (LigneSortie().Match(ligne) is { Success: true } o) { if (L(TA(o), out var t)) { reseauT += t; reconnu = true; } }
+            else if (LigneDessin().Match(ligne) is { Success: true } d) { if (L(TA(d), out var t)) { renduT += t; reconnu = true; } }
+            else if (LigneRendu().Match(ligne) is { Success: true } r) { if (L(r.Groups["n"], out var n)) renduN += n; }
+            else if (LigneReseau().Match(ligne) is { Success: true } x) { if (L(x.Groups["n"], out var n)) reseauN += n; }
         }
-        static double? Part(long n, long t) => t > 0 ? 100.0 * n / t : null;
+        // Plus d'images perdues que d'images tentées, c'est un journal abîmé, pas une part : jamais « 99900 % ».
+        static double? Part(long n, long t) => t > 0 && n <= t ? 100.0 * n / t : null;
         return new Session(quand, Part(encN, encT), Part(renduN, renduT), Part(reseauN, reseauT), reconnu);
     }
 
@@ -87,7 +100,10 @@ public static partial class ObsStudio
     public static Reglages? LireReglages(string dossier)
     {
         var user = Lire(Path.Combine(dossier, "user.ini")) ?? Lire(Path.Combine(dossier, "global.ini"));
-        if (user is null || Ini(user, "Basic", "ProfileDir") is not { Length: > 0 } profil || profil.Contains("..", StringComparison.Ordinal)) return null;
+        // Un nom de profil sous le dossier d'OBS : un chemin absolu ferait lire ailleurs, et un chemin réseau ouvrirait une
+        // connexion SMB, donc une authentification du compte, vers l'hôte nommé.
+        if (user is null || Ini(user, "Basic", "ProfileDir") is not { Length: > 0 } profil || profil.Contains("..", StringComparison.Ordinal)
+            || Path.IsPathRooted(profil)) return null;
         var dossierProfil = Path.Combine(dossier, "basic", "profiles", profil);
         if (Lire(Path.Combine(dossierProfil, "basic.ini")) is not { } basic) return null;
         var mode = Ini(basic, "Output", "Mode");
@@ -98,9 +114,13 @@ public static partial class ObsStudio
         {
             try
             {
-                if (Lire(Path.Combine(dossierProfil, "streamEncoder.json")) is { } json
-                    && JsonDocument.Parse(json).RootElement.TryGetProperty("bitrate", out var b) && b.TryGetInt32(out var kbps))
-                    debit = kbps;
+                if (Lire(Path.Combine(dossierProfil, "streamEncoder.json")) is { } json)
+                {
+                    using var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("bitrate", out var b)
+                        && b.ValueKind == JsonValueKind.Number && b.TryGetInt32(out var kbps))
+                        debit = kbps;
+                }
             }
             catch (JsonException) { }
         }
@@ -151,7 +171,8 @@ public static partial class ObsStudio
             yield return new RepairFinding("STREAM", "pertes en stream", null, null, RepairStatus.Unknown, Docteur.T("OBS.JournauxNonLus"));
             yield break;
         }
-        var lues = sessions.Where(s => s.Reconnu).ToList();
+        // Un bilan reconnu sans aucune image comptée (une sortie coupée à 0 image) ne mesure rien : il ne compte pas.
+        var lues = sessions.Where(s => s.Reconnu && (s.Encodage ?? s.Rendu ?? s.Reseau) is not null).ToList();
         if (lues.Count == 0)
         {
             // Des sorties arrêtées sans bilan reconnu : le format a changé, on ne fabrique pas un « 0 perte ».
@@ -160,13 +181,14 @@ public static partial class ObsStudio
                 : new RepairFinding("STREAM", "pertes en stream", null, null, RepairStatus.Unknown, Docteur.T("OBS.BilanNonReconnu", sessions.Count));
             yield break;
         }
-        var (cle, pire) = new[]
-        {
-            ("OBS.Encodage", lues.Max(s => s.Encodage ?? 0)),
-            ("OBS.Rendu", lues.Max(s => s.Rendu ?? 0)),
-            ("OBS.Reseau", lues.Max(s => s.Reseau ?? 0)),
-        }.MaxBy(x => x.Item2);
-        var valeur = Docteur.T("OBS.ValeurPertes", Pct(lues.Max(s => s.Encodage ?? 0)), Pct(lues.Max(s => s.Rendu ?? 0)), Pct(lues.Max(s => s.Reseau ?? 0)));
+        // Une cause qu'aucun lancement n'a comptée se dit non comptée, jamais « 0 % ».
+        static double? Pire(IEnumerable<double?> parts) => parts.OfType<double>().DefaultIfEmpty(double.NaN).Max() is var m && double.IsNaN(m) ? null : m;
+        var encodage = Pire(lues.Select(s => s.Encodage));
+        var rendu = Pire(lues.Select(s => s.Rendu));
+        var reseau = Pire(lues.Select(s => s.Reseau));
+        var (cle, pire) = new[] { ("OBS.Encodage", encodage ?? 0), ("OBS.Rendu", rendu ?? 0), ("OBS.Reseau", reseau ?? 0) }.MaxBy(x => x.Item2);
+        static string Part(double? p) => p is { } v ? $"{Pct(v)} %" : Docteur.T("OBS.NonCompte");
+        var valeur = Docteur.T("OBS.ValeurPertes", Part(encodage), Part(rendu), Part(reseau));
         yield return pire > SeuilErreur
             ? new RepairFinding("STREAM", "pertes en stream", valeur, "≤ 1 %", RepairStatus.Suspicious,
                 Docteur.T(cle, Pct(pire), lues.Count, JoursLus), RepairAction.Recommandation)

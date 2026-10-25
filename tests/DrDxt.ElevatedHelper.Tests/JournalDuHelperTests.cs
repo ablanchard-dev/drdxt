@@ -88,7 +88,8 @@ public sealed class JournalDuHelperTests : IDisposable
         var journal = new JournalDEcritureAnticipee(Path.Combine(_racine, "j.json"));
         journal.Ajouter(Hags, "1", App, DateTimeOffset.UtcNow).IsOk.Should().BeTrue();
         var lecture = Substitute.For<DrDxt.Reconciler.Desinstallation.ILectureDesCibles>();
-        lecture.Lire(Arg.Any<PrivilegedOp>()).Returns(Result<string?>.Ok("2"));
+        // Posée (2) au jugement, rendue (1) à la relecture qui suit l'écriture.
+        lecture.Lire(Arg.Any<PrivilegedOp>()).Returns(Result<string?>.Ok("2"), Result<string?>.Ok("1"));
         lecture.CibleExiste(Arg.Any<PrivilegedOp>()).Returns(Result<bool>.Ok(true));
         var interne = Substitute.For<IPrivilegedOpExecutor>();
         interne.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(Result.Ok());

@@ -35,6 +35,15 @@ public class RepliDxgiBenchmarkRunnerTests
         CompteurPresentsDxgi.TracePleine(5L * 1024 * 1024).Should().BeFalse();
     }
 
+    // Le repli tourne pendant que le joueur joue. Tous les mots-cles au niveau verbeux tracaient chaque objet et chaque
+    // entree de journal de DXGI pour n'en garder qu'un evenement. Le manifeste installe place Present_Start (id 42) sous
+    // le mot-cle Events (0x2), au niveau LogAlways : Events au niveau information le garde, sans le reste.
+    [Fact]
+    public void La_trace_ne_demande_que_les_evenements_de_present()
+    {
+        CompteurPresentsDxgi.ArgumentsCreation(@"C:\t\x.etl").Should().EndWith("-p Microsoft-Windows-DXGI 0x2 4");
+    }
+
     // Un plantage en pleine capture laisse son .etl (jusqu'a la borne) ; son nom change a
     // chaque mesure, personne ne le reprenait. Une seule session a la fois : au demarrage, tout .etl du
     // compteur est un reste. Les autres fichiers du dossier ne sont pas touches.
@@ -152,5 +161,21 @@ public class RepliDxgiBenchmarkRunnerTests
             .RunAsync(1, TimeSpan.FromSeconds(1), 1, CancellationToken.None);
         r.Error!.Value.Code.Should().Be(ErrorCodes.NoPresentingFrames);
         r.Error.Value.Message.Should().Contain(ErrorCodes.CaptureFail);
+    }
+
+    // PresentMon rend une annulation en CaptureFail : le repli ne doit pas partir pour autant.
+    [Fact]
+    public async Task Une_annulation_ne_lance_pas_le_repli()
+    {
+        var dxgi = 0;
+        var pm = new PresentMon(Result<BenchmarkResult>.Fail(ErrorCodes.CaptureFail, "annulee"));
+        var runner = new RepliDxgiBenchmarkRunner(pm, (_, _, _) => { dxgi++; return Result<BenchmarkResult>.Ok(Serie(5)); });
+        using var annule = new CancellationTokenSource();
+        annule.Cancel();
+
+        var r = await runner.RunAsync(42, TimeSpan.FromSeconds(1), 1, annule.Token);
+
+        r.Error!.Value.Code.Should().Be(ErrorCodes.CaptureFail);
+        dxgi.Should().Be(0);
     }
 }

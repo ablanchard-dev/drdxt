@@ -16,7 +16,7 @@ public partial class ScanViewModel
     private bool OptimiserADuTravail => ReposCarteAOuvrir || !RienAPoserSeul || EssaiProposable;
 
     private EtapeDuDocteur EtapeSuivante =>
-        !CanApply ? EtapeDuDocteur.Aucune
+        !ScanPretAAgir ? EtapeDuDocteur.Aucune
         : EssaiEnCours ? EtapeDuDocteur.EssaiEnCours
         : PointsALaMain.Any() ? (OptimiserADuTravail ? EtapeDuDocteur.AFairePuisOptimiser : EtapeDuDocteur.AFaire)
         : OptimiserADuTravail ? EtapeDuDocteur.Optimiser
@@ -44,7 +44,8 @@ public partial class ScanViewModel
     public string? EtapeHorsListe => EtapeSuivante switch
     {
         EtapeDuDocteur.AFaire => null,
-        EtapeDuDocteur.AFairePuisOptimiser => _localize("Etape.PuisOptimiser"),
+        // Optimiser est juste sous le verdict, la liste repliée dit le point à la main : rien à redire entre les deux.
+        EtapeDuDocteur.AFairePuisOptimiser => null,
         _ => ProchaineEtape,
     };
 

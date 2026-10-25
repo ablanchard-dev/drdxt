@@ -17,10 +17,10 @@ namespace DrDxt.App.Tests;
 [Collection(CollectionWpf.Nom)]
 public sealed class LInterfaceTientALaTailleMinimaleTests
 {
-    // MainWindow : MinWidth 1040, MinHeight 680, moins la bordure (1 px de chaque
+    // MainWindow : MinWidth 1040, MinHeight 640, moins la bordure (1 px de chaque
     // cote) et la barre de titre maison (38 px).
     private const double LargeurUtile = 1040 - 2;
-    private const double HauteurUtile = 680 - 2 - 38;
+    private const double HauteurUtile = 640 - 2 - 38;
 
     private static bool SousUnViewbox(DependencyObject e, DependencyObject vue)
     {

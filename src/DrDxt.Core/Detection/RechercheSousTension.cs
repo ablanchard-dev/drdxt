@@ -43,7 +43,7 @@ public sealed record RechercheSousTension(int Index, IReadOnlyList<PalierStable>
                     ? this with { Stables = stables, Finie = true, Verdict = mv, Raison = Docteur.T("RST.TousTenus"), PalierCommenceLe = null }
                     : this with { Index = Index + 1, Stables = stables, PalierCommenceLe = null };
             case IssuePalier.Genre.Instable:
-                return this with { Finie = true, Verdict = Stables.LastOrDefault()?.Mv, Raison = $"{mv} mV : {issue.Raison}", PalierCommenceLe = null };
+                return this with { Finie = true, Verdict = Stables.LastOrDefault()?.Mv, Raison = $"{mv} mV{Docteur.DeuxPoints}{issue.Raison}", PalierCommenceLe = null };
             default:
                 return this with { Finie = true, Verdict = Stables.LastOrDefault()?.Mv, Raison = issue.Raison, PalierCommenceLe = null };
         }

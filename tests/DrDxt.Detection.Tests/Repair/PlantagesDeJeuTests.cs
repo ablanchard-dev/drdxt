@@ -37,6 +37,37 @@ public sealed class PlantagesDeJeuTests
         c.Explication.Should().Contain("cod26-cod.exe").And.NotContain("wmiprvse.exe");
     }
 
+    // La lecture s'arrête au plafond, tous programmes confondus, avant le tri des jeux : d'autres programmes qui plantent en
+    // boucle remplissent le plafond, et la fenêtre réellement lue est plus courte que trente jours. Aucun jeu dedans n'est
+    // pas « aucun plantage sur trente jours ».
+    [Fact]
+    public void Une_lecture_tronquee_sans_jeu_ne_dit_pas_aucun_plantage()
+    {
+        var autres = Enumerable.Range(0, PlantagesDeJeu.MaxEvenements)
+            .Select(i => Plantage(0, exe: "chrome.exe", module: "chrome.dll") with { Quand = Maintenant.AddMinutes(-i) }).ToList();
+
+        var c = Un(autres);
+
+        c.Statut.Should().Be(RepairStatus.Unknown);
+        Un(autres.Take(PlantagesDeJeu.MaxEvenements - 1).ToList()).Statut.Should().Be(RepairStatus.ExpectedDefault, "témoin : sous le plafond");
+    }
+
+    // Plafond atteint avec des plantages de jeu dedans : la fenêtre lue commence à l'événement le plus ancien lu, pas trente
+    // jours plus tôt. Le compte se dit « depuis le » cette date.
+    [Fact]
+    public void Une_lecture_tronquee_avec_des_jeux_dit_la_vraie_fenetre()
+    {
+        var lus = Enumerable.Range(0, PlantagesDeJeu.MaxEvenements - 1)
+            .Select(i => Plantage(0, exe: "chrome.exe", module: "chrome.dll") with { Quand = Maintenant.AddMinutes(-i) })
+            .Append(Plantage(0) with { Quand = Maintenant.AddMinutes(-1) }).ToList();
+
+        var c = Un(lus);
+
+        c.ValeurCourante.Should().NotContain("30").And.Contain(Maintenant.AddMinutes(-(PlantagesDeJeu.MaxEvenements - 2)).ToLocalTime()
+            .ToString(Docteur.T("PJ.FormatJour"), System.Globalization.CultureInfo.InvariantCulture));
+        Un(lus.Take(PlantagesDeJeu.MaxEvenements - 2).Append(lus[^1]).ToList()).ValeurCourante.Should().Contain("30", "témoin : sous le plafond");
+    }
+
     [Fact]
     public void Un_journal_illisible_se_dit_non_lu_jamais_aucun_plantage()
     {
@@ -99,7 +130,7 @@ public sealed class PlantagesDeJeuTests
         var pose = new Changement(Maintenant.AddDays(-2), "hags", null, "pose:hags");
         var c = Un([Plantage(1), Plantage(3), Plantage(10)], [change, pose]);
 
-        c.Explication.Should().Contain("2 de ces incidents depuis le réglage du BIOS « X » passé à « Y » (03/10), 1 avant")
+        c.Explication.Should().Contain($"2 de ces incidents depuis le réglage du BIOS « X » passé à « Y » ({change.Quand.ToLocalTime().ToString("dd/MM", System.Globalization.CultureInfo.InvariantCulture)}), 1 avant")
             .And.Contain("corrélation de dates, pas une cause prouvée")
             .And.NotContain("hags");
     }

@@ -29,6 +29,12 @@ public sealed class ElevatedClientFactoryTests : IDisposable
     public void Dispose() =>
         Environment.SetEnvironmentVariable(ElevatedClientFactory.SessionKeyEnv, _saved);
 
+    // Le client que l'App monte enveloppe toujours celui du helper : le type extérieur n'est jamais le client à clé, et une
+    // assertion sur lui passait toujours. Le choix se lit à l'intérieur.
+    private static IElevatedClient VersLeHelper(IElevatedClient client)
+        => client.Should().BeOfType<ClientSessionUtilisateur>().Which.VersLeHelper.Should().BeOfType<ClientDesPoses>()
+            .Which.VersLeHelper;
+
     [Fact]
     public void Returns_legacy_env_keyed_client_when_session_key_is_provisioned()
     {
@@ -39,9 +45,14 @@ public sealed class ElevatedClientFactoryTests : IDisposable
 
         // Enveloppé dans ClientSessionUtilisateur (HKCU par l'App, le reste au helper), puis dans ClientDesPoses : une
         // écriture HKCU ne passe jamais par le marquage des poses.
-        client.Should().BeOfType<ClientSessionUtilisateur>().Which.VersLeHelper.Should().BeOfType<ClientDesPoses>()
-            .Which.VersLeHelper.Should().BeOfType<TypedNamedPipeElevatedClient>(
-            "a pre-shared key selects the legacy smoke-compatible client");
+        var versLeHelper = client.Should().BeOfType<ClientSessionUtilisateur>().Which.VersLeHelper.Should().BeOfType<ClientDesPoses>()
+            .Which.VersLeHelper;
+#if DEBUG
+        versLeHelper.Should().BeOfType<TypedNamedPipeElevatedClient>("en développement, la clé choisit le client des outils de banc");
+#else
+        versLeHelper.Should().NotBeOfType<TypedNamedPipeElevatedClient>(
+            "l'App livrée ignore la variable : le client qui ne vérifie pas le serveur du tube n'est jamais choisi");
+#endif
     }
 
     [Fact]
@@ -55,7 +66,7 @@ public sealed class ElevatedClientFactoryTests : IDisposable
         // échec propre (helper introuvable). Les deux sont valides ; jamais null, jamais l'ancien
         // client à clé d'environnement quand aucune clé n'est présente.
         client.Should().NotBeNull();
-        client.Should().NotBeOfType<TypedNamedPipeElevatedClient>();
+        VersLeHelper(client).Should().NotBeOfType<TypedNamedPipeElevatedClient>();
     }
 
     [Fact]
@@ -65,7 +76,7 @@ public sealed class ElevatedClientFactoryTests : IDisposable
 
         var client = ElevatedClientFactory.Create();
 
-        client.Should().NotBeOfType<TypedNamedPipeElevatedClient>(
+        VersLeHelper(client).Should().NotBeOfType<TypedNamedPipeElevatedClient>(
             "a malformed key is ignored — never used to key the channel");
     }
 
@@ -77,7 +88,7 @@ public sealed class ElevatedClientFactoryTests : IDisposable
 
         var client = ElevatedClientFactory.Create();
 
-        client.Should().NotBeOfType<TypedNamedPipeElevatedClient>(
+        VersLeHelper(client).Should().NotBeOfType<TypedNamedPipeElevatedClient>(
             "a key shorter than 32 bytes is rejected, not used");
     }
 
@@ -94,4 +105,18 @@ public sealed class ElevatedClientFactoryTests : IDisposable
     [InlineData(null, true)]
     public void La_cle_de_session_d_environnement_n_est_permise_qu_hors_installation(string? processus, bool permise)
         => ElevatedClientFactory.CleDEnvironnementPermise(processus, @"C:\Program Files").Should().Be(permise);
+
+    // Le helper livré ignore cette clé ; l'App livrée aussi, même installée hors de Program Files (/DIR=, dossier copié) :
+    // sinon un programme du compte pose la variable et l'App prend le client qui ne vérifie pas le serveur du tube.
+    [Fact]
+    public void L_App_livree_ne_lit_jamais_la_cle_d_environnement()
+    {
+        var cle = Convert.ToBase64String(new byte[32]);
+        var lue = ElevatedClientFactory.LireCleDeSession(@"D:\Jeux\DrDXT\DrDxt.App.exe", @"C:\Program Files", _ => cle);
+#if DEBUG
+        lue.Should().NotBeNull("témoin : en développement, hors installation, la clé est lue");
+#else
+        lue.Should().BeNull();
+#endif
+    }
 }

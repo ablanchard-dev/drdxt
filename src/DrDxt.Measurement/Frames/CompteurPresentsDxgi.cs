@@ -30,8 +30,11 @@ public sealed class CompteurPresentsDxgi
     /// sequentiel, la session cesse d'ecrire a la borne : une trace qui l'atteint est tronquee.</summary>
     public const int MaxMo = 1024;
 
+    /// <summary>Seul le mot-cle Events (0x2) au niveau information : le manifeste y place Present_Start, au niveau
+    /// LogAlways. La trace tourne pendant que le joueur joue ; tous les mots-cles au niveau verbeux y ajouteraient chaque
+    /// objet et chaque entree de journal de DXGI, ecrits puis relus pour rien.</summary>
     public static string ArgumentsCreation(string etl)
-        => $"create trace {NomSession} -ets -o \"{etl}\" -max {MaxMo} -p Microsoft-Windows-DXGI 0xFFFFFFFFFFFFFFFF 5";
+        => $"create trace {NomSession} -ets -o \"{etl}\" -max {MaxMo} -p Microsoft-Windows-DXGI 0x2 4";
 
     /// <summary>Les .etl laisses par un plantage en pleine capture. Une seule session
     /// a la fois (la mesure arrete d'abord la precedente) : au demarrage, tout fichier du compteur
@@ -39,6 +42,8 @@ public sealed class CompteurPresentsDxgi
     public static int RangerRestes(string dossier)
     {
         var n = 0;
+        // Le dossier temporaire est au compte : élevé, rien n'y est supprimé à travers une jonction.
+        if (FichierJsonAtomique.RefusEleve(dossier, ErrorCodes.CaptureFail) is not null) return 0;
         foreach (var f in Directory.EnumerateFiles(dossier, "drdxt-presents-*.etl"))
             try { File.Delete(f); n++; } catch (IOException) { } catch (UnauthorizedAccessException) { }
         return n;
@@ -59,7 +64,16 @@ public sealed class CompteurPresentsDxgi
         return ms;
     }
 
+    // La session ETW a un nom fixe et l'arrêt préalable range tous les .etl du compteur : deux mesures en même temps se
+    // couperaient l'une l'autre. Une seule à la fois dans le processus.
+    private static readonly object UneSeuleMesure = new();
+
     public Result<BenchmarkResult> Mesurer(int pid, TimeSpan duree, CancellationToken ct)
+    {
+        lock (UneSeuleMesure) return MesurerSeule(pid, duree, ct);
+    }
+
+    private Result<BenchmarkResult> MesurerSeule(int pid, TimeSpan duree, CancellationToken ct)
     {
         var etl = Path.Combine(Path.GetTempPath(), $"drdxt-presents-{Environment.ProcessId}-{Guid.NewGuid():N}.etl");
         try
@@ -98,7 +112,7 @@ public sealed class CompteurPresentsDxgi
         }
         finally
         {
-            try { File.Delete(etl); } catch { /* fichier temporaire deja parti */ }
+            try { if (FichierJsonAtomique.RefusEleve(etl, ErrorCodes.CaptureFail) is null) File.Delete(etl); } catch { /* fichier temporaire deja parti */ }
         }
     }
 

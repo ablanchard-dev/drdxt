@@ -19,6 +19,8 @@ public sealed class AdlxGpuTuningReader : IAdlxGpuTuning
 
     public bool IsAvailable => _native.IsAvailable;
 
+    public bool? EstALUsine(int gpuIndex) => _native.IsAvailable && gpuIndex >= 0 ? _native.EstALUsine(gpuIndex) : null;
+
     public Result<int> ResolveTunableGpuIndex()
     {
         // Repris du sélecteur du banc AMD : sur une machine iGPU + dGPU, l'index ADLX 0 est souvent
@@ -85,7 +87,9 @@ public sealed class AdlxGpuTuningReader : IAdlxGpuTuning
             return Result<FanCurve>.Fail(ErrorCodes.TweakSdkUnavailable,
                 "ADLX fan-tuning read failed (GPU not supported or interface absent).");
 
-        IReadOnlyList<AdlxFanPoint> src = r.Points ?? Array.Empty<AdlxFanPoint>();
+        // Une lecture réussie sans point n'est pas une courbe : le levier bâtirait son retour d'une courbe vide.
+        if (r.Points is not { Count: > 0 } src)
+            return Result<FanCurve>.Fail(ErrorCodes.TweakSdkUnavailable, "ADLX returned no fan curve point.");
         var pts = new FanCurvePoint[src.Count];
         for (int i = 0; i < src.Count; i++)
             pts[i] = new FanCurvePoint(src[i].TempC, src[i].SpeedPct);

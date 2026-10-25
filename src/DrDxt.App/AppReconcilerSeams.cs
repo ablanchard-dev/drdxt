@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.IO;
 using System.Runtime.Versioning;
 using DrDxt.Core;
@@ -19,13 +18,14 @@ namespace DrDxt.App;
 /// <summary>L'IReconcilerNotifier de l'App, calqué sur le LoggingReconcilerNotifier de
 /// l'hôte : quand une dérive est classée UserIntentional/Unknown, le reconciler ne l'écrase
 /// pas (I5) et lève cette notification à la place. L'App la journalise dans la même trace
-/// d'audit IDiagnosticsLog (la ligne structurée reste neutre en langue ; le texte lisible
-/// vient d'une clé resx via ILocalizer, jamais écrit en dur).
+/// d'audit IDiagnosticsLog, en ligne structurée neutre en langue. Le texte lisible de la dérive
+/// est dit à l'écran au lancement (<see cref="DrDxt.App.Platform.VerificationDesReglages"/>).
 /// </summary>
 public sealed class AppReconcilerNotifier : IReconcilerNotifier
 {
     /// <summary>La clé resx de la notification « un réglage optimisé par DrDXT a été changé,
-    /// laissé tel que tu l'as mis ». {0} = le titre ou l'id du levier. Même clé que l'hôte.</summary>
+    /// laissé tel que tu l'as mis ». {0} = le titre du levier. Même clé que l'hôte ; l'App la dit au lancement
+    /// (<see cref="DrDxt.App.Platform.VerificationDesReglages"/>).</summary>
     public const string UserDriftKey = "reconciler.notify.user_drift";
 
     /// <summary>L'acteur de journal qui marque un résultat « notifié, pas écrasé », calqué sur
@@ -33,24 +33,12 @@ public sealed class AppReconcilerNotifier : IReconcilerNotifier
     public const string NotifiedActor = "DrDXT/notified";
 
     private readonly IDiagnosticsLog _diagnostics;
-    private readonly ILocalizer _localizer;
 
-    public AppReconcilerNotifier(IDiagnosticsLog diagnostics, ILocalizer localizer)
-    {
-        _diagnostics = diagnostics;
-        _localizer = localizer;
-    }
+    public AppReconcilerNotifier(IDiagnosticsLog diagnostics) => _diagnostics = diagnostics;
 
     public Task NotifyUserIntentionalDriftAsync(
         AppliedTweak tweak, string currentValueJson, CancellationToken ct)
     {
-        // Le message traduit vient d'une clé resx (pas écrit en dur). Fait pour l'audit et l'UI ;
-        // la ligne structurée du journal, plus bas, reste neutre en langue.
-        _ = string.Format(
-            CultureInfo.CurrentUICulture,
-            _localizer.Get(UserDriftKey),
-            tweak.TweakId);
-
         // Journalise les faits structurés : la valeur voulue a dérivé vers celle posée par
         // l'utilisateur ; elle a été notifiée, pas écrasée (I5).
         _diagnostics.Change(
@@ -95,7 +83,7 @@ public static class AppManifestPublicKey
 
     /// <summary>Charge le vérificateur depuis le fichier de clé publique installé, s'il existe
     /// (la clé de production qui prend le pas). Sans fichier installé, une version DEBUG ou de
-    /// test se replie sur la clé publique V1 embarquée (<see cref="ManifestDevKeys"/>), pour que
+    /// test se replie sur la clé publique de dev embarquée (<see cref="ManifestDevKeys"/>), pour que
     /// la version autonome de l'équipe vérifie de vrais manifestes ; une version RELEASE ne le
     /// fait pas, elle refuse (un manifeste signé par la clé de dev, ou non signé, est rejeté) :
     /// une clé de dev qui fuit ne peut pas piloter l'affichage de dérive de l'App. Un manifeste
@@ -140,7 +128,7 @@ public static class AppManifestPublicKey
             }
 
 #if DEBUG
-            // En DEBUG ou en test seulement : repli sur la clé publique V1 embarquée, pour qu'une
+            // En DEBUG ou en test seulement : repli sur la clé publique de dev embarquée, pour qu'une
             // version autonome vérifie les fixtures de test signées par la clé de dev. Jamais en release.
             return ManifestDevKeys.CreateVerifier();
 #else

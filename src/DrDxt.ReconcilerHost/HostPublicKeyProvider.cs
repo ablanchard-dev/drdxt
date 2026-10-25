@@ -12,7 +12,7 @@ namespace DrDxt.ReconcilerHost;
 // helper élevé la lit, jamais ce service (voir SignedDesiredStateStore, garde de la clé). Ceci lit
 // la clé publique dans un fichier sous la racine du manifeste en écriture admin.
 //
-// Fail-closed : une clé absente ou malformée rend Fail. L'hôte n'a alors aucun vérificateur : il
+// Fail-closed : une clé absente ou malformée rend Fail. L'hôte a alors un vérificateur qui refuse tout : il
 // ne peut vérifier aucun manifeste et (à raison) ne réconcilie pas ; il ne se rabat jamais sur une
 // lecture non vérifiée. Une clé privée absente / vide est la norme et n'est jamais branchée ici
 // (ce fournisseur ne produit jamais qu'un vérificateur).

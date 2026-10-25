@@ -41,6 +41,8 @@ public sealed class LeReadmeDuTesteurDitVraiTests
 
     private static string Readme() => Lire("installer", "README-testeur.txt");
 
+    private static string ReadmeAnglais() => Lire("installer", "README-tester.txt");
+
     /// <summary>Le script sans ses commentaires : un modele decrit en prose n'est pas une ligne executee.</summary>
     /// <remarks>
     /// Sans ce tri, le crible accuserait le `start= auto` que le .iss porte en commentaire pour
@@ -64,6 +66,19 @@ public sealed class LeReadmeDuTesteurDitVraiTests
         // Temoin de contenu : sans lui, un fichier deplace rendrait tout vert sur du vide.
         Readme().Should().Contain("PresentMonService").And.Contain("ANTI-CHEAT");
         IssExecutable().Should().Contain("sc.exe").And.NotBeEmpty();
+    }
+
+    /// <summary>L'installeur anglais livre sa propre version : elle porte les memes promesses, que les tests ci-dessous
+    /// verifient sur le code, et pas d'autres.</summary>
+    [Fact]
+    public void La_version_anglaise_porte_les_memes_promesses()
+    {
+        ReadmeAnglais().Should().Contain("manual mode").And.Contain("checked by default").And.NotContain("unchecked by default")
+            .And.Contain("The uninstall removes it")
+            .And.Contain("NEVER injects").And.Contain("no overlay").And.Contain("PresentMonService").And.Contain("ANTI-CHEAT");
+        foreach (var texte in new[] { Readme(), ReadmeAnglais() })
+            texte.Should().NotContain("tous les fichiers").And.NotContain("ne modifie rien",
+                "la desinstallation laisse des fichiers dits dans le README, et le scan peut poser le service de mesure");
     }
 
     [Fact]
@@ -97,7 +112,8 @@ public sealed class LeReadmeDuTesteurDitVraiTests
     [Fact]
     public void Aucun_service_ne_demarre_avec_Windows_sans_la_case()
     {
-        Readme().Should().Contain("decochee par defaut");
+        // La case est cochée par défaut (DrDXT.iss, sans « unchecked ») : le testeur lit ce que l'installeur lui montre.
+        Readme().Should().Contain("cochee par defaut").And.NotContain("decochee par defaut");
 
         var iss = IssExecutable();
         var auto = Regex.Matches(iss, @"start=\s*auto").Select(m => m.Index).ToList();

@@ -77,7 +77,17 @@ public class RepairTriageTests
         var t = RepairTriage.Trier([C(RepairStatus.Observed), C(RepairStatus.Unknown)]);
 
         t.Phrase.Should().Contain("rien ne demande ton attention").And.Contain("mais 1 n'a pas pu être lu")
-            .And.Contain("états vérifiés").And.NotContain("—");
+            .And.Contain(Docteur.T("RT.RienUn")).And.NotContain("—");
+    }
+
+    // « sur les 1 états vérifiés », « among the 0 states checked » : le compte s'accorde, et zéro état vérifié ne se dit pas
+    // « rien ne demande ton attention ».
+    [Fact]
+    public void Rien_a_signaler_s_accorde_et_zero_verifie_ne_rassure_pas()
+    {
+        RepairTriage.Trier([C(RepairStatus.Observed)]).Phrase.Should().Be(Docteur.T("RT.RienUn"));
+        RepairTriage.Trier([C(RepairStatus.Observed), C(RepairStatus.Observed)]).Phrase.Should().Be(Docteur.T("RT.Rien", 2));
+        RepairTriage.Trier([C(RepairStatus.Unknown)]).Phrase.Should().StartWith(Docteur.T("RT.RienAucun"));
     }
 
     [Fact]
@@ -109,6 +119,7 @@ public class RepairTriageTests
         var t = RepairTriage.Trier([]);
 
         t.Attention.Should().BeEmpty();
-        t.Phrase.Should().Contain("rien ne demande ton attention");
+        // Rien n'a été vérifié : la phrase ne rassure pas sur ce qu'elle n'a pas regardé.
+        t.Phrase.Should().Be(Docteur.T("RT.RienAucun"));
     }
 }

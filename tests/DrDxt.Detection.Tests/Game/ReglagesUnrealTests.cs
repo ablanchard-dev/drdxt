@@ -128,4 +128,14 @@ public sealed class ReglagesUnrealTests : IDisposable
         ReglagesUnreal.Constat(r, DateTime.Now).ValeurCourante.Should().Contain("V-Sync ?").And.Contain("affichage ?");
         ReglagesUnreal.Constat(r, DateTime.Now).Explication.Should().Contain("peut-être dépassées");
     }
+
+    // Une valeur non finie, négative ou démesurée n'est pas un plafond : elle se dit « ? ».
+    [Theory]
+    [InlineData("NaN")]
+    [InlineData("Infinity")]
+    [InlineData("-5")]
+    [InlineData("1e308")]
+    public void Un_plafond_impossible_n_est_pas_lu(string valeur)
+        => ReglagesUnreal.Lire("JeuB", "GameUserSettings.ini", $"[/Script/Engine.GameUserSettings]\nFrameRateLimit={valeur}\n", DateTime.Now)
+            .PlafondFps.Should().BeNull();
 }

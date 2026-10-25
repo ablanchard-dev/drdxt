@@ -27,7 +27,7 @@ public partial class ScanViewModel
 
     public bool TestRefroidissementATermine => ResultatTestRefroidissement is not null && !TestRefroidissementEnCours;
     partial void OnResultatTestRefroidissementChanged(string? value) => OnPropertyChanged(nameof(TestRefroidissementATermine));
-    partial void OnTestRefroidissementEnCoursChanged(bool value) => OnPropertyChanged(nameof(TestRefroidissementATermine));
+    partial void OnTestRefroidissementEnCoursChanged(bool value) { OnPropertyChanged(nameof(TestRefroidissementATermine)); OperationLongueChangee(); }
 
     public string LabelTestRefroidissementTitre => _localize("Refroidissement.Test.Titre");
     public string LabelTestRefroidissementDescription => _localize("Refroidissement.Test.Description");
@@ -37,7 +37,7 @@ public partial class ScanViewModel
     public string LabelTestRefroidissementRelancer => _localize("Refroidissement.Test.Relancer");
     public string LabelCapsuleTestRefroidissement => _localize("Agir.Capsule.TestRefroidissement");
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task LancerTestRefroidissement()
     {
         if (TestRefroidissementEnCours || RechercheSousTensionEnCours) return;
@@ -77,7 +77,7 @@ public partial class ScanViewModel
         catch (Exception ex)
         {
             TestRefroidissementEnDefaut = false;
-            ResultatTestRefroidissement = ex.Message;
+            ResultatTestRefroidissement = RaisonLisible.Dire(ex, _localize);
         }
         finally
         {

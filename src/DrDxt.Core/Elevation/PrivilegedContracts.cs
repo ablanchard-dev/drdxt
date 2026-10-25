@@ -45,7 +45,12 @@ public interface IElevatedClient
 // Chaque feuille porte des champs typés et validés (pas un blob opaque) : le helper
 // la valide à la feuille près (OpAllowlist) avant tout geste privilégié.
 // -----------------------------------------------------------------------
-public abstract record PrivilegedOp;
+public abstract record PrivilegedOp
+{
+    // Seul DrDxt.Core déclare des feuilles. Le constructeur de copie d'un record reste protégé (le langage l'impose) : une
+    // feuille venue d'ailleurs par ce chemin est refusée par l'allowlist et par le codec, qui ne connaissent que les leurs.
+    private protected PrivilegedOp() { }
+}
 
 // Le test de santé qui ne fait rien. L'ensemble fermé des feuilles est l'allowlist.
 public sealed record PingOp : PrivilegedOp;
@@ -139,8 +144,8 @@ public sealed record EnableSystemRestoreOp(string DriveLetter) : PrivilegedOp;
 
 // --- Feuilles de réglage GPU (décalage de P-state + limite de puissance, jamais la tension) ---
 
-/// <summary>Applique à un GPU un décalage d'horloge NVAPI cœur/mémoire (MHz). Les bornes
-/// sont posées par GpuSafeBounds (Phase E) ; ici le helper ne valide que la structure.</summary>
+/// <summary>Applique à un GPU un décalage d'horloge NVAPI cœur/mémoire (MHz). Le helper le borne lui-même (cœur
+/// [-200, +100], mémoire [-500, +500], NvApiTuningMath, repris de GpuSafeBounds), en plus de la structure.</summary>
 public sealed record ApplyNvApiClockOffsetOp(
     int GpuIndex,
     int CoreOffsetMhz,
@@ -172,7 +177,7 @@ public sealed record DeleteNvApiDrsSettingOp(
     DrsValueOrigin OrigineAttendue,
     uint ValeurAttendue) : PrivilegedOp;
 
-/// <summary>Applique une valeur de réglage AMD ADLX (anti-lag / sous-tension / puissance).</summary>
+/// <summary>Applique une valeur de réglage AMD ADLX (le genre dit laquelle : <see cref="AdlxTuningKind"/>).</summary>
 public sealed record ApplyAdlxTuningOp(
     int GpuIndex,
     AdlxTuningKind Kind,
@@ -182,7 +187,7 @@ public sealed record ApplyAdlxTuningOp(
 /// points (temp °C, cycle %). Feuille dédiée : une courbe à plusieurs points ne tient pas
 /// dans les ops à un seul IntValue. Le helper la valide à la feuille près (GpuIndex >= 0,
 /// chaque point dans la plage, jamais de silence aux points chauds) ; la borne prudente
-/// contre la surchauffe est GpuSafeBounds (Phase E), placée devant.</summary>
+/// contre la surchauffe est GpuSafeBounds, placée devant.</summary>
 public sealed record ApplyGpuFanCurveOp(
     int GpuIndex,
     IReadOnlyList<FanCurvePointDto> Points) : PrivilegedOp;
@@ -210,6 +215,16 @@ public sealed record InstallPresentMonServiceOp : PrivilegedOp;
 
 // --- Feuilles bail / homme mort (chien de garde du retour automatique) ---
 
+/// <summary>Une pose de levier dont l'App n'a pas encore noté l'origine : le journal d'écriture anticipée du helper garde la
+/// valeur d'avant de sa cible jusqu'à l'acquit (<see cref="AcquitterEcritureOp"/>). <see cref="PoseJson"/> est le JSON du
+/// codec de l'op posée, validée comme elle (OpAllowlist) ; une enveloppe dans une enveloppe est refusée. Seule une pose
+/// marquée est journalisée : une annulation, toujours nue, n'est jamais rejouée.</summary>
+public sealed record PoseEnAttenteDOrigineOp(string PoseJson) : PrivilegedOp;
+
+/// <summary>L'App a noté l'origine de cette pose : son entrée du journal d'écriture anticipée, et seulement celle de cet
+/// appelant, sort du journal. <see cref="PoseeJson"/> est le JSON du codec de l'op posée.</summary>
+public sealed record AcquitterEcritureOp(string PoseeJson) : PrivilegedOp;
+
 /// <summary>Inscrit le retour automatique d'un levier tenu et réversible auprès du chien
 /// de garde des baux, en mémoire du helper élevé. Si le contrôleur meurt (ou cesse
 /// d'envoyer ses battements), le chien de garde exécute le retour noté à l'échéance :
@@ -223,16 +238,6 @@ public sealed record InstallPresentMonServiceOp : PrivilegedOp;
 /// processus) ; lui seul peut le renouveler ou le clore. Échéance =
 /// maintenant + <see cref="LeaseSeconds"/> ; le bail vit en mémoire du helper seulement
 /// (rien sur disque, ce serait une surface d'attaque).</summary>
-/// <summary>Une pose de levier dont l'App n'a pas encore noté l'origine : le journal d'écriture anticipée du helper garde la
-/// valeur d'avant de sa cible jusqu'à l'acquit (<see cref="AcquitterEcritureOp"/>). <see cref="PoseJson"/> est le JSON du
-/// codec de l'op posée, validée comme elle (OpAllowlist) ; une enveloppe dans une enveloppe est refusée. Seule une pose
-/// marquée est journalisée : une annulation, toujours nue, n'est jamais rejouée.</summary>
-public sealed record PoseEnAttenteDOrigineOp(string PoseJson) : PrivilegedOp;
-
-/// <summary>L'App a noté l'origine de cette pose : son entrée du journal d'écriture anticipée, et seulement celle de cet
-/// appelant, sort du journal. <see cref="PoseeJson"/> est le JSON du codec de l'op posée.</summary>
-public sealed record AcquitterEcritureOp(string PoseeJson) : PrivilegedOp;
-
 public sealed record EstablishLeaseOp(
     string LeaseId,
     string RevertOpJson,

@@ -55,7 +55,7 @@ public class ConstatsDeCoreEnAnglaisTests
         using var _ = Docteur.Portee(CultureInfo.GetCultureInfo("en-US"));
 
         RepairTriage.Trier([new RepairFinding("CPU", "x", null, null, RepairStatus.Unknown, "y")]).Phrase
-            .Should().Be("nothing needs your attention among the 0 states checked, but 1 could not be read");
+            .Should().Be("no state could be checked, but 1 could not be read");
     }
 
     // Une langue que le docteur ne parle pas retombe sur l'anglais en entier : texte, dates et nombres.

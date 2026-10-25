@@ -264,7 +264,7 @@ public static class BiosQualificationMatrix
             new Dictionary<byte, string>(), Defaut, Taille: 1, Min: 0, Max: 100, Unite: Unite);
 
     /// <summary>Toutes les entrees de cette carte partagent le meme etat de connaissance : chemin
-    /// connu mais non verifie, valeurs et defaut jamais releves, valeur courante illisible,
+    /// connu mais non verifie, valeurs et defaut releves dans l'IFR, valeur courante lue a l'execution seulement,
     /// recuperation inconnue. Le fabriquer en un seul endroit evite qu'une entree derive vers un
     /// optimisme que rien ne soutient.</summary>
     private static BiosQualification Entree(

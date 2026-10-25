@@ -9,7 +9,9 @@ namespace DrDxt.App.ViewModels;
 // La recherche de la sous-tension stable des cœurs, sur la page du processeur. Une mesure de référence à la tension d'origine,
 // puis chaque palier : posé par le helper (relatif à la tension que le BIOS avait mise à ce démarrage, refusé avec SGX, relu), test
 // de charge de deux minutes, erreurs matérielles du processeur relues ; un palier qui faillit arrête tout. La tension d'origine est
-// rendue à la fin (décalage relatif 0), et ce retour est vérifié. Arrêtée, fermée ou en panne, la recherche est notée interrompue
+// rendue à la fin (décalage relatif 0), et ce retour est vérifié. Avant toute écriture, un bail du helper porte ce même retour :
+// l'App tuée en plein palier cesse de battre, et le helper, qui ne s'arrête pas tant qu'un bail tient, rend lui-même l'origine à
+// l'échéance. La mise en veille est empêchée pendant la recherche. Arrêtée, fermée ou en panne, la recherche est notée interrompue
 // (jamais lue comme un plantage) ; un vrai plantage redémarre le PC et se lit au démarrage suivant. Le verdict se reporte au BIOS :
 // DrDXT ne garde rien posé.
 public partial class ScanViewModel
@@ -22,6 +24,12 @@ public partial class ScanViewModel
         DrDxt.Detection.Repair.ErreursMaterielles.Lire(1)?.Count(e => e.Quand >= depuis && e.DuProcesseur && e.Gravite is 0 or 1 or 2);
 
     private CancellationTokenSource? _arretSousTension;
+
+    /// <summary>Couture de test : empêche la mise en veille jusqu'à libération.</summary>
+    internal Func<IDisposable> EmpecherLaVeille { get; set; } = DrDxt.App.Platform.SansVeille.Ouvrir;
+
+    internal const string IdBailSousTension = "cpu-sous-tension";
+    internal const int BailSousTensionSecondes = 30;
 
     /// <summary>Couture de test : le fabricant de la carte mère lu au dernier scan.</summary>
     internal Func<string?>? FabricantDeCarte { get; set; }
@@ -44,7 +52,7 @@ public partial class ScanViewModel
 
     public bool RechercheSousTensionATermine => ResultatSousTension is not null && !RechercheSousTensionEnCours;
     partial void OnResultatSousTensionChanged(string? value) => OnPropertyChanged(nameof(RechercheSousTensionATermine));
-    partial void OnRechercheSousTensionEnCoursChanged(bool value) => OnPropertyChanged(nameof(RechercheSousTensionATermine));
+    partial void OnRechercheSousTensionEnCoursChanged(bool value) { OnPropertyChanged(nameof(RechercheSousTensionATermine)); OperationLongueChangee(); }
 
     public string LabelSousTensionTitre => _localize("SousTension.Titre");
     public string LabelSousTensionDescription => _localize("SousTension.Description");
@@ -78,7 +86,20 @@ public partial class ScanViewModel
         ?? (_helper is { } h ? h.ExecuteAsync(new SetCpuVoltageOffsetOp(mv), CancellationToken.None)
             : Task.FromResult(Result.Fail(ErrorCodes.HelperOpFailed, _localize("SousTension.Raison.SansHelper"))));
 
-    [RelayCommand]
+    /// <summary>Le bail qui rend la tension d'origine (décalage relatif 0) si l'App cesse de battre. Par la couture de pose (tests),
+    /// aucun helper : rien à armer. Non armé, l'écran dit seulement que le filet manque.</summary>
+    private async Task<(bool Arme, HeartbeatSender? Bail)> ArmerBailSousTension()
+    {
+        if (PoserSousTension is not null || _helper is not { } h) return (true, null);
+        if (PrivilegedOpCodec.Serialize(new SetCpuVoltageOffsetOp(0)) is not { IsOk: true, Value: { } inverse }) return (false, null);
+        var bail = await h.ExecuteAsync(new EstablishLeaseOp(IdBailSousTension, inverse, BailSousTensionSecondes), CancellationToken.None);
+        if (!bail.IsOk) return (false, null);
+        var battement = new HeartbeatSender(h, IdBailSousTension, BailSousTensionSecondes);
+        battement.Start();
+        return (true, battement);
+    }
+
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task LancerRechercheSousTension()
     {
         if (RechercheSousTensionEnCours || TestRefroidissementEnCours || MemoireSousTension is not { } memoire) return;
@@ -94,13 +115,35 @@ public partial class ScanViewModel
         var jeton = _arretSousTension.Token;
         var pose = false;
         RechercheSousTension? r = null;
+        HeartbeatSender? bail = null;
+        IDisposable? veille = null;
         try
         {
+            veille = EmpecherLaVeille();
+            var (arme, filet) = await ArmerBailSousTension();
+            if (!arme)
+            {
+                r = RechercheSousTension.Nouvelle(DateTimeOffset.Now).Interrompre(_localize("SousTension.Raison.SansBail"));
+                return;
+            }
+            bail = filet;
+            // Bail rendu par le helper ou helper injoignable : le palier mesuré n'est peut-être plus posé, la mesure ne vaut rien.
+            if (bail is not null)
+            {
+                var arret = _arretSousTension;
+                bail.Perdu += () => arret.Cancel();
+                bail.Injoignable += () => arret.Cancel();
+            }
             // Un essai d'écriture, rendu aussitôt, avant toute charge : un BIOS qui refuse (Undervolt Protection) se sait en une
             // seconde, au lieu de deux minutes de charge pour rien. Noté avant d'écrire : un plantage à cet instant se rattache
             // au premier palier, et la tension d'origine se rend au retour (ReprendreRechercheSousTensionAsync).
             var debutEssai = DateTimeOffset.Now;
-            memoire.Ecrire(RechercheSousTension.Nouvelle(debutEssai) with { PalierCommenceLe = debutEssai });
+            // Non notée, une coupure ne se rattacherait à aucun palier, et l'origine ne se rendrait pas au retour : rien n'est posé.
+            if (memoire.Ecrire(RechercheSousTension.Nouvelle(debutEssai) with { PalierCommenceLe = debutEssai }) is { IsOk: false })
+            {
+                r = RechercheSousTension.Nouvelle(DateTimeOffset.Now).Interrompre(_localize("SousTension.Raison.NonNotee"));
+                return;
+            }
             var essai = await Poser(RechercheSousTension.Paliers[0]);
             if (!essai.IsOk)
             {
@@ -137,7 +180,11 @@ public partial class ScanViewModel
                 if (jeton.IsCancellationRequested) { r = r.Interrompre(_localize("SousTension.Raison.Interrompue")); break; }
                 EtapeSousTension = mv.ToString(CultureInfo.InvariantCulture) + " mV";
                 var debut = DateTimeOffset.Now;
-                memoire.Ecrire(r with { PalierCommenceLe = debut });
+                if (memoire.Ecrire(r with { PalierCommenceLe = debut }) is { IsOk: false })
+                {
+                    r = r.Interrompre(_localize("SousTension.Raison.NonNotee"));
+                    break;
+                }
                 var posee = await Poser(mv);
                 if (!posee.IsOk)
                 {
@@ -161,12 +208,20 @@ public partial class ScanViewModel
         }
         catch (Exception ex)
         {
-            r = (r ?? RechercheSousTension.Nouvelle(DateTimeOffset.Now)).Interrompre(ex.Message);
+            r = (r ?? RechercheSousTension.Nouvelle(DateTimeOffset.Now)).Interrompre(RaisonLisible.Dire(ex, _localize));
         }
         finally
         {
             // La tension d'origine, toujours, et vérifiée (un retour raté se dit, avec le geste qui la rend : redémarrer).
             var rendue = !pose || (await RendreOrigineSure()).IsOk;
+            // Rendue : le bail n'a plus rien à garder. Non rendue : il reste armé, sans battement, et le helper retentera
+            // l'origine à son échéance.
+            if (bail is not null)
+            {
+                if (rendue) await bail.LibererAsync();
+                else await bail.DisposeAsync();
+            }
+            veille?.Dispose();
             if (r is not null)
             {
                 // Non gardée, la recherche ne se reprendra pas après un plantage ; la tension d'origine, elle, est déjà rendue.

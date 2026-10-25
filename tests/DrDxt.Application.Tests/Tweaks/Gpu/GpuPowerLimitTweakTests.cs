@@ -1,3 +1,4 @@
+using DrDxt.Application.Tweaks;
 using DrDxt.Application.Tweaks.Gpu;
 using DrDxt.Application.Tweaks.Hardware;
 using DrDxt.Core;
@@ -134,69 +135,23 @@ public sealed class GpuPowerLimitTweakTests
             .Which.PowerLimitPercent.Should().Be(95);
     }
 
-    // --- Branche AMD. ---
+    // --- AMD : l'unité de la limite d'ADLX n'est relevée sur aucune vraie carte. Ni proposé, ni écrit. ---
 
     [Fact]
-    public async Task Apply_uses_adlx_power_limit_on_amd()
+    public void AppliesTo_false_on_desktop_amd() =>
+        Build().AppliesTo(DesktopAmd(), State).Should().BeFalse();
+
+    [Fact]
+    public async Task Apply_on_amd_writes_nothing_and_says_why()
     {
         var t = Build(requestedPct: 80);
         _nvApi.IsAvailable.Returns(false);
         _adlx.IsAvailable.Returns(true);
-        _adlx.GetPowerLimitPct(0).Returns(Result<int>.Ok(100));
-
-        var r = await t.ApplyAsync();
-
-        r.IsOk.Should().BeTrue();
-        await _elevated.Received().ExecuteAsync(
-            Arg.Is<ApplyAdlxTuningOp>(o => o.Kind == AdlxTuningKind.PowerLimit && o.IntValue == 80),
-            Arg.Any<CancellationToken>());
-        var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
-        inverse.Value.Should().BeOfType<ApplyAdlxTuningOp>()
-            .Which.IntValue.Should().Be(100);
-    }
-
-    // --- Choix de la carte AMD dédiée : résoudre la dGPU réglable, pas l'iGPU. ---
-
-    [Fact]
-    public async Task Apply_amd_resolves_discrete_gpu_index_and_targets_it()
-    {
-        // iGPU à l'index 0 (non réglable) + dGPU AMD dédiée à l'index 1. Le résolveur choisit 1,
-        // et la capture comme l'application visent l'index 1, jamais l'iGPU en 0.
-        var t = Build(requestedPct: 80);
-        _nvApi.IsAvailable.Returns(false);
-        _adlx.IsAvailable.Returns(true);
-        _adlx.ResolveTunableGpuIndex().Returns(Result<int>.Ok(1));
-        _adlx.GetPowerLimitPct(1).Returns(Result<int>.Ok(95));
-
-        var r = await t.ApplyAsync();
-
-        r.IsOk.Should().BeTrue();
-        // L'op de limite de puissance appliquée visait la carte dédiée à l'index 1.
-        await _elevated.Received().ExecuteAsync(
-            Arg.Is<ApplyAdlxTuningOp>(o =>
-                o.GpuIndex == 1 && o.Kind == AdlxTuningKind.PowerLimit && o.IntValue == 80),
-            Arg.Any<CancellationToken>());
-        // L'op inverse d'origine capturée (pour le retour arrière) porte l'index 1 et la valeur lue.
-        var inverse = PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson);
-        var op = inverse.Value.Should().BeOfType<ApplyAdlxTuningOp>().Subject;
-        op.GpuIndex.Should().Be(1);
-        op.IntValue.Should().Be(95);
-    }
-
-    [Fact]
-    public async Task Apply_amd_fails_clean_when_no_tunable_gpu_resolved()
-    {
-        // Machine sans GPU réglable : le résolveur échoue → échec propre, aucune op d'application, jamais Ok.
-        var t = Build(requestedPct: 80);
-        _nvApi.IsAvailable.Returns(false);
-        _adlx.IsAvailable.Returns(true);
-        _adlx.ResolveTunableGpuIndex()
-            .Returns(Result<int>.Fail(ErrorCodes.TweakSdkUnavailable, "no tunable AMD GPU found"));
 
         var r = await t.ApplyAsync();
 
         r.IsOk.Should().BeFalse();
-        r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
+        r.Error!.Value.Code.Should().Be(ErrorCodes.GpuAmdTuningUnavailable);
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
@@ -254,7 +209,7 @@ public sealed class GpuPowerLimitTweakTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
     }
 
-    // --- Honnêteté : GPU AMD présent mais ADLX indisponible → statut honnête explicite. ---
+    // --- Honnêteté : GPU AMD présent, ADLX indisponible → statut honnête explicite. ---
 
     [Fact]
     public async Task Apply_returns_amd_tuning_unavailable_when_amd_gpu_present_and_adlx_unavailable()
@@ -335,5 +290,67 @@ public sealed class GpuPowerLimitTweakTests
 
         r.IsOk.Should().BeTrue();
         PrivilegedOpCodec.Deserialize(r.Value!.AppliedValueJson).Value.Should().Be(new ApplyNvApiPowerLimitOp(0, 79));
+    }
+
+    // Reposé dans le même démarrage sans avoir été rendu, le levier relit sa propre pose (90 %) comme origine. Le journal
+    // garde la première : Annuler rend les 100 % du joueur, jamais les 90 % de DrDXT.
+    [Fact]
+    public async Task Repose_dans_le_meme_demarrage_puis_Annuler_rend_l_origine_du_joueur()
+    {
+        var levier = Build(requestedPct: 90);
+        var tenue = 100;
+        _nvApi.GetPowerLimitPct(0).Returns(_ => Result<int>.Ok(tenue));
+        _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(appel =>
+        {
+            if (appel.Arg<PrivilegedOp>() is ApplyNvApiPowerLimitOp op) tenue = op.PowerLimitPercent;
+            return Task.FromResult(Result.Ok());
+        });
+        var chemin = Path.Combine(Path.GetTempPath(), $"drdxt-repose-{Guid.NewGuid():N}.json");
+        try
+        {
+            var journal = new JournalDesLeviersAppliques(chemin);
+            foreach (var _ in new[] { "premier scan", "nouveau scan" })
+            {
+                var pose = await levier.ApplyAsync();
+                journal.Enregistrer(new ApplyReport([new ApplyOutcome(levier.Id, true, false, pose.Value!, null)], null)).Should().BeTrue();
+                tenue.Should().Be(90);
+            }
+
+            (await levier.RevertAsync(journal.Lire().Single())).IsOk.Should().BeTrue();
+
+            tenue.Should().Be(100);
+        }
+        finally { File.Delete(chemin); }
+    }
+
+    // Le joueur reprend la main entre deux poses (80 % à la main) : la valeur trouvée avant la nouvelle pose n'est plus celle de
+    // DrDXT. L'origine est alors la sienne, et Annuler rend ses 80 %, pas les 100 % d'avant.
+    [Fact]
+    public async Task Change_par_le_joueur_entre_deux_poses_Annuler_rend_sa_valeur_a_lui()
+    {
+        var levier = Build(requestedPct: 90);
+        var tenue = 100;
+        _nvApi.GetPowerLimitPct(0).Returns(_ => Result<int>.Ok(tenue));
+        _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(appel =>
+        {
+            if (appel.Arg<PrivilegedOp>() is ApplyNvApiPowerLimitOp op) tenue = op.PowerLimitPercent;
+            return Task.FromResult(Result.Ok());
+        });
+        var chemin = Path.Combine(Path.GetTempPath(), $"drdxt-repose-{Guid.NewGuid():N}.json");
+        try
+        {
+            var journal = new JournalDesLeviersAppliques(chemin);
+            var premiere = await levier.ApplyAsync();
+            journal.Enregistrer(new ApplyReport([new ApplyOutcome(levier.Id, true, false, premiere.Value!, null)], null)).Should().BeTrue();
+            tenue = 80;
+            var seconde = await levier.ApplyAsync();
+            journal.Enregistrer(new ApplyReport([new ApplyOutcome(levier.Id, true, false, seconde.Value!, null)], null)).Should().BeTrue();
+            tenue.Should().Be(90);
+
+            (await levier.RevertAsync(journal.Lire().Single())).IsOk.Should().BeTrue();
+
+            tenue.Should().Be(80);
+        }
+        finally { File.Delete(chemin); }
     }
 }

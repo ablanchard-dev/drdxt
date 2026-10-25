@@ -10,10 +10,8 @@ public sealed partial class ScanViewModel
 {
     // ── Le rapport de diagnostic ─────────────────────────────────────────────
     //
-    // « Jamais de debogage a l'aveugle par mail. » Sans ce bouton, le premier client difficile
-    // consomme une semaine : une question a la fois, avec quelqu'un qui ne sait pas ou regarder.
-    //
-    // Le bouton appelait `OnComingSoon`, la meme impasse que le bouton « debloquer ».
+    // « Jamais de debogage a l'aveugle par mail. » Sans ce bouton, chaque joueur en difficulte
+    // coute un echange par question, avec quelqu'un qui ne sait pas ou regarder.
 
     private ScanResult? _lastScan;
 
@@ -81,7 +79,10 @@ public sealed partial class ScanViewModel
     public string LabelReportFailed => _localize("Support.ReportFailed");
 
     /// <summary>Le rapport du docteur tel que l'écran le montre, avant anonymisation.</summary>
-    private string RapportBrut(DateTimeOffset now) => DrDxt.Application.Support.DiagnosticReport.Build(_lastScan, _appVersion, now, _derniereSante, _localize,
+    // Après un scan raté (ou pendant un scan), le scan d'avant ne se donne pas pour le dernier : le rapport dit « aucun scan ».
+    private string RapportBrut(DateTimeOffset now) => DrDxt.Application.Support.DiagnosticReport.Build(
+        State is ScanState.Failed or ScanState.Scanning ? null : _lastScan, _appVersion, now,
+        State is ScanState.Failed or ScanState.Scanning ? null : _derniereSante, _localize,
         processeur: _dernierDeficitCpu,
         reseau: NetworkPathLabel is { } ligne ? new DrDxt.Measurement.Network.LigneReseau(ligne) : null,
         memoire: MemoryMeasuredLabel is { } memoire ? new DrDxt.Measurement.Memory.LigneMemoireMesuree(memoire) : null,
@@ -146,6 +147,13 @@ public sealed partial class ScanViewModel
         if (_exporterMachine is null) return;
         LastMachineExportPath = string.Empty;
         MessageDExport = string.Empty;
+        // Un scan raté ou en cours a déjà remplacé le matériel ou les réglages lus, pas les constats : l'export mêlerait
+        // deux scans. Il ne part que d'un scan fini.
+        if (State is ScanState.Failed or ScanState.Scanning)
+        {
+            MessageDExport = _localize("Machine.ExportScanRate");
+            return;
+        }
         try
         {
             if (_materielLu is not { } hw || _reglagesLus is not { } st) throw new InvalidOperationException("no scan read");
@@ -164,10 +172,8 @@ public sealed partial class ScanViewModel
     /// « la partie BIOS est optionnelle ».
     ///
     /// Sans cette phrase, un joueur qui n'ose pas entrer dans son BIOS croit qu'il rate la moitie
-    /// du produit, et un joueur qui ose mais s'y perd ouvre un ticket. Un dev solo qui vend a des
-    /// joueurs un produit qui les envoie dans leur BIOS ne peut pas se permettre ni l'un ni
-    /// l'autre : le differenciateur mis en vitrine n'est pas le guide, c'est la preuve qu'un
-    /// changement a pris.
+    /// du produit, et un joueur qui ose mais s'y perd ouvre un ticket. Ce qui distingue DrDXT n'est
+    /// pas le guide, c'est la preuve qu'un changement a pris.
     /// </summary>
     public string LabelBiosOptional => _localize("Bios.Optional.Note");
 }

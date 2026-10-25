@@ -12,8 +12,11 @@ namespace DrDxt.Infrastructure.Updates;
 /// données JSON au schéma fermé (<see cref="TablesDeDonnees.Lire"/>), signées par la même clé que les mises à jour de
 /// l'App (<see cref="UpdateTrust"/>) : aucune nouvelle clé, et la clé de dev reste refusée. Les octets signés commencent
 /// par <see cref="Domaine"/>, si bien qu'une signature de manifeste de l'App ne vaut jamais pour des données, ni l'inverse.
-/// La version est dans les octets signés : un paquet plus ancien que les tables en service est refusé, sans compteur
-/// local à falsifier. Le paquet précédent est gardé à côté, et repris si le courant ne se vérifie plus.
+/// La version est dans les octets signés : le serveur ne peut pas faire reculer les tables en service (un paquet plus
+/// ancien y est refusé). Au démarrage, le plancher n'est que la version embarquée : le paquet précédent, gardé à côté,
+/// est repris si le courant ne se vérifie plus, et un programme du compte peut reposer dans le dossier un paquet signé
+/// plus ancien. Un plancher tenu dans ce dossier serait falsifiable par ce même programme. Seule l'App, sans droits,
+/// lit ces tables, et toujours signées.
 /// </summary>
 public static class DonneesSignees
 {
@@ -126,11 +129,20 @@ public static class DonneesSignees
     }
 
     /// <summary>Ce que la demande au serveur a donné.</summary>
-    public enum Issue { RienDeNeuf, Installe, Refuse, Injoignable, Echec }
+    // RienDePublie : 404, rien n'est publié à cette adresse ; RienDeNeuf : un paquet lu, pas plus récent.
+    public enum Issue { RienDeNeuf, RienDePublie, Installe, Refuse, Injoignable, Echec }
 
     /// <summary>Demande le paquet au serveur. Un paquet plus récent que <paramref name="courantes"/> et vérifié est gardé
     /// (l'ancien devient le précédent) puis rendu ; tout le reste laisse les tables en service telles quelles.</summary>
     public static async Task<(Issue Issue, TablesDeDonnees? Tables)> DemanderAsync(
+        HttpClient client, Uri racine, string dossier, Verificateur verificateur, TablesDeDonnees courantes, CancellationToken ct)
+    {
+        // Une exception imprévue ne traverse pas la frontière : les tables en service restent (fail-closed).
+        try { return await DemanderSansFiletAsync(client, racine, dossier, verificateur, courantes, ct).ConfigureAwait(false); }
+        catch (Exception) { return (Issue.Echec, null); }
+    }
+
+    private static async Task<(Issue Issue, TablesDeDonnees? Tables)> DemanderSansFiletAsync(
         HttpClient client, Uri racine, string dossier, Verificateur verificateur, TablesDeDonnees courantes, CancellationToken ct)
     {
         string json;
@@ -138,8 +150,8 @@ public static class DonneesSignees
         {
             var url = racine.GetLeftPart(UriPartial.Path).TrimEnd('/') + Chemin;
             using var reponse = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-            // Rien de publié encore : joignable, rien à offrir.
-            if (reponse.StatusCode == HttpStatusCode.NotFound) return (Issue.RienDeNeuf, null);
+            // Rien n'est publié à cette adresse : ni « rien de neuf » ni une panne.
+            if (reponse.StatusCode == HttpStatusCode.NotFound) return (Issue.RienDePublie, null);
             if (!reponse.IsSuccessStatusCode) return (Issue.Injoignable, null);
             if (reponse.Content.Headers.ContentLength > OctetsMax) return (Issue.Refuse, null);
             // Lu par morceaux et arrêté au plafond : un corps sans longueur annoncée n'est jamais gardé en entier.
@@ -160,14 +172,20 @@ public static class DonneesSignees
         var paquet = Lire(json);
         if (!paquet.IsOk) return (Issue.Refuse, null);
         if (paquet.Value!.Version == courantes.Version) return (Issue.RienDeNeuf, null);
-        var tables = verificateur.Verifier(paquet.Value, courantes.Version + 1);
+        // Au bout des versions, le plancher reste au bout : courantes.Version + 1 repasserait sous zéro.
+        var tables = verificateur.Verifier(paquet.Value, courantes.Version == int.MaxValue ? int.MaxValue : courantes.Version + 1);
         if (!tables.IsOk) return (Issue.Refuse, null);
 
         try
         {
             Directory.CreateDirectory(dossier);
             var chemin = Path.Combine(dossier, Fichier);
-            if (File.Exists(chemin)) File.Copy(chemin, Path.Combine(dossier, FichierPrecedent), overwrite: true);
+            if (FichierJsonAtomique.RefusEleve(chemin, ErrorCodes.StorageFail) is not null) return (Issue.Echec, tables.Value);
+            // L'ancien paquet passe au précédent par l'écriture atomique, pas par File.Copy : un nom posé d'avance en lien dur
+            // ou symbolique serait écrasé à travers, alors que le renommage remplace le nom seul.
+            if (File.Exists(chemin)
+                && new FichierJsonAtomique(Path.Combine(dossier, FichierPrecedent), ErrorCodes.StorageFail).WriteAtomic(File.ReadAllText(chemin)) is { IsOk: false })
+                return (Issue.Echec, tables.Value);
             var ecrit = new FichierJsonAtomique(chemin, ErrorCodes.StorageFail).WriteAtomic(json);
             return ecrit.IsOk ? (Issue.Installe, tables.Value) : (Issue.Echec, tables.Value);
         }

@@ -36,8 +36,12 @@ public sealed partial class ScanViewModel
     [RelayCommand]
     private async Task PreparerPaquetAsync()
     {
-        var rapport = RapportBrut(DateTimeOffset.Now);
-        PoserPaquet(await Task.Run(() => PaquetDeSupport.Contenu(DrDxt.Core.DossierDonnees.Racine(), rapport, MachineExportee.ValeursDeCePc())));
+        try
+        {
+            var rapport = RapportBrut(DateTimeOffset.Now);
+            PoserPaquet(await Task.Run(() => PaquetDeSupport.Contenu(DrDxt.Core.DossierDonnees.Racine(), rapport, MachineExportee.ValeursDeCePc())));
+        }
+        catch (Exception ex) { ApercuPaquet = RaisonLisible.Dire(ex, _localize); }
     }
 
     /// <summary>Le contenu préparé, montré fichier par fichier ; rien n'est choisi, donc rien n'est encore affiché.</summary>
@@ -53,7 +57,7 @@ public sealed partial class ScanViewModel
     [RelayCommand]
     private void EnregistrerPaquet()
     {
-        if (_paquet is null || ChoisirCheminDuPaquet?.Invoke($"drdxt-aide-{DateTimeOffset.Now:yyyy-MM-dd-HHmm}.zip") is not { } chemin) return;
+        if (_paquet is null || ChoisirCheminDuPaquet?.Invoke(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"drdxt-aide-{DateTimeOffset.Now:yyyy-MM-dd-HHmm}.zip")) is not { } chemin) return;
         try
         {
             PaquetDeSupport.Ecrire(chemin, _paquet);
@@ -62,7 +66,8 @@ public sealed partial class ScanViewModel
         catch (Exception)
         {
             LastPaquetPath = string.Empty;
-            ApplyBlockedMessage = _localize("Paquet.Echec");
+            // Dit à côté du bouton du paquet (MessageDExport), pas sous Optimiser en haut de page.
+            MessageDExport = _localize("Paquet.Echec");
         }
     }
 }

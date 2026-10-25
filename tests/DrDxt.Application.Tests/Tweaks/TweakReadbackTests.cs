@@ -165,4 +165,22 @@ public class TweakReadbackTests
         TweakReadback.Relire(new TweakSnapshot("x", ""), new LecteurFictif(0))
             .Etat.Should().Be(EtatRelu.NonRelisable);
     }
+
+    // Une feuille que le registre ne relit pas (la limite de puissance de la carte, un réglage du pilote) : la porte se
+    // fie au vérificateur de la pose quand on le lui donne. Sans lui, elle dirait « valeur de DrDXT », et un rendu sans clic
+    // réécrirait l'origine par-dessus le 80 % que le joueur a mis dans un autre outil.
+    [Theory]
+    [InlineData(EtatApplique.Drifted, PoseRelue.ChangeDepuis)]
+    [InlineData(EtatApplique.NotApplied, PoseRelue.ALOrigine)]
+    [InlineData(EtatApplique.Applied, PoseRelue.DeDrDxt)]
+    [InlineData(EtatApplique.Unknown, PoseRelue.DeDrDxt)]
+    public void Une_feuille_non_relisable_se_juge_par_le_verificateur(EtatApplique verdict, PoseRelue attendu)
+    {
+        var pose = new TweakSnapshot("gpu.power_limit", DrDxt.Tests.Shared.InversesDeTest.Pour("gpu.power_limit", "100"),
+            DrDxt.Tests.Shared.InversesDeTest.Pour("gpu.power_limit", "90"));
+        var registre = NSubstitute.Substitute.For<DrDxt.Application.Tweaks.Hardware.IRegistryReader>();
+
+        TweakReadback.EtatDeLaPose(pose, registre, _ => verdict).Should().Be(attendu);
+        TweakReadback.EtatDeLaPose(pose, registre).Should().Be(PoseRelue.DeDrDxt, "témoin : sans vérificateur, comme avant");
+    }
 }

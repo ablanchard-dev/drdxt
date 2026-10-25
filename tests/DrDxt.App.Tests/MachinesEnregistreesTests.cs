@@ -45,7 +45,7 @@ public class MachinesEnregistreesTests
             "amd-rx7900xtx-ryzen9-7950x3d", "console-portable-rog-ally", "nvidia-gtx1650-i5-10400", "nvidia-rtx3060-i5-12400f",
             "nvidia-rtx5070-i5-13400f", "bureau-sans-jeu-i5-8go"]);
 
-    // Sur les cinq machines, les constats de la suspension sélective USB (coupée ou non, entrées
+    // Sur chaque machine enregistrée, les constats de la suspension sélective USB (coupée ou non, entrées
     // suspendues ou non) ne font rien monter de plus dans « mérite ton attention » : aucune proposition n'est inventée.
     [Theory]
     [MemberData(nameof(Noms))]
@@ -121,8 +121,9 @@ public class MachinesEnregistreesTests
         // Sans mesure en jeu, le scan se dit dégradé : c'est l'état honnête d'une fixture, jamais un échec.
         vm.State.Should().BeOneOf(ViewModels.ScanState.Done, ViewModels.ScanState.Degraded);
         vm.RepairFindings.Concat(vm.RepairBlindSpots).Should().NotBeEmpty();
-        // Aucune partie relevée sur une fixture, donc aucun voisin lu : le calmeur se dit « non lu », jamais proposé.
-        vm.PropositionCalmer.Should().Be("Voisins.Proposition.NonLu");
+        // Aucune partie relevée sur une fixture, donc aucun voisin lu : le calmeur ne propose rien. Le relevé est allumé par
+        // défaut : la phrase dit « pas encore lu », jamais « allume le relevé ».
+        vm.PropositionCalmer.Should().Be("Voisins.Proposition.PasEncore");
         vm.CalmeurPropose.Should().BeFalse();
         // Une fixture publique ne porte aucun chemin d'un vrai compte (seul le compte de remplacement « joueur » est permis).
         vm.RepairFindings.Concat(vm.RepairBlindSpots).SelectMany(r => new[] { r.ValeurCourante, r.Explication })

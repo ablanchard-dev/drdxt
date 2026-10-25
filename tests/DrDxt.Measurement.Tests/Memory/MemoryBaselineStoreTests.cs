@@ -78,6 +78,19 @@ public class MemoryBaselineStoreTests
         lu.IsOk.Should().BeFalse();
     }
 
+    // Un point d'escalier nul passait la lecture, puis faisait lever MemoryQuality pendant l'A/B, qui se taisait.
+    [Fact]
+    public void Une_reference_dont_l_escalier_porte_un_vide_est_refusee()
+    {
+        var json = """
+            {"MachineId":"MACHINE-A","TakenUtc":"2026-09-06T10:00:00+00:00","ConfiguredMts":3800,
+             "Measurement":{"BandwidthGBs":34.2,"BandwidthSigmaPct":3.34,"LatencyNs":71.33,"LatencySigmaPct":4.53,
+             "Staircase":[null,{"WindowBytes":134217728,"LatencyNs":75.33}]}}
+            """;
+
+        new MemoryBaselineStore(new FausFichier { Contenu = json }).Read("MACHINE-A").IsOk.Should().BeFalse();
+    }
+
     // Une reference sans ses dispersions se relisait avec sigma = 0. Le seuil de
     // MemoryVerdict (3 sigma) tombait alors a 0, et n'importe quel ecart de bruit devenait
     // « significatif ». Un banc de dix passes ne rend jamais une dispersion nulle.

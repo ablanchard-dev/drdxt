@@ -14,7 +14,8 @@ public static class BilanSante
     [
         ("BS.TempProcesseur", "THERMIQUE", n => n == "temperature du processeur"),
         ("BS.TempCarte", "THERMIQUE", n => n == "temperature du GPU"),
-        ("BS.Disques", "STOCKAGE", n => n.StartsWith("usure", StringComparison.Ordinal) || n.StartsWith("erreurs non corrigées", StringComparison.Ordinal)),
+        ("BS.Disques", "STOCKAGE", n => n.StartsWith("usure", StringComparison.Ordinal) || n.StartsWith("erreurs non corrigées", StringComparison.Ordinal)
+            || n.StartsWith(Docteur.Nom("SW.SanteNom", ""), StringComparison.Ordinal)),
         ("BS.Arrets", "STABILITE", n => n == "arrets brutaux"),
         ("BS.Whea", "STABILITE", n => n.StartsWith("erreurs matérielles", StringComparison.Ordinal)),
         ("BS.MisesAJour", "WINDOWS UPDATE", n => n == "en attente" || n == "echecs"),

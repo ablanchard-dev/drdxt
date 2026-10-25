@@ -207,4 +207,19 @@ public sealed class SanePowerPlanTweakTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.SnapshotInvalid);
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
+
+    // Le plan actif, relu juste avant la pose, est un plan du constructeur : son inverse viserait un GUID que le helper
+    // refuse (KnownPowerPlans), et Hautes performances ne se rendrait plus. Rien n'est écrit.
+    [Fact]
+    public async Task Un_plan_actif_inconnu_ne_se_quitte_pas_faute_de_pouvoir_y_revenir()
+    {
+        var t = Build();
+        _power.GetActivePowerPlan().Returns(Result<Guid>.Ok(Guid.Parse("5a3b1c2d-0000-4000-8000-0123456789ab")));
+
+        var r = await t.ApplyAsync();
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.TweakNotApplicable);
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
 }

@@ -36,14 +36,30 @@ public sealed class SondeDeBuildWin32 : IOsBuildProbe
     }
 }
 
-/// <summary>La DriverVersion de l'adaptateur dont le fabricant correspond ; <c>Ok(null)</c> = absent.</summary>
+/// <summary>La DriverVersion de l'adaptateur dont le fabricant correspond ; <c>Ok(null)</c> = absent. Bornée par
+/// <see cref="LectureWmiBornee"/> : sans borne, un winmgmt figé figerait le commit du manifeste, donc Optimiser. Au-delà du
+/// délai, un échec <see cref="ErrorCodes.WmiTimeout"/> : la référence de dérive garde le build et laisse la version du pilote
+/// vide, comme un pilote non lu (ApplyReferenceSeedingStore).</summary>
 [SupportedOSPlatform("windows")]
 public sealed class SondeDePiloteWmi : IGpuDriverProbe
 {
+    private readonly Func<string, Result<string?>> _lire;
+    private readonly TimeSpan _delai;
+
+    public SondeDePiloteWmi() : this(Lire, LectureWmiBornee.Delai) { }
+
+    internal SondeDePiloteWmi(Func<string, Result<string?>> lire, TimeSpan delai) => (_lire, _delai) = (lire, delai);
+
     public Result<string?> ReadDriverVersion(string vendor)
     {
         if (string.IsNullOrWhiteSpace(vendor))
             return Result<string?>.Ok(null);
+        return LectureWmiBornee.Lire(() => _lire(vendor),
+            () => Result<string?>.Fail(ErrorCodes.WmiTimeout, $"WMI did not answer within {_delai.TotalSeconds:0} s."), _delai);
+    }
+
+    private static Result<string?> Lire(string vendor)
+    {
         try
         {
             using var requete = new ManagementObjectSearcher(

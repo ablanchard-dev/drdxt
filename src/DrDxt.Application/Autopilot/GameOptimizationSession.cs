@@ -138,16 +138,16 @@ public sealed class GameOptimizationSession
     public static readonly TimeSpan DureeParPasse = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    /// Plafond de passes d'alternance. **24, soit 4 minutes de jeu au pire, et souvent moins,**
-    /// parce que l'experience s'arrete des qu'elle sait repondre.
+    /// Passes d'alternance du protocole. **24, soit 4 minutes de jeu**, apres les 3 passes d'A/A, et jusqu'a 3 passes
+    /// refaites apres un alt-tab : 5 minutes au pire pour un levier.
     ///
-    /// Le protocole s'arretait a quatre passes. Quatre passes ne laissent qu'un degre de
-    /// liberte au modele (trois parametres a ajuster), donc t95 = 12,706 et une resolution
-    /// enorme : le produit ne pouvait rien prouver sous ~14 %. Mesure du 07/09/2026, bruit vrai
-    /// sur la moyenne : 13,7 % a 4 alternances, 5,2 % a 8, 3,9 % a 12, 2,7 % a 24.
+    /// Quatre passes ne laissent qu'un degre de liberte au modele (trois parametres a ajuster), donc t95 = 12,706 et une
+    /// resolution enorme : rien ne se prouverait sous ~14 %. Mesure du 07/09/2026, bruit vrai sur la moyenne : 13,7 % a
+    /// 4 alternances, 5,2 % a 8, 3,9 % a 12, 2,7 % a 24.
     ///
-    /// C'est un plafond, pas une duree. Une regression prouvee ou un gain de fluidite prouve
-    /// terminent l'experience immediatement.
+    /// C'est une duree fixe, pas un plafond : aucun resultat n'arrete l'experience plus tot (s'arreter sur un franchissement
+    /// serait de l'optional stopping, voir AutopilotEngine). Un levier qui declare son effet attendu fixe son propre
+    /// nombre d'alternances avant la mesure (Decidabilite.AlternancesPour : 12 ou 24).
     /// </summary>
     public const int AlternancesMax = 24;
 
@@ -208,7 +208,7 @@ public sealed class GameOptimizationSession
 
         GameMetrics? Mesurer()
         {
-            for (var essai = 0; ; essai++)
+            for (;;)
             {
                 var v = MesurerUneFois();
                 if (v is not null || rattrapagesFocus <= 0 || !derniereEcarteePourFocus) return v;
@@ -257,10 +257,9 @@ public sealed class GameOptimizationSession
             scene?.Representativite ?? SceneRepresentativity.Unknown, ct);
 
         // Laquelle des deux grandeurs ruine la resolution ?
-        // Le moteur ne voit qu'un score composite ; s'il resout mal, il ne dit pas pourquoi. Les
-        // memes passes d'A/A, reprobees separement, le disent : c'est presque toujours le 1 % low,
-        // un percentile sur ~21 frames, qui disperse, et il entraine la moyenne avec lui dans le
-        // score. Ces deux resolutions ne decident rien (le score decide, seul) : elles expliquent.
+        // Le moteur decide grandeur par grandeur (KeepPolicy.DecideParMetrique) ; s'il resout mal, il ne dit pas pourquoi.
+        // Les memes passes d'A/A, reprobees separement, le disent : c'est presque toujours le 1 % low, un percentile sur
+        // ~14 frames a 140 i/s, qui disperse. Ces deux resolutions ne decident rien : elles expliquent.
         var aa = journalMetriques.Take(passesAa).ToList();
         var resMoyenne = aa.Count >= 3 ? SceneResolution.Probe(aa.Select(m => m.AvgFps).ToList()) : null;
         var resP1Low = aa.Count >= 3 ? SceneResolution.Probe(aa.Select(m => m.P1LowFps).ToList()) : null;
@@ -275,7 +274,7 @@ public sealed class GameOptimizationSession
             profil.Scene,
             profil.Results,
             profil.EndedInBestState,
-            Expliquer(profil.Scene, but, scene ?? SceneContract.Inconnue)
+            Expliquer(profil.Scene, scene ?? SceneContract.Inconnue)
                 + (passesHorsFocus > 0
                     ? Docteur.T(passesHorsFocus == 1 ? "GOS.HorsFocus.Une" : "GOS.HorsFocus.Plusieurs", passesHorsFocus)
                     : string.Empty),
@@ -327,12 +326,12 @@ public sealed class GameOptimizationSession
     /// joueur de conclure « ton produit ne sert a rien » quand la vraie reponse est « ta partie
     /// etait trop bruitee ».
     ///
-    /// Elle dit ce que la partie permet de mesurer, et aussi ce que l'endroit permet de conclure
+    /// Elle dit la regle qui garde un reglage, et aussi ce que l'endroit permet de conclure
     /// (`SceneContract`) : un reglage trouve sur une scene inconnue ne vaut pas un reglage valide
     /// en pleine partie, et la phrase le dit. Le contrat ne
     /// s'ajoute qu'au cas ou la partie a pu decider : quand rien n'a ete teste, il n'y a pas de
     /// keep a nuancer.</summary>
-    private static string Expliquer(SceneResolution scene, OptimizationGoal but, SceneContract contrat)
+    private static string Expliquer(SceneResolution scene, SceneContract contrat)
         => scene.Verdict switch
     {
         SceneVerdict.DriftDominant =>
@@ -341,7 +340,9 @@ public sealed class GameOptimizationSession
         SceneVerdict.TooFewRuns =>
             Docteur.T("GOS.PassesInsuffisantes"),
 
-        _ => Docteur.T("GOS.Resolution", scene.ResolutionPct, GameObjective.Explication(but))
+        // La règle qui décide (KeepPolicy.DecideParMetrique), pas des poids qu'aucun verdict n'applique ni la résolution de
+        // l'A/A, plus large que celle de l'A/B apparié qui juge : chaque verdict dit sa propre marge.
+        _ => Docteur.T("GOS.Resolution")
              + (contrat.CeQuiManque is { } manque ? Docteur.T("GOS.Attention", manque) : string.Empty),
     };
 }

@@ -29,6 +29,16 @@ public sealed partial class GesteDuDocteur(string titre, string detail, Func<Tas
     [ObservableProperty]
     private bool _aEchoue;
 
+    // Une partie seulement a pris (TweakPartiallyApplied) : quelque chose reste posé, le geste se dit à moitié et Annuler
+    // reste possible.
+    [ObservableProperty]
+    private bool _aMoitie;
+
+    // La réponse du helper n'est pas arrivée après l'envoi : le geste a peut-être été fait. « Rien n'a été changé » serait
+    // faux ; il se dit incertain.
+    [ObservableProperty]
+    private bool _incertain;
+
     public bool PeutFaire => !Fait && !EnCours;
     public bool PeutAnnuler => Fait && !EnCours && annuler is not null;
 
@@ -43,10 +53,14 @@ public sealed partial class GesteDuDocteur(string titre, string detail, Func<Tas
         if (EnCours) return;
         EnCours = true;
         AEchoue = false;
+        AMoitie = false;
+        Incertain = false;
         try
         {
             var r = await action();
             if (r.IsOk) Fait = faitApres;
+            else if (r.Error?.Code == ErrorCodes.TweakPartiallyApplied) (AMoitie, Fait) = (true, true);
+            else if (r.Error?.Code is ErrorCodes.HelperNoReply or ErrorCodes.HelperNoReplyJournalisee) Incertain = true;
             else AEchoue = true;
         }
         catch (Exception)

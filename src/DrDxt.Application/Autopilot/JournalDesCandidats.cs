@@ -77,7 +77,9 @@ public sealed class JournalDesCandidats
 
     /// <summary>Ce que la ligne dit du verdict. Un candidat jamais mesure (non tente, ecriture qui
     /// n'a pas pris, instabilite) n'est ni garde ni rejete : la session n'a pas pu en decider.</summary>
-    public static string Decision(CandidateOutcome issue) => issue switch
+    public static string Decision(CandidateOutcome issue, string? raisonCle = null) =>
+        // Une experience invalide, ou sans aucune passe exploitable, est annulee sans avoir rien decide.
+        raisonCle is KeepPolicy.CleInvalide or KeepPolicy.CleAucuneMesure ? "non_decidable" : issue switch
     {
         CandidateOutcome.Kept => "garde",
         CandidateOutcome.RejectedRegression or CandidateOutcome.RejectedUnresolved => "rejete",
@@ -95,7 +97,7 @@ public sealed class JournalDesCandidats
             foreach (var r in profil.Results)
             {
                 var ligne = new CandidatJuge(quand, machine, profil.Identity.ProcessName, r.Id,
-                    Decision(r.Outcome), r.Outcome, r.Queue, r.PassesAb,
+                    Decision(r.Outcome, r.RaisonCle), r.Outcome, r.Queue, r.PassesAb,
                     (r.Metriques ?? Array.Empty<MetricEvidence>())
                         .Select(m => new EcartJuge(m.Metrique, m.Preuve.DeltaPct, m.Preuve.ResolutionPct, m.Preuve.Outcome))
                         .ToList(),

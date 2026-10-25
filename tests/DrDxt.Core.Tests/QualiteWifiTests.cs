@@ -48,6 +48,6 @@ public sealed class QualiteWifiTests
     {
         var f = ConnexionDeJeu.Juger([Wifi]);
         f.Explication.Should().NotContain("signal");
-        f.Statut.Should().Be(RepairStatus.Suspicious);
+        f.Statut.Should().Be(RepairStatus.NonDefault, "sans signal lu, le Wi-Fi n'est pas dit faible");
     }
 }

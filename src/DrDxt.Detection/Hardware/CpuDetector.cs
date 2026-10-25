@@ -13,16 +13,16 @@ public sealed class CpuDetector
         var q = _wmi.Query("SELECT Name, Manufacturer, NumberOfCores, NumberOfLogicalProcessors FROM Win32_Processor");
         if (!q.IsOk) return Result<CpuInfo>.Fail(q.Error!.Value.Code, q.Error.Value.Message);
 
-        // V1 gaming scope: un seul CPU. Sur un système multi-socket on prend la 1ère
-        // ligne Win32_Processor (une par socket physique). Limite connue : un système à plusieurs sockets n'est pas agrégé.
+        // Une ligne Win32_Processor par socket. Le nom vient de la première ; cœurs et fils se somment sur toutes : une
+        // machine virtuelle à un cœur par socket (réglage par défaut de VMware) en déclare autant que de processeurs.
         var row = q.Value!.FirstOrDefault();
         if (row is null)
             return Result<CpuInfo>.Fail(ErrorCodes.WmiFail, "Win32_Processor returned no rows.");
 
         var model = row.GetString("Name") ?? "Unknown CPU";
         var vendor = row.GetString("Manufacturer") ?? "Unknown";
-        var cores = row.GetInt("NumberOfCores") ?? 0;
-        var threads = row.GetInt("NumberOfLogicalProcessors") ?? cores;
+        var cores = q.Value!.Sum(r => r.GetInt("NumberOfCores") ?? 0);
+        var threads = q.Value!.Sum(r => r.GetInt("NumberOfLogicalProcessors") ?? r.GetInt("NumberOfCores") ?? 0);
 
         var isX3d = model.Contains("X3D", StringComparison.OrdinalIgnoreCase);
         var ccd = EstimateCcdCount(vendor, cores);

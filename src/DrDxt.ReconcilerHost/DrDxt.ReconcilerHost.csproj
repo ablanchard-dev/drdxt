@@ -22,8 +22,8 @@
          le WmiGpuDriverProbe du réconciliateur (pas tout le graphe d'analyse de Detection). -->
     <ProjectReference Include="..\DrDxt.Detection\DrDxt.Detection.csproj" />
     <ProjectReference Include="..\DrDxt.Infrastructure\DrDxt.Infrastructure.csproj" />
-    <!-- Vrai IElevatedClient à IPC signé (parle au helper élevé) ; l'hôte
-         le branche derrière une fabrique à échec propre tant que le handshake du contexte service n'existe pas. -->
+    <!-- Les types du helper : le service exécute les ops dans son propre processus (SYSTEM), par l'exécuteur du
+         helper derrière la même liste blanche, sans tube. -->
     <ProjectReference Include="..\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
   </ItemGroup>
 

@@ -11,7 +11,6 @@ namespace DrDxt.Reconciler.Manifest;
 //     réappliquer quoi que ce soit.
 //   * DPAPI / MAC symétrique sont explicitement refusés pour l'intégrité du manifeste : le
 //     propriétaire de la machine peut redériver une clé symétrique et forger un manifeste « valide ».
-//     DPAPI reste réservé au fichier de licence, jamais au manifeste.
 //   * Défense en profondeur = le fichier vit sous une ACL ProgramData en écriture admin seulement
 //     (IManifestStorage). L'ACL complète la signature ; elle ne la remplace jamais.
 //
@@ -24,13 +23,9 @@ namespace DrDxt.Reconciler.Manifest;
 /// son test de stabilité a passé et que son bénéfice mesuré a dépassé la marge). C'est
 /// l'enveloppe qui est signée.
 ///
-/// La licence n'est pas ici. Un champ <c>ExpiresAt</c> (la duree du droit de reappliquer) signe
-/// par la cle de la machine serait une erreur de categorie : cette cle protege contre un programme
-/// non eleve, jamais contre le proprietaire administrateur de la machine, qui peut la lire sous
-/// %ProgramData%\DrDxt et resigner ce qu'il veut, « licence valable dix ans » compris. Le droit de
-/// reappliquer se lit dans le fichier signe par l'editeur (DrDxt.Licensing.LicenceDeLaMachine,
-/// verifie par LicenseTrust) : une signature que la machine ne sait pas produire. Ce manifeste ne
-/// dit que ce que DrDXT a pose, ce qui est exactement ce que la cle de la machine sait garantir.
+/// La cle de la machine protege contre un programme non eleve, jamais contre le proprietaire
+/// administrateur de la machine, qui peut la lire sous %ProgramData%\DrDxt et resigner ce qu'il veut.
+/// Ce manifeste ne dit donc que ce que DrDXT a pose, ce qui est exactement ce que cette cle sait garantir.
 ///
 /// Un manifeste plus ancien qui porte encore un <c>expiresAt</c> le voit simplement ignore
 /// a la relecture (champ inconnu), sa signature reste valide et ses origines restent rendues a la
@@ -46,7 +41,7 @@ public sealed record DesiredStateManifest(
 }
 
 /// <summary>Lit tout le manifeste signé et vérifié, pour savoir s'il y a quelque chose
-/// d'armé (la licence, elle, ne se lit pas ici : LicenceDeLaMachine). Implémenté par
+/// d'armé. Implémenté par
 /// <c>SignedDesiredStateStore</c> à côté de <see cref="IDesiredStateStore"/>, avec exactement le
 /// même chemin « vérifier avant d'analyser » (la signature Ed25519 est l'autorité d'intégrité).
 /// Rend Ok(null) quand aucun manifeste n'existe encore (première installation) ; une altération,

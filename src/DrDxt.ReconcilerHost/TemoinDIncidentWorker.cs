@@ -27,6 +27,14 @@ public sealed class TemoinDIncidentWorker : BackgroundService
     internal TemoinDIncidentWorker(string dossier, Func<DateTimeOffset, DateTimeOffset, IReadOnlyList<TemoinDIncident.Ligne>>? lireFenetre = null)
         => (_dossier, _lireFenetre) = (dossier, lireFenetre ?? TemoinDIncident.LireFenetre);
 
+    private static bool DeConfiance(string fichier) => TrustedManifestRoot.EnsureTrustedFile(fichier).IsOk;
+
+    /// <summary>Pur : d'où relire le journal Système au démarrage. Le dernier témoin, ou une semaine en arrière s'il n'y en a
+    /// pas, ou s'il est daté dans le futur (une horloge partie en avant puis corrigée) : on lirait sinon à partir d'un
+    /// instant qui n'est pas encore venu, donc rien.</summary>
+    internal static DateTimeOffset DebutDuRattrapage(DateTimeOffset? dernier, DateTimeOffset maintenant)
+        => dernier is { } d && d <= maintenant ? d : maintenant.AddDays(-7);
+
     public static string DossierParDefaut() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DrDxt", TemoinDIncident.Dossier);
 
@@ -36,10 +44,10 @@ public sealed class TemoinDIncidentWorker : BackgroundService
         // refusé, pour que les témoins et leurs suppressions ne puissent viser que ce dossier-ci.
         if (!TrustedManifestRoot.EnsureCreatedHardened(Path.GetDirectoryName(_dossier)!).IsOk
             || !TrustedManifestRoot.EnsureCreatedHardened(_dossier).IsOk) return Task.CompletedTask;
-        var deja = TemoinDIncident.LireTous(_dossier) ?? [];
+        var deja = TemoinDIncident.LireTous(_dossier, DeConfiance) ?? [];
         _dernier = deja.FirstOrDefault()?.Incident;
         // Ce qui s'est passé pendant que le service ne tournait pas : au plus une semaine en arrière.
-        var depuis = _dernier ?? DateTimeOffset.Now.AddDays(-7);
+        var depuis = DebutDuRattrapage(_dernier, DateTimeOffset.Now);
         try
         {
             using var lecteur = new EventLogReader(new EventLogQuery("System", PathType.LogName, TemoinDIncident.Requete(depuis)));
@@ -83,8 +91,7 @@ public sealed class TemoinDIncidentWorker : BackgroundService
             if (!TrustedManifestRoot.WriteTrustedFile(fichier, JsonSerializer.SerializeToUtf8Bytes(temoin)).IsOk) return;
             _dernier = incident;
             // Les plus anciens partent : le dossier ne grossit pas sans fin.
-            foreach (var vieux in Directory.EnumerateFiles(_dossier, "temoin-*.json").OrderByDescending(f => f, StringComparer.Ordinal)
-                         .Skip(TemoinDIncident.Gardes))
+            foreach (var vieux in TemoinDIncident.EnTrop(_dossier, DeConfiance))
                 try { File.Delete(vieux); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         }
     }

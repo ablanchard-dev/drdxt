@@ -401,10 +401,10 @@ public class BiosAdvisorTests
 
     // Une fourchette que rien de public ne tient ne s'affiche pas.
     //
-    // Une plage comme « XMP : ≈ 11–25 % » ou « X3D : ≈ 0–10 % » tiree de nos notes ne tient pas. Les
-    // mesures publiques disent autre chose : pour XMP/EXPO, de quelques % dans un jeu limite par la
-    // carte graphique a ~42 % dans un jeu tres sensible a la memoire (TechSpot, XDA), et ~1 % sur un
-    // X3D (AMD). Une fourchette unique ne decrit la machine de personne ; la note memoire du projet
+    // Une plage comme « XMP : ≈ 11–25 % » ou « X3D : ≈ 0–10 % » tiree de nos notes ne tient pas. Pour
+    // XMP/EXPO, l'ecart va de presque rien dans un jeu limite par la carte graphique a beaucoup dans un
+    // jeu tres sensible a la memoire, et reste plus faible sur un X3D. Une fourchette unique ne decrit
+    // la machine de personne ; la note memoire du projet
     // (non publiee) le dit elle-meme : « non chiffrable de facon canonique : on mesure ». Le chiffre
     // de la personne vient de l'A/B du produit, pas d'une plage imprimee d'avance.
     [Fact]
@@ -416,5 +416,36 @@ public class BiosAdvisorTests
         tout.Where(f => f.Gain is not null).Should().HaveCountGreaterThanOrEqualTo(3, "temoin : XMP, ReBAR, X3D");
         tout.Where(f => f.Gain is { MinPct: not null } or { MaxPct: not null })
             .Select(f => f.Kind).Should().BeEmpty();
+    }
+
+    // ════════════════ Puce intégrée seule, barrette sans profil ════════════════
+
+    private static readonly GpuInfo Uhd = new("Intel(R) UHD Graphics 630", "Intel", 128L << 20, "31.0", TriState.Unknown);
+
+    [Fact] // Une puce intégrée n'a ni BAR à agrandir ni slot PCIe : rien à vérifier au BIOS pour elle
+    public void Puce_integree_seule_ni_rebar_ni_slot_du_gpu()
+    {
+        var findings = Advise(Hw() with { Gpus = new[] { Uhd } }, State(reBar: TriState.Unknown));
+
+        findings.Select(f => f.Kind).Should().NotContain(new[]
+        {
+            FirmwareSettingKind.ReBar, FirmwareSettingKind.Above4G, FirmwareSettingKind.Csm, FirmwareSettingKind.PcieGen,
+        });
+    }
+
+    [Fact] // La puce intégrée listée devant la carte : la chaîne ReBAR se lit sur la carte
+    public void Puce_integree_devant_la_carte_le_rebar_se_lit_sur_la_carte()
+    {
+        var carte = new GpuInfo("RTX 4060", "NVIDIA", 8L << 30, "616.56", TriState.On);
+
+        Advise(Hw() with { Gpus = new[] { Uhd, carte } }, State(reBar: TriState.Unknown))
+            .Should().NotContain(f => f.Kind == FirmwareSettingKind.ReBar);
+    }
+
+    [Fact] // Barrette JEDEC lue à sa vitesse, sans profil annoncé au-dessus : XMP n'a rien à activer
+    public void Xmp_non_lu_sans_profil_annonce_au_dessus_du_jedec_ne_dit_rien()
+    {
+        Advise(Hw(configuredMhz: 2666, ratedMhz: 2666), State(xmp: TriState.Unknown))
+            .Should().NotContain(f => f.Kind == FirmwareSettingKind.XmpExpo);
     }
 }

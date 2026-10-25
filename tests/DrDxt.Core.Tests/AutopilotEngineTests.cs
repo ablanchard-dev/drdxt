@@ -27,7 +27,7 @@ public class AutopilotEngineTests
         private readonly double _facteur;
         public bool Applique;
         public int Applications, Annulations;
-        public bool RelectureMenteuse, LeveALApply;
+        public bool RelectureMenteuse, LeveALApply, RelectureImpossible;
         public int EchoueALApplication;   // 0 = jamais ; sinon, la N-ieme application echoue
         public int EchoueALAnnulation;    // 0 = jamais ; sinon, la N-ieme annulation echoue (etat laisse tel quel)
 
@@ -61,7 +61,9 @@ public class AutopilotEngineTests
 
         // `RelectureMenteuse` reproduit un defaut reel : une limite de puissance « appliquee a 110 % »
         // peut se relire a 100 %, le pilote la bornant en silence.
-        public Result<bool> ReadBack() => Result<bool>.Ok(Applique && !RelectureMenteuse);
+        public Result<bool> ReadBack() => RelectureImpossible
+            ? Result<bool>.Fail(ErrorCodes.TweakSdkUnavailable, "ne se relit pas ici")
+            : Result<bool>.Ok(Applique && !RelectureMenteuse);
     }
 
     /// <summary>Une scene stable a 100, que le candidat applique multiplie.</summary>
@@ -125,6 +127,19 @@ public class AutopilotEngineTests
     // restait verte sur chacun : le moteur pouvait dire « meilleur etat » apres un retour refuse.
     // Les rangs (N-ieme annulation ou application) suivent le protocole par defaut, un bloc A-b-b-a.
 
+    // Le détail d'une écriture refusée s'affiche dans le récit d'Optimiser : le message du levier ou du helper (souvent de
+    // l'anglais technique) n'y entre pas, seul son code, dans une phrase traduite.
+    [Fact]
+    public void Une_ecriture_refusee_se_dit_par_son_code_jamais_par_son_message()
+    {
+        var c = new CandidatFake(facteur: 1.20) { EchoueALApplication = 1 };
+
+        var r = AutopilotEngine.Run(new IAutopilotCandidate[] { c }, Scene(c)).Results.Single();
+
+        r.Outcome.Should().Be(CandidateOutcome.ApplyFailed);
+        r.Detail.Should().Be(Docteur.T("AE.EcritureRefusee", ErrorCodes.IoFailure)).And.NotContain("bascule refusée");
+    }
+
     [Fact]
     public void Un_retour_refuse_apres_une_ecriture_qui_n_a_pas_pris_se_dit()
     {
@@ -157,14 +172,17 @@ public class AutopilotEngineTests
         AutopilotEngine.Run(new IAutopilotCandidate[] { c }, Scene(c)).EndedInBestState.Should().BeFalse();
     }
 
+    // Gardé par la mesure, le levier se repose à la fin (le protocole finit sur la référence). Si cette dernière pose échoue,
+    // il n'est pas dit « gardé » : la machine n'est pas dessus, et elle revient à la référence plutôt qu'à moitié posée.
     [Fact]
     public void Un_gain_garde_qui_ne_reprend_pas_se_dit()
     {
         // Applications : 1 l'essai, 2 et 3 les « b » de l'alternance, 4 la reprise du reglage garde.
         var c = new CandidatFake(facteur: 1.20) { EchoueALApplication = 4 };
         var profil = AutopilotEngine.Run(new IAutopilotCandidate[] { c }, Scene(c, bruit: 0.2));
-        profil.Results.Single().Outcome.Should().Be(CandidateOutcome.Kept);
+        profil.Results.Single().Outcome.Should().Be(CandidateOutcome.ApplyFailed);
         profil.EndedInBestState.Should().BeFalse();
+        c.Applique.Should().BeFalse();
     }
 
     [Fact]
@@ -176,6 +194,46 @@ public class AutopilotEngineTests
 
         profil.Results.Single().Outcome.Should().Be(CandidateOutcome.RejectedRegression);
         c.Applique.Should().BeFalse("on ne garde jamais une degradation prouvee");
+    }
+
+    // L'issue suit la décision, qui juge chaque grandeur : un 1 % low qui s'effondre sous une moyenne stable est une
+    // dégradation prouvée, et l'écran ne dit pas « sous la résolution ».
+    [Fact]
+    public void Un_1_pour_cent_low_qui_s_effondre_sous_une_moyenne_stable_se_dit_degradation()
+    {
+        var c = new CandidatFake(facteur: 1.0);
+        var i = 0;
+        GameMetrics? Mesurer()
+        {
+            var bruit = i++ % 2 == 0 ? 0.2 : -0.2;
+            return new GameMetrics(100.0 + bruit, (c.Applique ? 60.0 : 90.0) + bruit);
+        }
+
+        var r = AutopilotEngine.Run(new IAutopilotCandidate[] { c }, Mesurer).Results.Single();
+
+        r.RaisonCle.Should().Be(KeepPolicy.CleRegression);
+        r.Outcome.Should().Be(CandidateOutcome.RejectedRegression);
+        c.Applique.Should().BeFalse();
+    }
+
+    // Une expérience qui n'a pas tenu a bien posé et relu le levier : elle ne se dit pas « l'écriture n'a pas pris ».
+    [Fact]
+    public void Une_mesure_invalide_ne_se_dit_pas_ecriture_ratee()
+    {
+        var c = new CandidatFake(facteur: 1.0);
+        var i = 0;
+        // Chaque passe levier posé est perdue : l'état B n'est jamais mesuré, l'expérience est invalide.
+        GameMetrics? Mesurer()
+        {
+            var v = 100.0 + (i++ % 2 == 0 ? 0.2 : -0.2);
+            return c.Applique ? null : new GameMetrics(v, v);
+        }
+
+        var r = AutopilotEngine.Run(new IAutopilotCandidate[] { c }, Mesurer).Results.Single();
+
+        r.RaisonCle.Should().Be(KeepPolicy.CleInvalide);
+        r.Outcome.Should().NotBe(CandidateOutcome.ApplyFailed).And.NotBe(CandidateOutcome.Kept);
+        c.Applique.Should().BeFalse();
     }
 
     [Fact]
@@ -201,6 +259,21 @@ public class AutopilotEngineTests
 
         profil.Results.Single().Outcome.Should().Be(CandidateOutcome.ApplyFailed);
         profil.Results.Single().Evidence.Should().BeNull("rien n'a ete mesure, donc rien n'est affirme");
+        c.Applique.Should().BeFalse();
+    }
+
+    // Une pose qui ne se relit pas ici n'a pas « échoué » : elle est rendue par prudence, et le texte le dit tel quel.
+    [Fact]
+    public void Une_pose_qui_ne_se_relit_pas_est_rendue_sans_etre_dite_ratee()
+    {
+        var c = new CandidatFake(facteur: 1.20) { RelectureImpossible = true };
+
+        var profil = AutopilotEngine.Run(new IAutopilotCandidate[] { c }, Scene(c));
+
+        var r = profil.Results.Single();
+        r.Outcome.Should().Be(CandidateOutcome.ApplyFailed);
+        r.Detail.Should().Be(Docteur.T("AE.NonRelu")).And.NotBe(Docteur.T("AE.EcritureNonRelue"));
+        r.Evidence.Should().BeNull();
         c.Applique.Should().BeFalse();
     }
 
@@ -253,7 +326,7 @@ public class AutopilotEngineTests
 
         var r = profil.Results.Single();
         r.Outcome.Should().Be(CandidateOutcome.NotAttempted);
-        r.Detail.Should().Contain("AutoReboot");
+        r.Detail.Should().Contain(RepairLibelles.Nature(CandidateKind.AutoReboot)).And.NotContain("AutoReboot");
         c.Applications.Should().Be(0);
     }
 
@@ -273,8 +346,8 @@ public class AutopilotEngineTests
         var bon = new CandidatFake(facteur: 1.20);
         var mauvais = new CandidatFake(facteur: 0.80);
 
-        // Chaque candidat a sa propre scene : ce test verifie l'enchainement, pas l'interaction
-        // entre reglages — qui est un autre probleme, et un autre lot.
+        // Une seule scene, le produit des deux facteurs : le gagnant reste pose pendant l'essai du second, comme en vrai.
+        // Ce test verifie l'enchainement ; l'interaction entre reglages est un autre probleme.
         var profil = AutopilotEngine.Run(
             new IAutopilotCandidate[] { bon, mauvais },
             () => 100.0 * bon.Facteur * mauvais.Facteur);

@@ -4,23 +4,22 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// La pastille d'état était un point plat sur un halo. Elle devient une
-// perle de chrome teintée de son état : volume (reflet et ombre) et liseré chrome ; le mot reste à côté.
-// Le reflet brillant et le halo flou faisaient daté (« aqua ») ; la
-// pastille devient un point plat de l'état, cerclé d'un liseré chrome fin, sans reflet ni flou. Le mot reste.
+// La pastille d'état était un point plat sur un halo, puis une perle de chrome, puis un point plat cerclé de chrome : un
+// feu tricolore par domaine, sur l'orbite et dans la navigation, que le joueur lisait comme un gabarit tout fait. L'état ne
+// garde que son mot, et un domaine sans rien de signalé se tait.
 public sealed class PastilleEnPerleTests
 {
     [Fact]
-    public void La_pastille_d_etat_est_un_point_plat_cercle_de_chrome_sans_reflet_ni_flou()
+    public void L_etat_d_un_domaine_est_son_mot_et_le_silence_dit_que_tout_va_bien()
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
         var xaml = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
 
         var gabarit = Regex.Match(xaml, "<DataTemplate x:Key=\"ContenuEtat\">(.*?)</DataTemplate>", RegexOptions.Singleline).Groups[1].Value;
-        gabarit.Should().NotBeEmpty("témoin : le gabarit de la pastille est lu");
-        gabarit.Should().Contain("x:Name=\"Perle\"").And.Contain("LisereChromeBrush");
-        gabarit.Should().NotContain("BlurEffect", "pas de halo flou").And.NotContain("RadialGradientBrush", "pas de reflet brillant");
-        gabarit.Should().Contain("Text=\"{Binding EtatLibelle}\"", "le mot reste : la couleur seule ne dit rien");
+        gabarit.Should().NotBeEmpty("témoin : le gabarit de l'état est lu");
+        gabarit.Should().NotContain("<Ellipse", "plus de point de couleur");
+        gabarit.Should().Contain("Text=\"{Binding EtatLibelle}\"", "le mot dit l'état");
+        gabarit.Should().Contain("EtatDomaine.RienDeSignale").And.Contain("Collapsed");
     }
 }

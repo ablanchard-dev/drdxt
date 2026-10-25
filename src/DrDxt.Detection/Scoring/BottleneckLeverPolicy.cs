@@ -68,9 +68,9 @@ public static class BottleneckLeverPolicy
             BottleneckState.CappedOrVsyncLimited =>
                 Docteur.T("Promesse.Plafond", motif),
 
-            // THERMAL_OR_POWER_THROTTLE : « Suppress: more power limit/OC until stable thermal
-            // headroom proven ». Le pilote reste recommandé (un bug de ventilation se corrige
-            // par une mise à jour).
+            // THERMAL_OR_POWER_THROTTLE : une carte qui freine déjà. Seule la promesse de ReBAR, qui lui
+            // demande plus, est remplacée par « donne-lui de la marge thermique ». Le pilote reste
+            // recommandé (un bug de ventilation se corrige par une mise à jour).
             BottleneckState.ThermalOrPowerThrottle when leverId == LeverIds.ReBar =>
                 Docteur.T("Promesse.Chaleur", motif),
 

@@ -52,6 +52,12 @@ public static class CouleurDeSortie
             };
             var valeur = Docteur.T("COUL.Valeur", encodage, s.Bits, s.Avancee ? "HDR" : "SDR");
             var nom = Docteur.Nom("COUL.Nom", s.Nom ?? Docteur.T("TOPO.EcranSansNom"));
+            // Une profondeur à 0 n'est pas renseignée par le pilote : non lue, jamais « peu de bits ».
+            if (s.Bits == 0)
+            {
+                yield return new RepairFinding("DISPLAY", nom, valeur, null, RepairStatus.Unknown, Docteur.T("COUL.BitsNonLus"));
+                continue;
+            }
             // RVB ou 4:4:4 en 8 bits ou plus : toute l'information passe.
             yield return s.Encodage is 0 or 1 && s.Bits >= 8
                 ? new RepairFinding("DISPLAY", nom, valeur, null, RepairStatus.ExpectedDefault, Docteur.T("COUL.Complete"))

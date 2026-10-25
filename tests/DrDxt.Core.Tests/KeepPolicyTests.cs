@@ -136,4 +136,21 @@ public class KeepPolicyTests
         d.Keep.Should().BeFalse();
         d.RaisonCle.Should().Be(KeepPolicy.CleAucuneMesure);
     }
+
+    // Deux grandeurs de queue jugées chacune à 95 % : un levier inerte passe pour un gain environ une fois sur vingt. Seule
+    // prouvée, une grandeur doit dépasser sa marge du facteur de Bonferroni ; les deux prouvées se confirment.
+    [Fact]
+    public void Une_seule_queue_prouvee_au_ras_de_sa_marge_ne_garde_pas_le_levier()
+    {
+        static IReadOnlyList<MetricEvidence> Preuves(double low, double p95) =>
+        [
+            new(GameMetricKind.UnPourCentLow, Evidence.From(low, 1.0)),
+            new(GameMetricKind.P95Frametime, Evidence.From(p95, 1.0)),
+            new(GameMetricKind.Moyenne, Evidence.From(0.2, 1.0)),
+        ];
+
+        KeepPolicy.DecideParMetrique(Preuves(1.1, 0.3), OptimizationGoal.Competitive).Keep.Should().BeFalse();
+        KeepPolicy.DecideParMetrique(Preuves(1.3, 0.3), OptimizationGoal.Competitive).Keep.Should().BeTrue("au-delà du facteur");
+        KeepPolicy.DecideParMetrique(Preuves(1.1, 1.1), OptimizationGoal.Competitive).Keep.Should().BeTrue("les deux queues se confirment");
+    }
 }

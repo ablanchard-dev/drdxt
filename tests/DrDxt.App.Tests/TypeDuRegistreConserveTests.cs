@@ -29,4 +29,14 @@ public sealed class TypeDuRegistreConserveTests
         Win32RegistryReader.Texte(@"C:\Windows", RegistryValueKind.ExpandString).IsOk.Should()
             .BeFalse("un REG_EXPAND_SZ, déjà développé, reviendrait en REG_SZ figé");
     }
+
+    [Fact]
+    public void Seul_un_vrai_REG_MULTI_SZ_est_une_liste()
+    {
+        Win32RegistryReader.Liste(new[] { "c:\\pagefile.sys 0 0", "d:\\pagefile.sys 0 0" }).Value
+            .Should().Be("c:\\pagefile.sys 0 0\nd:\\pagefile.sys 0 0");
+        Win32RegistryReader.Liste(null).Value.Should().BeNull("absente, l'annulation est une suppression");
+        Win32RegistryReader.Liste("c:\\pagefile.sys 0 0").IsOk.Should()
+            .BeFalse("un REG_SZ lu « absent » ferait supprimer la valeur du joueur par Annuler");
+    }
 }

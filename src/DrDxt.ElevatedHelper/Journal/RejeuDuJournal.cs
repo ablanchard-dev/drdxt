@@ -14,7 +14,8 @@ namespace DrDxt.ElevatedHelper.Journal;
 /// Une écriture dans HKCU ne se rejoue que dans la ruche de son demandeur : le processus qui rejoue doit avoir son compte.
 /// Vu de SYSTEM, ou d'un helper élevé avec le compte d'un autre administrateur, HKCU est une autre ruche.
 /// Une entrée jugée sort du journal ; une entrée en suspens (écriture refusée, cible illisible, ruche d'un autre compte) y
-/// reste pour le rejeu suivant. Un journal illisible ne rend rien.
+/// reste pour le rejeu suivant. Une origine que la liste blanche refuserait (HwSchMode à 0) ne passera jamais : elle se dit
+/// non rendable et sort, au lieu d'être refusée à chaque rejeu. Un journal illisible ne rend rien.
 /// Limite : quand un demandeur vivant et un mort ont posé la même feuille, l'entrée du mort se lit « respectée » (la valeur
 /// en place est celle du vivant) et sort ; l'image d'avant du vivant est la pose du mort. Si le vivant meurt à son tour sans
 /// acquitter, le rejeu rend cette pose, pas l'origine du joueur. Il faut deux App en même temps ; aucune valeur étrangère à
@@ -25,8 +26,11 @@ public sealed class RejeuDuJournal(
     ILectureDesCibles lecture,
     IElevatedClient ecriture,
     Func<AppelantDuJournal, bool> vivant,
-    Func<string?> sidCourant)
+    Func<string?> sidCourant,
+    Func<PrivilegedOp, bool>? rendable = null)
 {
+    private readonly Func<PrivilegedOp, bool> _rendable = rendable ?? (op => new OpAllowlist().Validate(op).IsOk);
+
     /// <summary>Le nom des lignes du rapport : une écriture du journal n'a pas de levier, sa cible la nomme.</summary>
     public const string Source = "journal";
 
@@ -48,7 +52,9 @@ public sealed class RejeuDuJournal(
 
         var lignes = new List<LigneDuRendu>();
         var aRendre = new List<(IReadOnlyList<EntreeDuJournal> Entrees, AppliedTweak Origine)>();
-        foreach (var feuille in lu.Value!.Where(e => !vivant(e.Appelant)).OrderBy(e => e.Le).GroupBy(e => Cible(e.Op, e.Appelant)))
+        // L'ordre d'inscription au journal, jamais l'heure murale : une horloge reculée entre deux poses ferait prendre la
+        // seconde pour la première, et rendre sa valeur d'avant (une pose de DrDXT) au lieu de l'origine.
+        foreach (var feuille in lu.Value!.Where(e => !vivant(e.Appelant)).GroupBy(e => CleDe(e.Op, e.Appelant)))
         {
             var entrees = feuille.ToList();
             var (premiere, derniere) = (entrees[0], entrees[^1]);
@@ -58,6 +64,7 @@ public sealed class RejeuDuJournal(
                 continue;
             }
             if (OrigineDe(derniere.Op, premiere.ImageAvant) is not { } origine
+                || !_rendable(origine)
                 || PrivilegedOpCodec.Serialize(origine) is not { IsOk: true, Value: { } origineJson }
                 || PrivilegedOpCodec.Serialize(derniere.Op) is not { IsOk: true, Value: { } poseeJson })
             {
@@ -76,7 +83,9 @@ public sealed class RejeuDuJournal(
         {
             var siennes = rendu.Lignes.Where(l => l.TweakId == origine.TweakId).ToList();
             if (!siennes.Any(l => l.OrigineEnSuspens)) Retirer(entrees);
-            lignes.AddRange(siennes.Select(l => l with { TweakId = Source }));
+            // La clé de la feuille suit la ligne : l'App y reconnaît un levier qu'elle croyait encore gardé.
+            var cle = CleDe(entrees[^1].Op, entrees[^1].Appelant);
+            lignes.AddRange(siennes.Select(l => l with { TweakId = Source, Cle = cle }));
         }
         return Result<RapportDuRendu>.Ok(new RapportDuRendu(rendu.ManifesteNonLu, lignes));
     }
@@ -100,20 +109,32 @@ public sealed class RejeuDuJournal(
             => new SetCpuPackagePowerLimitOp(v, c.Valeur),
         RunServiceControlOp r when avant == "running" => r with { Action = ServiceAction.Start },
         RunServiceControlOp r when avant == "stopped" => r with { Action = ServiceAction.Stop },
+        // Le profil du jeu ne possédait pas le réglage : le lui retirer. La provenance notée est celle que le helper relit.
+        ApplyNvApiDrsSettingOp d when Heritee(avant) is { } origine
+            => new DeleteNvApiDrsSettingOp(d.SettingId, d.ProfileName, origine, 0),
         ApplyNvApiDrsSettingOp d when Naturel(avant) is { } v => d with { Value = v },
         ApplyNvApiPowerLimitOp n when Entier(avant) is { } v => n with { PowerLimitPercent = v },
         ApplyAdlxTuningOp a when Entier(avant) is { } v => a with { IntValue = v },
         _ => null,
     };
 
+    private static DrsValueOrigin? Heritee(string? s)
+        => s is not null && s.StartsWith(Execution.LectureDesCiblesWin32.ImageHeritee, StringComparison.Ordinal)
+           && Enum.TryParse<DrsValueOrigin>(s[Execution.LectureDesCiblesWin32.ImageHeritee.Length..], ignoreCase: false, out var o)
+           && Enum.IsDefined(o)
+            ? o : null;
+
     private static uint? Naturel(string? s) => uint.TryParse(s, NumberStyles.None, CultureInfo.InvariantCulture, out var v) ? v : null;
     private static int? Entier(string? s) => int.TryParse(s, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var v) ? v : null;
 
     /// <summary>La feuille qu'une op écrit : deux poses de la même feuille se fondent. HKCU est la ruche de chaque compte.</summary>
-    private static string Cible(PrivilegedOp op, AppelantDuJournal qui) => op switch
+    public static string CleDe(PrivilegedOp op, AppelantDuJournal qui) => CleDe(op, qui.Sid);
+
+    /// <summary>La même clé, pour le compte <paramref name="sid"/>.</summary>
+    public static string CleDe(PrivilegedOp op, string sid) => op switch
     {
         SetRegistryValueOp { Hive: RegistryHiveKind.CurrentUser } s
-            => $"{qui.Sid}\\{s.Path.Trim().Trim('\\')}\\{s.Name}".ToUpperInvariant(),
+            => $"{sid}\\{s.Path.Trim().Trim('\\')}\\{s.Name}".ToUpperInvariant(),
         SetRegistryValueOp s => $"{s.Hive}\\{s.Path.Trim().Trim('\\')}\\{s.Name}".ToUpperInvariant(),
         SetProcessorBoostModeOp b => $"boost {b.PlanGuid:D}",
         SetWirelessPowerSavingOp w => $"wifi {w.PlanGuid:D}",

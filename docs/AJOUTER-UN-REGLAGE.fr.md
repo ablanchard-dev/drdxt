@@ -44,7 +44,9 @@ cette valeur. Une origine absente se rend absente (une suppression), pas par une
 
 ## 4. La classe du journal d'écriture anticipée
 
-Avant d'exécuter une écriture, le helper note son image « avant », pour qu'un arrêt en plein milieu se défasse.
+Avant d'exécuter une écriture, le helper note son image « avant », pour qu'un arrêt en plein milieu se défasse. Une
+valeur de la session (HKCU), que l'App écrit elle-même, suit la même règle dans le journal du compte
+(`JournalDEcritureAnticipee.DuCompte`), que l'App rejoue à son lancement (`RejeuDuJournalDuCompte`).
 
 - Règle : chaque type d'opération a sa classe dans `src/DrDxt.ElevatedHelper/Journal/ClassesDuJournal.cs`
   (journalisée, lecteur à venir, volatile, ou sans état).

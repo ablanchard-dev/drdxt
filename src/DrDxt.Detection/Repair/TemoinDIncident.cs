@@ -29,7 +29,9 @@ public static class TemoinDIncident
 
     /// <summary>Ce qui déclenche un témoin dans le journal Système : arrêt brutal (Kernel-Power 41), erreur matérielle
     /// fatale (WHEA-Logger 18), pilote graphique relancé (Display 4101), mémoire virtuelle épuisée
-    /// (Resource-Exhaustion-Detector 2004). Les mêmes fournisseurs et numéros que <see cref="PannesDuJournal"/>.</summary>
+    /// (Resource-Exhaustion-Detector 2004). Display 4101 et Resource-Exhaustion-Detector 2004 sont ceux de
+    /// <see cref="PannesDuJournal"/> ; Kernel-Power 41 et WHEA-Logger 18 sont lus par les familles des arrêts et des erreurs
+    /// matérielles.</summary>
     public static readonly (string Fournisseur, int Id, string Genre)[] Declencheurs =
     [
         ("Microsoft-Windows-Kernel-Power", 41, "arret brutal"),
@@ -79,18 +81,26 @@ public static class TemoinDIncident
         return lignes.OrderBy(l => l.Quand).ToList();
     }
 
-    /// <summary>Les témoins écrits, du plus récent au plus ancien ; null si le dossier n'a pas pu être lu.</summary>
-    public static IReadOnlyList<Temoin>? LireTous(string dossier)
+    /// <summary>Les témoins écrits, du plus récent au plus ancien ; null si le dossier n'a pas pu être lu. Un fichier hors
+    /// confiance (posé par un compte avant l'installation : la réparation du dossier ne descend pas) n'est pas lu.</summary>
+    public static IReadOnlyList<Temoin>? LireTous(string dossier, Func<string, bool> fiable)
     {
         try
         {
             if (!Directory.Exists(dossier)) return [];
-            return Directory.EnumerateFiles(dossier, "temoin-*.json")
+            return Directory.EnumerateFiles(dossier, "temoin-*.json").Where(fiable)
                 .Select(f => { try { return JsonSerializer.Deserialize<Temoin>(File.ReadAllText(f)); } catch (Exception) { return null; } })
                 .OfType<Temoin>().OrderByDescending(t => t.Incident).ToList();
         }
         catch (Exception) { return null; }
     }
+
+    /// <summary>Les témoins de trop, à supprimer : les plus anciens par leur nom, au-delà des <see cref="Gardes"/>. Un fichier
+    /// hors confiance n'occupe aucune place gardée (sinon des noms plus récents posés d'avance feraient supprimer chaque vrai
+    /// témoin aussitôt écrit), et n'est jamais supprimé : le service ne suit pas un lien posé par un autre.</summary>
+    public static IEnumerable<string> EnTrop(string dossier, Func<string, bool> fiable)
+        => Directory.EnumerateFiles(dossier, "temoin-*.json").Where(fiable)
+            .OrderByDescending(f => f, StringComparer.Ordinal).Skip(Gardes);
 
     /// <summary>Pur : le constat du docteur, pour le dernier témoin des trente derniers jours.</summary>
     public static IEnumerable<RepairFinding> Juger(IReadOnlyList<Temoin>? temoins, DateTimeOffset maintenant)

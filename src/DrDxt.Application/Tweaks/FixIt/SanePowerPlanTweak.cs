@@ -58,8 +58,9 @@ public sealed class SanePowerPlanTweak : FixItTweakBase
             return false;
 
         // Le processeur limite-t-il ce jeu ? Seule la mesure du scan le dit.
-        // GPU-bound (97 % d'occupation mesuree le 08/09 sur la machine de reference) : monter la preference
-        // du CPU ne rendrait rien et couterait du courant au repos. null (aucune mesure en jeu) ou
+        // Franchement GPU (GpuBound) : monter la preference du CPU ne
+        // rendrait rien et couterait du courant au repos. Plutot GPU (MixedGpuLeaning) : le processeur pese encore sur
+        // une part des images, le plan est propose. null (aucune mesure en jeu) ou
         // verdict inconnu : rien. Le parking n'entre pas dans la decision : il est identique entre
         // les deux plans (mesure du 10/09), et au repos il est attendu sur un CPU hybride.
         return state.GoulotMesure is BottleneckState.CpuBoundStrong
@@ -76,6 +77,11 @@ public sealed class SanePowerPlanTweak : FixItTweakBase
             if (!active.IsOk)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     $"Could not read the active power plan: {active.Error?.Code}.");
+            // Le scan a pu dater : un plan du constructeur actif maintenant aurait un inverse que le helper refuse
+            // (KnownPowerPlans), et Hautes performances ne se rendrait plus. Rien n'est écrit.
+            if (!KnownPowerPlans.IsKnown(active.Value))
+                return Result<TweakSnapshot>.Fail(ErrorCodes.TweakNotApplicable,
+                    "The active power plan is not a known Windows plan: its revert would be refused, nothing is written.");
 
             var inverse = new SetActivePowerPlanOp(active.Value);
             var snapshotJson = PrivilegedOpCodec.Serialize(inverse);

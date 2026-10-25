@@ -37,4 +37,10 @@ public class PuissancePaquetReaderTests
         PuissancePaquetReader.LireWatts(new Wmi(Result<IReadOnlyList<WmiRow>>.Fail(ErrorCodes.IoFailure, "x")))
             .Should().BeNull();
     }
+
+    // Un 0 W sur le paquet est un compteur pas encore échantillonné, jamais une mesure : il n'entre pas dans un relevé.
+    [Fact]
+    public void Zero_watt_sur_le_paquet_est_non_lu()
+        => PuissancePaquetReader.LireWatts(new Wmi(Result<IReadOnlyList<WmiRow>>.Ok([Ligne("RAPL_Package0_PKG", 0)])))
+            .Should().BeNull();
 }

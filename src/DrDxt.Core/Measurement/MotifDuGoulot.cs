@@ -31,4 +31,21 @@ public static class MotifDuGoulot
             _ => verdict.Reason,
         };
     }
+
+    /// <summary>L'état du goulot en mots, dans la langue du docteur : le rapport et la raison d'un levier retenu le disent
+    /// pareil. Un état ajouté sans libellé se dit par son nom, pour qu'il se voie.</summary>
+    public static string Libelle(BottleneckState state) => state switch
+    {
+        BottleneckState.UnknownPartial => Docteur.T("Rapport.Etat.NonClasse"),
+        BottleneckState.GpuBound => Docteur.T("Rapport.Etat.Gpu"),
+        BottleneckState.MixedGpuLeaning => Docteur.T("Rapport.Etat.PlutotGpu"),
+        BottleneckState.CpuBoundOrAppBound => Docteur.T("Rapport.Etat.CpuOuJeu"),
+        BottleneckState.CpuBoundStrong => Docteur.T("Rapport.Etat.CpuNet"),
+        BottleneckState.RamCommitPressure => Docteur.T("Rapport.Etat.Memoire"),
+        BottleneckState.FramePacing => Docteur.T("Rapport.Etat.Cadence"),
+        BottleneckState.LatencyOnly => Docteur.T("Rapport.Etat.Latence"),
+        BottleneckState.ThermalOrPowerThrottle => Docteur.T("Rapport.Etat.Bridee"),
+        BottleneckState.CappedOrVsyncLimited => Docteur.T("Rapport.Etat.Plafonnee"),
+        _ => state.ToString(),
+    };
 }

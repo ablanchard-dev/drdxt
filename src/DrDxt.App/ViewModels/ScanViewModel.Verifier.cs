@@ -112,7 +112,7 @@ public partial class ScanViewModel
     public string LabelGuide => _localize("Carte.Guide");
 
     /// <summary>Ce que DrDXT ne peut pas écrire (BIOS, câbles, réglages du jeu) se lit étape par
-    /// Étape sur le dépôt. Navigateur absent : l'adresse est copiée dans le presse-papiers, pour la coller
+    /// étape sur le dépôt. Navigateur absent : l'adresse est copiée dans le presse-papiers, pour la coller
     /// ailleurs ; le presse-papiers lui-même peut refuser, et alors rien de plus n'est possible d'ici.</summary>
     [RelayCommand]
     private void OuvrirGuide() => OuvrirOuCopier(DrDxt.App.Platform.LienDeRapport.Guide);
@@ -127,7 +127,7 @@ public partial class ScanViewModel
         try { System.Windows.Clipboard.SetText(lien); } catch (Exception) { /* presse-papiers pris par un autre programme : le lien reste écrit à l'écran */ }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private void DemanderVerification()
     {
         VerificationBilan = string.Empty;
@@ -138,11 +138,17 @@ public partial class ScanViewModel
     [RelayCommand]
     private void AnnulerVerification() => VerificationAConfirmer = false;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task ConfirmerVerificationAsync()
     {
         VerificationAConfirmer = false;
         if (_verifierLaMachine is not { } verifier || VerificationEnCours) return;
+        // Elle pose puis rend chaque levier : un gros changement, qui part après un point de restauration, comme Optimiser.
+        if (await _safety.EnsureRestorePointAsync().ConfigureAwait(true) is { IsOk: false } point)
+        {
+            VerificationBilan = MessageDuPoint(point);
+            return;
+        }
         // Jamais en même temps qu'un essai en alternance : un seul essai tient dans le journal de remise.
         if (!await _verrouEssai.WaitAsync(0).ConfigureAwait(true))
         {

@@ -95,6 +95,17 @@ public class FrameCapInferencerTests
         s.Origin.Value.IsYourOwnChange.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(0)]   // pas de limite
+    [InlineData(240)] // au-dessus de l'écran
+    public void A_cap_that_never_binds_still_carries_its_origin(int cap)
+    {
+        var s = FrameCapInferencer.Infer(cap, TwoScreens, DrsSettingOrigin.Describe(0, 0, 0));
+
+        s.Verdict.Should().Be(FrameCapVerdict.NotCapping);
+        s.Origin.Should().NotBeNull("l'origine est transmise telle quelle, quel que soit le verdict");
+    }
+
     [Fact]
     public void Without_the_origin_the_verdict_is_unchanged_and_claims_no_author()
     {

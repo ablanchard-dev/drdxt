@@ -2,7 +2,7 @@
 
 English version of the coming changes: [CHANGELOG.en.md](CHANGELOG.en.md).
 
-## Non publié
+## 0.9.2 (non publiée)
 
 Pour le joueur :
 
@@ -32,7 +32,8 @@ Pour le joueur :
   tant qu'aucune température de partie n'a été relevée.
 - Le réglage de la carte est refusé quand un autre outil y a déjà posé un décalage, ou quand ce décalage n'a pas pu
   être lu.
-- Plafond d'envoi pendant une partie : seulement pour un jeu reconnu, et oublié au redémarrage.
+- Plafond d'envoi pendant une partie : seulement pour un jeu reconnu ; effacé au redémarrage de Windows, reposé par le
+  service à la partie suivante tant que la protection reste allumée.
 - Un antivirus ou un contrôle parental n'est jamais coupé au démarrage.
 - Les identifiants Windows ne vont qu'à un proxy que tu as configuré, jamais à un proxy découvert sur le réseau.
 - Les lecteurs de stabilité, de pilotes, de Defender et de BitLocker ne peuvent rien écrire.
@@ -53,7 +54,7 @@ Pour le joueur :
 - Les nombres et les dates suivent la langue de l'App ; les textes anglais prennent des guillemets anglais.
 - L'information d'expert sans problème est repliée dans « Détails techniques » sous chaque page ; l'étiquette
   « recommandation » est retirée.
-- Le README dit exactement ce qui reste après la désinstallation, et ce qui a été vérifié sur une vraie machine.
+- Le README dit exactement ce qui reste après la désinstallation.
 - « Envoyer mon rapport » dit que le ticket s'ouvre vide.
 - « Quoi de neuf » montré une fois après une mise à jour de DrDXT ; paquet d'aide en un clic, montré avant d'être
   écrit.

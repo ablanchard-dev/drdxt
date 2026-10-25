@@ -4,7 +4,7 @@ using FluentAssertions;
 
 namespace DrDxt.Measurement.Tests.Network;
 
-/// <summary>Branchement B3 — les pertes a l'interface, classees pareil par l'outil et par l'App.</summary>
+/// <summary>Les pertes a l'interface, classees pareil par l'outil et par l'App.</summary>
 public class PertesInterfaceTests
 {
     private sealed class Source(params Result<NicCounterSnapshot>[] releves) : INicCounterSource
@@ -30,6 +30,30 @@ public class PertesInterfaceTests
 
         c.Statut.Should().Be(RepairStatus.Suspicious);
         c.ValeurCourante.Should().Contain("35 ignorés").And.Contain("2 erreurs");
+    }
+
+    // Seuls les compteurs d'émission bougent : la valeur ne se lit pas « 0 ignorés / 0 erreurs en réception » sous un statut
+    // suspect, elle dit l'émission.
+    [Fact]
+    public void Des_pertes_en_emission_seule_se_disent_en_emission()
+    {
+        var c = PertesInterface.Classer(new NicErrorDelta(0, 0, 0, 3, 8000, 4000, false), TimeSpan.FromSeconds(20));
+
+        c.Statut.Should().Be(RepairStatus.Suspicious);
+        c.ValeurCourante.Should().Be(Docteur.T("PI.PertesEmission", 0, 3)).And.NotContain(Docteur.T("PI.Pertes", 0, 0));
+    }
+
+    // Une trame ignorée en 20 s donnait « suspect » : Windows ignore aussi les trames d'un protocole qu'il ne connaît pas.
+    // Quelques-unes sont observées ; une erreur compte dès la première.
+    [Fact]
+    public void Quelques_trames_ignorees_sont_observees_une_erreur_reste_suspecte()
+    {
+        PertesInterface.Classer(new NicErrorDelta(1, 0, 0, 0, 8000, 4000, false), TimeSpan.FromSeconds(20))
+            .Statut.Should().Be(RepairStatus.Observed);
+        PertesInterface.Classer(new NicErrorDelta(0, 1, 0, 0, 8000, 4000, false), TimeSpan.FromSeconds(20))
+            .Statut.Should().Be(RepairStatus.Suspicious);
+        PertesInterface.Classer(new NicErrorDelta(40, 0, 0, 0, 8000, 4000, false), TimeSpan.FromSeconds(20))
+            .Statut.Should().Be(RepairStatus.Suspicious, "40 sur 8000 : 0,5 %");
     }
 
     [Fact]

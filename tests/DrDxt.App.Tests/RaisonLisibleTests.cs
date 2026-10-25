@@ -59,6 +59,10 @@ public class RaisonLisibleTests
     [InlineData("en-US", "HELPER.OP_FAILED")]
     [InlineData("fr-FR", "HELPER_UNREACHABLE")]
     [InlineData("en-US", "HELPER_UNREACHABLE")]
+    [InlineData("fr-FR", "IO_FAILURE")]
+    [InlineData("en-US", "IO_FAILURE")]
+    [InlineData("fr-FR", "ELEVATION_DECLINED")]
+    [InlineData("en-US", "ELEVATION_DECLINED")]
     public void Le_repli_n_affirme_rien_sur_l_etat_de_la_machine(string langue, string code)
     {
         var resx = new DrDxt.Infrastructure.Localization.ResxLocalizer();
@@ -115,6 +119,8 @@ public class RaisonLisibleTests
     [InlineData("en-US", "JEA_REFUS", "nothing was written")]
     [InlineData("fr-FR", "JEA_JOURNAL", "rien n'a été écrit")]
     [InlineData("en-US", "JEA_JOURNAL", "nothing was written")]
+    [InlineData("fr-FR", "JEA_ILLISIBLE", "pas passager")]
+    [InlineData("en-US", "JEA_ILLISIBLE", "not temporary")]
     [InlineData("fr-FR", "JEA_ACQUIT_REFUSE", "JEA_ACQUIT_REFUSE")]
     [InlineData("en-US", "JEA_ACQUIT_REFUSE", "JEA_ACQUIT_REFUSE")]
     public void Un_refus_du_journal_dit_ce_qui_est_ecrit(string langue, string code, string attendu)
@@ -127,5 +133,49 @@ public class RaisonLisibleTests
 
         raison.Should().Contain(attendu);
         if (code == "JEA_ACQUIT_REFUSE") raison.Should().NotContain("rien n'a été écrit").And.NotContain("nothing was written");
+    }
+
+    // Les échecs les plus courants (l'invite Windows refusée, une écriture que l'outil administrateur refuse, un fichier qui ne
+    // se lit pas) ont leur phrase : jamais « raison technique : ELEVATION_DECLINED » à l'écran.
+    [Theory]
+    [InlineData("fr-FR", "ELEVATION_DECLINED")]
+    [InlineData("en-US", "ELEVATION_DECLINED")]
+    [InlineData("fr-FR", "HELPER.OP_FAILED")]
+    [InlineData("en-US", "HELPER.OP_FAILED")]
+    [InlineData("fr-FR", "IO_FAILURE")]
+    [InlineData("en-US", "IO_FAILURE")]
+    public void Les_echecs_courants_ont_leur_phrase(string langue, string code)
+    {
+        var resx = new DrDxt.Infrastructure.Localization.ResxLocalizer();
+        var culture = System.Globalization.CultureInfo.GetCultureInfo(langue);
+
+        RaisonLisible.Dire(Result.Fail(code, "x"), k => resx.Get(k, culture)).Should().NotContain(code);
+    }
+
+    // « Le helper » est un mot du code, pas du joueur : les textes montrés disent « l'outil administrateur de DrDXT ».
+    [Fact]
+    public void Aucun_texte_montre_ne_dit_helper()
+    {
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
+        var valeurs = new[] { "Strings.resx", "Strings.fr.resx" }
+            .SelectMany(f => System.Xml.Linq.XDocument.Load(Path.Combine(d!.FullName, "src", "DrDxt.Infrastructure", "Resources", f))
+                .Descendants("data").Select(x => (Cle: (string?)x.Attribute("name"), Valeur: (string?)x.Element("value") ?? "")));
+
+        valeurs.Where(v => Regex.IsMatch(v.Valeur, @"\bhelper\b", RegexOptions.IgnoreCase)).Select(v => v.Cle).Should().BeEmpty();
+    }
+
+    // Le point de restauration est pour les gros changements, pas pour chaque écriture : aucun texte ne promet le contraire.
+    [Fact]
+    public void Aucun_texte_ne_promet_un_point_de_restauration_a_chaque_ecriture()
+    {
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
+        var valeurs = new[] { "Strings.resx", "Strings.fr.resx" }
+            .SelectMany(f => System.Xml.Linq.XDocument.Load(Path.Combine(d!.FullName, "src", "DrDxt.Infrastructure", "Resources", f))
+                .Descendants("data").Select(x => (Cle: (string?)x.Attribute("name"), Valeur: (string?)x.Element("value") ?? "")));
+
+        valeurs.Where(v => Regex.IsMatch(v.Valeur, @"(ne change rien|n'écrit rien) sans point de restauration|(changes|writes) nothing without a restore point"))
+            .Select(v => v.Cle).Should().BeEmpty();
     }
 }

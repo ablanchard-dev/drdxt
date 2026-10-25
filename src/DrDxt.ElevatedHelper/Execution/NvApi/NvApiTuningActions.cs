@@ -45,6 +45,24 @@ public sealed class NvApiTuningActions : INvApiTuningActions
 
     // --- lectures (capture de l'original pour un retour fidèle) ---
 
+    public Result<int> GetMemoryClockOffsetMhz(int gpuIndex)
+    {
+        if (gpuIndex < 0)
+            return Result<int>.Fail(ErrorCodes.HelperOpFailed, "Invalid GPU index.");
+        if (!_native.IsAvailable)
+            return Result<int>.Fail(ErrorCodes.HelperOpFailed, Unavailable);
+        try
+        {
+            return _native.TryReadMemoryOffsetMhz(gpuIndex, out var mhz)
+                ? Result<int>.Ok(mhz)
+                : Result<int>.Fail(ErrorCodes.HelperOpFailed, "Memory clock offset not readable.");
+        }
+        catch (Exception ex)
+        {
+            return Result<int>.Fail(ErrorCodes.HelperOpFailed, ex.Message);
+        }
+    }
+
     public Result<int> GetCoreClockOffsetMhz(int gpuIndex)
     {
         if (gpuIndex < 0)

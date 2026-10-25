@@ -123,14 +123,177 @@ public sealed class JournalDesChangementsTests : IDisposable
             var t = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
             var a = new JournalDesChangements(chemin);
             var b = new JournalDesChangements(chemin);
-            await Task.WhenAll(Enumerable.Range(0, 30).Select(i => Task.Run(() =>
+            // Sur un runner lent, un écrivain peut attendre le verrou plus de 10 s et rendre « occupé » : ce n'est pas une
+            // perte. La perte, c'est un ajout qui a réussi et qui n'est plus dans le fichier. Seul ce refus est toléré :
+            // il porte le même code qu'une écriture refusée, son message l'en distingue.
+            var occupe = Docteur.T("App.JournalChangementsOccupe");
+            var ajouts = await Task.WhenAll(Enumerable.Range(0, 30).Select(i => Task.Run(() =>
                 (i % 2 == 0 ? a : b).Ajouter(new Changement(t.AddHours(i), $"changement {i}")))));
-            a.Lire().Should().HaveCount(30, "aucun ajout n'est écrasé par l'autre journal");
+            ajouts.Should().Contain(r => r.IsOk);
+            ajouts.Should().NotContain(r => !r.IsOk && r.Error!.Value.Message != occupe, "seul le verrou attendu trop longtemps");
+            a.Lire().Should().HaveCount(30, "aucun ajout n'est perdu : refusé, il attend le passage suivant, et se lit déjà");
 
             var pire = new BilanDuChangement(VerdictEnJeu.Pire, "cod.exe", 3, 3, 95, 81, 140, 140);
-            await Task.WhenAll(a.Lire().Select((c, i) => Task.Run(() => (i % 2 == 0 ? a : b).Figer(c, pire))));
-            b.Lire().Should().OnlyContain(c => c.Fige != null, "aucun bilan figé n'est perdu");
+            var lus = a.Lire();
+            var figes = await Task.WhenAll(lus.Select((c, i) => Task.Run(() => (i % 2 == 0 ? a : b).Figer(c, pire))));
+            figes.Should().Contain(r => r.IsOk);
+            figes.Should().NotContain(r => !r.IsOk && r.Error!.Value.Message != occupe, "seul le verrou attendu trop longtemps");
+            b.Lire().Should().HaveCount(lus.Count, "figer ne retire aucune entrée");
+            var reussis = lus.Where((c, i) => figes[i].IsOk).Select(c => c.Libelle).ToHashSet();
+            b.Lire().Where(c => reussis.Contains(c.Libelle)).Should().OnlyContain(c => c.Fige != null, "aucun bilan figé n'est perdu");
         }
         finally { File.Delete(chemin); }
+    }
+
+    [Fact]
+    public void Un_journal_abime_est_mis_de_cote_avant_le_prochain_ajout()
+    {
+        var chemin = Path.Combine(Path.GetTempPath(), $"journal-abime-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(chemin, "{ tronqu");
+            var journal = new JournalDesChangements(chemin);
+
+            journal.Ajouter(new Changement(new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero), "un changement")).IsOk.Should().BeTrue();
+
+            Directory.GetFiles(Path.GetDirectoryName(chemin)!, Path.GetFileName(chemin) + ".mis-de-cote-*").Should().ContainSingle()
+                .Which.Should().Match(f => File.ReadAllText(f) == "{ tronqu");
+            journal.Lire().Should().ContainSingle();
+        }
+        finally
+        {
+            foreach (var f in Directory.GetFiles(Path.GetDirectoryName(chemin)!, Path.GetFileName(chemin) + "*")) File.Delete(f);
+        }
+    }
+
+    // Un JSON valide de la mauvaise forme (une liste de nombres) ne se lit pas en changements : mis de côté, pas écrasé.
+    [Fact]
+    public void Une_liste_de_la_mauvaise_forme_est_mise_de_cote_avant_l_ajout()
+    {
+        File.WriteAllText(_chemin, "[1,2]");
+        var j = new JournalDesChangements(_chemin);
+
+        j.Ajouter(new Changement(new DateTimeOffset(2026, 10, 5, 0, 0, 0, TimeSpan.Zero), "Levier")).IsOk.Should().BeTrue();
+
+        j.Lire().Select(c => c.Libelle).Should().Equal("Levier");
+        Directory.GetFiles(Path.GetDirectoryName(_chemin)!, Path.GetFileName(_chemin) + ".mis-de-cote-*")
+            .Should().ContainSingle().Which.Should().Match(f => File.ReadAllText(f) == "[1,2]");
+        foreach (var f in Directory.GetFiles(Path.GetDirectoryName(_chemin)!, Path.GetFileName(_chemin) + ".mis-de-cote-*")) File.Delete(f);
+    }
+
+    // La référence d'un relevé n'a pas pu s'écrire après que le journal a pris ses changements : le relevé suivant les rend
+    // de nouveau, à une autre heure, mais avec la même clé et la même borne basse. C'est le même changement, pas un second.
+    [Fact]
+    public void Un_changement_rendu_de_nouveau_par_le_releve_suivant_n_est_pas_double()
+    {
+        var j = new JournalDesChangements(_chemin);
+        var depuis = new DateTimeOffset(2026, 10, 4, 4, 30, 0, TimeSpan.Zero);
+        j.Ajouter(new Changement(depuis.AddHours(1), "HAGS", depuis, "windows.hags:on")).IsOk.Should().BeTrue();
+
+        j.Ajouter(new Changement(depuis.AddHours(5), "HAGS", depuis, "windows.hags:on")).IsOk.Should().BeTrue();
+        j.Ajouter(new Changement(depuis.AddHours(6), "HAGS", depuis.AddHours(5), "windows.hags:on")).IsOk.Should().BeTrue();
+
+        j.Lire().Select(c => c.Quand).Should().Equal(new[] { depuis.AddHours(6), depuis.AddHours(1) },
+            "le même relevé rendu deux fois ne compte qu'une ; une borne neuve est une bascule neuve");
+    }
+
+    // L'horloge a reculé (pile du BIOS, fuseau, réglage à la main) et le journal est plein : le changement qui vient d'arriver
+    // est daté avant tous les autres. Il reste ; c'est la plus vieille des entrées d'avant qui part.
+    [Fact]
+    public void Journal_plein_et_horloge_reculee_le_dernier_changement_reste()
+    {
+        var j = new JournalDesChangements(_chemin);
+        var t = new DateTimeOffset(2026, 10, 4, 0, 0, 0, TimeSpan.Zero);
+        for (var i = 0; i < JournalDesChangements.Gardes; i++) j.Ajouter(new Changement(t.AddHours(i), $"L{i}")).IsOk.Should().BeTrue();
+
+        j.Ajouter(new Changement(t.AddDays(-1), "Arrivé après le recul")).IsOk.Should().BeTrue();
+
+        var lus = j.Lire().Select(c => c.Libelle).ToList();
+        lus.Should().HaveCount(JournalDesChangements.Gardes).And.Contain("Arrivé après le recul").And.NotContain("L0");
+    }
+
+    // L'App lancée élevée créait le mutex nommé du journal ; son descripteur par défaut ne s'ouvre pas depuis le relevé non élevé
+    // du même compte, qui levait UnauthorizedAccessException à chaque ajout. Simulé : un mutex de ce nom que ce compte ne peut
+    // pas ouvrir. Le verrou entre processus est un fichier du dossier du compte, que les deux ouvrent.
+    [Fact]
+    public void Un_mutex_d_un_processus_eleve_n_empeche_pas_d_ajouter()
+    {
+        var journal = new JournalDesChangements(_chemin, TimeSpan.FromMilliseconds(50));
+        using var mutex = new Mutex(false, AncienNomDuVerrou(_chemin));
+        var refus = new System.Security.AccessControl.MutexSecurity();
+        refus.AddAccessRule(new System.Security.AccessControl.MutexAccessRule(System.Security.Principal.WindowsIdentity.GetCurrent().User!,
+            System.Security.AccessControl.MutexRights.FullControl, System.Security.AccessControl.AccessControlType.Deny));
+        mutex.SetAccessControl(refus);
+
+        journal.Ajouter(new Changement(new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero), "BIOS")).IsOk.Should().BeTrue();
+        new JournalDesChangements(_chemin).Lire().Select(c => c.Libelle).Should().Equal("BIOS");
+    }
+
+    private static string AncienNomDuVerrou(string chemin) => @"Local\DrDXT-journal-" + Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(chemin).ToUpperInvariant())))[..32];
+
+    // Le verrou tenu plus longtemps que l'attente (un autre processus qui écrit lentement) : l'ajout était refusé, et ses
+    // appelants (la pose, le rendu de la garde) ne reprenaient jamais. Une pose perdue coupait le retrait automatique et la
+    // garde d'incident de ce levier. Refusé, l'ajout attend : il se lit tout de suite, et l'ajout suivant l'écrit avec lui.
+    [Fact]
+    public void Un_ajout_refuse_par_le_verrou_n_est_pas_perdu()
+    {
+        var t = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+        var journal = new JournalDesChangements(_chemin, TimeSpan.FromMilliseconds(50));
+        using (var tenu = new ManualResetEventSlim())
+        using (var lache = new ManualResetEventSlim())
+        {
+            var autre = new Thread(() =>
+            {
+                using var verrou = VerrouDuReleve.Prendre(journal.CheminDuVerrou);
+                tenu.Set();
+                lache.Wait();
+            });
+            autre.Start();
+            tenu.Wait();
+
+            journal.Ajouter(new Changement(t, "pose:hags", null, "pose:latency.hagsOn")).IsOk.Should().BeFalse("témoin : le verrou est tenu");
+            journal.Lire().Select(c => c.Libelle).Should().Contain("pose:hags", "la garde et le retrait le voient déjà");
+
+            lache.Set();
+            autre.Join();
+        }
+
+        journal.Ajouter(new Changement(t.AddHours(1), "BIOS")).IsOk.Should().BeTrue();
+        new JournalDesChangements(_chemin).Lire().Select(c => c.Libelle).Should().Equal("BIOS", "pose:hags");
+    }
+
+    // Les mises à jour de jeux et de pilotes remplissent l'anneau de 50 en deux ou trois mois. La date de pose d'un levier en
+    // sortait, et avec elle le retrait automatique et le contrôle des leviers volatils de ce levier. La dernière pose de chaque
+    // levier reste, quel que soit son âge.
+    [Fact]
+    public void La_derniere_pose_d_un_levier_ne_sort_pas_de_l_anneau()
+    {
+        var t = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
+        var j = new JournalDesChangements(_chemin);
+        j.Ajouter(new Changement(t, "latency.hagsOn", null, "pose:latency.hagsOn"));
+        for (var i = 1; i <= JournalDesChangements.Gardes + 10; i++)
+            j.Ajouter(new Changement(t.AddDays(i), $"mise à jour {i}", null, $"jeu:{i}"));
+
+        j.Lire().Should().Contain(c => c.Cle == "pose:latency.hagsOn");
+        j.Lire().Should().HaveCount(JournalDesChangements.Gardes + 1, "les 50 plus récentes, plus la dernière pose du levier");
+    }
+
+    // Un verdict figé se relit des mois plus tard. Écrit en entier, une valeur ajoutée avant « Pire » dans l'énumération
+    // changerait un « Mieux » figé, et le retrait automatique retirerait un levier prouvé bon. Il s'écrit par son nom ; les
+    // journaux écrits en entiers se relisent encore.
+    [Fact]
+    public void Un_verdict_fige_s_ecrit_par_son_nom_et_l_ancien_entier_se_relit()
+    {
+        var t = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+        var j = new JournalDesChangements(_chemin);
+        var c = new Changement(t, "HAGS");
+        j.Ajouter(c);
+        j.Figer(c, new BilanDuChangement(VerdictEnJeu.Pire, "cod.exe", 3, 3, 95, 81, 140, 140)).IsOk.Should().BeTrue();
+
+        File.ReadAllText(_chemin).Should().Contain("\"Verdict\":\"Pire\"");
+
+        File.WriteAllText(_chemin, File.ReadAllText(_chemin).Replace("\"Verdict\":\"Pire\"", "\"Verdict\":3"));
+        new JournalDesChangements(_chemin).Lire().Single().Fige!.Verdict.Should().Be(VerdictEnJeu.Pire);
     }
 }

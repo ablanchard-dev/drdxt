@@ -68,13 +68,21 @@ public class VendorBiosInterfaceProbeTests
     [Trait("Category", "Machine")] // lit le WMI du vrai BIOS : vide sur un runner CI
     public void LE_PROBE_TOURNE_SUR_CETTE_MACHINE_SANS_RIEN_APPELER()
     {
-        // Ce test EXECUTE le probe pour de vrai. Il ne verifie pas ce qu'il trouve — cela
-        // dependrait de la machine — mais qu'il rend une liste sans lever et sans appeler de
-        // methode firmware. Une regression qui ferait appeler `GetBiosSetting` se verrait au
-        // premier plantage d'une machine de test.
-        var trouvees = new VendorBiosInterfaceProbe().Chercher();
+        // Ce test EXECUTE le probe pour de vrai. Il ne verifie pas ce qu'il trouve, qui depend de la machine, mais qu'il
+        // rend une liste sans lever. « Sans rien appeler » se garde dans le test suivant.
+        new VendorBiosInterfaceProbe().Chercher().Should().NotBeNull();
+    }
 
-        trouvees.Should().NotBeNull();
-        trouvees.Should().OnlyContain(i => i.Methodes.Count > 0 || i.Instances >= 0);
+    // Le probe ne lit que la forme des classes : aucun appel de methode WMI dans son texte, sur toute machine.
+    [Fact]
+    public void Le_probe_n_appelle_aucune_methode_du_firmware()
+        => File.ReadAllText(Path.Combine(Racine(), "src", "DrDxt.Detection", "Bios", "VendorBiosInterfaceProbe.cs"))
+            .Should().NotContainAny("InvokeMethod", "ExecMethod", "GetMethodParameters");
+
+    private static string Racine()
+    {
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
+        return d!.FullName;
     }
 }

@@ -7,7 +7,9 @@ namespace DrDxt.ElevatedHelper.Execution;
 
 /// <summary>Un programme que DrDXT a coupé au démarrage, et les octets exacts qu'il a écrits sous StartupApproved (en
 /// hexadécimal, horodatage compris).</summary>
-public sealed record CoupureDuDemarrage(RegistryHiveKind Ruche, string Liste, string Nom, string Octets);
+/// <param name="Origine">Les octets lus juste avant la coupure, en hexadécimal ; vide : la valeur n'existait pas ; null : une
+/// trace écrite avant que l'origine soit notée, rendue « actif » comme avant.</param>
+public sealed record CoupureDuDemarrage(RegistryHiveKind Ruche, string Liste, string Nom, string Octets, string? Origine = null);
 
 /// <summary>
 /// La trace des programmes que DrDXT a coupés au démarrage, pour que « Réactiver » survive à l'App. Elle est notée avant

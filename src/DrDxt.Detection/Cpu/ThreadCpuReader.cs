@@ -57,7 +57,7 @@ public sealed class ThreadCpuReader
     {
         try
         {
-            var processus = Process.GetProcessById(pid);
+            using var processus = Process.GetProcessById(pid);
             var avant = Instantane(processus);
             var chrono = Stopwatch.StartNew();
             Thread.Sleep(fenetre);

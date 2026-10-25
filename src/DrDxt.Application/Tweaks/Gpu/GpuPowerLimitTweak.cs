@@ -6,9 +6,11 @@ namespace DrDxt.Application.Tweaks.Gpu;
 // -----------------------------------------------------------------------
 // GpuPowerLimitTweak.
 //
-// Plafonne la limite de puissance de la carte (en % du TDP) par NVAPI (ApplyNvApiPowerLimitOp) ou par
-// la commande de limite de puissance d'ADLX sur AMD. Une limite plus basse donne des températures plus
-// basses et des 1 % low plus stables, pour un coût quasi nul en images de pointe sur un PC déjà frais.
+// Plafonne la limite de puissance d'une carte NVIDIA (en % du TDP) par NVAPI (ApplyNvApiPowerLimitOp). Une limite plus
+// basse donne des températures plus basses et des 1 % low plus stables, pour un coût quasi nul en images de pointe sur un
+// PC déjà frais. Pas sur AMD : la limite d'ADLX se lit dans une plage (GetPowerLimitRange) dont l'unité, % du TDP ou
+// décalage autour de 0, n'est relevée sur aucune vraie carte ; y écrire un % du TDP serait une valeur sans sens. Le levier
+// n'y est pas proposé, et la couverture le dit (Levier.PasIci.PuissanceAmd).
 // La limite est toujours bornée par GpuSafeBounds.MinPowerLimitPct : jamais sous le plancher (ce qui
 // ferait des saccades, pas des gains).
 //
@@ -18,7 +20,7 @@ namespace DrDxt.Application.Tweaks.Gpu;
 // carte stable, contrairement à un décalage de tension.
 // -----------------------------------------------------------------------
 /// <summary>Abaisse la limite de puissance de la carte graphique (en % du TDP, bornée par GpuSafeBounds). Proposé sur
-/// un PC de bureau à carte dédiée ; volatil, le pilote remet sa valeur au redémarrage.</summary>
+/// un PC de bureau à carte NVIDIA dédiée ; volatil, le pilote remet sa valeur au redémarrage.</summary>
 public sealed class GpuPowerLimitTweak : GpuTweakBase
 {
     private readonly INvApiGpuTuning _nvApi;
@@ -46,7 +48,7 @@ public sealed class GpuPowerLimitTweak : GpuTweakBase
     public override string SummaryKey => "tweak.gpu.power_limit.efficiency";
 
     public override bool AppliesTo(HardwareInventory hw, SettingsState state) =>
-        GpuGating.HasDesktopDiscreteGpu(hw);
+        GpuGating.HasDesktopDiscreteGpu(hw) && hw.Gpus.Any(g => GpuGating.IsNvidia(g) && GpuGating.IsTunableDiscreteGpu(g));
 
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
@@ -58,15 +60,11 @@ public sealed class GpuPowerLimitTweak : GpuTweakBase
 
             if (_nvApi.IsAvailable)
                 return await ApplyNvidiaAsync(safePct).ConfigureAwait(false);
-            if (_adlx.IsAvailable)
-                return await ApplyAmdAsync(safePct).ConfigureAwait(false);
 
-            // Jamais de saut silencieux. Si un GPU AMD est présent (fait matériel tiré de l'inventaire,
-            // indépendant du SDK ADLX) mais qu'aucun SDK de réglage n'est branché, on affiche un état
-            // explicite et honnête.
-            if (_targets.IsAmdGpuPresent)
+            // Jamais de saut silencieux : sur AMD, la limite n'est pas écrite (unité d'ADLX non relevée), et c'est dit.
+            if (_adlx.IsAvailable || _targets.IsAmdGpuPresent)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.GpuAmdTuningUnavailable,
-                    "AMD GPU detected: ADLX tuning SDK not available in this build.");
+                    "AMD power limit not written: the ADLX unit is not proven on a real card.");
 
             return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                 "Neither NVAPI nor ADLX is available for GPU power-limit.");
@@ -109,48 +107,6 @@ public sealed class GpuPowerLimitTweak : GpuTweakBase
         // La valeur posée, relue (un pilote qui arrondit ferait croire au rendu que le joueur
         // l'a changée), pour que la désinstallation rende la limite seulement si elle porte encore la sienne.
         if (_nvApi.GetPowerLimitPct(Target.GpuIndex) is { IsOk: true } reluNv) pose = pose with { PowerLimitPercent = reluNv.Value };
-        return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, snapshotJson.Value, PrivilegedOpCodec.Serialize(pose).Value));
-    }
-
-    private async Task<Result<TweakSnapshot>> ApplyAmdAsync(int safePct)
-    {
-        // Trouver d'abord le GPU AMD dédié réglable (iGPU + dGPU : l'index 0 est souvent l'iGPU
-        // non réglable). La couture de lecture suit le sélecteur du banc AMD et rend le premier
-        // index dont le réglage GFX se lit. Échec propre (rien de posé) si aucun n'est trouvé.
-        var resolved = _adlx.ResolveTunableGpuIndex();
-        if (!resolved.IsOk)
-            return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
-                $"Could not resolve a tunable AMD GPU: {resolved.Error?.Code}.");
-        int gpuIndex = resolved.Value;
-
-        var capture = _adlx.GetPowerLimitPct(gpuIndex);
-        if (!capture.IsOk)
-            return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
-                $"Could not read original power-limit: {capture.Error?.Code}.");
-
-        var inverse = new ApplyAdlxTuningOp(gpuIndex, AdlxTuningKind.PowerLimit, capture.Value);
-        var snapshotJson = PrivilegedOpCodec.Serialize(inverse);
-        if (!snapshotJson.IsOk || snapshotJson.Value is null)
-            return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable, "Could not serialize the revert op.");
-
-        // (3b) Sonde de capacité : prouver que l'écriture marche sur cette carte et ce pilote
-        // avant de toucher à quoi que ce soit. On rejoue l'op inverse (réécriture à l'identique de
-        // la valeur relevée, aucun changement matériel) et on relit. Une carte dont le pilote dit
-        // « réussi » sans rien écrire est prise ici, au lieu de produire un faux « appliqué ».
-        // Échec → TWEAK.UNSUPPORTED_ON_THIS_GPU, rien n'est réglé.
-        var probe = await GpuWriteProbe.ConfirmWritableAsync(
-            Elevated, inverse, () => _adlx.GetPowerLimitPct(gpuIndex), capture.Value,
-            "GPU power-limit").ConfigureAwait(false);
-        if (!probe.IsOk)
-            return Result<TweakSnapshot>.Fail(probe.Error!.Value.Code, probe.Error!.Value.Message);
-
-        // Relevé, écriture et retour (par le snapshot) visent tous le même GPU physique trouvé.
-        var pose = new ApplyAdlxTuningOp(gpuIndex, AdlxTuningKind.PowerLimit, safePct);
-        var applied = await Elevated.ExecuteAsync(pose, CancellationToken.None).ConfigureAwait(false);
-        if (!applied.IsOk)
-            return Result<TweakSnapshot>.Fail(applied.Error!.Value.Code, applied.Error!.Value.Message);
-
-        if (_adlx.GetPowerLimitPct(gpuIndex) is { IsOk: true } reluAmd) pose = pose with { IntValue = reluAmd.Value };
         return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, snapshotJson.Value, PrivilegedOpCodec.Serialize(pose).Value));
     }
 }

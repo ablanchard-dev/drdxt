@@ -11,7 +11,7 @@ public sealed class JeuxSurDisqueDurTests
     public void Une_bibliotheque_sur_un_disque_dur_se_dit_avec_le_geste()
     {
         var c = JeuxSurDisqueDur.Juger([new("Steam", @"C:\Steam", JeuxSurDisqueDur.Ssd), new("Steam", @"D:\Jeux", JeuxSurDisqueDur.DisqueDur)]);
-        c.Statut.Should().Be(RepairStatus.Suspicious);
+        c.Statut.Should().Be(RepairStatus.NonDefault, "ranger des jeux sur un disque dur est un choix de place");
         c.Explication.Should().Contain(@"D:\Jeux").And.NotContain(@"C:\Steam").And.Contain("DrDXT ne déplace rien");
     }
 

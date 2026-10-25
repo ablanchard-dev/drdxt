@@ -53,8 +53,10 @@ public static class MemoireSaturee
         if (librePct < LibreMinimumPourcent && pagination == "MS.Calme")
             return new RepairFinding(Domaine, Nom, courante, attendue, RepairStatus.Observed, Docteur.T("MS.PleineCalme") + mesure);
 
+        // Une pagination forte avec de la place se mesure pendant le scan, qui lit lui-même le disque : à regarder seulement.
         if (librePct < LibreMinimumPourcent || pagination == "MS.PagineFort")
-            return new RepairFinding(Domaine, Nom, courante, attendue, RepairStatus.Suspicious,
+            return new RepairFinding(Domaine, Nom, courante, attendue,
+                librePct < LibreMinimumPourcent ? RepairStatus.Suspicious : RepairStatus.NonDefault,
                 Docteur.T(librePct < LibreMinimumPourcent ? "MS.Pleine" : "MS.PagineSansEtrePleine") + mesure + Gestes,
                 RepairAction.Recommandation);
 
@@ -71,5 +73,6 @@ public static class MemoireSaturee
             Docteur.T("MS.Rien") + mesure);
     }
 
-    private static string Go(ulong octets) => (octets / 1073741824.0).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+    // La virgule suit la langue du docteur, comme le reste de la phrase.
+    private static string Go(ulong octets) => (octets / 1073741824.0).ToString("0.#", Docteur.Langue);
 }

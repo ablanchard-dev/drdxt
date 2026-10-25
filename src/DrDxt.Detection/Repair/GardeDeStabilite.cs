@@ -19,15 +19,21 @@ public static class GardeDeStabilite
         IDumpCreationLog vidages, DateTimeOffset maintenant, Func<DateTimeOffset, IReadOnlyList<DateTimeOffset>?>? rapports = null,
         Func<int, IReadOnlyList<ErreursMaterielles.Enregistrement>?>? whea = null)
     {
-        var depuis = maintenant - CandidateSelector.FenetreInstabilite;
-        var bruts = StabiliteLue.ArretsBrutaux(arrets, maintenant);
-        var rapportsLus = (rapports ?? EcransBleus.LireRapports)(depuis);
-        var lus = vidages.Lire(depuis);
-        var erreurs = (whea ?? (jours => ErreursMaterielles.Lire(jours)))((int)CandidateSelector.FenetreInstabilite.TotalDays);
-        if (rapportsLus is null || !lus.IsOk || erreurs is null) return (null, []);
-        return (bruts, [.. rapportsLus, .. lus.Value!.DernierVidage is { } v ? [v] : Array.Empty<DateTimeOffset>(),
-            .. erreurs.Where(e => e.Gravite is 0 or 1).Select(e => e.Quand),
-            .. SanteNvme.Hausses(DossierDonnees.Chemin(SanteNvme.Fichier))]);
+        // Une source qui lève d'une façon qu'elle n'attrape pas rend la garde non lue : propagée, elle faisait échouer toute la
+        // lecture des réglages, donc le scan.
+        try
+        {
+            var depuis = maintenant - CandidateSelector.FenetreInstabilite;
+            var bruts = StabiliteLue.ArretsBrutaux(arrets, maintenant);
+            var rapportsLus = (rapports ?? EcransBleus.LireRapports)(depuis);
+            var lus = vidages.Lire(depuis);
+            var erreurs = (whea ?? (jours => ErreursMaterielles.Lire(jours)))((int)CandidateSelector.FenetreInstabilite.TotalDays);
+            if (rapportsLus is null || !lus.IsOk || erreurs is null) return (null, []);
+            return (bruts, [.. rapportsLus, .. lus.Value!.DernierVidage is { } v ? [v] : Array.Empty<DateTimeOffset>(),
+                .. erreurs.Where(e => e.Gravite is 0 or 1).Select(e => e.Quand),
+                .. SanteNvme.Hausses(DossierDonnees.Chemin(SanteNvme.Fichier))]);
+        }
+        catch (Exception) { return (null, []); }
     }
 
     /// <summary>Pur : toutes les dates d'incident ; <c>null</c> si une source n'a pas été lue.</summary>

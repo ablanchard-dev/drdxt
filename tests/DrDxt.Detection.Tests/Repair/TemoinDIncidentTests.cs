@@ -61,7 +61,29 @@ public sealed class TemoinDIncidentTests
         File.WriteAllText(Path.Combine(dossier, "temoin-1.json"), JsonSerializer.Serialize(new TemoinDIncident.Temoin(T, "arret brutal", T, T, [])));
         File.WriteAllText(Path.Combine(dossier, "temoin-2.json"), JsonSerializer.Serialize(new TemoinDIncident.Temoin(T.AddDays(1), "arret brutal", T, T, [])));
         File.WriteAllText(Path.Combine(dossier, "temoin-3.json"), "abîmé");
-        TemoinDIncident.LireTous(dossier)!.Select(t => t.Incident).Should().Equal(T.AddDays(1), T);
-        TemoinDIncident.LireTous(Path.Combine(dossier, "absent")).Should().BeEmpty();
+        TemoinDIncident.LireTous(dossier, _ => true)!.Select(t => t.Incident).Should().Equal(T.AddDays(1), T);
+        TemoinDIncident.LireTous(Path.Combine(dossier, "absent"), _ => true).Should().BeEmpty();
+    }
+
+    // %ProgramData% laisse tout compte y poser des fichiers avant l'installation, et la réparation du dossier ne descend pas.
+    // Un témoin hors confiance n'est pas dit par le docteur, n'occupe aucune place gardée (des noms plus récents posés d'avance
+    // feraient supprimer chaque vrai témoin aussitôt écrit) et n'est jamais supprimé par le service.
+    [Fact]
+    public void Un_temoin_hors_confiance_n_est_ni_lu_ni_garde_ni_supprime()
+    {
+        var dossier = Directory.CreateTempSubdirectory().FullName;
+        string Poser(string nom, DateTimeOffset incident)
+        {
+            var f = Path.Combine(dossier, nom);
+            File.WriteAllText(f, JsonSerializer.Serialize(new TemoinDIncident.Temoin(incident, "arret brutal", incident, incident, [])));
+            return f;
+        }
+        var vrais = Enumerable.Range(0, TemoinDIncident.Gardes + 2).Select(i => Poser($"temoin-2026{i:D4}.json", T.AddMinutes(i))).ToList();
+        var poses = Enumerable.Range(0, 3).Select(i => Poser($"temoin-9999{i:D4}.json", T.AddYears(5))).ToHashSet();
+        bool Fiable(string f) => !poses.Contains(f);
+
+        TemoinDIncident.LireTous(dossier, Fiable)!.Should().HaveCount(TemoinDIncident.Gardes + 2)
+            .And.OnlyContain(t => t.Incident < T.AddYears(1));
+        TemoinDIncident.EnTrop(dossier, Fiable).Should().BeEquivalentTo(vrais.Take(2));
     }
 }

@@ -44,10 +44,10 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
     private readonly IGameExecutable? _game;
     private readonly IAdlx? _adlx;
 
-    /// <param name="game">Le jeu en cours. Absent (outils, tests) ou jeu sans profil lisible :
-    /// ecriture globale, comme avant.</param>
-    /// <param name="adlx">A2b : le pilote AMD. Sans NVAPI, le plafond passe par FRTC (ADLX), et la Vsync
-    /// du pilote AMD (A2c, 08/10/2026) est mise « toujours activée », l'équivalent de FORCEON chez NVIDIA.</param>
+    /// <param name="game">Le jeu en cours. Absent (outils, tests) : ecriture globale. Un jeu connu sans profil lisible
+    /// est refuse (LatencyTweakBase.PlanifierDrs) : son reglage ne part jamais dans le profil global.</param>
+    /// <param name="adlx">Le pilote AMD. Sans NVAPI, le plafond passe par FRTC (ADLX), et la Vsync du pilote AMD est mise
+    /// « toujours activée », l'équivalent de FORCEON chez NVIDIA.</param>
     public VrrVsyncCapConfigTweak(INvApi nvApi, IDisplayInfo display, IElevatedClient elevated,
         IGameExecutable? game = null, IAdlx? adlx = null)
         : base(elevated)
@@ -73,8 +73,9 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
         var display = _display.GetPrimaryGameDisplay();
         if (!display.IsOk || display.Value is not { SupportsVrr: true } ecran || !FrequenceLue(ecran))
             return false;
+        // Sans jeu ouvert, la pose NVIDIA (au profil du jeu) échoue toujours et rien ne se lit : non lu, dit par EtatNonLu.
         if (LatencyGating.HasNvidiaDriverPath(hw))
-            return true;
+            return !SansJeuPourNvidia() && !ComboNvidiaDejaPose(ecran);
 
         // Sur AMD, il n'est proposé
         // que si FRTC, Chill, la Vsync et Enhanced Sync sont lus, Chill et Enhanced Sync éteints (allumer la Vsync éteint
@@ -84,16 +85,34 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
             && _adlx.GetEnhancedSyncActif() is { IsOk: true, Value: false }
             && _adlx.GetFrameRateTarget() is { IsOk: true } frtc
             && _adlx.GetVsyncMode() is { IsOk: true } vsync
-            && (!PlafondVrr.EstBasseLatence(frtc.Value, ecran.RefreshHz) || vsync.Value != VsyncAmdToujours);
+            && (!PlafondVrr.EstBasseLatence(frtc.Value, FrequenceDuPlafond(ecran)) || vsync.Value != VsyncAmdToujours);
+    }
+
+    /// <summary>Vsync et plafond déjà à la cible, lus là où la pose écrirait (le profil du jeu ouvert, sinon le global quand
+    /// rien ne cherche de jeu) : le levier n'a rien à poser. Une lecture ratée ou un seul des deux en place : à poser.</summary>
+    private bool ComboNvidiaDejaPose(DisplayInfo ecran)
+    {
+        if (!_nvApi.IsAvailable) return false;
+        var cible = (uint)Cible(FrequenceDuPlafond(ecran));
+        var jeu = _game?.RunningGameExecutablePath();
+        if (jeu is not null)
+            return _nvApi.GetDrsForApplication(VsyncModeSettingId, jeu) is { IsOk: true } v && v.Value.Value == VsyncOn
+                && _nvApi.GetDrsForApplication(FrameRateLimiterSettingId, jeu) is { IsOk: true } c && c.Value.Value == cible;
+        return _game is null
+            && _nvApi.GetVsyncMode() is { IsOk: true, Value: VsyncOn }
+            && _nvApi.GetFrameRateLimit() is { IsOk: true } plafond && plafond.Value == cible;
     }
 
     /// <summary>ADLX_WAIT_FOR_VERTICAL_REFRESH_MODE.WFVR_ALWAYS_ON (ADLXDefines.h).</summary>
     private const int VsyncAmdToujours = 3;
 
-    /// <summary>Carte AMD sans NVAPI, mais FRTC ou Chill illisible, ou écran VRR dont la fréquence n'est pas lue : rien n'est
-    /// proposé, et c'est dit.</summary>
+    /// <summary>La pose NVIDIA cherche un jeu et n'en trouve aucun ouvert.</summary>
+    private bool SansJeuPourNvidia() => _nvApi.IsAvailable && _game is not null && _game.RunningGameExecutablePath() is null;
+
+    /// <summary>Carte AMD sans NVAPI, mais FRTC ou Chill illisible ; écran VRR dont la fréquence n'est pas lue ; ou carte NVIDIA
+    /// sans jeu ouvert, dont le profil ne se lit pas : rien n'est proposé, et c'est dit.</summary>
     public override bool EtatNonLu(SettingsState state)
-        => (_display.GetPrimaryGameDisplay() is { IsOk: true, Value: { SupportsVrr: true } ecran } && !FrequenceLue(ecran))
+        => (_display.GetPrimaryGameDisplay() is { IsOk: true, Value: { SupportsVrr: true } ecran } && (!FrequenceLue(ecran) || SansJeuPourNvidia()))
            || (!_nvApi.IsAvailable && _adlx is { IsAvailable: true }
                && (!_adlx.GetFrameRateTarget().IsOk || !_adlx.GetChillActif().IsOk
                    || !_adlx.GetVsyncMode().IsOk || !_adlx.GetEnhancedSyncActif().IsOk));
@@ -104,7 +123,11 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
 
     private static int Cible(int rafraichissementHz) => Math.Min(PlafondVrr.Cible(rafraichissementHz), FrlMaxFps);
 
-    /// <summary>A2b/A2c : Vsync du pilote « toujours activée » puis FRTC à la cible, chacun seulement s'il n'y est pas
+    /// <summary>La fréquence sur laquelle se calcule le plafond : la maximale de l'écran quand elle est lue. Un écran 144 Hz
+    /// laissé à 60 recevrait sinon un plafond à 57, qui briderait le jeu dès que l'écran repasse à 144.</summary>
+    private static int FrequenceDuPlafond(DisplayInfo ecran) => Math.Max(ecran.RefreshHz, ecran.MaxRefreshHz);
+
+    /// <summary>Sur AMD : Vsync du pilote « toujours activée » puis FRTC à la cible, chacun seulement s'il n'y est pas
     /// déjà ; l'inverse (composite) rend le mode et l'état FRTC d'origine. Une seconde écriture refusée rend la première.
     /// GpuIndex 0 : pour ces réglages, le helper écrit la carte dédiée (celle que le lecteur lit), l'index est ignoré.</summary>
     private async Task<Result<TweakSnapshot>> ApplyAmdAsync(int cible)
@@ -171,11 +194,11 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
 
             if (!_nvApi.IsAvailable)
                 return _adlx is { IsAvailable: true }
-                    ? await ApplyAmdAsync(Cible(display.Value.RefreshHz)).ConfigureAwait(false)
+                    ? await ApplyAmdAsync(Cible(FrequenceDuPlafond(display.Value))).ConfigureAwait(false)
                     : Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                         "Neither NVAPI nor ADLX is available to configure the frame cap.");
 
-            var targetCap = (uint)Cible(display.Value.RefreshHz);
+            var targetCap = (uint)Cible(FrequenceDuPlafond(display.Value));
 
             // Relever les vraies origines avant d'écrire (retour composite fidèle), au scope écrit.
             var jeu = _game?.RunningGameExecutablePath();
@@ -241,8 +264,8 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Snapshot has no original-value payload.");
 
-        // Sur AMD, l'inverse est une seule op (FRTC), pas un composite. Lue comme composite, elle serait
-        // refusée à chaque remise et le plafond resterait posé sur la carte. Une op seule passe par le chemin de la base.
+        // ApplyAmdAsync écrit toujours un composite ; un ancien instantané AMD portait une seule op (FRTC). Lue comme
+        // composite, elle serait refusée à chaque remise et le plafond resterait posé : une op seule passe par la base.
         if (PrivilegedOpCodec.Deserialize(snapshot.OriginalValueJson) is { IsOk: true, Value: ApplyAdlxTuningOp })
             return await base.RevertAsync(snapshot).ConfigureAwait(false);
 
@@ -262,13 +285,7 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
 
         try
         {
-            foreach (var op in decoded.Value)
-            {
-                var res = await Elevated.ExecuteAsync(op, CancellationToken.None).ConfigureAwait(false);
-                if (!res.IsOk)
-                    return res; // rend tel quel le premier échec de retour
-            }
-            return Result.Ok();
+            return await RetourArriere.ToutRendreAsync(Elevated, decoded.Value).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

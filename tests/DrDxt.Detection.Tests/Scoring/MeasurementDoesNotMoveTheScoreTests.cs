@@ -110,7 +110,7 @@ public sealed class MeasurementDoesNotMoveTheScoreTests
     [Fact]
     public void And_yet_the_verdict_itself_does_change_otherwise_this_test_proves_nothing()
     {
-        // Le controle POSITIF. Sans lui, ces quatre theories passeraient aussi bien si le
+        // Le controle POSITIF. Sans lui, ces trois theories passeraient aussi bien si le
         // classifieur n'etait branche nulle part -- elles prouveraient l'invariance d'un cablage
         // absent, ce qui est exactement le genre de test vert qui ne garantit rien.
         Score(null).Bottleneck!.Value.State.Should().Be(BottleneckState.UnknownPartial);

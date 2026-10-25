@@ -18,6 +18,12 @@ public sealed class PartiesMemorisees
     private readonly FichierJsonAtomique _echec;
     private readonly FichierJsonAtomique _enCours;
     private readonly FichierJsonAtomique _interrompues;
+    private readonly FichierJsonAtomique _essais;
+
+    /// <summary>Les parties marquées par un essai en alternance, gardées à part. L'anneau des 20 dernières mêle tous les jeux :
+    /// un joueur qui en alterne trois n'y gardait jamais les 9 parties d'un même jeu qu'un verdict demande, et le rang A-B-B-A
+    /// se décalait à chaque partie évincée. Borné : un essai tranche bien avant.</summary>
+    public const int PartiesDEssaiGardees = 100;
 
     /// <param name="cheminEchec">La dernière capture ratée. Par défaut à côté de la liste.</param>
     public PartiesMemorisees(string cheminChoix, string cheminListe, string? cheminEchec = null)
@@ -28,6 +34,7 @@ public sealed class PartiesMemorisees
             ?? Path.Combine(Path.GetDirectoryName(cheminListe) ?? "", "releve-echec.json"), CodeErreur);
         _enCours = new FichierJsonAtomique(Path.Combine(Path.GetDirectoryName(cheminListe) ?? "", "partie-en-cours.json"), CodeErreur);
         _interrompues = new FichierJsonAtomique(Path.Combine(Path.GetDirectoryName(cheminListe) ?? "", "parties-interrompues.json"), CodeErreur);
+        _essais = new FichierJsonAtomique(Path.Combine(Path.GetDirectoryName(cheminListe) ?? "", "parties-essai.json"), CodeErreur);
     }
 
     /// <summary>La partie que le relevé suit, réécrite à chaque regard ; null quand elle se clôt. Restée
@@ -35,19 +42,24 @@ public sealed class PartiesMemorisees
     public Result NoterEnCours(PartieInterrompue? partie)
         => _enCours.WriteAtomic(partie is null ? "" : JsonSerializer.Serialize(partie));
 
-    /// <summary>Au démarrage du relevé : une marque restée ouverte passe dans les parties interrompues (les vingt dernières).</summary>
+    /// <summary>Au démarrage du relevé : une marque restée ouverte passe dans les parties interrompues (les vingt dernières).
+    /// La marque ne se lève qu'une fois la partie écrite : une liste illisible ou une écriture ratée la laisse au démarrage
+    /// suivant, au lieu d'effacer une partie qui n'a été gardée nulle part.</summary>
     /// <param name="maintenant">L'heure du relevé : l'arrêt qui a interrompu la partie tombe entre son dernier regard et elle.</param>
     public void ReleverInterrompue(DateTimeOffset maintenant)
     {
         var texte = _enCours.Read();
         if (!texte.IsOk || string.IsNullOrWhiteSpace(texte.Value)) return;
-        try
+        PartieInterrompue? p;
+        try { p = JsonSerializer.Deserialize<PartieInterrompue>(texte.Value); }
+        catch (JsonException) { p = null; } // une marque abîmée n'invente aucune partie
+        if (p is not null)
         {
-            if (JsonSerializer.Deserialize<PartieInterrompue>(texte.Value) is { } p)
-                _interrompues.WriteAtomic(JsonSerializer.Serialize(Interrompues().Prepend(p with { ReleveeLe = maintenant })
-                    .Take(ReleveDesParties.PartiesGardees).ToList()));
+            if (_interrompues.LireListePourReecrire<PartieInterrompue>() is not { IsOk: true } lu) return;
+            var ecrite = _interrompues.WriteAtomic(JsonSerializer.Serialize(lu.Value!.Prepend(p with { ReleveeLe = maintenant })
+                .Take(ReleveDesParties.PartiesGardees).ToList()));
+            if (!ecrite.IsOk) return;
         }
-        catch (JsonException) { /* une marque abîmée n'invente aucune partie */ }
         _enCours.WriteAtomic("");
     }
 
@@ -95,11 +107,31 @@ public sealed class PartiesMemorisees
         catch (JsonException) { return []; }
     }
 
-    /// <summary>Ajoute la partie en tête et garde les vingt dernières. Rend la liste écrite.</summary>
-    public IReadOnlyList<PartieRelevee> Ajouter(PartieRelevee partie)
+    /// <summary>Ajoute la partie en tête et garde les vingt dernières. Rend la liste avec la nouvelle partie, et l'écriture
+    /// sur le disque : non écrite, la partie est montrée mais perdue au relancement, et l'appelant le dit.</summary>
+    public PartiesAjoutees Ajouter(PartieRelevee partie)
     {
-        var liste = ReleveDesParties.Ajouter(Lire(), partie);
-        _liste.WriteAtomic(JsonSerializer.Serialize(liste));
-        return liste;
+        // Une liste qui ne se lit pas n'est pas une liste vide : rien n'est écrit. Abîmée ou d'une autre forme : mise de côté
+        // (sa trace reste), elle repart de cette partie.
+        if (_liste.LireListePourReecrire<PartieRelevee>() is not { IsOk: true } lu)
+            return new PartiesAjoutees([partie], Result.Fail(CodeErreur, "The match list could not be read: nothing written."));
+        var liste = ReleveDesParties.Ajouter(lu.Value!, partie);
+        var ecrite = _liste.WriteAtomic(JsonSerializer.Serialize(liste));
+        if (partie.Essai is not null && _essais.LireListePourReecrire<PartieRelevee>() is { IsOk: true } essais)
+            _essais.WriteAtomic(JsonSerializer.Serialize(new[] { partie }.Concat(essais.Value!).Take(PartiesDEssaiGardees).ToList()));
+        return new PartiesAjoutees(liste, ecrite);
+    }
+
+    /// <summary>Les parties marquées par un essai, la plus récente d'abord, au-delà de l'anneau des 20.</summary>
+    public IReadOnlyList<PartieRelevee> PartiesDEssai()
+    {
+        var texte = _essais.Read();
+        if (!texte.IsOk || string.IsNullOrWhiteSpace(texte.Value)) return [];
+        try { return (JsonSerializer.Deserialize<List<PartieRelevee?>>(texte.Value) ?? []).OfType<PartieRelevee>().ToList(); }
+        catch (JsonException) { return []; }
     }
 }
+
+/// <param name="Liste">Les parties, la nouvelle comprise.</param>
+/// <param name="Ecrite">L'écriture sur le disque.</param>
+public sealed record PartiesAjoutees(IReadOnlyList<PartieRelevee> Liste, Result Ecrite);

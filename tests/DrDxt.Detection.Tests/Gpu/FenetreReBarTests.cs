@@ -2,13 +2,24 @@ using System.Globalization;
 using DrDxt.Core;
 using DrDxt.Detection.Gpu;
 using FluentAssertions;
+using NSubstitute;
 
 namespace DrDxt.Detection.Tests.Gpu;
 
 // Le Resizable BAR prouvé par la plage allouée, comparée à la mémoire vidéo de la même carte.
 public sealed class FenetreReBarTests
 {
-    // Relevé sur la machine de référence le 16/10/2026 : RTX 4060, 8192 Mio à 0x4000000000, 8 585 740 288 octets de VRAM.
+    // Les cartes non listées par WMI : un constat inconnu, pas une famille muette.
+    [Fact]
+    public void Des_cartes_non_listees_se_disent_non_lues()
+    {
+        var wmi = Substitute.For<DrDxt.Detection.Wmi.IWmiQuery>();
+        wmi.Query(Arg.Any<string>()).Returns(Result<IReadOnlyList<DrDxt.Detection.Wmi.WmiRow>>.Fail(ErrorCodes.WmiFail, "non"));
+
+        FenetreReBar.LireEtJuger(wmi).Should().ContainSingle().Which.Statut.Should().Be(RepairStatus.Unknown);
+    }
+
+    // Relevé sur la machine de référence : RTX 4060, 8192 Mio à 0x4000000000, 8 585 740 288 octets de VRAM.
     [Fact]
     public void La_plage_de_la_machine_de_reference_prouve_ReBAR_et_Above_4G()
     {

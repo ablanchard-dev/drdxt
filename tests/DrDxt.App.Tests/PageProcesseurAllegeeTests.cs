@@ -14,7 +14,7 @@ public sealed class PageProcesseurAllegeeTests
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
         var xaml = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
 
-        var verdict = xaml.IndexOf("Text=\"{Binding Verdict}\"", StringComparison.Ordinal);
+        var verdict = xaml.IndexOf("Text=\"{Binding VerdictAffiche}\"", StringComparison.Ordinal);
         var bride = xaml.IndexOf("LabelLimiteTitre", StringComparison.Ordinal);
         var mesures = xaml.IndexOf("LabelCarteMesures", StringComparison.Ordinal);
 

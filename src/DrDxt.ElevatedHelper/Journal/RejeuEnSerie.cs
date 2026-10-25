@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using DrDxt.Core;
 using DrDxt.Reconciler.Desinstallation;
+using DrDxt.Reconciler.Manifest;
 
 namespace DrDxt.ElevatedHelper.Journal;
 
@@ -20,6 +21,15 @@ public sealed class RejeuEnSerie(Func<CancellationToken, Task<RapportDuRendu?>> 
     {
         await _un.WaitAsync(ct).ConfigureAwait(false);
         try { await UnRejeuAsync(ct).ConfigureAwait(false); }
+        finally { _un.Release(); }
+    }
+
+    /// <summary>Une écriture demandée par le tube attend la fin d'un rejeu en cours : sinon l'App relancée posait le même
+    /// réglage pendant que le rejeu rendait l'origine, et l'image d'avant notée était la valeur de DrDXT.</summary>
+    public async Task<T> HorsRejeuAsync<T>(Func<Task<T>> agir, CancellationToken ct)
+    {
+        await _un.WaitAsync(ct).ConfigureAwait(false);
+        try { return await agir().ConfigureAwait(false); }
         finally { _un.Release(); }
     }
 
@@ -82,33 +92,40 @@ public sealed record RapportDuRejeu(DateTimeOffset Le, string? NonLu, IReadOnlyL
 
     public static string Fichier(string ecrivain) => $"rejeu-du-journal.{ecrivain}.json";
 
-    public sealed record Ligne(string Cible, IssueDuRendu Issue, string Detail, bool EnSuspens);
+    /// <summary>Un rapport de DrDXT : propriétaire Administrateurs ou SYSTEM, aucune écriture pour un autre. %ProgramData% laisse
+    /// tout compte y poser un fichier avant l'installation, et la réparation de la racine ne descend pas.</summary>
+    public static bool DeConfiance(string chemin) => TrustedManifestRoot.EnsureTrustedFile(chemin).IsOk;
+
+    /// <param name="Cle">La feuille, indépendante de la langue (RejeuDuJournal.CleDe) ; absente des rapports d'avant.</param>
+    public sealed record Ligne(string Cible, IssueDuRendu Issue, string Detail, bool EnSuspens, string? Cle = null);
 
     public static RapportDuRejeu De(RapportDuRendu r, DateTimeOffset le)
-        => new(le, r.ManifesteNonLu, r.Lignes.Select(l => new Ligne(l.Cible, l.Issue, l.Detail, l.OrigineEnSuspens)).ToList());
+        => new(le, r.ManifesteNonLu, r.Lignes.Select(l => new Ligne(l.Cible, l.Issue, l.Detail, l.OrigineEnSuspens, l.Cle)).ToList());
 
     /// <summary>Ajoute le rapport aux derniers de cet écrivain. Un rapport qui n'a rien jugé (tout en suspens : la ruche du
     /// joueur vue du service à chaque démarrage) n'est pas ajouté.</summary>
-    public static Result Ecrire(string racine, string ecrivain, RapportDuRendu r, DateTimeOffset le, Func<string, byte[], Result> ecrire)
+    public static Result Ecrire(string racine, string ecrivain, RapportDuRendu r, DateTimeOffset le, Func<string, byte[], Result> ecrire,
+        Func<string, bool> fiable)
     {
         if (r.ManifesteNonLu is null && r.Lignes.All(l => l.OrigineEnSuspens)) return Result.Ok();
         var chemin = Path.Combine(racine, Fichier(ecrivain));
-        var tous = LireUn(chemin).Append(De(r, le)).TakeLast(Gardes).ToList();
+        var tous = LireUn(chemin, fiable).Append(De(r, le)).TakeLast(Gardes).ToList();
         return ecrire(chemin, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(tous)));
     }
 
-    /// <summary>Les rapports des deux écrivains, du plus ancien au plus récent. Un fichier absent ou illisible n'en donne aucun.</summary>
-    public static IReadOnlyList<RapportDuRejeu> Lire(string racine)
-        => LireUn(Path.Combine(racine, Fichier(Helper))).Concat(LireUn(Path.Combine(racine, Fichier(Service))))
+    /// <summary>Les rapports des deux écrivains, du plus ancien au plus récent. Un fichier absent, illisible ou hors confiance
+    /// n'en donne aucun.</summary>
+    public static IReadOnlyList<RapportDuRejeu> Lire(string racine, Func<string, bool> fiable)
+        => LireUn(Path.Combine(racine, Fichier(Helper)), fiable).Concat(LireUn(Path.Combine(racine, Fichier(Service)), fiable))
             .OrderBy(r => r.Le).ToList();
 
-    // Illisible, il est lu vide puis réécrit avec le seul nouveau rapport : d'anciens rapports non dits se perdent, jamais une
-    // origine (le fichier n'est écrit que par un hôte élevé).
-    private static IReadOnlyList<RapportDuRejeu> LireUn(string chemin)
+    // Illisible ou hors confiance, il est lu vide puis réécrit avec le seul nouveau rapport : d'anciens rapports non dits se
+    // perdent, jamais une origine.
+    private static IReadOnlyList<RapportDuRejeu> LireUn(string chemin, Func<string, bool> fiable)
     {
         try
         {
-            return File.Exists(chemin) && JsonSerializer.Deserialize<List<RapportDuRejeu>>(File.ReadAllText(chemin)) is { } l
+            return File.Exists(chemin) && fiable(chemin) && JsonSerializer.Deserialize<List<RapportDuRejeu>>(File.ReadAllText(chemin)) is { } l
                 ? l.Where(r => r is { Lignes: not null }).ToList()
                 : [];
         }

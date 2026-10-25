@@ -27,7 +27,7 @@ public static class EnregistrementNvidia
         try
         {
             var c = chemin ?? CheminParDefaut();
-            return File.Exists(c) ? File.ReadAllText(c) : null;
+            return File.Exists(c) ? FichierTiers.Lire(c) : null;
         }
         catch (Exception) { return null; }
     }
@@ -39,7 +39,10 @@ public static class EnregistrementNvidia
         try
         {
             using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.TryGetProperty("settings", out var s) && s.TryGetProperty("video", out var v)
+            // Chaque niveau est un objet avant d'y chercher une clé : TryGetProperty lève sur un tableau ou un nombre.
+            return doc.RootElement is { ValueKind: JsonValueKind.Object } racine
+                   && racine.TryGetProperty("settings", out var s) && s.ValueKind == JsonValueKind.Object
+                   && s.TryGetProperty("video", out var v) && v.ValueKind == JsonValueKind.Object
                    && v.TryGetProperty("irEnabled", out var ir) && ir.ValueKind is JsonValueKind.True or JsonValueKind.False
                 ? ir.GetBoolean() : null;
         }

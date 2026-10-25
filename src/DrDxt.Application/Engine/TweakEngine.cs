@@ -12,8 +12,7 @@ namespace DrDxt.Application.Engine;
 // privilegiee passe par les leviers (via IElevatedClient), et chaque retour arriere ou
 // retrait automatique passe par le RevertAsync du levier lui-meme : un levier a snapshot
 // composite (correctif X3D CCD, plafond VRR) est rendu en entier, pas seulement sa premiere
-// op. Le moteur ne depend d'ISafetyManager que pour EnsureRestorePointAsync ;
-// SafetyManager.RevertAsync reste la voie de retour d'un snapshot persiste sans instance de levier.
+// op. Le moteur ne depend d'ISafetyManager que pour EnsureRestorePointAsync.
 //
 // Contrats : les formes canoniques de Core sont utilisees telles quelles :
 //   TweakPlan(IReadOnlyList<string> TweakIds)
@@ -26,18 +25,20 @@ namespace DrDxt.Application.Engine;
 //
 // Invariants :
 //  - jamais un lot a moitie pose : au premier echec, tout ce qui est deja pose est rendu
-//    dans l'ordre inverse ⇒ ENGINE.BATCH_REVERTED.
+//    dans l'ordre inverse ⇒ ENGINE.BATCH_REVERTED ; un inverse refusé ⇒ TWEAK.PARTIALLY_APPLIED. Une exception levée
+//    après une pose passe par le même rendu (garde de frontière d'ApplyAsync).
 //  - rien n'est pose sans point de restauration verifie (EnsureRestorePointAsync).
 //  - mesure honnete : seule une regression mesuree au-dela des marges combinees retire le
 //    levier ; « aucun gain mesurable » est un etat garde valide ; un gain n'est annonce que
 //    mesure. Pas de reference ou banc en echec ⇒ on garde, verdict nul (jamais de gain
-//    invente, jamais de retrait sans raison mesuree).
+//    invente, jamais de retrait sans raison mesuree). L'App passe toujours une reference nulle :
+//    la remesure ne sert qu'aux outils et aux tests, et l'App juge en jeu par Optimiser.
 //  - Result partout ; aucune exception ne sort (try/catch aux frontieres).
 // -----------------------------------------------------------------------
 /// <summary>
 /// Pose un lot de leviers pour Optimiser : point de restauration verifie d'abord, puis chaque levier
-/// pose et relu, et tout le lot rendu au premier echec. Apres la pose, une nouvelle mesure peut retirer
-/// un levier, mais seulement sur une regression mesuree ; sans mesure, il garde et n'annonce aucun gain.
+/// pose et relu, et tout le lot rendu au premier echec. Avec une reference, une nouvelle mesure peut retirer
+/// un levier, mais seulement sur une regression mesuree ; sans reference (le cas de l'App), il garde et n'annonce aucun gain.
 /// </summary>
 public sealed class TweakEngine : ITweakEngine
 {
@@ -72,10 +73,16 @@ public sealed class TweakEngine : ITweakEngine
     private readonly IPowerPlanReader? _alimentation;
     private readonly IServiceStateReader? _services;
 
+    /// <summary>Les lecteurs de la carte et du processeur, ceux du vérificateur : sans eux, un levier qui ne se relit que par
+    /// eux (le plafond de chaleur du processeur, posé sans mesure) resterait non relu et se dirait « effectif ».</summary>
+    private readonly AppliedStateVerifier.LecteursCarte _carte;
+
     public TweakEngine(ISafetyManager safety, IBenchmarkRunner bench, IDiagnosticsLog diag,
         ITweakCatalog catalog, IRegistryReader? registre = null, INvApi? nvApi = null,
-        IPowerPlanReader? alimentation = null, IServiceStateReader? services = null)
+        IPowerPlanReader? alimentation = null, IServiceStateReader? services = null,
+        INvApiGpuTuning? nvCarte = null, IAdlxGpuTuning? adlxCarte = null, IAdlx? piloteAmd = null, ICpuPowerLimitReader? cpu = null)
     {
+        _carte = new AppliedStateVerifier.LecteursCarte(nvCarte, adlxCarte, piloteAmd, cpu);
         _services = services;
         _safety = safety;
         _bench = bench;
@@ -107,19 +114,30 @@ public sealed class TweakEngine : ITweakEngine
     public async Task<Result<ApplyReport>> ApplyAsync(
         TweakPlan plan, BenchmarkResult? baseline, int targetPid, CancellationToken ct)
     {
+        // La pile des leviers posés vit ici, pas dans ApplyCoreAsync : une exception levée après une pose la laisserait
+        // derrière, et le lot se dirait défait avec ses leviers encore posés.
+        var applied = new Stack<(ITweak Tweak, TweakSnapshot Snapshot)>();
         try
         {
-            return await ApplyCoreAsync(plan, baseline, targetPid, ct).ConfigureAwait(false);
+            return await ApplyCoreAsync(plan, baseline, targetPid, applied, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            // Garde de frontière : aucune exception ne sort jamais du moteur.
-            return Result<ApplyReport>.Fail(ErrorCodes.BatchReverted, $"Engine boundary error: {ex.Message}");
+            // Garde de frontière : aucune exception ne sort jamais du moteur, et ce qui reste posé est rendu avant de répondre.
+            var cause = new Error(ErrorCodes.HelperOpFailed, $"Engine boundary error: {ex.Message}");
+            try
+            {
+                if (applied.Count > 0)
+                    return await RollbackBatchAsync(applied, applied.Peek().Tweak.Id, cause).ConfigureAwait(false);
+            }
+            catch (Exception) { /* le rendu a levé à son tour : le point de restauration reste le dernier filet */ }
+            return Result<ApplyReport>.Fail(ErrorCodes.BatchReverted, cause.Message);
         }
     }
 
     private async Task<Result<ApplyReport>> ApplyCoreAsync(
-        TweakPlan plan, BenchmarkResult? baseline, int targetPid, CancellationToken ct)
+        TweakPlan plan, BenchmarkResult? baseline, int targetPid, Stack<(ITweak Tweak, TweakSnapshot Snapshot)> applied,
+        CancellationToken ct)
     {
         // Ids du plan → leviers ; les ids absents du catalogue sont écartés proprement.
         var tweaks = new List<ITweak>();
@@ -140,8 +158,7 @@ public sealed class TweakEngine : ITweakEngine
             return Result<ApplyReport>.Fail(point.Error!.Value.Code, point.Error!.Value.Message);
 
         // (2) Pose chaque levier et empile son snapshot (LIFO). Au premier échec
-        //     ⇒ tout le lot est rendu (LIFO) ⇒ ENGINE.BATCH_REVERTED. Jamais à moitié.
-        var applied = new Stack<(ITweak Tweak, TweakSnapshot Snapshot)>();
+        //     ⇒ tout le lot est rendu (LIFO) ⇒ ENGINE.BATCH_REVERTED ; un inverse refusé ⇒ TWEAK.PARTIALLY_APPLIED.
         // Vrai tant que chaque levier applique a prouve que sa cible est en place. Un seul
         // `Unknown` suffit a interdire d'attribuer la mesure au batch.
         var toutProuve = true;
@@ -183,7 +200,7 @@ public sealed class TweakEngine : ITweakEngine
             // l'A/B est saute, exactement comme pour un changement qui n'agit qu'apres redemarrage.
             if (_registre is not null)
             {
-                var preuve = AppliedStateVerifier.Verifier(snapshot, _registre, _nvApi, _alimentation, _services);
+                var preuve = AppliedStateVerifier.Verifier(snapshot, _registre, _nvApi, _alimentation, _services, _carte);
                 _diag.Change(tweak.Id, preuve.RequestedState ?? "?",
                     $"readback:{preuve.Verdict}", "DrDXT");
 
@@ -222,6 +239,10 @@ public sealed class TweakEngine : ITweakEngine
         Stack<(ITweak Tweak, TweakSnapshot Snapshot)> applied, string failedId, Error? cause)
     {
         var unreverted = new List<string>();
+        // Le helper a reçu l'écriture puis s'est tu, ou le levier dit lui-même n'avoir pas pu revenir : il a pu rester posé,
+        // sans instantané pour le rendre ici. Il compte comme non rendu : le lot ne se dit jamais « défait ».
+        if (cause?.Code is ErrorCodes.HelperNoReply or ErrorCodes.HelperNoReplyJournalisee or ErrorCodes.TweakPartiallyApplied)
+            unreverted.Add(failedId);
         while (applied.Count > 0)
         {
             var (tweak, snapshot) = applied.Pop();   // LIFO : le dernier posé est rendu le premier
@@ -262,7 +283,8 @@ public sealed class TweakEngine : ITweakEngine
         if (unreverted.Count > 0)
             detail += $"; rollback could not revert: {string.Join(", ", unreverted)} (use the System Restore point)";
 
-        return Result<ApplyReport>.Fail(ErrorCodes.BatchReverted, detail);
+        // Un levier resté posé : le lot n'est pas « défait », et l'écran ne doit jamais dire le système inchangé.
+        return Result<ApplyReport>.Fail(unreverted.Count > 0 ? ErrorCodes.TweakPartiallyApplied : ErrorCodes.BatchReverted, detail);
     }
 
     // --- Remesure → significativité AbComparer → on garde ou retour automatique. ---
@@ -353,7 +375,7 @@ public sealed class TweakEngine : ITweakEngine
     // secondaire (la latence informe, elle ne déclenche pas). Le moteur reste lié
     // à cette seule clé, pour que la règle du verdict vive à un seul endroit.
     private static bool IsMeasuredRegression(AbVerdict raw) =>
-        !raw.IsMeasurableGain && raw.SummaryKey == "Scan.Ab.Regression";
+        !raw.IsMeasurableGain && raw.SummaryKey == DrDxt.Measurement.AbComparer.CleRegression;
 
     private async Task<Result<ApplyReport>> AutoRevertBatchAsync(
         Stack<(ITweak Tweak, TweakSnapshot Snapshot)> applied, AbVerdict verdict)

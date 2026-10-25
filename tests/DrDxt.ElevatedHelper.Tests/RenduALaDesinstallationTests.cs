@@ -2,6 +2,7 @@
 using DrDxt.Application.Tweaks.Hardware;
 using DrDxt.Application.Tweaks.Latency;
 using DrDxt.Core;
+using DrDxt.ElevatedHelper.Execution;
 using DrDxt.Reconciler.Desinstallation;
 using DrDxt.Reconciler.Manifest;
 using FluentAssertions;
@@ -66,7 +67,11 @@ public sealed class RenduALaDesinstallationTests : IDisposable
     private static DesiredState Gardes(params AppliedTweak[] t) => new(Array.Empty<AppliedTweak>(), t);
 
     private Task<string> Rendre(ILectureDesCibles lecture, EcritureFactice ecriture)
-        => ModeDesinstallation.ExecuterAsync(_racine, appliquerAcl: false, lecture, ecriture, Quand, CancellationToken.None);
+    {
+        // Une écriture acceptée se voit à la relecture, comme sur la vraie machine (sauf pilote qui ment : SansEffet).
+        if (lecture is LectureFactice machine && !ecriture.SansEffet) ecriture.Machine ??= machine;
+        return ModeDesinstallation.ExecuterAsync(_racine, appliquerAcl: false, lecture, ecriture, Quand, CancellationToken.None);
+    }
 
     // ── Les réglages de la carte gardés par le joueur ──────────────────────────────
 
@@ -184,6 +189,30 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         else ecriture.Recues.Should().BeEmpty("le joueur a changé le boost depuis : ce n'est plus la valeur de DrDXT");
     }
 
+    // « Rendue » ne se dit que relue : un pilote qui accepte l'écriture sans rien changer laisse la valeur posée par DrDXT.
+    // L'origine reste à rendre (le manifeste est gardé), et le rapport ne dit pas « rendue ».
+    [Fact]
+    public async Task Une_ecriture_acceptee_mais_que_la_relecture_ne_confirme_pas_n_est_pas_rendue()
+    {
+        await Signer(Gardes(new AppliedTweak("latency.reflex", Op(Reflex(2)), Op(Reflex(1)), Quand)));
+
+        var rapport = await Rendre(new LectureFactice { [Cle(Reflex(2))] = "2" }, new EcritureFactice { SansEffet = true });
+
+        rapport.Should().NotContain("[Rendu] latency.reflex").And.Contain("[EchecDEcriture] latency.reflex").And.Contain("pas mis de côté");
+        Directory.GetFiles(_racine, "desired-state.manifest").Should().ContainSingle("l'origine reste à rendre");
+    }
+
+    [Fact]
+    public async Task Une_valeur_a_supprimer_encore_la_a_la_relecture_n_est_pas_rendue()
+    {
+        var supprimer = new DeleteRegistryValueOp(RegistryHiveKind.LocalMachine, NvTweak, "LowLatencyMode");
+        await Signer(Gardes(new AppliedTweak("latency.reflex", Op(Reflex(2)), Op(supprimer), Quand)));
+
+        var rapport = await Rendre(new LectureFactice { [Cle(Reflex(2))] = "2" }, new EcritureFactice { SansEffet = true });
+
+        rapport.Should().NotContain("[Rendu] latency.reflex").And.Contain("[EchecDEcriture] latency.reflex");
+    }
+
     [Fact]
     public async Task Un_reglage_change_a_la_main_depuis_est_respecte_et_le_rapport_le_dit()
     {
@@ -211,6 +240,47 @@ public sealed class RenduALaDesinstallationTests : IDisposable
 
         ecriture.Recues.Should().ContainSingle().Which.Should().Be(Reflex(1));
         rapport.Should().Contain("[Rendu] latency.reflex.lowLatencyMode").And.Contain("[DejaRendu] latency.reflex");
+    }
+
+    // Deux leviers de plan d'alimentation sur la même cible forment une chaîne : Économie→Équilibré (le plus ancien),
+    // puis Équilibré→Hautes perf (le plus récent). À la désinstallation, l'actuel (Hautes perf) est ce que DrDXT a laissé :
+    // le joueur n'a rien changé, et c'est la plus ancienne origine (Économie) qui ramène à l'état d'avant DrDXT. Sans ce
+    // jugement, le plus ancien se croyait « changé depuis » et la machine restait en Équilibré.
+    [Fact]
+    public async Task Deux_plans_d_alimentation_enchaines_rendent_la_plus_ancienne_origine()
+    {
+        var ps = KnownPowerPlans.PowerSaver;
+        var bal = KnownPowerPlans.Balanced;
+        var hp = KnownPowerPlans.HighPerformance;
+        // Le plus ancien (Économie→Équilibré), puis le plus récent (Équilibré→Hautes perf).
+        await Signer(Gardes(
+            new AppliedTweak("fixit.plan_economie", Op(new SetActivePowerPlanOp(bal)), Op(new SetActivePowerPlanOp(ps)), Quand),
+            new AppliedTweak("fixit.power_plan", Op(new SetActivePowerPlanOp(hp)), Op(new SetActivePowerPlanOp(bal)), Quand.AddHours(1))));
+        var ecriture = new EcritureFactice();
+
+        var rapport = await Rendre(new LectureFactice { ["plan"] = hp.ToString() }, ecriture);
+
+        ecriture.Recues.Should().ContainSingle().Which.Should().Be(new SetActivePowerPlanOp(ps),
+            "l'état d'avant DrDXT est Économie, la plus ancienne origine, pas le plan intermédiaire Équilibré");
+        rapport.Should().Contain("[Rendu] fixit.plan_economie").And.Contain("[DejaRendu] fixit.power_plan");
+    }
+
+    // Le joueur a choisi un plan lui-même après DrDXT : l'actuel n'est plus ce que DrDXT a laissé, rien n'est rendu.
+    [Fact]
+    public async Task Un_plan_change_par_le_joueur_apres_la_chaine_est_respecte()
+    {
+        var ps = KnownPowerPlans.PowerSaver;
+        var bal = KnownPowerPlans.Balanced;
+        var hp = KnownPowerPlans.HighPerformance;
+        await Signer(Gardes(
+            new AppliedTweak("fixit.plan_economie", Op(new SetActivePowerPlanOp(bal)), Op(new SetActivePowerPlanOp(ps)), Quand),
+            new AppliedTweak("fixit.power_plan", Op(new SetActivePowerPlanOp(hp)), Op(new SetActivePowerPlanOp(bal)), Quand.AddHours(1))));
+        var ecriture = new EcritureFactice();
+
+        var rapport = await Rendre(new LectureFactice { ["plan"] = KnownPowerPlans.Ultimate.ToString() }, ecriture);
+
+        ecriture.Recues.Should().BeEmpty("le joueur a mis Ultime depuis : ce n'est plus ce que DrDXT a laissé");
+        rapport.Should().Contain("[Respecte]");
     }
 
     // ── les composites : Tout-ou-rien ────────────────────────────────
@@ -322,6 +392,41 @@ public sealed class RenduALaDesinstallationTests : IDisposable
 
     // Une feuille illisible bloque tout le composite (laissé intact, à juste titre) : ce n'est pas « rendu ». Le manifeste
     // était mis de côté quand même et l'origine perdue ; il reste en place.
+    // Une écriture refusée au milieu d'un composite laisse les premières feuilles rendues. À la passe suivante, elles se
+    // relisent à leur valeur d'origine : ce n'est pas un changement à la main, le composite se termine.
+    [Fact]
+    public async Task Un_composite_rendu_a_moitie_par_une_ecriture_refusee_se_termine_a_la_passe_suivante()
+    {
+        await Signer(Gardes(new AppliedTweak("latency.vrr_vsync_cap",
+            Composite(Drs(Vsync, VsyncForceOn), Drs(Frl, 141)),
+            Composite(Drs(Frl, 0), Drs(Vsync, VsyncPassive)), Quand)));
+        await Rendre(new LectureFactice { ["drs|" + Vsync] = Dec(VsyncForceOn), ["drs|" + Frl] = "141" },
+            new EcritureFactice { Echoue = op => op == Drs(Vsync, VsyncPassive) });
+
+        var ecriture = new EcritureFactice();
+        var rapport = await Rendre(new LectureFactice { ["drs|" + Vsync] = Dec(VsyncForceOn), ["drs|" + Frl] = "0" }, ecriture);
+
+        ecriture.Recues.Should().Equal(Drs(Vsync, VsyncPassive));
+        rapport.Should().Contain("[DejaRendu] latency.vrr_vsync_cap").And.Contain("déjà à sa valeur d'origine")
+            .And.NotContain("CompositePartiellementModifie");
+        Directory.GetFiles(_racine, "desired-state.manifest").Should().BeEmpty("tout est rendu : il est mis de côté");
+    }
+
+    [Fact]
+    public async Task Une_feuille_d_origine_absente_et_deja_supprimee_ne_bloque_pas_le_composite()
+    {
+        var allow = new SetRegistryValueOp(RegistryHiveKind.LocalMachine, GameBar, "AllowAutoGameMode", RegistryValueType.DWord, "1");
+        var enabled = new SetRegistryValueOp(RegistryHiveKind.LocalMachine, GameBar, "AutoGameModeEnabled", RegistryValueType.DWord, "1");
+        var allowOrigine = allow with { Value = "0" };
+        await Signer(Gardes(new AppliedTweak("latency.gameModeOn", Composite(allow, enabled),
+            Composite(allowOrigine, new DeleteRegistryValueOp(RegistryHiveKind.LocalMachine, GameBar, "AutoGameModeEnabled")), Quand)));
+
+        var ecriture = new EcritureFactice();
+        await Rendre(new LectureFactice { [Cle(allow)] = "1", [Cle(enabled)] = null }, ecriture);
+
+        ecriture.Recues.Should().Equal(allowOrigine);
+    }
+
     [Fact]
     public async Task Un_composite_avec_une_feuille_illisible_garde_le_manifeste()
     {
@@ -471,6 +576,31 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         rapport.Should().Contain("NON LU").And.Contain("nothing was ever signed");
     }
 
+    // Une seconde désinstallation après une réinstallation : la clé est restée, le manifeste a été mis de côté la première
+    // fois. Le rapport disait « lu et vérifié » puis « mis de côté » pour un fichier qui n'existait pas.
+    [Fact]
+    public async Task Sans_manifeste_avec_la_cle_le_rapport_ne_dit_ni_lu_ni_mis_de_cote()
+    {
+        await Signer(Gardes(new AppliedTweak("latency.reflex", Op(Reflex(2)), Op(Reflex(1)), Quand)));
+        File.Delete(Path.Combine(_racine, "desired-state.manifest"));
+
+        var rapport = await Rendre(new LectureFactice(), new EcritureFactice());
+
+        rapport.Should().Contain("aucun manifeste").And.Contain("aucune origine à rendre.").And.NotContain("NON LU")
+            .And.NotContain("lu et vérifié").And.NotContain("mis de côté (renommé)");
+    }
+
+    [Fact]
+    public void Le_rapport_du_journal_ne_se_dit_pas_manifeste_signe()
+    {
+        var r = new RapportDuRendu(null, [new LigneDuRendu("journal", "cible", IssueDuRendu.Rendu, "")]);
+
+        var texte = r.EnTexte(Quand, "journal d'écriture anticipée : lu", "journal : NON LU ({0})");
+        texte.Should().Contain("journal d'écriture anticipée : lu").And.NotContain("lu et vérifié");
+        new RapportDuRendu("illisible", []).EnTexte(Quand, "lu", "journal : NON LU ({0})")
+            .Should().Contain("journal : NON LU (illisible)");
+    }
+
     [Fact]
     public async Task Un_echec_d_ecriture_n_arrete_pas_les_entrees_suivantes()
     {
@@ -529,6 +659,83 @@ public sealed class RenduALaDesinstallationTests : IDisposable
             .Returns<Task<Result>>(_ => throw new IOException("tube ferme"));
         (await ModeDesinstallation.RetirerPlafondEnvoiAsync(panne, CancellationToken.None))
             .Should().Contain("IOException");
+    }
+
+    // ── les programmes coupés au démarrage : hors manifeste, leurs traces les portent ──────────────────
+
+    private static readonly byte[] PoseeParDrDxt = SetStartupApprovalOp.Octets(false, new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc));
+
+    private static CoupureDuDemarrage Coupure(string nom, RegistryHiveKind ruche = RegistryHiveKind.CurrentUser)
+        => new(ruche, SetStartupApprovalOp.Run, nom, Convert.ToHexString(PoseeParDrDxt));
+
+    [Fact]
+    public async Task Un_programme_encore_coupe_par_DrDXT_est_reactive_a_la_desinstallation()
+    {
+        var ecriture = new EcritureFactice();
+
+        var texte = await ModeDesinstallation.ReactiverLesCoupuresAsync(
+            [Coupure("Discord"), Coupure("Steam", RegistryHiveKind.LocalMachine)], _ => PoseeParDrDxt, ecriture, CancellationToken.None);
+
+        ecriture.Recues.Should().Equal(
+            new SetStartupApprovalOp(RegistryHiveKind.CurrentUser, SetStartupApprovalOp.Run, "Discord", true),
+            new SetStartupApprovalOp(RegistryHiveKind.LocalMachine, SetStartupApprovalOp.Run, "Steam", true));
+        texte.Should().Contain("Discord : réactivé").And.Contain("Steam : réactivé");
+    }
+
+    // Recoupé ou réactivé à la main depuis (les octets portent l'heure de la coupure), ou valeur disparue : le choix du joueur
+    // tient, rien n'est écrit.
+    [Fact]
+    public async Task Un_programme_change_depuis_la_coupure_est_laisse_tel_quel()
+    {
+        var ecriture = new EcritureFactice();
+        var recoupe = SetStartupApprovalOp.Octets(false, new DateTime(2026, 10, 5, 0, 0, 0, DateTimeKind.Utc));
+
+        var texte = await ModeDesinstallation.ReactiverLesCoupuresAsync([Coupure("Discord"), Coupure("Steam")],
+            c => c.Nom == "Discord" ? recoupe : null, ecriture, CancellationToken.None);
+
+        ecriture.Recues.Should().BeEmpty();
+        texte.Should().Contain("Discord : changé depuis").And.Contain("Steam : changé depuis");
+    }
+
+    [Fact]
+    public async Task Une_reactivation_refusee_est_dite_et_les_autres_sont_tentees()
+    {
+        var ecriture = new EcritureFactice { Echoue = op => op is SetStartupApprovalOp { Nom: "Discord" } };
+
+        var texte = await ModeDesinstallation.ReactiverLesCoupuresAsync([Coupure("Discord"), Coupure("Steam")],
+            _ => PoseeParDrDxt, ecriture, CancellationToken.None);
+
+        ecriture.Recues.Should().HaveCount(2);
+        texte.Should().Contain("Discord : toujours coupé").And.Contain("refus (test)").And.Contain("Steam : réactivé");
+    }
+
+    // Élevée, la désinstallation n'écrit jamais dans le dossier du compte : il peut être une jonction vers la racine de
+    // confiance. Seule la trace de la machine se met à jour.
+    [Fact]
+    public void La_desinstallation_ne_reecrit_que_la_trace_de_la_machine()
+    {
+        ModeDesinstallation.TraceDuRendu(RegistryHiveKind.CurrentUser).Should().BeNull();
+        ModeDesinstallation.TraceDuRendu(RegistryHiveKind.LocalMachine).Should().NotBeNull();
+
+        // Le montage passe bien par elle, et la trace du compte n'y est que lue.
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
+        var source = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.ElevatedHelper", "ModeDesinstallation.cs"));
+        source.Should().Contain("new Win32RegistryActions(TraceDuRendu)");
+        System.Text.RegularExpressions.Regex.Matches(source, @"TraceDesCoupures\.DeLaSession\(\)(?<suite>\.Lire\(\))?")
+            .Should().ContainSingle("témoin : la trace du compte est lue pour réactiver ses coupures")
+            .Which.Groups["suite"].Success.Should().BeTrue("jamais passée à un écrivain");
+    }
+
+    [Fact]
+    public async Task Elevee_avec_un_autre_compte_la_desinstallation_ne_reactive_rien_dans_sa_ruche()
+    {
+        var ecriture = new EcritureFactice();
+
+        await ModeDesinstallation.ReactiverLesCoupuresAsync([Coupure("Discord")], _ => PoseeParDrDxt,
+            ModeDesinstallation.GarderLaRucheDuJoueur(ecriture, memeCompte: false), CancellationToken.None);
+
+        ecriture.Recues.Should().BeEmpty();
     }
 
     // ── la carte NVIDIA : les baux du helper tué ne se rendent plus, le désinstalleur la rend ──────────
@@ -602,6 +809,67 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         ModeDesinstallation.LireLesCartes(_ => 0, _ => true).Should().HaveCount(8, "borné : NVAPI n'énumère jamais plus");
     }
 
+    // ── ce qui n'est pas au manifeste : la marque que l'installeur lit ──────────────────────────────────
+
+    // Le manifeste resté en place ne couvre que ses propres lignes. Une carte, le plafond d'envoi ou un programme au démarrage
+    // non rendus le laissaient partir, et l'installeur affichait sa réussite : chaque étape note ce qui reste.
+    [Fact]
+    public async Task Chaque_etape_hors_manifeste_qui_ne_rend_pas_note_qu_il_reste_quelque_chose()
+    {
+        var refus = new EcritureFactice { Echoue = _ => true };
+
+        var plafond = new ModeDesinstallation.ResteARendre();
+        await ModeDesinstallation.RetirerPlafondEnvoiAsync(refus, CancellationToken.None, plafond);
+        plafond.Quelquechose.Should().BeTrue("le plafond d'envoi est resté");
+
+        var carte = new ModeDesinstallation.ResteARendre();
+        await ModeDesinstallation.RendreLaCarteNvidiaAsync(refus, [new(-150, true)], CancellationToken.None, carte);
+        carte.Quelquechose.Should().BeTrue("la carte n'est pas rendue");
+
+        var demarrage = new ModeDesinstallation.ResteARendre();
+        await ModeDesinstallation.ReactiverLesCoupuresAsync([Coupure("Discord")], _ => PoseeParDrDxt, refus, CancellationToken.None, demarrage);
+        demarrage.Quelquechose.Should().BeTrue("le programme reste coupé");
+    }
+
+    [Fact]
+    public async Task Tout_rendu_ne_note_rien_et_un_programme_change_depuis_n_est_pas_un_reste()
+    {
+        var reste = new ModeDesinstallation.ResteARendre();
+        var ecriture = new EcritureFactice();
+
+        await ModeDesinstallation.RetirerPlafondEnvoiAsync(ecriture, CancellationToken.None, reste);
+        await ModeDesinstallation.RendreLaCarteNvidiaAsync(ecriture, [new(-150, true)], CancellationToken.None, reste);
+        await ModeDesinstallation.ReactiverLesCoupuresAsync([Coupure("Discord"), Coupure("Steam")],
+            c => c.Nom == "Discord" ? PoseeParDrDxt : null, ecriture, CancellationToken.None, reste);
+
+        reste.Quelquechose.Should().BeFalse("tout est rendu, ou laissé au choix du joueur");
+    }
+
+    [Fact]
+    public async Task Une_origine_du_manifeste_non_rendue_note_aussi_qu_il_reste_quelque_chose()
+    {
+        await Signer(Gardes(new AppliedTweak("latency.reflex", Op(Reflex(2)), Op(Reflex(1)), Quand)));
+        var reste = new ModeDesinstallation.ResteARendre();
+
+        await ModeDesinstallation.ExecuterAsync(_racine, appliquerAcl: false, new LectureFactice { [Cle(Reflex(2))] = "2" },
+            new EcritureFactice { Echoue = op => op is SetRegistryValueOp }, Quand, CancellationToken.None, reste);
+
+        reste.Quelquechose.Should().BeTrue();
+    }
+
+    [Fact]
+    public void La_marque_nomme_le_rapport_quand_il_reste_quelque_chose_et_part_quand_tout_est_rendu()
+    {
+        var marque = Path.Combine(_racine, ModeDesinstallation.MarqueRenduIncomplet);
+
+        ModeDesinstallation.NoterLIssue(_racine, Quand, incomplet: true, appliquerAcl: false).IsOk.Should().BeTrue();
+        File.ReadAllText(marque).Should().Contain("desinstallation-20260911T230000Z.txt");
+
+        // Réinstallé puis désinstallé, tout rendu cette fois : la marque d'avant ne fait plus dire « incomplet ».
+        ModeDesinstallation.NoterLIssue(_racine, Quand.AddDays(1), incomplet: false, appliquerAcl: false).IsOk.Should().BeTrue();
+        File.Exists(marque).Should().BeFalse();
+    }
+
     // ── doublures ─────────────────────────────────────────────────────────────────────────────
 
     private sealed class LectureFactice : Dictionary<string, string?>, ILectureDesCibles
@@ -623,11 +891,33 @@ public sealed class RenduALaDesinstallationTests : IDisposable
     {
         public List<PrivilegedOp> Recues { get; } = new();
         public Func<PrivilegedOp, bool> Echoue { get; init; } = _ => false;
+        /// <summary>Le pilote accepte l'écriture sans rien changer.</summary>
+        public bool SansEffet { get; init; }
+        public LectureFactice? Machine { get; set; }
 
         public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
         {
             Recues.Add(op);
-            return Task.FromResult(Echoue(op) ? Result.Fail(ErrorCodes.HelperOpFailed, "refus (test)") : Result.Ok());
+            if (Echoue(op)) return Task.FromResult(Result.Fail(ErrorCodes.HelperOpFailed, "refus (test)"));
+            if (Machine is not null)
+            {
+                if (op is DeleteRegistryValueOp or DeleteNvApiDrsSettingOp) Machine[Cle(op)] = null; // relue « absente »
+                else if (Valeur(op) is { } v) Machine[Cle(op)] = v;
+            }
+            return Task.FromResult(Result.Ok());
         }
+
+        private static string? Valeur(PrivilegedOp op) => op switch
+        {
+            SetRegistryValueOp s => s.Value,
+            ApplyNvApiDrsSettingOp a => Dec(a.Value),
+            ApplyAdlxTuningOp a => a.IntValue.ToString(CultureInfo.InvariantCulture),
+            ApplyNvApiPowerLimitOp n => n.PowerLimitPercent.ToString(CultureInfo.InvariantCulture),
+            SetActivePowerPlanOp p => p.PlanGuid.ToString("D", CultureInfo.InvariantCulture),
+            SetProcessorBoostModeOp b => b.AcValue.ToString(CultureInfo.InvariantCulture),
+            RunServiceControlOp { Action: ServiceAction.Start } => "running",
+            RunServiceControlOp { Action: ServiceAction.Stop } => "stopped",
+            _ => null,
+        };
     }
 }

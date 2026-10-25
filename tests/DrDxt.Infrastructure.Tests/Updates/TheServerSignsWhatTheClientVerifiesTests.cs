@@ -2,6 +2,7 @@ using DrDxt.Infrastructure.Updates;
 using DrDxt.Server.Manifest;
 using FluentAssertions;
 using Xunit;
+using DrDxt.TestSupport;
 
 namespace DrDxt.Infrastructure.Tests.Updates;
 
@@ -36,7 +37,7 @@ public sealed class TheServerSignsWhatTheClientVerifiesTests
         // change de couleur.
         var signer = new Ed25519ManifestSigningService(new ManifestSigningOptions
         {
-            Ed25519PrivateSeedBase64 = Convert.ToBase64String(UpdateDevKeys.DevPrivateSeed),
+            Ed25519PrivateSeedBase64 = Convert.ToBase64String(UpdateDevTestKeys.DevPrivateSeed),
         });
 
         var signature = signer.Sign(UpdateManifestEndpoint.CanonicalBytes(channel, version, url, sha256));

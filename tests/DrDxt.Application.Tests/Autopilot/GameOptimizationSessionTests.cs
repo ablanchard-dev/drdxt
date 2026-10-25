@@ -119,8 +119,10 @@ public sealed class GameOptimizationSessionTests
                 () => Identite)
             .Run(1234, new IAutopilotCandidate[] { new CandidatFake() });
 
-        profil.SceneExplanation.Should().Contain("détecter un écart")
-            .And.Contain("1 % low", "le joueur doit savoir ce que l'objectif privilegie");
+        // L'écran dit la règle qui décide (KeepPolicy : 1 % low ou p95 prouvé meilleur, sans régression), pas des poids
+        // qu'aucun verdict n'applique, ni une résolution d'A/A que le verdict n'utilise pas.
+        profil.SceneExplanation.Should().Contain("1 % low").And.Contain("95e centile")
+            .And.NotContain("65").And.NotContain("indiscernable");
     }
 
     [Fact]
@@ -148,7 +150,7 @@ public sealed class GameOptimizationSessionTests
                 scene: new SceneContract(SceneRepresentativity.Gameplay, SceneRole.Validation,
                     "partie reelle, rotation complete"));
 
-        profil.SceneExplanation.Should().Contain("détecter un écart")
+        profil.SceneExplanation.Should().Contain("95e centile")
             .And.NotContain("⚠️", "rien ne manque a cette scene : elle ne merite aucune reserve");
     }
 

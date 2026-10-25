@@ -36,24 +36,20 @@ public sealed class FeatureUpdateDetector
         if (!build.IsOk)
             return Result<bool>.Fail(build.Error!.Value.Code, build.Error.Value.Message);
 
-        var loaded = await _stateStore.LoadAsync(ct);
-        if (!loaded.IsOk)
-            return Result<bool>.Fail(loaded.Error!.Value.Code, loaded.Error.Value.Message);
-
         var current = build.Value!;
-        var last = loaded.Value!.LastFeatureUpdateBuild;
+        var change = false;
 
         // Même build (y compris identique à un build déjà enregistré) → pas de mise à jour, pas d'écriture.
-        if (string.Equals(current, last, StringComparison.OrdinalIgnoreCase))
-            return Result<bool>.Ok(false);
-
         // Changé (ou premier lancement avec un relevé vide) → enregistrer le nouveau build pour que le
         // tour suivant avec ce build soit sans effet, puis signaler la mise à jour.
-        var saved = await _stateStore.SaveAsync(
-            loaded.Value! with { LastFeatureUpdateBuild = current }, ct);
-        if (!saved.IsOk)
-            return Result<bool>.Fail(saved.Error!.Value.Code, saved.Error.Value.Message);
+        var r = await _stateStore.MettreAJourAsync(etat =>
+        {
+            change = !string.Equals(current, etat.LastFeatureUpdateBuild, StringComparison.OrdinalIgnoreCase);
+            return change ? etat with { LastFeatureUpdateBuild = current } : null;
+        }, ct);
+        if (!r.IsOk)
+            return Result<bool>.Fail(r.Error!.Value.Code, r.Error.Value.Message);
 
-        return Result<bool>.Ok(true);
+        return Result<bool>.Ok(change);
     }
 }

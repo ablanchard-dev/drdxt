@@ -27,4 +27,25 @@ public sealed class ReglagesDesJeuxUnrealTests : IDisposable
             c.Nom.Should().Be("réglages de JeuB");
         }
     }
+
+    // Un fichier au-delà du plafond des fichiers tiers n'est pas lu : non lu, sans charger des Go en mémoire.
+    [Fact]
+    public void Un_fichier_trop_gros_dit_non_lu()
+    {
+        File.WriteAllText(_fichier, "FrameRateLimit=141\n" + new string(';', (int)DrDxt.Detection.FichierTiers.OctetsMax));
+
+        AppServiceCollectionExtensions.ConstatUnreal("JeuBClient-Win64-Shipping.exe", new FileInfo(_fichier))
+            .Statut.Should().Be(RepairStatus.Unknown);
+    }
+
+    // Call of Duty est lu dans le même lot que les jeux Unreal : son fichier illisible se dit non lu, sans lever.
+    [Fact]
+    public void Le_fichier_de_call_of_duty_verrouille_dit_non_lu_sans_lever()
+    {
+        File.WriteAllText(_fichier, "NvidiaReflex@0;1;0 = \"Enabled\"\n");
+
+        using (new FileStream(_fichier, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            AppServiceCollectionExtensions.ConstatsCod(new FileInfo(_fichier))
+                .Should().ContainSingle().Which.Statut.Should().Be(RepairStatus.Unknown);
+    }
 }

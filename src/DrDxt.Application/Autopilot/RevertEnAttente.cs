@@ -59,30 +59,67 @@ public sealed class FichierRevertEnAttente : IRevertEnAttente
     private readonly string _chemin;
     private readonly FichierJsonAtomique _fichier;
 
-    public FichierRevertEnAttente(string chemin)
+    private readonly TimeSpan _attente;
+
+    private readonly Tweaks.Hardware.IRegistryReader? _registre;
+    private readonly Func<string, string>? _nom;
+
+    /// <param name="attente">Combien attendre le verrou d'un autre processus avant de rendre « occupé » ; 5 s par défaut.</param>
+    /// <param name="registre">Relit le levier encore en essai, pour que le refus d'un autre essai dise la valeur lue et où la
+    /// remettre.</param>
+    /// <param name="nom">Le nom affiché d'un levier ; sans lui, son id.</param>
+    public FichierRevertEnAttente(string chemin, TimeSpan? attente = null, Tweaks.Hardware.IRegistryReader? registre = null,
+        Func<string, string>? nom = null)
     {
+        (_registre, _nom) = (registre, nom);
+        _attente = attente ?? TimeSpan.FromSeconds(5);
         _chemin = chemin;
         _fichier = new FichierJsonAtomique(chemin, CodeErreur);
     }
 
-    public static FichierRevertEnAttente ParDefaut() =>
-        new(FichierJsonAtomique.CheminLocal("pending-revert.json"));
+    public static FichierRevertEnAttente ParDefaut(Tweaks.Hardware.IRegistryReader? registre = null, Func<string, string>? nom = null) =>
+        new(FichierJsonAtomique.CheminLocal("pending-revert.json"), registre: registre, nom: nom);
 
-    public Result Poser(string tweakId, TweakSnapshot? snapshot)
+    // Poser, Lever et Garder lisent, modifient et réécrivent : l'App, le banc et l'outil de validation écrivent ce fichier ; le
+    // verrou voisin (le même que les autres journaux du compte) empêche l'un d'effacer la mise à jour de l'autre.
+    private Result SousVerrou(Func<Result> ecrire)
+    {
+        using var verrou = Parties.VerrouDuReleve.Attendre(_chemin + ".verrou", _attente);
+        return verrou is null ? Result.Fail(CodeErreur, Docteur.T("RV.JournalOccupe")) : ecrire();
+    }
+
+    public Result Poser(string tweakId, TweakSnapshot? snapshot) => SousVerrou(() => PoserSousVerrou(tweakId, snapshot));
+
+    private Result PoserSousVerrou(string tweakId, TweakSnapshot? snapshot)
     {
         // Un seul essai tient dans ce fichier. Poser un autre levier par-dessus un essai
         // pas encore rendu effacerait son origine pour toujours (essai démarré après une remise au démarrage refusée).
         // Le même levier aussi. Retenté après une remise ratée, il recapturerait comme « origine » la valeur
-        // que DrDXT avait posée. Seul compléter son propre essai (pose sans origine puis avec) est permis.
+        // que DrDXT avait posée. Ne sont permis que compléter son propre essai (pose sans origine puis avec) et remplacer
+        // l'origine de son propre essai par une autre : ses appelants (l'exercice, le ventilateur) ne partent que d'un
+        // journal vide.
         var lu = LireContenu();
         if (lu is { IsOk: true, Value: { TweakId: { } enCours } contenu }
             && (!string.Equals(enCours, tweakId, StringComparison.Ordinal) || (contenu.Snapshot is not null && snapshot is null)))
-            return Result.Fail(CodeErreur, Docteur.T("RV.EncoreEnEssai", enCours));
+            return Result.Fail(CodeErreur, Bloque(enCours, contenu.Snapshot));
         if (!lu.IsOk && !MettreDeCoteSiIllisible()) return Result.Fail(CodeErreur, lu.Error?.Message ?? "lecture impossible");
         return Ecrire(new Contenu(tweakId, snapshot, lu.Value?.Gardes ?? Array.Empty<RevertEnAttenteEntree>()));
     }
 
-    public Result Lever()
+    /// <summary>Le refus d'un essai par-dessus un levier encore posé n'est pas un cul-de-sac : le levier, la valeur relue, et où
+    /// le remettre à la main.</summary>
+    private string Bloque(string enCours, TweakSnapshot? snapshot)
+    {
+        Tweaks.Relecture? relu = null;
+        try { if (_registre is not null && snapshot is not null) relu = Tweaks.TweakReadback.Relire(snapshot, _registre); }
+        catch (Exception) { /* relecture ratée : « non lu » */ }
+        return Docteur.T("RV.EncoreEnEssai.Geste", _nom?.Invoke(enCours) ?? enCours,
+            relu?.ValeurCourante ?? Docteur.T("RV.ValeurNonLue"), relu?.Cible ?? Docteur.T("RV.EndroitDuReglage"));
+    }
+
+    public Result Lever() => SousVerrou(LeverSousVerrou);
+
+    private Result LeverSousVerrou()
     {
         var lu = LireContenu();
         if (!lu.IsOk)
@@ -91,6 +128,7 @@ public sealed class FichierRevertEnAttente : IRevertEnAttente
         if (gardes.Count > 0) return Ecrire(new Contenu(null, null, gardes));
         try
         {
+            if (FichierJsonAtomique.RefusEleve(_chemin, CodeErreur) is { } refus) return refus;
             File.Delete(_chemin);   // absent = deja leve, pas une erreur
             return Result.Ok();
         }
@@ -100,7 +138,9 @@ public sealed class FichierRevertEnAttente : IRevertEnAttente
         }
     }
 
-    public Result Garder(string tweakId, TweakSnapshot snapshot)
+    public Result Garder(string tweakId, TweakSnapshot snapshot) => SousVerrou(() => GarderSousVerrou(tweakId, snapshot));
+
+    private Result GarderSousVerrou(string tweakId, TweakSnapshot snapshot)
     {
         // Relu avant d'ecrire : un fichier illisible n'est pas une liste vide a ecraser, il est mis de cote.
         var lu = LireContenu();
@@ -171,8 +211,14 @@ public static class RevertAuDemarrage
     /// <param name="nom">Le titre affiché d'un réglage, que l'App passe ; par défaut, l'identifiant.</param>
     /// <param name="raison">La raison lisible d'un échec, que l'App passe ; par défaut, son code. Le message (souvent
     /// l'anglais technique du helper) n'entre jamais dans la phrase.</param>
+    /// <param name="registre">Le lecteur du registre : seule la valeur de DrDXT se rend (changée depuis, rien n'est réécrit
+    /// par-dessus ; revenue à l'origine, rien à écrire), et « remis » ne se dit que relu à l'origine. Sans lui, la réussite du
+    /// levier fait foi.</param>
+    /// <param name="verdict">Le vérificateur de la pose, pour une feuille que le registre ne relit pas (pilote, carte, plan) :
+    /// la même règle, avant et après l'écriture.</param>
     public static string? Executer(IRevertEnAttente journal, ITweakCatalog catalogue, out bool remiseUsineRequise,
-        Func<string, string>? nom = null, Func<Result, string>? raison = null)
+        Func<string, string>? nom = null, Func<Result, string>? raison = null, Tweaks.Hardware.IRegistryReader? registre = null,
+        Func<TweakSnapshot, Tweaks.EtatApplique>? verdict = null)
     {
         remiseUsineRequise = false;
         string Nom(string id) => nom?.Invoke(id) ?? id;
@@ -201,6 +247,13 @@ public static class RevertAuDemarrage
         if (!AnnulationSure(entree.TweakId, snapshot.OriginalValueJson))
             return Docteur.T("RV.InverseRefuse", Nom(entree.TweakId));
 
+        var pose = Tweaks.TweakReadback.EtatDeLaPose(snapshot, registre, verdict);
+        if (pose != Tweaks.PoseRelue.DeDrDxt)
+        {
+            journal.Lever();
+            return Docteur.T(pose == Tweaks.PoseRelue.ChangeDepuis ? "RV.ChangeDepuis" : "RV.Remis", Nom(entree.TweakId));
+        }
+
         Result rendu;
         try { rendu = levier.Value.RevertAsync(snapshot).GetAwaiter().GetResult(); }
         catch (Exception ex) { rendu = Result.Fail(CodeRevert, ex.Message); }
@@ -211,8 +264,15 @@ public static class RevertAuDemarrage
             return Docteur.T("RV.RenduEchoue", Nom(entree.TweakId), Raison(rendu));
         }
 
+        // Rendu, mais la valeur de DrDXT est encore là (un pilote qui borne) : le journal reste, le lancement suivant réessaie.
+        // Levé ici, plus rien ne l'aurait rendu.
+        if (Tweaks.TweakReadback.EncorePoseRelue(snapshot, registre, verdict))
+            return Docteur.T("RV.EncorePose", Nom(entree.TweakId));
         journal.Lever();
-        return Docteur.T("RV.Remis", Nom(entree.TweakId));
+        var relu = registre is null ? Tweaks.EtatRelu.NonRelisable : Tweaks.TweakReadback.Relire(snapshot, registre).Etat;
+        var remis = relu == Tweaks.EtatRelu.RevenuAvantApplication
+            || relu == Tweaks.EtatRelu.NonRelisable && (verdict is null || verdict(snapshot) == Tweaks.EtatApplique.NotApplied);
+        return Docteur.T(remis ? "RV.Remis" : "RV.RemisNonRelu", Nom(entree.TweakId));
     }
 
     private const string CodeRevert = "REVERT_AU_DEMARRAGE";
@@ -316,6 +376,7 @@ public static class RevertAuDemarrage
             ["fixit.heures_actives"] = [(RegistryHiveKind.LocalMachine, HeuresActives.Cle, HeuresActives.NomDebut),
                                         (RegistryHiveKind.LocalMachine, HeuresActives.Cle, HeuresActives.NomFin)],
             ["fixit.x3d_ccd"] = [(RegistryHiveKind.CurrentUser, GameBar, "AllowAutoGameMode"),
+                                 (RegistryHiveKind.CurrentUser, GameBar, "AutoGameModeEnabled"),
                                  (RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\Processor", "CppcEnable")],
         };
 
@@ -326,7 +387,9 @@ public static class RevertAuDemarrage
     /// tout fichier qui porte une annulation passe ici. Le mode d'écran se rend hors du helper, sans droits, depuis
     /// son propre format : il n'a pas d'op à filtrer.</summary>
     public static bool AnnulationSure(string tweakId, string? json)
-        => InverseRejouable(tweakId, json) || InversesHorsHelper.Contains(tweakId);
+        => InverseRejouable(tweakId, json) || InversesHorsHelper.Contains(tweakId)
+           // Un geste du docteur gardé ne rejoue que les inverses qu'il écrit lui-même (Tweaks.LevierDeGeste).
+           || Tweaks.LevierDeGeste.Inverses(tweakId, json) is not null;
 
     private static readonly HashSet<string> InversesHorsHelper = new(StringComparer.Ordinal) { "fixit.ecran_frequence" };
 

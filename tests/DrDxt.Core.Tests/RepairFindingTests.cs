@@ -103,4 +103,25 @@ public class RepairFindingTests
 
         illegal.Should().Throw<ArgumentException>().WithMessage("*explication*");
     }
+
+    // Un `with` ne repasse pas par les initialiseurs du constructeur : la règle doit tenir aussi par là.
+    [Fact]
+    public void Un_with_ne_contourne_pas_les_regles()
+    {
+        var inconnu = new RepairFinding("D", "n", null, null, RepairStatus.Unknown, "pourquoi");
+        var nuisible = new RepairFinding("D", "n", null, null, RepairStatus.KnownHarmful, "pourquoi", RepairAction.ReparationAutomatique);
+
+        FluentActions.Invoking(() => inconnu with { Action = RepairAction.ReparationAutomatique }).Should().Throw<ArgumentException>();
+        FluentActions.Invoking(() => nuisible with { Statut = RepairStatus.Unknown }).Should().Throw<ArgumentException>();
+        FluentActions.Invoking(() => inconnu with { Explication = " " }).Should().Throw<ArgumentException>();
+        (inconnu with { Statut = RepairStatus.Suspicious }).Statut.Should().Be(RepairStatus.Suspicious, "témoin : un with légal passe");
+    }
+
+    [Fact]
+    public void La_liste_des_statuts_qui_reparent_seuls_ne_se_modifie_pas()
+    {
+        typeof(RepairFinding).GetField(nameof(RepairFinding.AutorisentUneReparationAutomatique))!.FieldType.IsArray
+            .Should().BeFalse("un tableau public se réécrit élément par élément");
+        RepairFinding.AutorisentUneReparationAutomatique.Should().Equal(RepairStatus.KnownHarmful);
+    }
 }

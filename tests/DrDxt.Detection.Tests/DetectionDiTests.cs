@@ -49,9 +49,8 @@ public class DetectionDiTests
     [Fact]
     public void The_settings_reader_still_resolves_where_the_optional_seams_are_absent()
     {
-        // L'injection .NET honore bien les parametres optionnels (verifie par mutation le
-        // Ce test reste vert avec le cablage par convention comme avec une fabrique
-        // explicite). Ce test existe pour que ca le reste : sans lui, ajouter un seam
+        // L'injection .NET honore les parametres optionnels : ce test reste vert avec le cablage par convention comme
+        // avec une fabrique explicite. Il existe pour que ca le reste : sans lui, ajouter un seam
         // obligatoire au lecteur casserait tout hote qui ne l'enregistre pas.
         var act = () => new ServiceCollection().AddDrDxtDetection().BuildServiceProvider()
             .GetRequiredService<ISettingsStateReader>();

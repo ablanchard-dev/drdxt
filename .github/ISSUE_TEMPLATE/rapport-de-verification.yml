@@ -1,7 +1,7 @@
 name: Rapport de vérification / Verification report
 description: Le rapport de « Vérifier DrDXT sur mon PC » ou d'un zip. / The report from "Check DrDXT on my PC" or a zip.
 title: "Vérification : <processeur / processor> + <carte graphique / graphics card>"
-labels: ["preuve"]
+labels: ["verification"]
 body:
   - type: markdown
     attributes:

@@ -6,45 +6,30 @@ using Xunit;
 namespace DrDxt.Detection.Tests.Cpu;
 
 /// <summary>
-/// Le SDK est l'oracle, pas notre lecture de la documentation.
+/// Le SDK est l'oracle, pas notre lecture de la documentation. Une erreur d'interop ETW ne lève rien : seize octets
+/// d'écart sur `EventRecordCallback` (408 au lieu de 424, `TRACE_LOGFILE_HEADER` estimé à 264 octets quand il en fait
+/// 280) rendaient **zéro événement**, ce qui ressemble à « il n'y a rien à mesurer ».
 ///
-/// Ce sprint a paye SEPT erreurs d'interop ETW, et **aucune n'a leve d'exception** : mauvaise
-/// union, tailles de structures approximees, delegue ramasse par le GC, session qui survit au
-/// processus, mauvais nom de session, mauvais GUID de session, decalages calcules a la main.
-/// Le C# compilait a chaque fois.
-///
-/// La derniere est la plus instructive : `EventRecordCallback` etait a l'offset **408** alors que
-/// le SDK le place a **424** — seize octets, parce que j'avais estime `TRACE_LOGFILE_HEADER` a
-/// 264 octets quand il en fait 280. Le programme ne bloquait plus, ne plantait pas, et rendait
-/// **zero evenement**. C'est le pire mode d'echec possible : il ressemble a « il n'y a rien a
-/// mesurer ».
-///
-/// `tools/etwlayout` compile `offsetof` contre les en-tetes du SDK installe et les imprime. Ce test
-/// compare. **Un seul octet d'ecart doit faire echouer la suite** — c'est la seule facon d'empecher
-/// qu'un « seize octets trop loin mais tout compile » revienne.
-///
-/// Le test s'IGNORE proprement quand l'oracle n'a pas ete compile : un poste sans Visual Studio
-/// ne doit pas voir une suite rouge pour une raison qui ne le concerne pas. Mais il ne PASSE pas
-/// silencieusement non plus — il dit ce qui manque.
+/// Les décalages lus sur la structure se comparent aux valeurs de evntrace.h (x64) dans tous les cas ; quand
+/// `tools/etwlayout` a été compilé contre le SDK installé, ils se comparent aussi à ce qu'il imprime. **Un seul octet
+/// d'écart fait échouer la suite.**
 /// </summary>
 public class EtwInteropLayoutTests
 {
     [Fact]
     public void NOS_DECALAGES_SONT_CEUX_DU_SDK_INSTALLE()
     {
-        var oracle = LireOracle();
-        if (oracle is null)
+        // Les valeurs de evntrace.h (x64), relevées par tools/etwlayout : la garde tient sans l'oracle.
+        DpcLatencyTracer.DecalagesUtilises.Should().Equal(new Dictionary<string, int>
         {
-            // Pas d'echec : l'absence de l'oracle est un fait sur la machine, pas un defaut du
-            // produit. Mais on le DIT, pour que personne ne croie la garde active.
-            Console.WriteLine("oracle absent : compile tools/etwlayout/build.cmd pour activer "
-                              + "cette garde. Les decalages ETW ne sont PAS verifies.");
-            return;
-        }
+            ["EVENT_TRACE_LOGFILEW.size"] = 448, ["LoggerName"] = 8, ["ProcessTraceMode"] = 28,
+            ["PerfFreq"] = 376, ["EventRecordCallback"] = 424,
+        });
 
-        // Cette boucle lisait `ThreadResidencyTracer`, inacheve et appele par le seul
-        // `tools/cpuprobe`. Elle lit desormais `DpcLatencyTracer`, le traceur que le SCAN appelle
-        // reellement — memes decalages, mais la garde couvre enfin du code expedie.
+        // L'oracle compilé contre le SDK installé, quand il existe (il demande Visual Studio).
+        var oracle = LireOracle();
+        if (oracle is null) return;
+
         foreach (var (nom, attendu) in DpcLatencyTracer.DecalagesUtilises)
         {
             oracle.Should().ContainKey(nom, $"l'oracle doit publier le decalage de {nom}");

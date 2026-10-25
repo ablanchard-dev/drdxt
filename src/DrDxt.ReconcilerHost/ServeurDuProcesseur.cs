@@ -59,7 +59,7 @@ public sealed class ServeurDuProcesseur : BackgroundService
                 delaiEcriture ?? DelaiEcriture);
 
     /// <summary>Les ventilateurs de la carte mère, lus ici (le service a les droits) ; null sans PawnIO ou sur une puce non lue.
-    /// Une lecture coûte ~79 ms de processeur : la dernière sert pendant PawnIoSuperIo.IntervalleLecture (5 s).</summary>
+    /// Une lecture coûte ~79 ms de processeur : la dernière sert pendant PawnIoSuperIo.IntervalleLecture (15 s).</summary>
     private static IReadOnlyList<VentilateurLu>? VentilateursDirects()
         => DrDxt.GpuNative.PawnIo.PawnIoSuperIo.LireRecent()?.Ventilateurs.Select(v => new VentilateurLu(v.Index, v.TrMin, v.PwmPourcent)).ToList();
 

@@ -76,6 +76,10 @@ public interface INvApi
 public interface IGameExecutable
 {
     string? RunningGameExecutablePath();
+
+    /// <summary>Les noms des modules chargés par le jeu en cours (d3d11.dll, vulkan-1.dll…), d'où se lit son API graphique.
+    /// null : non lus (pas de jeu, accès refusé par le jeu ou son anti-triche).</summary>
+    IReadOnlyList<string>? ModulesDuJeu() => null;
 }
 
 /// <summary>Couture de lecture du runtime AMD ADLX pour les leviers de latence (Anti-Lag
@@ -195,4 +199,12 @@ public interface IRegistryReader
     /// rejeu soient symetriques. Ok(null) = valeur absente (capture = « absente ») ;
     /// Fail(TWEAK.SDK_UNAVAILABLE) en cas d'erreur de lecture. Jamais une valeur inventee.</summary>
     Result<string?> ReadMultiString(RegistryHiveKind hive, string path, string name);
+}
+
+/// <summary>Secteur ou batterie. Un portable sur batterie est souvent réglé exprès pour l'autonomie (écran à 60 Hz) :
+/// un levier qui défait ce réglage ne s'y applique pas.</summary>
+public interface ISourceDAlimentation
+{
+    /// <summary>Vrai sur batterie, faux sur secteur, null quand Windows ne le dit pas (bureau sans batterie compris).</summary>
+    bool? SurBatterie();
 }

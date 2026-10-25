@@ -29,6 +29,8 @@ from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[2]
 ABSENT = 3
+LANCES = ("service/DrDxt.ReconcilerHost.exe", "service/DrDxt.ReconcilerHost.dll", "PresentMonService.exe",
+          "DrDxt.ElevatedHelper.exe", "DrDxt.ElevatedHelper.dll", "DrDxt.Lanceur.exe", "DrDxt.App.exe", "DrDxt.App.dll")
 
 
 def iscc() -> str | None:
@@ -62,8 +64,13 @@ def main() -> int:
         dossier = Path(tmp) / "installer"
         (dossier / "publish").mkdir(parents=True)
         (dossier / "publish" / "temoin.txt").write_text("temoin du gate installeur.py\n", encoding="utf-8")
+        # Les fichiers dont le script calcule l'empreinte a la compilation (EmpreintesConformes) : des temoins aussi.
+        for lance in LANCES:
+            (dossier / "publish" / lance).parent.mkdir(parents=True, exist_ok=True)
+            (dossier / "publish" / lance).write_bytes(lance.encode("utf-8"))
         shutil.copy2(RACINE / "installer" / "DrDXT.iss", dossier)
         shutil.copy2(RACINE / "installer" / "README-testeur.txt", dossier)
+        shutil.copy2(RACINE / "installer" / "README-tester.txt", dossier)
         shutil.copy2(RACINE / "LICENSE", Path(tmp))
         r = subprocess.run([compilateur, "/O-", "/Q", f"/DAppVer={version()}", str(dossier / "DrDXT.iss")],
                            capture_output=True, text=True, encoding="utf-8", errors="replace")

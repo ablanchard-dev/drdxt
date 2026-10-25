@@ -50,7 +50,7 @@ public interface INvApiGpuTuning
 /// RTX 50 lockout »). Ada (RTX 40) et les plus anciennes acceptent encore l'ancienne écriture.</summary>
 public enum GpuArchitecture
 {
-    /// <summary>Indéterminé (pas de NVIDIA, lecture ratée). Traité avec prudence par les
+    /// <summary>Indéterminé (ni NVIDIA ni Radeon reconnue, lecture ratée). Traité avec prudence par les
     /// gardes (on ne suppose pas l'écriture de tension permise).</summary>
     Unknown = 0,
     /// <summary>Ada Lovelace (RTX 40) ou plus ancienne : l'ancienne écriture de tension marche.</summary>
@@ -120,8 +120,12 @@ public interface IAdlxGpuTuning
     /// Indisponible / lecture ratée / index &lt; 0 → Fail(TWEAK.SDK_UNAVAILABLE) ; ne lève jamais.</summary>
     Result<int> GetGfxMaxFreqMhz(int gpuIndex);
 
-    /// <summary>Lit la limite de puissance ADLX courante (% du TDP). Chemin indisponible →
-    /// Fail(TWEAK.SDK_UNAVAILABLE).</summary>
+    /// <summary>Le réglage de la carte est-il à l'usine (IADLXGPUTuningServices.IsAtFactory) ? null = non lu. Une carte déjà
+    /// réglée par un autre outil ne se règle pas par-dessus.</summary>
+    bool? EstALUsine(int gpuIndex) => null;
+
+    /// <summary>Lit la limite de puissance ADLX courante, dans l'unité du pilote (% du TDP ou décalage : non relevé sur une
+    /// vraie carte, d'où gpu.power_limit non proposé sur AMD). Chemin indisponible → Fail(TWEAK.SDK_UNAVAILABLE).</summary>
     Result<int> GetPowerLimitPct(int gpuIndex);
 
     /// <summary>Lit la courbe de ventilateur courante d'un GPU. Chemin indisponible →

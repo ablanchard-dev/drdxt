@@ -329,8 +329,7 @@ public class RepairHistoryTests
     [Fact]
     public void LA_PHRASE_RESTE_EN_FRANCAIS_SUR_UN_WINDOWS_ANGLAIS()
     {
-        // La CI (runner en-US) rendait « 8.2 % » dans une phrase francaise. Meme
-        // defaut que KeepPolicy et PlafondGpu (`ad1e8b8`) : la culture du poste fuyait dans le texte.
+        // Sur un Windows en anglais, la culture du poste ne doit pas fuir dans une phrase francaise (« 8.2 % »).
         var avant = System.Globalization.CultureInfo.CurrentCulture;
         try
         {

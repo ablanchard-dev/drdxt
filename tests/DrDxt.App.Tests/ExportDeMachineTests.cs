@@ -36,24 +36,33 @@ public class ExportDeMachineTests
     private const string Sid = "S-1-5-21-1111111111-2222222222-3333333333-1001";
     private const string CleLicence = "7KQ2M-XW9TR-B4HNP-3JC8D-VF6GY";
     private const string EmpreinteHex = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
+    // L'exemplaire d'un appareil : le numéro de série d'une souris USB, l'adresse d'une manette Bluetooth, le rang d'une carte.
+    private const string SerieUsb = "7Q4X9Z2KSOURIS", AdresseBt = "A0AB51C3D2E1", ExemplairePci = "4&1A2B3C4D&0&0008";
+    // Bluetooth porte aussi l'adresse dans le modèle : après DEV_, ou à la fin du modèle d'un appareil BLE.
+    private const string AdresseBle = "C2A7B8E9F0A1", AdresseBthenum = "D3B8C9FA01B2", AdresseBleDevice = "e4c9dafb12c3";
     private const string Volume = @"\\?\Volume{0e1f2a3b-4c5d-6e7f-8091-a2b3c4d5e6f7}\";
     private const string Courriel = "joueur.secret@example.com";
     private const string AutreCompte = "Bernard";
     // Un compte de deux lettres, et l'employeur d'un dossier OneDrive.
     private const string CompteCourt = "Qz", Entreprise = "Zorglub Industries";
+    // Un Documents redirigé par le domaine, hors de X:\Users et sous un autre nom que le compte.
+    private const string DocumentsRedirige = @"D:\Docs\jean.dupont";
+    private static readonly (string, string)[] Dossiers = [(DocumentsRedirige, "<Documents>")];
 
     private static readonly Dictionary<string, string[]> Semees = new()
     {
-        [MachineExportee.CeQuiEstRetire[0]] = [AutreCompte],
-        [MachineExportee.CeQuiEstRetire[1]] = [Compte, Pc, Domaine, CompteCourt],
-        [MachineExportee.CeQuiEstRetire[2]] = [SerieBios, SerieDisque, Uuid],
-        [MachineExportee.CeQuiEstRetire[3]] = [Mac, MacPoints, MacColle],
-        [MachineExportee.CeQuiEstRetire[4]] = [Ipv4, Ipv6],
-        [MachineExportee.CeQuiEstRetire[5]] = [Sid],
-        [MachineExportee.CeQuiEstRetire[6]] = ["0e1f2a3b-4c5d-6e7f-8091-a2b3c4d5e6f7"],
-        [MachineExportee.CeQuiEstRetire[7]] = [Courriel],
-        [MachineExportee.CeQuiEstRetire[8]] = [Entreprise],
-        [MachineExportee.CeQuiEstRetire[9]] = [CleLicence, EmpreinteHex],
+        [MachineExportee.CeQuiEstRetire[0]] = [DocumentsRedirige],
+        [MachineExportee.CeQuiEstRetire[1]] = [AutreCompte],
+        [MachineExportee.CeQuiEstRetire[2]] = [Compte, Pc, Domaine, CompteCourt],
+        [MachineExportee.CeQuiEstRetire[3]] = [SerieBios, SerieDisque, Uuid],
+        [MachineExportee.CeQuiEstRetire[4]] = [SerieUsb, AdresseBt, ExemplairePci, AdresseBle, AdresseBthenum, AdresseBleDevice],
+        [MachineExportee.CeQuiEstRetire[5]] = [Mac, MacPoints, MacColle],
+        [MachineExportee.CeQuiEstRetire[6]] = [Ipv4, Ipv6],
+        [MachineExportee.CeQuiEstRetire[7]] = [Sid],
+        [MachineExportee.CeQuiEstRetire[8]] = ["0e1f2a3b-4c5d-6e7f-8091-a2b3c4d5e6f7"],
+        [MachineExportee.CeQuiEstRetire[9]] = [Courriel],
+        [MachineExportee.CeQuiEstRetire[10]] = [Entreprise],
+        [MachineExportee.CeQuiEstRetire[11]] = [CleLicence, EmpreinteHex],
     };
 
     private static (HardwareInventory, SettingsState, List<RepairFinding>) FausseMachine()
@@ -74,6 +83,13 @@ public class ExportDeMachineTests
             new("FICHIERS", "synchro", $@"C:\Users\{Compte}\OneDrive - {Entreprise}\notes.txt", null, RepairStatus.Observed,
                 $"ouvert par {CompteCourt} hier"),
             new("LICENCE", "clé", CleLicence, null, RepairStatus.Observed, $"empreinte {EmpreinteHex}"),
+            new("PERIPHERIQUES", "couches logicielles d'entree", "2", null, RepairStatus.Observed,
+                $@"filtre sur « souris » (nœud USB\VID_046D&PID_C539\{SerieUsb}) ; manette (nœud BTHENUM\{{0000110b-0000-1000-8000-00805f9b34fb}}_LOCALMFG&000a\8&2A1B3C&0&{AdresseBt}_C00000000) ; "
+                + $@"casque BTHLE\DEV_{AdresseBle}\7&1A2B3C4D&0&{AdresseBle} ; BTHENUM\Dev_{AdresseBthenum}\8&3C4D&0&BLUETOOTHDEVICE_{AdresseBthenum} ; "
+                + $@"BTHLEDEVICE\{{00001812-0000-1000-8000-00805f9b34fb}}_Dev_VID&02046d_PID&b023_REV&0007_{AdresseBleDevice}\8&2B3C&0&0016",
+                Provenance: $@"carte PCI\VEN_10DE&DEV_2882&SUBSYS_51721462&REV_A1\{ExemplairePci}"),
+            new("JEU", "réglages du jeu", null, null, RepairStatus.Unknown,
+                $@"illisibles : {DocumentsRedirige}\Call of Duty\players\options.4.cod24.cst"),
         };
         return (hw, st, sante);
     }
@@ -83,6 +99,42 @@ public class ExportDeMachineTests
     public void Une_valeur_generique_de_wmi_ne_se_retire_pas()
         => MachineExportee.AnonymiserTexte("mémoire : unknown (moins de 3 passes) ; série Default string", ["Unknown", "Default string", "Bob"])
             .Should().Contain("unknown (moins de 3 passes)").And.Contain("Default string");
+
+    // Un compte « Admin » ou un PC nommé « PC » ne désignent personne ; retirés comme mots, ils abîmaient tout le rapport
+    // (« Ton [retiré] chauffe »). Un vrai nom, même court, part toujours, et le profil reste retiré par son chemin.
+    [Fact]
+    public void Un_nom_de_compte_ou_de_pc_generique_ne_se_retire_pas_comme_mot()
+    {
+        var propre = MachineExportee.AnonymiserTexte(@"Ton PC chauffe ; compte Admin ; Max joue ; C:\Users\Admin\Documents",
+            ["PC", "Admin", "Max"]);
+
+        propre.Should().Contain("Ton PC chauffe").And.Contain("compte Admin").And.NotContain("Max").And.NotContain(@"Users\Admin");
+    }
+
+    // Un compte dont le nom a une espace, dans un chemin nu (un message d'erreur) : le nom part en entier, jamais « joueur Dupont ».
+    [Fact]
+    public void Un_profil_dont_le_nom_a_une_espace_part_en_entier()
+    {
+        var propre = MachineExportee.AnonymiserTexte(@"accès refusé : C:\Users\Jean Dupont ; C:\Users\Jean Dupont\AppData\x.log",
+            ["Jean Dupont", @"C:\Users\Jean Dupont"]);
+
+        propre.Should().Be(@"accès refusé : C:\Users\joueur ; C:\Users\joueur\AppData\x.log");
+    }
+
+    // Un Documents redirigé (domaine, autre lecteur) ne passe pas par X:\Users\<nom>, et son nom n'est pas celui du compte :
+    // il paraissait en clair (constat « réglages du jeu illisibles »). Les dossiers connus du compte, lus par l'API, deviennent
+    // un repère, où qu'ils vivent.
+    [Fact]
+    public void Un_documents_redirige_devient_un_repere()
+    {
+        var texte = @"réglages illisibles : D:\Docs\jean.dupont\Call of Duty\players\options.4.cod24.cst ; "
+                    + @"\\serveur\profils\jdupont\Bureau\note.txt";
+
+        var propre = MachineExportee.AnonymiserTexte(texte, [],
+            [(@"D:\Docs\jean.dupont", "<Documents>"), (@"\\serveur\profils\jdupont\Bureau", "<Desktop>")]);
+
+        propre.Should().Be(@"réglages illisibles : <Documents>\Call of Duty\players\options.4.cod24.cst ; <Desktop>\note.txt");
+    }
 
     [Fact]
     public void Un_rapport_en_texte_libre_perd_les_memes_valeurs_et_garde_le_materiel()
@@ -94,13 +146,22 @@ public class ExportDeMachineTests
             + Environment.NewLine + hw.Board.Product + Environment.NewLine + string.Join(Environment.NewLine, (st.NetworkAdapters ?? []).Select(a => $"{a.Name} {a.Description}"))
             + Environment.NewLine + "Matériel : AMD Ryzen 7 7800X3D | AMD Radeon RX 9070 XT (pilote 32.0.21013.1000)";
 
-        var propre = MachineExportee.AnonymiserTexte(texte, [Compte, Pc, Domaine, SerieBios, SerieDisque, Uuid, MacColle, CompteCourt]);
+        var propre = MachineExportee.AnonymiserTexte(texte, [Compte, Pc, Domaine, SerieBios, SerieDisque, Uuid, MacColle, CompteCourt], Dossiers);
 
         foreach (var (regle, valeurs) in Semees)
             foreach (var v in valeurs)
                 propre.Should().NotContainEquivalentOf(v, $"« {regle} »");
         propre.Should().Contain("AMD Radeon RX 9070 XT (pilote 32.0.21013.1000)", "un modèle et un pilote ne désignent personne");
+        propre.Should().Contain(@"USB\VID_046D&PID_C539\<retiré>", "le modèle de l'appareil reste, son exemplaire part");
+        propre.Should().Contain(@"BTHLEDEVICE\{00001812-0000-1000-8000-00805f9b34fb}_Dev_VID&02046d_PID&b023_REV&0007_<retiré>\<retiré>",
+            "le GUID du service et le modèle restent, l'adresse part");
     }
+
+    // Un journal JSON du paquet d'aide est lu tel quel : son séparateur est doublé.
+    [Fact]
+    public void L_exemplaire_d_un_appareil_part_aussi_dans_un_json_lu_tel_quel()
+        => MachineExportee.AnonymiserTexte(@"{""noeud"":""USB\\VID_046D&PID_C539\\7Q4X9Z2KSOURIS""}", [], [])
+            .Should().Be(@"{""noeud"":""USB\\VID_046D&PID_C539\\<retiré>""}");
 
     [Fact]
     public void Aucune_valeur_qui_designe_le_joueur_ou_son_pc_ne_sort()
@@ -108,7 +169,7 @@ public class ExportDeMachineTests
         Semees.Keys.Should().BeEquivalentTo(MachineExportee.CeQuiEstRetire, "chaque règle écrite a sa valeur semée");
         var (hw, st, sante) = FausseMachine();
 
-        var json = MachineExportee.Json("essai", null, true, hw, st, sante, [Compte, Pc, Domaine, SerieBios, SerieDisque, Uuid, MacColle, CompteCourt]);
+        var json = MachineExportee.Json("essai", null, true, hw, st, sante, [Compte, Pc, Domaine, SerieBios, SerieDisque, Uuid, MacColle, CompteCourt], Dossiers);
 
         foreach (var (regle, valeurs) in Semees)
             foreach (var v in valeurs)
@@ -173,6 +234,33 @@ public class ExportDeMachineTests
         vm.LastMachineExportPath.Should().Be(@"D:\Documents\machine.json");
     }
 
+    // Après un scan raté, le matériel ou les réglages du nouveau scan se mêlaient aux constats de l'ancien : l'export ne part
+    // que d'un scan fini, et le dit sinon.
+    [Fact]
+    public async Task Apres_un_scan_rate_l_export_ne_mele_pas_deux_scans()
+    {
+        var m = MachinesEnregistreesTests.Charger("amd-radeon-synthetique");
+        var exports = 0;
+        string? rapport = null;
+        var vm = Vm(m, (_, _, _) => { exports++; return @"D:\Documents\machine.json"; }, (_, texte) => { rapport = texte; return "rapport.txt"; },
+            Result<HardwareInventory>.Ok(m.Inventaire), Result<HardwareInventory>.Fail(ErrorCodes.WmiFail, "détection ratée"));
+        await vm.ScanCommand.ExecuteAsync(null);
+        await vm.ExporterMaMachineCommand.ExecuteAsync(null);
+        exports.Should().Be(1, "témoin : après un scan fini, l'export part");
+
+        await vm.ScanCommand.ExecuteAsync(null);
+        vm.State.Should().Be(DrDxt.App.ViewModels.ScanState.Failed);
+        await vm.ExporterMaMachineCommand.ExecuteAsync(null);
+
+        exports.Should().Be(1);
+        vm.LastMachineExportPath.Should().BeEmpty();
+        vm.MessageDExport.Should().Be("Machine.ExportScanRate");
+
+        // Le rapport ne décrit plus l'ancien scan sans le dire.
+        await vm.ExportReportCommand.ExecuteAsync(null);
+        rapport.Should().Contain(Docteur.T("Rapport.AucunScan"));
+    }
+
     [Fact]
     public void Sans_couture_pas_de_bouton()
         => ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
@@ -180,10 +268,12 @@ public class ExportDeMachineTests
             .CanExportMachine.Should().BeFalse();
 
     private static ViewModels.ScanViewModel Vm(MachinesEnregistreesTests.Machine m,
-        Func<HardwareInventory, SettingsState, IReadOnlyList<RepairFinding>, string> exporter)
+        Func<HardwareInventory, SettingsState, IReadOnlyList<RepairFinding>, string> exporter,
+        Func<string, string, string>? writeReport = null, params Result<HardwareInventory>[] detections)
     {
         var hd = Substitute.For<IHardwareDetector>();
-        hd.DetectAsync().Returns(Result<HardwareInventory>.Ok(m.Inventaire));
+        if (detections.Length == 0) hd.DetectAsync().Returns(Result<HardwareInventory>.Ok(m.Inventaire));
+        else hd.DetectAsync().Returns(detections[0], detections[1..]);
         var sr = Substitute.For<ISettingsStateReader>();
         sr.ReadAsync(Arg.Any<HardwareInventory>()).Returns(Result<SettingsState>.Ok(m.Reglages));
         var br = Substitute.For<IBenchmarkRunner>();
@@ -192,6 +282,6 @@ public class ExportDeMachineTests
         var sd = Substitute.For<IStorageDetector>();
         sd.Detect().Returns(Result<IReadOnlyList<StorageDevice>>.Ok(new List<StorageDevice>()));
         return ScanViewModelTestSeams.Build(hd, sr, br, new DrDxt.Detection.Scoring.ScanScorer(), sd, k => k,
-            repairAudit: () => m.Sante, exporterMachine: exporter);
+            repairAudit: () => m.Sante, exporterMachine: exporter, writeReport: writeReport);
     }
 }

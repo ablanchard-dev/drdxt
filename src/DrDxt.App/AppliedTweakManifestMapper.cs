@@ -80,17 +80,10 @@ public sealed class AppliedTweakManifestMapper
             //     écrirait dans la mauvaise ruche (le reconciler de démarrage ne couvre que HKLM, le plan
             //     d'alimentation et les services). La valeur survit d'elle-même au redémarrage.
             //
-            //     L'App ne le reapplique pas au lancement suivant : `App.OnStartup` construit l'injection, affiche
-            //     la fenetre, et c'est tout. Aucune reverification, aucune reapplication. Le filet
-            //     invoque n'existe pas : si un tiers (autre « optimiseur », mise a jour de
-            //     fonctionnalite Windows, l'utilisateur) defait ce reglage, rien ne le remarque,
-            //     alors que le produit la promet « persistante ».
-            //     Ce qui manque vraiment, dans l'ordre : (1) un enregistrement par utilisateur de
-            //     ce qui a ete applique (le manifeste signe ne les porte pas, justement parce
-            //     qu'ils sont exclus ici) ; (2) une detection de derive au lancement ; (3) une
-            //     notification via `IReconcilerNotifier`, qui notifie sans ecraser (regle I5).
-            //     La reapplication devra passer par le levier lui-meme, pas par une op typee :
-            //     le tweak sait deja gerer le composite a deux feuilles et la fusion du REG_SZ.
+            //     Son origine entre au manifeste en RevertOnly (ToRevertOnly) : la desinstallation la rend, et
+            //     l'App la relit au lancement (VerificationDesReglages) pour dire qu'un tiers l'a defaite,
+            //     sans la reecrire (regle I5). Personne ne la reapplique : une reapplication devrait passer
+            //     par le levier lui-meme, qui sait gerer le composite a deux feuilles et la fusion du REG_SZ.
             //   * latency.gameModeOn : composite (deux feuilles HKCU), plus le souci HKCU ci-dessus ;
             //     le modèle un id → une feuille ne sait pas l'exprimer. Il faudrait une réconciliation
             //     sur plusieurs feuilles.
@@ -102,6 +95,10 @@ public sealed class AppliedTweakManifestMapper
 
     /// <summary>Le nom sous lequel le service connaît ce levier, s'il le réaffirme.</summary>
     public static string? IdDuService(string id) => Map.TryGetValue(id, out var m) ? m.ReconcilerId : null;
+
+    /// <summary>L'id de l'App d'une entrée du manifeste : celui du levier pour un id du service, sinon le même.</summary>
+    public static string IdDeLApp(string idDuManifeste)
+        => Map.FirstOrDefault(m => m.Value.ReconcilerId == idDuManifeste).Key ?? idDuManifeste;
 
     /// <summary>Les leviers gardés que le service ne réaffirme pas (absents de la table
     /// ci-dessus : les leviers HKCU, le fichier d'échange) n'entraient pas du tout au manifeste, et la désinstallation
@@ -123,7 +120,7 @@ public sealed class AppliedTweakManifestMapper
     }
 
     // Les ops que le mode de désinstallation du helper sait exécuter (même liste que OpAllowlist.ValiderOrigine).
-    private static bool OrigineRendable(string origine)
+    internal static bool OrigineRendable(string origine)
     {
         static bool Rendable(PrivilegedOp op) => op is SetRegistryValueOp or DeleteRegistryValueOp or SetActivePowerPlanOp
             or SetProcessorBoostModeOp or SetCpuPackagePowerLimitOp or SetWirelessPowerSavingOp

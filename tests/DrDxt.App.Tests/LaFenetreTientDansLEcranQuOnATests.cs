@@ -19,7 +19,7 @@ namespace DrDxt.App.Tests;
 //     alors des deux cotes.
 //
 // Ce qui depasse, c'est le bas de la fenetre -- la ou se trouve l'action. Et le
-// premier ecran d'un produit payant est celui qu'on ne recommence pas.
+// premier ecran est celui qu'on ne recommence pas.
 //
 // La reponse n'est pas de rapetisser la fenetre pour tout le monde : sur un
 // 1440p elle doit rester grande. Elle est de **s'adapter a la place qu'on a**,
@@ -68,11 +68,9 @@ public sealed class LaFenetreTientDansLEcranQuOnATests
     [InlineData(1280, 672)]   // 1600x900 a 125 %
     public void Le_minimum_lui_meme_tient_dans_les_ecrans_ordinaires(double zoneLargeur, double zoneHauteur)
     {
-        // Ce test a ete ecrit apres coup, parce que la mesure a contredit le precedent.
-        // Le minimum valait `MinHeight="680"` : sur un 1080p a 150 % (673 DIP de zone de
-        // travail) et sur un 1600x900 a 125 % (672), la fenetre ne pouvait jamais tenir --
-        // meme redimensionnee a la main par l'utilisateur. Le defaut n'etait pas la taille
-        // de depart, il etait dans la borne. 640 tient les trois avec de la marge.
+        // La borne elle-meme doit tenir : un minimum a 680 ne tiendrait jamais sur un 1080p a
+        // 150 % (673 DIP de zone de travail) ni sur un 1600x900 a 125 % (672), meme
+        // redimensionnee a la main. 640 tient les trois avec de la marge.
         TailleDeDepart.MinimumHauteur.Should().BeLessThanOrEqualTo(zoneHauteur);
         TailleDeDepart.MinimumLargeur.Should().BeLessThanOrEqualTo(zoneLargeur);
     }
@@ -115,5 +113,21 @@ public sealed class LaFenetreTientDansLEcranQuOnATests
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
         return d!.FullName;
+    }
+
+    // 1366x768 à 150 % (~911 x 480 DIP) : le minimum l'emporte et déborde. Centrée, la fenêtre débordait aussi par le haut,
+    // et la barre de titre (déplacer, fermer) sortait de l'écran. Le haut reste dans la zone : c'est le bas qui déborde.
+    [Theory]
+    [InlineData(911, 480)]
+    [InlineData(1366, 728)]
+    public void La_barre_de_titre_reste_toujours_dans_l_ecran(double zoneLargeur, double zoneHauteur)
+    {
+        var (largeur, hauteur) = TailleDeDepart.Adaptee(1320, 900, zoneLargeur, zoneHauteur);
+
+        var (gauche, haut) = TailleDeDepart.Position(largeur, hauteur, zoneGauche: 0, zoneHaut: 0, zoneLargeur, zoneHauteur);
+
+        haut.Should().BeGreaterThanOrEqualTo(0);
+        gauche.Should().BeGreaterThanOrEqualTo(0);
+        if (hauteur <= zoneHauteur) (haut + hauteur).Should().BeLessThanOrEqualTo(zoneHauteur, "ce qui tient reste centré dans la zone");
     }
 }

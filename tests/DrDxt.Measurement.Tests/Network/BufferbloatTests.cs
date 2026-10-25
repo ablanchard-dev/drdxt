@@ -9,6 +9,19 @@ public class BufferbloatTests
     private static IEnumerable<EchantillonEnvoi> N(int n, double mbps, double ping)
         => Enumerable.Range(0, n).Select(i => new EchantillonEnvoi(mbps, ping + (i % 3)));
 
+    // En partie, le plus fort envoi vu est souvent le trafic du jeu (moins de 2 Mbit/s) : la moitié tomberait sous le
+    // plancher du helper (1 Mbit/s), la carte « Activer » serait refusée, et « ton envoi a saturé à ~1 Mbit/s » ne serait pas
+    // prouvé. Rien n'est détecté.
+    [Fact]
+    public void Un_envoi_trop_faible_pour_porter_un_plafond_ne_se_dit_pas_sature()
+    {
+        var v = Bufferbloat.Juger(N(40, 0.1, 8).Concat(N(40, 1.5, 40)).ToList());
+
+        v.Detecte.Should().BeFalse();
+        v.PlafondConseilleBps.Should().Be(0);
+        v.Raison.Should().Be(Docteur.T("BB.SousLePlancher", 1.5));
+    }
+
     [Fact]
     public void Le_profil_mesure_sur_la_machine_de_reference_est_detecte_et_le_plafond_vaut_la_moitie_de_l_envoi_vu()
     {
@@ -103,7 +116,7 @@ public class BufferbloatTests
         detecte.Explication.Should().Contain("360 Mbit/s");
         detecte.Explication.Should().Contain("routeur").And.NotContain("SQM");
         detecte.Remede.Should().StartWith("1) ").And.Contain("Protéger ton ping pendant le jeu").And.Contain("360 Mbit/s")
-            .And.Contain("SQM", "le plafond ne règle que ce PC ; la maison entière passe par le routeur (plan 2.6)");
+            .And.Contain("SQM", "le plafond ne règle que ce PC ; la maison entière passe par le routeur");
 
         Bufferbloat.Constat(Bufferbloat.Juger(N(40, 2, 8).ToList()), f).Action.Should().Be(RepairAction.Aucune);
         Bufferbloat.Constat(Bufferbloat.Juger(N(40, 2, 8).Concat(N(5, 720, 60)).ToList()), f)

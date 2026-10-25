@@ -93,6 +93,21 @@ public sealed class RunningGameExecutable(IGameLocator locator) : DrDxt.Applicat
         }
     }
 
+    public IReadOnlyList<string>? ModulesDuJeu()
+    {
+        try
+        {
+            if (locator.LocateRunningGamePid() is not { } pid || pid <= 0) return null;
+            using var jeu = System.Diagnostics.Process.GetProcessById(pid);
+            return jeu.Modules.Cast<System.Diagnostics.ProcessModule>().Select(m => { using (m) return m.ModuleName; }).ToList();
+        }
+        catch
+        {
+            // Accès refusé (jeu élevé, anti-triche) ou jeu fermé entre-temps : non lus.
+            return null;
+        }
+    }
+
 }
 
 /// <summary>Valeur par défaut qui échoue proprement : ne trouve jamais de jeu (hors Windows,

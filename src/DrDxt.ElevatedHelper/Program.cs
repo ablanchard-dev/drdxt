@@ -54,12 +54,17 @@ internal static class Program
     private const string ReconcilerPathArg = "--reconciler-path=";
     private const string PipeArg = "--pipe=";
     private const string ServiceArg = "--service";
+    internal const string ConfianceIndisponible = "redirection-trust";
     private const string SessionKeyEnv = "DRDXT_HELPER_SESSION_KEY";
     private const string AppPathEnv = "DRDXT_HELPER_APP_PATH";
     private const string ReconcilerPathEnv = "DRDXT_HELPER_RECONCILER_PATH";
 
     private static async Task<int> Main(string[] args)
     {
+        // Élevé, avant toute lecture ou écriture : plus aucune jonction posée par un compte non administrateur n'est suivie
+        // (ConfianceDesRedirections). Indisponible (Windows d'avant 10 22H2), c'est dit au journal du helper.
+        if (DrDxt.Core.ConfianceDesRedirections.Activer() is { IsOk: false })
+            new HelperDiagnosticsLog().Change(ConfianceIndisponible, "off", "unavailable", "Windows");
         // La desinstallation : un mode court, sans tube, lance par l'installeur deja eleve
         // (voir ModeDesinstallation). Il passe avant tout le reste : aucun tube n'est ouvert.
         // Ses rapports parlent la langue de Windows, comme l'App.
@@ -150,7 +155,8 @@ internal static class Program
             // La limite de puissance du processeur, relue avant et après, par PawnIO s'il est là.
             cpu: new PawnIoCpuPowerActions(),
             // Relancer un peripherique en echec, retirer un vieux pilote d'affichage exporte, le remettre (pnputil).
-            pnp: new Win32PnpActions());
+            pnp: new Win32PnpActions(),
+            diagnostics: new HelperDiagnosticsLog());
 
         // Homme mort (dead-man's switch) : un décalage GPU / une limite de puissance tenus enregistrent
         // un bail dont le retour enregistré (une op typée existante) part tout seul si le contrôleur
@@ -166,7 +172,6 @@ internal static class Program
             DrDxt.Reconciler.Manifest.TrustedManifestRoot.EnsureCreatedHardened);
         if (journal is null)
             Console.Error.WriteLine("DrDxt.ElevatedHelper: write-ahead journal unavailable (data root not trusted); marked poses are refused.");
-        var servi = JournalDuHelper.Decorer(executor, journal, lecture.Lecteur);
         // Le rejeu, en tâche de fond : au démarrage, puis à chaque client authentifié (l'App relancée après un plantage
         // retrouve ce helper vivant). Jamais avant d'écouter : l'App qui vient de lancer le helper n'attend le tube que
         // quelques secondes. Le dernier rapport non vide est écrit pour l'App.
@@ -178,10 +183,13 @@ internal static class Program
             {
                 Console.Out.WriteLine(rapport.EnTexte(DateTimeOffset.UtcNow));
                 if (RapportDuRejeu.Ecrire(racineDesDonnees, RapportDuRejeu.Helper, rapport, DateTimeOffset.UtcNow,
-                        (chemin, octets) => DrDxt.Reconciler.Manifest.TrustedManifestRoot.WriteTrustedFile(chemin, octets)) is { IsOk: false } e)
+                        (chemin, octets) => DrDxt.Reconciler.Manifest.TrustedManifestRoot.WriteTrustedFile(chemin, octets),
+                        RapportDuRejeu.DeConfiance) is { IsOk: false } e)
                     Console.Error.WriteLine($"DrDxt.ElevatedHelper: replay report not written: {e.Error?.Message}");
             },
             TimeSpan.FromSeconds(30));
+        // Le tube sert l'exécuteur décoré, après un rejeu en cours (ExecuteurApresLeRejeu).
+        var servi = new ExecuteurApresLeRejeu(JournalDuHelper.Decorer(executor, journal, lecture.Lecteur), rejeu);
 
         // Choisir la stratégie d'acceptation selon le mode. Le mode handshake frappe une clé éphémère
         // par connexion après l'auth de l'appelant ; le mode historique donne au TypedPrivilegedServer
@@ -256,6 +264,9 @@ internal static class Program
             new ConsoleServiceLoopLog(),
             backoff: ct => Task.Delay(TimeSpan.FromMilliseconds(250), ct));
         var exitCode = await loop.RunAsync(cts.Token).ConfigureAwait(false);
+        // Sortie en fail-closed (rafale d'échecs), la boucle rend la main sans que rien n'ait annulé : la surveillance, qui
+        // n'attend que ce jeton, tiendrait le processus sans tube jusqu'à l'arrêt pour inactivité, ou pour toujours en service.
+        cts.Cancel();
 
         // Arret normal ou rafale d'echecs (un squatteur du tube peut la provoquer), les baux actifs
         // meurent avec ce processus. Ils sont rendus avant de sortir, sous un delai propre (cts peut etre annule).

@@ -55,6 +55,20 @@ public class GpuDetectorTests
         gpu.ReBar.Should().Be(TriState.Unknown);
     }
 
+    // Une carte d'avant les RTX 30 n'a pas de Resizable BAR : sa fenêtre BAR1 de 256 Mio n'est pas un réglage coupé, et
+    // le BIOS n'y peut rien.
+    [Theory]
+    [InlineData("NVIDIA GeForce GTX 1080", TriState.Unknown)]
+    [InlineData("NVIDIA GeForce RTX 2070 SUPER", TriState.Unknown)]
+    [InlineData("NVIDIA GeForce RTX 3060", TriState.Off)]
+    [InlineData("NVIDIA GeForce RTX 4060", TriState.Off)]
+    [InlineData("NVIDIA GeForce RTX 5070 Ti", TriState.Off)]
+    public void Nvidia_rebar_off_only_on_a_card_that_has_it(string nom, TriState attendu)
+    {
+        var (d, a, w, n, m) = Mocks(0x10DE, nom, 8L << 30, nvReBar: TriState.Off);
+        new GpuDetector(d, a, w, n, m).Detect().Value!.Single().ReBar.Should().Be(attendu);
+    }
+
     [Fact]
     public void Amd_gpu_rebar_comes_from_adlx()
     {

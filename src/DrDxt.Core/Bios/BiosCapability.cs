@@ -147,26 +147,42 @@ public sealed record BiosQualification(
     /// exactement ainsi qu'une supposition finit par autoriser une ecriture dans un firmware.
     /// La regle est donc dans le constructeur, pas dans une revue de code.
     /// </summary>
-    public bool Validated { get; init; } =
-        Validated && string.IsNullOrWhiteSpace(DocumentationSource)
+    /// Elle vit aussi dans les accesseurs init : un `with` copie le record puis passe par eux, jamais par les initialiseurs.
+    private readonly bool _validated = ValidationSourcee(Validated, DocumentationSource, Board, FirmwareVersion, Setting);
+    public bool Validated
+    {
+        get => _validated;
+        init => _validated = ValidationSourcee(value, _documentationSource, Board, FirmwareVersion, Setting);
+    }
+
+    private readonly string? _documentationSource = DocumentationSource;
+    public string? DocumentationSource
+    {
+        get => _documentationSource;
+        init { ValidationSourcee(_validated, value, Board, FirmwareVersion, Setting); _documentationSource = value; }
+    }
+
+    private static bool ValidationSourcee(bool validated, string? source, string board, string firmware, string setting) =>
+        validated && string.IsNullOrWhiteSpace(source)
             ? throw new ArgumentException(
-                $"l'entree « {Board} / {FirmwareVersion} / {Setting} » se declare validee sans "
+                $"l'entree « {board} / {firmware} / {setting} » se declare validee sans "
                 + "DocumentationSource: a validation without a source cannot be checked",
                 nameof(Validated))
-            : Validated;
+            : validated;
 
     /// <summary>
     /// DrDXT a-t-il le droit d'ecrire ceci tout seul ?
     ///
-    /// Quatre conditions, et il en manque une suffit a renvoyer au parcours guide :
+    /// Cinq conditions, et il en manque une suffit a renvoyer au parcours guide :
     /// une capacite d'ecriture qualifiee, une validation reelle sur cette matrice, une voie de
-    /// recuperation connue, et une valeur courante lisible : sans elle on ne saurait meme pas
-    /// dire ce qu'on a change.
+    /// recuperation connue, un risque de non-demarrage etabli, et une valeur courante lisible : sans
+    /// elle on ne saurait meme pas dire ce qu'on a change.
     /// </summary>
     public bool EcritureAutomatiqueAutorisee =>
         Capability is BiosCapabilityLevel.VendorSupportedWrite or BiosCapabilityLevel.QualifiedFirmwareWrite
         && Validated
         && Recoverability != BiosRecoverability.RecoveryUnknown
+        && NoPost != NoPostRisk.NoPostRiskUnknown
         && CurrentValue is not null;
 
     /// <summary>
@@ -191,6 +207,9 @@ public sealed record BiosQualification(
 
             if (Recoverability == BiosRecoverability.RecoveryUnknown)
                 manques.Add(Docteur.T("BC.SansRecuperation"));
+
+            if (NoPost == NoPostRisk.NoPostRiskUnknown)
+                manques.Add(Docteur.T("BC.NoPostInconnu"));
 
             if (CurrentValue is null)
                 manques.Add(Docteur.T("BC.ValeurIllisible"));

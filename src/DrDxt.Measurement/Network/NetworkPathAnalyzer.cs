@@ -9,10 +9,10 @@ namespace DrDxt.Measurement.Network;
 //
 // Le raisonnement, et il tient sans constante arbitraire : le premier saut est contenu
 // dans le chemin complet. Tout ce qui perturbe le lien local perturbe donc aussi la
-// mesure internet. Si le jitter du premier saut est déjà égal ou supérieur à celui du
-// chemin complet, l'instabilité est présente avant même de sortir de la maison : le
-// trajet au-delà n'ajoute rien de mesurable. C'est un ordre de grandeur, pas un seuil :
-// il n'y a aucun nombre à justifier.
+// mesure internet. Si le jitter du premier saut dépasse celui du chemin complet d'au moins la résolution de la sonde,
+// l'instabilité est présente avant même de sortir de la maison : le
+// trajet au-delà n'ajoute rien de mesurable. C'est un ordre de grandeur, pas un seuil : le seul nombre est la
+// résolution de la sonde (ProbeResolutionMs), en dessous de laquelle deux gigues ne se départagent pas.
 //
 // Ce que ça ne prouve pas, et qui doit voyager avec le verdict : une box répond à l'ICMP
 // avec son propre processeur, en basse priorité. Un premier saut instable peut donc venir
@@ -25,8 +25,8 @@ public enum NetworkPathVerdict
     /// <summary>Une des deux fenêtres n'a pas de jitter exploitable : on ne tranche pas.</summary>
     Unknown = 0,
 
-    /// <summary>Le jitter est déjà présent au premier saut, à hauteur au moins égale à celui du
-    /// chemin complet. L'instabilité commence sur le lien local (ou dans la réponse de la box).</summary>
+    /// <summary>Le jitter du premier saut dépasse celui du chemin complet d'au moins la résolution de la sonde.
+    /// L'instabilité commence sur le lien local (ou dans la réponse de la box).</summary>
     StartsAtFirstHop = 1,
 
     /// <summary>Le chemin complet est nettement plus instable que le premier saut : ce qui
@@ -51,8 +51,6 @@ public sealed record NetworkPathReport(
 
 public static class NetworkPathAnalyzer
 {
-    /// <summary>Compare les deux fenêtres. Aucune constante : le verdict ne repose que sur
-    /// l'inclusion du premier saut dans le chemin complet.</summary>
     /// <summary>
     /// La plus petite différence de jitter que l'instrument sait distinguer. Ce n'est pas un
     /// seuil de confort qu'on aurait choisi : <c>Ping</c> ne rend que des millisecondes entières
@@ -62,6 +60,8 @@ public static class NetworkPathAnalyzer
     /// </summary>
     private const double ProbeResolutionMs = 1.0;
 
+    /// <summary>Compare les deux fenêtres. Le verdict repose sur l'inclusion du premier saut dans le chemin complet ;
+    /// la seule constante est la résolution de la sonde.</summary>
     public static NetworkPathReport Compare(NetworkLatencyReport firstHop, NetworkLatencyReport internet)
     {
         var verdict = (firstHop.JitterMs, internet.JitterMs) switch

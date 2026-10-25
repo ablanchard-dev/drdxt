@@ -12,7 +12,7 @@ namespace DrDxt.App.Tests;
 /// <summary>
 /// Le vrai levier des heures d'activité passe par le vrai profil générique et le vrai consommateur du
 /// scan. « Optimiser » le propose seulement quand des parties relevées sortent des heures lues, sur toutes les machines (le
-/// réglage est le même chez NVIDIA, AMD, Intel, portable) ; sur les cinq machines enregistrées, qui n'ont ni heures ni
+/// réglage est le même chez NVIDIA, AMD, Intel, portable) ; sur les machines enregistrées, qui n'ont ni heures ni
 /// parties lues, il n'est jamais proposé. Source : Microsoft Learn, « Manage device restarts after updates ».
 /// </summary>
 public sealed class HeuresActivesOptimiserTests

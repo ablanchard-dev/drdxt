@@ -76,12 +76,29 @@ public sealed class EssaiRenduLibereLeBailTests
     {
         var client = new BailInconnu();
         var journal = Substitute.For<IRevertEnAttente>();
+        journal.Lire().Returns(Result<RevertEnAttenteEntree?>.Ok(new RevertEnAttenteEntree(VentilateurExpert.IdLevier, null)));
         var bail = new HeartbeatSender(client, VentilateurExpert.IdBail, 120);
         await using var essai = new EssaiVentilateur(client, journal, new RestoreGpuFanAutoOp(0), bail);
 
         await bail.PulseAsync(CancellationToken.None);
 
         journal.Received(1).Lever();
+    }
+
+    // Le journal ne tient qu'un levier : un bail perdu qui signale tard ne lève pas l'entrée d'un autre levier, posé entre-temps.
+    // Levée, une App tuée ensuite ne le rendrait pas.
+    [Fact]
+    public async Task Bail_perdu_ne_leve_pas_le_journal_d_un_autre_levier()
+    {
+        var client = new BailInconnu();
+        var journal = Substitute.For<IRevertEnAttente>();
+        journal.Lire().Returns(Result<RevertEnAttenteEntree?>.Ok(new RevertEnAttenteEntree("latency.hagsOn", null)));
+        var bail = new HeartbeatSender(client, VentilateurExpert.IdBail, 120);
+        await using var essai = new EssaiVentilateur(client, journal, new RestoreGpuFanAutoOp(0), bail);
+
+        await bail.PulseAsync(CancellationToken.None);
+
+        journal.DidNotReceive().Lever();
     }
 
     // Le helper mort, sa garde à 80 °C meurt avec lui : au premier battement qui ne l'atteint plus (transport en échec, ou
@@ -139,6 +156,7 @@ public sealed class EssaiRenduLibereLeBailTests
     {
         var client = new BailInconnu();
         var journal = Substitute.For<IRevertEnAttente>();
+        journal.Lire().Returns(Result<RevertEnAttenteEntree?>.Ok(new RevertEnAttenteEntree("gpu.undervolt", null)));
         var bail = new HeartbeatSender(client, ReglageCarteExpert.IdBail, 120);
         await using var essai = new EssaiCarte(null!, journal, new TweakSnapshot("gpu.undervolt", "{}", "{}"), bail);
 

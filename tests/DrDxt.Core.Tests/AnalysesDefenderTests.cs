@@ -53,4 +53,20 @@ public sealed class AnalysesDefenderTests
         var c = AnalysesDefender.Juger([Analyse(3), Analyse(20.5)], [Partie(20)], true, 30);
         c.Explication.Should().NotContain("(s)");
     }
+
+    // Une analyse sans fin lue (encore en cours, ou coupée par un redémarrage) commencée avant la partie la couvre jusqu'au
+    // début de l'analyse suivante, pas au-delà.
+    [Fact]
+    public void Une_analyse_sans_fin_commencee_avant_la_partie_compte()
+    {
+        var enCours = new AnalyseDefender(J.AddHours(21), null, false);
+        AnalysesDefender.Juger([enCours], [Partie(22)], true, 30).ValeurAttendue.Should().Be("1 pendant une partie");
+    }
+
+    [Fact]
+    public void Une_analyse_sans_fin_ne_couvre_pas_les_parties_apres_l_analyse_suivante()
+    {
+        var coupee = new AnalyseDefender(J.AddHours(1), null, false);
+        AnalysesDefender.Juger([coupee, Analyse(3)], [Partie(20)], true, 30).Statut.Should().Be(RepairStatus.ExpectedDefault);
+    }
 }

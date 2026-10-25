@@ -311,7 +311,8 @@ public sealed class CpuBaselineService
     /// 3 698 MHz, soit 70 %.</summary>
     internal const double RapportBride = 0.85;
 
-    /// <summary>La version du banc qui relève les fréquences (commit du 03/10/2026, 20 h 30 à Paris).</summary>
+    /// <summary>La version du banc qui relève les fréquences (commit du 03/10/2026 à 20 h 34, heure de Paris ; la borne
+    /// est posée à 20 h 00).</summary>
     internal static readonly DateTimeOffset BancAvecFrequence = new(2026, 10, 3, 18, 0, 0, TimeSpan.Zero);
 
     private static bool BrideDesLeDepart(CpuBaseline b) =>

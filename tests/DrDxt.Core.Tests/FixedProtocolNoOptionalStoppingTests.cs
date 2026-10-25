@@ -58,9 +58,8 @@ public class FixedProtocolNoOptionalStoppingTests
     [Fact]
     public void LE_PROTOCOLE_EST_FIXE_un_gain_ENORME_ne_l_ecourte_PAS()
     {
-        // Le test qui grave la correction. Avant, un +50 % franchissait le seuil au premier
-        // bloc et l'experience s'arretait a 4 passes. Le nombre de passes revelait donc le
-        // resultat — et c'est exactement la definition de l'optional stopping.
+        // Un +50 % franchit le seuil au premier bloc : s'arreter la, a 4 passes, ferait reveler
+        // le resultat par le nombre de passes — exactement la definition de l'optional stopping.
         var (_, passesGain) = Exercer(facteur: 1.50, alternances: 12);
 
         passesGain.Should().Be(12, "le protocole va au bout, quel que soit ce qu'il voit");

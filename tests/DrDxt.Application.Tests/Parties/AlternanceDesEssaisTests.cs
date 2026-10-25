@@ -132,6 +132,17 @@ public sealed class AlternanceDesEssaisTests
         AlternanceDesEssais.Suivante(parties, Levier, poseALOrigine: true).Pose.Should().BeTrue("l'état d'origine revient");
     }
 
+    // Le joueur passe d'un jeu à l'autre pendant l'essai : le rang des blocs se compte sur le jeu jugé, sinon une partie
+    // d'un autre jeu décalait l'ordre A-B-B-A de celui-ci. Call of Duty « avec », puis deux Valorant : la prochaine Call of
+    // Duty est la deuxième du bloc, « sans ».
+    [Fact]
+    public void Le_rang_des_blocs_se_compte_sur_le_jeu_juge()
+    {
+        var parties = new[] { P(1, 90, true), P(2, 80, false, "valorant.exe"), P(3, 80, false, "valorant.exe"), P(4, 91, true) };
+
+        AlternanceDesEssais.Suivante(parties, Levier, poseALOrigine: false).Pose.Should().BeFalse();
+    }
+
     [Fact]
     public void Tant_que_rien_n_est_tranche_les_parties_suivent_des_blocs_abba()
     {

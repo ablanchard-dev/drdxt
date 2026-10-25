@@ -2,7 +2,7 @@ namespace DrDxt.Infrastructure.Updates;
 
 // -----------------------------------------------------------------------
 // Codes d'erreur de mise à jour. Locaux au module, dans un espace de noms pour que les littéraux
-// ne soient jamais éparpillés (même convention que LicensingErrorCodes / ReconcilerErrorCodes). Ce
+// ne soient jamais éparpillés (même convention que ReconcilerErrorCodes). Ce
 // sont des codes (lisibles par machine), jamais du texte d'interface.
 //
 // La règle cardinale de tout le chemin de mise à jour : un paquet est vérifié (signature puis
@@ -17,6 +17,10 @@ public static class UpdateErrorCodes
     // refusé ; on ne récupère même pas la charge, car l'url / le sha256 d'un manifeste non fiable ne
     // valent pas qu'on agisse dessus. Jamais « ok par défaut ».
     public const string SignatureInvalid = "UPDATE_SIG_INVALID";
+
+    // Rien n'est publié à l'adresse du manifeste (404). Ni « à jour » ni une panne : vrai que le canal soit sain (rien de
+    // publié encore, l'état du site GitHub Pages) ou cassé (adresse fausse). Seul ce qui est su se dit.
+    public const string NotPublished = "UPDATE_NOT_PUBLISHED";
 
     // Le SHA-256 de la charge téléchargée n'égale pas le sha256 porté par le manifeste (déjà vérifié
     // par signature). La charge n'est jamais exécutée / préparée / extraite. On ne se fie qu'à une
@@ -33,21 +37,18 @@ public static class UpdateErrorCodes
     // ne dégrade jamais la confiance, il ne fait que reporter.
     public const string Offline = "UPDATE_OFFLINE";
 
-    // La couture élevée de remplacement de binaires n'est pas encore branchée en réel (reportée, comme
-    // les autres coutures à échec propre). Le canal de l'app remonte ce code au lieu de ne rien faire
-    // en silence ou d'écrire sans élévation. La charge préparée a été vérifiée et est intacte : seul
-    // l'échange privilégié est reporté.
-    public const string ReplacerUnavailable = "UPDATE_REPLACER_UNAVAILABLE";
-
     // Aucun serveur de mise a jour n'est configure (ou son url n'est pas une url https
     // absolue). L'updater n'est pas monte : le produit reste sur sa version installee et ne tente
     // rien. Deliberement distinct d'Offline — « pas configure » se corrige en configurant, tandis
-    // qu'« hors ligne » envoie chercher une panne de reseau qui n'existe pas. C'est l'etat reel du
-    // produit tant qu'aucune url de deploiement n'existe.
+    // qu'« hors ligne » envoie chercher une panne de reseau qui n'existe pas.
     public const string NotConfigured = "UPDATE_NOT_CONFIGURED";
 
     // Une charge vérifiée n'a pas pu être préparée / extraite sur le disque (échec d'E/S, disque plein,
     // permission). La version précédente reste intacte (transaction propre, jamais un état à moitié
     // appliqué). Échec propre, jamais d'exception à travers la frontière.
     public const string StageFailed = "UPDATE_STAGE_FAILED";
+
+    // Une exception qu'aucune couture ne prévoit, arrêtée à la frontière : rien n'est proposé ni installé (fail-closed),
+    // et l'App le dit comme un échec, pas comme un réseau coupé.
+    public const string Unexpected = "UPDATE_UNEXPECTED";
 }

@@ -9,21 +9,6 @@ namespace DrDxt.Infrastructure.Updates;
 // L'updater est entièrement testé avec des faux ; voici les vrais branchements.
 // -----------------------------------------------------------------------
 
-/// <summary>Le remplaçant élevé de binaires, reporté. Comme les autres coutures reportées :
-/// l'opération typée « remplacer des fichiers signés » demande le helper élevé + le branchement de
-/// l'UAC. D'ici là, il échoue proprement : il ne remplace rien et rend
-/// Fail(UPDATE_REPLACER_UNAVAILABLE). La charge préparée et vérifiée reste intacte pour qu'un futur
-/// remplaçant réel la reprenne ; jamais une installation à moitié appliquée.</summary>
-public sealed class DeferredElevatedFileReplacer : IElevatedFileReplacer
-{
-    public Task<Result> ReplaceAppFilesAsync(
-        string stagedPayloadPath, string targetInstallDir, CancellationToken ct)
-        => Task.FromResult(Result.Fail(
-            UpdateErrorCodes.ReplacerUnavailable,
-            "Elevated app-file replacement is not wired live yet (deferred, needs UAC). "
-            + "The verified payload is staged and intact."));
-}
-
 /// <summary>La vraie couture de système de fichiers %LOCALAPPDATA% pour la préparation. Chaque membre est emballé dans un Result : un échec d'E/S ne lève jamais à travers la frontière.</summary>
 public sealed class LocalFileSystemUpdateStore : IUpdateFileSystem
 {
@@ -35,10 +20,12 @@ public sealed class LocalFileSystemUpdateStore : IUpdateFileSystem
         catch { return null; }
     }
 
+    // Le staging vit dans le dossier du compte : élevé, rien ne s'y crée ni ne s'y vide à travers une jonction.
     public Result CreateDirectory(string path)
     {
         try
         {
+            if (FichierJsonAtomique.RefusEleve(path, UpdateErrorCodes.StageFailed) is { } refus) return refus;
             Directory.CreateDirectory(path);
             return Result.Ok();
         }
@@ -66,6 +53,7 @@ public sealed class LocalFileSystemUpdateStore : IUpdateFileSystem
     {
         try
         {
+            if (FichierJsonAtomique.RefusEleve(path, UpdateErrorCodes.StageFailed) is { } refus) return refus;
             if (Directory.Exists(path))
                 Directory.Delete(path, recursive: true);
             return Result.Ok();
@@ -80,8 +68,8 @@ public sealed class LocalFileSystemUpdateStore : IUpdateFileSystem
 /// <summary>Le vrai flux de mise à jour sur un <see cref="HttpClient"/> injecté. Toute panne de
 /// transport → Fail(UPDATE_OFFLINE) : non bloquant, l'app reste sur la version actuelle.
 ///
-/// Pas encore d'epinglage : le seul appelant reel, `App.xaml.cs`, construit un `new HttpClient()` nu,
-/// sans empreinte de certificat pour le serveur de mise a jour.
+/// Pas encore d'epinglage : le seul appelant reel, VerificationMiseAJour.VerifierAuDemarrageAsync, construit son
+/// HttpClient sur le transport du compte (ProxyDuCompte), sans empreinte de certificat pour le serveur de mise a jour.
 ///
 /// Une doc fausse ne se contente pas d'etre fausse : elle repond a la question qu'un auditeur
 /// venait poser, et l'empeche de trouver le trou. Ce que ce canal a reellement pour lui
@@ -118,24 +106,29 @@ public sealed class HttpUpdateFeed : IUpdateFeed
     {
         try
         {
-            using var resp = await _http.GetAsync(_manifestUrl(channel), ct).ConfigureAwait(false);
+            // Lu avant d'être vérifié : la réponse s'arrête au plafond au lieu d'être gardée en entier en mémoire.
+            using var resp = await _http.GetAsync(_manifestUrl(channel), HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
 
-            // « Joignable, rien a offrir » : deux formes. 404 = le canal n'existe pas ; 204 = le canal existe
-            // et aucune version n'y est publiee, ce qui est l'etat reel du produit aujourd'hui. Traite comme un
-            // succes, le 204 casserait sur un corps vide : le client annoncerait une panne de mise a jour a
-            // chaque demarrage d'une installation parfaitement saine. Mesure du 06/09/2026, en faisant parler
-            // le vrai client au vrai serveur (TheClientReadsTheRealServerTests).
-            if (resp.StatusCode is System.Net.HttpStatusCode.NotFound
-                                or System.Net.HttpStatusCode.NoContent)
+            // 204 : le serveur dit que le canal existe et qu'aucune version n'y est publiée, « rien à offrir ». Traité
+            // comme un succès, il casserait sur un corps vide : le client annoncerait une panne à chaque démarrage d'une
+            // installation saine (TheClientReadsTheRealServerTests, le vrai client contre le vrai serveur).
+            if (resp.StatusCode is System.Net.HttpStatusCode.NoContent)
                 return Result<UpdateManifest?>.Ok(null);
+            // 404 : rien n'est publié à cette adresse, que le canal soit sain (site statique sans manifeste) ou cassé.
+            // Ce n'est ni « à jour » ni une panne : un état à part, qui ne dit que ça.
+            if (resp.StatusCode is System.Net.HttpStatusCode.NotFound)
+                return Result<UpdateManifest?>.Fail(UpdateErrorCodes.NotPublished, "No update manifest is published at this address.");
 
             if (!resp.IsSuccessStatusCode)
                 return Result<UpdateManifest?>.Fail(
                     UpdateErrorCodes.Offline, $"Update feed returned {(int)resp.StatusCode}.");
 
-            var manifest = await resp.Content
-                .ReadFromJsonAsync<UpdateManifest>(ManifestJson, ct)
-                .ConfigureAwait(false);
+            if (resp.Content.Headers.ContentLength is > ManifesteOctetsMax)
+                return Result<UpdateManifest?>.Fail(UpdateErrorCodes.Offline, "Update manifest refused: larger than the size limit.");
+            var octets = await LireAuPlusAsync(resp.Content, ManifesteOctetsMax, ct).ConfigureAwait(false);
+            if (octets is null)
+                return Result<UpdateManifest?>.Fail(UpdateErrorCodes.Offline, "Update manifest refused: larger than the size limit.");
+            var manifest = System.Text.Json.JsonSerializer.Deserialize<UpdateManifest>(octets, ManifestJson);
             return Result<UpdateManifest?>.Ok(manifest);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
@@ -150,33 +143,49 @@ public sealed class HttpUpdateFeed : IUpdateFeed
         }
     }
 
+    /// <summary>Un manifeste tient en quelques centaines d'octets (canal, version, adresse, empreinte, signature).</summary>
+    public const int ManifesteOctetsMax = 64 * 1024;
+
     public const long TailleMaxOctets = 400L * 1024 * 1024;
 
     public async Task<Result<byte[]>> DownloadAsync(string url, CancellationToken ct)
     {
         try
         {
+            // L'adresse vient du manifeste signé ; elle est quand même exigée en HTTPS, et une adresse illisible est un refus,
+            // pas une exception.
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var adresse) || adresse.Scheme != Uri.UriSchemeHttps)
+                return Result<byte[]>.Fail(UpdateErrorCodes.Offline, "Update payload refused: its address is not HTTPS.");
             // Une réponse sans fin faisait allouer des Go en mémoire. Un installeur
             // de DrDXT pèse moins de 200 Mo : au-delà, ce n'est pas une mise à jour.
-            using var reponse = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            using var reponse = await _http.GetAsync(adresse, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             reponse.EnsureSuccessStatusCode();
             if (reponse.Content.Headers.ContentLength is > TailleMaxOctets)
                 return Result<byte[]>.Fail(UpdateErrorCodes.Offline, "Update payload refused: larger than the size limit.");
-            await using var flux = await reponse.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            using var memoire = new MemoryStream();
-            var tampon = new byte[81920];
-            int lu;
-            while ((lu = await flux.ReadAsync(tampon, ct).ConfigureAwait(false)) > 0)
-            {
-                if (memoire.Length + lu > TailleMaxOctets)
-                    return Result<byte[]>.Fail(UpdateErrorCodes.Offline, "Update payload refused: larger than the size limit.");
-                memoire.Write(tampon, 0, lu);
-            }
-            return Result<byte[]>.Ok(memoire.ToArray());
+            var octets = await LireAuPlusAsync(reponse.Content, TailleMaxOctets, ct).ConfigureAwait(false);
+            return octets is null
+                ? Result<byte[]>.Fail(UpdateErrorCodes.Offline, "Update payload refused: larger than the size limit.")
+                : Result<byte[]>.Ok(octets);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
         {
             return Result<byte[]>.Fail(UpdateErrorCodes.Offline, $"Update payload download failed: {ex.Message}");
         }
+    }
+
+    /// <summary>Le corps lu par morceaux, null dès qu'il dépasse <paramref name="plafond"/>.</summary>
+    private static async Task<byte[]?> LireAuPlusAsync(HttpContent contenu, long plafond, CancellationToken ct)
+    {
+        await using var flux = await contenu.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        using var memoire = new MemoryStream();
+        var tampon = new byte[81920];
+        int lu;
+        while ((lu = await flux.ReadAsync(tampon, ct).ConfigureAwait(false)) > 0)
+        {
+            if (memoire.Length + lu > plafond)
+                return null;
+            memoire.Write(tampon, 0, lu);
+        }
+        return memoire.ToArray();
     }
 }

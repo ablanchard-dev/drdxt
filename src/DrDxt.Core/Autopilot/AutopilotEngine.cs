@@ -104,9 +104,8 @@ public static class AutopilotEngine
     /// <param name="alternancesMax">Le nombre de passes d'alternance du protocole. **Fixe** : le
     /// moteur va au bout et ne prend qu'une decision statistique, sur l'experience complete.
     ///
-    /// Ce parametre s'appelait un « plafond » et l'experience s'arretait des qu'un gain
-    /// devenait significatif. C'etait de l'optional stopping : chaque regard est une occasion
-    /// supplementaire de franchir le seuil par hasard, et s'arreter uniquement sur les succes est
+    /// Ce n'est pas un plafond : s'arreter des qu'un gain devient significatif serait de l'optional stopping, chaque
+    /// regard etant une occasion supplementaire de franchir le seuil par hasard, et s'arreter uniquement sur les succes est
     /// exactement ce qui cree le biais. Seuls des arrets physiques pre-declares interrompent le
     /// protocole, parce qu'ils ne dependent pas du resultat mesure.</param>
     /// <param name="representativite">Ce que la scene represente (partie reelle,
@@ -169,7 +168,7 @@ public static class AutopilotEngine
             if (d.Kind != CandidateKind.AutoHot)
             {
                 resultats.Add(new CandidateResult(d.Id, CandidateOutcome.NotAttempted, null,
-                    Docteur.T("AE.Nature", d.Kind)));
+                    Docteur.T("AE.Nature", RepairLibelles.Nature(d.Kind))));
                 continue;
             }
 
@@ -198,9 +197,10 @@ public static class AutopilotEngine
                 {
                     toutRemis &= Annuler(candidat);
                     resultats.Add(new CandidateResult(d.Id, CandidateOutcome.ApplyFailed, null,
-                        applique.IsOk
-                            ? Docteur.T("AE.EcritureNonRelue")
-                            : applique.Error?.Message));
+                        // Le message du levier (souvent l'anglais du helper) ne va pas au récit : son code, dans une phrase.
+                        !applique.IsOk ? Docteur.T("AE.EcritureRefusee", applique.Error?.Code ?? "?")
+                        : relu.IsOk ? Docteur.T("AE.EcritureNonRelue")
+                        : Docteur.T("AE.NonRelu")));
                     continue;
                 }
 
@@ -239,14 +239,14 @@ public static class AutopilotEngine
                 // cette politique existe pour empecher.
                 var decision = KeepPolicy.DecideParMetrique(preuves, but);
 
+                // L'issue suit la decision, qui juge chaque grandeur : un 1 % low en regression prouvee sous une
+                // moyenne stable est une regression, et une experience invalide a bien pose et relu le levier
+                // (ce n'est pas une ecriture qui n'a pas pris).
                 var issue = decision.Keep
                     ? CandidateOutcome.Kept
-                    : preuve?.Outcome switch
-                    {
-                        EvidenceOutcome.ProvenRegression => CandidateOutcome.RejectedRegression,
-                        EvidenceOutcome.Invalid => CandidateOutcome.ApplyFailed,
-                        _ => CandidateOutcome.RejectedUnresolved,
-                    };
+                    : decision.RaisonCle == KeepPolicy.CleRegression
+                        ? CandidateOutcome.RejectedRegression
+                        : CandidateOutcome.RejectedUnresolved;
 
                 if (issue == CandidateOutcome.Kept)
                 {
@@ -256,7 +256,14 @@ public static class AutopilotEngine
                     // l'etat de reference en croyant avoir garde le gain.
                     var remis = candidat.Apply();
                     var reluApresKeep = remis.IsOk ? candidat.ReadBack() : Result<bool>.Ok(false);
-                    if (!remis.IsOk || !reluApresKeep.IsOk || !reluApresKeep.Value) toutRemis = false;
+                    if (!remis.IsOk || !reluApresKeep.IsOk || !reluApresKeep.Value)
+                    {
+                        // Gardé par la mesure mais pas repris : le profil ne le dit pas gardé, et la machine revient à la
+                        // référence plutôt que de rester à moitié posée.
+                        toutRemis = false;
+                        Annuler(candidat);
+                        issue = CandidateOutcome.ApplyFailed;
+                    }
                     // Seulement une fois le levier relu en place : un keep qui n'a pas repris garde
                     // son filet arme, et le demarrage suivant le rendra.
                     else if (!candidat.Garder().IsOk)

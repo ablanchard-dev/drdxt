@@ -7,14 +7,14 @@ namespace DrDxt.Detection.Scoring;
 /// Source unique du registre des leviers et des constats du scan.
 ///
 /// Sans ce catalogue, <see cref="ScoringRules"/> (constats + EstimatedGainPct) et le scorer
-/// porteraient deux jeux de chiffres divergents (XMP : constat 12 % contre score −18). Ils
-/// consomment la même évaluation ici : le gain annoncé par un constat == les points retirés.
+/// porteraient deux jeux de chiffres divergents. Ils consomment la même évaluation ici : le gain d'un
+/// constat (non affiché) == les points retirés.
 ///
-/// Doctrine (corrigée par l'audit adverse du projet, non publié) :
+/// Doctrine :
 ///  - Les magnitudes sont des estimations d'expert étalonnées (paliers ordinaux Major/Minor), pas
-///    des pourcentages mesurés ou « sourcés » (audit C1). La vraie mesure ne vit que dans le bloc A/B PresentMon.
+///    des pourcentages mesurés ou « sourcés ». La vraie mesure ne vit que dans le bloc A/B PresentMon.
 ///  - On ne pénalise pas les défauts neutres de Windows (HAGS coupé, Équilibré, mode Jeu coupé, VRR
-///    coupé sur un écran sans VRR) : ce sont des occasions à impact 0, jamais un déficit inventé (audit C2).
+///    coupé sur un écran sans VRR) : ce sont des occasions à impact 0, jamais un déficit inventé.
 ///  - Chaque pénalité dépend du matériel ou du symptôme qui rend le gain réel.
 ///  - Unknown (illisible) ne retire rien mais compte dans Coverage. Le ReBAR NVIDIA se lit par
 ///    NVML (NvmlReBarProvider) et celui d'AMD par ADLX : On/Off sont réels ; quand une lecture manque,
@@ -77,7 +77,8 @@ internal static class LeverCatalog
         HardwareInventory hw, SettingsState state, BottleneckVerdict? measured = null)
     {
         var desktop = hw.Chassis is ChassisType.Desktop;
-        var primaryGpu = hw.Gpus.Count > 0 ? hw.Gpus[0] : null;
+        // Le ReBAR se lit sur la carte dédiée : une puce intégrée listée en premier n'a pas de BAR à agrandir.
+        var primaryGpu = CartesGraphiques.CarteDediee(hw);
         // Symptôme de parcage des cœurs = condition du seul routage X3D. Le levier du plan d'alimentation ne
         // s'en sert pas (SanePowerPlanTweak : la politique de parcage est identique entre Equilibre et Haute
         // performance). Au repos, des coeurs parques sont la norme : ce signal n'est pas un defaut a lui seul.
@@ -85,7 +86,7 @@ internal static class LeverCatalog
         // troisieme cas ne doit ni armer un levier, ni compter comme une machine saine.
         // « des coeurs parqués » ne suffit pas ; seul le CCD de fréquence parqué, c'est le
         // routage sain. Le docteur suit la règle du levier fixit.x3d_ccd : un coeur du CCD à cache parqué. Rien de parqué
-        // reste « non confirmé » ici (au repos, sain et cassé se ressemblent), le levier le propose sous garde.
+        // reste « non confirmé » ici, le levier le propose sous garde ; le parcage n'est lu que jeu ouvert (hors jeu : null).
         bool? parkingSymptom = state.ParkedCoreIndexes is null
             ? null
             : state.ParkedCoreIndexes.Count == 0 ? false : DrDxt.Application.Tweaks.FixIt.X3dParkingHeuristic.LooksMisparked(hw.Cpu, state);
@@ -135,8 +136,9 @@ internal static class LeverCatalog
     }
 
     // --- Pilote GPU très ancien / corrompu (Performance, Major 15). ----
-    // Indépendant du fabricant (« levier no.1 » sur Arc, gros gains DX9/DX11). Logiciel seulement (DDU
-    // guidé) : s'applique sur tout châssis avec un GPU. Un faux positif ne fait que proposer une réinstallation guidée.
+    // Logiciel seulement (DDU guidé) : s'applique sur tout châssis avec un GPU. Un faux positif ne fait que proposer une
+    // réinstallation guidée. Seule une branche de fabricant se juge : WMI rend une version WDDM à quatre groupes, que
+    // seul NVIDIA remplace par sa branche (NVML) ; sur AMD et Intel, le levier ne se déclenche donc pas.
     private static LeverResult EvaluateDriver(HardwareInventory hw)
     {
         const int magnitude = 15;
@@ -156,7 +158,7 @@ internal static class LeverCatalog
     // --- Routage X3D multi-CCD (Performance, Major 12) ------------------------------
     // Ne s'applique qu'à un X3D à plus d'un CCD. Pénalité seulement sur une erreur confirmée. Le seul
     // signal de confirmation lisible est le symptôme de parcage ; sans lui, on ne peut pas confirmer un
-    // routage sain (le lecteur de cœurs parqués est un stub et l'état d'AMD3DVCacheSvc n'est pas lu) :
+    // routage sain (les cœurs parqués ne sont lus que jeu ouvert et l'état d'AMD3DVCacheSvc n'est pas lu) :
     // on reste Unknown (0) avec un constat Info, jamais de punition pour une machine X3D saine.
     private static LeverResult EvaluateX3d(HardwareInventory hw, bool? parkingSymptom, bool routageSain)
     {

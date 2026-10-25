@@ -58,6 +58,7 @@ if (args.Length == 2 && args[0] == "--etape" && int.TryParse(args[1], out var nu
 if (args.Contains("--lire"))
 {
     foreach (var ligne in LectureAdlx.Lignes(AdlxReglages.Lire(), AdlxReglages.DllPresente())) Console.WriteLine(ligne);
+    foreach (var ligne in LectureAdlx.LignesPuissance(LectureAdlx.LirePuissances())) Console.WriteLine(ligne);
     // Le processeur, par PawnIO s'il est installé : les seuls ioctl de lecture de PawnIoAmd, rien n'est écrit.
     if (DrDxt.GpuNative.PawnIo.PawnIoAmd.ProcesseurAmd())
     {

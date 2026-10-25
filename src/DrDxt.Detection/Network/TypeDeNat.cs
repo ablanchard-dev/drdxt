@@ -143,7 +143,8 @@ public static class TypeDeNat
         return nat switch
         {
             Nat.Simple => new RepairFinding("RESEAU", nom, Docteur.T("NAT.ValeurSimple"), null, RepairStatus.ExpectedDefault, Docteur.T("NAT.Simple")),
-            Nat.Double => new RepairFinding("RESEAU", nom, Docteur.T("NAT.ValeurDouble"), Docteur.T("NAT.ValeurSimple"), RepairStatus.Suspicious,
+            // Un routeur de devant en DMZ ou en redirection reste ouvert : le double NAT n'est qu'un risque, à regarder.
+            Nat.Double => new RepairFinding("RESEAU", nom, Docteur.T("NAT.ValeurDouble"), Docteur.T("NAT.ValeurSimple"), RepairStatus.NonDefault,
                 Docteur.T("NAT.Double"), RepairAction.Recommandation),
             Nat.Cgnat => new RepairFinding("RESEAU", nom, Docteur.T("NAT.ValeurCgnat"), Docteur.T("NAT.ValeurSimple"), RepairStatus.Observed, Docteur.T("NAT.Cgnat")),
             Nat.Tunnel => new RepairFinding("RESEAU", nom, Docteur.T("NAT.ValeurTunnel"), Docteur.T("NAT.ValeurSimple"), RepairStatus.Observed,

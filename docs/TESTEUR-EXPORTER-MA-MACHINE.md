@@ -33,10 +33,15 @@ c'est utile aussi.
 
 Avant d'écrire le fichier, DrDXT retire de chaque texte :
 
+- les dossiers connus du compte lus par Windows (Documents, Bureau, AppData, AppData local, et le profil hors de
+  `X:\Users`), où qu'ils soient, même redirigés : ils deviennent un repère (`<Documents>`, `<Desktop>`…), la suite du
+  chemin reste ;
 - le dossier de n'importe quel compte (`C:\Users\<nom>`) : il devient `C:\Users\joueur`, la suite du chemin reste ;
 - le nom de ton compte Windows (même de deux lettres), le nom du PC et son domaine ;
 - les numéros de série et identifiants matériels lus sur ce PC (BIOS, carte mère, disques, mémoire, UUID de la
   machine, numéros de volume) ;
+- la fin des identifiants d'appareil (`USB\VID_…&PID_…\<exemplaire>`) : un numéro de série, une adresse Bluetooth ; le
+  modèle reste ;
 - les adresses MAC ;
 - les adresses IP (v4 et v6) ;
 - les identifiants de compte Windows (SID) ;

@@ -101,12 +101,38 @@ public static class PrivilegedOpCodec
 
     private static readonly JsonSerializerOptions Options = new()
     {
-        // Les énumérations voyagent en valeur entière (le discriminant fermé), jamais par
-        // nom. Les membres inconnus sont tolérés dans la charge (compatibilité future) mais
-        // ne peuvent jamais choisir un type : seul le switch explicite le peut.
+        // Les énumérations voyagent en valeur entière (le discriminant fermé), jamais par nom.
         PropertyNamingPolicy = null,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        // La feuille ne se lie qu'à ce qu'elle déclare : un champ absent n'est pas comblé par la valeur par défaut du type
+        // (0, chaîne nulle, Guid.Empty), un nul n'entre pas dans un champ non nullable, un champ inconnu est un champ que
+        // personne ne vérifie, une énumération hors plage n'est aucune des valeurs prévues. L'allowlist reste l'autorité
+        // sur les valeurs ; elle n'a plus à deviner ce qu'un défaut voulait dire. Le helper et l'App s'installent ensemble.
+        RespectRequiredConstructorParameters = true,
+        RespectNullableAnnotations = true,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+        Converters = { new EnumerationsDefinies() },
     };
+
+    private sealed class EnumerationsDefinies : JsonConverterFactory
+    {
+        public override bool CanConvert(Type type) => type.IsEnum;
+
+        public override JsonConverter CreateConverter(Type type, JsonSerializerOptions options)
+            => (JsonConverter)Activator.CreateInstance(typeof(EnumerationDefinie<>).MakeGenericType(type))!;
+    }
+
+    private sealed class EnumerationDefinie<T> : JsonConverter<T> where T : struct, Enum
+    {
+        public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var valeur = JsonSerializer.Deserialize<T>(ref reader);
+            return Enum.IsDefined(valeur) ? valeur : throw new JsonException($"{typeof(T).Name} out of range.");
+        }
+
+        public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
+            => JsonSerializer.Serialize(writer, value);
+    }
 
     /// <summary>Sérialise une feuille PrivilegedOp connue en objet JSON discriminé.
     /// Rend Fail(HELPER.NOT_ALLOWLISTED) si la feuille n'est pas dans l'ensemble
@@ -224,7 +250,10 @@ public static class PrivilegedOpCodec
                     ErrorCodes.NotAllowlisted, "Missing or unknown privileged-op discriminant.");
             }
 
-            var rawJson = root.GetRawText();
+            // La feuille ne connaît pas le discriminant : retiré avant la liaison, où tout champ inconnu est refusé.
+            var sansDiscriminant = System.Text.Json.Nodes.JsonNode.Parse(root.GetRawText())!.AsObject();
+            sansDiscriminant.Remove(Discriminator);
+            var rawJson = sansDiscriminant.ToJsonString();
 
             // Switch explicite : le seul endroit où un discriminant devient un type. Pas de
             // réflexion, pas de Type.GetType, pas de résolution polymorphe par nom.

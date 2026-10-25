@@ -33,4 +33,16 @@ public sealed class PiloteRTCoreTests
     [Fact]
     public void Non_lu_reste_inconnu()
         => PiloteRTCore.Juger(null, _ => false).Statut.Should().Be(RepairStatus.Unknown);
+
+    // Sans droits, Windows peut masquer les adresses du noyau : la liste des pilotes chargés ne se lit pas, et « pas chargé »
+    // serait une affirmation sans lecture.
+    [Fact]
+    public void Un_chargement_non_lu_ne_se_dit_pas_absent()
+    {
+        var avec = new[] { ("RTCore64", @"\SystemRoot\System32\drivers\RTCore64.sys") };
+        var nonLu = PiloteRTCore.Juger(avec, _ => null);
+        nonLu.Statut.Should().Be(RepairStatus.Suspicious, "le pilote est installé, lu dans la clé Services");
+        nonLu.Explication.Should().Be(DrDxt.Core.Docteur.T("RTC.InstalleChargeNonLu"))
+            .And.NotBe(PiloteRTCore.Juger(avec, _ => false).Explication);
+    }
 }

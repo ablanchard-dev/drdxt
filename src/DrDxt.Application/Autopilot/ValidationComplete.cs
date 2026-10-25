@@ -4,9 +4,9 @@ using DrDxt.Core;
 namespace DrDxt.Application.Autopilot;
 
 /// <summary>
-/// Chaque
-/// levier du produit est posé, relu, rendu, puis relu encore, par le code du produit (ses leviers, son canal élevé). Rien
-/// n'est gardé : la machine finit comme elle a commencé, et le rapport le prouve levier par levier.
+/// Les leviers de la liste ci-dessous sont posés, relus, rendus, puis relus encore, par le code du produit (ses leviers,
+/// son canal élevé). Un levier déjà réglé n'est touché qu'en mode profond, un levier tenu par un essai jamais. Rien n'est
+/// gardé : la machine finit comme elle a commencé, et le rapport le prouve levier par levier.
 ///
 /// Le filet : avant chaque écriture, l'essai est inscrit dans un journal (le même que celui du produit) posé à côté du
 /// rapport. Si la fenêtre meurt pendant un essai, le lancement suivant rend d'abord ce qui y reste (<see cref="RemettreAsync"/>).
@@ -194,7 +194,7 @@ public static class ValidationComplete
         var pose = journal.Poser(levier.Id, null);
         if (!pose.IsOk) return (Docteur.T("VC.PasTouche.Journal", pose.Error?.Message), Issue.NonTouche);
 
-        // Le journal ci-dessus ne connaît pas encore l'origine : le helper la garde jusqu'à ce qu'il la porte.
+        // Le journal ci-dessus ne connaît pas encore l'origine : le helper la garde, jusqu'au rendu.
         using var portee = PorteeDePose.Ouvrir();
         var ecrit = await levier.ApplyAsync().ConfigureAwait(false);
         if (!ecrit.IsOk || ecrit.Value is not { } snapshot)
@@ -218,8 +218,9 @@ public static class ValidationComplete
             return (Docteur.T("VC.PasTouche.DejaRegle"), Issue.NonTouche);
         }
         var complete = journal.Poser(levier.Id, snapshot);
-        if (complete.IsOk) await portee.FermerAsync().ConfigureAwait(false);
-        else portee.Dispose();
+        // L'acquit attend le rendu : l'App tuée entre les deux laissait l'origine dans le seul fichier du compte, que la
+        // désinstallation élevée ne lit pas. Le rendu part hors de la portée, jamais journalisé comme une pose.
+        portee.Detacher();
 
         var sb = new StringBuilder();
         var posee = Relire(relire, snapshot);
@@ -232,6 +233,7 @@ public static class ValidationComplete
         sb.AppendLine(Docteur.T("VC.Ligne.RenduRelu", Mot(remis.Pose is { } p ? !p : null, Docteur.T("VC.OrigineEnPlace"), Docteur.T("VC.PasALOrigine")), remis.Texte));
 
         if (rendu.IsOk && remis.Pose != true) journal.Lever();
+        if (complete.IsOk && rendu.IsOk && remis.Pose != true) await portee.FermerAsync().ConfigureAwait(false);
         if (!rendu.IsOk || remis.Pose == true) nonRemis.Add(Docteur.T("VC.PasRemis.Levier", levier.Id, remis.Texte));
         else if (remis.Pose is null) nonRemis.Add(Docteur.T("VC.RenduNonConfirme", levier.Id, remis.Texte));
         if (!complete.IsOk) sb.AppendLine(Docteur.T("VC.JournalIncomplet", complete.Error?.Message));
@@ -252,7 +254,11 @@ public static class ValidationComplete
     /// <summary>Rend ce qu'un essai interrompu a laissé dans le journal. Ne lève jamais.
     /// Le journal est rejoué en administrateur ; comme au démarrage de l'App, seul un inverse que ce
     /// levier écrit lui-même est rejoué (<paramref name="rejouable"/> = RevertAuDemarrage.InverseRejouable en production).</summary>
-    public static async Task<Remise> RemettreAsync(IRevertEnAttente journal, Func<string, ITweak?> trouver, Func<string, string?, bool> rejouable)
+    /// <param name="registre">Le lecteur du registre, pour la porte des rendus.</param>
+    /// <param name="verdict">Le vérificateur de la pose : changé depuis hors de DrDXT, rien n'est réécrit ; rendu, « remis
+    /// d'origine » ne se dit que relu à l'origine. Sans lui, la réussite du levier fait foi.</param>
+    public static async Task<Remise> RemettreAsync(IRevertEnAttente journal, Func<string, ITweak?> trouver, Func<string, string?, bool> rejouable,
+        Tweaks.Hardware.IRegistryReader? registre = null, Func<TweakSnapshot, Tweaks.EtatApplique>? verdict = null)
     {
         try
         {
@@ -269,10 +275,24 @@ public static class ValidationComplete
             if (trouver(entree.TweakId) is not { } levier) return new(Docteur.T("VC.Remise.Inconnu", entree.TweakId), false);
             if (!rejouable(entree.TweakId, s.OriginalValueJson))
                 return new(Docteur.T("VC.Remise.Refusee", entree.TweakId), false);
-            var r = await levier.RevertAsync(s).ConfigureAwait(false);
-            if (!r.IsOk) return new(Docteur.T("VC.Remise.Echec", entree.TweakId, r.Error?.Code, r.Error?.Message), false);
+            var pose = Tweaks.TweakReadback.EtatDeLaPose(s, registre, verdict);
+            if (pose == Tweaks.PoseRelue.ChangeDepuis)
+            {
+                journal.Lever();
+                return new(Docteur.T("VC.Remise.ChangeDepuis", entree.TweakId), false);
+            }
+            if (pose == Tweaks.PoseRelue.DeDrDxt)
+            {
+                var r = await levier.RevertAsync(s).ConfigureAwait(false);
+                if (!r.IsOk) return new(Docteur.T("VC.Remise.Echec", entree.TweakId, r.Error?.Code, r.Error?.Message), false);
+                // Rendu, mais la valeur de DrDXT est encore là : le journal reste pour le lancement suivant.
+                if (Tweaks.TweakReadback.EncorePoseRelue(s, registre, verdict))
+                    return new(Docteur.T("VC.Remise.EncorePose", entree.TweakId), false);
+            }
             journal.Lever();
-            return new(Docteur.T("VC.Remise.Ok", entree.TweakId), true);
+            return verdict is null || verdict(s) == Tweaks.EtatApplique.NotApplied
+                ? new(Docteur.T("VC.Remise.Ok", entree.TweakId), true)
+                : new(Docteur.T("VC.Remise.NonRelue", entree.TweakId), false);
         }
         catch (Exception ex) { return new(Docteur.T("VC.Remise.Impossible", ex.Message), false); }
     }

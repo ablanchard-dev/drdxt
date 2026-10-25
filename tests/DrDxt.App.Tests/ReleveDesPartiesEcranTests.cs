@@ -53,6 +53,15 @@ public sealed class ReleveDesPartiesEcranTests
             .Should().Contain("(96 °C)");
     }
 
+    // Des pauses écartées du 1 % low (jeu hors premier plan) se disent sur la ligne : le chiffre ne les cache pas en silence.
+    [Fact]
+    public void La_ligne_dit_les_pauses_ecartees()
+    {
+        var p = new PartieRelevee("cod.exe", DateTimeOffset.Now, DateTimeOffset.Now, 6, 137, 77, BottleneckState.GpuBound);
+        ScanViewModel.LignePartie(p with { PausesEcartees = 2 }, k => k == "Parties.PausesEcartees" ? "{0} pauses" : k).Should().Contain("2 pauses");
+        ScanViewModel.LignePartie(p, k => k).Should().NotContain("Parties.PausesEcartees");
+    }
+
     // Mémoire vidéo saturée pendant la partie, la ligne le dit avec son pic ; en dessous du seuil, rien.
     [Fact]
     public void La_ligne_dit_la_memoire_video_pleine()
@@ -141,6 +150,17 @@ public sealed class ReleveDesPartiesEcranTests
     public void Pas_comparable_n_accuse_pas_un_cote(string langue, string cote)
         => new DrDxt.Infrastructure.Localization.ResxLocalizer().Get("Changement.PasComparable", System.Globalization.CultureInfo.GetCultureInfo(langue))
             .Should().NotContain(cote);
+
+    // Les réglages datés qui reçoivent ces textes (HAGS, mode Jeu, fichier d'échange, mémoire, BIOS) ne s'essaient pas en
+    // alternance : seul un levier « à chaud » le peut. Le texte ne renvoie pas vers un essai qui n'existe pas pour eux.
+    [Theory]
+    [InlineData("fr-FR", "Changement.PasComparable", "alternance")]
+    [InlineData("en-US", "Changement.PasComparable", "every other game")]
+    [InlineData("fr-FR", "Parties.Gains.Total", "alternance")]
+    [InlineData("en-US", "Parties.Gains.Total", "alternating")]
+    public void Pas_comparable_ne_propose_pas_un_essai_qui_n_existe_pas(string langue, string cle, string essai)
+        => new DrDxt.Infrastructure.Localization.ResxLocalizer().Get(cle, System.Globalization.CultureInfo.GetCultureInfo(langue))
+            .Should().NotContain(essai);
 
     // Un changement daté se dit jugé, avec ses médianes, ou avec ce qui manque pour le juger.
     [Fact]

@@ -12,9 +12,9 @@ namespace DrDxt.GpuNative.Nvml;
 // pilote NVIDIA (nvml.dll absente) donne IsAvailable == false au lieu d'une
 // DllNotFoundException : le contrat d'échec propre.
 //
-// Surface (lecture seule, non élevée ; les requêtes NVML ne demandent aucune élévation) :
-//   nvmlInit_v2 → nvmlDeviceGetHandleByIndex_v2 → nvmlDeviceGetMemoryInfo
-//                                               → nvmlDeviceGetBAR1MemoryInfo.
+// Surface : nvmlInit_v2 → nvmlDeviceGetHandleByIndex_v2, puis en lecture (non élevée) mémoire et BAR1, puissance,
+// température, horloges, raisons de bridage, lien PCIe, processus graphiques, version du pilote et ventilateurs ; en
+// écriture (helper élevé seulement) la vitesse des ventilateurs et leur retour à l'automatique.
 //
 // Symboles et structs exacts figés contre nvml.h (NVML_SUCCESS = 0 ; nvmlDevice_t = pointeur
 // opaque ; nvmlMemory_t { ull total, free, used } ; nvmlBAR1Memory_t { ull bar1Total, bar1Free,
@@ -286,14 +286,14 @@ public sealed class NvmlNative : INvmlNative
         try
         {
             if (_nombreVentilateurs(device, out var nombre) != NvmlSuccess || nombre == 0) return false;
-            uint min = 0, max = 100;
+            uint? min = null, max = null;
             if (_plageVentilateur is not null && _plageVentilateur(device, out var mn, out var mx) == NvmlSuccess) { min = mn; max = mx; }
             var lus = new List<VentilateurNvml>();
             for (uint i = 0; i < nombre; i++)
             {
                 if (_vitesseVentilateur(device, i, out var vitesse) != NvmlSuccess
                     || _politiqueVentilateur(device, i, out var politique) != NvmlSuccess) return false;
-                uint cible = vitesse;
+                uint? cible = null;
                 if (_cibleVentilateur is not null && _cibleVentilateur(device, i, out var c) == NvmlSuccess) cible = c;
                 lus.Add(new VentilateurNvml((int)i, vitesse, cible, politique, min, max));
             }

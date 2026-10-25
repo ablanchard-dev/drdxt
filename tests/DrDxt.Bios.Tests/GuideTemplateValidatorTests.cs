@@ -168,6 +168,14 @@ public class GuideTemplateValidatorTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.BiosTemplateInvalid);
     }
 
+    // Le nom du réglage dans la cible ne la rend pas juste : « XMP Disabled » contient « xmp ».
+    [Theory]
+    [InlineData("XMP Disabled")]
+    [InlineData("Profile Disabled")]
+    [InlineData("EXPO Disabled")]
+    public void Wrong_direction_xmp_disabled_is_rejected_even_when_named(string cible)
+        => Parse(ValidJson.Replace("\"targetValue\": \"Enabled\"", $"\"targetValue\": \"{cible}\"")).IsOk.Should().BeFalse();
+
     [Fact]
     public void Wrong_direction_csm_enabled_is_rejected()
     {

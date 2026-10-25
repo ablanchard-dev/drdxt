@@ -112,6 +112,9 @@ public static class PawnIoAmd
                 }
                 if (poignee == 0)
                 {
+                    // PawnIOLib.dll se trouve par le résolveur, jamais dans System32 : sans lui, la première lecture AMD
+                    // dépendait d'une lecture Intel ou Super I/O faite avant elle.
+                    PawnIoIntel.AssurerResolveur();
                     if (PawnIoIntel.Module(nom, empreinte) is not { } module) return null;
                     if (PawnIoIntel.pawnio_open(out var h) != 0) return null;
                     if (PawnIoIntel.pawnio_load(h, module, (nuint)module.Length) != 0) { PawnIoIntel.pawnio_close(h); return null; }

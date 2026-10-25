@@ -140,4 +140,15 @@ public class FrametimeStatisticsTests
 
         FrametimeStatistics.SumRatioOrNull(busy, trames).Should().BeApproximately(0.5, 1e-9);
     }
+
+    // Un gel en pleine partie (compilation de shaders, pilote qui décroche), même de plusieurs secondes, reste une image :
+    // c'est lui que le 1 % low et le 0,1 % low doivent montrer. Seul le relevé, qui sait si le jeu avait perdu le premier
+    // plan, écarte une pause (ReleveDesParties).
+    [Fact]
+    public void Un_gel_de_plusieurs_secondes_reste_compte()
+    {
+        var images = Enumerable.Repeat(10.0, 99).Append(2_500.0).ToList();
+
+        FrametimeStatistics.P1LowFps(images).Should().BeApproximately(0.4, 0.01);
+    }
 }

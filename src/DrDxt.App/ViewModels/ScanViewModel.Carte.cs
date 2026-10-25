@@ -21,11 +21,8 @@ public sealed partial class ScanViewModel
 
     public bool ADesDomaines => Domaines.Count > 0;
 
-    /// <summary>L'orbite montrait cinq composants sans état ni clic, et taisait trois
-    /// domaines. Chaque satellite porte maintenant l'état de son domaine et l'ouvre ; les domaines sans composant
-    /// (latence, réseau, BIOS) sont listés sous l'orbite. Les cinq tentacules de chrome restent : l'effet en dessine cinq.</summary>
-    /// <para>Les huit domaines sont huit satellites, chacun branché par sa tentacule. Plus de rangée de
-    /// pastilles sous la bille.</para></summary>
+    /// <summary>Les huit domaines sont huit satellites, chacun branché par son ruban de chrome : chaque satellite porte
+    /// l'état de son domaine et l'ouvre. L'ordre est celui du cercle, et celui des bits de <see cref="PolesLus"/>.</summary>
     public static readonly string[] OrdreDesSatellites = ["Cpu", "Gpu", "Latency", "Ram", "Ssd", "Firmware", "Windows", "Network"];
 
     /// <summary>Les trois domaines sans pièce de matériel à eux (latence, réseau, BIOS) : posés au scan du matériel.</summary>
@@ -85,7 +82,8 @@ public sealed partial class ScanViewModel
     [CommunityToolkit.Mvvm.Input.RelayCommand]
     private void Copier(string? texte)
     {
-        if (!string.IsNullOrEmpty(texte)) VersPressePapiers(texte);
+        if (string.IsNullOrEmpty(texte)) return;
+        try { VersPressePapiers(texte); } catch (Exception) { /* presse-papiers pris par un autre programme : la commande reste écrite à l'écran */ }
     }
 
     // Le texte d'un état lu sans geste : la même chaîne sert de ligne et de clé à son explication.
@@ -109,6 +107,9 @@ public sealed partial class ScanViewModel
          : familleValidee ? localiser("Levier.VerifieFamille")
          : localiser("Carte.Propose.NonValide");
 
+    /// <summary>La clé d'un constat de l'audit, pour le reconnaître sans comparer des textes traduits.</summary>
+    internal static string CleDeLAudit(string domaine, string? nom) => $"Audit.{domaine}.{nom}";
+
     private static string Majuscule(string phrase) =>
         phrase.Length == 0 ? phrase : char.ToUpper(phrase[0], CultureInfo.CurrentCulture) + phrase[1..];
 
@@ -129,8 +130,8 @@ public sealed partial class ScanViewModel
         foreach (var r in RepairFindings)
             entrees.Add(new EntreeCarte(CarteDeLaMachine.DomaineDeLAudit(r.DomaineCle, r.NomCle), r.Severity,
                 TitreDuConstat(r, _localize),
-                Majuscule(r.Explication), r.ValeurCourante, r.ActionLabel, NonLu: false, RemedeDuConstat: r.Remede,
-                Gestes: GestesDuConstat(r)));
+                Majuscule(r.Explication), r.ValeurCourante, r.ActionLabel, NonLu: false, Cle: CleDeLAudit(r.DomaineCle, r.NomCle),
+                RemedeDuConstat: r.Remede, Gestes: GestesDuConstat(r)));
 
         foreach (var r in RepairBlindSpots)
             entrees.Add(new EntreeCarte(CarteDeLaMachine.DomaineDeLAudit(r.DomaineCle, r.NomCle), r.Severity,

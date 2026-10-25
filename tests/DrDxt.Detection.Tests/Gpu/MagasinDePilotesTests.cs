@@ -44,7 +44,8 @@ public sealed class MagasinDePilotesTests
     {
         var c = MagasinDePilotes.Juger(Trois, Fichier("pnputil-cartes-2026-10-03.xml"), UneAncienneCarte).ToList();
         c.Should().HaveCount(2);
-        c[0].Statut.Should().Be(RepairStatus.Suspicious);
+        // Un ancien paquet est un repli possible de Windows, une carte déconnectée ne fait rien : à regarder, pas à corriger.
+        c.Should().OnlyContain(x => x.Statut == RepairStatus.NonDefault);
         c[0].ValeurCourante.Should().Be("NVIDIA 32.0.15.9186 (oem98.inf), Advanced Micro Devices, Inc. 31.0.24027.1012 (oem41.inf)",
             "sous le titre « anciens pilotes », le paquet en service n'a pas sa place");
         c[0].Explication.Should().Contain("2 paquet(s)").And.NotContain("pnputil")
@@ -112,7 +113,9 @@ public sealed class MagasinDePilotesTests
     }
 
     [Fact]
-    public void Une_sortie_illisible_ne_dit_rien() => MagasinDePilotes.Juger("pas du xml", "", "").Should().BeEmpty();
+    // pnputil qui ne rend pas de XML (un Windows qui ne connaît pas /format xml) : la famille dit « non lu » au lieu de se taire.
+    public void Une_sortie_illisible_se_dit_non_lue()
+        => MagasinDePilotes.Juger("pas du xml", "", "").Should().ContainSingle().Which.Statut.Should().Be(RepairStatus.Unknown);
 
     // Le vrai pnputil de la machine : la lecture en direct rend le même verdict que les sorties enregistrées.
     [Fact, Trait("Category", "Machine")]
@@ -149,5 +152,28 @@ public sealed class MagasinDePilotesTests
 
         c.Should().NotContain(x => x.Statut == RepairStatus.Suspicious);
         c.Should().ContainSingle().Which.Statut.Should().Be(RepairStatus.Unknown);
+    }
+    // Une carte branchée tombée sur le pilote de base de Windows (display.inf, hors du magasin des paquets) : le paquet NVIDIA
+    // qu'elle devrait prendre ne sert aucune carte, mais c'est le sien. Il n'est jamais proposé au retrait.
+    [Fact]
+    public void Le_paquet_d_une_carte_tombee_sur_le_pilote_de_base_n_est_pas_propose_au_retrait()
+    {
+        const string surLePiloteDeBase = """
+            <PnpUtil><Device InstanceId="PCI\VEN_10DE"><DeviceDescription>Microsoft Basic Display Adapter</DeviceDescription><DriverName>display.inf</DriverName></Device></PnpUtil>
+            """;
+        const string correspondants = """
+            <PnpUtil><Device InstanceId="PCI\VEN_10DE"><MatchingDrivers>
+              <DriverName DriverName="display.inf"/><DriverName DriverName="oem127.inf"/>
+            </MatchingDrivers></Device></PnpUtil>
+            """;
+
+        foreach (var lus in new[] { correspondants, null })
+        {
+            var c = MagasinDePilotes.Juger(Fichier("pnputil-pilotes-2026-10-03.xml"), surLePiloteDeBase, "<PnpUtil/>", lus).ToList();
+            c.Should().NotContain(x => x.Action == RepairAction.Recommandation, "le seul pilote NVIDIA de la carte branchée");
+            c.Should().NotContain(x => x.Statut == RepairStatus.ExpectedDefault);
+        }
+        MagasinDePilotes.Juger(Fichier("pnputil-pilotes-2026-10-03.xml"), surLePiloteDeBase, "<PnpUtil/>", correspondants).Single()
+            .Explication.Should().Contain("oem127.inf").And.Contain("display.inf").And.Contain("compatibles avec ta carte branchée");
     }
 }

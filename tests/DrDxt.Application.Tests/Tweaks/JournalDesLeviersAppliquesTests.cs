@@ -30,7 +30,7 @@ public class JournalDesLeviersAppliquesTests : IDisposable
     private static ApplyOutcome Garde(TweakSnapshot s) => new(s.TweakId, true, false, s, null);
 
     [Fact]
-    public void Seuls_les_leviers_appliques_et_non_annules_sont_notes_et_le_plus_recent_l_emporte()
+    public void Seuls_les_leviers_appliques_et_non_annules_sont_notes_et_la_plus_ancienne_origine_reste()
     {
         var j = new JournalDesLeviersAppliques(_chemin);
         j.Enregistrer(new ApplyReport(new[]
@@ -39,9 +39,48 @@ public class JournalDesLeviersAppliquesTests : IDisposable
             new ApplyOutcome("latency.hagsOn", true, AutoReverted: true, Snapshot("latency.hagsOn", "1"), null),
             new ApplyOutcome("fixit.power_plan", false, false, Snapshot("fixit.power_plan", "1"), null),
         }, null));
+        // Reposé sans avoir été rendu, le levier relit sa propre valeur posée : ce n'est pas l'origine du joueur.
+        j.Enregistrer(new ApplyReport(new[] { Garde(Snapshot("latency.gameDvrBackgroundOff", "0") with { AppliedValueJson = "posee" }) }, null));
+
+        var garde = j.Lire().Should().ContainSingle().Subject;
+        garde.OriginalValueJson.Should().Contain("\"1\"");
+        garde.AppliedValueJson.Should().Be("posee", "la valeur posée, elle, suit la dernière pose");
+    }
+
+    [Fact]
+    public void Rendu_puis_repose_le_levier_repart_de_sa_nouvelle_origine()
+    {
+        var j = new JournalDesLeviersAppliques(_chemin);
+        j.Enregistrer(new ApplyReport(new[] { Garde(Snapshot("latency.gameDvrBackgroundOff", "1")) }, null));
+        j.Retirer("latency.gameDvrBackgroundOff").Should().BeTrue();
         j.Enregistrer(new ApplyReport(new[] { Garde(Snapshot("latency.gameDvrBackgroundOff", "0")) }, null));
 
         j.Lire().Should().ContainSingle().Which.OriginalValueJson.Should().Contain("\"0\"");
+    }
+
+    [Theory]
+    [InlineData("[null]")]
+    [InlineData("doublon")]
+    public void Un_journal_qui_porte_un_vide_ou_un_doublon_s_enregistre_encore(string contenu)
+    {
+        var s = Snapshot("latency.gameDvrBackgroundOff", "1");
+        File.WriteAllText(_chemin, contenu == "doublon" ? System.Text.Json.JsonSerializer.Serialize(new[] { s, s }) : contenu);
+
+        new JournalDesLeviersAppliques(_chemin).Enregistrer(new ApplyReport(new[] { Garde(Snapshot("latency.gameDvrBackgroundOff", "0")) }, null))
+            .Should().BeTrue();
+        new JournalDesLeviersAppliques(_chemin).Lire().Should().ContainSingle();
+    }
+
+    // Une entrée sans identifiant (écrite hors de DrDXT) faisait tomber la lecture entière, et chaque enregistrement.
+    [Fact]
+    public void Une_entree_sans_identifiant_n_efface_pas_les_autres()
+    {
+        var s = Snapshot("latency.gameDvrBackgroundOff", "1");
+        File.WriteAllText(_chemin, "[{\"TweakId\":null,\"OriginalValueJson\":\"x\"}," + System.Text.Json.JsonSerializer.Serialize(s) + "]");
+
+        new JournalDesLeviersAppliques(_chemin).Lire().Should().ContainSingle();
+        new JournalDesLeviersAppliques(_chemin).Enregistrer(new ApplyReport(new[] { Garde(Snapshot("latency.hagsOn", "1")) }, null))
+            .Should().BeTrue();
     }
 
     [Fact]
@@ -97,5 +136,20 @@ public class JournalDesLeviersAppliquesTests : IDisposable
         var act = () => new JournalDesLeviersAppliques(_chemin).Constats(new Registre(1));
 
         act.Should().NotThrow();
+    }
+
+    // L'origine d'une pose ne se garde que si la valeur trouvée avant la pose suivante est encore la pose de DrDXT.
+    [Fact]
+    public void La_premiere_origine_ne_reste_que_si_la_pose_de_DrDXT_etait_encore_la()
+    {
+        var j = new JournalDesLeviersAppliques(_chemin);
+        var poseDrDxt = Snapshot("latency.gameDvrBackgroundOff", "0").OriginalValueJson;
+        j.Enregistrer(new ApplyReport(new[] { Garde(Snapshot("latency.gameDvrBackgroundOff", "1") with { AppliedValueJson = poseDrDxt }) }, null));
+
+        j.Enregistrer(new ApplyReport(new[] { Garde(Snapshot("latency.gameDvrBackgroundOff", "0") with { AppliedValueJson = poseDrDxt }) }, null));
+        j.Lire().Single().OriginalValueJson.Should().Be(Snapshot("x", "1").OriginalValueJson, "la pose de DrDXT était encore là");
+
+        j.Enregistrer(new ApplyReport(new[] { Garde(Snapshot("latency.gameDvrBackgroundOff", "2") with { AppliedValueJson = poseDrDxt }) }, null));
+        j.Lire().Single().OriginalValueJson.Should().Be(Snapshot("x", "2").OriginalValueJson, "le joueur a repris la main");
     }
 }

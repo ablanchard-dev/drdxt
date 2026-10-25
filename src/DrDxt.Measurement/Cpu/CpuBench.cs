@@ -202,13 +202,13 @@ public static class CpuBench
     /// pour une cause.
     ///
     /// Un banc qui ne consomme rien mesure donc le plafond de boost et rien d'autre. Celui-ci
-    /// multiplie sur 64 bits (unites larges sollicitees) et balaie un tampon de 192 Ko, taille
-    /// choisie pour tenir dans le L2 d'un cœur : assez de trafic pour appeler du courant, pas assez
-    /// pour que le resultat depende de la DRAM : la memoire a deja son propre banc.
+    /// multiplie sur 64 bits (unites larges sollicitees) et balaie un tampon qui tient dans le L2 d'un cœur : assez de
+    /// trafic pour appeler du courant, pas assez pour que le resultat depende de la DRAM : la memoire a deja son propre
+    /// banc. Le tampon fait 192 Ko, mais l'index masque par 0x5FFF n'en atteint que 16 Ki elements, soit 128 Ko.
     /// </summary>
     private static ulong TravailLourd(ulong graine)
     {
-        var tampon = new ulong[24 * 1024];          // 192 Ko : dans le L2, hors du L1
+        var tampon = new ulong[24 * 1024];          // 192 Ko alloues, 128 Ko balayes : dans le L2, hors du L1
         for (var i = 0; i < tampon.Length; i++) tampon[i] = graine + (ulong)i * 0x9E3779B9;
 
         var x = graine;
@@ -239,10 +239,15 @@ public static class CpuBench
     /// <c>SetThreadAffinityMask</c> rend l'ancien masque, ou 0 en cas d'echec.</summary>
     private static bool Epingler(int indexLogique)
     {
-        if (indexLogique < 0 || indexLogique >= Environment.ProcessorCount) return false;
-        try { return SetThreadAffinityMask(GetCurrentThread(), (UIntPtr)(1UL << indexLogique)) != UIntPtr.Zero; }
+        if (indexLogique >= Environment.ProcessorCount || MasqueDe(indexLogique) is not { } masque) return false;
+        try { return SetThreadAffinityMask(GetCurrentThread(), (UIntPtr)masque) != UIntPtr.Zero; }
         catch { return false; }
     }
+
+    /// <summary>Le masque d'affinité d'un processeur logique du groupe courant, ou null hors des 64 qu'un masque tient : en C#,
+    /// <c>1UL &lt;&lt; 64</c> vaut <c>1UL &lt;&lt; 0</c>, et le banc se serait épinglé sur le processeur 0.</summary>
+    internal static ulong? MasqueDe(int indexLogique)
+        => indexLogique is >= 0 and < 64 ? 1UL << indexLogique : null;
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetCurrentThread();

@@ -14,6 +14,8 @@ public sealed class CompteurTests
     [InlineData("12 points à corriger", 0.0, "0 points à corriger")]
     [InlineData("12 points à corriger", 1.0, "12 points à corriger")]
     [InlineData("tout lu, rien à corriger", 0.5, "tout lu, rien à corriger")]
+    [InlineData("99999999999 points", 0.5, "99999999999 points")] // au-delà d'un int : la phrase telle quelle, jamais un plantage
+    [InlineData("١٢ points", 0.5, "١٢ points")]                   // des chiffres non ASCII ne se lisent pas comme un nombre
     public void Une_etape_remplace_le_premier_nombre_par_sa_fraction(string texte, double avancement, string attendu)
         => Compteur.Etape(texte, avancement).Should().Be(attendu);
 

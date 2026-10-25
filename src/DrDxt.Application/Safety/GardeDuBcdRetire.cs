@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DrDxt.Core;
 
 namespace DrDxt.Application.Safety;
 
@@ -27,6 +28,7 @@ public sealed class GardeDuBcdRetire(string chemin)
             // cache. Coupé en cours d'écriture, il est illisible, donc pas une garde, et bcdedit n'a pas encore tourné.
             // Fichier du compte : le nom est retiré (un lien posé d'avance n'est que ce nom), puis créé en exclusif. Un lien
             // reposé entre les deux fait échouer la création : pas de garde, donc pas d'écriture du BCD.
+            if (FichierJsonAtomique.RefusEleve(chemin, "GARDE_BCD") is not null) return false;
             Directory.CreateDirectory(Path.GetDirectoryName(chemin)!);
             File.Delete(chemin);
             using var flux = new FileStream(chemin, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough);
@@ -54,7 +56,7 @@ public sealed class GardeDuBcdRetire(string chemin)
     /// <summary>Le helper a refusé, ou l'annulation est faite : plus rien à garder.</summary>
     public void Effacer()
     {
-        try { File.Delete(chemin); }
+        try { if (FichierJsonAtomique.RefusEleve(chemin, "GARDE_BCD") is null) File.Delete(chemin); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* garde orpheline : l'écran ne la lit que si l'audit ne voit plus l'élément, et elle ne pose rien seule */ }
     }
 }

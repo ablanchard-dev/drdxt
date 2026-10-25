@@ -12,6 +12,8 @@ namespace DrDxt.Detection.Hardware;
 /// <param name="PlusAncien">Le premier echec de la fenetre.</param>
 /// <param name="PlusRecent">Le dernier.</param>
 /// <param name="Nature">Ce que l'identifiant signifie.</param>
+/// <param name="Tronque">La lecture s'est arrêtée à son plafond d'événements : les échecs plus anciens n'ont pas été lus, et
+/// l'étendue réelle n'est pas connue.</param>
 public sealed record ServiceFailure(
     string Service,
     int EvenementId,
@@ -19,7 +21,8 @@ public sealed record ServiceFailure(
     int JoursDistincts,
     DateTimeOffset PlusAncien,
     DateTimeOffset PlusRecent,
-    string Nature)
+    string Nature,
+    bool Tronque = false)
 {
     /// <summary>L'ecart entre le premier et le dernier echec.</summary>
     public TimeSpan Etendue => PlusRecent - PlusAncien;
@@ -29,7 +32,9 @@ public sealed record ServiceFailure(
     /// (releve sur la machine de reference : `atvi-skuld`, `ERROR_ALREADY_EXISTS`, un installeur qui
     /// reessaie). Compter sans regarder la repartition transforme un accident en condition chronique.
     /// </summary>
-    public bool EstUneRafale => Occurrences > 1 && JoursDistincts == 1;
+    /// Une lecture tronquée n'en est jamais une : un service qui plante toutes les minutes depuis trente jours tient en huit
+    /// heures dans les 500 événements les plus récents.
+    public bool EstUneRafale => Occurrences > 1 && JoursDistincts == 1 && !Tronque;
 
     /// <summary>Revient-il assez souvent, sur assez de journees, pour meriter un regard ?
     ///
@@ -95,7 +100,7 @@ public sealed class WindowsServiceFailureLog : IServiceFailureLog
     /// qui les remplit (remplacer les journees distinctes par le compte brut ne tuerait aucun test).
     /// </summary>
     internal static IReadOnlyList<ServiceFailure> Regrouper(
-        IEnumerable<(string Service, int Id, DateTimeOffset Quand)> evenements) =>
+        IEnumerable<(string Service, int Id, DateTimeOffset Quand)> evenements, bool tronque = false) =>
         evenements
             .GroupBy(x => (x.Service, x.Id))
             .Select(g => new ServiceFailure(
@@ -104,7 +109,7 @@ public sealed class WindowsServiceFailureLog : IServiceFailureLog
                 // rafale d'installeur d'une panne qui revient.
                 g.Select(x => x.Quand.ToLocalTime().Date).Distinct().Count(),
                 g.Min(x => x.Quand), g.Max(x => x.Quand),
-                Docteur.T(Natures.Contains(g.Key.Id) ? $"SF.{g.Key.Id}" : "SF.Echec")))
+                Docteur.T(Natures.Contains(g.Key.Id) ? $"SF.{g.Key.Id}" : "SF.Echec"), tronque))
             // On classe par recurrence d'abord : un service qui echoue trois jours de suite compte
             // plus qu'un qui a reessaye vingt fois en deux minutes.
             .OrderByDescending(f => f.JoursDistincts)
@@ -143,7 +148,7 @@ public sealed class WindowsServiceFailureLog : IServiceFailureLog
                 }
             }
 
-            return Result<IReadOnlyList<ServiceFailure>>.Ok(Regrouper(brut));
+            return Result<IReadOnlyList<ServiceFailure>>.Ok(Regrouper(brut, tronque: brut.Count >= MaxEvenements));
         }
         catch (Exception ex)
         {

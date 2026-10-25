@@ -20,13 +20,13 @@ public sealed class RealMemoryBench : IMemoryBench
 ///
 /// La regle : automatique au premier scan (la machine est
 /// censee etre au repos a l'installation), a la demande ensuite. Un scan qui remesurerait a
-/// chaque fois couterait vingt a trente secondes et 384 Mo pour un chiffre qui ne bouge pas.
+/// chaque fois couterait vingt a trente secondes et plusieurs centaines de Mo pour un chiffre qui ne bouge pas.
 ///
 /// Trois refus qui comptent plus que le chemin nominal :
 ///   • une mesure rejetee par <see cref="MemoryQuality"/> n'est pas enregistree : une reference
 ///     prise sur une machine chargee resterait fausse pour toujours ;
-///   • une reference portant une autre frequence est caduque : le plafond d'un canal a change,
-///     donc le compte de canaux qu'elle portait ne vaut plus ;
+///   • une reference portant une autre frequence, ou d'autres barrettes, est caduque : le plafond d'un canal ou le
+///     nombre de canaux peuplés a change, donc le compte de canaux qu'elle portait ne vaut plus ;
 ///   • rien de prouve rend 0, jamais « simple canal ».
 /// </summary>
 public sealed class MemoryBaselineService
@@ -42,11 +42,6 @@ public sealed class MemoryBaselineService
         _now = now;
     }
 
-    /// <summary>
-    /// Le nombre de canaux que la mesure prouve, pour le scan en cours. Mesure au besoin (premier
-    /// scan, ou reference caduque), sinon relit celle qui existe. Rend 0 quand rien n'est prouve :
-    /// aucune conclusion, pas un diagnostic de simple canal.
-    /// </summary>
     /// <summary>
     /// La mesure deja enregistree, telle quelle, et rien d'autre.
     ///
@@ -77,24 +72,24 @@ public sealed class MemoryBaselineService
         var lu = _store.Read(machineId);
         if (!lu.IsOk || lu.Value is not { } reference) return null;
 
-        return reference.ConfiguredMts == CurrentMts(modules) ? reference : null;
+        return MemeConfiguration(reference, modules) ? reference : null;
     }
 
     /// <summary>Le scan va-t-il lancer le banc mémoire ? La même règle que <see cref="ProvenChannelsForScan"/>, lue
     /// avant : la jauge du scan prévoit la vraie durée de l'étape.</summary>
     public bool MesureraPourScan(string machineId, IReadOnlyList<MemoryModule> modules, bool jeuEnCours = false)
-        => Decider(_store.Read(machineId), CurrentMts(modules), jeuEnCours) == Suite.Mesurer;
+        => Decider(_store.Read(machineId), modules, jeuEnCours) == Suite.Mesurer;
 
     private enum Suite { Rien, Relire, Mesurer }
 
-    private static Suite Decider(Result<MemoryBaseline?> existing, int mts, bool jeuEnCours)
+    private static Suite Decider(Result<MemoryBaseline?> existing, IReadOnlyList<MemoryModule> modules, bool jeuEnCours)
     {
         // Une panne de lecture n'est pas une reference absente. Une reference amputee se
         // remplace : elle est inutilisable. Mais un fichier qu'on n'a pas pu lire (antivirus,
         // disque occupe) est peut-etre parfait, et la suite du scan ecrit. Continuer
         // detruirait la seule mesure d'avant que le client possede, pour une panne passagere.
         if (!existing.IsOk && existing.Error?.Code == ErrorCodes.MemoryBaselineIo) return Suite.Rien;
-        if (existing.IsOk && existing.Value is { } baseline && baseline.ConfiguredMts == mts) return Suite.Relire;
+        if (existing.IsOk && existing.Value is { } baseline && MemeConfiguration(baseline, modules)) return Suite.Relire;
         // Jamais de référence prise pendant qu'un jeu tourne. Celle du 16/09 a été mesurée dans le même scan
         // que Warzone (17:53, capture à 17:54) : 12,7 Go/s, contre 33,4 Go/s pour la même machine au repos.
         // Le jeu prend la bande passante, et une charge régulière ne disperse pas assez la mesure pour que
@@ -102,11 +97,16 @@ public sealed class MemoryBaselineService
         return jeuEnCours ? Suite.Rien : Suite.Mesurer;
     }
 
+    /// <summary>
+    /// Le nombre de canaux que la mesure prouve, pour le scan en cours. Mesure au besoin (premier
+    /// scan, ou reference caduque), sinon relit celle qui existe. Rend 0 quand rien n'est prouve :
+    /// aucune conclusion, pas un diagnostic de simple canal.
+    /// </summary>
     public int ProvenChannelsForScan(string machineId, IReadOnlyList<MemoryModule> modules, bool jeuEnCours = false)
     {
         var mts = CurrentMts(modules);
         var existing = _store.Read(machineId);
-        switch (Decider(existing, mts, jeuEnCours))
+        switch (Decider(existing, modules, jeuEnCours))
         {
             case Suite.Rien: return 0;
             case Suite.Relire:
@@ -119,7 +119,7 @@ public sealed class MemoryBaselineService
         // L'ecriture peut echouer (disque plein, fichier verrouille). La mesure, elle, est valide,
         // et ce qu'elle prouve reste vrai pour ce scan : on le rend. Ce qu'on perd alors, c'est la
         // memoire du resultat : le scan suivant remesurera. C'est un cout, pas un mensonge.
-        _store.Save(new MemoryBaseline(machineId, _now(), mts, measurement, JeuFermeVerifie: true));
+        _store.Save(new MemoryBaseline(machineId, _now(), mts, measurement, JeuFermeVerifie: true, Signature(modules)));
         return MemoryInference.ProvenMinimumChannels(MemoryInference.MeilleurDebit(measurement), modules);
     }
 
@@ -169,7 +169,7 @@ public sealed class MemoryBaselineService
 
         var verdict = MemoryVerdict.Compare(baseline.Measurement, after, peak);
         if (verdict.HasVerdict)
-            _store.Save(new MemoryBaseline(machineId, _now(), CurrentMts(modules), after, JeuFermeVerifie: true));
+            _store.Save(new MemoryBaseline(machineId, _now(), CurrentMts(modules), after, JeuFermeVerifie: true, Signature(modules)));
 
         return verdict;
     }
@@ -180,7 +180,7 @@ public sealed class MemoryBaselineService
     /// acceptees et quatre rejets Q-03**, alors que les moyennes tenaient a 2 % les unes des
     /// autres. Un seul essai perdrait donc la reference deux fois sur cinq sur une machine qui
     /// travaille normalement ; a trois essais, il reste environ 6 % de cas sans reference.
-    /// Au-dela, on ferait tourner un banc de 384 Mo en boucle sur la machine d'un joueur.
+    /// Au-dela, on ferait tourner un banc de plusieurs centaines de Mo en boucle sur la machine d'un joueur.
     /// </summary>
     public const int MaxAttempts = 3;
 
@@ -215,7 +215,7 @@ public sealed class MemoryBaselineService
         // Ses appelants (départ vers le BIOS, remesure à la demande) vérifient que le jeu est fermé.
         var (mesure, _) = MeasureAccepted(MemoryInference.UpperBoundPeakGBs(modules));
         return mesure is not null
-            && _store.Save(new MemoryBaseline(machineId, _now(), CurrentMts(modules), mesure, JeuFermeVerifie: true)).IsOk;
+            && _store.Save(new MemoryBaseline(machineId, _now(), CurrentMts(modules), mesure, JeuFermeVerifie: true, Signature(modules))).IsOk;
     }
 
     /// <summary>
@@ -242,7 +242,8 @@ public sealed class MemoryBaselineService
     }
 
     /// <summary>
-    /// Le banc, ou <c>null</c> quand il n'a pas pu tourner. Il alloue 384 Mo : sur une machine qui
+    /// Le banc, ou <c>null</c> quand il n'a pas pu tourner. Il alloue 256 Mo pour le debit, au moins 128 Mo pour la
+    /// latence et 64 Mo par fil pour le debit a plusieurs fils : sur une machine qui
     /// ne les a pas (c'est-a-dire exactement celle dont on veut parler), l'allocation echoue.
     /// Mesurer la memoire ne doit jamais etre la raison pour laquelle un scan s'arrete ; ne pas
     /// savoir est un resultat acceptable, un ecran d'echec ne l'est pas.
@@ -258,6 +259,15 @@ public sealed class MemoryBaselineService
             return null;
         }
     }
+
+    /// <summary>La référence décrit-elle la mémoire d'aujourd'hui ? Même fréquence, et mêmes barrettes aux mêmes emplacements :
+    /// une barrette ajoutée ou déplacée change le nombre de canaux que le débit prouve, sans changer la fréquence.</summary>
+    private static bool MemeConfiguration(MemoryBaseline reference, IReadOnlyList<MemoryModule> modules)
+        => reference.ConfiguredMts == CurrentMts(modules) && reference.Barrettes == Signature(modules);
+
+    /// <summary>Le nombre de barrettes et leurs emplacements, triés : l'ordre de lecture WMI ne change pas la configuration.</summary>
+    internal static string Signature(IReadOnlyList<MemoryModule> modules)
+        => $"{modules.Count}:{string.Join(",", modules.Select(m => m.DeviceLocator ?? "?").Order(StringComparer.Ordinal))}";
 
     private static int CurrentMts(IReadOnlyList<MemoryModule> modules)
         => modules.Where(m => m.ConfiguredMhz > 0).Select(m => m.ConfiguredMhz).DefaultIfEmpty(0).Min();
