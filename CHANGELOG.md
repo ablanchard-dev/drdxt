@@ -2,7 +2,7 @@
 
 English version of the coming changes: [CHANGELOG.en.md](CHANGELOG.en.md).
 
-## 0.9.2 (non publiée)
+## 0.9.2 (25/10/2026)
 
 Pour le joueur :
 
