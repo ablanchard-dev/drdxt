@@ -147,6 +147,94 @@ public sealed class CartesAgirTests
         geste.PeutAnnuler.Should().BeFalse();
     }
 
+    private static RepairFinding ServiceRemplacable(string? cible = "JeuServiceA") => new("SERVICES",
+        "service Call of Duty Broker : son fichier peut être remplacé par un autre programme",
+        @"C:\ProgramData\Activision\Call of Duty\JeuServiceA.exe", null, RepairStatus.Suspicious,
+        "ce service tourne avec les droits du système (SYSTEM), mais son dossier appartient à un compte.",
+        Remede: "1) Signale-le-lui.", Cible: cible);
+
+    // Le service remplaçable porte « Corriger les droits » et son Annuler, par le nom du service seul. Gardé dans « Ce que
+    // DrDXT a posé » pour un Annuler après une relance, jamais au manifeste : la désinstallation laisse la correction.
+    [Fact]
+    public async Task Un_service_remplacable_porte_corriger_les_droits_et_son_annuler()
+    {
+        var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"geste-{Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dossier);
+        try
+        {
+            var recues = new List<PrivilegedOp>();
+            var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
+            var manifeste = Substitute.For<IDesiredStateStore>();
+            var vm = Vm(new[] { ServiceRemplacable() }, HelperQuiNote(recues), journalLeviers: leviers, manifeste: manifeste);
+            vm.RetirerDuManifeste = _ => Task.FromResult(Result.Ok());
+            await vm.ScanCommand.ExecuteAsync(null);
+
+            var geste = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!.Single();
+            geste.Titre.Should().Be("Geste.Droits.Titre");
+            await geste.FaireCommand.ExecuteAsync(null);
+
+            recues.Should().Equal(new CorrigerDroitsDuServiceOp("JeuServiceA"));
+            var id = DrDxt.Application.Tweaks.LevierDeGeste.IdDroits("JeuServiceA");
+            leviers.Lire().Should().ContainSingle(s => s.TweakId == id);
+            vm.LeviersPoses.Should().ContainSingle(l => l.Id == id).Which.Titre.Should().Be("Leviers.Geste.Droits");
+            await manifeste.DidNotReceive().CommitAsync(Arg.Any<DesiredState>());
+
+            geste.PeutAnnuler.Should().BeTrue();
+            await geste.AnnulerCommand.ExecuteAsync(null);
+            recues.Last().Should().Be(new RendreDroitsDuServiceOp("JeuServiceA"));
+            leviers.Lire().Should().BeEmpty();
+        }
+        finally { System.IO.Directory.Delete(dossier, true); }
+    }
+
+    [Fact]
+    public async Task Sans_helper_corriger_les_droits_n_est_pas_propose()
+    {
+        var vm = Vm(new[] { ServiceRemplacable() }, helper: null);
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.Domaines.SelectMany(d => d.Lignes).Should().NotContain(l => l.AGestes);
+    }
+
+    // Un chemin non cité ne se corrige pas par les droits, et les tâches planifiées sont hors de ce geste.
+    [Fact]
+    public async Task Ni_un_chemin_non_cite_ni_une_tache_ne_portent_corriger_les_droits()
+    {
+        var nonCite = new RepairFinding("SERVICES", "chemin de service non cité : Svc", @"C:\Program.exe", null, RepairStatus.Suspicious,
+            @"Windows essaie C:\Program.exe avant le vrai binaire.", Remede: "1) regedit.");
+        var tache = new RepairFinding("TACHES", "tâche Maj : son fichier peut être remplacé par un autre programme", @"C:\Jeu\maj.exe", null,
+            RepairStatus.Suspicious, "cette tâche tourne en SYSTEM.", Remede: "1) Signale-le.", Cible: "Maj");
+        var vm = Vm(new[] { nonCite, tache }, Helper(Result.Ok()));
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.Domaines.SelectMany(d => d.Lignes).Should().NotContain(l => l.AGestes);
+    }
+
+    // Après une relance, la carte du geste n'existe plus (le service est protégé) : « Annuler » dans « Ce que DrDXT a posé »
+    // rend les droits d'origine.
+    [Fact]
+    public async Task Les_droits_corriges_se_rendent_depuis_ce_que_DrDXT_a_pose_apres_une_relance()
+    {
+        var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"geste-{Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dossier);
+        try
+        {
+            var recues = new List<PrivilegedOp>();
+            var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
+            var id = DrDxt.Application.Tweaks.LevierDeGeste.IdDroits("JeuServiceA");
+            leviers.Enregistrer(new ApplyReport([new ApplyOutcome(id, true, false, DrDxt.Application.Tweaks.LevierDeGeste.Snapshot(id,
+                [new RendreDroitsDuServiceOp("JeuServiceA")], [new CorrigerDroitsDuServiceOp("JeuServiceA")]), null)], null));
+            var relance = Vm(Array.Empty<RepairFinding>(), helper: HelperQuiNote(recues), journalLeviers: leviers);
+            relance.RetirerDuManifeste = _ => Task.FromResult(Result.Ok());
+
+            await relance.AnnulerLevierAsync(id, parClic: true);
+
+            recues.Should().Equal(new RendreDroitsDuServiceOp("JeuServiceA"));
+            leviers.Lire().Should().BeEmpty();
+        }
+        finally { System.IO.Directory.Delete(dossier, true); }
+    }
+
     // Un geste par paquet, chacun avec son « Annuler » qui le remet depuis l'export.
     [Fact]
     public async Task Chaque_vieux_pilote_d_affichage_se_retire_et_se_remet()

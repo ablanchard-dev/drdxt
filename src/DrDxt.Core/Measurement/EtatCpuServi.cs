@@ -8,10 +8,11 @@ namespace DrDxt.Core;
 /// aucun paramètre : pas de surface d'attaque). Ensemble fermé : TjMax (0x1A2), paquet (0x1B1), cœur 0 (0x19C), et les
 /// limites de puissance (0x606 unités, 0x610 limite, 0x614 puissances publiées, copie MMIO de la carte) ; jamais les
 /// compteurs d'énergie RAPL (attaque Platypus, Intel les a retirés aux non-administrateurs exprès). Et les
-/// ventilateurs de la carte mère (régime, cycle), lus par sa puce Super I/O.
+/// ventilateurs de la carte mère (régime, cycle), lus par sa puce Super I/O. Sur un Ryzen, Tctl en °C (registre SMN 0x59800),
+/// seulement sur une génération validée en vie (LecturesAmdProfondes.ValideesEnVie) ; null ailleurs.
 /// </summary>
 public sealed record EtatCpuServi(DateTimeOffset Le, EtatCpu? Etat, RegistresCpuLus? Limites = null, ulong? CopieMmio = null,
-    IReadOnlyList<VentilateurLu>? Ventilateurs = null)
+    IReadOnlyList<VentilateurLu>? Ventilateurs = null, double? TemperatureAmdC = null)
 {
     public const string NomDuTube = "DrDXT.Processeur";
     public const string NomDuService = "DrDxtReconciler";

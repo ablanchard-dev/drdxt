@@ -16,21 +16,26 @@ public static class GenerationAmd
     /// <summary>
     /// Une ligne par couple que nomme un document AMD publié (titres relevés le 16/10/2026 dans la liste des sources
     /// AMD de illumos usr/src/data/amdpmc/README, et pour 1Ah modèle 44h dans l'annonce de la publication 57896,
-    /// CPUID B40F40). Seuls les modèles nommés sont reconnus : un modèle voisin, même de la même famille, est une autre
-    /// puce. Ajouter une ligne demande son document. Cherchés le 16/10/2026 sans document AMD qui les nomme : Renoir
-    /// (17h 60h), Cezanne (19h 50h) et les Phoenix qui se déclarent 74h, 75h ou 78h (la publication 57019 ne nomme que
-    /// le modèle 70h, et aucun document AMD trouvé ne relie ces modèles à elle) : ils restent non reconnus.
+    /// CPUID B40F40). Renoir : « PPR for AMD Family 17h Model 60h, Revision A1 », publication 55922 (liste des publications
+    /// AMD de WikiChip, CPUID 860F01). Strix Point : « PPR for AMD Family 1Ah Model 24h, Revision B0 », publiée sous le
+    /// numéro 57254 (CPUID B20F40), que NetBSD cite sous 57274 ; le titre nomme le modèle. Seuls les modèles nommés sont
+    /// reconnus : un modèle voisin, même de la même famille, est une autre puce. Ajouter une ligne demande son document.
+    /// Cherchés le 25/10/2026 sans document AMD qui les nomme : Cezanne (19h 50h ; un PPR existe pour le modèle 51h,
+    /// sans copie AMD trouvée), Rembrandt (19h 44h), les Phoenix qui se déclarent 74h, 75h ou 78h dont la ROG Ally (la
+    /// publication 57019 ne nomme que le modèle 70h), Krackan (1Ah 60h) et Mendocino (17h A0h) : ils restent non reconnus.
     /// </summary>
     public static readonly IReadOnlyList<Ligne> Table =
     [
         new(0x17, 0x00, 0x2F, "Zen / Zen+", "AMD 56255, OSRR Family 17h Models 00h-2Fh"),
         new(0x17, 0x31, 0x31, "Zen 2", "AMD 55803, PPR Family 17h Model 31h B0"),
+        new(0x17, 0x60, 0x60, "Zen 2", "AMD 55922, PPR Family 17h Model 60h A1"),
         new(0x17, 0x71, 0x71, "Zen 2", "AMD 56176, PPR Family 17h Model 71h B0"),
         new(0x19, 0x01, 0x01, "Zen 3", "AMD 55898, PPR Family 19h Model 01h B1"),
         new(0x19, 0x21, 0x21, "Zen 3", "AMD 56214, PPR Family 19h Model 21h B0"),
         new(0x19, 0x11, 0x11, "Zen 4", "AMD 55901, PPR Family 19h Model 11h B1"),
         new(0x19, 0x61, 0x61, "Zen 4", "AMD 56713, PPR Family 19h Model 61h B1"),
         new(0x19, 0x70, 0x70, "Zen 4", "AMD 57019, PPR Family 19h Model 70h A0"),
+        new(0x1A, 0x24, 0x24, "Zen 5", "AMD 57254, PPR Family 1Ah Model 24h B0"),
         new(0x1A, 0x44, 0x44, "Zen 5", "AMD 57896, PPR Family 1Ah Model 44h B0"),
     ];
 

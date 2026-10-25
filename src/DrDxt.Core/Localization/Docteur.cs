@@ -53,7 +53,7 @@ public static class Docteur
     private static readonly string[] ClesDeNom =
     [
         "SW.ErreursNom", "SW.SanteNom", "BR.Nom.Lien", "BR.Nom.LienSsd", "BR.Nom.Ecran", "FS.Nom", "RU.Nom", "IM.NomChanges",
-        "SE.Remplacable.Nom", "SE.NonCite.Nom", "TA.Nom", "NV.Nom", "PX.Nom", "BL.Nom", "DC.Nom", "RB.Nom", "FS.NomManette", "RR.NomRegle", "TO.NomAffinite", "VC.Nom", "G32.Nom", "COUL.Nom",
+        "SE.Remplacable.Nom", "SE.NonCite.Nom", "TA.Nom", "NV.Nom", "PX.Nom", "BL.Nom", "DC.Nom", "RB.Nom", "FS.NomManette", "RR.NomRegle", "TO.NomAffinite", "VC.Nom", "G32.Nom", "COUL.Nom", "RAD.Nom",
     ];
 
     /// <summary>Le nom d'un constat, toujours formé en français : c'est la clé du journal (deux scans se comparent par

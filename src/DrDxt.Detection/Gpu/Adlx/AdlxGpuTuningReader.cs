@@ -75,6 +75,13 @@ public sealed class AdlxGpuTuningReader : IAdlxGpuTuning
             : Fail("ADLX power-limit read failed (GPU not supported or interface absent).");
     }
 
+    public Result<PlageDePuissanceAmd> GetPowerLimitRange(int gpuIndex)
+    {
+        if (gpuIndex < 0 || !_native.IsAvailable || !_native.TryReadPower(gpuIndex, out var r))
+            return Result<PlageDePuissanceAmd>.Fail(ErrorCodes.TweakSdkUnavailable, "ADLX power-limit range read failed.");
+        return Result<PlageDePuissanceAmd>.Ok(new PlageDePuissanceAmd(r.PowerRange.Min, r.PowerRange.Max, r.PowerRange.Step));
+    }
+
     public Result<FanCurve> GetFanCurve(int gpuIndex)
     {
         if (gpuIndex < 0)

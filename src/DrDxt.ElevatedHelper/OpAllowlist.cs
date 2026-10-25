@@ -297,6 +297,12 @@ public sealed class OpAllowlist
                 ? Result.Ok() : Deny("Driver package name is not an oemNN.inf name."),
             RestoreDriverPackageOp rr => PaquetPublie.IsMatch(rr.PublishedName ?? "")
                 ? Result.Ok() : Deny("Driver package name is not an oemNN.inf name."),
+            // Un nom de service seul : il devient une sous-clé de Services et un nom de fichier sous %ProgramData%\DrDxt.
+            // Ni barre (une autre clé), ni guillemet, ni variable, ni espace de bord ; le chemin est relu par le helper.
+            CorrigerDroitsDuServiceOp cd => NomDeService.IsMatch(cd.NomDuService ?? "")
+                ? Result.Ok() : Deny("Service name is not a plain service key name."),
+            RendreDroitsDuServiceOp rd2 => NomDeService.IsMatch(rd2.NomDuService ?? "")
+                ? Result.Ok() : Deny("Service name is not a plain service key name."),
 
             // Refus par défaut : tout type d'op non modélisé explicitement plus haut est refusé.
             _ => Deny("Operation type not in the allowlist."),
@@ -830,6 +836,11 @@ public sealed class OpAllowlist
     // Le nom que Windows donne a un paquet tiers publie dans son magasin (Microsoft Learn, « PnPUtil » : oem<n>.inf).
     private static readonly System.Text.RegularExpressions.Regex PaquetPublie =
         new(@"^oem[0-9]{1,5}\.inf$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    // Le nom d'une clé de service (256 caractères au plus, Microsoft Learn, « CreateServiceW ») : lettres, chiffres, et les
+    // séparateurs qu'on y voit (« Steam Client Service », « svc_1.2-x »), jamais en bord.
+    private static readonly System.Text.RegularExpressions.Regex NomDeService =
+        new(@"^[A-Za-z0-9](?:[A-Za-z0-9_. \-]{0,254}[A-Za-z0-9_.\-])?\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     // Retire les barres de début et de fin et ramène la comparaison à une forme canonique.
     private static string NormalizePath(string path) => path.Trim().Trim('\\');

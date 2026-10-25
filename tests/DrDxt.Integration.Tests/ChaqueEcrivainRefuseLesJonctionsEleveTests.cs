@@ -26,6 +26,7 @@ public sealed class ChaqueEcrivainRefuseLesJonctionsEleveTests
         ["Natif.cs"] = "déclaration de CreateFileW",
         ["PaquetDeSupport.cs"] = "écrit là où le joueur le choisit, dans la boîte d'enregistrement",
         ["Win32PnpActions.cs"] = "helper : copie des pilotes retirés dans la racine de confiance",
+        ["DroitsDesServices.cs"] = "helper : n'écrit des droits que par des handles tenus sans suivre de point de reparse, au chemin final vérifié ; l'origine gardée vit dans la racine de confiance",
         ["CallerImageIdentity.cs"] = "lecture de l'image de l'appelant",
         ["JournalDEcritureAnticipee.cs"] = "racine de confiance ; le journal du compte s'écrit par FichierJsonAtomique",
         ["ModeDesinstallation.cs"] = "racine de confiance",

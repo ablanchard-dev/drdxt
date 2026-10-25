@@ -129,6 +129,24 @@ public sealed class AdlxGpuTuningReaderTests
         act.Should().NotThrow();
     }
 
+    // ── GetPowerLimitRange : la plage dit l'unité de la limite (décalage ou % absolu). ──
+
+    [Fact]
+    public void GetPowerLimitRange_rend_la_plage_lue_et_echoue_proprement_sans_lecture()
+    {
+        var fake = new FakeAdlxNative
+        {
+            IsAvailable  = true,
+            PowerSuccess = true,
+            PowerReads   = new AdlxPowerReads { PowerLimitPct = 0, PowerRange = new AdlxIntRange { Min = -10, Max = 15, Step = 1 } },
+        };
+        new AdlxGpuTuningReader(fake).GetPowerLimitRange(0).Value.Should().Be(new DrDxt.Application.Tweaks.Hardware.PlageDePuissanceAmd(-10, 15, 1));
+
+        new AdlxGpuTuningReader(new FakeAdlxNative { IsAvailable = true, PowerSuccess = false }).GetPowerLimitRange(0)
+            .Error!.Value.Code.Should().Be(ErrorCodes.TweakSdkUnavailable);
+        new AdlxGpuTuningReader(fake).GetPowerLimitRange(-1).IsOk.Should().BeFalse();
+    }
+
     // ── GetPowerLimitPct ──────────────────────────────────────────────────
 
     [Fact]

@@ -40,6 +40,20 @@ public sealed class SourceAmdTests
             .And.NotContain("versions de retard", "AMD ne publie que la dernière : le nombre de versions entre les deux n'est pas lu");
     }
 
+    // Une APU avec une Radeon dédiée : Windows liste souvent la puce intégrée d'abord, parfois avec une réserve UMA de
+    // 2 Go. La version comparée est celle de la carte dédiée, pas celle de la puce.
+    [Theory]
+    [InlineData(512L << 20)]
+    [InlineData(2L << 30)]
+    public async Task Sur_une_APU_la_version_est_lue_sur_la_carte_dediee(long memoirePuce)
+    {
+        var puce = new GpuInfo("AMD Radeon(TM) Graphics", "AMD", memoirePuce, "31.0.0.1", TriState.Unknown);
+        var c = await VersionDuPilote.VerifierAsync([puce, Radeon("AMD Radeon RX 7800 XT")], NvidiaMuette, Source(),
+            m => m == "AMD Radeon RX 7800 XT" ? "26.5.1" : null);
+
+        c!.Explication.Should().Contain("ton pilote AMD 26.5.1 n'est pas le dernier");
+    }
+
     [Fact]
     public async Task Une_Radeon_a_jour_est_dite_a_jour()
     {

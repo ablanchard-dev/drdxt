@@ -33,6 +33,39 @@ public sealed class InventaireDesPilotesTests
         InventaireDesPilotes.Ancien(P("VB-Audio Software", Maintenant.AddYears(-1)), Maintenant).Should().BeFalse();
     }
 
+    // Le pilote chipset AMD : ses composants (PSP, SMBus, GPIO) installés par AMD sur un processeur AMD. Absent ou ancien,
+    // c'est « à regarder » : rien ne prouve un mal, mais Windows seul ne pose pas tout ce qu'AMD livre.
+    private static InventaireDesPilotes.Pilote Amd(string nom, DateTime date) =>
+        new("SYSTEM", nom, "Advanced Micro Devices, Inc", date, true, "oem42.inf");
+
+    [Fact]
+    public void Sur_un_Ryzen_sans_composant_AMD_du_chipset_le_pilote_est_dit_absent()
+    {
+        var c = InventaireDesPilotes.JugerChipsetAmd([P("Microsoft", Maintenant)], "AuthenticAMD", Maintenant).Should().ContainSingle().Subject;
+        c.Statut.Should().Be(RepairStatus.NonDefault);
+        c.Explication.Should().Be(Docteur.T("IV.ChipsetAmdAbsent"));
+    }
+
+    [Fact]
+    public void Un_pilote_chipset_AMD_ancien_est_dit_avec_sa_date_et_un_recent_est_seulement_lu()
+    {
+        var vieux = InventaireDesPilotes.JugerChipsetAmd([Amd("AMD PSP 10.0 Device", new(2019, 3, 1)), Amd("AMD SMBus", new(2020, 1, 1))],
+            "AuthenticAMD", Maintenant).Single();
+        vieux.Statut.Should().Be(RepairStatus.NonDefault);
+        vieux.ValeurCourante.Should().Contain("2020", "le plus récent des composants fait la date");
+
+        InventaireDesPilotes.JugerChipsetAmd([Amd("AMD GPIO Controller", Maintenant.AddMonths(-6))], "AuthenticAMD", Maintenant)
+            .Single().Statut.Should().Be(RepairStatus.Observed);
+    }
+
+    [Fact]
+    public void Sur_un_processeur_Intel_ou_sans_inventaire_le_chipset_AMD_ne_dit_rien()
+    {
+        InventaireDesPilotes.JugerChipsetAmd([P("INTEL", Maintenant)], "GenuineIntel", Maintenant).Should().BeEmpty();
+        InventaireDesPilotes.JugerChipsetAmd(null, "AuthenticAMD", Maintenant).Should().BeEmpty("l'inventaire dit déjà non lu");
+        InventaireDesPilotes.JugerChipsetAmd([], null, Maintenant).Should().BeEmpty();
+    }
+
     [Fact]
     public void Une_signature_non_lue_n_est_pas_un_pilote_non_signe()
     {

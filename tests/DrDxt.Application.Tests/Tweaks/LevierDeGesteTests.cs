@@ -30,6 +30,16 @@ public sealed class LevierDeGesteTests
     }
 
     [Fact]
+    public async Task Les_droits_d_un_service_se_rendent_par_son_nom()
+    {
+        var id = LevierDeGeste.IdDroits("JeuServiceA");
+
+        (await new LevierDeGeste(id, _eleve).RevertAsync(Pose(id, new RendreDroitsDuServiceOp("JeuServiceA")))).IsOk.Should().BeTrue();
+
+        await _eleve.Received(1).ExecuteAsync(new RendreDroitsDuServiceOp("JeuServiceA"), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Les_deux_reglages_DLSS_du_jeu_se_rendent()
     {
         var id = LevierDeGeste.IdDlss(Jeu);
@@ -53,6 +63,9 @@ public sealed class LevierDeGesteTests
         { LevierDeGeste.IdDlss(Jeu), new ApplyNvApiDrsSettingOp(0x1057EB71, 1, Jeu) },
         { LevierDeGeste.IdDlss(Jeu), new ApplyNvApiDrsSettingOp(SurcoucheDlss.Preset, 1, @"C:\Autre\jeu.exe") },
         { LevierDeGeste.IdDlss(Jeu), new RestoreDriverPackageOp("oem12.inf") },
+        { LevierDeGeste.IdDroits("JeuServiceA"), new RendreDroitsDuServiceOp("AutreService") },
+        { LevierDeGeste.IdDroits("JeuServiceA"), new CorrigerDroitsDuServiceOp("JeuServiceA") },
+        { LevierDeGeste.IdPilote("oem12.inf"), new RendreDroitsDuServiceOp("oem12.inf") },
     };
 
     [Theory]
@@ -71,8 +84,9 @@ public sealed class LevierDeGesteTests
     {
         LevierDeGeste.EstUnGeste(LevierDeGeste.IdPilote("oem12.inf")).Should().BeTrue();
         LevierDeGeste.EstUnGeste(LevierDeGeste.IdDlss(Jeu)).Should().BeTrue();
+        LevierDeGeste.EstUnGeste(LevierDeGeste.IdDroits("JeuServiceA")).Should().BeTrue();
         LevierDeGeste.EstUnGeste("gpu.repos_global_normal").Should().BeFalse();
-        LevierDeGeste.EstUnGeste("geste.autre|x").Should().BeFalse("seules les deux familles connues sont des gestes gardés");
+        LevierDeGeste.EstUnGeste("geste.autre|x").Should().BeFalse("seules les familles connues sont des gestes gardés");
     }
 
     // Comme chaque levier, le rendu d'un geste part hors de la portée d'une pose en cours : marqué comme une pose, il serait

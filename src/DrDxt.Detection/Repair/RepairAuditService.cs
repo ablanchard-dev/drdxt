@@ -503,6 +503,8 @@ public sealed partial class RepairAuditService
         constats.AddRange(Isoler("GPU DRIVER", () => DrDxt.Detection.Gpu.EnregistrementNvidia.Juger(DrDxt.Detection.Gpu.EnregistrementNvidia.LireReglages())));
         // La surcouche DLSS et « Ultra », des choix du joueur nommés sur carte NVIDIA, jamais posés.
         constats.AddRange(Isoler("GPU DRIVER", () => DrDxt.Detection.Gpu.OptionsNvidiaDuJoueur.Juger(CartesLues())));
+        // Leur pendant sur Radeon : Boost, Image Sharpening, RSR et AFMF, lus par ADLX et nommés, jamais posés.
+        constats.AddRange(Isoler("GPU DRIVER", () => DrDxt.Detection.Gpu.ReglagesRadeonDuJoueur.Juger(CartesLues(), _amd.Value)));
         // Les paquets de pilote d'affichage gardés par Windows et les cartes déconnectées restées déclarées.
         constats.AddRange(Isoler("GPU DRIVER", () => DrDxt.Detection.Gpu.MagasinDePilotes.Juger(
             DrDxt.Detection.Gpu.MagasinDePilotes.Pnputil("/enum-drivers /class Display"),
@@ -527,7 +529,8 @@ public sealed partial class RepairAuditService
             return FtpmAmd.Juger(generation, tpm.IsOk ? (uint?)tpm.Value!.FirstOrDefault()?.GetInt("ManufacturerId") : null, tpm.IsOk, dateBios);
         }));
         // Les lectures AMD profondes d'un Ryzen : timings appliqués et réglé contre appliqué (registres UMC en SMN), table PM
-        // (SMU), BIOS AMD nommé. Module de lecture AMD absent : une seule ligne le dit ; installé, chaque constat a sa ligne.
+        // (SMU), BIOS AMD nommé, cause matérielle des redémarrages. PawnIO absent ou génération non validée en vie : une seule
+        // ligne le dit ; porte ouverte, chaque constat a sa ligne.
         constats.AddRange(Isoler("CPU", () =>
         {
             var (fabricant, signature) = DrDxt.Detection.Cpu.Cpuid.Lire();
@@ -554,7 +557,11 @@ public sealed partial class RepairAuditService
             constats.AddRange(Isoler("PERIPHERIQUES", peripheriquesDEntreeLu));
         if (_couchesDEntree is { } couchesDEntreeLu)
             constats.AddRange(Isoler("PERIPHERIQUES", couchesDEntreeLu));
-        constats.AddRange(Isoler("PERIPHERIQUES", () => InventaireDesPilotes.Juger(PilotesLus(), DateTime.Now)));
+        IReadOnlyList<InventaireDesPilotes.Pilote>? pilotes = null;
+        constats.AddRange(Isoler("PERIPHERIQUES", () => InventaireDesPilotes.Juger(pilotes = PilotesLus(), DateTime.Now)));
+        // Le pilote chipset AMD, du même inventaire, sur un processeur AMD seulement.
+        constats.AddRange(Isoler("PERIPHERIQUES", () =>
+            InventaireDesPilotes.JugerChipsetAmd(pilotes, DrDxt.Detection.Cpu.Cpuid.Lire().Fabricant, DateTime.Now)));
         constats.AddRange(Isoler(SuspensionUsb.Domaine, SuspensionSelectiveUsb));
         constats.AddRange(Isoler("WINDOWS UPDATE", MisesAJour));
         // Ce qui attend dans Windows Update, pas seulement ce qui a échoué.
@@ -753,8 +760,9 @@ public sealed partial class RepairAuditService
             : [];
     }
 
-    // Les quatre constats AMD détaillés, quand le module de lecture AMD est installé. Les lecteurs du module (canaux UMC,
-    // table PM) restent à brancher le jour où il l'est : d'ici là, leurs entrées sont null et chaque constat dit « non lu ».
+    // Les constats AMD détaillés, appelés seulement porte ouverte (LecturesAmdProfondes.Juger). Les registres lus sont ceux
+    // que le kit de validation lit (canaux UMC, S5_RESET_STATUS) : un rapport validé couvre ce qu'il ouvre. La table PM n'est
+    // pas lue ici : le kit ne la lit pas encore, son constat dit « non lue ».
     private IEnumerable<RepairFinding> LecturesAmdDetaillees(GenerationAmd.Ligne generation)
     {
         var barrettes = _wmi.QueryInNamespace(@"\\.\root\cimv2", "SELECT SMBIOSMemoryType, Speed FROM Win32_PhysicalMemory");
@@ -763,11 +771,23 @@ public sealed partial class RepairAuditService
         // Le réglé contre l'appliqué : le BIOS nommé au dernier scan, contre les timings du contrôleur.
         var bios = DrDxt.Detection.Cpu.ChaleurEnPartie.LireBios(DossierDonnees.Chemin(ChaleurEnPartie.FichierBios),
             DrDxt.Detection.Hardware.DemarrageDuSysteme.Valeur)?.Reglages;
-        return [.. TimingsMemoireAmd.Juger(generation, types, canaux: null),
-            .. RegleContreApplique.Juger(generation, bios, appliques: null, vitesseKit),
+        return ConstatsAmdProfonds(generation, types, vitesseKit, bios, WmiFixe(RequeteCarte, "Product"),
+            WmiFixe(RequeteBios, "SMBIOSBIOSVersion"), LecturesAmd.CanauxMemoire, DrDxt.GpuNative.PawnIo.PawnIoAmd.EtatDuReset);
+    }
+
+    /// <summary>Couture de test : les constats depuis leurs entrées, les registres par <paramref name="canaux"/> et
+    /// <paramref name="reset"/> (PawnIO en vrai, null = non lu).</summary>
+    internal static IEnumerable<RepairFinding> ConstatsAmdProfonds(GenerationAmd.Ligne generation, IReadOnlyList<int> typesSmbios,
+        int vitesseKit, IReadOnlyList<BiosSettingReading>? bios, string? carte, string? versionBios,
+        Func<IReadOnlyList<(int Canal, IReadOnlyDictionary<uint, uint> Registres)>?> canaux, Func<uint?> reset)
+    {
+        var lus = canaux();
+        var appliques = TimingsMemoireAmd.Type(typesSmbios) is { } type && lus is not null ? TimingsMemoireAmd.Decoder(type, lus) : null;
+        return [.. TimingsMemoireAmd.Juger(generation, typesSmbios, lus),
+            .. RegleContreApplique.Juger(generation, bios, appliques, vitesseKit),
             .. TablePmAmd.Juger(generation, bridage: null),
-            .. TablesBiosAmd.Juger(generation, WmiFixe(RequeteCarte, "Product"),
-                WmiFixe(RequeteBios, "SMBIOSBIOSVersion"))];
+            .. TablesBiosAmd.Juger(generation, carte, versionBios),
+            .. ResetAmd.Juger(generation, reset())];
     }
 
     // Les pilotes installés (Win32_PnPSignedDriver) ; null = non lu. Une date ou une signature illisible reste null.

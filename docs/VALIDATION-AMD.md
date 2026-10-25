@@ -66,7 +66,7 @@ to the one from the reference tool.
 | Temperature (Tctl and per CCD) | thermal registers, through PawnIO's AMD modules (embedded, read-only) | not validated on real AMD | `DrDXT-Test.exe --lire`, PawnIO installed | the `Tctl` and `CCD` lines within 1 °C of HWiNFO |
 | Hardware cause of restarts | the processor's restart register (S5_RESET_STATUS), read without clearing it | not validated on real AMD | `DrDXT-Test.exe --lire`, PawnIO installed | the `S5 (reset)` line after a clean shutdown, then after a long press on the power button (bit 1) |
 | Applied memory timings | the timings the memory controller really applies, channel by channel | not validated on real AMD | `DrDXT-Test.exe --lire`, PawnIO installed | the raw `Timings channel` registers, and a ZenTimings screenshot of the same session |
-| PPT, TDC, EDC and thermal limits | the processor's power table, in game | pending the module | to come | values and limits, and the same in HWiNFO or Ryzen Master |
+| PPT, TDC, EDC and thermal limits | the processor's power table, in game, through PawnIO's RyzenSMU module (embedded, read-only) | not validated on real AMD | not in the kit yet | values and limits, and the same in HWiNFO or Ryzen Master |
 | Corrected hardware errors (MCA) | the errors the processor corrected | pending the module | to come | the errors read, and the same in Event Viewer (WHEA) |
 
 Per-core Curve Optimizer is not read from the processor: it would take a command outside the closed reading list. It is

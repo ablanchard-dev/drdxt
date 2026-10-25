@@ -42,6 +42,10 @@ public sealed partial class ScanViewModel
                 ("peripherique|" + id, () => new GesteDuDocteur(_localize("Geste.Peripherique.Titre"), _localize("Geste.Peripherique.Detail"),
                     () => Envoyer(new RestartDeviceOp(id)))),
             ]),
+            // Le service SYSTEM dont le fichier est remplaçable, par la clé de son service que le constat porte ; le chemin non
+            // cité n'en porte pas.
+            ("SERVICES", _) when r.Cible is { Length: > 0 } service => AvecLesFaits("droits",
+                [("droits|" + service, () => GesteDroits(service))]),
             // Un geste par vieux paquet : retiré après un export, remis depuis cet export.
             ("GPU DRIVER", "anciens pilotes d'affichage gardés") => AvecLesFaits("pilote",
                 (r.Cible ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries)
@@ -160,6 +164,28 @@ public sealed partial class ScanViewModel
             async () =>
             {
                 var r = await Envoyer(new RestoreDriverPackageOp(paquet)).ConfigureAwait(true);
+                if (r.IsOk) await OublierAsync(id).ConfigureAwait(true);
+                return r;
+            });
+    }
+
+    /// <summary>Rendre aux administrateurs le fichier d'un service SYSTEM et son dossier ; Annuler rend l'origine que le helper a
+    /// gardée. Gardé comme un levier pour un Annuler après une relance, quand le constat n'existe plus ; jamais au manifeste
+    /// (RendreDroitsDuServiceOp n'est pas une origine que la désinstallation rend) : désinstaller DrDXT laisse la correction.</summary>
+    internal GesteDuDocteur GesteDroits(string service)
+    {
+        var id = DrDxt.Application.Tweaks.LevierDeGeste.IdDroits(service);
+        Task<Result> Envoyer(PrivilegedOp op) => _helper!.ExecuteAsync(op, CancellationToken.None);
+        return new GesteDuDocteur(_localize("Geste.Droits.Titre"), _localize("Geste.Droits.Detail"),
+            async () =>
+            {
+                var r = await Envoyer(new CorrigerDroitsDuServiceOp(service)).ConfigureAwait(true);
+                if (r.IsOk) await GarderLeGesteAsync(id, [new RendreDroitsDuServiceOp(service)], [new CorrigerDroitsDuServiceOp(service)]).ConfigureAwait(true);
+                return r;
+            },
+            async () =>
+            {
+                var r = await Envoyer(new RendreDroitsDuServiceOp(service)).ConfigureAwait(true);
                 if (r.IsOk) await OublierAsync(id).ConfigureAwait(true);
                 return r;
             });

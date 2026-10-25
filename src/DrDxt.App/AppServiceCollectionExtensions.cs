@@ -551,7 +551,7 @@ public static class AppServiceCollectionExtensions
             new AdlxGpuTuningReader(sp.GetRequiredService<IAdlxNative>()));
         // La couture de latence AMD (Anti-Lag, limite FRTC / Chill) lue par ADLX, seulement si le pilote AMD a
         // posé amdadlx64.dll ; sinon StubAdlx (TryAdd dans AddDrDxtApplication) reste. Lecture seule : l'écriture
-        // d'Anti-Lag n'existe pas côté helper (ADLXTuningActions la refuse).
+        // d'Anti-Lag passe par le helper élevé (ADLXTuningActions, AdlxTuningKind.AntiLag).
         if (DrDxt.Detection.Gpu.Adlx.AdlxReglages.DllPresente())
             services.AddSingleton<IAdlx>(_ => new DrDxt.Detection.Gpu.Adlx.AdlxLatencyReader(DrDxt.Detection.Gpu.Adlx.AdlxReglages.Lire));
 

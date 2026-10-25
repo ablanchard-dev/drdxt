@@ -110,3 +110,17 @@ For the player:
 - Tracked settings: a failed read no longer loses the history, and the app and the background recording no longer
   get in each other's way.
 - One app per session: a second launch shows the open window.
+
+### Windows security
+- "Fix the permissions": a service of another program that runs as SYSTEM from a file your account can replace is
+  given back to the administrators, on your click; the original permissions are kept, and Undo puts them back. A link in
+  its folder cancels the fix.
+
+### AMD, ready for validation
+- Radeon: the card's power, clocks, hotspot and fan are recorded in-game; Boost, Image Sharpening, RSR and AFMF are read
+  and named by the doctor.
+- The power limit and the Expert-mode fixed fan speed are written through ADLX, closed until a report validates the
+  card's generation. GCN and RDNA 1 are recognized; RDNA 2 and 3 open with their report.
+- Ryzen: temperature, memory timings and the restart cause are read in the app, behind the same gate; Renoir and Strix
+  Point are recognized; a missing or old AMD chipset driver is reported.
+- The AMD driver version is read on the dedicated card, no longer on an APU's integrated chip.

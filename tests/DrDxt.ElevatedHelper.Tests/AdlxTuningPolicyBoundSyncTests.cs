@@ -46,6 +46,21 @@ public sealed class AdlxTuningPolicyBoundSyncTests
     [InlineData(101, false)]           // au-dessus du plafond
     [InlineData(int.MinValue, false)]
     [InlineData(int.MaxValue, false)]
+    // La même bande dite en décalage autour de l'usine, la forme de la limite de Radeon Software (0 = usine) : jamais
+    // au-dessus de l'usine, jamais sous le plancher.
+    [InlineData(0, true)]
+    [InlineData(-10, true)]
+    [InlineData(-40, true)]            // plancher : 100 - 40 = 60 %
+    [InlineData(-41, false)]
+    [InlineData(1, false)]             // au-dessus de l'usine
+    [InlineData(15, false)]
     public void Power_limit_rail_enforces_the_policy_band(int pct, bool inBand) =>
         AdlxTuningMath.IsPowerLimitWithinHardRail(pct).Should().Be(inBand);
+
+    [Fact]
+    public void Power_limit_offset_band_mirrors_GpuSafeBounds()
+    {
+        AdlxTuningMath.MinPowerLimitOffset.Should().Be(GpuSafeBounds.MinPowerLimitPct - 100);
+        AdlxTuningMath.MaxPowerLimitOffset.Should().Be(GpuSafeBounds.MaxPowerLimitPct - 100);
+    }
 }

@@ -22,7 +22,8 @@ public sealed class CommandeSmuLecture
 /// marge du Curve Optimizer) sont nommées, par génération exacte : un même numéro règle quelque chose sur une autre
 /// génération (0x06 lit l'adresse de la table sur Zen 2 et Zen 3, et règle la marge d'un cœur du Curve Optimizer sur
 /// Zen 4). Une génération absente n'a aucune commande. Aucune commande de réglage n'est nommée ici, et aucun code de
-/// DrDXT n'envoie de commande : l'accès passe par un module PawnIO AMD que DrDXT n'embarque pas (GATES).
+/// DrDXT n'envoie une commande par son numéro : l'accès passe par le module RyzenSMU de PawnIO, embarqué (PawnIoAmd), dont
+/// les ioctl de lecture fixent eux-mêmes leurs commandes (version du SMU, table PM).
 /// Sources, lues comme documentation : ryzen_smu (github.com/amkillam/ryzen_smu, commit d2983668, smu.c) et
 /// ZenStates-Core (github.com/irusanov/ZenStates-Core, commit 869b7e82, Hardware/Smu/Settings/Zen2Settings.cs,
 /// Zen3Settings.cs, Zen4Settings.cs, Zen5Settings.cs, Hardware/Smu/Mailbox.cs). AMD ne publie pas ces numéros.

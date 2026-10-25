@@ -37,6 +37,7 @@ public sealed class ServeurDuProcesseur : BackgroundService
     private readonly Func<EtatCpu?> _lire;
     private readonly Func<(RegistresCpuLus? Limites, ulong? CopieMmio)> _lireLimites;
     private readonly Func<IReadOnlyList<VentilateurLu>?> _lireVentilateurs;
+    private readonly Func<double?> _lireTemperatureAmd;
     private readonly Action _fermer;
     private readonly Func<bool> _ouvert;
     private readonly Func<DateTimeOffset> _horloge;
@@ -45,18 +46,27 @@ public sealed class ServeurDuProcesseur : BackgroundService
     private long _derniereDemandeTicks = DateTimeOffset.MinValue.UtcTicks;
 
     public ServeurDuProcesseur()
-        : this(DrDxt.Detection.Cpu.TemperaturePawnIo.LireEtatDirect, DrDxt.GpuNative.PawnIo.PawnIoIntel.FermerTout,
-            DrDxt.GpuNative.PawnIo.PawnIoIntel.Ouvert, () => DateTimeOffset.Now, EtatCpuServi.NomDuTube, LimitesDirectes,
-            VentilateursDirects) { }
+        : this(DrDxt.Detection.Cpu.TemperaturePawnIo.LireEtatDirect, FermerTout, Ouvert, () => DateTimeOffset.Now,
+            EtatCpuServi.NomDuTube, LimitesDirectes, VentilateursDirects,
+            lireTemperatureAmd: DrDxt.Detection.Cpu.LecturesAmd.TemperaturePourLeService) { }
+
+    // Les poignées Intel et AMD se ferment ensemble après l'inactivité : aucun pilote de lecture ne reste chargé hors des parties.
+    private static void FermerTout()
+    {
+        DrDxt.GpuNative.PawnIo.PawnIoIntel.FermerTout();
+        DrDxt.GpuNative.PawnIo.PawnIoAmd.FermerTout();
+    }
+
+    private static bool Ouvert() => DrDxt.GpuNative.PawnIo.PawnIoIntel.Ouvert() || DrDxt.GpuNative.PawnIo.PawnIoAmd.Ouvert();
 
     /// <summary>Coutures de test : la lecture, la fermeture de PawnIO, l'horloge, le nom du tube, la lecture des limites, celle
-    /// des ventilateurs, la borne d'écriture.</summary>
+    /// des ventilateurs, la borne d'écriture, la température d'un Ryzen.</summary>
     internal ServeurDuProcesseur(Func<EtatCpu?> lire, Action fermer, Func<bool> ouvert, Func<DateTimeOffset> horloge, string nom,
         Func<(RegistresCpuLus? Limites, ulong? CopieMmio)>? lireLimites = null, Func<IReadOnlyList<VentilateurLu>?>? lireVentilateurs = null,
-        TimeSpan? delaiEcriture = null)
-        => (_lire, _fermer, _ouvert, _horloge, _nom, _lireLimites, _lireVentilateurs, _delaiEcriture)
+        TimeSpan? delaiEcriture = null, Func<double?>? lireTemperatureAmd = null)
+        => (_lire, _fermer, _ouvert, _horloge, _nom, _lireLimites, _lireVentilateurs, _delaiEcriture, _lireTemperatureAmd)
             = (lire, fermer, ouvert, horloge, nom, lireLimites ?? (() => (null, null)), lireVentilateurs ?? (() => null),
-                delaiEcriture ?? DelaiEcriture);
+                delaiEcriture ?? DelaiEcriture, lireTemperatureAmd ?? (() => null));
 
     /// <summary>Les ventilateurs de la carte mère, lus ici (le service a les droits) ; null sans PawnIO ou sur une puce non lue.
     /// Une lecture coûte ~79 ms de processeur : la dernière sert pendant PawnIoSuperIo.IntervalleLecture (15 s).</summary>
@@ -150,7 +160,11 @@ public sealed class ServeurDuProcesseur : BackgroundService
         IReadOnlyList<VentilateurLu>? ventilateurs = null;
         try { ventilateurs = _lireVentilateurs(); }
         catch (Exception) { } // une panne des ventilateurs ne prive jamais de l'état du processeur
-        var octets = Encoding.UTF8.GetBytes(new EtatCpuServi(_horloge(), etat, limites.Limites, limites.CopieMmio, ventilateurs).VersJson() + "\n");
+        double? temperatureAmd = null;
+        try { temperatureAmd = _lireTemperatureAmd(); }
+        catch (Exception) { /* servie null : le client dit « non lue » */ }
+        var octets = Encoding.UTF8.GetBytes(new EtatCpuServi(_horloge(), etat, limites.Limites, limites.CopieMmio, ventilateurs,
+            temperatureAmd).VersJson() + "\n");
         using var borne = CancellationTokenSource.CreateLinkedTokenSource(ct);
         borne.CancelAfter(_delaiEcriture);
         try

@@ -84,8 +84,14 @@ public static class GpuArchitectureGate
         new(@"\bRX\s*6\d{3}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex Rdna4Model =
         new(@"\bRX\s*9\d{3}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // « RX 5xxx » (quatre chiffres) = RDNA 1. « RX 4x0/5x0 » (trois chiffres, suffixe X ou D possible), « Vega » et
+    // « Radeon VII » = GCN. Le nombre de chiffres sépare une RX 5700 d'une RX 570.
+    private static readonly Regex Rdna1Model =
+        new(@"\bRX\s*5\d{3}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex GcnModel =
+        new(@"\bRX\s*[45]\d0[XD]?\b|\bVega\b|\bRadeon\s+VII\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    /// <summary>Classe le nom commercial d'un GPU NVIDIA ou Radeon (RDNA 2 à 4) en architecture grossière.
+    /// <summary>Classe le nom commercial d'un GPU NVIDIA ou Radeon (GCN, RDNA 1 à 4) en architecture grossière.
     /// Nom inconnu ou d'un autre fabricant → Unknown (les gardes le traitent avec prudence).</summary>
     public static GpuArchitecture ClassifyByName(string? model)
     {
@@ -101,6 +107,10 @@ public static class GpuArchitectureGate
             return GpuArchitecture.Rdna3;
         if (Rdna2Model.IsMatch(model))
             return GpuArchitecture.Rdna2;
+        if (Rdna1Model.IsMatch(model))
+            return GpuArchitecture.Rdna1;
+        if (GcnModel.IsMatch(model))
+            return GpuArchitecture.Gcn;
         return GpuArchitecture.Unknown;
     }
 
@@ -124,7 +134,7 @@ public static class GpuArchitectureGate
     };
 
     /// <summary>Vrai quand ce GPU permet l'écriture directe de sous-tension. NVIDIA : vrai sauf Blackwell (RTX 50), qui
-    /// passe par limite de puissance + décalage cœur. AMD : faux pour RDNA 2 et RDNA 3 (jamais testées en écriture), vrai
+    /// passe par limite de puissance + décalage cœur. AMD : faux pour GCN et RDNA 1 à 3 (jamais testées en écriture), vrai
     /// pour les autres cartes, même non classées : elles gardent leur chemin ADLX. Le classificateur par architecture, lui,
     /// rend faux pour une architecture inconnue ; les deux ne répondent donc pas pareil pour un AMD non classé.</summary>
     public static bool SupportsVoltageUndervolt(GpuInfo gpu)
@@ -135,8 +145,8 @@ public static class GpuArchitectureGate
         // pas AMD », serait vrai et insuffisant : ca laisserait passer RDNA3, la seule
         // architecture AMD qui garde le voltage manuel et la seule que personne n'a jamais
         // testee en ecriture.
-        // RDNA2 pareil, jamais testée en écriture.
-        if (architecture is GpuArchitecture.Rdna3 or GpuArchitecture.Rdna2)
+        // RDNA2, RDNA1 et GCN pareil : jamais testées en écriture.
+        if (architecture is GpuArchitecture.Rdna3 or GpuArchitecture.Rdna2 or GpuArchitecture.Rdna1 or GpuArchitecture.Gcn)
             return false;
 
         var isNvidia = gpu.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase);

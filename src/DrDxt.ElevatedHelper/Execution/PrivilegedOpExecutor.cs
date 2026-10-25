@@ -46,6 +46,8 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
     private readonly IPnpActions? _pnp;
     private readonly DrDxt.Reconciler.PauseDuMaintien? _pauseDuMaintien;
     private const string PnpNotWiredMessage = "The pnputil seam is not wired in this host: nothing was done.";
+    private readonly DroitsDesServices? _droits;
+    private const string DroitsNotWiredMessage = "The service-permission seam is not wired in this host: nothing was written.";
     private readonly IVentilateurActions? _ventilateur;
     private readonly ICpuPowerActions? _cpu;
     private readonly IDiagnosticsLog? _diagnostics;
@@ -109,8 +111,11 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
         // La pause du maintien. Branchee dans le helper seul : le service la lit, il ne l'ecrit pas.
         DrDxt.Reconciler.PauseDuMaintien? pauseDuMaintien = null,
         // Le journal des écarts qui ne sont pas des échecs (le champ mémoire d'un décalage cœur). Absent : rien n'est noté.
-        IDiagnosticsLog? diagnostics = null)
+        IDiagnosticsLog? diagnostics = null,
+        // Les droits du fichier d'un service SYSTEM, corrigés et rendus. Branchés dans le helper seul.
+        DroitsDesServices? droits = null)
     {
+        _droits = droits;
         _diagnostics = diagnostics;
         _pauseDuMaintien = pauseDuMaintien;
         _pnp = pnp;
@@ -210,6 +215,10 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                     _pnp is null ? Fail(PnpNotWiredMessage) : _pnp.RemoveDriverPackage(rp.PublishedName),
                 RestoreDriverPackageOp rr =>
                     _pnp is null ? Fail(PnpNotWiredMessage) : _pnp.RestoreDriverPackage(rr.PublishedName),
+                CorrigerDroitsDuServiceOp cd =>
+                    _droits is null ? Fail(DroitsNotWiredMessage) : _droits.Corriger(cd.NomDuService),
+                RendreDroitsDuServiceOp rd2 =>
+                    _droits is null ? Fail(DroitsNotWiredMessage) : _droits.Rendre(rd2.NomDuService),
 
                 ReadFirmwareVariableOp fv =>
                     _firmwareBoot is null

@@ -1,4 +1,5 @@
 using DrDxt.Application.Autopilot;
+using DrDxt.Application.Tweaks.Hardware;
 using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks.Gpu;
@@ -7,8 +8,9 @@ namespace DrDxt.Application.Tweaks.Gpu;
 /// Le ventilateur de la carte en mode Expert, sur geste du joueur seulement. Même filet que la
 /// fréquence (<see cref="ReglageCarteExpert"/>) : l'essai est noté avant (le démarrage suivant rend l'automatique si
 /// DrDXT plante), le bail du helper est armé avant l'écriture (si DrDXT s'arrête, le helper rend l'automatique seul),
-/// puis la vitesse est posée. Le helper ne pose que vers le haut (voir NvmlVentilateurActions) ; ici, la borne basse
-/// est le plancher à chaud de la liste blanche (40 %).
+/// puis la vitesse est posée. Sur une carte NVIDIA, le helper ne pose que vers le haut (NvmlVentilateurActions) ; sur une
+/// carte AMD, il pose la même vitesse sur chaque état de la courbe par ADLX (AdlxVentilateurActions). Ici, la borne basse est
+/// le plancher à chaud de la liste blanche (40 %).
 /// </summary>
 public sealed class VentilateurExpert(IElevatedClient elevated, IRevertEnAttente journal)
 {
@@ -17,9 +19,18 @@ public sealed class VentilateurExpert(IElevatedClient elevated, IRevertEnAttente
     public const int MinPourcent = 40, MaxPourcent = 100;
 
     /// <summary>Un PC fixe à une seule carte NVIDIA : NVML pilote l'index 0, et sur un portable le constructeur pilote le
-    /// ventilateur.</summary>
-    public static bool Possible(HardwareInventory hw) => ReglageCarteExpert.Possible(hw)
-        && hw.Gpus.Count(g => g.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase)) == 1;
+    /// ventilateur. Ou, sans carte NVIDIA, une seule carte AMD dédiée dont l'architecture a son rapport de validation
+    /// (<see cref="GpuTuningCoverage.ValideesEnVie"/>, aucune AMD aujourd'hui) : ADLX pilote la carte dédiée.</summary>
+    public static bool Possible(HardwareInventory hw) => Possible(hw, GpuTuningCoverage.ValideesEnVie);
+
+    /// <param name="validees">Les architectures validées par un rapport.</param>
+    public static bool Possible(HardwareInventory hw, IReadOnlySet<GpuArchitecture> validees)
+    {
+        if (!ReglageCarteExpert.Possible(hw)) return false;
+        var nvidia = hw.Gpus.Count(g => g.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase));
+        return nvidia == 1 || (nvidia == 0 && hw.Gpus.Count(g => GpuGating.IsAmd(g) && GpuGating.IsTunableDiscreteGpu(g)) == 1
+            && LimitePuissanceAmd.AmdValidee(hw, validees));
+    }
 
     public async Task<Result<IEssaiCarte>> PoserAsync(int pourcent, int gpuIndex = 0)
     {

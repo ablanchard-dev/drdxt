@@ -74,6 +74,14 @@ public enum GpuArchitecture
     /// <summary>RDNA 2 (RX 6000 : 6400 à 6950 XT). Elles passaient « architecture inconnue » alors
     /// qu'elles sont nombreuses chez les joueurs. Reconnues, lues par ADLX ; jamais validées en écriture (voltage fermé).</summary>
     Rdna2 = 5,
+
+    /// <summary>RDNA 1 (RX 5000 : 5300 à 5700 XT). Reconnue par le nom, lue par ADLX ; aucune écriture validée,
+    /// lecture seule jusqu'à un rapport.</summary>
+    Rdna1 = 6,
+
+    /// <summary>GCN (RX 400/500 Polaris, RX Vega, Radeon VII). Reconnue par le nom pour dire ce qu'est la carte ;
+    /// aucune écriture validée, lecture seule jusqu'à un rapport.</summary>
+    Gcn = 7,
 }
 
 /// <summary>Borne partagée de la boucle de sonde des GPU réglables de
@@ -124,14 +132,22 @@ public interface IAdlxGpuTuning
     /// réglée par un autre outil ne se règle pas par-dessus.</summary>
     bool? EstALUsine(int gpuIndex) => null;
 
-    /// <summary>Lit la limite de puissance ADLX courante, dans l'unité du pilote (% du TDP ou décalage : non relevé sur une
-    /// vraie carte, d'où gpu.power_limit non proposé sur AMD). Chemin indisponible → Fail(TWEAK.SDK_UNAVAILABLE).</summary>
+    /// <summary>Lit la limite de puissance ADLX courante, dans l'unité du pilote (% du TDP ou décalage autour de l'usine :
+    /// la plage le dit, voir <see cref="Gpu.LimitePuissanceAmd"/>). Chemin indisponible → Fail(TWEAK.SDK_UNAVAILABLE).</summary>
     Result<int> GetPowerLimitPct(int gpuIndex);
+
+    /// <summary>Lit la plage de la limite de puissance (GetPowerLimitRange), dans l'unité du pilote. Chemin indisponible →
+    /// Fail(TWEAK.SDK_UNAVAILABLE).</summary>
+    Result<PlageDePuissanceAmd> GetPowerLimitRange(int gpuIndex) =>
+        Result<PlageDePuissanceAmd>.Fail(ErrorCodes.TweakSdkUnavailable, "ADLX power-limit range not read.");
 
     /// <summary>Lit la courbe de ventilateur courante d'un GPU. Chemin indisponible →
     /// Fail(TWEAK.SDK_UNAVAILABLE).</summary>
     Result<Gpu.FanCurve> GetFanCurve(int gpuIndex);
 }
+
+/// <summary>La plage de la limite de puissance d'une carte AMD, dans l'unité du pilote.</summary>
+public sealed record PlageDePuissanceAmd(int Min, int Max, int Pas);
 
 /// <summary>Le résultat d'un court test de stabilité GPU.</summary>
 public enum StabilityOutcome

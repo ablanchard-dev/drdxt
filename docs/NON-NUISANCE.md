@@ -539,6 +539,14 @@ aussi retiré : `Detection/Display/EdidDuMoniteur.cs` appelle `WmiGetMonitorRawE
 | `Reconciler/Manifest/MachineManifestCommit.cs` (0 → 1) | un fichier verrou, ouvert sans partage et supprimé à la fermeture, pour qu'un seul processus écrive le manifeste | à côté du manifeste, dans `%ProgramData%\DrDxt` |
 | `Reconciler/JsonReconcilerStateStore.cs` (3 → 2), `Reconciler/Manifest/TrustedManifestRoot.cs` (8 → 7) | moins d'écritures directes : elles passent par l'écriture atomique commune ou par le verrou partagé | inchangé |
 
+### 25/10/2026 — « Corriger les droits » et le ventilateur AMD
+
+| Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
+|---|---|---|
+| `ElevatedHelper/Execution/DroitsDesServices.cs` (0 → 3) | sur clic, le **propriétaire et la DACL** du fichier d'un service SYSTEM remplaçable par le compte, et de son dossier : SYSTEM et Administrateurs, Utilisateurs en lecture ; l'origine gardée avant (fichier de confiance), rendue par Annuler | chemin relu dans le registre des services par le helper ; jamais sous Windows, les profils, DrDXT ni à même un dossier partagé ; handles sans suivre de lien ; pose sans propagation, héritage rendu aux enfants sans suivre aucun lien, un lien trouvé fait refuser et rendre l'origine |
+| `GpuNative/AdlxNative.Ventilateur.cs` (0 → 2), `GpuNative/IAdlxNative.cs` (6 → 8, les membres par défaut qui refusent) | la **vitesse fixe du ventilateur d'une Radeon** (ADLX manual fan tuning) et le retour à la courbe de la carte | la carte dédiée ; relu après la pose |
+| `ElevatedHelper/Execution/AdlxVentilateurActions.cs` (0 → 3) | la pose et le rendu de cette vitesse, sous les mêmes gardes que le ventilateur NVIDIA : plancher de 40 %, bail, retour à l'automatique dès 80 °C lus par ADLX | fermé dans l'App tant que l'architecture n'a pas de rapport validé |
+
 `python tools/nonuisance/count-write-sites.py` refait ce compte et **sort non-zero** si un fichier
 apparait, disparait, ou change de compte. Le script ne recopie rien : un chiffre ecrit a la main
 est une dette tant qu'aucun outil ne le refait.
@@ -590,6 +598,8 @@ src/DrDxt.Detection/Repair/RepairAuditService.cs 2
 src/DrDxt.ElevatedHelper/ClientSessionUtilisateur.cs 1
 src/DrDxt.ElevatedHelper/Execution/Adlx/ADLXTuningActions.cs 8
 src/DrDxt.ElevatedHelper/Execution/Adlx/OrigineAdlx.cs 2
+src/DrDxt.ElevatedHelper/Execution/AdlxVentilateurActions.cs 3
+src/DrDxt.ElevatedHelper/Execution/DroitsDesServices.cs 3
 src/DrDxt.ElevatedHelper/Execution/GardeDuFichierDEchange.cs 3
 src/DrDxt.ElevatedHelper/Execution/IPrivilegedActions.cs 2
 src/DrDxt.ElevatedHelper/Execution/NvApi/NvApiDrsActions.cs 3
@@ -611,8 +621,9 @@ src/DrDxt.ElevatedHelper/Ipc/HelperLauncher.cs 1
 src/DrDxt.ElevatedHelper/Journal/JournalDEcritureAnticipee.cs 5
 src/DrDxt.ElevatedHelper/ModeDesinstallation.cs 5
 src/DrDxt.ElevatedHelper/Program.cs 1
+src/DrDxt.GpuNative/AdlxNative.Ventilateur.cs 2
 src/DrDxt.GpuNative/AdlxNative.cs 6
-src/DrDxt.GpuNative/IAdlxNative.cs 6
+src/DrDxt.GpuNative/IAdlxNative.cs 8
 src/DrDxt.GpuNative/INvApiNative.cs 6
 src/DrDxt.GpuNative/NvApiNative.cs 6
 src/DrDxt.GpuNative/Nvml/INvmlNative.cs 2
@@ -907,6 +918,16 @@ pause ne coupe que le maintien.
 `ValeursDrs` d'apres NvApiDriverSettings.h. Meme portee que les autres : un chemin d'executable complet ou le profil de base,
 et le produit n'ecrit qu'au profil d'un jeu qui en a deja un. Nuisance possible, dite : une image plus nette pour un calcul
 un peu plus lourd ; la generation d'images (latence) n'est pas touchee. Prouve par `SurcoucheDlssTests`, `GesteDlssTests`.
+
+### 25/10/2026 — `CorrigerDroitsDuServiceOp` / `RendreDroitsDuServiceOp` : les droits du fichier d'un service SYSTEM
+
+| Site | Ce qu'il fait | Garde | Prouve par |
+|---|---|---|---|
+| `DroitsDesServices` (helper eleve) | rend aux administrateurs le fichier d'un service qui tourne en SYSTEM et que le compte peut remplacer, et son dossier : proprietaire Administrateurs (un proprietaire deja SYSTEM, Administrateurs ou TrustedInstaller reste), DACL protegee SYSTEM et Administrateurs en controle total, TrustedInstaller s'il y etait, Utilisateurs en lecture et execution (heritable sur le dossier, donc propagee a ce qu'il contient). L'inverse rend le proprietaire et la DACL d'origine. | le nom du service seul sur le fil (regex : lettres, chiffres, `_ . -` et espace interieur, 256 au plus ; ni barre, ni guillemet, ni variable), jamais un chemin ni un SDDL ; `ImagePath` et `ObjectName` relus par le helper dans `HKLM\SYSTEM\CurrentControlSet\Services\<nom>`, sans developper de variable ; refus sans ecriture : service absent, compte autre que LocalSystem, pilote, chemin relatif, reseau ou avec variable, binaire absent, binaire sous `%WINDIR%`, sous les profils ou dans le dossier de DrDXT, binaire pose a meme une racine, ProgramData, Program Files ou Common Files (leur DACL se propagerait a tout ce qu'ils contiennent) ; deja protege (`CheminProtege.Verifier`) : reussite sans ecriture ; fichier et dossier tenus par handle sans partage de suppression, chemin final du handle egal au chemin du registre (ni lien ni jonction), un seul lien dur ; la DACL du dossier se pose sans propagation automatique (handle en `MAXIMUM_ALLOWED`, Microsoft Learn « SetSecurityInfo function »), l'heritage est rendu aux enfants par une descente qui ouvre chacun sans suivre de point de reparse : un lien (jonction, lien symbolique, lien dur) dans le dossier refuse la correction et rend l'origine, l'annulation le laisse intact sans jamais en toucher la cible ; origine (SDDL du fichier et du dossier, identifiant du fichier) gardee AVANT toute ecriture dans `%ProgramData%\DrDxt\droits-des-services\service-<nom>.json` (`TrustedManifestRoot.WriteTrustedFile`), jamais ecrasee ; relu apres ecriture : un dossier au-dessus encore modifiable par le compte rend l'origine tout de suite et l'echec dit pourquoi, les dossiers au-dessus ne sont jamais touches ; l'inverse ne rend que l'origine gardee, relue de confiance, pour le meme chemin et le meme fichier, puis la retire ; jamais le revert d'un bail | `DroitsDesServicesTests` (allowlist, codec, chaque refus, deja protege, lien et lien dur, correction relue protegee, TrustedInstaller garde, origine gardee avant ecriture et jamais ecrasee, ancetre modifiable rendu, inverse exact, inverse sans origine, origine non fiable, chemin change, fichier remplace, jonction et lien symbolique jamais suivis a la correction comme a l'annulation, pose du dossier sans propagation, enfants ordinaires rendus, origine qui ne se remet pas), `LeaseWatchdogTests` |
+
+Nuisance possible, dite : un lanceur ou un jeu qui ecrivait lui-meme dans ce dossier sans droits administrateur peut ne plus
+se mettre a jour ; « Annuler » rend les droits d'origine. La desinstallation de DrDXT laisse la correction en place (une
+correction de securite, pas un reglage de jeu) : son rapport nomme les services concernes.
 
 ## Ce que le produit a le DROIT de dire au client
 

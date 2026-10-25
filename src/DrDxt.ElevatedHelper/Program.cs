@@ -150,13 +150,15 @@ internal static class Program
             plafondDuService: DrDxt.Reconciler.Reseau.PlafondEnvoiDuService.ParDefaut(),
             // Le seul ecrivain de la pause du maintien que lit le service.
             pauseDuMaintien: DrDxt.Reconciler.PauseDuMaintien.ParDefaut(),
-            // Le ventilateur en mode Expert, vers le haut seulement, rendu sous bail.
-            ventilateur: new NvmlVentilateurActions(),
+            // Le ventilateur en mode Expert, rendu sous bail : NVML sur une carte NVIDIA (vers le haut seulement), ADLX sinon.
+            ventilateur: VentilateurSelonLaCarte.ParDefaut(),
             // La limite de puissance du processeur, relue avant et après, par PawnIO s'il est là.
             cpu: new PawnIoCpuPowerActions(),
             // Relancer un peripherique en echec, retirer un vieux pilote d'affichage exporte, le remettre (pnputil).
             pnp: new Win32PnpActions(),
-            diagnostics: new HelperDiagnosticsLog());
+            diagnostics: new HelperDiagnosticsLog(),
+            // Rendre aux administrateurs le fichier d'un service SYSTEM que le compte peut remplacer, et rendre l'origine.
+            droits: DroitsDesServices.ParDefaut());
 
         // Homme mort (dead-man's switch) : un décalage GPU / une limite de puissance tenus enregistrent
         // un bail dont le retour enregistré (une op typée existante) part tout seul si le contrôleur
@@ -234,10 +236,9 @@ internal static class Program
         // expirés reviennent en arrière tout seuls. Tourne à côté de la boucle d'acceptation ; les
         // pannes sont avalées pour qu'un mauvais tick ne fasse jamais planter l'hôte.
         // La garde thermique du ventilateur : tant qu'une vitesse fixe est tenue, la température est lue à chaque passage.
-        var nvml = new DrDxt.GpuNative.Nvml.NvmlNative();
-        uint? Temperature(int gpu) => nvml.TryGetTemperatureCelsius(gpu, out var c) ? c : null;
+        var temperature = GardeThermiqueVentilateur.Temperature(new DrDxt.GpuNative.Nvml.NvmlNative(), new DrDxt.Detection.Gpu.Adlx.AdlxNative());
         var monitor = RunLeaseMonitorAsync(watchdog, TimeSpan.FromSeconds(5), cts.Token,
-            ct => watchdog.RendreSiAsync(op => GardeThermiqueVentilateur.DoitRendre(op, Temperature), "fan-auto-hot-or-unread", ct), () =>
+            ct => watchdog.RendreSiAsync(op => GardeThermiqueVentilateur.DoitRendre(op, temperature), "fan-auto-hot-or-unread", ct), () =>
         {
             if (inactivite?.DoitSArreter(watchdog.NombreDeBaux, ProcessusVivant) != true) return;
             Console.Out.WriteLine("DrDxt.ElevatedHelper: app closed or 15 minutes without a connection, and no lease: stopping.");

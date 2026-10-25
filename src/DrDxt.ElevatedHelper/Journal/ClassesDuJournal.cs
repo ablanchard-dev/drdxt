@@ -61,6 +61,9 @@ public static class ClassesDuJournal
         // Le dossier pilotes-retires de ProgramData garde déjà de quoi les rendre.
         [typeof(RemoveDriverPackageOp)] = ClasseDuJournal.SansEtat,
         [typeof(RestoreDriverPackageOp)] = ClasseDuJournal.SansEtat,
+        // L'origine des droits est gardée par le helper lui-même, dans son fichier de confiance (DroitsDesServices).
+        [typeof(CorrigerDroitsDuServiceOp)] = ClasseDuJournal.SansEtat,
+        [typeof(RendreDroitsDuServiceOp)] = ClasseDuJournal.SansEtat,
         [typeof(InstallPresentMonServiceOp)] = ClasseDuJournal.SansEtat,
         [typeof(PingOp)] = ClasseDuJournal.SansEtat,
         [typeof(ReadComponentStoreHealthOp)] = ClasseDuJournal.SansEtat,

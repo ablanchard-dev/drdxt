@@ -78,6 +78,9 @@ public enum PrivilegedOpType
     AcquitterEcriture = 46,
     // La pause du maintien posée ou levée par le joueur. Appendue : ne jamais renumeroter.
     SetMaintenancePause = 47,
+    // Les droits du fichier d'un service corrigés, et rendus. Appendues : ne jamais renumeroter.
+    CorrigerDroitsDuService = 48,
+    RendreDroitsDuService = 49,
 }
 
 // -----------------------------------------------------------------------
@@ -185,6 +188,8 @@ public static class PrivilegedOpCodec
             PoseEnAttenteDOrigineOp pe => (PrivilegedOpType.PoseEnAttenteDOrigine, pe),
             AcquitterEcritureOp ae => (PrivilegedOpType.AcquitterEcriture, ae),
             SetMaintenancePauseOp mp => (PrivilegedOpType.SetMaintenancePause, mp),
+            CorrigerDroitsDuServiceOp cd => (PrivilegedOpType.CorrigerDroitsDuService, cd),
+            RendreDroitsDuServiceOp rd2 => (PrivilegedOpType.RendreDroitsDuService, rd2),
             _ =>((PrivilegedOpType)(-1), (object?)null),
         };
 
@@ -300,6 +305,8 @@ public static class PrivilegedOpCodec
                 PrivilegedOpType.PoseEnAttenteDOrigine => Read<PoseEnAttenteDOrigineOp>(rawJson),
                 PrivilegedOpType.AcquitterEcriture => Read<AcquitterEcritureOp>(rawJson),
                 PrivilegedOpType.SetMaintenancePause => Read<SetMaintenancePauseOp>(rawJson),
+                PrivilegedOpType.CorrigerDroitsDuService => Read<CorrigerDroitsDuServiceOp>(rawJson),
+                PrivilegedOpType.RendreDroitsDuService => Read<RendreDroitsDuServiceOp>(rawJson),
                 _ => null,
             };
 

@@ -64,7 +64,12 @@ public static class CheminProtege
     }
 
     /// <summary><c>null</c> quand le chemin est protégé ; sinon la raison, en clair.</summary>
-    public static string? Verifier(string executable)
+    public static string? Verifier(string executable) => Verifier(executable, null);
+
+    /// <inheritdoc cref="Verifier(string)"/>
+    /// <param name="borne">Le dossier où s'arrête la remontée, exclu : un test dans un dossier temporaire du profil ne juge
+    /// que ce qu'il a posé. <c>null</c> en production : chaque dossier jusqu'à la racine compte.</param>
+    public static string? Verifier(string executable, string? borne)
     {
         try
         {
@@ -73,7 +78,7 @@ public static class CheminProtege
             if (Probleme(fichier.GetAccessControl(), fichier.FullName) is { } f) return f;
             var dossier = fichier.Directory!;
             if (Probleme(dossier.GetAccessControl(), dossier.FullName) is { } d) return d;
-            for (var a = dossier.Parent; a is not null; a = a.Parent)
+            for (var a = dossier.Parent; a is not null && !MemeDossier(a.FullName, borne); a = a.Parent)
                 if (ProblemeAncetre(a.GetAccessControl(), a.FullName) is { } p) return p;
             return null;
         }
@@ -81,6 +86,26 @@ public static class CheminProtege
         {
             return Docteur.T("CP.Illisible", ex.GetType().Name);
         }
+    }
+
+    private static bool MemeDossier(string a, string? b)
+        => b is not null && string.Equals(Path.TrimEndingDirectorySeparator(a), Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
+            StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Le binaire d'un `PathName` ou d'un `ImagePath` de service : entre guillemets, ou jusqu'au premier « .exe »
+    /// (les arguments suivent), variables d'environnement développées. <c>null</c> si rien ne ressemble à un exécutable
+    /// (pilote, chemin noyau).</summary>
+    public static string? BinaireDuService(string? pathName)
+    {
+        if (string.IsNullOrWhiteSpace(pathName)) return null;
+        var p = Environment.ExpandEnvironmentVariables(pathName.Trim());
+        if (p.StartsWith('"'))
+        {
+            var fin = p.IndexOf('"', 1);
+            return fin > 1 ? p[1..fin] : null;
+        }
+        var exe = p.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
+        return exe > 0 ? p[..(exe + 4)] : null;
     }
 
     /// <summary>La règle d'un dossier au-dessus de celui de l'exécutable : <c>null</c> quand le compte ne peut ni en retirer

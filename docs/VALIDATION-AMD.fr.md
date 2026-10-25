@@ -67,7 +67,7 @@ lue par DrDXT à côté de celle de l'outil de référence.
 | Température (Tctl et par CCD) | registres thermiques, par les modules AMD de PawnIO (embarqués, en lecture seule) | non validé sur AMD réel | `DrDXT-Test.exe --lire`, PawnIO installé | les lignes `Tctl` et `CCD` à moins de 1 °C de HWiNFO |
 | Cause matérielle des redémarrages | le registre de redémarrage du processeur (S5_RESET_STATUS), lu sans l'effacer | non validé sur AMD réel | `DrDXT-Test.exe --lire`, PawnIO installé | la ligne `S5 (reset)` après un arrêt propre, puis après un appui long sur le bouton (bit 1) |
 | Timings mémoire appliqués | les timings que le contrôleur mémoire applique vraiment, canal par canal | non validé sur AMD réel | `DrDXT-Test.exe --lire`, PawnIO installé | les registres bruts `Timings canal`, et une capture de ZenTimings de la même session |
-| Limites PPT, TDC, EDC et thermique | la table de puissance du processeur, en jeu | en attente du module | à venir | valeurs et limites, et les mêmes dans HWiNFO ou Ryzen Master |
+| Limites PPT, TDC, EDC et thermique | la table de puissance du processeur, en jeu, par le module RyzenSMU de PawnIO (embarqué, en lecture seule) | non validé sur AMD réel | pas encore dans le kit | valeurs et limites, et les mêmes dans HWiNFO ou Ryzen Master |
 | Erreurs matérielles corrigées (MCA) | les erreurs que le processeur a corrigées | en attente du module | à venir | les erreurs lues, et les mêmes dans l'Observateur d'événements (WHEA) |
 
 Le Curve Optimizer par cœur n'est pas lu dans le processeur : il faudrait une commande hors de la liste fermée de

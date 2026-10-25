@@ -125,6 +125,10 @@ public sealed class LeaseWatchdog
         // verrait qu'au démarrage suivant. Les ops BCD restent des gestes du joueur, jamais d'un bail.
         if (decoded.Value is RestartDeviceOp or RemoveDriverPackageOp or RestoreDriverPackageOp)
             return Deny("A device or driver-store op can never be a lease revert: it would act with nobody at the machine.");
+        // Les droits d'un service se corrigent et se rendent sur le clic du joueur : rendus par un bail, ils rouvriraient le
+        // fichier au compte sans que personne ne l'ait demandé.
+        if (decoded.Value is CorrigerDroitsDuServiceOp or RendreDroitsDuServiceOp)
+            return Deny("A service permission op can never be a lease revert: it is the player's gesture only.");
         // La remise à l'usine de la carte AMD efface aussi ce que le joueur a réglé dans AMD Software : un geste, jamais un bail.
         if (decoded.Value is ApplyAdlxTuningOp { Kind: AdlxTuningKind.RemiseUsine })
             return Deny("A GPU factory reset can never be a lease revert: it is the player's gesture only.");

@@ -416,6 +416,8 @@ public static class DiagnosticReport
         GpuArchitecture.Rdna3 => "AMD RDNA3",
         GpuArchitecture.Rdna2 => "AMD RDNA2",
         GpuArchitecture.Rdna4 => "AMD RDNA4",
+        GpuArchitecture.Rdna1 => "AMD RDNA1",
+        GpuArchitecture.Gcn => "AMD GCN",
         _ => architecture.ToString(),
     };
 }

@@ -34,7 +34,8 @@ public sealed record BridageAmd(int Secondes, int Ppt, int Tdc, int Edc, int The
 /// commit d2983668, smu.c, smu_update_pmtable_size) ; positions, ryzen_monitor (github.com/hattedsquirrel/ryzen_monitor,
 /// commit 7529c7cf, src/pm_tables.c) : PPT limite et valeur aux flottants 0 et 1, TDC 2 et 3, thermique 4 et 5, EDC 8 et 9.
 /// Les versions que ryzen_monitor dit devinées (0x380905) ne sont pas reprises ; aucune source publique ne donne ces
-/// positions pour Zen 4 et Zen 5, qui restent non lus. Aucune lecture : le module PawnIO AMD manque (GATES).
+/// positions pour Zen 4 et Zen 5, qui restent non lus. La copie se lit par le module RyzenSMU de PawnIO, embarqué en
+/// lecture seule (PawnIoAmd.LireTablePm) ; non validé sur machine AMD réelle.
 /// </summary>
 public static class TablePmAmd
 {

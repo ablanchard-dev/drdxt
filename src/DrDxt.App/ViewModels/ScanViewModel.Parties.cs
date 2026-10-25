@@ -569,7 +569,9 @@ public partial class ScanViewModel
             ? string.Format(CultureInfo.CurrentCulture, _localize("Leviers.Geste.Pilote"), paquet)
             : DrDxt.Application.Tweaks.LevierDeGeste.JeuDe(id) is { } jeu
                 ? string.Format(CultureInfo.CurrentCulture, _localize("Leviers.Geste.Dlss"), Path.GetFileNameWithoutExtension(jeu))
-                : _localize(TweakDisplayKeys.TitleKey(id));
+                : DrDxt.Application.Tweaks.LevierDeGeste.ServiceDe(id) is { } service
+                    ? string.Format(CultureInfo.CurrentCulture, _localize("Leviers.Geste.Droits"), service)
+                    : _localize(TweakDisplayKeys.TitleKey(id));
 
     /// <summary>Le levier est rendu avant de sortir de la liste signée : rendu raté, la liste garde l'origine que la
     /// désinstallation rendra. Mais le service peut le reposer entre les deux (sa passe d'après une mise à jour de Windows
@@ -1259,7 +1261,6 @@ public partial class ScanViewModel
     }
 
     private readonly DrDxt.Detection.Cpu.CpuFrequencyReader _frequenceCpu = new();
-    private DrDxt.Detection.NvmlHardwareProbe? _sondeCarte;
     private DrDxt.Detection.EntreesDuJoueur? _entreesDuJoueur;
     private IReadOnlyList<int>? _coeursRapides;
 
@@ -1390,8 +1391,9 @@ public partial class ScanViewModel
             signalerEchec: raison => MemoireParties?.NoterEchec(new PartiesMemorisees.EchecDeCapture(Horloge(), raison)),
             // La marque « partie en cours » ; restée ouverte, elle dit qu'un arrêt est tombé en partie.
             suivre: p => MemoireParties?.NoterEnCours(p),
-            // La carte NVIDIA lue par NVML pendant chaque capture (bridage par la puissance, fréquence).
-            lireCarte: () => (_sondeCarte ??= new DrDxt.Detection.NvmlHardwareProbe()).Lire(),
+            // La carte dédiée lue pendant chaque capture : NVML sur une GeForce (bridage par la puissance, fréquence), ADLX sur
+            // une Radeon (puissance, fréquence, point chaud, ventilateur ; pas de raisons de bridage publiées).
+            lireCarte: () => DrDxt.Detection.SondeDeLaCarte.Pour(_materielLu is { } hw ? CartesGraphiques.CarteDediee(hw) : null).Lire(),
             // Le processeur chaque seconde (PawnIO ne répond qu'en administrateur : le relevé de fond, lancé sans droits
             // par la tâche planifiée, le lit par le service DrDXT), et l'activité du joueur, pour mettre menus et lobby à part.
             temperatureProcesseur: () => DrDxt.Detection.Cpu.TemperatureProcesseur.Lire()?.Celsius,

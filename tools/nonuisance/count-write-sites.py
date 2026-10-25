@@ -57,6 +57,8 @@ PATTERNS = [
     # Le ventilateur NVIDIA (NVML) s'ecrit par TryPoserVentilateur / TryRendreVentilateur, des noms
     # francais qu'aucun autre motif ne voit : meme reponse, un motif d'INTENTION.
     r"TryPoser\w+\(", r"TryRendre\w+\(",
+    # Le ventilateur AMD (ADLX) s'ecrit par PoserVentilateurFixe / RendreVentilateurAuto, sans le prefixe Try.
+    r"(?:PoserVentilateurFixe|RendreVentilateurAuto)\(",
     # Le service SYSTEM du temoin d'incident ecrit par TrustedManifestRoot.WriteTrustedFile et supprime par
     # File.Delete : sans ces motifs, la table se dirait « a jour » en les manquant.
     # Une suppression, un deplacement, une copie, un changement d'ACL ou de cle de registre sont des

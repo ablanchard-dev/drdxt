@@ -36,6 +36,37 @@ public static class InventaireDesPilotes
            && !string.Equals(p.Fournisseur, "Microsoft", StringComparison.OrdinalIgnoreCase)
            && p.Date is { } d && !DatesJeton.Contains(d.Date) && d < maintenant.AddYears(-AnsAncien);
 
+    // Les composants du pilote chipset AMD que la machine expose en périphériques : PSP, SMBus, GPIO (notes de version
+    // AMD du « Ryzen Chipset Driver », par exemple https://www.amd.com/en/resources/support-articles/release-notes/RN-RYZEN-CHIPSET-8-05-04-516.html :
+    // « AMD PSP Driver », « AMD SMBUS Driver », « AMD GPIO2 Driver »). Le PSP peut manquer sur un Ryzen 2000 (même
+    // source, version 6.01.25.342) : un seul des trois suffit à dire le pilote installé.
+    private static readonly string[] ComposantsChipsetAmd = ["PSP", "SMBus", "GPIO"];
+
+    private static bool DAmd(Pilote p) => p.Fournisseur is { } f
+        && (f.StartsWith("Advanced Micro Devices", StringComparison.OrdinalIgnoreCase) || string.Equals(f, "AMD", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Le pilote chipset AMD sur un processeur AMD : absent (aucun de ses composants posé par AMD) ou ancien (le plus
+    /// récent plus vieux que <see cref="AnsAncien"/> ans), « à regarder » ; sinon seulement lu. Rien sur un autre processeur,
+    /// ni sans inventaire (il se dit déjà non lu).</summary>
+    public static IEnumerable<RepairFinding> JugerChipsetAmd(IReadOnlyList<Pilote>? pilotes, string? fabricant, DateTime maintenant)
+    {
+        if (fabricant != "AuthenticAMD" || pilotes is null) yield break;
+        var composants = pilotes.Where(p => DAmd(p)
+            && ComposantsChipsetAmd.Any(c => p.Nom.Contains(c, StringComparison.OrdinalIgnoreCase))).ToList();
+        if (composants.Count == 0)
+        {
+            yield return new RepairFinding("PERIPHERIQUES", "pilote chipset AMD", Docteur.T("IV.ChipsetAmdAbsentValeur"), null,
+                RepairStatus.NonDefault, Docteur.T("IV.ChipsetAmdAbsent"), RepairAction.Recommandation, Remede: Docteur.T("IV.ChipsetAmdRemede"));
+            yield break;
+        }
+        var date = composants.Max(p => p.Date);
+        var valeur = date is { } d ? d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : Docteur.T("IV.ChipsetAmdDateNonLue");
+        yield return date is { } dd && dd < maintenant.AddYears(-AnsAncien)
+            ? new RepairFinding("PERIPHERIQUES", "pilote chipset AMD", valeur, null, RepairStatus.NonDefault,
+                Docteur.T("IV.ChipsetAmdAncien", AnsAncien), RepairAction.Recommandation, Remede: Docteur.T("IV.ChipsetAmdRemede"))
+            : new RepairFinding("PERIPHERIQUES", "pilote chipset AMD", valeur, null, RepairStatus.Observed, Docteur.T("IV.ChipsetAmdLu"));
+    }
+
     public static IEnumerable<RepairFinding> Juger(IReadOnlyList<Pilote>? pilotes, DateTime maintenant)
     {
         if (pilotes is null)

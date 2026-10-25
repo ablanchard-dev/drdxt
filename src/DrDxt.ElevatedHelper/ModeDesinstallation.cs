@@ -29,6 +29,7 @@ namespace DrDxt.ElevatedHelper;
 //     firmware et l'ecriture du manifeste n'y sont pas branches ;
 //   * rendre la carte NVIDIA a l'automatique (ventilateur, decalage du coeur a 0), que les baux du helper tue ne rendent plus ;
 //   * reactiver les programmes que DrDXT a coupes au demarrage, d'apres leurs traces, s'ils portent encore ses octets ;
+//   * dire quels services gardent les droits que DrDXT a corriges : une correction de securite, laissee en place ;
 //   * ecrire son rapport `desinstallation-<heure UTC>.txt` dans la meme racine durcie (lisible apres coup), et la marque
 //     `rendu-incomplet` quand quelque chose reste a rendre : l'installeur la lit pour le dire au joueur.
 // Aucun argument ne choisit un chemin ou une op : les seules entrees sont le manifeste signe et les traces des coupures
@@ -76,7 +77,8 @@ public static class ModeDesinstallation
                 client, quand, delai.Token, reste) + await RetirerPlafondEnvoiAsync(client, delai.Token, reste)
                 + await RendreLaCarteNvidiaAsync(client, LireLesCartesDeLaMachine(), delai.Token, reste)
                 + await ReactiverLesCoupuresAsync(CoupuresARendre(memeCompte), Win32RegistryActions.LireApprobation, client, delai.Token, reste)
-                + (memeCompte ? "" : Docteur.T("MD.DemarrageAutreCompte") + Environment.NewLine));
+                + (memeCompte ? "" : Docteur.T("MD.DemarrageAutreCompte") + Environment.NewLine)
+                + DroitsQuiRestent(racine));
             if (travail.Wait(Budget + TimeSpan.FromSeconds(5)))
                 texte = travail.Result;
             else
@@ -110,6 +112,13 @@ public static class ModeDesinstallation
         public bool Quelquechose => Volatile.Read(ref _nombre) > 0;
         public void Noter() => Interlocked.Increment(ref _nombre);
     }
+
+    /// <summary>Les droits corrigés d'un service restent : rendre le fichier d'un service SYSTEM au compte rouvrirait le chemin
+    /// qu'il ferme. Le rapport nomme ces services ; rien n'est écrit.</summary>
+    internal static string DroitsQuiRestent(string racine)
+        => DroitsDesServices.ServicesCorriges(DroitsDesServices.Racine(racine)) is { Count: > 0 } services
+            ? Docteur.T("MD.DroitsRestent", string.Join(", ", services)) + Environment.NewLine
+            : "";
 
     /// <summary>Le nom de la marque que l'installeur lit (`[Code]` de DrDXT.iss) pour dire au joueur que tout n'a pas été rendu.</summary>
     public const string MarqueRenduIncomplet = "rendu-incomplet";
