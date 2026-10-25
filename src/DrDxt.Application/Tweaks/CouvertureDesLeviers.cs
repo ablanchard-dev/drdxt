@@ -142,7 +142,8 @@ public static class CouvertureDesLeviers
             "latency.prefer_max_perf" or "gpu.repos_global_normal" when !nvidia => "Levier.PasIci.PasNvidia",
             "gpu.undervolt" or "gpu.power_limit" or "latency.render_queue_cap" or "latency.vrr_vsync_cap"
                 when !carteDediee => "Levier.PasIci.PasDeCarteDediee",
-            "gpu.power_limit" when !nvidia => "Levier.PasIci.PuissanceAmd",
+            // Sur AMD, la limite s'écrit seulement sur une architecture validée par un rapport (GpuPowerLimitTweak).
+            "gpu.power_limit" when !nvidia && !LimitePuissanceAmd.AmdValidee(hw, GpuTuningCoverage.ValideesEnVie) => "Levier.PasIci.PuissanceAmd",
             _ => null,
         };
     }

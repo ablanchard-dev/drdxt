@@ -120,7 +120,9 @@ public static class GpuTuningCoverage
             // 20/30 et GTX 10/16 attendent le leur.
             GpuArchitecture.AdaOrOlder when validees.Contains(architecture) && Rtx40.IsMatch(gpu.Model) =>
                 new(gpu.Model, GpuTuningSupport.Validated, architecture, ReasonValidated, voltage),
-            GpuArchitecture.Rdna4 when validees.Contains(architecture) =>
+            // Radeon : une seule règle pour toutes les architectures, chacune ouverte par son propre rapport.
+            GpuArchitecture.Gcn or GpuArchitecture.Rdna1 or GpuArchitecture.Rdna2 or GpuArchitecture.Rdna3
+                or GpuArchitecture.Rdna4 when validees.Contains(architecture) =>
                 new(gpu.Model, GpuTuningSupport.Validated, architecture, ReasonValidated, voltage),
 
             // Blackwell : le reste du tuning marche, NVIDIA a verrouillé le voltage. Le dire
@@ -128,11 +130,9 @@ public static class GpuTuningCoverage
             GpuArchitecture.Blackwell when validees.Contains(architecture) =>
                 new(gpu.Model, GpuTuningSupport.Validated, architecture, ReasonVoltageLockedByVendor, voltage),
 
-            GpuArchitecture.AdaOrOlder or GpuArchitecture.Rdna4 or GpuArchitecture.Blackwell =>
-                new(gpu.Model, GpuTuningSupport.ReadOnly, architecture, ReasonNeverWriteTested, voltage),
-
-            // RDNA3 : jamais testée en écriture. C'est le cas que la règle nomme.
-            GpuArchitecture.Rdna3 or GpuArchitecture.Rdna2 =>
+            // Reconnue mais sans rapport : jamais testée en écriture, lecture seule.
+            GpuArchitecture.AdaOrOlder or GpuArchitecture.Blackwell or GpuArchitecture.Gcn or GpuArchitecture.Rdna1
+                or GpuArchitecture.Rdna2 or GpuArchitecture.Rdna3 or GpuArchitecture.Rdna4 =>
                 new(gpu.Model, GpuTuningSupport.ReadOnly, architecture, ReasonNeverWriteTested, voltage),
 
             // Une carte qu'on ne sait pas nommer n'est pas une carte validée. Lecture seule, et

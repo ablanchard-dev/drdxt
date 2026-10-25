@@ -8,7 +8,11 @@ public readonly record struct HardwareReading(
     double? GpuClockMhz = null,
     /// <summary>Le bitmask publie par le pilote. <c>0</c> est une vraie valeur (rien ne
     /// bride), a ne jamais confondre avec <c>null</c>, qui veut dire « pas lisible ».</summary>
-    ClocksEventReason? Raisons = null);
+    ClocksEventReason? Raisons = null,
+    /// <summary>Le point le plus chaud de la puce (ADLX le publie, NVML non) ; <c>null</c> = pas lisible.</summary>
+    double? GpuPointChaudC = null,
+    /// <summary>Le ventilateur de la carte, en tours par minute ; <c>null</c> = pas lisible.</summary>
+    int? VentilateurTrMin = null);
 
 /// <summary>Ce qui sait lire le materiel pendant une passe. Une couture, pour que la boucle se
 /// teste sans carte graphique.</summary>

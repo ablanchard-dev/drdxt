@@ -48,6 +48,25 @@ later edit fails the build.
 | IADLXManualFanTuningState (`IGPUManualFanTuning.h`) | GetFanSpeed | 3 |
 | IADLXManualFanTuningState (`IGPUManualFanTuning.h`) | GetTemperature | 5 |
 
+## Ventilateur en écriture (relevé le 25/10/2026)
+
+Relevées dans `SDK/Include/IGPUManualFanTuning.h` de la branche `main`
+(<https://github.com/GPUOpen-LibrariesAndSDKs/ADLX/blob/main/SDK/Include/IGPUManualFanTuning.h>). Aucune n'a tourné sur
+une vraie carte AMD : le ventilateur du mode Expert reste fermé sur AMD tant qu'une architecture n'a pas son rapport.
+
+| Interface (header) | Method | Slot |
+|---|---|---|
+| IADLXManualFanTuning (`IGPUManualFanTuning.h`) | GetEmptyFanTuningStates | 5 |
+| IADLXManualFanTuning (`IGPUManualFanTuning.h`) | IsValidFanTuningStates | 6 |
+| IADLXManualFanTuning (`IGPUManualFanTuning.h`) | **SetFanTuningStates** | **7** |
+| IADLXManualFanTuning (`IGPUManualFanTuning.h`) | IsSupportedZeroRPM | 8 |
+| IADLXManualFanTuning (`IGPUManualFanTuning.h`) | GetZeroRPMState | 9 |
+| IADLXManualFanTuning (`IGPUManualFanTuning.h`) | **SetZeroRPMState** | **10** |
+| IADLXManualFanTuning1 (`IGPUManualFanTuning.h`), par QueryInterface | GetDefaultFanTuningStates | 23 |
+| IADLXManualFanTuning1 (`IGPUManualFanTuning.h`), par QueryInterface | GetDefaultZeroRPMState | 27 |
+| IADLXManualFanTuningState (`IGPUManualFanTuning.h`) | **SetFanSpeed** (en %) | **4** |
+| IADLXManualFanTuningState (`IGPUManualFanTuning.h`) | **SetTemperature** (en °C) | **6** |
+
 ## Lecture des réglages (A1, relevé le 06/10/2026)
 
 Relevées dans les blocs C `typedef struct ...Vtbl` des en-têtes de la branche `main` du SDK (même dépôt), lecture
@@ -69,6 +88,27 @@ seule. Aucune n'a encore tourné sur une vraie carte AMD : la commande de preuve
 | IADLX3DFrameRateTargetControl (`I3DSettings.h`) | IsSupported / IsEnabled / GetFPSRange / GetFPS / SetEnabled / SetFPS (écritures A2b du 07/10/2026, relues dans ADLX `d9f04a9b`) | 3 / 4 / 5 / 6 / 7 / 8 |
 | IADLXPerformanceMonitoringServices (`IPerformanceMonitoring.h`) | GetCurrentGPUMetrics | 18 |
 | IADLXGPUMetrics (`IPerformanceMonitoring.h`) | GPUTemperature | 7 |
+
+## Télémétrie en partie et réglages Radeon (relevé le 25/10/2026)
+
+Relevées dans les blocs C `typedef struct ...Vtbl` des en-têtes du SDK, commit `32b5a740d422` de la branche `main`
+(<https://github.com/GPUOpen-LibrariesAndSDKs/ADLX>, `SDK/Include`), membre par membre dans l'ordre de déclaration. Lecture
+seule : aucune entrée `Set*` n'est appelée. Aucune n'a encore tourné sur une vraie carte AMD.
+
+| Interface (header) | Method | Slot |
+|---|---|---|
+| IADLXGPUMetrics (`IPerformanceMonitoring.h`) | GPUClockSpeed (`adlx_int`, MHz) | 5 |
+| IADLXGPUMetrics (`IPerformanceMonitoring.h`) | GPUHotspotTemperature (`adlx_double`, °C) | 8 |
+| IADLXGPUMetrics (`IPerformanceMonitoring.h`) | GPUPower (`adlx_double`, W, la puce) | 9 |
+| IADLXGPUMetrics (`IPerformanceMonitoring.h`) | GPUTotalBoardPower (`adlx_double`, W, la carte) | 10 |
+| IADLXGPUMetrics (`IPerformanceMonitoring.h`) | GPUFanSpeed (`adlx_int`, tr/min) | 11 |
+| IADLX3DSettingsServices (`I3DSettings.h`) | GetBoost (par carte) / GetImageSharpening (par carte) | 5 / 6 |
+| IADLX3DSettingsServices (`I3DSettings.h`) | GetRadeonSuperResolution (système) | 14 |
+| IADLX3DSettingsServices1 (`I3DSettings1.h`), par QueryInterface `L"IADLX3DSettingsServices1"` | GetAMDFluidMotionFrames (système) | 17 |
+| IADLX3DBoost / IADLX3DImageSharpening / IADLX3DRadeonSuperResolution / IADLX3DAMDFluidMotionFrames | IsSupported / IsEnabled | 3 / 4 |
+
+HYPR-RX n'a pas d'interface dans le SDK ADLX (aucun en-tête de `SDK/Include` ne le nomme au commit `32b5a740d422`) : il
+n'est pas lu.
 
 ## Notes
 

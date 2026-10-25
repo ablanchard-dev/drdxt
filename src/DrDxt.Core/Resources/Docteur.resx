@@ -1039,7 +1039,7 @@
     <value>1) Uninstall the software: Settings &gt; Apps &gt; Installed apps. 2) Reinstall it in Program Files, where only administrators can write: this path closes. 3) If its installer does not let you pick the folder, report it to the software's publisher.</value>
   </data>
   <data name="SE.PasTouche" xml:space="preserve">
-    <value>DrDXT does not touch this service.</value>
+    <value>DrDXT only changes its permissions if you press “Fix the permissions”.</value>
   </data>
   <data name="SE.Editeur" xml:space="preserve">
     <value>This folder is chosen by the software's publisher, not by you. 1) Report it to them: that is what closes this path for good. 2) Do not remove this write right yourself: its updates could stop going through.</value>
@@ -5079,6 +5079,27 @@
   <data name="Nom.pilotes non signes" xml:space="preserve">
     <value>unsigned drivers</value>
   </data>
+  <data name="Nom.pilote chipset AMD" xml:space="preserve">
+    <value>AMD chipset driver</value>
+  </data>
+  <data name="IV.ChipsetAmdAbsentValeur" xml:space="preserve">
+    <value>missing</value>
+  </data>
+  <data name="IV.ChipsetAmdAbsent" xml:space="preserve">
+    <value>No AMD chipset driver component (PSP, SMBus, GPIO) is installed by AMD: Windows puts its generic drivers, not everything AMD ships for this processor (power management, processor plans).</value>
+  </data>
+  <data name="IV.ChipsetAmdAncien" xml:space="preserve">
+    <value>The AMD chipset driver is more than {0} years old: later versions fix power management and add support for recent Windows releases.</value>
+  </data>
+  <data name="IV.ChipsetAmdLu" xml:space="preserve">
+    <value>The AMD chipset driver is installed; the date is that of its newest component.</value>
+  </data>
+  <data name="IV.ChipsetAmdDateNonLue" xml:space="preserve">
+    <value>installed, date not read</value>
+  </data>
+  <data name="IV.ChipsetAmdRemede" xml:space="preserve">
+    <value>Download "AMD Chipset Drivers" for your motherboard from https://www.amd.com/en/support/download/drivers.html and install it; DrDXT does not install it.</value>
+  </data>
   <data name="IV.NonLu" xml:space="preserve">
     <value>The list of installed drivers could not be read (Win32_PnPSignedDriver): not read.</value>
   </data>
@@ -5656,7 +5677,7 @@
     <value>The memory timings actually applied are not read: your modules do not all report DDR4, or all DDR5 (mixed, LPDDR or type not read), and DrDXT decodes only those two.</value>
   </data>
   <data name="TMA.NonLus" xml:space="preserve">
-    <value>The memory timings actually applied are not read: they live in the AMD memory controller, which DrDXT could only read through an AMD PawnIO module it does not ship. Timings shown elsewhere are those of the kit or of the BIOS, not those that run.</value>
+    <value>The memory timings actually applied were not read: they live in the AMD memory controller, which DrDXT reads through PawnIO, and the read returned nothing this time. Timings shown elsewhere are those of the kit or of the BIOS, not those that run.</value>
   </data>
   <data name="TMA.Invraisemblables" xml:space="preserve">
     <value>The memory controller registers were read, but a value fell outside its plausible range: the applied timings are reported as not read rather than as a wrong timing.</value>
@@ -5692,7 +5713,7 @@
     <value>PPT/TDC/EDC limits (AMD)</value>
   </data>
   <data name="PMA.NonLue" xml:space="preserve">
-    <value>Whether your Ryzen hits its PPT, TDC, EDC or thermal limit during a game is not read: these limits live in the SMU power table, which DrDXT could only copy and read through an AMD PawnIO module it does not ship. For Zen 4 and Zen 5, no public source gives the layout of that table.</value>
+    <value>Whether your Ryzen hits its PPT, TDC, EDC or thermal limit during a game is not read: these limits live in the SMU power table, which DrDXT copies and reads through PawnIO, and no table was read for this chip. For Zen 4 and Zen 5, no public source gives the layout of that table.</value>
   </data>
   <data name="PMA.RienNeBride" xml:space="preserve">
     <value>Over {0} seconds of play, no limit held your Ryzen back: PPT, TDC, EDC and the thermal limit each stayed under 5 % of the time at 97 % of their ceiling or more (a threshold chosen by DrDXT, not a figure from AMD).</value>
@@ -6228,6 +6249,9 @@
   <data name="MD.DemarrageReste" xml:space="preserve">
     <value>startup program {0}: still off ({1}); Task Manager can turn it back on.</value>
   </data>
+  <data name="MD.DroitsRestent" xml:space="preserve">
+    <value>permissions fixed by DrDXT: they stay in place (a security fix, not a game setting), for {0}. Only administrators can replace their file.</value>
+  </data>
   <data name="MD.DemarrageAutreCompte" xml:space="preserve">
     <value>the player's startup programs: not read (uninstall run with another account); those DrDXT turned off can be turned back on in Task Manager.</value>
   </data>
@@ -6365,5 +6389,29 @@
   </data>
   <data name="MD.JournalNonLu" xml:space="preserve">
     <value>write-ahead journal: NOT READ ({0})</value>
+  </data>
+  <data name="RAD.Nom" xml:space="preserve">
+    <value>player's Radeon settings</value>
+  </data>
+  <data name="RAD.Valeur" xml:space="preserve">
+    <value>Boost {0} · Image Sharpening {1} · RSR {2} · AFMF {3}</value>
+  </data>
+  <data name="RAD.Actif" xml:space="preserve">
+    <value>on</value>
+  </data>
+  <data name="RAD.Eteint" xml:space="preserve">
+    <value>off</value>
+  </data>
+  <data name="RAD.NonLu" xml:space="preserve">
+    <value>not read</value>
+  </data>
+  <data name="RAD.Attendu" xml:space="preserve">
+    <value>your choice, in the AMD software</value>
+  </data>
+  <data name="RAD.NonLus" xml:space="preserve">
+    <value>the Radeon settings could not be read: {0}</value>
+  </data>
+  <data name="RAD.Explication" xml:space="preserve">
+    <value>four AMD software settings that DrDXT does not set, because they change the image or the latency to your taste. Radeon Boost lowers the resolution during fast motion; Image Sharpening makes the image sharper; RSR upscales an image rendered smaller; AFMF (frame generation) raises the frame count by raising latency. HYPR-RX, which turns several of them on at once, cannot be read through AMD's interface: DrDXT does not guess it. No figure promised: your call, in the AMD software.</value>
   </data>
 </root>

@@ -331,6 +331,18 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    hors de sa fenêtre, « Ultra » peut baisser les images ou la régularité. DrDXT pose déjà « On » (une image en file) au
    profil du jeu quand c'est utile. Source : Blur Busters, « NVIDIA Low Latency Mode - On or Off » (forums.blurbusters.com).
 
+### 5.19 bis Réglages Radeon (Boost, Image Sharpening, RSR, AFMF, HYPR-RX) : des choix, pas des réparations
+Logiciel AMD, onglet Jeux (ou Graphismes), un jeu ou les réglages globaux. DrDXT les lit et les nomme, ne les pose pas :
+chacun change l'image ou la latence selon ton goût.
+1. Radeon Boost baisse la résolution pendant les mouvements rapides, pour garder des images ; à juger à l'œil.
+2. Image Sharpening rend l'image plus nette, utile avec une mise à l'échelle ; sans effet sur la latence.
+3. Radeon Super Resolution (RSR) agrandit une image rendue plus petite, en plein écran exclusif seulement.
+4. AMD Fluid Motion Frames (AFMF) ajoute des images générées : plus d'images comptées, **plus de latence**. À essayer jeu
+   par jeu, à juger à la main, pas au compteur d'images.
+5. HYPR-RX allume plusieurs de ces réglages d'un coup ; l'interface d'AMD (ADLX) ne le publie pas, DrDXT ne le lit donc
+   pas et ne le devine pas.
+Source : les interfaces lues sont celles du SDK ADLX d'AMD (`I3DSettings.h`, `I3DSettings1.h`, GPUOpen-LibrariesAndSDKs/ADLX).
+
 ### 5.20 Batterie usée (portable)
 1. DrDXT compare ce que ta batterie tient à pleine charge à ce qu'elle tenait neuve (les mêmes compteurs que
    `powercfg /batteryreport`). Sous 80 %, elle est usée : moins d'autonomie, et sur certains portables moins de puissance

@@ -80,6 +80,12 @@ public static class PawnIoAmd
             return ((uint)resolue[0], table);
         });
 
+    /// <summary>Vrai tant qu'une poignée est ouverte : le service la ferme après son inactivité, comme celles d'Intel.</summary>
+    public static bool Ouvert()
+    {
+        lock (Verrou) return _poigneeReset != 0 || _poigneeFamille17 != 0 || _poigneeSmu != 0;
+    }
+
     /// <summary>Ferme les poignées : rien ne reste chargé entre deux lectures demandées.</summary>
     public static void FermerTout()
     {

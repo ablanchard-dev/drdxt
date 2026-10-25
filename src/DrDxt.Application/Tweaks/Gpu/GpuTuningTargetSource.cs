@@ -1,3 +1,4 @@
+using DrDxt.Application.Tweaks.Hardware;
 using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks.Gpu;
@@ -38,6 +39,10 @@ public interface IGpuTuningTargetSource
     /// silencieux quand ADLX manque. Faux tant qu'il n'est pas posé depuis le matériel.</summary>
     bool IsAmdGpuPresent { get; }
 
+    /// <summary>Une carte AMD de la machine scannée a son architecture validée par un rapport : sans lui, aucune écriture
+    /// AMD de limite de puissance, même appelée directement.</summary>
+    bool AmdEcritureValidee => false;
+
     /// <summary>Remplace les cibles en cours (l'appelant doit les avoir bornées à GpuSafeBounds).</summary>
     void Set(GpuTuningTarget tuning, GpuPowerLimitTarget powerLimit);
 
@@ -70,19 +75,28 @@ public sealed class GpuTuningTargetSource : IGpuTuningTargetSource
 
     public bool IsAmdGpuPresent { get; private set; }
 
+    public bool AmdEcritureValidee { get; private set; }
+
     public void Set(GpuTuningTarget tuning, GpuPowerLimitTarget powerLimit)
     {
         Tuning = tuning ?? throw new ArgumentNullException(nameof(tuning));
         PowerLimit = powerLimit ?? throw new ArgumentNullException(nameof(powerLimit));
     }
 
-    public void SetAmdGpuPresenceFromHardware(HardwareInventory hw) =>
+    public void SetAmdGpuPresenceFromHardware(HardwareInventory hw) => SetAmdGpuPresenceFromHardware(hw, GpuTuningCoverage.ValideesEnVie);
+
+    /// <param name="validees">Les architectures validées ; <see cref="GpuTuningCoverage.ValideesEnVie"/> en vie.</param>
+    public void SetAmdGpuPresenceFromHardware(HardwareInventory hw, IReadOnlySet<GpuArchitecture> validees)
+    {
         IsAmdGpuPresent = hw?.Gpus is { } gpus && gpus.Any(GpuGating.IsAmd);
+        AmdEcritureValidee = IsAmdGpuPresent && LimitePuissanceAmd.AmdValidee(hw!, validees);
+    }
 
     public void Reset()
     {
         Tuning = _defaultTuning;
         PowerLimit = _defaultPowerLimit;
         IsAmdGpuPresent = false;
+        AmdEcritureValidee = false;
     }
 }

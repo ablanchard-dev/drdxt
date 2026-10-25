@@ -1346,6 +1346,15 @@ Allume le compteur FPS du jeu pour comparer.</value>
   <data name="Leviers.Geste.Dlss" xml:space="preserve">
     <value>Dernier modèle DLSS : {0}</value>
   </data>
+  <data name="Leviers.Geste.Droits" xml:space="preserve">
+    <value>Droits corrigés du service {0}</value>
+  </data>
+  <data name="Geste.Droits.Titre" xml:space="preserve">
+    <value>Corriger les droits</value>
+  </data>
+  <data name="Geste.Droits.Detail" xml:space="preserve">
+    <value>DrDXT rend ce fichier et son dossier aux administrateurs : seuls Windows et les administrateurs pourront le remplacer, et ton compte garde la lecture. Les droits d'origine sont gardés à part. Si le jeu ou son lanceur n'arrive plus à se mettre à jour, « Annuler » les rend tels qu'ils étaient.</value>
+  </data>
   <data name="Geste.Pilote.ExportAbsent" xml:space="preserve">
     <value>{0} : la copie du paquet n'est plus là, DrDXT ne peut pas le remettre. Il sort de la liste ; Windows Update ou le site du fabricant le réinstallent si besoin.</value>
   </data>
@@ -2664,7 +2673,7 @@ Si elle est arrivée pendant un réglage, relance un scan : « Ce que DrDXT a po
     <value>Réglage du pilote NVIDIA : pas de carte NVIDIA ici.</value>
   </data>
   <data name="Levier.PasIci.PuissanceAmd" xml:space="preserve">
-    <value>Pas proposé sur AMD : l'unité de la limite de puissance du pilote AMD n'est pas encore vérifiée sur une vraie carte.</value>
+    <value>Pas encore proposé sur AMD : la limite s'écrira quand une carte de cette famille aura son rapport de validation.</value>
   </data>
   <data name="Levier.PasIci.PasDeCarteDediee" xml:space="preserve">
     <value>Pas de carte graphique dédiée ici.</value>

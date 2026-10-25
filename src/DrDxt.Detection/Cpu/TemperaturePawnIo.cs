@@ -7,9 +7,9 @@ namespace DrDxt.Detection.Cpu;
 /// déjà installé sur la machine. DrDXT n'installe jamais PawnIO (un pilote noyau : c'est le choix du joueur, voir le guide) ;
 /// sans lui, rien n'est lu et rien n'est dit.
 ///
-/// Intel seulement pour l'instant : IA32_TEMPERATURE_TARGET (0x1A2, bits 23:16 = TjMax) et IA32_PACKAGE_THERM_STATUS
-/// (0x1B1, bits 22:16 = écart sous TjMax). Température = TjMax − écart. Source : Intel SDM vol. 4. AMD : non lu (les
-/// adresses SMN changent par famille ; sans machine pour les relever, « non lu » plutôt qu'un chiffre deviné).
+/// Intel ici : IA32_TEMPERATURE_TARGET (0x1A2, bits 23:16 = TjMax) et IA32_PACKAGE_THERM_STATUS
+/// (0x1B1, bits 22:16 = écart sous TjMax). Température = TjMax − écart. Source : Intel SDM vol. 4. AMD : Tctl par
+/// <see cref="LecturesAmd"/>, seulement sur une génération validée en vie (LecturesAmdProfondes.ValideesEnVie).
 ///
 /// La frontière native (modules, poignées, lecture et écriture) vit dans <see cref="PawnIoIntel"/>, dans
 /// le projet natif commun, parce que le helper élevé écrit la limite de puissance par le même chemin. Ici ne restent que
@@ -58,7 +58,7 @@ public static class TemperaturePawnIo
         => etat is null ? null : ventilateurs is null ? etat
             : etat with { VentiloCpu = ventilateurs.FirstOrDefault(v => v.Index == 0 && v.PwmPourcent is not null), Ventilateurs = ventilateurs };
 
-    private static readonly Lazy<bool> Eleve = new(() =>
+    internal static readonly Lazy<bool> Eleve = new(() =>
         new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
             .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator));
 

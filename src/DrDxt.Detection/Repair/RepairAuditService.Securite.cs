@@ -9,7 +9,8 @@ public sealed partial class RepairAuditService
     // élévation de privilèges classique : n'importe quel programme lancé sans droits remplace le binaire,
     // et il s'exécute en SYSTEM au démarrage suivant du service. Vue sur la machine de reference (PresentMonService, laissé
     // dans un dossier de son profil). Même règle que celle du helper (`CheminProtege`) : le fichier et son
-    // dossier. Constat seulement (Suspicious) : DrDXT ne touche pas au service d'un autre logiciel.
+    // dossier. Constat (Suspicious) : DrDXT ne change ses droits que sur le geste « Corriger les droits », que le helper refait
+    // lui-même depuis le nom du service porté en cible.
     private Result<IReadOnlyList<DrDxt.Detection.Wmi.WmiRow>> ServicesSysteme() => _wmi.Query("SELECT Name, DisplayName, PathName, StartName, StartMode FROM Win32_Service");
 
     internal static IEnumerable<RepairFinding> ServicesRemplacables(Result<IReadOnlyList<DrDxt.Detection.Wmi.WmiRow>> services)
@@ -24,7 +25,7 @@ public sealed partial class RepairAuditService
         foreach (var s in services.Value!)
         {
             if (!string.Equals(s.GetString("StartName"), "LocalSystem", StringComparison.OrdinalIgnoreCase)) continue;
-            var exe = CheminDuBinaire(s.GetString("PathName"));
+            var exe = CheminProtege.BinaireDuService(s.GetString("PathName"));
             // Un binaire absent n'est pas une faille ; une ACL illisible n'est pas une preuve : on se tait.
             if (exe is null || !File.Exists(exe)) continue;
             var raison = CheminProtege.Verifier(exe);
@@ -39,7 +40,9 @@ public sealed partial class RepairAuditService
             yield return new RepairFinding("SERVICES", Docteur.Nom("SE.Remplacable.Nom", nom), exe, null,
                 RepairStatus.Suspicious,
                 Docteur.T("SE.Remplacable", debut, SansLeChemin(raison, exe)) + Docteur.T("SE.PasTouche"),
-                Remede: Remede(exe, Docteur.T("SE.Reinstaller")));
+                Remede: Remede(exe, Docteur.T("SE.Reinstaller")),
+                // La clé du registre, pas le nom affiché : c'est là que le helper relit le chemin à corriger.
+                Cible: s.GetString("Name"));
         }
     }
 
@@ -145,21 +148,5 @@ public sealed partial class RepairAuditService
         if (dossier is not null && raison.StartsWith(dossier + " ", StringComparison.OrdinalIgnoreCase))
             return Docteur.T("CP.SonDossier", dossier) + raison[dossier.Length..];
         return raison;
-    }
-
-    /// <summary>Le binaire d'un `PathName` de service : entre guillemets, ou jusqu'au premier « .exe »
-    /// (les arguments suivent), variables d'environnement développées. <c>null</c> si rien ne ressemble à
-    /// un exécutable (pilote, chemin noyau).</summary>
-    internal static string? CheminDuBinaire(string? pathName)
-    {
-        if (string.IsNullOrWhiteSpace(pathName)) return null;
-        var p = Environment.ExpandEnvironmentVariables(pathName.Trim());
-        if (p.StartsWith('"'))
-        {
-            var fin = p.IndexOf('"', 1);
-            return fin > 1 ? p[1..fin] : null;
-        }
-        var exe = p.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);
-        return exe > 0 ? p[..(exe + 4)] : null;
     }
 }

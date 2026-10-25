@@ -39,6 +39,28 @@ public sealed class GenerationAmdTests
             .Which.Statut.Should().Be(RepairStatus.Unknown);
     }
 
+    // Renoir (CPUID 860F01, 17h modèle 60h, publication 55922) et Strix Point (CPUID B20F40, 1Ah modèle 24h) ont leur PPR.
+    [Theory]
+    [InlineData(0x00860F01u, "Zen 2", "55922")]
+    [InlineData(0x00B20F40u, "Zen 5", "Model 24h")]
+    public void Les_APU_dont_AMD_publie_la_reference_sont_reconnus(uint eax, string generation, string document)
+    {
+        var l = GenerationAmd.Reconnaitre("AuthenticAMD", eax);
+        l.Should().NotBeNull();
+        l!.Generation.Should().Be(generation);
+        l.Document.Should().Contain(document);
+    }
+
+    // Sans document AMD qui les nomme : Rembrandt (19h 44h), Phoenix des consoles portables (19h 74h, ROG Ally), Krackan
+    // (1Ah 60h), Mendocino (17h A0h). Ils restent non reconnus.
+    [Theory]
+    [InlineData(0x00A40F41u)]
+    [InlineData(0x00A70F41u)]
+    [InlineData(0x00B60F00u)]
+    [InlineData(0x008A0F00u)]
+    public void Un_APU_sans_reference_publiee_reste_non_reconnu(uint eax)
+        => GenerationAmd.Reconnaitre("AuthenticAMD", eax).Should().BeNull();
+
     [Fact]
     public void Chaque_ligne_de_la_table_porte_son_document_AMD()
         => GenerationAmd.Table.Should().OnlyContain(l => l.Document.StartsWith("AMD ") && l.ModeleMin <= l.ModeleMax);

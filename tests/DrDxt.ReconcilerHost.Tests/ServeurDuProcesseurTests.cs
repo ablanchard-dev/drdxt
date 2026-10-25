@@ -143,6 +143,43 @@ public sealed class ServeurDuProcesseurTests
         (await service).Should().BeTrue();
     }
 
+    // Tctl d'un Ryzen, lu par le service derrière la porte des générations validées, passe par le même tube ; un service
+    // qui ne le lit pas (porte fermée, Intel, version plus ancienne) le sert null, et le client dit « non lue ».
+    [Fact]
+    public async Task La_temperature_AMD_passe_aussi_par_le_tube_et_reste_null_sans_lecture()
+    {
+        var nom = NomUnique();
+        var serveur = new ServeurDuProcesseur(() => null, () => { }, () => false, () => DateTimeOffset.Now, nom,
+            lireTemperatureAmd: () => 61.5);
+        using var fin = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var service = serveur.ServirAsync(fin.Token, connexionsMax: 1);
+        (await Task.Run(() => ProcesseurParLeService.LireTout(nom, () => MonPid, () => DateTimeOffset.Now)))!.TemperatureAmdC.Should().Be(61.5);
+        (await service).Should().BeTrue();
+
+        var nom2 = NomUnique();
+        var sansAmd = new ServeurDuProcesseur(() => Etat, () => { }, () => false, () => DateTimeOffset.Now, nom2);
+        using var fin2 = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var service2 = sansAmd.ServirAsync(fin2.Token, connexionsMax: 1);
+        (await Task.Run(() => ProcesseurParLeService.LireTout(nom2, () => MonPid, () => DateTimeOffset.Now)))!.TemperatureAmdC.Should().BeNull();
+        (await service2).Should().BeTrue();
+    }
+
+    // Le service ferme aussi les poignées AMD après l'inactivité : un pilote de lecture resté chargé hors des parties est ce
+    // que des anti-triches refusent.
+    [Fact]
+    public void Le_service_par_defaut_ferme_Intel_et_AMD()
+    {
+        var source = File.ReadAllText(Path.Combine(Racine(), "src", "DrDxt.ReconcilerHost", "ServeurDuProcesseur.cs"));
+        source.Should().Contain("PawnIoAmd.FermerTout").And.Contain("PawnIoAmd.Ouvert");
+    }
+
+    private static string Racine()
+    {
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
+        return d!.FullName;
+    }
+
     [Fact]
     public void Sans_service_rien_n_est_attendu_et_rien_n_est_lu()
         => ProcesseurParLeService.Lire(NomUnique(), () => null, () => DateTimeOffset.Now).Should().BeNull();

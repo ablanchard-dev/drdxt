@@ -34,6 +34,21 @@ public sealed class RenduALaDesinstallationTests : IDisposable
         try { Directory.Delete(_racine, recursive: true); } catch { /* dossier temporaire */ }
     }
 
+    // Les droits corrigés d'un service sont une correction de sécurité : la désinstallation les laisse, et son rapport le dit,
+    // service par service.
+    [Fact]
+    public void Les_droits_corriges_restent_et_le_rapport_nomme_leurs_services()
+    {
+        var origines = DrDxt.ElevatedHelper.Execution.DroitsDesServices.Racine(_racine);
+        Directory.CreateDirectory(origines);
+        File.WriteAllText(Path.Combine(origines, "service-ServiceDuJeuA.json"), "{}");
+        File.WriteAllText(Path.Combine(origines, "service-ServiceDuJeuB.json"), "{}");
+
+        using (Docteur.Portee(CultureInfo.GetCultureInfo("fr-FR")))
+            ModeDesinstallation.DroitsQuiRestent(_racine).Should().Contain("ServiceDuJeuA, ServiceDuJeuB").And.Contain("restent");
+        ModeDesinstallation.DroitsQuiRestent(Path.Combine(_racine, "vide")).Should().BeEmpty();
+    }
+
     private static string Op(PrivilegedOp op) => PrivilegedOpCodec.Serialize(op).Value!;
     private static string Composite(params PrivilegedOp[] ops) => CompositeSnapshotCodec.Encode(ops).Value!;
     private static string Dec(uint v) => v.ToString(CultureInfo.InvariantCulture);

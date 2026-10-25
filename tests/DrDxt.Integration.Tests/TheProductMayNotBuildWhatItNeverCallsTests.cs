@@ -95,11 +95,6 @@ public class TheProductMayNotBuildWhatItNeverCallsTests
         // utilise l'executeur en processus, sans aucun point d'entree privilegie ouvert. Un chemin
         // volontairement non pris n'est pas un branchement oublie.
         "HostElevatedClientFactory",
-        // `LecturesAmd` et `ResetAmd` — les registres d'un Ryzen par PawnIO, lus seulement par le kit de validation
-        // (`tools/amd-harness --lire`). Le produit ne les ouvre que sur une génération qu'un rapport réel a validée
-        // (`LecturesAmdProfondes.ValideesEnVie`, vide : DrDXT n'a pas de machine AMD). Se rouvre au premier rapport.
-        "LecturesAmd",
-        "ResetAmd",
         // GameThreadPressure et ThreadCpuReader retires — le scan de l'App
         // observe les threads du jeu et le diagnostic les lit. 16 ⇒ 14.
         // DpcLatencyTracer et DpcOutcome retires — le scan mesure les DPC/ISR en jeu. 13 ⇒ 11.

@@ -59,9 +59,20 @@ public static class AdlxVtableSlots
     public const int Power_GetLimit      = 4;
     public const int Power_SetLimit      = 5;  // Write
 
-    // IADLXManualFanTuning (IGPUManualFanTuning.h) : chemin en lecture seule ici.
+    // IADLXManualFanTuning (IGPUManualFanTuning.h).
     public const int Fan_GetTuningRanges = 3;
     public const int Fan_GetTuningStates = 4;
+    public const int Fan_GetEmptyTuningStates = 5;
+    public const int Fan_IsValidTuningStates = 6;
+    public const int Fan_SetTuningStates     = 7;  // Write
+    public const int Fan_IsSupportedZeroRpm  = 8;
+    public const int Fan_GetZeroRpmState     = 9;
+    public const int Fan_SetZeroRpmState     = 10; // Write
+
+    // IADLXManualFanTuning1 (IGPUManualFanTuning.h), par QueryInterface : les états et le Zero RPM par défaut, le retour
+    // à la courbe de la carte.
+    public const int Fan1_GetDefaultTuningStates = 23;
+    public const int Fan1_GetDefaultZeroRpmState = 27;
 
     // IADLXManualFanTuningStateList (IGPUManualFanTuning.h)
     public const int FanStateList_Size = 3;
@@ -69,7 +80,9 @@ public static class AdlxVtableSlots
 
     // IADLXManualFanTuningState (IGPUManualFanTuning.h)
     public const int FanState_GetFanSpeed    = 3;
+    public const int FanState_SetFanSpeed    = 4;  // Write
     public const int FanState_GetTemperature = 5;
+    public const int FanState_SetTemperature = 6;  // Write
 
     // ── Lecture des réglages. Relevées dans les blocs C `...Vtbl` des en-têtes du SDK
     //    (source : branche main, version téléchargée le 06/10/2026, https://github.com/GPUOpen-LibrariesAndSDKs/ADLX).
@@ -99,6 +112,12 @@ public static class AdlxVtableSlots
     // A2c, relues dans ADLX d9f04a9b : Enhanced Sync 7, Vsync (WaitForVerticalRefresh) 8.
     public const int Settings3D_GetEnhancedSync = 7;
     public const int Settings3D_GetWaitForVerticalRefresh = 8;
+    // Lecture seule, relues dans les blocs C `...Vtbl` d'ADLX 32b5a740 (I3DSettings.h) : Boost et Image Sharpening par
+    // carte, RSR pour tout le système. IADLX3DSettingsServices1 (I3DSettings1.h, par QueryInterface) : AFMF, global.
+    public const int Settings3D_GetBoost = 5;
+    public const int Settings3D_GetImageSharpening = 6;
+    public const int Settings3D_GetRadeonSuperResolution = 14;
+    public const int Settings3D1_GetAmdFluidMotionFrames = 17;
 
     // IADLX3DWaitForVerticalRefresh (I3DSettings.h) : 3 IsSupported, 4 IsEnabled, 5 GetMode, 6 SetMode.
     public const int Wfvr_GetMode = 5;
@@ -127,4 +146,11 @@ public static class AdlxVtableSlots
     // IADLXPerformanceMonitoringServices / IADLXGPUMetrics (IPerformanceMonitoring.h)
     public const int Perf_GetCurrentGpuMetrics = 18;
     public const int Metrics_GpuTemperature    = 7;
+    // Relevées dans IADLXGPUMetricsVtbl d'ADLX 32b5a740 : GPUClockSpeed (adlx_int, MHz), GPUHotspotTemperature,
+    // GPUPower (la puce) et GPUTotalBoardPower (la carte) en adlx_double, GPUFanSpeed (adlx_int, tr/min).
+    public const int Metrics_GpuClockSpeed          = 5;
+    public const int Metrics_GpuHotspotTemperature  = 8;
+    public const int Metrics_GpuPower               = 9;
+    public const int Metrics_GpuTotalBoardPower     = 10;
+    public const int Metrics_GpuFanSpeed            = 11;
 }

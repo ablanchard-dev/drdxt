@@ -433,6 +433,15 @@ public sealed record RemoveDriverPackageOp(string PublishedName) : PrivilegedOp;
 /// Le chemin est derive par le helper du nom publie, jamais transmis.</summary>
 public sealed record RestoreDriverPackageOp(string PublishedName) : PrivilegedOp;
 
+/// <summary>Rend aux administrateurs le fichier d'un service SYSTEM que le compte peut remplacer, et son dossier.
+/// Le nom du service seul : un chemin ou un SDDL venus de l'App donneraient de quoi ouvrir l'écriture sur un binaire
+/// SYSTEM. Le helper relit lui-même le chemin dans le registre des services et garde l'origine avant d'écrire.</summary>
+public sealed record CorrigerDroitsDuServiceOp(string NomDuService) : PrivilegedOp;
+
+/// <summary>L'inverse de <see cref="CorrigerDroitsDuServiceOp"/> : rend l'origine que le helper a gardée, et rien
+/// d'autre.</summary>
+public sealed record RendreDroitsDuServiceOp(string NomDuService) : PrivilegedOp;
+
 /// <summary>
 /// L'etat du magasin de composants de Windows, tel que `DISM /CheckHealth` le rend :
 /// sain, reparable ou non reparable (Microsoft, « Repair a Windows Image »). Lecture seule : aucun

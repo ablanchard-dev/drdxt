@@ -56,6 +56,10 @@ surtout en français.
   jeu, par toi.
 - **Le mode Expert** ouvre la fréquence et le ventilateur de la carte graphique, sur ton accord, avec test de stabilité
   et retour automatique.
+- **Corriger les droits** : quand le service d'un autre programme tourne en SYSTEM depuis un fichier que ton compte
+  peut remplacer (une élévation de privilèges que n'importe quel programme pourrait utiliser), DrDXT rend ce fichier et
+  son dossier aux administrateurs, sur ton clic. Les droits d'origine sont gardés, et **Annuler** les remet, par exemple
+  si le programme ne se met plus à jour.
 - **Trouver ma sous-tension** (Intel) baisse la tension du processeur palier par palier, avec un test de charge à
   chaque palier et un retour automatique à la valeur d'origine. La valeur stable se reporte ensuite au BIOS, guidée
   pas à pas.
@@ -86,6 +90,10 @@ Version 0.9, utilisable aujourd'hui. Le scan, le docteur, le relevé de tes part
 le retour arrière de chaque réglage tournent sur de vrais PC. Les réglages de la vérification complète (« Vérifier
 DrDXT sur mon PC ») ont été posés, relus et rendus sur la machine de référence (Intel, NVIDIA) ; ceux qui ne touchent
 que du matériel AMD restent à vérifier sur une vraie machine ([docs/VALIDATION-AMD.fr.md](docs/VALIDATION-AMD.fr.md)).
+Pour AMD, le code est prêt et attend ces rapports : la puissance, la fréquence, le point chaud et le ventilateur de la
+carte en partie, les réglages Radeon (Boost, Image Sharpening, RSR, AFMF), la température du processeur, les timings
+mémoire et la cause des redémarrages, la limite de puissance, la fréquence et le ventilateur du mode Expert. Chacun reste
+en lecture seule ou fermé sur une génération tant qu'un rapport de cette génération ne l'ouvre pas.
 
 Ce qui reste à prouver : un gain mesuré par DrDXT sur des parties, et les cartes AMD, Intel Arc, les portables à deux
 cartes et les consoles portables, prévus dans le code mais testés seulement sur des machines reconstituées.
@@ -201,8 +209,9 @@ La liste, en entier :
 - **Pilote NVIDIA**, au profil du jeu, ou au profil global quand le jeu n'en a pas : file de rendu, synchronisation
   verticale, limiteur d'images, mode d'alimentation, et sur ta demande la surcouche DLSS vers le dernier modèle. Le
   profil global aussi, pour rendre « Normal » au mode d'alimentation.
-- **Pilote AMD**, par ADLX : Anti-Lag, limite d'images, synchronisation verticale (la limite de puissance attend que
-  son unité soit relevée sur une vraie carte). Sur ton clic
+- **Pilote AMD**, par ADLX : Anti-Lag, limite d'images, synchronisation verticale. La limite de puissance et, en mode
+  Expert, une vitesse fixe du ventilateur (jamais sous 40 %, retour à la courbe de la carte à 80 °C) s'écrivent, mais
+  restent fermées tant qu'aucun rapport de validation n'existe pour cette génération de carte. Sur ton clic
   seulement, la remise à l'usine de la carte, quand une sous-tension gardée par le pilote ne peut pas être rendue
   autrement.
 - **Écran** : la fréquence de l'écran principal, réglée sur la plus haute que Windows propose à sa résolution, dans ton
@@ -227,6 +236,10 @@ La liste, en entier :
 - **Carte graphique**, dans des bornes : la limite de puissance, essayée en jeu et gardée seulement avec un gain
   mesuré ; en mode Expert, sur ton accord, le décalage d'horloge et une vitesse fixe du ventilateur, rendus seuls si
   DrDXT s'arrête.
+- **Droits du service d'un autre programme**, sur ton clic « Corriger les droits » : le propriétaire et l'accès du
+  fichier qu'un service SYSTEM lance, et de son dossier, rendus à SYSTEM et aux administrateurs, en lecture pour les
+  utilisateurs. Jamais sous Windows, les profils ou DrDXT ; un lien trouvé dans le dossier annule la correction.
+  L'origine est gardée et rendue par Annuler ; la désinstallation de DrDXT laisse la correction, et son rapport le dit.
 - **Deux règles QoS** pendant une partie, sur ta demande, pour plafonner l'envoi ; retirées à la fin de la partie.
 - **Les programmes ouverts à côté du jeu**, sur ta demande, pendant une partie : leur priorité passée de normale à
   inférieure à la normale, jamais le jeu, les processus de Windows qu'il connaît, Defender ou un antivirus courant (par le nom de son
@@ -308,7 +321,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**9 724 tests, 0 échec**, mesuré le 25/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
+**9 887 tests, 0 échec**, mesuré le 25/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
 matériel). Ce chiffre est vérifié par `tools/gates/compte_des_tests.py` contre la dernière exécution. La commande qui
 le redonne :
 

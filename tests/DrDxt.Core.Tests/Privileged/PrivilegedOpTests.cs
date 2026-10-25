@@ -359,6 +359,10 @@ public sealed class PrivilegedOpTests
             // Elargie deliberement : la pause du maintien posee ou levee par le joueur (un fichier sous %ProgramData%\DrDxt,
             // un booleen, ne peut qu'en faire moins). Documentee dans docs/NON-NUISANCE.md.
             nameof(PrivilegedOpType.SetMaintenancePause),
+            // Elargie deliberement : les droits du fichier d'un service SYSTEM rendus aux administrateurs, et leur origine
+            // rendue. Le nom du service seul ; le helper relit le chemin. Documentee dans docs/NON-NUISANCE.md.
+            nameof(PrivilegedOpType.CorrigerDroitsDuService),
+            nameof(PrivilegedOpType.RendreDroitsDuService),
         });
     }
 

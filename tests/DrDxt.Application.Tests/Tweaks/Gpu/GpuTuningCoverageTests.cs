@@ -62,6 +62,15 @@ public sealed class GpuTuningCoverageTests
     [InlineData("AMD Radeon RX 6800 XT", GpuArchitecture.Rdna2)]
     [InlineData("AMD Radeon RX 6600", GpuArchitecture.Rdna2)]
     [InlineData("AMD Radeon RX 6700 XT", GpuArchitecture.Rdna2)]
+    // RX 5000 (RDNA1), RX 400/500 et Vega (GCN) : reconnues par le nom, comme les autres.
+    [InlineData("AMD Radeon RX 5700 XT", GpuArchitecture.Rdna1)]
+    [InlineData("AMD Radeon RX 5500 XT", GpuArchitecture.Rdna1)]
+    [InlineData("Radeon RX 580 Series", GpuArchitecture.Gcn)]
+    [InlineData("AMD Radeon RX 480", GpuArchitecture.Gcn)]
+    [InlineData("AMD Radeon RX 590 GME", GpuArchitecture.Gcn)]
+    [InlineData("AMD Radeon RX 550X", GpuArchitecture.Gcn)]
+    [InlineData("Radeon RX Vega 64", GpuArchitecture.Gcn)]
+    [InlineData("AMD Radeon VII", GpuArchitecture.Gcn)]
     [InlineData("Une carte que personne ne connait", GpuArchitecture.Unknown)]
     public void The_classifier_reads_the_marketing_name_and_says_Unknown_when_it_cannot(
         string model, GpuArchitecture expected)
@@ -141,11 +150,43 @@ public sealed class GpuTuningCoverageTests
     public void A_card_nobody_recognises_is_READ_ONLY_not_optimistically_supported()
     {
         // Le fail-closed dans sa forme la plus litterale : ne pas savoir n'autorise rien.
-        var row = GpuTuningCoverage.For(Hw(gpus: Gpu("AMD Radeon RX 5700 XT")))
+        var row = GpuTuningCoverage.For(Hw(gpus: Gpu("AMD Radeon Carte Inconnue")))
             .Should().ContainSingle().Subject;
 
         row.Support.Should().Be(GpuTuningSupport.ReadOnly);
         row.ReasonKey.Should().Be(GpuTuningCoverage.ReasonUnknownArchitecture);
+    }
+
+    // La même règle pour toutes les architectures Radeon : sans rapport, lecture seule et voltage fermé ; avec un
+    // rapport validé, la carte s'ouvre. Le voltage reste fermé là où la garde le ferme : un rapport ouvre les leviers
+    // qu'il prouve, pas la tension.
+    [Theory]
+    [InlineData("AMD Radeon RX 5700 XT", GpuArchitecture.Rdna1, false)]
+    [InlineData("Radeon RX 580 Series", GpuArchitecture.Gcn, false)]
+    [InlineData("AMD Radeon RX 6700 XT", GpuArchitecture.Rdna2, false)]
+    [InlineData("AMD Radeon RX 7900 XTX", GpuArchitecture.Rdna3, false)]
+    [InlineData("AMD Radeon RX 9070 XT", GpuArchitecture.Rdna4, true)]
+    public void Une_Radeon_suit_la_meme_regle_rapport_valide_ouvre_sinon_lecture_seule(
+        string modele, GpuArchitecture architecture, bool voltage)
+    {
+        var sans = GpuTuningCoverage.For(Hw(gpus: Gpu(modele)), new HashSet<GpuArchitecture>()).Single();
+        sans.Architecture.Should().Be(architecture);
+        sans.Support.Should().Be(GpuTuningSupport.ReadOnly);
+        sans.ReasonKey.Should().Be(GpuTuningCoverage.ReasonNeverWriteTested);
+        sans.VoltageTuning.Should().Be(voltage);
+
+        var avec = GpuTuningCoverage.For(Hw(gpus: Gpu(modele)), new HashSet<GpuArchitecture> { architecture }).Single();
+        avec.Support.Should().Be(GpuTuningSupport.Validated);
+        avec.ReasonKey.Should().Be(GpuTuningCoverage.ReasonValidated);
+        avec.VoltageTuning.Should().Be(voltage);
+    }
+
+    [Fact]
+    public void Un_rapport_RDNA2_n_ouvre_pas_une_RDNA3()
+    {
+        var row = GpuTuningCoverage.For(Hw(gpus: Gpu("AMD Radeon RX 7900 XTX")),
+            new HashSet<GpuArchitecture> { GpuArchitecture.Rdna2 }).Single();
+        row.Support.Should().Be(GpuTuningSupport.ReadOnly);
     }
 
     [Fact]

@@ -20,6 +20,7 @@ public sealed class TemperatureProcesseurTests
     }
 
     [Fact]
-    public void La_chaine_garde_ses_trois_etages_dans_l_ordre()
-        => TemperatureProcesseur.Chaine.Select(c => c.Nom).Should().Equal("HWiNFO", "PawnIO direct", "service DrDXT");
+    public void La_chaine_garde_ses_etages_dans_l_ordre()
+        => TemperatureProcesseur.Chaine.Select(c => c.Nom).Should()
+            .Equal("HWiNFO", "PawnIO direct", "service DrDXT", "PawnIO AMD direct", "service DrDXT, AMD");
 }

@@ -135,7 +135,78 @@ public sealed class GpuPowerLimitTweakTests
             .Which.PowerLimitPercent.Should().Be(95);
     }
 
-    // --- AMD : l'unité de la limite d'ADLX n'est relevée sur aucune vraie carte. Ni proposé, ni écrit. ---
+    // --- AMD : la limite d'ADLX est « en % », absolue ou en décalage autour de l'usine selon la carte. Elle ne s'écrit que
+    // sur une architecture validée par un rapport, et sous la forme que dit la plage lue. ---
+
+    private static readonly IReadOnlySet<GpuArchitecture> Rdna4Validee = new HashSet<GpuArchitecture> { GpuArchitecture.Rdna4 };
+
+    private static HardwareInventory DesktopRdna4() => Hw("AMD Radeon RX 9070 XT", "AMD", 16L << 30, ChassisType.Desktop);
+
+    private GpuPowerLimitTweak BuildAmd(PlageDePuissanceAmd plage, int actuelle, bool validee = true)
+    {
+        Build();
+        _nvApi.IsAvailable.Returns(false);
+        _adlx.IsAvailable.Returns(true);
+        _adlx.GetPowerLimitRange(0).Returns(Result<PlageDePuissanceAmd>.Ok(plage));
+        _adlx.GetPowerLimitPct(0).Returns(Result<int>.Ok(actuelle));
+        var validees = validee ? Rdna4Validee : new HashSet<GpuArchitecture>();
+        var source = new GpuTuningTargetSource(new GpuTuningTarget(0, -100, 0), new GpuPowerLimitTarget(0, 80));
+        source.SetAmdGpuPresenceFromHardware(DesktopRdna4(), validees);
+        return new GpuPowerLimitTweak(_nvApi, _adlx, _elevated, source, validees);
+    }
+
+    private Task<Result> PoseAdlx(int valeur) => _elevated.Received().ExecuteAsync(
+        Arg.Is<PrivilegedOp>(o => Equals(o, new ApplyAdlxTuningOp(0, AdlxTuningKind.PowerLimit, valeur))),
+        Arg.Any<CancellationToken>());
+
+    [Fact]
+    public void AppliesTo_true_on_desktop_amd_once_its_architecture_is_validated() =>
+        BuildAmd(new PlageDePuissanceAmd(-10, 15, 1), 0).AppliesTo(DesktopRdna4(), State).Should().BeTrue();
+
+    [Fact]
+    public async Task Une_plage_en_decalage_recoit_un_decalage_borne_par_la_plage()
+    {
+        var r = await BuildAmd(new PlageDePuissanceAmd(-10, 15, 1), actuelle: 0).ApplyAsync();
+
+        r.IsOk.Should().BeTrue(r.Error?.Message);
+        await PoseAdlx(-10); // 80 % voulus = -20, la carte ne descend qu'à -10
+        PrivilegedOpCodec.Deserialize(r.Value!.OriginalValueJson).Value.Should()
+            .Be(new ApplyAdlxTuningOp(0, AdlxTuningKind.PowerLimit, 0), "le retour rend l'usine relue");
+    }
+
+    [Fact]
+    public async Task Une_plage_absolue_recoit_le_pourcentage_voulu()
+    {
+        var r = await BuildAmd(new PlageDePuissanceAmd(50, 115, 1), actuelle: 100).ApplyAsync();
+
+        r.IsOk.Should().BeTrue(r.Error?.Message);
+        await PoseAdlx(80);
+    }
+
+    [Theory]
+    [InlineData(20, 40, 30)]   // ni décalage autour de 0, ni plage qui contient 100 : forme inconnue
+    [InlineData(-10, 15, 5)]   // déjà au-dessus de l'usine : son retour sortirait de la bande de règle
+    [InlineData(-10, 15, -10)] // déjà au plus bas : rien à baisser
+    public async Task Une_forme_inconnue_ou_une_origine_hors_bande_n_est_pas_ecrite(int min, int max, int actuelle)
+    {
+        var r = await BuildAmd(new PlageDePuissanceAmd(min, max, 1), actuelle).ApplyAsync();
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.GpuAmdTuningUnavailable);
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Sans_rapport_valide_rien_n_est_ecrit_meme_appele_directement()
+    {
+        var r = await BuildAmd(new PlageDePuissanceAmd(-10, 15, 1), 0, validee: false).ApplyAsync();
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.GpuAmdTuningUnavailable);
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
+
+    // --- AMD sans rapport validé : ni proposé, ni écrit. ---
 
     [Fact]
     public void AppliesTo_false_on_desktop_amd() =>

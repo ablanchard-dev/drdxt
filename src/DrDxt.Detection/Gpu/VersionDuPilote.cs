@@ -67,7 +67,10 @@ public static class VersionDuPilote
                 // Site muet (hors ligne, page changée) = l'endroit où vérifier, pas le silence.
                 : await nvidia.DernieresAsync(ct).ConfigureAwait(false) is { } publiees ? Juger("NVIDIA", version, publiees)
                 : SansReponse("NVIDIA", version, Docteur.T("VP.OuNvidia"));
-        if (cartes.FirstOrDefault(c => c.Vendor.Contains("AMD", StringComparison.OrdinalIgnoreCase)) is { } radeon)
+        // La carte dédiée d'abord, puis la plus grosse mémoire : une APU liste souvent sa puce intégrée en premier.
+        if (cartes.Where(c => CartesGraphiques.EstAmd(c.Vendor))
+                .OrderByDescending(CartesGraphiques.EstDediee).ThenByDescending(c => c.VramBytes)
+                .FirstOrDefault() is { } radeon)
         {
             if (!SuitAdrenalin(radeon.Model))
                 // « les cartes plus anciennes » était faux pour une puce intégrée récente (« AMD Radeon(TM) Graphics »).

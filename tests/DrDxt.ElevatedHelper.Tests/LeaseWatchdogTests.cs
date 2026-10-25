@@ -522,6 +522,17 @@ public sealed class LeaseWatchdogTests
             wd.Establish(OwnerA, "lease-pnp", PrivilegedOpCodec.Serialize(op).Value!, leaseSeconds: 30).IsOk.Should().BeFalse();
     }
 
+    // Corriger ou rendre les droits d'un service : le geste du joueur, jamais parti d'un bail sans lui.
+    [Fact]
+    public void Les_droits_d_un_service_ne_peuvent_jamais_etre_le_revert_d_un_bail()
+    {
+        var wd = Build(new FakeClock(), new RecordingExecutor());
+
+        foreach (var op in new PrivilegedOp[] { new CorrigerDroitsDuServiceOp("Broker"), new RendreDroitsDuServiceOp("Broker") })
+            wd.Establish(OwnerA, "lease-droits", PrivilegedOpCodec.Serialize(op).Value!, leaseSeconds: 30).IsOk.Should().BeFalse();
+        new OpAllowlist().Validate(new RendreDroitsDuServiceOp("Broker")).IsOk.Should().BeTrue();
+    }
+
     [Fact]
     public void Le_test_memoire_au_demarrage_ne_peut_jamais_etre_le_revert_d_un_bail()
     {

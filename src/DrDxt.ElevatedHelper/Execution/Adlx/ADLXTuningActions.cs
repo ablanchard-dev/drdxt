@@ -25,7 +25,7 @@ namespace DrDxt.ElevatedHelper.Execution.Adlx;
 //        • La cible absolue reste aussi dans la plage matérielle annoncée par le pilote
 //          (AdlxGfxReads.MaxFreqRange) ; hors de l'une ou de l'autre, rejet (échec propre, jamais de
 //          bornage). Après l'écriture, la MaxFreq est relue ; autre que la cible, l'origine est reposée.
-//          Le chemin PowerLimit reprend la plage prudente en % via AdlxTuningMath (cette plage-là est absolue).
+//          Le chemin PowerLimit reprend la bande prudente via AdlxTuningMath, en absolu ou en décalage autour de l'usine.
 //   #3 Tout false ou panne native → Result.Fail(HELPER.OP_FAILED), jamais un Ok sur un échec.
 //
 // Sur une machine sans AMD / sans amdadlx64.dll, IAdlxNative.IsAvailable vaut false et chaque
@@ -195,7 +195,7 @@ public sealed class ADLXTuningActions : IADLXTuningActions
             : _native.EstALUsine(gpuIndex) is true ? Result.Ok()
             : Fail(Docteur.T("ADLX.UsineImpossible", "IsAtFactory does not confirm it"));
 
-    // --- PowerLimit : une limite de puissance absolue (% du TDP). ---
+    // --- PowerLimit : une limite de puissance dans l'unité du pilote (% absolu ou décalage, voir AdlxTuningMath). ---
 
     private Result SetPowerLimit(int gpuIndex, int pct)
     {
@@ -203,7 +203,8 @@ public sealed class ADLXTuningActions : IADLXTuningActions
         if (!AdlxTuningMath.IsPowerLimitWithinHardRail(pct))
             return Fail(
                 $"Refused: ADLX power-limit {pct}% is outside the GPU safe-bounds policy band " +
-                $"[{AdlxTuningMath.MinPowerLimitPct}, {AdlxTuningMath.MaxPowerLimitPct}]%.");
+                $"[{AdlxTuningMath.MinPowerLimitPct}, {AdlxTuningMath.MaxPowerLimitPct}]% " +
+                $"(offset [{AdlxTuningMath.MinPowerLimitOffset}, {AdlxTuningMath.MaxPowerLimitOffset}]).");
 
         // AdlxNative fait GET puis SET : lit l'actuel, valide contre le GetPowerLimitRange
         // du pilote, écrit la limite de puissance.

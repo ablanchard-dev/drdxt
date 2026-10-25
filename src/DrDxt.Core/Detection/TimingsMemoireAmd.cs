@@ -13,8 +13,9 @@ public sealed record TimingsMemoire(TypeMemoireAmd Type, IReadOnlyList<TimingsCa
 
 /// <summary>
 /// Les timings mémoire réellement appliqués par le contrôleur mémoire AMD (UMC), pas ceux que le BIOS dit avoir
-/// demandés. Pur : décode des registres déjà lus. Les lire demande l'accès SMN, qui passe par un module PawnIO AMD que
-/// DrDXT n'embarque pas : la lecture reste fermée et le constat dit « non lu » (GATES).
+/// demandés. Pur : décode des registres déjà lus. Les lire demande l'accès SMN, par le module AMDFamily17 de PawnIO,
+/// embarqué en lecture seule (LecturesAmd.CanauxMemoire) ; l'App ne s'en sert que sur une génération validée en vie
+/// (LecturesAmdProfondes.ValideesEnVie), sinon le constat dit « non lu ».
 /// Sources : base des canaux, noyau Linux drivers/edac/amd64_edac.h (get_umc_base : 0x50000 + canal &lt;&lt; 20, commit
 /// 6a857969) ; disposition des champs, compilation communautaire ZenStates-Core (github.com/irusanov/ZenStates-Core,
 /// commit 869b7e82, Dictionaries/DDR4Dictionary.cs, DDR5Dictionary.cs, Hardware/DRAM/Ddr4Timings.cs, Ddr5Timings.cs),

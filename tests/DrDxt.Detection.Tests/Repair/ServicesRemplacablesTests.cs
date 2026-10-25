@@ -16,11 +16,11 @@ public sealed class ServicesRemplacablesTests
     [InlineData("C:\\Outils\\Mon Service.EXE /x", "C:\\Outils\\Mon Service.EXE")]
     [InlineData("\"C:\\Users\\x\\DrDXT\\PresentMonService.exe\"", "C:\\Users\\x\\DrDXT\\PresentMonService.exe")]
     public void Le_chemin_du_binaire_se_lit_malgre_guillemets_et_arguments(string pathName, string attendu)
-        => RepairAuditService.CheminDuBinaire(pathName).Should().Be(attendu);
+        => DrDxt.Core.CheminProtege.BinaireDuService(pathName).Should().Be(attendu);
 
     [Fact]
     public void Les_variables_d_environnement_sont_developpees()
-        => RepairAuditService.CheminDuBinaire("%SystemRoot%\\System32\\lsass.exe")
+        => DrDxt.Core.CheminProtege.BinaireDuService("%SystemRoot%\\System32\\lsass.exe")
             .Should().Be(Path.Combine(Environment.GetEnvironmentVariable("SystemRoot")!, "System32", "lsass.exe"));
 
     private sealed class WmiCompteur : DrDxt.Detection.Wmi.IWmiQuery
@@ -65,7 +65,7 @@ public sealed class ServicesRemplacablesTests
             File.WriteAllBytes(exe, [0]);
             var ligne = new DrDxt.Detection.Wmi.WmiRow(new Dictionary<string, object?>
             {
-                ["Name"] = "Svc", ["DisplayName"] = "Svc", ["PathName"] = $"\"{exe}\"",
+                ["Name"] = "Svc", ["DisplayName"] = "Mon service", ["PathName"] = $"\"{exe}\"",
                 ["StartName"] = "LocalSystem", ["StartMode"] = demarrage,
             });
             var c = RepairAuditService.ServicesRemplacables(
@@ -75,7 +75,9 @@ public sealed class ServicesRemplacablesTests
             else e.Should().StartWith("ce service tourne avec les droits du système");
             // Le geste se lit à part, en étapes ; l'explication garde le quoi et le pourquoi.
             c.Remede.Should().StartWith("1) ").And.Contain("Program Files");
-            e.Should().NotContain("Réinstaller").And.EndWith("DrDXT ne touche pas à ce service.");
+            e.Should().NotContain("Réinstaller").And.EndWith("DrDXT ne change ses droits que si tu appuies sur « Corriger les droits ».");
+            // Le geste vise la clé du service, sous son nom de service : c'est là que le helper relit le chemin.
+            c.Cible.Should().Be("Svc");
         }
         finally { Directory.Delete(dossier, recursive: true); }
     }
@@ -104,6 +106,7 @@ public sealed class ServicesRemplacablesTests
             // La clé du service lu, pas une clé générique : c'est là que vit le chemin à mettre entre guillemets.
             c.Remede.Should().StartWith("1) ").And.Contain(@"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Svc").And.Contain("ImagePath");
             e.Should().NotContain("Mettre le chemin").And.EndWith("DrDXT ne touche pas à ce service.");
+            c.Cible.Should().BeNull("aucun geste ne corrige un chemin non cité");
         }
         finally { Directory.Delete(dossier, recursive: true); }
     }
@@ -156,5 +159,5 @@ public sealed class ServicesRemplacablesTests
     [InlineData("")]
     [InlineData("\\SystemRoot\\System32\\drivers\\pilote.sys")]
     public void Sans_executable_reconnaissable_rien_n_est_rendu(string? pathName)
-        => RepairAuditService.CheminDuBinaire(pathName).Should().BeNull();
+        => DrDxt.Core.CheminProtege.BinaireDuService(pathName).Should().BeNull();
 }

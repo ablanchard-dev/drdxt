@@ -64,6 +64,20 @@ public readonly struct AdlxFanReads
 /// lieu d'un vague « non disponible ».</summary>
 public sealed record GpuProbeStep(string Name, bool Ok, string? Detail = null);
 
+/// <summary>Ce que la carte dédiée AMD rend pendant une partie (IADLXGPUMetrics) : puissance de la carte (à défaut, de la
+/// puce), température, point chaud, fréquence graphique, ventilateur. Chaque champ à null = non lu ; jamais zéro.
+/// <paramref name="Raison"/> dit pourquoi rien n'a été lu quand c'est le cas.</summary>
+public sealed record AdlxMetriques(
+    string? Raison = null,
+    double? PuissanceW = null,
+    double? TemperatureC = null,
+    double? PointChaudC = null,
+    int? FrequenceMhz = null,
+    int? VentilateurTrMin = null)
+{
+    public static AdlxMetriques RienLu(string raison) => new(Raison: raison);
+}
+
 /// <summary>Les réglages AMD lus par ADLX sur la carte dédiée. Chaque champ à null = non lu
 /// (DLL absente, carte sans la fonction, entrée qui rend une erreur ADLX) ; jamais une valeur par défaut.
 /// <paramref name="Raison"/> dit pourquoi rien n'a été lu quand c'est le cas.</summary>
@@ -81,7 +95,13 @@ public sealed record AdlxReglagesLus(
     int? FrtcFpsReglee = null,
     // Le mode Vsync du pilote (0 à 3) et Enhanced Sync, qu'allumer la Vsync éteint.
     int? VsyncMode = null,
-    bool? EnhancedSyncActif = null)
+    bool? EnhancedSyncActif = null,
+    // Les réglages Radeon lus seulement : Boost et Image Sharpening de la carte, RSR et AFMF du système. Non pris en
+    // charge = null, comme SAM et Anti-Lag : « éteint » ferait proposer de les allumer.
+    bool? BoostActif = null,
+    bool? ImageSharpeningActif = null,
+    bool? RsrActif = null,
+    bool? AfmfActif = null)
 {
     public static AdlxReglagesLus RienLu(string raison) => new(Raison: raison);
 
@@ -173,6 +193,10 @@ public interface IAdlxNative
     /// jamais. Par défaut (doublures qui ne la portent pas) : rien lu.</summary>
     AdlxReglagesLus LireReglages() => AdlxReglagesLus.RienLu("This seam does not read ADLX settings.");
 
+    /// <summary>Puissance, températures, fréquence et ventilateur de la carte dédiée, à l'instant. Lecture seule ; ne lève
+    /// jamais. Par défaut (doublures qui ne la portent pas) : rien lu.</summary>
+    AdlxMetriques LireMetriques() => AdlxMetriques.RienLu("This seam does not read ADLX metrics.");
+
     /// <summary>Allume ou éteint Anti-Lag (le classique ; le niveau Anti-Lag Next n'est jamais
     /// touché) sur la carte dédiée, celle que <see cref="LireReglages"/> lit. Rend <c>null</c> si écrit, sinon la
     /// raison ; ne lève jamais. Par défaut (doublures qui ne la portent pas) : refusé.</summary>
@@ -193,6 +217,17 @@ public interface IAdlxNative
     /// <summary>Pose le mode Vsync du pilote (0 à 3, ADLX_WAIT_FOR_VERTICAL_REFRESH_MODE) sur la
     /// carte dédiée. Rend <c>null</c> si écrit, sinon la raison ; ne lève jamais.</summary>
     string? EcrireVsync(int mode) => "This seam does not write Vsync.";
+
+    /// <summary>Pose la même vitesse (en %) à chaque état de la courbe du ventilateur de la carte dédiée et coupe le Zero
+    /// RPM. Rend <c>null</c> si posé et relu, sinon la raison ; ne lève jamais.</summary>
+    string? PoserVentilateurFixe(int pourcent) => "This seam does not write the fan.";
+
+    /// <summary>Remet la courbe et le Zero RPM par défaut de la carte dédiée. Rend <c>null</c> si remis et relu, sinon la
+    /// raison ; ne lève jamais.</summary>
+    string? RendreVentilateurAuto() => "This seam does not write the fan.";
+
+    /// <summary>La température de la carte dédiée en °C ; null si elle ne se lit pas.</summary>
+    double? LireTemperatureCarte() => null;
 
     /// <summary>A-FS1 : FreeSync de chaque écran branché sur la carte AMD, lu au pilote. Vide = rien lu.</summary>
     IReadOnlyList<AdlxEcranFreeSync> LireFreeSync() => Array.Empty<AdlxEcranFreeSync>();

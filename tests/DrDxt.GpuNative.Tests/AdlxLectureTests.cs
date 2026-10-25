@@ -39,6 +39,14 @@ public sealed unsafe class AdlxLectureTests
     [UnmanagedCallersOnly] private static int Sortie7(IntPtr p, IntPtr* o) => Sortie(p, 7, o);
     [UnmanagedCallersOnly] private static int Sortie8(IntPtr p, IntPtr* o) => Sortie(p, 8, o);
     [UnmanagedCallersOnly] private static int Sortie9(IntPtr p, IntPtr* o) => Sortie(p, 9, o);
+    [UnmanagedCallersOnly] private static int Sortie14(IntPtr p, IntPtr* o) => Sortie(p, 14, o);
+    [UnmanagedCallersOnly] private static int Sortie17(IntPtr p, IntPtr* o) => Sortie(p, 17, o);
+    [UnmanagedCallersOnly] private static int ParCarte5(IntPtr p, IntPtr g, IntPtr* o) => ParCarte(p, 5, g, o);
+    [UnmanagedCallersOnly] private static int ParCarte6(IntPtr p, IntPtr g, IntPtr* o) => ParCarte(p, 6, g, o);
+    [UnmanagedCallersOnly] private static int Entier11(IntPtr p, int* v) => Entier(p, 11, v);
+    [UnmanagedCallersOnly] private static int Reel8(IntPtr p, double* v) { var r = H<HReel>(p, 8)(out var x); *v = x; return r; }
+    [UnmanagedCallersOnly] private static int Reel9(IntPtr p, double* v) { var r = H<HReel>(p, 9)(out var x); *v = x; return r; }
+    [UnmanagedCallersOnly] private static int Reel10(IntPtr p, double* v) { var r = H<HReel>(p, 10)(out var x); *v = x; return r; }
     [UnmanagedCallersOnly] private static int ParCarte3(IntPtr p, IntPtr g, IntPtr* o) => ParCarte(p, 3, g, o);
     [UnmanagedCallersOnly] private static int ParCarte4(IntPtr p, IntPtr g, IntPtr* o) => ParCarte(p, 4, g, o);
     [UnmanagedCallersOnly] private static int ParCarte9(IntPtr p, IntPtr g, IntPtr* o) => ParCarte(p, 9, g, o);
@@ -67,6 +75,14 @@ public sealed unsafe class AdlxLectureTests
         [(typeof(HSortie), 7)] = (IntPtr)(delegate* unmanaged<IntPtr, IntPtr*, int>)&Sortie7,
         [(typeof(HSortie), 8)] = (IntPtr)(delegate* unmanaged<IntPtr, IntPtr*, int>)&Sortie8,
         [(typeof(HSortie), 9)] = (IntPtr)(delegate* unmanaged<IntPtr, IntPtr*, int>)&Sortie9,
+        [(typeof(HSortie), 14)] = (IntPtr)(delegate* unmanaged<IntPtr, IntPtr*, int>)&Sortie14,
+        [(typeof(HSortie), 17)] = (IntPtr)(delegate* unmanaged<IntPtr, IntPtr*, int>)&Sortie17,
+        [(typeof(HParCarte), 5)] = (IntPtr)(delegate* unmanaged<IntPtr, IntPtr, IntPtr*, int>)&ParCarte5,
+        [(typeof(HParCarte), 6)] = (IntPtr)(delegate* unmanaged<IntPtr, IntPtr, IntPtr*, int>)&ParCarte6,
+        [(typeof(HEntier), 11)] = (IntPtr)(delegate* unmanaged<IntPtr, int*, int>)&Entier11,
+        [(typeof(HReel), 8)] = (IntPtr)(delegate* unmanaged<IntPtr, double*, int>)&Reel8,
+        [(typeof(HReel), 9)] = (IntPtr)(delegate* unmanaged<IntPtr, double*, int>)&Reel9,
+        [(typeof(HReel), 10)] = (IntPtr)(delegate* unmanaged<IntPtr, double*, int>)&Reel10,
         [(typeof(HParCarte), 3)] = (IntPtr)(delegate* unmanaged<IntPtr, IntPtr, IntPtr*, int>)&ParCarte3,
         [(typeof(HParCarte), 4)] = (IntPtr)(delegate* unmanaged<IntPtr, IntPtr, IntPtr*, int>)&ParCarte4,
         [(typeof(HParCarte), 9)] = (IntPtr)(delegate* unmanaged<IntPtr, IntPtr, IntPtr*, int>)&ParCarte9,
@@ -88,6 +104,11 @@ public sealed unsafe class AdlxLectureTests
         public (bool Sup, bool On, int Fps) Frtc = (true, true, 141);
         public (bool Sup, bool On, int Min, int Max) Chill = (true, false, 0, 0);
         public double Temperature = 58.0;
+        // Les métriques de la carte (IADLXGPUMetrics) : point chaud, puissance de la puce et de la carte, fréquence, ventilateur.
+        public double PointChaud = 74.0, PuissancePuce = 180.0, PuissanceCarte = 231.0;
+        public int Frequence = 2480, Ventilateur = 1450;
+        // Les réglages Radeon lus seulement (Boost, Image Sharpening, RSR, AFMF).
+        public (bool Sup, bool On) Boost = (true, false), Ris = (true, true), Rsr = (true, false), Afmf = (true, true);
         // A-FS1 : les écrans branchés sur la carte, tels qu'ADLX les nomme.
         public (string Nom, bool Sup, bool On)[] Ecrans = [("VG27AQ", true, true), ("MAG274QRF", true, false)];
         public HashSet<string> Erreurs = [];
@@ -129,13 +150,30 @@ public sealed unsafe class AdlxLectureTests
             var antiLag = Fonction("antilag", s.AntiLag.Sup, s.AntiLag.On, []);
             var frtc = Fonction("frtc", s.Frtc.Sup, s.Frtc.On, new() { [6] = Int("frtc-fps", s.Frtc.Fps) });
             var chill = Fonction("chill", s.Chill.Sup, s.Chill.On, new() { [6] = Int("chill-min", s.Chill.Min), [7] = Int("chill-max", s.Chill.Max) });
+            var boost = Fonction("boost", s.Boost.Sup, s.Boost.On, []);
+            var ris = Fonction("ris", s.Ris.Sup, s.Ris.On, []);
+            var rsr = Fonction("rsr", s.Rsr.Sup, s.Rsr.On, []);
+            var afmf = Fonction("afmf", s.Afmf.Sup, s.Afmf.On, []);
+            var trois1 = Objet(new() { [17] = SortieVers(afmf, "get-afmf") });
             var trois = Objet(new()
             {
+                [2] = new HQi((string? id, out IntPtr o) => id == "IADLX3DSettingsServices1" ? Remettre(trois1, out o, "qi-3d1") : Echec(out o)),
                 [3] = ParCarteVers(antiLag, "get-antilag"),
                 [4] = ParCarteVers(chill, "get-chill"),
+                [5] = ParCarteVers(boost, "get-boost"),
+                [6] = ParCarteVers(ris, "get-ris"),
                 [9] = ParCarteVers(frtc, "get-frtc"),
+                [14] = SortieVers(rsr, "get-rsr"),
             });
-            var metriques = Objet(new() { [7] = new HReel((out double v) => { v = s.Temperature; return Err("temp"); }) });
+            var metriques = Objet(new()
+            {
+                [5] = Int("frequence", s.Frequence),
+                [7] = new HReel((out double v) => { v = s.Temperature; return Err("temp"); }),
+                [8] = new HReel((out double v) => { v = s.PointChaud; return Err("point-chaud"); }),
+                [9] = new HReel((out double v) => { v = s.PuissancePuce; return Err("puissance-puce"); }),
+                [10] = new HReel((out double v) => { v = s.PuissanceCarte; return Err("puissance-carte"); }),
+                [11] = Int("ventilateur", s.Ventilateur),
+            });
             var perf = Objet(new() { [18] = ParCarteVers(metriques, "get-metrics") });
 
             var ecrans = s.Ecrans.Select(e =>
@@ -435,5 +473,118 @@ public sealed unsafe class AdlxLectureTests
         new AdlxReglagesLus(FrtcActif: false).LimiteImages.Should().BeNull();
         new AdlxReglagesLus(FrtcActif: true, FrtcFps: 141).LimiteImages.Should().BeNull("Chill non lu");
         new AdlxReglagesLus(FrtcActif: true, FrtcFps: 141, ChillActif: true, ChillMaxFps: 120).LimiteImages.Should().Be(120);
+    }
+
+    // ── Les métriques de la carte en partie (IADLXGPUMetrics, IPerformanceMonitoring.h) ──
+
+    private static (AdlxMetriques M, Doublure D) Metriques(Scenario s)
+    {
+        var d = new Doublure(s);
+        return (new AdlxNative(d.Systeme).LireMetriques(), d);
+    }
+
+    [Fact]
+    public void Lit_la_puissance_de_la_carte_la_frequence_le_point_chaud_et_le_ventilateur_de_la_carte_dediee()
+    {
+        var (m, d) = Metriques(new Scenario());
+        using (d)
+        {
+            m.Raison.Should().BeNull();
+            m.PuissanceW.Should().Be(231.0, "la puissance de la carte entière, comme NVML");
+            m.TemperatureC.Should().Be(58.0);
+            m.PointChaudC.Should().Be(74.0);
+            m.FrequenceMhz.Should().Be(2480);
+            m.VentilateurTrMin.Should().Be(1450);
+            d.Rendus.Should().Be(d.Remis, "chaque interface remise est rendue");
+        }
+    }
+
+    [Fact]
+    public void Sans_puissance_de_carte_la_puissance_de_la_puce_la_remplace()
+    {
+        var (m, d) = Metriques(new Scenario { Erreurs = ["puissance-carte"] });
+        using (d) m.PuissanceW.Should().Be(180.0);
+    }
+
+    [Theory]
+    [InlineData("frequence")]
+    [InlineData("point-chaud")]
+    [InlineData("ventilateur")]
+    public void Une_metrique_en_erreur_est_non_lue_et_les_autres_restent(string entree)
+    {
+        var (m, d) = Metriques(new Scenario { Erreurs = [entree] });
+        using (d)
+        {
+            (entree switch { "frequence" => (object?)m.FrequenceMhz, "point-chaud" => m.PointChaudC, _ => m.VentilateurTrMin })
+                .Should().BeNull();
+            m.PuissanceW.Should().Be(231.0, "témoin : le reste est lu");
+        }
+    }
+
+    // Une valeur impossible n'est pas une mesure : non lue, jamais zéro ni recopiée.
+    [Fact]
+    public void Une_metrique_impossible_n_est_pas_une_mesure()
+    {
+        var (m, d) = Metriques(new Scenario { PointChaud = 400, PuissanceCarte = -5, PuissancePuce = 0, Frequence = 0, Ventilateur = -1 });
+        using (d)
+        {
+            m.PointChaudC.Should().BeNull();
+            m.PuissanceW.Should().BeNull();
+            m.FrequenceMhz.Should().BeNull();
+            m.VentilateurTrMin.Should().BeNull();
+        }
+    }
+
+    [Fact]
+    public void Sans_carte_dediee_lue_les_metriques_disent_pourquoi()
+    {
+        var (m, d) = Metriques(new Scenario { Erreurs = ["gpus"] });
+        using (d)
+        {
+            m.Raison.Should().NotBeNullOrEmpty();
+            m.PuissanceW.Should().BeNull();
+        }
+    }
+
+    // ── Les réglages Radeon lus (I3DSettings.h, I3DSettings1.h) ──
+
+    [Fact]
+    public void Lit_Boost_Image_Sharpening_RSR_et_AFMF()
+    {
+        var (lus, d) = Lire(new Scenario());
+        using (d)
+        {
+            lus.BoostActif.Should().BeFalse();
+            lus.ImageSharpeningActif.Should().BeTrue();
+            lus.RsrActif.Should().BeFalse();
+            lus.AfmfActif.Should().BeTrue();
+        }
+    }
+
+    // Une fonction que la carte ne gère pas n'est pas « éteinte, à allumer » : non lue, comme Anti-Lag et SAM.
+    [Fact]
+    public void Un_reglage_Radeon_non_pris_en_charge_est_non_lu()
+    {
+        var (lus, d) = Lire(new Scenario { Boost = (false, false), Ris = (false, false), Rsr = (false, false), Afmf = (false, false) });
+        using (d)
+        {
+            lus.BoostActif.Should().BeNull();
+            lus.ImageSharpeningActif.Should().BeNull();
+            lus.RsrActif.Should().BeNull();
+            lus.AfmfActif.Should().BeNull();
+        }
+    }
+
+    // AFMF vit dans IADLX3DSettingsServices1 : un pilote qui ne la donne pas laisse AFMF non lu, et le reste lu.
+    [Fact]
+    public void Sans_IADLX3DSettingsServices1_AFMF_est_non_lu_et_le_reste_lu()
+    {
+        var (lus, d) = Lire(new Scenario { Erreurs = ["qi-3d1"] });
+        using (d)
+        {
+            lus.AfmfActif.Should().BeNull();
+            lus.ImageSharpeningActif.Should().BeTrue("témoin : le reste est lu");
+            d.Rendus.Should().Be(d.Remis);
+        }
     }
 }

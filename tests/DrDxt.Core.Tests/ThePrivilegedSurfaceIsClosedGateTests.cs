@@ -62,6 +62,10 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
         "RestartDeviceOp",
         "RemoveDriverPackageOp",
         "RestoreDriverPackageOp",
+        // Rendre aux administrateurs le fichier d'un service SYSTEM que le compte peut remplacer, et son inverse ; le
+        // helper relit lui-même le chemin et ne rend que l'origine qu'il a gardée (docs/NON-NUISANCE.md).
+        "CorrigerDroitsDuServiceOp",
+        "RendreDroitsDuServiceOp",
         // Le journal d'écriture anticipée du helper : une pose marquée, validée par l'op qu'elle porte, et son acquit.
         // Aucune nouvelle surface : chacune ne vaut que ce que vaut son op intérieure (OpAllowlist).
         "PoseEnAttenteDOrigineOp",

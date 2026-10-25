@@ -1374,6 +1374,15 @@ Turn on the game's FPS counter to compare.</value>
   <data name="Leviers.Geste.Dlss" xml:space="preserve">
     <value>Latest DLSS model: {0}</value>
   </data>
+  <data name="Leviers.Geste.Droits" xml:space="preserve">
+    <value>Fixed permissions of service {0}</value>
+  </data>
+  <data name="Geste.Droits.Titre" xml:space="preserve">
+    <value>Fix the permissions</value>
+  </data>
+  <data name="Geste.Droits.Detail" xml:space="preserve">
+    <value>DrDXT hands this file and its folder back to the administrators: only Windows and administrators will be able to replace it, and your account keeps read access. The original permissions are kept aside. If the game or its launcher can no longer update itself, “Undo” puts them back as they were.</value>
+  </data>
   <data name="Geste.Pilote.ExportAbsent" xml:space="preserve">
     <value>{0}: the package copy is gone, DrDXT cannot put it back. It leaves the list; Windows Update or the maker's site reinstall it if needed.</value>
   </data>
@@ -2692,7 +2701,7 @@ If it happened while a setting was being changed, run a scan: "What DrDXT set" s
     <value>NVIDIA driver setting: no NVIDIA card here.</value>
   </data>
   <data name="Levier.PasIci.PuissanceAmd" xml:space="preserve">
-    <value>Not offered on AMD: the unit of the AMD driver's power limit is not yet checked on a real card.</value>
+    <value>Not offered on AMD yet: the limit will be written once a card of this family has its validation report.</value>
   </data>
   <data name="Levier.PasIci.PasDeCarteDediee" xml:space="preserve">
     <value>No dedicated graphics card here.</value>

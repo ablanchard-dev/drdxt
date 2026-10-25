@@ -70,6 +70,21 @@ public sealed class AdlxSlotsTests
         AdlxVtableSlots.Power_SetLimit.Should().Be(5);    // Write
     }
 
+    [Fact] // IGPUManualFanTuning.h : les écritures du ventilateur (vitesse fixe, Zero RPM) et les défauts de la v1
+    public void Fan_Write_Slots_AreCanonical()
+    {
+        AdlxVtableSlots.Fan_GetEmptyTuningStates.Should().Be(5);
+        AdlxVtableSlots.Fan_IsValidTuningStates.Should().Be(6);
+        AdlxVtableSlots.Fan_SetTuningStates.Should().Be(7);
+        AdlxVtableSlots.Fan_IsSupportedZeroRpm.Should().Be(8);
+        AdlxVtableSlots.Fan_GetZeroRpmState.Should().Be(9);
+        AdlxVtableSlots.Fan_SetZeroRpmState.Should().Be(10);
+        AdlxVtableSlots.Fan1_GetDefaultTuningStates.Should().Be(23);
+        AdlxVtableSlots.Fan1_GetDefaultZeroRpmState.Should().Be(27);
+        AdlxVtableSlots.FanState_SetFanSpeed.Should().Be(4);
+        AdlxVtableSlots.FanState_SetTemperature.Should().Be(6);
+    }
+
     [Fact] // IGPUManualFanTuning.h — réglage de ventilation + liste d'états + état
     public void Fan_Slots_AreCanonical()
     {
@@ -106,6 +121,20 @@ public sealed class AdlxSlotsTests
         AdlxVtableSlots.Wfvr_SetMode.Should().Be(6);
         AdlxVtableSlots.Perf_GetCurrentGpuMetrics.Should().Be(18);
         AdlxVtableSlots.Metrics_GpuTemperature.Should().Be(7);
+    }
+
+    [Fact] // ADLX 32b5a740 : IADLXGPUMetricsVtbl (IPerformanceMonitoring.h), IADLX3DSettingsServices(1)Vtbl (I3DSettings(1).h)
+    public void Metriques_et_reglages_Radeon_Slots_AreCanonical()
+    {
+        AdlxVtableSlots.Metrics_GpuClockSpeed.Should().Be(5);
+        AdlxVtableSlots.Metrics_GpuHotspotTemperature.Should().Be(8);
+        AdlxVtableSlots.Metrics_GpuPower.Should().Be(9);
+        AdlxVtableSlots.Metrics_GpuTotalBoardPower.Should().Be(10);
+        AdlxVtableSlots.Metrics_GpuFanSpeed.Should().Be(11);
+        AdlxVtableSlots.Settings3D_GetBoost.Should().Be(5);
+        AdlxVtableSlots.Settings3D_GetImageSharpening.Should().Be(6);
+        AdlxVtableSlots.Settings3D_GetRadeonSuperResolution.Should().Be(14);
+        AdlxVtableSlots.Settings3D1_GetAmdFluidMotionFrames.Should().Be(17);
     }
 
     [Fact] // ADLX 32b5a740 : ISystem.h, IDisplays.h, IDisplaySettings.h

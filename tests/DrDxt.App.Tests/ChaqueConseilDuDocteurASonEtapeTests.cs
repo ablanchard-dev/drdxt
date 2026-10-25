@@ -80,6 +80,7 @@ public sealed class ChaqueConseilDuDocteurASonEtapeTests
         ["JournalDesLeviersAppliques.cs"] = "relance l'optimisation",
         ["SanteWindows.cs"] = "Récupération > « Réinstaller maintenant »",
         ["OptionsNvidiaDuJoueur.cs"] = "Surcouche DLSS et mode faible latence",
+        ["ReglagesRadeonDuJoueur.cs"] = "Réglages Radeon (Boost, Image Sharpening, RSR, AFMF, HYPR-RX)",
         ["ConfigurationCallOfDuty.cs"] = "Fils de rendu (Call of Duty)",
         ["EcransBleus.cs"] = "le compte par trois sources",
         ["PannesDuJournal.cs"] = "Pilote graphique relancé par Windows",

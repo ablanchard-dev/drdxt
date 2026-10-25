@@ -113,6 +113,20 @@ Pour le joueur :
   plus.
 - Une seule App par session : un second lancement montre la fenêtre ouverte.
 
+### Sécurité de Windows
+- « Corriger les droits » : un service d'un autre programme qui tourne en SYSTEM depuis un fichier que ton compte peut
+  remplacer est rendu aux administrateurs, sur ton clic ; les droits d'origine sont gardés, et Annuler les remet. Un lien
+  dans son dossier fait refuser la correction.
+
+### AMD, prêt pour la validation
+- Radeon : la puissance, la fréquence, le point chaud et le ventilateur de la carte sont relevés en partie ; Boost,
+  Image Sharpening, RSR et AFMF sont lus et nommés par le docteur.
+- La limite de puissance et la vitesse fixe du ventilateur en mode Expert s'écrivent par ADLX, fermées tant qu'aucun
+  rapport ne valide la génération de la carte. GCN et RDNA 1 sont reconnues ; RDNA 2 et 3 s'ouvrent avec leur rapport.
+- Ryzen : la température, les timings mémoire et la cause des redémarrages sont lus dans l'App, derrière la même porte ;
+  Renoir et Strix Point sont reconnus ; le pilote chipset AMD absent ou ancien est signalé.
+- La version du pilote AMD se lit sur la carte dédiée, plus sur la puce intégrée d'une APU.
+
 ## 0.9.1 (15/10/2026)
 
 Pour le joueur :

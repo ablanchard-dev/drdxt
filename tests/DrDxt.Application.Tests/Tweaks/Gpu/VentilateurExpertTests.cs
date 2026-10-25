@@ -1,5 +1,6 @@
 using DrDxt.Application.Autopilot;
 using DrDxt.Application.Tweaks.Gpu;
+using DrDxt.Application.Tweaks.Hardware;
 using DrDxt.Core;
 using FluentAssertions;
 using NSubstitute;
@@ -117,5 +118,20 @@ public sealed class VentilateurExpertTests
         VentilateurExpert.Possible(Machine(ChassisType.Laptop, "NVIDIA")).Should().BeFalse("le constructeur pilote le ventilateur");
         VentilateurExpert.Possible(Machine(ChassisType.Desktop, "AMD")).Should().BeFalse();
         VentilateurExpert.Possible(Machine(ChassisType.Desktop, "NVIDIA", "NVIDIA")).Should().BeFalse("une seule carte est pilotée");
+    }
+
+    // Sur AMD, le ventilateur passe par ADLX ; il reste fermé tant que l'architecture de la carte n'a pas son rapport.
+    [Fact]
+    public void Sur_une_seule_carte_AMD_il_n_ouvre_qu_avec_un_rapport_valide()
+    {
+        var rx9070 = Machine(ChassisType.Desktop, "AMD") with
+        {
+            Gpus = [new GpuInfo("AMD Radeon RX 9070 XT", "AMD", 16L << 30, "1", TriState.On)],
+        };
+        IReadOnlySet<GpuArchitecture> rdna4 = new HashSet<GpuArchitecture> { GpuArchitecture.Rdna4 };
+
+        VentilateurExpert.Possible(rx9070).Should().BeFalse("aucune architecture AMD n'a encore son rapport");
+        VentilateurExpert.Possible(rx9070, rdna4).Should().BeTrue();
+        VentilateurExpert.Possible(Machine(ChassisType.Laptop, "AMD") with { Gpus = rx9070.Gpus }, rdna4).Should().BeFalse();
     }
 }

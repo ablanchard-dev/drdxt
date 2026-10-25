@@ -55,6 +55,10 @@ version, [SECURITY.md](SECURITY.md) holds both languages; the technical document
   changed in the game, by you.
 - **Expert mode** opens the graphics card's clock offset and fan speed, with your consent, with a stability test and
   automatic rollback.
+- **Fix the permissions**: when a service of another program runs as SYSTEM from a file your account can replace (a
+  privilege escalation any program could use), DrDXT gives that file and its folder back to the administrators, on your
+  click. The original permissions are kept, and **Undo** puts them back, for instance if the program can no longer
+  update itself.
 - **Find my undervolt** (Intel) lowers the processor voltage step by step, with a load test at each step and an
   automatic return to the original value. The stable value is then yours to write in the BIOS, guided step by step.
 - **Check DrDXT on my PC** applies each setting, reads it back, reverts it and reads it again, then writes a report
@@ -81,7 +85,10 @@ Five rules hold the code, and each comes from a real failure:
 Version 0.9, usable today. The scan, the doctor, match recording, Optimize, the every-other-game trial and the rollback
 of every setting run on real PCs. The settings of the full check ("Check DrDXT on my PC") were applied, read back and
 restored on the reference machine (Intel, NVIDIA); those that only touch AMD hardware are still to be checked on a
-real machine ([docs/VALIDATION-AMD.md](docs/VALIDATION-AMD.md)).
+real machine ([docs/VALIDATION-AMD.md](docs/VALIDATION-AMD.md)). For AMD, the code is ready and waits for those reports:
+the card's power, clocks, hotspot and fan in-game, the Radeon settings (Boost, Image Sharpening, RSR, AFMF), the
+processor temperature, memory timings and restart cause, the power limit, Expert-mode clocks and fan. Each one stays
+read-only or closed on a generation until a report from that generation opens it.
 
 Still to prove: a gain measured by DrDXT over matches, and AMD cards, Intel Arc, dual-GPU laptops and handhelds,
 covered in the code but tested only on reconstructed machines. [docs/COUVERTURE.md](docs/COUVERTURE.md) says, setting
@@ -184,8 +191,9 @@ restore it. The full list:
 - **NVIDIA driver**, on the game's profile, or on the global profile when the game has none: render queue, vertical
   sync, frame limiter, power mode, and on request the DLSS override to the latest model. The global profile also, to set
   the power mode back to "Normal".
-- **AMD driver**, through ADLX: Anti-Lag, frame rate target, vertical sync (the power limit waits until its unit is
-  read on a real card). On your click only, the card's
+- **AMD driver**, through ADLX: Anti-Lag, frame rate target, vertical sync. The power limit and, in Expert mode, a
+  fixed fan speed (never under 40 %, back to the card's curve at 80 °C) are written, but stay closed until a validation
+  report exists for that card generation. On your click only, the card's
   factory reset, when an undervolt kept by the driver cannot be given back any other way.
 - **Display**: the main screen's refresh rate, set to the highest Windows offers at its resolution, in your Windows
   profile and without admin rights; kept only if you confirm the picture within 15 seconds.
@@ -208,6 +216,10 @@ restore it. The full list:
   to read the chip, never a setting: no fan speed, curve or mode is changed.
 - **Graphics card**, within bounds: the power limit, tried in-game and kept only with a measured gain; in Expert mode,
   with your consent, the clock offset and a fixed fan speed, reverted on their own if DrDXT stops.
+- **Permissions of another program's service**, on your click "Fix the permissions": the owner and access of the file a
+  SYSTEM service runs, and of its folder, given to SYSTEM and the administrators, with read access for users. Never
+  under Windows, user profiles or DrDXT; a link found in the folder cancels the fix. The original is kept and restored
+  by Undo; uninstalling DrDXT leaves the fix in place, and its report says so.
 - **Two QoS rules** during a match, on request, to cap upload; removed when the match ends.
 - **Programs open next to the game**, on request, during a match: their priority lowered from normal to below normal,
   never the game, the Windows processes it knows, Defender or a common antivirus (by process name), or an anti-cheat. Windows does not keep it; DrDXT gives it back at the end
@@ -282,7 +294,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**9,724 tests, 0 failures**, measured on 25/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
+**9,887 tests, 0 failures**, measured on 25/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
 real hardware). The number is checked by `tools/gates/compte_des_tests.py` against the last run. The command that gives
 it back (an English .NET SDK; with a French one, see the French README):
 
