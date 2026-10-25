@@ -770,7 +770,7 @@ end;
       et ne releverait jamais les parties du joueur. Une instance par session (Parallel), pour un PC a plusieurs comptes ; sur
       batterie aussi, et sans limite de duree : le releve tient toute la session. Le
       fichier XML vit dans le sous-dossier de Windows\SystemTemp que seuls SYSTEM et les Administrateurs ecrivent, et part
-      apres la creation. --- }
+      apres la creation. schtasks ne lit l'UTF-8 que sans BOM et sans declaration d'encodage : sinon « XML mal forme ». --- }
 function PoserLeReleve(): Boolean;
 var
   Chemin: String;
@@ -781,15 +781,14 @@ begin
   ResultCode := -1;
   Chemin := DossierDuLanceur() + '\releve.xml';
   SetArrayLength(Xml, 1);
-  Xml[0] := '<?xml version="1.0" encoding="UTF-8"?>' +
-    '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">' +
+  Xml[0] := '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">' +
     '<Triggers><LogonTrigger><Enabled>true</Enabled></LogonTrigger></Triggers>' +
     '<Principals><Principal id="Joueur"><GroupId>S-1-5-32-545</GroupId><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>' +
     '<Settings><MultipleInstancesPolicy>Parallel</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>' +
     '<StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><Enabled>true</Enabled></Settings>' +
     '<Actions Context="Joueur"><Exec><Command>' + XmlEchappe(ExpandConstant('{app}') + '\DrDxt.App.exe') +
     '</Command><Arguments>--releve</Arguments></Exec></Actions></Task>';
-  if ForceDirectories(DossierDuLanceur()) and SaveStringsToUTF8File(Chemin, Xml, False) then
+  if ForceDirectories(DossierDuLanceur()) and SaveStringsToUTF8FileWithoutBOM(Chemin, Xml, False) then
     Result := Exec(ExpandConstant('{sys}\schtasks.exe'), '/Create /F /TN "DrDXT releve" /XML "' + Chemin + '"', '', SW_HIDE,
       ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
   DeleteFile(Chemin);

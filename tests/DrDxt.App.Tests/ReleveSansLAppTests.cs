@@ -38,6 +38,9 @@ public sealed class ReleveSansLAppTests
             .And.Contain("XmlEchappe(ExpandConstant('{app}') + '\\DrDxt.App.exe')").And.Contain("<Arguments>--releve</Arguments>")
             .And.NotContain("DrDxt.Lanceur.exe", "non élevé, le lanceur demanderait l'élévation");
         poser.Should().Contain("Chemin := DossierDuLanceur() + '\\releve.xml'", "un XML lu en administrateur ne vit pas sous le compte");
+        // schtasks /XML ne lit l'UTF-8 que sans BOM et sans déclaration d'encodage : sinon « XML mal formé », et la tâche par
+        // groupe tombe dans le repli du seul compte qui installe.
+        poser.Should().Contain("SaveStringsToUTF8FileWithoutBOM(Chemin, Xml, False)").And.NotContain("encoding=");
         poser.IndexOf("DeleteFile(Chemin)", StringComparison.Ordinal).Should()
             .BeGreaterThan(poser.IndexOf("/XML", StringComparison.Ordinal), "le XML part après la création");
         poser.Should().Contain("and (ResultCode = 0)", "un refus de Windows se voit");
