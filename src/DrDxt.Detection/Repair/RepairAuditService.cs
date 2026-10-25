@@ -164,7 +164,8 @@ public sealed partial class RepairAuditService
     /// seconde seule comme pendant l'audit). Les états de veille, qui se lisent au repos, restent après l'audit.</summary>
     internal static Func<T> EnFond<T>(Func<T> mesure)
     {
-        var enCours = Task.Run(mesure);
+        // Son propre thread : une mesure qui bloque deux secondes n'occupe pas le pool, et ne l'attend pas quand il est saturé.
+        var enCours = Task.Factory.StartNew(mesure, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         return () => enCours.GetAwaiter().GetResult();
     }
 
