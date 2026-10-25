@@ -55,8 +55,11 @@ public sealed class InstanceUniqueOuverteTests
         var ancienne = InstanceUnique.Prendre(nom, () => { });
         ancienne.Should().NotBeNull("témoin : la première prend la place");
 
-        var nouvelle = System.Threading.Tasks.Task.Run(() => InstanceUnique.Prendre(nom, () => { }, TimeSpan.FromSeconds(5)));
-        await System.Threading.Tasks.Task.Delay(300);
+        // Sur son propre fil, et la place rendue sans passer par le pool : un pool saturé retarderait le rendu au-delà de
+        // l'attente, et le test jugerait la vitesse de la machine au lieu de l'attente elle-même.
+        var nouvelle = System.Threading.Tasks.Task.Factory.StartNew(() => InstanceUnique.Prendre(nom, () => { }, TimeSpan.FromSeconds(30)),
+            CancellationToken.None, System.Threading.Tasks.TaskCreationOptions.LongRunning, System.Threading.Tasks.TaskScheduler.Default);
+        Thread.Sleep(300);
         ancienne!.Dispose();
 
         using var prise = await nouvelle;
