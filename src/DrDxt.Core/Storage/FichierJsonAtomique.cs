@@ -12,7 +12,7 @@ namespace DrDxt.Core;
 /// la ou il y avait une mesure.
 ///
 /// Vit dans Core parce que la plupart des magasins de DrDXT en ont besoin : une correction faite ici les atteint tous.
-/// Lire et ecrire rendent un Result ; le constructeur refuse un chemin vide, et Remplacer relance apres ses six attentes.
+/// Lire et ecrire rendent un Result ; le constructeur refuse un chemin vide, et Remplacer relance apres ses attentes.
 /// </summary>
 public sealed class FichierJsonAtomique
 {
@@ -100,9 +100,10 @@ public sealed class FichierJsonAtomique
 
     /// <summary>Les attentes entre deux essais de remplacement. L'App, le relevé de fond et le service lisent les mêmes
     /// fichiers : un lecteur qui tient la cible fait refuser le renommage par-dessus elle (accès refusé, ou fichier
-    /// utilisé). La lecture dure quelques millisecondes ; un peu plus d'une seconde en tout laisse finir la plus lente,
-    /// et un refus durable (droits) échoue quand même, dit.</summary>
-    internal static readonly int[] AttentesDeRemplacementMs = [20, 50, 100, 200, 400, 600];
+    /// utilisé). L'antivirus aussi : il analyse le temporaire à sa fermeture et le tient le temps de l'analyse, plus d'une
+    /// seconde sur un PC chargé. Environ cinq secondes en tout laissent finir les deux ; un refus durable (droits) échoue
+    /// quand même, dit.</summary>
+    internal static readonly int[] AttentesDeRemplacementMs = [20, 50, 100, 200, 400, 600, 800, 1000, 1000, 1000];
 
     /// <summary>Renomme <paramref name="tmp"/> par-dessus <paramref name="cible"/>, avec les reprises ci-dessus.</summary>
     public static void Remplacer(string tmp, string cible)

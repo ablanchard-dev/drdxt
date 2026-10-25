@@ -119,15 +119,16 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
     }
 
     // Le helper élevé et le service SYSTEM écrivent le même fichier : sans verrou, deux ajouts simultanés relisent la même
-    // liste et l'un efface l'autre.
+    // liste et l'un efface l'autre. Le verrou attend largement : le test éprouve la sérialisation, pas la vitesse du disque.
     [Fact]
     public async Task Deux_ecrivains_en_parallele_ne_perdent_aucune_entree()
     {
-        var a = new JournalDEcritureAnticipee(Fichier);
-        var b = new JournalDEcritureAnticipee(Fichier);
+        var a = new JournalDEcritureAnticipee(Fichier, attente: TimeSpan.FromMinutes(1));
+        var b = new JournalDEcritureAnticipee(Fichier, attente: TimeSpan.FromMinutes(1));
 
-        await Task.WhenAll(Enumerable.Range(0, 40).Select(i => Task.Run(() => (i % 2 == 0 ? a : b).Ajouter(Hags, $"{i}", App, Le))));
+        var poses = await Task.WhenAll(Enumerable.Range(0, 40).Select(i => Task.Run(() => (i % 2 == 0 ? a : b).Ajouter(Hags, $"{i}", App, Le))));
 
+        poses.Where(p => !p.IsOk).Select(p => p.Error!.Value.Message).Should().BeEmpty();
         new JournalDEcritureAnticipee(Fichier).EnAttente().Value.Should().HaveCount(40);
     }
 
