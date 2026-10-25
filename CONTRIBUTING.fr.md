@@ -29,7 +29,8 @@ tester et ce que le rapport doit montrer ; le rapport part par une issue « Vali
 
 Une issue « Bug » : ce que tu as fait, ce que tu attendais, ce qui s'est passé, et ta version de DrDXT (en bas
 de l'écran). Joins le rapport de diagnostic (« Voir le rapport ») si l'App en a produit un. Une faille de sécurité
-se signale en privé : voir [SECURITY.md](SECURITY.md).
+se signale en privé : voir [SECURITY.md](SECURITY.md). Une question n'est pas un bug : pose-la dans les
+[Discussions](https://github.com/ablanchard-dev/drdxt/discussions) ou sur [Discord](https://discord.gg/z6HJWDzfB3).
 
 ## 3. Écrire du code
 
