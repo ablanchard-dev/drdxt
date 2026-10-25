@@ -70,7 +70,9 @@ PATTERNS = [
     # AdlxNative.EcrireAntiLag/Frtc/Vsync, et la memoire volatile du demarrage par un SetValue sur une cle nommee `cle`.
     # Une methode WMI qui ne commence pas par Get est comptee comme une ecriture ; un SetValue qui porte un
     # RegistryValueKind est une ecriture de registre, quel que soit le nom de la cle (pas le setter WPF).
-    r"\.InvokeMethod\(\"(?!Get)", r"SRRemoveRestorePoint\b", r"Ecrire(?:AntiLag|Frtc|Vsync)\(",
+    # Les methodes de lecture de WMI s'appellent Get… ou, pour les classes du moniteur (root\wmi), WmiGet… :
+    # WmiGetMonitorRawEEdidV1Block rend un bloc EDID et n'ecrit rien (Microsoft Learn, WmiMonitorRawEEdidV1Block).
+    r"\.InvokeMethod\(\"(?!(?:Wmi)?Get)",r"SRRemoveRestorePoint\b", r"Ecrire(?:AntiLag|Frtc|Vsync)\(",
     r"\.SetValue\(.*RegistryValueKind",
     # La remise a l'usine de la carte AMD (IADLXGPUTuningServices.ResetToFactory), le seul retour au-dela de la bande.
     r"RemettreReglageUsine\(",

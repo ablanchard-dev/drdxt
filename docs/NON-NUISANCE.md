@@ -518,12 +518,33 @@ refuse un `Process.Start` qui redirige ses flux hors du lanceur.
 |---|---|---|
 | `Core/ProcessusBorne.cs` (0 → 1) | le processus de l'outil demandé par l'appelant | chemin absolu, System32, attente bornée puis arbre arrêté |
 
+### 25/10/2026 — les sites des passes 9 à 14, décrits un par un
+
+Les passes de revue ont ajouté des écritures sans que ce tableau les décrive. Chacune est relue ici. Un faux site est
+aussi retiré : `Detection/Display/EdidDuMoniteur.cs` appelle `WmiGetMonitorRawEEdidV1Block`, une méthode WMI de
+**lecture** (le bloc EDID du moniteur) ; le motif des méthodes WMI exclut maintenant `WmiGet…` comme il excluait `Get…`.
+
+| Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
+|---|---|---|
+| `App/App.xaml.cs` (10 → 11) | la **priorité de son propre processus**, « en dessous de la normale », pour le relevé de fond lancé à l'ouverture de session | ce processus seulement ; aucun autre programme |
+| `ReconcilerHost/Program.cs` (0 → 1) | la même priorité basse, pour le service de démarrage lui-même | ce processus seulement |
+| `App/Updates/NettoyageDuStaging.cs` (0 → 1) | supprime le dossier de staging des mises à jour quand l'installeur qu'il garde a servi (version installée ou plus ancienne) | `%LOCALAPPDATA%\DrDXT\staging\app-staging` ; jamais à travers une jonction quand l'App est élevée (`FichierJsonAtomique.RefusEleve`) |
+| `Application/Parties/PartiesMemorisees.cs` (7 → 8) | la liste des parties de l'essai A-B-B-A en cours, par l'écriture atomique commune | les données de DrDXT du compte |
+| `Core/Storage/FichierJsonAtomique.cs` (5 → 6) | un journal borné réécrit à sa moitié la plus récente, par la même écriture atomique | la cible de l'appelant |
+| `ElevatedHelper/Execution/Win32RegistryActions.cs` (9 → 10) | la remise de l'approbation de démarrage d'un programme : la valeur d'avant, ou son retrait si elle n'existait pas | `StartupApproved` de la liste blanche (Run, Run32, StartupFolder), HKLM ou HKCU |
+| `ElevatedHelper/Journal/JournalDEcritureAnticipee.cs` (4 → 5) | le journal écrit en fichier de confiance (`WriteTrustedFile`) ; son verrou naît aux Administrateurs, et un verrou d'avant au propriétaire non fiable est supprimé puis recréé | le dossier réservé du journal, SYSTEM et Administrateurs seulement |
+| `ElevatedHelper/Execution/Win32PnpActions.cs` (1 → 3) | supprime un export de pilote une fois remis dans le magasin de Windows, et les exports au-delà des derniers gardés | le dossier d'exports du helper ; seuls les dossiers dont le propriétaire et l'accès sont fiables se suppriment en administrateur |
+| `ElevatedHelper/ModeDesinstallation.cs` (2 → 5) | la marque « rendu incomplet » que l'installeur lit pour dire au joueur que tout n'a pas été rendu, ou son retrait quand tout l'est ; le rapport, écrit hors racine durcie quand l'ACL ne s'applique pas | la racine de DrDXT dans `%ProgramData%` ; le retrait supprime le nom, sans suivre de lien |
+| `Lanceur/PreparationDesDroits.cs` (0 → 2) | met de côté (renomme) un dossier ou un fichier de DrDXT dont le propriétaire ou l'accès n'est pas fiable, avant d'en créer un neuf | `Program Files\DrDXT` et `%ProgramData%\DrDxt` ; rien n'est supprimé |
+| `Reconciler/Manifest/MachineManifestCommit.cs` (0 → 1) | un fichier verrou, ouvert sans partage et supprimé à la fermeture, pour qu'un seul processus écrive le manifeste | à côté du manifeste, dans `%ProgramData%\DrDxt` |
+| `Reconciler/JsonReconcilerStateStore.cs` (3 → 2), `Reconciler/Manifest/TrustedManifestRoot.cs` (8 → 7) | moins d'écritures directes : elles passent par l'écriture atomique commune ou par le verrou partagé | inchangé |
+
 `python tools/nonuisance/count-write-sites.py` refait ce compte et **sort non-zero** si un fichier
 apparait, disparait, ou change de compte. Le script ne recopie rien : un chiffre ecrit a la main
 est une dette tant qu'aucun outil ne le refait.
 
 ```counts
-src/DrDxt.App/App.xaml.cs 10
+src/DrDxt.App/App.xaml.cs 11
 src/DrDxt.App/AppServiceCollectionExtensions.cs 2
 src/DrDxt.App/Effets/MoteurDAnimation.cs 1
 src/DrDxt.App/Platform/CalmeurDeVoisins.cs 1
@@ -532,6 +553,7 @@ src/DrDxt.App/Platform/EcritureDansDocuments.cs 2
 src/DrDxt.App/Platform/RejeuDuJournalLu.cs 1
 src/DrDxt.App/Platform/RelanceElevee.cs 1
 src/DrDxt.App/Updates/InstallationMiseAJour.cs 3
+src/DrDxt.App/Updates/NettoyageDuStaging.cs 1
 src/DrDxt.App/ViewModels/BiosGuideViewModel.cs 1
 src/DrDxt.App/ViewModels/ScanViewModel.Agir.cs 1
 src/DrDxt.App/ViewModels/ScanViewModel.QuoiDeNeuf.cs 1
@@ -545,7 +567,7 @@ src/DrDxt.Application/Parties/ImagesDesParties.cs 1
 src/DrDxt.Application/Parties/JournalDesChangements.cs 2
 src/DrDxt.Application/Parties/MemoireDeLEssai.cs 1
 src/DrDxt.Application/Parties/MemoireSousTension.cs 1
-src/DrDxt.Application/Parties/PartiesMemorisees.cs 7
+src/DrDxt.Application/Parties/PartiesMemorisees.cs 8
 src/DrDxt.Application/Parties/SuiviDesReglages.cs 1
 src/DrDxt.Application/Parties/VerrouDuReleve.cs 1
 src/DrDxt.Application/Safety/GardeDuBcdRetire.cs 3
@@ -555,7 +577,7 @@ src/DrDxt.Application/Tweaks/PreuveDuRepos.cs 4
 src/DrDxt.Bios/BiosMarkerFile.cs 2
 src/DrDxt.Bios/PendingBiosChangeStore.cs 2
 src/DrDxt.Core/ProcessusBorne.cs 1
-src/DrDxt.Core/Storage/FichierJsonAtomique.cs 5
+src/DrDxt.Core/Storage/FichierJsonAtomique.cs 6
 src/DrDxt.Detection/Cpu/EtatsDeVeille.cs 1
 src/DrDxt.Detection/Display/Win32ModeEcran.cs 2
 src/DrDxt.Detection/Gpu/MagasinDePilotes.cs 1
@@ -580,14 +602,14 @@ src/DrDxt.ElevatedHelper/Execution/TraceDesCoupures.cs 2
 src/DrDxt.ElevatedHelper/Execution/Win32BcdActions.cs 3
 src/DrDxt.ElevatedHelper/Execution/Win32FirmwareBootActions.cs 4
 src/DrDxt.ElevatedHelper/Execution/Win32NetworkQosActions.cs 1
-src/DrDxt.ElevatedHelper/Execution/Win32PnpActions.cs 1
+src/DrDxt.ElevatedHelper/Execution/Win32PnpActions.cs 3
 src/DrDxt.ElevatedHelper/Execution/Win32PowerPlanActions.cs 6
-src/DrDxt.ElevatedHelper/Execution/Win32RegistryActions.cs 9
+src/DrDxt.ElevatedHelper/Execution/Win32RegistryActions.cs 10
 src/DrDxt.ElevatedHelper/Execution/Win32RestorePointActions.cs 5
 src/DrDxt.ElevatedHelper/Execution/Win32ServiceActions.cs 4
 src/DrDxt.ElevatedHelper/Ipc/HelperLauncher.cs 1
-src/DrDxt.ElevatedHelper/Journal/JournalDEcritureAnticipee.cs 4
-src/DrDxt.ElevatedHelper/ModeDesinstallation.cs 2
+src/DrDxt.ElevatedHelper/Journal/JournalDEcritureAnticipee.cs 5
+src/DrDxt.ElevatedHelper/ModeDesinstallation.cs 5
 src/DrDxt.ElevatedHelper/Program.cs 1
 src/DrDxt.GpuNative/AdlxNative.cs 6
 src/DrDxt.GpuNative/IAdlxNative.cs 6
@@ -600,6 +622,7 @@ src/DrDxt.Infrastructure/Diagnostics/DiagnosticsLog.cs 2
 src/DrDxt.Infrastructure/Repair/RepairHistoryStore.cs 1
 src/DrDxt.Infrastructure/Updates/DonneesSignees.cs 2
 src/DrDxt.Infrastructure/Updates/UpdateSeams.cs 2
+src/DrDxt.Lanceur/PreparationDesDroits.cs 2
 src/DrDxt.Lanceur/Program.cs 2
 src/DrDxt.Measurement/Cpu/CpuBaseline.cs 1
 src/DrDxt.Measurement/Cpu/CpuBaselineSeams.cs 1
@@ -609,13 +632,15 @@ src/DrDxt.Measurement/Memory/MemoryBaselineStore.cs 1
 src/DrDxt.Measurement/Memory/RepriseDuTestMemoire.cs 2
 src/DrDxt.Measurement/NoOpCalibrationStore.cs 1
 src/DrDxt.Measurement/PerformanceJournalStore.cs 2
-src/DrDxt.Reconciler/JsonReconcilerStateStore.cs 3
+src/DrDxt.Reconciler/JsonReconcilerStateStore.cs 2
+src/DrDxt.Reconciler/Manifest/MachineManifestCommit.cs 1
 src/DrDxt.Reconciler/Manifest/MachineManifestKey.cs 3
 src/DrDxt.Reconciler/Manifest/ProgramDataManifestStorage.cs 2
-src/DrDxt.Reconciler/Manifest/TrustedManifestRoot.cs 8
+src/DrDxt.Reconciler/Manifest/TrustedManifestRoot.cs 7
 src/DrDxt.Reconciler/PauseDuMaintien.cs 3
 src/DrDxt.Reconciler/Reseau/PlafondEnvoiDuService.cs 3
 src/DrDxt.ReconcilerHost/HostServiceCollectionExtensions.cs 1
+src/DrDxt.ReconcilerHost/Program.cs 1
 src/DrDxt.ReconcilerHost/TemoinDIncidentWorker.cs 2
 ```
 
