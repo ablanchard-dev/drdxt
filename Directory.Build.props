@@ -20,4 +20,10 @@
   <PropertyGroup Condition="'$(SelfContained)' == 'true'">
     <RuntimeFrameworkVersion>10.0.12</RuntimeFrameworkVersion>
   </PropertyGroup>
+  <!-- Les tests seulement : des centaines de tests qui bloquent un fil tournent en parallèle, et sur une machine à deux
+       cœurs (la CI) le pool n'ajoute ses fils qu'au compte-gouttes. Une tâche du pool y attend alors plus que le délai
+       qu'un test lui laisse, et le test juge la vitesse de la machine au lieu du code. Le produit garde le pool par défaut. -->
+  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <RuntimeHostConfigurationOption Include="System.Threading.ThreadPool.MinThreads" Value="64" />
+  </ItemGroup>
 </Project>
