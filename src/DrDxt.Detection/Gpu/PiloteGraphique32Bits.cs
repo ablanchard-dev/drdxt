@@ -42,7 +42,10 @@ public static class PiloteGraphique32Bits
             yield break;
         }
         foreach (var c in cartes)
-            yield return Defaut(c, existe) is { } d
+            // Rien de lu (pilote de base, clé de classe introuvable ou illisible) n'est pas « ses fichiers sont là ».
+            yield return c.Noms64 is not { Count: > 0 }
+                ? new RepairFinding("GPU DRIVER", Docteur.Nom("G32.Nom", c.Nom), null, null, RepairStatus.Unknown, Docteur.T("G32.CarteNonLue", c.Nom))
+                : Defaut(c, existe) is { } d
                 ? new RepairFinding("GPU DRIVER", Docteur.Nom("G32.Nom", c.Nom), Docteur.T("G32.ValeurAbsent"), null, RepairStatus.Suspicious,
                     Docteur.T(d.Cle, c.Nom, d.Manquants), RepairAction.Recommandation)
                 : new RepairFinding("GPU DRIVER", Docteur.Nom("G32.Nom", c.Nom), Docteur.T("G32.ValeurPresent"), null, RepairStatus.ExpectedDefault,

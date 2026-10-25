@@ -174,8 +174,8 @@ public sealed class DefaultReapplyOpMapperTests
     [Fact]
     public void DrsBackedLatencyId_Rejects_NoOpLeafInV1()
     {
-        // latency.renderQueueCap est classé Registry par la politique mais appliqué via DRS NVAPI ;
-        // absent du catalogue, le mappeur le traite comme inconnu.
+        // latency.renderQueueCap et latency.vrrVsyncCap s'appliquent par DRS NVAPI ; absents du catalogue, le mappeur les
+        // traite comme inconnus.
         _mapper.Map("latency.renderQueueCap", "1").IsOk.Should().BeFalse();
         _mapper.Map("latency.vrrVsyncCap", "1").IsOk.Should().BeFalse();
     }

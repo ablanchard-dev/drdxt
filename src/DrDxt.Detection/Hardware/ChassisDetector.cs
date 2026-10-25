@@ -8,9 +8,11 @@ public sealed class ChassisDetector
     // Types SMBIOS System Enclosure (table 3 de la spec). Console portable = 11 (Hand Held), 30 (Tablet).
     private static readonly int[] HandheldCodes = { 11, 30 };
     private static readonly int[] DesktopCodes = { 3, 4, 5, 6, 7, 15, 16, 17, 23, 24 };
-    private static readonly int[] LaptopCodes = { 8, 9, 10, 14, 18, 21, 31, 32 };
-    // Beaucoup de handhelds rapportent un code laptop (ex. 10/Notebook), donc on raffine aussi par modèle.
-    private static readonly string[] HandheldModels = { "ROG Ally", "Jupiter", "Legion Go", "Steam Deck", "AOKZOE", "AYANEO", "OneXPlayer", "Claw", "GPD", "Xbox Ally" };
+    // 18 (Expansion Chassis) et 21 (Peripheral Chassis) ne sont pas des portables : inconnus, ils se rangent par la batterie.
+    private static readonly int[] LaptopCodes = { 8, 9, 10, 14, 31, 32 };
+    // Beaucoup de handhelds rapportent un code laptop (ex. 10/Notebook), donc on raffine aussi par modèle. Le Steam Deck
+    // se nomme « Jupiter » (LCD) ou « Galileo » (OLED).
+    private static readonly string[] HandheldModels = { "ROG Ally", "Jupiter", "Legion Go", "Steam Deck", "Galileo", "AOKZOE", "AYANEO", "OneXPlayer", "Claw", "GPD", "Xbox Ally" };
 
     private readonly IWmiQuery _wmi;
     public ChassisDetector(IWmiQuery wmi) => _wmi = wmi;

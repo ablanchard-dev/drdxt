@@ -16,7 +16,7 @@ namespace DrDxt.Application.Safety;
 //    typé du snapshot (la forme filaire du codec, qui porte la vraie valeur d'origine
 //    relevée) et la renvoie par le client élevé. Le chemin générique bas niveau couvre les
 //    retours de registre et de plan d'alimentation ; les retours propres à un levier
-//    (par exemple une courbe V/F du GPU) vivent dans ITweak.RevertAsync (Phase E).
+//    (par exemple une courbe V/F du GPU) vivent dans ITweak.RevertAsync.
 //
 // Chaque frontière externe est protégée → Result.Fail. Aucune exception ne sort jamais.
 // -----------------------------------------------------------------------
@@ -82,6 +82,9 @@ public sealed class SafetyManager : ISafetyManager
             // joueur, elle, revient sur son fil (ConfigureAwait(true)) pour garder sa fenêtre propriétaire.
             if (!await Task.Run(_restore.IsEnabled).ConfigureAwait(true))
             {
+                // Interdite par stratégie : demander au joueur ne mènerait à rien, la raison se dit.
+                if (_restore.InterditeParStrategie())
+                    return Result.Fail(ErrorCodes.RestorePolicy, "System Restore is turned off by a Windows policy (DisableSR).");
                 // Restauration coupée : on ne peut avancer qu'en l'activant avec un accord explicite.
                 // Pas d'accord → refusé ; accord mais activation impossible → désactivée.
                 if (!_consent.AskEnableRestore())

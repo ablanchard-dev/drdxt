@@ -33,6 +33,16 @@ public class CpuDetectorTests
         r.Value.Threads.Should().Be(16);
     }
 
+    // VMware, un cœur par socket : huit lignes Win32_Processor à un cœur. Le rapport ne dit pas « 1c/1t ».
+    [Fact]
+    public void Les_coeurs_de_chaque_socket_se_somment()
+    {
+        var huit = Enumerable.Repeat(("Intel(R) Core(TM) i7-14700F", "GenuineIntel", 1, 1), 8).ToArray();
+        var r = new CpuDetector(WmiReturning(huit)).Detect().Value!;
+        r.Cores.Should().Be(8);
+        r.Threads.Should().Be(8);
+    }
+
     [Fact]
     public void Flags_x3d_from_model_name()
     {

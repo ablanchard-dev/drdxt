@@ -17,11 +17,20 @@ internal static class Program
 {
     private const int ElevationRefusee = 1223;
     private const string Relance = "--relance-elevee";
+    internal const string Droits = "droits";
 
     private static int Main(string[] args)
     {
         if (args.Length == 0) return 2;
         var nom = args[0];
+        // « droits <mode> <racine> <sddl> » : l'installeur élevé prépare un dossier de confiance ici même, sans lancer de
+        // processus (rien ne lit l'environnement du compte, aucune stratégie de langage ne l'empêche). Jamais de relance :
+        // l'installeur est déjà élevé, et une relance « runas » poserait une invite au milieu de la copie.
+        if (string.Equals(nom, Droits, StringComparison.Ordinal))
+        {
+            if (args.Length != 4 || !EstEleve()) return 2;
+            return PreparationDesDroits.Preparer(args[1], args[2], args[3], Console.WriteLine);
+        }
         var reparer = args.Length == 1 && string.Equals(nom, EnvironnementPropre.ReparerWindows, StringComparison.Ordinal);
         if (!reparer && !EnvironnementPropre.Executables.Contains(nom, StringComparer.OrdinalIgnoreCase)) return 2;
         var dossier = AppContext.BaseDirectory;
@@ -59,7 +68,8 @@ internal static class Program
         psi.Environment.Clear();
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         var localAppData = Dossier(Environment.SpecialFolder.LocalApplicationData);
-        var temp = localAppData is null ? Path.Combine(windows, "Temp") : Path.Combine(localAppData, "Temp");
+        var temp = EnvironnementPropre.DossierTemporaire(windows, Dossier(Environment.SpecialFolder.CommonApplicationData),
+            EnvironnementPropre.DossierSur, d => { try { Directory.CreateDirectory(d); } catch (Exception) { /* non sûr : non pris */ } });
         var systeme = new EnvironnementPropre.DossiersDuSysteme(
             Dossier(Environment.SpecialFolder.ProgramFiles), Dossier(Environment.SpecialFolder.ProgramFilesX86),
             Dossier(Environment.SpecialFolder.CommonProgramFiles), Dossier(Environment.SpecialFolder.CommonProgramFilesX86),

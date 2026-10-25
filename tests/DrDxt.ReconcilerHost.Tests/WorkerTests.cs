@@ -305,6 +305,91 @@ public sealed class WorkerTests
         tick.Passes.Should().Be(2, "la partie finie, la passe tourne une fois");
     }
 
+    // Même plafond pour la passe quotidienne : un faux jeu permanent ne l'empêche plus jamais de tourner.
+    [Fact]
+    public async Task DailyPoll_RunsAfterTheCapEvenIfTheGameNeverEnds()
+    {
+        var delay = new PartieSansFin();
+        var (worker, tick) = Build(new FakeOsBuildProbe { Build = "22631.3447" },
+            new InMemoryReconcilerStateStore(ReconcilerState.Default with { LastFeatureUpdateBuild = "22631.3447" }),
+            new FakeUpdateSignal { Recent = false }, new FakeBootOutcomeStore(), delay, new RecordingDiagnostics(), () => true);
+
+        var cts = new CancellationTokenSource();
+        var run = worker.StartAsync(cts.Token);
+        await tick.WaitForPasses(2);
+
+        cts.Cancel();
+        await StopAsync(worker, run);
+        delay.EnPartie.Should().Be((int)(Worker.AttenteEnPartieMax / Worker.AttenteEnPartie));
+    }
+
+    // Une passe qui lève (manifeste, déclencheur, réconciliateur) ne fait pas tomber le service : journalisée, la boucle continue.
+    [Fact]
+    public async Task A_pass_that_throws_is_logged_and_the_service_keeps_running()
+    {
+        var passes = 0;
+        var single = new SingleFlightReconcile(_ => ++passes == 1 ? throw new InvalidOperationException("manifeste") : Task.FromResult(Result.Ok()));
+        var delay = new BlockingDelay();
+        var diagnostics = new RecordingDiagnostics();
+        var worker = new Worker(single,
+            new FeatureUpdateTrigger(new FeatureUpdateDetector(new FakeOsBuildProbe { Build = "22631.3447" },
+                new InMemoryReconcilerStateStore(ReconcilerState.Default with { LastFeatureUpdateBuild = "22631.3447" })),
+                new FakeUpdateSignal { Recent = false }),
+            new BootSessionMarker(new FakeBootOutcomeStore(), delay), diagnostics, delay,
+            new HostTimingOptions(StableWindow, PollInterval), () => false);
+
+        var cts = new CancellationTokenSource();
+        var run = worker.StartAsync(cts.Token);
+        await delay.ReleasePollOnce(PollInterval).WaitAsync(TimeSpan.FromSeconds(5));
+        await delay.ProchaineAttenteDemandee().WaitAsync(TimeSpan.FromSeconds(5));
+
+        passes.Should().Be(2, "la passe du démarrage a levé, la quotidienne a tourné quand même");
+        run.IsFaulted.Should().BeFalse();
+        diagnostics.Entries.Should().Contain(e => e.to == "pass-threw");
+        cts.Cancel();
+        await StopAsync(worker, run);
+    }
+
+    // Une annulation interne à la passe (un délai dépassé, un jeton qui n'est pas celui du service) n'est pas l'arrêt du
+    // service : elle se dit comme une passe qui lève, et la boucle continue.
+    [Fact]
+    public async Task Une_annulation_interne_a_la_passe_n_arrete_pas_le_service()
+    {
+        var passes = 0;
+        var single = new SingleFlightReconcile(_ => ++passes == 1 ? throw new TaskCanceledException("délai") : Task.FromResult(Result.Ok()));
+        var delay = new BlockingDelay();
+        var diagnostics = new RecordingDiagnostics();
+        var worker = new Worker(single,
+            new FeatureUpdateTrigger(new FeatureUpdateDetector(new FakeOsBuildProbe { Build = "22631.3447" },
+                new InMemoryReconcilerStateStore(ReconcilerState.Default with { LastFeatureUpdateBuild = "22631.3447" })),
+                new FakeUpdateSignal { Recent = false }),
+            new BootSessionMarker(new FakeBootOutcomeStore(), delay), diagnostics, delay,
+            new HostTimingOptions(StableWindow, PollInterval), () => false);
+
+        var cts = new CancellationTokenSource();
+        var run = worker.StartAsync(cts.Token);
+        await delay.ReleasePollOnce(PollInterval).WaitAsync(TimeSpan.FromSeconds(5));
+        await delay.ProchaineAttenteDemandee().WaitAsync(TimeSpan.FromSeconds(5));
+
+        passes.Should().Be(2, "la passe du démarrage a été annulée de l'intérieur, la quotidienne a tourné quand même");
+        diagnostics.Entries.Should().Contain(e => e.to == "pass-threw");
+        cts.Cancel();
+        await StopAsync(worker, run);
+    }
+
+    /// <summary>Un jeu qui ne finit jamais : chaque attente en partie passe tout de suite et se compte ; la première attente
+    /// quotidienne passe, les suivantes et la fenêtre stable tiennent jusqu'à l'arrêt.</summary>
+    private sealed class PartieSansFin : IDelay
+    {
+        public int EnPartie, Quotidiennes;
+        public Task DelayAsync(TimeSpan duration, CancellationToken ct)
+        {
+            if (duration == Worker.AttenteEnPartie) { EnPartie++; return Task.CompletedTask; }
+            if (duration == PollInterval && Interlocked.Increment(ref Quotidiennes) == 1) return Task.CompletedTask;
+            return Task.Delay(Timeout.InfiniteTimeSpan, ct);
+        }
+    }
+
     private sealed class BlockingDelay : IDelay
     {
         private readonly object _lock = new();
@@ -350,6 +435,12 @@ public sealed class WorkerTests
             }
             toRelease?.TrySetResult();
             expected.Should().Be(PollInterval, "daily polls use the configured interval");
+        }
+
+        // La boucle redemande une attente une fois sa passe finie : l'attendre sans la libérer fige le compte des passes.
+        public Task ProchaineAttenteDemandee()
+        {
+            lock (_lock) { return _pollRequested.Task; }
         }
 
         // Attend la prochaine attente demandée (quotidienne ou en partie), puis l'achève.

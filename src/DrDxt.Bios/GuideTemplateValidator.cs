@@ -152,7 +152,8 @@ public static class GuideTemplateValidator
         return setting switch
         {
             // Le profil mémoire doit être activé (enable / un profil / EXPO / XMP / DOCP).
-            FirmwareSettingKind.XmpExpo => Any("enable", "profile", "expo", "xmp", "docp"),
+            // Le nom du réglage dans la cible ne dit pas son sens : « XMP Disabled » contient « xmp ».
+            FirmwareSettingKind.XmpExpo => Any("enable", "profile", "expo", "xmp", "docp") && !Any("disable"),
             // ReBAR et son prérequis Above 4G doivent être activés.
             FirmwareSettingKind.ReBar => Any("enable"),
             FirmwareSettingKind.Above4G => Any("enable"),

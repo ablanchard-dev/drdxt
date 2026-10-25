@@ -445,8 +445,8 @@ public sealed class PanneauOrbital : Panel
 }
 
 /// <summary>
-/// Le reflet qui suit la souris. L'idée vient du « Specular Button » de React Bits ; le code est propre à DrDXT (08/10/2026,
-/// Aucune ligne reprise, la licence MIT avec Commons Clause n'est pas compatible avec la GPL).
+/// Le reflet qui suit la souris. L'idée vient du « Specular Button » de React Bits ; le code est propre à DrDXT : aucune
+/// ligne reprise, la licence MIT avec Commons Clause n'est pas compatible avec la GPL.
 ///
 /// Le liseré d'un contrôle est un dégradé ; ce comportement le fait tourner vers le curseur, comme
 /// une arête de métal qui accroche la lumière. Au départ du curseur, le reflet revient se poser.
@@ -625,15 +625,19 @@ public static class Compteur
     public static string? GetTexte(DependencyObject d) => (string?)d.GetValue(TexteProperty);
     public static void SetTexte(DependencyObject d, string? valeur) => d.SetValue(TexteProperty, valeur);
 
-    private static readonly System.Text.RegularExpressions.Regex Nombre = new(@"\d+");
+    // Chiffres ASCII seulement : \d prend aussi les chiffres d'autres écritures, que la lecture invariante refuse.
+    private static readonly System.Text.RegularExpressions.Regex Nombre = new("[0-9]+");
     internal static readonly TimeSpan Duree = TimeSpan.FromMilliseconds(300);
 
     /// <summary>La phrase à l'avancement donné : le premier nombre ramené à sa fraction, le reste inchangé.</summary>
     internal static string Etape(string texte, double avancement)
     {
         var m = Nombre.Match(texte);
-        if (!m.Success || avancement >= 1) return texte;
-        var valeur = (int)Math.Round(int.Parse(m.Value, System.Globalization.CultureInfo.InvariantCulture) * Math.Clamp(avancement, 0, 1));
+        // Un nombre trop grand pour un int s'affiche tel quel, sans animation : jamais un plantage de l'interface.
+        if (!m.Success || avancement >= 1
+            || !int.TryParse(m.Value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var cible))
+            return texte;
+        var valeur = (int)Math.Round(cible * Math.Clamp(avancement, 0, 1));
         return texte[..m.Index] + valeur.ToString(System.Globalization.CultureInfo.InvariantCulture) + texte[(m.Index + m.Length)..];
     }
 

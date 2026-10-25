@@ -54,16 +54,37 @@ public static class PertesInterface
             return Inconnu(Docteur.T("PI.Recule"));
 
         var taux = delta.ReceivedDiscardPercent;
-        return delta.IsClean
-            ? new RepairFinding(Domaine, Nom, Docteur.T("PI.Aucune"), Docteur.T("PI.Aucune"), RepairStatus.ExpectedDefault,
-                Docteur.T("PI.Propre", secondes, delta.ReceivedPackets, delta.SentPackets))
+        // Chaque sens se dit s'il a bougé : une valeur « 0 / 0 en réception » sous un statut suspect cacherait l'émission.
+        var sens = new List<string>();
+        if (delta.ReceivedDiscarded > 0 || delta.ReceivedErrors > 0)
+            sens.Add(Docteur.T("PI.Pertes", delta.ReceivedDiscarded, delta.ReceivedErrors));
+        if (delta.SentDiscarded > 0 || delta.SentErrors > 0)
+            sens.Add(Docteur.T("PI.PertesEmission", delta.SentDiscarded, delta.SentErrors));
+        if (delta.IsClean)
+            return new RepairFinding(Domaine, Nom, Docteur.T("PI.Aucune"), Docteur.T("PI.Aucune"), RepairStatus.ExpectedDefault,
+                Docteur.T("PI.Propre", secondes, delta.ReceivedPackets, delta.SentPackets));
+        // Windows ignore aussi, normalement, les trames d'un protocole qu'il ne connaît pas : quelques-unes ne disent rien de la
+        // carte. Une erreur (CRC, matériel) compte dès la première ; des trames ignorées, à partir d'un seuil.
+        var significatif = delta.ReceivedErrors > 0 || delta.SentErrors > 0
+            || IgnoresSignificatifs(delta.ReceivedDiscarded, delta.ReceivedPackets)
+            || IgnoresSignificatifs(delta.SentDiscarded, delta.SentPackets);
+        return !significatif
+            ? new RepairFinding(Domaine, Nom, string.Join(" ; ", sens), Docteur.T("PI.Aucune"), RepairStatus.Observed,
+                Docteur.T("PI.PeuDIgnores", secondes, IgnoresMinimum, IgnoresMinimumPourcent))
             : new RepairFinding(Domaine, Nom,
-                Docteur.T("PI.Pertes", delta.ReceivedDiscarded, delta.ReceivedErrors),
+                string.Join(" ; ", sens),
                 Docteur.T("PI.Aucune"), RepairStatus.Suspicious,
                 Docteur.T("PI.Sur", delta.ReceivedPackets, secondes)
                 + (taux is { } x ? Docteur.T("PI.Taux", x) : "")
                 + Docteur.T("PI.Carte"));
     }
+
+    /// <summary>Des trames ignorées comptent à partir de ce nombre, et de cette part du trafic dans ce sens : un choix de DrDXT.</summary>
+    public const int IgnoresMinimum = 5;
+    public const double IgnoresMinimumPourcent = 0.1;
+
+    private static bool IgnoresSignificatifs(long ignores, long paquets)
+        => ignores >= IgnoresMinimum && (paquets <= 0 || 100.0 * ignores / paquets >= IgnoresMinimumPourcent);
 
     private static RepairFinding Inconnu(string pourquoi)
         => new(Domaine, Nom, null, null, RepairStatus.Unknown, pourquoi);

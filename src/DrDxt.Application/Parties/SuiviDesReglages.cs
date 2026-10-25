@@ -45,29 +45,24 @@ public sealed class SuiviDesReglages
 
     /// <summary>Compare aux états du relevé précédent, garde les nouveaux, rend les changements. Un réglage absent d'un
     /// des deux relevés (logiciel désinstallé, lecture ratée) n'est pas un changement.</summary>
+    /// <param name="consigner">L'écriture des changements au journal, sous le verrou, avant que les nouveaux états soient
+    /// gardés. Elle rend faux (journal occupé, écriture ratée) : rien n'est gardé, les changements reviennent au relevé
+    /// suivant, bornés pareil ; gardés quand même, la bascule serait perdue. Absente : les changements sont rendus à
+    /// l'appelant seul.</param>
     public IReadOnlyList<Changement> Relever(IReadOnlyDictionary<string, string> actuels, DateTimeOffset maintenant,
-        Func<string, string, string, string> libeller)
+        Func<string, string, string, string> libeller, Func<IReadOnlyList<Changement>, bool>? consigner = null)
     {
         lock (VerrousDuProcessus.GetOrAdd(Path.GetFullPath(_chemin), _ => new object()))
         {
             using var verrou = PrendreVerrou();
-            return verrou is null ? [] : ReleverSousVerrou(actuels, maintenant, libeller);
+            return verrou is null ? [] : ReleverSousVerrou(actuels, maintenant, libeller, consigner);
         }
     }
 
-    private IDisposable? PrendreVerrou()
-    {
-        var limite = DateTime.UtcNow + _attenteMax;
-        while (true)
-        {
-            if (VerrouDuReleve.Prendre(_chemin + ".verrou") is { } v) return v;
-            if (DateTime.UtcNow >= limite) return null;
-            Thread.Sleep(10);
-        }
-    }
+    private IDisposable? PrendreVerrou() => VerrouDuReleve.Attendre(_chemin + ".verrou", _attenteMax);
 
     private IReadOnlyList<Changement> ReleverSousVerrou(IReadOnlyDictionary<string, string> actuels, DateTimeOffset maintenant,
-        Func<string, string, string, string> libeller)
+        Func<string, string, string, string> libeller, Func<IReadOnlyList<Changement>, bool>? consigner)
     {
         // Absent : premier relevé, l'historique vide est le vrai. Lecture ratée (fichier tenu un instant par une écriture) :
         // ce n'est pas un historique vide ; récrit avec les seuls réglages de cet appel, il effaçait les autres (le relevé
@@ -80,6 +75,8 @@ public sealed class SuiviDesReglages
         {
             try { avant = JsonSerializer.Deserialize<Releve>(texte.Value); }
             catch (JsonException) { }
+            // « {} » se lit sans erreur mais sans états : ce n'est pas un historique.
+            if (avant?.Etats is null) avant = null;
             // Lu mais illisible : mis de côté (sa trace reste), et le suivi repart comme d'un premier relevé, au lieu d'être
             // bloqué pour toujours. Si la mise de côté échoue, rien n'est écrit : le relevé suivant retente.
             if (avant is null && !_fichier.MettreDeCote()) return [];
@@ -90,11 +87,13 @@ public sealed class SuiviDesReglages
             .Select(a => new Changement(maintenant, libeller(a.Key, avant.Etats[a.Key], a.Value),
                 avant.Lus?.TryGetValue(a.Key, out var lu) == true ? lu : avant.Le, $"{a.Key}:{a.Value}"))
             .ToList();
+        if (changes.Count > 0 && consigner?.Invoke(changes) == false) return [];
 
         // Les réglages non relus cette fois gardent leur dernier état connu.
         var etats = new Dictionary<string, string>(avant?.Etats ?? [], StringComparer.Ordinal);
         var lus = new Dictionary<string, DateTimeOffset>(avant?.Lus ?? avant?.Etats.ToDictionary(e => e.Key, _ => avant.Le) ?? [], StringComparer.Ordinal);
         foreach (var a in actuels) { etats[a.Key] = a.Value; lus[a.Key] = maintenant; }
+        // Ratée, les changements déjà au journal reviennent au relevé suivant avec la même borne : le journal les reconnaît.
         _fichier.WriteAtomic(JsonSerializer.Serialize(new Releve(maintenant, etats, lus)));
         return changes;
     }

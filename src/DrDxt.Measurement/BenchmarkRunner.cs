@@ -10,7 +10,7 @@ namespace DrDxt.Measurement;
 /// Mode dégradé : si le service PresentMon est absent,
 /// retourne <c>Fail(PmonUnavailable)</c> : le scanner peut alors mettre Baseline = null
 /// et continuer à produire un rapport de scan sans mesure de performance.
-/// Aucune exception ne remonte vers l'appelant.
+/// Aucune exception ne remonte vers l'appelant, sauf l'annulation, qui reste une annulation.
 /// </summary>
 public sealed class BenchmarkRunner : IBenchmarkRunner
 {
@@ -40,6 +40,14 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
     }
 
     // Vraie vérification de vie : GetProcessById lève ArgumentException si le PID a disparu.
+    /// <summary>Le temps que la sonde a vu le jeu derrière une autre fenêtre pendant la passe, plus une seconde (elle lit
+    /// toutes les 250 ms) : la limite des secondes que l'hygiène peut écarter comme hors focus. Au premier plan tout du long,
+    /// ou sans lecture concluante, aucune : une chute lente et régulière vue par le joueur est la mesure, pas un alt-tab.</summary>
+    internal static double SecondesHorsFocus(FocusObservation passe, IReadOnlyList<double> brut)
+        => passe.FractionAuPremierPlan is { } f && f < 1
+            ? Math.Ceiling((1 - f) * brut.Where(ms => ms > 0 && double.IsFinite(ms)).Sum() / 1000.0) + 1
+            : 0;
+
     private static bool DefaultProcessAlive(int pid)
     {
         try
@@ -93,8 +101,10 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
         var allPresentApi = new List<double>();
         var allAnimationError = new List<double>();
         // Le denominateur de l'exposition : combien de trames les captures ont rendues,
-        // avant hygiene. `all.Count / brutesVues` dit ce que la mesure a reellement garde.
+        // avant hygiene. `retenuesVues / brutesVues` dit ce que la mesure a reellement garde, et ce que le masque aurait
+        // garde quand il refuse de filtrer : la serie reste entiere, l'exposition reste celle du jeu.
         var brutesVues = 0;
+        var retenuesVues = 0;
         // Le focus, accumule sur toutes les passes : c'est la session entiere qui doit avoir ete
         // jouee, pas seulement sa premiere minute.
         var focus = FocusObservation.Aucune;
@@ -125,13 +135,16 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             // GPU : lire le focus une fois la passe finie ne dit rien de ce qui s'est passe
             // pendant : le joueur est revenu au jeu entre-temps.
             using var arretFocus = new CancellationTokenSource();
+            var focusPasse = FocusObservation.Aucune;
             var suiviFocus = _foreground is null
                 ? Task.CompletedTask
                 : Task.Run(async () =>
                 {
                     while (!arretFocus.Token.IsCancellationRequested)
                     {
-                        focus = focus.Avec(_foreground.ForegroundProcessId(), targetPid);
+                        var lu = _foreground.ForegroundProcessId();
+                        focus = focus.Avec(lu, targetPid);
+                        focusPasse = focusPasse.Avec(lu, targetPid);
                         try { await Task.Delay(250, arretFocus.Token).ConfigureAwait(false); }
                         catch (OperationCanceledException) { return; }
                     }
@@ -155,8 +168,16 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             arretFocus.Cancel();
             await suiviFocus.ConfigureAwait(false);
             await suiviMateriel.ConfigureAwait(false);
+            // La session rend les images déjà vues quand le jeton tombe, ou un CaptureFail : ni l'une ni l'autre n'est
+            // une passe, et l'annulation reste une annulation.
+            ct.ThrowIfCancellationRequested();
             if (!cap.IsOk)
             {
+                // Le jeu fermé ou la capture perdue en cours de route : les passes déjà réussies restent une mesure. Deux au
+                // moins se gardent, même si la marge entre passes reste inconnue sous trois ; Runs dira combien ont servi.
+                if (perRunAvgFps.Count >= 2)
+                    break;
+
                 // Le service repond (verifie plus haut), le processus tourne, et zero frame est
                 // arrivee. Deux causes possibles, et le produit ne sait pas trancher : le
                 // processus ne presente rien en ce moment (menu, fenetre minimisee, onglet en
@@ -186,10 +207,14 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             // Le masque retire ce qui n'est pas du jeu : les secondes de chargement, et les
             // plafonds hors focus : un jeu derriere une autre fenetre se cale sur 30 fps, et
             // publier ces secondes revient a reprocher au joueur d'avoir alt-tabbe. Un vrai
-            // ralentissement, lui, traverse : voir `FrameSeriesHygiene.CapRegularityMax`.
+            // ralentissement, lui, traverse : voir `FrameSeriesHygiene.CapRegularityMax`. Et seulement le temps que la sonde
+            // a vu le jeu derrière une autre fenêtre : une chute V-Sync régulière au premier plan reste dans la mesure.
             var brut = cap.Value!.FrameTimesMs;
-            var masque = FrameSeriesHygiene.Masque(brut);
+            // En pleine partie (le relevé), aucun démarrage à couper : voir MesureEnPartie.
+            var masque = FrameSeriesHygiene.Masque(brut, MesureEnPartie.Active ? 0 : FrameSeriesHygiene.DefaultWarmupSeconds,
+                horsFocusMaxSecondes: SecondesHorsFocus(focusPasse, brut));
             brutesVues += brut.Count;
+            retenuesVues += masque.Retenues;
             var frames = Filtrer(brut, masque);
 
             all.AddRange(frames);
@@ -245,7 +270,9 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             }
         }
 
-        if (all.Count == 0)
+        // Des images sans aucun temps exploitable (NaN, 0) ne font aucune passe : rendues Ok, elles donnaient une
+        // mesure à 0 FPS, et le repli DXGI ne partait pas.
+        if (all.Count == 0 || perRunAvgFps.Count == 0)
             return Result<BenchmarkResult>.Fail(ErrorCodes.NoFrames,
                 Docteur.T("BR.AucuneFrame"));
 
@@ -271,7 +298,8 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             MarginOfError: FrametimeStatistics.InterRunMarginOfError(perRunAvgFps),
             P1LowMarginOfError: FrametimeStatistics.InterRunMarginOfError(perRunP1Low),
             P01LowMarginOfError: FrametimeStatistics.InterRunMarginOfError(perRunP01Low),
-            Runs: runs,
+            // Les passes qui ont servi, pas celles demandées : un échec en cours de route en garde moins.
+            Runs: perRunAvgFps.Count,
             // GPU busy (ms) : le temps de travail du GPU par image, en moyenne sur les passes. GpuBusy/FrameTime
             // distingue limité par le GPU (≈ temps d'image) et limité par le CPU (≪). Null sans relevé (non mesuré).
             MeanGpuBusyMs: FrametimeStatistics.MeanOrNull(allGpuBusy),
@@ -317,7 +345,7 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             // Sans elle, deux passes A/B peuvent avoir vecu des choses differentes sans que rien
             // ne le dise : un alt-tab de vingt secondes d'un seul cote suffit a fabriquer un gain.
             // `AbComparer.Evidence` refuse de comparer deux expositions trop eloignees.
-            HygieneKeptFraction: brutesVues > 0 ? (double)all.Count / brutesVues : null,
+            HygieneKeptFraction: brutesVues > 0 ? (double)retenuesVues / brutesVues : null,
 
             // Le focus observe. Sans sonde, il reste null, et Unknown ne condamne pas.
             ForegroundFraction: focus.FractionAuPremierPlan,

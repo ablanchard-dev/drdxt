@@ -21,8 +21,13 @@ public sealed class RejeuDuJournalTests : IDisposable
     private static readonly AppelantDuJournal Vivant = new("S-1-5-21-1", 777, new DateTimeOffset(2026, 10, 18, 10, 0, 0, TimeSpan.Zero));
     private static readonly DateTimeOffset Le = new(2026, 10, 18, 11, 0, 0, TimeSpan.Zero);
 
-    private static SetRegistryValueOp Hags(string valeur, RegistryHiveKind ruche = RegistryHiveKind.LocalMachine)
-        => new(ruche, Cle, "HwSchMode", RegistryValueType.DWord, valeur);
+    private static SetRegistryValueOp Hags(string valeur)
+        => new(RegistryHiveKind.LocalMachine, Cle, "HwSchMode", RegistryValueType.DWord, valeur);
+
+    // Une feuille de la session, dans la liste blanche du helper : le rejeu ne rend qu'une origine qu'il sait réécrire.
+    private const string CleSession = @"Software\Microsoft\GameBar";
+    private static SetRegistryValueOp Session(string valeur)
+        => new(RegistryHiveKind.CurrentUser, CleSession, "AllowAutoGameMode", RegistryValueType.DWord, valeur);
 
     /// <summary>La machine : une valeur par feuille ; absente = pas de clé dans le dictionnaire.</summary>
     private sealed class Machine : ILectureDesCibles, IElevatedClient
@@ -81,7 +86,37 @@ public sealed class RejeuDuJournalTests : IDisposable
         r.IsOk.Should().BeTrue();
         m.Feuilles[$"LocalMachine\\{Cle}\\HwSchMode"].Should().Be("1");
         r.Value!.Lignes.Should().ContainSingle().Which.Issue.Should().Be(IssueDuRendu.Rendu);
+        // La feuille rendue se nomme aussi sans dépendre de la langue : l'App y reconnaît un levier qu'elle croyait gardé.
+        r.Value.Lignes[0].Cle.Should().Be(RejeuDuJournal.CleDe(Hags("2"), Mort));
         EnAttente().Should().HaveCount(0);
+    }
+
+    // Un réglage DRS posé au profil d'un jeu qui ne le possédait pas : son image d'avant n'a pas de valeur, seulement sa
+    // provenance. Sans elle, l'entrée se disait « non rendable », sortait du journal, et le réglage restait dans le pilote.
+    private const string Jeu = @"C:\Games\Call of Duty\cod.exe";
+    private static ApplyNvApiDrsSettingOp DrsAuJeu(uint valeur) => new(0x1057EB71u, valeur, Jeu);
+
+    [Fact]
+    public async Task Un_reglage_drs_que_le_profil_du_jeu_ne_possedait_pas_lui_est_retire()
+    {
+        var m = new Machine();
+        Poser(m, DrsAuJeu(1), Execution.LectureDesCiblesWin32.ImageHeritee + nameof(DrsValueOrigin.InheritedFromGlobalProfile), Mort);
+        m.Feuilles[nameof(ApplyNvApiDrsSettingOp)] = "1"; // la pose de DrDXT est encore là
+
+        var r = await Rejeu(m).ExecuterAsync(CancellationToken.None);
+
+        m.Ecrites.Should().Equal(new DeleteNvApiDrsSettingOp(0x1057EB71u, Jeu, DrsValueOrigin.InheritedFromGlobalProfile, 0));
+        r.Value!.Lignes.Should().ContainSingle().Which.Issue.Should().Be(IssueDuRendu.Rendu);
+        EnAttente().Should().BeEmpty();
+    }
+
+    // Une provenance inconnue ne prouve aucun retour : le helper refuse la suppression, l'entrée se dit non rendable.
+    [Fact]
+    public void Une_provenance_inconnue_ou_illisible_ne_donne_aucune_suppression_rendable()
+    {
+        RejeuDuJournal.OrigineDe(DrsAuJeu(1), Execution.LectureDesCiblesWin32.ImageHeritee + "Nulle").Should().BeNull();
+        var inconnue = RejeuDuJournal.OrigineDe(DrsAuJeu(1), Execution.LectureDesCiblesWin32.ImageHeritee + nameof(DrsValueOrigin.Unknown));
+        new OpAllowlist().Validate(inconnue!).IsOk.Should().BeFalse();
     }
 
     [Fact]
@@ -94,6 +129,22 @@ public sealed class RejeuDuJournalTests : IDisposable
 
         m.Ecrites.Should().Equal(new DeleteRegistryValueOp(RegistryHiveKind.LocalMachine, Cle, "HwSchMode"));
         m.Feuilles.Should().NotContainKey($"LocalMachine\\{Cle}\\HwSchMode");
+    }
+
+    // Une origine que le helper refuserait de réécrire (HwSchMode à 0) restait au journal à vie, refusée à chaque rejeu.
+    // Elle se dit non rendable une fois, et sort.
+    [Fact]
+    public async Task Une_origine_que_le_helper_refuserait_se_dit_non_rendable_et_sort_du_journal()
+    {
+        var m = new Machine();
+        m.Feuilles[$"LocalMachine\\{Cle}\\HwSchMode"] = "0";
+        Poser(m, Hags("2"), "0", Mort);
+
+        var r = await Rejeu(m).ExecuterAsync(CancellationToken.None);
+
+        m.Ecrites.Should().HaveCount(0);
+        r.Value!.Lignes.Should().ContainSingle().Which.Issue.Should().Be(IssueDuRendu.ValeurPoseeInconnue);
+        EnAttente().Should().HaveCount(0);
     }
 
     // L'App vit encore : elle notera l'origine ou rendra la pose elle-même.
@@ -135,7 +186,7 @@ public sealed class RejeuDuJournalTests : IDisposable
     public async Task Une_ecriture_de_la_session_attend_un_helper_du_meme_compte(string sidCourant)
     {
         var m = new Machine();
-        Poser(m, Hags("2", RegistryHiveKind.CurrentUser), "1", Mort);
+        Poser(m, Session("2"), "1", Mort);
 
         var r = await Rejeu(m, sidCourant).ExecuterAsync(CancellationToken.None);
 
@@ -148,12 +199,12 @@ public sealed class RejeuDuJournalTests : IDisposable
     public async Task Une_ecriture_de_la_session_est_rendue_par_un_helper_du_meme_compte()
     {
         var m = new Machine();
-        Poser(m, Hags("2", RegistryHiveKind.CurrentUser), "1", Mort);
+        Poser(m, Session("2"), "1", Mort);
 
         var r = await Rejeu(m, Mort.Sid).ExecuterAsync(CancellationToken.None);
 
         r.Value!.Lignes.Should().ContainSingle().Which.Issue.Should().Be(IssueDuRendu.Rendu);
-        m.Feuilles[$"CurrentUser\\{Cle}\\HwSchMode"].Should().Be("1");
+        m.Feuilles[$"CurrentUser\\{CleSession}\\AllowAutoGameMode"].Should().Be("1");
         EnAttente().Should().HaveCount(0);
     }
 
@@ -164,12 +215,12 @@ public sealed class RejeuDuJournalTests : IDisposable
     {
         var m = new Machine();
         var autre = Mort with { Sid = "S-1-5-21-2", Pid = 5151 };
-        Poser(m, Hags("2", RegistryHiveKind.CurrentUser), "1", Mort, Le);
-        new JournalDEcritureAnticipee(Fichier).Ajouter(Hags("3", RegistryHiveKind.CurrentUser), "0", autre, Le.AddMinutes(1)).IsOk.Should().BeTrue();
+        Poser(m, Session("2"), "1", Mort, Le);
+        new JournalDEcritureAnticipee(Fichier).Ajouter(Session("3"), "0", autre, Le.AddMinutes(1)).IsOk.Should().BeTrue();
 
         var r = await Rejeu(m, Mort.Sid).ExecuterAsync(CancellationToken.None);
 
-        m.Ecrites.Should().Equal(Hags("1", RegistryHiveKind.CurrentUser));
+        m.Ecrites.Should().Equal(Session("1"));
         r.Value!.Lignes.Should().HaveCount(2);
         EnAttente().Should().ContainSingle().Which.Appelant.Should().Be(autre);
     }
@@ -206,6 +257,21 @@ public sealed class RejeuDuJournalTests : IDisposable
         m.Ecrites.Should().ContainSingle();
         EnAttente().Should().HaveCount(0);
         r.Value!.Lignes.Should().ContainSingle().Which.Issue.Should().Be(IssueDuRendu.Rendu);
+    }
+
+    // L'horloge a reculé entre les deux poses : l'ordre d'inscription au journal fait foi, pas l'heure murale. La première
+    // inscrite porte la vraie origine, la dernière la valeur à comparer.
+    [Fact]
+    public async Task Une_horloge_reculee_entre_deux_poses_rend_l_origine_de_la_premiere_inscrite()
+    {
+        var m = new Machine();
+        m.Feuilles[$"LocalMachine\\{Cle}\\HwSchMode"] = "1";
+        Poser(m, Hags("2"), "1", Mort, Le);
+        Poser(m, Hags("3"), "2", Mort, Le.AddHours(-1));
+
+        await Rejeu(m).ExecuterAsync(CancellationToken.None);
+
+        m.Feuilles[$"LocalMachine\\{Cle}\\HwSchMode"].Should().Be("1");
     }
 
     [Fact]
@@ -263,5 +329,25 @@ public sealed class RejeuDuJournalTests : IDisposable
 
         r.Value!.Lignes.Should().ContainSingle().Which.Issue.Should().Be(IssueDuRendu.Rendu);
         m.Feuilles[$"LocalMachine\\{Cle}\\HwSchMode"].Should().Be("1");
+    }
+
+    // DirectXUserGlobalSettings porte aussi Auto HDR, que le joueur règle lui-même. Le rejeu rendrait l'image d'avant entière
+    // et effacerait un Auto HDR basculé depuis : seules les clés de DrDXT reprennent leur origine, comme à la désinstallation.
+    [Fact]
+    public async Task Le_rejeu_de_la_chaine_DirectX_garde_l_Auto_HDR_du_joueur()
+    {
+        var m = new Machine();
+        var chaine = new SetRegistryValueOp(RegistryHiveKind.CurrentUser, DirectXUserGlobalSettings.Chemin, DirectXUserGlobalSettings.Nom,
+            RegistryValueType.String, "SwapEffectUpgradeEnable=1;AutoHDREnable=0;VRROptimizeEnable=1");
+        Poser(m, chaine, "SwapEffectUpgradeEnable=1;AutoHDREnable=0", Mort);
+        m.Feuilles[$"{RegistryHiveKind.CurrentUser}\\{DirectXUserGlobalSettings.Chemin}\\{DirectXUserGlobalSettings.Nom}"]
+            = "SwapEffectUpgradeEnable=1;AutoHDREnable=1;VRROptimizeEnable=1";
+
+        var r = await Rejeu(m).ExecuterAsync(CancellationToken.None);
+
+        r.Value!.Lignes.Should().ContainSingle().Which.Issue.Should().Be(IssueDuRendu.Rendu);
+        m.Ecrites.OfType<SetRegistryValueOp>().Should().ContainSingle()
+            .Which.Value.Should().Be("AutoHDREnable=1;SwapEffectUpgradeEnable=1", "le VRR de DrDXT part, l'Auto HDR du joueur reste");
+        EnAttente().Should().BeEmpty();
     }
 }

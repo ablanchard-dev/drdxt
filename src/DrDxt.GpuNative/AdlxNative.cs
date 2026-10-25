@@ -67,8 +67,8 @@ namespace DrDxt.Detection.Gpu.Adlx;
 //   • DllNotFoundException (DLL absente, pas de pilote AMD) → IsAvailable = false.
 //   • Toute panne de parcours de vtable / pointeur null / mauvais type → rend false.
 //   • Les méthodes TryRead* ne lèvent jamais vers l'appelant ; un catch-all garde chaque chemin.
-//   • Pas de Release sur IADLXSystem : appeler seulement ADLXTerminate() (à la sortie du
-//     processus ou sur nettoyage explicite). Toutes les autres interfaces sont libérées dans des finally.
+//   • Pas de Release sur IADLXSystem : le singleton vit jusqu'à la sortie du processus, qui le libère (ADLXTerminate
+//     est déclarée, jamais appelée). Toutes les autres interfaces sont libérées dans des finally.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class AdlxNative : IAdlxNative
@@ -89,13 +89,19 @@ public sealed class AdlxNative : IAdlxNative
     // ── Init paresseuse (thread-safe, double vérification) ───────────────────────────
 
     private readonly object _gate = new();
-    private bool   _initAttempted;
+    // Levé seulement une fois l'init finie : un appelant concurrent attend le verrou au lieu de lire « indisponible ».
+    private volatile bool _initAttempted;
     private bool   _initialized;
     private int    _initResult;   // code de retour brut d'ADLXInitialize (diagnostics)
     private string? _initDetail;  // raison lisible quand l'init n'a pas réussi (diagnostics)
     private IntPtr _pSystem; // IADLXSystem* : singleton ; pas de Release
 
+    private readonly Func<(int Res, IntPtr Systeme)>? _initialiser;
+
     public AdlxNative() { }
+
+    /// <summary>Tests : remplace l'appel à ADLXInitialize.</summary>
+    internal AdlxNative(Func<(int Res, IntPtr Systeme)> initialiser) => _initialiser = initialiser;
 
     /// <summary>Tests : un IADLXSystem* déjà construit (tables doublures en mémoire non managée), sans
     /// appeler ADLXInitialize.</summary>
@@ -122,10 +128,11 @@ public sealed class AdlxNative : IAdlxNative
         lock (_gate)
         {
             if (_initAttempted) return;
-            _initAttempted = true;
             try
             {
-                int res = ADLXInitialize(AdlxVersion, out _pSystem);
+                int res;
+                if (_initialiser is null) res = ADLXInitialize(AdlxVersion, out _pSystem);
+                else (res, _pSystem) = _initialiser();
                 _initResult = res;
                 // 0 = ADLX_OK  |  2 = ADLX_ALREADY_INITIALIZED : les deux sont un succès.
                 _initialized = (res == 0 || res == 2) && _pSystem != IntPtr.Zero;
@@ -142,6 +149,7 @@ public sealed class AdlxNative : IAdlxNative
                 // toute autre panne d'init : rester indisponible
                 _initDetail = $"ADLXInitialize threw {ex.GetType().Name}: {ex.Message}";
             }
+            _initAttempted = true;
         }
     }
 
@@ -552,7 +560,7 @@ public sealed class AdlxNative : IAdlxNative
     {
         try
         {
-            // SetGPUMaxFrequency : emplacement de vtable 8 (IADLXManualGraphicsTuning1/2)
+            // SetGPUMaxFrequency : emplacement de vtable 8 d'IADLXManualGraphicsTuning2
             var setMaxFreq = Slot<SetIntDelegate>(pT, AdlxVtableSlots.Gfx2_SetMaxFreq);
             if (setMaxFreq == null) return false;
             if (setMaxFreq(pT, newMaxFreqMhz) != 0) return false;
@@ -754,7 +762,7 @@ public sealed class AdlxNative : IAdlxNative
             bool voltOk      = getVolt      != null && getVolt(pGfxV2,      out tmpI) == 0;
             bool voltRangeOk = getVoltRange != null && getVoltRange(pGfxV2, out tmpR) == 0;
 
-            steps.Add(new GpuProbeStep("read-maxfreq",       maxFreqOk,   maxFreqOk  ? $"offset={maxFreqVal} MHz" : "GetGPUMaxFrequency error"));
+            steps.Add(new GpuProbeStep("read-maxfreq",       maxFreqOk,   maxFreqOk  ? $"max={maxFreqVal} MHz" : "GetGPUMaxFrequency error"));
             steps.Add(new GpuProbeStep("read-maxfreq-range", maxRangeOk,  maxRangeOk ? $"range=[{maxRangeVal.minValue},{maxRangeVal.maxValue}] MHz" : "GetGPUMaxFrequencyRange error"));
             steps.Add(new GpuProbeStep("read-minfreq",       minFreqOk,   minFreqOk  ? "ok" : "GetGPUMinFrequency error (RDNA4 drops this: OPTIONAL)"));
             steps.Add(new GpuProbeStep("read-minfreq-range", minRangeOk,  minRangeOk ? "ok" : "GetGPUMinFrequencyRange error (RDNA4 drops this: OPTIONAL)"));
@@ -786,6 +794,7 @@ public sealed class AdlxNative : IAdlxNative
     // n'empêche pas les autres. Aucune entrée Set* n'est appelée ici.
 
     private const int AdlxGpuTypeDiscrete = 2; // ADLX_GPU_TYPE.GPUTYPE_DISCRETE (ADLXDefines.h)
+    private const int AdlxGpuTypeIntegrated = 1; // ADLX_GPU_TYPE.GPUTYPE_INTEGRATED
 
     public AdlxReglagesLus LireReglages()
     {
@@ -868,6 +877,31 @@ public sealed class AdlxNative : IAdlxNative
         {
             Release(pListe);
             Release(pSvc);
+        }
+    }
+
+    // ── EstALUsine ───────────────────────────────────────────────────────
+    // IADLXGPUTuningServices::IsAtFactory(pGPU, adlx_bool*), entrée 4 de IGPUTuning.h (ADLX) : relire la remise à l'usine,
+    // dont le code de retour seul ne prouve rien. null si non lu.
+    public bool? EstALUsine(int gpuIndex)
+    {
+        if (!IsAvailable || gpuIndex < 0) return null;
+        IntPtr pGpuList = IntPtr.Zero, pGpu = IntPtr.Zero, pTuningSvc = IntPtr.Zero;
+        try
+        {
+            if (!GetGpuAtIndex(gpuIndex, out pGpuList, out pGpu)) return null;
+            var getTuningSvc = Slot<GetOutPtrDelegate>(_pSystem, AdlxVtableSlots.System_GetGPUTuningServices);
+            if (getTuningSvc == null || getTuningSvc(_pSystem, out pTuningSvc) != 0 || pTuningSvc == IntPtr.Zero) return null;
+            var lire = Slot<IsSupportedDelegate>(pTuningSvc, AdlxVtableSlots.Tuning_IsAtFactory);
+            if (lire == null || lire(pTuningSvc, pGpu, out var aLUsine) != 0) return null;
+            return aLUsine != 0;
+        }
+        catch (Exception) { return null; }
+        finally
+        {
+            if (pTuningSvc != IntPtr.Zero) Release(pTuningSvc);
+            if (pGpu != IntPtr.Zero) Release(pGpu);
+            if (pGpuList != IntPtr.Zero) Release(pGpuList);
         }
     }
 
@@ -976,8 +1010,17 @@ public sealed class AdlxNative : IAdlxNative
     }
 
     // La carte dédiée (IADLXGPU::Type == GPUTYPE_DISCRETE). Sur un Ryzen 7800X3D + RX 9070 XT, l'index 0 est
-    // la puce intégrée (relevé du harnais, 29/06). Une seule carte : c'est elle. Plusieurs sans dédiée dite :
-    // non lu, plutôt que lire la mauvaise. Rend null si trouvée, sinon la raison.
+    // la puce intégrée (relevé du harnais, 29/06). Une seule carte au type illisible ou indéfini : c'est elle. Une seule carte DITE
+    // intégrée (un Ryzen à puce graphique avec une RTX) n'est pas la carte du jeu : rien. Plusieurs sans dédiée dite : non lu,
+    // plutôt que lire la mauvaise. Rend null si trouvée, sinon la raison.
+    /// <summary>Pur : l'index de la carte à lire ou écrire, d'après le type lu de chaque carte (null : non lu).</summary>
+    internal static int? IndexDeLaCarte(IReadOnlyList<int?> types)
+    {
+        for (var i = 0; i < types.Count; i++)
+            if (types[i] == AdlxGpuTypeDiscrete) return i;
+        return types.Count == 1 && types[0] != AdlxGpuTypeIntegrated ? 0 : null;
+    }
+
     private string? CarteDediee(out IntPtr pGpuList, out IntPtr pGpu)
     {
         pGpuList = IntPtr.Zero;
@@ -991,15 +1034,25 @@ public sealed class AdlxNative : IAdlxNative
         uint n = sizeFn(pGpuList);
         if (n == 0) return "ADLX lists no AMD card.";
 
+        var types = new List<int?>((int)n);
         for (uint i = 0; i < n; i++)
         {
-            if (atFn(pGpuList, i, out var p) != 0 || p == IntPtr.Zero) continue;
-            var type = Slot<GetIntDelegate>(p, AdlxVtableSlots.Gpu_Type);
-            if (type != null && type(p, out var t) == 0 && t == AdlxGpuTypeDiscrete) { pGpu = p; return null; }
-            Release(p);
+            int? lu = null;
+            if (atFn(pGpuList, i, out var p) == 0 && p != IntPtr.Zero)
+            {
+                var type = Slot<GetIntDelegate>(p, AdlxVtableSlots.Gpu_Type);
+                if (type != null && type(p, out var t) == 0) lu = t;
+                Release(p);
+            }
+            types.Add(lu);
         }
-        if (n == 1 && atFn(pGpuList, 0, out var seule) == 0 && seule != IntPtr.Zero) { pGpu = seule; return null; }
-        return $"ADLX lists {n} cards and reports none as discrete.";
+        if (IndexDeLaCarte(types) is { } index && atFn(pGpuList, (uint)index, out var carte) == 0 && carte != IntPtr.Zero)
+        {
+            pGpu = carte;
+            return null;
+        }
+        return n == 1 ? "ADLX lists only an integrated AMD chip: not the game's card."
+            : $"ADLX lists {n} cards and reports none as discrete.";
     }
 
     // SAM : IADLXGPUTuningServices → QI IADLXGPUTuningServices1 → GetSmartAccessMemory → IsSupported / IsEnabled.
@@ -1022,8 +1075,9 @@ public sealed class AdlxNative : IAdlxNative
         finally { Release(pSam); Release(pTs1); Release(pTs); }
     }
 
-    // Anti-Lag, Chill, FRTC : IADLX3DSettingsServices. Une fonction que la carte ne prend pas en charge est lue
-    // éteinte (elle ne peut pas limiter les images ni agir).
+    // Anti-Lag, Chill, FRTC : IADLX3DSettingsServices. Une limite d'images (FRTC, Chill) que la carte ne prend pas en
+    // charge est lue éteinte : elle ne limite rien. Anti-Lag non pris en charge reste non lu, comme SAM : « éteint »
+    // ferait proposer de l'allumer, et la carte refuserait.
     private (bool? AntiLag, bool? FrtcActif, int? FrtcFps, int? FrtcReglee, bool? ChillActif, int? ChillMin, int? ChillMax) Lire3D(IntPtr pGpu)
     {
         IntPtr p3D = IntPtr.Zero;
@@ -1032,7 +1086,7 @@ public sealed class AdlxNative : IAdlxNative
             var get3D = Slot<GetOutPtrDelegate>(_pSystem, AdlxVtableSlots.System_Get3DSettingsServices);
             if (get3D == null || get3D(_pSystem, out p3D) != 0 || p3D == IntPtr.Zero) return default;
 
-            bool? antiLag = Fonction(p3D, AdlxVtableSlots.Settings3D_GetAntiLag, pGpu, _ => { });
+            bool? antiLag = Fonction(p3D, AdlxVtableSlots.Settings3D_GetAntiLag, pGpu, _ => { }, nonGereeEteinte: false);
             int? frtcFps = null;
             bool? frtc = Fonction(p3D, AdlxVtableSlots.Settings3D_GetFrameRateTargetControl, pGpu,
                 p => frtcFps = Entier(p, AdlxVtableSlots.Frtc_GetFps));
@@ -1100,7 +1154,7 @@ public sealed class AdlxNative : IAdlxNative
 
     // Obtient l'interface d'une fonction 3D pour la carte, lit son état et, si elle est prise en charge, ses valeurs
     // (A2b : aussi éteinte, pour rendre la cible FRTC exacte ; l'appelant ne garde que celles d'une fonction allumée).
-    private static bool? Fonction(IntPtr p3D, int slot, IntPtr pGpu, Action<IntPtr> lireValeurs)
+    private static bool? Fonction(IntPtr p3D, int slot, IntPtr pGpu, Action<IntPtr> lireValeurs, bool nonGereeEteinte = true)
     {
         IntPtr p = IntPtr.Zero;
         try
@@ -1108,7 +1162,7 @@ public sealed class AdlxNative : IAdlxNative
             var get = Slot<GetManualDelegate>(p3D, slot);
             if (get == null || get(p3D, pGpu, out p) != 0 || p == IntPtr.Zero) return null;
             var (supporte, actif) = Etat(p);
-            if (supporte == false) return false;
+            if (supporte == false) return nonGereeEteinte ? false : null;
             if (supporte == true) lireValeurs(p);
             return actif;
         }

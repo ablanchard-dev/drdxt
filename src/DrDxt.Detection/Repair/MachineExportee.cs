@@ -23,9 +23,11 @@ public static class MachineExportee
     /// </summary>
     public static readonly IReadOnlyList<string> CeQuiEstRetire =
     [
+        Docteur.Nom("ME.Dossiers"),
         @"le dossier de n'importe quel compte (X:\Users\<nom>) : il devient X:\Users\joueur, la suite du chemin reste",
         "le nom du compte Windows (même de deux lettres), le nom du PC et son domaine",
         "les numéros de série et identifiants matériels lus sur ce PC (BIOS, carte mère, disques, mémoire, UUID de la machine, numéros de volume)",
+        Docteur.Nom("ME.Exemplaire"),
         "les adresses MAC (avec tirets, deux-points ou collées, pour celles des cartes de ce PC)",
         "les adresses IP (v4 et v6) ; une version à quatre nombres (1.4.6.3) a la forme d'une adresse v4 et part aussi, sauf dans les champs de version (DriverVersion)",
         "les identifiants de compte Windows (SID S-1-5-21-…)",
@@ -39,9 +41,11 @@ public static class MachineExportee
     private const string Retire = "<retiré>";
     private static readonly TimeSpan Delai = TimeSpan.FromMilliseconds(250);
 
-    // Le nom du compte va jusqu'au séparateur suivant ; sans séparateur, jusqu'au premier blanc.
-    private static readonly Regex Profil = new(@"(?<tete>[A-Za-z]:[\\/]Users[\\/])(?:[^\\/\r\n]+(?=[\\/])|[^\\/\s]+)",
+    // Le nom du compte va jusqu'au séparateur suivant, sans franchir un caractère interdit dans un nom Windows (le « : » d'un
+    // autre chemin plus loin sur la ligne) ; sans séparateur, jusqu'au premier blanc.
+    private static readonly Regex Profil = new(@"(?<tete>[A-Za-z]:[\\/]Users[\\/])(?:[^\\/:*?""<>|\r\n]+(?=[\\/])|[^\\/\s]+)",
         RegexOptions.IgnoreCase, Delai);
+    private static readonly Regex ProfilEntier = new(@"^[A-Za-z]:[\\/]Users[\\/][^\\/]+$", RegexOptions.IgnoreCase, Delai);
     private static readonly Regex AdresseMac = new(@"(?<![0-9A-Fa-f:-])[0-9A-Fa-f]{2}(?:([:-])[0-9A-Fa-f]{2})(?:\1[0-9A-Fa-f]{2}){4}(?![0-9A-Fa-f:-])",
         RegexOptions.None, Delai);
     // Quatre octets bornés, hors d'une suite pointée plus longue (une version 1.2.3.4.5 n'est pas une adresse).
@@ -51,6 +55,19 @@ public static class MachineExportee
     private static readonly Regex Ipv6 = new(
         @"(?<![0-9A-Fa-f:])(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?=[0-9A-Fa-f:]*[0-9A-Fa-f])(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?::(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?)(?:%\w+)?(?![0-9A-Fa-f:])",
         RegexOptions.None, Delai);
+    // Un identifiant d'appareil Windows est « énumérateur\modèle\exemplaire » ; l'exemplaire d'un appareil USB ou Bluetooth est
+    // son numéro de série ou son adresse, qu'aucune lecture du PC ne connaît d'avance. Le séparateur peut être doublé (un
+    // journal JSON lu tel quel). Un appareil Bluetooth porte aussi son adresse dans le modèle (BTHLE\DEV_<adresse>, ou à la
+    // fin du modèle après « _ ») : elle part aussi. Un GUID de service, dont le dernier groupe a douze chiffres, suit un tiret
+    // et reste.
+    private static readonly Regex Exemplaire = new(
+        @"(?<tete>(?<![A-Za-z0-9_])(?<enum>USB|USBSTOR|HID|BTH[A-Z]*|PCI|HDAUDIO|SWD|ROOT|ACPI|DISPLAY|MONITOR|SCSI|STORAGE|NVME|SD|UMB)\\{1,2}[^\\\s""]+\\{1,2})[^\\\s""'(),;]+",
+        RegexOptions.IgnoreCase, Delai);
+    private static readonly Regex AdresseBluetooth = new(@"(?<=[_\\])[0-9A-Fa-f]{12}(?![0-9A-Fa-f])", RegexOptions.None, Delai);
+
+    private static string SansExemplaire(Match m)
+        => (m.Groups["enum"].Value.StartsWith("BTH", StringComparison.OrdinalIgnoreCase)
+            ? AdresseBluetooth.Replace(m.Groups["tete"].Value, Retire) : m.Groups["tete"].Value) + Retire;
     private static readonly Regex Sid = new(@"\bS-1-5-21(?:-\d+){1,4}\b", RegexOptions.None, Delai);
     private static readonly Regex VolumeGuid = new(@"Volume\{[0-9A-Fa-f-]{36}\}", RegexOptions.IgnoreCase, Delai);
     // « OneDrive - Nom de l'entreprise » nomme l'employeur du joueur.
@@ -66,6 +83,10 @@ public static class MachineExportee
     {
         "Unknown", "None", "Default", "Default string", "To be filled by O.E.M.", "To Be Filled By O.E.M.", "System Serial Number",
         "Not Specified", "Not Applicable", "N/A", "0", "00000000", "0000000000000000", "Base Board Serial Number", "Chassis Serial Number",
+        // Les noms de compte ou de PC que Windows ou le joueur donnent par défaut : ils ne désignent personne, et retirés comme
+        // mots ils abîmeraient tout le rapport (« Ton <retiré> chauffe »). Le dossier du profil reste retiré par son chemin.
+        "PC", "Admin", "Administrator", "Administrateur", "User", "Utilisateur", "Owner", "Guest",
+        "Desktop", "Home", "Gamer", "Joueur", "Windows", "WORKGROUP",
     };
 
     private static readonly Regex Courriel = new(@"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", RegexOptions.None, Delai);
@@ -81,10 +102,11 @@ public static class MachineExportee
 
     /// <param name="valeursDeCePc">Les valeurs propres à ce PC (voir <see cref="ValeursDeCePc"/>), retirées partout.</param>
     /// <returns>Le texte du fichier. Il est relu avant d'être rendu : un fichier qui ne se relirait pas lève ici.</returns>
+    /// <param name="dossiers">Les dossiers connus du compte et leur repère ; null = ceux de ce compte (<see cref="DossiersDuCompte"/>).</param>
     public static string Json(string nom, string? note, bool? eleve, HardwareInventory inventaire, SettingsState reglages,
-        IReadOnlyList<RepairFinding> sante, IEnumerable<string> valeursDeCePc)
+        IReadOnlyList<RepairFinding> sante, IEnumerable<string> valeursDeCePc, IEnumerable<(string Chemin, string Repere)>? dossiers = null)
     {
-        var anonymiser = Anonymiseur(valeursDeCePc);
+        var anonymiser = Anonymiseur(valeursDeCePc, dossiers ?? DossiersDuCompte());
 
         var noeud = JsonSerializer.SerializeToNode(new { Nom = nom, Note = note, Eleve = eleve, Inventaire = inventaire,
             Reglages = reglages, Sante = sante }, Options)!;
@@ -99,19 +121,71 @@ public static class MachineExportee
     /// envoyés en public (bouton de l'App et zip de validation). Une suite de quatre nombres qui n'est pas une adresse IP
     /// (rare dans ces rapports) part aussi : mieux vaut perdre une version que garder une adresse.
     /// </summary>
-    public static string AnonymiserTexte(string texte, IEnumerable<string> valeursDeCePc)
-        => Anonymiseur(valeursDeCePc)(texte, null);
+    /// <param name="dossiers">Les dossiers connus du compte et leur repère ; null = ceux de ce compte (<see cref="DossiersDuCompte"/>).</param>
+    public static string AnonymiserTexte(string texte, IEnumerable<string> valeursDeCePc, IEnumerable<(string Chemin, string Repere)>? dossiers = null)
+        => Anonymiseur(valeursDeCePc, dossiers ?? DossiersDuCompte())(texte, null);
 
-    private static Func<string, string?, string> Anonymiseur(IEnumerable<string> valeursDeCePc)
+    /// <summary>Un fichier JSON du produit, valeur texte par valeur texte, décodée : écrit avec l'encodeur par défaut, il porte
+    /// des antislashs doublés et des accents en \u00E9 que les règles sur le texte brut ne trouvent pas. Un texte qui n'est pas
+    /// du JSON passe par <see cref="AnonymiserTexte"/>.</summary>
+    public static string AnonymiserJson(string json, IEnumerable<string> valeursDeCePc, IEnumerable<(string Chemin, string Repere)>? dossiers = null)
     {
+        var anonymiser = Anonymiseur(valeursDeCePc, dossiers ?? DossiersDuCompte());
+        JsonNode? noeud;
+        try { noeud = JsonNode.Parse(json); }
+        catch (JsonException) { return anonymiser(json, null); }
+        if (noeud is null) return anonymiser(json, null);
+        if (Texte(noeud) is { } seul) return JsonSerializer.Serialize(anonymiser(seul, null), Options);
+        Nettoyer(noeud, null, anonymiser);
+        return noeud.ToJsonString(Options);
+    }
+
+    /// <summary>
+    /// Les dossiers connus du compte, lus par Windows, et leur repère. Un Documents redirigé (domaine, autre lecteur, partage
+    /// réseau) ne passe pas par X:\Users\&lt;nom&gt; et ne porte pas toujours le nom du compte : sans eux, son chemin sortirait en
+    /// clair. Le profil sous X:\Users reste à la règle du profil (il devient X:\Users\joueur).
+    /// </summary>
+    public static IReadOnlyList<(string Chemin, string Repere)> DossiersDuCompte()
+    {
+        var dossiers = new List<(string, string)>();
+        void Ajouter(Environment.SpecialFolder dossier, string repere)
+        {
+            try
+            {
+                var chemin = Path.TrimEndingDirectorySeparator(Environment.GetFolderPath(dossier));
+                if (chemin.Length > 3) dossiers.Add((chemin, repere));
+            }
+            catch (Exception) { /* dossier illisible : sauté */ }
+        }
+        Ajouter(Environment.SpecialFolder.MyDocuments, "<Documents>");
+        Ajouter(Environment.SpecialFolder.Desktop, "<Desktop>");
+        Ajouter(Environment.SpecialFolder.ApplicationData, "<AppData>");
+        Ajouter(Environment.SpecialFolder.LocalApplicationData, "<LocalAppData>");
+        if (!Profil.IsMatch(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "\\"))
+            Ajouter(Environment.SpecialFolder.UserProfile, "<Profil>");
+        return dossiers;
+    }
+
+    private static Func<string, string?, string> Anonymiseur(IEnumerable<string> valeursDeCePc, IEnumerable<(string Chemin, string Repere)> dossiers)
+    {
+        // Le plus long d'abord : AppData local est sous le profil, et un repère ne doit pas en couper un autre.
+        // Le profil de ce PC, lu entier, devient X:\Users\joueur avant la règle générale : sans séparateur derrière, elle
+        // s'arrête au premier blanc et laisserait « joueur Dupont ».
+        var profils = valeursDeCePc.OfType<string>().Select(v => Path.TrimEndingDirectorySeparator(v.Trim()))
+            .Where(v => ProfilEntier.IsMatch(v)).Select(v => (Chemin: v, Repere: v[..9] + "joueur"));
+        var reperes = dossiers.Concat(profils).Where(d => d.Chemin.Length > 3).OrderByDescending(d => d.Chemin.Length)
+            .Select(d => (Motif: new Regex(Regex.Escape(Path.TrimEndingDirectorySeparator(d.Chemin)) + @"(?=$|[\\/""\s;,)])",
+                RegexOptions.IgnoreCase, Delai), d.Repere)).ToList();
         var propres = valeursDeCePc.Select(v => v?.Trim() ?? "").Where(v => v.Length >= 2 && !ValeursGeneriques.Contains(v)).Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(v => v.Length)
             .Select(v => new Regex($"(?<![A-Za-z0-9]){Regex.Escape(v)}(?![A-Za-z0-9])", RegexOptions.IgnoreCase, Delai)).ToList();
         return (s, cle) =>
         {
+            foreach (var (motif, repere) in reperes) s = motif.Replace(s, repere);
             s = Profil.Replace(s, "${tete}joueur");
             s = OneDrive.Replace(s, "${tete}" + Retire);
             foreach (var p in propres) s = p.Replace(s, Retire);
+            s = Exemplaire.Replace(s, SansExemplaire);
             s = AdresseMac.Replace(s, Retire);
             if (cle?.EndsWith("Version", StringComparison.Ordinal) != true) s = Ipv4.Replace(s, Retire);
             s = Ipv6.Replace(s, Retire);
@@ -131,6 +205,18 @@ public static class MachineExportee
             case JsonObject o:
                 foreach (var cle in o.Select(p => p.Key).ToList())
                     if (Texte(o[cle]) is { } s) o[cle] = anonymiser(s, cle); else Nettoyer(o[cle], cle, anonymiser);
+                // Une clé peut être un chemin ou un identifiant (un dictionnaire par jeu, par fichier) : elle passe par les mêmes
+                // règles. Deux clés rendues identiques gardent chacune sa valeur.
+                foreach (var cle in o.Select(p => p.Key).ToList())
+                {
+                    var propre = anonymiser(cle, null);
+                    if (propre == cle) continue;
+                    var valeur = o[cle];
+                    o.Remove(cle);
+                    var libre = propre;
+                    for (var n = 2; o.ContainsKey(libre); n++) libre = $"{propre} ({n})";
+                    o[libre] = valeur;
+                }
                 break;
             case JsonArray a:
                 for (var i = 0; i < a.Count; i++)

@@ -19,11 +19,11 @@ namespace DrDxt.GpuNative.NvApi;
 //
 // Surfaces
 // ────────
-//   Lectures  : TryReadCoreOffsetMhz (GetPstates20), non élevée.
-//               TryReadPowerLimitPct (ClientPowerPoliciesGetStatus).
-//   Écritures : TrySetCoreClockOffset (Get→SetPstates20, écriture minimale, conditionnée au bit modifiable).
-//               TrySetPowerLimitPercent (GetInfo→bornage→GetStatus→SetStatus).
-//               TrySetDrsGlobalSetting (la séquence de session DRS publique et sûre).
+//   Lectures  : décalages cœur et mémoire (GetPstates20), limite de puissance (ClientPowerPoliciesGetStatus),
+//               VRR, réglages DRS (global et au profil d'un exécutable), non élevées.
+//   Écritures : décalages cœur et mémoire (Get→SetPstates20, écriture minimale, conditionnée au bit modifiable),
+//               limite de puissance (GetInfo→bornage→GetStatus→SetStatus), VRR, réglages DRS global et par
+//               exécutable et leur suppression (la séquence de session DRS publique et sûre).
 //
 // Règles d'or de sécurité (recette) :
 //   #1 mot de version = Marshal.SizeOf(struct) | (1 << 16) à l'exécution (NvApiEntry.MakeVersion) :
@@ -167,7 +167,7 @@ public sealed class NvApiNative : INvApiNative
             if (status.Count == 0 || status.Entries is null || status.Entries.Length == 0) return false;
 
             // Note : le % est entier ici ; une cible d'origine fractionnaire (par exemple 87,5 % = 87_500 PCM)
-            // se capture à 88 → le retour est à ±0,5 % (négligeable). La lecture du décalage cœur est exacte.
+            // se capture à 88 → le retour est à ±0,5 % (négligeable). Le décalage cœur se lit en MHz tronqués vers zéro.
             powerLimitPct = NvApiConvert.PcmToPercent(status.Entries[0].PowerTargetPcm);
             return true;
         }
@@ -643,14 +643,12 @@ public sealed class NvApiNative : INvApiNative
                     currentValue = new byte[NvapiSettingMaxValues],
                 };
 
-                if (getSetting(session, profile, settingId, ref setting) != (int)NvApiStatus.Ok)
+                if (getSetting(session, profile, settingId, ref setting) != (int)NvApiStatus.Ok
+                    || Decoder(setting.settingType, setting.currentValue, setting.settingLocation,
+                               setting.isCurrentPredefined, setting.isPredefinedValid) is not { } lu)
                     return Illisible;
 
-                reading = new DrsReading(
-                    BitConverter.ToUInt32(setting.currentValue, 0),
-                    setting.settingLocation,
-                    setting.isCurrentPredefined,
-                    setting.isPredefinedValid);
+                reading = lu;
                 return INvApiNative.LectureAuJeu.Lu;
             }
             finally
@@ -718,14 +716,10 @@ public sealed class NvApiNative : INvApiNative
                 if (statut != (int)NvApiStatus.Ok)
                     return statut;
 
-                // Le DWORD vit dans les 4 premiers octets de currentValue (recette §C). Les champs de provenance
-                // reviennent avec la même lecture : les garder ne coûte rien et c'est le seul moyen de distinguer
-                // une valeur livrée par le pilote d'un choix de l'utilisateur.
-                reading = new DrsReading(
-                    BitConverter.ToUInt32(setting.currentValue, 0),
-                    setting.settingLocation,
-                    setting.isCurrentPredefined,
-                    setting.isPredefinedValid);
+                if (Decoder(setting.settingType, setting.currentValue, setting.settingLocation,
+                            setting.isCurrentPredefined, setting.isPredefinedValid) is not { } lu)
+                    return Echec;
+                reading = lu;
                 return (int)NvApiStatus.Ok;
             }
             finally
@@ -867,6 +861,14 @@ public sealed class NvApiNative : INvApiNative
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = NvapiUnicodeStringMax)]
         public string commandLine;
     }
+
+    // Le DWORD vit dans les 4 premiers octets de currentValue (recette §C) ; pour un réglage binaire ces octets sont sa
+    // longueur, pour une chaîne deux caractères : un autre type n'est pas lu. Les champs de provenance reviennent avec la
+    // même lecture : c'est le seul moyen de distinguer une valeur livrée par le pilote d'un choix de l'utilisateur.
+    internal static DrsReading? Decoder(uint type, byte[] valeur, uint location, uint courantePredefinie, uint predefinieValide)
+        => type == NvdrsSettingDwordType
+            ? new DrsReading(BitConverter.ToUInt32(valeur, 0), location, courantePredefinie, predefinieValide)
+            : null;
 
     // NVDRS_SETTING_V1 (NvApiDriverSettings.h). Pack = 8 (règle d'or n°2).
     [StructLayout(LayoutKind.Sequential, Pack = 8, CharSet = CharSet.Unicode)]

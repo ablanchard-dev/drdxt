@@ -70,13 +70,15 @@ public sealed record CoeurFrequence(
 /// Mesure reelle par les compteurs : **3 630 MHz**, soit 184,8 % du nominal. Les deux sources
 /// evidentes se trompaient d'un facteur 1,7.
 ///
-/// ══ pourquoi la resolution par index ══
+/// ══ les noms des compteurs ══
 /// Les noms de compteurs sont localises. Sur ce Windows francais, le jeu s'appelle
-/// « Informations sur le processeur » et le compteur « Fréquence réelle » : la requete anglaise
-/// echoue avec « L'objet spécifié n'a pas été trouvé ». Coder les noms francais marcherait ici et
-/// nulle part ailleurs.
+/// « Informations sur le processeur » et le compteur « Fréquence réelle » : un chemin PDH anglais
+/// (Get-Counter) echoue avec « L'objet spécifié n'a pas été trouvé ». La classe PerformanceCounter
+/// de .NET accepte, elle, le nom anglais sous toute langue, et le nom localise echoue quand le
+/// format regional n'est pas de la langue de Windows : le lecteur ouvre par le nom anglais, et
+/// garde le nom localise en repli. Coder les noms francais marcherait ici et nulle part ailleurs.
 ///
-/// Windows publie la table : `Perflib\009\Counter` porte les paires index/nom en anglais,
+/// Pour le repli, Windows publie la table : `Perflib\009\Counter` porte les paires index/nom en anglais,
 /// `Perflib\CurrentLanguage\Counter` les memes index dans la langue du systeme. On cherche donc
 /// l'index par le nom anglais (stable) et on lit le nom localise. Aucun index code en dur,
 /// aucun nom traduit a la main.
@@ -104,7 +106,7 @@ public sealed class CpuFrequencyReader
     /// laisserait passer la mutation qu'il doit attraper.</param>
     public CpuFrequencyState Lire(Action<int>? attendre = null)
     {
-        var jeu = Localiser(JeuAnglais);
+        var jeu = Nom(JeuAnglais);
         if (jeu is null) return new CpuFrequencyState(null, null, null, null);
 
         // Une seule attente pour les quatre compteurs.
@@ -154,9 +156,9 @@ public sealed class CpuFrequencyReader
     /// chacun ferait durer une lecture 28 fois trop longtemps pour une boucle de surveillance.</summary>
     public IReadOnlyList<CoeurFrequence> LireParProcesseur()
     {
-        var jeu = Localiser(JeuAnglais);
-        var nomPerf = Localiser(CompteurPourcentage);
-        var nomTemps = Localiser(CompteurTemps);
+        var jeu = Nom(JeuAnglais);
+        var nomPerf = Nom(CompteurPourcentage);
+        var nomTemps = Nom(CompteurTemps);
         if (jeu is null || nomPerf is null) return Array.Empty<CoeurFrequence>();
 
         try
@@ -255,7 +257,7 @@ public sealed class CpuFrequencyReader
     /// <summary>Ouvre un compteur du jeu, ou <c>null</c> s'il n'existe pas sur cette machine.</summary>
     private static PerformanceCounter? Ouvrir(string jeuLocalise, string compteurAnglais)
     {
-        var compteur = Localiser(compteurAnglais);
+        var compteur = Nom(compteurAnglais);
         if (compteur is null) return null;
         try { return new PerformanceCounter(jeuLocalise, compteur, "_Total", readOnly: true); }
         catch { return null; }
@@ -312,7 +314,24 @@ public sealed class CpuFrequencyReader
     /// changent pas de la vie du processus.</summary>
     internal static void OublierLesTables()
     {
-        lock (_verrou) { _tables.Clear(); _nomsLocalises.Clear(); }
+        lock (_verrou) { _tables.Clear(); _nomsLocalises.Clear(); _anglaisOuvrable = null; }
+    }
+
+    /// <summary>Le nom sous lequel ouvrir un jeu ou un compteur. L'anglais d'abord : .NET l'accepte quelle que soit la
+    /// langue de Windows. Le nom de la table de la langue d'affichage echoue quand le format regional est d'une autre
+    /// langue (Windows en francais, format anglais : « la categorie n'existe pas ») ; il reste le repli.</summary>
+    private static string? Nom(string nomAnglais) => AnglaisOuvrable() ? nomAnglais : Localiser(nomAnglais);
+
+    private static bool? _anglaisOuvrable;
+
+    /// <summary>Couture : seule la réponse est retenue, jamais l'échec (même règle que les tables).</summary>
+    internal static Func<bool> AnglaisExiste = () => PerformanceCounterCategory.Exists(JeuAnglais);
+
+    internal static bool AnglaisOuvrable()
+    {
+        if (_anglaisOuvrable is { } connu) return connu;
+        try { return (_anglaisOuvrable = AnglaisExiste()).Value; }
+        catch { return false; }
     }
 
     /// <summary>Le nom localise d'un jeu ou d'un compteur, a partir de son nom anglais.

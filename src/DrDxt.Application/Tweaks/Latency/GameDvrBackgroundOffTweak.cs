@@ -40,8 +40,8 @@ public sealed class GameDvrBackgroundOffTweak : LatencyTweakBase
     // Le DVR relit le réglage au prochain lancement du jeu → le moteur diffère sa preuve A/B.
     public override bool TakesEffectAfterReboot => true;
 
-    // Deja a 0 ⇒ rien a faire, hors du plan ; illisible ⇒ applicable, non lu
-    // n'est pas « deja regle ».
+    // Deja a 0 ⇒ rien a faire, hors du plan ; illisible ⇒ non lu (EtatNonLu) : ni « deja regle », ni « a poser »,
+    // puisque la pose relit l'origine et echouerait.
     // « Record what happened » est desactive par defaut, et une valeur absente vaut 0
     // (elevenforum.com/t/…record-what-happened-for-gaming-captures-in-windows-11.17900 ;
     // github.com/FunkyFr3sh/GameDVR_Config). Le poste de reference n'a pas la valeur : sans cette regle,
@@ -51,9 +51,15 @@ public sealed class GameDvrBackgroundOffTweak : LatencyTweakBase
         try
         {
             var read = _registry.ReadDword(RegistryHiveKind.CurrentUser, GameDvrPath, HistoricalCaptureName);
-            return !(read.IsOk && read.Value is null or Disabled);
+            return read.IsOk && read.Value is not (null or Disabled);
         }
-        catch (Exception) { return true; } // frontiere externe : non lu, jamais « deja regle »
+        catch (Exception) { return false; } // frontiere externe : non lu, dit par EtatNonLu
+    }
+
+    public override bool EtatNonLu(SettingsState state)
+    {
+        try { return !_registry.ReadDword(RegistryHiveKind.CurrentUser, GameDvrPath, HistoricalCaptureName).IsOk; }
+        catch (Exception) { return true; }
     }
 
     // Banc profond : déjà à 0 ou absente (absente vaut 0), l'exercice passe par 1 (l'enregistrement en arrière-plan

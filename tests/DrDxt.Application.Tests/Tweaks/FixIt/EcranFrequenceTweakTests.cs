@@ -112,6 +112,37 @@ public sealed class EcranFrequenceTweakTests
         _mode.DidNotReceive().Ecrire(Arg.Any<ModeEcran>(), Arg.Any<bool>());
     }
 
+    // Un portable sur batterie est souvent mis à 60 Hz exprès (Windows ou le constructeur, pour l'autonomie) : Optimiser
+    // remettait la fréquence maximale et l'enregistrait. Sur batterie, le levier ne s'applique pas, et sa pose est refusée.
+    [Fact]
+    public async Task Sur_batterie_la_frequence_de_l_ecran_n_est_pas_remontee()
+    {
+        var alimentation = Substitute.For<ISourceDAlimentation>();
+        alimentation.SurBatterie().Returns(true);
+        Build();
+        var t = new EcranFrequenceTweak(_ecrans, _mode, _confirmation, alimentation);
+
+        t.AppliesTo(Hw(), State(new RefreshHeadroom(TriState.On, 60, 144))).Should().BeFalse();
+        var r = await t.ApplyAsync();
+
+        r.Error!.Value.Code.Should().Be(ErrorCodes.TweakNotApplicable);
+        _mode.DidNotReceive().Ecrire(Arg.Any<ModeEcran>(), Arg.Any<bool>());
+    }
+
+    // Le joueur ne garde pas le mode, et le retour à l'ancien échoue : l'écran reste au mode cible pour la session. Le levier
+    // rendait « indisponible », et l'écran disait « Pas posé (rien n'est resté) ».
+    [Fact]
+    public async Task Un_retour_rate_se_dit_partiellement_pose()
+    {
+        var t = Build(confirme: false);
+        _mode.Ecrire(A60, false).Returns(-1);
+
+        var r = await t.ApplyAsync();
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.TweakPartiallyApplied);
+    }
+
     [Fact]
     public async Task Relecture_qui_ne_confirme_pas_ramene_l_ancien_mode()
     {
@@ -153,7 +184,7 @@ public sealed class EcranFrequenceTweakTests
         var t = Build();
         var snapshot = (await t.ApplyAsync()).Value!;
         _mode.ClearReceivedCalls();
-        _mode.Courant(Ecran).Returns(A60);
+        _mode.Courant(Ecran).Returns(A144, A60);
 
         (await t.RevertAsync(snapshot)).IsOk.Should().BeTrue();
         _mode.Received(1).Ecrire(A60, true);
@@ -177,6 +208,40 @@ public sealed class EcranFrequenceTweakTests
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Code.Should().Be(ErrorCodes.SnapshotInvalid);
+        _mode.DidNotReceive().Ecrire(Arg.Any<ModeEcran>(), Arg.Any<bool>());
+    }
+
+    // Le joueur a choisi une autre fréquence depuis (120 Hz dans les Paramètres) : l'annulation ne remet pas 60 Hz par-dessus
+    // son choix. Rien n'est écrit, et l'échec le dit.
+    [Fact]
+    public async Task Annuler_ne_reecrit_pas_une_frequence_choisie_depuis()
+    {
+        var t = Build();
+        var snapshot = (await t.ApplyAsync()).Value!;
+        _mode.ClearReceivedCalls();
+        _mode.Courant(Ecran).Returns(A60 with { Hz = 120 });
+
+        var r = await t.RevertAsync(snapshot);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Message.Should().Be(Docteur.T("EF.ChangeDepuis", 120, 144));
+        _mode.DidNotReceive().Ecrire(Arg.Any<ModeEcran>(), Arg.Any<bool>());
+    }
+
+    // L'écran a été débranché et un autre a pris son nom (\\.\DISPLAY1), à la même fréquence : l'ancienne définition n'est
+    // pas posée et enregistrée sur un moniteur qui n'est pas celui que DrDXT a réglé.
+    [Fact]
+    public async Task Annuler_ne_pose_pas_l_ancien_mode_sur_un_autre_ecran_du_meme_nom()
+    {
+        var t = Build();
+        var snapshot = (await t.ApplyAsync()).Value!;
+        _mode.ClearReceivedCalls();
+        _mode.Courant(Ecran).Returns(new ModeEcran(Ecran, 1920, 1080, 32, 144));
+
+        var r = await t.RevertAsync(snapshot);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Message.Should().Be(Docteur.T("EF.AutreEcran", 2560, 1440, 1920, 1080));
         _mode.DidNotReceive().Ecrire(Arg.Any<ModeEcran>(), Arg.Any<bool>());
     }
 }

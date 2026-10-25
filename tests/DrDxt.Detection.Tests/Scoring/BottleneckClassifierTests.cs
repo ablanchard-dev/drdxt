@@ -243,6 +243,16 @@ public sealed class BottleneckClassifierTests
         v.Reason.Should().Contain("average");
     }
 
+    // Trente secondes à 150 i/s puis trente à 100 : chaque image suit la précédente sans à-coup, c'est la scène qui change.
+    // L'écart-type sur toute la minute donnerait 0,20, « cadence cassée », et cacherait le vrai goulot.
+    [Fact]
+    public void A_scene_that_changes_pace_is_not_uneven_pacing()
+    {
+        var ft = Enumerable.Repeat(6.67, 4500).Concat(Enumerable.Repeat(10.0, 3000)).ToList();
+
+        BottleneckClassifier.Classify(Result(gpuBusyMs: 7.0 * 0.95, frames: ft)).State.Should().NotBe(BottleneckState.FramePacing);
+    }
+
     [Fact]
     public void Rare_hard_hitches_are_caught_even_when_the_variation_stays_low()
     {
@@ -336,5 +346,36 @@ public sealed class BottleneckClassifierTests
         };
 
         cases.Should().OnlyContain(v => v.Reason.Length > 40);
+    }
+
+    // La branche « GPU bridé » ne tournait jamais : aucun appelant ne passait le bridage, alors que la mesure garde déjà les
+    // raisons que le pilote publie (HardwareObservation.RaisonsVues). Un plafond thermique ou de puissance vu pendant la mesure
+    // dit bridé ; des raisons lues sans plafond disent non bridé ; rien de lu, ou une chute sans raison, ne dit rien.
+    [Theory]
+    [InlineData(ClocksEventReason.ThermiqueMateriel, true)]
+    [InlineData(ClocksEventReason.PlafondPuissanceLogiciel, true)]
+    [InlineData(ClocksEventReason.Aucune, false)]
+    [InlineData(ClocksEventReason.RalentissementMateriel, null)]
+    public void Le_bridage_se_lit_dans_les_raisons_vues(ClocksEventReason raisons, bool? bride)
+        => BottleneckClassifier.Bridage(new HardwareObservation(4, 120, 70, 2500, 2400, raisons)).Should().Be(bride);
+
+    [Fact]
+    public void Sans_observation_du_materiel_le_bridage_n_est_pas_lu()
+    {
+        BottleneckClassifier.Bridage(null).Should().BeNull();
+        BottleneckClassifier.Bridage(HardwareObservation.Vide).Should().BeNull();
+    }
+
+    [Fact]
+    public void Le_scan_classe_bride_une_carte_qui_plafonne_pendant_la_mesure()
+    {
+        var mesure = Result(gpuBusyMs: 7.0 * 0.95) with { Materiel = new HardwareObservation(4, 160, 87, 2400, 2100, ClocksEventReason.ThermiqueLogiciel) };
+        var hw = new HardwareInventory(new CpuInfo("i7", "Intel", 8, 16, false, 1),
+            [new GpuInfo("RTX 4060", "NVIDIA", 8L << 30, "1", TriState.On)], [new MemoryModule("PN", "K", 3200, 3200)],
+            new MotherboardInfo("M", "B"), new BiosInfo("1", null, true), ChassisType.Desktop);
+        var etat = new SettingsState(TriState.On, TriState.On, KnownPowerPlans.Balanced.ToString(), TriState.On,
+            GameMode: TriState.On, ParkedCoreIndexes: [], Vrr: TriState.Unknown);
+
+        new ScanScorer().Score(hw, etat, mesure).Value!.Bottleneck!.Value.State.Should().Be(BottleneckState.ThermalOrPowerThrottle);
     }
 }

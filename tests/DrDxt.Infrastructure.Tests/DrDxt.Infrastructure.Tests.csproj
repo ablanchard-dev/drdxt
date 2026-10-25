@@ -35,6 +35,7 @@
          T12 cross-key test signs a fixture with the MANIFEST seed to prove it does NOT
          verify against the UPDATE key. -->
     <Compile Include="..\Shared\ManifestDevTestKeys.cs" Link="Shared\ManifestDevTestKeys.cs" />
+    <Compile Include="..\Shared\UpdateDevTestKeys.cs" Link="Shared\UpdateDevTestKeys.cs" />
   </ItemGroup>
 
   <ItemGroup>

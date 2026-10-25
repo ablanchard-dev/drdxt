@@ -13,6 +13,8 @@
 
     <UserControl.Resources>
         <conv:SeverityColorConverter x:Key="SeverityColor"/>
+        <conv:SeverityLabelConverter x:Key="SeverityLabel"/>
+        <conv:NomAccessibleConverter x:Key="NomAccessible"/>
         <conv:BoolToVisibilityConverter x:Key="BoolVis"/>
         <conv:StringNotEmptyToVisibilityConverter x:Key="StrVis"/>
         <conv:ScanStateToVisibilityConverter x:Key="StateVis"/>
@@ -43,9 +45,43 @@
         </Style>
 
         <!-- Le contenu du chip : le point prend la teinte héritée, le mot garde le contraste du texte. -->
+        <!-- Le métal s'agite pendant le scan. -->
+        <!-- Ce qui est
+             facultatif ou de l'ordre du détail se replie derrière un lien, sur place ; rien n'est retiré. -->
+        <Style x:Key="Depliant" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{StaticResource IrisCyanBrush}"/>
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusIris}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="Transparent" Padding="0,2">
+                            <StackPanel Orientation="Horizontal">
+                                <ContentPresenter VerticalAlignment="Center"/>
+                                <Path x:Name="Chevron" Data="M0,0 L4,4 L0,8" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.5"
+                                      Margin="8,1,0,0" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                    <Path.RenderTransform><RotateTransform x:Name="Rotation" Angle="0"/></Path.RenderTransform>
+                                </Path>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Chevron" Property="RenderTransform"><Setter.Value><RotateTransform Angle="90"/></Setter.Value></Setter>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter Property="Opacity" Value="0.8"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Un seul signe pour « pourquoi ? » partout (mesures, constats, lectures
-             impossibles, processeur bridé) : un « ? » rond, gris au repos, cyan au survol et ouvert. Son nom complet reste
-             pour le lecteur d'écran et l'infobulle. -->
+             impossibles, processeur bridé) : un chevron, gris au repos, cyan au survol, tourné quand c'est ouvert. Son nom
+             complet reste pour le lecteur d'écran et l'infobulle. -->
         <Style x:Key="BoutonPourquoi" TargetType="ToggleButton">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{StaticResource FocusIris}"/>
@@ -54,19 +90,20 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="Rond" Width="20" Height="20" CornerRadius="10" BorderThickness="1"
-                                BorderBrush="{StaticResource TexteSecondaireBrush}" Background="Transparent">
-                            <TextBlock x:Name="Signe" Text="?" FontFamily="{StaticResource UiFont}" FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TexteSecondaireBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <!-- Un chevron, sans cercle : un rond « ? » répété sur chaque ligne faisait une page pointillée. -->
+                        <Border Width="20" Height="20" Background="Transparent">
+                            <Path x:Name="Signe" Data="M0,0 L4,4 L0,8" Stroke="{StaticResource TexteSecondaireBrush}" StrokeThickness="1.5"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform><RotateTransform Angle="0"/></Path.RenderTransform>
+                            </Path>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Rond" Property="BorderBrush" Value="{StaticResource IrisCyanBrush}"/>
-                                <Setter TargetName="Signe" Property="Foreground" Value="{StaticResource IrisCyanBrush}"/>
+                                <Setter TargetName="Signe" Property="Stroke" Value="{StaticResource IrisCyanBrush}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Rond" Property="BorderBrush" Value="{StaticResource IrisCyanBrush}"/>
-                                <Setter TargetName="Signe" Property="Foreground" Value="{StaticResource IrisCyanBrush}"/>
+                                <Setter TargetName="Signe" Property="Stroke" Value="{StaticResource IrisCyanBrush}"/>
+                                <Setter TargetName="Signe" Property="RenderTransform"><Setter.Value><RotateTransform Angle="90"/></Setter.Value></Setter>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -74,18 +111,16 @@
             </Setter>
         </Style>
 
+        <!-- L'état d'un domaine : son mot seul, sans point de couleur (un feu tricolore par domaine faisait l'écran d'un
+             gabarit tout fait). Un domaine sans rien de signalé se tait : le silence dit que tout va bien. -->
         <DataTemplate x:Key="ContenuEtat">
-            <StackPanel Orientation="Horizontal">
-                <!-- La perle brillante (reflet blanc, halo flou) faisait daté. Un point plat de la
-                     couleur de l'état, cerclé d'un liseré chrome fin : net, et toujours dans la matière. -->
-                <Grid Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,7,0">
-                    <Ellipse x:Name="Perle" Width="8" Height="8"
-                             Fill="{Binding (TextElement.Foreground), RelativeSource={RelativeSource AncestorType=Border}}"/>
-                    <Ellipse Width="10" Height="10" Stroke="{StaticResource LisereChromeBrush}" StrokeThickness="0.9"/>
-                </Grid>
-                <TextBlock Text="{Binding EtatLibelle}" FontFamily="{StaticResource UiFont}" FontSize="12"
-                           FontWeight="Medium" Foreground="{StaticResource TexteBrush}" VerticalAlignment="Center"/>
-            </StackPanel>
+            <TextBlock x:Name="MotEtat" Text="{Binding EtatLibelle}" FontFamily="{StaticResource UiFont}" FontSize="12"
+                       FontWeight="Medium" Foreground="{StaticResource TexteBrush}" VerticalAlignment="Center"/>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Etat}" Value="{x:Static vm:EtatDomaine.RienDeSignale}">
+                    <Setter TargetName="MotEtat" Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
 
         <!-- Une ligne « Pas pu lire ». La température du processeur tenait quatre lignes de prose d'un
@@ -94,45 +129,49 @@
             <StackPanel Margin="0,0,0,12">
                 <!-- Le « ? » au bout de la ligne qu'il explique, partout. -->
                 <DockPanel LastChildFill="True">
-                    <ToggleButton x:Name="PourquoiNonLu" Style="{StaticResource BoutonPourquoi}" AutomationProperties.Name="{Binding DataContext.LabelPourquoi, RelativeSource={RelativeSource AncestorType=UserControl}}" DockPanel.Dock="Right" Margin="10,1,0,0" VerticalAlignment="Top" Visibility="{Binding ADetailSuite, Converter={StaticResource BoolVis}}"/>
+                    <ToggleButton x:Name="PourquoiNonLu" Style="{StaticResource BoutonPourquoi}" DockPanel.Dock="Right" Margin="10,1,0,0" VerticalAlignment="Top" Visibility="{Binding ADetailSuite, Converter={StaticResource BoolVis}}">
+                        <AutomationProperties.Name>
+                            <MultiBinding Converter="{StaticResource NomAccessible}">
+                                <Binding Path="DataContext.LabelPourquoi" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                <Binding Path="Titre"/>
+                            </MultiBinding>
+                        </AutomationProperties.Name>
+                    </ToggleButton>
                     <TextBlock Text="{Binding Titre}" Style="{StaticResource Corps}" Foreground="{StaticResource TexteSecondaireBrush}"/>
                 </DockPanel>
                 <TextBlock Text="{Binding DetailCourt}" Style="{StaticResource Legende}" Margin="0,3,0,0"
-                           Visibility="{Binding Detail, Converter={StaticResource StrVis}}"/>
+                           Visibility="{Binding DetailCourt, Converter={StaticResource StrVis}}"/>
                 <TextBlock Text="{Binding DetailSuite}" Style="{StaticResource Legende}" Margin="0,3,0,0"
                            Visibility="{Binding IsChecked, ElementName=PourquoiNonLu, Converter={StaticResource BoolVis}}"/>
             </StackPanel>
         </DataTemplate>
 
         <!-- Une ligne de la carte : partagée par « Constaté » et « Réglages proposés ». -->
+        <!-- Ni puce de couleur ni filet : la gravité se dit par le titre du groupe (GroupeDeConstats), l'espace sépare
+             les lignes. -->
         <DataTemplate x:Key="LigneDeCarte" DataType="{x:Type vm:EntreeCarte}">
-            <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource FiletBrush}" Padding="0,14,0,14">
+            <Border Padding="0,10,0,10">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="18"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Ellipse Width="8" Height="8" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="0,6,0,0"
-                             Fill="{Binding Converter={StaticResource SeverityColor}}"/>
-
-                    <StackPanel Grid.Column="1">
+                    <StackPanel>
                         <!-- Le « ? » au bout de la ligne qu'il explique, partout. -->
                         <DockPanel LastChildFill="True">
-                            <ToggleButton x:Name="Pourquoi" Style="{StaticResource BoutonPourquoi}" AutomationProperties.Name="{Binding DataContext.LabelPourquoi, RelativeSource={RelativeSource AncestorType=UserControl}}" DockPanel.Dock="Right" Margin="10,1,0,0" VerticalAlignment="Top" Visibility="{Binding ADetailSuite, Converter={StaticResource BoolVis}}"/>
+                            <ToggleButton x:Name="Pourquoi" Style="{StaticResource BoutonPourquoi}" DockPanel.Dock="Right" Margin="10,1,0,0" VerticalAlignment="Top" Visibility="{Binding ADeplier, Converter={StaticResource BoolVis}}">
+                        <AutomationProperties.Name>
+                            <MultiBinding Converter="{StaticResource NomAccessible}">
+                                <Binding Path="DataContext.LabelPourquoi" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                <Binding Path="Titre"/>
+                            </MultiBinding>
+                        </AutomationProperties.Name>
+                            </ToggleButton>
                             <TextBlock Text="{Binding Titre}" Style="{StaticResource Corps}" FontWeight="SemiBold"/>
                         </DockPanel>
                         <!-- La première phrase, puis la suite derrière « Pourquoi ? » ; un constat mémoire
                              faisait dix lignes d'un bloc. -->
-                        <TextBlock Text="{Binding DetailCourt}" Style="{StaticResource Discret}" Margin="0,5,0,0"
-                                   Visibility="{Binding Detail, Converter={StaticResource StrVis}}"/>
-                        <!-- Le remède se lit sans clic, liseré cyan, avant « Pourquoi ? ». -->
-                        <Border BorderThickness="2,0,0,0" BorderBrush="{StaticResource IrisCyanBrush}" Padding="10,2,0,2" Margin="0,8,0,0"
-                                Visibility="{Binding ACommentCorriger, Converter={StaticResource BoolVis}}">
+
+                        <!-- Ce que DrDXT fait lui-même reste visible : un bouton par geste. La marche à suivre à la main (texte,
+                             commandes) se replie sous « Comment corriger » : dépliée d'office, elle faisait un pavé par constat. -->
+                        <StackPanel Margin="0,8,0,0" Visibility="{Binding ACommentCorriger, Converter={StaticResource BoolVis}}">
                             <StackPanel>
-                                <TextBlock Text="{Binding DataContext.LabelCommentCorriger, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                           Style="{StaticResource Discret}" FontWeight="SemiBold" Margin="0,0,0,3"/>
-                                <TextBlock Text="{Binding RemedeLisible}" Style="{StaticResource Corps}" TextWrapping="Wrap"
-                                           Visibility="{Binding ARemede, Converter={StaticResource BoolVis}}"/>
                                 <!-- Ce que DrDXT fait lui-même de ces étapes : un bouton par geste, « Annuler » une fois fait. -->
                                 <ItemsControl ItemsSource="{Binding Gestes}" Margin="0,4,0,0"
                                               Visibility="{Binding AGestes, Converter={StaticResource BoolVis}}">
@@ -162,6 +201,12 @@
                                                             Visibility="{Binding PeutAnnuler, Converter={StaticResource BoolVis}}"
                                                             Foreground="{StaticResource IrisCyanBrush}" FocusVisualStyle="{StaticResource FocusIris}"
                                                             FontFamily="{StaticResource UiFont}" FontSize="12.5">
+                                                        <AutomationProperties.Name>
+                                                            <MultiBinding Converter="{StaticResource NomAccessible}">
+                                                                <Binding Path="DataContext.LabelGesteAnnuler" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                                                <Binding Path="Titre"/>
+                                                            </MultiBinding>
+                                                        </AutomationProperties.Name>
                                                         <Button.Template>
                                                             <ControlTemplate TargetType="Button">
                                                                 <Border Background="Transparent" Padding="0,2"><ContentPresenter/></Border>
@@ -172,10 +217,21 @@
                                                 <TextBlock Text="{Binding DataContext.LabelGesteEchec, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                            Style="{StaticResource Legende}" Foreground="{StaticResource EtatRegarderBrush}" Margin="0,6,0,0" TextWrapping="Wrap"
                                                            Visibility="{Binding AEchoue, Converter={StaticResource BoolVis}}"/>
+                                                <TextBlock Text="{Binding DataContext.LabelGesteIncertain, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           Style="{StaticResource Legende}" Foreground="{StaticResource EtatRegarderBrush}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                           Visibility="{Binding Incertain, Converter={StaticResource BoolVis}}"/>
+                                                <TextBlock Text="{Binding DataContext.LabelGesteAMoitie, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           Style="{StaticResource Legende}" Foreground="{StaticResource EtatRegarderBrush}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                           Visibility="{Binding AMoitie, Converter={StaticResource BoolVis}}"/>
                                             </StackPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                <ToggleButton x:Name="DepliantRemede" Style="{StaticResource Depliant}" Margin="0,4,0,0"
+                                              Content="{Binding DataContext.LabelCommentCorriger, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                              Visibility="{Binding ARemede, Converter={StaticResource BoolVis}}"/>
+                                <StackPanel Visibility="{Binding IsChecked, ElementName=DepliantRemede, Converter={StaticResource BoolVis}}">
+                                <TextBlock Text="{Binding RemedeLisible}" Style="{StaticResource Corps}" TextWrapping="Wrap" Margin="0,6,0,0"/>
                                 <!-- Les commandes en police de code, une par ligne, sélectionnables. -->
                                 <Border HorizontalAlignment="Left" CornerRadius="8" Padding="9,4" Margin="0,8,0,0"
                                         Background="{StaticResource ObsidienneBrush}" BorderThickness="1" BorderBrush="{StaticResource FiletClairBrush}"
@@ -193,6 +249,12 @@
                                         Foreground="{StaticResource IrisCyanBrush}" FocusVisualStyle="{StaticResource FocusIris}"
                                         FontFamily="{StaticResource UiFont}" FontSize="12.5" FontWeight="SemiBold"
                                         Visibility="{Binding ACommande, Converter={StaticResource BoolVis}}">
+                                    <AutomationProperties.Name>
+                                        <MultiBinding Converter="{StaticResource NomAccessible}">
+                                            <Binding Path="DataContext.LabelCopierCommande" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                            <Binding Path="Titre"/>
+                                        </MultiBinding>
+                                    </AutomationProperties.Name>
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <Border Background="Transparent" Padding="0,2"><ContentPresenter/></Border>
@@ -207,21 +269,25 @@
                                         <TextBlock Text="{Binding DataContext.LabelCadreALaMain, RelativeSource={RelativeSource AncestorType=UserControl}}" Style="{StaticResource Legende}" Margin="7,0,0,0" TextWrapping="Wrap"/>
                                     </DockPanel>
                                 </StackPanel>
+                                </StackPanel>
                             </StackPanel>
-                        </Border>
-                        <TextBlock Text="{Binding DetailSuite}" Style="{StaticResource Discret}" Margin="0,4,0,0"
+                        </StackPanel>
+                        <TextBlock Text="{Binding DetailEntier}" Style="{StaticResource Discret}" Margin="0,4,0,0"
                                    Visibility="{Binding IsChecked, ElementName=Pourquoi, Converter={StaticResource BoolVis}}"/>
                         <Border HorizontalAlignment="Left" CornerRadius="9" Padding="8,2" Margin="0,8,0,0"
                                 Background="{StaticResource IrisCyanDouxBrush}"
                                 Visibility="{Binding ActionAAfficher, Converter={StaticResource StrVis}}">
                             <TextBlock Text="{Binding ActionAAfficher}" Style="{StaticResource Legende}" Foreground="{StaticResource IrisCyanBrush}"/>
                         </Border>
-                        <!-- La valeur lue, telle quelle : « non lisible » compris. Sauf si la phrase au-dessus la dit déjà. -->
+                        <!-- La valeur lue, telle quelle : « non lisible » compris. Sauf si la phrase au-dessus la dit déjà. Elle
+                             s'ouvre avec le détail, sous le chevron du titre : le constat ne montre que son titre. -->
+                        <StackPanel Visibility="{Binding IsChecked, ElementName=Pourquoi, Converter={StaticResource BoolVis}}">
                         <Border HorizontalAlignment="Left" CornerRadius="8" Padding="9,4" Margin="0,8,0,0"
                                 Background="{StaticResource ObsidienneBrush}" BorderThickness="1" BorderBrush="{StaticResource FiletClairBrush}"
                                 Visibility="{Binding ValeurAAfficher, Converter={StaticResource StrVis}}">
                             <TextBlock Text="{Binding ValeurAAfficher}" Style="{StaticResource Donnee}" FontFamily="{StaticResource UiFont}" FontSize="12.5"/>
                         </Border>
+                        </StackPanel>
                         <!-- La réserve d'un réglage proposé se lit comme une phrase, pas comme une valeur lue. -->
                         <TextBlock Text="{Binding ReserveDeValidation}" Style="{StaticResource Discret}" FontStyle="Italic" Margin="0,8,0,0"
                                    Visibility="{Binding ReserveDeValidation, Converter={StaticResource StrVis}}"/>
@@ -229,6 +295,17 @@
                 </Grid>
             </Border>
         </DataTemplate>
+
+        <!-- Un groupe de constats : son mot (« À corriger », « À regarder ») à la couleur de sa gravité, la seule couleur
+             d'état de la page hors de la navigation ; puis ses lignes. -->
+        <DataTemplate x:Key="GroupeDeConstats" DataType="{x:Type vm:GroupeDeConstats}">
+            <StackPanel Margin="0,4,0,8">
+                <TextBlock Text="{Binding Premiere, Converter={StaticResource SeverityLabel}, ConverterParameter=Titre}" Foreground="{StaticResource TexteSecondaireBrush}"
+                           FontFamily="{StaticResource UiFont}" FontSize="12" FontWeight="SemiBold"/>
+                <ItemsControl ItemsSource="{Binding Lignes}" ItemTemplate="{StaticResource LigneDeCarte}" Focusable="False"/>
+            </StackPanel>
+        </DataTemplate>
+
 
         <!-- Le rail des domaines : chaque domaine est un pôle du réseau qu'on sélectionne. -->
         <Style x:Key="RailDomaines" TargetType="ListBox">
@@ -287,39 +364,6 @@
             <TextBlock Text="{Binding Libelle}" TextWrapping="Wrap" TextAlignment="Center"/>
         </DataTemplate>
 
-        <!-- Le métal s'agite pendant le scan. -->
-        <!-- Ce qui est
-             facultatif ou de l'ordre du détail se replie derrière un lien, sur place ; rien n'est retiré. -->
-        <Style x:Key="Depliant" TargetType="ToggleButton">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="{StaticResource IrisCyanBrush}"/>
-            <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="HorizontalAlignment" Value="Left"/>
-            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusIris}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Border Background="Transparent" Padding="0,2">
-                            <StackPanel Orientation="Horizontal">
-                                <ContentPresenter VerticalAlignment="Center"/>
-                                <Path x:Name="Chevron" Data="M0,0 L4,4 L0,8" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.5"
-                                      Margin="8,1,0,0" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
-                                    <Path.RenderTransform><RotateTransform x:Name="Rotation" Angle="0"/></Path.RenderTransform>
-                                </Path>
-                            </StackPanel>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Chevron" Property="RenderTransform"><Setter.Value><RotateTransform Angle="90"/></Setter.Value></Setter>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter Property="Opacity" Value="0.8"/></Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
 
         <!-- Un seul dépliant sur la page : chaque Expander prend le lien cyan et son chevron (Depliant), au lieu du rond
              blanc et du pointillé de Windows ; le lien est le seul arrêt du clavier, son nom est celui de l'Expander. -->
@@ -506,89 +550,42 @@
 
                                 <!-- Un seul titre : le nombre, qui répond à « ma machine va bien ? ». Une ligne de verdict
                                      dessous le redirait en mots. -->
-                                <TextBlock effets:Compteur.Texte="{Binding ProblemSummary}" FontFamily="{StaticResource UiDisplayFont}" FontSize="38" LineHeight="44" FontWeight="SemiBold"
+                                <TextBlock effets:Compteur.Texte="{Binding TitreAccueil}" FontFamily="{StaticResource UiDisplayFont}" FontSize="38" LineHeight="44" FontWeight="SemiBold"
                                            Foreground="{StaticResource TexteBrush}" TextWrapping="Wrap"
                                            Typography.NumeralAlignment="Tabular"/>
-                                <TextBlock Text="{Binding SubtitleText}" Style="{StaticResource Discret}" FontSize="15" LineHeight="23" Margin="0,12,0,0"/>
+                                <TextBlock Text="{Binding SousTitreAccueil}" Style="{StaticResource Discret}" FontSize="15" LineHeight="23" Margin="0,12,0,0"
+                                           Visibility="{Binding SousTitreAccueil, Converter={StaticResource StrVis}}"/>
                                 <TextBlock Text="{Binding DateDuScan}" Style="{StaticResource Legende}" Margin="0,4,0,0" Typography.NumeralAlignment="Tabular"/>
-                                <!-- Le docteur dit ce qui vient ensuite quand la liste ne le dit pas déjà : un point à faire soi-même
-                                     est le premier de la liste, cliquable vers son domaine. -->
-                                <Border x:Name="ProchaineEtape" BorderBrush="{StaticResource IrisCyanBrush}" BorderThickness="2,0,0,0" Padding="14,2,0,2"
-                                        Margin="0,18,0,0" HorizontalAlignment="Left" MaxWidth="560"
-                                        Visibility="{Binding EtapeHorsListe, Converter={StaticResource StrVis}}">
-                                    <TextBlock Text="{Binding EtapeHorsListe}" Style="{StaticResource Corps}" Foreground="{StaticResource TexteBrush}" TextWrapping="Wrap"/>
-                                </Border>
+                                <!-- Le docteur dit ce qui vient ensuite quand l'écran ne le dit pas déjà. -->
+                                <TextBlock x:Name="ProchaineEtape" Text="{Binding EtapeHorsListe}" Style="{StaticResource Corps}" Foreground="{StaticResource TexteBrush}"
+                                           TextWrapping="Wrap" MaxWidth="560" HorizontalAlignment="Left" Margin="0,18,0,0"
+                                           Visibility="{Binding EtapeHorsListe, Converter={StaticResource StrVis}}"/>
 
-                                <!-- « 12 points à corriger » sans liste obligeait à ouvrir les huit domaines. Ce qui
-                                     est à corriger, le plus grave d'abord, trois au plus ; un clic ouvre le domaine plus bas. -->
+                                <!-- Un seul appel principal : Optimiser vient d'abord. La liste des défauts se replie dessous ;
+                                     ouverte d'office, elle faisait de l'accueil un inventaire de ce qui ne va pas. -->
                                 <StackPanel Margin="0,22,0,0">
-                                    <!-- Seule la liste se cache quand elle est vide : Optimiser, « Plus d'options » et « Prêt à jouer ? »
-                                         restent sur une machine sans point à corriger. -->
-                                    <StackPanel x:Name="ListeDesPointsAFaire">
-                                    <StackPanel.Style>
-                                        <Style TargetType="StackPanel">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding PointsAFaire.Count}" Value="0">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
-                                    <!-- La ligne la plus utile sous le titre était la plus petite. -->
-                                    <!-- Une étiquette de section, plus un troisième titre. -->
-                                    <TextBlock Text="{Binding LabelAFaire}" Style="{StaticResource Legende}" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                    <!-- Les résultats entrent dans l'ordre de lecture, verdict d'abord. -->
-                                    <ItemsControl x:Name="ListeAFaire" ItemsSource="{Binding PointsAFaire}" Focusable="False"
-                                                  effets:Revelation.Active="True" effets:Revelation.Retard="160">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate DataType="{x:Type vm:PointAFaire}">
-                                                <Button Style="{StaticResource Lien}" Margin="0,3"
-                                                        Command="{Binding DataContext.ChoisirDomaineCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                        CommandParameter="{Binding Domaine}"
-                                                        AutomationProperties.Name="{Binding Entree.Titre}">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="16"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <!-- La puce d'un constat a la couleur de sa gravité, comme dans son domaine. -->
-                                                        <Ellipse Width="6" Height="6" Fill="{Binding Entree.Gravite, Converter={StaticResource SeverityColor}}" VerticalAlignment="Top" Margin="0,7,0,0"/>
-                                                        <TextBlock Grid.Column="1" TextWrapping="Wrap" MaxWidth="520">
-                                                            <Run Text="{Binding Entree.Titre, Mode=OneWay}" Foreground="{StaticResource TexteBrush}"/>
-                                                            <Run Text="{Binding Domaine.Nom, Mode=OneWay, StringFormat='· {0}'}" Foreground="{StaticResource TexteSecondaireBrush}" FontWeight="Normal"/>
-                                                        </TextBlock>
-                                                    </Grid>
-                                                </Button>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                    </StackPanel>
-                                    <!-- Optimiser n'était qu'au milieu de la page, sous huit
-                                         domaines. La même commande, là où la liste vient de dire quoi faire. -->
-                                    <!-- Ce qu'Optimiser essaiera, dit avant le clic. Posé sous la
-                                         liste, le bouton laissait croire qu'il la corrigeait ; l'aperçu vient d'abord, séparé
-                                         de la liste, et dit que ce sont ses propres réglages. -->
+                                    <!-- Ce qu'Optimiser essaiera, dit avant le clic, et que ce sont ses propres réglages. -->
                                     <TextBlock x:Name="ApercuOptimiser" Text="{Binding ApercuOptimisation}" Style="{StaticResource Discret}" TextWrapping="Wrap"
-                                               effets:Revelation.Active="True" effets:Revelation.Retard="280"
-                                               MaxWidth="540" HorizontalAlignment="Left" Margin="0,26,0,0"
+                                               effets:Revelation.Active="True" effets:Revelation.Retard="160"
+                                               MaxWidth="540" HorizontalAlignment="Left"
                                                Visibility="{Binding ApercuOptimisation, Converter={StaticResource StrVis}}"/>
                                     <!-- Rien que DrDXT puisse poser seul : une phrase vraie à la place du bouton. -->
                                     <TextBlock Text="{Binding LabelRienAPoserSeul}" Style="{StaticResource Discret}" TextWrapping="Wrap" MaxWidth="540"
                                                HorizontalAlignment="Left" Margin="0,12,0,0"
                                                Visibility="{Binding RienAPoserDuTout, Converter={StaticResource BoolVis}}"/>
-                                    <!-- Un souci en cours (arrêt brutal...) se lit avant le clic, en « à regarder ». -->
-                                    <TextBlock Text="{Binding AvertissementPoint}" Style="{StaticResource Discret}" TextWrapping="Wrap" Foreground="{StaticResource EtatRegarderBrush}"
+                                    <!-- Un souci en cours (arrêt brutal...) se lit avant le clic ; ses mots le disent, sans couleur d'état
+                                         hors de la navigation et des titres de groupe. -->
+                                    <TextBlock Text="{Binding AvertissementPoint}" Style="{StaticResource Discret}" TextWrapping="Wrap" Foreground="{StaticResource TexteBrush}"
                                                MaxWidth="540" HorizontalAlignment="Left" Margin="0,12,0,0"
                                                Visibility="{Binding AvertissementPoint, Converter={StaticResource StrVis}}"/>
                                     <Button x:Name="BoutonOptimiser" Style="{StaticResource CapsuleChrome}" Content="{Binding LabelOptimize}"
-                                            effets:Revelation.Active="True" effets:Revelation.Retard="360"
-                                            Command="{Binding ApplyCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                            effets:Revelation.Active="True" effets:Revelation.Retard="280"
+                                            Command="{Binding ApplyCommand}" HorizontalAlignment="Left" Margin="0,16,0,0"
                                             ToolTipService.ShowOnDisabled="True" ToolTip="{Binding ApplyHint}"/>
                                     <!-- Point de restauration puis réglages, jusqu'à ~40 s : le dire. -->
                                     <TextBlock Visibility="{Binding ApplyCommand.IsRunning, Converter={StaticResource BoolVis}}"
                                                Text="{Binding LabelOptimisationEnCours}" Style="{StaticResource Discret}" Margin="0,8,0,0"/>
-                                    <!-- Le résultat d'Optimiser et ses refus, sous le bouton ;
-                                         ils s'écrivaient ~900 lignes plus bas, sous le pli. -->
+                                    <!-- Le résultat d'Optimiser et ses refus, sous le bouton. -->
                                     <StackPanel Margin="0,10,0,0" MaxWidth="540" HorizontalAlignment="Left">
                                         <TextBlock Text="{Binding LabelAttenteDuJeuSession}" Style="{StaticResource Discret}" Foreground="{StaticResource IrisCyanBrush}"
                                                    Margin="0,0,0,8" TextWrapping="Wrap" Visibility="{Binding AttenteDuJeuSession, Converter={StaticResource BoolVis}}"/>
@@ -604,9 +601,47 @@
                                         <TextBlock Text="{Binding ResultatOptimisation}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,0,0,8"
                                                    Visibility="{Binding ResultatOptimisation, Converter={StaticResource StrVis}}"/>
                                     </StackPanel>
-                                    <!-- « Prêt à jouer ? » juste sous Optimiser : c'est la question qu'on se pose ensuite. -->
-                                    <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelPretAJouer}" HorizontalAlignment="Left"
-                                            Command="{Binding VerifierPretAJouerCommand}" Margin="0,4,0,0"/>
+
+                                    <!-- Les points à corriger, le plus grave d'abord, trois au plus ; un clic ouvre le domaine plus bas.
+                                         Seule la liste se cache quand elle est vide : Optimiser, « Plus d'options » et « Prêt à jouer ? »
+                                         restent sur une machine sans point à corriger. -->
+                                    <StackPanel x:Name="ListeDesPointsAFaire" Margin="0,14,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding PointsAFaire.Count}" Value="0">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <ToggleButton x:Name="DepliantAFaire" Style="{StaticResource Depliant}" Content="{Binding LabelAFaire}"/>
+                                    <!-- La gravité se dit par le groupe et son mot, plus par une puce de couleur devant chaque ligne ;
+                                         le domaine du point passe en info-bulle, l'espace remplace le séparateur. -->
+                                    <ItemsControl x:Name="ListeAFaire" ItemsSource="{Binding PointsAFaire}" Focusable="False" Margin="0,8,0,0"
+                                                  Visibility="{Binding IsChecked, ElementName=DepliantAFaire, Converter={StaticResource BoolVis}}"
+                                                  effets:Revelation.Active="True" effets:Revelation.Retard="360">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type vm:PointAFaire}">
+                                                <Button Style="{StaticResource Lien}" Margin="0,4"
+                                                        Command="{Binding DataContext.ChoisirDomaineCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        CommandParameter="{Binding Domaine}" ToolTip="{Binding Domaine.Nom}"
+                                                        AutomationProperties.Name="{Binding Entree.Titre}">
+                                                    <TextBlock Text="{Binding Entree.Titre}" Foreground="{StaticResource TexteBrush}" TextWrapping="Wrap" MaxWidth="540"/>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    </StackPanel>
+
+                                    <!-- Le reste se replie sous un seul lien : « Prêt à jouer ? », « Quoi de neuf », ce que DrDXT pose
+                                         lui-même, l'essai en alternance, ce que tu joues. -->
+                                    <ToggleButton x:Name="PlusDOptions" Style="{StaticResource Depliant}" Content="{Binding LabelPlusDOptions}" Margin="0,18,0,0"/>
+                                    <StackPanel Visibility="{Binding IsChecked, ElementName=PlusDOptions, Converter={StaticResource BoolVis}}" MaxWidth="540"
+                                                HorizontalAlignment="Left" Margin="0,8,0,0">
+                                    <!-- « Prêt à jouer ? » : une question qu'on se pose ensuite, pas un second appel principal. -->
+                                    <Button Style="{StaticResource BoutonDiscret}" Content="{Binding LabelPretAJouer}" HorizontalAlignment="Left"
+                                            Command="{Binding VerifierPretAJouerCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Margin="0,14,0,0"/>
                                     <ItemsControl ItemsSource="{Binding LignesPretAJouer}" Margin="0,8,0,0" MaxWidth="540" HorizontalAlignment="Left">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -614,33 +649,35 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                    <!-- « Quoi de neuf » : une fois après une mise à jour de DrDXT, jusqu'à « Vu ». -->
+                                    <!-- « Quoi de neuf » : une fois après une mise à jour de DrDXT, jusqu'à « Vu » ; replié, il ne prend
+                                         plus la page. -->
                                     <StackPanel Visibility="{Binding AQuoiDeNeuf, Converter={StaticResource BoolVis}}" MaxWidth="540"
                                                 HorizontalAlignment="Left" Margin="0,14,0,0">
-                                        <TextBlock Text="{Binding LabelQuoiDeNeuf}" Style="{StaticResource Discret}" Foreground="{StaticResource IrisCyanBrush}"/>
-                                        <ItemsControl ItemsSource="{Binding LignesQuoiDeNeuf}" Margin="0,4,0,0">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding}" Style="{StaticResource Corps}" Margin="0,3,0,0" TextWrapping="Wrap"/>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                        <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelQuoiDeNeufVu}" HorizontalAlignment="Left"
-                                                Command="{Binding MarquerQuoiDeNeufVuCommand}" Margin="0,8,0,0"/>
+                                        <ToggleButton x:Name="DepliantQuoiDeNeuf" Style="{StaticResource Depliant}" Content="{Binding LabelQuoiDeNeuf}"/>
+                                        <StackPanel Visibility="{Binding IsChecked, ElementName=DepliantQuoiDeNeuf, Converter={StaticResource BoolVis}}">
+                                            <ItemsControl ItemsSource="{Binding LignesQuoiDeNeuf}" Margin="0,4,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" Style="{StaticResource Corps}" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelQuoiDeNeufVu}" HorizontalAlignment="Left"
+                                                    Command="{Binding MarquerQuoiDeNeufVuCommand}" Margin="0,8,0,0"/>
+                                        </StackPanel>
                                     </StackPanel>
-                                    <!-- Le reste se replie : ce que DrDXT pose lui-même, l'essai en alternance, ce que tu joues. -->
-                                    <ToggleButton x:Name="PlusDOptions" Style="{StaticResource Depliant}" Content="{Binding LabelPlusDOptions}" Margin="0,18,0,0"/>
-                                    <StackPanel Visibility="{Binding IsChecked, ElementName=PlusDOptions, Converter={StaticResource BoolVis}}" MaxWidth="540"
-                                                HorizontalAlignment="Left" Margin="0,8,0,0">
                                         <!-- La légende du registre passe en info-bulle de sa ligne : une ligne de moins, rien de perdu. -->
                                         <TextBlock Text="{Binding RegisterText}" Style="{StaticResource Discret}" TextWrapping="Wrap"
                                                    Typography.NumeralAlignment="Tabular" ToolTip="{Binding LabelRegisterCaption}"/>
                                         <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelEssaiBouton}" HorizontalAlignment="Left"
-                                                Command="{Binding EssayerEnAlternanceCommand}" Margin="0,12,0,4"
+                                                Command="{Binding EssayerEnAlternanceCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Margin="0,12,0,4"
                                                 Visibility="{Binding EssaiProposable, Converter={StaticResource BoolVis}}"/>
                                         <!-- Chaque bouton dit ce qu'il fait en une ligne. -->
                                         <TextBlock Text="{Binding LabelEssaiExplication}" Style="{StaticResource Legende}" TextWrapping="Wrap"
                                                    Visibility="{Binding EssaiProposable, Converter={StaticResource BoolVis}}"/>
+                                        <!-- Ce que le clic a donné se lit sous le bouton, pas seulement dans « Tes dernières parties ». -->
+                                        <TextBlock Text="{Binding LigneEssai}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                                   Visibility="{Binding LigneEssai, Converter={StaticResource StrVis}}"/>
                                         <!-- Pourquoi le réglage de la carte est ouvert ou fermé chez ce joueur : une explication, pas une étape. -->
                                         <StackPanel Visibility="{Binding PhraseReglageCarte, Converter={StaticResource StrVis}}" Margin="0,12,0,0">
                                             <ToggleButton x:Name="PourquoiCarte" Style="{StaticResource Depliant}" Content="{Binding LabelReglageCartePourquoi}"/>
@@ -726,8 +763,8 @@
                                                         Visibility="{Binding DataContext.ADomaine, ElementName=Carte, Converter={StaticResource BoolVis}}">
                                                     <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource ContenuEtat}"/>
                                                 </Border>
-                                                <TextBlock x:Name="Valeur" Grid.Row="3" Text="{Binding Composant.Value}" Style="{StaticResource Corps}" FontSize="13" LineHeight="18"
-                                                           TextAlignment="Center" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                                <!-- Le matériel du domaine (« Intel Core i7-14700F ») se lit sur sa page, pas sur l'orbite. -->
+                                                <TextBlock x:Name="Valeur" Grid.Row="3" Visibility="Collapsed"/>
                                                 <effets:AncrageArgente x:Name="Ancrage" Grid.Row="4" Width="124" Height="8" Margin="0,8,0,0"/>
                                             </Grid>
                                         </Button>
@@ -770,7 +807,7 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Grid.Style>
-                                    <effets:NoyauDeMaintien Width="244" Height="244" Command="{Binding ScanCommand}" IsEnabled="{Binding CanScan}"
+                                    <effets:NoyauDeMaintien Width="244" Height="244" Command="{Binding ScanCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" IsEnabled="{Binding CanScan}"
                                                             Occupe="{Binding IsScanning}"
                                                             AutomationProperties.Name="{Binding LabelScanButton}">
 <effets:NoyauDeMaintien.Template>
@@ -969,13 +1006,10 @@
                                                         <TextBlock Text="{Binding Composant}" Style="{StaticResource Discret}" Margin="0,6,0,0"
                                                                    Visibility="{Binding AUnComposant, Converter={StaticResource BoolVis}}"/>
                                                         <!-- La phrase qui dit quoi faire, avant les listes. -->
-                                                        <TextBlock Text="{Binding Verdict}" Style="{StaticResource Corps}" FontWeight="SemiBold"
+                                                        <TextBlock Text="{Binding VerdictAffiche}" Style="{StaticResource Corps}" FontWeight="SemiBold"
                                                                    TextWrapping="Wrap" MaxWidth="640" HorizontalAlignment="Left" Margin="0,12,0,0"
-                                                                   Visibility="{Binding Verdict, Converter={StaticResource StrVis}}"/>
+                                                                   Visibility="{Binding VerdictAffiche, Converter={StaticResource StrVis}}"/>
                                                     </StackPanel>
-                                                    <Border Style="{StaticResource PastilleEtat}" HorizontalAlignment="Right" VerticalAlignment="Top">
-                                                        <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource ContenuEtat}"/>
-                                                    </Border>
                                                 </Grid>
 
                                                 <TextBlock Text="{Binding DataContext.LabelCarteVide, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -1020,8 +1054,10 @@
 
                                                 <!-- Mesuré -->
                                                 <StackPanel Margin="0,24,0,0" Visibility="{Binding ADesMesures, Converter={StaticResource BoolVis}}">
-                                                    <TextBlock Text="{Binding DataContext.LabelCarteMesures, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                               Style="{StaticResource TitreSection}" FontSize="13"/>
+                                                    <!-- Les états lus pour information se replient : ouverts d'office, ils passaient avant les constats. -->
+                                                    <ToggleButton x:Name="DepliantMesures" Style="{StaticResource Depliant}"
+                                                                  Content="{Binding DataContext.LabelCarteMesures, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                                    <StackPanel Visibility="{Binding IsChecked, ElementName=DepliantMesures, Converter={StaticResource BoolVis}}">
                                                     <ItemsControl x:Name="ListeMesures" ItemsSource="{Binding MesuresVisibles}" Margin="0,10,0,0">
                                                         <ItemsControl.ItemTemplate>
                                                             <DataTemplate>
@@ -1052,21 +1088,6 @@
                                                                     <ToggleButton x:Name="PourquoiMesure" Style="{StaticResource BoutonPourquoi}" AutomationProperties.Name="{Binding DataContext.LabelPourquoi, RelativeSource={RelativeSource AncestorType=UserControl}}" Grid.Row="0" Grid.Column="2" Margin="10,1,0,0" VerticalAlignment="Top" Visibility="{Binding ASuite, Converter={StaticResource BoolVis}}"/>
                                                                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Suite}" Style="{StaticResource Discret}" Margin="0,4,0,0"
                                                                                Visibility="{Binding IsChecked, ElementName=PourquoiMesure, Converter={StaticResource BoolVis}}"/>
-                                                                    <Ellipse Width="5" Height="5" Fill="{StaticResource IrisCyanBrush}" VerticalAlignment="Top" Margin="0,8,0,0"
-                                                                             HorizontalAlignment="Left">
-                                                                        <Ellipse.Style>
-                                                                            <Style TargetType="Ellipse">
-                                                                                <Style.Triggers>
-                                                                                    <DataTrigger Binding="{Binding EstTitre}" Value="True">
-                                                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                                                    </DataTrigger>
-                                                                                    <DataTrigger Binding="{Binding EstEntete}" Value="True">
-                                                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                                                    </DataTrigger>
-                                                                                </Style.Triggers>
-                                                                            </Style>
-                                                                        </Ellipse.Style>
-                                                                    </Ellipse>
                                                                     <TextBlock Text="{Binding TexteCourt}" ToolTip="{Binding Explication}">
                                                                         <TextBlock.Style>
                                                                             <Style TargetType="TextBlock" BasedOn="{StaticResource Corps}">
@@ -1111,6 +1132,7 @@
                                                         <ItemsControl ItemsSource="{Binding MesuresRepliees}" ItemTemplate="{Binding ItemTemplate, ElementName=ListeMesures}"
                                                                       Margin="0,10,0,0" Visibility="{Binding IsChecked, ElementName=VoirMesures, Converter={StaticResource BoolVis}}"/>
                                                     </StackPanel>
+                                                    </StackPanel>
                                                 </StackPanel>
                                                 <!-- Détails techniques : l'information d'expert sans problème ni geste, repliée par défaut, comptée
                                                      dans son titre ; dépliée ou non, gardé d'un lancement à l'autre. -->
@@ -1127,8 +1149,8 @@
                                                 <StackPanel Margin="0,20,0,0" Visibility="{Binding ADesLignes, Converter={StaticResource BoolVis}}">
                                                     <TextBlock Text="{Binding DataContext.LabelCarteConstats, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                Style="{StaticResource TitreSection}" FontSize="13"/>
-                                                    <ItemsControl ItemsSource="{Binding LignesVisibles}" Margin="0,10,0,0"
-                                                                  ItemTemplate="{StaticResource LigneDeCarte}"/>
+                                                    <ItemsControl ItemsSource="{Binding GroupesVisibles}" Margin="0,10,0,0"
+                                                                  ItemTemplate="{StaticResource GroupeDeConstats}"/>
                                                     <!-- Au-delà de quatre constats, les trois plus graves d'abord, la suite se déplie. -->
                                                     <StackPanel Visibility="{Binding ADesLignesRepliees, Converter={StaticResource BoolVis}}" Margin="0,6,0,0">
                                                         <ToggleButton x:Name="VoirConstats" HorizontalAlignment="Left" Cursor="Hand"
@@ -1145,7 +1167,7 @@
                                                                 </ControlTemplate>
                                                             </ToggleButton.Template>
                                                         </ToggleButton>
-                                                        <ItemsControl ItemsSource="{Binding LignesRepliees}" ItemTemplate="{StaticResource LigneDeCarte}"
+                                                        <ItemsControl ItemsSource="{Binding GroupesReplies}" ItemTemplate="{StaticResource GroupeDeConstats}"
                                                                       Margin="0,10,0,0" Visibility="{Binding IsChecked, ElementName=VoirConstats, Converter={StaticResource BoolVis}}"/>
                                                     </StackPanel>
                                                 </StackPanel>
@@ -1175,7 +1197,7 @@
                                                             <ColumnDefinition Width="*"/>
                                                         </Grid.ColumnDefinitions>
                                                         <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeCorrection}" VerticalAlignment="Top"
-                                                                                Command="{Binding RendreLeReposALaCarteCommand}" Content="{Binding LabelCapsuleReposCarte}" Occupe="{Binding ReposCarteEnCours}"
+                                                                                Command="{Binding RendreLeReposALaCarteCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Content="{Binding LabelCapsuleReposCarte}" Occupe="{Binding ReposCarteEnCours}"
                                                                                 IsEnabled="{Binding ReposCarteAOuvrir}" AutomationProperties.Name="{Binding LabelReposCarteTitre}"/>
                                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding LabelReposCarteTitre}" Style="{StaticResource Corps}" FontWeight="SemiBold"/>
@@ -1230,7 +1252,7 @@
                                                                     IsEnabled="{Binding ExpertPeutPoser}" AutomationProperties.Name="{Binding LabelExpertDecalage}"/>
                                                             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                                                 <Button Content="{Binding LabelExpertAppliquer}" Command="{Binding PoserCarteExpertCommand}" Style="{StaticResource BoutonReflet}"
-                                                                        IsEnabled="{Binding ExpertPeutPoser}"/>
+                                                                        IsEnabled="{Binding ExpertPeutPoser}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True"/>
                                                             </StackPanel>
                                                             <!-- Le ventilateur NVIDIA, vers le haut seulement ; même accord, même « Rendre ». -->
                                                             <StackPanel Visibility="{Binding ExpertVentilateurVisible, Converter={StaticResource BoolVis}}">
@@ -1239,7 +1261,7 @@
                                                                         TickFrequency="5" IsSnapToTickEnabled="True" SmallChange="5" LargeChange="10" Margin="0,6,0,0"
                                                                         IsEnabled="{Binding ExpertPeutPoser}" AutomationProperties.Name="{Binding LabelExpertVentilateur}"/>
                                                                 <Button Content="{Binding LabelExpertVentilateurAppliquer}" Command="{Binding PoserVentilateurExpertCommand}" Style="{StaticResource BoutonReflet}"
-                                                                        IsEnabled="{Binding ExpertPeutPoser}" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+                                                                        IsEnabled="{Binding ExpertPeutPoser}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" HorizontalAlignment="Left" Margin="0,12,0,0"/>
                                                             </StackPanel>
                                                             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                                                 <Button Content="{Binding LabelExpertRendre}" Command="{Binding RendreCarteExpertCommand}" Style="{StaticResource BoutonReflet}"
@@ -1277,7 +1299,7 @@
                                                             <ColumnDefinition Width="*"/>
                                                         </Grid.ColumnDefinitions>
                                                         <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeMesure}" DureeMaintien="0:0:0.35" VerticalAlignment="Top"
-                                                                                Command="{Binding RemesurerProcesseurCommand}" Content="{Binding LabelCapsuleRemesureCpu}" Occupe="{Binding RemesureCpuEnCours}"
+                                                                                Command="{Binding RemesurerProcesseurCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Content="{Binding LabelCapsuleRemesureCpu}" Occupe="{Binding RemesureCpuEnCours}"
                                                                                 AutomationProperties.Name="{Binding LabelRemesureCpuTitre}"/>
                                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding LabelRemesureCpuTitre}" Style="{StaticResource Corps}" FontWeight="SemiBold"/>
@@ -1376,7 +1398,7 @@
                                                         </Grid.ColumnDefinitions>
                                                         <!-- L'avancement du test (cinq minutes) passe de l'anneau à une barre sous la capsule. -->
                                                         <StackPanel MinWidth="190" VerticalAlignment="Top">
-                                                            <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeMesure}" DureeMaintien="0:0:0.35" Command="{Binding LancerTestRefroidissementCommand}" Content="{Binding LabelCapsuleTestRefroidissement}"
+                                                            <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeMesure}" DureeMaintien="0:0:0.35" Command="{Binding LancerTestRefroidissementCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Content="{Binding LabelCapsuleTestRefroidissement}"
                                                                                     Occupe="{Binding TestRefroidissementEnCours}"
                                                                                     AutomationProperties.Name="{Binding LabelTestRefroidissementTitre}"/>
                                                             <ProgressBar Height="3" Margin="8,8,8,0" Minimum="0" Maximum="1" Value="{Binding ProgressionTestRefroidissement, Mode=OneWay}"
@@ -1449,7 +1471,7 @@
                                                                 </Border>
                                                                 <TextBlock Text="{Binding ResultatTestRefroidissement}" Style="{StaticResource Corps}" Margin="0,8,0,0" TextWrapping="Wrap"/>
                                                                 <Button Content="{Binding LabelTestRefroidissementRelancer}" Style="{StaticResource Lien}" Margin="0,8,0,0"
-                                                                        HorizontalAlignment="Left" Command="{Binding LancerTestRefroidissementCommand}"/>
+                                                                        HorizontalAlignment="Left" Command="{Binding LancerTestRefroidissementCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True"/>
                                                             </StackPanel>
                                                         </StackPanel>
                                                     </Grid>
@@ -1484,7 +1506,7 @@
                                                         </Grid.ColumnDefinitions>
                                                         <!-- L'avancement du test (cinq minutes) passe de l'anneau à une barre sous la capsule. -->
                                                         <StackPanel MinWidth="190" VerticalAlignment="Top">
-                                                            <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeMesure}" DureeMaintien="0:0:0.35" Command="{Binding LancerRechercheSousTensionCommand}" Content="{Binding LabelCapsuleSousTension}"
+                                                            <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeMesure}" DureeMaintien="0:0:0.35" Command="{Binding LancerRechercheSousTensionCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Content="{Binding LabelCapsuleSousTension}"
                                                                                     Occupe="{Binding RechercheSousTensionEnCours}"
                                                                                     AutomationProperties.Name="{Binding LabelSousTensionTitre}"/>
                                                         </StackPanel>
@@ -1534,7 +1556,7 @@
                                                                 </Border>
                                                                 <TextBlock Text="{Binding ResultatSousTension}" Style="{StaticResource Corps}" Margin="0,8,0,0" TextWrapping="Wrap"/>
                                                                 <Button Content="{Binding LabelSousTensionRelancer}" Style="{StaticResource Lien}" Margin="0,8,0,0"
-                                                                        HorizontalAlignment="Left" Command="{Binding LancerRechercheSousTensionCommand}"/>
+                                                                        HorizontalAlignment="Left" Command="{Binding LancerRechercheSousTensionCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True"/>
                                                             </StackPanel>
                                                         </StackPanel>
                                                     </Grid>
@@ -1564,7 +1586,7 @@
                                                         </Grid.ColumnDefinitions>
                                                         <!-- L'avancement du test (cinq minutes) passe de l'anneau à une barre sous la capsule. -->
                                                         <StackPanel MinWidth="190" VerticalAlignment="Top">
-                                                            <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeMesure}" DureeMaintien="0:0:0.35" Command="{Binding LancerTestMemoireCommand}" Content="{Binding LabelCapsuleTestMemoire}"
+                                                            <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeMesure}" DureeMaintien="0:0:0.35" Command="{Binding LancerTestMemoireCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Content="{Binding LabelCapsuleTestMemoire}"
                                                                                     Occupe="{Binding TestMemoireEnCours}"
                                                                                     AutomationProperties.Name="{Binding LabelTestMemoireTitre}"/>
                                                             <ProgressBar Height="3" Margin="8,8,8,0" Minimum="0" Maximum="1" Value="{Binding ProgressionTestMemoire, Mode=OneWay}"
@@ -1637,7 +1659,7 @@
                                                                 </Border>
                                                                 <TextBlock Text="{Binding ResultatTestMemoire}" Style="{StaticResource Corps}" Margin="0,8,0,0" TextWrapping="Wrap"/>
                                                                 <Button Content="{Binding LabelTestMemoireRelancer}" Style="{StaticResource Lien}" Margin="0,8,0,0"
-                                                                        HorizontalAlignment="Left" Command="{Binding LancerTestMemoireCommand}"/>
+                                                                        HorizontalAlignment="Left" Command="{Binding LancerTestMemoireCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True"/>
                                                             </StackPanel>
                                                         </StackPanel>
                                                     </Grid>
@@ -1669,7 +1691,7 @@
                                                             <ColumnDefinition Width="*"/>
                                                         </Grid.ColumnDefinitions>
                                                         <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeMesure}" DureeMaintien="0:0:0.35" VerticalAlignment="Top"
-                                                                                Command="{Binding RemesurerMemoireCommand}" Content="{Binding LabelCapsuleRemesureMemoire}" Occupe="{Binding RemesureMemoireEnCours}"
+                                                                                Command="{Binding RemesurerMemoireCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Content="{Binding LabelCapsuleRemesureMemoire}" Occupe="{Binding RemesureMemoireEnCours}"
                                                                                 AutomationProperties.Name="{Binding LabelRemesureMemoireTitre}"/>
                                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                                             <TextBlock Text="{Binding LabelRemesureMemoireTitre}" Style="{StaticResource Corps}" FontWeight="SemiBold"/>
@@ -1729,7 +1751,7 @@
                                                             <ColumnDefinition Width="*"/>
                                                         </Grid.ColumnDefinitions>
                                                         <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeMesure}" MinWidth="190" VerticalAlignment="Top" DureeMaintien="0:0:0.35"
-                                                                                Command="{Binding MesurerCadenceCommand}" Content="{Binding LabelCapsuleCadence}"
+                                                                                Command="{Binding MesurerCadenceCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Content="{Binding LabelCapsuleCadence}"
                                                                                 Occupe="{Binding CadenceEnCours}"
                                                                                 AutomationProperties.Name="{Binding LabelCadenceTitre}"/>
                                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
@@ -1833,7 +1855,7 @@
                                                             </Grid.ColumnDefinitions>
                                                             <StackPanel VerticalAlignment="Top">
                                                                 <Button Content="{Binding LabelTestLigne}" Style="{StaticResource BoutonReflet}"
-                                                                        Command="{Binding TesterLigneCommand}"/>
+                                                                        Command="{Binding TesterLigneCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True"/>
                                                                 <Button Content="{Binding LabelTestLigneArreter}" Style="{StaticResource Lien}" Margin="0,8,0,0"
                                                                         Command="{Binding ArreterTestLigneCommand}"
                                                                         Visibility="{Binding TestLigneEnCours, Converter={StaticResource BoolVis}}"/>
@@ -1875,7 +1897,7 @@
                                                             <ColumnDefinition Width="*"/>
                                                         </Grid.ColumnDefinitions>
                                                         <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeCorrection}" VerticalAlignment="Top"
-                                                                                Command="{Binding RendreBcdCommand}" Content="{Binding LabelCapsuleBcd}" Occupe="{Binding BcdEnCours}"
+                                                                                Command="{Binding RendreBcdCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Content="{Binding LabelCapsuleBcd}" Occupe="{Binding BcdEnCours}"
                                                                                 IsEnabled="{Binding BcdARendre}"
                                                                                 AutomationProperties.Name="{Binding LabelBcdTitre}"/>
                                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
@@ -1906,7 +1928,7 @@
                                                             <ColumnDefinition Width="*"/>
                                                         </Grid.ColumnDefinitions>
                                                         <effets:NoyauDeMaintien Style="{StaticResource CapsuleDeCorrection}" VerticalAlignment="Top"
-                                                                                Command="{Binding LancerReparationCommand}" Content="{Binding LabelCapsuleReparation}"
+                                                                                Command="{Binding LancerReparationCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Content="{Binding LabelCapsuleReparation}"
                                                                                 IsEnabled="{Binding ReparationAOuvrir}"
                                                                                 AutomationProperties.Name="{Binding LabelReparationTitre}"/>
                                                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
@@ -2109,7 +2131,7 @@
                             <TextBlock Text="{Binding LigneEssai}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,10,0,0"
                                        Visibility="{Binding LigneEssai, Converter={StaticResource StrVis}}"/>
                             <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelEssaiReprendre}" HorizontalAlignment="Left"
-                                    Command="{Binding ReprendreEssaiCommand}" Margin="0,8,0,0"
+                                    Command="{Binding ReprendreEssaiCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Margin="0,8,0,0"
                                     Visibility="{Binding EssaiEnAttente, Converter={StaticResource BoolVis}}"/>
                             <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelEssaiArreter}" HorizontalAlignment="Left"
                                     Command="{Binding ArreterEssaiCommand}" Margin="0,8,0,0"
@@ -2117,7 +2139,7 @@
                             <!-- Prêt à jouer, en quelques secondes. Après le scan, il est sous Optimiser : ici seulement avant. -->
                             <StackPanel Visibility="{Binding State, Converter={StaticResource StateVis}, ConverterParameter='Idle,Scanning'}">
                             <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelPretAJouer}" HorizontalAlignment="Left"
-                                    Command="{Binding VerifierPretAJouerCommand}" Margin="0,10,0,0"/>
+                                    Command="{Binding VerifierPretAJouerCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Margin="0,10,0,0"/>
                             <ItemsControl ItemsSource="{Binding LignesPretAJouer}" Margin="0,8,0,0">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -2201,7 +2223,8 @@
                                             <Button Grid.Column="1" Style="{StaticResource Lien}" Margin="14,0,0,0"
                                                     Content="{Binding DataContext.LabelLeviersAnnuler, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                     Command="{Binding DataContext.AnnulerLevierCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                    CommandParameter="{Binding Id}" AutomationProperties.Name="{Binding NomAccessible}"/>
+                                                    CommandParameter="{Binding Id}" AutomationProperties.Name="{Binding NomAccessible}"
+                                                    ToolTip="{Binding DataContext.InfoEcritureEnCours, RelativeSource={RelativeSource AncestorType=ItemsControl}}" ToolTipService.ShowOnDisabled="True"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -2224,8 +2247,8 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <!-- La frise en liste à points : vert partie, rouge arrêt ou erreur, violet
-                                 changement ; l'heure, ce qui s'est passé, et sous lui les FPS d'une partie.
+                            <!-- La frise : l'heure, ce qui s'est passé, et sous lui les FPS d'une partie. Sans point de couleur : le
+                                 texte de la ligne dit déjà ce qu'elle est.
                                  Bornée en largeur pour se lire d'un coup d'œil. Les FPS, en police fixe, n'ont pas de colonne à
                                  eux : à droite, ils prenaient toute la largeur et le nom du jeu se repliait lettre par lettre. -->
                             <ItemsControl ItemsSource="{Binding FriseHistorique}" Margin="0,8,0,0" Grid.IsSharedSizeScope="True" MaxWidth="720" HorizontalAlignment="Left">
@@ -2237,9 +2260,8 @@
                                                 <ColumnDefinition Width="Auto" SharedSizeGroup="HeureFrise"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <Ellipse x:Name="Point" Width="8" Height="8" VerticalAlignment="Top" Margin="0,6,0,0" Fill="{StaticResource EtatNonLuBrush}"/>
                                             <TextBlock Grid.Column="1" Text="{Binding Quand.LocalDateTime, StringFormat='dd/MM HH:mm'}" Style="{StaticResource Discret}"
-                                                       FontFamily="{StaticResource MonoFont}" FontSize="12" Margin="12,0,14,0" VerticalAlignment="Top" LineHeight="20" LineStackingStrategy="BlockLineHeight"/>
+                                                       FontFamily="{StaticResource MonoFont}" FontSize="12" Margin="0,0,14,0" VerticalAlignment="Top" LineHeight="20" LineStackingStrategy="BlockLineHeight"/>
                                             <StackPanel Grid.Column="2">
                                                 <TextBlock Text="{Binding Texte}" Style="{StaticResource Corps}" TextWrapping="Wrap" LineHeight="20" LineStackingStrategy="BlockLineHeight"
                                                            Visibility="{Binding Texte, Converter={StaticResource StrVis}}"/>
@@ -2247,12 +2269,6 @@
                                                            LineHeight="20" LineStackingStrategy="BlockLineHeight" Visibility="{Binding Detail, Converter={StaticResource StrVis}}"/>
                                             </StackPanel>
                                         </Grid>
-                                        <DataTemplate.Triggers>
-                                            <DataTrigger Binding="{Binding Genre}" Value="Partie"><Setter TargetName="Point" Property="Fill" Value="{StaticResource EtatRienBrush}"/></DataTrigger>
-                                            <DataTrigger Binding="{Binding Genre}" Value="ArretBrutal"><Setter TargetName="Point" Property="Fill" Value="{StaticResource EtatCorrigerBrush}"/></DataTrigger>
-                                            <DataTrigger Binding="{Binding Genre}" Value="ErreurMaterielle"><Setter TargetName="Point" Property="Fill" Value="{StaticResource EtatCorrigerBrush}"/></DataTrigger>
-                                            <DataTrigger Binding="{Binding Genre}" Value="Changement"><Setter TargetName="Point" Property="Fill" Value="#FFA98BFF"/></DataTrigger>
-                                        </DataTemplate.Triggers>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -2559,7 +2575,7 @@
                                 <!-- Vérifier DrDXT sur ce PC, chaque réglage posé, relu, remis d'origine, relu. -->
                                 <StackPanel Visibility="{Binding CanVerifierMachine, Converter={StaticResource BoolVis}}">
                                     <Button Style="{StaticResource BoutonReflet}" HorizontalAlignment="Left" Margin="0,12,0,0"
-                                            Command="{Binding DemanderVerificationCommand}" AutomationProperties.Name="{Binding LabelVerifierMachine}">
+                                            Command="{Binding DemanderVerificationCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="{Binding LabelVerifierMachine}">
                                         <StackPanel Orientation="Horizontal">
                                             <Path Style="{StaticResource GlyphIcon}" Data="{Binding Source=Report, Converter={StaticResource Icon}}"
                                                   Stroke="{StaticResource TexteBrush}" Width="15" Height="15" VerticalAlignment="Center"/>
@@ -2569,7 +2585,7 @@
                                     <StackPanel Margin="0,12,0,0" Visibility="{Binding VerificationAConfirmer, Converter={StaticResource BoolVis}}">
                                         <TextBlock Text="{Binding LabelVerifierConsentement}" Style="{StaticResource Corps}" FontSize="13" LineHeight="19" TextWrapping="Wrap"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                            <Button Style="{StaticResource BoutonReflet}" Command="{Binding ConfirmerVerificationCommand}">
+                                            <Button Style="{StaticResource BoutonReflet}" Command="{Binding ConfirmerVerificationCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True">
                                                 <TextBlock Text="{Binding LabelVerifierConfirmer}"/>
                                             </Button>
                                             <Button Style="{StaticResource BoutonReflet}" Margin="10,0,0,0" Command="{Binding AnnulerVerificationCommand}">

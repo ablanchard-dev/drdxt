@@ -16,7 +16,14 @@ public sealed class FichierJsonAtomiqueTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_dossier, recursive: true); } catch { /* nettoyage au mieux */ }
+        try
+        {
+            // Une jonction se retire seule d'abord : la suppression récursive refuse de la traverser.
+            foreach (var d in Directory.GetDirectories(_dossier).Where(d => new DirectoryInfo(d).Attributes.HasFlag(FileAttributes.ReparsePoint)))
+                Directory.Delete(d);
+            Directory.Delete(_dossier, recursive: true);
+        }
+        catch { /* nettoyage au mieux */ }
     }
 
     [Fact]
@@ -43,6 +50,29 @@ public sealed class FichierJsonAtomiqueTests : IDisposable
         File.Exists(chemin + ".tmp").Should().BeFalse();
     }
 
+    // Le contenu sur le disque ne suffit pas : un renommage resté en cache pouvait, après une coupure, rendre le fichier
+    // d'avant, sans l'entrée que le journal d'écriture anticipée venait de noter. Le renommage est lui aussi écrit à travers.
+    [Fact]
+    public void Le_renommage_remplace_la_cible_et_part_sur_le_disque()
+    {
+        Directory.CreateDirectory(_dossier);
+        var cible = Path.Combine(_dossier, "journal.json");
+        File.WriteAllText(cible, "avant");
+        var tmp = FichierJsonAtomique.NomTemporaire(cible);
+        File.WriteAllText(tmp, "apres");
+
+        FichierJsonAtomique.Remplacer(tmp, cible);
+
+        File.ReadAllText(cible).Should().Be("apres");
+        File.Exists(tmp).Should().BeFalse();
+
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
+        var source = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.Core", "Storage", "FichierJsonAtomique.cs"));
+        source.Should().Contain("MoveFileExW(tmp, cible, RemplacerExistant | EcritureATravers)")
+            .And.Contain("EcritureATravers = 0x8", "MOVEFILE_WRITE_THROUGH");
+    }
+
     // Sans vidage, après une coupure, le renommage peut avoir pris et le contenu non : la cible est illisible, et ce sont
     // des journaux d'annulation. Le temporaire est écrit en WriteThrough et vidé sur le disque avant le renommage.
     [Fact]
@@ -56,7 +86,7 @@ public sealed class FichierJsonAtomiqueTests : IDisposable
 
         ecrire.Should().Contain("FileOptions.WriteThrough").And.Contain("Flush(flushToDisk: true)");
         ecrire.IndexOf("Flush(flushToDisk: true)", StringComparison.Ordinal)
-            .Should().BeLessThan(ecrire.IndexOf("File.Move(", StringComparison.Ordinal));
+            .Should().BeLessThan(ecrire.IndexOf("Remplacer(tmp", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -154,5 +184,133 @@ public sealed class FichierJsonAtomiqueTests : IDisposable
         FichierJsonAtomique.AjouterSansLien(journal, "b", ErrorCodes.IoFailure).IsOk.Should().BeTrue();
 
         File.ReadAllText(journal).Should().Be("ab");
+    }
+
+    // Élevé, un dossier du compte peut être une jonction posée par le compte vers une racine protégée : le processus
+    // administrateur y écrirait. Aucune écriture élevée ne traverse un point d'analyse ; sans élévation, rien ne change.
+    private (string Lien, string Cible) Jonction()
+    {
+        var cible = Path.Combine(_dossier, "protege");
+        var lien = Path.Combine(_dossier, "DrDXT");
+        Directory.CreateDirectory(cible);
+        using var mklink = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+            Path.Combine(Environment.SystemDirectory, "cmd.exe"), $"/c mklink /J \"{lien}\" \"{cible}\"")
+        { CreateNoWindow = true, UseShellExecute = false })!;
+        mklink.WaitForExit();
+        new DirectoryInfo(lien).Attributes.HasFlag(FileAttributes.ReparsePoint).Should().BeTrue("témoin : la jonction existe");
+        return (lien, cible);
+    }
+
+    [Fact]
+    public void Eleve_rien_ne_s_ecrit_a_travers_une_jonction()
+    {
+        var (lien, cible) = Jonction();
+        var chemin = Path.Combine(lien, "coupures-demarrage.json");
+
+        FichierJsonAtomique.PointDAnalyseSurLeChemin(chemin).Should().Be(lien);
+        new FichierJsonAtomique(chemin, ErrorCodes.IoFailure, eleve: () => true).WriteAtomic("[]").IsOk.Should().BeFalse();
+        FichierJsonAtomique.AjouterSansLien(chemin, "x", ErrorCodes.IoFailure, eleve: () => true).IsOk.Should().BeFalse();
+        Directory.GetFiles(cible).Should().BeEmpty("rien n'est posé dans la cible");
+
+        File.WriteAllText(Path.Combine(cible, "coupures-demarrage.json"), "[]");
+        new FichierJsonAtomique(chemin, ErrorCodes.IoFailure, eleve: () => true).MettreDeCote().Should().BeFalse();
+        Directory.GetFiles(cible).Should().ContainSingle("le fichier de la cible n'est pas renommé");
+    }
+
+    [Fact]
+    public void Sans_elevation_une_jonction_du_compte_reste_suivie()
+    {
+        var (lien, cible) = Jonction();
+
+        new FichierJsonAtomique(Path.Combine(lien, "f.json"), ErrorCodes.IoFailure, eleve: () => false).WriteAtomic("[1]").IsOk.Should().BeTrue();
+
+        File.ReadAllText(Path.Combine(cible, "f.json")).Should().Be("[1]");
+    }
+
+    [Fact]
+    public void Eleve_un_chemin_sans_point_d_analyse_s_ecrit()
+    {
+        var chemin = Path.Combine(_dossier, "sous", "f.json");
+
+        FichierJsonAtomique.PointDAnalyseSurLeChemin(chemin).Should().BeNull();
+        new FichierJsonAtomique(chemin, ErrorCodes.IoFailure, eleve: () => true).WriteAtomic("[1]").IsOk.Should().BeTrue();
+    }
+
+    private sealed record Entree(string Nom);
+
+    // Pour un écrivain qui lit puis réécrit une liste : une lecture ratée est un échec, jamais une liste vide qu'il écraserait ;
+    // absent ou vide, la liste est vide ; illisible ou de la mauvaise forme, elle est mise de côté avant.
+    [Fact]
+    public void La_liste_a_reecrire_distingue_lecture_ratee_absence_et_liste_illisible()
+    {
+        Directory.CreateDirectory(_dossier);
+        var chemin = Path.Combine(_dossier, "l.json");
+        var f = new FichierJsonAtomique(chemin, ErrorCodes.IoFailure);
+
+        f.LireListePourReecrire<Entree>().Value.Should().BeEmpty("absent : une liste vide, légitime");
+
+        File.WriteAllText(chemin, "[{\"Nom\":\"a\"}]");
+        using (new FileStream(chemin, FileMode.Open, FileAccess.Read, FileShare.None))
+            f.LireListePourReecrire<Entree>().IsOk.Should().BeFalse("ne se lit pas : un échec, pas une liste vide");
+        f.LireListePourReecrire<Entree>().Value.Should().Equal(new Entree("a"));
+
+        File.WriteAllText(chemin, "[1,2]");
+        f.LireListePourReecrire<Entree>().Value.Should().BeEmpty();
+        Directory.GetFiles(_dossier, "l.json.mis-de-cote-*").Should().ContainSingle("de la mauvaise forme : mise de côté, pas écrasée");
+    }
+
+    // Un autre processus lit le fichier à l'instant du remplacement (l'App et le relevé de fond lisent les mêmes journaux) :
+    // le renommage par-dessus une cible ouverte est refusé. L'écriture était perdue ; elle reprend une fois la lecture finie.
+    [Fact]
+    public async Task Un_lecteur_qui_tient_la_cible_ne_fait_pas_perdre_l_ecriture()
+    {
+        Directory.CreateDirectory(_dossier);
+        var chemin = Path.Combine(_dossier, "journal.json");
+        File.WriteAllText(chemin, "[]");
+        var fichier = new FichierJsonAtomique(chemin, "TEST");
+
+        Result ecrit;
+        using (var lecteur = new FileStream(chemin, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        {
+            var ecriture = Task.Run(() => fichier.WriteAtomic("[1]"));
+            await Task.Delay(100);
+            lecteur.Dispose();
+            ecrit = await ecriture;
+        }
+
+        ecrit.IsOk.Should().BeTrue();
+        File.ReadAllText(chemin).Should().Be("[1]");
+    }
+
+    // Un journal qui ne fait qu'allonger (crash.log, une panne d'interface après l'autre) garde au-delà de son plafond la
+    // moitié la plus récente, coupée à une ligne.
+    [Fact]
+    public void Un_journal_borne_garde_sa_fin_la_plus_recente()
+    {
+        Directory.CreateDirectory(_dossier);
+        var chemin = Path.Combine(_dossier, "crash.log");
+        var lignes = Enumerable.Range(0, 5000).Select(i => $"ligne {i:D5} " + new string('x', 40)).ToList();
+        FichierJsonAtomique.AjouterSansLien(chemin, string.Join("\n", lignes) + "\n", "T").IsOk.Should().BeTrue();
+
+        FichierJsonAtomique.BornerSansLien(chemin, 64 * 1024, "T").IsOk.Should().BeTrue();
+
+        var reste = FichierJsonAtomique.LireSansLien(chemin, "T").Value!;
+        new FileInfo(chemin).Length.Should().BeLessThanOrEqualTo(64 * 1024);
+        reste.Should().EndWith(lignes[^1] + "\n").And.StartWith("ligne ");
+        reste.Length.Should().BeGreaterThan(16 * 1024, "témoin : la fin est gardée, pas effacée");
+    }
+
+    [Fact]
+    public void Un_journal_sous_son_plafond_n_est_pas_touche()
+    {
+        Directory.CreateDirectory(_dossier);
+        var chemin = Path.Combine(_dossier, "crash.log");
+        FichierJsonAtomique.AjouterSansLien(chemin, "court\n", "T");
+        var avant = File.GetLastWriteTimeUtc(chemin);
+
+        FichierJsonAtomique.BornerSansLien(chemin, 64 * 1024, "T").IsOk.Should().BeTrue();
+
+        File.GetLastWriteTimeUtc(chemin).Should().Be(avant);
+        File.ReadAllText(chemin).Should().Be("court\n");
     }
 }

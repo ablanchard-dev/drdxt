@@ -24,7 +24,7 @@ namespace DrDxt.Detection.Settings;
 internal static class CoreParkingSampling
 {
     /// <summary>Nombre de photos prises, et l'attente entre deux. **Choix produit** : trois
-    /// lectures sur environ une seconde et demie suffisent a attraper un coeur qui alterne, et
+    /// lectures sur environ une seconde (deux pauses de 500 ms) suffisent a attraper un coeur qui alterne, et
     /// c'est negligeable devant les vingt secondes de mesure que le scan paie deja.</summary>
     public const int Echantillons = 3;
     public const int PauseMs = 500;

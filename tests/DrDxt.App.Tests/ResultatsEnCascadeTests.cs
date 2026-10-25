@@ -4,11 +4,11 @@ using FluentAssertions;
 
 namespace DrDxt.App.Tests;
 
-// À la fin du scan, verdict, liste, aperçu, Optimiser et domaines
-// apparaissaient d'un bloc. Ils entrent maintenant dans l'ordre de lecture, chacun après le précédent.
+// À la fin du scan, verdict, aperçu, Optimiser, liste et domaines apparaissaient d'un bloc. Ils entrent dans l'ordre de
+// lecture, chacun après le précédent. Optimiser vient avant la liste des défauts : c'est l'appel principal de l'écran.
 public sealed class ResultatsEnCascadeTests
 {
-    private static readonly string[] OrdreDeLecture = ["ListeAFaire", "ApercuOptimiser", "BoutonOptimiser", "CarteMachine"];
+    private static readonly string[] OrdreDeLecture = ["ApercuOptimiser", "BoutonOptimiser", "ListeAFaire", "CarteMachine"];
 
     [Fact]
     public void Les_resultats_entrent_dans_l_ordre_de_lecture()
@@ -24,7 +24,7 @@ public sealed class ResultatsEnCascadeTests
         }).ToList();
 
         retards.Should().BeInAscendingOrder().And.OnlyHaveUniqueItems();
-        retards[0].Should().BePositive("le verdict entre d'abord, la liste après lui");
+        retards[0].Should().BePositive("le verdict entre d'abord, Optimiser après lui");
     }
 
     private static string Racine()

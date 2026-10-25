@@ -231,6 +231,38 @@ public sealed class TrustedManifestRootTests
         }
     }
 
+    // Le manifeste et le journal d'écriture anticipée passent par ici : un lecteur (l'App, le service) qui tient la cible au
+    // moment du remplacement ne fait pas échouer l'écriture, elle reprend.
+    [Fact]
+    public async Task WriteTrustedFile_reprend_quand_un_lecteur_tient_la_cible()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        var dir = Path.Combine(Path.GetTempPath(), "DrDxtWriteTrustLecteur_" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(dir, "desired-state.manifest");
+        try
+        {
+            if (!TrustedManifestRoot.WriteTrustedFile(path, [1]).IsOk) return; // non élevé : couvert par le test précédent
+
+            Result ecrit;
+            using (var lecteur = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+                var ecriture = Task.Run(() => TrustedManifestRoot.WriteTrustedFile(path, [2]));
+                await Task.Delay(100);
+                lecteur.Dispose();
+                ecrit = await ecriture;
+            }
+
+            ecrit.IsOk.Should().BeTrue();
+            File.ReadAllBytes(path).Should().Equal(2);
+        }
+        finally
+        {
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); } catch { }
+        }
+    }
+
     // ── Une racine point de reparse (jonction/lien symbolique) est rejetée avant la confiance. L'OS
     // la suivrait vers un stockage contrôlé par l'attaquant, donc le descripteur lu serait celui de la
     // cible, pas de la racine. Créer un lien symbolique demande SeCreateSymbolicLinkPrivilege ou le mode

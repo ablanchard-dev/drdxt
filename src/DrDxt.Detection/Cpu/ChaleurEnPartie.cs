@@ -11,7 +11,7 @@ namespace DrDxt.Detection.Cpu;
 /// Le docteur relie donc les deux : la chaleur relevée en partie et la limite de puissance lue, et propose le plafond
 /// qui garde le jeu tel quel (la médiane, plus une marge) en coupant les pics. Lecture seule du relevé des parties.
 ///
-/// Le chiffre est celui du cœur le plus chaud (le
+/// La chaleur relevée est celle du cœur le plus chaud (sur cette machine, le
 /// cœur 0 était 15 °C plus bas), et ce qui freinait était la limite de courant, pas la chaleur. Quand la partie porte son
 /// freinage (<see cref="FreinageCpu"/>), le docteur juge sur le temps passé freiné et sur sa raison, plus sur le pic seul.
 /// </summary>
@@ -22,6 +22,10 @@ public static class ChaleurEnPartie
     public const string FichierBios = "bios-lu.json";
     /// <summary>Le seuil d'Intel : 100 °C = freinage ; 95 laisse voir les pics que six captures par partie ratent.</summary>
     public const double SeuilC = 95;
+
+    /// <summary>Le TjMax d'Intel : là, le processeur se freine, et c'est prouvé. Entre <see cref="SeuilC"/> et lui, c'est à
+    /// regarder.</summary>
+    public const double TjMaxIntelC = 100;
     public const int FenetreJours = 14;
     public const int PartiesMaximum = 5;
 
@@ -89,7 +93,7 @@ public static class ChaleurEnPartie
         return Docteur.T("CH.CourantGenerique");
     }
 
-    /// <summary>Pur : le plafond de puissance qui garde la partie telle quelle : la médiane plus un tiers, arrondie à la
+    /// <summary>Pur : le plafond de puissance qui garde la partie telle quelle : la médiane plus 35 %, arrondie à la
     /// dizaine, jamais sous 125 W (le profil de base d'Intel pour les K).</summary>
     public static int Plafond(double wattsMedian) => Math.Max(125, (int)Math.Ceiling(wattsMedian * 1.35 / 10) * 10);
 
@@ -118,8 +122,10 @@ public static class ChaleurEnPartie
     /// <param name="intel">Le seuil de 95 °C et « à 100 °C il se freine » sont ceux d'Intel. Hors
     /// Intel (un Ryzen 7000 vit à 95 °C par conception, un 5800X3D se freine vers 90 °C), sans secondes de freinage relevées,
     /// la température seule ne juge rien.</param>
+    /// <param name="portable">Sur un portable, les limites de puissance et de courant sont celles du fabricant (batterie,
+    /// chauffe) : elles se regardent, elles ne se corrigent pas.</param>
     public static IEnumerable<RepairFinding> Juger(IReadOnlyList<PartieLue> parties, LimiteDePuissanceLue? limite,
-        BiosLu? bios = null, DateTimeOffset? demarrage = null, bool intel = true)
+        BiosLu? bios = null, DateTimeOffset? demarrage = null, bool intel = true, bool portable = false)
     {
         if (MaxC(parties) is not { } max) yield break;
         var fr = CultureInfo.InvariantCulture;
@@ -137,9 +143,11 @@ public static class ChaleurEnPartie
             switch (raison)
             {
                 case RaisonDuFreinage.Courant:
+                    // À regarder : rien ne dit que la limite n'est pas celle du profil d'Intel (Intel Default Settings), qui pose
+                    // un nombre au BIOS comme un réglage à la main ; sur un portable, c'est celle du fabricant.
                     yield return new RepairFinding("CPU", Nom, Docteur.T("CH.Val.Courant", Pourcent(f.Part(f.LimiteCourant))),
-                        Docteur.T("CH.Val.Sous", Pourcent(PartCourantQuiBride)), RepairStatus.Suspicious,
-                        tete + Docteur.T("CH.Courant")
+                        Docteur.T("CH.Val.Sous", Pourcent(PartCourantQuiBride)), RepairStatus.NonDefault,
+                        tete + Docteur.T("CH.Courant") + (portable ? Docteur.T("CH.LimitePortable") : "")
                         + (f.Part(f.Chaleur) >= PartChaleurNegligeable ? Docteur.T("CH.ChaleurAussi") : "")
                         + confirmer, RepairAction.Recommandation,
                         Remede: ConseilCourant(bios is not null && demarrage is { } d && derniere.Fin >= d ? bios.Reglages : null));
@@ -150,10 +158,15 @@ public static class ChaleurEnPartie
                         tete + Docteur.T("CH.Prochot") + confirmer, RepairAction.Recommandation, Remede: Docteur.T("CH.Prochot.Remede"));
                     break;
                 case RaisonDuFreinage.Puissance:
+                    // À corriger seulement sur un PC fixe dont la PL1 lue est sous la puissance de base d'Intel : là, elle bride
+                    // démontrablement. À la valeur d'Intel, au-dessus, non lue, ou sur un portable : à regarder, et dit.
+                    var sousIntel = !portable && limite is { SansLimite: false, NominaleW: > 0 } li && li.Pl1W < li.NominaleW - 1;
+                    var aIntel = limite is { SansLimite: false, NominaleW: > 0 } la && Math.Abs(la.Pl1W - la.NominaleW) <= 1;
                     yield return new RepairFinding("CPU", Nom, Docteur.T("CH.Val.Puissance", Pourcent(f.Part(f.LimiteW))),
-                        Docteur.T("CH.Val.Sous", Pourcent(PartCourantQuiBride)), RepairStatus.Suspicious,
+                        Docteur.T("CH.Val.Sous", Pourcent(PartCourantQuiBride)), sousIntel ? RepairStatus.Suspicious : RepairStatus.NonDefault,
                         tete + Docteur.T("CH.Puissance")
                         + (limite is { SansLimite: false } lp ? Docteur.T("CH.Pl1Lue", lp.Pl1W.ToString("0", fr)) : "")
+                        + (portable ? Docteur.T("CH.LimitePortable") : aIntel ? Docteur.T("CH.PuissanceIntel") : "")
                         + Docteur.T("CH.PuissanceSuite")
                         + confirmer, RepairAction.Recommandation);
                     break;
@@ -188,7 +201,7 @@ public static class ChaleurEnPartie
         var avertir = n < PartiesPourJuger
             ? Docteur.T("CH.Avertir", PartiesPourJuger) : "";
         yield return new RepairFinding("CPU", Nom, Docteur.T("CH.Val.JusquA", max.ToString("0", fr)),
-            Docteur.T("CH.Val.SousC", SeuilC.ToString("0", fr)), RepairStatus.Suspicious,
+            Docteur.T("CH.Val.SousC", SeuilC.ToString("0", fr)), chaude.CelsiusMax >= TjMaxIntelC ? RepairStatus.Suspicious : RepairStatus.NonDefault,
             Docteur.T("CH.Chaude", chaude.CelsiusMax!.Value.ToString("0", fr), chaude.Jeu, chaude.Fin.ToLocalTime(), n)
             + avertir, RepairAction.Recommandation, Remede: SuiteChaleur(chaude.WattsMedian, limite, fr).Trim());
     }

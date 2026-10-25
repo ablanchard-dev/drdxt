@@ -68,6 +68,29 @@ public sealed class PawnIoCpuPowerActionsTests
         r.Error!.Value.Message.Should().Contain("not read back");
     }
 
+    // L'écriture a pu partir sans se relire (relecture ratée, carte qui borne la valeur) : « refusé » laissait alors la PL1
+    // montée jusqu'au redémarrage, sans bail ni journal pour la rendre. La valeur lue juste avant est reposée.
+    [Fact]
+    public void Une_ecriture_non_relue_repose_la_valeur_d_avant()
+    {
+        var ecrites = new List<ulong>();
+        var a = new PawnIoCpuPowerActions(() => Registres(Origine), v => { ecrites.Add(v); return v == Origine; });
+
+        var r = a.SetPackagePowerLimit(Cible, Origine);
+
+        r.IsOk.Should().BeFalse();
+        ecrites.Should().Equal(Cible, Origine);
+        r.Error!.Value.Message.Should().Contain("put back");
+    }
+
+    [Fact]
+    public void Une_remise_qui_echoue_aussi_se_dit_peut_etre_encore_posee()
+    {
+        var r = new PawnIoCpuPowerActions(() => Registres(Origine), _ => false).SetPackagePowerLimit(Cible, Origine);
+
+        r.Error!.Value.Code.Should().Be(ErrorCodes.TweakPartiallyApplied);
+    }
+
     [Fact]
     public void Sans_registre_lisible_rien_n_est_ecrit()
     {
@@ -147,6 +170,21 @@ public sealed class PawnIoCpuPowerActionsTests
         var a = new PawnIoCpuPowerActions(() => new(0x3, Pl2SansLimite, 520UL), _ => { ecrites++; return true; });
 
         var r = a.SetPackagePowerLimit(RegistreDeLimiteCpu.ComposerPl1(Pl2SansLimite, 4095, 0x3), Pl2SansLimite);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Message.Should().Contain("no limit");
+        ecrites.Should().Be(0);
+    }
+
+    // Une carte qui écrit 0x7FF8 (4095 W) au lieu de 0x7FFF dit la même chose : rien ne borne la montée.
+    [Fact]
+    public void Sous_une_PL2_de_4095_W_sans_maximum_publie_aucune_montee()
+    {
+        const ulong pl2Haute = (0x7FF8UL << 32) | (1UL << 47) | (1UL << 15) | 520UL;
+        var ecrites = 0;
+        var a = new PawnIoCpuPowerActions(() => new(0x3, pl2Haute, 520UL), _ => { ecrites++; return true; });
+
+        var r = a.SetPackagePowerLimit(RegistreDeLimiteCpu.ComposerPl1(pl2Haute, 4000, 0x3), pl2Haute);
 
         r.IsOk.Should().BeFalse();
         r.Error!.Value.Message.Should().Contain("no limit");

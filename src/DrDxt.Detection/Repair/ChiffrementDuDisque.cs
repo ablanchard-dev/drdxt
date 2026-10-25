@@ -18,7 +18,7 @@ public static class ChiffrementDuDisque
     public sealed record Volume(string Lettre, int? Protection, int? Conversion, int? Methode, int? Pourcent);
 
     /// <summary>Le vrai, en lecture seule ; <c>null</c> = classe refusée (sans droits) ou absente (BitLocker non installé).</summary>
-    public static IReadOnlyList<Volume>? Lire()
+    public static IReadOnlyList<Volume>? Lire() => LectureWmiBornee.Lire<IReadOnlyList<Volume>?>(() =>
     {
         try
         {
@@ -44,7 +44,7 @@ public static class ChiffrementDuDisque
             return volumes;
         }
         catch (Exception) { return null; }
-    }
+    }, () => null);
 
     /// <summary>Pur : une conversion en cours sur un des volumes lus ; une conversion en pause n'occupe pas le disque.</summary>
     public static bool? ConversionEnCours(IReadOnlyList<Volume>? volumes)
@@ -63,7 +63,8 @@ public static class ChiffrementDuDisque
                 yield return new RepairFinding("SECURITE", nom, Docteur.T("BL.Clair"), null, RepairStatus.ExpectedDefault, Docteur.T("BL.ClairExplication"));
             else if (v.Conversion is 2 or 3)
                 yield return new RepairFinding("SECURITE", nom, Docteur.T("BL.Conversion", Pourcent(v)),
-                    null, RepairStatus.Suspicious, Docteur.T("BL.ConversionExplication"), RepairAction.Recommandation, Remede: Docteur.T("BL.ConversionRemede"));
+                    // Passager : la conversion finit seule, rien n'est abîmé.
+                    null, RepairStatus.Observed, Docteur.T("BL.ConversionExplication"), RepairAction.Recommandation, Remede: Docteur.T("BL.ConversionRemede"));
             else if (v.Conversion is 4 or 5)
                 yield return new RepairFinding("SECURITE", nom, Docteur.T("BL.Pause", Pourcent(v)), null, RepairStatus.Observed, Docteur.T("BL.PauseExplication"));
             // Conversion non lue : un volume en clair rend aussi ProtectionStatus 0, ce n'est pas une suspension.

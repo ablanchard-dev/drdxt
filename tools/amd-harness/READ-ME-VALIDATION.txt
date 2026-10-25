@@ -6,7 +6,8 @@ your processor and graphics card (AMD above all: that is what is missing most).
 
 This test CHANGES Windows settings, one at a time, and restores each one right away:
 Game Mode, Game Bar background recording, optimizations for windowed games, hardware-accelerated GPU scheduling,
-mouse acceleration, power plan, processor boost mode, graphics card power limit,
+mouse acceleration, power plan, processor boost mode, graphics card power limit
+(NVIDIA only: on AMD it is only read, with its range, in the DrDXT-Test.exe report),
 Anti-Lag, Vsync and the FRTC frame cap (AMD driver settings).
 VALIDER.cmd never touches the BIOS, nor the voltage, clock or fan of the graphics card: the program itself refuses these
 writes. It creates no service and no restore point, and installs nothing.
@@ -39,7 +40,7 @@ change; the file disappears once everything is restored).
 
 If the first line says "A VERIFIER A LA MAIN" (check by hand): the report gives, for each setting concerned, its
 original value. Run REMETTRE.cmd first. If the line is still there, restore that setting yourself (AMD Adrenalin
-software for Anti-Lag, the frame cap and the power limit; Windows Settings for the rest), then send the report
+software for Anti-Lag and the frame cap; NVIDIA control panel for the power limit; Windows Settings for the rest), then send the report
 anyway: that is exactly the case the project needs to know about.
 
 EXTRA, ONLY IF YOU WANT IT: your AMD card's frequency (VALIDER-FREQUENCE.cmd)

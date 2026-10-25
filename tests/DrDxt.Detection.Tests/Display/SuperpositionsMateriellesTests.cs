@@ -19,7 +19,7 @@ public sealed class SuperpositionsMateriellesTests
     public void La_valeur_5_coupe_les_superpositions_et_appelle_un_geste()
     {
         var c = SuperpositionsMaterielles.Juger(true, 5);
-        c.Statut.Should().Be(RepairStatus.Suspicious);
+        c.Statut.Should().Be(RepairStatus.UserChoiceProbable);
         c.Action.Should().Be(RepairAction.Recommandation);
     }
 

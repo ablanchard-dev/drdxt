@@ -54,6 +54,11 @@ public sealed class LeaseWatchdog
     // l'inverse de l'ancien, qui la déferait (l'écran dirait « gardé », la carte serait rendue).
     private readonly ConcurrentDictionary<string, int> _inversesEnCours = new(StringComparer.Ordinal);
 
+    // Le refus ci-dessus et l'inscription du nouveau bail ne font qu'un pas, face à la marque d'un inverse qui part : sans
+    // lui, un inverse marqué entre les deux retirait l'ancien bail, puis le nouveau s'inscrivait, et l'inverse défaisait le
+    // réglage que l'App croyait gardé.
+    private readonly object _inscription = new();
+
     public LeaseWatchdog(
         IClock clock,
         OpAllowlist allowlist,
@@ -89,8 +94,6 @@ public sealed class LeaseWatchdog
             return Result.Fail(ErrorCodes.NotAllowlisted, $"Lease duration above {DureeMaxSecondes} s.");
         if (_leases.Keys.Count(k => k.Owner == owner && k.LeaseId != leaseId) >= BauxMaxParAppelant)
             return Deny($"More than {BauxMaxParAppelant} leases for this caller.");
-        if (_inversesEnCours.ContainsKey(leaseId))
-            return Result.Fail(ErrorCodes.HelperOpFailed, Docteur.T("LW.RetourEnCours"));
         // Un autre client (une App plantée puis relancée) tient encore ce réglage ; son
         // bail expirera et rendra l'origine. Accepter le nouveau laissait cet inverse défaire la pose qu'on affichait « gardée ».
         if (_leases.Keys.Any(k => k.LeaseId == leaseId && k.Owner != owner))
@@ -139,8 +142,14 @@ public sealed class LeaseWatchdog
         var expiry = _clock.UtcNow.AddSeconds(leaseSeconds);
         var entry = new LeaseEntry(decoded.Value, expiry);
 
-        // AddOrUpdate : rétablir le même (owner, id) le rafraîchit.
-        _leases[key] = entry;
+        lock (_inscription)
+        {
+            if (_inversesEnCours.ContainsKey(leaseId))
+                return Result.Fail(ErrorCodes.HelperOpFailed, Docteur.T("LW.RetourEnCours"));
+            // AddOrUpdate : rétablir le même (owner, id) le rafraîchit. Remplacé avant que l'inverse le retire, l'ancien bail
+            // n'est plus l'entrée que l'inverse attend : il ne part pas.
+            _leases[key] = entry;
+        }
         _rendus.TryRemove(key, out _);
         return Result.Ok();
     }
@@ -244,7 +253,7 @@ public sealed class LeaseWatchdog
     // et un passage de surveillance peuvent viser le même bail, celui qui sort tôt n'efface pas la marque de l'autre.
     private async Task FireRevertAsync(LeaseKey key, LeaseEntry entry, CancellationToken ct)
     {
-        _inversesEnCours.AddOrUpdate(key.LeaseId, 1, (_, n) => n + 1);
+        lock (_inscription) _inversesEnCours.AddOrUpdate(key.LeaseId, 1, (_, n) => n + 1);
         try { await RejouerInverseAsync(key, entry, ct).ConfigureAwait(false); }
         finally
         {

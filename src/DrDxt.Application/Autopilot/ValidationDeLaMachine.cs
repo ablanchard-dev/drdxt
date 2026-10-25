@@ -20,7 +20,8 @@ public sealed class ValidationDeLaMachine(
     private readonly Func<string?> _levierDeLEssai = levierDeLEssai ?? (() => Parties.MemoireDeLEssai.ParDefaut().Lire()?.LevierId);
 
     public Task<ValidationComplete.Remise> RemettreAsync(IRevertEnAttente journal)
-        => ValidationComplete.RemettreAsync(journal, id => catalogue.Get(id) is { IsOk: true, Value: { } t } ? t : null, RevertAuDemarrage.InverseRejouable);
+        => ValidationComplete.RemettreAsync(journal, id => catalogue.Get(id) is { IsOk: true, Value: { } t } ? t : null, RevertAuDemarrage.InverseRejouable,
+            registre, Verdict);
 
     /// <param name="profond">Le banc profond : un levier déjà réglé qui sait s'exercer est mis hors de sa cible, posé, puis
     /// rendu à son origine exacte (<see cref="ITweak.PreparerExercice"/>).</param>
@@ -49,56 +50,42 @@ public sealed class ValidationDeLaMachine(
             tenuParUnEssai: id => id == levierDeLEssai, profond: profond).ConfigureAwait(false);
     }
 
+    /// <summary>Les lecteurs de la carte et du processeur, ceux du vérificateur : une seule définition de leur lecture.</summary>
+    public AppliedStateVerifier.LecteursCarte Carte => new(nvCarte, adlxCarte, latenceAmd, cpu);
+
+    /// <summary>Le verdict d'une pose, relue par ce qui lit vraiment chaque réglage (l'essai en alternance s'en sert).</summary>
+    public EtatApplique Verdict(TweakSnapshot s) => AppliedStateVerifier.Verifier(s, registre, nvApi, alimentation, services, Carte).Verdict;
+
     /// <summary>Ce que la machine porte maintenant, face à l'origine gardée dans le snapshot.</summary>
     public ValidationComplete.Lecture Relire(TweakSnapshot s)
     {
-        // La limite de puissance et Anti-Lag ne portent que leur inverse : relus par la carte, comparés à l'origine.
-        if (PrivilegedOpCodec.Deserialize(s.OriginalValueJson) is { IsOk: true, Value: var op })
+        // Un réglage de la carte qui ne porte que son inverse (le banc de fréquence) : relu par la carte, comparé à l'origine.
+        if (string.IsNullOrWhiteSpace(s.AppliedValueJson))
         {
-            var (nom, origine, valeur) = op switch
+            if (PrivilegedOpCodec.Deserialize(s.OriginalValueJson) is { IsOk: true, Value: { } op }
+                && AppliedStateVerifier.ValeurDeCarte(op) is { } origine && AppliedStateVerifier.LecteurDeCarte(op, Carte) is { } lire)
             {
-                ApplyAdlxTuningOp { Kind: AdlxTuningKind.PowerLimit } a => (Docteur.T("VM.LimitePuissance"), a.IntValue, adlxCarte.GetPowerLimitPct(a.GpuIndex)),
-                ApplyAdlxTuningOp { Kind: AdlxTuningKind.AntiLag } a => ("Anti-Lag (0/1)", a.IntValue, latenceAmd.GetAntiLagState()),
-                ApplyAdlxTuningOp { Kind: AdlxTuningKind.FrameRateTarget } a => (Docteur.T("VM.Frtc"), a.IntValue, latenceAmd.GetFrameRateTarget()),
-                ApplyAdlxTuningOp { Kind: AdlxTuningKind.Undervolt } a => (Docteur.T("VM.FrequenceMax"), a.IntValue, adlxCarte.GetGfxMaxFreqMhz(a.GpuIndex)),
-                ApplyNvApiPowerLimitOp n => (Docteur.T("VM.LimitePuissance"), n.PowerLimitPercent, nvCarte.GetPowerLimitPct(n.GpuIndex)),
-                _ => ("", 0, (Result<int>?)null),
-            };
-            if (valeur is not null)
+                var nom = AppliedStateVerifier.NomDeCarte(op);
+                var valeur = lire();
                 return valeur.IsOk
                     ? new(valeur.Value != origine, Docteur.T("VM.OrigineLu", nom, origine, valeur.Value))
                     : new(null, Docteur.T("VM.Illisible", nom, valeur.Error?.Message));
-        }
-        // Un composite de réglages AMD (Vsync du pilote + FRTC) : chaque feuille relue par la carte, comparée à son
-        // origine. Posé = toutes ont bougé ; rendu = toutes sont à l'origine ; sinon, non conclu.
-        if (CompositeSnapshotCodec.Decode(s.OriginalValueJson) is { IsOk: true, Value: { Count: > 0 } feuilles }
-            && feuilles.All(f => f is ApplyAdlxTuningOp))
-        {
-            var lues = feuilles.Cast<ApplyAdlxTuningOp>().Select(f => (f.Kind, Origine: f.IntValue, Lu: f.Kind switch
+            }
+            // Un composite de réglages AMD (Vsync du pilote + FRTC) qui ne porte que ses inverses : chaque feuille relue
+            // par la carte. Posé = toutes ont bougé ; rendu = toutes sont à l'origine ; sinon, non conclu.
+            if (CompositeSnapshotCodec.Decode(s.OriginalValueJson) is { IsOk: true, Value: { Count: > 0 } feuilles }
+                && feuilles.All(f => f is ApplyAdlxTuningOp))
             {
-                AdlxTuningKind.VerticalRefresh => latenceAmd.GetVsyncMode(),
-                AdlxTuningKind.FrameRateTarget => latenceAmd.GetFrameRateTarget(),
-                _ => Result<int>.Fail(ErrorCodes.TweakSdkUnavailable, Docteur.T("VM.GenreNonRelu")),
-            })).ToList();
-            var texte = string.Join(" ; ", lues.Select(l => Docteur.T("VM.OrigineLu", l.Kind, l.Origine, l.Lu.IsOk ? l.Lu.Value.ToString() : Docteur.T("VM.IllisibleMot"))));
-            if (lues.Any(l => !l.Lu.IsOk)) return new(null, texte);
-            if (lues.All(l => l.Lu.Value != l.Origine)) return new(true, texte);
-            if (lues.All(l => l.Lu.Value == l.Origine)) return new(false, texte);
-            return new(null, texte + Docteur.T("VM.EnPartie"));
+                var lues = feuilles.Select(f => (Nom: AppliedStateVerifier.NomDeCarte(f), Origine: AppliedStateVerifier.ValeurDeCarte(f),
+                    Lu: AppliedStateVerifier.LecteurDeCarte(f, Carte) is { } l ? l() : Result<long>.Fail(ErrorCodes.TweakSdkUnavailable, Docteur.T("VM.GenreNonRelu")))).ToList();
+                var texte = string.Join(" ; ", lues.Select(l => Docteur.T("VM.OrigineLu", l.Nom, l.Origine, l.Lu.IsOk ? l.Lu.Value.ToString() : Docteur.T("VM.IllisibleMot"))));
+                if (lues.Any(l => !l.Lu.IsOk)) return new(null, texte);
+                if (lues.All(l => l.Lu.Value != l.Origine)) return new(true, texte);
+                if (lues.All(l => l.Lu.Value == l.Origine)) return new(false, texte);
+                return new(null, texte + Docteur.T("VM.EnPartie"));
+            }
         }
-        // La limite PL1 du processeur se relit dans le registre, par le seul champ que le levier écrit (bits 14:0).
-        if (PrivilegedOpCodec.Deserialize(s.AppliedValueJson ?? "") is { IsOk: true, Value: SetCpuPackagePowerLimitOp poseCpu })
-        {
-            const ulong Pl1 = 0x7FFF;
-            var origineCpu = PrivilegedOpCodec.Deserialize(s.OriginalValueJson) is { IsOk: true, Value: SetCpuPackagePowerLimitOp o } ? o.Valeur & Pl1 : (ulong?)null;
-            if (cpu?.LireRegistres() is not { IsOk: true, Value: { } lecture })
-                return new(null, Docteur.T("VM.Illisible", "PL1", Docteur.T("VM.IllisibleMot")));
-            var lu = lecture.Registres.PkgPowerLimit & Pl1;
-            var texte = Docteur.T("VM.OrigineLu", "PL1", origineCpu, lu);
-            var luCpu = lu.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            return lu == (poseCpu.Valeur & Pl1) ? new(true, texte, luCpu) : lu == origineCpu ? new(false, texte, luCpu) : new(null, texte, luCpu);
-        }
-        var preuve = AppliedStateVerifier.Verifier(s, registre, nvApi, alimentation, services);
+        var preuve = AppliedStateVerifier.Verifier(s, registre, nvApi, alimentation, services, Carte);
         bool? pose = preuve.Verdict switch { EtatApplique.Applied => true, EtatApplique.NotApplied => false, _ => null };
         // Une valeur à supprimer (l'origine « absente » d'un exercice) n'a pas de valeur demandée : elle se dit supprimée.
         var supprimee = PrivilegedOpCodec.Deserialize(s.AppliedValueJson ?? "") is { IsOk: true, Value: DeleteRegistryValueOp };

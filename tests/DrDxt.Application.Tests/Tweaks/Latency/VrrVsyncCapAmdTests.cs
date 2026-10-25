@@ -6,8 +6,8 @@ using NSubstitute;
 
 namespace DrDxt.Application.Tests.Tweaks.Latency;
 
-// Sur une carte AMD (sans NVAPI), le plafond VRR passe par FRTC. Avant, le levier était proposé
-// puis ne pouvait qu'échouer.
+// Sur une carte AMD (sans NVAPI), le plafond VRR passe par FRTC : par NVAPI, le levier
+// serait proposé puis ne pourrait qu'échouer.
 public sealed class VrrVsyncCapAmdTests
 {
     private readonly INvApi _nvApi = Substitute.For<INvApi>();

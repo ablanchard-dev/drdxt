@@ -43,7 +43,7 @@ public static class SanteNvme
 
     /// <summary>Les SSD NVMe de la machine (MSFT_PhysicalDisk, BusType 17) et leur page 02h ; une page non lue reste <c>null</c>.
     /// <c>null</c> en entier si la liste des disques n'a pas pu être lue.</summary>
-    public static IReadOnlyList<(string Disque, SanteNvmeLue? Sante)>? Lire()
+    public static IReadOnlyList<(string Disque, SanteNvmeLue? Sante)>? Lire() => LectureWmiBornee.Lire<IReadOnlyList<(string Disque, SanteNvmeLue? Sante)>?>(() =>
     {
         try
         {
@@ -57,7 +57,7 @@ public static class SanteNvme
             return Nommer(lus).Zip(lus, (nom, l) => (nom, int.TryParse(l.Id, out var n) ? LirePage(n, nom) : null)).ToList();
         }
         catch (Exception) { return null; }
-    }
+    }, () => null);
 
     /// <summary>Pur : le nom qui retrouve le relevé d'un disque. Deux SSD du même modèle portent le même nom : le numéro
     /// du disque les sépare, sinon le compteur de l'un serait comparé à celui de l'autre. Jamais traduit : c'est la clé du
@@ -165,7 +165,8 @@ public static class SanteNvme
                 yield return new RepairFinding("STOCKAGE", nom, null, null, RepairStatus.Unknown, Docteur.T("NV.NonLu"));
                 continue;
             }
-            var celsius = s.TemperatureKelvin - 273;
+            // 0 kelvin : le disque ne renseigne pas sa température, jamais « −273 °C ».
+            object celsius = s.TemperatureKelvin > 0 ? s.TemperatureKelvin - 273 : Docteur.T("NV.TemperatureNonLue");
             var valeur = Docteur.T("NV.Valeur", s.UsurePourcent, s.ReservePourcent, celsius, s.Heures, s.Cycles, s.ArretsDangereux, s.ErreursMedia);
             var alertes = new List<string>();
             if (s.AvertissementCritique != 0) alertes.Add(Docteur.T("NV.Critique", Avertissements(s.AvertissementCritique)));

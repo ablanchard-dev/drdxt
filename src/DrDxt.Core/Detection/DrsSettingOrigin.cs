@@ -37,32 +37,22 @@ public static class DrsSettingOrigin
         switch (settingLocation)
         {
             case GlobalProfile:
-                return new(DrsValueOrigin.InheritedFromGlobalProfile, false,
-                    "This value is inherited from the global profile: this profile does not own it, " +
-                    "so changing it here would not be changing what the driver applies.");
+                return new(DrsValueOrigin.InheritedFromGlobalProfile, false, Docteur.T("DO.Global"));
 
             case BaseProfile:
-                return new(DrsValueOrigin.InheritedFromBaseProfile, false,
-                    "This value is inherited from the base profile: this profile does not own it.");
+                return new(DrsValueOrigin.InheritedFromBaseProfile, false, Docteur.T("DO.Base"));
 
             case DefaultProfile:
-                return new(DrsValueOrigin.DriverDefault, false,
-                    "This is the driver default: nobody set it anywhere.");
+                return new(DrsValueOrigin.DriverDefault, false, Docteur.T("DO.Defaut"));
 
             case CurrentProfile:
                 return isCurrentPredefined != 0
                     ? new(DrsValueOrigin.ShippedWithTheDriver, false,
-                        "This value ships with the NVIDIA driver for this application: it is a " +
-                        "predefined setting, not a choice anyone made on this machine." +
-                        (isPredefinedValid != 0 ? "" : " (the shipped value itself was not readable)"))
-                    : new(DrsValueOrigin.SetByUser, true,
-                        "This value was set on this profile and is not one the driver ships: " +
-                        "someone changed it on this machine.");
+                        Docteur.T("DO.Livre") + (isPredefinedValid != 0 ? "" : Docteur.T("DO.LivreIllisible")))
+                    : new(DrsValueOrigin.SetByUser, true, Docteur.T("DO.Utilisateur"));
 
             default:
-                return new(DrsValueOrigin.Unknown, false,
-                    $"The driver reported an unrecognised setting location ({settingLocation}), " +
-                    "so where this value comes from is not established.");
+                return new(DrsValueOrigin.Unknown, false, Docteur.T("DO.Inconnu", settingLocation));
         }
     }
 }

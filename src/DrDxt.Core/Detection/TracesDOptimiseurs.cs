@@ -97,9 +97,10 @@ public static class TracesDOptimiseurs
                         l.Valeurs.GetValueOrDefault("SystemResponsiveness"), null, RepairStatus.Observed,
                         Docteur.T("TO.Mmcss", valeurs.Length > 0 ? valeurs : Docteur.T("TO.Absente")) + date + Docteur.T("TO.Source", SourceMmcss));
                     break;
-                // Une clé de la carte toujours présente : seules des valeurs de débogage posées sont une trace.
+                // Une clé de la carte toujours présente : seules des valeurs de débogage posées sont une trace. Des logiciels
+                // de rendu 3D et vidéo demandent de rallonger TdrDelay : un écart dit, sans accuser.
                 case "tdr" when l.Valeurs.Count > 0:
-                    yield return new RepairFinding(Domaine, "traces : delais TDR de la carte", valeurs, null, RepairStatus.Suspicious,
+                    yield return new RepairFinding(Domaine, "traces : delais TDR de la carte", valeurs, null, RepairStatus.NonDefault,
                         Docteur.T("TO.Tdr", valeurs) + date + Docteur.T("TO.Source", SourceTdr));
                     break;
                 // Les INF des pilotes posent eux-mêmes une politique (Microsoft le prévoit) : seuls des processeurs désignés

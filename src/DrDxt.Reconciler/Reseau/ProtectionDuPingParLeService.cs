@@ -21,6 +21,8 @@ public sealed class ProtectionDuPingParLeService
     private readonly Func<string, bool> _jeuEnCours;
     private readonly SemaphoreSlim _uneALaFois = new(1, 1);
     private PlafondRetenuDuService? _pose;
+    // Le retrait du démarrage a été refusé : un plafond d'une vie précédente peut rester, rien ne le dit posé.
+    private bool _resteARetirer;
     private readonly IDiagnosticsLog? _journal;
 
     public const string IdJournal = "upload-cap-service";
@@ -40,7 +42,7 @@ public sealed class ProtectionDuPingParLeService
         await _uneALaFois.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            await _client.ExecuteAsync(new RemoveUploadCapOp(), ct).ConfigureAwait(false);
+            _resteARetirer = !(await _client.ExecuteAsync(new RemoveUploadCapOp(), ct).ConfigureAwait(false)).IsOk;
             _pose = null;
         }
         finally { _uneALaFois.Release(); }
@@ -53,7 +55,7 @@ public sealed class ProtectionDuPingParLeService
         {
             var retenu = _lireRetenu();
             var voulu = retenu is not null && _jeuEnCours(retenu.Exe) ? retenu : null;
-            if (voulu == _pose) return;
+            if (voulu == _pose && !(voulu is null && _resteARetirer)) return;
 
             if (voulu is null)
             {
@@ -61,6 +63,7 @@ public sealed class ProtectionDuPingParLeService
                 {
                     _journal?.Change(IdJournal, "posé", "retiré", "DrDXT");
                     _pose = null;
+                    _resteARetirer = false;
                 }
             }
             else if ((await _client.ExecuteAsync(new ApplyUploadCapOp(voulu.Exe, voulu.PlafondBps), ct).ConfigureAwait(false)).IsOk)

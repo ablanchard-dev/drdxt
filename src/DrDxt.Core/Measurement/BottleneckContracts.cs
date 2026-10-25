@@ -1,4 +1,4 @@
-namespace DrDxt.Core;
+﻿namespace DrDxt.Core;
 
 // ════════════════════════════════════════════════════════════════════════════
 // Le classifieur de goulot : contrats.
@@ -22,8 +22,10 @@ namespace DrDxt.Core;
 
 /// <summary>
 /// L'état mesuré d'une session : qui donne le tempo, et donc ce qu'il est honnête de proposer.
-/// Ensemble fermé : les dix états de la table de décision.
+/// Ensemble fermé : les dix états de la table de décision. Écrit par son nom dans les parties gardées : un entier
+/// changerait de sens au premier état ajouté avant lui. Un ancien entier se relit encore.
 /// </summary>
+[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<BottleneckState>))]
 public enum BottleneckState
 {
     /// <summary>Grandeurs absentes, insuffisantes, ou mesure non fiable. L'état honnête par
@@ -68,21 +70,6 @@ public enum BottleneckConfidence
 }
 
 /// <summary>
-/// Le verdict : l'état, sa confiance, et son motif en clair.
-///
-/// Le motif n'est pas décoratif. Sans lui, un utilisateur à qui l'on supprime un levier ne sait
-/// pas pourquoi, et nous ne savons pas non plus si le classifieur s'est trompé. Il porte les
-/// chiffres qui ont décidé.
-/// </summary>
-/// <param name="State">L'état retenu.</param>
-/// <param name="Confidence">La confiance, jamais High sur une mesure d'un seul run.</param>
-/// <param name="Reason">Le motif en clair, avec les grandeurs qui ont tranché.</param>
-/// <param name="Provisional">
-/// Vrai quand le verdict repose sur moins de runs que la spec n'en exige pour une affirmation
-/// forte. La spec est explicite : « Strong claims require 3-run repeatability ». Un verdict
-/// provisoire s'affiche, mais ne doit jamais servir à garder ou annuler un réglage.
-/// </param>
-/// <summary>
 /// Les motifs que le classifieur peut rendre, en clés et non en phrases.
 ///
 /// Mesuré le 05/09/2026, en usage réel : le rapport SAV (français, destiné à être collé dans un
@@ -120,6 +107,21 @@ public static class BottleneckReasonKeys
 /// Les grandeurs que la phrase interpole, dans l'ordre où le bord les attend. Vide quand la phrase
 /// n'en porte aucune. Des nombres, jamais du texte déjà formaté : le formatage appartient au bord,
 /// parce que « 96 % » et « 96,0 % » ne s'écrivent pas pareil selon la langue.
+/// </param>
+/// <summary>
+/// Le verdict : l'état, sa confiance, et son motif en clair.
+///
+/// Le motif n'est pas décoratif. Sans lui, un utilisateur à qui l'on supprime un levier ne sait
+/// pas pourquoi, et nous ne savons pas non plus si le classifieur s'est trompé. Il porte les
+/// chiffres qui ont décidé.
+/// </summary>
+/// <param name="State">L'état retenu.</param>
+/// <param name="Confidence">La confiance, jamais High sur une mesure d'un seul run.</param>
+/// <param name="Reason">Le motif en clair, avec les grandeurs qui ont tranché.</param>
+/// <param name="Provisional">
+/// Vrai quand le verdict repose sur moins de runs que la spec n'en exige pour une affirmation
+/// forte. La spec est explicite : « Strong claims require 3-run repeatability ». Un verdict
+/// provisoire s'affiche, mais ne doit jamais servir à garder ou annuler un réglage.
 /// </param>
 public readonly record struct BottleneckVerdict(
     BottleneckState State,

@@ -31,6 +31,9 @@ public sealed class EcouteEnvoisUdp
     private EventRecordCallback? _rappel;
     private readonly Dictionary<(int Pid, uint Adresse, int Port), long> _cumul = new();
     private int? _pidVise;
+    // Les événements du fournisseur reçus, tous genres confondus (l'en-tête de la session n'en est pas) : une session
+    // ouverte qui n'en livre aucun est muette, pas « aucun envoi ».
+    private int _recus;
     // Mode « qui occupe la montée » : TCP et UDP, IPv4 et IPv6, cumulés par programme seulement.
     private Dictionary<int, long>? _parProcessus;
 
@@ -39,7 +42,7 @@ public sealed class EcouteEnvoisUdp
     private static readonly object Verrou = new();
 
     /// <summary>Les octets envoyés par chaque programme pendant la fenêtre, en TCP et en UDP, sur IPv4 et IPv6 (événements
-    /// 10, 26, 42, 58 de <see cref="EnvoisUdp.Fournisseur"/>). <c>null</c> si la session n'a pas pu s'ouvrir.</summary>
+    /// 10, 26, 42, 58 de <see cref="EnvoisUdp.Fournisseur"/>). <c>null</c> si la session n'a pas pu s'ouvrir ou n'a rien livré.</summary>
     public IReadOnlyDictionary<int, long>? OctetsParProcessus(TimeSpan duree)
     {
         _parProcessus = new Dictionary<int, long>();
@@ -47,7 +50,7 @@ public sealed class EcouteEnvoisUdp
     }
 
     /// <summary>Les envois de la fenêtre, cumulés par programme et destination ; seulement ceux de <paramref name="pid"/>
-    /// s'il est donné. <c>null</c> si la session n'a pas pu s'ouvrir.</summary>
+    /// s'il est donné. <c>null</c> si la session n'a pas pu s'ouvrir ou n'a rien livré.</summary>
     public IReadOnlyList<EnvoiUdp>? Ecouter(TimeSpan duree, int? pid = null)
     {
         lock (Verrou) return EcouterSeul(duree, pid);
@@ -56,6 +59,7 @@ public sealed class EcouteEnvoisUdp
     private IReadOnlyList<EnvoiUdp>? EcouterSeul(TimeSpan duree, int? pid)
     {
         _pidVise = pid;
+        _recus = 0;
         var taille = Marshal.SizeOf<EVENT_TRACE_PROPERTIES>() + 2 * 1024;
         var proprietes = Marshal.AllocHGlobal(taille);
         try
@@ -109,6 +113,7 @@ public sealed class EcouteEnvoisUdp
                 Marshal.FreeHGlobal(nom);
             }
 
+            if (Volatile.Read(ref _recus) == 0) return null;
             lock (_cumul)
                 return _cumul.Select(kv => new EnvoiUdp(kv.Key.Pid, (int)Math.Min(kv.Value, int.MaxValue),
                     new IPAddress(kv.Key.Adresse), kv.Key.Port)).ToList();
@@ -123,6 +128,7 @@ public sealed class EcouteEnvoisUdp
 
     private void SurEvenement(ref EVENT_RECORD e)
     {
+        if (e.EventHeader.ProviderId == EnvoisUdp.Fournisseur) Interlocked.Increment(ref _recus);
         if (_parProcessus is { } parPid)
         {
             if (e.EventHeader.ProviderId != EnvoisUdp.Fournisseur || !EnvoisUdp.EvenementsEnvoi.Contains(e.EventHeader.EventDescriptor.Id)

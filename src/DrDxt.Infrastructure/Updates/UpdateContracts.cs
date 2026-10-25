@@ -8,22 +8,22 @@ namespace DrDxt.Infrastructure.Updates;
 // Modèle de sécurité :
 //   * Un manifeste est la seule chose à laquelle le client se fie pour savoir où est une charge
 //     (url), quelle empreinte elle doit avoir (sha256) et quelle version elle est. Il est signé
-//     avec une clé Ed25519 dédiée aux mises à jour (UpdateDevKeys), vérifiée avant d'agir sur le
+//     avec une clé Ed25519 dédiée aux mises à jour (UpdateTrust.ProductionPublicKey ; UpdateDevKeys, refusée en
+//     production, ne sert qu'aux tests), vérifiée avant d'agir sur le
 //     moindre de ses champs. On ne se fie jamais qu'à une empreinte venue d'un manifeste signé.
 //   * L'ordre est imposé : vérifier d'abord la signature du manifeste ; seulement si Ok, récupérer
 //     la charge et vérifier son SHA-256 contre l'empreinte du manifeste (désormais fiable).
 //   * Jamais fail-open : toute incertitude garde la version installée actuelle.
 //
-// Chaque couture rend un Result pour qu'un réseau / disque / chemin crypto indisponible échoue
-// proprement (jamais d'exception à travers la frontière).
+// Chaque couture rend un Result pour les pannes attendues (réseau, délai, disque, signature) ; une exception imprévue
+// s'arrête aux entrées publiques de l'updater (UPDATE_UNEXPECTED) : jamais d'exception à travers la frontière.
 // -----------------------------------------------------------------------
 
 /// <summary>Le canal de mise à jour. Seule l'app existe : le nom voyage dans les octets signés, un manifeste signé pour
 /// un autre canal ne peut donc pas passer pour une mise à jour de l'app.</summary>
 public enum UpdateChannel
 {
-    /// <summary>Le binaire de l'app dans Program Files. Le remplacer exige l'élévation : l'échange est
-    /// délégué à la couture typée <see cref="IElevatedFileReplacer"/>.</summary>
+    /// <summary>Le binaire de l'app dans Program Files, remplacé par l'installeur signé que le joueur lance au clic.</summary>
     App,
 }
 
@@ -105,18 +105,3 @@ public interface IUpdateFileSystem
     Result DeleteDirectory(string path);
 }
 
-/// <summary>La couture élevée, typée et admise, qui remplace des binaires signés dans Program
-/// Files. Ce n'est pas une primitive d'écriture quelconque : sa seule opération est « remplacer ces
-/// fichiers déjà vérifiés et préparés ». Pour l'instant, l'élévation réelle et le branchement au
-/// helper sont reportés (il faut l'UAC) : l'implémentation par défaut échoue proprement
-/// (UPDATE_REPLACER_UNAVAILABLE), exactement comme les autres coutures reportées. Un échec de
-/// vérification à n'importe quelle étape antérieure veut dire qu'elle n'est même pas appelée.</summary>
-public interface IElevatedFileReplacer
-{
-    /// <summary>Remplace les fichiers de l'app en service à partir d'une charge vérifiée et préparée.
-    /// Appelée seulement après que la signature du manifeste, l'empreinte de la charge et la règle de
-    /// non-rétrogradation sont toutes passées et que la charge a été préparée atomiquement.
-    /// Implémentation reportée → Fail(UPDATE_REPLACER_UNAVAILABLE) (rien de remplacé) ; l'implémentation
-    /// réelle fait l'échange typé.</summary>
-    Task<Result> ReplaceAppFilesAsync(string stagedPayloadPath, string targetInstallDir, CancellationToken ct);
-}

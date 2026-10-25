@@ -305,7 +305,7 @@
     {
       "Domaine": "MEMOIRE",
       "Nom": "mémoire saturée",
-      "ValeurCourante": "0.4 Go libres sur 8 (5 %), engagement 91 % de la limite",
+      "ValeurCourante": "0,4 Go libres sur 8 (5 %), engagement 91 % de la limite",
       "ValeurAttendue": "au moins 10 % libres, engagement sous 90 % (seuils DrDXT)",
       "Statut": "Suspicious",
       "Provenance": null,

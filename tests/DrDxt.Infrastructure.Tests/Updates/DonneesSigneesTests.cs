@@ -4,6 +4,7 @@ using DrDxt.Core;
 using DrDxt.Infrastructure.Updates;
 using FluentAssertions;
 using NSec.Cryptography;
+using DrDxt.TestSupport;
 
 namespace DrDxt.Infrastructure.Tests.Updates;
 
@@ -25,7 +26,7 @@ public sealed class DonneesSigneesTests : IDisposable
 
     private static DonneesSignees.Paquet Signer(int version, string contenu = Contenu, byte[]? graine = null)
     {
-        using var cle = Key.Import(SignatureAlgorithm.Ed25519, graine ?? UpdateDevKeys.DevPrivateSeed, KeyBlobFormat.RawPrivateKey);
+        using var cle = Key.Import(SignatureAlgorithm.Ed25519, graine ?? UpdateDevTestKeys.DevPrivateSeed, KeyBlobFormat.RawPrivateKey);
         var signature = SignatureAlgorithm.Ed25519.Sign(cle, DonneesSignees.OctetsSignes(version, contenu));
         return new DonneesSignees.Paquet(version, contenu, Convert.ToBase64String(signature));
     }
@@ -76,7 +77,7 @@ public sealed class DonneesSigneesTests : IDisposable
     {
         // Les deux canaux partagent la clé : sans le domaine en tête, une signature posée par un autre usage de la clé
         // sur « version, contenu » passerait pour un paquet de données.
-        using var cle = Key.Import(SignatureAlgorithm.Ed25519, UpdateDevKeys.DevPrivateSeed, KeyBlobFormat.RawPrivateKey);
+        using var cle = Key.Import(SignatureAlgorithm.Ed25519, UpdateDevTestKeys.DevPrivateSeed, KeyBlobFormat.RawPrivateKey);
         var sansDomaine = System.Text.Encoding.UTF8.GetBytes("1\n" + Contenu);
         var signature = Convert.ToBase64String(SignatureAlgorithm.Ed25519.Sign(cle, sansDomaine));
 
@@ -161,6 +162,33 @@ public sealed class DonneesSigneesTests : IDisposable
         DonneesSignees.Lire(File.ReadAllText(Path.Combine(_dossier, DonneesSignees.FichierPrecedent))).Value!.Version.Should().Be(4);
     }
 
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateHardLink(string lien, string cible, IntPtr securite);
+
+    // L'ancien paquet passait au précédent par File.Copy : un nom posé d'avance en lien dur faisait écrire dans un autre
+    // fichier. Le renommage de l'écriture atomique remplace le nom seul.
+    [Fact]
+    public async Task Le_precedent_ne_s_ecrit_jamais_a_travers_un_lien_dur()
+    {
+        Directory.CreateDirectory(_dossier);
+        File.WriteAllText(Path.Combine(_dossier, DonneesSignees.Fichier), DonneesSignees.Ecrire(Signer(4)));
+        var temoin = Path.Combine(Path.GetTempPath(), "drdxt-temoin-" + Guid.NewGuid().ToString("N") + ".txt");
+        File.WriteAllText(temoin, "intact");
+        try
+        {
+            CreateHardLink(Path.Combine(_dossier, DonneesSignees.FichierPrecedent), temoin, IntPtr.Zero).Should().BeTrue();
+            var courantes = DonneesSignees.Charger(_dossier, Dev());
+
+            var (issue, _) = await DonneesSignees.DemanderAsync(new HttpClient(new Serveur(HttpStatusCode.OK, DonneesSignees.Ecrire(Signer(6)))),
+                Racine, _dossier, Dev(), courantes, CancellationToken.None);
+
+            issue.Should().Be(DonneesSignees.Issue.Installe);
+            File.ReadAllText(temoin).Should().Be("intact");
+            DonneesSignees.Lire(File.ReadAllText(Path.Combine(_dossier, DonneesSignees.FichierPrecedent))).Value!.Version.Should().Be(4);
+        }
+        finally { File.Delete(temoin); }
+    }
+
     [Fact]
     public async Task Un_paquet_plus_ancien_que_celui_en_service_n_est_pas_garde()
     {
@@ -175,8 +203,25 @@ public sealed class DonneesSigneesTests : IDisposable
         DonneesSignees.Charger(_dossier, Dev()).Version.Should().Be(6);
     }
 
+    // Le plancher d'un paquet neuf est la version en service plus un : à int.MaxValue, il repassait sous zéro et tout
+    // paquet signé plus ancien était repris.
+    [Fact]
+    public async Task Au_bout_des_versions_un_paquet_plus_ancien_reste_refuse()
+    {
+        Directory.CreateDirectory(_dossier);
+        File.WriteAllText(Path.Combine(_dossier, DonneesSignees.Fichier), DonneesSignees.Ecrire(Signer(int.MaxValue)));
+        var courantes = DonneesSignees.Charger(_dossier, Dev());
+        courantes.Version.Should().Be(int.MaxValue);
+
+        var (issue, _) = await DonneesSignees.DemanderAsync(new HttpClient(new Serveur(HttpStatusCode.OK, DonneesSignees.Ecrire(Signer(5)))),
+            Racine, _dossier, Dev(), courantes, CancellationToken.None);
+
+        issue.Should().Be(DonneesSignees.Issue.Refuse);
+        DonneesSignees.Charger(_dossier, Dev()).Version.Should().Be(int.MaxValue);
+    }
+
     [Theory]
-    [InlineData(HttpStatusCode.NotFound, DonneesSignees.Issue.RienDeNeuf)]
+    [InlineData(HttpStatusCode.NotFound, DonneesSignees.Issue.RienDePublie)]
     [InlineData(HttpStatusCode.InternalServerError, DonneesSignees.Issue.Injoignable)]
     public async Task Rien_de_publie_ou_un_serveur_en_panne_laissent_les_tables_en_service(HttpStatusCode code, DonneesSignees.Issue attendue)
     {
@@ -200,6 +245,23 @@ public sealed class DonneesSigneesTests : IDisposable
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
         public override void SetLength(long value) => throw new NotSupportedException();
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private sealed class ServeurQuiLeve : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+            => throw new InvalidOperationException("imprévu");
+    }
+
+    // Une exception que la couture ne prévoit pas ne traverse pas la frontière : les tables en service restent.
+    [Fact]
+    public async Task Une_exception_imprevue_rend_un_echec_et_garde_les_tables()
+    {
+        var (issue, tables) = await DonneesSignees.DemanderAsync(new HttpClient(new ServeurQuiLeve()), Racine, _dossier, Dev(),
+            TablesDeDonnees.Embarquees, CancellationToken.None);
+
+        issue.Should().Be(DonneesSignees.Issue.Echec);
+        tables.Should().BeNull();
     }
 
     private sealed class ServeurSansFin : HttpMessageHandler

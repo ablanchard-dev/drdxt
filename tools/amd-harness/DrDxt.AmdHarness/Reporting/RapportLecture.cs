@@ -107,6 +107,9 @@ public static class RapportLecture
                 }
                 return Task.FromResult(sb.ToString());
             }),
+            // L'unité de la limite d'ADLX (% du TDP ou décalage) se prouve en mettant cette plage à côté d'AMD Software.
+            new("AMD : limite de puissance et sa plage (lecture)", _ =>
+                Task.FromResult(string.Join(Environment.NewLine, LectureAdlx.LignesPuissance(LectureAdlx.LirePuissances())))),
             new("Température de la carte (NVML, ADLX ou IGCL)", _ => Task.FromResult(TemperatureCarte.Lire().ToString())),
             new("Carte qui porte l'affichage (dwm)", _ =>
             {

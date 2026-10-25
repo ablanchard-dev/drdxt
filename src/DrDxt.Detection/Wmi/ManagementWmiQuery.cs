@@ -3,12 +3,29 @@ using DrDxt.Core;
 
 namespace DrDxt.Detection.Wmi;
 
+/// <summary>
+/// Une requête WMI bornée par <see cref="LectureWmiBornee"/> : au-delà de son délai, un échec <see cref="ErrorCodes.WmiTimeout"/>.
+/// </summary>
 public sealed class ManagementWmiQuery : IWmiQuery
 {
+    public static readonly TimeSpan Delai = LectureWmiBornee.Delai;
+
+    private readonly TimeSpan _delai;
+    private readonly Func<string, string, Result<IReadOnlyList<WmiRow>>> _executer;
+
+    public ManagementWmiQuery() : this(Delai, Executer) { }
+
+    internal ManagementWmiQuery(TimeSpan delai, Func<string, string, Result<IReadOnlyList<WmiRow>>> executer)
+        => (_delai, _executer) = (delai, executer);
+
     public Result<IReadOnlyList<WmiRow>> Query(string wql)
         => QueryInNamespace(@"\\.\root\cimv2", wql);
 
     public Result<IReadOnlyList<WmiRow>> QueryInNamespace(string ns, string wql)
+        => LectureWmiBornee.Lire(() => _executer(ns, wql),
+            () => Result<IReadOnlyList<WmiRow>>.Fail(ErrorCodes.WmiTimeout, $"WMI did not answer within {_delai.TotalSeconds:0} s."), _delai);
+
+    private static Result<IReadOnlyList<WmiRow>> Executer(string ns, string wql)
     {
         try
         {

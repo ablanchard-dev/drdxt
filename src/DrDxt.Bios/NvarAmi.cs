@@ -7,7 +7,7 @@ namespace DrDxt.Bios;
 /// Décode le magasin des valeurs d'usine d'un firmware AMI (la variable « StdDefaults ») : une suite d'enregistrements
 /// NVAR, chacun avec son nom, son GUID et ses octets. Sert à dire quels réglages du BIOS ne sont plus à leur valeur
 /// d'usine. Le format est celui que documente UEFITool (github.com/LongSoft/UEFITool, commit dac91b26,
-/// common/nvram.h et common/ksy/ami_nvar.ksy) ; il a été relu le 17/10/2026 sur la carte de référence (AMI 1.H0) :
+/// common/nvram.h et common/ksy/ami_nvar.ksy) ; mesuré le 17/10/2026 sur la carte de référence (AMI 1.H0) :
 /// 24 enregistrements, « Setup » et « CpuSetup » aux tailles des variables vivantes. Lecture seule, pur.
 /// </summary>
 public static class NvarAmi

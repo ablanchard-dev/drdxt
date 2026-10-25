@@ -23,6 +23,8 @@ internal static class InversesDeTest
             @"Software\Microsoft\DirectX\UserGpuPreferences", "DirectXUserGlobalSettings", RegistryValueType.String, valeur),
         "latency.gameDvrBackgroundOff" => new SetRegistryValueOp(RegistryHiveKind.CurrentUser,
             @"Software\Microsoft\Windows\CurrentVersion\GameDVR", "HistoricalCaptureEnabled", RegistryValueType.DWord, valeur),
+        "latency.gameModeOn" => new SetRegistryValueOp(RegistryHiveKind.CurrentUser,
+            @"Software\Microsoft\GameBar", "AllowAutoGameMode", RegistryValueType.DWord, valeur),
         _ => throw new ArgumentException($"Pas d'annulation de test pour {tweakId}.", nameof(tweakId)),
     }).Value!;
 }

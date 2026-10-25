@@ -77,7 +77,7 @@ public class IncidentNoyauLisibleTests
         var ancien = Constat(IlYA(48), IlYA(52), IlYA(55));
         ancien.Statut.Should().Be(RepairStatus.Observed);
         ancien.Explication.Should().StartWith("3 fois la même signature, 0x193 VIDEO_DXGKRNL_LIVEDUMP : ")
-            .And.Contain($"rien depuis le {DateTimeOffset.UtcNow.AddDays(-48).ToLocalTime():dd/MM}");
+            .And.Contain("rien depuis le " + DateTimeOffset.UtcNow.AddDays(-48).ToLocalTime().ToString("dd/MM", System.Globalization.CultureInfo.InvariantCulture));
     }
 
     // Un vidage à chaud isolé (« la machine a continué de tourner ») ouvrait la

@@ -24,9 +24,11 @@ public sealed class BootLoopGuard
     private readonly IBootOutcomeStore _bootStore;
     private readonly int _threshold;
 
-    /// <param name="threshold">Nombre de démarrages non propres consécutifs à partir duquel la
-    /// réapplication des réglages GPU est suspendue (3 par défaut, plan T27b).</param>
-    public BootLoopGuard(IBootOutcomeStore bootStore, int threshold = 3)
+    /// <summary>Le seuil par défaut (démarrages non propres consécutifs à partir desquels la réapplication des
+    /// réglages GPU est suspendue) ; aussi la série d'un état mis de côté, qui ne se sait plus.</summary>
+    public const int SeuilParDefaut = 3;
+
+    public BootLoopGuard(IBootOutcomeStore bootStore, int threshold = SeuilParDefaut)
     {
         _bootStore = bootStore;
         _threshold = threshold;

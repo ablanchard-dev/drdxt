@@ -169,4 +169,31 @@ public sealed class CalmerPendantLesPartiesTests
         vm.CalmerVoisinsActif.Should().BeFalse("aucun choix gardé : rien ne s'allume tout seul");
         sys.Historique.Should().BeEmpty();
     }
+
+    private sealed class LecteurEnPanne : ILecteurDeVoisins
+    {
+        public IReadOnlyList<VoisinDuJeu> Lire(int? pidDuJeu, CancellationToken ct) => throw new InvalidOperationException("lecture en panne");
+    }
+
+    // Une erreur imprévue arrêtait la boucle en silence : l'interrupteur restait sur « allumé » sans que rien ne tourne.
+    // Elle s'éteint maintenant, rend les priorités, et le dit.
+    [Fact]
+    public async Task Une_erreur_eteint_l_interrupteur_et_le_dit()
+    {
+        var locator = Substitute.For<IGameLocator>();
+        locator.LocateRunningGamePid().Returns(Jeu);
+        var vm = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
+            Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k,
+            gameLocator: locator, voisins: new LecteurEnPanne());
+        vm.Priorites = new Systeme();
+        vm.PasCalmer = TimeSpan.Zero;
+        vm.PidPremierPlan = () => 0;
+        vm.EstUnJeu = _ => true;
+        vm.CalmerVoisinsActif = true;
+
+        await vm.CalmerPendantLesPartiesAsync(CancellationToken.None);
+
+        vm.CalmerVoisinsActif.Should().BeFalse();
+        vm.MessageDemarrage.Should().Contain("Voisins.Calmer.ArreteSurErreur");
+    }
 }

@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- La SEULE source de version : l'App, le helper et l'installeur la lisent ici. -->
-    <Version>0.9.1</Version>
+    <Version>0.9.2</Version>
   </PropertyGroup>
   <!-- Le build livré portait C:\Users\<développeur> dans la DLL et dans chaque
        pile de plantage (PDB livrés). Déterministe en Release : la racine locale devient « /_/ ». -->

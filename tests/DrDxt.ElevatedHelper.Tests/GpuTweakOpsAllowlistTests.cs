@@ -101,6 +101,12 @@ public sealed class GpuTweakOpsAllowlistTests
         _allow.Validate(new ApplyGpuFanCurveOp(0, Array.Empty<FanCurvePointDto>()))
             .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
 
+    // `"Points":[null]` se décode : le refus vient de l'allowlist, pas d'une NullReferenceException rattrapée plus loin.
+    [Fact]
+    public void E4_null_fan_curve_point_is_denied() =>
+        _allow.Validate(new ApplyGpuFanCurveOp(0, new FanCurvePointDto[] { null! }))
+            .Error!.Value.Code.Should().Be(ErrorCodes.NotAllowlisted);
+
     [Fact]
     public void E4_out_of_range_duty_is_denied() =>
         _allow.Validate(new ApplyGpuFanCurveOp(0, new[] { new FanCurvePointDto(60, 130) }))

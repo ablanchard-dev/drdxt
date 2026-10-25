@@ -7,8 +7,8 @@ namespace DrDxt.Detection.Tests.Hardware;
 
 /// <summary>
 /// Les chaines d'emplacement de ces tests ne sont pas inventees : `Controller0-DIMMA2` et
-/// `Controller1-DIMMB2` sont ce que `Win32_PhysicalMemory` a rendu sur la machine de reference le
-/// Avec `Attributes=2` (dual rank) et 3800 MT/s a 1350 mV. Un test de topologie ecrit
+/// `Controller1-DIMMB2` sont ce que `Win32_PhysicalMemory` a rendu sur la machine de reference,
+/// avec `Attributes=2` (dual rank) et 3800 MT/s a 1350 mV. Un test de topologie ecrit
 /// sur des chaines imaginaires prouve la lecture d'une invention.
 /// </summary>
 public sealed class MemoryTopologyAdvisorTests

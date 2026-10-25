@@ -48,7 +48,8 @@ public sealed class TestDeRefroidissementVmTests
         await vm.LancerTestRefroidissementCommand.ExecuteAsync(null);
 
         vm.TestRefroidissementEnCours.Should().BeFalse();
-        vm.ResultatTestRefroidissement.Should().Be("lecture impossible");
+        // Le message technique part au journal ; l'écran dit la phrase générique.
+        vm.ResultatTestRefroidissement.Should().Contain("Erreur.Generique").And.NotContain("lecture impossible");
     }
 
     [Fact]

@@ -11,14 +11,15 @@ namespace DrDxt.Application.Tweaks.FixIt;
 // 1080p (Hardware Busters, 02/04/2023 : sans parcage, 94,12 % de la machine bien réglée). L'écart réel est
 // mesuré par le produit, et seulement par la voie logicielle prise en charge :
 //   (1) démarrer le service AMD 3D V-Cache Performance Optimizer (AMD3DVCacheSvc) ;
-//   (2) activer le mode Jeu automatique de la Game Bar (l'optimiseur se règle sur la Game Bar).
+//   (2) activer le mode Jeu de Windows (l'optimiseur se règle sur la Game Bar) : AllowAutoGameMode et
+//       AutoGameModeEnabled, la bascule des Paramètres récents, comme latency.gameModeOn.
 // CppcEnable sous ...\Control\Processor n'est pas écrit : aucune source trouvée ne montre que Windows
 // lise cette valeur ; CPPC se règle au BIOS. La feuille reste dans l'allowlist pour annuler un instantané
 // ancien qui la porte. Aucun bricolage du noyau, aucune écriture du BIOS : l'option CPPC du BIOS est
 // guidée par le guide BIOS, jamais scriptée ici.
 //
-// L'état d'origine du service et de la Game Bar est relu, rangé dans un snapshot composite inverse ;
-// l'annulation rend les deux. Chaque frontière externe est protégée : échec propre, jamais d'exception.
+// L'état d'origine du service et des deux valeurs du mode Jeu est relu, rangé dans un snapshot composite inverse ;
+// l'annulation rend le tout. Chaque frontière externe est protégée : échec propre, jamais d'exception.
 //
 // Le SummaryKey décrit la réparation, jamais « +FPS ». Le gain se prouve par la nouvelle mesure du
 // moteur ; sans gain mesuré, aucun gain n'est affiché.
@@ -33,6 +34,7 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
     private const string ServiceName = "AMD3DVCacheSvc";
     private const string GameBarPath = @"Software\Microsoft\GameBar";
     private const string GameBarName = "AllowAutoGameMode";
+    private const string GameBarEnabledName = "AutoGameModeEnabled";
     private const uint Enable = 1;
 
     private readonly IServiceStateReader _service;
@@ -53,10 +55,13 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
 
     public override bool AppliesTo(HardwareInventory hw, SettingsState state) =>
         // X3D à deux CCD (les 7800X3D/9800X3D à un CCD, Intel et les non-X3D sont écartés par
-        // l'heuristique) dont le parcage semble faux.
-        X3dParkingHeuristic.LooksMisparked(hw.Cpu, state);
+        // l'heuristique) dont le parcage semble faux, et dont le service AMD existe : sans le pilote de chipset, la pose
+        // démarrerait un service absent et défairait tout le lot ; le corriger demande le pilote, pas ce levier.
+        X3dParkingHeuristic.LooksMisparked(hw.Cpu, state) && !ServiceAbsent();
 
-    /// <summary>Le parking non lu n'est pas « rien n'est parqué ».</summary>
+    private bool ServiceAbsent() => _service.GetServiceState(ServiceName) is { IsOk: true, Value: ServiceState.NotInstalled };
+
+    /// <summary>Le parking non lu (ou scanné sans jeu ouvert) n'est pas « rien n'est parqué ».</summary>
     public override bool EtatNonLu(SettingsState state) => state.ParkedCoreIndexes is null;
 
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
@@ -68,16 +73,24 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
             if (!serviceState.IsOk)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     $"Could not read the AMD 3D V-Cache service state: {serviceState.Error?.Code}.");
+            if (serviceState.Value == ServiceState.NotInstalled)
+                return Result<TweakSnapshot>.Fail(ErrorCodes.TweakNotApplicable,
+                    "The AMD 3D V-Cache service is not installed (AMD chipset driver missing); nothing written.");
 
             var gameBar = _registry.ReadDword(RegistryHiveKind.CurrentUser, GameBarPath, GameBarName);
             if (!gameBar.IsOk)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     $"Could not read original Game Bar auto-mode: {gameBar.Error?.Code}.");
+            var gameBarEnabled = _registry.ReadDword(RegistryHiveKind.CurrentUser, GameBarPath, GameBarEnabledName);
+            if (!gameBarEnabled.IsOk)
+                return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
+                    $"Could not read original AutoGameModeEnabled: {gameBarEnabled.Error?.Code}.");
 
-            // Construire le snapshot inverse composite (rend les deux origines).
+            // Construire le snapshot inverse composite (rend toutes les origines).
             var inverseOps = new List<PrivilegedOp>
             {
                 BuildRegistryInverse(RegistryHiveKind.CurrentUser, GameBarPath, GameBarName, gameBar.Value),
+                BuildRegistryInverse(RegistryHiveKind.CurrentUser, GameBarPath, GameBarEnabledName, gameBarEnabled.Value),
             };
             // N'ajouter l'inverse du service que s'il ne tournait pas déjà : on ne doit pas
             // arrêter un service que l'utilisateur avait déjà allumé.
@@ -110,6 +123,11 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
                         RegistryValueType.DWord, enableValue),
                     BuildRegistryInverse(RegistryHiveKind.CurrentUser, GameBarPath, GameBarName, gameBar.Value)
                 ),
+                (
+                    new SetRegistryValueOp(RegistryHiveKind.CurrentUser, GameBarPath, GameBarEnabledName,
+                        RegistryValueType.DWord, enableValue),
+                    BuildRegistryInverse(RegistryHiveKind.CurrentUser, GameBarPath, GameBarEnabledName, gameBarEnabled.Value)
+                ),
             };
 
             var appliedInverses = new List<PrivilegedOp?>(steps.Length);
@@ -124,7 +142,7 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
                 appliedInverses.Add(inverse);
             }
 
-            // Les valeurs posees (service, Game Bar), pour que la desinstallation ne
+            // Les valeurs posees (service, mode Jeu), pour que la desinstallation ne
             // rende une feuille que si elle porte encore ce que DrDXT y a mis.
             var posees = CompositeSnapshotCodec.Encode(steps.Select(s => s.Forward).ToList());
             return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, snapshotJson.Value, posees.IsOk ? posees.Value : null));
@@ -161,13 +179,7 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
 
         try
         {
-            foreach (var op in decoded.Value)
-            {
-                var res = await Elevated.ExecuteAsync(op, CancellationToken.None).ConfigureAwait(false);
-                if (!res.IsOk)
-                    return res; // rend tel quel le premier échec de retour
-            }
-            return Result.Ok();
+            return await RetourArriere.ToutRendreAsync(Elevated, decoded.Value).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

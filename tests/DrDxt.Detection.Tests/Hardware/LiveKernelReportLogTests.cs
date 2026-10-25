@@ -184,4 +184,33 @@ public class LiveKernelReportLogTests : IDisposable
         new LiveKernelReport(DateTimeOffset.UtcNow, code, null, null, null)
             .EstGraphique.Should().Be(graphique);
     }
+
+    // Un rapport abîmé ne fait pas disparaître les autres : une date hors de la plage de Windows n'est pas un rapport.
+    [Theory]
+    [InlineData(-5L)]
+    [InlineData(long.MaxValue)]
+    public void Une_date_hors_plage_ecarte_ce_rapport_seul(long filetime)
+    {
+        Rapport("Kernel_193_sain", "LiveKernelEvent", "193", "80e", 134318324727177547);
+        Rapport("Kernel_193_abime", "LiveKernelEvent", "193", "80e", filetime);
+
+        var r = new WerLiveKernelReportLog(_racine).Lire();
+
+        r.IsOk.Should().BeTrue();
+        r.Value.Should().ContainSingle();
+    }
+
+    // WER peut tenir un rapport ouvert en écriture : ce dossier est sauté, les autres restent.
+    [Fact]
+    public void Un_rapport_verrouille_n_efface_pas_les_autres()
+    {
+        Rapport("Kernel_193_sain", "LiveKernelEvent", "193", "80e", 134318324727177547);
+        var verrouille = Rapport("Kernel_193_ouvert", "LiveKernelEvent", "193", "80e", 134318324727177547);
+        using var tenu = new FileStream(Path.Combine(verrouille, "Report.wer"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        var r = new WerLiveKernelReportLog(_racine).Lire();
+
+        r.IsOk.Should().BeTrue();
+        r.Value.Should().ContainSingle();
+    }
 }

@@ -22,7 +22,7 @@ public static class BiosGuideStringKeys
     public const string Verified = "Bios.Guide.Confidence.Verified";
     public const string UnverifiedFallback = "Bios.Guide.Confidence.Unverified";
 
-    // ── Désactivation du CSM retirée sur démarrage Legacy : une étape d'avertissement la remplace. ──
+    // ── Texte prévu pour un démarrage Legacy ; aucune étape ne l'affiche, le CSM n'étant jamais une étape. ──
     public const string CsmSuppressedLegacy = "Bios.Guide.Csm.SuppressedLegacy";
 
     // ── Échelle de récupération (en haut et en bas, dans cet ordre exact). ──

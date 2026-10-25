@@ -46,7 +46,7 @@ public sealed class PawnIoCpuPowerActions : ICpuPowerActions
             using var cle = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
             var nom = (cle?.GetValue("ProcessorNameString") as string)?.Trim();
             var rev = MicrocodeVmin.Revision(cle?.GetValue("Update Revision") as byte[]);
-            return MicrocodeVmin.Perime(nom, rev, (cle?.GetValue("Identifier") as string)?.Trim());
+            return MicrocodeVmin.PerimePourLaPuissance(nom, rev, (cle?.GetValue("Identifier") as string)?.Trim());
         }
         catch (Exception) { return null; }
     }
@@ -146,14 +146,19 @@ public sealed class PawnIoCpuPowerActions : ICpuPowerActions
             var maximale = (courant.PkgPowerInfo >> 32) & 0x7FFF;
             if (maximale > 0 && (valeur & 0x7FFF) > maximale)
                 return Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit raise refused: PL1 above the maximum power the processor publishes; nothing written.");
-            if (maximale == 0 && ((valeur >> 32) & 0x7FFF) == 0x7FFF)
+            if (maximale == 0 && RegistreDeLimiteCpu.Pl2SansLimite(valeur, courant.RaplPowerUnit))
                 return Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit raise refused: the board's PL2 says no limit and the processor publishes no maximum; nothing written.");
         }
         if (RegistreDeLimiteCpu.Verrou(courant.PkgPowerLimit))
             return Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit register is locked by the firmware until the next boot; nothing written.");
-        return _ecrire(valeur)
-            ? Result.Ok()
-            : Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit write was not read back; the board refused it.");
+        if (_ecrire(valeur))
+            return Result.Ok();
+        // La valeur a pu partir sans se relire (relecture ratée, carte qui la borne) : un refus sans rendu laissait la PL1
+        // montée jusqu'au redémarrage, sans bail ni journal pour la rendre. Le registre lu juste avant est reposé.
+        return _ecrire(courant.PkgPowerLimit)
+            ? Result.Fail(ErrorCodes.HelperOpFailed, "CPU power limit write was not read back; the previous value was put back.")
+            // Peut-être encore posée : le moteur compte ce code comme non rendu, jamais comme « rien n'a changé ».
+            : Result.Fail(ErrorCodes.TweakPartiallyApplied, "CPU power limit write was not read back, and the previous value could not be put back; it clears at the next boot.");
     }
 }
 

@@ -51,7 +51,7 @@ public sealed class PawnIoCpuPowerLimitReader : ICpuPowerLimitReader
             CopieMmioPl1W = RegistreDeLimiteCpu.CopieMmioPl1W(copie, registres.RaplPowerUnit),
             ChaleurEnPartieMaxC = ChaleurEnPartie.MaxC(parties),
             PlafondThermiqueW = ChaleurEnPartie.PlafondThermique(parties) ?? PlafondEncorePose(registres),
-            MicrocodeVminPerime = MicrocodeVmin.Perime(nom, revision, identifiant) == true,
+            MicrocodeVminPerime = MicrocodeVmin.PerimePourLaPuissance(nom, revision, identifiant) == true,
         };
         return Result<LectureLimiteCpu>.Ok(new LectureLimiteCpu(registres, lu));
     }

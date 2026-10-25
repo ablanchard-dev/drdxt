@@ -184,6 +184,22 @@ public sealed class ScanApplyCommandTests
         h.Vm.ResultatOptimisation.Should().Contain("Apply.Result.RebootSet");
     }
 
+    // Le résultat dit le moment d'une pose, pas son effet ; une pose que la relecture ne confirme pas porte « non relu ».
+    [Theory]
+    [InlineData(DrDxt.Application.Tweaks.EtatApplique.Applied, false)]
+    [InlineData(DrDxt.Application.Tweaks.EtatApplique.Unknown, true)]
+    [InlineData(DrDxt.Application.Tweaks.EtatApplique.Unavailable, true)]
+    public async Task Une_pose_non_relue_se_dit_non_relue(DrDxt.Application.Tweaks.EtatApplique relu, bool ditNonRelu)
+    {
+        var h = Build(graines: new[] { "latency.hagsOn", "latency.gameModeOn" });
+        h.Vm.VerifierLaPose = _ => relu;
+        await ScanThenApply(h);
+
+        h.Vm.ResultatOptimisation.Should().Contain("Apply.Result.RebootSet");
+        if (ditNonRelu) h.Vm.ResultatOptimisation.Should().Contain("Apply.Result.NonRelu");
+        else h.Vm.ResultatOptimisation.Should().NotContain("Apply.Result.NonRelu");
+    }
+
     // Le moteur défait un lot entier sur un échec. Un mode d'écran que le joueur ne garde pas ne
     // doit pas défaire les heures d'activité ni les corrections au redémarrage cliquées avec lui : chacun son lot.
     [Fact]
@@ -201,6 +217,62 @@ public sealed class ScanApplyCommandTests
             Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
         h.Vm.ApplyBlockedMessage.Should().BeNullOrEmpty();
         h.Vm.ResultatOptimisation.Should().Contain("Apply.Result.NotHeld", "F-16 : le lot refusé se nomme, il ne disparaît pas");
+    }
+
+    // Un lot que le moteur n'a pas pu défaire en entier : un levier peut être resté posé. « Rien n'a été conservé » ou
+    // « rien n'est resté » serait faux ; l'écran dit de vérifier ces réglages.
+    [Fact]
+    public async Task Un_lot_pas_defait_en_entier_ne_se_dit_jamais_inchange()
+    {
+        var h = Build(graines: new[] { "latency.hagsOn", "latency.gameModeOn" },
+            applyResult: Result<ApplyReport>.Fail(ErrorCodes.TweakPartiallyApplied, "rollback could not revert: latency.hagsOn"));
+        await ScanThenApply(h);
+
+        h.Vm.ApplyBlockedMessage.Should().StartWith("Apply.Result.ResteAVerifier").And.NotBe("Apply.Failed");
+        h.Vm.ResultatOptimisation.Should().Contain("Apply.Result.ResteAVerifier")
+            .And.NotContain("Apply.Result.NotHeld").And.NotContain("Apply.Result.RebootNoneHeld");
+    }
+
+    [Fact]
+    public async Task Parmi_d_autres_lots_celui_pas_defait_en_entier_est_dit_a_verifier()
+    {
+        var h = Build(graines: new[] { "latency.hagsOn", "fixit.heures_actives", "fixit.ecran_frequence" });
+        h.Engine.ApplyAsync(Arg.Is<TweakPlan>(p => p.TweakIds.Contains("fixit.ecran_frequence")), Arg.Any<BenchmarkResult?>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Result<ApplyReport>.Fail(ErrorCodes.TweakPartiallyApplied, "rollback could not revert: fixit.ecran_frequence"));
+        await ScanThenApply(h);
+
+        var lignes = h.Vm.ResultatOptimisation!.Split(Environment.NewLine);
+        lignes.Should().Contain(l => l.StartsWith("Apply.Result.ResteAVerifier") && l.Contains("fixit.ecran_frequence"));
+        lignes.Where(l => l.StartsWith("Apply.Result.NotHeld")).Should().NotContain(l => l.Contains("fixit.ecran_frequence"),
+            "un réglage peut-être resté posé n'est pas « rien n'est resté »");
+    }
+
+    [Fact]
+    public async Task Le_reglage_au_clic_pas_defait_en_entier_ne_se_dit_pas_sans_effet()
+    {
+        var h = Build(graines: new[] { "latency.hagsOn", "fixit.ecran_frequence" });
+        h.Engine.ApplyAsync(Arg.Is<TweakPlan>(p => p.TweakIds.Contains("fixit.ecran_frequence")), Arg.Any<BenchmarkResult?>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Result<ApplyReport>.Fail(ErrorCodes.TweakPartiallyApplied, "rollback could not revert: fixit.ecran_frequence"));
+        await ScanThenApply(h);
+
+        h.Vm.ResultatOptimisation.Should().Contain("Apply.Result.ResteAVerifier").And.NotContain("Apply.Result.SetNowNoneHeld");
+    }
+
+    [Fact]
+    public async Task Le_lot_au_redemarrage_pas_defait_en_entier_ne_se_dit_pas_sans_effet()
+    {
+        var h = Build(graines: new[] { "latency.hagsOn", "fixit.heures_actives" });
+        h.Engine.ApplyAsync(Arg.Is<TweakPlan>(p => p.TweakIds.Contains("latency.hagsOn")), Arg.Any<BenchmarkResult?>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Result<ApplyReport>.Fail(ErrorCodes.TweakPartiallyApplied, "rollback could not revert: latency.hagsOn"));
+        h.Engine.ApplyAsync(Arg.Is<TweakPlan>(p => p.TweakIds.Contains("fixit.heures_actives")), Arg.Any<BenchmarkResult?>(),
+                Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Result<ApplyReport>.Ok(OkReport("fixit.heures_actives")));
+        await ScanThenApply(h);
+
+        h.Vm.ResultatOptimisation.Should().Contain("Apply.Result.ResteAVerifier").And.NotContain("Apply.Result.RebootNoneHeld");
     }
 
     [Fact]
@@ -328,6 +400,33 @@ public sealed class ScanApplyCommandTests
         finally { System.IO.Directory.Delete(dossier, recursive: true); }
     }
 
+    // Un levier gardé par la session restait dans les graines du clic suivant : un nouveau candidat relisait la cible déjà
+    // posée comme « origine », et l'A/B comparait la cible à elle-même. Gardé, il sort des graines, comme les poses
+    // d'Optimiser (et comme l'essai, qui part d'un levier déjà posé).
+    [Fact]
+    public async Task Un_levier_garde_en_session_ne_repart_pas_au_clic_suivant()
+    {
+        var dossier = System.IO.Directory.CreateTempSubdirectory("drdxt-session-").FullName;
+        try
+        {
+            var m = new Machine();
+            var h = Build(graines: AChaud, pid: PidDuJeu, banc: new BancReflex(m),
+                journalLeviers: new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "leviers.json")),
+                creer: d => new DrDxt.Application.Autopilot.TweakCandidate(new LevierReflex(m, d.Id), d, new RegistreReflex(m),
+                    new DrDxt.Application.Autopilot.FichierRevertEnAttente(System.IO.Path.Combine(dossier, "revert.json"))));
+            await h.Vm.ScanCommand.ExecuteAsync(null);
+            h.Vm.Patienter = _ => Task.CompletedTask;
+
+            await h.Vm.ApplyCommand.ExecuteAsync(null);
+            m.Pose.Should().BeTrue("témoin : la session a gardé le levier");
+            await h.Vm.ApplyCommand.ExecuteAsync(null);
+
+            h.CandidatsCrees.Count(id => id == AChaud[0]).Should().Be(1, "gardé au premier clic, il ne repart pas au second");
+            m.Pose.Should().BeTrue();
+        }
+        finally { System.IO.Directory.Delete(dossier, recursive: true); }
+    }
+
     [Fact]
     public async Task Jeu_reste_reduit_la_session_n_a_pas_lieu_et_c_est_dit()
     {
@@ -359,7 +458,8 @@ public sealed class ScanApplyCommandTests
         return h;
     }
 
-    // Avant le clic, Optimiser dit ce qu'il va changer : après le scan, l'écran nomme les réglages qu'il essaiera.
+    // Avant le clic, Optimiser dit ce qu'il va changer : après le scan, l'écran nomme le réglage qu'il essaiera à ce clic. Un
+    // seul levier à chaud part en session : l'aperçu ne promet pas le second.
     [Fact]
     public async Task Avant_le_clic_Optimiser_nomme_ce_qu_il_essaiera()
     {
@@ -368,8 +468,64 @@ public sealed class ScanApplyCommandTests
 
         await h.Vm.ScanCommand.ExecuteAsync(null);
 
-        foreach (var id in AChaud)
-            h.Vm.ApercuOptimisation.Should().Contain(TweakDisplayKeys.TitleKey(id));
+        h.Vm.ApercuOptimisation.Should().StartWith("Optimiser.Apercu ").And.Contain(TweakDisplayKeys.TitleKey(AChaud[0]))
+            .And.NotContain(TweakDisplayKeys.TitleKey(AChaud[1]));
+    }
+
+    // Scan sans jeu, puis le joueur lance son jeu et clique Optimiser : le jeu se lisait au scan, le veto « l'affichage se règle
+    // hors partie » ne jouait pas, et le mode d'écran changeait sous le jeu, sa question « garder ou revenir » cachée derrière.
+    [Fact]
+    public async Task Un_jeu_lance_apres_le_scan_empeche_de_changer_l_ecran_au_clic()
+    {
+        var h = Build(graines: new[] { "fixit.ecran_frequence" });
+        await h.Vm.ScanCommand.ExecuteAsync(null);
+        h.Locator!.LocateRunningGamePid().Returns(PidDuJeu);
+
+        await h.Vm.ApplyCommand.ExecuteAsync(null);
+
+        await h.Engine.DidNotReceiveWithAnyArgs().ApplyAsync(default!, default, default, default);
+    }
+
+    // Après « Annuler », l'écran gardait « Posé(s) … » et « déjà en place », et un nouveau clic ne reposait rien jusqu'au scan
+    // suivant : le levier annulé restait parmi les poses de ce scan.
+    [Fact]
+    public async Task Apres_annuler_optimiser_peut_reposer_et_ne_dit_plus_pose()
+    {
+        var dossier = Directory.CreateTempSubdirectory("drdxt-annuler-").FullName;
+        try
+        {
+            const string hags = "latency.hagsOn";
+            var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(Path.Combine(dossier, "leviers.json"));
+            var h = Build(graines: new[] { hags }, journalLeviers: leviers,
+                applyResult: Result<ApplyReport>.Ok(new ApplyReport([new ApplyOutcome(hags, true, false,
+                    new TweakSnapshot(hags, DrDxt.Tests.Shared.InversesDeTest.Pour(hags, "1"), DrDxt.Tests.Shared.InversesDeTest.Pour(hags, "2")), null)], null)));
+            await ScanThenApply(h);
+            leviers.Lire().Should().ContainSingle("témoin : HAGS est posé et inscrit");
+            var levier = Substitute.For<ITweak>();
+            levier.Id.Returns(hags);
+            levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Ok());
+            h.Vm.LevierParId = id => id == hags ? levier : null;
+
+            await h.Vm.AnnulerLevierCommand.ExecuteAsync(hags);
+
+            h.Vm.ResultatOptimisation.Should().BeNullOrEmpty("le compte rendu d'Optimiser ne dit plus vrai");
+            h.Vm.RienAPoserSeul.Should().BeFalse();
+            await h.Vm.ApplyCommand.ExecuteAsync(null);
+            await EngineReceived(h, 2);
+        }
+        finally { Directory.Delete(dossier, true); }
+    }
+
+    // Les leviers au redémarrage partent sans mesure : l'aperçu promettait « mesuré en jeu » pour eux aussi.
+    [Fact]
+    public async Task L_apercu_ne_promet_pas_de_mesure_aux_leviers_poses_sans_mesure()
+    {
+        var h = Build(graines: AuRedemarrage);
+
+        await h.Vm.ScanCommand.ExecuteAsync(null);
+
+        h.Vm.ApercuOptimisation.Should().StartWith("Optimiser.Apercu.SansMesure ")
+            .And.Contain(TweakDisplayKeys.TitleKey(AuRedemarrage[0])).And.NotContain("Optimiser.Apercu ");
     }
 
     // « Rien à changer automatiquement ici » s'affichait juste au-dessus de « DrDXT
@@ -609,8 +765,43 @@ public sealed class ScanApplyCommandTests
 
             await h.Engine.DidNotReceiveWithAnyArgs().ApplyAsync(default!, default, default, default);
             h.Vm.ResultatOptimisation.Should().Contain("Garde.PasRepose");
+            h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingThisRound", "rendu par la garde : pas « déjà en place »");
         }
         finally { Directory.Delete(dossier, true); }
+    }
+
+    // HAGS retiré parce qu'il coûtait en jeu (bascule « on » figée « moins bien ») : au scan suivant, HAGS lu éteint le remettait
+    // au plan, et Optimiser le reposait sans un mot. Il n'est pas reposé avant trente jours, et l'écran le dit.
+    [Fact]
+    public async Task Un_levier_retire_parce_qu_il_coutait_n_est_pas_repose_en_silence()
+    {
+        var h = Build(graines: new[] { "latency.hagsOn" });
+        var dossier = Directory.CreateTempSubdirectory("drdxt-retrait-").FullName;
+        try
+        {
+            h.Vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(Path.Combine(dossier, "changements.json"));
+            var bascule = new DrDxt.Application.Parties.Changement(DateTimeOffset.Now.AddDays(-3), "HAGS", DateTimeOffset.Now.AddDays(-4), "windows.hags:on");
+            h.Vm.JournalChangements.Ajouter(bascule);
+            h.Vm.JournalChangements.Figer(bascule, new DrDxt.Application.Parties.BilanDuChangement(
+                DrDxt.Application.Parties.VerdictEnJeu.Pire, "cod.exe", 3, 3, 95, 81, 140, 140));
+
+            await ScanThenApply(h);
+
+            await h.Engine.DidNotReceiveWithAnyArgs().ApplyAsync(default!, default, default, default);
+            h.Vm.ResultatOptimisation.Should().Contain("Retrait.PasRepose");
+        }
+        finally { Directory.Delete(dossier, true); }
+    }
+
+    // « Déjà en place » ne se dit que quand aucun réglage n'était candidat ; un réglage écarté (sans jeu, veto, garde) se dit
+    // « rien à ce clic », jamais « déjà en place ».
+    [Fact]
+    public async Task Sans_aucun_candidat_rien_a_poser_se_dit_deja_en_place()
+    {
+        var h = Build(graines: [], pid: PidDuJeu);
+        await ScanThenApply(h);
+
+        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingApplicable");
     }
 
     [Fact]
@@ -619,7 +810,7 @@ public sealed class ScanApplyCommandTests
         var h = Build(graines: AChaud, pid: 0);
         await ScanThenApply(h);
 
-        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingApplicable");
+        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingThisRound");
         h.Vm.ResultatOptimisation.Should().NotContain("Apply.SousGarde");
     }
 
@@ -633,7 +824,7 @@ public sealed class ScanApplyCommandTests
 
         h.CandidatsCrees.Should().BeEmpty();
         await h.Safety.DidNotReceive().EnsureRestorePointAsync();
-        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingApplicable");
+        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingThisRound");
         h.Vm.ResultatOptimisation.Should().Contain("aucun jeu");
     }
 
@@ -711,7 +902,7 @@ public sealed class ScanApplyCommandTests
         var h = Build(consumption: AvecPlanGpu(), pid: 0);
         await ScanThenApplyGpu(h);
 
-        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingApplicable");
+        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingThisRound");
     }
 
     // ====================== porte du point de restauration ======================
@@ -803,6 +994,39 @@ public sealed class ScanApplyCommandTests
             .Should().Contain("ApplyCommand.IsRunning", "le texte n'apparaît que pendant le travail");
     }
 
+    // Un essai en alternance tient son levier : Optimiser ne le mesure pas en A/B par-dessus, sinon les parties suivantes
+    // seraient marquées d'un état que la session a changé.
+    [Fact]
+    public async Task Optimiser_ne_mesure_pas_le_levier_d_un_essai_en_cours()
+    {
+        var h = Build(graines: new[] { "latency.reflex" }, pid: PidDuJeu);
+        var dossier = Directory.CreateTempSubdirectory("drdxt-essai-opt-").FullName;
+        try
+        {
+            h.Vm.MemoireEssai = new DrDxt.Application.Parties.MemoireDeLEssai(Path.Combine(dossier, "essai.json"));
+            h.Vm.MemoireEssai.Ecrire(new DrDxt.Application.Parties.EssaiEnAlternance("latency.reflex", false, false, DateTimeOffset.Now))
+                .IsOk.Should().BeTrue();
+
+            await ScanThenApply(h);
+
+            h.CandidatsCrees.Should().NotContain("latency.reflex");
+        }
+        finally { Directory.Delete(dossier, true); }
+    }
+
+    // Le résultat d'un Optimiser précédent ne reste pas sous le bouton après un nouveau scan : il contredirait la nouvelle liste.
+    [Fact]
+    public async Task Un_nouveau_scan_efface_le_resultat_d_Optimiser()
+    {
+        var h = Build(graines: new[] { "fixit.heures_actives" });
+        await ScanThenApply(h);
+        h.Vm.ResultatOptimisation.Should().NotBeNullOrEmpty("témoin : Optimiser a parlé");
+
+        await h.Vm.ScanCommand.ExecuteAsync(null);
+
+        h.Vm.ResultatOptimisation.Should().BeNullOrEmpty();
+    }
+
     [Fact]
     public async Task Engine_failure_surfaces_error()
     {
@@ -810,6 +1034,17 @@ public sealed class ScanApplyCommandTests
         await ScanThenApply(h);
 
         h.Vm.ApplyBlockedMessage.Should().Be("Apply.Failed");
+    }
+
+    // La réponse du helper manque après l'envoi : le réglage a pu être posé. « Rien n'a été posé » serait faux ; seule la
+    // phrase de l'incertitude se dit.
+    [Fact]
+    public async Task Sans_reponse_du_helper_Optimiser_ne_dit_pas_que_rien_n_a_ete_pose()
+    {
+        var h = Build(applyResult: Result<ApplyReport>.Fail(ErrorCodes.HelperNoReply, "pas de réponse"));
+        await ScanThenApply(h);
+
+        h.Vm.ApplyBlockedMessage.Should().Be("Erreur.Generique", "la phrase de l'incertitude, pas « Apply.Failed »");
     }
 
     // ====================== le scan fait remonter les recommandations du profil ======================

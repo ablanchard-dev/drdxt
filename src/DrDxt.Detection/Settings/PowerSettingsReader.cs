@@ -33,7 +33,8 @@ public sealed record PowerSettingValue(string Nom, uint? ValeurAc, uint? DefautA
 /// Un ecart au defaut reste un ecart. Il ne dit pas que la valeur est mauvaise, ni que
 /// quelqu'un l'a posee par erreur. Le classement vit ailleurs (<see cref="DrDxt.Core.RepairStatus"/>).
 ///
-/// Échec propre : ne leve jamais ; toute lecture ratee rend <c>null</c>, jamais zero. « Non lu » et
+/// Échec propre : une erreur de retour ne leve jamais (une signature fausse, elle, tue le processus : voir
+/// PowerReadACValueIndex) ; toute lecture ratee rend <c>null</c>, jamais zero. « Non lu » et
 /// « vaut zero » sont deux reponses differentes, et les confondre ferait accuser un plan sain.
 /// </summary>
 [SupportedOSPlatform("windows")]
@@ -70,7 +71,7 @@ public sealed class PowerSettingsReader
         // Les freins que l'interface de Windows cache (Microsoft Learn, « Processor power management options » et « System
         // cooling policy ») : PROCFREQMAX et PROCFREQMAX1 plafonnent la fréquence en MHz (0 = aucun plafond),
         // PROCTHROTTLEMAX1 l'état maximal des cœurs de la 2e classe d'efficacité, SYSCOOLPOL (0 passif, 1 actif) ralentit le
-        // processeur avant de lancer les ventilateurs. Lus sur cette machine le 16/10/2026 par powercfg /qh : 0, 0, 100 %, actif.
+        // processeur avant de lancer les ventilateurs. Relevés sur cette machine le 16/10/2026 par powercfg /qh : 0, 0, 100 %, actif.
         ("frequence maximale", new Guid("75b0ae3f-bce0-45a7-8c89-c9611c25e100"), "MHz"),
         ("frequence maximale (coeurs efficaces)", new Guid("75b0ae3f-bce0-45a7-8c89-c9611c25e101"), "MHz"),
         ("etat maximal (coeurs efficaces)", new Guid("bc5038f7-23e0-4960-96da-33abaf5935ed"), "%"),
@@ -120,9 +121,8 @@ public sealed class PowerSettingsReader
             var sousGroupe = sousGroupeLu ?? SousGroupeProcesseur;
             var schema = plan ?? Guid.Empty;
             uint valeur = 0;
-            // Un plan NUL ne marche pas ici, contrairement a l'hypothese de depart : mesure du
-            // Les six lectures rendaient « non lu » pendant que les defauts, eux,
-            // sortaient. Il faut nommer le plan dont on lit la valeur.
+            // Un plan nul ne marche pas ici : avec lui, les six lectures rendaient « non lu » pendant que
+            // les defauts, eux, sortaient. Il faut nommer le plan dont on lit la valeur.
             return PowerReadACValueIndex(IntPtr.Zero, ref schema, ref sousGroupe, ref reglage, ref valeur) == 0
                 ? valeur
                 : null;   // ERROR_SUCCESS ou rien : jamais un zero fabrique.

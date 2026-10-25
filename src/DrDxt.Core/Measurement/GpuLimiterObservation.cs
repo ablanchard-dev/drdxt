@@ -140,7 +140,9 @@ public static class GpuLimiter
         if (raisons is null && gpuBusyRatio is null && frequenceMedianeMhz is null)
             return GpuLimiterObserved.Inconnu;
 
-        return raisons is not null || gpuBusyRatio is not null
+        // Une raison lue, ou une frequence lue et stable : « rien ne bride » s'appuie sur l'une ou l'autre. L'occupation seule
+        // (carte AMD, NVML muet) ne dit rien du bridage.
+        return raisons is not null || frequenceMedianeMhz is > 0
             ? GpuLimiterObserved.RienDeBridant
             : GpuLimiterObserved.Inconnu;
     }

@@ -34,8 +34,8 @@ namespace DrDxt.Reconciler;
 // periodique remettrait la reference a « maintenant » a chaque tour et effacerait
 // exactement le signal qu'on cherche a armer. Seul un champ vide est rempli.
 //
-// L'echec se dit. Dans l'App non elevee, qui ne peut pas ecrire la racine admin, `SaveAsync`
-// rendrait Fail et le commit Ok (ReferenceDeDeriveTests) : le decorateur vit donc dans le
+// L'echec se dit. Dans l'App non elevee, qui ne peut pas ecrire la racine admin, la mise a jour
+// du sidecar rendrait Fail et le commit Ok (ReferenceDeDeriveTests) : le decorateur vit donc dans le
 // helper eleve (MachineManifestCommit). Le manifeste reste l'autorite : un sidecar illisible ou
 // non ecrit ne defait pas le commit, mais il le signale (ErrorCodes.ManifestReferenceNotSeeded),
 // et l'ecran le montre.
@@ -104,19 +104,23 @@ public sealed class ApplyReferenceSeedingStore : IDesiredStateStore
         if (state.Tweaks.Count == 0)
             return Result.Ok(); // un keep (RevertOnly) n'est jamais reaffirme : rien a referencer.
 
-        var loaded = await _sidecar.LoadAsync(CancellationToken.None);
-        if (!loaded.IsOk)
-            return Result.Fail(loaded.Error!.Value.Code, loaded.Error.Value.Message);
-
-        var current = loaded.Value!;
-        var byId = current.Items.ToDictionary(i => i.TweakId, StringComparer.Ordinal);
-
         var build = _buildProbe.ReadCurrentBuild();
         var buildToken = build.IsOk ? build.Value! : string.Empty;
 
         // Une lecture pilote par vendeur, memorisee : un item sans vendeur n'en declenche
         // aucune, dix items NVIDIA n'en declenchent qu'une (la sonde reelle interroge WMI).
         var versionsParVendeur = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+        // Relire, poser, reecrire d'un seul tenant : le service reecrit ce fichier a chaque passe.
+        var r = await _sidecar.MettreAJourAsync(current => AvecLesReferences(current, state, buildToken, versionsParVendeur),
+            CancellationToken.None);
+        return r.IsOk ? Result.Ok() : Result.Fail(r.Error!.Value.Code, r.Error.Value.Message);
+    }
+
+    private ReconcilerState? AvecLesReferences(ReconcilerState current, DesiredState state, string buildToken,
+        Dictionary<string, string?> versionsParVendeur)
+    {
+        var byId = current.Items.ToDictionary(i => i.TweakId, StringComparer.Ordinal);
 
         var change = false;
         foreach (var tweak in state.Tweaks)
@@ -154,8 +158,6 @@ public sealed class ApplyReferenceSeedingStore : IDesiredStateStore
             change = true;
         }
 
-        return change
-            ? await _sidecar.SaveAsync(current with { Items = byId.Values.ToArray() }, CancellationToken.None)
-            : Result.Ok();
+        return change ? current with { Items = byId.Values.ToArray() } : null;
     }
 }

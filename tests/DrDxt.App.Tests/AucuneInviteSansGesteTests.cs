@@ -153,6 +153,24 @@ public sealed class AucuneInviteSansGesteTests : IDisposable
         leviers.Lire().Should().ContainSingle("rien n'est rendu : le levier reste au journal, et le retrait se retentera");
     }
 
+    // La capture de la veille est prise en pleine partie : le banc n'y coupe pas de « démarrage » (MesureEnPartie), et un
+    // scan, hors de la veille, garde sa recherche du démarrage.
+    [Fact]
+    public async Task La_capture_de_la_veille_se_mesure_en_pleine_partie()
+    {
+        bool? vu = null;
+        var banc = Substitute.For<IBenchmarkRunner>();
+        banc.RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(_ => { vu = DrDxt.Measurement.MesureEnPartie.Active; return Result<BenchmarkResult>.Fail(ErrorCodes.PmonUnavailable, "test"); });
+        var vm = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
+            banc, Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k);
+
+        await vm.Invoking(v => v.CapturerSansGesteAsync(4242, TimeSpan.FromSeconds(1), CancellationToken.None)).Should().ThrowAsync<InvalidOperationException>();
+
+        vu.Should().BeTrue();
+        DrDxt.Measurement.MesureEnPartie.Active.Should().BeFalse("la portée se referme avec la capture");
+    }
+
     // En pleine partie : la capture de la veille des parties. Sans PresentMon, le banc l'installe par le helper ; sans clic,
     // il ne le lance pas, et la capture échoue en le disant (le prochain scan l'installera).
     [Fact]

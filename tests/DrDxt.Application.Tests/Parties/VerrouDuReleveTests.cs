@@ -69,7 +69,10 @@ public sealed class VerrouDuReleveTests : IDisposable
         Directory.CreateDirectory(_dossier);
         var temoin = Path.Combine(_dossier, "temoin.txt");
         File.WriteAllText(temoin, "intact");
-        File.CreateSymbolicLink(Chemin, temoin);
+        // Créer un lien symbolique demande l'administrateur ou le mode développeur : sans eux, rien à prouver ici, comme
+        // dans TrustedManifestRootTests.
+        try { File.CreateSymbolicLink(Chemin, temoin); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return; }
 
         VerrouDuReleve.Prendre(Chemin)?.Dispose();
 

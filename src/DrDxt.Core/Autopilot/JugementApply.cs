@@ -6,9 +6,9 @@ namespace DrDxt.Core;
 /// </summary>
 public static class DiagnosticDeScan
 {
-    // Le drapeau global `TuningGpuAutorise = false` (pris pour une seule machine de
-    // reference) est retire. La carte se ferme machine par machine, par famille d'arret
-    // (`CandidateSelector.CarteFermeeParLesArrets`), et un reglage n'est garde qu'avec un gain mesure en jeu.
+    // Aucun drapeau global ne ferme la carte : elle passe sous la garde d'incident, les arrets ne ferment que les leviers
+    // qui ne declarent pas ce qu'ils ecrivent (`CandidateSelector.CarteFermeeParLesArrets`), et un reglage n'est garde
+    // qu'avec un gain mesure en jeu.
 
     /// <param name="pressionThread">Ce que les threads du jeu ont consomme pendant la fenetre de mesure
     /// du scan (<see cref="PressionThreads"/>). Unknown = pas observe, et « pas observe » ne ferme rien.</param>
@@ -66,8 +66,8 @@ public static class PressionThreads
 }
 
 /// <summary>
-/// Juger avant d'encaisser. Ce que l'Optimiser fera sur cette machine, decide
-/// avant tout paiement : un client a qui il n'y a rien a tenter ne paie pas pour l'apprendre.
+/// Juger avant d'agir. Ce que l'Optimiser fera sur cette machine, decide avant le clic : un joueur a qui il n'y a rien
+/// a tenter ne lance pas une session pour l'apprendre.
 /// </summary>
 /// <param name="Appreciations">Chaque graine, jugee, avec ses motifs.</param>
 /// <param name="LotAChaud">tous les leviers mesurables que le selecteur retient, dans l'ordre des
@@ -80,15 +80,9 @@ public static class PressionThreads
 /// de lui-meme »).</param>
 /// <param name="SansDescripteur">Des graines que le catalogue ne connait pas : jamais tentees.</param>
 /// <param name="VetoDesArrets">Le motif quand les arrets brutaux forment une condition, sinon
-/// <c>null</c>. Il ne decide rien : le selecteur a deja ferme chaque surface materielle ou pilote
-/// (<see cref="CandidateSelector.FermeeParLesArrets"/>). Il sert a le dire : l'ecran de l'App
-/// (« un test memoire d'abord ») et l'outil de campagne.
-///
-/// Il s'appelait `VetoDeCampagne` et vidait le lot de la seule campagne, parce que
-/// trois leviers du pilote passaient le veto du selecteur (ils se declaraient « latence »).
-/// L'Optimiser de l'App, lui, tentait encore `latency.reflex`. Le defaut etait dans le veto, pas
-/// chez l'appelant : il ferme desormais sur la surface ecrite, et ce second veto par appelant, devenu
-/// redondant, est retire.</param>
+/// <c>null</c>. Il ne decide rien : les arrets ne ferment que les leviers qui ne disent pas ce qu'ils ecrivent
+/// (<see cref="CandidateSelector.CarteFermeeParLesArrets"/>), sur la surface ecrite, chez le selecteur seul. Il sert a le
+/// dire : l'ecran de l'App (« un test memoire d'abord ») et l'outil de campagne.</param>
 public sealed record JugementApply(
     IReadOnlyList<CandidateAppraisal> Appreciations,
     IReadOnlyList<CandidateDescriptor> LotAChaud,
@@ -106,11 +100,10 @@ public sealed record JugementApply(
 
     public bool RienATenter => LotAChaud.Count == 0 && AuRedemarrage.Count == 0 && PosesSansMesure.Count == 0;
 
-    /// <param name="jeuEnCours">Un jeu tournait-il au scan ? Sans lui, un levier a chaud etait
-    /// « a tenter » sans jeu : le client payait et creait un point de restauration pour lire ensuite
-    /// « lance ton jeu ». Un levier qui se mesure en jeu, sans jeu, n'est pas
-    /// a tenter, et ce refus est gratuit.</param>
-    public static JugementApply Juger(DiagnosticMachine diagnostic, IReadOnlyList<string> graines, bool jeuEnCours)
+    /// <param name="jeuEnCours">Un jeu tournait-il au scan ? Un levier qui se mesure en jeu, sans jeu, n'est pas a tenter :
+    /// le proposer creerait un point de restauration pour lire ensuite « lance ton jeu ».</param>
+    /// <param name="jeuOuvert">Un jeu est-il ouvert maintenant (relu au clic, pas au scan) ? Par défaut, celui du scan.</param>
+    public static JugementApply Juger(DiagnosticMachine diagnostic, IReadOnlyList<string> graines, bool jeuEnCours, bool? jeuOuvert = null)
     {
         var sansDescripteur = new List<string>();
         var descripteurs = new List<CandidateDescriptor>();
@@ -140,8 +133,8 @@ public sealed record JugementApply(
                 .ToList();
 
         // Changer le mode d'écran sort un jeu plein écran exclusif, et la question « garder ou
-        // revenir » reste derrière lui. L'affichage se règle hors partie.
-        if (jeuEnCours)
+        // revenir » reste derrière lui. L'affichage se règle hors partie : un jeu lancé après le scan compte.
+        if (jeuOuvert ?? jeuEnCours)
             appreciations = appreciations
                 .Select((a, i) => a.Retenu && descripteurs[i].Surface == SurfaceTouchee.Affichage
                     ? new CandidateAppraisal(a.Id, false, [Docteur.T("JA.Affichage")])

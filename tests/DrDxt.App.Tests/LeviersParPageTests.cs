@@ -31,7 +31,7 @@ public sealed class LeviersParPageTests
     public async Task Apres_un_scan_la_page_Graphique_liste_ses_leviers()
     {
         var hw = new DrDxt.Core.HardwareInventory(new DrDxt.Core.CpuInfo("CPU", "AMD", 8, 16, false, 1),
-            new[] { new DrDxt.Core.GpuInfo("GPU", "AMD", 16L << 30, "1", DrDxt.Core.TriState.On) },
+            new[] { new DrDxt.Core.GpuInfo("GPU", "NVIDIA", 16L << 30, "1", DrDxt.Core.TriState.On) },
             new[] { new DrDxt.Core.MemoryModule("PN", "C", 6000, 6000) }, new DrDxt.Core.MotherboardInfo("M", "B"),
             new DrDxt.Core.BiosInfo("1", DateTimeOffset.UtcNow, true), DrDxt.Core.ChassisType.Desktop);
         var st = new DrDxt.Core.SettingsState(DrDxt.Core.TriState.On, DrDxt.Core.TriState.On,

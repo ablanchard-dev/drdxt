@@ -8,7 +8,7 @@ namespace DrDxt.Bios.Tests;
 /// <summary>
 /// Le magasin des valeurs d'usine AMI se décode par ses en-têtes NVAR, jamais par une recherche de chaîne, et la
 /// comparaison couvre toutes les variables que la table nomme. Magasins synthétiques, construits selon le format de
-/// UEFITool (ami_nvar.ksy) ; le même décodage a été relu sur la carte de référence le 17/10/2026.
+/// UEFITool (ami_nvar.ksy) ; le même décodage a été mesuré sur la carte de référence le 17/10/2026.
 /// </summary>
 public class NvarAmiTests
 {

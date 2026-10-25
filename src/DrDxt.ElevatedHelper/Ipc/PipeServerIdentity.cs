@@ -1,6 +1,7 @@
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Security.Principal;
 using System.Text;
 using static DrDxt.ElevatedHelper.Natif;
 
@@ -97,7 +98,83 @@ public static class PipeServerIdentity
         }
     }
 
+    /// <summary>Le serveur du tube tient-il les droits du helper ? Null : oui ; sinon la raison. L'image seule ne suffit pas :
+    /// un programme non élevé du compte qui lance le vrai helper non élevé, depuis le vrai chemin, la passerait. Deux exigences
+    /// de plus. (1) Le tube appartient aux Administrateurs ou à SYSTEM : un processus élevé le crée sous les Administrateurs,
+    /// le service sous SYSTEM ; un squatteur non élevé le crée à son propre SID et ne peut pas s'en donner un autre
+    /// (Administrateurs est « deny-only » dans son jeton filtré). Lu sur le handle déjà ouvert (READ_CONTROL vient avec la
+    /// lecture). (2) Le jeton du serveur, s'il se lit, est élevé : le squatteur visé, du même compte, a toujours un jeton
+    /// lisible par ce client ; un jeton illisible n'est pas une preuve, l'exigence (1) reste.</summary>
+    public static string? RefusDePrivilege(NamedPipeClientStream client)
+    {
+        try
+        {
+            var pipe = client.SafePipeHandle.DangerousGetHandle();
+            if (GetSecurityInfo(pipe, SeKernelObject, OwnerSecurityInformation, out var proprietaire, out _, out _, out _, out var descripteur) != 0)
+                return "the pipe's owner cannot be read";
+            try
+            {
+                var sid = new SecurityIdentifier(proprietaire);
+                if (!sid.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid) && !sid.IsWellKnown(WellKnownSidType.LocalSystemSid))
+                    return $"the pipe is owned by {sid.Value}, not by Administrators or SYSTEM";
+            }
+            finally
+            {
+                LocalFree(descripteur);
+            }
+            if (!GetNamedPipeServerProcessId(pipe, out var pid) || pid == 0)
+                return "the process serving the pipe cannot be found";
+            return JetonNonEleve(pid) ? "the process serving the pipe is not elevated" : null;
+        }
+        catch
+        {
+            return "the pipe server's privileges cannot be read";
+        }
+    }
+
+    /// <summary>Vrai seulement si le jeton du processus se lit et dit « non élevé » (TokenElevation). Illisible : faux.</summary>
+    internal static bool JetonNonEleve(uint pid)
+    {
+        var processus = OpenProcess(ProcessQueryLimitedInformation, false, pid);
+        if (processus == IntPtr.Zero) return false;
+        try
+        {
+            if (!OpenProcessToken(processus, TokenQuery, out var jeton)) return false;
+            try
+            {
+                return GetTokenInformation(jeton, TokenElevation, out var eleve, sizeof(int), out _) && eleve == 0;
+            }
+            finally
+            {
+                CloseHandle(jeton);
+            }
+        }
+        finally
+        {
+            CloseHandle(processus);
+        }
+    }
+
     private const uint ProcessQueryLimitedInformation = 0x1000;
+    private const uint TokenQuery = 0x0008;
+    private const int TokenElevation = 20;          // TOKEN_INFORMATION_CLASS (winnt.h)
+    private const int SeKernelObject = 6;           // SE_OBJECT_TYPE (accctrl.h)
+    private const uint OwnerSecurityInformation = 1;
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern uint GetSecurityInfo(IntPtr handle, int objectType, uint securityInfo, out IntPtr owner, out IntPtr group,
+        out IntPtr dacl, out IntPtr sacl, out IntPtr securityDescriptor);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr LocalFree(IntPtr memory);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetTokenInformation(IntPtr token, int informationClass, out int information, int length, out int returned);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

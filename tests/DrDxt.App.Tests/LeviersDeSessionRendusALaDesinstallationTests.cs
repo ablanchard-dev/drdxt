@@ -64,6 +64,7 @@ public sealed class LeviersDeSessionRendusALaDesinstallationTests : IDisposable
         var verificateur = MachineManifestKey.ChargerVerificateur(_racine, appliquerAcl: false);
         verificateur.IsOk.Should().BeTrue();
 
+        ecriture.Machine = machine;
         return await new RenduALaDesinstallation(
             new SignedDesiredStateStore(new ProgramDataManifestStorage(_racine, applyAcl: false), signer: null,
                 verificateur.Value!, new DefaultReconcilabilityPolicy(), new SystemClock()),
@@ -110,6 +111,29 @@ public sealed class LeviersDeSessionRendusALaDesinstallationTests : IDisposable
         rapport.Lignes.Should().HaveCount(1);
         rapport.Lignes[0].Issue.Should().Be(IssueDuRendu.Respecte);
         desinstallation.Recues.Should().BeEmpty();
+    }
+
+    // Auto HDR vit dans la même chaîne, et le joueur le règle lui-même. Basculé depuis la pose, la chaîne entière ne vaut plus
+    // celle de DrDXT : jugée en entier, elle serait respectée et les clés de DrDXT resteraient pour toujours. Seules elles se
+    // jugent et reprennent leur origine ; l'Auto HDR du joueur reste.
+    [Fact]
+    public async Task Un_Auto_HDR_bascule_depuis_n_empeche_pas_de_rendre_les_cles_de_DrDXT()
+    {
+        var (registre, eleve) = Doublures();
+        registre.ReadString(RegistryHiveKind.CurrentUser, PrefsPath, PrefsName)
+            .Returns(Result<string?>.Ok("SwapEffectUpgradeEnable=1;AutoHDREnable=0"));
+        var pose = await new VrrFlipModelOnTweak(registre, eleve).ApplyAsync();
+        var entrees = new AppliedTweakManifestMapper().ToRevertOnly(Garde(pose.Value!));
+
+        var desinstallation = new EcritureFactice();
+        var rapport = await DesinstallerAsync(entrees, new LectureFactice
+        {
+            [$"{RegistryHiveKind.CurrentUser}|{PrefsPath}|{PrefsName}"] = "SwapEffectUpgradeEnable=1;AutoHDREnable=1;VRROptimizeEnable=1",
+        }, desinstallation);
+
+        rapport.Lignes.Should().ContainSingle().Which.Issue.Should().Be(IssueDuRendu.Rendu);
+        desinstallation.Recues.OfType<SetRegistryValueOp>().Should().ContainSingle()
+            .Which.Value.Should().Be("AutoHDREnable=1;SwapEffectUpgradeEnable=1", "le VRR de DrDXT part, l'Auto HDR du joueur reste");
     }
 
     [Fact]
@@ -233,13 +257,22 @@ public sealed class LeviersDeSessionRendusALaDesinstallationTests : IDisposable
         public Result<bool> CibleExiste(PrivilegedOp ecriture) => Result<bool>.Ok(true);
     }
 
+    // Une écriture acceptée se voit à la relecture, comme sur la vraie machine : le rendu n'est dit fait que relu.
     private sealed class EcritureFactice : IElevatedClient
     {
         public List<PrivilegedOp> Recues { get; } = new();
+        public LectureFactice? Machine { get; set; }
 
         public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
         {
             Recues.Add(op);
+            switch (op)
+            {
+                case DeleteRegistryValueOp when Machine is not null: Machine[Cle(op)] = null; break; // relue « absente »
+                case SetRegistryValueOp s when Machine is not null: Machine[Cle(op)] = s.Value; break;
+                case RunServiceControlOp { Action: ServiceAction.Stop } when Machine is not null: Machine[Cle(op)] = "stopped"; break;
+                case RunServiceControlOp { Action: ServiceAction.Start } when Machine is not null: Machine[Cle(op)] = "running"; break;
+            }
             return Task.FromResult(Result.Ok());
         }
     }

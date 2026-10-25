@@ -38,7 +38,9 @@ public static class PlantagesDeJeu
     /// <summary>Choix non chiffré, aligné sur la fenêtre des échecs de services.</summary>
     public static readonly TimeSpan Fenetre = TimeSpan.FromDays(30);
     private const int Seuil = 3;
-    private const int MaxEvenements = 2000;
+    /// <summary>Le plafond de lecture, tous programmes confondus, avant le tri des jeux : atteint, la fenêtre lue est plus
+    /// courte que <see cref="Fenetre"/>, et « aucun plantage » ne se dit pas.</summary>
+    internal const int MaxEvenements = 2000;
 
     // Microsoft Learn, page citée plus haut : les modules de Windows le plus souvent victimes.
     private static readonly HashSet<string> Victimes = new(StringComparer.OrdinalIgnoreCase)
@@ -187,6 +189,13 @@ public static class PlantagesDeJeu
             ? string.Join(", ", jeux.Order(StringComparer.OrdinalIgnoreCase))
                 + (dossiers.Count > 0 ? Docteur.T("PJ.EtDossiers", dossiers.Count) : "")
             : Docteur.T("PJ.DesDossiers", dossiers.Count);
+        static string D(DateTimeOffset d) => d.ToLocalTime().ToString(Docteur.T("PJ.FormatJour"), CultureInfo.InvariantCulture);
+        if (miens.Count == 0 && lus.Count >= MaxEvenements)
+        {
+            yield return new RepairFinding("STABILITE", Nom, null, null, RepairStatus.Unknown,
+                Docteur.T("PJ.Tronque", MaxEvenements, D(lus.Min(e => e.Quand))));
+            yield break;
+        }
         if (miens.Count == 0)
         {
             yield return new RepairFinding("STABILITE", Nom, Docteur.T("PJ.AucunEn", jours), Docteur.T("PJ.Aucun"), RepairStatus.ExpectedDefault,
@@ -194,7 +203,6 @@ public static class PlantagesDeJeu
             yield break;
         }
 
-        static string D(DateTimeOffset d) => d.ToLocalTime().ToString(Docteur.T("PJ.FormatJour"), CultureInfo.InvariantCulture);
         var plantages = miens.Where(e => !e.Blocage).ToList();
         var blocages = miens.Count - plantages.Count;
         var morceaux = new List<string>
@@ -224,7 +232,11 @@ public static class PlantagesDeJeu
             morceaux.Add(Docteur.T("PJ.Correlation", lien.apres, lien.c.Libelle, D(lien.c.Quand), lien.avant));
 
         var repete = miens.Count >= Seuil;
-        yield return new RepairFinding("STABILITE", Nom, Docteur.T("PJ.Valeur", plantages.Count, blocages, jours), Docteur.T("PJ.Aucun"),
+        // Plafond atteint : la fenêtre lue commence à l'événement le plus ancien lu, et le compte le dit.
+        var valeur = lus.Count >= MaxEvenements
+            ? Docteur.T("PJ.ValeurDepuis", plantages.Count, blocages, D(lus.Min(e => e.Quand)))
+            : Docteur.T("PJ.Valeur", plantages.Count, blocages, jours);
+        yield return new RepairFinding("STABILITE", Nom, valeur, Docteur.T("PJ.Aucun"),
             repete ? RepairStatus.Suspicious : RepairStatus.Observed,
             string.Join(" ", morceaux),
             repete ? RepairAction.Recommandation : RepairAction.Aucune);

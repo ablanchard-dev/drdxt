@@ -127,7 +127,8 @@ public record SettingsState(
     // concluait « Game Mode desactive » et proposait de le reparer : un deficit fabrique a
     // partir d'une lecture ratee, l'exact contraire de la regle « Unknown ne deduit rien ».
     TriState GameMode,
-    // null = le parking n'a pas PU etre lu. Une liste vide veut dire "lu, et aucun coeur
+    // null = le parking n'a pas PU etre lu, ou aucun jeu n'etait ouvert (hors jeu, il ne dit rien du routage X3D).
+    // Une liste vide veut dire "lu, et aucun coeur
     // n'est parque" : ce sont deux etats differents, et les confondre a fait proposer une
     // Ecriture sur des machines saines pendant que le scan les declarait sans probleme.
     IReadOnlyList<int>? ParkedCoreIndexes,
@@ -244,8 +245,6 @@ public record SettingsState(
     // Le fichier d'échange géré par le système sur un disque dur, Windows sur un SSD (FichierDEchangeADeplacer) ; Unknown = non lu.
     TriState FichierDEchangeADeplacer = TriState.Unknown);
 
-/// <summary>PERFBOOSTMODE sur secteur, lu dans un plan, avec le défaut de la personnalité de ce plan
-/// (Microsoft Learn, « PERFBOOSTMODE » : 0 = désactivé quel que soit le mode du processeur, 1 à 4 = activé).</summary>
 /// <summary>« Mode d'économie d'énergie » des « Paramètres de la carte sans fil » d'un plan, sur
 /// secteur. Microsoft Learn (Wi-Fi power management) : l'économie « réduit la consommation au prix d'une latence de
 /// transfert accrue ». 0 = performances maximales, 1 = économie faible, 2 = moyenne, 3 = maximale.</summary>
@@ -257,6 +256,8 @@ public sealed record EconomieSansFilLue(Guid Plan, uint Valeur)
     public const uint MaxDocumente = 3;
 }
 
+/// <summary>PERFBOOSTMODE sur secteur, lu dans un plan, avec le défaut de la personnalité de ce plan
+/// (Microsoft Learn, « PERFBOOSTMODE » : 0 = désactivé quel que soit le mode du processeur, 1 à 4 = activé).</summary>
 public sealed record ModeDeBoostLu(Guid Plan, uint Valeur, uint Defaut)
 {
     /// <summary>GUID du réglage (Learn) ; sous-groupe GUID_PROCESSOR_SETTINGS_SUBGROUP.</summary>

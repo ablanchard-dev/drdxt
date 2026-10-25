@@ -46,7 +46,7 @@ public static class EtatsDeVeille
     internal sealed record Compteurs(ulong C1, ulong C2, ulong C3, ulong Repos, ulong Sys100Ns, ulong T1, ulong T2, ulong T3,
         ulong PerfTime, ulong PerfFreq);
 
-    private static Compteurs? Brut()
+    private static Compteurs? Brut() => LectureWmiBornee.Lire<Compteurs?>(() =>
     {
         using var s = new System.Management.ManagementObjectSearcher(
             "SELECT PercentC1Time, PercentC2Time, PercentC3Time, PercentIdleTime, Timestamp_Sys100NS, C1TransitionsPersec, "
@@ -56,13 +56,13 @@ public static class EtatsDeVeille
         foreach (var o in rangees.Cast<System.Management.ManagementObject>())
             using (o)
             {
-                ulong U(string n) => Convert.ToUInt64(o[n], CultureInfo.InvariantCulture);
+                ulong U(string n) => LectureWmiBornee.Compteur(o[n]);
                 return new(U("PercentC1Time"), U("PercentC2Time"), U("PercentC3Time"), U("PercentIdleTime"), U("Timestamp_Sys100NS"),
                     U("C1TransitionsPersec"), U("C2TransitionsPersec"), U("C3TransitionsPersec"), U("Timestamp_PerfTime"),
                     U("Frequency_PerfTime"));
             }
         return null;
-    }
+    }, () => null);
 
     /// <summary>
     /// Pur. Microsoft Learn, types de compteurs : « % Cx Time » est un PERF_100NSEC_TIMER (delta du compteur sur delta de

@@ -30,9 +30,8 @@ public class FindingViewModelTests
     [Fact]
     public void Every_finding_names_what_it_found()
     {
-        // DrDXT est gratuit. Avant, un constat au correctif « payant » ne montrait
-        // qu'une accroche (« Mémoire (RAM) — problème trouvé ») et cachait le reglage jusqu'a
-        // l'achat. Il n'y a plus rien a acheter : le constat dit toujours ce qu'il a trouve.
+        // DrDXT est gratuit : un constat dit toujours ce qu'il a trouve, jamais une simple accroche
+        // (« Mémoire (RAM) — problème trouvé ») qui cacherait le reglage.
         var f = new Finding("Memory", Severity.Major, "Finding.Memory.XmpOff", 12.0);
         var vm = new FindingViewModel(f, k => k == "Finding.Memory.XmpOff" ? "Mémoire : XMP off" : k);
 

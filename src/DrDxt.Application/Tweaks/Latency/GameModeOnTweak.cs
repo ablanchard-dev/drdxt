@@ -16,8 +16,9 @@ namespace DrDxt.Application.Tweaks.Latency;
 // CompositeSnapshotCodec, retour fidèle de toutes les feuilles. Un échec en cours d'application
 // défait les feuilles déjà écrites (la dernière écrite d'abord) : rien ne reste à moitié posé.
 //
-// Effet au redémarrage ou au prochain lancement du jeu : le moteur saute l'A/B immédiat
-// (TakesEffectAfterReboot = true) ; la preuve est le prochain scan en jeu, jamais cette session.
+// Effet au prochain lancement du jeu, sans redémarrage : le moteur saute l'A/B immédiat (TakesEffectAfterReboot = true,
+// le contrat range ensemble redémarrage et prochain lancement) ; la preuve est le prochain scan en jeu, jamais cette
+// session. Les phrases d'annulation et de retrait disent « au prochain lancement du jeu » (ScanViewModel.AuLancementDuJeu).
 //
 // L'effet du mode Jeu varie : il est proposé (quand il est inactif), jamais posé en silence, et le
 // SummaryKey décrit le changement (pas de « +FPS »). Persiste au redémarrage.
@@ -131,13 +132,7 @@ public sealed class GameModeOnTweak : LatencyTweakBase
 
         try
         {
-            foreach (var op in decoded.Value)
-            {
-                var res = await Elevated.ExecuteAsync(op, CancellationToken.None).ConfigureAwait(false);
-                if (!res.IsOk)
-                    return res; // rend tel quel le premier échec de retour
-            }
-            return Result.Ok();
+            return await RetourArriere.ToutRendreAsync(Elevated, decoded.Value).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

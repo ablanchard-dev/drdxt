@@ -10,12 +10,18 @@ namespace DrDxt.Detection.Hardware;
 /// HKCU\Software\Valve\Steam (SteamPath) puis les « path » de steamapps\libraryfolders.vdf ; Epic : les InstallLocation des
 /// manifestes de ProgramData\Epic\EpicGamesLauncher\Data\Manifests ; Battle.net, Riot, EA app et Ubisoft Connect :
 /// l'InstallLocation de leurs jeux dans la liste des programmes de Windows. Le disque : MSFT_Partition (lettre ⇒ numéro de disque)
-/// puis MSFT_PhysicalDisk.MediaType. Mesure du 07/10 sur la machine de référence : Steam et Epic sur C:, un Samsung 990 PRO
-/// en NVMe (MediaType 4). <c>null</c> = rien n'a pu être lu.
+/// puis MSFT_PhysicalDisk.MediaType. Mesure du 07/10 sur la machine de référence : Steam et Epic sur C:, un Samsung 990 PRO,
+/// SSD (MediaType 4) ; MediaType ne distingue pas un NVMe d'un SSD SATA. <c>null</c> = rien n'a pu être lu.
 /// </summary>
 public static class DossiersDeJeux
 {
     private static readonly Regex CheminVdf = new("\"path\"\\s+\"([^\"]+)\"", RegexOptions.IgnoreCase);
+
+    /// <summary>Un dossier local sous une lettre de disque, jamais la racine : une bibliothèque se parcourt sur cinq niveaux, et
+    /// un partage réseau ouvrirait une connexion SMB (donc une authentification du compte) vers l'hôte nommé ; une racine
+    /// ferait parcourir le disque entier.</summary>
+    internal static bool Parcourable(string chemin)
+        => chemin.Length > 3 && CheminsLocaux.EstLocal(chemin);
 
     /// <summary>Les chemins des bibliothèques d'un libraryfolders.vdf (antislashs doublés dans le fichier).</summary>
     internal static IReadOnlyList<string> CheminsSteam(string vdf)
@@ -70,22 +76,26 @@ public static class DossiersDeJeux
         try
         {
             var dossiers = new List<(string Lanceur, string Chemin)>();
-            if (Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null) is string steam
-                && File.Exists(Path.Combine(steam, "steamapps", "libraryfolders.vdf")))
-                dossiers.AddRange(CheminsSteam(File.ReadAllText(Path.Combine(steam, "steamapps", "libraryfolders.vdf"))).Select(c => ("Steam", c)));
+            try
+            {
+                if (Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Software\Valve\Steam", "SteamPath", null) is string steam
+                    && CheminsLocaux.EstLocal(steam) && File.Exists(Path.Combine(steam, "steamapps", "libraryfolders.vdf")))
+                    dossiers.AddRange(CheminsSteam(FichierTiers.Lire(Path.Combine(steam, "steamapps", "libraryfolders.vdf"))).Select(c => ("Steam", c)));
+            }
+            catch (Exception) { /* la liste de Steam illisible n'empêche pas Epic et les autres lanceurs */ }
             var epic = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), @"Epic\EpicGamesLauncher\Data\Manifests");
             if (Directory.Exists(epic))
                 foreach (var f in Directory.EnumerateFiles(epic, "*.item"))
                     try
                     {
-                        using var doc = JsonDocument.Parse(File.ReadAllText(f));
+                        using var doc = JsonDocument.Parse(FichierTiers.Lire(f));
                         if (doc.RootElement.TryGetProperty("InstallLocation", out var l) && l.GetString() is { Length: > 0 } c) dossiers.Add(("Epic", c));
                     }
                     catch (Exception) { /* un manifeste abîmé n'empêche pas les autres */ }
             try { dossiers.AddRange(JeuxDesLanceurs(ProgrammesInstalles())); }
             catch (Exception) { /* la liste des programmes illisible n'empêche pas Steam et Epic */ }
             var types = TypesParLettre();
-            return dossiers.DistinctBy(d => d.Chemin, StringComparer.OrdinalIgnoreCase)
+            return dossiers.Where(d => Parcourable(d.Chemin)).DistinctBy(d => d.Chemin, StringComparer.OrdinalIgnoreCase)
                 .Select(d => new DossierDeJeux(d.Lanceur, d.Chemin,
                     d.Chemin.Length > 1 && d.Chemin[1] == ':' && types.TryGetValue(char.ToUpperInvariant(d.Chemin[0]), out var t) ? t : 0))
                 .ToList();
@@ -117,18 +127,29 @@ public static class DossiersDeJeux
         var types = new Dictionary<char, int>();
         try
         {
-            var disques = new Dictionary<string, int>();
-            using (var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", "SELECT DeviceId, MediaType FROM MSFT_PhysicalDisk"))
-            using (var rangees = s.Get())
-                foreach (var o in rangees.Cast<ManagementObject>())
-                    using (o)
-                        if (o["DeviceId"]?.ToString() is { } id) disques[id] = Convert.ToInt32(o["MediaType"] ?? 0);
-            using (var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", "SELECT DriveLetter, DiskNumber FROM MSFT_Partition"))
-            using (var rangees = s.Get())
-                foreach (var o in rangees.Cast<ManagementObject>())
-                    using (o)
-                        if (o["DriveLetter"] is char lettre && lettre != '\0' && disques.TryGetValue(o["DiskNumber"]?.ToString() ?? "", out var t))
-                            types[char.ToUpperInvariant(lettre)] = t;
+            // Figé, une lecture lève comme une lecture ratée : types non lus.
+            var disques = LectureWmiBornee.Lire(() =>
+            {
+                var lus = new Dictionary<string, int>();
+                using (var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", "SELECT DeviceId, MediaType FROM MSFT_PhysicalDisk"))
+                using (var rangees = s.Get())
+                    foreach (var o in rangees.Cast<ManagementObject>())
+                        using (o)
+                            if (o["DeviceId"]?.ToString() is { } id) lus[id] = Convert.ToInt32(o["MediaType"] ?? 0);
+                return lus;
+            }, () => throw new TimeoutException("WMI did not answer in time."));
+            var parLettre = LectureWmiBornee.Lire(() =>
+            {
+                var lus = new Dictionary<char, int>();
+                using (var s = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", "SELECT DriveLetter, DiskNumber FROM MSFT_Partition"))
+                using (var rangees = s.Get())
+                    foreach (var o in rangees.Cast<ManagementObject>())
+                        using (o)
+                            if (o["DriveLetter"] is char lettre && lettre != '\0' && disques.TryGetValue(o["DiskNumber"]?.ToString() ?? "", out var t))
+                                lus[char.ToUpperInvariant(lettre)] = t;
+                return lus;
+            }, () => throw new TimeoutException("WMI did not answer in time."));
+            foreach (var (lettre, t) in parLettre) types[lettre] = t;
         }
         catch (Exception) { /* types non lus : 0, rien n'est affirmé */ }
         return types;

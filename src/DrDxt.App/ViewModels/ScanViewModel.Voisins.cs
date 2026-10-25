@@ -124,7 +124,9 @@ public partial class ScanViewModel
         get
         {
             var noms = CalmeurDeVoisins.AProposer(_partiesPourProposition, Exclus());
-            if (noms is null) return _localize("Voisins.Proposition.NonLu");
+            // Aucune partie relevée : « allume le relevé » seulement s'il est éteint ; allumé (le cas par défaut), rien n'est
+            // encore lu.
+            if (noms is null) return _localize(MemoireParties is { } m && !m.EstAllume() ? "Voisins.Proposition.NonLu" : "Voisins.Proposition.PasEncore");
             if (noms.Count == 0) return _localize("Voisins.Proposition.Aucun");
             return string.Format(System.Globalization.CultureInfo.CurrentCulture,
                 _localize(CalmerVoisinsActif ? "Voisins.Proposition.Actif" : "Voisins.Proposition"), string.Join(", ", noms));
@@ -215,6 +217,13 @@ public partial class ScanViewModel
             }
         }
         catch (OperationCanceledException) { /* arrêt demandé */ }
+        catch (Exception)
+        {
+            // Sans ceci, une erreur imprévue arrêterait la boucle en silence, l'interrupteur resté sur « allumé ». Le choix du
+            // joueur reste noté : le prochain lancement le rallume.
+            CalmerVoisinsActif = false;
+            DireAuDemarrage(_localize("Voisins.Calmer.ArreteSurErreur"));
+        }
         finally
         {
             calmeur.Rendre();

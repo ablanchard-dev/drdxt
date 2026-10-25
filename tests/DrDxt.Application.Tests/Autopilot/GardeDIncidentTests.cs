@@ -9,6 +9,18 @@ public sealed class GardeDIncidentTests
 {
     private static readonly DateTimeOffset Pose = new(2026, 10, 8, 21, 0, 0, TimeSpan.Zero);
 
+    // Une pose notée pendant qu'une horloge partait en avant, corrigée depuis : datée après l'arrêt qui l'a suivie, elle ne
+    // s'y rattachait jamais. Au jugement, une pose ne peut pas être plus tard que maintenant.
+    [Fact]
+    public void Une_pose_datee_dans_le_futur_se_rattache_a_l_arret_qui_suit_le_jugement()
+    {
+        var maintenant = Pose;
+        var poseEnAvance = Pose.AddDays(20);
+        GardeDIncident.ARendre([("fixit.power_plan", poseEnAvance)], [new ArretClasse(maintenant.AddHours(1), FamilleDArret.EcranBleu, 0xEF)],
+                maintenant: maintenant)
+            .Should().ContainSingle(r => r.Id == "fixit.power_plan");
+    }
+
     [Fact]
     public void Un_arret_hors_veille_dans_la_semaine_apres_la_pose_rend_le_reglage()
         => GardeDIncident.ARendre([("fixit.power_plan", Pose)], [new ArretClasse(Pose.AddDays(2), FamilleDArret.EcranBleu, 0xEF)])
@@ -45,9 +57,11 @@ public sealed class GardeDIncidentTests
     public void Arrets_non_lus_rien_n_est_rendu()
         => GardeDIncident.ARendre([("fixit.power_plan", Pose)], null).Should().BeEmpty();
 
-    // GARDE1 : un réglage de la seule session (mode Jeu, heures d'activité) ne peut pas causer un arrêt : il reste.
+    // Un réglage de la seule session (mode Jeu, heures d'activité) ne peut pas causer un arrêt : il reste. Le mode
+    // de l'écran non plus : le rendre sans clic changerait la fréquence que le joueur a peut-être choisie depuis.
     [Theory]
     [InlineData("latency.gameModeOn", false)]
+    [InlineData("fixit.ecran_frequence", false)]
     [InlineData("fixit.heures_actives", false)]
     [InlineData("fixit.power_plan", true)]
     [InlineData("levier.inconnu", true)]

@@ -40,9 +40,6 @@ public static class TemperaturePawnIo
     public static TemperatureHwinfo.Lecture? LireParLeService()
         => Installe() && ProcesseurIntel() && ProcesseurParLeService.Lire() is { } e ? new TemperatureHwinfo.Lecture(e.ChaudC, Libelle) : null;
 
-    /// <summary>La seconde du processeur entière (cœur le plus chaud, cœur 0, raisons de freiner), ou null.
-    /// Sans les statuts de limite et de chaleur du paquet (CPUID.06H:EAX bits 4 et 6), les bits liraient 0
-    /// et diraient « jamais freiné » : rien n'est lu.</summary>
     /// <summary>En administrateur, la lecture directe ; sans droits, le service DrDXT la sert (s'il est
     /// installé et tourne). Avec le ventilateur CPU de la même seconde, quand la carte le laisse lire.</summary>
     public static DrDxt.Core.EtatCpu? LireEtat()
@@ -65,7 +62,9 @@ public static class TemperaturePawnIo
         new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent())
             .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator));
 
-    /// <summary>La lecture dans CE processus, sans le service (c'est celle que le service lui-même fait).</summary>
+    /// <summary>La seconde du processeur entière (cœur le plus chaud, cœur 0, raisons de freiner), ou null, lue dans CE
+    /// processus sans le service (c'est celle que le service lui-même fait). Sans les statuts de limite et de chaleur du
+    /// paquet (CPUID.06H:EAX bits 4 et 6), les bits liraient 0 et diraient « jamais freiné » : rien n'est lu.</summary>
     public static DrDxt.Core.EtatCpu? LireEtatDirect()
     {
         if (!StatutsPresents.Value || !Installe() || !ProcesseurIntel()) return null;

@@ -53,8 +53,8 @@ public sealed class PlafondThermiqueCpuTweakTests
         Build(150).AppliesTo(Hw(ChassisType.Laptop), Etat(lu)).Should().BeFalse();
     }
 
-    // Aucune température relevée en partie : on ne sait pas si le processeur se freine par la chaleur. La vérification disait
-    // « déjà réglé » ; c'est « non lu ». Des parties lues sans freinage, elles, disent bien qu'il n'y a rien à plafonner.
+    // Aucune température relevée en partie : on ne sait pas si le processeur se freine par la chaleur. La vérification dit
+    // « non lu », pas « déjà réglé ». Des parties lues sans freinage, elles, disent bien qu'il n'y a rien à plafonner.
     [Fact]
     public void Sans_temperature_relevee_en_partie_l_etat_est_dit_non_lu()
     {
@@ -124,5 +124,19 @@ public sealed class PlafondThermiqueCpuTweakTests
         Build(null).EtatNonLu(Etat(sansPartie with { Verrou = true })).Should().BeFalse("verrouillée");
         Build(null).EtatNonLu(Etat(sansPartie with { Pl1W = 300 })).Should().BeFalse("PL1 au-dessus de la PL2 : le helper refuserait");
         Build(null).EtatNonLu(Etat(sansPartie)).Should().BeTrue("seule la chaleur manque");
+    }
+
+    // Le retour : c'est l'inverse gardé à la pose, et lui seul, qui part au helper (les deux registres échangés).
+    [Fact]
+    public async Task Le_retour_rend_l_inverse_garde_a_la_pose()
+    {
+        var levier = Build(plafond: 150);
+        var snapshot = (await levier.ApplyAsync()).Value!;
+        var inverse = PrivilegedOpCodec.Deserialize(snapshot.OriginalValueJson).Value;
+        _elevated.ClearReceivedCalls();
+
+        (await levier.RevertAsync(snapshot)).IsOk.Should().BeTrue();
+
+        await _elevated.Received(1).ExecuteAsync(Arg.Is<PrivilegedOp>(o => o.Equals(inverse)), Arg.Any<CancellationToken>());
     }
 }

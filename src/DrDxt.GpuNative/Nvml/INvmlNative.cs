@@ -109,8 +109,8 @@ public interface INvmlNative
 }
 
 /// <summary>Un ventilateur lu par NVML. <see cref="Politique"/> 0 = automatique (NVML_FAN_POLICY_TEMPERATURE_CONTINOUS_SW),
-/// 1 = manuel.</summary>
-public sealed record VentilateurNvml(int Index, uint VitessePct, uint CiblePct, uint Politique, uint MinPct, uint MaxPct)
+/// 1 = manuel. Cible et plage valent null quand le pilote ne les rend pas : elles servent de plancher à l'écriture.</summary>
+public sealed record VentilateurNvml(int Index, uint VitessePct, uint? CiblePct, uint Politique, uint? MinPct, uint? MaxPct)
 {
     public const uint PolitiqueAutomatique = 0;
     public bool Automatique => Politique == PolitiqueAutomatique;

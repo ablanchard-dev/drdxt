@@ -14,7 +14,8 @@ public sealed class StabiliteEnAnglaisTests
     public void La_repartition_des_arrets_se_dit_en_anglais()
     {
         using var _ = Docteur.Portee(CultureInfo.GetCultureInfo("en-US"));
-        var quand = new DateTimeOffset(2026, 10, 3, 20, 0, 0, TimeSpan.Zero);
+        // Heure de la machine : les dates s'affichent dans son fuseau, le jour attendu ne change pas avec lui.
+        var quand = new DateTimeOffset(new DateTime(2026, 10, 3, 20, 0, 0, DateTimeKind.Local));
 
         RepairAuditService.Repartition([new ArretBrutal(quand, 0, false, false), new ArretBrutal(quand.AddDays(2), 0, false, false)], 1)
             .Should().Be("2 shutdowns with no code at all (freeze, power cut or power supply; from 10/03 to 10/05), "

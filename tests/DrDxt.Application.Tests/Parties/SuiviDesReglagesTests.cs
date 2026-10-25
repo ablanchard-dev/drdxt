@@ -32,6 +32,17 @@ public sealed class SuiviDesReglagesTests : IDisposable
         c.Depuis.Should().Be(t1.AddHours(1), "la bascule a eu lieu entre les deux derniers relevés");
     }
 
+    // Un relevé « {} » se lit sans erreur mais sans états : pris pour un historique, il faisait lever le relevé à chaque scan.
+    [Fact]
+    public void Un_releve_sans_etats_est_mis_de_cote_et_le_suivi_repart()
+    {
+        File.WriteAllText(_chemin, "{}");
+        var s = new SuiviDesReglages(_chemin);
+
+        s.Relever(new Dictionary<string, string> { ["IR"] = "allumé" }, DateTimeOffset.Now, Libelle).Should().BeEmpty();
+        s.Relever(new Dictionary<string, string> { ["IR"] = "éteint" }, DateTimeOffset.Now, Libelle).Should().ContainSingle();
+    }
+
     [Fact]
     public void Un_reglage_non_relu_n_est_pas_un_changement_et_garde_son_etat()
     {
@@ -114,5 +125,19 @@ public sealed class SuiviDesReglagesTests : IDisposable
 
         s.Relever(Tout("on"), T0.AddDays(6), Libelle).Should().HaveCount(3, "l'historique n'a pas été touché");
         File.Exists(_chemin + ".verrou").Should().BeFalse("le verrou disparaît avec son détenteur");
+    }
+
+    // Le journal refuse les changements (occupé, écriture ratée) : la référence n'avance pas, sinon la bascule serait perdue
+    // pour toujours (le relevé suivant ne verrait plus de différence). Elle revient au relevé suivant, bornée pareil.
+    [Fact]
+    public void Un_journal_qui_refuse_les_changements_ne_perd_pas_la_bascule()
+    {
+        var s = new SuiviDesReglages(_chemin);
+        s.Relever(Tout("off"), T0, Libelle);
+
+        s.Relever(Tout("on"), T0.AddDays(1), Libelle, _ => false).Should().BeEmpty("le journal n'a rien pris");
+
+        s.Relever(Tout("on"), T0.AddDays(2), Libelle, _ => true).Should().HaveCount(3)
+            .And.OnlyContain(c => c.Depuis == T0, "bornée au dernier relevé que le journal a pris");
     }
 }

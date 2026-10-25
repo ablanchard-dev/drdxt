@@ -51,6 +51,16 @@ public class CandidateSelectorTests
         appreciation.Retenu.Should().BeTrue();
     }
 
+    // La raison d'un levier retenu s'affiche à l'écran d'Optimiser : le goulot s'y dit en mots, jamais par son nom C#.
+    [Fact]
+    public void Le_goulot_du_motif_retenu_se_dit_en_mots()
+    {
+        var appreciation = Juger(Machine(goulot: BottleneckState.GpuBound, mediane: 2700, minimum: 2100), Levier("gpu.prefer_max_perf", "gpu.clock"));
+
+        appreciation.Retenu.Should().BeTrue();
+        appreciation.Motif.Should().Be(Docteur.T("CS.Retenu.Coherent", Docteur.T("Rapport.Etat.Gpu"))).And.NotContain(nameof(BottleneckState.GpuBound));
+    }
+
     [Fact]
     public void SANS_LECTURE_DE_FREQUENCE_ON_NE_DISQUALIFIE_RIEN()
     {
@@ -123,7 +133,7 @@ public class CandidateSelectorTests
         }).Single();
 
         appreciation.Retenu.Should().BeFalse();
-        appreciation.Motif.Should().Contain("AutoReboot");
+        appreciation.Motif.Should().Contain(RepairLibelles.Nature(CandidateKind.AutoReboot)).And.NotContain("AutoReboot");
     }
 
     [Fact]
@@ -156,10 +166,8 @@ public class CandidateSelectorTests
     [Fact]
     public void UN_CANDIDAT_DISQUALIFIE_DEUX_FOIS_DIT_LES_DEUX_RAISONS()
     {
-        // Le premier motif trouve masquait les autres. Mesure du 08/09/2026 :
-        // `latency.prefer_max_perf` ressortait « ecriture GPU interdite » alors que la raison la
-        // plus forte etait mesuree — la frequence ne bouge pas d'un MHz. Les deux sont vraies, et
-        // c'est celle-la qu'on relira dans six mois pour juger si la regle etait bonne.
+        // Le premier motif trouve masquerait les autres : un interdit d'ecriture cacherait la raison mesuree, une
+        // frequence qui ne bouge pas d'un MHz. Le levier de laboratoire ne declare pas sa surface, donc l'interdit le ferme.
         var appreciation = Juger(
             Machine(tuningGpuAutorise: false),
             Levier("latency.prefer_max_perf", "gpu.clock"));
@@ -200,7 +208,9 @@ public class CandidateSelectorTests
             "0x193 VIDEO_DXGKRNL_LIVEDUMP (parametre 1 : 0x80e)");
 
     [Fact]
-    public void UNE_SIGNATURE_REPETEE_ET_RECENTE_FERME_L_ECRITURE_GPU()
+    // Le levier de laboratoire ne déclare pas sa surface : c'est lui que l'instabilité graphique ferme. Un vrai levier de
+    // la carte passe sous la garde d'incident (JugementApplyLotTests).
+    public void UNE_SIGNATURE_REPETEE_ET_RECENTE_FERME_UN_LEVIER_SANS_SURFACE_DECLAREE()
     {
         var appreciation = Juger(
             Machine() with { InstabiliteGpu = Watchdogs(occurrences: 3, ilYaJours: 17) },
@@ -219,9 +229,8 @@ public class CandidateSelectorTests
         // le refus tient quand meme.
         //
         // La machine est choisie pour que rien D'autre ne refuse : frequence qui chute vraiment,
-        // bridage publie. Ecrit d'abord avec `gpu.power` sur une machine sans plafond, ce test
-        // passait sur le motif « aucun plafond de puissance observe » — vert sans jamais toucher a
-        // la porte de stabilite. La mutation du seuil l'a demasque en ne tuant qu'un test sur deux.
+        // bridage publie : avec `gpu.power` sur une machine sans plafond, le motif « aucun plafond de puissance observe »
+        // suffirait a refuser, et le test passerait sans toucher a la porte de stabilite.
         var appreciation = Juger(
             Machine(tuningGpuAutorise: true, mediane: 2700, minimum: 2100,
                     bridage: GpuLimiterObserved.ChuteDeFrequenceObservee)

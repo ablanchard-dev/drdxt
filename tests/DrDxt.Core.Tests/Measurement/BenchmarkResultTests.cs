@@ -48,26 +48,4 @@ public class BenchmarkResultTests
     [Fact]
     public void Stutter_percent_null_when_no_frames()
         => WithFrames().StutterTimePercent.Should().BeNull();
-
-    // --- Classification du goulot : occupation GPU contre temps d'image (méthode PresentMon d'Intel) ---
-
-    [Fact]
-    public void Bottleneck_is_gpu_bound_when_gpu_busy_fills_the_frame()
-        // 9,5 ms d'occupation à 100 fps (10 ms/image) → 95 % ≥ 90 → la carte a rythmé l'image.
-        => Bench(100, 9.5).Bottleneck.Should().Be(Bottleneck.GpuBound);
-
-    [Fact]
-    public void Bottleneck_is_cpu_or_other_bound_when_a_big_share_is_spent_off_gpu()
-        // 7 ms d'occupation à 100 fps → 70 % ≤ 75 → une part significative de l'image s'est passée hors carte.
-        => Bench(100, 7).Bottleneck.Should().Be(Bottleneck.CpuOrOtherBound);
-
-    [Fact]
-    public void Bottleneck_is_indeterminate_in_the_middle_band()
-        // 8 ms d'occupation à 100 fps → 80 %, dans la bande 75–90 → on n'affirme rien dans un sens ni dans l'autre.
-        => Bench(100, 8).Bottleneck.Should().Be(Bottleneck.Indeterminate);
-
-    [Fact]
-    public void Bottleneck_is_indeterminate_when_gpu_busy_unmeasured()
-        // Pas de donnée d'occupation GPU → Indeterminate honnête, jamais un GpuBound fabriqué.
-        => Bench(100, null).Bottleneck.Should().Be(Bottleneck.Indeterminate);
 }

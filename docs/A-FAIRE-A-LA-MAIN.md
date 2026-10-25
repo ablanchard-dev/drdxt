@@ -30,7 +30,7 @@ relue le 09/10/2026.
 | Suspension sélective USB des périphériques d'entrée | Un périphérique suspendu met du temps à se réveiller. | **lu et dit** : DrDXT lit si la suspension est active sur tes périphériques d'entrée et le dit. | Microsoft Learn, [USB selective suspend](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/usb-selective-suspend) |
 | Mode Jeu de Windows | Pendant la partie, Windows Update n'installe pas de pilotes et ne demande pas de redémarrage. | **écrit** (`latency.gameModeOn`) | Microsoft, paramètres du Mode Jeu |
 | Enregistrement Game DVR en arrière-plan | Capture continue : du processeur, de la carte et du disque pris en permanence. | **écrit** (`latency.gameDvrBackgroundOff`) | Microsoft, Xbox Game Bar |
-| Enregistrement continu NVIDIA (Instant Replay) | Même coût, côté pilote : environ 5 % d'images selon la FAQ ShadowPlay de NVIDIA, non mesuré par DrDXT. | **lu et dit** (geste : Alt+Z, Instant Replay, Désactiver) | NVIDIA, FAQ ShadowPlay |
+| Enregistrement continu NVIDIA (Instant Replay) | Même coût, côté pilote : il encode en continu ; aucun chiffre publié à jour, non mesuré par DrDXT. | **lu et dit** (geste : Alt+Z, Instant Replay, Désactiver) | — |
 | Planification GPU à accélération matérielle (HAGS) | La carte gère sa propre file de travail au lieu du processeur ; l'effet sur la latence n'est pas mesuré. | **écrit** (`latency.hagsOn`, au redémarrage) | Microsoft, [redesign des réglages graphiques](https://devblogs.microsoft.com/directx/navigating-the-redesigned-graphics-settings-page/) |
 | Optimisations pour les jeux en fenêtre (modèle flip) | Les jeux en fenêtre ou en fenêtre sans bordure passent du vieux modèle « blt » au modèle « flip » : moins de latence de présentation, VRR possible. | **écrit** (`latency.vrrFlipModelOn`) | Microsoft, [Optimizations for windowed games](https://support.microsoft.com/en-us/windows/optimizations-for-windowed-games-in-windows-11-3f006843-2c7e-4ed0-9a5e-f9389e535952) |
 | Plein écran exclusif contre optimisations plein écran | Windows fait tourner le plein écran « exclusif » en fenêtre sans bordure optimisée ; Microsoft mesure des performances égales. | **rien à faire** (ne pas désactiver les optimisations plein écran sans mesure) | Microsoft, [Demystifying Fullscreen Optimizations](https://devblogs.microsoft.com/directx/demystifying-full-screen-optimizations/) |
@@ -192,7 +192,7 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
    Gestionnaire des tâches, et « Annuler » le réactive (« SecurityHealth » reste). À la main : Gestionnaire des tâches
    (Ctrl + Maj + Échap) > Applications de démarrage.
 2. Overlays : coupe ceux dont tu ne te sers pas (Discord : Paramètres > Overlay du jeu ; GeForce : Alt+Z, Paramètres).
-3. Instant Replay de NVIDIA (enregistre en continu, environ 5 % d'images selon NVIDIA) : Alt+Z > Instant Replay >
+3. Instant Replay de NVIDIA (enregistre en continu, ce qui coûte des images) : Alt+Z > Instant Replay >
    Désactiver, si tu ne t'en sers pas.
 4. Pertes en stream au-dessus de 5 % (DrDXT lit les journaux d'OBS) : si l'encodage ne suit pas, baisse dans OBS le
    préréglage de l'encodeur, la taille de sortie ou la fréquence d'images ; si le rendu manque des images, plafonne les
@@ -280,7 +280,7 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 4. Plan d'alimentation « Économie d'énergie » pour jouer : sur un PC de bureau, DrDXT repasse en Équilibré lui-même (Optimiser,
    réversible). Sur un portable, où l'économie peut être voulue : Paramètres > Système > Alimentation, repasse en Équilibré.
 5. Un réglage posé par DrDXT et défait depuis (mise à jour, autre programme) : relance l'optimisation. Sans le service de
-   maintien (case décochée par défaut à l'installation), DrDXT ne le repose pas tout seul ; avec lui, il repose au démarrage
+   maintien (case cochée par défaut à l'installation, décochable), DrDXT ne le repose pas tout seul ; avec lui, il repose au démarrage
    de Windows les réglages qu'il suit (plan d'alimentation, Reflex, cache X3D, HAGS) que tu avais gardés.
 6. Doute sur la mémoire : Windows + R, `mdsched.exe`, le test tourne au redémarrage ; DrDXT lit le résultat. DrDXT
    peut aussi le demander lui-même pour le prochain redémarrage (« Le lancer au prochain démarrage », sous le constat),

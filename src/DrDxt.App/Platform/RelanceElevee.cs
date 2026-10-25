@@ -12,6 +12,9 @@ namespace DrDxt.App.Platform;
 public static class RelanceElevee
 {
     public const string Lanceur = "DrDxt.Lanceur.exe";
+
+    /// <summary>Marque la nouvelle App : l'ancienne tient encore sa place un instant, la nouvelle l'attend (InstanceUnique).</summary>
+    public const string ApresRelance = "--apres-relance";
     private const int ElevationRefusee = 1223;
 
     /// <summary>Faux quand l'invite Windows est refusée ou que rien ne démarre : l'App reste ouverte et le dit.</summary>
@@ -22,6 +25,7 @@ public static class RelanceElevee
         var psi = new ProcessStartInfo(fichier) { UseShellExecute = true, Verb = "runas", WorkingDirectory = Path.GetDirectoryName(exe) };
         foreach (var a in prefixe) psi.ArgumentList.Add(a);
         foreach (var a in arguments) psi.ArgumentList.Add(a);
+        psi.ArgumentList.Add(ApresRelance);
         try { Process.Start(psi); return true; }
         catch (System.ComponentModel.Win32Exception) { return false; }
         catch (InvalidOperationException) { return false; }

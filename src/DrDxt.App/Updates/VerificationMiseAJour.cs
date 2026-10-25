@@ -9,8 +9,10 @@ public enum EtatMiseAJour
 {
     /// <summary>Aucun serveur configure : rien n'a ete tente, aucune requete n'est partie.</summary>
     NonConfigure,
-    /// <summary>Serveur joint, rien de plus recent a offrir.</summary>
+    /// <summary>Un manifeste signé lu (ou le 204 du serveur) : rien de plus récent à offrir.</summary>
     AJour,
+    /// <summary>Rien n'est publié à l'adresse du manifeste (404) : ni « à jour » ni une panne.</summary>
+    RienDePublie,
     /// <summary>Une version de l'App signee et verifiee est annoncee ; son installeur ne se telecharge qu'au clic.</summary>
     NouvelleVersionVerifiee,
     /// <summary>Serveur injoignable (ou trop lent) : on reste sur la version installee.</summary>
@@ -49,9 +51,9 @@ public static class VerificationMiseAJour
 {
     public const string VariableUrl = "DRDXT_UPDATE_URL";
 
-    /// <summary>Sans adresse écrite, aucune copie installée n'aurait jamais pu recevoir de
-    /// mise à jour, et l'installeur ne posait pas la variable. Les manifestes signés vivent sur le site GitHub Pages du dépôt
-    /// public. Tant qu'il n'est pas publié, GitHub répond 404 : « joignable, rien à offrir », jamais une erreur.</summary>
+    /// <summary>L'adresse est écrite dans l'App : l'installeur ne pose pas la variable, et sans elle aucune copie
+    /// installée ne recevrait de mise à jour. Les manifestes signés vivent sur le site GitHub Pages du dépôt
+    /// public. Tant qu'il n'est pas publié, GitHub répond 404 : « rien de publié », ni « à jour » ni une erreur.</summary>
     public const string UrlParDefaut = "https://ablanchard-dev.github.io/drdxt";
 
     /// <summary>La variable gagne quand elle existe ; « off » coupe toute vérification (aucune requête ne part).
@@ -75,7 +77,7 @@ public static class VerificationMiseAJour
     /// le manifeste ; le téléchargement, au clic, a sa propre borne.</summary>
     public static readonly TimeSpan DelaiParDefaut = TimeSpan.FromSeconds(15);
 
-    /// <summary>Le téléchargement de la charge, au clic : 49 Mo en 15 min passent à 0,5 Mbit/s.</summary>
+    /// <summary>Le téléchargement de la charge, au clic : une cinquantaine de Mo en 15 min passent à 0,5 Mbit/s.</summary>
     public static readonly TimeSpan DelaiTelechargement = TimeSpan.FromMinutes(15);
 
     /// <param name="verifierDeTest">Pour les tests seulement. null = clef de production (embarquée ;
@@ -86,12 +88,11 @@ public static class VerificationMiseAJour
             url,
             client,
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            AppContext.BaseDirectory,
             versionInstallee,
             verifierDeTest);
 
     /// <summary>La vérification du démarrage, et le client par lequel le bouton « Installer » téléchargera plus tard. Ce
-    /// client n'est jamais libéré ici : libéré à la fin de la vérification, il faisait échouer le clic (ObjectDisposedException
+    /// client n'est jamais libéré ici : libéré à la fin de la vérification, il ferait échouer le clic (ObjectDisposedException
     /// au téléchargement).</summary>
     /// <param name="transport">Pour les tests seulement. null = le transport de l'App : les identifiants du compte vont au
     /// seul proxy configuré (<see cref="DrDxt.App.Platform.ProxyDuCompte"/>) ; derrière un proxy d'entreprise manuel qui
@@ -111,8 +112,8 @@ public static class VerificationMiseAJour
     public static async Task<ResultatMiseAJour> VerifierAsync(
         Func<Result<AutoUpdater>> monter, TimeSpan delai, CancellationToken ct)
     {
-        // La borne couvre aussi le montage (cles, crypto, dossiers). Il tournait avant elle :
-        // la CI a mesure 3,3 puis 7,7 s pour une borne de 200 ms. Un montage trop lent est « injoignable »,
+        // La borne couvre aussi le montage (cles, crypto, dossiers), qui peut prendre plusieurs secondes sur une
+        // machine chargee. Un montage trop lent est « injoignable »,
         // comme un serveur trop lent ; il finit en arriere-plan sans que personne l'attende.
         using var borne = CancellationTokenSource.CreateLinkedTokenSource(ct);
         borne.CancelAfter(delai);
@@ -137,23 +138,14 @@ public static class VerificationMiseAJour
         catch (Exception) { return new(EtatMiseAJour.Echec); }
     }
 
-    /// <summary>Le resultat du canal, un etat. Un refus passe avant « injoignable » : un paquet rejete est une
-    /// information de securite.</summary>
-    public static EtatMiseAJour Classer(Result<UpdateOutcome> app)
-    {
-        if (app is { IsOk: true, Value: UpdateOutcome.AppStaged }
-            || app.Error?.Code == UpdateErrorCodes.ReplacerUnavailable)
-            return EtatMiseAJour.NouvelleVersionVerifiee;
-
-        return app.IsOk ? EtatMiseAJour.AJour : ClasserErreur(app.Error?.Code);
-    }
-
+    /// <summary>Un refus passe avant « injoignable » : un paquet rejete est une information de securite.</summary>
     internal static EtatMiseAJour ClasserErreur(string? code)
     {
         return code switch
         {
             UpdateErrorCodes.SignatureInvalid or UpdateErrorCodes.HashMismatch or UpdateErrorCodes.Downgrade => EtatMiseAJour.Refusee,
             UpdateErrorCodes.Offline => EtatMiseAJour.Injoignable,
+            UpdateErrorCodes.NotPublished => EtatMiseAJour.RienDePublie,
             _ => EtatMiseAJour.Echec,
         };
     }
@@ -162,6 +154,7 @@ public static class VerificationMiseAJour
     {
         EtatMiseAJour.NonConfigure => "UI.Footer.Updates.NotConfigured",
         EtatMiseAJour.AJour => "UI.Footer.Updates.UpToDate",
+        EtatMiseAJour.RienDePublie => "UI.Footer.Updates.NothingPublished",
         EtatMiseAJour.NouvelleVersionVerifiee => "UI.Footer.Updates.NewVersion",
         EtatMiseAJour.Injoignable => "UI.Footer.Updates.Offline",
         EtatMiseAJour.Refusee => "UI.Footer.Updates.Rejected",

@@ -12,7 +12,7 @@ namespace DrDxt.Detection.Display;
 /// Source : NVIDIA, article de support 5157 (MPO sous Windows 11, mis à jour le 28/09/2026) ; son fichier mpo_disable.reg
 /// pose « OverlayTestMode »=dword:00000005 sous HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\Dwm, et mpo_restore.reg
 /// retire la valeur. Une valeur absente est donc le réglage d'origine de Windows, pas une lecture manquée. Relevé sur la
-/// machine de référence le 17/10/2026 : valeur absente.
+/// machine de référence (relevé du 17/10/2026) : valeur absente.
 /// </remarks>
 public static class SuperpositionsMaterielles
 {
@@ -42,7 +42,9 @@ public static class SuperpositionsMaterielles
             null => new RepairFinding("DISPLAY", "superpositions materielles", Docteur.T("MPO.Defaut"), null, RepairStatus.ExpectedDefault,
                 Docteur.T("MPO.Absente")),
             Coupees => new RepairFinding("DISPLAY", "superpositions materielles", $"{Valeur} = {Coupees}", Docteur.T("MPO.Defaut"),
-                RepairStatus.Suspicious, Docteur.T("MPO.Coupees"), RepairAction.Recommandation),
+                // NVIDIA publie ce fichier contre des scintillements et des écrans noirs : la valeur est un remède voulu
+                // autant qu'un reste d'optimiseur, elle se dit sans accuser.
+                RepairStatus.UserChoiceProbable, Docteur.T("MPO.Coupees"), RepairAction.Recommandation),
             _ => new RepairFinding("DISPLAY", "superpositions materielles", $"{Valeur} = {valeur}", Docteur.T("MPO.Defaut"),
                 RepairStatus.Observed, Docteur.T("MPO.Autre", valeur)),
         };

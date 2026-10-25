@@ -61,14 +61,15 @@ public partial class ScanViewModel
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(ExpertPeutPoser))] private bool _expertGarde;
 
     public bool ExpertVisible => PoserCarteExpert is not null && _lastScan is { } scan && ReglageCarteExpert.Possible(scan.Hw);
-    public bool ExpertPeutPoser => !ExpertEnCours && !ExpertGarde;
+    public bool ExpertPeutPoser => !ExpertEnCours && !ExpertGarde && AucuneOperationLongue;
     public int ExpertMinMhz => GpuSafeBounds.MinCoreOffsetMhz;
     public int ExpertMaxMhz => GpuSafeBounds.MaxCoreOffsetMhz;
 
     public string LabelExpertTitre => _localize("Carte.Expert.Titre");
-    // Sur une carte sans validation archivée (toute Radeon à ce jour), l'Expert reste ouvert mais
-    // l'accord le dit : l'écriture n'a jamais été essayée sur cette architecture.
-    public string LabelExpertAccord => _lastScan is { } s && GpuTuningCoverage.For(s.Hw).Any(r => r.Support == GpuTuningSupport.ReadOnly)
+    // Sans rapport archivé qui ait écrit, relu et rendu le décalage cœur sur cette architecture, l'Expert reste ouvert mais
+    // l'accord le dit. Une carte « validée » pour sa limite de puissance ne l'est pas pour son décalage.
+    public string LabelExpertAccord => _lastScan is { } s && GpuTuningCoverage.For(s.Hw)
+            .Any(r => r.Support == GpuTuningSupport.ReadOnly || !PreuvesArchivees.Prouve(r.Architecture, "gpu.undervolt"))
         ? $"{_localize("Carte.Expert.Accord")} {_localize("Carte.Expert.NonValideIci")}"
         : _localize("Carte.Expert.Accord");
     public string LabelExpertDecalage => string.Format(System.Globalization.CultureInfo.CurrentCulture,
@@ -118,6 +119,7 @@ public partial class ScanViewModel
                 };
             }
         }
+        catch (Exception ex) { ExpertEtat = $"{_localize("Carte.Expert.Refuse")} {RaisonLisible.Dire(ex, _localize)}"; }
         finally { ExpertEnCours = false; }
     }
 
@@ -136,6 +138,10 @@ public partial class ScanViewModel
 
     /// <summary>Vrai tant qu'un réglage temporaire est posé : décalage expert gardé, ou recherche de sous-tension en cours.</summary>
     internal bool QuelqueChoseARendre => _essaiCarte is not null || RechercheSousTensionEnCours;
+
+    /// <summary>Optimiser ou une vérification écrit encore : fermer la laisserait à moitié (le journal d'essai, le rejeu et le
+    /// bail rattrapent, mais le joueur doit le savoir). La question avant de fermer, ou null quand rien n'écrit.</summary>
+    internal string? AvertissementDeFermeture => ApplyCommand.IsRunning || VerificationEnCours ? _localize("Fermeture.EcritureEnCours") : null;
 
     /// <summary>Avant la fermeture de la fenêtre : le décalage expert rendu, la recherche arrêtée et la tension d'origine
     /// rendue. Appelé sur le fil d'interface sans le bloquer : la recherche y reprend pour exécuter son finally.</summary>
@@ -177,6 +183,8 @@ public partial class ScanViewModel
                 ExpertEtat = _localize("Carte.Expert.RenduRate");
             }
         }
+        // Jamais « rendue » sur une panne : le retour n'est pas prouvé.
+        catch (Exception ex) { ExpertEtat = $"{_localize("Carte.Expert.RenduRate")} {RaisonLisible.Dire(ex, _localize)}"; }
         finally { ExpertEnCours = false; }
     }
 }

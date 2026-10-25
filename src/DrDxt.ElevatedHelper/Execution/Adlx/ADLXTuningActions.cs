@@ -188,8 +188,12 @@ public sealed class ADLXTuningActions : IADLXTuningActions
 
     // La remise à l'usine, geste à part (AdlxTuningKind.RemiseUsine) : le seul retour vers le défaut du pilote au-delà de la
     // bande. Elle remet aussi la mémoire, le ventilateur et la puissance réglés dans AMD Software ; l'appelant le dit.
+    // Le code 0 du pilote ne prouve rien : la carte relue doit se dire à l'usine (IsAtFactory), sinon l'App dirait « remis »
+    // et sortirait le levier du journal.
     private Result RemettreUsine(int gpuIndex)
-        => _native.RemettreReglageUsine(gpuIndex) is { } refus ? Fail(Docteur.T("ADLX.UsineImpossible", refus)) : Result.Ok();
+        => _native.RemettreReglageUsine(gpuIndex) is { } refus ? Fail(Docteur.T("ADLX.UsineImpossible", refus))
+            : _native.EstALUsine(gpuIndex) is true ? Result.Ok()
+            : Fail(Docteur.T("ADLX.UsineImpossible", "IsAtFactory does not confirm it"));
 
     // --- PowerLimit : une limite de puissance absolue (% du TDP). ---
 

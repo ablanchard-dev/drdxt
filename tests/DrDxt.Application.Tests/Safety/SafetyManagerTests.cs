@@ -52,6 +52,21 @@ public sealed class SafetyManagerTests
         await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
+    // Une stratégie de Windows (DisableSR) interdit la restauration : rien à demander au joueur, qui ne peut pas l'activer, et
+    // le refus dit pourquoi.
+    [Fact]
+    public async Task Une_restauration_interdite_par_strategie_se_dit_sans_rien_demander()
+    {
+        _restore.IsEnabled().Returns(false);
+        _restore.InterditeParStrategie().Returns(true);
+
+        var r = await Build().EnsureRestorePointAsync();
+
+        r.Error!.Value.Code.Should().Be(ErrorCodes.RestorePolicy);
+        _consent.DidNotReceive().AskEnableRestore();
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Blocks_when_user_declines_enabling_restore()
     {
@@ -264,6 +279,9 @@ public sealed class SafetyManagerTests
         r2.IsOk.Should().BeTrue();
         // Un seul vrai point de restauration par session ou lot (pas de spam).
         await _elevated.Received(1).ExecuteAsync(Arg.Any<CreateRestorePointOp>(), Arg.Any<CancellationToken>());
+        // Et la seconde demande ne relit même pas Windows : sans la garde de session, elle retrouverait le point récent
+        // et rendrait Ok de toute façon, ce qui ne prouverait rien de la garde.
+        _restore.Received(1).IsEnabled();
     }
 
     // --- B2 ---

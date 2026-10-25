@@ -25,6 +25,20 @@ public sealed class FriseHistoriqueXamlTests
         frise[..frise.IndexOf('>')].Should().Contain("MaxWidth=").And.Contain("HorizontalAlignment=\"Left\"");
     }
 
+    // Un point vert, rouge ou violet devant chaque événement : un feu tricolore qui se lit comme un gabarit tout fait. Le
+    // texte de chaque ligne dit déjà ce qu'elle est (une partie, un arrêt brutal, un changement).
+    [Fact]
+    public void La_frise_n_a_pas_de_point_de_couleur()
+    {
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
+        var vue = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var debut = vue.IndexOf("ItemsSource=\"{Binding FriseHistorique}\"", StringComparison.Ordinal);
+        var frise = vue[debut..(vue.IndexOf("</ItemsControl>", debut, StringComparison.Ordinal) + "</ItemsControl>".Length)];
+
+        frise.Should().NotContain("<Ellipse").And.NotContain("EtatCorrigerBrush").And.NotContain("EtatRienBrush");
+    }
+
     [Fact]
     public void Les_fps_passent_sous_le_texte_et_se_replient()
     {

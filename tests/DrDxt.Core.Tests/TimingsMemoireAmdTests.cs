@@ -4,7 +4,7 @@ using FluentAssertions;
 namespace DrDxt.Core.Tests;
 
 // Les timings que le contrôleur mémoire AMD applique : registres synthétiques construits selon la disposition citée par
-// TimingsMemoireAmd (aucune machine AMD ici). La DDR5 reste marquée non vérifiée.
+// TimingsMemoireAmd (aucune machine AMD ici). DDR4 et DDR5 restent marquées non vérifiées.
 public sealed class TimingsMemoireAmdTests
 {
     private static readonly GenerationAmd.Ligne Zen4 = GenerationAmd.Table.First(l => l.Generation == "Zen 4");
@@ -40,14 +40,25 @@ public sealed class TimingsMemoireAmdTests
     }
 
     [Fact]
-    public void Un_canal_DDR5_se_decode_et_reste_marque_non_verifie()
+    public void Un_canal_DDR5_se_decode_et_aucune_disposition_n_est_dite_verifiee()
     {
         var t = TimingsMemoireAmd.Decoder(TypeMemoireAmd.Ddr5, [Ddr5(), Ddr5()])!;
 
         t.Canaux.Should().HaveCount(2).And.AllSatisfy(c => c.Should().BeEquivalentTo(
             new { DebitMts = 5800, Cl = 34, Rcd = 41, Rp = 42, Ras = 90, Rc = 132, Rfc = 820, Commande2T = false, GearDown = true, PowerDown = true }));
         t.DispositionVerifiee.Should().BeFalse();
-        TimingsMemoireAmd.Decoder(TypeMemoireAmd.Ddr4, [Ddr4()])!.DispositionVerifiee.Should().BeTrue();
+        // La DDR4 vient de la même compilation, et aucune lecture de référence ne l'a confrontée non plus.
+        TimingsMemoireAmd.Decoder(TypeMemoireAmd.Ddr4, [Ddr4()])!.DispositionVerifiee.Should().BeFalse();
+    }
+
+    // La lecture saute les canaux vides : une barrette sur le canal B seul se dit B, jamais A.
+    [Fact]
+    public void Un_canal_garde_la_lettre_de_son_numero_physique()
+    {
+        var t = TimingsMemoireAmd.Decoder(TypeMemoireAmd.Ddr5, [(1, (IReadOnlyDictionary<uint, uint>)Ddr5())])!;
+
+        t.Canaux.Single().Canal.Should().Be(1);
+        RegleContreApplique.Comparer([new BiosSettingReading("tCL", 0, "30", false)], t).Single().Canal.Should().Be('B');
     }
 
     [Fact]
@@ -106,9 +117,12 @@ public sealed class TimingsMemoireAmdTests
         ferme.Explication.Should().Be(Docteur.T("TMA.NonLus"));
         TimingsMemoireAmd.Juger(Zen4, [26, 34], null).Single().Explication.Should().Be(Docteur.T("TMA.TypeNonDecode"));
 
-        var lu = TimingsMemoireAmd.Juger(Zen4, [34, 34], [Ddr5()]).Single();
+        var lu = TimingsMemoireAmd.Juger(Zen4, [34, 34], [(0, Ddr5())]).Single();
         lu.Statut.Should().Be(RepairStatus.Observed);
         lu.ValeurCourante.Should().Be("A 5800 MT/s 34-41-42-90 tRC 132 tRFC 820 1T GDM on PD on");
-        lu.Explication.Should().Be(Docteur.T("TMA.LusDdr5NonVerifiee", lu.ValeurCourante!));
+        lu.Explication.Should().Be(Docteur.T("TMA.LusNonVerifiee", lu.ValeurCourante!));
+        // La DDR4 ne se dit pas « réellement appliqués » sur une disposition que rien n'a vérifiée.
+        var ddr4 = TimingsMemoireAmd.Juger(Zen4, [26, 26], [(0, Ddr4())]).Single();
+        ddr4.Explication.Should().Be(Docteur.T("TMA.LusNonVerifiee", ddr4.ValeurCourante!));
     }
 }

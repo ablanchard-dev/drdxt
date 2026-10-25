@@ -34,4 +34,14 @@ public sealed class CouleurDeSortieTests
         CouleurDeSortie.Juger([new("A", 0, 6, false)]).Single().Statut.Should().Be(RepairStatus.Observed);
         CouleurDeSortie.Juger(null).Single().Statut.Should().Be(RepairStatus.Unknown);
     }
+
+    // Une profondeur à 0 n'est pas « peu de bits » : le pilote ne l'a pas renseignée.
+    [Fact]
+    public void Une_profondeur_a_zero_se_dit_non_lue()
+    {
+        var c = CouleurDeSortie.Juger([new CouleurDeSortie.Sortie("Écran", 0, 0, false)]).Single();
+
+        c.Statut.Should().Be(RepairStatus.Unknown);
+        c.Explication.Should().Be(Docteur.T("COUL.BitsNonLus"));
+    }
 }

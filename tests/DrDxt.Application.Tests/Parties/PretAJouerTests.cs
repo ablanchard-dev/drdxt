@@ -32,6 +32,13 @@ public sealed class PretAJouerTests
     public void Une_perte_isolee_ou_un_ping_filtre_vers_internet_n_est_pas_une_gene(double pertes)
         => PretAJouer.Genes(Propre with { PertesInternetPourcent = pertes }, k => k).Should().BeEmpty();
 
+    // Sans passerelle lue (VPN, partage de connexion), la perte vers la box n'est pas mesurée : elle ne se dit pas « 0 % ».
+    [Fact]
+    public void Une_perte_vers_la_box_non_mesuree_ne_se_dit_pas_zero()
+        => PretAJouer.Genes(Propre with { PingBoxMs = null, PertesBoxPourcent = null, PertesInternetPourcent = 30 },
+                k => k == "PretAJouer.Pertes" ? "{0}|{1}" : k)
+            .Should().Equal("?|30");
+
     [Fact]
     public void Un_aller_retour_sous_la_milliseconde_se_dit_moins_de_un()
         => PretAJouer.Mesure(Propre with { PingBoxMs = 0 }, k => k == "PretAJouer.Mesure" ? "{0}" : k).Should().Be("< 1 ms");

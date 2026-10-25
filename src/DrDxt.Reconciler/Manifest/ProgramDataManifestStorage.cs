@@ -12,11 +12,11 @@ namespace DrDxt.Reconciler.Manifest;
 // Défense en profondeur : le manifeste vit sous
 //   %ProgramData%\DrDxt\desired-state.manifest
 // avec une DACL qui n'accorde l'écriture qu'aux Administrateurs + SYSTEM et la lecture aux
-// utilisateurs authentifiés. Un utilisateur non admin peut le lire (le réconciliateur tourne
-// peu privilégié) mais pas le réécrire. Cela complète la signature asymétrique, sans jamais la
+// utilisateurs authentifiés. Un utilisateur non admin peut le lire (l'App le relit sans droits) mais
+// pas le réécrire. Cela complète la signature asymétrique, sans jamais la
 // remplacer : la signature est l'autorité d'intégrité ; l'ACL ne fait que relever la barre au repos.
 //
-// Les écritures sont atomiques (écriture dans un .tmp voisin, puis File.Move / remplacement) :
+// Les écritures sont atomiques (un temporaire au nom aléatoire, puis FichierJsonAtomique.Remplacer) :
 // un plantage en pleine écriture ne laisse jamais un manifeste à moitié écrit.
 //
 // Testabilité : le chemin et le descripteur de DACL sont des fonctions statiques pures
@@ -27,7 +27,10 @@ namespace DrDxt.Reconciler.Manifest;
 [SupportedOSPlatform("windows")]
 public sealed class ProgramDataManifestStorage : IManifestStorage
 {
-    private const string FileName = "desired-state.manifest";
+    private const string FileName = NomDuFichier;
+
+    /// <summary>Le nom du manifeste dans sa racine (l'installeur et la désinstallation le cherchent aussi).</summary>
+    public const string NomDuFichier = "desired-state.manifest";
 
     private readonly string _root;
     private readonly bool _applyAcl;
@@ -54,7 +57,7 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
     /// <summary>La sécurité durcie de la racine en écriture admin : propriétaire épinglé à
     /// Administrateurs, écriture pour Administrateurs + SYSTEM, lecture pour les utilisateurs
     /// authentifiés ; protégée (n'hérite pas d'une ACL parente plus lâche). Épingler le propriétaire
-    /// ferme le trou « le créateur garde un WRITE_DAC implicite et rouvre la DACL » (BLOCKER #1b) :
+    /// ferme le trou « le créateur garde un WRITE_DAC implicite et rouvre la DACL » :
     /// voir <see cref="TrustedManifestRoot.BuildHardenedSecurity"/>.</summary>
     public static DirectorySecurity BuildAdminWriteDacl()
         => TrustedManifestRoot.BuildHardenedSecurity();
@@ -105,7 +108,7 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
             if (!File.Exists(FilePath))
                 return Task.FromResult(Result<SignedManifestEnvelope?>.Ok(null));
 
-            // Intégrité au repos (BLOCKER #1a) : avant de faire confiance à un manifeste présent, vérifier
+            // Intégrité au repos : avant de faire confiance à un manifeste présent, vérifier
             // que son propriétaire est Administrateurs/SYSTEM et que la racine n'est pas inscriptible par un
             // non-admin. Une racine empoisonnée (par exemple un %ProgramData%\DrDxt créé par l'utilisateur)
             // → fail-closed (traitée comme altérée) : rien n'est réappliqué. Défense en profondeur au-dessus

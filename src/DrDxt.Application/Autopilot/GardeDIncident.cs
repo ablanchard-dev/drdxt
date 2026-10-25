@@ -13,11 +13,12 @@ public static class GardeDIncident
     public static readonly TimeSpan Surveillance = TimeSpan.FromDays(7);
 
     /// <summary>Un réglage qui n'écrit que la session (mode Jeu, préférences HKCU) ou le moment où
-    /// Windows Update redémarre ne peut pas causer un arrêt brutal ; une coupure de courant ne le rend pas. Un levier qui ne
+    /// Windows Update redémarre ne peut pas causer un arrêt brutal ; une coupure de courant ne le rend pas. Le mode de l'écran
+    /// non plus : le rendre sans clic changerait la fréquence que le joueur a peut-être choisie depuis. Un levier qui ne
     /// déclare pas sa surface reste sous garde.</summary>
     public static bool PeutCauserUnArret(string id) =>
         CatalogueDeCandidats.Decrire(id)?.Surface is not (SurfaceTouchee.OsUtilisateur or SurfaceTouchee.PlanificationWindows
-            or SurfaceTouchee.Aucune);
+            or SurfaceTouchee.Affichage or SurfaceTouchee.Aucune);
 
     /// <summary>Les réglages à rendre, avec l'arrêt qui les fait rendre (le premier après la pose). Une coupure pendant la
     /// veille ne dit rien de la stabilité en charge : elle ne rend rien.</summary>
@@ -26,9 +27,11 @@ public static class GardeDIncident
     /// a continué de tourner, mais le pilote a décroché après notre écriture, et l'attribution appartient au joueur, pas à un refus.</param>
     public static IReadOnlyList<(string Id, ArretClasse Arret, bool VidageAChaud)> ARendre(
         IEnumerable<(string Id, DateTimeOffset Pose)> poses, IReadOnlyList<ArretClasse>? arrets,
-        IReadOnlyList<(DateTimeOffset Quand, int Code)>? vidagesCarte = null)
+        IReadOnlyList<(DateTimeOffset Quand, int Code)>? vidagesCarte = null, DateTimeOffset? maintenant = null)
     {
-        var liste = poses.ToList();
+        // Une pose notée sous une horloge partie en avant, corrigée depuis, serait datée après l'arrêt qui l'a suivie : au
+        // jugement, elle ne peut pas être plus tard que maintenant.
+        var liste = poses.Select(p => maintenant is { } m && p.Pose > m ? (p.Id, Pose: m) : p).ToList();
         var rendus = new List<(string Id, ArretClasse Arret, bool VidageAChaud)>();
         if (arrets is { Count: > 0 })
             rendus.AddRange(liste

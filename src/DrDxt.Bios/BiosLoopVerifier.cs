@@ -68,7 +68,11 @@ public sealed class BiosLoopVerifier : IBiosLoopVerifier
             outcomes.Add(new BiosSettingOutcome(target.Setting, target.ExpectedState, observed, verdict));
         }
 
-        var allTook = outcomes.Count > 0 && outcomes.All(o => o.Verdict == BiosSettingVerdict.Took);
+        // Une cible que l'OS ne sait jamais relire au retour (JamaisRelisibles) ne bloque pas un voyage dont les cibles lues
+        // ont pris : sans cela, le marqueur restait pour toujours. Elle reste dite illisible dans les issues. Une cible lisible
+        // relue inconnue bloque toujours.
+        var jugees = outcomes.Where(o => !(o.Verdict == BiosSettingVerdict.Unreadable && JamaisRelisibles.Contains(o.Setting))).ToList();
+        var allTook = jugees.Count > 0 && jugees.All(o => o.Verdict == BiosSettingVerdict.Took);
 
         if (allTook)
         {
@@ -129,6 +133,10 @@ public sealed class BiosLoopVerifier : IBiosLoopVerifier
         // fonction dont la raison d'être est précisément de refuser ça.
         if (target.ObservedBefore is not { } before || before == 0) return null;
 
+        // Lu dans la NVRAM, l'état est un fait, plus une inférence : un profil XMP à la fréquence d'un réglage à la main
+        // ne fait pas bouger l'horloge et a pourtant pris.
+        if (target.Setting == FirmwareSettingKind.XmpExpo && state.BiosLu?.Any(l => l.Setting == "XMP") == true) return null;
+
         long after = ObservableNow(state, target.Setting);
         if (after == 0) return null;
 
@@ -149,6 +157,11 @@ public sealed class BiosLoopVerifier : IBiosLoopVerifier
         _ => 0,
     };
 
+    /// <summary>Les réglages que Windows ne confirme jamais au retour : le CSM en démarrage UEFI (seul un démarrage Legacy le
+    /// prouve), le routage CPPC, la génération PCIe, la version du BIOS (voir ReadObserved).</summary>
+    private static readonly HashSet<FirmwareSettingKind> JamaisRelisibles =
+        [FirmwareSettingKind.Csm, FirmwareSettingKind.X3dCppc, FirmwareSettingKind.PcieGen, FirmwareSettingKind.BiosVersion];
+
     // ── Relier un réglage firmware à la lecture neuve de SettingsState. Tout ce qu'on ne peut pas
     //    lire est honnêtement Unknown : la boucle rapporte Unreadable au lieu de fabriquer un état. ──
     private static TriState ReadObserved(SettingsState state, FirmwareSettingKind kind) => kind switch
@@ -161,14 +174,14 @@ public sealed class BiosLoopVerifier : IBiosLoopVerifier
         // ReBAR désactivé), d'où Unknown plutôt qu'un « désactivé » fabriqué.
         FirmwareSettingKind.Above4G => state.ReBar == TriState.On ? TriState.On : TriState.Unknown,
 
-        // CSM : rempli par le scan d'après le mode de démarrage. Un démarrage Legacy prouve le CSM actif ;
-        // un démarrage UEFI ne le prouve pas inactif. Le lecteur porte déjà cette asymétrie.
+        // CSM : le scan le laisse Unknown (SettingsStateReader ne sait pas distinguer un démarrage Legacy d'un type de
+        // firmware non lu) ; seule la lecture NVRAM du BIOS le remplit. Un démarrage UEFI ne le prouverait pas inactif.
         FirmwareSettingKind.Csm => state.Csm,
 
         // Encore vraiment illisibles, chacun pour une raison nommée (pas un cas oublié du switch) :
         //   X3dCppc     : demande le routage CPPC des cœurs préférés, pas seulement les cœurs parqués.
-        //   PcieGen     : demande nvmlDeviceGetCurrPcieLinkGeneration/Width ; INvmlNative n'expose
-        //                 aujourd'hui que BAR1/puissance/température/pilote.
+        //   PcieGen     : INvmlNative lit le lien PCIe, mais l'état relu au retour (SettingsState) ne le porte
+        //                 pas.
         //   BiosVersion : pas une bascule : un TriState ne peut pas exprimer « 1.H0 -> 1.J0 ». Il relève
         //                 du chemin par écart avec un comparant chaîne, pas d'ici.
         _ => TriState.Unknown,

@@ -47,9 +47,9 @@ public sealed class VentilateursEnPartieTests
         c.Statut.Should().Be(RepairStatus.Suspicious);
         c.Explication.Should().Contain("42 s").And.Contain("n° 5").And.Contain("frotte");
         VentilateursEnPartie.Juger([Partie(0, new VentilateurEnPartie(5, 900, 0, 3, 600))]).Should().BeEmpty("3 s : une mesure ratée, pas un arrêt");
-        // Une seule lecture de la puce (toutes les 5 s) ratée compte 5 s : ce n'est pas un arrêt.
-        VentilateursEnPartie.Juger([Partie(0, new VentilateurEnPartie(5, 900, 0, 5, 600))]).Should().BeEmpty("une lecture ratée, resservie 5 s");
-        VentilateursEnPartie.Juger([Partie(0, new VentilateurEnPartie(5, 900, 0, 10, 600))]).Should().ContainSingle("deux lectures à l'arrêt");
+        // Une seule lecture de la puce (toutes les 15 s) ratée compte 15 s : ce n'est pas un arrêt.
+        VentilateursEnPartie.Juger([Partie(0, new VentilateurEnPartie(5, 900, 0, 15, 600))]).Should().BeEmpty("une lecture ratée, resservie 15 s");
+        VentilateursEnPartie.Juger([Partie(0, new VentilateurEnPartie(5, 900, 0, 30, 600))]).Should().ContainSingle("deux lectures à l'arrêt");
     }
 
     [Fact]

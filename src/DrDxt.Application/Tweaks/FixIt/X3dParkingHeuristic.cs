@@ -4,7 +4,8 @@ namespace DrDxt.Application.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
 // X3dParkingHeuristic : détection prudente d'un « mauvais parcage des CCD » sur un processeur
-// AMD X3D à deux CCD, d'après SettingsState.ParkedCoreIndexes (lu par le scan).
+// AMD X3D à deux CCD, d'après SettingsState.ParkedCoreIndexes (lu par le scan, jeu ouvert seulement : hors jeu,
+// l'optimiseur ne parque rien, et « rien de parqué » ne distingue pas un routage sain d'un cassé).
 //
 // Contexte : sur un X3D à deux CCD (7950X3D / 7900X3D / 9950X3D), un CCD porte la 3D V-Cache
 // empilée (le CCD de jeu) et l'autre est le CCD haute fréquence. Le service AMD 3D V-Cache
@@ -33,7 +34,7 @@ public static class X3dParkingHeuristic
         var parked = state.ParkedCoreIndexes;
 
         // Parcage non lu (null) n'est pas « rien n'est parque ». Ce levier ecrit
-        // (AMD3DVCacheSvc + CppcEnable) : proposer une ecriture sur un signal non lu
+        // (AMD3DVCacheSvc et le mode Jeu) : proposer une ecriture sur un signal non lu
         // est exactement ce qu'un lecteur bouchonne rendant toujours une liste vide
         // ferait faire ici, sur toute machine X3D bi-CCD, saines comprises.
         if (parked is null)

@@ -40,7 +40,7 @@ lue par DrDXT à côté de celle de l'outil de référence.
 
 | Chemin | Ce qu'il fait | État | Test | Le rapport montre |
 |---|---|---|---|---|
-| Limite de puissance (`gpu.power_limit`) | baisse la limite de puissance de la carte par le pilote | non validé sur AMD réel | `VALIDER.cmd` | la limite d'origine, celle posée, puis l'origine relue ; Adrenalin d'accord avant et après |
+| Limite de puissance (`gpu.power_limit`) | baisse la limite de puissance de la carte par le pilote | pas proposé sur AMD : l'unité de la plage d'ADLX (GetPowerLimitRange), % du TDP ou décalage, n'est pas relevée sur une vraie carte | `VALIDER.cmd` | rien n'est écrit : la limite est seulement lue |
 | Anti-Lag (`latency.render_queue_cap`) | active Anti-Lag pour raccourcir la file de rendu | non validé sur AMD réel | `VALIDER.cmd` | Anti-Lag posé, relu, rendu, relu ; Adrenalin d'accord |
 | Vsync du pilote et plafond FRTC (`latency.vrr_vsync_cap`) | sur un écran à fréquence variable, Vsync « toujours activée » et un plafond d'images sous la fréquence de l'écran | non validé sur AMD réel | `VALIDER.cmd`, écran à fréquence variable branché sur la carte | les deux réglages posés puis rendus à leur valeur d'origine ; Adrenalin d'accord |
 | Fréquence maximale testée (`gpu.undervolt`, mode Expert) | essaie une fréquence maximale plus basse, la garde seulement si elle tient | non validé sur AMD réel | `VALIDER-FREQUENCE.cmd`, à part de `VALIDER.cmd` (qui n'écrit jamais de fréquence) | la fréquence maximale d'origine, celle baissée de 50 MHz, puis l'origine relue ; Adrenalin d'accord avant et après |

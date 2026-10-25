@@ -225,6 +225,25 @@ public class ScanViewModelTests
         vm.Findings.Should().NotBeEmpty();
     }
 
+    // Un scan réussi, puis un scan qui échoue : le titre, le sous-titre et la date du premier restaient au-dessus du message
+    // d'erreur, comme si le second avait trouvé la même chose.
+    [Fact]
+    public async Task Un_scan_en_echec_n_affiche_plus_le_verdict_du_precedent()
+    {
+        var (hd, sr, br, sc) = Happy();
+        var vm = ScanViewModelTestSeams.Build(hd, sr, br, sc, Storage(), k => k);
+        await vm.ScanCommand.ExecuteAsync(null);
+        vm.DateDuScan.Should().NotBeNullOrEmpty("témoin : le premier scan a daté son verdict");
+
+        hd.DetectAsync().Returns(Result<HardwareInventory>.Fail(ErrorCodes.WmiFail, "x"));
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.State.Should().Be(ScanState.Failed);
+        vm.ProblemSummary.Should().BeEmpty();
+        vm.SubtitleText.Should().BeEmpty();
+        vm.DateDuScan.Should().BeNull();
+    }
+
     [Fact]
     public async Task Detection_failure_sets_failed_state()
     {

@@ -50,6 +50,20 @@ public sealed class VerificationDesReglagesTests
             .Should().Be("modifie : tweak.latency.hagsOn.title");
     }
 
+    // Un levier que le service réaffirme est inscrit au manifeste sous l'id du service (os.hags) : son titre reste celui
+    // du levier de l'App, jamais l'id interne.
+    [Theory]
+    [InlineData("os.hags", "tweak.latency.hagsOn.title")]
+    [InlineData("fixit.sanePowerPlan", "tweak.fixit.power_plan.title")]
+    [InlineData("latency.reflex.lowLatencyMode", "tweak.latency.reflex.title")]
+    public void A_setting_kept_under_its_service_id_is_said_by_the_App_title(string idDuService, string titre)
+    {
+        static string Localiser(string cle) => cle == "reconciler.notify.user_drift" ? "modifie : {0}" : cle;
+        var preuve = new AppliedStateEvidence(idDuService, EtatApplique.Drifted, null, null, null, null);
+
+        VerificationDesReglages.Dire(new[] { preuve }, Localiser).Should().Be("modifie : " + titre);
+    }
+
     [Fact]
     public async Task An_unreadable_manifest_claims_nothing()
     {

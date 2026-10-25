@@ -17,7 +17,7 @@ namespace DrDxt.Detection.Settings;
 ///
 /// <b>Le descripteur « Monitor Range Limits » (0xFD) ne prouve rien.</b> Tous les écrans en
 /// portent un : il décrit la plage de modes supportés, pas le VRR. Le Samsung 144 Hz de la
-/// machine de référence en a un (50-144 Hz) et n'est pas VRR. S'en servir ferait dire « capable »
+/// machine de référence en a un (50-144 Hz), qui ne dit rien du VRR. S'en servir ferait dire « capable »
 /// à n'importe quel écran rapide.
 ///
 /// Ce qui fait foi, et rien d'autre (sources : la liste amd-gfx, AMD VSDB, versions et tailles :
@@ -31,12 +31,14 @@ public static class EdidVrrCapabilite
 {
     private const int TailleBloc = 128;
     private const byte TagExtensionCta = 0x02;
+    // DisplayID peut déclarer l'Adaptive-Sync d'un écran DisplayPort, et ce lecteur ne le parcourt pas.
+    private const byte TagExtensionDisplayId = 0x70;
     private const int TagVendorSpecific = 3;
 
     private static readonly byte[] EnteteEdid = [0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00];
 
     /// <summary>
-    /// <c>On</c> = un bloc VRR est déclaré. <c>Off</c> = l'EDID est lisible et n'en déclare
+    /// <c>On</c> = un bloc VRR est déclaré. <c>Off</c> = l'EDID est lisible, sans extension DisplayID non parcourue, et n'en déclare
     /// aucun. <c>Unknown</c> = l'EDID est absent, tronqué ou n'en est pas un.
     ///
     /// La distinction Off / Unknown porte tout le sens. « Cet écran n'est pas VRR » est une
@@ -50,12 +52,14 @@ public static class EdidVrrCapabilite
             return TriState.Unknown;
 
         var extensions = edid[126];
+        var displayIdNonLu = false;
         for (var i = 1; i <= extensions; i++)
         {
             var debut = TailleBloc * i;
             if (debut + TailleBloc > edid.Length)
-                break; // extension annoncee mais absente : on ne conclut rien dessus
+                return TriState.Unknown; // extension annoncee mais absente : elle pouvait porter le bloc VRR
             var bloc = edid.Slice(debut, TailleBloc);
+            if (bloc[0] == TagExtensionDisplayId) displayIdNonLu = true;
             if (bloc[0] != TagExtensionCta)
                 continue;
 
@@ -63,7 +67,8 @@ public static class EdidVrrCapabilite
                 return TriState.On;
         }
 
-        return TriState.Off;
+        // Aucun bloc VRR dans les extensions CTA : « pas de VRR » seulement si rien d'autre n'a pu en déclarer un.
+        return displayIdNonLu ? TriState.Unknown : TriState.Off;
     }
 
     /// <summary>Parcourt les data blocks CTA-861 d'une extension et cherche un bloc VRR.</summary>

@@ -28,4 +28,20 @@ public sealed class LaCompilationLivreeNePortePasLeCheminDuDeveloppeurTests
                 && ((string?)e.Parent!.Attribute("Condition") ?? string.Empty).Contains("Release"),
                 "sans elle, chaque pile de plantage d'un utilisateur porte C:\\Users\\<développeur>");
     }
+
+    // Le lanceur est compilé en natif : son éditeur de liens écrit le chemin du .pdb, que la propriété ci-dessus ne touche
+    // pas. La construction de l'installeur scanne les octets de chaque binaire livré, et vérifie PresentMon.
+    [Fact]
+    public void Le_lanceur_natif_et_la_construction_de_l_installeur_gardent_les_binaires_propres()
+    {
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
+
+        XDocument.Load(Path.Combine(d!.FullName, "src", "DrDxt.Lanceur", "DrDxt.Lanceur.csproj"))
+            .Descendants("LinkerArg").Should().Contain(e => (string?)e.Attribute("Include") == "/PDBALTPATH:%_PDB%");
+        File.ReadAllText(Path.Combine(d.FullName, "installer", "build-installer.ps1")).Should()
+            .Contain("throw \"Chemin du developpeur dans")
+            .And.Contain("throw \"Empreinte differente de VERSION.txt")
+            .And.Contain("O=Intel Corporation");
+    }
 }

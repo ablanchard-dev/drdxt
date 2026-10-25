@@ -17,6 +17,8 @@ public static class VerrouDuReleve
     {
         try
         {
+            // Élevé, rien ne se crée à travers une jonction du dossier du compte : sans verrou, le relevé attend.
+            if (FichierJsonAtomique.RefusEleve(chemin, "VERROU_RELEVE") is not null) return null;
             Directory.CreateDirectory(Path.GetDirectoryName(chemin)!);
             // Dossier du joueur : ouvert sans suivre de point de reparse, la suppression à la fermeture ne retire que ce nom,
             // jamais la cible d'un lien posé d'avance (l'App peut tourner élevée).
@@ -27,6 +29,20 @@ public static class VerrouDuReleve
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
+    }
+
+    /// <summary>Le verrou, pris dès qu'il se libère, ou <c>null</c> passé <paramref name="attente"/>. Un fichier et non un
+    /// mutex nommé : le descripteur par défaut d'un mutex créé par l'App élevée ne s'ouvre pas depuis un processus non élevé
+    /// du même compte, alors que ce fichier vit dans le dossier du compte, que les deux ouvrent.</summary>
+    public static IDisposable? Attendre(string chemin, TimeSpan attente)
+    {
+        var limite = DateTime.UtcNow + attente;
+        while (true)
+        {
+            if (Prendre(chemin) is { } v) return v;
+            if (DateTime.UtcNow >= limite) return null;
+            Thread.Sleep(10);
+        }
     }
 
     // GENERIC_READ | GENERIC_WRITE | DELETE ; FILE_FLAG_DELETE_ON_CLOSE, FILE_FLAG_OPEN_REPARSE_POINT.

@@ -19,6 +19,8 @@ namespace DrDxt.Application.Tweaks.Latency;
 // SummaryKey décrit le changement (jamais « +FPS ») et la preuve est l'A/B mesuré de la session suivante.
 //
 // Gating : seulement quand l'état effectif (lu par D3DKMT) est désactivé ; inconnu, rien n'est proposé.
+// Origine : absente ou 1/2 seulement. Le helper ne réécrit HwSchMode qu'à 1 ou 2 (OpAllowlist) ; une autre valeur lue
+// (0, ou posée par un autre outil) ne se remettrait jamais : rien n'est écrit, refus OrigineNonRendable.
 // Tous fabricants (AMD, Intel, NVIDIA, WDDM 2.7+).
 // -----------------------------------------------------------------------
 /// <summary>Active HAGS (HwSchMode = 2) quand Windows le lit désactivé ; effet au redémarrage.</summary>
@@ -81,6 +83,9 @@ public sealed class HagsOnTweak : LatencyTweakBase
             if (!read.IsOk)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     $"Could not read original HwSchMode: {read.Error?.Code}.");
+            if (read.Value is uint lu && lu is not (1 or 2))
+                return Result<TweakSnapshot>.Fail(ErrorCodes.OrigineNonRendable,
+                    $"HwSchMode is {lu}: DrDXT only writes 1 or 2 back, so it is not changed.");
 
             var inverse = BuildRegistryInverse(
                 RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName, read.Value);

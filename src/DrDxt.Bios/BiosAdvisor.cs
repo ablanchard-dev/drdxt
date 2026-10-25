@@ -56,17 +56,19 @@ public sealed class BiosAdvisor : IBiosAdvisor
             return Result<IReadOnlyList<BiosFinding>>.Ok(findings);
         }
 
-        AddXmpExpo(findings, state);
-        AddReBarChain(findings, hw, state);
+        AddXmpExpo(findings, hw, state);
+        // Une puce intégrée n'a ni BAR à agrandir ni slot PCIe : sans carte dédiée, rien à vérifier au BIOS pour elles.
+        var carte = CartesGraphiques.CarteDediee(hw);
+        if (carte is not null) AddReBarChain(findings, hw, carte, state);
         AddX3dCppc(findings, hw);
-        AddPcieGen(findings);
+        if (carte is not null) AddPcieGen(findings);
         AddBiosVersion(findings, hw);
 
         return Result<IReadOnlyList<BiosFinding>>.Ok(findings);
     }
 
     // ── XMP / EXPO (consomme l'état inféré par le scan ; jamais de nouvelle inférence ici). ──
-    private static void AddXmpExpo(List<BiosFinding> findings, SettingsState state)
+    private static void AddXmpExpo(List<BiosFinding> findings, HardwareInventory hw, SettingsState state)
     {
         switch (state.XmpExpo)
         {
@@ -99,7 +101,9 @@ public sealed class BiosAdvisor : IBiosAdvisor
                     StateNotReadable: false));
                 break;
 
-            case TriState.Unknown:
+            // Une barrette qui n'annonce aucun profil au-dessus de son socle JEDEC n'a rien à activer : la vérifier au BIOS
+            // ne mène nulle part.
+            case TriState.Unknown when hw.Memory.Any(SocleJedec.AnnonceUnProfil):
                 // « Non lu » honnête : on rapporte l'inconnu, on n'affirme jamais « désactivé ».
                 findings.Add(new BiosFinding(
                     FirmwareSettingKind.XmpExpo, Severity.Info,
@@ -114,11 +118,10 @@ public sealed class BiosAdvisor : IBiosAdvisor
     }
 
     // ── ReBAR + prérequis ordonnés (Above-4G → CSM → Re-Size BAR). ──
-    private static void AddReBarChain(List<BiosFinding> findings, HardwareInventory hw, SettingsState state)
+    private static void AddReBarChain(List<BiosFinding> findings, HardwareInventory hw, GpuInfo primary, SettingsState state)
     {
-        // Préférer la lecture ReBAR par GPU (le GPU principal) ; à défaut, la lecture au niveau des
+        // Préférer la lecture ReBAR de la carte dédiée ; à défaut, la lecture au niveau des
         // réglages. Les deux viennent directement du scan : aucune redétection.
-        var primary = hw.Gpus[0];
         var rebar = primary.ReBar != TriState.Unknown ? primary.ReBar : state.ReBar;
         var isNvidia = primary.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase)
                        || primary.Vendor.Contains("GeForce", StringComparison.OrdinalIgnoreCase);

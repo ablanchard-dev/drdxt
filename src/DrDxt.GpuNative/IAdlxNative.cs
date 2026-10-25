@@ -21,8 +21,8 @@ public readonly struct AdlxIntRange
     public int Step { get; init; }
 }
 
-/// <summary>Lectures de réglage graphique depuis IADLXManualGraphicsTuning2 : décalage de tension
-/// (mV), décalage de fréquence max (MHz), fréquence min (MHz) et leurs plages prises en charge.</summary>
+/// <summary>Lectures de réglage graphique depuis IADLXManualGraphicsTuning2 : tension (mV), fréquence max (MHz),
+/// fréquence min (MHz), des valeurs absolues, et leurs plages prises en charge.</summary>
 public readonly struct AdlxGfxReads
 {
     public int          VoltMv       { get; init; }
@@ -122,9 +122,9 @@ public interface IAdlxNative
     /// <summary>Vrai quand ADLXInitialize a réussi (GPU AMD + pilote Adrenalin présents).</summary>
     bool IsAvailable { get; }
 
-    /// <summary>Lit le réglage graphique du GPU via IADLXManualGraphicsTuning2 (RDNA) ou
-    /// IADLXManualGraphicsTuning1 (Vega / plus ancien) pour l'index de GPU donné.
-    /// Rend false si l'index est hors plage ou l'interface non prise en charge.</summary>
+    /// <summary>Lit le réglage graphique du GPU via IADLXManualGraphicsTuning2 (RDNA) pour l'index de GPU donné.
+    /// Rend false si l'index est hors plage ou l'interface non prise en charge : une Vega (Tuning1 seulement) n'expose
+    /// pas les lectures de décalage et de tension, elle rend false.</summary>
     bool TryReadGfx(int gpuIndex, out AdlxGfxReads reads);
 
     /// <summary>Lit le réglage de limite de puissance via IADLXManualPowerTuning.
@@ -135,7 +135,7 @@ public interface IAdlxNative
     /// Rend false si l'index est hors plage ou non pris en charge.</summary>
     bool TryReadFan(int gpuIndex, out AdlxFanReads reads);
 
-    // ── méthodes d'écriture (harnais seulement, jamais appelées pendant dotnet test) ─────────
+    // ── méthodes d'écriture (appelées par le helper élevé, jamais pendant dotnet test) ─────────
 
     /// <summary>
     /// GET puis SET : lit d'abord l'état GFX actuel (capturé dans <paramref name="original"/> pour le
@@ -181,6 +181,9 @@ public interface IAdlxNative
     /// <summary>Remet tout le réglage de la carte à l'usine (IADLXGPUTuningServices.ResetToFactory) : fréquence, tension,
     /// mémoire, ventilateur et puissance. Rend null si fait, sinon la raison.</summary>
     string? RemettreReglageUsine(int gpuIndex) => "This seam does not reset GPU tuning.";
+
+    /// <summary>Le réglage de la carte est-il à l'usine (IADLXGPUTuningServices.IsAtFactory) ? null = non lu.</summary>
+    bool? EstALUsine(int gpuIndex) => null;
 
     /// <summary>Pose FRTC sur la carte dédiée. <paramref name="code"/> &gt; 0 = allumé à cette cible ;
     /// &lt; 0 = éteint, cible rendue à <c>-code</c> ; 0 refusé. La cible doit tenir dans GetFPSRange. Rend <c>null</c>

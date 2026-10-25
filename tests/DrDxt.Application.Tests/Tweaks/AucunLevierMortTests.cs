@@ -15,6 +15,8 @@ public sealed class AucunLevierMortTests
     {
         ["NvidiaUltraLowLatencyTweak.cs"] = "latency.reflex : défait seulement l'écriture d'une ancienne version (manifeste, retour au démarrage)",
         // La raison « pas encore construite » était périmée.
+        // Un geste du docteur se pose sur sa carte ; ce levier ne sert qu'à le défaire depuis « Ce que DrDXT a posé ».
+        ["LevierDeGeste.cs"] = "geste.* : défait un geste du docteur gardé (paquet de pilote retiré, DLSS) ; jamais posé d'ici",
         ["GpuFanCurveTweak.cs"] = "gpu.fan_curve : jamais proposé par l'autopilote (ReglagesCarteInterdits) ; le ventilateur s'écrit en mode Expert seulement (VentilateurExpert), et ce levier garde son entrée au catalogue pour la couverture et le retour au démarrage",
     };
 

@@ -46,9 +46,9 @@ public static class Bufferbloat
     private const double FractionCharge = 0.7;
     private const double FractionRepos = 0.1;
 
-    // Simplification voulue : plafond = 50 % du plus fort envoi vu. Calibre sur une machine (400 demandes sur
-    // ~780 vus = p99 48 -> 18 ms) ; la consigne QoS est lache (200 demandes -> ~340 obtenus). A
-    // remplacer par une boucle qui ajuste sur le ping mesure quand une 2e machine le demandera.
+    // Point de depart : plafond = 50 % du plus fort envoi vu. Calibre sur une machine (400 demandes sur
+    // ~780 vus = p99 48 -> 18 ms) ; la consigne QoS est lache (200 demandes -> ~340 obtenus). En partie,
+    // AjustementDuPlafond l'ajuste ensuite sur le ping mesure.
     public const double FractionPlafond = 0.5;
 
     public static VerdictBufferbloat Juger(IReadOnlyList<EchantillonEnvoi> echantillons)
@@ -71,9 +71,15 @@ public static class Bufferbloat
             return Rien(capacite, p90Repos, p90Charge, repos.Count, charge.Count,
                 Docteur.T("BB.SousSeuil", hausse, SeuilMs));
 
+        // Un plafond sous le plancher du helper serait refusé, et un envoi aussi faible (souvent le seul trafic du jeu) ne
+        // prouve pas que la ligne a saturé : rien n'est conclu.
+        var plafond = (long)(capacite * FractionPlafond * 1_000_000);
+        if (plafond < AjustementDuPlafond.PlancherBps)
+            return Rien(capacite, p90Repos, p90Charge, repos.Count, charge.Count,
+                Docteur.T("BB.SousLePlancher", capacite));
+
         return new VerdictBufferbloat(true, capacite, p90Repos, p90Charge, repos.Count, charge.Count,
-            (long)(capacite * FractionPlafond * 1_000_000),
-            Docteur.T("BB.Monte", hausse));
+            plafond, Docteur.T("BB.Monte", hausse));
     }
 
     public const string Nom = "ping quand tu envoies";

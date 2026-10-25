@@ -37,7 +37,8 @@ public sealed partial class RepairAuditService
                 if (string.IsNullOrWhiteSpace(brut)) continue;
                 var exe = Environment.ExpandEnvironmentVariables(brut.Trim('"'));
                 // Un nom nu (« cmd.exe ») se résout par le PATH : pas de fichier précis à juger.
-                if (!Path.IsPathFullyQualified(exe) || !File.Exists(exe)) continue;
+                // Un partage réseau n'est pas sondé : File.Exists y ouvrirait une connexion SMB vers l'hôte nommé.
+                if (!CheminsLocaux.EstLocal(exe) || !File.Exists(exe)) continue;
                 var raison = verifier(exe);
                 if (raison is null || CheminProtege.EstIllisible(raison)) continue;
 

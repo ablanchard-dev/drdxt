@@ -12,7 +12,8 @@ namespace DrDxt.Detection.Tests.Repair;
 public class ArretsBrutauxDatesTests
 {
     private static ArretBrutal Le(int mois, int jour, int code = 0, bool transition = false)
-        => new(new DateTimeOffset(2026, mois, jour, 12, 0, 0, TimeSpan.Zero), code, false, transition);
+        // À midi, heure de la machine : les dates s'affichent dans son fuseau, le jour attendu ne change pas avec lui.
+        => new(new DateTimeOffset(new DateTime(2026, mois, jour, 12, 0, 0, DateTimeKind.Local)), code, false, transition);
 
     [Fact]
     public void Les_arrets_en_transition_portent_leur_plage_de_dates()

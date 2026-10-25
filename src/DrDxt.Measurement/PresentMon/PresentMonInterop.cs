@@ -5,8 +5,10 @@ namespace DrDxt.Measurement.PresentMon;
 // ============================================================
 // Couche de marshaling pour PresentMonAPI2.dll (v2.5.1, MIT).
 //
-// Les enums sont copiés mot pour mot (complets, dans l'ordre) depuis
+// Les enums sont copiés mot pour mot, dans l'ordre, depuis
 //   third_party/presentmon/PresentMonAPI.h
+// jusqu'à la dernière valeur dont le produit se sert : les valeurs suivantes de l'en-tête n'y sont pas, et un statut
+// inconnu s'affiche par son nombre.
 // pour que les valeurs numériques correspondent exactement à l'ABI native. Demander la mauvaise
 // valeur de grandeur ferait lire le blob dans la mauvaise colonne et rendrait du déchet en
 // silence : l'en-tête est la source unique.
@@ -37,9 +39,8 @@ internal enum PM_STATUS
     PM_STATUS_MIDDLEWARE_SERVICE_MISMATCH,
 }
 
-// L'enum complet et ordonné des grandeurs, tiré de l'en-tête. On n'en consomme que deux
-// (BETWEEN_PRESENTS, RENDER_PRESENT_LATENCY), mais toute la liste est gardée pour garantir des
-// valeurs numériques justes face au côté natif.
+// L'enum complet et ordonné des grandeurs, tiré de l'en-tête. On en consomme onze (la requête de PresentMonSession),
+// mais toute la liste est gardée pour garantir des valeurs numériques justes face au côté natif.
 internal enum PM_METRIC
 {
     PM_METRIC_APPLICATION,
@@ -120,7 +121,7 @@ internal enum PM_METRIC
     PM_METRIC_GPU_CARD_POWER,
     PM_METRIC_PRESENT_START_TIME,
     PM_METRIC_PRESENT_START_QPC,
-    PM_METRIC_BETWEEN_PRESENTS,        // 78 : frametime (ms, double) agrégé en Avg/P1/P0.1
+    PM_METRIC_BETWEEN_PRESENTS,        // 78 : frametime (ms, double), demandé brut par image ; FrametimeStatistics l'agrège
     PM_METRIC_IN_PRESENT_API,
     PM_METRIC_BETWEEN_DISPLAY_CHANGE,
     PM_METRIC_UNTIL_DISPLAYED,

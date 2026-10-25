@@ -8,7 +8,8 @@ namespace DrDxt.Integration.Tests;
 // demarrage » dans la liste des services de Windows. Relu ensuite dans l'installeur : la case
 // « Reappliquer mes reglages au demarrage de Windows », son groupe « Demarrage : », « Creer un raccourci »
 // et le raccourci « Desinstaller DrDXT » du menu Demarrer. Tout ce que le joueur lit pendant et apres
-// l'installation. Les commentaires du script, eux, ne sont pas lus par le joueur : ils ne sont pas vises.
+// l'installation. Les commentaires du script, eux, ne sont pas lus par le joueur : ils ne sont pas vises. Les textes
+// francais vivent dans [CustomMessages] (fr.*) : le crible les lit la.
 // -----------------------------------------------------------------------
 public sealed class LInstalleurParleFrancaisAvecSesAccentsTests
 {
@@ -19,9 +20,9 @@ public sealed class LInstalleurParleFrancaisAvecSesAccentsTests
         return File.ReadAllText(Path.Combine(d!.FullName, "installer", "DrDXT.iss"));
     }
 
-    // Les textes affiches : descriptions de case, groupes, noms de raccourci, libelles d'etat, nom de service.
+    // Les textes affiches : messages francais, descriptions de case, groupes, noms de raccourci, libelles d'etat, nom de service.
     private static readonly Regex TexteAffiche = new(
-        @"(?:Description|GroupDescription):\s*""(?<t>[^""]*)""|Name:\s*""\{group\}\\(?<t>[^""]*)""|Caption\s*:=\s*'(?<t>[^']*)'|DisplayName=\s*""(?<t>[^""]*)""");
+        @"^fr\.\w+=(?<t>.*)$|(?:Description|GroupDescription):\s*""(?<t>[^""]*)""|Name:\s*""\{group\}\\(?<t>[^""]*)""|Caption\s*:=\s*'(?<t>[^']*)'|DisplayName=\s*""(?<t>[^""]*)""", RegexOptions.Multiline);
 
     private static readonly string[] SansAccent =
         ["reglage", "demarrage", "Demarrage", "Creer", "Desinstaller", "Reappliquer", "systeme"];
@@ -32,7 +33,8 @@ public sealed class LInstalleurParleFrancaisAvecSesAccentsTests
         // Les lignes `Type: files` effacent d'anciens fichiers : elles nomment l'ancien texte exprès.
         var affiche = string.Join("\n", Iss().Replace("\r\n", "\n").Split('\n')
             .Where(l => !l.TrimStart().StartsWith("Type:", StringComparison.Ordinal)));
-        var textes = TexteAffiche.Matches(affiche).Select(m => m.Groups["t"].Value).ToList();
+        // {cm:Cle} renvoie a un message : la cle n'est pas lue, son texte fr l'est, plus haut dans le crible.
+        var textes = TexteAffiche.Matches(affiche).Select(m => m.Groups["t"].Value).Where(t => !t.StartsWith("{cm:")).ToList();
 
         textes.Should().HaveCountGreaterThan(5, "témoin : le crible voit bien les textes de l'installeur");
         textes.Where(t => SansAccent.Any(t.Contains)).Should().BeEmpty();

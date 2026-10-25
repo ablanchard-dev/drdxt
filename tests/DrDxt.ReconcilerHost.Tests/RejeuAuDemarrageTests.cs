@@ -60,11 +60,18 @@ public sealed class RejeuAuDemarrageTests : IDisposable
         journal.Ajouter(new SetRegistryValueOp(RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers",
             "HwSchMode", RegistryValueType.DWord, "2"), "1", new AppelantDuJournal("S-1-5-21-1", 4242, DateTimeOffset.UnixEpoch),
             DateTimeOffset.UtcNow).IsOk.Should().BeTrue();
+        // La machine porte la valeur posée ; l'écriture acceptée s'y voit à la relecture, comme sur la vraie : le rendu n'est dit
+        // fait que relu à l'origine.
+        var valeur = "2";
         var lecture = Substitute.For<ILectureDesCibles>();
-        lecture.Lire(Arg.Any<PrivilegedOp>()).Returns(Result<string?>.Ok("2"));
+        lecture.Lire(Arg.Any<PrivilegedOp>()).Returns(_ => Result<string?>.Ok(valeur));
         lecture.CibleExiste(Arg.Any<PrivilegedOp>()).Returns(Result<bool>.Ok(true));
         var ecriture = Substitute.For<IElevatedClient>();
-        ecriture.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(Result.Ok());
+        ecriture.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(c =>
+        {
+            if (c.Arg<PrivilegedOp>() is SetRegistryValueOp s) valeur = s.Value;
+            return Result.Ok();
+        });
         var enJeu = new Queue<bool>([true, true, false]);
         var delai = new DelaiCompte();
         var rejeu = new RejeuAuDemarrage(new JournalDuService(journal), lecture, ecriture, jeuEnCours: () => enJeu.Count > 0 && enJeu.Dequeue(), delai: delai);
@@ -75,6 +82,37 @@ public sealed class RejeuAuDemarrageTests : IDisposable
         delai.Attentes.Should().Be(2, "une attente par passage en jeu, comme le Worker");
         await ecriture.Received(1).ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
         journal.EnAttente().Value.Should().HaveCount(0);
+    }
+
+    // Le service voit un jeu par son seul nom de processus : un « cod.exe » qui ne finit jamais (lancé par n'importe quel
+    // programme du compte) retiendrait le rejeu pour toujours sans plafond. Passé le plafond, le rejeu part quand même.
+    [Fact]
+    public async Task Un_jeu_qui_ne_finit_jamais_ne_retient_le_rejeu_que_jusqu_au_plafond()
+    {
+        var journal = new JournalDEcritureAnticipee(Path.Combine(_dossier, "journal.json"));
+        journal.Ajouter(new SetRegistryValueOp(RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers",
+            "HwSchMode", RegistryValueType.DWord, "2"), "1", new AppelantDuJournal("S-1-5-21-1", 4242, DateTimeOffset.UnixEpoch),
+            DateTimeOffset.UtcNow).IsOk.Should().BeTrue();
+        // L'écriture acceptée se voit à la relecture, comme sur la vraie machine.
+        var valeur = "2";
+        var lecture = Substitute.For<ILectureDesCibles>();
+        lecture.Lire(Arg.Any<PrivilegedOp>()).Returns(_ => Result<string?>.Ok(valeur));
+        lecture.CibleExiste(Arg.Any<PrivilegedOp>()).Returns(Result<bool>.Ok(true));
+        var ecriture = Substitute.For<IElevatedClient>();
+        ecriture.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(c =>
+        {
+            if (c.Arg<PrivilegedOp>() is SetRegistryValueOp s) valeur = s.Value;
+            return Result.Ok();
+        });
+        var delai = new DelaiCompte();
+        var rejeu = new RejeuAuDemarrage(new JournalDuService(journal), lecture, ecriture, jeuEnCours: () => true, delai: delai);
+
+        await rejeu.StartAsync(CancellationToken.None);
+        await rejeu.Differe.WaitAsync(TimeSpan.FromSeconds(10));
+
+        delai.Attentes.Should().Be((int)(Worker.AttenteEnPartieMax / Worker.AttenteEnPartie));
+        await ecriture.Received(1).ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+        journal.EnAttente().Value.Should().BeEmpty("rendu, et relu à l'origine");
     }
 
     /// <summary>Une partie qui ne finit pas : l'attente tient jusqu'à l'arrêt.</summary>

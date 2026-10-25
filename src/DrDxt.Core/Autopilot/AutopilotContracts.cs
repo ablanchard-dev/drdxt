@@ -4,7 +4,7 @@ namespace DrDxt.Core;
 /// La nature d'une action, parce que « tweak » ne dit pas assez pour decider quoi en faire.
 ///
 /// Un moteur qui ne connait qu'un `ITweak` indistinct ne peut ni choisir l'ordre des essais, ni
-/// savoir ce qu'il a le droit de tenter tout seul. Ces cinq natures se traitent differemment, et
+/// savoir ce qu'il a le droit de tenter tout seul. Ces six natures se traitent differemment, et
 /// c'est le minimum pour qu'un autopilote soit honnete sur ce qu'il fait.
 /// </summary>
 public enum CandidateKind
@@ -82,8 +82,10 @@ public enum SurfaceTouchee
     /// <summary>N'ecrit rien lui-meme (un guide).</summary>
     Aucune,
 
-    /// <summary>Quand Windows Update s'autorise a redemarrer (heures d'activite). Ni materiel, ni
-    /// pilote : un arret sec ne peut pas lui etre attribue.</summary>
+    /// <summary>Une preference de planification de Windows : heures d'activite de Windows Update, economie d'energie
+    /// de la carte sans fil, plan economie. Ni materiel, ni pilote : un arret sec ne peut pas lui etre attribue.
+    /// Le plan Performances elevees (fixit.power_plan) n'en est pas : il change ce que fait le processeur, il est
+    /// <see cref="Processeur"/> ; le plan economie remet une planification de Windows.</summary>
     PlanificationWindows,
 
     /// <summary>Le mode d'affichage d'un ecran (ChangeDisplaySettingsEx, profil de l'utilisateur). Le pilote graphique

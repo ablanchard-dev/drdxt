@@ -27,7 +27,10 @@ public sealed class MemoireSatureeTests
 
         f.Statut.Should().Be(RepairStatus.Suspicious);
         f.Action.Should().Be(RepairAction.Recommandation);
-        f.ValeurCourante.Should().StartWith("0.4 Go libres sur 8 (4 %)");
+        // La virgule suit la langue du docteur : « 0,4 » en français, « 0.4 » en anglais.
+        f.ValeurCourante.Should().StartWith("0,4 Go libres sur 8 (4 %)");
+        using (Docteur.Portee(new System.Globalization.CultureInfo("en-US")))
+            MemoireSaturee.Juger(new MemoireLue(8 * Go, 400 * (1UL << 20), 9 * Go, 12 * Go)).ValeurCourante.Should().StartWith("0.4 ");
         f.Explication.Should().Contain("onglets").And.Contain("démarrage").And.Contain("fichier d'échange").And.Contain("barrette")
             .And.Contain("ne ferme rien", "lecture seule, dite comme telle");
     }
@@ -71,7 +74,8 @@ public sealed class MemoireSatureeTests
         MemoireSaturee.Juger(pleine, 3).Explication.Should().Contain("rien n'attend le disque");
         MemoireSaturee.Juger(pleine, 900).Statut.Should().Be(RepairStatus.Suspicious);
         MemoireSaturee.Juger(pleine).Statut.Should().Be(RepairStatus.Suspicious, "non mesuré ne vaut pas calme");
-        MemoireSaturee.Juger(new MemoireLue(32 * Go, 20 * Go, 12 * Go, 40 * Go), 900).Statut.Should().Be(RepairStatus.Suspicious);
+        MemoireSaturee.Juger(new MemoireLue(32 * Go, 20 * Go, 12 * Go, 40 * Go), 900).Statut.Should().Be(RepairStatus.NonDefault,
+            "de la place libre : une pagination mesurée pendant le scan, qui lit lui-même le disque, se regarde sans accuser");
         MemoireSaturee.Juger(new MemoireLue(32 * Go, 20 * Go, 12 * Go, 40 * Go), 900).ValeurCourante.Should().EndWith("900 lectures de pages dures/s");
     }
 }

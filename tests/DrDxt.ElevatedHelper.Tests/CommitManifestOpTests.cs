@@ -70,6 +70,21 @@ public sealed class CommitManifestOpTests
         Allowlist.Validate(Op(tweaks)).IsOk.Should().BeTrue();
     }
 
+    // Le repos de la carte prouvé et un geste DLSS ne sont pas des candidats de l'autopilote, mais leur origine doit entrer au
+    // manifeste pour que la désinstallation la rende. Un paquet de pilote retiré, lui, reste dehors.
+    [Fact]
+    public void Le_repos_de_la_carte_et_un_geste_DLSS_entrent_au_manifeste_un_paquet_de_pilote_non()
+    {
+        var repos = new AppliedTweak("gpu.repos_global_normal", OpJson(new ApplyNvApiDrsSettingOp(0x1057EB71, 0, "Base Profile")),
+            OpJson(new ApplyNvApiDrsSettingOp(0x1057EB71, 1, "Base Profile")), T);
+        var dlss = new AppliedTweak(@"geste.dlss|C:\Jeux\cod.exe", "{\"composite\":[1]}", "{\"composite\":[2]}", T);
+        Allowlist.Validate(Op(revertOnly: new[] { repos, dlss })).IsOk.Should().BeTrue();
+
+        var pilote = new AppliedTweak("geste.pilote|oem12.inf", "x", OpJson(new RestoreDriverPackageOp("oem12.inf")), T);
+        Allowlist.Validate(Op(revertOnly: new[] { pilote })).IsOk.Should().BeFalse("la remise d'un pilote se fait depuis l'App");
+        Allowlist.Validate(Op(revertOnly: new[] { new AppliedTweak("geste.autre|x", "a", "b", T) })).IsOk.Should().BeFalse();
+    }
+
     [Fact]
     public void Une_origine_composite_indecodable_passe_comme_donnee_bornee()
     {

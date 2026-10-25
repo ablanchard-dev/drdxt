@@ -42,6 +42,37 @@ public sealed class ErreursMateriellesTests
         grave.ValeurCourante.Should().Be("1 grave(s), 1 corrigée(s)");
     }
 
+    // Une seule erreur corrigée, ou des erreurs corrigées toutes PCIe (un « Advisory Non-Fatal » que le lien relève en gérant son
+    // énergie) : à regarder, rien ne prouve un tort. Plusieurs corrigées du processeur, ou une grave : à corriger.
+    [Fact]
+    public void Une_erreur_corrigee_isolee_ou_des_PCIe_corrigees_sont_a_regarder()
+    {
+        var t = DateTimeOffset.Now;
+        var pcie = new ErreursMaterielles.Origine(null, null, null, 1, 0, 0, 0x10DE, 0x2882, 4, 0x2000);
+        ErreursMaterielles.Juger([new(t, 2)]).Single().Statut.Should().Be(RepairStatus.NonDefault);
+        ErreursMaterielles.Juger([new(t, 2, Source: pcie), new(t.AddHours(-1), 2, Source: pcie), new(t.AddHours(-2), 2, Source: pcie)])
+            .Single().Statut.Should().Be(RepairStatus.NonDefault);
+        ErreursMaterielles.Juger([new(t, 2, DuProcesseur: true), new(t.AddHours(-1), 2, DuProcesseur: true)])
+            .Single().Statut.Should().Be(RepairStatus.Suspicious, "témoin : plusieurs corrigées du processeur, une marge manque");
+    }
+
+    // Toutes PCIe, mais un flot sur le dernier jour : plus une gestion d'énergie ponctuelle, à corriger, et dit comme un flot
+    // du lien. Le même nombre étalé sur des jours reste à regarder.
+    [Fact]
+    public void Un_flot_d_erreurs_PCIe_corrigees_sur_un_jour_est_a_corriger()
+    {
+        var t = DateTimeOffset.Now;
+        var pcie = new ErreursMaterielles.Origine(null, null, null, 1, 0, 0, 0x10DE, 0x2882, 4, 0x2000);
+        var n = ErreursMaterielles.PcieParJourARegarder + 1;
+
+        var flot = ErreursMaterielles.Juger(Enumerable.Range(0, n).Select(i => new ErreursMaterielles.Enregistrement(t.AddHours(-i), 2, Source: pcie)).ToList()).Single();
+        flot.Statut.Should().Be(RepairStatus.Suspicious);
+        flot.Explication.Should().Contain("flot").And.NotContain("Isolée");
+
+        ErreursMaterielles.Juger(Enumerable.Range(0, n).Select(i => new ErreursMaterielles.Enregistrement(t.AddDays(-i), 2, Source: pcie)).ToList())
+            .Single().Statut.Should().Be(RepairStatus.NonDefault, "témoin : étalées sur des jours");
+    }
+
     // Seules les erreurs du processeur jugent un palier ; une erreur PCIe corrigée qu'une
     // carte relève en continu ne doit pas faire croire à une instabilité. UEFI, annexe N : nombre de sections en octet 10,
     // descripteurs à l'octet 128 (72 octets), type de section (GUID) à l'octet 16 du descripteur.

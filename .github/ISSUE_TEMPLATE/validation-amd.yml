@@ -1,7 +1,7 @@
 name: Validation AMD / AMD validation
 description: Un chemin AMD de DrDXT vérifié sur ton Ryzen ou ta Radeon. / A DrDXT AMD path checked on your Ryzen or Radeon.
 title: "Validation AMD : <processeur / processor> + <carte graphique / graphics card>"
-labels: ["preuve"]
+labels: ["verification"]
 body:
   - type: markdown
     attributes:

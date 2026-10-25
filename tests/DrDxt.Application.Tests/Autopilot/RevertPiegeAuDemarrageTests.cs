@@ -172,10 +172,11 @@ public sealed class RevertPiegeAuDemarrageTests : IDisposable
         RevertAuDemarrage.InverseRejouable("fixit.x3d_ccd", CompositeSnapshotCodec.Encode([gameBar]).Value!).Should().BeTrue();
         RevertAuDemarrage.InverseRejouable("fixit.x3d_ccd", CompositeSnapshotCodec.Encode([gameBar, dvr]).Value!).Should().BeFalse();
 
-        // Même clé, autre valeur : x3d_ccd n'écrit que AllowAutoGameMode sous GameBar.
-        var voisine = gameBar with { Name = "AutoGameModeEnabled" };
+        // Même clé, autre valeur : x3d_ccd n'écrit sous GameBar que les deux valeurs du mode Jeu.
+        RevertAuDemarrage.InverseRejouable("fixit.x3d_ccd", Json(gameBar with { Name = "AutoGameModeEnabled" })).Should().BeTrue();
+        var voisine = gameBar with { Name = "UseNexusForGameBarEnabled" };
         RevertAuDemarrage.InverseRejouable("fixit.x3d_ccd", Json(voisine)).Should().BeFalse();
-        RevertAuDemarrage.InverseRejouable("latency.gameModeOn", Json(voisine)).Should().BeTrue();
+        RevertAuDemarrage.InverseRejouable("latency.gameModeOn", Json(voisine)).Should().BeFalse();
     }
 
     // Même trou côté NVIDIA : le helper borne l'identifiant DRS, jamais la valeur. Un fichier nommant

@@ -4,14 +4,14 @@ using DrDxt.Core;
 using DrDxt.Infrastructure.Updates;
 using FluentAssertions;
 using NSec.Cryptography;
+using DrDxt.TestSupport;
 
 namespace DrDxt.Infrastructure.Tests.Updates;
 
 // -----------------------------------------------------------------------
 // Mise à jour signée de l'application :
-//     * vérifier → télécharger → vérifier l'empreinte → préparer atomiquement → déléguer
-//       l'échange dans Program Files à la couture typée IElevatedFileReplacer (différée, échoue proprement)
-//     * la vérification échoue à n'importe quelle étape → aucun fichier remplacé (aucun état à moitié appliqué)
+//     * annoncer (le manifeste seul, signature vérifiée) ; au clic : télécharger → vérifier l'empreinte → préparer
+//     * la vérification échoue à n'importe quelle étape → rien n'est préparé
 //   Sans réseau → Fail(UPDATE_OFFLINE), l'application continue (jamais bloquante)
 //   Ordre imposé : signature du manifeste vérifiée avant même de télécharger la charge.
 // -----------------------------------------------------------------------
@@ -19,7 +19,6 @@ public sealed class AutoUpdaterTests
 {
     private const string Installed = "1.2.0";
     private const string StagingRoot = @"X:\local\DrDXT\staging";
-    private const string AppInstallDir = @"C:\Program Files\DrDXT";
 
     // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -36,7 +35,7 @@ public sealed class AutoUpdaterTests
     {
         var unsigned = new UpdateManifest(channel, version, url, Sha256Hex(payload), Signature: string.Empty);
         using var key = Key.Import(
-            SignatureAlgorithm.Ed25519, UpdateDevKeys.DevPrivateSeed, KeyBlobFormat.RawPrivateKey);
+            SignatureAlgorithm.Ed25519, UpdateDevTestKeys.DevPrivateSeed, KeyBlobFormat.RawPrivateKey);
         var sig = SignatureAlgorithm.Ed25519.Sign(key, UpdateVerifier.CanonicalBytes(unsigned));
         return unsigned with { Signature = Convert.ToBase64String(sig) };
     }
@@ -45,14 +44,12 @@ public sealed class AutoUpdaterTests
         IUpdateFeed feed,
         IUpdateVerifier? verifier = null,
         IUpdateFileSystem? fs = null,
-        IElevatedFileReplacer? replacer = null,
         string installed = Installed)
         => new(
             feed,
             verifier ?? RealVerifier(),
             fs ?? new InMemoryFs(),
-            replacer ?? new DeferredElevatedFileReplacer(),
-            StagingRoot, AppInstallDir, installed);
+            StagingRoot, installed);
 
     // ── Canal ──────────────────────────────────────────────────────────────────
 
@@ -65,144 +62,52 @@ public sealed class AutoUpdaterTests
         var manifest = SignedManifest((UpdateChannel)7, "9.9.9", "https://u/other.zip", payload);
         var feed = new FakeFeed(manifest, payload);
 
-        var result = await Build(feed).UpdateAppAsync(CancellationToken.None);
+        var result = await Build(feed).AnnoncerAsync(CancellationToken.None);
 
         result.IsOk.Should().BeFalse();
         result.Error!.Value.Code.Should().Be(UpdateErrorCodes.SignatureInvalid);
         feed.DownloadCount.Should().Be(0, "rien n'est téléchargé sur un manifeste du mauvais canal");
     }
 
-    // ── Canal App ────────────────────────────────────────────────────────────────
-
-    // L'échange suit le téléchargement : il reçoit sa borne (des minutes), pas celle du manifeste (secondes), déjà passée
-    // après un long téléchargement.
     [Fact]
-    public async Task App_Replacer_Gets_The_Download_Budget_Not_The_Manifest_One()
-    {
-        var payload = Encoding.UTF8.GetBytes("the-new-app-binary");
-        var manifest = SignedManifest(UpdateChannel.App, "1.3.0", "https://u/app.pkg", payload);
-        var replacer = new RecordingReplacer(new DeferredElevatedFileReplacer());
-        using var manifeste = new CancellationTokenSource();
-        using var telechargement = new CancellationTokenSource();
-
-        await Build(new FakeFeed(manifest, payload), fs: new InMemoryFs(), replacer: replacer)
-            .UpdateAppAsync(manifeste.Token, telechargement.Token);
-
-        replacer.LastToken.Should().Be(telechargement.Token);
-    }
-
-    [Fact]
-    public async Task App_VerifiedPayload_Staged_ThenDeferredReplacer_NoHalfApply()
-    {
-        var payload = Encoding.UTF8.GetBytes("the-new-app-binary");
-        var manifest = SignedManifest(UpdateChannel.App, "1.3.0", "https://u/app.pkg", payload);
-        var fs = new InMemoryFs();
-        var replacer = new RecordingReplacer(new DeferredElevatedFileReplacer());
-
-        var result = await Build(new FakeFeed(manifest, payload), fs: fs, replacer: replacer)
-            .UpdateAppAsync(CancellationToken.None);
-
-        // Remplaceur différé → échec propre, mais la charge a bien été préparée d'abord.
-        result.IsOk.Should().BeFalse();
-        result.Error!.Value.Code.Should().Be(UpdateErrorCodes.ReplacerUnavailable);
-        fs.WriteCalls.Should().BeGreaterThan(0, "the verified payload is staged before delegating");
-        replacer.Calls.Should().Be(1, "staging succeeded, so the typed replacer IS invoked");
-        replacer.LastStagedPath.Should().NotBeNullOrEmpty();
-    }
-
-    [Fact]
-    public async Task App_SignatureInvalid_NoStaging_NoReplace()
+    public async Task Annoncer_un_manifeste_mal_signe_ne_telecharge_ni_ne_prepare_rien()
     {
         var payload = Encoding.UTF8.GetBytes("binary");
         var manifest = SignedManifest(UpdateChannel.App, "1.3.0", "https://u/app.pkg", payload);
         var tampered = manifest with { Url = "https://evil/app.pkg" }; // casse la signature
         var fs = new InMemoryFs();
-        var replacer = new RecordingReplacer(new DeferredElevatedFileReplacer());
+        var feed = new FakeFeed(tampered, payload);
 
-        var result = await Build(new FakeFeed(tampered, payload), fs: fs, replacer: replacer)
-            .UpdateAppAsync(CancellationToken.None);
+        var result = await Build(feed, fs: fs).AnnoncerAsync(CancellationToken.None);
 
         result.IsOk.Should().BeFalse();
         result.Error!.Value.Code.Should().Be(UpdateErrorCodes.SignatureInvalid);
+        feed.DownloadCount.Should().Be(0);
         fs.WriteCalls.Should().Be(0, "nothing is staged when the manifest signature fails");
-        replacer.Calls.Should().Be(0, "the replacer is never reached on a verification failure");
     }
 
+    // Le manifeste a fait l'aller-retour par l'écran : une version plus ancienne, même signée, n'est jamais préparée.
     [Fact]
-    public async Task App_HashMismatch_NoStaging_NoReplace()
-    {
-        var manifest = SignedManifest(
-            UpdateChannel.App, "1.3.0", "https://u/app.pkg", Encoding.UTF8.GetBytes("real"));
-        var tampered = Encoding.UTF8.GetBytes("tampered-binary");
-        var fs = new InMemoryFs();
-        var replacer = new RecordingReplacer(new DeferredElevatedFileReplacer());
-
-        var result = await Build(new FakeFeed(manifest, tampered), fs: fs, replacer: replacer)
-            .UpdateAppAsync(CancellationToken.None);
-
-        result.IsOk.Should().BeFalse();
-        result.Error!.Value.Code.Should().Be(UpdateErrorCodes.HashMismatch);
-        fs.WriteCalls.Should().Be(0);
-        replacer.Calls.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task App_Downgrade_Refused_NoStaging_NoReplace()
+    public async Task Au_clic_une_version_plus_ancienne_n_est_jamais_preparee()
     {
         var payload = Encoding.UTF8.GetBytes("older-binary");
         var manifest = SignedManifest(UpdateChannel.App, "1.1.0", "https://u/app.pkg", payload);
         var fs = new InMemoryFs();
-        var replacer = new RecordingReplacer(new DeferredElevatedFileReplacer());
 
-        var result = await Build(new FakeFeed(manifest, payload), fs: fs, replacer: replacer)
-            .UpdateAppAsync(CancellationToken.None);
+        var result = await Build(new FakeFeed(manifest, payload), fs: fs).TelechargerAsync(manifest, CancellationToken.None);
 
         result.IsOk.Should().BeFalse();
         result.Error!.Value.Code.Should().Be(UpdateErrorCodes.Downgrade);
         fs.WriteCalls.Should().Be(0);
-        replacer.Calls.Should().Be(0);
     }
 
     [Fact]
-    public async Task App_Offline_FailsCleanly_NonBlocking_NoReplace()
+    public async Task Annoncer_hors_ligne_echoue_proprement_sans_bloquer()
     {
-        var replacer = new RecordingReplacer(new DeferredElevatedFileReplacer());
-        var result = await Build(FakeFeed.Offline(), replacer: replacer).UpdateAppAsync(CancellationToken.None);
+        var result = await Build(FakeFeed.Offline()).AnnoncerAsync(CancellationToken.None);
 
         result.IsOk.Should().BeFalse();
         result.Error!.Value.Code.Should().Be(UpdateErrorCodes.Offline);
-        replacer.Calls.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task App_LiveReplacerSucceeds_ReturnsAppStaged()
-    {
-        // Prouver le chemin de succès une fois un remplaceur vivant présent (ici un faux remplaceur Ok).
-        var payload = Encoding.UTF8.GetBytes("the-new-app-binary");
-        var manifest = SignedManifest(UpdateChannel.App, "1.3.0", "https://u/app.pkg", payload);
-        var replacer = new RecordingReplacer(new OkReplacer());
-
-        var result = await Build(new FakeFeed(manifest, payload), replacer: replacer)
-            .UpdateAppAsync(CancellationToken.None);
-
-        result.IsOk.Should().BeTrue();
-        result.Value.Should().Be(UpdateOutcome.AppStaged);
-        replacer.Calls.Should().Be(1);
-        replacer.LastTargetDir.Should().Be(AppInstallDir);
-    }
-
-    [Fact]
-    public async Task App_the_installed_version_is_up_to_date_not_a_new_version()
-    {
-        var payload = Encoding.UTF8.GetBytes("installeur deja en place");
-        var manifest = SignedManifest(UpdateChannel.App, Installed, "https://u/app.pkg", payload);
-        var replacer = new RecordingReplacer(new OkReplacer());
-
-        var result = await Build(new FakeFeed(manifest, payload), replacer: replacer).UpdateAppAsync(CancellationToken.None);
-
-        result.IsOk.Should().BeTrue();
-        result.Value.Should().Be(UpdateOutcome.UpToDate);
-        replacer.Calls.Should().Be(0);
     }
 
     // ── La charge stagee n'est pas retelechargee a chaque demarrage ──
@@ -215,12 +120,11 @@ public sealed class AutoUpdaterTests
         var feed = new FakeFeed(manifest, payload);
         var updater = Build(feed, fs: new InMemoryFs());
 
-        await updater.UpdateAppAsync(CancellationToken.None);
-        var second = await updater.UpdateAppAsync(CancellationToken.None);
+        await updater.TelechargerAsync(manifest, CancellationToken.None);
+        var second = await updater.TelechargerAsync(manifest, CancellationToken.None);
 
         feed.DownloadCount.Should().Be(1, "la charge stagee au premier passage est reprise, puis re-verifiee");
-        second.Error!.Value.Code.Should().Be(UpdateErrorCodes.ReplacerUnavailable, "elle reste une version verifiee");
-        updater.DerniereVersionApp!.Version.Should().Be("1.3.0");
+        second.Value.Should().Be(updater.StagedAppPayloadPath, "elle reste une version verifiee");
     }
 
     [Fact]
@@ -232,9 +136,9 @@ public sealed class AutoUpdaterTests
         var fs = new InMemoryFs();
         var updater = Build(feed, fs: fs);
 
-        await updater.UpdateAppAsync(CancellationToken.None);
+        await updater.TelechargerAsync(manifest, CancellationToken.None);
         fs.SeedFile(updater.StagedAppPayloadPath, "trafique sur le disque");
-        await updater.UpdateAppAsync(CancellationToken.None);
+        await updater.TelechargerAsync(manifest, CancellationToken.None);
 
         feed.DownloadCount.Should().Be(2, "une charge stagee qui ne correspond plus au manifeste signe n'est jamais reprise");
     }
@@ -311,6 +215,27 @@ public sealed class AutoUpdaterTests
 
     // ── fakes ─────────────────────────────────────────────────────────────────────
 
+    // Une exception que les coutures ne prévoient pas ne traverse jamais la frontière : la mise à jour échoue fermée,
+    // rien n'est proposé ni téléchargé.
+    private sealed class FluxQuiLeve : IUpdateFeed
+    {
+        public Task<Result<UpdateManifest?>> GetManifestAsync(UpdateChannel channel, CancellationToken ct)
+            => throw new InvalidOperationException("imprévu");
+        public Task<Result<byte[]>> DownloadAsync(string url, CancellationToken ct)
+            => throw new InvalidOperationException("imprévu");
+    }
+
+    [Fact]
+    public async Task Une_exception_imprevue_rend_un_echec_ferme_et_jamais_un_lancer()
+    {
+        var annonce = await Build(new FluxQuiLeve()).AnnoncerAsync(CancellationToken.None);
+        annonce.Error!.Value.Code.Should().Be(UpdateErrorCodes.Unexpected);
+
+        var manifeste = SignedManifest(UpdateChannel.App, "9.9.9", "https://exemple.test/x.exe", Payload("x"));
+        var telechargement = await Build(new FluxQuiLeve()).TelechargerAsync(manifeste, CancellationToken.None);
+        telechargement.Error!.Value.Code.Should().Be(UpdateErrorCodes.Unexpected);
+    }
+
     private sealed class FakeFeed : IUpdateFeed
     {
         private readonly UpdateManifest? _manifest;
@@ -340,32 +265,6 @@ public sealed class AutoUpdaterTests
                 return Task.FromResult(Result<byte[]>.Fail(UpdateErrorCodes.Offline, "no network"));
             return Task.FromResult(Result<byte[]>.Ok(_payload ?? Array.Empty<byte>()));
         }
-    }
-
-    private sealed class RecordingReplacer : IElevatedFileReplacer
-    {
-        private readonly IElevatedFileReplacer _inner;
-        public int Calls { get; private set; }
-        public string? LastStagedPath { get; private set; }
-        public string? LastTargetDir { get; private set; }
-        public CancellationToken LastToken { get; private set; }
-
-        public RecordingReplacer(IElevatedFileReplacer inner) => _inner = inner;
-
-        public Task<Result> ReplaceAppFilesAsync(string stagedPayloadPath, string targetInstallDir, CancellationToken ct)
-        {
-            Calls++;
-            LastStagedPath = stagedPayloadPath;
-            LastTargetDir = targetInstallDir;
-            LastToken = ct;
-            return _inner.ReplaceAppFilesAsync(stagedPayloadPath, targetInstallDir, ct);
-        }
-    }
-
-    private sealed class OkReplacer : IElevatedFileReplacer
-    {
-        public Task<Result> ReplaceAppFilesAsync(string stagedPayloadPath, string targetInstallDir, CancellationToken ct)
-            => Task.FromResult(Result.Ok());
     }
 
     // Faux système de fichiers en mémoire : enregistre écritures et remplacements et modélise l'échange

@@ -7,10 +7,10 @@ using NSubstitute;
 
 namespace DrDxt.App.Tests;
 
-// Ce qui suit une annulation retire VRAIMENT le levier du manifeste signé. Avant, il
-// cherchait l'identifiant de l'App (« latency.hagsOn ») parmi ceux du service (« os.hags ») et ne trouvait rien,
-// et il renvoyait un manifeste privé du levier que le magasin FUSIONNAIT, sans jamais rien retirer. Le service
-// reposait donc au démarrage un levier annulé, et la désinstallation en gardait la première origine.
+// Ce qui suit une annulation retire VRAIMENT le levier du manifeste signé : l'identifiant de l'App
+// (« latency.hagsOn ») se traduit en celui du service (« os.hags »), et le retrait n'est pas un manifeste privé du
+// levier que le magasin FUSIONNERAIT. Sinon le service reposerait au démarrage un levier annulé, et la
+// désinstallation en garderait la première origine.
 public sealed class RetraitDeLevierTests
 {
     private readonly string _journal = Path.Combine(Path.GetTempPath(), "drdxt-retrait-" + Guid.NewGuid().ToString("N") + ".json");

@@ -59,14 +59,31 @@ public class CpuFrequencyStateTests
     [Trait("Category", "Machine")] // lit la table Perflib localisee de la vraie machine
     public void LES_NOMS_DE_COMPTEURS_SE_RESOLVENT_PAR_INDEX_SUR_CETTE_MACHINE()
     {
-        // Ce test EXECUTE la resolution. Les noms sont LOCALISES : la requete anglaise echoue
-        // sur ce Windows francais. Coder « Informations sur le processeur » marcherait ici et
-        // nulle part ailleurs — la table `Perflib` est la seule voie portable.
+        // Ce test EXECUTE la resolution du repli. Les noms sont LOCALISES : un chemin PDH anglais
+        // echoue sur ce Windows francais, et coder « Informations sur le processeur » marcherait ici
+        // et nulle part ailleurs : la table `Perflib` est la voie portable du nom localise.
         //
         // Il ne verifie pas quel nom sort (il depend de la langue), seulement que la table repond.
         var jeu = CpuFrequencyReader.Localiser("Processor Information");
 
         jeu.Should().NotBeNullOrWhiteSpace(
             "la table Perflib doit rendre le nom localise du jeu de compteurs processeur");
+    }
+
+    // Windows dans une langue, format regional dans une autre : le nom localise de la table d'affichage n'ouvre plus le
+    // compteur (« la categorie n'existe pas »), le nom anglais si. Sur un Windows anglais, le test passe aussi.
+    [Fact]
+    [Trait("Category", "Machine")] // lit les vrais compteurs du processeur
+    public void La_frequence_se_lit_quand_le_format_regional_n_est_pas_de_la_langue_de_windows()
+    {
+        var avant = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("en-US");
+
+            new CpuFrequencyReader().Lire(_ => Thread.Sleep(200)).FrequenceNominaleMhz.Should()
+                .BeGreaterThan(0, "le compteur s'ouvre par son nom anglais, accepte sous tout format regional");
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = avant; }
     }
 }

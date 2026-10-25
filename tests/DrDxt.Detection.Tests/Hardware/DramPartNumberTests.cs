@@ -52,6 +52,16 @@ public class DramPartNumberTests
         DramPartNumber.TryParseRatedMhz("   ").Should().BeNull();
     }
 
+    // Crucial code sa vitesse autrement : CT16G4DFD8266 est une DDR4-2666, et « 8266 » se lisait 8 266 MHz. Le débit
+    // réglé (2666) passait sous le socle : « XMP éteint », constat majeur, sur une barrette sans profil. Comme Kingston,
+    // une référence Crucial ne donne aucun débit ; l'appelant garde la valeur WMI.
+    [Theory]
+    [InlineData("CT16G4DFD8266")]
+    [InlineData("CT8G4DFS8266.C8FE")]
+    [InlineData("CT16G4DFRA32A")]
+    public void Crucial_ne_donne_jamais_un_debit_devine(string pn)
+        => DramPartNumber.TryParseRatedMhz(pn).Should().BeNull();
+
     [Fact]
     public void Four_digit_numbers_outside_the_dram_range_are_ignored()
     {

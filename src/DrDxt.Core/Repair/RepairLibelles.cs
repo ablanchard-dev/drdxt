@@ -7,10 +7,25 @@
 /// </summary>
 public static class RepairLibelles
 {
+    /// <summary>Le statut d'un constat en mots, jamais le nom de l'énumération.</summary>
+    public static string Statut(RepairStatus statut) => Docteur.T(statut switch
+    {
+        RepairStatus.KnownHarmful => "RF.Statut.Nuisible",
+        RepairStatus.Suspicious => "RF.Statut.Suspect",
+        RepairStatus.NonDefault => "RF.Statut.NonDefaut",
+        RepairStatus.UserChoiceProbable => "RF.Statut.ChoixProbable",
+        RepairStatus.ExpectedDefault => "RF.Statut.Defaut",
+        RepairStatus.Unknown => "RF.Statut.NonLu",
+        _ => "RF.Statut.Observe",
+    });
+
+    /// <summary>La nature d'un candidat de l'autopilote en mots, jamais le nom de l'énumération.</summary>
+    public static string Nature(CandidateKind nature) => Docteur.T("CK." + nature);
+
     // Une cle inconnue s'affiche telle quelle plutot que de disparaitre.
     public static string Domaine(string cle) => Docteur.Chercher("Domaine." + cle) ?? cle;
 
-    // Le nom est une cle du journal, ecrite sans accents ; seul l'affichage les remet. Un nom inconnu (cle BCD, service,
+    // Le nom est une cle du journal, en francais (accents compris, selon le constat) ; seul l'affichage le traduit. Un nom inconnu (cle BCD, service,
     // disque) s'affiche tel quel. Une majuscule initiale partout : des titres en minuscule et un nom d'element BCD brut se
     // lisaient comme un journal de debogage.
     public static string Nom(string cle) => Majuscule(Docteur.Chercher("Nom." + cle) ?? Docteur.TraduireNom(cle) ?? cle);

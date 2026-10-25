@@ -7,10 +7,9 @@ using DrDxt.Detection.Network;
 namespace DrDxt.Detection.Scoring;
 
 /// <summary>
-/// Table des constats du scan « vicieux mais honnête » : montre les vrais écarts + un gain estimé
-/// honnête, jamais la correction. Chaque constat vient du <see cref="LeverCatalog"/> partagé :
-/// le <see cref="Finding.EstimatedGainPct"/> d'un constat est exactement la pénalité retirée par
-/// le score (plus de chiffres divergents, couplage de l'audit C1). Les conditions (châssis /
+/// Table des constats du scan : montre les vrais écarts, jamais la correction. Chaque constat vient du
+/// <see cref="LeverCatalog"/> partagé : le <see cref="Finding.EstimatedGainPct"/> d'un constat est exactement la pénalité
+/// retirée par le score, et il n'est pas affiché (FindingViewModel) : il sert au tri. Les conditions (châssis /
 /// matériel / symptôme) et l'honnêteté Unknown→Info vivent dans le catalogue. Toutes les clés
 /// sont des resx FR+EN ; jamais de chaîne en dur.
 /// </summary>

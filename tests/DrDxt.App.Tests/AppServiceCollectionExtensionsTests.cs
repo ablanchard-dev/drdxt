@@ -65,7 +65,7 @@ public sealed class AppServiceCollectionExtensionsTests
         using var provider = Build();
 
         provider.GetRequiredService<DrDxt.Application.Tweaks.Hardware.IDisplayInfo>()
-            .Should().BeOfType<DrDxt.Detection.Display.Win32DisplayInfo>(
+            .Should().BeOfType<DrDxt.Detection.Display.EcransEnCache>(
                 "sans la vraie sonde d'affichage, deux leviers deviennent silencieux");
     }
 
@@ -82,6 +82,19 @@ public sealed class AppServiceCollectionExtensionsTests
             .Which.ReadsAtGameScope.Should().BeTrue("sans le jeu, le gate du pilote lit le mauvais profil");
     }
 
+    /// <summary>Le levier d'écran reçoit la source d'alimentation : sans elle (paramètre optionnel), il remonterait la
+    /// fréquence d'un portable sur batterie, et rien ailleurs ne le verrait.</summary>
+    [Fact]
+    public void Le_levier_d_ecran_recoit_la_source_d_alimentation()
+    {
+        using var provider = Build();
+        var levier = provider.GetServices<ITweak>().Single(t => t.Id == "fixit.ecran_frequence");
+
+        levier.GetType().GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .Single(f => f.FieldType == typeof(DrDxt.Application.Tweaks.Hardware.ISourceDAlimentation))
+            .GetValue(levier).Should().BeOfType<DrDxt.Detection.Hardware.Win32SourceDAlimentation>();
+    }
+
     /// <summary>Un levier DRS sans le jeu écrit au profil global, pour tout le PC. Le
     /// paramètre est optionnel : un câblage raté ne se verrait nulle part ailleurs.</summary>
     [Theory]
@@ -96,6 +109,22 @@ public sealed class AppServiceCollectionExtensionsTests
         levier.GetType()
             .GetField("_game", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
             .GetValue(levier).Should().BeOfType<RunningGameExecutable>();
+    }
+
+    // Le moteur relit un levier posé sans mesure par ce qui le lit vraiment : la composition lui passe les lecteurs de la
+    // carte et du processeur, sinon le plafond de chaleur se dirait « effectif » sans relecture.
+    [Fact]
+    public void Le_moteur_recoit_les_lecteurs_de_la_carte_et_du_processeur()
+    {
+        using var provider = Build();
+        var moteur = provider.GetRequiredService<ITweakEngine>();
+
+        var carte = (DrDxt.Application.Tweaks.AppliedStateVerifier.LecteursCarte)moteur.GetType()
+            .GetField("_carte", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(moteur)!;
+        carte.Cpu.Should().NotBeNull();
+        carte.Nvidia.Should().NotBeNull();
+        carte.Amd.Should().NotBeNull();
+        carte.PiloteAmd.Should().NotBeNull();
     }
 
     [Fact]
@@ -168,7 +197,9 @@ public sealed class AppServiceCollectionExtensionsTests
         bool available = true;
         var read = () => available = adlx!.IsAvailable;
         read.Should().NotThrow("the ADLX boundary is fail-clean — no AMD driver must never crash");
-        available.Should().BeFalse("no AMD GPU / amdadlx64.dll on this machine → IsAvailable is false");
+        // Sur une machine AMD avec Adrenalin, ADLX est là : la valeur ne se fige que là où elle est certaine, sans la DLL.
+        if (!System.IO.File.Exists(System.IO.Path.Combine(Environment.SystemDirectory, "amdadlx64.dll")))
+            available.Should().BeFalse("no amdadlx64.dll on this machine → IsAvailable is false");
     }
 
     // La racine de composition de l'App câble la vraie couture de lecture NVAPI : INvApiGpuTuning →

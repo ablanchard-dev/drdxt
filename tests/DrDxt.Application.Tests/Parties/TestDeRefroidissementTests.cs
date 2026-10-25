@@ -47,7 +47,27 @@ public sealed class TestDeRefroidissementTests
         TestDeRefroidissement.Juger(r, null).Statut.Should().Be(RepairStatus.Observed);
     }
 
-    // Sans lecture, pas de sécurité ; la charge ne démarre pas, ou s'arrête au bout de 3 s sans lecture.
+    // Le joueur clique « Arrêter » après trois secondes : trois secondes froides ne disent pas que le refroidissement
+    // tient à cette charge, et le verdict ne le conclut pas.
+    [Fact]
+    public async Task Un_test_arrete_a_la_main_ne_conclut_pas_que_le_refroidissement_tient()
+    {
+        using var arret = new CancellationTokenSource();
+        var suite = new Queue<int?>(Enumerable.Repeat<int?>(70, 200));
+        var secondes = 0;
+        var test = new TestDeRefroidissement(_ => new Charge(),
+            () => suite.Dequeue() is { } c ? new EtatCpu(c, c - 15, false, false, false, false) : null,
+            (_, _) => { if (++secondes == 3) arret.Cancel(); return Task.CompletedTask; });
+
+        var r = await test.LancerAsync(TimeSpan.FromMinutes(2), arret.Token);
+
+        r.Secondes.Should().BeLessThan(120);
+        var verdict = TestDeRefroidissement.Juger(r, null);
+        verdict.Statut.Should().Be(RepairStatus.Unknown);
+        verdict.Explication.Should().Be(Docteur.T("TR.RefroidissementInterrompu", r.Secondes));
+    }
+
+    // Sans lecture, pas de sécurité ; la charge ne démarre pas, ou s'arrête au bout de 5 s sans lecture (SecondesSansLectureMax).
     [Fact]
     public async Task Sans_premiere_lecture_la_charge_ne_demarre_pas()
     {

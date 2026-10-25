@@ -17,7 +17,8 @@ public sealed class ScanScorer : IScanScorer
         //
         // Le verdict de cap vient de l'etat deja lu par le scan : c'est une lecture du pilote, pas une
         // deduction depuis les frames, et une session capee est celle ou l'A/B ment le plus.
-        var bottleneck = BottleneckClassifier.Classify(baseline, state.FrameCap);
+        // Le bridage de la carte vient des raisons que le pilote a publiées pendant la mesure.
+        var bottleneck = BottleneckClassifier.Classify(baseline, state.FrameCap, BottleneckClassifier.Bridage(baseline?.Materiel));
 
         var levers = LeverCatalog.Evaluate(hw, state, bottleneck);
 

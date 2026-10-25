@@ -49,7 +49,7 @@ public sealed class HeuresActivesTweakTests
     public void Propose_seulement_sur_des_parties_lues_hors_des_heures_lues_et_en_manuel()
     {
         var t = Build();
-        t.AppliesTo(Hw, Etat(new(15, 8, null), [Du0410])).Should().BeFalse("F-17 : manuel non lu, Windows peut les régler seul");
+        t.AppliesTo(Hw, Etat(new(15, 8, null), [Du0410])).Should().BeFalse("manuel non lu, Windows peut les régler seul");
         t.AppliesTo(Hw, Etat(new(15, 8, false), [Du0410])).Should().BeTrue();
         t.AppliesTo(Hw, Etat(new(15, 8, true), [Du0410])).Should().BeFalse("Windows les règle tout seul");
         t.AppliesTo(Hw, Etat(new(6, 15, false), [Du0410])).Should().BeFalse("la partie est déjà couverte");

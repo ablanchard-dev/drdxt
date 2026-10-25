@@ -17,7 +17,7 @@ namespace DrDxt.Measurement.Memory;
 /// </summary>
 public static class MemoryBench
 {
-    /// <summary>32 M de longs = 256 Mo, environ 8x le plus gros L3 grand public. Le buffer doit
+    /// <summary>32 M de longs = 256 Mo, deux fois le plus gros L3 grand public (128 Mo sur un 9950X3D). Le buffer doit
     /// deborder largement du cache, sinon on mesure le processeur et pas la memoire.</summary>
     private const int BandwidthElements = 32 * 1024 * 1024;
 
@@ -115,7 +115,21 @@ public static class MemoryBench
             sw.Stop();
             return fils * (double)(Elements / Stride) * 64.0 * 3 / sw.Elapsed.TotalSeconds / 1e9;
         }
-        return new[] { Serie(), Serie(), Serie() }.Order().ElementAt(1);
+        return MedianeSiStable(Serie(), Serie(), Serie());
+    }
+
+    /// <summary>Au-delà de cet écart entre la plus haute et la plus basse des trois séries (rapporté à la médiane), une
+    /// charge de fond a pesé sur une partie de la mesure : elle ne prouve rien.</summary>
+    internal const double DispersionMax = 0.10;
+
+    /// <summary>Pur : la médiane des trois séries, ou 0 (non mesuré) si elles s'écartent de plus de
+    /// <see cref="DispersionMax"/>. C'est ce débit qui peut dire « un seul canal » : sous charge, une machine en double
+    /// canal tombait sous le plafond d'un canal.</summary>
+    internal static double MedianeSiStable(double a, double b, double c)
+    {
+        var tri = new[] { a, b, c }.Order().ToArray();
+        var mediane = tri[1];
+        return mediane > 0 && (tri[2] - tri[0]) / mediane <= DispersionMax ? mediane : 0;
     }
 
     /// <summary>Le tampon de chaque fil du debit multi-fil.</summary>

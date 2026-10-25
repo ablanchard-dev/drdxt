@@ -152,6 +152,37 @@ public class BiosLoopVerifierTests
         store.ClearCalled.Should().BeFalse();
     }
 
+    // Le guide du ReBAR ajoute la cible CSM, que Windows ne confirme jamais en démarrage UEFI : le ReBAR pris, le marqueur
+    // restait pour toujours et la carte de récupération revenait à chaque scan. Une cible que l'OS ne sait jamais relire ne
+    // bloque pas un voyage dont les cibles lues ont pris ; elle reste dite illisible.
+    [Fact]
+    public void Une_cible_jamais_lisible_ne_bloque_pas_un_voyage_dont_le_reste_a_pris()
+    {
+        var store = new FakeStore(Pending(
+            new PendingSettingTarget(FirmwareSettingKind.ReBar, TriState.On),
+            new PendingSettingTarget(FirmwareSettingKind.Csm, TriState.Off)));
+
+        var r = Verifier(store).Verify(State(rebar: TriState.On));
+
+        r.Value!.AllTook.Should().BeTrue();
+        r.Value.ShowRecoveryCard.Should().BeFalse();
+        r.Value.MarkerCleared.Should().BeTrue();
+        r.Value.Outcomes.Should().Contain(o => o.Setting == FirmwareSettingKind.Csm && o.Verdict == BiosSettingVerdict.Unreadable);
+    }
+
+    [Fact]
+    public void Une_cible_lisible_relue_inconnue_bloque_toujours()
+    {
+        var store = new FakeStore(Pending(
+            new PendingSettingTarget(FirmwareSettingKind.ReBar, TriState.On),
+            new PendingSettingTarget(FirmwareSettingKind.XmpExpo, TriState.On)));
+
+        var r = Verifier(store).Verify(State(rebar: TriState.On));
+
+        r.Value!.AllTook.Should().BeFalse();
+        r.Value.MarkerCleared.Should().BeFalse();
+    }
+
     [Fact]
     public void A_readable_unknown_read_is_unreadable_not_a_did_not_take()
     {
@@ -291,6 +322,33 @@ public class BiosLoopVerifierTests
         r.Value.AllTook.Should().BeFalse();
         r.Value.ShowRecoveryCard.Should().BeTrue();
         store.MarkerPresent.Should().BeTrue();   // marqueur gardé : la boucle peut rejouer
+    }
+
+    // Une RAM réglée à la main à 3800, XMP éteint, puis XMP activé sur un profil à 3800 : la fréquence ne bouge pas, mais
+    // la NVRAM lit le profil. Ce qui a été lu dans le BIOS est un fait, le delta n'est qu'un indice.
+    [Theory]
+    [InlineData(TriState.On, 1L, BiosSettingVerdict.Took)]
+    [InlineData(TriState.Off, 0L, BiosSettingVerdict.Took)]
+    [InlineData(TriState.On, 0L, BiosSettingVerdict.DidNotTake)]
+    public void La_NVRAM_lue_l_emporte_sur_le_delta(TriState attendu, long brut, BiosSettingVerdict verdict)
+    {
+        var store = new FakeStore(Pending(
+            new PendingSettingTarget(FirmwareSettingKind.XmpExpo, attendu, ObservedBefore: 3800)));
+        var lu = StateWith(xmp: brut == 0 ? TriState.Off : TriState.On, mhz: 3800)
+            with { BiosLu = [new BiosSettingReading("XMP", brut, brut == 0 ? "Disabled" : "Profile 1", IsDefault: brut == 0)] };
+
+        Verifier(store).Verify(lu).Value!.Outcomes.Single().Verdict.Should().Be(verdict);
+    }
+
+    [Fact]
+    public void Une_NVRAM_lue_sans_XMP_laisse_juger_XMP_au_delta()
+    {
+        var store = new FakeStore(Pending(
+            new PendingSettingTarget(FirmwareSettingKind.XmpExpo, TriState.On, ObservedBefore: 3600)));
+        var lu = StateWith(xmp: TriState.On, mhz: 3600)
+            with { BiosLu = [new BiosSettingReading("Re-Size BAR", 1, "Enabled", IsDefault: false)] };
+
+        Verifier(store).Verify(lu).Value!.Outcomes.Single().Verdict.Should().Be(BiosSettingVerdict.DidNotTake);
     }
 
     [Fact]

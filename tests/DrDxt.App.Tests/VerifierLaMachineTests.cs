@@ -163,4 +163,22 @@ public class VerifierLaMachineTests
         await vm.ConfirmerVerificationCommand.ExecuteAsync(null);
         relancee.Should().BeTrue();
     }
+
+    // « Vérifier DrDXT » pose puis rend chaque levier : un gros changement, qui part après un point de restauration, comme
+    // Optimiser. Refusé, rien ne part, et le bilan dit pourquoi.
+    [Fact]
+    public async Task La_verification_part_apres_un_point_de_restauration()
+    {
+        var safety = Substitute.For<ISafetyManager>();
+        safety.EnsureRestorePointAsync().Returns(Result.Fail(ErrorCodes.RestoreDeclined, "refusé"));
+        var vm = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
+            Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k, safety: safety);
+        var lance = false;
+        vm.VerifierLaMachine = _ => { lance = true; return Task.FromResult(new VerificationRendue(null, [], null)); };
+
+        await vm.ConfirmerVerificationCommand.ExecuteAsync(null);
+
+        lance.Should().BeFalse("rien ne part sans le point");
+        vm.VerificationBilan.Should().Be("Apply.RestoreRequired.Declined");
+    }
 }

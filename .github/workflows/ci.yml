@@ -18,7 +18,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         # L'historique entier. Le test d'hygiene relit tous les messages de commit ; un clone a 1 commit
-        # lui en donnait 6 et il echouait (« plus de mille commits attendus »).
+        # lui en donnait 6 et il echouait.
         with:
           fetch-depth: 0
 
@@ -110,10 +110,10 @@ jobs:
           --configuration Release --no-build --verbosity normal
           --filter "Category=SecurityGate" -- RunConfiguration.TreatNoTestsAsError=true
 
-      # Les 5 machines de tests/Shared/machines (référence, sans droits
+      # Les machines de tests/Shared/machines (référence, sans droits
       # administrateur, AMD, Intel Arc, portable) rejouées par le scan et l'écran, sans matériel. Un seul PC réel existe :
       # c'est la seule preuve qu'une autre machine n'obtient pas de phrase fausse. Un filtre vide rougit.
-      - name: Gate — machines-fixtures (5 machines rejouées sans matériel)
+      - name: Gate — machines-fixtures (machines rejouées sans matériel)
         run: >-
           dotnet test tests/DrDxt.App.Tests/DrDxt.App.Tests.csproj
           --logger "trx;LogFileName=gate-machines.trx"

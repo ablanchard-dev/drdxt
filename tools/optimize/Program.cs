@@ -51,7 +51,6 @@ if (cible is null)
     return 3;
 }
 Console.WriteLine($"   jeu       : {cible.ProcessName} (pid {cible.Id})");
-Console.WriteLine($"   objectif  : Competitive — {GameObjective.Explication(OptimizationGoal.Competitive)}");
 Console.WriteLine($"   passe     : {secondes:0.#} s");
 Console.WriteLine();
 
@@ -321,7 +320,6 @@ static void Afficher(GameOptimizationProfile profil, TimeSpan duree)
     Console.WriteLine(profil.Baseline is { } b
         ? $"   baseline  : {b.AvgFps:0.0} FPS moyens - 1 % low {b.P1LowFps:0.0} FPS"
         : "   baseline  : aucune mesure exploitable");
-    Console.WriteLine($"   objectif  : {GameObjective.Explication(profil.Goal)}");
     Console.WriteLine($"   la partie : {profil.SceneExplanation}");
     if (profil.ResolutionMoyenne is { } rm && profil.ResolutionUnPourcentLow is { } rl)
     {

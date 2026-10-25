@@ -29,15 +29,23 @@ public static class TemperatureAmd
     public static uint AdresseCcd(uint decalage, int ccd) => AdresseTctl + decalage + (uint)ccd * 4;
 
     /// <summary>Tctl, la température de contrôle. Sur les premiers Ryzen X et Threadripper, elle est décalée au-dessus de la
-    /// vraie (k10temp, tctl_offset_table) : <see cref="DecalageTdie"/> le retire.</summary>
-    public static double Tctl(uint registre)
+    /// vraie (k10temp, tctl_offset_table) : <see cref="DecalageTdie"/> le retire. Null sur la réponse d'erreur du SMN
+    /// (tous les bits à 1), et sur toute lecture hors du physique.</summary>
+    public static double? Tctl(uint registre)
     {
+        if (registre == uint.MaxValue) return null;
         var t = (registre >> 21) * 0.125;
-        return (registre & (1u << 19)) != 0 || (registre & 0x30000) == 0x30000 ? t - 49 : t;
+        return Physique((registre & (1u << 19)) != 0 || (registre & 0x30000) == 0x30000 ? t - 49 : t);
     }
 
-    /// <summary>La température d'un CCD, ou null quand le registre ne la dit pas valide (CCD absent).</summary>
-    public static double? TemperatureCcd(uint registre) => (registre & 0x800) == 0 ? null : (registre & 0x7FF) * 0.125 - 49;
+    /// <summary>La température d'un CCD, ou null quand le registre ne la dit pas valide (CCD absent, réponse d'erreur, lecture
+    /// hors du physique).</summary>
+    public static double? TemperatureCcd(uint registre) =>
+        registre == uint.MaxValue || (registre & 0x800) == 0 ? null : Physique((registre & 0x7FF) * 0.125 - 49);
+
+    // Un Ryzen se coupe vers 115 °C, décalage Tctl des premiers X compris ; au-delà, ou sous -20 °C, le registre ne dit pas
+    // une température : une valeur de garde ou de moniteur fondée dessus serait fausse.
+    private static double? Physique(double t) => t is < -20 or > 130 ? null : t;
 
     /// <summary>Ce que Tctl ajoute à la vraie température sur les modèles que k10temp nomme (famille 17h seulement).</summary>
     public static double DecalageTdie(int famille, string? modele)

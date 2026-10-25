@@ -48,6 +48,7 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
     private const string PnpNotWiredMessage = "The pnputil seam is not wired in this host: nothing was done.";
     private readonly IVentilateurActions? _ventilateur;
     private readonly ICpuPowerActions? _cpu;
+    private readonly IDiagnosticsLog? _diagnostics;
     private const string BcdNotWiredMessage = "The BCD seam is not wired in this host: nothing was written.";
 
     private const string QosNotWiredMessage =
@@ -61,6 +62,21 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
 
     private const string ManifestCommitNotWiredMessage =
         "The signed-manifest writer is not wired in this host: nothing was signed or written.";
+
+    /// <summary>Le décalage cœur seul. La recette vérifiée ne couvre que l'horloge graphique P0, et DrDXT n'écrit jamais la
+    /// mémoire : le champ mémoire décrit la carte à la capture, ce n'est pas une consigne. Chaque producteur l'envoie à 0
+    /// (ChaqueProducteurDuDecalageCoeurEnvoieUneMemoireNulleTests). Un champ non nul qui n'est pas celui de la carte, ou une
+    /// carte illisible, ne fait pas échouer l'op : échouer laisserait le cœur posé, et un bail rejouerait l'inverse sans fin,
+    /// le cœur jamais rendu. L'écart se journalise.</summary>
+    private Result RendreLeCoeur(ApplyNvApiClockOffsetOp c)
+    {
+        var r = _tuning.SetCoreClockOffset(c.GpuIndex, c.CoreOffsetMhz);
+        if (c.MemoryOffsetMhz != 0 && _tuning.GetMemoryClockOffsetMhz(c.GpuIndex) is var lu && (!lu.IsOk || lu.Value != c.MemoryOffsetMhz))
+            _diagnostics?.Change("nvapi.memory_offset", c.MemoryOffsetMhz.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                lu.IsOk ? lu.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "unread",
+                "memory field differs, not DrDXT's, not written");
+        return r;
+    }
 
     public PrivilegedOpExecutor(
         IRegistryActions registry,
@@ -91,8 +107,11 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
         // Les gestes pnputil (peripherique, vieux pilotes d'affichage). Absents : refuses honnetement.
         IPnpActions? pnp = null,
         // La pause du maintien. Branchee dans le helper seul : le service la lit, il ne l'ecrit pas.
-        DrDxt.Reconciler.PauseDuMaintien? pauseDuMaintien = null)
+        DrDxt.Reconciler.PauseDuMaintien? pauseDuMaintien = null,
+        // Le journal des écarts qui ne sont pas des échecs (le champ mémoire d'un décalage cœur). Absent : rien n'est noté.
+        IDiagnosticsLog? diagnostics = null)
     {
+        _diagnostics = diagnostics;
         _pauseDuMaintien = pauseDuMaintien;
         _pnp = pnp;
         _cpu = cpu;
@@ -220,13 +239,8 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
                 DeleteNvApiDrsSettingOp dd =>
                     _drs.DeleteSettingForApplication(dd.ProfileName, dd.SettingId, dd.OrigineAttendue),
 
-                // --- Réglage NVAPI risqué : réel. GET puis SET, échec propre.
-                //     L'op CoreOffset porte aussi un décalage mémoire, mais la recette vérifiée
-                //     ne couvre que l'horloge graphique P0 ; on n'applique que le décalage cœur ;
-                //     le champ mémoire est ignoré. L'App l'envoie à 0 (ReglageCarteExpert refuse
-                //     toute mémoire demandée). ---
-                ApplyNvApiClockOffsetOp c =>
-                    _tuning.SetCoreClockOffset(c.GpuIndex, c.CoreOffsetMhz),
+                // --- Réglage NVAPI risqué : réel. GET puis SET, échec propre. Seul le cœur s'écrit (voir RendreLeCoeur). ---
+                ApplyNvApiClockOffsetOp c => RendreLeCoeur(c),
                 ApplyNvApiPowerLimitOp pl =>
                     _tuning.SetPowerLimitPercent(pl.GpuIndex, pl.PowerLimitPercent),
 

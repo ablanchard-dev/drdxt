@@ -39,6 +39,5 @@ public static class TailStatistic
     public static string? PourquoiPasInterpretable(int echantillons) =>
         P95EstInterpretable(echantillons)
             ? null
-            : $"{echantillons} frame(s) : sous {EchantillonsMinimumPourUnP95}, un p95 se confond "
-              + "avec le maximum et ne decrit plus une queue";
+            : Docteur.T("TS.PasInterpretable", echantillons, EchantillonsMinimumPourUnP95);
 }

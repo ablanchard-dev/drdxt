@@ -34,8 +34,8 @@ public interface IHardwareProbe
 /// etait a 97 % d'occupation et 68 °C » ; il n'a pas le droit d'en deduire « c'est la temperature
 /// qui te coute des FPS ».
 /// </summary>
-/// <param name="Echantillons">Combien de lectures ont abouti. Zero = rien d'observe, et les
-/// agregats valent <c>null</c>.</param>
+/// <param name="Echantillons">Combien de lectures ont ete faites, y compris celles qui n'ont rien rendu. Zero = aucune
+/// lecture, et les agregats valent <c>null</c>.</param>
 /// <param name="PuissanceMedianeW">La mediane et non la moyenne : une seule lecture aberrante
 /// pendant un changement d'etat tirerait une moyenne, pas une mediane.</param>
 /// <param name="TemperatureMaxC">Le max et non la moyenne : un plafond thermique est un

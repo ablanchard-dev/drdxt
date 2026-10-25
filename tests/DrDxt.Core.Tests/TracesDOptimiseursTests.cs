@@ -65,7 +65,7 @@ public sealed class TracesDOptimiseursTests
     {
         var c = Juger(new TracesDOptimiseurs.Lecture("tdr", TracesDOptimiseurs.Liste[1].Chemin,
             new Dictionary<string, string> { ["TdrDelay"] = "10" }, Installation.AddDays(100))).Should().ContainSingle().Subject;
-        c.Statut.Should().Be(RepairStatus.Suspicious);
+        c.Statut.Should().Be(RepairStatus.NonDefault, "des logiciels de rendu demandent de rallonger TdrDelay");
         c.Action.Should().Be(RepairAction.Aucune, "une trace se dit, DrDXT ne la retire pas");
         c.Explication.Should().Contain("TdrDelay = 10").And.Contain(TracesDOptimiseurs.SourceTdr).And.Contain("hors du démarrage");
     }

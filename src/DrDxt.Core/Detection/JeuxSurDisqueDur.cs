@@ -24,9 +24,10 @@ public static class JeuxSurDisqueDur
             return new RepairFinding("STOCKAGE", Nom, null, null, RepairStatus.Observed,
                 Docteur.T("JD.Aucun"));
         var lents = dossiers.Where(d => d.TypeDeDisque == DisqueDur).ToList();
+        // Ranger des jeux sur un disque dur est un choix de place ; on ne sait pas lesquels se jouent : à regarder.
         if (lents.Count > 0)
             return new RepairFinding("STOCKAGE", Nom, string.Join(", ", lents.Select(d => $"{d.Lanceur}{Docteur.DeuxPoints}{d.Chemin}")), Docteur.T("JD.UnSsd"),
-                RepairStatus.Suspicious,
+                RepairStatus.NonDefault,
                 Docteur.T("JD.Lents", lents.Count, string.Join(", ", lents.Select(d => d.Chemin))),
                 RepairAction.Recommandation);
         // Rien de lu ne vaut pas « aucun » ; et seuls les dossiers lus sont dits sur un SSD.

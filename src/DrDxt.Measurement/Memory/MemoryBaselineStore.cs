@@ -15,7 +15,10 @@ public sealed record MemoryBaseline(
     DateTimeOffset TakenUtc,
     int ConfiguredMts,
     MemoryMeasurement Measurement,
-    bool JeuFermeVerifie = false);
+    bool JeuFermeVerifie = false,
+    // Les barrettes de la mesure (nombre et emplacements) : une barrette ajoutée ou déplacée à la même fréquence change le
+    // nombre de canaux que le débit prouve. Absente d'une référence plus ancienne : sa configuration est inconnue.
+    string? Barrettes = null);
 
 /// <summary>Le fichier sous le magasin. Meme couture que le marqueur BIOS : les tests
 /// injectent un faux et n'ecrivent jamais sur le disque.</summary>
@@ -104,7 +107,7 @@ public sealed class MemoryBaselineStore
         if (b is null) return "empty reference";
         if (string.IsNullOrWhiteSpace(b.MachineId)) return "machine id missing";
         if (b.Measurement is null) return "measurement missing";
-        if (b.Measurement.Staircase is null) return "staircase missing";
+        if (b.Measurement.Staircase is null || b.Measurement.Staircase.Any(p => p is null)) return "staircase missing";
         if (!double.IsFinite(b.Measurement.BandwidthGBs) || b.Measurement.BandwidthGBs <= 0)
             return "bandwidth missing or absurd";
         if (!double.IsFinite(b.Measurement.LatencyNs) || b.Measurement.LatencyNs <= 0)

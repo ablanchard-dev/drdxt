@@ -11,17 +11,27 @@ public sealed class ConnexionDeJeuTests
     public void Le_wifi_seul_se_dit_avec_le_geste()
     {
         var c = ConnexionDeJeu.Juger([new("Wi-Fi", true)]);
-        c.Statut.Should().Be(RepairStatus.Suspicious);
+        c.Statut.Should().Be(RepairStatus.NonDefault);
         c.Action.Should().Be(RepairAction.Recommandation);
         c.Explication.Should().Contain("Activision").And.Contain("ne change rien");
     }
+
+    // Le Wi-Fi est souvent le seul choix du logement : « à corriger » sur un signal mesuré faible (sous -67 dBm, ou sous
+    // 66 % sans RSSI), un écart dit sans accuser sinon.
+    [Theory]
+    [InlineData(80, -60, RepairStatus.NonDefault)]
+    [InlineData(80, -70, RepairStatus.Suspicious)]
+    [InlineData(70, null, RepairStatus.NonDefault)]
+    [InlineData(50, null, RepairStatus.Suspicious)]
+    public void Le_wifi_est_a_corriger_sur_un_signal_faible(int qualite, int? rssi, RepairStatus attendu)
+        => ConnexionDeJeu.Juger([new("Wi-Fi", true)], new QualiteWifi(10, qualite, rssi, 5_500_000, 100)).Statut.Should().Be(attendu);
 
     // Câble et Wi-Fi reliés ensemble, la route décide ; sans elle, rien n'est affirmé.
     [Fact]
     public void Cable_et_wifi_relies_la_route_decide()
     {
         ConnexionDeJeu.Juger([new("Wi-Fi", true), new("Ethernet", false, PorteLaRoute: true)]).Statut.Should().Be(RepairStatus.ExpectedDefault);
-        ConnexionDeJeu.Juger([new("Wi-Fi", true, PorteLaRoute: true), new("Ethernet", false)]).Statut.Should().Be(RepairStatus.Suspicious);
+        ConnexionDeJeu.Juger([new("Wi-Fi", true, PorteLaRoute: true), new("Ethernet", false)]).Statut.Should().Be(RepairStatus.NonDefault);
         ConnexionDeJeu.Juger([new("Wi-Fi", true), new("Ethernet", false)]).Statut.Should().Be(RepairStatus.Unknown);
     }
 
@@ -30,7 +40,7 @@ public sealed class ConnexionDeJeuTests
     public void Un_vpn_ne_passe_pas_pour_un_cable()
     {
         ConnexionDeJeu.Juger([new("Wi-Fi", true), new("TAP-Windows Adapter V9", false, Virtuelle: true, PorteLaRoute: true)])
-            .Statut.Should().Be(RepairStatus.Suspicious);
+            .Statut.Should().Be(RepairStatus.NonDefault);
         ConnexionDeJeu.Juger([new("NordLynx", false, Virtuelle: true)]).Statut.Should().Be(RepairStatus.Unknown);
     }
 

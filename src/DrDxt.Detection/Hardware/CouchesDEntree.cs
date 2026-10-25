@@ -82,7 +82,7 @@ public static class CouchesDEntree
 
     // ── Lecture ─────────────────────────────────────────────────────────────────────────
 
-    public static (IReadOnlyList<Appareil>? Appareils, IReadOnlyList<Filtre> FiltresDeClasse) Lire()
+    public static (IReadOnlyList<Appareil>? Appareils, IReadOnlyList<Filtre> FiltresDeClasse) Lire() => LectureWmiBornee.Lire<(IReadOnlyList<Appareil>? Appareils, IReadOnlyList<Filtre> FiltresDeClasse)>(() =>
     {
         var filtresDeClasse = FiltresDesClasses();
         try
@@ -107,7 +107,7 @@ public static class CouchesDEntree
             return (appareils, filtresDeClasse);
         }
         catch (Exception) { return (null, filtresDeClasse); }
-    }
+    }, () => (null, FiltresDesClasses()));
 
     // Les GUID des classes d'entrée et USB (devguid.h).
     private static readonly (string Guid, string Nom)[] ClesDeClasse =

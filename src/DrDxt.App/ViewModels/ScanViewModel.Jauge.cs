@@ -6,8 +6,7 @@ namespace DrDxt.App.ViewModels;
 // La jauge du scan : ses étapes nommées, sa progression qui ne recule jamais, et les pôles déjà lus.
 public sealed partial class ScanViewModel
 {
-    /// <summary>Les pôles du réseau déjà lus par CE scan, un bit par composant, dans l'ordre de
-    /// <see cref="Components"/> (processeur, carte, mémoire, stockage, Windows), le même que celui des pôles.</summary>
+    /// <summary>Les pôles déjà lus par CE scan, un bit par satellite, dans l'ordre de <see cref="OrdreDesSatellites"/>.</summary>
     [ObservableProperty] private int _polesLus;
 
     /// <summary>L'analyse dure plus de 10 s ; un rond qui tourne sans fin fait croire à un plantage

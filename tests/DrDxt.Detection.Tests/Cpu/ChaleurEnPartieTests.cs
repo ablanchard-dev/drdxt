@@ -10,6 +10,10 @@ public sealed class ChaleurEnPartieTests
 {
     private static readonly DateTimeOffset Maintenant = new(2026, 10, 10, 23, 0, 0, TimeSpan.FromHours(2));
 
+    // La date de la partie s'affiche à l'heure de la machine : l'attendu suit le même fuseau, sinon le test change de jour hors
+    // d'Europe.
+    private static string JourLocal(DateTimeOffset quand) => quand.ToLocalTime().ToString("MM/dd", System.Globalization.CultureInfo.InvariantCulture);
+
     private static ChaleurEnPartie.PartieLue Partie(double? celsius, double? watts, int ilYAJours = 0, string jeu = "cod.exe")
         => new(jeu, Maintenant.AddDays(-ilYAJours), celsius, watts, 63);
 
@@ -73,7 +77,8 @@ public sealed class ChaleurEnPartieTests
         var c = ChaleurEnPartie.Juger([Freinee(93, new FreinageCpu(966, 41, 0, 0, 544, 88, 100, 73))],
             new LimiteDePuissanceLue(160, 160, 65, false)).Single();
 
-        c.Statut.Should().Be(RepairStatus.Suspicious);
+        // Rien ne dit que la limite n'est pas celle du profil d'Intel (Intel Default Settings) : à regarder, pas à corriger.
+        c.Statut.Should().Be(RepairStatus.NonDefault);
         c.ValeurCourante.Should().Be("limite de courant 56 % du temps");
         c.Tout().Should().Contain("limite de courant qui le bride").And.Contain("CPU Current Limit").And.Contain("étape 7")
             .And.Contain("cœur 0 à 73 °C").And.Contain("À confirmer : 1 partie(s) de ce jeu sur 3").And.NotContain("autour de")
@@ -89,7 +94,7 @@ public sealed class ChaleurEnPartieTests
             new LimiteDePuissanceLue(160, 160, 65, false)).Single();
 
         c.ValeurCourante.Should().Be("current limit 56% of the time");
-        c.Tout().Should().StartWith("On your last recorded game (\"cod.exe\", 10/10), the processor was throttled 4% of the time by heat")
+        c.Tout().Should().StartWith($"On your last recorded game (\"cod.exe\", {JourLocal(Maintenant)}), the processor was throttled 4% of the time by heat")
             .And.Contain("Its current limit is what holds it back.").And.Contain("core 0 at 73 °C")
             .And.Contain("To be confirmed: 1 game(s) of this title out of 3");
     }
@@ -123,7 +128,7 @@ public sealed class ChaleurEnPartieTests
         var demarrage = Maintenant.AddHours(-2);
         ChaleurEnPartie.BiosLu Lu(params BiosSettingReading[] r) => new(Maintenant.AddHours(-1), r);
         ChaleurEnPartie.Juger(parties, null, Lu(new BiosSettingReading("CPU Current Limit", 160, "160 A", false)), demarrage).Single()
-            .Tout().Should().Contain("à la main à 160 A").And.Contain("en Auto");
+            .Tout().Should().Contain("à 160 A").And.Contain("Intel Default Settings").And.Contain("en Auto");
         ChaleurEnPartie.Juger(parties, null, Lu(new BiosSettingReading("CPU Current Limit", 0, "Auto", true),
                 new BiosSettingReading("CPU Lite Load", 80, "Mode 9", false)), demarrage).Single()
             .Tout().Should().Contain("déjà en Auto").And.Contain("en Mode 9");
@@ -177,9 +182,42 @@ public sealed class ChaleurEnPartieTests
         ChaleurEnPartie.RaisonDe(f).Should().Be(RaisonDuFreinage.Puissance);
 
         var c = ChaleurEnPartie.Juger([Freinee(78, f)], new LimiteDePuissanceLue(65, 65, 65, false)).Single();
-        c.Statut.Should().Be(RepairStatus.Suspicious);
+        // PL1 = puissance de base : c'est la valeur d'Intel, voulue ; à regarder, et la raison est dite.
+        c.Statut.Should().Be(RepairStatus.NonDefault);
         c.ValeurCourante.Should().Be("limite de puissance 90 % du temps");
-        c.Tout().Should().NotContain("presque pas freiné").And.Contain("guide 5.3");
+        c.Tout().Should().NotContain("presque pas freiné").And.Contain("guide 5.3").And.Contain("valeur d'Intel");
+    }
+
+    // Sous la puissance de base d'Intel, sur un PC fixe, la limite bride démontrablement : à corriger.
+    [Fact]
+    public void Une_limite_de_puissance_sous_la_valeur_d_Intel_sur_un_fixe_est_a_corriger()
+    {
+        var f = new FreinageCpu(900, 0, 0, 810, 0, 70, 78, 65);
+        ChaleurEnPartie.Juger([Freinee(78, f)], new LimiteDePuissanceLue(45, 45, 65, false)).Single()
+            .Statut.Should().Be(RepairStatus.Suspicious);
+    }
+
+    // Sur un portable, la limite de puissance et la limite de courant sont celles du fabricant : à regarder, jamais à corriger.
+    [Fact]
+    public void Sur_un_portable_les_limites_du_processeur_sont_a_regarder()
+    {
+        var puissance = new FreinageCpu(900, 0, 0, 810, 0, 70, 78, 65);
+        var p = ChaleurEnPartie.Juger([Freinee(78, puissance)], new LimiteDePuissanceLue(28, 28, 45, false), portable: true).Single();
+        p.Statut.Should().Be(RepairStatus.NonDefault);
+        p.Tout().Should().Contain("portable");
+
+        var courant = ChaleurEnPartie.Juger([Freinee(93, new FreinageCpu(966, 41, 0, 0, 544, 88, 100, 73))],
+            new LimiteDePuissanceLue(160, 160, 65, false), portable: true).Single();
+        courant.Statut.Should().Be(RepairStatus.NonDefault);
+        courant.Tout().Should().Contain("portable");
+    }
+
+    // Le conseil de courant ne pousse pas contre le profil d'Intel : une valeur posée par « Intel Default Settings » se garde.
+    [Fact]
+    public void Le_conseil_de_courant_dit_que_le_profil_d_Intel_se_garde()
+    {
+        ChaleurEnPartie.ConseilCourant([new BiosSettingReading("CPU Current Limit", 307, "307", false)]).Should().Contain("Intel Default Settings");
+        ChaleurEnPartie.ConseilCourant(null).Should().Contain("Intel Default Settings");
     }
 
     // PROCHOT (un signal de la carte mère, VRM ou alimentation) qui freine, sur un portable ou une
@@ -202,7 +240,8 @@ public sealed class ChaleurEnPartieTests
         c.Action.Should().Be(RepairAction.Aucune);
         c.Tout().Should().Contain("ne dit pas s'il se freine").And.NotContain("à 100 °C le processeur se freine");
 
-        ChaleurEnPartie.Juger([Partie(95, 120)], null).Single().Statut.Should().Be(RepairStatus.Suspicious, "Intel : 95 °C reste à regarder");
+        ChaleurEnPartie.Juger([Partie(95, 120)], null).Single().Statut.Should().Be(RepairStatus.NonDefault, "Intel : 95 °C, sous le TjMax, reste à regarder");
+        ChaleurEnPartie.Juger([Partie(100, 120)], null).Single().Statut.Should().Be(RepairStatus.Suspicious, "témoin : au TjMax, il se freine");
     }
 
     // Bridé par le courant, puis réglé ; la partie suivante, propre, fait foi.

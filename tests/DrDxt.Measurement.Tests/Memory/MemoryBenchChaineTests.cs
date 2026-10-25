@@ -48,4 +48,14 @@ public sealed class MemoryBenchChaineTests
     [Fact]
     public void Le_l3_se_lit_sans_lever()
         => MemoryBench.OctetsL3().Should().BeGreaterThanOrEqualTo(0);
+
+    // Le débit multi-fil est le seul qui puisse dire « un seul canal ». Une analyse antivirus pendant une série le faisait
+    // tomber sous le plafond d'un canal sur une machine en double canal. Trois séries trop dispersées ne concluent rien.
+    [Theory]
+    [InlineData(50.0, 52.0, 51.0, 51.0)]
+    [InlineData(24.0, 50.0, 51.0, 0.0)]
+    [InlineData(24.0, 25.0, 40.0, 0.0)]
+    [InlineData(25.0, 25.5, 26.0, 25.5)]
+    public void Trois_series_dispersees_ne_concluent_rien(double a, double b, double c, double attendu)
+        => MemoryBench.MedianeSiStable(a, b, c).Should().Be(attendu);
 }

@@ -169,7 +169,8 @@ Hors de l'instrument : `App/Platform/ReleveAuDemarrage.cs` (J1b) cree le raccour
 ne voit), pour que le releve des parties tourne DrDXT ferme. Pose seulement si DrDXT est installe ;
 retire quand le releve est eteint et a la desinstallation (`[UninstallDelete]`).
 **Remplace depuis** : ce fichier et ce raccourci n'existent plus. L'installeur cree la tache planifiee
-« DrDXT releve » (`schtasks /Create /SC ONLOGON /RL LIMITED`, sans droits, qui lance l'App directement ;
+« DrDXT releve » (à l'ouverture de session de chaque compte, pour ce compte et sans droits : principal du groupe Utilisateurs en
+LeastPrivilege ; elle lance l'App directement ;
 `installer/DrDXT.iss`), la supprime a la desinstallation, et efface l'ancien raccourci.
 **Limite (revue F-11, 07/10/2026)** : la desinstallation tourne sous le compte qui a valide l'UAC. Un joueur
 sans droits qui a fait valider l'UAC par un autre compte garde le raccourci dans SON Demarrage, pointant vers
@@ -412,7 +413,7 @@ page OEM « Disabled » aussi en mode autonome). La mesure en jeu le tranche. Ga
 |---|---|---|
 | `GpuNative/Nvml/NvmlNative.cs` (0 → 2) et `GpuNative/Nvml/INvmlNative.cs` (0 → 2, les membres par defaut qui rendent `false`) | `nvmlDeviceSetFanSpeed_v2` (une vitesse fixe, la politique passe en manuel) et `nvmlDeviceSetDefaultFanSpeed_v2` (le retour a l'automatique), exports documentes de NVML (docs.nvidia.com/deploy/nvml-api, Maxwell et plus, droits administrateur) | **helper eleve** seulement, par `NvmlVentilateurActions` |
 | `GpuNative/PawnIo/PawnIoIntel.cs` (0 → 1) | `ioctl_write_msr` du module IntelMSR de PawnIO (namazso/PawnIO.Modules 0.2.11, qui n'accepte d'ecrire que ses registres de puissance et de tension) : la **limite de puissance du processeur Intel** (MSR 0x610, `SetCpuPackagePowerLimitOp`), B1 du 10/10/2026. PL1 seule (bits 15:0), jamais PL2, fenetre, courant, tension ni verrou ; relu avant (le registre porte encore l'origine, pas de verrou BIOS) et apres (le registre porte ce qui a ete ecrit, sinon echec dit). Volatil : le BIOS remet sa valeur au redemarrage | **helper eleve** seulement, par `PawnIoCpuPowerActions` ; borne par `OpAllowlist` (`PawnIoIntel.NeToucheQuePl1` : PL1 entre 1 et la PL2 que la carte porte deja) ; le service de demarrage ne la recoit pas ; PawnIO jamais installe par DrDXT |
-| `GpuNative/PawnIo/PawnIoSuperIo.cs` (hors du bloc des comptes : des ports d'entree-sortie, pas un reglage) | pour **lire** les ventilateurs de la carte mere (puce Super I/O NCT6687), les **ports de configuration** 0x2E ou 0x4E (entree 0x87 0x87, choix du bloc 0x0B, sortie 0xAA, toujours dans un finally) et la **page de la memoire EC** de la puce (selection de page, puis liberation 0xFF), toutes les 5 s au plus. Jamais un regime, une courbe ni un mode du ventilateur : rien de ce que la puce garde n'est change | par **l'App et le service de demarrage**, par le module LpcIO de PawnIO (jamais installe par DrDXT) ; une lecture servie 5 s (`LireRecent`) ; un emplacement refuse par le module laisse l'autre |
+| `GpuNative/PawnIo/PawnIoSuperIo.cs` (hors du bloc des comptes : des ports d'entree-sortie, pas un reglage) | pour **lire** les ventilateurs de la carte mere (puce Super I/O NCT6687), les **ports de configuration** 0x2E ou 0x4E (entree 0x87 0x87, choix du bloc 0x0B, sortie 0xAA, toujours dans un finally) et la **page de la memoire EC** de la puce (selection de page, puis liberation 0xFF), toutes les 15 s au plus. Jamais un regime, une courbe ni un mode du ventilateur : rien de ce que la puce garde n'est change | par **l'App et le service de demarrage**, par le module LpcIO de PawnIO (jamais installe par DrDXT) ; une lecture servie 15 s (`LireRecent`) ; un emplacement refuse par le module laisse l'autre |
 | `ElevatedHelper/Execution/NvmlVentilateurActions.cs` (0 → 2) | la pose d'une vitesse fixe (`ApplyGpuFanCurveOp` a un seul point) et le retour a l'automatique (`RestoreGpuFanAutoOp`) | **helper eleve**, mode Expert sur geste du joueur seulement. NVIDIA previent qu'une vitesse trop basse peut abimer la carte : DrDXT ne pose qu'en partant de l'automatique, jamais sous la vitesse que l'automatique vise a cet instant ni sous le minimum de la carte, et jamais sous 40 % (plancher a chaud de `OpAllowlist`). Tout est relu apres l'ecriture ; un echec rend l'automatique. Le retour se prouve par la politique relue (un retour rate a ete signale en 2022 sur le forum NVIDIA) : non confirme, l'echec le dit. Une courbe a plusieurs points reste refusee |
 
 ### 07/10/2026 — revue F-28, le mode d'alimentation de Windows 11 que l'activation d'un plan peut remettre
@@ -443,8 +444,10 @@ une tension trop haute l'abime, et l'op ne monte jamais (refus par la liste blan
 l'a corrige en verrouillant la tension quand SGX est actif ; DrDXT refuse toute ecriture sur un processeur qui a SGX
 (`PawnIoTensionTests`, SGX ⇒ aucune ecriture). Undervolt Protection (12e-14e gen, reglage BIOS) ou la securite par
 virtualisation de Windows peuvent ignorer l'ecriture : chaque plan est relu, une valeur non retrouvee est un echec dit et un plan
-deja pose est rendu (`PawnIoTensionTests`). Residuel : un decalage trop fort peut faire planter avant d'etre juge ; la garde
-d'incident rend les leviers poses apres un arret, et le redemarrage le rend de toute facon. Lu sur le PC de reference le 12/10
+deja pose est rendu (`PawnIoTensionTests`). Pendant la recherche, un bail du helper porte le retour a 0 : l'App tuee en plein
+palier cesse de battre et le helper rend l'origine en 35 s au plus (le bail de 30 s, puis le passage suivant de la surveillance, toutes les 5 s) (`RechercheSousTensionVmTests`, `LeaseWatchdogTests`) ; la
+mise en veille est empechee le temps de la recherche (`SansVeille`). Residuel : un decalage trop fort peut faire planter avant
+d'etre juge ; la garde d'incident rend les leviers poses apres un arret, et le redemarrage le rend de toute facon. Lu sur le PC de reference le 12/10
 (lecture 0x10 seulement) : decalage 0 sur les cœurs et le cache, processeur sans SGX.
 
 ### La frontiere reelle : chaque op doit rester inoffensive meme demandee par un programme hostile du compte
@@ -688,7 +691,7 @@ tient par la structure du contrat privilegie, pas par une garde qu'on pourrait d
 
 | Site | Ce qu'il fait | Garde | Residuel | Prouve par |
 |---|---|---|---|---|
-| `Win32FirmwareBootActions` | `shutdown.exe /r /fw` — le **voyage** vers le setup UEFI, une facilite documentee par Microsoft | delai borne **0 a 300 s** (`OpAllowlist`), et le code de sortie de `shutdown.exe` est **LU** : un echec se dit, il ne se rattrape pas | le comportement sur un firmware inconnu est **UNKNOWN** | `OpAllowlistTests.Firmware_reboot_outside_the_band_is_denied` |
+| `Win32FirmwareBootActions` | `shutdown.exe /r /fw` — le **voyage** vers le setup UEFI, une facilite documentee par Microsoft | delai borne **10 a 300 s** (`OpAllowlist`), et le code de sortie de `shutdown.exe` est **LU** : un echec se dit, il ne se rattrape pas | le comportement sur un firmware inconnu est **UNKNOWN** | `OpAllowlistTests.Firmware_reboot_outside_the_band_is_denied` |
 | `CancelPendingFirmwareBootOp` | `shutdown /a /fw` — **l'annulation** du precedent | — | c'est la sortie de secours du voyage | `LeaseWatchdogTests.A_firmware_reboot_can_NEVER_be_a_lease_revert` |
 | `ReadFirmwareVariableOp` | **LECTURE seule** d'une variable firmware | **quatre ensembles fermes** : sous le GUID EFI global, 3 noms (`BootOrder`, `SecureBoot`, `BootCurrent`) ; sous le GUID constructeur, `Setup` ; sous le GUID du varstore Intel, `CpuSetup` ; sous le GUID des valeurs d'usine AMI, `StdDefaults`. Tout autre GUID est hors de portee par construction, et un espace n'herite pas des noms de l'autre | — | `OpAllowlistTests.ReadFirmwareVariable_ForeignGuid_IsDenied` (+2) |
 | `PendingBiosChangeStore`, `FirmwareTrip` | un marqueur **fichier** pour savoir au retour si le voyage a eu lieu | ecrit dans les donnees locales du joueur (`%LOCALAPPDATA%\DrDXT`), pas dans le firmware | H-aucune | — |
@@ -839,7 +842,8 @@ helper seul), ni le firmware, ni le manifeste, ni le BCD : `HostCompositionTests
 | `Win32RegistryActions.SetStartupApproval` (helper eleve) | ecrit les 12 octets que le Gestionnaire des taches ecrit (02 = actif ; 03 + heure FILETIME = coupe) a la valeur du programme sous `Explorer\StartupApproved\{Run, Run32, StartupFolder}`. La commande du programme (cle Run, raccourci du dossier Demarrage) n'est jamais touchee. | liste fermee (`Run`, `Run32` en machine seulement, `StartupFolder`), ruche utilisateur ou machine, nom simple (ni `\`, ni `/`, ni caractere de controle, 260 au plus) ; `SecurityHealth` ne se coupe pas ; le programme doit etre liste la ou sa liste le dit, sinon rien n'est ecrit (un op forge ne cree pas de valeur pour un programme qui n'existe pas). | `StartupApprovalAllowlistTests` (11 cas), `SetStartupApprovalOpTests` (codec, octets), `StartupApprovalMachineTests` (une entree d'essai de la session coupee, relue, reactivee puis effacee sur la machine de reference) |
 
 Nuisance possible, dite : un programme coupe ne se lance plus a l'ouverture de session, ce que le joueur a demande ;
-il se reactive par le meme geste, dans DrDXT ou dans le Gestionnaire des taches. Le format n'est pas documente par
+il se reactive par le meme geste, dans DrDXT ou dans le Gestionnaire des taches, et a la desinstallation
+(`ModeDesinstallation.ReactiverLesCoupuresAsync`) s'il porte encore les octets que DrDXT a ecrits. Le format n'est pas documente par
 Microsoft : il est releve sur la machine de reference et decrit pareil par la communaute.
 
 ### 15/10/2026 — `ScheduleMemoryDiagnosticOp` / `CancelMemoryDiagnosticOp` : le test memoire au prochain demarrage

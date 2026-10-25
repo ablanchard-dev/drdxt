@@ -8,6 +8,8 @@ public sealed partial class ScanViewModel
     public string LabelGesteFait => _localize("Geste.Fait");
     public string LabelGesteAnnuler => _localize("Geste.Annuler");
     public string LabelGesteEchec => _localize("Geste.Echec");
+    public string LabelGesteIncertain => _localize("Geste.Incertain");
+    public string LabelGesteAMoitie => _localize("Geste.AMoitie");
 
     /// <summary>La recherche en ligne de Windows Update, hors du fil de l'interface ; une couture pour les tests.</summary>
     internal Func<Task<Result>> ChercherWindowsUpdate { get; set; }
@@ -43,14 +45,13 @@ public sealed partial class ScanViewModel
             // Un geste par vieux paquet : retiré après un export, remis depuis cet export.
             ("GPU DRIVER", "anciens pilotes d'affichage gardés") => AvecLesFaits("pilote",
                 (r.Cible ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(p => ("pilote|" + p, (Func<GesteDuDocteur>)(() => new GesteDuDocteur(
-                        string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize("Geste.Pilote.Titre"), p),
-                        string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize("Geste.Pilote.Detail"), p),
-                        () => Envoyer(new RemoveDriverPackageOp(p)), () => Envoyer(new RestoreDriverPackageOp(p))))))),
+                    .Select(p => ("pilote|" + p, (Func<GesteDuDocteur>)(() => GestePilote(p))))),
             // Le jeu en DLSS : le dernier modèle, au profil pilote de ce seul jeu.
             ("LATENCE", _) when r.Cible is { } exe && exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
                 && NvApiDesJeux is { } nv && CheminDuJeu(exe) is { } chemin
-                => AvecLesFaits("dlss|" + chemin, GesteDlss(nv, chemin, Envoyer, _localize) is { } geste
+                => AvecLesFaits("dlss|" + chemin, GesteDlss(nv, chemin, Envoyer, _localize,
+                        (inverses, poses) => GarderLeGesteAsync(DrDxt.Application.Tweaks.LevierDeGeste.IdDlss(chemin), inverses, poses),
+                        () => OublierAsync(DrDxt.Application.Tweaks.LevierDeGeste.IdDlss(chemin))) is { } geste
                     ? [("dlss|" + chemin + "|modele", () => geste)] : []),
             _ => null,
         };
@@ -97,9 +98,14 @@ public sealed partial class ScanViewModel
 
     /// <summary>Le dernier modèle DLSS au profil pilote de ce jeu, ou null (profil absent ou illisible, provenance
     /// inconnue, déjà au dernier modèle). Les deux réglages partent dans l'ordre ; si le second est refusé, le premier est
-    /// défait : le geste n'est jamais laissé à moitié posé sans Annuler.</summary>
+    /// défait. Ce qui reste posé (un premier réglage qui ne se défait pas, une annulation refusée en partie) rend
+    /// <see cref="ErrorCodes.TweakPartiallyApplied"/> : le geste se dit à moitié, et Annuler reste.</summary>
+    /// <param name="garder">Le geste posé (même à moitié) est gardé comme un levier : ses inverses, dans l'ordre où ils se
+    /// rejouent, et ce qui a été posé.</param>
+    /// <param name="oublier">Le geste rendu en entier sort du journal des leviers et du manifeste.</param>
     internal static GesteDuDocteur? GesteDlss(DrDxt.Application.Tweaks.Hardware.INvApi nv, string chemin,
-        Func<PrivilegedOp, Task<Result>> envoyer, Func<string, string> localiser)
+        Func<PrivilegedOp, Task<Result>> envoyer, Func<string, string> localiser,
+        Func<IReadOnlyList<PrivilegedOp>, IReadOnlyList<PrivilegedOp>, Task>? garder = null, Func<Task>? oublier = null)
     {
         if (DrDxt.Application.Tweaks.Gpu.SurcoucheDlss.Planifier(nv, chemin) is not { IsOk: true } plan) return null;
         var (faire, annuler) = plan.Value;
@@ -110,19 +116,78 @@ public sealed partial class ScanViewModel
             for (var i = 0; i < faire.Count; i++)
                 if (await envoyer(faire[i]).ConfigureAwait(true) is { IsOk: false } refus)
                 {
-                    for (var j = i - 1; j >= 0; j--) await envoyer(annuler[j]).ConfigureAwait(true);
-                    return refus;
+                    var defait = true;
+                    for (var j = i - 1; j >= 0; j--)
+                        if (!(await envoyer(annuler[j]).ConfigureAwait(true)).IsOk) defait = false;
+                    if (defait) return refus;
+                    if (garder is not null) await garder(annuler.Take(i).Reverse().ToList(), faire.Take(i).ToList()).ConfigureAwait(true);
+                    return Result.Fail(ErrorCodes.TweakPartiallyApplied, "The first setting could not be undone.");
                 }
+            if (garder is not null) await garder(annuler.AsEnumerable().Reverse().ToList(), faire).ConfigureAwait(true);
             return Result.Ok();
         }
 
+        // Chaque réglage est tenté : un refus n'empêche pas de rendre les autres.
         async Task<Result> Rendre()
         {
+            var (rendus, refus) = (0, default(Result));
             for (var j = annuler.Count - 1; j >= 0; j--)
-                if (await envoyer(annuler[j]).ConfigureAwait(true) is { IsOk: false } refus) return refus;
-            return Result.Ok();
+                if (await envoyer(annuler[j]).ConfigureAwait(true) is { IsOk: false } r) refus ??= r;
+                else rendus++;
+            if (refus is null && oublier is not null) await oublier().ConfigureAwait(true);
+            return refus is null ? Result.Ok()
+                : rendus > 0 ? Result.Fail(ErrorCodes.TweakPartiallyApplied, "Part of the gesture was not undone.")
+                : refus;
         }
     }
+
+    /// <summary>Retirer un vieux paquet de pilote d'affichage (après un export que le helper garde), et le remettre. Retiré, il est
+    /// gardé comme un levier (<see cref="DrDxt.Application.Tweaks.LevierDeGeste"/>) : « Ce que DrDXT a posé » le remet après une
+    /// relance, quand ce geste n'a plus de carte.</summary>
+    internal GesteDuDocteur GestePilote(string paquet)
+    {
+        var id = DrDxt.Application.Tweaks.LevierDeGeste.IdPilote(paquet);
+        Task<Result> Envoyer(PrivilegedOp op) => _helper!.ExecuteAsync(op, CancellationToken.None);
+        return new GesteDuDocteur(
+            string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize("Geste.Pilote.Titre"), paquet),
+            string.Format(System.Globalization.CultureInfo.CurrentCulture, _localize("Geste.Pilote.Detail"), paquet),
+            async () =>
+            {
+                var r = await Envoyer(new RemoveDriverPackageOp(paquet)).ConfigureAwait(true);
+                if (r.IsOk) await GarderLeGesteAsync(id, [new RestoreDriverPackageOp(paquet)], [new RemoveDriverPackageOp(paquet)]).ConfigureAwait(true);
+                return r;
+            },
+            async () =>
+            {
+                var r = await Envoyer(new RestoreDriverPackageOp(paquet)).ConfigureAwait(true);
+                if (r.IsOk) await OublierAsync(id).ConfigureAwait(true);
+                return r;
+            });
+    }
+
+    /// <summary>Un geste posé entre au journal des leviers (son Annuler) et, si son origine se rend à la désinstallation, au
+    /// manifeste signé.</summary>
+    private async Task GarderLeGesteAsync(string id, IReadOnlyList<PrivilegedOp> inverses, IReadOnlyList<PrivilegedOp> poses)
+    {
+        var rapport = new ApplyReport([new ApplyOutcome(id, true, false, DrDxt.Application.Tweaks.LevierDeGeste.Snapshot(id, inverses, poses), null)], null);
+        _journalLeviers?.Enregistrer(rapport);
+        if (_manifestMapper.ToRevertOnly(rapport) is { Count: > 0 } gardes)
+            await _desiredStateStore.CommitAsync(new DesiredState(Array.Empty<AppliedTweak>(), gardes)).ConfigureAwait(true);
+        ChargerLeviersPoses();
+    }
+
+    /// <summary>L'export d'un paquet de pilote retiré est-il encore sous la racine de confiance du helper ? Lu, jamais écrit ;
+    /// illisible, le helper en décide. Une couture pour les tests.</summary>
+    internal Func<string, bool> ExportDuPiloteExiste { get; set; } = paquet =>
+    {
+        try
+        {
+            var racine = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DrDxt", "pilotes-retires");
+            return !System.IO.Directory.Exists(racine)
+                || System.IO.Directory.GetDirectories(racine, System.IO.Path.GetFileNameWithoutExtension(paquet) + "-*").Length > 0;
+        }
+        catch (Exception) { return true; }
+    };
 
     /// <summary>Le pilote NVIDIA lu au profil d'un jeu ; null = pas de carte NVIDIA, aucun geste DLSS.</summary>
     internal DrDxt.Application.Tweaks.Hardware.INvApi? NvApiDesJeux { get; set; }

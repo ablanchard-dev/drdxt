@@ -9,9 +9,10 @@ namespace DrDxt.Application.Parties;
 /// </summary>
 public sealed class VeilleDesParties
 {
-    /// <summary>Une fenêtre d'une minute, et les fenêtres se suivent sans trou : toute la partie est mesurée,
-    /// image par image (avant : 20 s toutes les trois minutes, soit un dixième de la partie, et un pic de chaleur entre deux
-    /// captures passait inaperçu). La minute est le grain auquel un menu ou un lobby se met à part.</summary>
+    /// <summary>Une fenêtre d'une minute, et les fenêtres se suivent sans attente : la partie est mesurée image par image,
+    /// sauf la seconde ou deux qui précède la première image de chaque fenêtre (PresentMon réarme son suivi à chaque fois).
+    /// Avant : 20 s toutes les trois minutes, soit un dixième de la partie, et un pic de chaleur entre deux captures passait
+    /// inaperçu. La minute est le grain auquel un menu ou un lobby se met à part.</summary>
     public static readonly TimeSpan DureeCapture = TimeSpan.FromMinutes(1);
 
     /// <summary>Plus d'attente entre deux fenêtres : la suivante commence dès que la précédente est relevée.</summary>
@@ -19,6 +20,11 @@ public sealed class VeilleDesParties
 
     /// <summary>Hors partie, on regarde toutes les trente secondes si un jeu a démarré.</summary>
     public static readonly TimeSpan HorsPartie = TimeSpan.FromSeconds(30);
+
+    /// <summary>Une capture peut rater vite (service de mesure arrêté, relevé sans droits) : relancée sans pause, elle
+    /// tournerait une fois par seconde toute la partie, à côté du jeu. Le recul double à chaque raté, jusqu'au regard hors
+    /// partie : une partie qui commence est relevée au plus tard trente secondes après que la mesure redevient possible.</summary>
+    public static readonly TimeSpan PremierRecul = TimeSpan.FromSeconds(5);
 
     private readonly Func<(string Exe, int Pid)?> _jeu;
     private readonly Func<int, TimeSpan, CancellationToken, Task<BenchmarkResult?>> _capturer;
@@ -41,6 +47,12 @@ public sealed class VeilleDesParties
     private readonly Func<EtatCpu?>? _etatProcesseur;
     private readonly Func<int, double?>? _horsCarte;
     private readonly Action<PartieRelevee, IReadOnlyList<CaptureEnPartie>>? _garderLesImages;
+    private readonly int _imagesBrutesMax;
+
+    /// <summary>Les minutes dont la veille garde toutes les images ; au-delà, les plus anciennes n'en gardent que leur résumé
+    /// (<see cref="ReleveDesParties.Comprimer"/>). Trois heures couvrent une soirée de jeu, dont les chiffres restent ceux de
+    /// toutes ses images ; un jeu laissé ouvert des jours ne garde plus 5,8 Mo d'images par heure à 200 i/s.</summary>
+    public const int ImagesBrutesMax = 180;
 
     public VeilleDesParties(
         Func<(string Exe, int Pid)?> jeu,
@@ -76,8 +88,10 @@ public sealed class VeilleDesParties
         // La mémoire du jeu tenue hors de la carte (en mémoire système), en Mo, à la fin de la capture.
         Func<int, double?>? horsCarte = null,
         // Option de développement (ImagesDesParties) : la partie close et ses fenêtres ; null hors développement.
-        Action<PartieRelevee, IReadOnlyList<CaptureEnPartie>>? garderLesImages = null)
+        Action<PartieRelevee, IReadOnlyList<CaptureEnPartie>>? garderLesImages = null,
+        int imagesBrutesMax = ImagesBrutesMax)
     {
+        _imagesBrutesMax = imagesBrutesMax;
         _garderLesImages = garderLesImages;
         _horsCarte = horsCarte;
         _etatProcesseur = etatProcesseur;
@@ -122,13 +136,16 @@ public sealed class VeilleDesParties
         // Une partie sans aucune seconde du processeur lue se dit une fois, avec sa raison probable ;
         // avant, elle s'enregistrait sans température ni freinage, sans un mot.
         var processeurSignale = false;
+        var recul = TimeSpan.Zero;
 
         void Clore()
         {
             processeurSignale = false;
             if (enCours is not null && ReleveDesParties.Resumer(enCours, captures) is { } partie)
             {
-                _enregistrer(partie);
+                // Un enregistrement qui lève ne fait pas tomber la veille de la session : il se dit.
+                try { _enregistrer(partie); }
+                catch (Exception ex) { Signaler($"{enCours} : {ex.Message}"); }
                 try { _garderLesImages?.Invoke(partie, [.. captures]); }
                 catch (Exception) { /* option de développement : son échec, quel qu'il soit, n'empêche jamais le relevé */ }
             }
@@ -139,7 +156,15 @@ public sealed class VeilleDesParties
 
         while (!ct.IsCancellationRequested)
         {
-            var jeu = _jeu();
+            // Un regard qui lève ne fait pas tomber la veille : il se dit, et le suivant regarde à nouveau.
+            (string Exe, int Pid)? jeu;
+            try { jeu = _jeu(); }
+            catch (Exception ex)
+            {
+                Signaler(ex.Message);
+                await Attendre(HorsPartie, ct);
+                continue;
+            }
             // Le même nom d'exécutable
             // ne suffit pas, un nouveau processus est une nouvelle partie ; sinon les deux sessions n'en faisaient qu'une.
             if (jeu is null || jeu.Value.Exe != enCours || jeu.Value.Pid != pidEnCours) Clore();
@@ -211,9 +236,18 @@ public sealed class VeilleDesParties
                     ImagesMs: mesure.FrameTimesMs, PremierPlan: mesure.ForegroundFraction,
                     Entrees: entrees.Count > 0 ? entrees.Count(e => e) / (double)entrees.Count : null,
                     Freinage: FreinageCpu.Depuis(etats), Ventilateurs: VentilateursEnPartie.Depuis(etats.Select(e => e.Ventilateurs)),
-                    PartComposee: mesure.PartImagesComposees, LatencePcMs: mesure.PcLatencyMsMedian, HorsCarteMo: horsCarte));
+                    PartComposee: mesure.PartImagesComposees, LatencePcMs: mesure.PcLatencyMsMedian, HorsCarteMo: horsCarte, Instrument: mesure.Instrument));
+                // Au-delà de la fenêtre, la plus ancienne minute entière ne garde que son résumé.
+                if (captures.Count(c => c.ImagesMs is not null) > _imagesBrutesMax)
+                {
+                    var plusAncienne = captures.FindIndex(c => c.ImagesMs is not null);
+                    captures[plusAncienne] = ReleveDesParties.Comprimer(captures[plusAncienne]);
+                }
             }
-            await Attendre(EntreDeuxCaptures, ct);
+            recul = mesure is { AvgFps: > 0 } ? TimeSpan.Zero
+                : recul == TimeSpan.Zero ? PremierRecul
+                : TimeSpan.FromTicks(Math.Min(recul.Ticks * 2, HorsPartie.Ticks));
+            await Attendre(recul == TimeSpan.Zero ? EntreDeuxCaptures : recul, ct);
         }
     }
 

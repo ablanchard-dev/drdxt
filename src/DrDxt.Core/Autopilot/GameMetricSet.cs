@@ -73,8 +73,8 @@ public enum GameMetricKind
 public static class GameMetricSet
 {
     /// <summary>Les grandeurs qu'une session mesure et juge, dans l'ordre d'affichage.</summary>
-    public static readonly GameMetricKind[] Toutes =
-        { GameMetricKind.Moyenne, GameMetricKind.UnPourCentLow, GameMetricKind.P95Frametime };
+    public static readonly System.Collections.Immutable.ImmutableArray<GameMetricKind> Toutes =
+        [GameMetricKind.Moyenne, GameMetricKind.UnPourCentLow, GameMetricKind.P95Frametime];
 
     /// <summary>Le nom stable d'une grandeur, pour les preuves et le journal.</summary>
     public static string Nom(GameMetricKind k) => k switch

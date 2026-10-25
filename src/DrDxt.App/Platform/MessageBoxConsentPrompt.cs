@@ -12,14 +12,9 @@ namespace DrDxt.App.Platform;
 // avec RESTORE_DECLINED (jamais d'avance sans point vérifié). Sans interface, la réponse par
 // défaut est non (refus au moindre doute). Ne lève jamais.
 //
-// Cette question etait ecrite en dur, en anglais.
-// C'est la seule question que DrDXT pose avant de toucher la machine, et elle
-// s'affichait dans une langue que l'utilisateur n'a pas choisie (sur le poste
-// francais auquel ce produit s'adresse) pendant qu'il doit repondre Oui ou Non.
-// La regle etait deja ecrite dans `AppReconcilerSeams.cs` : « le texte lisible vient
-// d'une clé resx via ILocalizer, jamais écrit en dur ». Une surface l'appliquait,
-// celle-ci non. Le titre portait meme un tiret cadratin, que les gardes de ressources
-// de ce depot refusent, sans les voir, puisqu'elles lisent les `.resx`.
+// La question et son titre viennent des ressources : c'est la seule question que DrDXT pose avant
+// de toucher la machine, et elle doit parler la langue de l'utilisateur. Écrits en dur, ils
+// échapperaient aussi aux gardes de ressources du dépôt, qui ne lisent que les `.resx`.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class MessageBoxConsentPrompt(ILocalizer localizer) : IConsentPrompt

@@ -34,25 +34,19 @@ public static class DetectionServiceCollectionExtensions
 
         // Composed services
         services.TryAddSingleton<IHardwareDetector, HardwareDetector>();
-        // Cablage par convention : SettingsStateReader porte INvApi et IDisplayInfo en
-        // parametres optionnels, et l'injection .NET honore leur valeur par defaut quand ils
-        // ne sont pas enregistres. Verifie par mutation, pas suppose : les deux tests de
-        // DetectionDiTests restent verts avec ce cablage-ci et avec une fabrique explicite,
-        // donc la fabrique etait du code en plus sans garantie en plus.
-        // LR : le lecteur d'arrets brutaux, injecte dans le parametre optionnel de
-        // SettingsStateReader par la meme convention que INvApi et IDisplayInfo. Non
-        // enregistre = champ null = jamais lu, ce qui reste une reponse honnete.
+        // Cablage par convention : SettingsStateReader porte INvApi, IDisplayInfo et le lecteur d'arrets brutaux en
+        // parametres optionnels, et l'injection .NET honore leur valeur par defaut quand ils ne sont pas enregistres
+        // (DetectionDiTests). Non enregistre = champ null = jamais lu, ce qui reste une reponse honnete.
         // Le lecteur d'ecrans appartient ici, et non a la seule couche app : sinon tout ce qui monte
-        // ce conteneur (sondes, tests d'integration, un futur mode console) lirait
-        // `AttachedRefreshHz = null` et se tairait sur la consommation au repos. `TryAdd` :
-        // l'enregistrement explicite de l'App reste prioritaire s'il passe en premier.
-        // G-Sync lu au pilote (NVAPI, lecture non elevee). Enregistre par type, le lecteur prendrait
-        // son constructeur sans NVAPI et dirait « VRR non lisible » alors que le pilote repond.
-        // Fabrique explicite, TryAdd : l'App garde la main.
+        // ce conteneur (sondes, tests d'integration) lirait `AttachedRefreshHz = null` et se tairait sur la
+        // consommation au repos. G-Sync se lit au pilote (NVAPI, lecture non elevee) : enregistre par type, le lecteur
+        // prendrait son constructeur sans NVAPI et dirait « VRR non lisible » alors que le pilote repond. FreeSync ne se
+        // lit que si l'hote enregistre IAdlxNative, ce que ce conteneur ne fait pas. Fabriques explicites, TryAdd :
+        // l'enregistrement de l'App reste prioritaire s'il passe en premier.
         services.TryAddSingleton<DrDxt.GpuNative.NvApi.INvApiNative>(_ => new DrDxt.GpuNative.NvApi.NvApiNative());
-        services.TryAddSingleton<DrDxt.Application.Tweaks.Hardware.IDisplayInfo>(sp =>
+        services.TryAddSingleton<DrDxt.Application.Tweaks.Hardware.IDisplayInfo>(sp => new Display.EcransEnCache(
             new Display.Win32DisplayInfo(sp.GetService<DrDxt.GpuNative.NvApi.INvApiNative>(),
-                sp.GetService<DrDxt.Detection.Gpu.Adlx.IAdlxNative>()));
+                sp.GetService<DrDxt.Detection.Gpu.Adlx.IAdlxNative>())));
 
         services.TryAddSingleton<IUnexpectedShutdownLog, WindowsUnexpectedShutdownLog>();
         // Les vidages d'écran bleu : la garde XMP de SettingsStateReader lit la même stabilité que Curve Optimizer.

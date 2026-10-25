@@ -15,7 +15,7 @@ public sealed record FinDuRejeu(Func<Task> Attendre);
 /// <summary>
 /// Le rejeu du journal au démarrage du service, avant la première réconciliation. Le service démarre aussi pendant une partie
 /// (la tâche cochée à l'installation, une récupération après un plantage, sc start) : le rejeu attend alors la fin du jeu,
-/// comme la passe quotidienne du Worker. Cette attente ne retient pas le démarrage, que le gestionnaire de services borne à
+/// comme la passe quotidienne du Worker, au plus <see cref="Worker.AttenteEnPartieMax"/>. Cette attente ne retient pas le démarrage, que le gestionnaire de services borne à
 /// quelques dizaines de secondes : StartAsync la lance en fond et rend la main, et le Worker l'attend avant de réconcilier.
 /// Sous SYSTEM, une écriture de la ruche du joueur attend le helper de sa session ; une écriture que le service ne sait pas
 /// faire (la carte) reste en suspens pour lui.
@@ -52,8 +52,7 @@ public sealed class RejeuAuDemarrage(JournalDuService journal, ILectureDesCibles
     {
         try
         {
-            while (_jeuEnCours())
-                await _delai.DelayAsync(Worker.AttenteEnPartie, ct).ConfigureAwait(false);
+            await Worker.AttendreLaFinDuJeuAsync(_jeuEnCours, _delai, ct).ConfigureAwait(false);
             using var borne = CancellationTokenSource.CreateLinkedTokenSource(ct);
             borne.CancelAfter(Borne);
             var rapport = await JournalDuHelper.RejouerAsync(journal.Journal, lecture, ecriture, RejeuDuJournal.ProcessusVivant,

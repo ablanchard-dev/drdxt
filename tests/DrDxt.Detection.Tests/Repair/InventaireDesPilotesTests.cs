@@ -16,7 +16,7 @@ public sealed class InventaireDesPilotesTests
     public void La_date_du_pilote_est_celle_de_l_INF_quel_que_soit_le_fuseau()
     {
         // DriverDate est une date sans heure écrite à minuit UTC : convertie en heure locale, elle recule d'un jour à
-        // l'ouest de Greenwich, et le 18/07/1968 du chipset Intel cessait d'être une date jeton.
+        // l'ouest de Greenwich, et la date jeton 18/07/1968 du chipset Intel (relevée sur la machine de référence) ne se reconnaîtrait plus.
         InventaireDesPilotes.DateDmtf("19680718000000.******+000").Should().Be(new DateTime(1968, 7, 18));
         InventaireDesPilotes.DateDmtf("20060621000000.******-300").Should().Be(new DateTime(2006, 6, 21));
         InventaireDesPilotes.DateDmtf("x").Should().BeNull();

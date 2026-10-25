@@ -5,8 +5,9 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // Sous chaque ligne lue « pour information », « Pourquoi ? » prenait une ligne entière ;
-// un « ? » en fin de ligne ouvre la même suite. Deux mécanismes pour la même chose, le « ? » rond
-// devient le seul signe partout (mesures, constats, lectures impossibles, processeur bridé), nom complet gardé.
+// un signe en fin de ligne ouvre la même suite. Deux mécanismes pour la même chose : un chevron discret devient le seul
+// signe partout (mesures, constats, lectures impossibles, processeur bridé), nom complet gardé. Le « ? » rond, répété sur
+// chaque ligne, faisait une page pointillée.
 public sealed class PourquoiDesMesuresEnFinDeLigneTests
 {
     private static string Vue()
@@ -75,7 +76,7 @@ public sealed class PourquoiDesMesuresEnFinDeLigneTests
         var debut = vue.IndexOf("<Style x:Key=\"BoutonPourquoi\"", StringComparison.Ordinal);
         debut.Should().BeGreaterThan(0);
         var style = vue[debut..vue.IndexOf("</Style>", debut, StringComparison.Ordinal)];
-        style.Should().Contain("AutomationProperties.Name").And.Contain("Text=\"?\"");
+        style.Should().Contain("AutomationProperties.Name").And.Contain("<Path x:Name=\"Signe\"").And.NotContain("CornerRadius");
     }
 
     // Protection du ping indisponible = un seul « ? » dans le bloc (celui de la

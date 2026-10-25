@@ -28,7 +28,13 @@ public sealed class TweakCandidate : IAutopilotCandidate
     private readonly IServiceStateReader? _services;
     private readonly IRevertEnAttente _journal;
     private readonly IDesiredStateStore? _manifeste;
+    private readonly AppliedStateVerifier.LecteursCarte? _carte;
     private TweakSnapshot? _snapshot;
+
+    /// <summary>La pose en essai, pas encore acquittée au journal du helper : elle l'est au keep ou au rendu. Tant qu'elle ne
+    /// l'est pas, le helper la rend si l'App meurt, désinstallation comprise ; l'origine de `pending-revert.json` vit dans un
+    /// dossier du compte, que la désinstallation élevée ne lit pas.</summary>
+    private PorteeDePose? _poseEnEssai;
 
     /// <summary>L'instantané du levier tant qu'il est posé (gardé par la session), pour que l'App
     /// l'inscrive au journal des leviers : sans lui, « Annuler » et la garde d'incident ne le voyaient pas.</summary>
@@ -41,8 +47,9 @@ public sealed class TweakCandidate : IAutopilotCandidate
     /// et <see cref="OrigineHorsManifeste"/> le dit.</param>
     public TweakCandidate(ITweak tweak, CandidateDescriptor descriptor, IRegistryReader registre,
         IRevertEnAttente journal, INvApi? nvApi = null, IPowerPlanReader? alimentation = null,
-        IDesiredStateStore? manifeste = null, IServiceStateReader? services = null)
+        IDesiredStateStore? manifeste = null, IServiceStateReader? services = null, AppliedStateVerifier.LecteursCarte? carte = null)
     {
+        _carte = carte;
         _services = services;
         _manifeste = manifeste;
         _journal = journal ?? throw new ArgumentNullException(nameof(journal));
@@ -73,18 +80,37 @@ public sealed class TweakCandidate : IAutopilotCandidate
             return Result.Fail(pose.Error?.Code ?? FichierRevertEnAttente.CodeErreur,
                 Docteur.T("GX.SansFilet", pose.Error?.Message));
 
-        // Le journal ci-dessus ne connaît pas encore l'origine : le helper la garde jusqu'à ce qu'il la porte.
-        using var portee = PorteeDePose.Ouvrir();
+        // Le journal ci-dessus ne connaît pas encore l'origine : le helper la garde, et la garde jusqu'au keep ou au rendu.
+        var portee = PorteeDePose.Ouvrir();
+        var tenue = false;
+        try
+        {
+            tenue = Poser(portee, out var resultat);
+            return resultat;
+        }
+        finally
+        {
+            // Une pose ratée laisse ses écritures au journal du helper, sans acquit : il les rendra si l'App meurt.
+            if (!tenue) portee.Dispose();
+        }
+    }
+
+    private bool Poser(PorteeDePose portee, out Result resultat)
+    {
         var r = _tweak.ApplyAsync().GetAwaiter().GetResult();
         if (!r.IsOk || r.Value is null)
         {
             // Posé en partie et retour arrière raté : le journal reste (sans origine),
             // et le démarrage suivant dit de vérifier ce réglage, au lieu de croire que rien n'a changé.
             if (r.Error?.Code == ErrorCodes.TweakPartiallyApplied)
-                return Result.Fail(ErrorCodes.TweakPartiallyApplied, r.Error?.Message ?? Docteur.T("TC.PoseEnPartie"));
+            {
+                resultat = Result.Fail(ErrorCodes.TweakPartiallyApplied, r.Error?.Message ?? Docteur.T("TC.PoseEnPartie"));
+                return false;
+            }
             _journal.Lever();
-            return Result.Fail(r.Error?.Code ?? ErrorCodes.TweakSdkUnavailable,
+            resultat = Result.Fail(r.Error?.Code ?? ErrorCodes.TweakSdkUnavailable,
                 r.Error?.Message ?? Docteur.T("TC.SansSnapshot"));
+            return false;
         }
 
         // Le journal doit porter de quoi revenir. S'il ne le peut pas, on ne garde pas un levier pose
@@ -96,17 +122,30 @@ public sealed class TweakCandidate : IAutopilotCandidate
             if (!rendu.IsOk)
             {
                 _snapshot = r.Value;   // garde l'inverse en memoire : Revert() pourra reessayer
-                return Result.Fail(complete.Error?.Code ?? FichierRevertEnAttente.CodeErreur,
+                resultat = Result.Fail(complete.Error?.Code ?? FichierRevertEnAttente.CodeErreur,
                     Docteur.T("TC.JournalEtLevier"));
+                return false;
             }
             _journal.Lever();
-            return Result.Fail(complete.Error?.Code ?? FichierRevertEnAttente.CodeErreur,
+            resultat = Result.Fail(complete.Error?.Code ?? FichierRevertEnAttente.CodeErreur,
                 Docteur.T("TC.JournalLevierRendu"));
+            return false;
         }
 
         _snapshot = r.Value;
-        portee.FermerAsync().GetAwaiter().GetResult();
-        return Result.Ok();
+        // Le rendu de l'essai part hors de la portée : il ne se journalise pas comme une pose.
+        portee.Detacher();
+        _poseEnEssai = portee;
+        resultat = Result.Ok();
+        return true;
+    }
+
+    /// <summary>Le keep ou le rendu : l'écriture de l'essai sort du journal du helper.</summary>
+    private void AcquitterLaPose()
+    {
+        if (_poseEnEssai is not { } p) return;
+        _poseEnEssai = null;
+        p.FermerAsync().GetAwaiter().GetResult();
     }
 
     public Result Revert()
@@ -120,6 +159,7 @@ public sealed class TweakCandidate : IAutopilotCandidate
         {
             _snapshot = null;
             _journal.Lever();
+            AcquitterLaPose();
         }
         return r;
     }
@@ -139,6 +179,8 @@ public sealed class TweakCandidate : IAutopilotCandidate
         // `RevertOnly` : rendue a la desinstallation, jamais reaffirmee au demarrage. Son echec ne defait
         // pas le keep (le gain est prouve, le journal local garde l'origine) : il est dit.
         OrigineHorsManifeste = InscrireOrigine(s);
+        // Gardé, le levier n'est plus un essai : le helper ne doit plus le rendre si l'App meurt.
+        AcquitterLaPose();
         return garde;
     }
 
@@ -177,7 +219,10 @@ public sealed class TweakCandidate : IAutopilotCandidate
     {
         if (_snapshot is not { } s) return Result<bool>.Ok(false);
 
-        DernierePreuve = AppliedStateVerifier.Verifier(s, _registre, _nvApi, _alimentation, _services);
-        return Result<bool>.Ok(DernierePreuve.AutoriseLaMesure);
+        DernierePreuve = AppliedStateVerifier.Verifier(s, _registre, _nvApi, _alimentation, _services, _carte);
+        // Ne pas savoir relire n'est pas « n'a pas pris » : le moteur rend le levier par prudence, et le dit tel quel.
+        return DernierePreuve.Verdict is EtatApplique.Unknown or EtatApplique.Unavailable
+            ? Result<bool>.Fail(ErrorCodes.TweakSdkUnavailable, DernierePreuve.Verdict.ToString())
+            : Result<bool>.Ok(DernierePreuve.AutoriseLaMesure);
     }
 }

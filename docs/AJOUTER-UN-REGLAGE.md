@@ -44,7 +44,9 @@ that value. An absent original is put back as absent (a deletion), not as a defa
 
 ## 4. The write-ahead journal class
 
-Before executing a write, the helper notes its "before" image, so that a crash halfway can be undone.
+Before executing a write, the helper notes its "before" image, so that a crash halfway can be undone. A session value
+(HKCU), which the App writes itself, follows the same rule in the account journal (`JournalDEcritureAnticipee.DuCompte`),
+which the App replays when it starts (`RejeuDuJournalDuCompte`).
 
 - Rule: every operation type has a class in `src/DrDxt.ElevatedHelper/Journal/ClassesDuJournal.cs` (journaled,
   reader to come, volatile, or without state).

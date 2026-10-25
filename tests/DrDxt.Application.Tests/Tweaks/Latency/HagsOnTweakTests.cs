@@ -241,6 +241,34 @@ public sealed class HagsOnTweakTests
         r.NonRemis.Should().BeEmpty();
     }
 
+    // Le helper ne réécrit HwSchMode qu'à 1 ou 2 (OpAllowlist) : une origine à 0, ou à une valeur posée par un autre outil,
+    // ne se remettrait jamais. Rien n'est écrit, et le refus se nomme.
+    [Theory]
+    [InlineData(0u)]
+    [InlineData(3u)]
+    public async Task Une_origine_que_DrDXT_ne_remettrait_pas_n_est_pas_posee(uint origine)
+    {
+        _registry.ReadDword(RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName).Returns(Result<uint?>.Ok(origine));
+
+        var r = await new HagsOnTweak(_registry, _elevated).ApplyAsync();
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.OrigineNonRendable);
+        await _elevated.DidNotReceiveWithAnyArgs().ExecuteAsync(default!, default);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(1u)]
+    [InlineData(2u)]
+    public async Task Une_origine_absente_ou_a_1_ou_2_se_pose(uint? origine)
+    {
+        _registry.ReadDword(RegistryHiveKind.LocalMachine, GraphicsDriversPath, HwSchModeName).Returns(Result<uint?>.Ok(origine));
+        _elevated.ExecuteAsync(default!, default).ReturnsForAnyArgs(Result.Ok());
+
+        (await new HagsOnTweak(_registry, _elevated).ApplyAsync()).IsOk.Should().BeTrue();
+    }
+
     [Fact]
     public void HAGS_pas_effectif_ou_une_cle_a_1_n_est_pas_exerce()
     {

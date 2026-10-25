@@ -87,6 +87,19 @@ public sealed class BiosGuideDepartTests
         vm.ErreurDepart.Should().Contain("Bios.Depart.Echec").And.Contain("Erreur.Generique").And.NotContain("UAC refusée");
     }
 
+    // Une panne n'est pas une saisie invalide : la raison technique nomme l'exception, jamais BIOS_INPUT_INVALID.
+    [Fact]
+    public async Task Une_exception_se_dit_par_son_type_pas_comme_une_saisie_invalide()
+    {
+        var vm = new BiosGuideViewModel(Guide(), k => k == "Erreur.Generique" ? "raison : {0}" : k,
+            _ => throw new InvalidOperationException("tube fermé"));
+        vm.DemanderDepartCommand.Execute(null);
+
+        await vm.ConfirmerDepartCommand.ExecuteAsync(null);
+
+        vm.ErreurDepart.Should().Contain(nameof(InvalidOperationException)).And.NotContain(ErrorCodes.BiosInputInvalid);
+    }
+
     [Fact]
     public async Task Une_exception_ne_casse_pas_l_ecran()
     {

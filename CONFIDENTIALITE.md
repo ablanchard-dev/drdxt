@@ -2,7 +2,7 @@
 
 English version: [PRIVACY.md](PRIVACY.md).
 
-DrDXT n'a ni compte, ni télémétrie, ni serveur à lui. Ce qu'il lit sur ton PC y reste, sauf les deux fichiers que tu
+DrDXT n'a ni compte, ni télémétrie, ni serveur à lui. Ce qu'il lit sur ton PC y reste, sauf les fichiers que tu
 choisis d'envoyer toi-même, plus bas.
 
 ## Ce que DrDXT lit, et où il le garde
@@ -23,15 +23,16 @@ Ce qu'il en garde reste sur ta machine :
   message) ;
 - `Documents` : seulement les fichiers que tu demandes (rapport, export de ta machine).
 
-La désinstallation retire le programme, son service et ce qu'il a posé ; ton historique reste dans
-`%LOCALAPPDATA%\DrDXT` (le détail exact est dans le README). Supprimer ce dossier et `%ProgramData%\DrDxt` efface tout.
+La désinstallation retire le programme et ses services, et rend les réglages qu'elle connaît ; ton historique reste
+dans `%LOCALAPPDATA%\DrDXT`, et le reste est listé dans le README (« Ce qui reste »). Supprimer ce dossier et `%ProgramData%\DrDxt` efface tout.
 
 ## Ce qui part sur le réseau
 
 Seulement ce que liste la section « Ce qui quitte la machine » du README : la version publique des pilotes graphiques,
 des pings, une question à ta box sur le réseau de la maison (son adresse WAN, jamais affichée), la vérification de mise à
-jour si elle est configurée, le test de ta ligne sous charge si tu le lances (`speed.cloudflare.com`), et les pages que
-tu ouvres toi-même. Rien qui te
+jour au démarrage (coupée par la variable `DRDXT_UPDATE_URL` à `off`), le test de ta ligne sous charge si tu le lances
+(`speed.cloudflare.com`), la réparation de Windows si tu la lances (DISM télécharge depuis Windows Update), et les pages
+que tu ouvres toi-même. Rien qui te
 désigne. Un test échoue si le code contacte une adresse que le README ne nomme pas.
 
 Les identifiants de ton compte Windows ne vont à un proxy que si quelqu'un l'a configuré : une variable HTTP(S)_PROXY, ou
@@ -52,9 +53,11 @@ une fois soumis, il est lisible par ceux qui voient le dépôt, sous ton compte 
 **« Exporter ma machine »** écrit un fichier dans tes Documents, que tu envoies si tu veux que ta machine serve de test.
 Avant l'écriture, DrDXT en retire :
 
+- les dossiers connus du compte lus par Windows (Documents, Bureau, AppData, AppData local, et le profil hors de X:\Users), où qu'ils soient, même redirigés : ils deviennent un repère (<Documents>, <Desktop>…), la suite du chemin reste
 - le dossier de n'importe quel compte (X:\Users\<nom>) : il devient X:\Users\joueur, la suite du chemin reste
 - le nom du compte Windows (même de deux lettres), le nom du PC et son domaine
 - les numéros de série et identifiants matériels lus sur ce PC (BIOS, carte mère, disques, mémoire, UUID de la machine, numéros de volume)
+- la fin des identifiants d'appareil (USB\VID_…&PID_…\<exemplaire>) : un numéro de série, une adresse Bluetooth ; le modèle reste
 - les adresses MAC (avec tirets, deux-points ou collées, pour celles des cartes de ce PC)
 - les adresses IP (v4 et v6) ; une version à quatre nombres (1.4.6.3) a la forme d'une adresse v4 et part aussi, sauf dans les champs de version (DriverVersion)
 - les identifiants de compte Windows (SID S-1-5-21-…)

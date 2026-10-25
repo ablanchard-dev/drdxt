@@ -38,8 +38,8 @@ public sealed class LoggingReconcilerNotifier : IReconcilerNotifier
     public Task NotifyUserIntentionalDriftAsync(
         AppliedTweak tweak, string currentValueJson, CancellationToken ct)
     {
-        // Résoudre le message localisé depuis une clé resx (pas en dur). Construit pour l'audit /
-        // l'interface ; la ligne de journal structurée ci-dessous reste neutre en langue.
+        // Le message localisé se résout ici pour qu'une clé absente se voie au premier passage ; le service n'a pas
+        // d'écran et ne l'affiche pas. La ligne de journal structurée ci-dessous reste neutre en langue.
         _ = string.Format(
             System.Globalization.CultureInfo.CurrentUICulture,
             _localizer.Get(UserDriftKey),

@@ -32,27 +32,18 @@ public sealed class FailClosedEndToEndTests
 
         // Altérer le contenu persisté.
         var slot = storage.Slot!;
-        var chars = slot.CanonicalJson.ToCharArray();
-        chars[chars.Length / 2] = chars[chars.Length / 2] == 'x' ? 'y' : 'x';
-        storage.Slot = slot with { CanonicalJson = new string(chars) };
+        // Une date changée garde un JSON valide : seule la signature peut refuser. Un caractère au hasard cassait le JSON,
+        // et le refus pouvait venir de la lecture sans que la signature soit vérifiée.
+        var altere = slot.CanonicalJson.Replace("2026", "2027", StringComparison.Ordinal);
+        altere.Should().NotBe(slot.CanonicalJson);
+        System.Text.Json.JsonDocument.Parse(altere).Dispose();
+        storage.Slot = slot with { CanonicalJson = altere };
 
         // Le chargement de l'hôte : il doit se fermer.
         var loaded = await store.LoadAsync();
         loaded.IsOk.Should().BeFalse();
         loaded.Error!.Value.Code.Should().Be(ErrorCodes.ManifestTampered);
-
-        // Comme le chargement a échoué, l'hôte n'appelle jamais ReconcileAsync. Prouver que le
-        // réconciliateur, s'il avait reçu (à tort) le DesiredState de l'attaquant, n'est jamais
-        // atteint : on vérifie simplement la porte de l'hôte. Le client de réconciliation est
-        // un enregistreur en mémoire qui doit avoir zéro écriture.
-        var h = new ReconcilerHarness();
-        h.Policy.Map("a", ReconcileSurface.Registry);
-
-        // Simuler le bon flux de contrôle de l'hôte : ne réconcilier que sur un chargement vérifié.
-        if (loaded.IsOk)
-            await h.Build().ReconcileAsync(loaded.Value!, default);
-
-        h.Reapply.Reapplies.Should().BeEmpty("tamper ⇒ load fails ⇒ nothing is ever applied (fail-closed)");
+        loaded.Value.Should().BeNull("aucun état altéré ne sort du magasin : l'hôte n'a rien à réconcilier");
     }
 
     [Fact]

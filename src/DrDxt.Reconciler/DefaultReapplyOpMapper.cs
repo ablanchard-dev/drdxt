@@ -21,7 +21,7 @@ namespace DrDxt.Reconciler;
 //
 // Fermé par construction : un tweakId inconnu (sans descripteur), une valeur illisible ou hors
 // type, ou une surface sans feuille d'op en V1 (ScheduledTask / Firmware) → Fail, aucune op.
-// Seuls les trois ids branchés en V1 se traduisent : latency.reflex.lowLatencyMode (registre
+// Seuls les ids branchés se traduisent (la table de ce fichier) : latency.reflex.lowLatencyMode et os.hags (registre
 // DWORD), fixit.sanePowerPlan (PowerPlan), fixit.x3dVCacheService (Service).
 // -----------------------------------------------------------------------
 public sealed class DefaultReapplyOpMapper : IReapplyOpMapper

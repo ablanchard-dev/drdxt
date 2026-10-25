@@ -12,7 +12,9 @@ public static class MeasurementServiceCollectionExtensions
     {
         // La vraie frontière P/Invoke derrière la couture testable.
         services.TryAddSingleton<IPresentMonApi, PresentMonApi2>();
-        // Horloge transitoire : chaque capture a un chronomètre neuf (redémarré à chaque passe de toute façon).
+        // Une horloge par session : la session est unique, donc deux captures simultanées (relevé de fond et banc du scan)
+        // partagent ce chronomètre et le redémarrent l'une pour l'autre. Seul le filet de durée en dépend quand l'instant
+        // QPC de la capture est lu.
         services.TryAddTransient<IMonotonicClock, StopwatchClock>();
         // Fabrique explicite : le constructeur de PresentMonSession est interne (il prend la couture
         // interne IPresentMonApi), l'activateur par défaut ne peut donc pas l'atteindre.

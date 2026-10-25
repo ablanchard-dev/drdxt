@@ -105,5 +105,23 @@ public sealed class LimiteDePuissanceTests
         lu.Pl2SansLimite.Should().BeTrue();
         LimiteDePuissance.CibleDeMontee(lu).Should().BeNull();
         LimiteDePuissance.CibleDeMontee(lu with { MaximaleW = 253 }).Should().Be(253);
+
+        RegistreDeLimiteCpu.Decoder(0x3, (0x7FF8UL << 32) | (1UL << 47) | (1UL << 15) | 520UL, 520UL)!.Pl2SansLimite
+            .Should().BeTrue("0x7FF8 dit 4095 W, que rien ne tire");
+        RegistreDeLimiteCpu.Decoder(0x3, (2024UL << 32) | (1UL << 47) | (1UL << 15) | 520UL, 520UL)!.Pl2SansLimite
+            .Should().BeFalse("témoin : 253 W est une vraie PL2");
+    }
+
+    // Sur un portable, une PL1 sous la puissance de base est celle du fabricant (batterie, chauffe) : à regarder, sans geste
+    // de montée ni de BIOS.
+    [Fact]
+    public void Sur_un_portable_une_limite_sous_la_base_est_a_regarder()
+    {
+        var f = LimiteDePuissance.Juger(new LimiteDePuissanceLue(28, 64, 45, Verrou: false, ChaleurEnPartieMaxC: 80), portable: true);
+
+        f.Statut.Should().Be(RepairStatus.NonDefault);
+        f.Explication.Should().Contain("portable").And.NotContain("Optimiser").And.NotContain("guide 5.3");
+        LimiteDePuissance.Juger(new LimiteDePuissanceLue(28, 64, 45, Verrou: false, ChaleurEnPartieMaxC: 80))
+            .Statut.Should().Be(RepairStatus.Suspicious, "témoin : sur un fixe, la même limite bride");
     }
 }

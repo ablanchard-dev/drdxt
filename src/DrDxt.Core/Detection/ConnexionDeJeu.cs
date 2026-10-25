@@ -14,17 +14,21 @@ public sealed record QualiteWifi(int PhyType, int QualitePct, int? RssiDbm, int?
 
     public string? Bande => Mhz switch
     {
-        >= 2400 and < 2500 => "2,4 GHz",
+        >= 2400 and < 2500 => Docteur.T("CJ.Bande24"),
         >= 5150 and < 5925 => "5 GHz",
         >= 5925 and <= 7125 => "6 GHz",
         _ => null,
     };
 
+    /// <summary>Sous -67 dBm, le seuil que les guides de conception Wi-Fi pour la voix et le temps réel (Cisco, Ekahau)
+    /// fixent comme minimum. Sans RSSI, la qualité de Windows, linéaire de -100 dBm (0 %) à -50 dBm (100 %), donne 66 %.</summary>
+    public bool Faible => RssiDbm is { } dbm ? dbm < -67 : QualitePct < 66;
+
     public string? Generation => PhyType switch { 7 => "Wi-Fi 4", 8 => "Wi-Fi 5", 10 => "Wi-Fi 6", 11 => "Wi-Fi 7", _ => null };
 
     public string Phrase()
     {
-        var morceaux = new List<string> { RssiDbm is { } dbm ? $"signal {QualitePct} % ({dbm} dBm)" : $"signal {QualitePct} %" };
+        var morceaux = new List<string> { RssiDbm is { } dbm ? Docteur.T("CJ.SignalDbm", QualitePct, dbm) : Docteur.T("CJ.Signal", QualitePct) };
         if (Bande is { } b) morceaux.Add(Canal is { } c ? Docteur.T("CJ.Canal", b, c) : b);
         if (Generation is { } g) morceaux.Add(g);
         return string.Join(", ", morceaux);
@@ -61,7 +65,8 @@ public static class ConnexionDeJeu
         if (cable)
             return new RepairFinding("RESEAU", Nom, Docteur.T("CJ.Cable"), Docteur.T("CJ.Cable"), RepairStatus.ExpectedDefault,
                 Docteur.T("CJ.CableExplication", string.Join(", ", cables.Select(c => c.Nom))));
-        return new RepairFinding("RESEAU", Nom, "Wi-Fi", Docteur.T("CJ.Cable"), RepairStatus.Suspicious,
+        // Le Wi-Fi est souvent le seul choix du logement : il n'est « à corriger » que sur un signal mesuré faible.
+        return new RepairFinding("RESEAU", Nom, "Wi-Fi", Docteur.T("CJ.Cable"), wifiLu is { Faible: true } ? RepairStatus.Suspicious : RepairStatus.NonDefault,
             Docteur.T("CJ.Wifi", string.Join(", ", sansFil.Select(c => c.Nom)), wifiLu is { } q ? $"{Docteur.DeuxPoints}{q.Phrase()}" : ""),
             RepairAction.Recommandation);
     }

@@ -3,7 +3,7 @@ using System.Globalization;
 namespace DrDxt.Core;
 
 /// <summary>Une analyse de Microsoft Defender lue dans son journal : début, fin (null si elle n'est pas finie dans la
-/// fenêtre lue), et si elle a été arrêtée avant la fin (événement 1002).</summary>
+/// fenêtre lue : encore en cours, ou coupée par un redémarrage), et si elle a été arrêtée avant la fin (événement 1002).</summary>
 public sealed record AnalyseDefender(DateTimeOffset Debut, DateTimeOffset? Fin, bool Arretee);
 
 /// <summary>
@@ -40,7 +40,11 @@ public static class AnalysesDefender
                 seulementInactif == false ? RepairStatus.Suspicious : RepairStatus.Observed,
                 Docteur.T("AD.SansPartie", bilan, reglage));
 
-        var pendant = analyses.Where(a => parties.Any(p => a.Debut < p.Fin && (a.Fin ?? a.Debut) > p.Debut)).ToList();
+        // Sans fin lue, l'analyse est encore en cours ou a été coupée (redémarrage) : elle couvre au plus jusqu'au début de
+        // l'analyse suivante, jamais toutes les parties d'après.
+        var debuts = analyses.Select(a => a.Debut).Order().ToList();
+        DateTimeOffset Fin(AnalyseDefender a) => a.Fin ?? debuts.FirstOrDefault(d => d > a.Debut, DateTimeOffset.MaxValue);
+        var pendant = analyses.Where(a => parties.Any(p => a.Debut < p.Fin && Fin(a) > p.Debut)).ToList();
         if (pendant.Count == 0)
             return new RepairFinding(Domaine, "analyses pendant tes parties", bilan, Docteur.T("AD.AucunePendant"),
                 seulementInactif == false ? RepairStatus.Suspicious : RepairStatus.ExpectedDefault,

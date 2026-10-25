@@ -75,7 +75,8 @@ public sealed class AucunBoutonGriseNEstMuetTests
     {
         var xaml = TousLesXaml();
         var orphelines = CommandesGrisables()
-            .Where(c => !xaml.Contains($"Command=\"{{Binding {c}}}\""))
+            // Un bouton d'une liste atteint sa commande par le DataContext de la liste.
+            .Where(c => !xaml.Contains($"Command=\"{{Binding {c}}}\"") && !xaml.Contains($"Command=\"{{Binding DataContext.{c},"))
             .Except(SansBoutonEnAttenteDArbitrage)
             .ToList();
 

@@ -101,7 +101,7 @@ public sealed class EcritureDansDocumentsTests : IDisposable
         ecrire = ecrire[..ecrire.IndexOf("private static", 1, StringComparison.Ordinal)];
 
         ecrire.Should().Contain("EcritureDansDocuments.Ecrire(").And.NotContain("File.WriteAllText");
-        s.Should().Contain("return EcrireDansDocuments($\"verification-drdxt-").And.Contain("=> EcrireDansDocuments(nomDeFichier, json);");
+        s.Should().Contain("return EcrireDansDocuments(string.Create(System.Globalization.CultureInfo.InvariantCulture, $\"verification-drdxt-").And.Contain("=> EcrireDansDocuments(nomDeFichier, json);");
     }
 
     // Entre le contrôle et la création, Documents ou un parent remplacé par une jonction (fenêtre élargie par un oplock) : les

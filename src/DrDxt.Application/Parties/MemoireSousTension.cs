@@ -13,12 +13,19 @@ public sealed class MemoireSousTension
 
     public static MemoireSousTension ParDefaut() => new(FichierJsonAtomique.CheminLocal("sous-tension.json"));
 
-    /// <summary>La recherche, ou null (aucune, ou un fichier abîmé : rien n'est supposé).</summary>
+    /// <summary>La recherche, ou null (aucune, ou un fichier abîmé : rien n'est supposé). Un palier hors de la table ou des
+    /// paliers stables absents sont un fichier abîmé : la reprise lèverait sur eux au démarrage.</summary>
     public RechercheSousTension? Lire()
     {
         var texte = _fichier.Read();
         if (!texte.IsOk || string.IsNullOrWhiteSpace(texte.Value)) return null;
-        try { return JsonSerializer.Deserialize<RechercheSousTension>(texte.Value); }
+        try
+        {
+            return JsonSerializer.Deserialize<RechercheSousTension>(texte.Value) is { Stables: not null } r
+                   && r.Index >= 0 && r.Index < RechercheSousTension.Paliers.Length
+                ? r
+                : null;
+        }
         catch (JsonException) { return null; }
     }
 

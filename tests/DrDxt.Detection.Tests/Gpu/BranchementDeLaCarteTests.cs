@@ -89,6 +89,17 @@ public sealed class BranchementDeLaCarteTests
         c.Explication.Should().Contain("NVIDIA GeForce RTX 4070");
     }
 
+    // L'écran principal sur la carte dédiée, un second sur la carte mère : un montage voulu (stream, discussion), à regarder.
+    // L'écran principal sur la carte mère, même avec un second sur la carte dédiée : le jeu s'y ouvre, à corriger. Principal
+    // non lu : un écran sur la carte dédiée ne démontre rien de nuisible, à regarder.
+    [Theory]
+    [InlineData("NVIDIA GeForce RTX 4070", RepairStatus.NonDefault)]
+    [InlineData("Intel(R) UHD Graphics 770", RepairStatus.Suspicious)]
+    [InlineData(null, RepairStatus.NonDefault)]
+    public void Un_second_ecran_sur_la_carte_mere_se_juge_sur_l_ecran_principal(string? principal, RepairStatus attendu)
+        => BranchementDeLaCarte.JugerEcrans([Rtx.Model, "Intel(R) UHD Graphics 770"], [Rtx, Uhd], batterie: false, principal).Single()
+            .Statut.Should().Be(attendu);
+
     [Fact]
     public void Sur_la_carte_dediee_ou_sur_un_portable_rien_n_est_dit()
     {

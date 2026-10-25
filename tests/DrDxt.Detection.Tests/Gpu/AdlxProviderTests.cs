@@ -10,10 +10,10 @@ public class AdlxProviderTests
     [Fact]
     public void Rebar_query_never_throws_and_is_unknown_when_adlx_absent()
     {
-        // Sur un runner CI sans GPU AMD / sans ADLX : doit renvoyer Unknown, pas crasher.
-        var sut = new AdlxProvider();
-        var act = () => sut.GetSmartAccessMemoryState();
-        var r = act.Should().NotThrow().Subject;
-        r.Should().BeOneOf(TriState.On, TriState.Off, TriState.Unknown);
+        // ADLX absent (pas de carte AMD, pas de pilote Adrenalin) : Unknown, jamais Off inventé, et rien ne lève.
+        new AdlxProvider(() => DrDxt.Detection.Gpu.Adlx.AdlxReglagesLus.RienLu("absent")).GetSmartAccessMemoryState()
+            .Should().Be(TriState.Unknown);
+        var act = () => new AdlxProvider(() => throw new InvalidOperationException()).GetSmartAccessMemoryState();
+        act.Should().NotThrow().Subject.Should().Be(TriState.Unknown);
     }
 }

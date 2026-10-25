@@ -27,6 +27,7 @@ public sealed class X3dCcdParkingFixTweakTests
     private const string CppcName = "CppcEnable";
     private const string GameBarPath = @"Software\Microsoft\GameBar";
     private const string GameBarName = "AllowAutoGameMode";
+    private const string GameBarEnabledName = "AutoGameModeEnabled";
     private const string Service = "AMD3DVCacheSvc";
 
     private readonly IServiceStateReader _service = Substitute.For<IServiceStateReader>();
@@ -71,9 +72,51 @@ public sealed class X3dCcdParkingFixTweakTests
         _service.GetServiceState(Service).Returns(Result<ServiceState>.Ok(ServiceState.Stopped));
         _registry.ReadDword(RegistryHiveKind.LocalMachine, CppcPath, CppcName).Returns(Result<uint?>.Ok(0u));
         _registry.ReadDword(RegistryHiveKind.CurrentUser, GameBarPath, GameBarName).Returns(Result<uint?>.Ok(0u));
+        _registry.ReadDword(RegistryHiveKind.CurrentUser, GameBarPath, GameBarEnabledName).Returns(Result<uint?>.Ok(0u));
         _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(Result.Ok()));
         return new X3dCcdParkingFixTweak(_service, _registry, _elevated);
+    }
+
+    // Le mode Jeu des Paramètres récents est AutoGameModeEnabled : AllowAutoGameMode seul le laisse éteint. Les deux sont
+    // posés, comme latency.gameModeOn, et les deux rendus à leur origine (absente : supprimée).
+    [Fact]
+    public async Task Le_mode_Jeu_pose_ses_deux_valeurs_et_rend_les_deux()
+    {
+        var t = Build();
+        _registry.ReadDword(RegistryHiveKind.CurrentUser, GameBarPath, GameBarEnabledName).Returns(Result<uint?>.Ok((uint?)null));
+
+        var r = await t.ApplyAsync();
+
+        r.IsOk.Should().BeTrue();
+        await _elevated.Received(1).ExecuteAsync(
+            Arg.Is<SetRegistryValueOp>(o => o.Path == GameBarPath && o.Name == GameBarEnabledName && o.Value == "1"),
+            Arg.Any<CancellationToken>());
+        _elevated.ClearReceivedCalls();
+
+        (await t.RevertAsync(r.Value!)).IsOk.Should().BeTrue();
+
+        await _elevated.Received(1).ExecuteAsync(
+            Arg.Is<DeleteRegistryValueOp>(o => o.Path == GameBarPath && o.Name == GameBarEnabledName), Arg.Any<CancellationToken>());
+        await _elevated.Received(1).ExecuteAsync(
+            Arg.Is<SetRegistryValueOp>(o => o.Path == GameBarPath && o.Name == GameBarName && o.Value == "0"),
+            Arg.Any<CancellationToken>());
+    }
+
+    // Sans le pilote de chipset AMD, le service AMD3DVCacheSvc n'existe pas : le levier était proposé, sa pose démarrait un
+    // service absent, échouait et défaisait tout le lot d'Optimiser. Le corriger demande le pilote, pas ce levier.
+    [Fact]
+    public async Task Sans_le_service_AMD_le_levier_n_est_ni_propose_ni_pose()
+    {
+        var t = Build();
+        _service.GetServiceState(Service).Returns(Result<ServiceState>.Ok(ServiceState.NotInstalled));
+
+        t.AppliesTo(Ryzen7950X3D(), DualCcdBadParking()).Should().BeFalse();
+        var r = await t.ApplyAsync();
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.TweakNotApplicable);
+        await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -108,8 +151,8 @@ public sealed class X3dCcdParkingFixTweakTests
     public void AppliesTo_true_only_on_dual_ccd_x3d_with_bad_parking() =>
         Build().AppliesTo(Ryzen7950X3D(), DualCcdBadParking()).Should().BeTrue();
 
-    // Les cœurs hauts du CCD à cache portent les numéros 8 à 14 : parqués, c'est le mauvais CCD. L'heuristique comparait les
-    // numéros au nombre de cœurs par CCD (8) et disait « sain ».
+    // Les cœurs hauts du CCD à cache portent les numéros 8 à 14 : parqués, c'est le mauvais CCD. Comparer les numéros au nombre
+    // de cœurs par CCD (8) dirait « sain » à tort.
     [Fact]
     public void AppliesTo_true_when_the_upper_vcache_cores_are_parked() =>
         Build().AppliesTo(Ryzen7950X3D(), StateWith(new[] { 8, 10, 12, 14 })).Should().BeTrue();

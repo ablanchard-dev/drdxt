@@ -160,4 +160,23 @@ public sealed class AccelerationSourisOffTweakTests
 
         t.PreparerExercice(Hw, State(TriState.Off)).Should().BeNull();
     }
+
+    // La pose refusée par un « Non » à l'invite : les feuilles déjà posées se rendent sans rouvrir d'invite.
+    [Fact]
+    public async Task Une_pose_refusee_a_l_invite_se_rend_sans_nouvelle_invite()
+    {
+        var t = Build();
+        var appels = new List<(PrivilegedOp Op, bool SansGeste)>();
+        _elevated.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>()).Returns(c =>
+        {
+            appels.Add((c.Arg<PrivilegedOp>(), SansGesteDuJoueur.Actif));
+            return Task.FromResult(appels.Count == 3 ? Result.Fail(ErrorCodes.ElevationDeclined, "non") : Result.Ok());
+        });
+
+        (await t.ApplyAsync()).IsOk.Should().BeFalse();
+
+        appels.Should().HaveCount(5, "trois poses, la troisième refusée, puis les deux inverses");
+        appels.Take(3).Should().OnlyContain(a => !a.SansGeste);
+        appels.Skip(3).Should().OnlyContain(a => a.SansGeste);
+    }
 }

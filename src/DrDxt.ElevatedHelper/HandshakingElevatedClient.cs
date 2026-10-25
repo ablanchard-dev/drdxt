@@ -42,11 +42,11 @@ namespace DrDxt.ElevatedHelper;
 // de PROCESS_QUERY_LIMITED_INFORMATION plutot que de Process.MainModule est fait pour ce cas
 // precis (voir PipeServerIdentity).
 //
-// Limite assumee : la comparaison porte sur le chemin de l'image, pas sur son empreinte ni
-// sur son niveau d'integrite. Un attaquant qui lancerait le vrai helper non eleve depuis le
-// vrai chemin passerait la garde, mais il echouerait alors sur les ops privilegiees, donc
-// il rendrait un echec honnete, pas un faux « applique ». Et l'injection intra-utilisateur
-// bat de toute facon toute verification d'image (risque connu et accepte, D.4).
+// Apres l'image, le privilege (PipeServerIdentity.RefusDePrivilege) : le tube appartient aux
+// Administrateurs ou a SYSTEM, et le jeton du serveur, s'il se lit, est eleve. Sans cela, un
+// programme non eleve du compte qui lancerait le vrai helper non eleve depuis le vrai chemin
+// passerait la garde d'image. L'injection intra-utilisateur bat de toute facon toute
+// verification d'image (risque connu et accepte, D.4).
 //
 // La latence de démarrage s'absorbe ici, dans la connexion de la vraie op : une boucle de
 // reprise de connexion bornée (échecs repris toutes les ~pollIntervalMs jusqu'à
@@ -183,10 +183,11 @@ public sealed class HandshakingElevatedClient : IElevatedClient
         }
     }
 
-    // La garde. Quatre refus nommes, aucun silence, aucun repli : « pas de chemin attendu »,
-    // « processus introuvable », « image illisible » et « mauvaise image » se distinguent dans
-    // le message, parce qu'ils ne se corrigent pas pareil. Un seul chemin rend Ok : celui ou
-    // l'image du serveur est le helper attendu.
+    // La garde. Des refus nommes, aucun silence, aucun repli : « pas de chemin attendu »,
+    // « processus introuvable », « image illisible », « mauvaise image », puis le privilege
+    // (proprietaire du tube, jeton non eleve) se distinguent dans le message, parce qu'ils ne se
+    // corrigent pas pareil. Un seul chemin rend Ok : l'image du serveur est le helper attendu, et
+    // il tient les droits du helper.
     private Result AuthentifierLeServeur(NamedPipeClientStream client)
     {
         if (_cheminHelperAttendu is null)
@@ -207,9 +208,11 @@ public sealed class HandshakingElevatedClient : IElevatedClient
             return Refus("pipe server not authenticated: its image path is unreadable.");
         }
 
-        return string.Equals(attendu, trouve, StringComparison.OrdinalIgnoreCase)
-            ? Result.Ok()
-            : Refus($"pipe server not authenticated: expected process {attendu}, found {trouve}.");
+        if (!string.Equals(attendu, trouve, StringComparison.OrdinalIgnoreCase))
+            return Refus($"pipe server not authenticated: expected process {attendu}, found {trouve}.");
+        return PipeServerIdentity.RefusDePrivilege(client) is { } pourquoi
+            ? Refus($"pipe server not authenticated: {pourquoi}.")
+            : Result.Ok();
     }
 
     private static Result Refus(string pourquoi) => Result.Fail(ErrorCodes.ElevationDenied, pourquoi);

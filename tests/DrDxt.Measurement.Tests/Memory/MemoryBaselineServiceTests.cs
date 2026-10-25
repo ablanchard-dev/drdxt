@@ -75,7 +75,25 @@ public class MemoryBaselineServiceTests
         service.MesureraPourScan("MACHINE-A", Barrettes(mts), jeu).Should().Be(attendu);
         service.ProvenChannelsForScan("MACHINE-A", Barrettes(mts), jeu);
         (banc.Lancements > avant).Should().Be(attendu, "l'annonce et le scan suivent la même règle");
-        fichier.Should().NotBeNull();
+    }
+
+    // Le joueur ajoute une barrette, ou déplace les siennes, à la même fréquence : la référence décrivait une autre
+    // configuration, et relue telle quelle elle gardait « un seul canal probable » sur une machine corrigée.
+    [Fact]
+    public void Une_reference_prise_avec_d_autres_barrettes_n_est_plus_celle_de_la_machine()
+    {
+        var (service, banc, _) = Monter(Mesure(17.0));
+        MemoryModule[] une = [new("PN", "Kingston", 3200, 3200, DeviceLocator: "DIMMA1")];
+        MemoryModule[] deplacees = [new("PN", "Kingston", 3200, 3200, DeviceLocator: "DIMMA2")];
+        MemoryModule[] deux = [.. une, new("PN", "Kingston", 3200, 3200, DeviceLocator: "DIMMB1")];
+        service.ProvenChannelsForScan("MACHINE-A", une);
+
+        service.MesureCourante("MACHINE-A", une).Should().NotBeNull();
+        service.MesureCourante("MACHINE-A", deux).Should().BeNull();
+        service.MesureCourante("MACHINE-A", deplacees).Should().BeNull();
+        service.MesureraPourScan("MACHINE-A", deux).Should().BeTrue();
+        service.MesureraPourScan("MACHINE-A", deplacees).Should().BeTrue();
+        banc.Lancements.Should().Be(1);
     }
 
     [Fact]

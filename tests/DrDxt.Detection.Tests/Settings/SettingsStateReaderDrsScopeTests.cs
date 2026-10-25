@@ -142,8 +142,8 @@ public class SettingsStateReaderDrsScopeTests
 
     // L'en-tête officiel NvApiDriverSettings.h (github.com/NVIDIA/nvapi) donne six valeurs à
     // PREFERRED_PSTATE, et sa valeur par défaut est OPTIMAL_POWER (5), pas ADAPTIVE (0). Seul 1 (PREFER_MAX) est « au
-    // maximum » : toute autre valeur LUE de l'en-tête dit « pas au maximum ». Avant, 2 à 5 rendaient Unknown, et le levier
-    // n'était jamais proposé sur une carte au réglage par défaut du pilote.
+    // maximum » : toute autre valeur LUE de l'en-tête dit « pas au maximum ». Lues Unknown, 2 à 5 feraient que le levier
+    // ne serait jamais proposé sur une carte au réglage par défaut du pilote.
     [Theory]
     [InlineData(0u)]
     [InlineData(2u)]

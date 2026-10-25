@@ -67,12 +67,17 @@ public sealed class ReglageCarteExpert(GpuUndervoltTweak levier, GpuTuningTarget
 }
 
 /// <summary>Le bail perdu, le helper a rendu l'origine : le journal n'a plus rien à rendre (sinon l'Expert et l'autopilote se
-/// croiraient « encore en essai » jusqu'au redémarrage de l'App).</summary>
+/// croiraient « encore en essai » jusqu'au redémarrage de l'App). Seulement si le journal tient encore ce levier : il n'en tient
+/// qu'un, et un bail perdu qui signale tard effacerait l'entrée d'un autre levier posé entre-temps.</summary>
 internal static class SuiviDuBail
 {
-    public static bool LeverAuBailPerdu(HeartbeatSender bail, IRevertEnAttente journal)
+    public static bool LeverAuBailPerdu(HeartbeatSender bail, IRevertEnAttente journal, string tweakId)
     {
-        bail.Perdu += () => journal.Lever();
+        bail.Perdu += () =>
+        {
+            if (journal.Lire() is { IsOk: true, Value: { } entree } && string.Equals(entree.TweakId, tweakId, StringComparison.Ordinal))
+                journal.Lever();
+        };
         return true;
     }
 }
@@ -91,7 +96,7 @@ public interface IEssaiCarte : IAsyncDisposable
 public sealed class EssaiCarte(GpuUndervoltTweak levier, IRevertEnAttente journal, TweakSnapshot snapshot, HeartbeatSender bail)
     : IEssaiCarte
 {
-    private readonly bool _journalSuitLeBail = SuiviDuBail.LeverAuBailPerdu(bail, journal);
+    private readonly bool _journalSuitLeBail = SuiviDuBail.LeverAuBailPerdu(bail, journal, snapshot.TweakId);
 
     public TweakSnapshot Snapshot { get; } = snapshot;
 

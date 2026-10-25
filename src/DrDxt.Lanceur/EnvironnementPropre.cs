@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace DrDxt.Lanceur;
 
@@ -61,6 +63,69 @@ public static class EnvironnementPropre
             if (!string.IsNullOrEmpty(s.Architecture)) env["PROCESSOR_ARCHITECTURE"] = s.Architecture;
         }
         return env;
+    }
+
+    /// <summary>Le TEMP des processus élevés et de leurs fils (dism et PowerShell du helper, logman et .etl de l'App élevée),
+    /// jamais celui du compte : %LOCALAPPDATA%\Temp s'écrit sans droits, un programme du compte y préparerait un fichier ou une
+    /// jonction qu'un processus élevé ouvrirait. SystemTemp (SYSTEM et Administrateurs seuls) quand il est sûr ; sinon
+    /// ProgramData\DrDxt\temp, créé seulement sous un ProgramData\DrDxt sûr ; sinon Windows\Temp, où les comptes créent
+    /// mais ne touchent pas aux fichiers des autres.</summary>
+    public static string DossierTemporaire(string dossierWindows, string? programData, Func<string, bool> sur, Action<string> creer)
+    {
+        var w = dossierWindows.TrimEnd('\\');
+        var systemTemp = Path.Combine(w, "SystemTemp");
+        if (sur(systemTemp)) return systemTemp;
+        if (!string.IsNullOrEmpty(programData))
+        {
+            var drdxt = Path.Combine(programData, "DrDxt");
+            var temp = Path.Combine(drdxt, "temp");
+            if (sur(drdxt))
+            {
+                creer(temp);
+                if (sur(temp)) return temp;
+            }
+        }
+        return Path.Combine(w, "Temp");
+    }
+
+    private static readonly SecurityIdentifier[] Confiance =
+    [
+        new(WellKnownSidType.LocalSystemSid, null),
+        new(WellKnownSidType.BuiltinAdministratorsSid, null),
+        new("S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"), // NT SERVICE\TrustedInstaller
+    ];
+
+    private const FileSystemRights Ecriture =
+        FileSystemRights.WriteData | FileSystemRights.AppendData | FileSystemRights.Delete
+        | FileSystemRights.DeleteSubdirectoriesAndFiles | FileSystemRights.ChangePermissions
+        | FileSystemRights.TakeOwnership | FileSystemRights.WriteExtendedAttributes;
+
+    /// <summary>Le dossier existe, ni lui ni ses parents ne sont des jonctions ou des liens, son propriétaire est SYSTEM,
+    /// Administrateurs ou TrustedInstaller, et lui seuls y écrivent ou y créent. La règle de CheminProtege (DrDxt.Core,
+    /// que le lanceur natif ne référence pas). Illisible : non.</summary>
+    public static bool DossierSur(string chemin)
+    {
+        try
+        {
+            var dossier = new DirectoryInfo(Path.GetFullPath(chemin));
+            if (!dossier.Exists) return false;
+            for (var d = dossier; d is not null; d = d.Parent)
+                if (d.Attributes.HasFlag(FileAttributes.ReparsePoint)) return false;
+            var acl = dossier.GetAccessControl();
+            if (acl.GetOwner(typeof(SecurityIdentifier)) is not SecurityIdentifier proprio || !Confiance.Contains(proprio)) return false;
+            foreach (FileSystemAccessRule r in acl.GetAccessRules(true, true, typeof(SecurityIdentifier)))
+            {
+                if (r.AccessControlType != AccessControlType.Allow || r.PropagationFlags.HasFlag(PropagationFlags.InheritOnly)) continue;
+                if ((r.FileSystemRights & Ecriture) == 0) continue;
+                if (r.IdentityReference is SecurityIdentifier sid && Confiance.Contains(sid)) continue;
+                return false;
+            }
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>Les dossiers du système que l'audit de santé lit par leurs variables ; lus aux API par le lanceur.</summary>

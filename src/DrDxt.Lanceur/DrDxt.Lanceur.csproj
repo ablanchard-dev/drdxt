@@ -26,4 +26,10 @@
     <InternalsVisibleTo Include="DrDxt.ElevatedHelper.Tests" />
   </ItemGroup>
 
+  <!-- L'éditeur de liens natif écrit le chemin complet du .pdb dans l'exécutable (C:\Users\<développeur>\...) ;
+       ContinuousIntegrationBuild ne neutralise que le code managé. Seul le nom du fichier reste. -->
+  <ItemGroup>
+    <LinkerArg Include="/PDBALTPATH:%_PDB%" />
+  </ItemGroup>
+
 </Project>

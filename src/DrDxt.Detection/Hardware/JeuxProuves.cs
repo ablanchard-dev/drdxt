@@ -66,7 +66,7 @@ public static class JeuxProuves
                     if (exe is null && d.Lanceur == "Steam") continue;
                     var info = Path.Combine(c, ".build.info");
                     var version = exe is null ? null
-                        : (File.Exists(info) ? VersionBattleNet(File.ReadAllText(info)) : null)
+                        : (File.Exists(info) ? VersionBattleNet(FichierTiers.Lire(info)) : null)
                           ?? FileVersionInfo.GetVersionInfo(Path.Combine(c, exe)).FileVersion;
                     jeux.Add(new Jeu(d.Lanceur, c, exe, version));
                 }

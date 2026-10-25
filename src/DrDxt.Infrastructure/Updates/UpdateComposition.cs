@@ -11,7 +11,7 @@ namespace DrDxt.Infrastructure.Updates;
 // rien dans une suite de tests verte ne le dit.
 //
 // ══ l'absence d'url est un etat, pas une panne ══
-// Le serveur n'est deploye nulle part a ce jour (aucune URL dans le depot ; c'est un geste de publication).
+// Sans URL de mises a jour (ni configuree, ni par defaut dans l'App), il n'y a rien a interroger.
 // Le montage doit donc pouvoir refuser de se faire, proprement et une seule fois, plutot que de
 // produire un updater qui echouera a chaque tour en accusant le reseau. La difference n'est pas
 // cosmetique : « pas configure » se corrige en configurant, « hors ligne » envoie chercher une
@@ -22,31 +22,33 @@ public static class UpdateComposition
     /// <summary>Le chemin du manifeste pour un canal : la meme chaine que la route du serveur
     /// (`/updates/{canal}/manifest`, canal en minuscules). Expose plutot que recopie : un chemin
     /// ecrit deux fois est un chemin qui divergera, et la divergence se presenterait au client
-    /// comme un 404, c'est-a-dire comme « rien a offrir » : un silence, pas une erreur.</summary>
+    /// comme un 404, c'est-a-dire comme « rien de publie » : un silence, pas une erreur.</summary>
     public static string ManifestPath(UpdateChannel channel)
         => "/updates/" + channel.ToString().ToLowerInvariant() + "/manifest";
 
     /// <summary>La racine garde son chemin. <c>new Uri(racine, "/updates/…")</c> le remplaçait :
-    /// https://ablanchard-dev.github.io/drdxt devenait https://ablanchard-dev.github.io/updates/…, un 404 lu comme
-    /// « rien à offrir », et aucune copie installée n'aurait reçu de mise à jour.</summary>
+    /// https://ablanchard-dev.github.io/drdxt deviendrait https://ablanchard-dev.github.io/updates/…, un 404 lu comme
+    /// « rien de publié », et aucune copie installée ne recevrait de mise à jour.</summary>
     public static string UrlDuManifeste(Uri racine, UpdateChannel channel)
         => racine.GetLeftPart(UriPartial.Path).TrimEnd('/') + ManifestPath(channel);
+
+    /// <summary>Le dossier où l'installeur vérifié attend le clic (payload.pkg, puis DrDXT-Setup-&lt;v&gt;.exe).</summary>
+    public static string DossierDuStagingApp(string localAppDataRoot)
+        => Path.Combine(localAppDataRoot, "DrDXT", "staging", "app-staging");
 
     /// <summary>Monte l'updater, ou dit pourquoi il ne peut pas l'etre.</summary>
     /// <param name="manifestBaseUrl">Racine du serveur de mise a jour. Vide/absente ⇒ refus.</param>
     /// <param name="pinnedClient">Le client HTTP injecte, non epingle :
     /// aucune fabrique n'epingle le serveur de mise a jour, qui n'a pas encore d'empreintes.</param>
     /// <param name="localAppDataRoot">Racine des donnees locales (staging de l'installeur).</param>
-    /// <param name="appInstallDir">Le dossier d'installation, pour l'echange eleve.</param>
     /// <param name="installedVersion">La version installee (regle de non-retrogradation).</param>
     public static Result<AutoUpdater> TryCreate(
         string? manifestBaseUrl,
         HttpClient pinnedClient,
         string localAppDataRoot,
-        string appInstallDir,
         string installedVersion,
         // Les tests seuls fournissent un verificateur (la clef de dev). null = la clef de production
-        // (UpdateTrust), absente aujourd'hui ⇒ aucun montage.
+        // (UpdateTrust) ; absente ou de dev ⇒ aucun montage.
         IUpdateVerifier? verifier = null)
     {
         if (string.IsNullOrWhiteSpace(manifestBaseUrl))
@@ -87,9 +89,7 @@ public static class UpdateComposition
             feed,
             porte.Value!,
             new LocalFileSystemUpdateStore(),
-            new DeferredElevatedFileReplacer(),
             Path.Combine(localAppDataRoot, "DrDXT", "staging"),
-            appInstallDir,
             installedVersion));
     }
 }

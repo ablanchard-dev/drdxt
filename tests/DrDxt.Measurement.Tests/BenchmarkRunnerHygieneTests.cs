@@ -1,4 +1,4 @@
-using DrDxt.Core;
+﻿using DrDxt.Core;
 using DrDxt.Measurement.PresentMon;
 using FluentAssertions;
 using NSubstitute;
@@ -35,9 +35,31 @@ public class BenchmarkRunnerHygieneTests
     {
         var s = Substitute.For<IPresentMonSession>();
         s.IsServiceAvailable().Returns(Result<bool>.Ok(true));
+        // Une passe qui dure : la sonde de premier plan a le temps d'être lue pendant elle, comme en vrai.
         s.CaptureAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
-         .Returns(Result<FrameCapture>.Ok(Capture(frames)));
+         .Returns(async _ => { await Task.Delay(300); return Result<FrameCapture>.Ok(Capture(frames)); });
         return s;
+    }
+
+    /// <summary>La sonde de premier plan : le jeu (pid 1234) devant, ou une autre fenêtre.</summary>
+    private sealed class Sonde(bool jeuDevant) : IForegroundProbe
+    {
+        public int? ForegroundProcessId() => jeuDevant ? 1234 : 4321;
+    }
+
+    private static BenchmarkRunner Banc(IReadOnlyList<double> serie, bool jeuDevant) => new(Session(serie), foreground: new Sonde(jeuDevant));
+
+    /// <summary>Écran à 60 Hz, V-Sync : quand la carte ne tient plus 60 i/s, le jeu tombe à 30 i/s réguliers.</summary>
+    private static IEnumerable<double> VSync(int secondes, double ms)
+    {
+        var restant = secondes * 1000.0;
+        var i = 0;
+        while (restant > 0)
+        {
+            var v = ms + (i++ % 3 - 1) * 0.25;
+            yield return v;
+            restant -= v;
+        }
     }
 
     /// <summary>Un plafond hors focus : 30 fps NET pendant `secondes`, la signature d'un jeu
@@ -75,7 +97,7 @@ public class BenchmarkRunnerHygieneTests
         var serie = Jeu(60, 1).Concat(Plafond(10)).Concat(Jeu(60, 2)).ToList();
         var brut = FrametimeStatistics.AvgFps(serie);
 
-        var r = await new BenchmarkRunner(Session(serie)).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
+        var r = await Banc(serie, jeuDevant: false).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
 
         r.IsOk.Should().BeTrue();
         r.Value!.FrameTimesMs.Should().HaveCountLessThan(serie.Count, "les secondes de plafond sortent");
@@ -90,7 +112,7 @@ public class BenchmarkRunnerHygieneTests
         // ratio de la frame i se lit sur une autre frame. Aucune exception, un chiffre faux.
         var serie = Jeu(60, 3).Concat(Plafond(10)).Concat(Jeu(60, 4)).ToList();
 
-        var r = await new BenchmarkRunner(Session(serie)).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
+        var r = await Banc(serie, jeuDevant: false).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
 
         r.IsOk.Should().BeTrue();
         var garde = r.Value!.FrameTimesMs.Count;
@@ -113,13 +135,27 @@ public class BenchmarkRunnerHygieneTests
         // C'est `AbComparer.Evidence` qui s'en sert pour REFUSER de comparer l'incomparable.
         var serie = Jeu(60, 10).Concat(Plafond(20)).Concat(Jeu(60, 11)).ToList();
 
-        var r = await new BenchmarkRunner(Session(serie)).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
+        var r = await Banc(serie, jeuDevant: false).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
 
         r.Value!.HygieneKeptFraction.Should().NotBeNull("un champ que personne ne remplit est un orphelin");
         r.Value.HygieneKeptFraction.Should().BeLessThan(1.0, "le plafond hors focus a bien ete retire");
         r.Value.HygieneKeptFraction.Should().BeApproximately(
             (double)r.Value.FrameTimesMs.Count / serie.Count, 1e-9,
             "l'exposition doit etre le rapport reel, pas une estimation");
+    }
+
+    // Le jeu passe 97 % de la passe derrière une autre fenêtre : le masque refuse de tout retirer et garde la série
+    // entière. L'exposition dit pourtant ce qui était du jeu, sinon l'A/B compare 1,0 à 1,0 et juge un plafond hors focus.
+    [Fact]
+    public async Task Quand_l_hygiene_refuse_de_filtrer_l_exposition_reste_celle_du_jeu()
+    {
+        var serie = Jeu(3, 20).Concat(Plafond(97)).ToList();
+
+        var r = await Banc(serie, jeuDevant: false).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
+
+        r.IsOk.Should().BeTrue();
+        r.Value!.FrameTimesMs.Should().HaveCount(serie.Count, "le masque a refusé : la série reste entière");
+        r.Value.HygieneKeptFraction.Should().BeLessThan(0.9);
     }
 
     [Fact]
@@ -140,7 +176,7 @@ public class BenchmarkRunnerHygieneTests
         // gardent toutes leurs trames. Le branchement ne doit rien changer pour elles.
         var serie = Jeu(120, 5).ToList();
 
-        var r = await new BenchmarkRunner(Session(serie)).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
+        var r = await Banc(serie, jeuDevant: false).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
 
         r.Value!.FrameTimesMs.Should().HaveCount(serie.Count);
     }
@@ -157,8 +193,49 @@ public class BenchmarkRunnerHygieneTests
 
         var serie = Jeu(60, 6).Concat(rame).Concat(Jeu(60, 7)).ToList();
 
-        var r = await new BenchmarkRunner(Session(serie)).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
+        var r = await Banc(serie, jeuDevant: false).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
 
         r.Value!.FrameTimesMs.Should().HaveCount(serie.Count, "aucune trame de gameplay ne se supprime");
+    }
+
+    // Le relevé capture une partie par fenêtres d'une minute : chercher un « démarrage » au début de chacune retirait ses
+    // premières secondes lentes, les pires images d'un combat, et le 1 % low montait. En pleine partie, il n'y a rien à couper.
+    [Fact]
+    public async Task En_pleine_partie_les_premieres_secondes_lentes_restent()
+    {
+        var serie = Enumerable.Repeat(11.1, 900).Concat(Enumerable.Repeat(6.67, 7500)).ToList();
+
+        var horsPartie = await Banc(serie, jeuDevant: false).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
+        BenchmarkResult enPartie;
+        using (MesureEnPartie.Ouvrir())
+            enPartie = (await Banc(serie, jeuDevant: false).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default)).Value!;
+
+        horsPartie.Value!.FrameTimesMs.Count.Should().BeLessThan(serie.Count, "hors partie, le démarrage lent est coupé");
+        enPartie.FrameTimesMs.Count.Should().Be(serie.Count);
+        enPartie.P1LowFps.Should().BeApproximately(1000 / 11.1, 0.5);
+    }
+
+    // Le jeu au premier plan tout du long, en V-Sync, tombe de 60 à 30 i/s réguliers pendant 20 s. Lentes et régulières,
+    // ces secondes ressemblent à un plafond hors focus ; la sonde dit que le joueur les a vues. Elles restent dans la mesure.
+    [Fact]
+    public async Task Une_chute_V_Sync_au_premier_plan_reste_dans_la_mesure()
+    {
+        var serie = VSync(40, 1000.0 / 60).Concat(VSync(20, 1000.0 / 30)).ToList();
+
+        var r = await Banc(serie, jeuDevant: true).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
+
+        r.Value!.FrameTimesMs.Should().HaveCount(serie.Count, "aucune seconde jouée au premier plan n'est hors focus");
+        r.Value.AvgFps.Should().BeApproximately(FrametimeStatistics.AvgFps(serie), 1e-6);
+    }
+
+    // Sans sonde, le premier plan est inconnu : « je n'ai pas pu regarder » ne devient jamais « il n'était pas là ».
+    [Fact]
+    public async Task Sans_signal_de_premier_plan_aucune_seconde_n_est_ecartee_comme_hors_focus()
+    {
+        var serie = Jeu(60, 20).Concat(Plafond(10)).Concat(Jeu(60, 21)).ToList();
+
+        var r = await new BenchmarkRunner(Session(serie)).RunAsync(1234, TimeSpan.FromSeconds(1), 1, default);
+
+        r.Value!.FrameTimesMs.Should().HaveCount(serie.Count);
     }
 }

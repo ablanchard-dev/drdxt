@@ -20,14 +20,14 @@ public sealed class LecturePawnIoAmdTests
     {
         var canal = TimingsMemoireAmd.Registres.ToDictionary(r => r, r => 0x11223344u);
 
-        var l = LecturePawnIoAmd.Lignes(true, Zen4, 52.25, [50, 51.5], 1u << 1, (0x4C, 0x00544500), [canal]);
+        var l = LecturePawnIoAmd.Lignes(true, Zen4, 52.25, [50, 51.5], 1u << 1, (0x4C, 0x00544500), [(2, (IReadOnlyDictionary<uint, uint>)canal)]);
 
         l.Should().Contain("Génération    : Zen 4")
             .And.Contain("Tctl          : 52.3 °C")
             .And.Contain("CCD           : 50.0 °C ; 51.5 °C")
             .And.Contain("S5 (reset)    : 0x00000002, bits 1")
             .And.Contain("SMU           : version 0x00544500, nom de code 76");
-        l.Should().ContainSingle(x => x.StartsWith("Timings canal 0 : ", StringComparison.Ordinal))
+        l.Should().ContainSingle(x => x.StartsWith("Timings canal 2 : ", StringComparison.Ordinal))
             .Which.Should().Contain($"{TimingsMemoireAmd.Registres[0]:X5}=11223344");
     }
 

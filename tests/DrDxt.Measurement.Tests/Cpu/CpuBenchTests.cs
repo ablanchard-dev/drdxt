@@ -85,4 +85,20 @@ public class CpuBenchTests
         r.Threads.Should().Be(1, "on prefere mesurer un thread que rendre une division par zero");
         r.MopsParThread.Should().BeGreaterThan(0);
     }
+
+    // Un masque d'affinité tient 64 processeurs : au-delà (Threadripper, plusieurs groupes), 1 << 64 revient à 1 << 0
+    // en C#, et le banc s'épinglait sur le processeur 0 en se croyant sur le bon.
+    [Theory]
+    [InlineData(64)]
+    [InlineData(65)]
+    [InlineData(-1)]
+    public void Un_processeur_hors_du_masque_d_affinite_n_a_pas_de_masque(int index)
+        => CpuBench.MasqueDe(index).Should().BeNull();
+
+    [Fact]
+    public void Le_masque_d_un_processeur_porte_son_seul_bit()
+    {
+        CpuBench.MasqueDe(0).Should().Be(1UL);
+        CpuBench.MasqueDe(63).Should().Be(1UL << 63);
+    }
 }

@@ -1,8 +1,11 @@
 namespace DrDxt.Core;
 
-// Obligatoire : les codes littéraux ne doivent jamais être éparpillés ailleurs.
+// Obligatoire : les codes d'erreur vivent ici, jamais en littéral ailleurs. Seuls les codes de magasin que chaque magasin
+// donne à FichierJsonAtomique sont choisis par lui (FichierJsonAtomique le prévoit).
 public static class ErrorCodes
 {
+    public const string RedirectionTrust = "REDIRECTION_TRUST";
+
     public const string DetectionFailed = "DETECTION_FAILED";
     public const string BenchmarkFailed = "BENCHMARK_FAILED";
     public const string RestorePointBlocked = "RESTORE_POINT_BLOCKED";
@@ -55,9 +58,17 @@ public static class ErrorCodes
     public const string UpdateExpired = "UPDATE_EXPIRED";
     public const string OpNotAllowed = "OP_NOT_ALLOWED";
     public const string IoFailure = "IO_FAILURE";
+    // L'origine lue est une valeur que le helper ne réécrirait pas (hors de sa liste blanche) : poser serait sans retour,
+    // rien n'est écrit.
+    public const string OrigineNonRendable = "ORIGINE_NON_RENDABLE";
+    // Compte Windows standard : le helper tournerait sous l'administrateur qui a donné son mot de passe, et son tube refuse
+    // l'App du joueur. Rien n'est demandé, rien n'est écrit par le helper.
+    public const string CompteStandard = "STANDARD_ACCOUNT";
 
     // Codes de détection
     public const string WmiFail          = "DET.WMI_FAIL";
+    // WMI n'a pas répondu dans le délai : winmgmt figé, pas une panne passagère (jamais rejoué).
+    public const string WmiTimeout       = "DET.WMI_TIMEOUT";
     public const string DxgiFail         = "DET.DXGI_FAIL";
     public const string NvapiUnavailable = "DET.NVAPI_UNAVAIL";
     public const string AdlxUnavailable  = "DET.ADLX_UNAVAIL";
@@ -149,6 +160,8 @@ public static class ErrorCodes
     // La Restauration du système est coupée et ne peut pas être activée (GPO/SKU/verrouillée)
     // → blocage, jamais d'avance sans point de restauration vérifié.
     public const string RestoreDisabled  = "SAFETY.RESTORE_DISABLED";
+    /// <summary>Une stratégie de Windows (DisableSR) interdit la restauration système : le joueur ne peut pas l'activer.</summary>
+    public const string RestorePolicy    = "SAFETY.RESTORE_POLICY";
     // La Restauration du système est coupée et l'utilisateur a refusé de l'activer → blocage.
     public const string RestoreDeclined  = "SAFETY.RESTORE_DECLINED";
     // La création (ou la vérification) du point de restauration a échoué → blocage, rien d'appliqué.
@@ -181,6 +194,9 @@ public static class ErrorCodes
     // test de stabilité a vu un blocage, un artefact ou un plantage → il s'est annulé
     // aussitôt et rend ceci. On ne rend jamais Ok quand le GPU est instable.
     public const string TweakUnstable = "TWEAK.UNSTABLE";
+    // Le test de stabilité n'a pas pu juger la carte (non concluant, délai dépassé, banc en panne) : le réglage est rendu
+    // aussitôt comme pour une instabilité, mais rien n'a vu la carte instable, et l'écran ne doit pas le dire.
+    public const string TweakStabiliteNonJugee = "TWEAK.STABILITY_NOT_JUDGED";
     // Le chemin de réglage GPU n'a pas pu être prouvé inscriptible sur cette carte et ce pilote :
     // la sonde de capacité avant application (réécriture de l'origine relevée + relecture)
     // a échoué ou relu une autre valeur. La règle :

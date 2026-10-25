@@ -6,7 +6,8 @@ namespace DrDxt.Application.Parties;
 /// <summary>
 /// Un changement (réglage du BIOS, levier, bascule) suivi d'un arrêt brutal ou d'une erreur
 /// matérielle dans la semaine est la première piste ; le docteur rapprochait déjà les incidents des pilotes installés,
-/// pas des réglages. Une semaine sans incident après un changement se dit aussi : c'est ce qui permet de le garder.
+/// pas des réglages. Pendant la semaine qui suit un changement, l'absence d'incident se dit aussi (« pour l'instant ») ; une
+/// fois la semaine passée sans incident, plus rien n'est dit.
 /// Pur : le journal des changements, les dates d'arrêts et d'erreurs, et l'heure, viennent de l'appelant.
 /// </summary>
 public static class StabiliteApresChangement

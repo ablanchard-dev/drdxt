@@ -69,8 +69,8 @@ public class IntelGpuAdvisorTests
     [Fact]
     public void Says_out_loud_that_there_is_no_intel_tuning_path()
     {
-        // Le refus de tuning doit être DIT. Aujourd'hui il est silencieux —
-        // GpuGating.IsTunableDiscreteGpu n'autorise que NVIDIA/AMD et la carte disparaît.
+        // Le refus de tuning doit être DIT : GpuGating.IsTunableDiscreteGpu n'autorise que NVIDIA/AMD, et sans ce conseil
+        // la carte disparaîtrait sans un mot.
         var advice = IntelGpuAdvisor.Advise(new[] { ArcA770(TriState.On) });
 
         advice.Select(a => a.Id).Should().Contain("gpu.intel.no_tuning_path");

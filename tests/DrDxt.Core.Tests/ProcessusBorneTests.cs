@@ -70,9 +70,11 @@ public sealed class ProcessusBorneTests
         var debut = DateTime.Now.AddSeconds(-1);
         var chrono = Stopwatch.StartNew();
 
-        var r = ProcessusBorne.Executer(Cmd("start /b ping -n 8 127.0.0.1 & echo parti"), TimeSpan.FromSeconds(1));
+        // Le PING vit une demi-minute, la borne laisse à cmd le temps de démarrer sur un runner lent : rendre la main
+        // avant 15 s prouve qu'on n'attend pas le petit-enfant qui tient les flux.
+        var r = ProcessusBorne.Executer(Cmd("start /b ping -n 30 127.0.0.1 & echo parti"), TimeSpan.FromSeconds(10));
 
-        chrono.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(4.5), "borne d'une seconde, plancher de deux pour les flux");
+        chrono.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(15), "cmd rend la main tout de suite, plancher de deux secondes pour les flux");
         r.Fini.Should().BeTrue("l'outil lui-même a rendu la main");
         r.Code.Should().Be(0);
         r.Sortie.Should().Contain("parti");

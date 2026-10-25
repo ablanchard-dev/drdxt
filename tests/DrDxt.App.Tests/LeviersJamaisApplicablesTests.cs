@@ -23,6 +23,8 @@ public sealed class LeviersJamaisApplicablesTests
         ["gpu.fan_curve"] = "jamais proposé par l'autopilote ; le ventilateur s'écrit en mode Expert (VentilateurExpert)",
         ["latency.render_queue_cap"] = "s'ouvre sur la file lue au profil du jeu en cours (pilote NVIDIA ou ADLX) : RenderQueueCapTweakTests",
         ["latency.vrr_vsync_cap"] = "s'ouvre sur un écran VRR lu par le pilote : VrrVsyncCapConfigTweakTests, VrrVsyncCapAmdTests",
+        ["latency.gameDvrBackgroundOff"] = "s'ouvre sur « Enregistrer ce qui s'est passé » actif, lu dans le registre du compte, que les machines enregistrées ne portent pas : GameDvrBackgroundOffTweakTests",
+        ["latency.vrrFlipModelOn"] = "s'ouvre sur DirectXUserGlobalSettings lu dans le registre du compte, que les machines enregistrées ne portent pas : VrrFlipModelOnTweakTests",
         ["fixit.heures_actives"] = "s'ouvre sur des heures actives « manuelles » lues et des parties datées dans le fuseau local : HeuresActivesTweakTests",
     };
 

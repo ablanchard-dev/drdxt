@@ -51,6 +51,20 @@ public sealed class DesinstallationInstalleurTests
     // survivait à une réinstallation sans geste du joueur. Le plafond est rendu avant (le service est arrêté au
     // désinstallement, puis [UninstallRun] lance RemoveUploadCapOp) : [UninstallDelete] tourne en dernier. Le fichier exact,
     // jamais le dossier : la racine porte aussi la clé et le manifeste de la machine.
+    // Le désinstalleur est administrateur : un dossier du compte peut être une jonction vers un dossier que le compte ne peut
+    // pas vider lui-même. Aucun dossier entier n'y part.
+    [Fact]
+    public void Aucun_dossier_du_compte_ne_se_vide_en_administrateur()
+    {
+        var iss = File.ReadAllText(Path.Combine(RepoRoot(), "installer", "DrDXT.iss"));
+        var lignes = Regex.Matches(iss, @"(?ms)^\[(?:Uninstall|Install)Delete\]\s*$(.*?)(?=^\[)").SelectMany(m => m.Groups[1].Value.Split('\n'))
+            .Select(l => l.Trim()).Where(l => l.StartsWith("Type:", StringComparison.Ordinal)).ToList();
+
+        lignes.Should().NotBeEmpty("témoin : les sections de suppression sont lues");
+        lignes.Where(l => l.Contains("filesandordirs") && Regex.IsMatch(l, @"\{(?:localappdata|userappdata|user\w+|userdocs)\}"))
+            .Should().BeEmpty();
+    }
+
     [Fact]
     public void Les_reglages_du_service_partent_a_la_desinstallation()
     {
@@ -106,10 +120,62 @@ public sealed class DesinstallationInstalleurTests
         var corps = Regex.Match(iss, @"^function PrepareToInstall\(.*?^end;", RegexOptions.Multiline | RegexOptions.Singleline);
         corps.Success.Should().BeTrue("témoin : la préparation de la mise à jour est relue");
 
-        corps.Value.Should().Contain("'/IM DrDxt.ElevatedHelper.exe /F'");
+        corps.Value.Should().Contain("LaisserLeHelperRendreSesBaux();");
         // Seulement le nôtre, décidé par la règle partagée (PresentMonEstANous) : celui d'un autre produit continue.
-        Regex.IsMatch(corps.Value, @"if PresentMonEstANous\(\) then\s+Exec\([^;]*'stop \{#PmService\}'")
+        Regex.IsMatch(corps.Value, @"if PresentMonEstANous\(\) then\s+(begin\s+)?Exec\([^;]*'stop \{#PmService\}'")
             .Should().BeTrue("l'arrêt de PresentMon est gardé par PresentMonEstANous");
+    }
+
+    // La désinstallation tuait le helper tout de suite : la sous-tension, la limite de puissance et les décalages AMD qu'il
+    // tenait par bail restaient posés jusqu'au redémarrage (le rendu de désinstallation ne relit que la carte NVIDIA et le
+    // plafond d'envoi). Elle ferme l'App, puis laisse le helper rendre ses baux, comme la mise à jour.
+    [Fact]
+    public void La_desinstallation_laisse_le_helper_rendre_ses_baux_avant_de_l_arreter_de_force()
+    {
+        var iss = File.ReadAllText(Path.Combine(RepoRoot(), "installer", "DrDXT.iss")).Replace("\r\n", "\n");
+        var etape = Regex.Match(iss, @"^procedure CurUninstallStepChanged\(.*?^end;", RegexOptions.Multiline | RegexOptions.Singleline).Value;
+        etape.Should().NotContain("ElevatedHelper.exe /F", "jamais tué avant d'avoir pu rendre ses baux");
+        etape.IndexOf("'/IM {#AppExe} /F'", StringComparison.Ordinal).Should()
+            .BeLessThan(etape.IndexOf("LaisserLeHelperRendreSesBaux();", StringComparison.Ordinal), "l'App fermée d'abord : le helper voit son client parti");
+        // Pendant l'attente du helper, une ouverture de session relançait l'App par la tâche du relevé : elle part avant.
+        etape.IndexOf("'/Delete /F /TN \"DrDXT releve\"'", StringComparison.Ordinal).Should()
+            .BeGreaterThan(-1).And.BeLessThan(etape.IndexOf("'/IM {#AppExe} /F'", StringComparison.Ordinal));
+    }
+
+    // Une App élevée tuée en pleine mesure laissait la session ETW du compteur DXGI ouverte, et sa trace (jusqu'à 1 Go) dans
+    // le TEMP des processus élevés : seule une mesure suivante les rangeait, et après la désinstallation il n'y en a plus.
+    [Fact]
+    public void La_desinstallation_arrete_la_session_du_compteur_dxgi_et_range_sa_trace()
+    {
+        var iss = File.ReadAllText(Path.Combine(RepoRoot(), "installer", "DrDXT.iss")).Replace("\r\n", "\n");
+        var etape = Regex.Match(iss, @"^procedure CurUninstallStepChanged\(.*?^end;", RegexOptions.Multiline | RegexOptions.Singleline).Value;
+        etape.Should().Contain($"'stop {DrDxt.Measurement.Frames.CompteurPresentsDxgi.NomSession} -ets'");
+        iss.Should().Contain("Type: files; Name: \"{win}\\SystemTemp\\drdxt-presents-*.etl\"")
+            .And.NotContain("{win}\\Temp\\drdxt-presents", "Windows\\Temp est ouvert à la création par les comptes");
+    }
+
+    // L'App tuée ne rend pas ses réglages à bail : son helper les rend à l'expiration du bail (120 s pour le ventilateur
+    // Expert), puis s'arrête seul. Tué tout de suite, il laissait le réglage posé jusqu'au redémarrage.
+    [Fact]
+    public void Une_mise_a_jour_laisse_le_helper_rendre_ses_baux_avant_de_l_arreter_de_force()
+    {
+        var iss = File.ReadAllText(Path.Combine(RepoRoot(), "installer", "DrDXT.iss")).Replace("\r\n", "\n");
+        var preparer = Regex.Match(iss, @"^function PrepareToInstall\(.*?^end;", RegexOptions.Multiline | RegexOptions.Singleline).Value;
+        preparer.IndexOf("'/IM {#AppExe} /F'", StringComparison.Ordinal).Should()
+            .BeLessThan(preparer.IndexOf("LaisserLeHelperRendreSesBaux();", StringComparison.Ordinal), "l'App fermée d'abord : le helper voit son client parti");
+        preparer.Should().NotContain("ElevatedHelper.exe /F", "jamais tué avant d'avoir pu rendre ses baux");
+
+        var attente = Regex.Match(iss, @"^procedure LaisserLeHelperRendreSesBaux\(\);.*?^end;", RegexOptions.Multiline | RegexOptions.Singleline).Value;
+        attente.Should().Contain("if not HelperVivant() then Exit;")
+            .And.Contain("while HelperVivant() and (Attendu < 135) do", "le bail le plus long (120 s), le pas de 5 s de la surveillance, une marge")
+            .And.Contain("Sleep(1000);");
+        var force = attente.IndexOf("'/IM DrDxt.ElevatedHelper.exe /F'", StringComparison.Ordinal);
+        force.Should().BeGreaterThan(attente.IndexOf("while HelperVivant()", StringComparison.Ordinal), "/F seulement après l'attente, s'il vit encore");
+        attente.Should().Contain("Log(", "le journal de l'installeur dit ce qui s'est passé");
+
+        var vivant = Regex.Match(iss, @"^function HelperVivant\(\): Boolean;.*?^end;", RegexOptions.Multiline | RegexOptions.Singleline).Value;
+        vivant.Should().Contain("ExecAndCaptureOutput(ExpandConstant('{sys}\\tasklist.exe')")
+            .And.Contain("Pos('\"drdxt.elevatedhelper.exe\"', Lowercase(Sortie.StdOut[I])) = 1", "la sortie CSV commence par le nom de l'image");
     }
 
     [Fact]
@@ -118,10 +184,12 @@ public sealed class DesinstallationInstalleurTests
         // L'installeur tourne en administrateur : un « sc.exe » sans chemin peut etre cherche hors de
         // System32 (dossier courant). Chaque Exec du [Code] doit partir d'une constante de dossier.
         var iss = File.ReadAllText(Path.Combine(RepoRoot(), "installer", "DrDXT.iss"));
-        var appels = Regex.Matches(iss, @"\bExec\(\s*(?<cible>[^,]+),").Select(m => m.Groups["cible"].Value.Trim()).ToList();
+        var appels = Regex.Matches(iss, @"\bExec(?:AndCaptureOutput)?\(\s*(?<cible>[^,]+),").Select(m => m.Groups["cible"].Value.Trim()).ToList();
 
         appels.Should().NotBeEmpty("temoin : l'installeur arrete et retire le service par Exec");
-        appels.Should().OnlyContain(c => c.StartsWith("ExpandConstant('{sys}\\", StringComparison.Ordinal),
-            "un outil lance en administrateur se nomme par son chemin System32");
+        // Le lanceur natif est lance par sa variable Lanceur, le chemin que LanceurPret() rend apres avoir relu son
+        // empreinte : jamais un nom seul cherche ailleurs. Tout le reste part de la constante System32.
+        appels.Should().OnlyContain(c => c.StartsWith("ExpandConstant('{sys}\\", StringComparison.Ordinal) || c == "Lanceur",
+            "un outil lance en administrateur se nomme par son chemin System32, ou est le lanceur verifie par empreinte");
     }
 }

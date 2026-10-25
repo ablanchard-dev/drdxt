@@ -15,7 +15,7 @@ namespace DrDxt.Core.Tests;
 ///
 /// Autrement dit : **cette liste est la surface d'attaque du produit sur la machine du client**, et
 /// la reponse a « est-ce qu'une branche de l'app peut abimer le materiel, le BIOS ou Windows ? »
-/// commence par « voici les 20 choses qu'elle peut demander, et rien d'autre ».
+/// commence par « voici les choses qu'elle peut demander, et rien d'autre » : la liste de `Frozen`.
 ///
 /// Une liste qui n'est pas figee n'est pas une surface : c'est une tendance. Ce controle la fige.
 ///
@@ -27,7 +27,7 @@ namespace DrDxt.Core.Tests;
 public sealed class ThePrivilegedSurfaceIsClosedGateTests
 {
     /// <summary>
-    /// Les 20 operations privilegiees du produit. Figee volontairement : c'est le point de la garde.
+    /// Les operations privilegiees du produit. Figee volontairement : c'est le point de la garde.
     /// `DeleteNvApiDrsSettingOp` est l'INVERSE d'une
     /// ecriture au profil d'un jeu, documentee dans docs/NON-NUISANCE.md avant d'entrer ici.
     /// `CommitManifestOp` ecrit le manifeste signe sous %ProgramData%\DrDxt :
@@ -128,7 +128,7 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
             .ToList();
 
     [Fact]
-    public void The_set_of_privileged_operations_is_exactly_the_frozen_twenty_five()
+    public void The_set_of_privileged_operations_is_exactly_the_frozen_list()
     {
         var actual = ActualOpNames();
 
@@ -146,9 +146,9 @@ public sealed class ThePrivilegedSurfaceIsClosedGateTests
     public void Nothing_privileged_writes_a_voltage_or_a_firmware_variable()
     {
         // Deux mots interdits dans un NOM d'operation, et deux raisons distinctes :
-        //   • « voltage » : ecrire une tension est le seul geste de ce produit qui puisse abimer
-        //     du materiel de facon irreversible. Il n'existe pas, et c'est ce qui rend la
-        //     non-nuisance materielle vraie par ABSENCE plutot que par garde.
+        //   • « voltage » : ecrire une tension est le geste qui peut abimer du materiel de facon irreversible. Une seule
+        //     tension existe, admise nommement (TensionAdmise : celle des coeurs Intel, vers le bas, bornee par
+        //     l'executeur) ; toute autre se refuse par son nom.
         //   • « write »/« set » + « firmware » : aucune ecriture firmware n'existe ; la seule
         //     operation firmware est une lecture (ReadFirmwareVariableOp, Setup et CpuSetup compris).
         Offenders(ActualOpNames())

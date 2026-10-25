@@ -76,7 +76,7 @@ public sealed class ClientDesPoses : IElevatedClient
         => await ReprendreAsync().ConfigureAwait(false) ? null : Docteur.T("JEA.AcquitRefuse");
 
     /// <summary>Un acquit refusé attend encore, dans ce processus.</summary>
-    public static bool UnAcquitAttend => DuProcessus.Copie().Length > 0;
+    public static bool UnAcquitAttend => DuProcessus.Copie().Length > 0 || DrDxt.ElevatedHelper.ClientSessionUtilisateur.UnAcquitLocalAttend;
 
     /// <summary>Le texte à montrer à la fermeture de la fenêtre, ou null. Le dernier essai est borné : passé la borne, l'acquit
     /// est tenu pour refusé. Windows qui ferme la session n'attend pas une boîte : rien à montrer, l'essai seul.</summary>

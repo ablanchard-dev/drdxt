@@ -45,11 +45,12 @@ public sealed class LimitePuissanceCpuTweakTests
     [InlineData(ChassisType.Laptop)]
     [InlineData(ChassisType.Handheld)]
     public void Jamais_sur_un_portable_ni_une_console(ChassisType chassis) =>
-        Build().AppliesTo(Hw(chassis), Etat(new LimiteDePuissanceLue(45, 125, 65, false))).Should().BeFalse();
+        // La température de partie est lue : sans elle, la montée serait refusée de toute façon et le châssis ne serait pas testé.
+        Build().AppliesTo(Hw(chassis), Etat(new LimiteDePuissanceLue(45, 125, 65, false, ChaleurEnPartieMaxC: 80))).Should().BeFalse();
 
     [Fact]
     public void Jamais_hors_Intel() =>
-        Build().AppliesTo(Hw(ChassisType.Desktop, "AuthenticAMD"), Etat(new LimiteDePuissanceLue(65, 219, 65, false))).Should().BeFalse();
+        Build().AppliesTo(Hw(ChassisType.Desktop, "AuthenticAMD"), Etat(new LimiteDePuissanceLue(65, 219, 65, false, ChaleurEnPartieMaxC: 80))).Should().BeFalse();
 
     // Un processeur qui touche déjà 95 °C en partie ne se voit pas monter sa PL1, quelle que soit la PL2.
     // Aucune température relevée en partie : « inconnu » n'est pas « pas chaud ». La montée était proposée sur un processeur
@@ -73,7 +74,7 @@ public sealed class LimitePuissanceCpuTweakTests
         LimitePuissanceCpuTweak.Cible(chaud with { ChaleurEnPartieMaxC = 88 }).Should().Be(219);
     }
 
-    // Le guide 5.3 exige le microcode corrigé avant de monter un Core 13e/14e ; le levier ne le lisait pas.
+    // Le guide 5.3 exige le microcode corrigé avant de monter un Core 13e/14e.
     // La garde vit dans la lecture des registres, que ApplyAsync refait à chaque pose (essai en cours compris).
     [Fact]
     public void Jamais_plus_de_puissance_sur_un_microcode_d_avant_le_correctif_Vmin()
@@ -119,7 +120,7 @@ public sealed class LimitePuissanceCpuTweakTests
     [InlineData(219, 219, false, false)]  // aucune marge
     [InlineData(65, 65, false, false)]    // PL2 = PL1 : la carte ne laisse rien passer
     public void Rien_sans_marge_sure(double pl1, double pl2, bool verrou, bool sansLimite) =>
-        LimitePuissanceCpuTweak.Cible(new LimiteDePuissanceLue(pl1, pl2, 65, verrou, RegistreAuMaximum: sansLimite)).Should().BeNull();
+        LimitePuissanceCpuTweak.Cible(new LimiteDePuissanceLue(pl1, pl2, 65, verrou, RegistreAuMaximum: sansLimite, ChaleurEnPartieMaxC: 80)).Should().BeNull();
 
     [Fact]
     public async Task Apply_ecrit_PL1_a_la_PL2_et_garde_l_origine_exacte_pour_le_retour()

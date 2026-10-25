@@ -22,8 +22,9 @@ public static class LecturesAmd
     public static double? Temperature(string? nomDuProcesseur)
     {
         var (_, signature) = Cpuid.Lire();
-        if (signature is not { } s || PawnIoAmd.LireSmn(TemperatureAmd.AdresseTctl, SmnAmd.Autorisee) is not { } tctl) return null;
-        return TemperatureAmd.Tctl(tctl) - TemperatureAmd.DecalageTdie(GenerationAmd.Decoder(s).Famille, nomDuProcesseur);
+        if (signature is not { } s || PawnIoAmd.LireSmn(TemperatureAmd.AdresseTctl, SmnAmd.Autorisee) is not { } tctl
+            || TemperatureAmd.Tctl(tctl) is not { } t) return null;
+        return t - TemperatureAmd.DecalageTdie(GenerationAmd.Decoder(s).Famille, nomDuProcesseur);
     }
 
     /// <summary>La température de chaque CCD présent ; null si la puce n'est pas dans la table ou si rien n'est lu.</summary>
@@ -42,12 +43,12 @@ public static class LecturesAmd
         return lues;
     }
 
-    /// <summary>Les registres de timings de chaque canal mémoire actif, clés au canal 0 ; null si non lus. Un canal est
-    /// tenu pour actif quand son premier registre de timings n'est ni nul ni à tous les bits levés : règle à confirmer sur
-    /// machine réelle.</summary>
-    public static IReadOnlyList<IReadOnlyDictionary<uint, uint>>? CanauxMemoire()
+    /// <summary>Les registres de timings de chaque canal mémoire actif, avec son numéro physique ; null si non lus. Un canal
+    /// est tenu pour actif quand son premier registre de timings n'est ni nul ni à tous les bits levés : règle à confirmer sur
+    /// machine réelle. Les canaux vides sont sautés : la lettre d'un canal vient de son numéro, jamais de son rang.</summary>
+    public static IReadOnlyList<(int Canal, IReadOnlyDictionary<uint, uint> Registres)>? CanauxMemoire()
     {
-        var canaux = new List<IReadOnlyDictionary<uint, uint>>();
+        var canaux = new List<(int, IReadOnlyDictionary<uint, uint>)>();
         for (var canal = 0; canal < SmnAmd.CanauxMax; canal++)
         {
             var registres = new Dictionary<uint, uint>();
@@ -56,20 +57,10 @@ public static class LecturesAmd
                 if (PawnIoAmd.LireSmn(TimingsMemoireAmd.Adresse(canal, r), SmnAmd.Autorisee) is not { } v) return null;
                 registres[r] = v;
             }
-            if (registres[TimingsMemoireAmd.Registres[1]] is not (0 or uint.MaxValue)) canaux.Add(registres);
+            if (registres[TimingsMemoireAmd.Registres[1]] is not (0 or uint.MaxValue)) canaux.Add((canal, registres));
         }
         return canaux;
     }
-
-    /// <summary>La température par les registres, sur une génération validée seulement : sinon null, et la chaîne passe la
-    /// main. Le nom vient du registre Windows du processeur.</summary>
-    public static TemperatureHwinfo.Lecture? TemperatureSiValidee()
-    {
-        if (!PawnIoAmd.Installe() || Generation() is not { } g || !LecturesAmdProfondes.ValideesEnVie.Contains(g.Generation)) return null;
-        return Temperature(NomDuProcesseur()) is { } t ? new TemperatureHwinfo.Lecture(t, Libelle) : null;
-    }
-
-    public static string Libelle => Docteur.T("TP.LibelleAmd");
 
     public static string? NomDuProcesseur()
     {

@@ -2,13 +2,6 @@ namespace DrDxt.Core;
 
 // --- Mesure ---
 
-/// <summary>Quel composant a cadencé une session, lu par GPU-busy contre temps de trame. Méthode
-/// GPU-Busy d'Intel PresentMon : GPU-bound ⟺ le GPU busy suit de près le temps de trame ; limité par
-/// le CPU ou autre ⟺ un grand écart (le GPU a fini et attendu le CPU, le moteur ou la présentation).
-/// Indeterminate si le GPU busy n'est pas mesuré ou si la machine est entre les deux : jamais deviné.
-/// Source (concept) : Intel PresentMon GPU-Busy, https://presentmon.com/ .</summary>
-public enum Bottleneck { Indeterminate, GpuBound, CpuOrOtherBound }
-
 public record BenchmarkResult(
     double AvgFps,
     double P1LowFps,
@@ -170,7 +163,7 @@ public record BenchmarkResult(
     double P1LowMarginOfError = double.PositiveInfinity,
 
     /// <summary>La marge des 0,1 % lows, meme calcul. Le chiffre le plus fragile du rapport
-    /// sortait seul sans marge. Informative, jamais decisionnelle (voir <c>GameObjective</c>).</summary>
+    /// sortait seul sans marge. Informative, jamais decisionnelle (voir <c>GameMetrics.P01LowFps</c>).</summary>
     double P01LowMarginOfError = double.PositiveInfinity,
     /// <summary>Médiane de la latence d'affichage de PresentMon (début de l'image → écran), en ms ;
     /// null quand la série n'a pas été livrée. Le chiffre sur lequel l'essai en alternance juge un levier de latence.</summary>
@@ -207,26 +200,6 @@ public record BenchmarkResult(
         : MeanGpuBusyMs is { } busy && AvgFps > 0 ? busy * AvgFps / 10.0
         : null;
 
-    /// <summary>GPU-busy % à partir duquel le GPU a cadencé presque toute la trame → GPU-bound. Intel
-    /// PresentMon définit le concept (un petit écart GPU-busy↔temps de trame = GPU-bound) sans publier
-    /// de seuil ; 90 % (≤10 % hors GPU) est le défaut prudent de DrDXT, pas une constante sourcée.
-    /// réglage d'étalonnage : monter vers 95 pour être plus strict avant d'affirmer GPU-bound.</summary>
-    public const double GpuBoundBusyPercent = 90.0;
-
-    /// <summary>GPU-busy % jusqu'auquel une part notable de la trame s'est passée hors GPU → le CPU
-    /// ou un autre sous-système l'a cadencée. Défaut DrDXT (≥25 % hors GPU). La bande 75–90 reste
-    /// Indeterminate exprès, pour n'affirmer à tort aucune limite. réglage d'étalonnage.</summary>
-    public const double CpuBoundBusyPercent = 75.0;
-
-    /// <summary>Ce qui a limité la session (<see cref="Core.Bottleneck"/>), d'après <see cref="GpuBusyPercent"/>.
-    /// Indeterminate si le GPU busy n'est pas mesuré : l'état dégradé honnête, jamais un GpuBound
-    /// inventé. La reco évite ainsi de vendre un levier GPU comme gain de FPS sur une machine CPU-bound.</summary>
-    public Bottleneck Bottleneck =>
-        GpuBusyPercent is not { } pct ? Bottleneck.Indeterminate
-        : pct >= GpuBoundBusyPercent ? Bottleneck.GpuBound
-        : pct <= CpuBoundBusyPercent ? Bottleneck.CpuOrOtherBound
-        : Bottleneck.Indeterminate;
-
     /// <summary>« Stuttering factor » par défaut de CapFrameX : une trame est un à-coup quand son
     /// temps dépasse 2,5× la moyenne. Source : CapFrameX (outil de référence d'analyse des frametimes).</summary>
     public const double StutterFactor = 2.5;
@@ -252,11 +225,12 @@ public record BenchmarkResult(
     }
 
     /// <summary>
-    /// Coefficient de variation des frametimes (ecart-type / moyenne) : le proxy de cadence
-    /// normalise. Il met une machine a 60 FPS et une a 240 FPS sur la meme echelle, ce qu'un
-    /// ecart-type brut ne fait pas. Derive des frametimes deja portees ici, donc pas de
-    /// parametre de plus. Null avec moins de deux frames valides : une seule frame n'a pas de
-    /// dispersion, et rendre 0 dirait « parfaitement regulier » sur une absence de mesure.
+    /// Coefficient de variation de la cadence, d'une image a la suivante : l'ecart-type estime sur les differences
+    /// successives (sqrt(somme des (x[i] - x[i-1])^2 / (2(n-1)))), sur la moyenne. Pour des temps independants il vaut le
+    /// coefficient de variation habituel ; mais une scene qui passe de 150 a 100 i/s ne le fait pas monter, alors que
+    /// l'ecart-type sur toute la capture y lirait une cadence cassee et masquerait le vrai goulot. Normalise, il met une
+    /// machine a 60 FPS et une a 240 FPS sur la meme echelle. Null avec moins de deux frames valides : une seule frame n'a
+    /// pas de dispersion, et rendre 0 dirait « parfaitement regulier » sur une absence de mesure.
     /// </summary>
     public double? FrameMsCv
     {
@@ -266,8 +240,9 @@ public record BenchmarkResult(
             if (ft.Count < 2) return null;
             var mean = ft.Average();
             if (mean <= 0) return null;
-            var variance = ft.Sum(x => (x - mean) * (x - mean)) / (ft.Count - 1);
-            return Math.Sqrt(variance) / mean;
+            var sommeDesSauts = 0.0;
+            for (var i = 1; i < ft.Count; i++) sommeDesSauts += (ft[i] - ft[i - 1]) * (ft[i] - ft[i - 1]);
+            return Math.Sqrt(sommeDesSauts / (2.0 * (ft.Count - 1))) / mean;
         }
     }
 
@@ -313,10 +288,4 @@ public interface IBenchmarkRunner
     Task<Result<BenchmarkResult>> RunAsync(int targetPid, TimeSpan duration, int runs, CancellationToken ct);
 }
 
-public record AbVerdict(BenchmarkResult Before, BenchmarkResult After, bool IsMeasurableGain, string SummaryKey)
-{
-    /// <summary>Ce qui limitait la session de base. Classé d'après <see cref="Before"/> (la limite
-    /// naturelle de la machine non modifiée), pour que la reco nuance un gain de levier GPU obtenu
-    /// sur une machine limitée par le CPU ou autre, au lieu de le vendre comme FPS en jeu.</summary>
-    public Bottleneck Bottleneck => Before.Bottleneck;
-}
+public record AbVerdict(BenchmarkResult Before, BenchmarkResult After, bool IsMeasurableGain, string SummaryKey);

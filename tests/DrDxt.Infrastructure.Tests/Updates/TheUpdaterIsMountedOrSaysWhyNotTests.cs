@@ -42,7 +42,7 @@ public sealed class TheUpdaterIsMountedOrSaysWhyNotTests
     }
 
     private static Result<AutoUpdater> Mount(string? baseUrl, HttpClient client)
-        => UpdateComposition.TryCreate(baseUrl, client, Path.GetTempPath(), @"C:\Program Files\DrDXT", "1.0.0");
+        => UpdateComposition.TryCreate(baseUrl, client, Path.GetTempPath(), "1.0.0");
 
     [Theory]
     [InlineData(null)]
@@ -87,7 +87,7 @@ public sealed class TheUpdaterIsMountedOrSaysWhyNotTests
         var (client, _) = Wire();
 
         UpdateComposition.TryCreate("https://updates.example.invalid", client, Path.GetTempPath(),
-                @"C:\Program Files\DrDXT", "1.0.0", UpdateDevKeys.CreateUpdateVerifier().Value!)
+                "1.0.0", UpdateDevKeys.CreateUpdateVerifier().Value!)
             .IsOk.Should().BeTrue();
     }
 

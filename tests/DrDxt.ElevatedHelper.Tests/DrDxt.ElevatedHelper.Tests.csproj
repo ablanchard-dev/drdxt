@@ -19,6 +19,7 @@
     <ProjectReference Include="..\..\src\DrDxt.ElevatedHelper\DrDxt.ElevatedHelper.csproj" />
     <!-- Le lanceur natif (NativeAOT) n'est pas référençable ; sa logique d'environnement est compilée ici en lien. -->
     <Compile Include="..\..\src\DrDxt.Lanceur\EnvironnementPropre.cs" Link="Lanceur\EnvironnementPropre.cs" />
+    <Compile Include="..\..\src\DrDxt.Lanceur\PreparationDesDroits.cs" Link="Lanceur\PreparationDesDroits.cs" />
     <!-- Test-only: assert the helper's mirrored policy band (NvApiTuningMath) stays in sync
          with GpuSafeBounds, the single source of truth. The helper itself does NOT reference
          DrDxt.Application (it depends only on DrDxt.Core) — this is a test-edge reference. -->

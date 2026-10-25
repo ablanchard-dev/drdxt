@@ -179,7 +179,8 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
     /// <summary>La taille du code, en modules, marge comprise ; 0 si rien n'a été encodé.</summary>
     internal int ModulesQr { get; }
 
-    public string LabelQr => _localize("Scan.Bios.Guide.Qr");
+    /// <summary>La page demande du réseau au téléphone, une fois ; le texte brut se lit sans.</summary>
+    public string LabelQr => _localize(QrPorteLaPage ? "Scan.Bios.Guide.Qr.Page" : "Scan.Bios.Guide.Qr");
 
     internal static string Telephone(BiosGuideViewModel g, Func<string, string> localize)
     {
@@ -298,7 +299,8 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
         if (Depart != EtatDepart.Lance || _annulerDepart is null) return;
         Result r;
         try { r = await _annulerDepart(); }
-        catch (Exception ex) { r = Result.Fail(ErrorCodes.BiosInputInvalid, ex.Message); }
+        // Une panne n'est pas une saisie invalide : son type, comme RaisonLisible.Dire(Exception).
+        catch (Exception ex) { r = Result.Fail(ex.GetType().Name, ex.Message); }
         if (r.IsOk) { ErreurDepart = null; Depart = EtatDepart.Repos; return; }
         ErreurDepart = RaisonLisible.Echec(r, _localize("Bios.Depart.AnnulationEchec"), _localize);
     }
@@ -333,7 +335,8 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
         Depart = EtatDepart.EnCours;
         Result r;
         try { r = await OpenFirmwareSetupAsync(); }
-        catch (Exception ex) { r = Result.Fail(ErrorCodes.BiosInputInvalid, ex.Message); }
+        // Une panne n'est pas une saisie invalide : son type, comme RaisonLisible.Dire(Exception).
+        catch (Exception ex) { r = Result.Fail(ex.GetType().Name, ex.Message); }
         if (r.IsOk) { Depart = EtatDepart.Lance; return; }
         ErreurDepart = RaisonLisible.Echec(r, _localize("Bios.Depart.Echec"), _localize);
         Depart = EtatDepart.Repos;

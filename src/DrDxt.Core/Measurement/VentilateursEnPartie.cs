@@ -10,7 +10,7 @@ public sealed record VentilateurEnPartie(int Index, double TrMinMoyen, int TrMin
 }
 
 /// <summary>
-/// Un ventilateur qui frotte et s'arrête (après un nettoyage, par exemple) passe inaperçu jusqu'au bruit : chaque partie garde chaque ventilateur de la carte mère (lus par la puce Super I/O, toutes les cinq
+/// Un ventilateur qui frotte et s'arrête (après un nettoyage, par exemple) passe inaperçu jusqu'au bruit : chaque partie garde chaque ventilateur de la carte mère (lus par la puce Super I/O, toutes les quinze
 /// secondes), et le docteur dit celui qui s'arrête pendant la partie ou qui ne tourne plus d'une partie à l'autre. Un en-tête qui
 /// n'a jamais tourné (rien de branché) n'est pas gardé. Limite dite : les cartes dont la puce est lue (MSI, NCT6687).
 /// </summary>
@@ -19,10 +19,10 @@ public static class VentilateursEnPartie
     /// <summary>Sous ce régime, un ventilateur est à l'arrêt ; au-dessus de <see cref="TrMinTourne"/>, il tourne.</summary>
     public const int TrMinArret = 200;
     public const int TrMinTourne = 300;
-    /// <summary>Deux lectures de la puce à l'arrêt au moins pour le dire : elle se lit toutes les 5 s (PawnIoSuperIo.IntervalleLecture)
-    /// et chaque lecture compte pour 5 s, donc une seule lecture ratée faisait déjà 5 s. **Non chiffré**. Limite : un arrêt de
-    /// moins de 10 s peut ne pas se voir.</summary>
-    public const int SecondesArretMinimum = 10;
+    /// <summary>Deux lectures de la puce à l'arrêt au moins pour le dire : elle se lit toutes les 15 s (PawnIoSuperIo.IntervalleLecture)
+    /// et chaque lecture compte pour 15 s, donc une seule lecture ratée fait déjà 15 s. **Non chiffré**. Limite : un arrêt de
+    /// moins de 30 s peut ne pas se voir.</summary>
+    public const int SecondesArretMinimum = 30;
     /// <summary>Deux parties d'avant où il tournait, pour dire qu'il ne tourne plus.</summary>
     public const int PartiesAvantMinimum = 2;
 

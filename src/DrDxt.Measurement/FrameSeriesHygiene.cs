@@ -72,8 +72,9 @@ public static class FrameSeriesHygiene
     /// Plafond connu : un plafond dont l'instabilité du minuteur dépasse 4 % est gardé plutôt
     /// qu'écarté, et ces secondes comptent alors comme performance de la machine. C'est le sens
     /// voulu : l'erreur inverse présenterait une machine saine à un joueur qui a vu son jeu ramer.
-    /// La vraie correction est d'observer l'état de la fenêtre pendant la capture ; d'ici là, c'est
-    /// une inférence, et elle est nommée comme telle.
+    /// L'inférence ne suffit pas seule : un jeu en V-Sync qui tombe de 60 à 30 i/s a la même signature. En
+    /// production, le banc observe le premier plan pendant la passe et borne les secondes écartées au temps vu
+    /// hors du premier plan (<c>horsFocusMaxSecondes</c> de <see cref="Masque"/>).
     /// </summary>
     public const double CapRegularityMax = 0.04;
 
@@ -135,30 +136,39 @@ public static class FrameSeriesHygiene
     /// </summary>
     /// <param name="Garde">Un booleen par frame d'entree : la garder, ou non.</param>
     /// <param name="Applied">False quand le filtre a refuse : le masque est alors tout a vrai.</param>
+    /// <param name="Retenues">Les images valides que le filtre garderait, qu'il ait ete applique ou refuse. C'est
+    /// l'exposition : un refus garde la serie entiere, et la passe n'en a pas moins vecu surtout hors du jeu.</param>
     public sealed record MaskResult(
         IReadOnlyList<bool> Garde,
         int WarmupSecondsDropped,
         int OutOfFocusSecondsDropped,
-        bool Applied);
+        bool Applied,
+        int Retenues = 0);
 
     /// <inheritdoc cref="MaskResult"/>
+    /// <param name="horsFocusMaxSecondes">Le temps que la sonde de premier plan a vu le jeu derrière une autre fenêtre. Une
+    /// seconde lente et régulière n'est écartée comme hors focus que dans cette limite : un jeu en V-Sync qui tombe de 60 à
+    /// 30 i/s au premier plan a la même signature qu'un plafond hors focus, et ses chutes sont la mesure. Sans borne, l'
+    /// inférence seule (rejeu hors ligne).</param>
     public static MaskResult Masque(
         IReadOnlyList<double> frameTimesMs,
         double warmupSeconds = DefaultWarmupSeconds,
         double outOfFocusMedianMs = DefaultOutOfFocusMedianMs,
-        double minKeptFraction = 0.20)
+        double minKeptFraction = 0.20,
+        double horsFocusMaxSecondes = double.PositiveInfinity)
     {
         if (frameTimesMs is null || frameTimesMs.Count == 0)
             return new MaskResult(Array.Empty<bool>(), 0, 0, false);
 
-        return CleanCore(frameTimesMs, warmupSeconds, outOfFocusMedianMs, minKeptFraction);
+        return CleanCore(frameTimesMs, warmupSeconds, outOfFocusMedianMs, minKeptFraction, horsFocusMaxSecondes);
     }
 
     private static MaskResult CleanCore(
         IReadOnlyList<double> frameTimesMs,
         double warmupSeconds,
         double outOfFocusMedianMs,
-        double minKeptFraction)
+        double minKeptFraction,
+        double horsFocusMaxSecondes = double.PositiveInfinity)
     {
         var toutGarde = () => new MaskResult(
             Enumerable.Repeat(true, frameTimesMs.Count).ToList(), 0, 0, false);
@@ -192,14 +202,14 @@ public static class FrameSeriesHygiene
         var warmupDropped = 0;
         var focusDropped = 0;
         var dropped = new HashSet<int>();
-        foreach (var (second, bucket) in bySecond)
+        foreach (var (second, bucket) in bySecond.OrderBy(kv => kv.Key))
         {
             if (second < warmupCutoff)
             {
                 dropped.Add(second);
                 warmupDropped++;
             }
-            else if (Median(bucket) > outOfFocusMedianMs && EstUnPlafond(bucket))
+            else if (focusDropped < horsFocusMaxSecondes && Median(bucket) > outOfFocusMedianMs && EstUnPlafond(bucket))
             {
                 dropped.Add(second);
                 focusDropped++;
@@ -219,8 +229,8 @@ public static class FrameSeriesHygiene
         // supprimer transformerait le pire diagnostic en resultat vide. Refuser est un troisieme
         // etat : ni « filtre », ni « rien a filtrer ».
         return gardees < valides * minKeptFraction
-            ? toutGarde()
-            : new MaskResult(garde, warmupDropped, focusDropped, true);
+            ? toutGarde() with { Retenues = gardees }
+            : new MaskResult(garde, warmupDropped, focusDropped, true, gardees);
     }
 
     /// <summary>

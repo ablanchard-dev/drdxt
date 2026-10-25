@@ -36,6 +36,10 @@ public enum EtatRelu
 public sealed record Relecture(
     EtatRelu Etat, string? Cible, string? ValeurAvant, string? ValeurCourante);
 
+/// <summary>Ce que porte un réglage posé : encore la valeur de DrDXT (ou rien ne le relit), revenu à l'origine, ou changé depuis
+/// (ni l'une ni l'autre).</summary>
+public enum PoseRelue { DeDrDxt, ALOrigine, ChangeDepuis }
+
 /// <summary>
 /// Relire ce qu'un levier a ecrit : une fois, pour tous les leviers de registre.
 ///
@@ -61,6 +65,45 @@ public sealed record Relecture(
 /// </summary>
 public static class TweakReadback
 {
+    /// <summary>Tout rendu passe par là : rendre un réglage changé depuis réécrirait le choix du joueur. Une feuille que le
+    /// registre ne relit pas (pilote, carte, plan d'alimentation) se juge par <paramref name="verdict"/>, le vérificateur de la
+    /// pose : ni la valeur posée ni l'origine, c'est un changement d'ailleurs. Sans relecture possible : la valeur de DrDXT.</summary>
+    /// <param name="verdict">Le vérificateur de la pose (<see cref="AppliedStateVerifier"/>) ; consulté seulement quand le
+    /// registre ne relit pas la feuille.</param>
+    public static PoseRelue EtatDeLaPose(TweakSnapshot s, IRegistryReader? lecteur, Func<TweakSnapshot, EtatApplique>? verdict = null)
+    {
+        // Origine égale à la valeur posée = DrDXT n'a rien changé.
+        if (string.Equals(s.AppliedValueJson, s.OriginalValueJson, StringComparison.Ordinal)) return PoseRelue.ALOrigine;
+        var surOrigine = lecteur is null ? EtatRelu.NonRelisable : Relire(s, lecteur).Etat;
+        if (surOrigine == EtatRelu.NonRelisable && verdict is not null)
+            return verdict(s) switch
+            {
+                EtatApplique.NotApplied => PoseRelue.ALOrigine,
+                EtatApplique.Drifted => PoseRelue.ChangeDepuis,
+                _ => PoseRelue.DeDrDxt,
+            };
+        if (lecteur is null) return PoseRelue.DeDrDxt;
+        if (s.AppliedValueJson is { Length: > 0 } posee)
+        {
+            var surPosee = Relire(new TweakSnapshot(s.TweakId, posee), lecteur).Etat;
+            if (surPosee == EtatRelu.RevenuAvantApplication) return PoseRelue.DeDrDxt;
+            if (surPosee == EtatRelu.DifferentDeAvant)
+                return surOrigine == EtatRelu.RevenuAvantApplication ? PoseRelue.ALOrigine : PoseRelue.ChangeDepuis;
+        }
+        return surOrigine == EtatRelu.RevenuAvantApplication ? PoseRelue.ALOrigine : PoseRelue.DeDrDxt;
+    }
+
+    /// <summary>Relu, le réglage porte encore la valeur que DrDXT a posée : une preuve positive (la feuille relue à la valeur
+    /// posée, ou le vérificateur qui dit « appliqué »). « Rien ne le relit » n'en est pas une.</summary>
+    public static bool EncorePoseRelue(TweakSnapshot s, IRegistryReader? lecteur, Func<TweakSnapshot, EtatApplique>? verdict = null)
+    {
+        if (string.Equals(s.AppliedValueJson, s.OriginalValueJson, StringComparison.Ordinal)) return false;
+        var surOrigine = lecteur is null ? EtatRelu.NonRelisable : Relire(s, lecteur).Etat;
+        if (surOrigine == EtatRelu.NonRelisable) return verdict?.Invoke(s) == EtatApplique.Applied;
+        return lecteur is not null && s.AppliedValueJson is { Length: > 0 } posee
+            && Relire(new TweakSnapshot(s.TweakId, posee), lecteur).Etat == EtatRelu.RevenuAvantApplication;
+    }
+
     /// <summary>Relit la feuille que decrit <paramref name="snapshot"/>.</summary>
     /// <param name="lecteur">Le seam de lecture registre. Non elevee : lire ne demande pas l'UAC.</param>
     public static Relecture Relire(TweakSnapshot? snapshot, IRegistryReader lecteur)
@@ -102,6 +145,12 @@ public static class TweakReadback
 
     private static Relecture RelireOp(PrivilegedOp? op, IRegistryReader lecteur) => op switch
     {
+        // DirectXUserGlobalSettings porte aussi Auto HDR, que le joueur règle lui-même : seules les clés de DrDXT s'y relisent.
+        SetRegistryValueOp { Path: DirectXUserGlobalSettings.Chemin, Name: DirectXUserGlobalSettings.Nom } set
+            => ComparerClesDeDrDxt(lecteur, set.Hive, set.Value),
+        DeleteRegistryValueOp { Path: DirectXUserGlobalSettings.Chemin, Name: DirectXUserGlobalSettings.Nom } del
+            => ComparerClesDeDrDxt(lecteur, del.Hive, null),
+
         // La valeur d'avant existait : revert la reposerait.
         SetRegistryValueOp set when set.Kind == RegistryValueType.DWord
             => Comparer(lecteur, set.Hive, set.Path, set.Name, set.Value),
@@ -119,6 +168,16 @@ public static class TweakReadback
 
         _ => new Relecture(EtatRelu.NonRelisable, null, null, null),
     };
+
+    private static Relecture ComparerClesDeDrDxt(IRegistryReader lecteur, RegistryHiveKind ruche, string? avant)
+    {
+        var cible = $"{ruche}\\{DirectXUserGlobalSettings.Chemin}\\{DirectXUserGlobalSettings.Nom}";
+        var lu = lecteur.ReadString(ruche, DirectXUserGlobalSettings.Chemin, DirectXUserGlobalSettings.Nom);
+        if (!lu.IsOk) return new Relecture(EtatRelu.NonLu, cible, avant, null);
+        var attendues = DirectXUserGlobalSettings.ClesDeDrDxtDe(avant);
+        var lues = DirectXUserGlobalSettings.ClesDeDrDxtDe(lu.Value);
+        return new Relecture(attendues == lues ? EtatRelu.RevenuAvantApplication : EtatRelu.DifferentDeAvant, cible, avant, lu.Value);
+    }
 
     private static Relecture ComparerTexte(Result<string?> lu, SetRegistryValueOp avant)
     {

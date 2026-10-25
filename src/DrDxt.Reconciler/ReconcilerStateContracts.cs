@@ -50,4 +50,18 @@ public interface IReconcilerStateStore
 {
     Task<Result<ReconcilerState>> LoadAsync(CancellationToken ct);
     Task<Result> SaveAsync(ReconcilerState state, CancellationToken ct);
+
+    /// <summary>Lire, modifier, réécrire d'un seul tenant : le helper et le service réécrivent le même fichier, et une
+    /// écriture faite entre la lecture et la réécriture de l'autre se perdait. <paramref name="modifier"/> rend null pour ne
+    /// rien écrire. Rend l'état tel qu'il est après. Un magasin en mémoire n'a qu'un écrivain : il enchaîne les deux.</summary>
+    async Task<Result<ReconcilerState>> MettreAJourAsync(Func<ReconcilerState, ReconcilerState?> modifier, CancellationToken ct)
+    {
+        var lu = await LoadAsync(ct).ConfigureAwait(false);
+        if (!lu.IsOk)
+            return lu;
+        if (modifier(lu.Value!) is not { } suivant)
+            return lu;
+        var ecrit = await SaveAsync(suivant, ct).ConfigureAwait(false);
+        return ecrit.IsOk ? Result<ReconcilerState>.Ok(suivant) : Result<ReconcilerState>.Fail(ecrit.Error!.Value.Code, ecrit.Error.Value.Message);
+    }
 }

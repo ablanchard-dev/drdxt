@@ -28,14 +28,12 @@ public static class ChipClassifier
     private static readonly Regex GeForceModel =
         new(@"\b(RTX\s*\d{3,4}|GTX\s*1[06]\d{2})\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    /// <summary>Vrai pour une chaîne constructeur AMD (processeur ou carte). Même lecture que la
-    /// détection : WMI dit « AuthenticAMD » pour les processeurs, « Advanced Micro Devices » ou « ATI » pour les cartes.</summary>
-    public static bool IsAmd(string? vendor) =>
-        !string.IsNullOrWhiteSpace(vendor) &&
-        (vendor.Contains("AMD", StringComparison.OrdinalIgnoreCase)
-         || vendor.Contains("Authentic", StringComparison.OrdinalIgnoreCase)
-         || vendor.Contains("Advanced Micro Devices", StringComparison.OrdinalIgnoreCase)
-         || vendor.Contains("ATI", StringComparison.OrdinalIgnoreCase));
+    // Les cartes professionnelles portent des numéros proches : « Quadro RTX 4000 », « RTX 2000 Ada Generation ».
+    private static readonly Regex ModelePro =
+        new(@"\b(Quadro|Tesla)\b|\bGeneration\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Vrai pour une chaîne constructeur AMD (processeur ou carte), même règle que la détection.</summary>
+    public static bool IsAmd(string? vendor) => CartesGraphiques.EstAmd(vendor);
 
     /// <summary>Vrai pour une chaîne constructeur NVIDIA.</summary>
     public static bool IsNvidia(string? vendor) =>
@@ -57,7 +55,8 @@ public static class ChipClassifier
         && IsNvidia(gpu.Vendor)
         && gpu.VramBytes >= DiscreteVramFloorBytes
         && !IsMobile(gpu.Model)
-        && GeForceModel.IsMatch(gpu.Model ?? string.Empty);
+        && GeForceModel.IsMatch(gpu.Model ?? string.Empty)
+        && !ModelePro.IsMatch(gpu.Model ?? string.Empty);
 
     /// <summary>Vrai quand la machine est un poste de bureau avec au moins une GeForce dédiée
     /// réglable : là où les leviers NVIDIA de l'option A s'appliquent vraiment (GpuGating :

@@ -97,26 +97,35 @@ public sealed record RepairFinding(
 {
     /// <summary>Les statuts qui autorisent DrDXT a ecrire tout seul. Un seul, et c'est
     /// deliberé.</summary>
-    public static readonly RepairStatus[] AutorisentUneReparationAutomatique =
-        { RepairStatus.KnownHarmful };
+    public static readonly System.Collections.Frozen.FrozenSet<RepairStatus> AutorisentUneReparationAutomatique =
+        System.Collections.Frozen.FrozenSet.ToFrozenSet([RepairStatus.KnownHarmful]);
 
     public bool NecessiteUneDecisionHumaine =>
         Action is RepairAction.Recommandation or RepairAction.GuidedBios;
 
-    // Simplification voulue : la validation vit dans les initialiseurs de propriete du constructeur primaire :
-    // un appelant ne peut pas construire un constat illegal, meme en se trompant.
-    public string Explication { get; init; } = string.IsNullOrWhiteSpace(Explication)
+    // La validation vit dans les initialiseurs du constructeur primaire ET dans les accesseurs init : un `with` copie le
+    // record puis passe par les accesseurs, jamais par les initialiseurs. Un `with` qui change statut et action pose
+    // d'abord celui qui garde le constat légal.
+    private readonly string _explication = ExplicationValide(Explication);
+    public string Explication { get => _explication; init => _explication = ExplicationValide(value); }
+
+    private readonly RepairAction _action = ActionValide(Action, Statut);
+    public RepairAction Action { get => _action; init => _action = ActionValide(value, _statut); }
+
+    private readonly RepairStatus _statut = Statut;
+    public RepairStatus Statut { get => _statut; init { ActionValide(_action, value); _statut = value; } }
+
+    private static string ExplicationValide(string explication) => string.IsNullOrWhiteSpace(explication)
         ? throw new ArgumentException(
             "a finding without an explanation is just authority: fill in the explanation",
             nameof(Explication))
-        : Explication;
+        : explication;
 
-    public RepairAction Action { get; init; } =
-        Action == RepairAction.ReparationAutomatique
-        && !AutorisentUneReparationAutomatique.Contains(Statut)
+    private static RepairAction ActionValide(RepairAction action, RepairStatus statut) =>
+        action == RepairAction.ReparationAutomatique && !AutorisentUneReparationAutomatique.Contains(statut)
             ? throw new ArgumentException(
-                $"status {Statut}: an automatic repair requires {nameof(RepairStatus.KnownHarmful)}. "
+                $"status {statut}: an automatic repair requires {nameof(RepairStatus.KnownHarmful)}. "
                 + "\"Different\" is not \"damaged\", and Unknown never repairs itself.",
                 nameof(Action))
-            : Action;
+            : action;
 }

@@ -135,7 +135,7 @@ public sealed class ReglageCarteExpertTests : IDisposable
     {
         _journal.Poser("latency.gameModeOn", null);
         var r = await Expert().PoserAsync(75);
-        r.Error!.Value.Message.Should().Contain("latency.gameModeOn").And.Contain("encore en essai");
+        r.Error!.Value.Message.Should().Contain("latency.gameModeOn").And.Contain("les essais reprendront");
         _envoyees.Should().BeEmpty();
     }
 

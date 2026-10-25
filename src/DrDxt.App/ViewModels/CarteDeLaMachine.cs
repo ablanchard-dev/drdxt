@@ -48,9 +48,22 @@ public sealed record EntreeCarte(
     public bool ACommentCorriger => ARemede || AGestes;
 
     /// <summary>La première phrase du détail reste à l'écran ; la suite s'ouvre sous « Pourquoi ? »
-    /// (un constat mémoire faisait dix lignes d'un bloc).</summary>
-    public string DetailCourt => CarteDeLaMachine.TitreEtSuite(Detail).Titre;
-    public string DetailSuite => CarteDeLaMachine.TitreEtSuite(SansRemede).Suite;
+    /// (un constat mémoire faisait dix lignes d'un bloc). Une première phrase plus longue que <see cref="PhraseCourte"/>
+    /// passe entière derrière « Pourquoi ? » : seul le titre reste.</summary>
+    public string DetailCourt => PremiereCourte ? CarteDeLaMachine.TitreEtSuite(Detail).Titre : string.Empty;
+    public string DetailSuite => PremiereCourte ? CarteDeLaMachine.TitreEtSuite(SansRemede).Suite : SansRemede;
+
+    /// <summary>Sur la carte d'un domaine, tout le détail (sans le remède) s'ouvre sous le chevron : le constat ne montre
+    /// que son titre.</summary>
+    public string DetailEntier => SansRemede;
+    public bool ADetailEntier => DetailEntier.Length > 0;
+
+    /// <summary>Le chevron du titre : il ouvre le détail et la valeur lue, et existe dès que l'un des deux existe.</summary>
+    public bool ADeplier => ADetailEntier || ValeurAAfficher.Length > 0;
+
+    /// <summary>Deux lignes de lecture, environ ; au-delà, la phrase sous le titre devient un pavé.</summary>
+    public const int PhraseCourte = 140;
+    private bool PremiereCourte => CarteDeLaMachine.TitreEtSuite(Detail).Titre.Length <= PhraseCourte;
     public bool ADetailSuite => DetailSuite.Length > 0;
 
     /// <summary>La Carte graphique était « à corriger » sans aucun geste visible ; le remède était écrit,
@@ -93,8 +106,8 @@ public sealed record EntreeCarte(
     /// (« Version du pilote graphique » puis la même version). Elle ne s'affiche que si elle apprend quelque chose.</summary>
     public string ValeurAAfficher => ValeurLue.Length == 0 || DejaDit(ValeurLue) ? string.Empty : ValeurLue;
 
-    /// <summary>L'étiquette « recommandation » ne disait rien que la couleur du point ne dise déjà, et se lisait comme un
-    /// mot de code ; elle se tait, dans toutes les langues. Les étiquettes qui informent (« DrDXT peut le réparer »,
+    /// <summary>L'étiquette « recommandation » ne dit rien que la couleur du point ne dise déjà, et se lit comme un mot de
+    /// code : elle se tait, dans toutes les langues. Les étiquettes qui informent (« DrDXT peut le réparer »,
     /// « passage guidé par le BIOS ») restent.</summary>
     public string ActionAAfficher => LibellesRecommandation.Contains(Action) ? string.Empty : Action;
 
@@ -147,6 +160,29 @@ public sealed record LigneMesure(string Texte, string? Explication, bool EstTitr
     public override string ToString() => Texte;
 }
 
+/// <summary>Des constats qui se suivent et portent le même mot de gravité (« À corriger », « À regarder »).</summary>
+public sealed record GroupeDeConstats(string Cle, IReadOnlyList<EntreeCarte> Lignes)
+{
+    /// <summary>La première ligne, pour la couleur et le mot du titre (les convertisseurs de gravité la lisent).</summary>
+    public EntreeCarte Premiere => Lignes[0];
+
+    /// <summary>Ce que le lecteur d'écran annonce pour le groupe : son mot, pas les champs du record.</summary>
+    public override string ToString()
+        => (string)new DrDxt.App.Converters.SeverityLabelConverter().Convert(Premiere, typeof(string), "Titre", System.Globalization.CultureInfo.InvariantCulture);
+
+    public static IReadOnlyList<GroupeDeConstats> Grouper(IReadOnlyList<EntreeCarte> lignes)
+    {
+        var groupes = new List<GroupeDeConstats>();
+        foreach (var l in lignes)
+        {
+            var cle = DrDxt.App.Converters.SeverityLabelConverter.Cle(l);
+            if (groupes.Count > 0 && groupes[^1].Cle == cle) ((List<EntreeCarte>)groupes[^1].Lignes).Add(l);
+            else groupes.Add(new GroupeDeConstats(cle, new List<EntreeCarte> { l }));
+        }
+        return groupes;
+    }
+}
+
 /// <summary>Un domaine de la machine et tout ce que le scan en sait.</summary>
 public sealed record DomaineMachine(
     string Cle,
@@ -182,6 +218,10 @@ public sealed record DomaineMachine(
     /// <summary>La phrase d'ouverture du domaine, qui dit quoi faire.</summary>
     public string Verdict { get; init; } = "";
 
+    /// <summary>Ce que l'en-tête affiche : avec des constats, rien (« Le plus urgent ici : … » répétait le premier, juste
+    /// en dessous) ; sans constat, le verdict (« rien à signaler », « à essayer »).</summary>
+    public string VerdictAffiche => ADesLignes ? string.Empty : Verdict;
+
     /// <summary>Ce que la vue affiche : la ligne, et son explication en info-bulle quand il y en a une.</summary>
     public IReadOnlyList<LigneMesure> MesuresAffichees =>
         Mesures.Select(m => new LigneMesure(m, Explications?.GetValueOrDefault(m) ?? (Cle == "bios" ? CarteDeLaMachine.ExplicationBios(m) : null),Titres?.Contains(m) == true, m == Entete)).ToList();
@@ -208,6 +248,11 @@ public sealed record DomaineMachine(
     public IReadOnlyList<EntreeCarte> LignesVisibles => Lignes.Take(NombreVisibles).ToList();
     public IReadOnlyList<EntreeCarte> LignesRepliees => Lignes.Skip(NombreVisibles).ToList();
     public bool ADesLignesRepliees => LignesRepliees.Count > 0;
+
+    /// <summary>La gravité se dit une fois par groupe, par son titre, plus par une puce devant chaque ligne. Les lignes
+    /// arrivent triées : les groupes suivent l'ordre, sans en changer.</summary>
+    public IReadOnlyList<GroupeDeConstats> GroupesVisibles => GroupeDeConstats.Grouper(LignesVisibles);
+    public IReadOnlyList<GroupeDeConstats> GroupesReplies => GroupeDeConstats.Grouper(LignesRepliees);
 
     public bool ADesLignes => Lignes.Count > 0;
     public bool ADesNonLus => NonLus.Count > 0;
@@ -542,7 +587,7 @@ public static class CarteDeLaMachine
 
     /// <summary>La phrase qui ouvre un domaine et dit quoi faire. Le plus grave
     /// d'abord (les lignes sont déjà rangées par gravité), sinon le premier point à regarder, sinon le réglage à essayer.</summary>
-    private static string VerdictDuDomaine(EtatDomaine etat, IReadOnlyList<EntreeCarte> lignes, IReadOnlyList<EntreeCarte> proposes,
+    private static string VerdictDuDomaine(string cle, EtatDomaine etat, IReadOnlyList<EntreeCarte> lignes, IReadOnlyList<EntreeCarte> proposes,
         Func<string, string> localiser)
     {
         // La phrase d'ouverture finit par un point, comme les autres domaines.
@@ -554,7 +599,8 @@ public static class CarteDeLaMachine
         {
             EtatDomaine.ARegarder => "Carte.Verdict.Mesure",
             EtatDomaine.RienDeSignale => "Carte.Verdict.Rien",
-            _ => "Carte.Verdict.NonLu",
+            // Le réseau non mesuré n'est pas illisible : le chemin se mesure pendant le scan, s'il y a une connexion.
+            _ => cle == "reseau" ? "Carte.Verdict.NonLu.reseau" : "Carte.Verdict.NonLu",
         });
     }
 
@@ -645,7 +691,7 @@ public static class CarteDeLaMachine
                 lesMesures,
                 lignes,
                 nonLus,
-                proposes) { Explications = explications, Titres = titres, Entete = entete, Verdict = VerdictDuDomaine(etat, lignes, proposes, localiser),
+                proposes) { Explications = explications, Titres = titres, Entete = entete, Verdict = VerdictDuDomaine(cle, etat, lignes, proposes, localiser),
                 Details = details?.GetValueOrDefault(cle) ?? [],
                 TitreDesDetails = string.Format(System.Globalization.CultureInfo.CurrentCulture, localiser("Carte.DetailsTechniques"),
                     details?.GetValueOrDefault(cle)?.Count ?? 0) };

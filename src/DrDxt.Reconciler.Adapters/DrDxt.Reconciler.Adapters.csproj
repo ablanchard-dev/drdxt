@@ -8,7 +8,7 @@
     <!-- Frontières des sondes liées à l'OS (confinées à ce projet ; le Reconciler pur
          ne les référence jamais). Lectures du registre via Microsoft.Win32.Registry ; démarrage /
          état des services via System.ServiceProcess.ServiceController ; le plan d'alimentation actif
-         via un P/Invoke de powrprof.dll. WMI est repris de l'IWmiQuery de DrDxt.Detection. -->
+         par PlanActif (Core). WMI est repris de l'IWmiQuery de DrDxt.Detection. -->
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
   </ItemGroup>

@@ -79,6 +79,13 @@ public static class PairedAb
     /// </summary>
     public const double ResiduToleretouteFoisLaResolution = 2.0;
 
+    /// <summary>Sous ce seuil, la marge du modèle n'est que l'arrondi des flottants d'un résidu nul, pas un bruit mesuré.</summary>
+    public const double ResolutionNumeriqueMinPct = 1e-6;
+
+    /// <summary>La marge, quand les passes ne disent pas leur bruit : un choix de DrDXT, pas une mesure. Un écart plus petit ne
+    /// se prouve pas sur des passes sans bruit visible.</summary>
+    public const double PlancherSansBruitPct = 1.0;
+
     /// <summary>Juge une sequence appariee.</summary>
     /// <param name="passes">Les passes dans l'ordre chronologique du protocole.</param>
     /// <param name="resolutionPct">Ce que la scene sait resoudre, mesure par
@@ -171,6 +178,10 @@ public static class PairedAb
         var varianceResiduelle = sse / Math.Max(1, points.Count - 3);
         var margeFps = TValue95(points.Count - 3) * Math.Sqrt(varianceResiduelle * stt / determinant);
         var resolutionDuModele = margeFps / baseA * 100.0;
+        // Des passes exactement sur la droite (résidu nul) ne disent pas un bruit nul : elles n'en disent aucun, et une marge
+        // de zéro rendrait « prouvé » le moindre écart. Le modèle cède alors à la marge de la scène, jamais sous un plancher.
+        if (!(resolutionDuModele > ResolutionNumeriqueMinPct))
+            resolutionDuModele = Math.Max(PlancherSansBruitPct, double.IsFinite(resolutionPct) && resolutionPct > 0 ? resolutionPct : 0);
 
         return new PerformanceEvidence(
             null,

@@ -17,6 +17,11 @@ public sealed class EcransDupliquesTests
         EcransDupliques.Juger([C(0, 1, 200), C(1, 2, 144)]).Statut.Should().Be(RepairStatus.ExpectedDefault);
     }
 
+    // Aucun chemin actif (session à distance, écran éteint) n'est pas « un seul écran ».
+    [Fact]
+    public void Aucun_chemin_actif_se_dit_non_lu()
+        => EcransDupliques.Juger([]).Statut.Should().Be(RepairStatus.Unknown);
+
     [Fact]
     public void Une_duplication_entre_deux_frequences_dit_les_deux_sans_chiffrer_un_cout_non_mesure()
     {
@@ -32,7 +37,12 @@ public sealed class EcransDupliquesTests
     // 59,94 et 60 Hz sont la même fréquence d'écran (NTSC) : pas deux fréquences différentes.
     [Fact]
     public void Cinquante_neuf_94_et_60_hz_sont_la_meme_frequence()
-        => EcransDupliques.Juger([C(0, 1, 60), C(0, 2, 60000 / 1001.0)]).Statut.Should().Be(RepairStatus.Observed);
+    {
+        var c = EcransDupliques.Juger([C(0, 1, 60), C(0, 2, 60000 / 1001.0)]);
+        c.Statut.Should().Be(RepairStatus.Observed);
+        c.Explication.Should().Be(Docteur.T("TOPO.DupliqueeMeme"), "la même fréquence, pas deux fréquences différentes");
+        c.Action.Should().Be(RepairAction.Aucune);
+    }
 
     [Fact]
     public void Non_lu_reste_inconnu()
@@ -54,5 +64,15 @@ public sealed class EcransDupliquesTests
         l.Should().HaveCount(2);
         l[0].Should().Be(new CheminsDAffichage.Chemin(7, 3, 7, 42, 10, 60000 / 1001.0, null));
         l[1].Hz.Should().BeNull("fraction 0/0 : fréquence non donnée, jamais 0 Hz");
+    }
+
+    // Deux écrans dupliqués dont aucune fréquence n'est lue : « même fréquence » serait une égalité affirmée sans l'avoir lue.
+    [Fact]
+    public void Des_ecrans_dupliques_sans_frequence_lue_ne_se_disent_pas_a_la_meme_frequence()
+    {
+        var c = EcransDupliques.Juger([C(0, 1, null), C(0, 1, null)]);
+
+        c.Explication.Should().Be(Docteur.T("TOPO.DupliqueeNonLue"));
+        c.Statut.Should().Be(RepairStatus.Unknown);
     }
 }

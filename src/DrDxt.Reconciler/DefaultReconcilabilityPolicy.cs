@@ -24,10 +24,9 @@ public sealed class DefaultReconcilabilityPolicy : IReconcilabilityPolicy
     private static readonly IReadOnlyDictionary<string, ReconcileSurface> Surfaces =
         new Dictionary<string, ReconcileSurface>(StringComparer.Ordinal)
         {
-            // Réglages de latence / du pilote dans le registre (adossés au NVCP / DRS).
+            // Réglage de latence du pilote dans le registre. latency.renderQueueCap et latency.vrrVsyncCap n'y sont pas :
+            // portés par DRS, ils n'ont pas de feuille que le service sache relire ou réécrire (ReconcilableTweakCatalog).
             ["latency.reflex.lowLatencyMode"] = ReconcileSurface.Registry,
-            ["latency.renderQueueCap"] = ReconcileSurface.Registry,
-            ["latency.vrrVsyncCap"] = ReconcileSurface.Registry,
             // Plan d'alimentation système (une mise à jour de fonctionnalité le remet à Équilibré).
             ["fixit.sanePowerPlan"] = ReconcileSurface.PowerPlan,
             // Service d'optimisation AMD 3D V-Cache.
@@ -44,7 +43,6 @@ public sealed class DefaultReconcilabilityPolicy : IReconcilabilityPolicy
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["latency.reflex.lowLatencyMode"] = "NVIDIA",
-            ["latency.renderQueueCap"] = "NVIDIA",
         };
 
     // Surfaces protégées : jamais réconciliées, refusées strictement.

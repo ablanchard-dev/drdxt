@@ -19,6 +19,11 @@ public sealed class SourceAmdTests
     private static readonly SourceNvidia NvidiaMuette = new((_, _) => Task.FromResult(""));
     private static GpuInfo Radeon(string modele) => new(modele, "AMD", 16L << 30, "32.0.21025.10016", TriState.On);
 
+    // La page d'AMD se lit avec l'en-tête d'un navigateur ; rien n'y dit à AMD que cette adresse utilise DrDXT.
+    [Fact]
+    public void La_requete_a_amd_ne_nomme_pas_drdxt() =>
+        SourceAmd.EnTeteNavigateur.Should().StartWith("Mozilla/5.0").And.NotContainEquivalentOf("DrDXT");
+
     [Fact]
     public void La_page_reelle_d_AMD_donne_la_derniere_version_et_sa_date() =>
         SourceAmd.Lire(Page()).Should().Be(new VersionPubliee("26.8.1", new DateOnly(2026, 8, 18)));

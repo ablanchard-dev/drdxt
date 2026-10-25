@@ -40,4 +40,17 @@ public class LeHelperBrancheSesQuatrePortesTests
 
         construction.Should().Contain(porte, "absente, l'op correspondante échoue à chaque demande");
     }
+
+    // Une rafale d'échecs du tube (un squatteur peut la provoquer) fait sortir la boucle en fail-closed sans annulation : la
+    // surveillance des baux n'attend que `cts`, et le helper restait vivant sans tube, pour toujours en mode service.
+    [Fact]
+    public void La_fin_de_la_boucle_arrete_la_surveillance_avant_de_l_attendre()
+    {
+        var programme = File.ReadAllText(Path.Combine(Racine(), "src", "DrDxt.ElevatedHelper", "Program.cs"));
+        var boucle = programme.IndexOf("await loop.RunAsync(cts.Token)", StringComparison.Ordinal);
+        var attente = programme.IndexOf("await monitor", StringComparison.Ordinal);
+        boucle.Should().BeGreaterThanOrEqualTo(0, "témoin : la boucle d'acceptation est trouvée");
+        attente.Should().BeGreaterThan(boucle, "témoin : la surveillance est attendue après la boucle");
+        programme[boucle..attente].Should().Contain("cts.Cancel();");
+    }
 }

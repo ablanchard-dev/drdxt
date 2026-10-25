@@ -138,6 +138,11 @@ public static class ErreursMaterielles
     private static readonly Guid ProcesseurGenerique = new("9876CCAD-47B4-4BDB-B65E-16F193C4F3DB");
     private static readonly Guid ProcesseurX64 = new("DC3EA0B0-A144-4797-B95B-53FA242B6E1D");
 
+    /// <summary>Au-delà, des erreurs corrigées toutes PCIe sont un flot du lien, à corriger. Aucun seuil n'est publié ; un lien
+    /// qui gère son énergie en relève quelques-unes, pas des dizaines par jour, qui disent plutôt un signal qui passe mal
+    /// (carte mal enfoncée, rallonge, vitesse PCIe). Compté sur les 24 heures avant la plus récente.</summary>
+    public const int PcieParJourARegarder = 5;
+
     /// <summary>Pur. Les informations ne comptent pas ; une erreur fatale ou récupérable pèse plus qu'une corrigée.</summary>
     public static IEnumerable<RepairFinding> Juger(IReadOnlyList<Enregistrement>? lus, int jours = 90)
     {
@@ -158,13 +163,21 @@ public static class ErreursMaterielles
             yield break;
         }
         var graves = erreurs.Count(e => e.Gravite is 0 or 1);
+        // Une seule erreur corrigée, ou des corrigées toutes PCIe à un rythme faible (un « Advisory Non-Fatal » que le lien
+        // relève en gérant son énergie) : rien ne prouve un tort, à regarder. Une grave, plusieurs corrigées du processeur ou de
+        // la mémoire, ou un flot du lien PCIe : à corriger.
+        var toutesPcie = erreurs.All(e => e.Source?.Bus is not null);
+        var surUnJour = erreurs.Count(e => e.Quand > erreurs[0].Quand.AddDays(-1));
+        var flotPcie = graves == 0 && erreurs.Count > 1 && toutesPcie && surUnJour > PcieParJourARegarder;
+        var aRegarder = graves == 0 && !flotPcie && (erreurs.Count == 1 || toutesPcie);
         var dates = string.Join(", ", erreurs.Take(5).Select(e => e.Quand.LocalDateTime.ToString(Docteur.T("EM.FormatDate"), CultureInfo.InvariantCulture)));
         yield return new RepairFinding("STABILITE", "erreurs matérielles (WHEA)",
             graves > 0 ? Docteur.T("EM.GravesValeur", graves, erreurs.Count - graves) : Docteur.T("EM.CorrigeesValeur", erreurs.Count),
             Docteur.T("EM.Aucune"),
-            RepairStatus.Suspicious,
+            aRegarder ? RepairStatus.NonDefault : RepairStatus.Suspicious,
             (graves > 0 ? Docteur.T("EM.Graves", graves) : Docteur.T("EM.Corrigees", erreurs.Count))
-            + Docteur.T("EM.Suite", jours, dates),
+            + Docteur.T("EM.Suite", jours, dates) + (aRegarder ? Docteur.T("EM.ARegarder") : "")
+            + (flotPcie ? Docteur.T("EM.FlotPcie", surUnJour) : ""),
             RepairAction.Recommandation);
     }
 }

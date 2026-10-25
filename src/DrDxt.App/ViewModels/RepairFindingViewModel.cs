@@ -84,22 +84,11 @@ public sealed class RepairFindingViewModel
     public Severity Severity { get; }
 
     // Les libellés suivent la langue du docteur, comme les phrases des constats.
-    internal static string LibelleStatut(RepairStatus s) => Docteur.T(s switch
-    {
-        RepairStatus.KnownHarmful      => "RF.Statut.Nuisible",
-        RepairStatus.Suspicious        => "RF.Statut.Suspect",
-        RepairStatus.NonDefault        => "RF.Statut.NonDefaut",
-        RepairStatus.UserChoiceProbable => "RF.Statut.ChoixProbable",
-        RepairStatus.ExpectedDefault   => "RF.Statut.Defaut",
-        RepairStatus.Unknown           => "RF.Statut.NonLu",
-        _                              => "RF.Statut.Observe",
-    });
+    internal static string LibelleStatut(RepairStatus s) => RepairLibelles.Statut(s);
 
     // Les mots vivent dans Core (RepairLibelles) : le rapport de diagnostic dit les memes.
     internal static string LibelleDomaine(string cle) => RepairLibelles.Domaine(cle);
 
-    /// <summary>Deux incidents noyau différents (USB 3, carte graphique) partageaient un titre. Le titre
-    /// affiché dit lequel, d'après ce que le constat dit déjà ; la clé (comparée par l'historique) ne change pas.</summary>
     /// <summary>La valeur à l'écran, accordée ; une valeur BCD dit ce qu'elle veut dire, son nom technique
     /// entre parenthèses. <c>null</c> = non lue. La valeur d'origine (comparée par l'historique) ne change pas.</summary>
     internal static string? ValeurAffichee(RepairFinding f) => f.ValeurCourante is not { } v ? null
@@ -128,6 +117,8 @@ public sealed class RepairFindingViewModel
         ["DisplayAllFailures"] = "RF.Bcd.DisplayAll",
     };
 
+    /// <summary>Deux incidents noyau différents (USB 3, carte graphique) partagent un nom. Le titre
+    /// affiché dit lequel, d'après ce que le constat dit déjà ; la clé (comparée par l'historique) ne change pas.</summary>
     internal static string TitreAffiche(RepairFinding f) => f.Nom switch
     {
         // Reconnus au code d'arrêt (« 3x 0x193 VIDEO_… »), pas à la phrase : « carte graphique » échouait en anglais.

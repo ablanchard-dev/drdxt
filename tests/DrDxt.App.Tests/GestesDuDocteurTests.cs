@@ -69,4 +69,19 @@ public sealed class GestesDuDocteurTests
         new EntreeCarte("windows", Severity.Info, "t", "d", "", "", false,
             Gestes: [new GesteDuDocteur("x", "y", () => Task.FromResult(Result.Ok()))]).AGestes.Should().BeTrue();
     }
+
+    // La réponse du helper n'est pas arrivée après l'envoi : le geste a peut-être été fait. « Rien n'a été changé » serait
+    // faux ; le geste se dit incertain.
+    [Theory]
+    [InlineData(ErrorCodes.HelperNoReply)]
+    [InlineData(ErrorCodes.HelperNoReplyJournalisee)]
+    public async Task Sans_reponse_du_helper_le_geste_se_dit_incertain(string code)
+    {
+        var g = new GesteDuDocteur("Lancer", "détail", () => Task.FromResult(Result.Fail(code, "pas de réponse")));
+
+        await g.FaireCommand.ExecuteAsync(null);
+
+        g.Incertain.Should().BeTrue();
+        g.AEchoue.Should().BeFalse("rien ne dit que rien n'a été changé");
+    }
 }

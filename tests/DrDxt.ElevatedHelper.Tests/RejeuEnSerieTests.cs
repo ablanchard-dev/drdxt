@@ -96,13 +96,30 @@ public sealed class RejeuEnSerieTests : IDisposable
 
         Result Ecrire(string chemin, byte[] octets) { File.WriteAllBytes(chemin, octets); return Result.Ok(); }
         for (var i = 0; i < RapportDuRejeu.Gardes + 2; i++)
-            RapportDuRejeu.Ecrire(_dossier, RapportDuRejeu.Helper, rendu, le.AddMinutes(i), Ecrire).IsOk.Should().BeTrue();
+            RapportDuRejeu.Ecrire(_dossier, RapportDuRejeu.Helper, rendu, le.AddMinutes(i), Ecrire, _ => true).IsOk.Should().BeTrue();
 
-        var lus = RapportDuRejeu.Lire(_dossier);
+        var lus = RapportDuRejeu.Lire(_dossier, _ => true);
         lus.Should().HaveCount(RapportDuRejeu.Gardes, "seuls les derniers sont gardés");
         lus[^1].Le.Should().Be(le.AddMinutes(RapportDuRejeu.Gardes + 1));
         lus[^1].Lignes.Should().ContainSingle().Which.Should().Be(new RapportDuRejeu.Ligne("registre HwSchMode", IssueDuRendu.Rendu, "remis à 1", false));
-        RapportDuRejeu.Lire(Path.Combine(_dossier, "absent")).Should().HaveCount(0);
+        RapportDuRejeu.Lire(Path.Combine(_dossier, "absent"), _ => true).Should().HaveCount(0);
+    }
+
+    // %ProgramData% laisse tout compte y poser un fichier avant l'installation : un rapport hors confiance n'est ni dit à l'App
+    // (de faux « rendu »), ni recopié dans le suivant.
+    [Fact]
+    public void Un_rapport_hors_confiance_n_est_ni_lu_ni_recopie()
+    {
+        Directory.CreateDirectory(_dossier);
+        var le = new DateTimeOffset(2026, 10, 18, 12, 0, 0, TimeSpan.Zero);
+        RapportDuRendu Rendu(string detail) => new(null, [new LigneDuRendu(RejeuDuJournal.Source, "registre HwSchMode", IssueDuRendu.Rendu, detail)]);
+        Result Ecrire(string chemin, byte[] octets) { File.WriteAllBytes(chemin, octets); return Result.Ok(); }
+        RapportDuRejeu.Ecrire(_dossier, RapportDuRejeu.Helper, Rendu("posé d'avance"), le, Ecrire, _ => true).IsOk.Should().BeTrue();
+
+        RapportDuRejeu.Lire(_dossier, _ => false).Should().BeEmpty();
+
+        RapportDuRejeu.Ecrire(_dossier, RapportDuRejeu.Helper, Rendu("vrai"), le.AddMinutes(1), Ecrire, _ => false).IsOk.Should().BeTrue();
+        RapportDuRejeu.Lire(_dossier, _ => true).SelectMany(r => r.Lignes).Select(l => l.Detail).Should().Equal("vrai");
     }
 
     // Le service rejoue à chaque démarrage et laisse en suspens la ruche du joueur : ce rapport-là n'efface pas celui du helper.
@@ -112,7 +129,7 @@ public sealed class RejeuEnSerieTests : IDisposable
         var ecrits = 0;
         var suspens = new RapportDuRendu(null, [new LigneDuRendu(RejeuDuJournal.Source, "HKCU", IssueDuRendu.Illisible, "session", EnSuspens: true)]);
 
-        RapportDuRejeu.Ecrire(_dossier, RapportDuRejeu.Service, suspens, DateTimeOffset.UtcNow, (_, _) => { ecrits++; return Result.Ok(); }).IsOk.Should().BeTrue();
+        RapportDuRejeu.Ecrire(_dossier, RapportDuRejeu.Service, suspens, DateTimeOffset.UtcNow, (_, _) => { ecrits++; return Result.Ok(); }, _ => true).IsOk.Should().BeTrue();
 
         ecrits.Should().Be(0);
     }

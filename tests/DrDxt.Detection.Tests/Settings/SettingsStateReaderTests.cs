@@ -315,4 +315,24 @@ public class SettingsStateReaderTests
         r2.GetHeuresActives().Returns((HeuresActivesLues?)null);
         (await new SettingsStateReader(p2, r2, NoNetwork()).ReadAsync(Hw(TriState.Unknown))).Value!.HeuresActives.Should().BeNull();
     }
+
+    // Hors jeu, l'optimiseur 3D V-Cache ne parque rien : « aucun cœur parqué » y est la norme d'un X3D sain, pas un routage
+    // cassé. Le parcage ne se lit que jeu ouvert ; sinon il reste non lu.
+    [Fact]
+    public async Task Le_parcage_ne_se_lit_que_jeu_ouvert()
+    {
+        var (p, r) = Providers();
+        var jeu = Substitute.For<IGameExecutable>();
+        jeu.RunningGameExecutablePath().Returns((string?)null);
+        (await new SettingsStateReader(p, r, NoNetwork(), game: jeu).ReadAsync(Hw(TriState.Unknown))).Value!.ParkedCoreIndexes
+            .Should().BeNull();
+        r.DidNotReceive().GetParkedCoreIndexes();
+
+        jeu.RunningGameExecutablePath().Returns(@"C:\Jeux\cod.exe");
+        (await new SettingsStateReader(p, r, NoNetwork(), game: jeu).ReadAsync(Hw(TriState.Unknown))).Value!.ParkedCoreIndexes
+            .Should().BeEmpty("témoin : jeu ouvert, le parcage se lit");
+
+        (await new SettingsStateReader(p, r, NoNetwork()).ReadAsync(Hw(TriState.Unknown))).Value!.ParkedCoreIndexes
+            .Should().BeNull("sans couture du jeu, rien ne dit qu'un jeu tourne");
+    }
 }

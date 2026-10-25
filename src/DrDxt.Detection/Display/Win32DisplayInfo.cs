@@ -218,11 +218,6 @@ public sealed class Win32DisplayInfo : IDisplayInfo
         }
     }
 
-    /// <summary>
-    /// La fréquence la plus haute que l'écran offre à cette résolution et cette profondeur de
-    /// couleur. Prendre le maximum de tous les modes annoncerait la fréquence d'un mode 800x600
-    /// comme « ce que ton écran sait faire », un déficit sans geste possible. 0 si aucun mode.
-    /// </summary>
     /// <summary>La plus haute fréquence que Windows propose à une résolution donnée (la
     /// native de l'écran, comparée à son EDID), en 32 bits par pixel. 0 = aucun mode.</summary>
     public static int MaxRefreshAt(string deviceName, int width, int height) => MaxRefreshAtResolution(deviceName, width, height, 32);
@@ -240,6 +235,11 @@ public sealed class Win32DisplayInfo : IDisplayInfo
     /// sort 0 (non lue), comme une lecture ratée.</summary>
     internal static int FrequenceLue(int dmDisplayFrequency) => dmDisplayFrequency > 1 ? dmDisplayFrequency : 0;
 
+    /// <summary>
+    /// La fréquence la plus haute que l'écran offre à cette résolution et cette profondeur de
+    /// couleur. Prendre le maximum de tous les modes annoncerait la fréquence d'un mode 800x600
+    /// comme « ce que ton écran sait faire », un déficit sans geste possible. 0 si aucun mode.
+    /// </summary>
     private static int MaxRefreshAtResolution(string deviceName, int width, int height, int bpp)
     {
         var max = 0;

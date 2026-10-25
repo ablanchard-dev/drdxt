@@ -56,7 +56,7 @@ public static class OverlaysEnPartie
             {
                 // Deux estimateurs du 1 % low ne se comparent pas : une partie de l'autre ne compte d'aucun côté.
                 var estimateur = ComparaisonDesParties.EstimateurMajoritaire(jeu.ToList());
-                var memes = jeu.Where(p => p.Low1SurToutesLesImages == estimateur).ToList();
+                var memes = jeu.Where(p => ComparaisonDesParties.Estimateur(p) == estimateur).ToList();
                 var avec = memes.Where(p => p.Overlays!.Contains(overlay)).ToList();
                 var sans = memes.Where(p => !p.Overlays!.Contains(overlay)).ToList();
                 if (avec.Count >= PartiesParCote && sans.Count >= PartiesParCote)

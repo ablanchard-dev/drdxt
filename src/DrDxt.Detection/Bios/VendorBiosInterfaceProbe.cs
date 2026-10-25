@@ -29,8 +29,9 @@ public sealed record VendorBiosInterface(
 /// sur la MSI PRO B760-P WIFI DDR4 : `root\wmi` expose `MSI_BiosSetting` avec
 /// `GetBiosSetting(Item)` et `SetBiosSetting(Item, Value)`, deux instances ACPI\PNP0C14 actives.
 ///
-/// **ce probe n'appelle aucune methode.** Il lit la forme des classes, jamais leur contenu.
-/// Trois raisons, et chacune suffit :
+/// **ce probe n'appelle aucune methode.** Il lit la forme des classes et compte leurs instances, sans garder aucune
+/// valeur. Compter fait enumerer les instances par le fournisseur WMI : sur une classe de donnees ACPI, c'est deja une
+/// lecture du firmware, la seule que ce probe fasse. Ne pas appeler de methode, trois raisons, et chacune suffit :
 ///
 ///   1. `GetBiosSetting` prend un nom de reglage que nous ne connaissons pas. L'appeler
 ///      reviendrait a tatonner le parseur d'un firmware.
@@ -72,7 +73,7 @@ public sealed class VendorBiosInterfaceProbe
         return trouvees;
     }
 
-    private static VendorBiosInterface? Inspecter(string espace, string classe)
+    private static VendorBiosInterface? Inspecter(string espace, string classe) => LectureWmiBornee.Lire<VendorBiosInterface?>(() =>
     {
         try
         {
@@ -94,7 +95,7 @@ public sealed class VendorBiosInterfaceProbe
                 methodes);
         }
         catch { return null; }   // absente : le cas normal sur la plupart des machines
-    }
+    }, () => null);
 
     /// <summary>
     /// Le niveau de capacite que cette decouverte autorise, et il s'arrete a `Unsupported`.

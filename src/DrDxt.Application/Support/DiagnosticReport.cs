@@ -20,8 +20,9 @@ namespace DrDxt.Application.Support;
 /// ══ ce qui n'entre jamais dans ce fichier ══
 ///
 /// Rien de nominatif : ni nom d'utilisateur, ni chemins personnels. Ce rapport est destiné à être collé
-/// dans un salon public. Ce qu'on met est ce
-/// dont le support a besoin pour comprendre une machine, et rien de plus.
+/// dans un salon public. Ce qu'on met est ce dont le support a besoin pour comprendre une machine, et rien de plus.
+/// Les explications des constats arrivent telles que le scan les a écrites et peuvent porter un chemin : les deux
+/// appelants (export, paquet d'aide) passent le texte par MachineExportee.AnonymiserTexte, qui les retire.
 /// </summary>
 public static class DiagnosticReport
 {
@@ -31,8 +32,8 @@ public static class DiagnosticReport
         FormattableString.Invariant($"drdxt-diagnostic-{when:yyyy-MM-dd-HHmm}.txt");
 
     /// <summary>
-    /// Construit le rapport. Pur : meme entree, meme texte ; aucune lecture de machine ici, tout
-    /// arrive deja lu, ce qui le rend entierement testable.
+    /// Construit le rapport. Pur, a la version du runtime pres : meme entree, meme texte ; aucune lecture de la
+    /// machine ici, tout arrive deja lu, ce qui le rend entierement testable.
     /// </summary>
     /// <param name="scan">Le dernier scan. null = aucun scan encore lance, et ca se dit.</param>
     /// <param name="appVersion">La version du produit : la premiere question de tout support.</param>
@@ -275,7 +276,9 @@ public static class DiagnosticReport
         foreach (var row in rows)
             Line(sb, row.Model,
                 Docteur.T("Rapport.ReglageCarte.Ligne", Texte(row.Support), Texte(row.Architecture),
-                    Docteur.T(row.VoltageTuning ? "Rapport.Oui" : "Rapport.Non")));
+                    // Le levier de la carte écrit un décalage d'horloge, jamais une tension : aucune op de tension de carte
+                    // n'existe (NoVoltageWriteOpExistsGateTests), quelle que soit l'architecture ou sa validation.
+                    Docteur.T("Rapport.VoltageJamaisEcrit")));
         sb.AppendLine();
     }
 
@@ -317,10 +320,16 @@ public static class DiagnosticReport
         Line(sb, Docteur.T("Rapport.Marge1Low"), double.IsFinite(baseline.P1LowMarginOfError)
             ? baseline.P1LowMarginOfError.ToString("F2", CultureInfo.InvariantCulture)
             : Docteur.T("Rapport.MargeInconnue"));
-        Line(sb, "0.1% low", baseline.P01LowFps.ToString("F1", CultureInfo.InvariantCulture));
-        Line(sb, Docteur.T("Rapport.Marge01Low"), double.IsFinite(baseline.P01LowMarginOfError)
-            ? baseline.P01LowMarginOfError.ToString("F2", CultureInfo.InvariantCulture)
-            : Docteur.T("Rapport.MargeInconnue"));
+        // Sous ImagesPourLe01Low images, le 0,1 % le plus lent n'est qu'une image, la pire : il ne se chiffre pas.
+        if (baseline.FrameTimesMs.Count < ImagesPourLe01Low)
+            Line(sb, "0.1% low", Docteur.T("Rapport.P01Insuffisant", baseline.FrameTimesMs.Count, ImagesPourLe01Low));
+        else
+        {
+            Line(sb, "0.1% low", baseline.P01LowFps.ToString("F1", CultureInfo.InvariantCulture));
+            Line(sb, Docteur.T("Rapport.Marge01Low"), double.IsFinite(baseline.P01LowMarginOfError)
+                ? baseline.P01LowMarginOfError.ToString("F2", CultureInfo.InvariantCulture)
+                : Docteur.T("Rapport.MargeInconnue"));
+        }
         // La marge et le nombre de passes sans lesquels un chiffre de FPS ne veut rien dire.
         // +inf sous trois passes, que la culture invariante ecrit « Infinity ».
         Line(sb, Docteur.T("Rapport.Marge"), double.IsFinite(baseline.MarginOfError)
@@ -378,14 +387,10 @@ public static class DiagnosticReport
         _ => state.ToString(),
     };
 
-    private static string Texte(BottleneckState state) => state switch
-    {
-        BottleneckState.UnknownPartial => Docteur.T("Rapport.Etat.NonClasse"),
-        BottleneckState.GpuBound => Docteur.T("Rapport.Etat.Gpu"),
-        BottleneckState.MixedGpuLeaning => Docteur.T("Rapport.Etat.PlutotGpu"),
-        BottleneckState.CpuBoundOrAppBound => Docteur.T("Rapport.Etat.CpuOuJeu"),
-        _ => state.ToString(),
-    };
+    /// <summary>Le 0,1 % le plus lent d'une mesure n'est plus une seule image qu'à partir de mille.</summary>
+    public const int ImagesPourLe01Low = 1000;
+
+    private static string Texte(BottleneckState state) => MotifDuGoulot.Libelle(state);
 
     private static string Texte(BottleneckConfidence confidence) => confidence switch
     {

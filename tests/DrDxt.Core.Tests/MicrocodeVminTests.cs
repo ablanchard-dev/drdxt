@@ -15,6 +15,18 @@ public class MicrocodeVminTests
         MicrocodeVmin.Perime("Intel(R) Core(TM) i7-14700F", 0x133, RaptorLake).Should().BeFalse("relevé sur la machine de référence");
     }
 
+    // L'identifiant CPUID non lu rendait « pas concerné » : la PL1 pouvait monter sur un i7-14700F à vieux microcode. Un nom de
+    // Core de bureau 13e/14e sans identifiant lu est concerné ; un i5 Alder Lake y perd au plus une montée refusée.
+    [Fact]
+    public void Un_identifiant_non_lu_ne_rend_jamais_pas_concerne()
+    {
+        MicrocodeVmin.PerimePourLaPuissance("Intel(R) Core(TM) i7-14700F", 0x12B, null).Should().BeTrue();
+        MicrocodeVmin.PerimePourLaPuissance("Intel(R) Core(TM) i7-14700F", 0x133, null).Should().BeFalse();
+        MicrocodeVmin.PerimePourLaPuissance("Intel(R) Core(TM) i7-14700F", null, null).Should().BeTrue();
+        MicrocodeVmin.PerimePourLaPuissance("Intel(R) Core(TM) i7-14700HX", 0x100, null).Should().BeNull("portable : le nom suffit à l'écarter");
+        MicrocodeVmin.Perime("Intel(R) Core(TM) i7-14700F", 0x12B, null).Should().BeNull("le docteur n'affirme que ce qu'il a lu");
+    }
+
     [Fact]
     public void Hors_Raptor_Lake_portable_ou_AMD_rien()
     {

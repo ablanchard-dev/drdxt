@@ -103,9 +103,12 @@ public sealed class Ed25519SignatureSchemeTests
 
         // Altérer → fermé sous le vrai Ed25519 (inverser un octet du contenu signé).
         var slot = storage.Slot!;
-        var chars = slot.CanonicalJson.ToCharArray();
-        chars[chars.Length / 2] = chars[chars.Length / 2] == 'x' ? 'y' : 'x';
-        storage.Slot = slot with { CanonicalJson = new string(chars) };
+        // Une date changée garde un JSON valide : seule la signature peut refuser. Un caractère au hasard cassait le JSON,
+        // et le refus pouvait venir de la lecture sans que la signature soit vérifiée.
+        var altere = slot.CanonicalJson.Replace("2026", "2027", StringComparison.Ordinal);
+        altere.Should().NotBe(slot.CanonicalJson);
+        System.Text.Json.JsonDocument.Parse(altere).Dispose();
+        storage.Slot = slot with { CanonicalJson = altere };
         var tampered = await store.LoadAsync();
         tampered.IsOk.Should().BeFalse();
         tampered.Error!.Value.Code.Should().Be(ErrorCodes.ManifestTampered);

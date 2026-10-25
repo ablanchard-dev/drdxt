@@ -5,9 +5,9 @@ using FluentAssertions;
 namespace DrDxt.ElevatedHelper.Tests;
 
 /// <summary>
-/// Le journal du helper élevé vit dans le profil de l'utilisateur. Une session non élevée peut y
-/// remplacer un dossier par une jonction : l'ajout élevé partirait alors où elle pointe. Ces tests
-/// créent une vraie jonction (mklink /J, sans droit particulier).
+/// Le journal du helper élevé vit dans la racine durcie ; un dossier passé à la main (tests, surcharge) peut, lui, être
+/// remplacé par une jonction, et un nom posé d'avance en lien dur. L'ajout comme l'export ne suivent alors aucun lien. Ces
+/// tests créent une vraie jonction (mklink /J, sans droit particulier).
 /// </summary>
 public sealed class HelperDiagnosticsLogTests : IDisposable
 {
@@ -80,5 +80,43 @@ public sealed class HelperDiagnosticsLogTests : IDisposable
         new HelperDiagnosticsLog(dossier).Change("t", "a", "b", "test");
 
         File.ReadAllText(temoin).Should().Be("intact");
+    }
+
+    // L'export lit le journal en administrateur et en rend le texte à l'App, qui ne l'est pas : il ne suit pas plus un lien
+    // que l'ajout. Un nom posé d'avance en lien dur, ou un dossier remplacé par une jonction, ne lui fait rien lire d'autre.
+    [Fact]
+    public async Task L_export_ne_lit_pas_un_autre_fichier_par_un_lien_dur()
+    {
+        var dossier = Directory.CreateDirectory(Path.Combine(_base, "racine")).FullName;
+        var secret = Path.Combine(_base, "secret.txt");
+        File.WriteAllText(secret, "secret");
+        CreateHardLink(Path.Combine(dossier, "helper.journal.log"), secret, IntPtr.Zero).Should().BeTrue();
+
+        var r = await new HelperDiagnosticsLog(dossier).ExportAsync();
+
+        (r.IsOk ? r.Value : "").Should().NotContain("secret");
+    }
+
+    [Fact]
+    public async Task L_export_ne_lit_pas_a_travers_une_jonction()
+    {
+        var cible = Directory.CreateDirectory(Path.Combine(_base, "cible")).FullName;
+        File.WriteAllText(Path.Combine(cible, "helper.journal.log"), "secret");
+        var lien = Path.Combine(_base, "journal");
+        Jonction(lien, cible);
+
+        var r = await new HelperDiagnosticsLog(lien).ExportAsync();
+
+        (r.IsOk ? r.Value : "").Should().NotContain("secret");
+    }
+
+    [Fact]
+    public async Task L_export_rend_le_journal_ecrit()
+    {
+        var dossier = Path.Combine(_base, "normal");
+        var journal = new HelperDiagnosticsLog(dossier);
+        journal.Change("t", "a", "b", "test");
+
+        (await journal.ExportAsync()).Value.Should().Contain("tweak=t");
     }
 }

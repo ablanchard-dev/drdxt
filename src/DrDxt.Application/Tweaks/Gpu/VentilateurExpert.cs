@@ -83,7 +83,7 @@ public sealed class EssaiVentilateur : IEssaiCarte
     public EssaiVentilateur(IElevatedClient elevated, IRevertEnAttente journal, RestoreGpuFanAutoOp retour, HeartbeatSender bail)
     {
         (_elevated, _journal, _retour, _bail) = (elevated, journal, retour, bail);
-        SuiviDuBail.LeverAuBailPerdu(bail, journal);
+        SuiviDuBail.LeverAuBailPerdu(bail, journal, VentilateurExpert.IdLevier);
         bail.Perdu += () => BailPerdu?.Invoke();
         bail.Injoignable += () => RenduApresPerte = RendreSansHelperAsync();
     }

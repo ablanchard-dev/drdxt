@@ -45,9 +45,29 @@ public sealed class CalmeurDeVoisins
         "EAAntiCheat.GameServiceLauncher", "FACEIT", "FACEITService", "PnkBstrA", "PnkBstrB", "GameMon", "GameMon64",
     };
 
-    /// <summary>Jamais touché, quoi qu'en dise le joueur : le système, la sécurité, DrDXT, les antitriches.</summary>
+    // Les antivirus courants, les mêmes marques que les programmes au démarrage jamais coupés (ProtegesAuDemarrage), par le
+    // nom de leur processus. Les noms courts se comparent exactement : contenus, ils prendraient d'autres programmes.
+    private static readonly HashSet<string> Antivirus = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "avp", "avpui", "ekrn", "egui", "bdagent", "bdservicehost", "vsserv", "mcshield", "mfemms", "mfevtps", "WRSA",
+        "PccNTMon", "TmListen", "coreServiceShell", "fshoster32", "fsorsp64", "PSANHost", "cmdagent", "vsmon", "zlclient",
+        "AVKService", "GDScan", "SavService", "ns", "nsWscSvc", "mbam", "mbamtray", "avguard", "avgnt",
+    };
+
+    private static readonly string[] MarquesDAntivirus =
+        ["Avast", "AVG", "Avira", "Bitdefender", "Kaspersky", "ESET", "Norton", "McAfee", "Malwarebytes", "MBAM", "Sophos", "Webroot"];
+
+    /// <summary>Jamais touché, quoi qu'en dise le joueur : le système, la sécurité (Defender et les antivirus courants, par le
+    /// nom de leur processus), DrDXT, les antitriches.</summary>
     public static bool Protege(string nom)
-        => Intouchables.Contains(nom) || nom.Contains("anticheat", StringComparison.OrdinalIgnoreCase);
+        => Intouchables.Contains(nom) || Antivirus.Contains(nom) || nom.Contains("anticheat", StringComparison.OrdinalIgnoreCase)
+           || MarquesDAntivirus.Any(m => DeLaMarque(nom, m));
+
+    // La marque seule, ou suivie d'un séparateur ou d'une majuscule (AvastSvc, AVGUI, Avira.ServiceHost) : en tête d'un autre
+    // mot (esetup, Nortonville), ce n'est pas elle.
+    private static bool DeLaMarque(string nom, string marque)
+        => nom.StartsWith(marque, StringComparison.OrdinalIgnoreCase)
+           && (nom.Length == marque.Length || nom[marque.Length] is '.' or '_' or '-' or ' ' || char.IsUpper(nom[marque.Length]));
 
     /// <summary>Les programmes à proposer au calmeur, lus dans les parties relevées : ceux qui y ont
     /// tenu plus d'un quart de cœur sur deux relevés (<see cref="DrDxt.Application.Parties.VoisinEnPartie"/>, même seuil

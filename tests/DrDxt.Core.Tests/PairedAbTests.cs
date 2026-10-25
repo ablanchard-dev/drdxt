@@ -38,6 +38,21 @@ public class PairedAbTests
         r.Game!.Preuve.InvalidReason.Should().Contain("au moins 4 passes");
     }
 
+    // Des passes exactement sur la droite laissent un résidu nul : une marge de zéro rendait « prouvé » un écart de 0,1 %.
+    [Fact]
+    public void Un_residu_nul_ne_donne_pas_une_marge_nulle()
+    {
+        var parfaite = Suite(('A', 100), ('B', 100.1), ('B', 100.1), ('A', 100), ('A', 100), ('B', 100.1));
+
+        PairedAb.Analyse(parfaite, resolutionPct: 3.0).Game!.Preuve.Outcome.Should().Be(EvidenceOutcome.NoResolvedChange,
+            "la marge de la scène prend le relais");
+        PairedAb.Analyse(parfaite, resolutionPct: double.NaN).Game!.Preuve.Outcome.Should().Be(EvidenceOutcome.NoResolvedChange,
+            "sans bruit connu, le plancher");
+        var nette = Suite(('A', 100), ('B', 120), ('B', 120), ('A', 100), ('A', 100), ('B', 120));
+        PairedAb.Analyse(nette, resolutionPct: double.NaN).Game!.Preuve.Outcome.Should().Be(EvidenceOutcome.ProvenGain,
+            "un écart de 20 % passe le plancher");
+    }
+
     [Fact]
     public void Une_sequence_a_un_seul_etat_le_dit()
     {

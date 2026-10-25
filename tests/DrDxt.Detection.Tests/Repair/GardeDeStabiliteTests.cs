@@ -17,4 +17,24 @@ public sealed class GardeDeStabiliteTests
         GardeDeStabilite.Dates(([], [vidage])).Should().Equal(vidage);
         GardeDeStabilite.Dates((null, [vidage])).Should().BeNull("non lu vaut instable, jamais stable");
     }
+
+    // Une source qui lève (journal refusé d'une autre façon que celles qu'elle attrape) rend la garde non lue ; elle faisait
+    // échouer toute la lecture des réglages, donc le scan entier.
+    private sealed class VidagesQuiLevent : IDumpCreationLog
+    {
+        public Result<EtatDesVidages> Lire(DateTimeOffset depuis) => throw new InvalidOperationException("journal (test)");
+    }
+
+    private sealed class AucunArret : IUnexpectedShutdownLog
+    {
+        public Result<IReadOnlyList<DateTimeOffset>> Since(DateTimeOffset earliest) => Result<IReadOnlyList<DateTimeOffset>>.Ok([]);
+    }
+
+    [Fact]
+    public void Une_source_qui_leve_rend_la_garde_non_lue()
+    {
+        var lu = GardeDeStabilite.Lire(new AucunArret(), new VidagesQuiLevent(), DateTimeOffset.UtcNow, _ => [], _ => []);
+
+        GardeDeStabilite.Dates(lu).Should().BeNull();
+    }
 }

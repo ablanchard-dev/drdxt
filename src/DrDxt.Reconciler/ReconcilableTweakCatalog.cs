@@ -151,9 +151,9 @@ public sealed class DefaultReconcilableTweakCatalog : IReconcilableTweakCatalog
 
             // Note : les leviers HKCU (Game DVR / mode Jeu / VRR) sont absents exprès : le réconciliateur
             // de démarrage tourne en LocalSystem, où Registry.CurrentUser est la ruche de SYSTEM ; une
-            // réapplication HKCU viserait donc la mauvaise ruche. Ils persistent d'eux-mêmes au redémarrage
-            // et l'App les réapplique au lancement suivant ; les réconcilier demande une réconciliation par
-            // utilisateur (voir AppliedTweakManifestMapper / DefaultReconcilabilityPolicy).
+            // réapplication HKCU viserait donc la mauvaise ruche. Ils persistent d'eux-mêmes au redémarrage ;
+            // l'App les relit au lancement et dit une dérive sans la réécrire. Les réconcilier demande une
+            // réconciliation par utilisateur (voir AppliedTweakManifestMapper / DefaultReconcilabilityPolicy).
 
             // latency.renderQueueCap / latency.vrrVsyncCap restent omis. Ils n'ont pas de feuille de
             // registre lisible : les sonder comme une feuille lirait un emplacement bidon. Leur lecture

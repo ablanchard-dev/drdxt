@@ -35,28 +35,44 @@ public sealed class WmiRestorePointService : IRestorePointService
     public WmiRestorePointService(IElevatedClient elevated) =>
         _elevated = elevated ?? throw new ArgumentNullException(nameof(elevated));
 
-    public bool IsEnabled()
+    public bool InterditeParStrategie()
     {
         try
         {
-            // D'abord : WMI SystemRestoreConfig (RPSessionInterval > 0 veut dire restauration active).
-            using var searcher = new ManagementObjectSearcher(
-                SystemRestoreScope, "SELECT RPSessionInterval FROM SystemRestoreConfig");
-            using var rangees = searcher.Get();
-            foreach (var o in rangees)
+            using var cle = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows NT\SystemRestore");
+            return cle?.GetValue("DisableSR") is int v && v != 0;
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or System.IO.IOException) { return false; }
+    }
+
+    public bool IsEnabled()
+    {
+        // D'abord : WMI SystemRestoreConfig (RPSessionInterval > 0 veut dire restauration active), sous borne ; illisible ou
+        // figé, la lecture du registre décide.
+        if (LectureWmiBornee.Lire(() =>
             {
-                using (o)
+                try
                 {
-                    var raw = o["RPSessionInterval"];
-                    if (raw is not null && int.TryParse(raw.ToString(), out var interval) && interval > 0)
-                        return true;
+                    using var searcher = new ManagementObjectSearcher(
+                        SystemRestoreScope, "SELECT RPSessionInterval FROM SystemRestoreConfig");
+                    using var rangees = searcher.Get();
+                    foreach (var o in rangees)
+                    {
+                        using (o)
+                        {
+                            var raw = o["RPSessionInterval"];
+                            if (raw is not null && int.TryParse(raw.ToString(), out var interval) && interval > 0)
+                                return true;
+                        }
+                    }
                 }
-            }
-        }
-        catch
-        {
-            // on passe à la lecture du registre
-        }
+                catch
+                {
+                    // on passe à la lecture du registre
+                }
+                return false;
+            }, () => false))
+            return true;
 
         // Repli : la clé de registre de configuration de la restauration (RPSessionInterval).
         try
@@ -117,7 +133,7 @@ public sealed class WmiRestorePointService : IRestorePointService
         return "C:";
     }
 
-    public DateTime? DernierPointDepuis(DateTime depuisUtc)
+    public DateTime? DernierPointDepuis(DateTime depuisUtc) => LectureWmiBornee.Lire(() =>
     {
         try
         {
@@ -135,7 +151,7 @@ public sealed class WmiRestorePointService : IRestorePointService
         {
             return null;
         }
-    }
+    }, () => (DateTime?)null);
 
     /// <summary>Le point le plus recent cree depuis <paramref name="depuisUtc"/>, en UTC, ou <c>null</c>.
     /// Les dates sont celles de la classe WMI SystemRestore (ex. « 20260911222955.512634-000 », relevée sur un

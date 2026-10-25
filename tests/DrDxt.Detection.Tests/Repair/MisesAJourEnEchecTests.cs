@@ -35,6 +35,25 @@ public class MisesAJourEnEchecTests
         constats[0].Explication.Should().StartWith("2 de ces échecs ont été rattrapés");
     }
 
+    // La mise à jour cumulative de septembre ratée deux fois, puis celle d'octobre installée : septembre ne sera plus
+    // proposée, elle ne reste pas « en échec à chaque essai ». Témoin : deux correctifs distincts sans mois ne se mêlent pas.
+    [Fact]
+    public void Une_mise_a_jour_mensuelle_remplacee_par_la_suivante_ne_reste_pas_en_echec()
+    {
+        MisesAJourEnEchec.Juger(
+        [
+            Essai(1, false, "2026-09 Mise à jour cumulative pour Windows 11 Version 24H2 pour les systèmes x64 (KB5065426)", "0x800f0922"),
+            Essai(3, false, "2026-09 Mise à jour cumulative pour Windows 11 Version 24H2 pour les systèmes x64 (KB5065426)", "0x800f0922"),
+            Essai(40, true, "2026-10 Mise à jour cumulative pour Windows 11 Version 24H2 pour les systèmes x64 (KB5066835)"),
+        ], 90).Should().ContainSingle("seul le bilan : rien ne reste en échec");
+
+        MisesAJourEnEchec.Juger(
+        [
+            Essai(1, false, "Correctif (KB1)", "0x800f0922"), Essai(3, false, "Correctif (KB1)", "0x800f0922"),
+            Essai(40, true, "Correctif (KB2)"),
+        ], 90).Should().HaveCount(2, "un autre correctif ne rattrape pas celui-ci");
+    }
+
     /// <summary>« Échecs : 27 sur 90 jours » au-dessus de quatre lignes à un échec chacune tromperait si le
     /// rattrapage n'était dit qu'en info-bulle : le compte visible porte sa part rattrapée.</summary>
     [Fact]

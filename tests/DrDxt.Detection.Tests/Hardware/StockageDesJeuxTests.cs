@@ -21,7 +21,7 @@ public sealed class StockageDesJeuxTests
     public void Un_ssd_sur_moins_de_lignes_que_les_siennes_se_dit_avec_le_geste()
     {
         var c = BranchementDeLaCarte.JugerLienSsd(new("SSD", 4, 2, 4, 4)).Single();
-        c.Statut.Should().Be(RepairStatus.Suspicious);
+        c.Statut.Should().Be(RepairStatus.NonDefault, "un emplacement câblé x2 par la carte mère est un choix de conception");
         c.Action.Should().Be(RepairAction.Recommandation);
     }
 

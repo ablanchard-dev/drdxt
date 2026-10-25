@@ -48,6 +48,21 @@ public sealed class CouvertureDesLeviersTests
     public void Non_lu_est_dit() =>
         Un(Levier("latency.hagsOn", nonLu: true), Machine()).Statut.Should().Be(StatutDuLevier.NonLu);
 
+    // Un portable dont le SMBIOS dit « Other » ou « Unknown », avec sa batterie : le châssis reste inconnu, et un levier de
+    // PC fixe ne s'y applique pas. Il n'est pas « déjà bon », il n'est pas lu, même avec un plan Économie d'énergie actif.
+    [Fact]
+    public void Chassis_inconnu_un_levier_qui_depend_du_chassis_est_non_lu()
+    {
+        var t = Levier("fixit.plan_economie");
+        t.AppliesTo(Arg.Is<HardwareInventory>(h => h.Chassis == ChassisType.Desktop), Arg.Any<SettingsState>()).Returns(true);
+
+        Un(t, Machine(ChassisType.Unknown)).Statut.Should().Be(StatutDuLevier.NonLu);
+    }
+
+    [Fact]
+    public void Chassis_inconnu_un_levier_qui_n_en_depend_pas_reste_deja_bon() =>
+        Un(Levier("latency.gameModeOn"), Machine(ChassisType.Unknown)).Statut.Should().Be(StatutDuLevier.DejaBon);
+
     [Fact]
     public void Ni_applicable_ni_non_lu_sur_le_bon_materiel_est_deja_bon() =>
         Un(Levier("latency.gameModeOn"), Machine()).Statut.Should().Be(StatutDuLevier.DejaBon);
@@ -75,6 +90,11 @@ public sealed class CouvertureDesLeviersTests
     public void Sans_carte_dediee_les_reglages_de_carte_ne_s_appliquent_pas() =>
         Un(Levier("gpu.power_limit"), Machine(gpu: "Intel UHD 770", vendeur: "Intel", vram: 0)).RaisonCle
             .Should().Be("Levier.PasIci.PasDeCarteDediee");
+
+    [Fact]
+    public void La_limite_de_puissance_sur_AMD_dit_pourquoi_elle_n_est_pas_proposee() =>
+        Un(Levier("gpu.power_limit"), Machine(gpu: "AMD Radeon RX 7800 XT", vendeur: "AMD")).RaisonCle
+            .Should().Be("Levier.PasIci.PuissanceAmd");
 
     [Fact]
     public void Le_routage_X3D_ne_concerne_qu_un_X3D_a_deux_blocs()
@@ -120,5 +140,34 @@ public sealed class CouvertureDesLeviersTests
         liste.Single(l => l.Id == "latency.gameModeOn").VerifieIci.Should().BeTrue();
         liste.Single(l => l.Id == "gpu.fan_curve").VerifieIci.Should().BeFalse("Expert : la vérification ne le pose pas");
         liste.Single(l => l.Id == "fixit.x3d_ccd").VerifieIci.Should().BeFalse("pas un X3D : pas pour ce matériel");
+    }
+
+    // La carte de la machine se redessine plusieurs fois par scan ; un levier qui lit l'écran ou le pilote dans AppliesTo
+    // (mesuré : 30 à 50 ms par lecture de l'écran de jeu) se relisait à chaque fois, trois fois de plus sur un châssis inconnu.
+    // Pour un même scan (le même inventaire et le même relevé), chaque levier se juge une fois par châssis.
+    [Fact]
+    public void Un_meme_scan_ne_rejuge_pas_ses_leviers()
+    {
+        var t = Levier("latency.gameModeOn");
+        var hw = Machine(ChassisType.Unknown);
+        var poses = new HashSet<string>();
+
+        CouvertureDesLeviers.Calculer([t], hw, Etat, poses);
+        CouvertureDesLeviers.Calculer([t], hw, Etat, poses);
+
+        t.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(ITweak.AppliesTo)).Should().Be(3, "inconnu, fixe, portable : une fois chacun");
+        t.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(ITweak.EtatNonLu)).Should().Be(1);
+    }
+
+    [Fact]
+    public void Un_autre_scan_rejuge_ses_leviers()
+    {
+        var t = Levier("latency.gameModeOn");
+        var hw = Machine();
+
+        CouvertureDesLeviers.Calculer([t], hw, Etat, new HashSet<string>());
+        CouvertureDesLeviers.Calculer([t], hw, Etat with { Hags = TriState.Off }, new HashSet<string>());
+
+        t.ReceivedCalls().Count(c => c.GetMethodInfo().Name == nameof(ITweak.AppliesTo)).Should().Be(2);
     }
 }

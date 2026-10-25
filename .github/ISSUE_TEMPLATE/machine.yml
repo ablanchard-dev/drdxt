@@ -1,7 +1,7 @@
 name: Machine
 description: La lecture de ta machine (« Exporter ma machine »). / What DrDXT reads on your machine ("Export my machine").
 title: "Machine : <processeur / processor> + <carte graphique / graphics card> (<bureau, portable / desktop, laptop>)"
-labels: ["machine"]
+labels: ["hardware"]
 body:
   - type: markdown
     attributes:

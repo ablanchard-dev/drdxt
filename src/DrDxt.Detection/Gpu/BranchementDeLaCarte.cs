@@ -56,7 +56,9 @@ public static class BranchementDeLaCarte
 
     /// <param name="adaptateursDesEcrans">Le nom de l'adaptateur de chaque écran actif (EnumDisplayDevices).</param>
     /// <param name="batterie">null = non lu : rien n'est dit.</param>
-    public static IEnumerable<RepairFinding> JugerEcrans(IReadOnlyList<string> adaptateursDesEcrans, IReadOnlyList<GpuInfo> cartes, bool? batterie)
+    /// <param name="principal">L'adaptateur de l'écran principal, celui où le jeu s'ouvre ; null = non lu.</param>
+    public static IEnumerable<RepairFinding> JugerEcrans(IReadOnlyList<string> adaptateursDesEcrans, IReadOnlyList<GpuInfo> cartes, bool? batterie,
+        string? principal = null)
     {
         if (batterie is not false) yield break;
         var dediee = cartes.FirstOrDefault(c => c.VramBytes >= Dediee);
@@ -67,8 +69,13 @@ public static class BranchementDeLaCarte
                                         && c.Model.Equals(a, StringComparison.OrdinalIgnoreCase)))
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (integrees.Count == 0) yield break;
+        // L'écran principal, celui où le jeu s'ouvre, sur la carte mère : à corriger. Sur la carte dédiée, un second écran
+        // (stream, discussion) sur la carte mère est un montage courant et voulu : à regarder. Principal non lu : rien n'est
+        // démontré tant qu'un écran est sur la carte dédiée, à regarder ; aucun, le jeu passe par la carte mère, à corriger.
+        bool SurLaDediee(string a) => cartes.Any(c => c.VramBytes >= Dediee && c.Model.Equals(a, StringComparison.OrdinalIgnoreCase));
+        var unSurLaDediee = principal is not null ? SurLaDediee(principal) : adaptateursDesEcrans.Any(SurLaDediee);
         yield return new RepairFinding("GPU", Docteur.Nom("BR.Nom.Ecran"), string.Join(", ", integrees), dediee.Model,
-            RepairStatus.Suspicious,
+            unSurLaDediee ? RepairStatus.NonDefault : RepairStatus.Suspicious,
             // Un 2e écran sur la carte mère ne dit rien du jeu sur l'écran principal : la phrase parle de cet écran.
             Docteur.T("BR.Ecran", string.Join(", ", integrees), dediee.Model),
             RepairAction.Recommandation);
@@ -116,7 +123,8 @@ public static class BranchementDeLaCarte
         var lu = $"x{l.Largeur}" + (l.Generation > 0 ? $", PCIe {l.Generation}.0" : "");
         var max = $"x{l.LargeurMax}" + (l.GenerationMax > 0 ? $", PCIe {l.GenerationMax}.0" : "");
         if (l.Largeur < l.LargeurMax)
-            yield return new RepairFinding("STOCKAGE", Docteur.Nom("BR.Nom.LienSsd", l.Carte), lu, max, RepairStatus.Suspicious,
+            // Un emplacement câblé x2 par la carte mère est un choix de conception, pas une panne : à regarder.
+            yield return new RepairFinding("STOCKAGE", Docteur.Nom("BR.Nom.LienSsd", l.Carte), lu, max, RepairStatus.NonDefault,
                 Docteur.T("BR.SsdLargeur", l.LargeurMax, l.Largeur), RepairAction.Recommandation);
         else if (l.GenerationMax > 0 && l.Generation > 0 && l.Generation < l.GenerationMax)
             yield return new RepairFinding("STOCKAGE", Docteur.Nom("BR.Nom.LienSsd", l.Carte), lu, max, RepairStatus.Observed,

@@ -71,10 +71,6 @@ public interface IDesiredStateStore // l'application écrit (op signée), le rec
     Task<Result> CommitAsync(DesiredState state);
     Task<Result<DesiredState>> LoadAsync();
 
-    /// <summary>La reprise, sur geste explicite de l'utilisateur, quand un commit a ete
-    /// refuse parce que le manifeste existant est illisible (ou la cle inutilisable) : l'ancien est mis de
-    /// cote (jamais efface) et un manifeste neuf commence avec ce qui avait ete refuse. Par defaut : refus,
-    /// un magasin sans voie de reprise le dit.</summary>
     /// <summary>Re-signer l'etat deja arme (habilitation) sans jamais declencher d'elevation :
     /// un rafraichissement de fond qui ferait surgir l'UAC sans geste de l'utilisateur est exactement ce
     /// qui detruit la confiance. Par defaut : un commit ordinaire.</summary>
@@ -83,6 +79,10 @@ public interface IDesiredStateStore // l'application écrit (op signée), le rec
     Task<Result> RetirerAsync(IReadOnlyList<string> ids)
         => Task.FromResult(Result.Fail(ErrorCodes.OpNotAllowed, "This store cannot remove an entry."));
 
+    /// <summary>La reprise, sur geste explicite de l'utilisateur, quand un commit a ete
+    /// refuse parce que le manifeste existant est illisible (ou la cle inutilisable) : l'ancien est mis de
+    /// cote (jamais efface) et un manifeste neuf commence avec ce qui avait ete refuse. Par defaut : refus,
+    /// un magasin sans voie de reprise le dit.</summary>
     Task<Result> RepartirDUnManifesteVideAsync()
         => Task.FromResult(Result.Fail(ErrorCodes.OpNotAllowed, "This store has no recovery path."));
 }

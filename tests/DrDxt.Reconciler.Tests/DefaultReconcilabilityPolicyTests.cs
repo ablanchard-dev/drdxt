@@ -23,6 +23,18 @@ public sealed class DefaultReconcilabilityPolicyTests
         _policy.IsReconcilable(id).Should().BeTrue();
     }
 
+    // Le magasin signe ce que la politique dit réconciliable, et la passe sonde par le catalogue : un levier connu de l'une
+    // et pas de l'autre entrerait au manifeste, puis échouerait à chaque passe (RECONCILE_PARTIAL tous les jours).
+    [Theory]
+    [InlineData("fixit.sanePowerPlan")]
+    [InlineData("fixit.x3dVCacheService")]
+    [InlineData("latency.reflex.lowLatencyMode")]
+    [InlineData("os.hags")]
+    [InlineData("latency.renderQueueCap")]
+    [InlineData("latency.vrrVsyncCap")]
+    public void La_politique_et_le_catalogue_disent_la_meme_chose(string id)
+        => _policy.IsReconcilable(id).Should().Be(new DefaultReconcilableTweakCatalog().DescriptorFor(id) is not null);
+
     [Fact]
     public void UnknownTweak_IsNotReconcilable()
     {

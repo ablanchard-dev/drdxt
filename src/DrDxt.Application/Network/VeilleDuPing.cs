@@ -5,7 +5,7 @@ namespace DrDxt.Application.Network;
 /// <summary>
 /// « Protéger mon ping » sans scan pendant une partie saturée.
 ///
-/// Avant, la protection ne s'allumait qu'apres un scan lance pendant une partie ou l'envoi avait
+/// Liee au seul scan, la protection ne s'allumerait qu'apres un scan lance pendant une partie ou l'envoi
 /// sature : chez un joueur normal, quasiment jamais. Allumer la veille ne pose rien. Elle regarde les
 /// vraies parties (le jeu repere par le produit), accumule les echantillons d'envoi et de ping partie
 /// apres partie, et les juge avec le meme juge que le scan (<see cref="Bufferbloat.Juger"/>). Le

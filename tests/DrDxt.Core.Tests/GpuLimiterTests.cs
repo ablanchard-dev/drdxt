@@ -30,6 +30,15 @@ public class GpuLimiterTests
             .Should().Be(GpuLimiterObserved.Inconnu);
     }
 
+    // Sur une carte AMD ou un NVML muet, seule l'occupation se lit : « rien ne bridait le GPU » s'affirmait sans aucune raison
+    // ni fréquence lue. Il faut l'une ou l'autre ; une fréquence lue et stable suffit.
+    [Fact]
+    public void L_occupation_seule_ne_dit_pas_que_rien_ne_bride()
+    {
+        GpuLimiter.Classer(null, 0.70, null, null).Should().Be(GpuLimiterObserved.Inconnu);
+        GpuLimiter.Classer(null, 0.70, 2400, 2380).Should().Be(GpuLimiterObserved.RienDeBridant);
+    }
+
     [Fact]
     public void UN_RALENTISSEMENT_THERMIQUE_PUBLIE_est_nomme_tel_quel()
     {

@@ -33,7 +33,7 @@ public sealed class InventaireMachineTests
         c.Should().HaveCount(2, "les logiciels n'ont pas changé : rien à dire sur eux");
         var pilotes = c.Single(x => x.Nom == "pilotes tiers changés").Explication;
         pilotes.Should().Contain("apparus : Realtek rt640x64.inf 10.73.815.2024")
-            .And.Contain("NVIDIA nvmdi.inf 32.0.16.1656 ⇒ 32.0.16.1714").And.Contain("depuis le scan du 02/10");
+            .And.Contain("NVIDIA nvmdi.inf 32.0.16.1656 ⇒ 32.0.16.1714").And.Contain($"depuis le scan du {Hier.ToLocalTime().ToString("dd/MM", System.Globalization.CultureInfo.InvariantCulture)}");
         c.Single(x => x.Nom == "services tiers changés").Explication.Should().Contain("disparus : AncienService");
     }
 

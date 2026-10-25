@@ -37,12 +37,9 @@ public sealed class StorageDetector : IStorageDetector
     private Result<IReadOnlyList<StorageDevice>> TryMsftPhysicalDisk()
     {
         var result = _wmi.QueryInNamespace(
-            // Sans le prefixe `\\.\`, et ce n'est pas cosmetique. Avec lui,
-            // `ManagementObjectSearcher` rend « Parametre non valide » sur ce namespace imbrique
-            // (mesure du 10/09/2026). La requete echouerait donc toujours, et le
-            // `TryWin32DiskDrive()` juste en dessous la rattraperait en silence : le produit tournerait
-            // sur le lecteur degrade sans que rien ne le signale. Un repli qui ne se voit pas est
-            // un repli qu'on ne corrige jamais.
+            // Avec ou sans le prefixe `\\.\`, la requete aboutit (mesure du 25/10/2026). Si elle echouait, le
+            // `TryWin32DiskDrive()` juste en dessous la rattraperait en silence : le produit tournerait sur le
+            // lecteur degrade sans que rien ne le signale.
             @"root\Microsoft\Windows\Storage",
             "SELECT FriendlyName, MediaType, BusType, Size FROM MSFT_PhysicalDisk");
 
@@ -78,20 +75,19 @@ public sealed class StorageDetector : IStorageDetector
         if (!result.IsOk)
             return Result<IReadOnlyList<StorageDevice>>.Fail(ErrorCodes.StorageFail, result.Error!.Value.Message);
 
-        var devices = new List<StorageDevice>();
+        var devices = new List<(StorageDevice Disque, bool Amovible)>();
         foreach (var row in result.Value!)
         {
             var model = row.GetString("Model") ?? "Unknown";
             var sizeBytes = (long)(row.GetUlong("Size") ?? 0UL);
             var mediaTypeStr = row.GetString("MediaType") ?? string.Empty;
 
-            // Le MediaType de Win32_DiskDrive est une chaîne qui décrit le support
-            string kind = mediaTypeStr.Contains("Fixed", StringComparison.OrdinalIgnoreCase)
-                ? "HDD"
-                : "Unknown";
-
-            devices.Add(new StorageDevice(model, kind, sizeBytes));
+            // « Fixed hard disk media » décrit tout disque interne, SSD et NVMe compris : le support n'est pas lu ici.
+            // « Removable Media » et « External hard disk media » passent après les internes, comme les bus amovibles.
+            var amovible = mediaTypeStr.Contains("Removable", StringComparison.OrdinalIgnoreCase)
+                || mediaTypeStr.Contains("External", StringComparison.OrdinalIgnoreCase);
+            devices.Add((new StorageDevice(model, "Unknown", sizeBytes), amovible));
         }
-        return Result<IReadOnlyList<StorageDevice>>.Ok(devices);
+        return Result<IReadOnlyList<StorageDevice>>.Ok(devices.OrderBy(d => d.Amovible).Select(d => d.Disque).ToList());
     }
 }

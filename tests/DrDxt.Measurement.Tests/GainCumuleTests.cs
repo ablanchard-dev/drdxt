@@ -16,6 +16,27 @@ public class GainCumuleTests
     private const string BancGpu = "banc GPU deterministe";
     private const string BancCpu = "banc CPU soutenu";
 
+    // Un écart ou un bruit non mesuré (NaN, infini, bruit négatif) faisait annoncer « NaN % » ou « prouvé ± NaN » : il est
+    // écarté avec sa raison, et le total reste celui des gains mesurés.
+    [Theory]
+    [InlineData(double.NaN, 0.5)]
+    [InlineData(3.0, double.NaN)]
+    [InlineData(double.PositiveInfinity, 0.5)]
+    [InlineData(3.0, -1.0)]
+    public void Un_gain_non_mesure_n_entre_pas_au_total(double ecart, double bruit)
+    {
+        var total = GainCumule.Additionner(
+        [
+            new GainProuve("gpu.core", BancGpu, 2.0, 0.122),
+            new GainProuve("gpu.mem", BancGpu, ecart, bruit),
+        ]);
+
+        total.TotalPercent.Should().BeApproximately(2.0, 1e-9);
+        double.IsFinite(total.BruitPercent).Should().BeTrue();
+        total.Retenus.Should().Equal("gpu.core");
+        total.Refus.Should().ContainSingle().Which.Should().Be(Docteur.T("GC.NonMesure", "gpu.mem"));
+    }
+
     [Fact]
     public void Deux_gains_se_COMPOSENT_et_ne_s_additionnent_pas()
     {

@@ -32,7 +32,10 @@ public sealed class LectureDesCiblesWin32 : ILectureDesCibles
     {
         try
         {
-            return Lecteur(ecriture) is { } lire ? lire() : Illisible(Docteur.T("LC.AucuneLecture", ecriture.GetType().Name));
+            if (Lecteur(ecriture) is not { } lire) return Illisible(Docteur.T("LC.AucuneLecture", ecriture.GetType().Name));
+            // Le jugement compare une valeur : un réglage que le profil du jeu ne possède pas s'y lit absent.
+            var lu = lire();
+            return lu is { IsOk: true, Value: { } v } && v.StartsWith(ImageHeritee, StringComparison.Ordinal) ? Result<string?>.Ok(null) : lu;
         }
         catch (Exception ex)
         {
@@ -91,10 +94,16 @@ public sealed class LectureDesCiblesWin32 : ILectureDesCibles
     {
         if (!_nvApi.Value.IsAvailable || !_nvApi.Value.TryReadDrsSettingForApplication(jeu, reglage, out var lu))
             return Illisible(Docteur.T("LC.DrsJeu", $"0x{reglage:X8}"));
+        // Non possédé, l'image du journal garde d'où il vient : son retour est de le retirer au profil du jeu, et c'est cette
+        // provenance que le helper relit pour prouver le retour (DeleteNvApiDrsSettingOp). Lire la rend absente.
         return Result<string?>.Ok(lu.SettingLocation == EmplacementProfilCourant
             ? lu.Value.ToString(CultureInfo.InvariantCulture)
-            : null);
+            : ImageHeritee + DrsSettingOrigin.Describe(lu.SettingLocation, lu.IsCurrentPredefined, lu.IsPredefinedValid).Origin);
     }
+
+    /// <summary>Le préfixe de l'image d'un réglage DRS que le profil du jeu ne possède pas, suivi de sa provenance
+    /// (<see cref="DrsValueOrigin"/>) : RejeuDuJournal en fait la suppression qui le rend.</summary>
+    internal const string ImageHeritee = "herite:";
 
     /// <summary>La cible existe-t-elle encore ? On interroge le contenant, pas la valeur :
     /// la cle de registre, le service, le plan d'alimentation reference. Une valeur absente d'une cle

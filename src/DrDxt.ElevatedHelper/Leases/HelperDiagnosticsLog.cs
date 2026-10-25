@@ -76,12 +76,13 @@ public sealed class HelperDiagnosticsLog : IDiagnosticsLog
     {
         try
         {
-            string content;
+            // Le texte part vers l'App, qui n'est pas élevée : la lecture ne suit pas plus un lien que l'ajout.
             lock (_lock)
             {
-                content = File.Exists(_journalPath) ? File.ReadAllText(_journalPath) : string.Empty;
+                if (TraverseUnPointDeReparse(_journalPath))
+                    return Task.FromResult(Result<string>.Fail(ErrorCodes.IoFailure, "Helper journal refused: its folder is a link."));
+                return Task.FromResult(DrDxt.Core.FichierJsonAtomique.LireSansLien(_journalPath, ErrorCodes.IoFailure));
             }
-            return Task.FromResult(Result<string>.Ok(content));
         }
         catch (Exception ex)
         {

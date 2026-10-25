@@ -20,7 +20,8 @@ namespace DrDxt.Infrastructure.Tests;
 /// </summary>
 public sealed class ResxPlaceholdersSurviveTranslationTests
 {
-    private static readonly Regex Placeholder = new(@"\{(\d+)\}", RegexOptions.Compiled);
+    // Un emplacement formaté ({0:F1}, {0,5}) en est un aussi : ignoré, il pouvait disparaître d'une traduction sans bruit.
+    private static readonly Regex Placeholder = new(@"\{(\d+)(?:[,:][^}]*)?\}", RegexOptions.Compiled);
 
     /// <summary>
     /// Les cles a emplacements, DERIVEES du fichier de ressources lui-meme.

@@ -35,12 +35,32 @@ public sealed partial class ScanViewModel
 
     /// <summary>Le bouton n'existe que pour une version App verifiee dont on connait empreinte et version, et se tait
     /// pendant son téléchargement. Depuis une App élevée, il se tait aussi : le setup hériterait du jeton administrateur, et
-    /// le téléchargement écrirait en administrateur dans le dossier du compte.</summary>
-    public bool CanInstallUpdate => _miseAJour?.Installable == true && !_telechargementMiseAJour && _estEleve != true;
+    /// le téléchargement écrirait en administrateur dans le dossier du compte, qu'un programme sans droits peut piéger. Sauf
+    /// l'UAC coupé : chaque programme du compte y a déjà ce jeton, il n'y a plus de programme sans droits à tenir à l'écart,
+    /// et « relancer normalement » n'existe pas.</summary>
+    // Pendant une opération longue aussi : l'installeur ferme l'App et le helper d'office, et un levier de test resterait posé.
+    public bool CanInstallUpdate => _miseAJour?.Installable == true && !_telechargementMiseAJour && !EleveRefuse && !OperationLongueEnCours;
+
+    /// <summary>L'App élevée refuse d'installer, sauf l'UAC coupé.</summary>
+    private bool EleveRefuse => _estEleve == true && !UacCoupe();
+
+    /// <summary>L'UAC est-il coupé ? Une couture pour les tests.</summary>
+    internal Func<bool> UacCoupe { get; set; } = DrDxt.App.Platform.CompteDuJoueur.UacCoupe;
+
+    /// <summary>L'installeur ferme l'App et le helper d'office (DrDXT.iss) : le rendu de fermeture ne tourne pas, et un réglage
+    /// temporaire posé (palier de sous-tension, décalage ou ventilateur Expert) resterait sur la carte. Tant qu'il est posé,
+    /// rien ne s'installe ; le pied de page dit de le rendre d'abord, la version reste proposée.</summary>
+    private bool ResteARendreAvantInstallation()
+    {
+        if (!QuelqueChoseARendre) return false;
+        _etatMisesAJour = _localize("UI.Footer.Updates.ARendreDAbord");
+        SignalerMiseAJour();
+        return true;
+    }
 
     private string VersionNommee(string v)
         => string.Format(System.Globalization.CultureInfo.CurrentUICulture, _localize("UI.Footer.Updates.NewVersionNamed"), v)
-           + (_estEleve == true ? " · " + Docteur.T("MAJ.InstalleurEleve") : "");
+           + (EleveRefuse ? " · " + Docteur.T("MAJ.InstalleurEleve") : "");
 
     /// <summary>La version signée et vérifiée qui attend le clic ; null sinon.</summary>
     public string? VersionProposee => _miseAJour is { Installable: true } m ? m.Version : null;
@@ -64,12 +84,13 @@ public sealed partial class ScanViewModel
     private async Task InstallUpdate()
     {
         if (_miseAJour is not { Installable: true } m || _telechargementMiseAJour) return;
-        if (_estEleve == true)
+        if (EleveRefuse)
         {
             _etatMisesAJour = VersionNommee(m.Version!);
             SignalerMiseAJour();
             return;
         }
+        if (ResteARendreAvantInstallation()) return;
         _telechargementMiseAJour = true;
         _etatMisesAJour = _localize("UI.Footer.Updates.Downloading");
         SignalerMiseAJour();
@@ -91,24 +112,29 @@ public sealed partial class ScanViewModel
             }
             // Le jeton connu de l'App décide ; inconnu, Lancer lit celui du processus. La production passe toujours un jeton
             // connu : inconnu, le téléchargement aurait déjà eu lieu avant ce refus, qui n'est qu'une défense en profondeur.
+            // Un réglage temporaire posé pendant le téléchargement retient aussi l'installeur.
+            if (ResteARendreAvantInstallation()) return;
             var lance = await Task.Run(() => DrDxt.App.Updates.InstallationMiseAJour.Lancer(dl.Value!, m.Sha256!, m.Version!, _lancerInstalleur,
-                _estEleve is { } e ? () => e : null));
+                _estEleve is { } e ? () => e && !UacCoupe() : null));
             if (lance.Error?.Code == DrDxt.App.Updates.InstallationMiseAJour.CodeEleve)
             {
                 // Jeton inconnu de l'App, élevé au lancement. Rien n'est retiré : relancer l'App normalement suffit.
                 _etatMisesAJour = VersionNommee(m.Version!) + " · " + RaisonLisible.Dire(lance, _localize);
                 return;
             }
-            _etatMisesAJour = _localize(lance.IsOk ? "UI.Footer.Updates.InstallerLaunched" : "UI.Footer.Updates.InstallerRefused");
-            // Un installeur refusé (fichier changé depuis la vérification) n'est plus proposé.
-            if (!lance.IsOk) _miseAJour = m with { Etat = DrDxt.App.Updates.EtatMiseAJour.Refusee };
+            var refuse = lance.Error?.Code == DrDxt.App.Updates.InstallationMiseAJour.CodeRefus;
+            _etatMisesAJour = _localize(lance.IsOk ? "UI.Footer.Updates.InstallerLaunched"
+                : refuse ? "UI.Footer.Updates.InstallerRefused" : "UI.Footer.Updates.InstallerNotLaunched");
+            // Seul un installeur changé depuis la vérification n'est plus proposé ; un installeur qui n'est pas parti se
+            // retente au clic suivant.
+            if (refuse) _miseAJour = m with { Etat = DrDxt.App.Updates.EtatMiseAJour.Refusee };
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             // Une panne imprévue (client libéré, disque plein) remontait jusqu'au fil de l'écran. Elle se dit au pied de
             // page, et la version reste proposée : un nouveau clic réessaie.
             System.Diagnostics.Trace.TraceError("Update install failed: {0}", ex);
-            _etatMisesAJour = $"{_localize(DrDxt.App.Updates.VerificationMiseAJour.CleResx(DrDxt.App.Updates.EtatMiseAJour.Echec))}{Docteur.DeuxPoints}{ex.Message}";
+            _etatMisesAJour = $"{_localize(DrDxt.App.Updates.VerificationMiseAJour.CleResx(DrDxt.App.Updates.EtatMiseAJour.Echec))}{Docteur.DeuxPoints}{RaisonLisible.Dire(ex, _localize)}";
         }
         finally
         {

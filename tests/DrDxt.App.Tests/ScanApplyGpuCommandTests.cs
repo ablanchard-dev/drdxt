@@ -174,7 +174,7 @@ public sealed class ScanApplyGpuCommandTests
         // L'action GPU ne joue jamais le lot sûr hors GPU.
         await h.Engine.DidNotReceive().ApplyAsync(
             Arg.Any<TweakPlan>(), Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
-        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingApplicable");
+        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingThisRound");
         h.Vm.ResultatOptimisation.Should().Contain("Apply.Result.Discarded · tweak.gpu.undervolt.title");
     }
 
@@ -186,7 +186,7 @@ public sealed class ScanApplyGpuCommandTests
         await h.Vm.ApplyGpuTuningCommand.ExecuteAsync(null);
 
         await h.Safety.DidNotReceive().EnsureRestorePointAsync();
-        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingApplicable");
+        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingThisRound");
     }
 
     // ====================== outcomes ======================
@@ -200,6 +200,6 @@ public sealed class ScanApplyGpuCommandTests
         await h.Vm.ApplyGpuTuningCommand.ExecuteAsync(null);
 
         await h.Safety.DidNotReceive().EnsureRestorePointAsync();
-        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingApplicable");
+        h.Vm.ApplyBlockedMessage.Should().Be("Apply.NothingThisRound");
     }
 }

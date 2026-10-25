@@ -20,10 +20,12 @@ INSTALLER
 
 CE QUE FAIT DrDXT
   - Scanne ton PC (CPU / GPU / RAM / reglages) et chiffre honnetement ce
-    qui est ameliorable. Le scan ne modifie rien.
+    qui est ameliorable. Le scan ne change aucun reglage (il peut installer
+    ou demarrer le service de mesure PresentMon s'il manque).
   - Mesure tes perfs en jeu (FPS, 1% lows) via PresentMon.
-  - Applique des optimisations sures, mesure le gain, et ANNULE tout seul
-    si ca ne va pas (point de restauration cree avant).
+  - Applique des optimisations sures et juge chacune sur tes vraies
+    parties : retiree si elle fait pire, et un gain n'est annonce que
+    s'il est mesure (point de restauration cree avant).
 
 ANTI-CHEAT
   DrDXT ne s'injecte JAMAIS dans le jeu, ne modifie aucun fichier du jeu,
@@ -35,14 +37,16 @@ SERVICE DE MESURE
   (demarre a la demande, pas au demarrage de Windows). Il sert uniquement
   a mesurer les FPS. La desinstallation le retire.
 
-SERVICE DE DEMARRAGE (option, case decochee)
-  Une case de l'installeur, decochee par defaut : "Reappliquer mes reglages
+SERVICE DE DEMARRAGE (option, case cochee)
+  Une case de l'installeur, cochee par defaut : "Reappliquer mes reglages
   au demarrage de Windows". Cochee, elle enregistre le service
   "DrDxtReconciler" en demarrage automatique : au demarrage, il remet les
   reglages que tu as appliques avec DrDXT si Windows les a changes. Il ne
-  touche jamais la carte graphique. Decochee, rien ne demarre avec Windows.
+  touche jamais la carte graphique. Il lit aussi la temperature du
+  processeur pour le releve des parties. Decochee, rien ne demarre avec Windows.
   La desinstallation le retire.
 
 DESINSTALLER
   Parametres Windows -> Applications -> DrDXT -> Desinstaller.
-  (Retire les services et tous les fichiers.)
+  (Retire les services et les fichiers du programme, et rend les reglages
+  gardes. Ce qui reste est dit dans le README du projet.)

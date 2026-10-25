@@ -11,8 +11,9 @@ namespace DrDxt.Core.Tests;
 /// Mesure du 05/09/2026 : `GpuArchitectureGate.SupportsVoltageUndervolt` refuse le voltage sur
 /// RDNA3 et sur toute architecture non nommee, et sa garantie est reelle (mutation du defaut
 /// conservateur en permissif : rouge). Mais son seul appelant de production est le RAPPORT DE
-/// COUVERTURE affiche avant l'achat. Elle ne refuse aucune ecriture — parce qu'aucun op privilegie
-/// n'ecrit une tension. L'undervolt du produit est un offset d'horloge ; la courbe V/F n'existe pas.
+/// COUVERTURE. Elle ne refuse aucune ecriture — parce qu'aucun op privilegie n'ecrit une tension de carte graphique
+/// (la seule tension admise est celle des coeurs Intel, SetCpuVoltageOffsetOp). L'undervolt de la carte est un offset
+/// d'horloge ; la courbe V/F n'existe pas.
 ///
 /// Autrement dit la garde protege aujourd'hui une VERITE D'AFFICHAGE, pas un geste. Le jour ou
 /// quelqu'un ajoutera l'op d'ecriture, la garde ne se mettra pas toute seule sur le chemin — et

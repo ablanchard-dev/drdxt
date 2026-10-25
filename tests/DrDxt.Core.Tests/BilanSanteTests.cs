@@ -88,4 +88,14 @@ public sealed class BilanSanteTests
 
         bilan[6].Constat.Valeur.Should().Be("NVIDIA 617.14");
     }
+
+    // La santé que Windows annonce compte dans la ligne « Disques » : seule, elle la remplit ; mauvaise, elle passe devant
+    // une usure normale.
+    [Fact]
+    public void La_sante_du_disque_annoncee_par_Windows_remplit_la_ligne_Disques()
+    {
+        var sante = F("STOCKAGE", Docteur.Nom("SW.SanteNom", "Samsung 980"), "mauvaise", RepairStatus.Suspicious);
+        BilanSante.Construire([sante])[2].Constat.Valeur.Should().Be("mauvaise");
+        BilanSante.Construire([F("STOCKAGE", "usure · Samsung 980", "3 %"), sante])[2].Constat.Valeur.Should().Be("mauvaise");
+    }
 }

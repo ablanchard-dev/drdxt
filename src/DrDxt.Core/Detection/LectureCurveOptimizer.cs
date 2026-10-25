@@ -36,7 +36,7 @@ public static class LectureCurveOptimizer
         && double.TryParse(libelle[..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var x) ? x : null;
 
     /// <summary>Pur : l'échelle PBO rendue par la commande GetPBOScalar, un flottant dans le premier argument
-    /// (ZenStates-Core 869b7e82, GetPBOScalar.cs) ; null hors de 0 à 10, les bornes de cette même source.</summary>
+    /// (ZenStates-Core 869b7e82, GetPBOScalar.cs) ; null hors de ]0 ; 10], les bornes de cette même source.</summary>
     public static double? EchelleSmu(uint argument)
     {
         var x = BitConverter.Int32BitsToSingle(unchecked((int)argument));

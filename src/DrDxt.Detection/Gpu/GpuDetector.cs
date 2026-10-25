@@ -52,7 +52,7 @@ public sealed class GpuDetector
             var rebar = a.VendorId switch
             {
                 VendorAmd    => _adlx.GetSmartAccessMemoryState(),       // SAM via ADLX
-                VendorNvidia => uneSeuleNvidia ? _nvReBar.GetReBarState() : TriState.Unknown, // NVML BAR1, device 0
+                VendorNvidia => uneSeuleNvidia ? ReBarNvidia(_nvReBar.GetReBarState(), a.Description) : TriState.Unknown, // NVML BAR1, device 0
                 _            => TriState.Unknown                         // Intel: pas d'API → Unknown
             };
             // NVML seulement pour NVIDIA, et seulement si la lecture a marché : sinon on garde
@@ -66,6 +66,14 @@ public sealed class GpuDetector
 
         return Result<IReadOnlyList<GpuInfo>>.Ok(gpus);
     }
+
+    /// <summary>NVIDIA ne prend en charge le Resizable BAR qu'à partir des GeForce RTX 30 (NVIDIA, « GeForce RTX 30 Series
+    /// Resizable BAR ») : sur une carte plus ancienne, la fenêtre BAR1 classique est la seule possible, pas un réglage coupé.
+    /// Seul Off dépend du modèle ; On reste lu tel quel.</summary>
+    internal static TriState ReBarNvidia(TriState lu, string description)
+        => lu == TriState.Off && !System.Text.RegularExpressions.Regex.IsMatch(description, @"\bRTX\s*[3-9]0[0-9]{2}\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant)
+            ? TriState.Unknown : lu;
 
     // Une ligne Win32_VideoController par controleur. Sur une machine iGPU + carte dediee, prendre
     // la premiere collerait le pilote de l'iGPU sur la carte. La ligne se retrouve par son nom (WMI
@@ -96,7 +104,7 @@ public sealed class GpuDetector
         return ligne?.GetString("DriverVersion") ?? "Unknown";
     }
 
-    private static string VendorName(int id) => id switch
+    internal static string VendorName(int id) => id switch
     {
         VendorNvidia => "NVIDIA",
         VendorAmd    => "AMD",

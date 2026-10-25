@@ -6,7 +6,8 @@ pour ton processeur et ta carte graphique (AMD surtout, c'est ce qui manque le p
 
 Ce test MODIFIE des réglages de Windows, un par un, et remet chacun d'origine aussitôt :
 mode Jeu, enregistrement en arrière-plan de la Game Bar, mode fenêtré optimisé, planification GPU accélérée,
-accélération de la souris, plan d'alimentation, mode boost du processeur, limite de puissance de la carte graphique,
+accélération de la souris, plan d'alimentation, mode boost du processeur, limite de puissance de la carte graphique
+(NVIDIA seulement : sur AMD, elle est seulement lue, avec sa plage, dans le rapport de DrDXT-Test.exe),
 Anti-Lag, Vsync et plafond d'images FRTC (réglages du pilote AMD).
 VALIDER.cmd ne touche jamais au BIOS, ni à la tension, à la fréquence ou au ventilateur de la carte : le programme refuse
 lui-même ces écritures. Il ne crée ni service ni point de restauration, et n'installe rien.
@@ -39,7 +40,7 @@ seuls les administrateurs peuvent modifier ; le fichier disparaît une fois tout
 
 Si la première ligne dit « À VÉRIFIER À LA MAIN » : le rapport donne, pour chaque réglage concerné, sa valeur
 d'origine. Lance d'abord REMETTRE.cmd. Si la ligne reste là, remets ce réglage toi-même (logiciel AMD Adrenalin pour
-Anti-Lag, le plafond d'images et la limite de puissance ; Paramètres de Windows pour le reste), puis envoie quand même
+Anti-Lag et le plafond d'images ; panneau NVIDIA pour la limite de puissance ; Paramètres de Windows pour le reste), puis envoie quand même
 le rapport : c'est justement ce cas que le projet doit connaître.
 
 EN PLUS, SEULEMENT SI TU LE VEUX : la fréquence de ta carte AMD (VALIDER-FREQUENCE.cmd)

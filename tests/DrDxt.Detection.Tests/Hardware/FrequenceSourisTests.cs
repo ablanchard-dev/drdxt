@@ -74,7 +74,7 @@ public sealed class FrequenceSourisTests
         var c = FrequenceSouris.Juger("Souris X", 125);
 
         c.Nom.Should().Be("fréquence de la souris · Souris X");
-        c.Statut.Should().Be(RepairStatus.Suspicious);
+        c.Statut.Should().Be(RepairStatus.NonDefault, "125 Hz est l'intervalle que la souris déclare elle-même : à regarder");
         c.Action.Should().Be(RepairAction.Recommandation);
     }
 

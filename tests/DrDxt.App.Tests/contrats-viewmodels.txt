@@ -102,6 +102,8 @@ DomaineMachine
   Etat : EtatDomaine
   EtatLibelle : String
   Explications : IReadOnlyDictionary<String, String>
+  GroupesReplies : IReadOnlyList<GroupeDeConstats>
+  GroupesVisibles : IReadOnlyList<GroupeDeConstats>
   IconKey : String
   Leviers : IReadOnlyList<LigneLevier>
   Lignes : IReadOnlyList<EntreeCarte>
@@ -118,9 +120,12 @@ DomaineMachine
   TitreDesDetails : String
   Titres : IReadOnlySet<String>
   Verdict : String
+  VerdictAffiche : String
 EntreeCarte
   ACommande : Boolean
   ACommentCorriger : Boolean
+  ADeplier : Boolean
+  ADetailEntier : Boolean
   ADetailSuite : Boolean
   AGestes : Boolean
   ARemede : Boolean
@@ -130,6 +135,7 @@ EntreeCarte
   CommandeACopier : String
   Detail : String
   DetailCourt : String
+  DetailEntier : String
   DetailSuite : String
   Domaine : String
   Gestes : IReadOnlyList<GesteDuDocteur>
@@ -146,10 +152,6 @@ EntreeCarte
   ValeurLue : String
 EtatDomaine
   = ACorriger, ARegarder, RienDeSignale, NonLu
-FeatureItem
-  Body : String
-  IconKey : String
-  Title : String
 FindingViewModel
   Category : String
   Constat : Constat
@@ -159,14 +161,20 @@ FindingViewModel
   Title : String
 GesteDuDocteur
   AEchoue : Boolean
+  AMoitie : Boolean
   AnnulerCommand : IAsyncRelayCommand
   Detail : String
   EnCours : Boolean
   FaireCommand : IAsyncRelayCommand
   Fait : Boolean
+  Incertain : Boolean
   PeutAnnuler : Boolean
   PeutFaire : Boolean
   Titre : String
+GroupeDeConstats
+  Cle : String
+  Lignes : IReadOnlyList<EntreeCarte>
+  Premiere : EntreeCarte
 LigneEnAttente
   Changement : String
   Date : String
@@ -261,6 +269,8 @@ ScanViewModel
   AssistantSummary : String
   AttenteDuJeu : Boolean
   AttenteDuJeuSession : Boolean
+  AucuneEcritureEnCours : Boolean
+  AucuneOperationLongue : Boolean
   AucunePartie : Boolean
   AucuneRecommandation : Boolean
   AvertissementPoint : String
@@ -347,7 +357,6 @@ ScanViewModel
   ExpertVisible : Boolean
   ExportReportCommand : IAsyncRelayCommand
   ExporterMaMachineCommand : IAsyncRelayCommand
-  Features : ObservableCollection<FeatureItem>
   Findings : ObservableCollection<FindingViewModel>
   FriseHistorique : ObservableCollection<EvenementDeFrise>
   GatingNote : String
@@ -366,6 +375,8 @@ ScanViewModel
   HasRepairFindings : Boolean
   HasVerificationBilan : Boolean
   HasVerificationChemin : Boolean
+  InfoEcritureEnCours : String
+  InfoOperationEnCours : String
   InstallUpdateCommand : IAsyncRelayCommand
   IsCoverageComplete : Boolean
   IsScanning : Boolean
@@ -456,9 +467,11 @@ ScanViewModel
   LabelFindings : String
   LabelFooterUpdates : String
   LabelFooterVersion : String
+  LabelGesteAMoitie : String
   LabelGesteAnnuler : String
   LabelGesteEchec : String
   LabelGesteFait : String
+  LabelGesteIncertain : String
   LabelGuide : String
   LabelHeaderTagline : String
   LabelHistoriqueDescription : String
@@ -627,6 +640,7 @@ ScanViewModel
   MesurerCadenceCommand : IAsyncRelayCommand
   MoatUnarmedMessage : String
   NetworkPathLabel : String
+  OperationLongueEnCours : Boolean
   OublierChangementBiosCommand : IRelayCommand
   OuvrirGuideCommand : IRelayCommand
   OuvrirGuideSousTensionCommand : IRelayCommand
@@ -713,6 +727,7 @@ ScanViewModel
   SousTensionPossible : Boolean
   SousTensionPrerequisVisible : Boolean
   SousTensionTrouvee : Boolean
+  SousTitreAccueil : String
   State : ScanState
   StutterLabel : String
   SubtitleText : String
@@ -729,6 +744,7 @@ ScanViewModel
   TesterLigneCommand : IAsyncRelayCommand
   TextePlafondEnvoi : String
   TexteTestLigne : String
+  TitreAccueil : String
   VeillePingActive : Boolean
   VeillePingProposee : Boolean
   VerdictReposCarte : String

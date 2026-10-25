@@ -55,6 +55,7 @@ public sealed class FileSystemBiosMarkerFile : IBiosMarkerFile
     {
         try
         {
+            if (DrDxt.Core.FichierJsonAtomique.RefusEleve(_path, "BIOS_MARQUEUR") is { } refus) return refus;
             if (File.Exists(_path))
                 File.Delete(_path);
             return Result.Ok();

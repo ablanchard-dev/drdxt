@@ -204,14 +204,18 @@ internal static class ScanViewModelTestSeams
         DrDxt.Application.Tweaks.JournalDesLeviersAppliques? journalLeviers = null,
         DrDxt.Application.Tweaks.Hardware.IRegistryReader? registreGains = null,
         Func<HardwareInventory, SettingsState, IReadOnlyList<RepairFinding>, string>? exporterMachine = null,
-        IDesiredStateStore? manifeste = null) =>
-        new(hd, sr, br, sc, sd, Safety(), Engine(), profileConsumer ?? ProfileConsumer(), manifeste ?? DesiredStateStore(), new AppliedTweakManifestMapper(), biosAdvisor ?? BiosAdvisor(),
+        IDesiredStateStore? manifeste = null,
+        // Le point de restauration. null = toujours accordé, comme avant la couture.
+        ISafetyManager? safety = null,
+        // Les arrêts et l'instabilité de la carte. null = non lus, comme avant la couture.
+        Func<(InstabiliteGpuObservee?, IReadOnlyList<ArretClasse>?)>? lireStabilite = null) =>
+        new(hd, sr, br, sc, sd, safety ?? Safety(), Engine(), profileConsumer ?? ProfileConsumer(), manifeste ?? DesiredStateStore(), new AppliedTweakManifestMapper(), biosAdvisor ?? BiosAdvisor(),
             guideGenerator ?? GuideGenerator(), localize, gameLocator: gameLocator, firmwareTrip: firmwareTrip,
             repairAudit: repairAudit, journalSante: journalSante, voisins: voisins,
             estEleve: estEleve, relancerEnAdministrateur: relancerEnAdministrateur, helper: helper, writeReport: writeReport,
             machineId: machineId, cpuBaseline: cpuBaseline, performanceJournal: performanceJournal, mesurerRoute: mesurerRoute,
             mesurerMemoireLibre: mesurerMemoireLibre, verifierPilote: verifierPilote, journalLeviers: journalLeviers,
-            registreGains: registreGains, exporterMachine: exporterMachine);
+            registreGains: registreGains, exporterMachine: exporterMachine, lireStabilite: lireStabilite);
 
     /// <summary>Aucun reglage au plan, seulement des leviers GPU (machine NVIDIA de bureau).</summary>
     public static ScanProfileConsumption GpuOnlyConsumption(params string[] gpuIds) =>

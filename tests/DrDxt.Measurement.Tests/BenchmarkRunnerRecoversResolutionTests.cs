@@ -88,8 +88,9 @@ public class BenchmarkRunnerRecoversResolutionTests
         var r = await new BenchmarkRunner(session).RunAsync(1234, TimeSpan.FromMilliseconds(10), 3, default);
 
         session.Appels.Should().BeLessThanOrEqualTo(6, "trois passes demandees, trois rattrapages au plus");
-        // Et le resultat reste HONNETE : soit un echec franc, soit une marge assumee inconnue.
-        if (r.IsOk) double.IsFinite(r.Value!.MarginOfError).Should().BeFalse();
+        // Et le resultat reste HONNETE : aucune passe n'a d'image, c'est un echec franc, jamais une mesure a 0 FPS.
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.NoFrames);
     }
 
     [Fact]

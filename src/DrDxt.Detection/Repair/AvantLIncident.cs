@@ -47,7 +47,8 @@ public static class AvantLIncident
             yield return new RepairFinding("STABILITE", "incident après une installation",
                 Docteur.T("AI.Valeur", i.Libelle, i.Quand.ToLocalTime(), proche.Libelle, Ecart(proche, i))
                 + (avant.Count > 1 ? Docteur.T("AI.EtAutres", avant.Count - 1) : ""), null,
-                recent ? RepairStatus.Suspicious : RepairStatus.Observed,
+                // Un rapprochement de dates, pas une preuve : à regarder, jamais « à corriger ».
+                recent ? RepairStatus.NonDefault : RepairStatus.Observed,
                 Docteur.T("AI.Debut", Majuscule(i.Libelle), i.Quand.ToLocalTime(), Fenetre.TotalDays,
                     string.Join(Docteur.T("AI.Separateur"), avant.Select(c => $"{c.Libelle}, {Ecart(c, i)}")))
                 + (logiciels.Count == 0 ? ""
@@ -115,15 +116,34 @@ public static class AvantLIncident
             ? $"{pilote} ({nv})" : pilote;
     }
 
+    /// <summary>Les lignes d'un journal, une à une : ces fichiers gardent des mois d'historique (des dizaines de Mio sur une
+    /// machine très pilotée) et ne se chargent jamais en mémoire. Un fichier qui ne s'ouvre pas, ou ne se lit plus, s'arrête
+    /// là sans lever : les autres journaux continuent.</summary>
+    internal static IEnumerable<string> Lignes(string chemin)
+    {
+        IEnumerator<string> e;
+        try { e = File.ReadLines(chemin).GetEnumerator(); }
+        catch (Exception) { yield break; }
+        using (e)
+            while (true)
+            {
+                string ligne;
+                try
+                {
+                    if (!e.MoveNext()) yield break;
+                    ligne = e.Current;
+                }
+                catch (Exception) { yield break; }
+                yield return ligne;
+            }
+    }
+
     public static IReadOnlyList<FaitDate> LirePilotes()
     {
         try
         {
             var inf = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "INF");
-            return PilotesInstalles(Directory.EnumerateFiles(inf, "setupapi.dev*.log").SelectMany(f =>
-            {
-                try { return File.ReadLines(f).ToList(); } catch { return []; }
-            }));
+            return PilotesInstalles(Directory.EnumerateFiles(inf, "setupapi.dev*.log").SelectMany(Lignes));
         }
         catch { return []; }
     }

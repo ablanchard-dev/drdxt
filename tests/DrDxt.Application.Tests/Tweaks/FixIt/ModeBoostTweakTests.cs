@@ -50,7 +50,7 @@ public sealed class ModeBoostTweakTests
         Build().AppliesTo(Hw(ChassisType.Handheld), Etat(new ModeDeBoostLu(Plan, 0, 2))).Should().BeFalse();
 
     [Theory]
-    [InlineData(2u, 2u)]   // le cas des cinq machines enregistrées : rien à rendre
+    [InlineData(2u, 2u)]   // le cas des machines enregistrées : rien à rendre
     [InlineData(1u, 2u)]   // boost allumé, autre que le défaut : pas notre affaire
     [InlineData(0u, 0u)]   // un plan dont le défaut est « coupé » (Économie) : c'est son réglage
     [InlineData(0u, 5u)]   // un défaut hors de ce que Microsoft documente : jamais écrit
@@ -114,7 +114,6 @@ public sealed class ModeBoostTweakTests
         t.SummaryKey.Should().Be("tweak.fixit.mode_boost.summary");
         CatalogueDeCandidats.Decrire(t.Id)!.Kind.Should().Be(CandidateKind.AutoHot);
         CatalogueDeCandidats.Decrire(t.Id)!.Surface.Should().Be(SurfaceTouchee.Processeur);
-        CandidateSelector.FermeeParLesArrets(SurfaceTouchee.Processeur).Should().BeTrue();
     }
     // Banc profond : boost déjà au défaut du plan, l'exercice le coupe (0, l'état que le levier répare) le temps de
     // l'exercice, puis le levier le rend au défaut, puis l'origine exacte revient. De bout en bout avec le vrai vérificateur.

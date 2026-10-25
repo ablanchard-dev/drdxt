@@ -14,7 +14,8 @@ namespace DrDxt.Application.Tweaks.Latency;
 //     cours, jamais une écriture de registre brute non prise en charge.
 //
 // La branche NVIDIA écrit au profil du jeu, comme PreferMaxPerf : « Base Profile » toucherait tous
-// les jeux et le bureau.
+// les jeux et le bureau. Elle ne vaut qu'en DirectX 9 à 11 (en DX12 et Vulkan, le moteur du jeu gère lui-même la file) :
+// proposée et posée seulement sur un jeu dont l'API se lit DX9/DX11 dans ses modules chargés.
 //
 // L'original est relu d'abord, l'op inverse sérialisée rangée dans le snapshot ; chaque frontière
 // externe est protégée : échec propre (TWEAK.SDK_UNAVAILABLE), jamais d'exception.
@@ -34,8 +35,8 @@ public sealed class RenderQueueCapTweak : LatencyTweakBase
     private readonly IAdlx _adlx;
     private readonly IGameExecutable? _game;
 
-    /// <param name="game">Le jeu en cours. Absent (outils, tests) ou jeu sans profil lisible :
-    /// ecriture globale, comme avant.</param>
+    /// <param name="game">Le jeu en cours, son profil et son API graphique. Absent (outils, banc) : écriture globale, sans
+    /// lecture de l'API.</param>
     public RenderQueueCapTweak(INvApi nvApi, IAdlx adlx, IElevatedClient elevated, IGameExecutable? game = null)
         : base(elevated)
     {
@@ -66,37 +67,73 @@ public sealed class RenderQueueCapTweak : LatencyTweakBase
         return _nvApi.GetDrsForApplication(MaxPreRenderedFramesSettingId, jeu);
     }
 
+    internal enum Api { NonLue, Dx9Ou11, Autre }
+
+    /// <summary>L'API du jeu d'après ses modules. d3d12.dll ou vulkan-1.dll chargé l'emporte : un jeu DX11 qui les charge
+    /// (une surcouche) n'est pas proposé, ce qui est le côté sûr.</summary>
+    internal static Api ApiDuJeu(IReadOnlyList<string>? modules)
+    {
+        if (modules is null) return Api.NonLue;
+        bool A(string nom) => modules.Any(m => string.Equals(m, nom, StringComparison.OrdinalIgnoreCase));
+        if (A("d3d12.dll") || A("vulkan-1.dll")) return Api.Autre;
+        return A("d3d11.dll") || A("d3d9.dll") ? Api.Dx9Ou11 : Api.Autre;
+    }
+
+    private Api ApiLue() => ApiDuJeu(_game?.ModulesDuJeu());
+
+    /// <summary>La file du pilote agit sur le jeu en cours : son API est lue DX9/DX11. Sans couture du jeu (outils, banc),
+    /// rien ne se cherche et l'écriture va au profil global, comme dans PlanifierDrs.</summary>
+    private bool FileDuPiloteAgit() => _game is null || ApiLue() == Api.Dx9Ou11;
+
+    private enum Carte { Aucune, Nvidia, Amd }
+
+    /// <summary>La carte du levier, la même pour le proposer, le dire non lu et le poser : NVIDIA dès que NVAPI répond, AMD
+    /// seulement sans elle, comme les autres leviers de la carte. Un Ryzen à puce graphique AMD avec une RTX charge ADLX pour
+    /// la puce : la carte du jeu reste la NVIDIA.</summary>
+    private Carte CarteDuLevier() => _nvApi.IsAvailable ? Carte.Nvidia : _adlx.IsAvailable ? Carte.Amd : Carte.Aucune;
+
     public override bool AppliesTo(HardwareInventory hw, SettingsState state)
     {
         if (!LatencyGating.FixeOuPortable(hw))
             return false;
-        // Sur NVIDIA, « Low Latency Mode : On » (une seule image d'avance), au profil du jeu
-        // seulement ; sans profil de jeu, rien ne s'écrit (pas de repli sur le global, voir PlanifierDrs).
-        if (LatencyGating.HasNvidiaDriverPath(hw))
-            return FileNvidiaAuJeu() is { IsOk: true } lu && lu.Value.Value != RenderQueueCapValue;
-        // L'écriture existe (IADLX3DAntiLag.SetEnabled, carte dédiée). Proposé seulement quand Anti-Lag
-        // est LU éteint et Chill LU éteint : allumer Anti-Lag éteint Chill, et le rendre ne le rallume pas.
-        return LatencyGating.HasAmdDriverPath(hw)
-            && _adlx.GetAntiLagState() is { IsOk: true, Value: 0 }
-            && _adlx.GetChillActif() is { IsOk: true, Value: false };
+        return CarteDuLevier() switch
+        {
+            // Sur NVIDIA, « Low Latency Mode : On » (une seule image d'avance), au profil du jeu
+            // seulement ; sans profil de jeu, rien ne s'écrit (pas de repli sur le global, voir PlanifierDrs).
+            Carte.Nvidia => LatencyGating.HasNvidiaDriverPath(hw) && FileDuPiloteAgit()
+                && FileNvidiaAuJeu() is { IsOk: true } lu && lu.Value.Value != RenderQueueCapValue,
+            // L'écriture existe (IADLX3DAntiLag.SetEnabled, carte dédiée). Proposé seulement quand Anti-Lag
+            // est LU éteint et Chill LU éteint : allumer Anti-Lag éteint Chill, et le rendre ne le rallume pas.
+            Carte.Amd => LatencyGating.HasAmdDriverPath(hw)
+                && _adlx.GetAntiLagState() is { IsOk: true, Value: 0 }
+                && _adlx.GetChillActif() is { IsOk: true, Value: false },
+            _ => false,
+        };
     }
 
-    /// <summary>Carte AMD, mais Anti-Lag ou Chill illisible : rien n'est proposé, et c'est dit.</summary>
-    public override bool EtatNonLu(SettingsState state)
-        => (_adlx.IsAvailable && (!_adlx.GetAntiLagState().IsOk || !_adlx.GetChillActif().IsOk))
-           || FileNvidiaAuJeu() is { IsOk: false } echec && echec.Error?.Code != ErrorCodes.DrsNoGameProfile
-           // Sur NVIDIA, la file se lit au profil du jeu ; scanné sans jeu ouvert, elle n'est pas lue.
-           || (_nvApi.IsAvailable && !_adlx.IsAvailable && _game is not null && _game.RunningGameExecutablePath() is null);
+    /// <summary>Carte AMD, mais Anti-Lag ou Chill illisible : rien n'est proposé, et c'est dit. Sur NVIDIA, la file du profil
+    /// du jeu illisible, l'API du jeu ouvert illisible, ou scannée sans jeu ouvert.</summary>
+    public override bool EtatNonLu(SettingsState state) => CarteDuLevier() switch
+    {
+        Carte.Amd => !_adlx.GetAntiLagState().IsOk || !_adlx.GetChillActif().IsOk,
+        Carte.Nvidia => FileNvidiaAuJeu() is { IsOk: false } echec && echec.Error?.Code != ErrorCodes.DrsNoGameProfile
+            || (_game is not null && (_game.RunningGameExecutablePath() is null || ApiLue() == Api.NonLue)),
+        _ => false,
+    };
 
     public override async Task<Result<TweakSnapshot>> ApplyAsync()
     {
         try
         {
-            // D'abord Anti-Lag d'AMD ; sinon le plafond DRS de file de rendu de NVIDIA.
-            if (_adlx.IsAvailable)
-                return await ApplyAntiLagAsync().ConfigureAwait(false);
-            if (_nvApi.IsAvailable)
-                return await ApplyNvidiaRenderQueueCapAsync().ConfigureAwait(false);
+            switch (CarteDuLevier())
+            {
+                case Carte.Nvidia:
+                    return FileDuPiloteAgit()
+                        ? await ApplyNvidiaRenderQueueCapAsync().ConfigureAwait(false)
+                        : Result<TweakSnapshot>.Fail(ErrorCodes.TweakNotApplicable,
+                            "The driver render queue only acts in DirectX 9 to 11; the game's API is not read as such.");
+                case Carte.Amd: return await ApplyAntiLagAsync().ConfigureAwait(false);
+            }
 
             return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                 "Neither ADLX nor NVAPI is available for a render-queue cap.");

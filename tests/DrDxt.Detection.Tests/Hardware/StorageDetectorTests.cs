@@ -122,7 +122,24 @@ public class StorageDetectorTests
         var result = new StorageDetector(wmi).Detect();
         result.IsOk.Should().BeTrue();
         result.Value!.Single().Model.Should().Be("WD Blue");
-        result.Value!.Single().MediaKind.Should().Be("HDD");
+        // « Fixed hard disk media » est aussi ce que Windows dit d'un SSD NVMe (un WD Blue SN580) : support non lu.
+        result.Value!.Single().MediaKind.Should().Be("Unknown");
+    }
+
+    // Le repli liste aussi la clé USB : comme pour MSFT_PhysicalDisk, l'écran prend le premier disque, l'amovible passe après.
+    [Fact]
+    public void Dans_le_repli_une_cle_usb_passe_apres_le_disque_interne()
+    {
+        var wmi = Substitute.For<IWmiQuery>();
+        wmi.QueryInNamespace(Arg.Any<string>(), Arg.Any<string>())
+           .Returns(Result<IReadOnlyList<WmiRow>>.Fail(ErrorCodes.WmiFail, "namespace unavailable"));
+        wmi.Query(Arg.Any<string>()).Returns(Result<IReadOnlyList<WmiRow>>.Ok(new List<WmiRow>
+        {
+            new(new Dictionary<string, object?> { ["Model"] = "JetFlash Transcend 32GB USB Device", ["Size"] = 32_000_000_000UL, ["MediaType"] = "Removable Media" }),
+            new(new Dictionary<string, object?> { ["Model"] = "Samsung SSD 990 PRO 2TB", ["Size"] = 2_000_000_000_000UL, ["MediaType"] = "Fixed hard disk media" }),
+        }));
+        new StorageDetector(wmi).Detect().Value!.Select(d => d.Model)
+            .Should().Equal("Samsung SSD 990 PRO 2TB", "JetFlash Transcend 32GB USB Device");
     }
 
     [Fact]

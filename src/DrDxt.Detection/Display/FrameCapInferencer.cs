@@ -47,7 +47,7 @@ public static class FrameCapInferencer
         if (cap == 0 || cap >= primary.RefreshHz)
             return new(FrameCapVerdict.NotCapping,
                 $"The frame cap ({(cap == 0 ? "off" : cap + " fps")}) never binds on a " +
-                $"{primary.RefreshHz} Hz screen.");
+                $"{primary.RefreshHz} Hz screen.", origin);
 
         // La règle basse latence (PlafondVrr, celle qu'écrit le levier VRR) : entre la valeur Reflex et fréquence - 3.
         if (PlafondVrr.EstBasseLatence(cap, primary.RefreshHz))

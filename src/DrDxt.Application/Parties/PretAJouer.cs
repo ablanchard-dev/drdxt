@@ -54,7 +54,8 @@ public static class PretAJouer
         // perdu (limitation des réponses) ou filtré à 100 % (pare-feu, opérateur) n'en est pas un. Dite à partir de 2 sur 10,
         // et pas quand aucun ne revient alors que la box répond (filtrage, rien de mesuré).
         if (e.PertesBoxPourcent > 0 || e.PertesInternetPourcent is >= 20 and < 100)
-            genes.Add(F("PretAJouer.Pertes", (e.PertesBoxPourcent ?? 0).ToString("0", fr), (e.PertesInternetPourcent ?? 0).ToString("0", fr)));
+            // Un côté non mesuré (sans passerelle lue : VPN, partage de connexion) se dit « ? », jamais « 0 % ».
+            genes.Add(F("PretAJouer.Pertes", e.PertesBoxPourcent?.ToString("0", fr) ?? "?", e.PertesInternetPourcent?.ToString("0", fr) ?? "?"));
         if (e.PingBoxMs >= SeuilBoxMs)
             genes.Add(F("PretAJouer.Box", e.PingBoxMs.Value.ToString("0", fr)));
         if (e.MemoireLibreOctets < SeuilMemoireOctets)

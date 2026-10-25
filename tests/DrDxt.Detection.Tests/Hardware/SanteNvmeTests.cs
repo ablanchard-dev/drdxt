@@ -161,4 +161,16 @@ public sealed class SanteNvmeTests
         SanteNvme.Juger([("SSD", SanteNvmeLue.Decoder("SSD", Page(arrets: 15)))], [avant with { Quand = Maintenant.AddDays(-1) }], [],
             Maintenant, Maintenant.AddDays(-90)).Single().Explication.Should().Contain("que Windows n'a pas notés");
     }
+
+    // Un disque qui ne renseigne pas sa température (0 kelvin) ne s'affiche pas à −273 °C : la température se dit non lue.
+    [Fact]
+    public void Une_temperature_non_renseignee_ne_s_affiche_pas_a_moins_273()
+    {
+        var page = Page();
+        BinaryPrimitives.WriteUInt16LittleEndian(page.AsSpan(1), 0);
+
+        var c = Juger(page, null, []);
+
+        c.ValeurCourante.Should().NotContain("-273").And.Contain(Docteur.T("NV.TemperatureNonLue"));
+    }
 }

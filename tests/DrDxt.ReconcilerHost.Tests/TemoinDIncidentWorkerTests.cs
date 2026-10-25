@@ -32,6 +32,16 @@ public sealed class TemoinDIncidentWorkerTests
         parent.Should().BeLessThan(s.IndexOf("TrustedManifestRoot.EnsureCreatedHardened(_dossier)", StringComparison.Ordinal));
     }
 
+    // Les témoins posés d'avance par un compte (la réparation du dossier ne descend pas) : ni relus, ni comptés, ni supprimés.
+    [Fact]
+    public void Le_service_ne_relit_et_ne_purge_que_des_temoins_de_confiance()
+    {
+        var s = Source();
+        s.Should().Contain("TemoinDIncident.LireTous(_dossier, DeConfiance)").And.Contain("TemoinDIncident.EnTrop(_dossier, DeConfiance)")
+            .And.Contain("TrustedManifestRoot.EnsureTrustedFile(fichier).IsOk");
+        s.Should().NotContain("Directory.EnumerateFiles(");
+    }
+
     // Le rappel du journal tourne sur un fil du pool : une exception y arrêterait tout le service, réconciliateur compris.
     [Fact]
     public void Un_temoin_qui_echoue_ne_fait_jamais_tomber_le_service()
@@ -54,4 +64,16 @@ public sealed class TemoinDIncidentWorkerTests
     [Fact]
     public void Le_dossier_est_sous_les_donnees_communes_de_DrDXT()
         => TemoinDIncidentWorker.DossierParDefaut().Should().EndWith(Path.Combine("DrDxt", "temoins"));
+
+    // Un dernier témoin daté dans le futur (horloge partie en avant puis corrigée) ferait lire le journal à partir d'un
+    // instant pas encore venu : rien ne serait rattrapé.
+    [Fact]
+    public void Le_rattrapage_part_du_dernier_temoin_sauf_s_il_est_dans_le_futur()
+    {
+        var maintenant = new DateTimeOffset(2026, 10, 23, 22, 0, 0, TimeSpan.Zero);
+
+        TemoinDIncidentWorker.DebutDuRattrapage(maintenant.AddHours(-3), maintenant).Should().Be(maintenant.AddHours(-3));
+        TemoinDIncidentWorker.DebutDuRattrapage(null, maintenant).Should().Be(maintenant.AddDays(-7));
+        TemoinDIncidentWorker.DebutDuRattrapage(maintenant.AddDays(30), maintenant).Should().Be(maintenant.AddDays(-7));
+    }
 }

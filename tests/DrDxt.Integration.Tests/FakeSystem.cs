@@ -417,6 +417,7 @@ public sealed class FakeAdlxGpuTuning : IAdlxGpuTuning
             : Result<int>.Fail(ErrorCodes.TweakSdkUnavailable, "ADLX not available (fake).");
     public Result<int> GetUndervoltValue(int gpuIndex) => Result<int>.Ok(_state.AdlxUndervolt);
     public Result<int> GetGfxMaxFreqMhz(int gpuIndex) => Result<int>.Ok(_state.AdlxMaxFreqMhz);
+    public bool? EstALUsine(int gpuIndex) => true; // la carte modélisée part de l'usine
     public Result<int> GetPowerLimitPct(int gpuIndex) => Result<int>.Ok(_state.AdlxPowerLimitPct);
     public Result<FanCurve> GetFanCurve(int gpuIndex) => Result<FanCurve>.Ok(_state.GpuFanCurve);
 }

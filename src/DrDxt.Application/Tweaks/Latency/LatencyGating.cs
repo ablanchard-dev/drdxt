@@ -32,18 +32,10 @@ internal static class LatencyGating
     public static bool IsNvidia(GpuInfo g) =>
         g.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase);
 
-    public static bool IsAmd(GpuInfo g) =>
-        g.Vendor.Contains("AMD", StringComparison.OrdinalIgnoreCase)
-        || g.Vendor.Contains("Advanced Micro Devices", StringComparison.OrdinalIgnoreCase)
-        || g.Vendor.Contains("ATI", StringComparison.OrdinalIgnoreCase);
+    public static bool IsAmd(GpuInfo g) => CartesGraphiques.EstAmd(g.Vendor);
 
-    // Un GPU de rendu dédié a de la VRAM dédiée. Les GPU intégrés en rapportent ~0 (ils
-    // partagent la mémoire système) : tout ce qui est sous 1 Gio compte comme intégré.
-    private static bool IsDiscreteRenderGpu(GpuInfo g) =>
-        !IsIntel(g) && g.VramBytes >= (1L << 30);
-
-    private static bool IsIntel(GpuInfo g) =>
-        g.Vendor.Contains("Intel", StringComparison.OrdinalIgnoreCase);
+    // La règle unique du produit (mémoire et nom) : une APU à grosse réserve UMA n'est pas une carte de rendu dédiée.
+    private static bool IsDiscreteRenderGpu(GpuInfo g) => CartesGraphiques.EstDediee(g);
 
     // GPU mobiles : horloges verrouillées par le pilote. Les réglages du pilote marchent quand même (voir HasNvidiaDriverPath).
     private static bool IsMobileGpu(GpuInfo g) =>

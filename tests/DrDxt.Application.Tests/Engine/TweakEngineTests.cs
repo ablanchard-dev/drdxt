@@ -1,4 +1,5 @@
 ﻿using DrDxt.Application.Engine;
+using DrDxt.Application.Tweaks.Hardware;
 using DrDxt.Core;
 using FluentAssertions;
 using NSubstitute;
@@ -13,8 +14,8 @@ namespace DrDxt.Application.Tests.Engine;
 //     - ApplyBatch : (1) EnsureRestorePointAsync ; échec ⇒ abandon, rien n'est appliqué ;
 //       (2) appliquer chaque levier en empilant son instantané (pile LIFO) ; premier échec
 //       ⇒ dépiler + RevertAsync chaque levier déjà appliqué (LIFO) ⇒ ENGINE.BATCH_REVERTED ;
-//       un retour arrière qui échoue lui-même pendant le rollback ⇒ journal critique + renvoyer
-//       quand même BATCH_REVERTED avec les identifiants non annulés (jamais d'exception).
+//       un retour arrière qui échoue lui-même pendant le rollback ⇒ journal critique + TWEAK.PARTIALLY_APPLIED
+//       avec les identifiants non annulés (jamais d'exception).
 // C2  Retour arrière automatique sur régression mesurée : re-banc → significativité AbComparer :
 //       régression au-delà de la marge ⇒ retour arrière de tout le lot (LIFO) +
 //       rapport réussi + SummaryKey verdict.regression_reverted ;
@@ -138,6 +139,26 @@ public sealed class TweakEngineTests
 
     // ====================== C1 : application transactionnelle ======================
 
+    // Le garde de frontière rendait ENGINE.BATCH_REVERTED sur une exception levée après une pose, sans rien rendre : la pile
+    // des leviers posés vivait dans la méthode qui venait de lever. L'App croyait le lot défait, les leviers restaient posés.
+    [Fact]
+    public async Task Une_exception_apres_une_pose_rend_ce_qui_a_ete_pose()
+    {
+        var a = FakeTweak("a");
+        var b = FakeTweak("b");
+        var engine = Build();
+        Register(a, b);
+        _diag.When(d => d.Change("b", Arg.Any<string>(), "applied", Arg.Any<string>()))
+            .Do(_ => throw new InvalidOperationException("journal en panne"));
+
+        var r = await engine.ApplyAsync(Plan(a, b), baseline: null, Pid, CancellationToken.None);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.BatchReverted);
+        await b.Received(1).RevertAsync(Arg.Any<TweakSnapshot>());
+        await a.Received(1).RevertAsync(Arg.Any<TweakSnapshot>());
+    }
+
     [Fact]
     public async Task RestorePoint_failure_aborts_before_any_apply()
     {
@@ -153,6 +174,41 @@ public sealed class TweakEngineTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.RestoreDisabled);
         await t1.DidNotReceive().ApplyAsync();              // rien n'est appliqué sans point
         await _bench.DidNotReceive().RunAsync(Arg.Any<int>(), Arg.Any<TimeSpan>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    // Le helper a reçu l'écriture, l'a notée à son journal, puis s'est tu : le réglage a pu être posé. Par le vrai moteur et
+    // un vrai levier : le lot ne se dit jamais « défait » (l'écran dirait « rien n'est resté »), il est partiellement posé.
+    [Fact]
+    public async Task Un_helper_qui_ecrit_puis_se_tait_ne_rend_jamais_un_lot_defait()
+    {
+        var registre = Substitute.For<IRegistryReader>();
+        registre.ReadDword(RegistryHiveKind.LocalMachine, @"SYSTEM\CurrentControlSet\Control\GraphicsDrivers", "HwSchMode")
+            .Returns(Result<uint?>.Ok(1u));
+        var eleve = Substitute.For<IElevatedClient>();
+        eleve.ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(Result.Fail(ErrorCodes.HelperNoReplyJournalisee, "aucune réponse après l'envoi")));
+        var hags = new DrDxt.Application.Tweaks.Latency.HagsOnTweak(registre, eleve);
+        var engine = Build();
+        Register(hags);
+
+        var r = await engine.ApplyAsync(Plan(hags), Baseline, Pid, default);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Code.Should().Be(ErrorCodes.TweakPartiallyApplied, "le réglage a pu rester posé");
+    }
+
+    // Un levier qui dit lui-même n'avoir pas pu revenir (l'écran resté au mode cible) : le lot n'est pas « défait ».
+    [Fact]
+    public async Task Un_levier_reste_partiellement_pose_ne_rend_jamais_un_lot_defait()
+    {
+        var t = FakeTweak("ecran");
+        t.ApplyAsync().Returns(Task.FromResult(Result<TweakSnapshot>.Fail(ErrorCodes.TweakPartiallyApplied, "pas revenu")));
+        var engine = Build();
+        Register(t);
+
+        var r = await engine.ApplyAsync(Plan(t), Baseline, Pid, default);
+
+        r.Error!.Value.Code.Should().Be(ErrorCodes.TweakPartiallyApplied);
     }
 
     [Fact]
@@ -219,10 +275,10 @@ public sealed class TweakEngineTests
     }
 
     [Fact]
-    public async Task Failed_revert_during_rollback_still_returns_batch_reverted_and_logs_unreverted()
+    public async Task Failed_revert_during_rollback_returns_partially_applied_and_logs_unreverted()
     {
-        // Le retour arrière de rollback de t1 échoue lui-même : pas d'exception ; rapporter quand
-        // même BATCH_REVERTED et signaler que t1 n'a pas été annulé (filet ultime = point de restauration).
+        // Le retour arrière de rollback de t1 échoue lui-même : pas d'exception. t1 est resté posé : le lot n'est pas
+        // « défait » (BATCH_REVERTED ferait dire à l'écran le système inchangé) ; t1 est nommé (filet ultime = point de restauration).
         var t1 = FakeTweak("t1", revertOk: false);
         var t2 = FakeTweak("t2", applyOk: false);
         var engine = Build();
@@ -231,7 +287,7 @@ public sealed class TweakEngineTests
         var r = await engine.ApplyAsync(Plan(t1, t2), Baseline, Pid, default);
 
         r.IsOk.Should().BeFalse();
-        r.Error!.Value.Code.Should().Be(ErrorCodes.BatchReverted);
+        r.Error!.Value.Code.Should().Be(ErrorCodes.TweakPartiallyApplied);
         r.Error!.Value.Message.Should().Contain("t1");      // un-reverted id surfaced
         // Journal critique (une trace de changement pour le rollback raté).
         _diag.ReceivedWithAnyArgs().Change(default!, default!, default!, default!);
@@ -599,6 +655,44 @@ public sealed class TweakEngineTests
         return t;
     }
 
+    // Un levier posé sans mesure (le plafond de chaleur du processeur) se relit par le processeur lui-même : sans ses
+    // lecteurs, le moteur le garderait non relu, et le résultat le dirait « effectif tout de suite ».
+    private const ulong Unite = 0x3, Registre65W = (1752UL << 32) | (1UL << 47) | (1UL << 15) | 520UL, Info65W = 520UL;
+    private static readonly ulong Pose = (Registre65W & ~0x7FFFUL) | 400UL;
+
+    private static ICpuPowerLimitReader Processeur(ulong pl)
+    {
+        var cpu = Substitute.For<ICpuPowerLimitReader>();
+        cpu.LireRegistres().Returns(Result<LectureLimiteCpu>.Ok(new LectureLimiteCpu(new RegistresCpuLus(Unite, pl, Info65W),
+            RegistreDeLimiteCpu.Decoder(Unite, pl, Info65W)! with { CopieMmioPl1W = 0, ChaleurEnPartieMaxC = 80 })));
+        return cpu;
+    }
+
+    private ITweak PlafondDeChaleur()
+    {
+        var t = FakeTweak("fixit.cpu_power_cap");
+        t.ApplyAsync().Returns(Result<TweakSnapshot>.Ok(new TweakSnapshot("fixit.cpu_power_cap",
+            DrDxt.Core.PrivilegedOpCodec.Serialize(new SetCpuPackagePowerLimitOp(Registre65W, Pose)).Value!,
+            DrDxt.Core.PrivilegedOpCodec.Serialize(new SetCpuPackagePowerLimitOp(Pose, Registre65W)).Value!)));
+        return t;
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Un_levier_du_processeur_se_relit_par_le_processeur_dans_le_lot(bool pris)
+    {
+        _safety.EnsureRestorePointAsync().Returns(Task.FromResult(Result.Ok()));
+        var t = PlafondDeChaleur();
+        Register(t);
+        var engine = new TweakEngine(_safety, _bench, _diag, _catalog, new LecteurFige(2), cpu: Processeur(pris ? Pose : Registre65W));
+
+        await engine.ApplyAsync(Plan(t), Baseline, Pid, default);
+
+        if (pris) _diag.Received().Change("fixit.cpu_power_cap", Arg.Any<string>(), "readback:Applied", "DrDXT");
+        else await t.Received(1).RevertAsync(Arg.Any<TweakSnapshot>());
+    }
+
     private sealed class LecteurFige(uint? valeur) : DrDxt.Application.Tweaks.Hardware.IRegistryReader
     {
         public Result<uint?> ReadDword(RegistryHiveKind hive, string path, string name)
@@ -710,8 +804,8 @@ public sealed class TweakEngineTests
     }
 
     /// <summary>
-    /// La distinction qui a failli m'echapper. Refuser de MESURER faute de preuve supprimait
-    /// aussi le filet anti-regression : un batch qui degrade la machine serait reste en place.
+    /// Refuser de MESURER faute de preuve supprimerait aussi le filet anti-regression : un batch qui degrade la machine
+    /// resterait en place.
     /// Mesurer sert deux choses opposees — PROTEGER (annuler une regression, aucune attribution)
     /// et AFFIRMER (annoncer un gain, attribution a ce levier). Seule la seconde exige la preuve.
     /// </summary>

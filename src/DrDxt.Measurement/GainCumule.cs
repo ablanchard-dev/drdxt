@@ -33,7 +33,7 @@ public sealed record TotalDeGains(
 /// par plan applique, jamais un par levier, et ne l'ecrit nulle part ; le seul gain prouve de la
 /// machine de reference, +2,2 % au banc GPU, ne vit que dans un fichier de plan.
 ///
-/// ══ les deux fautes que ce type rend impossibles ══
+/// ══ les trois fautes que ce type rend impossibles ══
 ///
 /// **1. Additionner des pourcentages.** Deux gains de 2 % et 3 % ne font pas 5 % : ils font
 /// 1,02 x 1,03 - 1 = 5,06 %. L'ecart est petit ici et grossit vite ; sur cinq leviers a 10 %,
@@ -89,6 +89,14 @@ public static class GainCumule
             if (!string.Equals(g.Instrument, instrument, StringComparison.OrdinalIgnoreCase))
             {
                 refus.Add(Docteur.T("GC.Instrument", g.Levier, g.Instrument, instrument));
+                continue;
+            }
+
+            // Un ecart ou un bruit non mesure (NaN, infini, bruit negatif) n'est ni un gain ni du bruit : compose, il rendrait le
+            // total « NaN % ».
+            if (!double.IsFinite(g.EcartPercent) || !double.IsFinite(g.BruitPercent) || g.BruitPercent < 0)
+            {
+                refus.Add(Docteur.T("GC.NonMesure", g.Levier));
                 continue;
             }
 

@@ -15,7 +15,7 @@ namespace DrDxt.ReconcilerHost;
 // ReconcilableTweakCatalog). Puis planifier la remise à zéro de session stable après la fenêtre
 // de marche. Puis boucler sur l'interrogation quotidienne de secours, en réconciliant sans
 // condition à chaque intervalle. Chaque passe passe par SingleFlightReconcile : des déclencheurs
-// qui se chevauchent ne tournent jamais deux fois.
+// qui se chevauchent ne tournent jamais en même temps, ils passent l'un après l'autre.
 //
 // La détection de mise à jour de fonctionnalité (FeatureUpdateTrigger/Detector) est un signal en
 // plus, pas une barrière : chaque passe l'interroge pour son effet d'enregistrement (relevé sur
@@ -45,6 +45,18 @@ public sealed class Worker : BackgroundService
 
     /// <summary>Une passe quotidienne qui tombe pendant une partie attend sa fin, relue à ce rythme.</summary>
     public static readonly TimeSpan AttenteEnPartie = TimeSpan.FromMinutes(10);
+
+    /// <summary>Le plafond cumulé de cette attente. Le service ne voit un jeu que par son nom de processus : tout programme du
+    /// compte peut lancer un « cod.exe » qui ne finit jamais, et sans plafond ni le rejeu ni la réconciliation n'auraient plus
+    /// lieu. Quatre heures couvrent une longue session ; au-delà, la passe part quand même.</summary>
+    public static readonly TimeSpan AttenteEnPartieMax = TimeSpan.FromHours(4);
+
+    /// <summary>Attend la fin du jeu, relue toutes les <see cref="AttenteEnPartie"/>, au plus <see cref="AttenteEnPartieMax"/>.</summary>
+    internal static async Task AttendreLaFinDuJeuAsync(Func<bool> jeuEnCours, IDelay delai, CancellationToken ct)
+    {
+        for (var attendu = TimeSpan.Zero; attendu < AttenteEnPartieMax && jeuEnCours(); attendu += AttenteEnPartie)
+            await delai.DelayAsync(AttenteEnPartie, ct).ConfigureAwait(false);
+    }
 
     public Worker(
         SingleFlightReconcile single,
@@ -87,7 +99,7 @@ public sealed class Worker : BackgroundService
         if (!booted.IsOk)
             LogFailure("boot-mark", booted);
 
-        // (2) Le rejeu du journal d'écriture anticipée d'abord (il attend la fin d'une partie), puis réconcilier une fois,
+        // (2) Le rejeu du journal d'écriture anticipée d'abord (il attend la fin d'une partie, au plus AttenteEnPartieMax), puis réconcilier une fois,
         // sans condition : le démarrage est la principale fenêtre de dérive.
         if (_finDuRejeu is { } fin)
         {
@@ -108,9 +120,8 @@ public sealed class Worker : BackgroundService
             {
                 await _delay.DelayAsync(_timing.DailyPollInterval, stoppingToken).ConfigureAwait(false);
                 // Rien ne se réapplique pendant une partie (un changement de plan d'alimentation en plein jeu se sent) :
-                // la passe attend la fin du jeu. Le démarrage, lui, passe toujours.
-                while (_jeuEnCours())
-                    await _delay.DelayAsync(AttenteEnPartie, stoppingToken).ConfigureAwait(false);
+                // la passe attend la fin du jeu, au plus AttenteEnPartieMax, comme la première passe au démarrage.
+                await AttendreLaFinDuJeuAsync(_jeuEnCours, _delay, stoppingToken).ConfigureAwait(false);
                 await RunPassAsync(stoppingToken).ConfigureAwait(false);
             }
         }
@@ -133,8 +144,19 @@ public sealed class Worker : BackgroundService
     /// comme barrière : il tourne d'abord pour son seul effet d'enregistrement (le détecteur relève
     /// sur front LastFeatureUpdateBuild sur un changement de build de l'OS), et une mise à jour
     /// détectée est journalisée ; mais quoi qu'il rende, la réconciliation ci-dessous tourne. Un échec
-    /// de lecture du déclencheur ou de réconciliation est journalisé, jamais levé hors de la boucle de l'hôte.</summary>
+    /// de lecture du déclencheur ou de réconciliation est journalisé, jamais levé hors de la boucle de l'hôte : une exception
+    /// (manifeste, déclencheur, réconciliateur) aussi, sinon elle arrêterait le service jusqu'au redémarrage.</summary>
     private async Task RunPassAsync(CancellationToken ct)
+    {
+        try { await UnePasseAsync(ct).ConfigureAwait(false); }
+        // Seul l'arrêt du service sort : une annulation interne à la passe (un délai dépassé) se dit et la boucle continue.
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _diagnostics.Change(HostActors.ManifestTweakId, ex.GetType().Name, "pass-threw", HostActors.Security);
+        }
+    }
+
+    private async Task UnePasseAsync(CancellationToken ct)
     {
         // Détection de mise à jour de fonctionnalité : une raison / un enregistreur en plus, pas une
         // barrière. On l'appelle pour son effet (enregistrer LastFeatureUpdateBuild sur un changement de

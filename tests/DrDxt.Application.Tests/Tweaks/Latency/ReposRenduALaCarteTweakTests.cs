@@ -36,7 +36,7 @@ public sealed class ReposRenduALaCarteTweakTests
     }
 
     // Lu au profil du jeu (un jeu tournait), l'état ne dit rien du profil global : ce levier ne sait pas si le bureau est
-    // au maximum. La vérification disait « déjà réglé » ; c'est « non lu ». Lu au global, il répond.
+    // au maximum. La vérification dit « non lu », pas « déjà réglé ». Lu au global, il répond.
     [Fact]
     public void Lu_au_profil_du_jeu_le_global_est_dit_non_lu()
     {

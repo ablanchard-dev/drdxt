@@ -39,6 +39,13 @@ public sealed class PorteeDePose : IDisposable
         if (ReferenceEquals(EnCours.Value, this)) EnCours.Value = _avant;
     }
 
+    /// <summary>Le flux reprend la portée d'avant ; celle-ci reste ouverte, pour être acquittée ou abandonnée plus tard. Un
+    /// chemin qui pose plusieurs lots en ouvre une par lot : un lot qui échoue n'acquitte pas avec les autres.</summary>
+    public void Detacher()
+    {
+        if (ReferenceEquals(EnCours.Value, this)) EnCours.Value = _avant;
+    }
+
     /// <summary>Le temps du bloc, ce flux n'a plus de portée : un retour arrière en pleine pose part nu.</summary>
     public static IDisposable Suspendre()
     {

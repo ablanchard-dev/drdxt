@@ -2,6 +2,7 @@ using DrDxt.Infrastructure.Updates;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
+using DrDxt.TestSupport;
 
 namespace DrDxt.Infrastructure.Tests.Updates;
 
@@ -46,7 +47,7 @@ public sealed class TheClientReadsTheRealServerTests : IClassFixture<WebApplicat
     private static (string Key, string Value)[] PublishedApp() =>
     [
         ("ManifestSigning:Ed25519PrivateSeedBase64",
-            Convert.ToBase64String(UpdateDevKeys.DevPrivateSeed)),
+            Convert.ToBase64String(UpdateDevTestKeys.DevPrivateSeed)),
         ("Updates:App:Version", Version),
         ("Updates:App:Url", Url),
         ("Updates:App:Sha256", Sha256),
@@ -80,7 +81,7 @@ public sealed class TheClientReadsTheRealServerTests : IClassFixture<WebApplicat
         // demarrage alors que tout va bien — et le jour ou le reseau tombera vraiment, plus
         // personne ne regardera ce message.
         var feed = FeedAgainst(("ManifestSigning:Ed25519PrivateSeedBase64",
-            Convert.ToBase64String(UpdateDevKeys.DevPrivateSeed)));
+            Convert.ToBase64String(UpdateDevTestKeys.DevPrivateSeed)));
 
         var fetched = await feed.GetManifestAsync(UpdateChannel.App, CancellationToken.None);
 

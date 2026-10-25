@@ -72,7 +72,7 @@ public static class CachesL3
             yield break;
         }
         static string Mo(long o) => (o / (1024.0 * 1024)).ToString("0.#", Docteur.Langue);
-        var valeur = string.Join(" + ", caches.Select(c => Mo(c.Octets) + " Mo"));
+        var valeur = string.Join(" + ", caches.Select(c => Docteur.T("U.Mo", Mo(c.Octets))));
         if (caches.Select(c => c.Octets).Distinct().Count() == 1)
         {
             yield return new RepairFinding("CPU", "caches L3", valeur, null, RepairStatus.Observed, Docteur.T("L3.Uniforme", caches.Count, Mo(caches[0].Octets)));

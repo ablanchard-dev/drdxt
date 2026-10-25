@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DrDxt.Application.Parties;
 using DrDxt.Core;
+using Pose = DrDxt.Application.Tweaks.PoseRelue;
 
 namespace DrDxt.App.ViewModels;
 
@@ -61,7 +62,7 @@ public partial class ScanViewModel
     /// <summary>La mesure réelle ; l'appli la pose au démarrage, <c>null</c> = bouton sans effet (tests).</summary>
     internal Func<CancellationToken, Task<EtatAvantPartie>>? MesurerAvantPartie { get; set; }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(AucuneOperationLongue))]
     private async Task VerifierPretAJouer()
     {
         if (MesurerAvantPartie is null || PretAJouerEnCours) return;
@@ -295,6 +296,9 @@ public partial class ScanViewModel
         var fr = CultureInfo.CurrentCulture;
         var ligne = $"{p.Fin.LocalDateTime.ToString(localiser("Format.JourHeure"), fr)} · {NomDuJeu(p.Jeu)} · "
             + $"{p.FpsMedian.ToString("0", fr)} FPS, 1 % low {p.Low1Median.ToString("0", fr)} · {localiser(goulot)}";
+        // Les pauses écartées du 1 % low (jeu hors premier plan) se disent : le chiffre ne les cache pas en silence.
+        if (p.PausesEcartees > 0)
+            ligne += " · " + string.Format(fr, localiser("Parties.PausesEcartees"), p.PausesEcartees);
         // Les minutes vraiment jouées, menus et lobby à part.
         if (p.MinutesJouees is { } jouees)
             ligne += " · " + string.Format(fr, localiser("Parties.Jouees"), jouees.ToString("0", fr), (p.Fin - p.Debut).TotalMinutes.ToString("0", fr));
@@ -392,9 +396,8 @@ public partial class ScanViewModel
         public override string ToString() => NomAccessible;
     }
 
-    /// <summary>Ce que DrDXT a posé et garde, chacun annulable depuis l'écran. Avant, « Annuler »
-    /// n'existait que juste après un réglage de carte graphique ; un levier d'« Optimiser » ne partait que par le retrait
-    /// automatique.</summary>
+    /// <summary>Ce que DrDXT a posé et garde, chacun annulable depuis l'écran, et pas seulement
+    /// juste après un réglage de carte graphique : un levier d'« Optimiser » n'attend pas le retrait automatique.</summary>
     public ObservableCollection<LevierPose> LeviersPoses { get; } = [];
 
     public bool ALeviersPoses => LeviersPoses.Count > 0;
@@ -411,74 +414,181 @@ public partial class ScanViewModel
         var poses = _journalLeviers?.Lire() ?? [];
         foreach (var s in poses.Where(EncorePoseParDrDxt))
         {
-            var titre = _localize(TweakDisplayKeys.TitleKey(s.TweakId));
+            var titre = TitreDuLevier(s.TweakId);
             // Le lecteur d'écran annonce l'action et le réglage, pas le seul réglage.
             LeviersPoses.Add(new LevierPose(s.TweakId, titre, $"{_localize("Leviers.BoutonAnnuler")}{Docteur.DeuxPoints}{titre}"));
         }
+        foreach (var o in _orphelinsDuManifeste.Where(o => LeviersPoses.All(l => l.Id != o.Id)))
+        {
+            var titre = string.Format(CultureInfo.CurrentCulture, _localize("Leviers.ListeSigneeSeulement"), _localize(TweakDisplayKeys.TitleKey(o.Id)));
+            LeviersPoses.Add(new LevierPose(o.Id, titre, $"{_localize("Leviers.BoutonAnnuler")}{Docteur.DeuxPoints}{titre}"));
+        }
         OnPropertyChanged(nameof(ALeviersPoses));
+    }
+
+    /// <summary>Dans la liste signée (ce que le service repose, ce que la désinstallation rend) mais plus dans le journal des
+    /// leviers : une App arrêtée entre les deux retraits, ou un journal mis de côté. Relus à chaque scan, montrés avec leur
+    /// « Annuler ». L'origine est celle que la liste porte pour un levier gardé (RevertOnly) ; aucune pour une entrée que le
+    /// service réaffirme, qui ne fait alors que sortir de la liste.</summary>
+    private IReadOnlyList<(string Id, TweakSnapshot? Snapshot)> _orphelinsDuManifeste = [];
+
+    /// <summary>Relit la liste signée ; rend les titres des leviers qui n'y sont plus qu'elle. Liste ou journal illisibles :
+    /// rien n'est affirmé.</summary>
+    internal async Task<IReadOnlyList<string>> RelireOrphelinsDuManifesteAsync()
+    {
+        if (_journalLeviers is not { } journal || !journal.Lisible()) return [];
+        Result<DesiredState> lu;
+        try { lu = await _desiredStateStore.LoadAsync().ConfigureAwait(true); }
+        catch (Exception) { return []; }
+        if (!lu.IsOk || lu.Value is null) return [];
+        var poses = journal.Lire().Select(s => s.TweakId).ToHashSet(StringComparer.Ordinal);
+        _orphelinsDuManifeste = (lu.Value.RevertOnly ?? [])
+            .Select(t => (Id: t.TweakId, Snapshot: (TweakSnapshot?)new TweakSnapshot(t.TweakId, t.OriginalValueJson, t.DesiredValueJson)))
+            // Une entrée que le service réaffirme porte l'origine du levier, copiée de son snapshot : seule dans la liste
+            // (Optimiser interrompu avant le journal), elle est le dernier endroit qui la garde, et Annuler la rend.
+            .Concat(lu.Value.Tweaks.Select(t => (Id: AppliedTweakManifestMapper.IdDeLApp(t.TweakId),
+                Snapshot: AppliedTweakManifestMapper.OrigineRendable(t.OriginalValueJson)
+                    ? new TweakSnapshot(AppliedTweakManifestMapper.IdDeLApp(t.TweakId), t.OriginalValueJson, t.PoseesJson)
+                    : (TweakSnapshot?)null)))
+            .Where(o => !poses.Contains(o.Id))
+            .GroupBy(o => o.Id, StringComparer.Ordinal)
+            .Select(g => g.FirstOrDefault(o => o.Snapshot is not null) is { Snapshot: not null } avecOrigine ? avecOrigine : g.First())
+            .ToList();
+        ChargerLeviersPoses();
+        return _orphelinsDuManifeste.Select(o => _localize(TweakDisplayKeys.TitleKey(o.Id))).ToList();
     }
 
     /// <summary>Seulement ce qui porte encore la valeur posée par DrDXT, la même règle que la
     /// désinstallation. Revenu à la valeur d'avant (désinstallation, mise à jour) : rien à annuler, et le scan le dit déjà.
     /// Modifié depuis par le joueur : « Annuler » réécrirait la valeur d'avant par-dessus son choix ; pas montré. Sans
     /// valeur posée connue ou non relisable : montré seulement s'il n'est pas revenu à l'origine.</summary>
-    private bool EncorePoseParDrDxt(TweakSnapshot s)
-    {
-        // Origine égale à la valeur posée = DrDXT n'a rien changé ; rien à annuler.
-        if (string.Equals(s.AppliedValueJson, s.OriginalValueJson, StringComparison.Ordinal)) return false;
-        if (_registreGains is not { } registre) return true;
-        if (s.AppliedValueJson is { Length: > 0 } posee)
-        {
-            var surPosee = DrDxt.Application.Tweaks.TweakReadback.Relire(new TweakSnapshot(s.TweakId, posee), registre).Etat;
-            if (surPosee == DrDxt.Application.Tweaks.EtatRelu.RevenuAvantApplication) return true; // encore celle de DrDXT
-            if (surPosee == DrDxt.Application.Tweaks.EtatRelu.DifferentDeAvant) return false;     // revenue ou changée
-        }
-        return DrDxt.Application.Tweaks.TweakReadback.Relire(s, registre).Etat != DrDxt.Application.Tweaks.EtatRelu.RevenuAvantApplication;
-    }
+    private bool EncorePoseParDrDxt(TweakSnapshot s) => EtatDeLaPose(s) == Pose.DeDrDxt;
+
+    /// <summary>Tout rendu passe par là (<see cref="DrDxt.Application.Tweaks.TweakReadback.EtatDeLaPose"/>).</summary>
+    private Pose EtatDeLaPose(TweakSnapshot s) => DrDxt.Application.Tweaks.TweakReadback.EtatDeLaPose(s, _registreGains, VerifierLaPose);
 
     /// <summary>Le même chemin que le retrait automatique : la valeur d'avant par le levier lui-même, puis le journal et le
-    /// manifeste signé. Un refus ne retire rien et le dit. Le clic, et lui seul, peut remettre la carte AMD à l'usine.</summary>
-    [RelayCommand]
+    /// manifeste signé. Un refus ne retire rien et le dit. Le clic, et lui seul, peut remettre la carte AMD à l'usine.
+    /// « Annulé » ne se dit que relu à l'origine (<see cref="Relu"/>).</summary>
+    [RelayCommand(CanExecute = nameof(AucuneEcritureEnCours))]
     private Task AnnulerLevierAsync(string id) => AnnulerLevierAsync(id, parClic: true);
 
     /// <param name="parClic">Faux pour la garde d'incident, qui rend sans clic : un refus du helper (fréquence au-delà de sa
     /// bande) s'y dit, il ne devient jamais une remise à l'usine.</param>
-    internal async Task AnnulerLevierAsync(string id, bool parClic)
+    /// <returns>Ce que la relecture a dit après un rendu accepté ; <c>null</c> quand rien n'a été rendu.</returns>
+    internal async Task<DrDxt.Application.Tweaks.EtatApplique?> AnnulerLevierAsync(string id, bool parClic)
     {
-        var titre = _localize(TweakDisplayKeys.TitleKey(id));
-        // Retiré entre-temps (retrait automatique) ou levier inconnu : dit, pas muet.
-        if (_journalLeviers?.Lire().FirstOrDefault(s => s.TweakId == id) is not { } snapshot
-            || LevierParId?.Invoke(id) is not { } levier)
+        var titre = TitreDuLevier(id);
+        var orphelin = _orphelinsDuManifeste.FirstOrDefault(o => o.Id == id);
+        // Dans la liste signée seulement, sans origine que l'App sache rendre (une entrée du service à l'origine illisible) : il en
+        // sort, et le réglage reste tel qu'il est.
+        if (_journalLeviers?.Lire().FirstOrDefault(s => s.TweakId == id) is null && orphelin is { Id: not null, Snapshot: null })
+        {
+            var sortiSeul = await RetirerDuManifesteAsync(id);
+            if (sortiSeul.IsOk) _orphelinsDuManifeste = _orphelinsDuManifeste.Where(o => o.Id != id).ToList();
+            MessageLeviers = sortiSeul.IsOk
+                ? string.Format(CultureInfo.CurrentCulture, _localize("Leviers.SortiDeLaListe"), titre)
+                : string.Format(CultureInfo.CurrentCulture, _localize("Changement.PasSortiDuManifeste"), titre, RaisonLisible.Dire(sortiSeul, _localize));
+            ChargerLeviersPoses();
+            return null;
+        }
+        // Retiré entre-temps (retrait automatique) ou levier inconnu : dit, pas muet. Hors du journal mais dans la liste signée,
+        // son origine est celle que la liste porte.
+        // Le repos de la carte et les gestes du docteur gardés sont hors du catalogue des leviers : ils se trouvent par leur
+        // propre levier.
+        if ((_journalLeviers?.Lire().FirstOrDefault(s => s.TweakId == id) ?? orphelin.Snapshot) is not { } snapshot
+            || (LevierParId?.Invoke(id) ?? (LevierReposCarte is { } repos && repos.Id == id ? repos : null)
+                ?? (DrDxt.Application.Tweaks.LevierDeGeste.EstUnGeste(id) && _helper is { } eleve ? new DrDxt.Application.Tweaks.LevierDeGeste(id, eleve) : null))
+                is not { } levier)
         {
             MessageLeviers = string.Format(CultureInfo.CurrentCulture, _localize("Leviers.Introuvable"), titre);
             ChargerLeviersPoses();
-            return;
+            return null;
         }
-        var issue = parClic
-            ? await DrDxt.Application.Autopilot.AnnulationParClic.AnnulerAsync(levier, snapshot, _helper)
+        // L'export d'un paquet de pilote retiré n'est plus sous la racine du helper : rien ne peut le remettre. Il sort de la
+        // liste, et c'est dit, au lieu d'un Annuler qui échouerait à chaque clic.
+        if (DrDxt.Application.Tweaks.LevierDeGeste.PaquetDe(id) is { } paquet && !ExportDuPiloteExiste(paquet))
+        {
+            await OublierAsync(id).ConfigureAwait(true);
+            MessageLeviers = string.Format(CultureInfo.CurrentCulture, _localize("Geste.Pilote.ExportAbsent"), titre);
+            return null;
+        }
+        // Seule la valeur de DrDXT se rend : la garde d'incident et une entrée de la liste signée ne passent pas par le filtre
+        // de la liste. Revenu à l'origine, rien à écrire ; changé depuis, rien n'est réécrit par-dessus. Dans les deux cas,
+        // plus rien de DrDXT n'y est : il sort du manifeste et du journal.
+        var etat = EtatDeLaPose(snapshot);
+        var issue = etat != Pose.DeDrDxt ? new DrDxt.Application.Autopilot.AnnulationParClic.Issue(Result.Ok(), null)
+            : parClic ? await DrDxt.Application.Autopilot.AnnulationParClic.AnnulerAsync(levier, snapshot, _helper)
             : new DrDxt.Application.Autopilot.AnnulationParClic.Issue(await levier.RevertAsync(snapshot), null);
         var r = issue.Resultat;
         if (!r.IsOk)
         {
             MessageLeviers = RaisonLisible.OuIncertain(r,
                 string.Format(CultureInfo.CurrentCulture, _localize("Leviers.PasAnnule"), titre, RaisonLisible.Dire(r, _localize)), _localize, titre);
-            return;
+            return null;
         }
-        var journalReecrit = _journalLeviers.Retirer(id);
-        await ArreterEssaiSurAnnulationAsync(id);
+        // La remise à l'usine (issue.Message) est relue par la carte elle-même ; l'usine n'est pas forcément l'origine.
+        var relu = issue.Message is null && etat == Pose.DeDrDxt ? Relu(snapshot) : DrDxt.Application.Tweaks.EtatApplique.NotApplied;
+        if (relu == DrDxt.Application.Tweaks.EtatApplique.Applied)
+        {
+            MessageLeviers = string.Format(CultureInfo.CurrentCulture, _localize("Leviers.PasAnnule"), titre, _localize("Leviers.EncorePose"));
+            return relu;
+        }
+        // Le manifeste (ce que le service repose) sort avant tout ce qui cache le levier à l'écran.
         var sorti = await RetirerDuManifesteAsync(id);
-        MessageLeviers = string.Format(CultureInfo.CurrentCulture,
-                _localize(levier.TakesEffectAfterReboot ? "Leviers.AnnuleAuRedemarrage" : "Leviers.Annule"), titre)
+        relu = await RelireApresLaSortie(levier, snapshot, relu);
+        if (relu == DrDxt.Application.Tweaks.EtatApplique.Applied)
+        {
+            MessageLeviers = string.Format(CultureInfo.CurrentCulture, _localize("Leviers.PasAnnule"), titre, _localize("Leviers.EncorePose"));
+            return relu;
+        }
+        var journalReecrit = _journalLeviers?.Retirer(id) ?? true;
+        // Annulé, le repos de la carte n'est plus suivi en jeu : la surveillance le croirait sinon changé depuis par le joueur.
+        if (LevierReposCarte?.Id == id) ReglagesDeLaCarte?.Effacer();
+        await ArreterEssaiSurAnnulationAsync(id);
+        _orphelinsDuManifeste = _orphelinsDuManifeste.Where(o => o.Id != id).ToList();
+        // Annulé, il n'est plus une pose de ce scan : Optimiser peut le reproposer, et son compte rendu, qui le disait posé,
+        // ne dit plus vrai.
+        if (_posesDepuisLeScan.Remove(id)) ResultatOptimisation = null;
+        await JugerCeQuiResteAPoserAsync().ConfigureAwait(true);
+        MessageLeviers = string.Format(CultureInfo.CurrentCulture, _localize(etat == Pose.ChangeDepuis ? "Leviers.ChangeDepuis"
+                : relu != DrDxt.Application.Tweaks.EtatApplique.NotApplied
+                ? "Leviers.AnnuleNonRelu" : levier.TakesEffectAfterReboot
+                    ? Differe(levier, "Leviers.AnnuleAuRedemarrage", "Leviers.AnnuleAuLancementDuJeu") : "Leviers.Annule"), titre)
             + (journalReecrit ? "" : " " + _localize("Leviers.JournalPasMisAJour"))
             + (sorti.IsOk ? "" : " " + string.Format(CultureInfo.CurrentCulture, _localize("Changement.PasSortiDuManifeste"),
                 titre, RaisonLisible.Dire(sorti, _localize)))
             + (issue.Message is { } m ? " " + m : "");
         ChargerLeviersPoses();
+        return relu;
     }
 
-    /// <summary>Les arrêts passés ne refusent plus Optimiser ; un
-    /// réglage posé par DrDXT et suivi d'un arrêt brutal hors veille dans la semaine se rend seul (<see cref="DrDxt.Application.Autopilot.GardeDIncident"/>).
-    /// Sans le helper joignable sans autorisation Windows, il se dit à rendre, jamais d'UAC sans clic.</summary>
+    /// <summary>Le titre d'un levier posé ; un geste du docteur gardé se nomme par ce qu'il a fait.</summary>
+    private string TitreDuLevier(string id)
+        => DrDxt.Application.Tweaks.LevierDeGeste.PaquetDe(id) is { } paquet
+            ? string.Format(CultureInfo.CurrentCulture, _localize("Leviers.Geste.Pilote"), paquet)
+            : DrDxt.Application.Tweaks.LevierDeGeste.JeuDe(id) is { } jeu
+                ? string.Format(CultureInfo.CurrentCulture, _localize("Leviers.Geste.Dlss"), Path.GetFileNameWithoutExtension(jeu))
+                : _localize(TweakDisplayKeys.TitleKey(id));
+
+    /// <summary>Le levier est rendu avant de sortir de la liste signée : rendu raté, la liste garde l'origine que la
+    /// désinstallation rendra. Mais le service peut le reposer entre les deux (sa passe d'après une mise à jour de Windows
+    /// ou du pilote). Relu rendu avant la sortie et reposé après, il est rendu une fois de plus ; le service ne le connaît plus.</summary>
+    private async Task<DrDxt.Application.Tweaks.EtatApplique> RelireApresLaSortie(ITweak levier, TweakSnapshot snapshot,
+        DrDxt.Application.Tweaks.EtatApplique relu)
+    {
+        if (relu != DrDxt.Application.Tweaks.EtatApplique.NotApplied || Relu(snapshot) != DrDxt.Application.Tweaks.EtatApplique.Applied)
+            return relu;
+        return (await levier.RevertAsync(snapshot)).IsOk ? Relu(snapshot) : DrDxt.Application.Tweaks.EtatApplique.Applied;
+    }
+
+    /// <summary>Une annulation acceptée, relue par ce qui lit vraiment le réglage : « annulé » et « retiré » ne se disent que
+    /// sur NotApplied (la valeur d'avant). Applied : la machine porte encore la valeur de DrDXT, rien n'est rendu ; le journal
+    /// et le manifeste la gardent (le service la reposerait sinon, et « Annuler » se reclique). Illisible, ou ni l'une ni
+    /// l'autre : rendu par le levier mais non relu, et c'est dit. Lecteur non branché : la réussite du levier fait foi.</summary>
+    private DrDxt.Application.Tweaks.EtatApplique Relu(TweakSnapshot s)
+        => VerifierLaPose?.Invoke(s) ?? DrDxt.Application.Tweaks.EtatApplique.NotApplied;
+
     /// <summary>GARDE2 : les vidages à chaud du pilote graphique, branchés par l'App ; null = non lus.</summary>
     internal Func<IReadOnlyList<(DateTimeOffset Quand, int Code)>?>? LireVidagesCarte { get; set; }
 
@@ -501,7 +611,7 @@ public partial class ScanViewModel
         var poses = JournalChangements?.Lire() ?? [];
         foreach (var s in journal)
         {
-            if (s.TweakId == enEssai || LevierParId(s.TweakId) is not { } levier) continue;
+            if (s.TweakId == enEssai || DrDxt.Application.Tweaks.LevierDeGeste.EstUnGeste(s.TweakId) || LevierParId(s.TweakId) is not { } levier) continue;
             var encore = levier is DrDxt.Application.Tweaks.FixIt.LevierPl1TweakBase pl1 ? pl1.EncorePose(s, journal) : null;
             if (encore is null && DrDxt.Application.Tweaks.LeviersVolatils.Contient(s.TweakId)
                 && poses.Where(c => c.Cle == "pose:" + s.TweakId).Select(c => (DateTimeOffset?)c.Quand).Max() is { } posele)
@@ -510,17 +620,21 @@ public partial class ScanViewModel
         }
     }
 
+    /// <summary>Les arrêts passés ne refusent pas Optimiser : un
+    /// réglage posé par DrDXT et suivi d'un arrêt brutal hors veille dans la semaine se rend seul (<see cref="DrDxt.Application.Autopilot.GardeDIncident"/>).
+    /// Sans le helper joignable sans autorisation Windows, il se dit à rendre, jamais d'UAC sans clic.</summary>
     private async Task<IReadOnlyList<string>> RendreApresUnArretAsync()
     {
         if (JournalChangements is null || _journalLeviers is null || LevierParId is null) return [];
         var (_, arrets) = await Task.Run(LireStabiliteSure).ConfigureAwait(true);
         var vidages = await Task.Run(LireVidagesCarteSur).ConfigureAwait(true);
         var journal = JournalChangements.Lire();
-        var poses = _journalLeviers.Lire().Select(s => s.TweakId).Distinct()
+        // Un geste du docteur gardé est un choix du joueur, posé sur son clic : jamais rendu par la garde.
+        var poses = _journalLeviers.Lire().Select(s => s.TweakId).Where(id => !DrDxt.Application.Tweaks.LevierDeGeste.EstUnGeste(id)).Distinct()
             .Select(id => (Id: id, Pose: journal.Where(c => c.Cle == "pose:" + id).OrderByDescending(c => c.Quand).FirstOrDefault()))
             .Where(x => x.Pose is not null).Select(x => (x.Id, x.Pose!.Quand)).ToList();
         var dits = new List<string>();
-        foreach (var (id, arret, vidage) in DrDxt.Application.Autopilot.GardeDIncident.ARendre(poses, arrets, vidages))
+        foreach (var (id, arret, vidage) in DrDxt.Application.Autopilot.GardeDIncident.ARendre(poses, arrets, vidages, DateTimeOffset.Now))
         {
             var titre = _localize(TweakDisplayKeys.TitleKey(id));
             var quand = arret.Quand.ToLocalTime().ToString(_localize("Format.JourHeure"), CultureInfo.CurrentCulture);
@@ -530,9 +644,13 @@ public partial class ScanViewModel
                 dits.Add(string.Format(CultureInfo.CurrentCulture, _localize("Garde.ARendre"), titre, quand));
                 continue;
             }
-            await AnnulerLevierAsync(id, parClic: false);
+            var changeDepuis = _journalLeviers.Lire().FirstOrDefault(s => s.TweakId == id) is { } pose && EtatDeLaPose(pose) == Pose.ChangeDepuis;
+            var relu = await AnnulerLevierAsync(id, parClic: false);
+            // Changé depuis par le joueur : rien n'est rendu par-dessus, et la ligne ne dit pas « rendu ».
+            if (changeDepuis && !_journalLeviers.Lire().Any(s => s.TweakId == id))
+                dits.Add(string.Format(CultureInfo.CurrentCulture, _localize("Garde.ChangeDepuis"), titre, quand));
             // GARDE1 : un rendu raté se dit sur la carte (il reste au journal et se retente au prochain affichage).
-            if (_journalLeviers.Lire().Any(s => s.TweakId == id))
+            else if (_journalLeviers.Lire().Any(s => s.TweakId == id))
                 dits.Add(string.Format(CultureInfo.CurrentCulture, _localize("Garde.Rate"), titre, quand, MessageLeviers));
             else
             {
@@ -540,7 +658,10 @@ public partial class ScanViewModel
                 JournalChangements.Ajouter(new Changement(Horloge(), id, null, ClePoseGarde + id));
                 var auRedemarrage = LevierParId(id) is { TakesEffectAfterReboot: true };
                 // GARDE2 : un vidage à chaud du pilote se dit comme tel, pas comme un arrêt brutal.
-                dits.Add(string.Format(CultureInfo.CurrentCulture, _localize(vidage
+                // « La valeur d'avant est remise » ne se dit que relu à l'origine.
+                dits.Add(string.Format(CultureInfo.CurrentCulture, _localize(relu is not (null or DrDxt.Application.Tweaks.EtatApplique.NotApplied)
+                        ? "Garde.RenduNonRelu"
+                        : vidage
                         ? (auRedemarrage ? "Garde.RenduIncidentCarteAuRedemarrage" : "Garde.RenduIncidentCarte")
                         : (auRedemarrage ? "Garde.RenduAuRedemarrage" : "Garde.Rendu")), titre, quand, code));
             }
@@ -681,19 +802,33 @@ public partial class ScanViewModel
     /// (HAGS se lit dans son état effectif, qui attend aussi le redémarrage).</summary>
     internal static readonly IReadOnlySet<string> ReglagesAEffetImmediat = new HashSet<string>(StringComparer.Ordinal) { "windows.game_mode" };
 
+    /// <summary>Parmi les leviers à effet différé, ceux qui agissent au prochain lancement du jeu, sans redémarrage : leur
+    /// annulation et leur retrait le disent ainsi.</summary>
+    private static readonly IReadOnlySet<string> AuLancementDuJeu = new HashSet<string>(StringComparer.Ordinal) { "latency.gameModeOn" };
+
+    /// <summary>La phrase d'un rendu différé : « au prochain lancement du jeu » pour un levier qui agit ainsi, sinon la clé du
+    /// redémarrage.</summary>
+    private static string Differe(ITweak levier, string cleAuRedemarrage, string cleAuLancement)
+        => AuLancementDuJeu.Contains(levier.Id) ? cleAuLancement : cleAuRedemarrage;
+
     /// <summary>Ce qui a basculé depuis le scan précédent entre au journal, et la carte se refait. Le relevé attend son tour
     /// derrière celui d'un autre (le relevé de fond, un autre relevé de l'App), jusqu'à quelques secondes : il attend hors du
-    /// fil de l'écran, qui sinon se figeait d'autant. Le journal et la carte, eux, restent sur le fil de l'appelant.</summary>
+    /// fil de l'écran, qui sinon se figeait d'autant. Le journal s'écrit sous le verrou du relevé : refusé, la bascule
+    /// revient au relevé suivant. La carte, elle, reste sur le fil de l'appelant.</summary>
     internal async Task ReleverReglagesSuivisAsync(IReadOnlyDictionary<string, string> etats, DateTimeOffset maintenant)
     {
-        if (SuiviReglages is not { } suivi || JournalChangements is null) return;
+        if (SuiviReglages is not { } suivi || JournalChangements is not { } journal) return;
         string Valeur(string v) => _localize(v == "on" ? "Reglage.Allume" : v == "off" ? "Reglage.Eteint" : v);
         string Libeller(string id, string avant, string apres) => string.Format(CultureInfo.CurrentCulture,
             _localize("Changement.Reglage"), _localize("Reglage." + id), Valeur(avant), Valeur(apres));
-        var changes = await Task.Run(() => suivi.Relever(etats, maintenant, Libeller)).ConfigureAwait(true);
-        var journal = changes.Count > 0 ? JournalChangements.Lire() : [];
-        var demarrage = DemarrageDuPc();
-        foreach (var c in changes) JournalChangements.Ajouter(DaterAuDemarrage(DaterSurLaPose(c, journal, demarrage), demarrage));
+        bool Consigner(IReadOnlyList<Changement> changes)
+        {
+            var deja = journal.Lire();
+            var demarrage = DemarrageDuPc();
+            return changes.Select(c => journal.Ajouter(DaterAuDemarrage(DaterSurLaPose(c, deja, demarrage), demarrage)))
+                .ToList().TrueForAll(r => r.IsOk);
+        }
+        var changes = await Task.Run(() => suivi.Relever(etats, maintenant, Libeller, Consigner)).ConfigureAwait(true);
         if (changes.Count > 0) Afficher(MemoireParties?.Lire() ?? []);
     }
 
@@ -782,9 +917,18 @@ public partial class ScanViewModel
 
     private bool _retraitEnCours;
 
+    /// <summary>Un retrait automatique (ce qui coûte en jeu, la garde d'incident) rend des réglages : « Annuler » l'attend, et
+    /// il ne part pas pendant un « Annuler » (il se refera au prochain affichage). Sinon deux rendus du même instantané.</summary>
+    internal bool RetraitAutomatiqueEnCours
+    {
+        get => _retraitEnCours;
+        set { _retraitEnCours = value; OperationLongueChangee(); }
+    }
+
     /// <summary>Règle 4 du plan : un levier sans gain se retire tout seul. Un changement jugé « moins bien en jeu »,
     /// posé par un levier de DrDXT encore au journal des leviers, est annulé (valeur d'origine relue au moment de la
-    /// pose) ; le journal le perd, et la carte le dit. Rendu : les phrases à ajouter en tête de la carte.</summary>
+    /// pose) ; le journal le perd, et la carte le dit, « retiré » seulement relu à l'origine (<see cref="Relu"/>). Rendu :
+    /// les phrases à ajouter en tête de la carte.</summary>
     internal async Task<IReadOnlyList<string>> RetirerCeQuiCouteAsync(IReadOnlyList<PartieRelevee> parties)
     {
         // Retrait et garde d'incident se font sans clic : le helper qui s'est arrêté entre la vérification et le retour
@@ -796,8 +940,9 @@ public partial class ScanViewModel
         catch (Exception) { /* mises à jour non lues : le retrait se juge sans elles, comme avant cette lecture */ }
         // Le calmeur de voisins n'est pas un levier du catalogue ; il se juge pareil.
         if (JournalChangements is not null) dits.AddRange(RetirerLeCalmeurSIlCoute(JournalChangements.Lire(), parties));
-        if (JournalChangements is null || LevierParId is null || _journalLeviers is null || _retraitEnCours) return dits;
-        _retraitEnCours = true;
+        if (JournalChangements is null || LevierParId is null || _journalLeviers is null || RetraitAutomatiqueEnCours
+            || AnnulerLevierCommand.IsRunning) return dits;
+        RetraitAutomatiqueEnCours = true;
         try
         {
             dits.AddRange(await RendreApresUnArretAsync());
@@ -815,6 +960,9 @@ public partial class ScanViewModel
                 // Le même bilan que l'écran (bornes des changements voisins, bilan figé).
                 if (BilansBornes(journal, parties).FirstOrDefault(x => x.C == c).B is not { Verdict: VerdictEnJeu.Pire } bilan) continue;
                 if (_journalLeviers.Lire().FirstOrDefault(s => s.TweakId == id) is not { } snapshot || LevierParId(id) is not { } levier) continue;
+                // La bascule suivie peut dater d'avant un changement du joueur que l'état effectif ne montre pas encore (HAGS
+                // coupé, sans redémarrage) : seule la valeur de DrDXT se retire, comme partout ailleurs.
+                if (EtatDeLaPose(snapshot) != Pose.DeDrDxt) continue;
                 if (HelperJoignableSansUac is { } joignable && levier.RequiresElevation && !await joignable())
                 {
                     dits.Add(string.Format(CultureInfo.CurrentCulture, _localize("Changement.ARetirer"), c.Libelle));
@@ -828,21 +976,34 @@ public partial class ScanViewModel
                         RaisonLisible.Dire(r, _localize)), _localize, c.Libelle));
                     continue;
                 }
+                var relu = Relu(snapshot);
+                if (relu == DrDxt.Application.Tweaks.EtatApplique.Applied)
+                {
+                    dits.Add(string.Format(CultureInfo.CurrentCulture, _localize("Changement.RetraitRate"), c.Libelle, _localize("Leviers.EncorePose")));
+                    continue;
+                }
                 // Le verdict qui a fait retirer est figé ; sinon les parties jouées après le retrait, encore
                 // dans sa fenêtre jusqu'au prochain relevé, le faisaient passer à « sans effet ».
                 try { JournalChangements.Figer(c, bilan); }
                 catch (Exception) { /* un journal non écrit garde le retrait ; seul le libellé peut bouger */ }
-                if (!_journalLeviers.Retirer(id)) dits.Add(_localize("Leviers.JournalPasMisAJour"));
-                // Le service de réapplication le reposerait (manifeste signé) ; il en sort aussi.
+                // Le service de réapplication le reposerait (manifeste signé) : il en sort d'abord, avant le journal que l'écran montre.
                 var sorti = await RetirerDuManifesteAsync(id);
-                dits.Add(string.Format(CultureInfo.CurrentCulture,
-                    _localize(levier.TakesEffectAfterReboot ? "Changement.RetireAuRedemarrage" : "Changement.Retire"), c.Libelle));
+                relu = await RelireApresLaSortie(levier, snapshot, relu);
+                if (relu == DrDxt.Application.Tweaks.EtatApplique.Applied)
+                {
+                    dits.Add(string.Format(CultureInfo.CurrentCulture, _localize("Changement.RetraitRate"), c.Libelle, _localize("Leviers.EncorePose")));
+                    continue;
+                }
+                if (!_journalLeviers.Retirer(id)) dits.Add(_localize("Leviers.JournalPasMisAJour"));
+                dits.Add(string.Format(CultureInfo.CurrentCulture, _localize(relu != DrDxt.Application.Tweaks.EtatApplique.NotApplied
+                    ? "Changement.RetireNonRelu" : levier.TakesEffectAfterReboot
+                        ? Differe(levier, "Changement.RetireAuRedemarrage", "Changement.RetireAuLancementDuJeu") : "Changement.Retire"), c.Libelle));
                 if (!sorti.IsOk)
                     dits.Add(RaisonLisible.OuIncertain(sorti, string.Format(CultureInfo.CurrentCulture, _localize("Changement.PasSortiDuManifeste"),
                         c.Libelle, RaisonLisible.Dire(sorti, _localize)), _localize, c.Libelle));
             }
         }
-        finally { _retraitEnCours = false; }
+        finally { RetraitAutomatiqueEnCours = false; }
         if (dits.Count > 0) ChargerLeviersPoses();
         return dits;
     }
@@ -853,14 +1014,10 @@ public partial class ScanViewModel
 
     private Task<Result> RetirerDuManifesteAsync(string id) => RetirerDuManifeste?.Invoke(id) ?? Task.FromResult(Result.Ok());
 
-    /// <summary>Une ligne par changement : jugé en jeu avec ses chiffres, ou combien de parties il manque.</summary>
-    /// <summary>Les changements sans partie d'avant tiennent en une ligne, à la place du premier ;
-    /// les autres gardent leur phrase et leur ordre.</summary>
     /// <summary>
-    /// `GainCumule` n'était appelé que par un outil de développement. La carte des parties
-    /// commence par ce que les changements ont fait en jeu : les gains (et pertes) prouvés par séparation nette sur trois
+    /// La carte des parties commence par ce que les changements ont fait en jeu : les gains (et pertes) prouvés par séparation nette sur trois
     /// parties de chaque côté, composés par <see cref="DrDxt.Measurement.GainCumule"/> (jamais additionnés), ce qui n'a rien
-    /// changé, et ce qui attend des parties. Le bruit vaut 0 : la séparation nette l'a déjà écarté. null = aucun changement.
+    /// changé, et ce qui attend des parties. null = aucun changement.
     /// </summary>
     internal static string? LigneDesGains(IReadOnlyList<(Changement C, BilanDuChangement B)> changements, Func<string, string> localiser)
     {
@@ -885,12 +1042,17 @@ public partial class ScanViewModel
             {
                 var x = g.FirstOrDefault(y => y.C.Fige is not null, g.First());
                 var ecart = (x.B.Low1Apres!.Value / x.B.Low1Avant!.Value - 1) * 100;
-                return new DrDxt.Measurement.GainProuve(string.Join(" + ", g.Select(y => y.C.Libelle)),
-                    Docteur.T("App.LowMedianEnPartie", x.B.Jeu), ecart, Math.Abs(ecart - x.B.EcartBornesPercent!.Value));
+                var borne = Math.Min(x.B.EcartBornesPercent!.Value, ecart);
+                return (Gain: new DrDxt.Measurement.GainProuve(string.Join(" + ", g.Select(y => y.C.Libelle)),
+                    Docteur.T("App.LowMedianEnPartie", x.B.Jeu), ecart, ecart - borne), BornePercent: borne);
             })
             .ToList();
-        var total = DrDxt.Measurement.GainCumule.Additionner(prouves);
-        var auMoins = total.TotalPercent > 0 ? total.TotalPercent - total.BruitPercent : total.TotalPercent + total.BruitPercent;
+        var total = DrDxt.Measurement.GainCumule.Additionner(prouves.Select(p => p.Gain).ToList());
+        // « Au moins » : la borne de chaque mesure, sa pire paire, composée comme le total ; une valeur que les parties ont
+        // prise, jamais extrapolée. Une perte figée avec la paire la plus proche de zéro compte pour son écart mesuré.
+        // La somme quadratique des bruits vaudrait pour des écarts-types, pas pour des bornes.
+        var auMoins = (prouves.Where(g => total.Retenus.Contains(g.Gain.Levier))
+            .Aggregate(1.0, (f, g) => f * (1 + g.BornePercent / 100)) - 1) * 100;
         // Un total qui ne dépasse pas son propre bruit ne s'annonce pas (même règle que GainCumule.Phrase) : un gain et une
         // perte prouvés qui s'annulent donnaient « +0,6 % (au moins -7,0 %) ».
         var gains = total.Retenus.Count == 0
@@ -906,12 +1068,13 @@ public partial class ScanViewModel
         return Pluriels.Accorder(autreJeu > 0 ? ligne + " " + string.Format(fr, localiser("Parties.Gains.AutreJeu"), autreJeu) : ligne);
     }
 
+    /// <summary>Deux changements plus proches que ça sont du même instant (le journal dédoublonne déjà à la minute).</summary>
+    internal static readonly TimeSpan MemeInstant = TimeSpan.FromMinutes(1);
+
     /// <summary>
     /// Chaque changement jugé sur les parties d'entre lui et le changement suivant (sinon
     /// l'après de l'un portait le gain de l'autre), et son bilan figé une fois tranché (le relevé ne garde que 20 parties).
     /// </summary>
-    /// <summary>Deux changements plus proches que ça sont du même instant (le journal dédoublonne déjà à la minute).</summary>
-    internal static readonly TimeSpan MemeInstant = TimeSpan.FromMinutes(1);
 
     internal static IReadOnlyList<(Changement C, BilanDuChangement B)> BilansDesChangements(IReadOnlyList<Changement> changements,
         IReadOnlyList<PartieRelevee> parties, JournalDesChangements? journal, IReadOnlyList<DateTimeOffset>? misesAJour = null)
@@ -930,7 +1093,14 @@ public partial class ScanViewModel
             // Le mode Jeu, relevé à la pose, et HAGS, au redémarrage, viennent pourtant du même clic. Ils
             // ne se bornent pas l'un l'autre.
             var autres = parDate.Where(x => !DuMemeClic(x, c)).ToList();
-            var suivant = autres.Select(x => x.Quand).Concat(machine).Where(q => q > c.Quand + MemeInstant).Order()
+            // L'après s'arrête où le suivant a pu commencer : son Depuis quand l'heure exacte n'est pas connue (un réglage
+            // relevé au scan suivant). Les parties d'entre Depuis et Quand ont pu être jouées sous lui ; dans l'après de
+            // celui-ci, elles lui feraient porter l'effet de l'autre. Limite : un Depuis d'avant ce changement (la fenêtre du
+            // suivant l'enjambe, comme un retrait de DrDXT relevé au scan d'après) laisserait un après vide pour toujours ;
+            // la borne reste alors son Quand.
+            var suivant = autres.Where(x => x.Quand > c.Quand + MemeInstant)
+                .Select(x => x.Depuis is { } d && d > c.Quand && d < x.Quand ? d : x.Quand)
+                .Concat(machine.Where(q => q > c.Quand + MemeInstant)).Order()
                 .Select(q => (DateTimeOffset?)q).FirstOrDefault();
             var precedent = autres.Select(x => x.Quand).Concat(machine).Where(q => q < c.Quand - MemeInstant).Order()
                 .Select(q => (DateTimeOffset?)q).LastOrDefault();
@@ -961,8 +1131,7 @@ public partial class ScanViewModel
 
     private static bool EnAttente(BilanDuChangement b) => b.Avant == 0 || b.Verdict == VerdictEnJeu.PasEncoreJuge || b.Jeu is null;
 
-    /// <summary>« Pas jugeables en jeu, faute de partie relevée avant eux : … » faisait
-    /// un paragraphe de quatre lignes. Un tableau : le changement, sa date, et où il en est. Les parties d'avant ne
+    /// <summary>Les changements pas encore jugés tiennent dans un tableau plutôt qu'en paragraphe : le changement, sa date, et où il en est. Les parties d'avant ne
     /// peuvent plus augmenter : sans assez de parties du même jeu avant, il n'est pas jugé (une partie d'un autre jeu peut le juger plus tard), et le tableau le dit.</summary>
     internal static IReadOnlyList<LigneEnAttente> TableauDesChangementsEnAttente(IReadOnlyList<(Changement C, BilanDuChangement B)> changements,
         Func<string, string> localiser)
@@ -979,6 +1148,7 @@ public partial class ScanViewModel
         }).ToList();
     }
 
+    /// <summary>Une ligne par changement : jugé en jeu avec ses chiffres, ou combien de parties il manque.</summary>
     internal static string LigneChangement(Changement c, BilanDuChangement b, Func<string, string> localiser)
     {
         var fr = CultureInfo.CurrentCulture;
@@ -1035,7 +1205,9 @@ public partial class ScanViewModel
     {
         if (echec is null || parties.Any(p => p.Fin >= echec.Quand)) return null;
         var fr = CultureInfo.CurrentCulture;
-        return string.Format(fr, localiser("Parties.CaptureRatee"), echec.Quand.LocalDateTime.ToString(localiser("Format.JourHeure"), fr));
+        // Le service arrêté ne revient pas en jouant : le relevé sans droits ne peut pas le relancer.
+        var cle = echec.Raison.Contains(ErrorCodes.PmonUnavailable, StringComparison.Ordinal) ? "Parties.CaptureRateeService" : "Parties.CaptureRatee";
+        return string.Format(fr, localiser(cle), echec.Quand.LocalDateTime.ToString(localiser("Format.JourHeure"), fr));
     }
 
     /// <summary>Ce que le retrait a fait pendant cette session. La carte se refait à chaque partie et à
@@ -1057,8 +1229,10 @@ public partial class ScanViewModel
         }
         catch (Exception) { /* un journal illisible ne cache pas les parties */ }
         OnPropertyChanged(nameof(ADesChangementsEnAttente));
-        // Un affichage pendant un retrait en cours ne le cache pas : on attend les deux.
-        DernierRetrait = Task.WhenAll(DernierRetrait, RetirerEtDireAsync(parties));
+        // Un affichage pendant un retrait en cours ne le cache pas : on attend les deux. Un retrait déjà fini ne s'enchaîne
+        // plus : la chaîne s'allongeait d'une tâche à chaque affichage, sans jamais se vider.
+        var retrait = RetirerEtDireAsync(parties);
+        DernierRetrait = DernierRetrait.IsCompletedSuccessfully ? retrait : Task.WhenAll(DernierRetrait, retrait);
         _ = AfficherHistoriqueAsync(parties);
         // Le profil de chaque jeu assez joué, avant ses parties.
         foreach (var profil in ProfilDesJeux.Construire(parties)) LignesParties.Add(LigneProfil(profil, _localize));
@@ -1103,8 +1277,15 @@ public partial class ScanViewModel
         catch (Exception) { /* sans banc, la partie se garde quand même ; elle ne se comparera pas à un autre banc */ }
         // La partie porte l'état de l'essai en alternance qui l'a vue jouer.
         p = MarquerEssai(p);
-        var liste = MemoireParties?.Ajouter(p) ?? [p];
-        if (ui is null) Afficher(liste); else ui.Post(_ => Afficher(liste), null);
+        var ajout = MemoireParties?.Ajouter(p);
+        IReadOnlyList<PartieRelevee> liste = ajout?.Liste ?? [p];
+        // Non écrite, la partie est montrée mais perdue au relancement : la carte le dit en tête.
+        void Montrer()
+        {
+            Afficher(liste);
+            if (ajout is { Ecrite.IsOk: false }) LignesParties.Insert(0, _localize("Parties.NonGardee"));
+        }
+        if (ui is null) Montrer(); else ui.Post(_ => Montrer(), null);
         // Sur le fil de l'écran, comme l'affichage (poser un levier rafraîchit des listes liées à l'écran). Personne n'a
         // cliqué : les bascules de l'essai n'ouvrent aucune invite Windows (SansGesteDuJoueur).
         if (ui is null) AvancerEssaiSansGeste(liste);
@@ -1115,7 +1296,34 @@ public partial class ScanViewModel
     {
         // La méthode asynchrone garde le contexte de son appel : la portée la suit jusqu'au bout, puis se referme ici.
         using var sansGeste = SansGesteDuJoueur.Ouvrir();
-        DerniereAvanceeEssai = AvancerEssaiAsync(liste);
+        DerniereAvanceeEssai = AvancerPuisPrevenirAsync(liste);
+    }
+
+    private async Task AvancerPuisPrevenirAsync(IReadOnlyList<PartieRelevee> liste)
+    {
+        await AvancerEssaiAsync(liste).ConfigureAwait(true);
+        PrevenirSiLEssaiAttend();
+    }
+
+    /// <summary>Le relevé de fond la branche (une notification de Windows) ; null dans l'App, qui montre l'essai à l'écran.</summary>
+    internal Action<string>? NotifierEssaiEnAttente { get; set; }
+
+    /// <summary>Une App avec sa fenêtre tourne-t-elle ? Elle montre déjà l'essai : le relevé ne notifie pas.</summary>
+    internal Func<bool> AppOuverte { get; set; } = () => false;
+
+    /// <summary>Le dernier état d'essai dont le joueur a été prévenu : un même essai en attente ne se redit pas à chaque partie.</summary>
+    private string? _essaiPrevenu;
+
+    /// <summary>Le relevé de fond ne pose rien : un essai qui attend l'App ouverte resterait figé en silence. Jeu fermé, le joueur
+    /// est prévenu une fois par attente.</summary>
+    private void PrevenirSiLEssaiAttend()
+    {
+        if (NotifierEssaiEnAttente is not { } notifier || MemoireEssai?.Lire() is not { } e || !EssaiEnAttente || JeuOuvertPourLEssai()
+            || AppOuverte()) return;
+        var cle = $"{e.LevierId}|{Effectif(e).Depuis:O}|{e.PoseMaintenant}";
+        if (cle == _essaiPrevenu) return;
+        _essaiPrevenu = cle;
+        notifier(string.Format(CultureInfo.CurrentCulture, _localize("Essai.Notification"), Titre(e.LevierId)));
     }
 
     // La veille dure toute la session ; sans exécutions simultanées le bouton restait grisé et le relevé ne
@@ -1134,10 +1342,16 @@ public partial class ScanViewModel
     internal async Task<BenchmarkResult?> CapturerSansGesteAsync(int pid, TimeSpan duree, CancellationToken ct)
     {
         using var sansGeste = SansGesteDuJoueur.Ouvrir();
+        using var enPartie = DrDxt.Measurement.MesureEnPartie.Ouvrir();
         var r = await _benchmark.RunAsync(pid, duree, 1, ct);
         // La raison de l'échec remonte à la veille, qui la note.
-        return r.IsOk ? r.Value : throw new InvalidOperationException(r.Error?.Message ?? Docteur.T("App.CaptureSansResultat"));
+        return r.IsOk ? r.Value : throw new InvalidOperationException(r.Error is { } e ? RaisonDuRate(e.Code, e.Message) : Docteur.T("App.CaptureSansResultat"));
     }
+
+    /// <summary>La raison notée d'une capture ratée. Le service de mesure injoignable y garde son code, que son message le
+    /// porte ou non : la ligne de la carte le reconnaît et dit quoi faire, au lieu de « réessaie à ta prochaine partie ».</summary>
+    internal static string RaisonDuRate(string code, string message)
+        => code == ErrorCodes.PmonUnavailable && !message.Contains(code, StringComparison.Ordinal) ? $"{message} ({code})" : message;
 
     private async Task BasculerReleveCoeurAsync()
     {
@@ -1162,7 +1376,8 @@ public partial class ScanViewModel
             jeu: () => _gameLocator.LocateRunningGamePid() is { } pid && pid > 0 && NomExeDuProcessus(pid) is { } exe
                        && DrDxt.Core.NomExeDeJeu.EstUnJeuPossible(exe, CheminDuProcessus(pid)) ? (exe, pid) : null,
             capturer: CapturerSansGesteAsync,
-            classer: r => DrDxt.Detection.Scoring.BottleneckClassifier.Classify(r).State,
+            classer: r => DrDxt.Detection.Scoring.BottleneckClassifier.Classify(r, gpuThrottling:
+                DrDxt.Detection.Scoring.BottleneckClassifier.Bridage(r.Materiel)).State,
             enregistrer: p => EnregistrerPartie(p, ui),
             patienter: Task.Delay,
             // Mêmes cœurs et même compteur que le banc ; le plus rapide, pas la moyenne (voir FrequenceMaxDe).
@@ -1177,8 +1392,8 @@ public partial class ScanViewModel
             suivre: p => MemoireParties?.NoterEnCours(p),
             // La carte NVIDIA lue par NVML pendant chaque capture (bridage par la puissance, fréquence).
             lireCarte: () => (_sondeCarte ??= new DrDxt.Detection.NvmlHardwareProbe()).Lire(),
-            // Le processeur chaque seconde (PawnIO ne répond qu'en administrateur : le relevé de fond est lancé
-            // ainsi par la tâche planifiée de l'installeur), et l'activité du joueur, pour mettre menus et lobby à part.
+            // Le processeur chaque seconde (PawnIO ne répond qu'en administrateur : le relevé de fond, lancé sans droits
+            // par la tâche planifiée, le lit par le service DrDXT), et l'activité du joueur, pour mettre menus et lobby à part.
             temperatureProcesseur: () => DrDxt.Detection.Cpu.TemperatureProcesseur.Lire()?.Celsius,
             entrees: (_entreesDuJoueur ??= new DrDxt.Detection.EntreesDuJoueur()).ActiveRecemment,
             // Cœur le plus chaud, cœur 0 et raisons de freiner, chaque seconde (PawnIO, administrateur). Posé
@@ -1211,5 +1426,16 @@ public partial class ScanViewModel
             }
         }
         catch (OperationCanceledException) { /* la veille s'arrête : fermeture ou relevé coupé par le joueur */ }
+        catch (Exception)
+        {
+            // Sans ceci, une erreur imprévue arrêterait le relevé en silence, l'interrupteur resté sur « allumé ». Le choix du
+            // joueur reste noté : le prochain lancement le rallume, et le relevé de fond (tâche planifiée) continue.
+            ReleveDesPartiesActif = false;
+            DireAuDemarrage(_localize("Parties.Releve.ArreteSurErreur"));
+        }
     }
+
+    /// <summary>Une ligne de plus au message du haut de l'écran.</summary>
+    private void DireAuDemarrage(string ligne)
+        => MessageDemarrage = string.IsNullOrEmpty(MessageDemarrage) ? ligne : MessageDemarrage + Environment.NewLine + ligne;
 }

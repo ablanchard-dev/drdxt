@@ -53,7 +53,8 @@ public sealed record RepairSnapshot(
 /// et 15 % de charge, donc « comparables » selon ce critere, ont fait basculer
 /// `RAM / mode memoire` de `Unknown` a `ExpectedDefault`. Le banc memoire est limite par la bande
 /// passante, pas par le processeur : un autre programme peut saturer la memoire sans faire monter
-/// la charge CPU. La dispersion du banc, elle, le voit : 8,2 % sur la passe agitee.
+/// la charge CPU. La dispersion du banc, elle, le voit sur les passes vraiment agitees (12,6 a 26,6 %) ; les 8,2 %
+/// d'une passe pendant des compilations restent dans la plage calme (voir DispersionQuiCompte).
 ///
 /// La lecon generale : une condition de mesure doit etre choisie pour la grandeur qu'elle
 /// qualifie, pas parce qu'elle est facile a lire.</param>
@@ -191,7 +192,6 @@ public static class RepairHistory
     /// la plage calme (max 8,7) : il n'est separable a aucun seuil. Reversible : une constante.</summary>
     public const double DispersionQuiCompte = 10.0;
 
-    /// <summary>Compare deux photos. L'ordre compte : <paramref name="avant"/> est la plus ancienne.</summary>
     /// <summary>
     /// La photo à laquelle comparer : la plus récente prise par le même lecteur. Une photo écrite
     /// avant le champ `Lecteur` n'est gardée que si toutes ses familles sont lues par la photo
@@ -211,6 +211,7 @@ public static class RepairHistory
                 : p.DomainesExamines.All(famillesActuelles.Contains) || (p.Eleve == true && actuelle.Eleve == false));
     }
 
+    /// <summary>Compare deux photos. L'ordre compte : <paramref name="avant"/> est la plus ancienne.</summary>
     public static IReadOnlyList<RepairDelta> Comparer(RepairSnapshot avant, RepairSnapshot apres)
     {
         var famillesAvant = new HashSet<string>(avant.DomainesExamines, StringComparer.OrdinalIgnoreCase);
@@ -256,7 +257,7 @@ public static class RepairHistory
                 if (vieux.Statut != e.Statut)
                     deltas.Add(new RepairDelta(e.Domaine, e.Nom, RepairChangement.StatutChange,
                         vieux.Statut.ToString(), e.Statut.ToString(),
-                        Docteur.T("RH.JugementChange", vieux.Statut, e.Statut)));
+                        Docteur.T("RH.JugementChange", RepairLibelles.Statut(vieux.Statut), RepairLibelles.Statut(e.Statut))));
                 else if (vieux.Valeur != e.Valeur)
                     deltas.Add(new RepairDelta(e.Domaine, e.Nom, RepairChangement.ValeurChangee,
                         vieux.Valeur, e.Valeur, Docteur.T("RH.ValeurChangee")));

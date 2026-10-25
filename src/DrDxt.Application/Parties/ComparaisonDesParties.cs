@@ -3,20 +3,21 @@
 // NonConcluant : le test à blanc de l'essai en alternance a vu un écart entre deux groupes au même réglage.
 // PasComparable : les parties d'avant et d'après n'ont pas le même estimateur du 1 % low (PartieRelevee.Low1SurToutesLesImages).
 // Ajouté en dernier : un verdict figé déjà écrit garde sa valeur.
+/// <summary>Écrit par son nom dans les verdicts figés : un entier changerait de sens au premier verdict ajouté avant lui,
+/// et un « Mieux » figé pourrait se relire « Pire ». Un ancien entier se relit encore.</summary>
+[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<VerdictEnJeu>))]
 public enum VerdictEnJeu { PasEncoreJuge, PasDeDifference, Mieux, Pire, NonConcluant, PasComparable }
 
-/// <summary>
-/// Un réglage de la carte ne reste que s'il ne coûte rien en jeu. Les
-/// parties relevées du même jeu, avant et après le réglage, se comparent sur leur 1 % le plus lent (la médiane de la
-/// partie) : c'est lui qu'un réglage d'alimentation abîmerait d'abord.
-///
-/// Même règle que la preuve du repos : séparation nette ou rien. Pire = toutes les parties d'après sous toutes celles
-/// d'avant ; mieux = toutes au-dessus. Moins de trois parties d'un côté : pas encore jugé. Un autre jeu ne compte pas.
-/// </summary>
+// La règle de ComparaisonDesParties : un réglage de la carte ne reste que s'il ne coûte rien en jeu. Les parties relevées
+// du même jeu, avant et après le réglage, se comparent sur leur 1 % le plus lent (la médiane de la partie) : c'est lui
+// qu'un réglage d'alimentation abîmerait d'abord. Même règle que la preuve du repos : séparation nette ou rien. Pire =
+// toutes les parties d'après sous toutes celles d'avant ; mieux = toutes au-dessus. Moins de trois parties d'un côté :
+// pas encore jugé. Un autre jeu ne compte pas.
+
 /// <summary>Ce qu'un changement a fait en jeu, avec les chiffres qui fondent le verdict.</summary>
-/// <param name="EcartBornesPercent">L'écart dans le pire cas des bornes (après le plus bas
-/// contre avant le plus haut pour « mieux », l'inverse pour « pire ») ; null hors verdict tranché. Un gain se dit « au moins »
-/// cela : 3 parties contre 3 tombent nettement séparées une fois sur 20 par hasard.</param>
+/// <param name="EcartBornesPercent">L'écart de la pire paire (après le plus bas contre avant le plus haut), pour « mieux »
+/// comme pour « pire » : la valeur la plus basse que le rapport a prise, que « au moins » compose ; null hors verdict
+/// tranché. Pour une perte, la paire la plus proche de zéro ne borne rien par en dessous.</param>
 /// <param name="SurLaLatence">Jugé sur la latence d'affichage (plus bas = mieux), pas sur le 1 % low : un levier de latence
 /// dont les parties la portent. <paramref name="LatenceAvant"/> et <paramref name="LatenceApres"/> sont alors ses médianes.</param>
 public sealed record BilanDuChangement(VerdictEnJeu Verdict, string? Jeu, int Avant, int Apres,
@@ -74,12 +75,9 @@ public static class ComparaisonDesParties
             : apres.Min(Mesure) > avant.Max(Mesure) ? VerdictEnJeu.Mieux
             : VerdictEnJeu.PasDeDifference;
         // L'écart des bornes est celui du 1 % low ; jugé sur la latence, ce sont ses médianes qui se disent.
-        double? bornes = latence ? null : verdict switch
-        {
-            VerdictEnJeu.Mieux when avant.Max(p => p.Low1Median) > 0 => (apres.Min(p => p.Low1Median) / avant.Max(p => p.Low1Median) - 1) * 100,
-            VerdictEnJeu.Pire when avant.Min(p => p.Low1Median) > 0 => (apres.Max(p => p.Low1Median) / avant.Min(p => p.Low1Median) - 1) * 100,
-            _ => null,
-        };
+        double? bornes = !latence && verdict is VerdictEnJeu.Mieux or VerdictEnJeu.Pire && avant.Max(p => p.Low1Median) > 0
+            ? (apres.Min(p => p.Low1Median) / avant.Max(p => p.Low1Median) - 1) * 100
+            : null;
         return new(verdict, jeu, avant.Count, apres.Count,
             Med(avant.Select(p => p.Low1Median)), Med(apres.Select(p => p.Low1Median)),
             Med(avant.Select(p => p.FpsMedian)), Med(apres.Select(p => p.FpsMedian)), bornes,
@@ -95,20 +93,30 @@ public static class ComparaisonDesParties
         var reference = apres.Count > 0 ? apres : avant;
         if (reference.Count == 0) return (avant, apres);
         var estimateur = EstimateurMajoritaire(reference);
-        var a = avant.Where(p => p.Low1SurToutesLesImages == estimateur).ToList();
-        var b = apres.Where(p => p.Low1SurToutesLesImages == estimateur).ToList();
+        var a = avant.Where(p => Estimateur(p) == estimateur).ToList();
+        var b = apres.Where(p => Estimateur(p) == estimateur).ToList();
         return (avant.Count >= PartiesMinimum && a.Count < PartiesMinimum) || (apres.Count >= PartiesMinimum && b.Count < PartiesMinimum)
             ? null
             : (a, b);
     }
 
-    /// <summary>L'estimateur du 1 % low le plus fréquent parmi ces parties (à égalité, toutes les images).</summary>
-    internal static bool EstimateurMajoritaire(IReadOnlyCollection<PartieRelevee> parties)
-        => parties.Count(p => p.Low1SurToutesLesImages) * 2 >= parties.Count;
+    /// <summary>Ce qui a produit le 1 % low d'une partie : l'instrument (PresentMon ou le repli DXGI) et l'estimateur (0 la
+    /// médiane des fenêtres, 1 toutes les images pauses comprises, 2 toutes les images sans les pauses de présentation).
+    /// Deux parties de clés différentes ne se comparent pas.</summary>
+    internal static string Estimateur(PartieRelevee p)
+        => $"{p.Instrument ?? "PresentMon"}|{(!p.Low1SurToutesLesImages ? 0 : p.Low1SansPauses ? 2 : 1)}";
 
-    public static VerdictEnJeu Juger(IEnumerable<PartieRelevee> parties, DateTimeOffset reglage, string jeu)
+    /// <summary>L'estimateur du 1 % low le plus fréquent parmi ces parties (à égalité, le plus récent).</summary>
+    internal static string EstimateurMajoritaire(IReadOnlyCollection<PartieRelevee> parties)
+        => parties.GroupBy(Estimateur).OrderByDescending(g => g.Count()).ThenByDescending(g => g.Max(p => p.Debut))
+            .Select(g => g.Key).FirstOrDefault("PresentMon|2");
+
+    /// <param name="jusqua">Le changement suivant, comme pour <see cref="Bilan"/> : les parties d'après lui portent son effet,
+    /// et le retrait automatique attribuerait sa perte à celui-ci. null = aucun changement depuis.</param>
+    public static VerdictEnJeu Juger(IEnumerable<PartieRelevee> parties, DateTimeOffset reglage, string jeu, DateTimeOffset? jusqua = null)
     {
-        var dujeu = parties.Where(p => p.Essai is null && string.Equals(p.Jeu, jeu, StringComparison.OrdinalIgnoreCase)).ToList();
+        var dujeu = parties.Where(p => p.Essai is null && string.Equals(p.Jeu, jeu, StringComparison.OrdinalIgnoreCase)
+                                       && (jusqua is not { } fin || p.Debut < reglage || p.Fin <= fin)).ToList();
         if (MemeEstimateur(dujeu.Where(p => p.Fin <= reglage).ToList(), dujeu.Where(p => p.Debut >= reglage).ToList()) is not { } memes)
             return VerdictEnJeu.PasComparable;
         var avant = memes.Avant.Select(p => p.Low1Median).ToList();

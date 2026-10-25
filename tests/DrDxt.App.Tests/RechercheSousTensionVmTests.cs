@@ -23,7 +23,7 @@ public sealed class RechercheSousTensionVmTests : IDisposable
     private int _testsDeCharge;
 
     private ScanViewModel Vm(Func<int, Result>? poser = null, Func<int, int?>? whea = null, bool jeuOuvert = false,
-        Func<int, int?>? chaleur = null)
+        Func<int, int?>? chaleur = null, HelperFactice? helper = null)
     {
         var vm = ScanViewModelTestSeams.Build(Substitute.For<IHardwareDetector>(), Substitute.For<ISettingsStateReader>(),
             Substitute.For<IBenchmarkRunner>(), Substitute.For<IScanScorer>(), Substitute.For<IStorageDetector>(), k => k switch
@@ -43,7 +43,7 @@ public sealed class RechercheSousTensionVmTests : IDisposable
                 "SousTension.Rendue" => " ORIGINE RENDUE",
                 "SousTension.NonDisponible" => "NON DISPONIBLE",
                 _ => k,
-            });
+            }, helper: helper);
         vm.MemoireSousTension = new MemoireSousTension(Path.Combine(_dossier, "sous-tension.json"));
         vm.PoserSousTension = mv =>
         {
@@ -54,7 +54,7 @@ public sealed class RechercheSousTensionVmTests : IDisposable
         };
         // La chaleur baisse avec la sous-tension : 96 °C à 0 mV, 2 °C de moins par 10 mV.
         vm.FabriqueTestRefroidissement = () => { _testsDeCharge++; return new TestDeRefroidissement(_ => new Charge(),
-            () => (chaleur ?? (mv => 96 + mv / 5))(_decalage) is { } c ? new EtatCpu(c, 80, c >= 95, false, false, false) : null,
+            () => (chaleur ?? (mv => 96 + mv / 5))(helper?.Decalage ?? _decalage) is { } c ? new EtatCpu(c, 80, c >= 95, false, false, false) : null,
             (_, ct) => Task.Delay(1, ct)); };
         vm.DureeDuTestRefroidissement = TimeSpan.FromSeconds(5);
         vm.JeuOuvertPourLeTest = () => jeuOuvert;
@@ -420,6 +420,104 @@ public sealed class RechercheSousTensionVmTests : IDisposable
         await vm.LancerRechercheSousTensionCommand.ExecuteAsync(null);
 
         vm.ResultatSousTension.Should().Contain("-30 mV").And.Contain("UnderVolt Protection").And.NotContain(ErrorCodes.TensionRefusee);
+    }
+
+    // Par le vrai helper (pas la couture de pose) : un bail est armé avant toute écriture, son inverse rend la tension
+    // d'origine, et il n'est libéré qu'une fois l'origine rendue. La mise en veille est empêchée pendant toute la recherche.
+    private sealed class HelperFactice(Func<PrivilegedOp, Result>? reponse = null) : IElevatedClient
+    {
+        public List<PrivilegedOp> Recues { get; } = [];
+        public int Decalage { get; private set; }
+
+        public Task<Result> ExecuteAsync(PrivilegedOp op, CancellationToken ct)
+        {
+            lock (Recues) Recues.Add(op);
+            var r = reponse?.Invoke(op) ?? Result.Ok();
+            if (r.IsOk && op is SetCpuVoltageOffsetOp v) Decalage = v.DecalageMv;
+            return Task.FromResult(r);
+        }
+
+        public Task<Result<byte[]>> ReadAsync(PrivilegedOp op, CancellationToken ct) => Task.FromResult(Result<byte[]>.Ok([]));
+    }
+
+    private sealed class Veille : IDisposable
+    {
+        public int Ouvertes, Fermees;
+        public void Dispose() => Fermees++;
+    }
+
+    private ScanViewModel VmParLeHelper(HelperFactice helper, Veille veille)
+    {
+        var vm = Vm(helper: helper);
+        vm.PoserSousTension = null;
+        vm.ErreursWheaDepuis = _ => 0;
+        vm.EmpecherLaVeille = () => { veille.Ouvertes++; return veille; };
+        return vm;
+    }
+
+    [Fact]
+    public async Task Un_bail_qui_rend_l_origine_est_arme_avant_la_premiere_ecriture_et_libere_apres_le_retour()
+    {
+        var helper = new HelperFactice();
+        var veille = new Veille();
+        var vm = VmParLeHelper(helper, veille);
+
+        await vm.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+
+        var bail = helper.Recues[0].Should().BeOfType<EstablishLeaseOp>().Subject;
+        bail.LeaseId.Should().Be("cpu-sous-tension");
+        PrivilegedOpCodec.Deserialize(bail.RevertOpJson).Value.Should().Be(new SetCpuVoltageOffsetOp(0));
+        var ecritures = helper.Recues.OfType<SetCpuVoltageOffsetOp>().Select(o => o.DecalageMv).ToList();
+        ecritures.Should().Equal(-30, 0, -30, -50, -70, -90, 0);
+        var retour = helper.Recues.FindLastIndex(o => o is SetCpuVoltageOffsetOp { DecalageMv: 0 });
+        helper.Recues.FindIndex(retour, o => o is RenewLeaseOp { LeaseId: "cpu-sous-tension", LeaseSeconds: 1 })
+            .Should().BeGreaterThan(retour, "le bail n'est libéré qu'une fois l'origine rendue");
+        (veille.Ouvertes, veille.Fermees).Should().Be((1, 1), "pas de veille pendant la recherche, rendue à la fin");
+    }
+
+    [Fact]
+    public async Task Sans_bail_arme_aucune_tension_n_est_posee()
+    {
+        var helper = new HelperFactice(op => op is EstablishLeaseOp ? Result.Fail(ErrorCodes.HelperOpFailed, "refus") : Result.Ok());
+        var veille = new Veille();
+        var vm = VmParLeHelper(helper, veille);
+
+        await vm.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+
+        helper.Recues.OfType<SetCpuVoltageOffsetOp>().Should().BeEmpty();
+        vm.ResultatSousTension.Should().Contain("SousTension.Raison.SansBail");
+        veille.Fermees.Should().Be(veille.Ouvertes);
+    }
+
+    // Le retour à l'origine échoue : le bail reste armé (sans battement) et le helper retentera l'origine à son échéance ;
+    // il n'est pas ramené à une seconde.
+    [Fact]
+    public async Task Une_origine_non_rendue_laisse_le_bail_au_helper()
+    {
+        var helper = new HelperFactice(op => op is SetCpuVoltageOffsetOp { DecalageMv: 0 }
+            ? Result.Fail(ErrorCodes.HelperOpFailed, "panne") : Result.Ok());
+        var vm = VmParLeHelper(helper, new Veille());
+
+        await vm.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+
+        helper.Recues.OfType<SetCpuVoltageOffsetOp>().Should().NotBeEmpty("témoin : une tension a été posée");
+        helper.Recues.Where(o => o is RenewLeaseOp { LeaseSeconds: 1 }).Should().BeEmpty("le bail reste au helper");
+        vm.ResultatSousTension.Should().Contain("NON RENDUE");
+    }
+
+    // La recherche se note avant chaque palier : non notée, une coupure ne se rattacherait à aucun palier. Rien n'est posé.
+    [Fact]
+    public async Task Une_recherche_qui_ne_peut_pas_etre_notee_ne_pose_rien()
+    {
+        var vm = Vm();
+        var occupe = Path.Combine(_dossier, "memoire-dossier");
+        Directory.CreateDirectory(occupe);
+        vm.MemoireSousTension = new MemoireSousTension(occupe);
+
+        await vm.LancerRechercheSousTensionCommand.ExecuteAsync(null);
+
+        _poses.Should().BeEmpty();
+        vm.ResultatSousTension.Should().Contain("SousTension.Raison.NonNotee");
     }
 
     // Au lancement, l'origine d'une recherche interrompue se rend sans clic : aucune invite Windows (SansGesteDuJoueur).

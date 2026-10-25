@@ -177,4 +177,12 @@ public class RepairAuditServiceTests
         public Result<IReadOnlyList<ServiceFailure>> Depuis(DateTimeOffset depuis)
             => Result<IReadOnlyList<ServiceFailure>>.Ok([]);
     }
+
+    // Le seuil d'usure est une convention du constructeur : il dit quand regarder, il ne prouve aucun tort.
+    [Theory]
+    [InlineData(79, RepairStatus.Observed)]
+    [InlineData(80, RepairStatus.NonDefault)]
+    [InlineData(100, RepairStatus.NonDefault)]
+    public void L_usure_au_seuil_du_constructeur_est_a_regarder(int usure, RepairStatus attendu)
+        => RepairAuditService.StatutDUsure(usure).Should().Be(attendu);
 }

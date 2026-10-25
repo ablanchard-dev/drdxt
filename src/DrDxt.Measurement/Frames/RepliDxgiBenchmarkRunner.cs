@@ -29,7 +29,8 @@ public sealed class RepliDxgiBenchmarkRunner : IBenchmarkRunner
     public async Task<Result<BenchmarkResult>> RunAsync(int targetPid, TimeSpan duration, int runs, CancellationToken ct)
     {
         var pm = await _presentMon.RunAsync(targetPid, duration, runs, ct).ConfigureAwait(false);
-        if (pm.IsOk || pm.Error is not { } e || !EchecsDeCapture.Contains(e.Code)) return pm;
+        // PresentMon rend une annulation en CaptureFail : sans ce test, le repli partirait sur un jeton annulé.
+        if (pm.IsOk || ct.IsCancellationRequested || pm.Error is not { } e || !EchecsDeCapture.Contains(e.Code)) return pm;
 
         var series = new List<double>();
         var focus = FocusObservation.Aucune;
@@ -52,6 +53,7 @@ public sealed class RepliDxgiBenchmarkRunner : IBenchmarkRunner
             var r = await Task.Run(() => _dxgi(targetPid, duration, ct), ct).ConfigureAwait(false);
             arret.Cancel();
             await suivi.ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
             if (!r.IsOk || r.Value is null) return r.IsOk ? pm : Result<BenchmarkResult>.Fail(r.Error!.Value.Code,
                 $"{r.Error!.Value.Message} (PresentMon avant lui : {e.Code})");
             series.AddRange(r.Value.FrameTimesMs);

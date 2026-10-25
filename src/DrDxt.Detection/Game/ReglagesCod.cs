@@ -80,9 +80,8 @@ public static class ReglagesCod
             c.Add(new RepairFinding(Domaine, "génération d'images DLSS", Docteur.T("RC.Activee"), Docteur.T("RC.Desactivee"), RepairStatus.NonDefault,
                 Docteur.T("RC.Generation") + vieux, RepairAction.Recommandation));
 
-        // En partie, la carte de la machine de référence tourne à 97 % ; ses FPS se jouent dans la carte,
-        // et le levier logiciel qui reste est le mode DLSS du jeu. DrDXT dit ce que le mode Performance retire, pas
-        // un gain qu'il n'a pas mesuré, et n'écrit rien dans le fichier du jeu.
+        // Quand les FPS se jouent dans la carte, le levier logiciel qui reste est le mode DLSS du jeu. DrDXT dit ce que
+        // le mode Performance retire, pas un gain qu'il n'a pas mesuré, et n'écrit rien dans le fichier du jeu.
         var dlssConstat = r.TechniqueDUpscaling is { } tech && tech.Equals("DLSS", StringComparison.OrdinalIgnoreCase)
             && r.ModeDlss is { } mode && EchelleDlss.TryGetValue(mode, out var echelle) && echelle > EchelleDlss["Performance"]
             ? new RepairFinding(Domaine, "mode DLSS de Call of Duty", mode, null, RepairStatus.Observed,
@@ -104,12 +103,24 @@ public static class ReglagesCod
     /// `%LOCALAPPDATA%\Activision\Call of Duty\players`, et alterne entre `.txt0` et `.txt1` (le plus
     /// recent etait `.txt1`). Les dossiers « Documents » ne portaient qu'une ancienne version (cod24,
     /// juin) : lire la par defaut aurait rendu des reglages perimes.</summary>
-    public static FileInfo? Trouver() => PlusRecent(new[]
-    {
+    public static FileInfo? Trouver() => PlusRecent(Dossiers());
+
+    private static string[] Dossiers() =>
+    [
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Activision", "Call of Duty", "players"),
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Call of Duty", "players"),
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "OneDrive", "Documents", "Call of Duty", "players"),
-    });
+    ];
+
+    /// <summary>Lancé en administrateur, DrDXT ne suit pas un lien que le compte a posé (ConfianceDesRedirections) : un dossier
+    /// des réglages du jeu qui passe par l'un d'eux ne se lit pas, et ce n'est pas « rien à signaler ». Le premier lien
+    /// trouvé sur le chemin d'un dossier connu, ou null (non élevé : le lien se suit).</summary>
+    public static string? LienNonSuivi(bool eleve, IEnumerable<string>? dossiers = null)
+        => eleve ? (dossiers ?? Dossiers()).Select(FichierJsonAtomique.PointDAnalyseSurLeChemin).FirstOrDefault(l => l is not null) : null;
+
+    /// <summary>Les réglages du jeu non lus, et pourquoi.</summary>
+    public static RepairFinding ConstatNonSuivi(string lien)
+        => new(Domaine, "options de Call of Duty", Docteur.T("RC.NonSuivi"), null, RepairStatus.Unknown, Docteur.T("RC.NonSuiviExplication", lien));
 
     public static FileInfo? PlusRecent(IEnumerable<string> dossiers) => dossiers
         .Where(Directory.Exists)

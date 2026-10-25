@@ -31,7 +31,9 @@ public class CreationDeVidageTests
 
         c.Statut.Should().Be(RepairStatus.Suspicious);
         c.ValeurCourante.Should().Be("2 échec(s), aucun vidage gardé");
-        c.Explication.Should().Contain("02/09").And.Contain("04/09")
+        // La date s'affiche à l'heure de la machine : l'attendu suit le même fuseau.
+        c.Explication.Should().Contain(Le2Septembre.ToLocalTime().ToString("dd/MM", System.Globalization.CultureInfo.InvariantCulture))
+            .And.Contain(Le4Septembre.ToLocalTime().ToString("dd/MM", System.Globalization.CultureInfo.InvariantCulture))
             .And.Contain("n'est pas établie").And.Contain("type de vidage ne réglerait rien");
         RepairTriage.Trier([c]).Attention.Should().ContainSingle();
     }

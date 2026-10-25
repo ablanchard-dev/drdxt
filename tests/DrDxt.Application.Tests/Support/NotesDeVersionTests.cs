@@ -46,16 +46,18 @@ public sealed class NotesDeVersionTests
         return d.FullName;
     }
 
-    // La section à venir d'un vrai CHANGELOG (fichier, titre, puces).
+    // La première section d'un vrai CHANGELOG (fichier, titre, puces) : « Non publié » avant le numéro, puis numérotée.
     private static (string Texte, int Puces) AVenir(string langue)
     {
-        var (fichier, titre) = langue == "fr-FR" ? ("CHANGELOG.md", "## Non publié") : ("CHANGELOG.en.md", "## Unreleased");
+        var fichier = langue == "fr-FR" ? "CHANGELOG.md" : "CHANGELOG.en.md";
         fichier.Should().Be(NotesDeVersion.Ressource(System.Globalization.CultureInfo.GetCultureInfo(langue)));
         var texte = File.ReadAllText(Path.Combine(Racine(), fichier)).Replace("\r\n", "\n");
-        var debut = texte.IndexOf(titre, StringComparison.Ordinal);
-        debut.Should().BeGreaterThan(0, "témoin : la section à venir existe");
+        var debut = texte.IndexOf("\n## ", StringComparison.Ordinal) + 1;
+        debut.Should().BeGreaterThan(0, "témoin : la première section existe");
+        var titre = texte[debut..texte.IndexOf('\n', debut)];
         var fin = texte.IndexOf("\n## ", debut, StringComparison.Ordinal);
-        var aVenir = texte[debut..(fin < 0 ? texte.Length : fin)].Replace(titre, "## 9.9.9");
+        var section = texte[debut..(fin < 0 ? texte.Length : fin)];
+        var aVenir = System.Text.RegularExpressions.Regex.IsMatch(titre, @"^##\s+\d+\.\d+\.\d+") ? section : section.Replace(titre, "## 9.9.9");
         return (aVenir, aVenir.Split('\n').Count(l => l.StartsWith("- ", StringComparison.Ordinal)));
     }
 

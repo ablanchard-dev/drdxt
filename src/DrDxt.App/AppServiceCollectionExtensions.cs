@@ -25,10 +25,6 @@ namespace DrDxt.App;
 
 public static class AppServiceCollectionExtensions
 {
-    /// <summary>
-    /// Assemble tous les modules DI de DrDXT dans la collection de services racine.
-    /// À appeler une seule fois au démarrage, avant de construire le provider.
-    /// </summary>
     /// <summary>Un fichier illisible (le jeu l'écrit pendant le scan) se dit « non lu » pour ce jeu
     /// seul ; il ne cache plus les autres.</summary>
     internal static RepairFinding ConstatUnreal(string exe, FileInfo fichier, BottleneckState? goulot = null)
@@ -36,7 +32,7 @@ public static class AppServiceCollectionExtensions
         var nom = DrDxt.Detection.Game.ReglagesUnreal.Nom(exe);
         try
         {
-            var lu = DrDxt.Detection.Game.ReglagesUnreal.Lire(nom, fichier.FullName, File.ReadAllText(fichier.FullName), fichier.LastWriteTime);
+            var lu = DrDxt.Detection.Game.ReglagesUnreal.Lire(nom, fichier.FullName, DrDxt.Detection.FichierTiers.Lire(fichier.FullName), fichier.LastWriteTime);
             var constat = DrDxt.Detection.Game.ReglagesUnreal.Constat(lu, DateTime.Now, goulot);
             // Le jeu en DLSS porte son exécutable : le geste « dernier modèle DLSS » vise son profil pilote.
             return lu.Upscaling?.Contains("DLSS", StringComparison.OrdinalIgnoreCase) == true ? constat with { Cible = exe } : constat;
@@ -45,6 +41,23 @@ public static class AppServiceCollectionExtensions
         {
             return new RepairFinding(DrDxt.Detection.Game.ReglagesCod.Domaine, Docteur.Nom("RU.Nom", nom), null, null, RepairStatus.Unknown,
                 Docteur.T("App.ReglagesJeuIllisibles", fichier.FullName));
+        }
+    }
+
+    /// <summary>Le fichier de Call of Duty illisible (le jeu l'écrit, ou il dépasse le plafond) se dit « non lu » ; il
+    /// n'emporte plus les constats des jeux Unreal, lus dans le même lot.</summary>
+    internal static IReadOnlyList<RepairFinding> ConstatsCod(FileInfo fichier)
+    {
+        try
+        {
+            return DrDxt.Detection.Game.ReglagesCod.Constats(
+                DrDxt.Detection.Game.ReglagesCod.Lire(fichier.FullName, DrDxt.Detection.FichierTiers.Lire(fichier.FullName), fichier.LastWriteTime),
+                DateTime.Now);
+        }
+        catch (Exception)
+        {
+            return [new RepairFinding(DrDxt.Detection.Game.ReglagesCod.Domaine, Docteur.Nom("RU.Nom", "Call of Duty"), null, null, RepairStatus.Unknown,
+                Docteur.T("App.ReglagesJeuIllisibles", fichier.FullName))];
         }
     }
 
@@ -66,6 +79,10 @@ public static class AppServiceCollectionExtensions
         catch (Exception) { return []; /* un fichier illisible ne casse pas le scan */ }
     }
 
+    /// <summary>
+    /// Assemble tous les modules DI de DrDXT dans la collection de services racine.
+    /// À appeler une seule fois au démarrage, avant de construire le provider.
+    /// </summary>
     public static IServiceCollection AddDrDxtApp(this IServiceCollection services)
     {
         services.AddDrDxtCore();
@@ -112,7 +129,8 @@ public static class AppServiceCollectionExtensions
         // Le filet d'une session tuee : le levier en cours d'essai est journalise avant
         // d'ecrire la machine, et rendu au demarrage suivant (App.OnStartup).
         services.TryAddSingleton<DrDxt.Application.Autopilot.IRevertEnAttente>(
-            _ => DrDxt.Application.Autopilot.FichierRevertEnAttente.ParDefaut());
+            sp => DrDxt.Application.Autopilot.FichierRevertEnAttente.ParDefaut(sp.GetRequiredService<IRegistryReader>(),
+                id => sp.GetRequiredService<ILocalizer>().Get(TweakDisplayKeys.TitleKey(id))));
 
         // La couture du voyage dans le BIOS. Elle relie trois choses deja enregistrees
         // et jusqu'ici orphelines (le store du marqueur, le verifieur, l'horloge) au canal
@@ -141,7 +159,7 @@ public static class AppServiceCollectionExtensions
                         DateTimeOffset.UtcNow.AddDays(-90)),
                     .. new DrDxt.Detection.Repair.RepairAuditService().Lire(), DrDxt.App.Platform.SanteWindows.Constat(),
                     // Les états de veille du processeur, comparés au relevé de repos gardé. Après l'audit, jamais pendant :
-                    // le relevé se prend au repos, et la charge du scan entrerait dans la référence (mesuré le 16/10/2026 sur
+                    // le relevé se prend au repos, et la charge du scan entrerait dans la référence (mesuré sur
                     // 28 fils : 2 à 4 points de repos en moins pendant l'audit, bien plus sur un processeur de 4 cœurs).
                     .. DrDxt.Detection.Cpu.EtatsDeVeille.ComparerEtGarder(
                         DrDxt.Core.DossierDonnees.Chemin(DrDxt.Detection.Cpu.EtatsDeVeille.Fichier)),
@@ -162,10 +180,11 @@ public static class AppServiceCollectionExtensions
             Func<IReadOnlyList<RepairFinding>>? reglagesJeu = () =>
             [
                 .. DrDxt.Detection.Game.ReglagesCod.Trouver() is { } f
-                    ? DrDxt.Detection.Game.ReglagesCod.Constats(
-                        DrDxt.Detection.Game.ReglagesCod.Lire(f.FullName, File.ReadAllText(f.FullName), f.LastWriteTime),
-                        DateTime.Now)
-                    : Array.Empty<RepairFinding>(),
+                    ? ConstatsCod(f)
+                    // Rien trouvé, élevé, et un lien du compte sur le chemin : non lu, dit.
+                    : DrDxt.Detection.Game.ReglagesCod.LienNonSuivi(eleve == true) is { } lien
+                        ? [DrDxt.Detection.Game.ReglagesCod.ConstatNonSuivi(lien)]
+                        : Array.Empty<RepairFinding>(),
                 // Les jeux Unreal Engine joués sur ce PC (relevé des parties), réglages lus.
                 .. ReglagesDesJeuxUnreal(),
             ];
@@ -311,7 +330,9 @@ public static class AppServiceCollectionExtensions
                         sp.GetRequiredService<DrDxt.Application.Tweaks.Hardware.IPowerPlanReader>(),
                         // Un keep inscrit son origine au manifeste signe : la desinstallation la rend.
                         sp.GetRequiredService<IDesiredStateStore>(),
-                        sp.GetRequiredService<DrDxt.Application.Tweaks.Hardware.IServiceStateReader>())
+                        sp.GetRequiredService<DrDxt.Application.Tweaks.Hardware.IServiceStateReader>(),
+                        // La carte et le processeur se relisent par ce qui les lit vraiment (NVAPI, ADLX, 0x610).
+                        sp.GetRequiredService<DrDxt.Application.Autopilot.ValidationDeLaMachine>().Carte)
                     : null,
                 // Ce que la stabilite interdit : les memes lectures que tools/candidatprobe.
                 () => (DrDxt.Detection.Hardware.StabiliteLue.InstabiliteGpu(
@@ -405,7 +426,8 @@ public static class AppServiceCollectionExtensions
                 exporterMachine: (hw, st, constats) =>
                 {
                     var maintenant = DateTimeOffset.Now;
-                    var nom = $"machine-exportee-{maintenant:yyyy-MM-dd-HHmmss}";
+                    // Un nom de fichier en calendrier grégorien, quel que soit le format régional (ar-SA l'écrirait en 1448).
+                    var nom = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"machine-exportee-{maintenant:yyyy-MM-dd-HHmmss}");
                     // Trois nombres : une version à quatre a la forme d'une adresse IP, et l'anonymisation la retirerait.
                     var note = Docteur.T("App.NoteExport", typeof(AppServiceCollectionExtensions).Assembly.GetName().Version?.ToString(3), maintenant);
                     return EcrireMachineExportee(nom + ".json", DrDxt.Detection.Repair.MachineExportee.Json(nom, note, eleve, hw, st,
@@ -417,6 +439,8 @@ public static class AppServiceCollectionExtensions
                 LireCoupures = () => [.. DrDxt.ElevatedHelper.Execution.TraceDesCoupures.DeLaSession().Lire(),
                     .. DrDxt.ElevatedHelper.Execution.TraceDesCoupures.DeLaMachine().Lire()],
             };
+            // L'essai en alternance ne part que sur une pose que la machine confirme.
+            vm.VerifierLaPose = sp.GetRequiredService<DrDxt.Application.Autopilot.ValidationDeLaMachine>().Verdict;
             // « Vérifier DrDXT sur mon PC » : la validation complète par les leviers et le canal élevé du
             // produit, dans le journal de remise du produit (la reprise au démarrage rend un essai interrompu).
             vm.VerifierLaMachine = async progres =>
@@ -487,11 +511,13 @@ public static class AppServiceCollectionExtensions
         // machine sans window station elle échoue proprement, et l'appelant passe son tour au lieu de
         // conclure « aucun écran ».
         // NVAPI est passé explicitement : sans lui G-Sync reste illisible et le levier de cadence meurt.
-        services.AddSingleton<IDisplayInfo>(sp =>
+        // Gardée un court instant : un scan relit les écrans à chaque levier qui en dépend (40 à 57 ms la lecture).
+        services.AddSingleton<IDisplayInfo>(sp => new DrDxt.Detection.Display.EcransEnCache(
             new DrDxt.Detection.Display.Win32DisplayInfo(sp.GetRequiredService<INvApiNative>(),
-                sp.GetService<DrDxt.Detection.Gpu.Adlx.IAdlxNative>()));
+                sp.GetService<DrDxt.Detection.Gpu.Adlx.IAdlxNative>())));
         // Le mode de l'écran se pose côté utilisateur (user32), et le joueur le garde ou il revient.
         services.AddSingleton<IModeEcran, DrDxt.Detection.Display.Win32ModeEcran>();
+        services.AddSingleton<ISourceDAlimentation, DrDxt.Detection.Hardware.Win32SourceDAlimentation>();
         services.AddSingleton<IConfirmationEcran, FenetreConfirmationEcran>();
         services.AddSingleton<IPowerPlanReader, Win32PowerPlanReader>();
         // La limite de puissance du processeur par PawnIO (lecture ; l'écriture passe par le helper).
@@ -511,7 +537,7 @@ public static class AppServiceCollectionExtensions
 
         // La vraie lecture ADLX : AdlxGpuTuningReader, par la frontiere P/Invoke d'AdlxNative, remplace le
         // StubAdlxGpuTuning qui echoue proprement (TryAdd dans AddDrDxtApplication ; le dernier enregistrement
-        // gagne, comme pour IGpuLoadProbe juste au-dessus). Lecture essayee sur une RX 9070 XT (commit 76d225d),
+        // gagne, comme pour IGpuLoadProbe juste au-dessus). Lecture essayee sur une seule RX 9070 XT,
         // sans rapport de verification archive.
         // Sur AMD, IAdlxGpuTuning.IsAvailable passe à vrai → GpuUndervolt/GpuPowerLimit
         // .ApplyAmdAsync s'exécute. Sur une machine non AMD, IsAvailable d'AdlxNative sonde
@@ -533,7 +559,7 @@ public static class AppServiceCollectionExtensions
         // NvApiGpuTuningReader sur la frontière P/Invoke de NvApiNative, à la place du
         // StubNvApiGpuTuning qui échoue proprement (TryAdd dans AddDrDxtApplication ; le dernier
         // enregistrement gagne). La recette d'écriture NVAPI est validée en vrai sur une RTX 4060
-        // (11b6b41 : décalage du cœur 0→-15→retour, puissance 100→90→retour) ; les lectures ne
+        // (décalage du cœur 0→-15→retour, puissance 100→90→retour) ; les lectures ne
         // demandent pas d'élévation (NvAPI_Initialize et les GET). Sur NVIDIA,
         // INvApiGpuTuning.IsAvailable passe à vrai → GpuUndervolt/GpuPowerLimit.ApplyNvidiaAsync
         // s'exécute. Sur une machine non NVIDIA, NvApiNative sonde nvapi64.dll à la demande et chaque
@@ -595,7 +621,7 @@ public static class AppServiceCollectionExtensions
 
         // Lectures du manifeste en vérification seule : même racine ProgramData en écriture admin
         // que l'hôte. Le vérificateur vient du fichier de clé publique de la machine (écrit par le
-        // helper) ou, en DEBUG seulement, de la clé publique V1 embarquée (AppManifestPublicKey). Un
+        // helper) ou, en DEBUG seulement, de la clé publique de dev embarquée (AppManifestPublicKey). Un
         // manifeste altéré ou étranger est toujours refusé.
         services.TryAddSingleton<IManifestStorage>(_ => new ProgramDataManifestStorage());
         // Relue a chaque verification : la cle nait au premier commit du helper, pendant la session.
@@ -606,9 +632,8 @@ public static class AppServiceCollectionExtensions
         services.TryAddSingleton<AppliedTweakManifestMapper>();
         // La reference de derive (build, pilote vus au moment de l'apply, que la 1re passe
         // du reconciliateur lit) est posee par le helper, dans le meme CommitManifestOp que le manifeste
-        // (MachineManifestCommit → ApplyReferenceSeedingStore). L'App ne l'ecrit plus : non elevee, elle ne
-        // pouvait pas ecrire la racine admin, et l'echec etait avale (ReferenceDeDeriveTests). Un echec
-        // cote helper revient en MANIFEST_REFERENCE_NOT_SEEDED, et l'ecran le dit. Sans decorateur ici,
+        // (MachineManifestCommit → ApplyReferenceSeedingStore) : l'App, non elevee, ne peut pas ecrire la
+        // racine admin (ReferenceDeDeriveTests). Un echec cote helper revient en MANIFEST_REFERENCE_NOT_SEEDED, et l'ecran le dit. Sans decorateur ici,
         // RafraichirAsync est celui de HelperDesiredStateStore : jamais d'UAC.
         services.TryAddSingleton<IDesiredStateStore>(sp => new HelperDesiredStateStore(
             sp.GetRequiredService<IElevatedClient>(),          // commit : le helper (UAC a la demande).
@@ -625,13 +650,10 @@ public static class AppServiceCollectionExtensions
         // ici ; celui-ci l'imite sans dépendance malvenue au projet du service).
         services.TryAddSingleton<IReconcilerNotifier, AppReconcilerNotifier>();
 
-        // Aucun reconciliateur cote App. Le vrai tourne dans le service eleve
-        // (DrDxt.ReconcilerHost). L'App enregistrait ici DesiredStateReconciler, IReconciler,
-        // IReconcilerStateStore, IBootOutcomeStore et BootLoopGuard sans qu'aucun code de l'App
-        // ne les resolve jamais : enregistrement mort. Mort n'est pas inoffensif : le jour ou
-        // quelqu'un les resout par erreur, un second ecrivain non eleve redevient actif sans
-        // qu'aucun test ne rougisse. Ce que l'App garde du reconciliateur, c'est la lecture :
-        // IDesiredStateStore (verify-only) et le mapper de commit.
+        // Aucun reconciliateur cote App : le vrai tourne dans le service eleve (DrDxt.ReconcilerHost).
+        // DesiredStateReconciler, IReconcilerStateStore, IBootOutcomeStore et BootLoopGuard ne sont pas
+        // enregistres ici : resolus par erreur, ils feraient de l'App un second ecrivain non eleve. Ce que
+        // l'App garde du reconciliateur, c'est la lecture : IDesiredStateStore (verify-only) et le mapper de commit.
     }
 
     /// <summary>
@@ -677,7 +699,7 @@ public static class AppServiceCollectionExtensions
             + Environment.NewLine + Environment.NewLine + r.Texte;
         // Ce texte part en public (ticket GitHub) : les règles de la machine exportée s'y appliquent aussi.
         texte = DrDxt.Detection.Repair.MachineExportee.AnonymiserTexte(texte, DrDxt.Detection.Repair.MachineExportee.ValeursDeCePc());
-        return EcrireDansDocuments($"verification-drdxt-{maintenant:yyyy-MM-dd-HHmmss}.txt", texte);
+        return EcrireDansDocuments(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"verification-drdxt-{maintenant:yyyy-MM-dd-HHmmss}.txt"), texte);
     }
 
     // L'élévation réelle du processus, pas celle d'une machine rejouée : élevée, l'écriture hors du dossier tenu est gardée.
@@ -692,17 +714,18 @@ public static class AppServiceCollectionExtensions
 
     /// <summary>Les jeux mis à jour et les pilotes d'affichage changés depuis le scan précédent, notés dans le journal des
     /// changements (la frise les montre) à l'heure du scan, le scan précédent comme borne basse. Ne rend aucun constat :
-    /// la frise est leur seul affichage. Une lecture ratée ne note rien.</summary>
+    /// la frise est leur seul affichage. Une lecture ratée ne note rien ; un journal qui refuse, non plus, et l'écart
+    /// revient au scan suivant.</summary>
     private static IReadOnlyList<DrDxt.Core.RepairFinding> NoterLeMonde()
     {
         try
         {
             var maintenant = DateTimeOffset.Now;
-            var (ecarts, depuis) = DrDxt.Detection.Hardware.MondeDeLaMachine.ComparerEtGarder(
-                DrDxt.Core.DossierDonnees.Chemin(DrDxt.Detection.Hardware.MondeDeLaMachine.Fichier), maintenant);
             var journal = DrDxt.Application.Parties.JournalDesChangements.ParDefaut();
-            foreach (var e in ecarts)
-                journal.Ajouter(new DrDxt.Application.Parties.Changement(maintenant, e.Libelle, depuis, e.Cle));
+            DrDxt.Detection.Hardware.MondeDeLaMachine.ComparerEtGarder(
+                DrDxt.Core.DossierDonnees.Chemin(DrDxt.Detection.Hardware.MondeDeLaMachine.Fichier), maintenant,
+                (ecarts, depuis) => ecarts.Select(e => journal.Ajouter(new DrDxt.Application.Parties.Changement(maintenant, e.Libelle, depuis, e.Cle)))
+                    .ToList().TrueForAll(r => r.IsOk));
         }
         catch (Exception) { /* un monde non relu ne fait pas échouer la santé */ }
         return [];

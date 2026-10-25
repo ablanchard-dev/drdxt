@@ -28,4 +28,19 @@ public sealed class JeuxDesLanceursTests
             ("Battle.net", @"D:\Jeux\Overwatch"),
             ("Riot", @"C:\Riot Games\VALORANT\live"));
     }
+
+    // Une bibliothèque se parcourt sur 5 niveaux : jamais sur un partage réseau (connexion SMB sortante) ni une racine de disque.
+    [Theory]
+    [InlineData(@"D:\SteamLibrary", true)]
+    [InlineData(@"C:\Program Files (x86)\Call of Duty", true)]
+    [InlineData(@"\hote\partage\Jeux", false)]
+    [InlineData(@"\\hote\partage\Jeux", false)]
+    [InlineData(@"//hote/partage/Jeux", false)]
+    [InlineData(@"\?\UNC\hote\partage", false)]
+    [InlineData(@"\\?\UNC\hote\partage", false)]
+    [InlineData(@"D:\", false)]
+    [InlineData(@"D:", false)]
+    [InlineData(@"Jeux\relatif", false)]
+    public void Seuls_les_dossiers_locaux_sous_une_racine_se_parcourent(string chemin, bool parcourable)
+        => DossiersDeJeux.Parcourable(chemin).Should().Be(parcourable);
 }

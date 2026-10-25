@@ -54,4 +54,14 @@ public class MecanismeCarteTests
         m.Echantillons.Should().Be(2);
         m.MhzLibre.Should().Be(2730);
     }
+
+    // Des lectures libres identiques sont autant de secondes : les fondre en une fausserait la médiane.
+    [Fact]
+    public void Des_lectures_libres_egales_comptent_chacune_dans_la_mediane()
+    {
+        var lus = Enumerable.Repeat(L(2715, ClocksEventReason.Aucune), 100)
+            .Append(L(2700, ClocksEventReason.Aucune))
+            .Append(L(2600, ClocksEventReason.PlafondPuissanceLogiciel));
+        MecanismeCarte.Depuis(lus)!.MhzLibre.Should().Be(2715);
+    }
 }

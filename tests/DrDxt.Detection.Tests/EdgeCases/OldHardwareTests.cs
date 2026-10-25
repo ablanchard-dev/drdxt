@@ -82,6 +82,29 @@ public class OldHardwareTests
         state.Value!.ReBar.Should().Be(TriState.Unknown, "aucun GPU détecté → Unknown honnête");
     }
 
+    // ── Puce intégrée listée devant la carte → ReBar lu sur la carte ─
+
+    [Fact]
+    public async Task SettingsStateReader_lit_le_rebar_de_la_carte_dediee_pas_de_la_puce_integree()
+    {
+        var power = Substitute.For<IPowerProvider>();
+        power.GetActiveSchemeGuid().Returns(Result<string>.Ok("381b4222-f694-41f0-9685-ff5bb260df2e"));
+        var reg = Substitute.For<IRegistryProvider>();
+        reg.GetParkedCoreIndexes().Returns(Array.Empty<int>());
+        var hw = EmptyGpuInventory() with
+        {
+            Gpus = new[]
+            {
+                new GpuInfo("Intel(R) UHD Graphics 770", "Intel", 128L << 20, "31.0", TriState.Off),
+                new GpuInfo("RTX 4060", "NVIDIA", 8L << 30, "616.56", TriState.On),
+            },
+        };
+
+        var state = await new SettingsStateReader(power, reg, NoNetwork()).ReadAsync(hw);
+
+        state.Value!.ReBar.Should().Be(TriState.On);
+    }
+
     // ── Memory vide → XmpInferencer retourne Unknown, scorer ne crash pas ─
 
     [Fact]

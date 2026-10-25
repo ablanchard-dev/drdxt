@@ -42,8 +42,25 @@ public class BiosQualificationMatrixTests
             Capability: BiosCapabilityLevel.VendorSupportedWrite,
             Recoverability: BiosRecoverability.PhysicalRecoveryAvailable,
             Validated: true,
+            NoPost: NoPostRisk.CannotPreventPost,
             DocumentationSource: "manuel constructeur, page 42")
             .EcritureAutomatiqueAutorisee.Should().BeTrue();
+    }
+
+    // « Pas établi » n'autorise rien : un risque de non-démarrage inconnu renvoie au parcours guidé, et se dit.
+    [Fact]
+    public void UN_RISQUE_DE_NON_DEMARRAGE_INCONNU_N_AUTORISE_PAS_L_ECRITURE()
+    {
+        var e = new BiosQualification(
+            Board: "carte", FirmwareVersion: "1.0", Setting: "XMP",
+            CurrentValue: "Disabled", TargetValue: "Profil 1", Provider: "vendeur",
+            Capability: BiosCapabilityLevel.VendorSupportedWrite,
+            Recoverability: BiosRecoverability.PhysicalRecoveryAvailable,
+            Validated: true,
+            DocumentationSource: "manuel constructeur, page 42");
+
+        e.EcritureAutomatiqueAutorisee.Should().BeFalse();
+        e.CeQuiManqueTout.Should().ContainSingle();
     }
 
     [Fact]
@@ -129,5 +146,18 @@ public class BiosQualificationMatrixTests
 
         e.CeQuiManqueTout.Should().HaveCount(4);
         e.CeQuiManque.Should().Contain("recuperation").And.Contain("pas lisible");
+    }
+
+    // Un `with` ne repasse pas par les initialiseurs du constructeur : la règle doit tenir aussi par là.
+    [Fact]
+    public void Un_with_ne_valide_pas_sans_source()
+    {
+        var sansSource = new BiosQualification("carte", "1.0", "XMP", "Disabled", "Profil 1", "vendeur",
+            BiosCapabilityLevel.VendorSupportedWrite, BiosRecoverability.PhysicalRecoveryAvailable);
+        var validee = sansSource with { DocumentationSource = "manuel p. 12" };
+
+        FluentActions.Invoking(() => sansSource with { Validated = true }).Should().Throw<ArgumentException>();
+        FluentActions.Invoking(() => (validee with { Validated = true }) with { DocumentationSource = null }).Should().Throw<ArgumentException>();
+        (validee with { Validated = true }).Validated.Should().BeTrue("témoin : avec sa source, la validation passe");
     }
 }

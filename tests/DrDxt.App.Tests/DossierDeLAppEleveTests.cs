@@ -58,6 +58,17 @@ public sealed class DossierDeLAppEleveTests : IDisposable
         raison.Should().EndWith("logs");
     }
 
+    // Plus bas que les dossiers tenus : une jonction au deuxième niveau d'un dossier que l'App ne crée pas est refusée aussi.
+    [Fact]
+    public void Une_jonction_au_deuxieme_niveau_est_refusee()
+    {
+        Directory.CreateDirectory(Path.Combine(Racine, "autre"));
+        Mklink("/J", Path.Combine(Racine, "autre", "profond"), Ailleurs);
+
+        DossierDeLAppEleve.Verrouiller(Racine, out var raison).Should().BeNull();
+        raison.Should().EndWith("profond");
+    }
+
     [Fact]
     public void Un_fichier_lien_dur_est_refuse()
     {
@@ -109,6 +120,24 @@ public sealed class DossierDeLAppEleveTests : IDisposable
         verrou.Should().BeLessThan(app.IndexOf("DispatcherUnhandledException", debut, StringComparison.Ordinal));
         verrou.Should().BeLessThan(app.IndexOf("new ServiceCollection()", debut, StringComparison.Ordinal));
     }
+    // Une panne pendant le démarrage, avant que la fenêtre soit montrée : le filet l'écrit, puis l'App s'arrête. Sans cela, le
+    // processus restait sans fenêtre, gardait la place de l'App, et chaque relance ne faisait que le réveiller.
+    [Fact]
+    public void Une_panne_avant_la_fenetre_arrete_l_App_au_lieu_de_la_laisser_sans_fenetre()
+    {
+        var d = new DirectoryInfo(AppContext.BaseDirectory);
+        while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
+        var app = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "App.xaml.cs"));
+        var debut = app.IndexOf("DispatcherUnhandledException += ", StringComparison.Ordinal);
+        debut.Should().BePositive("témoin : le filet est trouvé");
+        var filet = app[debut..app.IndexOf("};", debut, StringComparison.Ordinal)];
+
+        filet.Should().Contain("ReportFatal(args.Exception);")
+            .And.Contain("MainWindow is not { IsVisible: true }")
+            .And.Contain("Shutdown(1);")
+            .And.Contain("ArgumentReleve", "le relevé de fond tourne sans fenêtre : il ne s'arrête pas pour autant");
+    }
+
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
     private static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFileW(string nom, uint acces, FileShare partage, IntPtr securite,
         FileMode creation, uint drapeaux, IntPtr modele);

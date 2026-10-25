@@ -52,7 +52,7 @@ public sealed partial class ScanViewModel
     /// <summary>Vrai si l'analyse vient d'être confiée à l'instance élevée (celle-ci se ferme).</summary>
     private bool ConfierAUneInstanceElevee()
     {
-        if (_estEleve != false || RelancerEleveEtAnalyser is null || _elevationRefusee) return false;
+        if (!PeutSeRelancerEleve || RelancerEleveEtAnalyser is null || _elevationRefusee) return false;
         var scene = Math.Max(0, ChoixDeScene.ToList().IndexOf(SceneDeclaree));
         if (RelancerEleveEtAnalyser(scene)) return true;
         _elevationRefusee = true;
@@ -63,7 +63,12 @@ public sealed partial class ScanViewModel
     /// <summary>Le bouton « lire aussi ce qui demande l'administrateur » : seulement quand l'appli
     /// tourne sans droits connus, que la relance existe, et qu'il reste des angles morts a lire.</summary>
     public bool PeutRelancerEnAdministrateur =>
-        _estEleve == false && _relancerEnAdministrateur is not null && RepairBlindSpots.Count > 0;
+        PeutSeRelancerEleve && _relancerEnAdministrateur is not null && RepairBlindSpots.Count > 0;
+
+    /// <summary>Sans droits, et pas depuis un compte standard : là, l'invite Windows demande le mot de passe d'un
+    /// administrateur et l'App relancée tourne sous ce compte. Elle lirait ses réglages à lui, et y écrirait ceux du
+    /// compte en disant « posé ». L'analyse se fait alors dans cette fenêtre, sans les lectures réservées.</summary>
+    private bool PeutSeRelancerEleve => _estEleve == false && !CompteStandard();
 
     public string LabelRelancerEnAdministrateur => _localize("Scan.Elevation.Button");
     public string LabelRelancerEnAdministrateurAide => _localize("Scan.Elevation.Hint");
@@ -76,7 +81,7 @@ public sealed partial class ScanViewModel
     [RelayCommand]
     private void RelancerEnAdministrateur()
     {
-        if (_relancerEnAdministrateur is null) return;
+        if (_relancerEnAdministrateur is null || !PeutSeRelancerEleve) return;
         MessageRelanceAdministrateur = _relancerEnAdministrateur() ? null : _localize("Scan.Elevation.Refused");
     }
 

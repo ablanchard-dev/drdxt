@@ -17,15 +17,6 @@ namespace DrDxt.Detection.Settings;
 /// </summary>
 public static class XmpInferencer
 {
-    // Vitesses de base JEDEC (inférence, probable : pas une borne certifiée de la spec)
-    private const int Ddr4JedecBase = 3200; // max JEDEC natif DDR4
-    private const int Ddr5JedecBase = 4800; // base JEDEC native DDR5
-
-    // SMBIOS Memory Device Type. 26 = DDR4 (mesuré sur la machine de référence), 34 = DDR5
-    // (valeur de la spécification, non vérifiée ici).
-    private const int SmbiosDdr4 = 26;
-    private const int SmbiosDdr5 = 34;
-
     // Tensions nominales JEDEC, en mV. Un module qui tourne nettement au-dessus a forcément un
     // profil chargé : rien d'autre ne monte la tension.
     private const int Ddr4JedecMv = 1200;
@@ -54,11 +45,7 @@ public static class XmpInferencer
 
         foreach (var m in modules)
         {
-            // Le type mémoire est lu quand le SMBIOS le donne ; sinon seulement on le devine
-            // depuis la vitesse nominale (DDR5 JEDEC démarre à 4800, en dessous c'est du DDR4).
-            // Lire vaut mieux que deviner : un kit DDR5-4800 et un DDR4-4800 n'ont pas le même
-            // socle, et la vitesse seule ne les sépare pas.
-            int jedecBase = JedecBaseOf(m);
+            int jedecBase = SocleJedec.Mhz(m);
 
             // OFF seulement quand le module est à ou sous sa base JEDEC alors que sa vitesse nominale
             // est au-dessus (il tourne au défaut JEDEC, pas sur le profil). Sous le max nominal mais
@@ -71,18 +58,11 @@ public static class XmpInferencer
         // rien. Apres un reset XMP, Windows rabat souvent la vitesse nominale sur la reglee
         // (2667/2667 releve sur la machine de reference le 29/06) : conclure On ici est le faux « XMP actif ». Seule la
         // tension peut encore trancher, et seulement vers On.
-        if (modules.All(m => m.ConfiguredMhz <= JedecBaseOf(m)))
+        if (modules.All(m => m.ConfiguredMhz <= SocleJedec.Mhz(m)))
             return modules.Any(ProfileVoltageProven) ? TriState.On : TriState.Unknown;
 
         return TriState.On;
     }
-
-    private static int JedecBaseOf(MemoryModule m) => m.SmbiosMemoryType switch
-    {
-        SmbiosDdr5 => Ddr5JedecBase,
-        SmbiosDdr4 => Ddr4JedecBase,
-        _ => m.RatedMhz >= Ddr5JedecBase ? Ddr5JedecBase : Ddr4JedecBase,
-    };
 
     // Le profil est prouvé chargé quand la tension configurée dépasse nettement le nominal
     // JEDEC du type lu. Type inconnu ou tension non lue (0 mV) ⇒ aucun signal, jamais une
@@ -93,8 +73,8 @@ public static class XmpInferencer
 
         int jedecMv = m.SmbiosMemoryType switch
         {
-            SmbiosDdr4 => Ddr4JedecMv,
-            SmbiosDdr5 => Ddr5JedecMv,
+            SocleJedec.SmbiosDdr4 => Ddr4JedecMv,
+            SocleJedec.SmbiosDdr5 => Ddr5JedecMv,
             _ => 0,
         };
         if (jedecMv == 0) return false;

@@ -17,14 +17,30 @@ namespace DrDxt.Core;
 // réécrire la DACL). Pour le dossier, créer un fichier compte comme écrire : une DLL posée à côté serait
 // chargée par le service. Les règles « héritage seulement » (CREATOR OWNER de Program Files) ne visent
 // que les enfants à venir et ne comptent pas. L'installation par défaut (Program Files) passe.
+//
+// Chaque dossier au-dessus compte aussi : là où le compte peut supprimer un enfant (son profil), il renomme le dossier
+// protégé et en pose un autre au même chemin. Pour un ancêtre, seuls comptent supprimer, renommer et réécrire la DACL ;
+// créer un dossier neuf, que C:\ accorde aux utilisateurs, ne remplace rien.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class CheminProtege
 {
+    // Une règle peut porter un masque générique non mappé (GENERIC_ALL, GENERIC_WRITE) : Windows le traduit en droits de
+    // fichier à l'accès (Microsoft Learn, « File Security and Access Rights » : GENERIC_WRITE donne FILE_GENERIC_WRITE,
+    // GENERIC_ALL le contrôle total). Il compte comme les droits qu'il donne, sinon une règle effective le cacherait.
+    private const FileSystemRights GeneriqueTout = (FileSystemRights)0x10000000;
+    private const FileSystemRights GeneriqueEcriture = (FileSystemRights)0x40000000;
+
     private const FileSystemRights Dangereux =
         FileSystemRights.WriteData | FileSystemRights.AppendData | FileSystemRights.Delete
         | FileSystemRights.DeleteSubdirectoriesAndFiles | FileSystemRights.ChangePermissions
-        | FileSystemRights.TakeOwnership | FileSystemRights.WriteExtendedAttributes;
+        | FileSystemRights.TakeOwnership | FileSystemRights.WriteExtendedAttributes
+        | GeneriqueTout | GeneriqueEcriture;
+
+    private const FileSystemRights DangereuxPourUnAncetre =
+        FileSystemRights.Delete | FileSystemRights.DeleteSubdirectoriesAndFiles
+        | FileSystemRights.ChangePermissions | FileSystemRights.TakeOwnership
+        | GeneriqueTout;
 
     private static readonly SecurityIdentifier[] Confiance =
     [
@@ -56,7 +72,10 @@ public static class CheminProtege
             if (!fichier.Exists) return Docteur.T("CP.Absent");
             if (Probleme(fichier.GetAccessControl(), fichier.FullName) is { } f) return f;
             var dossier = fichier.Directory!;
-            return Probleme(dossier.GetAccessControl(), dossier.FullName);
+            if (Probleme(dossier.GetAccessControl(), dossier.FullName) is { } d) return d;
+            for (var a = dossier.Parent; a is not null; a = a.Parent)
+                if (ProblemeAncetre(a.GetAccessControl(), a.FullName) is { } p) return p;
+            return null;
         }
         catch (Exception ex)
         {
@@ -64,7 +83,11 @@ public static class CheminProtege
         }
     }
 
-    private static string? Probleme(FileSystemSecurity acl, string chemin)
+    /// <summary>La règle d'un dossier au-dessus de celui de l'exécutable : <c>null</c> quand le compte ne peut ni en retirer
+    /// un enfant, ni le renommer, ni en réécrire la DACL.</summary>
+    public static string? ProblemeAncetre(FileSystemSecurity acl, string chemin) => Probleme(acl, chemin, DangereuxPourUnAncetre);
+
+    private static string? Probleme(FileSystemSecurity acl, string chemin, FileSystemRights dangereux = Dangereux)
     {
         if (acl.GetOwner(typeof(SecurityIdentifier)) is not SecurityIdentifier proprio || !Confiance.Contains(proprio))
             return Docteur.T("CP.Proprio", chemin);
@@ -73,7 +96,7 @@ public static class CheminProtege
         {
             if (r.AccessControlType != AccessControlType.Allow) continue;
             if (r.PropagationFlags.HasFlag(PropagationFlags.InheritOnly)) continue;
-            if ((r.FileSystemRights & Dangereux) == 0) continue;
+            if ((r.FileSystemRights & dangereux) == 0) continue;
             if (r.IdentityReference is SecurityIdentifier sid && Confiance.Contains(sid)) continue;
             return Docteur.T("CP.Modifiable", chemin, Nom(r.IdentityReference));
         }

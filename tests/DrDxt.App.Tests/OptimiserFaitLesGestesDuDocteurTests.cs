@@ -92,6 +92,52 @@ public sealed class OptimiserFaitLesGestesDuDocteurTests
         vm.Ordonnance(reposFait: false).Should().Contain("à ta main (5)");
     }
 
+    // Optimiser vient de poser la fréquence de l'écran et le fichier d'échange : l'ordonnance les mettait encore « à ta main »
+    // et les comptait. Un constat dont le levier est posé dans ce scan sort de la liste et du compte.
+    [Fact]
+    public async Task L_ordonnance_ne_met_pas_a_la_main_ce_qu_optimiser_vient_de_poser()
+    {
+        var vm = await ScanneAvec(k => k == "Ordonnance.ATaMain" ? "à ta main ({0})" : k,
+            new Finding("Display", Severity.Major, "Finding.Display.RefreshBelowMax", 5),
+            new Finding("Memory", Severity.Minor, "Finding.Memory.PagefileOff", 5),
+            new Finding("Memory", Severity.Minor, "Finding.Memory.PagefileDisabled", null),
+            new Finding("Cpu", Severity.Major, "Finding.B", null));
+        vm.Ordonnance(reposFait: false).Should().Contain("à ta main (4)", "témoin : avant Optimiser, les quatre");
+
+        vm.RetenirPoses(["fixit.ecran_frequence", "fixit.sane_pagefile"]);
+
+        vm.Ordonnance(reposFait: false).Should().Contain("à ta main (1)");
+        vm.PointsALaMain.Select(p => p.Entree.Cle).Should().Equal("Finding.B");
+    }
+
+    // Le compte des réglages lus compte XMP, Resizable BAR et le pilote, que DrDXT juge sans les poser (BIOS, installation à
+    // la main) : le texte ne dit pas « qu'il sait poser ».
+    [Theory]
+    [InlineData("fr", "juger")]
+    [InlineData("en", "assess")]
+    public void Le_compte_des_reglages_lus_ne_dit_pas_qu_il_sait_tous_les_poser(string culture, string attendu)
+    {
+        var langue = new System.Globalization.CultureInfo(culture);
+        var textes = new DrDxt.Infrastructure.Localization.ResxLocalizer();
+        foreach (var cle in new[] { "Ordonnance.DejaEnPlace", "UI.Register.LeversRead" })
+            textes.Get(cle, langue).Should().Contain(attendu).And.NotContain("poser").And.NotContain("pose lui-même")
+                .And.NotContain("can set").And.NotContain("applies itself");
+    }
+
+    // Sur batterie, Optimiser ne remonte pas la fréquence de l'écran : le point reste à la main, et l'ordonnance dit pourquoi.
+    [Fact]
+    public async Task Sur_batterie_l_ordonnance_dit_pourquoi_l_ecran_reste_tel_quel()
+    {
+        var vm = await ScanneAvec(new Finding("Display", Severity.Major, "Finding.Display.RefreshBelowMax", 5));
+        var alimentation = Substitute.For<DrDxt.Application.Tweaks.Hardware.ISourceDAlimentation>();
+        alimentation.SurBatterie().Returns(true);
+        vm.Ordonnance(reposFait: false).Should().NotContain("Ordonnance.EcranSurBatterie", "témoin : sans source, rien n'est dit");
+
+        vm.Alimentation = alimentation;
+
+        vm.Ordonnance(reposFait: false).Should().Contain("Ordonnance.EcranSurBatterie");
+    }
+
     // Après le scan, une prochaine étape en tête, un seul bouton.
     [Fact]
     public async Task Apres_le_scan_le_docteur_dit_la_prochaine_etape_et_elle_suit_ce_qui_est_fait()
@@ -148,7 +194,7 @@ public sealed class OptimiserFaitLesGestesDuDocteurTests
         vm.PointsALaMain.Should().ContainSingle(p => p.Entree.Cle == "Finding.Latency.VrrOff",
             "le repos de la carte, Optimiser le fait lui-même : il n'est pas à ta main");
         vm.ProchaineEtape.Should().Be("Etape.AFairePuisOptimiser");
-        vm.EtapeHorsListe.Should().Be("Etape.PuisOptimiser", "le point à la main est en tête de liste ; l'encadré garde « puis Optimise »");
+        vm.EtapeHorsListe.Should().BeNull("Optimiser est juste sous le verdict, la liste repliée dit le point à la main : rien à redire");
         vm.RienAPoserDuTout.Should().BeFalse("Optimiser a toujours sa part à faire");
 
         await vm.ApplyCommand.ExecuteAsync(null);
@@ -171,7 +217,7 @@ public sealed class OptimiserFaitLesGestesDuDocteurTests
         Levier(vm);
         vm.SignalerReposCarte();
         vm.ProchaineEtape.Should().Be("Etape.AFairePuisOptimiser", "témoin : l'étape est bien à ta main");
-        vm.EtapeHorsListe.Should().Be("Etape.PuisOptimiser", "la liste dit déjà ce point, en premier ; l'encadré dit seulement la suite");
+        vm.EtapeHorsListe.Should().BeNull("la liste dit déjà ce point, et Optimiser est juste sous le verdict");
 
         var seul = await ScanneAvec(new Finding("Gpu", Severity.Minor, "Finding.Gpu.PerfMaxGlobal", null));
         Levier(seul);

@@ -58,4 +58,14 @@ public class DpcAttributionTests
     [Fact]
     public void La_taille_se_lit_dans_l_en_tete_pe_d_un_chemin_noyau() =>
         DpcLatencyTracer.TailleImage(@"\SystemRoot\System32\ntoskrnl.exe").Should().BeGreaterThan(0x100000);
+
+    // La session est créée en temps système (ClientContext = 2) : horodatages et InitialTime sont en unités de 100 ns. Diviser
+    // par la fréquence du compteur de performance (PerfFreq de l'en-tête) n'était juste que là où elle vaut 10 MHz ; ailleurs
+    // (matériel plus ancien, machines virtuelles), toutes les durées sortaient fausses.
+    [Theory]
+    [InlineData(10_000L, 1.0)]
+    [InlineData(25_000L, 2.5)]
+    [InlineData(1L, 0.0001)]
+    public void Une_duree_se_lit_en_unites_de_100_ns(long ticks, double ms)
+        => DpcLatencyTracer.DureeMs(ticks).Should().BeApproximately(ms, 1e-9);
 }

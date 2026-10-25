@@ -90,14 +90,15 @@ public sealed class GameDvrBackgroundOffTweakTests
     }
 
     [Fact]
-    public void AppliesTo_when_unreadable()
+    public void Illisible_se_dit_non_lu_ni_deja_regle_ni_a_poser()
     {
-        // Illisible = non lu, jamais « deja regle ».
+        // La pose relit l'origine et échouerait : proposer le levier « à poser » mettrait au lot un échec certain.
         var t = Build();
         _registry.ReadDword(RegistryHiveKind.CurrentUser, GameDvrPath, HistoricalCaptureName)
             .Returns(Result<uint?>.Fail(ErrorCodes.TweakSdkUnavailable, "illisible"));
 
-        t.AppliesTo(Hw, State).Should().BeTrue();
+        t.AppliesTo(Hw, State).Should().BeFalse();
+        t.EtatNonLu(State).Should().BeTrue();
     }
 
     [Fact]

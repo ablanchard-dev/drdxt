@@ -100,4 +100,33 @@ public sealed class TemperatureHwinfoTests
 
         TemperatureHwinfo.AnalyserVentilateurs(b, Maintenant).Should().Equal(new VentilateurLu(100, 900, null, "Chassis1"));
     }
+
+    // HWiNFO absent (le cas courant) : sa mémoire s'ouvrait une à deux fois par seconde en partie, chaque fois par une
+    // exception. Absente, elle n'est rouverte qu'après une pause ; HWiNFO lancé en cours de session est vu ensuite.
+    [Fact]
+    public void Hwinfo_absent_n_est_pas_rouvert_a_chaque_seconde()
+    {
+        var ouvertures = 0;
+        byte[] Absent() { ouvertures++; throw new FileNotFoundException(); }
+        var pause = DateTimeOffset.MinValue;
+
+        TemperatureHwinfo.Bloc(Absent, Maintenant, ref pause).Should().BeNull();
+        TemperatureHwinfo.Bloc(Absent, Maintenant.AddSeconds(1), ref pause).Should().BeNull();
+        ouvertures.Should().Be(1, "absente, la mémoire n'est pas rouverte avant la fin de la pause");
+
+        var bloc = new byte[] { 1, 2, 3 };
+        TemperatureHwinfo.Bloc(() => bloc, Maintenant + TemperatureHwinfo.PauseSiAbsent, ref pause).Should().BeSameAs(bloc);
+    }
+
+    // La mémoire est publiée par un autre processus : au-delà du plafond, elle n'est pas copiée (non lu), et la lecture
+    // suivante réessaie sans pause.
+    [Fact]
+    public void Un_bloc_trop_grand_n_est_pas_lu_et_la_lecture_suivante_reessaie()
+    {
+        var pause = DateTimeOffset.MinValue;
+
+        TemperatureHwinfo.Bloc(() => throw new InvalidDataException("trop grand"), Maintenant, ref pause).Should().BeNull();
+        pause.Should().Be(DateTimeOffset.MinValue);
+        TemperatureHwinfo.OctetsMax.Should().BeGreaterThan(1L << 20, "une publication de HWiNFO tient en quelques centaines de Ko");
+    }
 }

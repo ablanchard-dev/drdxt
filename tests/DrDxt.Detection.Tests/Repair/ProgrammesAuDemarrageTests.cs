@@ -113,4 +113,17 @@ public sealed class ProgrammesAuDemarrageTests
         new ProgrammesAuDemarrage.Entree("Spotify", false, @"C:\S\Spotify.lnk", DansRun: false, Liste: SetStartupApprovalOp.DossierDemarrage, Cle: "Spotify.lnk")
             .Geste(true).Should().Be(new SetStartupApprovalOp(RegistryHiveKind.CurrentUser, SetStartupApprovalOp.DossierDemarrage, "Spotify.lnk", true));
     }
+
+    // Une cible sur un partage réseau n'est jamais sondée : File.Exists sur \hôte\… ouvre une connexion SMB, donc une
+    // authentification du compte vers l'hôte nommé. Elle n'est pas dite morte, elle n'est pas jugée.
+    [Fact]
+    public void Une_cible_reseau_n_est_jamais_sondee()
+    {
+        var sondes = new List<string>();
+        bool Existe(string c) { sondes.Add(c); return false; }
+
+        ProgrammesAuDemarrage.Juger(Ok(E("Partage", commande: @"\hote\partage\outil.exe"), E("Local", commande: @"C:\absent.exe")), [], Existe).ToList();
+
+        sondes.Should().Equal(@"C:\absent.exe");
+    }
 }

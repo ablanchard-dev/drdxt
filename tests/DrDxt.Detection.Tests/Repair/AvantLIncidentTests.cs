@@ -56,7 +56,7 @@ public sealed class AvantLIncidentTests
 
         var c = AvantLIncident.Juger(incidents, pilotes, T(9, 10, 12, 0)).Single();
 
-        c.Statut.Should().Be(RepairStatus.Suspicious, "l'incident a moins de trente jours");
+        c.Statut.Should().Be(RepairStatus.NonDefault, "l'incident a moins de trente jours : à regarder, un rapprochement de dates n'est pas une preuve");
         c.ValeurCourante.Should().Be("arrêt brutal le 02/09 à 05:09, juste avant : pilote NVIDIA 32.0.16.1656 (616.56), installé le 01/09 à 01:27, 28 h avant");
         c.Explication.Should().StartWith("Arrêt brutal le 02/09/2026 à 05:09. Dans les 3 jours avant : ")
             .And.Contain("pilote NVIDIA 32.0.16.1656 (616.56), installé le 01/09 à 01:27, 28 h avant")
@@ -174,5 +174,24 @@ public sealed class AvantLIncidentTests
 
         c.Explication.Should().NotContain("revenir à la version précédente, ou désinstaller")
             .And.Contain("changer de version (la précédente, ou une plus récente si elle existe)");
+    }
+
+    // Les journaux setupapi gardent des mois d'historique (des dizaines de Mio sur une machine très pilotée) : ils se lisent
+    // ligne à ligne, sans être chargés en mémoire. Un fichier verrouillé s'arrête là, sans lever, les autres continuent.
+    [Fact]
+    public void Un_journal_se_lit_ligne_a_ligne_et_un_journal_verrouille_ne_leve_pas()
+    {
+        var f = Path.Combine(Path.GetTempPath(), $"setupapi-{Guid.NewGuid():N}.log");
+        File.WriteAllLines(f, [">>>  [Device Install]", "ligne"]);
+        try
+        {
+            var lues = AvantLIncident.Lignes(f);
+            lues.Should().NotBeAssignableTo<System.Collections.ICollection>("ligne à ligne, jamais une liste en mémoire");
+            lues.Should().Equal(">>>  [Device Install]", "ligne");
+
+            using (new FileStream(f, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                AvantLIncident.Lignes(f).Should().BeEmpty();
+        }
+        finally { File.Delete(f); }
     }
 }

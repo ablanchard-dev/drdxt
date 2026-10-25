@@ -76,6 +76,11 @@ public partial class App : System.Windows.Application
 #endif
         DrDxt.Core.Docteur.FixerLangue(CultureInfo.CurrentUICulture);
 
+        // Élevée seulement, avant toute écriture : aucune jonction posée par un compte non administrateur n'est plus suivie,
+        // ni sur les parents du dossier des données, ni sous un dossier créé après la vérification qui suit (le staging d'une
+        // mise à jour). Sans élévation, le compte garde ses jonctions. Indisponible, c'est dit au journal plus bas.
+        var confiance = DrDxt.Core.FichierJsonAtomique.ProcessusEleve ? DrDxt.Core.ConfianceDesRedirections.Activer() : DrDxt.Core.Result.Ok();
+
         // Relancée en administrateur, l'App écrit sous un dossier que tout programme du compte peut modifier : avant toute
         // écriture, il est vérifié sans suivre les liens et tenu (DossierDeLAppEleve). Un lien trouvé : elle ne démarre pas.
         using (var id = System.Security.Principal.WindowsIdentity.GetCurrent())
@@ -107,6 +112,10 @@ public partial class App : System.Windows.Application
             // echouait, on ne veut pas remplacer un crash par un autre.
             args.Handled = true;
             ReportFatal(args.Exception);
+            // Sans fenêtre montrée (une panne avant ou pendant son ouverture), rien ne fermerait le processus : il garderait la
+            // place de l'App, et chaque lancement suivant ne ferait que le réveiller. Le relevé de fond tourne exprès sans fenêtre.
+            if (!e.Args.Contains(ArgumentReleve, StringComparer.OrdinalIgnoreCase) && MainWindow is not { IsVisible: true })
+                Shutdown(1);
         };
 
         // Le second filet couvre ce que le premier ne voit pas : une exception levee hors du
@@ -123,6 +132,8 @@ public partial class App : System.Windows.Application
         if (releveDeFond)
             collection.AddSingleton<DrDxt.Core.IElevatedClient>(_ => DrDxt.App.Platform.ElevatedClientFactory.CreateSansLancer());
         _services = collection.BuildServiceProvider();
+        if (!confiance.IsOk)
+            (_services.GetService(typeof(DrDxt.Core.IDiagnosticsLog)) as DrDxt.Core.IDiagnosticsLog)?.Change("redirection-trust", "off", "unavailable", "Windows");
         if (releveDeFond)
         {
             ReleverEnFond(_services);
@@ -163,7 +174,10 @@ public partial class App : System.Windows.Application
 #endif
         if (prendreLaPlace)
         {
-            _instance = InstanceUnique.Prendre(InstanceUnique.NomDeSession(), () => Dispatcher.BeginInvoke(MontrerLaFenetre));
+            // Relancée élevée : l'ancienne App rend sa place pendant son arrêt, celle-ci l'attend jusqu'à 5 s.
+            var attente = e.Args.Contains(DrDxt.App.Platform.RelanceElevee.ApresRelance, StringComparer.Ordinal)
+                ? TimeSpan.FromSeconds(5) : TimeSpan.Zero;
+            _instance = InstanceUnique.Prendre(InstanceUnique.NomDeSession(), () => Dispatcher.BeginInvoke(MontrerLaFenetre), attente);
             if (_instance is null)
             {
                 Shutdown();
@@ -187,7 +201,17 @@ public partial class App : System.Windows.Application
         // démarrage se dit au joueur, puis la fenêtre se ferme quoi qu'il arrive.
         window.Closing += async (_, fermeture) =>
         {
-            if (_sessionFinit || _fermetureLancee) return;
+            if (_sessionFinit || _fermetureAutorisee) return;
+            // Un second clic sur la croix pendant le rendu (10 s au plus) attend sa fin : sinon il fermerait l'App au milieu, et
+            // seul le bail du helper rendrait la tension ou le décalage.
+            if (_fermetureLancee) { fermeture.Cancel = true; return; }
+            // Optimiser ou une vérification en cours : fermer la laisserait à moitié, la fenêtre le demande.
+            if (scan.AvertissementDeFermeture is { } avertissement
+                && MessageBox.Show(window, avertissement, "DrDXT", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            {
+                fermeture.Cancel = true;
+                return;
+            }
             var rendre = scan.QuelqueChoseARendre;
             if (!rendre && !DrDxt.App.Platform.ClientDesPoses.UnAcquitAttend) return;
             _fermetureLancee = true;
@@ -204,7 +228,7 @@ public partial class App : System.Windows.Application
                         () => _sessionFinit, TimeSpan.FromSeconds(5)) is { } texte)
                     MessageBox.Show(window, texte, "DrDXT", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
-            finally { window.Close(); }
+            finally { _fermetureAutorisee = true; window.Close(); }
         };
         window.Content = new ScanView { DataContext = scan };
         window.Show();
@@ -217,7 +241,7 @@ public partial class App : System.Windows.Application
         // et non pendant le scan. Voir AmorceDesCompteurs.
         _ = DrDxt.App.Platform.AmorceDesCompteurs.AuLancementAsync();
 
-        // La V1 relit au lancement les reglages que DrDXT a poses, et dit ce qui a bouge.
+        // L'App relit au lancement les reglages que DrDXT a poses, et dit ce qui a bouge.
         _ = DrDxt.App.Platform.VerificationDesReglages.AuLancementAsync(_services, scan);
 
         // Une session tuee a peut-etre laisse un levier d'essai pose : le rendre, et le dire.
@@ -329,6 +353,7 @@ public partial class App : System.Windows.Application
         // Lues dès l'ouverture, pour que le premier affichage borne déjà les bilans.
         _ = scan.MisesAJourAsync();
         scan.LevierParId = id => _services!.GetRequiredService<DrDxt.Core.ITweakCatalog>().Get(id) is { IsOk: true } t ? t.Value : null;
+        scan.Alimentation = _services!.GetService<DrDxt.Application.Tweaks.Hardware.ISourceDAlimentation>();
         // La recherche de sous-tension ; coupée par un plantage, elle se relit ici (palier fautif dit).
         scan.MemoireSousTension = DrDxt.Application.Parties.MemoireSousTension.ParDefaut();
         // Jamais d'invite UAC sans geste ; le retrait automatique ne part que si le helper tourne déjà. Posé avant la reprise
@@ -371,7 +396,7 @@ public partial class App : System.Windows.Application
 
         // La page Windows dit ce que le service a réaffirmé seul (lecture seule de son état).
         scan.LireEtatDuService = () =>
-            new DrDxt.Reconciler.JsonReconcilerStateStore(DrDxt.Reconciler.JsonReconcilerStateStore.DefaultPath())
+            new DrDxt.Reconciler.JsonReconcilerStateStore(DrDxt.Reconciler.JsonReconcilerStateStore.DefaultPath(), lectureSeule: true)
                 .LoadAsync(CancellationToken.None).Result is { IsOk: true } lu ? lu.Value : null;
 
         // La liste « ce que DrDXT fait ici » de chaque page lit le vrai catalogue.
@@ -449,7 +474,7 @@ public partial class App : System.Windows.Application
                 var journal = new System.Text.StringBuilder();
                 var nvml = new DrDxt.GpuNative.Nvml.NvmlNative();
                 string Ventilo() => nvml.TryLireVentilateurs(0, out var v)
-                    ? string.Join(" ; ", v.Select(f => $"ventilateur {f.Index} : {f.VitessePct} %, cible {f.CiblePct} %, {(f.Automatique ? "automatique" : "manuel")}"))
+                    ? string.Join(" ; ", v.Select(f => $"ventilateur {f.Index} : {f.VitessePct} %, cible {(f.CiblePct is { } c ? $"{c} %" : "non lue")}, {(f.Automatique ? "automatique" : "manuel")}"))
                     : "ventilateur illisible";
                 var horloge = _services?.GetService<DrDxt.Application.Tweaks.Hardware.INvApiGpuTuning>();
                 string Decalage() => horloge?.GetCoreClockOffsetMhz(0) is { IsOk: true } d ? $"décalage cœur {d.Value} MHz" : "décalage illisible";
@@ -558,7 +583,17 @@ public partial class App : System.Windows.Application
 
     private static async Task VerifierMisesAJourAsync(ScanViewModel scan)
     {
+        // Lancée sans attente : une panne imprévue se dit « échec », jamais une vérification qui ne finit pas.
+        try { await VerifierMisesAJourSansFiletAsync(scan); }
+        catch (Exception) { scan.AfficherMiseAJour(new DrDxt.App.Updates.ResultatMiseAJour(DrDxt.App.Updates.EtatMiseAJour.Echec)); }
+    }
+
+    private static async Task VerifierMisesAJourSansFiletAsync(ScanViewModel scan)
+    {
         var version = typeof(App).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+        // L'installeur d'une version déjà installée a servi : le staging part (des dizaines de Mo).
+        DrDxt.App.Updates.NettoyageDuStaging.Purger(DrDxt.Infrastructure.Updates.UpdateComposition.DossierDuStagingApp(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)), new Version(version));
         var url = DrDxt.App.Updates.VerificationMiseAJour.UrlEffective(Environment.GetEnvironmentVariable(DrDxt.App.Updates.VerificationMiseAJour.VariableUrl));
         // Le client vit autant que l'App : le bouton « Installer » télécharge plus tard par lui.
         var (etat, client) = await Task.Run(() => DrDxt.App.Updates.VerificationMiseAJour.VerifierAuDemarrageAsync(
@@ -580,13 +615,6 @@ public partial class App : System.Windows.Application
         }
     }
 
-    /// <summary>
-    /// Ecrit la panne, puis la montre. Dans cet ordre : si l'affichage echoue a son tour (pas de
-    /// bureau, session en fermeture), la trace est deja sur le disque.
-    ///
-    /// Total par construction : chaque moitie est isolee. Un filet de securite qui peut lui-meme
-    /// lever ne protege de rien, et rate precisement le cas ou tout va deja mal.
-    /// </summary>
     /// <summary>L'argument de la tâche planifiée « DrDXT releve » (installer/DrDXT.iss).</summary>
     public const string ArgumentReleve = "--releve";
 
@@ -601,6 +629,13 @@ public partial class App : System.Windows.Application
             Shutdown();
             return;
         }
+        // Le relevé tourne à côté du jeu : il cède la main à tout le reste, qu'il soit lancé par le Planificateur ou par
+        // l'installeur (hors du Planificateur, rien d'autre ne baisse sa priorité).
+        try { System.Diagnostics.Process.GetCurrentProcess().PriorityClass = System.Diagnostics.ProcessPriorityClass.BelowNormal; }
+        catch (Exception) { /* une priorité refusée n'empêche pas le relevé */ }
+        // L'ouverture de session, sans jeu : l'initialisation de perflib se paie ici plutôt qu'à la première lecture du
+        // processeur, en pleine première partie.
+        _ = DrDxt.App.Platform.AmorceDesCompteurs.AuLancementAsync();
         var scan = services.GetRequiredService<ScanViewModel>();
         scan.MemoireParties = memoire;
         scan.PrendreVerrouReleve = () => DrDxt.Application.Parties.VerrouDuReleve.Prendre(DrDxt.Application.Parties.VerrouDuReleve.CheminParDefaut());
@@ -618,6 +653,9 @@ public partial class App : System.Windows.Application
         // alternance avance dans l'App, sur ce qu'elle montre).
         scan.ChargerParties();
         _ = scan.ReleverReglagesHorsScanAsync();
+        // Sans fenêtre, un essai qui attend l'App ouverte se dit par une notification de Windows, une fois par attente.
+        scan.NotifierEssaiEnAttente = texte => DrDxt.App.Platform.NotificationDeBureau.Montrer("DrDXT", texte);
+        scan.AppOuverte = () => InstanceUnique.Ouverte(InstanceUnique.NomDeSession());
         var relecture = new System.Windows.Threading.DispatcherTimer { Interval = DrDxt.Application.Parties.VeilleDesParties.HorsPartie };
         relecture.Tick += (_, _) => { if (!memoire.EstAllume()) Shutdown(); };
         relecture.Start();
@@ -629,13 +667,25 @@ public partial class App : System.Windows.Application
         // L'essai en alternance, lu par l'App et par le relevé de fond (qui marque les parties ; seul l'App
         // pose ou rend le levier, quand son helper tourne déjà).
         scan.MemoireEssai = DrDxt.Application.Parties.MemoireDeLEssai.ParDefaut();
+        scan.DerniereSortieDeVeille = ScanViewModel.SortieDeVeilleEnCache;
         scan.RejeuLu = DrDxt.App.Platform.RejeuDuJournalLu.ParDefaut();
+        scan.RejeuDuCompte = () => DrDxt.App.Platform.RejeuDuJournalDuCompte.RejouerAsync(DrDxt.App.Platform.ElevatedClientFactory.JournalDuCompte(),
+            new DrDxt.ElevatedHelper.Execution.LectureDesCiblesWin32());
+        scan.RapportsDuRejeu = () => DrDxt.ElevatedHelper.Journal.RapportDuRejeu.Lire(
+            DrDxt.Reconciler.Manifest.ProgramDataManifestStorage.DefaultRoot(), DrDxt.ElevatedHelper.Journal.RapportDuRejeu.DeConfiance);
         scan.SuiviReglages = DrDxt.Application.Parties.SuiviDesReglages.ParDefaut();
         scan.LireInstantReplay = () => DrDxt.Detection.Gpu.EnregistrementNvidia.EtatInstantReplay(DrDxt.Detection.Gpu.EnregistrementNvidia.LireReglages());
         scan.LireReglagesSuivis = () => ScanViewModel.EtatsSuivisSansScan(services.GetRequiredService<DrDxt.Detection.Settings.IRegistryProvider>(),
             services.GetService<DrDxt.Detection.Settings.IHagsEffectiveReader>(), scan.LireInstantReplay());
     }
 
+    /// <summary>
+    /// Ecrit la panne, puis la montre. Dans cet ordre : si l'affichage echoue a son tour (pas de
+    /// bureau, session en fermeture), la trace est deja sur le disque.
+    ///
+    /// Total par construction : chaque moitie est isolee. Un filet de securite qui peut lui-meme
+    /// lever ne protege de rien, et rate precisement le cas ou tout va deja mal.
+    /// </summary>
     private static void ReportFatal(Exception? ex)
     {
         var detail = ex?.ToString() ?? "Unknown exception (no exception object supplied).";
@@ -648,8 +698,11 @@ public partial class App : System.Windows.Application
             // BOM UTF-8 explicite. Sans elle, .NET ecrit de l'UTF-8 nu et les lecteurs qui
             // devinent (PowerShell 5.1 en tete, l'outil le plus probable d'un depannage)
             // rendent « levée » en « levÃ©e ». Un rapport de panne illisible est un rapport de
-            // panne perdu, et c'est le SAV qui paie. Constate en verifiant ce filet.
+            // panne perdu.
             // Dossier du joueur : jamais à travers un nom posé d'avance en lien (l'App peut tourner élevée).
+            // L'App continue après une panne d'interface : sans plafond, le journal grossirait à chacune. Au-delà d'un Mo, il
+            // garde sa moitié la plus récente.
+            DrDxt.Core.FichierJsonAtomique.BornerSansLien(path, 1024 * 1024, "CRASH_LOG");
             DrDxt.Core.FichierJsonAtomique.AjouterSansLien(path,
                 $"=== {DateTimeOffset.Now:u} ==={Environment.NewLine}{detail}{Environment.NewLine}{Environment.NewLine}",
                 "CRASH_LOG", new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
@@ -662,10 +715,7 @@ public partial class App : System.Windows.Application
 
         try
         {
-            // Ce message etait ecrit en dur, en francais, pendant que la seule
-            // autre boite de dialogue du produit l'etait en anglais. Quelle que soit la langue
-            // du poste, l'un des deux tombait a cote. La regle (« le texte lisible vient d'une clé
-            // resx via ILocalizer, jamais écrit en dur ») etait deja ecrite ailleurs.
+            // Le message vient d'une clé resx, dans la langue du poste, comme toute boîte de dialogue.
             //
             // Ici, le localisateur est construit a la main, pas injecte. Ce filet tourne
             // quand tout le reste a deja echoue : demander un service au conteneur, c'est
@@ -684,9 +734,6 @@ public partial class App : System.Windows.Application
     }
 
 #if DEBUG
-    // Une fois le résultat affiché, défile page par page et dépose un signal par page
-    // (%TEMP%\drdxt-visite-N.txt, puis drdxt-visite-fin.txt) : le script de capture photographie
-    // la fenêtre à chaque signal.
     /// <summary>
     /// Sonde de gel (DEBUG) : ce que l'oeil voit, chronometre.
     ///
@@ -727,6 +774,9 @@ public partial class App : System.Windows.Application
         };
     }
 
+    // Une fois le résultat affiché, défile page par page et dépose un signal par page
+    // (%TEMP%\drdxt-visite-N.txt, puis drdxt-visite-fin.txt) : le script de capture photographie
+    // la fenêtre à chaque signal.
     private static void VisiterLeResultat(Window window, ScanViewModel scan)
     {
         var dossier = Path.GetTempPath();
@@ -953,8 +1003,11 @@ public partial class App : System.Windows.Application
     /// la tension en parallèle, puis des services disposés sous la première.</summary>
     private Task? _renduAvantFermeture;
 
-    /// <summary>La fenêtre a lancé sa fermeture (rendu, dernier essai des acquits) : le Close qui la termine passe.</summary>
+    /// <summary>La fenêtre a lancé sa fermeture (rendu, dernier essai des acquits) : un second clic attend.</summary>
     private bool _fermetureLancee;
+
+    /// <summary>Le rendu de fermeture est fini : le Close qui la termine passe.</summary>
+    private bool _fermetureAutorisee;
 
     private bool _sessionFinit;
 

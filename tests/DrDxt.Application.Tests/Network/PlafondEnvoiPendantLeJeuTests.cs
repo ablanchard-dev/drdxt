@@ -184,6 +184,52 @@ public class PlafondEnvoiPendantLeJeuTests
         mode.PlafondPose.Should().BeFalse();
     }
 
+    // Le retrait se relit au helper (la politique doit avoir disparu) : son refus remonte, l'écran ne dit pas « éteint » à faux.
+    [Fact]
+    public async Task Un_retrait_refuse_a_l_arret_remonte()
+    {
+        var (mode, h, tick) = Monter();
+        await mode.DemarrerAsync(CancellationToken.None);
+        await tick(true);
+        h.RefusePour = op => op is RemoveUploadCapOp;
+
+        (await mode.ArreterAsync(CancellationToken.None)).IsOk.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Un_retrait_qui_leve_a_l_arret_remonte_en_echec()
+    {
+        var (mode, h, tick) = Monter();
+        await mode.DemarrerAsync(CancellationToken.None);
+        await tick(true);
+        h.LeveAuProchain = 1;
+
+        (await mode.ArreterAsync(CancellationToken.None)).IsOk.Should().BeFalse();
+        mode.PlafondPose.Should().BeTrue("le retrait n'a pas été fait : le plafond est peut-être encore là");
+    }
+
+    // Un helper injoignable ne rejoue pas non plus le retrait du bail : un arrêt refusé ne se tient pas pour fait. Le suivant
+    // réessaie, et le battement ne repose rien (le mode est éteint).
+    [Fact]
+    public async Task Un_arret_refuse_se_reessaie_au_suivant()
+    {
+        var (mode, h, tick) = Monter();
+        await mode.DemarrerAsync(CancellationToken.None);
+        await tick(true);
+        h.RefusePour = op => op is RemoveUploadCapOp;
+        (await mode.ArreterAsync(CancellationToken.None)).IsOk.Should().BeFalse();
+
+        var poses = h.Ops.OfType<ApplyUploadCapOp>().Count();
+        await tick(true);
+        h.Ops.OfType<ApplyUploadCapOp>().Should().HaveCount(poses, "éteint, le battement ne repose rien");
+
+        h.RefusePour = null;
+        var retraits = h.Ops.OfType<RemoveUploadCapOp>().Count();
+        (await mode.ArreterAsync(CancellationToken.None)).IsOk.Should().BeTrue();
+        h.Ops.OfType<RemoveUploadCapOp>().Should().HaveCount(retraits + 1);
+        mode.PlafondPose.Should().BeFalse();
+    }
+
     [Fact]
     public async Task Un_battement_qui_leve_ne_casse_pas_le_mode_le_suivant_pose_le_plafond()
     {

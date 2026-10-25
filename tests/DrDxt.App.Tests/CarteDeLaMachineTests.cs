@@ -88,6 +88,44 @@ public class CarteDeLaMachineTests
         court.ADetailSuite.Should().BeFalse("rien à déplier, pas de « Pourquoi ? »");
     }
 
+    // Une première phrase de 200 caractères (l'audit des droits d'un service) remplissait l'écran à elle seule : au-delà
+    // d'une phrase courte, seul le titre reste, et tout le détail passe derrière « Pourquoi ? ».
+    [Fact]
+    public void Une_premiere_phrase_trop_longue_passe_entiere_derriere_le_pourquoi()
+    {
+        var longue = new string('m', EntreeCarte.PhraseCourte) + ". Suite.";
+        var e = new EntreeCarte("windows", Severity.Minor, "t", longue, string.Empty, string.Empty, false);
+
+        e.DetailCourt.Should().BeEmpty();
+        e.DetailSuite.Should().Be(longue);
+        e.ADetailSuite.Should().BeTrue();
+
+        var juste = new string('m', EntreeCarte.PhraseCourte - 1) + ". Suite.";
+        new EntreeCarte("windows", Severity.Minor, "t", juste, string.Empty, string.Empty, false)
+            .DetailCourt.Should().Be(juste[..EntreeCarte.PhraseCourte], "témoin : une phrase courte reste à l'écran");
+    }
+
+    // Sur la carte d'un domaine, un constat ne montre que son titre ; tout le détail, sans le remède, s'ouvre sous le chevron.
+    [Fact]
+    public void Le_detail_entier_s_ouvre_sous_le_chevron()
+    {
+        var e = new EntreeCarte("memoire", Severity.Minor, "t", "Première phrase. Deuxième.", string.Empty, string.Empty, false);
+        e.DetailEntier.Should().Be("Première phrase. Deuxième.");
+        e.ADetailEntier.Should().BeTrue();
+        new EntreeCarte("memoire", Severity.Minor, "t", "", string.Empty, string.Empty, false).ADetailEntier.Should().BeFalse();
+    }
+
+    // La valeur lue (un chemin de fichier) passe aussi derrière le chevron : un constat sans explication mais avec sa valeur
+    // garde un chevron pour l'ouvrir.
+    [Fact]
+    public void Une_valeur_seule_garde_un_chevron_pour_s_ouvrir()
+    {
+        var e = new EntreeCarte("windows", Severity.Minor, "Service", "", @"C:\Jeu\service.exe", string.Empty, false);
+        e.ADetailEntier.Should().BeFalse();
+        e.ADeplier.Should().BeTrue();
+        new EntreeCarte("windows", Severity.Minor, "Service", "", "", string.Empty, false).ADeplier.Should().BeFalse();
+    }
+
     [Fact]
     public void Une_mesure_longue_montre_sa_premiere_phrase_et_garde_la_suite_a_deplier()
     {
@@ -675,4 +713,11 @@ public class CarteDeLaMachineTests
             "NVIDIA 617.14 installé → 617.42 disponible", "", false);
         pilote.ValeurAAfficher.Should().BeEmpty("la première phrase dit déjà les deux versions");
     }
+
+    // Sans mesure du chemin réseau (pas de connexion pendant le scan, box muette), le domaine disait « n'a pas pu être lu sur
+    // cette machine », sans dire pourquoi ni quoi faire. Il dit ce qui manque : une connexion pendant le scan.
+    [Fact]
+    public void Le_reseau_non_mesure_dit_qu_il_faut_une_connexion()
+        => CarteDeLaMachine.Construire([], Aucune, [], Loc).Single(d => d.Cle == "reseau").Verdict
+            .Should().Be("Carte.Verdict.NonLu.reseau");
 }

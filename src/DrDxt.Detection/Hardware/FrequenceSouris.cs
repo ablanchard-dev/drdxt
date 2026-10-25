@@ -12,7 +12,8 @@ namespace DrDxt.Detection.Hardware;
 /// usbioctl.h) et le point d'accès d'interruption entrant porte bInterval. USB 2.0 §9.6.6 : en basse et pleine vitesse,
 /// bInterval est en millisecondes (1 à 255) ; en haute vitesse et au-delà, l'intervalle vaut 2^(bInterval−1) × 125 µs
 /// (1 à 16). C'est la fréquence maximale que la souris annonce : un logiciel de souris peut la régler plus bas sans changer
-/// le descripteur. Au-dessous de 125 Hz le défaut est certain ; au-dessus, on dit « jusqu'à ». Une souris Bluetooth ou
+/// le descripteur. À 125 Hz et au-dessous, la fréquence se regarde (c'est la spécification de la souris, pas un tort
+/// prouvé) ; au-dessus, on dit « jusqu'à ». Une souris Bluetooth ou
 /// derrière un récepteur partagé peut rester non lue.
 /// </summary>
 public static class FrequenceSouris
@@ -55,7 +56,8 @@ public static class FrequenceSouris
     {
         null => new RepairFinding("LATENCE", Docteur.Nom("FS.Nom", nom), null, null, RepairStatus.Unknown,
             Docteur.T("FS.NonLue")),
-        <= 125 => new RepairFinding("LATENCE", Docteur.Nom("FS.Nom", nom), Docteur.T("FS.Hz", hz), Docteur.T("FS.Hz", 1000), RepairStatus.Suspicious,
+        // L'intervalle que la souris déclare elle-même : sa spécification, pas un tort prouvé. À regarder.
+        <= 125 => new RepairFinding("LATENCE", Docteur.Nom("FS.Nom", nom), Docteur.T("FS.Hz", hz), Docteur.T("FS.Hz", 1000), RepairStatus.NonDefault,
             Docteur.T("FS.Lente", hz, 1000 / hz),
             RepairAction.Recommandation),
         _ => new RepairFinding("LATENCE", Docteur.Nom("FS.Nom", nom), Docteur.T("FS.JusquA", hz), null, RepairStatus.Observed,
@@ -104,7 +106,9 @@ public static class FrequenceSouris
         {
             if (Entier(noeud, ProprieteAdresse) is not { } port || CM_Get_Parent(out var hub, noeud, 0) != 0) return null;
             if (InstanceDe(hub) is not { } instanceHub || CheminDuHub(instanceHub) is not { } chemin) return null;
-            using var h = CreateFileW(chemin, 0x40000000, 2, IntPtr.Zero, 3, 0, IntPtr.Zero);
+            // Aucun droit demandé : IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX (0x220448) est FILE_ANY_ACCESS. Un droit
+            // d'écriture se ferait refuser sur un compte standard, et la souris se dirait non lue pour une question de droit.
+            using var h = CreateFileW(chemin, 0, 3, IntPtr.Zero, 3, 0, IntPtr.Zero);
             if (h.IsInvalid) return null;
             var info = new byte[35 + 32 * 11];
             BitConverter.GetBytes(port).CopyTo(info, 0);

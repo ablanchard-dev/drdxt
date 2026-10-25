@@ -42,7 +42,7 @@ public static class MondeDeLaMachine
             }
         // Les deux lus seulement : un état non lu n'est ni « rallumée » ni « coupée ».
         if (avant.Hvci is { } hvciAvant && apres.Hvci is { } hvciApres && hvciAvant != hvciApres)
-            ecarts.Add(new Ecart($"monde:hvci:{(hvciApres ? "active" : "coupee")}:{apres.Quand:yyyyMMddHHmm}",
+            ecarts.Add(new Ecart(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"monde:hvci:{(hvciApres ? "active" : "coupee")}:{apres.Quand:yyyyMMddHHmm}"),
                 Docteur.T(hvciApres ? "MO.HvciActive" : "MO.HvciCoupee")));
         return ecarts;
     }
@@ -53,18 +53,23 @@ public static class MondeDeLaMachine
     {
         var jeux = JeuxProuves.Lire()?.Where(j => j.Executable is not null && j.Version is not null)
             .GroupBy(j => j.Dossier, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().Version!);
-        try
+        // Figé, les cartes ne sont pas lues : null, comme une lecture ratée.
+        var cartes = LectureWmiBornee.Lire<(Dictionary<string, string>, Dictionary<string, string>)?>(() =>
         {
-            Dictionary<string, string> pilotes = [], noms = [];
-            using var s = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion, PNPDeviceID FROM Win32_VideoController");
-            using var rangees = s.Get();
-            foreach (var o in rangees.Cast<System.Management.ManagementObject>())
-                using (o)
-                    if (o["PNPDeviceID"] is string id && o["DriverVersion"] is string v)
-                        (pilotes[id], noms[id]) = (v, o["Name"] as string ?? id);
-            return (jeux, pilotes, noms);
-        }
-        catch (Exception) { return (jeux, null, null); }
+            try
+            {
+                Dictionary<string, string> pilotes = [], noms = [];
+                using var s = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion, PNPDeviceID FROM Win32_VideoController");
+                using var rangees = s.Get();
+                foreach (var o in rangees.Cast<System.Management.ManagementObject>())
+                    using (o)
+                        if (o["PNPDeviceID"] is string id && o["DriverVersion"] is string v)
+                            (pilotes[id], noms[id]) = (v, o["Name"] as string ?? id);
+                return (pilotes, noms);
+            }
+            catch (Exception) { return null; }
+        }, () => null);
+        return (jeux, cartes?.Item1, cartes?.Item2);
     }
 
     /// <summary>Pur : l'état à garder. Ce qui a été lu remplace l'ancien ; ce qui ne l'a pas été garde son état d'avant
@@ -76,7 +81,7 @@ public static class MondeDeLaMachine
 
     /// <summary>L'intégrité de la mémoire tourne-t-elle ? Win32_DeviceGuard, SecurityServicesRunning contient 2 (comme
     /// <c>IntegriteMemoire</c>). Null si la classe ne répond pas.</summary>
-    public static bool? LireHvci()
+    public static bool? LireHvci() => LectureWmiBornee.Lire<bool?>(() =>
     {
         try
         {
@@ -89,7 +94,7 @@ public static class MondeDeLaMachine
             return null;
         }
         catch (Exception) { return null; }
-    }
+    }, () => null);
 
     public static Etat? LirePrecedent(string fichier)
     {
@@ -98,16 +103,30 @@ public static class MondeDeLaMachine
         catch (Exception) { return null; }
     }
 
-    /// <summary>Compare l'état présent au précédent, rend les écarts (que l'appelant note dans la frise) puis garde le
-    /// présent. Un premier relevé ne rend rien : il n'y a pas encore d'avant.</summary>
-    public static (IReadOnlyList<Ecart> Ecarts, DateTimeOffset? Depuis) ComparerEtGarder(string fichier, DateTimeOffset maintenant)
+    /// <summary>Compare l'état présent au précédent, rend les écarts puis garde le présent. Un premier relevé ne rend rien :
+    /// il n'y a pas encore d'avant.</summary>
+    /// <param name="consigner">L'écriture des écarts dans la frise, avant que le présent soit gardé, avec le scan précédent
+    /// comme borne basse. Elle rend faux (journal occupé, écriture ratée) : rien n'est gardé, les écarts reviennent au scan
+    /// suivant ; gardé quand même, la mise à jour ne serait plus jamais vue.</param>
+    public static (IReadOnlyList<Ecart> Ecarts, DateTimeOffset? Depuis) ComparerEtGarder(string fichier, DateTimeOffset maintenant,
+        Func<IReadOnlyList<Ecart>, DateTimeOffset, bool>? consigner = null)
     {
         var (jeux, pilotes, noms) = Lire();
-        var hvci = LireHvci();
+        return ComparerEtGarder(fichier, maintenant, jeux, pilotes, noms, LireHvci(), consigner);
+    }
+
+    /// <summary>La même chose, sur ce qui a été lu de la machine.</summary>
+    public static (IReadOnlyList<Ecart> Ecarts, DateTimeOffset? Depuis) ComparerEtGarder(string fichier, DateTimeOffset maintenant,
+        Dictionary<string, string>? jeux, Dictionary<string, string>? pilotes, Dictionary<string, string>? noms, bool? hvci,
+        Func<IReadOnlyList<Ecart>, DateTimeOffset, bool>? consigner = null)
+    {
         if (jeux is null && pilotes is null && hvci is null) return ([], null);
         var avant = LirePrecedent(fichier);
         var present = Garder(avant, jeux, pilotes, noms, maintenant, hvci);
+        var ecarts = avant is null ? [] : Comparer(avant, present);
+        if (ecarts.Count > 0 && consigner?.Invoke(ecarts, avant!.Quand) == false) return ([], null);
+        // Ratée, les écarts déjà notés reviennent au scan suivant avec la même borne : le journal les reconnaît.
         new FichierJsonAtomique(fichier, ErrorCodes.StorageFail).WriteAtomic(JsonSerializer.Serialize(present));
-        return avant is null ? ([], null) : (Comparer(avant, present), avant.Quand);
+        return avant is null ? ([], null) : (ecarts, avant.Quand);
     }
 }

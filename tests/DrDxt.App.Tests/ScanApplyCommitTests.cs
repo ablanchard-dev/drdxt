@@ -62,7 +62,7 @@ public sealed class ScanApplyCommitTests
     private static Harness Build(
         Result<ApplyReport>? applyResult = null,
         Result? commitResult = null,
-        DrDxt.Application.Tweaks.JournalDesLeviersAppliques? journalLeviers = null)
+        DrDxt.Application.Tweaks.JournalDesLeviersAppliques? journalLeviers = null, string[]? plan = null)
     {
         var hd = Substitute.For<IHardwareDetector>();
         hd.DetectAsync().Returns(Result<HardwareInventory>.Ok(Hw()));
@@ -94,7 +94,7 @@ public sealed class ScanApplyCommitTests
         // Un consommateur de profil au plan non vide pour que l'application avance ; la logique de commit
         // testée dépend de l'ApplyReport du moteur (les leviers gardés), pas des identifiants du plan.
         var consumer = ScanViewModelTestSeams.ProfileConsumer(
-            ScanViewModelTestSeams.PlanConsumption(new[] { "latency.hagsOn" }));
+            ScanViewModelTestSeams.PlanConsumption(plan ?? new[] { "latency.hagsOn" }));
 
         var store = Substitute.For<IDesiredStateStore>();
         store.CommitAsync(Arg.Any<DesiredState>()).Returns(commitResult ?? Result.Ok());
@@ -136,6 +136,37 @@ public sealed class ScanApplyCommitTests
             });
         await ScanThenApply(h);
         return acquits;
+    }
+
+    // Deux lots dans un clic : le premier n'a pas pu être défait en entier (un réglage peut être resté posé), le second
+    // réussit et s'inscrit. Une seule portée pour les deux acquittait aussi l'origine du premier : plus rien ne la gardait,
+    // ni le journal des leviers, ni la liste signée, ni le journal du helper. Chaque lot a sa portée ; seul le second
+    // s'acquitte.
+    [Fact]
+    public async Task Un_lot_reste_peut_etre_pose_garde_son_origine_au_journal_du_helper()
+    {
+        var fichier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"leviers-{Guid.NewGuid():N}.json");
+        try
+        {
+            var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(fichier);
+            var h = Build(journalLeviers: leviers, plan: ["latency.hagsOn", "fixit.heures_actives"]);
+            var acquittes = new List<string>();
+            h.Engine.ApplyAsync(Arg.Any<TweakPlan>(), Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(appel =>
+                {
+                    var lot = appel.Arg<TweakPlan>().TweakIds;
+                    PorteeDePose.Courante?.Noter(() => { acquittes.Add(string.Join("+", lot)); return Task.FromResult(Result.Ok()); });
+                    return Task.FromResult(lot.Contains("latency.hagsOn")
+                        ? Result<ApplyReport>.Fail(ErrorCodes.TweakPartiallyApplied, "rollback could not revert: latency.hagsOn")
+                        : Result<ApplyReport>.Ok(ReportOf(Kept("fixit.heures_actives", DrDxt.Tests.Shared.InversesDeTest.Pour("fixit.power_plan")))));
+                });
+
+            await ScanThenApply(h);
+
+            await h.Engine.Received(2).ApplyAsync(Arg.Any<TweakPlan>(), Arg.Any<BenchmarkResult?>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+            acquittes.Should().Equal("fixit.heures_actives");
+        }
+        finally { System.IO.File.Delete(fichier); }
     }
 
     [Fact]

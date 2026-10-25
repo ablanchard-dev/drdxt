@@ -31,6 +31,20 @@ public sealed class PawnIoAmdLectureSeuleTests
         => PawnIoAmd.IoctlsAppeles.Should().NotIntersectWith(["ioctl_write_msr", "ioctl_write_smu_register", "ioctl_send_smu_command"])
             .And.NotContain(io => io.Contains("write") || io.Contains("send"));
 
+    // PawnIOLib.dll n'est pas dans System32 : seul le résolveur la trouve. La voie AMD ouvrait PawnIO sans le poser, et sur un
+    // Ryzen la première lecture sortait « non lue » tant qu'une lecture Intel ou Super I/O ne l'avait pas posé avant elle.
+    [Fact]
+    public void Chaque_fichier_qui_ouvre_PawnIO_pose_d_abord_le_resolveur()
+    {
+        var fautifs = Directory.EnumerateFiles(Path.Combine(Racine(), "src", "DrDxt.GpuNative", "PawnIo"), "*.cs")
+            .Where(f => File.ReadAllText(f).Contains("pawnio_open(out", StringComparison.Ordinal)
+                        && !File.ReadAllText(f).Contains("AssurerResolveur();", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        fautifs.Should().BeEmpty();
+    }
+
     private const string ChargeUnModuleAmd = "\"(AMDReset|AMDFamily17|RyzenSMU)\"";
 
     [Fact]

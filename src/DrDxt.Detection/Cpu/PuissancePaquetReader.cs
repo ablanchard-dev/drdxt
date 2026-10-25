@@ -24,9 +24,11 @@ public static class PuissancePaquetReader
     {
         var lu = wmi.Query(Requete);
         if (!lu.IsOk) return null;
-        // Le compteur publie des milliwatts. L'instance du paquet porte « _PKG » ; `_Total` vaut 0.
+        // Le compteur publie des milliwatts. L'instance du paquet porte « _PKG » ; `_Total` vaut 0. Un processeur allumé ne
+        // tire jamais 0 W : un 0 est un compteur pas encore échantillonné (une donnée « formatée » se calcule entre deux
+        // relevés), donc non lu.
         var paquet = lu.Value!.FirstOrDefault(r =>
             r.GetString("Name")?.EndsWith("_PKG", StringComparison.OrdinalIgnoreCase) == true);
-        return paquet?.GetUlong("Power") is { } mw ? mw / 1000.0 : null;
+        return paquet?.GetUlong("Power") is { } mw and > 0 ? mw / 1000.0 : null;
     }
 }

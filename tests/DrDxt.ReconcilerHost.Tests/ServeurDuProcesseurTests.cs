@@ -16,6 +16,28 @@ public sealed class ServeurDuProcesseurTests
     private static string NomUnique() => "DrDXT.Processeur.Test." + Guid.NewGuid().ToString("N");
     private static uint MonPid => (uint)Environment.ProcessId;
 
+    // Le relevé demande chaque seconde la température puis l'état : deux connexions, et deux lectures des registres et des
+    // ventilateurs par le service, pour la même réponse. Dans la demi-seconde, la réponse est partagée.
+    [Fact]
+    public async Task Deux_demandes_dans_la_meme_seconde_ne_font_qu_une_lecture_du_service()
+    {
+        var nom = NomUnique();
+        var lectures = 0;
+        var serveur = new ServeurDuProcesseur(() => { Interlocked.Increment(ref lectures); return Etat; }, () => { }, () => false,
+            () => DateTimeOffset.Now, nom);
+        using var fin = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var maintenant = DateTimeOffset.Now;
+
+        var service = serveur.ServirAsync(fin.Token, connexionsMax: 2);
+        (await Task.Run(() => ProcesseurParLeService.LireToutPartage(nom, () => MonPid, () => maintenant)))!.Etat.Should().Be(Etat);
+        (await Task.Run(() => ProcesseurParLeService.LireToutPartage(nom, () => MonPid, () => maintenant.AddMilliseconds(200))))!.Etat.Should().Be(Etat);
+        lectures.Should().Be(1, "la seconde demande reprend la réponse de la première");
+
+        (await Task.Run(() => ProcesseurParLeService.LireToutPartage(nom, () => MonPid, () => maintenant.AddSeconds(1))))!.Etat.Should().Be(Etat);
+        lectures.Should().Be(2, "une seconde plus tard, le service relit");
+        (await service).Should().BeTrue();
+    }
+
     [Fact]
     public async Task Une_connexion_rend_l_etat_lu_par_le_service_au_bon_serveur_seulement()
     {

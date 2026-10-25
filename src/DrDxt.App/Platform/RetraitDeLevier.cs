@@ -14,19 +14,18 @@ public static class RetraitDeLevier
     /// mais son entrée reste au manifeste. Rendu à l'appelant, qui le dit.</summary>
     public static async Task<Result> ApresAnnulationAsync(IDesiredStateStore manifeste, DrDxt.Application.Tweaks.JournalDesLeviersAppliques journal, string id)
     {
-        // Un journal non réécrit ferait dire « défait » au scan suivant ; c'est dit comme le manifeste.
-        // Son échec ne court-circuite plus le manifeste, nettoyé dans tous les cas.
-        var journalRetire = journal.Retirer(id);
+        // Le manifeste d'abord : c'est lui que le service repose. Retiré du journal d'abord, une App arrêtée entre les deux
+        // laissait un levier caché à l'écran et encore reposé après une mise à jour de Windows.
         Result r;
         try
         {
-            // Retiré sous ses deux noms (celui de l'App en RevertOnly, celui du service en
-            // Tweaks). Avant, il cherchait l'un parmi l'autre et renvoyait un manifeste que le magasin fusionnait :
-            // rien n'était jamais retiré.
+            // Retiré sous ses deux noms : celui de l'App en RevertOnly, celui du service en Tweaks.
             var ids = AppliedTweakManifestMapper.IdDuService(id) is { } service ? new[] { id, service } : new[] { id };
             r = await manifeste.RetirerAsync(ids);
         }
         catch (Exception ex) { r = Result.Fail(ErrorCodes.IoFailure, ex.Message); }
+        // Un journal non réécrit ferait dire « défait » au scan suivant ; c'est dit comme le manifeste.
+        var journalRetire = journal.Retirer(id);
         if (!r.IsOk || journalRetire) return r;
         return Result.Fail(ErrorCodes.HelperOpFailed, Docteur.T("App.JournalLeviersRetrait", id));
     }

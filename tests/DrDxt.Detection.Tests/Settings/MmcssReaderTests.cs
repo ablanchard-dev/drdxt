@@ -69,4 +69,24 @@ public class MmcssReaderTests
         MmcssReader.Source.Should().Contain("learn.microsoft.com");
         Lu.Should().NotBeEmpty();
     }
+
+    // « Values below 10 and above 100 are clamped to 20 » : 150 ne réserve pas 150 %, il est ramené à 20.
+    [Theory]
+    [InlineData(0, MmcssEffet.SansEffet)]
+    [InlineData(150, MmcssEffet.SansEffet)]
+    [InlineData(100, MmcssEffet.Desactive)]
+    [InlineData(20, MmcssEffet.Agit)]
+    [InlineData(null, MmcssEffet.NonLu)]
+    public void Hors_de_10_a_100_la_valeur_est_ramenee_a_20(int? valeur, MmcssEffet effet)
+        => MmcssReader.Reactivite(valeur).Effet.Should().Be(effet);
+
+    // Au-dessus de 100, ce n'est pas le tweak « = 0 » des guides : la phrase le dit à part.
+    [Fact]
+    public void Au_dessus_de_100_la_phrase_ne_parle_pas_du_tweak_a_zero()
+    {
+        var phrase = MmcssReader.Reactivite(150).Phrase;
+        phrase.Should().Be(DrDxt.Core.Docteur.T("MM.AuDessusDeCent", 150));
+        phrase.Should().Contain("20").And.NotContain("= 0").And.NotContain("MM.", "témoin : la clé existe");
+        MmcssReader.Reactivite(0).Phrase.Should().Be(DrDxt.Core.Docteur.T("MM.SousDix", 0));
+    }
 }

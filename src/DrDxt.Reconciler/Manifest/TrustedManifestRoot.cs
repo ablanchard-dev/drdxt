@@ -7,9 +7,9 @@ namespace DrDxt.Reconciler.Manifest;
 
 // -----------------------------------------------------------------------
 // TrustedManifestRoot : intégrité au repos de la racine du manifeste à laquelle SYSTEM fait
-// confiance (trou trouvé par une revue adverse).
+// confiance.
 //
-// Le réconciliateur de démarrage (LocalSystem, moat option B) fait confiance à deux fichiers sous
+// Le réconciliateur de démarrage (LocalSystem) fait confiance à deux fichiers sous
 //   %ProgramData%\DrDxt
 //   * manifest-public.key   : la racine de confiance en vérification seule (falsifier la clé →
 //     falsifier le manifeste que le réconciliateur de démarrage réapplique), et
@@ -74,8 +74,7 @@ public static class TrustedManifestRoot
         // Droits génériques : une ACE peut porter le masque générique brut (GENERIC_WRITE / GENERIC_ALL)
         // au lieu des bits spécifiques correspondants ; ces bits ne recoupent pas les droits spécifiques
         // ci-dessus, et une ACE non admin accordant GENERIC_WRITE/GENERIC_ALL passerait pour « aucun droit
-        // d'écriture », exactement le droit que cette garde doit refuser. Mesuré le 26/08/2026 (red team) :
-        // sans ces bits, Evaluate faisait confiance à un non-admin détenant 0x40000000 / 0x10000000.
+        // d'écriture », exactement le droit que cette garde doit refuser.
         // GENERIC_READ (0x80000000) / GENERIC_EXECUTE (0x20000000) sont en lecture seule ⇒ non signalés.
         | (FileSystemRights)0x40000000                 // GENERIC_WRITE
         | (FileSystemRights)0x10000000;                // GENERIC_ALL
@@ -170,7 +169,7 @@ public static class TrustedManifestRoot
     /// élevé et ne peut ni prendre possession ni poser owner=Administrators, la méthode rend Fail.
     /// Un point de reparse (jonction / lien symbolique) n'est jamais recouvert, réparé ni tenu pour
     /// fiable. Par construction, aucune racine de confiance possédée par l'utilisateur n'est jamais
-    /// créée ni laissée (BLOCKER #1c).</summary>
+    /// créée ni laissée.</summary>
     public static Result EnsureCreatedHardened(string dir)
     {
         try
@@ -229,8 +228,8 @@ public static class TrustedManifestRoot
             var di = new DirectoryInfo(dir);
 
             // Étape 1 : prise de possession, owner = Administrators. Seul un jeton élevé / SYSTEM le peut ;
-            // un jeton non élevé lève ici (→ Fail) : le moat n'est jamais activé sur une racine qu'un
-            // non-admin contrôle encore.
+            // un jeton non élevé lève ici (→ Fail) : rien n'est jamais réappliqué depuis une racine
+            // qu'un non-admin contrôle encore.
             var takeOwner = new DirectorySecurity();
             takeOwner.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
             di.SetAccessControl(takeOwner);
@@ -280,17 +279,24 @@ public static class TrustedManifestRoot
                 using var flux = new FileInfo(tmp).Create(FileMode.CreateNew, FileSystemRights.FullControl,
                     FileShare.None, 4096, FileOptions.WriteThrough, BuildPrivateFileSecurity());
                 flux.Write(bytes);
+                flux.Flush(flushToDisk: true);
             }
             else
             {
                 using (var flux = new FileStream(tmp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
+                {
                     flux.Write(bytes);
+                    // Le journal d'écriture anticipée et le manifeste passent par ici : sur le disque avant le renommage,
+                    // comme FichierJsonAtomique.
+                    flux.Flush(flushToDisk: true);
+                }
                 // Épingler propriétaire + DACL protégée sur le fichier temporaire avant de le publier sous son
                 // vrai nom : le fichier de confiance n'appartient jamais, même un instant, à l'utilisateur.
                 new FileInfo(tmp).SetAccessControl(BuildHardenedFileSecurity());
             }
-            // File.Move est un renommage qui garde le descripteur de sécurité.
-            File.Move(tmp, path, overwrite: true);
+            // Un renommage, qui garde le descripteur de sécurité, repris quelques fois quand un lecteur (l'App, le service)
+            // tient la cible à cet instant.
+            FichierJsonAtomique.Remplacer(tmp, path);
 
             // Défense en profondeur : le fichier publié doit être fiable au repos (côté admin), sinon échec.
             var trust = prive ? EnsurePrivateFile(path) : EnsureTrustedFile(path);

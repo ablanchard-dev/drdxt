@@ -5,7 +5,7 @@ using FluentAssertions;
 namespace DrDxt.App.Tests;
 
 // « Envoyer mon rapport » ouvre le modèle de ticket VIDE, exprès (LienDeRapport.Construire) : processeur, carte et texte
-// restent sur la machine jusqu'à ce que le joueur les joigne. Le bouton disait « ticket pré-rempli ».
+// restent sur la machine jusqu'à ce que le joueur les joigne. Le bouton ne promet donc pas de « ticket pré-rempli ».
 public class EnvoyerLeRapportDitCeQuIlOuvreTests
 {
     private static string Valeur(string fichier, string cle)

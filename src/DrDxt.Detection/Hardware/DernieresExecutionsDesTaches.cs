@@ -7,7 +7,12 @@ namespace DrDxt.Detection.Hardware;
 /// <c>null</c> = non lu.</summary>
 public static class DernieresExecutionsDesTaches
 {
+    /// <summary>Le Planificateur n'a pas de délai : un service bloqué figerait la famille, d'où la borne de temps. Figé ou
+    /// illisible : <c>null</c>, non lu.</summary>
     public static IReadOnlyList<TacheExecutee>? Lire()
+        => DrDxt.Core.LectureWmiBornee.Lire<IReadOnlyList<TacheExecutee>?>(LireSansBorne, () => null);
+
+    private static IReadOnlyList<TacheExecutee>? LireSansBorne()
     {
         try
         {

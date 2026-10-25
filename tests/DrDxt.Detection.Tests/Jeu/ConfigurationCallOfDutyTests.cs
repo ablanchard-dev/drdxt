@@ -41,7 +41,7 @@ public sealed class ConfigurationCallOfDutyTests
         ok.Explication.Should().Contain("8 cœurs performants").And.Contain("5.7").And.NotMatchRegex(@"\d+\s*%");
 
         var loin = ConfigurationCallOfDuty.Juger((2, "s.1.0.cod24.txt0"), 8).Should().ContainSingle().Subject;
-        loin.Statut.Should().Be(RepairStatus.Suspicious);
+        loin.Statut.Should().Be(RepairStatus.NonDefault, "un choix du joueur loin de guides sans mesure publiée : à regarder");
         loin.Action.Should().Be(RepairAction.Recommandation);
         loin.ValeurAttendue.Should().Contain("6").And.Contain("8");
     }

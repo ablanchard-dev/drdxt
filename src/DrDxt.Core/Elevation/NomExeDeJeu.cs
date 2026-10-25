@@ -12,8 +12,10 @@ namespace DrDxt.Core;
 /// </summary>
 public static class NomExeDeJeu
 {
-    private static readonly Regex Motif = new(@"^[A-Za-z0-9_.\-]{1,64}\.exe\z",
-        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+    // 64 caractères au plus avant l'extension, une espace possible à l'intérieur seulement (« League of Legends.exe ») :
+    // le nom est posé entre apostrophes dans le script. Sans IgnoreCase : avec lui, [A-Za-z] accepte le signe Kelvin (U+212A).
+    private static readonly Regex Motif = new(@"^[A-Za-z0-9_.\-](?:[A-Za-z0-9_. \-]{0,62}[A-Za-z0-9_.\-])?\.[Ee][Xx][Ee]\z",
+        RegexOptions.CultureInvariant);
 
     public static bool EstValide(string? nom) => nom is not null && Motif.IsMatch(nom);
 

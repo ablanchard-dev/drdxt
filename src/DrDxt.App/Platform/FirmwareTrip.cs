@@ -8,13 +8,8 @@ using DrDxt.Core;
 namespace DrDxt.App.Platform;
 
 // -----------------------------------------------------------------------
-// FirmwareTrip : le protocole en deux temps.
-//
-// Le module BIOS existait en entier (store de marqueur atomique, verifieur post-redemarrage,
-// libelles FR+EN) et n'etait resolu par personne. `PendingBiosChangeStore.Save()` n'avait
-// aucun appelant. Le differenciateur « on te dit quoi changer, et on prouve que ca a pris »
-// n'avait donc jamais tourne en production, et la regle du depot s'applique : ce qui n'a
-// jamais ete execute ne marche pas.
+// FirmwareTrip : le protocole en deux temps, qui relie le store du marqueur, le verifieur
+// post-redemarrage et le canal privilegie : « on te dit quoi changer, et on prouve que ca a pris ».
 //
 // Les deux temps
 //   1. Armer  : avant d'envoyer l'utilisateur dans le BIOS, on ecrit le marqueur avec

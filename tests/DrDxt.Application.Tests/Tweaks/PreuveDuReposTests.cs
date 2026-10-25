@@ -55,7 +55,7 @@ public sealed class PreuveDuReposTests
         var log = new List<string>();
 
         (await PreuveDuRepos.EcrireAsync(LevierQuiAcquitte(attente, log), new SondeEnFile(Serie(55)), 6, SansAttente, attente))
-            .Should().BeTrue();
+            .IsOk.Should().BeTrue();
 
         log.Should().Equal("noté", "acquit, preuve gardée");
     }
@@ -139,7 +139,7 @@ public sealed class PreuveDuReposTests
         var levier = Levier();
         var attente = new PreuvesEnAttente(Fichier());
 
-        (await PreuveDuRepos.EcrireAsync(levier, new SondeEnFile(Serie(55)), 6, SansAttente, attente)).Should().BeTrue();
+        (await PreuveDuRepos.EcrireAsync(levier, new SondeEnFile(Serie(55)), 6, SansAttente, attente)).IsOk.Should().BeTrue();
         attente.Charger().Should().NotBeNull("le lancement suivant doit trouver l'avant et l'écriture");
 
         var v = await PreuveDuRepos.ConclureAsync(levier, new SondeEnFile(Serie(14)), 6, SansAttente, attente);
@@ -164,6 +164,24 @@ public sealed class PreuveDuReposTests
         attente.Charger().Should().BeNull();
     }
 
+    // Le réglage de la carte a été changé depuis hors de DrDXT (panneau NVIDIA) : sans baisse nette, le lancement suivant
+    // rendrait l'origine par-dessus. La porte le dit changé : rien n'est réécrit, la preuve sort, et c'est dit.
+    [Theory]
+    [InlineData(PoseRelue.ChangeDepuis)]
+    [InlineData(PoseRelue.ALOrigine)]
+    public async Task Un_reglage_change_depuis_n_est_pas_reecrit_au_lancement(PoseRelue pose)
+    {
+        var levier = Levier();
+        var attente = new PreuvesEnAttente(Fichier());
+        await PreuveDuRepos.EcrireAsync(levier, new SondeEnFile(Serie(55)), 6, SansAttente, attente);
+
+        var v = await PreuveDuRepos.ConclureAsync(levier, new SondeEnFile(Serie(55)), 6, SansAttente, attente, _ => pose);
+
+        v!.Etat.Should().Be(EtatDeLaPreuve.ChangeDepuis);
+        await levier.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
+        attente.Charger().Should().BeNull("plus rien de DrDXT n'y est à prouver");
+    }
+
     [Fact]
     public async Task Sans_preuve_en_attente_le_lancement_ne_touche_a_rien()
     {
@@ -180,7 +198,7 @@ public sealed class PreuveDuReposTests
         var levier = Levier();
         var attente = new PreuvesEnAttente(Fichier());
 
-        (await PreuveDuRepos.EcrireAsync(levier, new SondeEnFile((double?)null), 6, SansAttente, attente)).Should().BeFalse();
+        (await PreuveDuRepos.EcrireAsync(levier, new SondeEnFile((double?)null), 6, SansAttente, attente)).IsOk.Should().BeFalse();
         await levier.DidNotReceive().ApplyAsync();
         attente.Charger().Should().BeNull();
     }
@@ -222,5 +240,46 @@ public sealed class PreuveDuReposTests
             new ReglagesRetenus(retenu).Charger().Should().NotBeNull();
         }
         finally { Directory.Delete(dossier, recursive: true); }
+    }
+
+    // Un fichier de preuve retouché, sans les watts d'avant : rien n'attend (illisible = rien n'attend), au lieu de faire
+    // lever la médiane au lancement suivant.
+    [Fact]
+    public void Une_preuve_sans_watts_d_avant_ne_se_charge_pas()
+    {
+        var f = Fichier();
+        try
+        {
+            File.WriteAllText(f, System.Text.Json.JsonSerializer.Serialize(
+                new PreuveEnAttente(Snapshot.TweakId, Snapshot.OriginalValueJson, Snapshot.AppliedValueJson, [])));
+
+            new PreuvesEnAttente(f).Charger().Should().BeNull();
+        }
+        finally { File.Delete(f); }
+    }
+
+    // File.Delete lève aussi UnauthorizedAccessException (fichier en lecture seule, antivirus) : l'effacement ne casse pas la
+    // conclusion, qui a déjà rendu le réglage.
+    [Fact]
+    public void Un_effacement_refuse_ne_leve_pas()
+    {
+        var preuve = Fichier();
+        var retenu = Fichier();
+        File.WriteAllText(preuve, "{}");
+        File.WriteAllText(retenu, "{}");
+        File.SetAttributes(preuve, FileAttributes.ReadOnly);
+        File.SetAttributes(retenu, FileAttributes.ReadOnly);
+        try
+        {
+            FluentActions.Invoking(() => new PreuvesEnAttente(preuve).Effacer()).Should().NotThrow();
+            FluentActions.Invoking(() => new ReglagesRetenus(retenu).Effacer()).Should().NotThrow();
+        }
+        finally
+        {
+            File.SetAttributes(preuve, FileAttributes.Normal);
+            File.SetAttributes(retenu, FileAttributes.Normal);
+            File.Delete(preuve);
+            File.Delete(retenu);
+        }
     }
 }

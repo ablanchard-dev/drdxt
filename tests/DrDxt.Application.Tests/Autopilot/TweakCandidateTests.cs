@@ -3,6 +3,7 @@ using DrDxt.Application.Tweaks;
 using DrDxt.Application.Tweaks.Hardware;
 using DrDxt.Core;
 using FluentAssertions;
+using NSubstitute;
 
 namespace DrDxt.Application.Tests.Autopilot;
 
@@ -94,17 +95,48 @@ public class TweakCandidateTests
     private static CandidateDescriptor Descripteur(string id = "latency.hagsOn") =>
         new(id, CandidateKind.AutoHot, RiskLevel: 1, NeedsStability: false, new[] { "latence" });
 
-    // Le helper garde l'origine de la pose jusqu'à ce que le journal de l'essai la porte : l'acquit part après, une fois.
+    // Pendant l'essai, l'origine n'est que dans le journal de l'essai, sous le dossier du compte, que la désinstallation élevée
+    // ne lit pas : l'écriture reste au journal du helper, qui la rend si l'App meurt. Elle s'acquitte au keep, une fois.
     [Fact]
-    public void La_pose_s_acquitte_une_fois_apres_que_le_journal_porte_l_origine()
+    public void La_pose_en_essai_s_acquitte_au_keep_une_fois()
     {
         var log = new List<string>();
         var c = new TweakCandidate(new LevierFaux { Log = log }, Descripteur(), new Registre(2), new JournalFaux { Log = log });
 
         c.Apply().IsOk.Should().BeTrue();
 
+        log.Should().ContainSingle().Which.Should().Be("origine", "en essai, le helper garde la pose");
+        PorteeDePose.Courante.Should().BeNull("la portée ne reste pas celle du flux après la pose");
+
+        c.Garder().IsOk.Should().BeTrue();
+        c.Garder();
         log.Should().Equal("origine", "acquit");
-        PorteeDePose.Courante.Should().BeNull("la portée ne survit pas à la pose");
+    }
+
+    [Fact]
+    public void La_pose_en_essai_s_acquitte_quand_elle_est_rendue()
+    {
+        var log = new List<string>();
+        var c = new TweakCandidate(new LevierFaux { Log = log }, Descripteur(), new Registre(2), new JournalFaux { Log = log });
+
+        c.Apply().IsOk.Should().BeTrue();
+        c.Revert().IsOk.Should().BeTrue();
+
+        log.Should().Equal("origine", "acquit");
+    }
+
+    // Un rendu refusé laisse le levier posé : la pose reste au journal du helper.
+    [Fact]
+    public void Une_pose_que_le_rendu_n_a_pas_defaite_reste_sans_acquit()
+    {
+        var log = new List<string>();
+        var c = new TweakCandidate(new LevierFaux { Log = log, RevertEchoue = true }, Descripteur(), new Registre(2),
+            new JournalFaux { Log = log });
+
+        c.Apply().IsOk.Should().BeTrue();
+        c.Revert().IsOk.Should().BeFalse();
+
+        log.Should().NotContain("acquit");
     }
 
     // Sans origine au journal de l'essai, seul le helper sait revenir : rien n'est acquitté.
@@ -128,6 +160,36 @@ public class TweakCandidateTests
         c.Apply().IsOk.Should().BeTrue();
         c.ReadBack().Value.Should().BeTrue();
         c.DernierePreuve!.Verdict.Should().Be(EtatApplique.Applied);
+    }
+
+    // La limite de puissance de la carte ne se relit pas dans le registre : sans le lecteur NVAPI, l'autopilote la rendrait
+    // en la croyant non prise.
+    private sealed class LimiteFausse : ITweak
+    {
+        public string Id => "gpu.power_limit";
+        public TweakCategory Category => TweakCategory.GpuTuning;
+        public bool RequiresElevation => true;
+        public bool RequiresRestorePoint => true;
+        public string SummaryKey => "tweak.gpu.power_limit.efficiency";
+        public bool AppliesTo(HardwareInventory hw, SettingsState state) => true;
+        public Task<Result<TweakSnapshot>> ApplyAsync() => Task.FromResult(Result<TweakSnapshot>.Ok(new TweakSnapshot(Id,
+            Fil(new ApplyNvApiPowerLimitOp(0, 100)), Fil(new ApplyNvApiPowerLimitOp(0, 90)))));
+        public Task<Result> RevertAsync(TweakSnapshot snapshot) => Task.FromResult(Result.Ok());
+    }
+
+    [Fact]
+    public void La_limite_de_la_carte_se_relit_par_NVAPI_et_sans_lecteur_ne_se_dit_pas_ratee()
+    {
+        var nv = Substitute.For<INvApiGpuTuning>();
+        nv.GetPowerLimitPct(0).Returns(Result<int>.Ok(90));
+        var avec = new TweakCandidate(new LimiteFausse(), Descripteur("gpu.power_limit"), new Registre(2), new JournalFaux(),
+            carte: new AppliedStateVerifier.LecteursCarte(Nvidia: nv));
+        avec.Apply();
+        avec.ReadBack().Value.Should().BeTrue();
+
+        var sans = new TweakCandidate(new LimiteFausse(), Descripteur("gpu.power_limit"), new Registre(2), new JournalFaux());
+        sans.Apply();
+        sans.ReadBack().IsOk.Should().BeFalse("ne pas savoir relire n'est pas « n'a pas pris »");
     }
 
     [Fact]
@@ -185,6 +247,8 @@ public class TweakCandidateTests
             passesAa: 3, stable: null, but: OptimizationGoal.Competitive, alternancesMax: 4);
 
         profil.EndedInBestState.Should().BeTrue();
+        // Zéro pose et zéro rendu passeraient aussi : le levier doit avoir été posé pour que l'égalité dise quelque chose.
+        levier.Rendus.Should().NotBeEmpty("le levier a ete pose pendant l'essai");
         levier.Annules.Should().HaveCount(levier.Rendus.Count, "chaque application a ete rendue");
     }
 

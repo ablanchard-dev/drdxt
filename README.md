@@ -22,8 +22,8 @@
 A PC gaming optimizer for Windows. Free, open source, and honest: it promises nothing it has not measured.
 
 DrDXT reads your machine, tells you what is costing you frames, and only applies settings it knows how to undo. Every
-setting is judged on your real matches: kept if it brings something, reverted otherwise. If your machine is already
-well set up, it tells you that too.
+setting is judged on your real matches: removed if it makes things worse, and a gain is only announced once measured.
+If your machine is already well set up, it tells you that too.
 
 <p align="center">
   <img src="docs/images/accueil-en.png" alt="DrDXT home screen: the machine read domain by domain around the chrome sphere" width="100%">
@@ -33,18 +33,18 @@ well set up, it tells you that too.
   <img src="docs/images/graphique-en.png" alt="The graphics card domain, with the expert mode folded" width="49%">
 </p>
 
-The app speaks English and French. [CONTRIBUTING.md](CONTRIBUTING.md), [PRIVACY.md](PRIVACY.md) and
-[SECURITY.md](SECURITY.md) are in English; the technical documents under `docs/` are in French.
+The app speaks English and French. [CONTRIBUTING.md](CONTRIBUTING.md) and [PRIVACY.md](PRIVACY.md) have a French
+version, [SECURITY.md](SECURITY.md) holds both languages; the technical documents under `docs/` are mostly in French.
 
 ## What it does
 
-- **A scan** reads your processor, graphics card, memory, storage, Windows, network and BIOS. Nothing is written at
-  this point.
+- **A scan** reads your processor, graphics card, memory, storage, Windows, network and BIOS. No setting is changed at
+  this point; the scan can only install or start the PresentMon measurement service if it is missing.
 - **A doctor per domain** explains each point: what was read, what is wrong, what DrDXT can do, and what has to be done
   by hand (BIOS, cables, in-game settings). When a point has a fix, it reads apart under **How to fix**, in numbered
   steps that name what was read on your machine: the app, the value, the path.
 - **Optimize** applies the useful settings one by one, after a restore point. **Try it every other game** compares one setting
-  across your games in blocks of with, without, without, with, and decides at 3 games with against 6 without.
+  across your games in blocks of with, without, without, with, and decides once it has at least 3 games with and 6 without (11 games, in that order).
 - **Your matches** are recorded in the background: frames per second, the slowest 1 %, what was the bottleneck, which
   programs were open alongside. This is the only proof DrDXT accepts. The game is found on its own, full screen or
   borderless, and the most played ones even windowed; launchers, Discord and maximized desktop apps are left aside.
@@ -64,10 +64,14 @@ The app speaks English and French. [CONTRIBUTING.md](CONTRIBUTING.md), [PRIVACY.
 
 Five rules hold the code, and each comes from a real failure:
 
-- **Proven, never claimed.** A gain is shown only above the noise of the measurement. "No measurable gain" is a valid
-  answer, and often the right one.
+- **Proven, never claimed.** A gain is shown only when three matches on each side are clearly apart, and as "at
+  least": the worst gap between the two series. "No measurable gain" is a valid answer, and often the right one.
 - **Surgical.** No service disabled, no Windows debloat, no bolted-on script. What requires the BIOS stays a guide.
-- **Reversible.** Original value read before any write, rollback tested, restore point.
+- **Reversible.** Every setting DrDXT applies, it can undo: original value read before any write, rollback tested, every
+  setting individually reversible. The big changes (Optimize, the alternating trial, "Check DrDXT on my PC") apply
+  after a restore point. Two things are not undone: the Windows repair (DISM, sfc), done by Windows itself, and an AMD
+  undervolt, which is undone only by resetting the card to factory settings. What uninstalling leaves is listed in
+  "What remains".
 - **Honest about unavailability.** A setting that does not apply says which one and why.
 - **Permanent blacklist.** The optimization myths (Nagle, `NetworkThrottlingIndex`, 8,000 Hz polling, realtime
   priority, C-states disabled wholesale) are refused by a test that breaks if one of them enters the catalog.
@@ -88,17 +92,25 @@ by setting, what DrDXT does on each kind of PC, and why not where it does not.
 1. Download `DrDXT-Setup-NON-SIGNE.exe` from the latest [Release](https://github.com/ablanchard-dev/drdxt/releases).
    Its SHA-256 is on the page; `Get-FileHash` in PowerShell recomputes it.
 2. The installer is not signed yet: Windows shows "Windows protected your PC". Click "More info", then "Run anyway".
-3. Two checkboxes: a Desktop shortcut, and the `DrDxtReconciler` service, unchecked by default, which reapplies at
-   Windows startup the settings you kept.
-4. On first launch, "Run scan" reads the machine without writing anything. Nothing is applied before you click
+3. The installer speaks English, or French when Windows does. Two checkboxes: a desktop shortcut, and "Reapply my
+   settings when Windows starts and read the processor temperature during my games" (the `DrDxtReconciler` service, checked by default, which reapplies at Windows
+   startup the settings you kept, and lets the match recording read the processor temperature; untick it if you don't
+   want it).
+4. On first launch, "Run scan" reads the machine without changing any setting (it may install or start the PresentMon
+   measuring service if it is missing). Nothing is applied before you click
    "Optimize" or "Try it every other game", and every setting can be undone from "What DrDXT set".
 5. Uninstall: Settings, Apps, DrDXT. The uninstaller first reverts the settings it knows about, then removes the files.
    `%LOCALAPPDATA%\DrDXT` (your records) and `%ProgramData%\DrDxt` (its reports) remain; delete them by hand to start
    from scratch.
 
-Windows 10 or 11, 64-bit, on an **administrator account**: it is the one that consents to each setting. On a standard
-account, Windows would ask for an administrator's password and the settings would go into that account's profile:
-this is not supported. No .NET to install, everything is in the installer.
+Windows 10 or 11, 64-bit, on an **administrator account**: it is the one that consents to each setting. No .NET to
+install, everything is in the installer.
+
+On a **standard account**, DrDXT says so at launch. The scan, the doctor, the match records and the advice work; the
+settings of your own account (mouse, Game Bar) are still written. Everything that needs an administrator (power plan,
+graphics driver, card, processor, services) is refused at once, with the reason: Windows would run DrDXT's helper as
+the administrator who typed the password, and that helper does not talk to your window. Installed from a standard
+account with an administrator's password, the background match recording is that administrator's, not yours.
 
 ### What remains after uninstalling
 
@@ -108,17 +120,32 @@ this is not supported. No .NET to install, everything is in the installer.
 - **The NVIDIA card** goes back to automatic fan control and a 0 MHz clock offset. A fan curve or an offset set by
   another tool (MSI Afterburner) also goes back to automatic and 0, until that tool sets them again the next time it
   starts.
+- **Startup apps** you switched off from DrDXT are switched back on, if they are still as DrDXT left them: switched
+  off or on again by hand since, they stay as you set them. Those of your account are only read if the uninstall runs
+  with your account; run with another administrator account, they stay off and Task Manager switches them back on.
+- **The screen's refresh rate** set by DrDXT stays as it is: changing the display mode during an uninstall is riskier
+  than leaving it. Undo it from DrDXT before uninstalling ("Undo" on the setting), or from Windows Settings afterwards.
 - **An AMD undervolt** set by DrDXT may remain, if the driver keeps it across a restart: uninstalling cannot restore it.
-  An alternating trial never sets one. See [docs/SECURITE.md](docs/SECURITE.md), §10.
+  An alternating trial never sets one. Undoing it can only reset the card to factory settings, which also resets the
+  memory, fan and power you set in AMD Software; DrDXT says so when it does it. See [docs/SECURITE.md](docs/SECURITE.md), §10.
+- **A memory test** scheduled from DrDXT and not yet run stays scheduled: it runs at the next restart, then is gone.
+- **A CPU undervolt** (voltage offset) set for the current session is not reset by uninstalling; it clears on the next
+  restart. Undo it from DrDXT before uninstalling if you want it gone at once.
+- **A setting Optimize is still trying** (not yet kept or put back) when you uninstall is put back if it is a machine
+  setting. A setting of your own session (mouse, Game Bar) stays as set: its original value is only in
+  `%LOCALAPPDATA%\DrDXT`, which the elevated uninstaller does not read. Let Optimize finish first; reinstalling DrDXT puts
+  it back at the next start.
+- **A removed boot setting** (`bootstatuspolicy`, the "Windows didn't start correctly" menu) stays removed: undo it
+  from DrDXT ("Undo") before uninstalling, or with `bcdedit`. `%LOCALAPPDATA%\DrDXT\bcd-rendu.json` also stays.
 - **`%ProgramData%\DrDxt`**: the uninstall reports, the set-aside manifest, the key that signed it, and the copy of the
-  driver packages you removed.
-- **`%LOCALAPPDATA%\DrDXT`**: your game records and the history of what DrDXT did.
+  driver packages you removed and did not put back (`pilotes-retires`: up to a few GB per NVIDIA package, and only the last two are kept).
+- **`%LOCALAPPDATA%\DrDXT`**: your game records, the history of what DrDXT did, and the last downloaded update.
 - **System Restore** stays on, with its 5 % reserve and the DrDXT points; Windows deletes them over time.
 
 No DrDXT program runs anymore. Both folders can be deleted by hand if you want a clean slate.
 
-An **update** stops the helper to replace its files: a fixed fan speed or a clock offset set in Expert mode then stays
-set until the next restart, which clears it.
+An **update** stops the helper to replace its files: it does not start while a temporary setting is in place (an
+undervolt search, a fixed fan speed or a clock offset in Expert mode). Put it back first, then install.
 
 ## Contributing
 
@@ -134,26 +161,31 @@ The most useful help does not require writing code:
 
 Writing code? [ARCHITECTURE.md](ARCHITECTURE.md) shows how the pieces fit and how to add a setting from end to end;
 [CONTRIBUTING.md](CONTRIBUTING.md) explains how to build, test and propose a change. Every pull
-request runs the full test suite in CI. A security issue is reported in private: [SECURITY.md](SECURITY.md).
+request runs the test suite in CI, except the tests marked `Machine` (they read real hardware). A security issue is reported in private: [SECURITY.md](SECURITY.md).
 
 ## What DrDXT writes on your machine
 
 Every setting goes through the list of the helper, the elevated program separate from the app, which refuses
 anything not on it; the DrDXT service, which restores your settings at startup, and the uninstaller apply the same list
-themselves. Every write first reads the original value and knows how to restore it. The full list:
+themselves, and so does the app for the values of your own account. Two settings do not go through it: the screen's
+refresh rate and the priority of programs open next to the game, which the app changes itself, without administrator
+rights, as Windows' own settings and Task Manager would. Every write first reads the original value and knows how to
+restore it. The full list:
 
 - **Registry, exact values**, never a whole branch: `HwSchMode` (hardware-accelerated GPU scheduling), `PagingFiles`
   (disabled page file restored, or moved to an SSD), `AllowAutoGameMode` and `AutoGameModeEnabled` (Game Mode), `HistoricalCaptureEnabled`
   (Game Bar background recording), `DirectXUserGlobalSettings` (VRR and presentation model), `MouseSpeed`,
   `MouseThreshold1` and `MouseThreshold2` (pointer acceleration), `ActiveHoursStart` and `ActiveHoursEnd` (Windows
-  Update active hours, the Settings option, not the policy). Two values are no longer applied, only reverted if an
-  older version wrote them: `LowLatencyMode` and `CppcEnable`.
+  Update active hours, the Settings option, not the policy). Two values are no longer offered, only reverted if an
+  older version wrote them: `LowLatencyMode` and `CppcEnable`. A `LowLatencyMode` kept with an older version is still
+  put back by the startup service, until DrDXT is uninstalled.
 - **Startup apps**, on request: the Windows on/off switch (`StartupApproved`) of an entry you choose, as Task Manager
   does.
 - **NVIDIA driver**, on the game's profile, or on the global profile when the game has none: render queue, vertical
   sync, frame limiter, power mode, and on request the DLSS override to the latest model. The global profile also, to set
   the power mode back to "Normal".
-- **AMD driver**, through ADLX: power limit, Anti-Lag, frame rate target, vertical sync. On your click only, the card's
+- **AMD driver**, through ADLX: Anti-Lag, frame rate target, vertical sync (the power limit waits until its unit is
+  read on a real card). On your click only, the card's
   factory reset, when an undervolt kept by the driver cannot be given back any other way.
 - **Display**: the main screen's refresh rate, set to the highest Windows offers at its resolution, in your Windows
   profile and without admin rights; kept only if you confirm the picture within 15 seconds.
@@ -165,22 +197,32 @@ themselves. Every write first reads the original value and knows how to restore 
   value read at boot (PL1, voltage, AMD maximum frequency), the helper keeps it in its own volatile key,
   `HKLM\SOFTWARE\DrDXT\Helper\CeDemarrage`, which Windows erases at the next boot.
 - **One restore point** before applying; System Restore is turned on for the system drive if it was off, with a
-  reserve of 5 % of the drive when there was none (kept after uninstalling). At most two DrDXT points, reused within
-  24 hours.
-- **Two services**: PresentMon, which measures frames, and the AMD 3D V-Cache service.
+  reserve of 5 % of the drive when there was none (kept after uninstalling). A point is reused within 24 hours. DrDXT
+  removes its own older points to keep two, but never past another program's point: Windows erases points oldest
+  first, and removing a newer one would erase that point too. With a Windows point in between, more DrDXT points
+  stay.
+- **Two services**: PresentMon, which measures frames (installed or started by a scan or a measurement if it is missing),
+  and the AMD 3D V-Cache service.
 - **The motherboard's Super I/O chip** (NCT6687), to read its fans: its configuration ports (0x2E or 0x4E) and its
-  EC page, every 5 seconds at most, from the app and the startup service, through PawnIO (LpcIO module). Ports used
+  EC page, every 15 seconds at most, from the app and the startup service, through PawnIO (LpcIO module). Ports used
   to read the chip, never a setting: no fan speed, curve or mode is changed.
 - **Graphics card**, within bounds: the power limit, tried in-game and kept only with a measured gain; in Expert mode,
   with your consent, the clock offset and a fixed fan speed, reverted on their own if DrDXT stops.
 - **Two QoS rules** during a match, on request, to cap upload; removed when the match ends.
 - **Programs open next to the game**, on request, during a match: their priority lowered from normal to below normal,
-  never the game, Windows, security software or an anti-cheat. Windows does not keep it; DrDXT gives it back at the end
+  never the game, the Windows processes it knows, Defender or a common antivirus (by process name), or an anti-cheat. Windows does not keep it; DrDXT gives it back at the end
   of the match.
-- **Windows boot settings**, five exact elements, on request, to remove a setting left by a script.
+- **Windows boot settings**, on request: removing `bootstatuspolicy` when a script left it at IgnoreAllFailures, and
+  scheduling the Windows memory test at the next restart (one boot entry, used up by that restart).
 - **Drivers**, on request: restart a device, remove an old driver package from the driver store and put it back.
 - **Windows Memory Diagnostic** at the next boot, on request, and its cancellation.
+- **Windows system files**, only on your click "Repair Windows with Microsoft's tool": DISM `/RestoreHealth` then
+  `sfc /scannow`, in a console you see. Windows repairs its own component store and files; DrDXT does not undo it.
 - **Reboot to BIOS**, on request. The BIOS is read, never written.
+- **The DrDXT service** (`DrDxtReconciler`, as SYSTEM, ticked by default): it reapplies at Windows startup the
+  settings you kept, repeats that pass once a day and after a Windows update, sets the upload cap during matches of the
+  chosen game if ping protection is on (even with DrDXT closed; removed at the end of the match, cleared on restart), and
+  serves the processor temperature to the app and the recording, through a read-only pipe.
 - **The signed manifest** of kept settings, in `%ProgramData%\DrDxt`, which the uninstaller reads to revert them.
 - **A scheduled task**, "DrDXT releve", created by the installer: it records your matches when your session opens, without
   administrator rights. Without the DrDXT service, a match played with DrDXT closed has no processor temperature.
@@ -199,10 +241,11 @@ in [PRIVACY.md](PRIVACY.md).
 - **The latest graphics driver version**, at each scan, to tell you whether yours is behind: AMD's public page
   (`www.amd.com`) and one fixed request to NVIDIA's public service (`gfwsl.geforce.com`, always the same, queried only
   on a GeForce card). Nothing identifies you.
-- **Pings** to your router and to `1.1.1.1`, to measure latency; during a match, also to the game server, to follow the
-  route from one match to the next.
+- **Pings** to your router and to `1.1.1.1`, to measure latency; during a match, also to the game server: some have a
+  limited lifetime, like `tracert`, so that the routers on the way answer. They follow the route from one match to the
+  next.
 - **One question to your router**, at each scan, for the NAT type: a UPnP search on the home network
-  (`239.255.255.250`), then a single request for its WAN address, which is never shown. Nothing leaves the home, no port
+  (`239.255.255.250`), then two requests to the router itself: its description, then its WAN address, which is never shown. Nothing leaves the home, no port
   is opened.
 - **The update check**, at startup: two small files read from `https://ablanchard-dev.github.io/drdxt`, and the signed
   tables package (the list of known regressions, data only) from the same site. GitHub sees your IP address, as with any
@@ -213,8 +256,13 @@ in [PRIVACY.md](PRIVACY.md).
   while DrDXT pings `1.1.1.1` and your router. Nothing about you is in it.
 - **Your MSI motherboard's support page**, only if you click "Open your board's page" in the BIOS guide: your browser
   opens `www.msi.com/Motherboard/<model>/support`.
+- **The BIOS guide page**, only if you scan the guide's QR code with your phone: it opens
+  `https://ablanchard-dev.github.io/drdxt/guide-bios/`. GitHub sees the phone's IP address and the time, as for any web
+  page. The guide is written after the `#` in the address, which a browser never sends: it stays on the phone.
 - **A Windows Update search**, only if you click "Check now" under the Windows Update finding: Windows Update asks
   Microsoft's servers what is waiting, as Settings > Windows Update does. Nothing is installed.
+- **The Windows repair**, only if you click "Repair Windows with Microsoft's tool": DISM downloads healthy components
+  from Windows Update (Microsoft's servers), as Windows does for its own updates.
 - **Your verification report**, only if you click "Send my report": DrDXT opens your browser on the empty GitHub
   issue template, and you attach the report yourself. Nothing leaves until you submit it.
 - **The installer of a new version**, only if you click "Install": downloaded from the address written in the signed
@@ -226,14 +274,15 @@ the code is missing from this list.
 
 ## Build
 
-Windows 10 or 11 x64 and the **.NET 10** SDK. Nothing else for the application and the tests.
+Windows 10 or 11 x64, the **.NET 10** SDK, and Node.js for the BIOS guide page tests (they run its script). Clone
+into a short folder, for example `C:\src\drdxt` (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ```
 dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**8,646 tests, 0 failures**, measured on 23/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
+**9,738 tests, 0 failures**, measured on 25/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
 real hardware). The number is checked by `tools/gates/compte_des_tests.py` against the last run. The command that gives
 it back (an English .NET SDK; with a French one, see the French README):
 
@@ -262,6 +311,7 @@ tools, to compile natively the launcher that receives elevation.
 | `DrDxt.Infrastructure` | the app's texts (French and English), signed updates, diagnostics log, repair history |
 | `DrDxt.App` | the user interface (WPF) |
 | `tools/` | benches and probes outside the solution, including the validation zip (`amd-harness`) |
+| `server/` | a server kept in the solution and its tests, not deployed: updates go through GitHub Pages |
 
 Where to start: [ARCHITECTURE.md](ARCHITECTURE.md), then [docs/NON-NUISANCE.md](docs/NON-NUISANCE.md), [docs/SECURITE.md](docs/SECURITE.md), then
 [docs/INSTRUMENTS.md](docs/INSTRUMENTS.md) and [docs/OU-VIT-LE-GAIN.md](docs/OU-VIT-LE-GAIN.md) for what each

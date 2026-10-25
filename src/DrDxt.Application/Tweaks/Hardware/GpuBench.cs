@@ -41,6 +41,8 @@ public sealed class GpuBench
 
     public GpuWorkloadSpec Spec => _spec;
 
+    /// <param name="gpuIndex">La carte réglée. Le banc charge la seule carte dédiée de la machine ; avec plusieurs, rien ne relie
+    /// cet index à un adaptateur DXGI et le runner refuse de juger (non concluant, jamais stable).</param>
     public Result<GpuBenchResult> Run(int gpuIndex, TimeSpan duration, CancellationToken ct)
     {
         try

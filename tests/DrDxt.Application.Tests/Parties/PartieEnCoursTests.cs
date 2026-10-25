@@ -27,6 +27,19 @@ public sealed class PartieEnCoursTests : IDisposable
         Memoire().Interrompues().Should().Equal(new PartieInterrompue("cod.exe", T, T.AddMinutes(9), T.AddHours(1)));
     }
 
+    // Les parties interrompues ne s'écrivent pas (le chemin est un dossier) : la marque reste, et le démarrage suivant
+    // relèvera la partie, au lieu de l'effacer sans l'avoir gardée.
+    [Fact]
+    public void Une_partie_interrompue_qui_ne_s_ecrit_pas_garde_sa_marque()
+    {
+        Directory.CreateDirectory(Path.Combine(_dossier, "parties-interrompues.json"));
+        Memoire().NoterEnCours(new PartieInterrompue("cod.exe", T, T.AddMinutes(9)));
+
+        Memoire().ReleverInterrompue(T.AddHours(1));
+
+        File.ReadAllText(Path.Combine(_dossier, "partie-en-cours.json")).Should().Contain("cod.exe");
+    }
+
     [Fact]
     public void Une_partie_close_ne_laisse_rien()
     {

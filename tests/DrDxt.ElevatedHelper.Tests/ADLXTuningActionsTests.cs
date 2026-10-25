@@ -117,12 +117,18 @@ internal sealed class FakeAdlxNative : IAdlxNative
 
     public int Usine { get; private set; }
     public string? UsineRefus { get; set; }
+    /// <summary>Le pilote dit la remise faite (code 0) sans rien remettre.</summary>
+    public bool UsineSansEffet { get; set; }
+    /// <summary>IsAtFactory ne se lit pas.</summary>
+    public bool UsineIllisible { get; set; }
+    private bool _aLUsine;
+    public bool? EstALUsine(int gpuIndex) => UsineIllisible ? null : _aLUsine;
 
     public string? RemettreReglageUsine(int gpuIndex)
     {
         Calls.Add(nameof(RemettreReglageUsine));
         Usine++;
-        if (UsineRefus is null) GfxReads = GfxReads with { MaxFreqMhz = 2900 };
+        if (UsineRefus is null && !UsineSansEffet) { GfxReads = GfxReads with { MaxFreqMhz = 2900 }; _aLUsine = true; }
         return UsineRefus;
     }
 
@@ -477,6 +483,21 @@ public sealed class ADLXTuningActionsTests
 
         fake.Usine.Should().Be(1);
         fake.SetGfxMaxFreqMhz.Should().BeNull();
+    }
+
+    // Le code 0 de ResetToFactory ne prouve rien : la carte relue (IsAtFactory) doit se dire à l'usine, sinon l'App dirait
+    // « remis » et sortirait le levier du journal.
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void Une_remise_a_l_usine_que_la_carte_ne_confirme_pas_est_un_echec(bool sansEffet, bool illisible)
+    {
+        var fake = new FakeAdlxNative { GfxReads = StockGfx(maxFreqMhz: 2700), UsineSansEffet = sansEffet, UsineIllisible = illisible };
+
+        var r = new ADLXTuningActions(fake, (_, _) => 2700).SetTuning(0, AdlxTuningKind.RemiseUsine, 0);
+
+        r.IsOk.Should().BeFalse();
+        r.Error!.Value.Message.Should().StartWith(Docteur.T("ADLX.UsineImpossible", "x")[..20]);
     }
 
     [Fact]

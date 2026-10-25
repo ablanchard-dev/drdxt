@@ -147,8 +147,8 @@ public sealed class PlafondEnvoiPendantLeJeu
         if (r.IsOk) _plafondBps = plafondBps;
         else
         {
-            // Une pose ratée ne laisse rien (le helper retire tout) : plus « posé », état incertain, et le battement suivant
-            // repose l'ancien plafond.
+            // Une pose ratée a pu laisser une politique : plus « posé », mais état incertain (le retrait partira quand même), et
+            // le battement suivant repose l'ancien plafond.
             _pose = false;
             _poseIncertaine = true;
         }
@@ -156,16 +156,23 @@ public sealed class PlafondEnvoiPendantLeJeu
     }
 
     /// <summary>Le joueur eteint le mode : on retire tout de suite. Le bail, lui, expirera et
-    /// rejouera un retrait sans effet (le retrait est idempotent, prouve par tools/qossmoke).</summary>
-    public async Task ArreterAsync(CancellationToken ct)
+    /// rejouera un retrait sans effet (le retrait est idempotent, prouve par tools/qossmoke).
+    /// Le resultat est celui du retrait, que le helper relit (la politique doit avoir disparu) : un refus
+    /// remonte, l'ecran ne dit pas « eteint » sans reserve. Le mode s'eteint quand meme (le battement ne repose plus rien) ;
+    /// le retrait refuse reste a faire : un helper injoignable ne rejoue pas non plus celui du bail, l'arret suivant reessaie.</summary>
+    public async Task<Result> ArreterAsync(CancellationToken ct)
     {
         await _uneALaFois.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            if (_pose || _bailOuvert)
-                await _helper.ExecuteAsync(new RemoveUploadCapOp(), ct).ConfigureAwait(false);
-            _pose = false;
+            if (!_pose && !_poseIncertaine && !_bailOuvert) return Result.Ok();
             _bailOuvert = false;
+            Result r;
+            try { r = await _helper.ExecuteAsync(new RemoveUploadCapOp(), ct).ConfigureAwait(false); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { r = Result.Fail(ErrorCodes.HelperOpFailed, ex.Message); }
+            _pose = !r.IsOk;
+            _poseIncertaine = !r.IsOk;
+            return r;
         }
         finally { _uneALaFois.Release(); }
     }

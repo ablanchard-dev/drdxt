@@ -35,8 +35,7 @@ public sealed record UsureDisque(string Disque, int? UsurePercent, int? Temperat
 [SupportedOSPlatform("windows")]
 public sealed class StorageWearReader
 {
-    /// <summary>sans le prefixe `\\.\`. Avec lui, `ManagementObjectSearcher` rend
-    /// « Parametre non valide » sur ce namespace imbrique (releve le 10/09/2026).</summary>
+    /// <summary>L'espace de noms local du stockage ; le prefixe `\\.\` n'y change rien (mesure du 25/10/2026).</summary>
     private const string Namespace = @"root\Microsoft\Windows\Storage";
 
     private readonly IWmiQuery _wmi;

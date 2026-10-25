@@ -4,9 +4,9 @@ namespace DrDxt.Core;
 
 /// <summary>
 /// Le pur du garde « Vmin Shift » des Core Intel de 13e et 14e génération pour ordinateur de bureau : Intel a attribué leur
-/// instabilité à des tensions trop hautes et l'a corrigée par microcode (0x129, 0x12B, puis 0x12F en 2025, qui complète
-/// 0x12B ; TechPowerUp, 25/09/2024). Partagé par le docteur (le dire) et par le levier de puissance (ne pas
-/// monter la PL1 sur un ancien microcode), qui ne le consultait pas.
+/// instabilité à des tensions trop hautes et l'a corrigée par microcode : 0x129, puis 0x12B (TechPowerUp, 25/09/2024), puis
+/// 0x12F (2025), qui complète 0x12B. Partagé par le docteur (le dire) et par le levier de puissance (ne pas monter la PL1
+/// sur un ancien microcode).
 /// </summary>
 public static class MicrocodeVmin
 {
@@ -35,4 +35,13 @@ public static class MicrocodeVmin
         => nom is not null && nom.Contains("Intel", StringComparison.OrdinalIgnoreCase) && Bureau.IsMatch(nom)
            && identifiant is not null
            && (identifiant.Contains("Family 6 Model 183 ", StringComparison.Ordinal) || identifiant.EndsWith("Family 6 Model 183", StringComparison.Ordinal));
+
+    /// <summary>Pour les gardes de puissance (helper, lecture de l'App) : comme <see cref="Perime"/>, sauf qu'un identifiant non
+    /// lu ne rend jamais « pas concerné » quand le nom est celui d'un Core de bureau 13e/14e. « Pas lu » ne laisse jamais monter
+    /// la PL1 ; un i5 Alder Lake y perd au plus une montée refusée. Le docteur garde <see cref="Perime"/> : il n'affirme que
+    /// ce qu'il a lu.</summary>
+    public static bool? PerimePourLaPuissance(string? nom, uint? revision, string? identifiant)
+        => identifiant is null && nom is not null && nom.Contains("Intel", StringComparison.OrdinalIgnoreCase) && Bureau.IsMatch(nom)
+            ? revision is not { } rev || rev < CorrectifComplet
+            : Perime(nom, revision, identifiant);
 }

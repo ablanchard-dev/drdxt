@@ -17,7 +17,7 @@ namespace DrDxt.App.Tests;
 // Aucune des trois n'existait dans `Strings.resx` ni dans `Strings.fr.resx`. Et le
 // contrat de `ResxLocalizer` est ecrit noir sur blanc : « Missing keys return the key
 // itself — never null, never an exception. » Rien ne leve, rien ne rougit : l'ecran de
-// resultat du produit payant affichait litteralement `Scan.Ab.NoMeasurableGain` a la
+// resultat affichait litteralement `Scan.Ab.NoMeasurableGain` a la
 // place de la phrase qui dit ce que la session a mesure.
 //
 // C'est le defaut qui ne leve rien, sur la seule ligne pour laquelle on lance un A/B.

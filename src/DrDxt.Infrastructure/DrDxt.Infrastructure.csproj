@@ -17,8 +17,8 @@
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <!-- Ed25519 (NOT in the .NET BCL) for the signed update-package verifier.
          Same tranched lib + version as DrDxt.Reconciler — verify
-         path uses the PUBLIC key only; the dev/test PRIVATE seed (UpdateDevKeys) is
-         used solely to sign fixtures in tests. -->
+         path uses the PUBLIC key only; the dev/test PRIVATE seed lives only in the test
+         assemblies (tests/Shared/UpdateDevTestKeys.cs). -->
     <PackageReference Include="NSec.Cryptography" Version="26.4.0" />
   </ItemGroup>
 

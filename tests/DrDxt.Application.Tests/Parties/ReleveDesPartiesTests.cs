@@ -175,6 +175,16 @@ public sealed class ReleveDesPartiesTests
         ReleveDesParties.RalentitEnPartie(p).Should().Be(attendu);
     }
 
+    // Les parties les plus limitées par le processeur (carte occupée moins de 60 % du temps) sont celles où un ralentissement
+    // du processeur coûte le plus : elles se signalent comme les autres parties limitées par le processeur.
+    [Fact]
+    public void Une_partie_fortement_limitee_par_le_processeur_se_dit_ralentie_aussi()
+    {
+        var p = new PartieRelevee("cod.exe", DateTimeOffset.Now, DateTimeOffset.Now, 5, 120, 90,
+            BottleneckState.CpuBoundStrong, 4300, 120, BancMhz: 5190);
+        ReleveDesParties.RalentitEnPartie(p).Should().BeTrue();
+    }
+
     // Pas « la chaleur » dès 90 °C : avec les secondes relevées, la raison est la plus vue.
     [Fact]
     public void La_cause_du_ralentissement_vient_des_secondes_freinees_quand_elles_sont_lues()
@@ -264,5 +274,69 @@ public sealed class ReleveDesPartiesTests
             C(2, 130, 95, BottleneckState.CpuBoundOrAppBound) with { Ventilateurs = [new VentilateurEnPartie(5, 500, 0, 30, 60)] },
         ])!;
         p.Ventilateurs!.Single().SecondesArret.Should().Be(30);
+    }
+
+    // L'instrument de la partie est celui de ses fenêtres : sans lui, une partie du repli DXGI se comparait à PresentMon.
+    [Fact]
+    public void La_partie_garde_l_instrument_de_ses_fenetres()
+    {
+        var t = DateTimeOffset.Now;
+        ReleveDesParties.Resumer("cod.exe", [new CaptureEnPartie(t, 120, 90, BottleneckState.GpuBound, Instrument: "DXGI"),
+                new CaptureEnPartie(t, 120, 90, BottleneckState.GpuBound, Instrument: "DXGI")])!
+            .Instrument.Should().Be("DXGI");
+        ReleveDesParties.Resumer("cod.exe", [new CaptureEnPartie(t, 120, 90, BottleneckState.GpuBound),
+                new CaptureEnPartie(t, 120, 90, BottleneckState.GpuBound)])!
+            .Instrument.Should().BeNull("PresentMon");
+    }
+
+    // Vingt secondes sans image dans une minute où le jeu a perdu le premier plan : le joueur était au bureau, ce n'est pas
+    // une image, et la partie le compte à part. Le même écart, jeu au premier plan toute la minute, est un gel : il compte.
+    [Fact]
+    public void Une_pause_hors_premier_plan_s_ecarte_un_gel_au_premier_plan_compte()
+    {
+        static CaptureEnPartie Fenetre(int minute, double ecart, double premierPlan)
+            => new(T0.AddMinutes(minute), 100, 99, BottleneckState.GpuBound,
+                ImagesMs: Enumerable.Repeat(10.0, 5000).Append(ecart).ToList(), PremierPlan: premierPlan);
+
+        var auBureau = ReleveDesParties.Resumer("cod.exe", [Fenetre(1, 20_000, 0.7), Fenetre(2, 10, 1.0)])!;
+        auBureau.PausesEcartees.Should().Be(1);
+        auBureau.Low1Median.Should().BeApproximately(100, 0.5, "la pause n'est pas une image");
+
+        var gel = ReleveDesParties.Resumer("cod.exe", [Fenetre(1, 2_500, 1.0), Fenetre(2, 10, 1.0)])!;
+        gel.PausesEcartees.Should().Be(0);
+        gel.Low1Median.Should().BeLessThan(90, "un gel au premier plan est la pire image de la partie");
+    }
+
+    // Une minute de jeu réaliste : 144 i/s avec sa gigue, un à-coup toutes les 400 images, et, hors du premier plan, une
+    // pause de présentation de 2,5 s.
+    private static CaptureEnPartie Minute(int minute, int graine)
+    {
+        var alea = new Random(graine);
+        var images = new List<double>();
+        for (var i = 0; i < 8600; i++) images.Add(i % 400 == 0 ? 25 + alea.NextDouble() * 20 : 6.9 + alea.NextDouble() * 1.2);
+        if (minute % 5 == 2) images.Add(2500);
+        return C(minute, 144, 100, BottleneckState.CpuBoundOrAppBound) with
+        {
+            ImagesMs = images, Entrees = 1, PremierPlan = minute % 5 == 2 ? 0.95 : 1,
+        };
+    }
+
+    // Le relevé ne garde pas les images de chaque minute d'une partie sans fin : au-delà d'une fenêtre, une minute n'en garde
+    // qu'un résumé (nombre, somme, régularité, pauses, ses images les plus lentes). Les chiffres de la partie ne changent pas.
+    [Fact]
+    public void Une_minute_resumee_donne_les_memes_chiffres_que_ses_images()
+    {
+        var brutes = Enumerable.Range(0, 12).Select(m => Minute(m, m)).ToList();
+        var resumees = brutes.Select((c, i) => i < 8 ? ReleveDesParties.Comprimer(c) : c).ToList();
+        resumees.Take(8).Should().OnlyContain(c => c.ImagesMs == null && c.Resume != null, "témoin : huit minutes résumées");
+
+        var avant = ReleveDesParties.Resumer("cod.exe", brutes)!;
+        var apres = ReleveDesParties.Resumer("cod.exe", resumees)!;
+
+        apres.FpsMedian.Should().BeApproximately(avant.FpsMedian, 1e-9);
+        apres.Low1Median.Should().BeApproximately(avant.Low1Median, 1e-9);
+        apres.MinutesJouees.Should().BeApproximately(avant.MinutesJouees!.Value, 1e-9);
+        apres.PausesEcartees.Should().Be(avant.PausesEcartees);
+        apres.Low1SurToutesLesImages.Should().BeTrue();
     }
 }

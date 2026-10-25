@@ -26,7 +26,7 @@ namespace DrDxt.Reconciler.Manifest;
 // que la desinstallation executerait elevee. La reprise part des entrees que l'App vient d'envoyer, et
 // elle dit que les origines de l'ancien manifeste ne seront plus rendues.
 //
-// Un seul appel a la fois : la boucle du helper sert une connexion apres l'autre.
+// Un seul appel a la fois, meme entre deux helpers (deux comptes) : un fichier verrou dans la racine de confiance.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class MachineManifestCommit
@@ -54,7 +54,35 @@ public sealed class MachineManifestCommit
         _pilote = pilote;
     }
 
+    /// <summary>Le verrou des écritures du manifeste et de sa clé : un fichier ouvert en exclusif dans la racine de confiance.
+    /// Deux comptes ont chacun leur helper ; un mutex nommé pourrait être pris d'avance par un programme sans droits, ce
+    /// dossier ne laisse créer un fichier qu'aux administrateurs.</summary>
+    public const string NomDuVerrou = "manifeste.verrou";
+
+    private static readonly TimeSpan AttenteDuVerrou = TimeSpan.FromSeconds(10);
+
     public async Task<Result> ExecuterAsync(DesiredState ajout, bool repartir, IReadOnlyCollection<string>? retirer = null)
+    {
+        // La racine est durcie (sans point de reparse, propriétaire Administrateurs) avant d'y ouvrir le verrou.
+        if (_appliquerAcl)
+        {
+            var racine = TrustedManifestRoot.EnsureCreatedHardened(_racine);
+            if (!racine.IsOk) return racine;
+        }
+        else Directory.CreateDirectory(_racine);
+        var chemin = Path.Combine(_racine, NomDuVerrou);
+        var fin = DateTime.UtcNow + AttenteDuVerrou;
+        FileStream? verrou = null;
+        while (verrou is null)
+        {
+            try { verrou = new FileStream(chemin, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose); }
+            catch (IOException) when (DateTime.UtcNow < fin) { await Task.Delay(50).ConfigureAwait(false); }
+            catch (IOException ex) { return Result.Fail(ErrorCodes.IoFailure, $"Manifest is busy: {ex.Message}"); }
+        }
+        using (verrou) return await ExecuterSousVerrouAsync(ajout, repartir, retirer).ConfigureAwait(false);
+    }
+
+    private async Task<Result> ExecuterSousVerrouAsync(DesiredState ajout, bool repartir, IReadOnlyCollection<string>? retirer)
     {
         var stockage = new ProgramDataManifestStorage(_racine, _appliquerAcl);
 

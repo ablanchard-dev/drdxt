@@ -75,9 +75,8 @@ public static class NetworkLatencyStatistics
             JitterMs: Jitter(samples));
     }
 
-    /// <summary>p95 au rang le plus proche sur la liste croissante. Avec peu de relevés, c'est
-    /// simplement l'avant-dernier pire : honnête pour une fenêtre courte, et n'interpole jamais une
-    /// valeur jamais mesurée.</summary>
+    /// <summary>p95 au rang le plus proche sur la liste croissante. Sous vingt relevés, c'est le pire relevé : honnête
+    /// pour une fenêtre courte, et n'interpole jamais une valeur jamais mesurée.</summary>
     private static double Percentile(IReadOnlyList<double> ascending, double fraction)
     {
         int rank = (int)Math.Ceiling(fraction * ascending.Count);

@@ -49,7 +49,10 @@ public class PointPendantUnSouciTests
         RepairAction action = RepairAction.Recommandation)
         => new("STABILITE", "point de restauration sain", valeur, null, statut, "explication", action, Souci);
 
-    private const string Souci = "arrêt brutal pendant une mise en veille, le 05/10/2026 à 20:47";
+    private const string Souci = "arrêt brutal pendant une mise en veille, le 05/10";
+
+    // L'avertissement commence par le souci : sa première lettre prend la majuscule.
+    private const string SouciAffiche = "Arrêt brutal pendant une mise en veille, le 05/10";
 
     [Fact]
     public async Task Un_souci_en_cours_est_dit_avant_le_clic_avec_le_point_sain()
@@ -58,7 +61,7 @@ public class PointPendantUnSouciTests
         await vm.ScanCommand.ExecuteAsync(null);
 
         vm.AvertissementPoint.Should().Contain("Apply.RestorePoint.DuringIssue").And.Contain("« Windows Update » du 18/09/2026")
-            .And.Contain(Souci, "capture du 06/10 : « un souci est en cours » sans dire lequel");
+            .And.Contain(SouciAffiche, "capture du 06/10 : « un souci est en cours » sans dire lequel");
     }
 
     // Sans point d'avant le souci, « Pour revenir à un état sain : aucun point d'avant le souci »
@@ -69,7 +72,7 @@ public class PointPendantUnSouciTests
         var vm = Vm(Sain("aucun point d'avant le souci", action: RepairAction.Aucune));
         await vm.ScanCommand.ExecuteAsync(null);
 
-        vm.AvertissementPoint.Should().StartWith("Apply.RestorePoint.DuringIssueNoPoint").And.NotContain("aucun point d'avant").And.Contain(Souci);
+        vm.AvertissementPoint.Should().StartWith("Apply.RestorePoint.DuringIssueNoPoint").And.NotContain("aucun point d'avant").And.Contain(SouciAffiche);
     }
 
     // Le bilan santé se remplit des constats du scan, jusqu'au ViewModel.
@@ -102,7 +105,7 @@ public class PointPendantUnSouciTests
         var vm = Vm(Sain(null, RepairStatus.Unknown));
         await vm.ScanCommand.ExecuteAsync(null);
 
-        vm.AvertissementPoint.Should().Be("Apply.RestorePoint.DuringIssueUnread " + Souci);
+        vm.AvertissementPoint.Should().Be("Apply.RestorePoint.DuringIssueUnread " + SouciAffiche);
     }
 
     // L'avertissement s'écrivait en gris SOUS le bouton Optimiser, lu après le clic.
@@ -117,6 +120,7 @@ public class PointPendantUnSouciTests
 
         avertissement.Should().BePositive("témoin : l'avertissement est affiché");
         avertissement.Should().BeLessThan(xaml.IndexOf("x:Name=\"BoutonOptimiser\"", StringComparison.Ordinal));
-        xaml.Substring(avertissement, 300).Should().Contain("EtatRegarderBrush");
+        // Ses mots le disent, en texte plein : la couleur d'état ne vit que dans la navigation et les titres de groupe.
+        xaml.Substring(avertissement, 300).Should().Contain("TexteBrush").And.NotContain("EtatRegarderBrush");
     }
 }

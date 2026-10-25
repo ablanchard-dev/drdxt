@@ -124,7 +124,13 @@ public sealed class LecteurWindowsUpdate : ILecteurWindowsUpdate
         return windows is { } w && w >= drdxt ? w : drdxt;
     }
 
+    /// <remarks>L'agent n'a pas de délai : la recherche hors ligne prend quelques secondes, un agent bloqué figerait l'audit.
+    /// Au-delà de 30 s : non lu.</remarks>
     public Result<EtatWindowsUpdate> Lire()
+        => DrDxt.Core.LectureWmiBornee.Lire(LireSansBorne,
+            () => Result<EtatWindowsUpdate>.Fail(ErrorCodes.IoFailure, "Windows Update did not answer within 30 s."), TimeSpan.FromSeconds(30));
+
+    private Result<EtatWindowsUpdate> LireSansBorne()
     {
         try
         {
@@ -133,8 +139,7 @@ public sealed class LecteurWindowsUpdate : ILecteurWindowsUpdate
             chercheur.Online = false;
             var enAttente = Chercher(chercheur, "IsInstalled=0 and IsHidden=0");
             // Ce qui ne s'installe qu'au clic n'apparaît qu'avec ce critère (Microsoft Learn, IUpdateSearcher::Search).
-            // Une panne de cette seconde recherche ne retire pas la première : la liste reste vide.
-            // Une panne de cette seconde recherche est « non lu » (null), pas « rien de proposé ».
+            // Une panne de cette seconde recherche ne retire pas la première : elle est « non lu » (null), pas « rien de proposé ».
             List<MiseAJourEnAttente>? proposees;
             try { proposees = Chercher(chercheur, "IsInstalled=0 and IsHidden=0 and DeploymentAction='OptionalInstallation'"); }
             catch (Exception) { proposees = null; }
@@ -150,7 +155,7 @@ public sealed class LecteurWindowsUpdate : ILecteurWindowsUpdate
             // LastSearchSuccessDate ne compte que les recherches de Windows lui-même (Microsoft Learn : « Only the
             // AutomaticUpdates object will update this property ») ; celle que DrDXT a lancée compte aussi.
             try { derniere = LaPlusRecente(derniere, File.Exists(_marque) ? File.ReadAllText(_marque) : null); }
-            catch (IOException) { /* marque illisible : la date de Windows seule */ }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* marque illisible : la date de Windows seule */ }
 
             return Result<EtatWindowsUpdate>.Ok(new EtatWindowsUpdate(enAttente, derniere, proposees));
         }
@@ -163,6 +168,9 @@ public sealed class LecteurWindowsUpdate : ILecteurWindowsUpdate
     private static List<MiseAJourEnAttente> Chercher(dynamic chercheur, string critere)
     {
         dynamic resultat = chercheur.Search(critere);
+        // Une recherche échouée rend une liste incomplète : elle est « non lu », jamais « rien en attente ».
+        if (!RechercheWindowsUpdate.Reussie((int)resultat.ResultCode))
+            throw new InvalidOperationException($"Windows Update search ended with code {(int)resultat.ResultCode}.");
         var liste = new List<MiseAJourEnAttente>();
         foreach (dynamic u in resultat.Updates)
         {
@@ -200,6 +208,10 @@ public sealed class LecteurWindowsUpdate : ILecteurWindowsUpdate
 [SupportedOSPlatform("windows")]
 public static class RechercheWindowsUpdate
 {
+    /// <summary>ISearchResult.ResultCode (OperationResultCode) : 2 réussie, 3 réussie avec erreurs. 0, 1, 4 et 5 (pas
+    /// commencée, en cours, échouée, abandonnée) ne sont pas une recherche faite.</summary>
+    internal static bool Reussie(int code) => code is 2 or 3;
+
     public static string MarqueParDefaut => DossierDonnees.Chemin("recherche-windows-update.txt");
 
     /// <summary>Cherche en ligne ce qui attend ; la réussite est notée dans <paramref name="marque"/>. Bloquant : peut
@@ -211,7 +223,9 @@ public static class RechercheWindowsUpdate
             dynamic session = Activator.CreateInstance(Type.GetTypeFromProgID("Microsoft.Update.Session", throwOnError: true)!)!;
             dynamic chercheur = session.CreateUpdateSearcher();
             chercheur.Online = true;
-            chercheur.Search("IsInstalled=0 and IsHidden=0");
+            dynamic resultat = chercheur.Search("IsInstalled=0 and IsHidden=0");
+            if (!Reussie((int)resultat.ResultCode))
+                return Result.Fail(ErrorCodes.IoFailure, $"Windows Update search ended with code {(int)resultat.ResultCode}.");
             // Fichier du compte : jamais à travers un nom posé d'avance en lien (l'App peut tourner élevée).
             return new FichierJsonAtomique(marque ?? MarqueParDefaut, ErrorCodes.IoFailure)
                 .WriteAtomic(DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture));

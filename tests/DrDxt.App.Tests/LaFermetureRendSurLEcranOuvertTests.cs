@@ -36,6 +36,23 @@ public sealed class LaFermetureRendSurLEcranOuvertTests
         source[..debut].Should().Contain("window.Closing").And.Contain("RendreAvantFermetureAsync");
     }
 
+    // Un second clic sur la croix pendant le rendu fermait l'App au milieu : il attend la fin, et seul le Close lancé par le
+    // rendu fini passe.
+    [Fact]
+    public void Un_second_clic_sur_la_croix_attend_la_fin_du_rendu()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "DrDXT.sln"))) dir = dir.Parent;
+        var source = File.ReadAllText(Path.Combine(dir!.FullName, "src", "DrDxt.App", "App.xaml.cs"));
+        var debut = source.IndexOf("window.Closing +=", StringComparison.Ordinal);
+        var corps = source[debut..source.IndexOf("window.Content =", debut, StringComparison.Ordinal)];
+
+        corps.Should().Contain("if (_fermetureLancee) { fermeture.Cancel = true; return; }")
+            .And.Contain("finally { _fermetureAutorisee = true; window.Close(); }");
+        corps.IndexOf("_fermetureAutorisee) return;", StringComparison.Ordinal).Should()
+            .BeLessThan(corps.IndexOf("if (_fermetureLancee)", StringComparison.Ordinal), "le Close du rendu fini passe avant la garde");
+    }
+
     [Fact]
     public async Task Une_recherche_en_cours_est_quelque_chose_a_rendre()
     {

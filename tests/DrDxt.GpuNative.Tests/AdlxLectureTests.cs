@@ -270,6 +270,14 @@ public sealed unsafe class AdlxLectureTests
         using (d) lus.Sam.Should().BeTrue();
     }
 
+    // Un Ryzen à puce graphique avec une RTX : ADLX ne liste que la puce, dite intégrée. Rien ne s'y lit.
+    [Fact]
+    public void Une_seule_carte_dite_integree_n_est_pas_lue()
+    {
+        var (lus, d) = Lire(new Scenario { Types = [1] });
+        using (d) lus.Sam.Should().BeNull();
+    }
+
     [Theory]
     [InlineData("sam-enabled")]
     [InlineData("qi")]
@@ -342,13 +350,18 @@ public sealed unsafe class AdlxLectureTests
     }
 
     [Fact]
-    public void SAM_non_pris_en_charge_est_non_lu_mais_Anti_Lag_non_pris_en_charge_est_eteint()
+    public void SAM_et_Anti_Lag_non_pris_en_charge_sont_non_lus_FRTC_et_Chill_ne_limitent_rien()
     {
-        var (lus, d) = Lire(new Scenario { Sam = (false, false), AntiLag = (false, false) });
+        var (lus, d) = Lire(new Scenario
+        {
+            Sam = (false, false), AntiLag = (false, false), Frtc = (false, false, 0), Chill = (false, false, 0, 0),
+        });
         using (d)
         {
             lus.Sam.Should().BeNull("la plateforme qui ne peut pas n'est pas « éteint, à allumer »");
-            lus.AntiLag.Should().BeFalse();
+            lus.AntiLag.Should().BeNull("Anti-Lag non géré n'est pas « désactivé » : l'allumer serait refusé par la carte");
+            lus.FrtcActif.Should().BeFalse("une limite d'images que la carte ne gère pas ne limite rien");
+            lus.ChillActif.Should().BeFalse();
         }
     }
 
