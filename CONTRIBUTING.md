@@ -30,7 +30,8 @@ must show; the report goes in an "AMD validation" issue.
 
 A "Bug" issue: what you did, what you expected, what happened, and your DrDXT version (bottom of the screen). Attach
 the diagnostic report ("View report") if the app produced one. A security issue is reported in private: see
-[SECURITY.md](SECURITY.md).
+[SECURITY.md](SECURITY.md). A question is not a bug: ask it in
+[Discussions](https://github.com/ablanchard-dev/drdxt/discussions) or on [Discord](https://discord.gg/z6HJWDzfB3).
 
 ## 3. Write code
 
