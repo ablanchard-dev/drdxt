@@ -2,7 +2,7 @@
 
 Version française, avec les versions publiées : [CHANGELOG.md](CHANGELOG.md).
 
-## 0.9.2 (unreleased)
+## 0.9.2 (25/10/2026)
 
 For the player:
 
