@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DrDxt.Application.Parties;
 using DrDxt.Core;
 using FluentAssertions;
@@ -143,6 +144,32 @@ public sealed class JournalDesChangementsTests : IDisposable
             b.Lire().Where(c => reussis.Contains(c.Libelle)).Should().OnlyContain(c => c.Fige != null, "aucun bilan figé n'est perdu");
         }
         finally { File.Delete(chemin); }
+    }
+
+    // Un ajout refusé (verrou tenu par l'autre écrivain) attend en mémoire le passage suivant. Figé avant ce passage, son
+    // bilan doit arriver dans le fichier : « réussi » sans rien écrire perdrait le verdict en silence.
+    [Fact]
+    public void Figer_un_ajout_encore_en_attente_l_ecrit_avec_son_bilan()
+    {
+        var chemin = Path.Combine(Path.GetTempPath(), $"journal-attente-{Guid.NewGuid():N}.json");
+        try
+        {
+            var journal = new JournalDesChangements(chemin, TimeSpan.Zero);
+            var c = new Changement(new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero), "changement en attente");
+            using (VerrouDuReleve.Prendre(journal.CheminDuVerrou))
+                journal.Ajouter(c).IsOk.Should().BeFalse("le verrou est tenu par l'autre écrivain");
+
+            var pire = new BilanDuChangement(VerdictEnJeu.Pire, "cod.exe", 3, 3, 95, 81, 140, 140);
+            journal.Figer(c, pire).IsOk.Should().BeTrue();
+
+            var ecrits = JsonSerializer.Deserialize<List<Changement>>(File.ReadAllText(chemin))!;
+            ecrits.Should().ContainSingle(e => e.Libelle == c.Libelle).Which.Fige.Should().Be(pire);
+        }
+        finally
+        {
+            File.Delete(chemin);
+            File.Delete(chemin + ".verrou");
+        }
     }
 
     [Fact]

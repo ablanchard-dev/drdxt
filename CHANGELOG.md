@@ -2,6 +2,19 @@
 
 English version of the coming changes: [CHANGELOG.en.md](CHANGELOG.en.md).
 
+## Non publié
+
+Pour le joueur :
+
+### Fiabilité
+- Un verdict en jeu n'est plus perdu quand le journal des changements était occupé au moment où son réglage a été
+  noté : il s'écrit avec l'entrée en attente.
+
+### Testeurs AMD
+- `DrDXT-Test.exe --lire` affiche aussi Enhanced Sync, Radeon Boost, Image Sharpening, RSR et AFMF, la consommation,
+  la fréquence, le point chaud et le ventilateur de la carte, et le FreeSync de chaque écran (contribution de
+  seragAhmed).
+
 ## 0.9.2 (25/10/2026)
 
 Pour le joueur :

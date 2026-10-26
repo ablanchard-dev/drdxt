@@ -127,6 +127,16 @@ public sealed class JournalDesChangements
     /// <summary>Fige le bilan tranché d'un changement (même date, même libellé) ; un bilan déjà figé n'est jamais réécrit.</summary>
     public Result Figer(Changement c, BilanDuChangement bilan) => bilan.Verdict == VerdictEnJeu.PasEncoreJuge ? Result.Ok() : SousVerrou(() =>
     {
+        // Un ajout refusé attend en mémoire : il s'écrit d'abord, sinon son bilan ne trouverait pas sa ligne dans le fichier
+        // et « réussi » ne serait vrai que pour ce processus.
+        var attente = Attente();
+        if (attente.Count > 0)
+        {
+            var ecrit = Ecrire(attente);
+            if (!ecrit.IsOk) return ecrit;
+            lock (EnAttente)
+                if (EnAttente.TryGetValue(Cle, out var l)) l.RemoveAll(attente.Contains);
+        }
         if (Existants() is not { IsOk: true } lu) return Result.Fail(CodeErreur, "The change log could not be read: nothing written.");
         var existants = lu.Value!;
         var liste = existants.Select(e => e.Fige is null && e.Quand == c.Quand && e.Libelle == c.Libelle ? e with { Fige = bilan } : e).ToList();
