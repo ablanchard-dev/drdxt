@@ -56,7 +56,9 @@ lue par DrDXT à côté de celle de l'outil de référence.
 
 | Chemin | Ce qu'il fait | État | Test | Le rapport montre |
 |---|---|---|---|---|
-| Réglages du pilote | lit SAM, Anti-Lag, Chill, FRTC, Vsync et la température de la carte | non validé sur AMD réel | `DrDXT-Test.exe --lire`, dans une invite de commandes ouverte dans le dossier du zip | chaque valeur lue par DrDXT, et la même dans Adrenalin (HWiNFO pour la température) |
+| Réglages du pilote | lit SAM, Anti-Lag, Chill, FRTC, Vsync et Enhanced Sync, et Radeon Boost, Image Sharpening, RSR et AFMF, que DrDXT n'écrit jamais | non validé sur AMD réel | `DrDXT-Test.exe --lire`, dans une invite de commandes ouverte dans le dossier du zip | chaque valeur lue par DrDXT, et la même dans Adrenalin |
+| Mesures de la carte | lit, à l'instant, la température de la carte, sa consommation, sa fréquence graphique, son point chaud et la vitesse de son ventilateur | non validé sur AMD réel | `DrDXT-Test.exe --lire`, dans la même invite | les lignes `Température`, `Consommation`, `Fréquence GPU`, `Point chaud` et `Ventilateur`, et HWiNFO au même moment |
+| FreeSync | lit, pour chaque écran branché sur la carte, si FreeSync est pris en charge et activé | non validé sur AMD réel | `DrDXT-Test.exe --lire`, dans la même invite | une ligne `FreeSync (écran N, nom)` par écran, et la même chose dans l'onglet Affichage d'Adrenalin |
 
 ## Lectures du processeur
 
