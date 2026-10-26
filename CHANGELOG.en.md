@@ -2,6 +2,18 @@
 
 Version française, avec les versions publiées : [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+For the player:
+
+### Reliability
+- An in-game verdict is no longer lost when the change log was busy at the moment its setting was noted: it is written
+  together with the waiting entry.
+
+### AMD testers
+- `DrDXT-Test.exe --lire` also prints Enhanced Sync, Radeon Boost, Image Sharpening, RSR and AFMF, the card's power,
+  clock, hotspot and fan speed, and FreeSync for each display (contributed by seragAhmed).
+
 ## 0.9.2 (25/10/2026)
 
 For the player:
