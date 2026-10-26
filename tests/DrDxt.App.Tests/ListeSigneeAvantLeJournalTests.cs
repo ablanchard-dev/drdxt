@@ -55,7 +55,7 @@ public sealed class ListeSigneeAvantLeJournalTests : IDisposable
     }
 
     // Le service repose le levier entre le rendu et sa sortie de la liste signée (sa passe d'après une mise à jour de Windows
-    // ou du pilote) : l'écran disait « Annulé » d'un réglage reposé. Relu après la sortie, il est rendu de nouveau, et
+    // ou du pilote) : l'écran dirait « Annulé » d'un réglage reposé. Relu après la sortie, il est rendu de nouveau, et
     // « Annulé » ne se dit que relu à l'origine.
     [Fact]
     public async Task Un_levier_repose_par_le_service_pendant_l_annulation_est_rendu_de_nouveau()

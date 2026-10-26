@@ -5,7 +5,7 @@ contact_links:
     about: Ask in Discussions, not in an issue. / Pose ta question dans les Discussions, pas dans une issue.
   - name: Discord
     url: https://discord.gg/z6HJWDzfB3
-    about: Talk with other players and the maintainer. / Échange avec les autres joueurs et le mainteneur.
+    about: Talk with other players and the maintainer. / Échange avec les autres joueurs et le développeur.
   - name: Security vulnerability / Faille de sécurité
     url: https://github.com/ablanchard-dev/drdxt/security/advisories/new
     about: Report it in private, never in a public issue. / À signaler en privé, jamais dans une issue publique.

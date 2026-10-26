@@ -1,8 +1,6 @@
 ﻿# NON-NUISANCE — ce que DrDXT peut ecrire sur la machine du client
 
-> Ecrit le 05/09/2026 par la boucle de livraison, lot LD.
->
-> Ce fichier existe pour repondre a une question qu'un acheteur a le droit de poser :
+> Ce fichier existe pour repondre a une question que tout joueur a le droit de poser :
 > **est-ce qu'une branche de ce logiciel peut abimer mon materiel, casser mon BIOS ou mon Windows ?**
 >
 > La reponse ne peut pas etre « non, promis ». Elle se construit en trois temps : dire ce que le
@@ -968,8 +966,7 @@ moins. Le test le rend visible, il ne l'empeche pas.
   relire) demande une session **elevee**. Non fait le 05/09.
 - **N4 — H2 et H3 reels** (no-boot puis recuperation ; survie a une mise a jour de
   fonctionnalite Windows) demandent une **machine sacrifiable ou une VM**. Non fait le 05/09.
-- Les gardes listees ici sont **prouvees par mutation** une par une dans le lot LD-N2. Faites le
-  06/09 : les **4 rails de `GpuSafeBounds`** (H1, 8 mutations) et les **cinq refus d'`OpAllowlist`**
+- Les gardes listees ici sont **prouvees par mutation** une par une. Faites le 06/09 : les **4 rails de `GpuSafeBounds`** (H1, 8 mutations) et les **cinq refus d'`OpAllowlist`**
   (H3, 6 mutations, dont la survivante qui a produit un test) et les **quatre gardes firmware**
   (H2, 6 mutations, plus la garde d'absence rendue falsifiable). **Vingt mutations, deux
   survivantes, deux tests ecrits en reponse.**

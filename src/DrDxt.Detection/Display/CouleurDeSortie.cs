@@ -11,8 +11,8 @@ namespace DrDxt.Detection.Display;
 /// remplit DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO (32 octets) : en-tête de 20, champ de bits à 20 (bit 0 prise en charge,
 /// bit 1 activée), DISPLAYCONFIG_COLOR_ENCODING à 24 (0 RVB, 1 YCbCr 4:4:4, 2 4:2:2, 3 4:2:0, 4 intensité),
 /// bitsPerColorChannel à 28. Le débit du lien n'est pas comparé : les débits HDMI et DisplayPort ne sont pas publiés en
-/// accès libre, donc un sous-échantillonnage est dit, sans dire s'il était évitable. Relevé sur la machine de référence le
-/// 17/10/2026 : deux écrans en RVB 8 bits, sans couleur avancée.
+/// accès libre, donc un sous-échantillonnage est dit, sans dire s'il était évitable. Relevé le 17/10/2026 sur la machine
+/// de référence : deux écrans en RVB 8 bits, sans couleur avancée.
 /// </remarks>
 public static class CouleurDeSortie
 {

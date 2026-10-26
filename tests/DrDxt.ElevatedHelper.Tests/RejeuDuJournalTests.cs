@@ -92,7 +92,7 @@ public sealed class RejeuDuJournalTests : IDisposable
     }
 
     // Un réglage DRS posé au profil d'un jeu qui ne le possédait pas : son image d'avant n'a pas de valeur, seulement sa
-    // provenance. Sans elle, l'entrée se disait « non rendable », sortait du journal, et le réglage restait dans le pilote.
+    // provenance. Sans elle, l'entrée serait dite « non rendable », sortirait du journal, et le réglage resterait dans le pilote.
     private const string Jeu = @"C:\Games\Call of Duty\cod.exe";
     private static ApplyNvApiDrsSettingOp DrsAuJeu(uint valeur) => new(0x1057EB71u, valeur, Jeu);
 

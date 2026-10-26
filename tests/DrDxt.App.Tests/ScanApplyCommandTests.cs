@@ -472,8 +472,8 @@ public sealed class ScanApplyCommandTests
             .And.NotContain(TweakDisplayKeys.TitleKey(AChaud[1]));
     }
 
-    // Scan sans jeu, puis le joueur lance son jeu et clique Optimiser : le jeu se lisait au scan, le veto « l'affichage se règle
-    // hors partie » ne jouait pas, et le mode d'écran changeait sous le jeu, sa question « garder ou revenir » cachée derrière.
+    // Scan sans jeu, puis le joueur lance son jeu et clique Optimiser : lu seulement au scan, le jeu échapperait au veto « l'affichage
+    // se règle hors partie », et le mode d'écran changerait sous le jeu, sa question « garder ou revenir » cachée derrière.
     [Fact]
     public async Task Un_jeu_lance_apres_le_scan_empeche_de_changer_l_ecran_au_clic()
     {

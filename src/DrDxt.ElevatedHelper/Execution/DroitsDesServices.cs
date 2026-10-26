@@ -182,8 +182,8 @@ public sealed class DroitsDesServices
         }
     }
 
-    /// <summary>Rend l'état d'avant cette correction (<see cref="RemettreLOrigine"/>), et retire l'origine que cette correction
-    /// avait gardée.</summary>
+    /// <summary>Rend l'état qui précédait la correction des droits (<see cref="RemettreLOrigine"/>), et retire l'origine
+    /// qu'elle avait gardée.</summary>
     private static Result Defaire(Tenus t, string exe, (string Fichier, string Dossier) avant, string? origineNouvelle, string raison)
     {
         try

@@ -33,7 +33,7 @@ Qualite de la source, notee parce qu'elle change ce qu'on a le droit d'en tirer 
 | R-05 | Peupler les quatre emplacements d'une carte grand public (topologie daisy chain) abaisse la frequence stable atteignable, par reflexion de signal | UNKNOWN | NON CHIFFRE | TERTIAIRE | https://www.faceofit.com/ddr5-2-vs-4-sticks/ | 2026-09-06 |
 | R-06 | La compression memoire de Windows reduit les acces disque en situation de memoire contrainte ; la desactiver degrade le plus souvent au lieu d'ameliorer | UNKNOWN | NON CHIFFRE | TERTIAIRE | https://www.ninjaone.com/blog/enable-or-disable-memory-compression-in-windows-11/ | 2026-09-06 |
 
-## MYTHES — nommes ici pour qu'aucune session future ne les reimplemente
+## MYTHES — nommes ici pour que personne ne les reimplemente
 
 Un mythe est une manipulation memoire populaire dont le gain n'est demontre nulle part, et dont le
 cout est reel. Le produit ne les propose pas. Il a le droit de dire au client qu'il ne les fera pas.

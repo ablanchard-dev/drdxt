@@ -104,8 +104,8 @@ public sealed class EdidVrrCapabiliteTests
         EdidVrrCapabilite.Lire(EdidFabrique.AvecHdmiForum(48, 144)[..128]).Should().Be(TriState.Unknown);
     }
 
-    /// <summary>L'extension CTA-861 du même Samsung, lue par WMI (WmiMonitorDescriptorMethods, bloc 1) sur la machine de
-    /// référence le 25/10/2026 : vidéo, audio, haut-parleurs et un VSDB HDMI 1.4 (OUI 000C03), aucun bloc VRR.</summary>
+    /// <summary>L'extension CTA-861 du même Samsung, relevée le 25/10/2026 par WMI (WmiMonitorDescriptorMethods, bloc 1) sur la
+    /// machine de référence : vidéo, audio, haut-parleurs et un VSDB HDMI 1.4 (OUI 000C03), aucun bloc VRR.</summary>
     private const string SamsungBloc1 =
         "02031CF147903F1F04130312230907078301000067030C001000B8440474801871382D40582C45000F282100001E023A" +
         "801871382D40582C45000F282100001E0000000000000000000000000000000000000000000000000000000000000000" +

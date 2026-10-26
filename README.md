@@ -94,6 +94,22 @@ Still to prove: a gain measured by DrDXT over matches, and AMD cards, Intel Arc,
 covered in the code but tested only on reconstructed machines. [docs/COUVERTURE.md](docs/COUVERTURE.md) says, setting
 by setting, what DrDXT does on each kind of PC, and why not where it does not.
 
+## How it is built
+
+DrDXT is written by one person, with heavy help from AI coding assistants. That is a choice, not a secret. What keeps
+the code honest is not trust in what an assistant writes, but what the build refuses:
+
+- every setting must know how to undo itself, and a bench applies and reverts all of them;
+- nothing is written outside the helper's allowlist, and CI recounts every write site against
+  [docs/NON-NUISANCE.md](docs/NON-NUISANCE.md);
+- a value that could not be read is never reported as fine;
+- the test count and the list of writes in this README are checked against the code.
+
+The code is written in French, identifiers and comments alike, and that stays: its author is French and reads every
+line. What a contributor needs to find their way (this README, [ARCHITECTURE.md](ARCHITECTURE.md),
+[CONTRIBUTING.md](CONTRIBUTING.md), and the index of [docs/](docs/README.md)) is in English, and issues and pull
+requests are welcome in English.
+
 ## Install
 
 1. Download `DrDXT-Setup-NON-SIGNE.exe` from the latest [Release](https://github.com/ablanchard-dev/drdxt/releases).

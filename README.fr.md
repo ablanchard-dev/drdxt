@@ -100,6 +100,22 @@ cartes et les consoles portables, prévus dans le code mais testés seulement su
 [docs/COUVERTURE.md](docs/COUVERTURE.md) dit, réglage par réglage, ce que DrDXT fait sur chaque type de PC, et pourquoi pas
 là où il ne le fait pas.
 
+## Comment il est construit
+
+DrDXT est écrit par une seule personne, avec beaucoup d'aide d'assistants de code IA. C'est un choix, pas un secret. Ce
+qui garde le code honnête, ce n'est pas la confiance dans ce qu'un assistant écrit, c'est ce que la compilation refuse :
+
+- chaque réglage doit savoir se défaire, et un banc les applique et les défait tous ;
+- rien ne s'écrit hors de la liste d'autorisation du helper, et la CI recompte chaque site d'écriture face à
+  [docs/NON-NUISANCE.md](docs/NON-NUISANCE.md) ;
+- une valeur qui n'a pas pu être lue n'est jamais présentée comme bonne ;
+- le compte des tests et la liste des écritures de ce README sont vérifiés contre le code.
+
+Le code est écrit en français, noms comme commentaires, et le reste : son auteur est français et en relit chaque
+ligne. Ce dont un contributeur a besoin pour s'y retrouver (le README, [ARCHITECTURE.md](ARCHITECTURE.md),
+[CONTRIBUTING.md](CONTRIBUTING.md) et l'index de [docs/](docs/README.md)) existe en anglais, et les issues et pull
+requests sont bienvenues en anglais comme en français.
+
 ## Installer
 
 1. Télécharge `DrDXT-Setup-NON-SIGNE.exe` dans la dernière [Release](https://github.com/ablanchard-dev/drdxt/releases).

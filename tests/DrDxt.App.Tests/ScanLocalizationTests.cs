@@ -171,7 +171,7 @@ public class ScanLocalizationTests
     }
 
     // Ce qui part dans un export ou un paquet : le nom d'un périphérique renommé par le joueur reste, l'écran le dit avant
-    // qu'il partage (CONFIDENTIALITE.md le disait seul).
+    // qu'il partage, et pas seulement CONFIDENTIALITE.md.
     [Theory]
     [InlineData("fr", "renommé")]
     [InlineData("en", "renamed")]

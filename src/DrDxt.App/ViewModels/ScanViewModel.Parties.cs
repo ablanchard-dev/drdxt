@@ -547,8 +547,8 @@ public partial class ScanViewModel
         if (LevierReposCarte?.Id == id) ReglagesDeLaCarte?.Effacer();
         await ArreterEssaiSurAnnulationAsync(id);
         _orphelinsDuManifeste = _orphelinsDuManifeste.Where(o => o.Id != id).ToList();
-        // Annulé, il n'est plus une pose de ce scan : Optimiser peut le reproposer, et son compte rendu, qui le disait posé,
-        // ne dit plus vrai.
+        // Annulé, il n'est plus une pose de ce scan : Optimiser peut le reproposer, et son compte rendu le compterait encore
+        // comme posé.
         if (_posesDepuisLeScan.Remove(id)) ResultatOptimisation = null;
         await JugerCeQuiResteAPoserAsync().ConfigureAwait(true);
         MessageLeviers = string.Format(CultureInfo.CurrentCulture, _localize(etat == Pose.ChangeDepuis ? "Leviers.ChangeDepuis"

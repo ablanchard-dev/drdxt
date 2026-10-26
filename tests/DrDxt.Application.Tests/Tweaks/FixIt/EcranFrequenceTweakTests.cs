@@ -130,7 +130,7 @@ public sealed class EcranFrequenceTweakTests
     }
 
     // Le joueur ne garde pas le mode, et le retour à l'ancien échoue : l'écran reste au mode cible pour la session. Le levier
-    // rendait « indisponible », et l'écran disait « Pas posé (rien n'est resté) ».
+    // ne rend pas « indisponible », qui ferait afficher « Pas posé (rien n'est resté) ».
     [Fact]
     public async Task Un_retour_rate_se_dit_partiellement_pose()
     {

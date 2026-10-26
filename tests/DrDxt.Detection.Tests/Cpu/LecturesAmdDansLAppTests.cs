@@ -6,7 +6,7 @@ using FluentAssertions;
 namespace DrDxt.Detection.Tests.Cpu;
 
 // Les lectures AMD déjà écrites (Tctl, S5_RESET_STATUS, timings du contrôleur), branchées dans l'App derrière
-// LecturesAmdProfondes.ValideesEnVie. Porte fermée : rien n'est appelé et le docteur dit ce qu'il disait. Porte ouverte
+// LecturesAmdProfondes.ValideesEnVie. Porte fermée : rien n'est appelé et le docteur dit ce qu'il dit sans elles. Porte ouverte
 // (ici seulement, avec un faux PawnIO) : la valeur décodée arrive au constat. Aucune lecture PawnIO réelle.
 public sealed class LecturesAmdDansLAppTests
 {

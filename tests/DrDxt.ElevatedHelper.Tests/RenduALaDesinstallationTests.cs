@@ -592,7 +592,7 @@ public sealed class RenduALaDesinstallationTests : IDisposable
     }
 
     // Une seconde désinstallation après une réinstallation : la clé est restée, le manifeste a été mis de côté la première
-    // fois. Le rapport disait « lu et vérifié » puis « mis de côté » pour un fichier qui n'existait pas.
+    // fois. Le rapport ne dit pas « lu et vérifié » puis « mis de côté » pour un fichier qui n'existe pas.
     [Fact]
     public async Task Sans_manifeste_avec_la_cle_le_rapport_ne_dit_ni_lu_ni_mis_de_cote()
     {

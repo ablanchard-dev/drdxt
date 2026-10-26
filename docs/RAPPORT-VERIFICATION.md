@@ -1,7 +1,7 @@
 # DrDXT — rapport de verification
 
-Ecrit le **06/09/2026**. Destine a quelqu'un qui n'a pas suivi le travail : un relecteur, un
-associe, un acheteur.
+Destine a quelqu'un qui n'a pas suivi le travail : un relecteur, un contributeur, un joueur qui veut savoir
+ce qui tient.
 
 **La regle du document, et elle est mecanique** : chaque ligne « prouve » nomme un test qui existe,
 et `python tools/nonuisance/check-guard-tests.py docs/RAPPORT-VERIFICATION.md` refuse un nom qui ne
@@ -28,10 +28,9 @@ mutations, consignees dans le journal. Il etablit qu'une affirmation a un instru
 | memoire — etat de l'art | aucune affirmation chiffree sans source ET date ; les mythes sont prouves ABSENTS par l'API qui les implementerait | `TheRamStateOfTheArtHasNoUnsourcedClaimTests` |
 | instruments | aucun plancher de bruit sans date ni nombre de passes ; un instrument jamais lance ici ne peut porter aucun chiffre | `TheInstrumentRegistryCannotRotTests` |
 | securite serveur | aucun `CommandText` n'est assemble ; chaque avis de vulnerabilite porte sa ligne de tri | `TheVulnerabilityTriageIsCompleteGateTests` |
-| encaissement | un remboursement qui ne revoque personne **se compte**, et `/health` passe a `degraded` | `HealthEndpointTests` |
 
-**Suite complete au 06/09 : 17 assemblies produit, 2 827 tests, 0 echec. Serveur : 51 tests,
-0 echec.**
+Le compte de la suite n'est pas recopie ici : le README publie celui du dernier passage, et
+`tools/gates/compte_des_tests.py` refuse un compte qui n'est pas le sien.
 
 ---
 
@@ -46,27 +45,17 @@ mutations, consignees dans le journal. Il etablit qu'une affirmation a un instru
 | ce qu'un firmware inconnu fait d'un boot-to-setup | hors de portee par construction |
 | si le produit survit a un no-boot puis a sa recuperation | aucun hyperviseur ni machine sacrifiable ici |
 
-**La forme de ces lignes est le produit lui-meme** : DrDXT vend de ne pas affirmer ce qu'il n'a
+**La forme de ces lignes est le produit lui-meme** : DrDXT s'engage a ne pas affirmer ce qu'il n'a
 pas mesure. Un rapport de verification qui cacherait sa propre colonne UNKNOWN contredirait ce
 qu'il verifie.
 
 ---
 
-## 3. Ce qui attend une decision — et elles sont toutes commerciales
+## 3. Ce qui attend une decision
 
-`GATES.md` porte le detail date. Aucune n'est un blocage technique.
+`GATES.md` porte le detail. Une seule decision reste, et elle n'est pas technique :
 
-1. **L'emission des licences** : sans objet. DrDXT est gratuit et open source (GPL) depuis le 23/09/2026
-   (e2a1e541) : plus de licence, de paiement ni de Keygen.
-2. **Le certificat de signature** (~100 €/an) : sans lui, l'installeur declenche SmartScreen.
-3. **Le prix**, jamais tranche.
-4. **La garantie 14 jours** : l'ecran de licence la **promet deja** alors qu'elle n'est pas
-   confirmee.
-5. **Ou tourne le serveur** : aucune URL de deploiement n'existe dans le depot, donc la mise a jour
-   est branchee des deux bouts et ne tourne pour personne.
-6. **Executer l'installeur** : reconstruit le 06/09 depuis le code courant, jamais installe. Un
-   double-clic et un UAC.
-7. **La pile ASP.NET en 10.x**, avant le **10 novembre 2026** — fin de support de .NET 8.
+1. **Le certificat de signature** : sans lui, l'installeur declenche SmartScreen.
 
 ---
 

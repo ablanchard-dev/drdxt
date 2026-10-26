@@ -714,8 +714,8 @@ public class CarteDeLaMachineTests
         pilote.ValeurAAfficher.Should().BeEmpty("la première phrase dit déjà les deux versions");
     }
 
-    // Sans mesure du chemin réseau (pas de connexion pendant le scan, box muette), le domaine disait « n'a pas pu être lu sur
-    // cette machine », sans dire pourquoi ni quoi faire. Il dit ce qui manque : une connexion pendant le scan.
+    // Sans mesure du chemin réseau (pas de connexion pendant le scan, box muette), « n'a pas pu être lu sur cette machine »
+    // ne dirait ni pourquoi ni quoi faire : le domaine dit ce qui manque, une connexion pendant le scan.
     [Fact]
     public void Le_reseau_non_mesure_dit_qu_il_faut_une_connexion()
         => CarteDeLaMachine.Construire([], Aucune, [], Loc).Single(d => d.Cle == "reseau").Verdict
