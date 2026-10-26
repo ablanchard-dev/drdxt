@@ -27,7 +27,9 @@ public sealed class ProcessusBorneTests
 
         var r = ProcessusBorne.Executer(psi, TimeSpan.FromMilliseconds(500));
 
-        chrono.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+        // La borne prouve que l'appel revient (sans délai, il ne reviendrait jamais), pas la durée du délai : large,
+        // elle tient sur un runner de CI à deux cœurs saturé par les autres projets de tests.
+        chrono.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(30));
         r.Lance.Should().BeTrue();
         r.Fini.Should().BeFalse();
         Action relire = () => { using var p = Process.GetProcessById(r.Pid); p.HasExited.Should().BeTrue("arrêté à la borne"); };

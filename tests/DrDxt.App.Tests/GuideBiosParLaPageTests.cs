@@ -232,7 +232,8 @@ public sealed class GuideBiosParLaPageTests(ITestOutputHelper sortie)
         foreach (var a in new[] { Path.Combine(Racine(), "tests", "DrDxt.App.Tests", "PageDuGuide.harnais.mjs"),
                      Path.Combine(Racine(), "docs", "guide-bios", "index.html"), PageDuGuide.Fragment(contenu), langue })
             psi.ArgumentList.Add(a);
-        var r = ProcessusBorne.Executer(psi, TimeSpan.FromSeconds(60));
+        // Node répond en moins d'une seconde ; la borne ne coupe qu'un processus perdu, même sur un runner de CI saturé.
+        var r = ProcessusBorne.Executer(psi, TimeSpan.FromSeconds(180));
         r.Code.Should().Be(0, r.Erreurs);
         using var doc = JsonDocument.Parse(r.Sortie);
         return doc.RootElement.EnumerateObject().ToDictionary(p => p.Name,

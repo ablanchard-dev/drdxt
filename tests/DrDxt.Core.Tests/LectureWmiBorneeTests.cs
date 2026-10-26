@@ -15,7 +15,9 @@ public sealed class LectureWmiBorneeTests
         var r = LectureWmiBornee.Lire(() => { jamais.Wait(); return "lu"; }, () => "figé", TimeSpan.FromMilliseconds(200));
 
         r.Should().Be("figé");
-        chrono.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
+        // La borne prouve que l'appel revient (sans délai, il ne reviendrait jamais), pas la durée du délai : large,
+        // elle tient sur un runner de CI à deux cœurs saturé par les autres projets de tests.
+        chrono.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(30));
         jamais.Set();
     }
 
