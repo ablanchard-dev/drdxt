@@ -1,6 +1,5 @@
-<!-- Portable AMD test-harness console tool. NOT part of DrDXT.sln. -->
+<!-- Portable AMD test-harness console tool. Part of DrDXT.sln: the solution builds it and runs its tests. -->
 <!-- Runs ONE throwaway session on a friend's AMD machine and leaves nothing behind. -->
-<!-- Follows the same out-of-sln pattern as tools/smoke. -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -8,7 +7,7 @@
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!-- Out-of-sln tool: TreatWarningsAsErrors inherited from Directory.Build.props -->
+    <!-- TreatWarningsAsErrors inherited from Directory.Build.props -->
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
