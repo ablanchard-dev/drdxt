@@ -54,11 +54,12 @@ if (args.Length == 2 && args[0] == "--etape" && int.TryParse(args[1], out var nu
 }
 
 // « --lire » lit par ADLX, sur la carte AMD dédiée, ce que le produit affiche (SAM, Anti-Lag,
-// FRTC / Chill, Vsync, température), puis s'arrête. Lecture seule : aucune entrée Set* n'est appelée, aucun service lancé.
+// FRTC / Chill, Vsync et Enhanced Sync, réglages Radeon, température et mesures de la carte, FreeSync de chaque écran,
+// limite de puissance), puis s'arrête. Lecture seule : aucune entrée Set* n'est appelée, aucun service lancé.
 if (args.Contains("--lire"))
 {
-    foreach (var ligne in LectureAdlx.Lignes(AdlxReglages.Lire(), AdlxReglages.DllPresente())) Console.WriteLine(ligne);
-    foreach (var ligne in LectureAdlx.LignesPuissance(LectureAdlx.LirePuissances())) Console.WriteLine(ligne);
+    var dllPresente = AdlxReglages.DllPresente();
+    foreach (var ligne in LectureAdlx.Lire(dllPresente ? AdlxReglages.Partage : null, dllPresente)) Console.WriteLine(ligne);
     // Le processeur, par PawnIO s'il est installé : les seuls ioctl de lecture de PawnIoAmd, rien n'est écrit.
     if (DrDxt.GpuNative.PawnIo.PawnIoAmd.ProcesseurAmd())
     {
