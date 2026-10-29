@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -38,7 +39,7 @@ public sealed class UnSeulAppelALActionParEcranTests
     }
 
     private static int CapsulesDe(string fichier)
-        => Regex.Matches(File.ReadAllText(fichier), $@"Style=""\{{StaticResource {Capsule}\}}""").Count;
+        => Regex.Matches(Path.GetFileName(fichier) == "ScanView.xaml" ? VueScan.Texte(fichier) : File.ReadAllText(fichier), $@"Style=""\{{StaticResource {Capsule}\}}""").Count;
 
     [Fact]
     public void Le_crible_voit_bien_des_capsules_dans_les_vues()

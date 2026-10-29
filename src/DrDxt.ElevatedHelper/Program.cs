@@ -23,8 +23,9 @@ namespace DrDxt.ElevatedHelper;
 //     TypedPrivilegedServer avec cette clé HMAC partagée.
 // Appelant de confiance : --app-path=<chemin complet> ou DRDXT_HELPER_APP_PATH, admis par chemin et SHA-256 calculé
 // au démarrage (ferme l'exe remplacé au même chemin, sans signature de code) ; pas de chemin ou empreinte
-// incalculable → DenyByDefault. --pipe=<nom> facultatif (nom standard par défaut). L'installeur enregistre ce même exe
-// comme service Windows sur le même pipe + handshake (une UAC à l'installation) ; la boucle ne change pas.
+// incalculable → DenyByDefault. --pipe=<nom> facultatif (nom standard par défaut). Case cochée à l'installation, la tâche
+// « DrDXT helper » lance ce même exe à l'ouverture de session (--service), sur le même pipe + handshake ; la boucle ne
+// change pas.
 internal static class Program
 {
     private const string SessionKeyArg = "--session-key=";
@@ -53,8 +54,8 @@ internal static class Program
         var sessionKey = ReadSessionKey(args);
         var handshakeMode = sessionKey is null;
 
-        // --service nomme l'intention de service (l'entrée que l'installeur enregistre) ; la boucle d'acceptation durable
-        // multi-connexion est la même avec ou sans.
+        // --service : lancé par la tâche « DrDXT helper » (case de l'installeur), pour toute la session. Il ne change que
+        // l'arrêt (DoitSArreter) ; la boucle d'acceptation, l'authentification des appelants et l'exécuteur sont les mêmes.
         var serviceMode = args.Any(a => string.Equals(a, ServiceArg, StringComparison.Ordinal));
 
         var pipeName = ReadArg(args, PipeArg) ?? PipeSecurityFactory.DefaultPipeName;
@@ -199,8 +200,8 @@ internal static class Program
         var monitor = RunLeaseMonitorAsync(watchdog, TimeSpan.FromSeconds(5), cts.Token,
             ct => watchdog.RendreSiAsync(op => GardeThermiqueVentilateur.DoitRendre(op, temperature), "fan-auto-hot-or-unread", ct), () =>
         {
-            if (inactivite?.DoitSArreter(watchdog.NombreDeBaux, ProcessusVivant) != true) return;
-            Console.Out.WriteLine("DrDxt.ElevatedHelper: app closed or 15 minutes without a connection, and no lease: stopping.");
+            if (!DoitSArreter(inactivite, watchdog.NombreDeBaux, ProcessusVivant, InstalleurEnCours)) return;
+            Console.Out.WriteLine("DrDxt.ElevatedHelper: app closed, 15 minutes without a connection or installer running, and no lease: stopping.");
             cts.Cancel();
         });
 
@@ -325,6 +326,27 @@ internal static class Program
             }
         }
         return null;
+    }
+
+    /// <summary>Le mutex que l'installeur de DrDXT crée pendant une mise à jour ou une désinstallation (LaisserLeHelperRendreSesBaux).</summary>
+    internal const string MutexDeLInstalleur = "DrDxtInstalleur";
+
+    /// <summary>Lancé à la demande, le helper s'arrête sur inactivité (<see cref="ArretSurInactivite"/>). En --service
+    /// (<paramref name="inactivite"/> nul), il tient la session : il ne s'arrête que quand l'installeur tourne, ses baux rendus,
+    /// pour que ses fichiers se remplacent sans arrêt forcé. Un programme du compte qui crée ce mutex ne fait que l'arrêter.</summary>
+    internal static bool DoitSArreter(ArretSurInactivite? inactivite, int bauxActifs, Func<int, bool> vivant, Func<bool> installeurEnCours)
+        => inactivite is not null ? inactivite.DoitSArreter(bauxActifs, vivant) : bauxActifs == 0 && installeurEnCours();
+
+    private static bool InstalleurEnCours()
+    {
+        try
+        {
+            if (!Mutex.TryOpenExisting(MutexDeLInstalleur, out var m)) return false;
+            m.Dispose();
+            return true;
+        }
+        // Existant mais fermé à ce compte : l'installeur élevé tourne bien.
+        catch (UnauthorizedAccessException) { return true; }
     }
 
     // Le client authentifié vit-il encore ? Un processus introuvable est parti.

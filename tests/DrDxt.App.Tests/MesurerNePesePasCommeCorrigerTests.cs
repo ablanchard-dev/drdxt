@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -12,7 +13,7 @@ public sealed class MesurerNePesePasCommeCorrigerTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        return File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        return VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
     }
 
     private static string StyleDe(string commande)

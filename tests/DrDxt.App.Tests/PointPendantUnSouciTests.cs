@@ -6,6 +6,7 @@ using DrDxt.Core;
 using FluentAssertions;
 using NSubstitute;
 using Xunit;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -115,7 +116,7 @@ public class PointPendantUnSouciTests
     {
         var d = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !System.IO.File.Exists(System.IO.Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = System.IO.File.ReadAllText(System.IO.Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(System.IO.Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         var avertissement = xaml.IndexOf("{Binding AvertissementPoint}", StringComparison.Ordinal);
 
         avertissement.Should().BePositive("témoin : l'avertissement est affiché");

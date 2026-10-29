@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -13,7 +14,7 @@ public sealed class ResultatsEnCascadeTests
     [Fact]
     public void Les_resultats_entrent_dans_l_ordre_de_lecture()
     {
-        var xaml = File.ReadAllText(Path.Combine(Racine(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(Racine(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
 
         var retards = OrdreDeLecture.Select(nom =>
         {

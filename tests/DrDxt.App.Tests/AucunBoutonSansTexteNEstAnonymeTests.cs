@@ -32,7 +32,7 @@ public sealed class AucunBoutonSansTexteNEstAnonymeTests
     private static IEnumerable<string> Vues()
     {
         var app = Path.Combine(Racine().FullName, "src", "DrDxt.App");
-        return Directory.EnumerateFiles(Path.Combine(app, "Views"), "*.xaml")
+        return Directory.EnumerateFiles(Path.Combine(app, "Views"), "*.xaml", SearchOption.AllDirectories)
                         .Append(Path.Combine(app, "MainWindow.xaml"))
                         .Where(File.Exists);
     }

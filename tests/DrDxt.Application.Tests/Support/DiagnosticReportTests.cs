@@ -45,6 +45,33 @@ public sealed class DiagnosticReportTests
             coverage ?? new ScanCoverage(3, 2, 1),
             bottleneck);
 
+    // Une barrette dont Windows ne dit pas les vitesses (0 = non lu dans MemoryModule) : « 0 MT/s » dans un rapport collé au
+    // support se lirait comme une mémoire mesurée, comme « 0 CCD » plus haut.
+    [Fact]
+    public void Une_vitesse_de_memoire_non_lue_ne_s_ecrit_pas_0_MTs()
+    {
+        using var _ = Docteur.Portee(System.Globalization.CultureInfo.GetCultureInfo("fr-FR"));
+        var scan = Scan();
+        scan = scan with { Hw = scan.Hw with { Memory = new[] { new MemoryModule("Unknown", "Unknown", 0, 0) } } };
+
+        var rapport = DiagnosticReport.Build(scan, "1.0", When);
+
+        rapport.Should().NotContain("0 MT/s").And.NotContain("nominal 0");
+        rapport.Should().Contain("Unknown Unknown, " + Docteur.T("RF.Statut.NonLu"));
+    }
+
+    // Win32_Processor sans NumberOfCores ni NumberOfLogicalProcessors (CpuDetector somme alors 0) : « 0c/0t » se lirait
+    // comme un processeur compté.
+    [Fact]
+    public void Des_coeurs_non_lus_ne_s_ecrivent_pas_0c()
+    {
+        using var _ = Docteur.Portee(System.Globalization.CultureInfo.GetCultureInfo("fr-FR"));
+        var scan = Scan();
+        scan = scan with { Hw = scan.Hw with { Cpu = new CpuInfo("Intel Core i7-14700F", "Intel", 0, 0, false, 1) } };
+
+        DiagnosticReport.Build(scan, "1.0", When).Should().NotContain("0c/0t").And.Contain("Intel Core i7-14700F (" + Docteur.T("RF.Statut.NonLu") + ", 1 CCD)");
+    }
+
     [Fact]
     public void En_anglais_le_rapport_n_a_plus_un_mot_de_francais()
     {

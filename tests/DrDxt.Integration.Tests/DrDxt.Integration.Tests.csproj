@@ -29,6 +29,7 @@
          tous les leviers du banc. -->
     <ProjectReference Include="..\..\src\DrDxt.App\DrDxt.App.csproj" />
     <Compile Include="..\Shared\AdminRequis.cs" Link="Shared\AdminRequis.cs" />
+    <Compile Include="..\Shared\VueScan.cs" Link="Shared\VueScan.cs" />
   </ItemGroup>
 
   <ItemGroup>

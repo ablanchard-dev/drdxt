@@ -6,6 +6,7 @@ using DrDxt.App.ViewModels;
 using DrDxt.Core;
 using FluentAssertions;
 using NSubstitute;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -78,7 +79,7 @@ public sealed partial class ScanApplyCommandTests
     {
         var d = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !System.IO.File.Exists(System.IO.Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = System.IO.File.ReadAllText(System.IO.Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(System.IO.Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         var bouton = xaml.IndexOf("x:Name=\"BoutonOptimiser\"", StringComparison.Ordinal);
         var scene = xaml.IndexOf("{Binding LabelSceneRetenue}", StringComparison.Ordinal);
         bouton.Should().BePositive("témoin");
@@ -94,7 +95,7 @@ public sealed partial class ScanApplyCommandTests
     {
         var d = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !System.IO.File.Exists(System.IO.Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = System.IO.File.ReadAllText(System.IO.Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(System.IO.Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         var apres = xaml[xaml.IndexOf("x:Name=\"BoutonOptimiser\"", StringComparison.Ordinal)..];
         apres.Should().Contain("{Binding LabelOptimisationEnCours}");
         apres[..apres.IndexOf("LabelOptimisationEnCours", StringComparison.Ordinal)]

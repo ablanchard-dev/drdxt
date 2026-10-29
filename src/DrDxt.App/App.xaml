@@ -456,7 +456,7 @@
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Iris" Storyboard.TargetProperty="Opacity" To="0.3" Duration="0:0:0.22"/>
+                                            <effets:TransitionDeGeste Storyboard.TargetName="Iris" Storyboard.TargetProperty="Opacity" To="0.3" Duration="0:0:0.22"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -464,7 +464,7 @@
                                     <BeginStoryboard>
                                         <Storyboard>
                                             <!-- La sortie est plus rapide que l'entrée. -->
-                                            <DoubleAnimation Storyboard.TargetName="Iris" Storyboard.TargetProperty="Opacity" To="0.12" Duration="0:0:0.16"/>
+                                            <effets:TransitionDeGeste Storyboard.TargetName="Iris" Storyboard.TargetProperty="Opacity" To="0.12" Duration="0:0:0.16"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
@@ -669,14 +669,14 @@
                                             <Trigger.EnterActions>
                                                 <BeginStoryboard>
                                                     <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="Capsule" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.24"/>
+                                                        <effets:TransitionDeGeste Storyboard.TargetName="Capsule" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.24"/>
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </Trigger.EnterActions>
                                             <Trigger.ExitActions>
                                                 <BeginStoryboard>
                                                     <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="Capsule" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.14"/>
+                                                        <effets:TransitionDeGeste Storyboard.TargetName="Capsule" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.14"/>
                                                     </Storyboard>
                                                 </BeginStoryboard>
                                             </Trigger.ExitActions>

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -28,7 +29,7 @@ public sealed class BasculesDisentLeurEtatTests
     [Fact]
     public void Les_trois_bascules_sont_de_vrais_interrupteurs_lies_a_leur_etat()
     {
-        var xaml = File.ReadAllText(Path.Combine(CheminDuDepot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(CheminDuDepot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
         foreach (var etat in new[] { "CalmerVoisinsActif", "VeillePingActive", "ReleveDesPartiesActif" })
             xaml.Should().Contain($"IsChecked=\"{{Binding {etat}, Mode=OneWay}}\"", etat);
         System.Text.RegularExpressions.Regex.Matches(xaml, "Style=\"\\{StaticResource Bascule\\}\"").Count.Should().BeGreaterThanOrEqualTo(3);

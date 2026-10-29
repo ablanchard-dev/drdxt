@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using DrDxt.App.Effets;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -21,7 +22,7 @@ public sealed class ConsigneAuSurvolTests
     {
         var dir = AppContext.BaseDirectory;
         while (!File.Exists(Path.Combine(dir, "DrDXT.sln"))) dir = Path.GetDirectoryName(dir)!;
-        var vue = File.ReadAllText(Path.Combine(dir, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var vue = VueScan.Texte(Path.Combine(dir, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         Regex.Matches(vue, @"<TextBlock Text=""\{Binding Label\w+Maintenir\}"" effets:ConsigneAuSurvol\.Actif=""True""").Count.Should().Be(9, "les cartes du test de refroidissement, de la recherche de sous-tension et de la cadence des entrées");
         Regex.IsMatch(vue, @"LabelMaintenirPourLancer\}""[^>]*ConsigneAuSurvol").Should().BeFalse("l'accueil enseigne le geste");
     }

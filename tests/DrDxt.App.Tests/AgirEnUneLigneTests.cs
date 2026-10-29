@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using DrDxt.Infrastructure.Localization;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -26,7 +27,7 @@ public sealed class AgirEnUneLigneTests
 
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         var propriete = cle == "Carte.Repos.Description" ? "LabelReposCarteDescription" : "LabelRemesureCpuDescription";
         xaml.Should().Contain($"Text=\"{{Binding {propriete}Courte}}\"").And.Contain($"ToolTip=\"{{Binding {propriete}}}\"");
     }

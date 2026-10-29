@@ -3,6 +3,7 @@ using DrDxt.App.ViewModels;
 using DrDxt.Core;
 using FluentAssertions;
 using NSubstitute;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -27,7 +28,7 @@ public sealed class OptimiserNePromettePasDansLeVideTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         var debut = xaml.IndexOf("x:Name=\"BoutonOptimiser\"", StringComparison.Ordinal);
         var bouton = xaml[debut..xaml.IndexOf("/>", debut, StringComparison.Ordinal)];
 

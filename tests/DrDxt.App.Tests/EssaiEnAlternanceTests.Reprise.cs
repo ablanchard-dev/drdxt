@@ -119,7 +119,7 @@ public sealed partial class EssaiEnAlternanceTests
         app.LigneEssai.Should().Be("Essai.Occupe");
     }
 
-    // Rien ne se pose pendant une partie : le clic le dit au lieu de ne rien faire.
+    // Rien ne change pendant une partie : le clic le dit au lieu de ne rien faire.
     [Fact]
     public async Task Reprendre_pendant_une_partie_dit_de_fermer_le_jeu()
     {

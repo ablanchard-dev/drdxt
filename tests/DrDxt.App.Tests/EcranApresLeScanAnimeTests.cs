@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -12,7 +13,7 @@ public sealed class EcranApresLeScanAnimeTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var scan = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var scan = VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         // Le bloc « Agir » du bas (second Optimiser) est retiré ; la liste part de la mesure en jeu.
         var debut = scan.IndexOf("───── LA MESURE EN JEU ─────", StringComparison.Ordinal);
         debut.Should().BeGreaterThan(0);

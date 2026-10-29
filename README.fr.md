@@ -279,7 +279,19 @@ La liste, en entier :
   rendre.
 - **Une tâche planifiée**, « DrDXT releve », créée par l'installeur : elle relève tes parties à l'ouverture de ta
   session, sans droits d'administrateur. Sans le service DrDXT, une partie jouée DrDXT fermé n'a donc pas la
-  température du processeur. Retirée à la désinstallation.
+  température du processeur. Elle fait aussi avancer un essai en alternance en cours, DrDXT fermé, mais seulement si
+  l'assistant administrateur de DrDXT tourne déjà : elle ne demande jamais d'autorisation Windows. Sinon, une
+  notification te demande d'ouvrir DrDXT avant ta prochaine partie. Retirée à la désinstallation.
+- **Une seconde tâche planifiée**, « DrDXT helper », seulement si tu coches « Faire les essais d'Optimiser sans ouvrir
+  DrDXT » à l'installation (décochée par défaut). À l'ouverture de ta session, elle lance l'assistant administrateur de
+  DrDXT, sans invite Windows, et il reste jusqu'à la fin de la session : l'essai en alternance avance DrDXT fermé. Le prix,
+  dit tel quel : le tube par lequel DrDXT parle à cet assistant reste ouvert toute la session, au lieu de se fermer avec
+  DrDXT ou après 15 minutes sans connexion. Ce qui le protège ne change pas : seul DrDXT, reconnu par son chemin et
+  l'empreinte SHA-256 de son fichier, y est admis, et seulement pour les opérations de la liste fermée. Elle est posée pour
+  le compte qui a lancé l'installeur, et proposée seulement si ce compte est administrateur : sur un compte standard, le niveau
+  le plus élevé d'une tâche n'est pas une élévation, l'assistant ne pourrait pas démarrer.
+  Décochée à une mise à jour, ou à la désinstallation, elle est retirée, et l'assistant s'arrête après avoir rendu ce qu'il
+  tenait.
 
 Jamais écrit, quoi qu'on demande : Windows Defender, les stratégies et le service de Windows Update, les services de
 Windows, le firmware. Le détail,
@@ -341,7 +353,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**9 906 tests, 0 échec**, mesuré le 29/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
+**9 937 tests, 0 échec**, mesuré le 29/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
 matériel). Ce chiffre est vérifié par `tools/gates/compte_des_tests.py` contre la dernière exécution. La commande qui
 le redonne :
 

@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using FluentAssertions;
 using Xunit;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.Integration.Tests;
 
@@ -79,7 +80,7 @@ public class AVerdictComputedIsAVerdictShownTests
     [Fact]
     public void La_consigne_de_scene_est_montree_AVANT_le_scan()
     {
-        var scan = File.ReadAllText(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml")).Replace("\r\n", "\n", StringComparison.Ordinal);
+        var scan = VueScan.Texte(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml")).Replace("\r\n", "\n", StringComparison.Ordinal);
 
         var idle = scan.IndexOf("ConverterParameter='Idle,Scanning'}\">\n                                    <TextBlock Text=\"{Binding LabelIdleHeroBody}",
             StringComparison.Ordinal);

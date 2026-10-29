@@ -27,6 +27,7 @@
     <Compile Include="..\Shared\UpdateDevTestKeys.cs" Link="Shared\UpdateDevTestKeys.cs" />
     <Compile Include="..\Shared\InversesDeTest.cs" Link="Shared\InversesDeTest.cs" />
     <Compile Include="..\Shared\AdminRequis.cs" Link="Shared\AdminRequis.cs" />
+    <Compile Include="..\Shared\VueScan.cs" Link="Shared\VueScan.cs" />
   </ItemGroup>
 
   <ItemGroup>

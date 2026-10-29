@@ -4,6 +4,7 @@ using System.Resources;
 using DrDxt.App.ViewModels;
 using DrDxt.Infrastructure.Localization;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -46,7 +47,7 @@ public sealed class LaSousTensionDitSonPrerequisAvantTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (!File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent!;
-        var vue = File.ReadAllText(Path.Combine(d.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var vue = VueScan.Texte(Path.Combine(d.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         var prerequis = vue.IndexOf("LabelSousTensionPrerequis", StringComparison.Ordinal);
         prerequis.Should().BeGreaterThan(0, "la carte porte la ligne de prérequis");
         vue.IndexOf("SousTensionPrerequisVisible", StringComparison.Ordinal).Should().BeGreaterThan(0, "et ne la montre qu'aux processeurs concernés");

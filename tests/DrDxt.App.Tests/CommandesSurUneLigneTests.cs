@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -15,7 +16,7 @@ public sealed class CommandesSurUneLigneTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         var bloc = Regex.Match(xaml, @"<ScrollViewer HorizontalScrollBarVisibility=""Auto""[^>]*>\s*<TextBlock Text=""\{Binding CommandeACopier\}""[^>]*>").Value;
         bloc.Should().NotBeEmpty("le bloc des commandes est dans un défilement horizontal").And.Contain("TextWrapping=\"NoWrap\"");
     }

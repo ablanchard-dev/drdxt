@@ -134,6 +134,10 @@ public partial class ScanViewModel
     /// <c>null</c> = aucun retrait automatique (les tests qui ne le vérifient pas).</summary>
     internal Func<string, ITweak?>? LevierParId { get; set; }
 
+    /// <summary>Le levier de l'essai en alternance, seul : le relevé de fond le branche sans <see cref="LevierParId"/>, pour
+    /// que l'essai avance l'App fermée sans qu'aucun autre levier ne se pose ni ne se retire sans fenêtre.</summary>
+    internal Func<string, ITweak?>? LevierDeLEssaiParId { get; set; }
+
     /// <summary>Le helper répond-il déjà, sans être lancé ? Le retrait automatique, sans geste, ne fait jamais surgir
     /// d'invite UAC : helper absent, rien n'est retiré, la carte dit « annule-le d'un clic ». <c>null</c> (tests) =
     /// joignable.</summary>
@@ -317,7 +321,7 @@ public partial class ScanViewModel
     /// <summary>Le dernier état d'essai dont le joueur a été prévenu : un même essai en attente ne se redit pas à chaque partie.</summary>
     private string? _essaiPrevenu;
 
-    /// <summary>Le relevé de fond ne pose rien : un essai qui attend l'App ouverte resterait figé en silence. Jeu fermé, le joueur
+    /// <summary>Sans le helper déjà lancé, le relevé de fond ne pose rien : un essai qui attend l'App ouverte resterait figé en silence. Jeu fermé, le joueur
     /// est prévenu une fois par attente.</summary>
     private void PrevenirSiLEssaiAttend()
     {

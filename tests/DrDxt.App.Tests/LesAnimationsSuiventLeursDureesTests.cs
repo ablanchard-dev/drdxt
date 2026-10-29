@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.RegularExpressions;
 using DrDxt.App.Effets;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -15,7 +16,8 @@ public sealed class LesAnimationsSuiventLeursDureesTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (!File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent!;
-        return File.ReadAllText(Path.Combine(new[] { d.FullName, "src", "DrDxt.App" }.Concat(chemin).ToArray()));
+        var fichier = Path.Combine(new[] { d.FullName, "src", "DrDxt.App" }.Concat(chemin).ToArray());
+        return Path.GetFileName(fichier) == "ScanView.xaml" ? VueScan.Texte(fichier) : File.ReadAllText(fichier);
     }
 
     [Fact]

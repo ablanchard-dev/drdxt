@@ -338,11 +338,7 @@ public partial class App : System.Windows.Application
         scan.MemoireSousTension = DrDxt.Application.Parties.MemoireSousTension.ParDefaut();
         // Jamais d'invite UAC sans geste : le retrait automatique ne part que si le helper tourne déjà. Posé avant la reprise
         // de la sous-tension, qui sinon passerait par le client qui lance le helper.
-        scan.HelperJoignableSansUac = async () =>
-        {
-            try { return (await DrDxt.App.Platform.ElevatedClientFactory.CreateSansLancer().ExecuteAsync(new DrDxt.Core.PingOp(), CancellationToken.None)).IsOk; }
-            catch (Exception) { return false; }
-        };
+        scan.HelperJoignableSansUac = HelperDejaLanceAsync;
         _ = Task.Run(async () =>
         {
             try { await scan.ReprendreRechercheSousTensionAsync(); }
@@ -624,8 +620,11 @@ public partial class App : System.Windows.Application
         // posé : rien ne se retire sans fenêtre (voir ReleverReglagesHorsScanAsync).
         scan.JournalChangements = DrDxt.Application.Parties.JournalDesChangements.ParDefaut();
         BrancherReglagesSuivis(scan, services);
-        // Sans HelperJoignableSansUac ni client qui lance le helper : sans fenêtre, rien ne se pose ni ne se rend (l'essai en
-        // alternance avance dans l'App, sur ce qu'elle montre).
+        // L'essai en alternance avance ici aussi, sans que le joueur ait à ouvrir DrDXT : son seul levier, et seulement si le
+        // helper tourne déjà (fin de partie, SansGesteDuJoueur : jamais d'invite Windows). LevierParId reste nul : aucun autre
+        // levier ne se pose ni ne se retire sans fenêtre.
+        scan.LevierDeLEssaiParId = id => services.GetRequiredService<DrDxt.Core.ITweakCatalog>().Get(id) is { IsOk: true } t ? t.Value : null;
+        scan.HelperJoignableSansUac = HelperDejaLanceAsync;
         scan.ChargerParties();
         _ = scan.ReleverReglagesHorsScanAsync();
         // Sans fenêtre, un essai qui attend l'App ouverte se dit par une notification de Windows, une fois par attente.
@@ -634,6 +633,13 @@ public partial class App : System.Windows.Application
         var relecture = new System.Windows.Threading.DispatcherTimer { Interval = DrDxt.Application.Parties.VeilleDesParties.HorsPartie };
         relecture.Tick += (_, _) => { if (!memoire.EstAllume()) Shutdown(); };
         relecture.Start();
+    }
+
+    /// <summary>Le helper répond-il déjà ? Sans le lancer : jamais d'invite Windows sans clic.</summary>
+    private static async Task<bool> HelperDejaLanceAsync()
+    {
+        try { return (await DrDxt.App.Platform.ElevatedClientFactory.CreateSansLancer().ExecuteAsync(new DrDxt.Core.PingOp(), CancellationToken.None)).IsOk; }
+        catch (Exception) { return false; }
     }
 
     /// <summary>Le suivi des réglages et leurs lectures sans scan, les mêmes pour l'App et le relevé de fond.</summary>

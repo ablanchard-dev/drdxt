@@ -287,6 +287,19 @@ public sealed class UpdatePackageVerifierTests
     public void Une_preversion_est_plus_ancienne_que_sa_version_stable(string candidate, string installee, bool retrograde)
         => UpdateVerifier.IsDowngrade(candidate, installee).Should().Be(retrograde);
 
+    // Le manifeste n'expire pas : ce garde seul refuse un ancien manifeste signé rejoué. Deux préversions du même cœur
+    // passaient toujours, rc.1 par-dessus rc.10. Ordre de SemVer 2.0.0 (§11) : identifiant par identifiant, les numériques
+    // en nombres et avant les alphanumériques, la liste la plus courte avant à préfixe égal.
+    [Theory]
+    [InlineData("1.0.0-rc.1", "1.0.0-rc.10", true)]
+    [InlineData("1.0.0-rc.10", "1.0.0-rc.2", false)]
+    [InlineData("1.0.0-beta", "1.0.0-rc.1", true)]
+    [InlineData("1.0.0-alpha", "1.0.0-alpha.1", true)]
+    [InlineData("1.0.0-alpha.1", "1.0.0-alpha.beta", true)]
+    [InlineData("1.0.0-rc.1+b2", "1.0.0-rc.1+b1", false)]
+    public void Deux_preversions_du_meme_coeur_se_comparent_entre_elles(string candidate, string installee, bool retrograde)
+        => UpdateVerifier.IsDowngrade(candidate, installee).Should().Be(retrograde);
+
     // ── Forme canonique : déterminisme et stabilité ───────────────────────────────
 
     [Fact]

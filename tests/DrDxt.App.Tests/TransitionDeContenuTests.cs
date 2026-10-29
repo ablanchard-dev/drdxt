@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows.Controls;
 using DrDxt.App.Effets;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -29,7 +30,7 @@ public sealed class TransitionDeContenuTests
     [Fact]
     public void La_transition_est_branchee_sur_le_panneau_des_domaines()
     {
-        var xaml = File.ReadAllText(Path.Combine(Racine(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(Racine(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
         xaml.Should().Contain("<ContentControl Content=\"{Binding DomaineSelectionne}\" Focusable=\"False\" effets:TransitionDeContenu.Actif=\"True\"");
     }
 

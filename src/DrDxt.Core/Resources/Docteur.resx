@@ -5700,6 +5700,9 @@
   <data name="RCA.Secours" xml:space="preserve">
     <value>Your BIOS asks for a memory profile ({0}), but every channel runs at {1} MT/s, the JEDEC floor, while your kit announces {2} MT/s: memory training most likely failed and the board fell back to safe speeds.</value>
   </data>
+  <data name="RCA.KitNonLu" xml:space="preserve">
+    <value>Whether your memory profile runs is not known: your BIOS asks for {0} and every channel runs at {1} MT/s, the JEDEC floor, but Windows does not say the speed your kit announces, so a failed memory training cannot be told from a setting you chose.</value>
+  </data>
   <data name="RCA.Conforme" xml:space="preserve">
     <value>Every timing set in your BIOS (Auto aside) runs as set, on all {0} channels.</value>
   </data>

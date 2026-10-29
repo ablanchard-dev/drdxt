@@ -1,5 +1,6 @@
 using System.IO;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -12,7 +13,7 @@ public sealed class CarteSousTensionXamlTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var vue = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var vue = VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         var debut = vue.IndexOf("la recherche de sous-tension", StringComparison.Ordinal);
         var fin = vue.IndexOf("le test mémoire sans redémarrer", debut, StringComparison.Ordinal);
         debut.Should().BeGreaterThan(0, "témoin : la carte de la sous-tension est trouvée");

@@ -36,6 +36,26 @@ public sealed partial class EssaiEnAlternanceTests
         (_poses - _rendus).Should().Be(0, "posé au moment du redémarrage, il est rendu : un plan d'alimentation survit au redémarrage");
     }
 
+    // Le redémarrage veut rendre l'origine d'un réglage durable, mais un jeu tourne : rien ne se rend sans clic pendant une
+    // partie. Le jeu fermé, la fin de partie suivante le rend.
+    [Fact]
+    public async Task Apres_un_redemarrage_rien_ne_se_rend_pendant_qu_un_jeu_tourne()
+    {
+        var vm = Vm(id: Durable);
+        await vm.DemarrerEssaiAsync(Durable);
+        _demarrage = _maintenant.AddHours(2);
+        vm.JeuOuvertPourLeTest = () => true;
+
+        await Jouer(vm, 90);
+
+        _rendus.Should().Be(0, "un jeu tourne");
+        vm.EssaiEnCours.Should().BeTrue();
+
+        vm.JeuOuvertPourLeTest = () => false;
+        await Jouer(vm, 90);
+        _rendus.Should().Be(1, "témoin : jeu fermé, l'origine est rendue");
+    }
+
     // Sans helper joignable, rien ne s'efface : l'essai attend que le joueur clique « Arrêter ».
     [Fact]
     public async Task Apres_un_redemarrage_sans_helper_l_essai_attend_le_clic_qui_rend_l_origine()

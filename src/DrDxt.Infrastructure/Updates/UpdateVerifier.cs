@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using DrDxt.Core;
@@ -125,7 +126,8 @@ public sealed class UpdateVerifier : IUpdateVerifier
 
     // -------------------------------------------------------------------
     // Vrai si et seulement si `candidate` est strictement plus ancienne que `installed` : cœur numérique par points
-    // (1.2.10 > 1.2.9), puis la préversion avant sa stable ; la métadonnée de build ne compte pas. Un composant illisible
+    // (1.2.10 > 1.2.9), puis la préversion avant sa stable, et deux préversions dans l'ordre de SemVer (rc.2 < rc.10) ;
+    // la métadonnée de build ne compte pas. Un composant illisible
     // vaut 0 (jamais « plus récente » en silence) ; une version égale n'est pas une rétrogradation. Ne lève pas.
     // -------------------------------------------------------------------
     internal static bool IsDowngrade(string candidate, string installed)
@@ -141,11 +143,27 @@ public sealed class UpdateVerifier : IUpdateVerifier
             if (ai > bi) return false;  // strictement plus récente → pas une rétrogradation
         }
         // Cœur égal : une préversion (« -rc.1 ») vient avant sa version stable, jamais après.
-        return EstUnePreversion(candidate) && !EstUnePreversion(installed);
+        if (!EstUnePreversion(installed)) return EstUnePreversion(candidate);
+        if (!EstUnePreversion(candidate)) return false;
+        // Deux préversions : identifiant par identifiant (SemVer 2.0.0, §11), les numériques en nombres et avant les
+        // alphanumériques ; à préfixe égal, la liste la plus courte vient avant.
+        var pa = Preversion(candidate);
+        var pb = Preversion(installed);
+        for (var i = 0; i < Math.Min(pa.Length, pb.Length); i++)
+        {
+            var na = ulong.TryParse(pa[i], NumberStyles.None, CultureInfo.InvariantCulture, out var xa);
+            var nb = ulong.TryParse(pb[i], NumberStyles.None, CultureInfo.InvariantCulture, out var xb);
+            var ordre = na && nb ? xa.CompareTo(xb) : na ? -1 : nb ? 1 : string.CompareOrdinal(pa[i], pb[i]);
+            if (ordre != 0) return ordre < 0;
+        }
+        return pa.Length < pb.Length;
     }
 
     private static bool EstUnePreversion(string? version)
         => version is not null && StripMetadata(version).Contains('-');
+
+    private static string[] Preversion(string version)
+        => StripMetadata(version) is var v ? v[(v.IndexOf('-') + 1)..].Split('.') : [];
 
     // La métadonnée de build (« +abc1234 ») ne compte jamais dans l'ordre.
     private static string StripMetadata(string version)

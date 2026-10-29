@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -14,7 +15,7 @@ public sealed class PastilleEnPerleTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
 
         var gabarit = Regex.Match(xaml, "<DataTemplate x:Key=\"ContenuEtat\">(.*?)</DataTemplate>", RegexOptions.Singleline).Groups[1].Value;
         gabarit.Should().NotBeEmpty("témoin : le gabarit de l'état est lu");

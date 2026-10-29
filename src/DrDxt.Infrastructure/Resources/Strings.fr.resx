@@ -2066,7 +2066,7 @@ Si elle est arrivée pendant un réglage, relance un scan : « Ce que DrDXT a po
     <value>L&apos;essai de « {0} » est en train de changer d&apos;état ailleurs (le relevé des parties) : clique « Reprendre l&apos;essai » de nouveau dans quelques secondes.</value>
   </data>
   <data name="Essai.FermeLeJeu" xml:space="preserve">
-    <value>Rien ne se pose pendant une partie : ferme {1}, puis clique « Reprendre l&apos;essai » pour « {0} ».</value>
+    <value>Rien ne change pendant une partie : ferme {1}, puis clique « Reprendre l&apos;essai » pour « {0} ».</value>
   </data>
   <data name="Essai.Fini.Mieux" xml:space="preserve">
     <value>Essai de « {0} » terminé : mieux en jeu sur tes parties, il reste posé.</value>

@@ -222,10 +222,21 @@ Corrigé — **la tâche planifiée « DrDXT releve »** (limite R-H, puis H-1 d
 devenait une création, un écrasement ou une suppression de fichier en administrateur ; elle faisait aussi avancer l'essai en
 alternance sans invite. La tâche tourne désormais sans droits, pour le compte qui ouvre sa session (principal du groupe Utilisateurs en
 LeastPrivilege, quel que soit le compte qui a validé l'UAC à l'installation), lance l'App directement (le lanceur, non
-élevé, demanderait l'élévation), ne lance jamais le helper (`CreateSansLancer`) et ne pose ni ne rend aucun levier. Une mise
+élevé, demanderait l'élévation), ne lance jamais le helper (`CreateSansLancer`) et ne pose ni ne rend aucun levier, sauf
+celui de l'essai en alternance, et seulement par un helper qui tourne déjà, jamais par une invite. Une mise
 à jour remplace la tâche d'une installation précédente (`/Create /F`). Ce qu'elle perd : sans le service DrDXT, une partie
 jouée DrDXT fermé n'a ni température ni état du processeur, et le repli `logman` du compteur d'images (une session ETW,
 réservée aux administrateurs) ne s'ouvre plus en fond (`ReleveSansLAppTests`).
+
+Choisi par le joueur — **la tâche planifiée « DrDXT helper »**, décochée par défaut. Proposée seulement si le compte qui a
+lancé l'installeur (celui de la session, lu par WTS, et non l'administrateur qui valide l'UAC) est administrateur ; à son
+ouverture de session, au niveau le plus élevé, elle lance le helper par le lanceur (environnement reconstruit) avec `--app-path` et
+`--service` : les essais en alternance avancent DrDXT fermé. Le tube du helper reste alors ouvert toute la session au lieu
+de se fermer avec l'App ou après 15 minutes sans connexion. Rien d'autre ne change : `--service` ne fait que remplacer
+l'arrêt sur inactivité par l'arrêt quand l'installeur tourne, baux rendus (mutex `DrDxtInstalleur` ; un programme du
+compte qui le crée ne fait qu'arrêter le helper). L'authentification des appelants (chemin et SHA-256), l'allowlist et
+l'exécuteur sont ceux du helper lancé à la demande. Retirée décochée, à la mise à jour avant la copie, dossier non protégé
+et à la désinstallation (`LAssistantDeSessionSurChoixTests`, `LeModeServiceNeChangeQueLArretTests`).
 
 Corrigé — **journaux d'annulation vidés sur le disque** (M-4 du second audit). `FichierJsonAtomique` écrit son temporaire
 en WriteThrough et le vide avant le renommage : une coupure ne laisse plus un `leviers-appliques.json` illisible
@@ -238,11 +249,10 @@ retour par Windows, le BCD, est gardé avant l'écriture (`GardeDuBcdRetire`).
 
 Corrigé en partie, résidu accepté — **l'essai en alternance lit un fichier du compte** (M-2 du second audit).
 `essai-alternance.json` vit sous le profil, que tout programme du compte peut écrire. « Arrêter l'essai » ne pose ni ne rend
-plus un levier qui n'a pas le droit d'alterner, et l'essai ne pose rien sans clic pendant qu'un jeu tourne
-(`EssaiEnAlternanceTests`). Résidu : un fichier forgé peut faire poser sans clic, entre deux parties, un levier à chaud
-(AutoHot), dans ses bornes. La frontière reste l'allowlist du helper et ses bornes : un programme du compte peut de toute
-façon piloter l'App. Seule la pose est bloquée pendant un jeu : rendre le levier, vers son origine, reste permis sans clic
-pendant qu'un jeu tourne, ce qui est aussi une écriture.
+plus un levier qui n'a pas le droit d'alterner, et l'essai ne pose ni ne rend rien pendant qu'un jeu tourne, y compris
+l'origine à rendre après un redémarrage (`EssaiEnAlternanceTests`) ; seul « Arrêter l'essai », un clic, rend le levier en
+jeu. Résidu : un fichier forgé peut faire poser sans clic, entre deux parties, un levier à chaud (AutoHot), dans ses
+bornes. La frontière reste l'allowlist du helper et ses bornes : un programme du compte peut de toute façon piloter l'App.
 
 Corrigé, non validé sur matériel — **le cliquet ADLX d'un démarrage à l'autre** (M-1 du second audit). La bande de
 +100/−200 MHz se mesurait autour de la MaxFreq lue au premier passage de chaque démarrage : si le pilote garde la valeur au

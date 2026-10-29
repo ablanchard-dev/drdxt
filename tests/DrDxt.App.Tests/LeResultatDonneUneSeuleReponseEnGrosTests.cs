@@ -2,6 +2,7 @@ using System.IO;
 using System.Linq;
 using System.Xml.Linq;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -20,7 +21,7 @@ public sealed class LeResultatDonneUneSeuleReponseEnGrosTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var vue = XDocument.Load(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var vue = XDocument.Parse(VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml")));
         return vue.Descendants().Where(e => e.Name.LocalName == "TextBlock"
             && Texte(e) is "{Binding TitreAccueil}" or "{Binding RegisterText}").ToList();
     }

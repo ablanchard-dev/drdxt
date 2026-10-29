@@ -221,10 +221,21 @@ where a program of the same account without rights can put a junction, and each 
 overwrite or deletion as administrator; it also advanced the alternating trial without a prompt. The task now runs
 without rights, for the account that logs on (principal of the Users group at LeastPrivilege, whatever account answered
 the UAC prompt at install), starts the app directly (the launcher, not elevated, would ask for elevation), never starts
-the helper (`CreateSansLancer`) and sets or gives back no lever. An update replaces the task of a previous install
+the helper (`CreateSansLancer`) and sets or gives back no lever, except the alternating trial's, and only through a helper
+that is already running, never through a prompt. An update replaces the task of a previous install
 (`/Create /F`). What it loses: without the DrDXT service, a match played with DrDXT closed has no processor temperature or
 state, and the `logman` fallback of the frame counter (an ETW session, reserved for administrators) no longer opens in
 the background (`ReleveSansLAppTests`).
+
+Chosen by the player: **the "DrDXT helper" scheduled task**, unticked by default. Offered only when the account that started
+the installer (the session's, read through WTS, not the administrator who approves UAC) is an administrator; when it signs
+in, at the highest level, it starts the helper through the launcher (rebuilt environment) with `--app-path` and `--service`:
+alternating trials move forward with DrDXT closed. The helper's pipe then stays open for the whole session instead of
+closing with the app or after 15 minutes without a connection. Nothing else changes: `--service` only replaces the
+inactivity stop with a stop while the installer runs, leases given back (mutex `DrDxtInstalleur`; a program of the
+account that creates it can only stop the helper). Caller authentication (path and SHA-256), the allowlist and the
+executor are those of the on-demand helper. Removed when unticked, on an update before the copy, when the folder is not
+protected and when uninstalling (`LAssistantDeSessionSurChoixTests`, `LeModeServiceNeChangeQueLArretTests`).
 
 Fixed: **undo journals flushed to disk** (M-4 of the second audit). `FichierJsonAtomique` writes its temp file with
 WriteThrough and flushes it before the rename: a power cut no longer leaves an unreadable `leviers-appliques.json`
@@ -238,11 +249,11 @@ set without "Undo". The only case with no way back through Windows, the BCD, is 
 
 Partly fixed, residual accepted: **the alternating trial reads an account file** (M-2 of the second audit).
 `essai-alternance.json` lives under the profile, which any program of the account can write. "Stop the trial" no longer
-sets or gives back a lever that is not allowed to alternate, and the trial sets nothing without a click while a game is
-running (`EssaiEnAlternanceTests`). Residual: a forged file can make a hot-switchable lever (AutoHot) be set without a
-click, between two matches, within its bounds. The boundary remains the helper's allowlist and its bounds: a program of
-the account can drive the app anyway. Only setting is blocked during a game: giving the lever back, to its origin,
-stays allowed without a click while a game runs, which is also a write.
+sets or gives back a lever that is not allowed to alternate, and the trial neither sets nor gives back anything while a
+game is running, the origin to give back after a reboot included (`EssaiEnAlternanceTests`); only "Stop the trial", a
+click, gives the lever back during a game. Residual: a forged file can make a hot-switchable lever (AutoHot) be set
+without a click, between two matches, within its bounds. The boundary remains the helper's allowlist and its bounds: a
+program of the account can drive the app anyway.
 
 Fixed, not validated on hardware: **the ADLX ratchet from one boot to the next** (M-1 of the second audit). The
 +100/−200 MHz band was measured around the MaxFreq read at the first pass of each boot: if the driver keeps the value

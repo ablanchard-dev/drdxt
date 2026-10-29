@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.Integration.Tests;
 
@@ -99,7 +100,7 @@ public sealed class TheScreenMayNotClaimAStateItNeverComputesTests
         // phrase qu'elle decore.
         if (AppSource().Contains("UpdateComposition") || AppSource().Contains("IUpdateEngine")) return;
 
-        var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
         var footer = xaml.Substring(xaml.IndexOf("LabelFooterVersion", StringComparison.Ordinal));
         var block = footer.Substring(0, footer.IndexOf("LabelFooterUpdates", StringComparison.Ordinal));
 
@@ -117,7 +118,7 @@ public sealed class TheScreenMayNotClaimAStateItNeverComputesTests
         //
         // Tronquer, c'est cacher. Un produit qui calcule un fait, l'etiquette pour dire d'ou il
         // sort, puis le coupe avec trois points, a fait tout le travail sauf le dernier pas.
-        var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
         // Le panneau lit les satellites (composant + état de son domaine), même gabarit, même règle.
         var start = xaml.IndexOf("ItemsSource=\"{Binding Satellites}\"", StringComparison.Ordinal);
         start.Should().BeGreaterThan(0, "le panneau des composants doit exister");
@@ -140,7 +141,7 @@ public sealed class TheScreenMayNotClaimAStateItNeverComputesTests
     {
         // `<Run Text="."/>` sur sa propre ligne : WPF insere une espace entre deux Run, donc le
         // client lirait « reglages a corriger . ».
-        var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(RepoRoot(), "src", "DrDxt.App", "Views", "ScanView.xaml"));
         xaml.Should().Contain("<Run ", "témoin : la vue compose bien des phrases en Run");
 
         xaml.Should().NotContain("Text=\".\"",

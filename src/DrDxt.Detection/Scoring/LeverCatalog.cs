@@ -65,9 +65,10 @@ internal static class LeverCatalog
         // Symptôme de parcage = condition du seul routage X3D (la politique de parcage est identique entre Equilibre et
         // Haute performance, SanePowerPlanTweak). Des coeurs parques au repos sont la norme. Tri-etat : true = mal parque
         // (la règle de fixit.x3d_ccd : un coeur du CCD à cache parqué), false = seul le CCD de fréquence parqué (routage
-        // sain), null = pas lu (hors jeu) ; null n'arme rien et ne compte pas comme sain. Rien de parqué reste « non
+        // sain), null = pas lu (hors jeu, ou processeurs logiques inconnus) ; null n'arme rien et ne compte pas comme sain. Rien de parqué reste « non
         // confirmé », le levier le propose sous garde.
-        bool? parkingSymptom = state.ParkedCoreIndexes is null
+        // Sans processeurs logiques lus, la frontière entre les deux CCD ne se place pas : un cœur parqué n'y est ni sain ni mal.
+        bool? parkingSymptom = state.ParkedCoreIndexes is null || (state.ParkedCoreIndexes.Count > 0 && hw.Cpu.Threads <= 0)
             ? null
             : state.ParkedCoreIndexes.Count == 0 ? false : DrDxt.Application.Tweaks.FixIt.X3dParkingHeuristic.LooksMisparked(hw.Cpu, state);
         var routageSain = state.ParkedCoreIndexes is { Count: > 0 } && parkingSymptom == false;

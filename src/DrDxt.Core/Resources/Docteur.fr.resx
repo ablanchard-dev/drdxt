@@ -5700,6 +5700,9 @@
   <data name="RCA.Secours" xml:space="preserve">
     <value>Ton BIOS demande un profil mémoire ({0}), mais tous les canaux tournent à {1} MT/s, le socle JEDEC, alors que ton kit annonce {2} MT/s : l'entraînement mémoire a très probablement raté et la carte est retombée aux vitesses de secours.</value>
   </data>
+  <data name="RCA.KitNonLu" xml:space="preserve">
+    <value>On ne sait pas si ton profil mémoire tourne : ton BIOS demande {0} et tous les canaux tournent à {1} MT/s, le socle JEDEC, mais Windows ne dit pas la vitesse qu'annonce ton kit : un entraînement mémoire raté ne se distingue pas d'un réglage voulu.</value>
+  </data>
   <data name="RCA.Conforme" xml:space="preserve">
     <value>Chaque timing réglé dans ton BIOS (Auto mis à part) tourne comme réglé, sur les {0} canaux.</value>
   </data>

@@ -72,4 +72,15 @@ public sealed class RegleContreAppliqueTests
             .Should().Be(RepairStatus.Observed);
         RegleContreApplique.Juger(Zen4, [Lu("tCL", "32")], Ddr5(Canal(0)), 5800).Single().Statut.Should().Be(RepairStatus.NonDefault);
     }
+
+    // Une barrette dont Windows ne dit pas la vitesse rend la vitesse du kit 0 (le plus lent des kits lus). Profil demandé,
+    // tous les canaux au socle : un entraînement raté ne se distingue plus, et le constat ne peut pas dire « conforme ».
+    [Fact]
+    public void Sans_vitesse_du_kit_un_profil_au_socle_ne_se_dit_pas_conforme()
+    {
+        var constat = RegleContreApplique.Juger(Zen4, [Lu("EXPO", "EXPO I")], Ddr5(Canal(0, 4800), Canal(1, 4800)), 0).Single();
+
+        constat.Statut.Should().Be(RepairStatus.Unknown);
+        constat.Explication.Should().Be(Docteur.T("RCA.KitNonLu", "EXPO I", 4800));
+    }
 }

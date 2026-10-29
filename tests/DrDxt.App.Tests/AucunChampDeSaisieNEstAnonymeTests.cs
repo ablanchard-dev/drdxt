@@ -29,7 +29,7 @@ public sealed class AucunChampDeSaisieNEstAnonymeTests
     private static List<(string Vue, int Ligne)> Champs(bool anonymesSeulement)
     {
         var app = Path.Combine(Racine().FullName, "src", "DrDxt.App");
-        var vues = Directory.EnumerateFiles(Path.Combine(app, "Views"), "*.xaml")
+        var vues = Directory.EnumerateFiles(Path.Combine(app, "Views"), "*.xaml", SearchOption.AllDirectories)
                             .Append(Path.Combine(app, "MainWindow.xaml")).Where(File.Exists);
         var trouves = new List<(string, int)>();
         foreach (var vue in vues)

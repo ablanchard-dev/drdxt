@@ -578,7 +578,7 @@ public sealed partial class ScanViewModel : ObservableObject
     private BiosGuideViewModel? _biosGuide;
 
     /// <summary>Vrai quand le scan a produit un guide BIOS à suivre (pilote la visibilité de la
-    /// section dans ScanView.xaml).</summary>
+    /// section dans Views/Scan/BiosEtSante.xaml).</summary>
     public bool HasBiosGuide => BiosGuide is not null;
 
     /// <summary>Le verdict du retour de BIOS : « ton changement a-t-il pris ? », reglage par

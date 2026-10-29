@@ -253,8 +253,19 @@ restore it. The full list:
   serves the processor temperature to the app and the recording, through a read-only pipe.
 - **The signed manifest** of kept settings, in `%ProgramData%\DrDxt`, which the uninstaller reads to revert them.
 - **A scheduled task**, "DrDXT releve", created by the installer: it records your matches when your session opens, without
-  administrator rights. Without the DrDXT service, a match played with DrDXT closed has no processor temperature.
+  administrator rights. Without the DrDXT service, a match played with DrDXT closed has no processor temperature. It
+  also moves an alternating trial in progress forward with DrDXT closed, but only if DrDXT's elevated helper is already
+  running: it never asks for a Windows prompt. Otherwise, a notification asks you to open DrDXT before your next match.
   Removed when uninstalling.
+- **A second scheduled task**, "DrDXT helper", only if you tick "Run Optimize trials without opening DrDXT" when
+  installing (unticked by default). When you sign in, it starts DrDXT's elevated helper, with no Windows prompt, and the
+  helper stays until you sign out: the alternating trial moves forward with DrDXT closed. The cost, stated plainly: the
+  pipe DrDXT uses to talk to that helper stays open for the whole session, instead of closing with DrDXT or after 15
+  minutes without a connection. What protects it does not change: only DrDXT, recognised by its path and the SHA-256 hash
+  of its file, is let in, and only for the operations of the closed list. It is set for the account that started the installer, and offered only
+  when that account is an administrator: on a standard account, the task's highest level is not an elevation, so the helper
+  could not start. Unticked on an update, or when
+  uninstalling, it is removed, and the helper stops after giving back what it held.
 
 Never written, whatever is asked: Windows Defender, the Windows Update policies and service, Windows services,
 firmware. The details, site by
@@ -313,7 +324,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**9,906 tests, 0 failures**, measured on 29/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
+**9,937 tests, 0 failures**, measured on 29/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
 real hardware). The number is checked by `tools/gates/compte_des_tests.py` against the last run. The command that gives
 it back (an English .NET SDK; with a French one, see the French README):
 

@@ -77,12 +77,17 @@ public static class DiagnosticReport
         sb.AppendLine(Docteur.T("Rapport.Section.Machine"));
         // Le nombre de CCD seulement s'il en existe : « 0 CCD » sur un Intel se lirait comme une detection ratee.
         var ccd = hw.Cpu.CcdCount > 0 ? $", {hw.Cpu.CcdCount} CCD" : string.Empty;
-        Line(sb, Docteur.T("Rapport.Processeur"), $"{hw.Cpu.Model} ({hw.Cpu.Cores}c/{hw.Cpu.Threads}t{ccd})");
+        // 0 cœur = non lu (CpuDetector somme ce que Windows donne) : « 0c/0t » se lirait comme un compte.
+        var coeurs = hw.Cpu.Cores > 0 ? $"{hw.Cpu.Cores}c/{hw.Cpu.Threads}t" : Docteur.T("RF.Statut.NonLu");
+        Line(sb, Docteur.T("Rapport.Processeur"), $"{hw.Cpu.Model} ({coeurs}{ccd})");
         foreach (var gpu in hw.Gpus)
             Line(sb, Docteur.T("Rapport.Carte"), Docteur.T("Rapport.Carte.Valeur", gpu.Model, gpu.DriverVersion));
         foreach (var stick in hw.Memory)
             // MT/s, pas MHz, comme l'ecran : 3800 MT/s = 1900 MHz reels pour une DDR.
-            Line(sb, Docteur.T("Rapport.Memoire"), $"{stick.Manufacturer} {stick.PartNumber}, {stick.ConfiguredMhz} MT/s (nominal {stick.RatedMhz})");
+            // 0 = non lu (MemoryModule) : « 0 MT/s » se lirait comme une mesure.
+            Line(sb, Docteur.T("Rapport.Memoire"), $"{stick.Manufacturer} {stick.PartNumber}, "
+                + (stick.ConfiguredMhz > 0 ? $"{stick.ConfiguredMhz} MT/s" : Docteur.T("RF.Statut.NonLu"))
+                + (stick.RatedMhz > 0 ? $" (nominal {stick.RatedMhz})" : ""));
         Line(sb, Docteur.T("Rapport.CarteMere"), $"{hw.Board.Manufacturer} {hw.Board.Product}");
         Line(sb, "BIOS", hw.Bios.Version);
         Line(sb, Docteur.T("Rapport.Chassis"), Texte(hw.Chassis));

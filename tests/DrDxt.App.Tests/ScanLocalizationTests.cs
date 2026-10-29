@@ -3,6 +3,7 @@ using System.Globalization;
 using DrDxt.Core;
 using DrDxt.Infrastructure.Localization;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -213,7 +214,7 @@ public class ScanLocalizationTests
 
         var d = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !System.IO.File.Exists(System.IO.Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = System.IO.File.ReadAllText(System.IO.Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(System.IO.Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         xaml.IndexOf("{Binding ApercuOptimisation}", StringComparison.Ordinal)
             .Should().BeLessThan(xaml.IndexOf("Style=\"{StaticResource CapsuleChrome}\"", StringComparison.Ordinal));
     }

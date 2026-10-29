@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -14,7 +15,7 @@ public sealed class PourquoiDesMesuresEnFinDeLigneTests
     {
         var dir = AppContext.BaseDirectory;
         while (!File.Exists(Path.Combine(dir, "DrDXT.sln"))) dir = Path.GetDirectoryName(dir)!;
-        return File.ReadAllText(Path.Combine(dir, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        return VueScan.Texte(Path.Combine(dir, "src", "DrDxt.App", "Views", "ScanView.xaml"));
     }
 
     [Fact]

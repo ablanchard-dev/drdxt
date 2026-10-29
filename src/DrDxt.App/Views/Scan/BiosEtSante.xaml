@@ -1,0 +1,239 @@
+﻿<!-- Le passage dans le BIOS, son guide, et le bilan de santé. -->
+<UserControl x:Class="DrDxt.App.Views.Scan.BiosEtSante"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:DrDxt.App.ViewModels"
+             xmlns:conv="clr-namespace:DrDxt.App.Converters"
+             xmlns:effets="clr-namespace:DrDxt.App.Effets"
+             xmlns:views="clr-namespace:DrDxt.App.Views"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:ScanViewModel}">
+
+    <UserControl.Resources>
+        <ResourceDictionary Source="Ressources.xaml"/>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <!-- ───── TON PASSAGE DANS LE BIOS ───── -->
+        <StackPanel Margin="0,30,0,0" Visibility="{Binding HasBiosLoopResult, Converter={StaticResource BoolVis}}" effets:Revelation.Active="True" effets:Revelation.Retard="220">
+            <TextBlock Text="{Binding LabelBiosReturnHeader}" Style="{StaticResource TitreSection}"/>
+            <Border Style="{StaticResource Dalle}" Padding="24,20" Margin="0,12,0,0">
+                <StackPanel>
+                    <TextBlock Text="{Binding BiosLoop.Headline}" Style="{StaticResource Corps}" Margin="0,0,0,10"
+                               Visibility="{Binding BiosLoop.Headline, Converter={StaticResource StrVis}}"/>
+                    <ItemsControl ItemsSource="{Binding BiosLoop.Outcomes}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,0,0,12">
+                                    <TextBlock Text="{Binding SettingName}" Style="{StaticResource Corps}" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding VerdictLabel}" Style="{StaticResource Discret}" Margin="0,2,0,0"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding BiosLoop.RecoveryCard}" Margin="0,6,0,0"
+                                  Visibility="{Binding BiosLoop.ShowRecoveryCard, Converter={StaticResource BoolVis}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Style="{StaticResource Discret}" Margin="0,0,0,6"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- Renoncer au changement, sans quoi le marqueur restait et chaque scan le redisait. -->
+                    <Button Content="{Binding LabelOublierChangementBios}" Command="{Binding OublierChangementBiosCommand}"
+                            Style="{StaticResource Lien}" HorizontalAlignment="Left" Margin="0,4,0,0"
+                            Visibility="{Binding BiosLoop.ShowRecoveryCard, Converter={StaticResource BoolVis}}"/>
+                    <TextBlock Text="{Binding ErreurOubliBios}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Visibility="{Binding ErreurOubliBios, Converter={StaticResource StrVis}}"/>
+
+                    <StackPanel Margin="0,12,0,0" Visibility="{Binding HasMemoryAb, Converter={StaticResource BoolVis}}">
+                        <Border Style="{StaticResource Filet}" Margin="0,0,0,12"/>
+                        <TextBlock Text="{Binding MemoryAb.Header}" Style="{StaticResource TitreSection}" FontSize="13"/>
+                        <ItemsControl ItemsSource="{Binding MemoryAb.Lines}" Margin="0,10,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="110"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Label}" Style="{StaticResource Legende}"/>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Before}" Style="{StaticResource Donnee}"/>
+                                            <Path Data="M0 4 H10 M7 1 L10 4 L7 7" Stroke="{StaticResource TexteDiscretBrush}" StrokeThickness="1.2"
+                                                  Width="11" Height="8" Margin="10,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding After}" Style="{StaticResource Donnee}" Foreground="{StaticResource TexteBrush}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding Delta}" Style="{StaticResource Donnee}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding MemoryAb.Conclusion}" Style="{StaticResource Discret}" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- ───── LE GUIDE BIOS ───── -->
+        <StackPanel Margin="0,30,0,0" Visibility="{Binding HasBiosGuide, Converter={StaticResource BoolVis}}" effets:Revelation.Active="True" effets:Revelation.Retard="260">
+            <TextBlock Text="{Binding LabelBiosGuideHeader}" Style="{StaticResource TitreSection}"/>
+            <DockPanel Margin="0,8,0,0" LastChildFill="True">
+                <Path Style="{StaticResource GlyphIcon}" Data="{Binding Source=Warning, Converter={StaticResource Icon}}"
+                      Stroke="{StaticResource EtatRegarderBrush}" Width="13" Height="13" VerticalAlignment="Top" Margin="0,2,0,0" DockPanel.Dock="Left"/>
+                <TextBlock Text="{Binding LabelCadreALaMain}" Style="{StaticResource Legende}" Margin="7,0,0,0" TextWrapping="Wrap"/>
+            </DockPanel>
+            <Border Style="{StaticResource Dalle}" Margin="0,12,0,0" Padding="24,20">
+                <StackPanel>
+                    <TextBlock Text="{Binding BiosGuide.BoardLabel}" Style="{StaticResource Corps}" FontWeight="SemiBold" TextWrapping="Wrap"
+                               Visibility="{Binding BiosGuide.BoardLabel, Converter={StaticResource StrVis}}"/>
+                    <!-- Une phrase, pas une étiquette : elle passe à la ligne sous le nom de la carte.
+                         23/09/2026 : posée dans une pastille à côté du nom, dans une pile horizontale,
+                         elle recevait une largeur infinie et sortait de la dalle, coupée net. -->
+                    <TextBlock Text="{Binding BiosGuide.ConfidenceLabel}" Style="{StaticResource Legende}" TextWrapping="Wrap"
+                               Margin="0,6,0,0" MaxWidth="760" HorizontalAlignment="Left"/>
+                    <TextBlock Text="{Binding BiosGuide.EnterInstruction}" Style="{StaticResource Discret}" Margin="0,14,0,0"
+                               Visibility="{Binding BiosGuide.EnterInstruction, Converter={StaticResource StrVis}}"/>
+                    <!-- Carte jamais vue, le manuel du constructeur fait foi. -->
+                    <TextBlock Text="{Binding BiosGuide.ManuelDeLaCarte}" Style="{StaticResource Corps}" TextWrapping="Wrap" MaxWidth="760"
+                               HorizontalAlignment="Left" Margin="0,14,0,0"
+                               Visibility="{Binding BiosGuide.ManuelDeLaCarte, Converter={StaticResource StrVis}}"/>
+                    <Button Content="{Binding BiosGuide.LabelOuvrirManuel}" Command="{Binding BiosGuide.OuvrirManuelCommand}"
+                            HorizontalAlignment="Left" Margin="0,8,0,0"
+                            Visibility="{Binding BiosGuide.LienManuelVisible, Converter={StaticResource BoolVis}}"/>
+                    <!-- Le guide entier dans un QR, pour le lire au téléphone pendant le BIOS. -->
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0" Visibility="{Binding BiosGuide.QrVisible, Converter={StaticResource BoolVis}}">
+                        <Image Source="{Binding BiosGuide.QrTelephone}" Stretch="None" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                               AutomationProperties.Name="{Binding BiosGuide.LabelQr}"/>
+                        <TextBlock Text="{Binding BiosGuide.LabelQr}" Style="{StaticResource Discret}" TextWrapping="Wrap" MaxWidth="360"
+                                   VerticalAlignment="Center" Margin="14,0,0,0"/>
+                    </StackPanel>
+                    <!-- Le depart vers le BIOS depuis DrDXT. Deux clics : le premier dit ce qui
+                         va se passer (mesure memoire, puis redemarrage), le second le fait. La touche a
+                         presser, juste au-dessus, reste affichee quoi qu'il arrive. -->
+                    <Button Content="{Binding BiosGuide.LabelDepart}" Command="{Binding BiosGuide.DemanderDepartCommand}"
+                            Style="{StaticResource BoutonReflet}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                            Visibility="{Binding BiosGuide.BoutonDepartVisible, Converter={StaticResource BoolVis}}"/>
+                    <StackPanel Margin="0,12,0,0" Visibility="{Binding BiosGuide.ConfirmationVisible, Converter={StaticResource BoolVis}}">
+                        <TextBlock Text="{Binding BiosGuide.LabelDepartConfirmation}" Style="{StaticResource Corps}" TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <Button Content="{Binding BiosGuide.LabelDepartConfirmer}" Command="{Binding BiosGuide.ConfirmerDepartCommand}"
+                                    Style="{StaticResource BoutonReflet}"/>
+                            <Button Content="{Binding BiosGuide.LabelDepartAnnuler}" Command="{Binding BiosGuide.AnnulerDepartCommand}"
+                                    Style="{StaticResource Lien}" Margin="18,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock Text="{Binding BiosGuide.LabelDepartEnCours}" Style="{StaticResource Discret}" Margin="0,12,0,0"
+                               Visibility="{Binding BiosGuide.DepartEnCoursVisible, Converter={StaticResource BoolVis}}"/>
+                    <TextBlock Text="{Binding BiosGuide.LabelDepartLance}" Style="{StaticResource Corps}" Margin="0,12,0,0"
+                               Visibility="{Binding BiosGuide.DepartLanceVisible, Converter={StaticResource BoolVis}}"/>
+                    <Button Content="{Binding BiosGuide.LabelAnnulerRedemarrage}" Command="{Binding BiosGuide.AnnulerRedemarrageCommand}"
+                            Style="{StaticResource Lien}" HorizontalAlignment="Left" Margin="0,6,0,0"
+                            Visibility="{Binding BiosGuide.AnnulationVisible, Converter={StaticResource BoolVis}}"/>
+                    <TextBlock Text="{Binding BiosGuide.ErreurDepart}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Visibility="{Binding BiosGuide.ErreurDepart, Converter={StaticResource StrVis}}"/>
+                    <!-- Le secours avant les étapes (lu avant de toucher à quoi que ce soit), et encore après elles. -->
+                    <Border CornerRadius="12" Padding="16,14" Margin="0,16,0,0" Background="{StaticResource IrisCyanDouxBrush}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding LabelBiosRecoveryHeader}" Style="{StaticResource TitreSection}" FontSize="13"/>
+                            <ItemsControl ItemsSource="{Binding BiosGuide.RecoveryTop}" Margin="0,8,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Style="{StaticResource Discret}" Margin="0,0,0,5"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding BiosGuide.Steps}" Margin="0,12,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border CornerRadius="12" Padding="16,12" Margin="0,0,0,8" Background="{StaticResource ObsidienneBrush}"
+                                        BorderThickness="1" BorderBrush="{StaticResource FiletBrush}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Instruction}" Style="{StaticResource Corps}"/>
+                                        <TextBlock Text="{Binding ExactValue}" Style="{StaticResource Donnee}" Foreground="{StaticResource IrisCyanBrush}" Margin="0,5,0,0"
+                                                   Visibility="{Binding ExactValue, Converter={StaticResource StrVis}}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding BiosGuide.SaveInstruction}" Style="{StaticResource Discret}" Margin="0,6,0,0"
+                               Visibility="{Binding BiosGuide.SaveInstruction, Converter={StaticResource StrVis}}"/>
+                    <TextBlock Text="{Binding BiosGuide.CsmSuppressedNote}" Style="{StaticResource Legende}" Margin="0,10,0,0"
+                               Visibility="{Binding BiosGuide.CsmSuppressedNote, Converter={StaticResource StrVis}}"/>
+                    <Border CornerRadius="12" Padding="16,14" Margin="0,16,0,0" Background="{StaticResource IrisCyanDouxBrush}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding LabelBiosRecoveryHeader}" Style="{StaticResource TitreSection}" FontSize="13"/>
+                            <ItemsControl ItemsSource="{Binding BiosGuide.RecoveryBottom}" Margin="0,8,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" Style="{StaticResource Discret}" Margin="0,0,0,5"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- ───── LE BILAN DE SANTÉ ───── -->
+        <StackPanel Margin="0,30,0,0" Visibility="{Binding RepairSummary, Converter={StaticResource StrVis}}" effets:Revelation.Active="True" effets:Revelation.Retard="300">
+            <TextBlock Text="{Binding LabelRepairHeader}" Style="{StaticResource TitreSection}"/>
+            <Border Style="{StaticResource Dalle}" Padding="24,20" Margin="0,12,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- Le docteur violet sort de l'interface (« faut changer ») ; le bilan porte la
+                         sphère de marque, la même que le logo et le bouton central. -->
+                    <!-- À 148 px le médaillon pesait plus que le verdict à côté. -->
+                    <Control Grid.Column="0" Template="{StaticResource SphereDeMarque}" Width="64" Height="64"
+                             VerticalAlignment="Top" Margin="2,2,20,2" Focusable="False" IsTabStop="False"/>
+                <StackPanel Grid.Column="1">
+                    <!-- La phrase s'affiche même sans constat : ce qui n'a pas pu être lu se dit. -->
+                    <TextBlock Text="{Binding RepairSummary}" Style="{StaticResource Corps}"/>
+
+                    <StackPanel Margin="0,14,0,0" Visibility="{Binding PeutRelancerEnAdministrateur, Converter={StaticResource BoolVis}}">
+                        <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelRelancerEnAdministrateur}"
+                                Command="{Binding RelancerEnAdministrateurCommand}" HorizontalAlignment="Left"/>
+                        <TextBlock Text="{Binding LabelRelancerEnAdministrateurAide}" Style="{StaticResource Legende}" Margin="0,6,0,0"/>
+                        <TextBlock Text="{Binding MessageRelanceAdministrateur}" Style="{StaticResource Legende}" Margin="0,4,0,0"
+                                   Visibility="{Binding MessageRelanceAdministrateur, Converter={StaticResource StrVis}}"/>
+                    </StackPanel>
+
+                    <StackPanel Margin="0,18,0,0" Visibility="{Binding HasRepairChanges, Converter={StaticResource BoolVis}}">
+                        <Border Style="{StaticResource Filet}" Margin="0,0,0,14"/>
+                        <!-- L'avertissement de conditions reste visible ; la liste se déplie à la demande. -->
+                        <ToggleButton x:Name="DeplierChangements" Style="{StaticResource EnTeteRepliable}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding LabelRepairChanges}" Style="{StaticResource TitreSection}" FontSize="13" VerticalAlignment="Center"/>
+                                <Border CornerRadius="10" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center" Background="{StaticResource ObsidienneReleveeBrush}">
+                                    <TextBlock Text="{Binding RepairChanges.Count}" Style="{StaticResource Legende}" Typography.NumeralAlignment="Tabular"/>
+                                </Border>
+                            </StackPanel>
+                        </ToggleButton>
+                        <TextBlock Text="{Binding RepairChangesWarning}" Style="{StaticResource Discret}" Foreground="{StaticResource EtatRegarderBrush}"
+                                   Margin="0,8,0,0" Visibility="{Binding RepairChangesWarning, Converter={StaticResource StrVis}}"/>
+                        <ItemsControl ItemsSource="{Binding RepairChanges}" Margin="0,10,0,0"
+                                      Visibility="{Binding IsChecked, ElementName=DeplierChangements, Converter={StaticResource BoolVis}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Style="{StaticResource Legende}" Margin="0,0,0,7"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </StackPanel>
+
+</UserControl>

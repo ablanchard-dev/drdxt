@@ -84,11 +84,17 @@ public sealed class ReleveSansLAppTests
     {
         var iss = Iss();
         iss.Should().Contain("schtasks.exe'), '/Delete /F /TN \"DrDXT releve\"'", "retirée par le [Code] de désinstallation, avec le service");
-        iss.Should().Contain("\n[UninstallDelete]").And.Contain("Type: files; Name: \"{userstartup}\\DrDXT releve.lnk\"");
-        iss.Should().Contain("[InstallDelete]");
-        iss.IndexOf("Type: files; Name: \"{userstartup}\\DrDXT releve.lnk\"", StringComparison.Ordinal)
-            // La section se cherche en début de ligne : un commentaire de l'iss peut la nommer.
-            .Should().BeLessThan(iss.IndexOf("\n[UninstallDelete]", StringComparison.Ordinal), "retiré aussi à la mise à jour");
+    }
+
+    // Le raccourci, l'App d'avant le posait sous le compte du joueur. {userstartup} est le Démarrage du compte qui valide
+    // l'UAC : pour un joueur sans droits, celui d'un autre, et le raccourci du joueur restait, pointé vers un exe effacé.
+    [Fact]
+    public void L_ancien_raccourci_s_efface_dans_le_Demarrage_du_joueur_et_non_de_l_administrateur()
+    {
+        var iss = Iss();
+        iss.Should().NotContain("{userstartup}", "le Démarrage du compte qui valide l'UAC n'est pas celui du joueur");
+        iss.Should().Contain("ExecAsOriginalUser(ExpandConstant('{sys}\\cmd.exe'), '/c del /f /q \"%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\DrDXT releve.lnk\"'",
+            "effacé sous le compte qui a lancé l'installeur, sans droits, dans son propre profil");
     }
 
     [Theory]
@@ -102,10 +108,10 @@ public sealed class ReleveSansLAppTests
         texte.Should().NotContain("20 s").And.NotContain("trois minutes").And.NotContain("three minutes", "11/10 : toute la partie est mesurée");
     }
 
-    // Lancé sans fenêtre, le relevé ne lance jamais le helper (aucune invite) et ne pose ni ne rend aucun levier : l'essai en
-    // alternance n'avance que dans l'App.
+    // Lancé sans fenêtre, le relevé ne lance jamais le helper (aucune invite). Il ne pose ni ne rend aucun levier, sauf celui
+    // de l'essai en alternance, et seulement après avoir demandé si le helper tourne déjà.
     [Fact]
-    public void Le_releve_de_fond_ne_lance_pas_le_helper_et_ne_pose_aucun_levier()
+    public void Le_releve_de_fond_ne_lance_pas_le_helper_et_ne_pose_que_le_levier_de_l_essai()
     {
         var d = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !System.IO.File.Exists(System.IO.Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
@@ -116,6 +122,8 @@ public sealed class ReleveSansLAppTests
         var debut = app.IndexOf("private void ReleverEnFond(", StringComparison.Ordinal);
         debut.Should().BePositive();
         var corps = app[debut..app.IndexOf("\n    }", debut, StringComparison.Ordinal)];
-        corps.Should().NotContain("LevierDeLEssai =").And.NotContain("HelperJoignableSansUac =");
+        corps.Should().NotContain("LevierParId =", "aucun autre levier ne se pose ni ne se retire sans fenêtre");
+        corps.Should().Contain("scan.LevierDeLEssaiParId =").And.Contain("scan.HelperJoignableSansUac = HelperDejaLanceAsync;",
+            "le levier de l'essai ne se pose que si le helper tourne déjà");
     }
 }

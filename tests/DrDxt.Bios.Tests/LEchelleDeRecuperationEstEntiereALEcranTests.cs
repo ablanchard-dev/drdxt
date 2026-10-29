@@ -56,7 +56,7 @@ public class LEchelleDeRecuperationEstEntiereALEcranTests
         bas.Should().Equal(haut,
             "l'interface n'affiche que BiosGuide.RecoveryTop : tout ce que Bottom dirait " +
             "en plus serait invisible pour quelqu'un dont la machine ne redemarre pas. " +
-            "Si les deux moities doivent diverger, lier aussi RecoveryBottom dans ScanView.xaml");
+            "Si les deux moities doivent diverger, lier aussi RecoveryBottom dans la vue de scan (Views/Scan/BiosEtSante.xaml)");
     }
 
     [Fact]

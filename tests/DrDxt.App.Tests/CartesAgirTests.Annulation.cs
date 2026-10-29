@@ -356,7 +356,7 @@ public sealed partial class CartesAgirTests
 
         var d = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !System.IO.File.Exists(System.IO.Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = System.IO.File.ReadAllText(System.IO.Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(System.IO.Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
         var carte = System.Text.RegularExpressions.Regex.Match(xaml, "<Border x:Name=\"CarteLeviersPoses\"(.*?)</Border>",
             System.Text.RegularExpressions.RegexOptions.Singleline).Groups[1].Value;
         carte.Should().Contain("LeviersPoses", "témoin : la carte existe");

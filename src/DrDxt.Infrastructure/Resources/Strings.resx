@@ -2094,7 +2094,7 @@ If it happened while a setting was being changed, run a scan: "What DrDXT set" s
     <value>The “{0}” trial is changing state elsewhere (the game recorder): click “Resume the trial” again in a few seconds.</value>
   </data>
   <data name="Essai.FermeLeJeu" xml:space="preserve">
-    <value>Nothing is applied during a game: close {1}, then click “Resume the trial” for “{0}”.</value>
+    <value>Nothing changes during a game: close {1}, then click “Resume the trial” for “{0}”.</value>
   </data>
   <data name="Essai.Fini.Mieux" xml:space="preserve">
     <value>Trial of “{0}” done: better in game across your games, it stays set.</value>

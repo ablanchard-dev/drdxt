@@ -1,0 +1,205 @@
+﻿<!-- La mesure en jeu, ce qui tournait à côté, et les dernières parties. -->
+<UserControl x:Class="DrDxt.App.Views.Scan.MesureEtParties"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:DrDxt.App.ViewModels"
+             xmlns:conv="clr-namespace:DrDxt.App.Converters"
+             xmlns:effets="clr-namespace:DrDxt.App.Effets"
+             xmlns:views="clr-namespace:DrDxt.App.Views"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:ScanViewModel}">
+
+    <UserControl.Resources>
+        <ResourceDictionary Source="Ressources.xaml"/>
+    </UserControl.Resources>
+
+    <StackPanel>
+        <!-- ───── LA MESURE EN JEU ───── -->
+        <Border Style="{StaticResource Dalle}" Padding="28,20" Margin="0,0,0,14" effets:Revelation.Active="True" effets:Revelation.Retard="140"
+                Visibility="{Binding State, Converter={StaticResource StateVis}, ConverterParameter='Done,AlreadyOptimal'}">
+            <StackPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.4*"/>
+                    <ColumnDefinition Width="1"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="1"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="{Binding LabelAvgFps}" Style="{StaticResource Legende}"/>
+                    <!-- Le FPS moyen ne s'affiche jamais seul : sa marge d'erreur est collée au chiffre. -->
+                    <TextBlock Text="{Binding AvgFpsAvecMarge}" Style="{StaticResource Mesure}" FontSize="34" Margin="0,4,0,0"/>
+                </StackPanel>
+                <Rectangle Grid.Column="1" Fill="{StaticResource FiletBrush}"/>
+                <StackPanel Grid.Column="2" Margin="28,0,0,0">
+                    <TextBlock Text="{Binding LabelP1Low}" Style="{StaticResource Legende}"/>
+                    <TextBlock Text="{Binding P1LowAvecMarge}" Style="{StaticResource Mesure}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+                <Rectangle Grid.Column="3" Fill="{StaticResource FiletBrush}"/>
+                <StackPanel Grid.Column="4" Margin="28,0,0,0">
+                    <TextBlock Text="{Binding LabelMargin}" Style="{StaticResource Legende}"/>
+                    <TextBlock Text="{Binding MarginDisplay}" Style="{StaticResource Mesure}" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Grid>
+            <!-- La courbe de CETTE mesure, jamais un avant/après : chaque point est la trame la plus lente de son
+                 instant, la ligne la médiane. Points calculés par le ViewModel. -->
+            <StackPanel Margin="0,18,0,0" Visibility="{Binding ACourbe, Converter={StaticResource BoolVis}}">
+                <TextBlock Text="{Binding LabelCourbe}" Style="{StaticResource Legende}"/>
+                <Viewbox Stretch="Fill" Height="120" Margin="0,8,0,0">
+                    <Canvas Width="600" Height="120" ClipToBounds="True"
+                            AutomationProperties.Name="{Binding LabelCourbe}">
+                        <Line X1="0" X2="600" Y1="{Binding CourbeDeLaMesure.MedianeY}" Y2="{Binding CourbeDeLaMesure.MedianeY}"
+                              Stroke="{StaticResource TexteDiscretBrush}" StrokeThickness="1" StrokeDashArray="4 3"/>
+                        <Polyline Points="{Binding PointsDeLaCourbe}" Stroke="{StaticResource IrisCyanBrush}" StrokeThickness="1.5"
+                                  StrokeLineJoin="Round"/>
+                        <!-- Les pics au-dessus de l'échelle : écrêtés en haut, marqués ici, comptés dans la légende. -->
+                        <ItemsControl ItemsSource="{Binding PicsDeLaCourbe}" Width="600" Height="120">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Ellipse Width="7" Height="7" Margin="-3.5,0,0,0" Fill="{StaticResource EtatRegarderBrush}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Canvas>
+                </Viewbox>
+                <TextBlock Text="{Binding LabelCourbeLegende}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                <TextBlock Text="{Binding LabelPicsEcretes}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,2,0,0"
+                           Visibility="{Binding LabelPicsEcretes, Converter={StaticResource StrVis}}"/>
+            </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Ce qui tournait à côté du jeu : le chiffre ne se lit pas sans. -->
+        <Border Style="{StaticResource Dalle}" Padding="22,16" Margin="0,0,0,14"
+                Visibility="{Binding State, Converter={StaticResource StateVis}, ConverterParameter='Done,AlreadyOptimal,Degraded'}">
+            <StackPanel>
+                <!-- La carte n'avait pas de titre ; une phrase seule flottait. -->
+                <!-- Même niveau de titre que la carte voisine « Tes dernières parties ». -->
+                <TextBlock Text="{Binding LabelVoisinsTitre}" Style="{StaticResource TitreSection}" FontSize="13" Margin="0,0,0,8"/>
+                <TextBlock Text="{Binding VoisinsResume}" Style="{StaticResource Discret}" TextWrapping="Wrap"/>
+                <!-- La liste brute des programmes se replie derrière un lien (critique de l'app :
+                     elle occupait la page juste sous Optimiser). La phrase au-dessus reste. -->
+                <StackPanel Visibility="{Binding VoisinsConnus, Converter={StaticResource BoolVis}}">
+                    <ToggleButton x:Name="VoirVoisins" Content="{Binding LabelVoirVoisins}" Margin="0,6,0,0" HorizontalAlignment="Left"
+                                  Cursor="Hand" Foreground="{StaticResource IrisCyanBrush}" FocusVisualStyle="{StaticResource FocusIris}"
+                                  FontFamily="{StaticResource UiFont}" FontSize="12.5" FontWeight="SemiBold">
+                        <ToggleButton.Template>
+                            <ControlTemplate TargetType="ToggleButton">
+                                <Border Background="Transparent" Padding="0,2"><ContentPresenter/></Border>
+                            </ControlTemplate>
+                        </ToggleButton.Template>
+                    </ToggleButton>
+                    <ItemsControl ItemsSource="{Binding VoisinsDuJeu}" Margin="0,8,0,0"
+                                  Visibility="{Binding IsChecked, ElementName=VoirVoisins, Converter={StaticResource BoolVis}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Style="{StaticResource Donnee}" Margin="0,3,0,0"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- ───── TES DERNIÈRES PARTIES ───── -->
+        <Border Style="{StaticResource Dalle}" Padding="22,16" Margin="0,0,0,14">
+            <!-- Visible sans scan ; « Prêt à jouer ? » sert avant la partie. -->
+            <StackPanel>
+                <TextBlock Text="{Binding LabelPartiesTitre}" Style="{StaticResource TitreSection}" FontSize="13"/>
+                <!-- L'explication du relevé se replie ; elle reste à un clic. -->
+                <ToggleButton x:Name="CommentParties" Style="{StaticResource Depliant}" Content="{Binding LabelCommentCaMarche}" Margin="0,6,0,0"/>
+                <TextBlock Text="{Binding LabelPartiesDescription}" Style="{StaticResource Legende}" Margin="0,6,0,0" TextWrapping="Wrap"
+                           Visibility="{Binding IsChecked, ElementName=CommentParties, Converter={StaticResource BoolVis}}"/>
+                <ToggleButton Style="{StaticResource Bascule}" Content="{Binding LabelBasculerReleve}"
+                              IsChecked="{Binding ReleveDesPartiesActif, Mode=OneWay}" Command="{Binding BasculerReleveDesPartiesCommand}" Margin="0,12,0,0"/>
+                <!-- L'essai en alternance se juge sur ces parties ; sa ligne et son arrêt vivent ici, visibles sans scan
+                     (avant, dans la zone de résultats : sans scan, aucun moyen de l'arrêter). Le lancer reste avec Optimiser. -->
+                <TextBlock Text="{Binding LigneEssai}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,10,0,0"
+                           Visibility="{Binding LigneEssai, Converter={StaticResource StrVis}}"/>
+                <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelEssaiReprendre}" HorizontalAlignment="Left"
+                        Command="{Binding ReprendreEssaiCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Margin="0,8,0,0"
+                        Visibility="{Binding EssaiEnAttente, Converter={StaticResource BoolVis}}"/>
+                <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelEssaiArreter}" HorizontalAlignment="Left"
+                        Command="{Binding ArreterEssaiCommand}" Margin="0,8,0,0"
+                        Visibility="{Binding EssaiEnCours, Converter={StaticResource BoolVis}}"/>
+                <!-- Prêt à jouer, en quelques secondes. Après le scan, il est sous Optimiser : ici seulement avant. -->
+                <StackPanel Visibility="{Binding State, Converter={StaticResource StateVis}, ConverterParameter='Idle,Scanning'}">
+                <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelPretAJouer}" HorizontalAlignment="Left"
+                        Command="{Binding VerifierPretAJouerCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Margin="0,10,0,0"/>
+                <ItemsControl ItemsSource="{Binding LignesPretAJouer}" Margin="0,8,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" Style="{StaticResource Corps}" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                </StackPanel>
+                <TextBlock Text="{Binding LabelPartiesAucune}" Style="{StaticResource Discret}" Margin="0,12,0,0"
+                           Visibility="{Binding AucunePartie, Converter={StaticResource BoolVis}}"/>
+                <!-- En tête ce qui compte ; le détail partie par partie sous son lien. -->
+                <ItemsControl ItemsSource="{Binding LignesPartiesResume}" Margin="0,12,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" Style="{StaticResource Corps}" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <!-- Les changements pas encore jugés en jeu, en tableau (changement · date · en jeu),
+                     au lieu d'un paragraphe de quatre lignes. -->
+                <Grid Margin="0,12,0,0" Grid.IsSharedSizeScope="True" Visibility="{Binding ADesChangementsEnAttente, Converter={StaticResource BoolVis}}">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="DateEnAttente"/>
+                            <ColumnDefinition Width="Auto" SharedSizeGroup="VerdictEnAttente"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding LabelEnAttenteChangement}" Style="{StaticResource Legende}"/>
+                        <TextBlock Grid.Column="1" Text="{Binding LabelEnAttenteDate}" Style="{StaticResource Legende}" Margin="18,0,0,0"/>
+                        <TextBlock Grid.Column="2" Text="{Binding LabelEnAttenteEnJeu}" Style="{StaticResource Legende}" Margin="18,0,0,0"/>
+                    </Grid>
+                    <ItemsControl Grid.Row="1" ItemsSource="{Binding ChangementsEnAttente}" Margin="0,4,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="#1FFFFFFF" BorderThickness="0,1,0,0" Padding="0,6,0,0" Margin="0,4,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="DateEnAttente"/>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="VerdictEnAttente"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Changement}" Style="{StaticResource Corps}" TextWrapping="Wrap" LineStackingStrategy="BlockLineHeight"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Date}" Style="{StaticResource Corps}" FontFamily="{StaticResource MonoFont}" FontSize="12.5" Margin="18,0,0,0" LineHeight="21" LineStackingStrategy="BlockLineHeight"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding EnJeu}" Style="{StaticResource Discret}" Margin="18,1,0,0" MaxWidth="340" TextWrapping="Wrap"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+                <ToggleButton x:Name="DetailParties" Style="{StaticResource Depliant}" Content="{Binding LabelDetailParties}" Margin="0,10,0,0"
+                              Visibility="{Binding ADuDetailDeParties, Converter={StaticResource BoolVis}}"/>
+                <ItemsControl ItemsSource="{Binding LignesPartiesDetail}" Margin="0,6,0,0"
+                              Visibility="{Binding IsChecked, ElementName=DetailParties, Converter={StaticResource BoolVis}}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" Style="{StaticResource Legende}" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+
+</UserControl>

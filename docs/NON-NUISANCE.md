@@ -169,10 +169,11 @@ retire quand le releve est eteint et a la desinstallation (`[UninstallDelete]`).
 **Remplace depuis** : ce fichier et ce raccourci n'existent plus. L'installeur cree la tache planifiee
 « DrDXT releve » (à l'ouverture de session de chaque compte, pour ce compte et sans droits : principal du groupe Utilisateurs en
 LeastPrivilege ; elle lance l'App directement ;
-`installer/DrDXT.iss`), la supprime a la desinstallation, et efface l'ancien raccourci.
-**Limite (revue F-11, 07/10/2026)** : la desinstallation tourne sous le compte qui a valide l'UAC. Un joueur
-sans droits qui a fait valider l'UAC par un autre compte garde le raccourci dans SON Demarrage, pointant vers
-un exe efface (rien ne se lance ; ce que Windows affiche alors n'a pas ete observe). A retirer a la main : `shell:startup`.
+`installer/DrDXT.iss`), la supprime a la desinstallation, et efface l'ancien raccourci a l'installation, sous le
+compte qui a lance l'installeur et sans droits (`ExecAsOriginalUser`) : le Demarrage de l'installeur eleve serait
+celui du compte qui valide l'UAC, un autre pour un joueur sans droits (revue F-11).
+**Limite** : un autre compte du PC qui avait lance l'ancienne App garde son raccourci, pointant vers
+un exe efface apres desinstallation (rien ne se lance ; ce que Windows affiche alors n'a pas ete observe). A retirer a la main : `shell:startup`.
 
 ### 07/10/2026 — « Exporter ma machine » (kit testeur, T1)
 

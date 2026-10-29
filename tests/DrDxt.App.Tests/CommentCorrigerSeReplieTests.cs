@@ -1,6 +1,7 @@
 using System.IO;
 using System.Xml.Linq;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -15,7 +16,7 @@ public sealed class CommentCorrigerSeReplieTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var vue = XDocument.Load(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml")).Root!;
+        var vue = XDocument.Parse(VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"))).Root!;
         var ligne = vue.Descendants().Single(e => (string?)e.Attribute(X + "Key") == "LigneDeCarte");
         ligne.Descendants().Single(e => (string?)e.Attribute(X + "Name") == "DepliantRemede").Attribute("IsChecked").Should().BeNull("replié d'office");
 

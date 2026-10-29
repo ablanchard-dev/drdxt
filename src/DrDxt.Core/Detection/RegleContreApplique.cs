@@ -75,6 +75,15 @@ public static class RegleContreApplique
                 Docteur.T("RCA.Secours", bios.First(r => r.Setting == "EXPO").Libelle, debit, vitesseAnnonceeKit));
             yield break;
         }
+        // Vitesse du kit non lue (une barrette muette suffit) : un profil demandé qui tourne au socle peut être un
+        // entraînement raté, rien ne le distingue d'un réglage voulu.
+        if (vitesseAnnonceeKit <= 0 && bios.FirstOrDefault(r => r.Setting == "EXPO") is { Libelle: not ("Disabled" or "Auto") } profil
+            && appliques.Canaux.All(c => c.DebitMts <= SocleJedec(appliques.Type)))
+        {
+            yield return new RepairFinding("RAM", Nom, null, null, RepairStatus.Unknown,
+                Docteur.T("RCA.KitNonLu", profil.Libelle, appliques.Canaux.Max(c => c.DebitMts)));
+            yield break;
+        }
         var ecarts = Comparer(bios, appliques);
         yield return ecarts.Count == 0
             ? new RepairFinding("RAM", Nom, null, null, RepairStatus.Observed, Docteur.T("RCA.Conforme", appliques.Canaux.Count))

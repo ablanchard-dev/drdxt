@@ -118,6 +118,8 @@ en.GroupeRaccourcis=Shortcuts:
 fr.GroupeRaccourcis=Raccourcis :
 en.TacheService=Reapply my settings when Windows starts and read the processor temperature during my games (DrDxtReconciler service)
 fr.TacheService=Réappliquer mes réglages au démarrage de Windows et relever la température du processeur pendant mes parties (service DrDxtReconciler)
+en.TacheHelper=Run Optimize trials without opening DrDXT (starts the administrator helper when you sign in)
+fr.TacheHelper=Faire les essais d'Optimiser sans ouvrir DrDXT (lance l'assistant administrateur à l'ouverture de session)
 en.GroupeDemarrage=Startup:
 fr.GroupeDemarrage=Démarrage :
 en.EtatServiceMesure=Registering the measurement service...
@@ -149,6 +151,10 @@ Name: "desktopicon"; Description: "{cm:TacheBureau}"; GroupDescription: "{cm:Gro
 ; administrateur et lit la temperature du processeur par ce service ; sans lui, elle n'est plus relevee en partie, et les
 ; reglages gardes ne sont plus reverifies au demarrage. Une mise a jour garde le choix de l'installation precedente.
 Name: "reconciler"; Description: "{cm:TacheService}"; GroupDescription: "{cm:GroupeDemarrage}"
+; Decochee par defaut : un processus administrateur pour toute la session est une surface que chaque joueur choisit. Une
+; mise a jour garde le choix de l'installation precedente ; decochee, la tache existante part (PoserOuRetirerLeHelper).
+; Proposee seulement au compte d'origine administrateur : HighestAvailable n'eleve pas un compte standard.
+Name: "helperseance"; Description: "{cm:TacheHelper}"; GroupDescription: "{cm:GroupeDemarrage}"; Flags: unchecked; Check: CompteDOrigineAdmin
 
 [InstallDelete]
 ; Le raccourci « Desinstaller DrDXT » prend ses accents ; sans cette ligne, une mise a jour
@@ -163,13 +169,6 @@ Type: files; Name: "{autodesktop}\DrDXT.lnk"
 ; Les fichiers de symboles ne sont plus livres, mais une mise a jour n'efface que ce qu'elle remplace :
 ; sans ce retrait, des .pdb d'une ancienne version resteraient a cote des nouveaux binaires.
 Type: files; Name: "{app}\*.pdb"
-; Une version precedente de l'App posait ce raccourci dans le dossier Demarrage du joueur. Lance par lui, le releve
-; tourne sans droits administrateur et ne lit jamais la temperature du processeur (PawnIO refuse). La tache
-; planifiee de [Run] le remplace ; le raccourci d'une installation precedente est retire.
-; C'est le seul usage de {userstartup} (ici et dans la section de desinstallation) : effacer ce raccourci, jamais en poser un. ISCC en
-; avertit (« UsedUserAreasWarning ») parce que l'installation tourne en administrateur : c'est le Demarrage du compte qui
-; valide l'UAC qui est nettoye ; un autre compte garde son ancien raccourci (limite ecrite dans docs/NON-NUISANCE.md, F-11).
-Type: files; Name: "{userstartup}\DrDXT releve.lnk"
 Type: files; Name: "{app}\service\*.pdb"
 ; Les copies de repli de PresentMon ne sont plus livrees (voir [Files]) ; une mise a jour n'efface que ce qu'elle remplace :
 ; sans ces lignes, celles d'une ancienne version resteraient, jamais lues.
@@ -177,9 +176,6 @@ Type: filesandordirs; Name: "{app}\third_party"
 Type: filesandordirs; Name: "{app}\service\third_party"
 
 [UninstallDelete]
-; Le raccourci d'une ancienne version (voir [InstallDelete]) : sans ce retrait, Windows lancerait a
-; chaque session un programme desinstalle.
-Type: files; Name: "{userstartup}\DrDXT releve.lnk"
 ; Le staging de la mise a jour (%LOCALAPPDATA%\DrDXT\staging) ne se retire pas ici : le desinstalleur est administrateur, et
 ; le dossier appartient au compte, qui peut en faire une jonction vers un dossier qu'il ne peut pas vider lui-meme (la
 ; RedirectionGuard d'Inno ne la bloque qu'a partir de Windows 10 22H2). L'App, sans droits, le purge a son lancement.
@@ -525,7 +521,7 @@ begin
   Chemin := DossierDuLanceur() + '\DrDxt.Lanceur.exe';
   Source := ExpandConstant('{tmp}\DrDxt.Lanceur.exe');
   if not FileExists(Source) then ExtractTemporaryFile('DrDxt.Lanceur.exe');
-  if not FileExists(Source) or not ForceDirectories(DossierDuLanceur()) or not FileCopy(Source, Chemin, False) then
+  if not FileExists(Source) or not ForceDirectories(DossierDuLanceur()) or not CopyFile(Source, Chemin, False) then
   begin
     Log('lanceur non copie dans SystemTemp : refuse');
     Exit;
@@ -606,6 +602,9 @@ procedure LaisserLeHelperRendreSesBaux();
 var
   ResultCode, Attendu: Integer;
 begin
+  { Le helper de la tache « DrDXT helper » (--service) ne s'arrete pas sur inactivite : ce mutex, qui vit jusqu'a la fin de
+    l'installeur, lui dit de s'arreter, baux rendus (Program.MutexDeLInstalleur). }
+  CreateMutex('DrDxtInstalleur');
   if not HelperVivant() then Exit;
   Log('helper en vie : il rend ses baux et s''arrete seul, 135 s au plus');
   Attendu := 0;
@@ -674,6 +673,8 @@ begin
     Result := FmtMessage(CustomMessage('HorsProgramFiles'), [ExpandConstant('{commonpf}\DrDXT')]);
     Exit;
   end;
+  { L'assistant de session ne se relance pas pendant la copie ; PoserOuRetirerLeHelper le repose si la case reste cochee. }
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /F /TN "DrDXT helper"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#RcService}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   AttendreLArret('{#RcService}', 30);
   { Le releve de fond tourne sans fenetre a chaque session ; sans ceci, une mise a jour butait sur
@@ -795,6 +796,113 @@ begin
   if not Result then Log('releve : tache par groupe refusee (' + IntToStr(ResultCode) + ')');
 end;
 
+function WTSQuerySessionInformationW(Serveur: Longword; Session: Longword; Classe: Integer; var Tampon: Longword;
+  var Octets: Longword): Boolean; external 'WTSQuerySessionInformationW@wtsapi32.dll stdcall';
+procedure WTSFreeMemory(Memoire: Longword); external 'WTSFreeMemory@wtsapi32.dll stdcall';
+
+{ --- Le compte d'origine : celui de la session interactive, qui a lance l'installeur. Un administrateur qui valide l'UAC
+      pour un joueur sans droits (« par-dessus l'epaule ») donne son jeton a l'installeur, pas sa session : GetUserNameString
+      dirait l'administrateur. Lu a l'API de la session (WTS), jamais dans un fichier ou une variable que le compte ecrit. --- }
+function LireLaSession(Classe: Integer): String;
+var
+  Tampon, Octets: Longword;
+  Longueur: Integer;
+begin
+  Result := '';
+  Tampon := 0;
+  if not WTSQuerySessionInformationW(0, $FFFFFFFF, Classe, Tampon, Octets) then Exit;
+  Longueur := lstrlenW(Tampon);
+  if Longueur > 0 then
+  begin
+    Result := StringOfChar(' ', Longueur);
+    lstrcpynW(Result, Tampon, Longueur + 1);
+  end;
+  WTSFreeMemory(Tampon);
+end;
+
+{ Vide si la session n'a pas de compte (installation deployee en session 0) : aucune tache n'est alors posee. }
+function CompteDOrigine(): String;
+var
+  Nom: String;
+begin
+  Result := '';
+  Nom := LireLaSession(5);
+  if Nom <> '' then Result := LireLaSession(7) + '\' + Nom;
+end;
+
+var
+  CompteDOrigineLu: Integer;
+
+{ --- Le compte d'origine est-il administrateur ? Sous son propre jeton (ExecAsOriginalUser, sans droits), whoami liste ses
+      groupes : un administrateur filtre par l'UAC y garde S-1-5-32-544 (« utilise pour refus seulement »), un compte
+      standard ne l'a pas. Le SID ne depend pas de la langue de Windows. Lu une fois ; illisible = standard, dit au journal.
+      Un programme du compte qui fausserait la reponse ne gagne rien : HighestAvailable n'eleve pas un compte standard. --- }
+function CompteDOrigineAdmin(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  if CompteDOrigineLu = 0 then
+  begin
+    CompteDOrigineLu := 2;
+    try
+      if ExecAsOriginalUser(ExpandConstant('{sys}\cmd.exe'), '/S /C ""' + ExpandConstant('{sys}\whoami.exe') + '" /groups | "' +
+           ExpandConstant('{sys}\findstr.exe') + '" /C:"S-1-5-32-544""', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+         and (ResultCode = 0) then
+        CompteDOrigineLu := 1;
+    except
+      Log('helper : groupes du compte d''origine illisibles (' + GetExceptionMessage + ')');
+    end;
+    if CompteDOrigineLu = 1 then
+      Log('helper : compte d''origine administrateur, la case est proposee')
+    else
+      Log('helper : compte d''origine standard, la case n''est pas proposee');
+  end;
+  Result := CompteDOrigineLu = 1;
+end;
+
+{ --- L'assistant administrateur pour la session, sur choix seulement (case "helperseance") : les essais d'Optimiser avancent
+      DrDXT ferme. Une tache du compte d'origine, a son ouverture de session, au niveau le plus eleve (aucune invite) ; par
+      le lanceur, qui reconstruit l'environnement (un processus eleve heriterait de HKCU\Environment, ou tout programme du
+      compte peut poser CORECLR_PROFILER_PATH), et avec --app-path, sans quoi le helper refuse tout appelant. Sur batterie
+      aussi, sans limite de duree, une seule instance. Decochee, la tache d'une installation precedente part. --- }
+procedure PoserOuRetirerLeHelper();
+var
+  Chemin, Compte: String;
+  Xml: TArrayOfString;
+  ResultCode: Integer;
+begin
+  { En silencieux, /TASKS ou /MERGETASKS peut la demander pour un compte standard : la case n'existe pas, la demande est
+    refusee et dite au journal. }
+  if not CompteDOrigineAdmin() and (Pos('helperseance', Lowercase(ExpandConstant('{param:TASKS|}') + ',' +
+       ExpandConstant('{param:MERGETASKS|}'))) > 0) then
+    Log('helper : tache demandee en ligne de commande, refusee : le compte d''origine n''est pas administrateur');
+  Compte := CompteDOrigine();
+  if not WizardIsTaskSelected('helperseance') or (Compte = '') then
+  begin
+    if Compte = '' then Log('helper : aucun compte dans la session, tache non posee');
+    Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /F /TN "DrDXT helper"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exit;
+  end;
+  ResultCode := -1;
+  Compte := XmlEchappe(Compte);
+  Chemin := DossierDuLanceur() + '\helper.xml';
+  SetArrayLength(Xml, 1);
+  Xml[0] := '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">' +
+    '<Triggers><LogonTrigger><Enabled>true</Enabled><UserId>' + Compte + '</UserId></LogonTrigger></Triggers>' +
+    '<Principals><Principal id="Joueur"><UserId>' + Compte + '</UserId><LogonType>InteractiveToken</LogonType>' +
+    '<RunLevel>HighestAvailable</RunLevel></Principal></Principals>' +
+    '<Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>' +
+    '<StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><Enabled>true</Enabled></Settings>' +
+    '<Actions Context="Joueur"><Exec><Command>' + XmlEchappe(ExpandConstant('{app}') + '\DrDxt.Lanceur.exe') +
+    '</Command><Arguments>DrDxt.ElevatedHelper.exe &quot;--app-path=' + XmlEchappe(ExpandConstant('{app}') + '\{#AppExe}') +
+    '&quot; --service</Arguments></Exec></Actions></Task>';
+  if not (ForceDirectories(DossierDuLanceur()) and SaveStringsToUTF8FileWithoutBOM(Chemin, Xml, False)
+          and Exec(ExpandConstant('{sys}\schtasks.exe'), '/Create /F /TN "DrDXT helper" /XML "' + Chemin + '"', '', SW_HIDE,
+                   ewWaitUntilTerminated, ResultCode) and (ResultCode = 0)) then
+    Log('helper : tache non posee (' + IntToStr(ResultCode) + ')');
+  DeleteFile(Chemin);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
@@ -806,6 +914,7 @@ begin
     begin
       InstallPresentMonService();
       InstallOrRemoveReconcilerService();
+      PoserOuRetirerLeHelper();
       { Le releve des parties, sans droits. Eleve, il ecrirait dans le dossier du compte, ou un programme sans droits peut
         poser une jonction : creation, ecrasement ou suppression de fichier en administrateur a chaque ouverture de session.
         Sans droits, il lit le processeur par le service DrDXT s'il est installe, comme l'App. L'App directement, pas le
@@ -813,6 +922,10 @@ begin
         la tache par groupe, celle du compte qui installe (/RL LIMITED) la remplace : elle releve au moins ce compte. Le
         premier releve part tout de suite, sous le compte qui a lance l'installeur ; c'est le joueur quand l'installeur
         s'est eleve lui-meme. }
+      { Une version precedente de l'App posait le raccourci « DrDXT releve » dans le Demarrage du joueur, sous son compte :
+        la tache le remplace. Il s'efface sous le compte qui a lance l'installeur, sans droits et dans son propre profil.
+        Le Demarrage de l'installeur eleve est celui du compte qui valide l'UAC, un autre pour un joueur sans droits. }
+      ExecAsOriginalUser(ExpandConstant('{sys}\cmd.exe'), '/c del /f /q "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\DrDXT releve.lnk"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       ReleveDeTous := PoserLeReleve();
       if ReleveDeTous or (Exec(ExpandConstant('{sys}\schtasks.exe'), '/Create /F /TN "DrDXT releve" /SC ONLOGON /RL LIMITED /TR "\"' + ExpandConstant('{app}') + '\DrDxt.App.exe\" --releve"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0)) then
       begin
@@ -832,6 +945,7 @@ begin
       { Dossier non protege : aucune tache elevee, et celle d'une installation precedente est retiree, comme ses services :
         celui de demarrage repartirait en SYSTEM au prochain demarrage, sur ces fichiers. }
       Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /F /TN "DrDXT releve"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /F /TN "DrDXT helper"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       Exec(ExpandConstant('{sys}\sc.exe'), 'stop {#RcService}',   '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       Exec(ExpandConstant('{sys}\sc.exe'), 'delete {#RcService}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       if PresentMonEstANous() then
@@ -888,6 +1002,8 @@ begin
     { La tache planifiee du releve (voir [Run]) part avec le programme, et avant lui : une ouverture de session pendant
       l'attente du helper (jusqu'a 135 s) relancerait l'App, dont le fichier resterait alors jusqu'au redemarrage. }
     Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /F /TN "DrDXT releve"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    { L'assistant de session aussi : il s'arrete ensuite, baux rendus (LaisserLeHelperRendreSesBaux). }
+    Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /F /TN "DrDXT helper"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#AppExe} /F',                '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     { Une App elevee tuee en pleine mesure laisse la session ETW du compteur DXGI ouverte jusqu'au redemarrage. }
     Exec(ExpandConstant('{sys}\logman.exe'), 'stop DrDxtPresents -ets',          '', SW_HIDE, ewWaitUntilTerminated, ResultCode);

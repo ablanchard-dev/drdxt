@@ -39,9 +39,9 @@ public partial class ScanViewModel
 
     public bool EssaiEnCours => MemoireEssai?.Lire() is not null;
 
-    /// <summary>Le levier n'est pas dans l'état que les blocs prévoient pour la prochaine partie : le relevé de fond ne pose
-    /// rien, et un redémarrage efface un levier volatil (un réveil aussi, quand la relecture le dit). Seule l'App ouverte le
-    /// rattrape, par « Reprendre l'essai ».</summary>
+    /// <summary>Le levier n'est pas dans l'état que les blocs prévoient pour la prochaine partie : un redémarrage efface un
+    /// levier volatil (un réveil aussi, quand la relecture le dit), et sans le helper déjà lancé rien ne le repose sans clic.
+    /// L'App ouverte le rattrape, par « Reprendre l'essai ».</summary>
     public bool EssaiEnAttente => MemoireEssai?.Lire() is { } lu && !SelonLePlan(Effectif(lu));
 
     public string LabelEssaiReprendre => _localize("Essai.Reprendre");
@@ -168,7 +168,7 @@ public partial class ScanViewModel
     private async Task ArreterEssaiSousVerrouAsync()
     {
         if (MemoireEssai?.Lire() is not { } e) return;
-        var levier = PeutAlterner(e.LevierId) ? LevierParId?.Invoke(e.LevierId) : null;
+        var levier = PeutAlterner(e.LevierId) ? LevierDeLEssai(e.LevierId) : null;
         var reelle = levier is null ? null : PoseReelle(e.LevierId);
         var nonRelu = reelle is null && VerifierLaPose is not null && levier is not null;
         // Rien ne relit l'état : rien n'est écrit à l'aveugle, et la ligne le dit (« Annuler » reste possible).
@@ -321,7 +321,7 @@ public partial class ScanViewModel
         // (le relevé de fond) : l'essai dit l'état vrai au lieu de rester figé sur « posé ».
         var e = Effectif(lu);
         if (e != lu) MemoireEssai.Ecrire(e);
-        if (LevierParId?.Invoke(e.LevierId) is not { } levier) return;
+        if (LevierDeLEssai(e.LevierId) is not { } levier) return;
         // Après un redémarrage, l'état réel du levier n'est plus sûr ; l'essai s'arrête honnêtement.
         if (RedemarreDepuis(e))
         {
@@ -330,7 +330,12 @@ public partial class ScanViewModel
             // sans invite Windows ; sinon il attend, et « Arrêter l'essai » la rend.
             if (e.PoseMaintenant != e.PoseALOrigine)
             {
-                if (e.PoseALOrigine && JeuOuvertPourLEssai()) return;
+                // Ni pose ni retrait pendant qu'un jeu tourne : la fin de partie suivante rend l'origine. Le clic le dit.
+                if (JeuOuvertPourLEssai())
+                {
+                    if (avecGeste) LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.FermeLeJeu"), Titre(e.LevierId), JeuDe(parties));
+                    return;
+                }
                 if (HelperJoignableSansUac is { } peut && levier.RequiresElevation && !await peut().ConfigureAwait(true))
                 {
                     MemoireEssai.Ecrire(e with { EnPause = true });
@@ -349,9 +354,9 @@ public partial class ScanViewModel
         var (pose, fini, verdict) = AlternanceDesEssais.Suivante(parties, e.LevierId, e.PoseALOrigine, e.Debut);
         if (pose != e.PoseMaintenant)
         {
-            // Rien ne se pose sans clic pendant qu'un jeu tourne (une autre partie lancée aussitôt, un second jeu) : l'essai
-            // garde son état, et la partie suivante le refait avancer.
-            if (pose && JeuOuvertPourLEssai())
+            // Rien ne se pose ni ne se retire pendant qu'un jeu tourne (une autre partie lancée aussitôt, un second jeu) : l'essai
+            // garde son état, et la partie suivante le refait avancer. Le clic le dit.
+            if (JeuOuvertPourLEssai())
             {
                 if (avecGeste) LigneEssai = string.Format(CultureInfo.CurrentCulture, _localize("Essai.FermeLeJeu"), Titre(e.LevierId), JeuDe(parties));
                 return;
@@ -406,6 +411,8 @@ public partial class ScanViewModel
     }
 
     private bool JeuOuvertPourLEssai() => (JeuOuvertPourLeTest ?? _gameLocator.JeuOuvert)();
+
+    private ITweak? LevierDeLEssai(string id) => (LevierParId ?? LevierDeLEssaiParId)?.Invoke(id);
 
     /// <summary>Le joueur annule le levier en essai depuis « Ce que DrDXT a posé » : l'essai s'arrête,
     /// rien ne le repose. La ligne dit l'annulation : la valeur d'avant DrDXT n'est pas l'état d'avant l'essai quand le levier

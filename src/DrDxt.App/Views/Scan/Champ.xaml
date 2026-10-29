@@ -1,0 +1,479 @@
+﻿<!-- Le champ du haut : chrome liquide, texte à gauche, réseau à droite. -->
+<UserControl x:Class="DrDxt.App.Views.Scan.Champ"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:DrDxt.App.ViewModels"
+             xmlns:conv="clr-namespace:DrDxt.App.Converters"
+             xmlns:effets="clr-namespace:DrDxt.App.Effets"
+             xmlns:views="clr-namespace:DrDxt.App.Views"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=vm:ScanViewModel}">
+
+    <UserControl.Resources>
+        <ResourceDictionary Source="Ressources.xaml"/>
+    </UserControl.Resources>
+
+    <StackPanel>
+                        <!-- ════════════ LE CHAMP : chrome liquide, texte à gauche, réseau à droite ════════════ -->
+                        <Grid>
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <!-- Au repos le champ occupe tout l'écran ; après le scan il laisse monter le résultat. -->
+                                    <Setter Property="MinHeight" Value="560"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding State}" Value="Idle">
+                                            <Setter Property="MinHeight" Value="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding State}" Value="Scanning">
+                                            <Setter Property="MinHeight" Value="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+                            <!-- Le fond reste le chrome liquide de DrDXT. La parallaxe (B6) est retirée : le décor
+                                 glissait à l'inverse de la souris, par à-coups. Le bouton s'en distingue par sa forme : un cerveau de neurones. -->
+                            <!-- Le mouvement fluide d'origine, en noir et argent : plus aucune irisation. -->
+                            <!-- Calculé à pleine résolution, plus à 60 % agrandi. -->
+                            <effets:ChampDeChrome x:Name="FondChrome" Style="{StaticResource ChampSelonEtat}" Amplitude="0.3" Frequence="3"
+                                                  Irisation="0" EchelleDeRendu="1" Teinte="#FF40444B"/>
+                            <Border Background="{StaticResource VoileLectureBrush}"/>
+                            <Border Height="220" VerticalAlignment="Bottom" Background="{StaticResource FonduVersObsidienneBrush}"/>
+
+                            <Grid Margin="52,48,32,36">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="0.92*"/>
+                                    <ColumnDefinition Width="1.08*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- ───── TEXTE ───── -->
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" MaxWidth="560" HorizontalAlignment="Left">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Style.Triggers>
+                                                <!-- Pendant le scan, on ne change plus la scène : elle est lue. -->
+                                                <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                                                    <Setter Property="IsEnabled" Value="False"/>
+                                                    <Setter Property="Opacity" Value="0.45"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <!-- Avant le scan -->
+                                    <StackPanel Visibility="{Binding State, Converter={StaticResource StateVis}, ConverterParameter='Idle,Scanning'}">
+                                        <TextBlock Style="{StaticResource TitreMarque}" FontSize="38" LineHeight="46">
+                                            <Run Text="{Binding LabelIdleHeadlineLead, Mode=OneWay}" Foreground="{StaticResource TexteBrush}"/>
+                                            <Run Text="{Binding LabelIdleHeadlineAccent, Mode=OneWay}" Foreground="{StaticResource ChromeTexteBrush}"/>
+                                        </TextBlock>
+                                        <!-- La promesse du produit, lue avant le premier scan. Elle n'était
+                                             affichée nulle part ; l'ancien sous-titre en disait la moitié. -->
+                                        <TextBlock Text="{Binding LabelProductPromise}" Style="{StaticResource Discret}" FontSize="15" LineHeight="23"
+                                                   TextWrapping="Wrap" Margin="0,14,0,0"/>
+
+                                        <!-- « Lance un scan » restait écrit pendant le scan (vu sur une photo
+                                             de scan réel). L'appel à l'action disparaît dès que le scan tourne. -->
+                                        <TextBlock Text="{Binding LabelIdleHeroBody}" Margin="0,26,0,0">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource Corps}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+
+                                        <!-- La consigne de scène se lit avant de lancer : la mesure porte sur ce que tu joues. -->
+                                        <TextBlock Text="{Binding LabelConsigneScene}" Style="{StaticResource Discret}" TextWrapping="Wrap" LineHeight="21" Margin="0,12,0,0"/>
+                                        <TextBlock Text="{Binding LabelSceneQuestion}" Style="{StaticResource Legende}" Margin="0,18,0,8"/>
+                                        <ListBox Style="{StaticResource SelecteurSegmente}" ItemsSource="{Binding ChoixDeScene}"
+                                                 SelectedItem="{Binding SceneDeclaree}" ItemTemplate="{StaticResource LibelleDeScene}"/>
+                                        <!-- La précision est facultative : repliée, elle n'occupe plus l'écran. -->
+                                        <ToggleButton x:Name="Preciser" Style="{StaticResource Depliant}" Content="{Binding LabelAjouterPrecision}" Margin="0,14,0,0"/>
+                                        <StackPanel Visibility="{Binding IsChecked, ElementName=Preciser, Converter={StaticResource BoolVis}}">
+                                            <TextBlock Text="{Binding LabelSceneDescription}" Style="{StaticResource Legende}" Margin="0,8,0,6"/>
+                                            <TextBox Text="{Binding DescriptionScene, UpdateSourceTrigger=PropertyChanged}" MaxLength="200"
+                                                     AutomationProperties.Name="{Binding LabelSceneDescription}"/>
+                                        </StackPanel>
+
+                                        <DockPanel Margin="0,18,0,0" LastChildFill="True">
+                                            <Path Style="{StaticResource GlyphIcon}" Data="{Binding Source=ShieldCheck, Converter={StaticResource Icon}}"
+                                                  Stroke="{StaticResource IrisCyanBrush}" Width="15" Height="15" VerticalAlignment="Top" Margin="0,1,0,0" DockPanel.Dock="Left"/>
+                                            <TextBlock Text="{Binding LabelTrustLocal}" Style="{StaticResource Legende}" Margin="8,0,0,0" TextWrapping="Wrap"/>
+                                        </DockPanel>
+                                        <!-- Windows a coupé ses animations, DrDXT est figé ; un clic l'anime quand même. Pas sous la sphère :
+                                             là, elle recouvre les étiquettes du bas de l'orbite. -->
+                                        <Button Style="{StaticResource BoutonDiscret}" Content="{Binding LabelAnimerMalgreWindows}" Command="{Binding AnimerMalgreWindowsCommand}"
+                                                HorizontalAlignment="Left" Margin="0,14,0,0"
+                                                Visibility="{Binding AnimationsFigeesParWindows, Converter={StaticResource BoolVis}}"/>
+                                    </StackPanel>
+
+                                    <!-- Après le scan -->
+                                    <StackPanel Visibility="{Binding State, Converter={StaticResource StateVis}, ConverterParameter='Done,AlreadyOptimal,Degraded,Failed'}"
+                                                effets:Revelation.Active="True">
+
+                                        <!-- Un seul titre : le nombre, qui répond à « ma machine va bien ? ». Une ligne de verdict
+                                             dessous le redirait en mots. -->
+                                        <TextBlock effets:Compteur.Texte="{Binding TitreAccueil}" FontFamily="{StaticResource UiDisplayFont}" FontSize="38" LineHeight="44" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource TexteBrush}" TextWrapping="Wrap"
+                                                   Typography.NumeralAlignment="Tabular"/>
+                                        <TextBlock Text="{Binding SousTitreAccueil}" Style="{StaticResource Discret}" FontSize="15" LineHeight="23" Margin="0,12,0,0"
+                                                   Visibility="{Binding SousTitreAccueil, Converter={StaticResource StrVis}}"/>
+                                        <TextBlock Text="{Binding DateDuScan}" Style="{StaticResource Legende}" Margin="0,4,0,0" Typography.NumeralAlignment="Tabular"/>
+                                        <!-- Le docteur dit ce qui vient ensuite quand l'écran ne le dit pas déjà. -->
+                                        <TextBlock x:Name="ProchaineEtape" Text="{Binding EtapeHorsListe}" Style="{StaticResource Corps}" Foreground="{StaticResource TexteBrush}"
+                                                   TextWrapping="Wrap" MaxWidth="560" HorizontalAlignment="Left" Margin="0,18,0,0"
+                                                   Visibility="{Binding EtapeHorsListe, Converter={StaticResource StrVis}}"/>
+
+                                        <!-- Un seul appel principal : Optimiser vient d'abord. La liste des défauts se replie dessous ;
+                                             ouverte d'office, elle faisait de l'accueil un inventaire de ce qui ne va pas. -->
+                                        <StackPanel Margin="0,22,0,0">
+                                            <!-- Ce qu'Optimiser essaiera, dit avant le clic, et que ce sont ses propres réglages. -->
+                                            <TextBlock x:Name="ApercuOptimiser" Text="{Binding ApercuOptimisation}" Style="{StaticResource Discret}" TextWrapping="Wrap"
+                                                       effets:Revelation.Active="True" effets:Revelation.Retard="160"
+                                                       MaxWidth="540" HorizontalAlignment="Left"
+                                                       Visibility="{Binding ApercuOptimisation, Converter={StaticResource StrVis}}"/>
+                                            <!-- Rien que DrDXT puisse poser seul : une phrase vraie à la place du bouton. -->
+                                            <TextBlock Text="{Binding LabelRienAPoserSeul}" Style="{StaticResource Discret}" TextWrapping="Wrap" MaxWidth="540"
+                                                       HorizontalAlignment="Left" Margin="0,12,0,0"
+                                                       Visibility="{Binding RienAPoserDuTout, Converter={StaticResource BoolVis}}"/>
+                                            <!-- Un souci en cours (arrêt brutal...) se lit avant le clic ; ses mots le disent, sans couleur d'état
+                                                 hors de la navigation et des titres de groupe. -->
+                                            <TextBlock Text="{Binding AvertissementPoint}" Style="{StaticResource Discret}" TextWrapping="Wrap" Foreground="{StaticResource TexteBrush}"
+                                                       MaxWidth="540" HorizontalAlignment="Left" Margin="0,12,0,0"
+                                                       Visibility="{Binding AvertissementPoint, Converter={StaticResource StrVis}}"/>
+                                            <Button x:Name="BoutonOptimiser" Style="{StaticResource CapsuleChrome}" Content="{Binding LabelOptimize}"
+                                                    effets:Revelation.Active="True" effets:Revelation.Retard="280"
+                                                    Command="{Binding ApplyCommand}" HorizontalAlignment="Left" Margin="0,16,0,0"
+                                                    ToolTipService.ShowOnDisabled="True" ToolTip="{Binding ApplyHint}"/>
+                                            <!-- Point de restauration puis réglages, jusqu'à ~40 s : le dire. -->
+                                            <TextBlock Visibility="{Binding ApplyCommand.IsRunning, Converter={StaticResource BoolVis}}"
+                                                       Text="{Binding LabelOptimisationEnCours}" Style="{StaticResource Discret}" Margin="0,8,0,0"/>
+                                            <!-- Le résultat d'Optimiser et ses refus, sous le bouton. -->
+                                            <StackPanel Margin="0,10,0,0" MaxWidth="540" HorizontalAlignment="Left">
+                                                <TextBlock Text="{Binding LabelAttenteDuJeuSession}" Style="{StaticResource Discret}" Foreground="{StaticResource IrisCyanBrush}"
+                                                           Margin="0,0,0,8" TextWrapping="Wrap" Visibility="{Binding AttenteDuJeuSession, Converter={StaticResource BoolVis}}"/>
+                                                <TextBlock Text="{Binding ApplyBlockedMessage}" Style="{StaticResource Discret}" TextWrapping="Wrap" Foreground="{StaticResource EtatCorrigerBrush}"
+                                                           Margin="0,0,0,8" Visibility="{Binding ApplyBlockedMessage, Converter={StaticResource StrVis}}"/>
+                                                <TextBlock Text="{Binding MoatUnarmedMessage}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,0,0,8"
+                                                           Visibility="{Binding MoatUnarmedMessage, Converter={StaticResource StrVis}}"/>
+                                                <TextBlock Text="{Binding ManifesteIllisibleMessage}" Style="{StaticResource Discret}" TextWrapping="Wrap" Foreground="{StaticResource EtatCorrigerBrush}"
+                                                           Margin="0,0,0,8" Visibility="{Binding ManifesteIllisibleMessage, Converter={StaticResource StrVis}}"/>
+                                                <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelManifestReset}" HorizontalAlignment="Left"
+                                                        Command="{Binding RepartirDuManifesteCommand}" Margin="0,0,0,8"
+                                                        Visibility="{Binding PeutRepartirDuManifeste, Converter={StaticResource BoolVis}}"/>
+                                                <TextBlock Text="{Binding ResultatOptimisation}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,0,0,8"
+                                                           Visibility="{Binding ResultatOptimisation, Converter={StaticResource StrVis}}"/>
+                                            </StackPanel>
+
+                                            <!-- Les points à corriger, le plus grave d'abord, trois au plus ; un clic ouvre le domaine plus bas.
+                                                 Seule la liste se cache quand elle est vide : Optimiser, « Plus d'options » et « Prêt à jouer ? »
+                                                 restent sur une machine sans point à corriger. -->
+                                            <StackPanel x:Name="ListeDesPointsAFaire" Margin="0,14,0,0">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding PointsAFaire.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+                                            <ToggleButton x:Name="DepliantAFaire" Style="{StaticResource Depliant}" Content="{Binding LabelAFaire}"/>
+                                            <!-- La gravité se dit par le groupe et son mot, plus par une puce de couleur devant chaque ligne ;
+                                                 le domaine du point passe en info-bulle, l'espace remplace le séparateur. -->
+                                            <ItemsControl x:Name="ListeAFaire" ItemsSource="{Binding PointsAFaire}" Focusable="False" Margin="0,8,0,0"
+                                                          Visibility="{Binding IsChecked, ElementName=DepliantAFaire, Converter={StaticResource BoolVis}}"
+                                                          effets:Revelation.Active="True" effets:Revelation.Retard="360">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type vm:PointAFaire}">
+                                                        <Button Style="{StaticResource Lien}" Margin="0,4"
+                                                                Command="{Binding DataContext.ChoisirDomaineCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding Domaine}" ToolTip="{Binding Domaine.Nom}"
+                                                                AutomationProperties.Name="{Binding Entree.Titre}">
+                                                            <TextBlock Text="{Binding Entree.Titre}" Foreground="{StaticResource TexteBrush}" TextWrapping="Wrap" MaxWidth="540"/>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            </StackPanel>
+
+                                            <!-- Le reste se replie sous un seul lien : « Prêt à jouer ? », « Quoi de neuf », ce que DrDXT pose
+                                                 lui-même, l'essai en alternance, ce que tu joues. -->
+                                            <ToggleButton x:Name="PlusDOptions" Style="{StaticResource Depliant}" Content="{Binding LabelPlusDOptions}" Margin="0,18,0,0"/>
+                                            <StackPanel Visibility="{Binding IsChecked, ElementName=PlusDOptions, Converter={StaticResource BoolVis}}" MaxWidth="540"
+                                                        HorizontalAlignment="Left" Margin="0,8,0,0">
+                                            <!-- « Prêt à jouer ? » : une question qu'on se pose ensuite, pas un second appel principal. -->
+                                            <Button Style="{StaticResource BoutonDiscret}" Content="{Binding LabelPretAJouer}" HorizontalAlignment="Left"
+                                                    Command="{Binding VerifierPretAJouerCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Margin="0,14,0,0"/>
+                                            <ItemsControl ItemsSource="{Binding LignesPretAJouer}" Margin="0,8,0,0" MaxWidth="540" HorizontalAlignment="Left">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" Style="{StaticResource Corps}" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <!-- « Quoi de neuf » : une fois après une mise à jour de DrDXT, jusqu'à « Vu » ; replié, il ne prend
+                                                 plus la page. -->
+                                            <StackPanel Visibility="{Binding AQuoiDeNeuf, Converter={StaticResource BoolVis}}" MaxWidth="540"
+                                                        HorizontalAlignment="Left" Margin="0,14,0,0">
+                                                <ToggleButton x:Name="DepliantQuoiDeNeuf" Style="{StaticResource Depliant}" Content="{Binding LabelQuoiDeNeuf}"/>
+                                                <StackPanel Visibility="{Binding IsChecked, ElementName=DepliantQuoiDeNeuf, Converter={StaticResource BoolVis}}">
+                                                    <ItemsControl ItemsSource="{Binding LignesQuoiDeNeuf}" Margin="0,4,0,0">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <TextBlock Text="{Binding}" Style="{StaticResource Corps}" Margin="0,3,0,0" TextWrapping="Wrap"/>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelQuoiDeNeufVu}" HorizontalAlignment="Left"
+                                                            Command="{Binding MarquerQuoiDeNeufVuCommand}" Margin="0,8,0,0"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                                <!-- La légende du registre passe en info-bulle de sa ligne : une ligne de moins, rien de perdu. -->
+                                                <TextBlock Text="{Binding RegisterText}" Style="{StaticResource Discret}" TextWrapping="Wrap"
+                                                           Typography.NumeralAlignment="Tabular" ToolTip="{Binding LabelRegisterCaption}"/>
+                                                <Button Style="{StaticResource BoutonReflet}" Content="{Binding LabelEssaiBouton}" HorizontalAlignment="Left"
+                                                        Command="{Binding EssayerEnAlternanceCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" Margin="0,12,0,4"
+                                                        Visibility="{Binding EssaiProposable, Converter={StaticResource BoolVis}}"/>
+                                                <!-- Chaque bouton dit ce qu'il fait en une ligne. -->
+                                                <TextBlock Text="{Binding LabelEssaiExplication}" Style="{StaticResource Legende}" TextWrapping="Wrap"
+                                                           Visibility="{Binding EssaiProposable, Converter={StaticResource BoolVis}}"/>
+                                                <!-- Ce que le clic a donné se lit sous le bouton, pas seulement dans « Tes dernières parties ». -->
+                                                <TextBlock Text="{Binding LigneEssai}" Style="{StaticResource Discret}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                                           Visibility="{Binding LigneEssai, Converter={StaticResource StrVis}}"/>
+                                                <!-- Pourquoi le réglage de la carte est ouvert ou fermé chez ce joueur : une explication, pas une étape. -->
+                                                <StackPanel Visibility="{Binding PhraseReglageCarte, Converter={StaticResource StrVis}}" Margin="0,12,0,0">
+                                                    <ToggleButton x:Name="PourquoiCarte" Style="{StaticResource Depliant}" Content="{Binding LabelReglageCartePourquoi}"/>
+                                                    <TextBlock Text="{Binding PhraseReglageCarte}" Style="{StaticResource Discret}" TextWrapping="Wrap"
+                                                               Margin="0,6,0,0"
+                                                               Visibility="{Binding IsChecked, ElementName=PourquoiCarte, Converter={StaticResource BoolVis}}"/>
+                                                </StackPanel>
+                                            <!-- Le choix de scène suit Optimiser ; le bloc du bas et son
+                                                 second Optimiser sont retirés (un seul appel à l'action). -->
+                                            <!-- Ce que tu joues pendant la mesure d'Optimiser. -->
+                                            <!-- Déjà répondu avant le scan, le choix se dit en une ligne ; le sélecteur
+                                                 ne revient que sur « Changer » (critique de l'app : sélecteur en double). -->
+                                            <StackPanel Margin="0,14,0,0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding LabelSceneRetenue}" Style="{StaticResource Discret}" VerticalAlignment="Center"/>
+                                                    <ToggleButton x:Name="ChangerScene" Content="{Binding LabelSceneChanger}" Margin="12,0,0,0" Cursor="Hand"
+                                                                  Foreground="{StaticResource IrisCyanBrush}" FocusVisualStyle="{StaticResource FocusIris}"
+                                                                  FontFamily="{StaticResource UiFont}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center">
+                                                        <ToggleButton.Template>
+                                                            <ControlTemplate TargetType="ToggleButton">
+                                                                <Border Background="Transparent" Padding="0,2"><ContentPresenter/></Border>
+                                                            </ControlTemplate>
+                                                        </ToggleButton.Template>
+                                                    </ToggleButton>
+                                                </StackPanel>
+                                                <StackPanel Visibility="{Binding IsChecked, ElementName=ChangerScene, Converter={StaticResource BoolVis}}">
+                                                    <ListBox Style="{StaticResource SelecteurSegmente}" ItemsSource="{Binding ChoixDeScene}"
+                                                             SelectedItem="{Binding SceneDeclaree}" ItemTemplate="{StaticResource LibelleDeScene}" Margin="0,10,0,0"
+                                                             AutomationProperties.Name="{Binding LabelSceneQuestion}"/>
+                                                    <TextBlock Text="{Binding LabelSceneDescription}" Style="{StaticResource Legende}" Margin="0,12,0,6"/>
+                                                    <TextBox Text="{Binding DescriptionScene, UpdateSourceTrigger=PropertyChanged}" MaxLength="200"
+                                                             AutomationProperties.Name="{Binding LabelSceneDescription}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- ───── LE RÉSEAU ───── -->
+                                <!-- Le réseau est dessiné sur 660 x 720 et mis à
+                                     l'échelle d'un bloc ; la boucle de chrome et les billes des composants sont un vrai rendu Cycles
+                                     (tools/rendus-3d/boucle.py) calé sur ces mêmes pôles. -->
+                                <Viewbox Grid.Column="1" MinHeight="480" Stretch="Uniform">
+                                <!-- 760 de large pour huit composants sans chevauchement (660 pour cinq). -->
+                                <Grid Width="760" Height="720">
+                                    <effets:BranchesDeChrome Panel.ZIndex="0" Rapide="{Binding IsScanning}" PolesLus="{Binding PolesLus}"/>
+                                    <!-- L'onde de balayage et les anneaux
+                                         de lecture (ReseauNeuronal) faisaient des cercles ; la lecture d'un domaine éclaire maintenant son icône par
+                                         en dessous, dans le shader des tentacules. -->
+
+
+                                    <!-- Tes composants, chacun sur son pôle. Les valeurs passent à la ligne, jamais coupées. -->
+                                    <!-- Chaque tentacule se branche sur l'icône de son composant,
+                                         et l'icône fait toujours face à la bille. Celui du haut a donc son icône en bas, posée sur son pôle. -->
+                                    <!-- Chaque satellite dit l'état de son domaine (point + mot) et l'ouvre au clic.
+                                         Avant le scan, ni état ni clic. -->
+                                    <ItemsControl Panel.ZIndex="4" ItemsSource="{Binding Satellites}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <effets:PanneauOrbital RayonX="0.37" RayonY="0.35" AngleDepart="-90" CentreIcone="24.5" PortVersCentre="True"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button x:Name="Carte" Width="194" MinHeight="88" Cursor="Hand" FocusVisualStyle="{StaticResource FocusIris}"
+                                                        IsEnabled="{Binding ADomaine}" Command="{Binding DataContext.ChoisirDomaineCommand, RelativeSource={RelativeSource AncestorType=views:ScanView}}"
+                                                        CommandParameter="{Binding Domaine}" AutomationProperties.Name="{Binding Composant.Label}">
+                                                    <Button.Template>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border Padding="14,12" Background="{StaticResource HaloDeLectureBrush}"><ContentPresenter/></Border>
+                                                        </ControlTemplate>
+                                                    </Button.Template>
+                                                    <Grid HorizontalAlignment="Center">
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                                        </Grid.RowDefinitions>
+                                                        <Path x:Name="Icone" Grid.Row="0" Data="{Binding Composant.IconKey, Converter={StaticResource Icon}}" Width="25" Height="25" Stretch="Uniform"
+                                                              Stroke="#FFECECEC" StrokeThickness="1.4" HorizontalAlignment="Center" Margin="0,0,0,7"/>
+                                                        <TextBlock x:Name="Nom" Grid.Row="1" Text="{Binding Composant.Label}" Style="{StaticResource Legende}" FontSize="13.5" Foreground="#FFB4B4B4" TextAlignment="Center"
+                                                                   HorizontalAlignment="Center"/>
+                                                        <Border x:Name="Etat" Grid.Row="2" Style="{StaticResource PastilleEtat}" DataContext="{Binding Domaine}" HorizontalAlignment="Center" Margin="0,3,0,0"
+                                                                Visibility="{Binding DataContext.ADomaine, ElementName=Carte, Converter={StaticResource BoolVis}}">
+                                                            <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource ContenuEtat}"/>
+                                                        </Border>
+                                                        <!-- Le matériel du domaine (« Intel Core i7-14700F ») se lit sur sa page, pas sur l'orbite. -->
+                                                        <TextBlock x:Name="Valeur" Grid.Row="3" Visibility="Collapsed"/>
+                                                        <effets:AncrageArgente x:Name="Ancrage" Grid.Row="4" Width="124" Height="8" Margin="0,8,0,0"/>
+                                                    </Grid>
+                                                </Button>
+                                                <DataTemplate.Triggers>
+                                                    <!-- Le composant du haut : le trait, le nom, l'état, la valeur, puis l'icône, tournée vers la bille. -->
+                                                    <DataTrigger Binding="{Binding (effets:PanneauOrbital.EnHaut), ElementName=Carte}" Value="True">
+                                                        <Setter TargetName="Ancrage" Property="Grid.Row" Value="0"/>
+                                                        <Setter TargetName="Ancrage" Property="Margin" Value="0,0,0,8"/>
+                                                        <Setter TargetName="Nom" Property="Grid.Row" Value="1"/>
+                                                        <Setter TargetName="Etat" Property="Grid.Row" Value="2"/>
+                                                        <Setter TargetName="Valeur" Property="Grid.Row" Value="3"/>
+                                                        <Setter TargetName="Icone" Property="Grid.Row" Value="4"/>
+                                                        <Setter TargetName="Icone" Property="Margin" Value="0,7,0,0"/>
+                                                    </DataTrigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+
+                                    <!-- Le noyau -->
+                                    <!-- Le bouton est au centre exact du réseau et de son anneau de chrome ; le libellé est posé dessous
+                                         sans le pousser (il ne compte pas dans la mise en page). -->
+                                    <Grid Panel.ZIndex="3" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <!-- Après le scan, « Relancer » avait le poids d'Optimiser.
+                                             Le noyau reste le cœur du réseau, réduit : l'action principale est à gauche. -->
+                                        <Grid>
+                                            <Grid.Style>
+                                                <Style TargetType="Grid">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding State}" Value="Done">
+                                                            <Setter Property="LayoutTransform"><Setter.Value><ScaleTransform ScaleX="0.72" ScaleY="0.72"/></Setter.Value></Setter>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding State}" Value="AlreadyOptimal">
+                                                            <Setter Property="LayoutTransform"><Setter.Value><ScaleTransform ScaleX="0.72" ScaleY="0.72"/></Setter.Value></Setter>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding State}" Value="Degraded">
+                                                            <Setter Property="LayoutTransform"><Setter.Value><ScaleTransform ScaleX="0.72" ScaleY="0.72"/></Setter.Value></Setter>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Grid.Style>
+                                            <effets:NoyauDeMaintien Width="244" Height="244" Command="{Binding ScanCommand}" ToolTip="{Binding InfoOperationEnCours}" ToolTipService.ShowOnDisabled="True" IsEnabled="{Binding CanScan}"
+                                                                    Occupe="{Binding IsScanning}"
+                                                                    AutomationProperties.Name="{Binding LabelScanButton}">
+        <effets:NoyauDeMaintien.Template>
+        <ControlTemplate TargetType="effets:NoyauDeMaintien">
+        <Grid>
+        <effets:BilleDeChrome x:Name="Bille" Margin="0" Rapide="{TemplateBinding Occupe}"/>
+        <Ellipse Fill="#01000000"/>
+        <effets:ArcDeProgression Margin="-4" Epaisseur="3" Valeur="{TemplateBinding Progression}" Trait="#FFF0F0F0" Fond="#00FFFFFF" IsHitTestVisible="False"/>
+        <Ellipse x:Name="AnneauFocus" Margin="0" StrokeThickness="1.5" Stroke="#FFF0F0F0" StrokeDashArray="2 3" Visibility="Collapsed"/>
+        <Ellipse x:Name="Eclair" Margin="-8" Fill="#30FFFFFF" Opacity="0" IsHitTestVisible="False"/>
+        </Grid>
+        <ControlTemplate.Triggers>
+        <!-- L'anneau en pointillés dit le focus clavier, pas le clic ; la bille s'éclaire au survol, plus au maintien. -->
+        <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsKeyboardFocused" Value="True"/><Condition Property="IsMouseOver" Value="False"/></MultiTrigger.Conditions><Setter TargetName="AnneauFocus" Property="Visibility" Value="Visible"/></MultiTrigger>
+        <Trigger Property="IsMouseOver" Value="True">
+        <Trigger.EnterActions><BeginStoryboard><Storyboard><effets:TransitionDeGeste Storyboard.TargetName="Bille" Storyboard.TargetProperty="Luminosite" To="1.18" Duration="0:0:0.2"/></Storyboard></BeginStoryboard></Trigger.EnterActions>
+        <Trigger.ExitActions><BeginStoryboard><Storyboard><effets:TransitionDeGeste Storyboard.TargetName="Bille" Storyboard.TargetProperty="Luminosite" To="1" Duration="0:0:0.15"/></Storyboard></BeginStoryboard></Trigger.ExitActions>
+        </Trigger>
+        <Trigger Property="IsMouseCaptured" Value="True">
+        <Trigger.EnterActions><BeginStoryboard><Storyboard><effets:TransitionDeGeste Storyboard.TargetName="Bille" Storyboard.TargetProperty="Luminosite" To="1.45" Duration="0:0:0.7"/></Storyboard></BeginStoryboard></Trigger.EnterActions>
+        <Trigger.ExitActions><BeginStoryboard><Storyboard><effets:TransitionDeGeste Storyboard.TargetName="Bille" Storyboard.TargetProperty="Luminosite" To="1" Duration="0:0:0.3"/></Storyboard></BeginStoryboard></Trigger.ExitActions>
+        </Trigger>
+        <!-- Le scan fini, la bille jette un éclat franc puis se pose ; c'est le moment dont on se souvient. -->
+        <DataTrigger Binding="{Binding State}" Value="Done"><DataTrigger.EnterActions><BeginStoryboard><Storyboard><effets:EclatSansGeste Storyboard.TargetName="Bille" Storyboard.TargetProperty="Luminosite"><EasingDoubleKeyFrame KeyTime="0:0:0.22" Value="2.1"><EasingDoubleKeyFrame.EasingFunction><CubicEase EasingMode="EaseOut"/></EasingDoubleKeyFrame.EasingFunction></EasingDoubleKeyFrame><EasingDoubleKeyFrame KeyTime="0:0:1.3" Value="1"><EasingDoubleKeyFrame.EasingFunction><CubicEase EasingMode="EaseInOut"/></EasingDoubleKeyFrame.EasingFunction></EasingDoubleKeyFrame></effets:EclatSansGeste></Storyboard></BeginStoryboard></DataTrigger.EnterActions></DataTrigger>
+        <DataTrigger Binding="{Binding State}" Value="AlreadyOptimal"><DataTrigger.EnterActions><BeginStoryboard><Storyboard><effets:EclatSansGeste Storyboard.TargetName="Bille" Storyboard.TargetProperty="Luminosite"><EasingDoubleKeyFrame KeyTime="0:0:0.22" Value="2.1"/><EasingDoubleKeyFrame KeyTime="0:0:1.3" Value="1"/></effets:EclatSansGeste></Storyboard></BeginStoryboard></DataTrigger.EnterActions></DataTrigger>
+        <DataTrigger Binding="{Binding State}" Value="Degraded"><DataTrigger.EnterActions><BeginStoryboard><Storyboard><effets:EclatSansGeste Storyboard.TargetName="Bille" Storyboard.TargetProperty="Luminosite"><EasingDoubleKeyFrame KeyTime="0:0:0.22" Value="2.1"/><EasingDoubleKeyFrame KeyTime="0:0:1.3" Value="1"/></effets:EclatSansGeste></Storyboard></BeginStoryboard></DataTrigger.EnterActions></DataTrigger>
+        <MultiTrigger><MultiTrigger.Conditions><Condition Property="IsEnabled" Value="False"/><Condition Property="Occupe" Value="False"/></MultiTrigger.Conditions><Setter Property="Opacity" Value="0.5"/></MultiTrigger>
+        </ControlTemplate.Triggers>
+        </ControlTemplate>
+        </effets:NoyauDeMaintien.Template>
+        </effets:NoyauDeMaintien>
+                                            <!-- Ce qui tourne est une courte comète blanche, à l'intérieur ; elle dit
+                                                 « vivant ». La progression, elle, n'est dite que par l'anneau cyan extérieur : collés et de couleurs
+                                                 voisines, les deux se lisaient comme un seul anneau presque plein dès l'étape 2. -->
+                                            <effets:ArcDeProgression Width="232" Height="232" Epaisseur="3" Tourne="True"
+                                                                     Trait="#CCFFFFFF" IsHitTestVisible="False"
+                                                                     Visibility="{Binding IsScanning, Converter={StaticResource BoolVis}}"/>
+                                            <!-- L'analyse dure plus de 10 s ; l'anneau extérieur avance par étape. -->
+                                            <effets:ArcDeProgression Width="264" Height="264" Epaisseur="3" Valeur="{Binding ProgressionDuScan}" Plafond="{Binding PlafondDuScan}" Vitesse="{Binding VitesseDuScan}"
+                                                                     Trait="#FFF0F0F0" Fond="#33FFFFFF" IsHitTestVisible="False"
+                                                                     Visibility="{Binding JaugeVisible, Converter={StaticResource BoolVis}}"/>
+                                        </Grid>
+                                        <Grid VerticalAlignment="Top">
+                                            <Grid.Style>
+                                                <Style TargetType="Grid">
+                                                    <Setter Property="RenderTransform"><Setter.Value><TranslateTransform Y="250"/></Setter.Value></Setter>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding State}" Value="Done"><Setter Property="RenderTransform"><Setter.Value><TranslateTransform Y="160"/></Setter.Value></Setter></DataTrigger>
+                                                        <DataTrigger Binding="{Binding State}" Value="AlreadyOptimal"><Setter Property="RenderTransform"><Setter.Value><TranslateTransform Y="160"/></Setter.Value></Setter></DataTrigger>
+                                                        <DataTrigger Binding="{Binding State}" Value="Degraded"><Setter Property="RenderTransform"><Setter.Value><TranslateTransform Y="160"/></Setter.Value></Setter></DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Grid.Style>
+                                            <StackPanel HorizontalAlignment="Center"
+                                                        Visibility="{Binding State, Converter={StaticResource StateVis}, ConverterParameter='Idle'}">
+                                                <!-- Les voiles passent sous le titre ; une ombre ronde le garde lisible. -->
+                                                <Border Background="{StaticResource HaloDeLectureBrush}" Padding="16,8" HorizontalAlignment="Center">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding LabelScanButton}" Style="{StaticResource TitreSection}" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding LabelMaintenirPourLancer}" Style="{StaticResource Legende}" Foreground="#FFBEBEBE" HorizontalAlignment="Center" Margin="0,2,0,0"/>
+                                                        <effets:AncrageArgente Width="100" Height="8" Margin="0,8,0,0"/>
+
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                            <!-- La boîte opaque coupait les tuyaux du bas ; l'étape est posée sur la même ombre
+                                                 ronde que « Lancer le scan », les tuyaux passent derrière. -->
+                                            <Border HorizontalAlignment="Center" Padding="30,14" Background="{StaticResource HaloDeLectureBrush}"
+                                                    Visibility="{Binding IsScanning, Converter={StaticResource BoolVis}}">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding LabelScanning}" Style="{StaticResource TitreSection}" Foreground="#FFF0F0F0"
+                                                           HorizontalAlignment="Center"/>
+                                                <TextBlock Text="{Binding LabelEtapeDuScan}" Style="{StaticResource Corps}" FontSize="15" Foreground="{StaticResource TexteBrush}"
+                                                           HorizontalAlignment="Center" Margin="0,4,0,0" MaxWidth="240" TextWrapping="Wrap" TextAlignment="Center"/>
+                                                <!-- Une consigne à suivre, pas une légende : le voile des étiquettes du graphe la
+                                                     détache du réseau animé. -->
+                                                <Border CornerRadius="10" Padding="10,5" Background="{StaticResource VoileBrush}" MaxWidth="340"
+                                                        Margin="0,6,0,0" HorizontalAlignment="Center"
+                                                        Visibility="{Binding AttenteDuJeu, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="{Binding LabelAttenteDuJeu}" Style="{StaticResource Corps}" FontSize="12.5"
+                                                               TextAlignment="Center" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </StackPanel>
+                                            </Border>
+                                            <StackPanel HorizontalAlignment="Center"
+                                                        Visibility="{Binding State, Converter={StaticResource StateVis}, ConverterParameter='Done,AlreadyOptimal,Degraded,Failed'}">
+                                                <TextBlock Text="{Binding LabelRescan}" Style="{StaticResource TitreSection}" HorizontalAlignment="Center"/>
+                                                <!-- Posée à nu sur le chrome clair du fond, la consigne serait illisible ; une capsule
+                                                     sombre, comme les libellés des pôles. -->
+                                                <Border Background="#B306070A" CornerRadius="9" Padding="10,2" Margin="0,4,0,0" HorizontalAlignment="Center">
+                                                    <TextBlock Text="{Binding LabelMaintenirPourLancer}" Style="{StaticResource Legende}" Foreground="#FFBEBEBE" HorizontalAlignment="Center"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
+                                </Viewbox>
+                            </Grid>
+                        </Grid>
+    </StackPanel>
+
+</UserControl>

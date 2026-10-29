@@ -1,6 +1,7 @@
 using System.IO;
 using System.Xml.Linq;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -15,7 +16,7 @@ public sealed class OptimiserResteVisibleTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        return XDocument.Load(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml")).Root!;
+        return XDocument.Parse(VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"))).Root!;
     }
 
     private static XElement Nomme(XElement vue, string nom)

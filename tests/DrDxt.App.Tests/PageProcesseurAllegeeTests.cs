@@ -1,5 +1,6 @@
 using System.IO;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -12,7 +13,7 @@ public sealed class PageProcesseurAllegeeTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
 
         var verdict = xaml.IndexOf("Text=\"{Binding VerdictAffiche}\"", StringComparison.Ordinal);
         var bride = xaml.IndexOf("LabelLimiteTitre", StringComparison.Ordinal);
@@ -29,7 +30,7 @@ public sealed class PageProcesseurAllegeeTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var xaml = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        var xaml = VueScan.Texte(Path.Combine(d!.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
 
         xaml.Should().NotContain("ItemsSource=\"{Binding DataContext.LignesLimiteDePuissance",
             "les quatre paragraphes ne s'affichent plus d'un bloc");

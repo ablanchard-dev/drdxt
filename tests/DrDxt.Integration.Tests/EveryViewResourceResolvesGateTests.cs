@@ -12,7 +12,8 @@ namespace DrDxt.Integration.Tests;
 /// (par exemple `TextBrush` au lieu de `TextPrimaryBrush`, ou un style déclaré chez le voisin).
 ///
 /// Ce gate lit chaque vue et exige que chaque `{StaticResource}` soit déclarée SOIT au niveau
-/// application (`App.xaml`), SOIT dans la vue elle-même. C'est exactement la portée que WPF
+/// application (`App.xaml`), SOIT dans la vue elle-même, SOIT dans un dictionnaire que la vue fusionne
+/// (`<ResourceDictionary Source="…"/>`, chemin relatif à la vue). C'est exactement la portée que WPF
 /// accorde à un `UserControl` monté seul : grouper tous les fichiers laisserait passer une ressource
 /// déclarée « quelque part » ailleurs.
 /// </summary>
@@ -20,6 +21,7 @@ public sealed class EveryViewResourceResolvesGateTests
 {
     private static readonly Regex Declared = new(@"x:Key=""([^""]+)""", RegexOptions.Compiled);
     private static readonly Regex Used = new(@"\{StaticResource ([A-Za-z0-9_.]+)", RegexOptions.Compiled);
+    private static readonly Regex Fusion = new(@"<ResourceDictionary Source=""([^""]+)""", RegexOptions.Compiled);
 
     [Fact]
     public void Every_StaticResource_a_view_uses_is_visible_from_that_view()
@@ -51,7 +53,8 @@ public sealed class EveryViewResourceResolvesGateTests
             var text = File.ReadAllText(view);
             // La portée réelle d'un UserControl : le dictionnaire applicatif + le sien. Grouper
             // toutes les vues ensemble est precisement l'erreur qui a laisse passer le crash.
-            var visible = appLevel.Union(Declared.Matches(text).Select(m => m.Groups[1].Value)).ToHashSet(StringComparer.Ordinal);
+            var visible = appLevel.Union(Declared.Matches(text).Select(m => m.Groups[1].Value))
+                .Union(Fusionnees(view, text)).ToHashSet(StringComparer.Ordinal);
 
             var missing = Used.Matches(text)
                 .Select(m => m.Groups[1].Value)
@@ -86,6 +89,39 @@ public sealed class EveryViewResourceResolvesGateTests
         var missing = Used.Matches(view).Select(m => m.Groups[1].Value).Where(k => !visible.Contains(k)).ToList();
 
         missing.Should().ContainSingle().Which.Should().Be("DeclareChezLeVoisin");
+    }
+
+    [Fact]
+    public void Un_dictionnaire_fusionne_par_Source_est_visible_et_lui_seul()
+    {
+        var dossier = Directory.CreateTempSubdirectory("drdxt-fusion-").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(dossier, "Partage.xaml"), """<ResourceDictionary><Style x:Key="Partage"/></ResourceDictionary>""");
+            const string vue = """
+                <UserControl><UserControl.Resources><ResourceDictionary Source="Partage.xaml"/></UserControl.Resources>
+                  <TextBlock Style="{StaticResource Partage}"/><TextBlock Style="{StaticResource DeclareChezLeVoisin}"/></UserControl>
+                """;
+            var visible = Fusionnees(Path.Combine(dossier, "Vue.xaml"), vue);
+            Used.Matches(vue).Select(m => m.Groups[1].Value).Where(k => !visible.Contains(k))
+                .Should().ContainSingle().Which.Should().Be("DeclareChezLeVoisin");
+        }
+        finally { Directory.Delete(dossier, true); }
+    }
+
+    // Les clés des dictionnaires que la vue fusionne, et de ceux qu'ils fusionnent à leur tour.
+    private static HashSet<string> Fusionnees(string vue, string texte)
+    {
+        var cles = new HashSet<string>(StringComparer.Ordinal);
+        foreach (Match m in Fusion.Matches(texte))
+        {
+            var chemin = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(vue)!, m.Groups[1].Value.Replace('/', Path.DirectorySeparatorChar)));
+            File.Exists(chemin).Should().BeTrue($"{Path.GetFileName(vue)} fusionne {m.Groups[1].Value}, qui doit exister");
+            var contenu = File.ReadAllText(chemin);
+            cles.UnionWith(Declared.Matches(contenu).Select(x => x.Groups[1].Value));
+            cles.UnionWith(Fusionnees(chemin, contenu));
+        }
+        return cles;
     }
 
     private static HashSet<string> KeysIn(string path) =>

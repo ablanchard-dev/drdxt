@@ -3,6 +3,7 @@ using System.IO;
 using System.Resources;
 using DrDxt.Infrastructure.Localization;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -16,7 +17,7 @@ public sealed class ChaqueActionRisqueeDitSiElleSeDefaitTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (!File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent!;
-        return File.ReadAllText(Path.Combine(d.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
+        return VueScan.Texte(Path.Combine(d.FullName, "src", "DrDxt.App", "Views", "ScanView.xaml"));
     }
 
     /// <summary>Le libellé de cadre le plus proche après l'action, dans la même portion de la vue.</summary>

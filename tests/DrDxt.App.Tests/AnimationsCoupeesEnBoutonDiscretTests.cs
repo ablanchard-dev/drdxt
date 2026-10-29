@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -12,7 +13,8 @@ public sealed class AnimationsCoupeesEnBoutonDiscretTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        return File.ReadAllText(Path.Combine([d!.FullName, "src", "DrDxt.App", .. chemin]));
+        var fichier = Path.Combine([d!.FullName, "src", "DrDxt.App", .. chemin]);
+        return Path.GetFileName(fichier) == "ScanView.xaml" ? VueScan.Texte(fichier) : File.ReadAllText(fichier);
     }
 
     [Fact]

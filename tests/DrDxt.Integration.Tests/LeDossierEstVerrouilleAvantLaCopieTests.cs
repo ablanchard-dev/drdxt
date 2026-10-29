@@ -58,7 +58,7 @@ public sealed class LeDossierEstVerrouilleAvantLaCopieTests
 
         var pret = Corps(iss, "function LanceurPret(): String;");
         pret.Should().Contain("ExtractTemporaryFile('DrDxt.Lanceur.exe')", "le lanceur est extrait tôt, avant la copie")
-            .And.Contain("FileCopy(Source, Chemin, False)", "il est copié hors du dossier temporaire du compte")
+            .And.Contain("CopyFile(Source, Chemin, False)", "il est copié hors du dossier temporaire du compte")
             .And.Contain("GetSHA256OfFile(Chemin), '{#EmpreinteLanceur}'", "l'empreinte est relue sur la copie qui sera lancée")
             .And.Contain("if not DirExists(ExpandConstant('{win}\\SystemTemp')) then", "sans SystemTemp, rien n'est lancé");
         Corps(iss, "function DossierDuLanceur(): String;").Should().Contain("ExpandConstant('{win}\\SystemTemp\\DrDXT-installeur')",
