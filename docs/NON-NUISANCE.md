@@ -116,7 +116,7 @@ Ce qui est apparu :
 | `App/App.xaml.cs` (4 → 7) | le journal de plantage (ajout, jamais ecrasement) ; une sonde de gel et les fichiers temoins du mode photos hors ecran, **diagnostics seulement** | `%TEMP%` et donnees locales ; rien sur la machine |
 | `ViewModels/ScanViewModel.Agir.cs` (0 → 2) | la **console de reparation Windows**, sur clic et sous UAC : `DISM /RestoreHealth` puis `sfc /scannow`, outils de Windows, visibles et fermables | donnees locales ; H3, outils Microsoft, geste du joueur |
 | `Application/Tweaks/JournalDesLeviersAppliques.cs` (0 → 1) | le journal des leviers gardes (source des constats « gain disparu ») ; n'ecrase jamais un journal illisible | donnees locales |
-| `Detection/Repair/RepairAuditService.cs` (1 → 2) | `bcdedit /enum {current}` : **lecture seule** | rien d'ecrit |
+| `Detection/Repair/RepairAuditService.DemarrageEtBios.cs` (1 → 2) | `bcdedit /enum {current}` : **lecture seule** | rien d'ecrit |
 | `ElevatedHelper/Execution/SanteDesComposants.cs` (0 → 1) | `dism /CheckHealth` : **lecture seule** | rien d'ecrit |
 | `ViewModels/BiosGuideViewModel.cs` (0 → 1) | 07/10/2026 (D12) : ouvre la page d'assistance MSI de la carte dans le navigateur, **sur clic** | rien d'ecrit ; adresse https://www.msi.com seulement, nom de carte filtre |
 | `ElevatedHelper/Execution/Win32BcdActions.cs` (0 → 2) | `bcdedit /set` et `/deletevalue` sur `{current}` | H3 ; liste fermee de **5 elements** et de leurs seules valeurs documentees, dans l'allowlist du helper (`OpAllowlistTests`) |
@@ -592,7 +592,7 @@ src/DrDxt.Detection/Hardware/MondeDeLaMachine.cs 1
 src/DrDxt.Detection/Hardware/SanteNvme.cs 1
 src/DrDxt.Detection/Repair/InventaireMachine.cs 1
 src/DrDxt.Detection/Repair/PaquetDeSupport.cs 1
-src/DrDxt.Detection/Repair/RepairAuditService.cs 2
+src/DrDxt.Detection/Repair/RepairAuditService.DemarrageEtBios.cs 2
 src/DrDxt.ElevatedHelper/ClientSessionUtilisateur.cs 1
 src/DrDxt.ElevatedHelper/Execution/Adlx/ADLXTuningActions.cs 8
 src/DrDxt.ElevatedHelper/Execution/Adlx/OrigineAdlx.cs 2
