@@ -254,14 +254,9 @@ public static class AppServiceCollectionExtensions
                 // Plus l'etat du magasin de composants (DISM /CheckHealth, par le helper).
                 // Et ce qui a été installé, retiré ou mis à jour depuis le scan précédent.
                 sante,
-                // Ce que le processeur rend a un jeu. Mesure la premiere fois, relue ensuite : plus
-                // de quarante secondes de charge complete a chaque scan chaufferaient la machine du
-                // client pour un chiffre qui ne bouge pas.
-                //
-                // La liste des processeurs vient de la topologie, jamais d'une formule : c'est
-                // ici, dans la couche qui reference `DrDxt.Detection`, qu'elle peut etre lue. Un
-                // processeur logique par cœur physique de la classe la plus rapide, groupe 0
-                // seulement : hors du groupe 0, le masque d'affinite change de sens.
+                // Ce que le processeur rend a un jeu : mesure une fois (plus de 40 s de pleine charge), relue ensuite. La
+                // liste des processeurs vient de la topologie (lue ici, la couche qui reference `DrDxt.Detection`) : un
+                // logique par cœur physique de la classe la plus rapide, groupe 0 seulement (au-dela, l'affinite change de sens).
                 new DrDxt.Measurement.Cpu.CpuBaselineService(
                     new DrDxt.Measurement.Cpu.RealCpuSustainedBench(() =>
                     {
@@ -307,14 +302,8 @@ public static class AppServiceCollectionExtensions
                         .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator),
                     // L'appli ne se compare qu'à ses propres photos (pas à celles de l'outil).
                     lecteur: "appli").EnregistrerEtComparer(constats),
-                // D'ou vient l'instabilite du reseau. L'instrument de latence et
-                // l'analyseur de chemin etaient ecrits, testes, et appeles par `tools/netprobe`
-                // seulement : le produit lisait les reglages de la carte et ne mesurait rien du
-                // reseau, le domaine qu'un joueur competitif ressent en premier.
-                //
-                // La passerelle vient de la carte physique, jamais de « la premiere passerelle
-                // trouvee » : un tunnel VPN en publie une aussi, et la mesurer repondrait sur le
-                // tunnel au lieu du lien local.
+                // D'ou vient l'instabilite du reseau : latence et chemin mesures. La passerelle vient de la carte physique,
+                // jamais de « la premiere trouvee » : un tunnel VPN en publie une aussi, et on mesurerait le tunnel.
                 ct => new DrDxt.Detection.Network.AttributionReseauService(
                     new DrDxt.Detection.Network.NetworkAdapterReader(
                         new DrDxt.Detection.Wmi.ManagementWmiQuery()),
@@ -535,17 +524,10 @@ public static class AppServiceCollectionExtensions
         services.AddSingleton<IGpuLoadProbe>(sp =>
             new DeterministicGpuLoadProbe(sp.GetRequiredService<IGpuComputeRunner>()));
 
-        // La vraie lecture ADLX : AdlxGpuTuningReader, par la frontiere P/Invoke d'AdlxNative, remplace le
-        // StubAdlxGpuTuning qui echoue proprement (TryAdd dans AddDrDxtApplication ; le dernier enregistrement
-        // gagne, comme pour IGpuLoadProbe juste au-dessus). Lecture essayee sur une seule RX 9070 XT,
-        // sans rapport de verification archive.
-        // Sur AMD, IAdlxGpuTuning.IsAvailable passe à vrai → GpuUndervolt/GpuPowerLimit
-        // .ApplyAmdAsync s'exécute. Sur une machine non AMD, IsAvailable d'AdlxNative sonde
-        // amdadlx64.dll à la demande et chaque chemin est protégé par un catch (DllNotFoundException
-        // → faux) : le constructeur n'a aucun effet de bord et le chemin AMD se dégrade proprement
-        // (pas de plantage, pas d'écriture).
-        // Lecture seule : l'écriture privilégiée passe toujours par le helper élevé.
-        // Une seule instance ADLX par processus, celle du lecteur partagé quand la DLL est là.
+        // La lecture ADLX (AdlxGpuTuningReader sur AdlxNative) remplace le StubAdlxGpuTuning (TryAdd dans
+        // AddDrDxtApplication ; le dernier enregistrement gagne). Essayee sur une seule RX 9070 XT, sans rapport archive.
+        // Sans amdadlx64.dll, IsAvailable rend faux sans effet de bord ni plantage. Lecture seule : l'ecriture passe par le
+        // helper eleve. Une seule instance ADLX par processus, celle du lecteur partage quand la DLL est la.
         services.AddSingleton<IAdlxNative>(_ => (IAdlxNative?)DrDxt.Detection.Gpu.Adlx.AdlxReglages.Partage ?? new AdlxNative());
         services.AddSingleton<IAdlxGpuTuning>(sp =>
             new AdlxGpuTuningReader(sp.GetRequiredService<IAdlxNative>()));
@@ -555,18 +537,10 @@ public static class AppServiceCollectionExtensions
         if (DrDxt.Detection.Gpu.Adlx.AdlxReglages.DllPresente())
             services.AddSingleton<IAdlx>(_ => new DrDxt.Detection.Gpu.Adlx.AdlxLatencyReader(DrDxt.Detection.Gpu.Adlx.AdlxReglages.Lire));
 
-        // La vraie couture de lecture NVAPI (le pendant NVIDIA du bloc ADLX ci-dessus) :
-        // NvApiGpuTuningReader sur la frontière P/Invoke de NvApiNative, à la place du
-        // StubNvApiGpuTuning qui échoue proprement (TryAdd dans AddDrDxtApplication ; le dernier
-        // enregistrement gagne). La recette d'écriture NVAPI est validée en vrai sur une RTX 4060
-        // (décalage du cœur 0→-15→retour, puissance 100→90→retour) ; les lectures ne
-        // demandent pas d'élévation (NvAPI_Initialize et les GET). Sur NVIDIA,
-        // INvApiGpuTuning.IsAvailable passe à vrai → GpuUndervolt/GpuPowerLimit.ApplyNvidiaAsync
-        // s'exécute. Sur une machine non NVIDIA, NvApiNative sonde nvapi64.dll à la demande et chaque
-        // chemin est protégé par un catch (DLL absente → faux) : le constructeur n'a aucun effet de
-        // bord et le chemin NVIDIA se dégrade proprement (pas de plantage, pas d'écriture). Lecture
-        // seule : l'écriture privilégiée passe toujours par le helper élevé (NvApiTuningActions, sur
-        // la même frontière NvApiNative).
+        // Le pendant NVIDIA : NvApiGpuTuningReader sur NvApiNative remplace le StubNvApiGpuTuning. La recette d'ecriture
+        // est validee sur une RTX 4060 (cœur 0→-15→retour, puissance 100→90→retour) ; les lectures ne demandent pas
+        // d'elevation. Sans nvapi64.dll, IsAvailable rend faux sans effet de bord. L'ecriture passe par le helper eleve
+        // (NvApiTuningActions, meme frontiere NvApiNative).
         services.AddSingleton<INvApiNative>(_ => new NvApiNative());
         services.AddSingleton<INvApiGpuTuning>(sp =>
             new NvApiGpuTuningReader(sp.GetRequiredService<INvApiNative>()));
@@ -587,17 +561,10 @@ public static class AppServiceCollectionExtensions
     }
 
     // -------------------------------------------------------------------
-    // Le reconciler comme surface d'état et de contrôle de l'App, et le côté enregistrement
-    // (signature) de la persistance.
-    //
-    // Après une application validée, l'App enregistre l'état voulu pour que le reconciler le
-    // réimpose au démarrage. L'App ne signe pas : elle envoie les entrées au helper élevé
-    // (CommitManifestOp, par l'IElevatedClient authentifié existant), qui valide, fusionne, signe
-    // avec la clé propre à la machine et écrit la racine admin. L'App relit en vérification seule
-    // (clé publique sous %ProgramData%\DrDxt ; repli sur la clé de dev embarquée en DEBUG
-    // seulement, une version RELEASE refuse). Enregistre aussi l'AppliedTweakManifestMapper et le
-    // magasin d'état annexe que les interrupteurs pause/reprise modifient (l'UI s'en sert).
-    // Voir HelperDesiredStateStore.
+    // Le reconciler et la persistance signée de l'état voulu, qu'il réimpose au démarrage. L'App ne signe pas : elle
+    // envoie les entrées au helper élevé (CommitManifestOp), qui valide, fusionne, signe avec la clé de la machine et
+    // écrit la racine admin. L'App relit en vérification seule (clé publique sous %ProgramData%\DrDxt ; clé de dev
+    // embarquée en DEBUG seulement, refusée en RELEASE). Voir HelperDesiredStateStore.
     // -------------------------------------------------------------------
     private static void RegisterReconciler(IServiceCollection services)
     {
@@ -657,14 +624,9 @@ public static class AppServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Ecrit le rapport de diagnostic a cote du journal de panne, et rend son chemin.
-    ///
-    /// Le meme dossier que crash.log, et c'est voulu : un client qu'on guide au telephone
-    /// apprend un endroit, pas deux. Le nom porte la date : deux rapports du meme client a deux
-    /// moments racontent une histoire que le second seul ne raconte pas.
-    ///
-    /// BOM UTF-8 explicite, pour la meme raison que le journal de panne : sans elle, les
-    /// accents ressortent en charabia chez qui l'ouvre avec un outil qui devine mal.
+    /// Ecrit le rapport de diagnostic a cote du journal de panne (un seul endroit a retenir), sous un nom date pour que
+    /// deux rapports se comparent, et rend son chemin. BOM UTF-8 explicite : sans elle, les accents ressortent en
+    /// charabia dans un outil qui devine mal l'encodage.
     /// </summary>
     private static string WriteSupportReport(string fileName, string content)
     {

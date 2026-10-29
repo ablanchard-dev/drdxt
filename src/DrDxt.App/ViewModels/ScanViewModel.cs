@@ -643,15 +643,9 @@ public sealed partial class ScanViewModel : ObservableObject
     /// Degraded). Il juge d'abord ce qu'il y a a tenter, et le dit quand il n'y a rien.</summary>
     public bool CanApply => ScanPretAAgir && !OperationLongueEnCours;
 
-    /// <summary>Ce que l'infobulle du bouton « Appliquer » dit, selon qu'il peut agir ou non.
-    /// <para>
-    /// Six commandes de l'application peuvent etre grisees et aucune
-    /// n'expliquait son inertie. Celle-ci est l'action principale du produit : grisee
-    /// avant tout scan, elle laissait la personne devant un bouton mort, sans savoir
-    /// s'il est casse ou s'il attend un geste d'elle.
-    /// </para></summary>
-    // L'info-bulle
-    // n'était jamais recalculée après le scan. Elle suit l'état, et dit quand il n'y a rien à poser.
+    /// <summary>Ce que l'infobulle du bouton « Appliquer » dit, selon qu'il peut agir ou non : l'action principale,
+    /// grisée sans raison dite, passerait pour cassée au lieu d'attendre un geste. Elle suit l'état à chaque
+    /// changement, et dit aussi quand il n'y a rien à poser.</summary>
     public string ApplyHintKey => !ScanPretAAgir ? "scan.apply.needs_scan" : OperationLongueEnCours ? "UI.OperationEnCours"
         : RienAPoserDuTout ? "Apply.RienAPoserSeul" : "scan.apply.ready";
 
@@ -678,12 +672,8 @@ public sealed partial class ScanViewModel : ObservableObject
         && c.Items.Where(i => c.GpuPlan.TweakIds.Contains(i.TweakId)).All(i => i.IsVerified);
 
     /// <summary>
-    /// Le verdict en une expression : trois états, fonction de deux entiers, jamais d'une somme.
-    ///
-    /// Il ne dépend d'aucune somme de pénalités : doubler toutes les pénalités du registre sans changer un levier ne
-    /// change pas ce que le client lit (test d'invariance).
-    ///
-    /// Les trois etats, dans l'ordre de priorite :
+    /// Le verdict : trois états, fonction de deux entiers, jamais d'une somme de pénalités (les doubler toutes ne change
+    /// pas ce que le client lit, test d'invariance). Dans l'ordre de priorité :
     ///   K > 0            -> la lecture est incomplete. Aucun verdict de sante n'est permis :
     ///                       ce qu'on n'a pas lu peut etre exactement le probleme.
     ///   K = 0 et N = 0   -> rien a corriger dans ce qui a ete lu. La nuance est la promesse.
@@ -720,16 +710,10 @@ public sealed partial class ScanViewModel : ObservableObject
     // et son plancher l'empêchait de dire « cette machine est mal réglée »).
 
     /// <summary>
-    /// Le nombre de problemes de configuration constates : les leviers lus et trouves
-    /// sous-optimaux, comptes dans le grand livre.
-    ///
-    /// « Prouve » porte sur l'existence du probleme, jamais sur son ampleur : on a lu que XMP est
-    /// desactive, c'est un fait ; combien d'images ca coute reste une estimation, et c'est
-    /// precisement pour ca qu'aucun chiffre de gain n'entre dans ce compteur.
-    ///
-    /// Vient du grand livre et pas de <see cref="Findings"/> : la liste des constats contient
-    /// aussi des lignes d'information et de guidage (« ReBAR non lisible sur NVIDIA »), et les
-    /// compter comme des problemes gonflerait le registre avec ce qu'on n'a justement pas prouve.
+    /// Le nombre de problemes de configuration constates : les leviers lus et trouves sous-optimaux, comptes dans le
+    /// grand livre. « Prouve » porte sur l'existence du probleme (XMP lu desactive), jamais sur son ampleur : aucun chiffre
+    /// de gain n'y entre. Pas <see cref="Findings"/>, qui porte aussi des lignes d'information et de guidage (« ReBAR non
+    /// lisible sur NVIDIA ») qu'il ne faut pas compter comme des problemes.
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RegisterText))]
@@ -911,14 +895,9 @@ public sealed partial class ScanViewModel : ObservableObject
     public string LabelBiosReturnHeader => _localize("Scan.BiosReturn.Header");
 
     /// <summary>
-    /// Cet hote sait-il prouver qu'un changement BIOS a pris ? Faux quand la couture n'est pas
-    /// cablee : le bouton « emmene-moi dans le BIOS » ne s'affiche pas et aucun verdict n'est
-    /// prononce.
-    ///
-    /// Expose parce que le contraire est invisible. Une couture optionnelle non passee donne un
-    /// ScanViewModel parfaitement construit et parfaitement muet : c'est la forme exacte du
-    /// defaut ou tout etait enregistre et rien n'etait resolu. Un test de composition peut
-    /// desormais le constater au lieu de lire le fichier de cablage.
+    /// Cet hote sait-il prouver qu'un changement BIOS a pris ? Faux quand la couture n'est pas cablee : le bouton
+    /// « emmene-moi dans le BIOS » ne s'affiche pas et aucun verdict n'est prononce. Expose pour qu'un test de
+    /// composition voie une couture optionnelle oubliee, qui donnerait un ScanViewModel construit mais muet.
     /// </summary>
     public bool CanProveBiosChanges => _firmwareTrip is not null;
 
@@ -957,14 +936,9 @@ public sealed partial class ScanViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanScan))]
     private async Task ScanAsync()
     {
-        // Les sondes du scan parlent a WMI, au registre, a des pilotes et a des
-        // services : du code qui leve au lieu de refuser (un service arrete, une cle
-        // absente, un pilote qui rend n'importe quoi). Sans cette garde, l'exception remonterait
-        // jusqu'au filet fatal de App.xaml.cs et l'application se fermerait au milieu du scan,
-        // c'est-a-dire au seul moment ou la personne attend quelque chose de nous.
-        //
-        // Un refus propre (`Result.Fail`) garde son message precis ; ceci ne rattrape que
-        // l'imprevu, et le detail technique part au journal, pas a l'ecran.
+        // Les sondes parlent a WMI, au registre, a des pilotes et a des services, qui levent au lieu de refuser. Sans cette
+        // garde, l'exception atteindrait le filet fatal de App.xaml.cs et fermerait l'App en plein scan. Un refus propre
+        // (`Result.Fail`) garde son message ; ceci ne rattrape que l'imprevu, et le detail part au journal, pas a l'ecran.
         if (ConfierAUneInstanceElevee()) return;
         var numero = ++_numeroDeScan;
         try
@@ -1035,13 +1009,9 @@ public sealed partial class ScanViewModel : ObservableObject
         FichierBiosLu?.WriteAtomic(System.Text.Json.JsonSerializer.Serialize(
             new DrDxt.Detection.Cpu.ChaleurEnPartie.BiosLu(Horloge(), st.BiosLu ?? [])));
 
-        // L'ordre des etapes ci-dessous est une contrainte, pas un hasard, et il a ete paye.
-        // Le verdict de retour BIOS lit la reference d'avant le voyage. Le rafraichissement, lui,
-        // juge une reference caduque des que la frequence a change (ce qui est exactement ce
-        // qu'un passage XMP off -> on provoque) et la remplace. Rafraichir d'abord effacerait donc
-        // la reference d'avant, et l'A/B comparerait l'apres a l'apres : « aucune difference
-        // mesurable » annonce sur un vrai +79 %. Le verdict passe devant, et consomme la reference
-        // avant que quoi que ce soit la remplace.
+        // L'ordre des etapes est une contrainte. Le verdict de retour BIOS lit la reference d'avant le voyage ; le
+        // rafraichissement remplace une reference des que la frequence a change (ce que fait XMP off -> on). Rafraichir
+        // d'abord ferait comparer l'apres a l'apres : « aucune difference mesurable » sur un vrai +79 %.
         // Verrouille par ScanMeasuresMemoryTests.La_reference_d_AVANT_le_BIOS_survit_au_scan_qui_la_relit.
         Etape(3, "Scan.Etape.Bios");
         var abMemoire = await PopulateBiosLoopAsync(st, hw);
@@ -1245,14 +1215,9 @@ public sealed partial class ScanViewModel : ObservableObject
                         && DrDxt.Measurement.Memory.MemoryInference.UnSeulCanalProbable(mesuree.Measurement.BandwidthMultiFilGBs, hw.Memory),
                 };
 
-                // La mesure vient d'etre prise ou relue juste au-dessus : on relit le magasin, on
-                // ne remesure pas. Rien d'enregistre (mesure rejetee, banc indisponible) => la
-                // ligne n'existe pas, plutot qu'un chiffre sorti de nulle part.
-                //
-                // Et une reference perimee ne s'affiche pas non plus : le magasin garde
-                // volontairement la mesure d'avant quand la configuration memoire a change, pour
-                // que l'A/B reste possible. La publier comme « ce que ta memoire rend » decrirait
-                // une machine qui n'existe plus.
+                // On relit le magasin, on ne remesure pas. Rien d'enregistre (mesure rejetee, banc indisponible) : pas de
+                // ligne. Une reference perimee non plus : le magasin garde la mesure d'avant un changement de memoire pour
+                // l'A/B, et l'afficher decrirait une machine qui n'existe plus.
                 MemoryMeasuredLabel = LigneMemoire(hw.Memory);
                 MemoireSauteeJeu = jeuEnCours && MemoryMeasuredLabel is null;
                 ErreurRemesureMemoire = null;
@@ -1367,16 +1332,9 @@ public sealed partial class ScanViewModel : ObservableObject
 
     private void PublierLesLibellesDeMesure(BenchmarkResult? baseline)
     {
-        // La cadence. Mesuree a chaque scan et lue par le seul classifieur de goulot jusqu'ici.
-        //
-        // La garde se reutilise : sous vingt echantillons un p95 se confond avec le maximum ;
-        // ce n'est pas de la prudence, c'est de l'arithmetique (1/20 = 5 %). Sans elle, une capture
-        // courte publierait un « ecart de 1 187 ms », chiffre juste et vide de sens.
-        //
-        // Et elle compte les echantillons d'animation, pas les trames. Le p95 repose sur une
-        // serie a part : une passe dont l'erreur d'animation manque ne contribue pas au percentile,
-        // et le nombre de trames n'en sait rien. Compter les trames validait un p95 tire de huit
-        // points en en lisant mille. Compte inconnu (mesure d'avant ce champ) ⇒ on se tait.
+        // La cadence. Sous vingt echantillons un p95 se confond avec le maximum (1/20 = 5 %) : une capture courte
+        // publierait un « ecart de 1 187 ms » juste et vide de sens. On compte les echantillons d'animation, pas les
+        // trames : le p95 repose sur cette serie, et mille trames peuvent n'en porter que huit. Compte inconnu : rien.
         CadenceLabel = DrDxt.Measurement.FrametimeStatistics.CadenceP95(baseline) is { } ecart
             ? string.Format(CultureInfo.CurrentCulture, _localize("Scan.Cadence.Measured"), ecart)
             : null;
@@ -1394,14 +1352,9 @@ public sealed partial class ScanViewModel : ObservableObject
             ? string.Format(CultureInfo.CurrentCulture, _localize("Scan.Stutter.Measured"), lentes)
             : null;
 
-        // Le plafond du gain. L'occupation GPU vient de cette mesure, jamais d'une constante ; sans
-        // trames ni GPU-busy, la ligne n'existe pas plutot que d'afficher une borne inventee.
-        //
-        // Le rappel de scene est colle a la borne et n'en part jamais : une borne unique lue
-        // sans lui deviendrait « ce que je peux gagner », c'est-a-dire une promesse.
-        // Le rappel de scene ne porte aucun chiffre. Les series de reference vont de
-        // +5,3 % a +16,3 %, sur une machine et un jeu. Les afficher chez quelqu'un d'autre
-        // ferait passer la mesure d'un tiers pour la sienne.
+        // Le plafond du gain : l'occupation GPU vient de cette mesure, jamais d'une constante ; sans trames ni GPU-busy,
+        // pas de ligne. Le rappel de scene reste colle a la borne (seule, elle se lirait comme une promesse) et ne porte
+        // aucun chiffre : les series de reference (+5,3 % a +16,3 %) sont celles d'une machine et d'un jeu.
         GpuCeilingLabel = DrDxt.Measurement.PlafondGpu.PhraseDuScan(baseline?.GpuBusyPercent);
 
         // La courbe de cette mesure et sa médiane.
@@ -1464,13 +1417,10 @@ public sealed partial class ScanViewModel : ObservableObject
     /// (scanner, plan, GPU, BIOS, sante) et rien de non lu. Un audit absent ou un conseiller BIOS en
     /// panne n'ont rien lu : jamais « deja reglee » sur ce qu'on n'a pas vu.
     /// </summary>
-    // Le scanner rend `Unknown` sans constat pour ce qu'il n'a pas pu lire
-    // (XMP, rafraichissement, pagefile, MMCSS) : « aucun constat » n'est pas « tout lu ». Sa
-    // couverture le dit ; une couverture absente n'a rien affirme.
-    // Rien à corriger = aucun constat au-dessus d'Info, et non `Findings.Count == 0` : un constat Info
-    // ne demande rien. Ce qui n'a pas ete lu reste la clause de couverture.
-    // Simplification voulue : pas de clause « aucun levier sous-optimal au registre ». Chaque Suboptimal de
-    // LeverCatalog porte un constat Minor/Major, la mutation l'a montree redondante (verte, 589/589).
+    // « Aucun constat » n'est pas « tout lu » : le scanner rend `Unknown` sans constat pour ce qu'il n'a pas lu (XMP,
+    // rafraichissement, pagefile, MMCSS), et seule sa couverture le dit. Rien à corriger = aucun constat au-dessus d'Info
+    // (un constat Info ne demande rien). Pas de clause « levier sous-optimal au registre » : chaque Suboptimal de
+    // LeverCatalog porte deja un constat Minor/Major (un test de mutation la montre redondante).
     private bool DejaReglee(ScanResult scan) =>
         scan.Findings.All(f => f.Severity == Severity.Info)
         && scan.Coverage is { UnknownLevers: 0, ApplicableLevers: > 0 }

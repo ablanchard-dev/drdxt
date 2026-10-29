@@ -3,28 +3,20 @@ using DrDxt.ElevatedHelper.Execution.NvApi;
 
 namespace DrDxt.ElevatedHelper;
 
-// -----------------------------------------------------------------------
-// OpAllowlist : valide une PrivilegedOp par type et par cible, a la feuille exacte.
-//
-// Sécurité (« feuille exacte, pas sous-arbre ») : c'est la vraie autorisation, la defense n°1,
-// pas le HMAC du transport. Chaque op est comparee a une liste fermee, a la feuille exacte :
-//   * Registre : seulement un ensemble explicite de feuilles (ruche, chemin, nom). Un
-//     sous-arbre interdit (Defender, Windows Update, BITS, bam, strategies de securite) est
-//     toujours refuse ; tout ce qui n'est pas explicitement permis est refuse (refus par
-//     defaut). « Sous-arbre permis » ne suffit jamais.
-//   * Plan d'alimentation : seulement les GUID de plans Windows connus.
-//   * Controle de service : seulement AMD3DVCacheSvc (et le service PresentMon, par l'op
-//     dediee InstallPresentMonServiceOp), en installation, demarrage, arret et requete.
-//   * Decalages d'horloge NVAPI : le helper impose lui-meme ici la bande GpuSafeBounds
-//     (decalage coeur et memoire refuse hors bande ; il ne laisse jamais les bornes de valeur
-//     au client). Autres ops NVAPI/ADLX : validation structurelle (index, type, plage), limite
-//     de puissance bornee a 0..100 puis bornee par le pilote.
-//   * Par defaut : refus (HELPER.NOT_ALLOWLISTED). Une op nulle ou non modelisee est refusee.
-// -----------------------------------------------------------------------
 /// <summary>
-/// Le gardien du helper eleve : avant toute ecriture privilegiee, il verifie que l'op demandee par l'App
-/// figure sur une liste fermee (feuille de registre exacte, service, plan, borne GPU). Tout le reste est
-/// refuse. Il existe pour qu'un client compromis ne puisse pas faire ecrire n'importe quoi en administrateur.
+/// Le gardien du helper eleve, la vraie autorisation (pas le HMAC du transport) : avant toute ecriture privilegiee,
+/// l'op demandee par l'App doit figurer sur une liste fermee, a la feuille exacte, pour qu'un client compromis ne
+/// fasse rien ecrire d'autre en administrateur.
+/// <list type="bullet">
+/// <item>Registre : des feuilles explicites (ruche, chemin, nom) ; un sous-arbre interdit (Defender, Windows Update,
+/// BITS, bam, strategies de securite) est toujours refuse, et « sous-arbre permis » ne suffit jamais.</item>
+/// <item>Plan d'alimentation : les GUID de plans Windows connus.</item>
+/// <item>Service : AMD3DVCacheSvc (et PresentMon par InstallPresentMonServiceOp) ; installation, demarrage, arret,
+/// requete.</item>
+/// <item>NVAPI : la bande GpuSafeBounds est imposee ici, jamais laissee au client ; autres ops NVAPI/ADLX : validation
+/// structurelle, limite de puissance bornee a 0..100 puis par le pilote.</item>
+/// <item>Tout le reste, op nulle ou non modelisee comprise : refus (HELPER.NOT_ALLOWLISTED).</item>
+/// </list>
 /// </summary>
 public sealed class OpAllowlist
 {
@@ -92,17 +84,12 @@ public sealed class OpAllowlist
         @"SAM",
     };
 
-    // L'ensemble fermé des ids de réglage du pilote NVIDIA (DRS) que DrDXT peut écrire, à la feuille
-    // près : exactement les ids qu'émettent les leviers de latence de file de rendu et de plafond VRR.
-    // Un nom de profil non vide ne suffit pas : tout id hors de cet ensemble est refusé (refus par défaut).
-    //   * 0x007BA09E : limite de pré-rendu / Max-Pre-Rendered-Frames (RenderQueueCap)
-    //   * 0x00A879CF : VSYNCMODE                                     (VrrVsyncCap)
-    //   * 0x10835002 : FRL_FPS (limiteur d'images)                  (VrrVsyncCap)
-    //   * 0x1057EB71 : PREFERRED_PSTATE / « Power management mode »  (PreferMaxPerf)
-    // Ces ids sont vérifiés mot pour mot contre le NvApiDriverSettings.h officiel de NVIDIA
-    // (github.com/NVIDIA/nvapi) : PRERENDERLIMIT_ID = 0x007BA09E, VSYNCMODE_ID = 0x00A879CF,
-    // FRL_FPS_ID = 0x10835002, PREFERRED_PSTATE_ID = 0x1057EB71. Les valeurs 0x00fc00fa (VSYNC)
-    // et 0x10835000 (FRL) sont fausses : ne pas les reprendre.
+    // L'ensemble fermé des ids de réglage du pilote NVIDIA (DRS) que DrDXT peut écrire : exactement ceux des leviers ;
+    // tout autre id est refusé. Vérifiés contre le NvApiDriverSettings.h officiel (github.com/NVIDIA/nvapi) :
+    //   * 0x007BA09E PRERENDERLIMIT_ID, Max-Pre-Rendered-Frames (RenderQueueCap)
+    //   * 0x00A879CF VSYNCMODE_ID (VrrVsyncCap) ; 0x10835002 FRL_FPS_ID, limiteur d'images (VrrVsyncCap)
+    //   * 0x1057EB71 PREFERRED_PSTATE_ID, « Power management mode » (PreferMaxPerf)
+    // 0x00fc00fa (VSYNC) et 0x10835000 (FRL), qui circulent, sont faux.
     private static readonly uint[] AllowedDrsSettingIds =
     {
         0x007BA09E, 0x00A879CF, 0x10835002, 0x1057EB71,
@@ -124,30 +111,18 @@ public sealed class OpAllowlist
     public const string EfiGlobalVariableGuid = "{8be4df61-93ca-11d2-aa0d-00e098032b8c}";
 
     /// <summary>
-    /// GUID du varstore de configuration AMI, ou vit « Setup » sur les cartes a firmware AMI
-    /// (la quasi-totalite des cartes grand public, celle de la machine de reference comprise : AMI 1.H0).
-    ///
-    /// Mesure le 24/09/2026 sur la machine de reference : « Setup » se lit sous ce GUID
-    /// (5081 octets, attributs 0x7), et l'IFR du BIOS officiel 1.H0 declare ce meme GUID pour son
-    /// VarStore « Setup ». Ce GUID est celui qu'utilisent les outils de la famille AMISCE/setup_var ;
-    /// il n'est pas publie dans une specification que ce depot puisse citer : la source est la
-    /// mesure sur la carte. Sous le GUID EFI global, « Setup » rend 203 (ERROR_ENVVAR_NOT_FOUND) :
-    /// il vit ailleurs.
+    /// GUID du varstore de configuration AMI, ou vit « Setup » sur les cartes a firmware AMI (la quasi-totalite des cartes
+    /// grand public). Aucune specification citable ne le publie : la source est la mesure du 24/09/2026 sur la machine de
+    /// reference (AMI 1.H0) : « Setup » s'y lit (5081 octets, attributs 0x7), l'IFR du BIOS officiel declare ce GUID, et
+    /// sous le GUID EFI global « Setup » rend 203 (ERROR_ENVVAR_NOT_FOUND). C'est celui des outils AMISCE/setup_var.
     /// </summary>
     public const string AmiSetupVarstoreGuid = GuidsUefi.AmiSetup;
 
-    // Les seules variables firmware que DrDXT lit, par espace de noms. Deux ensembles fermes
-    // plutot qu'un, parce que le nom seul ne dit pas le risque : « Setup » sous le GUID
-    // constructeur est le varstore de configuration de la carte, et « Setup » sous le GUID EFI
-    // global n'existe pas.
-    //
-    // Lecture seule, et c'est structurel : PrivilegedOpType ne contient aucune op d'ecriture
-    // firmware. Ouvrir la lecture de « Setup » n'ouvre donc pas son ecriture : il n'y a pas de
-    // chemin a ouvrir. C'est l'ecriture au mauvais offset qui peut rendre une carte non
-    // demarrable, et le clear CMOS ne suffit pas toujours.
-    //
-    // Garde par ReadFirmwareVariable_UnknownOrProprietaryName_IsDenied : ajouter « Setup » a
-    // l'ensemble EFI global fait echouer ce test.
+    // Les seules variables firmware que DrDXT lit, un ensemble ferme par espace de noms : le nom seul ne dit pas le
+    // risque (« Setup » est le varstore de la carte sous le GUID constructeur, et n'existe pas sous le GUID EFI global).
+    // Lecture seule par construction : PrivilegedOpType n'a aucune op d'ecriture firmware, et c'est l'ecriture au mauvais
+    // offset qui rend une carte non demarrable (le clear CMOS ne suffit pas toujours).
+    // Garde par ReadFirmwareVariable_UnknownOrProprietaryName_IsDenied (« Setup » ajoute a l'ensemble EFI global : rouge).
     private static readonly IReadOnlySet<string> ReadableEfiGlobalVariables =
         new HashSet<string>(StringComparer.Ordinal) { "BootOrder", "SecureBoot", "BootCurrent" };
 
@@ -407,20 +382,7 @@ public sealed class OpAllowlist
         return Result.Ok();
     }
 
-    // Lecture firmware. Deux verrous, dans cet ordre : l'espace de noms d'abord, puis le nom
-    // feuille-exacte dans cet espace. Comparaison Ordinal des deux cotes : les variables EFI sont
-    // sensibles a la casse, et une comparaison laxiste elargirait le mur sans le dire.
-    //
-    // Le varstore constructeur est ouvert, en lecture. Ce qui le justifie n'est pas le niveau
-    // de risque, c'est ce que le produit peut prouver : sans cette lecture, au retour d'un redemarrage
-    // dans le BIOS, l'app ne saurait pas si le client a fait le reglage ; elle l'infererait, et
-    // XmpInferencer s'etiquette lui-meme « probably ». Lire la variable met fin a ce silence.
-    //
-    // Le motif qui a ferme SCEWIN ne s'applique pas ici : SCEWIN charge un driver signe par
-    // IOCTL, ce qui ferait de DrDXT un vecteur BYOVD. Ce chemin-ci est
-    // GetFirmwareEnvironmentVariableExW : l'API Windows, avec un privilege du jeton. Aucun
-    // driver, rien a charger.
-    // À la feuille près : un nom d'executable nu (pas de chemin, pas de guillemet, pas d'espace de
+    // Plafond d'envoi, à la feuille près : un nom d'executable nu (pas de chemin, pas de guillemet, pas d'espace de
     // commande) et un plafond borne. Le nom finit dans une commande PowerShell : cette regex est
     // ce qui rend l'interpolation sure, elle ne se relache pas. Elle vit dans Core
     // (NomExeDeJeu), lue aussi par l'appli avant de rallumer le plafond : une seule regle.
@@ -448,6 +410,11 @@ public sealed class OpAllowlist
         return Result.Ok();
     }
 
+    // Lecture firmware : l'espace de noms d'abord, puis le nom à la feuille dans cet espace, en Ordinal des deux côtés
+    // (les variables EFI sont sensibles à la casse ; une comparaison laxiste élargirait le mur sans le dire). Le varstore
+    // constructeur est ouvert en lecture parce que c'est la seule preuve qu'un réglage BIOS a pris (XmpInferencer, lui,
+    // dit « probably »). Rien du risque de SCEWIN, qui charge un driver signé par IOCTL (vecteur BYOVD) : ici, c'est
+    // GetFirmwareEnvironmentVariableExW, l'API Windows avec un privilège du jeton, sans driver.
     private static Result ValidateFirmwareRead(ReadFirmwareVariableOp op)
     {
         var allowedNames = op.VendorGuid switch
@@ -530,17 +497,9 @@ public sealed class OpAllowlist
         if (string.IsNullOrWhiteSpace(d.ProfileName))
             return Deny("DRS profile name is required.");
 
-        // Deux portees, et exactement deux.
-        //
-        // Pourquoi cette forme : si l'op portait un nom de profil que personne n'honore, « cod.exe »
-        // et « Base Profile » produiraient la meme ecriture machine entiere, et une chaine non vide
-        // suffirait a passer : un appelant qui demande un changement par jeu en obtiendrait un pour
-        // toute la machine, en silence. L'executeur sait viser un profil d'application : la regle ouvre
-        // cette portee-la en plus du profil de base, et elle seule.
-        //
-        // Un chemin complet est exige, pas un nom nu : NVIDIA rend
-        // NVAPI_EXECUTABLE_PATH_IS_AMBIGUOUS sur « cod.exe », donc accepter un nom nu ferait
-        // echouer l'ecriture au bord natif apres avoir laisse croire qu'elle etait autorisee.
+        // Deux portees, exactement : le profil de base, ou le profil d'un jeu que l'executeur sait viser. Une chaine non
+        // vide quelconque ferait d'une demande par jeu une ecriture machine entiere, en silence. Le jeu se donne par un
+        // chemin complet : sur un nom nu (« cod.exe »), NVIDIA rend NVAPI_EXECUTABLE_PATH_IS_AMBIGUOUS au bord natif.
         if (!IsBaseProfileScope(d.ProfileName) && !IsQualifiedExecutablePath(d.ProfileName))
             return Deny($"A DRS scope must be '{BaseProfileName}' or the FULL path to a game "
                       + "executable (NVIDIA rejects a bare file name as ambiguous).");

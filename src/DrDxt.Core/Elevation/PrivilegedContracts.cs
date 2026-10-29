@@ -324,15 +324,9 @@ public enum AdlxTuningKind
 /// <summary>
 /// Demande à Windows d'envoyer le prochain démarrage dans l'écran de setup du firmware, puis redémarre.
 ///
-/// C'est <c>shutdown /r /fw</c> : une fonction documentée de Windows qui pose pour nous le bit 0
-/// d'<c>OsIndications</c> de la spec UEFI. DrDXT n'écrit donc aucune variable firmware lui-même :
-/// c'est la différence entre suivre la spec et bricoler la NVRAM, et elle compte autant pour un
-/// antivirus que pour la règle produit. Écrire le varstore <c>Setup</c> reste interdit ;
-/// cette op ne le contourne pas, c'est le
-/// seul geste firmware que la spécification prévoit.
-///
-/// L'op ne prend qu'un délai : il n'y a exprès aucune forme « lance une commande », les
-/// arguments sont fixés par le type et l'appelant ne peut rien exprimer d'autre.
+/// C'est <c>shutdown /r /fw</c>, fonction documentée de Windows qui pose le bit 0 d'<c>OsIndications</c> (spec UEFI) :
+/// DrDXT n'écrit aucune variable firmware lui-même, et écrire le varstore <c>Setup</c> reste interdit. L'op ne prend
+/// qu'un délai : aucune forme « lance une commande », l'appelant ne peut rien exprimer d'autre.
 /// </summary>
 /// <param name="DelaySeconds">
 /// Secondes avant le redémarrage, pour que l'UI montre ce qui va se passer et que l'utilisateur
@@ -352,19 +346,10 @@ public sealed record CancelPendingFirmwareBootOp : PrivilegedOp;
 /// <summary>
 /// Lit une variable firmware EFI (<c>GetFirmwareEnvironmentVariableExW</c>), en session élevée.
 ///
-/// À quoi ça sert : aujourd'hui, quand le client revient d'un redémarrage dans le BIOS, l'app ne
-/// sait pas s'il a fait le réglage ; elle l'infère (<c>XmpInferencer</c> s'étiquette lui-même
-/// « probably »). Lire la variable met fin au silence après reboot, ce qu'attend la boucle de
-/// vérification.
-///
-/// Lecture seule, et c'est structurel : il n'existe aucune op d'écriture firmware dans
-/// l'énumération fermée. Écrire au mauvais offset peut rendre une carte non démarrable, sans
-/// annulation possible (le seul recours serait physique), et l'offset dépend du couple
-/// (modèle × version de BIOS) : aucune API ne le publie.
-///
-/// Le nom et le GUID sont validés feuille-exacte par l'allowlist du helper : seul l'espace des
-/// variables EFI globales est permis, ainsi que les noms fermés des varstores « Setup » (AMI) et
-/// « CpuSetup » (Intel), en lecture seulement. Aucune opération n'écrit dans le firmware.
+/// Au retour d'un redémarrage dans le BIOS, c'est la preuve que le réglage a pris, là où <c>XmpInferencer</c> ne dit
+/// que « probably ». Lecture seule par construction : l'énumération fermée n'a aucune op d'écriture firmware (écrire au
+/// mauvais offset, qui dépend du modèle et de la version du BIOS, peut rendre une carte non démarrable). Nom et GUID
+/// validés à la feuille par l'allowlist du helper (voir <c>OpAllowlist.ValidateFirmwareRead</c>).
 /// </summary>
 public sealed record ReadFirmwareVariableOp(string Name, string VendorGuid) : PrivilegedOp;
 

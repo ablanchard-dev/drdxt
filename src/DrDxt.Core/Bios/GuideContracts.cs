@@ -3,27 +3,11 @@ namespace DrDxt.Core;
 // ════════════════════════════════════════════════════════════════════════════
 // Docteur BIOS : le générateur de guide (contenu). Pas le rendu.
 //
-// Ici, seulement le *contenu* du guide BIOS personnalisé :
-//   • le modèle du guide (records ci-dessous),
-//   • la bibliothèque de guides (IGuideLibrary) : par fabricant × génération d'UI BIOS,
-//     les chemins de menu exacts par réglage (JSON, validé par prudence),
-//   • le générateur (IGuideGenerator) : des BiosFindings à faire + l'identité
-//     carte/BIOS → le PersonalizedGuide.
-//
-// La précision est le produit. Carte couverte → chemin exact + Verified.
-// Carte non couverte → un repli étiqueté « non vérifié pour ta carte exacte » qui
-// porte toujours le nom exact du réglage à chercher (le client n'a jamais besoin d'un
-// outil tiers) + un filet de secours Clear-CMOS.
-//
-// Sécurité :
-//   • démarrage Legacy/MBR → jamais d'étape « CSM off » (garde anti non-démarrage).
-//   • prérequis ReBAR ordonnés → Above 4G → CSM OFF → Re-Size BAR, dans l'ordre.
-//   • la section de secours est obligatoire, en haut et en bas de chaque guide.
-//
-// Jamais d'écriture ni de script BIOS : un guide n'est que du texte et des étapes lisibles.
-//
-// Rendu (page HTML/mobile), QR, PDF, URL signée/TTL, boucle de vérification après
-// redémarrage, IBiosAutomationProvider : volontairement hors de ce lot.
+// Le modèle du guide, la bibliothèque (IGuideLibrary : chemins de menu exacts par fabricant × génération d'UI, JSON
+// validé) et le générateur (IGuideGenerator). Le rendu vit ailleurs. Carte couverte : chemin exact, Verified ; sinon
+// un repli étiqueté « non vérifié pour ta carte exacte » qui porte toujours le nom exact du réglage, et Clear-CMOS.
+// Sécurité : jamais « CSM off » en démarrage Legacy/MBR ; ReBAR dans l'ordre Above 4G → CSM OFF → Re-Size BAR ;
+// secours en haut et en bas de chaque guide ; jamais d'écriture ni de script BIOS, seulement du texte.
 // ════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
