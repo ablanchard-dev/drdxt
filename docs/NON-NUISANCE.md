@@ -114,7 +114,7 @@ Ce qui est apparu :
 | Fichier | Ce qu'il ecrit ou lance | Ou, et ce qui le borne |
 |---|---|---|
 | `App/App.xaml.cs` (4 → 7) | le journal de plantage (ajout, jamais ecrasement) ; une sonde de gel et les fichiers temoins du mode photos hors ecran, **diagnostics seulement** | `%TEMP%` et donnees locales ; rien sur la machine |
-| `ViewModels/ScanViewModel.Agir.cs` (0 → 2) | la **console de reparation Windows**, sur clic et sous UAC : `DISM /RestoreHealth` puis `sfc /scannow`, outils de Windows, visibles et fermables | donnees locales ; H3, outils Microsoft, geste du joueur |
+| `ViewModels/ScanViewModel.Reparation.cs` (0 → 2) | la **console de reparation Windows**, sur clic et sous UAC : `DISM /RestoreHealth` puis `sfc /scannow`, outils de Windows, visibles et fermables | donnees locales ; H3, outils Microsoft, geste du joueur |
 | `Application/Tweaks/JournalDesLeviersAppliques.cs` (0 → 1) | le journal des leviers gardes (source des constats « gain disparu ») ; n'ecrase jamais un journal illisible | donnees locales |
 | `Detection/Repair/RepairAuditService.DemarrageEtBios.cs` (1 → 2) | `bcdedit /enum {current}` : **lecture seule** | rien d'ecrit |
 | `ElevatedHelper/Execution/SanteDesComposants.cs` (0 → 1) | `dism /CheckHealth` : **lecture seule** | rien d'ecrit |
@@ -561,11 +561,12 @@ src/DrDxt.App/Platform/RelanceElevee.cs 1
 src/DrDxt.App/Updates/InstallationMiseAJour.cs 3
 src/DrDxt.App/Updates/NettoyageDuStaging.cs 1
 src/DrDxt.App/ViewModels/BiosGuideViewModel.cs 1
-src/DrDxt.App/ViewModels/ScanViewModel.Agir.cs 1
 src/DrDxt.App/ViewModels/ScanViewModel.QuoiDeNeuf.cs 1
+src/DrDxt.App/ViewModels/ScanViewModel.Reparation.cs 1
+src/DrDxt.App/ViewModels/ScanViewModel.Scan.cs 1
 src/DrDxt.App/ViewModels/ScanViewModel.Verifier.cs 1
 src/DrDxt.App/ViewModels/ScanViewModel.Voisins.cs 1
-src/DrDxt.App/ViewModels/ScanViewModel.cs 2
+src/DrDxt.App/ViewModels/ScanViewModel.cs 1
 src/DrDxt.Application/Autopilot/RevertEnAttente.cs 2
 src/DrDxt.Application/Network/PlafondEnvoiMemorise.cs 2
 src/DrDxt.Application/Network/VeillePingMemorisee.cs 2
@@ -619,8 +620,8 @@ src/DrDxt.ElevatedHelper/Ipc/HelperLauncher.cs 1
 src/DrDxt.ElevatedHelper/Journal/JournalDEcritureAnticipee.cs 5
 src/DrDxt.ElevatedHelper/ModeDesinstallation.cs 5
 src/DrDxt.ElevatedHelper/Program.cs 1
+src/DrDxt.GpuNative/AdlxNative.Ecriture.cs 6
 src/DrDxt.GpuNative/AdlxNative.Ventilateur.cs 2
-src/DrDxt.GpuNative/AdlxNative.cs 6
 src/DrDxt.GpuNative/IAdlxNative.cs 8
 src/DrDxt.GpuNative/INvApiNative.cs 6
 src/DrDxt.GpuNative/NvApiNative.cs 6

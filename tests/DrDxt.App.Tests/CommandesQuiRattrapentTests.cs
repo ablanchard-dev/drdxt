@@ -57,8 +57,8 @@ public sealed class CommandesQuiRattrapentTests
     // Les sept commandes relevées sans rattrapage : chacune a désormais son catch.
     [Theory]
     [InlineData("ScanViewModel.Appliquer.cs", "ApplyAsync")]
-    [InlineData("ScanViewModel.Agir.cs", "MesurerCadence")]
-    [InlineData("ScanViewModel.Agir.cs", "LancerTestMemoire")]
+    [InlineData("ScanViewModel.TestMemoire.cs", "MesurerCadence")]
+    [InlineData("ScanViewModel.TestMemoire.cs", "LancerTestMemoire")]
     [InlineData("ScanViewModel.Agir.cs", "BasculerPlafondEnvoi")]
     [InlineData("ScanViewModel.Expert.cs", "PoserEssaiAsync")]
     [InlineData("ScanViewModel.Expert.cs", "RendreCarteExpertAsync")]
@@ -68,9 +68,9 @@ public sealed class CommandesQuiRattrapentTests
 
     // Les tâches lancées sans attente (« _ = … ») : personne n'observe leur exception, qui laissait l'écran en attente.
     [Theory]
-    [InlineData("ViewModels/ScanViewModel.Agir.cs", @"internal async Task ConclureReposCarteAsync\(")]
-    [InlineData("ViewModels/ScanViewModel.Agir.cs", @"internal async Task SurveillerLaCarteEnJeuAsync\(")]
-    [InlineData("ViewModels/ScanViewModel.cs", @"public async Task LoadIdleComponentsAsync\(")]
+    [InlineData("ViewModels/ScanViewModel.ReposCarte.cs", @"internal async Task ConclureReposCarteAsync\(")]
+    [InlineData("ViewModels/ScanViewModel.ReposCarte.cs", @"internal async Task SurveillerLaCarteEnJeuAsync\(")]
+    [InlineData("ViewModels/ScanViewModel.Scan.cs", @"public async Task LoadIdleComponentsAsync\(")]
     [InlineData("App.xaml.cs", @"private static async Task VerifierMisesAJourAsync\(")]
     public void La_tache_sans_attente_rattrape_ses_exceptions(string fichier, string signature)
         => CorpsDe(fichier, signature, signature).Should().Contain("catch (Exception", signature);

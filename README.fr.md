@@ -303,7 +303,9 @@ dans [CONFIDENTIALITE.md](CONFIDENTIALITE.md).
 - **La vérification de mise à jour**, au démarrage : deux petits fichiers lus sur `https://ablanchard-dev.github.io/drdxt`,
   et le paquet signé des tables (la liste des régressions connues, des données seulement) sur le même site. GitHub voit
   ton adresse IP, comme pour toute page web. Pour la couper : la variable d'environnement `DRDXT_UPDATE_URL` posée à
-  `off`. Une mise à jour ne s'installe jamais sans ton clic ([docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)).
+  `off`. Une mise à jour ne s'installe jamais sans ton clic ([docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)). Rien n'y est
+  encore publié : l'App le dit en bas de sa fenêtre, et une nouvelle version se prend sur la page
+  [Releases](https://github.com/ablanchard-dev/drdxt/releases).
 - **Le test de ta ligne sous charge**, seulement si tu cliques « Tester ma ligne sous charge » : une vingtaine de
   secondes d'octets nuls reçus de et envoyés à `speed.cloudflare.com` (le serveur de mesure public de Cloudflare), au plus
   400 Mo dans chaque sens, pendant que DrDXT pingue `1.1.1.1` et ta box. Rien qui te désigne.
@@ -339,7 +341,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**9 904 tests, 0 échec**, mesuré le 29/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
+**9 906 tests, 0 échec**, mesuré le 29/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
 matériel). Ce chiffre est vérifié par `tools/gates/compte_des_tests.py` contre la dernière exécution. La commande qui
 le redonne :
 

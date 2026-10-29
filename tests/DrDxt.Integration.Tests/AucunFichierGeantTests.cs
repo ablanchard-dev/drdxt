@@ -8,7 +8,7 @@ namespace DrDxt.Integration.Tests;
 /// </summary>
 public sealed class AucunFichierGeantTests
 {
-    private const int PlafondDeLignes = 1500;
+    private const int PlafondDeLignes = 1000;
 
     private static string Racine()
     {

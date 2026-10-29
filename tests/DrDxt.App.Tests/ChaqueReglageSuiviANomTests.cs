@@ -17,7 +17,9 @@ public sealed class ChaqueReglageSuiviANomTests
     {
         var d = new DirectoryInfo(AppContext.BaseDirectory);
         while (d is not null && !File.Exists(Path.Combine(d.FullName, "DrDXT.sln"))) d = d.Parent;
-        var code = File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "ViewModels", "ScanViewModel.Parties.cs"));
+        // Les réglages suivis vivent dans la part « Parties » de ScanViewModel et les fichiers qui en sont issus.
+        var code = string.Concat(new[] { "Parties", "Changements", "Historique", "LeviersPoses" }
+            .Select(t => File.ReadAllText(Path.Combine(d!.FullName, "src", "DrDxt.App", "ViewModels", $"ScanViewModel.{t}.cs"))));
         var ids = Regex.Matches(code, @"""((?:bios|memoire|nvidia|windows)\.[a-z_]+)""").Select(m => m.Groups[1].Value).Distinct().ToList();
         ids.Should().Contain("bios.courbe_ventilateur_cpu", "témoin : le crible lit bien les identifiants");
 

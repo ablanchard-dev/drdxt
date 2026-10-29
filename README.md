@@ -278,7 +278,8 @@ in [PRIVACY.md](PRIVACY.md).
 - **The update check**, at startup: two small files read from `https://ablanchard-dev.github.io/drdxt`, and the signed
   tables package (the list of known regressions, data only) from the same site. GitHub sees your IP address, as with any
   web page. To turn it off: the `DRDXT_UPDATE_URL` environment variable set to `off`. An update never installs without
-  your click ([docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)).
+  your click ([docs/MISE-A-JOUR.md](docs/MISE-A-JOUR.md)). Nothing is published there yet: the app says so at the bottom
+  of its window, and a new version comes from the [Releases](https://github.com/ablanchard-dev/drdxt/releases) page.
 - **The line test under load**, only if you click "Test my line under load": about twenty seconds of empty bytes
   received from and sent to `speed.cloudflare.com` (Cloudflare's public speed test server), at most 400 MB each way,
   while DrDXT pings `1.1.1.1` and your router. Nothing about you is in it.
@@ -312,7 +313,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**9,904 tests, 0 failures**, measured on 29/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
+**9,906 tests, 0 failures**, measured on 29/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
 real hardware). The number is checked by `tools/gates/compte_des_tests.py` against the last run. The command that gives
 it back (an English .NET SDK; with a French one, see the French README):
 

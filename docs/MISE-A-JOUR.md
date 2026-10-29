@@ -49,6 +49,10 @@
 
 ## Ce qui n'est pas encore là
 
+- Aucun manifeste ni paquet des tables n'est publié sur le site GitHub Pages : les deux adresses répondent 404, que l'App
+  rend par « aucune mise à jour publiée pour l'instant » (`UPDATE_NOT_PUBLISHED`), jamais par « à jour ». Une nouvelle
+  version se prend sur la page Releases. Publier demande la clef de production (`tools/publication/signer.cs`).
+
 - L'installeur n'est pas signé Authenticode (demande de signature auprès d'une fondation de signature pour logiciels libres
   après la sortie publique). Tant qu'il ne l'est pas, Windows affiche son avertissement d'éditeur inconnu : l'empreinte du
   manifeste signé reste la preuve d'intégrité.
