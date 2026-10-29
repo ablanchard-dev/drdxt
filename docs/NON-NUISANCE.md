@@ -579,6 +579,7 @@ src/DrDxt.Application/Parties/PartiesMemorisees.cs 8
 src/DrDxt.Application/Parties/SuiviDesReglages.cs 1
 src/DrDxt.Application/Parties/VerrouDuReleve.cs 1
 src/DrDxt.Application/Safety/GardeDuBcdRetire.cs 3
+src/DrDxt.Application/Tweaks/Hardware/JeuAOptimiser.cs 1
 src/DrDxt.Application/Tweaks/JournalDesLeviersAppliques.cs 2
 src/DrDxt.Application/Tweaks/LeviersVerifies.cs 1
 src/DrDxt.Application/Tweaks/PreuveDuRepos.cs 4
@@ -928,6 +929,12 @@ un peu plus lourd ; la generation d'images (latence) n'est pas touchee. Prouve p
 Nuisance possible, dite : un lanceur ou un jeu qui ecrivait lui-meme dans ce dossier sans droits administrateur peut ne plus
 se mettre a jour ; « Annuler » rend les droits d'origine. La desinstallation de DrDXT laisse la correction en place (une
 correction de securite, pas un reglage de jeu) : son rapport nomme les services concernes.
+
+### 29/10/2026 — `MemoireDuJeuChoisi` : le jeu à optimiser, choisi sous Optimiser
+
+| Site | Ce qu'il fait | Garde | Prouve par |
+|---|---|---|---|
+| `Application/Tweaks/Hardware/JeuAOptimiser.cs` (0 → 1) | `jeu-choisi.json` dans les données du joueur : le nom d'exe du jeu choisi et le chemin complet appris en le voyant tourner ; « automatique » écrit `null` | des données locales, par `FichierJsonAtomique` ; un nom qui ne peut pas être un jeu (`NomExeDeJeu.EstUnJeuPossible`) ou un fichier abîmé se lit « automatique » ; le chemin ne s'apprend que d'un processus du même nom d'exe, complet et hors du dossier de Windows, et se relit à chaque usage (disparu : rien n'est visé) ; rien sur le système : les leviers au profil d'un jeu gardent leurs propres gardes | `JeuAOptimiserTests`, `RenderQueueCapTweakTests` (un jeu choisi fermé ne pose jamais au profil du jeu qui tourne) |
 
 ## Ce que le produit a le DROIT de dire au client
 

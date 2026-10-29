@@ -378,8 +378,15 @@ public partial class ScanViewModel
         var veille = new VeilleDesParties(
             // Le filtre du plafond réseau (ni navigateur, ni lecteur, ni programme de Windows) : une fenêtre plein écran
             // (YouTube en F11, VLC) chasserait de vraies parties de l'anneau de 20.
-            jeu: () => _gameLocator.LocateRunningGamePid() is { } pid && pid > 0 && NomExeDuProcessus(pid) is { } exe
-                       && DrDxt.Core.NomExeDeJeu.EstUnJeuPossible(exe, CheminDuProcessus(pid)) ? (exe, pid) : null,
+            // Le jeu choisi qui tourne apprend ici son chemin complet, App ouverte comme relevé de fond.
+            jeu: () =>
+            {
+                if (_gameLocator.LocateRunningGamePid() is not { } pid || pid <= 0 || NomExeDuProcessus(pid) is not { } exe) return null;
+                var chemin = CheminDuProcessus(pid);
+                if (!DrDxt.Core.NomExeDeJeu.EstUnJeuPossible(exe, chemin)) return null;
+                MemoireJeuChoisi?.Apprendre(chemin);
+                return (exe, pid);
+            },
             capturer: CapturerSansGesteAsync,
             classer: r => DrDxt.Detection.Scoring.BottleneckClassifier.Classify(r, gpuThrottling:
                 DrDxt.Detection.Scoring.BottleneckClassifier.Bridage(r.Materiel)).State,

@@ -11,6 +11,9 @@ public sealed record VerificationRendue(string? Refus, IReadOnlyList<string> AVe
 {
     /// <summary>Les réglages posés, relus et rendus, par identifiant (le bilan les nomme un par un).</summary>
     public IReadOnlyList<string> ValidesIds { get; init; } = [];
+
+    /// <summary>Les réglages que la vérification a atteints ; après un arrêt, les autres n'ont pas été essayés.</summary>
+    public IReadOnlyList<string> ParcourusIds { get; init; } = [];
 }
 
 // « Vérifier DrDXT sur mon PC ». Chaque réglage que DrDXT sait poser est posé, relu, remis d'origine, relu encore, sur la machine du
@@ -67,6 +70,8 @@ public partial class ScanViewModel
             var nom = _localize(TweakDisplayKeys.TitleKey(id));
             var cle = r.AVerifier.Any(a => a.StartsWith(id, StringComparison.Ordinal)) ? "Verifier.Ligne.AVerifier"
                 : r.ValidesIds.Contains(id) ? "Verifier.Ligne.Valide"
+                // Arrêtée avant lui, rien de ce réglage n'a été lu : ni « déjà réglé » ni « pas sur ce PC ».
+                : r.ArretPar != DrDxt.Application.Autopilot.ValidationComplete.Arret.Aucun && !r.ParcourusIds.Contains(id) ? "Verifier.Ligne.NonEssaye"
                 : "Verifier.Ligne.NonTouche";
             return string.Format(_localize(cle), nom);
         }).ToList();

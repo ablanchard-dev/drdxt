@@ -79,6 +79,34 @@ public sealed partial class CartesAgirTests
         else await levier.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
     }
 
+    // Un jeu tourne encore après la partie relevée : rien ne s'écrit sans clic pendant une partie. Le retrait attend une fin de
+    // partie jeu fermé ; le réglage reste suivi.
+    [Fact]
+    public async Task Un_reglage_garde_qui_abime_le_jeu_attend_que_le_jeu_soit_ferme()
+    {
+        var vm = Vm(Array.Empty<RepairFinding>(), helper: null);
+        var levier = Substitute.For<DrDxt.Core.ITweak>();
+        levier.Id.Returns("gpu.repos_global_normal");
+        levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Ok());
+        var le = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+        var retenu = new DrDxt.Application.Tweaks.ReglagesRetenus(System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"retenu-{Guid.NewGuid():N}.json"));
+        retenu.Garder(new("gpu.repos_global_normal", InversesDeTest.Pour("gpu.repos_global_normal"), null, le));
+        DrDxt.Application.Parties.PartieRelevee P(int j, double l) =>
+            new("cod", le.AddDays(j), le.AddDays(j).AddMinutes(20), 10, 140, l, BottleneckState.CpuBoundStrong);
+        var parties = new[] { P(-3, 90), P(-2, 92), P(-1, 91), P(1, 80), P(2, 81), P(3, 80.5) };
+        var jeuOuvert = true;
+        vm.JeuOuvertPourLeTest = () => jeuOuvert;
+
+        await vm.SurveillerLaCarteEnJeuAsync(levier, parties, retenu);
+
+        await levier.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
+        retenu.Charger().Should().NotBeNull("toujours posé, toujours suivi");
+
+        jeuOuvert = false;
+        await vm.SurveillerLaCarteEnJeuAsync(levier, parties, retenu);
+        await levier.Received(1).RevertAsync(Arg.Any<TweakSnapshot>());
+    }
+
     // Le réglage gardé a été changé depuis hors de DrDXT : les parties « pires » ne le font pas réécrire. Il n'est plus suivi,
     // et c'est dit. Retiré mais non relu : « retiré » ne se dit pas seul.
     [Theory]

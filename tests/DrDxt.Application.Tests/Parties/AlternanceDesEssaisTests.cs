@@ -28,6 +28,21 @@ public sealed class AlternanceDesEssaisTests
         return [.. parties];
     }
 
+    // Le jeu choisi sous Optimiser est celui qu'on juge, même moins joué : JeuB a ses douze parties, JeuA deux seulement.
+    [Fact]
+    public void Le_jeu_choisi_est_juge_meme_moins_joue_que_les_autres()
+    {
+        var jeuB = Abba([95, 96, 97, 95, 96, 97], SansCalme).Select(p => p with { Jeu = "JeuB.exe" }).ToList();
+        var jeuA = new[] { P(20, 95, true, "JeuA.exe"), P(21, 80, false, "JeuA.exe") };
+        var parties = jeuB.Concat(jeuA).ToList();
+
+        AlternanceDesEssais.Juger(parties, Levier).Should().Be(VerdictEnJeu.Mieux, "témoin : sans choix, JeuB, le plus joué, est jugé");
+        AlternanceDesEssais.Juger(parties, Levier, jeuChoisi: "JeuA.exe").Should().Be(VerdictEnJeu.PasEncoreJuge,
+            "JeuA n'a pas encore assez de parties");
+        AlternanceDesEssais.Suivante(parties, Levier, poseALOrigine: false, jeuChoisi: "JeuA.exe").Pose
+            .Should().BeFalse("deux parties de JeuA jouées : rang 2, « sans » (les douze de JeuB donneraient « avec »)");
+    }
+
     // Six parties sans le levier dont les deux moitiés alternées se chevauchent : le test à blanc passe.
     private static readonly double[] SansCalme = [80, 81, 79, 82, 80.5, 78];
 

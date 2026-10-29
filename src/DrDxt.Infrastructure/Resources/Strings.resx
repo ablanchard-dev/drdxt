@@ -289,6 +289,9 @@
   <data name="Verifier.Ligne.NonTouche" xml:space="preserve">
     <value>{0}: not touched, already set or not on this PC</value>
   </data>
+  <data name="Verifier.Ligne.NonEssaye" xml:space="preserve">
+    <value>{0}: not tried, the check stopped before it</value>
+  </data>
   <data name="Verifier.Ligne.AVerifier" xml:space="preserve">
     <value>{0}: check by hand, its original value is in the report</value>
   </data>
@@ -3152,5 +3155,26 @@ If it happened while a setting was being changed, run a scan: "What DrDXT set" s
   </data>
   <data name="Machine.ExportScanRate" xml:space="preserve">
     <value>The last scan did not finish: run a scan again before exporting your machine.</value>
+  </data>
+  <data name="JeuChoisi.Changer" xml:space="preserve">
+    <value>Change</value>
+  </data>
+  <data name="JeuChoisi.Ligne" xml:space="preserve">
+    <value>Game: {0}</value>
+  </data>
+  <data name="JeuChoisi.Automatique" xml:space="preserve">
+    <value>Game: automatic, the open game</value>
+  </data>
+  <data name="JeuChoisi.AutomatiqueCourt" xml:space="preserve">
+    <value>Automatic (the open game)</value>
+  </data>
+  <data name="JeuChoisi.Ferme" xml:space="preserve">
+    <value>{0} isn't open: its settings go to its profile, except the render queue cap, which waits until it runs. Measuring waits for a match of {0}.</value>
+  </data>
+  <data name="JeuChoisi.SansChemin" xml:space="preserve">
+    <value>Launch {0} once so DrDXT can set its profile.</value>
+  </data>
+  <data name="JeuChoisi.CheminDisparu" xml:space="preserve">
+    <value>{0} is no longer where DrDXT saw it: launch it once so DrDXT finds its profile again.</value>
   </data>
 </root>

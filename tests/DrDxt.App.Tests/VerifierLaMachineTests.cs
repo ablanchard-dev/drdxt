@@ -42,6 +42,27 @@ public class VerifierLaMachineTests
         vm.LignesVerification.Should().HaveCount(0, "refusée avant de commencer : aucun réglage n'a été essayé");
     }
 
+    // Arrêtée après le premier réglage (le joueur, un jeu lancé, l'invite Windows refusée) : les suivants n'ont jamais été
+    // essayés. « Pas touché, déjà réglé ou pas sur ce PC » affirmait un état qu'aucune lecture n'avait vu.
+    [Theory]
+    [InlineData(DrDxt.Application.Autopilot.ValidationComplete.Arret.ParLeJoueur)]
+    [InlineData(DrDxt.Application.Autopilot.ValidationComplete.Arret.JeuOuvert)]
+    [InlineData(DrDxt.Application.Autopilot.ValidationComplete.Arret.RefusDeWindows)]
+    public async Task Un_reglage_jamais_essaye_ne_se_dit_pas_deja_regle(DrDxt.Application.Autopilot.ValidationComplete.Arret arret)
+    {
+        var vm = Vm();
+        vm.VerifierLaMachine = _ => Task.FromResult(new VerificationRendue(null, [], "r.txt", Valides: 1, ArretPar: arret)
+            { ValidesIds = ["latency.gameModeOn"], ParcourusIds = ["latency.gameModeOn"] });
+
+        await vm.ConfirmerVerificationCommand.ExecuteAsync(null);
+
+        vm.LignesVerification.Should().ContainSingle(l => l.Contains("Verifier.Ligne.Valide"));
+        vm.LignesVerification.Should().NotContain(l => l.Contains("Verifier.Ligne.NonTouche"), "rien d'autre n'a été lu")
+            .And.HaveCount(DrDxt.Application.Autopilot.ValidationComplete.Leviers.Count);
+        vm.LignesVerification.Count(l => l.Contains("Verifier.Ligne.NonEssaye"))
+            .Should().Be(DrDxt.Application.Autopilot.ValidationComplete.Leviers.Count - 1);
+    }
+
     // Suivre en direct : chaque réglage essayé s'ajoute au fil ; « Arrêter » demande confirmation, puis l'arrêt est lu par la
     // validation. Aucune question n'est répondue à la place du joueur : rien ne part sans le clic qui confirme.
     [Fact]

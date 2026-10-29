@@ -359,6 +359,71 @@ public sealed class RenderQueueCapTweakTests
         r.Error!.Value.Code.Should().Be(ErrorCodes.SnapshotInvalid);
     }
 
+    // --- Le jeu choisi sous Optimiser (JeuAOptimiser) : son profil, jamais celui du jeu qui tourne. ---
+
+    private const string CheminJeuA = @"C:\Jeux\JeuA\JeuA.exe";
+    private const string CheminJeuB = @"C:\Jeux\JeuB\JeuB.exe";
+
+    private RenderQueueCapTweak AvecLeJeuChoisi(string dossier, JeuChoisi choix, string? tourne, Func<string, bool> existe)
+    {
+        Build();
+        _adlx.IsAvailable.Returns(false);
+        _nvApi.GetDrsForApplication(PreRenderId, Arg.Any<string>()).Returns(Lu(0));
+        var memoire = new MemoireDuJeuChoisi(Path.Combine(dossier, "jeu-choisi.json"));
+        memoire.Choisir(choix);
+        return new RenderQueueCapTweak(_nvApi, _adlx, _elevated, new JeuAOptimiser(new JeuFixe(tourne, Dx11), memoire, existe));
+    }
+
+    // JeuA choisi et fermé, JeuB ouvert : rien au profil de JeuB, et la file de JeuA attend qu'il tourne (son API ne se lit
+    // que jeu ouvert).
+    [Fact]
+    public async Task Un_jeu_choisi_ferme_ne_pose_jamais_au_profil_du_jeu_qui_tourne()
+    {
+        var dossier = Directory.CreateTempSubdirectory("drdxt-rqc-").FullName;
+        try
+        {
+            var t = AvecLeJeuChoisi(dossier, new JeuChoisi("JeuA.exe", CheminJeuA), CheminJeuB, _ => true);
+
+            t.AppliesTo(DesktopNvidia(), State).Should().BeFalse();
+            t.EtatNonLu(State).Should().BeTrue("la file de JeuA attend qu'il tourne, et c'est dit");
+            (await t.ApplyAsync()).IsOk.Should().BeFalse();
+            _nvApi.DidNotReceive().GetDrsForApplication(Arg.Any<uint>(), CheminJeuB);
+            await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+        }
+        finally { Directory.Delete(dossier, true); }
+    }
+
+    // Le chemin appris a disparu (jeu déplacé, désinstallé) : aucun profil n'est visé.
+    [Fact]
+    public async Task Un_chemin_appris_qui_n_existe_plus_ne_pose_rien()
+    {
+        var dossier = Directory.CreateTempSubdirectory("drdxt-rqc-").FullName;
+        try
+        {
+            var t = AvecLeJeuChoisi(dossier, new JeuChoisi("JeuA.exe", CheminJeuA), null, _ => false);
+
+            t.AppliesTo(DesktopNvidia(), State).Should().BeFalse();
+            (await t.ApplyAsync()).IsOk.Should().BeFalse();
+            await _elevated.DidNotReceive().ExecuteAsync(Arg.Any<PrivilegedOp>(), Arg.Any<CancellationToken>());
+        }
+        finally { Directory.Delete(dossier, true); }
+    }
+
+    // Témoin : le jeu choisi qui tourne se règle à son profil, comme le jeu ouvert en automatique.
+    [Fact]
+    public void Le_jeu_choisi_qui_tourne_se_propose_a_son_profil()
+    {
+        var dossier = Directory.CreateTempSubdirectory("drdxt-rqc-").FullName;
+        try
+        {
+            var t = AvecLeJeuChoisi(dossier, new JeuChoisi("JeuA.exe"), CheminJeuA, _ => true);
+
+            t.AppliesTo(DesktopNvidia(), State).Should().BeTrue();
+            _nvApi.Received().GetDrsForApplication(PreRenderId, CheminJeuA);
+        }
+        finally { Directory.Delete(dossier, true); }
+    }
+
     // --- La branche NVIDIA ecrit au profil du JEU. ---
     //
     // Elle ecrivait « Max Pre-Rendered Frames » dans « Base Profile » : tous les jeux et le bureau.

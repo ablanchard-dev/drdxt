@@ -645,9 +645,12 @@ public partial class App : System.Windows.Application
     /// <summary>Le suivi des réglages et leurs lectures sans scan, les mêmes pour l'App et le relevé de fond.</summary>
     private static void BrancherReglagesSuivis(ScanViewModel scan, IServiceProvider services)
     {
-        // L'essai en alternance, lu par l'App et par le relevé de fond (qui marque les parties ; seul l'App
-        // pose ou rend le levier, quand son helper tourne déjà).
+        // L'essai en alternance, lu par l'App et par le relevé de fond (qui marque les parties, et pose ou rend le levier
+        // de l'essai quand le helper tourne déjà).
         scan.MemoireEssai = DrDxt.Application.Parties.MemoireDeLEssai.ParDefaut();
+        // Le jeu choisi sous Optimiser : l'essai se juge sur lui, et la veille des parties apprend son chemin.
+        scan.MemoireJeuChoisi = services.GetRequiredService<DrDxt.Application.Tweaks.Hardware.MemoireDuJeuChoisi>();
+        scan.JeuAOptimiser = services.GetRequiredService<DrDxt.Application.Tweaks.Hardware.JeuAOptimiser>();
         scan.DerniereSortieDeVeille = ScanViewModel.SortieDeVeilleEnCache;
         scan.RejeuLu = DrDxt.App.Platform.RejeuDuJournalLu.ParDefaut();
         scan.RejeuDuCompte = () => DrDxt.App.Platform.RejeuDuJournalDuCompte.RejouerAsync(DrDxt.App.Platform.ElevatedClientFactory.JournalDuCompte(),

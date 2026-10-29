@@ -17,7 +17,7 @@ namespace DrDxt.App.ViewModels;
 public sealed partial class ScanViewModel
 {
     /// <summary>Vrai quand un scan en jeu a mesure le bufferbloat : le mode peut s'allumer.</summary>
-    public bool PlafondEnvoiDisponible => _plafondEnvoiMesure > 0 && _exeJeuMesure is not null && _helper is not null;
+    public bool PlafondEnvoiDisponible => _plafondEnvoiMesure > 0 && ExeDuPing is not null && _helper is not null;
     public bool PlafondEnvoiActif => _modePlafond is not null || _porteeParLeService;
 
     // Un seul poseur. Le service de demarrage en marche porte la protection (il relit le reglage que
@@ -32,6 +32,9 @@ public sealed partial class ScanViewModel
     }
     private Func<bool>? _serviceDemarrageActif;
     private bool _porteeParLeService;
+
+    /// <summary>Le jeu que la protection vise : celui que le joueur a choisi, sinon celui où la mesure l'a vu.</summary>
+    private string? ExeDuPing => MemoireJeuChoisi?.Lire()?.Exe ?? _exeJeuMesure;
 
     /// <summary>Ce que la mesure en jeu retient : le plafond conseille (0 = pas de bufferbloat) et le
     /// jeu observe. Seul point d'entree, pour le scan comme pour les tests.</summary>
@@ -67,12 +70,12 @@ public sealed partial class ScanViewModel
         if (_modePlafond is not null || _porteeParLeService) return Result.Ok();
         // Le service ne porte que le plafond d'un jeu reconnu par son nom (le helper refuse les autres) : un autre jeu garde
         // la protection de l'App, comme sans service.
-        if (ServiceDemarrageActif?.Invoke() == true && JeuPorteParLeService(_exeJeuMesure))
+        if (ServiceDemarrageActif?.Invoke() == true && JeuPorteParLeService(ExeDuPing))
         {
             // Le service pose un plafond fixe. DrDXT ouvert, l'ajustement tourne encore et lui
             // passe chaque nouveau plafond ; il le repose au battement suivant.
             _porteeParLeService = true;
-            var exe = _exeJeuMesure!;
+            var exe = ExeDuPing!;
             var plafond = _plafondEnvoiMesure;
             _battementPlafond = new CancellationTokenSource();
             // Jamais par _helper, qui se lance a la demande : une invite UAC en pleine partie, sans geste du joueur.
@@ -93,7 +96,7 @@ public sealed partial class ScanViewModel
 
         var mode = new DrDxt.Application.Network.PlafondEnvoiPendantLeJeu(
             _helper!, JeuVivant,
-            _exeJeuMesure!, _plafondEnvoiMesure);
+            ExeDuPing!, _plafondEnvoiMesure);
         var demarre = await mode.DemarrerAsync(CancellationToken.None);
         if (!demarre.IsOk) return demarre;
 
@@ -331,7 +334,7 @@ public sealed partial class ScanViewModel
     // Ce que la bascule appliquera, dit avant le clic : le plafond conseillé par la mesure en jeu.
     public string TextePlafondEnvoi => PlafondEnvoiDisponible
         ? string.Format(CultureInfo.CurrentCulture, _localize("Ping.Protection.Plafond"), _plafondEnvoiMesure / 1_000_000.0,
-            _exeJeuMesure ?? "?")
+            ExeDuPing ?? "?")
         : string.Empty;
     public string LabelPingBascule => _localize(PlafondEnvoiActif ? "Ping.Protection.Desactiver" : "Ping.Protection.Activer");
     public string LabelPingEtat => _localize(PlafondEnvoiActif ? "Ping.Protection.Active" : "Ping.Protection.Inactive");
@@ -374,7 +377,7 @@ public sealed partial class ScanViewModel
                     ErreurPlafondEnvoi = string.Format(CultureInfo.CurrentCulture, _localize("Ping.Protection.RetraitDiffere"),
                         RaisonLisible.Dire(retrait, _localize));
             }
-            else if (await ActiverEtRetenirAsync(_exeJeuMesure!, _plafondEnvoiMesure) is { IsOk: false } echec)
+            else if (await ActiverEtRetenirAsync(ExeDuPing!, _plafondEnvoiMesure) is { IsOk: false } echec)
                 ErreurPlafondEnvoi = RaisonLisible.Echec(echec, _localize("Ping.Protection.Echec"), _localize);
         }
         catch (Exception ex) { ErreurPlafondEnvoi = RaisonLisible.Dire(ex, _localize); }

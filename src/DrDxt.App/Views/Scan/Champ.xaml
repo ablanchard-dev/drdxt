@@ -149,6 +149,31 @@
                                                     effets:Revelation.Active="True" effets:Revelation.Retard="280"
                                                     Command="{Binding ApplyCommand}" HorizontalAlignment="Left" Margin="0,16,0,0"
                                                     ToolTipService.ShowOnDisabled="True" ToolTip="{Binding ApplyHint}"/>
+                                            <!-- Le jeu à optimiser : automatique (le jeu ouvert) ou choisi. « Changer » ouvre la liste. -->
+                                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                                <TextBlock x:Name="LigneJeuChoisi" Text="{Binding LigneJeuChoisi}" Style="{StaticResource Discret}" VerticalAlignment="Center"/>
+                                                <TextBlock Text=" · " Style="{StaticResource Discret}" VerticalAlignment="Center"/>
+                                                <Button x:Name="BoutonChangerJeu" Style="{StaticResource Lien}" Command="{Binding ChangerJeuCommand}"
+                                                        AutomationProperties.Name="{Binding LabelChangerJeu}">
+                                                    <TextBlock Text="{Binding LabelChangerJeu}" Foreground="{StaticResource TexteBrush}"/>
+                                                </Button>
+                                            </StackPanel>
+                                            <TextBlock x:Name="DetailJeuChoisi" Text="{Binding DetailJeuChoisi}" Style="{StaticResource Discret}" TextWrapping="Wrap"
+                                                       MaxWidth="540" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                                       Visibility="{Binding DetailJeuChoisi, Converter={StaticResource StrVis}}"/>
+                                            <ItemsControl x:Name="ListeDesJeux" ItemsSource="{Binding JeuxProposes}" Focusable="False" Margin="0,6,0,0"
+                                                          Visibility="{Binding ListeDesJeuxOuverte, Converter={StaticResource BoolVis}}"
+                                                          effets:Revelation.Active="True">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type vm:JeuPropose}">
+                                                        <Button Style="{StaticResource Lien}" Margin="0,3"
+                                                                Command="{Binding DataContext.ChoisirJeuCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                CommandParameter="{Binding Exe}" AutomationProperties.Name="{Binding Libelle}">
+                                                            <TextBlock Text="{Binding Libelle}" Foreground="{StaticResource TexteBrush}"/>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
                                             <!-- Point de restauration puis réglages, jusqu'à ~40 s : le dire. -->
                                             <TextBlock Visibility="{Binding ApplyCommand.IsRunning, Converter={StaticResource BoolVis}}"
                                                        Text="{Binding LabelOptimisationEnCours}" Style="{StaticResource Discret}" Margin="0,8,0,0"/>

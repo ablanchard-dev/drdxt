@@ -435,7 +435,7 @@ public static class AppServiceCollectionExtensions
             vm.VerifierLaMachine = async progres =>
             {
                 var jeux = sp.GetRequiredService<DrDxt.Application.Tweaks.Hardware.IGameExecutable>();
-                bool JeuOuvert() => jeux.RunningGameExecutablePath() is not null;
+                bool JeuOuvert() => jeux.JeuTourne();
                 if (JeuOuvert()) return new VerificationRendue("Verifier.JeuOuvert", [], null);
                 var journal = sp.GetRequiredService<DrDxt.Application.Autopilot.IRevertEnAttente>();
                 if (journal.Lire() is not { IsOk: true, Value: null })
@@ -448,7 +448,7 @@ public static class AppServiceCollectionExtensions
                 // La liste « ce que DrDXT fait ici » dit « vérifié ici » pour ces leviers.
                 try { DrDxt.Application.Tweaks.LeviersVerifies.Enregistrer(DrDxt.Core.DossierDonnees.Chemin("leviers-verifies.json"), r.Empreinte, r.EssayesIds, r.ValidesIds); }
                 catch (Exception) { /* la liste ne le dira pas ; le rapport, si */ }
-                return new VerificationRendue(null, r.NonRemis, chemin, r.Valides, r.NonTouches, r.Refuses, r.ArretPar) { ValidesIds = r.ValidesIds };
+                return new VerificationRendue(null, r.NonRemis, chemin, r.Valides, r.NonTouches, r.Refuses, r.ArretPar) { ValidesIds = r.ValidesIds, ParcourusIds = r.ParcourusIds };
             };
             // L'analyse lancée sans droits se relance en administrateur et enchaîne, une seule fois.
 #if DEBUG
@@ -556,8 +556,12 @@ public static class AppServiceCollectionExtensions
 
         // Le chemin du jeu en cours, pour que SettingsStateReader lise les reglages
         // du pilote au profil que le pilote applique a ce jeu (parametre optionnel du lecteur).
-        services.AddSingleton<IGameExecutable>(
-            new DrDxt.App.Platform.RunningGameExecutable(new DrDxt.App.Platform.Win32GameLocator()));
+        // Le jeu choisi par le joueur sous Optimiser passe avant le jeu ouvert (JeuAOptimiser) ; automatique, le jeu ouvert.
+        services.AddSingleton(_ => DrDxt.Application.Tweaks.Hardware.MemoireDuJeuChoisi.ParDefaut());
+        services.AddSingleton(sp => new DrDxt.Application.Tweaks.Hardware.JeuAOptimiser(
+            new DrDxt.App.Platform.RunningGameExecutable(new DrDxt.App.Platform.Win32GameLocator()),
+            sp.GetRequiredService<DrDxt.Application.Tweaks.Hardware.MemoireDuJeuChoisi>()));
+        services.AddSingleton<IGameExecutable>(sp => sp.GetRequiredService<DrDxt.Application.Tweaks.Hardware.JeuAOptimiser>());
     }
 
     // -------------------------------------------------------------------

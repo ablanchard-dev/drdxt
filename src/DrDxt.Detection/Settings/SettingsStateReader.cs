@@ -149,7 +149,7 @@ public sealed class SettingsStateReader : ISettingsStateReader
             AccelerationSouris: _registry.GetAccelerationSouris(),
             // Jeu ouvert seulement : hors jeu, l'optimiseur 3D V-Cache ne parque rien, et « aucun cœur parqué » serait lu
             // comme un routage X3D cassé sur une machine saine. Sans jeu, non lu.
-            ParkedCoreIndexes: _game?.RunningGameExecutablePath() is null ? null : _registry.GetParkedCoreIndexes(),
+            ParkedCoreIndexes: _game?.JeuTourne() != true ? null : _registry.GetParkedCoreIndexes(),
             Vrr: vrrPilote ?? (ecranJeu?.VrrEnabled is TriState.On or TriState.Off ? ecranJeu.VrrEnabled : _registry.GetVrr()),
             VrrCapableDisplay: ecranJeu?.VrrPossible ?? TriState.Unknown,
             PagefileConfigured: _registry.GetPagefile(),

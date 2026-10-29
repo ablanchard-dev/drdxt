@@ -68,6 +68,9 @@ public interface IGameExecutable
     /// <summary>Les noms des modules chargés par le jeu en cours (d3d11.dll, vulkan-1.dll…), d'où se lit son API graphique.
     /// null : non lus (pas de jeu, accès refusé par le jeu ou son anti-triche).</summary>
     IReadOnlyList<string>? ModulesDuJeu() => null;
+
+    /// <summary>Un jeu tourne-t-il ? Le jeu ouvert, pas celui dont on vise le profil (<see cref="JeuAOptimiser"/>).</summary>
+    bool JeuTourne() => RunningGameExecutablePath() is not null;
 }
 
 /// <summary>Couture de lecture du runtime AMD ADLX pour les leviers de latence (Anti-Lag

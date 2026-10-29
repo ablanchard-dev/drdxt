@@ -175,6 +175,9 @@ GroupeDeConstats
   Cle : String
   Lignes : IReadOnlyList<EntreeCarte>
   Premiere : EntreeCarte
+JeuPropose
+  Exe : String
+  Libelle : String
 LigneEnAttente
   Changement : String
   Date : String
@@ -304,7 +307,9 @@ ScanViewModel
   CanVerifierMachine : Boolean
   CarteWindowsVisible : Boolean
   ChangementsEnAttente : ObservableCollection<LigneEnAttente>
+  ChangerJeuCommand : IRelayCommand
   ChoisirDomaineCommand : IRelayCommand<DomaineMachine>
+  ChoisirJeuCommand : IAsyncRelayCommand<String>
   ChoixDeScene : IReadOnlyList<ChoixScene>
   Components : ObservableCollection<ComponentItem>
   ConfirmerArretVerificationCommand : IRelayCommand
@@ -320,6 +325,7 @@ ScanViewModel
   DemanderArretVerificationCommand : IRelayCommand
   DemanderVerificationCommand : IRelayCommand
   DescriptionScene : String
+  DetailJeuChoisi : String
   DetailsTechniquesDeplies : Boolean
   DomaineSelectionne : DomaineMachine
   Domaines : ObservableCollection<DomaineMachine>
@@ -381,6 +387,7 @@ ScanViewModel
   IsCoverageComplete : Boolean
   IsScanning : Boolean
   JaugeVisible : Boolean
+  JeuxProposes : IReadOnlyList<JeuPropose>
   LabelAFaire : String
   LabelAjouterPrecision : String
   LabelAnimerMalgreWindows : String
@@ -435,6 +442,7 @@ ScanViewModel
   LabelCarteProposes : String
   LabelCarteTitre : String
   LabelCarteVide : String
+  LabelChangerJeu : String
   LabelCommentCaMarche : String
   LabelCommentCorriger : String
   LabelConsigneScene : String
@@ -614,6 +622,7 @@ ScanViewModel
   LevierAEssayer : String
   LeviersPoses : ObservableCollection<LevierPose>
   LigneEssai : String
+  LigneJeuChoisi : String
   LignesHistorique : ObservableCollection<String>
   LignesLimiteDePuissance : IReadOnlyList<String>
   LignesLimiteSuite : IReadOnlyList<String>
@@ -625,6 +634,7 @@ ScanViewModel
   LignesQuoiDeNeuf : ObservableCollection<String>
   LignesVerification : IReadOnlyList<String>
   LimitePremiereLigne : String
+  ListeDesJeuxOuverte : Boolean
   MaintienEnPause : Boolean
   ManifesteIllisibleMessage : String
   MarginDisplay : String
@@ -776,6 +786,7 @@ VerificationRendue
   ArretPar : Arret
   Chemin : String
   NonTouches : Int32
+  ParcourusIds : IReadOnlyList<String>
   Refus : String
   Refuses : Int32
   Valides : Int32

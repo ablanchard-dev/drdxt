@@ -43,6 +43,10 @@ public static class ValidationComplete
         /// <summary>Les leviers tentés (validés ou non) ; ils perdent leur « vérifié ici » d'avant.</summary>
         public IReadOnlyList<string> EssayesIds { get; init; } = [];
 
+        /// <summary>Les leviers que la boucle a atteints, quelle qu'en soit l'issue (l'invite Windows refusée mise à part) : après
+        /// un arrêt, les autres n'ont jamais été lus.</summary>
+        public IReadOnlyList<string> ParcourusIds { get; init; } = [];
+
         /// <summary>L'empreinte du matériel vérifié (<see cref="DrDxt.Application.Tweaks.LeviersVerifies.Empreinte"/>).</summary>
         public string Empreinte { get; init; } = "";
     }
@@ -64,6 +68,7 @@ public static class ValidationComplete
         var nonRemis = new List<string>();
         var validesIds = new List<string>();
         var essayesIds = new List<string>();
+        var parcourusIds = new List<string>();
         int valides = 0, nonTouches = 0, refuses = 0;
         var arret = Arret.Aucun;
         void Ecrire(string t)
@@ -104,6 +109,7 @@ public static class ValidationComplete
             }
             // Un refus de l'accord Windows ne dit rien du levier : il ne retire pas une preuve d'avant.
             if (issue is not (Issue.NonTouche or Issue.RefusDeWindows)) essayesIds.Add(levier.Id);
+            if (issue != Issue.RefusDeWindows) parcourusIds.Add(levier.Id);
             switch (issue)
             {
                 case Issue.Valide: valides++; validesIds.Add(levier.Id); break;
@@ -128,7 +134,7 @@ public static class ValidationComplete
                 break;
             }
         }
-        return new Resultat(sb.ToString(), nonRemis, valides, nonTouches, refuses, arret) { ValidesIds = validesIds, EssayesIds = essayesIds, Empreinte = DrDxt.Application.Tweaks.LeviersVerifies.Empreinte(materiel) };
+        return new Resultat(sb.ToString(), nonRemis, valides, nonTouches, refuses, arret) { ValidesIds = validesIds, EssayesIds = essayesIds, ParcourusIds = parcourusIds, Empreinte = DrDxt.Application.Tweaks.LeviersVerifies.Empreinte(materiel) };
     }
 
     /// <summary>Le banc profond : origine au journal, état non cible posé et relu, levier posé et relu, origine exacte rendue

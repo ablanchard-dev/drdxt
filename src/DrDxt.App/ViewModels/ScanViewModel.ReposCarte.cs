@@ -140,6 +140,8 @@ public sealed partial class ScanViewModel
         // Après une partie relevée, sans clic : aucune invite Windows ; un retrait refusé reste suivi et se dit.
         using var sansGeste = SansGesteDuJoueur.Ouvrir();
         if (retenus.Charger() is not { } r || r.TweakId != levier.Id) return;
+        // Rien ne s'écrit sans clic pendant qu'un jeu tourne : le retrait attend une fin de partie jeu fermé, le réglage reste suivi.
+        if ((JeuOuvertPourLeTest ?? _gameLocator.JeuOuvert)()) return;
         var jeu = parties.Where(p => p.Debut >= r.Le).GroupBy(p => p.Jeu, StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
         if (jeu is null) return;

@@ -19,8 +19,10 @@ public static class AlternanceDesEssais
 {
     public static string Marque(string levierId, bool pose) => levierId + (pose ? ":on" : ":off");
 
-    /// <summary>Le verdict des parties « avec » contre « sans » ce levier, sur le jeu le plus joué des deux côtés.</summary>
-    public static VerdictEnJeu Juger(IReadOnlyList<PartieRelevee> parties, string levierId, DateTimeOffset? depuis = null)
+    /// <summary>Le verdict des parties « avec » contre « sans » ce levier, sur le jeu choisi par le joueur, sinon sur le jeu
+    /// le plus joué des deux côtés.</summary>
+    public static VerdictEnJeu Juger(IReadOnlyList<PartieRelevee> parties, string levierId, DateTimeOffset? depuis = null,
+        string? jeuChoisi = null)
     {
         // Les parties d'un essai précédent du même levier ne comptent pas.
         if (depuis is { } d) parties = parties.Where(p => p.Debut >= d).ToList();
@@ -31,6 +33,7 @@ public static class AlternanceDesEssais
         var avec = mesurees.Where(p => p.Essai == Marque(levierId, true)).ToList();
         var sans = mesurees.Where(p => p.Essai == Marque(levierId, false)).ToList();
         var jeu = avec.Select(p => p.Jeu).Intersect(sans.Select(p => p.Jeu), StringComparer.OrdinalIgnoreCase)
+            .Where(j => jeuChoisi is null || string.Equals(j, jeuChoisi, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(j => parties.Count(p => string.Equals(p.Jeu, j, StringComparison.OrdinalIgnoreCase)))
             .FirstOrDefault();
         if (jeu is null) return VerdictEnJeu.PasEncoreJuge;
@@ -77,16 +80,16 @@ public static class AlternanceDesEssais
     /// « pire » le retire (mesuré pire, il ne reste pas, même posé à l'origine), « pas de différence » ou « non concluant »
     /// rend l'état d'origine.</summary>
     public static (bool Pose, bool Fini, VerdictEnJeu Verdict) Suivante(IReadOnlyList<PartieRelevee> parties, string levierId,
-        bool poseALOrigine, DateTimeOffset? depuis = null)
+        bool poseALOrigine, DateTimeOffset? depuis = null, string? jeuChoisi = null)
     {
         if (depuis is { } d) parties = parties.Where(p => p.Debut >= d).ToList();
-        var verdict = Juger(parties, levierId);
+        var verdict = Juger(parties, levierId, jeuChoisi: jeuChoisi);
         if (verdict != VerdictEnJeu.PasEncoreJuge)
             return (verdict == VerdictEnJeu.Mieux || (verdict is VerdictEnJeu.PasDeDifference or VerdictEnJeu.NonConcluant && poseALOrigine), true, verdict);
-        // Le rang se compte sur le jeu le plus joué de l'essai, celui qui sera jugé : une partie d'un autre jeu ne décale pas
-        // ses blocs A-B-B-A.
+        // Le rang se compte sur le jeu qui sera jugé (le jeu choisi, sinon le plus joué de l'essai) : une partie d'un autre
+        // jeu ne décale pas ses blocs A-B-B-A.
         var essai = parties.Where(p => p.Essai is { } e && e.StartsWith(levierId + ":", StringComparison.Ordinal)).ToList();
-        var jeu = essai.GroupBy(p => p.Jeu, StringComparer.OrdinalIgnoreCase).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
+        var jeu = jeuChoisi ?? essai.GroupBy(p => p.Jeu, StringComparer.OrdinalIgnoreCase).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
         var jouees = essai.Count(p => string.Equals(p.Jeu, jeu, StringComparison.OrdinalIgnoreCase));
         return (PoseAuRang(jouees), false, verdict);
     }

@@ -285,6 +285,9 @@
   <data name="Verifier.Ligne.NonTouche" xml:space="preserve">
     <value>{0} : pas touché, déjà réglé ou pas sur ce PC</value>
   </data>
+  <data name="Verifier.Ligne.NonEssaye" xml:space="preserve">
+    <value>{0} : pas essayé, la vérification s'est arrêtée avant lui</value>
+  </data>
   <data name="Verifier.Ligne.AVerifier" xml:space="preserve">
     <value>{0} : à vérifier à la main, sa valeur d'origine est dans le rapport</value>
   </data>
@@ -3124,5 +3127,26 @@ Si elle est arrivée pendant un réglage, relance un scan : « Ce que DrDXT a po
   </data>
   <data name="Machine.ExportScanRate" xml:space="preserve">
     <value>Le dernier scan n'a pas abouti : relance un scan avant d'exporter ta machine.</value>
+  </data>
+  <data name="JeuChoisi.Changer" xml:space="preserve">
+    <value>Changer</value>
+  </data>
+  <data name="JeuChoisi.Ligne" xml:space="preserve">
+    <value>Jeu : {0}</value>
+  </data>
+  <data name="JeuChoisi.Automatique" xml:space="preserve">
+    <value>Jeu : automatique, le jeu ouvert</value>
+  </data>
+  <data name="JeuChoisi.AutomatiqueCourt" xml:space="preserve">
+    <value>Automatique (le jeu ouvert)</value>
+  </data>
+  <data name="JeuChoisi.Ferme" xml:space="preserve">
+    <value>{0} n'est pas ouvert : ses réglages vont à son profil, sauf la limite de la file de rendu, qui attend qu'il tourne. La mesure attendra une partie de {0}.</value>
+  </data>
+  <data name="JeuChoisi.SansChemin" xml:space="preserve">
+    <value>Lance {0} une fois pour que DrDXT règle son profil.</value>
+  </data>
+  <data name="JeuChoisi.CheminDisparu" xml:space="preserve">
+    <value>{0} n'est plus là où DrDXT l'a vu : lance-le une fois pour que DrDXT retrouve son profil.</value>
   </data>
 </root>

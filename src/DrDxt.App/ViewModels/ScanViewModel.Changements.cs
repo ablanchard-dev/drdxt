@@ -209,6 +209,9 @@ public partial class ScanViewModel
         if (JournalChangements is not null) dits.AddRange(RetirerLeCalmeurSIlCoute(JournalChangements.Lire(), parties));
         if (JournalChangements is null || LevierParId is null || _journalLeviers is null || RetraitAutomatiqueEnCours
             || AnnulerLevierCommand.IsRunning) return dits;
+        // Rien ne s'écrit sans clic pendant qu'un jeu tourne (une partie relancée aussitôt, un second jeu) : le retrait attend
+        // une fin de partie jeu fermé, le levier reste annulable d'un clic.
+        if ((JeuOuvertPourLeTest ?? _gameLocator.JeuOuvert)()) return dits;
         RetraitAutomatiqueEnCours = true;
         try
         {

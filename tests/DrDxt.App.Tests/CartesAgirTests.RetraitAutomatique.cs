@@ -48,6 +48,44 @@ public sealed partial class CartesAgirTests
         finally { System.IO.Directory.Delete(dossier, true); }
     }
 
+    // Un jeu tourne encore (une partie relancée aussitôt, un second jeu) : rien ne s'écrit sans clic pendant une partie, le
+    // retrait non plus. Il attend une fin de partie jeu fermé ; le levier reste au journal, « Annuler » le retire d'un clic.
+    [Fact]
+    public async Task Le_retrait_automatique_attend_que_le_jeu_soit_ferme()
+    {
+        var dossier = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"retrait-{Guid.NewGuid():N}");
+        System.IO.Directory.CreateDirectory(dossier);
+        try
+        {
+            var leviers = new DrDxt.Application.Tweaks.JournalDesLeviersAppliques(System.IO.Path.Combine(dossier, "l.json"));
+            var pose = new TweakSnapshot("latency.hagsOn", InversesDeTest.Pour("latency.hagsOn", "1"), "2");
+            leviers.Enregistrer(new ApplyReport([new ApplyOutcome("latency.hagsOn", true, false, pose, null)], null));
+            var vm = Vm(Array.Empty<RepairFinding>(), helper: null, journalLeviers: leviers);
+            vm.JournalChangements = new DrDxt.Application.Parties.JournalDesChangements(System.IO.Path.Combine(dossier, "j.json"));
+            var quand = new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero);
+            vm.NoterPoses(["latency.hagsOn"], quand.AddHours(-2));
+            vm.JournalChangements.Ajouter(new DrDxt.Application.Parties.Changement(quand, "HAGS", quand.AddHours(-1), "windows.hags:on"));
+            var levier = Substitute.For<ITweak>();
+            levier.TakesEffectAfterReboot.Returns(true);
+            levier.RevertAsync(Arg.Any<TweakSnapshot>()).Returns(Result.Ok());
+            vm.LevierParId = id => id == "latency.hagsOn" ? levier : null;
+            DrDxt.Application.Parties.PartieRelevee P(double h, double low1) => new("cod.exe", quand.AddHours(h), quand.AddHours(h).AddMinutes(20), 6, 120, low1, BottleneckState.CpuBoundOrAppBound);
+            var pire = new[] { P(-30, 95), P(-20, 96), P(-10, 94), P(10, 80), P(20, 82), P(30, 81) };
+            var jeuOuvert = true;
+            vm.JeuOuvertPourLeTest = () => jeuOuvert;
+
+            await vm.RetirerCeQuiCouteAsync(pire);
+
+            await levier.DidNotReceive().RevertAsync(Arg.Any<TweakSnapshot>());
+            leviers.Lire().Should().ContainSingle("toujours posé, toujours annulable d'un clic");
+
+            jeuOuvert = false;
+            await vm.RetirerCeQuiCouteAsync(pire);
+            await levier.Received(1).RevertAsync(pose);
+        }
+        finally { System.IO.Directory.Delete(dossier, true); }
+    }
+
     // HAGS est un levier de latence : il coûte un peu d'images et baisse la latence. Jugé sur le 1 % low, ce gain passait pour
     // « moins bien en jeu » et le retrait automatique le défaisait. Ses parties portent la latence : il se juge sur elle.
     [Fact]

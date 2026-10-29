@@ -328,7 +328,14 @@ public class SettingsStateReaderTests
             .Should().BeNull();
         r.DidNotReceive().GetParkedCoreIndexes();
 
-        jeu.RunningGameExecutablePath().Returns(@"C:\Jeux\cod.exe");
+        // Le profil visé est celui d'un jeu choisi, mais aucun jeu ne tourne : le parcage ne se lit pas.
+        jeu.RunningGameExecutablePath().Returns(@"C:\Jeux\JeuA\JeuA.exe");
+        jeu.JeuTourne().Returns(false);
+        (await new SettingsStateReader(p, r, NoNetwork(), game: jeu).ReadAsync(Hw(TriState.Unknown))).Value!.ParkedCoreIndexes
+            .Should().BeNull("un profil visé n'est pas un jeu ouvert");
+        r.DidNotReceive().GetParkedCoreIndexes();
+
+        jeu.JeuTourne().Returns(true);
         (await new SettingsStateReader(p, r, NoNetwork(), game: jeu).ReadAsync(Hw(TriState.Unknown))).Value!.ParkedCoreIndexes
             .Should().BeEmpty("témoin : jeu ouvert, le parcage se lit");
 

@@ -76,7 +76,8 @@ public sealed class AppServiceCollectionExtensionsTests
         // un lecteur parfaitement resolu qui lit le profil GLOBAL pour tous les jeux, sans rien dire.
         using var provider = Build();
 
-        provider.GetRequiredService<IGameExecutable>().Should().BeOfType<RunningGameExecutable>();
+        // Le jeu choisi sous Optimiser passe avant le jeu ouvert, qu'il enveloppe.
+        provider.GetRequiredService<IGameExecutable>().Should().BeOfType<DrDxt.Application.Tweaks.Hardware.JeuAOptimiser>();
         provider.GetRequiredService<ISettingsStateReader>()
             .Should().BeOfType<DrDxt.Detection.Settings.SettingsStateReader>()
             .Which.ReadsAtGameScope.Should().BeTrue("sans le jeu, le gate du pilote lit le mauvais profil");
@@ -108,7 +109,7 @@ public sealed class AppServiceCollectionExtensionsTests
 
         levier.GetType()
             .GetField("_game", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
-            .GetValue(levier).Should().BeOfType<RunningGameExecutable>();
+            .GetValue(levier).Should().BeOfType<DrDxt.Application.Tweaks.Hardware.JeuAOptimiser>();
     }
 
     // Le moteur relit un levier posé sans mesure par ce qui le lit vraiment : la composition lui passe les lecteurs de la

@@ -211,7 +211,8 @@ public partial class ScanViewModel
     /// <summary>Le levier est dans l'état que les blocs A-B-B-A prévoient pour la prochaine partie. Une partie jouée hors du
     /// plan ne compte d'aucun côté : marquée de l'état courant, elle avancerait les blocs sans que le plan soit suivi.</summary>
     private bool SelonLePlan(EssaiEnAlternance e)
-        => AlternanceDesEssais.Suivante(PartiesPourLEssai(MemoireParties?.Lire() ?? []), e.LevierId, e.PoseALOrigine, e.Debut).Pose == e.PoseMaintenant;
+        => AlternanceDesEssais.Suivante(PartiesPourLEssai(MemoireParties?.Lire() ?? []), e.LevierId, e.PoseALOrigine, e.Debut,
+            MemoireJeuChoisi?.Lire()?.Exe).Pose == e.PoseMaintenant;
 
     /// <summary>L'anneau des 20 dernières parties, plus les parties d'essai gardées à part (<see cref="PartiesMemorisees.PartiesDEssai"/>) :
     /// le verdict et le rang A-B-B-A se comptent sur toutes les parties de l'essai, pas sur celles que l'anneau a gardées.</summary>
@@ -351,7 +352,8 @@ public partial class ScanViewModel
             OnPropertyChanged(nameof(EssaiProposable));
             return;
         }
-        var (pose, fini, verdict) = AlternanceDesEssais.Suivante(parties, e.LevierId, e.PoseALOrigine, e.Debut);
+        var (pose, fini, verdict) = AlternanceDesEssais.Suivante(parties, e.LevierId, e.PoseALOrigine, e.Debut,
+            MemoireJeuChoisi?.Lire()?.Exe);
         if (pose != e.PoseMaintenant)
         {
             // Rien ne se pose ni ne se retire pendant qu'un jeu tourne (une autre partie lancée aussitôt, un second jeu) : l'essai
