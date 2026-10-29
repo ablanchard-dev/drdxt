@@ -20,12 +20,9 @@ public enum DecisionRemesure
 /// <summary>
 /// Remesurer la memoire et le processeur sans demander au joueur.
 ///
-/// Les deux references de la machine de reference ont ete prises pendant une partie (memoire 16/09,
-/// processeur 11/09) ; l'ecran le dit depuis le 26/09, et la seule issue etait un geste : « remesure, jeu
-/// ferme ». La regle rend ce geste inutile sans rien imposer : on ne remesure qu'une reference deja
-/// signalee comme suspecte, et seulement quand le poste est vraiment au repos (aucun jeu, meme reduit ;
-/// personne au clavier depuis 5 min ; processeur sous 10 %), au plus une fois par heure. Une mesure
-/// trop bruitee garde l'ancienne reference, comme a la main.
+/// Une reference prise pendant une partie est signalee suspecte a l'ecran ; plutot que d'attendre le geste « remesure, jeu
+/// ferme », on la remesure seule, et seulement quand le poste est vraiment au repos (aucun jeu, meme reduit ; personne au
+/// clavier depuis 5 min ; processeur sous 10 %), au plus une fois par heure. Une mesure trop bruitee garde l'ancienne.
 ///
 /// Seuils : les essais du 25/09 ont montre qu'une charge lourde fausse la mesure, pas a partir de quelle
 /// charge ; cette borne-la reste inconnue. Ce qui est mesure (27/09, 20 releves d'1 s sur la machine de

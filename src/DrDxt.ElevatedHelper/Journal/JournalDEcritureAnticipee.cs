@@ -22,23 +22,22 @@ public sealed record EntreeDuJournal(Guid Id, PrivilegedOp Op, string? ImageAvan
 /// seulement, sans héritage. Le helper élevé et le service SYSTEM écrivent le même fichier ; le verrou est un fichier ouvert
 /// sans partage dans ce dossier, qu'aucun processus du compte ne peut ouvrir, donc ni tenir ni bloquer.
 ///
-/// Dépendance à l'ordre de construction, obligatoire : le dossier du journal doit naître dans une racine déjà réparée
+/// Ordre de construction obligatoire : le dossier du journal naît dans une racine déjà réparée
 /// (ProgramDataManifestStorage, qui refuse les points d'analyse et ferme l'écriture à Users). Seul le dernier dossier est
-/// contrôlé ici ; et un dossier qu'un compte aurait créé d'avance, en y tenant le verrou, rendrait le journal occupé pour
-/// toujours, la réparation n'ayant lieu qu'une fois le verrou pris.
+/// contrôlé ici : un dossier créé d'avance par un compte qui y tiendrait le verrou rendrait le journal occupé pour
+/// toujours, la réparation n'ayant lieu que verrou pris.
 /// </summary>
-/// <param name="maxParAppelant">Les entrées en attente d'un même appelant, au plus. Au-delà, sa pose est refusée : un appelant
-/// qui n'acquitterait jamais ferait grossir sans fin un journal relu et réécrit à chaque écriture.</param>
+/// <param name="maxParAppelant">Les entrées en attente d'un même appelant, au plus ; au-delà, sa pose est refusée (un
+/// appelant qui n'acquitte jamais ferait grossir sans fin un journal réécrit à chaque écriture).</param>
 /// <param name="duCompte">Le journal du compte (<see cref="DuCompte"/>) : mêmes entrées, mêmes règles, pour les seules valeurs de
 /// la session (HKCU), que l'App écrit avec son jeton.</param>
 public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente = null, int maxParAppelant = JournalDEcritureAnticipee.MaxParAppelantParDefaut,
     bool duCompte = false)
 {
     /// <summary>
-    /// Le journal des valeurs de la session, dans le dossier du compte. Le compte peut réécrire ce fichier : il n'y gagne rien,
-    /// une entrée ne rend qu'une valeur de sa propre ruche (HKCU), qu'il peut déjà écrire lui-même. C'est la seule chose qu'il
-    /// porte : une autre op n'y entre pas, et une autre op lue n'est ni rendue ni recopiée. Le verrou est un mutex de la session,
-    /// l'écriture celle de FichierJsonAtomique.
+    /// Le journal des valeurs de la session, dans le dossier du compte. Le compte peut le réécrire sans rien y gagner : une
+    /// entrée ne rend qu'une valeur de sa propre ruche (HKCU), la seule op qu'il porte (une autre lue n'est ni rendue ni
+    /// recopiée). Verrou : un mutex de la session ; écriture : FichierJsonAtomique.
     /// </summary>
     public static JournalDEcritureAnticipee DuCompte(string chemin, TimeSpan? attente = null) => new(chemin, attente, duCompte: true);
 
@@ -49,11 +48,11 @@ public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente =
     public const int MaxParAppelantParDefaut = 512;
 
     public const string CodeErreur = "JEA_JOURNAL";
-    /// <summary>Le journal ne se lit plus : il n'est jamais écrasé (une origine s'y perdrait), donc rien ne s'écrit plus tant
-    /// qu'il l'est. Pas un refus passager : le joueur ne doit pas lire « réessaie dans un instant ».</summary>
+    /// <summary>Le journal ne se lit plus : jamais écrasé (une origine s'y perdrait), rien ne s'écrit tant qu'il l'est. Pas
+    /// un refus passager.</summary>
     public const string CodeIllisible = "JEA_ILLISIBLE";
-    /// <summary>Aucune entrée de cet appelant ne porte cette op : déjà rendue par un rejeu, ou journal réécrit. Définitif, à la
-    /// différence d'un journal illisible ou occupé : l'App ne reprend pas cet acquit.</summary>
+    /// <summary>Aucune entrée de cet appelant ne porte cette op (rendue par un rejeu, ou journal réécrit) : définitif, l'App
+    /// ne reprend pas cet acquit.</summary>
     public const string CodeSansEntree = "JEA_ACQUIT_SANS_ENTREE";
     private readonly TimeSpan _attente = attente ?? TimeSpan.FromSeconds(10);
 
@@ -120,9 +119,9 @@ public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente =
 
     private Result<List<Ligne>> Lire()
     {
-        // %ProgramData% laisse tout compte créer un dossier, et la réparation de la racine ne descend pas : un journal qui
-        // n'est pas de confiance (propriétaire Administrateurs/SYSTEM, aucune écriture pour un autre) n'est pas de DrDXT.
-        // Mis de côté, il n'est ni rejoué ni recopié ; s'il ne peut pas l'être, il est illisible et rien n'est écrit.
+        // %ProgramData% laisse tout compte créer un dossier, la réparation de la racine ne descend pas : un journal non fiable
+        // (propriétaire Administrateurs/SYSTEM, aucune écriture pour un autre) n'est pas de DrDXT. Mis de côté, jamais
+        // rejoué ni recopié ; impossible à mettre de côté : illisible, rien n'est écrit.
         if (!duCompte && File.Exists(_chemin) && !DrDxt.Reconciler.Manifest.TrustedManifestRoot.EnsureTrustedFile(_chemin).IsOk)
             return _fichier.MettreDeCote() ? Result<List<Ligne>>.Ok([]) : Result<List<Ligne>>.Fail(CodeErreur, "Untrusted journal.");
         var texte = _fichier.Read();
@@ -145,10 +144,9 @@ public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente =
         if (duCompte) return SousVerrouDuCompte(modifier);
         try
         {
-            // Le dossier est créé déjà fermé. Un dossier qui existait n'est jamais cru : %ProgramData% laisse tout compte en
-            // créer un. Un lien est refusé avant d'y ouvrir quoi que ce soit (l'accès de sa cible serait réécrit), et encore
-            // une fois le verrou ouvert dedans, quand il ne peut plus être remplacé. L'accès et le propriétaire
-            // (Administrateurs : un propriétaire garde le droit de rendre l'accès) sont réparés sous le verrou.
+            // Le dossier est créé déjà fermé ; un dossier existant n'est jamais cru. Un lien est refusé avant d'y ouvrir quoi
+            // que ce soit, puis encore verrou ouvert (il ne peut plus être remplacé). Accès et propriétaire (Administrateurs :
+            // un propriétaire garde le droit de rendre l'accès) sont réparés sous le verrou.
             var dossier = new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(_chemin))!);
             if (!dossier.Exists) dossier.Create(AccesReserve());
             if (EstUnLien(dossier)) return Result.Fail(CodeErreur, "The journal folder is a link.");
@@ -159,9 +157,9 @@ public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente =
             var lu = Lire();
             if (!lu.IsOk) return Result.Fail(lu.Error!.Value.Code, lu.Error.Value.Message);
             var r = modifier(lu.Value!);
-            // Un fichier de confiance : propriétaire Administrateurs et accès protégé posés sur le temporaire avant le
-            // renommage. Écrit sous le propriétaire par défaut (le compte qui a élevé), il en laissait réécrire l'accès par
-            // un programme du même compte sans élévation, puis y forger des écritures que SYSTEM rejouerait.
+            // Propriétaire Administrateurs et accès protégé posés sur le temporaire avant le renommage : sous le propriétaire
+            // par défaut (le compte qui a élevé), un programme de ce compte sans élévation pourrait en rouvrir l'accès et y
+            // forger des écritures que SYSTEM rejouerait.
             return r.IsOk
                 ? DrDxt.Reconciler.Manifest.TrustedManifestRoot.WriteTrustedFile(_chemin,
                     System.Text.Encoding.UTF8.GetBytes(JsonSerializer.Serialize(lu.Value)))
@@ -192,9 +190,9 @@ public sealed class JournalDEcritureAnticipee(string chemin, TimeSpan? attente =
         finally { if (pris) verrou.ReleaseMutex(); }
     }
 
-    // Créé sous le propriétaire par défaut (le compte qui a élevé), le verrou laissait ce compte, sans élévation, s'en rendre
-    // l'accès et le tenir ouvert : toute écriture journalisée était refusée. Il naît aux Administrateurs, sous SYSTEM et
-    // Administrateurs seulement ; un verrou d'avant, au propriétaire non fiable, est remplacé une fois, sinon « occupé ».
+    // Le verrou naît aux Administrateurs, accès SYSTEM et Administrateurs seulement : sous le propriétaire par défaut, le
+    // compte qui a élevé pourrait le tenir ouvert sans élévation et faire refuser toute écriture. Un verrou au propriétaire
+    // non fiable est remplacé une fois, sinon « occupé ».
     private FileStream? Prendre()
     {
         var chemin = _chemin + ".verrou";

@@ -3,28 +3,13 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks.Gpu;
 
-// -----------------------------------------------------------------------
-// IGpuTuningTargetSource : le contexte GPU en cours que les leviers GPU lisent à la pose.
-//
-// Les cibles sont remplaçables à chaque scan : un profil de puce (DrDxt.Profiles) fournit
-// les valeurs, et le flux du scan les pose ici par Set() après avoir borné chacune à
-// GpuSafeBounds.
-//
-// La source porte la valeur, elle n'autorise rien : chaque levier GPU reborne et filtre
-// encore la valeur par GpuSafeBounds avant toute écriture privilégiée (défense en
-// profondeur : « un profil est une demande, pas une autorisation », comme le contrat de GpuTuningTarget).
-//
-// Elle porte aussi le fait matériel « un GPU AMD est présent » (calculé depuis le
-// HardwareInventory scanné via GpuGating.IsAmd, fabricant DXGI 0x1002), posé au scan à partir
-// du même matériel que les cibles. Ce fait se sait toujours, que le SDK de réglage ADLX soit
-// chargé ou non : un levier GPU peut ainsi afficher « GPU AMD détecté, réglage à venir » au
-// lieu d'un saut silencieux quand ADLX manque. Il doit vivre ici et pas sur la couture ADLX,
-// dont l'implémentation de prod dit « indisponible » sur toute machine.
-//
-// Amorcée avec les défauts prudents et dans les bornes : sans remplacement par un profil, le
-// comportement est identique à l'octet près. Reset() revient à ces défauts (et efface le
-// drapeau de présence), pour que le remplacement d'un scan ne fuie jamais dans le suivant.
-// -----------------------------------------------------------------------
+// IGpuTuningTargetSource : le contexte GPU que les leviers GPU lisent à la pose. Un profil de puce (DrDxt.Profiles)
+// fournit les cibles, le scan les pose par Set() bornées à GpuSafeBounds. La source n'autorise rien : chaque levier
+// reborne par GpuSafeBounds avant toute écriture privilégiée (« un profil est une demande, pas une autorisation »).
+// Elle porte aussi le fait « un GPU AMD est présent » (GpuGating.IsAmd sur le HardwareInventory scanné, fabricant DXGI
+// 0x1002), connu même sans le SDK ADLX : « GPU AMD détecté, réglage à venir » plutôt qu'un saut silencieux. Ici et
+// pas sur la couture ADLX, dont l'implémentation de prod dit « indisponible » partout. Amorcée avec des défauts prudents
+// dans les bornes ; Reset() y revient et efface le drapeau, pour qu'un scan ne fuie jamais dans le suivant.
 public interface IGpuTuningTargetSource
 {
     /// <summary>La cible courante de décalage d'horloge cœur/mémoire que pose le levier de sous-tension.</summary>
@@ -33,10 +18,8 @@ public interface IGpuTuningTargetSource
     /// <summary>La cible courante de limite de puissance que pose le levier de limite de puissance.</summary>
     GpuPowerLimitTarget PowerLimit { get; }
 
-    /// <summary>Vrai quand un GPU AMD a été détecté dans le matériel scanné, que le SDK de réglage
-    /// ADLX soit disponible ou non. Un fait matériel (toujours connaissable), pour que les leviers
-    /// GPU affichent l'état honnête « GPU AMD détecté, réglage à venir » au lieu d'un saut
-    /// silencieux quand ADLX manque. Faux tant qu'il n'est pas posé depuis le matériel.</summary>
+    /// <summary>Vrai quand un GPU AMD a été détecté dans le matériel scanné, ADLX disponible ou non. Faux tant qu'il n'est
+    /// pas posé depuis le matériel.</summary>
     bool IsAmdGpuPresent { get; }
 
     /// <summary>Une carte AMD de la machine scannée a son architecture validée par un rapport : sans lui, aucune écriture

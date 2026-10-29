@@ -30,11 +30,10 @@ public static class ComparaisonDesParties
 
     /// <summary>Le bilan d'un changement sur le jeu le plus joué depuis (sinon avant) : même verdict que
     /// <see cref="Juger"/>, plus les médianes de chaque côté pour que l'écran les dise.</summary>
-    /// <param name="jusqua">Le changement suivant. Sans borne, l'après d'un changement
-    /// contenait les parties d'après le suivant : son écart portait déjà le gain de l'autre, et le total les comptait deux
-    /// fois. null = aucun changement depuis.</param>
-    /// <param name="apartirDe">Le changement précédent. Sans borne, l'avant remontait
-    /// avant lui : la médiane d'avant mélangeait les deux époques et l'écart portait encore le gain du précédent.</param>
+    /// <param name="jusqua">Le changement suivant, qui borne l'après (sans elle, l'écart porterait déjà le gain du suivant,
+    /// compté deux fois). null = aucun changement depuis.</param>
+    /// <param name="apartirDe">Le changement précédent, qui borne l'avant (sans elle, la médiane d'avant mélangerait les
+    /// deux époques).</param>
     /// <param name="surLaLatence">Le changement est un levier de latence : il se juge sur la latence d'affichage, sur les
     /// parties qui la portent, comme dans l'essai en alternance ; seulement si aucune ne la porte, sur le 1 % low.</param>
     public static BilanDuChangement Bilan(IReadOnlyList<PartieRelevee> parties, DateTimeOffset quand, DateTimeOffset? depuis = null,

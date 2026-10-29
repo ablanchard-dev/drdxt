@@ -1,10 +1,7 @@
 namespace DrDxt.Measurement.Memory;
 
-/// <summary>
-/// Le resultat d'un A/B memoire. <see cref="HasVerdict"/> faux veut dire « on ne se prononce
-/// pas », ce qui n'est ni un gain ni une absence de gain : c'est l'aveu qu'une des deux mesures
-/// n'a pas ete jugee valide.
-/// </summary>
+/// <summary>Le resultat d'un A/B memoire. <see cref="HasVerdict"/> faux = « on ne se prononce pas » (une des deux mesures
+/// n'a pas ete jugee valide), ni gain ni absence de gain.</summary>
 public sealed record MemoryAbVerdict(
     bool HasVerdict,
     string? NoVerdictReason,
@@ -12,36 +9,24 @@ public sealed record MemoryAbVerdict(
     double LatencyDeltaPct,
     bool BandwidthSignificant,
     bool LatencySignificant,
-    // Les valeurs brutes voyagent avec le verdict : un ecran qui annonce « +79 % » sans montrer
-    // 19,1 -> 34,2 demande de le croire sur parole. Le pourcentage se recalcule a la main.
+    // Les valeurs brutes voyagent avec le verdict : « +79 % » se verifie sur 19,1 -> 34,2.
     double BandwidthBeforeGBs = 0,
     double BandwidthAfterGBs = 0,
     double LatencyBeforeNs = 0,
     double LatencyAfterNs = 0,
-    // La resolution : le plus petit ecart que ces deux mesures pouvaient distinguer, en pourcent.
-    // Sans elle, « pas significatif » se lit « ca ne sert a rien », ce qui est une conclusion que
-    // l'instrument n'a pas produite. Mesure du 17/09/2026 : sur cette machine la resolution du
-    // debit vaut ~7,8 %, quand passer de 3 800 a 4 000 MT/s n'en promet que 5,3 : le banc ne peut
-    // pas trancher cette question-la, et c'est ce chiffre qui le dit. L'ecran de scan parle
-    // deja ainsi pour le GPU (Scan.Drift.None). NaN quand il n'y a pas de verdict.
+    // La resolution, en pourcent : le plus petit ecart distinguable, sans quoi « pas significatif » se lirait « ca ne
+    // sert a rien ». Mesure du 17/09/2026 : resolution du debit ~7,8 % sur cette machine, quand 3 800 → 4 000 MT/s n'en
+    // promet que 5,3. Comme Scan.Drift.None pour le GPU. NaN sans verdict.
     double BandwidthResolutionPct = double.NaN,
     double LatencyResolutionPct = double.NaN);
 
-/// <summary>
-/// La comparaison avant / apres d'un changement memoire, et le seul endroit du produit autorise a
-/// dire « ca a change quelque chose ».
-///
-/// La regle : un ecart ne compte que s'il depasse 3 sigma de la difference des deux mesures. En
-/// dessous, la phrase est « aucune difference mesurable », jamais « leger gain ». C'est ce
-/// garde-fou qui separe un instrument d'un generateur d'espoir.
-/// </summary>
+/// <summary>La comparaison avant / apres d'un changement memoire, le seul endroit autorise a dire « ca a change quelque
+/// chose » : un ecart ne compte qu'au-dela de 3 sigma de la difference ; en dessous, « aucune difference mesurable »,
+/// jamais « leger gain ».</summary>
 public static class MemoryVerdict
 {
-    /// <summary>
-    /// Nombre d'ecarts-types exiges. Choix produit : a 3 sigma, la probabilite qu'un ecart de
-    /// cette taille soit du bruit est inferieure a 1 %. Deux sigma laisserait passer un ecart
-    /// sur vingt : trop, pour une phrase que le client lit comme une preuve.
-    /// </summary>
+    /// <summary>Nombre d'ecarts-types exiges. Choix produit : a 3 sigma, moins de 1 % de chances que l'ecart soit du
+    /// bruit ; 2 sigma en laisserait passer un sur vingt.</summary>
     public const double SigmaFactor = 3.0;
 
     public static MemoryAbVerdict Compare(
@@ -75,13 +60,9 @@ public static class MemoryVerdict
             LatencyResolutionPct: Threshold(before.LatencySigmaPct, after.LatencySigmaPct));
     }
 
-    /// <summary>
-    /// Le seuil, en pourcent. Les deux mesures apportent chacune leur dispersion, et l'incertitude
-    /// d'une difference est la racine de la somme des carres, pas la somme, qui surestimerait.
-    /// On garde les sigma des passes et non ceux de la moyenne : c'est plus severe, et sur une
-    /// phrase que le client lira comme une preuve, l'erreur a ne pas commettre est de crier un
-    /// gain qui n'existe pas.
-    /// </summary>
+    /// <summary>Le seuil, en pourcent : l'incertitude d'une difference est la racine de la somme des carres des deux
+    /// dispersions (la somme surestimerait). Sigma des passes, pas de la moyenne : plus severe, contre un gain crie a
+    /// tort.</summary>
     private static double Threshold(double sigmaBeforePct, double sigmaAfterPct)
         => SigmaFactor * Math.Sqrt(sigmaBeforePct * sigmaBeforePct + sigmaAfterPct * sigmaAfterPct);
 

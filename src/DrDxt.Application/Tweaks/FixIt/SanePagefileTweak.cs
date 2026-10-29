@@ -4,19 +4,10 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// Réparer un fichier d'échange désactivé.
-//
-// « Couper le pagefile pour gagner des FPS » est un mythe répandu, classé comme tel par la
-// recherche du projet (non publiée). Écarté du catalogue, il laisse quand même la machine cassée
-// quand l'utilisateur l'a appliqué avant d'installer DrDXT : à la limite de commit, Windows tombe
-// en manque de mémoire (gel, plantage), et l'utilisateur accuse le jeu.
-//
-// Le scan le signale (`Finding.Memory.PagefileDisabled`). La configuration vit dans une simple
-// valeur de registre, `PagingFiles` (REG_MULTI_SZ), que le lecteur du produit lit déjà ; pas besoin
-// d'op WMI. La feuille reste unique (allowlist à la feuille exacte).
-//
-// C'est un levier de fiabilité, jamais un gain d'images. Sa phrase ne parle pas de FPS, et il ne
-// prend effet qu'au redémarrage.
+// Réparer un fichier d'échange désactivé. « Couper le pagefile pour gagner des FPS » est un mythe (recherche du projet,
+// non publiée) qui laisse la machine cassée : à la limite de commit, Windows manque de mémoire (gel, plantage). Signalé
+// au scan (`Finding.Memory.PagefileDisabled`) ; la configuration est la seule valeur `PagingFiles` (REG_MULTI_SZ), sans
+// op WMI, une feuille exacte de l'allowlist. Un levier de fiabilité, jamais un gain d'images ; effet au redémarrage.
 // -----------------------------------------------------------------------
 /// <summary>Rend à Windows la gestion du fichier d'échange (`PagingFiles`) quand il est lu désactivé ; effet au redémarrage.</summary>
 public sealed class SanePagefileTweak : ITweak
@@ -25,15 +16,10 @@ public sealed class SanePagefileTweak : ITweak
         @"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management";
     private const string PagingFilesName = "PagingFiles";
 
-    // La valeur exacte que Windows lui-même écrit quand « Gestion automatique du fichier
-    // d'échange pour tous les lecteurs » est cochée. Relevée sur une machine réelle
-    // (Windows 11 26200, gestion automatique active) : `?:\pagefile.sys`, sans taille.
-    //
-    // La forme `?:\pagefile.sys 0 0` n'est pas la bonne : « 0 0 » existe, mais décrit
-    // une taille gérée par le système sur un lecteur nommé (`C:\pagefile.sys 0 0`), pas la
-    // gestion automatique. Écrire une forme voisine mais non canonique laisserait la machine
-    // dans un état que l'interface de Windows ne produit jamais. Le `?:` est le marqueur de
-    // l'automatique : c'est Windows qui choisit le lecteur et la taille.
+    // La valeur exacte qu'écrit Windows pour « Gestion automatique du fichier d'échange pour tous les lecteurs », relevée
+    // sur une machine réelle (Windows 11 26200) : `?:\pagefile.sys`, sans taille. `?:` = Windows choisit lecteur et
+    // taille ; « 0 0 » décrit une taille gérée sur un lecteur nommé (`C:\pagefile.sys 0 0`), un état que l'interface de
+    // Windows ne produit jamais ici.
     private const string SystemManagedEntry = @"?:\pagefile.sys";
 
     private readonly IRegistryReader _registry;
@@ -47,15 +33,12 @@ public sealed class SanePagefileTweak : ITweak
     public bool RequiresElevation => true;
     public bool RequiresRestorePoint => true;
 
-    // La configuration du fichier d'échange ne s'applique qu'au redémarrage : un A/B immédiat
-    // mesurerait le bruit de session sur un changement qui n'est même pas actif, et pourrait
-    // l'annuler à tort.
+    // Effet au redémarrage : un A/B immédiat mesurerait le bruit sur un changement inactif, et l'annulerait à tort.
     public bool TakesEffectAfterReboot => true;
 
     public string SummaryKey => "tweak.fixit.sane_pagefile.reliability";
 
-    /// <summary>Uniquement quand le fichier d'échange est lu comme désactivé. `Unknown`
-    /// (illisible) ne déclenche rien : on ne répare pas ce qu'on n'a pas su lire.</summary>
+    /// <summary>Seulement quand le fichier d'échange est lu désactivé ; `Unknown` ne déclenche rien.</summary>
     public bool AppliesTo(HardwareInventory hw, SettingsState state) =>
         state.PagefileConfigured == TriState.Off;
 
@@ -66,9 +49,8 @@ public sealed class SanePagefileTweak : ITweak
     {
         try
         {
-            // Capture de l'original avant d'écrire. Absent (null) → l'inverse est une
-            // suppression de valeur, pas une écriture de chaîne vide : les deux états ne sont
-            // pas les mêmes pour Windows.
+            // L'original avant d'écrire ; absent → l'inverse est une suppression, pas une chaîne vide (deux états différents
+            // pour Windows).
             var capture = _registry.ReadMultiString(RegistryHiveKind.LocalMachine,
                                                     MemoryManagementPath, PagingFilesName);
             if (!capture.IsOk)

@@ -5,26 +5,18 @@ namespace DrDxt.Infrastructure.Updates;
 // ───────────────────────────────────────────────────────────────────────────────
 //  EMBEDDED PUBLIC MATERIAL ONLY : aucun secret ne doit jamais vivre ici dans une version publiée.
 // ───────────────────────────────────────────────────────────────────────────────
-//
-// La clé de dev de la couche de mise à jour : une paire de signature dédiée aux mises à jour,
-// séparée exprès de celle du manifeste du réconciliateur (DrDxt.Reconciler.Manifest.ManifestDevKeys).
-// Cloisonner les canaux empêche la compromission d'une clé d'atteindre l'autre.
-//
-// La clé publique d'ici est sûre à livrer dans un binaire décompilable : elle ne peut que vérifier
-// un manifeste de mise à jour, jamais en frapper un. La clé privée de signature des versions vit
-// hors du client (build / CI / HSM, hors bande), exactement comme pour ManifestDevKeys.
-//
+// La clé de dev des mises à jour, séparée de celle du manifeste (DrDxt.Reconciler.Manifest.ManifestDevKeys) : la
+// compromission d'un canal n'atteint pas l'autre. La clé publique est sûre à livrer dans un binaire décompilable (elle
+// ne fait que vérifier) ; la clé privée de signature des versions vit hors du client (build / CI / HSM, hors bande).
 // La clé de production vit dans UpdateTrust.ProductionPublicKey ; celle-ci, de dev, y est refusée. Sa graine privée
 // appariée ne vit que dans les assemblys de test (DrDxt.TestSupport.UpdateDevTestKeys, tests/Shared), comme celle du
 // manifeste : aucun octet de clé privée dans une DLL livrée.
 // ───────────────────────────────────────────────────────────────────────────────
 public static class UpdateDevKeys
 {
-    /// <summary>La clé publique Ed25519 brute de 32 octets associée aux manifestes que signe la chaîne
-    /// de publication de test. Sûre à livrer : elle ne peut que vérifier un <see cref="UpdateManifest"/>,
-    /// jamais en signer un. Valeur DEV/TEST, dont la graine ne vit que dans les tests, et que
-    /// <see cref="UpdateTrust.Refuser"/> refuse en production. Dédiée aux mises à jour : ce n'est pas
-    /// celle du manifeste.</summary>
+    /// <summary>La clé publique Ed25519 brute de 32 octets des manifestes de la chaîne de publication de test : elle ne
+    /// fait que vérifier un <see cref="UpdateManifest"/>. Valeur de dev/test, graine dans les tests seulement, refusée en
+    /// production par <see cref="UpdateTrust.Refuser"/>.</summary>
     public static byte[] UpdatePublicKey =>
     [
         0xEA, 0x3F, 0xA2, 0xFA, 0x3E, 0x66, 0x8B, 0x0B,
@@ -45,10 +37,8 @@ public static class UpdateDevKeys
         ],
     ];
 
-    /// <summary>Construit l'<see cref="IUpdateVerifier"/> en vérification seule à partir de la clé
-    /// publique embarquée. Échec propre : une clé embarquée corrompue ou de mauvaise longueur rend
-    /// Fail(UPDATE_SIG_INVALID) au lieu de lever (protège d'un futur mauvais échange de clé). Reprend
-    /// <c>ManifestDevKeys.CreateVerifier</c>.</summary>
+    /// <summary>L'<see cref="IUpdateVerifier"/> en vérification seule sur la clé embarquée ; corrompue ou de mauvaise
+    /// longueur : Fail(UPDATE_SIG_INVALID), sans lever. Reprend <c>ManifestDevKeys.CreateVerifier</c>.</summary>
     public static Result<IUpdateVerifier> CreateUpdateVerifier()
         => UpdateVerifier.Create(UpdatePublicKey);
 }

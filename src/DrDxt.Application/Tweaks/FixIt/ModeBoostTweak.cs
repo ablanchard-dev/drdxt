@@ -17,9 +17,9 @@ namespace DrDxt.Application.Tweaks.FixIt;
 // Ce qui est écrit : la seule valeur secteur de PERFBOOSTMODE du plan actif, jamais la valeur batterie, jamais une
 // valeur hors 1 à 4, jamais un autre réglage du plan. L'original est relu juste avant d'écrire.
 //
-// Ouvert sur portable, puisque seule la valeur secteur est écrite (la batterie n'est jamais
-// touchée) et que l'essai est mesuré en jeu puis rendu s'il ne gagne rien. Écarté : consoles portables, profils verrouillés. Intel et AMD : proposé aux deux (la table couvre les trois modes ;
-// pas de variante par classe de cœurs sur un Intel hybride).
+// Ouvert sur portable (seule la valeur secteur est écrite, l'essai est rendu s'il ne gagne rien) ; écarté sur les
+// consoles portables (profils verrouillés). Intel et AMD (la table couvre les trois modes ; pas de variante par classe
+// de cœurs sur un Intel hybride).
 // -----------------------------------------------------------------------
 /// <summary>Rend au boost du processeur le défaut de son plan quand la valeur secteur du plan actif est lue coupée (0)
 /// contre un défaut documenté. Proposé sur PC de bureau et portable, jugé en jeu.</summary>
@@ -44,8 +44,7 @@ public sealed class ModeBoostTweak : FixItTweakBase
     internal static uint? ARendre(ModeDeBoostLu lu) =>
         lu.Valeur == 0 && lu.Defaut is >= 1 and <= ModeDeBoostLu.MaxDocumente ? lu.Defaut : null;
 
-    // Banc profond : boost déjà au défaut du plan actif, l'exercice le coupe (0, l'état que le levier répare) le temps de
-    // l'exercice, puis rend la valeur d'origine exacte.
+    // Banc profond : depuis le défaut du plan, l'exercice coupe le boost (0) puis rend la valeur d'origine exacte.
     public override ExerciceProfond? PreparerExercice(HardwareInventory hw, SettingsState state)
     {
         if (hw.Chassis is not (ChassisType.Desktop or ChassisType.Laptop)

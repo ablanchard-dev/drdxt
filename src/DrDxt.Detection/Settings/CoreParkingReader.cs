@@ -7,17 +7,9 @@ namespace DrDxt.Detection.Settings;
 /// <summary>
 /// Lit les cœurs réellement parqués, par l'API CPU Sets de Windows.
 ///
-/// <c>GetSystemCpuSetInformation</c> rend, pour chaque processeur logique, son index de cœur et un
-/// bit <c>Parked</c>. Documentée, en espace utilisateur, <b>sans élévation</b> et sans dépendance
-/// nouvelle ; le compteur de performance équivalent porte un nom localisé (« État de parcage » sur
-/// un Windows français), ce qui obligerait à résoudre les noms par index et à ajouter un paquet.
-///
-/// Contrat : <c>null</c> quand la lecture n'a pas abouti, liste (éventuellement vide) sinon. Cette
-/// distinction est la raison d'être du fichier : un lecteur qui rendrait toujours une liste
-/// vide rendrait « je n'ai pas pu lire » indiscernable de « aucun cœur n'est parqué », et deux
-/// consommateurs en tireraient des conclusions opposées, dont une qui proposerait une écriture.
-///
-/// Ne lève jamais : tout échec natif devient <c>null</c>.
+/// <c>GetSystemCpuSetInformation</c> rend l'index de cœur et le bit <c>Parked</c> de chaque processeur logique (voir
+/// <see cref="CpuSetParsing"/> pour le choix de l'API). Contrat : <c>null</c> quand la lecture n'a pas abouti, liste
+/// (éventuellement vide) sinon ; « pas pu lire » et « aucun cœur parqué » ne se confondent jamais. Ne lève jamais.
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal static class CoreParkingReader

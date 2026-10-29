@@ -7,22 +7,11 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler.Manifest;
 
 // -----------------------------------------------------------------------
-// ProgramDataManifestStorage : l'IManifestStorage de production.
-//
-// Défense en profondeur : le manifeste vit sous
-//   %ProgramData%\DrDxt\desired-state.manifest
-// avec une DACL qui n'accorde l'écriture qu'aux Administrateurs + SYSTEM et la lecture aux
-// utilisateurs authentifiés. Un utilisateur non admin peut le lire (l'App le relit sans droits) mais
-// pas le réécrire. Cela complète la signature asymétrique, sans jamais la
-// remplacer : la signature est l'autorité d'intégrité ; l'ACL ne fait que relever la barre au repos.
-//
-// Les écritures sont atomiques (un temporaire au nom aléatoire, puis FichierJsonAtomique.Remplacer) :
-// un plantage en pleine écriture ne laisse jamais un manifeste à moitié écrit.
-//
-// Testabilité : le chemin et le descripteur de DACL sont des fonctions statiques pures
-// (vérifiées en test unitaire sans système de fichiers ni admin). L'instance se construit avec
-// une racine explicite pour que les tests fassent l'aller-retour dans un dossier temporaire ;
-// `applyAcl` se désactive pour ces tests.
+// ProgramDataManifestStorage : l'IManifestStorage de production, %ProgramData%\DrDxt\desired-state.manifest. DACL :
+// écriture pour Administrateurs + SYSTEM, lecture pour les utilisateurs authentifiés (l'App relit sans droits). En
+// défense en profondeur : la signature reste l'autorité d'intégrité, l'ACL relève la barre au repos. Écritures
+// atomiques (temporaire au nom aléatoire, puis FichierJsonAtomique.Remplacer). Chemin et DACL sont statiques purs ; la
+// racine explicite et `applyAcl` désactivable servent aux tests en dossier temporaire.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class ProgramDataManifestStorage : IManifestStorage
@@ -38,8 +27,7 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
     public ProgramDataManifestStorage() : this(DefaultRoot(), applyAcl: true) { }
 
     /// <param name="root">Le dossier où vit le manifeste.</param>
-    /// <param name="applyAcl">Poser la DACL en écriture admin à la création (false dans les tests
-    /// unitaires, qui tournent sans admin dans un dossier temporaire).</param>
+    /// <param name="applyAcl">Poser la DACL en écriture admin (false dans les tests, sans admin).</param>
     public ProgramDataManifestStorage(string root, bool applyAcl)
     {
         _root = root;
@@ -54,11 +42,9 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
             "DrDxt");
 
-    /// <summary>La sécurité durcie de la racine en écriture admin : propriétaire épinglé à
-    /// Administrateurs, écriture pour Administrateurs + SYSTEM, lecture pour les utilisateurs
-    /// authentifiés ; protégée (n'hérite pas d'une ACL parente plus lâche). Épingler le propriétaire
-    /// ferme le trou « le créateur garde un WRITE_DAC implicite et rouvre la DACL » :
-    /// voir <see cref="TrustedManifestRoot.BuildHardenedSecurity"/>.</summary>
+    /// <summary>La sécurité durcie de la racine : propriétaire Administrateurs (le créateur ne rouvre pas la DACL par son
+    /// WRITE_DAC implicite), écriture Administrateurs + SYSTEM, lecture utilisateurs authentifiés, sans héritage. Voir
+    /// <see cref="TrustedManifestRoot.BuildHardenedSecurity"/>.</summary>
     public static DirectorySecurity BuildAdminWriteDacl()
         => TrustedManifestRoot.BuildHardenedSecurity();
 
@@ -70,12 +56,9 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
 
             if (_applyAcl)
             {
-                // Production : écriture durcie. S'assurer de la racine appartenant aux administrateurs (ou la
-                // réparer), écrire atomiquement, et épingler owner=Administrators + DACL protégée réservée aux
-                // admins sur le fichier du manifeste, pour que le réconciliateur SYSTEM lui fasse confiance au
-                // repos même quand l'écrivain est un utilisateur admin (pas SYSTEM). Échoue bruyamment si le
-                // propriétaire ne peut pas être posé (appelant non élevé) : jamais de manifeste appartenant à
-                // l'utilisateur, que le service rejetterait en silence.
+                // Production : racine aux administrateurs (ou réparée), écriture atomique, owner=Administrators et DACL
+                // protégée sur le fichier, pour que SYSTEM lui fasse confiance même écrit par un admin. Propriétaire
+                // impossible à poser (non élevé) : échec, jamais un manifeste à l'utilisateur.
                 return Task.FromResult(
                     TrustedManifestRoot.WriteTrustedFile(FilePath, Encoding.UTF8.GetBytes(json)));
             }
@@ -89,16 +72,13 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
         }
     }
 
-    /// <summary>La reprise : le manifeste illisible est renomme a cote de lui, jamais efface
-    /// (il reste la seule trace de ce qu'il contenait). Absent ⇒ rien a faire. Le renommage garde le
-    /// descripteur de securite du fichier.</summary>
+    /// <summary>La reprise : le manifeste illisible est renomme a cote, jamais efface (la seule trace de son contenu),
+    /// descripteur de securite garde. Absent ⇒ rien a faire.</summary>
     public Result MettreDeCote() => MiseDeCote.Renommer(FilePath);
 
-    /// <summary>Apres un rendu a la desinstallation. Laisse en place, le manifeste ferait retrouver a
-    /// une reinstallation des origines deja rendues, capturees avant la desinstallation
-    /// precedente, et le jour ou le service les rejouerait il reecrirait un passe que l'utilisateur a
-    /// quitte. Il est renomme `desired-state.manifest.rendu-<heure UTC>`, jamais efface : il reste la
-    /// trace de ce que la desinstallation a lu.</summary>
+    /// <summary>Apres un rendu a la desinstallation : laisse en place, le manifeste ferait retrouver a une reinstallation
+    /// des origines deja rendues, que le service pourrait rejouer. Renomme `desired-state.manifest.rendu-<heure UTC>`,
+    /// jamais efface : la trace de ce que la desinstallation a lu.</summary>
     public Result MettreDeCoteApresRendu() => MiseDeCote.Renommer(FilePath, "rendu");
 
     public Task<Result<SignedManifestEnvelope?>> ReadAsync(CancellationToken ct)
@@ -108,11 +88,9 @@ public sealed class ProgramDataManifestStorage : IManifestStorage
             if (!File.Exists(FilePath))
                 return Task.FromResult(Result<SignedManifestEnvelope?>.Ok(null));
 
-            // Intégrité au repos : avant de faire confiance à un manifeste présent, vérifier
-            // que son propriétaire est Administrateurs/SYSTEM et que la racine n'est pas inscriptible par un
-            // non-admin. Une racine empoisonnée (par exemple un %ProgramData%\DrDxt créé par l'utilisateur)
-            // → fail-closed (traitée comme altérée) : rien n'est réappliqué. Défense en profondeur au-dessus
-            // de la signature Ed25519 (l'autorité d'intégrité). Sautée seulement en mode test / sans ACL.
+            // Intégrité au repos, en plus de la signature Ed25519 : propriétaire Administrateurs/SYSTEM et racine non
+            // inscriptible par un non-admin. Racine empoisonnée (un %ProgramData%\DrDxt créé par l'utilisateur) →
+            // traitée comme altérée, rien n'est réappliqué. Sautée seulement sans ACL (tests).
             if (_applyAcl)
             {
                 var trust = TrustedManifestRoot.EnsureTrustedFile(FilePath);

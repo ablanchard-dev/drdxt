@@ -105,8 +105,7 @@ public sealed class RegistryProvider : IRegistryProvider
         try
         {
             using var k = Registry.CurrentUser.OpenSubKey(GameModeLecture.CheminGameBar);
-            // Les deux noms : `GameModeOnTweak` ecrit les deux, la detection n'en lisait qu'un.
-            // Voir `GameModeLecture` pour le pourquoi et la mesure.
+            // Les deux noms, comme `GameModeOnTweak` les ecrit (voir `GameModeLecture`).
             return GameModeLecture.Interpreter(
                 k?.GetValue(GameModeLecture.NomModerne),
                 k?.GetValue(GameModeLecture.NomAncien));
@@ -126,16 +125,9 @@ public sealed class RegistryProvider : IRegistryProvider
 
     public IReadOnlyList<int>? GetParkedCoreIndexes()
     {
-        // Lecture reelle par l'API CPU Sets. null = non lu ; liste vide = lu, aucun
-        // coeur parque. Un bouchon qui rendrait toujours une liste vide ferait dire au bareme
-        // « machine saine » et a l'heuristique X3D « l'optimiseur ne route pas », donc
-        // proposerait une ecriture sur des machines saines.
-        //
-        // Plusieurs photos, pas une. Mesure du 07/09/2026 : six scans d'affilee ont rendu
-        // 11, 14, 14, 16 et 16 coeurs parques, et un scan lance pendant une compilation en a
-        // rendu 0, ce qui faisait disparaitre le seul constat Minor du produit. Le meme PC
-        // recevait deux verdicts selon l'heure du scan. Un coeur qui dort une seconde sur deux
-        // dort ; une photo prise pendant qu'il travaille dit le contraire.
+        // L'API CPU Sets. null = non lu ; liste vide = lu, aucun coeur parque (toujours vide, elle ferait proposer une
+        // ecriture sur des machines saines). Plusieurs photos, pas une : voir CoreParkingSampling (mesure du 07/09/2026,
+        // de 11 a 16 coeurs parques sur six scans, 0 pendant une compilation).
         var echantillons = new List<IReadOnlyList<int>?>(CoreParkingSampling.Echantillons);
         for (var i = 0; i < CoreParkingSampling.Echantillons; i++)
         {
@@ -148,11 +140,9 @@ public sealed class RegistryProvider : IRegistryProvider
 
     public TriState GetVrr()
     {
-        // La bascule globale « Taux de rafraîchissement variable » de Windows vit ici :
-        // HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\EnableVRR (DWORD, 1=On 0=Off)
-        // Cette clé existe sur Windows 11 22H2+ avec un écran compatible VRR.
-        // Absente (Windows plus ancien, écran incompatible, ou clé jamais écrite) → Unknown.
-        // L'état G-Sync/FreeSync du fabricant exige NVAPI/ADLX → lu ailleurs.
+        // La bascule « Taux de rafraîchissement variable » de Windows :
+        // HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\EnableVRR (DWORD, 1=On 0=Off), présente sur Windows 11
+        // 22H2+ avec un écran compatible ; absente → Unknown. G-Sync/FreeSync du fabricant : NVAPI/ADLX, lu ailleurs.
         try
         {
             using var k = Registry.LocalMachine.OpenSubKey(
@@ -165,8 +155,7 @@ public sealed class RegistryProvider : IRegistryProvider
 
     public TriState GetSysMain()
     {
-        // Le type de demarrage d'un service vit dans le registre : pas besoin du SCM, donc pas
-        // besoin d'elevation ni d'un service en cours d'execution pour savoir qu'il est desactive.
+        // Le type de demarrage d'un service se lit dans le registre, sans SCM ni elevation.
         // HKLM\SYSTEM\CurrentControlSet\Services\SysMain\Start (DWORD ; 4 = desactive)
         try
         {
@@ -182,9 +171,8 @@ public sealed class RegistryProvider : IRegistryProvider
         // HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile
         //   \SystemResponsiveness (DWORD ; Windows ecrit 20, le mythe ecrit 0)
         //
-        // On passe a l'inferenceur le fait que la cle se soit ouverte, separement de la valeur :
-        // une valeur absente est le defaut de Windows (donc intact), une cle illisible est un
-        // Unknown. Sans cette distinction, presque toute machine saine ressortirait « non lue ».
+        // L'ouverture de la cle passe a part de la valeur : valeur absente = defaut de Windows (intact), cle illisible =
+        // Unknown ; sinon presque toute machine saine ressortirait « non lue ».
         try
         {
             using var k = Registry.LocalMachine.OpenSubKey(
@@ -196,11 +184,8 @@ public sealed class RegistryProvider : IRegistryProvider
 
     public TriState GetPagefile()
     {
-        // La configuration du fichier d'échange vit dans le REG_MULTI_SZ PagingFiles :
-        // HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PagingFiles
-        // → string[]. Vide = désactivé (Off) ; une entrée = un fichier d'échange existe (On). Valeur
-        // absente / mauvais type / illisible → Unknown (jamais Off à l'aveugle). Le classement est le
-        // PagefileInferencer pur, testé à part ; cette méthode n'est que la lecture de l'OS.
+        // Le REG_MULTI_SZ HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PagingFiles, classé par
+        // PagefileInferencer (testé à part) : vide = Off, une entrée = On ; absente, mauvais type, illisible = Unknown.
         try
         {
             using var k = Registry.LocalMachine.OpenSubKey(

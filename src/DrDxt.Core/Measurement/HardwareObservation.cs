@@ -23,20 +23,9 @@ public interface IHardwareProbe
 }
 
 /// <summary>
-/// Ce que le materiel a fait pendant la passe, sur la meme fenetre que les frames.
-///
-/// Un seul GPU busy, lu sur une capture prise avant l'experience, ne parlerait pas des fenetres
-/// que l'Autopilot utilise vraiment, et ne dirait rien de la puissance ni de la temperature,
-/// donc rien d'un eventuel plafond.
-///
-/// Ces agregats sont echantillonnes pendant chaque passe, comme le focus. La distinction n'est pas
-/// theorique : lire les watts une fois la passe finie mesure une carte qui a deja commence a
-/// redescendre.
-///
-/// Ce que ceci n'est pas : une cause. Une correlation entre un a-coup et une temperature haute
-/// reste une correlation. Le produit a le droit de dire « pendant les fenetres mesurees, le GPU
-/// etait a 97 % d'occupation et 68 °C » ; il n'a pas le droit d'en deduire « c'est la temperature
-/// qui te coute des FPS ».
+/// Ce que le materiel a fait pendant la passe, sur la meme fenetre que les frames : echantillonne pendant chaque passe,
+/// comme le focus (lus apres, les watts decrivent une carte qui redescend deja). Pas une cause : « pendant les fenetres
+/// mesurees, le GPU etait a 97 % d'occupation et 68 °C », jamais « c'est la temperature qui te coute des FPS ».
 /// </summary>
 /// <param name="Echantillons">Combien de lectures ont ete faites, y compris celles qui n'ont rien rendu. Zero = aucune
 /// lecture, et les agregats valent <c>null</c>.</param>
@@ -59,9 +48,8 @@ public sealed record HardwareObservation(
 {
     public static readonly HardwareObservation Vide = new(0, null, null);
 
-    /// <summary>Agrege des lectures brutes. Chaque grandeur est jugee separement : une carte peut
-    /// rendre sa temperature et pas ses watts (c'est le cas des Ada consumer sur l'appel
-    /// instantane), et perdre les deux parce que l'une manque serait absurde.</summary>
+    /// <summary>Agrege des lectures brutes, chaque grandeur a part : une carte peut rendre sa temperature et pas ses
+    /// watts (les Ada consumer sur l'appel instantane).</summary>
     public static HardwareObservation De(IReadOnlyList<HardwareReading> lectures)
     {
         if (lectures is null || lectures.Count == 0) return Vide;
@@ -73,9 +61,8 @@ public sealed record HardwareObservation(
         var mhz = lectures.Select(l => l.GpuClockMhz).OfType<double>()
             .Where(x => x > 0 && double.IsFinite(x)).OrderBy(x => x).ToList();
 
-        // L'union, pas l'intersection : un plafond qui n'a dure qu'un echantillon a quand meme
-        // eu lieu. Et si aucune lecture n'a abouti, on rend null, pas `Aucune`, qui affirmerait
-        // que rien ne bridait alors que personne n'a regarde.
+        // L'union : un plafond d'un seul echantillon a eu lieu. Aucune lecture aboutie ⇒ null, pas `Aucune` (« rien ne
+        // bridait » sans avoir regarde).
         var lues = lectures.Select(l => l.Raisons).OfType<ClocksEventReason>().ToList();
         ClocksEventReason? raisons = lues.Count == 0
             ? null

@@ -2,22 +2,11 @@ using System.Text.Json;
 
 namespace DrDxt.Core;
 
-// -----------------------------------------------------------------------
-// CompositeSnapshotCodec : enveloppe plusieurs PrivilegedOp inverses dans un seul snapshot.
-//
-// Un levier qui règle plusieurs choses à la fois (par exemple le plafond VRR : Vsync + plafond
-// d'images ; Service + CppcEnable + Game Bar) doit toutes les rendre au retour arrière. Chaque
-// élément est lui-même encodé par le PrivilegedOpCodec à la feuille près : le modèle de
-// sécurité ne change pas, ceci ne fait qu'encadrer une liste ordonnée de ces formes filaires
-// dans une seule chaîne de snapshot.
-//
-// Le décodage est total : un format malformé, qui n'est pas un tableau, ou un élément
-// indécodable rend un Result en échec ; jamais d'exception, jamais de type arbitraire lié.
-//
-// Vit dans Core pour que les leviers et le mode désinstallation du helper élevé lisent le
-// même format de snapshot composite : le helper référence Core, jamais
-// Application.
-// -----------------------------------------------------------------------
+// CompositeSnapshotCodec : plusieurs PrivilegedOp inverses dans un seul snapshot, pour un levier qui règle plusieurs
+// choses (le plafond VRR : Vsync + plafond d'images ; Service + CppcEnable + Game Bar). Chaque élément reste encodé par
+// PrivilegedOpCodec à la feuille près : une liste ordonnée de formes filaires, même modèle de sécurité. Décodage total :
+// malformé, pas un tableau ou élément indécodable → Result en échec, jamais d'exception ni de type arbitraire. Dans
+// Core, pour que le mode désinstallation du helper (qui référence Core, jamais Application) lise le même format.
 public static class CompositeSnapshotCodec
 {
     private const string OpsProperty = "ops";

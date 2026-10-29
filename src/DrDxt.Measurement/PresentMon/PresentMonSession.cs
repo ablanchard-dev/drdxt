@@ -7,10 +7,8 @@ namespace DrDxt.Measurement.PresentMon;
 /// pmOpenSession → pmStartTrackingProcess → pmRegisterFrameQuery → pmConsumeFrames (parse blob)
 /// → pmFreeFrameQuery → pmStopTrackingProcess → pmCloseSession.
 ///
-/// Contrat d'honnêteté / de mode dégradé, essentiel : ne lève jamais vers l'appelant. Chaque
-/// <see cref="PM_STATUS"/> non réussi et chaque exception P/Invoke devient un échec
-/// <see cref="Result"/>, pour que le scanner puisse se rabattre sur le mode détection seule.
-/// Le nettoyage natif tourne toujours dans un finally, chaque étape dans son propre try/catch.
+/// Ne lève jamais : chaque <see cref="PM_STATUS"/> non réussi et chaque exception P/Invoke devient un échec
+/// <see cref="Result"/> (le scanner passe en détection seule). Nettoyage natif dans un finally, chaque étape isolée.
 /// </summary>
 public sealed class PresentMonSession : IPresentMonSession
 {
@@ -187,18 +185,15 @@ public sealed class PresentMonSession : IPresentMonSession
             var latenceAffichage = new List<double>();
             var latencePc = new List<double>();
 
-            // La durée se compte à partir de la première image, pas du pmStartTrackingProcess.
-            // Mesure du 06/10/2026 (scène D3D11, service Intel 2.5.1, `tools/scene`) : le service
-            // n'active ses fournisseurs ETW (DXGI, D3D9, DxgKrnl) qu'au début du suivi, et la
-            // première image arrive 1 à 2 s plus tard. Capture d'1 s : « aucune image » ; de 3 s :
-            // une seule seconde couverte. L'attente est bornée : un processus qui ne présente rien
-            // reste « aucune image », avec AttentePremiereImage de plus.
+            // La durée part de la première image, pas de pmStartTrackingProcess. Mesure du 06/10/2026 (scène D3D11, service
+            // Intel 2.5.1, `tools/scene`) : les fournisseurs ETW (DXGI, D3D9, DxgKrnl) ne s'activent qu'au suivi, première
+            // image 1 à 2 s plus tard (capture d'1 s : aucune image ; de 3 s : une seconde couverte). Attente bornée : un
+            // processus qui ne présente rien reste « aucune image », AttentePremiereImage de plus.
             _clock.Restart();
             var enAttente = true;
-            // Quand chaque image porte son instant, la durée se mesure sur ces instants, pas sur l'horloge
-            // de DrDXT : le service livre les images avec 1 à 2 s de retard (mesuré : 844 images au lieu de ~1 200 pour 6 s
-            // à 200 FPS avec un 2e client). La capture s'arrête à la première image hors fenêtre ; l'horloge ne reste qu'un
-            // filet, avec une marge de livraison.
+            // La durée se mesure sur les instants des images, pas sur l'horloge de DrDXT : le service livre avec 1 à 2 s de
+            // retard (mesuré : 844 images au lieu de ~1 200 pour 6 s à 200 FPS avec un 2e client). Arrêt à la première image
+            // hors fenêtre ; l'horloge reste un filet, avec une marge de livraison.
             long? finQpc = null;
             // Si l'horloge des images n'est pas celle de DrDXT, tout serait écarté en silence ; le compte
             // et le premier instant lu vont dans le message d'échec.
@@ -235,9 +230,8 @@ public sealed class PresentMonSession : IPresentMonSession
                     latencies.Add(BitConverter.ToDouble(buffer, frameBase + latencyOffset));
                     // GPU busy (ms de travail du GPU sur l'image) : GpuBusy/FrameTime ⇒ limité par le GPU ou par le CPU.
                     gpuBusy.Add(BitConverter.ToDouble(buffer, frameBase + gpuBusyOffset));
-                    // Les quatre grandeurs du classifieur. Meme lecture
-                    // brute, meme blob, meme frame : les series restent paralleles, ce dont
-                    // depend tout ratio par frame calcule en aval.
+                    // Les quatre grandeurs du classifieur, meme blob, meme frame : les series restent paralleles pour les
+                    // ratios par frame en aval.
                     gpuWait.Add(BitConverter.ToDouble(buffer, frameBase + gpuWaitOffset));
                     cpuBusy.Add(BitConverter.ToDouble(buffer, frameBase + cpuBusyOffset));
                     presentApi.Add(BitConverter.ToDouble(buffer, frameBase + presentApiOffset));

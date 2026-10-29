@@ -4,12 +4,10 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// X3dCcdParkingFixTweak.
-//
-// Répare un mauvais parcage des blocs (CCD) sur un processeur AMD X3D à deux blocs (7950X3D, etc.), pour
-// que le jeu tourne sur le bloc à V-Cache. La seule mesure publique trouvée donne environ 6 % en moyenne en
-// 1080p (Hardware Busters, 02/04/2023 : sans parcage, 94,12 % de la machine bien réglée). L'écart réel est
-// mesuré par le produit, et seulement par la voie logicielle prise en charge :
+// X3dCcdParkingFixTweak : répare un mauvais parcage des CCD sur un AMD X3D à deux blocs (7950X3D, etc.), pour que le jeu
+// tourne sur le bloc à V-Cache. Seule mesure publique trouvée : ~6 % en moyenne en 1080p
+// (source : Hardware Busters, publiée le 02/04/2023 : sans parcage, 94,12 % de la machine bien réglée). L'écart réel
+// est mesuré par le produit, par la seule voie logicielle prise en charge :
 //   (1) démarrer le service AMD 3D V-Cache Performance Optimizer (AMD3DVCacheSvc) ;
 //   (2) activer le mode Jeu de Windows (l'optimiseur se règle sur la Game Bar) : AllowAutoGameMode et
 //       AutoGameModeEnabled, la bascule des Paramètres récents, comme latency.gameModeOn.
@@ -18,14 +16,9 @@ namespace DrDxt.Application.Tweaks.FixIt;
 // ancien qui la porte. Aucun bricolage du noyau, aucune écriture du BIOS : l'option CPPC du BIOS est
 // guidée par le guide BIOS, jamais scriptée ici.
 //
-// L'état d'origine du service et des deux valeurs du mode Jeu est relu, rangé dans un snapshot composite inverse ;
-// l'annulation rend le tout. Chaque frontière externe est protégée : échec propre, jamais d'exception.
-//
-// Le SummaryKey décrit la réparation, jamais « +FPS ». Le gain se prouve par la nouvelle mesure du
-// moteur ; sans gain mesuré, aucun gain n'est affiché.
-//
-// Risque de faux positif : l'heuristique est prudente (X3dParkingHeuristic), et la voie est prise en
-// charge et entièrement annulée : un faux positif ne coûte rien de mesurable.
+// Les origines (service, deux valeurs du mode Jeu) vont dans un snapshot composite inverse ; jamais d'exception. Le
+// SummaryKey décrit la réparation, jamais « +FPS » : sans gain mesuré, aucun gain affiché. Heuristique prudente
+// (X3dParkingHeuristic), voie entièrement annulable : un faux positif ne coûte rien de mesurable.
 // -----------------------------------------------------------------------
 /// <summary>Démarre l'optimiseur 3D V-Cache d'AMD et le mode Jeu automatique pour que le jeu tourne sur le bloc à cache.
 /// Proposé sur un Ryzen X3D à deux blocs dont le parcage semble faux.</summary>
@@ -54,9 +47,8 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
     public override string SummaryKey => "tweak.fixit.x3d_ccd.repair_routing";
 
     public override bool AppliesTo(HardwareInventory hw, SettingsState state) =>
-        // X3D à deux CCD (les 7800X3D/9800X3D à un CCD, Intel et les non-X3D sont écartés par
-        // l'heuristique) dont le parcage semble faux, et dont le service AMD existe : sans le pilote de chipset, la pose
-        // démarrerait un service absent et défairait tout le lot ; le corriger demande le pilote, pas ce levier.
+        // X3D à deux CCD au parcage qui semble faux (l'heuristique écarte 7800X3D/9800X3D, Intel, non-X3D), service AMD
+        // présent : sans le pilote de chipset, la pose démarrerait un service absent et défairait tout le lot.
         X3dParkingHeuristic.LooksMisparked(hw.Cpu, state) && !ServiceAbsent();
 
     private bool ServiceAbsent() => _service.GetServiceState(ServiceName) is { IsOk: true, Value: ServiceState.NotInstalled };
@@ -92,8 +84,7 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
                 BuildRegistryInverse(RegistryHiveKind.CurrentUser, GameBarPath, GameBarName, gameBar.Value),
                 BuildRegistryInverse(RegistryHiveKind.CurrentUser, GameBarPath, GameBarEnabledName, gameBarEnabled.Value),
             };
-            // N'ajouter l'inverse du service que s'il ne tournait pas déjà : on ne doit pas
-            // arrêter un service que l'utilisateur avait déjà allumé.
+            // L'inverse du service seulement s'il ne tournait pas : jamais arrêter un service allumé par l'utilisateur.
             if (serviceState.Value == ServiceState.Stopped)
                 inverseOps.Add(new RunServiceControlOp(ServiceName, ServiceAction.Stop));
 
@@ -102,18 +93,14 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "Could not serialize the revert ops.");
 
-            // (Pose, voie prise en charge seulement) démarrage du service + Game Bar.
-            // Chaque op est appariée à l'inverse qui ramène le système à l'état d'entrée du
-            // levier. Si une op échoue en cours de route, on rejoue les inverses des ops déjà
-            // posées (LIFO) pour que rien ne reste à moitié posé, puis on rend le Fail d'origine.
+            // (Pose) service + Game Bar, chaque op appariée à son inverse : un échec en route rejoue les inverses déjà posés
+            // (LIFO), puis rend le Fail d'origine.
             var enableValue = Enable.ToString(System.Globalization.CultureInfo.InvariantCulture);
             var steps = new (PrivilegedOp Forward, PrivilegedOp? Inverse)[]
             {
                 (
                     new RunServiceControlOp(ServiceName, ServiceAction.Start),
-                    // N'annuler le démarrage que si le service était Stopped à l'entrée ; s'il tournait
-                    // déjà, rien à annuler (ne jamais arrêter un service que l'utilisateur avait allumé)
-                    // → inverse null, sauté au rollback.
+                    // Inverse seulement si le service était Stopped ; sinon null, sauté au rollback.
                     serviceState.Value == ServiceState.Stopped
                         ? new RunServiceControlOp(ServiceName, ServiceAction.Stop)
                         : null
@@ -142,8 +129,7 @@ public sealed class X3dCcdParkingFixTweak : FixItTweakBase
                 appliedInverses.Add(inverse);
             }
 
-            // Les valeurs posees (service, mode Jeu), pour que la desinstallation ne
-            // rende une feuille que si elle porte encore ce que DrDXT y a mis.
+            // Les valeurs posees : la desinstallation ne rend une feuille que si elle porte encore celle de DrDXT.
             var posees = CompositeSnapshotCodec.Encode(steps.Select(s => s.Forward).ToList());
             return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, snapshotJson.Value, posees.IsOk ? posees.Value : null));
         }

@@ -3,27 +3,17 @@ using DrDxt.Core;
 
 namespace DrDxt.Reconciler;
 
-// -----------------------------------------------------------------------
-// DefaultReapplyOpMapper : l'IReapplyOpMapper de production, et la frontière de sécurité du
-// réconciliateur (I3, la leçon WinRing0).
-//
-// Il traduit un tweakId réconciliable + sa valeur voulue sérialisée en exactement une des
-// feuilles PrivilegedOp scellées existantes, aux champs bornés, ou il échoue avant de produire
-// la moindre op. Il ne construit jamais de primitive privilégiée libre ou générique.
-//
-// Source unique. La cible de l'op (ruche/chemin/nom/type, serviceName, surface) est lue
-// entièrement dans le même IReconcilableTweakCatalog que la sonde de lecture : lecture et
-// écriture partagent une seule table d'emplacements. Le desiredValueJson fourni par l'appelant
-// n'influe que sur le champ de valeur borné, jamais sur la cible : une valeur hostile ne peut pas
-// diriger une écriture admin vers une autre clé. La valeur est aussi resérialisée par
-// ReconcilableValueCanonicalizer pour que l'op porte la forme identique à l'octet près que la
-// sonde relit pour confirmer.
-//
+// DefaultReapplyOpMapper : l'IReapplyOpMapper de production, frontière de sécurité du réconciliateur (I3, la leçon
+// WinRing0). Un tweakId réconciliable et sa valeur voulue deviennent exactement une feuille PrivilegedOp scellée, aux
+// champs bornés, ou un échec avant toute op ; jamais de primitive privilégiée libre ou générique.
+// La cible (ruche/chemin/nom/type, serviceName, surface) vient du même IReconcilableTweakCatalog que la sonde de
+// lecture ; desiredValueJson n'influe que sur le champ de valeur borné, jamais sur la cible (une valeur hostile ne
+// dirige pas une écriture admin vers une autre clé). La valeur est resérialisée par ReconcilableValueCanonicalizer :
+// l'op porte la forme, à l'octet près, que la sonde relit.
 // Fermé par construction : un tweakId inconnu (sans descripteur), une valeur illisible ou hors
 // type, ou une surface sans feuille d'op en V1 (ScheduledTask / Firmware) → Fail, aucune op.
 // Seuls les ids branchés se traduisent (la table de ce fichier) : latency.reflex.lowLatencyMode et os.hags (registre
 // DWORD), fixit.sanePowerPlan (PowerPlan), fixit.x3dVCacheService (Service).
-// -----------------------------------------------------------------------
 public sealed class DefaultReapplyOpMapper : IReapplyOpMapper
 {
     private readonly IReconcilableTweakCatalog _catalog;
@@ -117,10 +107,8 @@ public sealed class DefaultReapplyOpMapper : IReapplyOpMapper
                 ReconcilerErrorCodes.TweakNotAllowlisted,
                 $"value '{desiredValueJson}' is not a valid power-plan GUID for tweak '{tweakId}'");
 
-    // Service → RunServiceControlOp sur le nom de service du descripteur. Seuls les jetons
-    // run/stop donnent une action ; « notinstalled » / « unknown » / tout le reste → Fail. Le
-    // réconciliateur n'installe ni ne désinstalle jamais un service pour réparer une dérive :
-    // ServiceAction.Install n'est jamais émis ici (l'installation relève de l'apply).
+    // Service → RunServiceControlOp sur le nom de service du descripteur ; seuls run/stop donnent une action, le reste →
+    // Fail. Jamais d'installation ni de désinstallation pour une dérive : ServiceAction.Install relève de l'apply.
     private static Result<PrivilegedOp> MapService(
         string tweakId, ReconcilableDescriptor descriptor, string desiredValueJson)
     {

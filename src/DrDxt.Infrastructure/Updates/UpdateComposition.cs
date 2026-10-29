@@ -4,31 +4,20 @@ using DrDxt.Core;
 namespace DrDxt.Infrastructure.Updates;
 
 // -----------------------------------------------------------------------
-// Le montage du moteur de mise a jour.
-//
-// Ici s'assemblent `AutoUpdater`, `HttpUpdateFeed`, `UpdateVerifier` et
-// `LocalFileSystemUpdateStore`. Un moteur qu'aucun code ne construit ne tourne pour personne, et
-// rien dans une suite de tests verte ne le dit.
-//
-// ══ l'absence d'url est un etat, pas une panne ══
-// Sans URL de mises a jour (ni configuree, ni par defaut dans l'App), il n'y a rien a interroger.
-// Le montage doit donc pouvoir refuser de se faire, proprement et une seule fois, plutot que de
-// produire un updater qui echouera a chaque tour en accusant le reseau. La difference n'est pas
-// cosmetique : « pas configure » se corrige en configurant, « hors ligne » envoie chercher une
-// panne qui n'existe pas.
+// Le montage du moteur de mise a jour : `AutoUpdater`, `HttpUpdateFeed`, `UpdateVerifier`, `LocalFileSystemUpdateStore`.
+// Sans URL (ni configuree, ni par defaut), le montage refuse une fois, proprement : « pas configure » se corrige en
+// configurant, un faux « hors ligne » a chaque tour enverrait chercher une panne qui n'existe pas.
 // -----------------------------------------------------------------------
 public static class UpdateComposition
 {
-    /// <summary>Le chemin du manifeste pour un canal : la meme chaine que la route du serveur
-    /// (`/updates/{canal}/manifest`, canal en minuscules). Expose plutot que recopie : un chemin
-    /// ecrit deux fois est un chemin qui divergera, et la divergence se presenterait au client
-    /// comme un 404, c'est-a-dire comme « rien de publie » : un silence, pas une erreur.</summary>
+    /// <summary>Le chemin du manifeste pour un canal, la route du serveur (`/updates/{canal}/manifest`, canal en
+    /// minuscules), ecrite une seule fois : une copie divergente serait un 404 lu « rien de publie ».</summary>
     public static string ManifestPath(UpdateChannel channel)
         => "/updates/" + channel.ToString().ToLowerInvariant() + "/manifest";
 
-    /// <summary>La racine garde son chemin. <c>new Uri(racine, "/updates/…")</c> le remplaçait :
-    /// https://ablanchard-dev.github.io/drdxt deviendrait https://ablanchard-dev.github.io/updates/…, un 404 lu comme
-    /// « rien de publié », et aucune copie installée ne recevrait de mise à jour.</summary>
+    /// <summary>La racine garde son chemin : <c>new Uri(racine, "/updates/…")</c> ferait de
+    /// https://ablanchard-dev.github.io/drdxt un https://ablanchard-dev.github.io/updates/…, un 404 lu « rien de
+    /// publié ».</summary>
     public static string UrlDuManifeste(Uri racine, UpdateChannel channel)
         => racine.GetLeftPart(UriPartial.Path).TrimEnd('/') + ManifestPath(channel);
 
@@ -61,10 +50,8 @@ public static class UpdateComposition
         if (!Uri.TryCreate(manifestBaseUrl.Trim(), UriKind.Absolute, out var baseUri)
             || !string.Equals(baseUri.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal))
         {
-            // HTTPS exige. La signature protege deja le contenu du manifeste, mais en clair, un
-            // intermediaire voit qui met a jour quoi et quand, et peut retenir indefiniment une
-            // mise a jour de securite en repondant 204. Un refus de servir est invisible pour une
-            // signature.
+            // HTTPS exige : en clair, un intermediaire voit qui met a jour quoi, et peut retenir une mise a jour de securite
+            // en repondant 204, invisible pour la signature.
             return Result<AutoUpdater>.Fail(
                 UpdateErrorCodes.NotConfigured,
                 "The update server url must be an absolute https url; refusing to fetch in clear.");
@@ -76,8 +63,7 @@ public static class UpdateComposition
             : UpdateTrust.CreateProductionVerifier();
         if (!porte.IsOk)
         {
-            // Pas de clef de production (ou clef de dev) : on ne monte rien. Sans verificateur de
-            // confiance, un moteur de mise a jour est pire qu'aucun moteur.
+            // Pas de clef de production (ou clef de dev) : rien n'est monte.
             return Result<AutoUpdater>.Fail(porte.Error!.Value.Code, porte.Error.Value.Message);
         }
 

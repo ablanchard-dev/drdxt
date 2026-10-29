@@ -4,24 +4,17 @@ using System.Security.Principal;
 
 namespace DrDxt.Core;
 
-// -----------------------------------------------------------------------
-// CheminProtege : un exécutable que le helper fait tourner en SYSTEM doit être hors d'atteinte du compte.
-//
-// PresentMonService tournait en
-// LocalSystem depuis `C:\Users\<compte>\DrDXT\tools\...\PresentMonService.exe`, où `icacls` donnait au
-// compte le contrôle total. Tout processus du compte, sans droits admin, pouvait remplacer le binaire ;
-// au démarrage suivant du service (le helper le lance lui-même pour mesurer), ce code tournait en SYSTEM.
-//
+// CheminProtege : un exécutable que le helper fait tourner en SYSTEM doit être hors d'atteinte du compte. Exemple vu :
+// PresentMonService en LocalSystem depuis `C:\Users\<compte>\DrDXT\tools\...\PresentMonService.exe`, où `icacls` donnait
+// au compte le contrôle total : tout processus sans droits remplaçait le binaire, qui tournait ensuite en SYSTEM.
 // Règle : le fichier et son dossier n'accordent de droit d'écriture qu'à SYSTEM, Administrateurs ou
 // TrustedInstaller, et leur propriétaire est l'un d'eux (un propriétaire garde le droit implicite de
 // réécrire la DACL). Pour le dossier, créer un fichier compte comme écrire : une DLL posée à côté serait
 // chargée par le service. Les règles « héritage seulement » (CREATOR OWNER de Program Files) ne visent
 // que les enfants à venir et ne comptent pas. L'installation par défaut (Program Files) passe.
-//
 // Chaque dossier au-dessus compte aussi : là où le compte peut supprimer un enfant (son profil), il renomme le dossier
 // protégé et en pose un autre au même chemin. Pour un ancêtre, seuls comptent supprimer, renommer et réécrire la DACL ;
 // créer un dossier neuf, que C:\ accorde aux utilisateurs, ne remplace rien.
-// -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class CheminProtege
 {

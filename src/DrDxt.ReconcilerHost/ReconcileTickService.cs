@@ -3,23 +3,11 @@ using DrDxt.Reconciler.Manifest;
 
 namespace DrDxt.ReconcilerHost;
 
-// -----------------------------------------------------------------------
-// ReconcileTickService : une passe de réconciliation, en échec propre sur un mauvais manifeste.
-//
-// Un « tour » : charger le manifeste d'état voulu signé, une seule fois, puis réconcilier. Le
-// LoadAsync du store vérifie la signature avant de rendre la main : une
-// altération, une erreur de schéma ou d'E/S remonte donc ici en Fail. La règle critique de
-// sécurité (I4) : un chargement raté n'atteint jamais le réconciliateur ; on n'entre pas dans une
-// boucle d'écriture sur un manifeste auquel on ne peut pas se fier. On journalise à la place un
-// diagnostic de sécurité et on rend le Fail tel quel.
-//
-// Aucune licence : le manifeste s'applique tel quel après vérification de sa signature. Aucun manifeste
-// → état vide (rien d'armé). Un refus ne défait pas automatiquement les leviers déjà appliqués.
-//
-// Tout le travail privilégié vit dans l'IReconciler injecté ; cette classe ne fait que séquencer
-// chargement → réconciliation et imposer l'échec propre : elle se teste entièrement avec un store
-// simulé (Ok / Fail) et un réconciliateur de substitution.
-// -----------------------------------------------------------------------
+// ReconcileTickService : un tour charge une fois le manifeste signé (LoadAsync vérifie la signature d'abord : altération,
+// schéma ou E/S remontent en Fail), puis réconcilie. Règle de sécurité (I4) : un chargement raté n'atteint jamais le
+// réconciliateur, pas de boucle d'écriture sur un manifeste non fiable ; un diagnostic de sécurité, et le Fail rendu tel
+// quel. Aucune licence ; aucun manifeste → état vide, rien d'armé ; un refus ne défait pas les leviers déjà appliqués.
+// Le travail privilégié vit dans l'IReconciler injecté : testée avec un store simulé (Ok / Fail) et un substitut.
 public sealed class ReconcileTickService
 {
     private readonly IDesiredStateStore _store;

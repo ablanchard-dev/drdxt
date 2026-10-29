@@ -5,28 +5,18 @@ using DrDxt.ElevatedHelper.Leases;
 
 namespace DrDxt.ElevatedHelper;
 
-// -----------------------------------------------------------------------
-// HandshakeAcceptingServer : le cycle de vie par connexion de l'hôte élevé, avec le handshake
-// de clé de session placé devant le protocole typé éprouvé.
-//
-// Par connexion acceptée (refus par défaut, échec propre partout) :
+// HandshakeAcceptingServer : le cycle de vie par connexion de l'hôte élevé, le handshake de clé de session devant le
+// protocole typé. Par connexion (refus par défaut, échec propre partout) :
 //   1. créer le pipe FIRST_PIPE_INSTANCE protégé par ACL (PipeSecurityFactory) et accepter.
 //   2. résoudre le PID du pair depuis le pipe (GetNamedPipeClientProcessId) → CallerInfo.
 //   3. lancer HandshakeServerCore : authentifier l'appelant, puis frapper et envoyer une clé
 //      éphémère propre à la connexion. Un pair refusé, déchet ou tronqué n'a aucune clé et la
 //      connexion est coupée : l'exécuteur n'est jamais atteint.
-//   4. avec la clé négociée, servir une requête typée via le
-//      TypedPrivilegedServer.ProcessTypedRequestAsync existant : protocole de messages, HMAC,
-//      anti-rejeu par nonce, codec, allowlist à la feuille près et exécuteur restent tous
-//      inchangés. Seule la provenance de la clé change (négociée, pas partagée d'avance par
-//      variable d'environnement).
-//
-// La clé de session est éphémère et propre à la connexion (en mémoire seulement, jamais
-// persistée). Le chien de garde des baux (s'il existe) est partagé entre connexions (il vit
-// dans le helper) : il est donc injecté et réutilisé ; tout le reste est reconstruit par
-// connexion avec la clé neuve. La même auth de l'appelant repasse dans le serveur typé
-// (défense en profondeur + liaison du bail à son propriétaire).
-// -----------------------------------------------------------------------
+//   4. avec la clé négociée, servir une requête typée par TypedPrivilegedServer.ProcessTypedRequestAsync (messages,
+//      HMAC, anti-rejeu par nonce, codec, allowlist à la feuille près, exécuteur).
+// Clé éphémère, propre à la connexion, en mémoire seulement. Le chien de garde des baux vit dans le helper : injecté et
+// partagé ; le reste est reconstruit par connexion. La même auth repasse dans le serveur typé (défense en profondeur,
+// bail lié à son propriétaire).
 [SupportedOSPlatform("windows")]
 public sealed class HandshakeAcceptingServer
 {
@@ -106,8 +96,7 @@ public sealed class HandshakeAcceptingServer
             return; // toute panne de handshake → couper la connexion, fail-closed
         }
 
-        // 4. Servir une requête typée avec la clé négociée sur la même
-        //    connexion, par le pipeline éprouvé (inchangé).
+        // 4. Servir une requête typée avec la clé négociée, sur la même connexion.
         var typed = new TypedPrivilegedServer(
             sessionKey, _authenticator, _allowlist, _executor, _pipeName, _leaseWatchdog);
 

@@ -1,24 +1,16 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// Ce que chaque levier du produit declare de lui-meme, en un seul endroit.
-///
-/// Cette table vivait dans `tools/candidatprobe`, ecrite a la main, et nulle part dans le produit :
-/// l'App ne pouvait donc pas juger un levier comme l'outil le jugeait. Elle est remontee ici, et
-/// l'outil comme l'App la lisent : deux appelants, un seul jugement.
-///
-/// `EffetAttenduPct` reste <c>null</c> pour tous : aucun effet n'est source a ce jour, et un chiffre
-/// devine ferait refuser ou accepter un essai sur une estimation. <c>null</c> = le moteur se comporte
-/// comme avant (voir <see cref="Decidabilite"/>).
-///
+/// Ce que chaque levier du produit declare de lui-meme, en un seul endroit, lu par l'outil (`tools/candidatprobe`) comme
+/// par l'App : un seul jugement. `EffetAttenduPct` reste <c>null</c> pour tous, faute d'effet source (un chiffre devine
+/// ferait refuser ou accepter un essai sur une estimation) ; voir <see cref="Decidabilite"/>.
 /// - `latency.reflex` : NVIDIA, annonce du pilote 436.02 (nvidia.com/en-us/geforce/news/gamescom-2019-game-ready-driver) :
 ///   « support for all GPUs in DX9 and DX11 games (in DX12 and Vulkan titles, the game decides when to
 ///   queue the frame) » et « reduces latency by up to 33% ». « Jusqu'a » est un maximum, pas un effet
 ///   attendu ; et sur DX12 (Warzone) l'effet est nul par construction. Le guide latence NVIDIA le range
 ///   en repli « si NVIDIA Reflex n'est pas disponible dans votre jeu ». Aucun chiffre ne vaut pour tous les jeux.
-/// - `fixit.power_plan` : aucune mesure publiee trouvee (jeux, processeur, passes), des avis de forum
-///   seulement. Un resume de recherche a meme attribue « 0-2 FPS » a une page qui ne le contient pas.
-///
+/// - `fixit.power_plan` : aucune mesure publiee trouvee (jeux, processeur, passes), des avis de forum seulement (un
+///   resume de recherche attribuait « 0-2 FPS » a une page qui ne le contient pas).
 /// La nature (<see cref="CandidateKind"/>) doit egaler ce que le levier dit de lui-meme
 /// (`TakesEffectAfterReboot`) : un test de l'App le verifie sur tous les leviers enregistres.
 /// </summary>
@@ -29,10 +21,9 @@ public static class CatalogueDeCandidats
     private static readonly string[] PuissanceGpu = { CandidateSelector.GrandeurPuissanceGpu };
 
     private static readonly IReadOnlyDictionary<string, CandidateDescriptor> Table =
-        // La surface vient des operations privilegiees que le levier ecrit (lues dans
-        // chaque `ApplyAsync`), jamais de sa famille. Une surface OS utilisateur est prouvee par
-        // `SurfaceDesLeviersTests` (App) : le levier est execute et chacune de ses ecritures doit
-        // viser HKCU. Une surface fermee n'a pas besoin de preuve : au pire elle refuse de trop.
+        // La surface vient des operations privilegiees que le levier ecrit (lues dans chaque `ApplyAsync`), jamais de sa
+        // famille. Une surface OS utilisateur est prouvee par `SurfaceDesLeviersTests` (App : chaque ecriture vise HKCU) ;
+        // une surface fermee n'a pas besoin de preuve, au pire elle refuse de trop.
         new CandidateDescriptor[]
         {
             // GPU : ecrivent sur la carte, risque 3, stabilite a verifier.
@@ -89,8 +80,8 @@ public static class CatalogueDeCandidats
             new("fixit.x3d_ccd", CandidateKind.AutoHot, 1, false, new[] { "cpu.sched" }, Family: CandidateFamily.Scheduler,
                 Surface: SurfaceTouchee.Processeur),
             // `SetProcessorBoostModeOp`, le boost coupé rendu au défaut du plan. Il change la fréquence,
-            // donc les images : mesuré en jeu. Microsoft se contredit sur son effet sous HWP (learn.microsoft.com, « Options for perf state engine PerfBoostMode » et « Power and performance tuning ») :
-            // aucun effet attendu chiffré, l'A/B tranche.
+            // donc les images : mesuré en jeu. Microsoft se contredit sur son effet sous HWP (learn.microsoft.com, « Options
+            // for perf state engine PerfBoostMode » et « Power and performance tuning ») : aucun effet chiffré, l'A/B tranche.
             new("fixit.mode_boost", CandidateKind.AutoHot, 1, false, new[] { "cpu.power" }, Family: CandidateFamily.Cpu,
                 Surface: SurfaceTouchee.Processeur),
 

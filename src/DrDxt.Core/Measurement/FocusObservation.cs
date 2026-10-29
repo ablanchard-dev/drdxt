@@ -1,33 +1,22 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// Qui est au premier plan, maintenant. Une lecture, pas une deduction.
-///
-/// C'est la couture qui permet de tester toute la logique de focus sans fenetre, et de brancher
-/// le vrai `GetForegroundWindow` en production.
+/// Qui est au premier plan, maintenant : une lecture, pas une deduction. La couture qui teste le focus sans fenetre et
+/// branche le vrai `GetForegroundWindow` en production.
 /// </summary>
 public interface IForegroundProbe
 {
     /// <summary>Le PID du processus dont la fenetre est au premier plan, ou <c>null</c> si la
-    /// question n'a pas de reponse fiable (bureau verrouille, transition, lecture refusee).
-    ///
-    /// <c>null</c> n'est pas « le jeu a perdu le focus » : c'est « je ne sais pas ». Les deux se
-    /// traitent differemment, et les confondre ferait invalider des passes parfaitement bonnes.</summary>
+    /// question n'a pas de reponse fiable (bureau verrouille, transition, lecture refusee) : « je ne sais pas », pas « le
+    /// jeu a perdu le focus », qui invaliderait des passes bonnes.</summary>
     int? ForegroundProcessId();
 }
 
 /// <summary>
-/// Ce que le focus a reellement fait pendant une passe : observe, pas infere.
-///
-/// Jusqu'ici, DrDXT devinait l'alt-tab a partir de la regularite des frametimes : une seconde
-/// lente et reguliere ressemble a un plafond hors focus. C'est une inference, et elle se trompe
-/// dans les deux sens : un jeu qui rame regulierement passe pour un alt-tab, un alt-tab irregulier
-/// passe pour du jeu.
-///
-/// Ici on regarde. La difference tient en une phrase : **une zone hors focus n'est jamais une
-/// performance du PC, et un ralentissement avec le jeu au premier plan est toujours une vraie
-/// donnee.** Le produit mesure l'experience vecue ; il ne nettoie pas les mauvaises performances
-/// du joueur.
+/// Ce que le focus a reellement fait pendant une passe : observe, pas infere de la regularite des frametimes (un jeu qui
+/// rame regulierement passerait pour un alt-tab, un alt-tab irregulier pour du jeu). **Une zone hors focus n'est jamais
+/// une performance du PC, un ralentissement au premier plan toujours une vraie donnee** : on ne nettoie pas les
+/// mauvaises performances du joueur.
 /// </summary>
 /// <param name="Echantillons">Nombre de lectures effectuees.</param>
 /// <param name="AuPremierPlan">Lectures ou le processus cible etait au premier plan.</param>
@@ -49,11 +38,8 @@ public sealed record FocusObservation(int Echantillons, int AuPremierPlan, int I
         }
     }
 
-    /// <summary>Part minimale de temps au premier plan pour qu'une passe reste comparable.
-    ///
-    /// **Non chiffré.** 90 % laisse passer une notification ou un changement de fenetre d'une
-    /// seconde sur une passe d'une minute, et arrete un alt-tab qui dure. Ecrit ici pour etre
-    /// discute, pas dilue dans une condition.</summary>
+    /// <summary>Part minimale de temps au premier plan pour qu'une passe reste comparable. **Non chiffré** : 90 % laisse
+    /// passer une notification d'une seconde sur une minute, et arrete un alt-tab qui dure.</summary>
     public const double FractionMinimale = 0.90;
 
     /// <summary>La passe a-t-elle ete jouee, ou le joueur etait-il ailleurs ?

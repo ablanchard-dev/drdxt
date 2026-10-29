@@ -4,11 +4,9 @@ using DrDxt.Core;
 namespace DrDxt.Measurement.Memory;
 
 /// <summary>
-/// La mesure de reference d'une machine : ce a quoi un apres se comparera.
-/// <paramref name="ConfiguredMts"/> voyage avec elle parce qu'un A/B dont la frequence a change
-/// ne compare pas deux fois la meme configuration, et c'est justement le changement qu'on teste.
-/// <paramref name="JeuFermeVerifie"/> : vrai pour une mesure prise par une version qui refuse de
-/// mesurer jeu lancé ; faux ou absent pour une référence d'avant ce garde.
+/// La mesure de reference d'une machine, a laquelle un apres se compare. <paramref name="ConfiguredMts"/> voyage avec
+/// elle : une frequence changee n'est plus la meme configuration. <paramref name="JeuFermeVerifie"/> : vrai pour une
+/// version qui refuse de mesurer jeu lancé ; faux ou absent avant ce garde.
 /// </summary>
 public sealed record MemoryBaseline(
     string MachineId,
@@ -20,8 +18,7 @@ public sealed record MemoryBaseline(
     // nombre de canaux que le débit prouve. Absente d'une référence plus ancienne : sa configuration est inconnue.
     string? Barrettes = null);
 
-/// <summary>Le fichier sous le magasin. Meme couture que le marqueur BIOS : les tests
-/// injectent un faux et n'ecrivent jamais sur le disque.</summary>
+/// <summary>Le fichier sous le magasin, couture comme le marqueur BIOS : les tests n'ecrivent pas sur le disque.</summary>
 public interface IMemoryBaselineFile
 {
     Result WriteAtomic(string json);
@@ -29,15 +26,9 @@ public interface IMemoryBaselineFile
 }
 
 /// <summary>
-/// Le magasin de la mesure de reference.
-///
-/// Il porte une garantie qui n'est pas cosmetique : une reference prise sur une autre machine est
-/// ignoree comme si elle n'existait pas. Un disque voyage (image systeme, restauration, second
-/// PC), et comparer la memoire d'une machine a la reference d'une autre rendrait un delta invente
-/// de toutes pieces, avec l'air d'un resultat.
-///
-/// Lecture en echec propre : fichier absent = <c>Ok(null)</c> (rien de mesure encore), contenu illisible
-/// = echec nomme. Il ne leve jamais.
+/// Le magasin de la mesure de reference. Une reference d'une autre machine est ignoree : un disque voyage (image,
+/// restauration, second PC), et la comparer inventerait un delta. Absent = <c>Ok(null)</c>, illisible = echec nomme ;
+/// ne leve jamais.
 /// </summary>
 public sealed class MemoryBaselineStore
 {
@@ -50,8 +41,7 @@ public sealed class MemoryBaselineStore
 
     public Result Save(MemoryBaseline baseline)
     {
-        // Defensif, comme le magasin BIOS : on n'ecrit jamais une reference qui se relirait
-        // comme corrompue.
+        // Comme le magasin BIOS : jamais une reference qui se relirait corrompue.
         var invalide = Invalide(baseline);
         if (invalide is not null)
             return Result.Fail(ErrorCodes.MemoryBaselineCorrupt, invalide);
@@ -67,8 +57,7 @@ public sealed class MemoryBaselineStore
     }
 
     /// <summary>
-    /// La reference de cette machine, ou <c>null</c> quand il n'y en a pas, y compris quand le
-    /// fichier decrit une autre machine.
+    /// La reference de cette machine, ou <c>null</c> (aucune, ou celle d'une autre machine).
     /// </summary>
     public Result<MemoryBaseline?> Read(string machineId)
     {
@@ -86,10 +75,8 @@ public sealed class MemoryBaselineStore
             return Result<MemoryBaseline?>.Fail(ErrorCodes.MemoryBaselineCorrupt, ex.Message);
         }
 
-        // Le refus vit ici, la ou tous les appelants passent. `JsonSerializer` remplit un record
-        // sans se plaindre d'un champ absent : un fichier a moitie ecrit se relit en objet valide
-        // dont la mesure vaut null, et c'est le premier appelant qui la dereference qui tombe,
-        // en plein scan. Une reference amputee est corrompue, pas « presque bonne ».
+        // Le refus vit ici, ou tous passent : `JsonSerializer` relit un fichier a moitie ecrit en objet « valide » a la
+        // mesure null, qui tomberait en plein scan. Une reference amputee est corrompue.
         var invalide = Invalide(baseline);
         if (invalide is not null)
             return Result<MemoryBaseline?>.Fail(ErrorCodes.MemoryBaselineCorrupt, invalide);
@@ -100,8 +87,7 @@ public sealed class MemoryBaselineStore
                 : null);
     }
 
-    /// <summary>Ce qui manque, ou <c>null</c> quand la reference est complete. Sert des deux
-    /// cotes : on n'ecrit jamais une reference qui se relirait comme corrompue.</summary>
+    /// <summary>Ce qui manque, ou <c>null</c> quand la reference est complete ; a l'ecriture comme a la lecture.</summary>
     private static string? Invalide(MemoryBaseline? b)
     {
         if (b is null) return "empty reference";
@@ -112,8 +98,7 @@ public sealed class MemoryBaselineStore
             return "bandwidth missing or absurd";
         if (!double.IsFinite(b.Measurement.LatencyNs) || b.Measurement.LatencyNs <= 0)
             return "latency missing or absurd";
-        // Une dispersion absente se relit 0, et MemoryVerdict en tire un seuil de 3 sigma nul :
-        // tout ecart de bruit deviendrait « significatif ». Dix passes ne rendent jamais 0.
+        // Une dispersion absente se relit 0, un seuil de 3 sigma nul pour MemoryVerdict ; dix passes ne rendent jamais 0.
         if (!double.IsFinite(b.Measurement.BandwidthSigmaPct) || b.Measurement.BandwidthSigmaPct <= 0
             || !double.IsFinite(b.Measurement.LatencySigmaPct) || b.Measurement.LatencySigmaPct <= 0)
             return "dispersion absente ou absurde";

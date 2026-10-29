@@ -4,24 +4,18 @@ using DrDxt.Reconciler;
 namespace DrDxt.Reconciler.Adapters;
 
 // -----------------------------------------------------------------------
-// SurfaceSettingProbe : ISettingProbe sur le catalogue de descripteurs.
-//
-// CanProbe(tweakId) = le catalogue a un descripteur réconciliable pour l'id et sa surface est
-// lisible par cette sonde (Registry avec une feuille concrète, PowerPlan ou Service).
-// ScheduledTask / Firmware / non associé → false.
-//
-// ReadCurrentValueAsync aiguille selon la surface et rend la valeur déjà canonicalisée par le
-// lecteur brut (même forme JSON que le DesiredValueJson du manifeste), pour que la comparaison
-// ordinale voulu / réel du réconciliateur tienne :
+// SurfaceSettingProbe : ISettingProbe sur le catalogue de descripteurs. CanProbe = un descripteur réconciliable à
+// surface lisible (Registry à feuille concrète, PowerPlan, Service) ; ScheduledTask, Firmware, non associé → false.
+// ReadCurrentValueAsync rend la valeur canonicalisée comme le DesiredValueJson du manifeste, pour la comparaison
+// ordinale du réconciliateur :
 //   * Registry      → lire la feuille, sérialiser selon son type,
 //   * PowerPlan      → le GUID du plan actif,
 //   * Service        → le jeton d'état de marche,
 //   * ScheduledTask  → Fail « not supported in V1 » (pas encore de feuille d'op de tâche planifiée),
 //   * inconnu / Registry sans feuille → Fail(ProbeFailed).
 //
-// Les trois lectures OS brutes sont derrière des coutures internes (IRawRegistryValueReader /
-// IRawPowerPlanReader / IRawServiceStateReader) : cet aiguillage et la résolution du descripteur
-// sont entièrement testés avec des faux ; les vrais lecteurs sont le bord non testé.
+// Les lectures OS brutes sont derrière des coutures (IRawRegistryValueReader / IRawPowerPlanReader /
+// IRawServiceStateReader) : l'aiguillage se teste avec des faux, les vrais lecteurs sont le bord non testé.
 // -----------------------------------------------------------------------
 public sealed class SurfaceSettingProbe : ISettingProbe
 {

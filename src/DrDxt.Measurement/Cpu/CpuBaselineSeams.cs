@@ -20,14 +20,9 @@ public sealed class FileSystemCpuBaselineFile : ICpuBaselineFile
 }
 
 /// <summary>
-/// Le banc reel : la meme charge, deux fois, et c'est la duree qui change.
-///
-/// D'abord en rafale : quelques secondes, la machine ne quitte pas son turbo. Puis en soutenu,
-/// apres une chauffe continue qui franchit la marche observee vers la quinzieme seconde. Le meme
-/// nombre de cœurs dans les deux cas : le deficit ne veut rien dire a nombre different.
-///
-/// La liste des processeurs vient de l'appelant. Ce projet ne lit pas la topologie (c'est
-/// `DrDxt.Detection` qui la publie), et la deviner par une formule epinglerait le banc sur les
+/// Le banc reel : la meme charge deux fois, seule la duree change. En rafale (quelques secondes, toujours en turbo), puis
+/// en soutenu apres une chauffe qui franchit la marche observee vers la quinzieme seconde ; meme nombre de cœurs. La
+/// liste des processeurs vient de l'appelant (`DrDxt.Detection` publie la topologie) : une formule epinglerait les
 /// mauvais cœurs.
 /// </summary>
 public sealed class RealCpuSustainedBench : ICpuSustainedBench
@@ -38,10 +33,8 @@ public sealed class RealCpuSustainedBench : ICpuSustainedBench
 
     private const int Passes = 4;
 
-    /// <summary>Premier releve de puissance, en secondes depuis le debut de la charge soutenue.
-    /// Non chiffré au-dela de ceci : la marche est observee vers la 15e seconde. Si la puissance
-    /// descend encore apres, l'ecart des releves grandit et le juge ne conclut pas : l'erreur possible
-    /// est un silence, pas une affirmation.</summary>
+    /// <summary>Premier releve de puissance, en secondes depuis le debut de la charge soutenue. Non chiffré au-dela de la
+    /// marche observee vers la 15e seconde : si la puissance descend encore, l'ecart grandit et le juge se tait.</summary>
     private const double DebutRelevesSecondes = 20;
 
     private readonly Func<IReadOnlyList<int>> _processeursRapides;
@@ -88,11 +81,9 @@ public sealed class RealCpuSustainedBench : ICpuSustainedBench
         return resultat;
     }
 
-    /// <summary>Moyenne et incertitude relative de cette moyenne (en %), ou <c>null</c> sous trois relevés.
-    ///
-    /// Pas (max - min) : un releve instantane d'une seconde est bruite. Mesure du 25/09/2026, banc
-    /// reel : 13 releves de 56,3 a 73,7 W autour de 63,4 W, soit 27 % d'etendue pour 7 % d'ecart-type.
-    /// L'etendue aurait fait taire le produit sur une puissance nettement tenue.</summary>
+    /// <summary>Moyenne et incertitude relative de cette moyenne (en %), ou <c>null</c> sous trois relevés. Pas
+    /// (max - min) : mesure du 25/09/2026, banc reel, 13 releves de 56,3 a 73,7 W autour de 63,4 W, 27 % d'etendue pour
+    /// 7 % d'ecart-type ; l'etendue ferait taire le produit sur une puissance tenue.</summary>
     internal static (double MoyenneW, double EcartPercent)? Resumer(IReadOnlyList<double> releves)
     {
         if (releves.Count < 3) return null;
@@ -118,15 +109,14 @@ public sealed class RealCpuSustainedBench : ICpuSustainedBench
         // `var`, `CpuBenchResult` passerait pour orphelin alors que les quatre lignes suivantes le
         // lisent : le faux positif qu'annonce l'en-tete de ce test. Le nommer dit la verite.
         CpuBenchResult rafale = CpuBench.Measure(processeurs.Count, Passes, ChargeCpu.Lourde, 0, processeurs);
-        // Un seul cœur chargé, la limite de puissance du paquet ne le retient pas ; c'est la fréquence
-        // de référence. Relevé sur la machine le 03/10 : avec 2 s de chauffe, la charge finissait avant que la première
-        // lecture (près d'une seconde) n'aboutisse, et le « cœur seul » sortait à 3 792 MHz, sous les 4 270 MHz des huit.
-        // Six secondes de chauffe : 5 292 MHz tenus de la 1re à la 7e seconde.
+        // Un seul cœur chargé, que la limite du paquet ne retient pas : la fréquence de référence.
+        // Relevé sur la machine le 03/10 : avec 2 s de chauffe, la charge finissait avant la première lecture (près d'une
+        // seconde), et le cœur seul sortait à 3 792 MHz, sous les 4 270 MHz des huit ; avec six secondes, 5 292 MHz tenus
+        // de la 1re à la 7e.
         IReadOnlyList<int> premier = [processeurs[0]];
         PendantQue(() => CpuBench.Measure(1, Passes, ChargeCpu.Lourde, 6, premier), premier, 1, out var frequenceUnCoeur);
-        // La puissance se lit a cote, une fois par seconde, a partir de DebutRelevesSecondes. Pas
-        // seulement apres la chauffe : la mesure qui la suit dure une a deux secondes (banc entier
-        // chronometre a 37 s le 25/09/2026), ce qui ne laissait qu'un releve.
+        // La puissance se lit a cote, une fois par seconde, des DebutRelevesSecondes : apres la chauffe, la mesure ne dure
+        // qu'une a deux secondes (banc entier chronometre a 37 s, mesure du 25/09/2026), soit un seul releve.
         var releves = new List<double>();
         using var fin = new CancellationTokenSource();
         var releveur = _puissancePaquetW is null ? Task.CompletedTask : Task.Run(async () =>

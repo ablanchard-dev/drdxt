@@ -8,11 +8,10 @@ namespace DrDxt.Detection.Cpu;
 /// Sur la machine de référence, 100 °C en partie (registres du processeur) et des 1 % low de 63 contre
 /// 91 deux jours avant, avec un refroidisseur sain. La cause n'était pas le montage : la limite de puissance avait été
 /// ouverte au BIOS (65 → 253 W) et le refroidisseur saturait sur les pics, alors que le jeu tirait 117 W en médiane.
-/// Le docteur relie donc les deux : la chaleur relevée en partie et la limite de puissance lue, et propose le plafond
-/// qui garde le jeu tel quel (la médiane, plus une marge) en coupant les pics. Lecture seule du relevé des parties.
-///
-/// La chaleur relevée est celle du cœur le plus chaud (sur cette machine, le
-/// cœur 0 était 15 °C plus bas), et ce qui freinait était la limite de courant, pas la chaleur. Quand la partie porte son
+/// Le docteur relie la chaleur relevée en partie et la limite de puissance lue, et propose le plafond qui garde le jeu tel
+/// quel (la médiane, plus une marge) en coupant les pics. Lecture seule du relevé des parties.
+/// La chaleur relevée est celle du cœur le plus chaud (sur cette machine, le cœur 0 était 15 °C plus bas), et ce qui
+/// freinait était la limite de courant, pas la chaleur. Quand la partie porte son
 /// freinage (<see cref="FreinageCpu"/>), le docteur juge sur le temps passé freiné et sur sa raison, plus sur le pic seul.
 /// </summary>
 public static class ChaleurEnPartie
@@ -113,9 +112,8 @@ public static class ChaleurEnPartie
     /// <summary>Pur : la règle du cœur (<see cref="FreinageCpu.Raison"/>), la même que la carte des parties.</summary>
     public static RaisonDuFreinage RaisonDe(FreinageCpu f) => f.Raison();
 
-    /// <summary>Pur : le constat. Rien sans température relevée. Quand les parties portent leurs secondes,
-    /// le verdict est celui de la dernière partie relevée (un réglage corrigé se voit dès la partie suivante, au lieu d'un
-    /// vieux constat répété deux semaines), confirmé par les parties du même jeu qui disent pareil. Sans secondes : le pic.</summary>
+    /// <summary>Pur : le constat. Rien sans température relevée. Avec les secondes, le verdict de la dernière partie (un
+    /// réglage corrigé se voit dès la suivante), confirmé par les parties du même jeu qui disent pareil ; sans : le pic.</summary>
     /// <param name="bios">Le BIOS lu dans cette session de Windows (voir <see cref="LireBios"/>).</param>
     /// <param name="demarrage">Le démarrage de cette session : le BIOS lu ne vaut pour la partie jugée que si elle a été
     /// jouée depuis, sinon le réglage a pu changer entre les deux.</param>

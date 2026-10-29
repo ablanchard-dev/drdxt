@@ -1,23 +1,13 @@
 namespace DrDxt.Detection.Settings;
 
 /// <summary>
-/// Reunit plusieurs lectures du parking de coeurs en un seul verdict.
-///
-/// Pourquoi ce fichier existe, mesure du 07/09/2026 : six scans d'affilee sur la machine de
-/// reference ont rendu 11, 14, 14, 16 et 16 coeurs parques, et un scan lance pendant une
-/// compilation en a rendu **0**, ce qui fait disparaitre le seul constat Minor du produit. Le meme
-/// PC recevait donc deux verdicts selon l'heure du scan, sans que rien ne le dise au client.
-///
-/// Le levier n'a pas tort d'exiger un symptome reel. Ce qui a tort, c'est de le lire a un seul
-/// instant : un coeur qui dort une seconde sur deux dort, et une photo prise pendant qu'il
-/// travaille dit le contraire.
-///
-/// ══ la regle, et elle porte une asymetrie voulue ══
-///   • parque dans un echantillon suffit a compter comme parque : c'est un symptome, pas une
-///     moyenne ;
-///   • mais si aucune lecture n'aboutit, le resultat reste <c>null</c>. « Je n'ai pas pu lire » ne
-///     devient jamais « rien n'est parque » : cette confusion-la ferait proposer une ecriture
-///     sur des machines parfaitement saines.
+/// Reunit plusieurs lectures du parking de coeurs en un seul verdict. Mesure du 07/09/2026 : six scans d'affilee sur la
+/// machine de reference ont rendu 11, 14, 14, 16 et 16 coeurs parques, et un scan pendant une compilation **0** : deux
+/// verdicts selon l'heure. Un coeur qui dort une seconde sur deux dort, meme photographie pendant qu'il travaille.
+/// Asymetrie voulue :
+///   • parque dans un echantillon suffit : un symptome, pas une moyenne ;
+///   • aucune lecture aboutie ⇒ <c>null</c>, jamais « rien n'est parque », qui ferait proposer une ecriture sur une
+///     machine saine.
 ///
 /// Pur et total : aucune I/O, jamais d'exception.
 /// </summary>

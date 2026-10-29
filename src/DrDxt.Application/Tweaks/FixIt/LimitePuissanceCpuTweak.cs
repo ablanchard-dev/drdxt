@@ -17,9 +17,9 @@ namespace DrDxt.Application.Tweaks.FixIt;
 // fréquence : rien au-delà de ce que la carte autorise déjà en pointe (instabilité 13e/14e gén., 2024). Volatil : le
 // BIOS remet sa valeur au redémarrage. Le registre est relu avant d'écrire, et relu après par le helper.
 //
-// Refusé, et dit par le docteur : microcode d'avant le correctif Vmin sur un Core 13e/14e, verrou du BIOS (bit 63), registre « sans limite », PL1 déjà à la PL2, PawnIO absent,
-// portable (sa carte est faite pour sa puissance), processeur non Intel. Jugé en jeu (AutoHot) : l'essai en alternance
-// garde la montée seulement si les parties gagnent ; sans gain, rendu.
+// Refusé, et dit par le docteur : microcode d'avant le correctif Vmin sur un Core 13e/14e, verrou du BIOS (bit 63),
+// registre « sans limite », PL1 déjà à la PL2, PawnIO absent, portable (sa carte est faite pour sa puissance),
+// processeur non Intel. Jugé en jeu (AutoHot) : gardé seulement si les parties gagnent.
 // -----------------------------------------------------------------------
 /// <summary>Monte à chaud la limite PL1 d'un processeur Intel jusqu'à la PL2 que la carte mère laisse passer ; volatil.
 /// Proposé sur un PC de bureau Intel quand une montée est possible, gardé seulement si les parties gagnent.</summary>
@@ -38,8 +38,7 @@ public sealed class LimitePuissanceCpuTweak : LevierPl1TweakBase
 
     // Aucune température relevée en partie : la chaleur n'est pas lue, la montée attend.
     public override bool EtatNonLu(SettingsState state)
-        // Seule la chaleur manque quand, parties froides, la montée aurait lieu : un verrou, aucune marge ou un microcode
-        // d'avant le correctif Vmin donnent déjà la réponse, chaleur ou pas.
+        // Seulement si la chaleur est ce qui manque : un verrou, aucune marge ou un vieux microcode répondent déjà.
         => base.EtatNonLu(state) || (state.LimitePuissance is { ChaleurEnPartieMaxC: null } lu
             && LimiteDePuissance.CibleDeMontee(lu with { ChaleurEnPartieMaxC = 0 }) is not null);
 }

@@ -29,11 +29,9 @@ public interface IBootPerformanceLog
 /// « Le démarrage de cette application a été plus long que l'habitude ce qui a entraîné une
 /// dégradation des performances du processus de démarrage du système », avec la duree de la
 /// degradation.
-///
-/// Le piege, trouve le jour meme sur la machine de reference : ses mesures les plus recentes datent
-/// du **31/07/2025** (Defender +39,9 s, un Norton desinstalle depuis). L'annee ne s'affichait pas ; les
-/// presenter comme actuelles aurait decrit un autre PC. D'ou la fenetre : au-dela, DrDXT le dit et
-/// ne cite aucun chiffre.
+/// Sur la machine de reference, les mesures les plus recentes relevees datent du **31/07/2025** (Defender +39,9 s, un
+/// Norton desinstalle depuis) : presentees comme actuelles, elles decriraient un autre PC. D'ou la fenetre : au-dela,
+/// DrDXT le dit et ne cite aucun chiffre.
 /// </summary>
 public static class DemarrageMesure
 {

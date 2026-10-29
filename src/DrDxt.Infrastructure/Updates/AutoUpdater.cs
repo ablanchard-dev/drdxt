@@ -8,13 +8,9 @@ namespace DrDxt.Infrastructure.Updates;
 // ainsi préparé est lancé par InstallationMiseAJour, qui relit son empreinte. Un échec de vérification à n'importe
 // quelle étape veut dire que rien n'est préparé.
 //
-// Aucun canal de contenu silencieux : tout changement de ce que fait DrDXT arrive comme une
-// nouvelle version de l'app, que le joueur installe d'un clic.
-//
-// Jamais fail-open, jamais bloquant : pas de réseau → Fail(UPDATE_OFFLINE) et l'app continue sur
-// la version actuelle. Aucun manifeste offert → null (sans effet). Chaque issue est un Result :
-// les frontières crypto / HTTP / disque rendent un Result ; une exception imprévue s'arrête aux entrées publiques
-// (UPDATE_UNEXPECTED), sans rien proposer ni installer.
+// Aucun canal de contenu silencieux : tout changement arrive comme une nouvelle version, installée d'un clic. Jamais
+// fail-open ni bloquant : pas de réseau → Fail(UPDATE_OFFLINE), l'app continue ; aucun manifeste → null. Une exception
+// imprévue s'arrête aux entrées publiques (UPDATE_UNEXPECTED), sans rien proposer ni installer.
 // -----------------------------------------------------------------------
 
 /// <summary>Mène le canal de mise à jour de l'app derrière des coutures (<see cref="IUpdateFeed"/>,
@@ -78,8 +74,7 @@ public sealed class AutoUpdater
         if (!sig.IsOk)
             return Result<UpdateManifest?>.Fail(sig.Error!.Value.Code, sig.Error.Value.Message);
 
-        // Le site sert toujours le dernier manifeste. La version déjà installée n'est pas une
-        // nouvelle version : sans ce test, elle était retéléchargée et « Installer » la reproposait à chaque démarrage.
+        // Le site sert toujours le dernier manifeste : la version installée n'est pas une nouvelle version.
         if (!UpdateVerifier.IsDowngrade(manifest.Version, _installedVersion)
             && !UpdateVerifier.IsDowngrade(_installedVersion, manifest.Version))
             return Result<UpdateManifest?>.Ok(null);
@@ -127,9 +122,7 @@ public sealed class AutoUpdater
     // (2) puis (3) : la charge d'un manifeste déjà vérifié, puis son empreinte (+ non-rétrogradation).
     private async Task<Result<byte[]>> ChargeVerifieeAsync(UpdateManifest manifest, CancellationToken telechargement)
     {
-        // Tant que l'installation est manuelle, le canal App retelechargerait la meme charge a chaque
-        // demarrage : une charge deja stagee avec l'empreinte du manifeste signe est reprise, et repasse
-        // la verification (3) comme une charge neuve.
+        // Une charge deja stagee avec l'empreinte du manifeste signe est reprise, et repasse la verification (3).
         byte[] payload;
         var existante = _fs.TryReadFile(StagedAppPayloadPath);
         if (existante is not null && string.Equals(Sha256Hex(existante), manifest.Sha256, StringComparison.OrdinalIgnoreCase))
@@ -158,8 +151,7 @@ public sealed class AutoUpdater
     private static string Sha256Hex(byte[] bytes)
         => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
 
-    // Préparer une charge brute de l'app (déjà vérifiée) comme un seul fichier dans un dossier de
-    // préparation neuf, et rendre son chemin pour l'installation au clic. La préparation n'est pas privilégiée.
+    // La charge vérifiée, seule dans un dossier de préparation neuf, sans privilège ; rend son chemin.
     private Result<string> StagePayload(byte[] payload, string stagingDir)
     {
         var create = ResetStaging(stagingDir);

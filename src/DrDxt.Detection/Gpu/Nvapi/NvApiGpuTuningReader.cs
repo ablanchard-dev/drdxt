@@ -5,24 +5,13 @@ using DrDxt.GpuNative.NvApi;
 
 namespace DrDxt.Detection.Gpu.Nvapi;
 
-// -----------------------------------------------------------------------
-// NvApiGpuTuningReader : implémente INvApiGpuTuning sur INvApiNative.
-//
-// Le pendant NVIDIA d'AdlxGpuTuningReader : pure logique de domaine qui traduit les lectures
-// brutes de l'unique frontière native NVAPI en Result du domaine. Aucun appel natif ici :
-// entièrement testable contre FakeNvApiNative sans GPU NVIDIA (nvapi64.dll n'est jamais
-// chargé dans un processus de test). Sans élévation : NvAPI_Initialize et les GET marchent sans
-// élévation ; les écritures privilégiées passent par les ops typées d'IElevatedClient, pas ici.
-//
-//   • Décalage d'horloge cœur / mémoire + limite de puissance = vraies lectures sur le GET
-//     vérifié. La lecture mémoire est réelle exprès : la pose de sous-tension
-//     (GpuUndervoltTweak.ApplyNvidia) relève les décalages cœur et mémoire pour un retour fidèle
-//     et fait échouer toute la sous-tension si l'une des lectures échoue ; un placebo ici la casserait.
-//   • Courbe de ventilateur = échec propre et honnête. La lecture NVAPI de la courbe n'est pas
-//     dans la recette de réglage vérifiée (GetPstates20 + ClientPowerPolicies seulement) et le
-//     levier ventilateur attend pour les deux fabricants ; ApplyNvidia ne lit jamais la courbe. On
-//     refuse honnêtement plutôt que d'inventer une courbe vide ou fausse : jamais un chiffre placebo.
-// -----------------------------------------------------------------------
+// NvApiGpuTuningReader : INvApiGpuTuning sur INvApiNative, le pendant NVIDIA d'AdlxGpuTuningReader. Traduit les lectures
+// de l'unique frontière NVAPI en Result du domaine, sans appel natif (testé contre FakeNvApiNative, nvapi64.dll jamais
+// chargé en test) ni élévation (NvAPI_Initialize et les GET n'en demandent pas ; l'écriture passe par IElevatedClient).
+//   • Décalages cœur / mémoire et limite de puissance : vraies lectures sur le GET vérifié. GpuUndervoltTweak.ApplyNvidia
+//     relève les deux décalages pour un retour fidèle et échoue si l'une manque : un placebo la casserait.
+//   • Courbe de ventilateur : échec propre, jamais une courbe inventée. Sa lecture n'est pas dans la recette vérifiée
+//     (GetPstates20 + ClientPowerPolicies seulement), et ApplyNvidia ne la lit pas.
 public sealed class NvApiGpuTuningReader : INvApiGpuTuning
 {
     private readonly INvApiNative _native;
@@ -65,8 +54,7 @@ public sealed class NvApiGpuTuningReader : INvApiGpuTuning
     }
 
     public Result<FanCurve> GetFanCurve(int gpuIndex) =>
-        // Indisponible, honnêtement : la lecture NVAPI de la courbe n'est pas dans la recette vérifiée
-        // et le levier ventilateur attend → échec propre, jamais une courbe inventée ou vide.
+        // Hors de la recette vérifiée : échec propre, jamais une courbe inventée ou vide.
         Result<FanCurve>.Fail(ErrorCodes.TweakSdkUnavailable,
             "NVAPI fan-curve read is not implemented (not in the verified tuning recipe; fan tweak deferred).");
 

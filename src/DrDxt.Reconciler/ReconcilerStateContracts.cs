@@ -2,15 +2,9 @@ using DrDxt.Core;
 
 namespace DrDxt.Reconciler;
 
-// -----------------------------------------------------------------------
-// État modifiable du sidecar d'exécution.
-//
-// Séparé du manifeste scellé pour que les modifications à chaque tour (pause par élément, dernier
-// build vu par élément, compteur de série de démarrages) ne cassent jamais la signature du
-// manifeste. Ce fichier n'est pas signé (il ne porte aucune autorité privilégiée : il ne peut
-// qu'en faire moins au réconciliateur, jamais plus) ; il vit à côté du manifeste sous la même
-// racine en écriture admin, pour résister à l'altération au repos.
-// -----------------------------------------------------------------------
+// État modifiable du sidecar d'exécution, séparé du manifeste scellé : les modifications de chaque tour (pause par
+// élément, dernier build vu, série de démarrages) ne cassent pas sa signature. Non signé, il ne peut qu'en faire moins au
+// réconciliateur, jamais plus ; il vit sous la même racine en écriture admin, contre l'altération au repos.
 
 /// <summary>Per-item runtime state: paused flag (kill-switch), les jetons de reference
 /// (build + version de pilote) contre lesquels une derive est classee `WindowsReset`, et
@@ -51,9 +45,9 @@ public interface IReconcilerStateStore
     Task<Result<ReconcilerState>> LoadAsync(CancellationToken ct);
     Task<Result> SaveAsync(ReconcilerState state, CancellationToken ct);
 
-    /// <summary>Lire, modifier, réécrire d'un seul tenant : le helper et le service réécrivent le même fichier, et une
-    /// écriture faite entre la lecture et la réécriture de l'autre se perdait. <paramref name="modifier"/> rend null pour ne
-    /// rien écrire. Rend l'état tel qu'il est après. Un magasin en mémoire n'a qu'un écrivain : il enchaîne les deux.</summary>
+    /// <summary>Lire, modifier, réécrire d'un seul tenant : le helper et le service réécrivent le même fichier, et
+    /// l'écriture de l'un ne doit pas se perdre entre la lecture et la réécriture de l'autre. <paramref name="modifier"/>
+    /// rend null pour ne rien écrire. Rend l'état d'après. Un magasin en mémoire n'a qu'un écrivain : il enchaîne.</summary>
     async Task<Result<ReconcilerState>> MettreAJourAsync(Func<ReconcilerState, ReconcilerState?> modifier, CancellationToken ct)
     {
         var lu = await LoadAsync(ct).ConfigureAwait(false);

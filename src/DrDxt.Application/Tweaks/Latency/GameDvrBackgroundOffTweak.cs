@@ -4,22 +4,11 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// GameDvrBackgroundOffTweak (système, persistant).
-//
-// Coupe l'enregistrement en arrière-plan de Game DVR (le tampon « Enregistrer ce qui s'est passé »,
-// toujours actif, qui est le vrai coût) par la feuille de l'utilisateur
-//   HKCU\Software\Microsoft\Windows\CurrentVersion\GameDVR\HistoricalCaptureEnabled = 0.
-//
-// Chirurgical : seul le tampon d'arrière-plan est coupé. La capture manuelle (AppCaptureEnabled) et la
-// Game Bar restent intactes : couper une fonction ne se vend pas comme des images. L'original est relu
-// d'abord, l'inverse sérialisé, puis 0 est écrit.
-//
-// Effet au redémarrage ou au prochain lancement du jeu : le moteur saute l'A/B immédiat
-// (TakesEffectAfterReboot = true) ; la preuve est le prochain scan en jeu, jamais cette session.
-//
-// Le SummaryKey dit « moins de charge en arrière-plan », jamais « +FPS ».
-//
-// Gating : AppliesTo lit la feuille même que l'application écrit ; déjà à 0, rien n'est proposé.
+// GameDvrBackgroundOffTweak (système, persistant) : coupe le tampon toujours actif « Enregistrer ce qui s'est passé »,
+// le vrai coût, par HKCU\Software\Microsoft\Windows\CurrentVersion\GameDVR\HistoricalCaptureEnabled = 0. La capture
+// manuelle (AppCaptureEnabled) et la Game Bar restent. Original relu, inverse sérialisé, puis 0 écrit. Effet au prochain
+// lancement du jeu : le moteur saute l'A/B immédiat, la preuve vient du prochain scan en jeu. Le SummaryKey dit « moins
+// de charge en arrière-plan », jamais « +FPS ». AppliesTo lit la feuille même qu'il écrit.
 // -----------------------------------------------------------------------
 /// <summary>Coupe l'enregistrement en arrière-plan de Game DVR (HistoricalCaptureEnabled = 0), proposé tant qu'il
 /// n'est pas lu déjà coupé. La capture manuelle et la Game Bar restent.</summary>
@@ -40,12 +29,10 @@ public sealed class GameDvrBackgroundOffTweak : LatencyTweakBase
     // Le DVR relit le réglage au prochain lancement du jeu → le moteur diffère sa preuve A/B.
     public override bool TakesEffectAfterReboot => true;
 
-    // Deja a 0 ⇒ rien a faire, hors du plan ; illisible ⇒ non lu (EtatNonLu) : ni « deja regle », ni « a poser »,
-    // puisque la pose relit l'origine et echouerait.
-    // « Record what happened » est desactive par defaut, et une valeur absente vaut 0
-    // (elevenforum.com/t/…record-what-happened-for-gaming-captures-in-windows-11.17900 ;
-    // github.com/FunkyFr3sh/GameDVR_Config). Le poste de reference n'a pas la valeur : sans cette regle,
-    // le levier y resterait au plan, « rien a tenter » ne serait jamais vrai et le client paierait pour rien.
+    // Deja a 0 ⇒ hors du plan ; illisible ⇒ non lu (EtatNonLu), la pose relisant l'origine echouerait. « Record what
+    // happened » est desactive par defaut et une valeur absente vaut 0 (source :
+    // elevenforum.com/t/…record-what-happened-for-gaming-captures-in-windows-11.17900 ; github.com/FunkyFr3sh/GameDVR_Config) :
+    // le poste de reference n'a pas la valeur, et sans cette regle « rien a tenter » n'y serait jamais vrai.
     public override bool AppliesTo(HardwareInventory hw, SettingsState state)
     {
         try
@@ -62,8 +49,7 @@ public sealed class GameDvrBackgroundOffTweak : LatencyTweakBase
         catch (Exception) { return true; }
     }
 
-    // Banc profond : déjà à 0 ou absente (absente vaut 0), l'exercice passe par 1 (l'enregistrement en arrière-plan
-    // allumé) puis rend l'origine exacte, 0 ou absente.
+    // Banc profond : depuis 0 ou absente, l'exercice passe par 1 puis rend l'origine exacte.
     public override ExerciceProfond? PreparerExercice(HardwareInventory hw, SettingsState state)
     {
         try

@@ -2,24 +2,13 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Safety;
 
-// -----------------------------------------------------------------------
-// SafetyManager : la garde de réversibilité.
-//
-// EnsureRestorePointAsync : rien n'est jamais posé sans point de restauration vérifié.
-//    Si la restauration est coupée et ne peut pas être activée (ou si l'utilisateur
-//    refuse), on bloque, jamais d'avance silencieuse. Le point est créé par le helper
-//    élevé via un CreateRestorePointOp typé, puis on vérifie qu'il existe vraiment (une
-//    GPO ou l'édition peut annuler la création en silence). Limité à un point par
-//    session ou lot, pour ne jamais en créer en trop.
-//
-// RevertAsync : reconstruit la PrivilegedOp inverse typée à partir de l'OriginalValueJson
-//    typé du snapshot (la forme filaire du codec, qui porte la vraie valeur d'origine
-//    relevée) et la renvoie par le client élevé. Le chemin générique bas niveau couvre les
-//    retours de registre et de plan d'alimentation ; les retours propres à un levier
-//    (par exemple une courbe V/F du GPU) vivent dans ITweak.RevertAsync.
-//
-// Chaque frontière externe est protégée → Result.Fail. Aucune exception ne sort jamais.
-// -----------------------------------------------------------------------
+// SafetyManager : la garde de réversibilité. Aucune exception ne sort : chaque frontière rend Result.Fail.
+// EnsureRestorePointAsync : rien n'est posé sans point de restauration vérifié. Restauration coupée et non activable (ou
+//    refus de l'utilisateur) : blocage, jamais d'avance silencieuse. Créé par le helper (CreateRestorePointOp typé),
+//    puis relu (une GPO ou l'édition peut annuler la création en silence). Un point par session ou lot, pas plus.
+// RevertAsync : l'op inverse typée reconstruite depuis l'OriginalValueJson du snapshot (forme filaire du codec, la
+//    vraie origine relevée), renvoyée par le client élevé. Registre et plan d'alimentation ici ; les retours propres à
+//    un levier (une courbe V/F du GPU) vivent dans ITweak.RevertAsync.
 public sealed class SafetyManager : ISafetyManager
 {
     /// <summary>Une création sans point relu est retentée une fois. VSS échoue par
@@ -96,8 +85,7 @@ public sealed class SafetyManager : ISafetyManager
                         "System Restore could not be enabled (GPO/SKU/locked).");
             }
 
-            // Un point de moins de
-            // 24 h, de DrDXT ou de Windows, protège déjà ; on le réutilise et l'écran le dit.
+            // Un point de moins de 24 h, de DrDXT ou de Windows, protège déjà : réutilisé, et l'écran le dit.
             var demandeUtc = DateTime.UtcNow;
             if (await Task.Run(() => _restore.DernierPointDepuis(demandeUtc - FenetreDuRefusDeWindows)).ConfigureAwait(false) is { } recent)
             {
@@ -148,8 +136,7 @@ public sealed class SafetyManager : ISafetyManager
     {
         // Une annulation part hors portée de pose : marquée, le helper la rejouerait après un arrêt sec et remettrait le levier.
         using var horsPortee = PorteeDePose.Suspendre();
-        // Validation prudente du JSON reçu : un snapshot malformé ou de type inconnu ne doit
-        // jamais lever ni lancer une op arbitraire ; échec propre avec SAFETY.SNAPSHOT_INVALID.
+        // Un snapshot malformé ou de type inconnu ne lève ni ne lance d'op arbitraire : SAFETY.SNAPSHOT_INVALID.
         if (snapshot is null || string.IsNullOrWhiteSpace(snapshot.OriginalValueJson))
             return Result.Fail(ErrorCodes.SnapshotInvalid, "Snapshot has no original-value payload.");
 

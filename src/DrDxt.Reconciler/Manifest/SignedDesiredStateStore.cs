@@ -8,26 +8,18 @@ namespace DrDxt.Reconciler.Manifest;
 // -----------------------------------------------------------------------
 // SignedDesiredStateStore : l'IDesiredStateStore concret (DrDxt.Core).
 //
-// Commit (côté qui tient la clé privée via IManifestSigner) :
-//   1. Rejeter tout levier non réconciliable côté OS (firmware / inconnu / protégé) :
-//      portée de durabilité.
-//   2. Canonicaliser le manifeste versionné en octets déterministes.
-//   3. Signer les octets canoniques ; enregistrer {canonical, signature} atomiquement par la
-//      couture de stockage en écriture admin.
-//
-// Chargement (côté réconciliateur, qui ne tient que la clé publique via IManifestVerifier) :
-//   1. Pas de fichier → DesiredState vide (première installation) : pas un échec.
-//   2. Vérifier la signature sur les octets canoniques exacts enregistrés, avant l'analyse.
-//      Toute altération / signature étrangère → Fail(ManifestTampered), aucun DesiredState
-//      (fail-closed, jamais fail-open).
-//   3. Analyser + vérifier schemaVersion ; version inconnue → Fail(ManifestSchema).
-//
-// Garde de la cle (la regle du projet est « rien hors du PC », donc la cle privee vit sur la machine) :
-//   La cle privee est propre a la machine (MachineManifestKey) : creee par le helper eleve,
-//   stockee sous %ProgramData%\DrDxt, lisible par Administrateurs + SYSTEM seulement. Seul le
-//   helper eleve construit ce magasin avec un signataire (MachineManifestCommit). L'App et le
-//   service reconciliateur le construisent sans (signer: null) et verifient avec la cle publique
-//   posee a cote. Un signataire null fait echouer proprement CommitAsync (un magasin en verification seule ne signe pas).
+// Commit (avec la clé privée, IManifestSigner) :
+//   1. rejeter tout levier non réconciliable côté OS (firmware, inconnu, protégé) ;
+//   2. canonicaliser le manifeste versionné en octets déterministes ;
+//   3. signer ; enregistrer {canonical, signature} atomiquement dans le stockage en écriture admin.
+// Chargement (réconciliateur, clé publique seule, IManifestVerifier) :
+//   1. pas de fichier → DesiredState vide (première installation), pas un échec ;
+//   2. signature vérifiée sur les octets exacts avant l'analyse ; altération ou signature étrangère →
+//      Fail(ManifestTampered), aucun DesiredState (fail-closed) ;
+//   3. schemaVersion inconnue → Fail(ManifestSchema).
+// Garde de la cle (« rien hors du PC ») : la cle privee de la machine (MachineManifestKey), creee par le helper eleve
+// sous %ProgramData%\DrDxt, lisible par Administrateurs + SYSTEM seulement. Seul le helper construit ce magasin avec un
+// signataire (MachineManifestCommit) ; l'App et le service sans (signer: null), et CommitAsync y echoue proprement.
 // -----------------------------------------------------------------------
 public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifestReader
 {
@@ -65,9 +57,8 @@ public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifes
                     $"Tweak '{tweak.TweakId}' is not an OS-side reconcilable surface.");
         }
 
-        // (1 bis) Fusion, jamais remplacement. Le manifeste existant est relu par le meme
-        // chemin verifie ; s'il ne se relit pas (altere, illisible), on refuse d'ecrire : l'ecraser
-        // effacerait les seules valeurs d'origine que la desinstallation sait rendre.
+        // (1 bis) Fusion, jamais remplacement : l'existant relu par le chemin verifie ; illisible, rien n'est ecrit (ce sont
+        // les seules origines que la desinstallation sait rendre).
         var existant = await LoadManifestAsync();
         if (!existant.IsOk)
             return Result.Fail(existant.Error!.Value.Code,
@@ -91,9 +82,8 @@ public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifes
 
     private async Task<Result> SignerEtEcrireAsync(DesiredState state)
     {
-        // (2) octets canoniques + signature. La cle qui les signe est celle de la machine ; elle prouve
-        // « DrDXT a pose ceci » face a un programme non eleve, pas face au proprietaire administrateur,
-        // qui peut la lire.
+        // (2) octets canoniques + signature par la cle de la machine : une preuve face a un programme non eleve, pas face a
+        // un administrateur, qui peut la lire.
         var now = _clock.UtcNow;
         var manifest = new DesiredStateManifest(
             DesiredStateManifest.CurrentSchemaVersion, state, now);
@@ -111,9 +101,8 @@ public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifes
 
     public async Task<Result<DesiredState>> LoadAsync()
     {
-        // Déléguer au cœur partagé « vérifier avant d'analyser » (ISignedManifestReader) et réduire à
-        // la vue de l'état seul. Pas de fichier → état vide (première installation), altération /
-        // schéma → échec propre. Un manifeste dont la signature se vérifie se réapplique.
+        // Le cœur « vérifier avant d'analyser » (ISignedManifestReader), réduit à l'état : pas de fichier → vide,
+        // altération ou schéma → échec propre.
         var manifest = await LoadManifestAsync();
         if (!manifest.IsOk)
             return Result<DesiredState>.Fail(manifest.Error!.Value.Code, manifest.Error.Value.Message);
@@ -121,9 +110,8 @@ public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifes
         return Result<DesiredState>.Ok(manifest.Value?.State ?? new DesiredState(Array.Empty<AppliedTweak>()));
     }
 
-    /// <summary>Charge tout le manifeste vérifié (date de commit comprise). Partage exactement le
-    /// chemin « vérifier avant d'analyser » de LoadAsync (la signature est l'autorité d'intégrité) :
-    /// pas de fichier → Ok(null) ; altération / mauvaise signature / schéma inconnu → échec propre.</summary>
+    /// <summary>Tout le manifeste vérifié (date de commit comprise), par le chemin « vérifier avant d'analyser » : pas de
+    /// fichier → Ok(null) ; altération, mauvaise signature, schéma inconnu → échec propre.</summary>
     public async Task<Result<DesiredStateManifest?>> LoadManifestAsync()
     {
         var read = await _storage.ReadAsync(CancellationToken.None);
@@ -136,13 +124,11 @@ public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifes
 
         var envelope = read.Value;
 
-        // Un fichier « {} » ou une ecriture interrompue donne une enveloppe aux champs nuls ;
-        // Convert.FromBase64String(null) levait, et le service tombait au lieu d'echouer proprement.
+        // « {} » ou une ecriture interrompue : enveloppe aux champs nuls, que Convert.FromBase64String(null) ferait lever.
         if (string.IsNullOrEmpty(envelope.CanonicalJson) || string.IsNullOrEmpty(envelope.SignatureBase64))
             return Result<DesiredStateManifest?>.Fail(ErrorCodes.ManifestTampered, "Manifest envelope is incomplete.");
 
-        // (2) Vérifier avant d'analyser. Décoder la signature par prudence ; toute erreur =
-        // fail-closed (jamais fail-open).
+        // (2) Vérifier avant d'analyser ; toute erreur de décodage = fail-closed.
         byte[] signature;
         try
         {
@@ -157,8 +143,7 @@ public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifes
         if (!_verifier.Verify(canonicalBytes, signature))
             return Result<DesiredStateManifest?>.Fail(ErrorCodes.ManifestTampered, "Manifest signature did not verify.");
 
-        // (3) analyse + vérification du schéma. Tout ce qui est malformé derrière une signature valide
-        // est encore traité en échec propre (par prudence).
+        // (3) analyse + schéma ; malformé derrière une signature valide = échec propre.
         DesiredStateManifest? manifest;
         try
         {
@@ -181,9 +166,7 @@ public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifes
     }
 
     // -------------------------------------------------------------------
-    // Sérialisation canonique : une forme d'octets déterministe pour que la signature soit calculée
-    // et vérifiée sur exactement les mêmes octets. L'ordre des propriétés est fixé par la forme du
-    // record ; les horodatages s'écrivent en chaînes invariantes aller-retour (« O »).
+    // Sérialisation canonique : les mêmes octets signés et vérifiés ; ordre fixé par le record, horodatages en « O ».
     // -------------------------------------------------------------------
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
@@ -200,8 +183,7 @@ public sealed class SignedDesiredStateStore : IDesiredStateStore, ISignedManifes
     private static string Canonicalize(DesiredStateManifest manifest)
         => JsonSerializer.Serialize(manifest, WriteOptions);
 
-    /// <summary>Accroche de test : expose la forme canonique exacte pour qu'un test fabrique une
-    /// enveloppe correctement signée avec un corps posé à la main (par exemple un futur schéma).</summary>
+    /// <summary>Accroche de test : la forme canonique, pour signer un corps posé à la main (un futur schéma).</summary>
     internal static string CanonicalizeForTest(DesiredStateManifest manifest)
         => Canonicalize(manifest);
 }

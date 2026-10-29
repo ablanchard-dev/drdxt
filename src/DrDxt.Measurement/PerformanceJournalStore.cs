@@ -12,30 +12,17 @@ public interface IPerformanceJournalFile
 }
 
 /// <summary>
-/// Le journal des mesures, et la seule chose qu'il sert a faire.
-///
-/// Sans lui, seul `memory-baseline.json` survivrait a une session : ni les mesures, ni les
-/// verdicts, ni les resolutions. Le produit redecouvrirait la machine a chaque lancement et ne
-/// pourrait pas repondre a « mon PC est-il plus lent qu'avant ? » ; or une degradation lente est
-/// exactement ce qu'aucun scan isole ne voit : chaque mesure prise seule parait normale.
-///
-/// Le magasin ne fait que trois choses : ajouter, relire, elaguer. Le jugement vit dans
-/// <see cref="PerformanceJournal"/>, pur et teste sans disque.
-///
-/// Une lecture qui echoue rend un journal vide, pas une erreur : ne pas avoir d'historique est
-/// un etat normal (premier lancement), et il ne doit jamais faire echouer un scan. Une ecriture qui
-/// echoue, elle, se dit : sinon le produit croirait accumuler un historique qui n'existe pas.
+/// Le journal des mesures, pour repondre a « mon PC est-il plus lent qu'avant ? » : une degradation lente, aucun scan
+/// isole ne la voit. Le magasin ajoute, relit, elague ; le jugement vit dans <see cref="PerformanceJournal"/>, pur. Une
+/// lecture ratee rend un journal vide (pas d'historique est normal, jamais un scan en echec) ; une ecriture ratee se dit.
 /// </summary>
 public sealed class PerformanceJournalStore
 {
-    /// <summary>Nombre d'entrees conservees. Assez pour plusieurs mois de scans occasionnels, assez
-    /// peu pour que le fichier reste lisible a la main : c'est un journal de diagnostic, pas une
-    /// base de donnees. L'elagage garde toujours la mesure la plus ancienne : voir
-    /// <see cref="PerformanceJournal.Elaguer"/>.</summary>
+    /// <summary>Plusieurs mois de scans occasionnels, lisible a la main. L'elagage garde toujours la mesure la plus
+    /// ancienne (<see cref="PerformanceJournal.Elaguer"/>).</summary>
     public const int MaximumEntrees = 200;
 
-    // La marge vaut +infini sous trois passes, et le JSON par defaut refuse d'ecrire l'infini.
-    // L'exception etait avalee par le scan : la mesure du jour disparaissait en silence.
+    // La marge vaut +infini sous trois passes, que le JSON par defaut refuse d'ecrire.
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = false,
@@ -46,8 +33,7 @@ public sealed class PerformanceJournalStore
 
     public PerformanceJournalStore(IPerformanceJournalFile fichier) => _fichier = fichier;
 
-    /// <summary>Tout l'historique lisible. Vide quand il n'y en a pas, ou quand le fichier est
-    /// illisible : un historique perdu ne doit pas empecher de mesurer aujourd'hui.</summary>
+    /// <summary>Tout l'historique lisible ; vide sans historique ou fichier illisible.</summary>
     public IReadOnlyList<PerformanceSample> Lire()
         => LireOuEchec() is { IsOk: true } lu ? lu.Value! : Array.Empty<PerformanceSample>();
 
@@ -64,8 +50,7 @@ public sealed class PerformanceJournalStore
         try
         {
             var entrees = JsonSerializer.Deserialize<List<PerformanceSample>>(brut.Value!, Options);
-            // Une entree sans machine ou sans FPS ne peut servir ni de reference ni de mesure :
-            // la garder ferait porter la comparaison sur du vide.
+            // Sans machine ou sans FPS, une entree ne sert ni de reference ni de mesure.
             return Result<IReadOnlyList<PerformanceSample>>.Ok(
                 entrees?.Where(e => e is not null
                                  && !string.IsNullOrWhiteSpace(e.MachineId)
@@ -82,11 +67,8 @@ public sealed class PerformanceJournalStore
         }
     }
 
-    /// <summary>Ajoute une mesure et rend le journal tel qu'il vient d'etre ecrit.
-    ///
-    /// Si une lecture ratee ou un JSON corrompu rendait un journal vide, cette methode ecraserait le
-    /// fichier avec la seule mesure du jour : la plus ancienne mesure, la reference de toute derive,
-    /// disparaitrait en silence. Sans lecture sure, on n'ecrit pas.</summary>
+    /// <summary>Ajoute une mesure et rend le journal ecrit. Sans lecture sure, on n'ecrit pas : la plus ancienne mesure,
+    /// reference de toute derive, disparaitrait.</summary>
     public Result<IReadOnlyList<PerformanceSample>> Ajouter(PerformanceSample mesure)
     {
         if (mesure is null || string.IsNullOrWhiteSpace(mesure.MachineId) || !(mesure.AvgFps > 0))
@@ -110,12 +92,8 @@ public sealed class PerformanceJournalStore
 }
 
 /// <summary>
-/// Le fichier reel, ecrit atomiquement : temporaire a cote de la cible (meme volume, donc le
-/// deplacement est un vrai renommage) puis remplacement. Un journal a moitie ecrit serait pire
-/// qu'absent : il se comparerait quand meme.
-///
-/// Meme forme que <c>FileSystemMemoryBaselineFile</c>, volontairement : deux magasins qui se
-/// ressemblent se relisent ensemble.
+/// Le fichier reel, ecrit atomiquement (temporaire sur le meme volume, puis renommage) : a moitie ecrit, il se
+/// comparerait quand meme. Meme forme que <c>FileSystemMemoryBaselineFile</c>.
 /// </summary>
 public sealed class FileSystemPerformanceJournalFile : IPerformanceJournalFile
 {
@@ -131,7 +109,7 @@ public sealed class FileSystemPerformanceJournalFile : IPerformanceJournalFile
             ? throw new ArgumentException("A path is required.", nameof(path))
             : path;
 
-    // L'ecriture atomique a une seule implementation (Core) : elle etait recopiee ici.
+    // L'ecriture atomique a une seule implementation (Core).
     private FichierJsonAtomique Fichier => new(_path, ErrorCodes.CaptureFail);
 
     public Result WriteAtomic(string json) => Fichier.WriteAtomic(json);

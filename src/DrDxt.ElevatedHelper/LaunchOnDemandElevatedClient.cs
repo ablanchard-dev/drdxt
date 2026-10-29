@@ -2,22 +2,11 @@ using DrDxt.Core;
 
 namespace DrDxt.ElevatedHelper;
 
-// -----------------------------------------------------------------------
-// LaunchOnDemandElevatedClient : l'IElevatedClient de l'App qui reporte l'élévation UAC à la
-// première op privilégiée (l'App ne demande donc jamais rien au démarrage), puis délègue au vrai
-// client à handshake.
-//
-// Au premier ExecuteAsync, il lance l'étape « s'assurer qu'il tourne » (HelperLauncher : une UAC
-// interactive, ou réutilisation s'il tourne déjà). Une fois réussie, chaque op (celle-ci et les
-// suivantes) passe au client interne à handshake, qui négocie une clé de session éphémère par
-// connexion. Un lancement raté (UAC refusée, helper qui ne démarre jamais) remonte en Fail propre
-// et peut être repris à une op suivante : une seule invite fermée ne doit pas casser
-// l'application pour de bon.
-//
-// Les deux coutures (s'assurer qu'il tourne + client interne) sont injectées : la barrière est
-// entièrement testée sans rien lancer. Sûr en concurrence : l'étape tourne au plus une fois à la
-// fois et ne se « verrouille » qu'après un succès.
-// -----------------------------------------------------------------------
+// LaunchOnDemandElevatedClient : l'IElevatedClient de l'App qui reporte l'UAC à la première op privilégiée (rien au
+// démarrage), puis délègue au client à handshake (clé éphémère par connexion). Au premier ExecuteAsync, HelperLauncher
+// s'assure qu'il tourne (une UAC, ou réutilisation). Un lancement raté (UAC refusée, helper qui ne démarre pas) rend un
+// Fail propre, repris à l'op suivante : une invite fermée ne casse pas l'application. Les deux coutures sont injectées
+// (testée sans rien lancer) ; l'étape tourne au plus une fois à la fois, verrouillée seulement après un succès.
 public sealed class LaunchOnDemandElevatedClient : IElevatedClient
 {
     private readonly Func<CancellationToken, Task<Result>> _ensureRunningAsync;
@@ -48,17 +37,14 @@ public sealed class LaunchOnDemandElevatedClient : IElevatedClient
         var r = await _inner.ExecuteAsync(op, ct).ConfigureAwait(false);
         if (r.Error?.Code != ErrorCodes.HelperUnreachable) return r;
 
-        // Le helper s'arrête seul après 15 minutes d'inactivité (SEC1). « Déjà lancé » ne
-        // vaut plus : il est relancé une fois, sur ce geste, et l'op est rejouée.
+        // Le helper s'arrête seul après 15 minutes d'inactivité (SEC1) : relancé une fois sur ce geste, l'op rejouée.
         _ensured = false;
         ensure = await EnsureOnceAsync(ct).ConfigureAwait(false);
         return ensure.IsOk ? await _inner.ExecuteAsync(op, ct).ConfigureAwait(false) : ensure;
     }
 
-    /// <summary>Une op qui repond a besoin du meme helper lance que les autres. Sans ce
-    /// relais, une lecture tomberait sur le refus par defaut de IElevatedClient au lieu
-    /// d'atteindre le client interne : un canal cable de bout en bout, muet a l'avant-dernier
-    /// maillon.</summary>
+    /// <summary>Une op qui repond passe par le meme helper lance ; sans ce relais, elle tomberait sur le refus par defaut
+    /// de IElevatedClient.</summary>
     public async Task<Result<byte[]>> ReadAsync(PrivilegedOp op, CancellationToken ct)
     {
         if (SansGesteDuJoueur.Actif)

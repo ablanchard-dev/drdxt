@@ -28,16 +28,9 @@ public sealed class GpuDetector
 
         var controleurs = ReadControllers();
 
-        // La branche NVIDIA reelle, via NVML (nvmlSystemGetDriverVersion → "610.88"). Elle est
-        // system-wide : un seul pilote sert toutes les cartes NVIDIA de la machine.
-        //
-        // Pourquoi ça compte, et pas qu'esthétiquement : WMI rend la quadruplette WDDM
-        // ("32.0.16.1088"), dont le premier groupe est la version WDDM/DirectX. Le levier de fraîcheur
-        // refuse de juger cette forme (à raison : la juger contre le plancher NVIDIA marquerait
-        // toutes les machines obsolètes) ; sans la branche NVML, le levier « pilote obsolète » ne se
-        // déclencherait jamais sur une machine NVIDIA.
-        // Seulement s'il y a une carte NVIDIA : sinon on forcerait le chargement de nvml.dll sur
-        // une machine AMD ou Intel pure, pour un résultat dont personne ne se sert.
+        // La branche NVIDIA réelle par NVML (nvmlSystemGetDriverVersion → "610.88"), un pilote pour toutes les cartes NVIDIA.
+        // WMI rend la quadruplette WDDM ("32.0.16.1088"), que le levier de fraîcheur refuse de juger : sans NVML, « pilote
+        // obsolète » ne partirait jamais sur NVIDIA. Seulement avec une carte NVIDIA : pas de nvml.dll chargé pour rien.
         string? nvidiaBranch = adapters.Value!.Any(a => a.VendorId == VendorNvidia)
                                && _nvml.TryGetDriverVersion(out var branch) ? branch : null;
 
@@ -55,9 +48,8 @@ public sealed class GpuDetector
                 VendorNvidia => uneSeuleNvidia ? ReBarNvidia(_nvReBar.GetReBarState(), a.Description) : TriState.Unknown, // NVML BAR1, device 0
                 _            => TriState.Unknown                         // Intel: pas d'API → Unknown
             };
-            // NVML seulement pour NVIDIA, et seulement si la lecture a marché : sinon on garde
-            // la valeur WMI. Jamais de version fabriquée, jamais la branche NVIDIA collée sur une
-            // carte AMD ou Intel.
+            // NVML seulement pour NVIDIA et si la lecture a marché, sinon la valeur WMI : jamais une version fabriquée, ni
+            // la branche NVIDIA sur une carte AMD ou Intel.
             var driverVersion = a.VendorId == VendorNvidia && nvidiaBranch is not null
                 ? nvidiaBranch
                 : DriverVersionFor(a, controleurs);
@@ -75,12 +67,9 @@ public sealed class GpuDetector
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant)
             ? TriState.Unknown : lu;
 
-    // Une ligne Win32_VideoController par controleur. Sur une machine iGPU + carte dediee, prendre
-    // la premiere collerait le pilote de l'iGPU sur la carte. La ligne se retrouve par son nom (WMI
-    // Name et DXGI Description viennent tous deux du DriverDesc du pilote : identiques, relevé sur une RTX 4060),
-    // sinon par le fabricant dans PNPDeviceID (« PCI\VEN_10DE&... ») s'il n'y en a
-    // qu'une. Seule ligne de la machine : c'est la sienne. Sinon « Unknown », jamais le pilote d'un
-    // autre controleur.
+    // Une ligne Win32_VideoController par controleur (la premiere collerait le pilote de l'iGPU sur la carte). Retrouvee
+    // par son nom (WMI Name et DXGI Description viennent du DriverDesc : identiques, relevé sur une RTX 4060), sinon par
+    // le fabricant dans PNPDeviceID (« PCI\VEN_10DE&... ») s'il est seul, ou seule ligne de la machine ; sinon « Unknown ».
     private IReadOnlyList<WmiRow> ReadControllers()
     {
         var q = _wmi.Query("SELECT DriverVersion, Name, PNPDeviceID FROM Win32_VideoController");

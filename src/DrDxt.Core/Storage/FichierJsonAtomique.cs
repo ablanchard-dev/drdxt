@@ -1,17 +1,10 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// Un fichier JSON ecrit sans jamais etre lu a moitie.
-///
-/// Fichier temporaire a cote de la cible (meme volume, donc le deplacement est un vrai renommage),
-/// puis remplacement. Un lecteur ne voit jamais un fichier a demi ecrit, et **une reference tronquee
-/// serait pire qu'absente** : elle se comparerait quand meme.
-///
-/// Le piege que cette forme evite : ouvrir la cible en ecriture la
-/// tronque avant d'ecrire quoi que ce soit. Une panne a cet instant precis laisse un fichier vide
-/// la ou il y avait une mesure.
-///
-/// Vit dans Core parce que la plupart des magasins de DrDXT en ont besoin : une correction faite ici les atteint tous.
+/// Un fichier JSON ecrit sans jamais etre lu a moitie : temporaire a cote de la cible (meme volume, un vrai renommage),
+/// puis remplacement. **Une reference tronquee serait pire qu'absente** : elle se comparerait quand meme. Ouvrir la
+/// cible en ecriture la tronquerait d'abord, et une panne a cet instant laisserait un fichier vide a la place d'une mesure.
+/// Dans Core : la plupart des magasins de DrDXT en ont besoin, une correction ici les atteint tous.
 /// Lire et ecrire rendent un Result ; le constructeur refuse un chemin vide, et Remplacer relance apres ses attentes.
 /// </summary>
 public sealed class FichierJsonAtomique
@@ -98,11 +91,10 @@ public sealed class FichierJsonAtomique
     /// pose a l'avance ne l'occupe. A creer en exclusif (FileMode.CreateNew).</summary>
     public static string NomTemporaire(string chemin) => chemin + "." + Guid.NewGuid().ToString("N") + ".tmp";
 
-    /// <summary>Les attentes entre deux essais de remplacement. L'App, le relevé de fond et le service lisent les mêmes
-    /// fichiers : un lecteur qui tient la cible fait refuser le renommage par-dessus elle (accès refusé, ou fichier
-    /// utilisé). L'antivirus aussi : il analyse le temporaire à sa fermeture et le tient le temps de l'analyse, plus d'une
-    /// seconde sur un PC chargé. Environ cinq secondes en tout laissent finir les deux ; un refus durable (droits) échoue
-    /// quand même, dit.</summary>
+    /// <summary>Les attentes entre deux essais de remplacement : l'App, le relevé de fond et le service lisent les mêmes
+    /// fichiers, et un lecteur qui tient la cible fait refuser le renommage (accès refusé, fichier utilisé) ; l'antivirus
+    /// tient le temporaire le temps de l'analyse, plus d'une seconde sur un PC chargé. Environ cinq secondes en tout ; un
+    /// refus durable (droits) échoue quand même, dit.</summary>
     internal static readonly int[] AttentesDeRemplacementMs = [20, 50, 100, 200, 400, 600, 800, 1000, 1000, 1000];
 
     /// <summary>Renomme <paramref name="tmp"/> par-dessus <paramref name="cible"/>, avec les reprises ci-dessus.</summary>
@@ -123,8 +115,8 @@ public sealed class FichierJsonAtomique
     }
 
     /// <summary>Le renommage lui-même sur le disque avant de rendre la main (MOVEFILE_WRITE_THROUGH, Microsoft Learn,
-    /// MoveFileExW) : le contenu l'est déjà ; sans lui, une coupure juste après pouvait rendre le fichier d'avant, sans l'entrée
-    /// que le journal venait de noter, alors que l'écriture qu'elle protège avait tenu.</summary>
+    /// MoveFileExW), comme le contenu : sinon une coupure juste après rendrait le fichier d'avant, sans l'entrée que le journal
+    /// venait de noter, alors que l'écriture qu'elle protège a tenu.</summary>
     private static void Renommer(string tmp, string cible)
     {
         if (!OperatingSystem.IsWindows())

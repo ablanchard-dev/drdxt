@@ -23,21 +23,14 @@ public interface IChipProfileMatcher
     Result<ProfileRecommendation> Recommend(HardwareInventory hw);
 }
 
-// -----------------------------------------------------------------------
-// ChipProfileMatcher.
-//
-// Composition prudente (« jamais inventer ») :
+// ChipProfileMatcher, composition prudente (« jamais inventer ») :
 //   * la base générique sûre est toujours recommandée (le plancher) ;
 //   * le profil AMD X3D à deux CCD s'ajoute si, et seulement si, le processeur est de cette
 //     famille avec certitude ;
 //   * le profil NVIDIA option A s'ajoute si, et seulement si, une GeForce de bureau réglable
 //     est présente.
-// Une puce inconnue n'ajoute rien de spécifique : générique seulement. Un inventaire absent
-// est refusé (PROFILE.INPUT_INVALID) : jamais de profil fabriqué.
-// L'AppliesTo de chaque levier (état courant des réglages) reste la dernière garde au moment
-// de poser ; le matcher ne juge que l'éligibilité au niveau de la puce, rien de plus.
-// Pur sur le catalogue ; ne lève jamais.
-// -----------------------------------------------------------------------
+// Une puce inconnue : générique seulement. Un inventaire absent est refusé (PROFILE.INPUT_INVALID). L'AppliesTo de
+// chaque levier reste la dernière garde à la pose ; le matcher ne juge que l'éligibilité de la puce. Pur, ne lève jamais.
 public sealed class ChipProfileMatcher : IChipProfileMatcher
 {
     private readonly IChipProfileCatalog _catalog;

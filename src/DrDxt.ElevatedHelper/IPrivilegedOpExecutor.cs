@@ -3,15 +3,9 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper;
 
 // -----------------------------------------------------------------------
-// IPrivilegedOpExecutor : exécute une op privilégiée déjà passée par l'allowlist.
-//
-// Sécurité : cette couture n'est atteinte qu'après qu'une requête a passé, dans l'ordre,
-// intégrité HMAC → anti-rejeu → autorisation de l'appelant → liaison par le codec →
-// OpAllowlist.Validate. Elle reçoit donc une feuille PrivilegedOp typée, fermée, reconnue
-// bonne. Le contrat prend une PrivilegedOp (la hiérarchie scellée) et rien d'autre : aucune
-// surcharge par chaîne de commande ou de chemin n'existe, donc aucun chemin d'exécution
-// générique. L'exécuteur concret (registre/alimentation/NVAPI/ADLX/service) arrive avec chaque
-// levier ; cette couche ne prouve que la barrière.
+// IPrivilegedOpExecutor : exécute une op privilégiée, atteinte seulement après HMAC → anti-rejeu → autorisation de
+// l'appelant → codec → OpAllowlist.Validate. Le contrat ne prend qu'une PrivilegedOp (hiérarchie scellée) : aucune
+// surcharge par chaîne de commande ou de chemin, aucun chemin d'exécution générique.
 // -----------------------------------------------------------------------
 public interface IPrivilegedOpExecutor
 {
@@ -23,13 +17,8 @@ public interface IPrivilegedOpExecutor
         => ExecuteAsync(op, ct);
 
     /// <summary>
-    /// Exécute une op qui répond au lieu d'agir, et rend ses octets. Même contrat de sécurité
-    /// que <see cref="ExecuteAsync"/> : la feuille est déjà passée par HMAC → anti-rejeu →
-    /// autorisation d'appelant → codec borné → allowlist. Le seul écart est le retour.
-    ///
-    /// Implémentation par défaut : echec. Un exécuteur qui n'a pas de chemin de lecture le dit
-    /// au lieu de rendre un succès vide : « je n'ai pas de canal » et « la variable est vide »
-    /// ne sont pas le même état. Les doublures de test héritent donc du bon refus sans changer.
+    /// Exécute une op qui répond au lieu d'agir et rend ses octets, avec les mêmes gardes que
+    /// <see cref="ExecuteAsync"/>. Par défaut : échec, pas un succès vide (« pas de canal » n'est pas « variable vide »).
     /// </summary>
     Task<Result<byte[]>> ReadAsync(PrivilegedOp op, CancellationToken ct)
         => Task.FromResult(Result<byte[]>.Fail(

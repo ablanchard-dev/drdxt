@@ -4,27 +4,13 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// NvidiaUltraLowLatencyTweak.
-//
-// Pose le mode faible latence de NVIDIA (NULL) sur Ultra, par la feuille de registre autorisée
-// ...\NVTweak\LowLatencyMode, écrite par le helper élevé.
-//
-// Ce n'est pas Reflex : ce sont deux technologies différentes (documentation NVIDIA).
-//   * NULL (ce réglage) limite la file d'images côté pilote. Il ne fonctionne qu'en DirectX 9 à 11 :
-//     en DX12 et Vulkan, le moteur du jeu gère lui-même la file et le pilote n'a pas la main.
-//   * Reflex aligne le travail du moteur juste à temps. C'est un SDK intégré au jeu, que DrDXT ne peut
-//     ni activer ni désactiver.
-// Les confondre donnerait un titre faux et un candidat essayé sur un jeu DirectX 12, où ce réglage
-// ne peut rien.
-//
-// L'identifiant `latency.reflex` est gardé : c'est une clé de persistance, lue par le réconciliateur
-// et par les manifestes déjà écrits. La renommer est une migration à part entière (GATES.md).
-//
-// Jamais proposé (voir AppliesTo) ; le code reste pour défaire une écriture passée.
-//
-// Application : l'original de LowLatencyMode est relu, l'op inverse sérialisée rangée dans le
-// snapshot, puis Ultra (= 2) est écrit par le helper. SDK ou chemin de registre absent :
-// TWEAK.SDK_UNAVAILABLE (échec propre, sans exception).
+// NvidiaUltraLowLatencyTweak : le mode faible latence de NVIDIA (NULL) sur Ultra, par la feuille autorisée
+// ...\NVTweak\LowLatencyMode, écrite par le helper. Pas Reflex (documentation NVIDIA) : NULL limite la file côté pilote,
+// en DirectX 9 à 11 seulement (en DX12 et Vulkan, le moteur gère la file) ; Reflex est un SDK intégré au jeu, que DrDXT
+// ne peut ni activer ni désactiver. L'identifiant `latency.reflex` reste, clé de persistance lue par le réconciliateur
+// et les manifestes écrits (le renommer est une migration, GATES.md). Jamais proposé (AppliesTo) : le code reste pour
+// défaire une écriture passée. Original relu, inverse au snapshot, puis Ultra (= 2) ; SDK ou chemin absent :
+// TWEAK.SDK_UNAVAILABLE.
 // -----------------------------------------------------------------------
 /// <summary>Pose LowLatencyMode = Ultra dans le registre NVIDIA. Jamais proposé : rien ne prouve que le pilote lise
 /// cette valeur ; il ne sert plus qu'à défaire une écriture passée.</summary>
@@ -51,11 +37,9 @@ public sealed class NvidiaUltraLowLatencyTweak : LatencyTweakBase
     public override string Id => "latency.reflex";
     public override string SummaryKey => "tweak.latency.reflex.driver_floor";
 
-    // Jamais proposé. Rien ne prouve que le pilote lise cette valeur : absente de
-    // l'en-tête public NvApiDriverSettings.h, absente du registre de la machine de référence (seul
-    // `OverridePRR` y vit), et le « Low Latency Mode » du panneau passe par PRERENDERLIMIT, déjà
-    // posé par `latency.render_queue_cap`. Le code reste pour défaire une écriture passée ;
-    // le supprimer est la décision produit.
+    // Jamais proposé : rien ne prouve que le pilote lise cette valeur (absente de l'en-tête public NvApiDriverSettings.h
+    // et du registre de la machine de référence, où seul `OverridePRR` vit) ; le « Low Latency Mode » du panneau passe par
+    // PRERENDERLIMIT, posé par `latency.render_queue_cap`. Le supprimer est une décision produit.
     public override bool AppliesTo(HardwareInventory hw, SettingsState state) => false;
 
     public override async Task<Result<TweakSnapshot>> ApplyAsync()

@@ -5,24 +5,14 @@ using DrDxt.Core;
 namespace DrDxt.Infrastructure.Repair;
 
 /// <summary>
-/// Le journal des constats, pour que « qu'est-ce qui a change depuis hier ? » ait une reponse.
-///
-/// L'audit recalcule tout a chaque passe ; sans ce journal, il ne garderait rien : on verrait un
-/// etat, jamais une trajectoire, et aucune reparation ne pourrait etre prouvee dans le temps (le
-/// pilier « maintenir » de la north star).
-///
-/// Meme forme que <c>FileSystemMemoryBaselineFile</c>, volontairement : deux magasins qui se
-/// ressemblent se relisent ensemble : ecriture atomique (temporaire a cote de la cible, donc sur
-/// le meme volume, puis remplacement), aucune exception qui remonte, et une lecture ratee qui se
-/// dit au lieu de rendre une photo vide.
-///
-/// Une photo vide et une lecture ratee ne doivent jamais se confondre : la premiere ferait
-/// croire que tout est apparu aujourd'hui.
+/// Le journal des constats, pour que « qu'est-ce qui a change depuis hier ? » ait une reponse : une trajectoire, pas
+/// seulement un etat (le pilier « maintenir »). Meme forme que <c>FileSystemMemoryBaselineFile</c> : ecriture atomique,
+/// aucune exception qui remonte, et une lecture ratee qui se dit au lieu de rendre une photo vide (qui ferait croire que
+/// tout est apparu aujourd'hui).
 /// </summary>
 public sealed class RepairHistoryStore
 {
-    /// <summary>Combien de photos on garde. Non chiffré. Trente laisse voir un mois sans
-    /// faire enfler un fichier que personne ne relira.</summary>
+    /// <summary>Combien de photos on garde. Non chiffré : trente, un mois, sans enfler le fichier.</summary>
     public const int PhotosGardees = 30;
 
     private static readonly JsonSerializerOptions Options = new()
@@ -62,8 +52,8 @@ public sealed class RepairHistoryStore
                 return Result<IReadOnlyList<RepairSnapshot>>.Fail(ErrorCodes.DetectionFailed,
                     Docteur.T("RHS.Illisible", Docteur.T("RHS.ContenuNul")));
 
-            // Le desérialiseur remplit une photo amputee sans se plaindre (entree nulle,
-            // listes absentes), et la comparaison levait en plein scan. Amputee = illisible.
+            // Une photo amputee (entree nulle, listes absentes) se deserialise sans erreur et ferait lever la comparaison
+            // en plein scan : illisible.
             if (photos.Any(p => p?.DomainesExamines is null || p.Etats is null
                                 || p.Etats.Any(e => e?.Domaine is null || e.Nom is null)))
                 return Result<IReadOnlyList<RepairSnapshot>>.Fail(ErrorCodes.DetectionFailed,
@@ -87,12 +77,8 @@ public sealed class RepairHistoryStore
             : Result<RepairSnapshot?>.Fail(lu.Error!.Value.Code, lu.Error.Value.Message);
     }
 
-    /// <summary>
-    /// Ajoute une photo et taille le journal.
-    ///
-    /// Si le journal existant est illisible, on refuse d'ecrire plutot que de repartir de zero :
-    /// ecraser un journal casse effacerait l'historique qu'on essaie justement de tenir.
-    /// </summary>
+    /// <summary>Ajoute une photo et taille le journal. Journal existant illisible : refus d'ecrire, plutot qu'effacer
+    /// l'historique.</summary>
     public Result Enregistrer(RepairSnapshot photo)
     {
         var lu = Lire();
@@ -114,7 +100,7 @@ public sealed class RepairHistoryStore
                 Docteur.T("RHS.NonEcrit", ex.Message));
         }
 
-        // L'ecriture atomique a une seule implementation (Core) : elle etait recopiee ici.
+        // L'ecriture atomique a une seule implementation (Core).
         return new FichierJsonAtomique(_chemin, ErrorCodes.DetectionFailed).WriteAtomic(json);
     }
 }

@@ -21,9 +21,8 @@ namespace DrDxt.Bios;
 /// </summary>
 public sealed class BiosAdvisor : IBiosAdvisor
 {
-    // Un BIOS plus ancien que ceci est signalé pour information « envisager une mise à jour ». La
-    // fondation n'a aucune base de connaissance des cartes mères (c'est pour plus tard) : c'est donc
-    // une indication douce et honnête, jamais une affirmation ferme sur l'AGESA ou la version.
+    // Un BIOS plus ancien est signalé pour information (« envisager une mise à jour ») : sans base de connaissance des
+    // cartes mères, jamais une affirmation sur l'AGESA ou la version.
     private static readonly TimeSpan OldBiosThreshold = TimeSpan.FromDays(365 * 2);
 
     public Result<IReadOnlyList<BiosFinding>> Advise(HardwareInventory hw, SettingsState state)
@@ -38,8 +37,7 @@ public sealed class BiosAdvisor : IBiosAdvisor
 
         var findings = new List<BiosFinding>();
 
-        // ── Filtre par châssis : le BIOS d'un portable / d'une console portable est en général verrouillé. ──
-        // Montrer un seul constat honnête d'information plutôt que des étapes impossibles.
+        // Le BIOS d'un portable / d'une console portable est en général verrouillé : un constat d'information, pas d'étapes.
         if (hw.Chassis is ChassisType.Laptop or ChassisType.Handheld)
         {
             findings.Add(new BiosFinding(
@@ -91,10 +89,8 @@ public sealed class BiosAdvisor : IBiosAdvisor
                     BiosStringKeys.XmpOffTitle, BiosStringKeys.XmpOffRationale,
                     BiosMatrixClass.Guide, TriState.Off,
                     BiosRecommendedAction.Enable, BiosStringKeys.XmpEnableAction,
-                    // Pas de fourchette. Mesures publiques : de quelques % (jeu limite
-                    // par la carte graphique) a ~42 % (jeu tres sensible a la memoire), ~1 % sur un
-                    // X3D (TechSpot, XDA, AMD). Aucune plage unique ne decrit une machine : le
-                    // chiffre de la personne vient de l'A/B du produit. La mise en garde le dit.
+                    // Pas de fourchette. Mesures publiques : quelques % (jeu limite par la carte graphique) a ~42 % (jeu
+                    // tres sensible a la memoire), ~1 % sur un X3D (TechSpot, XDA, AMD) ; le chiffre vient de l'A/B.
                     Gain: new BiosGainEstimate(
                         MinPct: null, MaxPct: null, Conditional: false,
                         SourceKey: BiosStringKeys.GainXmpSource, CaveatKey: BiosStringKeys.GainXmpCaveat),
@@ -178,11 +174,8 @@ public sealed class BiosAdvisor : IBiosAdvisor
     }
 
     // ── Routage X3D / CPPC : ne compte que sur un AMD X3D à plusieurs CCD. ──
-    // La correction principale du routage est côté Windows (service AMD 3D V-Cache / Game Bar), et le
-    // CPPC du BIOS ne compte que « s'il est mal réglé ». Le scan ne lit pas l'état du routage : on ne
-    // claironne donc pas une étape Major d'écriture BIOS ; on montre un constat Verify qui commence par
-    // la vérification côté Windows (la resx de justification) et traite le chemin CPPC du BIOS comme
-    // une étape secondaire « seulement s'il est mal réglé ».
+    // Le routage se corrige d'abord côté Windows (service AMD 3D V-Cache / Game Bar), le CPPC du BIOS seulement « s'il
+    // est mal réglé » ; le scan ne lit pas l'état du routage : un constat Verify, pas une étape Major d'écriture BIOS.
     private static void AddX3dCppc(List<BiosFinding> findings, HardwareInventory hw)
     {
         if (hw.Cpu.IsX3D && hw.Cpu.CcdCount > 1)
@@ -191,9 +184,8 @@ public sealed class BiosAdvisor : IBiosAdvisor
                 BiosStringKeys.X3dCppcTitle, BiosStringKeys.X3dCppcRationale,
                 BiosMatrixClass.Read, TriState.Unknown,
                 BiosRecommendedAction.Verify, BiosStringKeys.VerifyAction,
-                // Gain seulement si le routage des CCD est mal regle ; le plus souvent deja correct.
-                // Pas de fourchette « 0–10 % », tiree de nos notes et non d'une mesure
-                // publique. Conditionnel, et c'est la mise en garde qui porte la nuance.
+                // Gain seulement si le routage des CCD est mal regle (le plus souvent correct) ; aucune fourchette
+                // faute de mesure publique, la mise en garde porte la nuance.
                 Gain: new BiosGainEstimate(
                     MinPct: null, MaxPct: null, Conditional: true,
                     SourceKey: BiosStringKeys.GainX3dSource, CaveatKey: BiosStringKeys.GainX3dCaveat),

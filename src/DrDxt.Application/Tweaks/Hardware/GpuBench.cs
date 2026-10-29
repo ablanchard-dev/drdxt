@@ -2,22 +2,14 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks.Hardware;
 
-// -----------------------------------------------------------------------
-// Banc GPU : GpuBench, une enveloppe de mesure sur le runner de calcul déterministe.
-// Transforme une passe en résultat répétable et comparable pour l'A/B de tools/r2bench :
-// un score de débit + un verdict de stabilité + un drapeau « somme de contrôle juste ».
-//
-// Le score (ElementIterationsPerSecond = ElementCount * IterationsCompleted / secondes) est
-// le nombre comparable : la charge étant identique d'une passe à l'autre, seuls l'horloge et
-// le débit du GPU le font bouger. Donc : passe à l'origine, pose du +décalage par le helper
-// (étape UAC à part), nouvelle passe, comparaison nette des scores.
-//
-// Correspondance des verdicts, même contrat de sécurité que la sonde :
+// GpuBench : une passe du runner de calcul déterministe en résultat comparable pour l'A/B de tools/r2bench (score de
+// débit, verdict de stabilité, somme de contrôle juste). Le score (ElementIterationsPerSecond = ElementCount *
+// IterationsCompleted / secondes) ne bouge qu'avec l'horloge et le débit du GPU, la charge étant identique : passe à
+// l'origine, +décalage posé par le helper (UAC à part), nouvelle passe. Verdicts, même contrat que la sonde :
 //   * sain + somme de contrôle juste → Stable
 //   * DeviceLost ou somme de contrôle fausse → Unstable  (« pas de TDR ≠ stable »)
 //   * erreur / panne du runner → Inconclusive
 // Ne lève jamais. Lecture et calcul seulement : pas de NVAPI, pas d'écriture GPU, pas d'élévation.
-// -----------------------------------------------------------------------
 
 /// <summary>Un résultat de banc répétable : un score de débit comparable, le verdict de
 /// stabilité, et si la somme de contrôle déterministe correspond à la réponse connue.</summary>

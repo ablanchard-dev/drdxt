@@ -3,24 +3,15 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks.Hardware;
 
-// -----------------------------------------------------------------------
 // OcSweep : balayage croissant du décalage cœur sur le compteur de performance déterministe.
-//
-// Protocole (chirurgical, honnête) :
-//   1. poser 0 (origine) et mesurer l'agrégat d'origine ; une origine instable fait échouer
-//      tout le balayage (la machine n'est pas mesurable, rien n'est jamais posé),
-//   2. pour chaque candidat (croissant, dans la plage de GpuSafeBounds ; ceux hors plage sont
-//      écartés sans bruit, le balayage ne peut jamais écrire au-delà de la règle) : pose →
-//      mesure → verdict GpuBenchAb contre l'origine,
-//   3. garder le meilleur gain prouvé (l'écart dépasse la marge cumulée entre passes et chaque
-//      passe est stable) ; la première étape instable ou ratée arrête le balayage,
-//   4. toujours finir en reposant le meilleur décalage (0 = origine si rien n'a prouvé mieux) :
-//      jamais de décalage non prouvé laissé sur le GPU, même en sortie anticipée.
-//
-// Pure orchestration sur deux délégués (mesurer / poser), pour que la logique de décision soit
-// testée en entier sans GPU ; le banc octune les branche sur GpuBenchSession et la vraie
-// écriture NVAPI.
-// -----------------------------------------------------------------------
+//   1. poser 0 (origine) et mesurer ; une origine instable fait échouer tout le balayage, rien n'est posé ;
+//   2. chaque candidat, croissant, dans la plage de GpuSafeBounds (les autres écartés : jamais d'écriture hors règle) :
+//      pose → mesure → verdict GpuBenchAb contre l'origine ;
+//   3. garder le meilleur gain prouvé (écart au-delà de la marge cumulée, passes stables) ; la première étape instable
+//      ou ratée arrête ;
+//   4. finir toujours au meilleur décalage prouvé (0 sinon), même en sortie anticipée.
+// Orchestration pure sur deux délégués (mesurer / poser), testée sans GPU ; le banc octune les branche sur
+// GpuBenchSession et la vraie écriture NVAPI.
 
 /// <summary>Une étape du balayage : le décalage essayé, si l'écriture a pris, l'agrégat mesuré
 /// (null si la pose ou la mesure a échoué) et son verdict contre l'origine.</summary>

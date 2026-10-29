@@ -8,13 +8,13 @@ namespace DrDxt.Detection.Repair;
 /// Lue par la classe WMI de Microsoft <c>Win32_DeviceGuard</c> (root\Microsoft\Windows\DeviceGuard) :
 /// <c>VirtualizationBasedSecurityStatus</c> 2 = la sécurité basée sur la virtualisation tourne ;
 /// <c>SecurityServicesRunning</c> contient 2 quand l'intégrité de la mémoire tourne (0 = aucun service).
-/// Machine de référence, 04/10 : VBS 2, services {0}, donc HVCI coupée.
+/// Machine de référence, relevé du 04/10 : VBS 2, services {0}, donc HVCI coupée.
 ///
 /// Coût : une seule mesure de média, environ 8 % d'images (ComputerBase, Ryzen 5800X3D, reprise par Neowin) ; le reste
-/// des chiffres qui circulent vient de blogs de réglages. Depuis Windows 11 22H2, la liste de
-/// blocage des pilotes vulnérables a son propre interrupteur, active par défaut (Microsoft Learn) ; elle ne dépend plus
-/// de l'intégrité de la mémoire, la phrase ne le dit donc plus. Ce que l'intégrité de la mémoire ajoute : empêcher un
-/// code noyau non signé ou modifié de s'exécuter. Certains anti-triches l'exigent. DrDXT ne la coupe ni ne l'active.
+/// des chiffres qui circulent vient de blogs de réglages. Depuis Windows 11 22H2, la liste de blocage des pilotes
+/// vulnérables a son propre interrupteur, actif par défaut (Microsoft Learn), indépendant de l'intégrité de la mémoire.
+/// Celle-ci empêche un code noyau non signé ou modifié de s'exécuter ; certains anti-triches l'exigent. DrDXT ne la coupe
+/// ni ne l'active.
 /// </summary>
 public static class IntegriteMemoire
 {

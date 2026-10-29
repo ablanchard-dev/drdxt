@@ -4,34 +4,19 @@ using DrDxt.Core;
 namespace DrDxt.Measurement;
 
 /// <summary>
-/// Le journal des controles : il accumule, il ne corrige rien.
-///
-/// La tentation est de regarder trois no-op et d'« ajuster » les intervalles. Ce serait
-/// exactement la faute a eviter : trancher sur un echantillon trop petit.
-/// Sous vingt observations, <see cref="NoOpCalibration"/> refuse de conclure, et ce magasin ne
-/// fait rien d'autre que remplir le compteur.
-///
-/// Ce qui rend ce journal precieux est qu'il n'a pas besoin d'etre lu tout de suite. Chaque
-/// session de controle depose un fait qui ne perd rien a attendre : l'effet valait zero, voici ce
-/// que la chaine a trouve, voici ce qu'elle avait annonce. Dans quelques semaines, le produit
-/// pourra dire s'il est surconfiant, calibre ou aveugle, par grandeur et par protocole.
-///
-/// Le protocole fait partie de la cle. Un intervalle calibre a 8 alternances de 10 s ne dit
-/// rien de ce qu'il vaut a 24 : melanger les deux ferait une calibration moyenne de rien.
-///
-/// Meme frontiere disque que <see cref="PerformanceJournalStore"/>, volontairement : une seule
-/// chaine traverse, donc le magasin se teste sans fichier.
+/// Le journal des controles : il accumule, il ne corrige rien (sous vingt observations, <see cref="NoOpCalibration"/>
+/// refuse de conclure). Chaque session de controle depose un fait : l'effet valait zero, voici ce que la chaine a trouve
+/// et annonce ; a terme, le produit dira s'il est surconfiant, calibre ou aveugle, par grandeur et par protocole. Le
+/// protocole fait partie de la cle : 8 alternances de 10 s ne disent rien de 24. Meme frontiere disque que
+/// <see cref="PerformanceJournalStore"/> : une seule chaine traverse, le magasin se teste sans fichier.
 /// </summary>
 public sealed class NoOpCalibrationStore
 {
-    /// <summary>Assez pour des mois de controles, assez peu pour rester lisible a la main. On
-    /// elague les plus anciennes : contrairement au journal de derive, ou la premiere mesure est
-    /// la reference, ici toutes les observations ont le meme statut et les recentes decrivent
-    /// mieux la machine d'aujourd'hui.</summary>
+    /// <summary>Des mois de controles, lisible a la main. Les plus anciennes s'elaguent : ici toutes les observations se
+    /// valent (pas de premiere mesure de reference comme pour la derive), et les recentes decrivent mieux la machine.</summary>
     public const int MaximumEntrees = 500;
 
-    // Une resolution peut valoir +infini (PairedAb, zero degre de liberte) ; le JSON par
-    // defaut refuse de l'ecrire, et tout le lot de controles du jour etait perdu.
+    // Une resolution peut valoir +infini (PairedAb, zero degre de liberte), que le JSON par defaut refuse d'ecrire.
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = false,
@@ -42,13 +27,12 @@ public sealed class NoOpCalibrationStore
 
     public NoOpCalibrationStore(IPerformanceJournalFile fichier) => _fichier = fichier;
 
-    /// <summary>Un journal illisible ne doit pas empecher de mesurer aujourd'hui : on juge alors
-    /// sur rien, et <see cref="NoOpCalibration"/> refuse de conclure sous vingt observations.</summary>
+    /// <summary>Un journal illisible n'empeche pas de mesurer : on juge sur rien, et <see cref="NoOpCalibration"/>
+    /// refuse de conclure.</summary>
     public IReadOnlyList<NoOpObservation> Lire()
         => LireOuEchec() is { IsOk: true } lu ? lu.Value! : Array.Empty<NoOpObservation>();
 
-    /// <summary>La lecture qui dit son echec. Un fichier absent ou vide est un journal vide ; une
-    /// lecture ratee ou un JSON illisible ne le sont pas.</summary>
+    /// <summary>La lecture qui dit son echec : absent ou vide = journal vide ; lecture ratee ou JSON illisible = echec.</summary>
     private Result<List<NoOpObservation>> LireOuEchec()
     {
         var brut = _fichier.Read();
@@ -68,12 +52,8 @@ public sealed class NoOpCalibrationStore
         }
     }
 
-    /// <summary>Ajoute les observations d'une session de controle. Une ecriture qui echoue se dit :
-    /// sinon le produit croirait accumuler un historique qui n'existe pas.
-    ///
-    /// Si une lecture ratee (fichier verrouille) ou un JSON illisible rendait une liste vide, cette
-    /// methode ecraserait le fichier avec les seules observations du jour : des semaines de controles
-    /// effacees en silence. Sans lecture sure, on n'ecrit pas.</summary>
+    /// <summary>Ajoute les observations d'une session de controle ; un echec d'ecriture se dit. Sans lecture sure, on
+    /// n'ecrit pas : une liste lue vide par erreur ecraserait des semaines de controles.</summary>
     public Result Ajouter(IReadOnlyList<NoOpObservation> nouvelles)
     {
         if (nouvelles is null || nouvelles.Count == 0) return Result.Ok();
@@ -94,10 +74,8 @@ public sealed class NoOpCalibrationStore
         return _fichier.WriteAtomic(JsonSerializer.Serialize(tout, Options));
     }
 
-    /// <summary>Ce que les controles accumules disent d'une grandeur, pour un protocole donne.
-    ///
-    /// Le filtre par protocole n'est pas un raffinement : un intervalle calibre a 8 alternances
-    /// de 10 s ne dit rien de ce qu'il vaut a 24.</summary>
+    /// <summary>Ce que les controles accumules disent d'une grandeur, pour un protocole donne (8 alternances de 10 s ne
+    /// disent rien de 24).</summary>
     public CalibrationRapport Juger(GameMetricKind metrique, double secondesParPasse, int passes) =>
         NoOpCalibration.Juger(
             Lire().Where(o => Math.Abs(o.SecondesParPasse - secondesParPasse) < 0.01

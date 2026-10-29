@@ -5,12 +5,8 @@ using DrDxt.Core;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// Analyse et valide avec prudence le JSON de la bibliothèque de guides (valider toute donnée
-/// externe avant de s'en servir). Les données de la bibliothèque sont un atout du moat ; un fichier
-/// corrompu ou altéré doit échouer proprement (<see cref="ErrorCodes.BiosTemplateInvalid"/>) : jamais
-/// de plantage, jamais de valeur non validée dans un guide.
-///
-/// Invariants validés :
+/// Valide le JSON de la bibliothèque de guides avant usage : corrompu ou altéré, il échoue proprement
+/// (<see cref="ErrorCodes.BiosTemplateInvalid"/>), jamais une valeur non validée dans un guide. Invariants :
 ///   • tableau JSON bien formé, au moins un modèle ;
 ///   • constructeur et chaque réglage s'analysent en un enum connu (aucun repli sur l'enum 0) ;
 ///   • un modèle ne peut être <c>isVerified</c> que s'il porte une clé de base de connaissance
@@ -26,11 +22,8 @@ namespace DrDxt.Bios;
 /// </summary>
 public static class GuideTemplateValidator
 {
-    // Marqueurs qui ne doivent jamais apparaître dans les données de la bibliothèque. Les valeurs sont
-    // de simples libellés / touches de menu BIOS ; '>' n'est exprès pas ici, c'est le séparateur
-    // légitime de chemin de menu (« Advanced > PCI Subsystem »). Les marqueurs ci-dessous attrapent
-    // les balises HTML et la syntaxe de moteurs de modèles : altération ou erreur d'écriture, pas des
-    // libellés normaux.
+    // Balises HTML et syntaxe de moteurs de modèles, jamais dans des libellés de menu BIOS. '>' n'y est exprès pas : le
+    // séparateur de chemin de menu (« Advanced > PCI Subsystem »).
     private static readonly string[] InjectionMarkers =
         { "<", "{{", "}}", "&lt;", "&gt;", "${" };
 
@@ -88,8 +81,7 @@ public static class GuideTemplateValidator
         if (dto.Paths is null || dto.Paths.Count == 0)
             return FailT("template has no setting paths");
 
-        // Carte + version BIOS sont facultatives (un repli constructeur / génération d'interface les
-        // omet), mais présentes, elles doivent être propres. Ensemble, elles forment la clé carte + BIOS.
+        // Carte + version BIOS, la clé, facultatives (un repli les omet), mais propres si présentes.
         var board = dto.Board ?? string.Empty;
         if (ContainsInjection(board))
             return FailT("injection in board");
@@ -97,9 +89,7 @@ public static class GuideTemplateValidator
         if (ContainsInjection(biosVersion))
             return FailT("injection in biosVersion");
 
-        // Honnêteté : « vérifié pour votre carte exacte » ne peut être annoncé que par une vraie entrée
-        // carte + version BIOS. Une entrée constructeur / génération d'interface qui se dit vérifiée ment
-        // (et c'est un vecteur d'altération / d'erreur) → la rejeter.
+        // « Vérifié pour votre carte exacte » exige une entrée carte + version BIOS : un repli qui se dit vérifié est rejeté.
         if (dto.IsVerified && (string.IsNullOrWhiteSpace(board) || string.IsNullOrWhiteSpace(biosVersion)))
             return FailT("a verified template must carry both a board and a biosVersion "
                 + "(the board+BIOS KB key); vendor/UI-generation entries cannot be verified");
@@ -124,9 +114,8 @@ public static class GuideTemplateValidator
             if (IsBlankOrInjected(p.TargetValue))
                 return FailT($"missing/invalid targetValue for '{setting}'");
 
-            // Garde sémantique de sens : un modèle valide en structure pourrait encore être écrit dans un sens
-            // dangereux (par exemple Csm="Enabled" → risque de non-démarrage, ou XmpExpo="Disabled").
-            // Vérifier que la cible va dans le sens sûr / voulu.
+            // Le sens de la cible : une structure valide peut encore pointer dans le sens dangereux (Csm="Enabled" → risque
+            // de non-démarrage, XmpExpo="Disabled").
             var targetValue = p.TargetValue!.Trim();
             if (!IsExpectedDirection(setting, targetValue))
                 return FailT($"targetValue '{targetValue}' for '{setting}' points the wrong direction "
@@ -142,9 +131,7 @@ public static class GuideTemplateValidator
             dto.EnterKey!.Trim(), dto.SaveKey!.Trim(), paths));
     }
 
-    // Sens attendu de la cible par réglage. Attrape une erreur d'écriture dangereuse qui passe tous
-    // les contrôles de structure (par exemple une cible CSM « Enabled », ou une cible XMP « Disabled »).
-    // Les jetons se comparent à la valeur cible sans tenir compte de la casse.
+    // Sens attendu de la cible par réglage, jetons comparés sans tenir compte de la casse.
     private static bool IsExpectedDirection(FirmwareSettingKind setting, string targetValue)
     {
         var v = targetValue.ToLowerInvariant();
@@ -179,8 +166,7 @@ public static class GuideTemplateValidator
     private static Result<GuideTemplate> FailT(string why)
         => Result<GuideTemplate>.Fail(ErrorCodes.BiosTemplateInvalid, why);
 
-    // Les DTO sont nullables à dessein : un champ manquant est attrapé par la validation, pas
-    // par une valeur par défaut de désérialisation qui produirait en silence un enum 0 ou une chaîne vide.
+    // DTO nullables : un champ manquant est attrapé par la validation, pas changé en silence en enum 0 ou chaîne vide.
     private sealed class TemplateDto
     {
         public string? Vendor { get; init; }

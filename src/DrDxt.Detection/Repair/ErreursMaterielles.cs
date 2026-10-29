@@ -27,8 +27,8 @@ public static class ErreursMaterielles
     public sealed record Origine(int? ApicId, int? Banque, ulong? Statut, int? Bus, int? Peripherique, int? Fonction,
         int? Fabricant, int? Produit, int? TypeDePort, uint? StatutCorrigeable);
 
-    /// <summary><c>null</c> quand le journal n'a pas pu être lu ; une liste vide veut dire
-    /// « lu, rien trouvé ». Avaler l'échec rendait « aucune erreur en 90 jours » sur un journal refusé.</summary>
+    /// <summary><c>null</c> quand le journal n'a pas pu être lu ; une liste vide veut dire « lu, rien trouvé » (jamais
+    /// « aucune erreur en 90 jours » sur un journal refusé).</summary>
     public static IReadOnlyList<Enregistrement>? Lire(int jours = 90)
     {
         var lus = new List<Enregistrement>();

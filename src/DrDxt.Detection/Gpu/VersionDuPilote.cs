@@ -8,10 +8,8 @@ namespace DrDxt.Detection.Gpu;
 public sealed record VersionPubliee(string Version, DateOnly? Sortie);
 
 /// <summary>
-/// Hors ligne,
-/// DrDXT ne savait pas qu'une version plus récente existait : la branche 616 passait le plancher « 500 » et le pilote,
-/// trois versions en retard, était déclaré à jour. DrDXT demande maintenant au fabricant de la carte ses dernières
-/// versions publiées, et compte le retard du pilote installé.
+/// Le retard du pilote installé, compté sur les dernières versions publiées par le fabricant de la carte : un plancher
+/// seul (« 500 ») déclarerait à jour une branche 616 en retard de trois versions.
 /// </summary>
 public static class VersionDuPilote
 {
@@ -82,18 +80,16 @@ public static class VersionDuPilote
                 : SansReponse("AMD", installee, Docteur.T("VP.OuAmd"));
         }
         if (cartes.FirstOrDefault(c => c.Vendor.Contains("Intel", StringComparison.OrdinalIgnoreCase)) is { } intel)
-            // Relevé le 03/10/2026 : la page de téléchargement d'Intel répond 403 à tout programme, même avec les en-têtes
-            // d'un navigateur. Pas de source lisible : l'endroit où vérifier est dit.
+            // Relevé le 03/10/2026 : la page d'Intel répond 403 à tout programme, même avec les en-têtes d'un navigateur.
+            // L'endroit où vérifier est dit.
             return SansSource("Intel", intel.DriverVersion, Docteur.T("VP.OuIntel"));
         return null;
     }
 
     /// <summary>
-    /// La source lue est celle des GeForce récentes. NVIDIA a arrêté les nouvelles
-    /// versions pour Maxwell, Pascal et Volta à la branche 580 (annonce de juillet 2025, reprise par Tom's Hardware et
-    /// TechPowerUp) : une GTX 1060 se verrait dire « en retard » sur des versions qui ne la prennent pas en charge. Les
-    /// cartes professionnelles (Quadro, RTX A) suivent une autre suite. Seules les GeForce qui reçoivent la même version
-    /// Game Ready que la RTX 40 de référence sont donc comparées : RTX 20 à 50, GTX 16, MX 400 et 500.
+    /// Les GeForce qui reçoivent la version Game Ready de la RTX 40 de référence : RTX 20 à 50, GTX 16, MX 400 et 500.
+    /// NVIDIA a arrêté Maxwell, Pascal et Volta à la branche 580 (source : annonce de juillet 2025, reprise par Tom's
+    /// Hardware et TechPowerUp) ; Quadro et RTX A suivent une autre suite.
     /// </summary>
     internal static bool SuitLesPilotesGameReady(string modele) =>
         System.Text.RegularExpressions.Regex.IsMatch(modele, @"GeForce\s+(RTX\s+[2-5]0\d0|GTX\s+16\d0|MX\s*[45]\d0)",
@@ -104,10 +100,9 @@ public static class VersionDuPilote
         System.Text.RegularExpressions.Regex.IsMatch(modele, @"Radeon\s+RX\s+[5-9]\d{3}",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-    /// <summary>La version AMD installée au format d'AMD, que Windows garde dans la clé de la carte graphique
-    /// (valeur « RadeonSoftwareVersion », relevée dans des exports de registre publiés sur le forum Guru3D) ; <c>null</c>
-    /// sans carte AMD ou sans cette valeur. Les clés des cartes retirées restent ; seule celle dont la description
-    /// (« DriverDesc ») est le nom de la carte présente est lue.</summary>
+    /// <summary>La version AMD installée au format d'AMD, valeur « RadeonSoftwareVersion » de la clé de la carte (relevée
+    /// dans des exports de registre publiés sur le forum Guru3D) ; <c>null</c> sinon. Seule la clé dont « DriverDesc » est
+    /// le nom de la carte présente est lue (celles des cartes retirées restent).</summary>
     public static string? RadeonSoftwareVersion(string modele)
     {
         try
@@ -208,10 +203,9 @@ public sealed class SourceAmd
 }
 
 /// <summary>
-/// La source publique de NVIDIA (celle du formulaire de téléchargement du site), relevée le 03/10/2026 : une requête
-/// rend les dernières versions Game Ready WHQL pour Windows 11. La version GeForce est la même pour toutes les cartes
-/// de bureau d'une époque ; la série RTX 40 (psid 129, pfid 1004) sert de référence. L'une des deux requêtes réseau de ce
-/// module, avec <see cref="SourceAmd"/>.
+/// La source publique de NVIDIA (le formulaire de téléchargement du site), relevée le 03/10/2026 : les dernières
+/// versions Game Ready WHQL pour Windows 11, la RTX 40 (psid 129, pfid 1004) en référence. L'une des deux requêtes réseau
+/// du module, avec <see cref="SourceAmd"/>.
 /// </summary>
 public sealed class SourceNvidia
 {
@@ -254,8 +248,8 @@ public sealed class SourceNvidia
     }
 }
 
-/// <summary>La lecture d'une page de fabricant : 10 s au plus, et 4 Mio au plus. La réponse de NVIDIA fait 25 Ko (relevé le
-/// 03/10/2026) ; une page captive ou un incident côté fabricant qui rendrait des Mio n'est pas lu, la version reste non lue.</summary>
+/// <summary>La lecture d'une page de fabricant : 10 s et 4 Mio au plus (NVIDIA : 25 Ko, relevé le 03/10/2026). Une page
+/// captive qui rendrait des Mio n'est pas lue, la version reste non lue.</summary>
 internal static class PageDuFabricant
 {
     public const int OctetsMax = 4 * 1024 * 1024;

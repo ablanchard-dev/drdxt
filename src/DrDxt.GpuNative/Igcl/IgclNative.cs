@@ -3,9 +3,7 @@ using System.Runtime.Versioning;
 
 namespace DrDxt.GpuNative.Igcl;
 
-// -----------------------------------------------------------------------
 // La température d'une carte Intel par IGCL (Intel Graphics Control Library), en lecture seule.
-//
 // Source : intel/drivers.gpu.control-library, include/igcl_api.h et Source/cApiWrapper.cpp (licence MIT), lus le 07/10/2026.
 // ControlLib.dll est livrée par le pilote Intel ; le chargeur officiel la cherche dans System32 seulement
 // (LoadLibraryExW + LOAD_LIBRARY_SEARCH_SYSTEM32), comme ici. Les fonctions sont exportées par leur nom (GetProcAddress).
@@ -15,11 +13,9 @@ namespace DrDxt.GpuNative.Igcl;
 //   ctlEnumTemperatureSensors(carte, uint32_t*, handle*)    idem
 //   ctlTemperatureGetProperties(sonde, ctl_temp_properties_t*)   type de sonde (GPU, mémoire, global, minima)
 //   ctlTemperatureGetState(sonde, double*)                   degrés Celsius
-//
 // Non prouvé sur une vraie carte Intel (aucune ici) : la disposition des deux structures est figée par un test de taille
-// contre l'en-tête ; la valeur rendue, elle, attend une machine Arc.
-// ctlInit une fois (paresseux), jamais ctlClose : comme NVML, la poignée meurt avec le processus.
-// -----------------------------------------------------------------------
+// contre l'en-tête ; la valeur rendue attend une machine Arc. ctlInit une fois (paresseux), jamais ctlClose : comme NVML,
+// la poignée meurt avec le processus.
 [SupportedOSPlatform("windows")]
 public sealed class IgclNative
 {

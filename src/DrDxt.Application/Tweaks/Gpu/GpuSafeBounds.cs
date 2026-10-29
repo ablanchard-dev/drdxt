@@ -1,22 +1,11 @@
 namespace DrDxt.Application.Tweaks.Gpu;
 
-// -----------------------------------------------------------------------
-// GpuSafeBounds (table de bornes prudentes).
-//
-// Le garde-fou placé devant le helper élevé pour chaque levier de réglage GPU (sous-tension,
-// limite de puissance, courbe de ventilateur). Aucune valeur hors de ces bornes n'atteint
-// jamais le pilote : un levier borne par Clamp* et refuse (TWEAK.NOT_APPLICABLE) ce
-// que Is*Safe dit hors plage.
-//
-// Les valeurs sont volontairement timides : on prend les 80 % sûrs et ennuyeux du gain
-// (plus frais, 1 % lows plus réguliers) et on refuse la marge risquée. Elles seront
-// durcies avec de vraies données. Pur, sans effet de bord, entièrement testé.
-//
-// Un décalage d'horloge cœur, dans un sens ou dans l'autre, jamais une tension. Un décalage
-// négatif fait tourner chaque point de tension plus lentement (plus frais, moins d'images),
-// pas « les mêmes fréquences à tension plus basse ». On borne le décalage cœur à une plage
-// prudente pour qu'aucun extrême n'atteigne le helper.
-// -----------------------------------------------------------------------
+// GpuSafeBounds : le garde-fou devant le helper élevé pour chaque levier GPU (sous-tension, limite de puissance, courbe
+// de ventilateur). Rien hors de ces bornes n'atteint le pilote : un levier borne par Clamp* et refuse
+// (TWEAK.NOT_APPLICABLE) ce que Is*Safe dit hors plage. Valeurs timides : les 80 % sûrs du gain (plus frais, 1 % lows
+// plus réguliers), pas la marge risquée. Pur, entièrement testé.
+// Un décalage d'horloge cœur, jamais une tension : négatif, chaque point de tension tourne plus lentement (plus frais,
+// moins d'images), pas « les mêmes fréquences à tension plus basse ».
 public static class GpuSafeBounds
 {
     // --- Décalage d'horloge cœur (MHz). Négatif = sens de la sous-tension. ---
@@ -46,9 +35,8 @@ public static class GpuSafeBounds
     public static bool IsMemoryOffsetSafe(int offsetMhz) =>
         offsetMhz >= MinMemoryOffsetMhz && offsetMhz <= MaxMemoryOffsetMhz;
 
-    /// <summary>Borne un décalage d'horloge cœur demandé à [MinCoreOffsetMhz, MaxCoreOffsetMhz].
-    /// La borne d'entrée d'un paramètre de profil de puce : une valeur hors plage est ramenée à
-    /// la borne prudente la plus proche, et rien hors plage n'atteint une cible.</summary>
+    /// <summary>Borne un décalage d'horloge cœur demandé à [MinCoreOffsetMhz, MaxCoreOffsetMhz] : l'entrée d'un
+    /// paramètre de profil de puce, ramenée à la borne la plus proche.</summary>
     public static int ClampCoreOffsetMhz(int offsetMhz) =>
         Math.Clamp(offsetMhz, MinCoreOffsetMhz, MaxCoreOffsetMhz);
 
@@ -83,10 +71,8 @@ public static class GpuSafeBounds
     /// sûr : la courbe ne laissera pas le GPU cuire en silence.</summary>
     public static bool IsFanCurveSafe(FanCurve curve) =>
         curve.Points.All(p => p.TempC < HotTempThresholdC || p.DutyPct >= MinFanDutyAtHotTempPct)
-        // Les points chauds seuls ne suffisaient pas. (79 °C, 10 %) puis (100 °C, 40 %)
-        // passait, et à 85 °C la carte tournait à 10-17 % selon que le pilote tient ou interpole ;
-        // (60 °C, 20 %) seul passait aussi, et tenait 20 % à 90 °C. Le point qui gouverne 80 °C
-        // (le dernier à 80 °C ou moins) doit lui aussi tenir le plancher.
+        // Le point qui gouverne 80 °C (le dernier à 80 °C ou moins) tient aussi le plancher : sinon (79 °C, 10 %) puis
+        // (100 °C, 40 %) tournerait à 10-17 % à 85 °C (le pilote tient ou interpole), et (60 °C, 20 %) seul à 20 % à 90 °C.
         && (curve.Points.Where(p => p.TempC <= HotTempThresholdC).MaxBy(p => p.TempC) is not { } g
             || g.DutyPct >= MinFanDutyAtHotTempPct);
 }

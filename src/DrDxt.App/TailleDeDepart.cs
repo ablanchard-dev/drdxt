@@ -1,21 +1,13 @@
 namespace DrDxt.App;
 
 /// <summary>
-/// La taille a laquelle la fenetre s'ouvre, adaptee a la place reellement disponible.
-///
-/// `MainWindow.xaml` demande 1320 x 900 DIP sans regarder l'ecran, et WPF
-/// ouvre a la taille demandee : il ne rapetisse pas, il deborde. Deux cas ordinaires :
-/// un portable 1366 x 768 laisse ~728 DIP de haut une fois la barre des taches retiree
-/// (172 sous l'ecran), et un 1920 x 1080 a 150 % (le reglage que Windows recommande sur
-/// beaucoup de portables) ne laisse que ~1280 x 673 DIP, donc un debordement des deux
-/// cotes. Ce qui depasse en bas, c'est l'action de l'ecran.
-///
-/// La regle est ici, pure et sans WPF, pour qu'elle se prouve sans ouvrir de fenetre :
-/// `MainWindow` lui passe `SystemParameters.WorkArea`, les tests lui passent des chiffres.
-///
-/// Le minimum l'emporte sur le debordement. Sur un ecran plus petit que le minimum
-/// utilisable, rapetisser encore ne repare rien : l'interface devient inutilisable et
-/// deborde quand meme. On rend le minimum, et l'utilisateur deplace la fenetre.
+/// La taille a laquelle la fenetre s'ouvre, adaptee a la place reellement disponible. `MainWindow.xaml` demande
+/// 1320 x 900 DIP, et WPF deborde au lieu de rapetisser : un portable 1366 x 768 laisse ~728 DIP de haut sans la barre
+/// des taches (172 sous l'ecran), un 1920 x 1080 a 150 % (recommande sur beaucoup de portables) ~1280 x 673. Ce qui
+/// depasse en bas, c'est l'action de l'ecran.
+/// Pure et sans WPF, prouvee sans fenetre : `MainWindow` passe `SystemParameters.WorkArea`, les tests des chiffres. Le
+/// minimum l'emporte : sur un ecran plus petit, rapetisser rendrait l'interface inutilisable ; l'utilisateur deplace la
+/// fenetre.
 /// </summary>
 public static class TailleDeDepart
 {

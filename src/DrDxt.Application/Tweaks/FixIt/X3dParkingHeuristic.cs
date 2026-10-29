@@ -7,15 +7,9 @@ namespace DrDxt.Application.Tweaks.FixIt;
 // AMD X3D à deux CCD, d'après SettingsState.ParkedCoreIndexes (lu par le scan, jeu ouvert seulement : hors jeu,
 // l'optimiseur ne parque rien, et « rien de parqué » ne distingue pas un routage sain d'un cassé).
 //
-// Contexte : sur un X3D à deux CCD (7950X3D / 7900X3D / 9950X3D), un CCD porte la 3D V-Cache
-// empilée (le CCD de jeu) et l'autre est le CCD haute fréquence. Le service AMD 3D V-Cache
-// Performance Optimizer + la Game Bar envoient les jeux sur le CCD à V-Cache en parquant les
-// cœurs du CCD fréquence pendant le jeu. Par convention, le CCD à V-Cache est CCD0 (les index
-// de cœur bas) ; le CCD fréquence est CCD1 (les index hauts).
-//
-// États cassés signalés (prudemment : un faux positif ne fait qu'activer une voie logicielle
-// prise en charge et entièrement annulable, et le vrai gain est prouvé par la remesure du
-// moteur ; on préfère quand même ne pas signaler une machine saine) :
+// Sur un X3D à deux CCD (7950X3D / 7900X3D / 9950X3D), CCD0 (index bas) porte la 3D V-Cache, CCD1 (index hauts) la
+// haute fréquence ; l'optimiseur AMD 3D V-Cache et la Game Bar parquent les cœurs de CCD1 pendant le jeu. Signalé
+// prudemment (un faux positif n'active qu'une voie annulable, et le gain se prouve à la remesure) :
 //   * rien de parqué → l'optimiseur ne route rien (le cas cassé classique : les deux CCD
 //     actifs, l'ordonnanceur éjecte le jeu du CCD à cache).
 //   * un cœur du CCD à V-Cache (index bas, < cœurs par CCD) est parqué → le mauvais CCD est
@@ -33,10 +27,8 @@ public static class X3dParkingHeuristic
 
         var parked = state.ParkedCoreIndexes;
 
-        // Parcage non lu (null) n'est pas « rien n'est parque ». Ce levier ecrit
-        // (AMD3DVCacheSvc et le mode Jeu) : proposer une ecriture sur un signal non lu
-        // est exactement ce qu'un lecteur bouchonne rendant toujours une liste vide
-        // ferait faire ici, sur toute machine X3D bi-CCD, saines comprises.
+        // Non lu (null) n'est pas « rien de parque » : ce levier ecrit (AMD3DVCacheSvc, mode Jeu), et un lecteur bouchonne
+        // le ferait proposer sur toute machine X3D bi-CCD, saines comprises.
         if (parked is null)
             return false;
 
@@ -44,9 +36,8 @@ public static class X3dParkingHeuristic
         if (parked.Count == 0)
             return true;
 
-        // État cassé n° 2 : un cœur du CCD à V-Cache (index bas) est parqué = mauvais CCD.
-        // Windows numérote un cœur par son premier processeur logique (CoreIndex : 0, 2, 4… avec l'hyperthreading) : le
-        // CCD0 à V-Cache possède les numéros [0 .. processeurs logiques par CCD - 1].
+        // État cassé n° 2 : un cœur du CCD à V-Cache parqué. Windows numérote un cœur par son premier processeur logique
+        // (0, 2, 4… avec l'hyperthreading) : CCD0 possède [0 .. logiques par CCD - 1].
         var logiquesParCcd = Math.Max(1, cpu.Threads / cpu.CcdCount);
         foreach (var index in parked)
         {

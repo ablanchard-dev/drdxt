@@ -6,37 +6,22 @@ using DrDxt.ElevatedHelper.Ipc;
 
 namespace DrDxt.App.Platform;
 
-// -----------------------------------------------------------------------
 // ElevatedClientFactory : construit l'IElevatedClient côté App.
-//
-// Deux chemins :
-//   1. Par défaut : lancement à la demande et handshake. L'App trouve
-//      DrDxt.ElevatedHelper.exe à côté d'elle et, à la première opération privilégiée,
-//      le lance élevé (une seule invite UAC via HelperLauncher), puis lui parle par le
-//      named pipe protégé par ACL, en négociant à la connexion une clé éphémère par
-//      session (HandshakingElevatedClient). Aucun développeur ne partage de clé à l'avance.
-//   2. Forcé (outils de banc, build DEBUG hors Program Files seulement) : si DRDXT_HELPER_SESSION_KEY (base64, >= 32 octets)
-//      est posée, on rend à la place le TypedNamedPipeElevatedClient éprouvé, à clé par
-//      variable d'environnement, pour que les outils m2smoke/r2smoke existants marchent
-//      sans changement (ils lancent le helper en mode ancien et partagent la clé à l'avance).
-//
-// Quand rien ne peut donner de canal (exe du helper absent, etc.), on rend un client qui
-// échoue proprement et refuse chaque opération (Result.Fail) : l'App ne lève ni ne plante
-// jamais sur un helper absent ; une application échoue simplement proprement.
-//
-// Le helper n'est pas un service : il est lancé à la demande, à chaque session. Le service de
-// démarrage (DrDxt.ReconcilerHost) est un autre exécutable, qui exécute ses ops dans son propre
-// processus (InProcessElevatedClient) sans passer par ce canal.
-// -----------------------------------------------------------------------
+//   1. Par défaut : à la première opération privilégiée, l'App lance élevé le DrDxt.ElevatedHelper.exe posé à côté
+//      d'elle (une invite UAC, HelperLauncher), puis lui parle par le named pipe protégé par ACL avec une clé éphémère
+//      négociée par session (HandshakingElevatedClient). Aucune clé partagée à l'avance.
+//   2. Forcé (outils de banc, build DEBUG hors Program Files seulement) : DRDXT_HELPER_SESSION_KEY (base64, >= 32
+//      octets) rend le TypedNamedPipeElevatedClient à clé partagée, pour m2smoke/r2smoke (helper en mode ancien).
+// Sans canal possible (helper absent…), un client qui refuse chaque opération (Result.Fail) : jamais de plantage.
+// Le helper est lancé à la demande, à chaque session ; le service de démarrage (DrDxt.ReconcilerHost) exécute ses ops
+// dans son propre processus (InProcessElevatedClient), hors de ce canal.
 [SupportedOSPlatform("windows")]
 public static class ElevatedClientFactory
 {
     public const string SessionKeyEnv = "DRDXT_HELPER_SESSION_KEY";
 
-    /// <summary>Nom de fichier du helper élevé, copié à côté de l'exe de l'App à la compilation.
-    /// Source de verite unique, partagee avec la garde qui authentifie le serveur du tube
-    /// cote client : le fichier qu'on lance et le fichier qu'on accepte d'ecouter doivent
-    /// etre nommes au meme endroit, sinon les deux derivent.</summary>
+    /// <summary>Nom de fichier du helper élevé, copié à côté de l'exe de l'App à la compilation. Source unique, partagée
+    /// avec la garde qui authentifie le serveur du tube : le fichier lancé et le fichier écouté ne dérivent pas.</summary>
     public const string HelperExeName = PipeServerIdentity.HelperExeName;
 
     /// <summary>Les valeurs HKCU s'écrivent par l'App (jeton de l'utilisateur), le reste par le helper.</summary>
@@ -86,16 +71,14 @@ public static class ElevatedClientFactory
         var pipeName = PipeSecurityFactory.DefaultPipeName;
         var spec = new HelperLaunchSpec(helperExe, appExe, pipeName);
 
-        // La réutilisation et la présence du helper se détectent par une tentative complète de
-        // connexion et de handshake (pas de sonde de connexion nue à part, qui entrerait en course
-        // avec le pipe à instance unique).
+        // Réutilisation et présence du helper se détectent par une connexion et un handshake complets : une sonde nue
+        // entrerait en course avec le pipe à instance unique.
         var launcher = new HelperLauncher(
             new RunAsProcessLauncher(),
             new PipeHandshakeAttempt(pipeName));
 
-        // Le client n'accepte de parler qu'au helper qu'on vient de lancer : meme chemin des
-        // deux cotes. Un squatteur non privilegie qui aurait pris le nom du tube avant lui est
-        // refuse avant le handshake, donc avant d'apprendre ce que DrDXT voulait appliquer.
+        // Le client ne parle qu'au helper lancé, même chemin des deux côtés : un squatteur du nom du tube est refusé avant
+        // le handshake, donc avant d'apprendre ce que DrDXT voulait appliquer.
         var inner = new HandshakingElevatedClient(pipeName, helperExe);
 
         // Le lancement UAC attend la première opération privilégiée ; on réutilise le helper s'il tourne déjà.
@@ -112,10 +95,9 @@ public static class ElevatedClientFactory
         return helper ?? (locaux ? null : Docteur.T("JEA.AcquitRefuse"));
     }
 
-    /// <summary>Un client qui ne lance jamais le helper : il le reutilise s'il sert deja son
-    /// tube (meme garde d'authentification du serveur), sinon il echoue vite (HELPER_UNREACHABLE). Pour les
-    /// gestes de fond, comme le rafraichissement de l'habilitation du manifeste : une invite UAC sans geste
-    /// de l'utilisateur n'est jamais acceptable.</summary>
+    /// <summary>Un client qui ne lance jamais le helper : il le reutilise s'il sert deja son tube (meme garde du serveur),
+    /// sinon HELPER_UNREACHABLE. Pour les gestes de fond (rafraichissement de l'habilitation du manifeste) : jamais
+    /// d'invite UAC sans geste de l'utilisateur.</summary>
     public static IElevatedClient CreateSansLancer() => Monter(CreerSansLancerVersLeHelper(), JournalDuCompte());
 
     private static IElevatedClient CreerSansLancerVersLeHelper()

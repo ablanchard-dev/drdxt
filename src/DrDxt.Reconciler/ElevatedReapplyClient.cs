@@ -2,21 +2,11 @@ using DrDxt.Core;
 
 namespace DrDxt.Reconciler;
 
-// -----------------------------------------------------------------------
-// ElevatedReapplyClient : le pont entre « un tweakId réconciliable a dérivé, le remettre à la
-// valeur voulue » et le pipeline existant des ops privilégiées typées.
-//
-// Sécurité (I3, la leçon WinRing0) : la réapplication n'introduit jamais de nouvelle primitive
-// privilégiée. Elle traduit tweakId + valeur voulue en une des feuilles PrivilegedOp scellées
-// existantes (SetRegistryValueOp / SetActivePowerPlanOp / RunServiceControlOp) par l'IReapplyOpMapper injecté, puis l'envoie par le même
-// IElevatedClient.ExecuteAsync, dont elle hérite tout le chemin signature → autorisation de
-// l'appelant → allowlist côté serveur. Un tweakId inconnu du mappeur échoue avant tout IPC
-// (aucune op n'est jamais envoyée).
-//
-// Les traductions elles-mêmes (quel tweakId construit quelle feuille avec quelle valeur bornée)
-// reprennent les leviers de la couche Application. Ici sont construits et testés la couture,
-// l'envoi et la garantie d'échec avant IPC.
-// -----------------------------------------------------------------------
+// ElevatedReapplyClient : « ce tweakId réconciliable a dérivé, le remettre à sa valeur voulue », par le pipeline des ops
+// typées. Sécurité (I3, la leçon WinRing0) : aucune nouvelle primitive privilégiée. L'IReapplyOpMapper injecté traduit
+// en une feuille PrivilegedOp scellée existante (SetRegistryValueOp / SetActivePowerPlanOp / RunServiceControlOp),
+// envoyée par IElevatedClient.ExecuteAsync : signature → autorisation de l'appelant → allowlist côté serveur. Un
+// tweakId inconnu du mappeur échoue avant tout IPC. Les traductions reprennent les leviers de la couche Application.
 
 /// <summary>Traduit un tweakId réconciliable + sa valeur voulue sérialisée en la feuille
 /// PrivilegedOp typée existante qui le réaffirme. Un tweakId inconnu, ou une valeur voulue qui

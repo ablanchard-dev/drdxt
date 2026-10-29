@@ -1,22 +1,11 @@
 namespace DrDxt.Detection.Gpu.Adlx;
 
-// -----------------------------------------------------------------------
-// AdlxVtableSlots : les indices de référence des emplacements de vtable COM d'ADLX (à partir de 0).
-//
-// ADLX expose une ABI C proche de COM : le premier mot de chaque objet pointe vers une vtable (un
-// tableau de pointeurs de fonction). Pour appeler une méthode, on indexe ce tableau. Ces indices
-// ne sont pas arbitraires : ils sont fixés par les déclarations d'interfaces du SDK ADLX. Indexer
-// le mauvais emplacement appelle la mauvaise fonction native.
-//
-// Chaque constante ci-dessous a été vérifiée emplacement par emplacement le 2026-06-29 contre les
-// en-têtes de référence du SDK ADLX :
+// AdlxVtableSlots : les indices des emplacements de vtable COM d'ADLX (à partir de 0). ADLX expose une ABI C proche de
+// COM : le premier mot de chaque objet pointe vers une vtable, et le mauvais indice appelle la mauvaise fonction native.
+// Chaque constante a été vérifiée emplacement par emplacement le 2026-06-29 contre les en-têtes du SDK ADLX :
 //   https://github.com/GPUOpen-LibrariesAndSDKs/ADLX  (SDK/Include/*.h)
-// Voir ADLX-SLOTS.md (même dossier) pour le tableau complet des citations par emplacement.
-//
-// AdlxNative est le seul consommateur. AdlxSlotsTests fige chaque valeur pour qu'une modification
-// accidentelle fasse échouer le build bruyamment au lieu d'appeler le pilote de travers en silence :
-// on ne peut pas les tester sur du vrai matériel en CI.
-// -----------------------------------------------------------------------
+// Le tableau complet des citations est dans ADLX-SLOTS.md (même dossier). AdlxNative est le seul consommateur ;
+// AdlxSlotsTests fige chaque valeur, faute de vrai matériel en CI.
 public static class AdlxVtableSlots
 {
     // IADLXInterface : base de toutes les interfaces sauf IADLXSystem.

@@ -4,24 +4,14 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// GameModeOnTweak (système, persistant).
-//
-// Active le mode Jeu de Windows en posant à 1 les deux feuilles GameBar de l'utilisateur :
-//   * AllowAutoGameMode : l'autorisation (celle que la détection lit) ;
-//   * AutoGameModeEnabled : la bascule des Paramètres récents.
-// Elles se posent ensemble (les Paramètres et les guides communautaires écrivent les deux) ; n'en
-// changer qu'une peut laisser le mode Jeu inactif, donc les deux sont écrites et rendues.
-//
-// Snapshot composite (comme X3dCcdParkingFixTweak) : chaque original est relu avant d'écrire,
-// CompositeSnapshotCodec, retour fidèle de toutes les feuilles. Un échec en cours d'application
-// défait les feuilles déjà écrites (la dernière écrite d'abord) : rien ne reste à moitié posé.
-//
-// Effet au prochain lancement du jeu, sans redémarrage : le moteur saute l'A/B immédiat (TakesEffectAfterReboot = true,
-// le contrat range ensemble redémarrage et prochain lancement) ; la preuve est le prochain scan en jeu, jamais cette
-// session. Les phrases d'annulation et de retrait disent « au prochain lancement du jeu » (ScanViewModel.AuLancementDuJeu).
-//
-// L'effet du mode Jeu varie : il est proposé (quand il est inactif), jamais posé en silence, et le
-// SummaryKey décrit le changement (pas de « +FPS »). Persiste au redémarrage.
+// GameModeOnTweak (système, persistant) : le mode Jeu de Windows, les deux feuilles GameBar de l'utilisateur à 1,
+// AllowAutoGameMode (l'autorisation, que la détection lit) et AutoGameModeEnabled (la bascule des Paramètres récents).
+// Ensemble, comme les Paramètres : une seule peut laisser le mode Jeu inactif. Snapshot composite (comme
+// X3dCcdParkingFixTweak), chaque original relu ; un échec défait les feuilles écrites, la dernière d'abord.
+// Effet au prochain lancement du jeu : le moteur saute l'A/B immédiat (TakesEffectAfterReboot range redémarrage et
+// prochain lancement ensemble), la preuve vient du prochain scan en jeu ; annulation et retrait disent « au prochain
+// lancement du jeu » (ScanViewModel.AuLancementDuJeu). Proposé quand il est inactif, jamais posé en silence, sans
+// « +FPS ».
 // -----------------------------------------------------------------------
 /// <summary>Active le mode Jeu de Windows (AllowAutoGameMode et AutoGameModeEnabled à 1), proposé quand il est lu inactif.</summary>
 public sealed class GameModeOnTweak : LatencyTweakBase
@@ -42,10 +32,8 @@ public sealed class GameModeOnTweak : LatencyTweakBase
     // Le mode Jeu agit au prochain lancement du jeu ou redémarrage → le moteur diffère sa preuve A/B.
     public override bool TakesEffectAfterReboot => true;
 
-    // Proposé dès que le mode Jeu n'est pas actif (les clés sont des préférences utilisateur,
-    // parfois absentes par défaut ; les écrire est sûr et réversible).
-    /// <summary>Uniquement quand Game Mode est lu comme desactive. `Unknown` (illisible) ne
-    /// declenche rien : on ne repare pas ce qu'on n'a pas su lire.</summary>
+    /// <summary>Seulement quand le mode Jeu est lu désactivé (des préférences utilisateur, sûres et réversibles à écrire) ;
+    /// `Unknown` ne déclenche rien.</summary>
     public override bool AppliesTo(HardwareInventory hw, SettingsState state) =>
         state.GameMode == TriState.Off;
 
@@ -95,8 +83,7 @@ public sealed class GameModeOnTweak : LatencyTweakBase
                 appliedInverses.Add(inverse);
             }
 
-            // Les valeurs posees, pour que la desinstallation ne rende une feuille que si elle
-            // porte encore ce que DrDXT y a mis (un reglage change a la main depuis est respecte).
+            // Les valeurs posees : la desinstallation ne rend une feuille que si elle porte encore celle de DrDXT.
             var posees = CompositeSnapshotCodec.Encode(steps.Select(s => s.Forward).ToList());
             return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, snapshotJson.Value, posees.IsOk ? posees.Value : null));
         }
@@ -140,8 +127,7 @@ public sealed class GameModeOnTweak : LatencyTweakBase
         }
     }
 
-    // L'op inverse d'une feuille DWORD GameBar : remettre la valeur relevée, ou la supprimer
-    // si elle était absente au départ (retour fidèle d'une valeur ajoutée).
+    // L'inverse d'une feuille GameBar : la valeur relevée, ou une suppression si elle était absente.
     private static PrivilegedOp Inverse(string name, uint? capturedOriginal) =>
         capturedOriginal is uint original
             ? new SetRegistryValueOp(RegistryHiveKind.CurrentUser, GameBarPath, name, RegistryValueType.DWord,

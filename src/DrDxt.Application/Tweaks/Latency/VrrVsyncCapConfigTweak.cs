@@ -4,36 +4,22 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// VrrVsyncCapConfigTweak.
-//
-// Pose dans le pilote le combo basse latence de Blur Busters pour un écran VRR (G-Sync, FreeSync) :
-// Vsync activée et un plafond d'images environ 3 images/s sous la fréquence de l'écran. Les images
-// restent dans la fenêtre VRR, avec la latence la plus basse et sans déchirure. Le plafond par jeu est
-// souvent dans le moteur ; ici, c'est la Vsync et le plafond du pilote, et l'écran affiche la valeur
-// exacte (fréquence − 3).
-//
-// Gating : un écran VRR doit être détecté (IDisplayInfo), jamais de plafond à l'aveugle sur un écran
-// sans VRR. Vise l'écran de jeu principal ; ambigu, rien n'est proposé.
-//
-// Le combo s'écrit au profil du jeu en cours, comme PreferMaxPerf : « Base Profile » toucherait tous
-// les jeux et le bureau.
-//
-// La Vsync et le plafond d'origine sont gardés dans un snapshot composite : l'annulation rend les deux.
-// Chaque frontière externe est protégée : échec propre, jamais d'exception.
+// VrrVsyncCapConfigTweak : le combo basse latence de Blur Busters pour un écran VRR (G-Sync, FreeSync), dans le pilote :
+// Vsync activée et plafond ~3 images/s sous la fréquence (fréquence − 3, affichée), dans la fenêtre VRR, sans
+// déchirure. Seulement sur un écran VRR détecté (IDisplayInfo), l'écran de jeu principal ; ambigu, rien. Au profil du
+// jeu, comme PreferMaxPerf (« Base Profile » toucherait tous les jeux et le bureau). Origines dans un snapshot
+// composite ; jamais d'exception.
 // -----------------------------------------------------------------------
 /// <summary>Pose Vsync et plafond d'images (fréquence − 3) dans le pilote, au profil du jeu. Proposé quand l'écran de jeu
 /// est lu VRR, sur NVIDIA, ou sur AMD si Chill et Enhanced Sync sont lus éteints et le combo pas déjà en place.</summary>
 public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
 {
-    // Ids des réglages DRS (réglages du pilote, pas des clés de registre libres). Vsync + limite d'images.
-    // Vérifiés mot pour mot contre le NvApiDriverSettings.h officiel de NVIDIA
-    // (github.com/NVIDIA/nvapi) : VSYNCMODE_ID = 0x00A879CF, FRL_FPS_ID = 0x10835002.
-    // Les valeurs 0x00fc00fa (VSYNC) et 0x10835000 (FRL) sont fausses : ne pas les reprendre.
+    // Ids DRS vérifiés contre le NvApiDriverSettings.h officiel (source : github.com/NVIDIA/nvapi) : VSYNCMODE_ID =
+    // 0x00A879CF, FRL_FPS_ID = 0x10835002. Les valeurs 0x00fc00fa (VSYNC) et 0x10835000 (FRL) sont fausses.
     private const uint VsyncModeSettingId = 0x00A879CF;        // VSYNCMODE_ID
     private const uint FrameRateLimiterSettingId = 0x10835002;  // FRL_FPS_ID
-    // VSYNCMODE est une énumération de constantes magiques, pas un drapeau 0/1 (vérifié contre
-    // NvApiDriverSettings.h : PASSIVE=0x60925292, FORCEON=0x47814940, FORCEOFF=0x08416747 ; une
-    // RTX 4060 réelle lit le défaut PASSIVE=0x60925292). « Vsync ON » est FORCEON ; écrire 1 pose une valeur invalide.
+    // VSYNCMODE : des constantes, pas un 0/1 (NvApiDriverSettings.h : PASSIVE=0x60925292, FORCEON=0x47814940,
+    // FORCEOFF=0x08416747 ; une RTX 4060 réelle lit PASSIVE). « Vsync ON » = FORCEON ; 1 serait une valeur invalide.
     private const uint VsyncOn = 0x47814940;                   // VSYNCMODE_FORCEON
     // La cible : PlafondVrr (Core), la plus basse de « fréquence − 3 » et de la règle de Reflex.
     // Plage documentée de FRL_FPS = 0-1023 fps (NvApiDriverSettings.h) : jamais d'écriture hors plage.
@@ -77,9 +63,8 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
         if (LatencyGating.HasNvidiaDriverPath(hw))
             return !SansJeuPourNvidia() && !ComboNvidiaDejaPose(ecran);
 
-        // Sur AMD, il n'est proposé
-        // que si FRTC, Chill, la Vsync et Enhanced Sync sont lus, Chill et Enhanced Sync éteints (allumer la Vsync éteint
-        // Enhanced Sync, et la rendre ne le rallume pas), et le combo pas déjà en place.
+        // Sur AMD : FRTC, Chill, Vsync et Enhanced Sync lus, Chill et Enhanced Sync éteints (allumer la Vsync éteint
+        // Enhanced Sync, la rendre ne le rallume pas), et le combo pas déjà en place.
         return _adlx is { IsAvailable: true }
             && _adlx.GetChillActif() is { IsOk: true, Value: false }
             && _adlx.GetEnhancedSyncActif() is { IsOk: true, Value: false }
@@ -169,8 +154,7 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
             }
             posees.Add(inv);
         }
-        // Les valeurs posées (Vsync, FRTC), pour que la désinstallation ne rende une feuille que si elle porte
-        // encore ce que DrDXT y a mis.
+        // Les valeurs posées : la désinstallation ne rend une feuille que si elle porte encore celle de DrDXT.
         var poseesJson = CompositeSnapshotCodec.Encode(etapes.Select(e => e.Pose).ToList());
         return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, inverse.Value, poseesJson.IsOk ? poseesJson.Value : null));
     }
@@ -210,8 +194,7 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
             if (!cap.IsOk)
                 return Result<TweakSnapshot>.Fail(cap.Error!.Value.Code, cap.Error.Value.Message);
 
-            // Un profil de jeu lisible pour un reglage et pas pour l'autre poserait un
-            // combo moitie au jeu, moitie au pilote entier. Les deux au meme endroit, ou rien.
+            // Les deux reglages au meme profil, ou rien (sinon moitie au jeu, moitie au pilote entier).
             if (vsync.Value.Op.ProfileName != cap.Value.Op.ProfileName)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "Vsync and the frame cap would not land in the same driver profile.");
@@ -222,9 +205,7 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
             if (!snapshotJson.IsOk || snapshotJson.Value is null)
                 return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable, "Could not serialize the revert ops.");
 
-            // Pose Vsync ON, puis le plafond d'images. Chaque op est appariée à l'inverse qui rend
-            // l'état d'entrée du levier. Si la 2e op échoue, on rejoue l'inverse de la 1re (déjà
-            // posée) (LIFO) pour que rien ne reste à moitié posé, puis on rend Fail.
+            // Vsync ON puis plafond, chaque op appariée à son inverse : la 2e échoue, l'inverse de la 1re est rejoué.
             var steps = new (PrivilegedOp Forward, PrivilegedOp Inverse)[]
             {
                 (vsync.Value.Op, vsync.Value.Inverse),
@@ -243,8 +224,7 @@ public sealed class VrrVsyncCapConfigTweak : LatencyTweakBase
                 appliedInverses.Add(inverse);
             }
 
-            // Les valeurs posees (Vsync, plafond), pour que la desinstallation ne rende un
-            // reglage du pilote que s'il porte encore ce que DrDXT y a mis.
+            // Les valeurs posees : la desinstallation ne rend un reglage que s'il porte encore celle de DrDXT.
             var posees = CompositeSnapshotCodec.Encode(steps.Select(s => s.Forward).ToList());
             return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, snapshotJson.Value, posees.IsOk ? posees.Value : null));
         }

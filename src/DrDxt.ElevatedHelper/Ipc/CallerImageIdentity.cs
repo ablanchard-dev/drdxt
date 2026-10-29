@@ -8,16 +8,9 @@ namespace DrDxt.ElevatedHelper.Ipc;
 // Identité d'image de l'appelant : résout l'image de processus d'un pair qui se connecte en un
 // couple (chemin, empreinte du contenu) pour l'auth durcie de l'appelant (« Authenticode appelant »).
 //
-// Identité du build de dev (cette couche) : chemin + SHA-256 du fichier image. Cela ferme le trou
-// où l'égalité de chemin seule ferait confiance à un binaire remplacé au même chemin. C'est la
-// barrière du build de dev non signé.
-//
-// Limite connue tant que l'App n'est pas signée : remplacer l'égalité d'empreinte par une vraie
-// vérification Authenticode (WinVerifyTrust WINTRUST_ACTION_GENERIC_VERIFY_V2, puis extraction +
-// épinglage de notre certificat d'éditeur). D'ici là, l'empreinte d'image est la preuve
-// d'identité, et elle ne s'ouvre jamais par défaut (au moindre doute => refus). La forme de la
-// couture ne changera pas avec WinVerifyTrust : le vérificateur rendra simplement identité-ou-null
-// depuis une vérification plus forte.
+// Chemin + SHA-256 de l'image : un binaire remplacé au même chemin ne passe pas. Tant que l'App n'est pas signée,
+// l'empreinte tient lieu d'Authenticode (WinVerifyTrust WINTRUST_ACTION_GENERIC_VERIFY_V2 + épinglage du certificat
+// d'éditeur viendra à la même couture) ; au moindre doute, refus.
 // -----------------------------------------------------------------------
 
 /// <summary>L'image résolue d'un pair qui se connecte : son chemin complet et le SHA-256 des

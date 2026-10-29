@@ -7,18 +7,10 @@ using DrDxt.Core;
 namespace DrDxt.App.Updates;
 
 /// <summary>
-/// « Installer » : lancer l'installeur signe deja verifie, pas un remplacement
-/// maison des binaires. L'installeur (Inno Setup, PrivilegesRequired=admin) demande lui-meme l'UAC et
-/// ferme l'App en cours.
-///
-/// L'empreinte est reverifiee juste avant le lancement : entre la verification au demarrage et le
-/// clic, le fichier stage a pu etre remplace sur le disque. Un installeur lance sans cette relecture
-/// executerait ce qui se trouve la, pas ce qui a ete verifie.
-///
-/// Relire ne suffit pas. Le binaire est verrouille (ouvert en
-/// partage lecture seule) de l'empreinte jusqu'apres le lancement, sinon il resterait une fenetre ou il
-/// pourrait etre remplace dans un dossier ecrivable par l'utilisateur, et ce qui part sous UAC serait
-/// alors le code de l'attaquant.
+/// « Installer » : lancer l'installeur signe deja verifie (Inno Setup, PrivilegesRequired=admin, qui demande l'UAC et
+/// ferme l'App), pas un remplacement maison des binaires. L'empreinte est relue juste avant le lancement, binaire
+/// verrouille en partage lecture seule jusqu'apres : le staging est ecrivable par l'utilisateur, et sans verrou ce qui
+/// part sous UAC pourrait etre le code d'un attaquant.
 /// </summary>
 public static class InstallationMiseAJour
 {
@@ -42,10 +34,9 @@ public static class InstallationMiseAJour
     {
         try
         {
-            // Lance depuis une App elevee, le setup heriterait du jeton administrateur et chargerait ce qui est pose a
-            // cote de lui, dans un dossier que le compte peut ecrire. Lance depuis l'App normale, il tourne sans
-            // elevation et seule la partie d'Inno qui demande l'UAC devient administrateur (docs/SECURITE.md §9).
-            // L'UAC coupé n'a pas de frontière à garder : tout programme du compte y tourne déjà élevé.
+            // Depuis une App elevee, le setup heriterait du jeton administrateur et chargerait ce qui est pose a cote de lui,
+            // dans un dossier du compte ; depuis l'App normale, seule la partie d'Inno qui demande l'UAC est administrateur
+            // (docs/SECURITE.md §9). UAC coupé : aucune frontière à garder.
             if ((eleve ?? (() => ProcessusEleve() && !DrDxt.App.Platform.CompteDuJoueur.UacCoupe()))())
                 return Result.Fail(CodeEleve, Docteur.T("MAJ.InstalleurEleve"));
             if (!File.Exists(cheminStage))
@@ -54,12 +45,9 @@ public static class InstallationMiseAJour
             var exe = Path.Combine(Path.GetDirectoryName(cheminStage)!, $"DrDXT-Setup-{Nettoyer(version)}.exe");
             File.Copy(cheminStage, exe, overwrite: true);
 
-            // Le fichier reste ouvert en partage lecture seule de la relecture jusqu'apres le
-            // lancement. Sans ce verrou il resterait une fenetre entre l'empreinte et Process.Start :
-            // le staging vit sous %LOCALAPPDATA%, donc tout code tournant sous le compte de
-            // l'utilisateur peut y ecrire, et ce qui partirait sous UAC ne serait plus ce qui a
-            // ete verifie. Sous ce partage, l'execution passe et l'ecriture comme la suppression
-            // sont refusees par le systeme.
+            // Ouvert en partage lecture seule de la relecture jusqu'apres le lancement : sous %LOCALAPPDATA%, tout code du
+            // compte pourrait le remplacer entre l'empreinte et Process.Start. L'execution passe, ecriture et suppression
+            // sont refusees.
             var verrou = new FileStream(exe, FileMode.Open, FileAccess.Read, FileShare.Read);
             try
             {

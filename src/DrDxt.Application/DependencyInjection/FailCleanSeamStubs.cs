@@ -4,22 +4,11 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.DependencyInjection;
 
-// -----------------------------------------------------------------------
-// Stubs des coutures SDK qui échouent proprement.
-//
-// Les vraies implémentations P/Invoke (NVAPI / ADLX / registre / alimentation / point de
-// restauration / affichage) vivent dans Detection / Infrastructure. Sans elles, le conteneur
-// DI a besoin de quelque chose à injecter pour résoudre le graphe, et la règle d'or est
-// d'échouer fermé, jamais ouvert : chaque couture ici dit « indisponible », un levier passe
-// proprement (TWEAK.SDK_UNAVAILABLE) et rien de privilégié n'arrive par accident.
-//
-// En particulier, StubElevatedClient refuse chaque op (il n'écrit rien de privilégié), et
-// StubRestorePointService dit la restauration désactivée : le moteur bloque avant toute
-// pose. C'est le défaut sûr : une version à moitié câblée peut lire et planifier, pas poser.
-//
-// Ils sont enregistrés par TryAdd* : la racine de composition de l'App peut remplacer
-// chacun par la vraie implémentation sans toucher ce fichier.
-// -----------------------------------------------------------------------
+// Stubs des coutures SDK qui échouent fermé, pour résoudre le graphe DI sans les vraies implémentations P/Invoke (NVAPI,
+// ADLX, registre, alimentation, point de restauration, affichage ; dans Detection / Infrastructure) : chacun dit
+// « indisponible », un levier passe (TWEAK.SDK_UNAVAILABLE), rien de privilégié n'arrive par accident. StubElevatedClient
+// refuse chaque op, StubRestorePointService dit la restauration désactivée (le moteur bloque avant toute pose) : une
+// version à moitié câblée lit et planifie, ne pose pas. Enregistrés par TryAdd*, remplacés par la racine de composition.
 
 /// <summary>IElevatedClient qui échoue proprement : refuse chaque op (aucune écriture privilégiée).
 /// Le vrai client en IPC signé est branché dans l'hôte App.</summary>
@@ -121,9 +110,8 @@ internal sealed class StubAdlxGpuTuning : IAdlxGpuTuning
         Result<T>.Fail(ErrorCodes.TweakSdkUnavailable, "ADLX GPU tuning not available (stub).");
 }
 
-/// <summary>Sonde de charge GPU qui échoue proprement : la vraie charge D3D11 n'est pas
-/// branchée ici, elle rend CouldNotRun → GpuStabilityTester rend Inconclusive → une
-/// sous-tension n'est jamais gardée (elle s'annule). Remplacée par la vraie sonde D3D11.</summary>
+/// <summary>Sonde de charge GPU qui échoue proprement : CouldNotRun → GpuStabilityTester rend Inconclusive → une
+/// sous-tension n'est jamais gardée. Remplacée par la vraie sonde D3D11.</summary>
 internal sealed class StubGpuLoadProbe : IGpuLoadProbe
 {
     public Task<Result<GpuLoadResult>> RunBriefLoadAsync(int gpuIndex, TimeSpan duration, CancellationToken ct) =>

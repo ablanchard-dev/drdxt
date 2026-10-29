@@ -4,24 +4,17 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// GpuPowerLimitTweak.
-//
-// Plafonne la limite de puissance d'une carte NVIDIA (en % du TDP) par NVAPI (ApplyNvApiPowerLimitOp), ou d'une carte AMD par
-// ADLX (ApplyAdlxTuningOp PowerLimit). Une limite plus basse donne des températures plus basses et des 1 % low plus stables,
-// pour un coût quasi nul en images de pointe sur un PC déjà frais. Sur AMD, la limite est « en % » sans dire où est l'usine :
-// la plage lue sur la carte tranche entre % absolu et décalage (LimitePuissanceAmd). Une écriture AMD n'est proposée ni posée
-// tant que l'architecture de la carte n'a pas de rapport validé (GpuTuningCoverage.ValideesEnVie) ; la couverture le dit
-// (Levier.PasIci.PuissanceAmd).
-// La limite est toujours bornée par GpuSafeBounds.MinPowerLimitPct : jamais sous le plancher (ce qui
-// ferait des saccades, pas des gains).
-//
-// Mêmes invariants que le levier de décalage : carte dédiée de PC de bureau, bornes GpuSafeBounds,
-// original relu puis rangé en op inverse dans le snapshot, application par l'op typée autorisée, retour
-// par la base, échec propre. Pas de test de stabilité : baisser la puissance ne rend pas instable une
-// carte stable, contrairement à un décalage de tension.
+// GpuPowerLimitTweak : la limite de puissance d'une carte NVIDIA (% du TDP, ApplyNvApiPowerLimitOp) ou AMD
+// (ApplyAdlxTuningOp PowerLimit). Plus basse : des températures plus basses et des 1 % low plus stables, pour un coût
+// quasi nul en images de pointe sur un PC déjà frais. Sur AMD, la plage lue tranche entre % absolu et décalage
+// (LimitePuissanceAmd), et rien n'est proposé sans rapport validé pour l'architecture (GpuTuningCoverage.ValideesEnVie,
+// dit par Levier.PasIci.PuissanceAmd). Jamais sous GpuSafeBounds.MinPowerLimitPct (des saccades, pas des gains).
+// Invariants du levier de décalage : carte dédiée de bureau, bornes GpuSafeBounds, original en op inverse, op typée,
+// échec propre. Pas de test de stabilité : baisser la puissance ne déstabilise pas une carte stable.
 // -----------------------------------------------------------------------
 /// <summary>Abaisse la limite de puissance de la carte graphique (en % du TDP, bornée par GpuSafeBounds). Proposé sur
-/// un PC de bureau à carte NVIDIA dédiée ; volatil, le pilote remet sa valeur au redémarrage.</summary>
+/// un PC de bureau à carte NVIDIA dédiée, ou AMD dont l'architecture a un rapport validé (voir <see cref="AppliesTo"/>) ;
+/// volatil, le pilote remet sa valeur au redémarrage.</summary>
 public sealed class GpuPowerLimitTweak : GpuTweakBase
 {
     private readonly INvApiGpuTuning _nvApi;
@@ -44,9 +37,7 @@ public sealed class GpuPowerLimitTweak : GpuTweakBase
         _validees = validees ?? GpuTuningCoverage.ValideesEnVie;
     }
 
-    // La cible de limite de puissance en cours. Un profil de puce a pu la remplacer au scan
-    // (déjà bornée à l'entrée) ; relue ici et rebornée par GpuSafeBounds plus bas avant toute
-    // écriture (défense en profondeur).
+    // La cible en cours (un profil de puce a pu la remplacer, bornée), rebornée plus bas avant toute écriture.
     private GpuPowerLimitTarget Target => _targets.PowerLimit;
 
     public override string Id => "gpu.power_limit";
@@ -60,8 +51,7 @@ public sealed class GpuPowerLimitTweak : GpuTweakBase
     {
         try
         {
-            // Borner au plancher sûr : la limite de puissance n'atteint jamais le helper
-            // sous GpuSafeBounds.MinPowerLimitPct.
+            // Jamais sous GpuSafeBounds.MinPowerLimitPct jusqu'au helper.
             var safePct = GpuSafeBounds.ClampPowerLimitPct(Target.PowerLimitPct);
 
             if (_nvApi.IsAvailable)
@@ -91,8 +81,7 @@ public sealed class GpuPowerLimitTweak : GpuTweakBase
         var gpu = index.Value;
         if (_adlx.GetPowerLimitRange(gpu) is not { IsOk: true } plage || _adlx.GetPowerLimitPct(gpu) is not { IsOk: true } capture)
             return Result<TweakSnapshot>.Fail(ErrorCodes.GpuAmdTuningUnavailable, "Could not read the AMD power limit or its range.");
-        // La forme de la plage dit l'unité ; une forme inconnue, une origine au-dessus de l'usine ou rien à baisser : rien
-        // ne s'écrit.
+        // La forme de la plage dit l'unité ; forme inconnue, origine au-dessus de l'usine ou rien à baisser : rien d'écrit.
         if (LimitePuissanceAmd.Cible(plage.Value!, capture.Value, safePct) is not { } valeur)
             return Result<TweakSnapshot>.Fail(ErrorCodes.GpuAmdTuningUnavailable,
                 $"AMD power limit not written: range [{plage.Value!.Min}, {plage.Value.Max}], current {capture.Value}.");
@@ -129,11 +118,7 @@ public sealed class GpuPowerLimitTweak : GpuTweakBase
         if (!snapshotJson.IsOk || snapshotJson.Value is null)
             return Result<TweakSnapshot>.Fail(ErrorCodes.TweakSdkUnavailable, "Could not serialize the revert op.");
 
-        // (3b) Sonde de capacité : prouver que l'écriture marche sur cette carte et ce pilote
-        // avant de toucher à quoi que ce soit. On rejoue l'op inverse (réécriture à l'identique de
-        // la valeur relevée, aucun changement matériel) et on relit. Une carte dont le pilote dit
-        // « réussi » sans rien écrire est prise ici, au lieu de produire un faux « appliqué ».
-        // Échec → TWEAK.UNSUPPORTED_ON_THIS_GPU, rien n'est réglé.
+        // (3b) La sonde de capacité (GpuWriteProbe) avant toute vraie écriture ; échec → TWEAK.UNSUPPORTED_ON_THIS_GPU.
         var probe = await GpuWriteProbe.ConfirmWritableAsync(
             Elevated, inverse, () => _nvApi.GetPowerLimitPct(Target.GpuIndex), capture.Value,
             "GPU power-limit").ConfigureAwait(false);
@@ -145,8 +130,8 @@ public sealed class GpuPowerLimitTweak : GpuTweakBase
         if (!applied.IsOk)
             return Result<TweakSnapshot>.Fail(applied.Error!.Value.Code, applied.Error!.Value.Message);
 
-        // La valeur posée, relue (un pilote qui arrondit ferait croire au rendu que le joueur
-        // l'a changée), pour que la désinstallation rende la limite seulement si elle porte encore la sienne.
+        // La valeur posée, relue (un pilote qui arrondit la ferait passer pour celle du joueur) : la désinstallation ne rend
+        // la limite que si elle porte encore la sienne.
         if (_nvApi.GetPowerLimitPct(Target.GpuIndex) is { IsOk: true } reluNv) pose = pose with { PowerLimitPercent = reluNv.Value };
         return Result<TweakSnapshot>.Ok(new TweakSnapshot(Id, snapshotJson.Value, PrivilegedOpCodec.Serialize(pose).Value));
     }

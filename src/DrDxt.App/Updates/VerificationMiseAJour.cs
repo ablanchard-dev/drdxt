@@ -34,26 +34,17 @@ public sealed record ResultatMiseAJour(
 }
 
 /// <summary>
-/// La mise a jour branchee dans l'app : un produit qui ne se met pas a jour reste un prototype.
-///
-/// Au demarrage : montage de `UpdateComposition` et `AutoUpdater`, canal App, sous un
-/// delai borne, et le pied de page dit ce qui a ete constate.
-///
-/// L'URL du serveur : <see cref="UrlParDefaut"/> ; la variable <see cref="VariableUrl"/> la coupe (« off »), et ne la
-/// remplace qu'en compilation Debug.
-/// Coupée : aucun reseau touche, « aucun serveur configure ».
-///
-/// Transport : HTTPS exige par le montage, contenu garanti par la signature Ed25519 du manifeste.
-/// L'epinglage SPKI du serveur de mise a jour se posera avec son deploiement (ses empreintes
-/// n'existent pas encore).
+/// La mise a jour branchee dans l'app : au demarrage, `UpdateComposition` et `AutoUpdater`, canal App, sous un delai
+/// borne ; le pied de page dit ce qui a ete constate. URL : <see cref="UrlParDefaut"/> ; <see cref="VariableUrl"/> la
+/// coupe (« off » : aucun reseau, « aucun serveur configure ») et ne la remplace qu'en Debug. HTTPS exige, contenu
+/// garanti par la signature Ed25519 du manifeste ; l'epinglage SPKI viendra avec les empreintes du serveur.
 /// </summary>
 public static class VerificationMiseAJour
 {
     public const string VariableUrl = "DRDXT_UPDATE_URL";
 
-    /// <summary>L'adresse est écrite dans l'App : l'installeur ne pose pas la variable, et sans elle aucune copie
-    /// installée ne recevrait de mise à jour. Les manifestes signés vivent sur le site GitHub Pages du dépôt
-    /// public. Tant qu'il n'est pas publié, GitHub répond 404 : « rien de publié », ni « à jour » ni une erreur.</summary>
+    /// <summary>L'adresse écrite dans l'App (l'installeur ne pose pas la variable) : les manifestes signés du site GitHub
+    /// Pages du dépôt public. Rien de publié : un 404, ni « à jour » ni une erreur.</summary>
     public const string UrlParDefaut = "https://ablanchard-dev.github.io/drdxt";
 
     /// <summary>La variable gagne quand elle existe ; « off » coupe toute vérification (aucune requête ne part).
@@ -91,12 +82,11 @@ public static class VerificationMiseAJour
             versionInstallee,
             verifierDeTest);
 
-    /// <summary>La vérification du démarrage, et le client par lequel le bouton « Installer » téléchargera plus tard. Ce
-    /// client n'est jamais libéré ici : libéré à la fin de la vérification, il ferait échouer le clic (ObjectDisposedException
-    /// au téléchargement).</summary>
+    /// <summary>La vérification du démarrage, et le client du bouton « Installer », jamais libéré ici (le clic lèverait
+    /// ObjectDisposedException).</summary>
     /// <param name="transport">Pour les tests seulement. null = le transport de l'App : les identifiants du compte vont au
-    /// seul proxy configuré (<see cref="DrDxt.App.Platform.ProxyDuCompte"/>) ; derrière un proxy d'entreprise manuel qui
-    /// les demande, sans eux il répondait 407 et la mise à jour restait « injoignable » pour toujours.</param>
+    /// seul proxy configuré (<see cref="DrDxt.App.Platform.ProxyDuCompte"/>), sans quoi un proxy d'entreprise manuel
+    /// répondrait 407.</param>
     public static async Task<(ResultatMiseAJour Etat, HttpClient Client)> VerifierAuDemarrageAsync(
         Func<HttpClient, Result<AutoUpdater>> monter, HttpMessageHandler? transport = null)
     {
@@ -112,9 +102,7 @@ public static class VerificationMiseAJour
     public static async Task<ResultatMiseAJour> VerifierAsync(
         Func<Result<AutoUpdater>> monter, TimeSpan delai, CancellationToken ct)
     {
-        // La borne couvre aussi le montage (cles, crypto, dossiers), qui peut prendre plusieurs secondes sur une
-        // machine chargee. Un montage trop lent est « injoignable »,
-        // comme un serveur trop lent ; il finit en arriere-plan sans que personne l'attende.
+        // La borne couvre aussi le montage (cles, crypto, dossiers) : trop lent, « injoignable », il finit en arriere-plan.
         using var borne = CancellationTokenSource.CreateLinkedTokenSource(ct);
         borne.CancelAfter(delai);
         Result<AutoUpdater> monte;

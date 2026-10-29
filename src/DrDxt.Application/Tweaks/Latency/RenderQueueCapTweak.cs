@@ -4,28 +4,21 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// RenderQueueCapTweak.
-//
-// Le plancher de faible latence pour les deux marques, quand le jeu n'a pas Reflex. Limite la
-// profondeur de la file de rendu pour que le processeur ne prépare jamais d'images d'avance sur la
-// carte (moins de latence entre l'entrée et l'affichage, sans coût en images) :
+// RenderQueueCapTweak : le plancher de faible latence des deux marques, quand le jeu n'a pas Reflex. La file de rendu
+// limitée, le processeur ne prépare pas d'images d'avance (moins de latence, sans coût en images) :
 //   * AMD : Anti-Lag d'ADLX activé (ApplyAdlxTuningOp) ;
 //   * NVIDIA : DRS « Max Pre-Rendered Frames » = 1 (ApplyNvApiDrsSettingOp), au profil du jeu en
 //     cours, jamais une écriture de registre brute non prise en charge.
 //
-// La branche NVIDIA écrit au profil du jeu, comme PreferMaxPerf : « Base Profile » toucherait tous
-// les jeux et le bureau. Elle ne vaut qu'en DirectX 9 à 11 (en DX12 et Vulkan, le moteur du jeu gère lui-même la file) :
-// proposée et posée seulement sur un jeu dont l'API se lit DX9/DX11 dans ses modules chargés.
-//
-// L'original est relu d'abord, l'op inverse sérialisée rangée dans le snapshot ; chaque frontière
-// externe est protégée : échec propre (TWEAK.SDK_UNAVAILABLE), jamais d'exception.
+// NVIDIA : au profil du jeu, comme PreferMaxPerf, et seulement en DirectX 9 à 11 (en DX12 et Vulkan, le moteur gère la
+// file), lu dans les modules chargés du jeu. Original relu, inverse au snapshot ; TWEAK.SDK_UNAVAILABLE, jamais
+// d'exception.
 // -----------------------------------------------------------------------
 /// <summary>Limite la file de rendu à une image : Anti-Lag sur AMD, « Max Pre-Rendered Frames » = 1 au profil du jeu
 /// sur NVIDIA. Proposé quand la valeur est lue autrement (sur AMD, Anti-Lag et Chill lus éteints).</summary>
 public sealed class RenderQueueCapTweak : LatencyTweakBase
 {
-    // Id du réglage DRS NVIDIA de la limite de pré-rendu (PRERENDERLIMIT_ID). La valeur
-    // 1 = une seule image pré-rendue (la file la plus courte, la latence la plus basse).
+    // PRERENDERLIMIT_ID ; 1 = une seule image pré-rendue, la file la plus courte.
     private const uint MaxPreRenderedFramesSettingId = 0x007ba09e;
     private const uint RenderQueueCapValue = 1;
 
@@ -48,9 +41,9 @@ public sealed class RenderQueueCapTweak : LatencyTweakBase
     public override string Id => "latency.render_queue_cap";
     public override string SummaryKey => "tweak.latency.render_queue_cap.floor";
 
-    // Les jeux qui ont Reflex. Quand le jeu l'active, Reflex remplace la file du pilote : l'essai ne
-    // mesurerait que du bruit. Source : https://www.nvidia.com/en-us/geforce/technologies/reflex/supported-products/
-    // Liste courte des jeux compétitifs les plus joués ; un jeu absent est essayé, mesuré, et rendu s'il ne gagne rien.
+    // Les jeux à Reflex, qui remplace alors la file du pilote (l'essai ne mesurerait que du bruit). Source :
+    // https://www.nvidia.com/en-us/geforce/technologies/reflex/supported-products/ ; liste courte, un jeu absent est essayé
+    // et rendu s'il ne gagne rien.
     private static readonly HashSet<string> JeuxAvecReflex = new(StringComparer.OrdinalIgnoreCase)
     {
         "cod.exe", "VALORANT-Win64-Shipping.exe", "cs2.exe", "FortniteClient-Win64-Shipping.exe", "r5apex.exe",
@@ -87,9 +80,8 @@ public sealed class RenderQueueCapTweak : LatencyTweakBase
 
     private enum Carte { Aucune, Nvidia, Amd }
 
-    /// <summary>La carte du levier, la même pour le proposer, le dire non lu et le poser : NVIDIA dès que NVAPI répond, AMD
-    /// seulement sans elle, comme les autres leviers de la carte. Un Ryzen à puce graphique AMD avec une RTX charge ADLX pour
-    /// la puce : la carte du jeu reste la NVIDIA.</summary>
+    /// <summary>La carte du levier, la même pour proposer, dire non lu et poser : NVIDIA dès que NVAPI répond, sinon AMD
+    /// (un Ryzen à puce AMD avec une RTX charge ADLX pour la puce, le jeu reste sur la NVIDIA).</summary>
     private Carte CarteDuLevier() => _nvApi.IsAvailable ? Carte.Nvidia : _adlx.IsAvailable ? Carte.Amd : Carte.Aucune;
 
     public override bool AppliesTo(HardwareInventory hw, SettingsState state)
@@ -98,12 +90,11 @@ public sealed class RenderQueueCapTweak : LatencyTweakBase
             return false;
         return CarteDuLevier() switch
         {
-            // Sur NVIDIA, « Low Latency Mode : On » (une seule image d'avance), au profil du jeu
-            // seulement ; sans profil de jeu, rien ne s'écrit (pas de repli sur le global, voir PlanifierDrs).
+            // « Low Latency Mode : On », au profil du jeu seulement, sans repli sur le global (PlanifierDrs).
             Carte.Nvidia => LatencyGating.HasNvidiaDriverPath(hw) && FileDuPiloteAgit()
                 && FileNvidiaAuJeu() is { IsOk: true } lu && lu.Value.Value != RenderQueueCapValue,
-            // L'écriture existe (IADLX3DAntiLag.SetEnabled, carte dédiée). Proposé seulement quand Anti-Lag
-            // est LU éteint et Chill LU éteint : allumer Anti-Lag éteint Chill, et le rendre ne le rallume pas.
+            // IADLX3DAntiLag.SetEnabled, carte dédiée ; Anti-Lag et Chill lus éteints (allumer Anti-Lag éteint Chill, le
+            // rendre ne le rallume pas).
             Carte.Amd => LatencyGating.HasAmdDriverPath(hw)
                 && _adlx.GetAntiLagState() is { IsOk: true, Value: 0 }
                 && _adlx.GetChillActif() is { IsOk: true, Value: false },

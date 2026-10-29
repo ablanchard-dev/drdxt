@@ -16,21 +16,11 @@ public sealed record UsureDisque(string Disque, int? UsurePercent, int? Temperat
     int? SanteWindows = null);
 
 /// <summary>
-/// L'usure des disques, et pourquoi la requete evidente rend zero ligne.
-///
-/// Verifie sur la machine avant d'ecrire une ligne.
-/// Interroger directement `MSFT_StorageReliabilityCounter` rend **la classe presente et aucune
-/// instance** : on en conclurait que la machine ne publie pas son usure. C'est faux. Le compteur
-/// n'existe que par une association au disque physique, et c'est cette forme qui repond :
-///
+/// L'usure des disques. Verifie sur la machine : interroger directement `MSFT_StorageReliabilityCounter` rend **la
+/// classe presente et aucune instance** ; le compteur n'existe que par association au disque physique :
 /// <code>ASSOCIATORS OF {MSFT_PhysicalDisk.ObjectId="…"} where ResultClass=MSFT_StorageReliabilityCounter</code>
-///
-/// Mesure du 10/09/2026 sur la machine de reference : **Wear = 0, Temperature = 43-44 °C** pour un
-/// Samsung SSD 990 PRO 2 To. `PowerOnHours` et `ReadErrorsTotal` reviennent vides sur ce NVMe :
-/// tous les disques ne publient pas les memes compteurs, et les absents restent `null` plutot que
-/// de valoir zero.
-///
-/// Lecture pure, non elevee.
+/// Mesure du 10/09/2026 sur la machine de reference : **Wear = 0, Temperature = 43-44 °C** pour un Samsung SSD 990 PRO
+/// 2 To ; `PowerOnHours` et `ReadErrorsTotal` vides sur ce NVMe, donc `null`, jamais zero. Lecture pure, non elevee.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class StorageWearReader
@@ -57,9 +47,8 @@ public sealed class StorageWearReader
             var objectId = d.GetString("ObjectId");
             if (string.IsNullOrWhiteSpace(objectId)) continue;
 
-            // Un ObjectId porte des antislashs et des guillemets : dans un litteral WQL, les deux
-            // doivent etre echappes, sinon la requete est syntaxiquement fausse et rend zero ligne,
-            // c'est-a-dire exactement l'allure d'un disque qui ne publierait rien.
+            // Un ObjectId porte des antislashs et des guillemets, a echapper dans un litteral WQL : sinon zero ligne, comme
+            // un disque qui ne publierait rien.
             var echappe = objectId.Replace("\\", "\\\\").Replace("\"", "\\\"");
             var compteurs = _wmi.QueryInNamespace(Namespace,
                 "ASSOCIATORS OF {MSFT_PhysicalDisk.ObjectId=\"" + echappe + "\"} "
@@ -102,8 +91,7 @@ public sealed class StorageWearReader
         _ => null,
     };
 
-    /// <summary>Un compteur absent rend <c>null</c>, jamais zero : sur ce NVMe, `PowerOnHours` et
-    /// `ReadErrorsTotal` sont vides, et les rendre a zero ferait croire a un disque neuf.</summary>
+    /// <summary>Un compteur absent rend <c>null</c>, jamais zero (un disque passerait pour neuf).</summary>
     private static int? Entier(WmiRow row, string nom)
     {
         var brut = row.GetString(nom);

@@ -5,16 +5,12 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// Conditions matérielles strictes, partagées par les leviers de réglage GPU.
-//
-// Le réglage GPU (sous-tension / limite de puissance / courbe de ventilateur) est réservé aux
-// cartes dédiées de PC de bureau. Il est refusé sur :
+// Conditions matérielles strictes des leviers GPU (sous-tension, limite de puissance, ventilateur) : cartes dédiées de
+// PC de bureau seulement. Refusé sur :
 //   * les portables / GPU mobiles Optimus (verrouillés par le pilote, guidés par le BIOS),
 //   * les GPU intégrés (Intel UHD/Iris, iGPU des APU AMD : rien d'utile à régler),
 //   * les consoles portables (profils de puissance verrouillés par le firmware).
-//
-// Prédicats purs, sans effet de bord : chaque levier GPU applique la même condition, testée
-// à part.
+// Prédicats purs, la même condition pour chaque levier, testée à part.
 // -----------------------------------------------------------------------
 internal static class GpuGating
 {
@@ -54,16 +50,10 @@ internal static class GpuGating
 }
 
 // -----------------------------------------------------------------------
-// GpuArchitectureGate : classificateur public et pur des architectures NVIDIA + garde de tension.
-//
-// Expose la détection Blackwell / RTX 50, pour qu'une garde de sous-tension partage une seule
-// source (recette « Blackwell / RTX 50 lockout »). Pur et sans effet de bord → testable sans aucun appel NVAPI.
-//
-// La détection se fait par le nom commercial (par exemple « RTX 5080 » → Blackwell, « RTX 4070 » → Ada) :
-// le signal sûr sans élévation et indépendant du pilote, déjà porté par GpuInfo.Model et par la
-// lecture du nom du GPU par NVAPI. (NvAPI_GPU_GetArchInfo donnerait directement l'id
-// d'architecture du silicium, mais son id de fonction n'est pas vérifié dans la recette : le
-// classement par nom est la voie vérifiée, qui échoue proprement, utilisée ici.)
+// GpuArchitectureGate : classificateur pur des architectures et garde de tension, une seule source pour la recette
+// « Blackwell / RTX 50 lockout », testable sans NVAPI. Par le nom commercial (« RTX 5080 » → Blackwell, « RTX 4070 » →
+// Ada), sûr sans élévation et indépendant du pilote (GpuInfo.Model). NvAPI_GPU_GetArchInfo donnerait l'id du silicium,
+// mais son id de fonction n'est pas vérifié dans la recette.
 // -----------------------------------------------------------------------
 public static class GpuArchitectureGate
 {
@@ -75,9 +65,8 @@ public static class GpuArchitectureGate
     private static readonly Regex AdaOrOlderModel =
         new(@"\b(RTX\s*(40|30|20)\d{2}|GTX\s*(16|10)\d{2})\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // « RX 7xxx » = RDNA 3, « RX 9xxx » = RDNA 4. Meme discipline que cote NVIDIA : le nom
-    // commercial est le signal lisible sans elevation et sans driver, donc utilisable avant
-    // l'achat, ce que la matrice de couverture exige.
+    // « RX 7xxx » = RDNA 3, « RX 9xxx » = RDNA 4 : le nom, lisible sans elevation ni pilote, comme la matrice de
+    // couverture l'exige.
     private static readonly Regex Rdna3Model =
         new(@"\bRX\s*7\d{3}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex Rdna2Model =
@@ -114,9 +103,8 @@ public static class GpuArchitectureGate
         return GpuArchitecture.Unknown;
     }
 
-    /// <summary>Vrai quand un GPU de cette architecture accepte l'écriture directe de
-    /// sous-tension. Blackwell est verrouillé ; Ada ou plus ancien est permis ; Unknown est
-    /// traité avec prudence comme non pris en charge (jamais d'écriture supposée sûre).</summary>
+    /// <summary>Cette architecture accepte-t-elle l'écriture directe de sous-tension ? Blackwell verrouillé, Ada ou plus
+    /// ancien permis, Unknown non pris en charge.</summary>
     public static bool SupportsVoltageUndervolt(GpuArchitecture architecture) => architecture switch
     {
         // L'architecture garde le voltage. Ce n'est pas une validation : le rapport archive (GpuTuningCoverage.ValideesEnVie,
@@ -125,35 +113,28 @@ public static class GpuArchitectureGate
         GpuArchitecture.Rdna4 => true,
         // Blackwell : NVIDIA a verrouille le chemin voltage.
         GpuArchitecture.Blackwell => false,
-        // RDNA3 : la seule architecture AMD qui garde le voltage manuel, et la seule que
-        // personne n'a jamais testee en ecriture. Ecrire un voltage sur du materiel jamais valide
-        // est exactement ce que « fail-closed materiel » interdit.
+        // RDNA3 garde le voltage manuel mais n'a jamais ete testee en ecriture (« fail-closed materiel »).
         GpuArchitecture.Rdna3 => false,
         // Une architecture qu'on ne sait pas nommer n'est pas une architecture validee.
         _ => false,
     };
 
-    /// <summary>Vrai quand ce GPU permet l'écriture directe de sous-tension. NVIDIA : vrai sauf Blackwell (RTX 50), qui
-    /// passe par limite de puissance + décalage cœur. AMD : faux pour GCN et RDNA 1 à 3 (jamais testées en écriture), vrai
-    /// pour les autres cartes, même non classées : elles gardent leur chemin ADLX. Le classificateur par architecture, lui,
-    /// rend faux pour une architecture inconnue ; les deux ne répondent donc pas pareil pour un AMD non classé.</summary>
+    /// <summary>Ce GPU permet-il l'écriture directe de sous-tension ? NVIDIA : oui sauf Blackwell (RTX 50, limite de
+    /// puissance + décalage cœur). AMD : non pour GCN et RDNA 1 à 3 (jamais testées), oui pour les autres, même non classées
+    /// (leur chemin ADLX) : sur un AMD non classé, la réponse diffère donc de celle par architecture.</summary>
     public static bool SupportsVoltageUndervolt(GpuInfo gpu)
     {
         var architecture = ClassifyByName(gpu.Model);
 
-        // Rendre `true` pour tout GPU non-NVIDIA, au motif que « le verrou Blackwell ne concerne
-        // pas AMD », serait vrai et insuffisant : ca laisserait passer RDNA3, la seule
-        // architecture AMD qui garde le voltage manuel et la seule que personne n'a jamais
-        // testee en ecriture.
-        // RDNA2, RDNA1 et GCN pareil : jamais testées en écriture.
+        // « Le verrou Blackwell ne concerne pas AMD » laisserait passer RDNA3 (voltage manuel, jamais testée), et RDNA2,
+        // RDNA1, GCN, jamais testées non plus.
         if (architecture is GpuArchitecture.Rdna3 or GpuArchitecture.Rdna2 or GpuArchitecture.Rdna1 or GpuArchitecture.Gcn)
             return false;
 
         var isNvidia = gpu.Vendor.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase);
         if (!isNvidia)
-            // Les autres cartes AMD gardent leur chemin ADLX : la regle nomme RDNA3, et elargir le
-            // refus a toutes les cartes non classees couperait des machines sur une supposition
-            // plutot que sur un constat. La matrice de couverture, elle, dit ce qu'on ignore.
+            // Les autres cartes AMD gardent leur chemin ADLX : refuser les non classees couperait sur une supposition ; la
+            // matrice de couverture dit ce qu'on ignore.
             return true;
 
         return architecture != GpuArchitecture.Blackwell;

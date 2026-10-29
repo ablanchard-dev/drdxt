@@ -4,29 +4,14 @@ using static DrDxt.ElevatedHelper.Natif;
 
 namespace DrDxt.ElevatedHelper.Execution;
 
-// -----------------------------------------------------------------------
-// FirmwarePrivilege : activer SeSystemEnvironmentPrivilege avant toute lecture firmware.
-//
-// Pourquoi ce fichier existe (mesure sur la machine de reference, 27/08/2026) :
-// etre administrateur ne suffit pas. Dans une session elevee, `whoami /priv` montre
-// SeSystemEnvironmentPrivilege present mais desactive, et
-// GetFirmwareEnvironmentVariableExW rend alors `win32=1314`. Windows livre le privilege
-// dans le token sans l'activer ; il faut le demander explicitement.
-//
-// Ce 1314 se lit « privilege pas active », surtout pas « le firmware a refuse ».
-// Confondre les deux transforme un non-concluant en verdict de fond.
-//
-// Le piege d'alignement, et il est vicieux : si le LUID est declare avec un `long`,
-// .NET aligne le champ sur 8 octets et TOKEN_PRIVILEGES pese 24 octets au lieu de
-// 16, avec le LUID au mauvais offset. AdjustTokenPrivileges rend alors
-// ERROR_NOT_ALL_ASSIGNED (1300) sur un utilisateur qui est administrateur : un
-// symptome qui accuse les droits alors que le defaut est dans la disposition memoire.
-// D'ou LowPart/HighPart declares separement et Pack = 1. `TokenPrivilegesSize` est
-// exposee pour qu'un test verrouille les 16 octets : c'est la garantie qui empeche de
-// reintroduire le piege.
-// Mesure : 16 octets, AdjustTokenPrivileges = succes, puis BootOrder/BootCurrent/
-// SecureBoot lues pour de vrai.
-// -----------------------------------------------------------------------
+// FirmwarePrivilege : activer SeSystemEnvironmentPrivilege avant toute lecture firmware. Administrateur ne suffit pas
+// (mesure le 27/08/2026 sur la machine de reference) : en session elevee, `whoami /priv` montre le privilege
+// present mais desactive, et GetFirmwareEnvironmentVariableExW rend `win32=1314` (« privilege pas active », pas « le
+// firmware a refuse »). Windows le livre dans le token sans l'activer.
+// Piege d'alignement : un LUID declare en `long` est aligne sur 8 octets, TOKEN_PRIVILEGES pese 24 au lieu de 16, et
+// AdjustTokenPrivileges rend ERROR_NOT_ALL_ASSIGNED (1300) a un administrateur. D'ou LowPart/HighPart separes et
+// Pack = 1 ; `TokenPrivilegesSize` laisse un test verrouiller les 16 octets. Mesure : 16 octets, AdjustTokenPrivileges
+// = succes, puis BootOrder/BootCurrent/SecureBoot lues pour de vrai.
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public static class FirmwarePrivilege
 {
@@ -68,10 +53,8 @@ public static class FirmwarePrivilege
     [DllImport("kernel32.dll")]
     private static extern IntPtr GetCurrentProcess();
 
-    /// <summary>Active SeSystemEnvironmentPrivilege sur le process courant. Echec propre : ne jette
-    /// jamais. Un echec est dit avec son motif, notamment ERROR_NOT_ALL_ASSIGNED (1300), qui
-    /// signifie que le privilege n'est pas dans le token (session non elevee), et jamais que le
-    /// firmware aurait refuse quoi que ce soit.</summary>
+    /// <summary>Active SeSystemEnvironmentPrivilege sur le process courant ; ne jette jamais. Un echec dit son motif :
+    /// ERROR_NOT_ALL_ASSIGNED (1300) = privilege absent du token (session non elevee), jamais un refus du firmware.</summary>
     public static Result Enable()
     {
         IntPtr token = IntPtr.Zero;

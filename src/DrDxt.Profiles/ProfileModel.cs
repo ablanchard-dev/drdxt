@@ -2,22 +2,11 @@ using DrDxt.Core;
 
 namespace DrDxt.Profiles;
 
-// -----------------------------------------------------------------------
-// Profils d'optimisation par puce (« réparer d'abord » ; la carte se règle par sa limite de
-// puissance, jamais par sa tension).
-//
-// Un profil est un ensemble nommé, visant une puce, de sélections de leviers (avec leurs
-// paramètres). Il ne pose rien et ne détient aucune primitive privilégiée : c'est la couche
-// de recommandation, établie et auditable, devant le catalogue et le moteur. Chaque
-// sélection renvoie à un levier existant du catalogue et porte sa provenance : tout effet
-// annoncé cite une mesure ou une fourchette sourcée, avec une confiance et un niveau de
-// sûreté. Aucun chiffre inventé (« ne jamais inventer de problème » ; « on prouve, on ne
-// promet pas » : le vrai écart est prouvé par le re-banc A/B du moteur, jamais par cette table).
-//
-// Données pures : ni entrée-sortie, ni injection, testable unitairement. Les valeurs sont
-// prudentes et restent soumises au recadrage de GpuSafeBounds en aval : un profil est une
+// Profils d'optimisation par puce (« réparer d'abord » ; la carte se règle par sa limite de puissance, jamais par sa
+// tension) : des sélections nommées de leviers existants, avec paramètres et provenance (mesure ou fourchette sourcée,
+// confiance, sûreté). La couche de recommandation, sans rien poser ni primitive privilégiée ; aucun chiffre inventé, le
+// vrai écart vient du re-banc A/B. Données pures, prudentes, recadrées par GpuSafeBounds en aval : un profil est une
 // demande, pas une autorisation (même contrat que GpuTuningTarget).
-// -----------------------------------------------------------------------
 
 /// <summary>À quel point un effet annoncé est fondé : l'échelle d'honnêteté.
 /// <list type="bullet">

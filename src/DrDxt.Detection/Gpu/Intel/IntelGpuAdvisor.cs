@@ -4,22 +4,13 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Gpu.Intel;
 
 // -----------------------------------------------------------------------
-// Arrêter de se taire sur Intel.
-//
-// Le produit prétend couvrir 2015-2026 et les trois fabricants. Une Arc A770 est bien une
-// carte dédiée (`CartesGraphiques.EstDediee`), mais les leviers de réglage de carte ne
-// visent que NVIDIA et AMD (`GpuGating.IsTunableDiscreteGpu`) : sans ce conseiller, le
-// produit se tairait sur une machine Arc, un skip silencieux, exactement ce qu'il s'interdit.
-//
-// Cette tranche ne demande aucune carte Intel et n'écrit rien :
-//   * classer correctement un GPU Intel (Arc discrète vs intégrée),
-//   * dire honnêtement qu'il n'y a pas de chemin de tuning Intel,
-//   * remonter les deux leviers qui comptent vraiment sur Arc, tous deux sourcés
-//     chez Intel : le pilote game-ready (levier n°1) et ReBAR (requis pour une
+// Ne pas se taire sur Intel : une Arc A770 est une carte dédiée (`CartesGraphiques.EstDediee`), mais le réglage de carte
+// ne vise que NVIDIA et AMD (`GpuGating.IsTunableDiscreteGpu`). Sans carte Intel ni écriture :
+//   * classer un GPU Intel (Arc discrète ou intégrée) ;
+//   * dire qu'il n'y a pas de chemin de tuning Intel ;
+//   * remonter les deux leviers sourcés chez Intel : le pilote game-ready (levier n°1) et ReBAR (requis pour une
 //     performance optimale, BIOS donc guidance).
-//
-// L'écriture IGCL reste un lot à part entière. Ici on répare l'honnêteté, pas la
-// couverture de tuning.
+// L'écriture IGCL reste un lot à part entière.
 // -----------------------------------------------------------------------
 
 public enum IntelGpuClass
@@ -32,10 +23,8 @@ public enum IntelGpuClass
     DiscreteArc = 2,
 }
 
-/// <summary>Un conseil Intel. Guidance par construction : aucun chemin d'application
-/// n'existe dans ce namespace. <paramref name="MessageKey"/> est la clé de ressource finale
-/// (convention `Finding.<Domaine><Sujet>`, comme `Finding.Memory.PagefileDisabled`), pas un
-/// fragment à recomposer : une clé assemblée à la volée ne se retrouve pas par recherche.</summary>
+/// <summary>Un conseil Intel, guidance seule (aucun chemin d'application ici). <paramref name="MessageKey"/> est la clé
+/// finale (`Finding.<Domaine><Sujet>`), jamais assemblée à la volée : elle se retrouve par recherche.</summary>
 public sealed record IntelGpuGuidance(string Id, string Gpu, string MessageKey, string SourceUrl)
 {
     public bool IsGuidanceOnly => true;
@@ -43,18 +32,13 @@ public sealed record IntelGpuGuidance(string Id, string Gpu, string MessageKey, 
 
 public static class IntelGpuAdvisor
 {
-    // Arc discrète = une lettre de série + 3 chiffres : A310/A380/A580/A750/A770,
-    // B570/B580, et la série suivante quelle qu'elle soit.
-    //
-    // Le piège que ce motif évite : Intel appelle aussi « Arc » des iGPU : « Intel Arc
-    // Graphics » (Meteor Lake) et « Arc 140V » (Lunar Lake). Chercher le simple mot « Arc »
-    // classerait un iGPU soudé comme une carte discrète et proposerait de l'overclocker.
-    // « Arc 140V » n'a pas de lettre de série, il ne matche pas.
+    // Arc discrète = une lettre de série + 3 chiffres (A310/A380/A580/A750/A770, B570/B580, et la série suivante). Le seul
+    // mot « Arc » classerait comme discrets les iGPU « Intel Arc Graphics » (Meteor Lake) et « Arc 140V » (Lunar Lake,
+    // sans lettre de série).
     private static readonly Regex DiscreteArcModel =
         new(@"\bArc\b.*?\b[A-Z]\d{3}\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    // Une carte discrète a de la VRAM dédiée ; un iGPU partage la mémoire système et en
-    // rapporte ~0. Deuxième garde-fou, au cas où le nom mentirait.
+    // Deuxième garde-fou : une carte discrète a de la VRAM dédiée, un iGPU en rapporte ~0.
     private const long DiscreteVramFloor = 1L << 30;
 
     private const string SrcArcDriver =
@@ -84,16 +68,13 @@ public static class IntelGpuAdvisor
             if (Classify(g) != IntelGpuClass.DiscreteArc)
                 continue; // heuristique : rien à dire d'utile sur un iGPU que les leviers OS ne couvrent déjà.
 
-            // (1) Ne pas se taire. Le tuning GPU est refusé sur cette carte : on dit lequel
-            // et pourquoi, au lieu de la faire disparaître du rapport.
+            // (1) Le tuning GPU est refusé sur cette carte : on dit lequel et pourquoi.
             advice.Add(new IntelGpuGuidance(
                 "gpu.intel.no_tuning_path", g.Model,
                 "Finding.Gpu.IntelNoTuningPath", SrcIgcl));
 
-            // (2) ReBAR : Intel dit qu'il est requis pour une performance optimale sur Arc.
-            // La carte tourne sans, mais sous-performe. BIOS ⇒ guidance, jamais d'écriture.
-            // Unknown compte ici : sur Intel la lecture ReBAR n'est pas câblée, et « je ne sais
-            // pas » sur un levier à deux chiffres de pourcentage mérite d'être dit.
+            // (2) ReBAR, requis pour une performance optimale sur Arc selon Intel ; BIOS ⇒ guidance. Unknown compte : la
+            // lecture ReBAR Intel n'est pas câblée, et « je ne sais pas » sur un levier à deux chiffres se dit.
             if (g.ReBar != TriState.On)
                 advice.Add(new IntelGpuGuidance(
                     "gpu.intel.rebar_required", g.Model,
@@ -102,11 +83,8 @@ public static class IntelGpuAdvisor
                         : "Finding.Gpu.IntelRebarUnknown",
                     SrcArcRebar));
 
-            // (3) Le pilote est le levier n°1 sur Arc (optimisations par titre, surtout
-            // DX9/DX11). Notre détecteur de fraîcheur est vendor-agnostique et son plancher
-            // est trop grossier pour la cadence Arc : il ne dira jamais qu'un pilote Arc de
-            // six mois est en retard. Donc on le dit, au lieu de laisser croire que le
-            // silence vaut « ton pilote va bien ».
+            // (3) Le pilote, levier n°1 sur Arc (optimisations par titre, surtout DX9/DX11) : le plancher de fraîcheur est trop
+            // grossier pour la cadence Arc, donc on le dit, plutôt qu'un silence lu « ton pilote va bien ».
             advice.Add(new IntelGpuGuidance(
                 "gpu.intel.driver_is_the_lever", g.Model,
                 "Finding.Gpu.IntelDriverIsTheLever", SrcArcDriver));

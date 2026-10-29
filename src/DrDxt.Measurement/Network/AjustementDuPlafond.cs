@@ -1,21 +1,16 @@
 namespace DrDxt.Measurement.Network;
 
 /// <summary>
-/// Le plafond d'envoi en boucle fermee, pendant la partie.
-///
-/// Un plafond fixe (50 % du plus fort envoi vu au scan) serait calibre sur une machine, et la consigne
-/// QoS de Windows est lache (200 demandes, ~340 obtenus). Ici on le juge la ou il agit : sur une
-/// fenetre glissante prise plafond en place, le meme juge que le scan (<see cref="Bufferbloat.Juger"/>)
-/// dit si le ping monte encore quand l'envoi est a son maximum.
-///
+/// Le plafond d'envoi en boucle fermee, pendant la partie : un plafond fixe (50 % du plus fort envoi vu au scan) serait
+/// calibre sur une machine, et la consigne QoS de Windows est lache (200 demandes, ~340 obtenus). Sur une fenetre
+/// glissante, plafond en place, le juge du scan (<see cref="Bufferbloat.Juger"/>) dit si le ping monte encore a l'envoi
+/// maximal :
 ///   - il monte encore de <see cref="Bufferbloat.SeuilMs"/> ou plus : on descend de 20 % ;
 ///   - il monte de moins de la moitie du seuil, sur assez d'echantillons des deux cotes : on remonte
 ///     de 10 %, jamais au-dessus de la capacite vue au scan ;
-///   - sinon (trop peu vu, zone grise) : on ne touche a rien. Pas de mouvement sans preuve.
-///
-/// Descendre plus vite que monter : un ping qui monte se sent tout de suite, un envoi un peu trop
-/// bride ne coute qu'un transfert un peu plus lent. Rien n'est envoye pour mesurer : la fenetre est le
-/// trafic reel du joueur.
+///   - sinon (trop peu vu, zone grise) : on ne touche a rien.
+/// Descendre plus vite que monter : un ping qui monte se sent tout de suite, un envoi un peu bride ne coute qu'un
+/// transfert plus lent. Rien n'est envoye pour mesurer : la fenetre est le trafic reel du joueur.
 /// </summary>
 public static class AjustementDuPlafond
 {

@@ -2,23 +2,15 @@ using DrDxt.Core;
 
 namespace DrDxt.Reconciler;
 
-// -----------------------------------------------------------------------
-// ReconcilerStateBootOutcomeStore : le chemin d'écriture du compteur anti-boucle de démarrage
-// (plan T27b), qui enregistre la série dans le sidecar d'exécution. Pur : il ne dépend que des
-// coutures IReconcilerStateStore + IClock (Core), sans appel à l'OS de son côté.
-//
-// Motif « homme mort » :
+// ReconcilerStateBootOutcomeStore : l'écriture du compteur anti-boucle de démarrage (plan T27b) dans le sidecar
+// d'exécution. Pur : seulement IReconcilerStateStore + IClock (Core). Motif « homme mort » :
 //   • MarkBootStarted (démarrage de l'hôte, avant la passe de réconciliation) incrémente la
 //     série. Un démarrage qui n'atteint jamais une session stable la laisse élevée.
 //   • MarkSessionStable (après un intervalle de marche stable) remet la série à 0 et horodate
 //     LastStableSessionAt : la remise à zéro « homme mort » qui efface le compteur.
 //   • GetUncleanStreak ne fait que la lire (ce que consomme BootLoopGuard).
-//
-// Chaque modification est Load → record-with → Save d'un seul tenant (MettreAJourAsync), en échec propre : si Load ou Save échoue,
-// l'op rend ce Fail tel quel, sans modification partielle ni exception à travers la couture. Le
-// sidecar n'a aucune autorité signée (il ne peut qu'en faire moins au réconciliateur) : l'enregistrer
-// ici n'élargit jamais les privilèges.
-// -----------------------------------------------------------------------
+// Chaque modification est Load → record-with → Save d'un seul tenant (MettreAJourAsync) : un échec rend son Fail, sans
+// modification partielle ni exception. Le sidecar n'a aucune autorité signée : l'écrire n'élargit aucun privilège.
 public sealed class ReconcilerStateBootOutcomeStore : IBootOutcomeStore
 {
     private readonly IReconcilerStateStore _stateStore;

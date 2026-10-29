@@ -70,18 +70,12 @@ public sealed class Win32ServiceActions : IServiceActions
             if (_verifierChemin(binary) is { } nonProtege)
                 return Fail($"PresentMon service not started: its executable is not protected ({nonProtege}).");
 
-            // Quatre cas, pas deux. « Le service existe ⇒ demarre-le » laisserait passer
-            // celui qui produit le conflit : un service d'une installation plus ancienne de DrDXT,
-            // ailleurs ou avec des arguments qu'on ne pose plus. Le demarrer ne suffit pas : il republie le
-            // tube par defaut, que le service Intel possede deja (mesure du 07/09 : les deux
-            // services Running, une seule paire de tubes).
-            //
-            // Et l'inverse : quand la configuration est deja la bonne, on n'ecrit rien. Un
-            // produit qui recree son service a chaque mesure se bat contre le systeme.
+            // Quatre cas (PresentMonServicePlan) : un service d'une installation plus ancienne republierait le tube par defaut
+            // du service Intel (mesure du 07/09 : les deux Running, une seule paire de tubes). Une configuration deja bonne
+            // n'est jamais reecrite.
             var exists = ServiceExists(PresentMonServiceName);
-            // L'echappement du binPath vit dans Core, teste : ecrit naivement, sc.exe rend 1639
-            // et ne cree rien (mesure du 07/09/2026). Le chemin d'installation par defaut contient
-            // une espace, donc c'est le cas nominal qui casse.
+            // L'echappement du binPath vit dans Core, teste : naif, sc.exe rend 1639 sans rien creer (mesure du 07/09/2026),
+            // et le chemin par defaut contient une espace.
             var binPath = PresentMonServicePlan.BinPathArgument(binary);
 
             switch (PresentMonServicePlan.Decide(exists, exists ? ReadBinPath(PresentMonServiceName) : null, binary))
@@ -92,8 +86,7 @@ public sealed class Win32ServiceActions : IServiceActions
                     break;
 
                 case PresentMonServiceAction.Repair:
-                    // Le service doit etre arrete pour que la nouvelle ligne de commande prenne.
-                    // Un arret rate fait echouer la reparation (PresentMonServicePlan.Reparer).
+                    // Arreter d'abord pour que la ligne prenne ; un arret rate fait echouer (PresentMonServicePlan.Reparer).
                     var repare = PresentMonServicePlan.Reparer(
                         () => Stop(PresentMonServiceName),
                         () => RunSc($"config {PresentMonServiceName} {binPath} start= demand"));
@@ -156,10 +149,8 @@ public sealed class Win32ServiceActions : IServiceActions
         ServiceController.GetServices().Any(s =>
             string.Equals(s.ServiceName, serviceName, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>La ligne de commande enregistree dans le SCM, ou <c>null</c> si elle n'a pas pu
-    /// etre lue. Le registre est la source : `ServiceController` n'expose pas le `binPath`.
-    /// `null` ne veut pas dire « elle est correcte » : <see cref="PresentMonServicePlan"/>
-    /// repare dans ce cas, par la meme doctrine que partout ailleurs : Unknown ne deduit rien.</summary>
+    /// <summary>La ligne de commande du SCM, lue au registre (`ServiceController` n'expose pas le `binPath`), ou
+    /// <c>null</c> : jamais « correcte » par defaut, <see cref="PresentMonServicePlan"/> en decide.</summary>
     private static string? ReadBinPath(string serviceName)
     {
         try
@@ -176,9 +167,8 @@ public sealed class Win32ServiceActions : IServiceActions
 
     private static Result RunSc(string arguments)
     {
-        // Resolu depuis System32, jamais par nom nu. Un nom nu part dans la recherche
-        // de CreateProcess (dossier de l'appli, puis dossier courant, avant System32 : Microsoft Learn,
-        // CreateProcessW, lpCommandLine). Meme regle que shutdown.exe et powershell.exe.
+        // Depuis System32, jamais un nom nu, que CreateProcess chercherait d'abord dans le dossier de l'appli puis le
+        // courant (source : Microsoft Learn, CreateProcessW, lpCommandLine). Comme shutdown.exe et powershell.exe.
         var psi = new ProcessStartInfo(
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "sc.exe"), arguments)
         {

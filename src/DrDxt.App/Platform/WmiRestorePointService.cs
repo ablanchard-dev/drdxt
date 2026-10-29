@@ -8,22 +8,13 @@ namespace DrDxt.App.Platform;
 // -----------------------------------------------------------------------
 // WmiRestorePointService : le vrai IRestorePointService.
 //
-// * IsEnabled() : la Restauration du système est utilisable quand sa configuration annonce
-//   un espace disque non nul pour le lecteur système (lu via WMI
-//   root\default:SystemRestoreConfig, avec repli sur le registre). Lecture seule.
-// * TryEnable() : activer la Restauration du système est une écriture privilégiée, elle
-//   passe donc par le helper élevé via un EnableSystemRestoreOp typé (lecteur système
-//   seulement, liste blanche à la feuille près). Une fois le helper passé, on revérifie
-//   IsEnabled() et on rend ce résultat : vrai seulement si la restauration est vraiment
-//   utilisable. Le SafetyManager demande déjà le consentement
-//   (IConsentPrompt.AskEnableRestore) avant cet appel ; ici on fait vraiment l'activation.
-// * VerifyPointExists(desc) : cherche dans les points récents (root\default:SystemRestore)
-//   une description qui correspond ; c'est la garde contre une création qui ne fait rien
-//   en silence.
-//
-// La création elle-même passe par le helper élevé (CreateRestorePointOp) ; ce service
-// répond à « la restauration est-elle utilisable », pilote l'activation par le helper, et
-// vérifie « le point a-t-il été créé ». Chaque chemin est protégé ; rien ne lève.
+// * IsEnabled() : utilisable quand la configuration annonce un espace disque non nul pour le lecteur système (WMI
+//   root\default:SystemRestoreConfig, repli sur le registre). Lecture seule.
+// * TryEnable() : par le helper élevé (EnableSystemRestoreOp, lecteur système seulement), après le consentement du
+//   SafetyManager (IConsentPrompt.AskEnableRestore), puis IsEnabled() revérifié.
+// * VerifyPointExists(desc) : une description correspondante dans les points récents (root\default:SystemRestore), la
+//   garde contre une création qui ne fait rien en silence.
+// La création passe par le helper (CreateRestorePointOp). Rien ne lève.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class WmiRestorePointService : IRestorePointService
@@ -96,10 +87,8 @@ public sealed class WmiRestorePointService : IRestorePointService
 
         try
         {
-            // Activer la Restauration du système est une écriture privilégiée : elle passe par le helper
-            // élevé avec un EnableSystemRestoreOp typé, sur liste blanche, pour le lecteur système
-            // seulement. Puis on revérifie : vrai seulement si la restauration est vraiment utilisable
-            // (une GPO ou l'édition de Windows peut encore annuler l'activation → on dit « inutilisable »).
+            // Par le helper (EnableSystemRestoreOp, lecteur système), puis revérifié : une GPO ou l'édition de Windows peut
+            // encore l'annuler.
             var drive = SystemDrive();
             var result = _elevated
                 .ExecuteAsync(new EnableSystemRestoreOp(drive), CancellationToken.None)
@@ -116,8 +105,7 @@ public sealed class WmiRestorePointService : IRestorePointService
         }
     }
 
-    // Le lecteur système sous la forme « X: » (par exemple « C: »). %SystemDrive% est déjà
-    // « C: » ; on retire une éventuelle barre finale. Repli sur « C: » si l'environnement est illisible.
+    // Le lecteur système en « X: » depuis %SystemDrive%, barre finale retirée ; repli « C: ».
     private static string SystemDrive()
     {
         try
@@ -154,9 +142,8 @@ public sealed class WmiRestorePointService : IRestorePointService
     }, () => (DateTime?)null);
 
     /// <summary>Le point le plus recent cree depuis <paramref name="depuisUtc"/>, en UTC, ou <c>null</c>.
-    /// Les dates sont celles de la classe WMI SystemRestore (ex. « 20260911222955.512634-000 », relevée sur un
-    /// poste réel). Une date illisible est ignoree : un point dont on ne sait pas l'age ne
-    /// prouve pas qu'il protege ce changement.</summary>
+    /// Dates de la classe WMI SystemRestore (« 20260911222955.512634-000 », relevée sur un poste réel) ; une date illisible
+    /// est ignoree, un point d'age inconnu ne prouve rien.</summary>
     internal static DateTime? PlusRecentDepuis(IEnumerable<string?> creationsDmtf, DateTime depuisUtc)
     {
         DateTime? plusRecent = null;

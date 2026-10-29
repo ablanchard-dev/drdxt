@@ -4,12 +4,10 @@ using System.Text.Json.Serialization;
 namespace DrDxt.Core;
 
 // -----------------------------------------------------------------------
-// PrivilegedOpType : le discriminant fermé de la forme filaire d'un PrivilegedOp.
-// Chaque membre correspond à exactement une feuille scellée. Le codec fait un switch
-// explicite sur cette énumération ; il ne résout jamais un type par son nom.
-//
-// C'est le reflet sur le fil de l'allowlist des feuilles PrivilegedOp. Il ne grandit
-// qu'en ajoutant un membre ici et un bras correspondant dans les deux switch du codec.
+// PrivilegedOpType : le discriminant fermé de la forme filaire d'un PrivilegedOp, un membre par feuille scellée. Le
+// codec fait un switch explicite dessus, jamais une résolution de type par nom. Il ne grandit qu'avec un membre ici et
+// un bras dans les deux switch du codec. Les valeurs s'ajoutent en fin et ne se renumérotent jamais : un ancien client
+// et un nouveau serveur partagent ce fil.
 // -----------------------------------------------------------------------
 public enum PrivilegedOpType
 {
@@ -28,78 +26,65 @@ public enum PrivilegedOpType
     EnableSystemRestore = 12,
     EstablishLease = 13,
     RenewLease = 14,
-    // Sans ces entrees, Serialize rendrait le discriminant -1 et l'op ne traverserait pas l'IPC :
-    // le trajet vers le BIOS serait inerte des que le helper tourne hors du processus, c'est-a-dire
-    // en production. Les valeurs sont ajoutees en fin : ne jamais renumeroter, un ancien client et
-    // un nouveau serveur partagent ce fil.
+    // Le voyage vers le BIOS : sans ces entrees, Serialize rendrait -1 et l'op ne traverserait pas l'IPC.
     RebootToFirmwareSetup = 15,
     CancelPendingFirmwareBoot = 16,
-    // Lecture seule. Il n'existe deliberement aucune op d'ecriture firmware dans cette
-    // enumeration fermee : ecrire au mauvais offset d'un varstore peut rendre une carte non
-    // demarrable, et l'offset depend du couple (modele x version de BIOS). Appendue, comme
-    // les precedentes : ne jamais renumeroter.
+    // Lecture seule : exprès aucune op d'ecriture firmware, un mauvais offset de varstore (qui depend du couple modele x
+    // version de BIOS) peut rendre une carte non demarrable.
     ReadFirmwareVariable = 17,
-    // L'inverse d'une ecriture au profil d'un jeu. Appendue,
-    // comme les precedentes : ne jamais renumeroter.
+    // L'inverse d'une ecriture au profil d'un jeu.
     DeleteNvApiDrsSetting = 18,
-    // Le manifeste signe, ecrit par le helper eleve. Appendue : ne jamais renumeroter.
+    // Le manifeste signe, ecrit par le helper eleve.
     CommitManifest = 19,
-    // Le plafond d'envoi QoS et son inverse. Appendues : ne jamais renumeroter.
+    // Le plafond d'envoi QoS et son inverse.
     ApplyUploadCap = 20,
     RemoveUploadCap = 21,
-    // Retirer / reposer un element BCD de l'ensemble ferme. Appendues : ne jamais renumeroter.
+    // Retirer / reposer un element BCD de l'ensemble ferme.
     DeleteBcdValue = 22,
     SetBcdValue = 23,
-    // Lecture de l'etat du magasin de composants (DISM /CheckHealth). Appendue : ne jamais renumeroter.
+    // Lecture de l'etat du magasin de composants (DISM /CheckHealth).
     ReadComponentStoreHealth = 24,
-    // La protection du ping retenue pour le service, et son inverse. Appendues : ne jamais renumeroter.
+    // La protection du ping retenue pour le service, et son inverse.
     RetainServiceUploadCap = 25,
     ForgetServiceUploadCap = 26,
-    // Le mode de boost secteur d'un plan. Appendue : ne jamais renumeroter.
+    // Le mode de boost secteur d'un plan.
     SetProcessorBoostMode = 27,
-    // Les ventilateurs rendus à l'automatique. Appendue : ne jamais renumeroter.
+    // Les ventilateurs rendus à l'automatique.
     RestoreGpuFanAuto = 28,
-    // La limite de puissance du processeur par PawnIO. Appendue : ne jamais renumeroter.
+    // La limite de puissance du processeur par PawnIO.
     SetCpuPackagePowerLimit = 29,
-    // L'economie d'energie de la carte sans fil (secteur) d'un plan. Appendue : ne jamais renumeroter.
+    // L'economie d'energie de la carte sans fil (secteur) d'un plan.
     SetWirelessPowerSaving = 30,
-    // Le décalage de tension des cœurs et du cache. Appendue : ne jamais renumeroter.
+    // Le décalage de tension des cœurs et du cache.
     SetCpuVoltageOffset = 31,
-    // Un programme au démarrage coupé ou réactivé (StartupApproved). Appendue : ne jamais renumeroter.
+    // Un programme au démarrage coupé ou réactivé (StartupApproved).
     SetStartupApproval = 32,
-    // Le test memoire au prochain demarrage, et son annulation. Appendues : ne jamais renumeroter.
+    // Le test memoire au prochain demarrage, et son annulation.
     ScheduleMemoryDiagnostic = 40,
     CancelMemoryDiagnostic = 41,
-    // Relancer un peripherique, retirer un vieux pilote d'affichage exporte, le remettre. Appendues : ne jamais renumeroter.
+    // Relancer un peripherique, retirer un vieux pilote d'affichage exporte, le remettre.
     RestartDevice = 42,
     RemoveDriverPackage = 43,
     RestoreDriverPackage = 44,
     PoseEnAttenteDOrigine = 45,
     AcquitterEcriture = 46,
-    // La pause du maintien posée ou levée par le joueur. Appendue : ne jamais renumeroter.
+    // La pause du maintien posée ou levée par le joueur.
     SetMaintenancePause = 47,
-    // Les droits du fichier d'un service corrigés, et rendus. Appendues : ne jamais renumeroter.
+    // Les droits du fichier d'un service corrigés, et rendus.
     CorrigerDroitsDuService = 48,
     RendreDroitsDuService = 49,
 }
 
 // -----------------------------------------------------------------------
-// PrivilegedOpCodec : sérialise et désérialise un PrivilegedOp en JSON via une
-// énumération discriminante bornée + un switch explicite.
-//
-// Sécurité (risque : JSON polymorphe = RCE) :
-//   * pas de TypeNameHandling de Newtonsoft, pas de polymorphisme System.Text.Json par
-//     discriminant vers des types arbitraires, pas de Type.GetType. Le fil ne porte
-//     qu'un discriminant numérique « op » ; un discriminant inconnu ou hors plage ne
-//     donne rien, il échoue proprement
-//     (Result.Fail("HELPER.NOT_ALLOWLISTED", ...)).
-//   * La désérialisation est totale : toute charge malformée ou hostile rend un Result
-//     en échec. Elle ne lève jamais et n'instancie jamais un type arbitraire.
+// PrivilegedOpCodec : un PrivilegedOp en JSON, par un discriminant borné et un switch explicite.
+// Sécurité (JSON polymorphe = RCE) :
+//   * ni TypeNameHandling de Newtonsoft, ni polymorphisme System.Text.Json vers des types arbitraires, ni Type.GetType :
+//     un discriminant numérique « op », inconnu ou hors plage → Result.Fail("HELPER.NOT_ALLOWLISTED", ...) ;
+//   * désérialisation totale : une charge malformée ou hostile rend un échec, jamais une exception ni un type arbitraire.
 // -----------------------------------------------------------------------
 public static class PrivilegedOpCodec
 {
-    // Le nom de la propriété discriminante sur le fil. Volontairement pas « $type »
-    // (qui évoque le type-name handling) : c'est un simple champ d'énumération numérique.
+    // Le discriminant sur le fil, exprès pas « $type » (qui évoque le type-name handling).
     private const string Discriminator = "op";
 
     private static readonly JsonSerializerOptions Options = new()
@@ -137,9 +122,8 @@ public static class PrivilegedOpCodec
             => JsonSerializer.Serialize(writer, value);
     }
 
-    /// <summary>Sérialise une feuille PrivilegedOp connue en objet JSON discriminé.
-    /// Rend Fail(HELPER.NOT_ALLOWLISTED) si la feuille n'est pas dans l'ensemble
-    /// fermé (prudence ; inatteignable pour la hiérarchie scellée).</summary>
+    /// <summary>Sérialise une feuille connue en objet JSON discriminé ; hors de l'ensemble fermé (inatteignable, hiérarchie
+    /// scellée) → Fail(HELPER.NOT_ALLOWLISTED).</summary>
     public static Result<string> Serialize(PrivilegedOp op)
     {
         if (op is null)
@@ -198,9 +182,7 @@ public static class PrivilegedOpCodec
 
         try
         {
-            // Écrit le discriminant, puis fusionne les champs de la feuille dans le même
-            // objet. On construit un nœud JSON pour que le discriminant et la charge de la
-            // feuille partagent un objet plat (pas d'enveloppe polymorphe imbriquée).
+            // Le discriminant et les champs de la feuille dans un même objet plat, sans enveloppe polymorphe.
             using var doc = JsonSerializer.SerializeToDocument(payload, payload.GetType(), Options);
             using var stream = new MemoryStream();
             using (var writer = new Utf8JsonWriter(stream))
@@ -219,9 +201,8 @@ public static class PrivilegedOpCodec
         }
     }
 
-    /// <summary>Désérialise un objet JSON discriminé en sa feuille fermée, par un switch
-    /// explicite sur le discriminant borné. Totale : toute charge malformée, inconnue ou
-    /// hors plage échoue proprement (jamais d'exception, jamais de type résolu).</summary>
+    /// <summary>Un objet JSON discriminé vers sa feuille fermée, par switch explicite. Totale : malformé, inconnu ou hors
+    /// plage échoue proprement.</summary>
     public static Result<PrivilegedOp> Deserialize(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -260,8 +241,7 @@ public static class PrivilegedOpCodec
             sansDiscriminant.Remove(Discriminator);
             var rawJson = sansDiscriminant.ToJsonString();
 
-            // Switch explicite : le seul endroit où un discriminant devient un type. Pas de
-            // réflexion, pas de Type.GetType, pas de résolution polymorphe par nom.
+            // Le seul endroit où un discriminant devient un type : ni réflexion, ni Type.GetType, ni résolution par nom.
             PrivilegedOp? op = (PrivilegedOpType)rawType switch
             {
                 PrivilegedOpType.Ping => new PingOp(),

@@ -7,15 +7,8 @@ namespace DrDxt.Application.Tweaks.FixIt;
 // Réparer, pas booster : chacun défait une erreur de réglage par une voie logicielle prise
 // en charge seulement, jamais par un bricolage du noyau, jamais par une écriture du BIOS.
 //
-// Même contrat de retour que LatencyTweakBase / GpuTweakBase : l'OriginalValueJson du
-// snapshot est la PrivilegedOp typée inverse, sérialisée, qui porte la vraie origine
-// relevée ; annuler = la désérialiser et la renvoyer par IElevatedClient. Un snapshot
-// malformé ou de type inconnu ne doit jamais lever ni lancer une op arbitraire
-// → SAFETY.SNAPSHOT_INVALID (échec propre), comme ISafetyManager.RevertAsync.
-//
-// Honnêteté : le SummaryKey d'une réparation décrit l'effet réel (réparation, moins
-// d'à-coups), jamais un « +FPS » non mérité. Le gain mesuré est prouvé par la remesure du
-// moteur (Phase C2) ; sans mesure, aucun gain n'est affiché.
+// Même contrat de retour que GpuTweakBase (op inverse typée dans le snapshot ; malformé → SAFETY.SNAPSHOT_INVALID).
+// Le SummaryKey décrit l'effet réel (réparation, moins d'à-coups), jamais un « +FPS » : sans mesure, aucun gain affiché.
 // -----------------------------------------------------------------------
 public abstract class FixItTweakBase : ITweak
 {

@@ -3,14 +3,8 @@ using DrDxt.Core;
 namespace DrDxt.Profiles;
 
 // -----------------------------------------------------------------------
-// CoreProfileMatcherAdapter.
-//
-// Réalise l'IProfileMatcher de Core (la forme que le reste de l'App connaît déjà) en
-// projetant la recommandation riche sur un seul Profile composite de Core. Même motif que
-// dans le reste du dépôt : le contrat de Core ne bouge pas, le modèle riche vit dans le
-// projet de couche (cf. EnginePlan et ITweakEngine). Les consommateurs qui ne veulent que
-// « quels leviers recommander » obtiennent une liste propre, réparations d'abord, sans doublon.
-//
+// CoreProfileMatcherAdapter : l'IProfileMatcher de Core, la recommandation riche projetée sur un Profile composite (le
+// contrat de Core ne bouge pas, comme EnginePlan et ITweakEngine).
 //   * Profile.Id           = composition des identifiants de familles appariées.
 //   * Profile.Match        = descripteurs informatifs du processeur et de la carte appariés.
 //   * RecommendedTweakIds  = union de toutes les sélections, ordre FixMisconfig → Latency →
@@ -19,8 +13,7 @@ namespace DrDxt.Profiles;
 //                            validés par vague) : un composite n'est « testé » que si chaque
 //                            partie l'est.
 //
-// Fermé par défaut : un Recommend en échec (inventaire inutilisable) remonte tel quel ;
-// jamais de profil fabriqué.
+// Un Recommend en échec (inventaire inutilisable) remonte tel quel : jamais de profil fabriqué.
 // -----------------------------------------------------------------------
 public sealed class CoreProfileMatcherAdapter : IProfileMatcher
 {

@@ -3,14 +3,10 @@
 namespace DrDxt.Bios;
 
 /// <summary>
-/// LIT les reglages BIOS dans la NVRAM, pour les cartes et versions de firmware que
-/// <see cref="BiosQualificationMatrix"/> decrit avec un emplacement releve dans l'IFR.
-///
-/// Tout ou rien, et c'est voulu : si la variable n'a pas la taille que l'IFR declare, ou si UN
-/// octet tombe hors des valeurs du menu, la table ne decrit pas ce firmware et aucune lecture
-/// n'est rendue. Une seule valeur fausse suffirait a refaire le faux « XMP actif ».
-///
-/// Lecture seule : la couture ne sait que lire.
+/// Lit les reglages BIOS dans la NVRAM, pour les cartes et firmwares que <see cref="BiosQualificationMatrix"/> decrit
+/// avec un emplacement releve dans l'IFR. Tout ou rien : une taille de variable differente de l'IFR, ou un seul octet
+/// hors des valeurs du menu, et aucune lecture n'est rendue (une valeur fausse referait le faux « XMP actif »). La
+/// couture ne sait que lire.
 /// </summary>
 public sealed class NvramBiosSettingsReader
 {
@@ -127,10 +123,8 @@ public sealed class NvramBiosSettingsReader
     }
 
     /// <summary>
-    /// Verse les lectures dans l'etat des reglages, apres les avoir recoupees avec ce que Windows
-    /// voit deja. Une contradiction jette toutes les lectures : c'est la table qu'elle accuse.
-    ///
-    /// Recoupements (ce que Windows prouve, et seulement ca) :
+    /// Verse les lectures dans l'etat des reglages, recoupees avec ce que Windows prouve : une contradiction accuse la
+    /// table et jette toutes les lectures.
     /// · ReBAR lu par Windows (On/Off) doit etre la valeur du BIOS ;
     /// · un demarrage LEGACY prouverait le CSM (st.Csm == On) : le BIOS ne pourrait pas dire « UEFI ». Le scan laisse
     ///   st.Csm a Unknown (SettingsStateReader) : ce recoupement ne joue que si une autre source le remplit.

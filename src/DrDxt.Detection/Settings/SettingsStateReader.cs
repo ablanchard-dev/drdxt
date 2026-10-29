@@ -77,13 +77,9 @@ public sealed class SettingsStateReader : ISettingsStateReader
             displays = read is { IsOk: true } ? read.Value : null;
         }
 
-        // L'ecran tourne-t-il sous sa frequence maximale ? Mesure sur la machine de reference :
-        // panneau 200 Hz pilote a 143 Hz trois jours de suite. Lu sur l'ecran principal : le mesurer
-        // sur le mauvais ecran serait aussi inutile que d'en changer le mode.
-        // Les frequences de tous les ecrans, pas seulement du principal. Elles sont
-        // deja dans `displays` : ne pas les transporter rendait la consommation au repos
-        // indetectable. Une frequence a 0 est gardee telle quelle : c'est l'advisor qui decide
-        // qu'une lecture ratee ne conseille rien, pas le lecteur qui la maquille.
+        // Les frequences de tous les ecrans (un panneau 200 Hz pilote a 143 Hz trois jours de suite, mesure sur la machine
+        // de reference ; et la consommation au repos depend des autres ecrans). Une frequence a 0 reste telle quelle :
+        // c'est l'advisor qui decide qu'une lecture ratee ne conseille rien.
         var attachedRefreshHz = displays?.Select(d => d.RefreshHz).ToList();
 
         RefreshHeadroom? displayRefresh = null;

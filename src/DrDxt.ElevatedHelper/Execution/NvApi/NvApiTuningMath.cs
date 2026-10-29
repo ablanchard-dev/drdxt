@@ -1,26 +1,13 @@
 namespace DrDxt.ElevatedHelper.Execution.NvApi;
 
-// -----------------------------------------------------------------------
-// NvApiTuningMath : la règle de bornes des valeurs GPU imposée à la frontière de privilège ou
-// en dessous (défense n°1). Gardée dans le helper (pas dans la feuille native) parce qu'elle
-// reprend GpuSafeBounds de la couche App ; les conversions d'unités de la recette (MHz↔kHz,
-// %↔PCM, le bornage du pilote) vivent avec la frontière native dans DrDxt.GpuNative
-// (NvApiConvert), ce fichier n'est que la règle. Pur, testable sans GPU.
-//
-// Le helper élevé impose la même plage prudente que GpuSafeBounds : il ne fait jamais confiance
-// à l'appelant (ni au bornage côté client) pour les bornes. Un décalage hors plage est rejeté
-// (par OpAllowlist et par l'écriture de l'exécuteur dans NvApiTuningActions), jamais borné en
-// silence : une op IPC brute (un smoke test tools/r2*, ou une future version de l'App qui branche
-// les coutures de réglage) ne peut jamais pousser un décalage hors règle sur le vrai matériel.
-//
-// GpuSafeBounds (DrDxt.Application) est la source unique de la plage. Le helper ne dépend que de
-// DrDxt.Core et ne peut pas la référencer : les constantes sont donc reprises ici ; le test
-// inter-assemblages NvApiTuningPolicyBoundSyncTests vérifie qu'elles restent égales à
-// GpuSafeBounds.{Min,Max}{Core,Memory}OffsetMhz. Les garder synchronisées.
-//
-// Pur et total : les vérifications ne lèvent jamais ; pas de Math.Abs (int.MinValue est sûr) et
-// NaN / Infinity sont rejetés par le garde-fou de puissance.
-// -----------------------------------------------------------------------
+// NvApiTuningMath : la règle de bornes des valeurs GPU à la frontière de privilège (défense n°1), dans le helper parce
+// qu'elle reprend GpuSafeBounds ; les conversions d'unités (MHz↔kHz, %↔PCM, bornage du pilote) vivent dans
+// DrDxt.GpuNative (NvApiConvert). Le helper ne fait jamais confiance au bornage de l'appelant : un décalage hors plage
+// est rejeté (OpAllowlist, et l'écriture de l'exécuteur dans NvApiTuningActions), jamais borné en silence ; une op IPC
+// brute (smoke test tools/r2*, future App) ne pousse rien hors règle sur le vrai matériel.
+// GpuSafeBounds (DrDxt.Application) est la source unique ; le helper ne dépend que de DrDxt.Core, d'où les constantes
+// reprises ici, que NvApiTuningPolicyBoundSyncTests garde égales à GpuSafeBounds.{Min,Max}{Core,Memory}OffsetMhz.
+// Pur et total : jamais de levée, pas de Math.Abs (int.MinValue est sûr), NaN / Infinity rejetés par le garde-fou.
 internal static class NvApiTuningMath
 {
     // Reprise de GpuSafeBounds.MinCoreOffsetMhz / MaxCoreOffsetMhz (la plage prudente).

@@ -10,21 +10,11 @@ namespace DrDxt.Infrastructure.Repair;
 public sealed record JournalDeSante(string? Avertissement, IReadOnlyList<RepairDelta> Nouvelles);
 
 /// <summary>
-/// Ce qui a change depuis la derniere fois : le pilier maintenir, cote produit.
-///
-/// ══ pourquoi il existe ══
-/// Une photo isolee ne prouve rien dans le temps : la degradation lente, celle qu'un scan isole ne
-/// voit jamais, ne se voit qu'en comparant la photo a la precedente.
-///
-/// ══ ce que ce service ne montre pas, et c'est sa valeur ══
-/// Il ecarte les valeurs mesurees qui bougent. Deux passes a une minute d'ecart produisent
-/// quatre « changements » (cœurs parques, frequence CPU, debit RAM, temperature GPU), tous exacts
-/// et tous sans interet : ce sont des mesures, elles varient par nature. Les melanger aux vrais
-/// changements donne un diff qui trouve toujours quelque chose, donc un diff qu'on cesse de lire.
-///
-/// Et l'avertissement de conditions passe avant tout le reste : « le multi-canal n'est plus
-/// prouve » peut venir d'une compilation qui tourne pendant la lecture, sans que la machine ait
-/// rien perdu. Le constat serait juste et sa lecture fausse.
+/// Ce qui a change depuis la derniere fois : le pilier maintenir, cote produit (une degradation lente ne se voit qu'en
+/// comparant a la photo precedente). Il ecarte les valeurs mesurees qui bougent : deux passes a une minute d'ecart
+/// donnent quatre « changements » exacts et sans interet (cœurs parques, frequence CPU, debit RAM, temperature GPU), et
+/// un diff qui trouve toujours quelque chose cesse d'etre lu. L'avertissement de conditions passe d'abord : « le
+/// multi-canal n'est plus prouve » peut venir d'une compilation pendant la lecture.
 /// </summary>
 public sealed class RepairJournalService
 {
@@ -59,9 +49,7 @@ public sealed class RepairJournalService
 
         var photo = new RepairSnapshot(
             _maintenant(),
-            // Les familles examinees voyagent avec la photo. Sans elles, le jour ou l'audit
-            // apprend a lire une famille de plus, le diff annonce une degradation de la machine
-            // alors que c'est le produit qui a appris a regarder.
+            // Les familles examinees voyagent avec la photo : une famille nouvellement lue n'est pas une degradation.
             constats.Select(c => c.Domaine).Distinct().ToList(),
             constats.Select(c => new RepairEtat(c.Domaine, c.Nom, c.ValeurCourante, c.Statut)).ToList(),
             Conditions(),
@@ -75,14 +63,11 @@ public sealed class RepairJournalService
             ? Result<RepairSnapshot?>.Ok(RepairHistory.PhotoComparable(photos.Value!, photo))
             : Result<RepairSnapshot?>.Fail(photos.Error!.Value.Code, photos.Error.Value.Message);
 
-        // L'enregistrement se fait dans tous les cas : meme sans photo d'avant, celle-ci servira la
-        // prochaine fois. Un echec d'ecriture ne doit pas empecher de rendre le diff qu'on a.
+        // Enregistree dans tous les cas (elle servira la prochaine fois) ; un echec d'ecriture n'empeche pas le diff.
         _magasin.Enregistrer(photo);
 
-        // Un journal illisible n'est pas un journal vide. Si les deux rendaient `null`, l'ecran
-        // afficherait la meme chose dans les deux cas : rien. « On ne sait pas lire l'historique »
-        // passerait pour « rien n'a change depuis la derniere fois », un Unknown peint en sain,
-        // exactement ce que le magasin prend soin de distinguer une couche plus bas.
+        // Un journal illisible n'est pas un journal vide : rendre `null` dans les deux cas peindrait en « rien n'a change »
+        // un historique illisible, ce que le magasin distingue une couche plus bas.
         if (!precedente.IsOk)
             return new JournalDeSante(
                 Docteur.T("RJS.HistoriqueNonLu", precedente.Error!.Value.Message),
@@ -99,9 +84,8 @@ public sealed class RepairJournalService
                               || (d.Quoi == RepairChangement.StatutChange && d.Apres == nameof(RepairStatus.Unknown)))))
             .ToList();
 
-        // La mise a jour du lecteur et l'agitation de la machine NUANCENT des
-        // changements. Sans changement, elles s'afficheraient seules sous un compteur a 0 : une mise
-        // en garde sur rien. Les droits, eux, disent qu'une lecture a ete refusee : ils restent.
+        // La mise a jour du lecteur et l'agitation de la machine nuancent des changements : sans changement, rien. Les
+        // droits disent qu'une lecture a ete refusee : ils restent.
         var avertissements = new[]
         {
             nouvelles.Count > 0 ? RepairHistory.AvertissementDeLecteur(avant, photo) : null,

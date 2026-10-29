@@ -6,25 +6,18 @@ namespace DrDxt.Reconciler.Manifest;
 // -----------------------------------------------------------------------
 // MachineManifestCommit : ce que fait le helper eleve d'un `CommitManifestOp`.
 //
-// Les entrees sont deja validees par l'allowlist du helper quand elles arrivent ici (identifiants du
-// catalogue, valeurs bornees, ce qui serait execute passe l'allowlist). Cette classe fait le reste :
+// Les entrees arrivent validees par l'allowlist du helper (identifiants du catalogue, valeurs bornees). Le reste :
 //   1. charge la cle de la machine, la cree si elle n'existe pas (MachineManifestKey) ;
 //   2. relit le manifeste existant par le meme chemin verifie que le reconciliateur ;
 //   3. fusionne (SignedDesiredStateStore.CommitAsync → DesiredState.Fusionner : premiere origine gagne),
 //      retire ce qu'on lui demande de retirer (levier annule), signe, ecrit atomiquement ;
 //   4. pose ou repare la cle publique a cote, pour l'App et le service.
 //
-// La regle de l'illisible. Un manifeste qui ne se relit pas (altere, signe par une autre cle, une
-// ancienne ou celle de dev, JSON casse, ACL non fiable) n'est jamais ecrase : refus nomme
-// ErrorCodes.ManifestUnreadable, rien n'est ecrit. Meme chose pour une cle inutilisable
-// (ManifestKeyUnusable). La seule sortie est la reprise explicite (`repartir`) : l'illisible est mis
-// de cote (renomme, jamais efface) et un manifeste neuf commence avec les entrees recues. Sur un
-// manifeste lisible, la reprise est refusee : on ne jette jamais des origines qu'on sait relire.
-//
-// Pourquoi pas « reconstruire depuis `Gardes` » : ce journal vit sous %LOCALAPPDATA%, ecrivable par
-// tout processus du compte. Le rejouer ici ferait d'un simple fichier utilisateur une autorite signee
-// que la desinstallation executerait elevee. La reprise part des entrees que l'App vient d'envoyer, et
-// elle dit que les origines de l'ancien manifeste ne seront plus rendues.
+// Un manifeste illisible (altere, signe par une autre cle, une ancienne ou celle de dev, JSON casse, ACL non fiable)
+// n'est jamais ecrase : ErrorCodes.ManifestUnreadable, rien d'ecrit ; de meme pour une cle inutilisable
+// (ManifestKeyUnusable). Seule sortie : la reprise explicite (`repartir`), qui met l'illisible de cote (renomme, jamais
+// efface) ; refusee sur un manifeste lisible. La reprise ne reconstruit pas depuis `Gardes` : sous %LOCALAPPDATA%,
+// ecrivable par tout processus du compte, il deviendrait une autorite signee executee elevee a la desinstallation.
 //
 // Un seul appel a la fois, meme entre deux helpers (deux comptes) : un fichier verrou dans la racine de confiance.
 // -----------------------------------------------------------------------
@@ -40,9 +33,8 @@ public sealed class MachineManifestCommit
     private readonly IGpuDriverProbe? _pilote;
 
     /// <param name="appliquerAcl">Production : true. Tests : false (dossier temporaire).</param>
-    /// <param name="reference">Le fichier du reconciliateur ou la reference de derive (build,
-    /// pilote) est posee dans le meme geste que le manifeste (ApplyReferenceSeedingStore), par ce processus
-    /// eleve. Absent (avec ses sondes) = pas de reference posee.</param>
+    /// <param name="reference">Le fichier ou la reference de derive (build, pilote) est posee avec le manifeste
+    /// (ApplyReferenceSeedingStore), par ce processus eleve. Absent = pas de reference posee.</param>
     public MachineManifestCommit(string racine, bool appliquerAcl, IClock horloge,
         IReconcilerStateStore? reference = null, IOsBuildProbe? build = null, IGpuDriverProbe? pilote = null)
     {
@@ -54,9 +46,8 @@ public sealed class MachineManifestCommit
         _pilote = pilote;
     }
 
-    /// <summary>Le verrou des écritures du manifeste et de sa clé : un fichier ouvert en exclusif dans la racine de confiance.
-    /// Deux comptes ont chacun leur helper ; un mutex nommé pourrait être pris d'avance par un programme sans droits, ce
-    /// dossier ne laisse créer un fichier qu'aux administrateurs.</summary>
+    /// <summary>Le verrou des écritures du manifeste et de sa clé : un fichier exclusif dans la racine de confiance, où
+    /// seuls les administrateurs créent un fichier (un mutex nommé pourrait être pris d'avance sans droits).</summary>
     public const string NomDuVerrou = "manifeste.verrou";
 
     private static readonly TimeSpan AttenteDuVerrou = TimeSpan.FromSeconds(10);
@@ -95,8 +86,7 @@ public sealed class MachineManifestCommit
             if (!repartir)
                 return Result.Fail(ErrorCodes.ManifestKeyUnusable, cle.Error.Value.Message + " Nothing was written.");
 
-            // Reprise : la cle et le manifeste qu'elle signait sont mis de cote. Ce que la cle publique relit encore est
-            // repris et re-signe par la nouvelle cle : ce sont les seules origines que la desinstallation sait rendre.
+            // Reprise : cle et manifeste mis de cote ; ce que la cle publique relit encore est re-signe par la nouvelle.
             DesiredState? repris = null;
             var verificateur = MachineManifestKey.ChargerVerificateur(_racine, _appliquerAcl);
             if (verificateur.IsOk)

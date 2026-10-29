@@ -4,9 +4,7 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.FixIt;
 
 // -----------------------------------------------------------------------
-// La carte sans fil sortie de son mode d'économie d'énergie quand le jeu
-// passe par le Wi-Fi.
-//
+// La carte sans fil sortie de son mode d'économie d'énergie quand le jeu passe par le Wi-Fi.
 // Ce qui est sourcé : Microsoft Learn (Wi-Fi power management) : « Power save mode reduces power consumption at the cost
 // of increased data transfer latency » ; attendu actif sur batterie « sauf quand une connexion à faible latence est
 // requise ». Microsoft Q&A : des pics de ping en Wi-Fi réglés par « Performances maximales ». Le réglage vit dans le plan
@@ -15,10 +13,9 @@ namespace DrDxt.Application.Tweaks.FixIt;
 //
 // Ce qui est écrit : la seule valeur secteur de ce réglage, dans le plan actif, à 0 ; jamais la valeur batterie (le
 // choix du joueur quand il n'est pas branché), jamais un autre réglage du plan. L'original est relu juste avant.
-// Proposé seulement quand un adaptateur sans fil est connecté et aucun filaire (sinon le jeu passe par le câble), et que
-// la valeur lue n'est pas déjà « performances maximales » (sur secteur, le plan Équilibré y est déjà : la portée est un
-// plan ou un constructeur qui l'a changé). Confort de latence : posé et relu, pas un gain d'images ; le scan suivant
-// montre la gigue vers la box. Le vrai remède du Wi-Fi reste le câble, et le docteur le dit.
+// Proposé avec un adaptateur sans fil connecté et aucun filaire, sur une valeur pas déjà « performances maximales »
+// (Équilibré l'est sur secteur : seul un plan ou un constructeur l'a changée). Confort de latence, pas un gain
+// d'images ; le scan suivant montre la gigue vers la box. Le vrai remède reste le câble, et le docteur le dit.
 // -----------------------------------------------------------------------
 /// <summary>Sort la carte sans fil de son mode d'économie d'énergie (valeur secteur à 0 dans le plan actif). Proposé quand
 /// le jeu passe par le Wi-Fi sans câble branché et que la valeur n'est pas déjà « performances maximales ».</summary>

@@ -11,13 +11,10 @@ namespace DrDxt.Detection.Settings;
 ///                                    « C:\pagefile.sys 0 0 » ou taille personnalisée ; un fichier présent est
 ///                                    un choix valide, peut-être voulu, qu'on ne remet jamais en cause),
 ///   • null (illisible)      → Unknown (jamais Off quand on ne peut pas lire).
-/// Détection seule : nourrit un constat honnête de fiabilité, pas une promesse de « +FPS », et
-/// n'écrit jamais (remettre « géré par le système » est une op WMI, hors du modèle d'ops typées).
-/// Encodage de PagingFiles vérifié (« vide = désactivé » n'est donc pas un faux positif) : un
-/// fichier « géré par le système » / « géré automatiquement » stocke une entrée sans tailles (par
-/// exemple « ?:\pagefile.sys » ou « C:\pagefile.sys 0 0 »), non vide ; un fichier personnalisé est
-/// « …sys min max » ; seule la désactivation laisse la valeur vide. Toute entrée non vide ⇒ présent (On).
-/// Source : https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file
+/// Détection seule, un constat de fiabilité sans « +FPS » ; n'écrit jamais (« géré par le système » est une op WMI, hors
+/// des ops typées). Encodage vérifié : « géré par le système / automatiquement » stocke une entrée sans tailles
+/// (« ?:\pagefile.sys », « C:\pagefile.sys 0 0 »), un fichier personnalisé « …sys min max » ; seule la désactivation
+/// laisse la valeur vide.
 /// </summary>
 public static class PagefileInferencer
 {

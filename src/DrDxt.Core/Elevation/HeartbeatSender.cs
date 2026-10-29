@@ -1,23 +1,11 @@
 namespace DrDxt.Core;
 
-// -----------------------------------------------------------------------
-// HeartbeatSender : un petit objet jetable et réutilisable qui maintient en vie le bail
-// d'un levier tenu en le renouvelant à intervalle régulier, jusqu'à sa libération.
-//
-// Contrat (le chemin d'application à décalage tenu est conçu pour en brancher un) :
-// tant qu'un décalage GPU ou une limite de puissance tenus sont posés et que le contrôleur
-// vit, le battement renouvelle le bail pour que l'homme mort du helper ne parte jamais.
-// Quand l'application finit (ou que le processus qui pilote meurt ou le libère), le
-// battement s'arrête ; le bail expire et le chien de garde annule le levier tenu.
-//
-// Branché sur le mode Expert de la carte (décalage, ventilateur) et sur le plafond d'envoi.
-//
-// Le renouvellement passe par IElevatedClient.RenewLease → le même pipeline IPC signé et
-// la même identité d'appelant que toute autre op (le helper ne laisse que le détenteur du
-// bail le renouveler). Un échec passager (pipe occupé, helper absent un instant) est
-// avalé : un battement manqué ne doit pas faire planter le contrôleur ; le bail a
-// simplement moins de battements avant sa vraie échéance.
-// -----------------------------------------------------------------------
+// HeartbeatSender : renouvelle à intervalle régulier le bail d'un levier tenu, jusqu'à sa libération. Tant qu'un
+// décalage GPU ou une limite de puissance tenus sont posés et que le contrôleur vit, l'homme mort du helper ne part pas ;
+// quand l'application finit (ou que son processus meurt), le battement s'arrête, le bail expire et le chien de garde
+// annule le levier. Branché sur le mode Expert de la carte (décalage, ventilateur) et sur le plafond d'envoi.
+// IElevatedClient.RenewLease : même pipeline IPC signé, même identité que toute op (seul le détenteur renouvelle). Un
+// échec passager (pipe occupé, helper absent un instant) est avalé : un battement de moins avant l'échéance.
 public sealed class HeartbeatSender : IAsyncDisposable
 {
     private readonly IElevatedClient _client;
@@ -70,9 +58,8 @@ public sealed class HeartbeatSender : IAsyncDisposable
         {
             var r = await _client.RenewLease(_leaseId, _leaseSeconds, ct).ConfigureAwait(false);
             // « Rendu par le helper » : Perdu (le journal peut être levé). « Inconnu » (helper relancé, registre vide) : le
-            // réglage est peut-être encore posé, pas de Perdu, mais plus rien à renouveler. Conséquence assumée : jusqu'à la
-            // fin de la session, ce réglage n'a plus de bail ; seul le journal le rend, au démarrage suivant de l'App.
-            // Un refus d'appelant (ElevationDenied) est passager : le battement continue.
+            // réglage est peut-être encore posé, pas de Perdu, plus de bail jusqu'à la fin de la session ; seul le journal
+            // le rend, au démarrage suivant de l'App. Un refus d'appelant (ElevationDenied) est passager : on continue.
             if (r is { IsOk: false, Error.Code: ErrorCodes.LeaseReverted or ErrorCodes.LeaseUnknown } && Interlocked.Exchange(ref _perdu, 1) == 0)
             {
                 try { _cts.Cancel(); } catch { /* déjà libéré */ }

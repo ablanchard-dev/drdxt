@@ -11,11 +11,9 @@ public sealed record EcartJuge(GameMetricKind Grandeur, double EcartPct, double 
 /// <summary>Une ligne du journal : un candidat juge par une session.</summary>
 /// <param name="Decision">`garde`, `rejete` ou `non_decidable` : voir <see cref="JournalDesCandidats.Decision"/>.</param>
 /// <param name="Queue">Recopiee de <see cref="CandidateResult.Queue"/>, donc de la decision elle-meme.</param>
-/// <param name="Scene">La scene declaree pour la session (<see cref="SceneContract.Representativite"/>),
-/// recopiee du contrat qui a reellement atteint la session. Sans elle, le corpus ne
-/// saurait pas si un keep est ne en partie reelle ou dans un lobby. <c>null</c> = ligne ecrite avant
-/// ce champ (non consignee), a ne jamais confondre avec <see cref="SceneRepresentativity.Unknown"/>
-/// (« je ne sais pas », declare).</param>
+/// <param name="Scene">La scene declaree (<see cref="SceneContract.Representativite"/>) du contrat qui a atteint la
+/// session : un keep ne en partie reelle ou dans un lobby. <c>null</c> = non consignee, jamais
+/// <see cref="SceneRepresentativity.Unknown"/> (« je ne sais pas », declare).</param>
 /// <param name="Role">Decouverte ou validation, meme source, meme regle du <c>null</c>.</param>
 /// <param name="DescriptionScene">Ce que le joueur en a dit, mot pour mot.</param>
 public sealed record CandidatJuge(
@@ -33,18 +31,10 @@ public sealed record CandidatJuge(
     string? DescriptionScene = null);
 
 /// <summary>
-/// Le reservoir des candidats juges : un fichier JSONL en ajout seul, une ligne par candidat.
-///
-/// <see cref="KeepDecision.Queue"/> nomme la grandeur de queue qui a valide un keep, pour trancher
-/// un jour si le p95 seul merite de garder un reglage. <see cref="CandidateResult"/> ne vit que le
-/// temps d'une session : ce fichier garde le corpus qui permettra de trancher.
-///
-/// Ajout seul, jamais reecrit : une ligne a moitie ecrite par une panne ne coute qu'elle-meme,
-/// alors qu'une reecriture complete ratee couterait tout l'historique. C'est la raison de ne pas
-/// passer par <see cref="FichierJsonAtomique"/>, qui remplace le fichier entier.
-///
-/// Il ne decide rien et ne change aucun critere. Et un echec d'ecriture ne fait jamais echouer
-/// la session : <see cref="Consigner"/> ne leve pas, il rend un <see cref="Result"/>.
+/// Le reservoir des candidats juges, un JSONL, une ligne par candidat : le corpus pour trancher un jour si le p95 seul
+/// (<see cref="KeepDecision.Queue"/>) merite de garder un reglage, <see cref="CandidateResult"/> ne vivant qu'une
+/// session. Ajout seul, pas <see cref="FichierJsonAtomique"/> : une ligne a moitie ecrite ne coute qu'elle-meme, une
+/// reecriture ratee couterait tout. Il ne decide rien ; <see cref="Consigner"/> ne leve jamais.
 /// </summary>
 public sealed class JournalDesCandidats
 {
@@ -54,8 +44,7 @@ public sealed class JournalDesCandidats
     {
         WriteIndented = false,
         Converters = { new JsonStringEnumConverter() },
-        // Une preuve invalide porte NaN, et le JSON par defaut refuse de l'ecrire. Un seul
-        // candidat non decidable faisait perdre toutes les lignes de la session.
+        // Une preuve invalide porte NaN, que le JSON par defaut refuse : sinon toute la session serait perdue.
         NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
     };
 
@@ -75,8 +64,8 @@ public sealed class JournalDesCandidats
     /// <summary>A cote de `performance-journal.json` et `repair-history.json`.</summary>
     public static string CheminParDefaut() => FichierJsonAtomique.CheminLocal(NomFichier);
 
-    /// <summary>Ce que la ligne dit du verdict. Un candidat jamais mesure (non tente, ecriture qui
-    /// n'a pas pris, instabilite) n'est ni garde ni rejete : la session n'a pas pu en decider.</summary>
+    /// <summary>Le verdict de la ligne. Jamais mesure (non tente, ecriture qui n'a pas pris, instabilite) : ni garde ni
+    /// rejete.</summary>
     public static string Decision(CandidateOutcome issue, string? raisonCle = null) =>
         // Une experience invalide, ou sans aucune passe exploitable, est annulee sans avoir rien decide.
         raisonCle is KeepPolicy.CleInvalide or KeepPolicy.CleAucuneMesure ? "non_decidable" : issue switch

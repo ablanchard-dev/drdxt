@@ -5,21 +5,15 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks.FixIt;
 
-// -----------------------------------------------------------------------
-// Les heures d'activité de Windows Update réglées sur les heures de jeu relevées.
-//
-// Microsoft (Learn, « Manage device restarts after updates ») : « Automatic restarts after an update occur outside of the
+// Les heures d'activité de Windows Update réglées sur les heures de jeu relevées. Microsoft (Learn, « Manage device restarts after updates ») : « Automatic restarts after an update occur outside of the
 // active hours », 18 h au plus. Relevé le 06/10/2026 sur la machine de référence : un redémarrage de Windows Update à
 // 10:15, hors de ses heures d'activité (15 h à 8 h), et sa seule partie relevée (8:23) elle aussi hors de ces heures.
-//
-// Ce qui est écrit : le réglage de l'utilisateur (Paramètres > Windows Update > Heures d'activité), deux DWORD de
-// HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings, par le helper (deux feuilles exactes). Pas la stratégie : elle
-// verrouille l'écran de Paramètres et Microsoft la range côté entreprise. L'emplacement du réglage utilisateur n'est pas
-// documenté par Microsoft (seule la stratégie l'est, Policy CSP Update) : le constat suivant le relit.
-//
-// Jamais : désactiver Windows Update, reporter une mise à jour. Aucun gain d'images : c'est un levier de confort, posé au
-// clic et jugé sur les redémarrages tombés pendant une partie (le constat du docteur), pas en session mesurée.
-// -----------------------------------------------------------------------
+// Écrit : le réglage de l'utilisateur (Paramètres > Windows Update > Heures d'activité), deux DWORD de
+// HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings, par le helper (deux feuilles exactes). Pas la stratégie, qui
+// verrouille l'écran de Paramètres et que Microsoft range côté entreprise ; l'emplacement du réglage utilisateur n'est pas
+// documenté (seule la stratégie l'est, Policy CSP Update) : le constat suivant le relit.
+// Jamais : désactiver Windows Update, reporter une mise à jour. Aucun gain d'images : posé au clic, jugé sur les
+// redémarrages tombés pendant une partie (le constat du docteur), pas en session mesurée.
 /// <summary>Règle les heures d'activité de Windows Update sur les heures de jeu relevées, pour qu'un redémarrage automatique
 /// ne tombe pas en pleine partie. Proposé quand elles sont lues en mode manuel et que les parties en demandent d'autres.</summary>
 public sealed class HeuresActivesTweak : ITweak
@@ -46,8 +40,8 @@ public sealed class HeuresActivesTweak : ITweak
     /// <summary>Seulement quand des parties sont relevées, qu'elles sortent des heures lues, que Windows ne les règle pas
     /// tout seul, et qu'une plage de 18 h au plus les couvre. Non lu ne déclenche rien.</summary>
     public bool AppliesTo(HardwareInventory hw, SettingsState state) =>
-        // Seulement « manuel » LU. Absent, Windows peut les régler seul et réécrire ce que
-        // DrDXT poserait : « posé » à l'écran, effet nul. Sur la machine de référence la valeur est absente (15 h - 8 h).
+        // Seulement « manuel » lu : absent, Windows peut les régler seul et réécrire ce que DrDXT poserait (« posé », effet
+        // nul). Sur la machine de référence la valeur est absente (15 h - 8 h).
         state.HeuresActives is { Automatique: false } h && Parties(state) is { } parties
         && HeuresActives.Proposer(h, parties, _fuseau) is not null;
 

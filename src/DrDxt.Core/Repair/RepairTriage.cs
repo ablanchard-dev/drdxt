@@ -13,19 +13,10 @@ public sealed record RepairTriage(
     IReadOnlyList<RepairFinding> Verifies)
 {
     /// <summary>
-    /// Le tri qui decide de ce qu'un joueur voit.
-    ///
-    /// L'audit rend une quarantaine de constats sur onze domaines ; un decompte de statuts
-    /// (« 2 recommandations, 6 Unknown ») serait exact et illisible, sans dire quoi regarder.
-    /// Un rapport que personne ne lit ne vaut pas mieux qu'un rapport faux.
-    ///
-    /// La regle vit ici, pas dans l'outil, parce qu'elle decide de ce que le produit met sous
-    /// les yeux de quelqu'un : une regle qui decide doit etre exercee par un test.
-    ///
-    /// L'ordre de priorite compte. Un constat porteur d'un geste va dans `Attention` meme si
-    /// son statut est `Unknown` : les quatre reglages BIOS sont inconnus en valeur (on ne sait
-    /// pas les lire), et pourtant chacun propose un passage guide. Les ranger dans les angles
-    /// morts les rendrait invisibles.
+    /// Le tri qui decide de ce qu'un joueur voit, parmi une quarantaine de constats sur onze domaines (un decompte de
+    /// statuts, « 2 recommandations, 6 Unknown », serait exact et illisible). Ici, et pas dans l'outil, pour etre exerce
+    /// par un test. Un constat porteur d'un geste va dans `Attention` meme `Unknown` : les quatre reglages BIOS sont
+    /// illisibles en valeur et proposent chacun un passage guide.
     /// </summary>
     public static RepairTriage Trier(IEnumerable<RepairFinding> constats)
     {
@@ -47,11 +38,8 @@ public sealed record RepairTriage(
         return new RepairTriage(attention, nonLus, verifies);
     }
 
-    /// <summary>La phrase que le produit a le droit de dire, et rien de plus.
-    ///
-    /// Elle nomme les trois nombres ensemble. « Rien a signaler » sans dire combien de choses
-    /// n'ont pas pu etre lues serait la meme faute que de rendre zero pour un compteur illisible.
-    /// </summary>
+    /// <summary>La phrase que le produit a le droit de dire : les trois nombres ensemble, jamais « rien a signaler » sans
+    /// le compte des non-lus.</summary>
     public string Phrase =>
         Attention.Count == 0
             // Le compte s'accorde ; zéro état vérifié ne se dit pas « rien ne demande ton attention ».
@@ -75,7 +63,6 @@ public sealed record RepairTriage(
         }
     }
 
-    // Un seul etat non lu ne doit pas donner « 1 n'ont pas pu être lus ». Les accords se font sur
-    // le nombre, pas avec des parentheses.
+    // Accord sur le nombre, pas de parentheses : jamais « 1 n'ont pas pu être lus ».
     private string NonLusDits => NonLus.Count == 1 ? Docteur.T("RT.UnNonLu") : Docteur.T("RT.NonLus", NonLus.Count);
 }

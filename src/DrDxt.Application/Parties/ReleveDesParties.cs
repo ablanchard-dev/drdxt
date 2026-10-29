@@ -73,13 +73,9 @@ public sealed record PartieRelevee(
     string? Instrument = null);
 
 /// <summary>
-/// Aucune partie jouée ne laissait de trace dans DrDXT. La veille
-/// prend des captures pendant la partie ; à la fin, une ligne. « Inconnu » ne gagne jamais au nombre contre un goulot mesuré.
-///
-/// Les captures
-/// se suivent sans attente (seule la seconde ou deux avant la première image de chaque fenêtre manque) et portent toutes
-/// leurs images ; les FPS et le 1 % low se calculent sur toutes les images des
-/// fenêtres jouées, pas sur une médiane de fenêtres. Les champs gardent leur nom (<c>FpsMedian</c>, <c>Low1Median</c>)
+/// La trace d'une partie : la veille capture pendant la partie, et à la fin, une ligne. « Inconnu » ne gagne jamais au
+/// nombre contre un goulot mesuré. Les captures se suivent sans attente et portent toutes leurs images ; FPS et 1 % low
+/// se calculent sur toutes les images des fenêtres jouées, pas sur une médiane de fenêtres. Les champs gardent leur nom (<c>FpsMedian</c>, <c>Low1Median</c>)
 /// pour ne pas casser les parties déjà écrites : sans images (rejeu, test), ils restent des médianes de captures.
 ///
 /// Une fenêtre n'est pas jouée (« quand FPS bloqué c'est menu, ou navigation vers une autre fenêtre ») quand le jeu

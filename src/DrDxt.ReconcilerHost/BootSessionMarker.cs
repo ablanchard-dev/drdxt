@@ -3,23 +3,13 @@ using DrDxt.Reconciler;
 
 namespace DrDxt.ReconcilerHost;
 
-// -----------------------------------------------------------------------
-// BootSessionMarker (planification de l'issue des démarrages) : mène le compteur « homme mort »
-// de boucle de démarrage depuis le cycle de vie de l'hôte (plan T27b).
-//
-// L'invariant : MarkBootStarted est un +1 sans condition par démarrage ; seule une vraie fenêtre
-// de marche stable l'efface. Donc :
-//   * MarkBootOnceAsync incrémente la série de démarrages non propres exactement une fois par
-//     processus (une garde empêche un double compte si l'hôte le rappelle). Un démarrage qui
-//     plante avant la fenêtre stable reste compté : ces démarrages consécutifs s'accumulent en
-//     une boucle de démarrage que BootLoopGuard détecte ensuite.
-//   * MarkStableAfterAsync attend une fenêtre de marche stable (via l'IDelay injecté) et ne remet
-//     la série à zéro (MarkSessionStable) qu'ensuite. Si l'hôte meurt ou est annulé avant la fin
-//     de la fenêtre, la stabilité n'est jamais marquée : la garantie « homme mort » tient.
-//
-// Tout le temps est injecté (IDelay) : la classe se teste sans vrai minuteur ; le store des
-// démarrages est le même IBootOutcomeStore que lit la garde.
-// -----------------------------------------------------------------------
+// BootSessionMarker : le compteur « homme mort » de boucle de démarrage, mené depuis le cycle de vie de l'hôte (plan
+// T27b). MarkBootStarted est un +1 sans condition par démarrage ; seule une vraie fenêtre de marche stable l'efface :
+//   * MarkBootOnceAsync incrémente une fois par processus (une garde empêche le double compte) ; les démarrages qui
+//     plantent avant la fenêtre s'accumulent en une boucle que BootLoopGuard détecte ;
+//   * MarkStableAfterAsync attend la fenêtre (IDelay injecté) puis remet la série à zéro (MarkSessionStable) ; hôte mort
+//     ou annulé avant, rien n'est marqué.
+// Temps injecté (testée sans vrai minuteur) ; le store est le même IBootOutcomeStore que lit la garde.
 public sealed class BootSessionMarker
 {
     private readonly IBootOutcomeStore _bootStore;
@@ -61,8 +51,7 @@ public sealed class BootSessionMarker
     /// la fin de la fenêtre se propage et la session n'est pas marquée stable (homme mort).</summary>
     public async Task<Result> MarkStableAfterAsync(TimeSpan window, CancellationToken ct)
     {
-        // Une annulation lève ici une OperationCanceledException, le bon signal « n'a pas tenu la
-        // fenêtre » : on ne marque exprès pas la stabilité.
+        // Une annulation lève OperationCanceledException (« n'a pas tenu la fenêtre ») : la stabilité n'est pas marquée.
         await _delay.DelayAsync(window, ct).ConfigureAwait(false);
         return await _bootStore.MarkSessionStableAsync(ct).ConfigureAwait(false);
     }

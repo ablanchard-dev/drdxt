@@ -4,12 +4,9 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Settings;
 
 /// <summary>
-/// HAGS tel que Windows l'applique, pas tel que le registre le raconte.
-///
-/// Lire la presence de `HwSchMode` ne suffit pas. Mesure du 10/09/2026 sur la machine de
-/// reference : cle absente, HAGS actif (`0x0B` par D3DKMT). Un gate sur la cle lirait « inconnu »
-/// la ou l'etat est connaissable, et un gate `!= On` proposerait meme d'activer un
-/// ordonnancement deja actif : un placebo.
+/// HAGS tel que Windows l'applique, pas tel que le registre le raconte. Mesure du 10/09/2026 sur la machine de
+/// reference : `HwSchMode` absent, HAGS actif (`0x0B` par D3DKMT) ; un gate `!= On` sur la cle proposerait d'activer un
+/// ordonnancement deja actif.
 /// </summary>
 public interface IHagsEffectiveReader
 {
@@ -25,9 +22,8 @@ public readonly record struct AdaptateurHags(uint Sources, bool Lu, uint Caps);
 /// `D3DKMTCloseAdapter`. Sequence reprise de la sonde lecture seule
 /// (releve le 10/09/2026 sur la machine de reference : `0x0B`).
 ///
-/// La structure `D3DKMT_WDDM_2_7_CAPS` est documentee (d3dkmthk.h) mais marquee « reserved for
-/// system use » : c'est une lecture de bonne foi, jamais utilisee pour ecrire, et toute reponse
-/// qu'on ne sait pas lire devient Unknown.
+/// `D3DKMT_WDDM_2_7_CAPS` est documentee (d3dkmthk.h) mais « reserved for system use » : lecture de bonne foi seulement,
+/// et toute reponse illisible devient Unknown.
 /// </summary>
 public sealed class D3dkmtHagsReader : IHagsEffectiveReader
 {
@@ -42,11 +38,9 @@ public sealed class D3dkmtHagsReader : IHagsEffectiveReader
     }
 
     /// <summary>
-    /// Pur. L'adaptateur qui compte est celui qui affiche (au moins une source) : un adaptateur
-    /// sans sortie (rendu hors ecran, adaptateur logiciel) ne dit rien de ce que le jeu obtient.
-    /// Rien de lisible, ou HAGS non supporte ⇒ Unknown : « on ne peut pas l'activer » n'est pas
-    /// « il est eteint ». Deux adaptateurs qui affichent et se contredisent ⇒ Unknown : choisir
-    /// l'un serait deviner lequel porte le jeu.
+    /// Pur. Compte l'adaptateur qui affiche (au moins une source), pas un rendu hors ecran ni un adaptateur logiciel. Rien
+    /// de lisible ou HAGS non supporte ⇒ Unknown (« impossible a activer » n'est pas « eteint ») ; deux adaptateurs qui
+    /// affichent et se contredisent ⇒ Unknown.
     /// </summary>
     public static TriState Decider(IReadOnlyList<AdaptateurHags> adaptateurs)
     {

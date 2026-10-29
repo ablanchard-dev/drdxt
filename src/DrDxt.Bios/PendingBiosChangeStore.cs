@@ -5,27 +5,20 @@ using DrDxt.Core;
 namespace DrDxt.Bios;
 
 /// <summary>
-/// <see cref="IPendingBiosChangeStore"/> sur fichier. Le marqueur est un seul fichier JSON
-/// (par défaut <c>%LOCALAPPDATA%\DrDXT\pending-bios-change.json</c>). Tout accès au disque
-/// passe par la couture <see cref="IBiosMarkerFile"/> : les tests simulent l'entrée-sortie
-/// (atomicité, corruption, pannes) sans toucher au vrai disque.
-///
-/// Garanties :
-///   • écriture atomique : sérialiser, écrire un fichier temporaire, puis le déplacer par
-///     dessus la cible (le déplacement publie ; un lecteur ne voit jamais un fichier tronqué) ;
-///   • lecture propre : fichier absent → <c>Ok(null)</c>, rien en attente ; contenu corrompu
-///     (JSON invalide, cibles vides, attente Unknown, identifiant machine vide, horodatage
-///     non positif) → <see cref="ErrorCodes.BiosPendingChangeCorrupt"/> ; panne d'entrée-sortie
-///     → <see cref="ErrorCodes.BiosPendingChangeIo"/>. Ne lève jamais ;
-///   • n'écrit jamais le BIOS : ne lit et n'écrit qu'un fichier du système.
+/// <see cref="IPendingBiosChangeStore"/> sur un fichier JSON (<c>%LOCALAPPDATA%\DrDXT\pending-bios-change.json</c>),
+/// par la couture <see cref="IBiosMarkerFile"/> (les tests simulent atomicité, corruption et pannes).
+///   • écriture atomique : un temporaire déplacé sur la cible, jamais un fichier tronqué ;
+///   • absent → <c>Ok(null)</c> ; corrompu (JSON invalide, cibles vides, attente Unknown, identifiant machine vide,
+///     horodatage non positif) → <see cref="ErrorCodes.BiosPendingChangeCorrupt"/> ; panne →
+///     <see cref="ErrorCodes.BiosPendingChangeIo"/>. Ne lève jamais ;
+///   • n'écrit jamais le BIOS, seulement ce fichier.
 /// </summary>
 public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
-        // Énumérations en chaînes : une valeur future inconnue fait échouer la lecture
-        // proprement (marqueur corrompu) au lieu de retomber en silence sur le membre zéro.
+        // Énumérations en chaînes : une valeur inconnue rend « marqueur corrompu », jamais le membre zéro en silence.
         Converters = { new JsonStringEnumConverter() },
     };
 
@@ -58,8 +51,7 @@ public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
         }
         catch (Exception ex)
         {
-            // La sérialisation ne devrait pas lever pour un changement validé, mais la frontière
-            // est protégée quand même : aucune exception ne sort du magasin.
+            // Aucune exception ne sort du magasin, même d'une sérialisation qui ne devrait pas lever.
             return Result.Fail(ErrorCodes.BiosPendingChangeIo, $"Marker serialize failed: {ex.Message}");
         }
     }
@@ -131,10 +123,8 @@ public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
         return null;
     }
 
-    // ── DTO sur disque : une forme explicite que l'on contrôle (pas l'enregistrement du
-    //    domaine), pour qu'un fichier malformé ou hostile se désérialise dans quelque chose
-    //    que l'on valide ensuite, au lieu de se lier directement au domaine. Énumérations en
-    //    chaînes (voir JsonOptions). ──
+    // ── DTO sur disque, pas le domaine : un fichier malformé ou hostile se désérialise dans une forme validée ensuite.
+    //    Énumérations en chaînes (voir JsonOptions). ──
     private sealed record MarkerDto(
         List<TargetDto> Targets,
         DateTimeOffset CreatedUtc,
@@ -176,15 +166,9 @@ public sealed class PendingBiosChangeStore : IPendingBiosChangeStore
         }
     }
 
-    // ObservedBefore est OPTIONNEL/en queue : un marqueur ecrit par une version anterieure
-    // se relit avec null, et le juge retombe alors sur la comparaison TriState -- le
-    // comportement d'avant, jamais un verdict fabrique.
-    //
-    // Corrige le 26/08. Ce DTO n'avait pas ce champ : la grandeur mesuree etait jetee a
-    // l'ecriture et reconstruite a null a la relecture. Comme BiosLoopVerifier ne voit les
-    // cibles que par Load(), le juge par delta ne se declenchait jamais apres un redemarrage
-    // -- c'est-a-dire dans le seul moment ou la boucle tourne. Le lot etait inerte en
-    // production, et les tests le rataient parce qu'ils injectent la cible par FakeStore et ne
-    // passent jamais par la serialisation. D'ou le test d'aller-retour ajoute avec ce correctif.
+    // ObservedBefore, optionnel : un marqueur plus ancien se relit null, et le juge retombe sur la comparaison TriState,
+    // jamais un verdict fabrique. Il doit survivre a la serialisation : BiosLoopVerifier ne voit les cibles que par Load(),
+    // et sans lui le juge par delta ne se declencherait jamais apres un redemarrage. Un test d'aller-retour le garde (un
+    // FakeStore ne passe pas par la serialisation).
     private sealed record TargetDto(FirmwareSettingKind Setting, TriState ExpectedState, long? ObservedBefore = null);
 }

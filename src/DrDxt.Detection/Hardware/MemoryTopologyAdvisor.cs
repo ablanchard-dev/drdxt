@@ -13,26 +13,14 @@ public sealed record MemoryTopologyGuidance(string Id, string Subject, string Me
 }
 
 /// <summary>
-/// Le canal, le seul defaut memoire qu'on peut prouver sans rien mesurer.
-///
-/// `MemoryDetector` lit `DeviceLocator`, et deux controleurs distincts prouvent le dual channel.
-/// C'est le defaut memoire le plus courant d'une machine assemblee vite : une seule barrette, ou
-/// deux barrettes du meme cote de la carte.
-///
-/// Ce que ca coute est dans `docs/RAM-ETAT-DE-LART.md` (R-01) : 5 a 34 % selon le titre, et les
-/// 1 % low pris entre 20 et 33 %. C'est au-dessus du plancher de bruit de 9,9 % du banc, ce qu'on
-/// ne peut dire d'a peu pres aucun reglage logiciel.
-///
-/// ══ ce qu'il refuse de faire ══
-/// Il ne devine pas. Deux conventions d'emplacement existent sur les cartes grand public :
-/// `Controller0-DIMMA2` (le controleur est nomme) et `DIMMA1` (seule la lettre de canal l'est),
-/// et une carte peut n'en suivre aucune. Quand la chaine ne rend ni controleur ni lettre, le
-/// verdict est `Unknown` et le produit le dit ; il ne conclut jamais au simple canal par defaut.
-/// Un faux positif ici enverrait un client demonter une machine correctement montee.
-///
-/// Il ne dit rien non plus du rang (`Ranks`), et c'est volontaire : le dual rank abaisse le
-/// plafond de frequence atteignable (R-04), mais le produit ne conseille aucune frequence, donc
-/// il n'a rien a en faire. Une donnee lue n'oblige pas a un conseil.
+/// Le canal, le seul defaut memoire prouvable sans mesure : `MemoryDetector` lit `DeviceLocator`, et deux controleurs
+/// distincts prouvent le dual channel. Le plus courant d'une machine assemblee vite : une barrette, ou deux du meme
+/// cote. Cout (`docs/RAM-ETAT-DE-LART.md`, R-01) : 5 a 34 % selon le titre, 1 % low pris entre 20 et 33 %, au-dessus du
+/// plancher de bruit de 9,9 % du banc.
+/// Il ne devine pas : deux conventions existent (`Controller0-DIMMA2`, le controleur nomme ; `DIMMA1`, la seule lettre
+/// de canal), et une carte peut n'en suivre aucune ; ni controleur ni lettre ⇒ `Unknown`, jamais simple canal par
+/// defaut (un faux positif ferait demonter une machine bien montee). Rien sur le rang (`Ranks`) : le dual rank abaisse
+/// le plafond de frequence (R-04), mais aucune frequence n'est conseillee.
 /// </summary>
 public static class MemoryTopologyAdvisor
 {
@@ -56,32 +44,25 @@ public static class MemoryTopologyAdvisor
     public static IReadOnlyList<MemoryTopologyGuidance> Advise(
         IReadOnlyList<MemoryModule> modules, ChassisType chassis, int emplacements = 0)
     {
-        // Le chassis d'abord, et ce n'est pas une formalite. Une machine portable rapporte
-        // souvent une seule entree pour de la memoire soudee qui tourne pourtant sur plusieurs
-        // canaux : conclure au simple canal y serait faux. Et meme quand c'est vrai, personne
-        // n'ajoute une barrette a un portable ou a une console. Le produit tait donc la
-        // topologie ailleurs que sur un fixe : meme regle que tous les autres constats memoire.
+        // Le chassis d'abord : un portable rapporte souvent une seule entree pour une memoire soudee multi-canal, et
+        // personne n'ajoute une barrette a un portable ou a une console. Rien sur la topologie hors d'un fixe, comme pour
+        // les autres constats memoire.
         if (chassis != ChassisType.Desktop) return Array.Empty<MemoryTopologyGuidance>();
 
         if (modules.Count == 0) return Array.Empty<MemoryTopologyGuidance>();
 
-        // Une seule barrette est le simple canal, et aucune chaine n'a besoin d'etre comprise
-        // pour le dire. C'est le cas le plus frequent et le seul qui soit certain.
+        // Une seule barrette est le simple canal, sans chaine a comprendre : le cas le plus frequent, et certain.
         if (modules.Count == 1)
             return One("memory.single_channel_one_module", "Finding.Memory.SingleChannelOneModule");
 
         var read = modules.Select(Discriminators).ToList();
 
-        // Un seul emplacement illisible suffit a rendre le verdict illisible. Conclure sur les
-        // autres, ce serait appliquer la regle a une partie de ce qu'elle couvre, un defaut
-        // deja vu ailleurs.
+        // Un seul emplacement illisible rend le verdict illisible : pas de conclusion sur une partie des barrettes.
         if (read.Any(d => d.Controller is null && d.Channel is null))
             return One("memory.channel_topology_unknown", "Finding.Memory.ChannelTopologyUnknown");
 
-        // Deux canaux sont prouves des qu'un seul discriminant lu differe. Le piege que ca evite :
-        // certaines cartes nomment `Controller0` pour tous les emplacements et ne distinguent
-        // que par la lettre (`Controller0-DIMMA2` / `Controller0-DIMMB2`). Trancher sur le seul
-        // controleur y accuserait de simple canal une machine parfaitement montee.
+        // Deux canaux sont prouves des qu'un seul discriminant lu differe : certaines cartes nomment `Controller0` partout
+        // et ne distinguent que par la lettre (`Controller0-DIMMA2` / `Controller0-DIMMB2`).
         if (Differs(read.Select(d => d.Controller)) || Differs(read.Select(d => d.Channel)))
             return PaireConseillee(modules, emplacements);
 

@@ -3,12 +3,9 @@ using System.Text.RegularExpressions;
 namespace DrDxt.Core;
 
 /// <summary>
-/// Le nom d'exe d'un jeu tel que le helper l'accepte pour le plafond d'envoi : un nom nu, en ASCII,
-/// sans rien qui puisse sortir de l'apostrophe d'un script PowerShell.
-///
-/// La regle vivait seulement dans l'allowlist du helper. L'appli rallumait un nom qu'elle
-/// jugeait acceptable (caractere nul compris) et le helper le refusait ensuite, a chaque lancement,
-/// apres une invite UAC. Une seule regle, lue des deux cotes.
+/// Le nom d'exe d'un jeu tel que le helper l'accepte pour le plafond d'envoi : nu, ASCII, rien qui sorte de l'apostrophe
+/// d'un script PowerShell. Une seule regle, lue par l'appli et le helper (sinon l'appli rallumerait un nom refuse
+/// ensuite, apres une invite UAC).
 /// </summary>
 public static class NomExeDeJeu
 {
@@ -19,17 +16,12 @@ public static class NomExeDeJeu
 
     public static bool EstValide(string? nom) => nom is not null && Motif.IsMatch(nom);
 
-    // Le fichier est écrivable par tout programme du compte, et le rallumage se fait sans clic.
-    // Un binaire de Windows qui tourne toujours (explorer.exe) y serait exempté pendant que tout le reste
-    // de la machine est bridé. Un jeu ne vit pas dans les dossiers de Windows, que le compte ne peut pas
-    // remplir : un nom qui s'y trouve, ou qui n'est pas un nom d'exe nu, ne se rallume pas.
-    // Limite connue : un autre programme toujours lancé hors de ces dossiers reste possible.
-    // Venue de PlafondEnvoiMemorise, pour que le helper (ordre « retenir ») et le service SYSTEM
-    // l'appliquent aussi : retenu pour le service, un lanceur serait exempte a chaque session.
-    // Partagee avec la veille du ping, qui prend le programme en plein ecran pour le jeu. Une
-    // video plein ecran dans un navigateur, un lecteur, ou l'ecran d'un logiciel de stream ne sont pas des
-    // parties : les exempter du plafond briderait tout le reste pour rien. Liste courte des plus courants,
-    // liste fermee, a etendre quand un joueur en voit un autre pris pour un jeu.
+    // Le fichier est écrivable par tout programme du compte et se rallume sans clic : un binaire de Windows toujours
+    // lancé (explorer.exe) serait exempté pendant que tout le reste est bridé. Un jeu ne vit pas dans les dossiers de
+    // Windows, et un nom qui n'est pas un exe nu ne se rallume pas. Limite connue : un autre programme toujours lancé hors
+    // de ces dossiers reste possible. Appliquée aussi par le helper (« retenir ») et le service SYSTEM, et par la veille
+    // du ping : une vidéo plein écran, un lecteur, un logiciel de stream ne sont pas des parties. Liste fermée des plus
+    // courants, à étendre quand un joueur en voit un autre pris pour un jeu.
     private static readonly HashSet<string> PasDesJeux = new(StringComparer.OrdinalIgnoreCase)
     {
         "chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "opera_gx.exe", "brave.exe", "vivaldi.exe",
@@ -40,8 +32,7 @@ public static class NomExeDeJeu
         "steam.exe", "steamwebhelper.exe", "EpicGamesLauncher.exe", "Battle.net.exe", "EADesktop.exe",
         "EpicWebHelper.exe", "UbisoftConnect.exe", "upc.exe", "GalaxyClient.exe", "RiotClientServices.exe",
         "OneDrive.exe", "Dropbox.exe", "ms-teams.exe", "Teams.exe", "Slack.exe",
-        // Écran de verrouillage,
-        // consoles et terminal.
+        // Écran de verrouillage, consoles et terminal.
         "LockApp.exe", "powershell.exe", "pwsh.exe", "cmd.exe", "WindowsTerminal.exe", "OpenConsole.exe",
         // DrDXT lui-même : sa fenêtre (agrandie, ou posée hors écran pour une capture) n'est pas une partie.
         "DrDxt.App.exe", "DrDxt.Lanceur.exe", "DrDxt.ElevatedHelper.exe", "DrDxt.ReconcilerHost.exe",
@@ -59,10 +50,8 @@ public static class NomExeDeJeu
 
     public static bool EstUnJeuConnu(string? exe) => exe is not null && JeuxConnus.Contains(exe);
 
-    /// <summary>Vrai seulement quand le nom (ou le chemin) est lu et dit « pas un jeu » : un nom illisible, celui d'un jeu
-    /// protégé par son anti-triche, ne s'écarte pas.
-    /// Un nom hors du format strict (espace, accent : « Among Us.exe ») ne dit rien : il ne s'écarte pas, il n'est
-    /// simplement pas admis là où le format sert de garde (liste blanche du helper).</summary>
+    /// <summary>Vrai seulement quand le nom (ou le chemin) est lu et dit « pas un jeu » ; un nom illisible (anti-triche) ou
+    /// hors format strict (« Among Us.exe ») ne s'écarte pas, il n'est juste pas admis là où le format garde.</summary>
     public static bool EstSurementPasUnJeu(string? exe, string? chemin)
         => exe is not null && !EstUnJeuConnu(exe) && (SousWindows(chemin) || (EstValide(exe) && !EstUnJeuPossible(exe)));
 

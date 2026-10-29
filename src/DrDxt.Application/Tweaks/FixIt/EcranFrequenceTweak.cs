@@ -4,16 +4,10 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks.FixIt;
 
-// -----------------------------------------------------------------------
-// L'écran de jeu réglé à la plus haute fréquence que Windows propose à sa résolution courante.
-//
-// Un écran 144, 165 ou 240 Hz laissé à 60 Hz est le défaut gratuit le plus répandu chez un joueur. Le scan le signale
-// (`Finding.Display.RefreshBelowMax`) ; ce levier le répare.
-//
-// Sans droits : ChangeDisplaySettingsEx sans CDS_GLOBAL enregistre le mode dans le profil de l'utilisateur (Microsoft
-// Learn), comme le fait la page Affichage des Paramètres. Rien ne passe par le helper élevé.
-//
-// L'ordre, et pourquoi :
+// L'écran de jeu à la plus haute fréquence que Windows propose à sa résolution : un écran 144, 165 ou 240 Hz laissé à
+// 60 Hz, le défaut gratuit le plus répandu (`Finding.Display.RefreshBelowMax`). Sans droits : ChangeDisplaySettingsEx
+// sans CDS_GLOBAL enregistre le mode dans le profil de l'utilisateur (Microsoft Learn), comme la page Affichage.
+// L'ordre :
 //   1. l'original est lu avant tout ;
 //   2. CDS_TEST : si Windows refuse le mode à l'essai, rien n'est écrit ;
 //   3. changement dynamique, non enregistré : si la machine s'éteint là, la session suivante repart sur l'ancien mode ;
@@ -21,10 +15,8 @@ namespace DrDxt.Application.Tweaks.FixIt;
 //   5. le joueur garde le mode dans les 15 s, sinon l'ancien revient : CDS_TEST dit que le pilote accepte le mode, pas
 //      que l'écran l'affiche, et un écran noir ne se confirme pas ;
 //   6. seulement alors, le mode est enregistré.
-//
-// Honnêteté : c'est un réglage de fluidité, jugé « appliqué et relu », jamais chiffré en images. Le snapshot n'est pas
-// une op privilégiée : le moteur ne sait pas le relire, donc il n'attribue aucun gain à ce levier.
-// -----------------------------------------------------------------------
+// Jugé « appliqué et relu », jamais chiffré en images : le snapshot n'est pas une op privilégiée, le moteur ne le relit
+// pas et n'attribue aucun gain.
 /// <summary>Règle l'écran de jeu sur la plus haute fréquence que Windows propose à sa résolution, sans droits élevés.
 /// Proposé quand le scan lit une marge de fréquence ; gardé seulement si le joueur confirme l'image dans les 15 s.</summary>
 public sealed class EcranFrequenceTweak(IDisplayInfo ecrans, IModeEcran mode, IConfirmationEcran confirmation,

@@ -16,12 +16,10 @@ public sealed class SuiviDesReglages
     private readonly string _chemin;
     private readonly Func<Result<string?>> _lire;
 
-    // Deux relevés du même fichier lisaient puis récrivaient sans s'attendre : le second écrasait le premier. Ils viennent
-    // d'un même processus (le scan, le relevé d'après Optimiser, celui d'un retrait) ou de deux (l'App et le relevé de fond,
-    // l'un élevé, l'autre non). Dans le processus, un verrou qui attend son tour : un relevé n'y est jamais perdu. Entre
-    // processus, le verrou du relevé des parties (VerrouDuReleve) : un fichier ouvert sans partage, que Windows rend à la mort
-    // du processus ; recréé à chaque relevé, un antivirus peut le tenir un instant, d'où une attente bornée large, au-delà
-    // de laquelle rien n'est écrit, comme une lecture ratée.
+    // Deux relevés du même fichier ne doivent pas s'écraser : ils viennent d'un processus (le scan, le relevé d'après
+    // Optimiser, celui d'un retrait) ou de deux (l'App et le relevé de fond, élevé ou non). Dans le processus, un verrou qui
+    // attend son tour ; entre processus, VerrouDuReleve, un fichier ouvert sans partage que Windows rend à la mort du
+    // processus. Un antivirus peut le tenir un instant : attente bornée large, au-delà rien n'est écrit.
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> VerrousDuProcessus = new(StringComparer.OrdinalIgnoreCase);
     public static readonly TimeSpan AttenteParDefaut = TimeSpan.FromSeconds(5);
     private readonly TimeSpan _attenteMax;
@@ -46,9 +44,8 @@ public sealed class SuiviDesReglages
     /// <summary>Compare aux états du relevé précédent, garde les nouveaux, rend les changements. Un réglage absent d'un
     /// des deux relevés (logiciel désinstallé, lecture ratée) n'est pas un changement.</summary>
     /// <param name="consigner">L'écriture des changements au journal, sous le verrou, avant que les nouveaux états soient
-    /// gardés. Elle rend faux (journal occupé, écriture ratée) : rien n'est gardé, les changements reviennent au relevé
-    /// suivant, bornés pareil ; gardés quand même, la bascule serait perdue. Absente : les changements sont rendus à
-    /// l'appelant seul.</param>
+    /// gardés. Faux (journal occupé, écriture ratée) : rien n'est gardé, les changements reviennent au relevé suivant,
+    /// bornés pareil (sinon la bascule serait perdue). Absente : les changements vont à l'appelant seul.</param>
     public IReadOnlyList<Changement> Relever(IReadOnlyDictionary<string, string> actuels, DateTimeOffset maintenant,
         Func<string, string, string, string> libeller, Func<IReadOnlyList<Changement>, bool>? consigner = null)
     {
@@ -64,10 +61,9 @@ public sealed class SuiviDesReglages
     private IReadOnlyList<Changement> ReleverSousVerrou(IReadOnlyDictionary<string, string> actuels, DateTimeOffset maintenant,
         Func<string, string, string, string> libeller, Func<IReadOnlyList<Changement>, bool>? consigner)
     {
-        // Absent : premier relevé, l'historique vide est le vrai. Lecture ratée (fichier tenu un instant par une écriture) :
-        // ce n'est pas un historique vide ; récrit avec les seuls réglages de cet appel, il effaçait les autres (le relevé
-        // d'après Optimiser ne porte que le mode Jeu, et les bascules de HAGS et du fichier d'échange ne se relevaient plus).
-        // Rien n'est écrit, le relevé suivant reprend l'historique intact.
+        // Absent : premier relevé, l'historique vide est le vrai. Lecture ratée (fichier tenu un instant) : rien n'est écrit ;
+        // récrit avec les seuls réglages de cet appel, il effacerait les autres (le relevé d'après Optimiser ne porte que le
+        // mode Jeu). Le relevé suivant reprend l'historique intact.
         var texte = _lire();
         if (!texte.IsOk) return [];
         Releve? avant = null;

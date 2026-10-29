@@ -1,23 +1,12 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// Transforme les deux champs que NVIDIA remplit à chaque lecture DRS (settingLocation et
-/// isCurrentPredefined) en réponse à « qui a mis cette valeur ici ? ».
-///
-/// Sans eux, on ne garde que le DWORD. Sur une machine qui porte 10218 profils d'application
-/// livrés par le pilote, chaque valeur ressemble alors à un choix de l'utilisateur, et la
-/// question « quels réglages ai-je vraiment changés ? » n'a plus de réponse.
-///
-/// Sens tiré du Driver Settings Programming Guide de NVIDIA (PG-12072-001 v01) : la p. 2 sépare
-/// les « predefined settings » (livrés avec le pilote) des « user settings » (modifiés après
-/// installation) ; les p. 9-10 disent que les réglages hors du profil courant sont hérités du
-/// profil de base ou global, et à ignorer quand on demande ce qu'un profil possède.
-///
-/// Vit dans Core : le helper élevé a besoin de la même lecture pour prouver qu'un retour arrière
-/// a rendu au profil d'un jeu sa provenance d'origine, et il ne référence que Core.
-/// Deux copies de cette correspondance feraient deux définitions de « rendu ».
-///
-/// Pur et total : aucune E/S. Un emplacement inconnu donne <see cref="DrsValueOrigin.Unknown"/>.
+/// « Qui a mis cette valeur ici ? » depuis settingLocation et isCurrentPredefined, remplis à chaque lecture DRS : sans
+/// eux, sur une machine aux 10218 profils livrés par le pilote, chaque valeur ressemble à un choix de l'utilisateur.
+/// Source : Driver Settings Programming Guide de NVIDIA (PG-12072-001 v01), p. 2 (« predefined » contre « user
+/// settings »), p. 9-10 (hors du profil courant : hérité du profil de base ou global). Dans Core, pour que le helper
+/// prouve un retour par la même lecture (une seule définition de « rendu »). Pur ; emplacement inconnu →
+/// <see cref="DrsValueOrigin.Unknown"/>.
 /// </summary>
 public static class DrsSettingOrigin
 {
@@ -31,9 +20,7 @@ public static class DrsSettingOrigin
     /// utilisable. Rapporté, jamais utilisé pour passer outre les deux champs ci-dessus.</param>
     public static DrsOriginState Describe(uint settingLocation, uint isCurrentPredefined, uint isPredefinedValid)
     {
-        // L'héritage se décide d'abord. Sinon isCurrentPredefined == 0 sur une valeur héritée se
-        // lirait « l'utilisateur l'a posée ici » ; il l'a posée ailleurs, et envoyer quelqu'un
-        // modifier un profil qui ne possède rien est pire que ne rien dire.
+        // L'héritage d'abord : isCurrentPredefined == 0 sur une valeur héritée se lirait « posée ici ».
         switch (settingLocation)
         {
             case GlobalProfile:

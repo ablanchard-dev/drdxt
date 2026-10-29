@@ -119,8 +119,8 @@ public static class ValidationComplete
                 Ecrire(Docteur.T("VC.Arret.Uac") + Environment.NewLine);
                 break;
             }
-            // Un levier non rendu reste au journal. Le levier suivant l'écraserait (un seul essai y
-            // tient) : on s'arrête là, et le journal le garde pour la remise au prochain lancement.
+            // Un levier non rendu reste au journal, que le suivant écraserait (un seul essai y tient) : arrêt, remise au
+            // prochain lancement.
             if (journal.Lire() is not { IsOk: true, Value: null })
             {
                 arret = Arret.LevierNonRendu;
@@ -160,8 +160,7 @@ public static class ValidationComplete
             else nonRemis.Add(Docteur.T("VC.PasRemis.Levier", levier.Id, remis.Texte));
         }
 
-        // Les étapes nommées, avec ce qui a été lu à chacune : l'« origine » d'une relecture, aux étapes 2 et 3, était l'état
-        // intermédiaire, pas l'origine du joueur.
+        // Chaque étape nommée avec ce qui y a été lu : aux étapes 2 et 3, l'« origine » relue est l'état intermédiaire.
         static string Etape(Lecture? l) => l?.Lu is { } v ? Docteur.T("VC.Exercice.Lu", v) : l?.Texte ?? "-";
         var detail = Docteur.T("VC.Exercice.Etapes", Etape(nonCible), Etape(prise), Etape(remis));
         if (rendu.IsOk && remis.Pose == true && prise?.Pose == true)
@@ -199,8 +198,7 @@ public static class ValidationComplete
         var ecrit = await levier.ApplyAsync().ConfigureAwait(false);
         if (!ecrit.IsOk || ecrit.Value is not { } snapshot)
         {
-            // Posé en partie, retour arrière raté. Le journal reste (sans origine) : le lancement
-            // suivant dit de vérifier ce réglage, et la boucle s'arrête ici.
+            // Posé en partie, retour arrière raté : le journal reste (sans origine), le lancement suivant dit de vérifier.
             if (ecrit.Error?.Code == ErrorCodes.TweakPartiallyApplied)
             {
                 nonRemis.Add(Docteur.T("VC.PoseEnPartie", levier.Id, ecrit.Error?.Message));
@@ -210,16 +208,15 @@ public static class ValidationComplete
             return (Docteur.T("VC.EcritureRefusee", ecrit.Error?.Code, ecrit.Error?.Message),
                 ecrit.Error?.Code == ErrorCodes.ElevationDeclined ? Issue.RefusDeWindows : Issue.Refuse);
         }
-        // La machine portait déjà la valeur du levier (un essai en alternance l'avait posée, par exemple) : la pose a réécrit la
-        // même valeur, et aucune relecture ne peut la distinguer de l'origine. Rien n'est à prouver ni à rendre.
+        // La machine portait déjà la valeur du levier (un essai en alternance, par exemple) : rien à prouver ni à rendre.
         if (snapshot.AppliedValueJson is { } valeurPosee && valeurPosee == snapshot.OriginalValueJson)
         {
             journal.Lever();
             return (Docteur.T("VC.PasTouche.DejaRegle"), Issue.NonTouche);
         }
         var complete = journal.Poser(levier.Id, snapshot);
-        // L'acquit attend le rendu : l'App tuée entre les deux laissait l'origine dans le seul fichier du compte, que la
-        // désinstallation élevée ne lit pas. Le rendu part hors de la portée, jamais journalisé comme une pose.
+        // L'acquit attend le rendu (sinon l'origine resterait dans le seul fichier du compte, que la désinstallation ne lit
+        // pas) ; le rendu part hors de la portée, jamais journalisé comme une pose.
         portee.Detacher();
 
         var sb = new StringBuilder();
@@ -267,8 +264,8 @@ public static class ValidationComplete
             if (lu.Value is not { } entree) return new(Docteur.T("VC.RienARemettre"), true);
             if (entree.Snapshot is not { } s)
             {
-                // Arrêté pendant l'écriture, l'origine n'a pas été gardée. Le journal ne sait rien
-                // rendre (il est levé, sinon il bloquerait tout lancement), mais le bilan ne dit pas « tout est remis ».
+                // Arrêté pendant l'écriture, sans origine : le journal est levé (il bloquerait tout lancement), sans dire
+                // « tout est remis ».
                 journal.Lever();
                 return new(Docteur.T("VC.Remise.ArretEcriture", entree.TweakId), false);
             }
