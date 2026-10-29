@@ -296,6 +296,10 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 8. Horloge haute résolution lente ou qui recule (DrDXT mesure ce que coûte une lecture) : en administrateur,
    `bcdedit /enum {current}` ; si `useplatformclock` y figure, `bcdedit /deletevalue useplatformclock` puis redémarre.
    Sinon, mets à jour le BIOS (5.14) : c'est lui qui dit à Windows si le compteur du processeur est fiable.
+9. Ordonnanceur multimédia (MMCSS) coupé : `SystemResponsiveness` vaut 100 sous
+   `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile`, et Microsoft écrit « A value of 100
+   disables MMCSS ». Dans `regedit`, remets une valeur de 10 à 99 (sous 10, Windows la ramène à 20), puis redémarre.
+   Les autres réglages MMCSS que DrDXT dit « sans effet » ne demandent rien.
 
 ### 5.17 Mémoire saturée (PC de bureau comme PC de jeu)
 1. DrDXT lit deux choses à l'instant du relevé (seuils DrDXT, pas une norme) : la mémoire libre, sous 10 % ce qui ne tient

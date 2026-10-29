@@ -36,14 +36,10 @@ public sealed partial class RepairAuditService
         foreach (var v in new PowerSettingsReader().LireProcesseur(personnalite, planLu))
         {
             var (statut, phrase) = JugerReglageProcesseur(v, portable);
-            // Un ecart sans geste est un ecart invisible. `RepairTriage.Trier` range dans
-            // « verifies » (comptes, jamais affiches) tout ce qui n'est ni suspect ni nuisible et
-            // ne porte aucune action. Un `NonDefault` muet finirait donc dans le meme sac qu'un
-            // reglage identique au defaut : le minimum processeur a 100 %, la signature des scripts
-            // gaming, serait lu, compte, et jamais montre. La recommandation est la seule facon de
-            // le rendre visible sans le declarer nuisible : la doctrine « different n'est pas
-            // endommage » interdit `Suspicious`, elle n'impose pas le silence.
-            // DISPLAY suit la meme regle.
+            // Un ecart sans geste serait invisible : `RepairTriage.Trier` compte sans jamais l'afficher ce qui n'est ni
+            // suspect ni nuisible et ne porte aucune action. Le minimum processeur a 100 % (la signature des scripts
+            // gaming) passerait donc pour un reglage par defaut. La recommandation le montre sans le dire nuisible
+            // (« different n'est pas endommage » interdit `Suspicious`, pas la parole). DISPLAY suit la meme regle.
             yield return new RepairFinding("POWER", v.Nom,
                 v.ValeurAc is { } a ? Lisible(v.Nom, a, v.Unite) : null,
                 v.DefautAc is { } d ? Lisible(v.Nom, d, v.Unite) : null,
@@ -174,14 +170,10 @@ public sealed partial class RepairAuditService
                 RepairStatus.Unknown, Docteur.T("RA.Freq.NonLue"));
         }
 
-        // Le bridage porte aussi la question thermique : on ne sait pas combien il fait (voir
-        // Thermique), mais on sait si un indicateur Windows est leve. Un seul constat pour les
-        // deux lectures : c'est le meme masque.
-        //
-        // Le cas « aucun » est Observed et jamais ExpectedDefault : `Performance Limit Flags` ne
-        // voit pas les limites de puissance du paquet (RAPL). Mesure sur cette machine : les
-        // indicateurs valent 0 pendant que la frequence tombe de 5292 a 3698 MHz sous charge
-        // soutenue. On observe une absence d'indicateur, on ne certifie pas une absence de limite.
+        // Un seul constat pour le bridage et la chaleur : c'est le meme masque d'indicateurs Windows (la temperature
+        // elle-meme ne se lit pas ici, voir Thermique). « Aucun » reste Observed, jamais ExpectedDefault : `Performance
+        // Limit Flags` ne voit pas les limites de puissance du paquet (RAPL), et il valait 0 sur la machine de reference
+        // pendant que la frequence tombait de 5292 a 3698 MHz sous charge soutenue.
         yield return cpu.EstBride switch
         {
             null => new RepairFinding("CPU", "bridage", null, null, RepairStatus.Unknown, Docteur.T("RA.Bridage.NonLu")),

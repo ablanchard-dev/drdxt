@@ -300,19 +300,13 @@ public sealed partial class RepairAuditService
     /// laissent voir une recurrence sans remonter a une configuration qui n'existe plus.</summary>
     public static readonly TimeSpan FenetreEchecs = TimeSpan.FromDays(30);
 
-    /// <summary>Depuis quand on regarde les arrets brutaux. **Non chiffré**, et plus large que
-    /// la fenetre des services a dessein : un arret brutal est rare, et trente jours pourraient
-    /// n'en montrer aucun sur une machine qui en fait un par mois, c'est-a-dire une machine dont
-    /// l'utilisateur, lui, sait tres bien qu'elle le fait.</summary>
+    /// <summary>Depuis quand on regarde les arrets brutaux. **Non chiffré**, et plus large que la fenetre des services :
+    /// un arret brutal est rare, et trente jours n'en montreraient aucun sur une machine qui en fait un par mois.</summary>
     public static readonly TimeSpan FenetreArrets = TimeSpan.FromDays(90);
 
-    /// <summary>Au-dela de ce nombre d'arrets brutaux dans la fenetre, le constat cesse d'etre une
-    /// observation et demande le regard de l'utilisateur.
-    ///
-    /// **ce seuil est emprunte, pas derive.** C'est celui que la famille des incidents noyau
-    /// utilise deja dans ce fichier pour la meme raison : « repete a l'identique, ce n'est plus du
-    /// bruit ». Aucune mesure ne dit que trois est le bon nombre pour des arrets brutaux ; prendre
-    /// le seuil deja en vigueur est un choix de coherence, et il est dit ici plutot que subi.</summary>
+    /// <summary>Au-dela de ce nombre d'arrets brutaux dans la fenetre, le constat demande le regard de l'utilisateur.
+    /// **Emprunte, pas derive** : c'est le seuil des incidents noyau (« repete a l'identique, ce n'est plus du
+    /// bruit ») ; aucune mesure ne dit que trois est le bon nombre pour des arrets brutaux.</summary>
     private const int SeuilArretsRepetes = 3;
 
     public IReadOnlyList<RepairFinding> Lire()
@@ -687,30 +681,11 @@ public sealed partial class RepairAuditService
 
     // ── Thermique ──────────────────────────────────────────────────────────────────────────
     //
-    // La temperature du processeur ne se lit pas par WMI, et le chiffre qui semble la donner est
-    // un piege. `MSAcpi_ThermalZoneTemperature` repond sur cette machine : `TZ00`, 27,9 °C. Un outil
-    // d'opti l'affiche comme « CPU 28 °C » et personne ne bronche.
-    //
-    // Mesuré le 08/09/2026 (falsification) : charge sur 20 fils pendant 60 s, temoin de charge non
-    // localise (`Win32_PerfFormattedData_PerfOS_Processor`).
-    //
-    //   repos       zone 27,9 °C    CPU  4 %
-    //   charge 15 s zone 27,9 °C    CPU 66 %
-    //   charge 30 s zone 27,9 °C    CPU 86 %
-    //   charge 45 s zone 27,9 °C    CPU 84 %
-    //   apres       zone 27,9 °C    CPU  1 %
-    //
-    // **Constante a la decimale pendant que le processeur passe de 4 a 86 %.** Cette zone ne suit pas
-    // le processeur. La lire et l'appeler « temperature CPU » serait un chiffre fabrique.
-    //
-    // Le compteur « Thermal Zone Information » (Win32_PerfFormattedData_Counters_ThermalZoneInformation)
-    // n'est pas une autre source : il rend la même zone `\_TZ.TZ00`, 301 K, constante pendant que la charge passait de
-    // 10 à 90 % sur cette machine. Une zone ACPI est une région que le fabricant de la carte mère découpe et dont il
-    // choisit la sonde (Microsoft Learn, « ACPI-defined devices », zones thermiques et `_TMP`), pas le cœur. La
-    // température des cœurs se lit dans HWiNFO quand il publie, ou dans les registres MSR par PawnIO (ThermiqueGpu).
-    //
-    // Sans ces deux sources, on ne sait pas combien il fait, mais on sait si un indicateur
-    // de limite est leve, et ce constat vit dans la famille CPU, qui lit deja le masque.
+    // La température du processeur ne se lit pas par WMI : `MSAcpi_ThermalZoneTemperature` (zone `TZ00`) est restée
+    // à 27,9 °C à la décimale pendant 60 s de charge sur 20 fils, processeur de 4 à 86 % (mesuré le 08/09/2026), et le
+    // compteur « Thermal Zone Information » rend la même zone. Une zone ACPI est une région dont le fabricant de la carte
+    // choisit la sonde, pas le cœur (Microsoft Learn, « ACPI-defined devices », `_TMP`). La température des cœurs vient
+    // de HWiNFO ou des MSR par PawnIO (ThermiqueGpu) ; sans eux, seul l'indicateur de limite est lu (famille CPU).
     private readonly Func<DrDxt.Detection.Cpu.TemperatureHwinfo.Lecture?> _temperatureHwinfo;
 
     // ── LECTEURS ───────────────────────────────────────────────────────────────────────────

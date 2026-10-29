@@ -236,16 +236,10 @@ public sealed partial class RepairAuditService
     }
 
     /// <summary>
-    /// Les arrets brutaux, dits sans condition.
-    ///
-    /// <see cref="Settings.MemoryStabilityAdvisor"/> ne parle que si XMP est actif et que des arrets
-    /// existent : sur une machine dont la memoire tourne au JEDEC, onze arrets brutaux en
-    /// quatre-vingt-dix jours ne seraient dits nulle part. Un fait de cette taille ne depend pas
-    /// d'une hypothese sur la memoire.
-    ///
-    /// Ce constat ne designe aucune cause. Un `Kernel-Power 41` dit que Windows a redemarre sans
-    /// avoir ete arrete proprement : gel, coupure de courant, reset, gardien materiel, tout y
-    /// ressemble. Nommer un coupable ici serait inventer.
+    /// Les arrets brutaux, dits sans condition : <see cref="Settings.MemoryStabilityAdvisor"/> ne parle que si XMP est
+    /// actif, et onze arrets en quatre-vingt-dix jours sur une memoire au JEDEC ne seraient dits nulle part. Aucune cause
+    /// n'est nommee : un `Kernel-Power 41` dit seulement que Windows n'a pas ete arrete proprement (gel, coupure, reset,
+    /// gardien materiel).
     /// </summary>
     private IEnumerable<RepairFinding> ArretsBrutaux()
     {
