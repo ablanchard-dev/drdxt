@@ -263,6 +263,9 @@ d'options changent d'une marque de carte mère à l'autre : le manuel de ta cart
 5. Firmware d'un SSD signalé par son fabricant : DrDXT compare le firmware du disque à un bulletin du fabricant
    (adresse et date de relevé dans le constat). Sauvegarde d'abord, puis mets-le à jour avec l'outil du fabricant
    (Samsung Magician pour un Samsung) ; DrDXT n'écrit jamais le firmware d'un disque.
+6. Endurance d'un SSD consommée au-delà du seuil que DrDXT affiche : ce seuil est une convention du fabricant, il dit
+   quand regarder, pas quand le disque lâchera. Garde une copie de ce qui compte ailleurs et prévois son remplacement ;
+   l'outil du fabricant (Samsung Magician pour un Samsung) en dit plus.
 
 ### 5.16 Windows et périphériques
 1. Windows Update : Paramètres > Windows Update > Rechercher des mises à jour, puis Microsoft Store > Bibliothèque > Obtenir

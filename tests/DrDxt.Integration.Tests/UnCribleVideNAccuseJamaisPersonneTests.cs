@@ -36,7 +36,7 @@ public sealed class UnCribleVideNAccuseJamaisPersonneTests
 
     /// <summary>Ce qui fabrique une liste a partir du depot ou du produit : ca peut se vider.</summary>
     private static readonly Regex LitLeDepot = new(
-        "FichiersDuDepot|EnumerateFiles|EnumerateDirectories|GetFiles|Directory\\.|"
+        "FichiersDuDepot|EnumerateFiles|EnumerateDirectories|GetFiles|Directory\\.(?!CreateDirectory|Delete)|"
         + "File\\.ReadAllText|File\\.ReadAllLines|XDocument|GetResourceSet");
 
     private static readonly Regex ConclutVide = new(@"\.Should\(\)\s*\.\s*BeEmpty\(");
@@ -114,5 +114,8 @@ public sealed class UnCribleVideNAccuseJamaisPersonneTests
         const string ordinaire = "var r = Calculer(3);\nr.Erreurs.Should().BeEmpty();";
 
         LitLeDepot.IsMatch(ordinaire).Should().BeFalse();
+        // Un dossier jetable qu'un test crée puis efface ne lit rien du dépôt ; parcourir un dossier, si.
+        LitLeDepot.IsMatch("Directory.CreateDirectory(d); Directory.Delete(d, true);").Should().BeFalse();
+        LitLeDepot.IsMatch("Directory.GetDirectories(racine)").Should().BeTrue();
     }
 }

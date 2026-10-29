@@ -73,11 +73,11 @@ public sealed class LAuditNImposePasSaSourceWmiTests
         // tests lents passent de 10,3 s a 9,8 s avec la couture WMI. Elle corrige une incoherence
         // reelle (c'etait le seul lecteur sans couture) mais n'est pas la cause du plateau.
         //
-        // Ce qui reste vrai et verifiable : cinq lecteurs systeme sont encore cables dans
-        // `Lire()`. Les geler ici, c'est savoir ou chercher la prochaine fois, et empecher
-        // la liste de grossir en silence.
-        var fichier = Chemin("src", "DrDxt.Detection", "Repair", "RepairAuditService.cs");
-        var texte = File.ReadAllText(fichier);
+        // Ce qui reste vrai et verifiable : cinq lecteurs systeme sont encore cables dans le
+        // service, tous ses fichiers partial compris. Les geler ici, c'est savoir ou chercher la
+        // prochaine fois, et empecher la liste de grossir en silence.
+        var texte = string.Concat(Directory.GetFiles(Chemin("src", "DrDxt.Detection", "Repair"), "RepairAuditService*.cs")
+            .Order(StringComparer.Ordinal).Select(File.ReadAllText));
 
         texte.Should().Contain("_wmi = wmi ?? new ManagementWmiQuery()",
             "temoin : le crible lit bien le service, couture comprise");
