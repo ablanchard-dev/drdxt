@@ -3,6 +3,7 @@ using DrDxt.ElevatedHelper.Journal;
 using System.Security.AccessControl;
 using System.Security.Principal;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -27,7 +28,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
     private static readonly AppelantDuJournal Autre = new("S-1-5-21-1-2-3-1002", 5151, new DateTimeOffset(2026, 10, 18, 9, 5, 0, TimeSpan.Zero));
     private static readonly DateTimeOffset Le = new(2026, 10, 18, 9, 30, 0, TimeSpan.Zero);
 
-    [Fact]
+    [FactAdmin]
     public void Une_entree_ajoutee_survit_au_plantage()
     {
         new JournalDEcritureAnticipee(Fichier).Ajouter(Hags, "1", App, Le).IsOk.Should().BeTrue();
@@ -43,7 +44,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
         e.Le.Should().Be(Le);
     }
 
-    [Fact]
+    [FactAdmin]
     public void Une_valeur_absente_avant_reste_absente_pas_vide()
     {
         new JournalDEcritureAnticipee(Fichier).Ajouter(Hags, null, App, Le);
@@ -51,7 +52,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
         new JournalDEcritureAnticipee(Fichier).EnAttente().Value![0].ImageAvant.Should().BeNull();
     }
 
-    [Fact]
+    [FactAdmin]
     public void Acquitter_retire_la_plus_ancienne_entree_de_cet_appelant_pour_cette_op()
     {
         var j = new JournalDEcritureAnticipee(Fichier);
@@ -65,7 +66,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
             .Should().Equal((Autre, "1"), (App, "2"));
     }
 
-    [Fact]
+    [FactAdmin]
     public void Acquitter_une_ecriture_inconnue_echoue_sans_rien_retirer()
     {
         var j = new JournalDEcritureAnticipee(Fichier);
@@ -77,7 +78,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
         j.EnAttente().Value.Should().ContainSingle();
     }
 
-    [Fact]
+    [FactAdmin]
     public void Une_ecriture_qui_a_echoue_sort_du_journal()
     {
         var j = new JournalDEcritureAnticipee(Fichier);
@@ -90,7 +91,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
     }
 
     // Un journal illisible n'est pas un journal vide : le croire vide perdrait des origines, l'écraser aussi.
-    [Fact]
+    [FactAdmin]
     public void Un_journal_illisible_n_est_ni_lu_vide_ni_ecrase()
     {
         // Un journal de DrDXT (fichier de confiance) devenu illisible ; un fichier qui n'est pas de confiance est mis de côté.
@@ -106,7 +107,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
 
     // Le journal est rejoué en administrateur : seuls SYSTEM et les administrateurs peuvent ouvrir son dossier. Un
     // processus du compte ne peut ni le lire, ni y tenir le verrou, ni y poser un fichier.
-    [Fact]
+    [FactAdmin]
     public void Le_dossier_du_journal_n_est_ouvert_qu_a_SYSTEM_et_aux_administrateurs()
     {
         new JournalDEcritureAnticipee(Fichier).Ajouter(Hags, "1", App, Le).IsOk.Should().BeTrue();
@@ -120,7 +121,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
 
     // Le helper élevé et le service SYSTEM écrivent le même fichier : sans verrou, deux ajouts simultanés relisent la même
     // liste et l'un efface l'autre. Le verrou attend largement : le test éprouve la sérialisation, pas la vitesse du disque.
-    [Fact]
+    [FactAdmin]
     public async Task Deux_ecrivains_en_parallele_ne_perdent_aucune_entree()
     {
         var a = new JournalDEcritureAnticipee(Fichier, attente: TimeSpan.FromMinutes(1));
@@ -132,7 +133,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
         new JournalDEcritureAnticipee(Fichier).EnAttente().Value.Should().HaveCount(40);
     }
 
-    [Fact]
+    [FactAdmin]
     public void Un_verrou_tenu_ailleurs_rend_un_echec_jamais_une_exception()
     {
         new JournalDEcritureAnticipee(Fichier).Ajouter(Hags, "1", App, Le);
@@ -146,7 +147,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
 
     // %ProgramData% laisse tout compte créer un dossier : le journal ne croit pas un dossier qui l'attendait. Un lien vers
     // ailleurs ferait réécrire l'accès de la cible par un processus élevé, et y poser le journal.
-    [Fact]
+    [FactAdmin]
     public void Un_dossier_qui_est_un_lien_est_refuse_et_rien_n_est_ecrit_dans_sa_cible()
     {
         Directory.CreateDirectory(_cible);
@@ -158,7 +159,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
     }
 
     // Le propriétaire d'un dossier garde le droit de rendre l'accès : créé d'avance par un compte, il resterait à lui.
-    [Fact]
+    [FactAdmin]
     public void Un_dossier_cree_d_avance_passe_aux_administrateurs()
     {
         var dossier = Directory.CreateDirectory(_dossier);
@@ -175,7 +176,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
     // d'avance par un compte y survivait. Rejoué par le helper ou SYSTEM, il faisait écrire ses ops sans UAC, et la
     // première écriture le recopiait dans le fichier de confiance. Un journal qui n'est pas de confiance (propriétaire,
     // accès) n'est pas de DrDXT : mis de côté, lu vide.
-    [Fact]
+    [FactAdmin]
     public void Un_journal_pose_d_avance_par_un_compte_n_est_ni_rejoue_ni_recopie()
     {
         new JournalDEcritureAnticipee(Path.Combine(_cible, "modele.json")).Ajouter(Hags, "1", App, Le).IsOk.Should().BeTrue();
@@ -193,7 +194,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
     // Créé par le helper élevé, le journal appartenait au compte (le créateur en est le propriétaire, par défaut) : un
     // programme du même compte, sans élévation, pouvait en réécrire l'accès puis y forger des écritures que SYSTEM
     // rejouerait. Le journal appartient aux Administrateurs, sous un accès que seuls eux et SYSTEM écrivent.
-    [Fact]
+    [FactAdmin]
     public void Le_journal_ecrit_est_un_fichier_de_confiance()
     {
         new JournalDEcritureAnticipee(Fichier).Ajouter(Hags, "1", App, Le).IsOk.Should().BeTrue();
@@ -210,7 +211,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
     // Créé par le helper élevé, le verrou appartenait au compte : sans élévation, le compte pouvait s'en rendre l'accès et le
     // tenir ouvert, et toute écriture journalisée était refusée (« occupé »). Le verrou appartient aux Administrateurs ; un
     // verrou laissé par l'ancien code, au propriétaire non fiable, est remplacé.
-    [Fact]
+    [FactAdmin]
     public void Le_verrou_appartient_aux_administrateurs_meme_s_il_existait_deja()
     {
         Directory.CreateDirectory(_dossier);
@@ -230,7 +231,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
 
     // Un appelant qui empilerait des poses sans jamais les acquitter ferait grossir le journal sans fin, relu et réécrit à
     // chaque écriture : au-delà de la borne, sa pose est refusée (fermé par défaut), celles des autres passent.
-    [Fact]
+    [FactAdmin]
     public void Au_dela_de_la_borne_par_appelant_la_pose_est_refusee()
     {
         var j = new JournalDEcritureAnticipee(Fichier, maxParAppelant: 2);
@@ -267,7 +268,7 @@ public sealed class JournalDEcritureAnticipeeTests : IDisposable
 
     // Le compte peut réécrire son journal : une op hors de sa session n'y entre pas, et une op forgée n'en sort jamais pour
     // être rendue (elle partirait au helper).
-    [Fact]
+    [FactAdmin]
     public void Le_journal_du_compte_ne_porte_que_la_session()
     {
         var compte = JournalDEcritureAnticipee.DuCompte(Fichier);

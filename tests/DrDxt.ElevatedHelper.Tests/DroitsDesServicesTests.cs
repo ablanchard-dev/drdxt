@@ -6,6 +6,7 @@ using DrDxt.ElevatedHelper.Execution;
 using DrDxt.ElevatedHelper.Journal;
 using FluentAssertions;
 using NSubstitute;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -25,9 +26,6 @@ public sealed class DroitsDesServicesTests : IDisposable
 
     private static readonly string Compte = WindowsIdentity.GetCurrent().User!.Value;
     private const string TrustedInstaller = "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464";
-
-    // Poser un propriétaire Administrateurs demande l'élévation : sans elle, ces tests n'ont rien à prouver.
-    private static bool Eleve => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
 
     public DroitsDesServicesTests() => Directory.CreateDirectory(_racine);
 
@@ -212,10 +210,9 @@ public sealed class DroitsDesServicesTests : IDisposable
         _ecrits.Should().BeEmpty();
     }
 
-    [Fact]
+    [FactAdmin]
     public void Un_binaire_de_DrDXT_n_est_jamais_touche()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable(sousDossier: "drdxt");
         var avant = Etat(exe);
 
@@ -226,10 +223,9 @@ public sealed class DroitsDesServicesTests : IDisposable
     }
 
     // Réécrire la DACL de ProgramData ou de Program Files la propagerait à tout ce qu'ils contiennent.
-    [Fact]
+    [FactAdmin]
     public void Un_binaire_pose_a_meme_un_dossier_partage_est_refuse()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable(sousDossier: "partage");
         var avant = Etat(exe);
 
@@ -239,10 +235,9 @@ public sealed class DroitsDesServicesTests : IDisposable
         _ecrits.Should().BeEmpty();
     }
 
-    [Fact]
+    [FactAdmin]
     public void Un_service_deja_protege_reussit_sans_rien_ecrire()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable(dossierSddl: "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)");
         var proprio = new FileSecurity();
         proprio.SetOwner(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
@@ -257,10 +252,9 @@ public sealed class DroitsDesServicesTests : IDisposable
     }
 
     // Un lien (jonction, lien symbolique) ferait réécrire la cible : le chemin final du handle doit être celui du registre.
-    [Fact]
+    [FactAdmin]
     public void Un_chemin_qui_passe_par_un_lien_est_refuse()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         var lien = Path.Combine(_racine, "lien");
         Directory.CreateSymbolicLink(lien, Path.GetDirectoryName(exe)!);
@@ -277,10 +271,9 @@ public sealed class DroitsDesServicesTests : IDisposable
     private static extern bool CreateHardLinkW(string nouveau, string existant, IntPtr securite);
 
     // Un lien dur ferait réécrire un autre fichier, que le compte ne pourrait pas remplacer lui-même.
-    [Fact]
+    [FactAdmin]
     public void Un_binaire_a_plusieurs_liens_durs_est_refuse()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         CreateHardLinkW(Path.Combine(_racine, "autre.exe"), exe, IntPtr.Zero).Should().BeTrue();
         var avant = Etat(exe);
@@ -293,10 +286,9 @@ public sealed class DroitsDesServicesTests : IDisposable
 
     // ── La correction ───────────────────────────────────────────────────────────────────
 
-    [Fact]
+    [FactAdmin]
     public void La_correction_rend_le_fichier_et_son_dossier_aux_administrateurs()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         CheminProtege.Verifier(exe, _racine).Should().NotBeNull("témoin : le compte peut remplacer ce fichier");
 
@@ -316,10 +308,9 @@ public sealed class DroitsDesServicesTests : IDisposable
             .Cast<FileSystemAccessRule>().Should().OnlyContain(r => r.InheritanceFlags == (InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit));
     }
 
-    [Fact]
+    [FactAdmin]
     public void TrustedInstaller_est_garde_s_il_y_etait()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable(dossierSddl: $"O:{Compte}D:P(A;OICI;FA;;;{Compte})(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;{TrustedInstaller})");
 
         Droits().Corriger("Broker").IsOk.Should().BeTrue();
@@ -329,10 +320,9 @@ public sealed class DroitsDesServicesTests : IDisposable
         CheminProtege.Verifier(exe, _racine).Should().BeNull();
     }
 
-    [Fact]
+    [FactAdmin]
     public void L_origine_est_gardee_avant_toute_ecriture()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         var avant = Etat(exe);
         (string, string)? auMomentDeGarder = null;
@@ -345,10 +335,9 @@ public sealed class DroitsDesServicesTests : IDisposable
         garde.Should().Contain(avant.Fichier.Replace("\\", "\\\\")).And.Contain(avant.Dossier.Replace("\\", "\\\\"));
     }
 
-    [Fact]
+    [FactAdmin]
     public void Sans_origine_gardee_rien_n_est_corrige()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         var avant = Etat(exe);
         _ecrire = (_, _) => Result.Fail(ErrorCodes.IoFailure, "disque plein");
@@ -360,10 +349,9 @@ public sealed class DroitsDesServicesTests : IDisposable
 
     // Une mise à jour du jeu rouvre le dossier ; corrigé une seconde fois, l'origine gardée reste la vraie, celle d'avant
     // la première correction.
-    [Fact]
+    [FactAdmin]
     public void Une_seconde_correction_n_ecrase_jamais_l_origine_gardee()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         var origine = Etat(exe);
         Droits().Corriger("Broker").IsOk.Should().BeTrue();
@@ -382,10 +370,9 @@ public sealed class DroitsDesServicesTests : IDisposable
 
     // Un dossier au-dessus que le compte peut modifier laisse renommer le dossier corrigé et en poser un autre : la
     // correction ne ferme rien. L'origine revient tout de suite, et la raison est dite.
-    [Fact]
+    [FactAdmin]
     public void Un_ancetre_modifiable_rend_l_origine_et_echoue_en_le_disant()
     {
-        if (!Eleve) return;
         Directory.CreateDirectory(Path.Combine(_racine, "Jeu"));
         var exe = ServiceRemplacable(sousDossier: Path.Combine("Jeu", "service"));
         var avant = Etat(exe);
@@ -402,10 +389,9 @@ public sealed class DroitsDesServicesTests : IDisposable
 
     // ── L'inverse ───────────────────────────────────────────────────────────────────────
 
-    [Fact]
+    [FactAdmin]
     public void Annuler_rend_exactement_l_origine_et_retire_ce_qui_la_gardait()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable(dossierSddl: $"O:{Compte}D:P(A;OICI;FA;;;{Compte})(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;{TrustedInstaller})");
         var avant = Etat(exe);
         Droits().Corriger("Broker").IsOk.Should().BeTrue();
@@ -417,10 +403,9 @@ public sealed class DroitsDesServicesTests : IDisposable
         File.Exists(Droits().CheminDeLOrigine("Broker")).Should().BeFalse();
     }
 
-    [Fact]
+    [FactAdmin]
     public void Annuler_sans_origine_gardee_echoue_sans_rien_ecrire()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         var avant = Etat(exe);
 
@@ -429,10 +414,9 @@ public sealed class DroitsDesServicesTests : IDisposable
         Etat(exe).Should().Be(avant);
     }
 
-    [Fact]
+    [FactAdmin]
     public void Une_origine_gardee_qui_n_est_pas_de_confiance_est_refusee()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         Droits().Corriger("Broker").IsOk.Should().BeTrue();
         var corrige = Etat(exe);
@@ -445,10 +429,9 @@ public sealed class DroitsDesServicesTests : IDisposable
         Droits().Corriger("Broker").IsOk.Should().BeTrue("déjà protégé, rien à écrire");
     }
 
-    [Fact]
+    [FactAdmin]
     public void Une_origine_non_fiable_bloque_une_nouvelle_correction()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         Directory.CreateDirectory(Origines);
         File.WriteAllText(Droits().CheminDeLOrigine("Broker"), "{}");
@@ -460,10 +443,9 @@ public sealed class DroitsDesServicesTests : IDisposable
         Etat(exe).Should().Be(avant);
     }
 
-    [Fact]
+    [FactAdmin]
     public void Annuler_refuse_un_service_dont_le_chemin_a_change()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         Droits().Corriger("Broker").IsOk.Should().BeTrue();
         var corrige = Etat(exe);
@@ -478,10 +460,9 @@ public sealed class DroitsDesServicesTests : IDisposable
     }
 
     // Le fichier remplacé depuis la correction n'est plus celui dont l'origine a été lue : la rendre lui donnerait les droits d'un autre.
-    [Fact]
+    [FactAdmin]
     public void Annuler_refuse_un_fichier_remplace_depuis_la_correction()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         Droits().Corriger("Broker").IsOk.Should().BeTrue();
         File.Delete(exe);
@@ -523,10 +504,9 @@ public sealed class DroitsDesServicesTests : IDisposable
 
     // Le dossier du service appartenait au compte : il a pu y planter une jonction vers n'importe quel arbre. La correction la
     // trouve, ne la suit pas, rend l'origine et le dit.
-    [Fact]
+    [FactAdmin]
     public void Une_jonction_dans_le_dossier_du_service_n_est_jamais_suivie_et_la_correction_est_refusee()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         var victime = Victime();
         Jonction(Path.Combine(Path.GetDirectoryName(exe)!, "donnees"), victime.Dossier);
@@ -542,10 +522,9 @@ public sealed class DroitsDesServicesTests : IDisposable
         File.Exists(Droits().CheminDeLOrigine("Broker")).Should().BeFalse();
     }
 
-    [Fact]
+    [FactAdmin]
     public void Un_lien_symbolique_de_fichier_dans_le_dossier_du_service_n_est_jamais_suivi()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         var victime = Victime();
         File.CreateSymbolicLink(Path.Combine(Path.GetDirectoryName(exe)!, "moteur.dll"), victime.Fichier);
@@ -560,10 +539,9 @@ public sealed class DroitsDesServicesTests : IDisposable
 
     // Un lien posé après la correction (par un administrateur, le compte n'y écrit plus) : Annuler rend l'origine sans le
     // suivre, et la victime reste telle quelle.
-    [Fact]
+    [FactAdmin]
     public void Annuler_ne_suit_jamais_un_lien_du_dossier_du_service()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         var origine = Etat(exe);
         Droits().Corriger("Broker").IsOk.Should().BeTrue();
@@ -580,10 +558,9 @@ public sealed class DroitsDesServicesTests : IDisposable
     }
 
     // La pose sur le dossier ne propage rien d'elle-même : c'est la descente, qui ne suit aucun lien, qui rend l'héritage.
-    [Fact]
+    [FactAdmin]
     public void Poser_la_DACL_du_dossier_ne_propage_rien_aux_enfants()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         var voisin = Path.Combine(Path.GetDirectoryName(exe)!, "voisin.dll");
         File.WriteAllBytes(voisin, [0]);
@@ -596,10 +573,9 @@ public sealed class DroitsDesServicesTests : IDisposable
 
     // Une DLL voisine qui héritait l'écriture du compte la perd avec la correction (le service la chargerait), et la retrouve
     // avec Annuler ; un sous-dossier aussi.
-    [Fact]
+    [FactAdmin]
     public void Les_enfants_ordinaires_perdent_l_ecriture_heritee_du_compte_et_la_retrouvent_a_l_annulation()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable();
         var voisin = Path.Combine(Path.GetDirectoryName(exe)!, "voisin.dll");
         File.WriteAllBytes(voisin, [0]);
@@ -659,10 +635,9 @@ public sealed class DroitsDesServicesTests : IDisposable
 
     // Le dossier appartenait à un autre compte : le rendre demanderait un privilège que le helper n'active pas. L'échec dit que
     // l'origine n'est pas revenue, et elle reste gardée pour un Annuler.
-    [Fact]
+    [FactAdmin]
     public void Une_origine_qui_ne_se_remet_pas_se_dit_a_moitie_et_reste_gardee()
     {
-        if (!Eleve) return;
         Directory.CreateDirectory(Path.Combine(_racine, "Jeu"));
         var exe = ServiceRemplacable(sousDossier: Path.Combine("Jeu", "service"));
         AvecLaRestauration(() =>
@@ -680,10 +655,9 @@ public sealed class DroitsDesServicesTests : IDisposable
     }
 
     // Un nom court 8.3 n'est pas le chemin final : refusé comme un lien, et le message le dit.
-    [Fact]
+    [FactAdmin]
     public void Un_chemin_en_nom_court_est_refuse_et_le_message_le_dit()
     {
-        if (!Eleve) return;
         var exe = ServiceRemplacable(sousDossier: "dossier au nom long");
         var court = new System.Text.StringBuilder(512);
         if (GetShortPathNameW(exe, court, 512) == 0 || string.Equals(court.ToString(), exe, StringComparison.OrdinalIgnoreCase)) return; // pas de noms courts sur ce volume
@@ -698,10 +672,9 @@ public sealed class DroitsDesServicesTests : IDisposable
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern uint GetShortPathNameW(string longue, System.Text.StringBuilder courte, uint taille);
 
-    [Fact]
+    [FactAdmin]
     public void Les_services_corriges_se_lisent_par_leur_origine_gardee()
     {
-        if (!Eleve) return;
         ServiceRemplacable("Broker");
         Droits().Corriger("Broker").IsOk.Should().BeTrue();
 

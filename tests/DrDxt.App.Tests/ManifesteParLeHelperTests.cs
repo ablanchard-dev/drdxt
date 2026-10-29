@@ -16,6 +16,7 @@ using DrDxt.Reconciler.Manifest;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.App.Tests;
 
@@ -241,7 +242,7 @@ public sealed class ManifesteParLeHelperTests
         }
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task De_bout_en_bout_l_App_commite_le_helper_signe_et_l_App_relit_sans_jamais_tenir_la_cle()
     {
         var racine = Path.Combine(Path.GetTempPath(), "drdxt-bout-en-bout-" + Guid.NewGuid().ToString("N"));

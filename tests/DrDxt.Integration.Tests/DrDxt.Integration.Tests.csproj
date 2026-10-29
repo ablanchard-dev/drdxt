@@ -28,6 +28,7 @@
     <!-- Le manifeste de la désinstallation (AppliedTweakManifestMapper) vit dans l'App : les invariants le relisent sur
          tous les leviers du banc. -->
     <ProjectReference Include="..\..\src\DrDxt.App\DrDxt.App.csproj" />
+    <Compile Include="..\Shared\AdminRequis.cs" Link="Shared\AdminRequis.cs" />
   </ItemGroup>
 
   <ItemGroup>

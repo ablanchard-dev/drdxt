@@ -3,6 +3,7 @@ using DrDxt.ElevatedHelper.Journal;
 using DrDxt.ElevatedHelper.Leases;
 using FluentAssertions;
 using NSubstitute;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -21,7 +22,7 @@ public sealed class JournalDuHelperTests : IDisposable
 
     // Un dossier qu'un compte aurait créé d'avance, verrou tenu, rendrait le journal occupé pour toujours : la racine est
     // réparée avant que le dossier du journal n'existe.
-    [Fact]
+    [FactAdmin]
     public void La_racine_est_reparee_avant_que_le_dossier_du_journal_n_existe()
     {
         var vus = new List<bool>();
@@ -82,7 +83,7 @@ public sealed class JournalDuHelperTests : IDisposable
     }
 
     // Le rejeu au démarrage passe par la liste blanche, comme le tube.
-    [Fact]
+    [FactAdmin]
     public async Task Le_rejeu_au_demarrage_ecrit_par_la_liste_blanche()
     {
         var journal = new JournalDEcritureAnticipee(Path.Combine(_racine, "j.json"));

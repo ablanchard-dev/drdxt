@@ -3,6 +3,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using DrDxt.Lanceur;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -32,16 +33,6 @@ public sealed class PreparationDesDroitsTests : IDisposable
     }
 
     private static bool Eleve() => new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
-
-    // Ces tests ne se jouent qu'en administrateur : seul un administrateur fait naître un dossier aux Administrateurs. Sans
-    // droits (un contributeur), ils se taisent ; sur la CI, dont les machines sont administrateurs, ils doivent se jouer :
-    // une garde de l'installeur sans test en CI ne protège personne.
-    private static bool SeJoueEleve()
-    {
-        if (Eleve()) return true;
-        Environment.GetEnvironmentVariable("CI").Should().NotBe("true", "la CI se lance en administrateur");
-        return false;
-    }
 
     // Le module tel que le lanceur l'exécute, en mémoire : les lignes « ecarte … » sont captées au lieu d'aller à la console.
     private static (int Code, string Sortie) Lancer(string mode, string chemin, string sddl)
@@ -158,10 +149,9 @@ public sealed class PreparationDesDroitsTests : IDisposable
     // Une racine en jonction posée par un administrateur, vers un dossier qui a l'air fiable : la jonction et sa cible portent
     // le descripteur du dossier de l'App, l'installeur y poserait ses fichiers. Seul son point d'analyse la trahit : elle part
     // de côté.
-    [Fact]
+    [FactAdmin]
     public void Une_racine_en_jonction_vers_un_dossier_d_apparence_fiable_part_de_cote()
     {
-        if (!SeJoueEleve()) return;
         var cible = CibleFiable();
         var avant = Sddl(cible);
         var app = Path.Combine(_dossier, "DrDXT");
@@ -191,10 +181,9 @@ public sealed class PreparationDesDroitsTests : IDisposable
     // Une racine des données fiable garde ce qui est aux Administrateurs et le fichier du compte (aucun lecteur élevé ne
     // le croit) ; un lien et un dossier du compte partent de côté, la cible du lien intacte. Le chemin complet, vérifié
     // tel quel : naissance verrouillée, rien de récursif sur ce que le compte contrôle.
-    [Fact]
+    [FactAdmin]
     public void Les_donnees_ecartent_les_liens_et_les_dossiers_du_compte_et_gardent_le_reste()
     {
-        if (!SeJoueEleve()) return;
         var cible = CibleFiable();
         var avant = Sddl(cible);
         var racine = Path.Combine(_dossier, "DrDxt");
@@ -222,10 +211,9 @@ public sealed class PreparationDesDroitsTests : IDisposable
 
     // Un dossier de l'App neuf, puis des fichiers copiés au compte : la vérification les refuse tant qu'ils ne sont pas
     // passés aux Administrateurs, puis les accepte ; un dossier fiable reste à sa place.
-    [Fact]
+    [FactAdmin]
     public void Un_dossier_neuf_se_verifie_apres_le_changement_de_proprietaire_des_fichiers_copies()
     {
-        if (!SeJoueEleve()) return;
         var app = Path.Combine(_dossier, "DrDXT");
         Lancer("app", app, SddlApp).Code.Should().Be(0);
         Directory.CreateDirectory(Path.Combine(app, "service"));

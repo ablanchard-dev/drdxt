@@ -2,6 +2,7 @@ using DrDxt.Core;
 using DrDxt.ElevatedHelper.Journal;
 using DrDxt.Reconciler.Desinstallation;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -74,7 +75,7 @@ public sealed class RejeuDuJournalTests : IDisposable
 
     private IReadOnlyList<EntreeDuJournal> EnAttente() => new JournalDEcritureAnticipee(Fichier).EnAttente().Value!;
 
-    [Fact]
+    [FactAdmin]
     public async Task Une_ecriture_dont_le_demandeur_est_mort_est_rendue_et_sort_du_journal()
     {
         var m = new Machine();
@@ -96,7 +97,7 @@ public sealed class RejeuDuJournalTests : IDisposable
     private const string Jeu = @"C:\Games\Call of Duty\cod.exe";
     private static ApplyNvApiDrsSettingOp DrsAuJeu(uint valeur) => new(0x1057EB71u, valeur, Jeu);
 
-    [Fact]
+    [FactAdmin]
     public async Task Un_reglage_drs_que_le_profil_du_jeu_ne_possedait_pas_lui_est_retire()
     {
         var m = new Machine();
@@ -119,7 +120,7 @@ public sealed class RejeuDuJournalTests : IDisposable
         new OpAllowlist().Validate(inconnue!).IsOk.Should().BeFalse();
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task Une_valeur_absente_avant_l_ecriture_est_supprimee()
     {
         var m = new Machine();
@@ -133,7 +134,7 @@ public sealed class RejeuDuJournalTests : IDisposable
 
     // Une origine que le helper refuserait de réécrire (HwSchMode à 0) restait au journal à vie, refusée à chaque rejeu.
     // Elle se dit non rendable une fois, et sort.
-    [Fact]
+    [FactAdmin]
     public async Task Une_origine_que_le_helper_refuserait_se_dit_non_rendable_et_sort_du_journal()
     {
         var m = new Machine();
@@ -148,7 +149,7 @@ public sealed class RejeuDuJournalTests : IDisposable
     }
 
     // L'App vit encore : elle notera l'origine ou rendra la pose elle-même.
-    [Fact]
+    [FactAdmin]
     public async Task Une_ecriture_dont_le_demandeur_vit_n_est_pas_touchee()
     {
         var m = new Machine();
@@ -163,7 +164,7 @@ public sealed class RejeuDuJournalTests : IDisposable
     }
 
     // Quelqu'un a changé la valeur depuis : son choix est respecté, et l'entrée sort (il n'y a plus rien à rendre).
-    [Fact]
+    [FactAdmin]
     public async Task Une_valeur_changee_depuis_est_respectee()
     {
         var m = new Machine();
@@ -180,7 +181,7 @@ public sealed class RejeuDuJournalTests : IDisposable
 
     // Sous SYSTEM, ou dans un helper élevé avec le compte d'un autre administrateur, HKCU est une autre ruche : y rendre
     // l'origine écrirait chez quelqu'un d'autre et laisserait le levier du joueur posé. L'entrée attend un helper de son compte.
-    [Theory]
+    [TheoryAdmin]
     [InlineData("S-1-5-18")]
     [InlineData("S-1-5-21-autre-admin")]
     public async Task Une_ecriture_de_la_session_attend_un_helper_du_meme_compte(string sidCourant)
@@ -195,7 +196,7 @@ public sealed class RejeuDuJournalTests : IDisposable
         EnAttente().Should().ContainSingle();
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task Une_ecriture_de_la_session_est_rendue_par_un_helper_du_meme_compte()
     {
         var m = new Machine();
@@ -210,7 +211,7 @@ public sealed class RejeuDuJournalTests : IDisposable
 
     // Deux comptes, deux ruches : leurs poses de la même clé HKCU ne se fondent pas. Celle du compte courant est rendue,
     // l'autre attend son compte.
-    [Fact]
+    [FactAdmin]
     public async Task Deux_comptes_ne_fondent_pas_leurs_poses_de_session()
     {
         var m = new Machine();
@@ -229,7 +230,7 @@ public sealed class RejeuDuJournalTests : IDisposable
     public void Le_compte_courant_se_lit()
         => RejeuDuJournal.CompteCourant().Should().StartWith("S-1-");
 
-    [Fact]
+    [FactAdmin]
     public async Task Une_ecriture_refusee_au_rejeu_reste_au_journal()
     {
         var m = new Machine();
@@ -243,7 +244,7 @@ public sealed class RejeuDuJournalTests : IDisposable
     }
 
     // Deux poses de la même feuille, l'App morte après chacune : la plus ancienne image est la vraie origine.
-    [Fact]
+    [FactAdmin]
     public async Task Deux_poses_de_la_meme_feuille_rendent_la_plus_ancienne_origine()
     {
         var m = new Machine();
@@ -261,7 +262,7 @@ public sealed class RejeuDuJournalTests : IDisposable
 
     // L'horloge a reculé entre les deux poses : l'ordre d'inscription au journal fait foi, pas l'heure murale. La première
     // inscrite porte la vraie origine, la dernière la valeur à comparer.
-    [Fact]
+    [FactAdmin]
     public async Task Une_horloge_reculee_entre_deux_poses_rend_l_origine_de_la_premiere_inscrite()
     {
         var m = new Machine();
@@ -274,7 +275,7 @@ public sealed class RejeuDuJournalTests : IDisposable
         m.Feuilles[$"LocalMachine\\{Cle}\\HwSchMode"].Should().Be("1");
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task Le_plan_d_alimentation_d_origine_est_reactive()
     {
         var m = new Machine();
@@ -287,7 +288,7 @@ public sealed class RejeuDuJournalTests : IDisposable
         m.Ecrites.Should().Equal(new SetActivePowerPlanOp(equilibre));
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task Un_journal_illisible_ne_rend_rien_et_le_dit()
     {
         // Un journal de DrDXT (fichier de confiance) devenu illisible ; un fichier qui n'est pas de confiance est mis de côté.
@@ -316,7 +317,7 @@ public sealed class RejeuDuJournalTests : IDisposable
     // L'App a posé, noté l'origine, mais son acquit n'est jamais arrivé (helper parti), puis elle est morte. L'App relancée,
     // du même compte et vivante, ne protège pas l'entrée de l'ancienne : c'est un autre processus. L'origine est rendue, le
     // sens sûr, plutôt qu'un fichier d'acquits du profil qui pourrait empêcher le rejeu.
-    [Fact]
+    [FactAdmin]
     public async Task L_acquit_jamais_remis_d_une_App_morte_laisse_rendre_l_origine_meme_App_relancee()
     {
         var m = new Machine();
@@ -333,7 +334,7 @@ public sealed class RejeuDuJournalTests : IDisposable
 
     // DirectXUserGlobalSettings porte aussi Auto HDR, que le joueur règle lui-même. Le rejeu rendrait l'image d'avant entière
     // et effacerait un Auto HDR basculé depuis : seules les clés de DrDXT reprennent leur origine, comme à la désinstallation.
-    [Fact]
+    [FactAdmin]
     public async Task Le_rejeu_de_la_chaine_DirectX_garde_l_Auto_HDR_du_joueur()
     {
         var m = new Machine();

@@ -7,6 +7,7 @@ using DrDxt.ElevatedHelper.Ipc;
 using DrDxt.Reconciler;
 using FluentAssertions;
 using NSubstitute;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -279,7 +280,7 @@ public sealed class CommitManifestOpTests
         return r;
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task Temoin_un_appelant_authentifie_atteint_l_ecrivain_avec_ses_entrees()
     {
         var ecrivain = Substitute.For<IManifestCommitActions>();
@@ -317,7 +318,7 @@ public sealed class CommitManifestOpTests
         ecrivain.DidNotReceiveWithAnyArgs().Commit(default!);
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task Un_commit_hostile_d_un_appelant_authentifie_n_atteint_pas_l_ecrivain()
     {
         var ecrivain = Substitute.For<IManifestCommitActions>();
@@ -330,7 +331,7 @@ public sealed class CommitManifestOpTests
         ecrivain.DidNotReceiveWithAnyArgs().Commit(default!);
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task Le_code_d_un_manifeste_illisible_revient_jusqu_au_client()
     {
         var ecrivain = Substitute.For<IManifestCommitActions>();

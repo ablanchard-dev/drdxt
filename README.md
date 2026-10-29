@@ -303,14 +303,16 @@ the code is missing from this list.
 ## Build
 
 Windows 10 or 11 x64, the **.NET 10** SDK, and Node.js for the BIOS guide page tests (they run its script). Clone
-into a short folder, for example `C:\src\drdxt` (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+into a short folder, for example `C:\src\drdxt` (see [CONTRIBUTING.md](CONTRIBUTING.md)). Run the tests from an
+**administrator terminal**: like DrDXT, its elevated helper's tests need administrator rights; from a normal terminal
+they are skipped with the reason, and CI always runs them.
 
 ```
 dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**9,903 tests, 0 failures**, measured on 26/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
+**9,903 tests, 0 failures**, measured on 29/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
 real hardware). The number is checked by `tools/gates/compte_des_tests.py` against the last run. The command that gives
 it back (an English .NET SDK; with a French one, see the French README):
 

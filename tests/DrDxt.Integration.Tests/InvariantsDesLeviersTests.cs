@@ -8,6 +8,7 @@ using DrDxt.Core;
 using DrDxt.Reconciler.Desinstallation;
 using DrDxt.ElevatedHelper;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.Integration.Tests;
 
@@ -200,7 +201,7 @@ public sealed class InvariantsDesLeviersTests : IDisposable
         => RevertAuDemarrage.LeviersJournalises.Should().BeSubsetOf(
             ChaqueLevierDuProduitSaitSeDefaireTests.TousLesLeviers(SansOrigine(), new FakeElevatedClient(SansOrigine())).Select(t => t.Id));
 
-    [Theory]
+    [TheoryAdmin]
     [MemberData(nameof(Leviers))]
     public async Task Tue_entre_l_ecriture_et_l_origine_gardee_le_rejeu_du_helper_rend_l_origine(string id)
     {

@@ -1,6 +1,7 @@
 using DrDxt.Lanceur;
 using FluentAssertions;
 using Xunit;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -39,7 +40,7 @@ public sealed class DossierTemporaireEleveTests
         crees.Should().BeEmpty("on ne crée rien sous un dossier que le compte contrôle");
     }
 
-    [Fact]
+    [FactAdmin]
     public void Un_dossier_du_compte_n_est_pas_sur_et_SystemTemp_l_est_quand_il_existe()
     {
         EnvironnementPropre.DossierSur(Path.GetTempPath()).Should().BeFalse("le TEMP du compte s'écrit sans droits");

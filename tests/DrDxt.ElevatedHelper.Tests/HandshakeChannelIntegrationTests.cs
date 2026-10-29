@@ -2,6 +2,7 @@ using DrDxt.Core;
 using DrDxt.ElevatedHelper;
 using DrDxt.ElevatedHelper.Ipc;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -47,7 +48,7 @@ public sealed class HandshakeChannelIntegrationTests
     private static string CeProcessus => Environment.ProcessPath!;
 
     // --- chemin nominal : appelant autorisé → négociation → l'op autorisée s'exécute ---
-    [Fact]
+    [FactAdmin]
     public async Task Authorized_handshake_then_allowlisted_op_executes()
     {
         var pipe = UniquePipe();
@@ -128,7 +129,7 @@ public sealed class HandshakeChannelIntegrationTests
         }
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task Un_helper_qui_meurt_apres_la_requete_ne_se_dit_pas_injoignable()
     {
         var pipe = UniquePipe();
@@ -154,7 +155,7 @@ public sealed class HandshakeChannelIntegrationTests
     }
 
     // --- une op hors liste blanche reste refusée après une négociation valide ---
-    [Fact]
+    [FactAdmin]
     public async Task Non_allowlisted_op_refused_after_valid_handshake()
     {
         var pipe = UniquePipe();
@@ -195,7 +196,7 @@ public sealed class HandshakeChannelIntegrationTests
     //     Le client lance son op alors qu'aucun tube n'existe ; le serveur se met à écouter
     //     un peu plus tard (le helper tout juste lancé). La reconnexion bornée l'atteint à une
     //     tentative suivante : un seul accept, pas de sonde séparée. ---
-    [Fact]
+    [FactAdmin]
     public async Task First_op_retries_connect_until_a_late_starting_helper_serves()
     {
         var pipe = UniquePipe();

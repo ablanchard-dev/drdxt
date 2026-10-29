@@ -3,6 +3,7 @@ using DrDxt.ElevatedHelper.Execution;
 using DrDxt.ElevatedHelper.Ipc;
 using DrDxt.ElevatedHelper.Journal;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -47,7 +48,7 @@ public sealed class ExecuteurJournaliseTests : IDisposable
             () => new DateTimeOffset(2026, 10, 18, 9, 30, 0, TimeSpan.Zero)), interne, journal);
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task L_image_avant_est_notee_sur_le_disque_avant_l_ecriture()
     {
         var (exec, interne, journal) = Monter();
@@ -125,7 +126,7 @@ public sealed class ExecuteurJournaliseTests : IDisposable
     }
 
     // Un échec qui laisse la cible changée (retour en arrière raté) : l'entrée reste, et le rejeu rendra l'origine.
-    [Fact]
+    [FactAdmin]
     public async Task Une_ecriture_qui_echoue_en_laissant_la_cible_changee_reste_au_journal()
     {
         var (exec, _, journal) = Monter(reponse: Result.Fail(ErrorCodes.TweakPartiallyApplied, "posé"));
@@ -190,7 +191,7 @@ public sealed class ExecuteurJournaliseTests : IDisposable
     }
 
     // L'acquit retire l'entrée de son appelant, et d'aucun autre : un processus ne peut pas effacer la protection d'un autre.
-    [Fact]
+    [FactAdmin]
     public async Task Un_appelant_n_acquitte_que_sa_propre_pose()
     {
         var journal = new JournalDEcritureAnticipee(Fichier);
@@ -211,7 +212,7 @@ public sealed class ExecuteurJournaliseTests : IDisposable
 
     // Un acquit arrive APRÈS l'écriture : son refus porte son propre code. Sous celui d'un refus d'avant l'écriture, l'écran
     // pourrait dire « rien n'a été écrit » d'une pose bien en place.
-    [Fact]
+    [FactAdmin]
     public async Task Un_acquit_refuse_porte_son_propre_code_un_refus_d_avant_l_ecriture_garde_le_sien()
     {
         var journal = new JournalDEcritureAnticipee(Fichier, attente: TimeSpan.FromMilliseconds(50));

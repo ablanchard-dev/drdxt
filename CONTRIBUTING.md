@@ -50,6 +50,12 @@ dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 
 `Category=Machine` tests read the real hardware; they run by hand, not in CI.
 
+**Run the tests from an administrator terminal.** DrDXT itself needs administrator rights: its helper runs elevated,
+gives its journal to the Administrators and only trusts a pipe they own. The tests that prove this can only run
+elevated. From a normal terminal they are reported as *skipped*, with the reason, not as failures. They are still
+required: CI always runs them as administrator, never skips them, and a pull request is green only once they pass
+there.
+
 To see the app without the hardware, a Debug build replays a recorded machine from `tests/Shared/machines` (an AMD
 card, a laptop on battery, an account without admin rights...); its data go to a throwaway folder:
 

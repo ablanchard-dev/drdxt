@@ -331,13 +331,15 @@ contactée par le code manque dans cette liste.
 
 Windows 10 ou 11 x64, le SDK **.NET 10**, et Node.js pour les tests de la page du guide du BIOS (ils exécutent son
 script). Clone dans un dossier au chemin court, par exemple `C:\src\drdxt` (voir [CONTRIBUTING.md](CONTRIBUTING.md)).
+Lance les tests depuis un **terminal administrateur** : comme DrDXT, les tests de son helper élevé ont besoin des droits
+administrateur ; depuis un terminal normal ils sont ignorés avec la raison, et la CI les joue toujours.
 
 ```
 dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**9 903 tests, 0 échec**, mesuré le 26/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
+**9 903 tests, 0 échec**, mesuré le 29/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
 matériel). Ce chiffre est vérifié par `tools/gates/compte_des_tests.py` contre la dernière exécution. La commande qui
 le redonne :
 

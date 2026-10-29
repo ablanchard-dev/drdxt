@@ -4,6 +4,7 @@ using DrDxt.Core;
 using DrDxt.ElevatedHelper;
 using DrDxt.ElevatedHelper.Ipc;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -116,7 +117,7 @@ public sealed class TubeUsurpeTests
     }
 
     // --- TEMOIN : le serveur est l'image attendue → la session passe. ---
-    [Fact]
+    [FactAdmin]
     public async Task Un_serveur_dont_l_image_est_celle_attendue_est_accepte()
     {
         var (resultat, recues) = await JouerUnOpAsync(CeProcessus());

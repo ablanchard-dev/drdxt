@@ -2,6 +2,7 @@ using DrDxt.Core;
 using DrDxt.ElevatedHelper.Journal;
 using DrDxt.Reconciler.Desinstallation;
 using FluentAssertions;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ElevatedHelper.Tests;
 
@@ -33,7 +34,7 @@ public sealed class RejeuEnSerieTests : IDisposable
         }
     }
 
-    [Fact]
+    [FactAdmin]
     public async Task Une_App_relancee_qui_se_connecte_fait_rendre_ce_que_la_morte_a_laisse()
     {
         var journal = new JournalDEcritureAnticipee(Path.Combine(_dossier, "journal.json"));

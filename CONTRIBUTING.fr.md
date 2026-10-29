@@ -49,6 +49,12 @@ dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 
 Les tests `Category=Machine` lisent le vrai matériel ; ils tournent à la main, pas en CI.
 
+**Lance les tests depuis un terminal administrateur.** DrDXT lui-même a besoin des droits administrateur : son helper
+tourne élevé, donne son journal aux Administrateurs et ne fait confiance qu'à un tube qui leur appartient. Les tests qui
+le prouvent ne peuvent tourner qu'en élevé. Depuis un terminal normal, ils sont comptés *ignorés*, avec la raison, pas
+en échec. Ils restent obligatoires : la CI les joue toujours en administrateur, ne les saute jamais, et une pull
+request n'est verte qu'une fois qu'ils y passent.
+
 Pour voir l'App sans le matériel, un build Debug rejoue une machine enregistrée de `tests/Shared/machines` (une carte
 AMD, un portable sur batterie, un compte sans droits administrateur…) ; ses données vont dans un dossier jetable :
 

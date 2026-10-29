@@ -3,6 +3,7 @@ using DrDxt.ElevatedHelper.Journal;
 using DrDxt.Reconciler.Desinstallation;
 using FluentAssertions;
 using NSubstitute;
+using DrDxt.Tests.Shared;
 
 namespace DrDxt.ReconcilerHost.Tests;
 
@@ -25,7 +26,7 @@ public sealed class RejeuAuDemarrageTests : IDisposable
     }
 
     // Une lecture qui lève pendant le rejeu : le service démarre quand même, et le dit.
-    [Fact]
+    [FactAdmin]
     public async Task Un_rejeu_qui_leve_ne_retient_pas_le_demarrage()
     {
         var journal = new JournalDEcritureAnticipee(Path.Combine(_dossier, "journal.json"));
@@ -53,7 +54,7 @@ public sealed class RejeuAuDemarrageTests : IDisposable
 
     // Le service démarre aussi pendant une partie (tâche cochée à l'installation, récupération après un plantage, sc start) :
     // le rejeu attend la fin du jeu, comme la passe quotidienne du Worker, sans retenir le démarrage.
-    [Fact]
+    [FactAdmin]
     public async Task Un_jeu_lance_au_demarrage_du_service_retarde_le_rejeu_jusqu_a_sa_fin()
     {
         var journal = new JournalDEcritureAnticipee(Path.Combine(_dossier, "journal.json"));
@@ -86,7 +87,7 @@ public sealed class RejeuAuDemarrageTests : IDisposable
 
     // Le service voit un jeu par son seul nom de processus : un « cod.exe » qui ne finit jamais (lancé par n'importe quel
     // programme du compte) retiendrait le rejeu pour toujours sans plafond. Passé le plafond, le rejeu part quand même.
-    [Fact]
+    [FactAdmin]
     public async Task Un_jeu_qui_ne_finit_jamais_ne_retient_le_rejeu_que_jusqu_au_plafond()
     {
         var journal = new JournalDEcritureAnticipee(Path.Combine(_dossier, "journal.json"));
