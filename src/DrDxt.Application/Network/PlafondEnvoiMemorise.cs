@@ -7,14 +7,9 @@ namespace DrDxt.Application.Network;
 public sealed record PlafondEnvoiRetenu(string Exe, long PlafondBps, DateTimeOffset MesureLe);
 
 /// <summary>
-/// Le mode « proteger ton ping » survit a la fermeture de DrDXT.
-///
-/// Il vivait dans la memoire de l'appli : la fermer l'eteignait, la rouvrir ne le rallumait pas. Le clic
-/// du joueur est le consentement ; ce fichier le garde jusqu'a ce qu'il eteigne le mode.
-///
-/// Il vit sous %LOCALAPPDATA%, ecrivable par tout processus du compte. Ce qu'il porte repasse de toute
-/// facon par l'allowlist du helper (nom d'exe par regex, plafond borne) : le pire qu'un code du meme
-/// compte puisse en tirer est de brider son propre envoi.
+/// Le mode « proteger ton ping » survit a la fermeture de DrDXT : le clic du joueur est le consentement, ce fichier le
+/// garde jusqu'a ce qu'il eteigne le mode. Sous %LOCALAPPDATA%, ecrivable par tout processus du compte, mais repasse par
+/// l'allowlist du helper (nom d'exe par regex, plafond borne) : au pire, un code du compte bride son propre envoi.
 /// </summary>
 public sealed class PlafondEnvoiMemorise
 {

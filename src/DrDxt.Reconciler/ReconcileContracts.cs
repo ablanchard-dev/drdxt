@@ -26,15 +26,10 @@ public interface IElevatedReapplyClient
     Task<Result> ReapplyAsync(string tweakId, string desiredValueJson, CancellationToken ct);
 }
 
-/// <summary>Le compteur persisté d'issue des démarrages, derrière une couture (plan T27b). L'hôte
-/// marque tôt un démarrage « commencé » et « stable » après une fenêtre de session propre ; la
-/// garde lit la série pour décider si la réapplication des réglages GPU doit être suspendue.
-/// Abstrait pour que les tests unitaires mènent la série avec un faux.
-///
-/// Motif « homme mort » : MarkBootStarted incrémente la série avant la passe de réconciliation,
-/// MarkSessionStable la remet à 0 une fois l'hôte resté en marche un intervalle stable. Un
-/// démarrage qui n'atteint jamais une session stable laisse la série élevée ; ces démarrages
-/// consécutifs s'accumulent en une boucle de démarrage détectable.</summary>
+/// <summary>Le compteur persisté d'issue des démarrages, derrière une couture (plan T27b ; un faux en test). Motif
+/// « homme mort » : MarkBootStarted incrémente la série avant la passe de réconciliation, MarkSessionStable la remet à 0
+/// après un intervalle stable ; des démarrages sans session stable s'accumulent en une boucle que la garde détecte pour
+/// suspendre les réglages GPU.</summary>
 public interface IBootOutcomeStore
 {
     /// <summary>La série actuelle de démarrages non propres consécutifs.</summary>

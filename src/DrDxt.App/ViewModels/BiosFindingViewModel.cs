@@ -5,16 +5,10 @@ using DrDxt.Core;
 namespace DrDxt.App.ViewModels;
 
 /// <summary>
-/// Un constat du docteur BIOS, traduit et prêt à afficher dans les résultats du scan.
-///
-/// Les constats BIOS ne sont que du guidage : DrDXT n'écrit jamais le firmware (V1 = lire,
-/// guider, prouver). Le joueur change lui-même le réglage dans le BIOS ; ces constats ne sont
-/// jamais ajoutés au lot appliqué. Ce VM porte le titre honnête, la raison, le sens conseillé,
-/// une plage de gain sourcée avec sa réserve (jamais un % promis tout seul), et des drapeaux
-/// honnêtes :
+/// Un constat du docteur BIOS prêt à afficher : du guidage seul (DrDXT n'écrit jamais le firmware, jamais dans le lot
+/// appliqué). Titre, raison, sens conseillé, plage de gain sourcée avec sa réserve, et :
 ///   • <see cref="IsGuidanceOnly"/> : un changement à faire par le joueur dans le BIOS ;
-///   • <see cref="StateNotReadable"/> : l'état n'a pas pu être lu, on dit donc « à vérifier »
-///     au lieu d'affirmer un état faux (honnêteté).
+///   • <see cref="StateNotReadable"/> : état non lu, « à vérifier » plutôt qu'un état faux.
 /// </summary>
 public sealed class BiosFindingViewModel
 {

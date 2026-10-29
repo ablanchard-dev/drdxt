@@ -7,12 +7,8 @@ namespace DrDxt.Application.Tweaks.Hardware;
 // le levier de sous-tension. Critique pour la sécurité, sûr par construction :
 //   * Stable      seulement si la charge s'est terminée avec un périphérique sain,
 //   * Unstable    si le périphérique a été perdu (TDR) pendant la charge,
-//   * Inconclusive pour tout le reste : panne de la sonde, résultat inconnu ou exception.
-//                 Le levier de sous-tension traite Inconclusive comme « retour » : un test
-//                 de stabilité qui n'est pas sûr ne valide jamais une sous-tension.
-//
-// Ne lève jamais. La vraie charge GPU est l'IGpuLoadProbe injecté (vraie implémentation D3D11
-// dans Detection, validée par smoke test) ; cette orchestration est pure et testée.
+//   * Inconclusive pour tout le reste (panne de la sonde, résultat inconnu, exception) : traité comme « retour ».
+// Ne lève jamais. La charge est l'IGpuLoadProbe injecté (D3D11 dans Detection, smoke test) ; l'orchestration est pure.
 // -----------------------------------------------------------------------
 public sealed class GpuStabilityTester : IStabilityTester
 {

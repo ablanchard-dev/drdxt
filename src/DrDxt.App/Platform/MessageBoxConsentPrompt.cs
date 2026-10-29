@@ -5,16 +5,9 @@ using DrDxt.Core;
 namespace DrDxt.App.Platform;
 
 // -----------------------------------------------------------------------
-// MessageBoxConsentPrompt : le vrai IConsentPrompt.
-//
-// Demande à l'utilisateur (Oui/Non) s'il faut activer la Restauration du système quand elle
-// est coupée. Sert seulement dans ce cas ; si l'utilisateur refuse, le SafetyManager bloque
-// avec RESTORE_DECLINED (jamais d'avance sans point vérifié). Sans interface, la réponse par
-// défaut est non (refus au moindre doute). Ne lève jamais.
-//
-// La question et son titre viennent des ressources : c'est la seule question que DrDXT pose avant
-// de toucher la machine, et elle doit parler la langue de l'utilisateur. Écrits en dur, ils
-// échapperaient aussi aux gardes de ressources du dépôt, qui ne lisent que les `.resx`.
+// MessageBoxConsentPrompt : le vrai IConsentPrompt. Oui/Non pour activer la Restauration du système coupée ; refusé, le
+// SafetyManager bloque (RESTORE_DECLINED, jamais d'avance sans point vérifié). Sans interface, non. Ne lève jamais.
+// Question et titre viennent des ressources (la langue de l'utilisateur, et les gardes des `.resx`).
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class MessageBoxConsentPrompt(ILocalizer localizer) : IConsentPrompt

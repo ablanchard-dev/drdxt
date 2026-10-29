@@ -3,12 +3,8 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Latency;
 
 // -----------------------------------------------------------------------
-// Conditions matérielles partagées par les leviers de latence. Prédicats purs, sans effet
-// de bord, pour que le plancher NVIDIA Reflex et le plafond universel de file de rendu se
-// complètent et se testent à part.
-//
-// « GPU de rendu » = un GPU dédié qui rend vraiment le jeu. On écarte les GPU intégrés
-// (Intel UHD/Iris, iGPU des APU AMD) et les GPU mobiles verrouillés des portables.
+// Conditions matérielles des leviers de latence, prédicats purs testés à part. « GPU de rendu » = un GPU dédié qui rend
+// le jeu, ni intégré (Intel UHD/Iris, iGPU des APU AMD) ni mobile verrouillé de portable.
 // -----------------------------------------------------------------------
 internal static class LatencyGating
 {

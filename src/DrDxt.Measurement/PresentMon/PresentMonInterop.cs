@@ -2,17 +2,11 @@ using System.Runtime.InteropServices;
 
 namespace DrDxt.Measurement.PresentMon;
 
-// ============================================================
-// Couche de marshaling pour PresentMonAPI2.dll (v2.5.1, MIT).
-//
-// Les enums sont copiés mot pour mot, dans l'ordre, depuis
+// Couche de marshaling pour PresentMonAPI2.dll (v2.5.1, MIT). Les enums sont copiés mot pour mot, dans l'ordre, depuis
 //   third_party/presentmon/PresentMonAPI.h
-// jusqu'à la dernière valeur dont le produit se sert : les valeurs suivantes de l'en-tête n'y sont pas, et un statut
-// inconnu s'affiche par son nombre.
-// pour que les valeurs numériques correspondent exactement à l'ABI native. Demander la mauvaise
-// valeur de grandeur ferait lire le blob dans la mauvaise colonne et rendrait du déchet en
-// silence : l'en-tête est la source unique.
-// ============================================================
+// pour correspondre exactement à l'ABI native, jusqu'à la dernière valeur dont le produit se sert (un statut inconnu
+// s'affiche par son nombre). Une mauvaise valeur de grandeur lirait le blob dans la mauvaise colonne, en silence :
+// l'en-tête est la source unique.
 
 internal enum PM_STATUS
 {

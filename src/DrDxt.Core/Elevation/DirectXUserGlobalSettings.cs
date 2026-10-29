@@ -1,17 +1,11 @@
 namespace DrDxt.Core;
 
 // -----------------------------------------------------------------------
-// DirectXUserGlobalSettings : lit et fusionne la chaîne REG_SZ de Windows sous
-// HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings.
-//
-// Le format est une liste plate « clé=valeur;clé=valeur;... » (par exemple
-// "HighPerfAdapter=10DE&2684&...;VRROptimizeEnable=1;AutoHDREnable=1;SwapEffectUpgradeEnable=1").
-// Le VRR (VRROptimizeEnable) et le flip-model / les optimisations pour les jeux en fenêtré
-// (SwapEffectUpgradeEnable) partagent cette chaîne avec AutoHDREnable et d'autres : un levier
-// doit fusionner, poser seulement ses clés et garder toutes les autres (jamais écraser AutoHDR). Dans Core :
-// le levier, la relecture de l'App et le rendu de la désinstallation la partagent.
-//
-// Pur, sans E/S. Le premier '=' sépare la clé de la valeur (une valeur peut contenir '=' / '&').
+// DirectXUserGlobalSettings : lit et fusionne la chaîne REG_SZ
+// HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings, une liste « clé=valeur;… »
+// ("HighPerfAdapter=10DE&2684&...;VRROptimizeEnable=1;AutoHDREnable=1;SwapEffectUpgradeEnable=1"). VRROptimizeEnable et
+// SwapEffectUpgradeEnable la partagent avec AutoHDREnable : un levier ne pose que ses clés, jamais écraser AutoHDR. Dans
+// Core pour le levier, la relecture de l'App et la désinstallation. Pur ; le premier '=' sépare clé et valeur.
 // -----------------------------------------------------------------------
 public static class DirectXUserGlobalSettings
 {

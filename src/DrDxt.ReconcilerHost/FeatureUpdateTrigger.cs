@@ -17,16 +17,10 @@ public interface IUpdateSignal
     Task<Result<bool>> RecentSetupCompletionAsync(CancellationToken ct);
 }
 
-// -----------------------------------------------------------------------
-// FeatureUpdateTrigger : compose le détecteur de build principal avec le signal d'événement de
-// confirmation.
-//
-// Se déclenche quand l'un ou l'autre dit « mise à jour ». Le principal fait autorité : si la
-// lecture du build échoue, le déclencheur échoue (un build inconnu ne doit pas passer en silence
-// pour « pas de mise à jour »). La lecture de confirmation est au mieux : un échec de son côté ne
-// masque jamais une mise à jour principale prouvée et n'en fabrique jamais ; elle ne fait
-// qu'ajouter un déclenchement précoce quand elle se lit et dit « oui ».
-// -----------------------------------------------------------------------
+// FeatureUpdateTrigger : le détecteur de build principal et le signal d'événement de confirmation ; l'un ou l'autre
+// déclenche. Le principal fait autorité : sa lecture ratée fait échouer le déclencheur (un build inconnu ne passe pas
+// pour « pas de mise à jour »). La confirmation est au mieux : son échec ne masque ni ne fabrique rien, elle ajoute
+// seulement un déclenchement précoce quand elle dit « oui ».
 public sealed class FeatureUpdateTrigger
 {
     private readonly FeatureUpdateDetector _buildDetector;

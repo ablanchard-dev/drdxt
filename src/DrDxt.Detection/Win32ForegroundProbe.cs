@@ -5,15 +5,10 @@ using DrDxt.Core;
 namespace DrDxt.Detection;
 
 /// <summary>
-/// Qui est au premier plan, lu a la source : <c>GetForegroundWindow</c> puis le PID de sa fenetre.
-///
-/// Deux API, aucune elevation, aucun hook, aucune injection : c'est une lecture d'etat que Windows
-/// expose a tout le monde. C'est precisement ce qui la rend utilisable dans un jeu protege.
-///
-/// Rend <c>null</c> plutot que de deviner : pas de fenetre au premier plan (bureau verrouille,
-/// transition d'ecran, session distante en train de basculer) ou PID nul. Le contrat de
-/// <see cref="FocusObservation"/> compte ces lectures comme inconnues, ni pour ni contre : les
-/// traiter comme une perte de focus invaliderait des passes parfaitement bonnes.
+/// Qui est au premier plan, lu a la source : <c>GetForegroundWindow</c> puis le PID de sa fenetre. Deux API, aucune
+/// elevation, aucun hook, aucune injection : utilisable dans un jeu protege. <c>null</c> sans fenetre au premier plan
+/// (bureau verrouille, transition d'ecran, session distante qui bascule) ou PID nul : inconnu pour
+/// <see cref="FocusObservation"/>, jamais une perte de focus.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class Win32ForegroundProbe : IForegroundProbe

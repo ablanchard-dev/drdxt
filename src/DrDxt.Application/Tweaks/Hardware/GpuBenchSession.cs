@@ -4,14 +4,10 @@ using DrDxt.Measurement;
 namespace DrDxt.Application.Tweaks.Hardware;
 
 // -----------------------------------------------------------------------
-// Le compteur de performance GPU déterministe. GpuBench transforme une passe en score de
-// débit comparable ; ceci la lance N fois et agrège les scores en une moyenne + une marge
-// entre passes, pour qu'un A/B origine contre décalage ait une vraie barre d'erreur (jamais
-// une supposition sur une seule passe). La charge étant identique d'une passe à l'autre,
-// seuls l'horloge et le débit du GPU font bouger le score : aucun bruit de carte ni de scène
-// (raison pour laquelle on ne se fie pas au jeu brut pour les leviers GPU). La marge reprend
-// la statistique de l'A/B des frametimes (FrametimeStatistics.InterRunMarginOfError : +Infinity
-// sous 3 passes = « non prouvable »), pour que les deux chemins de preuve restent cohérents.
+// Le compteur de performance GPU déterministe : GpuBench lancé N fois, une moyenne et une marge entre passes, pour une
+// vraie barre d'erreur sur l'A/B origine contre décalage. Charge identique : seuls l'horloge et le débit du GPU font
+// bouger le score, sans bruit de scène. La marge est celle des frametimes (FrametimeStatistics.InterRunMarginOfError,
+// +Infinity sous 3 passes).
 // -----------------------------------------------------------------------
 
 /// <summary>Agrégat de N passes déterministes du banc : le score de débit moyen, sa marge à

@@ -2,9 +2,7 @@ using System.Diagnostics;
 using System.Security.Principal;
 using DrDxt.Lanceur;
 
-// -----------------------------------------------------------------------
 // DrDxt.Lanceur — l'exécutable natif qui reçoit l'élévation.
-//
 //   DrDxt.Lanceur.exe <DrDxt.ElevatedHelper.exe | DrDxt.App.exe | DrDXT-Test.exe> [arguments du programme]
 //
 // 1. Pas élevé : se relance lui-même avec le verbe « runas » (l'invite Windows porte ce programme) et s'arrête.
@@ -12,7 +10,6 @@ using DrDxt.Lanceur;
 //    reconstruit (EnvironnementPropre) et sans fenêtre, puis s'arrête sans attendre. Le fils hérite du jeton
 //    élevé : aucune seconde invite.
 // Codes de sortie : 0 lancé, 2 usage, 3 programme absent, 1223 élévation refusée, 1 autre échec.
-// -----------------------------------------------------------------------
 internal static class Program
 {
     private const int ElevationRefusee = 1223;

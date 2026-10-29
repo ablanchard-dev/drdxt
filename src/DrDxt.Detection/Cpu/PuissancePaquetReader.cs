@@ -3,16 +3,10 @@ using DrDxt.Detection.Wmi;
 namespace DrDxt.Detection.Cpu;
 
 /// <summary>
-/// La puissance du paquet processeur, telle que Windows la publie (compteur
-/// « Energy Meter », instance RAPL du paquet). Lue par la classe CIM et non par le nom du
-/// compteur : le nom est traduit (« Compteur Énergie » sur un Windows français), la classe non.
-///
-/// Mesure du jour sur la machine de reference, Warzone en partie : 66,5 W plats sur un
-/// i7-14700F dont la Base Power est de 65 W. C'est ce chiffre qui a montre que la limite longue
-/// du BIOS plafonnait les cœurs a 4,0 GHz ; aucun indicateur de Windows ne le montrait.
-///
-/// <c>null</c> quand le compteur n'existe pas (toutes les machines ne l'exposent pas) : jamais
-/// une valeur inventee.
+/// La puissance du paquet processeur que Windows publie (« Energy Meter », instance RAPL du paquet), lue par la classe CIM
+/// car le nom du compteur est traduit (« Compteur Énergie »). Mesure sur la machine de reference, Warzone en partie :
+/// 66,5 W plats sur un i7-14700F de Base Power 65 W, la preuve que la limite longue du BIOS plafonnait les cœurs a
+/// 4,0 GHz, ce qu'aucun indicateur de Windows ne montrait. <c>null</c> sans compteur.
 /// </summary>
 public static class PuissancePaquetReader
 {

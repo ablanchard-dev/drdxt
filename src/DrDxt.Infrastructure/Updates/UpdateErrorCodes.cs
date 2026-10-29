@@ -1,14 +1,8 @@
 namespace DrDxt.Infrastructure.Updates;
 
-// -----------------------------------------------------------------------
-// Codes d'erreur de mise à jour. Locaux au module, dans un espace de noms pour que les littéraux
-// ne soient jamais éparpillés (même convention que ReconcilerErrorCodes). Ce
-// sont des codes (lisibles par machine), jamais du texte d'interface.
-//
-// La règle cardinale de tout le chemin de mise à jour : un paquet est vérifié (signature puis
-// empreinte) avant que quoi que ce soit soit exécuté ou qu'un fichier soit remplacé.
-// Jamais fail-open : toute incertitude garde la version installée actuelle.
-// -----------------------------------------------------------------------
+// Codes d'erreur de mise à jour, locaux au module (même convention que ReconcilerErrorCodes) : des codes lisibles par
+// machine, jamais du texte d'interface. Règle du chemin : un paquet est vérifié (signature puis empreinte) avant toute
+// exécution ou tout remplacement de fichier ; jamais fail-open, toute incertitude garde la version installée.
 public static class UpdateErrorCodes
 {
     // La signature Ed25519 sur le manifeste canonique ne se vérifie pas : signature altérée, champs

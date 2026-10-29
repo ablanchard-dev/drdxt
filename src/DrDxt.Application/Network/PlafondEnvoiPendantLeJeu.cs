@@ -3,17 +3,11 @@ using DrDxt.Core;
 namespace DrDxt.Application.Network;
 
 /// <summary>
-/// Le plafond d'envoi, pose tout seul quand le jeu tourne et retire quand il se ferme.
-///
-/// Consentement : ce mode n'existe que si le joueur l'a allume, et seulement apres qu'un scan a
-/// mesure son bufferbloat (le plafond vient de ce verdict, jamais d'une valeur par defaut).
-///
-/// Filet de securite, et il ne depend pas de cette classe : un bail du helper est ouvert au
-/// demarrage du mode, avec pour inverse <see cref="RemoveUploadCapOp"/>, et renouvele a chaque
-/// battement. Si l'application meurt pendant la partie, le bail expire et le helper retire le
-/// plafond lui-meme. Un bail pour toute la duree du mode, pas un par partie : un bail de la
-/// partie precedente qui expirerait pendant la suivante retirerait le plafond en plein jeu.
-/// Sans compter qu'un redemarrage efface de toute facon les politiques (ActiveStore).
+/// Le plafond d'envoi, pose quand le jeu tourne et retire quand il se ferme, seulement si le joueur l'a allume et apres
+/// qu'un scan a mesure son bufferbloat (le plafond vient de ce verdict, jamais d'un defaut). Filet independant de cette
+/// classe : un bail du helper, inverse <see cref="RemoveUploadCapOp"/>, renouvele a chaque battement ; l'application
+/// morte, le helper retire le plafond. Un bail pour tout le mode, pas un par partie (celui d'avant expirerait en pleine
+/// partie suivante). Un redemarrage efface de toute facon les politiques (ActiveStore).
 /// </summary>
 public sealed class PlafondEnvoiPendantLeJeu
 {

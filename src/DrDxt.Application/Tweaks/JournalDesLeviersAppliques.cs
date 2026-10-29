@@ -4,13 +4,9 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks;
 
 /// <summary>
-/// Ce que DrDXT a applique et garde, cote utilisateur (sans elevation).
-///
-/// Le manifeste signe ne porte que les leviers que le service reapplique au demarrage. Les
-/// autres (Game DVR, Game Mode, VRR dans la ruche de l'utilisateur, leviers pilote) ne seraient
-/// notes nulle part, et `GainsDisparus` ne pourrait pas etre appele faute de snapshots. Ce
-/// journal les garde, un par levier (le plus recent l'emporte), pour que le scan suivant
-/// remarque un gain defait, sans jamais le reecrire.
+/// Ce que DrDXT a applique et garde, cote utilisateur (sans elevation), un snapshot par levier (le plus recent
+/// l'emporte), y compris ceux que le service ne reapplique pas (Game DVR, Game Mode, VRR en HKCU, leviers pilote) : le
+/// scan suivant (`GainsDisparus`) remarque un gain defait, sans jamais le reecrire.
 /// </summary>
 public sealed class JournalDesLeviersAppliques
 {

@@ -4,14 +4,9 @@ using DrDxt.Core;
 namespace DrDxt.Measurement.Network;
 
 /// <summary>
-/// Les pertes a l'interface, pendant une fenetre : un constat reseau du scan de l'App.
-///
-/// Remonte de `tools/repairaudit` : l'outil
-/// et l'App classent la meme fenetre de la meme facon. Dans l'App, la fenetre est celle de la mesure en
-/// jeu du scan : c'est la carte pendant une partie, pas une carte au repos.
-///
-/// Ceci mesure la carte (cable, port, pilote qui jette des trames) et non la route : un lien peut
-/// pinguer parfaitement en perdant des paquets a l'interface.
+/// Les pertes a l'interface pendant une fenetre, classees comme dans `tools/repairaudit` : dans l'App, la fenetre de
+/// mesure en jeu du scan (la carte en partie, pas au repos). La carte (cable, port, pilote qui jette des trames), pas la
+/// route : un lien peut pinguer parfaitement en perdant des paquets a l'interface.
 /// </summary>
 public static class PertesInterface
 {

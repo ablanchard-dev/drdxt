@@ -3,17 +3,10 @@ using NSec.Cryptography;
 
 namespace DrDxt.Reconciler.Manifest;
 
-// -----------------------------------------------------------------------
-// Signature / vérification Ed25519 derrière les coutures IManifestSigner / IManifestVerifier
-// (Ed25519 par NSec). Ed25519 n'est pas dans la BCL .NET : la bibliothèque retenue par le projet
-// (NSec / libsodium) le fournit.
-//
-// Tout l'intérêt est l'asymétrie : un Verifier se construit à partir de la seule clé publique et
-// ne peut que vérifier ; un Signer tient la clé privée et ne peut que signer. L'hôte
-// réconciliateur / de vérification reçoit un Verifier : il ne peut pas falsifier, car il n'a pas
-// la clé privée (et ne la reçoit jamais par injection). C'est exactement pourquoi un MAC
-// symétrique / DPAPI est refusé : le propriétaire pourrait redériver la clé.
-// -----------------------------------------------------------------------
+// Signature / vérification Ed25519 derrière IManifestSigner / IManifestVerifier, par NSec / libsodium (Ed25519 n'est pas
+// dans la BCL .NET). L'asymétrie fait tout : un Verifier, construit sur la seule clé publique, ne fait que vérifier ;
+// l'hôte réconciliateur n'en reçoit qu'un, jamais la clé privée. D'où le refus d'un MAC symétrique / DPAPI : le
+// propriétaire pourrait redériver la clé.
 
 /// <summary>Vérificateur Ed25519 : ne tient que la clé publique de 32 octets. Verify est total :
 /// toute signature malformée ou de mauvaise longueur rend false (fail-closed), jamais d'exception.</summary>

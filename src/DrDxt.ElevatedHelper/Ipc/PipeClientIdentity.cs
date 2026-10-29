@@ -4,14 +4,8 @@ using System.Runtime.Versioning;
 
 namespace DrDxt.ElevatedHelper.Ipc;
 
-// -----------------------------------------------------------------------
-// PipeClientIdentity : résout le process id du client connecté au pipe.
-//
-// Sécurité : le serveur s'en sert (après l'acceptation d'une connexion) pour construire le
-// CallerInfo que vérifie l'authentificateur. GetNamedPipeClientProcessId est le moyen documenté
-// d'attribuer une connexion de pipe à un processus. Tout échec rend null → l'authentificateur
-// refuse (fail-closed).
-// -----------------------------------------------------------------------
+// PipeClientIdentity : le process id du client connecté au pipe, par GetNamedPipeClientProcessId (le moyen documenté),
+// pour le CallerInfo que vérifie l'authentificateur. Tout échec rend null → refus (fail-closed).
 [SupportedOSPlatform("windows")]
 public static class PipeClientIdentity
 {

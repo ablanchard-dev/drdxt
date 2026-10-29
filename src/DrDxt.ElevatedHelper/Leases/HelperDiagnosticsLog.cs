@@ -3,16 +3,9 @@ using DrDxt.Core;
 
 namespace DrDxt.ElevatedHelper.Leases;
 
-// -----------------------------------------------------------------------
-// HelperDiagnosticsLog : un IDiagnosticsLog minimal et autonome, pour l'usage propre du helper
-// élevé (le chien de garde des baux y journalise les retours automatiques).
-//
-// Exprès sans référence à DrDxt.Infrastructure.DiagnosticsLog : le helper élevé (la surface de
-// risque n°1) ne référence que Core ; le journal reste donc un petit ajout au fichier, au mieux,
-// au lieu de tirer Infrastructure dans le processus élevé. Un échec d'écriture (disque plein,
-// ACL) est avalé : le journal est une trace d'audit secondaire et ne doit jamais interrompre ni
-// faire planter le helper.
-// -----------------------------------------------------------------------
+// HelperDiagnosticsLog : un IDiagnosticsLog minimal pour le helper élevé (le chien de garde des baux y journalise les
+// retours automatiques), sans DrDxt.Infrastructure : le helper, la surface de risque n°1, ne référence que Core. Un
+// échec d'écriture (disque plein, ACL) est avalé : une trace d'audit secondaire n'interrompt jamais le helper.
 public sealed class HelperDiagnosticsLog : IDiagnosticsLog
 {
     private const string DateFormat = "yyyy-MM-ddTHH:mm:ssZ";

@@ -6,16 +6,9 @@ using Microsoft.Win32;
 
 namespace DrDxt.Reconciler.Adapters;
 
-// -----------------------------------------------------------------------
-// Les trois coutures de lecture OS brutes derrière SurfaceSettingProbe, avec leurs vraies
-// implémentations minces. L'aiguillage et la sérialisation canonique de la sonde sont testés
-// avec des faux de ces coutures ; les vrais lecteurs ci-dessous sont les seuls bords non testés
-// (chacun touche une seule frontière OS et emballe toute exception dans un Result).
-//
-// Chaque lecteur rend la valeur déjà canonicalisée (via ReconcilableValueCanonicalizer) : la
-// sonde n'a jamais à connaître la représentation brute de la surface, et la valeur correspond à
-// l'octet près au DesiredValueJson du manifeste.
-// -----------------------------------------------------------------------
+// Les trois coutures de lecture OS brutes derrière SurfaceSettingProbe et leurs implémentations minces, seuls bords non
+// testés (une frontière OS chacun, toute exception dans un Result) ; la sonde est testée avec des faux. Chaque lecteur
+// rend la valeur canonicalisée (ReconcilableValueCanonicalizer), égale à l'octet près au DesiredValueJson du manifeste.
 
 /// <summary>Lit une seule valeur de registre décrite par un <see cref="RegistryDescriptor"/> et
 /// rend sa chaîne canonique. Clé ou valeur absente, ou erreur de lecture → Fail.</summary>

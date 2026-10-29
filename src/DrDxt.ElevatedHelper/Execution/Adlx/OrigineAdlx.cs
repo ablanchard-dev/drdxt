@@ -6,9 +6,9 @@ using Microsoft.Win32;
 namespace DrDxt.ElevatedHelper.Execution.Adlx;
 
 /// <summary>
-/// L'origine de la MaxFreq d'une carte AMD, gardée d'un démarrage à l'autre. Retenue seulement par démarrage, elle suivait
-/// la valeur que DrDXT avait posée si le pilote la garde au redémarrage : +100 MHz par démarrage, jusqu'au plafond
-/// d'overclock du pilote. Chaque carte (identifiée par ses identifiants PNP) garde dans
+/// L'origine de la MaxFreq d'une carte AMD, gardée d'un démarrage à l'autre : retenue par démarrage seulement, elle
+/// suivrait la valeur posée par DrDXT quand le pilote la garde (+100 MHz par démarrage, jusqu'au plafond d'overclock du
+/// pilote). Chaque carte (identifiée par ses identifiants PNP) garde dans
 /// <c>HKLM\SOFTWARE\DrDXT\Helper\AdlxOrigine</c> son origine et la dernière valeur que DrDXT y a écrite. Au premier passage
 /// d'un démarrage, une MaxFreq lue égale à cette dernière valeur garde l'origine ; une autre (le joueur l'a réglée dans AMD
 /// Software, ou le pilote l'a remise à l'usine) devient la nouvelle origine. La clé ne s'écrit qu'en administrateur, et la

@@ -1,13 +1,9 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// Le dossier des donnees de DrDXT (%LOCALAPPDATA%\DrDXT), en un seul endroit.
-///
-/// Douze fichiers le recalculaient chacun a la main. Au-dela de la repetition, c'etait un obstacle a la
-/// preuve : photographier l'appli en build de developpement lancait un vrai scan qui ecrivait dans les
-/// donnees du joueur (references memoire et processeur, journal). En DEBUG seulement, la variable
-/// <see cref="VariableDeDeveloppement"/> redirige le dossier vers un chemin absolu jetable. Une version
-/// publiee (Release) ne la lit jamais : pas de nouvelle facon de deplacer les donnees d'un joueur.
+/// Le dossier des donnees de DrDXT (%LOCALAPPDATA%\DrDXT), en un seul endroit. En DEBUG seulement,
+/// <see cref="VariableDeDeveloppement"/> le redirige vers un chemin absolu jetable, pour qu'un scan de developpement
+/// n'ecrive pas dans les donnees du joueur ; une version publiee (Release) ne la lit jamais.
 /// </summary>
 public static class DossierDonnees
 {

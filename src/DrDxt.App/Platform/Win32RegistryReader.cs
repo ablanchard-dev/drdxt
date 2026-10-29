@@ -6,12 +6,8 @@ using Microsoft.Win32;
 namespace DrDxt.App.Platform;
 
 // -----------------------------------------------------------------------
-// Win32RegistryReader : le vrai IRegistryReader (lecture seule).
-//
-// Lit un DWORD via Microsoft.Win32.Registry. Une clé ou une valeur manquante donne le
-// résultat propre « absent » (Ok(null)), que les leviers savent déjà traiter (leur
-// « origine » est alors l'absence). Une vraie erreur de lecture → Fail(TWEAK.SDK_UNAVAILABLE).
-// Ne lève jamais. Aucune écriture ici : les écritures passent par le helper élevé.
+// Win32RegistryReader : le vrai IRegistryReader, lecture seule (les écritures passent par le helper). Clé ou valeur
+// manquante → Ok(null), une origine absente pour les leviers ; vraie erreur → Fail(TWEAK.SDK_UNAVAILABLE).
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class Win32RegistryReader : IRegistryReader

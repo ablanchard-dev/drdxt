@@ -3,12 +3,8 @@
 namespace DrDxt.App.ViewModels;
 
 /// <summary>
-/// Un constat d'audit (<see cref="RepairAuditService"/>), pret a afficher : c'est par lui que
-/// l'audit de sante arrive a l'ecran.
-///
-/// Ce VM ne juge pas : le tri appartient a <see cref="RepairTriage"/>, la contrainte
-/// statut/action au constructeur de <see cref="RepairFinding"/>. Ici on ne fait que mettre en
-/// forme ; sinon la regle vivrait a deux endroits et divergerait au premier ajout.
+/// Un constat d'audit (<see cref="RepairAuditService"/>) pret a afficher. Il ne juge pas : le tri est a
+/// <see cref="RepairTriage"/>, la contrainte statut/action au constructeur de <see cref="RepairFinding"/>.
 /// </summary>
 public sealed class RepairFindingViewModel
 {

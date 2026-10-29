@@ -3,16 +3,10 @@ using DrDxt.Core;
 namespace DrDxt.Infrastructure.Updates;
 
 /// <summary>
-/// Le paquet de confiance de production des mises a jour.
-///
-/// Verifier avec <see cref="UpdateDevKeys.UpdatePublicKey"/>, une clef dont la graine privee est
-/// dans le depot, permettrait a quiconque a lu le depot de signer un manifeste que l'App
-/// accepterait, des qu'une URL de serveur existe. Un commentaire « la clef publique est remplacee a
-/// la release » ne serait qu'un rappel ; ceci bloque.
-///
-/// Regle : sans clef de production, aucun montage ; et la clef de dev est refusee meme si elle est
-/// posee ici par erreur. L'URL du serveur, cette clef et les empreintes SPKI changent ensemble, dans un
-/// seul commit, le jour du deploiement.
+/// Le paquet de confiance de production des mises a jour. <see cref="UpdateDevKeys.UpdatePublicKey"/> a sa graine privee
+/// dans le depot : verifier avec elle laisserait quiconque a lu le depot signer un manifeste accepte. Sans clef de
+/// production, aucun montage ; la clef de dev est refusee meme posee ici par erreur. L'URL du serveur, cette clef et les
+/// empreintes SPKI changent ensemble, dans un seul commit, le jour du deploiement.
 /// </summary>
 public static class UpdateTrust
 {

@@ -1,14 +1,9 @@
 namespace DrDxt.Application.Tweaks.Gpu;
 
 // -----------------------------------------------------------------------
-// GpuTuningTarget : les valeurs de réglage GPU qu'un levier doit poser.
-//
-// Ici, une « sous-tension » est un petit décalage négatif de l'horloge cœur (MHz). Ces
-// valeurs restent soumises au bornage et au filtrage de GpuSafeBounds avant d'atteindre le
-// helper : la cible est une demande, pas une autorisation.
-//
-// En production, elles viennent d'un profil de puce ; dans les tests, elles sont injectées
-// pour que le levier reste pur et testable.
+// GpuTuningTarget : les valeurs de réglage GPU qu'un levier pose (une « sous-tension » = un petit décalage négatif de
+// l'horloge cœur, en MHz), venues d'un profil de puce ou des tests. Bornées par GpuSafeBounds avant le helper : une
+// demande, pas une autorisation.
 // -----------------------------------------------------------------------
 public sealed record GpuTuningTarget(int GpuIndex, int CoreOffsetMhz, int MemoryOffsetMhz);
 

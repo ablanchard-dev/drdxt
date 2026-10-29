@@ -4,14 +4,10 @@ namespace DrDxt.Detection.Wmi;
 
 /// <summary>
 /// Rejoue une lecture WMI qui a leve. Rien d'autre.
-/// Mesure du 09/09 : sur des passes d'audit consecutives, toute la famille RAM et la carte
-/// reseau ont disparu puis sont revenues sans qu'une ligne change. La panne est dans la
-/// lecture, pas dans la machine. Un client qui lance deux audits a une minute d'ecart ne
-/// doit pas voir une famille entiere apparaitre et disparaitre.
-/// Ce qu'il s'interdit : rejouer une lecture reussie mais vide. Zero ligne est une reponse
-/// de la machine, pas une panne ; la rejouer fabriquerait une difference entre deux passes
-/// identiques, c'est-a-dire exactement le defaut qu'on repare. Ni un delai depasse (WmiTimeout) :
-/// winmgmt fige, le rejouer doublerait l'attente et laisserait un second fil bloque.
+/// Mesure du 09/09 : sur des passes d'audit consecutives, toute la famille RAM et la carte reseau ont disparu puis sont
+/// revenues sans qu'une ligne change ; la panne est dans la lecture, pas dans la machine.
+/// Jamais rejouee : une lecture reussie mais vide (zero ligne est une reponse, la rejouer fabriquerait une difference
+/// entre deux passes identiques), ni un delai depasse (WmiTimeout : winmgmt fige, l'attente doublerait).
 /// </summary>
 public sealed class RetryingWmiQuery(IWmiQuery inner, int attempts = 2, TimeSpan? delay = null) : IWmiQuery
 {

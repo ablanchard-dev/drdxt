@@ -5,12 +5,10 @@ namespace DrDxt.Detection.Hardware;
 /// <summary>
 /// Ce que le Gestionnaire de périphériques marque d'un point d'exclamation, et ce que
 /// chaque code veut dire. Source des codes et de leurs noms : Microsoft, « Device Manager Error
-/// Messages » (learn.microsoft.com/windows-hardware/drivers/install/device-manager-error-messages).
-///
-/// Ce qui a decide du tri, mesure le meme jour sur la machine de reference : ses trois peripheriques
-/// « en erreur » sont en **code 22**, des profils Bluetooth mains libres de casques, desactives.
-/// Beaucoup de joueurs les coupent exprès pour que le casque ne bascule pas en qualite telephone.
-/// Un docteur qui les appellerait pannes mentirait : le code decide du statut, pas sa presence.
+/// Messages » (learn.microsoft.com/windows-hardware/drivers/install/device-manager-error-messages). Le code decide du
+/// statut, pas la presence : sur la machine de reference, les trois peripheriques « en erreur » sont en **code 22**, des
+/// profils Bluetooth mains libres de casques desactives (souvent coupes expres, pour que le casque ne bascule pas en
+/// qualite telephone).
 /// </summary>
 public static class PeripheriquesEnErreur
 {

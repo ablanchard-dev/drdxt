@@ -11,9 +11,8 @@ namespace DrDxt.Detection.Cpu;
 /// (0x1B1, bits 22:16 = écart sous TjMax). Température = TjMax − écart. Source : Intel SDM vol. 4. AMD : Tctl par
 /// <see cref="LecturesAmd"/>, seulement sur une génération validée en vie (LecturesAmdProfondes.ValideesEnVie).
 ///
-/// La frontière native (modules, poignées, lecture et écriture) vit dans <see cref="PawnIoIntel"/>, dans
-/// le projet natif commun, parce que le helper élevé écrit la limite de puissance par le même chemin. Ici ne restent que
-/// les décodages vers les contrats du cœur.
+/// La frontière native vit dans <see cref="PawnIoIntel"/> (projet natif commun, le chemin du helper pour la limite de
+/// puissance) ; ici, les décodages seulement.
 /// </summary>
 public static class TemperaturePawnIo
 {

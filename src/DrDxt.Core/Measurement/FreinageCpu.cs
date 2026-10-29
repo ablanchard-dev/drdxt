@@ -1,17 +1,16 @@
 namespace DrDxt.Core;
 
 /// <summary>
-/// La température seule a trompé deux soirs de suite. Le
-/// registre du paquet (0x1B1) donne le cœur le plus chaud, pas tout le processeur : à 98 °C lus, le cœur 0 était à 77 °C
-/// (écart moyen 15 °C). Et ce qui freinait vraiment un soir n'était pas la chaleur mais la limite de courant (bit 12 de
-/// 0x19C, 544 s sur 966). Une seconde du processeur porte donc les deux températures et ses quatre raisons de freiner.
+/// Une seconde du processeur : deux températures et quatre raisons de freiner, car la température seule trompe. Relevé sur
+/// la machine de référence : le paquet (0x1B1) donne le cœur le plus chaud (98 °C lus, cœur 0 à 77 °C, écart moyen
+/// 15 °C), et un soir le frein était la limite de courant (bit 12 de 0x19C, 544 s sur 966), pas la chaleur.
 /// Source : Intel SDM vol. 4, IA32_THERM_STATUS (0x19C) et IA32_PACKAGE_THERM_STATUS (0x1B1) ; bits de statut (l'instant),
 /// pas les journaux collants (1, 3, 11, 13). Le bit 10 du cœur dit « sous la fréquence demandée, pour
 /// toute raison » ; seul celui du paquet dit « par la limite de puissance » : c'est lui qui fait <see cref="LimiteW"/>.
-/// PROCHOT (bit 2) = un signal venu d'ailleurs (VRM, carte), pas la chaleur des cœurs.
+/// PROCHOT (bit 2) = un signal venu d'ailleurs (VRM, carte), pas la chaleur des cœurs. <paramref name="VentiloCpu"/> : le
+/// ventilateur du processeur à la même seconde (puce Super I/O) ; <paramref name="Ventilateurs"/> : tous ceux de la carte
+/// (demande 23) ; null si non lus.
 /// </summary>
-/// <paramref name="VentiloCpu"/>, le ventilateur du processeur à la même seconde (puce Super I/O), null si non lu.
-/// Et <paramref name="Ventilateurs"/>, tous ceux de la carte à la même seconde (demande 23), null si non lus.
 public sealed record EtatCpu(int ChaudC, int? Coeur0C, bool Chaleur, bool Prochot, bool LimiteW, bool LimiteCourant,
     VentilateurLu? VentiloCpu = null, IReadOnlyList<VentilateurLu>? Ventilateurs = null)
 {

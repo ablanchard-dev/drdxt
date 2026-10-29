@@ -1,13 +1,6 @@
-// -----------------------------------------------------------------------
-// Hôte réconciliateur DrDXT : point d'entrée (coquille mince).
-//
-// Toute la logique vit dans les classes testées (ReconcileTickService / SingleFlightReconcile
-// / FeatureUpdateTrigger / BootSessionMarker / Worker). Ce fichier ne fait que :
-//   * construire l'hôte générique,
-//   * l'enregistrer pour tourner comme service Windows (UseWindowsService),
-//   * brancher tout le graphe DI de production (AddDrDxtReconcilerHost),
-//   * le lancer.
-// -----------------------------------------------------------------------
+// Hôte réconciliateur DrDXT : point d'entrée, coquille mince. La logique vit dans les classes testées
+// (ReconcileTickService, SingleFlightReconcile, FeatureUpdateTrigger, BootSessionMarker, Worker) ; ici, l'hôte générique
+// en service Windows (UseWindowsService), le graphe DI de production (AddDrDxtReconcilerHost), et le lancement.
 using DrDxt.ReconcilerHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

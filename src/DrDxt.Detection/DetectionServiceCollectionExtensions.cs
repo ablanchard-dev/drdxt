@@ -34,15 +34,11 @@ public static class DetectionServiceCollectionExtensions
 
         // Composed services
         services.TryAddSingleton<IHardwareDetector, HardwareDetector>();
-        // Cablage par convention : SettingsStateReader porte INvApi, IDisplayInfo et le lecteur d'arrets brutaux en
-        // parametres optionnels, et l'injection .NET honore leur valeur par defaut quand ils ne sont pas enregistres
-        // (DetectionDiTests). Non enregistre = champ null = jamais lu, ce qui reste une reponse honnete.
-        // Le lecteur d'ecrans appartient ici, et non a la seule couche app : sinon tout ce qui monte
-        // ce conteneur (sondes, tests d'integration) lirait `AttachedRefreshHz = null` et se tairait sur la
-        // consommation au repos. G-Sync se lit au pilote (NVAPI, lecture non elevee) : enregistre par type, le lecteur
-        // prendrait son constructeur sans NVAPI et dirait « VRR non lisible » alors que le pilote repond. FreeSync ne se
-        // lit que si l'hote enregistre IAdlxNative, ce que ce conteneur ne fait pas. Fabriques explicites, TryAdd :
-        // l'enregistrement de l'App reste prioritaire s'il passe en premier.
+        // SettingsStateReader prend INvApi, IDisplayInfo et le lecteur d'arrets brutaux en parametres optionnels : non
+        // enregistres, null = jamais lu (DetectionDiTests). Le lecteur d'ecrans est ici pour tout ce qui monte ce conteneur
+        // (sinon `AttachedRefreshHz = null`). Fabrique explicite avec NVAPI : par type, il prendrait le constructeur sans
+        // NVAPI et dirait G-Sync « non lisible ». FreeSync demande IAdlxNative, enregistre par l'hote. TryAdd : l'App passe
+        // en premier si elle s'enregistre avant.
         services.TryAddSingleton<DrDxt.GpuNative.NvApi.INvApiNative>(_ => new DrDxt.GpuNative.NvApi.NvApiNative());
         services.TryAddSingleton<DrDxt.Application.Tweaks.Hardware.IDisplayInfo>(sp => new Display.EcransEnCache(
             new Display.Win32DisplayInfo(sp.GetService<DrDxt.GpuNative.NvApi.INvApiNative>(),

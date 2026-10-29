@@ -5,16 +5,9 @@ using System.Text.Json.Serialization;
 
 namespace DrDxt.ElevatedHelper.Ipc;
 
-// -----------------------------------------------------------------------
-// Tramage JSON préfixé par sa longueur sur le flux du pipe.
-//
-// Chaque message = un préfixe de longueur de 4 octets big-endian suivi d'exactement autant
-// d'octets JSON UTF-8. Le préfixe est borné (MaxMessageBytes) pour qu'un pair hostile ou
-// déchet ne puisse pas faire allouer au serveur une mémoire sans borne.
-//
-// Sécurité : la désérialisation ne vise que des DTO fixes et fermés ; aucune instanciation
-// guidée par un nom de type ici.
-// -----------------------------------------------------------------------
+// Tramage JSON sur le flux du pipe : 4 octets de longueur big-endian, puis exactement autant d'octets JSON UTF-8. Le
+// préfixe est borné (MaxMessageBytes) : un pair hostile ne fait pas allouer une mémoire sans borne. La désérialisation ne
+// vise que des DTO fixes et fermés, jamais une instanciation guidée par un nom de type.
 public static class WireCodec
 {
     // Large pour une enveloppe minuscule ; protège d'un préfixe de longueur démesuré.

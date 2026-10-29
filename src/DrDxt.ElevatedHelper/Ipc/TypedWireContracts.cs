@@ -1,14 +1,8 @@
 namespace DrDxt.ElevatedHelper.Ipc;
 
-// -----------------------------------------------------------------------
-// Enveloppe de fil pour une op privilégiée typée.
-//
-// Sécurité : le fil porte le JSON du codec d'une feuille PrivilegedOp fermée (OpJson), pas un
-// nom de type. Le serveur ne la relie que par le switch de discriminant borné de
-// PrivilegedOpCodec, puis la valide à la feuille près (OpAllowlist) avant de l'exécuter. Le HMAC
-// authentifie les octets canoniques de (OpJson, Nonce) ; le nonce donne l'unicité anti-rejeu
-// par requête.
-// -----------------------------------------------------------------------
+// Enveloppe de fil d'une op privilégiée typée : le JSON du codec d'une feuille PrivilegedOp fermée (OpJson), pas un nom
+// de type. Le serveur ne la relie que par le switch de discriminant borné de PrivilegedOpCodec, puis la valide à la
+// feuille près (OpAllowlist). Le HMAC authentifie (OpJson, Nonce) ; le nonce rend chaque requête unique (anti-rejeu).
 public sealed record TypedPrivilegedRequest
 {
     /// <summary>Le JSON PrivilegedOpCodec d'une feuille PrivilegedOp fermée.</summary>

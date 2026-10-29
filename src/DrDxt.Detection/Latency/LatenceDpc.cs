@@ -3,13 +3,8 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Latency;
 
 /// <summary>
-/// La latence DPC/ISR, pendant la partie : le constat « micro-saccades ».
-///
-/// Le traceur sert ici parce qu'une surface a la demande existe : le scan est lance par
-/// l'utilisateur, en jeu, et les angles morts s'affichent. La fenetre est celle des 20 s de mesure en jeu : les pilotes qui parlent sous
-/// charge, pas ceux d'un bureau au repos.
-///
-/// Le produit n'a aucun levier sur un pilote : le constat nomme le fautif, il ne corrige rien.
+/// La latence DPC/ISR pendant la partie : le constat « micro-saccades », sur les 20 s de mesure en jeu du scan lance par
+/// l'utilisateur (les pilotes sous charge, pas au repos). Aucun levier sur un pilote : le constat nomme le fautif.
 /// </summary>
 public static class LatenceDpc
 {

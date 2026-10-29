@@ -3,15 +3,10 @@ using DrDxt.Core;
 
 namespace DrDxt.ElevatedHelper.Execution;
 
-// -----------------------------------------------------------------------
-// Win32BcdActions : retirer / reposer un element BCD de `{current}`, puis relire.
-//
-// Les elements et valeurs arrivent deja valides par OpAllowlist (ensemble ferme). bcdedit.exe est
-// resolu depuis le dossier systeme, jamais depuis le PATH. Chaque ecriture est relue par
-// `bcdedit /enum {current}` : un code de sortie 0 n'est pas une preuve.
-// Les libelles de `bcdedit /enum` sont traduits (« identificateur »), pas les noms d'elements :
-// c'est sur eux seuls que la relecture s'appuie.
-// -----------------------------------------------------------------------
+// Win32BcdActions : retirer / reposer un element BCD de `{current}`, puis relire. Elements et valeurs arrivent valides
+// par OpAllowlist (ensemble ferme) ; bcdedit.exe vient du dossier systeme, jamais du PATH. Chaque ecriture est relue par
+// `bcdedit /enum {current}` (un code de sortie 0 n'est pas une preuve), sur les noms d'elements seuls : les libelles
+// sont traduits (« identificateur »).
 public sealed class Win32BcdActions : IBcdActions
 {
     private const string Entree = "{current}";

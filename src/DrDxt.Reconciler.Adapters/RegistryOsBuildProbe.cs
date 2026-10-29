@@ -5,18 +5,10 @@ using Microsoft.Win32;
 
 namespace DrDxt.Reconciler.Adapters;
 
-// -----------------------------------------------------------------------
-// RegistryOsBuildProbe : IOsBuildProbe sur le registre.
-//
-// Lit HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion → CurrentBuild (chaîne) + UBR (dword)
-// et rend « {CurrentBuild}.{UBR} » (par exemple « 22631.3447 »). Un changement depuis la valeur
-// capturée à l'apply est le signal WindowsReset principal.
-//
-// La lecture brute du registre est derrière IRawOsVersionReader : la logique de mise en forme et
-// d'échec est entièrement testée avec un faux ; le vrai lecteur mince (Win32OsVersionReader) est
-// le seul bord non testé : il ouvre la clé et lit deux valeurs, en emballant toute exception
-// dans un Result.Fail.
-// -----------------------------------------------------------------------
+// RegistryOsBuildProbe : IOsBuildProbe sur HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion, CurrentBuild (chaîne) +
+// UBR (dword) → « {CurrentBuild}.{UBR} » (par exemple « 22631.3447 ») ; un changement depuis l'apply est le signal
+// WindowsReset principal. La lecture brute est derrière IRawOsVersionReader (la mise en forme testée avec un faux) ;
+// Win32OsVersionReader, seul bord non testé, lit deux valeurs et emballe toute exception dans un Result.Fail.
 
 /// <summary>Lecture brute interne des deux valeurs de CurrentVersion. Rend les valeurs telles que
 /// lues (CurrentBuild peut être null/absent, UBR aussi) ; une vraie erreur de registre → Fail. Ce

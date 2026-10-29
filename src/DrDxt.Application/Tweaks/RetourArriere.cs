@@ -4,10 +4,9 @@ namespace DrDxt.Application.Tweaks;
 
 /// <summary>
 /// Le retour arrière d'un levier à plusieurs écritures : sa pose quand l'une d'elles est refusée (<see cref="EchecAsync"/>),
-/// et son annulation (<see cref="ToutRendreAsync"/>). Dans les deux cas, chaque inverse est tenté.
-/// Les trois copies d'avant (Vsync et plafond, mode Jeu, X3D) avalaient l'échec d'un inverse : un levier à moitié posé
-/// rendait le refus d'origine, l'appelant concluait « rien n'a changé » et levait son journal. Ici, un inverse refusé
-/// change le code en <see cref="ErrorCodes.TweakPartiallyApplied"/>, que les appelants lisent pour garder le journal.
+/// et son annulation (<see cref="ToutRendreAsync"/>), pour Vsync et plafond, mode Jeu, X3D : chaque inverse est tenté, et
+/// un inverse refusé rend <see cref="ErrorCodes.TweakPartiallyApplied"/>, qui fait garder le journal (jamais « rien n'a
+/// changé » sur un levier à moitié posé).
 /// Un « Non » à l'invite de Windows, ou un helper injoignable, ne se redemande pas à chaque inverse : les suivants partent sans
 /// geste du joueur (<see cref="SansGesteDuJoueur"/>, aucune invite). Ceux que l'App écrit elle-même (la session) passent
 /// encore ; ceux du helper échouent tout de suite, et le premier échec est rendu.

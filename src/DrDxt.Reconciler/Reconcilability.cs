@@ -2,17 +2,10 @@ using DrDxt.Core;
 
 namespace DrDxt.Reconciler;
 
-// -----------------------------------------------------------------------
-// Les réglages que le réconciliateur a le droit de posséder.
-//
-// Portée de durabilité : seules les surfaces volatiles côté OS sont réconciliées (registre hors
-// stratégies, services, plan d'alimentation, tâches planifiées). Les réglages persistés dans le
-// firmware (XMP/EXPO, undervolt BIOS) vivent dans le BIOS et sont hors portée : le manifeste ne
-// doit jamais les porter.
-//
-// Les surfaces protégées (liste noire) ne peuvent jamais être touchées, même si un levier finit
-// d'une façon ou d'une autre dans le manifeste en les visant (garde stricte).
-// -----------------------------------------------------------------------
+// Les réglages que le réconciliateur a le droit de posséder : les surfaces volatiles côté OS seulement (registre hors
+// stratégies, services, plan d'alimentation, tâches planifiées). Le firmware (XMP/EXPO, undervolt BIOS) est hors
+// portée : le manifeste ne le porte jamais. Les surfaces protégées (liste noire) ne sont jamais touchées, même visées
+// par un levier entré dans le manifeste (garde stricte).
 
 /// <summary>La surface côté OS qu'écrit un levier réconcilié. Reprend les quatre ops d'écriture
 /// qu'expose l'ElevatedHelper (registre / service / plan d'alimentation / tâche planifiée).

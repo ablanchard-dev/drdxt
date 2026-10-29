@@ -8,13 +8,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace DrDxt.App.Platform;
 
 /// <summary>
-/// Verifie au lancement que les reglages poses par DrDXT tiennent. Un autre optimiseur, une mise a jour
-/// Windows ou l'utilisateur peuvent defaire un reglage ; le produit promet « persistant », il doit le remarquer.
-///
-/// Au lancement, chaque reglage du manifeste signe est relu par le verificateur existant
-/// (<see cref="AppliedStateVerifier"/>) contre ce que DrDXT a pose (<see cref="RenduALaDesinstallation.PoseesDe"/>,
-/// la meme regle que la desinstallation). Ce qui a bouge est dit ; rien n'est reecrit (regle I5 : on
-/// notifie, on n'ecrase pas). Lecture seule, aucun service, aucune elevation.
+/// Verifie au lancement que les reglages poses par DrDXT tiennent (un autre optimiseur, une mise a jour ou l'utilisateur
+/// peuvent les defaire) : chaque reglage du manifeste signe relu par <see cref="AppliedStateVerifier"/> contre
+/// <see cref="RenduALaDesinstallation.PoseesDe"/>. Ce qui a bouge est dit, rien n'est reecrit (regle I5). Lecture seule,
+/// sans service ni elevation.
 /// Les reglages que le service ne reaffirme pas (HKCU : Game Mode, Game DVR, modele flip) y sont en RevertOnly
 /// (<see cref="AppliedTweakManifestMapper.ToRevertOnly"/>) : relus de meme.
 /// </summary>

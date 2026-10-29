@@ -67,15 +67,10 @@ public sealed class LocalFileSystemUpdateStore : IUpdateFileSystem
 
 /// <summary>Le vrai flux de mise à jour sur un <see cref="HttpClient"/> injecté. Toute panne de
 /// transport → Fail(UPDATE_OFFLINE) : non bloquant, l'app reste sur la version actuelle.
-///
 /// Pas encore d'epinglage : le seul appelant reel, VerificationMiseAJour.VerifierAuDemarrageAsync, construit son
 /// HttpClient sur le transport du compte (ProxyDuCompte), sans empreinte de certificat pour le serveur de mise a jour.
-///
-/// Une doc fausse ne se contente pas d'etre fausse : elle repond a la question qu'un auditeur
-/// venait poser, et l'empeche de trouver le trou. Ce que ce canal a reellement pour lui
-/// aujourd'hui, chaque point etant tenu par un test : l'URL doit etre absolue et en HTTPS,
-/// rien n'est monte sans clef de verification de production, le manifeste est signe en Ed25519
-/// et le binaire verifie par son sha256. L'epinglage se posera avec le deploiement du serveur.
+/// Ce que ce canal a, chaque point tenu par un test : URL absolue et en HTTPS, rien de monte sans clef de verification de
+/// production, manifeste signe en Ed25519, binaire verifie par son sha256.
 /// </summary>
 public sealed class HttpUpdateFeed : IUpdateFeed
 {

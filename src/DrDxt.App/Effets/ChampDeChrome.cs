@@ -66,12 +66,9 @@ public sealed class ChromeLiquideEffect : ShaderEffect
 }
 
 /// <summary>
-/// Un champ de métal qui coule.
-///
-/// Le shader tourne sur la carte graphique, sur un rendu réduit (<see cref="EchelleDeRendu"/>) puis
-/// agrandi : le chrome liquide est lisse par nature, et un rendu à moitié d'échelle coûte quatre
-/// fois moins de pixels sans différence visible. Il ne bat qu'au rythme du
-/// <see cref="MoteurDAnimation"/> : fenêtre au premier plan, visible, animations de Windows actives.
+/// Un champ de métal qui coule, rendu par la carte graphique à échelle réduite (<see cref="EchelleDeRendu"/>) puis
+/// agrandi : lisse par nature, à moitié d'échelle il coûte quatre fois moins de pixels sans différence visible. Il ne
+/// bat qu'au rythme du <see cref="MoteurDAnimation"/>.
 /// </summary>
 public sealed class ChampDeChrome : Border
 {

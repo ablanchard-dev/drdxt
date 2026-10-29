@@ -5,15 +5,11 @@ namespace DrDxt.Core;
 public sealed record MemoireLue(ulong TotalOctets, ulong DisponiblesOctets, ulong EngagementOctets, ulong LimiteEngagementOctets);
 
 /// <summary>
-/// Un PC de bureau sans jeu gagne aussi en fluidité : une mémoire pleine fait déborder sur le disque ce qui ne tient
-/// plus. Fenêtres qui mettent une seconde à revenir, souris qui accroche, saccades : c'est le défaut de fluidité le plus
-/// courant d'un PC de bureau, et il n'a rien à voir avec le jeu. Lecture seule : DrDXT ne ferme rien, ne touche pas au
-/// fichier d'échange ; il dit, et donne les gestes. Un relevé est un instant : il le dit aussi.
-///
-/// Deux choses distinctes, deux constats. La mémoire libre basse veut dire que Windows pagine déjà ;
-/// l'engagement près de sa limite veut dire que la mémoire virtuelle (mémoire + fichier d'échange) est presque réservée en
-/// entier : le prochain programme peut manquer de mémoire, sans que rien ne pagine encore. Les seuils (10 % libres, 90 % de
-/// la limite) sont des seuils DrDXT, pas une norme Microsoft.
+/// Une mémoire pleine déborde sur le disque (fenêtres lentes à revenir, souris qui accroche, saccades), le défaut de
+/// fluidité le plus courant d'un PC de bureau, jeu ou pas. Lecture seule : DrDXT ne ferme rien, ne touche pas au fichier
+/// d'échange ; il dit, donne les gestes, et dit qu'un relevé est un instant. Deux constats : mémoire libre basse (Windows
+/// pagine déjà), engagement près de sa limite (mémoire + fichier d'échange presque réservés, le prochain programme peut
+/// manquer). Seuils DrDXT (10 % libres, 90 % de la limite), pas une norme Microsoft.
 /// Source : Microsoft Learn, MEMORYSTATUSEX (ullAvailPhys, ullTotalPageFile = limite d'engagement courante).
 /// </summary>
 public static class MemoireSaturee

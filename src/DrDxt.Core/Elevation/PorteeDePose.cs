@@ -4,9 +4,8 @@ namespace DrDxt.Core;
 /// La portée d'une pose de levier dont l'origine n'est pas encore notée. Ouverte par le chemin de pose autour du seul
 /// ApplyAsync, dans la même méthode ; le client élevé de l'App marque alors les écritures journalisées, et la fermeture,
 /// juste après l'enregistrement de l'origine, les acquitte. Sans portée (oubli, tâche de fond, retour arrière), tout part
-/// nu : le comportement d'avant le journal, jamais un rejeu à tort.
-/// Le chemin la tient par un <c>using</c> : une pose qui échoue, ou une origine qui n'a pas pu être notée, la laisse sans
-/// acquit. Les entrées restent alors au journal du helper, qui rendra l'origine si l'App meurt sans l'avoir notée.
+/// nu, jamais un rejeu à tort. Tenue par un <c>using</c> : une pose ratée ou une origine non notée reste sans acquit, au
+/// journal du helper, qui rendra l'origine si l'App meurt.
 /// </summary>
 public sealed class PorteeDePose : IDisposable
 {

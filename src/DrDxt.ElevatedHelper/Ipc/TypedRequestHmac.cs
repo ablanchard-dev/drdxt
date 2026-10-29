@@ -3,16 +3,10 @@ using System.Text;
 
 namespace DrDxt.ElevatedHelper.Ipc;
 
-// -----------------------------------------------------------------------
-// HMAC-SHA256 sur les octets canoniques d'une requête privilégiée typée.
-//
-// Sécurité : intégrité du transport seulement. Il prouve que le JSON de l'op + le nonce n'ont
-// pas été modifiés en route et que le pair détient la clé de session. Ce n'est pas
-// l'autorisation (c'est ICallerAuthenticator) ni l'allowlist (c'est OpAllowlist). La
-// vérification est en temps constant (FixedTimeEquals) et ne lève jamais sur une entrée
-// malformée (fail-closed). La clé est injectée : une clé HMAC éphémère par session, et le
-// chemin d'échec propre est testé.
-// -----------------------------------------------------------------------
+// HMAC-SHA256 sur les octets canoniques d'une requête privilégiée typée : l'intégrité du transport seulement (le JSON de
+// l'op + le nonce intacts, le pair détient la clé de session), ni l'autorisation (ICallerAuthenticator) ni l'allowlist
+// (OpAllowlist). Vérification en temps constant (FixedTimeEquals), sans levée sur une entrée malformée (fail-closed).
+// Clé injectée : une clé HMAC éphémère par session.
 public static class TypedRequestHmac
 {
     // Séparateur d'unité ASCII (0x1F) entre les champs. La forme reste sans ambiguïté parce que le séparateur ne peut

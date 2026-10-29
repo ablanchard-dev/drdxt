@@ -7,11 +7,8 @@ namespace DrDxt.Bios;
 /// constructeur + <see cref="BiosInfo"/>. Chaque constructeur nomme à sa façon son interface BIOS
 /// récente (MSI « Click BIOS 5 », ASUS « AI Tweaker UEFI », Gigabyte « Aorus UEFI », ASRock « UEFI »).
 ///
-/// Honnêteté : c'est une heuristique grossière (la correspondance par révision est une donnée de
-/// banc qu'on n'a pas encore). Faute de pouvoir fixer une génération avec confiance, on rend le
-/// jeton « récent » du constructeur, et la bibliothèque se rabat sur un repli étiqueté si cette
-/// entrée exacte n'est pas curée. Ne lève jamais et rend toujours un jeton non vide : la
-/// bibliothèque peut toujours résoudre quelque chose d'utilisable.
+/// Heuristique grossière (la correspondance par révision n'a pas encore de données de banc) : le jeton « récent » du
+/// constructeur, et la bibliothèque se rabat sur un repli étiqueté. Ne lève jamais, rend toujours un jeton non vide.
 /// </summary>
 public static class BiosUiGenerationDetector
 {

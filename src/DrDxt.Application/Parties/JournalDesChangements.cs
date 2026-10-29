@@ -9,9 +9,8 @@ namespace DrDxt.Application.Parties;
 /// d'aucun côté.
 /// <paramref name="Cle"/> : l'identifiant stable du réglage et sa nouvelle valeur
 /// (« windows.hags:on ») ; le libellé est traduit, la clé permet de relier le changement au levier qui l'a posé.
-/// <paramref name="Fige"/> : le bilan au moment où il a été tranché. Le relevé ne garde que
-/// les 20 dernières parties : rejugé à chaque affichage, un gain prouvé redevenait « pas encore jugé » une fois ses parties
-/// d'avant sorties de l'anneau. Une fois tranché, il ne bouge plus.</summary>
+/// <paramref name="Fige"/> : le bilan une fois tranché, qui ne bouge plus : le relevé ne garde que 20 parties, et un gain
+/// rejugé redeviendrait « pas encore jugé » après la sortie de ses parties d'avant.</summary>
 public sealed record Changement(DateTimeOffset Quand, string Libelle, DateTimeOffset? Depuis = null, string? Cle = null,
     BilanDuChangement? Fige = null);
 
