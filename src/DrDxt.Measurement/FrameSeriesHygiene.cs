@@ -1,86 +1,49 @@
 namespace DrDxt.Measurement;
 
 /// <summary>
-/// Hygiène de la série d'images avant tout calcul statistique (compagnon de
-/// <see cref="FrametimeStatistics"/>). Deux opérations, toutes deux pures, sans E/S :
-///
-///   • <see cref="Clean"/> retire les images qui ne sont pas du jeu : le chargement du début et les
-///     secondes passées derrière une autre fenêtre (alt-tab). Publiées brutes, ces secondes passent
-///     pour des défauts de la machine du joueur : un jeu plafonné à 30 fps hors focus pèse 33,3 ms par
-///     image, et quelques secondes d'alt-tab suffisent à faire le pire centile d'une partie à 140 fps.
-///
-///   • <see cref="Slice"/> découpe une longue session en tranches de même durée. Plus une capture
-///     dure, plus elle a de chances de croiser une image rare et lente, donc plus son pire centile
-///     paraît mauvais, sans que la machine ait changé : deux sessions de durées très différentes
-///     ne se comparent pas sur leurs centiles extrêmes. Le découpage donne la
-///     dispersion propre de la machine d'une passe à l'autre, exactement l'entrée dont a besoin
-///     <see cref="FrametimeStatistics.InterRunMarginOfError"/> : une seule longue session peut ainsi
-///     produire une marge A/B honnête au lieu d'exiger trois passes de banc séparées.
-///
-/// <see cref="PresentMon.FrameCapture"/> ne porte aucun horodatage et n'en a pas besoin : les temps
-/// d'image sont les écarts, le temps écoulé est leur somme cumulée.
+/// Hygiène de la série d'images avant tout calcul statistique, pure, sans E/S :
+///   • <see cref="Clean"/> retire le chargement du début et les secondes hors focus (alt-tab) : un jeu plafonné à 30 fps
+///     hors focus pèse 33,3 ms par image, et quelques secondes suffisent à faire le pire centile d'une partie à 140 fps.
+///   • <see cref="Slice"/> découpe une session en tranches de même durée : plus une capture dure, plus son pire centile
+///     paraît mauvais. Les tranches donnent la dispersion d'une passe à l'autre qu'attend
+///     <see cref="FrametimeStatistics.InterRunMarginOfError"/>, depuis une seule longue session.
+/// Le temps écoulé est la somme cumulée des temps d'image : <see cref="PresentMon.FrameCapture"/> n'a pas d'horodatage.
 /// </summary>
 public static class FrameSeriesHygiene
 {
-    /// <summary>Borne haute des secondes écartées au début d'une capture (chargement du niveau,
-    /// compilation des shaders), pas la quantité réellement retirée. Le vrai démarrage est mesuré par
-    /// <see cref="DetectWarmup"/> ; cette valeur ne fait que borner la recherche.
-    ///
-    /// Mesuré sur une capture de 178 s prise en pleine partie (2026-09-01, i7-14700F / RTX 4060) : la
-    /// seconde 0 est déjà à 7,84 ms pour une médiane de session de 7,27 ms, sans aucun démarrage.
-    /// Retirer 90 s d'office jetterait la moitié des images (24 082 → 11 783) pour 0,9 % de changement
-    /// du résultat, et laisserait 88 s, trop peu pour une seule tranche de 120 s : <see cref="Slice"/>
-    /// ne produirait rien. Une capture qui commence en jeu n'a pas de démarrage ; seule une capture
-    /// qui commence au lancement du jeu en a un.</summary>
+    /// <summary>Borne haute de la recherche du démarrage (chargement, shaders), pas la quantité retirée : celle-ci est
+    /// mesurée par <see cref="DetectWarmup"/>. Capture de 178 s en pleine partie (2026-09-01, i7-14700F / RTX 4060) :
+    /// seconde 0 à 7,84 ms pour une médiane de 7,27 ms. Retirer 90 s d'office jetterait 24 082 → 11 783 images pour 0,9 %
+    /// de changement, et 88 s restantes ne feraient pas une tranche de 120 s.</summary>
     public const double DefaultWarmupSeconds = 90.0;
 
-    /// <summary>Une seconde de début compte comme démarrage tant que son temps d'image médian dépasse
-    /// ce multiple de la médiane de la session. Calibré sur la même série plutôt que sur une valeur
-    /// fixe en millisecondes, pour valoir d'une machine à l'autre : ici, une seconde de chargement à
-    /// 30 fps vaut ~4,6× une seconde de jeu à 150 fps, quand l'instabilité ordinaire du jeu reste près
-    /// de 1,1×. Vérifié sur la capture ci-dessus : le démarrage détecté est de 0 s à 1,25×, 1,5× et 2×,
-    /// le choix ne porte donc pas le résultat.</summary>
+    /// <summary>Une seconde de début compte comme démarrage tant que sa médiane dépasse ce multiple de celle de la session
+    /// (relatif, pour valoir d'une machine à l'autre) : un chargement à 30 fps vaut ~4,6× une seconde à 150 fps, le jeu
+    /// ordinaire ~1,1×. Sur la capture ci-dessus, 0 s détectée à 1,25×, 1,5× et 2× : le choix ne porte pas le
+    /// résultat.</summary>
     public const double WarmupMedianFactor = 1.5;
 
-    /// <summary>Une seconde entière dont le temps d'image médian dépasse ce seuil peut être hors jeu :
-    /// le plafond hors focus (un jeu plafonné à 30 fps hors focus reste à 33,3 ms) ou un blocage de
-    /// chargement. La médiane, pas le maximum : un seul à-coup légitime ne supprime jamais une bonne
-    /// seconde. Bouton de calibrage : lire le plafond hors focus du jeu quand on peut le connaître
-    /// (Call of Duty publie <c>MaxFpsOutOfFocus</c>) et placer ce seuil juste sous cette période, au
-    /// lieu de deviner.
-    ///
-    /// Lent ne suffit pas : voir <see cref="CapRegularityMax"/>. Seul, ce seuil supprime 10 secondes
-    /// d'un vrai à-coup à 25 fps (prouvé par un témoin positif).</summary>
+    /// <summary>Une seconde dont la médiane dépasse ce seuil peut être hors jeu (plafond hors focus à 33,3 ms, blocage de
+    /// chargement). La médiane, pas le maximum : un à-coup légitime ne supprime jamais une bonne seconde. Bouton de
+    /// calibrage : lire le plafond hors focus du jeu (Call of Duty publie <c>MaxFpsOutOfFocus</c>) et poser ce seuil
+    /// juste sous sa période. Lent ne suffit pas (<see cref="CapRegularityMax"/>) : seul, ce seuil supprime 10 s d'un
+    /// vrai à-coup à 25 fps (témoin positif).</summary>
     public const double DefaultOutOfFocusMedianMs = 25.0;
 
     /// <summary>
-    /// Lent ne suffit pas pour supprimer une seconde : elle doit aussi être *régulière*.
-    ///
-    /// Une seconde n'est écartée que si son écart interquartile, rapporté à sa médiane, reste sous ce
-    /// seuil. La raison est structurelle plutôt que statistique : un jeu hors focus est plafonné
-    /// (le moteur dort jusqu'au tick suivant), sa période est donc régulière par construction. Un jeu
-    /// qui peine vraiment est limité par un travail variable : ses temps d'image s'éparpillent. La
-    /// médiane seule ne distingue pas un plafond à 30 fps d'un à-coup à 25 fps ; la régularité, si.
-    ///
-    /// La valeur s'appuie sur une mesure, pas sur un jugement. Sur les 2 170 secondes de vrai jeu
-    /// gardées dans `tools/p3` (2026-09-01, i7-14700F / RTX 4060, ~143 fps), la seconde la plus
-    /// régulière vaut 0,038 ; le 1er centile est 0,060 et la médiane 0,128. Le vrai jeu n'atteint
-    /// jamais une telle régularité. Le seuil est posé à ce plancher observé : chaque doute se résout
-    /// du côté sûr, garder les données. La règle du projet : un ralentissement soutenu est le résultat
-    /// de la mesure, jamais un artefact à nettoyer.
-    ///
-    /// Plafond connu : un plafond dont l'instabilité du minuteur dépasse 4 % est gardé plutôt
-    /// qu'écarté, et ces secondes comptent alors comme performance de la machine. C'est le sens
-    /// voulu : l'erreur inverse présenterait une machine saine à un joueur qui a vu son jeu ramer.
-    /// L'inférence ne suffit pas seule : un jeu en V-Sync qui tombe de 60 à 30 i/s a la même signature. En
-    /// production, le banc observe le premier plan pendant la passe et borne les secondes écartées au temps vu
-    /// hors du premier plan (<c>horsFocusMaxSecondes</c> de <see cref="Masque"/>).
+    /// Une seconde lente n'est écartée que si elle est aussi régulière : écart interquartile / médiane sous ce seuil. Un
+    /// jeu hors focus est plafonné (le moteur dort jusqu'au tick), donc régulier ; un jeu qui peine s'éparpille.
+    /// Mesure : sur 2 170 s de vrai jeu dans `tools/p3` (2026-09-01, i7-14700F / RTX 4060, ~143 fps), la seconde la plus
+    /// régulière vaut 0,038, le 1er centile 0,060, la médiane 0,128 ; le seuil est posé à ce plancher, le doute garde les
+    /// données (un ralentissement soutenu est la mesure, jamais un artefact). Plafond connu : un minuteur instable à plus
+    /// de 4 % est gardé, l'erreur sûre. Un V-Sync qui tombe de 60 à 30 i/s a la même signature : en production, les
+    /// secondes écartées sont bornées au temps vu hors premier plan (<c>horsFocusMaxSecondes</c> de <see cref="Masque"/>).
     /// </summary>
     public const double CapRegularityMax = 0.04;
 
     /// <summary>
-    /// Résultat de <see cref="Clean"/>. Les comptes existent pour qu'un appelant voie ce qui a été
-    /// retiré : un filtre qui mange une capture en silence est pire que pas de filtre.
+    /// Résultat de <see cref="Clean"/>. Les comptes montrent ce qui a été retiré : un filtre qui mange une capture en
+    /// silence est pire que pas de filtre.
     /// </summary>
     /// <param name="FrameTimesMs">Les images gardées, dans l'ordre.</param>
     /// <param name="WarmupSecondsDropped">Secondes entières retirées comme démarrage.</param>
@@ -93,13 +56,9 @@ public static class FrameSeriesHygiene
         bool Applied);
 
     /// <summary>
-    /// Retire d'une série d'images les secondes de démarrage et les secondes hors focus.
-    ///
-    /// Refuse de s'appliquer (rend l'entrée intacte avec <c>Applied = false</c>) quand le filtre
-    /// garderait moins de <paramref name="minKeptFraction"/> des images. Cette garde est l'essentiel :
-    /// sur une machine qui tourne vraiment à 30 fps, chaque seconde a une médiane au-dessus du seuil,
-    /// et un filtre qui supprimerait toute la session changerait un vrai problème en résultat vide.
-    /// Refuser est un troisième état : ni « filtré » ni « rien à filtrer ».
+    /// Retire les secondes de démarrage et hors focus. Refuse (entrée intacte, <c>Applied = false</c>) sous
+    /// <paramref name="minKeptFraction"/> des images gardées : à 30 fps réels, chaque seconde dépasse le seuil, et tout
+    /// supprimer changerait un vrai problème en résultat vide. Refuser est un troisième état.
     /// </summary>
     public static CleanResult Clean(
         IReadOnlyList<double> frameTimesMs,
@@ -119,25 +78,15 @@ public static class FrameSeriesHygiene
     }
 
     /// <summary>
-    /// Le meme nettoyage, rendu comme un masque, parce que sept series doivent bouger ensemble.
-    ///
-    /// `BenchmarkRunner` accumule `FrameTimesMs` et six series appariees par index
-    /// (latence, GPU busy, GPU wait, CPU busy, present API, erreur d'animation). Le ratio de la
-    /// frame i se lit a l'index i de chacune. Filtrer la premiere seule decale les six autres, et
-    /// chaque ratio du classifieur devient faux sans lever la moindre erreur.
-    ///
-    /// <see cref="Clean"/> rend une serie, ce qui suffit a un rejeu hors ligne et pas a la
-    /// production. Cette surcharge rend la decision, index par index, pour que l'appelant
-    /// l'applique aux sept series d'un meme run, la ou elles sont encore coherentes entre elles.
-    ///
-    /// <paramref name="frameTimesMs"/> et le masque ont exactement la meme longueur : une frame
-    /// invalide (nulle, negative, non finie) est marquee non gardee plutot que sautee, sinon les
-    /// index ne voudraient plus rien dire.
+    /// Le meme nettoyage rendu comme un masque : `BenchmarkRunner` accumule `FrameTimesMs` et six series appariees par
+    /// index (latence, GPU busy, GPU wait, CPU busy, present API, erreur d'animation). Filtrer la premiere seule
+    /// fausserait chaque ratio du classifieur sans erreur ; l'appelant applique le masque aux sept. Meme longueur que
+    /// <paramref name="frameTimesMs"/> : une frame invalide est marquee non gardee, jamais sautee.
     /// </summary>
     /// <param name="Garde">Un booleen par frame d'entree : la garder, ou non.</param>
     /// <param name="Applied">False quand le filtre a refuse : le masque est alors tout a vrai.</param>
-    /// <param name="Retenues">Les images valides que le filtre garderait, qu'il ait ete applique ou refuse. C'est
-    /// l'exposition : un refus garde la serie entiere, et la passe n'en a pas moins vecu surtout hors du jeu.</param>
+    /// <param name="Retenues">Les images valides que le filtre garderait, applique ou refuse : l'exposition, car un refus
+    /// garde la serie entiere d'une passe vecue surtout hors du jeu.</param>
     public sealed record MaskResult(
         IReadOnlyList<bool> Garde,
         int WarmupSecondsDropped,
@@ -146,10 +95,9 @@ public static class FrameSeriesHygiene
         int Retenues = 0);
 
     /// <inheritdoc cref="MaskResult"/>
-    /// <param name="horsFocusMaxSecondes">Le temps que la sonde de premier plan a vu le jeu derrière une autre fenêtre. Une
-    /// seconde lente et régulière n'est écartée comme hors focus que dans cette limite : un jeu en V-Sync qui tombe de 60 à
-    /// 30 i/s au premier plan a la même signature qu'un plafond hors focus, et ses chutes sont la mesure. Sans borne, l'
-    /// inférence seule (rejeu hors ligne).</param>
+    /// <param name="horsFocusMaxSecondes">Le temps que la sonde de premier plan a vu le jeu derrière une autre fenêtre :
+    /// au-delà, une seconde lente et régulière est gardée (un V-Sync de 60 à 30 i/s a la même signature, et ses chutes
+    /// sont la mesure). Sans borne : l'inférence seule (rejeu hors ligne).</param>
     public static MaskResult Masque(
         IReadOnlyList<double> frameTimesMs,
         double warmupSeconds = DefaultWarmupSeconds,
@@ -173,11 +121,8 @@ public static class FrameSeriesHygiene
         var toutGarde = () => new MaskResult(
             Enumerable.Repeat(true, frameTimesMs.Count).ToList(), 0, 0, false);
 
-        // Ranger les images par seconde entière. Les images invalides ne font rien avancer : elles ne
-        // portent aucune durée fiable, elles sont donc retirées et ne décalent jamais l'horloge.
-        // `secondeDe` garde la seconde de chaque index d'entree (−1 = frame invalide), parce
-        // que le masque rendu doit avoir exactement la longueur de la serie d'entree : sans ca,
-        // les index ne designeraient plus les memes frames dans les sept series.
+        // Les images par seconde entière ; une image invalide ne fait pas avancer l'horloge. `secondeDe` garde la seconde
+        // de chaque index (−1 = invalide) : le masque doit avoir la longueur de l'entrée.
         var bySecond = new Dictionary<int, List<double>>();
         var secondeDe = new int[frameTimesMs.Count];
         var valides = 0;
@@ -225,9 +170,7 @@ public static class FrameSeriesHygiene
             if (garde[i]) gardees++;
         }
 
-        // La garde de dernier recours : sur une machine qui tourne genuinement au ralenti, tout
-        // supprimer transformerait le pire diagnostic en resultat vide. Refuser est un troisieme
-        // etat : ni « filtre », ni « rien a filtrer ».
+        // Dernier recours : sur une machine vraiment lente, tout supprimer viderait le pire diagnostic. On refuse.
         return gardees < valides * minKeptFraction
             ? toutGarde() with { Retenues = gardees }
             : new MaskResult(garde, warmupDropped, focusDropped, true, gardees);
@@ -235,9 +178,8 @@ public static class FrameSeriesHygiene
 
     /// <summary>
     /// Découpe une série d'images en tranches consécutives de <paramref name="sliceSeconds"/> chacune.
-    /// Un reste final plus court qu'une tranche est écarté : le garder comparerait une tranche courte
-    /// à des tranches pleines, exactement le biais que le découpage doit retirer.
-    /// Rend une liste vide quand la série est plus courte qu'une tranche (le dire ; jamais combler).
+    /// Le reste final, plus court, est écarté : le garder ramènerait le biais de durée. Série plus courte qu'une tranche :
+    /// liste vide, jamais comblée.
     /// </summary>
     public static IReadOnlyList<IReadOnlyList<double>> Slice(
         IReadOnlyList<double> frameTimesMs, double sliceSeconds)
@@ -264,16 +206,10 @@ public static class FrameSeriesHygiene
     }
 
     /// <summary>
-    /// La première seconde gardée après le démarrage (toute seconde antérieure est retirée), mesurée
-    /// sur la session elle-même : une seconde compte comme démarrage tant que sa médiane dépasse
-    /// <see cref="WarmupMedianFactor"/> × la médiane de toutes les médianes par seconde. Le balayage
-    /// s'arrête à la première seconde normale (un à-coup en pleine partie est un défaut à signaler,
-    /// jamais un démarrage à cacher) et ne dépasse jamais <paramref name="cap"/>.
-    ///
-    /// Plafond connu : la médiane de référence inclut les secondes de démarrage ; une capture à plus
-    /// de moitié de démarrage tire la référence vers le haut et sous-détecte. C'est le sens sûr (on
-    /// garde des images de chargement plutôt que de supprimer du jeu), et une capture surtout faite
-    /// d'écran de chargement n'est de toute façon pas un banc.
+    /// La première seconde gardée après le démarrage : une seconde est démarrage tant que sa médiane dépasse
+    /// <see cref="WarmupMedianFactor"/> × la médiane des médianes par seconde. Arrêt à la première seconde normale (un
+    /// à-coup en pleine partie est un défaut à signaler), jamais au-delà de <paramref name="cap"/>. Plafond connu : une
+    /// capture à plus de moitié de chargement sous-détecte, le sens sûr.
     /// </summary>
     internal static int DetectWarmup(Dictionary<int, List<double>> bySecond, int cap)
     {
@@ -292,10 +228,8 @@ public static class FrameSeriesHygiene
         return dropped < seconds.Count ? seconds[dropped] : seconds[^1] + 1;
     }
 
-    /// <summary>Cette seconde lente est-elle un plafond (régulier par construction) plutôt qu'un jeu
-    /// qui peine ? Voir <see cref="CapRegularityMax"/> pour la raison du critère de régularité et
-    /// l'origine du 0,04. Trop peu d'images pour juger (moins de quatre) veut dire aucun verdict, et
-    /// aucun verdict veut dire garder : supprimer sur une supposition est l'erreur qui cache un vrai ralentissement.</summary>
+    /// <summary>Cette seconde lente est-elle un plafond plutôt qu'un jeu qui peine (<see cref="CapRegularityMax"/>) ?
+    /// Moins de quatre images : aucun verdict, donc garder.</summary>
     private static bool EstUnPlafond(List<double> bucket)
     {
         if (bucket.Count < 4) return false;

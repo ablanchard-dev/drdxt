@@ -2,22 +2,14 @@ using DrDxt.Core;
 
 namespace DrDxt.Infrastructure.Updates;
 
-// -----------------------------------------------------------------------
-// Le manifeste de mise à jour signé + les coutures sur lesquelles tourne l'updater.
-//
-// Modèle de sécurité :
-//   * Un manifeste est la seule chose à laquelle le client se fie pour savoir où est une charge
-//     (url), quelle empreinte elle doit avoir (sha256) et quelle version elle est. Il est signé
-//     avec une clé Ed25519 dédiée aux mises à jour (UpdateTrust.ProductionPublicKey ; UpdateDevKeys, refusée en
-//     production, ne sert qu'aux tests), vérifiée avant d'agir sur le
-//     moindre de ses champs. On ne se fie jamais qu'à une empreinte venue d'un manifeste signé.
-//   * L'ordre est imposé : vérifier d'abord la signature du manifeste ; seulement si Ok, récupérer
-//     la charge et vérifier son SHA-256 contre l'empreinte du manifeste (désormais fiable).
-//   * Jamais fail-open : toute incertitude garde la version installée actuelle.
-//
+// Le manifeste de mise à jour signé et les coutures de l'updater. Modèle de sécurité :
+//   * le manifeste est la seule source de l'url, de l'empreinte (sha256) et de la version d'une charge ; signé par une
+//     clé Ed25519 dédiée (UpdateTrust.ProductionPublicKey ; UpdateDevKeys, refusée en production, sert aux tests),
+//     vérifiée avant d'agir sur le moindre champ. Aucune empreinte hors d'un manifeste signé ;
+//   * ordre imposé : la signature d'abord ; seulement si Ok, la charge et son SHA-256 contre l'empreinte du manifeste ;
+//   * jamais fail-open : toute incertitude garde la version installée.
 // Chaque couture rend un Result pour les pannes attendues (réseau, délai, disque, signature) ; une exception imprévue
-// s'arrête aux entrées publiques de l'updater (UPDATE_UNEXPECTED) : jamais d'exception à travers la frontière.
-// -----------------------------------------------------------------------
+// s'arrête aux entrées publiques de l'updater (UPDATE_UNEXPECTED).
 
 /// <summary>Le canal de mise à jour. Seule l'app existe : le nom voyage dans les octets signés, un manifeste signé pour
 /// un autre canal ne peut donc pas passer pour une mise à jour de l'app.</summary>
@@ -49,19 +41,15 @@ public sealed record UpdateManifest(
 /// / rétrogradation → Fail(UPDATE_*), jamais Ok. Jamais fail-open.</summary>
 public interface IUpdateVerifier
 {
-    /// <summary>Étape 1 : vérifier la signature Ed25519 du manifeste sous la clé publique de mise à
-    /// jour embarquée. Ok si et seulement si la signature est valide sur les octets canoniques du
-    /// manifeste. Une signature null / vide / altérée, un champ altéré, une clé étrangère ou toute
-    /// panne crypto → Fail(UPDATE_SIG_INVALID). Ne lève jamais, jamais Ok par défaut. L'appelant ne
-    /// doit pas télécharger la charge tant que ceci ne rend pas Ok.</summary>
+    /// <summary>Étape 1 : la signature Ed25519 du manifeste sous la clé publique embarquée. Ok si et seulement si elle est
+    /// valide sur les octets canoniques ; null / vide / altérée, champ altéré, clé étrangère ou panne crypto →
+    /// Fail(UPDATE_SIG_INVALID). Ne lève jamais. Rien ne se télécharge avant Ok.</summary>
     Result VerifyManifest(UpdateManifest manifest);
 
-    /// <summary>Étape 2 : vérifier la charge téléchargée contre le manifeste (déjà vérifié par
-    /// signature). Calcule le SHA-256 de <paramref name="payload"/> et le compare à
-    /// <paramref name="manifest"/>.Sha256. Impose aussi la règle de non-rétrogradation contre
-    /// <paramref name="installedVersion"/> (sautée seulement si <paramref name="allowDowngrade"/> vaut
-    /// true, par exemple un canal bêta). Empreinte en désaccord → Fail(UPDATE_HASH_MISMATCH) (charge
-    /// jamais exécutée) ; version inférieure → Fail(UPDATE_DOWNGRADE). Ne lève jamais.</summary>
+    /// <summary>Étape 2 : le SHA-256 de <paramref name="payload"/> contre <paramref name="manifest"/>.Sha256 (manifeste
+    /// déjà vérifié), et la non-rétrogradation contre <paramref name="installedVersion"/> (sautée seulement si
+    /// <paramref name="allowDowngrade"/>, par exemple un canal bêta). Désaccord → Fail(UPDATE_HASH_MISMATCH), charge
+    /// jamais exécutée ; version inférieure → Fail(UPDATE_DOWNGRADE). Ne lève jamais.</summary>
     Result VerifyPayload(
         UpdateManifest manifest, byte[] payload, string installedVersion, bool allowDowngrade);
 }
@@ -82,9 +70,8 @@ public interface IUpdateFeed
     Task<Result<byte[]>> DownloadAsync(string url, CancellationToken ct);
 }
 
-/// <summary>Couture de système de fichiers minimale pour que la préparation soit entièrement
-/// testable avec un faux en mémoire (sans vrai disque ni admin). Chaque membre est emballé dans un
-/// Result : un échec d'E/S ne lève jamais à travers la frontière.</summary>
+/// <summary>Couture de système de fichiers minimale, testable en mémoire (sans disque ni admin). Chaque membre rend un
+/// Result : un échec d'E/S ne lève jamais.</summary>
 public interface IUpdateFileSystem
 {
     /// <summary>Vrai si et seulement si le dossier existe.</summary>
@@ -100,8 +87,8 @@ public interface IUpdateFileSystem
     /// <summary>Écrit des octets dans un fichier, en l'écrasant. Échec d'E/S → Fail.</summary>
     Result WriteFile(string path, byte[] bytes);
 
-    /// <summary>Suppression au mieux d'un dossier de préparation (nettoyage). Ne lève jamais ; ne pas
-    /// réussir à nettoyer un reste n'est pas fatal et rend Fail pour que l'appelant le journalise.</summary>
+    /// <summary>Suppression au mieux d'un dossier de préparation. Ne lève jamais ; un échec n'est pas fatal, Fail pour le
+    /// journal.</summary>
     Result DeleteDirectory(string path);
 }
 

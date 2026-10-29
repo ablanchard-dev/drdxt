@@ -1,19 +1,10 @@
 namespace DrDxt.Core;
 
 // ════════════════════════════════════════════════════════════════════════════
-// Docteur BIOS (socle). Contrats du cœur détection→comparaison→Findings.
-//
-// Stratégie arrêtée : V1 = docteur BIOS = lire + guider +
-// prouver, jamais d'écriture ni de script BIOS. Le conseiller ici ne fait que lire et
-// comparer : il prend le HardwareInventory + SettingsState déjà produits par le scan (il ne
-// les redétecte jamais) et émet les Findings firmware qui concernent cette machine.
-//
-// Honnêteté : un réglage illisible = un Finding honnête
-// « non lu + pourquoi », jamais un état inventé. « Rien à régler dans le
-// BIOS » est un résultat valide, assumé.
-//
-// Étapes de guide / QR / page mobile / boucle de vérification / IBiosAutomationProvider
-// viennent plus tard, volontairement hors de ces contrats de socle.
+// Docteur BIOS (socle) : détection→comparaison→Findings. V1 = lire + guider + prouver, jamais d'écriture ni de script
+// BIOS. Le conseiller lit le HardwareInventory + SettingsState du scan (sans redétecter) et émet les Findings firmware
+// de cette machine. Un réglage illisible = « non lu + pourquoi », jamais un état inventé ; « rien à régler » est un
+// résultat valide. Guide, QR, page mobile et vérification après redémarrage vivent hors de ces contrats.
 // ════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
@@ -44,12 +35,9 @@ public enum FirmwareSettingKind
 }
 
 /// <summary>
-/// La place d'un réglage firmware dans la matrice d'action.
-/// V1 émet <see cref="Guide"/> pour tout ce qui doit changer (lire + guider +
-/// prouver). <see cref="Read"/> sert aux états d'information, déjà bons ou illisibles.
-/// <see cref="AutoOfficial"/> / <see cref="LabWhitelist"/> / <see cref="Forbidden"/>
-/// décrivent la voie d'écriture qu'une future version pourrait (ou ne doit jamais) prendre :
-/// portés par le Finding pour l'honnêteté et l'UX, mais le socle n'écrit jamais.
+/// La place d'un réglage firmware dans la matrice d'action. V1 émet <see cref="Guide"/> pour tout ce qui doit changer,
+/// <see cref="Read"/> pour l'information. Les autres classes décrivent la voie d'écriture qu'une future version pourrait
+/// (ou ne doit jamais) prendre : portées par le Finding pour l'honnêteté, le socle n'écrit jamais.
 /// </summary>
 public enum BiosMatrixClass
 {
@@ -70,9 +58,8 @@ public enum BiosMatrixClass
 }
 
 /// <summary>
-/// Le sens conseillé pour un réglage firmware. Les constats du socle portent une clé
-/// de libellé honnête (<see cref="BiosFinding.RecommendedActionKey"/>), pas d'étapes de
-/// navigation dans le BIOS (elles viennent avec le guide).
+/// Le sens conseillé pour un réglage firmware : une clé de libellé (<see cref="BiosFinding.RecommendedActionKey"/>),
+/// pas d'étapes de menu (elles viennent avec le guide).
 /// </summary>
 public enum BiosRecommendedAction
 {
@@ -96,19 +83,14 @@ public enum BiosRecommendedAction
 }
 
 /// <summary>
-/// Une estimation honnête du gain d'un réglage firmware mal posé : une plage sourcée avec
-/// une réserve, jamais un % promis tout seul. Même discipline que la <c>GainEvidence</c> des
-/// profils (« on prouve, on ne promet pas ») : une plage pire cas/typique liée à une
-/// source citée, plus une réserve qui dit quand c'est ≈0 (déjà bien réglé) ou conditionnel
-/// (par exemple seulement si mal routé). Aucun chiffre inventé : un réglage sans chiffre
-/// sourcé porte une plage null et s'appuie sur la réserve (par exemple selon le jeu).
+/// Le gain d'un réglage firmware mal posé : une plage sourcée avec une réserve, jamais un % promis seul (même discipline
+/// que la <c>GainEvidence</c> des profils). La réserve dit quand c'est ≈0 ou conditionnel ; sans chiffre sourcé, la
+/// plage est null.
 /// </summary>
 /// <param name="MinPct">Bas de la plage honnête (par exemple ≈0 si déjà bien réglé) ; null = non chiffré.</param>
 /// <param name="MaxPct">Haut de la plage honnête (gain au mieux) ; null = non chiffré.</param>
-/// <param name="Conditional">
-/// Vrai quand le gain n'existe que sous condition (par exemple le réglage est vraiment
-/// mal posé ou mal routé) et vaut sans doute ≈0 sinon : pilote une formulation conditionnelle dans l'UI.
-/// </param>
+/// <param name="Conditional">Vrai quand le gain n'existe que sous condition (réglage vraiment mal posé ou mal routé), ≈0
+/// sinon : pilote une formulation conditionnelle dans l'UI.</param>
 /// <param name="SourceKey">Clé resx qui cite la source du dépôt (le document de décision). Jamais vide.</param>
 /// <param name="CaveatKey">Clé resx de la réserve d'honnêteté (« ≈0 si déjà correct » / selon le jeu…). Jamais vide.</param>
 public record BiosGainEstimate(
@@ -119,9 +101,7 @@ public record BiosGainEstimate(
     string CaveatKey);
 
 /// <summary>
-/// Un Finding firmware qui concerne cette machine, produit par détection→comparaison
-/// sur le <see cref="HardwareInventory"/> + <see cref="SettingsState"/> du scan.
-/// Constat + raison + sens conseillé, rien d'autre : pas d'étapes de menu, pas d'écriture.
+/// Un Finding firmware de cette machine : constat + raison + sens conseillé, ni étapes de menu ni écriture.
 /// </summary>
 /// <param name="Kind">Le réglage firmware concerné.</param>
 /// <param name="Severity">Son poids quand il est mal posé (Info / Minor / Major).</param>
@@ -131,14 +111,10 @@ public record BiosGainEstimate(
 /// <param name="CurrentState">État lu s'il existe ; <see cref="TriState.Unknown"/> s'il est illisible.</param>
 /// <param name="RecommendedAction">Le sens conseillé honnête (pas d'étapes de menu ici).</param>
 /// <param name="RecommendedActionKey">Clé resx du libellé de l'action conseillée (FR+EN).</param>
-/// <param name="Gain">
-/// Une plage de gain honnête et sourcée, avec réserve, quand c'est mal posé (jamais un %
-/// promis tout seul) ; null si non chiffré. Voir <see cref="BiosGainEstimate"/>.
-/// </param>
-/// <param name="StateNotReadable">
-/// Vrai quand <see cref="CurrentState"/> n'a pas pu être lu (« non lu + pourquoi », honnête).
-/// Le Finding dit alors l'inconnu et n'affirme jamais un état faux.
-/// </param>
+/// <param name="Gain">Plage sourcée avec réserve quand c'est mal posé ; null si non chiffré. Voir
+/// <see cref="BiosGainEstimate"/>.</param>
+/// <param name="StateNotReadable">Vrai quand <see cref="CurrentState"/> n'a pas pu être lu : le Finding dit l'inconnu,
+/// jamais un état faux.</param>
 public record BiosFinding(
     FirmwareSettingKind Kind,
     Severity Severity,
@@ -152,15 +128,14 @@ public record BiosFinding(
     bool StateNotReadable);
 
 /// <summary>
-/// Détection→comparaison sur l'inventaire et les réglages déjà produits par le scan, qui émet
-/// les Findings firmware de cette machine. Ne redétecte jamais, n'écrit jamais.
+/// Émet les Findings firmware de cette machine depuis l'inventaire et les réglages du scan. Ne redétecte jamais,
+/// n'écrit jamais.
 /// </summary>
 public interface IBiosAdvisor
 {
     /// <summary>
-    /// Produit les Findings firmware qui s'appliquent à <paramref name="hw"/> selon
-    /// <paramref name="state"/>. Une machine bien réglée donne une liste vide (résultat
-    /// valide, assumé). Une entrée incohérente échoue proprement via <see cref="Result"/>.
+    /// Les Findings firmware de <paramref name="hw"/> selon <paramref name="state"/> ; machine bien réglée = liste vide.
+    /// Une entrée incohérente échoue via <see cref="Result"/>.
     /// </summary>
     Result<IReadOnlyList<BiosFinding>> Advise(HardwareInventory hw, SettingsState state);
 }

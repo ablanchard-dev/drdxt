@@ -41,16 +41,9 @@ public interface IGameLocator
     bool EstAffiche(int pid) => LocateRunningGamePid() == pid;
 
     /// <summary>
-    /// Comment s'appelle ce jeu : la seule chose qui rend deux mesures comparables dans le temps.
-    ///
-    /// Le journal de performance comparait deux mesures sur la seule foi de l'identifiant
-    /// machine. Or le produit mesure le jeu qui tourne, quel qu'il soit : scanner pendant Warzone
-    /// puis pendant un autre titre remplissait le journal de deux echelles de FPS sans rapport, et
-    /// la comparaison annonçait une « degradation » qui n'etait qu'un changement de jeu.
-    ///
-    /// Le nom du processus suffit : il ne quitte pas la machine, il n'identifie personne, et il est
-    /// stable d'une session a l'autre. <c>null</c> quand le PID est inconnu ou deja mort : « pas
-    /// identifie » n'est pas « le meme jeu », et le journal se taira.
+    /// Comment s'appelle ce jeu : sans lui, deux mesures de jeux differents se compareraient, et un changement de jeu
+    /// passerait pour une « degradation ». Le nom du processus suffit (stable, il n'identifie personne et ne quitte pas la
+    /// machine). <c>null</c> quand le PID est inconnu ou mort : « pas identifie » n'est pas « le meme jeu ».
     /// </summary>
     string? NameOfGame(int pid)
     {

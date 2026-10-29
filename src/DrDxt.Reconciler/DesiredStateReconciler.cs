@@ -132,20 +132,11 @@ public sealed class DesiredStateReconciler : IReconciler
         var currentBuild = _buildProbe.ReadCurrentBuild();
         var buildToken = currentBuild.IsOk ? currentBuild.Value! : string.Empty;
 
-        // Le signal pilote se rafraichit ici, comme le build.
-        //
-        // Aucun autre endroit de `src/` n'ecrit `LastSeenDriverVersion`. Si cette methode le recopiait
-        // depuis l'item precedent, il naitrait vide et le resterait ; or `Classify` garde sa branche
-        // pilote derriere `!string.IsNullOrEmpty(item.LastSeenDriverVersion)` : un reglage GPU remis a
-        // zero par une mise a jour de pilote ne serait jamais classe `WindowsReset`, il tomberait en
-        // `Unknown` et serait notifie au lieu d'etre reapplique.
-        //
-        // Un test qui pose `lastDriver` a la main dans l'etat initial (T8b/T8c) reste vert sans que le
-        // produit ecrive la valeur : un test peut nommer une garantie sans la prouver, d'ou le test a
-        // deux passes.
-        //
-        // Une lecture par vendeur, memorisee : un item sans vendeur n'en demande aucune, et dix
-        // items NVIDIA n'en demandent qu'une (la sonde reelle interroge WMI).
+        // Le signal pilote se rafraichit ici, comme le build : c'est le seul endroit de `src/` qui ecrit
+        // `LastSeenDriverVersion`. Recopie de l'item precedent, il resterait vide, et `Classify` (qui n'entre dans sa branche
+        // pilote que s'il est renseigne) classerait `Unknown` au lieu de `WindowsReset` un reglage GPU remis a zero par une
+        // mise a jour de pilote. Prouve par le test a deux passes (T8b/T8c posent la valeur a la main). Une lecture WMI par
+        // vendeur, memorisee.
         //
         // Les sondes sont lues avant le verrou : il n'est tenu que le temps de relire l'état et de le réécrire. L'état est relu
         // sous le verrou, pas repris du début de la passe : une référence posée par le helper pendant la passe reste.

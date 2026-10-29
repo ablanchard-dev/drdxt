@@ -4,31 +4,20 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Execution;
 
 // -----------------------------------------------------------------------
-// Win32FirmwareBootActions : le voyage firmware et son annulation.
-//
-// Les deux sont shutdown.exe : `/r /fw` demande à Windows d'envoyer le prochain démarrage dans
-// l'interface de setup du firmware et redémarre, `/a /fw` retire cette demande. Windows possède
-// le bit OsIndications ; DrDXT n'écrit aucune variable firmware lui-même. C'est voulu : c'est la
-// différence entre utiliser la spécification UEFI et bricoler la NVRAM à la main, et cela compte
-// autant pour un antivirus qui analyse le binaire que pour la règle produit qui interdit d'écrire
-// le varstore `Setup`.
-//
-// Les arguments sont construits ici à partir d'un entier borné, jamais pris dans une chaîne
-// fournie par l'appelant. Aucun chemin de ce fichier ne lance une commande quelconque.
-//
-// Les codes de sortie sont lus, pas supposés : shutdown.exe rend une valeur non nulle quand le
-// firmware ne gère pas le démarrage vers le setup, et cela doit remonter comme un échec honnête
-// plutôt qu'un redémarrage que l'utilisateur ne s'explique jamais.
+// Win32FirmwareBootActions : le voyage firmware et son annulation, par shutdown.exe (`/r /fw` envoie le prochain
+// démarrage au setup firmware et redémarre, `/a /fw` retire la demande). Windows possède le bit OsIndications ; DrDXT
+// n'écrit aucune variable firmware (la spécification UEFI, pas la NVRAM à la main : compte pour un antivirus comme pour
+// la règle qui interdit d'écrire le varstore `Setup`).
+//   * Arguments construits d'un entier borné, jamais d'une chaîne de l'appelant ; aucune commande quelconque.
+//   * Codes de sortie lus : un firmware sans démarrage vers le setup rend non nul, remonté comme un échec.
 // -----------------------------------------------------------------------
 public sealed class Win32FirmwareBootActions : IFirmwareBootActions
 {
-    // shutdown.exe est résolu depuis le dossier système, jamais depuis le PATH : une recherche
-    // par PATH laisserait un shutdown.exe posé dans le dossier courant tourner en élevé.
+    // Depuis le dossier système, jamais le PATH : un shutdown.exe du dossier courant tournerait en élevé.
     private static string ShutdownExe =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "shutdown.exe");
 
-    // Le délai laissé à un appel shutdown.exe pour répondre. Il rend la main tout de suite (il
-    // planifie le redémarrage, il ne l'attend pas) : ce délai ne garde donc qu'un processus bloqué.
+    // shutdown.exe rend la main tout de suite (il planifie) : ce délai ne garde qu'un processus bloqué.
     private static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(15);
 
     public Result RequestFirmwareSetupReboot(int delaySeconds)
@@ -81,42 +70,27 @@ public sealed class Win32FirmwareBootActions : IFirmwareBootActions
     }
 
     // ── lecture firmware ─────────────────────────────────────────────────────────
-    // Il n'existe volontairement aucun P/Invoke Set* dans ce fichier. Ecrire une variable
-    // au mauvais offset peut rendre une carte non demarrable, sans annulation possible : le
-    // seul recours serait physique. On ne construit donc pas la capacite.
-    //
-    // Ce que la lecture apporte : sans elle, au retour d'un redemarrage dans le BIOS, l'app
-    // ne sait pas si le client a fait le reglage : elle l'infere. Lire la variable met fin a
-    // ce silence.
+    // Exprès aucun P/Invoke Set* : une variable ecrite au mauvais offset peut rendre une carte non demarrable, sans autre
+    // recours que physique. La lecture dit, au retour du BIOS, si le client a fait le reglage, au lieu de l'inferer.
     [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "GetFirmwareEnvironmentVariableExW",
         CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
     private static extern uint GetFirmwareEnvironmentVariableExW(
         string lpName, string lpGuid, byte[] pBuffer, uint nSize, out uint pdwAttributes);
 
-    // 1314 = ERROR_PRIVILEGE_NOT_HELD. Le distinguer compte : c'est « nous n'avions pas le
-    // privilege », pas « le firmware a refuse ». Confondre les deux, c'est transformer un non
-    // concluant en verdict de fond.
+    // 1314 = ERROR_PRIVILEGE_NOT_HELD : « nous n'avions pas le privilege », non concluant, pas « le firmware a refuse ».
     private const int ErrorPrivilegeNotHeld = 1314;
 
-    // 203 = ERROR_ENVVAR_NOT_FOUND. Mesure : « Setup » rend 203 sous le GUID EFI
-    // global : la variable n'y est pas, le varstore du fabricant a son propre GUID. C'est un
-    // constat d'absence, pas un refus : ne pas melanger les deux dans un message d'erreur.
+    // 203 = ERROR_ENVVAR_NOT_FOUND : une absence, pas un refus (mesure : « Setup » rend 203 sous le GUID EFI global, le
+    // varstore du fabricant a son propre GUID).
     private const int ErrorEnvVarNotFound = 203;
 
-    // 122 = ERROR_INSUFFICIENT_BUFFER. Le distinguer aussi : « la variable existe mais elle est
-    // plus grande que mon tampon » n'est ni un refus, ni une absence : c'est notre limite a
-    // nous, et la confondre avec les deux autres ferait accuser le firmware de notre defaut.
+    // 122 = ERROR_INSUFFICIENT_BUFFER : la variable existe, plus grande que notre tampon ; notre limite, ni refus ni
+    // absence.
     private const int ErrorInsufficientBuffer = 122;
 
     /// <summary>
-    /// Taille du tampon de lecture. Alignee sur la borne du canal de retour de donnees
-    /// (PrivilegedResponse.MaxDataBytes) : lire plus que ce que la reponse peut porter
-    /// produirait une lecture reussie qui echouerait ensuite au transport, ce qui est le pire
-    /// des deux mondes.
-    ///
-    /// 1 Ko ne suffit pas. Le varstore de configuration d'une carte pese plusieurs Ko, donc
-    /// la seule variable pour laquelle cette lecture existe serait refusee par notre propre tampon :
-    /// un mur honnete, et parfaitement inutile.
+    /// Taille du tampon de lecture, alignee sur PrivilegedResponse.MaxDataBytes : plus, une lecture reussie echouerait au
+    /// transport. 1 Ko ne suffit pas : le varstore de configuration d'une carte pese plusieurs Ko.
     /// </summary>
     private const int ReadBufferBytes = 16 * 1024;
 
@@ -128,10 +102,8 @@ public sealed class Win32FirmwareBootActions : IFirmwareBootActions
 
         try
         {
-            // Etre admin ne suffit pas. Mesure : dans une session elevee, le privilege
-            // SeSystemEnvironmentPrivilege est present mais desactive, et l'appel ci-dessous
-            // rend 1314. Il faut l'activer d'abord : sans cette ligne, cette methode echouerait
-            // en production meme lancee en administrateur.
+            // Etre admin ne suffit pas (mesure) : SeSystemEnvironmentPrivilege est present mais desactive en session
+            // elevee, et l'appel rend 1314 sans cette activation.
             var privilege = FirmwarePrivilege.Enable();
             if (!privilege.IsOk)
                 return Result<byte[]>.Fail(privilege.Error!.Value.Code, privilege.Error.Value.Message);
@@ -143,15 +115,12 @@ public sealed class Win32FirmwareBootActions : IFirmwareBootActions
                 int err = System.Runtime.InteropServices.Marshal.GetLastWin32Error();
                 string why = err switch
                 {
-                    // 122 = notre tampon est trop petit. C'est un constat sur nous, pas sur le
-                    // firmware : la variable existe et est lisible.
+                    // 122 = notre tampon est trop petit : la variable existe et est lisible.
                     ErrorInsufficientBuffer =>
                         $"the variable exists but is larger than the {ReadBufferBytes}-byte read buffer",
-                    // 1314 = le privilege n'est pas actif (et non « absent » : il peut etre dans le
-                    // token, simplement desactive). Non concluant : jamais un refus du firmware.
+                    // 1314 = le privilege n'est pas actif (peut-etre dans le token, desactive) : non concluant.
                     ErrorPrivilegeNotHeld => "SeSystemEnvironmentPrivilege is not ACTIVE -- INCONCLUSIVE, not a firmware refusal",
-                    // 203 = cette variable n'existe pas sous ce GUID. Mesure : « Setup » rend 203
-                    // sous le GUID EFI global : le varstore du fabricant vit sous un GUID propre.
+                    // 203 = cette variable n'existe pas sous ce GUID.
                     ErrorEnvVarNotFound => "no such variable under this GUID (a vendor varstore lives under its own GUID)",
                     _ => "the firmware did not return this variable",
                 };

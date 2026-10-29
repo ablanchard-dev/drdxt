@@ -4,37 +4,22 @@ namespace DrDxt.Core;
 
 /// <summary>
 /// Quelle grandeur de queue a valide un keep : pur enregistrement, aucun pouvoir de decision.
-///
-/// Pourquoi ce champ existe. <see cref="KeepPolicy.DecideParMetrique"/> accepte le p95
-/// frametime **seul** comme preuve de queue. Deux mesures se contredisent sur ce que ca vaut :
-///
-///   * Sur un reglage qui ajoute un a-coup toutes les 60 frames, le p95 rend
-///     **+1,6 %** pendant que le 1 % low rend **−65,6 %**. Les deux grandeurs se separent donc
-///     pour de bon sur un vrai defaut de fluidite : exiger le 1 % low n'aurait rien sauve ici,
-///     la regression l'aurait de toute facon interdit ;
-///   * Sur 9 tranches d'une capture inerte, moyenne et p95 partagent **95,5 %** de
-///     leur variance. Un keep « moyenne prouvee + p95 prouve » n'y est pas loin d'un keep sur la
-///     moyenne seule, ce que la regle existe precisement pour interdire.
-///
-/// Un cas de chaque cote ne tranche rien, et durcir la regle sur un seul cas serait exactement la
-/// faute que ce depot traque. Ce champ nomme ce qui a valide, verdict par verdict, pour qu'on
-/// puisse un jour trancher sur un corpus de cas reels au lieu de deux mesures isolees.
-///
-/// Il ne change aucun critere. Un gain garde ou rejete avant l'existence de ce champ l'est
-/// exactement pareil apres : c'est ce que verrouille `ProvenanceDeQueueTests`.
+/// <see cref="KeepPolicy.DecideParMetrique"/> accepte le p95 seul comme preuve de queue, et deux mesures se
+/// contredisent sur ce que ca vaut : un a-coup toutes les 60 frames rend p95 +1,6 % et 1 % low −65,6 % (la regression
+/// l'interdit de toute facon) ; sur 9 tranches d'une capture inerte, moyenne et p95 partagent 95,5 % de leur variance.
+/// Un cas de chaque cote ne tranche rien : ce champ nomme ce qui a valide, pour trancher un jour sur un corpus reel.
+/// Il ne change aucun critere (`ProvenanceDeQueueTests`).
 /// </summary>
 public enum PreuveDeQueue
 {
-    /// <summary>Aucune grandeur de queue n'est en gain prouve. C'est le cas de tout verdict qui
-    /// ne garde pas : sans queue prouvee, un keep est impossible.</summary>
+    /// <summary>Aucune grandeur de queue en gain prouve : tout verdict qui ne garde pas.</summary>
     Aucune,
 
-    /// <summary>Le p95 frametime seul. **C'est le cas a compter** : celui dont on ne sait pas
-    /// encore s'il merite de garder un reglage.</summary>
+    /// <summary>Le p95 frametime seul : le cas a compter, dont on ne sait pas s'il merite de garder un reglage.</summary>
     P95Seul,
 
-    /// <summary>Le 1 % low seul : la grandeur de queue la plus profonde, et la moins bien
-    /// resolue (±9,2 % en rejeu contre ±1,2 % pour le p95).</summary>
+    /// <summary>Le 1 % low seul : la queue la plus profonde, la moins bien resolue (±9,2 % en rejeu, ±1,2 % pour le
+    /// p95).</summary>
     UnPourCentLowSeul,
 
     /// <summary>Les deux. Le cas ou la question ne se pose pas.</summary>
@@ -45,46 +30,26 @@ public enum PreuveDeQueue
 /// <param name="Keep">Conserver le reglage ?</param>
 /// <param name="RaisonCle">Cle de message pour l'ecran, jamais une phrase assemblee ici.</param>
 /// <param name="Detail">De quoi construire la phrase : les chiffres qui ont decide.</param>
-/// <param name="Queue">ce qui a valide la queue pour ce verdict precis : voir
-/// <see cref="PreuveDeQueue"/>. Optionnel et en queue : les decisions qui n'ont pas de notion de
-/// grandeur (<see cref="KeepPolicy.Decide"/>, qui juge un score de jeu scalaire) le laissent a
-/// <see cref="PreuveDeQueue.Aucune"/>, ce qui est vrai et pas un defaut.</param>
+/// <param name="Queue">Ce qui a valide la queue pour ce verdict (<see cref="PreuveDeQueue"/>).
+/// <see cref="KeepPolicy.Decide"/>, qui juge un score scalaire, le laisse a <see cref="PreuveDeQueue.Aucune"/>.</param>
 public sealed record KeepDecision(bool Keep, string RaisonCle, string Detail,
     PreuveDeQueue Queue = PreuveDeQueue.Aucune);
 
 /// <summary>
-/// La regle qui protege la promesse : un gain de sous-systeme n'est pas un gain de jeu.
-///
-/// Le premier autopilote a obtenu **+2,54 % de debit GPU synthetique, prouve a ±1,53 %** sur le
-/// banc deterministe. C'est un vrai resultat, et pour un profil **gaming**, il ne suffit pas a
-/// garder le reglage. Le banc mesure ce que la carte calcule ; le joueur ressent ce que le jeu
-/// affiche. Entre les deux il y a le CPU, le moteur, le pilote et la scene.
-///
-/// ══ ce que chaque preuve a le droit de decider ══
-/// <see cref="SubsystemEvidence"/> : resolution fine (0,122 % sur le banc GPU). Elle sert a :
-///   * prouver qu'un levier fait reellement quelque chose ;
-///   * ordonner les candidats ;
-///   * detecter une regression materielle ;
-///   * ne pas perdre vingt minutes sur un levier inerte.
-///   Elle n'autorise **jamais** un keep permanent en profil gaming.
-///
-/// <see cref="GameEvidence"/> : resolution grossiere (~13 % en rejeu in-game). C'est la seule qui
-/// decide si le reglage ameliore le jeu.
-///
-/// ══ les deux cas qui resument tout ══
-///   debit GPU +2,6 % prouve · FPS +0,8 % pour ±3,5 %  →  non resolu  →  on n'garde pas
-///   debit GPU +2,4 % prouve · score jeu +3,1 % pour ±0,7 %  →  keep
-///
-/// Le banc synthetique est un **pre-filtre haute precision**, pas le juge du profil gaming.
+/// Un gain de sous-systeme n'est pas un gain de jeu : +2,54 % de debit GPU prouve a ±1,53 % au banc ne suffit pas a
+/// garder un reglage en profil gaming ; entre la carte et l'ecran il y a le CPU, le moteur, le pilote et la scene.
+/// <see cref="SubsystemEvidence"/> (0,122 % au banc GPU) prouve qu'un levier agit, ordonne les candidats, detecte une
+/// regression materielle, ecarte un levier inerte : jamais un keep permanent en gaming. Seule
+/// <see cref="GameEvidence"/> (~13 % en rejeu in-game) decide. GPU +2,6 % · FPS +0,8 % ± 3,5 % → non resolu, pas garde ;
+/// GPU +2,4 % · score jeu +3,1 % ± 0,7 % → keep.
 /// </summary>
 public static class KeepPolicy
 {
-    /// <summary>Codes stables de la décision, rendus dans CandidateResult.RaisonCle. Aucune ressource ne les traduit :
-    /// ce sont des identifiants, pas des phrases.</summary>
     /// <summary>La marge qu'une seule grandeur de queue doit dépasser pour un keep : Bonferroni sur deux essais, z 2,24 contre
     /// 1,96 (×1,14), porté à ×1,25 pour couvrir t de Student à cinq degrés de liberté (3,16 contre 2,57, ×1,23).</summary>
     public const double FacteurDeBonferroni = 1.25;
 
+    // Codes stables de la décision, rendus dans CandidateResult.RaisonCle : des identifiants, pas des phrases.
     public const string CleGainProuve = "autopilot.keep.game_gain";
     public const string CleRegression = "autopilot.revert.regression";
     public const string CleNonResolu = "autopilot.revert.unresolved";
@@ -100,23 +65,11 @@ public static class KeepPolicy
     private static string Marge(double v) => v.ToString("0.0", Docteur.Langue);
 
     /// <summary>
-    /// La decision par objectif, sur des preuves qui existent separement.
-    ///
-    /// Une ponderation entre grandeurs serait une preference du joueur. Ce n'est pas une permission de
-    /// melanger une grandeur bien resolue avec une grandeur inconnue et d'appeler le resultat une
-    /// information. Mesure sur une session Warzone du 07/09/2026 : le score composite annoncait +/-72 %
-    /// quand la moyenne seule resolvait a +/-4,6 % ; le 1 % low ruinait la mesure des deux.
-    ///
-    /// ══ ce que `Competitive` exige ══
-    ///   * aucune regression prouvee, sur aucune grandeur : un 1 % low qui s'effondre interdit le
-    ///     keep meme si la moyenne monte ;
-    ///   * au moins une grandeur de queue (1 % low ou p95 frametime) en gain prouve. Un gain de
-    ///     moyenne avec une fluidite non resolue n'est pas un profil Competitive ameliore : c'est
-    ///     un debit ameliore, et ca se dit comme ca.
-    ///
-    /// Le revert ne jette pas la preuve. « débit moyen ameliore ; fluidite non prouvee » reste
-    /// dans le detail : c'est exactement ce qu'il faut pour qu'un futur objectif `MaxFPS`, lui,
-    /// puisse s'en contenter.
+    /// La decision par objectif, sur des preuves separees : melanger une grandeur resolue et une inconnue n'est pas une
+    /// information (Warzone, 07/09/2026 : composite a ±72 %, moyenne seule a ±4,6 %, le 1 % low ruinait les deux).
+    /// `Competitive` exige aucune regression prouvee sur aucune grandeur, et au moins une grandeur de queue (1 % low ou
+    /// p95) en gain prouve : une moyenne seule est un debit ameliore, et se dit comme ca. Le revert garde la preuve dans
+    /// le detail, pour un futur objectif `MaxFPS`.
     /// </summary>
     public static KeepDecision DecideParMetrique(
         IReadOnlyList<MetricEvidence> preuves, OptimizationGoal but)
@@ -150,16 +103,9 @@ public static class KeepPolicy
 
         if (queueProuvee is not null)
         {
-            // Un keep nomme toujours ce qu'il n'a pas resolu.
-            //
-            // Le p95 frametime n'est pas « la fluidite » : il decrit les 5 % de frames les plus
-            // lentes, pas le pire centile. Mesure du 08/09/2026 : sur un reglage qui ajoute un
-            // gros a-coup toutes les 60 frames, le p95 rend +1,6 % pendant que le 1 % low rend
-            // -65,6 %. Un keep qui annoncerait « fluidite prouvee » sur le seul p95 vendrait une
-            // partie de la queue pour la totalite.
-            //
-            // La regression est deja interdite plus haut ; ce qui reste a dire, c'est ce qui est
-            // reste inconnu. Le joueur a le droit de savoir sur quoi le produit se tait.
+            // Un keep nomme toujours ce qu'il n'a pas resolu. Le p95 decrit les 5 % de frames les plus lentes, pas le pire
+            // centile (08/09/2026 : un a-coup toutes les 60 frames rend p95 +1,6 %, 1 % low -65,6 %) : « fluidite
+            // prouvee » sur le seul p95 vendrait une partie de la queue pour la totalite.
             var prouve = preuves.Where(m => m.Preuve.Outcome == EvidenceOutcome.ProvenGain).Select(Dire);
             var nonResolu = preuves
                 .Where(m => m.Preuve.Outcome == EvidenceOutcome.NoResolvedChange)
@@ -173,8 +119,7 @@ public static class KeepPolicy
                 QueueQuiAValide(preuves));
         }
 
-        // Le cas que le brief nomme explicitement : la moyenne monte, la fluidite reste
-        // inconnue. En Competitive ce n'est pas un profil ameliore, et la preuve est conservee.
+        // La moyenne monte, la fluidite reste inconnue : pas un profil Competitive ameliore, la preuve est conservee.
         if (moyenne?.Preuve.Outcome == EvidenceOutcome.ProvenGain)
             return new KeepDecision(false, CleFluiditeNonResolue,
                 Docteur.T("KP.DebitSeul", Dire(moyenne), string.Join(", ", queue.Select(Dire))));
@@ -184,14 +129,9 @@ public static class KeepPolicy
     }
 
     /// <summary>
-    /// Quelles grandeurs de queue sont en gain prouve dans ces preuves.
-    ///
-    /// Publique expres : `DecideParMetrique` s'en sert pour etiqueter son verdict, et une lecture du corpus
-    /// (`CandidateResult.Metriques` porte deja la liste complete) devra passer par elle. Une seconde definition de « ce qui
-    /// compte comme queue », ecrite ailleurs, est exactement la classe de derive silencieuse que ce fichier existe pour
-    /// eviter.
-    ///
-    /// Elle ne decide rien. Elle lit.
+    /// Quelles grandeurs de queue sont en gain prouve. Publique expres : une lecture du corpus
+    /// (`CandidateResult.Metriques`) doit passer par elle plutot que redefinir « ce qui compte comme queue ». Elle ne
+    /// decide rien.
     /// </summary>
     public static PreuveDeQueue QueueQuiAValide(IReadOnlyList<MetricEvidence>? preuves)
     {
@@ -235,9 +175,8 @@ public static class KeepPolicy
             EvidenceOutcome.Invalid => new KeepDecision(false, CleInvalide,
                 j.InvalidReason ?? Docteur.T("KP.Invalide")),
 
-            // Le cas le plus frequent, et celui qui distingue un autopilote honnete d'un placebo.
-            // On nomme le gain sous-systeme quand il existe : « ca fait quelque chose, mais pas
-            // quelque chose que tu ressentiras » est une reponse utile, pas un echec.
+            // Le cas le plus frequent : on nomme le gain sous-systeme quand il existe, « ca fait quelque chose, mais pas
+            // quelque chose que tu ressentiras » est une reponse utile.
             _ => new KeepDecision(false,
                 sousSysteme?.Outcome == EvidenceOutcome.ProvenGain ? CleSousSystemeSeul : CleNonResolu,
                 sousSysteme is { } sp && double.IsFinite(sp.DeltaPct)

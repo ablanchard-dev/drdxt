@@ -62,23 +62,12 @@ public sealed record CalibrationRapport(
 /// <summary>
 /// Le no-op est notre verite terrain.
 ///
-/// Un modele statistique est joli ou il ne l'est pas ; ce qui compte est que ses intervalles
-/// correspondent au bruit reel de cette machine, dans ce jeu, sur cette scene. Un candidat qui
-/// n'ecrit rien donne exactement cette reference : l'effet y vaut zero par construction, donc
-///
-///   * l'ecart trouve mesure directement l'erreur de la chaine complete ;
-///   * un intervalle a 95 % doit exclure zero **environ une fois sur vingt**, pas plus.
-///
-/// C'est la seule facon de detecter la surconfiance. Elle ne garde pas un keep : seul l'outil de campagne
-/// (`tools/optimize`, par NoOpCalibrationStore) la calcule et l'affiche, et le moteur ne la consulte pas avant de garder. Une
-/// formule mathematiquement correcte peut etre surconfiante en pratique : il suffit que les
-/// passes ne soient pas aussi independantes qu'elle le suppose, ce qui est le cas normal en jeu.
-/// Mesure du 07/09/2026 sur le corpus des 8 captures Warzone : le p99 frametime annoncait 9,2 %
-/// pour un ecart p95 observe de 15,3 %, exactement ce piege.
-///
-/// Le verdict inverse compte tout autant. Un produit dont les intervalles sont trois fois trop
-/// larges ne se trompera jamais **et ne verra jamais rien** : c'etait l'etat de DrDXT, qui
-/// annoncait 14,3 % pour un ecart p95 observe de 3,9 % sur le corpus.
+/// Un candidat qui n'ecrit rien a un effet nul par construction : l'ecart trouve mesure l'erreur de toute la chaine, et un
+/// intervalle a 95 % doit exclure zero environ une fois sur vingt, pas plus. C'est la seule facon de voir la surconfiance
+/// (passes moins independantes que suppose, le cas normal en jeu : sur 8 captures Warzone mesurees le 07/09/2026, le p99 annoncait
+/// 9,2 % pour un ecart observe de 15,3 %) et la sous-confiance (14,3 % annonces pour 3,9 % observes : on ne voit plus
+/// rien). Seul l'outil de campagne (`tools/optimize`, NoOpCalibrationStore) la calcule ; le moteur ne la consulte pas
+/// avant un keep.
 ///
 /// Pur, aucune I/O : la persistance vit ailleurs, cette logique se teste sans disque.
 /// </summary>

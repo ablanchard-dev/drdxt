@@ -3,32 +3,14 @@ namespace DrDxt.Core;
 // ════════════════════════════════════════════════════════════════════════════
 // Docteur BIOS : la boucle fermée (vérification après redémarrage). Logique seule.
 //
-// La boucle a deux moitiés, toutes deux marqueur OS + relecture (jamais d'écriture BIOS) :
-//
-//   1. Avant que l'utilisateur redémarre dans le BIOS, on enregistre un marqueur
-//      PendingBiosChange (quels réglages firmware il va changer, l'état attendu pour
-//      chacun, quand, et un id machine léger). IPendingBiosChangeStore possède ce
-//      marqueur : écriture atomique, lecture qui échoue proprement (absent = rien en
-//      attente, corrompu = un Result.Fail honnête, jamais d'exception ni de faux « en attente »).
-//
-//   2. Au retour suivant de Windows, IBiosLoopVerifier prend ce marqueur + le SettingsState
-//      frais relu par le scan et compare, réglage par réglage : Took / DidNotTake /
-//      Unreadable. Honnêteté : un réglage qui n'a pas pris, ou qu'on ne peut pas lire,
-//      est dit tel, avec une carte de secours (réessayer un changement à la fois,
-//      Clear-CMOS, Load Optimized Defaults). Jamais présenté comme un faux succès.
-//      Si tout a pris, le marqueur est effacé. Pas de marqueur → rien à faire (idempotent).
-//
-// Ce fichier ne contient que des contrats (records + interfaces + la couture d'horloge).
-// Le rendu (HTML/QR/PDF/URL signée), les inspecteurs en direct et IBiosAutomationProvider
-// n'y sont pas, exprès.
+// Deux moitiés, marqueur OS et relecture, jamais d'écriture BIOS : avant le redémarrage, un PendingBiosChange
+// (IPendingBiosChangeStore) ; au retour, IBiosLoopVerifier compare réglage par réglage au SettingsState relu.
+// Seulement des contrats : le rendu vit ailleurs.
 // ════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// Horloge UTC injectable de la boucle BIOS : l'horodatage du marqueur ne passe que par
-/// cette couture, pour qu'un FakeClock rende une valeur fixe et vérifiée. DateTime.Now /
-/// DateTimeOffset.UtcNow sont interdits ici. Une ligne locale au module, comme dans
-/// le reste du code (le reconciler, le helper élevé et la licence ont chacun la leur
-/// plutôt que de coupler les projets).
+/// Horloge UTC injectable de la boucle BIOS : l'horodatage du marqueur ne passe que par elle (DateTime.Now interdit
+/// ici), pour qu'un FakeClock le fixe. Locale au module, comme celles du reconciler, du helper et de la licence.
 /// </summary>
 public interface IBiosClock
 {
@@ -44,11 +26,8 @@ public sealed class SystemBiosClock : IBiosClock
 }
 
 /// <summary>
-/// Identité machine injectable, légère et non secrète, de la boucle BIOS. Le vérificateur
-/// ne lit l'id de la machine courante que par cette couture et le compare au
-/// <see cref="PendingBiosChange.MachineId"/> du marqueur : un marqueur copié d'un autre PC
-/// ne doit pas être honoré ici. Une ligne locale au module, comme dans le reste du
-/// code (voir <see cref="IBiosClock"/>).
+/// Identité machine injectable, légère et non secrète, comparée au <see cref="PendingBiosChange.MachineId"/> du
+/// marqueur : un marqueur copié d'un autre PC n'est pas honoré ici.
 /// </summary>
 public interface IBiosMachineId
 {
@@ -79,10 +58,9 @@ public sealed class SystemBiosMachineId : IBiosMachineId
 /// <see cref="FirmwareSettingKind.XmpExpo"/> : l'horloge mémoire configurée, en MHz).
 /// <c>null</c> = aucune valeur relevée, et la boucle se replie sur la comparaison TriState.
 ///
-/// Pourquoi : la question de la boucle n'est pas « XMP est-il actif » mais « qu'est-ce qui a
-/// changé à ce redémarrage ». 2133 -> 3800 est un fait ; probablement-On -> probablement-Off est
-/// un pari sur un pari, et sur un kit qui dépasse le plancher JEDEC dans les deux états l'inférence
-/// ne bouge pas alors que la machine bouge. Facultatif et en dernier : les constructions à 2 arguments compilent toujours.
+/// La boucle demande ce qui a changé à ce redémarrage : 2133 → 3800 est un fait, alors que l'inférence TriState ne
+/// bouge pas sur un kit au-dessus du plancher JEDEC dans les deux états. Facultatif et en dernier (constructions à 2
+/// arguments).
 /// </param>
 public record PendingSettingTarget(
     FirmwareSettingKind Setting,

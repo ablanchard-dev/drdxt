@@ -3,21 +3,11 @@ namespace DrDxt.GpuNative.NvApi;
 // -----------------------------------------------------------------------
 // INvApiNative : la frontière managée mince sur la surface native de NVAPI.
 //
-// C'est le seul accès à nvapi64.dll depuis le code managé. Le mécanisme d'entrée
-// (nvapi_QueryInterface + Initialize + EnumPhysicalGPUs), les ids de fonction rétro-ingéniés, les
-// structs d'interop et la recette d'écriture GET puis SET vivent tous dans NvApiNative. Le lecteur
-// non élevé (DrDxt.Detection) et les orchestrateurs d'écriture élevés (DrDxt.ElevatedHelper :
-// NvApiTuningActions / NvApiDrsActions) passent tous par cette frontière unique : aucune seconde
-// copie des ids de fonction ni de la recette d'écriture (le piège de divergence refusé : ids et
-// recette ont été validés en réel).
-//
-// Exactement comme IAdlxNative : une seule frontière native qui porte lectures et écritures,
-// remplacée par un faux en test unitaire (aucun appel natif en test).
-//
-// Contrat d'échec propre (identique à IAdlxNative) :
-//   • IsAvailable == false  ⇒ nvapi64.dll absente ou Initialize raté ; chaque Try* rend false.
-//   • Aucune méthode Try* ne lève ; elle rend false sur toute panne.
-//   • Les paramètres out sont à leur valeur par défaut quand le retour est false.
+// Le seul accès à nvapi64.dll : l'entrée (QueryInterface, Initialize, EnumPhysicalGPUs), les ids de fonction, les
+// structs et la recette GET puis SET, validés en réel, vivent dans NvApiNative, et le lecteur (Detection) comme les
+// écritures élevées (NvApiTuningActions, NvApiDrsActions) passent par ici : aucune seconde copie. Comme IAdlxNative,
+// remplacée par un faux en test. Contrat d'échec : IsAvailable faux (DLL absente, Initialize raté) ⇒ chaque Try* rend
+// false ; aucun Try* ne lève ; sur false, les out sont à leur défaut.
 // -----------------------------------------------------------------------
 
 /// <summary>Frontière mince sur NVAPI natif. Ne lève jamais : rend false sur tout échec (DLL
@@ -34,12 +24,9 @@ public interface INvApiNative
     /// Rend false sur un mauvais index, sans GPU NVIDIA, ou sur une panne du pilote.</summary>
     bool TryReadCoreOffsetMhz(int gpuIndex, out int offsetMhz);
 
-    /// <summary>Lit le décalage d'horloge P0/Memory appliqué (MHz) du GPU d'index
-    /// <paramref name="gpuIndex"/> (GetPstates20 → delta du domaine mémoire P0 → kHz→MHz).
-    /// Fait partie du même GET documenté que la lecture du cœur (lecture sûre, aucune écriture). Le
-    /// chemin d'undervolt non élevé a besoin des deux décalages pour construire un retour fidèle :
-    /// c'est donc une vraie lecture, jamais un 0 fabriqué. Rend false sur un mauvais index, sans GPU
-    /// NVIDIA, sans domaine d'horloge mémoire, ou sur une panne du pilote.</summary>
+    /// <summary>Lit le décalage d'horloge P0/Memory appliqué (MHz) (GetPstates20, même GET que le cœur, sans écriture) :
+    /// le retour fidèle d'un undervolt a besoin des deux décalages, jamais d'un 0 fabriqué. Rend false sur un mauvais
+    /// index, sans GPU NVIDIA, sans domaine mémoire, ou sur une panne du pilote.</summary>
     bool TryReadMemoryOffsetMhz(int gpuIndex, out int offsetMhz);
 
     /// <summary>Lit la limite de puissance appliquée (% du TDP) du GPU d'index
@@ -60,13 +47,9 @@ public interface INvApiNative
     bool TrySetCoreClockOffset(int gpuIndex, int offsetMhz);
 
     /// <summary>
-    /// GET puis SET pour le delta d'horloge P0/Memory : le miroir exact de
-    /// <see cref="TrySetCoreClockOffset"/> avec le PublicClockDomain MEMORY (4, épinglé par le test de
-    /// gel du chercheur) au lieu de GRAPHICS : lit toute la struct Pstates20 actuelle, trouve l'entrée
-    /// P0/Memory, vérifie son bit modifiable, puis soumet une écriture minimale qui ne porte que ce seul
-    /// delta d'horloge. Même convention SetPstates20 que l'écriture du cœur (déjà validée en réel) ;
-    /// jamais une struct construite à zéro, jamais une modification de tension. Rend false si
-    /// indisponible, si l'entrée n'est pas modifiable, ou sur toute panne du pilote. Ne lève jamais.
+    /// Le miroir de <see cref="TrySetCoreClockOffset"/> pour P0/Memory (PublicClockDomain MEMORY = 4, épinglé par le
+    /// test de gel du chercheur), même GET puis SET minimal, jamais de tension. Rend false si indisponible, si l'entrée
+    /// n'est pas modifiable, ou sur toute panne du pilote. Ne lève jamais.
     /// </summary>
     bool TrySetMemoryClockOffset(int gpuIndex, int offsetMhz);
 
@@ -164,11 +147,8 @@ public interface INvApiNative
     /// <paramref name="applicationPath"/> doit etre le chemin complet : NVIDIA rend
     /// NVAPI_EXECUTABLE_PATH_IS_AMBIGUOUS sur un nom nu.
     ///
-    /// Ne cree jamais de profil. Quand l'executable n'en a pas, le driver rend
-    /// NVAPI_EXECUTABLE_NOT_FOUND et cette methode rend false. En fabriquer un serait une
-    /// decision separee : le produit ecrirait alors une entree permanente dans la base du driver
-    /// pour un jeu que l'utilisateur n'a peut-etre jamais lance, et le revert devrait savoir
-    /// supprimer un profil, pas seulement restaurer une valeur.
+    /// Ne cree jamais de profil (NVAPI_EXECUTABLE_NOT_FOUND ⇒ false) : ce serait une entree permanente dans la base du
+    /// driver, et un revert qui devrait supprimer un profil, pas seulement restaurer une valeur.
     ///
     /// NVIDIA documente que la sauvegarde d'une session DRS ecrase ce qu'un autre processus a
     /// modifie entre-temps, sans notification (PG-12072-001 p.11). La session est donc la plus

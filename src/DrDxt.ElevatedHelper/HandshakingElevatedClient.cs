@@ -5,59 +5,27 @@ using DrDxt.ElevatedHelper.Ipc;
 
 namespace DrDxt.ElevatedHelper;
 
-// -----------------------------------------------------------------------
-// HandshakingElevatedClient : l'IElevatedClient côté App qui négocie la clé de session sur
-// le pipe au lieu de lire une clé partagée d'avance dans une variable d'environnement.
+// HandshakingElevatedClient : l'IElevatedClient côté App qui négocie la clé de session sur le pipe. Par op, une
+// connexion : handshake (la clé éphémère frappée par le serveur vérifié) → op sérialisée par le codec borné → HMAC de
+// (opJson, nonce) → requête typée → réponse. Anti-rejeu : un nonce neuf par requête, une clé propre à la connexion.
+// Toute panne de transport → un Result en échec ; aucune exception ne s'échappe (repli UnavailableElevatedClient).
 //
-// Par op (une connexion) : connexion → handshake (obtenir la clé éphémère que le serveur
-// vérifié a frappée pour nous) → sérialiser l'op par le codec borné → HMAC du couple canonique
-// (opJson, nonce) avec la clé négociée → envoyer la requête typée → lire la réponse. Codec,
-// HMAC et tramage sont les pièces éprouvées, intactes ; seule la provenance de la clé change.
+// Authentification du serveur (defaut D.3), symetrique de celle du serveur (GetNamedPipeClientProcessId → chemin +
+// SHA-256, HandshakeServerCore etape 3) : le client resout le pid du serveur (GetNamedPipeServerProcessId) et compare
+// son image au chemin attendu du helper. Le nom du tube est public : un processus non privilegie du compte pourrait le
+// prendre avant le helper (qui le detecte : FirstPipeInstance echoue), repondre Ok a tout et recevoir la liste des ops.
+// Fail-closed et nommee : sans chemin attendu, sans pid, sans image lisible, ou sur un autre chemin, refus avant le
+// handshake, avec le cas dans le message. Refus et cas legitime mesures en in-process (TubeUsurpeTests /
+// HandshakeChannelIntegrationTests). La traversee d'integrite reelle (App moyenne 0x2000, lue par GetTokenInformation →
+// helper eleve par UAC → OVERALL PASS, cle negociee, deux Ping) est un banc manuel, `tools/helperhandshake` : d'ou
+// PROCESS_QUERY_LIMITED_INFORMATION plutot que Process.MainModule (voir PipeServerIdentity).
+// Apres l'image, le privilege (PipeServerIdentity.RefusDePrivilege) : tube aux Administrateurs ou a SYSTEM, jeton du
+// serveur eleve s'il se lit ; sinon le vrai helper lance non eleve depuis le vrai chemin passerait. L'injection
+// intra-utilisateur bat toute verification d'image (risque connu et accepte, D.4).
 //
-// L'anti-rejeu est gardé : un nonce neuf par requête, et la clé éphémère est propre à la
-// connexion. Toute panne de transport est emballée → un Result en échec propre ; aucune
-// exception ne s'échappe (l'App se rabat sur UnavailableElevatedClient).
-//
-// Authentification du serveur (defaut D.3). Elle est symetrique de celle du serveur : celui-ci
-// resout le pid de l'appelant depuis le tube (GetNamedPipeClientProcessId → chemin + SHA-256,
-// HandshakeServerCore etape 3) ; le client resout le pid du serveur (GetNamedPipeServerProcessId)
-// et compare son image au chemin attendu du helper. Sans elle, le nom du tube etant une chaine
-// fixe et publique, un processus non privilegie du meme compte pourrait le prendre avant le
-// helper (qui, lui, le detecte : FirstPipeInstance echoue) puis repondre Ok a tout : l'App
-// croirait une op privilegiee appliquee alors que rien ne l'est, et le squatteur recevrait la
-// liste des ops demandees. Ce n'est pas une elevation, c'est un mensonge rendu au client.
-//
-// La garde est fail-closed et nommee : sans chemin attendu, sans pid resoluble, sans image
-// lisible, ou sur un chemin qui differe, la session est refusee avant le handshake avec un
-// message qui dit lequel des quatre cas s'est produit. Le refus et le cas legitime sont
-// tous deux mesures en in-process (TubeUsurpeTests / HandshakeChannelIntegrationTests) :
-// une garde dont seul le refus serait prouve pourrait refuser tout, toujours, sous une
-// suite verte.
-//
-// La traversee d'integrite reelle (App moyenne → helper eleve) se mesure avec
-// `tools/helperhandshake`, qui lance a
-// integrite moyenne (0x2000, lu par GetTokenInformation sur le processus vivant), helper eleve
-// par UAC, garde du serveur active → OVERALL PASS, cle negociee, deux Ping. Les tests, eux,
-// tournent toujours a integrite egale : cette preuve-la est un banc manuel, pas un test. Le choix
-// de PROCESS_QUERY_LIMITED_INFORMATION plutot que de Process.MainModule est fait pour ce cas
-// precis (voir PipeServerIdentity).
-//
-// Apres l'image, le privilege (PipeServerIdentity.RefusDePrivilege) : le tube appartient aux
-// Administrateurs ou a SYSTEM, et le jeton du serveur, s'il se lit, est eleve. Sans cela, un
-// programme non eleve du compte qui lancerait le vrai helper non eleve depuis le vrai chemin
-// passerait la garde d'image. L'injection intra-utilisateur bat de toute facon toute
-// verification d'image (risque connu et accepte, D.4).
-//
-// La latence de démarrage s'absorbe ici, dans la connexion de la vraie op : une boucle de
-// reprise de connexion bornée (échecs repris toutes les ~pollIntervalMs jusqu'à
-// connectTimeoutMs), pour que la toute première op après un lancement à la demande atteigne le
-// helper juste démarré sans qu'une sonde de vie séparée consomme une acceptation. Le handshake
-// lui-même n'est tenté qu'une fois par connexion réussie (pas de reprise : un rejet est
-// définitif), il y a donc exactement une acceptation pour l'op.
-//
-// Note : l'abstraction client vit ici pour l'instant ; elle pourrait passer dans
-// DrDxt.Infrastructure (« élévation client ») sans changer le canal.
-// -----------------------------------------------------------------------
+// La latence de démarrage s'absorbe dans la connexion de la vraie op (reprises toutes les ~pollIntervalMs jusqu'à
+// connectTimeoutMs), sans sonde de vie qui consommerait une acceptation ; le handshake n'est tenté qu'une fois (un rejet
+// est définitif) : une acceptation par op.
 [SupportedOSPlatform("windows")]
 public sealed class HandshakingElevatedClient : IElevatedClient
 {
@@ -66,11 +34,9 @@ public sealed class HandshakingElevatedClient : IElevatedClient
     private readonly int _connectTimeoutMs;
     private readonly int _connectRetryIntervalMs;
 
-    /// <param name="expectedServerImagePath">Le chemin complet de l'image du helper que ce
-    /// client accepte d'ecouter. Obligatoire de fait : un null (ou un chemin vide) ne
-    /// desactive pas la garde, il la fait refuser : aucun appelant ne peut donc obtenir un
-    /// canal non authentifie en omettant l'argument. Les deux fabriques de production le
-    /// resolvent par <see cref="PipeServerIdentity.TryResolveExpectedHelperPath"/>.</param>
+    /// <param name="expectedServerImagePath">Le chemin complet de l'image du helper que ce client accepte d'ecouter. Null
+    /// ou vide fait refuser la garde, jamais la desactive. Les deux fabriques de production le resolvent par
+    /// <see cref="PipeServerIdentity.TryResolveExpectedHelperPath"/>.</param>
     public HandshakingElevatedClient(
         string? pipeName = null,
         string? expectedServerImagePath = null,
@@ -96,10 +62,8 @@ public sealed class HandshakingElevatedClient : IElevatedClient
                           response.Message ?? "Privileged operation failed.");
     }
 
-    /// <summary>Le canal de retour de donnees sur le chemin de production (celui que l'app
-    /// utilise reellement). Sans cette surcharge, une lecture partie de l'app tomberait
-    /// sur le refus par defaut de IElevatedClient : un echec honnete, mais qui ferait
-    /// croire que le canal n'existe pas alors qu'il est cable partout ailleurs.</summary>
+    /// <summary>Le canal de retour de donnees sur le chemin de production ; sans cette surcharge, une lecture de l'app
+    /// tomberait sur le refus par defaut de IElevatedClient.</summary>
     public async Task<Result<byte[]>> ReadAsync(PrivilegedOp op, CancellationToken ct)
     {
         var round = await RoundTripAsync(op, ct).ConfigureAwait(false);
@@ -108,9 +72,8 @@ public sealed class HandshakingElevatedClient : IElevatedClient
             : Result<byte[]>.Fail(round.Error!.Value.Code, round.Error.Value.Message);
     }
 
-    // L'aller-retour complet : connect + handshake + requete signee + reponse. Un seul endroit
-    // ouvre le tuyau et signe ; ExecuteAsync et ReadAsync ne different que par la lecture de
-    // la reponse. La cle ephemere est effacee ici quoi qu'il arrive.
+    // L'aller-retour complet, seul endroit qui ouvre le tuyau et signe (ExecuteAsync et ReadAsync ne different que par la
+    // lecture de la reponse). La cle ephemere est effacee ici quoi qu'il arrive.
     private async Task<Result<PrivilegedResponse>> RoundTripAsync(PrivilegedOp op, CancellationToken ct)
     {
         // Sérialiser d'abord par le codec borné : refuser une feuille inconnue côté client
@@ -128,16 +91,13 @@ public sealed class HandshakingElevatedClient : IElevatedClient
             using var client = new NamedPipeClientStream(
                 ".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
 
-            // Reprise de connexion bornée : un helper juste lancé peut ne pas servir son pipe
-            // FirstPipeInstance pendant quelques centaines de ms. Reprendre les échecs de connexion
-            // jusqu'à l'échéance globale, puis échouer proprement en HELPER_UNREACHABLE.
+            // Un helper juste lancé peut ne pas servir son pipe quelques centaines de ms : reprises jusqu'à l'échéance, puis
+            // HELPER_UNREACHABLE.
             if (!await TryConnectWithRetryAsync(client, ct).ConfigureAwait(false))
                 return Result<PrivilegedResponse>.Fail(ErrorCodes.HelperUnreachable,
                     "Could not reach the elevated helper (it did not start serving in time).");
 
-            // Authentification du serveur, avant le handshake : on ne dit rien a un tube dont
-            // on ne sait pas qui le sert. Poser la garde ici et pas apres n'est pas cosmetique :
-            // le handshake livre au pair la liste des ops que DrDXT veut appliquer.
+            // Authentification du serveur avant le handshake, qui livre au pair la liste des ops que DrDXT veut appliquer.
             var authentification = AuthentifierLeServeur(client);
             if (!authentification.IsOk)
                 return Result<PrivilegedResponse>.Fail(
@@ -183,11 +143,9 @@ public sealed class HandshakingElevatedClient : IElevatedClient
         }
     }
 
-    // La garde. Des refus nommes, aucun silence, aucun repli : « pas de chemin attendu »,
-    // « processus introuvable », « image illisible », « mauvaise image », puis le privilege
-    // (proprietaire du tube, jeton non eleve) se distinguent dans le message, parce qu'ils ne se
-    // corrigent pas pareil. Un seul chemin rend Ok : l'image du serveur est le helper attendu, et
-    // il tient les droits du helper.
+    // La garde, des refus nommes sans repli : « pas de chemin attendu », « processus introuvable », « image illisible »,
+    // « mauvaise image », puis le privilege (proprietaire du tube, jeton non eleve) : ils ne se corrigent pas pareil.
+    // Seul Ok : l'image du serveur est le helper attendu, avec ses droits.
     private Result AuthentifierLeServeur(NamedPipeClientStream client)
     {
         if (_cheminHelperAttendu is null)
@@ -217,10 +175,8 @@ public sealed class HandshakingElevatedClient : IElevatedClient
 
     private static Result Refus(string pourquoi) => Result.Fail(ErrorCodes.ElevationDenied, pourquoi);
 
-    // Se connecte au pipe du helper en reprenant les échecs de connexion (le helper peut encore
-    // démarrer après un lancement à la demande) toutes les _connectRetryIntervalMs jusqu'à
-    // l'échéance globale _connectTimeoutMs. Rend true sur un flux connecté ; false si l'échéance
-    // est passée sans connexion. L'annulation se propage.
+    // Se connecte en reprenant les échecs toutes les _connectRetryIntervalMs jusqu'à _connectTimeoutMs : true connecté,
+    // false à l'échéance. L'annulation se propage.
     private async Task<bool> TryConnectWithRetryAsync(NamedPipeClientStream client, CancellationToken ct)
     {
         var deadline = Environment.TickCount64 + Math.Max(0, _connectTimeoutMs);

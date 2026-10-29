@@ -6,24 +6,11 @@ namespace DrDxt.GpuNative.NvApi;
 // -----------------------------------------------------------------------
 // NvApiNative : l'unique vraie frontière P/Invoke vers nvapi64.dll.
 //
-// Architecture
-// ────────────
-// nvapi64.dll n'exporte que nvapi_QueryInterface(id) → pointeur de fonction ; tout le reste
-// s'atteint par QueryInterface(id) → GetDelegateForFunctionPointer. NvApiEntry possède ce
-// mécanisme d'entrée (+ NvAPI_Initialize, EnumPhysicalGPUs, la règle d'or MakeVersion) ;
-// NvApiNative le compose et porte les ids de fonction rétro-ingéniés et la recette d'écriture
-// GET puis SET. C'est le miroir NVIDIA d'AdlxNative : une seule frontière avec les lectures (non
-// élevées) et les écritures (chemin élevé), pour que les ids de fonction et la recette
-// d'écriture, coûteux à valider en réel sur une vraie RTX 4060, aient exactement une copie,
-// jamais un doublon divergent.
-//
-// Surfaces
-// ────────
-//   Lectures  : décalages cœur et mémoire (GetPstates20), limite de puissance (ClientPowerPoliciesGetStatus),
-//               VRR, réglages DRS (global et au profil d'un exécutable), non élevées.
-//   Écritures : décalages cœur et mémoire (Get→SetPstates20, écriture minimale, conditionnée au bit modifiable),
-//               limite de puissance (GetInfo→bornage→GetStatus→SetStatus), VRR, réglages DRS global et par
-//               exécutable et leur suppression (la séquence de session DRS publique et sûre).
+// nvapi64.dll n'exporte que nvapi_QueryInterface(id) ; NvApiEntry porte l'entrée (QueryInterface →
+// GetDelegateForFunctionPointer, Initialize, EnumPhysicalGPUs, MakeVersion), NvApiNative les ids de fonction et la
+// recette GET puis SET, validés sur une vraie RTX 4060 : une seule copie, lectures non élevées et écritures élevées.
+// Lectures et écritures : décalages cœur et mémoire (Pstates20), limite de puissance (ClientPowerPolicies), VRR,
+// réglages DRS global et par exécutable (et leur suppression, par la séquence de session publique).
 //
 // Règles d'or de sécurité (recette) :
 //   #1 mot de version = Marshal.SizeOf(struct) | (1 << 16) à l'exécution (NvApiEntry.MakeVersion) :
@@ -37,11 +24,8 @@ namespace DrDxt.GpuNative.NvApi;
 // manquant, une taille de struct incorrecte ou toute panne d'interop rendent false. Ne lève jamais
 // vers l'appelant : un catch-all garde chaque chemin.
 //
-// La règle prudente de bornes des valeurs (plages de décalage / de puissance, reprises de
-// GpuSafeBounds) n'est pas imposée ici : elle vit dans le NvApiTuningMath du helper et est vérifiée
-// par les orchestrateurs d'écriture (NvApiTuningActions) avant d'atteindre cette frontière,
-// exactement comme AdlxTuningMath est placé devant AdlxNative. Cette frontière n'est que recette +
-// bornage du pilote.
+// Les bornes de valeurs (GpuSafeBounds) ne sont pas imposées ici mais avant, par NvApiTuningMath dans
+// NvApiTuningActions (comme AdlxTuningMath devant AdlxNative) : cette frontière n'est que recette et bornage du pilote.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class NvApiNative : INvApiNative

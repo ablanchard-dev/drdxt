@@ -5,29 +5,12 @@ namespace DrDxt.Detection.Hardware;
 /// <summary>
 /// « Optimal » est un jugement de qualite sur un overclock qu'on n'a pas teste.
 ///
-/// `LeverCatalog` rend `Optimal` des que XMP/EXPO est actif. C'est vrai en performance et muet sur
-/// la stabilite : un profil XMP est un overclock memoire, il peut ne pas tenir, et le produit n'a
-/// aucun moyen de le tester. Tant qu'il ne dit rien, un client dont la machine gele lit « memoire :
-/// rien a corriger » et cherche ailleurs.
-///
-/// ══ ce que ce conseil n'a pas le droit de faire : accuser ══
-/// `Kernel-Power 41` signifie « Windows a redemarre sans arret propre ». **Une extinction au bouton
-/// ou a la prise se logue exactement pareil.** Ecrire « ta machine plante N fois » a partir de
-/// ce compte est une surinterpretation, pas une mesure.
-///
-/// Le conseil pose donc deux faits lus (un profil est actif, la machine a redemarre sans arret
-/// propre) et **un Unknown nomme** (nous n'avons pas teste ce profil). Il propose la seule
-/// experience qui tranche : repasser en JEDEC quelques jours. Il ne chiffre rien : classe `NON CHIFFRE`.
-///
-/// Distinguer un gel d'une extinction au bouton est possible : `PowerButtonTimestamp` le dit.
-/// Les appuis longs sur le bouton sont exclus a la lecture
-/// (<see cref="ArretBrutal.HorsBouton"/>), et le detail (ecrans bleus, codes) est dit par
-/// l'audit de stabilite.
-///
-/// ══ pourquoi pas sur un profil sain ══
-/// Sans le moindre redemarrage sale, « XMP est un overclock non teste » est vrai et inutile : un
-/// avertissement permanent s'apprend a etre ignore, et le jour ou il a raison plus personne ne le
-/// voit. Le conseil n'existe donc que quand les deux faits sont reunis.
+/// `LeverCatalog` dit `Optimal` des que XMP/EXPO est actif, vrai en performance et muet sur la stabilite d'un overclock
+/// memoire non teste. Quand une machine a XMP a redemarre sans arret propre, ce conseil pose ces deux faits lus et un
+/// Unknown nomme (profil non teste), sans accuser (« ta machine plante N fois » serait une surinterpretation : les
+/// appuis longs sont exclus par <see cref="ArretBrutal.HorsBouton"/>, le detail vit dans l'audit de stabilite), et
+/// propose l'experience qui tranche : repasser en JEDEC quelques jours. `NON CHIFFRE`. Jamais sur un profil sain : un
+/// avertissement permanent s'apprend a etre ignore.
 /// </summary>
 public static class MemoryStabilityAdvisor
 {

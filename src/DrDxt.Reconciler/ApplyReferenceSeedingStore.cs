@@ -3,42 +3,19 @@ using DrDxt.Core;
 namespace DrDxt.Reconciler;
 
 // -----------------------------------------------------------------------
-// ApplyReferenceSeedingStore : la reference « au moment de l'apply ».
-//
-// Le trou qu'elle ferme. `DesiredStateReconciler.Classify` a deux signaux de cause
-// non-utilisateur, tous deux gardes par un jeton du sidecar : `item.LastSeenBuild` et
-// `item.LastSeenDriverVersion`. Si ces jetons n'etaient ecrits que par
-// `PersistBookkeepingAsync` (fin d'une passe du reconciliateur), les deux branches seraient
-// mortes sur un item jamais vu (`item is null`, test `PremierePasse_...`) : la premiere passe
-// ne pourrait classer que `UserIntentional` (valeur tierce) ou `Unknown` (revenu a
-// l'original), donc notifier.
-//
-// Le scenario n'a rien de theorique : l'App applique et commite le manifeste pendant la
-// session de bureau, alors que le service reconcilie au demarrage et une fois par jour.
-// Entre les deux il y a une fenetre reelle : un redemarrage, jusqu'a 24 h, ou le service
-// simplement arrete. Une mise a jour de pilote ou de fonctionnalite Windows qui tombe dans
-// cette fenetre remet le reglage a son etat d'origine ; la premiere passe enregistrerait
-// alors ce nouvel etat comme reference, et la derive resterait notifiee a chaque passe,
-// jamais reappliquee.
-//
-// Lire les jetons avant de classifier au lieu d'apres ne repare rien : cela donne l'etat
-// courant, celui d'apres le changement, donc une comparaison de la valeur avec elle-meme.
-// Le signal qui manque est celui d'avant : il faut l'ecrire la ou on sait encore ce qui
-// etait vrai, au commit qui suit l'apply. C'est tout ce que fait cette classe.
-//
-// Pourquoi un decorateur, et pas un appel dans le viewmodel : le manifeste est commite par
-// deux chemins (l'apply, et le rafraichissement periodique de l'habilitation). Le seeding
-// doit suivre le commit, jamais l'oublier, et ne s'executer qu'apres un commit reussi.
-//
-// Il ne re-stampe jamais un jeton deja pose. Sans cette regle, le rafraichissement
-// periodique remettrait la reference a « maintenant » a chaque tour et effacerait
-// exactement le signal qu'on cherche a armer. Seul un champ vide est rempli.
-//
-// L'echec se dit. Dans l'App non elevee, qui ne peut pas ecrire la racine admin, la mise a jour
-// du sidecar rendrait Fail et le commit Ok (ReferenceDeDeriveTests) : le decorateur vit donc dans le
-// helper eleve (MachineManifestCommit). Le manifeste reste l'autorite : un sidecar illisible ou
-// non ecrit ne defait pas le commit, mais il le signale (ErrorCodes.ManifestReferenceNotSeeded),
-// et l'ecran le montre.
+// ApplyReferenceSeedingStore : la reference « au moment de l'apply ». `DesiredStateReconciler.Classify` a deux signaux
+// de cause non-utilisateur, gardes par des jetons du sidecar (`item.LastSeenBuild`, `item.LastSeenDriverVersion`).
+// Ecrits seulement en fin de passe (`PersistBookkeepingAsync`), ils seraient morts sur un item jamais vu (test
+// `PremierePasse_...`). Or l'App commite en session de bureau, le service reconcilie au demarrage et une fois par jour :
+// une mise a jour de pilote ou de Windows dans cette fenetre (jusqu'a 24 h) deviendrait la reference, une derive
+// notifiee a chaque passe et jamais reappliquee. Les lire avant de classifier comparerait la valeur avec elle-meme : le
+// signal d'avant s'ecrit au commit qui suit l'apply.
+//   * Decorateur : le manifeste est commite par deux chemins (l'apply, le rafraichissement de l'habilitation) ; le
+//     seeding suit chaque commit reussi.
+//   * Jamais de re-stamp : seul un champ vide est rempli, sinon le rafraichissement effacerait le signal.
+//   * L'echec se dit : l'App non elevee ne peut pas ecrire la racine admin (ReferenceDeDeriveTests), le decorateur vit
+//     dans le helper eleve (MachineManifestCommit). Un sidecar non ecrit ne defait pas le commit, il le signale
+//     (ErrorCodes.ManifestReferenceNotSeeded) et l'ecran le montre.
 // -----------------------------------------------------------------------
 public sealed class ApplyReferenceSeedingStore : IDesiredStateStore
 {
@@ -69,9 +46,8 @@ public sealed class ApplyReferenceSeedingStore : IDesiredStateStore
     // Simplification voulue : transmise sans seeding ; le reconciliateur pose ces jetons a sa premiere passe.
     public Task<Result> RepartirDUnManifesteVideAsync() => _inner.RepartirDUnManifesteVideAsync();
 
-    // Transmis tel quel : un rafraichissement ne pose rien de neuf, et il garde le client de l'appele
-    // (celui de HelperDesiredStateStore ne lance jamais l'UAC). Sans cette ligne, la methode par defaut de
-    // l'interface repassait par CommitAsync, donc par le client qui lance le helper.
+    // Transmis tel quel : un rafraichissement ne pose rien de neuf, et garde le client de l'appele (celui de
+    // HelperDesiredStateStore ne lance jamais l'UAC) ; la methode par defaut repasserait par CommitAsync.
     public Task<Result> RafraichirAsync(DesiredState armed) => _inner.RafraichirAsync(armed);
 
     public async Task<Result> CommitAsync(DesiredState state)
@@ -107,8 +83,7 @@ public sealed class ApplyReferenceSeedingStore : IDesiredStateStore
         var build = _buildProbe.ReadCurrentBuild();
         var buildToken = build.IsOk ? build.Value! : string.Empty;
 
-        // Une lecture pilote par vendeur, memorisee : un item sans vendeur n'en declenche
-        // aucune, dix items NVIDIA n'en declenchent qu'une (la sonde reelle interroge WMI).
+        // Une lecture pilote (WMI) par vendeur, memorisee ; aucune pour un item sans vendeur.
         var versionsParVendeur = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
         // Relire, poser, reecrire d'un seul tenant : le service reecrit ce fichier a chaque passe.
@@ -151,8 +126,7 @@ public sealed class ApplyReferenceSeedingStore : IDesiredStateStore
                 Paused: prev?.Paused ?? false,     // le kill-switch n'est jamais efface.
                 LastSeenBuild: nouveauBuild,
                 LastSeenDriverVersion: nouveauPilote,
-                // Aucune passe n'a eu lieu : le dire, plutot que d'horodater un
-                // « reconcilie » qui n'a pas existe.
+                // Aucune passe n'a eu lieu : pas d'horodatage d'un « reconcilie » inexistant.
                 LastReconciledAt: prev?.LastReconciledAt ?? default,
                 LastResultCode: prev?.LastResultCode ?? string.Empty);
             change = true;

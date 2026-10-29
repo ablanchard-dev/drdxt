@@ -6,36 +6,20 @@ using NSec.Cryptography;
 
 namespace DrDxt.Reconciler.Manifest;
 
-// -----------------------------------------------------------------------
-// MachineManifestKey : la cle de signature du manifeste, propre a cette machine.
-//
-// Pourquoi une cle par machine. La regle du projet est « rien hors du PC » : pas de signataire serveur.
-// La graine en variable d'environnement ne sert a personne sur une machine installee. Il reste une
-// cle creee localement, par le seul processus qui a le droit d'ecrire la racine admin : le helper
-// eleve, au premier `CommitManifestOp`. L'App (integrite moyenne) ne la tient jamais.
-//
-// Ou elle vit. `%ProgramData%\DrDxt\manifest-signing.key`, dans la racine deja durcie
-// (proprietaire Administrateurs, ACE, points de reparse : TrustedManifestRoot). Le fichier a
-// sa propre ACL, plus stricte que celle des fichiers publics : Administrateurs + SYSTEM seulement,
-// posee a la creation (TrustedManifestRoot.BuildPrivateFileSecurity), verifiee a chaque lecture
-// (EnsurePrivateFile : un fichier lisible par un non-admin est refuse).
-//
-// DPAPI, et ce qu'il ne fait pas. La graine est chiffree DPAPI portee machine. Cette portee se
-// dechiffre depuis n'importe quel compte local : face a un processus local, DPAPI ne protege rien, et
-// c'est l'ACL qui garde la cle. DPAPI ne sert qu'a rendre inutilisable une copie du fichier sortie de
-// la machine (sauvegarde, image disque, archive de support) : il faudrait aussi la cle maitresse de
-// cette machine. Deux lignes pour cela ; ce n'est pas la garantie.
-//
-// La cle privee est la source de verite. La cle publique (`manifest-public.key`, lue par l'App et par le
-// service) en est derivee et reecrite si elle differe. Ordre d'ecriture : cle privee, puis manifeste,
-// puis cle publique : une coupure entre les deux derniers laisse une publique perimee, reparee au
-// commit suivant ; jamais une cle privee perdue.
-//
-// Ce qui n'est jamais fait en silence. Une cle privee presente mais inutilisable (ACL non fiable,
-// illisible, ou c'est la cle de dev) n'est ni ecrasee ni remplacee : refus nomme
-// (ErrorCodes.ManifestKeyUnusable). Seule la reprise explicite la met de cote (renommee, jamais
+// MachineManifestKey : la cle de signature du manifeste, propre a cette machine (« rien hors du PC » : pas de signataire
+// serveur). Creee localement par le seul processus qui peut ecrire la racine admin, le helper eleve, au premier
+// `CommitManifestOp` ; l'App (integrite moyenne) ne la tient jamais.
+// Elle vit dans `%ProgramData%\DrDxt\manifest-signing.key`, racine durcie (proprietaire Administrateurs, ACE, points de
+// reparse : TrustedManifestRoot), avec sa propre ACL Administrateurs + SYSTEM seulement, posee a la creation
+// (TrustedManifestRoot.BuildPrivateFileSecurity) et verifiee a chaque lecture (EnsurePrivateFile refuse un fichier
+// lisible par un non-admin).
+// La graine est chiffree DPAPI portee machine, dechiffrable depuis tout compte local : c'est l'ACL qui garde la cle.
+// DPAPI rend seulement inutilisable une copie sortie de la machine (sauvegarde, image disque, archive de support).
+// La cle privee fait foi ; `manifest-public.key` (lue par l'App et le service) en est derivee, reecrite si elle differe.
+// Ordre : privee, manifeste, publique ; une coupure laisse une publique perimee, reparee au commit suivant, jamais une
+// privee perdue. Une privee presente mais inutilisable (ACL non fiable, illisible, cle de dev) n'est ni ecrasee ni
+// remplacee : refus nomme (ErrorCodes.ManifestKeyUnusable). Seule la reprise explicite la met de cote (renommee, jamais
 // effacee) et en cree une neuve.
-// -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class MachineManifestKey
 {
@@ -88,9 +72,8 @@ public static class MachineManifestKey
         }
     }
 
-    /// <summary>Pose (ou repare) la cle publique a cote de la privee. Un fichier deja identique et fiable
-    /// au repos n'est pas reecrit ; un fichier identique mais plante par un non-admin l'est (l'App et le
-    /// service le refuseraient).</summary>
+    /// <summary>Pose (ou repare) la cle publique a cote de la privee. Identique et fiable : pas reecrite ; identique mais
+    /// plantee par un non-admin : reecrite (l'App et le service la refuseraient).</summary>
     public static Result PublierClePublique(string racine, bool appliquerAcl, byte[] clePublique)
     {
         var chemin = Path.Combine(racine, PublicFileName);
@@ -196,13 +179,11 @@ public static class MachineManifestKey
             $"The machine's manifest signing key exists but cannot be used: {pourquoi}");
 }
 
-/// <summary>Mettre de cote = renommer a cote, avec l'heure UTC. Jamais effacer : ce qui ne se relit plus
-/// reste la seule trace de ce qu'il contenait, et la regle du depot interdit de supprimer.</summary>
+/// <summary>Mettre de cote = renommer a cote, avec l'heure UTC, jamais effacer : la seule trace de ce qu'il contenait.</summary>
 internal static class MiseDeCote
 {
     /// <param name="suffixe">pourquoi il est mis de cote : « mis-de-cote » (illisible, reprise) ou
-    /// « rendu » (ses origines viennent d'etre rendues a la desinstallation). Le nom du
-    /// fichier laisse dit ce qui lui est arrive.</param>
+    /// « rendu » (ses origines viennent d'etre rendues a la desinstallation).</param>
     public static Result Renommer(string chemin, string suffixe = "mis-de-cote")
     {
         try

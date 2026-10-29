@@ -16,8 +16,7 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
 {
     private readonly IPresentMonSession _session;
     private readonly Func<int, bool> _isProcessAlive;
-    // La pression de validation, en couture injectable comme la liveness : un test doit
-    // pouvoir la fixer sans toucher a la memoire de la machine qui fait tourner la suite.
+    // La pression de validation, injectable comme la liveness : un test la fixe sans toucher a la memoire de la machine.
     private readonly Func<double?> _commitPressure;
 
     /// <summary>Qui est au premier plan. Optionnel : sans sonde, le focus reste Unknown, et
@@ -39,7 +38,6 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
         _materiel = materiel;
     }
 
-    // Vraie vérification de vie : GetProcessById lève ArgumentException si le PID a disparu.
     /// <summary>Le temps que la sonde a vu le jeu derrière une autre fenêtre pendant la passe, plus une seconde (elle lit
     /// toutes les 250 ms) : la limite des secondes que l'hygiène peut écarter comme hors focus. Au premier plan tout du long,
     /// ou sans lecture concluante, aucune : une chute lente et régulière vue par le joueur est la mesure, pas un alt-tab.</summary>
@@ -48,6 +46,7 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             ? Math.Ceiling((1 - f) * brut.Where(ms => ms > 0 && double.IsFinite(ms)).Sum() / 1000.0) + 1
             : 0;
 
+    // Vraie vérification de vie : GetProcessById lève ArgumentException si le PID a disparu.
     private static bool DefaultProcessAlive(int pid)
     {
         try
@@ -91,49 +90,32 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
         var allGpuBusy = new List<double>();
         // Le denominateur de l'occupation GPU : les memes trames que `allGpuBusy`, et elles seules.
         var tramesAvecGpu = new List<double>();
-        // Les quatre series du classifieur. Elles sont accumulees en parallele de `all`
-        // et dans le meme ordre : les ratios par frame en aval apparient l'index i de l'une
-        // avec l'index i de l'autre, donc une desynchronisation ne se verrait pas, elle
-        // produirait juste un chiffre faux. MedianRatioOrNull refuse d'ailleurs de calculer
-        // quand les longueurs different.
+        // Les quatre series du classifieur, accumulees en parallele de `all` et dans le meme ordre : les ratios apparient
+        // l'index i de chacune, et une desynchronisation donnerait un chiffre faux sans erreur. MedianRatioOrNull refuse
+        // de calculer quand les longueurs different.
         var allGpuWait = new List<double>();
         var allCpuBusy = new List<double>();
         var allPresentApi = new List<double>();
         var allAnimationError = new List<double>();
-        // Le denominateur de l'exposition : combien de trames les captures ont rendues,
-        // avant hygiene. `retenuesVues / brutesVues` dit ce que la mesure a reellement garde, et ce que le masque aurait
-        // garde quand il refuse de filtrer : la serie reste entiere, l'exposition reste celle du jeu.
+        // Le denominateur de l'exposition : les trames rendues avant hygiene. `retenuesVues / brutesVues` dit ce que la
+        // mesure a garde (ou aurait garde quand le masque refuse de filtrer : la serie reste entiere).
         var brutesVues = 0;
         var retenuesVues = 0;
-        // Le focus, accumule sur toutes les passes : c'est la session entiere qui doit avoir ete
-        // jouee, pas seulement sa premiere minute.
+        // Le focus, accumule sur toutes les passes : la session entiere doit avoir ete jouee.
         var focus = FocusObservation.Aucune;
         var lecturesMateriel = new System.Collections.Concurrent.ConcurrentBag<HardwareReading>();
 
-        // Rattraper une passe perdue, parce qu'une seule suffit a tuer la resolution.
-        //
-        // `InterRunMarginOfError` vaut +∞ sous trois passes utilisables, et une passe qui ne rend
-        // aucune trame exploitable n'en est pas une. Le re-bench du moteur en demande exactement
-        // trois : une passe perdue, et le produit ne peut plus rien conclure, y compris une
-        // regression qu'il aurait fallu annuler. Ce n'est pas une hypothese, c'est l'arithmetique
-        // de `FrametimeStatistics`.
-        //
-        // Le rattrapage est borne au nombre de passes demandees. Sur une machine ou la capture ne
-        // marche pas, le banc rend ce qu'il a avec sa resolution inconnue et assumee : refaire une
-        // passe est une correction, boucler serait un defaut.
-        //
-        // Aucun rattrapage sous trois passes demandees : demander une passe est un choix de
-        // l'appelant (un smoke rapide), et en faire trois a sa place rendrait une mesure que
-        // personne n'a demandee.
+        // Rattraper une passe perdue : `InterRunMarginOfError` (`FrametimeStatistics`) vaut +∞ sous trois passes
+        // utilisables, et le re-bench du moteur en demande trois ; une passe perdue, et plus rien ne se conclut, pas meme
+        // une regression a annuler. Borne au nombre de passes demandees (boucler serait un defaut) ; aucun rattrapage
+        // sous trois demandees, le choix de l'appelant (un smoke rapide).
         var rattrapagesRestants = runs >= 3 ? runs : 0;
 
         for (var i = 0; i < runs; i++)
         {
             ct.ThrowIfCancellationRequested();
 
-            // Echantillonne pendant la capture, jamais apres. Le meme piege que la telemetrie
-            // GPU : lire le focus une fois la passe finie ne dit rien de ce qui s'est passe
-            // pendant : le joueur est revenu au jeu entre-temps.
+            // Echantillonne pendant la capture, jamais apres : le joueur est revenu au jeu entre-temps.
             using var arretFocus = new CancellationTokenSource();
             var focusPasse = FocusObservation.Aucune;
             var suiviFocus = _foreground is null
@@ -150,8 +132,7 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
                     }
                 }, CancellationToken.None);
 
-            // Meme regle, meme boucle : la telemetrie materielle se lit pendant la passe. Lue
-            // apres, elle decrit une carte qui a deja commence a redescendre.
+            // La telemetrie materielle aussi : lue apres, elle decrit une carte qui redescend deja.
             var suiviMateriel = _materiel is null
                 ? Task.CompletedTask
                 : Task.Run(async () =>
@@ -178,18 +159,10 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
                 if (perRunAvgFps.Count >= 2)
                     break;
 
-                // Le service repond (verifie plus haut), le processus tourne, et zero frame est
-                // arrivee. Deux causes possibles, et le produit ne sait pas trancher : le
-                // processus ne presente rien en ce moment (menu, fenetre minimisee, onglet en
-                // arriere-plan), ou son anti-triche bloque la capture ETW.
-                //
-                // Un nom comme `AntiCheatBlocked` affirmerait une cause : en visant Firefox, qui n'a aucun
-                // anti-triche, le code rend aussi zero frame. Le message affiche nomme les deux hypotheses
-                // sans en choisir une.
-                //
-                // `NoPresentingFrames` decrit ce qu'on observe : aucune frame presentee. L'anti-
-                // triche n'est qu'une hypothese parmi deux, et aucun nom interne ne doit affirmer
-                // une cause que le produit n'a pas prouvee.
+                // Service vivant, processus vivant, zero frame : soit rien n'est presente (menu, fenetre minimisee, onglet
+                // en arriere-plan), soit l'anti-triche bloque la capture ETW. `NoPresentingFrames` decrit l'observation ;
+                // `AntiCheatBlocked` affirmerait une cause (Firefox, sans anti-triche, rend aussi zero frame). Le message
+                // nomme les deux hypotheses.
                 if (cap.Error!.Value.Code == ErrorCodes.NoFrames && _isProcessAlive(targetPid))
                     return Result<BenchmarkResult>.Fail(ErrorCodes.NoPresentingFrames,
                         "Measure.NoPresentingFrames");
@@ -197,18 +170,11 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
                 return Result<BenchmarkResult>.Fail(cap.Error.Value.Code, cap.Error.Value.Message);
             }
 
-            // ── Hygiene, appliquee par run et aux sept series ─────────────────────────────
-            // C'est ici, et pas apres l'agregation, parce que c'est ici que les sept series sont
-            // encore coherentes entre elles : `FrameTimesMs` et les six annexes sont appariees par
-            // index, et le ratio de la frame i se lit a l'index i de chacune. Un filtre pose sur la
-            // seule serie principale decalerait les six autres, et chaque ratio du classifieur
-            // deviendrait faux sans lever la moindre erreur.
-            //
-            // Le masque retire ce qui n'est pas du jeu : les secondes de chargement, et les
-            // plafonds hors focus : un jeu derriere une autre fenetre se cale sur 30 fps, et
-            // publier ces secondes revient a reprocher au joueur d'avoir alt-tabbe. Un vrai
-            // ralentissement, lui, traverse : voir `FrameSeriesHygiene.CapRegularityMax`. Et seulement le temps que la sonde
-            // a vu le jeu derrière une autre fenêtre : une chute V-Sync régulière au premier plan reste dans la mesure.
+            // Hygiene par run et sur les sept series : ici elles sont encore appariees par index (`FrameTimesMs` et six
+            // annexes) ; filtrer la seule principale fausserait chaque ratio sans erreur. Le masque retire ce qui n'est
+            // pas du jeu : le chargement, et les plafonds hors focus (30 fps derriere une autre fenetre), seulement le
+            // temps ou la sonde a vu le jeu derrière une autre fenêtre. Un vrai ralentissement traverse (voir
+            // `FrameSeriesHygiene.CapRegularityMax`), une chute V-Sync régulière au premier plan aussi.
             var brut = cap.Value!.FrameTimesMs;
             // En pleine partie (le relevé), aucun démarrage à couper : voir MesureEnPartie.
             var masque = FrameSeriesHygiene.Masque(brut, MesureEnPartie.Active ? 0 : FrameSeriesHygiene.DefaultWarmupSeconds,
@@ -227,18 +193,9 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             // Les modes de présentation, même masque : comptés en double pour passer par le même filtre.
             if (cap.Value.PresentModes is { Count: > 0 } modes)
                 AppendAligned(allPresentModes, Filtrer(modes.Select(m => (double)m).ToList(), masque, brut.Count), frames.Count);
-            // La serie GPU emporte son propre denominateur.
-            //
-            // Empilee sans appariement (`AddRange`), une capture desynchronisee contribuerait quand meme a
-            // l'occupation GPU du produit, celle qui porte le verdict de goulot.
-            //
-            // L'apparier run par run ne suffit pas non plus. Sur cinq passes dont une seule a une serie GPU
-            // decalee, `allGpuBusy` compterait quatre passes et `all` cinq : la part appariee deviendrait
-            // incalculable, et le repli « moyenne sur moyenne » se rallumerait, c'est-a-dire exactement le
-            // melange de populations a eviter.
-            //
-            // D'ou `tramesAvecGpu` : les trames d'une passe n'entrent au denominateur que si sa
-            // serie GPU est entree au numerateur. Les deux listes ne peuvent plus diverger.
+            // La serie GPU emporte son propre denominateur, `tramesAvecGpu` : les trames d'une passe n'y entrent que si sa
+            // serie GPU est entree au numerateur. Sinon une passe decalee sur cinq (quatre dans `allGpuBusy`, cinq dans
+            // `all`) rendrait la part appariee incalculable et rallumerait le repli « moyenne sur moyenne ».
             var gpuBusy = Filtrer(cap.Value.GpuBusyMs, masque, brut.Count);
             if (gpuBusy is not null && gpuBusy.Count == frames.Count)
             {
@@ -250,10 +207,8 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             AppendAligned(allPresentApi, Filtrer(cap.Value.InPresentApiMs, masque, brut.Count), frames.Count);
             AppendAligned(allAnimationError, Filtrer(cap.Value.AnimationErrorMs, masque, brut.Count), frames.Count);
 
-            // Agrégat par passe pour la marge entre passes : la marge A/B est l'écart entre passes
-            // indépendantes, pas un intervalle de confiance par image (des images autocorrélées le rendraient
-            // bien trop étroit). Une passe sans image utilisable n'apporte aucune moyenne : elle ne doit pas
-            // empoisonner la variance d'une passe à l'autre.
+            // Agrégat par passe : la marge A/B est l'écart entre passes indépendantes, pas un intervalle par image (des
+            // images autocorrélées le rendraient trop étroit). Une passe sans image utilisable n'entre pas dans la variance.
             var runAvg = FrametimeStatistics.AvgFps(frames);
             if (runAvg > 0)
             {
@@ -263,28 +218,21 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             }
             else if (rattrapagesRestants > 0)
             {
-                // Cette passe n'a rien rendu d'exploitable : elle ne compte pas, donc on en refait
-                // une a la place. Sinon la resolution disparait en silence.
+                // Rien d'exploitable : la passe ne compte pas, on en refait une.
                 rattrapagesRestants--;
                 i--;
             }
         }
 
-        // Des images sans aucun temps exploitable (NaN, 0) ne font aucune passe : rendues Ok, elles donnaient une
-        // mesure à 0 FPS, et le repli DXGI ne partait pas.
+        // Des images sans temps exploitable (NaN, 0) ne font aucune passe : rendues Ok, elles feraient une mesure à 0 FPS
+        // et le repli DXGI ne partirait pas.
         if (all.Count == 0 || perRunAvgFps.Count == 0)
             return Result<BenchmarkResult>.Fail(ErrorCodes.NoFrames,
                 Docteur.T("BR.AucuneFrame"));
 
-        // Ne pas filtrer ici. L'hygiene est deja passee, par run, juste au-dessus, et c'est le
-        // seul endroit ou elle peut passer. A ce stade `all` et les six series annexes sont le
-        // recollement de plusieurs captures ; un filtre pose maintenant devrait redecouper les
-        // sept a l'identique, alors que les frontieres entre runs ont disparu.
-        //
-        // Mesure du 07/09/2026 : rejouees a travers l'hygiene corrigee, les 8 captures reelles de
-        // `tools/p3` gardent toutes leurs trames (0 seconde retiree sur 2 170). Elles demarrent
-        // toutes en pleine partie. L'hygiene sert les captures qui commencent au lancement du jeu,
-        // et les sessions ou le joueur alt-tabbe : deux cas qu'aucune donnee conservee ne contient.
+        // Ne pas filtrer ici : l'hygiene passe par run, plus haut ; recollees, les sept series n'ont plus de frontieres de
+        // run. Mesure du 07/09/2026 : les 8 captures reelles de `tools/p3` gardent toutes leurs trames (0 seconde
+        // retiree sur 2 170), toutes en pleine partie ; l'hygiene sert le lancement du jeu et l'alt-tab, absents des donnees.
 
         var result = new BenchmarkResult(
             AvgFps: FrametimeStatistics.AvgFps(all),
@@ -303,24 +251,17 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             // GPU busy (ms) : le temps de travail du GPU par image, en moyenne sur les passes. GpuBusy/FrameTime
             // distingue limité par le GPU (≈ temps d'image) et limité par le CPU (≪). Null sans relevé (non mesuré).
             MeanGpuBusyMs: FrametimeStatistics.MeanOrNull(allGpuBusy),
-            // L'occupation GPU, appariee. C'est elle que `GpuBusyPercent` prend comme
-            // source : une part du temps ecoule calculee somme sur somme, sur les seules trames ou
-            // les deux grandeurs existent. La moyenne juste au-dessus reste publiee (elle dit
-            // autre chose : le travail GPU d'une trame), mais elle ne sert pas a fabriquer un
-            // pourcentage a partir de deux populations differentes.
+            // L'occupation GPU appariee, source de `GpuBusyPercent` : somme sur somme, sur les seules trames ou les deux
+            // grandeurs existent. La moyenne au-dessus (le travail GPU d'une trame) ne sert pas a fabriquer ce pourcentage.
             GpuBusyShare: FrametimeStatistics.SumRatioOrNull(allGpuBusy, tramesAvecGpu),
 
-            // ── Les grandeurs du classifieur de goulot ──────────────────────────────
-            // Mediane pour les ratios, p95 pour les latences : c'est ce que la spec demande, et
-            // pas par gout. Une moyenne de ratios se fait tirer par quelques frames aberrantes
-            // (un chargement, un alt-tab) et ferait basculer un etat entier ; un a-coup vit
-            // dans la queue qu'une moyenne noie. Chaque grandeur vaut null quand elle n'a pas
-            // ete mesuree : le classifieur en tire UNKNOWN_PARTIAL, jamais un etat confiant.
+            // Les grandeurs du classifieur : mediane pour les ratios (quelques frames aberrantes, un chargement, un alt-tab,
+            // tireraient une moyenne), p95 pour les latences (un a-coup vit dans la queue). Null quand non mesuree : le
+            // classifieur en tire UNKNOWN_PARTIAL, jamais un etat confiant.
             GpuWaitRatio: FrametimeStatistics.MedianRatioOrNull(allGpuWait, all),
             CpuBusyRatio: FrametimeStatistics.MedianRatioOrNull(allCpuBusy, all),
             PresentStallMsP95: FrametimeStatistics.PercentileOrNull(allPresentApi, 0.95),
-            // Le compte qui va avec, par le meme filtre : la valeur et sa garde ne peuvent pas
-            // porter sur deux populations differentes.
+            // Le compte, par le meme filtre : la valeur et sa garde portent sur la meme population.
             PresentStallSamples: FrametimeStatistics.EchantillonsExploitables(allPresentApi),
             RenderPresentLatencyMsP95: FrametimeStatistics.PercentileOrNull(allLatencies, 0.95),
             // La médiane, pas le p95 : un levier de latence se juge sur ce que le joueur sent à chaque image.
@@ -329,22 +270,16 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
             PcLatencyMsMedian: FrametimeStatistics.PercentileOrNull(allPcLatencies, 0.5),
             PcLatencyMsP95: FrametimeStatistics.PercentileOrNull(allPcLatencies, 0.95),
             PartImagesComposees: FrametimeStatistics.PartComposee(allPresentModes.Select(m => (int)m).ToList()),
-            // Valeur absolue : une frame affichee 5 ms trop tot casse la cadence autant qu'une
-            // frame 5 ms trop tard, et l'erreur d'animation est signee.
+            // Valeur absolue : l'erreur d'animation est signee, et 5 ms trop tot casse la cadence autant que 5 ms trop tard.
             AnimationErrorMsP95: FrametimeStatistics.AbsPercentileOrNull(allAnimationError, 0.95),
-            // Le compte qui va avec ce p95, calcule par le meme filtre : sans lui, l'affichage
-            // jugerait son interpretabilite sur le nombre de trames, qui n'a aucun rapport avec le
-            // nombre d'echantillons d'animation reellement retenus.
+            // Le compte de ce p95, par le meme filtre : le nombre de trames ne dit pas combien d'echantillons d'animation
+            // ont ete retenus.
             AnimationErrorSamples: FrametimeStatistics.EchantillonsAbsExploitables(allAnimationError),
-            // La seule grandeur qui ne vient pas de PresentMon. Elle parle de fiabilite (gels,
-            // OOM), pas de FPS, et c'est exactement pour ca qu'elle compte : une machine sous
-            // pression de validation ne se repare pas en overclockant quoi que ce soit.
+            // La seule grandeur hors PresentMon : la fiabilite (gels, OOM), qu'aucun overclocking ne repare.
             CommitPressure: _commitPressure(),
 
-            // L'exposition reelle de la mesure : ce que l'hygiene a garde, tous runs confondus.
-            // Sans elle, deux passes A/B peuvent avoir vecu des choses differentes sans que rien
-            // ne le dise : un alt-tab de vingt secondes d'un seul cote suffit a fabriquer un gain.
-            // `AbComparer.Evidence` refuse de comparer deux expositions trop eloignees.
+            // L'exposition reelle, tous runs confondus : un alt-tab de vingt secondes d'un seul cote suffit a fabriquer un
+            // gain. `AbComparer.Evidence` refuse de comparer deux expositions trop eloignees.
             HygieneKeptFraction: brutesVues > 0 ? (double)retenuesVues / brutesVues : null,
 
             // Le focus observe. Sans sonde, il reste null, et Unknown ne condamne pas.
@@ -354,9 +289,8 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
         return Result<BenchmarkResult>.Ok(result);
     }
 
-    // Ajoute une serie a son accumulateur seulement si elle a bien une entree par frame.
-    // Une serie partielle concatenee decalerait tout ce qui suit sans qu'aucun test ne rougisse :
-    // les ratios continueraient d'etre calcules, sur des paires de frames differentes.
+    // Ajoute une serie seulement si elle a une entree par frame : une serie partielle decalerait tout ce qui suit, et les
+    // ratios se calculeraient sur des paires de frames differentes, sans erreur.
     private static void AppendAligned(List<double> accumulator, IReadOnlyList<double>? series, int frameCount)
     {
         if (series is null || series.Count != frameCount) return;
@@ -368,13 +302,9 @@ public sealed class BenchmarkRunner : IBenchmarkRunner
         IReadOnlyList<double> serie, FrameSeriesHygiene.MaskResult masque)
         => Filtrer(serie, masque, serie.Count)!;
 
-    /// <summary>Applique le masque a une serie annexe.
-    ///
-    /// Une serie annexe dont la longueur ne correspond pas a la serie brute est rendue telle
-    /// quelle, sans etre filtree : elle n'etait deja pas appariee, et lui appliquer un masque
-    /// construit sur d'autres index inventerait un alignement au lieu de le retablir.
-    /// `AppendAligned` la rejettera ensuite, ce qui est le comportement voulu : une serie
-    /// desynchronisee ne doit contribuer a aucun ratio.</summary>
+    /// <summary>Applique le masque a une serie annexe. D'une autre longueur que la serie brute, elle est rendue telle
+    /// quelle (un masque construit sur d'autres index inventerait un alignement), puis `AppendAligned` la rejette : une
+    /// serie desynchronisee ne contribue a aucun ratio.</summary>
     private static IReadOnlyList<double>? Filtrer(
         IReadOnlyList<double>? serie, FrameSeriesHygiene.MaskResult masque, int longueurBrute)
     {

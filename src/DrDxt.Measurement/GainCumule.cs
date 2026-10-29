@@ -25,42 +25,15 @@ public sealed record TotalDeGains(
     IReadOnlyList<string> Refus);
 
 /// <summary>
-/// Additionner des gains sans mentir, et refuser quand c'est impossible.
-///
-/// ══ pourquoi ce type existe ══
-/// `Cumulative game gain` est la metrique que le mandat « PERFORMANCE first » designe comme juge du
-/// produit. Sans ce type, rien dans ce depot ne garde un gain prouve : le moteur rend un verdict
-/// par plan applique, jamais un par levier, et ne l'ecrit nulle part ; le seul gain prouve de la
-/// machine de reference, +2,2 % au banc GPU, ne vit que dans un fichier de plan.
-///
-/// ══ les trois fautes que ce type rend impossibles ══
-///
-/// **1. Additionner des pourcentages.** Deux gains de 2 % et 3 % ne font pas 5 % : ils font
-/// 1,02 x 1,03 - 1 = 5,06 %. L'ecart est petit ici et grossit vite ; sur cinq leviers a 10 %,
-/// l'addition naive rend 50 % quand la composition rend 61 %. Un produit qui annonce le premier
-/// chiffre se trompe contre lui-meme, ce qui ne le rend pas plus honnete.
-///
-/// **2. Melanger les instruments, et c'est la vraie.** Un gain de 2,2 % au banc GPU et un gain
-/// de 10 % au banc CPU ne s'additionnent pas : ils ne mesurent pas la meme chose, et aucun des
-/// deux ne dit ce qu'un jeu obtient. Les sommer produirait « +12,4 % de performance », un nombre
-/// qui n'a aucun referent, exactement le genre d'annonce que ce depot reproche aux autres. Ce type
-/// refuse, nomme le refus, et n'additionne que ce qui partage un instrument.
-///
-/// **3. Composer le gain et additionner le bruit.** Composer les ecarts (un produit) tout en
-/// empilant les bruits en points de pourcentage (racine de la somme des carres) serait faux : les
-/// deux ne vivent pas a la meme echelle. Le bruit d'un produit se propage en relatif, puis se
-/// reporte a l'echelle du total. Sur cinq leviers a +10 % ± 1 %, la formule en points annonce
-/// ± 2,24 % la ou la propagation correcte donne ± 3,27 % (verifie par Monte-Carlo, 400 000
-/// tirages, qui rend 3,27 %). Elle sous-estime l'incertitude, donc surestime la confiance : la
-/// direction dangereuse pour un depot dont la loi est « un ecart plus petit que le bruit n'est
-/// pas un gain ».
-///
-/// Sur un seul gain les deux formules coincident exactement. Le seul chiffre publie de cette
-/// machine, +2,2 % ± 0,122 % au banc GPU, ne bouge donc pas d'un millieme.
-///
-/// Et il ne transforme jamais un gain de banc en gain de jeu. Le banc GPU deterministe resout
-/// 0,122 %, le jeu en ligne rend ±45 % sur le 1 % low : le second ne peut pas confirmer le premier,
-/// et le premier ne peut pas predire le second.
+/// Additionner des gains sans mentir (le « Cumulative game gain » du mandat « PERFORMANCE first »), et refuser quand
+/// c'est impossible. Trois fautes rendues impossibles :
+/// 1. Additionner des pourcentages : 2 % et 3 % font 1,02 x 1,03 - 1 = 5,06 % ; cinq leviers a 10 % font 61 %, pas 50.
+/// 2. Melanger les instruments : 2,2 % au banc GPU et 10 % au banc CPU ne mesurent pas la meme chose ; « +12,4 % » n'a
+///    aucun referent. Seul ce qui partage un instrument s'additionne, le reste est refuse et nomme.
+/// 3. Composer le gain et additionner le bruit : le bruit d'un produit se propage en relatif. Sur cinq leviers a
+///    +10 % ± 1 %, la formule en points dit ± 2,24 %, la propagation ± 3,27 % (Monte-Carlo, 400 000 tirages) : sous-
+///    estimer l'incertitude surestime la confiance. Sur un seul gain les deux coincident (+2,2 % ± 0,122 % au banc GPU).
+/// Un gain de banc n'est jamais un gain de jeu : le banc GPU resout 0,122 %, le jeu en ligne rend ±45 % sur le 1 % low.
 /// </summary>
 public static class GainCumule
 {
@@ -71,8 +44,7 @@ public static class GainCumule
         if (gains is null || gains.Count == 0)
             return new TotalDeGains(0, 0, null, [], [Docteur.T("GC.AucunGainProuve")]);
 
-        // On additionne dans l'instrument le plus represente plutot que de choisir au hasard : le
-        // total le plus etaye est celui qui a le plus de mesures derriere lui.
+        // L'instrument le plus represente : le total le plus etaye.
         var instrument = gains
             .GroupBy(g => g.Instrument, StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(g => g.Count())
@@ -100,8 +72,7 @@ public static class GainCumule
                 continue;
             }
 
-            // Un ecart plus petit que le bruit de sa propre mesure n'est pas un gain. Le retenir
-            // ferait grossir un total avec du bruit, ce qui est la definition d'un faux gain.
+            // Un ecart plus petit que le bruit de sa propre mesure n'est pas un gain.
             if (Math.Abs(g.EcartPercent) <= g.BruitPercent)
             {
                 refus.Add(Docteur.T("GC.Bruit", g.Levier, g.EcartPercent, g.BruitPercent));
@@ -110,9 +81,8 @@ public static class GainCumule
 
             var f = 1 + g.EcartPercent / 100.0;
 
-            // Un levier qui coute 100 % ou plus annule le produit : le total ne serait plus
-            // compose, il serait ecrase, et son incertitude relative n'existe plus. Ce n'est pas une
-            // mesure de performance, c'est une machine qui ne rend plus d'images.
+            // Un levier qui coute 100 % ou plus annule le produit et son incertitude relative : une machine qui ne rend
+            // plus d'images, pas une mesure de performance.
             if (f <= 0)
             {
                 refus.Add(Docteur.T("GC.Annule", g.Levier, g.EcartPercent));
@@ -120,9 +90,7 @@ public static class GainCumule
             }
 
             facteur *= f;
-            // Le bruit se compose dans l'espace du produit, pas en points de pourcentage. Chaque
-            // mesure apporte son incertitude relative (bruit / son propre facteur) ; elles s'ajoutent
-            // en quadrature parce qu'elles sont independantes, et le total les reporte a son echelle.
+            // Incertitudes relatives (bruit / facteur) independantes : en quadrature, reportees a l'echelle du total.
             bruitRelatifCarre += g.BruitPercent / f * (g.BruitPercent / f);
             retenus.Add(g.Levier);
         }
@@ -136,19 +104,9 @@ public static class GainCumule
     }
 
     /// <summary>
-    /// Ce qu'une campagne a laisse dans la machine, sur une grandeur.
-    ///
-    /// Seuls les candidats <see cref="CandidateOutcome.Kept"/> comptent, et c'est la garantie
-    /// qui porte : un candidat rejete a ete annule ; son ecart est reel, il n'est simplement plus
-    /// dans la machine. Le compter ferait annoncer un total que le PC ne rend pas.
-    ///
-    /// Une grandeur a la fois, jamais un composite. Un levier garde pour ses FPS moyens peut
-    /// avoir degrade le 1 % low : sur cette grandeur-la il entre au total avec son signe, et le
-    /// total baisse. C'est exactement ce qu'on veut lire.
-    ///
-    /// Une preuve non concluante (sous le bruit, ou invalide) n'entre pas : son ecart existe
-    /// mais l'experience ne l'a pas resolu, et composer un chiffre non resolu fabriquerait un total
-    /// que rien ne soutient.
+    /// Ce qu'une campagne a laisse dans la machine, sur une grandeur. Seuls les <see cref="CandidateOutcome.Kept"/>
+    /// comptent : un rejete a ete annule. Une grandeur a la fois : un levier garde pour ses FPS moyens qui degrade le
+    /// 1 % low y entre avec son signe. Une preuve non concluante (sous le bruit, invalide) n'entre pas.
     /// </summary>
     public static TotalDeGains DepuisLaCampagne(
         IReadOnlyList<CandidateResult>? resultats, GameMetricKind metrique)
@@ -163,21 +121,15 @@ public static class GainCumule
             .ToList();
 
         return gains.Count == 0
-            // La raison ne repete pas l'instrument : `Phrase` le nomme deja, sinon le rejeu rendrait
-            // « RIEN DE PROUVE sur « FPS moyens » : aucun levier garde n'a prouve quoi que ce soit sur
-            // « FPS moyens » ».
+            // La raison ne repete pas l'instrument : `Phrase` le nomme deja.
             ? new TotalDeGains(0, 0, instrument, [],
                 [Docteur.T("GC.AucunLevier")])
             : Additionner(gains);
     }
 
     /// <summary>
-    /// Le verdict en une phrase, pour que personne n'ait a lire un tableau pour savoir si c'est
-    /// prouve.
-    ///
-    /// Le total se juge contre son propre bruit (la propagation des incertitudes), pas contre celui
-    /// d'un levier. Un total de +3 % avec un bruit compose de ±3,3 % ne
-    /// prouve rien, meme si chacun des leviers qui le composent avait prouve le sien.
+    /// Le verdict en une phrase. Le total se juge contre son propre bruit compose : +3 % ± 3,3 % ne prouve rien, meme si
+    /// chaque levier avait prouve le sien.
     /// </summary>
     public static string Phrase(TotalDeGains total)
     {

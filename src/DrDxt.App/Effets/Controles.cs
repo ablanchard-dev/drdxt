@@ -99,18 +99,9 @@ public sealed class NoyauDeMaintien : ButtonBase
         nameof(EnMaintien), typeof(bool), typeof(NoyauDeMaintien), new PropertyMetadata(false));
 
     /// <summary>
-    /// Le noyau travaille, il ne s'éteint pas.
-    ///
-    /// Pendant le scan, le noyau est désactivé (on ne relance pas un scan en cours) et le style
-    /// le grisait à 50 % comme n'importe quel bouton hors service. Mesuré en photographiant la
-    /// fenêtre : au moment précis où la personne vient d'appuyer, la sphère, son chrome et son
-    /// anneau passent tous à demi-teinte ; le seul signe de vie restant est un arc fin, lui aussi
-    /// à demi-teinte. Le geste répond donc par une extinction, et le scan durant moins d'une
-    /// seconde, on ne voit que ça : « j'appuie, ça s'éteint, il ne se passe rien ».
-    ///
-    /// Occupé distingue les deux raisons de ne plus être cliquable : hors service (on grise) et
-    /// au travail (on reste allumé, et on s'agite). Une seule propriété, parce que le style ne
-    /// peut pas deviner la raison depuis IsEnabled seul.
+    /// Le noyau travaille, il ne s'éteint pas : pendant le scan il est désactivé, et un style qui le grise à 50 % comme un
+    /// bouton hors service répondrait à l'appui par une extinction (« j'appuie, ça s'éteint »). Occupé distingue les deux
+    /// raisons de ne plus être cliquable, hors service (grisé) ou au travail (allumé, agité), qu'IsEnabled seul ne dit pas.
     /// </summary>
     public static readonly DependencyProperty OccupeProperty = DependencyProperty.Register(
         nameof(Occupe), typeof(bool), typeof(NoyauDeMaintien), new PropertyMetadata(false,

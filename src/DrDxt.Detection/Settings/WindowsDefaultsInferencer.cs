@@ -5,15 +5,10 @@ namespace DrDxt.Detection.Settings;
 /// <summary>
 /// Les degats deja infliges a la machine.
 ///
-/// « Ce qui te coûte des images » dans sa forme la plus fréquente n'est pas un réglage jamais
-/// activé : c'est un défaut Windows qu'un « optimiseur » précédent a cassé. Ces deux-là étaient
-/// prévus depuis le modèle de notation initial (non publié) et jamais implémentés, faute de lecteurs.
-///
-/// La règle qui sépare les deux cas ci-dessous, et qui décide s'ils déduisent des points :
-/// **on ne pénalise que ce que la recherche du dépôt source comme un vrai risque.** Le reste est
-/// signalé comme une régression à annuler, sans promesse et sans point retiré, parce qu'inventer
-/// un déficit sur un réglage dont l'impact est documenté comme négligeable est exactement la
-/// faute que l'audit adverse (C2) reproche.
+/// Le cas le plus fréquent n'est pas un réglage jamais activé, mais un défaut Windows qu'un « optimiseur » précédent a
+/// cassé. Seul ce que la recherche du dépôt source comme un vrai risque est dit risqué (MMCSS) ; le reste (SysMain) est
+/// signalé comme un défaut changé, sans promesse : inventer un déficit à un réglage documenté négligeable serait la faute
+/// que l'audit adverse (C2) reproche.
 /// </summary>
 public static class WindowsDefaultsInferencer
 {
@@ -26,10 +21,8 @@ public static class WindowsDefaultsInferencer
     /// le plus courant. Unknown quand la valeur ne se lit pas : ne jamais conclure « désactivé »
     /// sur une lecture ratée.
     ///
-    /// Off n'est pas un déficit chiffré, et ce fichier ne prétend pas le contraire.
-    /// La note mémoire du projet (non publiée) conclut : gain **non prouvé** sur une install
-    /// saine, et sur SSD l'effet de SysMain (positif comme négatif) est négligeable. On le
-    /// signale pour ce qu'il est : une valeur par défaut que quelqu'un a changée.
+    /// Off n'est pas un déficit chiffré : gain non prouvé sur une install saine, effet négligeable sur SSD (note mémoire
+    /// du projet, non publiée). C'est une valeur par défaut que quelqu'un a changée.
     /// Source : https://learn.microsoft.com/en-us/powershell/module/mmagent/enable-mmagent
     /// </summary>
     public static TriState InferSysMain(object? startValue) => startValue switch

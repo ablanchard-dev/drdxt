@@ -4,30 +4,20 @@ using DrDxt.Measurement.Network;
 namespace DrDxt.Detection.Network;
 
 /// <summary>
-/// D'ou vient l'instabilite du reseau, mesuree et pas seulement lue sur la carte : un joueur
-/// competitif ressent le reseau avant tout le reste.
-///
-/// Ce service assemble la passerelle de la carte physique (jamais « la
-/// premiere passerelle trouvee » : un VPN monte en a une aussi), deux fenetres de mesure, et
-/// l'analyseur qui les compare sans seuil invente.
-///
-/// Ce qu'il rend quand il ne sait pas : `null`. Pas de carte, pas de passerelle, une mesure
-/// refusee, un verdict indecidable ⇒ la ligne n'apparait pas. « Non mesure » ne se remplace pas
-/// par « reseau sain » : c'est la meme regle que le regime soutenu du processeur.
-///
-/// Ordre d'appel : cette mesure doit passer avant le banc CPU du scan. Un banc qui sature huit
-/// cœurs gonfle la gigue ICMP des deux fenetres, et c'est notre propre machine qui la fabrique.
-/// Mesurer apres, ce serait attribuer au reseau une instabilite qu'on vient de creer.
+/// D'ou vient l'instabilite du reseau, mesuree et pas seulement lue sur la carte. Assemble la passerelle de la carte
+/// physique (jamais « la premiere trouvee » : un VPN en a une aussi), deux fenetres de mesure, et l'analyseur qui les
+/// compare sans seuil invente. Sans carte, passerelle, mesure ou verdict decidable : `null`, la ligne n'apparait pas
+/// (« non mesure » n'est pas « reseau sain »).
+/// A appeler avant le banc CPU du scan : huit cœurs satures gonflent la gigue ICMP, et on accuserait le reseau d'une
+/// instabilite qu'on vient de creer.
 /// </summary>
 public sealed class AttributionReseauService
 {
-    /// <summary>Reference internet par defaut : un resolveur anycast qui repond a l'ICMP depuis
-    /// n'importe quel operateur. Ce n'est pas le serveur de jeu : le caveat le dit dans la
-    /// phrase, et aucun verdict ne pretend le contraire.</summary>
+    /// <summary>Reference internet par defaut : un resolveur anycast qui repond a l'ICMP depuis n'importe quel operateur.
+    /// Pas le serveur de jeu, et la phrase le dit.</summary>
     public const string ReferenceInternetParDefaut = "1.1.1.1";
 
-    // Deux secondes par fenetre : assez de sondes pour une gigue lisible, assez court pour ne pas
-    // rallonger un scan qui charge deja le processeur pendant quarante secondes.
+    // Deux secondes par fenetre : une gigue lisible sans rallonger un scan qui charge deja le processeur 40 s.
     private const int Sondes = 10;
     private static readonly TimeSpan Intervalle = TimeSpan.FromMilliseconds(200);
     private static readonly TimeSpan Delai = TimeSpan.FromSeconds(2);
@@ -47,8 +37,7 @@ public sealed class AttributionReseauService
     /// <summary>La phrase a afficher, ou <c>null</c> quand rien n'a pu etre attribue.</summary>
     public async Task<string?> LigneAsync(CancellationToken ct = default)
     {
-        // La passerelle se lit par WMI (centaines de millisecondes) : hors du fil appelant, qui est celui de l'écran
-        // quand le scan l'appelle.
+        // La passerelle se lit par WMI (centaines de ms) : hors du fil appelant, celui de l'écran pendant le scan.
         var passerelle = await Task.Run(Passerelle, ct).ConfigureAwait(false);
         if (passerelle is null) return null;
 
@@ -57,10 +46,9 @@ public sealed class AttributionReseauService
         if (premier.Verdict is not (NetworkPathVerdict.StartsAtFirstHop or NetworkPathVerdict.AppearsBeyondGateway))
             return Phrase(premier, passerelle);
 
-        // Un verdict qui désigne (la box, l'opérateur) doit se reproduire. Mesuré sur la machine de reference avec
-        // le chemin exact du produit : 30 sur 30 « rien à désigner » au repos, mais 3 sur 10 accusations sous
-        // charge processeur (le PC occupé fabrique sa propre gigue). Une seconde comparaison doit dire la même
-        // chose ; sinon la mesure n'accuse personne. Coût : quatre secondes, seulement quand il y a accusation.
+        // Un verdict qui désigne (la box, l'opérateur) doit se reproduire : sur la machine de reference, par le chemin du
+        // produit, 30 sur 30 « rien à désigner » au repos mais 3 accusations sur 10 sous charge processeur. Une seconde
+        // comparaison doit dire la même chose, sinon personne n'est accusé (quatre secondes, seulement en cas d'accusation).
         var second = await Comparer(passerelle, ct).ConfigureAwait(false);
         if (second is null) return null;
         return Phrase(second.Verdict == premier.Verdict ? second : second with { Verdict = NetworkPathVerdict.Indistinguishable },
@@ -76,21 +64,10 @@ public sealed class AttributionReseauService
     }
 
     /// <summary>
-    /// Le premier saut, et le refus qui fait tenir tout le raisonnement.
-    ///
-    /// L'analyseur n'a pas de seuil : il conclut parce que le premier saut est contenu dans le
-    /// chemin complet. Cette inclusion est une hypothese sur le routage, pas une propriete de la
-    /// mesure, et elle tombe des que la machine a plusieurs sorties. Ethernet et Wi-Fi connectes
-    /// ensemble, un tunnel VPN monte : la passerelle qu'on mesurerait peut appartenir a un chemin
-    /// que la reference internet n'emprunte pas. On comparerait alors deux trajets differents et
-    /// on accuserait un lien qui ne porte rien.
-    ///
-    /// D'ou la regle : une seule passerelle publiee sur toute la machine, cartes virtuelles
-    /// comprises. Une seule ⇒ tout ce qui sort passe par elle, l'inclusion est acquise.
-    /// Plusieurs ⇒ rien ici ne dit laquelle porte la route, et le produit se tait.
-    ///
-    /// Et elle doit etre celle d'une carte physique : si l'unique passerelle appartient au seul
-    /// tunnel VPN, mesurer « le lien local » repondrait sur le tunnel.
+    /// Le premier saut. L'analyseur conclut sans seuil parce que le premier saut est contenu dans le chemin complet : une
+    /// hypothese de routage, fausse des que la machine a plusieurs sorties (Ethernet et Wi-Fi ensemble, un tunnel VPN), ou
+    /// on accuserait un lien qui ne porte rien. D'ou : une seule passerelle publiee sur toute la machine, cartes
+    /// virtuelles comprises (plusieurs ⇒ on se tait), et celle d'une carte physique (sinon on mesurerait le tunnel).
     /// </summary>
     public string? Passerelle()
     {
@@ -129,13 +106,11 @@ public sealed class AttributionReseauService
         var saut = rapport.FirstHop.JitterMs;
         var net = rapport.Internet.JitterMs;
 
-        // Le caveat voyage avec chaque phrase qui designe le premier saut, jamais en note de bas
-        // de page : une box repond a l'ICMP avec son propre processeur, en basse priorite, donc un
-        // premier saut instable peut venir de sa reponse et non de son acheminement.
+        // Le caveat accompagne chaque phrase qui designe le premier saut : une box repond a l'ICMP avec son processeur, en
+        // basse priorite, et l'instabilite peut venir de sa reponse, pas de son acheminement.
         var caveat = Docteur.T("AR.Caveat");
 
-        // « ICMP n'est pas le trafic du jeu » doit atteindre le joueur : le fait est dit dans chaque
-        // verdict, a la suite de la mesure qu'il nuance.
+        // « ICMP n'est pas le trafic du jeu » est dit dans chaque verdict, a la suite de la mesure qu'il nuance.
         var pasLeJeu = Docteur.T("AR.PasLeJeu");
 
         return rapport.Verdict switch
@@ -149,8 +124,7 @@ public sealed class AttributionReseauService
             NetworkPathVerdict.Indistinguishable =>
                 Docteur.T("AR.Indiscernable", saut, passerelle, net) + pasLeJeu,
 
-            // Une fenetre sans gigue exploitable : la mesure a eu lieu, elle ne tranche pas. On ne
-            // dit rien plutot que d'ecrire une phrase qui ressemblerait a un bilan de sante.
+            // Sans gigue exploitable, la mesure ne tranche pas : rien plutot qu'une phrase qui ressemblerait a un bilan.
             _ => null,
         };
     }

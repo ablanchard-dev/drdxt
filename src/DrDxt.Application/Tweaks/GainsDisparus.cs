@@ -11,29 +11,10 @@ public sealed record GainDisparu(string TweakId, string? Cible);
 /// <summary>
 /// Remarquer qu'un gain a disparu, sans jamais le reecrire.
 ///
-/// ══ ce que ce type n'est pas, et pourquoi ══
-/// On pourrait vouloir « ajouter les onze leviers manquants au catalogue de
-/// reconciliation ». **Ce serait faux, et nuisible.** Le catalogue
-/// (`DefaultReconcilableTweakCatalog`) explique deja ses absences, et ses raisons sont bonnes :
-///
-///   • les leviers HKCU (Game DVR, Game Mode, VRR) sont absents parce que le reconciliateur de
-///     boot tourne en LocalSystem : `Registry.CurrentUser` y designe la ruche de SYSTEM, donc une
-///     reapplication toucherait la mauvaise ruche. Et ils persistent nativement au reboot ;
-///   • `latency.renderQueueCap` et `vrrVsyncCap` sont absents parce que le reconciliateur est
-///     volontairement incapable d'ecrire le GPU (`DisabledNvApiActions`) : les sonder produirait
-///     une derive qu'il n'a pas le droit de corriger.
-///
-/// La question n'est pas « comment les relire » (c'est fait) mais **« qui a le droit de les
-/// reecrire »**, et la reponse ne doit pas etre le service SYSTEM.
-///
-/// ══ ce qu'il est ══
-/// Le manque reel n'est donc pas la reapplication : c'est que **personne ne remarque** quand un
-/// gain a disparu. Ce type lit, compare, et se tait sur le reste. Aucune ecriture, aucune ruche
-/// choisie a sa place : la feuille vient du snapshot que le levier a lui-meme produit.
-///
-/// Et il ne rend que les gains disparus. Un levier `DifferentDeAvant` n'est pas rendu comme
-/// « applique » : la relecture ne sait pas le prouver, et le silence est plus honnete qu'une
-/// affirmation.
+/// Les leviers absents du reconciliateur le restent (voir `DefaultReconcilableTweakCatalog` : HKCU y serait la ruche de
+/// SYSTEM, et il n'a pas le droit d'ecrire le GPU) ; ce qui manquait, c'est que quelqu'un remarque un gain disparu. Ce
+/// type lit la feuille du snapshot du levier, compare, n'ecrit rien, et ne rend que les gains disparus (un
+/// `DifferentDeAvant` ne se prouve pas « applique »).
 /// </summary>
 public static class GainsDisparus
 {

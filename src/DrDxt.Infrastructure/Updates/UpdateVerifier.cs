@@ -6,21 +6,13 @@ using NSec.Cryptography;
 namespace DrDxt.Infrastructure.Updates;
 
 // -----------------------------------------------------------------------
-// La barrière de confiance des mises à jour. Vérifie la signature Ed25519 sur le manifeste
-// canonique avec la clé publique reçue (en production, celle d'UpdateTrust, qui refuse la clé de dev),
-// puis, et seulement alors, l'empreinte de la charge.
-//
-// La règle cardinale : échec propre, jamais fail-open. Toute incertitude (clé embarquée corrompue,
-// signature de mauvaise longueur, exception NSec, empreinte illisible, version inférieure) se
-// réduit à un Fail(UPDATE_*). Aucun chemin ne continue dans le doute ; l'appelant garde la version
-// installée actuelle.
-//
-// Ordre imposé (la signature avant tout le reste) : VerifyManifest (signature) d'abord ;
-// l'appelant ne récupère la charge que sur Ok ; VerifyPayload vérifie ensuite le SHA-256 contre
-// l'empreinte du manifeste. On ne se fie qu'à une empreinte venue d'un manifeste déjà prouvé signé.
-//
-// Asymétrie (comme Ed25519ManifestVerifier) : construit à partir de la seule clé publique ; ne
-// peut que vérifier, jamais forger un manifeste. La chaîne de publication signe hors bande.
+// La barrière de confiance des mises à jour : la signature Ed25519 du manifeste canonique (clé d'UpdateTrust en
+// production, qui refuse la clé de dev), puis seulement l'empreinte de la charge.
+//   * Jamais fail-open : clé corrompue, signature de mauvaise longueur, exception NSec, empreinte illisible, version
+//     inférieure → Fail(UPDATE_*), l'appelant garde la version installée.
+//   * Ordre imposé : VerifyManifest d'abord ; la charge n'est récupérée que sur Ok ; VerifyPayload compare son SHA-256 à
+//     l'empreinte d'un manifeste déjà prouvé signé.
+//   * Clé publique seule (comme Ed25519ManifestVerifier) : vérifier, jamais forger. La publication signe hors bande.
 // -----------------------------------------------------------------------
 
 /// <summary>Vérificateur Ed25519 des mises à jour : ne tient que la clé publique de 32 octets.</summary>
@@ -30,9 +22,8 @@ public sealed class UpdateVerifier : IUpdateVerifier
 
     private UpdateVerifier(PublicKey publicKey) => _publicKey = publicKey;
 
-    /// <summary>Construit un vérificateur à partir d'une clé publique Ed25519 brute de 32 octets.
-    /// Échec propre : une clé corrompue ou de mauvaise longueur rend Fail(UPDATE_SIG_INVALID) au lieu
-    /// de lever, pour qu'un futur mauvais échange de clé ne fasse jamais planter la barrière.</summary>
+    /// <summary>Un vérificateur depuis une clé publique Ed25519 brute de 32 octets. Clé corrompue ou de mauvaise
+    /// longueur : Fail(UPDATE_SIG_INVALID), jamais une exception qui ferait planter la barrière.</summary>
     public static Result<IUpdateVerifier> Create(ReadOnlySpan<byte> publicKey)
     {
         try
@@ -56,8 +47,7 @@ public sealed class UpdateVerifier : IUpdateVerifier
         if (manifest is null)
             return Result.Fail(UpdateErrorCodes.SignatureInvalid, "Update manifest is absent.");
 
-        // Décoder la signature détachée. Absente / vide / non base64 / mauvaise longueur →
-        // refus. Jamais « ok par défaut ».
+        // Signature détachée absente, vide, non base64 ou de mauvaise longueur → refus.
         byte[] signature;
         try
         {
@@ -105,16 +95,13 @@ public sealed class UpdateVerifier : IUpdateVerifier
         if (payload is null)
             return Result.Fail(UpdateErrorCodes.HashMismatch, "Update payload is absent.");
 
-        // Règle de non-rétrogradation, imposée avant de valider une charge. Une version inférieure (hors
-        // canal bêta qui l'autorise) est refusée : jamais de retour en arrière silencieux.
+        // Non-rétrogradation avant toute charge : une version inférieure est refusée, sauf canal bêta qui l'autorise.
         if (!allowDowngrade && IsDowngrade(manifest.Version, installedVersion))
             return Result.Fail(
                 UpdateErrorCodes.Downgrade,
                 $"Update version {manifest.Version} is older than installed {installedVersion}.");
 
-        // L'empreinte de comparaison vient d'un manifeste que l'appelant a déjà prouvé signé
-        // (VerifyManifest doit tourner d'abord). Calculer le SHA-256 des octets et le comparer à
-        // l'empreinte fiable du manifeste. Désaccord → charge jamais exécutée.
+        // SHA-256 des octets contre l'empreinte du manifeste déjà prouvé signé ; désaccord → charge jamais exécutée.
         string actual;
         try
         {
@@ -137,12 +124,9 @@ public sealed class UpdateVerifier : IUpdateVerifier
     }
 
     // -------------------------------------------------------------------
-    // Comparaison de versions : vrai si et seulement si `candidate` est strictement plus ancienne que
-    // `installed`. Comparaison numérique par points du cœur (1.2.10 > 1.2.9), puis, à cœur égal, une préversion avant
-    // sa version stable ; la métadonnée de build ne compte pas. Tout composant illisible vaut 0,
-    // pour qu'une version malformée ne passe jamais en silence pour « plus récente » ; une version
-    // égale n'est pas une rétrogradation (reproposer la même version est sans effet en amont, pas un
-    // retour en arrière). L'analyse ne lève pas (int.TryParse, null toléré).
+    // Vrai si et seulement si `candidate` est strictement plus ancienne que `installed` : cœur numérique par points
+    // (1.2.10 > 1.2.9), puis la préversion avant sa stable ; la métadonnée de build ne compte pas. Un composant illisible
+    // vaut 0 (jamais « plus récente » en silence) ; une version égale n'est pas une rétrogradation. Ne lève pas.
     // -------------------------------------------------------------------
     internal static bool IsDowngrade(string candidate, string installed)
     {
@@ -182,22 +166,17 @@ public sealed class UpdateVerifier : IUpdateVerifier
     }
 
     // -------------------------------------------------------------------
-    // Sérialisation canonique des champs de confiance du manifeste : une forme d'octets déterministe
-    // pour que la signature soit calculée et vérifiée sur exactement les mêmes octets des deux côtés.
-    // Le champ de signature lui-même ne fait pas partie des octets signés (c'est la signature) :
-    //   * ordre des champs fixe (channel, version, url, sha256), écrit explicitement ;
-    //   * le canal par son nom d'enum invariant (stable d'un runtime / d'une culture à l'autre) ;
-    //   * aucune indentation ni mise en forme dépendant de la culture ; encodeur détendu (sans
-    //     échappement en trop), puisque ces octets ne sont que signés / vérifiés, jamais insérés en HTML.
+    // Sérialisation canonique des champs de confiance : les mêmes octets signés et vérifiés des deux côtés (la signature
+    // elle-même n'en fait pas partie) :
+    //   * ordre fixe (channel, version, url, sha256), écrit explicitement ;
+    //   * le canal par son nom d'enum invariant ;
+    //   * aucune mise en forme dépendant de la culture ; encodeur détendu (ces octets ne vont jamais dans du HTML).
+    // Public : tools/publication/signer.cs signe exactement ces octets, sans recopier la forme.
     // -------------------------------------------------------------------
-    // Public, pour que l'outil de release (tools/publication/signer.cs) signe exactement les octets que
-    // l'App vérifie, sans recopier la forme canonique.
     public static byte[] CanonicalBytes(UpdateManifest manifest)
         => Encoding.UTF8.GetBytes(Canonicalize(manifest));
 
-    /// <summary>La chaîne JSON canonique et déterministe sur laquelle la signature est calculée.
-    /// Exposée aux tests (InternalsVisibleTo) pour qu'une donnée d'essai signe les octets exacts et que
-    /// la forme canonique elle-même soit figée.</summary>
+    /// <summary>La chaîne JSON canonique sur laquelle la signature est calculée ; exposée aux tests, qui la figent.</summary>
     internal static string Canonicalize(UpdateManifest manifest)
     {
         var buffer = new System.Buffers.ArrayBufferWriter<byte>();

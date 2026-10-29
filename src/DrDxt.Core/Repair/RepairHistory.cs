@@ -7,20 +7,15 @@ public sealed record RepairEtat(string Domaine, string Nom, string? Valeur, Repa
 /// Une photo de la machine, prise par une version donnee du produit.
 /// </summary>
 /// <param name="Quand">L'instant de la photo.</param>
-/// <param name="DomainesExamines">Les familles que le produit savait lire ce jour-la.
-///
-/// Sans ce champ, la comparaison ment : quand l'audit gagne une famille (MMCSS, services, reseau,
-/// thermique), une photo d'avant comparee a celle d'apres afficherait des dizaines de constats
-/// « apparus », alors que c'est le produit qui a appris a regarder, pas la machine qui a change.</param>
+/// <param name="DomainesExamines">Les familles que le produit savait lire ce jour-la : quand l'audit en gagne une
+/// (MMCSS, services, reseau, thermique), ses constats ne ressortent pas « apparus » ; c'est le produit qui a appris a
+/// regarder, pas la machine qui a change.</param>
 /// <param name="Etats">Ce qui a ete lu.</param>
 /// <param name="Conditions">Dans quel etat etait la machine pendant la lecture. <c>null</c> pour
 /// les photos prises avant que le produit sache le mesurer.</param>
-/// <param name="EmpreinteLecteur">quel lecteur a pris la photo : l'identifiant du module qui lit.
-///
-/// Les familles examinees peuvent rester les memes quand la facon de lire change : un lecteur
-/// d'arrets qui apprend a exclure les appuis longs sur le bouton ferait lire « arrets brutaux 11 → 10 »
-/// comme une machine qui s'arrange. <c>null</c> pour
-/// les photos prises avant que le produit sache la noter.</param>
+/// <param name="EmpreinteLecteur">L'identifiant du module qui a lu. La facon de lire peut changer a familles egales :
+/// un lecteur d'arrets qui apprend a exclure les appuis longs ferait lire « arrets brutaux 11 → 10 » comme une machine
+/// qui s'arrange. <c>null</c> pour les photos prises avant que le produit sache la noter.</param>
 public sealed record RepairSnapshot(
     DateTimeOffset Quand,
     IReadOnlyList<string> DomainesExamines,
@@ -28,36 +23,24 @@ public sealed record RepairSnapshot(
     ConditionsDeMesure? Conditions = null,
     string? EmpreinteLecteur = null,
     bool? Eleve = null,
-    // Quel programme a pris la photo (« appli », « outil »). Les deux écrivent
-    // dans le même journal et ne lisent pas les mêmes familles : l'outil lit aussi la RAM, le réseau
-    // et le BIOS. Sans ce champ, l'appli se comparait à une photo de l'outil et annonçait des
-    // familles entières « disparues ». null = photo écrite avant le champ.
+    // Quel programme a pris la photo (« appli », « outil ») : les deux écrivent dans le même journal, et l'outil lit
+    // aussi la RAM, le réseau et le BIOS ; comparée à une photo de l'outil, l'appli annoncerait des familles entières
+    // « disparues ». null = photo écrite avant le champ.
     string? Lecteur = null);
 
 /// <summary>
-/// L'etat de la machine pendant l'audit, sans quoi un diff accuse la machine a tort.
-///
-/// Exemple mesure le 09/09/2026 : `RAM / mode memoire : ExpectedDefault → Unknown` se lirait « la
-/// machine a perdu son double canal », alors que le debit etait tombe a 18,7 GB/s parce que des
-/// compilations tournaient, et que la borne qui prouve le multi-canal ne tenait plus.
-///
-/// Ce qui distingue les deux n'est pas dans le constat, c'est autour : la charge au moment de
-/// la lecture. La porter dans la photo coute trois lectures d'un compteur et evite au produit
-/// d'accuser une machine qui n'a rien fait.
+/// L'etat de la machine pendant l'audit, sans quoi un diff accuse la machine a tort. Mesure du 09/09/2026 :
+/// `RAM / mode memoire : ExpectedDefault → Unknown` se lirait « double canal perdu », alors que des compilations
+/// avaient fait tomber le debit a 18,7 GB/s, sous la borne qui prouve le multi-canal. Trois lectures d'un compteur.
 /// </summary>
 /// <param name="ChargeProcesseurPct">Charge processeur moyenne pendant la passe, ou <c>null</c>
 /// si elle n'a pas pu etre lue, et « non lue » n'est pas « machine au repos ».</param>
-/// <param name="DispersionDebitMemoirePct">L'ecart-type relatif du banc memoire, en pourcent.
-///
-/// La charge processeur ne suffit pas, et c'est mesure : deux passes a 19 %
-/// et 15 % de charge, donc « comparables » selon ce critere, ont fait basculer
-/// `RAM / mode memoire` de `Unknown` a `ExpectedDefault`. Le banc memoire est limite par la bande
-/// passante, pas par le processeur : un autre programme peut saturer la memoire sans faire monter
-/// la charge CPU. La dispersion du banc, elle, le voit sur les passes vraiment agitees (12,6 a 26,6 %) ; les 8,2 %
-/// d'une passe pendant des compilations restent dans la plage calme (voir DispersionQuiCompte).
-///
-/// La lecon generale : une condition de mesure doit etre choisie pour la grandeur qu'elle
-/// qualifie, pas parce qu'elle est facile a lire.</param>
+/// <param name="DispersionDebitMemoirePct">L'ecart-type relatif du banc memoire, en pourcent. La charge processeur ne
+/// suffit pas (mesure : deux passes a 19 % et 15 %, « comparables », ont fait basculer `RAM / mode memoire` de
+/// `Unknown` a `ExpectedDefault`) : le banc est limite par la bande passante, qu'un autre programme sature sans faire
+/// monter le CPU. La dispersion voit les passes vraiment agitees (12,6 a 26,6 %) ; les 8,2 % d'une passe pendant des
+/// compilations restent dans la plage calme (voir DispersionQuiCompte). Une condition de mesure se choisit pour la
+/// grandeur qu'elle qualifie.</param>
 public sealed record ConditionsDeMesure(
     double? ChargeProcesseurPct,
     double? DispersionDebitMemoirePct = null);
@@ -69,8 +52,7 @@ public enum RepairChangement
     /// examinee. C'est le seul cas ou « apparu » veut dire quelque chose sur la machine.</summary>
     Apparu,
 
-    /// <summary>Le constat n'est plus produit. Cela peut vouloir dire repare, et cela peut
-    /// tout autant vouloir dire que le lecteur a echoue cette fois. Jamais une preuve de
+    /// <summary>Le constat n'est plus produit : repare, ou lecteur en echec cette fois. Jamais une preuve de
     /// reparation.</summary>
     Disparu,
 
@@ -95,42 +77,23 @@ public sealed record RepairDelta(
     string Phrase);
 
 /// <summary>
-/// Ce qui a change depuis la derniere fois : le pilier maintenir.
-///
-/// Sans historique, « est-ce que quelque chose a change depuis hier ? » n'a pas de reponse, et une
-/// reparation ne se prouve pas dans le temps : on voit un etat, jamais une trajectoire.
-///
-/// ══ les deux facons de mentir avec un diff, et comment elles sont fermees ══
-///
-/// **1. Confondre « le produit a appris » avec « la machine s'est degradee ».** Quand l'audit gagne
-/// des familles, un diff naif afficherait des dizaines d'« apparus » alarmants. La photo porte donc la liste des familles examinees, et un constat
-/// dans une famille inconnue de la photo precedente ressort en `FamilleNouvelle`.
-///
-/// **2. Confondre « disparu » avec « repare ».** Un constat qui n'est plus produit peut avoir ete
-/// corrige, ou son lecteur peut avoir echoue. Les deux se ressemblent parfaitement. Le type ne
-/// dit donc jamais « repare », et la phrase porte l'ambiguite. Quand une famille entiere
-/// disparait, la seconde explication devient la plus probable, et c'est dit.
+/// Ce qui a change depuis la derniere fois : le pilier maintenir (une trajectoire, pas seulement un etat).
+/// Deux facons de mentir avec un diff, fermees :
+/// 1. « le produit a appris » lu comme « la machine s'est degradee » : la photo porte ses familles examinees, et un
+///    constat d'une famille inconnue de la photo precedente ressort en `FamilleNouvelle` ;
+/// 2. « disparu » lu comme « repare » (le lecteur a pu echouer) : le type ne dit jamais « repare », la phrase porte
+///    l'ambiguite, et une famille entiere disparue designe d'abord le lecteur.
 /// </summary>
 public static class RepairHistory
 {
-    /// <summary>Au-dela de cet ecart de charge processeur, les deux photos n'ont pas ete prises
-    /// dans le meme monde.
-    ///
-    /// **Non chiffré.** Vingt points separent une machine au repos d'une machine qui travaille,
-    /// sans se declencher sur le bruit d'un antivirus qui passe. Ecrit ici pour etre discute.</summary>
+    /// <summary>Au-dela de cet ecart de charge processeur, les deux photos n'ont pas ete prises dans le meme monde.
+    /// **Non chiffré** : vingt points separent repos et travail sans se declencher sur un antivirus qui passe.</summary>
     public const double EcartDeChargeQuiCompte = 20.0;
 
     /// <summary>
-    /// Les deux photos ont-elles ete prises dans des conditions comparables ? Rend la phrase a
-    /// afficher quand ce n'est pas le cas, <c>null</c> quand rien ne s'y oppose.
-    ///
-    /// C'est un avertissement sur la lecture du diff, jamais une explication d'un changement
-    /// precis. Le produit ne sait pas dire quel constat a bouge a cause de la charge ; il sait
-    /// dire que la question se pose, et c'est deja ce qui manquait pour ne pas accuser la machine
-    /// a tort.
-    ///
-    /// Deux charges non lues ne declenchent rien : « on ne sait pas » n'est pas « c'etait
-    /// different ». Une seule lue non plus : comparer un nombre a une absence n'a pas de sens.
+    /// Les deux photos ont-elles ete prises dans des conditions comparables ? Rend la phrase a afficher quand ce n'est
+    /// pas le cas, <c>null</c> sinon. Un avertissement sur la lecture du diff, jamais l'explication d'un constat precis.
+    /// Une charge non lue (d'un cote ou des deux) ne declenche rien : « on ne sait pas » n'est pas « c'etait different ».
     /// </summary>
     public static string? AvertissementDeConditions(RepairSnapshot avant, RepairSnapshot apres)
     {
@@ -141,9 +104,8 @@ public static class RepairHistory
             && Math.Abs(a - b) >= EcartDeChargeQuiCompte)
             raisons.Add(Docteur.T("RH.ChargeProcesseur", a, b));
 
-        // La dispersion n'est pas une difference entre les deux photos : c'est la qualite de
-        // chacune. Une seule passe agitee suffit a rendre le diff douteux, meme si l'autre etait
-        // parfaite, et c'est ce cas-la qui s'est produit sur la machine.
+        // La dispersion est la qualite de chaque photo, pas un ecart entre elles : une seule passe agitee rend le diff
+        // douteux (le cas vu sur la machine).
         foreach (var (photo, quand) in new[] { (avant, "RH.BancAgite.Avant"), (apres, "RH.BancAgite.Apres") })
             if (photo.Conditions?.DispersionDebitMemoirePct is { } d && d >= DispersionQuiCompte)
                 raisons.Add(Docteur.T(quand, d));
@@ -164,12 +126,9 @@ public static class RepairHistory
             ? Docteur.T("RH.MisAJour")
             : null;
 
-    /// <summary>
-    /// Les deux photos ont-elles ete prises avec les memes droits ? Une photo prise en
-    /// administrateur puis une sans ferait dire au journal que la famille BCD a « cesse de
-    /// repondre » et que la latence des pilotes etait devenue inconnue. Rien n'avait change : la
-    /// seconde lecture avait ete refusee. Des droits inconnus d'un cote ne declenchent rien.
-    /// </summary>
+    /// <summary>Les deux photos ont-elles ete prises avec les memes droits ? Sans administrateur, la seconde lecture est
+    /// refusee : la famille BCD « cesse de repondre », la latence des pilotes devient inconnue, sans que rien n'ait
+    /// change. Des droits inconnus d'un cote ne declenchent rien.</summary>
     public static string? AvertissementDeDroits(RepairSnapshot avant, RepairSnapshot apres)
         => avant.Eleve is { } a && apres.Eleve is { } b && a != b
             ? (a
@@ -177,9 +136,7 @@ public static class RepairHistory
                 : Docteur.T("RH.DroitsGagnes"))
             : null;
 
-    /// <summary>Au-dela de cette dispersion, le banc memoire a mesure l'agitation de la machine
-    /// plus que sa memoire.
-    ///
+    /// <summary>Au-dela de cette dispersion, le banc memoire a mesure l'agitation de la machine plus que sa memoire.
     /// Seuil mesure le 17/09/2026 sur 27 photos du journal avec dispersion (machine de reference).
     /// Machine calme (charge < 10 %) : 15 photos, dispersion mediane 3,9 %, maximum 8,7 %. Machine
     /// chargee : 12 photos, mediane 6,9 %, maximum 26,6 %. Ce que chaque seuil aurait fait :
@@ -193,11 +150,8 @@ public static class RepairHistory
     public const double DispersionQuiCompte = 10.0;
 
     /// <summary>
-    /// La photo à laquelle comparer : la plus récente prise par le même lecteur. Une photo écrite
-    /// avant le champ `Lecteur` n'est gardée que si toutes ses familles sont lues par la photo
-    /// actuelle ; sinon elle vient d'un lecteur qui en lit davantage, et la comparer ferait parler
-    /// de disparitions qui n'en sont pas. Aucune photo comparable ⇒ null : on ne dit rien plutôt
-    /// que de comparer deux lecteurs.
+    /// La photo à laquelle comparer : la plus récente prise par le même lecteur. Une photo sans `Lecteur` n'est gardée
+    /// que si la photo actuelle lit toutes ses familles (sinon, de fausses disparitions). Aucune comparable ⇒ null.
     /// </summary>
     public static RepairSnapshot? PhotoComparable(IReadOnlyList<RepairSnapshot> photos, RepairSnapshot actuelle)
     {
@@ -217,13 +171,9 @@ public static class RepairHistory
         var famillesAvant = new HashSet<string>(avant.DomainesExamines, StringComparer.OrdinalIgnoreCase);
         var famillesApres = new HashSet<string>(apres.DomainesExamines, StringComparer.OrdinalIgnoreCase);
 
-        // Un dictionnaire ici levait sur l'entree reelle. Le couple (domaine, nom) n'est pas
-        // unique : l'audit rend deux « BIOS / interface constructeur » (une par interface WMI
-        // trouvee), et `ToDictionary` jetterait « An item with the same key has already been added ».
-        //
-        // On groupe donc, et un groupe a plusieurs entrees se compare comme un ensemble de
-        // valeurs. Une bibliotheque qui leve sur une donnee legitime est un defaut, quelle que
-        // soit la donnee.
+        // Le couple (domaine, nom) n'est pas unique : l'audit rend deux « BIOS / interface constructeur » (une par
+        // interface WMI), et `ToDictionary` leverait « An item with the same key has already been added ». On groupe,
+        // et un groupe de plusieurs entrees se compare comme un ensemble de valeurs.
         var avantParCle = avant.Etats.ToLookup(Cle, StringComparer.OrdinalIgnoreCase);
         var apresParCle = apres.Etats.ToLookup(Cle, StringComparer.OrdinalIgnoreCase);
 
@@ -264,9 +214,8 @@ public static class RepairHistory
                 continue;
             }
 
-            // Plusieurs constats portent le meme nom : ils n'ont pas d'identite individuelle, et
-            // les apparier par ordre serait un tirage. On compare donc l'ensemble des valeurs, et
-            // on ne parle que de ce qui entre et de ce qui sort.
+            // Plusieurs constats du meme nom n'ont pas d'identite : les apparier par ordre serait un tirage. On ne dit
+            // que ce qui entre et ce qui sort de l'ensemble des valeurs.
             var valeursAvant = vieuxGroupe.Select(x => x.Valeur ?? "").ToHashSet(StringComparer.Ordinal);
             var valeursApres = groupe.Select(x => x.Valeur ?? "").ToHashSet(StringComparer.Ordinal);
 
@@ -288,8 +237,7 @@ public static class RepairHistory
             if (apresParCle.Contains(groupeVieux.Key)) continue;
             var vieux = groupeVieux.First();
 
-            // Une famille entiere qui se tait accuse le lecteur bien plus qu'elle ne prouve des
-            // reparations en serie. Le dire evite qu'un utilisateur croie avoir tout repare.
+            // Une famille entiere qui se tait accuse le lecteur, pas des reparations en serie.
             var familleMuette = famillesDisparues.Contains(vieux.Domaine);
 
             deltas.Add(new RepairDelta(vieux.Domaine, vieux.Nom, RepairChangement.Disparu,

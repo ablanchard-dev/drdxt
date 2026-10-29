@@ -8,30 +8,22 @@ public enum EvidenceOutcome
     /// <summary>L'ecart depasse ce que l'experience sait resoudre, dans le bon sens.</summary>
     ProvenGain,
 
-    /// <summary>Il le depasse dans le mauvais sens. Une boucle qui ne sait pas dire ca ne peut
-    /// pas « conserver ce qui ameliore » : elle garde ce qui a aide par hasard.</summary>
+    /// <summary>Il le depasse dans le mauvais sens : sans ce cas, une boucle garde ce qui a aide par hasard.</summary>
     ProvenRegression,
 
-    /// <summary>Le signal est sous le bruit de cette experience. Ce n'est pas « pas de gain » :
-    /// c'est « pas resolu ici ». Le meme ecart peut etre prouve sur un banc plus fin.</summary>
+    /// <summary>Le signal est sous le bruit de cette experience : « pas resolu ici », pas « pas de gain ».</summary>
     NoResolvedChange,
 
-    /// <summary>L'experience elle-meme ne tient pas : perte de focus, capture defaillante, charge
-    /// concurrente. Aucun chiffre n'en sort, et surtout pas un « pas de changement ».</summary>
+    /// <summary>L'experience ne tient pas (perte de focus, capture defaillante, charge concurrente) : aucun chiffre, pas
+    /// meme « pas de changement ».</summary>
     Invalid,
 }
 
 /// <summary>
-/// Un ecart, et ce que l'experience pouvait resoudre : les deux ensemble, toujours.
-///
-/// Ce type remplace un booleen, `AbVerdict.IsMeasurableGain`, et c'est lui qui forcait a mentir.
-/// Le banc deterministe resout **0,1 %** (mesure du 06/09 : sigma/moyenne 0,122 % sur 10 passes) ;
-/// le rejeu in-game resout **~13 %** (sigma/base 6,46 %, 28 paires, meme date). Un booleen ne peut
-/// pas porter cette difference : il oblige a jeter un gain sous-systeme reel, ou a le survendre.
-///
-/// Le cas qui a impose ce modele (07/09, RTX 4060) : l'offset `+100/100` rend **+2,7 % de calcul
-/// GPU a watts identiques**, reproductible, controle A/A' a 0,72 %, et c'est **3,6 fois sous le
-/// plancher in-game de 9,9 %**. Les deux affirmations sont vraies en meme temps.
+/// Un ecart, et ce que l'experience pouvait resoudre, toujours ensemble. Le banc deterministe resout 0,1 % (mesuré le 06/09 :
+/// sigma/moyenne 0,122 % sur 10 passes), le rejeu in-game ~13 % (sigma/base 6,46 %, 28 paires) : un booleen obligerait a
+/// jeter un gain sous-systeme reel ou a le survendre. Mesuré le 07/09 sur RTX 4060 : `+100/100` rend +2,7 % de calcul GPU a watts
+/// identiques (A/A' a 0,72 %), 3,6 fois sous le plancher in-game de 9,9 % ; les deux sont vrais en meme temps.
 /// </summary>
 /// <param name="DeltaPct">L'ecart mesure, en pourcent, signe. Conserve meme quand rien n'est
 /// prouve : il faut bien l'afficher pour dire « +2,7 %, non resolu a +/-4,8 % ».</param>
@@ -48,12 +40,8 @@ public readonly record struct Evidence(
     public bool EstConcluante =>
         Outcome is EvidenceOutcome.ProvenGain or EvidenceOutcome.ProvenRegression;
 
-    /// <summary>Juge un ecart contre la resolution de l'experience qui l'a produit.
-    ///
-    /// La borne se resout du cote prudent : un ecart egal a la resolution ne prouve rien : un
-    /// instrument qui conclut pile a son propre seuil prouve son seuil, pas un gain. Et une
-    /// resolution non finie ne permet aucune conclusion : affirmer reviendrait a inventer une
-    /// resolution que personne n'a mesuree.</summary>
+    /// <summary>Juge un ecart contre la resolution de son experience. Un ecart egal a la resolution ne prouve rien ; une
+    /// resolution non finie ne permet aucune conclusion.</summary>
     public static Evidence From(double deltaPct, double resolutionPct)
     {
         if (!double.IsFinite(deltaPct) || !double.IsFinite(resolutionPct) || resolutionPct < 0)
@@ -67,8 +55,7 @@ public readonly record struct Evidence(
         return new Evidence(deltaPct, resolutionPct, issue, null);
     }
 
-    /// <summary>L'experience n'a pas tenu. Aucun chiffre n'en sort : le delta est mis a
-    /// <c>NaN</c> pour qu'aucun appelant ne puisse l'afficher par megarde.</summary>
+    /// <summary>L'experience n'a pas tenu : delta a <c>NaN</c>, qu'aucun appelant ne l'affiche par megarde.</summary>
     public static Evidence Invalide(string motif) =>
         new(double.NaN, double.NaN, EvidenceOutcome.Invalid, motif);
 }
@@ -83,31 +70,19 @@ public sealed record SubsystemEvidence(string Nom, Evidence Preuve);
 public sealed record GameEvidence(string Metrique, Evidence Preuve);
 
 /// <summary>
-/// Les deux preuves coexistent, elles ne s'excluent pas.
-///
-/// C'est la correction de fond apportee au modele a trois niveaux « A ou B ou C » : un changement
-/// produit une preuve sous-systeme et une preuve en jeu, chacune avec sa propre resolution, et il
-/// est parfaitement normal que l'une conclue et pas l'autre. La phrase cible, litteralement :
-/// « debit GPU +2,7 % prouve a +/-0,3 % ; impact FPS +1,2 %, non resolu avec une resolution de
-/// +/-4,8 % ».
-///
-/// Aucune phrase n'est construite ici. Le rapport client est localise, et ce depot a deja paye
-/// une fois le prix d'une phrase assemblee dans le moteur : le motif du classifieur de goulot
-/// sortait en anglais au milieu d'un rapport francais. L'affichage recoit des identifiants et des
-/// nombres, et c'est lui qui parle.
+/// Les deux preuves coexistent : un changement produit une preuve sous-systeme et une preuve en jeu, chacune a sa
+/// resolution, et l'une peut conclure sans l'autre (« debit GPU +2,7 % prouve a +/-0,3 % ; impact FPS +1,2 %, non
+/// resolu a +/-4,8 % »). Aucune phrase ici : le rapport est localise, l'affichage recoit identifiants et nombres.
 /// </summary>
 public sealed record PerformanceEvidence(SubsystemEvidence? Subsystem, GameEvidence? Game)
 {
-    /// <summary>Y a-t-il quoi que ce soit a affirmer ? Vrai des qu'une des deux preuves tranche,
-    /// **y compris une regression** : « ce reglage degrade ta machine » est une conclusion utile.</summary>
+    /// <summary>Y a-t-il quoi que ce soit a affirmer ? Vrai des qu'une preuve tranche, regression comprise.</summary>
     public bool QuelqueChoseDeProuve =>
         (Subsystem?.Preuve.EstConcluante ?? false) || (Game?.Preuve.EstConcluante ?? false);
 
-    /// <summary>Un gain que le joueur ressent, prouve au-dessus du bruit de sa session. C'est la
-    /// seule affirmation qui justifie de promettre des FPS.</summary>
+    /// <summary>Un gain en jeu prouve au-dessus du bruit de la session : la seule base pour promettre des FPS.</summary>
     public bool GainEnJeuProuve => Game?.Preuve.Outcome == EvidenceOutcome.ProvenGain;
 
-    /// <summary>Une degradation en jeu, prouvee. La moitie sans laquelle une boucle d'optimisation
-    /// ne peut pas annuler ce qu'elle vient d'appliquer.</summary>
+    /// <summary>Une degradation en jeu, prouvee : ce qui permet d'annuler ce qui vient d'etre applique.</summary>
     public bool RegressionEnJeuProuvee => Game?.Preuve.Outcome == EvidenceOutcome.ProvenRegression;
 }

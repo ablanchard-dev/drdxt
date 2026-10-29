@@ -14,35 +14,25 @@ using Microsoft.Extensions.Hosting;
 
 namespace DrDxt.ReconcilerHost;
 
-// -----------------------------------------------------------------------
-// HostServiceCollectionExtensions : le graphe DI de production de l'hôte réconciliateur.
-//
-// Branche tout le pipeline de réconciliation en vérification seule :
-//   * AddDrDxtCore (Serilog + IDiagnosticsLog + ILocalizer),
-//   * AddDrDxtReconcilerAdapters (sondes de production + dépendances du mappeur / client de réapplication),
-//   * la politique / le mappeur / le catalogue purs,
-//   * le store d'état du sidecar (JsonReconcilerStateStore) sous %ProgramData%\DrDxt,
-//   * le store du manifeste signé en vérification seule (clé publique seule, jamais de signataire),
-//   * le store d'issue des démarrages + la garde anti-boucle + le vrai DesiredStateReconciler,
-//   * un LoggingReconcilerNotifier,
-//   * l'IElevatedClient du contexte service = l'exécuteur en processus (moat option B),
-//   * les classes testées de l'hôte (tour / vol unique / déclencheurs / marqueur de démarrage),
-//   * le Worker comme service hébergé.
-//
-// Branchement du moat (option B) : l'hôte tourne en
-// LocalSystem et réapplique les leviers validés en processus au démarrage (un service de démarrage
-// ne peut pas ouvrir d'UAC interactive, et les surfaces réconciliables, HKLM / plan
-// d'alimentation / service, exigent SYSTEM). Il n'ouvre aucun point d'entrée IPC privilégié ; la
-// seule entrée qui puisse mener une écriture est le manifeste vérifié par signature Ed25519, et
-// chaque op est bornée par la même OpAllowlist fermée, à la feuille près, que le helper élevé. Le
-// canal réconciliateur peu privilégié + courtier helper (IElevatedReapplyClient sur le handshake
-// en connexion seule) est le durcissement V2 retenu, pas le défaut V1.
-// -----------------------------------------------------------------------
+// Le graphe DI de production de l'hôte réconciliateur, en vérification seule (sections ci-dessous). Moat, option B :
+// l'hôte tourne en LocalSystem et réapplique en processus au démarrage (un service de démarrage ne peut pas ouvrir
+// d'UAC, et HKLM / plan d'alimentation / service exigent SYSTEM). Aucun point d'entrée IPC privilégié : seul le
+// manifeste Ed25519 vérifié mène une écriture, chaque op bornée par la même OpAllowlist fermée que le helper élevé.
+// Le canal peu privilégié + courtier helper (IElevatedReapplyClient sur le handshake en connexion seule) est le
+// durcissement V2 retenu, pas le défaut V1.
 [SupportedOSPlatform("windows")]
 public static class HostServiceCollectionExtensions
 {
-    /// <summary>L'ordre de confiance ci-dessus, pour une clé à ce chemin. Extrait pour que les tests le
-    /// jugent sans lire le vrai %ProgramData% (une machine où DrDXT a déjà signé un manifeste y a sa clé).</summary>
+    /// <summary>
+    /// La clé publique du vérificateur, pour une clé à ce chemin, par ordre de priorité :
+    ///   (1) un fichier manifest-public.key fourni (la surcharge de production, déposée sous la racine en écriture admin) ;
+    ///   (2) Debug / test seulement : la clé publique V1 embarquée (ManifestDevKeys), pour qu'un build autonome vérifie
+    ///       les manifestes du signataire de dev de l'App, sinon fail-closed ;
+    ///   (3) Release : fail-closed. Jamais la clé de dev : un manifeste signé par elle ou non signé est rejeté, et rien
+    ///       n'est réappliqué sans clé publique de production.
+    /// Un manifeste altéré ou signé par une autre clé est toujours rejeté : aucune clé de dev utilisable ne mène le moat.
+    /// Extrait pour que les tests le jugent sans lire le vrai %ProgramData% (où DrDXT a peut-être déjà sa clé).
+    /// </summary>
     public static IManifestVerifier Verificateur(string cheminCle)
     {
         var provisioned = HostPublicKeyProvider.LoadVerifier(cheminCle);
@@ -63,8 +53,7 @@ public static class HostServiceCollectionExtensions
         services.AddDrDxtCore();
 
         // --- Sondes de production du réconciliateur + frontière de sécurité de la réapplication. ---
-        // La sonde WMI du pilote (WmiGpuDriverProbe) a besoin de l'IWmiQuery de Detection ; l'hôte fournit
-        // la couture de lecture nue (il n'a pas besoin de tout le graphe d'analyse de Detection).
+        // WmiGpuDriverProbe a besoin de l'IWmiQuery de Detection : la couture de lecture nue, sans le graphe d'analyse.
         services.TryAddSingleton<IWmiQuery>(_ => new RetryingWmiQuery(new ManagementWmiQuery()));
         services.AddDrDxtReconcilerAdapters();
 
@@ -84,22 +73,10 @@ public static class HostServiceCollectionExtensions
         // --- Store du manifeste en vérification seule : clé publique seule, jamais de signataire (garde de la clé). ---
         // Le stockage ProgramData en écriture admin (même racine que le sidecar).
         services.TryAddSingleton<IManifestStorage>(_ => new ProgramDataManifestStorage());
-        // La clé publique du vérificateur, par ordre de priorité :
-        //   (1) un fichier manifest-public.key fourni (le chemin de surcharge de production : une clé
-        //       neuve déposée sous la racine en écriture admin), sinon
-        //   (2) Debug / test seulement : la clé publique V1 embarquée (ManifestDevKeys), pour qu'un build
-        //       autonome vérifie de vrais manifestes signés par le signataire de dev de l'App, sinon un
-        //       vérificateur fail-closed, sinon
-        //   (3) Release : un vérificateur fail-closed. Un build Release ne fait jamais confiance à la clé
-        //       de dev embarquée : un manifeste signé par la clé de dev ou non signé est rejeté et rien
-        //       n'est réappliqué sans clé publique de production fournie.
-        // L'hôte ne s'ouvre jamais par défaut : un manifeste altéré ou signé par une autre clé est
-        // toujours rejeté (le vérificateur ne tient que notre clé publique). C'est l'invariant de garde de
-        // la clé du manifeste qu'impose la barrière de sécurité (aucune clé de dev utilisable ne mène le moat).
+        // La clé publique, dans l'ordre de confiance de Verificateur, relue si une vérification échoue.
         services.TryAddSingleton<IManifestVerifier>(_ => new VerificateurRelu(HostPublicKeyProvider.DefaultPath(), Verificateur));
-        // Une seule instance de store, exposée à la fois comme IDesiredStateStore (état) et
-        // ISignedManifestReader (tout le manifeste vérifié), pour que la barrière de réapplication
-        // partage exactement le même chemin de vérification.
+        // Une seule instance, exposée comme IDesiredStateStore (état) et ISignedManifestReader (tout le manifeste) : la
+        // barrière de réapplication partage le même chemin de vérification.
         services.TryAddSingleton(sp => new SignedDesiredStateStore(
             sp.GetRequiredService<IManifestStorage>(),
             signer: null, // hôte en vérification seule : un signataire null est la norme (ne peut pas signer).
@@ -116,18 +93,11 @@ public static class HostServiceCollectionExtensions
         // --- Le notificateur (journalise via IDiagnosticsLog, i18n via ILocalizer). ---
         services.TryAddSingleton<IReconcilerNotifier, LoggingReconcilerNotifier>();
 
-        // --- Le client élevé du contexte service : l'exécuteur en processus (branchement du moat,
-        // option B). L'hôte réconciliateur tourne en LocalSystem et
-        // réapplique au démarrage des leviers validés sans aucun IPC : aucun point d'entrée privilégié
-        // ouvert à attaquer. Il n'est mené que par le manifeste vérifié par signature Ed25519, dont l'ACL
-        // réserve l'écriture aux admins (vérifié en amont par SignedDesiredStateStore, signature avant
-        // analyse, fail-closed), et borné par la même OpAllowlist à la feuille près que le helper distant.
-        // Les coutures de réglage NVAPI *et* ADLX (AMD) sont désactivées ici : le service de démarrage est,
-        // par construction, incapable d'écrire le GPU chez l'un comme l'autre constructeur ; le
-        // réconciliateur ne fait persister que des réglages validés et durables (registre / plan
-        // d'alimentation / service), jamais de décalages GPU volatils. Le canal réconciliateur peu
-        // privilégié + courtier helper (HostElevatedClientFactory.CreateConnectOnly) est gardé comme
-        // durcissement V2 documenté, pas comme défaut V1. ---
+        // --- Le client élevé du contexte service : l'exécuteur en processus (moat, option B). Aucun IPC ; mené par le seul
+        // manifeste Ed25519 dont l'ACL réserve l'écriture aux admins (SignedDesiredStateStore : signature avant analyse,
+        // fail-closed), borné par la même OpAllowlist que le helper. NVAPI *et* ADLX (AMD) désactivés : ce service ne
+        // peut pas écrire le GPU, il ne fait persister que du durable (registre / plan d'alimentation / service). Le
+        // canal peu privilégié + courtier helper (HostElevatedClientFactory.CreateConnectOnly) reste le durcissement V2. ---
         // Le journal d'écriture anticipée, dans la racine réparée d'abord. Préenregistré par un test, il n'est jamais ouvert.
         services.TryAddSingleton(_ => new JournalDuService(DrDxt.ElevatedHelper.Journal.JournalDuHelper.Ouvrir(
             ProgramDataManifestStorage.DefaultRoot(), TrustedManifestRoot.EnsureCreatedHardened)));
@@ -144,16 +114,12 @@ public static class HostServiceCollectionExtensions
                 nvApiDisabled,  // couture DRS : le réconciliateur de démarrage ne règle jamais le GPU.
                 nvApiDisabled,  // couture de réglage NVAPI : idem, échec propre par construction.
                 new DisabledAdlxActions(), // couture de réglage ADLX (AMD) : idem, échec propre par construction.
-                // Le plafond d'envoi QoS, pour la protection du ping retenue par le joueur. Seul
-                // ProtectionDuPingParLeService le demande, pour le jeu retenu et pendant qu'il tourne, sous la
-                // meme allowlist ; les politiques vivent en memoire (ActiveStore), un redemarrage les efface.
+                // Le plafond d'envoi QoS de la protection du ping : seul ProtectionDuPingParLeService le demande, pour
+                // le jeu retenu pendant qu'il tourne ; politiques en memoire (ActiveStore), effacees au redemarrage.
                 qos: new Win32NetworkQosActions());
-            // La couture de démarrage firmware n'est exprès pas passée ici. Le réconciliateur de démarrage
-            // tourne sans surveillance : un redémarrage qu'il déclencherait arriverait chez l'utilisateur
-            // comme une machine repartie seule dans le BIOS, sans rien à l'écran pour l'expliquer. Même
-            // raisonnement que pour les coutures GPU ci-dessus : cet hôte réconcilie un état, il n'accomplit
-            // jamais un geste que l'utilisateur vient de ne pas demander. Omise (null) plutôt que simulée :
-            // toute tentative échoue bruyamment au lieu de ne rien faire en silence.
+            // Pas de couture de démarrage firmware, exprès : sans surveillance, un redémarrage arriverait comme une
+            // machine repartie seule dans le BIOS. Cet hôte réconcilie un état, jamais un geste non demandé. Omise
+            // (null) plutôt que simulée : une tentative échoue bruyamment.
             return new InProcessElevatedClient(new OpAllowlist(), DrDxt.ElevatedHelper.Journal.JournalDuHelper.Decorer(executor,
                 sp.GetRequiredService<JournalDuService>().Journal, sp.GetRequiredService<LectureDesCiblesWin32>()));
         });
@@ -277,14 +243,11 @@ public static class HostServiceCollectionExtensions
     private static extern uint WTSGetActiveConsoleSessionId();
 }
 
-/// <summary>Un vérificateur qui fait échouer chaque contrôle : branché seulement quand aucune clé
-/// publique n'est fournie, pour que l'hôte soit fail-closed (il ne peut pas vérifier ⇒ il ne
-/// réconcilie jamais un manifeste non vérifié). Ne lève jamais.</summary>
 /// <summary>
-/// Le vérificateur du service, qui relit la clé quand une vérification échoue. Le service démarre à l'installation, avant
-/// que le helper ait créé la clé au premier commit ; une reprise du manifeste en crée une neuve. Lue une seule fois au
-/// démarrage, la clé refusait tout manifeste jusqu'au redémarrage du PC. La relecture passe par le même chargeur, avec les
-/// mêmes contrôles de confiance du fichier ; un manifeste que la clé relue ne vérifie pas reste refusé.
+/// Le vérificateur du service, qui relit la clé quand une vérification échoue : le service démarre à l'installation, avant
+/// que le helper crée la clé au premier commit, et une reprise du manifeste en crée une neuve ; lue une seule fois, elle
+/// refuserait tout jusqu'au redémarrage du PC. Même chargeur, mêmes contrôles de confiance du fichier ; un manifeste que la
+/// clé relue ne vérifie pas reste refusé.
 /// </summary>
 internal sealed class VerificateurRelu(string cheminCle, Func<string, IManifestVerifier> charger) : IManifestVerifier
 {
@@ -300,6 +263,8 @@ internal sealed class VerificateurRelu(string cheminCle, Func<string, IManifestV
     }
 }
 
+/// <summary>Un vérificateur qui fait échouer chaque contrôle : branché seulement quand aucune clé publique n'est fournie,
+/// pour que l'hôte soit fail-closed (il ne réconcilie jamais un manifeste non vérifié). Ne lève jamais.</summary>
 internal sealed class FailClosedManifestVerifier : IManifestVerifier
 {
     public bool Verify(ReadOnlySpan<byte> canonicalBytes, ReadOnlySpan<byte> signature) => false;

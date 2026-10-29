@@ -5,34 +5,16 @@ using DrDxt.Detection.Settings;
 
 namespace DrDxt.Detection.Display;
 
-// -----------------------------------------------------------------------
-// Win32DisplayInfo : la vraie couture de lecture IDisplayInfo, à la place de StubDisplayInfo.
-//
-// Avec un stub, le produit ne saurait lire aucune fréquence d'écran. Ce manque a un coût, vu
-// sur la machine de référence : un écran capable de 200 Hz piloté à 144, dont la seule trace
-// visible était un plafond d'images à 141 (la règle basse latence de NVIDIA plafonne 3 sous la
-// fréquence). Ce 141 était lu comme valeur de retour, sans un mot sur l'écran.
-//
-// Lecture seule, sans élévation, sans dépendance : EnumDisplayDevices + EnumDisplaySettings,
-// tous deux dans user32. Rien n'écrit ici.
-//
-// Deux règles que ce fichier impose :
-//  1. Le maximum se cherche à la résolution courante. Un écran offre souvent une fréquence plus
-//     haute à une résolution plus basse ; l'annoncer comme « le maximum » inventerait un déficit
-//     sur lequel l'utilisateur ne peut agir qu'en changeant de résolution.
-//  2. L'etat du VRR n'est pas detectable par Win32 : G-Sync/FreeSync vit dans le pilote.
-//     L'etat n'est pas la capacite. La capacite, elle, est ecrite dans l'EDID de l'ecran, lisible dans le
-//     registre sans elevation et sans NVAPI, donc valable NVIDIA, AMD et Intel.
-//     Quand NVAPI est branche, il est lu au pilote (NvAPI_Disp_GetVRRInfo)
-//     et SupportsVrr = possible et actif. Sans NVAPI (AMD, ecran sur une autre carte) : Unknown,
-//     et SupportsVrr reste faux : un manque dit, pas une lecture.
-//     Sur AMD, FreeSync est lu au pilote par ADLX (IADLXDisplayFreeSync), l'ecran
-//     retrouve par le nom de modele de son EDID.
-//
-// Inutilisable dans un service / en session 0 : EnumDisplayDevices ne rend rien sans window
-// station. Ce n'est pas une erreur à masquer : elle est rapportée en SDK_UNAVAILABLE, pour que
-// l'appelant passe proprement au lieu de conclure « aucun écran ».
-// -----------------------------------------------------------------------
+// Win32DisplayInfo : la couture de lecture IDisplayInfo (à la place de StubDisplayInfo). Sur la machine de référence,
+// un écran capable de 200 Hz piloté à 144 n'avait pour trace qu'un plafond d'images à 141 (la règle basse latence de
+// NVIDIA plafonne 3 sous la fréquence). Lecture seule, sans élévation : EnumDisplayDevices + EnumDisplaySettings (user32).
+//  1. Le maximum se cherche à la résolution courante : une fréquence plus haute à plus basse résolution inventerait un
+//     déficit sur lequel on n'agit qu'en changeant de résolution.
+//  2. L'etat du VRR (G-Sync/FreeSync) vit dans le pilote, pas dans Win32 ; la capacite est dans l'EDID, lisible dans le
+//     registre sans elevation ni NVAPI (NVIDIA, AMD, Intel). Avec NVAPI, l'etat est lu au pilote
+//     (NvAPI_Disp_GetVRRInfo) et SupportsVrr = possible et actif ; sans (AMD, ecran sur une autre carte) : Unknown, et
+//     SupportsVrr faux. Sur AMD, FreeSync est lu par ADLX (IADLXDisplayFreeSync), l'ecran retrouve par le modele EDID.
+// En session 0 (service), EnumDisplayDevices ne rend rien sans window station : SDK_UNAVAILABLE, jamais « aucun écran ».
 public sealed class Win32DisplayInfo : IDisplayInfo
 {
     private const int EnumCurrentSettings = -1;
@@ -43,8 +25,7 @@ public sealed class Win32DisplayInfo : IDisplayInfo
     /// <summary>
     /// Fait rendre a <c>DeviceID</c> le nom d'interface du moniteur, celui qui porte les deux
     /// champs de la cle de registre : <c>DISPLAY#AUS2413#5&amp;3ac6cfcf&amp;0&amp;UID4354#{guid}</c>.
-    /// Sans ce drapeau, <c>DeviceID</c> rend un chemin de la classe MONITOR, qui ne permet pas de
-    /// retrouver l'EDID.
+    /// Sans ce drapeau, un chemin de la classe MONITOR, qui ne mene pas a l'EDID.
     /// </summary>
     private const uint EddGetDeviceInterfaceName = 0x00000001;
 
@@ -68,14 +49,10 @@ public sealed class Win32DisplayInfo : IDisplayInfo
             ? Traduire(r)
             : FreeSyncDe(freeSync, NomDuModele(EdidDuMoniteur.Lire(NomInterfaceDuMoniteur(deviceName))));
 
-        // L'EDID repond la ou le pilote ne peut pas. Mesure du 18/09/2026 : sur cette machine
-        // le pilote rend « possible = 0 » avec G-Sync coupe globalement, et ce fichier refuse a
-        // juste titre d'y lire « ecran incapable » : sans l'EDID, `Possible` resterait Unknown, et les deux
-        // leviers de latence se tairaient sur un ecran de jeu a 200 Hz qui declare FreeSync.
-        //
-        // La capacite d'un ecran est ecrite dans son EDID, independamment de l'etat du pilote et
-        // du vendeur : « le VRR n'est pas detectable par Win32 » est vrai de l'etat et faux de la capacite. On ne s'en sert que si le pilote n'a
-        // rien su dire : une lecture au pilote connait l'etat en plus, elle reste prioritaire.
+        // L'EDID repond la ou le pilote ne peut pas. Mesure du 18/09/2026 : le pilote rend « possible = 0 » avec G-Sync
+        // coupe globalement, qu'on ne lit pas « ecran incapable » ; sans l'EDID, `Possible` resterait Unknown et les deux
+        // leviers de latence se tairaient sur un ecran a 200 Hz qui declare FreeSync. Seulement si le pilote n'a rien su
+        // dire : sa lecture connait l'etat en plus.
         if (pilote.Possible != TriState.Unknown)
             return pilote;
 
@@ -83,13 +60,8 @@ public sealed class Win32DisplayInfo : IDisplayInfo
         return (capacite, pilote.Enabled);
     }
 
-    /// <summary>
-    /// Le nom d'interface du moniteur branche sur cet adaptateur, ou <c>null</c>.
-    ///
-    /// C'est lui qui designe l'ecran actif : le registre conserve aussi les branchements passes
-    /// (quatre entrees pour deux ecrans sur la machine de reference), et lire le premier venu
-    /// rendrait la capacite d'un ecran debranche.
-    /// </summary>
+    /// <summary>Le nom d'interface du moniteur branche sur cet adaptateur, ou <c>null</c> : il designe l'ecran actif, le
+    /// registre gardant les branchements passes (quatre entrees pour deux ecrans sur la machine de reference).</summary>
     private static string? NomInterfaceDuMoniteur(string deviceName)
     {
         var moniteur = new DisplayDevice();
@@ -131,13 +103,10 @@ public sealed class Win32DisplayInfo : IDisplayInfo
     }
 
     /// <summary>
-    /// Ce qu'une lecture du pilote autorise a dire.
-    ///
-    /// Mesure du 10/09/2026 sur la machine de reference : « possible = 0 » sur les deux ecrans, et
-    /// « Enable G-SYNC globally » (DRS VRR_MODE 0x1194F158) = 0. Avec G-Sync coupe globalement, le bit
-    /// « possible » ne distingue pas un ecran incapable d'un ecran capable dont le VRR est eteint : lire
-    /// ce 0 comme « non capable » aurait fait taire le constat « G-Sync desactive », un vrai, sur un
-    /// ecran FreeSync branche en DisplayPort. « Possible » ne vaut Off que si le VRR est active.
+    /// Ce qu'une lecture du pilote autorise a dire. Mesure du 10/09/2026 sur la machine de reference : « possible = 0 »
+    /// sur les deux ecrans, et « Enable G-SYNC globally » (DRS VRR_MODE 0x1194F158) = 0 ; G-Sync coupe, le bit ne
+    /// distingue pas un ecran incapable d'un capable eteint, et y lire « non capable » tairait le vrai constat
+    /// « G-Sync desactive » sur un ecran FreeSync en DisplayPort. « Possible » ne vaut Off que si le VRR est active.
     /// </summary>
     public static (TriState Possible, TriState Enabled) Traduire(DrDxt.GpuNative.NvApi.VrrReading r) =>
         (r.Possible ? TriState.On : r.Enabled ? TriState.Off : TriState.Unknown,
@@ -198,8 +167,7 @@ public sealed class Win32DisplayInfo : IDisplayInfo
                     Adaptateur: device.DeviceString));
             }
 
-            // Zéro écran veut dire qu'on n'a pas pu voir le bureau (session 0 / pas de window station),
-            // pas que la machine n'a pas d'écran. Dire « aucun » serait une lecture inventée.
+            // Zéro écran = bureau invisible (session 0 / pas de window station), pas une machine sans écran.
             if (displays.Count == 0)
                 return Result<IReadOnlyList<DisplayInfo>>.Fail(ErrorCodes.TweakSdkUnavailable,
                     "No display could be enumerated (no window station?).");
@@ -235,11 +203,8 @@ public sealed class Win32DisplayInfo : IDisplayInfo
     /// sort 0 (non lue), comme une lecture ratée.</summary>
     internal static int FrequenceLue(int dmDisplayFrequency) => dmDisplayFrequency > 1 ? dmDisplayFrequency : 0;
 
-    /// <summary>
-    /// La fréquence la plus haute que l'écran offre à cette résolution et cette profondeur de
-    /// couleur. Prendre le maximum de tous les modes annoncerait la fréquence d'un mode 800x600
-    /// comme « ce que ton écran sait faire », un déficit sans geste possible. 0 si aucun mode.
-    /// </summary>
+    /// <summary>La fréquence la plus haute que l'écran offre à cette résolution et cette profondeur de couleur, pas celle
+    /// d'un mode 800x600 (un déficit sans geste possible). 0 si aucun mode.</summary>
     private static int MaxRefreshAtResolution(string deviceName, int width, int height, int bpp)
     {
         var max = 0;

@@ -7,33 +7,21 @@ namespace DrDxt.Reconciler.Desinstallation;
 // -----------------------------------------------------------------------
 // RenduALaDesinstallation : ce que la desinstallation rend, et ce qu'elle laisse.
 //
-// Lancee par l'installeur Inno, par le lanceur natif (`DrDxt.Lanceur.exe` puis le helper en `--uninstall-revert`, deja
-// eleve), elle relit le
-// manifeste signe (verify-only, cle publique de la machine) et, pour chaque origine qu'il porte (les
-// corrections au redemarrage (`Tweaks`) comme les leviers gardes (`RevertOnly`)) :
-//
-//   * une feuille n'est rendue que si sa valeur courante est encore celle que DrDXT y a posee. Un reglage
-//     change a la main depuis est respecte, et le rapport le dit. Une valeur illisible, ou une valeur posee
-//     que le manifeste ne connait pas, ne se touche pas : on ne rend pas ce qu'on ne sait pas comparer ;
-//   * un instantane composite (plusieurs feuilles) est tout-ou-rien : il n'est
-//     rendu que si toutes ses feuilles sont encore a la valeur posee par DrDXT. Une seule changee a la
-//     main, illisible, ou dont la cible a disparu ⇒ aucune feuille n'est touchee, et le rapport nomme la
-//     coupable. Rendre les autres laisserait un melange que personne n'a choisi ;
-//   * avant toute ecriture, la cible doit exister encore (la cle, le service, le plan) : disparue ⇒ rien
-//     n'est ecrit, dit dans le rapport, plutot qu'une valeur orpheline laissee derriere ;
-//   * une feuille n'est dite rendue que relue a son origine, par le lecteur qui l'a jugee juste avant :
-//     une ecriture acceptee mais non confirmee reste a rendre (le manifeste est garde) ;
-//   * aucun echec n'arrete le reste : une entree qui echoue (ou qui jette) est ecrite dans le rapport, et
-//     l'entree suivante est tentee. Un manifeste absent ou illisible rend un rapport « rien rendu ».
-//
-// La valeur posee : pour une correction, la valeur voulue traduite par le meme mapper que le
-// reconciliateur ; pour un levier garde, `DesiredValueJson` = l'op avant (ou le composite des ops avant)
-// que le levier a ecrite. Les entrees sont rendues de la plus ancienne a la plus recente : une feuille deja
-// rendue par une entree plus ancienne n'est pas rendue une seconde fois (la plus ancienne origine est la
-// vraie).
-//
-// Ecrire passe par un IElevatedClient : en production l'executeur en processus du helper, derriere la meme
-// allowlist feuille-exacte que le tube.
+// Lancee par l'installeur Inno via le lanceur natif (`DrDxt.Lanceur.exe` puis le helper en `--uninstall-revert`, deja
+// eleve), elle relit le manifeste signe (verify-only, cle publique de la machine), et pour chaque origine (corrections
+// `Tweaks` et leviers gardes `RevertOnly`) :
+//   * une feuille n'est rendue que si sa valeur courante est encore celle que DrDXT y a posee ; changee a la main, elle
+//     est respectee et dite ; illisible, ou de valeur posee inconnue du manifeste, elle n'est pas touchee ;
+//   * un composite est tout-ou-rien : une seule feuille changee, illisible ou a la cible disparue ⇒ aucune n'est
+//     touchee, et la coupable est nommee (rendre les autres laisserait un melange que personne n'a choisi) ;
+//   * la cible doit exister encore (cle, service, plan) : disparue ⇒ rien d'ecrit, pas de valeur orpheline ;
+//   * une feuille n'est dite rendue que relue a son origine par le lecteur qui l'a jugee : non confirmee, elle reste a
+//     rendre (le manifeste est garde) ;
+//   * aucun echec n'arrete le reste ; manifeste absent ou illisible : « rien rendu ».
+// La valeur posee : pour une correction, la valeur voulue traduite par le mapper du reconciliateur ; pour un levier
+// garde, `DesiredValueJson` (l'op avant, ou leur composite). De la plus ancienne entree a la plus recente : la plus
+// ancienne origine est la vraie, une feuille n'est rendue qu'une fois. Ecriture par un IElevatedClient : en production,
+// l'executeur du helper derriere la meme allowlist feuille-exacte que le tube.
 // -----------------------------------------------------------------------
 
 /// <summary>Lit la valeur courante a la cible d'une ecriture, sous la forme que cette ecriture pose :
@@ -44,11 +32,9 @@ public interface ILectureDesCibles
 {
     Result<string?> Lire(PrivilegedOp ecriture);
 
-    /// <summary>La cible existe-t-elle encore ? Une valeur absente n'est pas
-    /// la meme chose qu'une cible disparue : la cle de registre a pu etre supprimee, le service
-    /// desinstalle, le plan d'alimentation efface. Y ecrire recreerait une valeur orpheline : un
-    /// reglage que DrDXT n'a jamais pose la, laisse derriere lui par la desinstallation. <c>Ok(false)</c>
-    /// = disparue, on n'ecrit rien et on le dit. <c>Fail</c> = on ne sait pas : on ne touche pas non plus.</summary>
+    /// <summary>La cible existe-t-elle encore ? Une valeur absente n'est pas une cible disparue (cle supprimee, service
+    /// desinstalle, plan efface), ou ecrire laisserait une valeur orpheline. <c>Ok(false)</c> = disparue, rien d'ecrit, et
+    /// c'est dit ; <c>Fail</c> = on ne sait pas, rien non plus.</summary>
     Result<bool> CibleExiste(PrivilegedOp ecriture);
 }
 
@@ -61,13 +47,10 @@ public enum IssueDuRendu
     Illisible,
     EchecDEcriture,
 
-    /// <summary>Une seule feuille d'un levier composite a ete changee a la main : aucune
-    /// feuille du composite n'est rendue. Rendre les autres laisserait la machine dans un etat que ni
-    /// DrDXT ni l'utilisateur n'a jamais choisi.</summary>
+    /// <summary>Une feuille d'un composite a ete changee a la main : aucune n'est rendue.</summary>
     CompositePartiellementModifie,
 
-    /// <summary>La cible de l'ecriture n'existe plus (cle supprimee, service desinstalle,
-    /// plan efface). Rien n'est ecrit : on ne pose pas une valeur orpheline.</summary>
+    /// <summary>La cible n'existe plus (cle supprimee, service desinstalle, plan efface) : rien n'est ecrit.</summary>
     CibleDisparue,
 }
 
@@ -120,10 +103,8 @@ public sealed class RenduALaDesinstallation
     private readonly IElevatedClient _ecriture;
     private static readonly IReapplyOpMapper Reaffirmation = new DefaultReapplyOpMapper(new DefaultReconcilableTweakCatalog());
 
-    /// <summary>Ce que DrDXT A pose pour ce levier, feuille par feuille : la meme regle pour la
-    /// desinstallation (qui rend) et la verification au lancement (qui relit). Une seule definition, pour
-    /// que les deux ne jugent jamais deux choses differentes. <c>null</c> = ce qui a ete pose n'est pas
-    /// connu : le verdict sera « inconnu », jamais « applique ».</summary>
+    /// <summary>Ce que DrDXT a pose pour ce levier, feuille par feuille : une seule definition pour la desinstallation
+    /// (qui rend) et la verification au lancement (qui relit). <c>null</c> = inconnu, jamais « applique ».</summary>
     /// <param name="estCorrection">Entree de <c>Tweaks</c> (correction reaffirmee) plutot que de <c>RevertOnly</c>.</param>
     public static IReadOnlyList<PrivilegedOp>? PoseesDe(AppliedTweak t, bool estCorrection)
         => Ops(t.PoseesJson) ?? (estCorrection ? Reaffirmee(t) : Ops(t.DesiredValueJson));
@@ -159,11 +140,9 @@ public sealed class RenduALaDesinstallation
             .OrderBy(e => e.Entree.AppliedAt) // stable : a date egale, les corrections d'abord
             .ToList();
 
-        // Ce que DrDXT a laissé sur chaque cible : la valeur posée par l'entrée la PLUS RÉCENTE. Deux leviers sur la même
-        // cible (Économie→Équilibré, puis Équilibré→Hautes perf) forment une chaîne : rendre la plus ancienne origine
-        // (Économie) ramène à l'état d'avant DrDXT, et c'est elle qui fait foi. Sans ceci, la plus ancienne se jugerait
-        // « changée depuis » (sa valeur posée, Équilibré, n'est plus l'actuelle, Hautes perf), on ne la rendrait pas, et la
-        // machine resterait au plan intermédiaire. On compare donc l'actuel à ce que DrDXT a laissé, pas à chaque pose.
+        // Ce que DrDXT a laissé sur chaque cible : la valeur posée par l'entrée la plus récente. Une chaîne
+        // (Économie→Équilibré, puis Équilibré→Hautes perf) se rend à la plus ancienne origine (Économie) ; comparée à sa
+        // propre pose (Équilibré), elle se croirait « changée depuis » et la machine resterait au plan intermédiaire.
         var laisseParDrDxt = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (entree, estCorrection) in entrees)
         {
@@ -210,22 +189,15 @@ public sealed class RenduALaDesinstallation
             return;
         }
 
-        // Les valeurs posees. Quand le manifeste porte l'origine complete du levier
-        // (`PoseesJson`, ecrit depuis l'Apply), elle fait foi : elle nomme chaque feuille. Sinon (levier a
-        // une seule feuille, ou manifeste ecrit avant ce champ), on retombe sur la valeur voulue,
-        // reaffirmee pour une correction, decodee telle quelle pour un levier garde.
+        // Les valeurs posees : `PoseesJson` quand le manifeste le porte (chaque feuille nommee), sinon la valeur voulue.
         var posees = PoseesDe(t, estCorrection);
 
         // ── 1. Juger toutes les feuilles, sans rien ecrire ─────────────────────────────────────
         var jugees = retours.Select(retour => Juger(retour, posees)).ToList();
 
         // ── 2. Le tout-ou-rien des composites ────────────────────────
-        // Un levier composite a plusieurs feuilles qui n'ont de sens qu'ensemble. Si une seule a ete
-        // changee a la main (ou est devenue illisible, ou sa cible a disparu), rendre les autres
-        // laisserait la machine dans un melange que personne n'a choisi : ni l'etat d'origine, ni
-        // celui de DrDXT, ni celui de l'utilisateur. On ne touche donc a aucune feuille, et on le dit
-        // nommement. « Deja rendue par une entree plus ancienne » n'est pas un empechement : la feuille
-        // est deja revenue a l'origine, c'est le but.
+        // Une feuille bloquante (changee, illisible, cible disparue) : aucune n'est touchee, et c'est dit nommement.
+        // « Deja rendue par une entree plus ancienne » n'est pas un empechement : c'est le but.
         var estComposite = retours.Count > 1;
         if (estComposite)
         {
@@ -293,8 +265,7 @@ public sealed class RenduALaDesinstallation
                 return new FeuilleJugee(cible, IssueDuRendu.ValeurPoseeInconnue,
                     Docteur.T("RD.ValeurInconnue"));
 
-            // La cible existe-t-elle encore ? Avant de comparer quoi que ce soit : une cle supprimee,
-            // un service desinstalle, un plan efface. Y ecrire poserait une valeur orpheline.
+            // La cible existe-t-elle encore ? Avant toute comparaison.
             var existe = _lecture.CibleExiste(retour);
             if (!existe.IsOk)
                 return new FeuilleJugee(cible, IssueDuRendu.Illisible,
@@ -308,15 +279,14 @@ public sealed class RenduALaDesinstallation
                 return new FeuilleJugee(cible, IssueDuRendu.Illisible,
                     Docteur.T("RD.ValeurIllisible", lue.Error?.Code, lue.Error?.Message));
 
-            // Feuille d'un composite deja a sa valeur d'origine : une passe precedente l'a rendue avant qu'une autre feuille
-            // echoue. Jugee « respectee », elle bloquerait le composite sans le garder en suspens, et l'autre feuille ne
-            // serait jamais rendue. Seule, la meme valeur reste un choix du joueur.
+            // Feuille d'un composite deja a son origine (rendue par une passe precedente) : jugee « respectee », elle
+            // bloquerait le composite et l'autre feuille ne serait jamais rendue. Seule, la meme valeur reste un choix du
+            // joueur.
             if (retours.Count > 1 && !string.Equals(lue.Value, attendue, StringComparison.Ordinal)
                 && (retour is DeleteRegistryValueOp ? lue.Value is null : string.Equals(lue.Value, ValeurPosee(retour), StringComparison.Ordinal)))
                 return new FeuilleJugee(cible, IssueDuRendu.DejaRendu, Docteur.T("RD.DejaALOrigine"));
 
-            // DirectXUserGlobalSettings porte aussi Auto HDR, que le joueur règle lui-même : jugée en entier, une bascule d'Auto HDR
-            // la ferait respecter, et les clés de DrDXT resteraient pour toujours. Seules elles s'y jugent, et seules elles
+            // DirectXUserGlobalSettings porte aussi Auto HDR, réglé par le joueur : seules les clés de DrDXT s'y jugent et
             // reprennent leur origine dans la chaîne courante.
             if (ChaineDirectX(retour) is { } ruche)
             {
@@ -330,10 +300,7 @@ public sealed class RenduALaDesinstallation
                 return new FeuilleJugee(cible, IssueDuRendu.Rendu, string.Empty, rendu, attendue, posee);
             }
 
-            // La regle : on ne rend que ce que DrDXT a pose et qui est encore la. Sur une cible touchee par plusieurs
-            // leviers (chaine de plans d'alimentation), « ce que DrDXT a pose » est la valeur de l'entree la plus recente ;
-            // l'actuel qui lui est egal veut dire que le joueur n'a rien change depuis, et la plus ancienne origine (celle de
-            // CETTE entree, rendue en premier) ramene a l'etat d'avant DrDXT.
+            // On ne rend que ce que DrDXT a pose et qui est encore la ; sur une chaine, comparee a la pose la plus recente.
             var laisse = laisseParDrDxt.TryGetValue(cible, out var d) ? d : attendue;
             if (!string.Equals(lue.Value, laisse, StringComparison.Ordinal))
                 return new FeuilleJugee(cible, IssueDuRendu.Respecte,
@@ -342,9 +309,8 @@ public sealed class RenduALaDesinstallation
             return new FeuilleJugee(cible, IssueDuRendu.Rendu, string.Empty, retour, attendue, posee);
         }
 
-        // Relue par le lecteur qui vient de la juger : null si elle est à son origine, sinon pourquoi elle n'est pas
-        // confirmée. Une origine sans valeur comparable (la suppression d'un réglage du pilote NVIDIA, que le helper vérifie
-        // déjà par l'origine relue) garde la parole de l'écriture.
+        // Relue par le lecteur qui l'a jugée : null à son origine, sinon pourquoi. Une origine sans valeur comparable (une
+        // suppression DRS NVIDIA, vérifiée par le helper) garde la parole de l'écriture.
         string? Relue(FeuilleJugee f)
         {
             var origine = ValeurPosee(f.Retour!); // null pour une valeur à supprimer : relue absente

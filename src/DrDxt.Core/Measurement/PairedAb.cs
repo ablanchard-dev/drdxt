@@ -9,31 +9,14 @@ public readonly record struct AbPass(bool EtatB, double AvgFps);
 /// <summary>
 /// A-b-a-b : separer l'effet du reglage de l'effet du temps.
 ///
-/// Ce n'est pas une precaution theorique, c'est une reponse a une mesure. Le 07/09/2026, les
-/// trois captures reelles conservees ont ete passees a <see cref="SceneResolution"/> : **deux sur
-/// trois derivent plus qu'elles ne bruitent** : 22h07 derive de 4,93 % pour un bruit de 1,83 %,
-/// 23h37 de 18,68 % pour 2,36 %. Sur cette machine, en partie reelle, un A/B en AAA→BBB attribue
-/// **le plus souvent** au reglage ce qui n'est que le temps ecoule.
+/// Mesure du 07/09/2026 : deux des trois captures reelles derivent plus qu'elles ne bruitent (<see cref="SceneResolution"/> :
+/// 22h07 derive de 4,93 % pour 1,83 % de bruit, 23h37 de 18,68 % pour 2,36 %) : un A/B en AAA→BBB y attribuerait le plus
+/// souvent au reglage le temps ecoule. L'appairage successif ne suffit pas : il reduit la derive de <c>3d</c> a <c>d</c>
+/// sans l'annuler (+14,6 % d'« effet » sur une derive pure de +10 fps par passe).
 ///
-/// ══ pourquoi pas un simple appairage successif ══
-/// Comparer chaque B au A qui le precede parait suffire, et ne suffit pas : si la machine derive de
-/// <c>d</c> par passe, chaque difference porte encore <c>effet + d</c>. L'appairage successif
-/// **reduit** la derive de <c>3d</c> a <c>d</c>, il ne l'annule pas. Essaye et mesure :
-/// sur une derive pure de +10 fps par passe, l'appairage successif rendait encore
-/// +14,6 % d'« effet ».
-///
-/// ══ ce que fait cette classe ══
-/// Un ajustement aux moindres carres de <c>fps ≈ a + b·t + c·estB</c>. Le coefficient <c>c</c> est
-/// l'effet du reglage **degage de la derive lineaire**, quel que soit l'ordre du protocole :
-/// A-b-a-b, a-b-b-a ou plus long. Sur une derive pure sans effet, il vaut **exactement zero**.
-///
-/// Et la garde contre AABB en tombe toute seule : dans cette sequence l'etat est **colineaire au
-/// temps** (tous les A avant tous les B), le systeme est singulier, et aucune methode au monde ne
-/// peut y separer l'effet du temps. Refuser n'est pas une precaution ajoutee, c'est le calcul qui
-/// le dit.
-///
-/// L'appairage augmente la sensibilite ; il ne la rend pas infinie. Un effet sous la resolution
-/// reste <see cref="EvidenceOutcome.NoResolvedChange"/>, jamais un gain.
+/// D'ou un ajustement aux moindres carres <c>fps ≈ a + b·t + c·estB</c> : <c>c</c> est l'effet degage de la derive
+/// lineaire, quel que soit l'ordre (A-b-a-b, a-b-b-a ou plus long), et vaut exactement zero sur une derive pure. Un effet
+/// sous la resolution reste <see cref="EvidenceOutcome.NoResolvedChange"/>, jamais un gain.
 ///
 /// Pur, aucune I/O.
 /// </summary>
@@ -47,10 +30,8 @@ public static class PairedAb
     /// Part maximale de la variance de l'etat expliquable par le temps (r² entre l'instant et
     /// l'indicatrice B). Au-dela, l'effet et la derive sont confondus.
     ///
-    /// Hypothese de depart : AABB donnerait un systeme singulier et se refuserait tout seul.
-    /// **Faux, verifie au calcul** : sur quatre passes, AABB rend un determinant de 1, pas de 0.
-    /// La colinearite parfaite demanderait deux points. Il faut donc une garde explicite, et voici
-    /// ce que valent les protocoles :
+    /// Une garde explicite, car AABB n'est pas singulier : sur quatre passes son determinant vaut 1 (la colinearite
+    /// parfaite demanderait deux points). Les protocoles :
     ///
     ///   A-b-b-a  r² = 0,0   ← orthogonal : l'etat n'a aucune composante temporelle
     ///   A-b-a-b  r² = 0,2
@@ -65,17 +46,9 @@ public static class PairedAb
     /// Combien de fois le residu du modele peut depasser le bruit annonce par la scene avant que
     /// le modele soit declare indefendable.
     ///
-    /// Sans cette garde, le modele fabrique des verdicts. Mesure du 07/09/2026 : sur un
-    /// changement brutal de phase (le jeu passe de 100 a 130 FPS au milieu de la sequence, effet
-    /// reel +1 %), l'ajustement lineaire rendait **-5,4 %, « degradation prouvee »**. Le saut, que
-    /// la droite ne peut pas epouser, se deversait dans le coefficient d'etat.
-    ///
-    /// Le symptome est visible : les residus valaient 8,3 % de la base quand la scene n'annoncait
-    /// que 2 % de bruit. Un modele qui laisse quatre fois plus de residu que le bruit mesure ne
-    /// decrit pas ces donnees, et un effet extrait d'un modele faux est une precision fabriquee.
-    ///
-    /// **Non chiffré** : le facteur 2 laisse passer le desajustement ordinaire (une courbure
-    /// douce) et arrete un saut. Il est ecrit ici pour etre discute, pas dilue dans un calcul.
+    /// Sans elle le modele fabrique des verdicts : sur un saut de phase (100 → 130 FPS au milieu, effet reel +1 %), la
+    /// droite rendait -5,4 %, « degradation prouvee » (mesure du 07/09/2026), avec des residus a 8,3 % de la base pour 2 %
+    /// de bruit annonce. **Non chiffré** : le facteur 2 laisse passer une courbure douce et arrete un saut.
     /// </summary>
     public const double ResiduToleretouteFoisLaResolution = 2.0;
 
@@ -163,18 +136,10 @@ public static class PairedAb
             return Invalide(Docteur.T("PA.Modele", residuPct, resolutionPct));
 
         // ── La resolution du modele lui-meme ────────────────────────────────────────────────
-        // Jusqu'ici l'effet etait juge contre la resolution d'une phase d'A/A a trois passes.
-        // C'est le pire estimateur de bruit possible : t95(1) = 12,706, six fois la valeur
-        // asymptotique. Mesure du 07/09/2026 (`tools/tailbench`, 8 captures Warzone reelles,
-        // 43 positions glissantes) : l'A/A annoncait **±14,3 %** quand le bruit vrai de la meme
-        // experience, mesure sur sa distribution nulle, valait **±3,85 %**. Le produit etait
-        // sous-confiant d'un facteur ~3,7 : il ne fabriquait pas de faux verdicts, il etait
-        // simplement aveugle a tout ce qui vaut moins de 14 %.
-        //
-        // L'experience appariee sait mesurer son propre bruit : la variance du coefficient
-        // d'etat vaut σ²·Stt/det, ou σ² est le residu du modele deja calcule ci-dessus. Elle
-        // profite de toutes les passes (df = n−3) au lieu de trois, et elle porte le bruit
-        // reellement present pendant l'experience plutot que celui d'une phase precedente.
+        // L'experience mesure son propre bruit : variance du coefficient d'etat = σ²·Stt/det (σ² : le residu ci-dessus),
+        // sur toutes les passes (df = n−3) et pendant l'experience. Une A/A a trois passes serait le pire estimateur
+        // (t95(1) = 12,706) : sur 8 captures Warzone (07/09/2026, `tools/tailbench`), elle annoncait ±14,3 % pour un bruit
+        // vrai de ±3,85 %, aveugle a tout ce qui vaut moins de 14 %.
         var varianceResiduelle = sse / Math.Max(1, points.Count - 3);
         var margeFps = TValue95(points.Count - 3) * Math.Sqrt(varianceResiduelle * stt / determinant);
         var resolutionDuModele = margeFps / baseA * 100.0;

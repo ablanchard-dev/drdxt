@@ -23,17 +23,10 @@ public sealed record LiveKernelReport(
     string? Parametre1)
 {
     /// <summary>
-    /// L'incident vient-il du sous-systeme graphique ?
-    ///
-    /// La question decide si une experience GPU peut avoir lieu, donc elle se tranche sur les
-    /// codes eux-memes et non sur le bucket : le bucket `WATCHDOG` heberge aussi des gardiens qui
-    /// n'ont rien de graphique. Les cinq codes retenus sont exactement ceux dont le nom SDK designe
-    /// le noyau graphique (`VIDEO_*`, `*_DXGKRNL_*`).
-    ///
-    /// Un code que nous ne savons pas nommer rend <c>false</c> : il pourrait etre graphique, et
-    /// nous l'ignorons. Cette porte retient la main, elle ne la force pas : se tromper vers
-    /// « inconnu donc pas graphique » coute une experience potentiellement risquee, se tromper vers
-    /// l'inverse gelerait la carte sur un incident sans rapport.
+    /// L'incident vient-il du sous-systeme graphique ? Elle decide si une experience GPU peut avoir lieu, donc se tranche
+    /// sur les codes, pas sur le bucket (`WATCHDOG` heberge aussi des gardiens non graphiques) : les cinq codes dont le
+    /// nom SDK designe le noyau graphique (`VIDEO_*`, `*_DXGKRNL_*`). Un code que nous ne savons pas nommer rend
+    /// <c>false</c> : l'inverse gelerait la carte sur un incident sans rapport.
     /// </summary>
     public bool EstGraphique => CodeGraphique(Code);
 
@@ -46,11 +39,8 @@ public sealed record LiveKernelReport(
 }
 
 /// <summary>
-/// Les incidents noyau que la machine a conserves, meme quand elle n'a pas plante.
-///
-/// Un incident live n'est pas un plantage : le noyau a pris une photo et la machine a continue
-/// de tourner. Les additionner aux arrets brutaux de <see cref="IUnexpectedShutdownLog"/>
-/// compterait ensemble deux natures d'incident differentes.
+/// Les incidents noyau que la machine a conserves, meme sans planter : le noyau a pris une photo et la machine a
+/// continue. Ils ne s'additionnent pas aux arrets brutaux de <see cref="IUnexpectedShutdownLog"/>.
 /// </summary>
 public interface ILiveKernelReportLog
 {
@@ -64,50 +54,33 @@ public interface ILiveKernelReportLog
 }
 
 /// <summary>
-/// La quatrieme classe de preuve, et la seule qui restait sur cette machine.
-///
-/// Constat du 08/09/2026 sur la machine de reference. Trois sources de preuve de plantage
-/// etaient soit vides, soit en echec :
-///
+/// La quatrieme classe de preuve. Constat du 08/09/2026 sur la machine de reference, les trois autres sources :
 ///   `C:\WINDOWS\MEMORY.DMP`            absent
 ///   `C:\WINDOWS\Minidump\`             vide
 ///   `volmgr` 161, 02/09 05:09 et 04/09 16:44
 ///                                      « la creation du fichier de vidage a echoue »,
 ///                                      `BugCheckProgress = 0x00040049` les deux fois
-///
-/// Et ce n'est ni la faute du fichier d'echange (33 Go, gere par le systeme, sur le volume de
-/// demarrage, pic a 1,7 Go) ni de la place disque (291 Go libres). Consequence a retenir : le
-/// « reparage » evident (remettre `CrashDumpEnabled` a 7 au lieu de 3) n'aurait rien repare,
-/// puisque c'est la creation du vidage qui echoue, pas son type.
-///
-/// Pourtant la machine avait garde quatre rapports, que rien ne lisait :
-///
+/// Ni le fichier d'echange (33 Go, gere par le systeme, sur le volume de demarrage, pic a 1,7 Go) ni la place disque
+/// (291 Go libres) : remettre `CrashDumpEnabled` a 7 au lieu de 3 n'aurait rien repare, c'est la creation qui echoue.
+/// La machine avait pourtant garde quatre rapports :
 ///   USBXHCI-20260222-0042.dmp   0x144 BUGCODE_USB3_DRIVER        22/02/2026 00:42:17
 ///   WATCHDOG-20260815-0138.dmp  0x193 VIDEO_DXGKRNL_LIVEDUMP     15/08/2026 01:38:49
 ///   WATCHDOG-20260818-1942.dmp  0x193 VIDEO_DXGKRNL_LIVEDUMP     18/08/2026 19:42:09
 ///   WATCHDOG-20260822-0234.dmp  0x193 VIDEO_DXGKRNL_LIVEDUMP     22/08/2026 02:34:32
+/// Trois gardiens du noyau graphique en huit jours, meme code, meme parametre 1 (`0x80e`) : ca conditionne toute
+/// experimentation GPU.
 ///
-/// Trois gardiens du noyau graphique en huit jours, code identique, parametre 1 identique
-/// (`0x80e`). Ce n'est pas du bruit, et ca conditionne toute experimentation GPU.
+/// Lecture par indice : `Report.wer` est localise (`Sig[1].Name=Paramètre 1` sur ce Windows francais), donc on lit
+/// les `Sig[N].Value` par position apres avoir verifie `EventType=LiveKernelEvent`, l'en-tete qui garantit le schema.
 ///
-/// ══ pourquoi la lecture se fait par index ══
-/// `Report.wer` est localise : sur ce Windows francais les champs s'appellent
-/// `Sig[1].Name=Paramètre 1`. Chercher « Parameter 1 » ne trouve rien ici, et coder « Paramètre »
-/// ne trouverait rien ailleurs. On lit donc les `Sig[N].Value` par indice, apres avoir verifie
-/// `EventType=LiveKernelEvent` : c'est cet en-tete qui garantit le schema. Meme lecon que les
-/// compteurs de performance.
-///
-/// Non couvert, et dit plutot que devine : `C:\Windows\LiveKernelReports` est l'autre
-/// emplacement de ces vidages. Il est vide sur cette machine, donc invérifiable ici : ecrire son
-/// analyse serait livrer du code que rien n'a prouve.
+/// Non couvert : `C:\Windows\LiveKernelReports`, l'autre emplacement, vide sur cette machine donc invérifiable ici.
 /// </summary>
 public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
 {
     /// <summary>
     /// Les codes que nous savons nommer, releves le 08/09/2026 dans
-    /// `Windows Kits\10\Include\10.0.22621.0\shared\bugcodes.h` (source : le SDK, ni memoire ni blog). Une table courte et exacte vaut mieux qu'une longue et approximative : un code
-    /// absent d'ici ressort en chiffre, ce qui est vrai, plutot qu'en nom plausible, qui serait
-    /// faux.
+    /// `Windows Kits\10\Include\10.0.22621.0\shared\bugcodes.h` (source : le SDK, ni memoire ni blog). Un code absent
+    /// d'ici ressort en chiffre, jamais en nom plausible.
     /// </summary>
     private static readonly IReadOnlyDictionary<uint, string> NomsSdk = new Dictionary<uint, string>
     {
@@ -131,8 +104,8 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
         [0x000000EF] = "CRITICAL_PROCESS_DIED",
     };
 
-    /// <summary>Le nom SDK d'un code d'arret, ou <c>null</c> s'il n'est pas dans la table.
-    /// La table servait aux incidents a chaud ; les ecrans bleus du bilan n'affichaient que le code.</summary>
+    /// <summary>Le nom SDK d'un code d'arret, ou <c>null</c> s'il n'est pas dans la table (aussi pour les ecrans bleus
+    /// du bilan).</summary>
     public static string? NomSdk(int code) => NomsSdk.TryGetValue(unchecked((uint)code), out var n) ? n : null;
 
     private readonly string[] _racines;
@@ -149,8 +122,7 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
         var wer = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
             "Microsoft", "Windows", "WER");
-        // La file et l'archive : Windows deplace les rapports de l'une a l'autre apres envoi, et
-        // ne lire que la file perdrait tout l'historique d'une machine qui a rapporte ses erreurs.
+        // La file et l'archive : Windows deplace les rapports de l'une a l'autre apres envoi.
         return [Path.Combine(wer, "ReportQueue"), Path.Combine(wer, "ReportArchive")];
     }
 
@@ -189,8 +161,7 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
         }
         catch (Exception ex)
         {
-            // Acces refuse sur une machine durcie, dossier verrouille : on le dit. Rendre une
-            // liste vide ferait passer « je n'ai pas pu lire » pour « aucun incident ».
+            // Acces refuse, dossier verrouille : on le dit ; une liste vide ferait passer « pas pu lire » pour « aucun incident ».
             return Result<IReadOnlyList<LiveKernelReport>>.Fail(
                 ErrorCodes.DetectionFailed, "Rapports WER illisibles : " + ex.Message);
         }
@@ -199,12 +170,10 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
     private static LiveKernelReport? Analyser(string dossier)
     {
         var wer = Path.Combine(dossier, "Report.wer");
-        // Pas de `File.Exists`. Sans droits administrateur, chaque dossier `Kernel_*`
-        // est fermé et `File.Exists` y répond « absent » : un refus passait pour une absence. On ouvre ; un refus lève
-        // UnauthorizedAccessException, compté par Lire().
+        // Pas de `File.Exists` : sans administrateur, chaque dossier `Kernel_*` est fermé et il y répond « absent ». On
+        // ouvre ; un refus lève UnauthorizedAccessException, compté par Lire().
         var champs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        // `Report.wer` est en UTF-16. On laisse la marque d'ordre des octets decider quand elle
-        // est presente, faute de quoi un fichier UTF-8 ressortirait en caracteres nuls.
+        // `Report.wer` est en UTF-16 ; la marque d'ordre des octets decide quand elle est la (un UTF-8 sortirait en nuls).
         StreamReader ouvert;
         try { ouvert = new StreamReader(wer, Encoding.Unicode, detectEncodingFromByteOrderMarks: true); }
         catch (FileNotFoundException) { return null; }
@@ -225,12 +194,9 @@ public sealed class WerLiveKernelReportLog : ILiveKernelReportLog
             // Hors de la plage de Windows, FromFileTimeUtc lève : ce rapport-là est abîmé, pas les autres.
             || filetime < 0 || filetime > DateTime.MaxValue.ToFileTimeUtc()) return null;
 
-        // Hexadecimal, et ce n'est pas un pari. WER ecrit ces valeurs sans prefixe : `144`,
-        // `193`, mais aussi `80e` et `ffff920c4059c760`, qui ne peuvent etre que de l'hexadecimal.
-        // Deux verifications independantes le confirment sur le code lui-meme : `144` accompagne un
-        // vidage nomme `USBXHCI` (0x144 = BUGCODE_USB3_DRIVER) et `193` un vidage du noyau
-        // graphique (0x193 = VIDEO_DXGKRNL_LIVEDUMP). Lus en decimal ils donneraient 0x90 et 0xC1,
-        // qui ne designent ni l'USB ni le graphique.
+        // Hexadecimal : WER ecrit sans prefixe `144`, `193`, mais aussi `80e` et `ffff920c4059c760`. Verifie sur le code :
+        // `144` accompagne un vidage `USBXHCI` (0x144 = BUGCODE_USB3_DRIVER), `193` un vidage graphique
+        // (0x193 = VIDEO_DXGKRNL_LIVEDUMP) ; en decimal, 0x90 et 0xC1 ne designeraient ni l'un ni l'autre.
         if (!champs.TryGetValue("Sig[0].Value", out var codeBrut)
             || !uint.TryParse(codeBrut, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var code))
             return null;

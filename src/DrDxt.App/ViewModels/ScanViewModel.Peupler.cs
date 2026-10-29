@@ -99,31 +99,22 @@ public sealed partial class ScanViewModel
         string slots = count == 1 ? "1 module" : $"{count} modules";
         if (speed <= 0) return slots;
 
-        // La latence vraie quand le tCL est lisible dans la référence du kit. C'est la seule
-        // grandeur comparable entre deux kits : DDR5-6000 CL30 et DDR4-3200 CL16 valent tous
-        // deux 10,00 ns malgré 88 % d'écart sur l'étiquette.
-        // Le tCL vient du kit, pas de la machine : aucune API Windows n'expose les timings
-        // effectifs. D'où « kit CL18 », qui dit d'où sort le chiffre au lieu de le présenter
-        // comme une mesure. Pas de tCL lisible ⇒ on n'affiche rien, jamais une latence devinée.
+        // La latence vraie, quand le tCL est lisible dans la référence du kit : la seule grandeur comparable entre kits
+        // (DDR5-6000 CL30 et DDR4-3200 CL16 valent 10,00 ns malgré 88 % d'écart d'étiquette). Le tCL vient du kit, aucune
+        // API Windows n'expose les timings effectifs : d'où « kit CL18 ». Pas de tCL lisible ⇒ rien, jamais deviné.
         int? cl = DramPartNumber.TryParseCasLatency(modules[0].PartNumber);
         string latency = cl is null
             ? string.Empty
             : F($" · CAS {MemoryMath.TrueLatencyNs(cl.Value, speed):0.0} ns (kit CL{cl})");
 
-        // Le kit peut être noté plus haut que la vitesse réellement entraînée (un kit 4000 qui
-        // tourne à 3800). Ce n'est pas un défaut (c'est fréquent en dual rank, le contrôleur
-        // mémoire ne tient pas toujours le nominal), donc ce n'est pas un Finding : le canal des
-        // findings est celui des problèmes à corriger. Ici c'est une information, dans le même
-        // idiome que « (kit CL18) » : dire d'où sort le chiffre.
-        // Le nominal vient du part number, pas de WMI : Win32_PhysicalMemory.Speed s'effondre
-        // sur la valeur entraînée (mesuré : un kit F4-4000C18 y rend 3800, pas 4000).
-        // RatedMhz = 0 signifie « jamais lu » ⇒ on ne compare pas contre un zéro.
+        // Un kit noté plus haut que sa vitesse entraînée (4000 qui tourne à 3800, fréquent en dual rank) n'est pas un
+        // défaut, donc pas un Finding : une information, comme « (kit CL18) ». Le nominal vient du part number, pas de
+        // WMI (Win32_PhysicalMemory.Speed rend la valeur entraînée : mesuré, F4-4000C18 → 3800). RatedMhz = 0 = jamais lu.
         int rated = modules.Max(m => m.RatedMhz);
         string ratedNote = rated > speed ? $" (kit {rated})" : string.Empty;
 
-        // MT/s, pas MHz : 3800 MT/s = 1900 MHz réels. L'étiquette précédente était fausse.
-        // « CAS » nomme la latence du kit (à ne pas confondre avec le temps d'accès
-        // mesuré) ; espace insécable devant chaque « · » : jamais un séparateur seul en fin de ligne.
+        // MT/s, pas MHz : 3800 MT/s = 1900 MHz réels. « CAS » nomme la latence du kit, pas le temps d'accès mesuré ;
+        // espace insécable devant chaque « · » : jamais un séparateur seul en fin de ligne.
         return $"{slots} · {speed} MT/s{ratedNote}{latency}";
     }
 
@@ -160,28 +151,19 @@ public sealed partial class ScanViewModel
         return $"{name} ({v.Build})";
     }
 
-    /// <summary>Pourquoi la perf en jeu manque, en distinguant ce que l'utilisateur peut y faire
-    /// de ce qu'il ne peut pas.
-    ///
-    /// « Lance une partie, puis relance le scan » ne vaut que s'il n'y avait aucun jeu a mesurer
-    /// (`PID_INVALID`). Si le service de mesure ne repond pas (`PMON_UNAVAIL`, par exemple un conflit
-    /// de tube avec le service Intel), relancer n'y change rien : le joueur lirait le meme message a
-    /// l'infini. Un diagnostic qui accuse l'utilisateur de son propre defaut est pire qu'un silence.</summary>
+    /// <summary>Pourquoi la perf en jeu manque, en distinguant ce que l'utilisateur peut y faire de ce qu'il ne peut pas.
+    /// « Lance une partie, puis relance le scan » ne vaut que sans jeu a mesurer (`PID_INVALID`) ; si le service de mesure
+    /// ne repond pas (`PMON_UNAVAIL`, par exemple un conflit de tube avec le service Intel), relancer n'y change rien.</summary>
     private static string CleDeCouvertureManquante(string codeDErreur) => codeDErreur switch
     {
         ErrorCodes.PmonUnavailable => "Scan.Degraded.ServiceUnavailable",
-        // Aucun jeu en cours, ou un jeu dont on ne peut pas lire les frames : la seule famille de
-        // cas ou lancer une partie change vraiment quelque chose.
+        // Aucun jeu, ou un jeu dont on ne lit pas les frames : le seul cas ou lancer une partie change quelque chose.
         _ => "Scan.Degraded.PresentMon",
     };
 
-    /// <summary>Depose la mesure du jour dans le journal, pour que le scan suivant puisse
-    /// conclure a une derive.
-    ///
-    /// Ne fait jamais echouer le scan. Le journal est un confort de diagnostic :
-    /// punir l'utilisateur d'un fichier qui ne s'ecrit pas serait le meme defaut que la mesure
-    /// memoire avait, et qu'on a corrige. Une mesure absente (mode degrade) n'est pas journalisee
-    /// non plus : un journal qui accumule des trous ne compare plus rien.</summary>
+    /// <summary>Depose la mesure du jour dans le journal, pour que le scan suivant puisse conclure a une derive. Ne fait
+    /// jamais echouer le scan (un confort de diagnostic). Une mesure absente (mode degrade) n'est pas journalisee : un
+    /// journal a trous ne compare plus rien.</summary>
     private void JournaliserLaMesure(BenchmarkResult? mesure)
     {
         if (_performanceJournal is null || _machineId is null || mesure is null || !(mesure.AvgFps > 0))
@@ -189,10 +171,8 @@ public sealed partial class ScanViewModel
 
         try
         {
-            // Le jeu voyage avec la mesure. Sans lui, deux titres differents se comparaient et le
-            // produit annonçait une degradation qui n'etait qu'un changement de jeu. Non identifie
-            // => `null`, et le juge se taira plutot que de rapprocher n'importe quoi.
-            // Et la scene declaree : un menu ne se compare pas a une partie.
+            // Le jeu voyage avec la mesure : sinon un changement de jeu passerait pour une degradation. Non identifie
+            // => `null`, et le juge se tait. Et la scene declaree : un menu ne se compare pas a une partie.
             _performanceJournal.Ajouter(new PerformanceSample(
                 DateTimeOffset.UtcNow, _machineId(), mesure.AvgFps,
                 mesure.MarginOfError, mesure.Runs, mesure.HygieneKeptFraction,
@@ -200,26 +180,17 @@ public sealed partial class ScanViewModel
         }
         catch
         {
-            // Le magasin enveloppe deja ses frontieres ; cette garde couvre le reste (une
-            // serialisation inattendue, un identifiant machine qui leve). Un scan ne tombe pas
-            // pour un journal.
+            // Le magasin enveloppe ses frontieres ; cette garde couvre le reste (serialisation inattendue, identifiant
+            // machine qui leve). Un scan ne tombe pas pour un journal.
         }
 
         DireLaDerive();
     }
 
     /// <summary>
-    /// « Mon PC est-il plus lent qu'avant ? » : la question que le journal savait deja trancher.
-    ///
-    /// `PerformanceJournal.Derive` existait, teste, et n'etait appele que par des tests : le
-    /// produit ecrivait un journal que personne ne relisait. Meme defaut que l'audit qui prenait
-    /// une photo puis l'oubliait, mais du cote performance, celui qui interesse un joueur, parce
-    /// qu'une degradation lente ne se voit dans aucun scan isole.
-    ///
-    /// Tout le jugement reste dans le juge : deux machines ne se comparent jamais, la date
-    /// ordonne, deux expositions differentes ne se comparent pas, et un ecart sous la resolution
-    /// n'est pas une alerte. Ici on ne fait que choisir la phrase : le moteur rend des nombres,
-    /// l'affichage parle, et il parle dans la langue du client.
+    /// « Mon PC est-il plus lent qu'avant ? », tranche par `PerformanceJournal.Derive` : une degradation lente ne se voit
+    /// dans aucun scan isole. Le jugement reste dans le juge (deux machines ou deux expositions ne se comparent pas, la
+    /// date ordonne, un ecart sous la resolution n'est pas une alerte) ; ici on choisit seulement la phrase.
     /// </summary>
     private void DireLaDerive()
     {
@@ -234,8 +205,7 @@ public sealed partial class ScanViewModel
             // « Pas comparable » ne se raconte pas comme « stable ».
             if (preuve is not { } p || p.Outcome == EvidenceOutcome.Invalid) return;
 
-            // La date de l'etalon, pas de la plus vieille entree : quand une premiere mesure trop
-            // bruitee est ecartee, l'ecran doit dater la mesure qui sert vraiment.
+            // La date de l'etalon, pas de la plus vieille entree : une premiere mesure trop bruitee peut etre ecartee.
             var depuis = (PerformanceJournal.Etalon(journal)?.TakenUtc ?? journal.Min(e => e.TakenUtc))
                 .ToLocalTime().DateTime;
             PerformanceDriftLabel = p.Outcome switch
@@ -255,17 +225,13 @@ public sealed partial class ScanViewModel
         }
     }
 
-    /// <summary>
-    /// Le résumé compte ce que la carte compte. Il ne voyait que le Majeur, pendant que
-    /// la carte marquait « À corriger » tout ce qui dépasse Info (santé et BIOS compris) : sur un
-    /// scan réel, « Aucun problème critique détecté » à côté de deux domaines « À corriger ».
-    /// </summary>
+    /// <summary>Le résumé compte ce que la carte compte : tout ce qui dépasse Info (santé et BIOS compris), sinon
+    /// « Aucun problème critique détecté » s'affiche à côté de domaines « À corriger ».</summary>
     private string ResumeDesProblemes()
     {
         var (critical, aCorriger) = CompteCommeLaCarte();
 
-        // Chaque nombre choisit sa forme. « 6 point(s) à corriger, dont 1 critique(s) »,
-        // c'est l'interface qui n'a pas pris la peine de compter, dans la phrase qu'on lit en premier.
+        // Chaque nombre choisit sa forme : jamais « 6 point(s) à corriger, dont 1 critique(s) ».
         if (critical > 0)
         {
             // Les deux nombres : le total que la carte marque, et combien sont critiques.
@@ -282,10 +248,8 @@ public sealed partial class ScanViewModel
             : Format(_localize(aCorriger == 1 ? "UI.Result.ACorrigerSansCritique.Un" : "UI.Result.ACorrigerSansCritique"), aCorriger);
     }
 
-    // Le seul compte des critiques et des points à corriger. Une liste « Résumé du
-    // diagnostic » recomptait de son côté, sans le BIOS ni les réparations, et cochait « Aucun
-    // problème critique » sous « dont 1 critique(s) ». Corrigée, puis retirée : elle redisait
-    // l'en-tête. Un deuxième endroit qui compte finira par compter autrement.
+    // Le seul compte des critiques et des points à corriger : un deuxième endroit qui compte finit par compter
+    // autrement (« Aucun problème critique » sous « dont 1 critique(s) »).
     private (int Critiques, int ACorriger) CompteCommeLaCarte()
     {
         // Le Majeur se compte partout où la carte le montre : un XMP coupé (BIOS, le plus gros gain
@@ -313,8 +277,7 @@ public sealed partial class ScanViewModel
         OnPropertyChanged(nameof(LabelExpertAccord));
         OnPropertyChanged(nameof(ExpertVentilateurVisible));
 
-        // Le sous-titre reprend la note deja choisie : deux endroits qui reformulent la meme cause
-        // finissent toujours par se contredire, et c'est ce qui vient d'arriver ici.
+        // Le sous-titre reprend la note deja choisie : deux reformulations de la meme cause finissent par se contredire.
         SubtitleText = degraded
             ? DegradedNote ?? _localize("Scan.Degraded.PresentMon")
             : _localize("UI.Result.Subtitle");
@@ -324,24 +287,18 @@ public sealed partial class ScanViewModel
         AssistantSummary = ResumeDuRapport();
     }
 
-    // « Des points à reprendre. 12 points à corriger » redirait deux fois la même chose, sous un titre
-    // qui la dit déjà. Quand le compte des points est la phrase, le verdict se tait ; une lecture incomplète
-    // ou une machine saine gardent le leur, c'est lui qui porte l'information.
+    // Quand le compte des points est la phrase, le verdict se tait (« Des points à reprendre. 12 points à corriger »
+    // redirait le titre) ; une lecture incomplète ou une machine saine gardent le leur, qui porte l'information.
     private string ResumeDuRapport() =>
         Majuscule(VerdictText is var v && (v == _localize("UI.Verdict.Problems") || v == _localize("UI.Verdict.SanteACorriger"))
             ? ProblemSummary
             : $"{VerdictText}. {ProblemSummary}");
 
-    // Affiche les constats du docteur BIOS, erreurs de réglage d'abord. Le conseiller ne fait que
-    // lire et comparer l'inventaire et les réglages déjà produits par ce scan (il ne redétecte
-    // rien, n'écrit rien). Ordre : les constats à guider avant ceux d'information ou illisibles,
-    // et dans chaque groupe la sévérité la plus haute d'abord (XMP/EXPO coupé, Major, passe donc
-    // premier). Une clé secondaire stable garde l'ordre des prérequis du conseiller (Above-4G →
-    // CSM → ReBAR se lit de haut en bas). Au mieux : un Result en échec ou une panne de frontière
-    // laisse la section vide et ne casse jamais le scan gratuit. Rend les constats bruts du
-    // conseiller (ni filtrés ni triés) pour nourrir le générateur de guide avec la même liste ;
-    // le générateur garde lui-même la part de classe Guide. null si rien n'a été conseillé ou en
-    // cas de panne.
+    // Les constats du docteur BIOS, qui compare l'inventaire et les réglages de ce scan sans rien redétecter ni écrire.
+    // Ordre : à guider d'abord, puis sévérité décroissante (XMP/EXPO coupé, Major, en tête), puis l'ordre des prérequis
+    // du conseiller (Above-4G → CSM → ReBAR). Une panne laisse la section vide sans casser le scan gratuit. Rend les
+    // constats bruts (ni filtrés ni triés) pour le générateur de guide, qui garde lui-même la classe Guide ; null si
+    // rien n'a été conseillé ou en cas de panne.
     private IReadOnlyList<BiosFinding>? PopulateBiosFindings(HardwareInventory hw, SettingsState st)
     {
         BiosFindings.Clear();
@@ -376,8 +333,7 @@ public sealed partial class ScanViewModel
         }
         catch
         {
-            // La section BIOS s'ajoute au scan ; une panne de frontière donne une section vide au lieu
-            // de casser le scan (gratuit).
+            // Une panne de frontière donne une section vide, jamais un scan cassé.
             BiosFindings.Clear();
             raw = null;
             _biosLu = false;
@@ -387,15 +343,9 @@ public sealed partial class ScanViewModel
         return raw;
     }
 
-    /// <summary>
-    /// L'audit de sante arrive a l'ecran.
-    ///
-    /// Le produit n'affiche que la pile `Attention` et le decompte des deux autres. Montrer la
-    /// cinquantaine de constats bruts serait exact et illisible ; n'afficher que `Attention` sans
-    /// dire combien d'etats n'ont pas pu etre lus ferait passer nos angles morts pour un bilan
-    /// de sante. <see cref="RepairTriage.Phrase"/> porte les trois nombres ensemble, et c'est
-    /// pour ca qu'elle est prise telle quelle plutot que recomposee ici.
-    /// </summary>
+    /// <summary>L'audit de sante a l'ecran : la pile `Attention` et le decompte des deux autres (la cinquantaine de
+    /// constats bruts serait illisible ; taire les etats non lus ferait passer nos angles morts pour un bilan).
+    /// <see cref="RepairTriage.Phrase"/> porte les trois nombres ensemble : prise telle quelle.</summary>
     internal static string PhraseDeLaSante(RepairTriage triage) => Docteur.T("App.AuditSeul", triage.Phrase);
 
     // Vrai quand l'audit de santé a levé : la section est vide parce qu'elle n'a pas été lue, pas parce qu'elle est saine.
@@ -425,8 +375,7 @@ public sealed partial class ScanViewModel
 
         try
         {
-            // Hors du thread UI : le service lance `bcdedit` (jusqu'a 5 s) et amorce des compteurs
-            // de performance (~300 ms chacun). Meme motif que le compte de canaux memoire.
+            // Hors du thread UI : `bcdedit` (jusqu'a 5 s) et l'amorce des compteurs de performance (~300 ms chacun).
             var audit = _repairAudit;
             var constats = await Task.Run(() => audit());
             // Le constat reseau mesure pendant la partie rejoint la sante de la machine.
@@ -474,11 +423,9 @@ public sealed partial class ScanViewModel
                 try { if (await verification.ConfigureAwait(true) is { } pilote) constats = constats.Append(pilote).ToList(); }
                 catch { /* source injoignable : rien n'est affirmé */ }
             }
-            // Sans point d'avant le souci (pas de geste), une seconde phrase, sans « pour revenir ».
-            // La liste des points illisible pendant un souci (le docteur ne rend ce constat qu'avec un souci en
-            // cours) : le point de l'Optimiser le contiendra quand même, c'est dit.
-            // « un souci est en cours » sans dire lequel ; le souci daté (Provenance)
-            // est nommé. {0} = le souci ; {1} = le point sain.
+            // Sans point d'avant le souci (pas de geste), une seconde phrase, sans « pour revenir ». Liste des points
+            // illisible pendant un souci (ce constat n'existe qu'avec un souci en cours) : le point de l'Optimiser le
+            // contiendra quand même, c'est dit. Le souci daté (Provenance) est nommé. {0} = le souci ; {1} = le point sain.
             if (constats.FirstOrDefault(c => c.Nom == "point de restauration sain") is { } point)
             {
                 // L'avertissement commence par le souci : sa première lettre prend la majuscule.
@@ -499,22 +446,20 @@ public sealed partial class ScanViewModel
             foreach (var c in triage.Attention)
                 RepairFindings.Add(new RepairFindingViewModel(c));
 
-            // Les angles morts arrivent a l'ecran, dans leur propre liste : les melanger avec ce
-            // qui merite correction ferait passer un trou de lecture pour un defaut.
+            // Les angles morts dans leur propre liste : melanges aux corrections, un trou de lecture passerait pour un defaut.
             foreach (var c in triage.NonLus)
                 RepairBlindSpots.Add(new RepairFindingViewModel(c));
 
-            // Le titre compte tous les points, cette phrase seulement l'audit de santé ;
-            // dit tel quel, « 13 » en haut et « 12 » en bas ne se contredisent plus.
+            // Le titre compte tous les points, cette phrase seulement l'audit de santé, et le dit (« 13 » en haut,
+            // « 12 » en bas).
             RepairSummary = PhraseDeLaSante(triage);
 
-            // Le pilier maintenir : la photo du jour est enregistree, et ce qui a change depuis la
-            // precedente arrive a l'ecran. Une panne de ce cote ne coute que cette section.
+            // Le pilier maintenir : la photo du jour est enregistree, et ce qui a change depuis la precedente arrive a
+            // l'ecran. Une panne de ce cote ne coute que cette section.
             try
             {
-                // Ecrire la photo du jour et la comparer a la precedente prend 390 a
-                // 400 ms de disque (mesure, sonde de gel + jalons). Sur le fil d'interface, c'etait
-                // le moment ou le scanner s'arretait de bouger. Le resultat revient ici pour l'ecran.
+                // Hors du fil d'interface : ecrire et comparer la photo prend 390 a 400 ms de disque (mesure, sonde de
+                // gel + jalons), pendant lesquels le scanner s'arretait de bouger.
                 var journalSante = _journalSante;
                 var journalLu = journalSante is null ? null : await Task.Run(() => journalSante(constats));
                 if (journalLu is { } journal)
@@ -526,25 +471,22 @@ public sealed partial class ScanViewModel
             }
             catch
             {
-                // Meme regle que le `Fail` du magasin, et c'est ici que la section survit au reste
-                // de l'audit : une panne de ce cote ne se raconte pas comme « rien n'a change ».
+                // Meme regle que le `Fail` du magasin : une panne ne se raconte pas comme « rien n'a change ».
                 RepairChanges.Clear();
                 RepairChangesWarning = Docteur.T("App.HistoriqueNonLu");
             }
         }
         catch
         {
-            // L'audit s'ajoute au scan : une panne de frontiere (WMI intermittent, journal
-            // illisible) degrade la section a rien plutot que de casser le scan. Et on ne laisse
-            // Aucune phrase derriere : un resume rescape d'une collecte en panne mentirait sur ce
-            // qui a ete regarde.
+            // Une panne de frontiere (WMI intermittent, journal illisible) vide la section sans casser le scan, et ne
+            // laisse aucune phrase : un resume rescape mentirait sur ce qui a ete regarde.
             RepairFindings.Clear();
             RepairBlindSpots.Clear();
             RepairChanges.Clear();
             RepairChangesWarning = null;
             RepairSummary = null;
-            // Une santé non lue ne laisse pas dire « tout lu, rien à corriger » : la lecture est incomplète. Le triage posé
-            // avant la panne tombe aussi : DejaReglee le lit, et rendait « déjà bien réglée » sur une lecture interrompue.
+            // Une santé non lue ne laisse pas dire « tout lu, rien à corriger ». Le triage posé avant la panne tombe aussi :
+            // DejaReglee le lit, et dirait « déjà bien réglée » sur une lecture interrompue.
             _santeNonLue = true;
             _derniereSante = null;
             Bilan = BilanSante.Construire([]);
@@ -557,13 +499,9 @@ public sealed partial class ScanViewModel
         OnPropertyChanged(nameof(HasRepairChanges));
     }
 
-    // Construit le guide BIOS personnalisé (le « comment » exact) à partir des mêmes constats
-    // bruts du conseiller (le générateur filtre lui-même la classe Guide). Texte de guidage
-    // seul : jamais une écriture, jamais dans le lot appliqué. Affiché seulement si le générateur
-    // a produit au moins une étape à faire : un guide qui n'a que le secours ne guide rien et
-    // reste null, et la section ne s'affiche jamais sur une machine bien réglée. Au mieux : un
-    // Result en échec ou une panne de frontière laisse le guide null et ne casse jamais le scan
-    // gratuit.
+    // Le guide BIOS personnalisé (le « comment » exact), à partir des mêmes constats bruts du conseiller. Texte seul :
+    // jamais une écriture, jamais dans le lot appliqué. Null sans au moins une étape à faire (un guide qui n'a que le
+    // secours ne guide rien), donc absent d'une machine bien réglée. Une panne laisse le guide null sans casser le scan.
     private void PopulateBiosGuide(HardwareInventory hw, IReadOnlyList<BiosFinding>? findings, SettingsState st)
     {
         BiosGuide = null;
@@ -576,25 +514,17 @@ public sealed partial class ScanViewModel
             if (!result.IsOk || result.Value is not { Steps.Count: > 0 } guide)
                 return;
 
-            // La couture « emmene-moi dans le BIOS ». Elle pose le marqueur avant de
-            // demander le redemarrage : c'est ce qui permet de prouver au retour que le
-            // changement a pris. Les constats et l'instantane des grandeurs sont ceux de ce
-            // scan, captures ici et pas relus au moment du clic : l'utilisateur doit repartir
-            // avec l'etat qu'il a sous les yeux.
-            //
-            // Sans couture (null), le VM ne montre pas le bouton et l'instruction manuelle
-            // (« appuie sur Suppr au demarrage ») reste affichee de toute facon.
+            // « Emmene-moi dans le BIOS » pose le marqueur avant le redemarrage, pour prouver au retour que le changement a
+            // pris. Constats et grandeurs captures ici, pas au clic : l'etat que l'utilisateur a sous les yeux. Sans
+            // couture (null), pas de bouton ; l'instruction manuelle (« appuie sur Suppr au demarrage ») reste affichee.
             BiosGuide = _firmwareTrip is null
                 ? new BiosGuideViewModel(guide, _localize)
                 : new BiosGuideViewModel(guide, _localize,
                     async delay =>
                     {
-                        // La mesure d'avant se prend ici, au depart, pour que l'A/B du retour
-                        // compare a la machine d'aujourd'hui et pas a une reference d'un autre jour. Un
-                        // echec ne bloque pas le voyage : l'A/B dira seulement qu'il n'a pas de mesure
-                        // d'avant fraiche.
-                        // Jeu lancé, pas de mesure : une mesure d'avant faussée à la baisse ferait annoncer un
-                        // gain au retour. Sans elle, l'A/B dit honnêtement qu'il n'a pas de mesure fraîche.
+                        // La mesure d'avant se prend au depart : l'A/B du retour compare a la machine d'aujourd'hui. Un
+                        // echec ne bloque pas le voyage (l'A/B dira qu'il n'a pas de mesure fraiche). Jeu lancé, pas de
+                        // mesure : faussée à la baisse, elle ferait annoncer un gain au retour.
                         if (_memoryBaseline is not null && _machineId is not null
                             && !_gameLocator.JeuOuvert())
                         {
@@ -607,24 +537,18 @@ public sealed partial class ScanViewModel
         }
         catch
         {
-            // Le guide est un renfort qui s'ajoute aux constats ; une panne de frontière donne « pas de
-            // guide » au lieu de casser le scan (gratuit).
+            // Une panne de frontière donne « pas de guide », jamais un scan cassé.
             BiosGuide = null;
         }
     }
 
-    // Le verdict du retour. Le verifieur et son marqueur existaient deja et
-    // n'etaient resolus par personne : « on prouve que ca a pris » n'avait jamais tourne en
-    // production. Ici il tourne, contre l'etat frais relu par ce scan.
-    //
-    // Meilleur effort, comme le reste de la section BIOS : un marqueur corrompu ou une panne
-    // d'E/S laisse la section vide plutot que de casser le scan (gratuit). Ce qu'on ne fait
-    // Pas, c'est fabriquer un verdict : pas de marqueur = pas de section, jamais un « tout va
-    // bien » sur un voyage qui n'a pas eu lieu.
     /// <summary>Ce que l'A/B memoire a donne, pour que l'appelant sache s'il a le droit de
     /// remplacer la reference derriere.</summary>
     private enum MemoryAbOutcome { Aucun, Conclu, Refusee }
 
+    // Le verdict du retour (« on prouve que ca a pris »), contre l'etat frais relu par ce scan. Meilleur effort : un
+    // marqueur corrompu ou une panne d'E/S laisse la section vide sans casser le scan (gratuit). Pas de marqueur = pas
+    // de section, jamais un « tout va bien » sur un voyage qui n'a pas eu lieu.
     private async Task<MemoryAbOutcome> PopulateBiosLoopAsync(SettingsState st, HardwareInventory hw)
     {
         BiosLoop = null;
@@ -647,17 +571,15 @@ public sealed partial class ScanViewModel
             return MemoryAbOutcome.Aucun;
         }
 
-        // L'A/B memoire ne se declenche que au retour d'un vrai voyage BIOS. C'est la seule
-        // fois ou remesurer se justifie : quelque chose a pu changer, et une mesure coute vingt a
-        // trente secondes, jusqu'a trois fois si la machine s'agite.
+        // L'A/B memoire seulement au retour d'un vrai voyage BIOS : quelque chose a pu changer, et une mesure coute 20 a
+        // 30 s, jusqu'a trois fois si la machine s'agite.
         if (!verdict.HadPendingChange || _memoryBaseline is null || _machineId is null)
             return MemoryAbOutcome.Aucun;
 
         try
         {
-            // Sur un fil de travail, comme le bloc de rafraichissement. Le banc parcourt 384 Mo
-            // et reessaie jusqu'a trois fois : appele ici sans `Task.Run`, il gelait la fenetre
-            // jusqu'a une minute et demie, sur le chemin meme qui doit montrer la preuve au client.
+            // Sur un fil de travail : le banc parcourt 384 Mo et reessaie jusqu'a trois fois, soit jusqu'a une minute et
+            // demie de fenetre gelee sur le fil d'interface.
             var jeuEnCours = _gameLocator.JeuOuvert();
             var ab = await Task.Run(
                 () => _memoryBaseline.CompareAfterChange(_machineId(), hw.Memory, verdict.DepartUtc, jeuEnCours));
@@ -667,8 +589,7 @@ public sealed partial class ScanViewModel
         }
         catch
         {
-            // Une panne du cote memoire ne jette pas le verdict BIOS deja obtenu : le client
-            // perdrait la seule chose qui lui dit si son changement a pris.
+            // Une panne du cote memoire ne jette pas le verdict BIOS deja obtenu.
             MemoryAb = null;
             return MemoryAbOutcome.Aucun;
         }

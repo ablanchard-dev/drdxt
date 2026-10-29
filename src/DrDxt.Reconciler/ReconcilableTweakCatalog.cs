@@ -12,18 +12,10 @@ namespace DrDxt.Reconciler;
 // concret (ruche/chemin/nom/type du registre, nom de service, ou identité du plan
 // d'alimentation) de chaque tweakId réconciliable.
 //
-// Source unique. Cette table n'est que des données (aucune dépendance à l'OS) : elle vit dans la
-// couche pure DrDxt.Reconciler, pas dans les adaptateurs liés à l'OS. Les deux consommateurs y
-// lisent :
-//   * la SettingProbe : pour savoir quoi lire et comment le sérialiser,
-//   * le mappeur d'ops : pour savoir quelle feuille PrivilegedOp typée réappliquer.
-//
-// Elle ne dépend pas exprès de DrDxt.Application : le catalogue Application indexe les leviers
-// par un autre id (« latency.reflex », « fixit.power_plan ») et cache ses cibles concrètes dans
-// des constantes privées ; il n'y a donc pas de dérivation propre par id, et référencer
-// Application tirerait NVAPI/ADLX/D3D11 dans l'hôte en vérification seule. Les descripteurs
-// ci-dessous reprennent exactement ces constantes Application (l'id canonique du réconciliateur
-// correspond aux mêmes ruche/chemin/nom qu'écrit le levier), relus comme une table explicite.
+// Source unique, des données seulement (couche pure, sans OS), lue par la SettingProbe (quoi lire, comment sérialiser)
+// et par le mappeur d'ops (quelle feuille PrivilegedOp réappliquer). Sans référence à DrDxt.Application, qui tirerait
+// NVAPI/ADLX/D3D11 dans l'hôte en vérification seule : les descripteurs reprennent ses constantes (mêmes ruche, chemin,
+// nom que le levier) en table explicite.
 // -----------------------------------------------------------------------
 
 /// <summary>Un emplacement de lecture dans le registre pour un levier réconciliable.
@@ -155,18 +147,10 @@ public sealed class DefaultReconcilableTweakCatalog : IReconcilableTweakCatalog
             // l'App les relit au lancement et dit une dérive sans la réécrire. Les réconcilier demande une
             // réconciliation par utilisateur (voir AppliedTweakManifestMapper / DefaultReconcilabilityPolicy).
 
-            // latency.renderQueueCap / latency.vrrVsyncCap restent omis. Ils n'ont pas de feuille de
-            // registre lisible : les sonder comme une feuille lirait un emplacement bidon. Leur lecture
-            // existe pourtant : `NvApiLatencyReader` (Detection/Gpu/Nvapi) les lit via
-            // `TryGetDrsGlobalSetting`, en NVAPI non eleve (GetMaxPreRenderedFrames, GetVsyncMode,
-            // GetFrameRateLimit, GetPreferredPstate).
-            //
-            // La raison de l'omission est structurelle : le reconciliateur de boot
-            // tourne en LocalSystem avec `DisabledNvApiActions` / `DisabledAdlxActions` : il est
-            // volontairement incapable d'ecrire le GPU (posture de securite). Les sonder
-            // produirait donc une derive qu'il ne peut pas corriger. Le jour ou on les veut
-            // reconciliables, la question n'est pas « comment les lire » (c'est fait) mais
-            // « qui a le droit de les reecrire », et la reponse ne doit pas etre le service SYSTEM.
+            // latency.renderQueueCap / latency.vrrVsyncCap restent omis, et pas faute de lecture (`NvApiLatencyReader` les
+            // lit en NVAPI non eleve) : le reconciliateur de boot tourne en LocalSystem avec `DisabledNvApiActions` /
+            // `DisabledAdlxActions`, volontairement incapable d'ecrire le GPU. Les sonder montrerait une derive qu'il ne peut
+            // pas corriger ; les rendre reconciliables demanderait qui a le droit de les reecrire, et ce n'est pas SYSTEM.
         };
 
     public ReconcilableDescriptor? DescriptorFor(string tweakId)

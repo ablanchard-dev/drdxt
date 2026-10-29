@@ -3,14 +3,9 @@
 // ════════════════════════════════════════════════════════════════════════════
 // Le classifieur de goulot : contrats.
 //
-// Le manque que ça comble, dit franchement : `LeverCatalog.Evaluate(HardwareInventory,
-// SettingsState)` ne recevait jamais de `BenchmarkResult`. Le produit mesurait d'un côté et
-// recommandait de l'autre, sans que les deux se parlent : il proposait donc les mêmes leviers
-// à une machine GPU-bound à 97 % et à une machine étranglée par la validation mémoire.
-//
-// La table de décision vient de la note de conception du classifieur (voir `BottleneckClassifier`),
-// elle-même dérivée de la sémantique des métriques PresentMon. Ce que la spec dit d'elle-même,
-// et qu'il ne faut pas oublier en lisant les constantes ci-dessous :
+// Il relie la mesure aux recommandations : sans lui, une machine GPU-bound à 97 % et une machine étranglée par la
+// validation mémoire recevraient les mêmes leviers. La table vient de la note de conception (voir
+// `BottleneckClassifier`), dérivée de la sémantique des métriques PresentMon, dont la spec dit :
 //
 //   « No canonical public threshold says "GPU Busy < X means CPU-bound" for every game. The
 //     thresholds above are DrDXT policy thresholds derived from PresentMon metric semantics,
@@ -72,15 +67,9 @@ public enum BottleneckConfidence
 /// <summary>
 /// Les motifs que le classifieur peut rendre, en clés et non en phrases.
 ///
-/// Mesuré le 05/09/2026, en usage réel : le rapport SAV (français, destiné à être collé dans un
-/// salon public) affichait « Motif : No measurement was taken, so nothing is claimed about what
-/// limits this machine. » Le classifieur construisait ses phrases en anglais et le rapport les
-/// recopiait. Huit phrases pouvaient atteindre cette ligne.
-///
-/// Une clé + ses valeurs, jamais une phrase construite : c'est ce qui permet à chaque bord
-/// (rapport, interface, journal de support) de dire la même chose dans sa langue, sans que le
-/// classifieur ait à choisir pour eux. Le dépôt le fait déjà pour la couverture GPU
-/// (<c>Coverage.Reason.*</c>) ; ceci aligne le classifieur sur ce motif.
+/// Une clé et ses valeurs, jamais une phrase construite : chaque bord (rapport, interface, journal) la dit dans sa
+/// langue, comme <c>Coverage.Reason.*</c>. Une phrase anglaise construite ici finissait telle quelle dans le rapport
+/// français (relevé le 05/09/2026).
 /// </summary>
 public static class BottleneckReasonKeys
 {

@@ -3,16 +3,9 @@ namespace DrDxt.Detection.Settings;
 /// <summary>
 /// Décodage du tampon rendu par <c>GetSystemCpuSetInformation</c> (kernel32, Windows 10+).
 ///
-/// Pourquoi ce fichier existe : un lecteur de cœurs parqués qui rendrait <b>toujours</b> une
-/// liste vide ferait tirer à deux consommateurs des conclusions opposées : le barème lirait
-/// « aucun parking, machine saine » et laisserait deux leviers muets, pendant que l'heuristique
-/// X3D lirait « rien n'est parqué, donc l'optimiseur ne route pas » et ferait proposer une
-/// <b>écriture</b> sur toute machine X3D bi-CCD, saines comprises.
-///
-/// Choix du mécanisme : l'API CPU Sets est documentée, en espace utilisateur, sans élévation et
-/// <b>sans dépendance nouvelle</b>. Le compteur de performance « Parking Status » existe aussi
-/// mais son nom est <b>localisé</b> (« État de parcage » sur un Windows français) : s'y fier
-/// obligerait à résoudre les noms par index, et à ajouter un paquet.
+/// Une liste toujours vide ferait conclure « machine saine » au barème et « l'optimiseur ne route pas » à l'heuristique
+/// X3D, qui proposerait alors une écriture sur toute machine X3D bi-CCD. L'API CPU Sets est documentée, sans élévation
+/// ni dépendance ; le compteur « Parking Status » a un nom localisé (« État de parcage » en français).
 ///
 /// Disposition de <c>SYSTEM_CPU_SET_INFORMATION</c>, vérifiée en direct avant d'être codée ici
 /// (28 structures, 18 processeurs logiques parqués, jumeaux SMT parqués par paires) :

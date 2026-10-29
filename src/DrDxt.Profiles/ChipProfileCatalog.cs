@@ -17,16 +17,10 @@ public interface IChipProfileCatalog
     Result<ChipProfile> ByFamily(ChipFamily family);
 }
 
-// -----------------------------------------------------------------------
-// ChipProfileCatalog : les profils concrets, chacun avec sa source.
-//
-// Trois profils de base ; chaque gain annoncé cite un document ou une recherche du dépôt.
-// Chaque TweakId est un levier existant du catalogue (vérifié contre le vrai catalogue par
-// ChipProfileProvenanceTests). Aucun chiffre inventé. Toutes les sélections sont
-// SafetyLevel.Safe (dans les bornes, voies prises en charge, réversibles). Tested = false
-// pour les trois : fondés mais pas encore validés sur un banc matériel ; passent à true
-// vague par vague, quand des machines réelles les confirment.
-//
+// ChipProfileCatalog : trois profils de base ; chaque gain annoncé cite un document ou une recherche du dépôt, chaque
+// TweakId est un levier du vrai catalogue (ChipProfileProvenanceTests), aucun chiffre inventé. Tout est SafetyLevel.Safe
+// (dans les bornes, voies prises en charge, réversibles). Tested = false pour les trois tant qu'un banc matériel ne les
+// a pas confirmés.
 //   Tweak ids referenced (see DrDxt.Application.Tweaks):
 //     fixit.power_plan · fixit.x3d_ccd · latency.vrr_vsync_cap · latency.render_queue_cap · gpu.power_limit
 //     fixit.sane_pagefile · latency.prefer_max_perf (06/10/2026 : en-têtes NVAPI,
@@ -37,7 +31,6 @@ public interface IChipProfileCatalog
 //     fixit.plan_economie (Microsoft Learn, Customize the Windows performance power slider)
 //     fixit.pagefile_ssd (Microsoft Learn, Introduction to the page file)
 //     fixit.cpu_power_limit (10/10/2026, B1 : TechPowerUp, i9-14900K aux limites de 35 à 253 W ; Intel SDM vol. 4, MSR 0x610)
-// -----------------------------------------------------------------------
 public sealed class ChipProfileCatalog : IChipProfileCatalog
 {
     // Identifiants des leviers du catalogue (miroir de DrDxt.Application.Tweaks ; inclusion vérifiée par test).
@@ -47,10 +40,8 @@ public sealed class ChipProfileCatalog : IChipProfileCatalog
     private const string TweakRenderQueueCap = "latency.render_queue_cap";
     private const string TweakGpuPowerLimit  = "gpu.power_limit";
 
-    // Sources, telles que la personne les lit a l'ecran (carte de la machine, bloc recommandations).
-    // Une source se verifie hors du projet : chaque texte dit ce qu'il sait et d'ou il le sait ; un chiffre ne reste
-    // que s'il est public ou mesure (et alors il le dit, avec la carte). Sans chiffre public, l'A/B du produit
-    // mesure chez la personne, il ne promet pas.
+    // Sources, telles que lues a l'ecran (carte de la machine, recommandations) : chaque texte dit ce qu'il sait et d'ou ;
+    // un chiffre ne reste que s'il est public ou mesure (avec la carte). Sinon, l'A/B mesure chez la personne.
     // Provenance, pour la maintenance (jamais affichee) :
     //   SrcCahierLatency  <- cahier des charges interne
     //   SrcCahierPowerPlan <- cahier des charges interne
@@ -63,8 +54,8 @@ public sealed class ChipProfileCatalog : IChipProfileCatalog
     private static string SrcCahierLatency => Docteur.T("CP.SrcCahierLatency");
     private static string SrcCahierPowerPlan => Docteur.T("CP.SrcCahierPowerPlan");
     private static string SrcX3d => Docteur.T("CP.SrcX3d");
-    // La « mesure publique de TechPowerUp » citée ici portait sur les connecteurs d'alimentation d'une
-    // RTX 4090 (450 W contre 600 W), pas sur une limite de puissance abaissée : aucun chiffre n'est plus affiché.
+    // Pas de chiffre : la mesure TechPowerUp trouvée porte sur les connecteurs d'une RTX 4090 (450 W contre 600 W), pas
+    // sur une limite de puissance abaissée.
     private static string SrcNvPowerLimit => Docteur.T("CP.SrcNvPowerLimit");
     private static string SrcNs1Os => Docteur.T("CP.SrcNs1Os");
 
@@ -75,10 +66,9 @@ public sealed class ChipProfileCatalog : IChipProfileCatalog
     private const string TweakGameDvr     = "latency.gameDvrBackgroundOff";
     private const string TweakVrrFlip     = "latency.vrrFlipModelOn";
 
-    // Deux leviers enregistrés et testés : le fichier d'échange est du profil générique, l'état P du profil NVIDIA.
-    // Chacun garde son AppliesTo (état LU qui le justifie, Unknown ne déclenche
-    // rien) et son juge : le fichier d'échange agit au redémarrage et se juge sur les parties (retrait si « moins bien en
-    // jeu ») ; l'état P agit à chaud et passe par la session mesurée en jeu, qui l'annule s'il ne gagne rien.
+    // Fichier d'échange (profil générique) et état P (profil NVIDIA) : chacun garde son AppliesTo (un état lu, Unknown ne
+    // déclenche rien) et son juge. Le fichier d'échange agit au redémarrage et se juge sur les parties (retrait si
+    // « moins bien en jeu ») ; l'état P agit à chaud, et la session mesurée l'annule s'il ne gagne rien.
     private const string TweakSanePagefile = "fixit.sane_pagefile";
     private const string TweakPreferMaxPerf = "latency.prefer_max_perf";
     private const string TweakEcranFrequence = "fixit.ecran_frequence";
@@ -214,10 +204,8 @@ public sealed class ChipProfileCatalog : IChipProfileCatalog
                     Docteur.T("CP.Gain10"),
                     SrcCahierLatency, GainConfidence.Inferred, SafetyLevel.Safe)),
 
-            // Windows et latence : conseillés quel que soit le constructeur, posés sur accord du
-            // joueur ; le vrai écart est prouvé par l'A/B du moteur (jamais promis ici). Tous
-            // demandent un redémarrage et sont réversibles ; chacun passe par son AppliesTo en
-            // aval (par exemple HAGS seulement si lisible et éteint).
+            // Windows et latence, tout constructeur, sur accord du joueur ; l'écart est prouvé par l'A/B, jamais promis.
+            // Redémarrage, réversibles, chacun derrière son AppliesTo (HAGS seulement si lisible et éteint).
             new ProfileTweakSelection(
                 TweakHags, ProfileIntent.Latency,
                 Array.Empty<ProfileParameter>(),

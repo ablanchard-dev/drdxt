@@ -3,23 +3,12 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Settings;
 
 /// <summary>
-/// Un écran déclare-t-il un rafraîchissement variable ? Lu dans son EDID, jamais déduit.
-///
-/// Pourquoi ce fichier existe : <c>SettingsState.VrrCapableDisplay</c> valait <c>Unknown</c>
-/// au départ, avec le contrat écrit dans <c>HardwareContracts</c> : « reste Unknown tant que la
-/// détection des capacités d'écran n'est pas branchée ». Deux leviers de latence en dépendent
-/// (<c>latency.vrr_vsync_cap</c>, <c>latency.vrrFlipModelOn</c>) et se tairaient donc, y compris
-/// sur un écran de jeu à 200 Hz qui déclare FreeSync.
-///
-/// Mécanisme : l'EDID que Windows conserve pour chaque écran. Lecture seule, <b>sans élévation
-/// et sans NVAPI</b>, donc valable NVIDIA, AMD et Intel. Ça élargit la couverture matérielle au
-/// lieu de la restreindre, contrairement à une voie pilote.
-///
-/// <b>Le descripteur « Monitor Range Limits » (0xFD) ne prouve rien.</b> Tous les écrans en
-/// portent un : il décrit la plage de modes supportés, pas le VRR. Le Samsung 144 Hz de la
-/// machine de référence en a un (50-144 Hz), qui ne dit rien du VRR. S'en servir ferait dire « capable »
-/// à n'importe quel écran rapide.
-///
+/// Un écran déclare-t-il un rafraîchissement variable ? Lu dans son EDID, jamais déduit : sans cette lecture,
+/// <c>SettingsState.VrrCapableDisplay</c> reste <c>Unknown</c> et deux leviers de latence (<c>latency.vrr_vsync_cap</c>,
+/// <c>latency.vrrFlipModelOn</c>) se taisent, même sur un écran à 200 Hz qui déclare FreeSync. L'EDID que Windows garde
+/// pour chaque écran se lit <b>sans élévation et sans NVAPI</b> : NVIDIA, AMD et Intel.
+/// <b>Le descripteur « Monitor Range Limits » (0xFD) ne prouve rien</b> : tous les écrans en portent un (le Samsung
+/// 144 Hz de la machine de référence : 50-144 Hz), il décrit la plage de modes, pas le VRR.
 /// Ce qui fait foi, et rien d'autre (sources : la liste amd-gfx, AMD VSDB, versions et tailles :
 /// ratatoskr.run/amd-gfx/2026/07/17291713 ; règle de validité HDMI Forum, drm/edid ; et CTA-861) :
 /// <list type="bullet">
@@ -39,12 +28,8 @@ public static class EdidVrrCapabilite
 
     /// <summary>
     /// <c>On</c> = un bloc VRR est déclaré. <c>Off</c> = l'EDID est lisible, sans extension DisplayID non parcourue, et n'en déclare
-    /// aucun. <c>Unknown</c> = l'EDID est absent, tronqué ou n'en est pas un.
-    ///
-    /// La distinction Off / Unknown porte tout le sens. « Cet écran n'est pas VRR » est une
-    /// réponse, qui autorise le produit à se taire pour une bonne raison. « Je n'ai pas su lire »
-    /// n'en est pas une, et rendre <c>Off</c> dans ce cas fermerait un levier sur une lecture
-    /// ratée, le défaut que ce dépôt traque partout ailleurs.
+    /// aucun. <c>Unknown</c> = l'EDID est absent, tronqué ou n'en est pas un : rendre <c>Off</c> fermerait un levier sur
+    /// une lecture ratée.
     /// </summary>
     public static TriState Lire(ReadOnlySpan<byte> edid)
     {
@@ -105,11 +90,8 @@ public static class EdidVrrCapabilite
         return false;
     }
 
-    /// <summary>
-    /// Règle HDMI 2.1 : le VRR compte comme supporté quand <c>VRRmin</c> tient dans 1-48 et que
-    /// <c>VRRmax</c> vaut 0 (déduit du mode vidéo) ou ≥ 100. Sans ce contrôle, n'importe quel
-    /// écran HDMI 2.1 passerait capable du seul fait d'avoir le bloc.
-    /// </summary>
+    /// <summary>Règle HDMI 2.1 : VRR supporté quand <c>VRRmin</c> tient dans 1-48 et que <c>VRRmax</c> vaut 0 (déduit du
+    /// mode vidéo) ou ≥ 100 ; le bloc seul ne suffit pas.</summary>
     private static bool VrrHdmiValide(ReadOnlySpan<byte> charge)
     {
         if (charge.Length < 11)

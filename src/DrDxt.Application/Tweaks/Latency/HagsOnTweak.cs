@@ -3,26 +3,14 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks.Latency;
 
-// -----------------------------------------------------------------------
-// HagsOnTweak (système et latence, persistant).
-//
-// Active la planification GPU accélérée par le matériel (HAGS) par la feuille autorisée
-// ...\GraphicsDrivers\HwSchMode (DWORD 2 = activé, 1 = désactivé, comme RegistryProvider.GetHags ;
-// sources : learn.microsoft.com/answers question 4137979 et howtogeek.com/756935 ; sans support du
-// pilote, Windows l'ignore), écrite par le helper élevé. L'original est relu d'abord, l'op inverse
-// rangée dans le snapshot, puis 2 est écrit. Persiste au redémarrage (registre), réconciliable.
-//
-// Effet au redémarrage seulement : le moteur saute l'A/B immédiat (TakesEffectAfterReboot = true) ;
-// le gain se prouve au prochain scan en jeu, jamais dans la session en cours.
-//
-// Proposé, jamais posé en silence : l'effet varie selon la carte, le pilote et le jeu, donc le
-// SummaryKey décrit le changement (jamais « +FPS ») et la preuve est l'A/B mesuré de la session suivante.
-//
-// Gating : seulement quand l'état effectif (lu par D3DKMT) est désactivé ; inconnu, rien n'est proposé.
-// Origine : absente ou 1/2 seulement. Le helper ne réécrit HwSchMode qu'à 1 ou 2 (OpAllowlist) ; une autre valeur lue
-// (0, ou posée par un autre outil) ne se remettrait jamais : rien n'est écrit, refus OrigineNonRendable.
-// Tous fabricants (AMD, Intel, NVIDIA, WDDM 2.7+).
-// -----------------------------------------------------------------------
+// Système et latence, persistant, réconciliable. Active HAGS par la feuille autorisée ...\GraphicsDrivers\HwSchMode
+// (DWORD 2 = activé, 1 = désactivé, comme RegistryProvider.GetHags ; sources : learn.microsoft.com/answers question
+// 4137979 et howtogeek.com/756935 ; sans support du pilote, Windows l'ignore), écrite par le helper élevé après relecture
+// de l'original (op inverse dans le snapshot). Effet au redémarrage seulement (TakesEffectAfterReboot) : le gain se
+// prouve au prochain scan en jeu. Proposé, jamais posé en silence, sans « +FPS » : l'effet varie selon carte, pilote, jeu.
+// Gating : seulement quand l'état effectif (lu par D3DKMT) est désactivé ; inconnu, rien. Origine : absente ou 1/2
+// seulement, le helper ne réécrivant HwSchMode qu'à 1 ou 2 (OpAllowlist) ; une autre valeur (0, un autre outil) ne se
+// remettrait jamais : refus OrigineNonRendable. Tous fabricants (AMD, Intel, NVIDIA, WDDM 2.7+).
 /// <summary>Active HAGS (HwSchMode = 2) quand Windows le lit désactivé ; effet au redémarrage.</summary>
 public sealed class HagsOnTweak : LatencyTweakBase
 {
@@ -38,16 +26,9 @@ public sealed class HagsOnTweak : LatencyTweakBase
     public override string Id => "latency.hagsOn";
     public override string SummaryKey => "tweak.latency.hags.enable";
 
-    // Une cle `HwSchMode` absente ne veut pas dire « HAGS eteint » : personne n'a ecrit ce reglage,
-    // et Windows choisit alors son propre defaut, selon la version, le GPU et le pilote.
-    //
-    // Un candidat fonde sur une absence de cle est un candidat fonde sur rien : il ecrirait un
-    // reglage pour « corriger » un etat que personne n'a lu, et l'A/B qui suit mesurerait un
-    // changement dont on ne connait meme pas le point de depart.
-    //
-    // Le gate lit donc l'etat effectif par D3DKMT (`SettingsState.HagsEffective`) ; la cle ne sert
-    // qu'a l'ecriture et au revert. Effectif = On : « deja bien regle », pas un trou.
-    // Unknown (non lu, non supporte) ne se corrige pas.
+    // Une cle `HwSchMode` absente ne veut pas dire « HAGS eteint » : Windows choisit son defaut (version, GPU, pilote).
+    // Le gate lit l'etat effectif par D3DKMT (`SettingsState.HagsEffective`) ; la cle ne sert qu'a l'ecriture et au
+    // revert. On = « deja bien regle » ; Unknown (non lu, non supporte) ne se corrige pas.
     public override bool AppliesTo(HardwareInventory hw, SettingsState state) =>
         state.HagsEffective == TriState.Off;
 

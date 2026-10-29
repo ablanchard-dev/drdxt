@@ -27,24 +27,14 @@ public sealed record ProcessCpuSample(
     int ThreadsVus);
 
 /// <summary>
-/// Ce que fait le thread principal d'un jeu, sans y toucher.
-///
-/// Le GPU de cette machine reste a 88-90 % pendant Warzone, sa frequence ne bouge pas d'un MHz
-/// et aucun plafond n'est publie. Quelque chose empeche donc le GPU d'etre alimente en continu, et
-/// le produit n'avait aucun instrument pour regarder ce quelque chose.
-///
-/// Celui-ci se contente de `OpenThread(THREAD_QUERY_LIMITED_INFORMATION)` + `GetThreadTimes` et
-/// `QueryThreadCycleTime` : des API documentees, en espace utilisateur, sans elevation.
-/// **Aucune injection, aucun hook, aucun scanner memoire** : la regle du depot, et la seule facon
-/// de rester compatible avec un anti-triche.
-///
-/// ══ ce qu'il ne dit pas ══
-/// Le 14700F est hybride : huit P-cores et douze E-cores. « ce thread consomme 95 % d'un thread
-/// logique » ne dit pas « un P-core est sature » : le thread peut avoir tourne sur un E-core, ou
-/// avoir migre. Ce lecteur rend une part de thread logique, jamais un verdict sur un type de coeur.
-///
-/// Et une consommation elevee n'est pas une cause. Un thread a 100 % pendant que le GPU attend
-/// est une coincidence a verifier, pas une explication.
+/// Ce que fait le thread principal d'un jeu, sans y toucher. Pendant Warzone, le GPU de cette machine reste a 88-90 %,
+/// frequence immobile, aucun plafond publie : quelque chose l'empeche d'etre alimente en continu.
+/// Seulement `OpenThread(THREAD_QUERY_LIMITED_INFORMATION)`, `GetThreadTimes` et `QueryThreadCycleTime` : API
+/// documentees, espace utilisateur, sans elevation. **Aucune injection, aucun hook, aucun scanner memoire** : la regle
+/// du depot, et la seule compatible avec un anti-triche.
+/// Le 14700F est hybride (huit P-cores, douze E-cores) : 95 % d'un thread logique ne dit pas « un P-core est sature »
+/// (E-core, migration). Une part de thread logique, jamais un verdict sur un type de coeur ; et une consommation elevee
+/// pendant que le GPU attend est une coincidence a verifier, pas une cause.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class ThreadCpuReader
@@ -101,8 +91,7 @@ public sealed class ThreadCpuReader
             {
                 if (!GetThreadTimes(poignee, out _, out _, out var noyau, out var utilisateur))
                     continue;
-                // Le cycle est insensible a la frequence : deux fenetres ou l'horloge a bouge
-                // restent comparables. Optionnel : une lecture ratee rend simplement null.
+                // Optionnel : une lecture ratee rend null.
                 ulong? cycles = QueryThreadCycleTime(poignee, out var c) ? c : null;
                 sortie[t.Id] = (ToLong(noyau), ToLong(utilisateur), cycles);
             }

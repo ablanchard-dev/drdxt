@@ -9,9 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DrDxt.App;
 
-// 'Application' est qualifié en System.Windows.Application : la référence au projet
-// DrDxt.Application amène aussi un espace de noms 'DrDxt.Application', qui entrerait
-// sinon en collision avec le type de base WPF ci-dessous.
+// System.Windows.Application qualifié : l'espace de noms 'DrDxt.Application' entrerait en collision.
 /// <summary>
 /// Le point d'entrée de DrDXT. Au lancement, il pose les filets qui écrivent tout plantage dans crash.log, ouvre
 /// l'écran de scan et rallume ce que le joueur avait laissé allumé (protection du ping, relevé des parties,
@@ -41,9 +39,8 @@ public partial class App : System.Windows.Application
 #endif
 
     /// <summary>
-    /// Le fichier ou le produit ecrit ce qui l'a tue. A cote des donnees de l'app, pas dans
-    /// %TEMP% : un client qu'on guide au telephone doit pouvoir le trouver, et il doit survivre
-    /// a un nettoyage de disque.
+    /// Le fichier ou le produit ecrit ce qui l'a tue, a cote des donnees de l'app et pas dans %TEMP% : un client guide
+    /// au telephone le trouve, et il survit a un nettoyage de disque.
     /// </summary>
     private static string CrashLogPath => DrDxt.Core.DossierDonnees.Chemin("crash.log");
 
@@ -52,9 +49,8 @@ public partial class App : System.Windows.Application
     protected override void OnStartup(StartupEventArgs e)
     {
 #if DEBUG
-        // « machine=amd-radeon-synthetique » rejoue cette machine enregistrée (avant la
-        // construction des services, qui la lisent).
-        // Les données vont dans un dossier jetable : un rejeu n'écrit jamais dans celles du joueur.
+        // « machine=amd-radeon-synthetique » rejoue cette machine enregistrée, avant la construction des services, et
+        // dans un dossier de données jetable.
         if (e.Args.FirstOrDefault(a => a.StartsWith("machine=", StringComparison.OrdinalIgnoreCase)) is { } machine)
             DrDxt.App.Platform.MachineDeTest.Activer(machine["machine=".Length..], Environment.GetEnvironmentVariable,
                 Environment.SetEnvironmentVariable);
@@ -76,9 +72,8 @@ public partial class App : System.Windows.Application
 #endif
         DrDxt.Core.Docteur.FixerLangue(CultureInfo.CurrentUICulture);
 
-        // Élevée seulement, avant toute écriture : aucune jonction posée par un compte non administrateur n'est plus suivie,
-        // ni sur les parents du dossier des données, ni sous un dossier créé après la vérification qui suit (le staging d'une
-        // mise à jour). Sans élévation, le compte garde ses jonctions. Indisponible, c'est dit au journal plus bas.
+        // Élevée, avant toute écriture : plus aucune jonction posée par un compte non administrateur n'est suivie (parents
+        // du dossier des données, dossiers créés ensuite comme le staging d'une mise à jour). Indisponible : dit au journal.
         var confiance = DrDxt.Core.FichierJsonAtomique.ProcessusEleve ? DrDxt.Core.ConfianceDesRedirections.Activer() : DrDxt.Core.Result.Ok();
 
         // Relancée en administrateur, l'App écrit sous un dossier que tout programme du compte peut modifier : avant toute
@@ -97,36 +92,27 @@ public partial class App : System.Windows.Application
                 }
             }
 
-        // ── Le filet, et pourquoi il existe ────────────────────────────────────────────────
-        //
-        // Sans lui, une exception non geree tue le processus sans un mot : pas de fenetre, pas
-        // de message, l'icone disparait. Le client ne sait meme pas qu'il y a eu une erreur, et
-        // le SAV n'a rien a lire.
-        //
-        // Une couleur XAML invalide ou une ressource au mauvais nom passe la compilation et les
-        // tests, puis tue l'application au demarrage ; sans filet, la seule trace serait un code
-        // .NET dans l'observateur d'evenements, et le support n'aurait rien a demander.
+        // ── Le filet ─────────────────────────────────────────────────────────────────────────
+        // Sans lui, une exception non geree tue le processus sans un mot. Une couleur XAML invalide ou une ressource au
+        // mauvais nom passe compilation et tests puis tue l'application au demarrage : crash.log est la trace du support.
         DispatcherUnhandledException += (_, args) =>
         {
-            // Handled = true avant d'afficher quoi que ce soit : si le rapport lui-meme
-            // echouait, on ne veut pas remplacer un crash par un autre.
+            // Handled avant d'afficher : un rapport qui echoue ne remplace pas un crash par un autre.
             args.Handled = true;
             ReportFatal(args.Exception);
-            // Sans fenêtre montrée (une panne avant ou pendant son ouverture), rien ne fermerait le processus : il garderait la
-            // place de l'App, et chaque lancement suivant ne ferait que le réveiller. Le relevé de fond tourne exprès sans fenêtre.
+            // Sans fenêtre montrée, rien ne fermerait le processus, qui garderait la place de l'App. Le relevé de fond tourne
+            // exprès sans fenêtre.
             if (!e.Args.Contains(ArgumentReleve, StringComparer.OrdinalIgnoreCase) && MainWindow is not { IsVisible: true })
                 Shutdown(1);
         };
 
-        // Le second filet couvre ce que le premier ne voit pas : une exception levee hors du
-        // fil d'interface (une tache de fond, un timer). Elle ne peut pas etre annulee (le
-        // processus s'arrete de toute facon), mais elle sera ecrite.
+        // Le second filet : une exception hors du fil d'interface (tache de fond, timer), non annulable mais ecrite.
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             ReportFatal(args.ExceptionObject as Exception);
 
-        // « --releve » = lancé à l'ouverture de session, sans fenêtre, pour le seul relevé des parties, par la tâche planifiée
-        // de l'installeur, sans droits. Il ne lance jamais le helper (aucune invite au démarrage de Windows) et ne pose rien :
-        // élevé, il écrivait dans le dossier du compte, où une jonction posée sans droits devenait une écriture en administrateur.
+        // « --releve » : la tâche planifiée de l'installeur, à l'ouverture de session, sans fenêtre ni droits, pour le seul
+        // relevé des parties. Jamais le helper (aucune invite au démarrage), rien de posé : élevé, il écrirait dans le dossier
+        // du compte, où une jonction posée sans droits deviendrait une écriture en administrateur.
         var releveDeFond = e.Args.Contains(ArgumentReleve, StringComparer.OrdinalIgnoreCase);
         var collection = new ServiceCollection().AddDrDxtApp();
         if (releveDeFond)
@@ -141,9 +127,8 @@ public partial class App : System.Windows.Application
         }
 
 #if DEBUG
-        // « vitrine-sphere » ouvre une fenêtre qui ne montre que la sphère de marque, rendue par la
-        // carte graphique : le chrome liquide est un shader ps_3_0 que RenderTargetBitmap (rendu logiciel) ne dessine pas,
-        // donc l'icône Windows se photographie sur cette fenêtre-ci.
+        // « vitrine-sphere » : la sphère de marque seule, pour photographier l'icône (le chrome liquide est un shader ps_3_0
+        // que RenderTargetBitmap ne dessine pas).
         if (e.Args.Any(a => string.Equals(a, "vitrine-sphere", StringComparison.OrdinalIgnoreCase)))
         {
             Effets.MoteurDAnimation.ForcePourCapture = true;
@@ -161,9 +146,8 @@ public partial class App : System.Windows.Application
 #endif
 
 #if DEBUG
-        // « hors-ecran » : la fenêtre s'ouvre hors de tout moniteur, sans prendre le focus ni la
-        // barre des tâches, pour être photographiée par son handle pendant que l'utilisateur
-        // travaille : une capture de l'écran prendrait ce qui est devant la fenêtre.
+        // « hors-ecran » : la fenêtre s'ouvre hors de tout moniteur, sans focus ni barre des tâches, photographiée par son
+        // handle pendant que l'utilisateur travaille.
         var horsEcran = e.Args.Any(a => string.Equals(a, "hors-ecran", StringComparison.OrdinalIgnoreCase));
         if (horsEcran) Effets.MoteurDAnimation.ForcePourCapture = true;
 #endif
@@ -193,17 +177,14 @@ public partial class App : System.Windows.Application
 
         var scan = _services.GetRequiredService<ScanViewModel>();
         _ecranOuvert = scan;
-        // Un réglage temporaire posé (décalage expert, palier de sous-tension) se rend avant l'arrêt de l'App : la
-        // fermeture est suspendue le temps du rendu (5 s au plus), sans bloquer le fil d'interface où la recherche finit
-        // son finally. OnExit, qui bloque ce fil, ne reste qu'en secours. Windows qui s'arrête ignore Cancel : le rendu lancé
-        // ici ne finirait jamais, c'est alors OnExit qui rend, hors de ce fil.
-        // Un acquit refusé est repris une dernière fois, borné : un réglage gardé que le helper pourrait défaire au prochain
-        // démarrage se dit au joueur, puis la fenêtre se ferme quoi qu'il arrive.
+        // Un réglage temporaire posé (décalage expert, palier de sous-tension) se rend avant l'arrêt : la fermeture attend
+        // le rendu (5 s au plus) sans bloquer le fil d'interface où la recherche finit son finally. Windows qui s'arrête
+        // ignore Cancel : OnExit rend alors, hors de ce fil. Un acquit refusé est repris une fois, borné ; un réglage gardé
+        // que le helper pourrait défaire se dit au joueur, puis la fenêtre se ferme quoi qu'il arrive.
         window.Closing += async (_, fermeture) =>
         {
             if (_sessionFinit || _fermetureAutorisee) return;
-            // Un second clic sur la croix pendant le rendu (10 s au plus) attend sa fin : sinon il fermerait l'App au milieu, et
-            // seul le bail du helper rendrait la tension ou le décalage.
+            // Un second clic sur la croix pendant le rendu (10 s au plus) attend sa fin, sinon seul le bail du helper rendrait.
             if (_fermetureLancee) { fermeture.Cancel = true; return; }
             // Optimiser ou une vérification en cours : fermer la laisserait à moitié, la fenêtre le demande.
             if (scan.AvertissementDeFermeture is { } avertissement
@@ -236,9 +217,8 @@ public partial class App : System.Windows.Application
         // Remplit la liste d'attente « va examiner » hors du thread UI, sans l'attendre.
         _ = scan.LoadIdleComponentsAsync();
 
-        // Les 4,5 s d'initialisation de perflib se paient une fois par processus.
-        // Elles se paient ici, pendant que la fenetre s'ouvre et que personne n'attend rien,
-        // et non pendant le scan. Voir AmorceDesCompteurs.
+        // Les 4,5 s d'initialisation de perflib, une fois par processus, se paient pendant l'ouverture et non pendant le
+        // scan. Voir AmorceDesCompteurs.
         _ = DrDxt.App.Platform.AmorceDesCompteurs.AuLancementAsync();
 
         // L'App relit au lancement les reglages que DrDXT a poses, et dit ce qui a bouge.
@@ -356,8 +336,8 @@ public partial class App : System.Windows.Application
         scan.Alimentation = _services!.GetService<DrDxt.Application.Tweaks.Hardware.ISourceDAlimentation>();
         // La recherche de sous-tension ; coupée par un plantage, elle se relit ici (palier fautif dit).
         scan.MemoireSousTension = DrDxt.Application.Parties.MemoireSousTension.ParDefaut();
-        // Jamais d'invite UAC sans geste ; le retrait automatique ne part que si le helper tourne déjà. Posé avant la reprise
-        // de la sous-tension : lu encore vide, il ferait passer le retour par le client qui lance le helper (une invite).
+        // Jamais d'invite UAC sans geste : le retrait automatique ne part que si le helper tourne déjà. Posé avant la reprise
+        // de la sous-tension, qui sinon passerait par le client qui lance le helper.
         scan.HelperJoignableSansUac = async () =>
         {
             try { return (await DrDxt.App.Platform.ElevatedClientFactory.CreateSansLancer().ExecuteAsync(new DrDxt.Core.PingOp(), CancellationToken.None)).IsOk; }
@@ -429,9 +409,8 @@ public partial class App : System.Windows.Application
             }
         }
 
-        // Une référence mémoire ou processeur prise pendant une partie se remesure seule quand le
-        // poste est au repos (RemesureAuRepos). Rien ne se passe tant qu'aucune n'est soupçonnée. Les commandes
-        // appelées disent elles-mêmes leurs échecs sur la carte ; une exception ici ne doit pas tuer la minuterie.
+        // Une référence mémoire ou processeur prise pendant une partie se remesure seule au repos (RemesureAuRepos). Les
+        // commandes disent leurs échecs sur la carte ; une exception ici ne tue pas la minuterie.
         scan.LirePoste = DrDxt.App.Platform.EtatDuPosteWindows.LireAsync;
         scan.CorruptionSansSource = DrDxt.App.Platform.CorruptionDuMagasin.SurCetteMachine;
         var remesureAuRepos = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(2) };
@@ -455,18 +434,15 @@ public partial class App : System.Windows.Application
 #if DEBUG
         if (e.Args.Any(a => string.Equals(a, ScanAutoArg, StringComparison.OrdinalIgnoreCase)))
         {
-            // « xmp-off » : le conseiller BIOS voit un XMP coupé, pour photographier le guide que
-            // la machine de reference (XMP actif) n'affiche jamais. Le registre et le reste du scan lisent
-            // la vraie machine.
+            // « xmp-off » : le conseiller BIOS voit un XMP coupé, pour photographier le guide ; le reste lit la vraie machine.
             ScanViewModel.SimulerXmpOffPourLeBios =
                 e.Args.Any(a => string.Equals(a, "xmp-off", StringComparison.OrdinalIgnoreCase));
             window.ContentRendered += (_, _) => scan.ScanCommand.Execute(null);
             VisiterLeResultat(window, scan);
             SondeDeGel(scan);
         }
-        // « expert-auto » prouve le mode Expert sur la vraie carte par le chemin du
-        // produit (App, helper, bail) : ventilateur fixé à 60 % puis rendu, décalage d'horloge +15 MHz puis rendu, chaque
-        // étape relue (NVML pour le ventilateur, NVAPI pour l'horloge) et écrite dans %TEMP%\drdxt-expert.txt.
+        // « expert-auto » prouve le mode Expert par le chemin du produit (App, helper, bail) : ventilateur à 60 % puis
+        // rendu, horloge +15 MHz puis rendu, relus (NVML, NVAPI) et écrits dans %TEMP%\drdxt-expert.txt.
         if (e.Args.Any(a => string.Equals(a, "expert-auto", StringComparison.OrdinalIgnoreCase)))
         {
             window.ContentRendered += async (_, _) =>
@@ -512,9 +488,8 @@ public partial class App : System.Windows.Application
                 Current.Shutdown();
             };
         }
-        // « expert-crash » fixe le ventilateur à 60 % puis tue l'App sans rien rendre ;
-        // le bail du helper doit rendre l'automatique seul (relevé de l'extérieur par NVML). Avec « horloge » : décalage +15 MHz
-        // au lieu du ventilateur, rendu par le même bail (relevé de l'extérieur par NVAPI).
+        // « expert-crash » fixe le ventilateur à 60 % (« horloge » : +15 MHz) puis tue l'App : le bail du helper doit rendre
+        // seul, relevé de l'extérieur (NVML, NVAPI).
         if (e.Args.Any(a => string.Equals(a, "expert-crash", StringComparison.OrdinalIgnoreCase)))
         {
             var horloge = e.Args.Any(a => string.Equals(a, "horloge", StringComparison.OrdinalIgnoreCase));
@@ -680,11 +655,8 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
-    /// Ecrit la panne, puis la montre. Dans cet ordre : si l'affichage echoue a son tour (pas de
-    /// bureau, session en fermeture), la trace est deja sur le disque.
-    ///
-    /// Total par construction : chaque moitie est isolee. Un filet de securite qui peut lui-meme
-    /// lever ne protege de rien, et rate precisement le cas ou tout va deja mal.
+    /// Ecrit la panne, puis la montre : si l'affichage echoue (pas de bureau, session en fermeture), la trace est deja
+    /// sur le disque. Chaque moitie est isolee : un filet qui peut lever ne protege de rien.
     /// </summary>
     private static void ReportFatal(Exception? ex)
     {
@@ -693,15 +665,9 @@ public partial class App : System.Windows.Application
         try
         {
             var path = CrashLogPath;
-            // Ajout, jamais ecrasement : deux plantages de suite racontent une histoire que le
-            // second seul ne raconte pas.
-            // BOM UTF-8 explicite. Sans elle, .NET ecrit de l'UTF-8 nu et les lecteurs qui
-            // devinent (PowerShell 5.1 en tete, l'outil le plus probable d'un depannage)
-            // rendent « levée » en « levÃ©e ». Un rapport de panne illisible est un rapport de
-            // panne perdu.
-            // Dossier du joueur : jamais à travers un nom posé d'avance en lien (l'App peut tourner élevée).
-            // L'App continue après une panne d'interface : sans plafond, le journal grossirait à chacune. Au-delà d'un Mo, il
-            // garde sa moitié la plus récente.
+            // Ajout, jamais ecrasement : deux plantages de suite se lisent ensemble. BOM UTF-8 explicite : sans elle,
+            // PowerShell 5.1 rend « levée » en « levÃ©e ». Jamais a travers un nom pose d'avance en lien (l'App peut
+            // tourner elevee). Au-dela d'un Mo, le journal garde sa moitie la plus recente.
             DrDxt.Core.FichierJsonAtomique.BornerSansLien(path, 1024 * 1024, "CRASH_LOG");
             DrDxt.Core.FichierJsonAtomique.AjouterSansLien(path,
                 $"=== {DateTimeOffset.Now:u} ==={Environment.NewLine}{detail}{Environment.NewLine}{Environment.NewLine}",
@@ -709,19 +675,13 @@ public partial class App : System.Windows.Application
         }
         catch
         {
-            // Disque plein, droits refuses : on ne peut pas ecrire. Ce n'est pas une raison de
-            // priver l'utilisateur du message ci-dessous.
+            // Disque plein, droits refuses : le message ci-dessous part quand meme.
         }
 
         try
         {
-            // Le message vient d'une clé resx, dans la langue du poste, comme toute boîte de dialogue.
-            //
-            // Ici, le localisateur est construit a la main, pas injecte. Ce filet tourne
-            // quand tout le reste a deja echoue : demander un service au conteneur, c'est
-            // dependre de la chose qui vient peut-etre de casser. `ResxLocalizer` ne lit qu'un
-            // jeu de ressources embarque, et sa clef manquante rend la clef, jamais une
-            // exception. Un filet de securite qui peut lever ne protege de rien.
+            // Le message vient d'une clé resx, dans la langue du poste. Localisateur construit a la main, pas injecte : le
+            // conteneur vient peut-etre de casser, et `ResxLocalizer` rend la clef manquante, jamais une exception.
             var textes = new ResxLocalizer();
             MessageBox.Show(
                 string.Format(CultureInfo.CurrentUICulture, textes.Get("Dialog.Crash.Message"), CrashLogPath),
@@ -735,12 +695,8 @@ public partial class App : System.Windows.Application
 
 #if DEBUG
     /// <summary>
-    /// Sonde de gel (DEBUG) : ce que l'oeil voit, chronometre.
-    ///
-    /// Un battement de 50 ms sur le fil d'interface. S'il revient en retard, c'est que le fil
-    /// etait occupe ailleurs : le retard est la duree pendant laquelle rien ne pouvait bouger a
-    /// l'ecran. On note l'etat du scan au meme instant, pour savoir a quelle phase l'attribuer.
-    /// Rien n'est affiche : la sonde ecrit dans %TEMP% et ne change pas ce qu'elle mesure.
+    /// Sonde de gel (DEBUG) : un battement de 50 ms sur le fil d'interface ; son retard est la duree ou rien ne bougeait a
+    /// l'ecran, note avec l'etat du scan. Ecrit dans %TEMP%, n'affiche rien.
     /// </summary>
     private static void SondeDeGel(ScanViewModel scan)
     {
@@ -764,8 +720,7 @@ public partial class App : System.Windows.Application
         };
         battement.Start();
 
-        // Temoin : un fichier sans ligne « bloque » ne prouve rien si le scan n'a pas tourne. Chaque
-        // changement d'etat du scan s'inscrit ici, sur la meme horloge.
+        // Temoin : chaque changement d'etat du scan s'inscrit sur la meme horloge (sans scan, aucun « bloque » ne prouve rien).
         scan.PropertyChanged += (_, ev) =>
         {
             if (ev.PropertyName == nameof(ScanViewModel.State))
@@ -787,9 +742,8 @@ public partial class App : System.Windows.Application
             if (commence || ev.PropertyName != nameof(ScanViewModel.State)
                 || scan.State is ScanState.Idle or ScanState.Scanning) return;
             commence = true;
-            // « ping-disponible » : simule ce qu'une mesure en jeu aurait retenu (plafond conseillé,
-            // exe du jeu) pour photographier l'état « disponible » de la carte réseau, qu'un scan hors
-            // jeu ne montre jamais. Même point d'entrée que le vrai scan ; rien n'est écrit.
+            // « ping-disponible » : simule une mesure en jeu (plafond conseillé, exe du jeu) pour photographier l'état
+            // « disponible » de la carte réseau. Rien n'est écrit.
             if (Environment.GetCommandLineArgs().Any(a => a == "ping-disponible"))
                 scan.RetenirMesureEnvoi(20_000_000, "cod.exe");
             var page = 0;
@@ -821,8 +775,7 @@ public partial class App : System.Windows.Application
     // Ouvre chaque domaine de la carte, l'amène à l'écran et dépose un signal par domaine.
     private static async void PhotographierLesDomaines(Window window, ScanViewModel scan, string dossier)
     {
-        // « remesurer-processeur » : la même commande que la carte « Remesurer ton processeur »,
-        // avant les photos et le rapport, pour juger la phrase qu'elle produit sur une mesure fraîche.
+        // « remesurer-processeur » : la commande de la carte, avant les photos, pour juger sa phrase sur une mesure fraîche.
         if (Environment.GetCommandLineArgs().Any(a => string.Equals(a, "remesurer-processeur", StringComparison.OrdinalIgnoreCase)))
             await scan.RemesurerProcesseurCommand.ExecuteAsync(null);
         var index = 0;
@@ -833,22 +786,19 @@ public partial class App : System.Windows.Application
             {
                 File.WriteAllText(Path.Combine(dossier, "drdxt-visite-fin.txt"), "fin");
                 minuterie.Stop();
-                // « rapport » : le même export que le bouton, pour juger le document réel
-                // (sections, anonymisation) sur un scan réel, sans personne devant l'écran.
+                // « rapport » : le même export que le bouton, pour juger le document réel sur un scan réel.
                 if (Environment.GetCommandLineArgs().Any(a => string.Equals(a, "rapport", StringComparison.OrdinalIgnoreCase)))
                     scan.ExportReportCommand.Execute(null);
                 // « exporter », le même fichier que « Exporter ma machine », pour le ranger en fixture.
                 if (Environment.GetCommandLineArgs().Any(a => string.Equals(a, "exporter", StringComparison.OrdinalIgnoreCase)))
                     await scan.ExporterMaMachineCommand.ExecuteAsync(null);
-                // Hors écran (le seul cas où ce drapeau est levé), personne ne regarde la fenêtre :
-                // rester ouvert faisait attendre le lanceur jusqu'à son délai, ~5 min par tournée.
+                // Hors écran, personne ne regarde : rester ouvert ferait attendre le lanceur ~5 min.
                 if (Effets.MoteurDAnimation.ForcePourCapture) Current.Shutdown();
                 return;
             }
             var domaine = scan.Domaines[index++];
             scan.DomaineSelectionne = domaine;
-            // La capsule du rail glisse 280 ms jusqu'au domaine choisi ; photographier tout de suite la
-            // prenait à mi-chemin, et l'audit croyait la surbrillance décalée. On attend la fin du glissement.
+            // La capsule du rail glisse 280 ms : photographier après la fin du glissement.
             var apresGlissement = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
             apresGlissement.Tick += (_, _) => { apresGlissement.Stop(); Photographier(); };
             apresGlissement.Start();
@@ -863,8 +813,7 @@ public partial class App : System.Windows.Application
                 window.Dispatcher.BeginInvoke(() =>
                 {
                     File.WriteAllText(Path.Combine(dossier, $"drdxt-visite-domaine-{domaine.Cle}.txt"), domaine.Cle);
-                    // Une photo par domaine : les 40 photos du minuteur s'arretent avant la
-                    // carte, et une interface se juge sur un scan reel, domaine par domaine.
+                    // Une photo par domaine : les 40 photos du minuteur s'arretent avant la carte.
                     PhotographierVue(window, Path.Combine(Path.GetTempPath(), "drdxt-photos", $"domaine-{domaine.Cle}.png"));
                     // Et le bas du panneau : un domaine long (windows) cache sa section « Agir » sous le pli.
                     if (DescendantNomme(window, "CarteMachine") is FrameworkElement c)
@@ -873,8 +822,7 @@ public partial class App : System.Windows.Application
                         window.Dispatcher.BeginInvoke(() =>
                         {
                             PhotographierVue(window, Path.Combine(Path.GetTempPath(), "drdxt-photos", $"domaine-{domaine.Cle}-bas.png"));
-                            // Et la carte entière : le milieu d'un domaine long (les constats de sécurité de
-                            // la page Windows) ne tombait sur aucune des deux photos.
+                            // Et la carte entière : le milieu d'un domaine long n'est sur aucune des deux photos.
                             PhotographierElement(c, Path.Combine(Path.GetTempPath(), "drdxt-photos", $"domaine-{domaine.Cle}-entier.png"));
                         }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     }
@@ -909,8 +857,7 @@ public partial class App : System.Windows.Application
         {
             var cadre = new Rect(0, 0, element.ActualWidth, element.ActualHeight);
             dc.DrawRectangle(fond, null, cadre);
-            // La zone copiée est la carte elle-même, en coordonnées absolues : sans cela, le pinceau étirait
-            // les limites visuelles du contenu sur le cadre (photo du BIOS écrasée, texte illisible).
+            // La zone copiée est la carte, en coordonnées absolues : sinon le pinceau étire le contenu sur le cadre.
             dc.DrawRectangle(new System.Windows.Media.VisualBrush(element)
             {
                 Viewbox = cadre,
@@ -990,8 +937,7 @@ public partial class App : System.Windows.Application
             using (var f = File.Create(Path.Combine(dossier, dernier ? "dernier.png" : $"f{n:D2}.png"))) png.Save(f);
             if (++n >= 40 && !dernier) photographe.Stop();
         };
-        // Seulement sur demande (« photos ») : chaque photo dessine tout l'arbre sur le fil
-        // d'interface, 400 à 750 ms mesurés. Laissée allumée, elle se mesurait elle-même.
+        // Sur demande (« photos ») : chaque photo coûte 400 à 750 ms au fil d'interface.
         if (args.Any(a => string.Equals(a, "photos", StringComparison.OrdinalIgnoreCase)))
             window.ContentRendered += (_, _) => photographe.Start();
     }
@@ -1019,8 +965,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        // Un décalage gardé est rendu à la fermeture, borné à 5 s ; sinon le bail le rend. Secours seulement : quand la fenêtre a
-        // déjà lancé le rendu, il finit sur son fil ou le bail et le redémarrage rendent.
+        // Secours, si la fenêtre n'a pas lancé le rendu : le décalage gardé rendu en 5 s au plus, sinon le bail le rend.
         if (_renduAvantFermeture is null && _ecranOuvert is { } scanFin)
             try { Task.Run(scanFin.FermerCarteExpertAsync).Wait(TimeSpan.FromSeconds(5)); } catch { /* le bail rendra */ }
         // La recherche de sous-tension en cours : arrêtée et la tension d'origine rendue, bornée à 5 s ; sinon le redémarrage la rend.

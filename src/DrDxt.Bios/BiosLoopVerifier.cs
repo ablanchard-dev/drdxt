@@ -11,13 +11,9 @@ namespace DrDxt.Bios;
 ///   • désaccord lisible     → <see cref="BiosSettingVerdict.DidNotTake"/> ;
 ///   • illisible depuis l'OS → <see cref="BiosSettingVerdict.Unreadable"/> (« impossible à vérifier » honnête).
 ///
-/// Honnêteté : chaque réglage a pris → succès + le marqueur est effacé. Le moindre DidNotTake ou
-/// Unreadable → la carte de récupération s'affiche et le marqueur est gardé (la boucle peut
-/// retourner après l'essai suivant). On ne rapporte jamais un faux succès et on n'annonce jamais de
-/// succès sur un réglage invérifiable. Pas de marqueur → sans effet, idempotent.
-/// Un marqueur dont l'id de machine ne correspond pas à cette machine (copié d'un autre PC) n'est
-/// jamais honoré : il est traité comme « rien en attente » et laissé intact.
-///
+/// Tout a pris → succès, marqueur effacé. Le moindre DidNotTake ou Unreadable → carte de récupération, marqueur gardé
+/// (la boucle reprend après l'essai suivant) : jamais de succès sur un réglage invérifiable. Pas de marqueur → sans effet,
+/// idempotent. Un marqueur d'une autre machine (copié d'un autre PC) vaut « rien en attente » et reste intact.
 /// N'écrit jamais le BIOS : il ne lit qu'un marqueur de l'OS + les réglages déjà lus.
 /// </summary>
 public sealed class BiosLoopVerifier : IBiosLoopVerifier
@@ -49,10 +45,7 @@ public sealed class BiosLoopVerifier : IBiosLoopVerifier
 
         var change = load.Value;
 
-        // ── Comparaison d'id de machine fail-safe : un marqueur copié d'un autre PC ne doit jamais être
-        //    honoré ici. En cas de désaccord, on le traite comme « rien en attente » et on laisse le
-        //    marqueur étranger intact (ni effacé, ni évalué) : on n'annonce jamais qu'un changement
-        //    étranger a pris ou échoué sur cette machine. ──
+        // Un marqueur copié d'un autre PC n'est jamais honoré : « rien en attente », laissé intact (ni effacé, ni évalué).
         if (!string.Equals(
                 change.MachineId?.Trim(), _machineId.Current?.Trim(), StringComparison.OrdinalIgnoreCase))
             return Result<BiosLoopResult>.Ok(BiosLoopResult.NothingPending);
@@ -68,9 +61,8 @@ public sealed class BiosLoopVerifier : IBiosLoopVerifier
             outcomes.Add(new BiosSettingOutcome(target.Setting, target.ExpectedState, observed, verdict));
         }
 
-        // Une cible que l'OS ne sait jamais relire au retour (JamaisRelisibles) ne bloque pas un voyage dont les cibles lues
-        // ont pris : sans cela, le marqueur restait pour toujours. Elle reste dite illisible dans les issues. Une cible lisible
-        // relue inconnue bloque toujours.
+        // Une cible que l'OS ne relit jamais au retour (JamaisRelisibles) ne bloque pas un voyage dont les cibles lues ont
+        // pris (le marqueur resterait pour toujours) ; elle reste dite illisible. Une cible lisible relue inconnue bloque.
         var jugees = outcomes.Where(o => !(o.Verdict == BiosSettingVerdict.Unreadable && JamaisRelisibles.Contains(o.Setting))).ToList();
         var allTook = jugees.Count > 0 && jugees.All(o => o.Verdict == BiosSettingVerdict.Took);
 
@@ -115,22 +107,13 @@ public sealed class BiosLoopVerifier : IBiosLoopVerifier
             : BiosSettingVerdict.DidNotTake;
     }
 
-    // ── Le verdict par écart : la grandeur mesurée a-t-elle bougé, et dans le sens attendu ?
-    //    Rend null quand aucun écart n'est disponible (aucune valeur capturée avant, ou aucune lisible
-    //    maintenant) : l'appelant se rabat alors sur la comparaison TriState. On n'invente jamais de
-    //    mouvement.
-    //
-    //    Pourquoi il existe : XmpExpo est une inférence étiquetée « probably » par son propre
-    //    producteur. La comparer à une attente compare une supposition à une supposition ; et sur un
-    //    kit dont le plancher JEDEC est dépassé dans les deux états, elle ne bouge pas du tout alors que
-    //    la machine, si. 2133 -> 3800 est un fait. ──
+    // Le verdict par écart : la grandeur mesurée a-t-elle bougé, et dans le sens attendu ? Null sans écart disponible
+    // (rien capturé avant, ou rien de lisible) : repli sur le TriState. XmpExpo est une inférence « probably », immobile
+    // sur un kit au-dessus du plancher JEDEC dans les deux états ; 2133 -> 3800 est un fait.
     private static BiosSettingVerdict? DecideByDelta(PendingSettingTarget target, SettingsState state)
     {
-        // 0 = « jamais lu », jamais « 0 MHz », des deux côtés. La source qui alimente ce champ
-        // (`SettingsState.MemoryConfiguredMhz`) documente elle-même que 0 signifie non lu.
-        // Sans la garde sur `before`, une machine dont la RAM n'a pas été lue donnerait before=0,
-        // after=3800, donc `Took` : un succès fabriqué depuis une ligne de base inexistante, dans la
-        // fonction dont la raison d'être est précisément de refuser ça.
+        // 0 = « jamais lu » des deux côtés (`SettingsState.MemoryConfiguredMhz` le documente) : sans la garde sur
+        // `before`, before=0 et after=3800 donneraient un `Took` fabriqué.
         if (target.ObservedBefore is not { } before || before == 0) return null;
 
         // Lu dans la NVRAM, l'état est un fait, plus une inférence : un profil XMP à la fréquence d'un réglage à la main
@@ -142,8 +125,7 @@ public sealed class BiosLoopVerifier : IBiosLoopVerifier
 
         return target.ExpectedState switch
         {
-            // Activer doit faire monter la grandeur ; désactiver doit la faire baisser. Aucun mouvement veut
-            // dire que le changement n'a pas pris, quoi que dise l'inférence sur l'état.
+            // Activer fait monter, désactiver fait baisser ; aucun mouvement = pas pris, quoi que dise l'inférence.
             TriState.On => after > before ? BiosSettingVerdict.Took : BiosSettingVerdict.DidNotTake,
             TriState.Off => after < before ? BiosSettingVerdict.Took : BiosSettingVerdict.DidNotTake,
             _ => null,
@@ -169,9 +151,7 @@ public sealed class BiosLoopVerifier : IBiosLoopVerifier
         FirmwareSettingKind.XmpExpo => state.XmpExpo,
         FirmwareSettingKind.ReBar => state.ReBar,
 
-        // Above 4G Decoding est un prérequis du ReBAR : le ReBAR ne peut pas être actif sans lui, un
-        // ReBAR actif le prouve donc activé. L'inverse ne prouve rien (Above4G peut être activé avec le
-        // ReBAR désactivé), d'où Unknown plutôt qu'un « désactivé » fabriqué.
+        // Above 4G est un prérequis du ReBAR : un ReBAR actif le prouve activé ; l'inverse ne prouve rien, d'où Unknown.
         FirmwareSettingKind.Above4G => state.ReBar == TriState.On ? TriState.On : TriState.Unknown,
 
         // CSM : le scan le laisse Unknown (SettingsStateReader ne sait pas distinguer un démarrage Legacy d'un type de

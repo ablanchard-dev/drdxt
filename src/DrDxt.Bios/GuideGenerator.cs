@@ -68,26 +68,20 @@ public sealed class GuideGenerator : IGuideGenerator
         // Ne garder que les constats actionnables (classe Guide) ; trier selon l'ordre canonique pour que
         // la chaîne ReBAR se lise correctement. Stable, déterministe.
         //
-        // Le perimetre V1 est reduit : la bibliotheque ne compte aucun guide verifie sur une vraie carte, et un guide
-        // vague qui envoie un joueur dans son BIOS pour un reglage hors de ce perimetre fait plus de mal que de bien.
+        // Perimetre V1 reduit : aucun guide de la bibliotheque n'est verifie sur une vraie carte.
         var actionable = findings
             .Where(f => f.MatrixClass == BiosMatrixClass.Guide)
             .Where(f => V1Settings.Contains(f.Kind))
             .OrderBy(f => OrderIndex(f.Kind))
             .ToList();
 
-        // Le CSM ne fait pas partie du pas a pas, mais on regarde si l'advisor en a emis
-        // un : c'est le signal que ReBAR est desactive, et ca decide de ce qu'on dit ensuite.
+        // Un constat CSM de l'advisor signale un ReBAR desactive, et decide de ce qu'on dit ensuite.
         var csmWasAdvisable = findings.Any(f =>
             f.MatrixClass == BiosMatrixClass.Guide && f.Kind == FirmwareSettingKind.Csm);
 
-        // Le meme garde-fou. Sur un demarrage Legacy, conseiller de couper le CSM risque d'empecher la
-        // machine de demarrer. Le pas a pas ne le propose a personne ; ce booleen decide lequel des deux
-        // messages sort :
-        //   Legacy  -> « laissez le CSM tel quel » (la note existante, toujours vraie) ;
+        // En Legacy, couper le CSM risque d'empecher la machine de demarrer. Ce booleen choisit le message :
+        //   Legacy  -> « laissez le CSM tel quel » ;
         //   UEFI    -> « si ReBAR refuse, c'est probablement le CSM » (la ligne de secours).
-        // Sans condition, cette ligne de secours conseillerait le CSM a un utilisateur en Legacy :
-        // exactement le non-demarrage que ce garde-fou existe pour eviter.
         var csmSuppressed = csmWasAdvisable && bootMode != BootMode.Uefi;
         var mentionCsmInRecovery = csmWasAdvisable && bootMode == BootMode.Uefi;
 
@@ -165,14 +159,9 @@ public sealed class GuideGenerator : IGuideGenerator
             Recovery(5, BiosGuideStringKeys.RecoveryOneChangeAtATime),
         };
 
-        // Le CSM ne fait pas partie du pas a pas (risque de non-demarrage), mais il reste
-        // la cause n°1 d'un ReBAR qui refuse de s'activer. Le nommer sans le faire faire, c'est
-        // la difference entre « on a retire une etape » et « on a retire une etape et laisse le
-        // client en plan ».
-        //
-        // Uniquement en demarrage UEFI. En Legacy, cette phrase enverrait quelqu'un couper un
-        // CSM dont sa machine a besoin pour demarrer, et la note « laissez le CSM tel quel »
-        // sort a la place.
+        // Hors du pas a pas (risque de non-demarrage), le CSM reste la cause n°1 d'un ReBAR qui refuse de s'activer : on
+        // le nomme sans le faire faire. En UEFI seulement : en Legacy, la machine en a besoin pour demarrer, et la note
+        // « laissez le CSM tel quel » sort a la place.
         if (mentionCsm)
             steps.Add(Recovery(6, BiosGuideStringKeys.RecoveryRebarNeedsCsmOff));
 
@@ -183,25 +172,13 @@ public sealed class GuideGenerator : IGuideGenerator
         => new(order, key, ExactValue: null, Setting: FirmwareSettingKind.BiosVersion, IsRecoveryRelated: true);
 
     /// <summary>
-    /// Les seuls reglages que la V1 fait faire a un client. Ensemble ferme et volontairement
-    /// petit : chaque etape en plus est un ticket de support en plus, sur des chemins de menu que
-    /// personne n'a verifies sur une vraie carte.
-    ///
-    /// Ce qui est dehors, et pourquoi :
-    ///
-    /// • <b>CSM</b> : l'etape la plus dangereuse de tout le guide. Mal suivie, la machine ne
-    ///   demarre plus. Et elle serait conseillee a l'aveugle : `SettingsState.Csm` vaut Unknown en
-    ///   permanence (le lecteur refuse d'affirmer), on demanderait donc de desactiver quelque chose dont
-    ///   on ignore l'etat. Hors du guide ; le filet de recuperation la nomme quand meme, pour que
-    ///   quelqu'un dont ReBAR refuse de s'activer sache ou regarder.
-    ///
-    /// • <b>Routage CPPC / X3D</b> : un levier separe, hors du perimetre « XMP et ReBAR », et
-    ///   dont la detection de parking reste fragile.
-    ///
-    /// <b>Above 4G reste</b>, et c'est un ecart assume par rapport a la regle (« limites a
-    /// XMP et ReBAR ») : ce n'est pas une etape de plus, c'est la moitie mecanique de ReBAR. Sur
-    /// la plupart des cartes ReBAR ne s'active pas sans elle, et elle vit dans le meme menu. Un
-    /// pas a pas ReBAR qui ne peut pas aboutir est pire que pas de pas a pas.
+    /// Les seuls reglages que la V1 fait faire a un client : ensemble ferme et petit, sur des chemins de menu que personne
+    /// n'a verifies sur une vraie carte. Dehors :
+    /// • <b>CSM</b> : mal suivie, la machine ne demarre plus, et `SettingsState.Csm` vaut toujours Unknown (le lecteur
+    ///   refuse d'affirmer) : on ferait desactiver a l'aveugle. Le filet de recuperation la nomme quand meme ;
+    /// • <b>Routage CPPC / X3D</b> : un levier separe, hors « XMP et ReBAR », a la detection de parking fragile.
+    /// <b>Above 4G reste</b>, ecart assume : la moitie mecanique de ReBAR, qui sur la plupart des cartes ne s'active pas
+    /// sans elle, dans le meme menu.
     /// </summary>
     private static readonly IReadOnlySet<FirmwareSettingKind> V1Settings =
         new HashSet<FirmwareSettingKind>

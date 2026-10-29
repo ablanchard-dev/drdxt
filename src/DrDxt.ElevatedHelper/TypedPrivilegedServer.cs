@@ -18,10 +18,8 @@ namespace DrDxt.ElevatedHelper;
 //   (e) OpAllowlist.Validate ..... sinon HELPER.NOT_ALLOWLISTED   (non exécutée)
 //   (f) exécution de l'op admise (emballée → HELPER.OP_FAILED en cas d'erreur)
 //
-// Aucune primitive générique de registre ou d'exécution. Le seul point d'entrée privilégié est
-// une requête typée, signée, admise par l'allowlist ; la liaison passe par le switch de
-// discriminant borné de PrivilegedOpCodec (pas de résolution par nom de type). Chaque frontière
-// est emballée pour qu'aucune exception ne se propage à travers l'IPC.
+// Aucune primitive générique de registre ou d'exécution : une requête typée, signée, admise par l'allowlist, liée par le
+// discriminant borné de PrivilegedOpCodec (pas de résolution par nom de type). Aucune exception ne traverse l'IPC.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class TypedPrivilegedServer
@@ -46,20 +44,17 @@ public sealed class TypedPrivilegedServer
         _authenticator = authenticator ?? throw new ArgumentNullException(nameof(authenticator));
         _allowlist = allowlist ?? throw new ArgumentNullException(nameof(allowlist));
         _executor = executor ?? throw new ArgumentNullException(nameof(executor));
-        // Le registre de l'homme mort (dead-man's switch). Facultatif : un hôte minimal sans levier
-        // tenu n'a pas à en brancher ; une op de bail échoue alors proprement (jamais de plantage).
+        // L'homme mort, facultatif : sans lui, une op de bail échoue proprement.
         _leaseWatchdog = leaseWatchdog;
-        // Le nom du pipe est de la config serveur (comme la clé de session), pas une entrée par appel :
-        // le serveur n'expose donc aucun point d'entrée privilégié qui prenne une chaîne.
+        // Le nom du pipe est de la config serveur, comme la clé de session : aucun point d'entrée privilégié ne prend une
+        // chaîne.
         _pipeName = string.IsNullOrWhiteSpace(pipeName) ? PipeSecurityFactory.DefaultPipeName : pipeName;
     }
 
     /// <summary>
-    /// Fait tourner tout le pipeline pour une requête typée décodée. Totale : rend toujours
-    /// une réponse, ne lève jamais. L'exécuteur n'est appelé qu'après que la requête a passé
-    /// toutes les gardes (a)..(e). <paramref name="caller"/> porte l'identité du pair qui se
-    /// connecte (son process id, résolu depuis le pipe) pour que l'authentificateur (c) vérifie
-    /// que c'est le DrDxt.App de confiance.
+    /// Tout le pipeline pour une requête typée décodée ; rend toujours une réponse, ne lève jamais. L'exécuteur n'est
+    /// appelé qu'après les gardes (a)..(e). <paramref name="caller"/> porte le pid du pair, résolu par le pipe, que (c)
+    /// vérifie.
     /// </summary>
     public async Task<PrivilegedResponse> ProcessTypedRequestAsync(
         TypedPrivilegedRequest? request, CancellationToken ct, CallerInfo caller = default)
@@ -78,8 +73,7 @@ public sealed class TypedPrivilegedServer
             if (!_nonces.TryRegister(request.Nonce))
                 return Fail(ErrorCodes.NotAllowlisted, "Request rejected (replay or missing nonce).");
 
-            // (c) Autorisation de l'appelant : couture fail-closed (vérifie que le pair est
-            //     le DrDxt.App de confiance via le process id client résolu).
+            // (c) Autorisation de l'appelant, fail-closed : le pair est-il le DrDxt.App de confiance ?
             if (!_authenticator.Authorize(caller).IsOk)
                 return Fail(ErrorCodes.ElevationDenied, "Caller not authorized.");
 
@@ -94,10 +88,8 @@ public sealed class TypedPrivilegedServer
                 return Fail(allowed.Error!.Value.Code, allowed.Error!.Value.Message);
 
             // (f) Aiguiller l'op désormais reconnue bonne.
-            //  * Les ops de bail gèrent le registre de l'homme mort lié à l'appelant
-            //    authentifié (le propriétaire du bail) : ce ne sont pas des écritures
-            //    privilégiées, elles vont donc au chien de garde, jamais à l'exécuteur. Le
-            //    propriétaire est l'identité que (c) vient d'autoriser : lui seul peut renouveler ou clore.
+            //  * Les ops de bail vont au chien de garde, jamais à l'exécuteur, au nom de l'identité que (c) vient
+            //    d'autoriser : lui seul renouvelle ou clôt.
             //  * Tout le reste est une écriture privilégiée → l'exécuteur.
             return decoded.Value switch
             {
@@ -106,13 +98,10 @@ public sealed class TypedPrivilegedServer
                 RenewLeaseOp rl => DispatchLease(
                     () => Watchdog().Renew(LeaseOwnerOf(caller), rl.LeaseId, rl.LeaseSeconds)),
 
-                //  * Les ops qui repondent au lieu d'agir passent par le canal de retour de
-                //    donnees. Elles sont nommees une par une ici : c'est l'unique endroit qui
-                //    decide qu'une op rend des octets, et une op non nommee ne peut donc pas
-                //    en rendre par accident. Elles ont subi exactement les memes gardes (a)..(e).
-                //  * Une vitesse fixe de ventilateur n'est posée que sous un bail du même appelant qui rend ce ventilateur à
-                //    l'automatique : sans lui, ni la garde thermique (80 °C) ni l'expiration ne la verraient, et elle
-                //    restait jusqu'au redémarrage pendant que la carte chauffe.
+                //  * Les ops qui repondent au lieu d'agir passent par le canal de retour de donnees, nommees une par une :
+                //    le seul endroit qui decide qu'une op rend des octets. Memes gardes (a)..(e).
+                //  * Une vitesse fixe de ventilateur seulement sous un bail du même appelant qui la rend à l'automatique :
+                //    sinon ni la garde thermique (80 °C) ni l'expiration ne la verraient, jusqu'au redémarrage.
                 ApplyGpuFanCurveOp f when _leaseWatchdog?.VentilateurSousBail(LeaseOwnerOf(caller), f.GpuIndex) != true
                     => Fail(ErrorCodes.NotAllowlisted, "A fixed fan speed needs an active lease that gives the fan back to the card."),
 
@@ -128,24 +117,21 @@ public sealed class TypedPrivilegedServer
         }
         catch
         {
-            // Toute erreur interne inattendue (y compris un exécuteur qui lève) →
-            // réponse d'échec générique, sans fuite de détail.
+            // Erreur interne inattendue (exécuteur qui lève compris) → échec générique, sans détail.
             return Fail(ErrorCodes.HelperOpFailed, "Internal error processing request.");
         }
     }
 
     /// <summary>
-    /// Accepte exactement une connexion sur le pipe nommé protégé par ACL, traite une requête
-    /// typée et écrit la réponse. Ne lève jamais à travers la frontière pour un échec au
-    /// niveau de la requête.
+    /// Accepte une connexion sur le pipe protégé par ACL, traite une requête typée et répond. Un échec de requête ne lève
+    /// jamais à travers la frontière.
     /// </summary>
     public async Task AcceptOneAsync(CancellationToken ct)
     {
         using var server = PipeSecurityFactory.CreateServerStream(_pipeName);
         await server.WaitForConnectionAsync(ct).ConfigureAwait(false);
 
-        // Attribuer la connexion à un processus pour que l'authentificateur vérifie que
-        // le pair est le DrDxt.App de confiance. Un pid null → l'authentificateur refuse.
+        // Le pid du pair, pour l'authentificateur ; null → refus.
         var caller = new CallerInfo(PipeClientIdentity.TryGetClientProcessId(server));
 
         PrivilegedResponse response;
@@ -188,9 +174,8 @@ public sealed class TypedPrivilegedServer
                    exec.Error?.Message ?? "Privileged operation failed.");
     }
 
-    // Le canal de retour de donnees. Le succes porte les octets en base64 ; l'echec garde son
-    // code et son motif mot pour mot : « SeSystemEnvironmentPrivilege inactif » est un non concluant,
-    // et l'ecraser en un HELPER.OP_FAILED generique en ferait un refus du firmware.
+    // Le canal de retour de donnees : octets en base64, ou l'echec avec son code et son motif mot pour mot
+    // (« SeSystemEnvironmentPrivilege inactif » est un non concluant, pas un refus du firmware).
     private async Task<PrivilegedResponse> ExecuteReadAsync(PrivilegedOp op, CancellationToken ct)
     {
         var read = await _executor.ReadAsync(op, ct).ConfigureAwait(false);
@@ -199,14 +184,12 @@ public sealed class TypedPrivilegedServer
             return Fail(read.Error?.Code ?? ErrorCodes.HelperOpFailed,
                         read.Error?.Message ?? "Privileged read failed.");
 
-        // Un succes sans octets n'est pas une lecture : le dire, plutot que rendre un Ok vide
-        // que l'appelant lirait comme « la variable est vide ».
+        // Un succes sans octets n'est pas une lecture (pas un Ok vide lu comme « variable vide »).
         var data = read.Value;
         if (data is null)
             return Fail(ErrorCodes.HelperOpFailed, "The read succeeded but returned no data.");
 
-        // Depassement = echec, jamais troncature : la moitie d'une variable firmware serait lue
-        // comme une valeur entiere par tout ce qui vient apres.
+        // Depassement = echec, jamais troncature : une demi-variable firmware passerait pour entiere.
         if (data.Length > PrivilegedResponse.MaxDataBytes)
             return Fail(ErrorCodes.HelperOpFailed,
                         $"The read returned more than {PrivilegedResponse.MaxDataBytes} bytes.");
@@ -214,8 +197,7 @@ public sealed class TypedPrivilegedServer
         return new PrivilegedResponse { Ok = true, DataBase64 = Convert.ToBase64String(data) };
     }
 
-    // Lance une action du chien de garde (Establish/Renew). Sans chien de garde branché, l'op de
-    // bail échoue proprement, jamais de plantage. L'action rend elle-même un Result : le remonter.
+    // Une action du chien de garde (Establish/Renew), son Result remonté ; sans chien de garde, échec propre.
     private PrivilegedResponse DispatchLease(Func<Result> action)
     {
         if (_leaseWatchdog is null)
@@ -228,8 +210,7 @@ public sealed class TypedPrivilegedServer
 
     private LeaseWatchdog Watchdog() => _leaseWatchdog!; // gardé par DispatchLease
 
-    // Le propriétaire du bail est l'identité authentifiée de l'appelant (le pid du pair résolu
-    // par le pipe, déjà vérifié à l'étape (c)). Lie chaque bail à l'appelant qui le possède.
+    // Le propriétaire du bail : le pid du pair, vérifié à l'étape (c).
     private static LeaseOwner LeaseOwnerOf(CallerInfo caller) => new(caller.ClientProcessId);
 
     private static PrivilegedResponse Fail(string code, string message) =>

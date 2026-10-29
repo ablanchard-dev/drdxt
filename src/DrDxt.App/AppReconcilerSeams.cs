@@ -54,16 +54,10 @@ public sealed class AppReconcilerNotifier : IReconcilerNotifier
 // -----------------------------------------------------------------------
 // AppManifestPublicKey : le chargeur de clé publique de l'App, pour vérifier seulement.
 //
-// Calqué sur HostPublicKeyProvider (dans l'EXE de l'hôte, pas référençable ici). L'App
-// vérifie le manifeste pour montrer la dérive et ne le signe jamais : elle lit la clé
-// publique Ed25519 brute de 32 octets dans la même racine du manifeste, en écriture admin.
-// Refus au moindre doute : une clé absente ou malformée ne donne aucun vérificateur, et le
-// magasin en vérification seule traite alors chaque manifeste comme invérifiable au lieu
-// d'en lire un non vérifié.
-//
-// La clé publique arrive sur la machine par le helper élevé : elle est dérivée de la clé de
-// signature propre à la machine et écrite à côté du manifeste au premier CommitManifestOp
-// (MachineManifestKey). Ici, on ne fait que la consommer ; aucune clé privée n'est chargée.
+// Calqué sur HostPublicKeyProvider (dans l'EXE de l'hôte, pas référençable ici). L'App lit la clé publique Ed25519 brute
+// (32 octets) de la racine admin du manifeste, que le helper y écrit au premier CommitManifestOp (MachineManifestKey) ;
+// aucune clé privée n'est chargée. Clé absente ou malformée : aucun vérificateur, et chaque manifeste est invérifiable
+// plutôt que lu sans vérification.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class AppManifestPublicKey
@@ -149,11 +143,8 @@ public static class AppManifestPublicKey
 // -----------------------------------------------------------------------
 // HelperDesiredStateStore : le commit de l'app passe par le helper eleve.
 //
-// Jusqu'ici l'App signait elle-meme avec une graine lue dans DRDXT_MANIFEST_SIGNING_SEED. Sur une
-// machine installee cette variable n'existe pas (refus de signer) et l'App, a integrite moyenne, ne peut
-// de toute facon pas ecrire la racine admin : Rien n'atteignait le manifeste. La graine en variable
-// d'environnement est supprimee du produit (SecurityGateTests : aucun code de src/ ne la lit, dans aucune
-// configuration). L'App n'a plus aucune capacite de signature :
+// L'App, a integrite moyenne, ne peut ni signer ni ecrire la racine admin : elle n'a aucune capacite de signature,
+// et aucune graine en variable d'environnement n'existe dans src/ (SecurityGateTests) :
 //   * CommitAsync envoie les entrees au helper (CommitManifestOp) : il valide, fusionne, signe avec la cle
 //     de la machine et ecrit ;
 //   * LoadAsync lit par un magasin en verification seule (cle publique de la machine, sous %ProgramData%\DrDxt) ;

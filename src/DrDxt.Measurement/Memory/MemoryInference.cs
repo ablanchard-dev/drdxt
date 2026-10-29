@@ -3,18 +3,10 @@ using DrDxt.Core;
 namespace DrDxt.Measurement.Memory;
 
 /// <summary>
-/// Ce que la mesure apprend de la memoire, et que la lecture ne peut pas dire.
-///
-/// `MemoryTopologyAdvisor` deduit deja les canaux des chaines `DeviceLocator`, et il se tait quand
-/// une carte les nomme mal. Ici on raisonne dans l'autre sens, par une borne : un canal a une
-/// vitesse plafond, et rien ne peut la depasser. Un debit mesure au-dessus de ce plafond prouve
-/// qu'il y a plusieurs canaux, quelle que soit la facon dont la carte nomme ses emplacements.
-///
-/// ══ ce que ce raisonnement n'a pas le droit de faire : conclure a l'envers ══
-/// Un debit bas ne prouve rien du tout. Un seul fil d'execution ne sature pas forcement deux
-/// canaux : le facteur limitant est alors le nombre d'acces qu'un coeur garde en vol, pas la
-/// memoire. Le plancher rend donc `1` au sens de « au moins un », c'est-a-dire Unknown, et jamais
-/// « simple canal ».
+/// Ce que la mesure apprend de la memoire et que la lecture des chaines `DeviceLocator` (`MemoryTopologyAdvisor`) ne
+/// dit pas : un canal a un debit plafond, un debit mesure au-dessus prouve plusieurs canaux. Jamais a l'envers : un seul
+/// fil ne sature pas forcement deux canaux (le coeur limite ses acces en vol), donc `1` veut dire « au moins un »,
+/// Unknown, jamais « simple canal ».
 /// </summary>
 public static class MemoryInference
 {
@@ -22,17 +14,14 @@ public static class MemoryInference
     private const double BytesPerTransfer = 8.0;
 
     /// <summary>
-    /// Marge sous le plafond avant de conclure. **Choix produit** : la frequence lue est arrondie,
-    /// l'horloge derive, et un debit a 99,5 % du plafond theorique reste plus vraisemblablement une
-    /// mesure genereuse qu'un canal de plus. On exige de depasser franchement, pas de froler.
+    /// Marge au-dessus du plafond avant de conclure. Choix produit : frequence arrondie, horloge qui derive ; un debit a
+    /// 99,5 % du plafond est plutot une mesure genereuse qu'un canal de plus.
     /// </summary>
     private const double ProofMargin = 1.02;
 
     /// <summary>
-    /// Debit plafond d'un canal, en Go/s, a la frequence configuree. Les barrettes d'une machine
-    /// tournent toutes a la vitesse de la plus lente : c'est elle qui fixe le plafond.
-    /// Rend 0 quand aucune frequence n'a ete lue : 0 veut dire « je ne sais pas », et aucun
-    /// appelant n'a le droit d'en tirer une conclusion.
+    /// Debit plafond d'un canal, en Go/s, a la frequence de la barrette la plus lente (toutes tournent a sa vitesse).
+    /// 0 = aucune frequence lue, « je ne sais pas » : aucune conclusion.
     /// </summary>
     public static double PerChannelPeakGBs(IReadOnlyList<MemoryModule> modules)
     {
@@ -46,21 +35,16 @@ public static class MemoryInference
         => mts <= 0 || channels <= 0 ? 0 : mts * BytesPerTransfer * channels / 1000.0;
 
     /// <summary>
-    /// Plafond au-dela duquel une mesure est forcement fausse : tous les emplacements peuples,
-    /// chacun sur son canal. C'est le nombre a donner a <see cref="MemoryQuality"/>, parce qu'il
-    /// majore ce que la machine peut rendre sans supposer sa topologie.
+    /// Plafond au-dela duquel une mesure est fausse (chaque barrette sur son canal) : le majorant a donner a
+    /// <see cref="MemoryQuality"/>, sans supposer la topologie.
     /// </summary>
     public static double UpperBoundPeakGBs(IReadOnlyList<MemoryModule> modules)
         => PerChannelPeakGBs(modules) * modules.Count;
 
     /// <summary>
-    /// Lignes de cache en vol, par la loi de Little : concurrence = debit x latence. Elle relie
-    /// les deux nombres qu'on mesure deja et ne demande aucun banc supplementaire.
-    ///
-    /// Ce qu'elle explique, et qui compte pour ce produit : un debit modeste avec une bonne
-    /// latence signifie que la machine ne garde pas assez d'acces en vol : le facteur limitant
-    /// est le coeur, pas la memoire. C'est la raison pour laquelle
-    /// <see cref="ProvenMinimumChannels"/> refuse de conclure vers le bas.
+    /// Lignes de cache en vol, par la loi de Little : concurrence = debit x latence, sans banc de plus. Un debit modeste
+    /// avec une bonne latence : le coeur limite, pas la memoire, d'ou le refus de <see cref="ProvenMinimumChannels"/> de
+    /// conclure vers le bas.
     /// </summary>
     public static double LinesInFlight(double bandwidthGBs, double latencyNs)
         => latencyNs <= 0 ? 0 : bandwidthGBs * latencyNs / 64.0;
@@ -69,10 +53,9 @@ public static class MemoryInference
     public static double MeilleurDebit(MemoryMeasurement m) => Math.Max(m.BandwidthGBs, m.BandwidthMultiFilGBs);
 
     /// <summary>
-    /// Un seul canal probable : au moins deux barrettes lues, et meme plusieurs fils a la fois ne depassent pas le plafond
-    /// d'un canal. Plusieurs fils saturent le controleur sur un PC de bureau ; c'est ce qui autorise ici la conclusion
-    /// vers le bas que le debit d'un seul fil n'autorise pas. Le plafond se calcule dans la meme unite que la mesure (Go/s
-    /// decimaux : octets par seconde / 10^9, et MT/s x 8 octets / 1000). Sans debit multi-fil ou sans frequence : non.
+    /// Un seul canal probable : au moins deux barrettes, et meme plusieurs fils (qui saturent le controleur d'un PC de
+    /// bureau, ce qu'un seul fil ne fait pas) restent sous le plafond d'un canal. Meme unite que la mesure (Go/s decimaux :
+    /// octets/s / 10^9, MT/s x 8 / 1000). Sans debit multi-fil ou sans frequence : non.
     /// </summary>
     public static bool UnSeulCanalProbable(double debitMultiFilGBs, IReadOnlyList<MemoryModule> modules)
     {

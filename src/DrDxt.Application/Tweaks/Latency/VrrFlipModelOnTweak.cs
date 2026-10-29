@@ -3,31 +3,17 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks.Latency;
 
-// -----------------------------------------------------------------------
-// VrrFlipModelOnTweak (système, persistant).
-//
-// Active d'un coup les deux bascules graphiques de Windows qui partagent une seule REG_SZ :
+// Système, persistant. Les deux bascules graphiques de Windows qui partagent une REG_SZ, sous les noms qu'écrivent les
+// Paramètres eux-mêmes (relevés sur la machine de référence, `SwapEffectUpgradeEnable=1;`) :
 //   * VRROptimizeEnable : « Taux de rafraîchissement variable » (VRR en fenêtré et sans bordure) ;
 //   * SwapEffectUpgradeEnable : « Optimisations pour les jeux en fenêtré » (présentation flip-model).
-// Ce sont les noms qu'écrivent les Paramètres de Windows eux-mêmes (relevés tels quels dans le
-// registre de la machine de référence, `SwapEffectUpgradeEnable=1;`).
-// Les deux vivent dans HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings,
-// une chaîne « clé=valeur;... » qui porte aussi AutoHDREnable et HighPerfAdapter. D'où une fusion :
-// lire la chaîne, poser nos deux clés seulement, réécrire en gardant toutes les autres (jamais écraser
-// AutoHDR). Le snapshot garde la chaîne d'origine brute (ou une suppression si la valeur était absente) ; le
-// rendu la remet telle quelle si rien d'autre n'a bougé, sinon seules nos deux clés reprennent leur origine dans
-// la chaîne courante (un Auto HDR réglé entre-temps reste), et seules elles se relisent.
-//
-// Effet au redémarrage ou au prochain lancement du jeu : le moteur saute l'A/B immédiat.
-//
-// Proposé, jamais posé en silence ; le SummaryKey décrit le changement, pas de « +FPS ». Le VRR ne fait
-// rien sur un écran sans VRR (sans danger) ; la moitié flip-model aide les jeux fenêtrés dans tous les cas.
-//
-// Gating : AppliesTo lit lui-même cette chaîne (la lecture VRR du scan vient du pilote, une autre
-// source). Flip-model absent sous Windows 11 : proposé sur tout écran. Sinon (flip-model déjà actif, ou Windows 10, où
-// « Optimisations pour les jeux en fenêtré » n'existe pas d'après le support Microsoft) : proposé seulement pour la moitié
-// VRR, et seulement sur un écran lu compatible VRR (`VrrCapableDisplay`, voir AppliesTo).
-// -----------------------------------------------------------------------
+// La chaîne HKCU\Software\Microsoft\DirectX\UserGpuPreferences\DirectXUserGlobalSettings porte aussi AutoHDREnable et
+// HighPerfAdapter : on fusionne nos deux clés sans écraser les autres. Le snapshot garde la chaîne brute (ou une
+// suppression si absente) ; le rendu la remet telle quelle si rien n'a bougé, sinon seules nos clés reprennent leur
+// origine (un Auto HDR réglé entre-temps reste). Effet au redémarrage ou au lancement du jeu : pas d'A/B immédiat.
+// Proposé, jamais posé en silence, sans « +FPS ». Gating : AppliesTo lit cette chaîne (le VRR du scan vient du pilote).
+// Flip-model absent sous Windows 11 : proposé sur tout écran ; sinon (flip-model actif, ou Windows 10 où l'option
+// n'existe pas d'après le support Microsoft) : seulement la moitié VRR, sur un écran lu compatible (`VrrCapableDisplay`).
 /// <summary>Active le VRR fenêtré et le flip-model de Windows dans DirectXUserGlobalSettings, en gardant les autres
 /// clés. Proposé quand le flip-model manque, ou quand seul le VRR manque sur un écran compatible.</summary>
 public sealed class VrrFlipModelOnTweak : LatencyTweakBase
@@ -55,14 +41,9 @@ public sealed class VrrFlipModelOnTweak : LatencyTweakBase
 
     public override bool TakesEffectAfterReboot => true;
 
-    // Les deux interrupteurs deja a 1 ⇒ rien a faire, hors du plan (sinon
-    // « rien a tenter » n'est jamais vrai). Illisible ⇒ non lu (EtatNonLu) : ni « deja regle », ni « a poser », puisque la
-    // pose relit la chaine d'origine et echouerait. La capacite VRR de l'ecran reste a lire.
-    //
-    // La moitie VRR ne vaut rien sur un ecran qui ne fait pas de VRR. Le
-    // poste de reference a deja le flip-model (`SwapEffectUpgradeEnable=1`) et pas `VRROptimizeEnable` :
-    // le levier restait au plan pour la seule moitie VRR, que l'ecran soit capable ou non. Elle ne
-    // compte plus que sur un ecran LU comme VRR (`VrrCapableDisplay`, deja lu par le scan).
+    // Les deux a 1 ⇒ hors du plan. Illisible ⇒ EtatNonLu : ni « deja regle », ni « a poser » (la pose relit la chaine
+    // d'origine et echouerait). La moitie VRR ne compte que sur un ecran lu VRR (`VrrCapableDisplay`) : le poste de
+    // reference a le flip-model (`SwapEffectUpgradeEnable=1`) sans `VRROptimizeEnable`.
     public override bool AppliesTo(HardwareInventory hw, SettingsState state)
     {
         try
@@ -140,8 +121,7 @@ public sealed class VrrFlipModelOnTweak : LatencyTweakBase
             if (!applied.IsOk)
                 return Result<TweakSnapshot>.Fail(applied.Error!.Value.Code, applied.Error!.Value.Message);
 
-            // La chaîne posée voyage avec l'inverse. Sans elle, la désinstallation ne
-            // sait pas si la valeur est encore celle de DrDXT, et n'y touche pas.
+            // La chaîne posée voyage avec l'inverse : la désinstallation sait si la valeur est encore celle de DrDXT.
             return Result<TweakSnapshot>.Ok(SnapshotAvec(Id, inverseWire.Value, op));
         }
         catch (Exception ex)

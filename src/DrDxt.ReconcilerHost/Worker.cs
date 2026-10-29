@@ -6,31 +6,13 @@ namespace DrDxt.ReconcilerHost;
 // -----------------------------------------------------------------------
 // Worker (coquille mince) : relie le cycle de vie de l'hôte aux classes testées.
 //
-// Au démarrage : marquer le démarrage (homme mort +1) et lancer une passe de réconciliation sans
-// condition (la passe est idempotente : elle ne réapplique que les éléments qui ont dérivé, une
-// machine propre est un tour sans écriture ; la relancer à chaque démarrage est donc ce qui fait
-// tenir un réglage de registre / d'alimentation / de service qui a dérivé à travers un
-// redémarrage normal, pas seulement après une mise à jour de fonctionnalité. Les réglages GPU n'en
-// font pas partie : ce service tourne avec les écritures NVAPI/ADLX désactivées, voir
-// ReconcilableTweakCatalog). Puis planifier la remise à zéro de session stable après la fenêtre
-// de marche. Puis boucler sur l'interrogation quotidienne de secours, en réconciliant sans
-// condition à chaque intervalle. Chaque passe passe par SingleFlightReconcile : des déclencheurs
-// qui se chevauchent ne tournent jamais en même temps, ils passent l'un après l'autre.
+// Au démarrage : marquer le démarrage (homme mort +1), lancer une passe (voir RunPassAsync), planifier la remise à zéro
+// de session stable après la fenêtre de marche, puis réconcilier à chaque intervalle quotidien de secours. Chaque passe
+// passe par SingleFlightReconcile : des déclencheurs qui se chevauchent passent l'un après l'autre.
 //
-// La détection de mise à jour de fonctionnalité (FeatureUpdateTrigger/Detector) est un signal en
-// plus, pas une barrière : chaque passe l'interroge pour son effet d'enregistrement (relevé sur
-// front de LastFeatureUpdateBuild sur un changement de build de l'OS) et journalise une mise à
-// jour détectée, mais la réconciliation tourne quoi qu'il rende.
-//
-// Important (architecture) : le Worker n'a aucune dépendance directe d'écriture privilégiée. Il
-// n'a aucun handle de registre, de service ou d'alimentation. La seule façon d'écrire quoi que ce
-// soit est dans la passe de réconciliation : DesiredStateReconciler → IElevatedReapplyClient →
-// l'IElevatedClient de l'hôte, qui est l'exécuteur en processus (InProcessElevatedClient derrière
-// OpAllowlist, option B), sans IPC vers le helper (construit au fond du graphe, jamais injecté ici). La
-// surface du Worker : le lanceur de tour à vol unique, le déclencheur de mise à jour de
-// fonctionnalité, le marqueur de session de démarrage, le journal de diagnostic et la config de
-// temps, tous en lecture / coordination seulement. Le chemin d'écriture reste ainsi auditable et
-// le test de garde vert.
+// Le Worker n'a aucun handle d'écriture (registre, service, alimentation) : on n'écrit que dans la passe,
+// DesiredStateReconciler → IElevatedReapplyClient → InProcessElevatedClient derrière OpAllowlist (option B, sans IPC),
+// construit au fond du graphe et jamais injecté ici. Le chemin d'écriture reste auditable, et sa garde testée.
 // -----------------------------------------------------------------------
 public sealed class Worker : BackgroundService
 {

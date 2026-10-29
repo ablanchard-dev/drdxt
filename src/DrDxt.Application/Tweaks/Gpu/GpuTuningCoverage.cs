@@ -4,39 +4,24 @@ using DrDxt.Core;
 namespace DrDxt.Application.Tweaks.Gpu;
 
 /// <summary>
-/// Ce que cette machine recevra, dit avant le paiement.
-///
-/// Le problème que ça règle est commercial autant que technique : vendre du tuning GPU à
-/// quelqu'un dont la carte est en lecture seule, c'est un remboursement immédiat et un avis
-/// négatif. Le produit savait déjà refuser au moment d'appliquer : la sonde d'écriture-identité
-/// le fait honnêtement. Mais elle le fait après l'achat, et derrière une élévation.
-///
-/// D'où cette classification : elle n'utilise que ce qui se lit sans élévation, sans driver et
-/// sans rien écrire : le châssis, le fournisseur, la VRAM, le nom commercial. Exactement ce
-/// qu'on peut montrer à quelqu'un qui n'a pas encore payé.
-///
-/// ══ ce qu'elle ne fait pas ══
-///
-/// Elle ne remplace pas la sonde. Un nom commercial ne prouve pas qu'un pilote honorera une
-/// écriture : une carte OEM bridée, un portable déguisé, un pilote qui accepte et ne change
-/// rien passeront ici et seront attrapés là-bas. La promesse tenue est donc bornée : « voilà ce
-/// que ta machine devrait recevoir », jamais « voilà ce qui marchera à coup sûr ».
-///
-/// Et elle ne promet jamais par défaut. Une carte qu'on ne sait pas nommer ressort
-/// <see cref="GpuTuningSupport.ReadOnly"/>, pas « supporté » : c'est la moitié de la décision
-/// fail-closed, l'autre étant qu'on le dise.
+/// Ce que cette machine recevra, dit d'avance. La sonde d'écriture-identité refuse au moment d'appliquer, derrière une
+/// élévation ; cette classification ne lit que ce qui se lit sans élévation, sans pilote et sans écrire (châssis,
+/// fournisseur, VRAM, nom commercial). Elle ne remplace pas la sonde : une carte OEM bridée, un portable déguisé, un
+/// pilote qui accepte sans rien changer passent ici et sont attrapés là-bas. D'où « voilà ce que ta machine devrait
+/// recevoir », jamais « ce qui marchera à coup sûr ». Une carte qu'on ne sait pas nommer ressort
+/// <see cref="GpuTuningSupport.ReadOnly"/>, et c'est dit.
 /// </summary>
 public enum GpuTuningSupport
 {
-    /// <summary>Architecture validée en vrai (écriture, relecture, revert). Le tuning est vendu.</summary>
+    /// <summary>Architecture validée en vrai (écriture, relecture, revert) : le tuning est proposé.</summary>
     Validated,
 
-    /// <summary>Lue et comprise, mais jamais validée en écriture, ou validée seulement en
-    /// partie. « Supporté en lecture, tuning à venir » : on lit la carte, on ne la règle pas.</summary>
+    /// <summary>Lue et comprise, jamais (ou en partie seulement) validée en écriture : on lit la carte, on ne la règle
+    /// pas.</summary>
     ReadOnly,
 
-    /// <summary>Rien à régler ici : GPU intégré, portable, châssis verrouillé. Ce n'est pas un
-    /// manque du produit, c'est une propriété de la machine, et le dire évite un achat déçu.</summary>
+    /// <summary>Rien à régler ici (GPU intégré, portable, châssis verrouillé) : une propriété de la machine, pas un
+    /// manque du produit.</summary>
     NotApplicable,
 }
 
@@ -45,9 +30,8 @@ public enum GpuTuningSupport
 /// <param name="Support">Le verdict.</param>
 /// <param name="Architecture">L'architecture reconnue, ou Unknown.</param>
 /// <param name="ReasonKey">La clé resx du motif, jamais du texte codé en dur.</param>
-/// <param name="VoltageTuning">Le voltage manuel est-il proposé sur cette carte ? Séparé du
-/// verdict global : une RDNA3 est réglable (limite de puissance, fréquences) sans que le voltage
-/// le soit, et confondre les deux ferait perdre des leviers réels ou en promettre un faux.</param>
+/// <param name="VoltageTuning">Le voltage manuel est-il proposé ? Séparé du verdict : une RDNA3 est réglable (limite de
+/// puissance, fréquences) sans que le voltage le soit.</param>
 public readonly record struct GpuCoverageRow(
     string Model,
     GpuTuningSupport Support,
@@ -71,18 +55,15 @@ public static class GpuTuningCoverage
         new(@"\bRTX\s*40\d{2}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     /// <summary>
-    /// Les architectures validées en vie (écriture, relecture, retour). Une architecture n'entre ici qu'avec
-    /// son rapport dans tests/Shared/validations ; la garde <c>UnePreuveDebloqueSonMaterielTests</c> refuse le reste.
-    /// Sans rapport archivé, une architecture reste « lecture seule » jusqu'à sa preuve. Ada est validée par
-    /// AdaOrOlder-rtx4060-2026-10-08.txt (limite de puissance d'une RTX 4060 posée 100 ⇒ 90 %, relue, rendue, relue à 100 %,
-    /// par « Vérifier DrDXT » sur la machine).
+    /// Les architectures validées en vie (écriture, relecture, retour), chacune avec son rapport dans
+    /// tests/Shared/validations (garde <c>UnePreuveDebloqueSonMaterielTests</c>) ; sinon « lecture seule ». Ada :
+    /// AdaOrOlder-rtx4060-2026-10-08.txt (mesuré : limite de puissance d'une RTX 4060 posée 100 ⇒ 90 %, relue, rendue, relue à
+    /// 100 %, par « Vérifier DrDXT »).
     /// </summary>
     public static readonly IReadOnlySet<GpuArchitecture> ValideesEnVie = new HashSet<GpuArchitecture> { GpuArchitecture.AdaOrOlder };
 
     /// <summary>
-    /// La matrice pour cette machine, une ligne par GPU. Vide seulement quand aucun GPU n'a été
-    /// détecté, et ça se dit aussi, plutôt que d'afficher une matrice vide qui ressemble à une
-    /// machine sans problème.
+    /// La matrice pour cette machine, une ligne par GPU ; vide seulement sans GPU détecté, et ça se dit aussi.
     /// </summary>
     public static IReadOnlyList<GpuCoverageRow> For(HardwareInventory hw) => For(hw, ValideesEnVie);
 
@@ -90,8 +71,7 @@ public static class GpuTuningCoverage
     {
         if (hw?.Gpus is not { Count: > 0 }) return Array.Empty<GpuCoverageRow>();
 
-        // Le châssis d'abord : sur un portable ou une console portable, aucune carte n'est
-        // réglable, et l'annoncer carte par carte comme un défaut du produit serait faux.
+        // Le châssis d'abord : sur un portable ou une console portable, aucune carte n'est réglable.
         var lockedChassis = hw.Chassis != ChassisType.Desktop;
 
         return hw.Gpus.Select(g => Classify(g, lockedChassis, validees)).ToList();
@@ -105,8 +85,7 @@ public static class GpuTuningCoverage
             return new(gpu.Model, GpuTuningSupport.NotApplicable, architecture,
                 ReasonLaptopOrHandheld, VoltageTuning: false);
 
-        // iGPU, carte mobile, fournisseur hors périmètre : il n'y a rien à régler, et ce n'est
-        // pas un manque du produit.
+        // iGPU, carte mobile, fournisseur hors périmètre : rien à régler.
         if (!GpuGating.IsTunableDiscreteGpu(gpu))
             return new(gpu.Model, GpuTuningSupport.NotApplicable, architecture,
                 ReasonNotTunableHardware, VoltageTuning: false);
@@ -115,9 +94,8 @@ public static class GpuTuningCoverage
 
         return architecture switch
         {
-            // Validée seulement avec son rapport archivé (voir ValideesEnVie). Le rapport
-            // archivé est celui d'une RTX 4060 ; la classe AdaOrOlder ne se dit validée que pour les RTX 40 (Ada), les RTX
-            // 20/30 et GTX 10/16 attendent le leur.
+            // Le rapport archivé est celui d'une RTX 4060 : AdaOrOlder ne se dit validée que pour les RTX 40, les RTX 20 et 30
+            // et GTX 10 et 16 attendent le leur.
             GpuArchitecture.AdaOrOlder when validees.Contains(architecture) && Rtx40.IsMatch(gpu.Model) =>
                 new(gpu.Model, GpuTuningSupport.Validated, architecture, ReasonValidated, voltage),
             // Radeon : une seule règle pour toutes les architectures, chacune ouverte par son propre rapport.
@@ -125,8 +103,7 @@ public static class GpuTuningCoverage
                 or GpuArchitecture.Rdna4 when validees.Contains(architecture) =>
                 new(gpu.Model, GpuTuningSupport.Validated, architecture, ReasonValidated, voltage),
 
-            // Blackwell : le reste du tuning marche, NVIDIA a verrouillé le voltage. Le dire
-            // précisément vaut mieux que de classer toute la carte en lecture seule.
+            // Blackwell : NVIDIA a verrouillé le voltage, le reste du tuning marche.
             GpuArchitecture.Blackwell when validees.Contains(architecture) =>
                 new(gpu.Model, GpuTuningSupport.Validated, architecture, ReasonVoltageLockedByVendor, voltage),
 
@@ -135,8 +112,7 @@ public static class GpuTuningCoverage
                 or GpuArchitecture.Rdna2 or GpuArchitecture.Rdna3 or GpuArchitecture.Rdna4 =>
                 new(gpu.Model, GpuTuningSupport.ReadOnly, architecture, ReasonNeverWriteTested, voltage),
 
-            // Une carte qu'on ne sait pas nommer n'est pas une carte validée. Lecture seule, et
-            // on l'écrit : c'est le fail-closed dans sa forme la plus littérale.
+            // Une carte qu'on ne sait pas nommer : lecture seule, et on l'écrit (fail-closed).
             _ => new(gpu.Model, GpuTuningSupport.ReadOnly, architecture, ReasonUnknownArchitecture, voltage),
         };
     }

@@ -29,38 +29,9 @@ namespace DrDxt.Detection.Gpu.Adlx;
 //     GetManualPowerTuning → IADLXManualPowerTuning*
 //     GetManualFanTuning   → IADLXManualFanTuning*
 //
-// Emplacements de vtable : les constantes nommées vivent dans AdlxVtableSlots.cs ; ADLX-SLOTS.md
-// porte la citation complète par emplacement. Tous les indices vérifiés le 2026-06-29 contre les
-// en-têtes de référence du SDK ADLX (https://github.com/GPUOpen-LibrariesAndSDKs/ADLX, SDK/Include/*.h) :
-// ─────────────────────────────────────────────────────────────────────────────────────
-//   IADLXSystem (ISystem.h, spécial, sans Acquire/Release) :
-//     0=GetHybridGraphicsType  1=GetGPUs  8=GetGPUTuningServices
-//   IADLXGPUList (ISystem.h, avec Acquire/Release) :
-//     0=Acquire  1=Release  3=Size  11=At_GPUList
-//   IADLXGPUTuningServices (IGPUTuning.h, avec Acquire/Release) :
-//     0=Acquire  1=Release  8=IsSupportedManualGFXTuning  10=IsSupportedManualFanTuning
-//     11=IsSupportedManualPowerTuning  14=GetManualGFXTuning  16=GetManualFanTuning
-//     17=GetManualPowerTuning
-//   IADLXManualGraphicsTuning1 (IGPUManualGFXTuning.h, par états, RDNA1/Vega) :
-//     0=Acquire  1=Release  2=QueryInterface
-//     3=GetGPUTuningRanges  4=GetGPUTuningStates  5=GetEmptyGPUTuningStates
-//     6=IsValidGPUTuningStates  7=SetGPUTuningStates
-//     NB : les emplacements 3-7 ne sont jamais appelés ; Tuning1 ne sert que via QueryInterface
-//          (emplacement 2) pour obtenir Tuning2. Sa disposition est sans rapport avec l'API fréquence/tension de Tuning2.
-//   IADLXManualGraphicsTuning2 (IGPUManualGFXTuning.h, fréquence + tension, RDNA) :
-//     0=Acquire  1=Release  2=QueryInterface
-//     3=GetGPUMinFrequencyRange  4=GetGPUMinFrequency  5=SetGPUMinFrequency
-//     6=GetGPUMaxFrequencyRange  7=GetGPUMaxFrequency  8=SetGPUMaxFrequency  (écriture : emplacement 8)
-//     9=GetGPUVoltageRange      10=GetGPUVoltage       11=SetGPUVoltage       (écriture : emplacement 11)
-//   IADLXManualPowerTuning (IGPUManualPowerTuning.h, avec Acquire/Release) :
-//     0=Acquire  1=Release  2=QueryInterface  3=GetPowerLimitRange  4=GetPowerLimit
-//     5=SetPowerLimit  (écriture : emplacement 5)
-//   IADLXManualFanTuning (IGPUManualFanTuning.h, avec Acquire/Release) :
-//     0=Acquire  1=Release  3=GetFanTuningRanges  4=GetFanTuningStates
-//   IADLXManualFanTuningStateList (IGPUManualFanTuning.h, avec Acquire/Release) :
-//     0=Acquire  1=Release  3=Size  11=At_ManualFanTuningStateList
-//   IADLXManualFanTuningState (IGPUManualFanTuning.h, avec Acquire/Release) :
-//     0=Acquire  1=Release  3=GetFanSpeed  5=GetTemperature
+// Emplacements de vtable : les constantes nommées de AdlxVtableSlots.cs, la citation par emplacement dans ADLX-SLOTS.md,
+// vérifiés le 2026-06-29 contre les en-têtes du SDK ADLX (github.com/GPUOpen-LibrariesAndSDKs/ADLX, SDK/Include/*.h).
+// Tuning1 ne sert qu'à obtenir Tuning2 par QueryInterface (emplacement 2) ; ses emplacements 3-7 ne sont jamais appelés.
 //
 // Contrat d'échec propre
 // ───────────────────

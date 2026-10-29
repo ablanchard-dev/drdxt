@@ -57,12 +57,8 @@ public sealed record AutopilotProfile(
 /// <summary>
 /// La boucle : observer → mesurer ce qu'on peut voir → tenter → prouver → garder ou annuler.
 ///
-/// `OcSweep` avait deja cette philosophie et n'etait appele que par `tools/octune` : il ne savait
-/// balayer qu'un offset GPU entier, contre un banc GPU precis. Ce moteur-ci est la meme idee rendue
-/// generique : il ne sait rien du GPU, rien des FPS, rien du materiel. Il sait juste tenter des
-/// actions et refuser de garder ce qu'il ne peut pas prouver.
-///
-/// ══ ce qui le rend different d'un catalogue de tweaks ══
+/// Generique : il ne sait rien du GPU, des FPS ni du materiel, il tente des actions et refuse de garder ce qu'il ne
+/// peut pas prouver.
 /// 1. **Il mesure d'abord ce qu'il peut voir.** L'A/A (<see cref="SceneResolution"/>) passe avant
 ///    tout candidat : si la scene ne resout que +/-5 %, tenter un levier a +1 % est du temps
 ///    perdu d'avance, et le moteur le sait avant de le depenser.
@@ -104,10 +100,8 @@ public static class AutopilotEngine
     /// <param name="alternancesMax">Le nombre de passes d'alternance du protocole. **Fixe** : le
     /// moteur va au bout et ne prend qu'une decision statistique, sur l'experience complete.
     ///
-    /// Ce n'est pas un plafond : s'arreter des qu'un gain devient significatif serait de l'optional stopping, chaque
-    /// regard etant une occasion supplementaire de franchir le seuil par hasard, et s'arreter uniquement sur les succes est
-    /// exactement ce qui cree le biais. Seuls des arrets physiques pre-declares interrompent le
-    /// protocole, parce qu'ils ne dependent pas du resultat mesure.</param>
+    /// Pas un plafond : s'arreter au premier gain serait de l'optional stopping (voir la fin de la boucle) ; seuls des
+    /// arrets physiques pre-declares l'interrompent.</param>
     /// <param name="representativite">Ce que la scene represente (partie reelle,
     /// entrainement…). Sert a la regle de decidabilite ; <c>Unknown</c> par defaut.</param>
     public static AutopilotProfile Run(
@@ -133,15 +127,9 @@ public static class AutopilotEngine
         }
 
         // ── 1. L'A/A : de quoi cette scene est-elle capable ? ────────────────────────────────
-        // L'A/A se mesure sur la moyenne, pas sur le score composite. La derive est une
-        // propriete de la scene, et la moyenne est la grandeur qui la lit le mieux : mesuree sur une
-        // session Warzone le 07/09/2026 (docs/PROTOCOLES-DE-MESURE-IN-GAME.md), elle resout a +/-4,6 % la ou
-        // le score composite annonce +/-72 %. Prendre le
-        // score reviendrait a declarer inutilisable une scene parfaitement stable.
-        //
-        // L'A/A ne fixe pas le seuil de decision : l'experience appariee annonce sa propre
-        // resolution, mesuree sur ses residus. Il reste a l'A/A deux roles : dire si la scene
-        // derive, et dire d'avance ce qu'elle permettra d'esperer.
+        // L'A/A se mesure sur la moyenne, pas sur le score composite : sur Warzone le 07/09/2026
+        // (docs/PROTOCOLES-DE-MESURE-IN-GAME.md), elle resout a +/-4,6 % quand le score annonce +/-72 %. Il ne fixe pas le
+        // seuil (l'experience appariee mesure le sien sur ses residus) : il dit si la scene derive, et ce qu'elle permet.
         var aa = new List<double>();
         for (var i = 0; i < Math.Max(0, passesAa); i++) aa.Add(MesureJeu(Mesurer).AvgFps);
         var scene = SceneResolution.Probe(aa);
@@ -323,25 +311,11 @@ public static class AutopilotEngine
             }
             if (interrompu) break;
 
-            // Aucune decision statistique ici. Le protocole est fixe.
-            //
-            // Ce code s'arretait des qu'un gain devenait significatif, avec pour
-            // justification : « un Unresolved ne stoppe jamais, donc les regards repetes
-            // ne gonflent pas les faux positifs ». **C'est faux.** Regarder n fois et
-            // s'arreter au premier franchissement est de l'optional stopping : chaque
-            // regard est une occasion supplementaire de franchir le seuil par hasard, et
-            // le taux de faux positifs reel depasse le 5 % annonce, meme si l'on ne
-            // s'arrete que sur les succes. C'est precisement parce qu'on ne s'arrete que
-            // sur les succes que le biais existe.
-            //
-            // Un arret sequentiel correct existe (alpha-spending, confidence sequences) ;
-            // il demande de depenser le risque au fil des regards, pas de faire semblant
-            // qu'il n'y en a pas. Tant que ce n'est pas implemente et calibre, le
-            // protocole va au bout : une decision, sur l'experience complete.
-            //
-            // La seule interruption permise est physique : une bascule d'etat qui echoue
-            // (`Interrompu`, plus haut). Elle ne depend pas du resultat mesure, donc elle
-            // ne biaise pas le verdict.
+            // Aucune decision statistique ici : le protocole va au bout. S'arreter au premier gain significatif serait de
+            // l'optional stopping (chaque regard est une chance de franchir le seuil par hasard, et s'arreter sur les seuls
+            // succes est justement ce qui pousse les faux positifs au-dela des 5 % annonces). Un arret sequentiel correct
+            // (alpha-spending, confidence sequences) devrait depenser ce risque ; il n'est ni implemente ni calibre. Seule
+            // une interruption physique (`Interrompu`, plus haut) arrete : elle ne depend pas du resultat.
         }
         return (passes, interrompu);
     }

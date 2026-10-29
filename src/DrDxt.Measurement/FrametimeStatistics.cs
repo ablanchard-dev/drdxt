@@ -49,14 +49,11 @@ public static class FrametimeStatistics
     }
 
     /// <summary>
-    /// Marge de confiance à 95 % (±, dans l'unité des entrées, par exemple des FPS) sur la moyenne des
-    /// passes, tirée de l'écart d'une passe à l'autre des agrégats par passe. C'est la marge A/B
-    /// honnête : les temps d'image successifs sont autocorrélés (un à-coup couvre plusieurs images),
-    /// et un intervalle par image traite n images corrélées comme n échantillons indépendants, ce qui
-    /// le rend bien trop étroit → de faux « gains mesurables ». Le bruit qui compte est entre passes
-    /// indépendantes (multipasse façon GamersNexus). Rend +Infinity sous 3 passes valides (« gain non
-    /// prouvable ») : <see cref="AbComparer"/> ne peut jamais annoncer un gain sur des données peu fiables.
-    /// Source : la note de preuve de mesure du projet (non publiée).
+    /// Marge de confiance à 95 % (±, dans l'unité des entrées) sur la moyenne des passes, tirée de l'écart entre passes.
+    /// Les temps d'image successifs sont autocorrélés (un à-coup couvre plusieurs images) : un intervalle par image
+    /// serait bien trop étroit, d'où de faux « gains mesurables » ; le bruit qui compte est entre passes indépendantes
+    /// (multipasse façon GamersNexus). +Infinity sous 3 passes valides : <see cref="AbComparer"/> n'annonce alors aucun
+    /// gain. Source : la note de preuve de mesure du projet (non publiée).
     /// </summary>
     public static double InterRunMarginOfError(IReadOnlyList<double> perRunValues)
     {
@@ -68,14 +65,13 @@ public static class FrametimeStatistics
         return TValue95(runs.Count - 1) * stdErr;
     }
 
-    // La table vit une seule fois (DrDxt.Core.Student). Celle-ci retombait sur
-    // 1,96 au-dela de 20 degres de liberte, une marge trop etroite.
+    // La table vit une seule fois (DrDxt.Core.Student) : retomber sur 1,96 au-dela de 20 degres de liberte serait trop
+    // etroit.
     private static double TValue95(int df) => DrDxt.Core.Student.T95(df);
 
     /// <summary>
-    /// Moyenne des valeurs finies strictement positives, ou <c>null</c> s'il n'y en a aucune. Sert aux
-    /// agrégats informatifs (par exemple la latence rendu-présentation) où « aucun relevé valide » doit
-    /// se lire « non mesuré » (null), jamais un 0 fabriqué.
+    /// Moyenne des valeurs finies strictement positives, ou <c>null</c> : « aucun relevé valide » se lit « non mesuré »,
+    /// jamais un 0 fabriqué (latence rendu-présentation, par exemple).
     /// </summary>
     public static double? MeanOrNull(IReadOnlyList<double> values)
     {
@@ -84,24 +80,13 @@ public static class FrametimeStatistics
     }
 
     // ── Les agregats que le classifieur de goulot demande ────────────────────────────
-    // Source : la note de conception du classifieur (voir `BottleneckClassifier`), § « Derived
-    // metrics to compute ». La spec dit mediane pour les ratios et p95 pour les latences ; ce
-    // ne sont pas des details de gout. Une moyenne de ratios se fait tirer par quelques frames
-    // aberrantes (un chargement, un alt-tab) et ferait basculer un etat entier ; un p95 est
-    // justement la ou vit un a-coup, qu'une moyenne noie.
+    // Note de conception du classifieur (`BottleneckClassifier`), § « Derived metrics to compute » : mediane pour les
+    // ratios (une moyenne se fait tirer par un chargement, un alt-tab), p95 pour les latences (la ou vit un a-coup).
 
     /// <summary>
-    /// Mediane du ratio par frame <paramref name="numerators"/> / <paramref name="denominators"/>,
-    /// bornee a [0, 1], ou <c>null</c> si on ne peut pas la calculer honnetement.
-    ///
-    /// Rend null, jamais 0, quand les deux series n'ont pas la meme longueur : elles sont
-    /// censees etre paralleles (une entree par frame), et si elles ne le sont pas, apparier
-    /// l'index i de l'une avec l'index i de l'autre divise deux frames differentes. Le resultat
-    /// aurait l'air d'un ratio et n'en serait pas.
-    ///
-    /// Le bornage a 1 est deliberé : la doc PresentMon previent que le temps GPU actif est
-    /// biaise a la hausse sous HAGS, donc un ratio > 1 est un artefact de mesure, pas un GPU
-    /// qui travaille 110 % de la frame.
+    /// Mediane du ratio par frame <paramref name="numerators"/> / <paramref name="denominators"/>, bornee a [0, 1].
+    /// null, jamais 0, si les longueurs different : apparier l'index i des deux diviserait deux frames differentes.
+    /// Borne a 1 : selon la doc PresentMon, le temps GPU actif est biaise a la hausse sous HAGS.
     /// </summary>
     public static double? MedianRatioOrNull(
         IReadOnlyList<double>? numerators, IReadOnlyList<double>? denominators)
@@ -114,8 +99,7 @@ public static class FrametimeStatistics
         {
             var d = denominators[i];
             var n = numerators[i];
-            // Un denominateur nul ou non fini n'est pas une frame exploitable. Un numerateur
-            // negatif non plus (0 est valide : le GPU peut n'avoir rien attendu).
+            // Denominateur nul ou non fini, numerateur negatif : frame inexploitable (0 est valide).
             if (!(d > 0) || !double.IsFinite(d) || !double.IsFinite(n) || n < 0) continue;
             ratios.Add(Math.Min(1.0, n / d));
         }
@@ -124,17 +108,9 @@ public static class FrametimeStatistics
     }
 
     /// <summary>
-    /// La part du temps total, appariee trame par trame : somme des numerateurs sur somme des
-    /// denominateurs, et seulement sur les trames ou les deux sont exploitables.
-    ///
-    /// Pourquoi pas une moyenne divisee par une autre moyenne. Les deux moyennes ne portent pas
-    /// forcement sur les memes trames : celle du numerateur ecarte les echantillons non finis et
-    /// les zeros, celle du denominateur garde toutes les trames. Le rapport melange alors deux
-    /// populations, et un zero de GPU-busy, qui est une mesure parfaitement valide (le GPU n'a
-    /// rien fait sur cette trame), disparait du haut sans disparaitre du bas.
-    ///
-    /// Ce n'est pas la mediane des rapports par trame : celle-la repond a « a quoi ressemble
-    /// une trame typique », celle-ci a « quelle part du temps ecoule ». Un plafond de debit se
+    /// La part du temps total, appariee trame par trame (somme sur somme, trames exploitables des deux cotes). Un rapport
+    /// de deux moyennes melangerait deux populations : un zero de GPU-busy, valide, disparaitrait du haut et pas du bas.
+    /// La mediane des rapports dit « une trame typique », celle-ci « quelle part du temps » : un plafond de debit se
     /// calcule sur des totaux.
     /// </summary>
     public static double? SumRatioOrNull(
@@ -148,8 +124,7 @@ public static class FrametimeStatistics
         {
             var d = denominators[i];
             var n = numerators[i];
-            // Meme regle de validite qu'ailleurs : un denominateur nul ou non fini n'est pas une
-            // trame exploitable, un numerateur negatif non plus. Zero est valide.
+            // Meme regle de validite qu'ailleurs. Zero est valide.
             if (!(d > 0) || !double.IsFinite(d) || !double.IsFinite(n) || n < 0) continue;
             haut += n;
             bas += d;
@@ -159,15 +134,13 @@ public static class FrametimeStatistics
     }
 
     /// <summary>
-    /// Percentile (0..1) des valeurs finies et positives, ou <c>null</c> quand il n'y en a
-    /// aucune. Interpolation la plus proche sur la serie triee : assez pour un p95 de latence,
-    /// et sans pretendre a une precision que le nombre de frames ne porte pas.
+    /// Percentile (0..1) des valeurs finies et positives, ou <c>null</c>. Rang le plus proche : assez pour un p95 de
+    /// latence, sans precision que le nombre de frames ne porte pas.
     /// </summary>
     public static double? PercentileOrNull(IReadOnlyList<double>? values, double fraction)
     {
         if (values is null) return null;
-        // Le meme filtre que `Clean` et que `EchantillonsExploitables` : ecrit une seule fois, il
-        // ne peut pas diverger du compte qui sert a juger si ce percentile merite son nom.
+        // Le filtre de `EchantillonsExploitables`, ecrit une seule fois : il ne peut pas diverger du compte.
         var v = Clean(values).OrderBy(x => x).ToList();
         if (v.Count == 0) return null;
         var index = (int)Math.Ceiling(fraction * v.Count) - 1;
@@ -175,45 +148,29 @@ public static class FrametimeStatistics
     }
 
     /// <summary>
-    /// Percentile de la valeur absolue, pour l'erreur d'animation, qui est signee : une frame
-    /// affichee 5 ms trop tot est aussi mauvaise pour la cadence qu'une frame 5 ms trop tard, et
+    /// Percentile de la valeur absolue, pour l'erreur d'animation signee : 5 ms trop tot vaut 5 ms trop tard, et
     /// filtrer sur « > 0 » jetterait la moitie du signal.
     /// </summary>
     public static double? AbsPercentileOrNull(IReadOnlyList<double>? values, double fraction)
         => values is null ? null : PercentileOrNull(values.Select(Math.Abs).ToList(), fraction);
 
     /// <summary>
-    /// Combien d'echantillons portent reellement un percentile : la question sans laquelle on ne
-    /// sait pas si le mot « p95 » est merite.
-    ///
-    /// Une garde d'interpretabilite qui compterait les frametimes se tromperait : le p95 de l'erreur
-    /// d'animation repose sur une autre serie. Une passe dont la serie d'animation est
-    /// desynchronisee ou absente ne contribue pas au numerateur, et le compte des trames n'en sait
-    /// rien : on validerait un p95 tire de huit points en lisant mille trames. Meme faute que deux
-    /// moyennes prises sur des trames differentes.
-    ///
-    /// Applique exactement le filtre de <see cref="PercentileOrNull"/>, sur la valeur absolue,
-    /// comme <see cref="AbsPercentileOrNull"/>. Les deux doivent bouger ensemble : un compte qui
-    /// ne compte pas ce que le percentile garde ne verifie rien.
+    /// Combien d'echantillons portent reellement un percentile absolu. Compter les frametimes se tromperait : le p95
+    /// d'animation repose sur une autre serie, et on validerait un p95 de huit points en lisant mille trames. Meme filtre
+    /// que <see cref="AbsPercentileOrNull"/> : les deux bougent ensemble.
     /// </summary>
     public static int EchantillonsAbsExploitables(IReadOnlyList<double>? values)
         => values is null ? 0 : values.Count(x => Math.Abs(x) > 0 && double.IsFinite(x));
 
     /// <summary>
-    /// Combien de valeurs portent reellement un <see cref="PercentileOrNull"/> : le compte a
-    /// donner a la garde d'interpretabilite quand on affiche un p95.
-    ///
-    /// Meme filtre que le percentile, par construction : les deux passent par <c>Clean</c>. Un
-    /// compte qui ne compte pas ce que le percentile garde ne verifie rien (meme faute qu'une
-    /// occupation GPU calculee sur deux populations de trames, ou qu'un p95 d'animation juge au
-    /// nombre de trames).
+    /// Combien de valeurs portent reellement un <see cref="PercentileOrNull"/>, pour la garde d'interpretabilite d'un p95.
+    /// Les deux passent par <c>Clean</c> : un compte qui ne compte pas ce que le percentile garde ne verifie rien.
     /// </summary>
     public static int EchantillonsExploitables(IReadOnlyList<double>? values)
         => values is null ? 0 : Clean(values).Count;
 
-    // Les trois queues que l'écran affiche (domaine Latence), chacune avec la garde de sa série.
-    // Une seule source pour l'écran et le rapport de diagnostic, qui ne les portait pas. null = pas mesurée,
-    // ou trop peu d'échantillons pour qu'un p95 mérite son nom.
+    // Les trois queues de l'écran (domaine Latence), chacune gardée sur sa série ; une seule source pour l'écran et le
+    // rapport de diagnostic. null = pas mesurée, ou trop peu d'échantillons pour un p95.
 
     /// <summary>Les 5 % de trames les plus lentes : le p95 des frametimes, jugé sur la même liste filtrée.</summary>
     public static double? SaccadeP95(BenchmarkResult? mesure)
@@ -231,19 +188,10 @@ public static class FrametimeStatistics
            && TailStatistic.P95EstInterpretable(n) ? p95 : null;
 
     /// <summary>
-    /// Une passe reconstruite depuis une serie deja enregistree : rejeu, re-analyse hors ligne.
-    ///
-    /// Pourquoi ce point de passage existe : construire un <see cref="BenchmarkResult"/> a la main,
-    /// en positionnel (bancs de rejeu `tools/optimize`, `tools/smoke`), laisse oublier une grandeur
-    /// optionnelle (en queue, `= null` par defaut) sans que rien ne casse. Un p95 oublie vaut `0` dans
-    /// `GameMetricSet.Valeur` : le rejeu jugerait deux grandeurs sur trois en annoncant les trois.
-    ///
-    /// Les formules sont celles de <see cref="BenchmarkRunner"/> et rien d'autre : le meme p95,
-    /// les memes lows. Un banc qui passe par ici ne peut pas perdre une grandeur en
-    /// silence, et la garantie est testee.
-    ///
-    /// La latence et la telemetrie GPU restent nulles : une serie de frametimes enregistree ne
-    /// les contient pas. Null = pas mesuree, jamais zero.
+    /// Une passe reconstruite depuis une serie enregistree (rejeu, re-analyse). Construire un
+    /// <see cref="BenchmarkResult"/> a la main (`tools/optimize`, `tools/smoke`) laisse oublier une grandeur optionnelle :
+    /// un p95 oublie vaut `0` dans `GameMetricSet.Valeur`. Ici, les formules de <see cref="BenchmarkRunner"/>, garantie
+    /// testee. Latence et telemetrie GPU restent nulles : une serie de frametimes ne les contient pas.
     /// </summary>
     /// <param name="frameTimesMs">La serie brute, en millisecondes.</param>
     /// <param name="runs">Combien de passes (ou de tranches) ont produit cette serie.</param>

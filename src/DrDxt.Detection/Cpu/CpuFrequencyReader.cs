@@ -5,18 +5,13 @@ using Microsoft.Win32;
 namespace DrDxt.Detection.Cpu;
 
 /// <summary>Ce que le processeur fait reellement, par opposition a ce que WMI en dit.</summary>
-/// <param name="FrequenceNominaleMhz">Ce que le compteur `Processor Frequency` rend. Sur cette
-/// plateforme c'est la frequence de base, pas l'effective : il ne suffit donc pas.</param>
-/// <param name="PourcentageDeNominal">Sa part de la frequence nominale, en pourcent. Au-dessus de
-/// 100 = la machine boost.</param>
-/// <param name="PartDeLaLimite">Le compteur `% of Maximum Frequency`, en pourcent. Ce n'est pas une
-/// limite atteinte : au repos, il passe de 56 a 99 % en deux secondes (mesure du 25/09/2026). Une
-/// lecture instantanee n'est donc pas affichee.</param>
-/// <param name="IndicateursDeLimite">Le masque des raisons de bridage que Windows expose
-/// (`Performance Limit Flags`). <c>0</c> = aucun indicateur Windows leve, une vraie valeur, a ne
-/// pas confondre avec <c>null</c> = non lu. Mais ce compteur ne voit pas les limites de puissance
-/// du paquet (RAPL) : mesure sur cette machine, il vaut 0 pendant que la frequence tombe de 5292 a
-/// 3698 MHz sous charge soutenue. Un 0 ne prouve donc pas que rien ne bride.</param>
+/// <param name="FrequenceNominaleMhz">Le compteur `Processor Frequency` : ici la frequence de base, pas l'effective.</param>
+/// <param name="PourcentageDeNominal">Sa part de la frequence nominale, en pourcent. Au-dessus de 100 = boost.</param>
+/// <param name="PartDeLaLimite">Le compteur `% of Maximum Frequency`, en pourcent, pas une limite atteinte : au repos il
+/// passe de 56 a 99 % en deux secondes (25/09/2026), une lecture instantanee n'est pas affichee.</param>
+/// <param name="IndicateursDeLimite">Le masque `Performance Limit Flags`. <c>0</c> = aucun indicateur leve, <c>null</c>
+/// = non lu. Il ne voit pas les limites de puissance du paquet (RAPL) : 0 mesure pendant une chute de 5292 a 3698 MHz
+/// sous charge soutenue. Un 0 ne prouve pas que rien ne bride.</param>
 public sealed record CpuFrequencyState(
     double? FrequenceNominaleMhz,
     double? PourcentageDeNominal,
@@ -24,14 +19,8 @@ public sealed record CpuFrequencyState(
     double? IndicateursDeLimite)
 {
     /// <summary>
-    /// La frequence effective, calculee, et non lue directement.
-    ///
-    /// Lue seule, elle donnerait « 2100 MHz (198 % du nominal) », deux chiffres qui se
-    /// contredisent dans la meme ligne. Le compteur `Processor Frequency` rend la frequence de
-    /// base sur cette plateforme ; c'est `% Processor Performance` qui porte le boost. La
-    /// frequence effective est donc un produit, jamais une lecture unique.
-    ///
-    /// <c>null</c> quand l'un des deux manque : une moitie de la formule ne fait pas un resultat.
+    /// La frequence effective, calculee : `Processor Frequency` rend la base, `% Processor Performance` porte le boost
+    /// (lue seule : « 2100 MHz (198 % du nominal) »). <c>null</c> quand l'un des deux manque.
     /// </summary>
     public double? FrequenceEffectiveMhz =>
         FrequenceNominaleMhz is { } b && b > 0 && PourcentageDeNominal is { } p
@@ -44,46 +33,23 @@ public sealed record CpuFrequencyState(
 
 /// <summary>La frequence d'un seul processeur logique, et ce qu'il faisait au moment de la lecture.</summary>
 /// <param name="Instance">Le nom de l'instance du compteur, « groupe,processeur ».</param>
-/// <param name="IndexLogique">L'index du processeur logique, ou <c>-1</c> si l'instance n'a pas
-/// pu etre decodee. Sur une machine a plusieurs groupes de processeurs, l'index d'instance
-/// n'est pas l'index logique global ; cette machine n'en a qu'un, et le cas est signale plutot
-/// que devine.</param>
+/// <param name="IndexLogique">L'index du processeur logique, ou <c>-1</c> si l'instance n'est pas decodee ou hors du
+/// groupe 0 (l'index d'instance n'y vaut plus l'index global) : signale plutot que devine.</param>
 /// <param name="PourcentageDeNominal">Sa part de la frequence nominale. Au-dessus de 100 = boost.</param>
-/// <param name="UtilisationPourcent">Sa charge au moment de la lecture. Sans elle la frequence
-/// ne veut rien dire : un cœur inactif tombe de lui-meme, et le moyenner avec les autres donne
-/// exactement le chiffre trompeur que rend l'instance `_Total`.</param>
+/// <param name="UtilisationPourcent">Sa charge a la lecture : un cœur inactif tombe de lui-meme, et le moyenner donne le
+/// chiffre trompeur de `_Total`.</param>
 public sealed record CoeurFrequence(
     string Instance, int IndexLogique, double? PourcentageDeNominal, double? UtilisationPourcent);
 
 /// <summary>
-/// La frequence reelle du processeur, et pourquoi les deux sources evidentes mentent.
-///
-/// Deux approches essayees et rejetees sur cette machine :
-///
-///   1. `Win32_Processor` rend `MaxClockSpeed = 2100` et `CurrentClockSpeed = 2100`. C'est la
-///      frequence de base, et `Current` la recopie. Un outil qui s'y fie conclut « CPU a
-///      2100/2100, aucun bridage » sur une puce qui monte a 5,4 GHz.
-///   2. `CallNtPowerInformation(ProcessorInformation)` reussit (code 0) et rend
-///      `max=2100 courant=2100 limite=2100` pour les 28 processeurs logiques. Depuis Speed Shift
-///      (HWP), Windows ne pilote plus les P-states et rapporte le nominal.
-///
-/// Mesure reelle par les compteurs : **3 630 MHz**, soit 184,8 % du nominal. Les deux sources
-/// evidentes se trompaient d'un facteur 1,7.
-///
-/// ══ les noms des compteurs ══
-/// Les noms de compteurs sont localises. Sur ce Windows francais, le jeu s'appelle
-/// « Informations sur le processeur » et le compteur « Fréquence réelle » : un chemin PDH anglais
-/// (Get-Counter) echoue avec « L'objet spécifié n'a pas été trouvé ». La classe PerformanceCounter
-/// de .NET accepte, elle, le nom anglais sous toute langue, et le nom localise echoue quand le
-/// format regional n'est pas de la langue de Windows : le lecteur ouvre par le nom anglais, et
-/// garde le nom localise en repli. Coder les noms francais marcherait ici et nulle part ailleurs.
-///
-/// Pour le repli, Windows publie la table : `Perflib\009\Counter` porte les paires index/nom en anglais,
-/// `Perflib\CurrentLanguage\Counter` les memes index dans la langue du systeme. On cherche donc
-/// l'index par le nom anglais (stable) et on lit le nom localise. Aucun index code en dur,
-/// aucun nom traduit a la main.
-///
-/// Échec propre : ne leve jamais ; toute lecture ratee rend <c>null</c>, jamais zero.
+/// La frequence reelle du processeur, par les compteurs : les deux sources evidentes rendent le nominal.
+/// `Win32_Processor` rend `MaxClockSpeed = CurrentClockSpeed = 2100` sur une puce qui monte a 5,4 GHz ;
+/// `CallNtPowerInformation(ProcessorInformation)` rend `max=courant=limite=2100` pour les 28 logiques (depuis Speed
+/// Shift/HWP, Windows ne pilote plus les P-states). Mesure par les compteurs : 3 630 MHz, 184,8 % du nominal.
+/// Les noms de compteurs sont localises (« Informations sur le processeur » / « Fréquence réelle » ici ; un chemin PDH
+/// anglais echoue). PerformanceCounter accepte le nom anglais sous toute langue, et le nom localise echoue quand le
+/// format regional differe : l'anglais d'abord, le localise en repli, resolu par index entre `Perflib\009\Counter` et
+/// `Perflib\CurrentLanguage\Counter`. Aucun index ni nom traduit en dur. Ne leve jamais : lecture ratee = <c>null</c>.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class CpuFrequencyReader
@@ -97,32 +63,17 @@ public sealed class CpuFrequencyReader
 
     private const string CheminPerflib = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Perflib";
 
-    /// <summary>Lit l'etat du processeur. Deux echantillons espaces sont necessaires : un compteur
-    /// de taux rend 0 a la premiere lecture, et prendre ce 0 pour une frequence nulle serait la
-    /// meme faute que de croire WMI.</summary>
-    /// <param name="attendre">L'attente entre l'amorce et la lecture. Injectee comme le reste
-    /// des seams de ce depot : sans elle, un test ne peut compter que les lignes `Thread.Sleep`,
-    /// et une boucle n'en contient qu'une tout en attendant quatre fois. Ce crible textuel
-    /// laisserait passer la mutation qu'il doit attraper.</param>
+    /// <summary>Lit l'etat du processeur, en deux echantillons espaces : un compteur de taux rend 0 a la premiere
+    /// lecture.</summary>
+    /// <param name="attendre">L'attente entre l'amorce et la lecture, injectee : un test compte les attentes reelles, une
+    /// boucle n'a qu'une ligne d'attente pour quatre attentes.</param>
     public CpuFrequencyState Lire(Action<int>? attendre = null)
     {
         var jeu = Nom(JeuAnglais);
         if (jeu is null) return new CpuFrequencyState(null, null, null, null);
 
-        // Une seule attente pour les quatre compteurs.
-        //
-        // Cette methode appelait `Mesurer` quatre fois, et chaque appel ouvrait son compteur,
-        // l'amorcait, dormait 300 ms, puis lisait. Quatre attentes en serie pour quatre compteurs
-        // du meme jeu. Mesure du jour, chronometre lecteur par lecteur : 6 963 ms sur les
-        // 7 111 ms de l'audit complet, soit 98 % : c'est le scan du client qui attendait.
-        //
-        // La lecon etait deja ecrite a deux methodes d'ici, dans le resume de `LireParProcesseur` :
-        // « Un seul intervalle d'attente pour tous les compteurs : les amorcer un par un avec
-        // 300 ms chacun ferait durer une lecture 28 fois trop longtemps. » Une surface
-        // l'appliquait, l'autre non.
-        //
-        // L'amorce reste indispensable : un compteur de taux rend 0 a la premiere lecture, et
-        // prendre ce 0 pour une frequence nulle serait la meme faute que de croire WMI.
+        // Une seule attente pour les quatre compteurs : quatre attentes de 300 ms en serie coutaient 6 963 ms sur les
+        // 7 111 ms d'un audit complet (98 %). L'amorce reste indispensable : un compteur de taux rend 0 la premiere fois.
         var compteurs = new[] { CompteurFrequence, CompteurPourcentage, CompteurLimite, CompteurIndicateurs }
             .Select(nom => Ouvrir(jeu, nom))
             .ToArray();
@@ -144,16 +95,9 @@ public sealed class CpuFrequencyReader
         }
     }
 
-    /// <summary>La frequence de chaque processeur logique, avec sa charge.
-    ///
-    /// Pourquoi cette methode existe. <see cref="Lire"/> interroge l'instance `_Total`, qui est
-    /// la moyenne des 28 processeurs logiques de cette machine, cœurs inactifs compris. Mesure du
-    /// 09/09/2026 pendant une partie : `_Total` rendait 3 622 MHz quand les 8 a 10 cœurs reellement
-    /// charges tournaient a 3 861 MHz. La moyenne repond a une question que personne ne pose, et
-    /// elle repond a cote de celle qui compte : « a quelle frequence tourne le cœur qui travaille ? »
-    ///
-    /// Un seul intervalle d'attente pour tous les compteurs : les amorcer un par un avec 300 ms
-    /// chacun ferait durer une lecture 28 fois trop longtemps pour une boucle de surveillance.</summary>
+    /// <summary>La frequence de chaque processeur logique, avec sa charge. `_Total` moyenne les 28 logiques, cœurs
+    /// inactifs compris : mesure en partie le 09/09/2026, 3 622 MHz quand les 8 a 10 cœurs charges tournaient a 3 861 MHz. Une
+    /// seule attente pour tous : 300 ms par compteur rendraient la lecture 28 fois trop longue.</summary>
     public IReadOnlyList<CoeurFrequence> LireParProcesseur()
     {
         var jeu = Nom(JeuAnglais);
@@ -225,10 +169,9 @@ public sealed class CpuFrequencyReader
         return parts.Count == 0 ? null : b * parts.Average() / 100;
     }
 
-    /// <summary>La fréquence du plus rapide des processeurs logiques donnés, pour une partie. La
-    /// moyenne ne convient pas en jeu : relevée au repos sur la machine de référence, elle tombait à 2 270-3 123 MHz, les
-    /// cœurs que le jeu n'occupe pas la tirant vers le bas. La chaleur et la limite de puissance baissent tous les cœurs,
-    /// le plus rapide compris.</summary>
+    /// <summary>La fréquence du plus rapide des processeurs logiques donnés, pour une partie : la moyenne tombait à
+    /// 2 270-3 123 MHz au repos sur la machine de référence, tirée par les cœurs inoccupés. Chaleur et limite de puissance
+    /// baissent tous les cœurs, le plus rapide compris.</summary>
     public double? FrequenceMaxDe(IReadOnlyList<int> processeurs)
     {
         var nominale = _nominaleMhz ??= Lire().FrequenceNominaleMhz;
@@ -239,9 +182,8 @@ public sealed class CpuFrequencyReader
         return parts.Count == 0 ? null : b * parts.Max() / 100;
     }
 
-    /// <summary>« 0,5 » → 5. Rend -1 quand l'instance n'a pas cette forme, ou quand le groupe
-    /// n'est pas 0 : hors du groupe 0 l'index d'instance ne vaut plus l'index logique, et deviner
-    /// serait pire que se taire.</summary>
+    /// <summary>« 0,5 » → 5. -1 pour une autre forme ou un groupe autre que 0, ou l'index d'instance ne vaut plus l'index
+    /// logique.</summary>
     private static int IndexDe(string instance)
     {
         var parts = instance.Split(',');
@@ -250,8 +192,7 @@ public sealed class CpuFrequencyReader
                && int.TryParse(parts[1], out var idx) ? idx : -1;
     }
 
-    /// <summary>L'intervalle entre l'amorce et la lecture, non chiffre : 300 ms, attendus une seule fois
-    /// pour les quatre compteurs au lieu de quatre fois de suite.</summary>
+    /// <summary>L'intervalle entre l'amorce et la lecture, attendu une seule fois pour les quatre compteurs.</summary>
     private const int IntervalleDAmorceMs = 300;
 
     /// <summary>Ouvre un compteur du jeu, ou <c>null</c> s'il n'existe pas sur cette machine.</summary>
@@ -278,48 +219,27 @@ public sealed class CpuFrequencyReader
     }
 
     // ══ la table se lit une fois, pas une fois par nom ══
-    //
-    // `Lire()` demande cinq noms (le jeu, puis quatre compteurs) ; si chaque demande lisait les
-    // deux tables completes du registre, puis les balayait l'une dans l'autre, ce seraient dix lectures de
-    // dizaines de milliers d'entrees pour resoudre cinq noms qui ne changent jamais de la vie
-    // du processus. Et `LireParProcesseur`, la boucle de surveillance appelee en continu
-    // pendant une partie, referait le meme travail a chaque tour.
-    //
-    // Ce que cette correction n'est pas : elle n'explique pas les 5 483 ms que le chronometre impute a ce
-    // lecteur (97 % d'un audit). Mesure : le total tombe a 4 996 ms, soit **490 ms** gagnes, pas 5 200.
-    // L'attribution, mesuree en trois phases dans un processus neuf :
-    //
-    //     1. cinq noms, tables froides       427 ms    <- ce que ce correctif divise
-    //     2. Lire(), noms deja resolus     4 543 ms    <- la premiere ouverture de compteur
-    //     3. Lire(), tout chaud             11,6 ms
-    //
-    // Le plateau de temps restant est donc nomme, et il n'est pas ici :
-    // c'est l'initialisation de perflib au premier `new PerformanceCounter` du processus, qui
-    // se paie une fois quoi qu'on fasse dans cette classe. Ce qui reste vrai de ce correctif :
-    // dix lectures de registre deviennent deux, et un second scan n'en fait plus aucune.
-    //
-    // Un echec n'est pas une reponse : seules les lectures reussies sont retenues. Memoriser
-    // un `null` condamnerait le lecteur pour toute la duree du processus sur un incident
-    // passager : l'application afficherait « frequence non lue » jusqu'au redemarrage.
+    // Cinq noms par `Lire()`, et `LireParProcesseur` en boucle pendant une partie : sans memoire, dix lectures de tables
+    // de dizaines de milliers d'entrees pour des noms qui ne changent pas. Deux lectures au total, aucune au second scan.
+    // Mesure en processus neuf : noms a froid 427 ms, premiere ouverture de compteur 4 543 ms (l'initialisation de
+    // perflib, payee une fois quoi qu'on fasse ici), tout chaud 11,6 ms. Seules les lectures reussies sont retenues :
+    // memoriser un `null` afficherait « frequence non lue » jusqu'au redemarrage apres un incident passager.
     private static readonly object _verrou = new();
     private static readonly Dictionary<string, string[]> _tables = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, string> _nomsLocalises = new(StringComparer.Ordinal);
 
-    /// <summary>D'ou viennent les tables de compteurs. Couture : elle rend le compte des
-    /// lectures observable, seule chose prouvable ici : une garde de duree dependrait de la
-    /// machine et de la charge.</summary>
+    /// <summary>D'ou viennent les tables de compteurs. Couture : le compte des lectures est prouvable, une duree
+    /// dependrait de la machine.</summary>
     internal static Func<string, string[]?> SourceDesTables = TableDuRegistre;
 
-    /// <summary>Oublie ce qui a ete retenu. Reservee aux tests : en production ces noms ne
-    /// changent pas de la vie du processus.</summary>
+    /// <summary>Oublie ce qui a ete retenu. Reservee aux tests.</summary>
     internal static void OublierLesTables()
     {
         lock (_verrou) { _tables.Clear(); _nomsLocalises.Clear(); _anglaisOuvrable = null; }
     }
 
-    /// <summary>Le nom sous lequel ouvrir un jeu ou un compteur. L'anglais d'abord : .NET l'accepte quelle que soit la
-    /// langue de Windows. Le nom de la table de la langue d'affichage echoue quand le format regional est d'une autre
-    /// langue (Windows en francais, format anglais : « la categorie n'existe pas ») ; il reste le repli.</summary>
+    /// <summary>Le nom sous lequel ouvrir un jeu ou un compteur : l'anglais d'abord ; le localise echoue quand le format
+    /// regional est d'une autre langue (« la categorie n'existe pas ») et reste le repli.</summary>
     private static string? Nom(string nomAnglais) => AnglaisOuvrable() ? nomAnglais : Localiser(nomAnglais);
 
     private static bool? _anglaisOuvrable;

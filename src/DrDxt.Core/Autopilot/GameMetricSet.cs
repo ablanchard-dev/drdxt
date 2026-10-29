@@ -12,54 +12,30 @@ public enum GameMetricKind
 
     /// <summary>Le p95 des frametimes : la frame plus lente que 95 % des autres.
     ///
-    /// **ce n'est pas « la fluidite ».** Il decrit une zone moins profonde de la distribution
-    /// que le p99 ou le 1 % low : les 5 % de frames les plus lentes, pas le pire centile. Un
-    /// reglage peut parfaitement ameliorer le p95 et laisser intacts (ou degrader) les a-coups
-    /// que le joueur remarque vraiment.
-    ///
-    /// Mesure du 08/09/2026 (`tools/tailbench --formes`) : sur une deformation qui monte la
-    /// moyenne en ajoutant un gros a-coup toutes les 60 frames, le p95 rend **+1,6 %** (un
-    /// leger gain) pendant que le 1 % low rend **-65,6 %** et prouve la regression 13 fois sur
-    /// 14. Le p95 seul aurait laisse passer le reglage.
-    ///
-    /// Il est notre meilleure grandeur de queue robuste sur ce corpus, et rien de plus. Le produit
-    /// doit pouvoir dire « regularite p95 amelioree » et « 1 % low non resolu » dans la meme
-    /// phrase, jamais « la fluidite est prouvee ».</summary>
+    /// Ce n'est pas « la fluidite » : les 5 % de frames les plus lentes, pas le pire centile, et un reglage peut
+    /// l'ameliorer en degradant les a-coups visibles. Sur un a-coup toutes les 60 frames (08/09/2026, `tools/tailbench
+    /// --formes`), le p95 rend +1,6 % quand le 1 % low rend -65,6 % (regression prouvee 13 fois sur 14). D'ou « regularite
+    /// p95 amelioree » et « 1 % low non resolu » dans la meme phrase, jamais « la fluidite est prouvee ».</summary>
     P95Frametime,
 }
 
 /// <summary>
 /// Une preuve par grandeur, et la ponderation vient apres.
 ///
-/// Un score composite (moyenne et 1 % low melanges avant de mesurer) ne se resout pas : mesure en
-/// session Warzone reelle, il annoncait +/-72 % quand la moyenne seule resolvait a +/-4,6 %. Une ponderation est
-/// une preference du joueur ; ce n'est pas une permission de transformer une grandeur inconnue en
-/// information.
+/// Un score composite ne se resout pas (en Warzone, +/-72 % quand la moyenne seule resolvait a +/-4,6 %) : chaque grandeur
+/// porte son ecart et sa resolution, et la ponderation, preference du joueur, n'arbitre qu'ensuite entre des preuves.
 ///
-/// Chaque grandeur porte donc son ecart et sa resolution. Le score n'intervient qu'apres,
-/// pour arbitrer entre des preuves qui existent deja.
-///
-/// ══ ce que le corpus permet de dire, et ce qu'il ne permet pas ══
-/// Une resolution tiree de ce corpus est une estimation empirique sur huit parties, pas une
-/// verite. Et 92 positions glissantes ne sont pas 92 experiences : deux positions voisines
-/// partagent 6 fenetres sur 7.
-///
-/// Mesure le 08/09/2026 avec la capture comme unite independante, fenetres non chevauchantes,
+/// Le corpus : huit parties, une estimation empirique (92 positions glissantes ne sont pas 92 experiences, deux voisines
+/// partagent 6 fenetres sur 7). Mesure le 08/09/2026, capture comme unite independante, fenetres disjointes,
 /// leave-one-capture-out (`tools/tailbench --loco 10 8`) :
 ///
 ///   8 holdouts, 15 experiences independantes, **0 faux verdict**, 1 invalide.
 ///   La procedure choisit le p95 frametime sur 7 holdouts sur 8.
 ///   Ecart maximal observe sous no-op, par capture : 2,0 % a 15,0 % selon la partie.
 ///
-/// Le p95 frametime est notre meilleure grandeur de queue robuste **sur ce corpus**, et il est
-/// choisi de facon stable sans jamais voir la partie sur laquelle il est evalue.
-///
-/// La resolution n'est pas une constante du produit : elle varie d'un facteur ~8 d'une partie a
-/// l'autre. C'est l'experience qui annonce la sienne, session par session.
-///
-/// Le protocole de production (24 alternances) n'est pas validable sur ce corpus : il ne laisse
-/// que **3 experiences disjointes sur 2 captures**, six holdouts sur huit n'en ayant aucune. Ce
-/// qui est valide independamment, c'est 8 alternances de 10 s.
+/// Le p95 frametime est la meilleure grandeur de queue robuste sur ce corpus, choisie sans voir la partie evaluee. La
+/// resolution varie d'un facteur ~8 d'une partie a l'autre : chaque experience annonce la sienne. Valide independamment :
+/// 8 alternances de 10 s ; les 24 du protocole de production ne laissent que 3 experiences disjointes sur 2 captures.
 ///
 /// Trois methodes rejetees par la mesure :
 ///   * le **p99** frametime est systematiquement surconfiant (annonce 9,2 % pour un ecart p95

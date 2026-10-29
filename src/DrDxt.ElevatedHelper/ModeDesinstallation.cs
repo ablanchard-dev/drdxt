@@ -13,15 +13,10 @@ using DrDxt.Reconciler.Manifest;
 
 namespace DrDxt.ElevatedHelper;
 
-// -----------------------------------------------------------------------
-// ModeDesinstallation : `DrDxt.ElevatedHelper.exe --uninstall-revert`.
-//
-// Lance par le desinstalleur Inno ([UninstallRun]), deja eleve : aucun tube, aucune UAC, aucun appelant a
-// authentifier. Pourquoi le helper et pas l'App : l'App est une application WPF dont le demarrage a des
-// effets (rendre au demarrage un levier en essai, verifier les mises a jour en ligne, ouvrir sa fenetre) ;
-// le helper, lui, est deja le processus eleve qui sait executer les ops de retour, et il ne reference que
-// Core et Reconciler.
-//
+// ModeDesinstallation : `DrDxt.ElevatedHelper.exe --uninstall-revert`, lance par le desinstalleur Inno
+// ([UninstallRun]) deja eleve : aucun tube, aucune UAC, aucun appelant a authentifier. Le helper et pas l'App, dont le
+// demarrage a des effets (rendre un levier en essai, verifier les mises a jour, ouvrir sa fenetre) : il sait deja
+// executer les ops de retour et ne reference que Core et Reconciler.
 // Ce que le mode peut faire, et rien d'autre :
 //   * Lire le manifeste signe sous %ProgramData%\DrDxt, verifie par la cle publique de la machine (jamais
 //     cree de cle) ;
@@ -39,7 +34,6 @@ namespace DrDxt.ElevatedHelper;
 //
 // Non bloquant : borne a 120 s, rend 0 (Inno ne lit pas le code de retour) et 2 seulement s'il n'est pas eleve ;
 // tout echec finit dans le rapport.
-// -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public static class ModeDesinstallation
 {
@@ -103,9 +97,8 @@ public static class ModeDesinstallation
         return 0;
     }
 
-    /// <summary>Ce qu'une étape n'a pas pu rendre. Le manifeste resté en place ne couvre que ses propres lignes : une ligne du
-    /// journal en suspens, une carte, le plafond d'envoi ou un programme au démarrage non rendus ne le gardent pas, et le joueur
-    /// n'en apprenait rien.</summary>
+    /// <summary>Ce qu'une étape n'a pas pu rendre, hors manifeste (qui ne couvre que ses lignes) : une ligne du journal en
+    /// suspens, une carte, le plafond d'envoi ou un programme au démarrage non rendus.</summary>
     internal sealed class ResteARendre
     {
         private int _nombre;
@@ -209,10 +202,8 @@ public static class ModeDesinstallation
 
         var texte = sansManifeste ? rapport.EnTexte(quand, Docteur.T("MD.AucunManifeste")) : rapport.EnTexte(quand);
 
-        // Le manifeste est mis de cote une fois lu. S'il restait en place apres la
-        // desinstallation, une reinstallation y retrouverait des origines capturees avant, deja rendues, et
-        // le jour ou un service les rejouerait il reecrirait un passe que l'utilisateur a quitte. Il est
-        // renomme, jamais efface. Non lu ⇒ on n'y touche pas : il n'a pas ete rendu.
+        // Le manifeste est mis de cote une fois lu : laisse en place, une reinstallation y retrouverait des origines deja
+        // rendues, qu'un service rejouerait. Renomme, jamais efface. Non lu ⇒ on n'y touche pas.
         // Une origine non rendue (écriture refusée, cible illisible) reste à rendre : le manifeste garde sa place, une
         // réinstallation puis une désinstallation la retentent.
         var nonRendues = rapport.Lignes.Count(l => l.OrigineEnSuspens);
@@ -233,11 +224,9 @@ public static class ModeDesinstallation
         return texte;
     }
 
-    /// <summary>Le plafond d'envoi ne passe pas par le manifeste (il n'est pose que pendant
-    /// une partie, sous un bail du helper). Un helper tue en pleine partie laisse la politique jusqu'au
-    /// redemarrage ; desinstaller avant ce redemarrage laisserait donc l'envoi de tous les autres programmes
-    /// plafonne sans plus aucun DrDXT pour le retirer. Retrait inconditionnel et idempotent de nos deux
-    /// politiques ; aucune entree ne choisit l'op.</summary>
+    /// <summary>Le plafond d'envoi ne passe pas par le manifeste (pose pendant une partie, sous un bail du helper) : un
+    /// helper tue en pleine partie le laisse jusqu'au redemarrage, sans plus aucun DrDXT pour le retirer. Retrait
+    /// inconditionnel et idempotent de nos deux politiques ; aucune entree ne choisit l'op.</summary>
     internal static async Task<string> RetirerPlafondEnvoiAsync(IElevatedClient ecriture, CancellationToken ct, ResteARendre? reste = null)
     {
         try
@@ -377,19 +366,14 @@ public static class ModeDesinstallation
         }
     }
 
-    // Le firmware et l'ecrivain du manifeste sont absents : ce mode ne sait que rendre (registre, plan, service, DRS du
-    // profil de base).
-    // La carte s'écrit aussi, pour rendre une limite de puissance, Anti-Lag, FRTC ou la Vsync AMD gardés ; seules
-    // les origines admises par OpAllowlist.ValiderOrigine passent (jamais fréquence ni tension). Hors manifeste, le ventilateur
-    // et le décalage du cœur ne reviennent qu'à l'automatique et à 0 (RendreLaCarteNvidiaAsync).
     /// <summary>Élevé avec le compte d'un autre (UAC « par-dessus l'épaule »), HKCU est la ruche de cet autre : les origines
     /// de la session du joueur n'y sont pas écrites. Refusées et dites, elles gardent le manifeste en place (une origine non
     /// rendue ne le laisse pas mettre de côté).</summary>
     public static IElevatedClient GarderLaRucheDuJoueur(IElevatedClient client, bool memeCompte) =>
         memeCompte ? client : new SansRucheEtrangere(client);
 
-    /// <summary>La lecture aussi : lue dans la ruche d'un autre compte, une origine du joueur passait pour « respectée » ou
-    /// « disparue », sans ligne non rendue, et le manifeste partait. Refusée, elle est illisible et le garde.</summary>
+    /// <summary>La lecture aussi : lue dans la ruche d'un autre compte, une origine du joueur passerait pour « respectée » ou
+    /// « disparue » et le manifeste partirait. Refusée, elle est illisible et le garde.</summary>
     internal static ILectureDesCibles GarderLaRucheDuJoueur(ILectureDesCibles lecture, bool memeCompte) =>
         memeCompte ? lecture : new LectureSansRucheEtrangere(lecture);
 
@@ -453,6 +437,10 @@ public static class ModeDesinstallation
     [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
     private static extern void WTSFreeMemory(IntPtr memoire);
 
+    // Le firmware et l'ecrivain du manifeste sont absents : ce mode ne sait que rendre (registre, plan, service, DRS du
+    // profil de base). La carte s'écrit aussi, pour rendre une limite de puissance, Anti-Lag, FRTC ou la Vsync AMD gardés ;
+    // seules les origines admises par OpAllowlist.ValiderOrigine passent (jamais fréquence ni tension). Hors manifeste, le
+    // ventilateur et le décalage du cœur ne reviennent qu'à l'automatique et à 0 (RendreLaCarteNvidiaAsync).
     private static IElevatedClient ClientEnProcessus(DrDxt.Detection.Gpu.Adlx.IAdlxNative adlx,
         DrDxt.ElevatedHelper.Journal.JournalDEcritureAnticipee? journal, Func<PrivilegedOp, Func<Result<string?>>?> lecteur)
         => new InProcessElevatedClient(new OpAllowlist(), JournalDuHelper.Decorer(new PrivilegedOpExecutor(

@@ -7,13 +7,9 @@ namespace DrDxt.ElevatedHelper.Execution.NvApi;
 // -----------------------------------------------------------------------
 // NvApiDrsActions : la vraie écriture DRS (réglages du pilote), frontière du m2smoke.
 //
-// La surface NVAPI publique et sûre : un seul réglage global du pilote (ni tension ni
-// horloge). La séquence de session (recette §C : CreateSession → LoadSettings →
-// GetBaseProfile → SetSetting → SaveSettings → DestroySession, DestroySession tourne toujours)
-// vit dans l'unique frontière native vérifiée : NvApiNative dans DrDxt.GpuNative, qui partage
-// l'entrée NVAPI avec les écritures d'horloge et de puissance. Aucune seconde copie des ids de
-// fonction DRS ni de la struct NVDRS_SETTING_V1 ici ; c'est un orchestrateur mince, exactement
-// comme ADLXTuningActions sur IAdlxNative.
+// La surface NVAPI publique et sûre (un réglage du pilote, ni tension ni horloge), orchestrée mince comme
+// ADLXTuningActions : la séquence de session (CreateSession → … → SaveSettings → DestroySession, toujours détruite), les
+// ids de fonction DRS et NVDRS_SETTING_V1 n'existent qu'une fois, dans NvApiNative.
 //
 // Le settingId reçu est déjà validé par l'allowlist (l'ensemble fermé d'ids d'OpAllowlist). Sur une machine AMD / sans
 // NVIDIA, NVAPI est indisponible → un Result.Fail propre (« NVIDIA NVAPI unavailable »). Ne lève jamais.
@@ -58,19 +54,9 @@ public sealed class NvApiDrsActions : INvApiDrsActions
     /// <summary>
     /// L'ecriture par jeu, et sa verification.
     ///
-    /// La relecture n'est pas une precaution de style : c'est la meme regle que les ecritures de
-    /// tuning (« une action relit avant d'affirmer »). Un `true` natif dit que le driver a
-    /// accepte l'appel, pas que la valeur a atterri. Ici deux choses peuvent la faire diverger :
-    /// NVIDIA documente qu'une sauvegarde de session ecrase ce qu'un autre processus a modifie
-    /// entre-temps (PG-12072-001 p.11), et un profil predefini peut se comporter autrement que
-    /// prevu.
-    ///
-    /// La relecture passe par une session neuve. Relire dans la session d'ecriture rendrait ce
-    /// qu'on vient d'y poser : une verification qui se verifie elle-meme, verte quoi qu'il
-    /// arrive. C'est le cas ou un test peut nommer une garantie sans la prouver.
-    ///
-    /// Une relecture qui echoue n'est pas un succes : « applique mais non confirme » est
-    /// exactement l'affirmation que ce code existe pour empecher.
+    /// Un `true` natif dit que le driver a accepte l'appel, pas que la valeur a atterri (une sauvegarde de session ecrase
+    /// ce qu'un autre processus a change, PG-12072-001 p.11 ; un profil predefini peut differer) : on relit, en session
+    /// neuve, car relire la session d'ecriture se verifierait soi-meme. Une relecture qui echoue n'est pas un succes.
     /// </summary>
     public Result SetSettingForApplication(string applicationPath, uint settingId, uint value)
     {

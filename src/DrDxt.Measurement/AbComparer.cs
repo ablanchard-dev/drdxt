@@ -80,18 +80,11 @@ public static class AbComparer
     /// <summary>
     /// Le meme a/b, mais qui garde sa resolution.
     ///
-    /// <see cref="Compare"/> calcule `combinedMargin`, s'en sert, et la jette : elle vit
-    /// dans une variable locale et meurt avec la methode. C'est pourtant elle qui distingue
-    /// « aucun gain » de « gain non resolu par cette session ». Sur la machine de reference, cette
-    /// confusion fait passer un +2,7 % reel pour un zero, alors que la session ne resout que +/-4,8 %.
-    ///
-    /// Rend une <see cref="GameEvidence"/> sur les FPS moyens : l'ecart en pourcent et ce que
-    /// l'experience savait resoudre, cote a cote. Le sous-systeme reste null : c'est au banc
-    /// deterministe de le remplir, avec sa resolution a lui, bien plus fine.
-    ///
-    /// La resolution est la somme des deux marges, comme dans <see cref="Compare"/>. La chaine
-    /// memoire, elle, utilise la racine de la somme des carres. La somme est plus large, donc plus
-    /// prudente ; les aligner serait changer un seuil, et un seuil ne se change pas sans mesure.
+    /// La marge combinee de <see cref="Compare"/> distingue « aucun gain » de « gain non resolu » (sur la machine de
+    /// reference, un +2,7 % reel passerait pour zero dans une session qui ne resout que +/-4,8 %) : ici elle est gardee, en
+    /// <see cref="GameEvidence"/> sur les FPS moyens. La resolution est la somme des deux marges, plus prudente que la
+    /// racine de la somme des carres de la chaine memoire ; les aligner changerait un seuil sans mesure. Le sous-systeme
+    /// reste null (le banc deterministe le remplit).
     /// </summary>
     public static PerformanceEvidence Evidence(BenchmarkResult before, BenchmarkResult after)
     {

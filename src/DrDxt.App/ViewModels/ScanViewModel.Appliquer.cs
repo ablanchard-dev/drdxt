@@ -9,19 +9,6 @@ namespace DrDxt.App.ViewModels;
 /// <summary>« Optimiser » : juger ce qui peut être posé, prendre un point de restauration, poser et relire, puis résumer.</summary>
 public sealed partial class ScanViewModel
 {
-    // -----------------------------------------------------------------------
-    // ApplyCommand : « Optimiser ».
-    //
-    //   1. Juger d'abord : diagnostic du scan → CandidateSelector sur les graines du profil.
-    //      Rien a tenter ⇒ on le dit, avec les motifs.
-    //   2. Point de restauration verifie.
-    //   3. Ce qui ne se mesure pas (effet au redemarrage) : le moteur, sans baseline (apply,
-    //      relecture, revert sur echec), puis le manifeste signe pour le reconciliateur.
-    //   4. Un levier a chaud, en session mesuree a-b-b-a. Jamais deux : un seul KeepPolicy.
-    //
-    // Le mode lot (tout le plan, re-bench global) n'est plus atteignable d'ici. Le tuning GPU
-    // reste une action separee (ApplyGpuTuningCommand).
-    // -----------------------------------------------------------------------
     /// <summary>Les leviers posés depuis le dernier scan : le plan du scan ne les connaît pas encore comme posés, et
     /// sans cette liste « Prochaine étape : Optimiser » resterait affiché après la pose. Vidé au scan.</summary>
     private readonly HashSet<string> _posesDepuisLeScan = new(StringComparer.Ordinal);
@@ -33,6 +20,16 @@ public sealed partial class ScanViewModel
     /// <summary>Secteur ou batterie ; branché par l'App, null en test (rien n'est dit).</summary>
     internal DrDxt.Application.Tweaks.Hardware.ISourceDAlimentation? Alimentation { get; set; }
 
+    // -----------------------------------------------------------------------
+    // ApplyCommand : « Optimiser ».
+    //   (1) Juger d'abord : diagnostic du scan → CandidateSelector sur les graines du profil ; rien a tenter ⇒ dit, avec
+    //       les motifs.
+    //   (2) Point de restauration verifie, avant tout ce qui ecrit ; puis les gestes du docteur.
+    //   (4) Ce qui ne se mesure pas (effet au redemarrage) : le moteur sans baseline, puis le manifeste signe.
+    //   (5) Un levier a chaud, en session mesuree a-b-b-a ; jamais deux, un seul KeepPolicy.
+    //   (6) L'etape en tete se rejuge sur ce qui reste.
+    // Le tuning GPU reste une action separee (ApplyGpuTuningCommand).
+    // -----------------------------------------------------------------------
     [RelayCommand(CanExecute = nameof(CanApply))]
     private async Task ApplyAsync()
     {
@@ -43,21 +40,19 @@ public sealed partial class ScanViewModel
 
         // (1) juger avant d'écrire : pur, sans effet sur la machine. Un clic qui n'a rien à poser ne crée pas de point de restauration.
         var jugement = await JugerAsync(GrainesOptimiser()).ConfigureAwait(true);
-        // Sans jeu ouvert, un réglage qui se mesure en jeu était
-        // « écarté, lance ton jeu, refais un scan ». L'essai en alternance sait attendre les parties : le clic vaut accord.
-        // Il part aussi quand il y avait autre chose à poser, comme l'étape en tête le promet.
+        // Sans jeu ouvert, un réglage qui se mesure en jeu part en essai en alternance, qui attend les parties : le clic
+        // vaut accord, même quand il y a autre chose à poser.
         var essaiAFaire = _gamePid == 0 && LevierAEssayer is not null && EssaiProposable;
         if (jugement.RienATenter && !essaiAFaire && !ReposCarteAOuvrir)
         {
-            // Les arrêts ne bloquent plus ; rien à tenter veut dire rien à tenter. Et jamais sans suite (U5).
+            // Rien à tenter, jamais sans suite (U5) ; les arrêts ne bloquent pas.
             ApplyBlockedMessage = RienAPoser(jugement);
             ResultatOptimisation = string.Join(Environment.NewLine,
                 new[] { Resumer(jugement, null, null), Ordonnance(reposFait: ReposCarteEnAttente) }.Where(l => l.Length > 0));
             return;
         }
 
-        // (2) la porte : un point de restauration vérifié avant tout ce qui écrit. le geste du
-        // docteur et l'essai lancé d'ici passaient avant elle, alors que l'écran l'annonçait.
+        // (2) la porte : un point de restauration vérifié avant tout ce qui écrit, gestes du docteur et essai compris.
         var gate = await _safety.EnsureRestorePointAsync().ConfigureAwait(true);
         if (!gate.IsOk)
         {
@@ -65,9 +60,8 @@ public sealed partial class ScanViewModel
             return;
         }
 
-        // Les gestes que le
-        // docteur propose et que DrDXT sait faire seul étaient cachés dans « Agir ». Optimiser les fait d'abord, et le dit
-        // en tête de son résultat, quelle que soit la suite.
+        // (3) Les gestes du docteur que DrDXT sait faire seul : faits d'abord, dits en tête du résultat quelle que soit la
+        // suite.
         IReadOnlyList<string> gestes = [];
         string? essai = null;
         try
@@ -88,14 +82,14 @@ public sealed partial class ScanViewModel
         }
         finally
         {
-            // Optimiser finit toujours par une ordonnance. Ce qui reste à ta main passe en tête : écrit après « Posé » et
-            // « C'est parti », il serait enterré. Puis ce que le docteur a fait, puis la suite.
+            // Optimiser finit toujours par une ordonnance : ce qui reste à ta main en tête (après « Posé », il serait
+            // enterré), puis ce que le docteur a fait, puis la suite.
             var (tete, fin) = OrdonnanceEnDeux(reposFait: ReposCarteEnAttente);
             ResultatOptimisation = string.Join(Environment.NewLine,
                 new[] { tete }.Concat(gestes).Append(ResultatOptimisation ?? string.Empty).Append(essai ?? string.Empty)
                     .Append(fin).Where(l => l.Length > 0));
         }
-        // (6) L'étape en tête suit Optimiser, pas seulement le scan : Rejugée sur ce qui reste.
+        // (6) L'étape en tête se rejuge sur ce qui reste.
         await JugerCeQuiResteAPoserAsync().ConfigureAwait(true);
     }
 
@@ -156,10 +150,9 @@ public sealed partial class ScanViewModel
         return (string.Join(Environment.NewLine, tete), string.Join(Environment.NewLine, fin));
     }
 
-    /// <summary>Ce qu'Optimiser fait sans mesure en jeu, parce que le scan l'a constaté et que DrDXT a son
-    /// geste : rendre le repos à la carte quand le pilote NVIDIA est sur « performances maximales » au global (le geste prouve
-    /// lui-même son effet au repos et se retire seul sans baisse nette), et rendre à Windows l'écran de récupération qu'un
-    /// script a coupé (la valeur retirée est gardée pour Annuler, et relue). Une ligne par geste tenté.</summary>
+    /// <summary>Ce qu'Optimiser fait sans mesure en jeu, constaté au scan : le repos de la carte quand le pilote NVIDIA est
+    /// en « performances maximales » au global (prouvé au repos, retiré seul sans baisse nette), et l'écran de récupération
+    /// qu'un script a coupé (valeur retirée gardée pour Annuler, et relue). Une ligne par geste tenté.</summary>
     internal async Task<IReadOnlyList<string>> GestesDuDocteurAsync()
     {
         var lignes = new List<string>();
@@ -187,20 +180,18 @@ public sealed partial class ScanViewModel
     private async Task PoserAsync(JugementApply jugement)
     {
         _aVerifier.Clear();
-        // (4) ce qui ne se mesure pas : un A/B avant redemarrage mesurerait le neant. Le moteur
-        //     applique, relit et revient sur echec ; baseline null = aucune pretention de gain.
+        // (4) ce qui ne se mesure pas (un A/B avant redemarrage mesurerait le neant) : le moteur applique, relit, revient
+        //     sur echec ; baseline null = aucune pretention de gain.
         ApplyReport? auRedemarrage = null;
         string? pasInscrit = null;
-        // Les réglages sans effet sur les images (heures d'activité) partent aussi sans mesure.
-        // Chacun dans son propre lot. Le moteur défait un lot entier sur un échec : un mode d'écran
-        // que le joueur ne garde pas défaisait le fichier d'échange et les heures cliqués avec lui.
+        // Les réglages sans effet sur les images (heures d'activité) partent aussi sans mesure, chacun dans son lot : le
+        // moteur défait un lot entier sur un échec (un mode d'écran refusé défaisait le fichier d'échange avec lui).
         var lots = (jugement.AuRedemarrage.Count > 0 ? new[] { jugement.AuRedemarrage.ToList() } : [])
             .Concat(jugement.PosesSansMesure.Select(id => new List<string> { id })).ToList();
         if (lots.Count > 0)
         {
-            // L'origine de ces poses n'est notée qu'au journal des leviers, plus bas : le helper la garde jusque-là. Une portée
-            // par lot : un lot qui n'a pas pu être défait en entier garde au journal du helper l'origine de ce qui a pu rester
-            // posé, même quand un autre lot réussit et s'acquitte.
+            // Le helper garde l'origine jusqu'au journal des leviers, plus bas. Une portée par lot : un lot mal défait garde
+            // l'origine de ce qui a pu rester posé, même quand un autre lot s'acquitte.
             var portees = new List<PorteeDePose>();
             try
             {
@@ -237,17 +228,16 @@ public sealed partial class ScanViewModel
                 auRedemarrage = reussi;
                 // Le reconciliateur reaffirme ces leviers gardes au demarrage ; non fatal.
                 await CommitDesiredStateAsync(reussi).ConfigureAwait(true);
-                // Tous les leviers gardes, cote utilisateur : le scan suivant remarquera
-                // s'ils ont ete defaits (le service n'en reaffirme que quatre).
+                // Tous les leviers gardes, cote utilisateur : le scan suivant voit s'ils ont ete defaits (le service n'en
+                // reaffirme que quatre).
                 (var inscrit, pasInscrit) = InscrireAuJournal(reussi);
                 if (inscrit) foreach (var portee in portees) await portee.FermerAsync().ConfigureAwait(true);
                 ChargerLeviersPoses();
                 var posees = reussi.Outcomes.Where(o => o.Applied && !o.AutoReverted).Select(o => o.TweakId).ToList();
                 NoterPoses(posees, Horloge());
                 RetenirPoses(posees);
-                // Le mode Jeu agit tout de suite. Relevé seulement à la prochaine ouverture ou au
-                // prochain scan, sa bascule était datée là, et les parties jouées entre la pose et ce relevé ne comptaient d'aucun
-                // côté. Seuls les réglages à effet immédiat se relèvent ici : un levier au redémarrage n'a pas encore basculé.
+                // Le mode Jeu agit tout de suite : relevé ici, sa bascule se date à la pose. Seuls les réglages à effet
+                // immédiat : un levier au redémarrage n'a pas encore basculé.
                 await ReleverReglagesHorsScanAsync(ReglagesAEffetImmediat).ConfigureAwait(true);
             }
             finally { foreach (var portee in portees) portee.Dispose(); }
@@ -261,9 +251,8 @@ public sealed partial class ScanViewModel
         ResultatOptimisation = Resumer(jugement, auRedemarrage, session) + (pasInscrit is null ? "" : Environment.NewLine + pasInscrit);
     }
 
-    /// <summary>Les leviers gardés entrent au journal des leviers, celui que « Annuler » relit. Raté, leurs portées ne sont pas
-    /// acquittées : le rejeu du journal du helper les remettra à l'origine au prochain lancement, et la phrase le dit. Sans
-    /// journal branché, rien n'est dit.</summary>
+    /// <summary>Les leviers gardés entrent au journal que « Annuler » relit. Raté, leurs portées ne sont pas acquittées : le
+    /// journal du helper les remettra à l'origine au prochain lancement, et c'est dit.</summary>
     private (bool Inscrit, string? Phrase) InscrireAuJournal(ApplyReport gardes)
     {
         if (_journalLeviers is null) return (false, null);
@@ -299,7 +288,7 @@ public sealed partial class ScanViewModel
         PhraseReglageCarte = _consumption is { HasGpuPlan: true }
             ? CandidateSelector.PhraseReglageCarte(diagnostic, DateTimeOffset.UtcNow)
             : _localize("Apply.Carte.NonProposee");
-        // Les incidents du pilote ne ferment plus la carte ; la garde d'incident les surveille et rend seule.
+        // Les incidents du pilote ne ferment pas la carte : la garde d'incident les surveille et rend seule.
     }
 
     /// <summary>Le réglage de la carte passe par Optimiser, comme les autres leviers à chaud : un
@@ -315,13 +304,12 @@ public sealed partial class ScanViewModel
             : [];
     }
 
-    /// <summary>Après un retrait parce qu'un levier coûtait en jeu, Optimiser ne le repose pas avant ce délai. **Non chiffré** :
-    /// le verdict tient sur trois parties de chaque côté (un indice, pas une preuve) ; un mois laisse au joueur le temps de le
-    /// voir sans l'écarter pour toujours.</summary>
+    /// <summary>Après un retrait parce qu'un levier coûtait en jeu, Optimiser ne le repose pas avant ce délai. Non chiffré :
+    /// trois parties de chaque côté sont un indice, pas une preuve ; un mois, sans l'écarter pour toujours.</summary>
     internal static readonly TimeSpan PasReposeApresUnCout = TimeSpan.FromDays(30);
 
-    /// <summary>Les leviers dont la bascule à « on » a été figée « moins bien en jeu » (le retrait automatique), avec sa date.
-    /// Le scan suivant les relit éteints et les remettait au plan : Optimiser les reposait sans un mot.</summary>
+    /// <summary>Les leviers dont la bascule à « on » a été figée « moins bien en jeu » (le retrait automatique), avec sa date :
+    /// relus éteints, ils reviendraient au plan et seraient reposés sans un mot.</summary>
     internal IReadOnlyDictionary<string, DateTimeOffset> RetiresParCeQuiCoute()
     {
         if (JournalChangements is null) return new Dictionary<string, DateTimeOffset>();
@@ -334,9 +322,8 @@ public sealed partial class ScanViewModel
             .ToDictionary(x => x.Id, x => x.Quand!.Value);
     }
 
-    /// <summary>Les leviers que la garde d'incident a rendus il y a moins d'une semaine, avec la date
-    /// du rendu. Optimiser ne les repose pas avant : sinon pose, arrêt, rendu, repose tourneraient sans fin, et « si l'arrêt
-    /// revient sans lui » ne se verrait jamais.</summary>
+    /// <summary>Les leviers rendus par la garde d'incident il y a moins d'une semaine, avec la date : pas reposés avant, sinon
+    /// pose, arrêt, rendu, repose tourneraient sans fin.</summary>
     internal IReadOnlyDictionary<string, DateTimeOffset> RendusParLaGarde()
     {
         if (JournalChangements is null) return new Dictionary<string, DateTimeOffset>();
@@ -385,18 +372,10 @@ public sealed partial class ScanViewModel
     }
 
     /// <summary>
-    /// Le contrat de scene que la session recoit, pris au clic (la session dure ensuite des minutes).
-    ///
-    /// Le role est toujours `Decouverte`, et c'est ce que le code permet d'affirmer sans deviner :
-    /// • aucun profil n'est persiste : rien ne dit qu'un profil a deja ete trouve pour ce jeu ;
-    /// • le journal des candidats n'a aucun lecteur, et il ne porte ni la scene ni le role de la
-    ///   session qui a garde ;
-    /// • surtout, rejouer un levier encore pose depuis un keep mesurerait la cible contre la cible :
-    ///   `TweakCandidate` recapture l'etat courant comme « origine », donc son revert rend la cible :
-    ///   un A/B nul qu'on appellerait « validation ».
-    /// `Validation` est la seule chose qui rend un keep durable ; la declarer ici la fabriquerait. Une
-    /// partie reelle declaree dit donc, a l'ecran, « trouve en decouverte : a revalider », la vraie
-    /// reserve.
+    /// Le contrat de scene que la session recoit, pris au clic. Le role est toujours `Decouverte` : aucun profil n'est
+    /// persiste, le journal des candidats ne porte ni scene ni role, et rejouer un levier encore pose mesurerait la cible
+    /// contre la cible (`TweakCandidate` recapture l'etat courant comme origine). Declarer `Validation`, seule a rendre un
+    /// keep durable, la fabriquerait : l'ecran dit « trouve en decouverte : a revalider ».
     /// </summary>
     private SceneContract ContratDeScene() => new(
         SceneDeclaree.Valeur,
@@ -410,8 +389,7 @@ public sealed partial class ScanViewModel
         // Sans jeu, le jugement a deja ecarte ce levier (JugementApply, jeuEnCours) : on n'arrive ici
         // qu'avec un jeu mesure au scan.
         var pid = _gamePid;
-        // Sur un seul écran, cliquer sur « Optimiser » réduit un plein écran exclusif. La
-        // session aurait mesuré pendant des minutes un jeu qui n'affiche rien : elle attend qu'il revienne.
+        // Sur un seul écran, le clic réduit un plein écran exclusif : la session attend que le jeu revienne.
         if (_gameLocator.LocateRunningGamePid() is null && _gameLocator.JeuOuvert())
         {
             if (await AttendreLeJeuAsync(pourLaSession: true).ConfigureAwait(true) is not { } revenu)
@@ -422,9 +400,8 @@ public sealed partial class ScanViewModel
         if (_creerCandidat?.Invoke(descripteur) is not { } candidat)
             return $"« {Titre(descripteur.Id)} » {_localize("Apply.Session.Unavailable")}";
 
-        // Simplification voulue : identite minimale, aucun profil n'est persiste tant qu'aucun keep n'existe.
-        // Le nom du jeu vient du meme localisateur que le journal de performance ; le pid seulement
-        // quand il ne sait pas nommer, pour que la ligne du journal des candidats porte un jeu.
+        // Simplification voulue : identite minimale, aucun profil n'est persiste tant qu'aucun keep n'existe. Le nom du jeu
+        // vient du localisateur du journal de performance, le pid quand il ne sait pas nommer.
         var jeu = _gameLocator.NameOfGame(pid) is { Length: > 0 } nom ? nom : $"pid {pid}";
         var session = new DrDxt.Application.Autopilot.GameOptimizationSession(_benchmark,
             () => new DrDxt.Application.Autopilot.GameProfileIdentity(
@@ -432,9 +409,8 @@ public sealed partial class ScanViewModel
             _journalCandidats);
         // Hors du fil d'interface : la session tient quatre a cinq minutes de jeu.
         var scene = ContratDeScene();
-        // Même garde que la capture du scan, sur toute la session. Un retour sur DrDXT en cours de
-        // route réduit le jeu : l'A/B mêle alors la partie et un jeu réduit, et le verdict le dit. Le levier
-        // éventuellement gardé n'est pas défait ici : la session a déjà rendu son meilleur état.
+        // La garde de la capture du scan, sur toute la session : un retour sur DrDXT réduit le jeu, et le verdict le dit.
+        // Le levier gardé n'est pas défait ici : la session a déjà rendu son meilleur état.
         var surveillance = new SurveillanceDuJeu();
         _ = SurveillerLeJeuAsync(pid, surveillance, BorneSurveillanceSession);
         var profil = await Task.Run(() => session.Run(pid, new[] { candidat }, scene: scene)).ConfigureAwait(true);
@@ -459,8 +435,7 @@ public sealed partial class ScanViewModel
         DrDxt.Application.Autopilot.GameOptimizationProfile profil, IAutopilotCandidate candidat)
     {
         var sb = new System.Text.StringBuilder();
-        // Relu sur le profil que la session rend, pas sur le choix a l'ecran : c'est le contrat qui
-        // a reellement atteint la session qui s'affiche.
+        // Le contrat relu sur le profil rendu : celui qui a reellement atteint la session.
         if (profil.Scene2 is { } recu)
             sb.AppendLine($"{_localize("Scan.Scene.Declared")} "
                           + ChoixDeScene.First(c => c.Valeur == recu.Representativite).Libelle
@@ -468,7 +443,7 @@ public sealed partial class ScanViewModel
         sb.AppendLine(profil.SceneExplanation);
         foreach (var r in profil.Results)
         {
-            // Les etats se disent par le resx, plus par le nom d'une enum.
+            // Les etats se disent par le resx, jamais par le nom d'une enum.
             sb.AppendLine($"{Titre(r.Id)}{Docteur.DeuxPoints}{_localize($"Autopilot.Outcome.{r.Outcome}")}"
                           + (r.Detail is { Length: > 0 } d ? $"{Docteur.DeuxPoints}{d}" : ""));
             foreach (var m in r.Metriques ?? Array.Empty<MetricEvidence>())
@@ -513,9 +488,8 @@ public sealed partial class ScanViewModel
         }
     }
 
-    /// <summary>La phrase de l'aperçu ; un réglage que le profil n'a pas testé sur une vraie machine porte la même
-    /// réserve que sur la carte. Collée au titre, elle s'accorderait mal (« Optimisations… pas encore validé ») :
-    /// elle forme une phrase à part.</summary>
+    /// <summary>La phrase de l'aperçu ; un réglage non testé sur une vraie machine porte la réserve de la carte, en phrase à
+    /// part (collée au titre, elle s'accorderait mal).</summary>
     internal static string ApercuDe(IReadOnlyList<string> ids, IReadOnlyList<DrDxt.App.Profiles.ProfileRecommendationItem> items,
         Func<string, string> titre, string amorce, string sansValidation, string aucuneValidation)
     {
@@ -536,8 +510,7 @@ public sealed partial class ScanViewModel
     private string Resumer(JugementApply j, ApplyReport? auRedemarrage, string? session)
     {
         var sb = new System.Text.StringBuilder();
-        // La condition du selecteur, lue telle quelle : l'App ne la recalcule pas.
-        // Des arrêts récents ne refusent plus ; ils se disent, avec la garde qui les remplace.
+        // La condition du selecteur, lue telle quelle : des arrêts récents se disent, avec la garde, sans refuser.
         if (j.VetoDesArrets is not null) sb.AppendLine(_localize(KeySousGarde));
         // GARDE1 : ce que la garde a rendu, et jusqu'à quand DrDXT ne le repose pas.
         foreach (var (id, quand) in RendusParLaGarde())
@@ -591,13 +564,9 @@ public sealed partial class ScanViewModel
     }
 
     // -----------------------------------------------------------------------
-    // ApplyGpuTuningCommand : l'application du réglage GPU, dédiée et isolée.
-    //
-    // Sur demande explicite : une action du joueur séparée de l'Apply sûr (jamais lancée au scan).
-    // Le levier GPU tourne dans la même session mesurée en jeu qu'Optimiser (un levier, gardé
-    // seulement avec un gain mesuré, sinon retour arrière). Activée seulement si le profil a
-    // recommandé une étape GPU applicable à cette machine (GPU non pris en charge, portable →
-    // désactivée → ne fait rien).
+    // ApplyGpuTuningCommand : le réglage GPU, une action du joueur séparée (jamais au scan), dans la même session mesurée
+    // qu'Optimiser (gardé seulement avec un gain mesuré). Activée seulement si le profil recommande une étape GPU
+    // applicable (GPU non pris en charge, portable → désactivée).
     // -----------------------------------------------------------------------
     [RelayCommand(CanExecute = nameof(CanApplyGpuTuning))]
     private async Task ApplyGpuTuningAsync()
@@ -619,12 +588,10 @@ public sealed partial class ScanViewModel
             ResultatOptimisation = Resumer(jugement, null, null);
             return;
         }
-        // La carte se regle comme tout levier a chaud, en jeu, un a la fois, garde seulement
-        // avec un gain mesure, sinon annule : un reglage sans gain ne reste pas.
+        // Comme tout levier a chaud : en jeu, un a la fois, garde seulement avec un gain mesure.
         if (jugement.AChaud is not { } aChaud) return;
 
-        // La garde du point de restauration d'abord, comme pour l'application sûre : un point vérifié
-        // doit exister avant tout changement privilégié. Bloqué → message traduit explicite, rien d'appliqué.
+        // Un point de restauration vérifié avant tout changement privilégié ; bloqué → message traduit, rien d'appliqué.
         var gate = await _safety.EnsureRestorePointAsync().ConfigureAwait(true);
         if (!gate.IsOk)
         {
@@ -635,11 +602,8 @@ public sealed partial class ScanViewModel
         ResultatOptimisation = Resumer(jugement, null, await MesurerEnJeuAsync(aChaud).ConfigureAwait(true));
     }
 
-    // Construit l'état voulu à partir des leviers validés gardés et enregistre le manifeste
-    // signé. Ne lève jamais d'exception vers l'écran d'application et ne bloque jamais : s'il n'y
-    // a rien de réconciliable à enregistrer, ne fait rien ; si l'enregistrement échoue, pose un
-    // signal non fatal « persistance non armée ». La surface d'écriture privilégiée ne change pas
-    // (on n'écrit que le manifeste de l'App, en écriture admin, via le magasin signé).
+    // L'état voulu des leviers gardés, au manifeste signé (magasin signé, écriture admin). Ne lève ni ne bloque jamais :
+    // rien de réconciliable, rien ; échec, le signal non fatal « persistance non armée ».
     private async Task CommitDesiredStateAsync(ApplyReport report)
     {
         try
@@ -660,17 +624,15 @@ public sealed partial class ScanViewModel
         }
         catch (Exception)
         {
-            // La persistance est un renfort, au mieux, par-dessus une application déjà réussie ; une
-            // erreur de frontière donne « non armée » et ne casse jamais l'écran d'application.
+            // Un renfort au mieux : une erreur de frontière donne « non armée », jamais un écran cassé.
             MoatUnarmedMessage = _localize(KeyMoatUnarmed);
         }
         await InscrireLesOriginesAsync(report).ConfigureAwait(true);
     }
 
-    /// <summary>L'origine des leviers gardés que le service ne réaffirme pas, au manifeste,
-    /// pour que la désinstallation les rende. Un seul envoi (un envoi par levier pouvait
-    /// enchaîner les invites UAC) ; chaque origine qu'il porte est acceptée par le helper (CommitManifestOpTests).
-    /// Un échec ne défait rien : il est dit, levier par levier.</summary>
+    /// <summary>L'origine des leviers gardés que le service ne réaffirme pas, au manifeste, pour la désinstallation. Un seul
+    /// envoi (un par levier enchaînerait les invites UAC), accepté par le helper (CommitManifestOpTests). Un échec ne
+    /// défait rien et se dit, levier par levier.</summary>
     private async Task InscrireLesOriginesAsync(ApplyReport report)
     {
         var gardes = _manifestMapper.ToRevertOnly(report);
@@ -708,8 +670,7 @@ public sealed partial class ScanViewModel
             string.Format(CultureInfo.CurrentCulture, _localize("Apply.RestoreRequired.Failed"), RaisonLisible.Dire(gate, _localize)), _localize),
     };
 
-    // Un refus « illisible » n'est pas une panne passagere : il se repetera a chaque commit tant que
-    // personne ne decide. Il est donc nomme, et la reprise est proposee.
+    // Un refus « illisible » se repete a chaque commit tant que personne ne decide : nomme, avec la reprise proposee.
     private void SignalerManifesteIllisible(Result r)
     {
         if (r.Error?.Code is not (ErrorCodes.ManifestUnreadable or ErrorCodes.ManifestKeyUnusable))
@@ -718,9 +679,8 @@ public sealed partial class ScanViewModel
         PeutRepartirDuManifeste = true;
     }
 
-    /// <summary>La reprise explicite. Le helper met l'ancien manifeste de cote (renomme, jamais
-    /// efface) et en commence un neuf avec ce qui avait ete refuse. L'ecran le dit : les origines de l'ancien
-    /// ne seront plus rendues par la desinstallation.</summary>
+    /// <summary>La reprise explicite : l'ancien manifeste mis de cote (renomme, jamais efface), un neuf avec ce qui avait ete
+    /// refuse. L'ecran dit que les origines de l'ancien ne seront plus rendues par la desinstallation.</summary>
     [RelayCommand]
     private async Task RepartirDuManifesteAsync()
     {

@@ -11,34 +11,25 @@ using Microsoft.Win32.SafeHandles;
 
 namespace DrDxt.ElevatedHelper.Execution;
 
-// -----------------------------------------------------------------------
-// DroitsDesServices : « Corriger les droits » et son Annuler.
-//
-// Un service qui tourne en SYSTEM depuis un fichier ou un dossier que le compte peut modifier (le service de Call of Duty
-// sous ProgramData, dont le dossier appartient au compte ; un service Epic sous Program Files dont le fichier porte un
-// droit d'écriture) laisse tout programme lancé sans droits remplacer le binaire, qui tourne ensuite en SYSTEM. La
-// correction rend le fichier et son dossier aux administrateurs, comme sous Program Files.
-//
-// Ce que l'App envoie : le nom du service, rien d'autre. Le chemin est relu ici dans le registre des services ; un chemin
-// ou un SDDL venus du fil donneraient l'écriture à n'importe qui sur n'importe quel binaire SYSTEM.
-//
+// DroitsDesServices : « Corriger les droits » et son Annuler. Un service SYSTEM lancé depuis un fichier ou un dossier que
+// le compte peut modifier (Call of Duty sous ProgramData, dossier au compte ; un service Epic sous Program Files, fichier
+// inscriptible) laisse tout programme sans droits remplacer le binaire. La correction rend fichier et dossier aux
+// administrateurs, comme sous Program Files.
+// L'App n'envoie que le nom du service ; le chemin est relu ici dans le registre des services (un chemin ou un SDDL venus
+// du fil donneraient l'écriture à n'importe qui sur n'importe quel binaire SYSTEM).
 // Refusés sans rien écrire : service absent, compte autre que LocalSystem, pilote ou chemin qui n'est pas un .exe complet
 // (variable d'environnement, chemin relatif ou réseau), binaire absent, binaire sous Windows, sous les profils ou dans le
 // dossier de DrDXT, binaire posé à même un dossier partagé (ProgramData, Program Files : leur DACL se propagerait à tout ce
 // qu'ils contiennent), lien symbolique, jonction ou lien dur sur le chemin. Déjà protégé : réussite sans écriture.
-//
-// L'origine (propriétaire et DACL du fichier et du dossier, en SDDL) est gardée avant toute écriture dans un fichier de
-// confiance du helper, sous %ProgramData%\DrDxt, un par service, et jamais écrasée : une seconde correction garde la vraie.
-// Le fichier et le dossier sont tenus par handle du contrôle à l'écriture, sans partage de suppression : ce qui est écrit est
-// ce qui a été contrôlé. La DACL du dossier se pose sans propagation automatique (handle ouvert en MAXIMUM_ALLOWED), et
-// l'héritage est rendu aux enfants par une descente qui ouvre chacun sans suivre de point de reparse : un lien planté par le
-// compte dans ce dossier (jonction vers System32, lien symbolique) ne fait jamais réécrire sa cible. La correction qui en
-// trouve un est refusée et l'origine rendue ; l'annulation le laisse intact. Un dossier au-dessus que le compte peut encore modifier laisse renommer le dossier corrigé : la
-// correction ne fermerait rien, l'origine est rendue tout de suite et la raison dite. Les dossiers au-dessus ne sont jamais
-// touchés.
-//
-// La désinstallation de DrDXT laisse la correction en place : c'est une correction de sécurité, pas un réglage de jeu.
-// -----------------------------------------------------------------------
+// L'origine (propriétaire et DACL du fichier et du dossier, en SDDL) est gardée avant toute écriture, dans un fichier de
+// confiance du helper sous %ProgramData%\DrDxt, un par service, jamais écrasée (une seconde correction garde la vraie).
+// Fichier et dossier sont tenus par handle du contrôle à l'écriture, sans partage de suppression : ce qui est écrit est
+// ce qui a été contrôlé. La DACL du dossier se pose sans propagation (handle en MAXIMUM_ALLOWED) ; l'héritage est rendu
+// aux enfants par une descente qui ouvre chacun sans suivre de point de reparse : un lien planté par le compte (jonction
+// vers System32, lien symbolique) ne fait jamais réécrire sa cible ; la correction qui en trouve un est refusée et
+// l'origine rendue, l'annulation le laisse intact. Un dossier au-dessus encore modifiable par le compte laisserait
+// renommer le dossier corrigé : origine rendue tout de suite, raison dite. Les dossiers au-dessus ne sont jamais touchés.
+// La désinstallation laisse la correction en place : une correction de sécurité, pas un réglage de jeu.
 [SupportedOSPlatform("windows")]
 public sealed class DroitsDesServices
 {

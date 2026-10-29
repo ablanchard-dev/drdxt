@@ -63,17 +63,9 @@ public static class NetworkAdvisor
                     "net.interrupt_moderation_on", a.Name,
                     "Finding.Network.InterruptModerationTradeoff", NicTuningSource));
 
-            // Les economies d'energie du lien (EEE et ses deux mots-cles voisins). Releve sur la
-            // machine de reference : actives, alors qu'un scanner qui ne les lit pas dirait « rien a signaler ».
-            //
-            // Ce constat ne chiffre rien, et c'est un resultat de recherche, pas de la prudence.
-            // `docs/LEVIERS-REPOS-ET-RESEAU.md` N-01 a N-03 : le reveil du lien se compte en
-            // microsecondes, « borne et negligeable sauf usages tres sensibles au delai », et
-            // aucune source ne chiffre l'effet en jeu. Notre plancher de bruit in-game est de
-            // 9,9 % : nous ne pourrons jamais le mesurer, donc jamais le promettre.
-            //
-            // Un seul constat meme si les deux mots-cles sont actifs : le client n'a pas a lire
-            // deux fois la meme idee parce que sa carte l'expose sous deux noms.
+            // Les economies d'energie du lien (EEE et ses deux mots-cles voisins), relevees actives sur la machine de
+            // reference. Un seul constat, sans chiffre : le reveil du lien se compte en microsecondes, « borne et
+            // negligeable » (`docs/LEVIERS-REPOS-ET-RESEAU.md` N-01 a N-03), sous notre plancher de bruit in-game (9,9 %).
             if (a.EnergyEfficientEthernet == TriState.On || a.LinkPowerSaving == TriState.On)
                 advice.Add(new NetworkGuidance(
                     "net.link_power_saving_on", a.Name,

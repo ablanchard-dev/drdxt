@@ -5,54 +5,23 @@ using DrDxt.Reconciler;
 namespace DrDxt.App;
 
 // -----------------------------------------------------------------------
-// AppliedTweakManifestMapper : le pont, côté App, entre une application validée et le
-// manifeste d'état voulu du reconciler (la persistance).
-//
-// Le pipeline d'application mesure déjà et annule tout seul les régressions : les leviers
-// encore gardés après ApplyAsync (Applied && !AutoReverted) sont l'ensemble validé. Ce
-// mapper transforme chaque résultat gardé en AppliedTweak du reconciler, pour que l'App
-// puisse les enregistrer.
-//
-// Il comble deux vrais écarts avec une table fermée, explicite et relue :
-//
-//   (1) L'espace des ids. Le catalogue d'Application nomme les leviers par des ids comme
-//       « fixit.power_plan » / « latency.reflex » ; la politique et le catalogue de
-//       descripteurs du reconciler utilisent « fixit.sanePowerPlan » /
-//       « latency.reflex.lowLatencyMode » (voir DefaultReconcilabilityPolicy /
-//       DefaultReconcilableTweakCatalog : ces couches ne référencent pas Application,
-//       exprès). Cette table est l'unique correspondance, relue, entre les deux espaces.
-//
-//   (2) La valeur voulue. Le TweakSnapshot de l'ApplyReport ne porte que la valeur
-//       d'origine (l'opération inverse) ; le jeton voulu canonique que le reconciler
-//       réapplique est connu par levier (Ultra=2, le GUID du plan Performances élevées,
-//       service « running ») et produit ici par le même ReconcilableValueCanonicalizer que
-//       celui de la sonde : un jeton voulu enregistré correspond octet pour octet à une
-//       lecture ultérieure de la sonde (comparaison ordinale).
-//
-// Portée : seuls sont émis les leviers qui ont une surface réconciliable côté OS et un
-// jeton voulu connu. Un levier gardé absent de la table (réglage GPU, ou composite dont le
-// reconciler ne possède qu'une feuille) est exclu : le manifeste ne contient que de l'état
-// voulu validé et réconciliable. Double sécurité avec SignedDesiredStateStore, qui rejette
-// de son côté tout id non réconciliable à l'enregistrement.
-//
-// Réserve sur la valeur d'origine : OriginalValueJson est noté depuis le snapshot gardé,
-// tel que relevé (la charge de l'opération inverse), trace honnête de l'état d'avant. Le
-// reconciler ne s'en sert que pour classer la dérive (voulue par l'utilisateur ou remise à
-// zéro par Windows), jamais pour réappliquer ; le jeton voulu est le champ qui compte, et il
-// est exact. On pourra rendre canonique le jeton d'origine pour qu'il corresponde à la sonde
-// si le classement de la dérive en a besoin ; le chemin de sécurité et de réapplication n'en
-// dépend pas.
+// AppliedTweakManifestMapper : transforme chaque levier gardé après ApplyAsync (Applied && !AutoReverted) en
+// AppliedTweak du manifeste d'état voulu du reconciler. Une table fermée et relue comble deux écarts :
+//   (1) les ids : « fixit.power_plan » côté Application, « fixit.sanePowerPlan » côté reconciler (ces couches ne
+//       référencent pas Application, exprès) ;
+//   (2) la valeur voulue : le snapshot ne porte que l'origine ; le jeton voulu (Ultra=2, GUID Performances élevées,
+//       service « running ») sort du même ReconcilableValueCanonicalizer que la sonde, donc se compare octet pour octet.
+// Un levier absent de la table (réglage GPU, composite dont le reconciler n'a qu'une feuille) est exclu ;
+// SignedDesiredStateStore rejette aussi tout id non réconciliable. OriginalValueJson, tel que relevé, ne sert qu'à
+// classer la dérive, jamais à réappliquer : le chemin de sécurité n'en dépend pas.
 // -----------------------------------------------------------------------
 public sealed class AppliedTweakManifestMapper
 {
-    /// <summary>Le jeton voulu canonique du plan d'alimentation actif, une fois que
-    /// SanePowerPlanTweak l'a passé en Performances élevées : la même forme 'D' que celle lue
-    /// par la sonde du reconciler (voulu enregistré == courant sondé en comparaison ordinale).</summary>
+    /// <summary>Le jeton voulu du plan Performances élevées, dans la forme 'D' que lit la sonde du reconciler.</summary>
     public static readonly string HighPerformancePlanToken =
         ReconcilableValueCanonicalizer.PowerPlan(KnownPowerPlans.HighPerformance);
 
-    // tweakId d'Application → (tweakId du reconciler, jeton voulu canonique). Une table fermée
-    // et relue, calquée sur les emplacements de lecture du catalogue de descripteurs du reconciler.
+    // tweakId d'Application → (tweakId du reconciler, jeton voulu canonique), calquée sur le catalogue de descripteurs.
     private static readonly IReadOnlyDictionary<string, (string ReconcilerId, string DesiredToken)> Map =
         new Dictionary<string, (string, string)>(StringComparer.Ordinal)
         {
@@ -62,35 +31,21 @@ public sealed class AppliedTweakManifestMapper
             // NvidiaUltraLowLatencyTweak écrit LowLatencyMode = Ultra (2) sur la feuille NVTweak.
             ["latency.reflex"] = ("latency.reflex.lowLatencyMode", "2"),
 
-            // X3dCcdParkingFixTweak démarre le service AMD 3D V-Cache optimizer. Le reconciler possède
-            // la surface du service (sa seule surface volatile côté OS) ; le jeton voulu est l'état
-            // canonique « running ».
+            // X3dCcdParkingFixTweak démarre le service AMD 3D V-Cache optimizer ; le reconciler en possède la surface.
             ["fixit.x3d_ccd"] = (
                 "fixit.x3dVCacheService",
                 ReconcilableValueCanonicalizer.Service(ServiceRunState.Running)),
 
-            // HagsOnTweak écrit HwSchMode = 2 (On) sur la feuille HKLM GraphicsDrivers.
-            // HKLM est la surface que le reconciler de démarrage, en LocalSystem, réapplique correctement.
+            // HagsOnTweak écrit HwSchMode = 2 (On) en HKLM, que le reconciler de démarrage en LocalSystem sait réappliquer.
             ["latency.hagsOn"] = ("os.hags", ReconcilableValueCanonicalizer.Dword(2)),
 
-            // Volontairement pas réconciliés par le reconciler de démarrage en LocalSystem :
-            //   * latency.gameDvrBackgroundOff : une feuille HKCU. Le reconciler réapplique dans son
-            //     propre processus, en LocalSystem (pas d'UAC au démarrage), où Registry.CurrentUser est
-            //     la ruche de SYSTEM et non celle de l'utilisateur connecté : une réapplication HKCU
-            //     écrirait dans la mauvaise ruche (le reconciler de démarrage ne couvre que HKLM, le plan
-            //     d'alimentation et les services). La valeur survit d'elle-même au redémarrage.
-            //
-            //     Son origine entre au manifeste en RevertOnly (ToRevertOnly) : la desinstallation la rend, et
-            //     l'App la relit au lancement (VerificationDesReglages) pour dire qu'un tiers l'a defaite,
-            //     sans la reecrire (regle I5). Personne ne la reapplique : une reapplication devrait passer
-            //     par le levier lui-meme, qui sait gerer le composite a deux feuilles et la fusion du REG_SZ.
-            //   * latency.gameModeOn : composite (deux feuilles HKCU), plus le souci HKCU ci-dessus ;
-            //     le modèle un id → une feuille ne sait pas l'exprimer. Il faudrait une réconciliation
-            //     sur plusieurs feuilles.
-            //   * latency.vrrFlipModelOn : un REG_SZ fusionné (HKCU) ; une réapplication naïve qui
-            //     écrase effacerait des clés de l'utilisateur (par exemple AutoHDR). Il faudrait une
-            //     réapplication par utilisateur qui sache fusionner.
-            // Comme les omissions existantes liées à NVAPI/ADLX : omis exprès, pas perdus.
+            // Omis exprès (comme NVAPI/ADLX), pas perdus :
+            //   * latency.gameDvrBackgroundOff : HKCU ; en LocalSystem, Registry.CurrentUser est la ruche de SYSTEM, la
+            //     réapplication écrirait dans la mauvaise ruche. La valeur survit seule au redémarrage. Son origine entre en
+            //     RevertOnly (ToRevertOnly) : la désinstallation la rend, l'App la relit au lancement
+            //     (VerificationDesReglages) sans la réécrire (règle I5).
+            //   * latency.gameModeOn : composite de deux feuilles HKCU, hors du modèle un id → une feuille.
+            //   * latency.vrrFlipModelOn : REG_SZ fusionné (HKCU) ; l'écraser effacerait des clés de l'utilisateur (AutoHDR).
         };
 
     /// <summary>Le nom sous lequel le service connaît ce levier, s'il le réaffirme.</summary>
@@ -100,19 +55,17 @@ public sealed class AppliedTweakManifestMapper
     public static string IdDeLApp(string idDuManifeste)
         => Map.FirstOrDefault(m => m.Value.ReconcilerId == idDuManifeste).Key ?? idDuManifeste;
 
-    /// <summary>Les leviers gardés que le service ne réaffirme pas (absents de la table
-    /// ci-dessus : les leviers HKCU, le fichier d'échange) n'entraient pas du tout au manifeste, et la désinstallation
-    /// ne relit que lui : elle laissait leur réglage en place. Leur origine y entre en <c>RevertOnly</c> (rendue à la
-    /// désinstallation, jamais réaffirmée), comme le fait déjà un levier gardé en jeu (TweakCandidate.Garder).
-    /// Seulement une origine que la désinstallation sait rendre : un réglage de carte graphique n'y entre pas.</summary>
+    /// <summary>Les leviers gardés que le service ne réaffirme pas (absents de la table : HKCU, fichier d'échange)
+    /// entrent au manifeste en <c>RevertOnly</c>, car la désinstallation ne relit que lui : rendus, jamais réaffirmés,
+    /// comme un levier gardé en jeu (TweakCandidate.Garder). Seulement une origine que la désinstallation sait rendre.</summary>
     /// <param name="pourUnEssai">Un essai en alternance rend lui-même son levier une partie sur deux : même un levier que le
     /// service réapplique n'est gardé que pour la désinstallation, jamais réappliqué.</param>
     public IReadOnlyList<AppliedTweak> ToRevertOnly(ApplyReport report, bool pourUnEssai = false)
     {
         var quand = DateTimeOffset.UtcNow;
         return report.Outcomes
-            // Sans valeur posée, la désinstallation ne sait pas si la valeur est encore
-            // celle de DrDXT et n'y touche jamais (le fichier d'échange) : l'inscrire ferait croire qu'elle la rend.
+            // Sans valeur posée, la désinstallation ne touche jamais la valeur (le fichier d'échange) : l'inscrire ferait
+            // croire qu'elle la rend.
             .Where(o => o.Applied && !o.AutoReverted && o.Snapshot is { AppliedValueJson: { Length: > 0 } }
                         && (pourUnEssai || !Map.ContainsKey(o.TweakId)) && OrigineRendable(o.Snapshot.OriginalValueJson))
             .Select(o => new AppliedTweak(o.TweakId, o.Snapshot!.AppliedValueJson!, o.Snapshot.OriginalValueJson, quand))
@@ -144,30 +97,23 @@ public sealed class AppliedTweakManifestMapper
         catch (Exception) { return false; }
     }
 
-    /// <summary>Les leviers d'état voulu, validés et réconciliables, à enregistrer, construits à
-    /// partir des résultats gardés (Applied &amp;&amp; !AutoReverted) d'une application réussie.
-    /// Les résultats annulés automatiquement, sans snapshot, ou sans correspondance ou non
-    /// réconciliables sont exclus.</summary>
+    /// <summary>Les leviers d'état voulu à enregistrer, depuis les résultats gardés (Applied &amp;&amp; !AutoReverted).
+    /// Sans snapshot, sans correspondance ou non réconciliables : exclus.</summary>
     public IReadOnlyList<AppliedTweak> ToDesiredTweaks(ApplyReport report)
     {
-        // ApplyOutcome ne porte pas d'horodatage par levier ; l'AppliedTweak du manifeste en veut
-        // un. On prend un seul horodatage, celui de l'enregistrement, pour tout le lot : le
-        // CommittedAt du manifeste fait foi, et le reconciler ne règle pas son comportement sur
-        // l'AppliedAt de chaque levier.
+        // Un seul horodatage pour le lot : le CommittedAt du manifeste fait foi, le reconciler ignore l'AppliedAt.
         var appliedAt = DateTimeOffset.UtcNow;
 
         var tweaks = new List<AppliedTweak>();
         foreach (var outcome in report.Outcomes)
         {
-            // Seuls les leviers appliqués et non annulés automatiquement sont validés et gardés.
             if (!outcome.Applied || outcome.AutoReverted)
                 continue;
 
-            // Pas de snapshot ⇒ pas de valeur d'origine honnête à noter ⇒ on passe (par prudence).
+            // Pas de snapshot ⇒ pas de valeur d'origine honnête à noter.
             if (outcome.Snapshot is null)
                 continue;
 
-            // Seuls les ids qui ont une correspondance connue côté reconciler et un jeton voulu sont enregistrés.
             if (!Map.TryGetValue(outcome.TweakId, out var mapping))
                 continue;
 
@@ -176,13 +122,9 @@ public sealed class AppliedTweakManifestMapper
                 mapping.DesiredToken,
                 outcome.Snapshot.OriginalValueJson,
                 appliedAt,
-                // L'origine complete des composites. Le token ci-dessus ne nomme qu'une
-                // feuille (celle que le reconciliateur reaffirme). Un levier composite (X3D : service +
-                // CppcEnable + Game Bar) en pose plusieurs : sans ce champ, la desinstallation ne savait
-                // pas quelle valeur DrDXT avait mise sur les deux autres, donc elle ne pouvait pas les
-                // juger rendables, et le tout-ou-rien bloquait le composite entier, pour toujours.
-                // Le tweak connaissait deja ses valeurs posees (TweakSnapshot.AppliedValueJson) : on les
-                // inscrit telles quelles, sans les recalculer ici.
+                // Les valeurs posées de toutes les feuilles : le jeton ne nomme que celle que le reconciler réaffirme. Un
+                // composite (X3D : service + CppcEnable + Game Bar) sans elles ne serait pas jugé rendable, et le
+                // tout-ou-rien de la désinstallation le bloquerait entier.
                 outcome.Snapshot.AppliedValueJson));
         }
 

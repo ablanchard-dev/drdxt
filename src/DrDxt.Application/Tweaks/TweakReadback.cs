@@ -43,25 +43,11 @@ public enum PoseRelue { DeDrDxt, ALOrigine, ChangeDepuis }
 /// <summary>
 /// Relire ce qu'un levier a ecrit : une fois, pour tous les leviers de registre.
 ///
-/// ══ pourquoi cette classe tient en une page ══
-/// Pas de methode de relecture dans `ITweak`, a implementer levier par levier : le snapshot porte
-/// deja la reponse.
-///
-/// `LatencyTweakBase.RevertAsync` deserialise `OriginalValueJson` en `PrivilegedOp` et la rejoue.
-/// Ce JSON est donc une op typee qui nomme exactement la feuille touchee : ruche, chemin, nom,
-/// type, valeur d'avant. Relire ne demande alors aucune connaissance du levier : la feuille est
-/// dans le snapshot, et une seule fonction couvre tous les leviers qui ecrivent dans le registre.
-///
-/// ══ ce qu'elle ne dit pas, et c'est la moitie de son interet ══
-/// Elle ne peut pas affirmer « ce levier est correctement applique ». Le snapshot porte l'etat
-/// original, jamais la valeur visee. Tout ce qui se deduit honnetement, c'est : la valeur courante
-/// est-elle revenue a celle d'avant, ou non. Les deux etats s'appellent donc
-/// <see cref="EtatRelu.RevenuAvantApplication"/> et <see cref="EtatRelu.DifferentDeAvant"/>, et pas
-/// « perdu » et « applique », deux noms qui affirmeraient plus que la mesure ne porte.
-///
-/// ══ ce qu'elle debloque ══
-/// Une partie des leviers n'est pas reposee au demarrage : leurs gains disparaitraient au redemarrage sans que
-/// rien ne le remarque. `RevenuAvantApplication` est exactement le constat qui le remarque.
+/// Le snapshot nomme deja la feuille touchee (`OriginalValueJson` est l'op inverse typee : ruche, chemin, nom, type,
+/// valeur d'avant), donc une seule fonction couvre tous les leviers de registre, sans methode par levier. Il porte
+/// l'origine, jamais la cible : on ne peut dire que <see cref="EtatRelu.RevenuAvantApplication"/> ou
+/// <see cref="EtatRelu.DifferentDeAvant"/>, pas « perdu » ou « applique ». C'est ce qui voit un levier non repose au
+/// demarrage et revenu a l'origine.
 /// </summary>
 public static class TweakReadback
 {

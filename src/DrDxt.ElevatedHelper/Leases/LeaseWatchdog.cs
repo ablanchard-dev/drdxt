@@ -5,34 +5,21 @@ using DrDxt.Core;
 namespace DrDxt.ElevatedHelper.Leases;
 
 // -----------------------------------------------------------------------
-// LeaseWatchdog : l'« homme mort » (dead-man's switch) côté helper pour les leviers privilégiés tenus.
+// LeaseWatchdog : l'« homme mort » du helper. Un décalage d'horloge GPU ou une limite de puissance tenu ne reste jamais
+// appliqué si son contrôleur cesse de se signaler : Establish enregistre l'op de retour et une échéance, Renew la
+// repousse, TickAsync lance le retour de tout bail expiré puis l'efface.
 //
-// Raison : un décalage d'horloge GPU (ou une limite de puissance) tenu, laissé appliqué après la
-// mort du processus qui le pilote, est un vrai danger. Le chien de garde garantit qu'un levier
-// privilégié tenu ne reste jamais appliqué si son contrôleur cesse de se signaler :
-//   * Establish enregistre l'op de retour du levier + une échéance (maintenant + leaseSeconds).
-//   * Renew (battement de cœur) repousse l'échéance tant que le contrôleur vit.
-//   * TickAsync (mené par une surveillance de fond) lance le retour enregistré de tout bail
-//     expiré, puis l'efface.
-//
-// Sécurité (le helper est la surface de risque n°1 : chaque invariant est gardé) :
-//   * Le retour est le JSON du codec d'une feuille PrivilegedOp typée existante. Il est relié à
-//     nouveau par le même PrivilegedOpCodec borné (pas de Type.GetType, pas de réflexion) et
-//     revalidé à la feuille près par OpAllowlist à l'enregistrement (un retour hostile ou hors
-//     allowlist est refusé d'emblée) et encore à l'échéance (défense en profondeur). Il passe
-//     ensuite par l'IPrivilegedOpExecutor existant : aucune nouvelle primitive privilégiée générique.
-//   * Les baux sont liés à l'identité authentifiée de l'appelant (LeaseOwner, tirée du process id
-//     résolu par le pipe). Seul le propriétaire qui a établi un bail peut le renouveler ou le
-//     clore ; tout autre appelant est refusé (ELEVATION_DENIED). Un propriétaire non identifié est
-//     refusé (refus par défaut).
-//   * L'état vit en mémoire seulement (aucune persistance disque : ce serait une surface
-//     d'attaque). Si le helper meurt lui-même, ses baux et la garde thermique du ventilateur
-//     meurent avec lui. Les décalages NVAPI comme la vitesse fixe NVML sont volatils (un
-//     redémarrage les efface) ; d'ici là, l'App qui ne joint plus le helper rend elle-même le
-//     ventilateur à l'automatique (EssaiVentilateur), et son journal rend le reste au lancement suivant.
-//   * Rien ne lève à travers la frontière : un échec de retour à l'échéance est journalisé via
-//     IDiagnosticsLog, remonte un code d'erreur et est repris au mieux au tick suivant (le bail
-//     est gardé jusqu'à ce qu'un retour réussisse).
+// Sécurité (le helper est la surface de risque n°1) :
+//   * Le retour est le JSON d'une feuille PrivilegedOp typée, relié par le PrivilegedOpCodec borné (ni Type.GetType ni
+//     réflexion), revalidé à la feuille près par OpAllowlist à l'enregistrement et à l'échéance, puis exécuté par
+//     l'IPrivilegedOpExecutor existant : aucune primitive privilégiée générique.
+//   * Les baux sont liés à l'appelant authentifié (LeaseOwner, pid résolu par le pipe) : seul le propriétaire renouvelle
+//     ou clôt ; tout autre est refusé (ELEVATION_DENIED), un propriétaire non identifié aussi.
+//   * L'état vit en mémoire seulement (le disque serait une surface d'attaque). Le helper mort, ses baux et la garde
+//     thermique meurent avec lui ; décalages NVAPI et vitesse fixe NVML sont volatils, l'App rend le ventilateur
+//     (EssaiVentilateur) et son journal rend le reste au lancement suivant.
+//   * Rien ne lève à travers la frontière : un retour raté est journalisé (IDiagnosticsLog) et retenté au tick suivant,
+//     le bail gardé jusqu'au succès.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class LeaseWatchdog
@@ -42,21 +29,18 @@ public sealed class LeaseWatchdog
     private readonly IPrivilegedOpExecutor _executor;
     private readonly IDiagnosticsLog _log;
 
-    // Clé (owner, leaseId). ConcurrentDictionary pour que le tick de fond et un
-    // Establish/Renew/Complete du thread IPC ne corrompent jamais le registre.
+    // Clé (owner, leaseId) ; concurrent : le tick de fond et le thread IPC y touchent ensemble.
     private readonly ConcurrentDictionary<LeaseKey, LeaseEntry> _leases = new();
     // Les baux que ce helper-là a rendus lui-même : seul cas où l'App peut lever son journal. Un helper relancé n'en connaît
     // aucun, et son « inconnu » ne veut pas dire « rendu ». Jamais vidé : quelques ids par session de l'App.
     private readonly ConcurrentDictionary<LeaseKey, byte> _rendus = new();
 
-    // Le nom d'un bail dont l'inverse est en train de partir. Un nouveau bail du même nom
-    // (même réglage, quel que soit le client) est refusé pendant ce temps : sinon son écriture pourrait partir avant
-    // l'inverse de l'ancien, qui la déferait (l'écran dirait « gardé », la carte serait rendue).
+    // Le nom d'un bail dont l'inverse part. Un nouveau bail du même nom (quel que soit le client) est refusé pendant ce
+    // temps : l'inverse de l'ancien déferait son écriture (« gardé » à l'écran, carte rendue).
     private readonly ConcurrentDictionary<string, int> _inversesEnCours = new(StringComparer.Ordinal);
 
-    // Le refus ci-dessus et l'inscription du nouveau bail ne font qu'un pas, face à la marque d'un inverse qui part : sans
-    // lui, un inverse marqué entre les deux retirait l'ancien bail, puis le nouveau s'inscrivait, et l'inverse défaisait le
-    // réglage que l'App croyait gardé.
+    // Le refus ci-dessus et l'inscription du nouveau bail ne font qu'un pas face à la marque d'un inverse : un inverse
+    // marqué entre les deux déferait le réglage que l'App croit gardé.
     private readonly object _inscription = new();
 
     public LeaseWatchdog(
@@ -71,17 +55,16 @@ public sealed class LeaseWatchdog
         _log = log ?? throw new ArgumentNullException(nameof(log));
     }
 
-    /// <summary>Enregistre le retour automatique d'un levier tenu. Le retour est relié et
-    /// validé à la feuille près dès maintenant (un retour hostile ou hors allowlist est refusé
-    /// d'emblée). Lie le bail au <paramref name="owner"/> authentifié.</summary>
     /// <summary>Le nombre de baux tenus (le helper ne s'arrête pas pour inactivité tant qu'il y en a).</summary>
     public int NombreDeBaux => _leases.Count;
 
-    /// <summary>Un bail ne dure pas plus de 10 minutes par renouvellement, et un appelant n'en
-    /// tient pas plus de 8 (sinon un appelant gardait le helper administrateur vivant pour toujours).</summary>
+    /// <summary>Un bail ne dure pas plus de 10 minutes par renouvellement, et un appelant n'en tient pas plus de 8 : sinon
+    /// un appelant garderait le helper administrateur vivant pour toujours.</summary>
     public const int DureeMaxSecondes = 600;
     public const int BauxMaxParAppelant = 8;
 
+    /// <summary>Enregistre le retour automatique d'un levier tenu, relié et validé à la feuille près dès maintenant (un
+    /// retour hostile ou hors allowlist est refusé d'emblée). Lie le bail au <paramref name="owner"/> authentifié.</summary>
     public Result Establish(LeaseOwner owner, string leaseId, string revertOpJson, int leaseSeconds)
     {
         if (!owner.IsIdentified)
@@ -94,8 +77,8 @@ public sealed class LeaseWatchdog
             return Result.Fail(ErrorCodes.NotAllowlisted, $"Lease duration above {DureeMaxSecondes} s.");
         if (_leases.Keys.Count(k => k.Owner == owner && k.LeaseId != leaseId) >= BauxMaxParAppelant)
             return Deny($"More than {BauxMaxParAppelant} leases for this caller.");
-        // Un autre client (une App plantée puis relancée) tient encore ce réglage ; son
-        // bail expirera et rendra l'origine. Accepter le nouveau laissait cet inverse défaire la pose qu'on affichait « gardée ».
+        // Un autre client (une App plantée puis relancée) tient encore ce réglage : son bail expirera, et son inverse
+        // déferait la pose affichée « gardée ».
         if (_leases.Keys.Any(k => k.LeaseId == leaseId && k.Owner != owner))
             return Result.Fail(ErrorCodes.HelperOpFailed,
                 Docteur.T("LW.AutreDrDxt"));
@@ -110,23 +93,16 @@ public sealed class LeaseWatchdog
         if (!allowed.IsOk)
             return allowed;
 
-        // Un op firmware ne peut jamais être le revert d'un bail, même s'il passe
-        // l'allowlist. Le déclencheur normal d'un dead-man's switch est la mort du contrôleur :
-        // le revert part donc précisément quand plus personne n'est devant la machine. Un
-        // redémarrage vers le setup firmware y arriverait chez le client comme une machine qui
-        // repart dans le BIOS toute seule, sans rien à l'écran pour l'expliquer.
-        //
-        // C'est le même invariant que l'omission de la couture côté ReconcilerHost, et sans ce
-        // garde il serait percé par ici : l'allowlist autorise l'op (à juste titre, pour un clic
-        // utilisateur), et le registre de baux l'exécuterait ensuite sans surveillance.
+        // Un revert de bail part quand plus personne n'est devant la machine (la mort du contrôleur). Une op firmware,
+        // autorisée par l'allowlist pour un clic, relancerait la machine dans le BIOS sans explication : jamais un revert
+        // (même invariant que l'omission de la couture côté ReconcilerHost).
         if (decoded.Value is RebootToFirmwareSetupOp or CancelPendingFirmwareBootOp)
             return Deny("A firmware-boot op can never be a lease revert: it would fire with nobody at the machine.");
-        // Même invariant : une écriture BCD partie sans personne devant la machine ne se
-        // verrait qu'au démarrage suivant. Les ops BCD restent des gestes du joueur, jamais d'un bail.
+        // Même invariant pour les gestes sur un périphérique ou le magasin de pilotes, et le BCD (vu au démarrage suivant).
         if (decoded.Value is RestartDeviceOp or RemoveDriverPackageOp or RestoreDriverPackageOp)
             return Deny("A device or driver-store op can never be a lease revert: it would act with nobody at the machine.");
-        // Les droits d'un service se corrigent et se rendent sur le clic du joueur : rendus par un bail, ils rouvriraient le
-        // fichier au compte sans que personne ne l'ait demandé.
+        // Les droits d'un service se rendent sur le clic du joueur : par un bail, ils rouvriraient le fichier au compte sans
+        // demande.
         if (decoded.Value is CorrigerDroitsDuServiceOp or RendreDroitsDuServiceOp)
             return Deny("A service permission op can never be a lease revert: it is the player's gesture only.");
         // La remise à l'usine de la carte AMD efface aussi ce que le joueur a réglé dans AMD Software : un geste, jamais un bail.
@@ -134,8 +110,7 @@ public sealed class LeaseWatchdog
             return Deny("A GPU factory reset can never be a lease revert: it is the player's gesture only.");
         if (decoded.Value is SetBcdValueOp or DeleteBcdValueOp or ScheduleMemoryDiagnosticOp or CancelMemoryDiagnosticOp)
             return Deny("A boot-configuration op can never be a lease revert: it would change the next boot unattended.");
-        // Un ordre de bail n'est pas executable par l'executeur (le serveur le route vers ce
-        // registre). En inverse, il echouait a chaque passage, remis et rejoue toutes les 5 s, sans fin.
+        // Un ordre de bail n'est pas executable par l'executeur : en inverse, il echouerait et serait rejoue toutes les 5 s.
         if (decoded.Value is EstablishLeaseOp or RenewLeaseOp)
             return Deny("A lease op can never be a lease revert: the executor cannot run it.");
         // Un retour de bail rend l'origine : il n'a ni pose à marquer ni acquit à donner.
@@ -164,9 +139,8 @@ public sealed class LeaseWatchdog
         => _leases.Any(b => b.Key.Owner == owner && b.Value.Expiry > _clock.UtcNow
                             && b.Value.RevertOp is RestoreGpuFanAutoOp r && r.GpuIndex == gpuIndex);
 
-    /// <summary>Battement de cœur : repousse l'échéance d'un bail existant à maintenant + leaseSeconds.
-    /// Seul le propriétaire peut renouveler ; un bail inconnu (ou un autre appelant) est refusé :
-    /// un renouvellement ne crée jamais de bail.</summary>
+    /// <summary>Battement de cœur : repousse l'échéance d'un bail existant. Seul le propriétaire renouvelle ; un
+    /// renouvellement ne crée jamais de bail.</summary>
     public Result Renew(LeaseOwner owner, string leaseId, int leaseSeconds)
     {
         if (!owner.IsIdentified)
@@ -177,8 +151,7 @@ public sealed class LeaseWatchdog
             return Result.Fail(ErrorCodes.NotAllowlisted, "Lease duration must be positive.");
 
         var key = new LeaseKey(owner, leaseId);
-        // La clé inclut le propriétaire : un autre appelant ne trouve donc aucun bail →
-        // refusé (il ne peut jamais atteindre, encore moins prolonger, le bail d'un autre).
+        // La clé inclut le propriétaire : un autre appelant ne trouve aucun bail.
         if (!_leases.TryGetValue(key, out var existing))
             return _rendus.ContainsKey(key)
                 ? Result.Fail(ErrorCodes.LeaseReverted, "This helper reverted the lease: its original state is back.")
@@ -188,8 +161,8 @@ public sealed class LeaseWatchdog
             return Result.Fail(ErrorCodes.NotAllowlisted, $"Lease duration above {DureeMaxSecondes} s.");
 
         var renewed = existing with { Expiry = _clock.UtcNow.AddSeconds(leaseSeconds) };
-        // Remplacer seulement si c'est encore l'entrée observée (pas de mise à jour perdue). Prise entre-temps par le chien de
-        // garde (il a pris le bail pour lancer son inverse, par exemple au réveil de veille) : le bail n'existe plus, répondre Ok serait faux.
+        // Remplacer seulement l'entrée observée : prise entre-temps par le chien de garde pour son inverse (au réveil de
+        // veille, par exemple), le bail n'existe plus et Ok serait faux.
         return _leases.TryUpdate(key, renewed, existing) ? Result.Ok() : EnCoursDeRendu();
     }
 
@@ -197,8 +170,8 @@ public sealed class LeaseWatchdog
     private static Result EnCoursDeRendu()
         => Result.Fail(ErrorCodes.LeaseReverting, "The lease expired while renewing; its inverse is running.");
 
-    /// <summary>Le contrôleur a fait lui-même un retour propre : abandonner le bail pour que le
-    /// chien de garde ne fasse jamais de retour automatique. Seul le propriétaire peut clore son bail.</summary>
+    /// <summary>Le contrôleur a rendu lui-même : le bail est abandonné, sans retour automatique. Seul le propriétaire
+    /// clôt.</summary>
     public Result Complete(LeaseOwner owner, string leaseId)
     {
         if (!owner.IsIdentified)
@@ -212,9 +185,8 @@ public sealed class LeaseWatchdog
         return Result.Ok();
     }
 
-    /// <summary>Un passage de surveillance : lance le retour enregistré de chaque bail expiré,
-    /// puis l'efface. Si le retour échoue, le bail est gardé (reprise au mieux au tick suivant)
-    /// et l'échec est journalisé. Ne lève jamais.</summary>
+    /// <summary>Un passage de surveillance : lance le retour de chaque bail expiré, puis l'efface ; un retour raté garde le
+    /// bail et se journalise. Ne lève jamais.</summary>
     public async Task TickAsync(CancellationToken ct)
     {
         var now = _clock.UtcNow;
@@ -228,10 +200,8 @@ public sealed class LeaseWatchdog
         }
     }
 
-    /// <summary>L'arret du helper : rend tous les baux encore actifs, expires ou non. Le registre vit
-    /// en memoire ; une fois le helper parti, personne ne peut plus les renouveler ni les rendre, et un plafond
-    /// d'envoi pose pour une partie restait jusqu'au redemarrage. Meme chemin que l'expiration (revalidation
-    /// feuille-exacte, jamais d'exception).</summary>
+    /// <summary>L'arret du helper : rend tous les baux, expires ou non. Le registre vit en memoire : le helper parti, un
+    /// plafond d'envoi pose pour une partie resterait jusqu'au redemarrage. Meme chemin que l'expiration.</summary>
     public async Task RendreToutAsync(CancellationToken ct)
     {
         foreach (var kvp in _leases)
@@ -252,9 +222,8 @@ public sealed class LeaseWatchdog
         }
     }
 
-    // L'inverse reste « en cours » jusqu'à ce que son issue soit écrite (rendu, ou bail remis) : un battement qui arrive
-    // entre les deux n'apprend jamais un « bail inconnu » qui couperait le battement pour de bon. Compté : l'arrêt du helper
-    // et un passage de surveillance peuvent viser le même bail, celui qui sort tôt n'efface pas la marque de l'autre.
+    // L'inverse reste « en cours » jusqu'à son issue (rendu, ou bail remis) : un battement entre les deux n'apprend jamais
+    // un « bail inconnu » qui le couperait. Compté : l'arrêt et un passage de surveillance peuvent viser le même bail.
     private async Task FireRevertAsync(LeaseKey key, LeaseEntry entry, CancellationToken ct)
     {
         lock (_inscription) _inversesEnCours.AddOrUpdate(key.LeaseId, 1, (_, n) => n + 1);
@@ -271,22 +240,18 @@ public sealed class LeaseWatchdog
         Result result;
         try
         {
-            // Défense en profondeur : revalider l'op enregistrée à la feuille près avant de
-            // l'exécuter. L'allowlist est l'autorisation, pas une barrière franchie une fois pour toutes.
+            // Défense en profondeur : revalider à la feuille près avant d'exécuter.
             var allowed = _allowlist.Validate(entry.RevertOp);
             if (!allowed.IsOk)
             {
-                // Une op enregistrée qui n'est plus dans l'allowlist : l'abandonner (jamais
-                // d'exécution d'une op hors allowlist) et journaliser l'anomalie.
+                // Plus dans l'allowlist : abandonnée, jamais exécutée, et journalisée.
                 _leases.TryRemove(key, out _);
                 _log.Change(LeaseTweakId(key), "expired", "revert-rejected-not-allowlisted", "DrDXT");
                 return;
             }
 
-            // Le bail quitte le registre avant que son inverse tourne, et seulement s'il est encore
-            // l'entrée expirée observée. Un Renew qui arrive pendant l'inverse est alors refusé (le contrôleur
-            // rétablit depuis un état connu) au lieu de répondre Ok pour un bail sur le point d'être abandonné.
-            // S'il a été renouvelé ou clos depuis le balayage, ce n'est plus à nous de le défaire.
+            // Le bail quitte le registre avant son inverse, seulement s'il est encore l'entrée expirée observée : un Renew
+            // pendant l'inverse est refusé. Renouvelé ou clos depuis le balayage, il n'est plus à défaire.
             if (!_leases.TryRemove(new KeyValuePair<LeaseKey, LeaseEntry>(key, entry)))
                 return;
 
@@ -299,8 +264,7 @@ public sealed class LeaseWatchdog
         }
         catch (Exception ex)
         {
-            // Un exécuteur qui lève ne doit jamais traverser cette frontière. Remettre le bail
-            // pour que le tick suivant réessaie ; journaliser l'échec.
+            // Un exécuteur qui lève ne traverse jamais la frontière : bail remis, échec journalisé.
             var echec = $"revert-threw:{ex.GetType().Name}";
             _leases.TryAdd(key, entry with { DernierEchec = echec });
             if (echec != entry.DernierEchec) _log.Change(LeaseTweakId(key), "expired", echec, "DrDXT");
@@ -315,10 +279,8 @@ public sealed class LeaseWatchdog
         }
         else
         {
-            // Remettre le bail (reprise au mieux au tick suivant) + journaliser l'erreur.
-            // TryAdd : si le contrôleur a rétabli entre-temps, son nouveau bail l'emporte.
-            // Rejoue a chaque passage (abandonner laisserait l'etat en place), mais journalise
-            // seulement quand l'erreur change : le journal du helper n'a pas de borne.
+            // Bail remis (TryAdd : un bail rétabli entre-temps l'emporte), rejoué à chaque passage ; journalisé seulement
+            // quand l'erreur change, le journal du helper n'a pas de borne.
             var echec = $"revert-failed:{result.Error?.Code}";
             _leases.TryAdd(key, entry with { DernierEchec = echec });
             if (echec != entry.DernierEchec) _log.Change(LeaseTweakId(key), "expired", echec, "DrDXT");
@@ -329,22 +291,16 @@ public sealed class LeaseWatchdog
 
     private static Result Deny(string message) => Result.Fail(ErrorCodes.ElevationDenied, message);
 
-    // Identité (owner, leaseId) du registre. Limitée au propriétaire : un appelant ne peut
-    // jamais viser que ses propres baux.
+    // Identité (owner, leaseId) : un appelant ne vise que ses propres baux.
     private readonly record struct LeaseKey(LeaseOwner Owner, string LeaseId);
 
-    // Le retour enregistré + le moment où il doit partir sans renouvellement. Immuable ; Renew
-    // fait une copie avec une nouvelle Expiry.
+    // Le retour et son échéance ; immuable, Renew en fait une copie.
     private sealed record LeaseEntry(PrivilegedOp RevertOp, DateTimeOffset Expiry, string? DernierEchec = null);
 }
 
 // -----------------------------------------------------------------------
-// LeaseOwner : l'identité authentifiée propriétaire d'un bail.
-//
-// Tirée de CallerInfo.ClientProcessId (le pid du pair résolu par le pipe, dont
-// l'authentificateur d'appelant a déjà vérifié qu'il est le DrDxt.App de confiance). Lier le
-// bail à cette identité fait toute l'auth : seul le même appelant authentifié peut renouveler
-// ou clore le bail qu'il a établi. Un pid non résolu → non identifié → refusé.
+// LeaseOwner : l'identité authentifiée propriétaire d'un bail, tirée de CallerInfo.ClientProcessId (pid du pair résolu
+// par le pipe, déjà vérifié comme le DrDxt.App de confiance). Toute l'auth des baux ; pid non résolu → refusé.
 // -----------------------------------------------------------------------
 public readonly record struct LeaseOwner(int? ProcessId = null)
 {

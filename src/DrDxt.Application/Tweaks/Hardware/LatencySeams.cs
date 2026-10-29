@@ -2,20 +2,10 @@ using DrDxt.Core;
 
 namespace DrDxt.Application.Tweaks.Hardware;
 
-// -----------------------------------------------------------------------
-// Coutures matérielles injectables des leviers de latence.
-//
-// Elles ne font que lire et dire ce qui est possible : elles n'écrivent jamais
-// elles-mêmes. Le vrai changement passe toujours par IElevatedClient avec un
-// PrivilegedOp typé et sur liste blanche (Phase A). Elles existent pour que chaque
-// levier puisse :
-//   * décider s'il s'applique (capacité / classe d'appareil), et
-//   * relever la vraie valeur d'origine avant la pose (pour un retour arrière fidèle).
-//
-// Chaque méthode rend un Result : un SDK ou un chemin de registre indisponible échoue
-// proprement (TWEAK.SDK_UNAVAILABLE), sans jamais lever. Les implémentations vivent dans
-// Detection / Infrastructure (P/Invoke) ; les tests unitaires utilisent des doublures NSubstitute.
-// -----------------------------------------------------------------------
+// Coutures matérielles des leviers de latence, en lecture seule : l'écriture passe par IElevatedClient (PrivilegedOp
+// typé, sur liste blanche). Elles disent si un levier s'applique (capacité, classe d'appareil) et relèvent la valeur
+// d'origine avant la pose. Chaque méthode rend un Result (indisponible → TWEAK.SDK_UNAVAILABLE, sans lever) ;
+// implémentations dans Detection / Infrastructure (P/Invoke), doublures NSubstitute en test.
 
 /// <summary>Couture de lecture du pilote NVIDIA (NVAPI / registre NVCP) pour les leviers
 /// de latence. La pose passe par IElevatedClient ; ceci ne fait que lire.</summary>
@@ -54,11 +44,9 @@ public interface INvApi
     /// défaut du pilote, OPTIMAL_POWER. Une panne de lecture rend faux. Par défaut : faux, le cas prudent.</summary>
     bool PreferredPstateAuDefaut() => false;
 
-    /// <summary>Un reglage DRS tel que le pilote l'applique a un executable, avec sa
-    /// provenance. Le profil de base n'est pas ce que le jeu recoit : un profil de jeu peut porter
-    /// sa propre valeur, et ecrire ou relire le global validerait alors un reglage sans effet.
-    /// Par defaut : Fail. Une couture qui ne sait pas lire au scope du jeu le dit ; elle ne rend
-    /// jamais la valeur globale a la place.</summary>
+    /// <summary>Un reglage DRS tel que le pilote l'applique a un executable, avec sa provenance : un profil de jeu peut
+    /// porter sa valeur, et le global validerait un reglage sans effet. Par defaut : Fail, jamais la valeur globale a la
+    /// place.</summary>
     Result<(uint Value, DrsOriginState Origin)> GetDrsForApplication(uint settingId, string applicationPath)
         => Result<(uint, DrsOriginState)>.Fail(ErrorCodes.TweakSdkUnavailable,
             "This seam cannot read a driver setting at game scope.");
@@ -124,10 +112,8 @@ public sealed record DisplayInfo(
     bool SupportsVrr /* G-Sync / FreeSync capable AND enabled */,
     int RefreshHz,
     // En dernier, avec défaut : les constructions existantes compilent toujours.
-    /// <summary>La fréquence la plus haute que l'écran offre à la résolution courante. 0 = non lu.
-    /// Jamais remplie par défaut avec <see cref="RefreshHz"/> : « on n'a pas lu le maximum » et
-    /// « l'écran est déjà à son maximum » sont deux réponses différentes, et les confondre
-    /// cacherait le déficit que ce champ existe pour montrer.</summary>
+    /// <summary>La fréquence la plus haute que l'écran offre à la résolution courante. 0 = non lu, jamais remplie avec
+    /// <see cref="RefreshHz"/> : « pas lu » n'est pas « déjà au maximum ».</summary>
     int MaxRefreshHz = 0,
     string? DeviceName = null,
     // Le VRR lu au pilote (NVAPI). Unknown = non lu, jamais Off. `SupportsVrr` n'est
@@ -143,15 +129,9 @@ public sealed record DisplayInfo(
     string? Adaptateur = null)
 {
     /// <summary>
-    /// L'écran peut faire mieux que ce que Windows lui demande. Arithmétique prouvée, pas une
-    /// estimation : le maximum que l'écran offre moins la fréquence à laquelle il tourne.
-    /// <para>
-    /// Vu sur la machine de référence : un écran capable de 200 Hz piloté à 144. La règle basse
-    /// latence de NVIDIA plafonne les images 3 sous la fréquence, d'où 141, et ce 141 était la
-    /// seule trace visible du vrai défaut. Corriger le plafond n'aurait rien corrigé ; le
-    /// déficit était l'écran, et le plafond son symptôme fidèle.
-    /// </para>
-    /// Un maximum inconnu ne retire rien, comme le reste de la doctrine de notation.
+    /// L'écran peut faire mieux que ce que Windows lui demande : le maximum offert moins la fréquence courante. Vu sur la
+    /// machine de référence : 200 Hz piloté à 144, et le plafond NVIDIA basse latence à 141 (3 sous la fréquence) n'en
+    /// était que le symptôme. Un maximum inconnu ne retire rien.
     /// </summary>
     public bool IsBelowCapability => MaxRefreshHz > 0 && RefreshHz > 0 && MaxRefreshHz > RefreshHz;
 
@@ -169,19 +149,13 @@ public interface IDisplayInfo
     /// au lieu de plafonner le mauvais écran.</summary>
     Result<DisplayInfo> GetPrimaryGameDisplay();
 
-    /// <summary>Tous les écrans branchés au bureau, le principal d'abord.
-    /// <para>
-    /// Un seul écran ne suffit pas à répondre à la question qui compte sur un bureau à plusieurs
-    /// écrans : un second écran plus rapide est invisible pour <see cref="GetPrimaryGameDisplay"/>,
-    /// et rien ne pourrait dire que le jeu tourne sur le plus lent.
-    /// </para></summary>
+    /// <summary>Tous les écrans branchés au bureau, le principal d'abord : un second écran plus rapide est invisible
+    /// pour <see cref="GetPrimaryGameDisplay"/>.</summary>
     Result<IReadOnlyList<DisplayInfo>> GetAllDisplays();
 }
 
-/// <summary>Couture minimale de lecture du registre (aucune écriture : elles passent par le
-/// helper élevé). Un levier y relève la vraie valeur DWORD d'origine avant la pose, pour que
-/// le snapshot porte une op inverse fidèle. Clé absente → Ok(null) : la valeur n'existe pas
-/// encore (son « origine » est l'absence). Chemin de registre cassé →
+/// <summary>Couture minimale de lecture du registre (l'écriture passe par le helper élevé) : l'origine relevée avant la
+/// pose, pour une op inverse fidèle. Clé absente → Ok(null) (l'origine est l'absence) ; chemin cassé →
 /// Fail(TWEAK.SDK_UNAVAILABLE).</summary>
 public interface IRegistryReader
 {
@@ -194,10 +168,8 @@ public interface IRegistryReader
     /// leviers qui lisent, modifient et réécrivent une chaîne composite (par exemple DirectXUserGlobalSettings).</summary>
     Result<string?> ReadString(RegistryHiveKind hive, string path, string name);
 
-    /// <summary>Lit un REG_MULTI_SZ et rend ses entrees jointes par des sauts de ligne,
-    /// la meme forme que celle transportee par SetRegistryValueOp, pour que capture et
-    /// rejeu soient symetriques. Ok(null) = valeur absente (capture = « absente ») ;
-    /// Fail(TWEAK.SDK_UNAVAILABLE) en cas d'erreur de lecture. Jamais une valeur inventee.</summary>
+    /// <summary>Lit un REG_MULTI_SZ, entrees jointes par des sauts de ligne comme dans SetRegistryValueOp (capture et
+    /// rejeu symetriques). Ok(null) = absente ; Fail(TWEAK.SDK_UNAVAILABLE) sur une erreur de lecture.</summary>
     Result<string?> ReadMultiString(RegistryHiveKind hive, string path, string name);
 }
 

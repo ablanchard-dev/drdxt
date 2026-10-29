@@ -34,10 +34,8 @@ public enum GameThreadPressure
 /// <summary>
 /// Un incident noyau du sous-systeme graphique, deja repete a l'identique.
 ///
-/// Pourquoi une valeur a part et non un `TuningGpuAutorise = false` de plus : ce drapeau porte
-/// une decision produit (« on reste a 0 MHz / 100 % »). Le jour ou elle est levee, il ne faut pas lever
-/// du meme geste un garde-fou fonde sur une mesure qu'il n'a pas regardee. Une decision et une
-/// preuve se revoquent separement.
+/// Une valeur a part, pas un `TuningGpuAutorise = false` de plus : ce drapeau porte une decision (« 0 MHz / 100 % »),
+/// ceci une preuve, et lever l'une ne doit pas lever l'autre.
 /// </summary>
 /// <param name="Occurrences">Combien de fois la meme signature est revenue. Une seule fois est un
 /// accident ; plusieurs fois est une condition.</param>
@@ -71,28 +69,17 @@ public sealed record DiagnosticMachine(
     IReadOnlyList<ArretClasse>? ArretsBrutaux = null);
 
 /// <summary>
-/// Ecarte, avant toute partie mesuree, les leviers que la mesure disqualifie deja, et dit pourquoi.
-/// Sans lui, l'autopilote essaierait les memes leviers sur une machine que le GPU sature et sur une
-/// machine ou il attend, en depensant a chaque fois quatre minutes et demie du temps de jeu du joueur.
-/// Il ne cherche pas le meilleur candidat : il elimine.
-///
-/// ══ ce qu'il sait eliminer, et sur quelle preuve ══
-/// **Un levier inerte.** Forcer l'etat P maximal n'a de sens que si la carte redescend.
-/// Mesure sur une session Warzone du 08/09/2026 : frequence mediane 2715 MHz, **minimum 2715 MHz**,
-/// pas un MHz de variation, et aucune raison de bridage publiee. Le levier n'a rien a donner ici, et le
-/// savoir coute une lecture au lieu de quatre minutes et demie.
-///
-/// **Un levier interdit.** Une decision de l'utilisateur (« on reste a 0 MHz / 100 % tant que les
-/// arrets non propres ne sont pas expliques ») n'est pas une preference a repeser a chaque
-/// session. Elle ferme la famille, point.
-///
-/// **Un levier hors sujet.** Un levier GPU sur une machine franchement CPU-bound ne sera pas
-/// interdit : il sera dit peu prometteur, parce que le classifieur peut se tromper et qu'une
-/// mesure vaut mieux qu'un pronostic.
-///
-/// **Ce selecteur ne prouve rien.** Il n'autorise aucun keep et n'annonce aucun gain. Il
-/// depense le temps du joueur la ou il a une chance de rapporter quelque chose. La preuve reste
-/// entierement du ressort de l'experience appariee.
+/// Ecarte, avant toute partie mesuree (quatre minutes et demie de jeu chacune), les leviers que la mesure disqualifie
+/// deja, et dit pourquoi. Il elimine, il ne choisit pas le meilleur, et il ne prouve rien : aucun keep, aucun gain
+/// annonce, la preuve reste a l'experience appariee.
+/// <list type="bullet">
+/// <item>Inerte : forcer l'etat P maximal n'a de sens que si la carte redescend ; mesure sur Warzone le 08/09/2026, mediane et
+/// minimum a 2715 MHz, aucun bridage publie.</item>
+/// <item>Interdit : une decision de l'utilisateur (« 0 MHz / 100 % tant que les arrets ne sont pas expliques ») ferme
+/// la famille, sans etre repesee a chaque session.</item>
+/// <item>Hors sujet : un levier GPU sur une machine CPU-bound est dit peu prometteur, pas interdit (le classifieur peut
+/// se tromper).</item>
+/// </list>
 /// </summary>
 public static class CandidateSelector
 {
@@ -111,15 +98,9 @@ public static class CandidateSelector
     public const string GrandeurLatence = "latence";
 
     /// <summary>
-    /// Les familles, de la plus prometteuse a la moins, avant tout choix d'identifiant.
-    ///
-    /// C'est le renversement qui compte. Le produit demandait « quel tweak avons-nous sous la
-    /// main ? » et repondait avec son catalogue. Il demande maintenant « ou cette machine perd-elle
-    /// de la performance ? », et le catalogue vient apres. Une famille peut donc arriver en tete
-    /// sans qu'aucun levier n'existe encore pour elle : c'est meme le resultat le plus utile,
-    /// puisqu'il dit quoi construire.
-    ///
-    /// Un classement n'est pas une preuve. Il ordonne des depenses de temps de jeu, rien de plus.
+    /// Les familles, de la plus prometteuse a la moins, avant tout choix d'identifiant : la question est « ou cette
+    /// machine perd-elle de la performance ? », le catalogue vient apres. Une famille en tete sans aucun levier dit quoi
+    /// construire. Un classement ordonne des depenses de temps de jeu ; ce n'est pas une preuve.
     /// </summary>
     public static IReadOnlyList<(CandidateFamily Famille, string Motif)> ClasserFamilles(
         DiagnosticMachine d)
@@ -375,12 +356,8 @@ public static class CandidateSelector
     /// Ce que la decision « 0 MHz / 100 % » (<see cref="DiagnosticMachine.TuningGpuAutorise"/> a
     /// faux) ferme, sur la meme definition des surfaces que les vetos : la carte elle-meme (frequences,
     /// tension, puissance, ventilateurs), et `NonDeclaree` (un levier qui ne dit pas ce qu'il ecrit ne passe
-    /// jamais un interdit).
-    ///
-    /// Ce qui change par rapport a l'ancienne lecture des grandeurs `gpu.`, sur le catalogue : deux leviers
-    /// ne portent plus ce motif. `latency.prefer_max_perf` ecrit un reglage DRS du pilote (PREFERRED_PSTATE) :
-    /// il ne touche ni l'offset d'horloge ni la limite de puissance, et les vetos de stabilite (incidents du
-    /// noyau graphique, arrets brutaux) le ferment toujours. Aucun levier n'est ferme en plus.
+    /// jamais un interdit). `latency.prefer_max_perf` ecrit un reglage DRS du pilote (PREFERRED_PSTATE), ni horloge ni
+    /// puissance : il reste ouvert ici, et les vetos de stabilite le ferment toujours.
     /// </summary>
     public static bool FermeeParLInterditGpu(SurfaceTouchee surface) =>
         surface is SurfaceTouchee.CarteGraphique or SurfaceTouchee.NonDeclaree;

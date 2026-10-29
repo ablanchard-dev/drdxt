@@ -30,16 +30,9 @@ public static class XmpInferencer
         // ── Seconde source : la tension configurée. Elle sert uniquement quand la fréquence
         //    ne peut pas trancher (vitesse nominale ou configurée non lue).
         //
-        //    Elle ne doit jamais court-circuiter le test de fréquence, et le piège est réel :
-        //    une carte peut charger la tension du profil puis échouer l'entraînement mémoire et
-        //    retomber au socle JEDEC. On lirait alors 1,35 V à 2133 MT/s. Conclure « profil
-        //    chargé » y masquerait le défaut exact que l'utilisateur doit corriger : un faux
-        //    négatif, la pire sortie possible ici.
-        //
-        //    Et elle reste asymétrique : une tension au nominal ne prouve pas l'absence de
-        //    profil (il existe des profils XMP qui tournent à la tension JEDEC). Elle conclut
-        //    On, jamais Off. Même forme qu'Above4G et Csm : ce qui prouve dans un sens ne
-        //    prouve pas dans l'autre. ──
+        //    Jamais avant la fréquence : une carte peut charger la tension du profil, échouer l'entraînement et retomber
+        //    au JEDEC (1,35 V à 2133 MT/s), et « profil chargé » masquerait le défaut. Asymétrique : elle conclut On,
+        //    jamais Off (des profils XMP tournent à la tension JEDEC), comme Above4G et Csm. ──
         if (modules.Any(m => m.RatedMhz <= 0 || m.ConfiguredMhz <= 0))
             return modules.Any(ProfileVoltageProven) ? TriState.On : TriState.Unknown;
 

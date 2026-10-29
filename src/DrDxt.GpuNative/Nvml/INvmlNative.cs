@@ -1,30 +1,13 @@
 ﻿namespace DrDxt.GpuNative.Nvml;
 
-// -----------------------------------------------------------------------
-// INvmlNative : la frontière managée mince sur nvml.dll (NVIDIA Management Library).
-//
-// NVML est la bibliothèque sur laquelle est construit nvidia-smi. Contrairement à NVAPI
-// (QueryInterface seulement, ids privés rétro-ingéniés), NVML expose des exports nommés, stables et
-// documentés : cette frontière est un P/Invoke direct, sans table d'ids de fonction ni recette.
-//
-// Ce qu'elle lit (source : docs.nvidia.com/deploy/nvml-api) :
-//   • la taille de BAR1 + la taille du framebuffer, d'où l'on déduit l'état du Resizable BAR
-//     (ReBAR activé ⇒ BAR1 ≈ toute la VRAM ; désactivé ⇒ fenêtre historique de ~256 Mio) ;
-//     nvmlDeviceGetBAR1MemoryInfo est l'appel exact de nvidia-smi pour « BAR1 Memory Usage » ;
-//   • la consommation, la température, la fréquence graphique et les raisons de bridage ;
-//   • la version du pilote (branche NVIDIA, par exemple « 580.88 ») ;
-//   • le lien PCIe (négocié et maximum) et la fréquence de la mémoire vidéo ;
-//   • les ventilateurs (vitesse, cible, politique, plage).
-// Elle porte aussi deux écritures de ventilateur, TryPoserVentilateur et TryRendreVentilateur
-// (false par défaut pour une implémentation qui ne les porte pas).
-//
-// Contrat d'échec propre (comme INvApiNative / IAdlxNative) :
-//   • IsAvailable == false ⇒ nvml.dll absente, pas de GPU NVIDIA, ou nvmlInit raté.
-//   • Aucun Try* ne lève ; il rend false sur toute panne ; les paramètres out sont à leur valeur par défaut.
-// -----------------------------------------------------------------------
-
-/// <summary>Frontière mince sur NVML natif. Ne lève jamais : rend false sur tout échec (DLL
-/// absente, init ratée, mauvais index, panne du pilote).</summary>
+/// <summary>Frontière managée mince sur nvml.dll (NVIDIA Management Library, la base de nvidia-smi). Contrairement à
+/// NVAPI (QueryInterface seulement, ids privés rétro-ingéniés), NVML expose des exports nommés, stables et documentés
+/// (docs.nvidia.com/deploy/nvml-api) : un P/Invoke direct. Elle lit BAR1 et le framebuffer (d'où l'état du Resizable
+/// BAR : activé ⇒ BAR1 ≈ toute la VRAM, désactivé ⇒ ~256 Mio ; nvmlDeviceGetBAR1MemoryInfo est l'appel de nvidia-smi
+/// pour « BAR1 Memory Usage »), la consommation, la température, la fréquence, les raisons de bridage, la version du
+/// pilote, le lien PCIe, la mémoire vidéo et les ventilateurs, sans élévation, et porte deux écritures de ventilateur
+/// (false par défaut). Ne lève jamais : false sur tout échec (DLL absente, pas de GPU NVIDIA, init ratée, mauvais index, panne du
+/// pilote), paramètres out à leur valeur par défaut.</summary>
 public interface INvmlNative
 {
     /// <summary>Vrai quand nvml.dll est chargée et que nvmlInit_v2 a réussi (GPU NVIDIA + pilote présents).</summary>
@@ -40,53 +23,36 @@ public interface INvmlNative
 
     /// <summary>
     /// Consommation de la carte en milliwatts pour le périphérique d'index <paramref name="deviceIndex"/>.
-    /// Tente d'abord la lecture instantanée (nvmlDeviceGetPowerUsage), puis se rabat sur la moyenne du
-    /// tampon circulaire de relevés de puissance (nvmlDeviceGetSamples) : la lecture instantanée est
-    /// dépréciée / N/A sur les cartes Ada grand public (RTX série 40), où le tampon de relevés est le
-    /// seul chemin vers de vrais watts. Lecture seule, non élevée. C'est l'instrument d'efficacité du
-    /// levier d'undervolt : à performance égale, un vrai undervolt la fait baisser. Rend false si
-    /// aucun des deux chemins ne donne une lecture non nulle.
+    /// La lecture instantanée (nvmlDeviceGetPowerUsage), sinon la moyenne du tampon de relevés (nvmlDeviceGetSamples) :
+    /// l'instantanée est dépréciée / N/A sur les Ada grand public (RTX série 40). L'instrument d'efficacité de
+    /// l'undervolt (à performance égale, elle baisse). False sans lecture non nulle.
     /// </summary>
     bool TryGetPowerUsageMilliwatts(int deviceIndex, out uint milliwatts);
 
     /// <summary>
     /// Température actuelle du cœur du GPU en Celsius (nvmlDeviceGetTemperature, NVML_TEMPERATURE_GPU).
-    /// Lecture seule, non élevée. Confirme le bénéfice de l'undervolt (tension plus basse ⇒
-    /// température plus basse ⇒ plus de marge de boost). Rend false sur un mauvais index, sans GPU
-    /// NVIDIA, ou sur une panne du pilote.
+    /// Confirme le bénéfice de l'undervolt (tension plus basse ⇒ température plus basse ⇒ marge de boost).
     /// </summary>
     bool TryGetTemperatureCelsius(int deviceIndex, out uint celsius);
 
     /// <summary>
-    /// Frequence graphique courante en MHz (nvmlDeviceGetClockInfo, NVML_CLOCK_GRAPHICS).
-    ///
-    /// Pas besoin de NVAPI : c'est un export NVML nomme, documente et stable, exactement comme la
-    /// puissance et la temperature. Source : docs.nvidia.com/deploy/nvml-api, groupe nvmlDeviceQueries.
-    ///
-    /// false quand le peripherique ne sait pas rendre cette horloge
-    /// (NVML_ERROR_NOT_SUPPORTED) : jamais un zero fabrique.
+    /// Frequence graphique courante en MHz (nvmlDeviceGetClockInfo, NVML_CLOCK_GRAPHICS ; groupe nvmlDeviceQueries).
+    /// false quand le peripherique ne la rend pas (NVML_ERROR_NOT_SUPPORTED) : jamais un zero fabrique.
     /// </summary>
     bool TryGetClockMhz(int deviceIndex, out uint mhz);
 
     /// <summary>
     /// Bitmask des raisons pour lesquelles l'horloge est actuellement bridee
     /// (nvmlDeviceGetCurrentClocksEventReasons, avec repli sur l'ancien nom
-    /// nvmlDeviceGetCurrentClocksThrottleReasons).
-    ///
-    /// Ici <c>0</c> est une vraie valeur : nvmlClocksEventReasonNone vaut 0x0 et signifie
-    /// « rien ne bride ». Le booleen de retour est donc la seule facon de distinguer « rien ne
-    /// bride » de « pas lisible ».
-    ///
-    /// Source : docs.nvidia.com/deploy/nvml-api, groupe nvmlClocksEventReasons.
+    /// nvmlDeviceGetCurrentClocksThrottleReasons ; groupe nvmlClocksEventReasons). <c>0</c> est une vraie valeur
+    /// (nvmlClocksEventReasonNone, « rien ne bride ») : seul le booleen distingue « rien ne bride » de « pas lisible ».
     /// </summary>
     bool TryGetClocksEventReasons(int deviceIndex, out ulong reasons);
 
     /// <summary>
-    /// Branche du pilote NVIDIA telle que l'utilisateur la connait ("580.88"), via
-    /// nvmlSystemGetDriverVersion. C'est la seule source d'un vrai numero de branche cote
-    /// user-mode sans elevation : Win32_VideoController.DriverVersion rend la quadruplette
-    /// WDDM ("32.0.16.1088"), dont le premier groupe est la version WDDM/DirectX. false quand
-    /// NVML est absent ou que l'appel echoue, jamais une version fabriquee.
+    /// Branche du pilote NVIDIA telle que l'utilisateur la connait ("580.88"), via nvmlSystemGetDriverVersion : la
+    /// seule source sans elevation (Win32_VideoController.DriverVersion rend la quadruplette WDDM "32.0.16.1088").
+    /// false quand NVML est absent ou que l'appel echoue, jamais une version fabriquee.
     /// </summary>
     bool TryGetDriverVersion(out string version);
     /// <summary>Lien PCIe negocie et maximum (NVML). Faux si non lu.</summary>

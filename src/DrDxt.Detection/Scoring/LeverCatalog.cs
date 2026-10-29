@@ -4,24 +4,15 @@ using DrDxt.Core;
 namespace DrDxt.Detection.Scoring;
 
 /// <summary>
-/// Source unique du registre des leviers et des constats du scan.
-///
-/// Sans ce catalogue, <see cref="ScoringRules"/> (constats + EstimatedGainPct) et le scorer
-/// porteraient deux jeux de chiffres divergents. Ils consomment la même évaluation ici : le gain d'un
-/// constat (non affiché) == les points retirés.
-///
-/// Doctrine :
-///  - Les magnitudes sont des estimations d'expert étalonnées (paliers ordinaux Major/Minor), pas
-///    des pourcentages mesurés ou « sourcés ». La vraie mesure ne vit que dans le bloc A/B PresentMon.
-///  - On ne pénalise pas les défauts neutres de Windows (HAGS coupé, Équilibré, mode Jeu coupé, VRR
-///    coupé sur un écran sans VRR) : ce sont des occasions à impact 0, jamais un déficit inventé.
+/// Source unique du registre des leviers et des constats du scan : <see cref="ScoringRules"/> et le scorer consomment la
+/// même évaluation, le gain d'un constat (non affiché) == les points retirés.
+///  - Les magnitudes sont des estimations d'expert (paliers Major/Minor), pas des pourcentages mesurés ; la mesure vit
+///    dans le bloc A/B PresentMon.
+///  - Les défauts neutres de Windows (HAGS coupé, Équilibré, mode Jeu coupé, VRR sans écran VRR) sont des occasions à
+///    impact 0.
 ///  - Chaque pénalité dépend du matériel ou du symptôme qui rend le gain réel.
-///  - Unknown (illisible) ne retire rien mais compte dans Coverage. Le ReBAR NVIDIA se lit par
-///    NVML (NvmlReBarProvider) et celui d'AMD par ADLX : On/Off sont réels ; quand une lecture manque,
-///    on pousse quand même un constat de guidage sur NVIDIA pour que le levier dominant reste visible.
-///
-/// Indépendant du fabricant : marche pour AMD, Intel et NVIDIA à partir des seuls contrats publics
-/// <see cref="HardwareInventory"/> / <see cref="SettingsState"/>.
+///  - Unknown ne retire rien mais compte dans Coverage.
+/// Indépendant du fabricant : seuls les contrats <see cref="HardwareInventory"/> / <see cref="SettingsState"/>.
 /// </summary>
 internal static class LeverCatalog
 {
@@ -30,8 +21,8 @@ internal static class LeverCatalog
     public const string GroupLatency = "Latency";
     public const string GroupStability = "Stability";
 
-    // Clés de source (audit C1) : le palier ordinal vient d'une fiche north-star ; le chiffre exact
-    // est une estimation étalonnée, montrée pour l'audit, jamais présentée comme mesurée.
+    // Clés de source (audit C1) : le palier vient d'une fiche north-star ; le chiffre exact est une estimation, jamais
+    // présentée comme mesurée.
     private const string SrcRam = "Source.RamAll";
     private const string SrcCpu = "Source.CpuAll";
     private const string SrcGpu = "Source.GpuVendors";
@@ -43,8 +34,7 @@ internal static class LeverCatalog
     private const int OtherBranchFloor = 20;   // AMD/Intel « 24.x »/« 31.0.x » → premier groupe minuscule = ancien
 
     /// <summary>
-    /// Un levier évalué : tout ce que consomment à la fois le scorer (pénalité / registre /
-    /// couverture) et la table des constats, pour que les deux ne divergent jamais.
+    /// Un levier évalué : ce que consomment le scorer et la table des constats, pour qu'ils ne divergent jamais.
     /// </summary>
     public sealed record LeverResult(
         string LeverId,
@@ -55,38 +45,28 @@ internal static class LeverCatalog
         string SourceKey,
         Finding? Finding,       // constat affiché (null = rien à montrer)
         bool CountsForCoverage, // vrai pour les vrais leviers notés (exclut les occasions neutres)
-        // Non nul quand la mesure dit que ce levier ne rendra pas d'images sur cette
-        // machine. Le constat et la penalite restent : c'est la promesse de gain qui tombe.
-        // Motif en clair, montrable tel quel (meme convention que FrameCapState.Reason).
+        // Non nul quand la mesure dit que ce levier ne rendra pas d'images ici : constat et penalite restent, la promesse
+        // tombe. Motif montrable tel quel (comme FrameCapState.Reason).
         string? GainSuppressedReason = null)
     {
         /// <summary>Vrai quand la mesure interdit de vendre ce levier comme des images en plus.</summary>
         public bool GainSuppressed => GainSuppressedReason is not null;
     }
 
-    /// <param name="measured">
-    /// Le verdict de goulot mesure cette session. null = pas de mesure (scan sans jeu, service
-    /// indisponible) : rien n'est supprime. Ne pas savoir n'est pas une raison de taire un
-    /// reglage, c'est une raison de ne pas promettre.
-    ///
-    /// Avant ce parametre, LeverCatalog ne recevait jamais de mesure. Le produit mesurait
-    /// d'un cote et recommandait de l'autre, donc il proposait les memes leviers a une machine
-    /// GPU-bound a 97 % et a une machine etranglee par la validation memoire.
-    /// </param>
+    /// <param name="measured">Le verdict de goulot mesure cette session, pour ne pas proposer les memes promesses a une
+    /// machine GPU-bound a 97 % et a une machine etranglee par la validation memoire. null = pas de mesure : rien n'est
+    /// supprime.</param>
     public static IReadOnlyList<LeverResult> Evaluate(
         HardwareInventory hw, SettingsState state, BottleneckVerdict? measured = null)
     {
         var desktop = hw.Chassis is ChassisType.Desktop;
         // Le ReBAR se lit sur la carte dédiée : une puce intégrée listée en premier n'a pas de BAR à agrandir.
         var primaryGpu = CartesGraphiques.CarteDediee(hw);
-        // Symptôme de parcage des cœurs = condition du seul routage X3D. Le levier du plan d'alimentation ne
-        // s'en sert pas (SanePowerPlanTweak : la politique de parcage est identique entre Equilibre et Haute
-        // performance). Au repos, des coeurs parques sont la norme : ce signal n'est pas un defaut a lui seul.
-        // Tri-etat : true = coeurs parques, false = lu et aucun, null = pas lu. Le
-        // troisieme cas ne doit ni armer un levier, ni compter comme une machine saine.
-        // « des coeurs parqués » ne suffit pas ; seul le CCD de fréquence parqué, c'est le
-        // routage sain. Le docteur suit la règle du levier fixit.x3d_ccd : un coeur du CCD à cache parqué. Rien de parqué
-        // reste « non confirmé » ici, le levier le propose sous garde ; le parcage n'est lu que jeu ouvert (hors jeu : null).
+        // Symptôme de parcage = condition du seul routage X3D (la politique de parcage est identique entre Equilibre et
+        // Haute performance, SanePowerPlanTweak). Des coeurs parques au repos sont la norme. Tri-etat : true = mal parque
+        // (la règle de fixit.x3d_ccd : un coeur du CCD à cache parqué), false = seul le CCD de fréquence parqué (routage
+        // sain), null = pas lu (hors jeu) ; null n'arme rien et ne compte pas comme sain. Rien de parqué reste « non
+        // confirmé », le levier le propose sous garde.
         bool? parkingSymptom = state.ParkedCoreIndexes is null
             ? null
             : state.ParkedCoreIndexes.Count == 0 ? false : DrDxt.Application.Tweaks.FixIt.X3dParkingHeuristic.LooksMisparked(hw.Cpu, state);
@@ -106,10 +86,8 @@ internal static class LeverCatalog
             EvaluateSysMain(state),
         };
 
-        // La mesure ne change que ce qu'on raconte. Chaque champ du levier est repris tel
-        // quel, penalite comprise : le registre decrit la configuration, et le faire dependre
-        // d'une mesure ferait bouger le registre d'une machine selon qu'un jeu tournait ou non au
-        // moment du scan.
+        // La mesure ne change que ce qu'on raconte, penalite comprise : le registre decrit la configuration, il ne bouge
+        // pas selon qu'un jeu tournait au scan.
         return levers
             .Select(l => l with
             {
@@ -156,10 +134,8 @@ internal static class LeverCatalog
     }
 
     // --- Routage X3D multi-CCD (Performance, Major 12) ------------------------------
-    // Ne s'applique qu'à un X3D à plus d'un CCD. Pénalité seulement sur une erreur confirmée. Le seul
-    // signal de confirmation lisible est le symptôme de parcage ; sans lui, on ne peut pas confirmer un
-    // routage sain (les cœurs parqués ne sont lus que jeu ouvert et l'état d'AMD3DVCacheSvc n'est pas lu) :
-    // on reste Unknown (0) avec un constat Info, jamais de punition pour une machine X3D saine.
+    // X3D à plus d'un CCD seulement ; pénalité sur une erreur confirmée par le symptôme de parcage. Sans lui (parcage lu
+    // jeu ouvert seulement, AMD3DVCacheSvc non lu) : Unknown (0) et un constat Info.
     private static LeverResult EvaluateX3d(HardwareInventory hw, bool? parkingSymptom, bool routageSain)
     {
         const int magnitude = 12;
@@ -177,10 +153,8 @@ internal static class LeverCatalog
     }
 
     // --- ReBAR coupé (Performance, Minor 3) : guidage BIOS. --------------------------------------
-    // Condition : PC de bureau + un GPU. Le ReBAR NVIDIA se lit par NVML (NvmlReBarProvider) et celui
-    // d'AMD par ADLX (SAM) → On/Off sont réels. La branche Unknown est le repli quand la lecture manque :
-    // sur NVIDIA on affiche quand même un constat de guidage, pour que le levier dominant reste visible,
-    // ailleurs une info honnête « illisible » ; ni l'un ni l'autre ne coûte de points.
+    // PC de bureau + un GPU. Lu par NVML (NvmlReBarProvider) chez NVIDIA, ADLX (SAM) chez AMD. Lecture manquante : un
+    // constat de guidage sur NVIDIA (le levier dominant reste visible), « illisible » ailleurs ; aucun point.
     private static LeverResult EvaluateRebar(GpuInfo? gpu, bool desktop)
     {
         const int magnitude = 3;
@@ -203,8 +177,7 @@ internal static class LeverCatalog
     }
 
     // --- VRR coupé (Latence, Minor 5) -------------------------------------------------
-    // Un déficit seulement si un écran compatible VRR est confirmé. Sans confirmation, on ne peut pas
-    // affirmer le gain → NotApplicable pour le score (0), affiché comme occasion neutre s'il est coupé.
+    // Un déficit seulement sur un écran VRR confirmé ; sinon NotApplicable (0), occasion neutre s'il est coupé.
     private static LeverResult EvaluateVrr(SettingsState state)
     {
         const int magnitude = 5;
@@ -218,10 +191,8 @@ internal static class LeverCatalog
 
         if (!displayCapable)
         {
-            // Pas d'écran VRR confirmé → pas noté. Si le VRR est coupé, on le montre comme occasion,
-            // sauf si le pilote a lu l'ecran non capable : sur la machine de
-            // reference NVAPI rend « VRR impossible » sur les deux ecrans, et « VRR desactive »
-            // aurait conseille d'activer ce qui n'existe pas. Un faux besoin, comme power-plan.
+            // Pas noté. VRR coupé : occasion, sauf si le pilote a lu l'ecran non capable (NVAPI rend « VRR impossible »
+            // sur les deux ecrans de la machine de reference : conseiller de l'activer serait un faux besoin).
             var opportunity = state.Vrr == TriState.Off && state.VrrCapableDisplay != TriState.Off
                 ? new Finding("Latency", Severity.Info, "Finding.Latency.VrrInactiveSupportUnknown", null)
                 : null;
@@ -240,9 +211,7 @@ internal static class LeverCatalog
     // mesure ; la mesure ne bouge jamais le registre de configuration.
 
     // --- HAGS coupé : occasion neutre (audit C2), jamais un déficit. ----------------------------
-    // HAGS est coupé par défaut sur la plupart des installations et son gain est « non garanti »
-    // (Microsoft). Affiché comme occasion s'il est coupé, il ne retire jamais rien et n'entre pas
-    // au dénominateur de la couverture.
+    // Coupé par défaut sur la plupart des installations, gain « non garanti » (Microsoft) : ni points ni couverture.
     private static LeverResult EvaluateHagsOpportunity(SettingsState state)
     {
         const string key = "Finding.Latency.HagsOff";
@@ -253,29 +222,17 @@ internal static class LeverCatalog
     }
 
     // --- L'ecran tourne sous sa frequence maximale (Performance, Major 15) -----------------------
-    //
-    // Le levier le plus gratuit d'un PC de jeu : il ne demande ni materiel, ni risque, ni
-    // compromis de qualite d'image, juste un menu Windows. Et aucun autre levier du catalogue ne
-    // le compense. Un panneau 200 Hz pilote a 143 Hz jette 28 % des images que le GPU rend deja.
-    //
-    // Mesure sur la machine de reference les 12 et 15/08/2026 : exactement ce cas, trois jours
-    // durant, pendant qu'un scan la declarait saine.
-    //
-    // Magnitude 15 = le meme rang que XMP, et c'est deliberé : les deux sont des leviers
-    // Performance majeurs, et celui-ci est le seul dont le gain est arithmetique plutot
-    // qu'estime : les images sont deja rendues, elles ne sont simplement pas affichees.
-    //
-    // Unknown ne deduit rien : « je n'ai pas pu enumerer les modes » n'est pas « l'ecran est deja
-    // au maximum ». C'est la regle 3 de l'heuristique, et la ligne ou ce levier deviendrait un
-    // deficit fabrique sur toute machine dont l'affichage ne se lit pas.
+    // Sans materiel ni risque, un menu Windows : un panneau 200 Hz pilote a 143 Hz jette 28 % des images deja rendues
+    // (machine de reference, 12 et 15/08/2026, pendant qu'un scan la declarait saine). Le rang de XMP, et le seul gain
+    // arithmetique plutot qu'estime. Unknown ne deduit rien (regle 3 de l'heuristique) : « modes non enumeres » n'est
+    // pas « deja au maximum ».
     private static LeverResult EvaluateDisplayRefresh(SettingsState state)
     {
         const int magnitude = 15;
         const string key = "Finding.Display.RefreshBelowMax";
 
         if (state.DisplayRefresh is not { } headroom)
-            // Aucune sonde d'affichage : le levier n'a pas ete evalue. Il compte comme non
-            // couvert, ce qui le rend visible dans la couverture au lieu de disparaitre.
+            // Aucune sonde d'affichage : non evalue, donc visible comme non couvert.
             return new("display-refresh", GroupPerformance, LeverState.Unknown, 0, key, SrcOsLatency,
                 null, true);
 
@@ -292,21 +249,12 @@ internal static class LeverCatalog
     }
 
     // ═══ Les degats deja infliges par un « optimiseur » precedent ═══════════════════════
-    //
-    // Trois regressions, trois traitements differents, et la difference n'est pas un detail de
-    // gout : on ne penalise que ce que la recherche du depot source comme un vrai risque. Traiter
-    // les trois pareil serait plus simple et malhonnete dans un sens ou dans l'autre.
-    //
-    // Aucune des trois ne promet d'images. Ce sont des reparations, pas des gains, et c'est
-    // exactement ce que le plan demandait : « les traiter en regressions a reparer, pas en
-    // opportunites ».
+    // Trois regressions, trois traitements : seul un risque source est penalise. Des reparations, aucune promesse
+    // d'images.
 
     // --- Pagefile desactive (Stabilite, Minor 5) : regression penalisee. -----------------------
-    // Microsoft documente le fait : a la limite de validation, le systeme et les processus
-    // peuvent geler, planter ou mal fonctionner. C'est un risque de fiabilite reel et source, pas
-    // une preference. Groupe Stabilite et jamais Performance : desactiver le pagefile ne coute pas
-    // des images, ca coute des plantages.
-    // Source : https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file
+    // A la limite de validation, le systeme et les processus peuvent geler, planter ou mal fonctionner : des plantages,
+    // pas des images. Source : https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file
     private static LeverResult EvaluatePagefile(SettingsState state)
     {
         const int magnitude = 5;
@@ -340,25 +288,16 @@ internal static class LeverCatalog
     }
 
     // --- SysMain desactive : regression signalee, jamais penalisee. ---------------------------
-    //
-    // Le levier ou il aurait ete facile de se tromper. SysMain desactive est le geste
-    // « optimiseur » le plus courant, donc la tentation est de le compter comme un defaut. Mais
-    // la note memoire du projet (non publiee) conclut : gain **non prouve** sur une install
-    // saine, et sur SSD l'effet (positif comme negatif) est negligeable (Microsoft :
-    // https://learn.microsoft.com/en-us/powershell/module/mmagent/enable-mmagent).
-    //
-    // Retirer des points pour ca fabriquerait un deficit sur un reglage dont l'impact est
-    // documente comme nul : exactement la faute que l'audit adverse reproche (C2). On le dit,
-    // on n'en fait pas un chiffre. Le constat garde toute sa valeur : il apprend a l'utilisateur
-    // que sa machine a ete « optimisee » par quelqu'un d'autre.
+    // Le geste « optimiseur » le plus courant, mais gain non prouve sur une install saine (note memoire du projet, non
+    // publiee) et effet negligeable sur SSD (Microsoft : https://learn.microsoft.com/en-us/powershell/module/mmagent/enable-mmagent).
+    // Le penaliser fabriquerait un deficit (audit C2). Le constat dit que la machine a ete « optimisee » par un autre.
     private static LeverResult EvaluateSysMain(SettingsState state)
     {
         const string key = "Finding.Memory.SysMainOff";
         var regression = state.SysMain == TriState.Off
             ? new Finding("Memory", Severity.Info, key, null)
             : null;
-        // NotApplicable + hors couverture : le levier n'est pas note, donc il ne doit pas non plus
-        // peser sur le denominateur d'honnetete du scan (meme traitement que HAGS).
+        // Non note, donc hors couverture (comme HAGS).
         return new("sysmain", GroupStability, LeverState.NotApplicable, 0, key, SrcRam, regression, false);
     }
 
@@ -370,16 +309,13 @@ internal static class LeverCatalog
         string.IsNullOrWhiteSpace(gpu.DriverVersion)
         || string.Equals(gpu.DriverVersion.Trim(), "Unknown", StringComparison.OrdinalIgnoreCase);
 
-    // Prudent : une version non lue n'est jamais périmée (voir PiloteNonLu) ; une version non
-    // numérique est un marqueur de corruption ; une branche de tête sous le plancher du fabricant =
-    // vraiment ancienne. Tout ce qui se lit au plancher ou au-dessus = récent.
+    // Non lue : jamais périmée ; non numérique : corruption ; branche de tête sous le plancher du fabricant : ancienne.
     private static bool IsDriverStaleOrCorrupt(GpuInfo gpu)
     {
         var version = gpu.DriverVersion;
         if (PiloteNonLu(gpu))
             return false;
-        // Forme WDDM à 4 groupes (« 32.0.16.1088 ») = ce que rapporte WMI. Son groupe de tête est la
-        // version WDDM, pas la branche du fabricant : aucun signal de fraîcheur, jamais un déficit.
+        // Forme WDDM à 4 groupes (« 32.0.16.1088 », WMI) : la tête est la version WDDM, aucun signal de fraîcheur.
         if (IsWddmQuad(version))
             return false;
         var branch = LeadingBranch(version);

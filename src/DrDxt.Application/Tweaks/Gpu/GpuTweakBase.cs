@@ -35,22 +35,11 @@ public abstract class GpuTweakBase : ITweak
     public abstract Task<Result<TweakSnapshot>> ApplyAsync();
 
     /// <summary>
-    /// Arme l'homme mort du helper élevé pour un décalage ou une limite de puissance GPU
-    /// tenus : inscrit un bail dont le retour automatique est la même op inverse typée que
-    /// ce levier produit déjà pour <see cref="RevertAsync"/> et, en cas de succès, rend un
-    /// <see cref="HeartbeatSender"/> démarré que l'appelant garde en vie tant que le décalage
-    /// est tenu.
-    ///
-    /// Si le contrôleur meurt (ou libère le battement), le bail expire et le helper annule
-    /// le levier tout seul : un décalage privilégié tenu ne reste jamais posé sans filet. Tout
-    /// passe par IElevatedClient (même pipeline IPC signé, même identité d'appelant) ; l'inverse
-    /// voyage en JSON du codec, pour que le helper le relie et le revalide à la feuille près à l'échéance.
-    ///
-    /// Si le bail ne peut pas être ouvert (pas de helper, refus), ceci échoue proprement et
-    /// ne rend aucun battement (ne lève jamais).
-    ///
-    /// Armé par <see cref="GpuUndervoltTweak.ApplyAvecBailAsync"/>, le chemin du mode Expert,
-    /// avant l'écriture. L'autopilote ne l'arme pas : il n'écrit ni fréquence ni tension.
+    /// Arme l'homme mort du helper élevé pour un décalage ou une limite GPU tenus : un bail dont le retour est l'op inverse
+    /// de <see cref="RevertAsync"/> (en JSON du codec, revalidée à la feuille par le helper), et un
+    /// <see cref="HeartbeatSender"/> à garder en vie tant que le décalage tient. Contrôleur mort ou battement libéré : le
+    /// helper annule seul. Bail impossible (pas de helper, refus) : échec propre, aucun battement. Armé par
+    /// <see cref="GpuUndervoltTweak.ApplyAvecBailAsync"/> (mode Expert) ; l'autopilote n'écrit ni fréquence ni tension.
     /// </summary>
     protected async Task<Result<HeartbeatSender>> EstablishAutoRevertLeaseAsync(
         PrivilegedOp inverse, string leaseId, int leaseSeconds)

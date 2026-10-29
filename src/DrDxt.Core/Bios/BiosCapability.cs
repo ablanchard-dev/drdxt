@@ -1,48 +1,30 @@
 ﻿namespace DrDxt.Core;
 
 /// <summary>
-/// Ce que DrDXT sait faire d'un reglage BIOS, sur cette plateforme.
-///
-/// `GuidedBios` est l'etape actuelle, pas la finalite. Le produit doit progressivement savoir
-/// ecrire certains reglages lui-meme : pas universellement, pas en devinant, pas par un hack
-/// generique, mais sur les plateformes pour lesquelles une methode fiable a ete identifiee et
-/// qualifiee.
-///
-/// La doctrine est donc : **aucune ecriture BIOS generique ou non qualifiee**, et non « aucune
-/// ecriture BIOS pour toujours ».
-///
-/// Il n'existe volontairement aucune valeur `GenericBiosWrite`. Son absence est le garde-fou :
-/// une future decision ne pourra pas s'y glisser sans ajouter explicitement un niveau, ce qui se
-/// verra.
+/// Ce que DrDXT sait faire d'un reglage BIOS, sur cette plateforme. Doctrine : aucune ecriture BIOS generique ou non
+/// qualifiee (pas « aucune pour toujours ») ; ecrire seulement la ou une methode fiable a ete qualifiee. Il n'existe
+/// exprès aucune valeur `GenericBiosWrite` : l'ajouter devrait se faire explicitement, et se verrait.
 /// </summary>
 public enum BiosCapabilityLevel
 {
     /// <summary>Aucune voie sure connue sur cette plateforme. → PDF et QR uniquement.</summary>
     Unsupported,
 
-    /// <summary>DrDXT connait le reglage et la procedure, mais ne peut pas l'ecrire assez surement.
-    /// → PDF et QR, puis validation apres redemarrage. **Le repli universel, qui ne disparait
-    /// jamais.**</summary>
+    /// <summary>DrDXT connait le reglage et la procedure, sans pouvoir l'ecrire surement. → PDF et QR, puis validation
+    /// apres redemarrage. Le repli universel, qui ne disparait jamais.</summary>
     Guided,
 
-    /// <summary>Une interface officiellement supportee par le constructeur permet lecture et
-    /// ecriture. → automatisable apres qualification.</summary>
+    /// <summary>Une interface officielle du constructeur lit et ecrit. → automatisable apres qualification.</summary>
     VendorSupportedWrite,
 
-    /// <summary>Une voie firmware/UEFI specifique a ete etudiee et validee pour une carte exacte,
-    /// une version de BIOS exacte et un reglage exact. → automatisable uniquement dans cette
-    /// matrice de compatibilite.</summary>
+    /// <summary>Une voie firmware/UEFI validee pour une carte, une version de BIOS et un reglage exacts. →
+    /// automatisable uniquement dans cette matrice.</summary>
     QualifiedFirmwareWrite,
 }
 
 /// <summary>
-/// La reversibilite d'un reglage BIOS ne se deduit pas de la connaissance de l'ancienne valeur.
-///
-/// Pour un reglage Windows : snapshot → apply → read-back → revert. Pour un reglage BIOS, si la
-/// machine ne passe plus le POST, **Windows ne s'execute pas** et `Revert()` n'a aucune chance de tourner.
-/// Connaitre l'ancienne valeur ne sert alors a rien.
-///
-/// Ce type existe pour qu'aucun code ne puisse ecrire « reversible » a partir d'un snapshot.
+/// La reversibilite d'un reglage BIOS ne se deduit pas de l'ancienne valeur : si la machine ne passe plus le POST,
+/// Windows ne s'execute pas et `Revert()` ne tourne jamais. Aucun code ne peut ecrire « reversible » depuis un snapshot.
 /// </summary>
 public enum BiosRecoverability
 {
@@ -56,42 +38,31 @@ public enum BiosRecoverability
     /// profil de secours, double BIOS.</summary>
     FirmwareRevertPossible,
 
-    /// <summary>Seule une intervention physique recupere la machine : cavalier Clear CMOS, retrait
-    /// de la pile, bouton de secours. Cela reste une recuperation, mais elle exige que quelqu'un
-    /// ouvre le boitier, et le joueur doit le savoir avant.</summary>
+    /// <summary>Seule une intervention physique recupere la machine (cavalier Clear CMOS, pile, bouton de secours) :
+    /// quelqu'un doit ouvrir le boitier, et le joueur doit le savoir avant.</summary>
     PhysicalRecoveryAvailable,
 }
 
 /// <summary>
-/// Le risque de ne plus demarrer, distinct de la recuperabilite.
-///
-/// Les deux se confondent facilement et ne disent pas la meme chose. `BiosRecoverability`
-/// repond a « comment revient-on ? », celui-ci a « peut-on y arriver ? ». Un XMP peut echouer a
-/// entrainer la memoire et laisser un ecran noir sur une carte parfaitement recuperable ; le
-/// joueur doit le savoir avant de cliquer, meme quand la recuperation est facile.
+/// Le risque de ne plus demarrer (« peut-on y arriver ? »), distinct de `BiosRecoverability` (« comment revient-on ? »).
+/// Un XMP peut laisser un ecran noir sur une carte parfaitement recuperable : le joueur doit le savoir avant de cliquer.
 /// </summary>
 public enum NoPostRisk
 {
     /// <summary>Pas etabli. Le defaut, et il n'autorise rien.</summary>
     NoPostRiskUnknown,
 
-    /// <summary>Le reglage ne peut pas empecher le POST : il n'agit qu'apres l'initialisation
-    /// materielle.</summary>
+    /// <summary>Le reglage n'agit qu'apres l'initialisation materielle.</summary>
     CannotPreventPost,
 
-    /// <summary>Le reglage touche l'initialisation memoire, le bus PCIe ou la sequence de
-    /// demarrage : un ecran noir est un resultat possible et normal.</summary>
+    /// <summary>Le reglage touche l'initialisation memoire, le bus PCIe ou la sequence de demarrage : un ecran noir est
+    /// un resultat possible et normal.</summary>
     CanPreventPost,
 }
 
 /// <summary>
-/// Une entree de la matrice de qualification.
-///
-/// **Le firmware fait partie de l'empreinte materielle du profil.** Une modification qui
-/// fonctionne sur « MSI carte A / BIOS X » ne devient pas valide sur « MSI carte A / BIOS Y »,
-/// encore moins sur « MSI carte B ». Une ecriture automatique n'existe que pour une entree
-/// qualifiee : carte, version, reglage, valeurs, fournisseur, relecture, redemarrage, risque,
-/// recuperation, statut de validation.
+/// Une entree de la matrice de qualification. Le firmware fait partie de l'empreinte : valide sur « carte A / BIOS X »
+/// ne vaut pas sur « carte A / BIOS Y ». Une ecriture automatique n'existe que pour une entree qualifiee en entier.
 /// </summary>
 /// <param name="Board">La carte exacte.</param>
 /// <param name="FirmwareVersion">La version de BIOS exacte.</param>
@@ -101,22 +72,18 @@ public enum NoPostRisk
 /// <param name="Provider">Qui saurait l'ecrire.</param>
 /// <param name="Capability">Ce que cette plateforme autorise.</param>
 /// <param name="Recoverability">Comment on revient en arriere si ca tourne mal.</param>
-/// <param name="RequiresReboot">Presque toujours vrai, et le dire explicitement evite de
-/// l'oublier dans un parcours.</param>
-/// <param name="Validated">Cette entree a-t-elle ete reellement validee sur cette matrice ?
-/// Faux par defaut. « Ca devrait marcher » n'est pas une validation.</param>
-/// <param name="BoardRevision">La revision de la carte. Deux revisions d'un meme nom commercial
-/// n'ont pas forcement le meme firmware ni les memes cavaliers.</param>
+/// <param name="RequiresReboot">Presque toujours vrai ; explicite pour ne pas l'oublier dans un parcours.</param>
+/// <param name="Validated">Reellement validee sur cette matrice ? Faux par defaut.</param>
+/// <param name="BoardRevision">Deux revisions d'un meme nom commercial n'ont pas forcement le meme firmware ni les
+/// memes cavaliers.</param>
 /// <param name="MenuPath">Ou cliquer, tel que le firmware l'affiche. <c>null</c> = inconnu.</param>
 /// <param name="PossibleValues">Ce que le reglage accepte. <c>null</c> = jamais releve.</param>
-/// <param name="DefaultValue">Ce que le firmware y met d'usine. <c>null</c> = inconnu, et
-/// surtout pas « Auto » suppose.</param>
+/// <param name="DefaultValue">Ce que le firmware y met d'usine. <c>null</c> = inconnu, jamais « Auto » suppose.</param>
 /// <param name="NoPost">Ce reglage peut-il laisser un ecran noir ? Voir <see cref="NoPostRisk"/>.</param>
-/// <param name="ReadMechanism">Comment on lit la valeur courante. <c>null</c> = on ne sait pas la
-/// lire, ce qui explique un <paramref name="CurrentValue"/> nul.</param>
-/// <param name="DocumentationSource">D'ou vient cette connaissance. Exigee des qu'une entree se
-/// declare validee : « ca devrait marcher » n'est pas une source, et une validation sans source
-/// n'est pas verifiable par quelqu'un d'autre.</param>
+/// <param name="ReadMechanism">Comment on lit la valeur courante. <c>null</c> = illisible, d'ou un
+/// <paramref name="CurrentValue"/> nul.</param>
+/// <param name="DocumentationSource">D'ou vient cette connaissance. Exigee des qu'une entree se declare validee : une
+/// validation sans source n'est verifiable par personne.</param>
 public sealed record BiosQualification(
     string Board,
     string FirmwareVersion,
@@ -140,14 +107,10 @@ public sealed record BiosQualification(
     NvramLocation? Nvram = null)
 {
     /// <summary>
-    /// Une validation sans source n'est pas une validation.
-    ///
-    /// Le champ `Validated` est le seul qui debloque l'ecriture automatique. Le poser sans dire
-    /// d'ou vient la certitude rend la matrice invérifiable par quelqu'un d'autre, et c'est
-    /// exactement ainsi qu'une supposition finit par autoriser une ecriture dans un firmware.
-    /// La regle est donc dans le constructeur, pas dans une revue de code.
+    /// Une validation sans source n'est pas une validation : `Validated` est le seul champ qui debloque l'ecriture
+    /// automatique, et une supposition ne doit pas pouvoir l'autoriser. La regle vit dans le constructeur et dans les
+    /// accesseurs init (un `with` passe par eux, jamais par les initialiseurs).
     /// </summary>
-    /// Elle vit aussi dans les accesseurs init : un `with` copie le record puis passe par eux, jamais par les initialiseurs.
     private readonly bool _validated = ValidationSourcee(Validated, DocumentationSource, Board, FirmwareVersion, Setting);
     public bool Validated
     {
@@ -171,12 +134,9 @@ public sealed record BiosQualification(
             : validated;
 
     /// <summary>
-    /// DrDXT a-t-il le droit d'ecrire ceci tout seul ?
-    ///
-    /// Cinq conditions, et il en manque une suffit a renvoyer au parcours guide :
-    /// une capacite d'ecriture qualifiee, une validation reelle sur cette matrice, une voie de
-    /// recuperation connue, un risque de non-demarrage etabli, et une valeur courante lisible : sans
-    /// elle on ne saurait meme pas dire ce qu'on a change.
+    /// DrDXT a-t-il le droit d'ecrire ceci tout seul ? Cinq conditions, une seule manquante renvoie au guide : capacite
+    /// qualifiee, validation reelle, recuperation connue, risque de non-demarrage etabli, valeur courante lisible (sans
+    /// elle on ne saurait pas dire ce qu'on a change).
     /// </summary>
     public bool EcritureAutomatiqueAutorisee =>
         Capability is BiosCapabilityLevel.VendorSupportedWrite or BiosCapabilityLevel.QualifiedFirmwareWrite
@@ -186,12 +146,8 @@ public sealed record BiosQualification(
         && CurrentValue is not null;
 
     /// <summary>
-    /// Tout ce qui manque, pas seulement le premier.
-    ///
-    /// Un seul motif masquerait les autres (meme regle que `CandidateAppraisal.Motifs`) : sur la
-    /// carte de reference, « aucune voie d'ecriture qualifiee » cacherait que le manque a lever en
-    /// premier est la voie de recuperation, et que la valeur courante n'est pas lisible non plus.
-    /// N'en dire qu'un donne une feuille de route fausse : on croit un obstacle la ou il y en a trois.
+    /// Tout ce qui manque, pas seulement le premier (meme regle que `CandidateAppraisal.Motifs`) : sur la carte de
+    /// reference, « aucune voie qualifiee » cacherait la recuperation et la valeur illisible, trois obstacles et non un.
     /// </summary>
     public IReadOnlyList<string> CeQuiManqueTout
     {
@@ -224,11 +180,8 @@ public sealed record BiosQualification(
 }
 
 /// <summary>
-/// L'emplacement d'un reglage BIOS dans une variable UEFI, tel que l'IFR du firmware le declare.
-///
-/// Il ne vaut que pour une carte et une version de BIOS : l'offset bouge d'une version a l'autre.
-/// <see cref="VarSize"/> est le garde-fou : la variable lue doit avoir exactement la taille que
-/// l'IFR declare, sinon la table ne decrit pas ce firmware et rien n'est lu.
+/// L'emplacement d'un reglage BIOS dans une variable UEFI, tel que l'IFR le declare, pour une carte et une version (l'offset
+/// bouge). <see cref="VarSize"/> est le garde-fou : une variable d'une autre taille n'est pas ce firmware, rien n'est lu.
 /// <see cref="Values"/> ferme les valeurs : un octet hors de la liste invalide la lecture.
 /// </summary>
 public sealed record NvramLocation(

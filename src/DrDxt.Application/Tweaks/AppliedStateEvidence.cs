@@ -6,26 +6,21 @@ namespace DrDxt.Application.Tweaks;
 /// <summary>Ce qu'une relecture de cible autorise a affirmer.</summary>
 public enum EtatApplique
 {
-    /// <summary>La valeur lue est celle que le levier a demandee. C'est le seul etat qui autorise
-    /// a mesurer le gain de ce levier.</summary>
+    /// <summary>La valeur lue est celle que le levier a demandee : le seul etat qui autorise a mesurer son gain.</summary>
     Applied,
 
-    /// <summary>La valeur lue est celle d'avant : l'ecriture n'a pas pris. Le pilote l'a peut-etre
-    /// clampee, la feuille est protegee, ou l'op a echoue sans le dire.
-    /// Mesurer ici reviendrait a mesurer le bruit d'une session et a l'attribuer a un
-    /// changement qui n'existe pas.</summary>
+    /// <summary>La valeur lue est celle d'avant : l'ecriture n'a pas pris (clamp du pilote, feuille protegee, echec
+    /// muet). Mesurer ici attribuerait du bruit a un changement inexistant.</summary>
     NotApplied,
 
     /// <summary>La valeur lue n'est ni la cible ni l'originale. Quelqu'un d'autre ecrit sur cette
     /// feuille : un autre outil, une strategie de groupe, le pilote lui-meme.</summary>
     Drifted,
 
-    /// <summary>Cette op ne sait pas se relire : elle ne touche pas le registre, ou porte un type
-    /// qu'on ne lit pas encore. « Je ne sais pas lire » n'est jamais « c'est applique ».</summary>
+    /// <summary>Cette op ne sait pas se relire. « Je ne sais pas lire » n'est jamais « c'est applique ».</summary>
     Unavailable,
 
-    /// <summary>La lecture a echoue, ou le snapshot ne porte pas la valeur demandee (ecrit avant
-    /// que ce champ existe). Un trou, pas un etat.</summary>
+    /// <summary>La lecture a echoue, ou le snapshot ne porte pas la valeur demandee. Un trou, pas un etat.</summary>
     Unknown,
 }
 
@@ -44,35 +39,17 @@ public sealed record AppliedStateEvidence(
     string? RequestedState,
     string? ObservedState)
 {
-    /// <summary>Le seul cas qui autorise un banc. Tout le reste, y compris « je ne sais pas »,
-    /// interdit d'attribuer un ecart de mesure a ce levier.</summary>
+    /// <summary>Le seul cas qui autorise un banc ; tout le reste, « je ne sais pas » compris, l'interdit.</summary>
     public bool AutoriseLaMesure => Verdict == EtatApplique.Applied;
 }
 
 /// <summary>
-/// Prouver qu'un levier est en place : la question a laquelle `TweakReadback` ne pouvait pas
-/// repondre.
-///
-/// ══ ce qui manquait, et pourquoi ce n'etait pas un detail ══
-/// `TweakSnapshot` ne portait que l'etat original. La relecture savait donc dire « la valeur a
-/// change depuis » (<c>DifferentDeAvant</c>) et rien de plus. Or « different d'avant » n'est pas
-/// « egal a la cible » : un autre outil, une strategie de groupe ou un clamp du pilote produisent
-/// exactement le meme verdict. Le moteur mesurait ensuite le gain d'un levier dont l'application
-/// n'etait pas etablie, et un banc sur un levier non applique mesure du bruit qu'on attribue a
-/// un changement inexistant.
-///
-/// Le snapshot porte desormais aussi l'op avant (`AppliedValueJson`). Les deux ops nomment la
-/// meme feuille : la comparaison a trois termes devient possible, sans qu'aucun levier ait a
-/// implementer quoi que ce soit.
-///
-/// ══ les cinq verdicts, et leur asymetrie ══
-/// Un seul autorise la mesure : <see cref="EtatApplique.Applied"/>. `Unavailable` et `Unknown`
-/// **interdisent** de conclure, dans les deux sens : ils ne condamnent pas le levier, ils privent
-/// simplement le produit du droit d'affirmer.
-///
-/// ══ ce qu'elle ne couvre pas ══
-/// La courbe de ventilation et les decalages de frequence NVIDIA ne posent pas de valeur cible : ils rendent `Unknown`
-/// ici. Ne pas confondre « ce lecteur ne sait pas » avec « ce levier n'est pas verifiable ».
+/// Prouver qu'un levier est en place. « Different d'avant » (<c>DifferentDeAvant</c>, `TweakReadback`) n'est pas « egal
+/// a la cible » : un autre outil, une strategie de groupe ou un clamp du pilote donnent le meme verdict. Le snapshot
+/// porte l'original et la valeur posee (`AppliedValueJson`) sur la meme feuille : la comparaison a trois termes, sans
+/// rien demander aux leviers. Seul <see cref="EtatApplique.Applied"/> autorise la mesure ; `Unavailable` et `Unknown`
+/// interdisent de conclure dans les deux sens, sans condamner le levier. La courbe de ventilation et les decalages de
+/// frequence NVIDIA n'ont pas de valeur cible : `Unknown` ici, ce qui ne veut pas dire « invérifiable ».
 /// </summary>
 public static class AppliedStateVerifier
 {
@@ -146,13 +123,9 @@ public static class AppliedStateVerifier
     }
 
     /// <summary>
-    /// Les quatre reglages du pilote NVIDIA que ce depot sait relire, par identifiant DRS.
-    ///
-    /// Pourquoi une table et pas un `GetDrsSetting(id)` generique : le vrai NVAPI de ce depot
-    /// n'expose pas de lecture par identifiant, il expose quatre lectures nommees, chacune ecrite
-    /// et verifiee contre `NvApiDriverSettings.h`. Inventer une API generique par-dessus
-    /// obligerait a la reimplementer, et un identifiant non couvert doit rendre `Unavailable`,
-    /// pas une valeur devinee.
+    /// Les quatre reglages du pilote NVIDIA que ce depot sait relire, par identifiant DRS : le NVAPI du depot expose quatre
+    /// lectures nommees, verifiees contre `NvApiDriverSettings.h`, pas de lecture par identifiant. Un identifiant non
+    /// couvert rend `Unavailable`, pas une valeur devinee.
     /// </summary>
     private static readonly IReadOnlyDictionary<uint, Func<INvApi, Result<uint>>> LecturesDrs =
         new Dictionary<uint, Func<INvApi, Result<uint>>>
@@ -164,13 +137,9 @@ public static class AppliedStateVerifier
         };
 
     /// <summary>
-    /// Un levier composite (Vsync + plafond ; X3D = service + deux
-    /// feuilles) se prouve feuille par feuille : son snapshot ne se decode pas comme une op, et lu d'un bloc
-    /// il resterait Unknown, sans jamais de banc.
-    ///
-    /// Chaque feuille posee est relue par le chemin d'une op seule, face a l'inverse de la meme feuille
-    /// (jamais par position : `VrrVsyncCap` range ses inverses a l'envers de ses ecritures). Le levier
-    /// n'est Applied que si toutes le sont ; une seule feuille illisible le rend Unknown ou Unavailable.
+    /// Un levier composite (Vsync + plafond ; X3D = service + deux feuilles) se prouve feuille par feuille, face a
+    /// l'inverse de la meme feuille (jamais par position : `VrrVsyncCap` range ses inverses a l'envers). Applied seulement
+    /// si toutes le sont ; une feuille illisible le rend Unknown ou Unavailable.
     /// </summary>
     private static AppliedStateEvidence VerifierComposite(TweakSnapshot snapshot, IReadOnlyList<PrivilegedOp> posees,
         IRegistryReader lecteur, INvApi? nvApi, IPowerPlanReader? alimentation, IServiceStateReader? services, LecteursCarte? carte)
@@ -233,8 +202,7 @@ public static class AppliedStateVerifier
 
     /// <summary>Compare l'etat lu a la cible et a l'original portes par le snapshot.</summary>
     /// <param name="lecteur">Le seam de lecture registre. Non elevee : lire ne demande pas l'UAC.</param>
-    /// <param name="nvApi">Le pilote NVIDIA, quand il est disponible : sans lui, un reglage DRS
-    /// rend <c>Unavailable</c> : « je ne sais pas lire » n'est jamais « c'est applique ».</param>
+    /// <param name="nvApi">Le pilote NVIDIA ; sans lui, un reglage DRS rend <c>Unavailable</c>.</param>
     /// <param name="alimentation">Le lecteur de plan d'alimentation, meme role.</param>
     /// <param name="services">Le lecteur d'etat des services, meme role.</param>
     /// <param name="carte">Les lecteurs de la carte et du processeur, meme role.</param>
@@ -245,8 +213,7 @@ public static class AppliedStateVerifier
         if (snapshot is null)
             return new AppliedStateEvidence("?", EtatApplique.Unknown, null, null, null, null);
 
-        // Sans valeur demandee, il n'y a rien a comparer : un snapshot ecrit avant l'existence de
-        // ce champ ne devient pas « applique » par indulgence.
+        // Sans valeur demandee, rien a comparer : pas d'« applique » par indulgence.
         if (string.IsNullOrWhiteSpace(snapshot.AppliedValueJson))
             return new AppliedStateEvidence(snapshot.TweakId, EtatApplique.Unknown, null, null, null, null);
 
@@ -262,8 +229,7 @@ public static class AppliedStateVerifier
         if (cible is ApplyNvApiDrsSettingOp drs)
             return VerifierDrs(snapshot.TweakId, drs, origine, nvApi);
 
-        // Le plan d'alimentation actif se relit par `powrprof`, la meme API que le levier utilise
-        // pour capturer l'original avant d'ecrire.
+        // Le plan actif se relit par `powrprof`, la meme API que le levier pour capturer l'original.
         if (cible is SetActivePowerPlanOp plan)
             return VerifierPlan(snapshot.TweakId, plan, origine as SetActivePowerPlanOp, alimentation);
 
@@ -305,7 +271,7 @@ public static class AppliedStateVerifier
         if (cible is SetRegistryValueOp { Kind: RegistryValueType.String or RegistryValueType.MultiString } texte)
             return VerifierTexte(snapshot.TweakId, texte, origine, lecteur);
 
-        // Sinon, seules les ops de registre savent se relire aujourd'hui.
+        // Sinon, seules les ops de registre DWORD savent se relire.
         if (cible is not SetRegistryValueOp demande || demande.Kind != RegistryValueType.DWord)
             return new AppliedStateEvidence(snapshot.TweakId, EtatApplique.Unavailable, null, null, null, null);
 
@@ -324,8 +290,7 @@ public static class AppliedStateVerifier
 
         var observe = lu.Value?.ToString();
 
-        // Comparaison sur la valeur, pas sur la chaine : « 2 » et « 02 » sont la meme chose pour
-        // le registre, et un ecart de formatage ferait crier une application ratee qui n'existe pas.
+        // Sur la valeur, pas la chaine : « 2 » et « 02 » sont la meme chose pour le registre.
         if (MemeValeur(demande.Value, lu.Value))
             return new AppliedStateEvidence(snapshot.TweakId, EtatApplique.Applied,
                 feuille, avant, demande.Value, observe);
@@ -359,9 +324,8 @@ public static class AppliedStateVerifier
         PrivilegedOp? inverse, INvApi? nvApi)
     {
         var feuille = $"NVAPI DRS 0x{demande.SettingId:X8} ({demande.ProfileName})";
-        // L'inverse d'une ecriture au profil d'un jeu peut etre une suppression ; elle
-        // porte la valeur d'avant. Sans ce cas, un reglage reste a sa valeur d'origine serait lu
-        // `Drifted` au lieu de `NotApplied`.
+        // L'inverse d'une ecriture au profil d'un jeu peut etre une suppression qui porte la valeur d'avant : sans ce cas,
+        // un reglage reste a l'origine serait lu `Drifted` au lieu de `NotApplied`.
         uint? origine = inverse switch
         {
             ApplyNvApiDrsSettingOp a => a.Value,
@@ -374,10 +338,8 @@ public static class AppliedStateVerifier
         if (nvApi is null || !nvApi.IsAvailable || !LecturesDrs.TryGetValue(demande.SettingId, out var lire))
             return new AppliedStateEvidence(tweakId, EtatApplique.Unavailable, feuille, avant, vise, null);
 
-        // Relire au profil que l'ecriture a vise. Le helper sait ecrire dans le
-        // profil d'un jeu (ProfileName = chemin complet) ; la relecture, elle, lisait toujours le
-        // profil de base. Un reglage ecrit dans le vide aurait ete prouve `Applied` par le global,
-        // et un reglage bien pris au jeu aurait ete accuse d'un ecart qu'il n'a pas.
+        // Relire au profil que l'ecriture a vise (ProfileName = chemin complet pour un jeu) : lu au profil de base, un
+        // reglage ecrit dans le vide passerait `Applied`, un reglage bien pris au jeu serait accuse d'un ecart.
         var lu = Path.IsPathFullyQualified(demande.ProfileName)
             ? nvApi.GetDrsForApplication(demande.SettingId, demande.ProfileName) is { IsOk: true } auJeu
                 ? Result<uint>.Ok(auJeu.Value.Value)
@@ -395,12 +357,8 @@ public static class AppliedStateVerifier
         return new AppliedStateEvidence(tweakId, EtatApplique.Drifted, feuille, avant, vise, observe);
     }
 
-    /// <summary>La comparaison a trois termes pour le plan d'alimentation actif.
-    ///
-    /// Ce que cette preuve couvre exactement : **quel plan est actif**, et rien d'autre. Elle
-    /// ne dit pas que les sous-parametres du plan valent ce qu'on croit : c'est la cible que ce
-    /// levier demande, donc c'est la cible qu'on verifie. Un levier qui modifierait des valeurs
-    /// a l'interieur d'un plan aurait besoin d'une preuve differente.</summary>
+    /// <summary>La comparaison a trois termes pour le plan d'alimentation actif : quel plan est actif, rien d'autre (ni
+    /// ses sous-parametres). C'est la cible que ce levier demande.</summary>
     private static AppliedStateEvidence VerifierPlan(string tweakId, SetActivePowerPlanOp demande,
         SetActivePowerPlanOp? origine, IPowerPlanReader? alimentation)
     {

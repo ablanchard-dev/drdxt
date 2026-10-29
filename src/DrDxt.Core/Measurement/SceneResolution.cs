@@ -19,21 +19,11 @@ public enum SceneVerdict
 /// <summary>
 /// L'A/a : ce que cette scene sait voir, mesure sur place et avant tout levier.
 ///
-/// DrDXT testait des leviers sans savoir ce que la scene pouvait detecter. Un +1 % teste vingt
-/// minutes sur une scene qui resout +/-5 %, ce sont vingt minutes perdues d'avance, et le
-/// « pas de gain » qui en sort est faux : il n'y avait pas de gain **detectable**, ce qui n'est pas
-/// la meme chose. Le modele de preuve sait deja dire `NoResolvedChange` apres coup ; l'A/A permet
-/// de le savoir avant de depenser le temps du joueur.
-///
-/// La resolution n'est pas une constante du produit : elle depend du jeu, de la scene, de la
-/// machine, de la temperature, de la duree, de la phase de partie et de la charge de fond.
-///
-/// ══ deux choses que la moyenne confond ══
-/// **Le bruit** disperse autour d'une valeur stable ; **la derive** deplace la valeur elle-meme.
-/// Mesure du 01/09/2026, machine inchangee, aucun reglage touche : **136 → 148 FPS en dix minutes**.
-/// Une moyenne ne distingue pas les deux, et « on ne moyenne pas une derive ». Une scene qui derive
-/// plus qu'elle ne bruite transformera le temps en effet du tweak, quel que soit le soin de la
-/// mesure : d'ou <see cref="SceneVerdict.DriftDominant"/>, qui envoie vers un protocole apparie.
+/// Un +1 % teste vingt minutes sur une scene qui resout +/-5 % est perdu d'avance ; l'A/A le dit avant de depenser le
+/// temps du joueur. La resolution depend du jeu, de la scene, de la machine, de la temperature, de la duree, de la phase
+/// et de la charge de fond. Le bruit disperse, la derive deplace la valeur (mesure du 01/09/2026, machine inchangee : 136 →
+/// 148 FPS en dix minutes) : une scene qui derive plus qu'elle ne bruite rend <see cref="SceneVerdict.DriftDominant"/>,
+/// vers un protocole apparie.
 ///
 /// Pur, aucune I/O : l'appelant fournit les moyennes par passe, cette classe juge.
 /// </summary>

@@ -69,14 +69,9 @@ public sealed class DiagnosticsLog : IDiagnosticsLog
     /// <summary>
     /// Taille au-dela de laquelle le journal laisse partir ses lignes les plus anciennes.
     ///
-    /// Sans borne, le fichier grandirait tant que le produit sert, et `ExportAsync` en copie
-    /// l'integralite dans ce que le client envoie au support. L'autre export du produit,
-    /// `DiagnosticReport`, porte cette regle en tete de son fichier : « le client le colle dans un
-    /// Discord ou un mail, et il doit pouvoir le relire lui-meme avant de l'envoyer ». Les deux
-    /// surfaces portent la meme promesse : les deux sont bornees.
-    ///
-    /// 2 Mo, soit environ vingt mille changements : personne n'atteint ca en usage normal, et
-    /// c'est exactement le but : la borne existe pour le cas qui derape, pas pour l'usage.
+    /// `ExportAsync` en copie l'integralite dans ce que le client envoie au support, qu'il doit pouvoir relire avant de
+    /// l'envoyer (meme promesse que `DiagnosticReport`). 2 Mo, environ vingt mille changements : la borne vise le cas qui
+    /// derape, pas l'usage normal.
     /// </summary>
     public const long PlafondOctets = 2L * 1024 * 1024;
 
@@ -87,15 +82,9 @@ public sealed class DiagnosticsLog : IDiagnosticsLog
     /// Ramene le journal sous le plafond en jetant les lignes les plus anciennes, et en le
     /// disant a la place exacte ou elles etaient.
     ///
-    /// Jeter le passe et pas le present : on consulte un journal juste apres un changement,
-    /// pas six mois plus tard. Et rien ne disparait en silence : un journal d'audit qui se tait
-    /// sur ce qu'il a perdu ment par omission.
-    ///
-    /// Ce que cette borne ne touche pas : la capacite a tout defaire. Le retour aux valeurs
-    /// d'origine s'appuie sur le manifeste signe sous %ProgramData% (voir ModeDesinstallation),
-    /// jamais sur ce fichier, qui est une trace lisible par un humain.
-    ///
-    /// Appelee sous `_lock`, juste apres l'ajout : le controle coute la taille du fichier.
+    /// Le passe part, pas le present (on lit un journal juste apres un changement), et la perte est dite. La capacite a
+    /// tout defaire n'en depend pas : le retour aux origines lit le manifeste signe sous %ProgramData% (voir
+    /// ModeDesinstallation), jamais ce fichier. Appelee sous `_lock`, juste apres l'ajout.
     /// </summary>
     private void BornerSiBesoin()
     {

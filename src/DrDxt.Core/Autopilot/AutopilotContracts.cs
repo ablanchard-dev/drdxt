@@ -53,11 +53,9 @@ public enum CandidateFamily
 /// <summary>
 /// Ce qu'un levier ecrit vraiment, independamment de sa famille d'affichage.
 ///
-/// Le veto des arrets brutaux fermait sur les grandeurs declarees (`gpu.`,
-/// `cpu.`, `ram.`). `latency.reflex`, `latency.render_queue_cap` et `latency.vrr_vsync_cap`
-/// ecrivent l'etat du pilote NVIDIA (cle NVTweak, reglages DRS) et se declarent « latence » : ils
-/// passaient, et l'Optimiser de l'App tentait `latency.reflex` sur une machine a sept arrets secs.
-/// La surface se decide en lisant les operations privilegiees du levier, pas son nom.
+/// Elle se decide en lisant les operations privilegiees du levier, pas son nom : `latency.reflex`,
+/// `latency.render_queue_cap` et `latency.vrr_vsync_cap` se disent « latence » mais ecrivent l'etat du pilote NVIDIA
+/// (NVTweak, DRS), et un veto sur les seuls prefixes `gpu.`/`cpu.`/`ram.` les laisserait passer.
 /// </summary>
 public enum SurfaceTouchee
 {
@@ -113,14 +111,9 @@ public sealed record CandidateDescriptor(
     /// <summary>Ce que l'appelant a constate sur la machine et qui empeche ce levier de
     /// s'appliquer, <c>null</c> quand rien ne l'empeche.
     ///
-    /// Ajoute apres que le probe de selection a annonce « 2 candidats retenus »
-    /// alors que les deux etaient inapplicables. <c>latency.reflex</c> n'a pas de valeur d'origine
-    /// a restaurer sur cette machine : la cle <c>NVTweak\LowLatencyMode</c> n'existe pas, donc le
-    /// tweak refuse d'ecrire plutot que d'ecrire sans pouvoir revenir en arriere. Et
-    /// <c>fixit.power_plan</c> exige le symptome de parking de coeurs, lu comme absent.
-    ///
-    /// Le selecteur ne peut pas deviner ces conditions : elles vivent dans le <c>AppliesTo</c> de
-    /// chaque tweak et dans l'etat lu de la machine. L'appelant les lit, le selecteur les compte.</summary>
+    /// Ces conditions vivent dans le <c>AppliesTo</c> de chaque tweak et l'etat lu : l'appelant les lit, le selecteur
+    /// les compte (sinon il annonce retenu un levier inapplicable, comme <c>latency.reflex</c> sans cle
+    /// <c>NVTweak\LowLatencyMode</c> d'origine, ou <c>fixit.power_plan</c> sans parking de coeurs).</summary>
     string? BlocageConstate = null,
 
     /// <summary>Sa famille. `Inconnue` par defaut : un levier qui ne declare pas sa famille ne

@@ -10,16 +10,9 @@ namespace DrDxt.Detection.Scoring;
 /// la note de conception du classifieur (voir `BottleneckClassifier`) pour les leviers que ce produit
 /// possède réellement. Pure et totale : (état mesuré × identifiant de levier) → suppression ou non.
 ///
-/// ══ ce qu'une suppression est, et ce qu'elle n'est pas ══
-///
-/// Elle supprime la promesse de gain, jamais le constat. XMP désactivé reste XMP désactivé sur une
-/// machine GPU-bound : le réglage est toujours mauvais, il faut toujours le dire, et le registre
-/// le compte toujours. Ce qui devient malhonnête, c'est de le vendre comme des images en plus alors
-/// que la mesure dit que les images ne viendront pas de là.
-///
-/// D'où la règle qui gouverne tout ce fichier : **la mesure ne touche pas aux pénalités du registre**, qui décrit la
-/// configuration. Une suppression change ce qu'on raconte, jamais ce qu'on compte. Faire l'inverse ferait bouger le
-/// registre d'une machine selon qu'un jeu tournait ou non au moment du scan.
+/// Une suppression retire la promesse de gain, jamais le constat : XMP désactivé reste dit et compté sur une machine
+/// GPU-bound, il n'est plus vendu comme des images en plus. La mesure ne touche donc pas aux pénalités du registre (sinon
+/// le registre d'une machine bougerait selon qu'un jeu tournait au moment du scan).
 /// </summary>
 public static class BottleneckLeverPolicy
 {

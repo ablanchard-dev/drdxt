@@ -1,17 +1,8 @@
 namespace DrDxt.Detection.Gpu.Adlx;
 
-// -----------------------------------------------------------------------
-// IAdlxNative : la frontière managée mince sur la surface native d'ADLX.
-//
-// C'est le seul accès à amdadlx64.dll depuis le code managé. Tout le parcours de vtable, les
-// DllImport et la durée de vie native vivent dans AdlxNative. Les tests unitaires la remplacent
-// par FakeAdlxNative : aucun appel natif en test.
-//
-// Contrat d'échec propre :
-//   • IsAvailable == false  ⇒ DLL absente ou init ratée ; chaque Try* rend false.
-//   • Aucune méthode Try* ne lève ; elle rend false sur toute panne.
-//   • Les paramètres out sont à leur valeur par défaut quand le retour est false.
-// -----------------------------------------------------------------------
+// IAdlxNative : le seul accès managé à amdadlx64.dll (vtables, DllImport et durée de vie native dans AdlxNative ;
+// FakeAdlxNative en test, aucun appel natif). IsAvailable == false ⇒ DLL absente ou init ratée, chaque Try* rend false ;
+// aucun Try* ne lève, false sur toute panne, paramètres out à leur valeur par défaut.
 
 /// <summary>Reflet d'ADLX_IntRange { minValue, maxValue, step }.</summary>
 public readonly struct AdlxIntRange
@@ -59,9 +50,8 @@ public readonly struct AdlxFanReads
 
 /// <summary>Une étape du parcours de diagnostic du chemin de lecture GFX d'ADLX (voir
 /// <see cref="IAdlxNative.ProbeGfxPath"/>). <paramref name="Name"/> est l'étape,
-/// <paramref name="Ok"/> sa réussite, <paramref name="Detail"/> une courte raison lisible. Sert à
-/// ce qu'une barrière GPU sautée sur du vrai matériel AMD dise exactement où ADLX s'est arrêté, au
-/// lieu d'un vague « non disponible ».</summary>
+/// <paramref name="Ok"/> sa réussite, <paramref name="Detail"/> une courte raison lisible : où ADLX s'est arrêté sur du
+/// vrai matériel AMD, plutôt que « non disponible ».</summary>
 public sealed record GpuProbeStep(string Name, bool Ok, string? Detail = null);
 
 /// <summary>Ce que la carte dédiée AMD rend pendant une partie (IADLXGPUMetrics) : puissance de la carte (à défaut, de la
@@ -158,25 +148,20 @@ public interface IAdlxNative
     // ── méthodes d'écriture (appelées par le helper élevé, jamais pendant dotnet test) ─────────
 
     /// <summary>
-    /// GET puis SET : lit d'abord l'état GFX actuel (capturé dans <paramref name="original"/> pour le
-    /// retour), valide les valeurs proposées contre les GetGPUMaxFrequencyRange / GetGPUVoltageRange
-    /// du matériel, puis écrit :
-    ///   SetGPUMaxFrequency  emplacement de vtable 8 d'IADLXManualGraphicsTuning2  (vérifié contre les en-têtes du SDK ADLX)
-    ///   SetGPUVoltage       emplacement de vtable 11 d'IADLXManualGraphicsTuning2 (vérifié contre les en-têtes du SDK ADLX)
-    /// Si SetGPUVoltage échoue après un SetGPUMaxFrequency réussi, MaxFreq est remise au mieux à
-    /// l'original avant de rendre false.
-    /// Rend false si indisponible, non pris en charge (hors RDNA), hors plage, ou sur toute panne.
-    /// Ne lève jamais.
+    /// GET puis SET : l'état GFX actuel capturé dans <paramref name="original"/>, les valeurs validées contre
+    /// GetGPUMaxFrequencyRange / GetGPUVoltageRange, puis (emplacements vérifiés contre les en-têtes du SDK ADLX) :
+    ///   SetGPUMaxFrequency  emplacement de vtable 8 d'IADLXManualGraphicsTuning2
+    ///   SetGPUVoltage       emplacement de vtable 11 d'IADLXManualGraphicsTuning2
+    /// Si SetGPUVoltage échoue après SetGPUMaxFrequency, MaxFreq est remise au mieux à l'original. False si indisponible,
+    /// hors RDNA, hors plage ou sur toute panne ; ne lève jamais.
     /// </summary>
     bool TrySetGfx(int gpuIndex, int newMaxFreqMhz, int newVoltMv, out AdlxGfxReads original);
 
     /// <summary>
-    /// GET puis SET : lit d'abord la limite de puissance actuelle (capturée dans
-    /// <paramref name="original"/>), valide la valeur proposée contre le GetPowerLimitRange du
-    /// matériel, puis écrit :
+    /// GET puis SET : la limite actuelle capturée dans <paramref name="original"/>, la valeur validée contre
+    /// GetPowerLimitRange, puis :
     ///   SetPowerLimit  emplacement de vtable 5 d'IADLXManualPowerTuning (vérifié contre les en-têtes du SDK ADLX)
-    /// Rend false si indisponible, non pris en charge, hors plage, ou sur toute panne.
-    /// Ne lève jamais.
+    /// False si indisponible, non pris en charge, hors plage ou sur toute panne ; ne lève jamais.
     /// </summary>
     bool TrySetPowerLimit(int gpuIndex, int newPowerLimitPct, out AdlxPowerReads original);
 
@@ -184,9 +169,8 @@ public interface IAdlxNative
 
     /// <summary>Parcourt pas à pas le chemin de lecture GFX (DLL / init → GetGPUs → taille / index de
     /// la liste → GetGPU → GetGPUTuningServices → IsSupportedManualGFXTuning → GetManualGFXTuning →
-    /// QueryInterface(Tuning2) → ReadGfxV2) en notant l'issue de chaque étape. S'arrête au premier
-    /// échec avec une raison honnête. Permet à une barrière GPU sautée de dire exactement où ADLX
-    /// s'est arrêté sur une machine donnée. Lecture seule ; aucune écriture ; ne lève jamais.</summary>
+    /// QueryInterface(Tuning2) → ReadGfxV2), l'issue de chaque étape notée, arrêt au premier échec avec sa raison.
+    /// Lecture seule ; ne lève jamais.</summary>
     IReadOnlyList<GpuProbeStep> ProbeGfxPath(int gpuIndex);
 
     /// <summary>SAM, Anti-Lag, FRTC, Chill et température de la carte dédiée. Lecture seule ; ne lève

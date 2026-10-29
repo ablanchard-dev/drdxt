@@ -7,39 +7,26 @@ using DrDxt.Core;
 namespace DrDxt.Application.Support;
 
 /// <summary>
-/// Le rapport que le client colle dans son ticket.
-///
-/// Sans lui, le premier client difficile consomme une semaine : on débogue à l'aveugle par mail,
-/// une question à la fois, avec quelqu'un qui ne sait pas où regarder. Un dev solo qui vend à des
-/// joueurs un produit qui les envoie dans leur BIOS ne peut pas se permettre ça.
-///
-/// Le format est du texte brut, pas du JSON : le client le colle dans un Discord ou un mail, et
-/// il doit pouvoir le relire lui-même avant de l'envoyer. Un blob illisible ne se relit pas, donc
-/// il s'envoie sans être lu, et c'est comme ça qu'on publie ce qu'on ne voulait pas publier.
-///
-/// ══ ce qui n'entre jamais dans ce fichier ══
-///
-/// Rien de nominatif : ni nom d'utilisateur, ni chemins personnels. Ce rapport est destiné à être collé
-/// dans un salon public. Ce qu'on met est ce dont le support a besoin pour comprendre une machine, et rien de plus.
-/// Les explications des constats arrivent telles que le scan les a écrites et peuvent porter un chemin : les deux
-/// appelants (export, paquet d'aide) passent le texte par MachineExportee.AnonymiserTexte, qui les retire.
+/// Le rapport que le client colle dans son ticket, pour ne pas déboguer à l'aveugle par mail. Texte brut, pas JSON : le
+/// client doit pouvoir le relire avant de l'envoyer, un blob illisible s'envoie sans être lu.
+/// Rien de nominatif (ni nom d'utilisateur, ni chemins personnels) : il est fait pour un salon public. Les explications
+/// des constats peuvent porter un chemin : les deux appelants (export, paquet d'aide) passent le texte par
+/// MachineExportee.AnonymiserTexte, qui les retire.
 /// </summary>
 public static class DiagnosticReport
 {
-    /// <summary>Le nom du fichier propose. Date dans le nom : deux rapports d'un meme client a
-    /// deux moments differents racontent une histoire que le second seul ne raconte pas.</summary>
+    /// <summary>Le nom du fichier propose, date comprise : deux rapports d'un meme client se comparent.</summary>
     public static string FileNameFor(DateTimeOffset when) =>
         FormattableString.Invariant($"drdxt-diagnostic-{when:yyyy-MM-dd-HHmm}.txt");
 
     /// <summary>
-    /// Construit le rapport. Pur, a la version du runtime pres : meme entree, meme texte ; aucune lecture de la
-    /// machine ici, tout arrive deja lu, ce qui le rend entierement testable.
+    /// Construit le rapport. Pur, a la version du runtime pres : tout arrive deja lu.
     /// </summary>
     /// <param name="scan">Le dernier scan. null = aucun scan encore lance, et ca se dit.</param>
     /// <param name="appVersion">La version du produit : la premiere question de tout support.</param>
     /// <param name="when">L'instant du rapport, injecte (jamais DateTime.Now ici).</param>
-    /// <param name="sante">Le tri de l'audit de sante (attention / non
-    /// lus / verifies), le meme que l'ecran. null = audit non lance, et ca se dit.</param>
+    /// <param name="sante">Le tri de l'audit de sante (attention / non lus / verifies), le meme que l'ecran. null = audit
+    /// non lance, et ca se dit.</param>
     public static string Build(
         ScanResult? scan, string appVersion, DateTimeOffset when,
         RepairTriage? sante = null, Func<string, string>? localiser = null,
@@ -73,16 +60,13 @@ public static class DiagnosticReport
         AppendBottleneck(sb, scan);
         AppendCoverage(sb, scan.Hw);
         AppendProcesseurSoutenu(sb, processeur?.PhraseAvec(scan.State?.BiosLu));
-        // Le rapport reprend telle quelle la ligne mémoire de l'écran : débit et latence mesurés, et la réserve
-        // d'une référence prise pendant une partie.
+        // La ligne mémoire de l'écran, réserve comprise (une référence prise pendant une partie).
         AppendSection(sb, Docteur.T("Rapport.Section.Memoire"), memoire?.Phrase);
         AppendSection(sb, Docteur.T("Rapport.Section.Reseau"), reseau?.Phrase);
         AppendMeasurement(sb, scan.Baseline);
-        // La dérive (ce jeu, cette machine, depuis la première mesure) : à l'écran, absente d'ici. C'est
-        // pourtant la réponse à « mon PC a-t-il ralenti ? », la première question d'un joueur au support.
+        // La dérive (ce jeu, cette machine, depuis la première mesure) : « mon PC a-t-il ralenti ? ».
         AppendSection(sb, Docteur.T("Rapport.Section.Derive"), derive?.Phrase);
-        // La borne du gain, affichée à l'écran (domaine Carte graphique), absente du rapport. Elle se
-        // calcule de la mesure du scan, déjà ici : la même phrase, sans rien recevoir de l'appelant.
+        // La borne du gain de l'écran (domaine Carte graphique), calculée de la mesure du scan.
         AppendSection(sb, Docteur.T("Rapport.Section.Plafond"), DrDxt.Measurement.PlafondGpu.PhraseDuScan(scan.Baseline?.GpuBusyPercent));
 
         return sb.ToString();
@@ -91,18 +75,13 @@ public static class DiagnosticReport
     private static void AppendMachine(StringBuilder sb, HardwareInventory hw)
     {
         sb.AppendLine(Docteur.T("Rapport.Section.Machine"));
-        // Le nombre de CCD n'est imprime que s'il en existe. Vu sur un vrai rapport de cette
-        // machine : « 20c/28t, 0 CCD » sur un Intel, ou la notion n'existe pas. Un champ sans
-        // objet affiche a zero se lit comme une detection ratee, et fait perdre une minute au
-        // support sur un probleme qui n'existe pas.
+        // Le nombre de CCD seulement s'il en existe : « 0 CCD » sur un Intel se lirait comme une detection ratee.
         var ccd = hw.Cpu.CcdCount > 0 ? $", {hw.Cpu.CcdCount} CCD" : string.Empty;
         Line(sb, Docteur.T("Rapport.Processeur"), $"{hw.Cpu.Model} ({hw.Cpu.Cores}c/{hw.Cpu.Threads}t{ccd})");
         foreach (var gpu in hw.Gpus)
             Line(sb, Docteur.T("Rapport.Carte"), Docteur.T("Rapport.Carte.Valeur", gpu.Model, gpu.DriverVersion));
         foreach (var stick in hw.Memory)
-            // MT/s, pas MHz. `ScanViewModel` porte deja cette correction : 3800 MT/s = 1900 MHz
-            // reels, et l'etiquette MHz est fausse pour une DDR. Le rapport suit la meme regle que
-            // l'ecran : c'est lui que le client colle dans son ticket, donc lui qui voyage.
+            // MT/s, pas MHz, comme l'ecran : 3800 MT/s = 1900 MHz reels pour une DDR.
             Line(sb, Docteur.T("Rapport.Memoire"), $"{stick.Manufacturer} {stick.PartNumber}, {stick.ConfiguredMhz} MT/s (nominal {stick.RatedMhz})");
         Line(sb, Docteur.T("Rapport.CarteMere"), $"{hw.Board.Manufacturer} {hw.Board.Product}");
         Line(sb, "BIOS", hw.Bios.Version);
@@ -110,8 +89,7 @@ public static class DiagnosticReport
         sb.AppendLine();
     }
 
-    // Ce que la NVRAM du BIOS dit, quand elle a pu etre lue. Sinon on le dit : les
-    // etats XMP/ReBAR/CSM du rapport sont alors des deductions, pas des lectures.
+    // Ce que la NVRAM du BIOS dit, si elle a ete lue ; sinon on le dit : XMP/ReBAR/CSM sont alors des deductions.
     private static void AppendBiosLu(StringBuilder sb, SettingsState? st)
     {
         sb.AppendLine(Docteur.T("Rapport.Section.Bios"));
@@ -131,8 +109,7 @@ public static class DiagnosticReport
     {
         sb.AppendLine(Docteur.T("Rapport.Section.Registre"));
         var problems = scan.Ledger?.Count(e => e.State == LeverState.Suboptimal) ?? 0;
-        // « Problèmes prouvés : 0 » suivi d'un constat « à corriger » se contredisait à
-        // la lecture ; ce compte ne porte que sur les leviers, l'intitulé le dit.
+        // Ce compte ne porte que sur les leviers, l'intitulé le dit (un constat « à corriger » peut suivre).
         Line(sb, Docteur.T("Rapport.LeviersACorriger"), problems.ToString(CultureInfo.InvariantCulture));
         Line(sb, Docteur.T("Rapport.LeviersLus"), scan.Coverage is { } c
             ? Docteur.T("Rapport.LeviersLus.Valeur", c.KnownLevers, c.ApplicableLevers, c.UnknownLevers)
@@ -141,12 +118,8 @@ public static class DiagnosticReport
     }
 
     /// <summary>
-    /// La sante de la machine, telle que l'ecran l'a triee.
-    ///
-    /// Ce que l'ecran montre (arrets brutaux, memoire jamais testee…) doit aussi arriver dans le
-    /// document que le client garde. La phrase a trois nombres vient de
-    /// <see cref="RepairTriage.Phrase"/> : ce qui merite l'attention, ce qui est verifie, ce qui n'a
-    /// pas pu etre lu, jamais l'un sans les autres.
+    /// La sante de la machine, telle que l'ecran l'a triee. La phrase a trois nombres vient de
+    /// <see cref="RepairTriage.Phrase"/> : attention, verifie, non lu, jamais l'un sans les autres.
     /// </summary>
     private static void AppendSante(StringBuilder sb, RepairTriage? sante)
     {
@@ -172,9 +145,7 @@ public static class DiagnosticReport
         }
         if (sante.NonLus.Count > 0)
             Line(sb, Docteur.T("Rapport.NonLus"), string.Join(", ", sante.NonLus.Select(c => $"{RepairLibelles.Ligne(c.Domaine, c.Nom)}")));
-        // Les états lus sans geste portent aussi une explication sourcée (fréquence
-        // effective, bridage, incidents noyau, MMCSS…). L'écran n'en montre que la valeur ; ici,
-        // dans le document que le client garde, ils ont leur phrase.
+        // Les états lus sans geste ont ici leur explication sourcée ; l'écran n'en montre que la valeur.
         if (sante.Verifies.Count > 0)
         {
             sb.AppendLine(Docteur.T("Rapport.EtatsLus"));
@@ -191,10 +162,8 @@ public static class DiagnosticReport
     }
 
     /// <summary>
-    /// Les constats du scanner, avec leur texte. Relu sur un rapport réel : le constat
-    /// principal de la machine de référence (le pilote graphique en performances maximales pour tout
-    /// le PC) n'y figurait pas ; seul « vrr : à corriger » passait, par le détail des leviers. Sans
-    /// traducteur (appels de test historiques), la section se tait plutôt que d'écrire des clés.
+    /// Les constats du scanner, avec leur texte : le détail des leviers n'en porte qu'une partie. Sans traducteur, la
+    /// section se tait plutôt que d'écrire des clés.
     /// </summary>
     private static void AppendConstats(StringBuilder sb, ScanResult scan, Func<string, string>? localiser)
     {
@@ -230,8 +199,7 @@ public static class DiagnosticReport
 
         sb.AppendLine(Docteur.T("Rapport.Section.Leviers"));
         foreach (var entry in scan.Ledger)
-            // L'identifiant du levier et son etat, pas le libelle traduit : le support lit ce
-            // fichier, et un identifiant se cherche dans le code alors qu'une phrase non.
+            // L'identifiant, pas le libelle traduit : il se cherche dans le code.
             Line(sb, entry.LeverId, Texte(entry.State));
         sb.AppendLine();
     }
@@ -248,18 +216,14 @@ public static class DiagnosticReport
 
         Line(sb, Docteur.T("Rapport.Etat"), Texte(verdict.State));
 
-        // Une confiance ne s'affiche pas sans la chose qu'elle qualifie. Sinon on imprimerait
-        // « Confiance : High » sous « Etat : UnknownPartial », ce qui se lit
-        // « grande confiance dans un etat inconnu ». La confiance qualifie une classification ;
-        // quand il n'y a pas de classification, elle ne qualifie rien.
+        // Sans classification, la confiance ne qualifie rien (« grande confiance dans un etat inconnu »).
         if (verdict.State != BottleneckState.UnknownPartial)
         {
             Line(sb, Docteur.T("Rapport.Confiance"), Texte(verdict.Confidence));
         }
 
         Line(sb, Docteur.T("Rapport.Provisoire"), Docteur.T(verdict.Provisional ? "Rapport.Oui" : "Rapport.Non"));
-        // Le motif en clair : c'est lui qui permet au support de comprendre le verdict sans
-        // rejouer le scan. Un etat sans son motif est un code, pas un diagnostic.
+        // Le motif en clair, pour comprendre le verdict sans rejouer le scan.
         Line(sb, Docteur.T("Rapport.Motif"), MotifDuGoulot.Dire(verdict));
         sb.AppendLine();
     }
@@ -269,8 +233,7 @@ public static class DiagnosticReport
         var rows = GpuTuningCoverage.For(hw);
         if (rows.Count == 0) return;
 
-        // La section annonçait « réglable » sans dire à quelles conditions. Le réglage
-        // est ouvert machine par machine ; ce qui le ferme est dit, sans rien promettre.
+        // Le réglage est ouvert machine par machine : ce qui le ferme est dit, sans rien promettre.
         sb.AppendLine(Docteur.T("Rapport.Section.ReglageCarte"));
         sb.AppendLine(Docteur.T("Rapport.ReglageCarte.Regle"));
         foreach (var row in rows)
@@ -282,13 +245,12 @@ public static class DiagnosticReport
         sb.AppendLine();
     }
 
-    /// <summary>Ce que le processeur rend sous charge longue. Affiche a l'ecran, absent du
-    /// rapport jusqu'ici (relu dans le rapport reel) : c'est pourtant ce qui explique un jeu limite par le
-    /// processeur. Rien n'est ecrit quand la mesure n'existe pas.</summary>
+    /// <summary>Ce que le processeur rend sous charge longue, qui explique un jeu limite par le processeur. Rien sans
+    /// mesure.</summary>
     private static void AppendProcesseurSoutenu(StringBuilder sb, string? phrase)
         => AppendSection(sb, Docteur.T("Rapport.Section.ProcesseurSoutenu"), phrase);
 
-    /// <summary>La ligne réseau de l'écran, jusque-là absente du rapport.</summary>
+    /// <summary>Une section de l'écran, sa phrase sous son titre.</summary>
     private static void AppendSection(StringBuilder sb, string titre, string? phrase)
     {
         if (string.IsNullOrWhiteSpace(phrase)) return;
@@ -302,9 +264,7 @@ public static class DiagnosticReport
         sb.AppendLine(Docteur.T("Rapport.Section.Mesure"));
         if (baseline is null)
         {
-            // Une mesure absente n'est pas une mesure a zero. Le dire evite au support de
-            // chercher pourquoi les chiffres sont mauvais alors qu'il n'y en a pas.
-            // PresentMon n'est plus le seul instrument (repli DXGI) ; ne pas l'accuser seul.
+            // Une mesure absente n'est pas une mesure a zero. PresentMon n'est pas le seul instrument (repli DXGI).
             sb.AppendLine(Docteur.T("Rapport.AucuneMesure"));
             sb.AppendLine();
             return;
@@ -315,8 +275,7 @@ public static class DiagnosticReport
         Line(sb, Docteur.T("Rapport.Processus"), baseline.ProcessusMesure ?? Docteur.T("Rapport.Inconnu"));
         Line(sb, Docteur.T("Rapport.FpsMoyen"), baseline.AvgFps.ToString("F1", CultureInfo.InvariantCulture));
         Line(sb, "1% low", baseline.P1LowFps.ToString("F1", CultureInfo.InvariantCulture));
-        // Les lows ont leur propre marge (plus large que celle de la moyenne) ; sans elle, le chiffre
-        // passerait pour aussi solide que le FPS moyen.
+        // Les lows ont leur propre marge, plus large que celle de la moyenne.
         Line(sb, Docteur.T("Rapport.Marge1Low"), double.IsFinite(baseline.P1LowMarginOfError)
             ? baseline.P1LowMarginOfError.ToString("F2", CultureInfo.InvariantCulture)
             : Docteur.T("Rapport.MargeInconnue"));
@@ -337,8 +296,7 @@ public static class DiagnosticReport
             : Docteur.T("Rapport.MargeInconnue"));
         Line(sb, Docteur.T("Rapport.Passes"), baseline.Runs.ToString(CultureInfo.InvariantCulture));
         Line(sb, Docteur.T("Rapport.Frames"), baseline.FrameTimesMs.Count.ToString(CultureInfo.InvariantCulture));
-        // Les queues que l'écran affiche (domaine Latence), absentes jusqu'ici. Une moyenne cache la
-        // saccade ; le support qui ne voit que le FPS moyen ne voit pas ce que le joueur ressent.
+        // Les queues de l'écran (domaine Latence) : une moyenne cache la saccade que le joueur ressent.
         LigneQueue(sb, Docteur.T("Rapport.TramesLentes"), DrDxt.Measurement.FrametimeStatistics.SaccadeP95(baseline));
         LigneQueue(sb, Docteur.T("Rapport.EcartAnimation"), DrDxt.Measurement.FrametimeStatistics.CadenceP95(baseline));
         LigneQueue(sb, Docteur.T("Rapport.AttenteAffichage"), DrDxt.Measurement.FrametimeStatistics.AttenteP95(baseline));
@@ -350,23 +308,14 @@ public static class DiagnosticReport
         if (ms is { } v) Line(sb, label, v.ToString("F2", CultureInfo.InvariantCulture) + " ms");
     }
 
-    // « {label,-22}: » collait les deux-points aux intitulés plus longs que la
-    // colonne (« Long Duration Power Limit (PL1): Auto »). Même sortie pour les intitulés courts.
+    // Un intitulé plus long que la colonne (« Long Duration Power Limit (PL1) ») garde son espace avant les deux-points.
     private static void Line(StringBuilder sb, string label, string value) =>
         sb.AppendLine(FormattableString.Invariant($"{label,-21} : {value}"));
 
     // ══════════════════════════════════════════════════════════════════════════════════════════
-    // Les valeurs affichees, dans la langue du docteur
-    //
-    // Mesure du 05/09/2026, en usage reel sur une vraie machine : ce rapport imprimait
-    // « Chassis : Desktop », « Etat : UnknownPartial », « Confiance : High »,
-    // « Validated / AdaOrOlder ». Ce sont des noms de symboles C#, dans un texte que le client lit
-    // et colle dans un salon public. Un identifiant brut n'est pas une information : c'est du code
-    // qui a fuit jusqu'a l'utilisateur, et ca demande au client de deviner ce que le programme
-    // voulait dire.
-    //
-    // Le `_ =>` rend le nom brut plutot que de mentir : une valeur ajoutee demain sera visible
-    // dans le rapport, et le test `No_raw_identifier_reaches_the_client` la fera rougir.
+    // Les valeurs affichees, dans la langue du docteur : jamais un nom de symbole C# (« UnknownPartial », « AdaOrOlder »)
+    // dans un texte que le client colle en public. Le `_ =>` rend le nom brut plutot que de mentir, et
+    // `No_raw_identifier_reaches_the_client` fera rougir toute valeur ajoutee.
     // ══════════════════════════════════════════════════════════════════════════════════════════
 
     private static string Texte(ChassisType chassis) => chassis switch

@@ -5,23 +5,10 @@ using DrDxt.Measurement;
 
 namespace DrDxt.Application.Engine;
 
-// -----------------------------------------------------------------------
-// TweakEngine : le coeur transactionnel de la pose.
-//
-// Il orchestre et ne tient lui-meme aucune primitive privilegiee. Chaque ecriture
-// privilegiee passe par les leviers (via IElevatedClient), et chaque retour arriere ou
-// retrait automatique passe par le RevertAsync du levier lui-meme : un levier a snapshot
-// composite (correctif X3D CCD, plafond VRR) est rendu en entier, pas seulement sa premiere
-// op. Le moteur ne depend d'ISafetyManager que pour EnsureRestorePointAsync.
-//
-// Contrats : les formes canoniques de Core sont utilisees telles quelles :
-//   TweakPlan(IReadOnlyList<string> TweakIds)
-//   ApplyOutcome(string TweakId, bool Applied, bool AutoReverted, TweakSnapshot? Snapshot, Error? Error)
-//   ApplyReport(IReadOnlyList<ApplyOutcome> Outcomes, AbVerdict? Verdict)
-//   ITweakEngine.ApplyAsync(TweakPlan, BenchmarkResult?, int targetPid, CancellationToken)
-// Les champs du lot s'en deduisent : leviers retires = Outcomes.Where(AutoReverted), phrase =
-// Verdict.SummaryKey, snapshots poses = Outcomes.Where(Applied).Snapshot. Le tri « Plan(...) »
-// vit sur le moteur concret (EnginePlan), hors de l'interface Core, pour ne pas toucher sa forme.
+// TweakEngine, le coeur transactionnel de la pose. Il ne tient aucune primitive privilegiee : les ecritures passent par
+// les leviers (IElevatedClient), chaque retour par le RevertAsync du levier (un snapshot composite, X3D CCD ou plafond
+// VRR, est rendu en entier) ; ISafetyManager ne sert qu'a EnsureRestorePointAsync. Le tri (EnginePlan) vit sur le
+// moteur concret, hors de l'interface Core.
 //
 // Invariants :
 //  - jamais un lot a moitie pose : au premier echec, tout ce qui est deja pose est rendu
@@ -179,25 +166,11 @@ public sealed class TweakEngine : ITweakEngine
 
             var snapshot = applyResult.Value;
 
-            // (2b) prouver que la cible est en place, avant toute mesure.
-            //
-            // Un `Result.Ok` de l'helper dit que l'op a ete envoyee, pas qu'elle a pris. Une
-            // feuille protegee par une strategie de groupe, un pilote qui clampe, un autre outil
-            // qui reecrit derriere : dans les trois cas l'apply « reussit » et la valeur cible
-            // n'est pas la. Le moteur mesurait alors l'ecart d'une session et l'attribuait a un
-            // changement inexistant : c'est ainsi qu'on fabrique un faux gain.
-            //
-            // Deux sorties, et elles ne se confondent pas.
-            //
-            // `NotApplied` et `Drifted` sont des echecs : dans le premier cas on sait que rien n'a
-            // bouge, dans le second la feuille porte une troisieme valeur : quelqu'un d'autre
-            // ecrit dessus. Les deux annulent le batch.
-            //
-            // `Unknown` et `Unavailable` (op non relisable, lecteur absent, snapshot ancien) ne
-            // condamnent pas le levier : un plan d'alimentation ou une courbe de ventilation ne se
-            // relisent pas dans le registre, et ils fonctionnent tres bien. Mais ils privent le
-            // produit du droit d'attribuer une mesure a ce levier : le batch est donc garde et
-            // l'A/B est saute, exactement comme pour un changement qui n'agit qu'apres redemarrage.
+            // (2b) prouver que la cible est en place, avant toute mesure : un `Result.Ok` du helper dit que l'op est partie,
+            // pas qu'elle a pris (strategie de groupe, pilote qui clampe, outil qui reecrit), et mesurer alors fabriquerait
+            // un faux gain. `NotApplied` (rien n'a bouge) et `Drifted` (une troisieme valeur : quelqu'un d'autre ecrit)
+            // annulent le batch. `Unknown` et `Unavailable` (op non relisable, lecteur absent, snapshot ancien : un plan ou
+            // une courbe de ventilation) gardent le batch mais sautent l'A/B, comme un changement qui agit au redemarrage.
             if (_registre is not null)
             {
                 var preuve = AppliedStateVerifier.Verifier(snapshot, _registre, _nvApi, _alimentation, _services, _carte);
@@ -324,17 +297,9 @@ public sealed class TweakEngine : ITweakEngine
         if (!after.IsOk || after.Value is null)
             return KeptReport(appliedList, verdict: null);
 
-        // La comparaison tient-elle, avant de s'en servir pour annuler ?
-        //
-        // Ce moteur auto-annule sur une regression mesuree : c'est sa garantie la plus forte. Mais
-        // il le faisait sans jamais demander si les deux passes avaient mesure la meme session.
-        // Le cas concret : le joueur alt-tabbe pendant la passe apres, l'hygiene lui retire 45 %
-        // de ses trames, les FPS s'effondrent, et le moteur defait un reglage peut-etre bon a
-        // cause d'une fenetre au premier plan. Rien ne l'aurait signale.
-        //
-        // Une experience qui ne tient pas se conclut comme une re-mesure impossible : on garde, et
-        // on n'affirme rien. C'est la distinction que porte le modele de preuve : « je n'ai rien
-        // vu » et « je n'ai pas mesure » ne se traitent pas pareil.
+        // La comparaison tient-elle, avant de s'en servir pour annuler ? Un alt-tab pendant la passe apres retire 45 % des
+        // trames a l'hygiene et ferait defaire un reglage peut-etre bon. Une experience qui ne tient pas se conclut comme
+        // une re-mesure impossible : on garde, on n'affirme rien (« pas mesure » n'est pas « rien vu »).
         if (AbComparer.Evidence(baseline, after.Value).Game?.Preuve.Outcome == EvidenceOutcome.Invalid)
             return KeptReport(appliedList, verdict: null);
 
@@ -348,18 +313,9 @@ public sealed class TweakEngine : ITweakEngine
             return await AutoRevertBatchAsync(applied, verdict).ConfigureAwait(false);
         }
 
-        // Un gain ne s'annonce que si la cible est prouvee en place.
-        //
-        // Et la regression, elle, se traite quand meme : c'est la distinction qui compte.
-        // Refuser de mesurer faute de preuve supprimerait aussi le filet : un batch qui
-        // degrade la machine resterait en place. Mesurer sert deux choses opposees, et une
-        // seule exige une preuve d'application :
-        //   * proteger (annuler une regression) : aucune attribution, donc aucune preuve requise ;
-        //   * affirmer (annoncer un gain) : attribution a ce levier, donc preuve exigee.
-        //
-        // Sans cible prouvee, le batch est garde et l'ecart mesure n'est rapporte comme gain de
-        // personne. « Je ne peux pas dire a qui l'attribuer » n'est pas « il n'y a pas de gain » :
-        // le verdict est nul, pas negatif.
+        // Proteger n'attribue rien, affirmer attribue : une regression s'annule meme sans cible prouvee, un gain ne
+        // s'annonce qu'avec elle. Sans cible prouvee, le batch est garde et l'ecart n'est le gain de personne : verdict
+        // nul, pas negatif.
         if (raw.IsMeasurableGain)
             return cibleProuvee
                 ? KeptReport(appliedList, raw with { SummaryKey = SummaryMeasurableGain })

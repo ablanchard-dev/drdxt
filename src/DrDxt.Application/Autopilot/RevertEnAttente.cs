@@ -11,25 +11,15 @@ public sealed record RevertEnAttenteEntree(string TweakId, TweakSnapshot? Snapsh
 /// <summary>
 /// Le filet d'une session tuee.
 ///
-/// Une session tient un levier pose quatre a cinq minutes. Sans ce journal, une App tuee ou un
-/// crash pendant ce temps laisserait le levier en place pour toujours, et l'etat d'origine du joueur
-/// n'existerait plus que dans la memoire d'un processus mort. Un seul levier en essai a la fois.
+/// Un levier reste pose quatre a cinq minutes pendant un essai (un seul a la fois) : sans ce journal, une App tuee le
+/// laisserait en place pour toujours. Un keep deplace l'entree de « en essai » vers « gardes » en une seule ecriture
+/// atomique, pour que le demarrage suivant ne rende pas un levier garde.
 ///
-/// Et les leviers gardes. Apres un keep, rien ne levait l'essai : le demarrage suivant
-/// rendait le levier garde. L'effacer n'aurait pas suffi : ce fichier est le seul endroit ou vit la
-/// valeur d'origine d'un levier garde en session (le manifeste signe ne recoit que les corrections au
-/// redemarrage). Un keep deplace donc l'entree de « en essai » vers « gardes », en une seule ecriture
-/// atomique, et plus aucun essai ne l'efface.
-///
-/// Qui fait foi, tranche. Au keep, `TweakCandidate` inscrit l'origine au
-/// manifeste signe (`DesiredState.RevertOnly`) par le helper eleve. Pour la desinstallation, c'est le seul
-/// qui fait foi : il est signe par la cle de la machine et vit dans la racine admin, alors que ce fichier-ci
-/// vit sous %LOCALAPPDATA%, ecrivable par tout processus du compte : le rejouer eleve ferait d'un fichier
-/// utilisateur une autorite privilegiee. `Gardes` n'est donc jamais rejoue (verifie : aucun lecteur hors de
-/// cette classe ; `Lire()` ne rend que l'essai). Il ne double pas `RevertOnly` pour rien : il reste la trace
-/// locale du keep, et la seule copie de l'origine quand le helper a refuse de l'inscrire (manifeste illisible
-/// avant reprise, helper injoignable, outil de campagne sans manifeste) : ce que `OrigineHorsManifeste` dit.
-/// Meme regle des deux cotes : la premiere origine gagne.
+/// Pour la desinstallation, seul fait foi le manifeste signe (`DesiredState.RevertOnly`, inscrit au keep par le helper) :
+/// ce fichier vit sous %LOCALAPPDATA%, ecrivable par tout le compte, et le rejouer eleve en ferait une autorite
+/// privilegiee. `Gardes` n'est donc jamais rejoue (`Lire()` ne rend que l'essai) ; il reste la trace locale du keep et la
+/// seule copie de l'origine quand le helper a refuse de l'inscrire (`OrigineHorsManifeste`). Des deux cotes, la premiere
+/// origine gagne.
 /// </summary>
 public interface IRevertEnAttente
 {

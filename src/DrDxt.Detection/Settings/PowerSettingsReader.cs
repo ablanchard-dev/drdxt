@@ -20,22 +20,11 @@ public sealed record PowerSettingValue(string Nom, uint? ValeurAc, uint? DefautA
 /// <summary>
 /// Les valeurs d'un plan d'alimentation, et le defaut de ce meme plan.
 ///
-/// Juger un plan par son GUID ou son nom ne prouve rien : **deux plans nommes « Equilibre »
-/// peuvent porter des reglages completement differents.** Un script d'optimisation qui pousse le
-/// minimum processeur a 100 % laisse un plan qui s'appelle toujours « Equilibre » et qui n'a plus
-/// rien du defaut Windows. C'est exactement le degat qu'on cherche, et un audit par le nom
-/// ne peut pas le voir.
-///
-/// Windows expose la reponse officiellement : <c>PowerReadACValueIndex</c> rend la valeur active,
-/// <c>PowerReadACDefaultIndex</c> rend **le defaut de ce plan pour ce reglage**. La difference des
-/// deux est un fait, pas une heuristique, et elle n'exige aucune elevation.
-///
-/// Un ecart au defaut reste un ecart. Il ne dit pas que la valeur est mauvaise, ni que
-/// quelqu'un l'a posee par erreur. Le classement vit ailleurs (<see cref="DrDxt.Core.RepairStatus"/>).
-///
-/// Échec propre : une erreur de retour ne leve jamais (une signature fausse, elle, tue le processus : voir
-/// PowerReadACValueIndex) ; toute lecture ratee rend <c>null</c>, jamais zero. « Non lu » et
-/// « vaut zero » sont deux reponses differentes, et les confondre ferait accuser un plan sain.
+/// Un plan « Equilibre » dont un script a pousse le minimum processeur a 100 % garde son nom : seul l'ecart entre
+/// <c>PowerReadACValueIndex</c> (la valeur) et <c>PowerReadACDefaultIndex</c> (le defaut de ce plan) le voit, un fait sans
+/// elevation. Un ecart n'est pas un verdict (le classement vit dans <see cref="DrDxt.Core.RepairStatus"/>). Une lecture
+/// ratee rend <c>null</c>, jamais zero ; une erreur de retour ne leve pas (une signature fausse, elle, tue le processus :
+/// voir PowerReadACValueIndex).
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class PowerSettingsReader

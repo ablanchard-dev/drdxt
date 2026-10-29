@@ -6,22 +6,12 @@ namespace DrDxt.ElevatedHelper.Execution;
 // -----------------------------------------------------------------------
 // PrivilegedOpExecutor : le vrai exécuteur des ops sûres (hors GPU).
 //
-// Atteint seulement après que TypedPrivilegedServer a passé, dans l'ordre : intégrité HMAC →
-// anti-rejeu → autorisation de l'appelant → liaison par le codec borné → OpAllowlist.Validate.
-// L'op reçue ici est donc une feuille typée, fermée, déjà passée par l'allowlist. L'aiguillage
-// relie chaque feuille à une action Windows concrète derrière une couture mince (l'appel natif
-// est la frontière du m2smoke) ; chaque action est emballée → Result, pour qu'aucune exception
-// ne traverse l'IPC.
-//
-// Moitié risquée : les écritures NVAPI risquées de décalage d'horloge + limite de puissance sont
-// branchées (recette §A/§B) via INvApiTuningActions (GET puis SET, échec propre). La surface DRS
-// des réglages du pilote (recette §C) l'est aussi. Le réglage ADLX (AMD) est branché via
-// IADLXTuningActions (le miroir AMD, GET puis SET, plage en refus par défaut, échec propre). La
-// courbe de ventilateur GPU multipoint reste reportée ici, avec un message HELPER.OP_FAILED
-// honnête et aucune action partielle : l'écriture ventilateur est une tâche future à part,
-// reportée pour les deux constructeurs (ADLX + NVAPI) jusqu'à une recette d'écriture vérifiée. Une
-// couture de lecture active n'implique pas qu'une écriture ventilateur existe ;
-// AdlxGpuTuningWriter est en lecture seule par conception.
+// Atteint seulement après TypedPrivilegedServer : HMAC → anti-rejeu → autorisation de l'appelant → codec borné →
+// OpAllowlist.Validate. Chaque feuille typée va à une action Windows derrière une couture mince, emballée en Result :
+// aucune exception ne traverse l'IPC. Horloge, puissance et DRS NVIDIA (INvApiTuningActions), réglage ADLX
+// (IADLXTuningActions) : GET puis SET, échec propre. La courbe de ventilateur multipoint n'est écrite pour aucun
+// constructeur (HELPER.OP_FAILED, aucune action partielle) tant qu'aucune recette n'est vérifiée ; une couture de lecture
+// n'en fait pas une écriture.
 // -----------------------------------------------------------------------
 public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
 {
@@ -231,13 +221,8 @@ public sealed class PrivilegedOpExecutor : IPrivilegedOpExecutor
 
                 // --- Réglage pilote DRS : réel (sûr, ni tension ni horloge). ---
                 //
-                // La portee est transportee. Si cette ligne ne passait que (SettingId, Value),
-                // `ProfileName` serait decoratif, et « cod.exe » produirait la meme ecriture machine
-                // entiere que « Base Profile ».
-                //
-                // La portee decide de la methode appelee. L'allowlist garantit que
-                // ProfileName est soit le profil de base, soit un chemin d'executable complet :
-                // il n'existe pas de troisieme cas qui atteindrait ce switch.
+                // La portee decide de la methode appelee (sinon « cod.exe » ecrirait la machine entiere comme « Base
+                // Profile ») ; l'allowlist n'en laisse passer que deux : profil de base ou chemin d'executable complet.
                 ApplyNvApiDrsSettingOp d =>
                     OpAllowlist.IsBaseProfileScope(d.ProfileName)
                         ? _drs.SetGlobalSetting(d.SettingId, d.Value)

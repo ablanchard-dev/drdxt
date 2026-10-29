@@ -5,19 +5,10 @@ namespace DrDxt.Application.Tweaks.Hardware;
 // -----------------------------------------------------------------------
 // Coutures matérielles injectables des leviers de réglage GPU (sous-tension, limite de puissance, courbe de ventilateur).
 //
-// Comme les coutures de latence, elles ne font que lire et dire ce qui est possible : elles
-// n'écrivent jamais. Le changement passe toujours par IElevatedClient avec un PrivilegedOp
-// typé et sur liste blanche (Phase A). Les coutures permettent à chaque levier de relever
-// la vraie valeur d'origine avant la pose (pour un retour arrière fidèle) et de décider
-// s'il s'applique.
-//
-// Chaque méthode rend un Result : un SDK ou un GPU indisponible échoue proprement
-// (TWEAK.SDK_UNAVAILABLE), sans jamais lever. Les implémentations vivent dans
-// Detection / Infrastructure (P/Invoke) ; les tests unitaires utilisent des doublures NSubstitute.
-//
-// Partage des SDK voulu (horloge et puissance seulement, jamais la tension) : NVIDIA = décalage
-// d'horloge + limite de puissance (pas de courbe V/F) ; AMD = réglage ADLX. Ces coutures sont
-// séparées de celles de latence (INvApi / IAdlx) pour que le réglage GPU n'y déborde pas.
+// Elles lisent l'origine (pour un retour fidèle) et disent si le levier s'applique, jamais n'écrivent : l'écriture passe
+// par IElevatedClient et une PrivilegedOp sur liste blanche. Un SDK ou un GPU absent échoue proprement
+// (TWEAK.SDK_UNAVAILABLE). Horloge et puissance seulement, jamais la tension (NVIDIA : décalage et limite, pas de courbe
+// V/F ; AMD : ADLX), séparées des coutures de latence.
 // -----------------------------------------------------------------------
 
 /// <summary>Couture de lecture du pilote NVIDIA (NVAPI) pour le réglage GPU. La pose passe

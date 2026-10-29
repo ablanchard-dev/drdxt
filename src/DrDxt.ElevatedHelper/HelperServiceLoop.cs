@@ -2,19 +2,10 @@ using System.Runtime.Versioning;
 
 namespace DrDxt.ElevatedHelper;
 
-// -----------------------------------------------------------------------
-// HelperServiceLoop : la boucle d'acceptation durable, multi-connexion, que le helper élevé
-// fait tourner en mode --service (canal réconciliateur↔helper).
-//
-// Le service helper doit servir de nombreuses connexions successives pendant sa vie (l'App et
-// l'hôte réconciliateur se connectent, à répétition), sans changer ce que fait une connexion.
-// Cette boucle mène donc le pipeline par connexion éprouvé : un délégué AcceptOneAsync injecté
-// (HandshakeAcceptingServer.AcceptOneAsync) qui fait déjà : (re)créer le pipe FIRST_PIPE_INSTANCE
-// protégé par ACL → accepter un client → handshake (auth → clé éphémère) → servir une op typée →
-// fermer. Cette classe n'ajoute que la boucle extérieure « boucler, réarmer, durcir » ; elle ne
-// touche rien au protocole par connexion (HMAC, nonce, codec, allowlist, exécuteur).
-//
-// Durcissement (même forme que la boucle d'acceptation de Program.cs, réutilisable et testée) :
+// HelperServiceLoop : la boucle d'acceptation durable, multi-connexion, du helper élevé en mode --service. Elle rappelle
+// à chaque tour le délégué AcceptOneAsync (HandshakeAcceptingServer.AcceptOneAsync) : (re)créer le pipe
+// FIRST_PIPE_INSTANCE protégé par ACL → accepter → handshake (auth → clé éphémère) → servir une op typée → fermer. Elle
+// n'ajoute que « boucler, réarmer, durcir », sans toucher au protocole (HMAC, nonce, codec, allowlist, exécuteur) :
 //   * une seule connexion mauvaise ou déchet (le délégué lève) est journalisée et la boucle
 //     continue : un mauvais client ne tue jamais le service ;
 //   * une rafale de pannes soutenue recule entre les tentatives puis se ferme (fail-closed, rend
@@ -23,10 +14,8 @@ namespace DrDxt.ElevatedHelper;
 //     ne s'accumulent jamais jusqu'au seuil) ;
 //   * l'annulation (le signal d'arrêt) se déroule proprement : une OperationCanceledException
 //     venue de l'acceptation est un arrêt, pas une panne.
-//
-// L'acceptation et le recul sont des coutures : la boucle est entièrement testée avec des faux
-// (sans pipe, sans élévation). Program.cs branche le vrai AcceptOneAsync + un recul Task.Delay.
-// -----------------------------------------------------------------------
+// Acceptation et recul sont des coutures (testée avec des faux, sans pipe ni élévation) ; Program.cs branche le vrai
+// AcceptOneAsync et un recul Task.Delay.
 
 /// <summary>Récepteur des diagnostics de la boucle d'acceptation du service. Minuscule et
 /// injectable pour tester la boucle ; en production, il écrit sur la console / les diagnostics du helper.</summary>
@@ -90,9 +79,8 @@ public sealed class HelperServiceLoop
             }
             catch (Exception ex)
             {
-                // Une panne au niveau d'une connexion (déchet sur le fil, squatteur de pipe…) ne doit
-                // pas jeter le service dans une boucle serrée qui brûle le CPU. Journaliser, reculer et,
-                // si cela persiste, s'arrêter en fail-closed plutôt que tourner en boucle.
+                // Panne d'une connexion (déchet sur le fil, squatteur de pipe…) : journaliser, reculer, et si elle
+                // persiste s'arrêter en fail-closed plutôt que brûler le CPU.
                 consecutiveFaults++;
                 _log.Fault(consecutiveFaults, _maxConsecutiveFaults, ex.GetType().Name);
 

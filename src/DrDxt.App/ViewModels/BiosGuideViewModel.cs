@@ -257,11 +257,8 @@ public sealed partial class BiosGuideViewModel : CommunityToolkit.Mvvm.Component
     /// redemarrer. DrDXT n'ecrit aucune variable firmware : c'est Windows qui detient le bit
     /// <c>OsIndications</c>.
     ///
-    /// <see cref="EnterInstruction"/> reste affiche quoi qu'il arrive. Le bouton est un
-    /// confort, pas un remplacement : si le firmware refuse le boot-to-setup, ou si la couture
-    /// n'est pas la, l'utilisateur doit toujours avoir sous les yeux la touche a presser. Un
-    /// produit qui cache le chemin manuel parce qu'il croit avoir mieux laisse le client sans
-    /// rien le jour ou le mieux ne marche pas.
+    /// <see cref="EnterInstruction"/> reste affiche quoi qu'il arrive : si le firmware refuse le boot-to-setup ou si la
+    /// couture manque, la touche a presser reste sous les yeux.
     /// </summary>
     public Task<Result> OpenFirmwareSetupAsync(int delaySeconds = DefaultFirmwareRebootDelaySeconds)
         => _requestFirmwareReboot is null

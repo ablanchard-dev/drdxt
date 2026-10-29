@@ -5,28 +5,16 @@ using static DrDxt.App.Natif;
 
 namespace DrDxt.App.Platform;
 
-// -----------------------------------------------------------------------
-// Ce qui tourne a cote du jeu : une demande produit.
-//
-// Ce qui a declenche ce code. Un scan a affiche « 164 FPS » pendant qu'on regardait l'ecran de
-// DrDXT, le jeu en arriere-plan. Le meme soir, en partie reelle avec nos agents qui compilaient, il
-// mesurait 79,5 FPS. Un FPS moyen seul ne veut rien dire : il depend de ce qui tournait a cote. Sur
-// son i7-14700F, Warzone est limite par le processeur (cpuApp 96 %, GPU busy 66 %) : chaque coeur
-// pris par OBS, un navigateur ou un compilateur est un coeur pris au jeu.
-//
-// L'ecran de scan dit donc, avant de montrer un chiffre, ce qui tournait a cote : nom lisible,
-// part de processeur (en pourcentage d'un seul coeur, comme le Gestionnaire des taches) et part de GPU.
-//
-// Lecture seule, et honnete sur ses limites :
-//   * le processeur se mesure par difference de temps processeur sur une fenetre courte : c'est ce
-//     que fait le Gestionnaire des taches, sans compteur de performance ni ETW ;
-//   * le GPU se lit dans la categorie « GPU Engine » des compteurs de performance de Windows, la
-//     meme source que l'onglet Performances. Absente (pilote, service desactive) ⇒ pas de part GPU,
-//     et on ne l'invente pas ;
-//   * un processus qu'on ne peut pas ouvrir (protege, anti-triche, autre session) est simplement
-//     absent de la liste. La liste n'est donc jamais garantie complete ; elle ne ment pas sur ce
-//     qu'elle montre.
-// -----------------------------------------------------------------------
+// Ce qui tourne a cote du jeu. Un scan a affiche « 164 FPS » le jeu en arriere-plan, et le meme soir 79,5 FPS en partie
+// reelle pendant des compilations : sur l'i7-14700F, Warzone est limite par le processeur (cpuApp 96 %, GPU busy 66 %),
+// et chaque coeur pris par OBS, un navigateur ou un compilateur est pris au jeu. L'ecran de scan dit donc ce qui
+// tournait a cote : nom lisible, part de processeur (en % d'un seul coeur, comme le Gestionnaire des taches), part de GPU.
+// Lecture seule :
+//   * le processeur, par difference de temps processeur sur une fenetre courte (comme le Gestionnaire des taches) ;
+//   * le GPU, dans « GPU Engine » des compteurs de performance (la source de l'onglet Performances) ; absente (pilote,
+//     service desactive) ⇒ pas de part GPU ;
+//   * un processus qu'on ne peut pas ouvrir (protege, anti-triche, autre session) est absent : la liste n'est jamais
+//     garantie complete, elle ne ment pas sur ce qu'elle montre.
 
 /// <param name="Nom">Le nom lisible du processus (sans .exe).</param>
 /// <param name="ProcesseurPourcent">Part de temps processeur pendant la fenetre, en % d'UN coeur.</param>
@@ -38,8 +26,7 @@ public interface ILecteurDeVoisins
 {
     /// <summary>Les processus qui consomment notablement pendant une courte fenetre, hors le jeu
     /// (<paramref name="pidDuJeu"/>) et hors DrDXT lui-meme. Ne jette jamais.
-    /// <c>null</c> = pas pu regarder ; liste vide = regardé, rien au-dessus du seuil. Une liste vide seule
-    /// confondrait « rien vu » et « pas pu regarder ».</summary>
+    /// <c>null</c> = pas pu regarder ; liste vide = regardé, rien au-dessus du seuil.</summary>
     IReadOnlyList<VoisinDuJeu>? Lire(int? pidDuJeu, CancellationToken ct);
 
     /// <summary>Par programme (processus d'un même nom additionnés avant le seuil), sans coupe ; pour le
@@ -48,11 +35,10 @@ public interface ILecteurDeVoisins
 }
 
 /// <summary>
-/// Seul le pid du jeu était écarté. Ses enfants et son lanceur (RiotClientServices,
-/// EpicWebHelper, steamwebhelper, GameOverlayUI, Battle.net) passaient pour des voisins : au-dessus d'un quart de cœur, le
-/// calmeur les proposait et les passait sous la normale, au risque de ralentir le jeu lui-même. La famille du jeu est
-/// écartée de la lecture : ce dont la chaîne de parents remonte au jeu, ce qui l'a lancé (jusqu'en haut), et ce que son
-/// lanceur direct fait tourner à côté, sauf si ce lanceur est un processus de Windows (l'explorateur lance tout).
+/// La famille du jeu, écartée de la lecture : ses enfants et son lanceur (RiotClientServices, EpicWebHelper,
+/// steamwebhelper, GameOverlayUI, Battle.net) passeraient pour des voisins, et au-dessus d'un quart de cœur le calmeur les
+/// passerait sous la normale, au risque de ralentir le jeu. Ce dont la chaîne de parents remonte au jeu, ce qui l'a lancé
+/// (jusqu'en haut), et ce que son lanceur direct fait tourner, sauf lanceur Windows (l'explorateur lance tout).
 /// Limite : un pid parent peut avoir été réattribué après la fin de son processus ; on écarte alors trop, jamais trop peu.
 /// </summary>
 public static class FamilleDuJeu
@@ -91,8 +77,7 @@ public sealed class VoisinsWin32 : ILecteurDeVoisins
     /// coeur, ou 5 % du GPU : le chiffre retenu.</summary>
     public const double SeuilPourcent = 5.0;
 
-    /// <summary>La fenetre de mesure. Assez longue pour que la difference de temps processeur soit
-    /// stable, assez courte pour ne pas faire attendre le scan.</summary>
+    /// <summary>La fenetre de mesure : assez longue pour une difference de temps processeur stable, assez courte pour le scan.</summary>
     public static readonly TimeSpan Fenetre = TimeSpan.FromMilliseconds(600);
 
     /// <summary>Combien de voisins on montre. Une liste courte : au-dela, personne ne la lit.</summary>
@@ -202,15 +187,9 @@ public sealed class VoisinsWin32 : ILecteurDeVoisins
     /// seul coup dans « GPU Engine » (la source de l'onglet Performances). Les instances s'appellent
     /// « pid_1234_luid_..._engtype_3D » : une par moteur et par processus, gardees separees (voir
     /// <see cref="PartsGpu"/>). Categorie absente ⇒ dictionnaire vide ⇒ aucune part GPU affichee.
-    ///
-    /// Mesure, pas gout. Cette methode ouvrait un <c>PerformanceCounter</c> par
-    /// instance : 637 objets sur cette machine, <b>552 ms de processeur</b> par scan (banc
-    /// `tools/voisinscout`), soit presque un cœur entier pendant que le joueur joue : exactement le
-    /// voisin qu'on lui reproche. Et ces 552 ms ne produisaient rien : le compteur est un cumul, un
-    /// seul <c>NextValue()</c> sur un compteur neuf rend toujours <b>0</b>, donc chaque voisin
-    /// affichait « 0 % de carte graphique », y compris Firefox et le gestionnaire de fenetres.
-    /// <c>ReadCategory()</c> lit les 637 instances en <b>1,4 ms</b>, et deux lectures encadrant la
-    /// fenetre donnent une vraie part. 400 fois moins cher, et juste au lieu de faux.</summary>
+    /// <c>ReadCategory()</c> lit les 637 instances de cette machine en <b>1,4 ms</b> ; un <c>PerformanceCounter</c> par
+    /// instance coute <b>552 ms de processeur</b> par scan (banc `tools/voisinscout`), et un seul <c>NextValue()</c> sur
+    /// un compteur neuf rend toujours <b>0</b> (c'est un cumul). Deux lectures encadrant la fenetre donnent une vraie part.</summary>
     private static Dictionary<string, long> OccupationGpu()
     {
         var cumul = new Dictionary<string, long>(StringComparer.Ordinal);
@@ -233,13 +212,10 @@ public sealed class VoisinsWin32 : ILecteurDeVoisins
 
     /// <summary>La part de GPU par PID sur la fenetre : pour chaque moteur, la difference des deux
     /// cumuls rapportee a la duree, puis, par PID, le moteur le plus occupe. Un moteur absent de l'une
-    /// des deux lectures n'a pas de part : on ne devine pas.
-    ///
-    /// Les moteurs d'un meme PID ne sont pas sommes. Le Gestionnaire des taches, dont ce chiffre
-    /// reprend la source et le sens, montre le moteur le plus occupe (« the utilization of the busiest
-    /// engine », devblogs.microsoft.com/directx/gpus-in-the-task-manager). Une somme gonfle la part de
-    /// tout processus qui occupe plusieurs moteurs a la fois (rendu 3D et encodage video d'un logiciel
-    /// de diffusion, rendu et calcul asynchrone d'un jeu), jusqu'a depasser 100 %.</summary>
+    /// des deux lectures n'a pas de part : on ne devine pas. Pas de somme des moteurs : comme le Gestionnaire des taches,
+    /// le moteur le plus occupe (« the utilization of the busiest engine »,
+    /// devblogs.microsoft.com/directx/gpus-in-the-task-manager) ; une somme depasserait 100 % pour un processus a plusieurs
+    /// moteurs (3D et encodage d'un logiciel de diffusion, rendu et calcul asynchrone d'un jeu).</summary>
     internal static Dictionary<int, double> PartsGpu(
         Dictionary<string, long> debut, Dictionary<string, long> fin, TimeSpan duree)
     {

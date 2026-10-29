@@ -12,7 +12,7 @@ namespace DrDxt.Detection.Tests.Gpu.Adlx;
 // en-têtes canoniques du SDK ADLX
 // (github.com/GPUOpen-LibrariesAndSDKs/ADLX, SDK/Include/*.h). Si quelqu'un édite une
 // constante, ceci échoue et renvoie à l'en-tête qui la définit.
-// Table complète des citations : src/DrDxt.Detection/Gpu/Adlx/ADLX-SLOTS.md
+// Table complète des citations : src/DrDxt.GpuNative/ADLX-SLOTS.md
 // -----------------------------------------------------------------------
 public sealed class AdlxSlotsTests
 {

@@ -3,15 +3,11 @@ using System.Diagnostics;
 namespace DrDxt.Measurement.Memory;
 
 /// <summary>
-/// Le banc memoire : debit, latence, et l'escalier de cache.
-///
-/// Lecture pure. Il alloue de la memoire et la lit. Il n'ecrit rien, ne demande aucune elevation,
-/// ne touche ni au BIOS ni au registre.
-///
+/// Le banc memoire : debit, latence, et l'escalier de cache. Lecture pure : il alloue et lit, sans elevation, sans BIOS
+/// ni registre.
 /// Mesure le 06/09/2026 sur la machine de reference (`tools/memprobe`, qui n'est plus qu'un appelant) :
 /// sigma/moyenne de 1,83 % sur le debit et 3,45 % sur la latence, contre un plancher de bruit
 /// in-game de 9,9 %.
-///
 /// Le piege : une chaine de 16 Mo tient dans le L3 de 33 Mo d'un i7-14700F et rend 25 ns, la
 /// latence du cache prise pour celle de la DRAM. Le controle Q-04 l'attrape.
 /// </summary>
@@ -33,17 +29,12 @@ public static class MemoryBench
         16 * 1024 * 1024L, 32 * 1024 * 1024L, 128 * 1024 * 1024L,
     ];
 
-    /// <summary>
-    /// Mesure la memoire. <paramref name="passes"/> passes pour le debit et la latence, dont on
-    /// tire la moyenne et la dispersion : sans la dispersion, aucun A/B ne peut distinguer un gain
-    /// du bruit. L'escalier, lui, se parcourt une fois : c'est sa forme qui compte, pas sa
-    /// precision au pourcent.
-    /// </summary>
+    /// <summary>Mesure la memoire : <paramref name="passes"/> passes pour le debit et la latence, moyenne et dispersion
+    /// (sans elle, aucun A/B ne separe un gain du bruit). L'escalier se parcourt une fois : sa forme compte.</summary>
     public static MemoryMeasurement Measure(int passes = 10)
     {
         var zone = ElementsLatence(OctetsL3());
-        // Chauffe : la premiere passe paie l'allocation et les defauts de page. La compter
-        // fausserait la moyenne et gonflerait l'ecart-type.
+        // Chauffe : la premiere passe paie l'allocation et les defauts de page, elle n'est pas comptee.
         BandwidthGBs(1);
         LatencyNs(zone, 1_000_000);
 
@@ -72,9 +63,8 @@ public static class MemoryBench
             BandwidthMultiFilGBs: multi);
     }
 
-    /// <summary>La zone de la latence « DRAM », en entiers : au moins 128 Mio, et au moins quatre fois le L3 lu. 128 Mio
-    /// fixes laissaient une part des accès dans le cache d'un X3D (96 Mo de L3, 128 Mo sur un 9950X3D) : la latence
-    /// de la mémoire était sous-estimée. Quatre fois, pour que la part encore servie par le L3 reste sous 25 %.</summary>
+    /// <summary>La zone de la latence « DRAM », en entiers : au moins 128 Mio, et au moins quatre fois le L3 lu, pour que
+    /// la part servie par le L3 reste sous 25 % (un X3D a 96 Mo de L3, 128 Mo sur un 9950X3D).</summary>
     internal static int ElementsLatence(long octetsL3)
         => (int)Math.Min(int.MaxValue / 2, Math.Max(128L * 1024 * 1024, 4 * octetsL3) / sizeof(int));
 
@@ -123,8 +113,8 @@ public static class MemoryBench
     internal const double DispersionMax = 0.10;
 
     /// <summary>Pur : la médiane des trois séries, ou 0 (non mesuré) si elles s'écartent de plus de
-    /// <see cref="DispersionMax"/>. C'est ce débit qui peut dire « un seul canal » : sous charge, une machine en double
-    /// canal tombait sous le plafond d'un canal.</summary>
+    /// <see cref="DispersionMax"/>. Ce débit peut dire « un seul canal » : sous charge, un double canal tombe sous le
+    /// plafond d'un canal.</summary>
     internal static double MedianeSiStable(double a, double b, double c)
     {
         var tri = new[] { a, b, c }.Order().ToArray();
@@ -164,11 +154,8 @@ public static class MemoryBench
         return bytes / sw.Elapsed.TotalSeconds / 1e9;
     }
 
-    /// <summary>
-    /// Latence d'un acces aleatoire dans une zone de <paramref name="elements"/> entiers. Chaine
-    /// de pointeurs : chaque acces depend du precedent, donc le prefetcheur ne peut rien anticiper
-    /// et la latence ne peut pas etre masquee.
-    /// </summary>
+    /// <summary>Latence d'un acces aleatoire dans une zone de <paramref name="elements"/> entiers, par chaine de
+    /// pointeurs : chaque acces depend du precedent, le prefetcheur ne peut rien anticiper.</summary>
     private static double LatencyNs(int elements, int steps)
     {
         var chain = ChaineUnique(elements);
@@ -183,23 +170,17 @@ public static class MemoryBench
     }
 
     /// <summary>
-    /// Une permutation aleatoire, chainee en un seul cycle qui passe par chaque element : partant de
-    /// 0, on parcourt toute la zone avant de revenir.
-    ///
-    /// Une chaine construite depuis 0 en suivant simplement la permutation reviendrait au depart en
-    /// arrivant sur la valeur 0 et reecrirait le premier maillon : le cycle parcouru ne couvrirait
-    /// qu'une fraction aleatoire de la zone (3,1 % des 128 Mo, 23,7 % des 2 Mo avec la graine du
-    /// banc). L'effet mesure est faible, parce que les elements visites restent eparpilles sur toute
-    /// la zone (au plus 6,5 %, sur la fenetre de 16 Mo), mais chaque fenetre ne mesurerait pas la
-    /// zone qu'elle annonce.
+    /// Une permutation aleatoire chainee en un seul cycle par chaque element : partant de 0, toute la zone avant de
+    /// revenir. Suivre simplement la permutation reviendrait au depart sur la valeur 0 et ne couvrirait qu'une fraction
+    /// de la zone (3,1 % des 128 Mo, 23,7 % des 2 Mo avec la graine du banc) ; effet mesure faible (au plus 6,5 %, sur la
+    /// fenetre de 16 Mo), mais chaque fenetre ne mesurerait pas la zone annoncee.
     /// </summary>
     internal static int[] ChaineUnique(int elements)
     {
         var next = new int[elements];
         for (int i = 0; i < elements; i++) next[i] = i;
 
-        // Graine fixe : deux executions parcourent exactement le meme chemin, sinon un A/B
-        // comparerait deux permutations differentes en croyant comparer deux reglages.
+        // Graine fixe : sinon un A/B comparerait deux permutations en croyant comparer deux reglages.
         var rng = new Random(12345);
         for (int i = elements - 1; i > 0; i--)
         {

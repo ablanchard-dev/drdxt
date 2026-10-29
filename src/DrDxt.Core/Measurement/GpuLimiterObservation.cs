@@ -72,14 +72,9 @@ public enum GpuLimiterObserved
 /// <summary>
 /// La lecture materielle minimale, sur la fenetre ou la decision est prise.
 ///
-/// Six grandeurs : frametime (ailleurs), GPU busy, frequence, watts, temperature, raisons de
-/// bridage. Elles viennent toutes de la meme passe : c'est la seule facon qu'elles aient de
-/// parler du meme instant.
-///
-/// **Corrélation, jamais causalité.** Le produit a le droit de dire « pendant les fenetres
-/// mesurees, un plafond de puissance a ete observe et la frequence a chute de 12 % ». Il n'a pas
-/// le droit d'en deduire « c'est la puissance qui te coute des FPS » : il faudrait pour cela
-/// changer la limite et remesurer, ce qui est une experience, pas une lecture.
+/// Six grandeurs de la meme passe, pour parler du meme instant : frametime (ailleurs), GPU busy, frequence, watts,
+/// temperature, raisons de bridage. Correlation, jamais causalite : « un plafond de puissance observe, frequence -12 % »,
+/// jamais « la puissance te coute des FPS », qui demanderait de changer la limite et remesurer.
 ///
 /// La frequence et la raison de bridage ne demandent pas NVAPI : `nvmlDeviceGetClockInfo` et
 /// `nvmlDeviceGetCurrentClocksEventReasons` sont des exports NVML publics et documentes (source :

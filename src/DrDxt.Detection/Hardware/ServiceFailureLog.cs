@@ -46,32 +46,13 @@ public sealed record ServiceFailure(
 /// <summary>
 /// Les services qui echouent : un defaut qui n'a besoin d'aucune reference.
 ///
-/// Le probleme de tout audit de reparation est qu'il faut connaitre le defaut pour dire qu'une
-/// valeur en devie. Pour les services, la question ne se pose pas : « ce service n'a pas pu
-/// demarrer » est un fait auto-decrit. Aucun `StartMode` de reference n'est necessaire, aucune
-/// opinion sur ce qui devrait tourner. Le systeme dit lui-meme que quelque chose a rate.
+/// « Ce service n'a pas pu demarrer » est un fait auto-decrit : aucun `StartMode` de reference n'est necessaire (le
+/// meme contournement que le MMCSS). Le lecteur ne diagnostique rien : `atvi-skuld` a echoue 21 fois en 30 jours sur la
+/// machine de reference sans effet prouve sur le jeu ; le produit rapporte le fait et son compte.
 ///
-/// C'est le meme contournement que pour le MMCSS : quand le defaut est hors de portee, chercher
-/// l'affirmation qui ne le demande pas.
-///
-/// Et ce lecteur ne diagnostique rien. Un service qui echoue n'est pas forcement une cause de
-/// perte de performance, et souvent pas une cause du tout : `atvi-skuld` a echoue 21 fois en 30
-/// jours sur la machine de reference sans que rien ne prouve un effet sur le jeu. Le produit
-/// rapporte le fait et son compte ; l'attribution reste a faire.
-///
-/// ══ pourquoi le nom du service ne vient pas du message ══
-/// Le message entier est localise : sur cette machine il dit « Le service Steam Client Service
-/// n'a pas pu demarrer en raison de l'erreur : ... ». Une expression reguliere calee sur « The
-/// service X failed to start » ne trouverait rien ici, et une calee sur le francais ne trouverait
-/// rien ailleurs. Le nom est donc lu dans les donnees structurees (`Properties[0]`), un champ a
-/// position fixe quelle que soit la langue.
-///
-/// Ce que ce champ n'est pas : le nom interne du service. Pour les services Windows il porte le nom
-/// d'affichage, lui aussi traduit (mesure le 08/09/2026 : « Service antivirus Microsoft Defender »,
-/// « SMP de l'Espace de stockages Microsoft »). Cela suffit ici : la position du champ ne depend pas de
-/// la langue, donc le regroupement et le comptage sont fiables sur une machine donnee. Mais ce nom
-/// ne doit jamais servir de cle pour comparer deux machines ou pour interroger le gestionnaire de
-/// services.
+/// Le nom vient de `Properties[0]`, un champ a position fixe quelle que soit la langue, pas du message, localise. Ce n'est
+/// pas le nom interne : pour un service Windows c'est le nom d'affichage, traduit lui aussi (« Service antivirus Microsoft
+/// Defender », lu le 08/09/2026). Fiable pour compter sur une machine, jamais une cle entre deux machines.
 /// </summary>
 public interface IServiceFailureLog
 {

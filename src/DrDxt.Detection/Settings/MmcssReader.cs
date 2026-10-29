@@ -14,14 +14,8 @@ public sealed record MmcssConstat(string Nom, string? Valeur, MmcssEffet Effet, 
 /// <summary>
 /// L'effet d'un reglage, et non son ecart a un defaut.
 ///
-/// C'est le contournement qui rend ce lecteur possible. La page Microsoft du MMCSS documente la
-/// semantique de chaque valeur mais ne publie aucun defaut, ni pour `SystemResponsiveness`, ni
-/// pour les champs de la tache `Games`. Sans defaut, impossible de dire « quelqu'un l'a change ».
-///
-/// Mais on n'en a pas besoin : dire qu'une valeur est **sans effet** ne demande pas de savoir d'ou
-/// elle vient. « Ce reglage ne fait rien, et voici la phrase de Microsoft qui le dit » est une
-/// affirmation complete, verifiable, et utile ; c'est meme la plus utile, puisqu'elle desamorce un
-/// tweak que quelqu'un a peut-etre paye ou passe une soiree a appliquer.
+/// Microsoft documente ce que fait chaque valeur MMCSS mais ne publie aucun defaut : on ne peut pas dire « quelqu'un l'a
+/// change », mais on peut dire « sans effet, voici la phrase de Microsoft », ce qui desamorce un placebo.
 /// </summary>
 public enum MmcssEffet
 {
@@ -60,12 +54,7 @@ public enum MmcssEffet
 ///                            always treated as 2 » ⇒ monter Priority a 8 en categorie High ne
 ///                            change rien.
 ///
-/// Ce que ce lecteur ne dit pas. Il ne dit jamais « quelqu'un a modifie ceci » : la page ne
-/// publie aucune valeur par defaut, et l'inventer serait la faute que ce depot traque. Il dit ce
-/// que la valeur fait, ce qui ne demande pas de connaitre son origine, et suffit a desamorcer un
-/// placebo.
-///
-/// Échec propre : ne leve jamais ; une lecture ratee rend `NonLu`, jamais une valeur fabriquee.
+/// Il ne dit jamais « quelqu'un a modifie ceci » (voir <see cref="MmcssEffet"/>). Échec propre : ne leve jamais ; une lecture ratee rend `NonLu`, jamais une valeur fabriquee.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class MmcssReader

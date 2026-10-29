@@ -7,29 +7,12 @@ namespace DrDxt.ElevatedHelper.Execution.NvApi;
 // -----------------------------------------------------------------------
 // NvApiTuningActions : les vraies écritures de réglage NVAPI risquées (la frontière du m2smoke).
 //
-// Reprend l'unique frontière NVAPI native vérifiée : NvApiNative dans DrDxt.GpuNative (la recette
-// privée rétro-ingéniée SetPstates20 / ClientPowerPoliciesSetStatus, validée en réel sur une
-// RTX 4060). Le helper n'a aucune seconde copie des ids de fonction ni de la recette GET puis SET
-// (le piège de divergence écarté) : il orchestre seulement sur INvApiNative, exactement comme
-// ADLXTuningActions sur IAdlxNative.
+// Orchestre sur INvApiNative, comme ADLXTuningActions sur IAdlxNative : la recette (SetPstates20,
+// ClientPowerPoliciesSetStatus, validée sur une RTX 4060) et ses règles d'or ne vivent que dans NvApiNative.
 //
-// Règles d'or (imposées dans NvApiNative) :
-//   #1 mot de version = Marshal.SizeOf(struct) | (1 << 16) à l'exécution : une taille incorrecte
-//      devient l'IncompatibleStructVersion sûr du pilote, jamais une écriture.
-//   #2 GET puis SET : lire toute la struct actuelle, ne modifier que le seul champ visé sur place,
-//      la réécrire ; jamais une struct d'écriture construite à zéro.
-//   #3 statut 0 = Ok ; tout non nul → la frontière rend false → Result.Fail ici.
-//
-// Défense en profondeur (cette couche) : les valeurs d'écriture hors règle sont refusées ici par
-// les garde-fous de plage de NvApiTuningMath (qui reprennent GpuSafeBounds de l'App et rejettent
-// aussi int.MinValue et NaN) avant d'atteindre la frontière native : l'écriture GPU élevée impose
-// elle-même la plage de sécurité et ne fait jamais confiance à son appelant pour les bornes, même
-// sur un appel direct (hors IPC) d'un outil de smoke test qui contourne OpAllowlist. Hors plage :
-// rejeté, pas borné.
-//
-// Chaque méthode rend un Result et ne lève jamais à travers l'IPC. Sur une machine AMD / sans
-// NVIDIA, ou si un id de fonction privée n'est pas exporté par le pilote installé, la frontière
-// rend false et l'appel échoue proprement (HELPER.OP_FAILED).
+// Défense en profondeur : NvApiTuningMath (GpuSafeBounds, plus int.MinValue et NaN) refuse ici toute valeur hors règle
+// avant la frontière native, même sur un appel direct d'un outil de smoke test qui contourne OpAllowlist. Hors plage :
+// rejeté, pas borné. Sans NVIDIA ou sans id exporté par le pilote : échec propre (HELPER.OP_FAILED), jamais d'exception.
 // -----------------------------------------------------------------------
 [SupportedOSPlatform("windows")]
 public sealed class NvApiTuningActions : INvApiTuningActions
@@ -187,18 +170,9 @@ public sealed class NvApiTuningActions : INvApiTuningActions
     }
 
     /// <summary>
-    /// Une écriture native qui rend true veut dire que le pilote a accepté l'appel, pas que la valeur
-    /// est en place. Relevé sur une vraie RTX 4060 : une demande de limite de puissance à 110 % a rendu
-    /// true et la carte est restée à 100 % ; elle n'a pas de marge et le pilote a borné en silence.
-    /// L'annoncer comme appliqué dirait à un client qu'on a relevé sa limite alors que rien n'a bougé,
-    /// et enregistrerait une valeur de retour que le GPU n'a jamais tenue.
-    ///
-    /// Chaque écriture relit donc et compare. La comparaison est exacte exprès : un pilote qui
-    /// arrondit une demande apparaîtrait ici comme un désaccord, ce qui renseigne sur ce pilote,
-    /// pas un défaut à masquer par une tolérance inventée.
-    ///
-    /// Une relecture qui échoue n'est pas un succès non plus : « appliqué mais non confirmé » est
-    /// exactement l'affirmation que cette méthode existe pour empêcher.
+    /// Un true natif dit que le pilote a accepté l'appel, pas que la valeur est en place : sur une RTX 4060, 110 % de
+    /// limite a rendu true et la carte est restée à 100 %, bornée en silence. Chaque écriture relit et compare exactement
+    /// (un arrondi du pilote est un désaccord qui renseigne, pas un défaut à masquer). Une relecture ratée n'est pas un succès.
     /// </summary>
     private static Result Confirm(int requested, bool readOk, int actual, string what, string unit)
     {

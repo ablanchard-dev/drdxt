@@ -36,15 +36,8 @@ public sealed record PerformanceSample(
     SceneRepresentativity? Scene = null);
 
 /// <summary>
-/// La derive entre deux sessions : la question qu'aucun scan unique ne peut poser.
-///
-/// Un seul fichier survivait a une session de DrDXT : `memory-baseline.json`. Ni les mesures, ni
-/// les verdicts, ni les resolutions. Le produit redecouvrait la machine a chaque lancement, et une
-/// **degradation lente** est precisement ce qu'un scan isole ne voit pas : chaque mesure prise
-/// seule parait normale.
-///
-/// Ce journal ne conserve pas des donnees pour le principe. Il compare la plus ancienne mesure
-/// assez precise (l'etalon, voir <see cref="Reference(IReadOnlyList{PerformanceSample})"/>)
+/// La derive entre deux sessions, qu'aucun scan isole ne voit (une degradation lente parait normale mesure par mesure).
+/// Le journal compare la plus ancienne mesure assez precise (l'etalon, voir <see cref="Reference(IReadOnlyList{PerformanceSample})"/>)
 /// a la plus recente, sur la meme machine et le meme jeu, **avec la resolution des deux**, par le meme
 /// <see cref="Evidence"/> que l'A/B. Une derive sous le bruit reste `NoResolvedChange`, jamais une
 /// alerte : un produit qui crie a la degradation tous les mois n'est plus lu.
@@ -86,20 +79,10 @@ public static class PerformanceJournal
 
     /// <summary>Borne la taille du journal en gardant une reference par jeu.
     ///
-    /// Tronquer par la fin detruirait la mesure la plus ancienne, c'est-a-dire tout l'interet :
-    /// un journal de trente jours glissants ne voit jamais une degradation lente, puisque chaque
-    /// comparaison se fait contre un passe deja degrade.
-    ///
-    /// Et une seule reference ne suffit pas. La comparaison se fait par (machine, jeu) : garder
-    /// la plus ancienne mesure du fichier conservait l'etalon d'un seul jeu et detruisait celui de
-    /// tous les autres : la derive de ces jeux se serait alors calculee contre un passe deja
-    /// degrade, sans que rien ne le signale. Exactement le defaut que cet elagage existe pour
-    /// eviter, deplace d'un cran.
-    ///
-    /// Si les references a elles seules depassent le plafond, ce sont les plus recentes qui
-    /// restent : un jeu auquel personne n'a touche depuis deux cents mesures cede sa place a celui
-    /// qu'on joue. Perdre une reference se paie, mais depasser le plafond se paierait a chaque
-    /// lecture.</summary>
+    /// Tronquer par la fin detruirait l'etalon (un journal glissant compare toujours a un passe deja degrade), et la
+    /// comparaison se fait par (machine, jeu) : une seule reference pour le fichier detruirait celle des autres jeux. Si
+    /// les references seules depassent le plafond, les plus recentes restent (un jeu delaisse depuis deux cents mesures
+    /// cede sa place).</summary>
     public static IReadOnlyList<PerformanceSample> Elaguer(
         IReadOnlyList<PerformanceSample> journal, int maximum)
     {

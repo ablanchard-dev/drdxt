@@ -49,18 +49,10 @@ public static class HostElevatedClientFactory
 
     /// <summary>Construit le client réconciliateur→helper en connexion seule.
     ///
-    /// Le service réconciliateur peu privilégié ne lance pas le helper (pas d'UAC au démarrage) : il
-    /// ne fait que se connecter au service helper déjà en marche, par le même handshake de clé de
-    /// session que l'App, en négociant une clé éphémère par session à la connexion. C'est donc le
-    /// <see cref="HandshakingElevatedClient"/> nu, pas l'enveloppe de lancement à la demande de l'App
-    /// (qui ouvrirait une UAC). Il est en connexion seule par construction (il ne lance jamais rien).
-    ///
-    /// Échec propre quand le helper est absent : <see cref="HandshakingElevatedClient"/> emballe déjà
-    /// toute panne de transport → un Result propre. Quand aucun service helper n'écoute, son échéance
-    /// bornée de reprise de connexion passe et il rend HELPER_UNREACHABLE (sans plantage) : le
-    /// réconciliateur journalise alors « élévation indisponible » et ne réapplique pas. Le handshake
-    /// revérifie aussi l'auth de l'appelant côté serveur : une image de réconciliateur non fiable y
-    /// est refusée (défense en profondeur).</summary>
+    /// Le service peu privilégié ne lance jamais le helper (pas d'UAC) : le <see cref="HandshakingElevatedClient"/> nu se
+    /// connecte au helper déjà en marche, avec une clé éphémère négociée comme l'App. Sans helper à l'écoute, l'échéance
+    /// bornée passe et il rend HELPER_UNREACHABLE : le réconciliateur dit « élévation indisponible » et ne réapplique pas.
+    /// Le serveur revérifie l'image de l'appelant (défense en profondeur).</summary>
     /// <param name="pipeName">Surcharge pour les tests ; par défaut le pipe standard protégé par ACL.</param>
     /// <param name="connectTimeoutMs">Échéance de reprise de connexion ; le test unitaire prend une
     /// valeur courte pour que le chemin d'échec propre sans helper rende vite la main.</param>
