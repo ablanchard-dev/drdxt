@@ -87,6 +87,40 @@ public sealed class PartiesMemoriseesTests : IDisposable
         Memoire().DernierEchec().Should().BeNull();
     }
 
+    // Du JSON valide sans sa raison ne passe pas pour un échec : la ligne de l'écran lit la raison au démarrage de l'App.
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"Quand\":\"2026-10-07T21:00:00+02:00\"}")]
+    [InlineData("{\"Raison\":null}")]
+    public void Un_echec_sans_sa_raison_ne_se_relit_pas(string contenu)
+    {
+        File.WriteAllText(Path.Combine(_dossier, "releve-echec.json"), contenu);
+        Memoire().DernierEchec().Should().BeNull();
+    }
+
+    // Une entrée sans son jeu n'est pas une partie : l'écran lit le nom du jeu de chacune au démarrage de l'App.
+    [Fact]
+    public void Une_partie_sans_son_jeu_ne_se_relit_pas()
+    {
+        File.WriteAllText(Path.Combine(_dossier, "parties.json"), "[{},{\"Jeu\":null}]");
+        File.WriteAllText(Path.Combine(_dossier, "parties-essai.json"), "[{}]");
+        Memoire().Lire().Should().BeEmpty();
+        Memoire().PartiesDEssai().Should().BeEmpty();
+    }
+
+    // Un essai sans son levier est un fichier abîmé : le juger planterait le démarrage de l'App, et il ne bloque pas un essai neuf.
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"LevierId\":\"\"}")]
+    public void Un_essai_sans_son_levier_ne_se_relit_pas_et_ne_bloque_pas(string contenu)
+    {
+        var chemin = Path.Combine(_dossier, "essai.json");
+        File.WriteAllText(chemin, contenu);
+        var essai = new DrDxt.Application.Parties.MemoireDeLEssai(chemin);
+        essai.Lire().Should().BeNull();
+        essai.Libre().Should().BeTrue();
+    }
+
     // Une liste abîmée (zéros après une coupure) n'est pas écrasée : mise de côté, sa trace reste.
     [Fact]
     public void Une_liste_abimee_est_mise_de_cote_avant_le_prochain_ajout()

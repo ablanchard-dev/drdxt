@@ -82,7 +82,7 @@ public sealed class PartiesMemorisees
     {
         var texte = _echec.Read();
         if (!texte.IsOk || string.IsNullOrWhiteSpace(texte.Value)) return null;
-        try { return JsonSerializer.Deserialize<EchecDeCapture>(texte.Value); }
+        try { return JsonSerializer.Deserialize<EchecDeCapture>(texte.Value) is { Raison: not null } echec ? echec : null; }
         catch (JsonException) { return null; }
     }
 
@@ -102,8 +102,8 @@ public sealed class PartiesMemorisees
     {
         var texte = _liste.Read();
         if (!texte.IsOk || string.IsNullOrWhiteSpace(texte.Value)) return [];
-        // Un « null » de la liste n'est pas une partie : écarté ici, il n'est ni rendu ni réécrit par Ajouter.
-        try { return (JsonSerializer.Deserialize<List<PartieRelevee?>>(texte.Value) ?? []).OfType<PartieRelevee>().ToList(); }
+        // Un « null » ou une entrée sans son jeu n'est pas une partie : écarté ici, il n'est ni rendu ni réécrit par Ajouter.
+        try { return (JsonSerializer.Deserialize<List<PartieRelevee?>>(texte.Value) ?? []).Where(p => p is { Jeu: not null }).Select(p => p!).ToList(); }
         catch (JsonException) { return []; }
     }
 
@@ -127,7 +127,7 @@ public sealed class PartiesMemorisees
     {
         var texte = _essais.Read();
         if (!texte.IsOk || string.IsNullOrWhiteSpace(texte.Value)) return [];
-        try { return (JsonSerializer.Deserialize<List<PartieRelevee?>>(texte.Value) ?? []).OfType<PartieRelevee>().ToList(); }
+        try { return (JsonSerializer.Deserialize<List<PartieRelevee?>>(texte.Value) ?? []).Where(p => p is { Jeu: not null }).Select(p => p!).ToList(); }
         catch (JsonException) { return []; }
     }
 }

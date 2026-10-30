@@ -44,7 +44,7 @@ public sealed class MemoireDeLEssai
     // elle, que rien n'amènerait. Rien de l'essai n'est plus tard que maintenant.
     private EssaiEnAlternance? Borne(EssaiEnAlternance? e)
     {
-        if (e is null) return null;
+        if (string.IsNullOrEmpty(e?.LevierId)) return null;   // sans son levier, le fichier est abîmé
         var m = _maintenant();
         return e with { Debut = e.Debut > m ? m : e.Debut, DerniereBascule = e.DerniereBascule > m ? m : e.DerniereBascule };
     }
@@ -57,7 +57,7 @@ public sealed class MemoireDeLEssai
         var texte = _fichier.Read();
         if (!texte.IsOk) return false;
         if (string.IsNullOrWhiteSpace(texte.Value) || texte.Value.Trim() == "null") return true;
-        try { if (JsonSerializer.Deserialize<EssaiEnAlternance>(texte.Value) is not null) return false; }
+        try { if (!string.IsNullOrEmpty(JsonSerializer.Deserialize<EssaiEnAlternance>(texte.Value)?.LevierId)) return false; }
         catch (JsonException) { }
         return _fichier.MettreDeCote();
     }
