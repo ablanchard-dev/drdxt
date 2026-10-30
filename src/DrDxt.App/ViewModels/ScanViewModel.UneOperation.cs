@@ -77,7 +77,11 @@ public partial class ScanViewModel
             commande.NotifyCanExecuteChanged();
     }
 
-    partial void OnStateChanged(ScanState value) => OperationLongueChangee();
+    partial void OnStateChanged(ScanState value)
+    {
+        OperationLongueChangee();
+        RedireLeJeuChoisi();
+    }
     partial void OnVerificationEnCoursChanged(bool value) => OperationLongueChangee();
     partial void OnRemesureCpuEnCoursChanged(bool value) => OperationLongueChangee();
     partial void OnRemesureMemoireEnCoursChanged(bool value) => OperationLongueChangee();

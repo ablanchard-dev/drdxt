@@ -87,4 +87,25 @@ public sealed partial class EssaiEnAlternanceTests
 
         vm.MemoireJeuChoisi!.Lire()!.Chemin.Should().Be(CheminJeuA);
     }
+
+    // L'écran lit la ligne dès sa création, avant que l'App branche le choix : sans nouvel avis, il dirait « automatique »
+    // jusqu'au premier clic. Le jeu lancé ou fermé depuis change aussi le détail : le scan le redit.
+    [Fact]
+    public void La_ligne_se_redit_quand_le_choix_est_branche_et_a_chaque_scan()
+    {
+        var vm = Vm();
+        var redit = new List<string?>();
+        vm.PropertyChanged += (_, e) => redit.Add(e.PropertyName);
+
+        vm.MemoireJeuChoisi = MemoireDuChoix(new JeuChoisi("JeuA.exe"));
+        redit.Should().Contain(nameof(vm.LigneJeuChoisi));
+
+        redit.Clear();
+        vm.JeuAOptimiser = new JeuAOptimiser(new JeuOuvertFixe(null), vm.MemoireJeuChoisi, _ => true);
+        redit.Should().Contain(nameof(vm.DetailJeuChoisi));
+
+        redit.Clear();
+        vm.State = DrDxt.App.ViewModels.ScanState.Done;
+        redit.Should().Contain(nameof(vm.LigneJeuChoisi)).And.Contain(nameof(vm.DetailJeuChoisi));
+    }
 }

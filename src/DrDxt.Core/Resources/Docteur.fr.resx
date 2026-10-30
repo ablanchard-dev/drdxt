@@ -3997,10 +3997,10 @@
     <value>Un essai de « {0} » a été interrompu avant que son état d'origine soit gardé : DrDXT ne peut pas le remettre seul. Vérifie ce réglage.</value>
   </data>
   <data name="RV.LevierDisparu" xml:space="preserve">
-    <value>« {0} » est resté en place après une session interrompue, et ce levier n'existe plus dans cette version : il n'a pas pu être remis.</value>
+    <value>« {0} » est resté en place après une session interrompue, et ce levier n'existe plus dans cette version : il n'a pas pu être remis. Vérifie ce réglage à la main.</value>
   </data>
   <data name="RV.InverseRefuse" xml:space="preserve">
-    <value>Un essai de « {0} » est resté en attente, mais ce que le journal demande de rejouer n'est pas une remise en état de ce levier : DrDXT ne l'exécute pas. Vérifie ce réglage, et le fichier pending-revert.json de ton profil.</value>
+    <value>Un essai de « {0} » est resté en attente, mais ce que le journal demande de rejouer n'est pas une remise en état de ce levier : DrDXT ne l'exécute pas et le retire. Vérifie ce réglage à la main.</value>
   </data>
   <data name="RV.RenduEchoue" xml:space="preserve">
     <value>« {0} » est resté en place après une session interrompue, et le remettre a échoué ({1}). Nouvel essai au prochain démarrage.</value>

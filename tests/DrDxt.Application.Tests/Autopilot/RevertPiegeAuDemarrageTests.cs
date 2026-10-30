@@ -108,7 +108,21 @@ public sealed class RevertPiegeAuDemarrageTests : IDisposable
         var (phrase, levier, journal) = Rejouer(new RebootToFirmwareSetupOp(0));
         levier.Rendus.Should().Be(0, "le helper élevé ne doit jamais recevoir cet op");
         phrase.Should().Contain("n'est pas une remise en état");
-        journal.Lire().Value.Should().NotBeNull("rien n'est rejoué, rien n'est effacé : le joueur est prévenu");
+        journal.Lire().Value.Should().BeNull("rien n'est rejoué, le joueur est prévenu, et l'entrée ne bloque pas les essais suivants");
+    }
+
+    // Une entrée que DrDXT ne rendra jamais (levier retiré par une mise à jour, inverse refusé) ne reste pas au journal :
+    // chaque essai suivant serait refusé, à chaque lancement, sans aucun geste qui en sorte.
+    [Fact]
+    public void Un_essai_d_un_levier_disparu_ne_bloque_pas_les_essais_suivants()
+    {
+        var journal = new FichierRevertEnAttente(Fichier);
+        journal.Poser("levier.retire", new TweakSnapshot("levier.retire", PrivilegedOpCodec.Serialize(EcritureLegitime).Value!));
+
+        RevertAuDemarrage.Executer(journal, new Catalogue(new Levier()))
+            .Should().Be(Docteur.T("RV.LevierDisparu", "levier.retire"));
+
+        journal.Poser("latency.hagsOn", null).IsOk.Should().BeTrue();
     }
 
     [Fact]
@@ -132,7 +146,7 @@ public sealed class RevertPiegeAuDemarrageTests : IDisposable
         var (phrase, levier, journal) = Rejouer(new ApplyNvApiPowerLimitOp(0, 50));
         levier.Rendus.Should().Be(0, "HAGS se remet par le registre, jamais par le GPU");
         phrase.Should().Contain("n'est pas une remise en état");
-        journal.Lire().Value.Should().NotBeNull();
+        journal.Lire().Value.Should().BeNull();
     }
 
     [Theory]

@@ -15,11 +15,29 @@ public sealed record JeuPropose(string Libelle, string? Exe);
 /// </summary>
 public partial class ScanViewModel
 {
-    /// <summary>Le choix, dans les données du joueur. Null (tests) : automatique.</summary>
-    internal MemoireDuJeuChoisi? MemoireJeuChoisi { get; set; }
+    /// <summary>Le choix, dans les données du joueur. Null (tests) : automatique. Branché après la création de l'écran,
+    /// qui a déjà lu la ligne : elle se redit.</summary>
+    internal MemoireDuJeuChoisi? MemoireJeuChoisi
+    {
+        get => _memoireJeuChoisi;
+        set { _memoireJeuChoisi = value; RedireLeJeuChoisi(); }
+    }
+    private MemoireDuJeuChoisi? _memoireJeuChoisi;
 
     /// <summary>Le jeu que visent les leviers ; l'App le branche, l'état de la ligne s'y lit.</summary>
-    internal JeuAOptimiser? JeuAOptimiser { get; set; }
+    internal JeuAOptimiser? JeuAOptimiser
+    {
+        get => _jeuAOptimiser;
+        set { _jeuAOptimiser = value; RedireLeJeuChoisi(); }
+    }
+    private JeuAOptimiser? _jeuAOptimiser;
+
+    /// <summary>La ligne et son détail relus : au branchement, au choix, et à chaque scan (le jeu a pu s'ouvrir ou se fermer).</summary>
+    private void RedireLeJeuChoisi()
+    {
+        OnPropertyChanged(nameof(LigneJeuChoisi));
+        OnPropertyChanged(nameof(DetailJeuChoisi));
+    }
 
     [ObservableProperty]
     private bool _listeDesJeuxOuverte;
@@ -92,8 +110,7 @@ public partial class ScanViewModel
         if (MemoireJeuChoisi.Choisir(choix).IsOk && choix is not null)
             JeuAOptimiser?.RunningGameExecutablePath();   // le jeu choisi déjà ouvert apprend son chemin tout de suite
         ListeDesJeuxOuverte = false;
-        OnPropertyChanged(nameof(LigneJeuChoisi));
-        OnPropertyChanged(nameof(DetailJeuChoisi));
+        RedireLeJeuChoisi();
         SignalerPlafondEnvoi();
         if (PlafondEnvoiActif && !string.Equals(visaitLePing, ExeDuPing, StringComparison.OrdinalIgnoreCase))
         {

@@ -3997,10 +3997,10 @@
     <value>A trial of "{0}" was interrupted before its original state was saved: DrDXT cannot put it back on its own. Check this setting.</value>
   </data>
   <data name="RV.LevierDisparu" xml:space="preserve">
-    <value>"{0}" stayed in place after an interrupted session, and this lever no longer exists in this version: it could not be put back.</value>
+    <value>"{0}" stayed in place after an interrupted session, and this lever no longer exists in this version: it could not be put back. Check this setting by hand.</value>
   </data>
   <data name="RV.InverseRefuse" xml:space="preserve">
-    <value>A trial of "{0}" is still pending, but what the log asks to replay is not a restore of this lever: DrDXT does not run it. Check this setting, and the pending-revert.json file in your profile.</value>
+    <value>A trial of "{0}" is still pending, but what the log asks to replay is not a restore of this lever: DrDXT does not run it and drops it. Check this setting by hand.</value>
   </data>
   <data name="RV.RenduEchoue" xml:space="preserve">
     <value>"{0}" stayed in place after an interrupted session, and putting it back failed ({1}). New attempt at next startup.</value>

@@ -126,6 +126,29 @@ public sealed class UneSignatureNeRattrapePasUneCONFIGURATIONTests
         reponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
+    // La version est le quatrième champ signé. Le client la lit chiffre par chiffre (UpdateVerifier.ParseVersion), un morceau
+    // illisible valant 0 : « v1.4.0 » se lit 0.4.0, plus ancienne que toute version installée, et la mise à jour est refusée
+    // comme un retour en arrière, à chaque démarrage, sans que personne l'apprenne.
+    [Theory]
+    [InlineData("v1.4.0")]
+    [InlineData("TODO")]
+    [InlineData("1.4.0 beta")]
+    [InlineData("1..4")]
+    public async Task Une_version_que_le_client_ne_lit_pas_n_est_JAMAIS_signee(string version)
+    {
+        var reponse = await Client(version: version).GetAsync("/updates/app/manifest");
+
+        reponse.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable,
+            $"« {version} » se lirait comme une version plus ancienne, et le client refuserait toujours la mise à jour");
+    }
+
+    [Theory]
+    [InlineData("1.4.0")]
+    [InlineData("1.4.0-rc.2")]
+    [InlineData("1.4.0+abc1234")]
+    public async Task Une_version_SemVer_reste_servie(string version)
+        => (await Client(version: version).GetAsync("/updates/app/manifest")).StatusCode.Should().Be(HttpStatusCode.OK);
+
     [Fact]
     public async Task Un_canal_inconnu_reste_introuvable()
     {

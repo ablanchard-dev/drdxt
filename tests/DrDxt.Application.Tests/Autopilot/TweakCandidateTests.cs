@@ -371,7 +371,7 @@ public class TweakCandidateTests
     }
 
     [Fact]
-    public void Au_demarrage_un_levier_DISPARU_de_cette_version_est_dit_et_le_journal_RESTE()
+    public void Au_demarrage_un_levier_DISPARU_de_cette_version_est_dit_et_sa_trace_reste_a_cote()
     {
         // La mise a jour qui retire un levier : le journal de la session precedente le nomme
         // encore, le catalogue de cette version ne le connait plus. Rien n'est pose a la main —
@@ -387,10 +387,11 @@ public class TweakCandidateTests
 
             phrase.Should().Contain("n'existe plus dans cette version");
             levier.Annules.Should().BeEmpty("il n'y a plus de code capable de rendre ce levier");
-            File.Exists(chemin).Should().BeTrue(
-                "rien n'a ete rendu : lever le journal effacerait la seule trace de ce qui reste pose");
+            File.Exists(chemin + ".ecarte").Should().BeTrue(
+                "rien n'a ete rendu : c'est la seule trace de ce qui reste pose");
+            new FichierRevertEnAttente(chemin).Lire().Value.Should().BeNull("il ne bloque pas les essais suivants");
         }
-        finally { File.Delete(chemin); }
+        finally { File.Delete(chemin); File.Delete(chemin + ".ecarte"); }
     }
 
     [Fact]

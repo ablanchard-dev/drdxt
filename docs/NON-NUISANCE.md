@@ -568,7 +568,7 @@ src/DrDxt.App/ViewModels/ScanViewModel.Scan.cs 1
 src/DrDxt.App/ViewModels/ScanViewModel.Verifier.cs 1
 src/DrDxt.App/ViewModels/ScanViewModel.Voisins.cs 1
 src/DrDxt.App/ViewModels/ScanViewModel.cs 1
-src/DrDxt.Application/Autopilot/RevertEnAttente.cs 2
+src/DrDxt.Application/Autopilot/RevertEnAttente.cs 3
 src/DrDxt.Application/Network/PlafondEnvoiMemorise.cs 2
 src/DrDxt.Application/Network/VeillePingMemorisee.cs 2
 src/DrDxt.Application/Parties/ImagesDesParties.cs 1

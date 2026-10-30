@@ -26,6 +26,10 @@ public interface IRevertEnAttente
     Result Poser(string tweakId, TweakSnapshot? snapshot);
     Result Lever();
 
+    /// <summary>Lève un essai que rien ne rendra jamais, en gardant sa trace à côté : resté au journal, il refuserait tous
+    /// les essais suivants.</summary>
+    Result Ecarter() => Lever();
+
     /// <summary>Le levier en essai est garde : il quitte l'essai (le demarrage ne le rendra plus) et
     /// rejoint les leviers gardes, avec la valeur d'origine du premier keep quand il y est deja : un
     /// levier garde puis retente recapture la cible comme « origine », et ecraser la vraie serait la
@@ -128,6 +132,20 @@ public sealed class FichierRevertEnAttente : IRevertEnAttente
         }
     }
 
+    public Result Ecarter() => SousVerrou(() =>
+    {
+        try
+        {
+            if (FichierJsonAtomique.RefusEleve(_chemin, CodeErreur) is { } refus) return refus;
+            if (File.Exists(_chemin)) File.Copy(_chemin, _chemin + ".ecarte", overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Result.Fail(CodeErreur, ex.Message);   // pas de trace : l'entrée reste, le lancement suivant réessaie
+        }
+        return LeverSousVerrou();
+    });
+
     public Result Garder(string tweakId, TweakSnapshot snapshot) => SousVerrou(() => GarderSousVerrou(tweakId, snapshot));
 
     private Result GarderSousVerrou(string tweakId, TweakSnapshot snapshot)
@@ -226,16 +244,22 @@ public static class RevertAuDemarrage
 
         var levier = catalogue.Get(entree.TweakId);
         if (!levier.IsOk || levier.Value is null)
+        {
+            journal.Ecarter();
             return Docteur.T("RV.LevierDisparu", Nom(entree.TweakId));
+        }
 
         // Ce fichier vit sous %LOCALAPPDATA%, écrivable par tout
         // processus du compte, et le levier rejoue son contenu par le helper élevé. Sans ce contrôle,
         // un fichier piégé ferait exécuter n'importe quel op de l'allowlist (redémarrage dans le BIOS,
         // BCD, écriture du manifeste…) sous une autorisation Windows donnée « à DrDXT ». Seuls les
         // types qu'un levier utilise réellement comme inverse passent ; tout le reste, et tout type
-        // futur, est refusé. Le journal reste en place : le joueur est prévenu, rien n'est rejoué.
+        // futur, est refusé. Rien n'est rejoué, le joueur est prévenu, et l'entrée est écartée.
         if (!AnnulationSure(entree.TweakId, snapshot.OriginalValueJson))
+        {
+            journal.Ecarter();
             return Docteur.T("RV.InverseRefuse", Nom(entree.TweakId));
+        }
 
         var pose = Tweaks.TweakReadback.EtatDeLaPose(snapshot, registre, verdict);
         if (pose != Tweaks.PoseRelue.DeDrDxt)

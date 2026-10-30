@@ -58,7 +58,7 @@ public static class UpdateManifestEndpoint
         //
         // Un manifeste douteux prend le chemin deja ecrit pour un manifeste non signable :
         // 503, fail-closed. Deplacer la panne chez le client sans la nommer serait pire.
-        if (!EstPubliable(url, sha256))
+        if (!EstPubliable(version, url, sha256))
         {
             return Results.StatusCode(503);
         }
@@ -89,10 +89,14 @@ public static class UpdateManifestEndpoint
     ///     voit une mise a jour qui echoue sans raison dicible ;
     ///   * le sha256 doit etre 64 caracteres hexadecimaux. Autrement le client refusera
     ///     TOUJOURS la mise a jour, en silence, et le produit cessera de se mettre a jour sans
-    ///     que personne ne l'apprenne. C'est la panne la plus discrete des deux.
+    ///     que personne ne l'apprenne. C'est la panne la plus discrete des deux ;
+    ///   * la version doit etre une version SemVer (coeur numerique, prerelease et build facultatifs). Le client lit chaque
+    ///     morceau comme un nombre, un morceau illisible valant 0 : « v1.4.0 » se lirait 0.4.0, un retour en arriere refuse a
+    ///     chaque demarrage, la meme panne discrete.
     /// </summary>
-    private static bool EstPubliable(string url, string sha256)
+    private static bool EstPubliable(string version, string url, string sha256)
     {
+        if (!VersionLisible.IsMatch(version)) return false;
         var adresseSaine = Uri.TryCreate(url, UriKind.Absolute, out var adresse)
                            && adresse.Scheme == Uri.UriSchemeHttps;
 
@@ -101,6 +105,10 @@ public static class UpdateManifestEndpoint
 
         return adresseSaine && empreinteSaine;
     }
+
+    private static readonly System.Text.RegularExpressions.Regex VersionLisible = new(
+        @"^[0-9]+(\.[0-9]+)*(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?\z",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     // Les quatre champs de confiance, dans un ordre IMPOSE, sans indentation, encodeur relaxe.
     // La signature ne porte jamais sur elle-meme.
