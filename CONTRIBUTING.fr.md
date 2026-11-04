@@ -94,3 +94,22 @@ code suit la même règle. Chaque fichier s'ouvre sur un court résumé en fran�
 lignes) : ce que fait la
 pièce, pour qui, et pourquoi elle existe. Un commentaire dit pourquoi, git garde l'historique. Les tickets et les
 demandes de fusion sont bienvenus en français ou en anglais. Un commit dit ce qui change pour le joueur, puis pourquoi.
+
+## 4. Ajouter une langue
+
+L'App parle anglais (`src/DrDxt.Infrastructure/Resources/Strings.resx`, la langue de repli) et français
+(`Strings.fr.resx`). Une troisième langue demande plus qu'une copie du fichier anglais, et la suite dit quand une
+étape manque :
+
+1. Copie `Strings.resx` en `Strings.<code>.resx` (par exemple `Strings.de.resx`) et traduis la `<value>` de chaque
+   entrée. Garde les clés et les `{0}` tels quels.
+2. Déclare la culture à côté du français dans `src/DrDxt.Infrastructure/DrDxt.Infrastructure.csproj`, et ajoute le
+   code à `SatelliteResourceLanguages` dans `src/DrDxt.App/DrDxt.App.csproj`. Un test compare cette liste aux
+   `.resx` du dépôt.
+3. Pluriels : `src/DrDxt.App/ViewModels/Pluriels.cs` connaît la règle française et l'anglaise. Une langue aux règles
+   différentes y demande la sienne, avec un test.
+4. Facultatif : l'installeur (`[Languages]` dans `installer/DrDXT.iss`) et la page du guide BIOS restent en anglais
+   tant qu'ils ne sont pas traduits.
+
+Lance l'App avec `--langue=<code>` (build Debug, machine enregistrée, voir plus haut) et lis chaque page : une entrée
+oubliée retombe sur l'anglais.

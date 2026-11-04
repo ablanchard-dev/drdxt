@@ -215,8 +215,9 @@ public static class PrivilegedOpCodec
             doc = JsonDocument.Parse(json);
             root = doc.RootElement;
         }
-        catch (JsonException)
+        catch (Exception)
         {
+            // JSON malformé, ou texte que l'UTF-8 ne transcode pas (surrogat isolé, levé en ArgumentException).
             doc?.Dispose();
             return Result<PrivilegedOp>.Fail(ErrorCodes.NotAllowlisted, "Malformed privileged-op JSON.");
         }

@@ -55,7 +55,20 @@ public sealed partial class CartesAgirTests
             "annulé, le réglage est revenu : le constat aussi");
     }
 
-    // Le test mémoire jamais lancé : DrDXT le demande lui-même au prochain démarrage, et l'annule. Le redémarrage
+    // Avec le démarrage rapide de Windows, éteindre puis rallumer ne suit pas la séquence : seul un redémarrage lance le
+    // test. Le geste le dit, sans quoi le joueur l'attend à chaque allumage.
+    [Theory]
+    [InlineData("fr", "redémarrage", "démarrage rapide")]
+    [InlineData("en", "restart", "Fast Startup")]
+    public void Le_geste_du_test_memoire_dit_qu_il_faut_redemarrer(string langue, string redemarrage, string demarrageRapide)
+    {
+        var textes = new DrDxt.Infrastructure.Localization.ResxLocalizer();
+        var culture = new System.Globalization.CultureInfo(langue);
+        textes.Get("Geste.TestMemoire.Titre", culture).Should().Contain(redemarrage);
+        textes.Get("Geste.TestMemoire.Detail", culture).Should().Contain(demarrageRapide);
+    }
+
+    // Le test mémoire jamais lancé : DrDXT le demande lui-même au prochain redémarrage, et l'annule. Le redémarrage
     // reste au joueur.
     [Fact]
     public async Task Le_test_memoire_jamais_lance_porte_son_geste_qui_le_demande_et_l_annule()

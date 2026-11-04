@@ -2,13 +2,40 @@
 
 English version of the coming changes: [CHANGELOG.en.md](CHANGELOG.en.md).
 
-## Non publié
+## 0.9.3 (04/11/2026)
 
 Pour le joueur :
 
-### Fiabilité
+### En partie
+- Rien n'est posé ni rendu pendant qu'un jeu tourne, pas même une origine à rendre après un redémarrage : ça attend
+  la fin de la partie.
+- Un réglage qui s'est montré pire en jeu n'est pas retiré pendant la partie, mais juste après.
 - Un verdict en jeu n'est plus perdu quand le journal des changements était occupé au moment où son réglage a été
   noté : il s'écrit avec l'entrée en attente.
+
+### Optimiser
+- Tu choisis le jeu à optimiser, sous le bouton Optimiser ; la protection du ping suit le jeu choisi.
+- Nouvelle case de l'installeur, « Assistant DrDXT » : les essais avancent même DrDXT fermé. Elle n'est proposée qu'à
+  un administrateur, et vaut pour le compte qui a lancé l'installeur.
+- Un essai que DrDXT ne peut jamais rendre est mis de côté et ne bloque plus tous les essais suivants.
+- « Vérifier mon PC » dit « pas essayé » pour un réglage qu'il n'a pas atteint, au lieu de « déjà posé ».
+
+### Docteur et rapport
+- Une valeur que Windows ne donne pas (cœurs, vitesse de la mémoire) est écrite « non lue », jamais 0 ; le profil
+  mémoire et le routage X3D ne sont plus dits bons sur une valeur non lue.
+- Le test de la mémoire dit qu'il faut redémarrer (le démarrage rapide le saute).
+
+### Fiabilité
+- Un fichier de réglages enregistré mais incomplet n'empêche plus DrDXT de démarrer.
+- L'installeur retire l'ancien raccourci de démarrage du profil du joueur, pas de celui de l'administrateur.
+
+### Sécurité
+- Le moteur .NET embarqué passe en 10.0.14 : il corrige une faille du décodeur Brotli (CVE-2026-111497) ; DrDXT
+  n'utilise pas Brotli.
+- Chaque programme de DrDXT ne charge ses bibliothèques système que depuis System32, jamais depuis son dossier ni le
+  PATH ; une DLL posée à côté n'est jamais chargée.
+- Le journal de l'assistant administrateur appartient aux administrateurs ; un journal douteux est mis de côté.
+- Le canal de l'assistant ne reste plus bloqué par un programme qui ne lit pas sa réponse.
 
 ### Testeurs AMD
 - `DrDXT-Test.exe --lire` affiche aussi Enhanced Sync, Radeon Boost, Image Sharpening, RSR et AFMF, la consommation,

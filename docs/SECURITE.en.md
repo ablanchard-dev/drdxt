@@ -163,8 +163,11 @@ Also fixed: `StartupHookSupport=false` on the service; an update download is cap
 Limits restated by this review, accepted:
 - What a program of the account obtains through the allowlist, without code execution: restart into the BIOS, BCD
   options, upload cap. Reversible, bounded.
-- The helper must never be distributed outside the installer: outside Program Files, it trusts the image passed in
-  `--app-path`, and the account can replace it before elevation. Only the installer is published.
+- Outside Program Files, the helper trusts the image passed in `--app-path`, and the account can replace it before
+  elevation. The releases' `DrDXT-Validation-AMD` and `DrDXT-Rapport-Lecture-Seule` zips contain it: extracted to a folder of
+  the account, they have none of these protections, and a program of the account can replace there what UAC will elevate.
+  The launcher looks for its imports in System32 only (`/DEPENDENTLOADFLAG:0x800`): a DLL placed next to it no longer
+  loads, in zips built after this fix; those of v0.9.2 and earlier stay exposed.
 
 ## 5. Audit of 17/10/2026: "DrDXT never does harm"
 
@@ -378,8 +381,8 @@ authentication, and behind a manual proxy while "Automatically detect settings" 
 ## 8. Undated manifests: accepted limit
 
 The signed manifests (app update, signed tables) carry neither a publication date nor an expiry. A compromised mirror
-or a network attacker, unable to sign, can serve an old valid manifest again, or answer 404: the app then says "up to
-date" and the player stays on their version without knowing. **That is a possible freeze, never a rollback**: a version
+or a network attacker, unable to sign, can serve an old valid manifest again (the app then says "up to
+date") or answer 404 (it says no update is published). The player stays on their version. **That is a possible freeze, never a rollback**: a version
 older than the installed one is refused (`UPDATE_DOWNGRADE`), and so are tables older than those in use. The fix (dated
 manifests, re-signed at least every 30 days) would require a monthly re-signature with the release key; it is described
 in GATES.md (§7), waiting for a CI that holds the key.
@@ -433,3 +436,19 @@ that injects itself into the app can therefore do so too, as it can do anything 
 injection model of section 3, which only the allowlist and the executor's rails bound. A pid reused after the app dies
 is not enough: the new process must first pass the app's authentication (image and hash), and the orphaned lease
 expires meanwhile, given back by the watchdog (`LeaseWatchdogTests`).
+
+## 12. Intel's PresentMon service: accepted limit
+
+DrDXT ships Intel's `PresentMonService.exe` 2.5.1, a manual-start SYSTEM service. Its control pipe carries
+`O:BAG:SYD:P(A;;FA;;;AU)`: any authenticated account connects. Measured on Intel's shared service of the same version;
+the connection succeeds from a medium-integrity token. DrDXT can change neither this descriptor nor the pipe name.
+
+The actions of version 2.5.1 (public source, GameTechDev/PresentMon) take no path and no command: a pid to track, bounded
+periods, metric usage; ETL logging is disabled. An account can therefore have any process tracked and read its frame rate.
+Once a measurement starts the service, DrDXT does not stop it afterwards.
+
+Its parsing was read and exercised with malformed messages (huge lengths, truncated, unknown type, corrupt strings,
+bursts): no crash, no handle leak. Two proven defects remain in Intel's code: a client can hold a read open with no
+timeout, and the read buffer grows without a cap with the bytes sent (60 MB sent, 63 MB more, returned on disconnect). The
+measured effect is memory use by a local account, with no elevation. Not exercised: action bodies in an open session, the
+outgoing direction. This test does not prove the absence of a memory error. The public advisories INTEL-SA-01392 and INTEL-SA-00711 do not target this version.

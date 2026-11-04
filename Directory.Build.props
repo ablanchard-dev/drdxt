@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <!-- La SEULE source de version : l'App, le helper et l'installeur la lisent ici. -->
-    <Version>0.9.2</Version>
+    <Version>0.9.3</Version>
   </PropertyGroup>
   <!-- Le build livré portait C:\Users\<développeur> dans la DLL et dans chaque
        pile de plantage (PDB livrés). Déterministe en Release : la racine locale devient « /_/ ». -->
@@ -18,7 +18,7 @@
        trois correctifs de retard). À monter à chaque correctif mensuel de .NET 10, puis reconstruire et livrer.
        Seulement en self-contained : les tests tournent sur le runtime installé. -->
   <PropertyGroup Condition="'$(SelfContained)' == 'true'">
-    <RuntimeFrameworkVersion>10.0.12</RuntimeFrameworkVersion>
+    <RuntimeFrameworkVersion>10.0.14</RuntimeFrameworkVersion>
   </PropertyGroup>
   <!-- Les tests seulement : des centaines de tests qui bloquent un fil tournent en parallèle, et sur une machine à deux
        cœurs (la CI) le pool n'ajoute ses fils qu'au compte-gouttes. Une tâche du pool y attend alors plus que le délai

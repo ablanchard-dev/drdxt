@@ -120,12 +120,15 @@ internal static class PageDuGuide
     private static bool Suit(string regle, string texte, RegexOptions options = RegexOptions.None)
         => Regex.IsMatch(texte, Regles[regle], options | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
 
+    // Le `$` de .NET accepte un saut de ligne final, celui de la page non ; les règles restent écrites une seule fois.
+    private static bool SuitEntier(string regle, string texte) => !texte.EndsWith('\n') && Suit(regle, texte);
+
     private static bool Propre(string texte) => !Suit("lien", texte, RegexOptions.IgnoreCase) && !Suit("tension", texte);
 
     /// <summary>Les mêmes règles que la page : un contenu qu'elle refuserait n'est jamais encodé.</summary>
     public static bool Accepte(Contenu c)
         => c.V == Version && c.Langue is "fr" or "en"
-           && Suit("carte", c.Carte) && Propre(c.Carte)
+           && SuitEntier("carte", c.Carte) && Propre(c.Carte)
            && (c.ToucheEntree is null || Touches.ContainsKey(c.ToucheEntree))
            && (c.ToucheSauvegarde is null || Touches.ContainsKey(c.ToucheSauvegarde))
            && c.Etapes.Count <= 20
@@ -133,7 +136,7 @@ internal static class PageDuGuide
            && c.SecoursHaut.Count is > 0 and <= 20 && c.SecoursHaut.All(Codes.Contains)
            && (c.SecoursBas is null || (c.SecoursBas.Count is > 0 and <= 20 && c.SecoursBas.All(Codes.Contains)))
            && (c.NoteCsm is null || Codes.Contains(c.NoteCsm))
-           && (c.Manuel is null || Suit("manuel", c.Manuel));
+           && (c.Manuel is null || SuitEntier("manuel", c.Manuel));
 
     public static string Fragment(Contenu contenu)
     {

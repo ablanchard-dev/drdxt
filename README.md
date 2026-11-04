@@ -115,6 +115,7 @@ requests are welcome in English.
 1. Download `DrDXT-Setup-NON-SIGNE.exe` from the latest [Release](https://github.com/ablanchard-dev/drdxt/releases).
    Its SHA-256 is on the page; `Get-FileHash` in PowerShell recomputes it.
 2. The installer is not signed yet: Windows shows "Windows protected your PC". Click "More info", then "Run anyway".
+   If you would rather not run an unsigned binary, build it from the sources yourself (see [Build](#build)).
 3. The installer speaks English, or French when Windows does. Two checkboxes: a desktop shortcut, and "Reapply my
    settings when Windows starts and read the processor temperature during my games" (the `DrDxtReconciler` service, checked by default, which reapplies at Windows
    startup the settings you kept, and lets the match recording read the processor temperature; untick it if you don't
@@ -324,7 +325,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**9,988 tests, 0 failures**, measured on 30/10/2026 across 17 projects, excluding tests marked `Machine` (they read the
+**10,061 tests, 0 failures**, measured on 02/11/2026 across 17 projects, excluding tests marked `Machine` (they read the
 real hardware). The number is checked by `tools/gates/compte_des_tests.py` against the last run. The command that gives
 it back (an English .NET SDK; with a French one, see the French README):
 

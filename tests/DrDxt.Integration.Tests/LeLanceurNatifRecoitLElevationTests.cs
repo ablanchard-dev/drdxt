@@ -31,6 +31,7 @@ public sealed class LeLanceurNatifRecoitLElevationTests
         var csproj = Lire("src", "DrDxt.Lanceur", "DrDxt.Lanceur.csproj");
         csproj.Should().Contain("<PublishAot>true</PublishAot>", "sans CoreCLR, les variables CORECLR_* n'ont aucune prise");
         csproj.Should().Contain("<StartupHookSupport>false</StartupHookSupport>");
+        csproj.Should().Contain("/DEPENDENTLOADFLAG:0x800", "ses imports hors KnownDLLs ne se cherchent que dans System32, jamais à côté de lui");
         Lire("src", "DrDxt.Lanceur", "app.manifest").Should().Contain("level=\"asInvoker\"", "un double-clic n'ouvre pas d'invite Windows");
     }
 

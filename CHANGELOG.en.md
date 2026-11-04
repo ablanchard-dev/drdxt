@@ -2,13 +2,40 @@
 
 Version française, avec les versions publiées : [CHANGELOG.md](CHANGELOG.md).
 
-## Unreleased
+## 0.9.3 (04/11/2026)
 
 For the player:
 
-### Reliability
+### In game
+- Nothing is set or given back while a game is running, not even an original value to restore after a reboot: it
+  waits for the match to end.
+- A setting that proved worse in game is not removed during the match, but right after.
 - An in-game verdict is no longer lost when the change log was busy at the moment its setting was noted: it is written
   together with the waiting entry.
+
+### Optimize
+- You choose the game to optimize, under the Optimize button; the ping protection follows the chosen game.
+- New installer checkbox, "DrDXT helper": trials move forward even with DrDXT closed. It is offered only to an
+  administrator, and applies to the account that started the installer.
+- A trial DrDXT can never give back is set aside and no longer blocks every later trial.
+- "Check my PC" says "not tried" for a setting it never reached, instead of "already set".
+
+### Doctor and report
+- A value Windows does not give (cores, memory speed) is written "not read", never 0; the memory profile and the X3D
+  routing are no longer called fine on a value that was not read.
+- The memory test says a restart is needed (Fast Startup skips it).
+
+### Reliability
+- A saved settings file that is incomplete no longer stops DrDXT from starting.
+- The installer removes the old startup shortcut from the player's profile, not the administrator's.
+
+### Security
+- The embedded .NET runtime moves to 10.0.14: it fixes a flaw in the Brotli decoder (CVE-2026-111497); DrDXT does
+  not use Brotli.
+- Every DrDXT program loads its system libraries from System32 only, never from its own folder or PATH; a DLL placed
+  next to it is never loaded.
+- The administrator helper's journal belongs to the administrators; an untrusted one is set aside.
+- The helper's channel is no longer held by a program that never reads its response.
 
 ### AMD testers
 - `DrDXT-Test.exe --lire` also prints Enhanced Sync, Radeon Boost, Image Sharpening, RSR and AFMF, the card's power,

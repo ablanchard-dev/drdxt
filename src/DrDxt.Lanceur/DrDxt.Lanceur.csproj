@@ -12,7 +12,7 @@
     <PublishAot>true</PublishAot>
     <!-- Le compilateur natif suit le runtime épinglé (Directory.Build.props), pas celui du SDK de la
          machine de build : sans cette ligne, il prenait 10.0.9, trois correctifs de sécurité de retard. -->
-    <RuntimeFrameworkVersion>10.0.12</RuntimeFrameworkVersion>
+    <RuntimeFrameworkVersion>10.0.14</RuntimeFrameworkVersion>
     <IsAotCompatible>true</IsAotCompatible>
     <InvariantGlobalization>true</InvariantGlobalization>
     <StartupHookSupport>false</StartupHookSupport>
@@ -30,6 +30,9 @@
        ContinuousIntegrationBuild ne neutralise que le code managé. Seul le nom du fichier reste. -->
   <ItemGroup>
     <LinkerArg Include="/PDBALTPATH:%_PDB%" />
+    <!-- bcrypt.dll et Secur32.dll ne sont pas des KnownDLLs : sans ce drapeau, Windows les cherche d'abord à côté de l'exe,
+         et une DLL posée là (dossier d'un zip extrait) tournerait élevée. 0x800 = LOAD_LIBRARY_SEARCH_SYSTEM32. -->
+    <LinkerArg Include="/DEPENDENTLOADFLAG:0x800" />
   </ItemGroup>
 
 </Project>

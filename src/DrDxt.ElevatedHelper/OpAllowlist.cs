@@ -790,11 +790,11 @@ public sealed class OpAllowlist
     // Un identifiant d'instance (Microsoft Learn, « Device Instance IDs ») : l'enumerateur, une barre, puis l'identifiant
     // materiel et l'instance. Lettres, chiffres et les separateurs qu'on y voit (& _ . - # { } \), 200 caracteres au plus.
     private static readonly System.Text.RegularExpressions.Regex IdentifiantDePeripherique =
-        new(@"^[A-Za-z0-9_]{1,32}\\[A-Za-z0-9_&.\-#{}\\:+,]{1,200}$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        new(@"^[A-Za-z0-9_]{1,32}\\[A-Za-z0-9_&.\-#{}\\:+,]{1,200}\z", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     // Le nom que Windows donne a un paquet tiers publie dans son magasin (Microsoft Learn, « PnPUtil » : oem<n>.inf).
     private static readonly System.Text.RegularExpressions.Regex PaquetPublie =
-        new(@"^oem[0-9]{1,5}\.inf$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        new(@"^oem[0-9]{1,5}\.inf\z", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     // Le nom d'une clé de service (256 caractères au plus, Microsoft Learn, « CreateServiceW ») : lettres, chiffres, et les
     // séparateurs qu'on y voit (« Steam Client Service », « svc_1.2-x »), jamais en bord.

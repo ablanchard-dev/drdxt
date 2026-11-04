@@ -28,9 +28,10 @@ public sealed class HandshakeAcceptingServer
     private readonly string _pipeName;
     private readonly TimeSpan _delaiDeLecture;
 
-    /// <summary>Le temps laisse a un client pour parler (poignee de main, puis requete). Le tube n'a
-    /// qu'une instance : sans ce delai, un programme du compte connecte et muet tiendrait le helper indefiniment. Il ne
-    /// borne que les lectures, pas l'execution d'un op (un point de restauration peut etre long).</summary>
+    /// <summary>Le temps laisse a un client pour parler (poignee de main, puis requete), puis pour lire la reponse. Le tube
+    /// n'a qu'une instance et aucun tampon de sortie : sans ce delai, un programme du compte connecte, muet ou qui ne lit
+    /// pas, tiendrait le helper indefiniment. Il ne borne pas l'execution d'un op (un point de restauration peut etre
+    /// long).</summary>
     public static readonly TimeSpan DelaiDeLectureParDefaut = TimeSpan.FromSeconds(10);
 
     /// <summary>Appelé après une poignée de main réussie seulement (SEC1 : une connexion
@@ -135,9 +136,16 @@ public sealed class HandshakeAcceptingServer
             Array.Clear(sessionKey);
         }
 
+        // Son propre delai : celui des lectures a pu s'ecouler pendant l'execution.
+        using var ecriture = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        ecriture.CancelAfter(_delaiDeLecture);
         try
         {
-            await WireCodec.WriteMessageAsync(server, response, ct).ConfigureAwait(false);
+            await WireCodec.WriteMessageAsync(server, response, ecriture.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Le client ne lit pas : la connexion expire, le service continue.
         }
         catch (OperationCanceledException)
         {

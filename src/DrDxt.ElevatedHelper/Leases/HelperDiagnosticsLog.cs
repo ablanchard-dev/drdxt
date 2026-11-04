@@ -24,11 +24,26 @@ public sealed class HelperDiagnosticsLog : IDiagnosticsLog
             // administrateur ne peut rien y poser. Racine non durcissable = pas de journal.
             _journalPath = CheminParDefaut();
             _ecrivable = DrDxt.Reconciler.Manifest.TrustedManifestRoot
-                .EnsureCreatedHardened(Path.GetDirectoryName(_journalPath)!).IsOk;
+                    .EnsureCreatedHardened(Path.GetDirectoryName(_journalPath)!).IsOk
+                && Preparer(_journalPath, p => DrDxt.Reconciler.Manifest.TrustedManifestRoot.EnsureTrustedFile(p).IsOk,
+                    p => DrDxt.Reconciler.Manifest.TrustedManifestRoot.WriteTrustedFile(p, []).IsOk);
             return;
         }
         try { Directory.CreateDirectory(directory); } catch { /* best-effort */ }
         _journalPath = Path.Combine(directory, "helper.journal.log");
+    }
+
+    /// <summary>Le journal naît au propriétaire Administrateurs : un fichier au compte du joueur lui laisse réécrire ses
+    /// droits, puis le journal. Un fichier non fiable est renommé à côté, jamais effacé. Faux si le journal reste non
+    /// fiable : rien n'y est écrit.</summary>
+    internal static bool Preparer(string chemin, Func<string, bool> fiable, Func<string, bool> creer)
+    {
+        if (File.Exists(chemin))
+        {
+            if (fiable(chemin)) return true;
+            if (!new DrDxt.Core.FichierJsonAtomique(chemin, "HELPER_JOURNAL").MettreDeCote()) return false;
+        }
+        return creer(chemin);
     }
 
     /// <summary>Le journal par defaut : a la racine durcie, jamais dans le profil. Sans effet de

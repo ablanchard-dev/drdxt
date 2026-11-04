@@ -1363,7 +1363,7 @@ Turn on the game's FPS counter to compare.</value>
     <value>Run it at the next restart</value>
   </data>
   <data name="Geste.TestMemoire.Detail" xml:space="preserve">
-    <value>DrDXT can ask Windows to run this test at the next restart, once. Restart whenever you like: the test takes a few minutes, then Windows starts normally.</value>
+    <value>DrDXT can ask Windows to run this test at the next restart, once. Restart whenever you like: the test takes a few minutes, then Windows starts normally. With Windows Fast Startup, shutting down and powering on does not run it: choose Restart.</value>
   </data>
   <data name="Geste.Peripherique.Titre" xml:space="preserve">
     <value>Restart it</value>

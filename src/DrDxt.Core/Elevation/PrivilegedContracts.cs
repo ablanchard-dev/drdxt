@@ -393,7 +393,8 @@ public sealed record DeleteBcdValueOp(string Element) : PrivilegedOp;
 public sealed record SetBcdValueOp(string Element, string Value) : PrivilegedOp;
 
 /// <summary>
-/// Le test memoire de Windows au prochain demarrage, une seule fois : `bcdedit /bootsequence {memdiag}`,
+/// Le test memoire de Windows au prochain redemarrage, une seule fois (le demarrage rapide ne suit pas la
+/// sequence) : `bcdedit /bootsequence {memdiag}`,
 /// ce que fait mdsched. Le gestionnaire de demarrage efface la sequence apres l'avoir suivie (Microsoft,
 /// « BCDEdit /bootsequence » : « one-time boot sequence »). Sans parametre : l'appelant ne choisit ni
 /// l'entree ni l'ordre. Le redemarrage reste au joueur.

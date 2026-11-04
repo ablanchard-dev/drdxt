@@ -8,3 +8,7 @@ using System.Windows;
                                                 // (utilisé si une ressource est introuvable dans la page, l'application
                                                 // ou les dictionnaires de ressources propres à un thème)
 )]
+
+// Une DLL cherchée par son seul nom passe sinon par le dossier courant et le PATH, modifiables par l'utilisateur.
+[assembly: System.Runtime.InteropServices.DefaultDllImportSearchPaths(
+    System.Runtime.InteropServices.DllImportSearchPath.System32)]

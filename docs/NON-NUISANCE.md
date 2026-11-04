@@ -620,6 +620,7 @@ src/DrDxt.ElevatedHelper/Execution/Win32RestorePointActions.cs 5
 src/DrDxt.ElevatedHelper/Execution/Win32ServiceActions.cs 4
 src/DrDxt.ElevatedHelper/Ipc/HelperLauncher.cs 1
 src/DrDxt.ElevatedHelper/Journal/JournalDEcritureAnticipee.cs 5
+src/DrDxt.ElevatedHelper/Leases/HelperDiagnosticsLog.cs 1
 src/DrDxt.ElevatedHelper/ModeDesinstallation.cs 5
 src/DrDxt.ElevatedHelper/Program.cs 1
 src/DrDxt.GpuNative/AdlxNative.Ecriture.cs 6
@@ -979,3 +980,7 @@ moins. Le test le rend visible, il ne l'empeche pas.
   (H3, 6 mutations, dont la survivante qui a produit un test) et les **quatre gardes firmware**
   (H2, 6 mutations, plus la garde d'absence rendue falsifiable). **Vingt mutations, deux
   survivantes, deux tests ecrits en reponse.**
+
+### 30/10/2026 — le journal du helper naît aux Administrateurs
+
+`ElevatedHelper/Leases/HelperDiagnosticsLog.cs` (0 → 1) : absent, le journal est créé vide par `TrustedManifestRoot.WriteTrustedFile`, à la racine durcie ; présent mais non fiable, il est renommé à côté par `FichierJsonAtomique.MettreDeCote`. Un fichier au compte du joueur lui laissait réécrire ses droits. Garde : `HelperDiagnosticsLogTests`.

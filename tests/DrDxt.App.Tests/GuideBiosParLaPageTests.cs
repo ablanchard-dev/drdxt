@@ -124,6 +124,19 @@ public sealed class GuideBiosParLaPageTests(ITestOutputHelper sortie)
     [InlineData("AAAA")]
     public void Un_fragment_invalide_ne_se_lit_pas(string fragment) => PageDuGuide.Lire(fragment).Should().BeNull();
 
+    // En .NET, `$` accepte un saut de ligne final ; dans la page, non. Sans la garde, le QR ouvrirait une page d'erreur au
+    // lieu de garder le texte brut.
+    [Theory]
+    [InlineData("PRO B760\n", null)]
+    [InlineData("PRO B760", "https://www.msi.com/Motherboard/PRO-B760/support\n")]
+    public void Un_saut_de_ligne_final_que_la_page_refuse_n_est_pas_encode(string carte, string? manuel)
+    {
+        var contenu = new PageDuGuide.Contenu(PageDuGuide.Version, "fr", carte, null, null,
+            [["Generic"]], ["NoBootNormal"], null, null, manuel);
+        PageDuGuide.Accepte(contenu).Should().BeFalse();
+        PageDuGuide.Accepte(contenu with { Carte = carte.TrimEnd(), Manuel = manuel?.TrimEnd() }).Should().BeTrue();
+    }
+
     private static string Page() => File.ReadAllText(Path.Combine(Racine(), "docs", "guide-bios", "index.html"));
 
     // La page dit chaque phrase fixe comme l'App : ses textes sont ceux des fichiers de traduction, en français et en

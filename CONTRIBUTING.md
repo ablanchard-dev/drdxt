@@ -93,3 +93,22 @@ rule; each
 file opens with a short French summary of what it does and why. See "Language of the code" in
 [ARCHITECTURE.md](ARCHITECTURE.md). Pull requests and issues are welcome in English or French. A commit says what
 changes for the player, then why.
+
+## 4. Add a language
+
+The app speaks English (`src/DrDxt.Infrastructure/Resources/Strings.resx`, the fallback) and French
+(`Strings.fr.resx`). A third language takes more than a copy of the English file, and the suite says when a step is
+missing:
+
+1. Copy `Strings.resx` to `Strings.<code>.resx` (for example `Strings.de.resx`) and translate the `<value>` of each
+   entry. Keep the keys and the `{0}` placeholders as they are.
+2. Declare the culture next to the French one in `src/DrDxt.Infrastructure/DrDxt.Infrastructure.csproj`, and add the
+   code to `SatelliteResourceLanguages` in `src/DrDxt.App/DrDxt.App.csproj`. A test compares that list with the
+   `.resx` files of the repository.
+3. Plurals: `src/DrDxt.App/ViewModels/Pluriels.cs` knows the French rule and the English one. A language with other
+   rules needs its own there, with a test.
+4. Optional: the installer (`[Languages]` in `installer/DrDXT.iss`) and the BIOS guide page stay in English
+   until they are translated.
+
+Run the app with `--langue=<code>` (Debug build, recorded machine, see above) and read every page: an entry left out
+falls back to English.

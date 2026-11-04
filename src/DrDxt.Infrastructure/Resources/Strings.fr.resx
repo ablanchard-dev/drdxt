@@ -1332,10 +1332,10 @@ Allume le compteur FPS du jeu pour comparer.</value>
     <value>La surcouche DLSS de l'appli NVIDIA, au profil de ce seul jeu : une image plus nette et plus stable en mouvement, pour un calcul un peu plus lourd (parfois quelques images en moins). Mise à l'échelle seulement : la génération d'images, qui ajoute de la latence, n'est pas touchée. Effet au prochain lancement du jeu ; ta partie suivante dira ce que ça coûte.</value>
   </data>
   <data name="Geste.TestMemoire.Titre" xml:space="preserve">
-    <value>Le lancer au prochain démarrage</value>
+    <value>Le lancer au prochain redémarrage</value>
   </data>
   <data name="Geste.TestMemoire.Detail" xml:space="preserve">
-    <value>DrDXT peut demander à Windows de lancer ce test au prochain redémarrage, une seule fois. Redémarre quand tu veux : le test dure quelques minutes, puis Windows s'ouvre normalement.</value>
+    <value>DrDXT peut demander à Windows de lancer ce test au prochain redémarrage, une seule fois. Redémarre quand tu veux : le test dure quelques minutes, puis Windows s'ouvre normalement. Avec le démarrage rapide de Windows, éteindre puis rallumer ne le lance pas : choisis bien Redémarrer.</value>
   </data>
   <data name="Geste.Peripherique.Titre" xml:space="preserve">
     <value>Le relancer</value>

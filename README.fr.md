@@ -121,7 +121,8 @@ requests sont bienvenues en anglais comme en français.
 1. Télécharge `DrDXT-Setup-NON-SIGNE.exe` dans la dernière [Release](https://github.com/ablanchard-dev/drdxt/releases).
    Son empreinte SHA-256 est dans la page ; `Get-FileHash` dans PowerShell la recalcule.
 2. L'installeur n'est pas encore signé : Windows affiche « Windows a protégé votre ordinateur ». Clique « Informations
-   complémentaires », puis « Exécuter quand même ».
+   complémentaires », puis « Exécuter quand même ». Si tu préfères ne pas lancer un binaire non signé, compile-le
+   toi-même depuis les sources (voir [Compiler](#compiler)).
 3. L'installeur parle français quand Windows est en français, anglais sinon. Deux cases : un raccourci sur le Bureau,
    et « Réappliquer mes réglages au démarrage de Windows et relever la température du processeur pendant mes parties »
    (le service `DrDxtReconciler`, coché par défaut, qui
@@ -353,7 +354,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**9 988 tests, 0 échec**, mesuré le 30/10/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
+**10 061 tests, 0 échec**, mesuré le 02/11/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
 matériel). Ce chiffre est vérifié par `tools/gates/compte_des_tests.py` contre la dernière exécution. La commande qui
 le redonne :
 

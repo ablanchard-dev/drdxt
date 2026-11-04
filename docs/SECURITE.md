@@ -166,8 +166,11 @@ Aussi corrigé : `StartupHookSupport=false` sur le service ; le téléchargement
 
 Limites redites par cette revue, acceptées :
 - Ce qu'un programme du compte obtient à travers l'allowlist, sans exécution de code : redémarrage dans le BIOS, options BCD, plafond d'envoi. Réversible, borné.
-- Le helper ne doit jamais être diffusé hors installeur : hors Program Files, il fait confiance à l'image passée en
-  `--app-path`, et le compte peut le remplacer avant l'élévation. Seul l'installeur est publié.
+- Hors Program Files, le helper fait confiance à l'image passée en `--app-path`, et le compte peut le remplacer avant
+  l'élévation. Les zips `DrDXT-Validation-AMD` et `DrDXT-Rapport-Lecture-Seule` des releases le contiennent : extraits dans
+  un dossier du compte, ils n'ont aucune de ces protections, et un programme du compte peut y remplacer ce que l'UAC
+  élèvera. Le lanceur ne cherche ses imports que dans System32 (`/DEPENDENTLOADFLAG:0x800`) : une DLL posée à côté ne se
+  charge plus, à partir des zips construits après ce correctif ; ceux de la v0.9.2 et d'avant restent exposés.
 
 ## 5. Audit du 17/10/2026 — « DrDXT ne fait jamais de mal »
 
@@ -382,8 +385,8 @@ la vérification de mise à jour reste « injoignable ». Décocher la détectio
 ## 8. Manifestes sans date — limite acceptée
 
 Les manifestes signés (mise à jour de l'App, tables signées) ne portent ni date de publication ni expiration. Un
-miroir compromis ou un attaquant réseau, incapable de signer, peut resservir un ancien manifeste valide, ou répondre 404 :
-l'App dit alors « à jour » et le joueur reste sur sa version sans le savoir. **C'est un gel possible, jamais un retour
+miroir compromis ou un attaquant réseau, incapable de signer, peut resservir un ancien manifeste valide (l'App dit alors
+« à jour ») ou répondre 404 (elle dit qu'aucune mise à jour n'est publiée). Le joueur reste sur sa version. **C'est un gel possible, jamais un retour
 arrière** : une version plus ancienne que celle installée est refusée (`UPDATE_DOWNGRADE`), et des tables plus anciennes
 que celles en service aussi. La parade (manifestes datés, re-signés au moins tous les 30 jours) imposerait une
 re-signature mensuelle avec la clé de release ; elle est décrite dans GATES.md (§7), en attente d'une CI qui tienne la clé.
@@ -436,3 +439,22 @@ programme du compte qui s'injecte dans l'App le peut donc aussi, comme il peut t
 d'injection accepté de la section 3, que seuls l'allowlist et les rails de l'exécuteur bornent. Un pid réutilisé après la
 mort de l'App ne suffit pas : le nouveau processus doit d'abord passer l'authentification de l'App (image et empreinte),
 et le bail orphelin expire entre-temps, rendu par le chien de garde (`LeaseWatchdogTests`).
+
+## 12. Le service PresentMon d'Intel — limite acceptée
+
+DrDXT livre `PresentMonService.exe` 2.5.1 d'Intel, un service SYSTEM à démarrage manuel. Son tube de contrôle porte
+`O:BAG:SYD:P(A;;FA;;;AU)` : tout compte authentifié s'y connecte. Mesuré sur le service partagé d'Intel de même version ;
+depuis un jeton d'intégrité moyenne, la connexion réussit. DrDXT ne peut ni changer ce descripteur ni le nom du tube.
+
+Les actions de la version 2.5.1 (source publique, GameTechDev/PresentMon) ne prennent ni chemin ni commande : un pid à
+suivre, des périodes bornées, l'usage des métriques ; les journaux ETL sont désactivés. Un compte peut donc faire suivre
+n'importe quel processus et lire ses images par seconde. Démarré par une mesure, le service n'est pas arrêté par DrDXT
+ensuite.
+
+Son décodage a été lu et éprouvé par des messages malformés (longueurs énormes, tronqués, type inconnu, chaînes
+corrompues, rafales) : aucun plantage, ni fuite de handles. Deux défauts prouvés restent dans le code d'Intel : un client
+peut garder une lecture ouverte sans délai, et le tampon de lecture grandit sans plafond avec les octets envoyés (60 Mo
+envoyés, 63 Mo de plus, rendus à la déconnexion). L'effet mesuré est une consommation de mémoire par un compte local, sans
+élévation. Non éprouvés : les corps d'action dans une session ouverte, la direction de sortie. Ce test ne prouve pas
+l'absence d'erreur mémoire. Les avis publics INTEL-SA-01392 et INTEL-SA-00711 ne
+visent pas cette version.

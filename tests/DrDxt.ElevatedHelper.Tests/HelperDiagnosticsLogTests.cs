@@ -42,6 +42,30 @@ public sealed class HelperDiagnosticsLogTests : IDisposable
     }
 
     [Fact]
+    public void Un_journal_non_fiable_est_renomme_a_cote_et_un_neuf_le_remplace()
+    {
+        var chemin = Path.Combine(_base, "helper.journal.log");
+        File.WriteAllText(chemin, "ancien");
+
+        var pret = HelperDiagnosticsLog.Preparer(chemin, _ => false, p => { File.WriteAllText(p, ""); return true; });
+
+        pret.Should().BeTrue();
+        File.ReadAllText(chemin).Should().BeEmpty();
+        File.ReadAllText(Directory.GetFiles(_base, "helper.journal.log.mis-de-cote-*").Single()).Should().Be("ancien");
+    }
+
+    [Fact]
+    public void Un_journal_fiable_reste_tel_quel_et_un_refus_de_creer_coupe_le_journal()
+    {
+        var chemin = Path.Combine(_base, "helper.journal.log");
+        HelperDiagnosticsLog.Preparer(chemin, _ => true, _ => false).Should().BeFalse("absent, et sa création est refusée");
+
+        File.WriteAllText(chemin, "garde");
+        HelperDiagnosticsLog.Preparer(chemin, _ => true, _ => throw new InvalidOperationException("jamais recréé")).Should().BeTrue();
+        File.ReadAllText(chemin).Should().Be("garde");
+    }
+
+    [Fact]
     public void Un_dossier_normal_recoit_le_journal()
     {
         var dossier = Path.Combine(_base, "normal");
