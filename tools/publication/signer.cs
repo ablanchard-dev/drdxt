@@ -1,5 +1,6 @@
 #:project ../../src/DrDxt.Infrastructure/DrDxt.Infrastructure.csproj
 #:property TargetFramework=net10.0-windows7.0
+#:property PublishAot=false
 #:package System.Security.Cryptography.ProtectedData@10.0.12
 // L'outil de release des mises à jour. Il tourne sur la machine qui publie, jamais dans l'App.
 //
@@ -53,6 +54,8 @@ byte[] Entropie()
     while (true)
     {
         var k = Console.ReadKey(intercept: true);
+        // Une commande collée apporte son retour à la ligne : lu ici, il rendait une phrase vide avant toute frappe.
+        if (k.Key == ConsoleKey.Enter && phrase.Length == 0) continue;
         if (k.Key == ConsoleKey.Enter) break;
         if (k.Key == ConsoleKey.Backspace) { if (phrase.Length > 0) phrase.Length--; continue; }
         if (k.KeyChar != '\0') phrase.Append(k.KeyChar);

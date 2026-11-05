@@ -6,6 +6,7 @@ namespace DrDxt.App.ViewModels;
 public sealed partial class ScanViewModel
 {
     public string LabelGesteFait => _localize("Geste.Fait");
+    public string LabelGesteEnCours => _localize("Geste.EnCours");
     public string LabelGesteAnnuler => _localize("Geste.Annuler");
     public string LabelGesteEchec => _localize("Geste.Echec");
     public string LabelGesteIncertain => _localize("Geste.Incertain");
@@ -21,6 +22,14 @@ public sealed partial class ScanViewModel
         // Chercher les mises à jour ne demande aucun droit : pas d'op privilégiée, pas de helper, rien à défaire.
         if (r.DomaineCle == "WINDOWS UPDATE" && r.Cible == DrDxt.Detection.Hardware.MisesAJourEnAttente.CibleRecherche)
             return [new GesteDuDocteur(_localize("Geste.WindowsUpdate.Titre"), _localize("Geste.WindowsUpdate.Detail"), () => ChercherWindowsUpdate())];
+
+        // La réparation de Windows passe par sa console élevée (UAC), pas par le helper : le bouton existe sans lui. Seulement
+        // sur un magasin lu abîmé, celui qui arme la carte Agir, et tant que le geste est la réparation : la réinstallation
+        // n'est qu'une page qui s'ouvre, un bouton du constat se dirait « fait » sans que rien ne le soit.
+        if (r.DomaineCle == "STABILITE" && r.NomCle == "magasin de composants")
+            return AvecLesFaits("reparation", _reparationARelancer && _geste == DrDxt.App.Platform.CorruptionDuMagasin.Geste.Reparer
+                ? [("reparation|dism", () => new GesteDuDocteur(LabelReparationTitre, LabelReparationDescription, ReparerDepuisLeConstatAsync))]
+                : []);
 
         if (_helper is not { } helper) return null;
         Task<Result> Envoyer(PrivilegedOp op) => helper.ExecuteAsync(op, CancellationToken.None);
@@ -46,6 +55,15 @@ public sealed partial class ScanViewModel
             // cité n'en porte pas.
             ("SERVICES", _) when r.Cible is { Length: > 0 } service => AvecLesFaits("droits",
                 [("droits|" + service, () => GesteDroits(service))]),
+            // Un élément d'horloge du BCD : retiré, Windows reprend son choix au prochain démarrage ; Annuler repose la valeur
+            // lue, que l'allowlist du helper borne au même ensemble.
+            ("BCD", var element) when DrDxt.Detection.Settings.BcdInterpretation.EstHorloge(element) && r.ValeurLue
+                && r.ValeurCourante is { Length: > 0 } valeur => AvecLesFaits("bcd",
+            [
+                ("bcd|" + element, () => new GesteDuDocteur(_localize("Geste.BcdHorloge.Titre"), _localize("Geste.BcdHorloge.Detail"),
+                    () => HorsOperationLongue(() => Envoyer(new DeleteBcdValueOp(element))),
+                    () => Envoyer(new SetBcdValueOp(element, valeur)))),
+            ]),
             // Un geste par vieux paquet : retiré après un export, remis depuis cet export.
             ("GPU DRIVER", "anciens pilotes d'affichage gardés") => AvecLesFaits("pilote",
                 (r.Cible ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries)
@@ -60,6 +78,12 @@ public sealed partial class ScanViewModel
             _ => null,
         };
     }
+
+    /// <summary>Un geste qui écrit attend la fin d'une mesure ou d'une écriture, comme les cartes Agir grisées ; Annuler n'y
+    /// passe pas (rendre la machine sûre n'attend jamais).</summary>
+    private Task<Result> HorsOperationLongue(Func<Task<Result>> agir) => OperationLongueEnCours
+        ? Task.FromResult(Result.Fail(ErrorCodes.HelperOpFailed, "Another long operation is running."))
+        : agir();
 
     /// <summary>Les gestes de la session, par clé. La carte se refait souvent (un geste, un nouveau scan) : refait de zéro,
     /// un geste perdait son « fait » et son Annuler.</summary>

@@ -88,6 +88,55 @@ public sealed partial class CartesAgirTests
         await helper.Received(1).ExecuteAsync(new CancelMemoryDiagnosticOp(), Arg.Any<CancellationToken>());
     }
 
+    // Un élément d'horloge posé dans le BCD se retire sans terminal : le bouton passe par le helper, et Annuler repose
+    // exactement la valeur lue.
+    [Theory]
+    [InlineData("useplatformclock", "Yes")]
+    [InlineData("disabledynamictick", "Yes")]
+    [InlineData("tscsyncpolicy", "Enhanced")]
+    public async Task Un_element_d_horloge_du_bcd_se_retire_par_le_bouton_et_s_annule(string element, string valeur)
+    {
+        var helper = Helper(Result.Ok());
+        var vm = Vm(new[] { DrDxt.Detection.Settings.BcdInterpretation.Juger(element, valeur) }, helper);
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        var geste = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!.Single();
+        await geste.FaireCommand.ExecuteAsync(null);
+        await helper.Received(1).ExecuteAsync(new DeleteBcdValueOp(element), Arg.Any<CancellationToken>());
+        geste.Fait.Should().BeTrue();
+
+        await geste.AnnulerCommand.ExecuteAsync(null);
+        await helper.Received(1).ExecuteAsync(new SetBcdValueOp(element, valeur), Arg.Any<CancellationToken>());
+    }
+
+    // Le BCD ne s'écrit pas pendant une mesure ou une écriture (la carte de l'écran de récupération se grise pareil).
+    [Fact]
+    public async Task Pendant_une_operation_longue_le_bouton_du_bcd_n_ecrit_rien()
+    {
+        var helper = Helper(Result.Ok());
+        var vm = Vm(new[] { DrDxt.Detection.Settings.BcdInterpretation.Juger("useplatformclock", "Yes") }, helper);
+        await vm.ScanCommand.ExecuteAsync(null);
+        var geste = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!.Single();
+
+        vm.RemesureCpuEnCours = true;
+        await geste.FaireCommand.ExecuteAsync(null);
+
+        await helper.DidNotReceive().ExecuteAsync(Arg.Any<DeleteBcdValueOp>(), Arg.Any<CancellationToken>());
+        geste.Fait.Should().BeFalse();
+    }
+
+    // Seuls les éléments d'horloge ont ce bouton : un élément lu mais pas jugé (posé par Windows lui-même) n'en a jamais.
+    [Theory]
+    [InlineData("increaseuserva", "3072")]
+    [InlineData("hypervisorlaunchtype", "Auto")]
+    [InlineData("description", "Windows Boot Manager")]
+    public async Task Un_element_du_bcd_hors_horloge_ne_porte_aucun_bouton(string element, string valeur)
+    {
+        var vm = Vm(new[] { DrDxt.Detection.Settings.BcdInterpretation.Juger(element, valeur) }, Helper(Result.Ok()));
+        await vm.ScanCommand.ExecuteAsync(null);
+        vm.Domaines.SelectMany(d => d.Lignes).Should().NotContain(l => l.AGestes);
+    }
+
     // Le périphérique en échec se relance par l'identifiant lu ; rien à défaire, donc pas d'« Annuler ».
     [Fact]
     public async Task Un_peripherique_en_echec_se_relance_par_son_identifiant_lu()

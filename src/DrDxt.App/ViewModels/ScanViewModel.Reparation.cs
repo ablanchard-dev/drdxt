@@ -206,6 +206,24 @@ public sealed partial class ScanViewModel
         }
     }
 
+    /// <summary>Le bouton du constat : la même console que la carte Agir, attendue jusqu'à sa fermeture. « Fait » seulement
+    /// si la relecture trouve Windows sain ; encore abîmé ou non relu, le geste se dit en échec et la carte se rouvre. Il
+    /// suit la même garde que la carte : rien ne s'ouvre pendant une mesure ou une écriture.</summary>
+    private async Task<Result> ReparerDepuisLeConstatAsync()
+    {
+        if (!ReparationLancee)
+        {
+            if (!LancerReparationCommand.CanExecute(null))
+                return Result.Fail(ErrorCodes.HelperOpFailed, "Another long operation is running.");
+            LancerReparationCommand.Execute(null);
+        }
+        if (ErreurReparation is { } erreur) return Result.Fail(ErrorCodes.HelperOpFailed, erreur);
+        if (!ReparationLancee || FinDeReparation is not { } fin)
+            return Result.Fail(ErrorCodes.HelperOpFailed, EtatReparation ?? "");
+        await fin.ConfigureAwait(true);
+        return ReparationLancee ? Result.Ok() : Result.Fail(ErrorCodes.HelperOpFailed, EtatReparation ?? "");
+    }
+
     /// <summary>Le choix du joueur, garde entre deux lancements. <c>null</c> = rien n'est
     /// garde (les tests ; l'appli pose le fichier reel au demarrage).</summary>
     internal DrDxt.Application.Network.PlafondEnvoiMemorise? MemoirePlafond { get; set; }

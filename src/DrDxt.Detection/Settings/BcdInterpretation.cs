@@ -16,6 +16,10 @@ public static class BcdInterpretation
     private static readonly string[] FamilleHorloge =
         ["useplatformclock", "useplatformtick", "disabledynamictick", "tscsyncpolicy"];
 
+    /// <summary>Un élément de la famille horloge : son constat porte le bouton qui le retire (même ensemble que l'allowlist
+    /// du helper).</summary>
+    public static bool EstHorloge(string cle) => FamilleHorloge.Contains(cle.ToLowerInvariant());
+
     /// <summary>Juge une paire (cle, valeur) lue par `bcdedit /enum`.</summary>
     public static RepairFinding Juger(string cle, string valeur) => cle.ToLowerInvariant() switch
     {
@@ -43,7 +47,7 @@ public static class BcdInterpretation
                 // Doc Microsoft « BCDEdit /set » : useplatformclock, useplatformtick, tscsyncpolicy et disabledynamictick
                 // portent chacun « This option should only be used for debugging », et la phrase ne dit rien de plus.
                 Docteur.T("BC.Horloge"),
-                // Pas de carte pour ces éléments : le geste est la commande, sur l'élément lu.
+                // Le bouton du constat le retire par le helper ; la commande reste écrite pour qui n'a pas DrDXT ouvert.
                 Remede: Docteur.T("BC.Horloge.Remede", k)),
 
         "increaseuserva" =>

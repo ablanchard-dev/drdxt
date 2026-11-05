@@ -2,6 +2,30 @@
 
 English version of the coming changes: [CHANGELOG.en.md](CHANGELOG.en.md).
 
+## 0.9.4 (05/11/2026)
+
+Pour le joueur :
+
+### Mises à jour
+- Les mises à jour arrivent dans DrDXT : quand une version est prête, le bas de la fenêtre le dit et « Installer » la
+  pose. Cette version-ci s'installe une dernière fois à la main, par-dessus la tienne, sans désinstaller.
+
+### Réparer sans terminal
+- « Fichiers de réparation de Windows » abîmés : le bouton est sur le constat lui-même et lance la réparation de
+  Microsoft (DISM puis sfc). Il ne dit « fait » que si Windows est relu sain.
+- Une horloge imposée au démarrage (useplatformclock, disabledynamictick…) se retire par un bouton, et s'annule.
+- Quand DrDXT sait le faire, le texte d'aide le dit avant les étapes à la main.
+- Un bouton de geste dit « en cours » tant qu'il travaille, au lieu de disparaître.
+
+### Docteur, moins de faux constats
+- Les barrettes Kingston Fury et HyperX sont lues : une Fury DDR5-6000 restée à 4800 est dite « EXPO éteint »,
+  plus « inconnu ».
+- La puce graphique du processeur n'est plus jugée quand une carte graphique fait tourner le jeu : plus de « pilote
+  exigé par Call of Duty » ni de « ReBAR pas appliqué » pour elle, et un seul plancher par carte.
+- Plusieurs vidages du même incident dans la même minute comptent pour un seul incident, pas pour une série.
+- Un plantage de Call of Duty ne cite plus le jeu lui-même parmi les modules étrangers.
+- L'explication du bridage ne cite plus sur un processeur AMD un chiffre relevé sur un autre processeur.
+
 ## 0.9.3 (04/11/2026)
 
 Pour le joueur :

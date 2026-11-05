@@ -53,6 +53,119 @@ public sealed partial class CartesAgirTests
         vm.ReparationAOuvrir.Should().Be(relancable);
     }
 
+    // Le joueur lit le constat, pas la carte Agir : le constat porte lui-même le bouton qui répare, sans helper (la console
+    // demande l'UAC). Sans lui, la seule voie écrite sous le constat est le terminal, où un joueur non technique s'arrête.
+    [Theory]
+    [InlineData(RepairStatus.ExpectedDefault, true)]
+    [InlineData(RepairStatus.Suspicious, false)]
+    public async Task Le_constat_reparable_porte_le_bouton_qui_repare_et_dit_ce_que_la_relecture_trouve(RepairStatus relu, bool sain)
+    {
+        var vm = Vm(new[] { MagasinReparable with { Remede = "1) Terminal." } }, helper: null);
+        var console = new TaskCompletionSource();
+        vm.LancerConsole = _ => console.Task;
+        vm.RelireSanteWindows = () => new RepairFinding("STABILITE", "magasin de composants", "x", "sain", relu, "relu");
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        var geste = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!.Single();
+        var fin = geste.FaireCommand.ExecuteAsync(null);
+        vm.ReparationLancee.Should().BeTrue("le bouton du constat ouvre la même console que la carte");
+        geste.EnCours.Should().BeTrue("tant que la console est ouverte, la réparation n'est pas finie");
+
+        console.SetResult();
+        await fin;
+        geste.Fait.Should().Be(sain);
+        geste.AEchoue.Should().Be(!sain, "encore abîmé après la console : le bouton ne dit pas « fait »");
+        geste.PeutAnnuler.Should().BeFalse("une réparation de Windows ne se défait pas");
+    }
+
+    // Le bouton est annoncé avant les étapes à la main : lues d'abord, elles envoient le joueur au terminal.
+    [Fact]
+    public async Task Le_remede_annonce_le_bouton_avant_les_etapes_du_terminal()
+    {
+        var vm = Vm(new[] { MagasinReparable with { Remede = Docteur.T("WinSante.Reparable.Remede") } }, helper: null);
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        var ligne = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes);
+        ligne.RemedeLisible.Should().StartWith(Docteur.T("Carte.BoutonAvantLeTerminal"));
+        ligne.RemedeLisible.Should().Contain("Terminal", "les étapes à la main restent, en secours");
+    }
+
+    // Sans bouton, rien n'est annoncé : la phrase ne promet jamais un geste que la carte ne montre pas.
+    [Fact]
+    public void Sans_geste_le_remede_reste_tel_quel()
+    {
+        var remede = Docteur.T("WinSante.Reparable.Remede");
+        var entree = new EntreeCarte("windows", Severity.Minor, "t", "d", "", "", false, RemedeDuConstat: remede);
+        entree.RemedeLisible.Should().Be(remede);
+    }
+
+    // Sans source de réparation, le geste de la carte devient la réinstallation de Windows : ouvrir la page Récupération
+    // ne la fait pas. Le constat ne porte alors aucun bouton, qui se dirait « fait » sur une page ouverte.
+    [Fact]
+    public async Task Sans_source_le_constat_ne_porte_pas_de_bouton_qui_se_dirait_fait()
+    {
+        var vm = Vm(new[] { MagasinReparable with { Remede = "1) Terminal." } }, helper: null);
+        vm.CorruptionSansSource = () => DrDxt.App.Platform.CorruptionDuMagasin.Geste.Reinstaller;
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        vm.ReparationVisible.Should().BeTrue("la carte Agir garde la réinstallation, avec ses mots");
+        vm.Domaines.SelectMany(d => d.Lignes).Should().NotContain(l => l.AGestes);
+    }
+
+    // Une mesure ou une écriture en cours grise la carte Agir : le bouton du constat n'ouvre pas la console élevée à côté.
+    [Fact]
+    public async Task Pendant_une_operation_longue_le_bouton_du_constat_ne_lance_rien()
+    {
+        var vm = Vm(new[] { MagasinReparable with { Remede = "1) Terminal." } }, helper: null);
+        var lances = 0;
+        vm.LancerConsole = _ => { lances++; return new TaskCompletionSource().Task; };
+        await vm.ScanCommand.ExecuteAsync(null);
+        var geste = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!.Single();
+
+        vm.RemesureCpuEnCours = true;
+        await geste.FaireCommand.ExecuteAsync(null);
+
+        lances.Should().Be(0);
+        geste.Fait.Should().BeFalse();
+        geste.AEchoue.Should().BeTrue();
+    }
+
+    // Une précondition que DrDXT ne fait pas (retirer d'abord les cartes déconnectées) : la phrase ne renvoie pas au bouton,
+    // qui échouerait sans elle.
+    [Fact]
+    public void Un_remede_a_precondition_n_annonce_pas_le_bouton()
+    {
+        var remede = Docteur.T("MP.DAbord", "pnputil /delete-driver oem98.inf");
+        var geste = new GesteDuDocteur("t", "d", () => Task.FromResult(Result.Ok()));
+        var entree = new EntreeCarte("graphique", Severity.Minor, "t", "d", "", "", false, RemedeDuConstat: remede, Gestes: [geste]);
+        entree.RemedeLisible.Should().Be(remede);
+    }
+
+    [Fact]
+    public async Task Le_bouton_du_constat_refuse_par_l_uac_dit_l_echec_sans_rien_lancer()
+    {
+        var vm = Vm(new[] { MagasinReparable with { Remede = "1) Terminal." } }, helper: null);
+        vm.LancerConsole = _ => throw new System.ComponentModel.Win32Exception(1223);
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        var geste = vm.Domaines.SelectMany(d => d.Lignes).Single(l => l.AGestes).Gestes!.Single();
+        await geste.FaireCommand.ExecuteAsync(null);
+
+        geste.AEchoue.Should().BeTrue();
+        geste.Fait.Should().BeFalse();
+    }
+
+    // Un magasin sain ou non lu n'a rien à réparer : aucun bouton, jamais un geste sur une lecture qui ne l'a pas demandé.
+    [Theory]
+    [InlineData(RepairStatus.ExpectedDefault)]
+    [InlineData(RepairStatus.Unknown)]
+    public async Task Un_magasin_sain_ou_non_lu_ne_porte_aucun_bouton(RepairStatus statut)
+    {
+        var vm = Vm(new[] { MagasinReparable with { Statut = statut, Remede = null } }, helper: null);
+        await vm.ScanCommand.ExecuteAsync(null);
+        vm.Domaines.SelectMany(d => d.Lignes).Should().NotContain(l => l.AGestes);
+    }
+
     [Fact]
     public async Task Sans_constat_reparable_la_carte_n_existe_pas()
     {

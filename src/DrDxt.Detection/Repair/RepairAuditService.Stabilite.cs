@@ -143,11 +143,26 @@ public sealed partial class RepairAuditService
                     : Docteur.T(a.TransitionEnCours ? "ST.Fait.ArretVeille" : "ST.Fait.ArretSansCode"))));
         if (rapports is { IsOk: true } noyau)
             // Un vidage à chaud isolé n'est pas un plantage (la machine a continué) ;
-            // seule une signature répétée (3 fois, comme son constat) entre dans la chaîne des incidents.
+            // seule une signature répétée (3 épisodes, comme son constat) entre dans la chaîne des incidents, une fois par épisode.
             incidents.AddRange(noyau.Value!.Where(r => r.Quand >= depuis).GroupBy(r => (r.Code, r.Parametre1))
-                .Where(g => g.Count() >= 3).SelectMany(g => g).Select(r =>
+                .Select(Episodes).Where(e => e.Count >= 3).SelectMany(e => e).Select(r =>
                 new FaitDate(r.Quand, r.EstGraphique ? Docteur.T("ST.Fait.BlocageCarte") : Docteur.T("ST.Fait.IncidentNoyau", r.Code))));
         return incidents;
+    }
+
+    /// <summary>Un blocage laisse souvent plusieurs vidages de la même signature d'un coup (quatre 0x1B8 la même minute sur
+    /// une machine réelle) : un vidage à moins de dix minutes du précédent est le même épisode, rendu par son premier
+    /// vidage. Dix minutes, choix non chiffré : bien au-delà d'une rafale, bien en deçà de deux blocages distincts.</summary>
+    internal static List<LiveKernelReport> Episodes(IEnumerable<LiveKernelReport> rapports)
+    {
+        var episodes = new List<LiveKernelReport>();
+        DateTimeOffset? precedent = null;
+        foreach (var r in rapports.OrderBy(r => r.Quand))
+        {
+            if (precedent is not { } p || r.Quand - p > TimeSpan.FromMinutes(10)) episodes.Add(r);
+            precedent = r.Quand;
+        }
+        return episodes;
     }
 
     private IEnumerable<RepairFinding> IncidentsNoyau()
@@ -177,7 +192,9 @@ public sealed partial class RepairAuditService
         foreach (var groupe in rapports.Value.GroupBy(r => (r.Code, r.Parametre1)))
         {
             var dernier = groupe.First();
+            // La valeur garde le nombre de vidages (le journal la compare) ; la répétition se compte en épisodes.
             var n = groupe.Count();
+            var episodes = Episodes(groupe).Count;
             // Répété et récent (30 jours), c'est une condition qui revient ; plus ancien, un fait daté.
             var plusRecent = groupe.Max(r => r.Quand);
             var recent = DateTimeOffset.UtcNow - plusRecent <= TimeSpan.FromDays(30);
@@ -188,11 +205,11 @@ public sealed partial class RepairAuditService
                 $"{n}x {dernier.Phrase}" + FamilleUsb3(dernier.Code, dernier.Parametre1), null,
                 // Un incident isole est une observation ; repete a l'identique, il decrit une
                 // condition qui revient.
-                n >= 3 && recent ? RepairStatus.Suspicious : RepairStatus.Observed,
+                episodes >= 3 && recent ? RepairStatus.Suspicious : RepairStatus.Observed,
                 // Deux incidents distincts portaient le même titre, l'un dans
                 // « Mesuré », l'autre dans « Constaté » ; le code n'était que dans l'étiquette. Il est
                 // nommé dès la première phrase.
-                (n >= 3 ? Docteur.T("ST.Noyau.MemeSignature", n, dernier.Code, dernier.NomSdk is { } sdk ? " " + sdk : "")
+                (episodes >= 3 ? Docteur.T("ST.Noyau.MemeSignature", episodes, dernier.Code, dernier.NomSdk is { } sdk ? " " + sdk : "")
                           + (recent ? Docteur.T("ST.Noyau.PasDuBruit") : Docteur.T("ST.Noyau.PlusDuBruit", plusRecent.ToLocalTime()))
                         : Docteur.T("ST.Noyau.Isole"))
                 + (dernier.EstGraphique ? Docteur.T("ST.Noyau.Graphique") : CauseUsb3(dernier.Code, dernier.Parametre1))

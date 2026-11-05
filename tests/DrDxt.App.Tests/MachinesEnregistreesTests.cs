@@ -43,7 +43,7 @@ public class MachinesEnregistreesTests
         => Noms().Cast<object[]>().Select(n => (string)n[0]).Should().Contain(["reference-i7-14700f-rtx4060-2026-10-06", "amd-radeon-synthetique",
             "intel-arc-synthetique", "sans-admin", "portable-batterie", "amd-rx6600-ryzen5-5600", "amd-rx6700xt-ryzen5-7600",
             "amd-rx7900xtx-ryzen9-7950x3d", "console-portable-rog-ally", "nvidia-gtx1650-i5-10400", "nvidia-rtx3060-i5-12400f",
-            "nvidia-rtx5070-i5-13400f", "bureau-sans-jeu-i5-8go"]);
+            "nvidia-rtx5070-i5-13400f", "bureau-sans-jeu-i5-8go", "amd-7800x3d-rtx5070-igpu-kingston"]);
 
     // Sur chaque machine enregistrée, les constats de la suspension sélective USB (coupée ou non, entrées
     // suspendues ou non) ne font rien monter de plus dans « mérite ton attention » : aucune proposition n'est inventée.
@@ -112,8 +112,12 @@ public class MachinesEnregistreesTests
         constats.Should().OnlyContain(c => !string.IsNullOrWhiteSpace(c.Id) && !string.IsNullOrWhiteSpace(c.Titre));
         // La santé n'est pas rejouée, elle est enregistrée (relevée le 06/10) ; S1 porte donc sur
         // ces vrais constats, pas sur une comparaison d'une valeur à elle-même.
-        m.Sante.Where(s => s.Statut != RepairStatus.Unknown)
+        // Deux constats d'information n'ont pas de valeur par construction : tout est dans leur explication (relevés sur un
+        // vrai export, CurveOptimizerAmd et AttenuationsProcesseur). Les autres en portent une.
+        (string, string)[] sansValeur = [("CPU", "Curve Optimizer (AMD)"), ("SECURITE", "attenuations du processeur")];
+        m.Sante.Where(s => s.Statut != RepairStatus.Unknown && !sansValeur.Contains((s.Domaine, s.Nom)))
             .Should().OnlyContain(s => !string.IsNullOrWhiteSpace(s.ValeurCourante) && !string.IsNullOrWhiteSpace(s.Explication));
+        m.Sante.Should().OnlyContain(s => s.Statut == RepairStatus.Unknown || !string.IsNullOrWhiteSpace(s.Explication));
 
         // Jusqu'à l'écran : le scan complet du ViewModel, sur ces seules données.
         var vm = Vm(m);
@@ -176,6 +180,36 @@ public class MachinesEnregistreesTests
 
         constats.Should().Contain(c => c.Etat == EtatConstat.NonLu && c.Categorie == "Gpu");
         constats.Should().Contain(c => c.Id == "sante/THERMIQUE/temperature du GPU" && c.Etat == EtatConstat.NonLu);
+    }
+
+    // L'export d'un 7800X3D + RTX 5070 + puce Radeon intégrée donnait quatre fois le même « incident après une installation » :
+    // un constat dit deux fois mot pour mot n'apprend rien de plus au joueur, et noie le reste.
+    [Theory]
+    [MemberData(nameof(Noms))]
+    public void Aucune_machine_ne_porte_deux_fois_le_meme_constat(string nom)
+        => Charger(nom).Sante.GroupBy(s => (s.Domaine, s.Nom, s.ValeurCourante, s.Explication))
+            .Should().OnlyContain(g => g.Count() == 1, nom);
+
+    // La même machine, rejouée par les juges purs sur son propre inventaire : le jeu tourne sur la RTX 5070, la puce
+    // intégrée (512 Mio pris sur la mémoire du système) ne reçoit ni plancher de pilote ni « Resizable BAR à activer ».
+    [Fact]
+    public void Sur_un_bureau_avec_puce_integree_seule_la_vraie_carte_est_jugee()
+    {
+        using var _ = Docteur.Portee(System.Globalization.CultureInfo.GetCultureInfo("fr-FR"));
+        var m = Charger("amd-7800x3d-rtx5070-igpu-kingston");
+        var cartes = m.Inventaire.Gpus.Select(g => new DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Carte(
+            g.Model, g.Vendor == "NVIDIA" ? "32.0.16.1742" : g.DriverVersion, null, g.VramBytes)).ToList();
+        const string Fichier = """{"driver_versions": {"nvidia": [591, 59], "amd": [25, 12, 1]}}""";
+        const string Recent = """{"driver_versions": {"nvidia": [616, 56], "amd": [26, 7, 1]}}""";
+        var retail = @"C:\Program Files (x86)\Call of Duty\_retail_\";
+
+        DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Juger([(retail + @"cod24\driverVersions.json", Fichier), (retail + @"cod25\driverVersions.json", Recent)], cartes)
+            .Should().ContainSingle().Which.Explication.Should().Contain("RTX 5070").And.Contain("616.56");
+
+        var integree = m.Inventaire.Gpus.Single(g => g.Vendor == "AMD");
+        DrDxt.Detection.Gpu.FenetreReBar.Juger(new(integree.Model, 256UL << 20, 0x7C00000000, (ulong)integree.VramBytes))
+            .Statut.Should().Be(RepairStatus.Unknown);
+        m.Inventaire.Memory.Should().ContainSingle().Which.PartNumber.Should().Be("KF560C36-16");
     }
 
     internal static ViewModels.ScanViewModel Vm(Machine m)

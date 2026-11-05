@@ -1338,6 +1338,9 @@ Turn on the game's FPS counter to compare.</value>
   <data name="Geste.Fait" xml:space="preserve">
     <value>done</value>
   </data>
+  <data name="Geste.EnCours" xml:space="preserve">
+    <value>in progress</value>
+  </data>
   <data name="Geste.Annuler" xml:space="preserve">
     <value>Undo</value>
   </data>
@@ -1370,6 +1373,12 @@ Turn on the game's FPS counter to compare.</value>
   </data>
   <data name="Geste.Peripherique.Detail" xml:space="preserve">
     <value>DrDXT can ask Windows to stop and restart this device, as Device Manager does. Nothing to undo; if it is still in error at the next scan, follow the steps above.</value>
+  </data>
+  <data name="Geste.BcdHorloge.Titre" xml:space="preserve">
+    <value>Give the clock back to Windows</value>
+  </data>
+  <data name="Geste.BcdHorloge.Detail" xml:space="preserve">
+    <value>DrDXT removes this setting from the boot configuration, without a terminal. It takes effect at the next restart; Undo puts back exactly the value that was read.</value>
   </data>
   <data name="Leviers.Geste.Pilote" xml:space="preserve">
     <value>Driver package {0} removed</value>

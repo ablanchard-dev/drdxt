@@ -93,7 +93,18 @@ public sealed record EntreeCarte(
 
     /// <summary>Deux commandes icacls complètes noyées dans la prose faisaient quatre
     /// lignes illisibles. La prose les annonce ; elles s'affichent dessous en police de code, une par ligne, et se copient.</summary>
-    public string RemedeLisible => !ACommande ? Remede : System.Text.RegularExpressions.Regex.Replace(
+    public string RemedeLisible => AGestes && ARemede && Remede.Contains("Terminal", StringComparison.Ordinal)
+        && !RemedesAPrecondition.Any(p => Remede.StartsWith(p, StringComparison.Ordinal))
+        ? $"{Docteur.T("Carte.BoutonAvantLeTerminal")} {RemedeSansBouton}" : RemedeSansBouton;
+
+    // Les étapes « Terminal (administrateur) », repliées sous « Comment corriger » juste sous le bouton, se lisent comme la
+    // seule voie : quand DrDXT sait le faire, la phrase renvoie au bouton avant les étapes à la main. Sauf quand la première
+    // étape est une précondition qu'aucun bouton ne fait (retirer d'abord les cartes déconnectées) : sans elle, le bouton
+    // échoue, et la phrase ne doit pas la reléguer au chemin « à la main ».
+    private static readonly string[] RemedesAPrecondition = new[] { "fr-FR", "en-US" }
+        .Select(l => { using var _ = Docteur.Portee(System.Globalization.CultureInfo.GetCultureInfo(l)); return Docteur.T("MP.DAbord", "\0").Split('\0')[0]; })
+        .ToArray();
+    private string RemedeSansBouton => !ACommande ? Remede : System.Text.RegularExpressions.Regex.Replace(
         System.Text.RegularExpressions.Regex.Replace(Remede, @"icacls ""[^""]+"" /setowner \S+ (?:puis|then) icacls ""[^""]+"" /reset", Docteur.T("Carte.DeuxCommandes")),
         @"icacls ""[^""]+"" /(?:setowner \S+|reset)", Docteur.T("Carte.UneCommande"));
     private string SansRemede => RemedeDuConstat is null && DebutDuRemede is var i and >= 0 ? Detail[..i].TrimEnd() : Detail;
