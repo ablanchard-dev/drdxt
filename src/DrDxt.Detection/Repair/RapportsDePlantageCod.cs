@@ -111,13 +111,16 @@ public static class RapportsDePlantageCod
             dx, ModulesTiers(pile));
     }
 
-    /// <summary>Pur : les modules de la pile hors du dossier du jeu (celui du premier module) et hors de Windows, nom seul.</summary>
+    /// <summary>Pur : les modules de la pile hors du dossier du jeu et hors de Windows, nom seul. Le dossier du jeu est
+    /// celui de son exécutable, le seul .exe d'une pile de processus ; le premier module peut être un pilote ou une
+    /// bibliothèque d'un sous-dossier, et l'exécutable du jeu passait alors pour un tiers. Sans .exe, le premier module.</summary>
     internal static IReadOnlyList<string> ModulesTiers(string? pile)
     {
         if (pile is null) return [];
         var chemins = pile.Split('\n').Skip(1).Select(l => l.TrimEnd('\r').Split(','))
             .Where(c => c.Length >= 6 && !c[0].StartsWith('#')).Select(c => c[5].Trim()).Where(p => p.Length > 0).ToList();
-        var jeu = chemins.Select(Path.GetDirectoryName).FirstOrDefault();
+        var jeu = Path.GetDirectoryName(chemins.FirstOrDefault(p => p.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                                        ?? chemins.FirstOrDefault() ?? "");
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
         return chemins.Where(p => (jeu is null || !p.StartsWith(jeu, StringComparison.OrdinalIgnoreCase))
                                   && !p.StartsWith(windows, StringComparison.OrdinalIgnoreCase)

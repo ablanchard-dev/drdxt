@@ -31,6 +31,19 @@ public sealed class RapportsDePlantageCodTests
         r.Modules.Should().Equal("hook64.dll");
     }
 
+    // Export d'un 7800X3D + RTX 5070 : « Modules hors du jeu et de Windows sur la pile du plantage : cod.exe ». Le jeu
+    // était pris dans le dossier du premier module de la pile ; quand c'est un pilote ou un sous-dossier, l'exécutable du
+    // jeu lui-même passait pour un tiers. Le jeu est le seul .exe d'une pile de processus.
+    [Fact]
+    public void L_executable_du_jeu_n_est_jamais_un_module_tiers()
+    {
+        var pile = "UsedInCrashSignature,FrameIndex,FrameAddress,FrameAdjustedAddress,ModuleBaseAddress,ModuleName\r\n"
+            + @"1,0,0x1,0x1,0x1,C:\Program Files (x86)\Call of Duty\_retail_\cod25\renderer.dll" + "\r\n"
+            + @"1,1,0x1,0x1,0x1,C:\Program Files (x86)\Call of Duty\_retail_\cod.exe" + "\r\n"
+            + @"1,2,0x1,0x1,0x1,C:\Program Files\Overlay\hook64.dll" + "\r\n";
+        RapportsDePlantageCod.ModulesTiers(pile).Should().Equal("hook64.dll");
+    }
+
     // Notre règle : une clé absente reste « non lue », jamais un zéro inventé.
     [Fact]
     public void Une_cle_absente_reste_non_lue()

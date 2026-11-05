@@ -101,26 +101,34 @@ public static class PiloteExigeParLeJeu
                 ? versionWindows is null || VersionDuPilote.VersionNvidia(versionWindows) is not { } nv ? null : VersionDuPilote.Groupes(nv)
                 : versionWindows is null ? null : VersionDuPilote.Groupes(versionWindows);
 
-    public sealed record Carte(string Modele, string? VersionWindows, string? VersionRadeon);
+    public sealed record Carte(string Modele, string? VersionWindows, string? VersionRadeon, long? MemoireDediee = null);
 
-    /// <summary>Pur. Pour chaque fichier et chaque carte décrite : sous le plancher, au-dessus, ou non lu.</summary>
+    /// <summary>Pur. Pour chaque jeu et chaque carte décrite : sous le plancher, au-dessus, ou non lu. Un jeu qui livre
+    /// plusieurs fichiers (un par titre sous _retail_) donne un seul plancher par carte, le plus haut : c'est celui que
+    /// le pilote doit tenir pour que tous ses titres démarrent. Une puce intégrée (règle du produit,
+    /// <see cref="CartesGraphiques.EstDediee(string, long)"/> : mémoire et nom, une réserve UMA de 2 Go comprise) n'est pas
+    /// jugée quand une vraie carte est là : le jeu tourne sur elle, et le plancher de la puce intégrée ne dit rien du jeu.
+    /// Une carte dont la mémoire n'est pas lue reste jugée.</summary>
     public static IEnumerable<RepairFinding> Juger(IReadOnlyList<(string Chemin, string? Contenu)> fichiers, IReadOnlyList<Carte> cartes)
     {
-        foreach (var (chemin, contenu) in fichiers)
+        bool? Dediee(Carte c) => c.MemoireDediee is { } m ? CartesGraphiques.EstDediee(c.Modele, m) : null;
+        var jugees = cartes.Any(c => Dediee(c) == true) ? cartes.Where(c => Dediee(c) != false).ToList() : cartes;
+        foreach (var parJeu in fichiers.GroupBy(f => Jeu(f.Chemin), StringComparer.OrdinalIgnoreCase))
         {
-            var jeu = Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(chemin))) is { Length: > 0 } j && j.StartsWith('_')
-                ? Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(chemin)))) ?? chemin
-                : Path.GetFileName(Path.GetDirectoryName(chemin)) ?? chemin;
+            var jeu = parJeu.Key;
             var nom = Docteur.Nom("PX.Nom", jeu);
-            var exige = contenu is null ? null : Lire(contenu);
-            if (exige is null)
+            var lus = new List<IReadOnlyDictionary<string, int[]>>();
+            foreach (var (chemin, contenu) in parJeu)
             {
-                yield return new RepairFinding("GPU DRIVER", nom, null, null, RepairStatus.Unknown, Docteur.T("PX.Illisible", chemin));
-                continue;
+                if ((contenu is null ? null : Lire(contenu)) is { } exige) lus.Add(exige);
+                else yield return new RepairFinding("GPU DRIVER", nom, null, null, RepairStatus.Unknown, Docteur.T("PX.Illisible", chemin));
             }
-            foreach (var c in cartes)
+            foreach (var c in jugees)
             {
-                if (Famille(c.Modele) is not { } famille || !exige.TryGetValue(famille, out var plancher)) continue;
+                if (Famille(c.Modele) is not { } famille) continue;
+                var planchers = lus.Select(e => e.GetValueOrDefault(famille)).OfType<int[]>().ToList();
+                if (planchers.Count == 0) continue;
+                var plancher = planchers.Aggregate((a, b) => VersionDuPilote.Comparer(a, b) >= 0 ? a : b);
                 var p = string.Join('.', plancher);
                 if (VersionInstallee(famille, c.VersionWindows, c.VersionRadeon) is not { } v)
                 {
@@ -135,4 +143,10 @@ public static class PiloteExigeParLeJeu
             }
         }
     }
+
+    // Le dossier du jeu : celui du fichier, ou celui qui porte « _retail_ » (Call of Duty : _retail_\cod25).
+    private static string Jeu(string chemin)
+        => Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(chemin))) is { Length: > 0 } j && j.StartsWith('_')
+            ? Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(chemin)))) ?? chemin
+            : Path.GetFileName(Path.GetDirectoryName(chemin)) ?? chemin;
 }

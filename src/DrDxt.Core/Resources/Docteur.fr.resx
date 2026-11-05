@@ -490,7 +490,7 @@
     <value>aucun indicateur</value>
   </data>
   <data name="RA.Bridage.AucunExplication" xml:space="preserve">
-    <value>les indicateurs Windows de limite de performance valent 0. Ce compteur ne voit pas les limites de puissance du paquet (RAPL) : il peut valoir 0 pendant que la fréquence tombe sous charge soutenue (relevé : de 5292 à 3698 MHz). Aucun indicateur levé n'est donc pas « rien ne bride ».</value>
+    <value>les indicateurs Windows de limite de performance valent 0. Ce compteur ne voit pas les limites de puissance du paquet (RAPL) : il peut valoir 0 pendant que la fréquence tombe sous charge soutenue (relevé sur une machine de test : de 5292 à 3698 MHz). Aucun indicateur levé n'est donc pas « rien ne bride ».</value>
   </data>
   <data name="RA.Bridage.Masque" xml:space="preserve">
     <value>masque 0x{0}</value>
@@ -3285,6 +3285,9 @@
   <data name="Carte.UneCommande" xml:space="preserve">
     <value>la commande ci-dessous</value>
   </data>
+  <data name="Carte.BoutonAvantLeTerminal" xml:space="preserve">
+    <value>DrDXT le fait avec le bouton ci-dessus, sans terminal. À la main, si tu préfères :</value>
+  </data>
   <data name="Carte.Pcie" xml:space="preserve">
     <value>Lien PCIe de la carte graphique : Gen{0} x{1} (maximum de la carte : Gen{2} x{3})</value>
   </data>
@@ -5491,7 +5494,7 @@
     <value>Plus grande plage mémoire allouée à la carte : {0} Mio. Sa mémoire vidéo n'a pas été lue, cette plage ne peut donc pas lui être comparée.</value>
   </data>
   <data name="RB.PetiteMemoire" xml:space="preserve">
-    <value>Windows a alloué {0} Mio à cette carte, qui déclare {1} Mio de mémoire dédiée : pas plus que l'ouverture classique de 256 Mio, comme une puce graphique intégrée qui emprunte la mémoire du système. La comparaison ne tranche pas si le Resizable BAR est actif.</value>
+    <value>Windows a alloué {0} Mio à cette carte, qui déclare {1} Mio de mémoire dédiée : moins qu'une vraie carte graphique, comme une puce graphique intégrée qui emprunte la mémoire du système. La comparaison ne tranche pas si le Resizable BAR est actif.</value>
   </data>
   <data name="RB.Actif" xml:space="preserve">
     <value>Le Resizable BAR est appliqué, prouvé par ce que Windows a alloué : une plage de {0} Mio pour {1} Mio de mémoire vidéo, le processeur la voit entière.</value>

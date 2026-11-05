@@ -178,12 +178,14 @@ public sealed partial class RepairAuditService
         var cartes = LectureWmiBornee.Lire(() =>
         {
             var lues = new List<DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Carte>();
-            using (var s = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion FROM Win32_VideoController"))
+            using (var s = new System.Management.ManagementObjectSearcher("SELECT Name, DriverVersion, AdapterRAM FROM Win32_VideoController"))
             using (var rangees = s.Get())
                 foreach (var o in rangees.Cast<System.Management.ManagementObject>())
                     using (o)
                         if (o["Name"]?.ToString() is { } nom)
-                            lues.Add(new(nom, o["DriverVersion"]?.ToString(), DrDxt.Detection.Gpu.VersionDuPilote.RadeonSoftwareVersion(nom)));
+                            lues.Add(new(nom, o["DriverVersion"]?.ToString(), DrDxt.Detection.Gpu.VersionDuPilote.RadeonSoftwareVersion(nom),
+                                // AdapterRAM est un entier 32 bits, plafonné à 4 Gio ; le nom tranche avec lui (CartesGraphiques). 0 = non dit.
+                                o["AdapterRAM"] is uint ram and > 0 ? ram : null));
             return lues;
         }, () => throw new TimeoutException("WMI did not answer in time."));
         return DrDxt.Detection.Gpu.PiloteExigeParLeJeu.Juger(fichiers, cartes);

@@ -36,6 +36,11 @@ public static class CartesGraphiques
 
     public static bool EstDediee(GpuInfo carte) => carte.VramBytes >= MemoireDedieeMin && !IntegreeAuNom(carte);
 
+    /// <summary>La même règle quand seul le nom est lu (Win32_VideoController, plages PnP) : ces noms portent le
+    /// constructeur (« AMD Radeon(TM) Graphics », « Intel(R) UHD Graphics 770 »), il sert donc aussi de constructeur.</summary>
+    public static bool EstDediee(string modele, long memoireDediee)
+        => EstDediee(new GpuInfo(modele, modele, memoireDediee, "", TriState.Unknown));
+
     /// <summary>La première carte dédiée, ou <c>null</c> sur une puce intégrée seule.</summary>
     public static GpuInfo? CarteDediee(HardwareInventory hw) => hw.Gpus.FirstOrDefault(EstDediee);
 

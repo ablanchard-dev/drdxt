@@ -62,6 +62,39 @@ public sealed class PiloteExigeParLeJeuTests
             .Statut.Should().Be(RepairStatus.Unknown);
         PiloteExigeParLeJeu.Juger([(Chemin, null)], []).Single().Statut.Should().Be(RepairStatus.Unknown);
     }
+    // Export d'un 7800X3D + RTX 5070 : le jeu tourne sur la 5070, et la puce intégrée du processeur (512 Mio pris sur la
+    // mémoire du système) sortait « sous le plancher » alors qu'elle n'affiche pas le jeu.
+    [Fact]
+    public void Une_puce_integree_n_est_pas_jugee_quand_une_vraie_carte_porte_le_jeu()
+    {
+        var cartes = new PiloteExigeParLeJeu.Carte[]
+        {
+            new("NVIDIA GeForce RTX 5070", "32.0.16.1742", null, 4_293_918_720),
+            new("AMD Radeon(TM) Graphics", "32.0.21030.2001", "25.8.1", 536_870_912),
+        };
+        PiloteExigeParLeJeu.Juger([(Chemin, Releve)], cartes).Should().ContainSingle()
+            .Which.Explication.Should().Contain("RTX 5070");
+
+        // Seule, la puce intégrée porte le jeu : elle reste jugée.
+        PiloteExigeParLeJeu.Juger([(Chemin, Releve)], [cartes[1]]).Single().Statut.Should().Be(RepairStatus.Suspicious);
+
+        // Réserve UMA réglée à 2 Go dans le BIOS : la mémoire seule la prendrait pour une carte dédiée, le nom tranche.
+        PiloteExigeParLeJeu.Juger([(Chemin, Releve)], [cartes[0], cartes[1] with { MemoireDediee = 2L << 30 }])
+            .Should().ContainSingle().Which.Explication.Should().Contain("RTX 5070");
+    }
+
+    // Même export : deux fichiers du même jeu (deux titres sous _retail_) donnaient deux planchers pour la même carte.
+    [Fact]
+    public void Deux_fichiers_du_meme_jeu_donnent_un_seul_plancher_par_carte_le_plus_haut()
+    {
+        var recent = Releve.Replace("[591, 59]", "[616, 56]");
+        var autre = @"C:\Program Files (x86)\Call of Duty\_retail_\cod24\driverVersions.json";
+        var c = PiloteExigeParLeJeu.Juger([(autre, Releve), (Chemin, recent)], [new("NVIDIA GeForce RTX 5070", "32.0.16.1742", null)])
+            .Should().ContainSingle().Subject;
+        c.ValeurAttendue.Should().Be("616.56");
+        c.Statut.Should().Be(RepairStatus.ExpectedDefault);
+    }
+
     [Fact]
     public void Le_fichier_se_trouve_aux_emplacements_connus_steam_compris_sans_parcourir_la_bibliotheque()
     {

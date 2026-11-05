@@ -7,8 +7,9 @@ namespace DrDxt.Detection.Hardware;
 /// XMP à zéro, <c>Win32_PhysicalMemory.Speed</c> retombe sur le JEDEC (== ConfiguredClockSpeed) : le part number est alors
 /// la seule source du nominal, au moment précis où il faut dire « XMP a été remis à zéro ».
 /// Seulement une suite isolée de quatre chiffres dans la plage DDR4/DDR5, la plus haute (« 6000 », pas le « 3038 » de
-/// F5-6000J3038...) ; rien de plausible : null, l'appelant garde WMI. Limite connue : Kingston Fury (« KF4 32 » =
-/// DDR4-3200) et Crucial (CT16G4DFD8266 = DDR4-2666) codent la vitesse autrement et rendent null.
+/// F5-6000J3038...) ; rien de plausible : null, l'appelant garde WMI. Kingston Fury/HyperX code le débit en centaines
+/// (KF560C36 = DDR5-6000) et a sa propre lecture. Limite connue : Crucial (CT16G4DFD8266 = DDR4-2666) le code autrement
+/// et rend null.
 /// </summary>
 public static partial class DramPartNumber
 {
@@ -20,10 +21,31 @@ public static partial class DramPartNumber
     [GeneratedRegex(@"\d{4}")]
     private static partial Regex FourDigitRun();
 
+    // Kingston Fury et HyperX : KF/HX, la génération (4 ou 5), le débit en centaines, puis C et le CL (KF560C36 =
+    // DDR5-6000 CL36) ; S au lieu de C sur les barrettes de portable (Fury Impact KF548S38). Les débits DDR4 « 66/33 » sont
+    // arrondis dans le code : 26 = 2666, 34 = 3466.
+    [GeneratedRegex(@"^\s*(?:KF|HX)([45])(\d{2})[CS](\d{2})", RegexOptions.IgnoreCase)]
+    private static partial Regex Kingston();
+
+    private static int KingstonMhz(int gen, int code) => (gen, code) switch
+    {
+        (4, 21) => 2133,
+        (4, 26) => 2666,
+        (4, 29) => 2933,
+        (4, 34) => 3466,
+        (4, 37) => 3733,
+        _ => code * 100,
+    };
+
     public static int? TryParseRatedMhz(string? partNumber)
     {
         if (string.IsNullOrWhiteSpace(partNumber)) return null;
         if (partNumber.TrimStart().StartsWith("CT", StringComparison.OrdinalIgnoreCase)) return null;
+        if (Kingston().Match(partNumber) is { Success: true } k)
+        {
+            int mhz = KingstonMhz(k.Groups[1].Value[0] - '0', int.Parse(k.Groups[2].Value));
+            return mhz is >= MinPlausibleMhz and <= MaxPlausibleMhz ? mhz : null;
+        }
 
         int? best = null;
         foreach (Match m in FourDigitRun().Matches(partNumber))
@@ -59,6 +81,10 @@ public static partial class DramPartNumber
         // Forme G.Skill DDR5 : ...-<rate>J<CL><tRCD><tRP>...  (J3038 => CL30)
         var j = System.Text.RegularExpressions.Regex.Match(partNumber, @"\d{4}J(\d{2})\d{2}");
         if (j.Success && Plausible(j.Groups[1].Value, out int clj)) return clj;
+
+        // Forme Kingston : KF<gen><débit/100>C<CL>  (KF560C36 => CL36)
+        var k = Kingston().Match(partNumber);
+        if (k.Success && Plausible(k.Groups[3].Value, out int clk)) return clk;
 
         return null;
 

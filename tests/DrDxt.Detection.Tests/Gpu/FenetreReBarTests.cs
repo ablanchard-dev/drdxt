@@ -48,8 +48,24 @@ public sealed class FenetreReBarTests
         FenetreReBar.Juger(new("carte", null, 0, 8UL << 30)).Statut.Should().Be(RepairStatus.Unknown);
     }
 
+    // Export d'un 7800X3D : la puce intégrée Radeon déclare 512 Mio pris sur la mémoire du système (le défaut des cartes
+    // AM5) et son ouverture fait 256 Mio. Elle sortait « pas appliqué, il s'active dans le BIOS » alors que la RTX 5070
+    // de la même machine prouvait le Resizable BAR actif.
+    [Fact]
+    public void Une_puce_integree_de_512_Mio_n_est_pas_dite_sans_ReBAR()
+    {
+        using var _ = Docteur.Portee(CultureInfo.GetCultureInfo("fr-FR"));
+        var c = FenetreReBar.Juger(new("AMD Radeon(TM) Graphics", 256UL << 20, 0x7C00000000, 512UL << 20));
+        c.Statut.Should().Be(RepairStatus.Unknown);
+        c.Explication.Should().NotContain("BIOS").And.Contain("ne tranche pas");
+
+        // Réserve UMA réglée à 2 Go : la mémoire seule ne la distingue pas d'une carte, le nom si.
+        FenetreReBar.Juger(new("AMD Radeon(TM) 780M Graphics", 256UL << 20, 0x7C00000000, 2UL << 30))
+            .Statut.Should().Be(RepairStatus.Unknown);
+    }
+
     // Une puce graphique intégrée déclare une petite mémoire « dédiée » (128 Mio) prise sur la mémoire du système, et son
-    // ouverture fait 256 Mio ou plus : comparer les deux dirait « actif » sans rien prouver. Sous l'ouverture classique,
+    // ouverture fait 256 Mio ou plus : comparer les deux dirait « actif » sans rien prouver. Sous le seuil de carte dédiée,
     // la mémoire déclarée ne tranche pas : non lu.
     [Fact]
     public void Une_memoire_dediee_sous_l_ouverture_classique_ne_dit_jamais_actif()

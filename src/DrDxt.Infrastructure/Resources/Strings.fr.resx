@@ -1310,6 +1310,9 @@ Allume le compteur FPS du jeu pour comparer.</value>
   <data name="Geste.Fait" xml:space="preserve">
     <value>fait</value>
   </data>
+  <data name="Geste.EnCours" xml:space="preserve">
+    <value>en cours</value>
+  </data>
   <data name="Geste.Annuler" xml:space="preserve">
     <value>Annuler</value>
   </data>
@@ -1342,6 +1345,12 @@ Allume le compteur FPS du jeu pour comparer.</value>
   </data>
   <data name="Geste.Peripherique.Detail" xml:space="preserve">
     <value>DrDXT peut demander à Windows d'arrêter puis de redémarrer ce périphérique, comme le Gestionnaire de périphériques. Rien à défaire ; s'il reste en erreur au scan suivant, suis les étapes ci-dessus.</value>
+  </data>
+  <data name="Geste.BcdHorloge.Titre" xml:space="preserve">
+    <value>Rendre l'horloge à Windows</value>
+  </data>
+  <data name="Geste.BcdHorloge.Detail" xml:space="preserve">
+    <value>DrDXT retire ce réglage de la configuration de démarrage, sans terminal. Il prend effet au prochain redémarrage ; Annuler remet exactement la valeur lue.</value>
   </data>
   <data name="Leviers.Geste.Pilote" xml:space="preserve">
     <value>Paquet de pilote {0} retiré</value>

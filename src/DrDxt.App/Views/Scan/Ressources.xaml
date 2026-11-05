@@ -176,16 +176,57 @@
                                         <StackPanel Margin="0,8,0,0">
                                             <TextBlock Text="{Binding Detail}" Style="{StaticResource Legende}" TextWrapping="Wrap"/>
                                             <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                                <!-- Survol : le voile cyan monte en 220 ms et redescend en 160 ms (la sortie plus vive que
+                                                     l'entrée) ; appui : 0,97, comme les capsules de l'appli. Le bouton entend le clic. -->
                                                 <Button Content="{Binding Titre}" Command="{Binding FaireCommand}" Cursor="Hand"
                                                         Visibility="{Binding PeutFaire, Converter={StaticResource BoolVis}}"
                                                         Foreground="{StaticResource IrisCyanBrush}" FocusVisualStyle="{StaticResource FocusIris}"
-                                                        FontFamily="{StaticResource UiFont}" FontSize="12.5" FontWeight="SemiBold">
+                                                        FontFamily="{StaticResource UiFont}" FontSize="12.5" FontWeight="SemiBold"
+                                                        RenderTransformOrigin="0.5,0.5">
+                                                    <Button.RenderTransform><ScaleTransform/></Button.RenderTransform>
                                                     <Button.Template>
                                                         <ControlTemplate TargetType="Button">
-                                                            <Border Background="{StaticResource IrisCyanDouxBrush}" CornerRadius="9" Padding="10,3"><ContentPresenter/></Border>
+                                                            <Border Background="{StaticResource IrisCyanDouxBrush}" CornerRadius="9">
+                                                                <Grid>
+                                                                    <Border x:Name="Voile" CornerRadius="9" Background="{StaticResource IrisCyanBrush}" Opacity="0"/>
+                                                                    <ContentPresenter Margin="10,3"/>
+                                                                </Grid>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Trigger.EnterActions>
+                                                                        <BeginStoryboard>
+                                                                            <Storyboard>
+                                                                                <effets:TransitionDeGeste Storyboard.TargetName="Voile" Storyboard.TargetProperty="Opacity" To="0.14" Duration="0:0:0.22"/>
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </Trigger.EnterActions>
+                                                                    <Trigger.ExitActions>
+                                                                        <BeginStoryboard>
+                                                                            <Storyboard>
+                                                                                <effets:TransitionDeGeste Storyboard.TargetName="Voile" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.16"/>
+                                                                            </Storyboard>
+                                                                        </BeginStoryboard>
+                                                                    </Trigger.ExitActions>
+                                                                </Trigger>
+                                                                <Trigger Property="IsPressed" Value="True">
+                                                                    <Setter Property="RenderTransform">
+                                                                        <Setter.Value><ScaleTransform ScaleX="0.97" ScaleY="0.97"/></Setter.Value>
+                                                                    </Setter>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
                                                         </ControlTemplate>
                                                     </Button.Template>
                                                 </Button>
+                                                <!-- Pendant le geste, le bouton laisse sa place à « En cours » : une réparation de Windows tient
+                                                     la console ouverte de longues minutes, et un vide laissait croire que rien ne se passait. -->
+                                                <Border CornerRadius="10" Padding="10,3" BorderThickness="1" VerticalAlignment="Center"
+                                                        Background="{StaticResource IrisCyanDouxBrush}" BorderBrush="{StaticResource FiletClairBrush}"
+                                                        Visibility="{Binding EnCours, Converter={StaticResource BoolVis}}">
+                                                    <TextBlock Text="{Binding DataContext.LabelGesteEnCours, RelativeSource={RelativeSource AncestorType=views:ScanView}}"
+                                                               Style="{StaticResource Legende}" Foreground="{StaticResource IrisCyanBrush}"
+                                                               AutomationProperties.LiveSetting="Polite"/>
+                                                </Border>
                                                 <Border CornerRadius="10" Padding="10,3" BorderThickness="1" VerticalAlignment="Center"
                                                         Background="{StaticResource EtatRienDouxBrush}" BorderBrush="{StaticResource EtatRienFiletBrush}"
                                                         Visibility="{Binding Fait, Converter={StaticResource BoolVis}}">

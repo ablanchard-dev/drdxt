@@ -92,4 +92,19 @@ public class IncidentNoyauLisibleTests
         PointSain(IlYA(2)).Should().BeNull();
         PointSain(IlYA(2), IlYA(9), IlYA(20)).Should().NotBeNull();
     }
+
+    // Export d'un 7800X3D : quatre vidages 0x1B8 écrits la même minute sortaient « 4 fois la même signature, ce n'est pas
+    // du bruit », puis quatre fois « incident après une installation ». Une rafale d'une minute est un seul épisode.
+    [Fact]
+    public void Des_vidages_ecrits_la_meme_minute_sont_un_seul_episode()
+    {
+        var t = DateTimeOffset.UtcNow.AddDays(-2);
+        var rafale = Enumerable.Range(0, 4).Select(s => new LiveKernelReport(t.AddSeconds(s * 10), 0x1B8, null, "WATCHDOG", null)).ToArray();
+
+        var c = Constat(rafale);
+        c.Statut.Should().Be(RepairStatus.Observed);
+        c.Explication.Should().StartWith("incident isolé");
+        new RepairAuditService(new ServicesMuets(), new RapportsFictifs(rafale), new ArretsMuets(), new MemoireMuette(), new VidagesMuets(), new WmiMuet())
+            .Lire().Should().NotContain(x => x.Nom == "point de restauration sain");
+    }
 }

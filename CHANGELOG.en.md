@@ -2,6 +2,30 @@
 
 Version française, avec les versions publiées : [CHANGELOG.md](CHANGELOG.md).
 
+## 0.9.4 (05/11/2026)
+
+For the player:
+
+### Updates
+- Updates arrive inside DrDXT: when a version is ready, the bottom of the window says so and "Install" sets it up.
+  This version is installed by hand one last time, over yours, without uninstalling.
+
+### Repair without a terminal
+- Damaged "Windows repair files": the button is on the finding itself and runs Microsoft's repair (DISM then sfc).
+  It only says "done" if Windows reads back healthy.
+- A clock forced at boot (useplatformclock, disabledynamictick…) is removed with a button, and can be undone.
+- When DrDXT can do it, the help text says so before the manual steps.
+- A gesture button says "in progress" while it works, instead of disappearing.
+
+### Doctor, fewer false findings
+- Kingston Fury and HyperX memory sticks are read: a Fury DDR5-6000 left at 4800 is reported as "EXPO off", no
+  longer "unknown".
+- The processor's graphics chip is no longer judged when a graphics card runs the game: no more "driver required by
+  Call of Duty" or "ReBAR not applied" for it, and one floor per card.
+- Several dumps of the same incident within a minute count as one incident, not a series.
+- A Call of Duty crash no longer lists the game itself among foreign modules.
+- The throttling explanation no longer quotes, on an AMD processor, a figure measured on another processor.
+
 ## 0.9.3 (04/11/2026)
 
 For the player:

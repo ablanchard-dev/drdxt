@@ -490,7 +490,7 @@
     <value>no flag</value>
   </data>
   <data name="RA.Bridage.AucunExplication" xml:space="preserve">
-    <value>the Windows performance-limit flags are 0. This counter does not see the package power limits (RAPL): it can read 0 while the frequency drops under sustained load (measured: from 5292 to 3698 MHz). No raised flag is therefore not "nothing is limiting".</value>
+    <value>the Windows performance-limit flags are 0. This counter does not see the package power limits (RAPL): it can read 0 while the frequency drops under sustained load (measured on a test machine: from 5292 to 3698 MHz). No raised flag is therefore not "nothing is limiting".</value>
   </data>
   <data name="RA.Bridage.Masque" xml:space="preserve">
     <value>mask 0x{0}</value>
@@ -3285,6 +3285,9 @@
   <data name="Carte.UneCommande" xml:space="preserve">
     <value>the command below</value>
   </data>
+  <data name="Carte.BoutonAvantLeTerminal" xml:space="preserve">
+    <value>DrDXT does it with the button above, no terminal needed. By hand, if you prefer:</value>
+  </data>
   <data name="Carte.Pcie" xml:space="preserve">
     <value>Graphics card PCIe link: Gen{0} x{1} (card maximum: Gen{2} x{3})</value>
   </data>
@@ -5491,7 +5494,7 @@
     <value>Largest memory range allocated to the card: {0} MiB. Its video memory was not read, so this range cannot be compared to it.</value>
   </data>
   <data name="RB.PetiteMemoire" xml:space="preserve">
-    <value>Windows allocated {0} MiB to this card, which declares {1} MiB of dedicated memory: no more than the classic 256 MiB opening, as an integrated graphics chip that borrows system memory does. The comparison does not settle whether Resizable BAR is active.</value>
+    <value>Windows allocated {0} MiB to this card, which declares {1} MiB of dedicated memory: less than a real graphics card, as an integrated graphics chip that borrows system memory does. The comparison does not settle whether Resizable BAR is active.</value>
   </data>
   <data name="RB.Actif" xml:space="preserve">
     <value>Resizable BAR is applied, proven by what Windows allocated: a {0} MiB range for {1} MiB of video memory, the processor sees all of it.</value>

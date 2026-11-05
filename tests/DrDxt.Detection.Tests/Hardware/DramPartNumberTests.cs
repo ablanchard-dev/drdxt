@@ -62,6 +62,28 @@ public class DramPartNumberTests
     public void Crucial_ne_donne_jamais_un_debit_devine(string pn)
         => DramPartNumber.TryParseRatedMhz(pn).Should().BeNull();
 
+    // Kingston Fury / HyperX : KF<génération><débit/100>C<CL>. Sans ce décodage, une Fury DDR5-6000 restée au JEDEC
+    // (KF560C36 relevée à 4800 sur une machine de testeur) rend un XMP/EXPO « inconnu » au lieu de « éteint ».
+    [Theory]
+    [InlineData("KF560C36-16", 6000)]
+    [InlineData("KF556C40BBK2-32", 5600)]
+    [InlineData("KF564C32RSAK2-32", 6400)]
+    [InlineData("KF432C16BB/16", 3200)]
+    [InlineData("KF436C17BBK2/16", 3600)]
+    [InlineData("KF426C16BB/8", 2666)]
+    [InlineData("HX429C15PB3/8", 2933)]
+    [InlineData("HX434C16PB3/8", 3466)]
+    [InlineData("HX437C19PB3/8", 3733)]
+    [InlineData("KF548S38IB-16", 4800)]       // Fury Impact (portable) : S au lieu de C
+    [InlineData("KF432S20IB/16", 3200)]
+    public void Kingston_code_son_debit_en_centaines(string pn, int attendu)
+        => DramPartNumber.TryParseRatedMhz(pn).Should().Be(attendu);
+
+    // ValueRAM (KVR) est une barrette JEDEC sans profil : aucun débit lu, l'appelant garde WMI.
+    [Fact]
+    public void Kingston_valueram_ne_donne_aucun_debit()
+        => DramPartNumber.TryParseRatedMhz("KVR32N22S8/8").Should().BeNull();
+
     [Fact]
     public void Four_digit_numbers_outside_the_dram_range_are_ignored()
     {
@@ -76,13 +98,14 @@ public class DramPartNumberTests
     [InlineData("F4-4000C18-32GTES", 18)]         // le kit de la machine de reference (mesure)
     [InlineData("F4-3600C16D-32GTZN", 16)]
     [InlineData("F5-6000J3038F16GX2-TZ5RK", 30)]  // DDR5 : J<CL><tRCD><tRP>
+    [InlineData("KF432C16BB/16", 16)]             // Kingston : KF<gen><débit/100>C<CL>
+    [InlineData("KF560C36-16", 36)]
     public void Parses_the_CAS_latency_from_the_part_number(string pn, int expected)
     {
         DramPartNumber.TryParseCasLatency(pn).Should().Be(expected);
     }
 
     [Theory]
-    [InlineData("KF432C16BB/16")]   // Kingston : pas la forme <rate>C<CL>
     [InlineData("")]
     [InlineData(null)]
     [InlineData("CT16G4DFRA32A")]   // Crucial : aucun CL encode

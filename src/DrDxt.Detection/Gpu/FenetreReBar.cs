@@ -40,9 +40,11 @@ public static class FenetreReBar
         var au4G = c.BaseMax >= 1UL << 32 ? Docteur.T("RB.Au4G") : "";
         if (c.MemoireVideo is not { } vram || vram == 0)
             return new RepairFinding("GPU", nom, Docteur.T("RB.Valeur", mio), null, RepairStatus.Unknown, Docteur.T("RB.SansVram", mio) + au4G);
-        // Une puce intégrée déclare une petite mémoire « dédiée » prise sur celle du système (128 Mio sur une Intel UHD) : toute
-        // ouverture la couvre, ReBAR ou pas. Sous l'ouverture classique, la comparaison ne prouve rien.
-        if (vram <= Classique)
+        // Une puce intégrée déclare une petite mémoire « dédiée » prise sur celle du système (128 Mio sur une Intel UHD, 512 Mio
+        // par défaut sur une Radeon de processeur AM5) : son ouverture ne dit rien du Resizable BAR, que le BIOS règle pour
+        // la vraie carte. Une réserve UMA réglée à 2 Go la ferait passer pour une carte : la règle du produit tranche aussi
+        // au nom. Sur une puce intégrée, la comparaison ne prouve rien.
+        if (!CartesGraphiques.EstDediee(c.Nom, (long)Math.Min(vram, long.MaxValue)))
             return new RepairFinding("GPU", nom, Docteur.T("RB.Valeur", mio), null, RepairStatus.Unknown,
                 Docteur.T("RB.PetiteMemoire", mio, vram >> 20) + au4G);
         if (Couvre(plage, vram))
