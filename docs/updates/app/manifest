@@ -1,0 +1,7 @@
+{
+  "Channel": "App",
+  "Version": "0.9.4",
+  "Url": "https://github.com/ablanchard-dev/drdxt/releases/download/v0.9.4/DrDXT-Setup-NON-SIGNE.exe",
+  "Sha256": "0680450b2235a34ebc734ab0e4726a6f75146918970820cf49d3c2cc8e9ac6fe",
+  "Signature": "/kT71YQjiO3QKpjzC4j5i5vXUW3e5n4nxSAmcdJdC12UiqRlEJH7Q0JyhgitstRH3LuJLEXN/Bt4FaoEp2IiAw=="
+}
