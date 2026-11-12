@@ -34,6 +34,9 @@
 - Pour une version : l'installeur est construit, publié comme fichier d'une GitHub Release, puis
   `signer.cs -- manifeste App <version> <url du fichier> <installeur> <sortie>` écrit le manifeste signé, le relit avec la
   clé publique, et le manifeste est publié à `<racine>/updates/app/manifest` (GitHub Pages du dépôt, fichiers statiques).
+  Ce fichier est dans le dépôt, à `docs/updates/app/manifest` : la suite le relit comme l'App (présent, signé par la clé
+  de production, jamais en avance sur la version du code), si bien qu'une publication qui le supprimerait ou le signerait
+  mal est refusée par les tests avant d'atteindre une App installée.
 - La clé publique du code est celle du mainteneur, créée le 05/11/2026 (empreinte hex
   `36d6221a492f6c6f4f63c2a688b1ab9b615b6844aa40fcb887910e66485cc420`). Elle remplace celle du 09/10/2026
   (`8fb9aa66…b2fe6eb`), dont la phrase est perdue : aucune mise à jour n'a jamais été signée avec elle, et les versions
