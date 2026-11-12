@@ -354,7 +354,7 @@ dotnet build DrDXT.sln -c Release
 dotnet test DrDXT.sln -c Release --no-build --filter "Category!=Machine"
 ```
 
-**10 120 tests, 0 échec**, mesuré le 05/11/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
+**10 135 tests, 0 échec**, mesuré le 12/11/2026 sur 17 projets, hors tests marqués `Machine` (ils lisent le vrai
 matériel). Ce chiffre est vérifié par `tools/gates/compte_des_tests.py` contre la dernière exécution. La commande qui
 le redonne :
 

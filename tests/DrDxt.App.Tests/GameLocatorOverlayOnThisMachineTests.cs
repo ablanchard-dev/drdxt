@@ -9,17 +9,19 @@ namespace DrDxt.App.Tests;
 public sealed class GameLocatorOverlayOnThisMachineTests
 {
     // NVIDIA Overlay pose une fenetre visible de la taille de l'ecran, en
-    // WS_EX_NOACTIVATE. On la reproduit dans un processus ENFANT (le locator s'ignore lui-meme),
-    // quasi transparente et sans voler le focus, et on interroge le vrai locator.
-    // Le cas sans NOACTIVATE est le controle : s'il n'etait pas trouve, le test passerait a vide.
+    // WS_EX_NOACTIVATE ; l'outil Capture de Windows, une fenetre d'outil (WS_EX_TOOLWINDOW). On les reproduit dans un
+    // processus ENFANT (le locator s'ignore lui-meme), quasi transparent et sans voler le focus, et on interroge le vrai locator.
+    // Le cas sans style etendu est le controle : s'il n'etait pas trouve, le test passerait a vide.
     [Theory]
     [Trait("Category", "Machine")] // ouvre une fenetre dans la vraie session : rien sur un runner CI
-    [InlineData(true)]
-    [InlineData(false)]
-    public void A_window_that_can_never_be_activated_is_not_the_game(bool noActivate)
+    [InlineData(0x08000000)]
+    [InlineData(0x00000080)]
+    [InlineData(0)]
+    public void A_window_that_can_never_be_activated_is_not_the_game(int styleEtendu)
     {
+        var overlay = styleEtendu != 0;
         using var enfant = Process.Start(new ProcessStartInfo(SondeDeJeu.Exe,
-            "-NoProfile -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(Script(noActivate))))
+            "-NoProfile -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(Script(styleEtendu))))
         {
             UseShellExecute = false,
             CreateNoWindow = true,
@@ -42,12 +44,12 @@ public sealed class GameLocatorOverlayOnThisMachineTests
 
             var apres = new Win32GameLocator().LocateRunningGamePid();
 
-            if (noActivate)
+            if (overlay)
             {
                 // La garantie du jour, vraie quoi qu'il y ait d'autre a l'ecran : une fenetre
                 // qui ne peut jamais passer au premier plan n'est jamais designee comme le jeu.
                 apres.Should().NotBe(enfant.Id,
-                    "une fenetre WS_EX_NOACTIVATE est un overlay, pas le jeu auquel on joue");
+                    "une fenetre WS_EX_NOACTIVATE ou d'outil est un overlay, pas le jeu auquel on joue");
                 apres.Should().Be(avant, "la sonde ne doit rien changer a ce que le produit voit");
             }
             else if (avant is null)
@@ -74,7 +76,7 @@ public sealed class GameLocatorOverlayOnThisMachineTests
         }
     }
 
-    private static string Script(bool noActivate) => $$"""
+    private static string Script(int styleEtendu) => $$"""
         Add-Type -AssemblyName System.Windows.Forms
         Add-Type -ReferencedAssemblies System.Windows.Forms -TypeDefinition @'
         public class FenetreSonde : System.Windows.Forms.Form {
@@ -84,7 +86,7 @@ public sealed class GameLocatorOverlayOnThisMachineTests
             protected override bool ShowWithoutActivation { get { return true; } }
         }
         '@
-        [FenetreSonde]::ExStyle = {{(noActivate ? 0x08000000 : 0)}}
+        [FenetreSonde]::ExStyle = {{styleEtendu}}
         $f = New-Object FenetreSonde
         $f.FormBorderStyle = 'None'
         $f.StartPosition = 'Manual'

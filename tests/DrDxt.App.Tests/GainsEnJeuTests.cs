@@ -153,6 +153,15 @@ public class GainsEnJeuTests
         ScanViewModel.LigneEchec(null, [], Loc).Should().BeNull();
     }
 
+    // Relevé sur la machine de référence : l'outil Capture de Windows, pris pour un jeu, a laissé un échec. Ce n'était pas
+    // une partie : rien n'a été raté, et la carte ne le dit pas.
+    [Theory]
+    [InlineData("SnippingTool.exe : La session ETW DXGI n'a pas pu démarrer (droits administrateur requis).")]
+    [InlineData("LockApp.exe : MEAS.NO_FRAMES")]
+    public void Une_capture_ratee_sur_un_programme_qui_n_est_pas_un_jeu_ne_se_dit_pas(string raison)
+        => ScanViewModel.LigneEchec(new PartiesMemorisees.EchecDeCapture(new DateTimeOffset(2026, 10, 8, 21, 0, 0, TimeSpan.Zero), raison),
+            [P(5, 80)], Loc).Should().BeNull();
+
     // Le service de mesure de DrDXT arrêté (démarrage à la demande, après un redémarrage ou une mise à jour) : jouer n'y
     // change rien, le relevé sans droits ne peut pas le relancer. « DrDXT réessaie à ta prochaine partie » était faux.
     [Theory]
@@ -174,7 +183,7 @@ public class GainsEnJeuTests
         ScanViewModel.RaisonDuRate(DrDxt.Core.ErrorCodes.NoFrames, "0 image").Should().Be("0 image");
     }
 
-    // Le code d'erreur brut (« powershell.exe : 0 image(s) DXGI… MEAS.NO_FRAMES »)
+    // Le code d'erreur brut (« cod.exe : 0 image(s) DXGI… MEAS.NO_FRAMES »)
     // ne s'affiche plus au joueur ; la phrase dit quoi faire. La raison reste dans le fichier de l'échec.
     [Theory]
     [InlineData("fr", "ta prochaine partie")]
@@ -186,12 +195,12 @@ public class GainsEnJeuTests
         try
         {
             var echec = new PartiesMemorisees.EchecDeCapture(new DateTimeOffset(2026, 10, 8, 7, 19, 0, TimeSpan.Zero),
-                "powershell.exe : 0 image(s) DXGI pour le processus 61740 (PresentMon avant lui : MEAS.NO_FRAMES)");
+                "cod.exe : 0 image(s) DXGI pour le processus 61740 (PresentMon avant lui : MEAS.NO_FRAMES)");
             var localise = new DrDxt.Infrastructure.Localization.ResxLocalizer();
 
             var ligne = ScanViewModel.LigneEchec(echec, [P(5, 80)], k => localise.Get(k, System.Globalization.CultureInfo.CurrentUICulture));
 
-            ligne.Should().Contain(attendu).And.NotContain("MEAS.").And.NotContain("powershell");
+            ligne.Should().Contain(attendu).And.NotContain("MEAS.").And.NotContain("cod.exe");
         }
         finally { System.Globalization.CultureInfo.CurrentUICulture = avant; }
     }

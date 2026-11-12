@@ -34,6 +34,8 @@ public static class NomExeDeJeu
         "OneDrive.exe", "Dropbox.exe", "ms-teams.exe", "Teams.exe", "Slack.exe",
         // Écran de verrouillage, consoles et terminal.
         "LockApp.exe", "powershell.exe", "pwsh.exe", "cmd.exe", "WindowsTerminal.exe", "OpenConsole.exe",
+        // L'outil Capture de Windows : son voile couvre l'écran au premier plan.
+        "SnippingTool.exe", "ScreenClippingHost.exe",
         // DrDXT lui-même : sa fenêtre (agrandie, ou posée hors écran pour une capture) n'est pas une partie.
         "DrDxt.App.exe", "DrDxt.Lanceur.exe", "DrDxt.ElevatedHelper.exe", "DrDxt.ReconcilerHost.exe",
         "PresentMonService.exe",
