@@ -1273,10 +1273,10 @@
     <value>1) Settings &gt; Windows Update &gt; Check for updates. 2) If it still fails, restart the PC and try again.</value>
   </data>
   <data name="WL.BilanRattrapes" xml:space="preserve">
-    <value>{0} failures in {1} days, {2} of them made up for later</value>
+    <value>{0} failure(s) in {1} days, {2} of them made up for later</value>
   </data>
   <data name="WL.Bilan" xml:space="preserve">
-    <value>{0} failures in {1} days</value>
+    <value>{0} failure(s) in {1} days</value>
   </data>
   <data name="WL.Rattrapes" xml:space="preserve">
     <value>{0} of these failures were made up for by a successful installation afterwards: they need nothing. </value>
@@ -1889,6 +1889,9 @@
   </data>
   <data name="IM.Famille.programmes au démarrage" xml:space="preserve">
     <value>startup programs</value>
+  </data>
+  <data name="IM.ValeurReference" xml:space="preserve">
+    <value>{0} item(s) recorded</value>
   </data>
   <data name="IM.Reference" xml:space="preserve">
     <value>first record of what is installed ({0}): from the next scan on, DrDXT will say what was installed, removed or updated in between.</value>
@@ -2598,6 +2601,9 @@
   <data name="TP.NonLues" xml:space="preserve">
     <value>scheduled tasks could not be read: DrDXT does not know which ones fall during your games.</value>
   </data>
+  <data name="TP.ValeurSansPartie" xml:space="preserve">
+    <value>no match recorded</value>
+  </data>
   <data name="TP.SansPartie" xml:space="preserve">
     <value>no game recorded: DrDXT cannot yet compare scheduled tasks to your play times.</value>
   </data>
@@ -2808,6 +2814,9 @@
   <data name="JD.Aucun" xml:space="preserve">
     <value>no game found in Steam, Epic, Battle.net, Riot, EA app or Ubisoft Connect: DrDXT does not know where your games are (another launcher is not read).</value>
   </data>
+  <data name="JD.AucunTrouve" xml:space="preserve">
+    <value>no game found</value>
+  </data>
   <data name="JD.UnSsd" xml:space="preserve">
     <value>an SSD</value>
   </data>
@@ -2879,6 +2888,15 @@
   </data>
   <data name="CO.ExplicationX3D5000" xml:space="preserve">
     <value>On your {0}, AMD locks overclocking, Precision Boost Overdrive and Curve Optimizer included. Some board makers reopened a negative Curve Optimizer (a per-core voltage reduction) through a BIOS update, from AGESA 1.2.0.8: DrDXT cannot tell whether yours did. If the menu does not appear, your BIOS does not offer it. {1} The gain is not measured on your PC, each chip has its own margin. Instability possible: go in small steps and test stability at each step. If unclean shutdowns or hardware errors (WHEA) appear afterwards, DrDXT reports them: go back to the previous value. DrDXT never writes to the BIOS.</value>
+  </data>
+  <data name="CO.ValeurAStabiliser" xml:space="preserve">
+    <value>{0} recent incident(s)</value>
+  </data>
+  <data name="CO.ValeurPasActif" xml:space="preserve">
+    <value>not active</value>
+  </data>
+  <data name="CO.ValeurPasLu" xml:space="preserve">
+    <value>BIOS setting not read</value>
   </data>
   <data name="CO.StabiliteNonLue" xml:space="preserve">
     <value>One of the stability logs (unclean shutdowns, blue screens, dumps, hardware errors) could not be read: without knowing whether the machine is stable, DrDXT does not suggest lowering the processor voltage (Curve Optimizer).</value>
@@ -5271,6 +5289,9 @@
   <data name="EM.AvisSeul" xml:space="preserve">
     <value> An advisory alone is a warning the link handled, not a link failure.</value>
   </data>
+  <data name="EM.OrigineValeur" xml:space="preserve">
+    <value>{0} source(s)</value>
+  </data>
   <data name="EM.OrigineSuite" xml:space="preserve">
     <value> The processor that raises an error is not always the block at fault: the role of a bank is written in its MCA_IPID register, which the Windows event does not carry, so the block stays unidentified rather than guessed from the bank number.</value>
   </data>
@@ -5303,6 +5324,12 @@
   </data>
   <data name="TI.Vide" xml:space="preserve">
     <value>DrDXT's service looked at what Windows logged in the {2} minutes before the incident of {0} ({1}): no error or warning. Nothing announced it in the logs.</value>
+  </data>
+  <data name="TI.RedemarrageReleve" xml:space="preserve">
+    <value>DrDXT's service looked at the {2} minutes before the restart of {0}, which followed an abrupt shutdown: {3} errors and warnings, {4} of them errors. Most frequent sources: {5}. The PC may have stayed off between the shutdown and this restart: these lines may come from the restart itself, not from what preceded the shutdown.</value>
+  </data>
+  <data name="TI.RedemarrageVide" xml:space="preserve">
+    <value>DrDXT's service looked at the {2} minutes before the restart of {0}, which followed an abrupt shutdown: no error or warning. The PC may have stayed off between the shutdown and this restart: this says nothing about what preceded the shutdown.</value>
   </data>
   <data name="TI.Autres" xml:space="preserve">
     <value> {0} other witness(es) in the last 30 days.</value>
@@ -5462,6 +5489,9 @@
   </data>
   <data name="AP.KvaInactive" xml:space="preserve">
     <value>Kernel page table isolation (Meltdown): not active.</value>
+  </data>
+  <data name="AP.Valeur" xml:space="preserve">
+    <value>{0} protection(s) read</value>
   </data>
   <data name="AP.JamaisCoupees" xml:space="preserve">
     <value> These are security protections, read for information: DrDXT never offers to turn them off.</value>
@@ -5706,6 +5736,9 @@
   <data name="RCA.KitNonLu" xml:space="preserve">
     <value>Whether your memory profile runs is not known: your BIOS asks for {0} and every channel runs at {1} MT/s, the JEDEC floor, but Windows does not say the speed your kit announces, so a failed memory training cannot be told from a setting you chose.</value>
   </data>
+  <data name="RCA.ValeurConforme" xml:space="preserve">
+    <value>matches</value>
+  </data>
   <data name="RCA.Conforme" xml:space="preserve">
     <value>Every timing set in your BIOS (Auto aside) runs as set, on all {0} channels.</value>
   </data>
@@ -5762,6 +5795,9 @@
   </data>
   <data name="RR.NonJugees" xml:space="preserve">
     <value>{0} rules read (tables version {2}); {1} could not be judged: the driver or the processor was not read.</value>
+  </data>
+  <data name="RR.AucuneValeur" xml:space="preserve">
+    <value>none applies to you</value>
   </data>
   <data name="RR.AucuneConcerne" xml:space="preserve">
     <value>{0} rules read (tables version {1}): none applies to this PC.</value>

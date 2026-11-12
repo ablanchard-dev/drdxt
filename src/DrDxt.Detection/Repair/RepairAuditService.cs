@@ -676,7 +676,8 @@ public sealed partial class RepairAuditService
     {
         var lus = _misesAJour.Depuis(DateTimeOffset.UtcNow - FenetreMisesAJour);
         return lus.IsOk
-            ? MisesAJourEnEchec.Juger(lus.Value!, (int)FenetreMisesAJour.TotalDays, PaquetsInstalles.DeposeLe)
+            ? MisesAJourEnEchec.Juger(lus.Value!, (int)FenetreMisesAJour.TotalDays, PaquetsInstalles.DeposeLe,
+                Microsoft.Win32.Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "DisplayVersion", null) as string)
             : [new RepairFinding("WINDOWS UPDATE", "echecs", null, null, RepairStatus.Unknown,
                 Docteur.T("RA.MAJ.NonLu", lus.Error?.Message))];
     }

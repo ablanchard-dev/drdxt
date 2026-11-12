@@ -59,7 +59,7 @@ public static class RadarDesRegressions
         if (concernees > 0) yield break;
         yield return nonJugees > 0
             ? new RepairFinding(Domaine, Nom, null, null, RepairStatus.Unknown, Docteur.T("RR.NonJugees", tables.Radar.Count, nonJugees, tables.Version))
-            : new RepairFinding(Domaine, Nom, null, null, RepairStatus.Observed, Docteur.T("RR.AucuneConcerne", tables.Radar.Count, tables.Version));
+            : new RepairFinding(Domaine, Nom, Docteur.T("RR.AucuneValeur"), null, RepairStatus.Observed, Docteur.T("RR.AucuneConcerne", tables.Radar.Count, tables.Version));
     }
 
     private static Verdict Evaluer(RegleDeRegression r, HashSet<string> installes,

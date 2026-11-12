@@ -86,7 +86,7 @@ public static class RegleContreApplique
         }
         var ecarts = Comparer(bios, appliques);
         yield return ecarts.Count == 0
-            ? new RepairFinding("RAM", Nom, null, null, RepairStatus.Observed, Docteur.T("RCA.Conforme", appliques.Canaux.Count))
+            ? new RepairFinding("RAM", Nom, Docteur.T("RCA.ValeurConforme"), null, RepairStatus.Observed, Docteur.T("RCA.Conforme", appliques.Canaux.Count))
             : new RepairFinding("RAM", Nom, string.Join(", ", ecarts.Select(e => $"{e.Reglage} {e.Canal}")), null, RepairStatus.NonDefault,
                 Docteur.T("RCA.Ecarts", string.Join(" ; ", ecarts.Select(e => $"{e.Reglage} {e.Demande} → {e.Applique} ({e.Canal})"))));
     }

@@ -40,7 +40,7 @@ public static class CurveOptimizerAmd
         var recents = arrets.Select(a => a.Quand).Concat(autresIncidents ?? [])
             .Where(d => maintenant - d <= CandidateSelector.FenetreInstabilite).ToList();
         if (recents.Count > 0)
-            return new RepairFinding("CPU", "Curve Optimizer (AMD)", null, null, RepairStatus.Observed,
+            return new RepairFinding("CPU", "Curve Optimizer (AMD)", Docteur.T("CO.ValeurAStabiliser", recents.Count), null, RepairStatus.Observed,
                 Docteur.T("CO.DabordStabiliser", recents.Count, jours, recents.Max().ToLocalTime()));
         if (lu is { Actif: true })
             return new RepairFinding("CPU", "Curve Optimizer (AMD)", LectureCurveOptimizer.Texte(lu), null, RepairStatus.Observed,
@@ -52,7 +52,8 @@ public static class CurveOptimizerAmd
             : Docteur.T("CO.Autre");
         var m = RyzenDeBureau.Match(processeur);
         var x3dVerrouille = m.Groups["serie"].Value == "5" && m.Groups["suffixe"].Value.Equals("X3D", StringComparison.OrdinalIgnoreCase);
-        return new RepairFinding("CPU", "Curve Optimizer (AMD)", null, null, RepairStatus.Observed,
+        // Lu inactif ou pas lu du tout : le conseil est le même, la valeur dit lequel des deux.
+        return new RepairFinding("CPU", "Curve Optimizer (AMD)", Docteur.T(lu is null ? "CO.ValeurPasLu" : "CO.ValeurPasActif"), null, RepairStatus.Observed,
             Docteur.T(x3dVerrouille ? "CO.ExplicationX3D5000" : "CO.Explication", processeur.Trim(), chemin),
             RepairAction.Recommandation);
     }

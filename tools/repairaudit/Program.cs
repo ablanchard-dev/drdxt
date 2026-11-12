@@ -34,6 +34,15 @@ using DrDxt.Measurement.Network;
 // ============================================================================================
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+// La redirection n'existe qu'en Debug. La demander a une version Release ecrirait la photo dans le vrai
+// journal du joueur : on s'arrete avant de lire quoi que ce soit.
+if (DossierDonnees.RedirectionDemandeeMaisIgnoree(Environment.GetEnvironmentVariable))
+{
+    Console.Error.WriteLine($"{DossierDonnees.VariableDeDeveloppement} est posee mais ignoree ici (chemin relatif, ou "
+                            + $"version Release) : le journal irait dans {DossierDonnees.Racine()}. Relance en Debug.");
+    return 2;
+}
 var constats = new List<RepairFinding>();
 
 // ── POWER : le parking de coeurs, seule lecture de cette famille qui reste ici ──────────
@@ -78,8 +87,8 @@ else
         vus.Count == 0
             ? "aucun coeur parque pendant l'echantillonnage — mais l'absence a un instant n'est "
               + "pas une propriete de la machine"
-            : "Windows parque et deparque selon la charge : c'est le comportement NORMAL du plan "
-              + "Equilibre, pas un degat. Seule une micro-saccade MESUREE justifierait d'y toucher"));
+            : "Windows parque et deparque selon la charge : c'est le comportement NORMAL de "
+              + "Windows (releve sous Equilibre comme sous Hautes performances), pas un degat. Seule une micro-saccade MESUREE justifierait d'y toucher"));
 }
 
 // ── LES FAMILLES DE PURE LECTURE, VIA LE SERVICE PARTAGE ──────────────────────────────

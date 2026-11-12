@@ -47,7 +47,7 @@ public static class AttenuationsProcesseur
             morceaux.Add((k & 0x20) != 0 && (k & 0x10) == 0 ? Docteur.T("AP.KvaNonConcerne")
                 : (k & 0x01) != 0 ? Docteur.T((k & 0x04) != 0 ? "AP.KvaActivePcid" : "AP.KvaActive")
                 : Docteur.T("AP.KvaInactive"));
-        return new RepairFinding("SECURITE", "attenuations du processeur", null, null, RepairStatus.Observed,
+        return new RepairFinding("SECURITE", "attenuations du processeur", Docteur.T("AP.Valeur", morceaux.Count), null, RepairStatus.Observed,
             string.Join(" ", morceaux) + Docteur.T("AP.JamaisCoupees"));
     }
 

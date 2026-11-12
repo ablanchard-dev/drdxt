@@ -19,13 +19,15 @@ public sealed class TemoinDIncidentWorker : BackgroundService
 {
     private readonly string _dossier;
     private readonly Func<DateTimeOffset, DateTimeOffset, IReadOnlyList<TemoinDIncident.Ligne>> _lireFenetre;
+    private readonly Func<DateTimeOffset, DateTimeOffset?> _dernierSigne;
     private readonly object _verrou = new();
     private DateTimeOffset? _dernier;
 
     public TemoinDIncidentWorker() : this(DossierParDefaut()) { }
 
-    internal TemoinDIncidentWorker(string dossier, Func<DateTimeOffset, DateTimeOffset, IReadOnlyList<TemoinDIncident.Ligne>>? lireFenetre = null)
-        => (_dossier, _lireFenetre) = (dossier, lireFenetre ?? TemoinDIncident.LireFenetre);
+    internal TemoinDIncidentWorker(string dossier, Func<DateTimeOffset, DateTimeOffset, IReadOnlyList<TemoinDIncident.Ligne>>? lireFenetre = null,
+        Func<DateTimeOffset, DateTimeOffset?>? dernierSigne = null)
+        => (_dossier, _lireFenetre, _dernierSigne) = (dossier, lireFenetre ?? TemoinDIncident.LireFenetre, dernierSigne ?? TemoinDIncident.LireDernierSigneDeVie);
 
     private static bool DeConfiance(string fichier) => TrustedManifestRoot.EnsureTrustedFile(fichier).IsOk;
 
@@ -85,7 +87,9 @@ public sealed class TemoinDIncidentWorker : BackgroundService
         lock (_verrou)
         {
             if (!TemoinDIncident.AEcrire(incident, _dernier)) return;
-            var (debut, fin) = TemoinDIncident.Fenetre(genre, incident);
+            // Seul l'arrêt brutal est noté après coup, au démarrage suivant : lui seul cherche où la séance d'avant s'est tue.
+            var (debut, fin) = TemoinDIncident.Fenetre(genre, incident,
+                genre == TemoinDIncident.Declencheurs[0].Genre ? _dernierSigne(incident) : null);
             var temoin = new TemoinDIncident.Temoin(incident, genre, debut, fin, _lireFenetre(debut, fin));
             var fichier = Path.Combine(_dossier, $"temoin-{incident.UtcDateTime:yyyyMMdd-HHmmss}.json");
             if (!TrustedManifestRoot.WriteTrustedFile(fichier, JsonSerializer.SerializeToUtf8Bytes(temoin)).IsOk) return;

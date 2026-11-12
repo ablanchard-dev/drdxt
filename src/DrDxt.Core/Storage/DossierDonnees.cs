@@ -22,5 +22,14 @@ public static class DossierDonnees
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DrDXT");
     }
 
+    /// <summary>Vrai quand la variable est posee et que les donnees vont quand meme ailleurs : chemin relatif, ou
+    /// version publiee. Un outil qui ecrit s'arrete la-dessus plutot que d'ecrire dans les donnees du joueur
+    /// en laissant croire qu'il les a epargnees.</summary>
+    public static bool RedirectionDemandeeMaisIgnoree(Func<string, string?> lireVariable)
+    {
+        var demande = lireVariable(VariableDeDeveloppement);
+        return !string.IsNullOrWhiteSpace(demande) && Racine(lireVariable) != demande;
+    }
+
     public static string Chemin(params string[] parties) => Path.Combine([Racine(), .. parties]);
 }

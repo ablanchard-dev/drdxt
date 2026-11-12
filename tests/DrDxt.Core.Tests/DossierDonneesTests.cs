@@ -32,4 +32,23 @@ public class DossierDonneesTests
     public void Une_version_publiee_ignore_la_variable()
         => DossierDonnees.Racine(_ => Path.GetTempPath()).Should().Be(Normal);
 #endif
+
+    [Fact]
+    public void Sans_variable_aucune_redirection_n_est_ignoree()
+        => DossierDonnees.RedirectionDemandeeMaisIgnoree(_ => null).Should().BeFalse();
+
+    [Fact]
+    public void Une_redirection_relative_est_demandee_mais_ignoree()
+        => DossierDonnees.RedirectionDemandeeMaisIgnoree(_ => "relatif\\dossier").Should().BeTrue();
+
+    [Fact]
+    public void Une_redirection_absolue_n_est_ignoree_que_par_une_version_publiee()
+    {
+        var ignoree = DossierDonnees.RedirectionDemandeeMaisIgnoree(_ => Path.Combine(Path.GetTempPath(), "drdxt-photo"));
+#if DEBUG
+        ignoree.Should().BeFalse();
+#else
+        ignoree.Should().BeTrue();
+#endif
+    }
 }

@@ -109,7 +109,7 @@ public static class ErreursMaterielles
                 causes.Count > 0 ? string.Join(", ", causes) : Docteur.T("EM.CauseNonLue"))
                 + (bits == AvisNonFatal ? Docteur.T("EM.AvisSeul") : "");
         });
-        yield return new RepairFinding("STABILITE", "origine des erreurs materielles", null, null, RepairStatus.Observed,
+        yield return new RepairFinding("STABILITE", "origine des erreurs materielles", Docteur.T("EM.OrigineValeur", sources.Count), null, RepairStatus.Observed,
             string.Join(" ", morceaux) + Docteur.T("EM.OrigineSuite"));
     }
 

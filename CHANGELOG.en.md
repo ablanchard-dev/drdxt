@@ -2,6 +2,23 @@
 
 Version française, avec les versions publiées : [CHANGELOG.md](CHANGELOG.md).
 
+## Unreleased
+
+For the player:
+
+### Updates
+- When your version is newer than the published one, the bottom of the window says so, instead of "a package was
+  rejected".
+
+### Doctor, fewer false findings
+- The Windows Snipping Tool and the lock screen are no longer taken for a game: no more shutdown "in the middle of a
+  match" or "failed capture" in their name.
+- After an abrupt shutdown, the incident witness keeps what came before the shutdown, even when the PC stayed off
+  afterwards. It used to read the hour before the restart.
+- A new version of Windows that is already installed is no longer reported as "failed" because of an earlier attempt.
+- Findings that were read correctly (processor protections, regression radar, first record of what is installed) no
+  longer show "unreadable" and no longer count as missed readings.
+
 ## 0.9.4 (05/11/2026)
 
 For the player:

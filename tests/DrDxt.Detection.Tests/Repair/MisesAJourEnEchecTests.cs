@@ -67,7 +67,7 @@ public class MisesAJourEnEchecTests
             Essai(12, false, "Defender", "0x8024001e"),
         ], 90).Single(c => c.Nom == "echecs");
 
-        bilan.ValeurCourante.Should().Be("3 échecs en 90 jours, dont 2 rattrapés ensuite");
+        bilan.ValeurCourante.Should().Be("3 échec(s) en 90 jours, dont 2 rattrapé(s) ensuite");
     }
 
     [Fact]
@@ -161,6 +161,32 @@ public class MisesAJourEnEchecTests
         ], 90);
 
         constats.Should().ContainSingle("les deux échecs sont rattrapés par la version suivante");
-        constats[0].ValeurCourante.Should().Be("2 échecs en 90 jours, dont 2 rattrapés ensuite");
+        constats[0].ValeurCourante.Should().Be("2 échec(s) en 90 jours, dont 2 rattrapé(s) ensuite");
     }
+
+    // Une nouvelle version de Windows note parfois un échec puis s'installe sans noter de réussite sous le même titre.
+    // La version que Windows dit porter fait foi : celle du titre, ou une plus récente, est installée.
+    [Theory]
+    [InlineData("25H2")]
+    [InlineData("26H2")]
+    public void Une_version_de_Windows_deja_installee_ne_reste_pas_en_echec(string installee)
+    {
+        var constats = MisesAJourEnEchec.Juger([Essai(10, false, "Windows 11, version 25H2", "0x80242016")], 90,
+            versionDeWindows: installee);
+
+        constats.Should().ContainSingle();
+        constats[0].ValeurCourante.Should().Be("1 échec(s) en 90 jours, dont 1 rattrapé(s) ensuite");
+    }
+
+    [Theory]
+    [InlineData("24H2")]
+    [InlineData(null)]
+    public void Une_version_de_Windows_pas_encore_installee_ou_non_lue_reste_en_echec(string? installee)
+        => MisesAJourEnEchec.Juger([Essai(10, false, "Windows 11, version 25H2", "0x80242016")], 90, versionDeWindows: installee)
+            .Should().HaveCount(2).And.Contain(c => c.Nom == "Windows 11, version 25H2");
+
+    [Fact]
+    public void Seul_un_titre_de_version_de_Windows_se_juge_sur_la_version_installee()
+        => MisesAJourEnEchec.Juger([Essai(10, false, "Pilote Contoso, version 24H1 (KB1)", "0x80242016")], 90, versionDeWindows: "25H2")
+            .Should().HaveCount(2);
 }
