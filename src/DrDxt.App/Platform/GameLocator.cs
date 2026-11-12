@@ -8,7 +8,7 @@ namespace DrDxt.App.Platform;
 // Détection du jeu par sa fenêtre, sans viser une liste de tous les titres. Un « jeu » est la fenêtre
 // de premier niveau visible, de la taille de l'écran (plein écran ou sans bordure), qui n'est ni le
 // shell, ni le bureau, ni DrDXT, ni un programme qu'on sait ne pas être un jeu (NomExeDeJeu : navigateurs,
-// Discord, lanceurs), ni une appli agrandie. Une liste courte des jeux les plus joués passe avant
+// Discord, lanceurs), ni une appli agrandie, ni une fenêtre d'outil ou d'overlay. Une liste courte des jeux les plus joués passe avant
 // (NomExeDeJeu.EstUnJeuConnu) : ceux-là sont reconnus même en fenêtré ou réduits. On mesure ce processus avec PresentMon : ça marche pour Warzone, Valorant,
 // CS2, Apex, Fortnite, n'importe quel titre, sans entretien, et ça reste honnête (on mesure le
 // vrai jeu ; un benchmark synthétique ne le représenterait pas et la doctrine l'interdit). Pas
@@ -197,9 +197,9 @@ public sealed class Win32GameLocator : IGameLocator
     internal static bool EstPleinEcranReduit(IntPtr h, uint self)
     {
         if (!IsIconic(h) || !IsWindowVisible(h)) return false;
-        // Mêmes exclusions que pour le jeu affiché : masquée par DWM, ou incapable de passer au premier plan.
+        // Mêmes exclusions que pour le jeu affiché : masquée par DWM, fenêtre d'outil ou d'overlay.
         if (DwmGetWindowAttribute(h, DwmwaCloaked, out var cloaked, sizeof(int)) == 0 && cloaked != 0) return false;
-        if ((GetWindowLong(h, GwlExStyle) & WsExNoActivate) != 0) return false;
+        if (EstUnOutilOuUnOverlay(GetWindowLong(h, GwlExStyle))) return false;
         GetWindowThreadProcessId(h, out var pid);
         if (pid == 0 || pid == self || pid == PidDuShell()) return false;
         if (PasUnJeu(pid)) return false;
@@ -244,10 +244,7 @@ public sealed class Win32GameLocator : IGameLocator
         if (DwmGetWindowAttribute(hwnd, DwmwaCloaked, out var cloaked, sizeof(int)) == 0 && cloaked != 0)
             return false;
 
-        // La fenetre visible de NVIDIA Overlay est
-        // WS_EX_NOACTIVATE : elle ne peut jamais passer au premier plan, donc ce n'est pas le jeu
-        // auquel on joue. Regle generique, pas une liste de noms : vaut pour tout overlay.
-        if ((GetWindowLong(hwnd, GwlExStyle) & WsExNoActivate) != 0)
+        if (EstUnOutilOuUnOverlay(GetWindowLong(hwnd, GwlExStyle)))
             return false;
 
         if (EstUneAppliAgrandie(GetWindowLong(hwnd, GwlStyle)))
@@ -343,6 +340,14 @@ public sealed class Win32GameLocator : IGameLocator
     /// qui garderait ce bouton en plein écran ne serait plus vu.</summary>
     internal static bool EstUneAppliAgrandie(int style) => (style & WsMaximize) != 0 && (style & WsMaximizeBox) != 0;
     private const int WsExNoActivate = 0x08000000; // WS_EX_NOACTIVATE (winuser.h)
+    private const int WsExToolWindow = 0x00000080; // WS_EX_TOOLWINDOW (winuser.h)
+
+    /// <summary>La fenêtre visible de NVIDIA Overlay est WS_EX_NOACTIVATE : elle ne peut jamais passer au premier plan, donc
+    /// ce n'est pas le jeu auquel on joue. Le voile de l'outil Capture de Windows est une fenêtre d'outil
+    /// (WS_EX_TOOLWINDOW) : ni bouton dans la barre des tâches ni place dans Alt+Tab, alors qu'on revient à un jeu par là.
+    /// Règle générique, pas une liste de noms : vaut pour tout overlay et tout outil de capture ; un jeu qui se donnerait
+    /// ce style ne serait plus vu.</summary>
+    internal static bool EstUnOutilOuUnOverlay(int styleEtendu) => (styleEtendu & (WsExNoActivate | WsExToolWindow)) != 0;
     [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hwnd, int index);
     private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
 

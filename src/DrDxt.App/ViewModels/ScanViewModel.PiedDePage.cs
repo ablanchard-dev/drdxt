@@ -107,7 +107,8 @@ public sealed partial class ScanViewModel
                 var etat = DrDxt.App.Updates.VerificationMiseAJour.ClasserErreur(dl.Error?.Code);
                 _etatMisesAJour = _localize(DrDxt.App.Updates.VerificationMiseAJour.CleResx(etat));
                 // Un paquet refusé n'est plus proposé ; un réseau coupé laisse réessayer.
-                if (etat == DrDxt.App.Updates.EtatMiseAJour.Refusee) _miseAJour = m with { Etat = etat };
+                if (etat is DrDxt.App.Updates.EtatMiseAJour.Refusee or DrDxt.App.Updates.EtatMiseAJour.PublieePlusAncienne)
+                    _miseAJour = m with { Etat = etat };
                 return;
             }
             // Le jeton connu de l'App décide ; inconnu, Lancer lit celui du processus. La production passe toujours un jeton

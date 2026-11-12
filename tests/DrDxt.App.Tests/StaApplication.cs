@@ -63,10 +63,25 @@ internal static class StaApplication
 
         // Construire l'App et appeler son InitializeComponent() généré, qui charge les jetons de
         // ressources d'App.xaml (pinceaux, polices) dans Application.Current.Resources.
-        // OnStartup n'est pas appelé (il ne tourne que sur Application.Run), donc ni fenêtre ni
-        // amorçage DI : on obtient juste les jetons StaticResource auxquels la vue se lie.
-        var app = new DrDxt.App.App();
+        // OnStartup ne doit pas tourner : ni fenêtre ni amorçage DI, juste les jetons StaticResource auxquels la
+        // vue se lie.
+        // Le constructeur d'Application poste lui-même l'appel d'OnStartup sur le dispatcher de ce fil. Un test qui
+        // pompe ce dispatcher (Dispatcher.Invoke à basse priorité) jouerait alors le vrai démarrage de l'App dans le
+        // banc : services réels, instance unique, fenêtre, helper, et la langue de Windows fixée pour tous les tests
+        // suivants. Ce qui est posté pendant la construction est donc retiré de la file avant de rendre la main.
+        var postees = new System.Collections.Generic.List<System.Windows.Threading.DispatcherOperation>();
+        System.Windows.Threading.DispatcherHookEventHandler noter = (_, e) => postees.Add(e.Operation);
+        var crochets = System.Windows.Threading.Dispatcher.CurrentDispatcher.Hooks;
+        crochets.OperationPosted += noter;
+        DrDxt.App.App app;
+        try { app = new DrDxt.App.App(); }
+        finally { crochets.OperationPosted -= noter; }
+        foreach (var postee in postees) postee.Abort();
+        DemarragesPostes = postees;
         app.InitializeComponent();
     }
+
+    /// <summary>Ce que le constructeur de l'App a posté sur le dispatcher du fil qui l'a créée : son démarrage.</summary>
+    internal static System.Collections.Generic.IReadOnlyList<System.Windows.Threading.DispatcherOperation>? DemarragesPostes { get; private set; }
 }
 

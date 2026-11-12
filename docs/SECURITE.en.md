@@ -382,7 +382,7 @@ authentication, and behind a manual proxy while "Automatically detect settings" 
 
 The signed manifests (app update, signed tables) carry neither a publication date nor an expiry. A compromised mirror
 or a network attacker, unable to sign, can serve an old valid manifest again (the app then says "up to
-date") or answer 404 (it says no update is published). The player stays on their version. **That is a possible freeze, never a rollback**: a version
+date", or that the installed version is newer than the published one) or answer 404 (it says no update is published). The player stays on their version. **That is a possible freeze, never a rollback**: a version
 older than the installed one is refused (`UPDATE_DOWNGRADE`), and so are tables older than those in use. The fix (dated
 manifests, re-signed at least every 30 days) would require a monthly re-signature with the release key; it is described
 in GATES.md (§7), waiting for a CI that holds the key.

@@ -17,8 +17,11 @@ public enum EtatMiseAJour
     NouvelleVersionVerifiee,
     /// <summary>Serveur injoignable (ou trop lent) : on reste sur la version installee.</summary>
     Injoignable,
-    /// <summary>Un paquet a ete refuse : signature, empreinte ou retrogradation. A dire, jamais a taire.</summary>
+    /// <summary>Un paquet a ete refuse : signature ou empreinte. A dire, jamais a taire.</summary>
     Refusee,
+    /// <summary>Le manifeste signé offre une version plus ancienne que l'installée (une version posée avant la publication
+    /// de son manifeste, ou un ancien manifeste resservi) : rien n'est proposé ni installé, et c'est dit sans alerte.</summary>
+    PublieePlusAncienne,
     /// <summary>Echec local (ecriture du staging) : on reste sur la version installee.</summary>
     Echec,
 }
@@ -131,7 +134,8 @@ public static class VerificationMiseAJour
     {
         return code switch
         {
-            UpdateErrorCodes.SignatureInvalid or UpdateErrorCodes.HashMismatch or UpdateErrorCodes.Downgrade => EtatMiseAJour.Refusee,
+            UpdateErrorCodes.SignatureInvalid or UpdateErrorCodes.HashMismatch => EtatMiseAJour.Refusee,
+            UpdateErrorCodes.Downgrade => EtatMiseAJour.PublieePlusAncienne,
             UpdateErrorCodes.Offline => EtatMiseAJour.Injoignable,
             UpdateErrorCodes.NotPublished => EtatMiseAJour.RienDePublie,
             _ => EtatMiseAJour.Echec,
@@ -146,6 +150,7 @@ public static class VerificationMiseAJour
         EtatMiseAJour.NouvelleVersionVerifiee => "UI.Footer.Updates.NewVersion",
         EtatMiseAJour.Injoignable => "UI.Footer.Updates.Offline",
         EtatMiseAJour.Refusee => "UI.Footer.Updates.Rejected",
+        EtatMiseAJour.PublieePlusAncienne => "UI.Footer.Updates.PublishedOlder",
         _ => "UI.Footer.Updates.Failed",
     };
 }

@@ -437,7 +437,10 @@
     <value>Mises à jour : serveur injoignable, on reste sur cette version</value>
   </data>
   <data name="UI.Footer.Updates.Rejected" xml:space="preserve">
-    <value>Mises à jour : un paquet a été refusé (signature, empreinte ou retour en arrière)</value>
+    <value>Mises à jour : un paquet a été refusé (signature ou empreinte)</value>
+  </data>
+  <data name="UI.Footer.Updates.PublishedOlder" xml:space="preserve">
+    <value>Mises à jour : ta version est plus récente que celle publiée, rien à installer</value>
   </data>
   <data name="UI.Footer.Updates.Failed" xml:space="preserve">
     <value>Mises à jour : vérification en échec, on reste sur cette version</value>

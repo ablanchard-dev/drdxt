@@ -7,8 +7,9 @@
    d'environnement `DRDXT_UPDATE_URL` posée à `off` coupe toute vérification (aucun réseau touché, le
    pied de page le dit) ; une autre adresse n'y est prise qu'en compilation Debug. Un fichier absent (404) veut dire « rien à offrir », jamais une erreur.
 2. Le manifeste est signé (Ed25519) par la clé de release du projet. La clé publique est dans l'App
-   (`UpdateTrust.ProductionPublicKey`) ; elle ne peut que vérifier. Un manifeste non signé, mal signé, ou qui propose une
-   version plus ancienne est refusé, et le refus est affiché : jamais lu, jamais installé.
+   (`UpdateTrust.ProductionPublicKey`) ; elle ne peut que vérifier. Un manifeste non signé ou mal signé est refusé, et le
+   refus est affiché : jamais lu, jamais installé. Un manifeste signé qui propose une version plus ancienne que la tienne
+   n'est jamais installé non plus ; le pied de page dit alors que ta version est plus récente que celle publiée.
 3. Le paquet (l'installeur) n'est téléchargé qu'après la signature vérifiée ; son empreinte SHA-256 doit être celle du
    manifeste signé, sinon il n'est jamais lancé.
 4. Une nouvelle version de l'App ne s'installe **jamais sans toi** : le pied de page propose « Installer », l'empreinte est

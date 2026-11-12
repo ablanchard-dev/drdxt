@@ -42,13 +42,14 @@ public static class ClasseurDArrets
     /// <summary>« Sous charge » : l'événement 41 ne le dit pas, et il est daté du redémarrage, pas de l'arrêt. Une partie
     /// restée ouverte a été coupée entre son dernier regard et le relevé suivant (qui suit le redémarrage) : le premier arrêt
     /// daté dans cet intervalle est le sien, et une partie n'en marque qu'un (des redémarrages en
-    /// boucle compteraient la même partie deux fois). Sans heure de relevé, aucune.</summary>
+    /// boucle compteraient la même partie deux fois). Sans heure de relevé, aucune. Une marque laissée par un programme
+    /// écarté depuis du relevé (écran de verrouillage, console, outil de capture) reste dans le fichier : elle ne marque rien.</summary>
     public static IReadOnlyList<ArretClasse> MarquerSousCharge(IReadOnlyList<ArretClasse> arrets, IReadOnlyList<PartieInterrompue?> interrompues)
     {
         var marques = arrets.ToList();
         foreach (var p in interrompues)
         {
-            if (p is not { ReleveeLe: { } relevee }) continue;
+            if (p is not { ReleveeLe: { } relevee } || NomExeDeJeu.EstSurementPasUnJeu(p.Jeu, chemin: null)) continue;
             var i = marques.Select((a, n) => (a, n))
                 .Where(x => x.a.PendantLaPartieDe is null && x.a.Quand >= p.DernierVu && x.a.Quand <= relevee)
                 .OrderBy(x => x.a.Quand).Select(x => (int?)x.n).FirstOrDefault();

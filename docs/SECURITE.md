@@ -386,7 +386,7 @@ la vérification de mise à jour reste « injoignable ». Décocher la détectio
 
 Les manifestes signés (mise à jour de l'App, tables signées) ne portent ni date de publication ni expiration. Un
 miroir compromis ou un attaquant réseau, incapable de signer, peut resservir un ancien manifeste valide (l'App dit alors
-« à jour ») ou répondre 404 (elle dit qu'aucune mise à jour n'est publiée). Le joueur reste sur sa version. **C'est un gel possible, jamais un retour
+« à jour », ou que la version installée est plus récente que celle publiée) ou répondre 404 (elle dit qu'aucune mise à jour n'est publiée). Le joueur reste sur sa version. **C'est un gel possible, jamais un retour
 arrière** : une version plus ancienne que celle installée est refusée (`UPDATE_DOWNGRADE`), et des tables plus anciennes
 que celles en service aussi. La parade (manifestes datés, re-signés au moins tous les 30 jours) imposerait une
 re-signature mensuelle avec la clé de release ; elle est décrite dans GATES.md (§7), en attente d'une CI qui tienne la clé.

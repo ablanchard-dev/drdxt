@@ -225,10 +225,27 @@ public sealed class VerificationMiseAJourTests : IDisposable
     [Fact]
     public void Un_refus_se_classe_avant_le_hors_ligne()
     {
-        foreach (var refus in new[] { UpdateErrorCodes.SignatureInvalid, UpdateErrorCodes.HashMismatch, UpdateErrorCodes.Downgrade })
+        foreach (var refus in new[] { UpdateErrorCodes.SignatureInvalid, UpdateErrorCodes.HashMismatch })
             VerificationMiseAJour.ClasserErreur(refus).Should().Be(EtatMiseAJour.Refusee, "un paquet rejete est une information de securite");
         VerificationMiseAJour.ClasserErreur(UpdateErrorCodes.Offline).Should().Be(EtatMiseAJour.Injoignable);
         VerificationMiseAJour.ClasserErreur(UpdateErrorCodes.StageFailed).Should().Be(EtatMiseAJour.Echec);
+    }
+
+    // Une version installée avant la publication de son manifeste (une version de test) lit un manifeste plus ancien
+    // qu'elle : rien n'est proposé, et rien n'a été falsifié. Le dire comme un paquet refusé serait une fausse alerte.
+    [Fact]
+    public void Une_version_publiee_plus_ancienne_que_l_installee_ne_se_dit_pas_comme_un_paquet_refuse()
+    {
+        VerificationMiseAJour.ClasserErreur(UpdateErrorCodes.Downgrade).Should().Be(EtatMiseAJour.PublieePlusAncienne);
+        VerificationMiseAJour.CleResx(EtatMiseAJour.PublieePlusAncienne).Should().Be("UI.Footer.Updates.PublishedOlder");
+        foreach (var resx in new[] { "Strings.resx", "Strings.fr.resx" })
+        {
+            var texte = File.ReadAllText(Path.Combine(Racine(), "src", "DrDxt.Infrastructure", "Resources", resx));
+            var refuse = System.Text.RegularExpressions.Regex.Match(texte,
+                @"name=""UI\.Footer\.Updates\.Rejected""[^>]*>\s*<value>([^<]*)</value>").Groups[1].Value;
+            refuse.Should().NotBeEmpty("témoin : le libellé du refus se lit")
+                .And.NotContainAny("downgrade", "retour en arrière");
+        }
     }
 
     [Fact]

@@ -403,11 +403,14 @@ public partial class ScanViewModel
     }
 
     /// <summary>Une capture ratée plus récente que la dernière partie se dit en tête de la carte : le relevé de fond ne
-    /// reste pas « allumé » des semaines sans rien relever. UI1 : sans son code d'erreur, qui reste dans le fichier.</summary>
+    /// reste pas « allumé » des semaines sans rien relever. UI1 : sans son code d'erreur, qui reste dans le fichier. Un échec
+    /// laissé par un programme écarté depuis du relevé (« SnippingTool.exe : … ») n'était pas une partie : il ne se dit pas.</summary>
     internal static string? LigneEchec(PartiesMemorisees.EchecDeCapture? echec, IReadOnlyList<PartieRelevee> parties,
         Func<string, string> localiser)
     {
         if (echec is null || parties.Any(p => p.Fin >= echec.Quand)) return null;
+        if (echec.Raison.IndexOf(" : ", StringComparison.Ordinal) is > 0 and var fin
+            && DrDxt.Core.NomExeDeJeu.EstSurementPasUnJeu(echec.Raison[..fin], chemin: null)) return null;
         var fr = CultureInfo.CurrentCulture;
         // Le service arrêté ne revient pas en jouant : le relevé sans droits ne peut pas le relancer.
         var cle = echec.Raison.Contains(ErrorCodes.PmonUnavailable, StringComparison.Ordinal) ? "Parties.CaptureRateeService" : "Parties.CaptureRatee";

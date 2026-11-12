@@ -36,6 +36,24 @@ public class ArretsSousChargeTests
         marques.Single(a => a.PendantLaPartieDe is not null).Quand.Should().Be(T.AddMinutes(2));
     }
 
+    // Relevés sur la machine de référence : l'écran de verrouillage, une console et l'outil Capture, pris pour des parties
+    // avant d'être écartés du relevé. Restés dans le fichier, ils ne disent pas qu'un arrêt est tombé en pleine partie.
+    [Theory]
+    [InlineData("LockApp.exe")]
+    [InlineData("powershell.exe")]
+    [InlineData("SnippingTool.exe")]
+    public void Une_marque_laissee_par_un_programme_qui_n_est_pas_un_jeu_ne_marque_aucun_arret(string exe)
+        => ClasseurDArrets.MarquerSousCharge([new ArretClasse(T.AddMinutes(12), FamilleDArret.SansCode)], [Cod with { Jeu = exe }])
+            .Single().PendantLaPartieDe.Should().BeNull();
+
+    // Un nom hors du format strict ou inconnu reste une partie : seul un nom lu et connu pour ne pas être un jeu s'écarte.
+    [Theory]
+    [InlineData("Among Us.exe")]
+    [InlineData("UnJeuInconnu-Win64-Shipping.exe")]
+    public void Un_jeu_que_la_liste_ne_connait_pas_marque_toujours_son_arret(string exe)
+        => ClasseurDArrets.MarquerSousCharge([new ArretClasse(T.AddMinutes(12), FamilleDArret.SansCode)], [Cod with { Jeu = exe }])
+            .Single().PendantLaPartieDe.Should().Be(exe);
+
     [Fact]
     public void Sans_heure_de_releve_ni_partie_rien_ne_change_et_une_entree_nulle_est_ignoree()
     {

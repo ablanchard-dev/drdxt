@@ -463,7 +463,10 @@
     <value>Updates: server unreachable, staying on this version</value>
   </data>
   <data name="UI.Footer.Updates.Rejected" xml:space="preserve">
-    <value>Updates: a package was rejected (signature, hash or downgrade)</value>
+    <value>Updates: a package was rejected (signature or hash)</value>
+  </data>
+  <data name="UI.Footer.Updates.PublishedOlder" xml:space="preserve">
+    <value>Updates: your version is newer than the published one, nothing to install</value>
   </data>
   <data name="UI.Footer.Updates.Failed" xml:space="preserve">
     <value>Updates: check failed, staying on this version</value>
