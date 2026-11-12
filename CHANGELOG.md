@@ -2,6 +2,23 @@
 
 English version of the coming changes: [CHANGELOG.en.md](CHANGELOG.en.md).
 
+## Non publié
+
+Pour le joueur :
+
+### Mises à jour
+- Quand ta version est plus récente que celle publiée, le bas de la fenêtre le dit, au lieu de « un paquet a été
+  refusé ».
+
+### Docteur, moins de faux constats
+- L'outil Capture de Windows et l'écran de verrouillage ne sont plus pris pour un jeu : plus d'arrêt « en pleine
+  partie » ni de « capture ratée » à leur nom.
+- Après un arrêt brutal, le témoin d'incident garde ce qui a précédé l'arrêt, même quand le PC est resté éteint
+  ensuite. Il relisait l'heure d'avant le redémarrage.
+- Une nouvelle version de Windows déjà installée n'est plus dite « en échec » à cause d'un essai raté avant elle.
+- Des constats bien lus (protections du processeur, radar des régressions, premier relevé de ce qui est installé)
+  n'affichent plus « non lisible » et ne comptent plus parmi les lectures manquées.
+
 ## 0.9.4 (05/11/2026)
 
 Pour le joueur :

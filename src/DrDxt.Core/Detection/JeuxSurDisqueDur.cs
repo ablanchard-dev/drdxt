@@ -21,7 +21,7 @@ public static class JeuxSurDisqueDur
             return new RepairFinding("STOCKAGE", Nom, null, null, RepairStatus.Unknown,
                 Docteur.T("JD.NonLues"));
         if (dossiers.Count == 0)
-            return new RepairFinding("STOCKAGE", Nom, null, null, RepairStatus.Observed,
+            return new RepairFinding("STOCKAGE", Nom, Docteur.T("JD.AucunTrouve"), null, RepairStatus.Observed,
                 Docteur.T("JD.Aucun"));
         var lents = dossiers.Where(d => d.TypeDeDisque == DisqueDur).ToList();
         // Ranger des jeux sur un disque dur est un choix de place ; on ne sait pas lesquels se jouent : à regarder.

@@ -58,6 +58,7 @@ ATTENDU = {
     "DrDxt.Detection.Tests/Repair/TracesDuRegistreTests.cs": (1, "lit le vrai registre et la date de la cle MMCSS"),
     "DrDxt.Measurement.Tests/Cpu/CpuBenchTests.cs": (1, "juge la dispersion du vrai processeur, qu'un runner partage ne tient pas (63 % mesures le 27/09)"),
     "DrDxt.Detection.Tests/Hardware/UnexpectedShutdownLogTests.cs": (1, "lit le journal Systeme"),
+    "DrDxt.Detection.Tests/Repair/TemoinDIncidentTests.cs": (1, "relit le vrai journal Systeme autour du dernier arret brutal"),
     # Trois tests lisent la vraie machine : la CI (runner vierge) les verrait rouges, et un echec plus tot
     # dans le meme job pourrait le masquer.
     "DrDxt.Detection.Tests/Repair/AvantLIncidentTests.cs": (1, "lit les vrais journaux d'installation de pilotes (setupapi)"),

@@ -1273,10 +1273,10 @@
     <value>1) Paramètres &gt; Windows Update &gt; Rechercher des mises à jour. 2) Si elle échoue encore, redémarre le PC puis relance.</value>
   </data>
   <data name="WL.BilanRattrapes" xml:space="preserve">
-    <value>{0} échecs en {1} jours, dont {2} rattrapés ensuite</value>
+    <value>{0} échec(s) en {1} jours, dont {2} rattrapé(s) ensuite</value>
   </data>
   <data name="WL.Bilan" xml:space="preserve">
-    <value>{0} échecs en {1} jours</value>
+    <value>{0} échec(s) en {1} jours</value>
   </data>
   <data name="WL.Rattrapes" xml:space="preserve">
     <value>{0} de ces échecs ont été rattrapés par une installation réussie ensuite : ils ne demandent rien. </value>
@@ -1889,6 +1889,9 @@
   </data>
   <data name="IM.Famille.programmes au démarrage" xml:space="preserve">
     <value>programmes au démarrage</value>
+  </data>
+  <data name="IM.ValeurReference" xml:space="preserve">
+    <value>{0} élément(s) relevé(s)</value>
   </data>
   <data name="IM.Reference" xml:space="preserve">
     <value>premier relevé de ce qui est installé ({0}) : à partir du prochain scan, DrDXT dira ce qui a été installé, retiré ou mis à jour entre les deux.</value>
@@ -2598,6 +2601,9 @@
   <data name="TP.NonLues" xml:space="preserve">
     <value>les tâches planifiées n'ont pas pu être lues : DrDXT ne sait pas lesquelles tombent pendant tes parties.</value>
   </data>
+  <data name="TP.ValeurSansPartie" xml:space="preserve">
+    <value>aucune partie relevée</value>
+  </data>
   <data name="TP.SansPartie" xml:space="preserve">
     <value>aucune partie relevée : DrDXT ne peut pas encore comparer les tâches planifiées à tes heures de jeu.</value>
   </data>
@@ -2808,6 +2814,9 @@
   <data name="JD.Aucun" xml:space="preserve">
     <value>aucun jeu trouvé dans Steam, Epic, Battle.net, Riot, EA app ni Ubisoft Connect : DrDXT ne sait pas où sont tes jeux (un autre lanceur n'est pas lu).</value>
   </data>
+  <data name="JD.AucunTrouve" xml:space="preserve">
+    <value>aucun jeu trouvé</value>
+  </data>
   <data name="JD.UnSsd" xml:space="preserve">
     <value>un SSD</value>
   </data>
@@ -2879,6 +2888,15 @@
   </data>
   <data name="CO.ExplicationX3D5000" xml:space="preserve">
     <value>Sur ton {0}, AMD verrouille l'overclocking, Precision Boost Overdrive et Curve Optimizer compris. Certains fabricants de cartes ont rouvert un Curve Optimizer négatif (une baisse de tension cœur par cœur) par une mise à jour du BIOS, à partir de l'AGESA 1.2.0.8 : DrDXT ne sait pas si la tienne l'a fait. Si le menu n'apparaît pas, ton BIOS ne le propose pas. {1} Le gain n'est pas mesuré chez toi, chaque puce a sa marge. Instabilité possible : avancer par petits pas et tester la stabilité à chaque pas. Si des arrêts brutaux ou des erreurs matérielles (WHEA) apparaissent ensuite, DrDXT les signale : reviens à la valeur d'avant. DrDXT n'écrit jamais dans le BIOS.</value>
+  </data>
+  <data name="CO.ValeurAStabiliser" xml:space="preserve">
+    <value>{0} incident(s) récent(s)</value>
+  </data>
+  <data name="CO.ValeurPasActif" xml:space="preserve">
+    <value>pas actif</value>
+  </data>
+  <data name="CO.ValeurPasLu" xml:space="preserve">
+    <value>réglage du BIOS pas lu</value>
   </data>
   <data name="CO.StabiliteNonLue" xml:space="preserve">
     <value>Un des journaux de stabilité (arrêts brutaux, écrans bleus, vidages, erreurs matérielles) n'a pas pu être lu : sans savoir si la machine est stable, DrDXT ne conseille pas de baisser la tension du processeur (Curve Optimizer).</value>
@@ -5271,6 +5289,9 @@
   <data name="EM.AvisSeul" xml:space="preserve">
     <value> Un avis seul est un avertissement que le lien a traité, pas une panne du lien.</value>
   </data>
+  <data name="EM.OrigineValeur" xml:space="preserve">
+    <value>{0} source(s)</value>
+  </data>
   <data name="EM.OrigineSuite" xml:space="preserve">
     <value> Le processeur qui relève une erreur n'est pas toujours le bloc en cause : le rôle d'une banque est écrit dans son registre MCA_IPID, que l'événement de Windows ne porte pas, donc le bloc reste non identifié plutôt que deviné d'après le numéro de banque.</value>
   </data>
@@ -5303,6 +5324,12 @@
   </data>
   <data name="TI.Vide" xml:space="preserve">
     <value>le service de DrDXT a relu ce que Windows a noté dans les {2} minutes d'avant l'incident du {0} ({1}) : aucune erreur ni avertissement. Rien ne l'annonçait dans les journaux.</value>
+  </data>
+  <data name="TI.RedemarrageReleve" xml:space="preserve">
+    <value>le service de DrDXT a relu les {2} minutes d'avant le redémarrage du {0}, qui a suivi un arrêt brutal : {3} erreurs et avertissements, dont {4} erreurs. Sources les plus fréquentes : {5}. Le PC a pu rester éteint entre l'arrêt et ce redémarrage : ces lignes peuvent venir du redémarrage lui-même, pas de ce qui a précédé l'arrêt.</value>
+  </data>
+  <data name="TI.RedemarrageVide" xml:space="preserve">
+    <value>le service de DrDXT a relu les {2} minutes d'avant le redémarrage du {0}, qui a suivi un arrêt brutal : aucune erreur ni avertissement. Le PC a pu rester éteint entre l'arrêt et ce redémarrage : cela ne dit rien de ce qui a précédé l'arrêt.</value>
   </data>
   <data name="TI.Autres" xml:space="preserve">
     <value> {0} autre(s) témoin(s) sur les 30 derniers jours.</value>
@@ -5462,6 +5489,9 @@
   </data>
   <data name="AP.KvaInactive" xml:space="preserve">
     <value>Isolation des tables de pages du noyau (Meltdown) : inactive.</value>
+  </data>
+  <data name="AP.Valeur" xml:space="preserve">
+    <value>{0} protection(s) lue(s)</value>
   </data>
   <data name="AP.JamaisCoupees" xml:space="preserve">
     <value> Ce sont des protections de sécurité, lues pour information : DrDXT ne propose jamais de les couper.</value>
@@ -5706,6 +5736,9 @@
   <data name="RCA.KitNonLu" xml:space="preserve">
     <value>On ne sait pas si ton profil mémoire tourne : ton BIOS demande {0} et tous les canaux tournent à {1} MT/s, le socle JEDEC, mais Windows ne dit pas la vitesse qu'annonce ton kit : un entraînement mémoire raté ne se distingue pas d'un réglage voulu.</value>
   </data>
+  <data name="RCA.ValeurConforme" xml:space="preserve">
+    <value>conforme</value>
+  </data>
   <data name="RCA.Conforme" xml:space="preserve">
     <value>Chaque timing réglé dans ton BIOS (Auto mis à part) tourne comme réglé, sur les {0} canaux.</value>
   </data>
@@ -5762,6 +5795,9 @@
   </data>
   <data name="RR.NonJugees" xml:space="preserve">
     <value>{0} règles relues (tables version {2}) ; {1} n'ont pas pu être jugées : le pilote ou le processeur n'a pas été lu.</value>
+  </data>
+  <data name="RR.AucuneValeur" xml:space="preserve">
+    <value>aucune ne te concerne</value>
   </data>
   <data name="RR.AucuneConcerne" xml:space="preserve">
     <value>{0} règles relues (tables version {1}) : aucune ne concerne ce PC.</value>

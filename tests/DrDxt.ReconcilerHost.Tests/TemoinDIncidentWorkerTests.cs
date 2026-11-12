@@ -76,4 +76,33 @@ public sealed class TemoinDIncidentWorkerTests
         TemoinDIncidentWorker.DebutDuRattrapage(null, maintenant).Should().Be(maintenant.AddDays(-7));
         TemoinDIncidentWorker.DebutDuRattrapage(maintenant.AddDays(30), maintenant).Should().Be(maintenant.AddDays(-7));
     }
+
+    // Après un arrêt brutal, le PC reste parfois éteint plus d'un jour avant le démarrage qui le note : l'heure d'avant la
+    // note est alors une heure où il était éteint.
+    [Fact]
+    public void Un_arret_brutal_relit_l_heure_d_avant_le_dernier_signe_de_vie()
+    {
+        var note = new DateTimeOffset(2026, 11, 9, 12, 41, 21, TimeSpan.FromHours(1));
+        var signe = new DateTimeOffset(2026, 11, 8, 0, 48, 31, TimeSpan.FromHours(1));
+        (DateTimeOffset Debut, DateTimeOffset Fin)? relue = null;
+        var w = new TemoinDIncidentWorker(Path.Combine(Path.GetTempPath(), $"temoins-{Guid.NewGuid():N}"),
+            (debut, fin) => { relue = (debut, fin); return []; }, _ => signe);
+
+        w.Temoigner(note, "arret brutal");
+
+        relue.Should().Be((signe.AddMinutes(-60), signe));
+    }
+
+    [Fact]
+    public void Un_incident_note_sur_le_vif_ne_cherche_aucun_signe_de_vie()
+    {
+        var note = new DateTimeOffset(2026, 11, 9, 12, 41, 21, TimeSpan.FromHours(1));
+        (DateTimeOffset Debut, DateTimeOffset Fin)? relue = null;
+        var w = new TemoinDIncidentWorker(Path.Combine(Path.GetTempPath(), $"temoins-{Guid.NewGuid():N}"),
+            (debut, fin) => { relue = (debut, fin); return []; }, _ => throw new InvalidOperationException("non demandé"));
+
+        w.Temoigner(note, "pilote graphique relance");
+
+        relue.Should().Be((note.AddMinutes(-10), note));
+    }
 }

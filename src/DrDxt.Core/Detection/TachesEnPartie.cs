@@ -24,7 +24,7 @@ public static class TachesEnPartie
             return new RepairFinding("TACHES", Nom, null, null, RepairStatus.Unknown,
                 Docteur.T("TP.NonLues"));
         if (parties.Count == 0)
-            return new RepairFinding("TACHES", Nom, null, null, RepairStatus.Observed,
+            return new RepairFinding("TACHES", Nom, Docteur.T("TP.ValeurSansPartie"), null, RepairStatus.Observed,
                 Docteur.T("TP.SansPartie"));
 
         var pendant = taches.Where(t => parties.Any(p => t.DerniereExecution >= p.Debut && t.DerniereExecution <= p.Fin))

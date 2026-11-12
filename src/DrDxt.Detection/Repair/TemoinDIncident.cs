@@ -48,10 +48,62 @@ public static class TemoinDIncident
     public static string? Genre(string? fournisseur, int id)
         => Declencheurs.FirstOrDefault(d => d.Fournisseur == fournisseur && d.Id == id).Genre;
 
-    /// <summary>Pur : la fenêtre relue. Un arrêt brutal est noté au démarrage qui le suit : ce qui l'a précédé est
-    /// dans l'heure d'avant cette note. Tout autre incident : les dix minutes d'avant.</summary>
-    public static (DateTimeOffset Debut, DateTimeOffset Fin) Fenetre(string genre, DateTimeOffset incident)
-        => (incident - (genre == Declencheurs[0].Genre ? AvantDemarrage : AvantIncident), incident);
+    /// <summary>Pur : la fenêtre relue. Un arrêt brutal est noté au démarrage qui le suit, et le PC a pu rester éteint
+    /// des heures entre les deux : ce qui l'a précédé est dans l'heure d'avant <paramref name="dernierSigne"/>, le dernier
+    /// événement de la séance interrompue. Non trouvé : l'heure d'avant la note, et le docteur le dit. Tout autre
+    /// incident est noté sur le vif : les dix minutes d'avant.</summary>
+    public static (DateTimeOffset Debut, DateTimeOffset Fin) Fenetre(string genre, DateTimeOffset incident, DateTimeOffset? dernierSigne = null)
+    {
+        if (SeNoteApresCoup(genre) && dernierSigne is { } signe && signe < incident) return (signe - AvantDemarrage, signe);
+        return (incident - (genre == Declencheurs[0].Genre ? AvantDemarrage : AvantIncident), incident);
+    }
+
+    /// <summary>Pur : ce qui arrête la machine (arrêt brutal, erreur matérielle fatale) ne peut être noté qu'au démarrage
+    /// suivant. Le reste (pilote relancé, mémoire épuisée) est noté sur le vif, Windows tournant toujours.</summary>
+    public static bool SeNoteApresCoup(string genre) => genre == Declencheurs[0].Genre || genre == Declencheurs[1].Genre;
+
+    /// <summary>Pur : dans le journal Système lu de <paramref name="note"/> vers le passé, l'événement qui précède le
+    /// démarrage de Windows (Kernel-General 12, le premier de chaque séance) est le dernier que la séance interrompue a
+    /// écrit. Seulement si Windows a démarré dans les <see cref="AvantIncident"/> d'avant la note : au-delà, l'incident
+    /// est de cette séance-ci. Null sans ce démarrage ou sans rien avant lui.</summary>
+    public static DateTimeOffset? DernierSigneDeVie(IEnumerable<(DateTimeOffset Quand, string? Fournisseur, int Id)> duPlusRecentAuPlusAncien,
+        DateTimeOffset note)
+    {
+        var demarrage = false;
+        foreach (var e in duPlusRecentAuPlusAncien)
+        {
+            if (demarrage) return e.Quand;
+            if (note - e.Quand > AvantIncident) return null;
+            demarrage = e is { Fournisseur: "Microsoft-Windows-Kernel-General", Id: 12 };
+        }
+        return null;
+    }
+
+    /// <summary>Ce qu'un démarrage écrit avant la note d'un incident tient en quelques dizaines de lignes ; au-delà de
+    /// cette borne, le démarrage n'est pas cherché plus loin.</summary>
+    public const int PlafondDuDemarrage = 5000;
+
+    /// <summary>Le dernier signe de vie avant la note d'un arrêt brutal, lu dans le journal Système ; null s'il ne se lit pas.</summary>
+    public static DateTimeOffset? LireDernierSigneDeVie(DateTimeOffset note)
+    {
+        try
+        {
+            var requete = new EventLogQuery("System", PathType.LogName, "*[System[TimeCreated[@SystemTime<='"
+                + note.UtcDateTime.ToString("o", CultureInfo.InvariantCulture) + "']]]") { ReverseDirection = true };
+            using var lecteur = new EventLogReader(requete);
+            return DernierSigneDeVie(Lus(lecteur), note);
+        }
+        catch (EventLogException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
+    }
+
+    private static IEnumerable<(DateTimeOffset, string?, int)> Lus(EventLogReader lecteur)
+    {
+        var n = 0;
+        for (var e = lecteur.ReadEvent(); e is not null && n < PlafondDuDemarrage; e = lecteur.ReadEvent(), n++)
+            using (e)
+                if (e.TimeCreated is { } t) yield return (new DateTimeOffset(t), e.ProviderName, e.Id);
+    }
 
     /// <summary>Pur : au plus un témoin toutes les deux minutes.</summary>
     public static bool AEcrire(DateTimeOffset incident, DateTimeOffset? dernier)
@@ -106,15 +158,20 @@ public static class TemoinDIncident
     public static IEnumerable<RepairFinding> Juger(IReadOnlyList<Temoin>? temoins, DateTimeOffset maintenant)
     {
         if (temoins?.FirstOrDefault(t => maintenant - t.Incident <= TimeSpan.FromDays(30)) is not { } t) yield break;
-        var quand = t.Incident.ToLocalTime().ToString(Docteur.T("ST.FormatDateHeure"), Docteur.Langue);
+        // Un arrêt brutal se date de son dernier signe de vie, pas du démarrage qui l'a noté. Fenêtre finie à la note : le
+        // signe n'a pas été trouvé, c'est l'heure d'avant le redémarrage qui a été relue, et la phrase le dit.
+        var brutal = t.Genre == Declencheurs[0].Genre;
+        var avantRedemarrage = brutal && t.Fin >= t.Incident;
+        var apresCoup = SeNoteApresCoup(t.Genre) && t.Fin < t.Incident;
+        var quand = (apresCoup ? t.Fin : t.Incident).ToLocalTime().ToString(Docteur.T("ST.FormatDateHeure"), Docteur.Langue);
         var minutes = (int)Math.Round((t.Fin - t.Debut).TotalMinutes);
         var erreurs = t.Lignes.Where(l => l.Niveau is 1 or 2).ToList();
         var parSource = t.Lignes.GroupBy(l => $"{l.Fournisseur} {l.Id}").OrderByDescending(g => g.Count()).Take(5)
             .Select(g => $"{g.Key} ({g.Count()}x)");
         yield return new RepairFinding("STABILITE", "temoin d'incident", Docteur.T("TI.Valeur", quand), null, RepairStatus.Observed,
             (t.Lignes.Count == 0
-                ? Docteur.T("TI.Vide", quand, Docteur.T("TI.Genre." + t.Genre), minutes)
-                : Docteur.T("TI.Releve", quand, Docteur.T("TI.Genre." + t.Genre), minutes, t.Lignes.Count, erreurs.Count,
+                ? Docteur.T(avantRedemarrage ? "TI.RedemarrageVide" : "TI.Vide", quand, Docteur.T("TI.Genre." + t.Genre), minutes)
+                : Docteur.T(avantRedemarrage ? "TI.RedemarrageReleve" : "TI.Releve", quand, Docteur.T("TI.Genre." + t.Genre), minutes, t.Lignes.Count, erreurs.Count,
                     string.Join(", ", parSource)))
             + (temoins!.Count(x => maintenant - x.Incident <= TimeSpan.FromDays(30)) is var n and > 1 ? Docteur.T("TI.Autres", n - 1) : ""));
     }

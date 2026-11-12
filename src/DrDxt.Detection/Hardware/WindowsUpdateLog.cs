@@ -70,8 +70,22 @@ public static class MisesAJourEnEchec
 
     private static readonly string[] PaquetsDesJeux = ["Microsoft.GamingServices", "Microsoft.XboxIdentityProvider"];
 
+    /// <summary>La version que nomme le titre d'une nouvelle version de Windows (« Windows 11, version 25H2 » ⇒ « 25H2 »),
+    /// sinon <c>null</c>. Le titre commence par « Windows » : un pilote ou une appli qui porte une version du même format
+    /// n'est pas une version de Windows.</summary>
+    internal static string? VersionDeWindowsDuTitre(string titre)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(titre, @"^Windows\b.*\bversion\s+(\d{2}H\d)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        return m.Success ? m.Groups[1].Value.ToUpperInvariant() : null;
+    }
+
+    /// <param name="versionDeWindows">La version que Windows dit porter (DisplayVersion, « 25H2 ») ; null = non lue. Une
+    /// nouvelle version de Windows peut noter un échec puis s'installer sans noter de réussite sous le même titre : celle
+    /// du titre, ou une plus récente, déjà installée, est rattrapée. « 24H2 » avant « 25H1 » avant « 25H2 » : l'ordre des
+    /// caractères est celui des versions.</param>
     public static IReadOnlyList<RepairFinding> Juger(IReadOnlyList<EssaiDeMiseAJour> essais, int jours,
-        Func<string, DateTimeOffset?>? versionInstalleeLe = null)
+        Func<string, DateTimeOffset?>? versionInstalleeLe = null, string? versionDeWindows = null)
     {
         var echecs = essais.Count(e => !e.Reussi);
         if (echecs == 0)
@@ -86,6 +100,8 @@ public static class MisesAJourEnEchec
             .Where(g => !g[^1].Reussi)
             .Where(g => !(NomDePaquet(g[^1].Titre) is { } paquet && versionInstalleeLe?.Invoke(paquet) is { } depose
                           && depose >= g[^1].Quand - MargeDeDepot))
+            .Where(g => !(versionDeWindows is { } installee && VersionDeWindowsDuTitre(g[^1].Titre) is { } visee
+                          && string.CompareOrdinal(visee, installee.ToUpperInvariant()) <= 0))
             .Select(g => (Titre: g[^1].Titre, Rates: g.Where(e => !e.Reussi).ToList()))
             .ToList();
         var rattrapes = echecs - enEchec.Sum(g => g.Rates.Count);

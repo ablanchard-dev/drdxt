@@ -49,7 +49,7 @@ public static class InventaireMachine
         if (precedent is null)
         {
             var parFamille = string.Join(", ", actuel.Elements.GroupBy(e => e.Famille).Select(g => $"{g.Count()} {Famille(g.Key)}"));
-            yield return new RepairFinding(Domaine, "point de référence", null, null, RepairStatus.Observed,
+            yield return new RepairFinding(Domaine, "point de référence", Docteur.T("IM.ValeurReference", actuel.Elements.Count), null, RepairStatus.Observed,
                 Docteur.T("IM.Reference", parFamille));
             yield break;
         }
